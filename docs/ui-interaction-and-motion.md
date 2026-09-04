@@ -179,8 +179,10 @@ keyboard navigation, outside dismissal, scroll locking, and focus return.
   control sits to the right of the OpenAlice brand. When compact, the expand
   control moves to the leading edge of the right-hand area's top bar. Only one
   copy is mounted; activation transfers keyboard focus to the new location.
-  Responsive compact mode is a default, never a lock: an explicit expanded
-  preference remains effective on Chat and small desktop windows.
+  Responsive compact mode is a default, never a lock. Chat, Quant, and
+  Prediction default compact and share a temporary expansion override while
+  inside that workbench group. Leaving the group clears the override and
+  restores the saved global preference; workbench toggles never rewrite it.
 - `TopBar` owns compact header geometry (40px desktop, at least 48px on phone).
   `PageContentLayout` owns a fixed header slot; `PageTopBar` portals a page's
   title and actions into it without copying business state or callbacks.
@@ -239,6 +241,27 @@ Motion tokens and primitives live in `ui/src/index.css`:
 Prefer these primitives over copying arbitrary `duration-*`, easing curves, or
 keyframes into individual pages. A local animation is justified when it conveys
 domain-specific state that the shared vocabulary cannot express.
+
+Keyboard focus uses the neutral `--oa-focus-ring` and `--oa-focus-shadow`
+tokens. `oa-field-control` owns the shared input, textarea, and select border
+transition. The same shadow token covers buttons, navigation rows, tabs,
+segmented controls, switches, and resizable handles. Product accent color keeps
+its selection and action meaning.
+
+The application body establishes a 14px type size with 20px leading. Explicit
+display, heading, control, caption, and data roles build from that stable
+reading baseline.
+
+The compact activity rail retains its static Alice mark. Its expansion action
+lives in the content-side top bar, not in a brand-hover affordance. Small
+desktop windows still permit explicit expansion. The shell owns effective
+rail state so its toggle and the rendered rail always agree.
+
+Dense market panels use `oa-data-surface` for the shared border and canvas and
+`oa-data-surface-header` for section hierarchy. Data components retain their
+domain-owned layout and use the shared surfaces to align cards, charts, quote
+summaries, and launch actions. Recharts tooltips set `isAnimationActive={false}`
+at the component boundary, and the shared chart class owns their visual material.
 
 Clickable native and ARIA controls receive a pointer cursor globally. Disabled
 controls keep the default cursor and must remain visually disabled. Hover-only

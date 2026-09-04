@@ -23,7 +23,9 @@ Owner guide: [[docs/ui-interaction-and-motion.md]].
   read, and overdrag gesture. Preserve resize geometry, saved widths, keyboard
   resizing, and feature drawers. Features may still own internal panel controls.
 - Responsive rail compactness is a default, not a prohibition on expansion.
-  Explicit preferences win; Chat/Quant/Prediction no longer force a compact rail.
+  Chat/Quant/Prediction default compact with a temporary expansion override;
+  leaving that group restores the saved preference. This incorporates the
+  maintainer-approved contextual behavior from community PR #1318.
 - Reuse theme, button, tooltip, and Resizable primitives. No backend, trading,
   route, or backend data-model changes.
 - Keep the branch for interactive acceptance; no PR or merge this iteration.
@@ -57,8 +59,9 @@ Owner guide: [[docs/ui-interaction-and-motion.md]].
 - Real UI: `http://127.0.0.1:5173`, home `/Users/ame/.openalice-ui-dev`.
   Portfolio, Chat/new chat/paused session, Inbox, Market, and Settings inspected.
   Confirmed 40px aligned desktop headers and touch-sized phone toolbar.
-- Explicit rail expansion works at 913px and remains expanded after entering
-  Chat. One button changes its accessible label/state without losing focus.
+- Initial topbar acceptance verified explicit expansion at 913px, including
+  Chat. PR #1318 integration supersedes the cross-route persistence policy
+  with temporary workbench expansion; toggle placement remains unchanged.
   Keyboard Home on Trading's separator stops at 200px; ArrowRight widens it.
 - Separate MSW preview checked account actions at 390px/913px, WebPi, terminal
   placeholder, Files open/close at 390px, and Studio failure/actions. The QA

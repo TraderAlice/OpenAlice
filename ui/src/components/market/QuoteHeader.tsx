@@ -42,8 +42,8 @@ export function QuoteHeader({ symbol }: Props) {
   const loading = !quote && !error
 
   return (
-    <div className="flex flex-wrap items-end gap-x-6 gap-y-2 rounded-lg border border-border bg-card px-4 py-3">
-      <div className="flex flex-col min-w-0">
+    <section className="oa-data-surface flex flex-wrap items-stretch gap-x-5 gap-y-3 rounded-lg border px-4 py-3">
+      <div className="flex min-w-[14rem] flex-col justify-center">
         <div className="flex items-baseline gap-2 min-w-0">
           <span className="text-[20px] font-semibold text-foreground tracking-tight">{symbol}</span>
           {loading ? (
@@ -87,7 +87,7 @@ export function QuoteHeader({ symbol }: Props) {
 
       {/* Bid / ask intentionally omitted — they're real-time L1 quote data
           that belongs at the execution layer (UTA), not in analysis. */}
-      <dl className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-x-4 gap-y-1 text-[11px]">
+      <dl className="grid min-w-0 flex-1 grid-cols-2 content-center gap-x-4 gap-y-1 border-border/60 text-[11px] sm:grid-cols-3 sm:border-l sm:pl-5 md:grid-cols-5">
         <Field label="Open"      value={fmtNumber(quote?.open)}        loading={loading} />
         <Field label="Prev"      value={fmtNumber(quote?.prev_close)}  loading={loading} />
         <Field label="High"      value={fmtNumber(quote?.high)}        loading={loading} />
@@ -101,15 +101,15 @@ export function QuoteHeader({ symbol }: Props) {
       </dl>
 
       {error && <div className="w-full text-[11px] text-destructive">{error}</div>}
-    </div>
+    </section>
   )
 }
 
 function Field({ label, value, loading }: { label: string; value: string; loading?: boolean }) {
   return (
-    <div className="flex flex-col min-w-0">
-      <dt className="font-medium text-muted-foreground/70">{label}</dt>
-      <dd className="font-mono text-foreground truncate">
+    <div className="flex min-w-0 flex-col justify-center py-0.5">
+      <dt className="text-[11px] font-medium leading-4 text-muted-foreground/70">{label}</dt>
+      <dd className="mt-px truncate font-mono leading-[16px] tabular-nums text-foreground">
         {loading ? <Skeleton className="h-3 w-12 rounded mt-0.5" /> : value}
       </dd>
     </div>

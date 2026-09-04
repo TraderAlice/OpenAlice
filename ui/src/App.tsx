@@ -15,7 +15,8 @@ import {
 } from './contexts/MobilePageNavigationContext'
 import { UrlAdopter } from './tabs/UrlAdopter'
 import { useLocale } from './i18n/useLocale'
-import { useActivityBarCollapse } from './live/activity-bar-collapse'
+import { useActivityRailState } from './hooks/useActivityRailState'
+import { useWorkspace } from './tabs/store'
 import { PrimaryNavigationContext } from './contexts/PrimaryNavigationContext'
 import { PrimaryNavigationToggle, useNavigationToggleFocus } from './components/PrimaryNavigationToggle'
 
@@ -89,14 +90,14 @@ function AppShellContent() {
   const hasRailText = useHasRailText() // ≥960 — text rail is allowed
   const hasFullRail = useHasFullRail() // ≥1280 — full rail width
   const railMode = !isDesktop ? 'full' : hasFullRail ? 'full' : hasRailText ? 'narrow' : 'compact'
-  const railPreference = useActivityBarCollapse((state) => state.railCollapsed)
-  const setRailCollapsed = useActivityBarCollapse((state) => state.setRailCollapsed)
-  const railCollapsed = railPreference ?? railMode === 'compact'
+  const area = useWorkspace((state) => state.selectedSidebar)
+  const workbench = area === 'chat' || area === 'auto-quant' || area === 'prediction'
+  const { collapsed: railCollapsed, toggle: toggleRail } = useActivityRailState(workbench, railMode === 'compact')
   const toggleFocus = useNavigationToggleFocus()
   const railToggle = isDesktop ? (
     <PrimaryNavigationToggle ref={toggleFocus.ref} collapsed={railCollapsed} onToggle={() => {
       toggleFocus.requestFocus()
-      setRailCollapsed(!railCollapsed)
+      toggleRail()
     }} />
   ) : null
   const location = useLocation()
@@ -137,6 +138,7 @@ function AppShellContent() {
           onClose={() => setSidebarOpen(false)}
           desktopStatic={isDesktop}
           railMode={railMode}
+          collapsed={railCollapsed}
           headerAction={!railCollapsed ? railToggle : null}
           returnFocusRef={mobileRailMenuButtonRef}
         />

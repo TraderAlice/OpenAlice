@@ -121,6 +121,7 @@ export function EquityCurve({
       <MeasuredChartFrame className="h-[220px] w-full">
         {({ width, height }) => (
           <AreaChart
+            accessibilityLayer
             width={width}
             height={height}
             data={chartData}
@@ -156,7 +157,10 @@ export function EquityCurve({
             domain={yAxis?.domain ?? ['auto', 'auto']}
             ticks={yAxis?.ticks}
           />
-          <Tooltip content={<CustomTooltip isAllView={isAllView} accounts={accounts} />} />
+          <Tooltip
+            isAnimationActive={false}
+            content={<CustomTooltip isAllView={isAllView} accounts={accounts} />}
+          />
           <Area
             type="monotone"
             dataKey="equityNum"
@@ -189,7 +193,7 @@ function CustomTooltip({ active, payload, isAllView, accounts }: any) {
   const accountMap = new Map((accounts as Array<{ id: string; label: string }>).map(a => [a.id, a.label]))
 
   return (
-    <div className="bg-secondary border border-border rounded-md px-3 py-2 shadow-lg text-[12px] leading-[18px]">
+    <div className="oa-chart-tooltip px-3 py-2 text-[12px] leading-[18px]">
       <p className="text-muted-foreground mb-1">
         {new Date(data.time).toLocaleString()}
       </p>

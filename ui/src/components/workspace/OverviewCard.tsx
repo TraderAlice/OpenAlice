@@ -73,7 +73,7 @@ export function OverviewCard({
         type="button"
         aria-label={label}
         onClick={onOpen}
-        className="absolute inset-0 z-0 rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+        className="absolute inset-0 z-0 rounded-lg focus-visible:outline-none focus-visible:[box-shadow:var(--oa-focus-shadow)]"
       />
 
       <div className="pointer-events-none relative z-10 flex flex-col gap-3">
@@ -127,7 +127,7 @@ export function OverviewCard({
                     type="button"
                     aria-label={`${sessionCoworkerLabel(s)} ${t(s.state === 'running' ? 'workspace.running' : 'workspace.paused')}`}
                     onClick={() => onOpenSession(s.id)}
-                    className="oa-nav-row pointer-events-auto flex min-h-10 w-full items-center gap-2 rounded px-2 py-1 text-left text-[12px] leading-[18px] text-foreground hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 sm:min-h-0"
+                    className="oa-nav-row pointer-events-auto flex min-h-10 w-full items-center gap-2 rounded px-2 py-1 text-left text-[12px] leading-[18px] text-foreground hover:bg-muted/40 focus-visible:outline-none sm:min-h-0"
                   >
                     <span className="w-3 flex justify-center text-muted-foreground">
                       <AgentGlyph agent={s.agent} />
@@ -153,7 +153,7 @@ export function OverviewCard({
                     type="button"
                     onClick={onOpen}
                     aria-label={t('workspace.viewAllSessions', { count: w.sessions.length })}
-                    className="oa-nav-row pointer-events-auto flex min-h-10 w-full items-center gap-2 rounded px-2 py-1.5 text-left text-[11px] leading-[15px] font-medium text-primary hover:bg-primary/8 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 sm:min-h-0"
+                    className="oa-nav-row pointer-events-auto flex min-h-10 w-full items-center gap-2 rounded px-2 py-1.5 text-left text-[11px] leading-[15px] font-medium text-primary hover:bg-primary/8 focus-visible:outline-none sm:min-h-0"
                   >
                     <span>{t('workspace.viewAllSessions', { count: w.sessions.length })}</span>
                     <span className="ml-auto tabular-nums text-muted-foreground/55 sm:hidden">

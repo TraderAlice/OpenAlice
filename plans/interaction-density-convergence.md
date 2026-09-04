@@ -1,0 +1,58 @@
+# Interaction and density convergence
+
+- Status — active
+- Related issue — #1158
+- Owner guide — `docs/ui-interaction-and-motion.md`
+
+## Intent
+
+Converge the current `dev` interface on one compact interaction system. The delivered increment gives form controls a quiet shared focus treatment, makes the compact Alice brand position expose the rail expansion action, flattens Connector setup hierarchy, and tightens repeated market information surfaces. Existing routes, data flow, and page layout remain stable.
+
+The convergence pass also establishes a more generous shared radius scale, refined credential disclosure geometry, and one chart interaction layer for Recharts and lightweight-charts consumers.
+
+## Decisions
+
+- A 14px by 20px body baseline and shared focus tokens establish common field and text metrics. The existing `oa-field-control` seam owns field emphasis. Feature-local blue focus shadows leave the common path.
+- The compact brand action follows the existing rail state boundary. Hover and keyboard focus crossfade the Alice mark with the expansion glyph inside one fixed optical box.
+- Connector credentials keep one disclosure boundary. Setup guidance uses separators and aligned content inside that boundary.
+- Existing market card owners receive shared surface classes after repeated geometry is confirmed in current consumers.
+- Shared radius tokens own control, card, popover, and dialog curvature. Product profiles retain their explicit geometry overrides.
+- Disclosure headers expose one label, one status, and one chevron in fixed optical boxes. Chart frames own tooltip material, numeric rhythm, cursor feedback, and active-point geometry.
+
+## Checklist
+
+- [x] Add shared focus and dense-surface primitives.
+- [x] Add the compact-rail brand expansion action and behavior tests.
+- [x] Flatten Connector setup guidance and align disclosure geometry.
+- [x] Apply the dense-surface hierarchy to current market consumers.
+- [x] Run targeted tests, complete UI checks, and capture representative routes.
+- [x] Increase the shared radius scale and audit common component primitives.
+- [x] Refine Connector credential disclosures through one coherent surface pattern.
+- [x] Standardize chart tooltip, crosshair, and active-point interaction.
+- [x] Run the complete verification set and capture updated interaction screenshots.
+
+## Verification
+
+- `pnpm --dir ui exec vitest run <affected specs>`
+- `pnpm --dir ui exec tsc -b`
+- `pnpm test`
+- `npx tsc --noEmit`
+- Browser review at desktop and phone widths with reduced-motion coverage.
+
+## Completion
+
+The shared primitives own the changed behavior, affected routes retain their current functions, screenshots show stable alignment and hierarchy, and the required checks pass.
+
+## Local integration with UI usability work
+
+- Preview integrates PR #1318 at `ee04e98b992ec62df5ac6287a6fbafc33eb4abdb`.
+  Maintainer visual acceptance is pending; this is not a remote merge.
+- Retain our toggle placement: beside OpenAlice when expanded, at the leading
+  content top bar when compact. Do not adopt the brand-hover expansion action.
+- Adopt temporary expansion for the Chat/Quant/Prediction group without
+  changing saved global preferences. Leaving the group resets the override.
+  Responsive compact defaults never prohibit manual desktop expansion.
+- Preserve `text-sm = 13px / 20px`; accept the 14px / 20px body baseline,
+  radius scale, shared focus, Connector hierarchy, and market/chart material.
+- Integrated UI owner suite: 284 files and 1675 tests passed. UI typecheck
+  passed. Real local preview remains available for maintainer inspection.

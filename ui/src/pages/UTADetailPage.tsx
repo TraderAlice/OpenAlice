@@ -814,7 +814,7 @@ function PositionMobileRow({ position: p, onClose, canClose, closeDisabledReason
     <details className="group border-t border-border">
       <summary
         aria-label={`${name} ${p.side} position, market value ${fmt(p.marketValue, ccy)}, PnL ${fmtPnl(pnl, ccy)}, ${fmtPctSigned(pct)}. Expand for position details.`}
-        className="list-none px-3 py-3 outline-none hover:bg-muted/30 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary [&::-webkit-details-marker]:hidden"
+        className="list-none px-3 py-3 outline-none hover:bg-muted/30 focus-visible:[box-shadow:inset_0_0_0_1px_var(--oa-focus-ring)] [&::-webkit-details-marker]:hidden"
       >
         <div className="grid grid-cols-[minmax(0,1fr)_auto_16px] items-start gap-2">
           <div className="min-w-0">

@@ -51,6 +51,8 @@ interface ActivityBarProps {
   desktopStatic?: boolean
   /** Static desktop rail width chosen by App's shell breakpoints. */
   railMode?: 'compact' | 'narrow' | 'full'
+  /** Effective shell state, including temporary workbench expansion. */
+  collapsed?: boolean
   /** Shell-owned collapse control, shown beside the expanded brand only. */
   headerAction?: ReactNode
   /** Mobile drawer trigger that receives focus again when the drawer closes. */
@@ -92,6 +94,7 @@ export function ActivityBar({
   onClose,
   desktopStatic = true,
   railMode = 'full',
+  collapsed,
   headerAction,
   returnFocusRef,
 }: ActivityBarProps) {
@@ -113,7 +116,7 @@ export function ActivityBar({
   const setCollapsed = useActivityBarCollapse((s) => s.setCollapsed)
   const railCollapsed = useActivityBarCollapse((s) => s.railCollapsed)
   const shortRailHeight = useMediaQuery('(max-height: 700px)')
-  const compactRail = desktopStatic && (railCollapsed ?? railMode === 'compact')
+  const compactRail = desktopStatic && (collapsed ?? railCollapsed ?? railMode === 'compact')
   const narrowRail = desktopStatic && railMode !== 'full' && !compactRail
   const denseRail = desktopStatic && shortRailHeight
   const mobileDrawerRef = useRef<HTMLDivElement>(null)

@@ -347,7 +347,7 @@ function ToolsTab() {
             onChange={(e) => setFilter(e.target.value)}
             placeholder={t('dev.filterTools')}
             aria-label={t('dev.filterTools')}
-            className="h-8 w-full rounded-md border border-border bg-background px-2.5 py-1.5 text-xs text-foreground outline-none focus:border-primary"
+            className="oa-field-control h-8 w-full rounded-md border border-input bg-background px-2.5 py-1.5 text-xs text-foreground outline-none"
           />
         </div>
         <div className="flex-1 overflow-y-auto px-1 pb-3">
@@ -515,7 +515,7 @@ function ToolExecutePanel({ detail, result, onResult }: ToolExecutePanelProps) {
                 <select
                   value={inputs[prop.key] ?? ''}
                   onChange={(e) => setInputs((prev) => ({ ...prev, [prop.key]: e.target.value }))}
-                  className="h-8 rounded-md border border-border bg-background px-2.5 py-1.5 text-xs text-foreground outline-none focus:border-primary"
+                  className="oa-field-control h-8 rounded-md border border-input bg-background px-2.5 py-1.5 text-xs text-foreground outline-none"
                 >
                   <option value="">-</option>
                   <option value="true">true</option>
@@ -527,7 +527,7 @@ function ToolExecutePanel({ detail, result, onResult }: ToolExecutePanelProps) {
                   value={inputs[prop.key] ?? ''}
                   onChange={(e) => setInputs((prev) => ({ ...prev, [prop.key]: e.target.value }))}
                   placeholder={prop.description || prop.key}
-                  className="h-8 w-full rounded-md border border-border bg-background px-2.5 py-1.5 font-mono text-xs text-foreground outline-none focus:border-primary"
+                  className="oa-field-control h-8 w-full rounded-md border border-input bg-background px-2.5 py-1.5 font-mono text-xs text-foreground outline-none"
                 />
               )}
               {prop.description && (
