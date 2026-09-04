@@ -34,6 +34,7 @@ const port = portProbe.port
 portProbe.stop(true)
 const environment = {
   SystemRoot: process.env.SystemRoot!, WINDIR: process.env.WINDIR!,
+  OS: 'Windows_NT', PROCESSOR_ARCHITECTURE: process.arch === 'arm64' ? 'ARM64' : 'AMD64',
   TEMP: scratch, TMP: scratch, HOME: scratch, USERPROFILE: scratch,
   PATH: join(process.env.SystemRoot!, 'System32'),
   OPENALICE_HOME: home, OPENALICE_TRADING_MODE: 'lite',
@@ -89,16 +90,23 @@ try {
     if ((await readFile(join(installDir, 'cli/current.txt'), 'utf8')).trim() !== releaseName) throw new Error('Inverse rollback did not restore the candidate')
     const marker = join(installDir, 'user-data-marker.txt')
     await writeFile(marker, 'preserve user data')
-    await command(powershell, ['-NoProfile', '-File', resolve('install.ps1'), '-InstallDir', installDir, '-Uninstall', '-Yes'], powershellEnv)
-    const removed = JSON.parse((await readFile(join(installDir, '.cli-uninstall-result.json'), 'utf8')).replace(/^\uFEFF/, ''))
-    if (removed.status !== 'removed' || await readFile(marker, 'utf8') !== 'preserve user data') throw new Error('Data-preserving removal failed')
+    await command(executable, ['uninstall', '--yes'], environment)
+    const receipt = join(installDir, '.cli-uninstall-result.json')
+    const deadline = Date.now() + 45_000
+    let removed: { status?: string } | undefined
+    while (Date.now() < deadline) {
+      try { removed = JSON.parse((await readFile(receipt, 'utf8')).replace(/^\uFEFF/, '')); break }
+      catch (error) { if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error }
+      await Bun.sleep(250)
+    }
+    if (removed?.status !== 'removed' || await readFile(marker, 'utf8') !== 'preserve user data') throw new Error(`Data-preserving removal failed: ${JSON.stringify(removed)}`)
     uninstalled = true
   }
   await writeFile(join(outputRoot, 'native-smoke.json'), JSON.stringify({
     status: 'pass', arch: process.arch, archiveSha256: candidate.sha256,
     contentIdentity: candidate.contentIdentity, sourceCommit: candidate.sourceCommit,
     accepted: [candidate.channelBuild ? 'PowerShell managed install' : 'PowerShell ZIP install', 'detached Guardian/Alice', 'real Web UI', 'Git', 'stop',
-      ...(candidate.channelBuild ? ['mapped-runtime update', 'bidirectional rollback', 'data-preserving removal'] : [])],
+      ...(candidate.channelBuild ? ['mapped-runtime update', 'bidirectional rollback', 'deferred CLI data-preserving removal'] : [])],
     remaining: ['interactive agent/provider acceptance', ...(candidate.channelBuild ? [] : ['manual upgrade/removal'])],
   }, null, 2) + '\n')
 } finally {
