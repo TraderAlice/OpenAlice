@@ -89,6 +89,10 @@ const HEADLESS_ALLOWED_TOOLS = [
   'Bash(traderhub:*)',
 ].join(',');
 
+// The allowlist above covers Bash only. Without this, Write/Edit fall through
+// to a permission prompt `-p` cannot answer, so headless runs lose all file output.
+const HEADLESS_PERMISSION_MODE = 'acceptEdits';
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
@@ -277,6 +281,7 @@ export const claudeAdapter: CliAdapter = {
       ...base,
       '--settings', AUTOTRUST_SETTINGS,
       '--allowedTools', HEADLESS_ALLOWED_TOOLS,
+      '--permission-mode', HEADLESS_PERMISSION_MODE,
       ...(ctx.sessionRuntime?.headlessArgs ?? []),
       ...(ctx.resume ? ['--resume', ctx.resume.sessionId] : []),
       '-p', '--output-format', 'stream-json', '--verbose',
