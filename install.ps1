@@ -115,6 +115,7 @@ if (-not $Archive) {
   }
 }
 if ($Sha256 -notmatch '^[a-f0-9]{64}$') { throw 'An archive requires its SHA-256 digest.' }
+$Sha256 = $Sha256.ToLowerInvariant()
 if ($Version -and -not $pinned -and $Channel -eq 'stable' -and $Version -notmatch '^\d+\.\d+\.\d+$') { throw 'Stable requires a stable version.' }
 if ($Version -and -not $pinned -and $Channel -eq 'beta' -and $Version -notmatch '^\d+\.\d+\.\d+-beta(?:\.[1-9][0-9]*)?$') { throw 'Beta requires a beta version.' }
 if ($env:OPENALICE_EXPECTED_CLI_ARTIFACT_SHA256 -and $Sha256 -ne $env:OPENALICE_EXPECTED_CLI_ARTIFACT_SHA256) { throw 'Candidate changed since update discovery; check again.' }

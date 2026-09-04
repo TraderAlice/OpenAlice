@@ -87,6 +87,24 @@ Its npm package assembly exposed a release inventory larger than the default
 fixed. Deferred CLI self-removal and native npm/Bun acceptance are being replayed
 against those same candidate bytes, not represented as a new product build.
 
+Delivery update: [PR #1346](https://github.com/TraderAlice/OpenAlice/pull/1346)
+integrates this topic into the ordinary dev lane after local acceptance; the
+remaining manual Windows rerun is deliberately not a synchronous dev gate.
+Both architectures have exercised install/start/update/rollback. The post-exit
+helper exposed Bun's Windows detached-child behavior, matching
+[Bun #31603](https://github.com/oven-sh/bun/issues/31603); the implementation now
+uses an awaited, quoted `cmd /c start` bootstrap instead of a new polling
+protocol. Its fresh native recheck is
+[33884781763](https://github.com/TraderAlice/OpenAlice/actions/runs/33884781763)
+(candidate source `5e800195`), still pending when this delivery note was written.
+Windows x64 npm install/native execution/manager removal and Bun install/native
+execution/ownership passed. Bun leaves a global entry after removing its package;
+[issue #1347](https://github.com/TraderAlice/OpenAlice/issues/1347) records the
+upstream boundary, and receipts must expose it rather than claim clean removal.
+Post-merge six-target CDN activation and the final native receipt are recorded
+on the integration PR; versioned release and Windows npm authority are still
+separate maintainer actions.
+
 ### Accepted preview groundwork
 
 Accepted 2026-09-04: ship both Windows architectures iteratively, without making
