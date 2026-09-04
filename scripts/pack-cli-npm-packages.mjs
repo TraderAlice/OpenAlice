@@ -18,6 +18,7 @@ export function packCliNpmPackages({
   inputDir,
   outputDir,
   npm = process.platform === 'win32' ? 'npm.cmd' : 'npm',
+  spawnNpm = spawnSync,
 }) {
   const inputRoot = resolve(inputDir)
   const outputRoot = resolve(outputDir)
@@ -45,7 +46,7 @@ export function packCliNpmPackages({
   mkdirSync(outputRoot, { recursive: true })
   const packages = []
   for (const name of [...platformNames, meta.name]) {
-    const packed = pack(join(inputRoot, name), outputRoot, npm)
+    const packed = pack(join(inputRoot, name), outputRoot, npm, spawnNpm)
     packages.push({
       name,
       version: meta.version,
@@ -64,13 +65,16 @@ export function packCliNpmPackages({
   return manifest
 }
 
-function pack(packageRoot, outputRoot, npm) {
-  const result = spawnSync(npm, [
+function pack(packageRoot, outputRoot, npm, spawnNpm) {
+  const result = spawnNpm(npm, [
     'pack', packageRoot, '--json', '--pack-destination', outputRoot,
   ], {
     encoding: 'utf8',
     stdio: 'pipe',
     shell: process.platform === 'win32',
+    // npm --json includes the complete file inventory. Native runtime packages
+    // legitimately exceed Node's 1 MiB spawnSync default before compression.
+    maxBuffer: 64 * 1024 * 1024,
   })
   if (result.error) throw result.error
   if (result.status !== 0) {

@@ -44,7 +44,8 @@ the durable truth after it changes. Git history is the archive.
   npm/Bun, Homebrew, and AUR channels consume one accepted artifact set.
   Homebrew tap is public at `0.90.2` with lightweight hourly/manual stable sync.
   Stable `0.91.0` source and version preparation are merged; final validation
-  exposed host-dependent TUI fixtures, now being isolated before re-promotion.
+  exposed and repaired host-dependent TUI fixtures; the release then exposed
+  npm's 1 MiB subprocess-report buffer, now under bounded repair.
   Native Intel acceptance passed; renderer latency remains tracked in #1350.
   AUR registration remains deferred.
   The CLI package owns OpenAlice only: Agent Runtime installation and Electron

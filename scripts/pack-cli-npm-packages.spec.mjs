@@ -42,6 +42,32 @@ describe('CLI npm package packing', () => {
       outputDir: join(root, 'output'),
     })).toThrow('platform package does not match')
   })
+
+  it('allows npm to report the complete native runtime inventory', async () => {
+    const root = await fixture()
+    const calls = []
+    const spawnNpm = (command, args, options) => {
+      calls.push({ command, args, options })
+      return {
+        status: 0,
+        stdout: JSON.stringify([{
+          filename: `package-${calls.length}.tgz`,
+          shasum: 'a'.repeat(40),
+          integrity: 'sha512-fixture',
+        }]),
+        stderr: '',
+      }
+    }
+
+    packCliNpmPackages({
+      inputDir: join(root, 'input'),
+      outputDir: join(root, 'output'),
+      spawnNpm,
+    })
+
+    expect(calls).toHaveLength(3)
+    expect(calls.every(({ options }) => options.maxBuffer === 64 * 1024 * 1024)).toBe(true)
+  })
 })
 
 async function fixture({ platformVersion = '0.90.1' } = {}) {
