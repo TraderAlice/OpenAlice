@@ -1065,7 +1065,7 @@ jobs:
         env:
           SOURCE_REF: ${{ github.ref }}
         run: '[[ "$SOURCE_REF" = refs/heads/dev || "$SOURCE_REF" = refs/heads/master ]]'
-      - name: Verify all five trusted publisher connections
+      - name: Verify all trusted publisher connections
         run: node scripts/preflight-public-cli-authority.mjs
         env:
           OPENALICE_PUBLISH_NPM: 'true'
@@ -1127,7 +1127,7 @@ jobs:
             curl --fail --location --retry 3 "$base/$metadata" -o "dist/existing-npm/$metadata"
           done
           jq -e --arg version "${RELEASE_TAG#v}" '.version == $version' dist/existing-npm/npm-publish-order.json
-          for package in openalice-darwin-arm64 openalice-darwin-x64 openalice-linux-arm64 openalice-linux-x64 openalice; do
+          for package in openalice-darwin-arm64 openalice-darwin-x64 openalice-linux-arm64 openalice-linux-x64 openalice-win32-arm64 openalice-win32-x64 openalice; do
             filename="$package-${RELEASE_TAG#v}.tgz"
             curl --fail --location --retry 3 "$base/$filename" -o "dist/existing-npm/$filename"
           done

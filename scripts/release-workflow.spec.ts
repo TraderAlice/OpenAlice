@@ -126,7 +126,7 @@ describe('Release workflow critical path', () => {
     expect(job['timeout-minutes']).toBe(5)
     expect(job.permissions).toEqual({ contents: 'read', 'id-token': 'write' })
     expect(step(job, 'Require integrated release tooling').run).toContain('refs/heads/dev')
-    expect(step(job, 'Verify all five trusted publisher connections').run)
+    expect(step(job, 'Verify all trusted publisher connections').run)
       .toBe('node scripts/preflight-public-cli-authority.mjs')
     expect(JSON.stringify(job)).not.toMatch(/secrets\.|publish-cli-npm|pnpm build|gh release/)
   })

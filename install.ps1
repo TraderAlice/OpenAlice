@@ -162,15 +162,31 @@ try {
   foreach ($entry in $entries) {
     $path = $entry.TrimEnd('/')
     if ($path -ne $top -and -not $path.StartsWith("$top/")) { throw 'Archive leaves its release root.' }
-    if ($path -match '[\\:\x00-\x1f]' -or $seen.ContainsKey($path)) { throw 'Unsafe or duplicate archive path.' }
+    if ($path -match '[\\:\x00-\x1f]' -or $path.Contains(' link to ') -or $seen.ContainsKey($path)) { throw 'Unsafe or duplicate archive path.' }
     $seen[$path] = $true
     foreach ($part in ($path -split '/')) {
       if ($part -in @('', '.', '..') -or $part -match '[. ]$' -or $part -match '^(?i)(CON|PRN|AUX|NUL|COM[1-9]|LPT[1-9])(?:\.|$)') { throw 'Unsafe Windows path.' }
     }
   }
   $listing = @(& $tar -tvzf $payload)
-  $special = @($listing | Where-Object { $_ -notmatch '^[-d]' })
-  if ($LASTEXITCODE -ne 0 -or $special.Count -ne 0) { throw "Archive contains links or special files: $($special | Select-Object -First 3)" }
+  if ($LASTEXITCODE -ne 0 -or $listing.Count -ne $entries.Count) { throw 'Cannot verify archive entry types.' }
+  $regularFiles = @{}
+  for ($index = 0; $index -lt $listing.Count; $index++) {
+    $line = $listing[$index]
+    $entry = $entries[$index]
+    if ($line.StartsWith('-')) { $regularFiles[$entry] = $true }
+    elseif ($line.StartsWith('h')) {
+      # PortableGit deliberately hard-links duplicate executables/DLLs. Accept
+      # only an unambiguous link to an earlier verified regular file in this
+      # archive; never a symlink, external path, forward link or directory.
+      $marker = " $entry link to "
+      if ([regex]::Matches($line, ' link to ').Count -ne 1 -or -not $line.Contains($marker)) { throw 'Ambiguous archive hard link.' }
+      $target = $line.Substring($line.IndexOf($marker) + $marker.Length)
+      if (-not $regularFiles.ContainsKey($target)) { throw 'Archive hard link leaves previously verified files.' }
+      $regularFiles[$entry] = $true
+    }
+    elseif (-not $line.StartsWith('d')) { throw 'Archive contains a symlink or special file.' }
+  }
   & $tar -xzf $payload -C $stage
   if ($LASTEXITCODE -ne 0) { throw 'Archive extraction failed.' }
   $expanded = Join-Path $stage $top
