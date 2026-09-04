@@ -2,6 +2,17 @@
 
 ## Stable 0.91.0 acceptance — 2026-09-05
 
+Stable release run
+[33903395758](https://github.com/TraderAlice/OpenAlice/actions/runs/33903395758)
+built all six native archives, but package-manager metadata assembly failed at
+`npm pack` with `spawnSync npm ENOBUFS`. The JSON report now includes the full
+native runtime inventory and exceeds Node's 1 MiB default buffer. Give this
+bounded subprocess 64 MiB and cover the exact option through injected test
+process output; do not suppress npm errors or omit its integrity report. Repair
+through dev/master before dispatching a new release commit. The focused
+package-channel checks passed (seven tests), followed by root types and the
+complete local suite (714 files, 6,361 passes, three skips, 195.26 seconds).
+
 Release source `af04fec0` (including UI integration #1352) was explicitly
 selected by the maintainer and promoted through #1349 after all local and
 hosted source/package/installer/SSH/dev-activation gates passed. Version-only
