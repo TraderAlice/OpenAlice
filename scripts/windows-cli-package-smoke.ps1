@@ -17,7 +17,7 @@ $platformTarball = Join-Path $tarballs (($report | ConvertFrom-Json)[0].filename
 $metaRoot = Join-Path $packages 'npm\openalice'
 $metaPath = Join-Path $metaRoot 'package.json'
 $meta = Get-Content -Raw -LiteralPath $metaPath | ConvertFrom-Json
-$meta.optionalDependencies.$platformName = ([uri]$platformTarball).AbsoluteUri
+$meta.optionalDependencies.$platformName = 'file:' + ($platformTarball -replace '\\', '/')
 [IO.File]::WriteAllText($metaPath, ($meta | ConvertTo-Json -Depth 10))
 $report = & $npm pack $metaRoot --json --pack-destination $tarballs
 if ($LASTEXITCODE -ne 0) { throw 'Meta npm pack failed.' }
@@ -25,13 +25,13 @@ $metaTarball = Join-Path $tarballs (($report | ConvertFrom-Json)[0].filename)
 $npmVersion = & $npm --version
 $bunVersion = & $bun --version
 try {
-  foreach ($manager in @('npm', 'bun')) {
+  foreach ($manager in @('bun', 'npm')) {
     $prefix = Join-Path $scratch "$manager prefix"
     $env:npm_config_cache = Join-Path $scratch "$manager-cache"
     $env:BUN_INSTALL = $prefix
     $env:Path = $originalPath
     if ($manager -eq 'npm') {
-      & $npm install --global --prefix $prefix --allow-scripts=openalice $metaTarball
+      & $npm install --global --prefix $prefix --allow-scripts=openalice --offline --no-audit --no-fund $metaTarball
     } else {
       # Only Bun plus Windows system tools; postinstall must not need host Node.
       $env:Path = (Split-Path $bun) + ';' + (Join-Path $env:SystemRoot 'System32')

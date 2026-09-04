@@ -101,7 +101,10 @@ try {
     const deadline = Date.now() + 90_000
     let removed: { status?: string } | undefined
     while (Date.now() < deadline) {
-      try { removed = JSON.parse((await readFile(receipt, 'utf8')).replace(/^\uFEFF/, '')); break }
+      try {
+        removed = JSON.parse((await readFile(receipt, 'utf8')).replace(/^\uFEFF/, ''))
+        if (removed?.status === 'removed' || removed?.status === 'failed') break
+      }
       catch (error) { if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error }
       await Bun.sleep(250)
     }

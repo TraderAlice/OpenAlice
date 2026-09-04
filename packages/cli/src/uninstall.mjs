@@ -113,6 +113,8 @@ async function scheduleWindowsUninstall(layout) {
   await writeFile(script, await readFile(source))
   const env = { ...process.env }
   delete env.PSModulePath
+  const receipt = join(layout.installRoot, '.cli-uninstall-result.json')
+  await rm(receipt, { force: true })
   const log = await open(join(layout.installRoot, '.cli-uninstall.log'), 'w', 0o600)
   try {
     const child = spawn(join(env.SystemRoot ?? 'C:\\Windows', 'System32', 'WindowsPowerShell', 'v1.0', 'powershell.exe'), [
@@ -120,6 +122,25 @@ async function scheduleWindowsUninstall(layout) {
       '-Uninstall', '-WaitForPid', String(process.pid), '-Yes',
     ], { detached: true, windowsHide: true, stdio: ['ignore', log.fd, log.fd], env })
     await new Promise((resolve, reject) => { child.once('spawn', resolve); child.once('error', reject) })
+    // Keep the parent alive until the helper is actually waiting for it,
+    // matching the detached Guardian's explicit readiness handoff.
+    const deadline = Date.now() + 45_000
+    let ready = false
+    while (Date.now() < deadline) {
+      try {
+        const value = JSON.parse((await readFile(receipt, 'utf8')).replace(/^\uFEFF/, ''))
+        if (value.status === 'waiting' && value.parentPid === process.pid) { ready = true; break }
+        if (value.status === 'failed') throw new Error(value.message || 'Windows cleanup failed')
+      } catch (error) {
+        if (error?.code !== 'ENOENT' && !(error instanceof SyntaxError)) throw error
+      }
+      if (child.exitCode !== null) break
+      await new Promise(resolve => setTimeout(resolve, 100))
+    }
+    if (!ready) {
+      child.kill()
+      throw new Error(`Windows cleanup did not become ready. See ${join(layout.installRoot, '.cli-uninstall.log')}`)
+    }
     child.unref()
   } finally { await log.close() }
   return { profilesChanged: [], deferred: true }
