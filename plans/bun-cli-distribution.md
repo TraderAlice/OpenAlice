@@ -3,7 +3,8 @@
 Status: Active — macOS/Linux native CLI is public in v0.90.2 and the separately
 dispatched v0.91.0-beta.3 is externally verified; stable remains v0.90.2 while
 stable/beta discovery authority is converged on the OpenAlice CDN. Native
-PowerShell and external package-manager activation remain deferred.
+PowerShell and Homebrew/AUR activation remain deferred. npm/Bun's five public
+packages are published at v0.90.2 under maintainer `jiaran258`.
 
 Delivery mode: Serial / interactive from current `dev`. The accepted native CLI
 increments have already reached `dev`; the old `codex/usability-improvements`
@@ -455,7 +456,7 @@ build harness when it improves the next investigation.
 
 ### 5. Package-manager publication
 
-- [ ] Reserve the npm meta and platform package names; keep the resulting
+- [x] Reserve the npm meta and platform package names; keep the resulting
   command named `openalice`.
 - [x] Generate npm platform packages from accepted release archives and one
   meta package with platform `optionalDependencies`.
@@ -769,9 +770,16 @@ This plan is complete only when:
   npm 12 installation requires explicit `--allow-scripts=openalice`. An
   isolated local registry serving the original, integrity-verified tarballs
   passed npm 12.0.2 / Node 22.22.2 install, version, detached start, status, and
-  stop on macOS arm64 with no Node/Bun in Runtime PATH. Actual registry
-  publication is pending, not inferred from absent public names. OIDC remains
-  follow-up work.
+  stop on macOS arm64 with no Node/Bun in Runtime PATH. All five packages were
+  published under `jiaran258` in
+  [run 33860369715](https://github.com/TraderAlice/OpenAlice/actions/runs/33860369715)
+  (98 seconds, one hosted job). Independent registry reads matched all five
+  accepted integrity values; a fresh public-registry npm 12 install passed
+  version, detached start, status, and stop with isolated data. Tooling merged
+  through [PR #1340](https://github.com/TraderAlice/OpenAlice/pull/1340), with
+  root typecheck, 34 focused tests, and 6,319 hermetic tests passing (3 expected
+  skips). No beta, CDN, desktop, Homebrew, or AUR publication ran. The persistent
+  automatic npm switch remains disabled; OIDC is still follow-up work.
 
 - 2026-08-29: Maintainer selected the architecture after comparing Herdr and
   OpenCode. CLI is treated as a primary long-running distribution. The selected
