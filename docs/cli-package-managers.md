@@ -121,27 +121,28 @@ External channels are explicit release switches:
 
 | Channel | Repository variable | Required authority |
 |---|---|---|
-| npm + Bun | `OPENALICE_PUBLISH_NPM=true` | `NPM_TOKEN` for all five public package names |
+| npm + Bun | `OPENALICE_PUBLISH_NPM=true` | npm Trusted Publishing for all five names, bound to `TraderAlice/OpenAlice` / `release.yml` |
 | Homebrew | `OPENALICE_PUBLISH_HOMEBREW=true` | `HOMEBREW_TAP_TOKEN` with write access to `TraderAlice/homebrew-tap` |
 | AUR / paru | `OPENALICE_PUBLISH_AUR=true` | dedicated `AUR_SSH_PRIVATE_KEY` plus manually verified `AUR_KNOWN_HOSTS` |
 
 Before a stable GitHub Release can be created, the release workflow preflights
-every enabled switch. npm must identify the token owner, confirm that every
-existing package lists that identity as a maintainer, and report any 404 names
-as explicit first-publication targets. A missing name is not proof of npm
-ownership, but the enabled stable publication switch is the maintainer's
-deliberate instruction to claim that fixed OpenAlice package name. The
+every enabled switch. npm exchanges a GitHub OIDC identity for a short-lived,
+package-scoped credential for each of the five existing names. Missing packages
+or missing/mismatched trusted publishers fail the check; there is no token
+fallback or automatic name reservation. Credentials stay in memory and are
+discarded without publishing. The
 Homebrew token must see `TraderAlice/homebrew-tap` with push authority; and the
 AUR key plus pinned known-hosts entry must be able to read the `openalice-bin`
 Git repository. Disabled channels perform no external authority checks. This
 makes missing credentials or conflicting ownership a release-planning failure
 instead of discovering it after the accepted assets are already public.
 
-The `Public CLI Channel Authority` workflow exposes the same checks as a manual
-read-only rehearsal. Select npm, Homebrew, AUR, or any combination before a
-stable promotion; the run uses repository secrets but cannot publish packages,
-push metadata, or create a GitHub Release. Use it after reserving names and
-installing credentials, before enabling the corresponding release switch.
+The `Public CLI Channel Authority` workflow rehearses Homebrew and/or AUR
+authority without publishing. npm uses `Release` with `operation=verify-npm`
+from integrated `dev` or `master` (no tag required). The rehearsal must run in
+`release.yml` because npm validates that exact workflow identity. It exchanges
+credentials for all five packages but does not upload, build, sign, change a
+version, or create a release. Use it before enabling the npm switch.
 
 The npm, Tap, and AUR writers are idempotent. npm verifies each local tarball
 against the accepted publish manifest, skips an already-public version only
@@ -169,8 +170,44 @@ and manifests, verifies every tarball before any upload, verifies the public
 native archives, then uses the same platform-first publisher as a new stable
 release. No build, signing, version change, tag creation, CDN mutation,
 Homebrew, or AUR job runs. After upload, verify an actual registry install.
-Trusted publishing configuration and retirement of the temporary token are
-separate follow-up actions; do not confuse `--provenance` with OIDC authority.
+This operation uses OIDC too; an already-published identical version is skipped.
+That skip alone is not proof of OIDC authorization.
+
+### npm Trusted Publishing (OIDC)
+
+For each of `openalice`, `openalice-darwin-arm64`, `openalice-darwin-x64`,
+`openalice-linux-arm64`, and `openalice-linux-x64`, configure npm Package Settings
+→ Trusted Publisher → GitHub Actions:
+
+- Organization/user: `TraderAlice`; repository: `OpenAlice`.
+- Workflow filename: `release.yml` (not its directory path).
+- Allow `npm publish`; leave environment empty because these jobs do not use a
+  GitHub environment. Access to changing/running the trusted workflow is a
+  publishing security boundary.
+
+Publication runs on GitHub-hosted Ubuntu with `id-token: write`, Node 22.22.2,
+and pinned npm 12.0.2. npm handles its own short-lived credential exchange when
+publishing; neither `NPM_TOKEN` nor `NODE_AUTH_TOKEN` is configured. The generated
+packages must retain the matching `TraderAlice/OpenAlice` repository URL.
+Provenance is not itself proof of OIDC authentication.
+
+After adding all five connections, run:
+
+```bash
+gh workflow run release.yml --ref dev -f operation=verify-npm
+```
+
+A successful exchange proves npm accepted the workflow identity for each
+package; it does not exercise upload/provenance acceptance for a new version.
+Record that last boundary at the next authorized stable publication, rather
+than inventing a release to test authentication. After verification, revoke
+the temporary first-publication token and remove the repository's `NPM_TOKEN`
+secret. npm's restrictive 2FA/token policy is compatible with OIDC.
+
+See [npm Trusted Publishing](https://docs.npmjs.com/trusted-publishers/) and
+the [registry OIDC exchange API](https://api-docs.npmjs.com/). Adding future
+platform packages (including Windows) requires first publication and their own
+trusted-publisher connections; the current native matrix is macOS/Linux only.
 
 ## Update and uninstall ownership
 
