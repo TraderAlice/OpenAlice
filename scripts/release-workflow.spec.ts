@@ -12,6 +12,7 @@ interface WorkflowStep {
 }
 
 interface WorkflowJob {
+  permissions?: Record<string, string>
   if?: string
   needs?: string | string[]
   'timeout-minutes'?: number
@@ -58,7 +59,7 @@ describe('Release workflow critical path', () => {
   it('publishes existing stable npm assets without rebuilding or changing product channels', () => {
     const job = workflow.jobs['publish-existing-npm']
     expect(job.if).toBe("inputs.operation == 'publish-npm'")
-    expect(workflow.jobs.release.if).toBe("inputs.operation != 'publish-npm'")
+    expect(workflow.jobs.release.if).toBe("inputs.operation == 'release' || inputs.operation == 'mirror'")
     expect(needs(job)).toEqual([])
     expect(job['timeout-minutes']).toBe(15)
     const guard = step(job, 'Require the current published stable release').run ?? ''
@@ -83,10 +84,10 @@ describe('Release workflow critical path', () => {
       operation: {
         required: true,
         type: 'choice',
-        options: ['release', 'mirror', 'publish-npm'],
+        options: ['release', 'mirror', 'publish-npm', 'verify-npm'],
       },
       tag: {
-        required: true,
+        required: false,
         type: 'string',
       },
       channel: {
@@ -116,6 +117,30 @@ describe('Release workflow critical path', () => {
       expect(step(workflow.jobs['publish-release'], name).with?.target_commitish)
         .toBe('${{ needs.release.outputs.source_sha }}')
     }
+  })
+
+  it('rehearses real OIDC exchanges under the trusted workflow without release work', () => {
+    const job = workflow.jobs['verify-npm']
+    expect(job.if).toBe("inputs.operation == 'verify-npm'")
+    expect(needs(job)).toEqual([])
+    expect(job['timeout-minutes']).toBe(5)
+    expect(job.permissions).toEqual({ contents: 'read', 'id-token': 'write' })
+    expect(step(job, 'Require integrated release tooling').run).toContain('refs/heads/dev')
+    expect(step(job, 'Verify all five trusted publisher connections').run)
+      .toBe('node scripts/preflight-public-cli-authority.mjs')
+    expect(JSON.stringify(job)).not.toMatch(/secrets\.|publish-cli-npm|pnpm build|gh release/)
+  })
+
+  it('uses modern npm and OIDC permissions without long-lived token fallback', () => {
+    for (const name of ['publish-cli-npm', 'publish-existing-npm']) {
+      const job = workflow.jobs[name]
+      expect(job.permissions?.['id-token']).toBe('write')
+      expect(job.steps?.find((entry) => entry.uses === 'actions/setup-node@v7')?.with)
+        .toMatchObject({ 'node-version': '22.22.2', 'package-manager-cache': false })
+      expect(step(job, 'Install OIDC-capable npm').run).toContain('npm@12.0.2')
+    }
+    expect(workflow.jobs['preflight-public-cli-authority'].permissions?.['id-token']).toBe('write')
+    expect(JSON.stringify(workflow)).not.toMatch(/NPM_TOKEN|NODE_AUTH_TOKEN/)
   })
 
   it('selects the previous release from the same channel', () => {

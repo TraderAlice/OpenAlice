@@ -25,6 +25,8 @@ describe('Public CLI channel authority workflow', () => {
     expect(Object.keys(workflow.on)).toEqual(['workflow_dispatch'])
     expect(workflow.permissions).toEqual({ contents: 'read' })
     expect(workflow.jobs.preflight['timeout-minutes']).toBe(5)
+    // npm trust must be exercised by release.yml, not this workflow identity.
+    expect(JSON.stringify(workflow)).not.toMatch(/NPM_TOKEN|OPENALICE_PUBLISH_NPM|inputs.npm/)
   })
 
   it('requires a selection and calls the non-publishing preflight', () => {

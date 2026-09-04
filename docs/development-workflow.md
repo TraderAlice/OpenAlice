@@ -25,6 +25,9 @@ Canonical startup rules: [[AGENTS.md]]. Guide index: [[docs/README.md]].
   published stable release. It may use integrated `dev` or `master` tooling;
   it cannot create a version, rebuild an artifact, or mutate product channels.
   See [[docs/cli-package-managers.md]] for its first-publication/retry contract.
+- `Release` operation `verify-npm` checks all five npm OIDC connections from
+  `dev` or `master` without a tag, build, or package upload. npm publishing uses
+  the workflow's identity, not a rotating repository token.
 - `archive/dev-pre-beta6` is a historical snapshot; do not modify or delete it.
 - `local` is a legacy shared-worktree branch. It is not the default workflow;
   audit its unmerged commits before deciding whether to retain or retire it.

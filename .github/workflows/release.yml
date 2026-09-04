@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       operation:
-        description: Create a release, repair mirrors, or publish existing stable npm assets without rebuilding.
+        description: Create a release, repair mirrors, publish existing stable npm assets, or verify npm OIDC without publishing.
         required: true
         default: release
         type: choice
@@ -12,9 +12,10 @@ on:
           - release
           - mirror
           - publish-npm
+          - verify-npm
       tag:
-        description: Release tag, for example v0.91.0 or v0.91.0-beta.1.
-        required: true
+        description: Required except for verify-npm; for example v0.91.0 or v0.91.0-beta.1.
+        required: false
         type: string
       channel:
         description: Mutable release channel that this tag is allowed to update.
@@ -32,7 +33,7 @@ concurrency:
 jobs:
   release:
     name: Plan release candidate
-    if: inputs.operation != 'publish-npm'
+    if: inputs.operation == 'release' || inputs.operation == 'mirror'
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -175,6 +176,7 @@ jobs:
     timeout-minutes: 5
     permissions:
       contents: read
+      id-token: write
 
     steps:
       - uses: actions/checkout@v7
@@ -189,7 +191,6 @@ jobs:
           OPENALICE_PUBLISH_NPM: ${{ vars.OPENALICE_PUBLISH_NPM }}
           OPENALICE_PUBLISH_HOMEBREW: ${{ vars.OPENALICE_PUBLISH_HOMEBREW }}
           OPENALICE_PUBLISH_AUR: ${{ vars.OPENALICE_PUBLISH_AUR }}
-          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
           HOMEBREW_TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
           AUR_SSH_PRIVATE_KEY: ${{ secrets.AUR_SSH_PRIVATE_KEY }}
           AUR_KNOWN_HOSTS: ${{ secrets.AUR_KNOWN_HOSTS }}
@@ -1024,6 +1025,30 @@ jobs:
             dist/release-cli-packages/cli-npm-tarballs/*.tgz
             dist/release-cli-packages/cli-npm-tarballs/npm-publish-order.json
 
+  # Keep this rehearsal in the trusted publishing workflow: npm validates the
+  # workflow filename, so another workflow cannot prove release.yml's identity.
+  verify-npm:
+    name: Verify npm OIDC without publishing
+    if: inputs.operation == 'verify-npm'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22.22.2
+      - name: Require integrated release tooling
+        env:
+          SOURCE_REF: ${{ github.ref }}
+        run: '[[ "$SOURCE_REF" = refs/heads/dev || "$SOURCE_REF" = refs/heads/master ]]'
+      - name: Verify all five trusted publisher connections
+        run: node scripts/preflight-public-cli-authority.mjs
+        env:
+          OPENALICE_PUBLISH_NPM: 'true'
+
   publish-existing-npm:
     name: Publish existing stable npm assets
     if: inputs.operation == 'publish-npm'
@@ -1047,6 +1072,10 @@ jobs:
         with:
           node-version: 22.22.2
           registry-url: https://registry.npmjs.org
+          package-manager-cache: false
+
+      - name: Install OIDC-capable npm
+        run: npm install --global npm@12.0.2 --ignore-scripts --no-audit --no-fund
 
       - name: Require the current published stable release
         run: |
@@ -1067,7 +1096,6 @@ jobs:
           OPENALICE_PUBLISH_NPM: 'true'
           OPENALICE_PUBLISH_HOMEBREW: 'false'
           OPENALICE_PUBLISH_AUR: 'false'
-          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
 
       - name: Download and verify existing public release bytes
         run: |
@@ -1089,8 +1117,6 @@ jobs:
 
       - name: Publish platform packages before the meta package
         run: node scripts/publish-cli-npm-packages.mjs --packages-dir dist/existing-npm
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
       - name: Preserve publication receipt
         if: always()
@@ -1117,8 +1143,12 @@ jobs:
 
       - uses: actions/setup-node@v7
         with:
-          node-version: 22.19.0
+          node-version: 22.22.2
           registry-url: https://registry.npmjs.org
+          package-manager-cache: false
+
+      - name: Install OIDC-capable npm
+        run: npm install --global npm@12.0.2 --ignore-scripts --no-audit --no-fund
 
       - uses: actions/download-artifact@v4
         with:
@@ -1129,8 +1159,6 @@ jobs:
         run: >-
           node scripts/publish-cli-npm-packages.mjs
           --packages-dir dist/cli-package-channels/cli-npm-tarballs
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
   verify-public-cli-channels:
     name: Verify public CLI channel assets

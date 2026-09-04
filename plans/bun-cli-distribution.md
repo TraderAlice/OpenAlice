@@ -6,6 +6,21 @@ stable/beta discovery authority is converged on the OpenAlice CDN. Native
 PowerShell and Homebrew/AUR activation remain deferred. npm/Bun's five public
 packages are published at v0.90.2 under maintainer `jiaran258`.
 
+Current increment: replace the temporary npm token with GitHub OIDC trust on
+the same five packages. Preserve stable-only publication and accepted artifact
+bytes; no Windows activation, new version, or package-manager switch changes.
+The non-publishing exchange rehearsal lives in `release.yml` so it verifies
+the real trusted workflow identity. Owner contract: [[docs/cli-package-managers.md]].
+
+- [x] Replace token-based preflight/publication wiring and add OIDC contract tests.
+- [x] Save all five npm Trusted Publisher connections, allowing direct publish
+  from `TraderAlice/OpenAlice` / `release.yml` (2026-09-04).
+- [x] Complete local verification: root typecheck; 708 full-suite files,
+  6,331 passed and 3 expected skips; 47 focused checks and 82 workflow contracts.
+- [ ] Integrate the focused PR to `dev`.
+- [ ] Run the real five-package OIDC exchange rehearsal without publishing.
+- [ ] Retire the temporary npm token and GitHub secret after verification.
+
 Delivery mode: Serial / interactive from current `dev`. The accepted native CLI
 increments have already reached `dev`; the old `codex/usability-improvements`
 tip contains superseded release-flow experiments and must not be promoted as a
