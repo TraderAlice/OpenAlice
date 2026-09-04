@@ -2,9 +2,37 @@
 
 ## Stable 0.91.0 acceptance — 2026-09-05
 
+Release source `af04fec0` (including UI integration #1352) was explicitly
+selected by the maintainer and promoted through #1349 after all local and
+hosted source/package/installer/SSH/dev-activation gates passed. Version-only
+#1353 then passed its stable gates and set both manifests to `0.91.0` on master
+`190778de`. No `v0.91.0` tag or public assets have been created.
+
+Final manual Full Source Validation
+[33899369066](https://github.com/TraderAlice/OpenAlice/actions/runs/33899369066)
+found two TUI fixture timeouts on clean macOS and three failures on Linux.
+The same three failures reproduce in isolated local Linux Docker, despite all
+91 TUI tests passing on the development Mac. The fixtures let Fleet discovery
+read the host registry/Home and consume scripted Runtime inspection results:
+an absent host Home disables Launch, while background inventory consumes a
+failure intended for the active-target health sequence. Replace these incidental
+host/network reads with explicit local Fleet and empty Inbox fixtures; retain
+the complete launch/recovery assertions and remove the ineffective CI-only
+timeout increase. This is a test-only dev-lane correction, not a runtime fix or
+a reason to waive final stable validation. Re-promote only this correction,
+preserving the already prepared stable manifest versions.
+
+The corrected fixture passes all 91 TUI tests twice in a fresh Linux container
+(1.77s and 1.81s total, compared with reproducible 31.85s failed baseline),
+without changing production code or weakening the three-failure recovery
+sequence. CLI/root types and full local regression passed: 714 files, 6,360
+tests passed, three expected skips, 243.48 seconds.
+
+Earlier acceptance evidence:
+
 Maintainer authorized stable publication, including both Windows CLI targets.
 AUR activation is deferred while account registration is closed. Promotion
-[PR #1349](https://github.com/TraderAlice/OpenAlice/pull/1349) remains unmerged:
+[PR #1349](https://github.com/TraderAlice/OpenAlice/pull/1349) initially waited on:
 local full regression (712 files, 6,360 passes, three expected skips), root
 types, unsigned packaged Workspace/Pi acceptance, OrbStack Docker and Guardian
 recovery passed. The exact dev channel and both Windows native replay receipts
@@ -12,10 +40,9 @@ passed. Hosted Docker passed unchanged on retry, as did Windows desktop/upgrade,
 Windows Broker Packs and Apple Silicon desktop/upgrade.
 
 Intel desktop Guardian/PTY smoke timed out twice after successful takeover;
-the second run also recorded a spawned Shell but no PTY connection. Do not retry
-blindly or waive it. Add smoke-only boundary diagnostics and a single-host manual
-rehearsal selector, identify the cause, then resume promotion and the separate
-version-only preparation. No stable tag or public 0.91.0 bytes exist yet. Release
+the second run also recorded a spawned Shell but no PTY connection. Smoke-only
+boundary diagnostics and a single-host rehearsal then passed as described below.
+No stable tag or public 0.91.0 bytes exist yet. Release
 and package-manager authority remain owned by [[docs/development-workflow.md]]
 and [[docs/cli-package-managers.md]].
 
@@ -24,8 +51,8 @@ passed native Intel takeover, PTY/CLI, packaged Workspace/Pi, and previous-app
 upgrade acceptance. Main returned Workspace HTTP 201 at `16:17:23.386Z`; the
 renderer observed response headers at `16:18:24.943Z`, then successfully spawned
 and attached the Shell. Total takeover smoke was 88 seconds against a 90-second
-budget. Increase only the smoke's bounded overall deadline to 180 seconds;
-retain every assertion and phase diagnostic, with no sleep, retry loop or
+budget. PR #1351 increased only the bounded overall deadline to 180 seconds,
+retaining every assertion and phase diagnostic, with no sleep, retry loop or
 production transport workaround. The underlying renderer delivery latency is
 not explained or claimed fixed; track it in [#1350](https://github.com/TraderAlice/OpenAlice/issues/1350). Local diagnostic regression
 passed 712 files / 6,361 tests with three expected skips, root/Desktop types and
