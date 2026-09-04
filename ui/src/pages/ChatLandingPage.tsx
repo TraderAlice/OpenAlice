@@ -8,6 +8,7 @@ import {
   type ReactNode,
 } from 'react'
 import { useTranslation } from 'react-i18next'
+import { PageTopBar } from '../components/PageTopBar'
 import {
   ArrowUp,
   BriefcaseBusiness,
@@ -447,6 +448,7 @@ function HarnessLandingPage({
       data-testid="harness-landing-root"
       className="@container/harness flex h-full min-h-0 w-full flex-col overflow-hidden bg-background"
     >
+      <PageTopBar title={t(mode === 'chat' ? 'chat.newChat' : mode === 'auto-quant' ? 'autoQuant.newResearch' : 'autoPrediction.newResearch')} />
       <div
         data-testid="harness-landing-scroll"
         className="oa-harness-scroll flex min-h-0 flex-1 justify-start overflow-x-hidden overflow-y-auto overscroll-contain px-5 py-8 @min-[42rem]/harness:px-8 @min-[42rem]/harness:py-10"

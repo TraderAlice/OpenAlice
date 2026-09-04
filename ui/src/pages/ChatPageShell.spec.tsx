@@ -57,13 +57,15 @@ describe('ChatPageShell', () => {
     render(<ChatPageShell><div>Chat content</div></ChatPageShell>)
 
     expect(screen.getByTestId('harness-sidebar')).toBeTruthy()
-    expect(screen.getByRole('button', { name: 'Collapse Ask Alice' })).toBeTruthy()
+    expect(screen.queryByRole('button', { name: 'Collapse Ask Alice' })).toBeNull()
+    expect(screen.getByRole('separator', { name: 'Resize Ask Alice' })).toBeTruthy()
     expect(screen.queryByRole('group', { name: 'Workspace display mode' })).toBeNull()
   })
 
   it('reuses the Ask Alice shell chrome for a ready AutoQuant desk', () => {
     render(<ChatPageShell mode="auto-quant"><div>Quant content</div></ChatPageShell>)
-    expect(screen.getByRole('button', { name: 'Collapse Quant' })).toBeTruthy()
+    expect(screen.queryByRole('button', { name: 'Collapse Quant' })).toBeNull()
+    expect(screen.getByRole('separator', { name: 'Resize Quant' })).toBeTruthy()
     expect(screen.getByTestId('harness-sidebar')).toBeTruthy()
   })
 

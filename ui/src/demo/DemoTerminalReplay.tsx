@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
-import type { ReactElement } from 'react'
+import type { ReactElement, ReactNode } from 'react'
+import { PageTopBar } from '../components/PageTopBar'
+import { Button } from '../components/ui/button'
 import { Play } from 'lucide-react'
 
 import { FitAddon } from '@xterm/addon-fit'
@@ -18,15 +20,16 @@ interface DemoTerminalReplayProps {
   readonly label: string
   readonly wsId: string
   readonly sessionId: string
+  readonly headerActions?: ReactNode
 }
 
 export function DemoTerminalReplay(props: DemoTerminalReplayProps): ReactElement {
   const transcript = transcriptsByWorkspace[props.wsId]
-  if (!transcript) return <DemoTerminalStub label={props.label} />
-  return <ReplayPane key={props.sessionId} label={props.label} transcript={transcript} />
+  if (!transcript) return <><PageTopBar title={props.label} actions={props.headerActions} /><DemoTerminalStub label={props.label} /></>
+  return <ReplayPane key={props.sessionId} label={props.label} transcript={transcript} headerActions={props.headerActions} />
 }
 
-function ReplayPane({ label, transcript }: { label: string; transcript: Transcript }): ReactElement {
+function ReplayPane({ label, transcript, headerActions }: { label: string; transcript: Transcript; headerActions?: ReactNode }): ReactElement {
   const containerRef = useRef<HTMLDivElement | null>(null)
   const [done, setDone] = useState(false)
   const [replayKey, setReplayKey] = useState(0)
@@ -119,23 +122,19 @@ function ReplayPane({ label, transcript }: { label: string; transcript: Transcri
 
   return (
     <div className="terminal-shell">
-      <header className="terminal-header">
-        <span className="inline-flex items-center gap-1.5 text-[10px] font-medium leading-4 text-warning">
-          <Play aria-hidden className="size-3 fill-current" />
-          Replay
-        </span>
-        <span className="text-[11px] text-muted-foreground truncate">{label}</span>
-        <span className="flex-1" />
+      <PageTopBar title={label} actions={<>
+        {headerActions}
         {done && (
-          <button
+          <Button variant="ghost" size="sm"
             type="button"
             onClick={() => setReplayKey((k) => k + 1)}
-            className="text-[11px] text-warning hover:underline"
           >
             ↻ Replay again
-          </button>
+          </Button>
         )}
-      </header>
+      </>}>
+        <span className="inline-flex items-center gap-1.5 text-xs text-warning"><Play aria-hidden className="size-3 fill-current" />Replay</span>
+      </PageTopBar>
       <div ref={containerRef} className="terminal-host" />
     </div>
   )

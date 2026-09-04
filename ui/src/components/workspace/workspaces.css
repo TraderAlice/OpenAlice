@@ -520,7 +520,7 @@
    * that view's titlebar, leave the titlebar exposed so its Files toggle can
    * close the overlay again. */
   .workspace-page-shell.is-terminal-canvas .workspace-side {
-    inset-block-start: 37px;
+    inset-block-start: 0;
   }
 }
 
@@ -1234,78 +1234,6 @@ button.files-row:focus-visible {
   box-shadow: 0 10px 30px color-mix(in srgb, var(--shadow-color) 35%, transparent);
 }
 
-.terminal-header {
-  display: flex;
-  align-items: center;
-  min-width: 0;
-  overflow: hidden;
-  gap: 10px;
-  padding: 8px 12px;
-  background: linear-gradient(180deg, var(--muted), var(--secondary));
-  border-bottom: 1px solid var(--border);
-  font-size: 12px;
-  color: var(--muted-foreground);
-  user-select: none;
-}
-
-.terminal-title {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  color: var(--foreground);
-  font-weight: 600;
-  letter-spacing: 0.2px;
-  font-family: ui-monospace, "SF Mono", Menlo, monospace;
-}
-
-.terminal-meta {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  margin-left: auto;
-  font-variant-numeric: tabular-nums;
-}
-
-.terminal-title-separator {
-  flex: 0 0 auto;
-  color: var(--muted-foreground);
-}
-
-.terminal-session-title {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  color: var(--muted-foreground);
-  font-family: ui-monospace, "SF Mono", Menlo, monospace;
-  font-size: 11px;
-}
-
-.terminal-header-actions {
-  display: inline-flex;
-  flex: 0 0 auto;
-  align-items: center;
-  gap: 4px;
-}
-
-.terminal-header-action {
-  height: 24px;
-  padding: 0 8px;
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  background: var(--secondary);
-  color: var(--foreground);
-  font-size: 11px;
-  line-height: 22px;
-}
-
-.terminal-header-action:hover {
-  border-color: var(--primary);
-  color: var(--primary);
-}
-
 /* A pinned terminal is the Workspace page's primary canvas, not a card inside
  * another card. Its titlebar absorbs the Workspace actions and its shell runs
  * edge-to-edge; the remaining borders describe actual pane splits. */
@@ -1324,20 +1252,6 @@ button.files-row:focus-visible {
   box-shadow: none;
 }
 
-.terminal-shell.is-canvas .terminal-header {
-  padding-block: 6px;
-  background: var(--secondary);
-}
-
-@container (max-width: 680px) {
-  .terminal-shell.is-canvas .terminal-meta {
-    display: none;
-  }
-
-  .terminal-shell.is-canvas .terminal-session-title {
-    flex: 1 1 auto;
-  }
-}
 
 .status-dot {
   width: 8px;
@@ -1418,23 +1332,6 @@ button.files-row:focus-visible {
     var(--background);
 }
 
-.webpi-header {
-  width: 100%;
-  min-width: 0;
-  min-height: 58px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  padding: 10px 18px;
-  border-bottom: 1px solid var(--border);
-  background: color-mix(in srgb, var(--secondary) 72%, transparent);
-}
-
-.webpi-header > div:first-child { min-width: 0; }
-.webpi-title { font-size: 13px; font-weight: 650; }
-.webpi-title span { margin-left: 7px; color: var(--muted-foreground); font-size: 10px; font-weight: 600; }
-.webpi-subtitle { margin-top: 2px; color: var(--muted-foreground); font-size: 10px; }
 .webpi-phase { display: inline-flex; align-items: center; gap: 5px; padding: 4px 8px; border: 1px solid var(--border); border-radius: 999px; color: var(--muted-foreground); font-size: 10px; text-transform: capitalize; }
 .webpi-phase.is-working, .webpi-phase.is-retrying, .webpi-phase.is-compacting { color: var(--primary); }
 .webpi-phase.is-failed { color: var(--destructive); }
@@ -1607,11 +1504,6 @@ button.files-row:focus-visible {
 }
 
 @container webpi (max-width: 460px) {
-  .webpi-header { min-height: 54px; gap: 8px; padding: 9px 12px; }
-  .webpi-title,
-  .webpi-subtitle { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .webpi-title span { display: block; margin: 1px 0 0; }
-  .webpi-subtitle { display: none; }
   .webpi-messages { padding-top: 18px; }
   .webpi-message { margin-bottom: 20px; }
   .webpi-activity > summary { gap: 6px; padding-inline: 8px; }

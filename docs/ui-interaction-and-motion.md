@@ -175,53 +175,47 @@ keyboard navigation, outside dismissal, scroll locking, and focus return.
 - Delete superseded event plumbing during migration. A component is not
   migrated if its old global Escape/outside-click/focus-loop implementation is
   still running beside the primitive.
-- Shared split layouts use the checked-in shadcn Resizable primitive for their
-  separator, pointer/touch capture, and keyboard resizing. Product adapters
-  such as `PageSidebarLayout` continue to own route content, responsive mode,
-  collapse affordances, and persisted preferences; they must not add a second
-  visible border or parallel document-level drag listeners beside the shared
-  separator. Responsive min/max values must be derived from the measured split
-  group rather than the window: app-shell chrome sits outside that group. Keep
-  the complete constraint set feasible at every supported width; when there is
-  not enough room for both preferred minimums, preserve the navigator minimum
-  and give the working view the measured remainder instead of sending mutually
-  impossible hard minimums to the primitive. Treat the primitive's applied
-  panel geometry as the authority for which expanded or collapsed surface is
-  interactive; input-source bookkeeping may decide whether a settled width is
-  persisted, but must never gate `aria-hidden`, `inert`, or collapse-state
-  synchronization. Capture resize intent at the split-group boundary so the
-  separator's enlarged fine/coarse pointer target behaves like its visible
-  one-pixel rule. Persist keyboard changes from the settled layout map rather
-  than a pre-paint DOM width, which can lag one key press behind. Direct pointer
-  resizing must stay attached to the cursor above the navigator minimum. Below
-  that minimum, keep the primitive layout and internal content measure fixed,
-  show only a bounded damped overdrag, and spring back on release before the
-  primitive's native collapsed-state midpoint. Arm the shared motion token as
-  that midpoint is crossed so the 200px-to-44px commit retains spatial
-  continuity without squeezing the navigator's controls or making ordinary
-  width changes feel lazy. Do not toggle the primitive's `collapsible`
-  metadata during an active pointer transaction; its native midpoint remains
-  the single collapse boundary.
-  Keep geometry transactions single-owner: native pointer and keyboard
-  interactions settle through the primitive, while a product collapse or
-  restore affordance issues exactly one imperative geometry call. Product
-  effects may reconcile applied geometry with persisted intent, but must not
-  repeat the same collapse/expand transaction. Because pixel constraint changes
-  can re-register v4 Panels after the group's settled callback, validate both
-  the settled layout and the final Panel ResizeObserver result; reject and
-  repair one-panel `100%` layouts instead of persisting them. A spring cleanup
-  timer begins only after release. When a new drag interrupts a returning
-  spring, cancel that timer and freeze the currently painted edge before
-  resuming direct manipulation so the handle never snaps away from the pointer.
-  Registration inputs such as `defaultSize` must remain stable during a held
-  pointer transaction; crossing a collapse midpoint is applied state, not a
-  reason to unregister and rebuild the Panel. If the product tracks gesture
-  state outside the primitive, capture that pointer at the split-group boundary
-  so an out-of-bounds release cannot strand it. A final invariant observer must
-  compare the painted navigator and content flex items, not only the primitive's
-  internal size callback. If those surfaces diverge into an impossible
-  `100%`/`0%` pair, rebuild one coherent group snapshot from the last valid
-  preference; repeating an already-satisfied internal resize is not recovery.
+- The app has one global navigation rail. When expanded, its desktop collapse
+  control sits to the right of the OpenAlice brand. When compact, the expand
+  control moves to the leading edge of the right-hand area's top bar. Only one
+  copy is mounted; activation transfers keyboard focus to the new location.
+  Responsive compact mode is a default, never a lock: an explicit expanded
+  preference remains effective on Chat and small desktop windows.
+- `TopBar` owns compact header geometry (40px desktop, at least 48px on phone).
+  `PageContentLayout` owns a fixed header slot; `PageTopBar` portals a page's
+  title and actions into it without copying business state or callbacks.
+  `PageHeader` adds description/live metadata below this bar. Keep large
+  onboarding prompts in the content rather than enlarging the global chrome.
+  Pages with dense actions wrap them and keep contextual metadata out of the
+  primary action row. Preserve full-title hints when labels truncate.
+- `PrimaryNavigationContext` supplies the expand control only while compact. A desktop
+  `PageSidebarLayout` consumes it in the navigator's top bar and masks it from
+  the content header. Without a static navigator, the content header consumes
+  it. There must be exactly one visible desktop primary-navigation toggle.
+  Phone navigation remains in `MobileContextBar`; feature drawers keep their
+  own labeled controls and shared Sheet focus/dismissal behavior.
+- A secondary navigator belongs to the feature's content layout, not to a
+  second global navigation layer. `PageSidebarLayout` keeps desktop resizing
+  but offers no generic collapse/restore, collapsed strip, or overdrag gesture.
+  Old saved secondary-collapse preferences are ignored; width preferences stay
+  intact. This does not prohibit a feature from owning collapsible internal
+  panels or a narrow-screen drawer where its workflow needs them.
+- Shared split layouts use the checked-in shadcn Resizable primitive for
+  separator geometry, pointer/touch capture, and keyboard resizing. Do not add
+  a second visible border or parallel document-level drag listeners.
+  Derive feasible min/max constraints from the measured split group, not the
+  window. When there is not enough room for preferred minimums, preserve the
+  navigator's 200px minimum and give content the measured remainder.
+  Capture intent at the group boundary so enlarged fine/coarse targets behave
+  like the visible separator, including an out-of-bounds pointer release.
+  Persist settled user widths, not temporary responsive caps; keyboard widths
+  come from the settled layout map rather than a pre-paint DOM measurement.
+  Keep Panel registration defaults stable during a gesture.
+  Because pixel constraint changes can re-register v4 Panels after a settled
+  callback, validate both the layout and painted navigator/content flex items.
+  Repair impossible `100%`/`0%` geometry with one coherent group snapshot from
+  the last valid preference; an already-satisfied internal resize is not
+  recovery.
 
 The `@/` alias resolves to `ui/src` in Vite, TypeScript, and the UI Vitest
 project. Backend tests keep their existing root `@` alias.

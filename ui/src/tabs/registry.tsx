@@ -50,6 +50,7 @@ import { WorkspacesSidebar } from '../components/workspace/WorkspacesSidebar'
 import { SettingsCategoryList } from '../components/SettingsCategoryList'
 import { MarketSidebar } from '../components/MarketSidebar'
 import { PortfolioSidebar } from '../components/PortfolioSidebar'
+import { PageContentLayout } from '../components/PageTopBar'
 import { AutomationSidebar } from '../components/AutomationSidebar'
 import { getDesignProject } from '../design/projects'
 
@@ -158,7 +159,7 @@ const issueDetailModule: ViewModule<'issue-detail'> = {
   title: (spec) => spec.params.id,
   toUrl: (spec) =>
     `/issues/${encodeURIComponent(spec.params.wsId)}/${encodeURIComponent(spec.params.id)}`,
-  Component: ({ spec }) => <IssueDetailPage spec={spec} />,
+  Component: ({ spec }) => <PageContentLayout title={spec.params.id}><IssueDetailPage spec={spec} /></PageContentLayout>,
 }
 
 const trackedIssueDetailModule: ViewModule<'tracked-issue-detail'> = {
@@ -206,7 +207,7 @@ const officeModule: ViewModule<'office'> = {
   kind: 'office',
   title: () => 'Office',
   toUrl: () => '/office',
-  Component: () => <OfficePage />,
+  Component: () => <PageContentLayout title="Office"><OfficePage /></PageContentLayout>,
 }
 
 function MarketArea({ children }: { children: ReactNode }) {

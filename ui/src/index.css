@@ -523,56 +523,6 @@ body {
   animation: oa-backdrop-enter var(--motion-standard) ease-out both;
 }
 
-/* Keep direct pointer resizing attached to the cursor, then soften only the
-   primitive's discrete 200px -> 44px collapse snap. Panel classes are applied
-   to react-resizable-panels' nested content element, so this rule deliberately
-   targets the direct flex item from the product-owned group seam. */
-.oa-page-sidebar-resizable[data-collapse-motion="armed"]
-  > [data-panel][data-collapse-state] {
-  transition: flex-grow var(--motion-standard) var(--motion-ease-out);
-}
-
-/* The expanded navigator keeps a hard 200px layout floor. Pointer travel past
-   that floor is represented as a damped, clipped overdrag: content retains its
-   layout width, the separator follows the resisted edge, and the working pane
-   shifts only for the duration of the gesture. Releasing before the commit
-   boundary uses a deliberately light spring; a committed gesture blends this
-   offset back into the primitive-owned 200px -> 44px collapse. */
-.oa-page-sidebar-resizable {
-  --oa-page-sidebar-overdrag: 0px;
-}
-
-.oa-page-sidebar-resizable > [data-page-sidebar-panel="navigator"] {
-  clip-path: inset(0 var(--oa-page-sidebar-overdrag) 0 0);
-}
-
-.oa-page-sidebar-resizable > [data-slot="resizable-handle"],
-.oa-page-sidebar-resizable > [data-page-sidebar-panel="content"] {
-  transform: translateX(calc(-1 * var(--oa-page-sidebar-overdrag)));
-}
-
-.oa-page-sidebar-resizable[data-overdrag-motion]
-  > [data-page-sidebar-panel="navigator"] {
-  transition: clip-path 240ms cubic-bezier(0.2, 1.3, 0.35, 1);
-}
-
-.oa-page-sidebar-resizable[data-overdrag-motion]
-  > [data-slot="resizable-handle"],
-.oa-page-sidebar-resizable[data-overdrag-motion]
-  > [data-page-sidebar-panel="content"] {
-  transition: transform 240ms cubic-bezier(0.2, 1.3, 0.35, 1);
-}
-
-.oa-page-sidebar-resizable[data-overdrag-state="resisting"]
-  > [data-slot="resizable-handle"] {
-  background-color: color-mix(in srgb, var(--foreground) 22%, var(--border));
-}
-
-.oa-page-sidebar-resizable[data-overdrag-state="armed"]
-  > [data-slot="resizable-handle"] {
-  background-color: color-mix(in srgb, var(--foreground) 36%, var(--border));
-}
-
 /* Page-owned navigators become touch surfaces inside the phone drawer.
    A 40px height floor removes the old 18–28px rows; icon controls keep 36px
    of horizontal room so adjacent workspace names remain distinguishable. */
@@ -673,27 +623,29 @@ body {
   @apply text-[11px] leading-[15px];
 }
 
-/* Page headers normally keep compact actions inline. Dense operational
-   controls can opt into a content-pane-aware stack so their title and status
-   retain full width after app/local sidebars are accounted for. */
-@container (max-width: 34rem) {
-  .oa-page-header-stack-actions {
-    align-items: stretch;
-    flex-direction: column;
-    gap: 0.75rem;
-  }
-
-  .oa-page-header-stack-actions > :first-child {
-    width: 100%;
-  }
-
-  .oa-page-header-actions {
-    width: 100%;
-  }
-
-  .oa-uta-header-divider {
-    display: none;
-  }
+/* One chrome row for navigator and working view. Body descriptions are not
+   toolbar content. Layout owns the header slot; pages retain their actions. */
+.oa-topbar-host { container-type: inline-size; }
+.oa-topbar {
+  display: flex;
+  flex: 0 0 auto;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 8px;
+  min-height: 40px;
+  padding: 4px 12px;
+  border-bottom: 1px solid var(--border);
+  color: var(--foreground);
+}
+.oa-topbar-leading { display: flex; flex: 0 0 auto; align-items: center; gap: 4px; }
+.oa-topbar-leading:empty { display: none; }
+.oa-topbar-identity { display: flex; flex: 1 1 6rem; min-width: 0; align-items: center; gap: 8px; }
+.oa-topbar-actions { display: flex; flex: 0 1 auto; max-width: 100%; min-width: 0; flex-wrap: wrap; align-items: center; gap: 4px; }
+.oa-topbar-actions > div { max-width: 100%; flex-wrap: wrap; }
+.oa-topbar [data-slot="button"] { min-height: 28px; }
+@media (max-width: 767px), (pointer: coarse) {
+  .oa-topbar { min-height: 48px; }
+  .oa-topbar [data-slot="button"] { min-height: 40px; }
 }
 
 /* ==================== Live-data pulse ====================
