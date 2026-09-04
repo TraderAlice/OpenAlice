@@ -8,7 +8,7 @@ import { usePendingPushCount } from '../live/trading-push'
 import { useConnectorWarningCount } from '../live/connector-health'
 import { useActivityBarCollapse } from '../live/activity-bar-collapse'
 import { useTranslation } from 'react-i18next'
-import { ThemeToggle } from './ThemeToggle'
+import { ActivityBarUtilityMenu } from './ActivityBarUtilityMenu'
 import { useAliceProject } from '../hooks/useAliceProject'
 import { useBetaFeatures } from '../live/beta-features'
 import { joinNavLayout, NAV_SECTIONS } from './activity-navigation'
@@ -125,27 +125,54 @@ export function ActivityBar({
   const narrowRail = desktopStatic && railMode === 'narrow' && !compactRail
   const denseRail = desktopStatic && shortRailHeight
   const mobileDrawerRef = useRef<HTMLDivElement>(null)
+  const railToggle = desktopStatic && !forcedCompactRail ? (
+    <Tooltip>
+      <TooltipTrigger
+        render={
+          <Button
+            type="button"
+            onClick={() => setRailCollapsed(!railCollapsed)}
+            aria-label={t(railCollapsed ? 'nav.expandRail' : 'nav.collapseRail')}
+            className={`${denseRail ? 'h-[26px] w-[26px]' : ''} shrink-0 text-muted-foreground`}
+            variant="ghost"
+            size="icon-sm"
+          />
+        }
+      >
+        {railCollapsed
+          ? <PanelLeftOpen size={denseRail ? 14 : 16} strokeWidth={1.75} aria-hidden />
+          : <PanelLeftClose size={denseRail ? 14 : 16} strokeWidth={1.75} aria-hidden />}
+      </TooltipTrigger>
+      <TooltipContent side="right" sideOffset={8}>
+        {t(railCollapsed ? 'nav.expandRail' : 'nav.collapseRail')}
+      </TooltipContent>
+    </Tooltip>
+  ) : null
   const railContent = (
     <>
-        <div className={`${denseRail ? 'h-10 md:h-8' : 'h-10'} flex shrink-0 items-center ${compactRail ? 'justify-center px-0' : narrowRail ? 'gap-2 px-3' : 'gap-2.5 px-3.5'}`}>
-          <img
-            src="/alice.ico"
-            alt="Alice"
-            className={`${denseRail ? 'h-6 w-6 md:h-5 md:w-5' : 'h-[22px] w-[22px]'} shrink-0 object-contain`}
-            draggable={false}
-          />
-          <h1 className={`min-w-0 flex-1 truncate text-[13px] font-semibold leading-[18px] tracking-[-0.01em] text-foreground ${compactRail ? 'md:hidden' : ''}`}>OpenAlice</h1>
-          {!desktopStatic && (
-            <Button
-              type="button"
-              onClick={onClose}
-              aria-label={t('common.closePanel', { title: t('nav.primaryNavigation') })}
-              className="-mr-1 shrink-0 text-muted-foreground"
-              variant="ghost"
-              size="icon"
-            >
-              <X size={15} strokeWidth={1.75} aria-hidden />
-            </Button>
+        <div className={`${denseRail ? 'h-10 md:h-8' : 'h-10'} flex shrink-0 items-center ${compactRail ? 'justify-center px-0' : narrowRail ? 'gap-1.5 px-2.5' : 'gap-2.5 px-3.5'}`}>
+          {railCollapsed && !forcedCompactRail && desktopStatic ? railToggle : (
+            <>
+              <img
+                src="/alice.ico"
+                alt="Alice"
+                className={`${denseRail ? 'h-6 w-6 md:h-5 md:w-5' : 'h-[22px] w-[22px]'} shrink-0 object-contain`}
+                draggable={false}
+              />
+              <h1 className={`min-w-0 flex-1 truncate text-[13px] font-semibold leading-[18px] tracking-[-0.01em] text-foreground ${compactRail ? 'md:hidden' : ''}`}>OpenAlice</h1>
+              {!desktopStatic ? (
+                <Button
+                  type="button"
+                  onClick={onClose}
+                  aria-label={t('common.closePanel', { title: t('nav.primaryNavigation') })}
+                  className="-mr-1 shrink-0 text-muted-foreground"
+                  variant="ghost"
+                  size="icon"
+                >
+                  <X size={15} strokeWidth={1.75} aria-hidden />
+                </Button>
+              ) : railToggle}
+            </>
           )}
         </div>
 
@@ -275,34 +302,18 @@ export function ActivityBar({
           })}
         </nav>
 
-        {/* Footer — global icon controls pinned to the bottom of the rail. */}
-        <div className={`flex shrink-0 items-center ${compactRail ? `${denseRail ? 'py-2 md:py-0.5 md:gap-px' : 'py-2 md:gap-1'} px-4 md:flex-col md:items-center md:px-2` : 'justify-between gap-2 border-t border-border/55 px-2 py-1'}`}>
-          <ThemeToggle compact={denseRail} />
-          {!forcedCompactRail && (
-            <Tooltip>
-              <TooltipTrigger
-                render={
-                  <Button
-                    type="button"
-                    onClick={() => setRailCollapsed(!railCollapsed)}
-                    aria-label={t(railCollapsed ? 'nav.expandRail' : 'nav.collapseRail')}
-                    aria-hidden={!desktopStatic ? true : undefined}
-                    tabIndex={!desktopStatic ? -1 : undefined}
-                    className={`hidden ${denseRail ? 'md:h-[26px] md:w-[26px]' : ''} shrink-0 text-muted-foreground md:flex`}
-                    variant="ghost"
-                    size="icon"
-                  />
-                }
-              >
-                {railCollapsed
-                  ? <PanelLeftOpen size={denseRail ? 14 : 17} strokeWidth={1.75} aria-hidden />
-                  : <PanelLeftClose size={denseRail ? 14 : 17} strokeWidth={1.75} aria-hidden />}
-              </TooltipTrigger>
-              <TooltipContent side="right" sideOffset={8}>
-                {t(railCollapsed ? 'nav.expandRail' : 'nav.collapseRail')}
-              </TooltipContent>
-            </Tooltip>
-          )}
+        {/* Application controls pinned to the bottom of the rail. */}
+        <div className={`shrink-0 border-t border-border/55 ${compactRail ? `flex justify-center ${denseRail ? 'py-0.5' : 'py-2'}` : 'p-1.5'}`}>
+          <ActivityBarUtilityMenu
+            compactRail={compactRail}
+            denseRail={denseRail}
+            active={selectedSidebar === 'settings'}
+            onOpenSettings={() => {
+              setSidebar('settings')
+              openOrFocus({ kind: 'settings', params: { category: 'general' } })
+              onClose()
+            }}
+          />
         </div>
     </>
   )

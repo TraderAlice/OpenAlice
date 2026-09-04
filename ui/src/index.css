@@ -80,6 +80,13 @@
   --font-mono: "SF Mono", "Fira Code", "Cascadia Code", Menlo, Consolas,
     monospace;
 
+  /* OpenAlice is a dense workbench: Tailwind's default 14px `text-sm` makes
+     shared controls and overlays compete with page titles. Keep the familiar
+     20px reading rhythm while aligning the global body/control size to the
+     semantic `.text-body` token below. */
+  --text-sm: 13px;
+  --text-sm--line-height: 20px;
+
   /* Compact workbench geometry. Composer and drawer silhouettes keep their
      dedicated larger radii at the component boundary. */
   --radius-sm: 4px;

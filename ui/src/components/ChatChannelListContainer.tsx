@@ -1,5 +1,4 @@
 import { ChatWorkspaceSection } from './workspace/ChatWorkspaceSection'
-import type { ChatDisplayMode } from './workspace/chat-display-mode'
 
 /**
  * Chat activity sidebar — **workspace chat only**.
@@ -17,21 +16,15 @@ import type { ChatDisplayMode } from './workspace/chat-display-mode'
 export function ChatChannelListContainer({
   mode = 'chat',
   onNavigate,
-  displayMode,
-  onRequestDisplayMode,
 }: {
   mode?: 'chat' | 'auto-quant' | 'prediction'
   onNavigate?: () => void
-  displayMode: ChatDisplayMode
-  onRequestDisplayMode: (mode: ChatDisplayMode) => void
 }) {
   return (
     <div className="flex h-full min-h-0 flex-col">
       <ChatWorkspaceSection
         mode={mode}
         onNavigate={onNavigate}
-        displayMode={displayMode}
-        onRequestDisplayMode={onRequestDisplayMode}
       />
     </div>
   )

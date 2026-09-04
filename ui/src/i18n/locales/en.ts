@@ -43,6 +43,8 @@ export const en = {
     connectorNeedsAttention: '{{count}} connector needs attention',
     about: 'About {{label}}',
     primaryNavigation: 'Primary navigation',
+    applicationMenu: 'Open settings menu',
+    appearanceMenu: 'Appearance: {{mode}}',
     collapseRail: 'Collapse activity bar',
     expandRail: 'Expand activity bar',
   },
