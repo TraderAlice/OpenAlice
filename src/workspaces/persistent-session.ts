@@ -509,6 +509,15 @@ export class PersistentSession {
       forwardQueryReplies: ws === null || ws.readyState !== ws.OPEN,
     });
     if (ws !== null) {
+      // Backends without a native pause primitive (Windows Bun ConPTY) must
+      // not accumulate an unbounded socket queue. Preserve the agent and its
+      // bounded scrollback; the client can reconnect and replay that tail.
+      if (!this.term.pause && ws.bufferedAmount >= this.opts.highWatermarkBytes) {
+        this.log.warn('session.slow_consumer_detached');
+        this.detach();
+        ws.close(1013, 'Terminal consumer is too slow; reconnect to resume');
+        return;
+      }
       ws.send(buf, { binary: true }, (err) => {
         if (err) {
           this.log.warn('session.send_error', { err });

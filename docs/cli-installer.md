@@ -51,9 +51,51 @@ bash install --archive ./openalice-cli-0.91.0-linux-x64.tar.gz \
   --sha256 <64-lowercase-hex>
 ```
 
-Native Windows PowerShell installation is deferred. Windows users use the
-Electron distribution or an explicitly chosen POSIX environment until that
-lane is implemented and accepted.
+Native Windows has an independent experimental ZIP/PowerShell lane described
+below. The normal stable/beta/dev installer and npm channels remain macOS/Linux
+only; Windows previews do not silently join those channels.
+
+### Windows x64 and ARM64 preview
+
+`Windows CLI Preview` builds complete native ZIPs with private PortableGit/Bash,
+UI, templates, Workspace helpers, checksums and commit metadata. It does not
+bundle an Agent Runtime, Node, or npm. The host architecture must match the
+package; ARM64 is not an x64-emulation label.
+
+Run the registered workflow from the intended `dev` source:
+
+```bash
+gh workflow run cli-installer-smoke.yml --ref dev -f windows_preview=true
+```
+
+This opts into only the two independent Windows jobs. It does not run the
+macOS/Linux installer matrix, full suite, Electron, signing, npm publication,
+or mutate any release/channel. Each downloadable Actions artifact contains a
+ZIP, its `.sha256`, installer, and candidate receipt. Native acceptance is a
+separate receipt: an available ZIP alone is not a passed smoke.
+
+After downloading the candidate and reviewing its checksum, use ordinary
+Windows PowerShell (no administrator rights):
+
+```powershell
+.\install-preview.ps1 -Archive .\openalice-cli-<version>-windows-<arch>-<commit>.zip `
+  -Sha256 <64-hex-digest> -InstallDir "$env:LOCALAPPDATA\OpenAlice\preview-<commit>" -Yes
+& "$env:LOCALAPPDATA\OpenAlice\preview-<commit>\bin\openalice.exe"
+```
+
+`-Archive` also accepts an explicit HTTPS URL. `-Plan` prints without mutation;
+without `-Yes` installation asks for consent. An existing destination is always
+refused. The script changes neither execution policy nor PATH nor profiles and
+never starts a Runtime. Do not globally relax PowerShell policy to run it;
+follow the machine's script policy or extract the checksum-verified ZIP and
+run `bin\openalice.exe` directly.
+
+Previews record custom/non-updating provenance. For now, install an update into
+a new directory, run the old executable's `down`, then launch the new one using
+the same explicit `--home`. Do not overwrite a running executable. Removal is
+likewise manual after `down`: delete only that chosen preview installation,
+never the AliceProject/user-data directory. Managed update/rollback and npm
+activation are not advertised until their Windows paths are accepted.
 
 ## Artifact contract
 

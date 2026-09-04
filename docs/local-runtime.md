@@ -88,6 +88,16 @@ boundary, avoiding an unbounded JavaScript spool. Graceful shutdown resumes a
 stopped group before terminating it. Electron and source-backed Node execution
 continue using `node-pty` pause/resume.
 
+The experimental Windows CLI uses Bun ConPTY without pretending POSIX group
+signals work on Windows. This backend advertises no read-side pause support;
+when an attached WebSocket exceeds its high watermark, Alice detaches that
+consumer with retryable close code 1013, retaining the independent agent and
+bounded replay buffer. macOS/Linux keep producer pause/resume unchanged.
+Windows npm-installed agents use the user's `node.exe`, never the compiled
+OpenAlice executable as a general JavaScript interpreter. Native agent `.exe`
+files do not gain a Node dependency. Private PortableGit supplies the Windows
+Git/Bash layout for both x64 and ARM64, independently of managed Pi.
+
 ## Broker Packs
 
 UTA remains a separate process and optional for non-trading use. Activated

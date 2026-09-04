@@ -47,6 +47,20 @@ afterEach(async () => {
 });
 
 describe('resolveLaunchCommand', () => {
+  it('compiled Windows CLI uses external Node for npm agents, not its own executable', async () => {
+    await stockNpmShim('pi.cmd');
+    await touch('node.exe');
+    const result = resolveLaunchCommand(['pi', '-p', 'a & b'], { platform: 'win32', env, bunStandalone: true });
+    expect(result.mode).toBe('node-shim');
+    expect(result.argv).toEqual([join(dir, 'node.exe'), join(dir, 'node_modules/pkg/cli.js'), '-p', 'a & b']);
+  });
+
+  it('does not turn the compiled product into an interpreter when host Node is absent', async () => {
+    await stockNpmShim('pi.cmd');
+    const result = resolveLaunchCommand(['pi'], { platform: 'win32', env, bunStandalone: true });
+    expect(result.mode).not.toBe('node-shim');
+    expect(result.argv[0]).not.toBe(process.execPath);
+  });
   it('is the identity function off win32', () => {
     const r = resolveLaunchCommand(['pi', '--continue'], { platform: 'linux', env });
     expect(r).toEqual({ argv: ['pi', '--continue'], viaShell: false, mode: 'direct' });

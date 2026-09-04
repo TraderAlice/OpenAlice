@@ -3,7 +3,7 @@
 Status: Active — macOS/Linux native CLI is public in v0.90.2 and the separately
 dispatched v0.91.0-beta.3 is externally verified; stable remains v0.90.2 while
 stable/beta discovery authority is converged on the OpenAlice CDN. Native
-PowerShell and Homebrew/AUR activation remain deferred. npm/Bun's five public
+Windows x64/ARM64 preview and Homebrew/AUR activation remain in progress. npm/Bun's five public
 packages are published at v0.90.2 under maintainer `jiaran258`.
 
 Accepted OIDC increment: replace the temporary npm token with GitHub OIDC trust on
@@ -31,8 +31,43 @@ the real trusted workflow identity. Owner contract: [[docs/cli-package-managers.
 The next authorized stable release still owns real new-version upload and
 provenance acceptance. The persistent npm channel switch remains unchanged;
 normal source promotion must carry the OIDC workflow to `master` before a new
-stable release uses it. Windows x64 is the maintainer's accepted next platform
-increment, separate from this completed authentication change.
+stable release uses it. Windows x64 and ARM64 are the maintainer's accepted next
+platform increment, separate from this completed authentication change.
+
+## Current increment: Windows previews
+
+Accepted 2026-09-04: ship both Windows architectures iteratively, without making
+the Windows experiment a prerequisite for existing macOS/Linux channels.
+Owner contracts: [[docs/cli-installer.md]], [[docs/local-runtime.md]].
+
+Choose a portable ZIP plus checksum-bound, side-by-side PowerShell installation
+first. This gives testers a complete product immediately without prematurely
+claiming stable npm availability or adding Windows junction/update recovery to
+the first increment. A direct managed updater and npm registration remain later
+acceptance steps; custom preview provenance deliberately disables automatic
+channel discovery. Agent CLIs remain user-owned.
+
+- [x] Compile both Windows architectures with pinned Bun 1.4.0 locally.
+- [x] Assemble complete ZIPs with UI, templates, helpers and checksum-pinned
+  PortableGit/Bash; use the existing desktop Git pins, not desktop managed Pi.
+- [x] Add explicit PowerShell archive installation into a new directory, with
+  checksum/path/host checks, consent, no admin/PATH changes, and no data removal.
+- [x] Correct Windows Git environment, npm-agent interpreter resolution and
+  ConPTY termination; bound slow WebSocket consumers without POSIX signals.
+- [x] Add an independently retryable, manual x64/ARM64 workflow. Preserve each
+  archive before its native smoke so failures retain reproduction bytes.
+- [ ] Complete local regression/type checks and integrate this increment.
+- [ ] Run native Windows installation, Guardian/Alice/Web, Git, ConPTY input,
+  resize, independent termination and stop checks for each architecture.
+- [ ] Perform interactive external-agent/provider acceptance; record concrete
+  failures instead of claiming cross-compilation proves Windows runtime support.
+- [ ] Add accepted Windows artifacts to the normal direct-channel manifest and
+  npm topology, then first-publish and enroll the two new package identities.
+
+The first preview is not a new beta/stable release. It is commit-addressed
+Actions output with a separate native acceptance receipt and no mutable channel
+alias. `CLI Installer Smoke` can dispatch only this lane from integrated `dev`
+using `windows_preview=true`, without the normal manual installer matrix.
 
 Delivery mode: Serial / interactive from current `dev`. The accepted native CLI
 increments have already reached `dev`; the old `codex/usability-improvements`
@@ -252,19 +287,17 @@ installations are never removal targets.
 
 ### Initial build matrix
 
-The current cutover gate covers macOS and Linux. Native Windows is explicitly
-deferred; its PowerShell, PTY, path, junction, signing, and locked-executable
-work remains a later platform initiative rather than blocking this plan.
+The original cutover gate covers macOS and Linux. Windows x64 and ARM64 now
+have a separate preview increment above; they do not block the existing matrix.
 
 | Platform | Architectures | Initial gate |
 |---|---|---|
 | macOS | arm64, x64 | Required |
 | Linux glibc | arm64, x64 | Required |
-| Windows | x64 | Deferred |
+| Windows | x64, arm64 | Independent preview; native acceptance pending |
 
-Linux musl and Windows arm64 are follow-up targets only after there is a
-supported-user or deployment requirement. Do not multiply release variants
-before the required matrix is proven.
+Linux musl remains deferred. Windows ARM64 is explicitly requested and is not
+replaced by an x64 emulation claim.
 
 ## Installation and Package-manager Topology
 

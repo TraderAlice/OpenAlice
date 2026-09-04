@@ -27,8 +27,9 @@ try {
 
   one.term.resize(91, 31)
   two.term.resize(103, 37)
-  one.term.write('alpha\n')
-  two.term.write('beta\n')
+  const enter = process.platform === 'win32' ? '\r' : '\n'
+  one.term.write(`alpha${enter}`)
+  two.term.write(`beta${enter}`)
   await Promise.all([
     waitForOutput(one, 'OA_ONE_INPUT:alpha'),
     waitForOutput(two, 'OA_TWO_INPUT:beta'),
@@ -37,9 +38,9 @@ try {
   one.term.kill()
   await one.exited
 
-  two.term.write('still-alive\n')
+  two.term.write(`still-alive${enter}`)
   await waitForOutput(two, 'OA_TWO_INPUT:still-alive')
-  flowControl = await probeFlowControl()
+  if (process.platform !== 'win32') flowControl = await probeFlowControl()
 } finally {
   try {
     one.term.kill()

@@ -43,7 +43,7 @@ the durable truth after it changes. Git history is the archive.
   OpenAlice CDN manifests. Managed SSH installation and Project transfer pass
   the disposable Docker target; beta3 core Runtime/PTY state survives a long
   tunnel outage, and the following `dev` increment refreshes Settings identity
-  after recovery. Native PowerShell and external package-manager activation
+  after recovery. Native Windows x64/ARM64 ZIP and PowerShell previews plus external package-manager activation
   remain open on focused branches from current `dev`. Routine dev
   and exact-beta source feedback is reduced to local-first, lightweight
   hosted lanes while `master` promotion, stable, and final artifact acceptance
