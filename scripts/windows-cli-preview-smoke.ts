@@ -116,6 +116,7 @@ async function findCandidates(directory: string): Promise<string[]> {
 }
 
 async function command(exe: string, args: string[], env = process.env) {
+  console.log(`[windows-smoke] ${basename(exe)} ${args[0]}`)
   const child = Bun.spawn([exe, ...args], { env, cwd: scratch, stdout: 'pipe', stderr: 'pipe' })
   const stdout = new Response(child.stdout).text()
   const stderr = new Response(child.stderr).text()

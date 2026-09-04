@@ -94,6 +94,10 @@ root and user data. Because an executing Windows EXE cannot remove itself,
 the outcome in `.cli-uninstall-result.json`. A running installed Runtime blocks
 cleanup; stop all AliceProjects using that installation before retrying.
 
+This first Windows implementation retains installed release directories until
+uninstall. Unlike the POSIX three-release collector, it does not yet prune old
+releases that could still be mapped by another AliceProject.
+
 Windows builds preserve their archive before native acceptance. Dev/beta
 cross-build on Linux; stable and explicit rehearsal use native Windows.
 Rehearse the managed install/update/rollback and npm/Bun command shims without

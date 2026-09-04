@@ -412,7 +412,7 @@ function atomicWrite(destination, content) {
 }
 
 function npmReadme(version) {
-  return `# OpenAlice CLI\n\nNative OpenAlice ${version} for macOS and Linux.\n\nInstall with npm:\n\n\`\`\`bash\nnpm install -g openalice\n\`\`\`\n\nOr install with Bun's explicit lifecycle-script trust:\n\n\`\`\`bash\nbun add -g --trust openalice\n\`\`\`\n\nThe install step selects the matching accepted platform package. The resulting \`openalice\` command is the native Bun-compiled executable and runs without the package manager or a host Node.js process. Agent Runtimes remain user-owned.\n`
+  return `# OpenAlice CLI\n\nNative OpenAlice ${version} for macOS, Linux and Windows (x64 and ARM64).\n\nInstall with npm:\n\n\`\`\`bash\nnpm install -g --allow-scripts=openalice openalice\n\`\`\`\n\nOr install with Bun's explicit lifecycle-script trust:\n\n\`\`\`bash\nbun add -g --trust openalice\n\`\`\`\n\nThe install step selects the matching accepted platform package. The resulting \`openalice\` command is the native Bun-compiled executable and runs without the package manager or a host Node.js process. Agent Runtimes remain user-owned.\n`
 }
 
 function platformPackageName(platform, arch) {

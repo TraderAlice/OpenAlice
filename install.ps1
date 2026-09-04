@@ -147,6 +147,19 @@ function Write-Atomic([string]$path, [string]$text) {
     if ([IO.File]::Exists($backup)) { [IO.File]::Delete($backup) }
   }
 }
+function Move-Release([string]$source, [string]$destination) {
+  # A just-exited staged EXE or a scanner may briefly retain a Windows handle.
+  # Retry only access/sharing failures; never copy over an existing release.
+  for ($attempt = 0; ; $attempt++) {
+    try { [IO.Directory]::Move($source, $destination); return }
+    catch {
+      $failure = $_.Exception
+      while ($failure.InnerException) { $failure = $failure.InnerException }
+      if ($attempt -ge 20 -or ($failure.HResult -band 65535) -notin @(5, 32, 33)) { throw }
+      Start-Sleep -Milliseconds 250
+    }
+  }
+}
 try {
   [IO.Directory]::CreateDirectory($root) | Out-Null
   try { $guard = [IO.File]::Open((Join-Path $root '.cli-install.lock.guard'), 'OpenOrCreate', 'ReadWrite', 'None') }
@@ -218,7 +231,7 @@ try {
       if (-not (Test-Path -LiteralPath $existing -PathType Leaf) -or (Get-FileHash -LiteralPath $file.FullName).Hash -ne (Get-FileHash -LiteralPath $existing).Hash) { throw 'Existing release is damaged; preserve it for inspection.' }
     }
     if (@(Get-ChildItem -LiteralPath $destination -File -Recurse).Count -ne @(Get-ChildItem -LiteralPath $expanded -File -Recurse).Count) { throw 'Existing release contains unexpected files.' }
-  } else { [IO.Directory]::Move($expanded, $destination) }
+  } else { Move-Release $expanded $destination }
   $source = @{ schemaVersion = 3; repository = 'TraderAlice/OpenAlice'; cliVersion = $Version; method = 'direct';
     installerUrl = $installerUrl; installedAt = [DateTime]::UtcNow.ToString('o');
     updateChannel = $(if ($pinned) { 'pinned' } elseif ($Channel -eq 'dev') { 'development' } else { $Channel });

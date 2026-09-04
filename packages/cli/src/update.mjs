@@ -142,10 +142,21 @@ export async function checkForUpdate(options = {}, dependencies = {}) {
   }
 }
 
+function directInstallerCommand(platform, channel) {
+  if (platform === 'win32') {
+    const url = channel === 'dev'
+      ? 'https://raw.githubusercontent.com/TraderAlice/OpenAlice/dev/install.ps1'
+      : 'https://download.openalice.ai/install.ps1'
+    return `& ([scriptblock]::Create((Invoke-RestMethod ${url}))) -Channel ${channel}`
+  }
+  return `curl -fsSL https://openalice.ai/install | bash -s -- --channel ${channel}`
+}
+
 export async function runUpdateCommand(argv, dependencies = {}) {
   const options = parseUpdateArgs(argv)
   const stdout = dependencies.stdout ?? process.stdout
   const env = dependencies.env ?? process.env
+  const platform = dependencies.platform ?? process.platform
   const installSource = await (
     dependencies.readInstallSourceImpl ?? readInstallSource
   )({ env })
@@ -153,7 +164,7 @@ export async function runUpdateCommand(argv, dependencies = {}) {
   if (manager && !options.checkOnly) {
     if (options.channel && options.channel !== 'stable') {
       stdout.write(`${manager.label} owns this OpenAlice installation and publishes only the stable channel.\n`)
-      stdout.write(`To switch to ${options.channel}, use the direct installer explicitly: curl -fsSL https://openalice.ai/install | bash -s -- --channel ${options.channel}\n`)
+      stdout.write(`To switch to ${options.channel}, use the direct installer explicitly: ${directInstallerCommand(platform, options.channel)}\n`)
       stdout.write('OpenAlice did not modify the package manager\'s files.\n')
       return 0
     }
@@ -191,7 +202,7 @@ export async function runUpdateCommand(argv, dependencies = {}) {
     stdout.write(manager
       ? result.channel === 'stable'
         ? `Update with: ${manager.update}\n`
-        : `Switch with the direct installer: curl -fsSL https://openalice.ai/install | bash -s -- --channel ${result.channel}\n`
+        : `Switch with the direct installer: ${directInstallerCommand(platform, result.channel)}\n`
       : 'Run "openalice update" to review and install it.\n')
     return 0
   }

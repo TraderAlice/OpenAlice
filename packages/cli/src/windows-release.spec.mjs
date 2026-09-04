@@ -4,7 +4,7 @@ import { mkdtemp, mkdir, readFile, realpath, rm, writeFile } from 'node:fs/promi
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { checkForUpdate, downloadAndRunInstaller } from './update.mjs'
+import { checkForUpdate, downloadAndRunInstaller, runUpdateCommand } from './update.mjs'
 import { parseInstallSource } from './install-source.mjs'
 import { CLI_RELEASE_TARGETS, cliArchiveName } from './release-targets.mjs'
 import { resolveCurrentRelease, resolveInstalledLayout } from './install-layout.mjs'
@@ -34,6 +34,18 @@ function devManifest() {
 function fetchDocument(document) { return async () => ({ ok: true, json: async () => document }) }
 
 describe('Windows unified release system', () => {
+  it('gives manager-owned Windows installs PowerShell channel-switch guidance', async () => {
+    let output = ''
+    expect(await runUpdateCommand(['--channel', 'dev', '--yes'], {
+      platform: 'win32', stdout: { write: value => { output += value } },
+      readInstallSourceImpl: async () => ({ ...source, method: 'npm', updateChannel: 'stable' }),
+    })).toBe(0)
+    expect(output).toContain('Invoke-RestMethod')
+    expect(output).toContain('/dev/install.ps1')
+    expect(output).toContain('-Channel dev')
+    expect(output).not.toContain('curl ')
+    expect(output).toContain('did not modify')
+  })
   it.each(['arm64', 'x64'])('accepts schema 3 Windows %s provenance', (arch) => {
     expect(parseInstallSource({ ...source, artifact: { ...source.artifact, arch } })).toMatchObject({ method: 'direct', artifact: { platform: 'win32', arch } })
     expect(cliArchiveName('0.91.0-beta.4', 'win32', arch)).toBe(`openalice-cli-0.91.0-beta.4-win32-${arch}.tar.gz`)
