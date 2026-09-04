@@ -38,6 +38,9 @@ the durable truth after it changes. Git history is the archive.
   Runtime with a Bun-compiled, multi-process CLI distribution. Direct,
   npm/Bun, Homebrew, and AUR channels consume one accepted artifact set.
   Homebrew tap is public at `0.90.2` with lightweight hourly/manual stable sync.
+  Stable `0.91.0` is authorized; native Intel acceptance passed with a measured
+  renderer delay (#1350), and bounded smoke-budget correction precedes promotion.
+  AUR registration remains deferred.
   The CLI package owns OpenAlice only: Agent Runtime installation and Electron
   packaging stay outside this plan. The native CLI is public through the
   separately dispatched `v0.91.0-beta.3`; stable/beta discovery now uses the

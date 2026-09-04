@@ -323,6 +323,8 @@ async function waitForUTA(utaUrl: string, timeoutMs = UTA_READY_TIMEOUT_MS): Pro
 async function runRendererPtySmoke(win: BrowserWindow): Promise<void> {
   const keepWorkspace = process.env['OPENALICE_ELECTRON_SMOKE_KEEP_WORKSPACE'] === '1'
   const result = await win.webContents.executeJavaScript(`(async () => {
+    const stage = (value) => console.warn('[desktop-pty-smoke] renderer stage=' + value)
+    stage('bridge')
     const bridge = window.openAlice?.pty
     if (!bridge) throw new Error('window.openAlice.pty missing')
     const keyboard = window.openAlice?.keyboard
@@ -333,7 +335,9 @@ async function runRendererPtySmoke(win: BrowserWindow): Promise<void> {
     }
     const tag = 'electron-smoke-' + Date.now().toString(36)
     const json = async (res) => {
+      stage('response-headers status=' + res.status)
       const text = await res.text()
+      stage('response-body')
       let body = null
       try { body = text ? JSON.parse(text) : null } catch { body = text }
       if (!res.ok) throw new Error(res.status + ' ' + text)
@@ -343,18 +347,21 @@ async function runRendererPtySmoke(win: BrowserWindow): Promise<void> {
     let sessionId = ''
     let connectionId = ''
     try {
+      stage('create-workspace')
       const created = await json(await fetch('/api/workspaces', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ tag, template: 'chat' }),
       }))
       workspaceId = created.workspace.id
+      stage('spawn-shell')
       const spawned = await json(await fetch('/api/workspaces/' + encodeURIComponent(workspaceId) + '/sessions/spawn', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ agent: 'shell' }),
       }))
       sessionId = spawned.sessionId
+      stage('connect-pty')
       const attached = await new Promise((resolve, reject) => {
         const timer = setTimeout(() => reject(new Error('PTY attached timeout')), 10000)
         connectionId = bridge.connect({ sessionId, cols: 80, rows: 24 })
@@ -383,6 +390,7 @@ async function runRendererPtySmoke(win: BrowserWindow): Promise<void> {
       if (typeof attached.kittyKeyboardFlags !== 'number') {
         throw new Error('PTY attach omitted Kitty keyboard flags')
       }
+      stage('attached')
       return { ok: true, workspaceId, sessionId, attached, keyboardInputSourceId }
     } finally {
       if (connectionId) bridge.close(connectionId)
@@ -927,8 +935,14 @@ app.whenReady().then(async () => {
     }),
   })
   protocol.handle('app', async (request) => {
+    const smokeTrace = process.env['OPENALICE_ELECTRON_SMOKE_PTY'] === '1'
+      && request.method === 'POST'
+      && new URL(request.url).pathname.startsWith('/api/workspaces')
+    if (smokeTrace) console.log('[desktop-pty-smoke] main stage=web-request')
     try {
-      return await fetchAliceWebRequest(request, alice)
+      const response = await fetchAliceWebRequest(request, alice)
+      if (smokeTrace) console.log('[desktop-pty-smoke] main stage=web-response status=' + response.status)
+      return response
     } catch (err) {
       return new Response(err instanceof Error ? err.message : String(err), { status: 503 })
     }

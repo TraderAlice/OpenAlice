@@ -1,5 +1,36 @@
 # Bun-native CLI Distribution
 
+## Stable 0.91.0 acceptance — 2026-09-05
+
+Maintainer authorized stable publication, including both Windows CLI targets.
+AUR activation is deferred while account registration is closed. Promotion
+[PR #1349](https://github.com/TraderAlice/OpenAlice/pull/1349) remains unmerged:
+local full regression (712 files, 6,360 passes, three expected skips), root
+types, unsigned packaged Workspace/Pi acceptance, OrbStack Docker and Guardian
+recovery passed. The exact dev channel and both Windows native replay receipts
+passed. Hosted Docker passed unchanged on retry, as did Windows desktop/upgrade,
+Windows Broker Packs and Apple Silicon desktop/upgrade.
+
+Intel desktop Guardian/PTY smoke timed out twice after successful takeover;
+the second run also recorded a spawned Shell but no PTY connection. Do not retry
+blindly or waive it. Add smoke-only boundary diagnostics and a single-host manual
+rehearsal selector, identify the cause, then resume promotion and the separate
+version-only preparation. No stable tag or public 0.91.0 bytes exist yet. Release
+and package-manager authority remain owned by [[docs/development-workflow.md]]
+and [[docs/cli-package-managers.md]].
+
+Diagnostic [run 33893555127](https://github.com/TraderAlice/OpenAlice/actions/runs/33893555127)
+passed native Intel takeover, PTY/CLI, packaged Workspace/Pi, and previous-app
+upgrade acceptance. Main returned Workspace HTTP 201 at `16:17:23.386Z`; the
+renderer observed response headers at `16:18:24.943Z`, then successfully spawned
+and attached the Shell. Total takeover smoke was 88 seconds against a 90-second
+budget. Increase only the smoke's bounded overall deadline to 180 seconds;
+retain every assertion and phase diagnostic, with no sleep, retry loop or
+production transport workaround. The underlying renderer delivery latency is
+not explained or claimed fixed; track it in [#1350](https://github.com/TraderAlice/OpenAlice/issues/1350). Local diagnostic regression
+passed 712 files / 6,361 tests with three expected skips, root/Desktop types and
+real isolated takeover/PTY/socket acceptance.
+
 ## Homebrew activation — 2026-09-04
 
 The maintainer created `TraderAlice/homebrew-tap` and authorized completing

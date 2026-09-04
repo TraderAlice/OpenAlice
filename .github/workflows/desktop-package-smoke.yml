@@ -2,6 +2,12 @@ name: Desktop Package Smoke
 
 on:
   workflow_dispatch:
+    inputs:
+      host:
+        description: Native host for manual rehearsal; promotion PRs always retain every host.
+        type: choice
+        default: all
+        options: [all, macos-14, macos-15-intel, windows-latest]
   pull_request:
     branches: [master]
     paths:
@@ -98,7 +104,9 @@ jobs:
   broker-packs-windows:
     name: broker-packs windows-latest
     needs: preflight
-    if: needs.preflight.outputs.beta_release_prep != 'true'
+    if: >-
+      needs.preflight.outputs.beta_release_prep != 'true' &&
+      (github.event_name != 'workflow_dispatch' || inputs.host == 'all' || inputs.host == 'windows-latest')
     runs-on: windows-latest
     timeout-minutes: 25
 
@@ -134,13 +142,13 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        include:
-          - os: macos-14
-            arch: arm64
-          - os: macos-15-intel
-            arch: x64
-          - os: windows-latest
-            arch: x64
+        include: >-
+          ${{ fromJSON(
+            github.event_name == 'workflow_dispatch' && inputs.host == 'macos-14' && '[{"os":"macos-14","arch":"arm64"}]' ||
+            github.event_name == 'workflow_dispatch' && inputs.host == 'macos-15-intel' && '[{"os":"macos-15-intel","arch":"x64"}]' ||
+            github.event_name == 'workflow_dispatch' && inputs.host == 'windows-latest' && '[{"os":"windows-latest","arch":"x64"}]' ||
+            '[{"os":"macos-14","arch":"arm64"},{"os":"macos-15-intel","arch":"x64"},{"os":"windows-latest","arch":"x64"}]'
+          ) }}
 
     steps:
       - uses: actions/checkout@v7
