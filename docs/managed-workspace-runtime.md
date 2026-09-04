@@ -703,6 +703,11 @@ the other hosts. PTY smoke logs fixed renderer and main-process stages around
 Workspace creation, response consumption, shell spawn and PTY attachment; these
 diagnostics are enabled only by the existing isolated smoke flag and never log
 request bodies, headers, credentials or user prompts.
+The outer PTY/CLI smoke deadline is 180 seconds, not a fixed delay: it exits
+immediately after acceptance and cleanup. Native Intel evidence showed an
+otherwise successful 88-second run, including a roughly 62-second main-to-renderer
+response delay. Preserve that timing as a separate performance finding rather
+than interpreting a larger smoke budget as a runtime performance fix.
 
 A release-facing change should also verify a clean-machine flow:
 
