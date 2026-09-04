@@ -89,6 +89,7 @@ jobs:
         if: inputs.candidate_run == ''
         run: bun scripts/build-windows-cli-preview.ts ${{ matrix.arch }}
       - name: Preserve complete candidate for reproduction
+        id: preserve
         if: inputs.candidate_run == ''
         uses: actions/upload-artifact@v6
         with:
@@ -104,6 +105,7 @@ jobs:
           retention-days: 30
           compression-level: 0
       - name: Reuse an existing candidate without installing dependencies or rebuilding
+        id: download
         if: inputs.candidate_run != ''
         uses: actions/download-artifact@v5
         with:
@@ -119,7 +121,7 @@ jobs:
         if: inputs.native_acceptance
         run: bun scripts/windows-cli-preview-smoke.ts
       - name: Accept Windows npm and Bun native command shims
-        if: inputs.native_acceptance && inputs.channel_build
+        if: ${{ !cancelled() && inputs.native_acceptance && inputs.channel_build && (steps.preserve.outcome == 'success' || steps.download.outcome == 'success') }}
         shell: pwsh
         run: |
           $candidates = @(Get-ChildItem -Recurse -Path dist/windows-cli-preview/${{ matrix.arch }} -Filter candidate.json)

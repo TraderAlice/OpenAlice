@@ -90,7 +90,7 @@ try {
     if ((await readFile(join(installDir, 'cli/current.txt'), 'utf8')).trim() !== releaseName) throw new Error('Inverse rollback did not restore the candidate')
     const marker = join(installDir, 'user-data-marker.txt')
     await writeFile(marker, 'preserve user data')
-    await command(executable, ['uninstall', '--yes'], environment)
+    console.log(await command(executable, ['uninstall', '--yes'], environment))
     const receipt = join(installDir, '.cli-uninstall-result.json')
     const deadline = Date.now() + 45_000
     let removed: { status?: string } | undefined
@@ -98,6 +98,11 @@ try {
       try { removed = JSON.parse((await readFile(receipt, 'utf8')).replace(/^\uFEFF/, '')); break }
       catch (error) { if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error }
       await Bun.sleep(250)
+    }
+    if (!removed) {
+      // Diagnose the retained helper with the exact minimal environment. Plan
+      // mode cannot remove files and exposes errors before receipt creation.
+      console.log(await command(powershell, ['-NoProfile', '-File', join(installDir, '.cli-uninstall.ps1'), '-InstallDir', installDir, '-Uninstall', '-Plan'], environment))
     }
     if (removed?.status !== 'removed' || await readFile(marker, 'utf8') !== 'preserve user data') throw new Error(`Data-preserving removal failed: ${JSON.stringify(removed)}`)
     uninstalled = true
