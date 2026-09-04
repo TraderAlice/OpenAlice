@@ -8,6 +8,13 @@ owned by [[docs/cli-supervisor.md]] and [[docs/local-runtime.md]].
 Native Windows package-manager and PowerShell channels are deferred. This guide
 covers macOS and glibc Linux on arm64 and x64.
 
+Public npm activation: `openalice` and its four platform packages were first
+published as `0.90.2` on 2026-09-04 under maintainer `jiaran258`. The registry
+integrities and a fresh npm 12 installation/start/stop were independently
+verified after [publication](https://github.com/TraderAlice/OpenAlice/actions/runs/33860369715).
+Homebrew and AUR still require their separate external activation; package
+metadata in a GitHub Release alone does not make those commands available.
+
 ## User commands
 
 Stable package-manager installs use:
