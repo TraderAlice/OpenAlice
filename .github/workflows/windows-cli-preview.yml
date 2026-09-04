@@ -118,7 +118,7 @@ jobs:
         if: inputs.native_acceptance
         run: bun scripts/bun-native-pty-smoke.ts
       - name: Install and start the packaged Runtime
-        if: inputs.native_acceptance
+        if: ${{ !cancelled() && inputs.native_acceptance && (steps.preserve.outcome == 'success' || steps.download.outcome == 'success') }}
         run: bun scripts/windows-cli-preview-smoke.ts
       - name: Accept Windows npm and Bun native command shims
         if: ${{ !cancelled() && inputs.native_acceptance && inputs.channel_build && (steps.preserve.outcome == 'success' || steps.download.outcome == 'success') }}

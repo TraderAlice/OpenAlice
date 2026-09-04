@@ -35,6 +35,12 @@ describe('Windows preview delivery boundary', () => {
     expect(download.if).toBe("inputs.candidate_run != ''")
     expect(download.with?.['merge-multiple']).toBe(false)
     expect(download.with?.['run-id']).toBe('${{ inputs.candidate_run }}')
+    for (const name of ['Install and start the packaged Runtime', 'Accept Windows npm and Bun native command shims']) {
+      const acceptance = steps.find(s => s.name === name)!
+      expect(acceptance.if).toContain('!cancelled()')
+      expect(acceptance.if).toContain("steps.preserve.outcome == 'success'")
+      expect(acceptance.if).toContain("steps.download.outcome == 'success'")
+    }
   })
 
   it('the registered installer workflow can dispatch previews without its normal manual gates or dev activation', () => {
