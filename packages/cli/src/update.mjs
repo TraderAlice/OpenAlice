@@ -5,6 +5,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
 import { resolveInstalledLayout } from './install-layout.mjs'
+import { cliArchiveName, isCliTarget } from './release-targets.mjs'
 import {
   packageManagerForSource,
   packageManagerUpdateMessage,
@@ -50,6 +51,7 @@ export function parseUpdateArgs(argv) {
 }
 
 export async function checkForUpdate(options = {}, dependencies = {}) {
+  const platform = options.platform ?? dependencies.platform ?? process.platform
   const currentVersion = options.currentVersion ?? CURRENT_VERSION
   const installSource = options.installSource ?? await (
     dependencies.readInstallSourceImpl ?? readInstallSource
@@ -80,7 +82,7 @@ export async function checkForUpdate(options = {}, dependencies = {}) {
         ?? process.env['OPENALICE_UPDATE_MANIFEST_URL']
         ?? DEFAULT_MANIFEST_URLS.dev,
       timeoutMs: options.timeoutMs ?? EXPLICIT_CHECK_TIMEOUT_MS,
-      platform: options.platform ?? process.platform,
+      platform,
       arch: options.arch ?? process.arch,
     }, dependencies)
     const currentArtifactSha256 = options.currentArtifactSha256
@@ -95,7 +97,7 @@ export async function checkForUpdate(options = {}, dependencies = {}) {
       latestContentIdentity: manifest.target.contentIdentity,
       latestArtifactSha256: manifest.target.sha256,
       releaseNotesUrl: `https://github.com/TraderAlice/OpenAlice/commit/${manifest.commit}`,
-      installer: manifest.installer,
+      installer: selectInstaller(manifest, platform),
       channel,
       sourceChannel: sourceChannel ?? installSourceUpdateChannel(installSource),
       ...(ownership ? { packageManager: ownership } : {}),
@@ -133,7 +135,7 @@ export async function checkForUpdate(options = {}, dependencies = {}) {
     currentVersion,
     latestVersion: manifest.version,
     releaseNotesUrl: manifest.releaseNotesUrl,
-    installer: manifest.installer,
+    installer: selectInstaller(manifest, platform),
     channel,
     sourceChannel: sourceChannel ?? installSourceUpdateChannel(installSource),
     ...(ownership ? { packageManager: ownership } : {}),
@@ -206,6 +208,7 @@ export async function runUpdateCommand(argv, dependencies = {}) {
     env,
     fetchImpl: dependencies.fetchImpl,
     spawnImpl: dependencies.spawnImpl,
+    platform: dependencies.platform ?? process.platform,
   })
 }
 
@@ -365,6 +368,7 @@ function requireReleaseManifest(value) {
     version: value.version,
     releaseNotesUrl: value.releaseNotesUrl,
     installer: requireInstaller(value.installer, 'release'),
+    ...(value.windowsInstaller ? { windowsInstaller: requireInstaller(value.windowsInstaller, 'Windows release') } : {}),
   }
 }
 
@@ -409,15 +413,19 @@ function requireDevManifestDocument(value) {
   }
   const targets = []
   const seen = new Set()
-  for (const target of value.targets) {
+  // Keep the shipped four-entry field readable by old dev clients. New hosts
+  // are an extension of the same commit-bound manifest, not another channel.
+  const additionalTargets = value.additionalTargets ?? []
+  if (!Array.isArray(additionalTargets) || (additionalTargets.length !== 0 && additionalTargets.length !== 2)) {
+    throw new Error('dev manifest has an incomplete additional target set')
+  }
+  for (const target of [...value.targets, ...additionalTargets]) {
     const key = `${String(target?.platform)}-${String(target?.arch)}`
-    const expectedArchive = `openalice-cli-dev-${key}.tar.gz`
     if (
-      !['darwin', 'linux'].includes(target?.platform)
-      || !['arm64', 'x64'].includes(target?.arch)
+      !isCliTarget(target?.platform, target?.arch)
       || seen.has(key)
       || typeof target.archive !== 'string'
-      || target.archive !== expectedArchive
+      || target.archive !== cliArchiveName('dev', target.platform, target.arch)
       || typeof target.sha256 !== 'string'
       || !/^[a-f0-9]{64}$/.test(target.sha256)
       || typeof target.contentIdentity !== 'string'
@@ -434,10 +442,15 @@ function requireDevManifestDocument(value) {
       contentIdentity: target.contentIdentity,
     })
   }
+  if (value.targets.some((target) => target.platform === 'win32')
+    || additionalTargets.some((target) => target.platform !== 'win32')) {
+    throw new Error('dev manifest target fields do not match their platform groups')
+  }
   return {
     version: value.version,
     commit: value.commit,
     installer: requireInstaller(value.installer, 'dev'),
+    ...(value.windowsInstaller ? { windowsInstaller: requireInstaller(value.windowsInstaller, 'Windows dev') } : {}),
     targets,
   }
 }
@@ -478,7 +491,14 @@ function requireInstaller(installer, manifestKind) {
   }
 }
 
+function selectInstaller(manifest, platform) {
+  if (platform !== 'win32') return manifest.installer
+  if (!manifest.windowsInstaller) throw new Error('This channel has not published a Windows CLI installer yet')
+  return manifest.windowsInstaller
+}
+
 export async function downloadAndRunInstaller(result, context) {
+  const windows = (context.platform ?? process.platform) === 'win32'
   const channel = normalizeUpdateChannel(result.channel)
   if (!channel) throw new Error('update result does not contain a supported channel')
   if (channel === 'stable' && result.latestVersion === LEGACY_STABLE_VERSION) {
@@ -513,29 +533,41 @@ export async function downloadAndRunInstaller(result, context) {
   if (digest !== result.installer.sha256) {
     throw new Error('downloaded installer failed SHA-256 verification')
   }
-  if (!bytes.toString('utf8', 0, 64).startsWith('#!/usr/bin/env bash')) {
-    throw new Error('downloaded installer is not the OpenAlice Bash installer')
+  const header = windows ? '# OpenAlice Windows CLI installer' : '#!/usr/bin/env bash'
+  if (!bytes.toString('utf8', 0, 64).startsWith(header)) {
+    throw new Error(`downloaded installer is not the OpenAlice ${windows ? 'PowerShell' : 'Bash'} installer`)
   }
 
   const temporary = await mkdtemp(join(tmpdir(), 'openalice-update-'))
-  const installerPath = join(temporary, 'install')
+  const installerPath = join(temporary, windows ? 'install.ps1' : 'install')
   try {
     await writeFile(installerPath, bytes, { mode: 0o700 })
     await chmod(installerPath, 0o700)
     const selectorArgs = channel === 'dev'
       ? ['--channel', 'dev']
       : ['--channel', channel, '--version', result.latestVersion]
-    const args = [
+    const args = windows ? [
+      '-NoLogo', '-NoProfile', '-File', installerPath,
+      '-Channel', channel,
+      ...(channel === 'dev' ? [] : ['-Version', result.latestVersion]),
+      '-InstallDir', context.layout.installRoot, '-NoModifyPath',
+      ...(context.yes ? ['-Yes'] : []),
+    ] : [
       installerPath,
       ...selectorArgs,
       '--install-dir', context.layout.installRoot,
       '--no-modify-path',
       ...(context.yes ? ['--yes'] : []),
     ]
-    return await runProcess(context.spawnImpl ?? spawn, 'bash', args, {
+    const installerEnv = { ...context.env }
+    if (windows) delete installerEnv.PSModulePath
+    const command = windows
+      ? join(installerEnv.SystemRoot ?? installerEnv.SYSTEMROOT ?? 'C:\\Windows', 'System32', 'WindowsPowerShell', 'v1.0', 'powershell.exe')
+      : 'bash'
+    return await runProcess(context.spawnImpl ?? spawn, command, args, {
       stdio: 'inherit',
       env: {
-        ...context.env,
+        ...installerEnv,
         OPENALICE_EXPECTED_CLI_VERSION: result.latestVersion,
         ...(result.latestContentIdentity
           ? { OPENALICE_EXPECTED_CLI_CONTENT_IDENTITY: result.latestContentIdentity }

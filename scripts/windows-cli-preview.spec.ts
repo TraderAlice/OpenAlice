@@ -29,7 +29,7 @@ describe('Windows preview delivery boundary', () => {
     for (const step of steps.filter(s => s.uses === 'pnpm/action-setup@v6' || s.uses === 'actions/setup-node@v7' ||
       s.run?.startsWith('pnpm ') || s.run?.includes('build-windows-cli-preview.ts') ||
       s.name === 'Preserve complete candidate for reproduction')) {
-      expect(step.if).toBe("inputs.candidate_run == ''")
+      expect(step.if?.split(' && ')[0]).toBe("inputs.candidate_run == ''")
     }
     const download = steps.find(s => s.uses === 'actions/download-artifact@v5')!
     expect(download.if).toBe("inputs.candidate_run != ''")
@@ -58,5 +58,19 @@ describe('Windows preview delivery boundary', () => {
     expect(source).not.toMatch(/Set-ExecutionPolicy|SetEnvironmentVariable|npm install|Invoke-Expression/)
     expect(source).toContain('Remove-Item -LiteralPath $stage -Recurse -Force')
     expect(source).not.toContain('Remove-Item -LiteralPath $destination')
+  })
+
+  it('joins ordinary dev and release publication without adding source-test jobs', () => {
+    const dev = YAML.parse(read('.github/workflows/cli-installer-smoke.yml'))
+    const release = YAML.parse(read('.github/workflows/release.yml'))
+    expect(dev.jobs['build-dev-cli-windows'].with).toMatchObject({ channel_build: true, neutral_inputs: true })
+    expect(dev.jobs['build-dev-cli-windows'].with.native_acceptance).toBe(false)
+    expect(dev.jobs['publish-dev-cli-candidate'].needs).toContain('build-dev-cli-windows')
+    expect(release.jobs['build-cli-windows'].with.channel_build).toBe(true)
+    expect(release.jobs['build-cli-windows'].with.native_acceptance).toContain("channel == 'stable'")
+    expect(release.jobs['publish-release'].needs).toContain('build-cli-windows')
+    expect(release.jobs['build-cli-package-channels'].needs).toContain('build-cli-windows')
+    expect(read('install.ps1')).not.toMatch(/Set-ExecutionPolicy|npm install|Invoke-Expression/)
+    expect(read('install.ps1')).toContain('[IO.File]::Replace($temporary, $path, $null)')
   })
 })

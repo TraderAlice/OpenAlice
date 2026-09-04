@@ -116,7 +116,7 @@ describe('exact beta release-preparation workflow lane', () => {
     expect(jobs['build-dev-cli-neutral'].if).toBe("github.event_name == 'push'")
     expect(jobs['build-dev-cli'].if).toBe("github.event_name == 'push'")
     expect(jobs['build-dev-cli'].needs).toBe('build-dev-cli-neutral')
-    expect(jobs['publish-dev-cli-candidate'].needs).toBe('build-dev-cli')
+    expect(jobs['publish-dev-cli-candidate'].needs).toEqual(['build-dev-cli', 'build-dev-cli-windows'])
     expect(jobs['activate-dev-cli'].needs).toBe('publish-dev-cli-candidate')
   })
 

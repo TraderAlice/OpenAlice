@@ -324,7 +324,7 @@ describe('Release workflow critical path', () => {
       .toContain("needs.release.outputs.channel == 'stable'")
     expect(npmAndBun).toContain('--manager npm')
     expect(npmAndBun).toContain('--manager bun')
-    expect(needs(channels)).toEqual(['release', 'build-cli-release'])
+    expect(needs(channels)).toEqual(['release', 'build-cli-release', 'build-cli-windows'])
     expect(channels.if).toContain("needs.release.outputs.channel == 'stable'")
     expect(step(channels, 'Derive package-manager metadata from accepted archives').run)
       .toContain('--require-all')

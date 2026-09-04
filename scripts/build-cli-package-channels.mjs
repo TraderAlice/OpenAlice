@@ -59,7 +59,7 @@ export function buildCliPackageChannels({
     throw new Error(`all ${CLI_RELEASE_TARGETS.length} native CLI targets are required; found ${targets.length}`)
   }
   if (!npmOnly && targets.length !== CLI_RELEASE_TARGETS.length) {
-    throw new Error('Homebrew and AUR generation require all four native CLI targets')
+    throw new Error('Full channel generation requires all native CLI targets')
   }
 
   const npm = buildNpmPackages({ outputRoot, version, targets })
@@ -146,40 +146,31 @@ function buildNpmPackages({ outputRoot, version, targets }) {
     license: 'AGPL-3.0-only',
     repository: { type: 'git', url: `git+https://github.com/${repository}.git` },
     homepage: 'https://openalice.ai',
-    bin: { openalice: './bin/openalice' },
-    scripts: { postinstall: 'sh ./postinstall.sh' },
+    // A PE executable needs its suffix for npm's Windows command shim. POSIX
+    // executes the same native bytes under this private filename as well.
+    bin: { openalice: './bin/openalice.exe' },
+    scripts: { postinstall: 'node ./postinstall.mjs' },
     os: [...new Set(targets.map(({ platform }) => platform))],
     cpu: [...new Set(targets.map(({ arch }) => arch))],
-    files: ['bin', 'postinstall.sh', 'postinstall.mjs', 'LICENSE', 'README.md'],
+    files: ['bin', 'postinstall.mjs', 'LICENSE', 'README.md'],
     optionalDependencies,
     publishConfig: { access: 'public' },
   })
   copyFileSync(join(repositoryRoot, 'LICENSE'), join(metaRoot, 'LICENSE'))
   writeFileSync(join(metaRoot, 'README.md'), npmReadme(version))
-  writeFileSync(join(metaRoot, 'postinstall.sh'), npmPostinstallLauncherSource())
   writeFileSync(join(metaRoot, 'postinstall.mjs'), npmPostinstallSource())
-  const placeholder = join(metaRoot, 'bin', 'openalice')
+  const placeholder = join(metaRoot, 'bin', 'openalice.exe')
   writeFileSync(placeholder, '#!/bin/sh\necho "OpenAlice native package installation did not finish." >&2\nexit 1\n')
   chmodSync(placeholder, 0o755)
   return { metaPackage: npmMetaName, platformPackages }
-}
-
-function npmPostinstallLauncherSource() {
-  return `#!/bin/sh
-set -eu
-
-case "\${npm_config_user_agent-}" in
-  bun/*) exec bun ./postinstall.mjs ;;
-  *) exec node ./postinstall.mjs ;;
-esac
-`
 }
 
 function buildHomebrewFormula({ outputRoot, version, targets, assetBaseUrl }) {
   const formulaRoot = join(outputRoot, 'homebrew')
   mkdirSync(formulaRoot, { recursive: true })
   const formulaPath = join(formulaRoot, 'openalice.rb')
-  const blocks = targets.map((target) => homebrewTargetBlock(version, target, assetBaseUrl)).join('\n')
+  const blocks = targets.filter((target) => target.platform !== 'win32')
+    .map((target) => homebrewTargetBlock(version, target, assetBaseUrl)).join('\n')
   writeFileSync(formulaPath, `# typed: false
 # frozen_string_literal: true
 
@@ -348,18 +339,18 @@ const require = createRequire(import.meta.url)
 const packageRoot = path.dirname(fileURLToPath(import.meta.url))
 const platform = os.platform()
 const arch = os.arch()
-if (!['darwin', 'linux'].includes(platform) || !['arm64', 'x64'].includes(arch)) {
-  throw new Error('OpenAlice npm packages currently support macOS and Linux on arm64 or x64.')
+if (!['darwin', 'linux', 'win32'].includes(platform) || !['arm64', 'x64'].includes(arch)) {
+  throw new Error('OpenAlice npm packages support macOS, Linux and Windows on arm64 or x64.')
 }
 const packageName = 'openalice-' + platform + '-' + arch
 const packageJsonPath = require.resolve(packageName + '/package.json')
 const nativePackageRoot = path.dirname(packageJsonPath)
 const nativePackage = JSON.parse(fs.readFileSync(packageJsonPath, 'utf8'))
 const releaseRoot = path.join(nativePackageRoot, 'release')
-const executable = path.join(packageRoot, 'bin', 'openalice')
+const executable = path.join(packageRoot, 'bin', 'openalice.exe')
 const share = path.join(packageRoot, 'share')
 
-replaceFile(path.join(releaseRoot, 'bin', 'openalice'), executable)
+replaceFile(path.join(releaseRoot, 'bin', platform === 'win32' ? 'openalice.exe' : 'openalice'), executable)
 replaceDirectoryLink(path.join(releaseRoot, 'share'), share)
 fs.copyFileSync(path.join(releaseRoot, 'release.json'), path.join(packageRoot, 'release.json'))
 
@@ -407,7 +398,7 @@ function replaceFile(source, destination) {
 
 function replaceDirectoryLink(source, destination) {
   fs.rmSync(destination, { recursive: true, force: true })
-  fs.symlinkSync(path.relative(path.dirname(destination), source), destination, 'dir')
+  fs.symlinkSync(platform === 'win32' ? source : path.relative(path.dirname(destination), source), destination, platform === 'win32' ? 'junction' : 'dir')
 }
 
 function atomicWrite(destination, content) {

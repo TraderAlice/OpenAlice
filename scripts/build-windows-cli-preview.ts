@@ -6,9 +6,8 @@ import { fileURLToPath } from 'node:url'
 import { bunReleaseContentIdentity } from './bun-release-content-identity.mjs'
 import { resolveWindowsGitRuntimeSpec } from './vendor-managed-runtime.mjs'
 
-// A deliberately independent preview lane. No stable/beta/dev aliases and no
-// npm publication are mutated by this build. Native smoke is a separate step,
-// so a failed smoke never discards the package needed to reproduce it.
+// Assembly never publishes a channel. Preserve bytes before native acceptance.
+const channelBuild = process.env.OPENALICE_WINDOWS_CHANNEL_BUILD === '1'
 const root = fileURLToPath(new URL('..', import.meta.url))
 const arch = process.argv[2] ?? process.arch
 if (!['x64', 'arm64'].includes(arch)) throw new Error(`Unsupported Windows architecture: ${arch}`)
@@ -24,7 +23,8 @@ const sourceDirty = run(['git', 'status', '--porcelain']).trim().length > 0
 const output = resolve(process.env.OPENALICE_BUN_OUTPUT_DIR ?? join(root, 'dist/windows-cli-preview', arch))
 await mkdir(output, { recursive: true })
 const staging = await mkdtemp(join(output, 'build-'))
-const name = `openalice-cli-${version}-windows-${arch}-${sourceCommit.slice(0,8)}${sourceDirty ? '-dirty' : ''}`
+const name = channelBuild ? `openalice-cli-${version}-win32-${arch}`
+  : `openalice-cli-${version}-windows-${arch}-${sourceCommit.slice(0,8)}${sourceDirty ? '-dirty' : ''}`
 const release = join(staging, name)
 const resources = join(release, 'share/openalice')
 const executable = join(release, 'bin/openalice.exe')
@@ -84,35 +84,40 @@ if (process.platform === 'win32' && arch === process.arch) {
   run([process.env.OPENALICE_7ZIP ?? '7zz', 'x', '-y', `-o${gitRoot}`, gitArchive])
 }
 for (const path of [git.gitBin, git.shellPath, git.shPath]) await stat(join(gitRoot, path))
-await cp(join(root, 'install-preview.ps1'), join(release, 'install-preview.ps1'))
-await writeFile(join(release, 'install-source.json'), JSON.stringify({
+if (channelBuild) await cp(join(root, 'install.ps1'), join(resources, 'install.ps1'))
+if (!channelBuild) {
+  await cp(join(root, 'install-preview.ps1'), join(release, 'install-preview.ps1'))
+  await writeFile(join(release, 'install-source.json'), JSON.stringify({
   schemaVersion: 2, repository: 'TraderAlice/OpenAlice', cliVersion: version,
   selector: { kind: 'branch', value: sourceCommit },
   installerUrl: 'https://github.com/TraderAlice/OpenAlice', updateChannel: 'custom',
-}, null, 2) + '\n')
+  }, null, 2) + '\n')
+}
 // Portable metadata is custom/non-updating, not a direct install with managed
 // current/rollback pointers. The external ZIP sidecar binds the entire package.
 const unsigned = {
   schemaVersion: 1, product: 'OpenAlice CLI', version, platform: 'win32', arch,
-  bunVersion: Bun.version, sourceCommit, sourceDirty, preview: true,
+  bunVersion: Bun.version, sourceCommit, sourceDirty, ...(!channelBuild ? { preview: true } : {}),
   executable: 'bin/openalice.exe', resourceRoot: 'share/openalice',
   git: { source: 'PortableGit', sourceVersion: git.version, sourceSha256: git.sha256 },
   files: await files(release),
 }
 const metadata = { ...unsigned, contentIdentity: bunReleaseContentIdentity(unsigned) }
 await writeFile(join(release, 'release.json'), JSON.stringify(metadata, null, 2) + '\n')
-const archive = join(output, `${name}.zip`)
+const archive = join(output, `${name}.${channelBuild ? 'tar.gz' : 'zip'}`)
 // Do not overwrite an older candidate or update an existing ZIP in place.
 try { await stat(archive); throw new Error(`Candidate already exists: ${archive}`) }
 catch (error) { if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error }
-if (process.platform === 'win32') run(['tar.exe', '-a', '-cf', archive, '-C', staging, name])
+if (channelBuild) run([process.platform === 'win32' ? 'tar.exe' : 'tar', '-czf', archive, '-C', staging, name])
+else if (process.platform === 'win32') run(['tar.exe', '-a', '-cf', archive, '-C', staging, name])
 else run(['zip', '-qr', archive, name], staging)
 const digest = sha256(await readFile(archive))
 await writeFile(`${archive}.sha256`, `${digest}  ${basename(archive)}\n`)
 await cp(join(root, 'install-preview.ps1'), join(output, 'install-preview.ps1'))
+if (channelBuild) await cp(join(root, 'install.ps1'), join(output, 'install.ps1'))
 await writeFile(join(output, 'candidate.json'), JSON.stringify({
   archive, sha256: digest, release, executable, sourceCommit, sourceDirty, version, arch,
-  contentIdentity: metadata.contentIdentity, runtimeVerification: 'not-run',
+  contentIdentity: metadata.contentIdentity, channelBuild, runtimeVerification: 'not-run',
 }, null, 2) + '\n')
 console.log(`Windows ${arch} preview built (native runtime verification pending): ${archive}`)
 

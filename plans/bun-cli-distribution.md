@@ -34,7 +34,38 @@ normal source promotion must carry the OIDC workflow to `master` before a new
 stable release uses it. Windows x64 and ARM64 are the maintainer's accepted next
 platform increment, separate from this completed authentication change.
 
-## Current increment: Windows previews
+## Current increment: unified Windows channels
+
+Accepted 2026-09-04: the portable-only decision below is superseded. Windows
+x64 and ARM64 join the existing stable/beta/dev version authority, not a new
+preview version system. Missing personal Windows hardware is an explicitly
+recorded interactive acceptance gap, not a reason to postpone distribution.
+Use the existing native runners for bounded artifact checks; do not restore
+full hosted source suites to dev/beta publication.
+
+Ordered delivery:
+
+- [ ] Extend common target/provenance and installer selection to Windows;
+  retain readable manifests for already-installed macOS/Linux dev clients.
+- [ ] Add the shared-channel PowerShell bootstrap and side-by-side activation,
+  update, rollback, and data-preserving removal. Never overwrite a mapped EXE.
+- [ ] Produce canonical Windows artifacts in the ordinary dev/release lanes,
+  preserving candidates before acceptance and allowing replay without rebuild.
+- [ ] Extend npm/Bun materialization and publication inputs to Windows without
+  adding Windows branches to Homebrew/AUR. First publication and OIDC enrollment
+  are separate external-authority checkpoints, not implied by generated files.
+- [ ] Verify local contracts/types/full regression once, existing POSIX
+  installation, and bounded native Windows install/update/rollback/start/stop.
+- [ ] Integrate to dev, inspect live six-target publication, and record the
+  remaining interactive Windows/provider gap before any versioned promotion.
+
+One product version and source commit bind the target set. Platform-specific
+installer bytes are checksum-bound snapshots selected by the shared updater.
+Windows uses an atomic text activation pointer to immutable release directories
+instead of requiring administrator symlink privileges or overwriting a running
+executable. Electron remains on its existing desktop updater.
+
+### Accepted preview groundwork
 
 Accepted 2026-09-04: ship both Windows architectures iteratively, without making
 the Windows experiment a prerequisite for existing macOS/Linux channels.

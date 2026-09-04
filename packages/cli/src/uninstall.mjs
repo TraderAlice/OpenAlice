@@ -2,6 +2,7 @@ import { lstat, readFile, rename, rm, rmdir, writeFile } from 'node:fs/promises'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
 import { createInterface } from 'node:readline/promises'
+import { spawn } from 'node:child_process'
 
 import { resolveInstalledLayout } from './install-layout.mjs'
 import { readInstallSource } from './install-source.mjs'
@@ -67,6 +68,10 @@ export async function runUninstallCommand(argv, dependencies = {}) {
     profiles,
     processKill: dependencies.processKill,
   })
+  if (result.deferred) {
+    stdout.write('\nWindows cleanup is scheduled after this command exits. See .cli-uninstall-result.json in the install root for its result. User data is preserved.\n')
+    return 0
+  }
   stdout.write('\nOpenAlice CLI releases and installer-owned launchers were removed.\n')
   stdout.write(`Preserved application data and user work under ${layout.installRoot}.\n`)
   if (result.profilesChanged.length > 0) {
@@ -78,6 +83,7 @@ export async function runUninstallCommand(argv, dependencies = {}) {
 export async function performUninstall(layout, options = {}) {
   const processKill = options.processKill ?? process.kill
   await assertNoLiveInstaller(layout.lockDir, processKill)
+  if (layout.platform === 'win32') return scheduleWindowsUninstall(layout)
 
   const profilesChanged = []
   for (const profile of options.profiles ?? []) {
@@ -97,6 +103,23 @@ export async function performUninstall(layout, options = {}) {
     if (!['ENOENT', 'ENOTEMPTY', 'EEXIST'].includes(error?.code)) throw error
   }
   return { profilesChanged }
+}
+
+async function scheduleWindowsUninstall(layout) {
+  // An executing PE file cannot remove itself. Run a retained installer copy
+  // from the install root after this process exits; never remove the root.
+  const script = join(layout.installRoot, '.cli-uninstall.ps1')
+  const source = join(layout.releaseDir, 'share', 'openalice', 'install.ps1')
+  await writeFile(script, await readFile(source))
+  const env = { ...process.env }
+  delete env.PSModulePath
+  const child = spawn(join(env.SystemRoot ?? 'C:\\Windows', 'System32', 'WindowsPowerShell', 'v1.0', 'powershell.exe'), [
+    '-NoLogo', '-NoProfile', '-File', script, '-InstallDir', layout.installRoot,
+    '-Uninstall', '-WaitForPid', String(process.pid), '-Yes',
+  ], { detached: true, windowsHide: true, stdio: 'ignore', env })
+  await new Promise((resolve, reject) => { child.once('spawn', resolve); child.once('error', reject) })
+  child.unref()
+  return { profilesChanged: [], deferred: true }
 }
 
 export async function removeManagedPathBlock(profile, binDir, dependencies = {}) {
@@ -170,7 +193,9 @@ Options:
 
 function printUninstallPlan(stdout, layout, profiles) {
   const releaseRoot = layout.cliDir ?? layout.versionsDir
-  const launchers = layout.kind === 'bun' ? NATIVE_LAUNCHERS : LEGACY_LAUNCHERS
+  const launchers = layout.kind === 'bun'
+    ? NATIVE_LAUNCHERS.map((name) => layout.platform === 'win32' ? `${name}.cmd` : name)
+    : LEGACY_LAUNCHERS
   stdout.write(`OpenAlice CLI uninstall plan
 
 Remove:

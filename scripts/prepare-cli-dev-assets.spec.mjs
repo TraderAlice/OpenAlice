@@ -7,6 +7,7 @@ import { promisify } from 'node:util'
 
 import { afterEach, describe, expect, it } from 'vitest'
 
+import { cliExecutableName } from '../packages/cli/src/release-targets.mjs'
 import { bunReleaseContentIdentity } from './bun-release-content-identity.mjs'
 import { prepareCliDevAssets } from './prepare-cli-dev-assets.mjs'
 
@@ -32,13 +33,15 @@ describe.skipIf(process.platform === 'win32')('CLI dev channel assets', () => {
     })
 
     expect(manifest.targets).toHaveLength(4)
+    expect(manifest.additionalTargets).toHaveLength(2)
+    expect(manifest.windowsInstaller.versionedUrl).toBe(`https://download.openalice.ai/cli/dev/releases/${commit}/install.ps1`)
     expect(manifest.targets.map(({ platform, arch }) => `${platform}-${arch}`).sort()).toEqual([
       'darwin-arm64',
       'darwin-x64',
       'linux-arm64',
       'linux-x64',
     ])
-    for (const target of manifest.targets) {
+    for (const target of [...manifest.targets, ...manifest.additionalTargets]) {
       const versioned = `openalice-cli-${version}-${target.platform}-${target.arch}.tar.gz`
       const alias = `openalice-cli-dev-${target.platform}-${target.arch}.tar.gz`
       expect(await readFile(join(output, 'releases', commit, versioned))).toEqual(
@@ -96,11 +99,13 @@ async function fixture({ tamperedIdentityTarget } = {}) {
     ['darwin', 'x64'],
     ['linux', 'arm64'],
     ['linux', 'x64'],
+    ['win32', 'arm64'],
+    ['win32', 'x64'],
   ]) {
     const releaseName = `openalice-cli-${version}-${platform}-${arch}`
     const releaseRoot = join(root, releaseName)
     await mkdir(join(releaseRoot, 'bin'), { recursive: true })
-    const executable = join(releaseRoot, 'bin', 'openalice')
+    const executable = join(releaseRoot, 'bin', cliExecutableName(platform))
     const executableBytes = Buffer.from('#!/bin/sh\n')
     await writeFile(executable, executableBytes)
     await chmod(executable, 0o755)
@@ -111,10 +116,10 @@ async function fixture({ tamperedIdentityTarget } = {}) {
       platform,
       arch,
       bunVersion: '1.4.0',
-      executable: 'bin/openalice',
+      executable: `bin/${cliExecutableName(platform)}`,
       resourceRoot: 'share/openalice',
       files: [{
-        path: 'bin/openalice',
+        path: `bin/${cliExecutableName(platform)}`,
         type: 'file',
         bytes: executableBytes.length,
         mode: 0o755,
