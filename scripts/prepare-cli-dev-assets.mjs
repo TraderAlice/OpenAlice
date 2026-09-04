@@ -12,6 +12,8 @@ import { CLI_RELEASE_TARGETS, cliExecutableName } from '../packages/cli/src/rele
 
 export { CLI_RELEASE_TARGETS }
 const PINNED_BUN_VERSION = readFileSync(new URL('../.bun-version', import.meta.url), 'utf8').trim()
+// PortableGit's complete file inventory exceeds child_process's 1 MiB default.
+const TAR_TEXT_OPTIONS = { encoding: 'utf8', maxBuffer: 16 * 1024 * 1024 }
 
 export function prepareCliDevAssets({ inputDir, outputDir, commit, version, installerPath, windowsInstallerPath }) {
   if (!/^[a-f0-9]{7,64}$/.test(commit)) {
@@ -114,7 +116,7 @@ export function validateCliReleaseArchive({ archivePath, version, platform, arch
   const releaseName = archiveName.slice(0, -'.tar.gz'.length)
   const metadata = JSON.parse(execFileSync('tar', [
     '-xOzf', archivePath, `${releaseName}/release.json`,
-  ], { encoding: 'utf8' }))
+  ], TAR_TEXT_OPTIONS))
   if (
     metadata?.schemaVersion !== 1
     || metadata?.product !== 'OpenAlice CLI'
@@ -135,7 +137,7 @@ export function validateCliReleaseArchive({ archivePath, version, platform, arch
   if (contentIdentity !== metadata.contentIdentity) {
     throw new Error(`${archiveName} content identity does not match its release manifest`)
   }
-  const entries = execFileSync('tar', ['-tzf', archivePath], { encoding: 'utf8' })
+  const entries = execFileSync('tar', ['-tzf', archivePath], TAR_TEXT_OPTIONS)
     .split('\n')
     .filter(Boolean)
   if (entries.some((entry) => !entry.startsWith(`${releaseName}/`) || entry.includes('/../'))) {

@@ -21,6 +21,11 @@ afterEach(async () => {
 })
 
 describe.skipIf(process.platform === 'win32')('CLI dev channel assets', () => {
+  it('accepts checksum-bound Windows metadata larger than the default subprocess buffer', async () => {
+    const root = await fixture({ largeWindowsMetadata: true })
+    const manifest = prepareCliDevAssets({ inputDir: join(root, 'input'), outputDir: join(root, 'output'), commit, version, installerPath: join(root, 'install') })
+    expect(manifest.additionalTargets).toHaveLength(2)
+  })
   it('validates all four native candidates and prepares immutable bytes plus a compatibility receipt', async () => {
     const root = await fixture()
     const output = join(root, 'output')
@@ -88,7 +93,7 @@ describe.skipIf(process.platform === 'win32')('CLI dev channel assets', () => {
   })
 })
 
-async function fixture({ tamperedIdentityTarget } = {}) {
+async function fixture({ tamperedIdentityTarget, largeWindowsMetadata = false } = {}) {
   const root = await mkdtemp(join(tmpdir(), 'openalice-cli-dev-assets-'))
   temporaryPaths.push(root)
   const input = join(root, 'input')
@@ -118,6 +123,7 @@ async function fixture({ tamperedIdentityTarget } = {}) {
       bunVersion: '1.4.0',
       executable: `bin/${cliExecutableName(platform)}`,
       resourceRoot: 'share/openalice',
+      ...(largeWindowsMetadata && platform === 'win32' ? { fixtureNotes: 'x'.repeat(1100 * 1024) } : {}),
       files: [{
         path: `bin/${cliExecutableName(platform)}`,
         type: 'file',
