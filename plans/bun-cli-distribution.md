@@ -34,9 +34,25 @@ was accepted and merged to dev as 9d592d18. The maintainer authorized a serial
   retained Workspace, rollback to 0.91.0 and back to beta all passed. Stable
   manifest and five update feeds match the pre-beta baseline byte-for-byte.
   Isolated acceptance root: /tmp/openalice-0911-public.Iut9Ho.
-- [ ] Complete Windows x64 npm first-publication/OIDC prerequisites.
-- [ ] Prepare and publish 0.91.1 independently after beta acceptance; verify
-  public release, npm/Bun, and Homebrew. AUR registration remains deferred.
+- [x] Publish Windows x64 npm bootstrap package: openalice-windows-x64@0.91.1
+  is public and its registry SHA-512 matches the release-owned npm manifest.
+- [x] Enroll Windows x64 OIDC and verify all seven identities. npm confirmed
+  TraderAlice/OpenAlice / release.yml with direct publishing permission;
+  real exchange run 33957933624 passed for the complete seven-package set.
+- [ ] Publish and accept the complete public npm/Bun channel. Run 33957962527
+  failed twice before publication while globally upgrading npm in place:
+  the running npm could no longer resolve its own promise-retry dependency.
+  Isolate pinned npm 12.0.2 in RUNNER_TEMP, verify its version, and prepend that
+  executable directory for subsequent steps without replacing bootstrap npm.
+  This is dev-lane publication tooling only; reuse the accepted stable bytes.
+  Clean Node 22.22.2 Docker reproduces the original promise-retry failure;
+  the isolated-prefix repair passes on native Linux ARM64 and emulated x64,
+  preserves bootstrap npm, and reads the public Windows x64 registry entry.
+  Focused release/OIDC/publisher contracts pass 45 tests.
+  Root typecheck and all 719 files / 6,425 tests pass (3 expected skips,
+  202.39 seconds); /tmp/openalice-0911-npm-bootstrap-tests.log.
+- [x] Prepare and publish 0.91.1 independently after beta acceptance; verify
+  public release, direct upgrade, and Homebrew. AUR registration remains deferred.
   Stable preparation #1371 and full source run 33952791151 passed on f1ac9ece.
   Release run 33953350725 accepted all six native CLI targets, then ARM64 AUR
   acceptance exposed a fixture defect: later pacman -U dependency downloads
@@ -48,7 +64,18 @@ was accepted and merged to dev as 9d592d18. The maintainer authorized a serial
   719 files / 6,425 tests pass (3 skipped); the added contract covers container
   scope, read-only checkout and unchanged package-signature policy.
   Intel signing independently failed to obtain a timestamp; no signature gate
-  is relaxed. Repair and re-promote through dev before retrying stable.
+  is relaxed. Repair #1372 and promotion #1373 passed, followed by full source
+  run 33954704340 on 52b51f29809178594b7b57bf666133829368b7b4.
+  Stable release run 33955286757 succeeded with all six native CLI targets,
+  final desktop N-1 upgrades, both AUR architectures, package-manager acceptance,
+  signed/notarized macOS artifacts, and public GitHub/CDN byte verification.
+  Tag v0.91.1 binds that exact SHA and is a non-prerelease. Public macOS CLI
+  beta -> stable upgrade/start/stop retained Workspace chat-stable-ivory-lantern;
+  real Settings reports 0.91.1 Stable and up-to-date. Homebrew sync 33957271180
+  passed, then a clean native Linux ARM64 container installed from the public
+  tap, resolved dependencies, started 0.91.1, and uninstalled successfully
+  (/tmp/openalice-0911-public-brew.log). Copy the two accepted version values
+  back to dev; source launcher identity remains dev, not stable.
 
 ### Implemented boundary
 

@@ -1096,7 +1096,12 @@ jobs:
           package-manager-cache: false
 
       - name: Install OIDC-capable npm
-        run: npm install --global npm@12.0.2 --ignore-scripts --no-audit --no-fund
+        run: |
+          # Do not replace the npm tree executing this installation.
+          npm_prefix="$RUNNER_TEMP/openalice-release-npm"
+          npm install --global --prefix "$npm_prefix" npm@12.0.2 --ignore-scripts --no-audit --no-fund
+          test "$("$npm_prefix/bin/npm" --version)" = 12.0.2
+          echo "$npm_prefix/bin" >> "$GITHUB_PATH"
 
       - name: Require the current published stable release
         run: |
@@ -1169,7 +1174,12 @@ jobs:
           package-manager-cache: false
 
       - name: Install OIDC-capable npm
-        run: npm install --global npm@12.0.2 --ignore-scripts --no-audit --no-fund
+        run: |
+          # Do not replace the npm tree executing this installation.
+          npm_prefix="$RUNNER_TEMP/openalice-release-npm"
+          npm install --global --prefix "$npm_prefix" npm@12.0.2 --ignore-scripts --no-audit --no-fund
+          test "$("$npm_prefix/bin/npm" --version)" = 12.0.2
+          echo "$npm_prefix/bin" >> "$GITHUB_PATH"
 
       - uses: actions/download-artifact@v4
         with:

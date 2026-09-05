@@ -138,6 +138,11 @@ describe('Release workflow critical path', () => {
       expect(job.steps?.find((entry) => entry.uses === 'actions/setup-node@v7')?.with)
         .toMatchObject({ 'node-version': '22.22.2', 'package-manager-cache': false })
       expect(step(job, 'Install OIDC-capable npm').run).toContain('npm@12.0.2')
+      const bootstrap = step(job, 'Install OIDC-capable npm').run ?? ''
+      expect(bootstrap).toContain('npm_prefix="$RUNNER_TEMP/openalice-release-npm"')
+      expect(bootstrap).toContain('npm install --global --prefix "$npm_prefix"')
+      expect(bootstrap).toContain('test "$("$npm_prefix/bin/npm" --version)" = 12.0.2')
+      expect(bootstrap).toContain('echo "$npm_prefix/bin" >> "$GITHUB_PATH"')
     }
     expect(workflow.jobs['preflight-public-cli-authority'].permissions?.['id-token']).toBe('write')
     expect(JSON.stringify(workflow)).not.toMatch(/NPM_TOKEN|NODE_AUTH_TOKEN/)
