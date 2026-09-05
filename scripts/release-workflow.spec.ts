@@ -62,6 +62,25 @@ function needs(job: WorkflowJob): string[] {
 }
 
 describe('Release workflow critical path', () => {
+  it('verifies artifact identities before upgrade and before either publication path', () => {
+    const build = desktopWorkflow.jobs.build.steps ?? []
+    expect(build.findIndex((entry) => entry.name === 'Record desktop candidate identity'))
+      .toBeLessThan(build.findIndex((entry) => entry.name === 'Preserve desktop release candidate'))
+    const upgrade = desktopWorkflow.jobs.upgrade.steps ?? []
+    const verify = upgrade.findIndex((entry) => entry.name === 'Verify restored desktop candidate identity')
+    const run = upgrade.findIndex((entry) => entry.name === 'Prove final desktop artifact upgrades previous release state')
+    const bind = upgrade.findIndex((entry) => entry.name === 'Bind upgrade acceptance to candidate identity')
+    expect(verify).toBeGreaterThanOrEqual(0)
+    expect(run).toBeGreaterThan(verify)
+    expect(bind).toBeGreaterThan(run)
+    const publication = workflow.jobs['publish-release'].steps ?? []
+    const gate = publication.findIndex((entry) => entry.name === 'Verify and stage the complete desktop candidate set')
+    expect(gate).toBeGreaterThanOrEqual(0)
+    for (const [index, entry] of publication.entries()) {
+      if (entry.uses === 'softprops/action-gh-release@v2') expect(index).toBeGreaterThan(gate)
+    }
+  })
+
   it('does not make POSIX system-package acceptance wait for Windows or generate npm packages', () => {
     for (const name of ['accept-cli-homebrew', 'accept-cli-linuxbrew', 'accept-cli-aur']) {
       const job = workflow.jobs[name]

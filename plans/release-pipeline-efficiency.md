@@ -103,8 +103,13 @@ beta-to-stable promotion; installing a permanent runner on the user's daily Mac.
   contents with source/version/channel/target identity, requires an explicitly
   selected candidate hash at verification, and binds acceptance to a verifier
   commit plus required named checks. Fifteen initial rejection/identity tests
-  pass. This module is not yet wired into workflow production/publication and
-  does not by itself prove trusted cross-run selection or replay support.
+  pass. Desktop build now records identity, upgrade checks the restored bytes
+  against its build output and binds the N-1 checks, and publication verifies
+  all three platform directories plus stable receipts before staging any file.
+  The raw previous-release identity and every named N-1 check are required;
+  beta retains byte verification without stable N-1. Initial integrated tests
+  pass (45 tests including primitive/workflow contracts); trusted cross-run
+  selection, candidate replay and real workflow rehearsal remain unfinished.
 - [ ] Increment 3: join exact-SHA full source validation at publication instead
   of serializing before candidate builds; reuse verified neutral CLI inputs.
   Test source failure/mismatch blocks publication, beta gates stay separate,

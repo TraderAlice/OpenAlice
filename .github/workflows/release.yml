@@ -782,6 +782,13 @@ jobs:
       contents: write
 
     steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          package-manager-cache: false
+
       - uses: actions/download-artifact@v4
         with:
           name: release-notes
@@ -790,8 +797,26 @@ jobs:
       - uses: actions/download-artifact@v4
         with:
           pattern: release-assets-*
-          path: dist/release-assets
-          merge-multiple: true
+          path: dist/desktop-candidates
+          merge-multiple: false
+
+      - name: Download artifact-bound desktop upgrade receipts
+        if: needs.release.outputs.channel == 'stable'
+        uses: actions/download-artifact@v4
+        with:
+          pattern: release-upgrade-acceptance-*
+          path: dist/desktop-receipts
+          merge-multiple: false
+
+      - name: Verify and stage the complete desktop candidate set
+        env:
+          CANDIDATE_SOURCE_SHA: ${{ needs.release.outputs.source_sha }}
+          CANDIDATE_VERSION: ${{ needs.release.outputs.version }}
+          CANDIDATE_CHANNEL: ${{ needs.release.outputs.channel }}
+          CANDIDATE_PREVIOUS_TAG: ${{ needs.release.outputs.previous_tag }}
+        run: >-
+          node scripts/desktop-candidate-receipt.mjs stage
+          dist/desktop-candidates dist/desktop-receipts dist/release-assets
 
       - uses: actions/download-artifact@v4
         with:

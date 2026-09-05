@@ -34,6 +34,12 @@ jobs:
   build:
     runs-on: ${{ inputs.os }}
     timeout-minutes: 45
+    outputs:
+      candidate-id: ${{ steps.identity.outputs.candidate-id }}
+    env:
+      CANDIDATE_SOURCE_SHA: ${{ github.sha }}
+      CANDIDATE_CHANNEL: ${{ inputs.channel }}
+      CANDIDATE_ARCH: ${{ inputs.arch }}
     steps:
       - uses: actions/checkout@v7
 
@@ -133,11 +139,16 @@ jobs:
             --arch "$RELEASE_ARCH" \
             --version "$VERSION"
 
+      - name: Record desktop candidate identity
+        id: identity
+        run: node scripts/desktop-candidate-receipt.mjs create dist/electron-app
+
       - name: Preserve desktop release candidate
         uses: actions/upload-artifact@v4
         with:
           name: release-assets-${{ runner.os }}-${{ inputs.arch }}
           path: |
+            dist/electron-app/candidate-manifest.json
             dist/electron-app/*.dmg
             dist/electron-app/*.zip
             dist/electron-app/*.yml
@@ -153,6 +164,12 @@ jobs:
     if: inputs.channel == 'stable'
     runs-on: ${{ inputs.os }}
     timeout-minutes: 35
+    env:
+      CANDIDATE_SOURCE_SHA: ${{ github.sha }}
+      CANDIDATE_CHANNEL: ${{ inputs.channel }}
+      CANDIDATE_ARCH: ${{ inputs.arch }}
+      CANDIDATE_ID: ${{ needs.build.outputs.candidate-id }}
+      CANDIDATE_PREVIOUS_TAG: ${{ inputs.previous-tag }}
     steps:
       - uses: actions/checkout@v7
 
@@ -172,6 +189,9 @@ jobs:
           name: release-assets-${{ runner.os }}-${{ inputs.arch }}
           path: dist/electron-app
 
+      - name: Verify restored desktop candidate identity
+        run: node scripts/desktop-candidate-receipt.mjs verify dist/electron-app
+
       - name: Prove final desktop artifact upgrades previous release state
         run: >-
           pnpm electron:smoke:upgrade --
@@ -179,6 +199,11 @@ jobs:
           --candidate-artifact-dir dist/electron-app
           --receipt "${{ runner.temp }}/openalice-desktop-upgrade.json"
         timeout-minutes: 30
+
+      - name: Bind upgrade acceptance to candidate identity
+        run: >-
+          node scripts/desktop-candidate-receipt.mjs bind-upgrade dist/electron-app
+          "${{ runner.temp }}/openalice-desktop-upgrade.json"
 
       - name: Preserve desktop upgrade acceptance receipt
         if: always()
