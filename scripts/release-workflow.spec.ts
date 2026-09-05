@@ -370,7 +370,7 @@ describe('Release workflow critical path', () => {
     const acceptance = step(called, 'Accept preserved final artifact without rebuilding')
     expect(called.steps!.indexOf(selection)).toBeLessThan(called.steps!.indexOf(verification))
     expect(called.steps!.indexOf(verification)).toBeLessThan(called.steps!.indexOf(acceptance))
-    expect(called.steps?.find((entry) => entry.uses === 'actions/download-artifact@v4')?.with?.['artifact-ids'])
+    expect(called.steps?.find((entry) => entry.uses === 'actions/download-artifact@v5')?.with?.['artifact-ids'])
       .toBe('${{ steps.candidate.outputs.artifact-id }}')
     expect(source).not.toMatch(/secrets:|contents: write|electron-builder|pnpm electron:build|gh release/)
     expect(step(called, 'Bind acceptance to unchanged bytes and current verifier').run).toContain('bind-upgrade')

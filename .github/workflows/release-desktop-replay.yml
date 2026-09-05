@@ -37,7 +37,6 @@ jobs:
       CANDIDATE_ARCH: ${{ inputs.arch }}
       CANDIDATE_PREVIOUS_TAG: ${{ inputs.previous-tag }}
       CANDIDATE_RUN: ${{ inputs.candidate-run }}
-      CANDIDATE_TARGET: ${{ runner.os }}-${{ inputs.arch }}
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
@@ -54,8 +53,9 @@ jobs:
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
+          CANDIDATE_TARGET: ${{ runner.os }}-${{ inputs.arch }}
         run: node scripts/select-release-candidate.mjs "$CANDIDATE_RUN" "$CANDIDATE_SOURCE_SHA" "$CANDIDATE_TARGET"
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v5
         with:
           github-token: ${{ github.token }}
           run-id: ${{ inputs.candidate-run }}
