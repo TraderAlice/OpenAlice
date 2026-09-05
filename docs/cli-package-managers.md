@@ -371,6 +371,12 @@ candidate, then lets a local Git-backed tap or real `pacman -U` perform both
 version transitions. Lifecycle assertions stay shared while file mutation
 remains owned by the manager under test.
 
+Homebrew/Linuxbrew/AUR fixture generation uses `--system-only`: all four POSIX
+archives are required, no npm payload is materialized, and Windows archives
+are not inputs. These jobs need not wait for Windows candidates. Full public
+channel generation remains six-platform and keeps its Windows dependency;
+system-only fixture output cannot replace the complete publication manifest.
+
 For a stable release, the release job derives every package-manager channel only
 after all native candidates pass, attaches the generated publication inputs to
 the GitHub Release, verifies the GitHub bytes and completed stable CDN mirror,

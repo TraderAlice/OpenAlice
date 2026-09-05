@@ -1,0 +1,284 @@
+name: Desktop release platform
+
+on:
+  workflow_call:
+    inputs:
+      os:
+        required: true
+        type: string
+      arch:
+        required: true
+        type: string
+      channel:
+        required: true
+        type: string
+      previous-tag:
+        required: true
+        type: string
+      candidate-run:
+        type: string
+        default: ''
+      rehearsal:
+        type: boolean
+        default: false
+      verifier-sha:
+        type: string
+        default: ''
+      version:
+        type: string
+        default: ''
+    secrets:
+      MACOS_CSC_LINK:
+        required: false
+      MACOS_CSC_KEY_PASSWORD:
+        required: false
+      APPLE_API_KEY_P8:
+        required: false
+      APPLE_API_KEY_ID:
+        required: false
+      APPLE_API_ISSUER:
+        required: false
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  build:
+    if: inputs.candidate-run == ''
+    runs-on: ${{ inputs.os }}
+    timeout-minutes: 45
+    outputs:
+      candidate-id: ${{ steps.identity.outputs.candidate-id }}
+    env:
+      CANDIDATE_SOURCE_SHA: ${{ github.sha }}
+      CANDIDATE_CHANNEL: ${{ inputs.channel }}
+      CANDIDATE_ARCH: ${{ inputs.arch }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: pnpm/action-setup@v6
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # macOS still uses dugite's embedded Git. Windows keeps only dugite's JS
+      # wrapper and routes it to managed PortableGit in the packaged smoke.
+      - name: Verify bundled git (dugite) was fetched
+        if: runner.os == 'macOS'
+        run: |
+          node -e "const{existsSync}=require('fs');const{dirname,join}=require('path');const g=join(dirname(require.resolve('dugite/package.json')),'git');if(!existsSync(g)){console.error('dugite embedded git MISSING at '+g);process.exit(1)}console.log('dugite embedded git OK '+g)"
+
+      - name: Build Alice + UTA + desktop shell
+        run: pnpm electron:build
+
+      - name: Vendor managed workspace runtime
+        run: pnpm vendor:runtime
+
+      - name: Write Apple notarization API key
+        if: runner.os == 'macOS' && !inputs.rehearsal
+        run: |
+          KEY_PATH="$RUNNER_TEMP/AuthKey_${APPLE_API_KEY_ID}.p8"
+          printf '%s' "$APPLE_API_KEY_P8" > "$KEY_PATH"
+          chmod 600 "$KEY_PATH"
+          echo "APPLE_API_KEY=$KEY_PATH" >> "$GITHUB_ENV"
+        env:
+          APPLE_API_KEY_P8: ${{ secrets.APPLE_API_KEY_P8 }}
+          APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
+
+      - name: Package macOS installer
+        if: runner.os == 'macOS' && !inputs.rehearsal
+        # Build on the matching native host so pnpm and electron-builder both
+        # select the correct native dependencies for arm64 or Intel.
+        run: |
+          ulimit -n 65536 || ulimit -n 32768 || ulimit -n 16384 || ulimit -n 10240
+          echo "open files limit: $(ulimit -n)"
+          pnpm -F @traderalice/desktop exec electron-builder --projectDir ../.. --publish never --${{ inputs.arch }}
+        env:
+          CSC_LINK: ${{ secrets.MACOS_CSC_LINK }}
+          CSC_KEY_PASSWORD: ${{ secrets.MACOS_CSC_KEY_PASSWORD }}
+          APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
+          APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
+
+      - name: Package unsigned macOS rehearsal
+        if: runner.os == 'macOS' && inputs.rehearsal
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+        run: pnpm -F @traderalice/desktop exec electron-builder --projectDir ../.. --publish never --${{ inputs.arch }} -c.mac.notarize=false
+
+      - name: Package Windows installer
+        if: runner.os == 'Windows'
+        # Windows remains unsigned until a Windows code-signing certificate is
+        # available.
+        run: pnpm -F @traderalice/desktop exec electron-builder --projectDir ../.. --publish never --${{ inputs.arch }}
+
+      - name: Prove release candidate Workspace CLI acceptance
+        run: pnpm electron:smoke:workspace --skip-build --skip-pack
+        timeout-minutes: 5
+        env:
+          OPENALICE_SMOKE_RECEIPT_PATH: ${{ runner.temp }}/openalice-workspace-acceptance.json
+
+      - name: Preserve release acceptance receipt
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-acceptance-${{ runner.os }}-${{ inputs.arch }}
+          path: ${{ runner.temp }}/openalice-workspace-acceptance.json
+          if-no-files-found: warn
+          retention-days: 7
+
+      - name: Prepare update channel aliases
+        shell: bash
+        env:
+          RELEASE_PLATFORM: ${{ runner.os }}
+          RELEASE_ARCH: ${{ inputs.arch }}
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          node scripts/prepare-desktop-release-assets.mjs build \
+            --out-dir dist/electron-app \
+            --platform "$RELEASE_PLATFORM" \
+            --arch "$RELEASE_ARCH" \
+            --version "$VERSION"
+          rm -f dist/electron-app/builder-debug.yml
+
+      - name: Verify candidate update metadata and referenced bytes
+        shell: bash
+        env:
+          RELEASE_PLATFORM: ${{ runner.os }}
+          RELEASE_ARCH: ${{ inputs.arch }}
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          pnpm electron:verify-update-assets -- \
+            --out-dir dist/electron-app \
+            --platform "$RELEASE_PLATFORM" \
+            --arch "$RELEASE_ARCH" \
+            --version "$VERSION"
+
+      - name: Record desktop candidate identity
+        id: identity
+        run: node scripts/desktop-candidate-receipt.mjs create dist/electron-app
+
+      - name: Preserve desktop release candidate
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ inputs.rehearsal && 'rehearsal' || 'release' }}-assets-${{ runner.os }}-${{ inputs.arch }}
+          path: |
+            dist/electron-app/candidate-manifest.json
+            dist/electron-app/*.dmg
+            dist/electron-app/*.zip
+            dist/electron-app/*.yml
+            dist/electron-app/*.blockmap
+            dist/electron-app/*.exe
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 3
+
+
+  restore:
+    if: inputs.candidate-run != ''
+    runs-on: ${{ inputs.os }}
+    timeout-minutes: 15
+    outputs:
+      candidate-id: ${{ steps.identity.outputs.candidate-id }}
+    env:
+      CANDIDATE_SOURCE_SHA: ${{ github.sha }}
+      CANDIDATE_CHANNEL: ${{ inputs.channel }}
+      CANDIDATE_ARCH: ${{ inputs.arch }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+      - name: Select same-source preserved candidate
+        id: select
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CANDIDATE_RUN: ${{ inputs.candidate-run }}
+          CANDIDATE_TARGET: ${{ runner.os }}-${{ inputs.arch }}
+          CANDIDATE_REHEARSAL_BRANCH: ${{ inputs.rehearsal && github.ref_name || '' }}
+        run: node scripts/select-release-candidate.mjs "$CANDIDATE_RUN" "$CANDIDATE_SOURCE_SHA" "$CANDIDATE_TARGET"
+      - uses: actions/download-artifact@v5
+        with:
+          github-token: ${{ github.token }}
+          run-id: ${{ inputs.candidate-run }}
+          artifact-ids: ${{ steps.select.outputs.artifact-id }}
+          merge-multiple: true
+          path: dist/electron-app
+      - name: Verify restored product and exact bytes
+        id: identity
+        run: node scripts/desktop-candidate-receipt.mjs verify-selected dist/electron-app
+      - name: Preserve unchanged candidate in this run
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ inputs.rehearsal && 'rehearsal' || 'release' }}-assets-${{ runner.os }}-${{ inputs.arch }}
+          path: dist/electron-app/*
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 3
+
+  upgrade:
+    needs: [build, restore]
+    if: >-
+      !cancelled() && inputs.channel == 'stable' &&
+      (needs.build.result == 'success' || needs.restore.result == 'success')
+    runs-on: ${{ inputs.os }}
+    timeout-minutes: 35
+    env:
+      CANDIDATE_SOURCE_SHA: ${{ github.sha }}
+      CANDIDATE_CHANNEL: ${{ inputs.channel }}
+      CANDIDATE_ARCH: ${{ inputs.arch }}
+      CANDIDATE_ID: ${{ needs.build.outputs.candidate-id || needs.restore.outputs.candidate-id }}
+      CANDIDATE_PREVIOUS_TAG: ${{ inputs.previous-tag }}
+      CANDIDATE_VERIFIER_SHA: ${{ inputs.verifier-sha || github.sha }}
+      CANDIDATE_VERSION: ${{ inputs.version }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.verifier-sha || github.sha }}
+
+      - uses: pnpm/action-setup@v6
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Restore desktop release candidate
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ inputs.rehearsal && 'rehearsal' || 'release' }}-assets-${{ runner.os }}-${{ inputs.arch }}
+          path: dist/electron-app
+
+      - name: Verify restored desktop candidate identity
+        run: node scripts/desktop-candidate-receipt.mjs verify dist/electron-app
+
+      - name: Prove final desktop artifact upgrades previous release state
+        run: >-
+          pnpm electron:smoke:upgrade --
+          --from "${{ inputs.previous-tag }}"
+          --candidate-artifact-dir dist/electron-app
+          --receipt "${{ runner.temp }}/openalice-desktop-upgrade.json"
+        timeout-minutes: 30
+
+      - name: Bind upgrade acceptance to candidate identity
+        run: >-
+          node scripts/desktop-candidate-receipt.mjs bind-upgrade dist/electron-app
+          "${{ runner.temp }}/openalice-desktop-upgrade.json"
+
+      - name: Preserve desktop upgrade acceptance receipt
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-upgrade-acceptance-${{ runner.os }}-${{ inputs.arch }}
+          path: ${{ runner.temp }}/openalice-desktop-upgrade.json
+          if-no-files-found: error
+          retention-days: 7

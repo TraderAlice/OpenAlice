@@ -13,6 +13,10 @@ on:
           - mirror
           - publish-npm
           - verify-npm
+          - verify-desktop
+          - verify-desktop-rehearsal
+          - benchmark-cli
+          - rehearse-desktop
       tag:
         description: Required except for verify-npm; for example v0.91.0 or v0.91.0-beta.1.
         required: false
@@ -25,12 +29,77 @@ on:
         options:
           - beta
           - stable
+      candidate-run:
+        description: Completed master Release run to reuse for verify-desktop or same-source desktop release recovery.
+        type: string
+      source-sha:
+        description: Exact product commit of the preserved desktop candidate.
+        type: string
+      desktop-verifier-sha:
+        description: Optional integrated dev/master commit for desktop acceptance only; never changes product source.
+        type: string
+      previous-tag:
+        description: Previous stable tag for verify-desktop upgrade acceptance.
+        type: string
+      desktop-target:
+        description: Native platform to retry without rebuilding or publishing.
+        type: choice
+        default: macOS-arm64
+        options:
+          - macOS-arm64
+          - macOS-x64
+          - Windows-x64
 
 concurrency:
-  group: openalice-release-publication
+  group: ${{ inputs.operation == 'rehearse-desktop' && format('desktop-rehearsal-{0}', github.ref) || inputs.operation == 'benchmark-cli' && format('cli-benchmark-{0}', github.ref) || startsWith(inputs.operation, 'verify-desktop') && format('desktop-replay-{0}-{1}', inputs.candidate-run, inputs.desktop-target) || 'openalice-release-publication' }}
   cancel-in-progress: false
 
 jobs:
+  rehearse-desktop:
+    if: inputs.operation == 'rehearse-desktop'
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-14
+            arch: arm64
+          - os: macos-15-intel
+            arch: x64
+          - os: windows-latest
+            arch: x64
+    uses: ./.github/workflows/release-desktop-platform.yml
+    permissions:
+      contents: read
+      actions: read
+    with:
+      os: ${{ matrix.os }}
+      arch: ${{ matrix.arch }}
+      channel: stable
+      previous-tag: ${{ inputs.previous-tag }}
+      candidate-run: ${{ inputs.candidate-run }}
+      rehearsal: true
+
+  benchmark-cli:
+    if: inputs.operation == 'benchmark-cli'
+    uses: ./.github/workflows/release-cli-benchmark.yml
+    permissions:
+      contents: read
+
+  replay-desktop:
+    if: (inputs.operation == 'verify-desktop' || inputs.operation == 'verify-desktop-rehearsal') && inputs.channel == 'stable'
+    uses: ./.github/workflows/release-desktop-replay.yml
+    permissions:
+      contents: read
+      actions: read
+    with:
+      candidate-run: ${{ inputs.candidate-run }}
+      source-sha: ${{ inputs.source-sha }}
+      rehearsal: ${{ inputs.operation == 'verify-desktop-rehearsal' }}
+      tag: ${{ inputs.tag }}
+      previous-tag: ${{ inputs.previous-tag }}
+      os: ${{ inputs.desktop-target == 'macOS-arm64' && 'macos-14' || inputs.desktop-target == 'macOS-x64' && 'macos-15-intel' || 'windows-latest' }}
+      arch: ${{ inputs.desktop-target == 'macOS-arm64' && 'arm64' || 'x64' }}
+
   release:
     name: Plan release candidate
     if: inputs.operation == 'release' || inputs.operation == 'mirror'
@@ -50,6 +119,7 @@ jobs:
       prerelease: ${{ steps.plan.outputs.prerelease }}
       previous_tag: ${{ steps.plan.outputs.previous_tag }}
       source_sha: ${{ steps.plan.outputs.source_sha }}
+      verifier_sha: ${{ steps.verifier.outputs.verifier_sha }}
 
     steps:
       - uses: actions/checkout@v7
@@ -139,6 +209,13 @@ jobs:
             echo "prerelease=false" >> "$GITHUB_OUTPUT"
           fi
 
+      - name: Select trusted desktop verifier without changing product source
+        id: verifier
+        if: steps.plan.outputs.created == 'true'
+        env:
+          RELEASE_VERIFIER_SHA: ${{ inputs.desktop-verifier-sha }}
+        run: node scripts/select-release-verifier.mjs
+
       - name: Install git-cliff
         if: steps.plan.outputs.created == 'true'
         uses: kenji-miyake/setup-git-cliff@v2
@@ -168,6 +245,15 @@ jobs:
           path: notes.md
           if-no-files-found: error
 
+  # Local reusable workflows and checkout resolve to this dispatch's SHA.
+  # Source acceptance runs alongside candidates, never after their publication.
+  validate-stable-source:
+    needs: release
+    if: needs.release.outputs.created == 'true' && needs.release.outputs.channel == 'stable'
+    uses: ./.github/workflows/ci.yml
+    permissions:
+      contents: read
+
   preflight-public-cli-authority:
     name: Preflight public CLI channel authority
     needs: release
@@ -195,13 +281,14 @@ jobs:
           AUR_SSH_PRIVATE_KEY: ${{ secrets.AUR_SSH_PRIVATE_KEY }}
           AUR_KNOWN_HOSTS: ${{ secrets.AUR_KNOWN_HOSTS }}
 
-  # Every beta still ships real signed/notarized desktop candidates and proves
-  # their current Workspace runtime. The slower N-1 journey is a stable-only
-  # confidence gate below rather than a tax on each beta iteration.
+  # Each matrix entry owns its build -> upgrade dependency. A fast platform
+  # never waits for another platform's build; final publication joins them all.
   build-desktop:
+    permissions:
+      contents: read
+      actions: read
     needs: release
     if: needs.release.outputs.created == 'true'
-    timeout-minutes: 45
     strategy:
       fail-fast: false
       matrix:
@@ -212,180 +299,21 @@ jobs:
             arch: x64
           - os: windows-latest
             arch: x64
-    runs-on: ${{ matrix.os }}
-    permissions:
-      contents: read
-
-    steps:
-      - uses: actions/checkout@v7
-
-      - uses: pnpm/action-setup@v6
-
-      - uses: actions/setup-node@v7
-        with:
-          node-version: 22
-          cache: pnpm
-
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
-
-      # macOS still uses dugite's embedded Git. Windows keeps only dugite's JS
-      # wrapper and routes it to managed PortableGit in the packaged smoke.
-      - name: Verify bundled git (dugite) was fetched
-        if: runner.os == 'macOS'
-        run: |
-          node -e "const{existsSync}=require('fs');const{dirname,join}=require('path');const g=join(dirname(require.resolve('dugite/package.json')),'git');if(!existsSync(g)){console.error('dugite embedded git MISSING at '+g);process.exit(1)}console.log('dugite embedded git OK '+g)"
-
-      - name: Build Alice + UTA + desktop shell
-        run: pnpm electron:build
-
-      - name: Vendor managed workspace runtime
-        run: pnpm vendor:runtime
-
-      - name: Write Apple notarization API key
-        if: runner.os == 'macOS'
-        run: |
-          KEY_PATH="$RUNNER_TEMP/AuthKey_${APPLE_API_KEY_ID}.p8"
-          printf '%s' "$APPLE_API_KEY_P8" > "$KEY_PATH"
-          chmod 600 "$KEY_PATH"
-          echo "APPLE_API_KEY=$KEY_PATH" >> "$GITHUB_ENV"
-        env:
-          APPLE_API_KEY_P8: ${{ secrets.APPLE_API_KEY_P8 }}
-          APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
-
-      - name: Package macOS installer
-        if: runner.os == 'macOS'
-        # Build on the matching native host so pnpm and electron-builder both
-        # select the correct native dependencies for arm64 or Intel.
-        run: |
-          ulimit -n 65536 || ulimit -n 32768 || ulimit -n 16384 || ulimit -n 10240
-          echo "open files limit: $(ulimit -n)"
-          pnpm -F @traderalice/desktop exec electron-builder --projectDir ../.. --publish never --${{ matrix.arch }}
-        env:
-          CSC_LINK: ${{ secrets.MACOS_CSC_LINK }}
-          CSC_KEY_PASSWORD: ${{ secrets.MACOS_CSC_KEY_PASSWORD }}
-          APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
-          APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
-
-      - name: Package Windows installer
-        if: runner.os == 'Windows'
-        # Windows remains unsigned until a Windows code-signing certificate is
-        # available.
-        run: pnpm -F @traderalice/desktop exec electron-builder --projectDir ../.. --publish never --${{ matrix.arch }}
-
-      - name: Prove release candidate Workspace CLI acceptance
-        run: pnpm electron:smoke:workspace --skip-build --skip-pack
-        timeout-minutes: 5
-        env:
-          OPENALICE_SMOKE_RECEIPT_PATH: ${{ runner.temp }}/openalice-workspace-acceptance.json
-
-      - name: Preserve release acceptance receipt
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: release-acceptance-${{ runner.os }}-${{ matrix.arch }}
-          path: ${{ runner.temp }}/openalice-workspace-acceptance.json
-          if-no-files-found: warn
-          retention-days: 7
-
-      - name: Prepare update channel aliases
-        shell: bash
-        env:
-          RELEASE_PLATFORM: ${{ runner.os }}
-          RELEASE_ARCH: ${{ matrix.arch }}
-        run: |
-          VERSION=$(node -p "require('./package.json').version")
-          node scripts/prepare-desktop-release-assets.mjs build \
-            --out-dir dist/electron-app \
-            --platform "$RELEASE_PLATFORM" \
-            --arch "$RELEASE_ARCH" \
-            --version "$VERSION"
-          rm -f dist/electron-app/builder-debug.yml
-
-      - name: Verify candidate update metadata and referenced bytes
-        shell: bash
-        env:
-          RELEASE_PLATFORM: ${{ runner.os }}
-          RELEASE_ARCH: ${{ matrix.arch }}
-        run: |
-          VERSION=$(node -p "require('./package.json').version")
-          pnpm electron:verify-update-assets -- \
-            --out-dir dist/electron-app \
-            --platform "$RELEASE_PLATFORM" \
-            --arch "$RELEASE_ARCH" \
-            --version "$VERSION"
-
-      - name: Preserve desktop release candidate
-        uses: actions/upload-artifact@v4
-        with:
-          name: release-assets-${{ runner.os }}-${{ matrix.arch }}
-          path: |
-            dist/electron-app/*.dmg
-            dist/electron-app/*.zip
-            dist/electron-app/*.yml
-            dist/electron-app/*.blockmap
-            dist/electron-app/*.exe
-          if-no-files-found: error
-          compression-level: 0
-          retention-days: 3
-
-  # Stable publication additionally proves each final candidate can upgrade
-  # the previous stable state. A failed platform remains retriable from the
-  # preserved candidate without rebuilding or re-signing it.
-  accept-desktop-upgrade:
-    name: Accept desktop upgrade (${{ matrix.os }}, ${{ matrix.arch }})
-    needs: [release, build-desktop]
-    if: needs.release.outputs.created == 'true' && needs.release.outputs.channel == 'stable' && needs.build-desktop.result == 'success'
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - os: macos-14
-            arch: arm64
-          - os: macos-15-intel
-            arch: x64
-          - os: windows-latest
-            arch: x64
-    runs-on: ${{ matrix.os }}
-    timeout-minutes: 35
-    permissions:
-      contents: read
-
-    steps:
-      - uses: actions/checkout@v7
-
-      - uses: pnpm/action-setup@v6
-
-      - uses: actions/setup-node@v7
-        with:
-          node-version: 22
-          cache: pnpm
-
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
-
-      - name: Restore desktop release candidate
-        uses: actions/download-artifact@v4
-        with:
-          name: release-assets-${{ runner.os }}-${{ matrix.arch }}
-          path: dist/electron-app
-
-      - name: Prove final desktop artifact upgrades previous release state
-        run: >-
-          pnpm electron:smoke:upgrade --
-          --from "${{ needs.release.outputs.previous_tag }}"
-          --candidate-artifact-dir dist/electron-app
-          --receipt "${{ runner.temp }}/openalice-desktop-upgrade.json"
-        timeout-minutes: 30
-
-      - name: Preserve desktop upgrade acceptance receipt
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: release-upgrade-acceptance-${{ runner.os }}-${{ matrix.arch }}
-          path: ${{ runner.temp }}/openalice-desktop-upgrade.json
-          if-no-files-found: error
-          retention-days: 7
+    uses: ./.github/workflows/release-desktop-platform.yml
+    with:
+      os: ${{ matrix.os }}
+      arch: ${{ matrix.arch }}
+      channel: ${{ needs.release.outputs.channel }}
+      previous-tag: ${{ needs.release.outputs.previous_tag }}
+      candidate-run: ${{ inputs.candidate-run }}
+      verifier-sha: ${{ needs.release.outputs.verifier_sha }}
+      version: ${{ needs.release.outputs.version }}
+    secrets:
+      MACOS_CSC_LINK: ${{ secrets.MACOS_CSC_LINK }}
+      MACOS_CSC_KEY_PASSWORD: ${{ secrets.MACOS_CSC_KEY_PASSWORD }}
+      APPLE_API_KEY_P8: ${{ secrets.APPLE_API_KEY_P8 }}
+      APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
+      APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
 
   cli-installer-acceptance:
     name: Accept CLI installer candidate
@@ -452,9 +380,38 @@ jobs:
           if-no-files-found: error
           retention-days: 1
 
+  build-cli-neutral:
+    name: Build shared CLI inputs
+    needs: release
+    if: needs.release.outputs.created == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22.19.0
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile --filter='!@traderalice/desktop'
+      - run: pnpm build:server
+      - name: Record commit-bound platform-neutral inputs
+        run: >-
+          node scripts/prepare-cli-neutral-inputs.mjs prepare
+          --repository-root . --output-dir dist/release-neutral-inputs
+          --commit "$GITHUB_SHA"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release-neutral-inputs
+          path: dist/release-neutral-inputs
+          if-no-files-found: error
+          retention-days: 3
+
   build-cli-release:
     name: Build native CLI (${{ matrix.platform }}-${{ matrix.arch }})
-    needs: release
+    needs: [release, build-cli-neutral]
     if: needs.release.outputs.created == 'true'
     strategy:
       fail-fast: false
@@ -494,9 +451,19 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile --filter='!@traderalice/desktop'
 
-      - name: Build Alice and native CLI
+      - uses: actions/download-artifact@v4
+        with:
+          name: release-neutral-inputs
+          path: dist/release-neutral-inputs
+
+      - name: Verify and install shared CLI inputs
+        run: >-
+          node scripts/prepare-cli-neutral-inputs.mjs verify
+          --repository-root . --input-dir dist/release-neutral-inputs
+          --commit "$GITHUB_SHA" --install
+
+      - name: Build native CLI
         run: |
-          pnpm build:server
           pnpm build:bun-runtime:feasibility
           pnpm build:bun:release
 
@@ -566,7 +533,7 @@ jobs:
           retention-days: 1
 
   build-cli-windows:
-    needs: release
+    needs: [release, build-cli-neutral]
     if: needs.release.outputs.created == 'true'
     uses: ./.github/workflows/windows-cli-preview.yml
     permissions:
@@ -575,6 +542,8 @@ jobs:
     with:
       channel_build: true
       artifact_prefix: cli-release
+      neutral_inputs: true
+      neutral_artifact: release-neutral-inputs
       native_acceptance: ${{ needs.release.outputs.channel == 'stable' }}
 
   build-cli-package-channels:
@@ -630,7 +599,7 @@ jobs:
 
   accept-cli-homebrew:
     name: Accept Homebrew CLI (${{ matrix.arch }})
-    needs: [release, build-cli-release, build-cli-windows]
+    needs: [release, build-cli-release]
     if: needs.release.outputs.created == 'true' && needs.release.outputs.channel == 'stable' && needs.build-cli-release.result == 'success'
     strategy:
       fail-fast: false
@@ -676,14 +645,14 @@ jobs:
             --version "$VERSION" \
             --released-at "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
             --asset-base-url "$CURRENT_ASSET_BASE_URL" \
-            --require-all
+            --system-only
           node scripts/build-cli-package-channels.mjs \
             --input-dir dist/cli-package-homebrew-previous \
             --output-dir dist/cli-package-homebrew-previous-channels \
             --version "$PREVIOUS_VERSION" \
             --released-at "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
             --asset-base-url "$PREVIOUS_ASSET_BASE_URL" \
-            --require-all
+            --system-only
           CURRENT_ID=$(node -e "const f=require('./dist/cli-package-homebrew-current/cli-package-channels.json');process.stdout.write(f.targets.find(t=>t.platform==='darwin'&&t.arch==='${{ matrix.arch }}').contentIdentity)")
           PREVIOUS_ID=$(node -e "const f=require('./dist/cli-package-homebrew-previous/fixture.json');process.stdout.write(f.targets.find(t=>t.platform==='darwin'&&t.arch==='${{ matrix.arch }}').previousContentIdentity)")
           node scripts/cli-system-package-manager-smoke.mjs \
@@ -697,7 +666,7 @@ jobs:
 
   accept-cli-linuxbrew:
     name: Accept Linuxbrew CLI (${{ matrix.arch }})
-    needs: [release, build-cli-release, build-cli-windows]
+    needs: [release, build-cli-release]
     if: needs.release.outputs.created == 'true' && needs.release.outputs.channel == 'stable' && needs.build-cli-release.result == 'success'
     strategy:
       fail-fast: false
@@ -741,14 +710,14 @@ jobs:
             --version "$VERSION" \
             --released-at "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
             --asset-base-url file:///work/dist/release-cli \
-            --require-all
+            --system-only
           node scripts/build-cli-package-channels.mjs \
             --input-dir dist/cli-package-linuxbrew-previous \
             --output-dir dist/cli-package-linuxbrew-previous-channels \
             --version "$PREVIOUS_VERSION" \
             --released-at "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
             --asset-base-url file:///work/dist/cli-package-linuxbrew-previous \
-            --require-all
+            --system-only
           CURRENT_ID=$(node -e "const f=require('./dist/cli-package-linuxbrew-current/cli-package-channels.json');process.stdout.write(f.targets.find(t=>t.platform==='linux'&&t.arch==='${{ matrix.arch }}').contentIdentity)")
           PREVIOUS_ID=$(node -e "const f=require('./dist/cli-package-linuxbrew-previous/fixture.json');process.stdout.write(f.targets.find(t=>t.platform==='linux'&&t.arch==='${{ matrix.arch }}').previousContentIdentity)")
           node scripts/cli-linuxbrew-smoke.mjs \
@@ -762,7 +731,7 @@ jobs:
 
   accept-cli-aur:
     name: Accept Arch/AUR CLI package (${{ matrix.arch }})
-    needs: [release, build-cli-release, build-cli-windows]
+    needs: [release, build-cli-release]
     if: needs.release.outputs.created == 'true' && needs.release.outputs.channel == 'stable' && needs.build-cli-release.result == 'success'
     strategy:
       fail-fast: false
@@ -806,14 +775,14 @@ jobs:
             --version "$VERSION" \
             --released-at "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
             --asset-base-url file:///work/dist/release-cli \
-            --require-all
+            --system-only
           node scripts/build-cli-package-channels.mjs \
             --input-dir dist/cli-package-aur-previous \
             --output-dir dist/cli-package-aur-previous-channels \
             --version "$PREVIOUS_VERSION" \
             --released-at "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
             --asset-base-url file:///work/dist/cli-package-aur-previous \
-            --require-all
+            --system-only
           CURRENT_ID=$(node -e "const f=require('./dist/cli-package-aur-current/cli-package-channels.json');process.stdout.write(f.targets.find(t=>t.platform==='linux'&&t.arch==='${{ matrix.arch }}').contentIdentity)")
           PREVIOUS_ID=$(node -e "const f=require('./dist/cli-package-aur-previous/fixture.json');process.stdout.write(f.targets.find(t=>t.platform==='linux'&&t.arch==='${{ matrix.arch }}').previousContentIdentity)")
           node scripts/cli-aur-container-smoke.mjs \
@@ -918,7 +887,7 @@ jobs:
 
   publish-release:
     name: Publish accepted release
-    needs: [release, preflight-public-cli-authority, build-desktop, accept-desktop-upgrade, build-cli-installer, build-cli-release, build-cli-windows, build-cli-package-channels, accept-cli-homebrew, accept-cli-linuxbrew, accept-cli-aur, accept-cli-legacy-cutover, build-broker-packs, cli-installer-acceptance]
+    needs: [release, validate-stable-source, preflight-public-cli-authority, build-desktop, build-cli-installer, build-cli-release, build-cli-windows, build-cli-package-channels, accept-cli-homebrew, accept-cli-linuxbrew, accept-cli-aur, accept-cli-legacy-cutover, build-broker-packs, cli-installer-acceptance]
     if: >-
       always() &&
       needs.release.outputs.created == 'true' &&
@@ -932,8 +901,8 @@ jobs:
         needs.release.outputs.channel == 'beta' ||
         (
           needs.release.outputs.channel == 'stable' &&
+          needs.validate-stable-source.result == 'success' &&
           needs.preflight-public-cli-authority.result == 'success' &&
-          needs.accept-desktop-upgrade.result == 'success' &&
           needs.build-cli-package-channels.result == 'success' &&
           needs.accept-cli-homebrew.result == 'success' &&
           needs.accept-cli-linuxbrew.result == 'success' &&
@@ -947,6 +916,13 @@ jobs:
       contents: write
 
     steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          package-manager-cache: false
+
       - uses: actions/download-artifact@v4
         with:
           name: release-notes
@@ -955,8 +931,27 @@ jobs:
       - uses: actions/download-artifact@v4
         with:
           pattern: release-assets-*
-          path: dist/release-assets
-          merge-multiple: true
+          path: dist/desktop-candidates
+          merge-multiple: false
+
+      - name: Download artifact-bound desktop upgrade receipts
+        if: needs.release.outputs.channel == 'stable'
+        uses: actions/download-artifact@v4
+        with:
+          pattern: release-upgrade-acceptance-*
+          path: dist/desktop-receipts
+          merge-multiple: false
+
+      - name: Verify and stage the complete desktop candidate set
+        env:
+          CANDIDATE_VERIFIER_SHA: ${{ needs.release.outputs.verifier_sha }}
+          CANDIDATE_SOURCE_SHA: ${{ needs.release.outputs.source_sha }}
+          CANDIDATE_VERSION: ${{ needs.release.outputs.version }}
+          CANDIDATE_CHANNEL: ${{ needs.release.outputs.channel }}
+          CANDIDATE_PREVIOUS_TAG: ${{ needs.release.outputs.previous_tag }}
+        run: >-
+          node scripts/desktop-candidate-receipt.mjs stage
+          dist/desktop-candidates dist/desktop-receipts dist/release-assets
 
       - uses: actions/download-artifact@v4
         with:
