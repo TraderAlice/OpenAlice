@@ -1,210 +1,89 @@
 # Bun-native CLI Distribution
 
-## Active: system-owned CLI dependencies — 2026-09-05
+## Active: system-owned CLI dependencies — implementation verified 2026-09-05
 
-Maintainer decision superseding the bundled-Git CLI topology below: dependency
-coordination belongs to installation, not to the OpenAlice payload. Apply this
-to every CLI platform and curl/PowerShell, npm/Bun, Homebrew, and AUR metadata.
-Electron retains its independently managed, out-of-box runtime.
+Goal: dependency detection and coordination are part of CLI installation across
+curl/PowerShell, npm/Bun, Homebrew, and AUR. CLI uses system Git/Bash; Electron
+retains its independent bundled runtime. Existing working tools are reused,
+not downgraded or overwritten. Agent Runtimes remain user-selected and external.
 
-Evidence: the Windows builder extracts complete PortableGit; standalone startup
-injects resource-owned Git paths (including shell and Git internals), so deleting
-the directory alone would break startup. POSIX also builds a bundled Git tree.
-The x64 npm payload expanded to 203,488,549 bytes when npm-incompatible hard links
-were materialized and was rejected with HTTP 413. These are installation/runtime
-boundary defects, not reasons to add another compression fallback.
+Delivery: [Draft PR #1365](https://github.com/TraderAlice/OpenAlice/pull/1365)
+targets dev. Implementation and acceptance below are complete; the draft remains
+unmerged for maintainer acceptance. No version, registry package, public AUR
+entry, release asset, or production installation was changed by this goal.
 
-External publication checkpoint: `openalice-windows-arm64@0.91.0` was accepted
-after renaming and expanding links; its Trusted Publisher is configured for
-TraderAlice/OpenAlice `release.yml`. Windows x64 is not published. The main npm
-package is not updated. Do not overwrite published versions or silently replace
-immutable release assets to retrofit this topology change.
+### Implemented boundary
 
-Implementation sequence and acceptance:
+- [x] Inventory and route Workspace Git consumers through a native CLI/system
+  execution boundary; source/Electron still use dugite.
+- [x] Shared executable detection distinguishes working, missing, and invalid
+  installations. Windows includes Git-for-Windows paths and excludes legacy WSL
+  bash. Working user versions are reused.
+- [x] Shared consent/plan/execute/recheck flow for WinGet, Homebrew, apt-get, dnf,
+  pacman, and apk. No silent elevation, license bypass, or package-manager
+  bootstrap. Apt refreshes package metadata before installing missing tools.
+- [x] curl/PowerShell continue setup after installing system-policy payloads.
+  Decline/failure preserves the installed release and gives a retry command.
+- [x] npm/Bun first local launch continues setup; postinstall only materializes
+  the native package. `setup --check/--json` never install. Help/status/remote
+  operations remain available; unfinished setup does not block TUI entry.
+  Local up/run/start and compatibility server start/run require ready tools.
+- [x] Homebrew/AUR declare Git/Bash dependencies. CLI POSIX/Windows builders
+  contain no Git or Agent Runtime payload. Runtime uses detected system paths.
+- [x] Windows npm names use `openalice-windows-*`; native target IDs remain
+  `win32`. Production and acceptance packing support npm 12 keyed reports,
+  legacy reports, and PowerShell array unwrapping.
+- [x] Installer/package/runtime owner guides updated; one coherent draft delivered.
 
-First implementation increment: `dependency-installation.mjs` now owns the
-shared consent/execute/re-detect state machine. Ten hermetic tests pass for
-reuse, invalid/unsupported installations, noninteractive mode, decline,
-unsupported package managers, failed/spawn-failed installation, failed
-verification, PATH-refresh ordering, and repeat installation. OS discovery,
-actual command providers, and installation entry-point wiring are still pending;
-this isolated module does not yet change user-visible installation behavior.
+### Acceptance evidence
 
-Discovery increment: `system-dependencies.mjs` probes Git/Bash with bounded
-execution, respects absolute PATH precedence, discovers standard/per-user and
-custom Git-for-Windows sibling paths, and excludes the legacy System32 WSL
-Bash launcher. Eighteen combined unit tests pass. A read-only macOS probe found
-working `/usr/bin/git` (2.50.1) and `/bin/bash` (3.2.57); no dependency was
-installed or modified. Native Windows and Linux discovery acceptance and all
-entry-point integration remain pending.
+- Root typecheck and full suite at product-code commit 80a17c78: 719 files,
+  6,424 passed, 3 skipped; `/tmp/openalice-dependencies-final-check.log`.
+  Subsequent change c72cfe04 only repairs PowerShell acceptance parsing and
+  records progress; its parser was executed in real PowerShell and native CI.
+- macOS ARM64 compiled CLI: system Git init/commit/clone, three templates,
+  Workspace CLI, independent Agent-shaped PTYs, input/resize/stop isolation,
+  UI readiness, no Node/Bun PATH requirement. A real TUI with Git/Bash absent
+  remained accessible; local `up --json` correctly failed without mutation.
+- Linux ARM64 native Docker and x64 under amd64 container emulation: equivalent
+  build/runtime acceptance. Reports under
+  `/tmp/openalice-linux-dependencies.HToP9a/{release,x64-release}/report.json`.
+- Clean Debian: read-only missing-tool detection, confirmed installation and
+  post-check passed. Offline real direct installation retained activation and
+  offered setup. Docker installer system suite passed.
+- macOS npm 10, npm 12, and Bun installation/update/removal passed. Supported
+  Node 22.22.2 + npm 12.0.2 repeated successfully on native Linux ARM64:
+  `/tmp/openalice-npm12-pinned-acceptance.log`.
+- Real isolated Homebrew ARM64: declared tool dependencies, setup, runtime
+  start/status/stop and removal passed:
+  `/tmp/openalice-brew-dependency-acceptance.log`.
+- Real pinned Arch ARM64: production-generated PKGBUILD, makepkg, pacman
+  dependency resolution, setup, runtime start/status/stop and removal passed:
+  `/tmp/openalice-aur-dependency-acceptance.log`.
+- Native Windows x64 and ARM64 both passed PowerShell install, system Git,
+  ConPTY, runtime/UI, mapped update, rollback, data-preserving removal, npm/Bun
+  installation, setup checks and update ownership.
+  [Candidate build](https://github.com/TraderAlice/OpenAlice/actions/runs/33947669774)
+  initially failed only in npm report parsing; the
+  [successful recheck](https://github.com/TraderAlice/OpenAlice/actions/runs/33948139518)
+  reused those exact candidates without rebuilding.
+  Receipts: `/tmp/openalice-windows-accepted-receipts`.
+- Local Windows npm archives have no bundled Git; x64 has no hard-link entries.
+  x64/ARM64 sizes are about 46/42 MB, versus the prior oversized Git payload.
 
-Installation entry increment: `openalice setup [--check] [--json]` now uses
-shared discovery and consent coordination. WinGet, Homebrew, apt-get, dnf,
-pacman, and apk plans retain manager confirmation/license prompts and execute
-argument arrays without a shell; absent managers require manual guidance.
-Thirty-one focused tests pass; real source CLI `setup --check --json` reports
-both macOS dependencies ready without mutation. Root help/completion, first
-launch, curl/PowerShell continuation, package metadata, runtime/builder changes,
-full regression and native acceptance remain outstanding.
+### Explicit residuals / external activation
 
-Native application entry now continues dependency setup before bare/TUI and
-up/run/start commands, excluding help and source development. Queries and SSH/
-remote commands remain ungated. Successful automatic setup is quiet, preserving
-the single JSON result contract; missing dependencies in JSON mode cannot prompt.
-Root help/completion now includes setup. Sixty-one focused tests and CLI types
-pass. Direct installer continuation and native internal/server entry paths still
-need integration auditing; the current hook alone is not full startup coverage.
-
-Direct Bash and PowerShell installers now continue through setup for releases
-declaring `dependencyPolicy: system`, outside activation rollback handling.
-Noninteractive install consent authorizes only a dependency check. Two new Bash
-integration fixtures exercise `--check` and preservation of the installed pointer
-after setup failure. Builders do not emit this policy yet: remove vendored Git
-and update environment/runtime acceptance before activating the new contract.
-
-Git execution boundary: six Workspace consumers now route through
-`git-execution.ts`. Source/Electron retain dugite; native CLI uses system Git
-without dugite's forced prefix/template/config rewriting. Five execution tests
-cover dispatch, environment preservation, exit status, stdin/buffers, callback,
-and spawn errors. The subsequent full local regression passed: 719 files,
-6,413 tests (3 skipped), recorded in
-`/tmp/openalice-cli-dependencies-full-test.log`.
-
-Standalone environment increment: foreground/detached and compatibility startup
-now re-probe system dependencies and pass the selected Git executable and Windows
-Bash into the child Runtime. Missing/invalid dependencies fail with setup guidance;
-the launch path never installs silently. Removed CLI-owned Git internal-path
-injection while retaining user Git configuration. Source/Electron are unchanged.
-The three updated startup/environment suites pass 45 tests and root typecheck
-passes.
-
-Builder/channel increment: POSIX and Windows builders no longer assemble bundled
-Git; both emit the system-dependency contract. Homebrew and AUR declare Git/Bash.
-Windows npm names now use `openalice-windows-*` in generation, postinstall,
-authority checks, publication workflow, and Windows package smoke (native target
-identifiers remain `win32`). The three package-channel/publication/authority
-suites pass 29 tests. This does not publish or enroll any new registry package.
-
-macOS ARM64 native assembly and runtime smoke passed after adapting the old
-bundled-Git-only PATH fixture. Receipt:
-`/tmp/openalice-system-cli.zenh18/report.json`; archive 31,933,891 bytes,
-expanded release 80,895,188 bytes. Verified system Git init/commit/clone, three
-template bootstraps, Workspace CLI invocation, independent external-Agent PTYs,
-resize/input/stop isolation, and HTTP UI readiness without Node/Bun on PATH.
-Network Git and a real external Agent remain opt-in and were not run. Linux,
-Windows, direct installer and actual package-manager acceptance remain pending.
-
-Installation acceptance increment: native macOS npm 10.9.4 and Bun 1.4.0
-isolated package install/update/removal passed. npm 12 rehearsal exposed outdated
-`npm pack --json` array parsing and local-tarball script consent; acceptance now
-accepts npm 12's keyed report and authorizes the resolved file identity (not all
-scripts). Registry instructions continue to authorize `openalice` by name.
-The corrected npm 12.0.2 install/update/removal rehearsal passed. The local Node
-22.22.1 is below npm 12's supported 22.22.2 floor, so repeat with the release
-toolchain before treating this as the pinned-toolchain acceptance gate.
-Windows acceptance now checks system Git/Bash rather than a deleted bundled path;
-native execution is still outstanding.
-
-Linux ARM64 native build and full runtime smoke passed in local Docker with the
-repository read-only and no network during smoke. Receipt:
-`/tmp/openalice-linux-dependencies.HToP9a/release/report.json`, content identity
-`2959095640830212`, archive 42,609,308 bytes. A separate clean Debian container
-correctly reported missing Git noninteractively without installing. Real
-interactive setup exposed absent apt indexes; the explicitly confirmed plan now
-refreshes apt metadata before installing only missing tools. Repeating the live
-setup from current modules installed Git and re-detected Git/Bash successfully,
-with apt's own confirmation retained. No host dependencies were changed.
-
-Direct installer continuation was exercised against the real Linux archive in
-a clean, offline container: install completed, the version command worked, and
-missing Git produced actionable setup guidance without reverting activation or
-installing software. The installer plan now describes immutable resources rather
-than release-owned Git. Setup failures include their spawn error/exit code and
-the retry command. Updated full regression is running in
-`/tmp/openalice-system-dependencies-final-regression.log` (not yet a passed gate).
-
-Windows x64/ARM64 cross-build and channel generation passed. Local npm pack
-produced 45,806,528-byte x64 and 42,265,079-byte ARM64 archives with zero bundled
-Git files; x64 tar inspection also found no hard-link entries. Native Windows
-execution remains unverified. The local Docker installer system suite passed.
-These are local candidates, not registry uploads or replacements for 0.91.0.
-
-Draft delivery: https://github.com/TraderAlice/OpenAlice/pull/1365 targets dev
-and remains unmerged. Updated full regression passed 719 files / 6,416 tests
-(3 skipped). A subsequent remote-only boundary correction no longer blocks TUI
-entry when setup is declined/unfinished; local startup still rejects missing
-dependencies. Verified the newly compiled CLI in a real PTY with Git/Bash absent:
-Supervisor rendered and detached normally, while `up --json` returned missing
-dependency diagnostics and exit 1. The 31 entry/environment tests and CLI
-typecheck pass. Native Windows and remaining manager acceptance are still open.
-
-System-manager acceptance tooling now exposes only verified Git/Bash through its
-isolated PATH instead of assuming bundled Git with an empty PATH. Actual
-Homebrew/AUR lifecycle execution remains pending; do not run its install/remove
-steps against the maintainer's existing Homebrew prefix. Production npm packing
-also needed npm 12's keyed JSON support (not only smoke tooling): four packing
-tests pass, and the production pack entry generated real Windows x64 plus meta
-tarballs and their integrity/publication-order manifest using npm 12. No upload
-was performed. PR #1365's latest inspected clean-build check passed.
-
-Real Homebrew acceptance passed inside a disposable Linux ARM64 Homebrew image:
-the production formula generator consumed the validated ARM64 archive, Homebrew
-installed Git/Bash dependencies, setup reported ready, Runtime started/statused/
-stopped successfully, and Homebrew removed the package. Receipt log:
-`/tmp/openalice-brew-dependency-acceptance.log`. No maintainer Homebrew prefix was
-mounted. Formula generation is exported for target-specific local acceptance;
-full release generation still requires its complete target set. Linux x64
-build/runtime smoke is now running under local amd64 container emulation,
-with output in `/tmp/openalice-linux-x64-native-build.log`; not yet accepted.
-
-Linux x64 build/runtime smoke subsequently passed under local amd64 container
-emulation (not a physical x64 host), with Git/template/CLI/PTY checks and receipt
-`/tmp/openalice-linux-dependencies.HToP9a/x64-release/report.json`. Both real Linux
-archives then fed the exported production AUR generator. In the pinned native
-ARM64 Arch-family container, makepkg built the package, pacman resolved and
-installed its Git dependency, setup reported ready, Runtime start/status/stop
-passed, and removal completed. Receipt:
-`/tmp/openalice-aur-dependency-acceptance.log`. This verifies local AUR package
-mechanics, not public AUR registration, paru discovery, or registry publication.
-
-Compatibility startup audit: `server start/run` now offers the same setup as
-`up/run/start`; server status/stop/help remain ungated. The 31 entry/server tests
-and CLI typecheck pass. Native Windows acceptance will use the existing isolated
-Windows CLI Preview manual workflow on this feature branch, with channel build
-and native acceptance enabled. It does not publish a release or npm packages.
-
-Final local regression at 80a17c78 passed 719 files / 6,424 tests (3 skipped),
-plus root typecheck. Windows run 33947669774 is still active. PowerShell npm
-report parsing now handles ConvertFrom-Json's single-element array unwrapping;
-both legacy and keyed reports passed in real PowerShell (Linux container),
-recorded in `/tmp/openalice-powershell-pack-parser.log`. This is parser acceptance,
-not a substitute for the native Windows install/runtime lane.
-
-- [ ] Inventory CLI Git/Bash consumers, installer entry points, package-manager
-  declarations, and runtime PATH injection; keep Electron ownership explicit.
-- [x] Implement shared executable detection and installation planning: reuse
-  working system dependencies, never downgrade/overwrite an existing install;
-  distinguish missing, invalid, and unsupported dependencies.
-- [ ] Integrate dependency coordination into Bash/PowerShell installation and
-  npm/Bun first-launch continuation. Explain the missing dependency and exact
-  installation action, require consent, propagate installation failures, and
-  re-detect afterward. Noninteractive runs must not hang or install implicitly.
-- [x] Declare dependencies through Homebrew/AUR where supported. npm postinstall
-  must not elevate or secretly launch a system package manager. Agent Runtime
-  selection remains user-owned, not an implicitly installed default.
-- [ ] Remove bundled Git from POSIX/Windows CLI builders and resource-owned Git
-  environment injection; use discovered system Git/Bash without breaking status,
-  help, or other operations that do not require them. Keep desktop vendoring.
-- [ ] Integrate Windows npm `windows-*` name mapping into generator, materializer,
-  authority preflight, workflow, and tests; validate registry-compatible archives.
-- [ ] Verify existing/missing dependencies, decline, noninteractive execution,
-  installation failure, PATH refresh, and repeat installation with hermetic tests;
-  exercise real isolated macOS and Linux Docker installation/runtime flows.
-  Windows discovery/install and Git/Bash/PTY need native acceptance, not merely
-  cross-compilation. No test may mutate the developer's system dependencies.
-- [ ] Update installer/package/runtime owner guides and record residual external
-  activation gaps. Deliver one coherent dev-targeted Draft PR for this goal;
-  publication/version selection remains a separate accepted release action.
+- Windows Bun 1.4 removes its package but can leave its global executable entry:
+  existing OpenAlice #1347 / oven-sh/bun#11970. Receipts disclose this; Alice does
+  not erase another package manager's files.
+- Native Windows acceptance reused installed Git/Bash. WinGet command planning
+  is unit-tested; a fresh Windows interactive download/elevation flow was not
+  exercised. Other Linux manager plans are likewise not all live-installed.
+- Real agent/provider credentials, broker operations, signing/notarization, and
+  network Git are separate opt-in release/product checks, not exercised here.
+- Public npm/AUR activation and release promotion remain separate actions.
+  The previously accepted `openalice-windows-arm64@0.91.0` is not overwritten;
+  this new topology requires a newly accepted version for publication.
 
 Owner guides: [[docs/cli-installer.md]], [[docs/cli-package-managers.md]],
 [[docs/local-runtime.md]], [[docs/managed-workspace-runtime.md]].
