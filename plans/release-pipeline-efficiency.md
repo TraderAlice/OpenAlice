@@ -50,6 +50,25 @@ publication in run 33958504645. Extend that bounded reuse principle to candidate
 
 ## Chosen design
 
+### Incremental measurement (2026-09-05)
+
+Maintainer requested measured feedback after each optimization, rather than
+only a final theoretical timing estimate. On 8948bacd, local macOS ARM64
+production server compilation with Turbo `--force` (dependencies already
+installed) took 36.34 seconds wall time. Preparing the actual 988-file neutral
+artifact took 215.71 ms. Installing and hash-verifying it into six distinct
+empty temporary consumers took 193.78, 165.30, 166.31, 158.06, 168.92 and
+170.71 ms. Temporary consumers were removed; the checkout stayed clean.
+Build log: /tmp/openalice-neutral-benchmark-build.log. This comparison excludes
+dependency installation, GitHub upload/download and runner queue latency; it
+demonstrates removed local repeated work, not total release wall-time savings.
+
+Negative hosted replay [33960665604](https://github.com/TraderAlice/OpenAlice/actions/runs/33960665604)
+used an intentionally wrong product SHA. The native job ran 12 seconds and
+failed at trusted selection as expected; artifact download, dependencies,
+upgrade acceptance and all release/publication jobs were skipped. This proves
+early rejection and operation isolation, not positive replay or speedup.
+
 1. Each platform builds and preserves its candidate, then its own downstream
    acceptance starts immediately. Final publication still joins all required
    platform results. Keep build and acceptance separate for selective retries.
