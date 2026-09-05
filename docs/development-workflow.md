@@ -280,7 +280,8 @@ delivery lane:
   and the native Windows dev-stack smoke. The hermetic Ubuntu suite, complete
   workspace build, and macOS build-and-test repetition run only when a
   maintainer explicitly dispatches Full Source Validation for the selected
-  commit. Windows desktop and Broker Pack packaging remain in the separate
+  commit or starts a stable Release (which calls the same full workflow).
+  Windows desktop and Broker Pack packaging remain in the separate
   package workflow. Local development owns macOS/Linux changed-test selection;
   hosted runners are a deliberate native-host or release-candidate tool, not a
   second purchase of every local check.
@@ -339,8 +340,9 @@ delivery lane:
 - A beta promotion uses recorded local acceptance, the automatic source gate,
   Windows dev-stack smoke, and the final Release workflow's artifact acceptance;
   it does not wait for a duplicate hosted macOS/Linux full suite. A stable
-  candidate requires a manually dispatched Full Source Validation on its exact
-  commit before release. A real product failure still stops or withdraws a
+  candidate runs Full Source Validation on its exact dispatch commit alongside
+  candidate construction. Final publication requires the full workflow to
+  succeed; a separate serial dispatch is not required. A real product failure still stops or withdraws a
   candidate; hosted-runner starvation and a known non-product fixture timeout
   do not become product risk through repetition.
 
@@ -350,8 +352,8 @@ OrbStack, installer, unsigned Electron/package, and native runtime acceptance
 only when those surfaces change. Remote acceptance starts from a host the user
 already made reachable through ordinary SSH; CI and repository scripts do not
 provision or manage a cloud provider. Record the commands and results in the
-PR. Stable release preparation re-establishes the complete manually dispatched
-matrix even when routine integration and beta used lighter hosted feedback.
+PR. Stable Release re-establishes the complete source matrix alongside artifact
+construction even when routine integration and beta used lighter hosted feedback.
 
 ### Package signing boundary
 
@@ -467,10 +469,12 @@ version that disagrees with either the root or `packages/cli` package. It binds
 the accepted candidates and eventual tag to the dispatch commit SHA.
 
 An exact forward beta version-only PR uses the bounded CI fast lane described
-above. Stable version preparation deliberately does not: it retains the full
-PR matrix. The subsequent `master` push remains a complete asynchronous
-backstop for both channels, but only stable waits for it as a synchronous
-publication gate. The manually dispatched beta Release rebuilds and accepts
+above. Stable version preparation deliberately does not: it retains the normal
+master PR gates. The stable Release calls the complete source-validation workflow
+from the same commit, in parallel with artifact construction; publication waits
+for both. There is no full-source workflow triggered by a `master` push and no
+need to dispatch that suite separately before starting the stable candidate.
+The manually dispatched beta Release rebuilds and accepts
 its own final candidates from the exact dispatch SHA; the fast lane never
 supplies release artifacts.
 
@@ -517,6 +521,13 @@ not wait for the other desktop architectures. The caller's aggregate success
 includes the stable upgrade result, so publication still requires every native
 platform. Build and upgrade remain separate jobs to preserve selective retries.
 Beta runs the current-candidate checks without the stable-only N-1 job.
+
+CLI candidates share one commit-bound platform-neutral input artifact containing
+only the approved UI and pure-JavaScript package outputs. Each of the six target
+jobs verifies its source SHA and exact file hashes before installing those
+inputs. Native dependencies, executable compilation, and channel-specific
+acceptance remain on the target's existing host lane. Never use the neutral
+artifact as a substitute for an accepted native archive.
 
 Do not delete `dev` after promotion. After a master hotfix, propagate the fix
 back to `dev` immediately so a later promotion cannot revert it.

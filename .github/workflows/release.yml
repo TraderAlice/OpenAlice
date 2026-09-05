@@ -168,6 +168,15 @@ jobs:
           path: notes.md
           if-no-files-found: error
 
+  # Local reusable workflows and checkout resolve to this dispatch's SHA.
+  # Source acceptance runs alongside candidates, never after their publication.
+  validate-stable-source:
+    needs: release
+    if: needs.release.outputs.created == 'true' && needs.release.outputs.channel == 'stable'
+    uses: ./.github/workflows/ci.yml
+    permissions:
+      contents: read
+
   preflight-public-cli-authority:
     name: Preflight public CLI channel authority
     needs: release
@@ -288,9 +297,38 @@ jobs:
           if-no-files-found: error
           retention-days: 1
 
+  build-cli-neutral:
+    name: Build shared CLI inputs
+    needs: release
+    if: needs.release.outputs.created == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22.19.0
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile --filter='!@traderalice/desktop'
+      - run: pnpm build:server
+      - name: Record commit-bound platform-neutral inputs
+        run: >-
+          node scripts/prepare-cli-neutral-inputs.mjs prepare
+          --repository-root . --output-dir dist/release-neutral-inputs
+          --commit "$GITHUB_SHA"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release-neutral-inputs
+          path: dist/release-neutral-inputs
+          if-no-files-found: error
+          retention-days: 3
+
   build-cli-release:
     name: Build native CLI (${{ matrix.platform }}-${{ matrix.arch }})
-    needs: release
+    needs: [release, build-cli-neutral]
     if: needs.release.outputs.created == 'true'
     strategy:
       fail-fast: false
@@ -330,9 +368,19 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile --filter='!@traderalice/desktop'
 
-      - name: Build Alice and native CLI
+      - uses: actions/download-artifact@v4
+        with:
+          name: release-neutral-inputs
+          path: dist/release-neutral-inputs
+
+      - name: Verify and install shared CLI inputs
+        run: >-
+          node scripts/prepare-cli-neutral-inputs.mjs verify
+          --repository-root . --input-dir dist/release-neutral-inputs
+          --commit "$GITHUB_SHA" --install
+
+      - name: Build native CLI
         run: |
-          pnpm build:server
           pnpm build:bun-runtime:feasibility
           pnpm build:bun:release
 
@@ -402,7 +450,7 @@ jobs:
           retention-days: 1
 
   build-cli-windows:
-    needs: release
+    needs: [release, build-cli-neutral]
     if: needs.release.outputs.created == 'true'
     uses: ./.github/workflows/windows-cli-preview.yml
     permissions:
@@ -411,6 +459,8 @@ jobs:
     with:
       channel_build: true
       artifact_prefix: cli-release
+      neutral_inputs: true
+      neutral_artifact: release-neutral-inputs
       native_acceptance: ${{ needs.release.outputs.channel == 'stable' }}
 
   build-cli-package-channels:
@@ -754,7 +804,7 @@ jobs:
 
   publish-release:
     name: Publish accepted release
-    needs: [release, preflight-public-cli-authority, build-desktop, build-cli-installer, build-cli-release, build-cli-windows, build-cli-package-channels, accept-cli-homebrew, accept-cli-linuxbrew, accept-cli-aur, accept-cli-legacy-cutover, build-broker-packs, cli-installer-acceptance]
+    needs: [release, validate-stable-source, preflight-public-cli-authority, build-desktop, build-cli-installer, build-cli-release, build-cli-windows, build-cli-package-channels, accept-cli-homebrew, accept-cli-linuxbrew, accept-cli-aur, accept-cli-legacy-cutover, build-broker-packs, cli-installer-acceptance]
     if: >-
       always() &&
       needs.release.outputs.created == 'true' &&
@@ -768,6 +818,7 @@ jobs:
         needs.release.outputs.channel == 'beta' ||
         (
           needs.release.outputs.channel == 'stable' &&
+          needs.validate-stable-source.result == 'success' &&
           needs.preflight-public-cli-authority.result == 'success' &&
           needs.build-cli-package-channels.result == 'success' &&
           needs.accept-cli-homebrew.result == 'success' &&

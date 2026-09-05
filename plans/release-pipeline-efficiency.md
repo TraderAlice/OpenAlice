@@ -89,8 +89,8 @@ beta-to-stable promotion; installing a permanent runner on the user's daily Mac.
   npm materialization. Public channel generation still requires all six targets.
   All 26 release/generator tests and root typecheck pass. actionlint 1.7.7
   passes with only its stale macos-15-intel label diagnostic excluded; no shell
-  checker is installed. Actions semantics rehearsal and full
-  local regression completed: 719 files, 6,430 passes and three expected skips
+  checker is installed. Full local regression completed: 719 files,
+  6,430 passes and three expected skips
   in 220 seconds (/tmp/openalice-release-pipeline-step1-tests.log). Final
   generator changes have additional focused coverage. Hosted Actions semantics
   rehearsal remains outstanding; no measured speedup is claimed yet.
@@ -114,6 +114,22 @@ beta-to-stable promotion; installing a permanent runner on the user's daily Mac.
   of serializing before candidate builds; reuse verified neutral CLI inputs.
   Test source failure/mismatch blocks publication, beta gates stay separate,
   and neutral inputs cannot cross commits or include host-native outputs.
+  In progress: the release now prepares the existing approved neutral input
+  inventory once, shares it with all six native CLI targets, and verifies its
+  exact commit and file hashes before installation. Windows uses a named input
+  artifact while dev retains its existing default. Native build, feasibility,
+  and channel-appropriate acceptance remain per-target. Source-validation
+  concurrency is now wired through the existing Full Source Validation reusable
+  workflow on the same dispatch SHA. Stable publication requires its success;
+  candidate jobs have no source-validation dependency, and beta does not call
+  the full workflow. Workflow contracts pass; real artifact and hosted
+  dependency rehearsal remain outstanding.
+  Local checkpoint: root typecheck passed; complete hermetic suite passed
+  (721 files, 6,458 passes, three skips, 201.31 seconds;
+  /tmp/openalice-release-pipeline-neutral-tests.log). Final source-concurrency
+  contracts were additionally checked after editing (35 passes), along with
+  actionlint under the previously documented tool limitations. These timings
+  measure local validation, not the optimized release critical path.
 - [ ] Complete a non-publishing workflow rehearsal of the new dependency and
   replay paths. Prefer local Mac/OrbStack for tests; use hosted jobs only for
   Actions semantics/native-host evidence unavailable locally. A routine rehearsal

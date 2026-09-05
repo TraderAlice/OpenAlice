@@ -346,7 +346,7 @@ describe('Release workflow critical path', () => {
       { os: 'ubuntu-24.04-arm', platform: 'linux', arch: 'arm64' },
     ])
     expect(nativeCli.steps?.some((candidate) => candidate.uses === 'oven-sh/setup-bun@v2')).toBe(true)
-    expect(step(nativeCli, 'Build Alice and native CLI').run).toContain('build:bun-runtime:feasibility')
+    expect(step(nativeCli, 'Build native CLI').run).toContain('build:bun-runtime:feasibility')
     expect(step(nativeCli, 'Preserve accepted native CLI').with?.name).toBe(
       'cli-release-${{ matrix.platform }}-${{ matrix.arch }}',
     )
@@ -356,6 +356,46 @@ describe('Release workflow critical path', () => {
     ]) {
       expect(step(publication, name).with?.files).toContain('dist/release-cli/*.tar.gz.sha256')
     }
+  })
+
+  it('joins full same-dispatch source validation only at stable publication', () => {
+    const source = workflow.jobs['validate-stable-source']
+    expect(source.uses).toBe('./.github/workflows/ci.yml')
+    expect(source.with).toBeUndefined() // No alternate product revision.
+    expect(needs(source)).toEqual(['release'])
+    expect(source.if).toContain("needs.release.outputs.channel == 'stable'")
+    for (const name of ['build-desktop', 'build-cli-neutral', 'build-cli-windows', 'build-cli-release']) {
+      expect(needs(workflow.jobs[name])).not.toContain('validate-stable-source')
+    }
+    const publication = workflow.jobs['publish-release']
+    expect(needs(publication)).toContain('validate-stable-source')
+    expect(publication.if).toContain("needs.validate-stable-source.result == 'success'")
+    const fullSource = YAML.parse(readFileSync(resolve(root, '.github/workflows/ci.yml'), 'utf8'))
+    expect(fullSource.on).toHaveProperty('workflow_call')
+    for (const name of ['workspace-build', 'hermetic-tests', 'cross-platform-test', 'dev-smoke']) {
+      expect(fullSource.jobs[name].if).toContain("github.event_name == 'workflow_dispatch'")
+      expect(fullSource.jobs[name]['continue-on-error']).toBeUndefined()
+      const checkout = fullSource.jobs[name].steps.find((entry: WorkflowStep) => entry.uses === 'actions/checkout@v7')
+      expect(checkout.with?.ref).toBeUndefined()
+    }
+  })
+
+  it('shares commit-bound neutral inputs without skipping native acceptance', () => {
+    const shared = workflow.jobs['build-cli-neutral']
+    const native = workflow.jobs['build-cli-release']
+    const windows = workflow.jobs['build-cli-windows']
+    expect(needs(shared)).toEqual(['release'])
+    expect(shared.steps?.filter((entry) => entry.run === 'pnpm build:server')).toHaveLength(1)
+    expect(step(shared, 'Record commit-bound platform-neutral inputs').run).toContain('--commit "$GITHUB_SHA"')
+    expect(needs(native)).toContain('build-cli-neutral')
+    expect(needs(windows)).toContain('build-cli-neutral')
+    const verify = step(native, 'Verify and install shared CLI inputs')
+    expect(verify.run).toContain('--commit "$GITHUB_SHA" --install')
+    expect(native.steps!.indexOf(verify)).toBeLessThan(native.steps!.indexOf(step(native, 'Build native CLI')))
+    expect(native.steps?.some((entry) => entry.run?.includes('pnpm build:server'))).toBe(false)
+    expect(windows.with?.neutral_inputs).toBe(true)
+    expect(windows.with?.neutral_artifact).toBe('release-neutral-inputs')
+    expect(windows.with?.native_acceptance).toBe("${{ needs.release.outputs.channel == 'stable' }}")
   })
 
   it('accepts manager installs and derives every channel from accepted archives', () => {
