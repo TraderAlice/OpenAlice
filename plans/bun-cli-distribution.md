@@ -173,6 +173,13 @@ and CLI typecheck pass. Native Windows acceptance will use the existing isolated
 Windows CLI Preview manual workflow on this feature branch, with channel build
 and native acceptance enabled. It does not publish a release or npm packages.
 
+Final local regression at 80a17c78 passed 719 files / 6,424 tests (3 skipped),
+plus root typecheck. Windows run 33947669774 is still active. PowerShell npm
+report parsing now handles ConvertFrom-Json's single-element array unwrapping;
+both legacy and keyed reports passed in real PowerShell (Linux container),
+recorded in `/tmp/openalice-powershell-pack-parser.log`. This is parser acceptance,
+not a substitute for the native Windows install/runtime lane.
+
 - [ ] Inventory CLI Git/Bash consumers, installer entry points, package-manager
   declarations, and runtime PATH injection; keep Electron ownership explicit.
 - [x] Implement shared executable detection and installation planning: reuse

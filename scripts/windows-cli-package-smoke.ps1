@@ -10,7 +10,8 @@ $bun = (Get-Command bun).Source
 $npm = (Get-Command npm.cmd).Source
 function Get-PackFilename([string]$Json) {
   $parsed = ConvertFrom-Json -InputObject $Json
-  $entries = if ($parsed -is [array]) { @($parsed) } else { @($parsed.PSObject.Properties | ForEach-Object { $_.Value }) }
+  # ConvertFrom-Json can unwrap a one-element legacy JSON array into an object.
+  $entries = if ($parsed -is [array] -or $parsed.PSObject.Properties.Name -contains 'filename') { @($parsed) } else { @($parsed.PSObject.Properties | ForEach-Object { $_.Value }) }
   if ($entries.Count -ne 1 -or -not $entries[0].filename) { throw 'Invalid npm pack JSON report.' }
   return $entries[0].filename
 }
