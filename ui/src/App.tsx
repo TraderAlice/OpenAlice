@@ -16,7 +16,6 @@ import {
 import { UrlAdopter } from './tabs/UrlAdopter'
 import { useLocale } from './i18n/useLocale'
 import { useActivityRailState } from './hooks/useActivityRailState'
-import { useWorkspace } from './tabs/store'
 import { PrimaryNavigationContext } from './contexts/PrimaryNavigationContext'
 import { PrimaryNavigationToggle, useNavigationToggleFocus } from './components/PrimaryNavigationToggle'
 
@@ -90,9 +89,7 @@ function AppShellContent() {
   const hasRailText = useHasRailText() // ≥960 — text rail is allowed
   const hasFullRail = useHasFullRail() // ≥1280 — full rail width
   const railMode = !isDesktop ? 'full' : hasFullRail ? 'full' : hasRailText ? 'narrow' : 'compact'
-  const area = useWorkspace((state) => state.selectedSidebar)
-  const workbench = area === 'chat' || area === 'auto-quant' || area === 'prediction'
-  const { collapsed: railCollapsed, toggle: toggleRail } = useActivityRailState(workbench, railMode === 'compact')
+  const { collapsed: railCollapsed, toggle: toggleRail } = useActivityRailState(railMode === 'compact')
   const toggleFocus = useNavigationToggleFocus()
   const railToggle = isDesktop ? (
     <PrimaryNavigationToggle ref={toggleFocus.ref} collapsed={railCollapsed} onToggle={() => {

@@ -87,6 +87,12 @@ export { resolveChatWorkspaceTarget } from '../lib/chat-workspace-target'
  */
 type HarnessLandingMode = 'chat' | 'auto-quant' | 'prediction'
 
+interface LandingPageProps {
+  spec: { params: { targetWsId?: string; initialPrompt?: string } }
+  showHeader?: boolean
+  onPromptChange?: (prompt: string) => void
+}
+
 const WORKFLOW_ICONS: Readonly<Record<string, LucideIcon>> = {
   market: ChartNoAxesCombined,
   portfolio: BriefcaseBusiness,
@@ -260,8 +266,9 @@ function HarnessWorkspacePicker({
 function HarnessLandingPage({
   spec,
   mode,
-}: {
-  spec: { params: { targetWsId?: string; initialPrompt?: string } }
+  showHeader = true,
+  onPromptChange,
+}: LandingPageProps & {
   mode: HarnessLandingMode
 }) {
   const { t } = useTranslation()
@@ -320,7 +327,11 @@ function HarnessLandingPage({
   // loop, so it can't be seeded with a first message).
   const cliAgents = agents.filter((a) => a.kind !== 'utility')
 
-  const [value, setValue] = useState(spec.params.initialPrompt ?? '')
+  const [value, setDraftValue] = useState(spec.params.initialPrompt ?? '')
+  const setValue = (next: string) => {
+    setDraftValue(next)
+    onPromptChange?.(next)
+  }
   const [launching, setLaunching] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [examplePage, setExamplePage] = useState(0)
@@ -448,7 +459,7 @@ function HarnessLandingPage({
       data-testid="harness-landing-root"
       className="@container/harness flex h-full min-h-0 w-full flex-col overflow-hidden bg-background"
     >
-      <PageTopBar title={t(mode === 'chat' ? 'chat.newChat' : mode === 'auto-quant' ? 'autoQuant.newResearch' : 'autoPrediction.newResearch')} />
+      {showHeader && <PageTopBar title={t(mode === 'chat' ? 'chat.newChat' : mode === 'auto-quant' ? 'autoQuant.newResearch' : 'autoPrediction.newResearch')} />}
       <div
         data-testid="harness-landing-scroll"
         className="oa-harness-scroll flex min-h-0 flex-1 justify-start overflow-x-hidden overflow-y-auto overscroll-contain px-5 py-8 @min-[42rem]/harness:px-8 @min-[42rem]/harness:py-10"
@@ -666,27 +677,27 @@ function HarnessLandingPage({
   )
 }
 
-export function ChatLandingPage({ spec }: { spec: { params: { targetWsId?: string; initialPrompt?: string } } }) {
+export function ChatLandingPage({ spec, ...presentation }: LandingPageProps) {
   const ctx = useWorkspaces()
   const hasChatWorkspace = ctx.workspaces.some((workspace) => workspace.template === 'chat')
   if (!hasChatWorkspace) return <ChatSetupPage />
-  return <HarnessLandingPage spec={spec} mode="chat" />
+  return <HarnessLandingPage spec={spec} mode="chat" {...presentation} />
 }
 
-export function AutoQuantLandingPage({ spec }: { spec: { params: { targetWsId?: string; initialPrompt?: string } } }) {
+export function AutoQuantLandingPage({ spec, ...presentation }: LandingPageProps) {
   const ctx = useWorkspaces()
   const workspace = ctx.workspaces.find((candidate) =>
     candidate.id === ctx.autoQuantDefaultWorkspaceId
     && candidate.template === 'auto-quant-v2')
   if (!workspace) return <AutoQuantSetupPage />
-  return <HarnessLandingPage spec={{ params: { targetWsId: workspace.id, initialPrompt: spec.params.initialPrompt } }} mode="auto-quant" />
+  return <HarnessLandingPage spec={{ params: { targetWsId: workspace.id, initialPrompt: spec.params.initialPrompt } }} mode="auto-quant" {...presentation} />
 }
 
-export function AutoPredictionLandingPage({ spec }: { spec: { params: { targetWsId?: string; initialPrompt?: string } } }) {
+export function AutoPredictionLandingPage({ spec, ...presentation }: LandingPageProps) {
   const ctx = useWorkspaces()
   const workspace = ctx.workspaces.find((candidate) =>
     candidate.id === ctx.autoPredictionDefaultWorkspaceId
     && candidate.template === 'auto-prediction')
   if (!workspace) return <AutoPredictionSetupPage />
-  return <HarnessLandingPage spec={{ params: { targetWsId: workspace.id, initialPrompt: spec.params.initialPrompt } }} mode="prediction" />
+  return <HarnessLandingPage spec={{ params: { targetWsId: workspace.id, initialPrompt: spec.params.initialPrompt } }} mode="prediction" {...presentation} />
 }

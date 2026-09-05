@@ -23,6 +23,8 @@
 
 .resume-cta-frame {
   flex: 1 1 auto;
+  min-width: 0;
+  min-height: 0;
   position: relative;
   overflow: hidden;
   background: var(--secondary);
@@ -167,9 +169,11 @@
   position: absolute;
   inset: 0;
   display: flex;
-  align-items: flex-end;
-  justify-content: center;
-  padding: clamp(16px, 3vw, 32px);
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  overflow-y: auto;
+  padding: clamp(12px, 3cqi, 28px);
   background: linear-gradient(
     to bottom,
     transparent 36%,
@@ -183,12 +187,15 @@
   display: flex;
   flex-direction: column;
   align-items: stretch;
-  gap: 10px;
-  padding: 14px 16px 9px;
-  width: min(960px, 100%);
+  flex: 0 0 auto;
+  gap: 14px;
+  margin-top: auto;
+  padding: 20px 20px 10px;
+  width: min(800px, 100%);
   min-width: 0;
   background: color-mix(in srgb, var(--background) 80%, var(--secondary));
-  border-block: 1px solid var(--border);
+  border: 1px solid var(--border);
+  border-radius: 10px;
   box-shadow: 0 -18px 44px -38px color-mix(in srgb, var(--shadow-color) 58%, transparent);
   transition:
     opacity var(--motion-standard) ease,
@@ -196,18 +203,21 @@
 }
 
 .resume-cta-card-main {
-  display: grid;
-  grid-template-columns: minmax(170px, 1.15fr) minmax(340px, 2fr) auto;
+  /* Identity and actions share a row only when the actual pane has room.
+     Runtime facts own the next row, never a competing fixed-width column. */
+  display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 16px;
+  gap: 18px 24px;
   min-width: 0;
 }
 
 .resume-cta-card-header {
+  flex: 1 1 260px;
   display: flex;
   flex-direction: column;
   align-items: flex-start;
-  gap: 2px;
+  gap: 6px;
   min-width: 0;
   text-align: left;
 }
@@ -218,27 +228,27 @@
   gap: 7px;
   margin-bottom: 1px;
   color: var(--muted-foreground);
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 600;
 }
 
 .resume-cta-name-row {
   display: flex;
+  width: 100%;
   min-width: 0;
-  align-items: center;
+  align-items: flex-start;
   gap: 8px;
 }
 
 .resume-cta-name {
   margin: 0;
+  min-width: 0;
   max-width: 100%;
-  overflow: hidden;
   color: var(--foreground);
   font-size: 16px;
   font-weight: 600;
-  line-height: 1.3;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
 }
 
 .resume-cta-state {
@@ -248,10 +258,13 @@
 }
 
 .resume-cta-runtime {
+  flex: 1 0 100%;
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   min-width: 0;
   margin: 0;
+  padding-top: 14px;
+  border-top: 1px solid var(--border);
 }
 
 .resume-cta-runtime-fact {
@@ -260,28 +273,30 @@
   border-left: 1px solid var(--border);
 }
 
+.resume-cta-runtime-fact:first-child {
+  border-left: 0;
+  padding-left: 0;
+}
+
 .resume-cta-runtime-fact dt {
   margin: 0 0 2px;
   color: var(--muted-foreground);
-  font-size: 9px;
+  font-size: 11px;
   font-weight: 600;
 }
 
 .resume-cta-runtime-fact dd {
   min-width: 0;
   margin: 0;
-  overflow: hidden;
   color: var(--foreground);
-  font-family: ui-monospace, "SF Mono", Menlo, monospace;
-  font-size: 11px;
+  font-size: 12px;
   line-height: 1.45;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  overflow-wrap: anywhere;
 }
 
 .resume-cta-meta {
   display: grid;
-  grid-template-columns: auto 1fr;
+  grid-template-columns: auto minmax(0, 1fr);
   column-gap: 14px;
   row-gap: 4px;
   margin: 0;
@@ -327,11 +342,17 @@
   border-radius: 4px;
   font-size: 13px;
   font-weight: 600;
-  white-space: nowrap;
+  min-height: 36px;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  text-align: center;
   cursor: pointer;
   transition:
     filter var(--motion-fast) ease,
     opacity var(--motion-fast) ease;
+}
+.resume-cta-btn > svg {
+  flex-shrink: 0;
 }
 .resume-cta-beta {
   padding: 1px 4px;
@@ -364,12 +385,12 @@
 .resume-cta-details > summary {
   display: flex;
   align-items: center;
-  justify-content: flex-end;
+  justify-content: space-between;
   gap: 5px;
   min-height: 30px;
   margin-bottom: -5px;
   color: var(--muted-foreground);
-  font-size: 11px;
+  font-size: 12px;
   list-style: none;
   cursor: pointer;
 }
@@ -417,44 +438,17 @@
   }
 }
 
-@container resume-cta (max-width: 760px) {
-  .resume-cta-card-main {
-    grid-template-columns: minmax(0, 1fr) auto;
-  }
-
-  .resume-cta-runtime {
-    grid-column: 1 / -1;
-    grid-row: 2;
-  }
-
-  .resume-cta-runtime-fact:first-child {
-    border-left: 0;
-    padding-left: 0;
-  }
-}
-
 @container resume-cta (max-width: 480px) {
   .resume-cta-overlay {
     padding: 12px;
   }
 
-  .resume-cta-card-main {
-    grid-template-columns: minmax(0, 1fr);
-    gap: 11px;
-  }
-
-  .resume-cta-runtime,
-  .resume-cta-actions {
-    grid-column: 1;
-  }
-
-  .resume-cta-runtime {
-    grid-row: auto;
+  .resume-cta-card {
+    padding: 16px 14px 10px;
   }
 
   .resume-cta-actions {
     width: 100%;
-    flex-direction: column;
   }
 }
 
@@ -1221,17 +1215,18 @@ button.files-row:focus-visible {
 
 .terminal-shell {
   display: grid;
-  grid-template-rows: auto 1fr;
+  /* PageTopBar portals outside this grid; only the terminal body is a row. */
+  grid-template-rows: minmax(0, 1fr);
   width: 100%;
   max-width: 100%;
   min-width: 0;
   min-height: 0;
   flex: 1 1 auto;
-  border: 1px solid var(--border);
-  border-radius: 8px;
+  border: 0;
+  border-radius: 0;
   overflow: hidden;
   background: var(--secondary);
-  box-shadow: 0 10px 30px color-mix(in srgb, var(--shadow-color) 35%, transparent);
+  box-shadow: none;
 }
 
 /* A pinned terminal is the Workspace page's primary canvas, not a card inside
@@ -1246,11 +1241,6 @@ button.files-row:focus-visible {
   border-radius: 0;
 }
 
-.terminal-shell.is-canvas {
-  border: 0;
-  border-radius: 0;
-  box-shadow: none;
-}
 
 
 .status-dot {
@@ -1293,6 +1283,9 @@ button.files-row:focus-visible {
 }
 .resume-cta-actions {
   display: flex;
+  flex-wrap: wrap;
+  max-width: 100%;
+  min-width: 0;
   gap: 8px;
   justify-content: flex-end;
 }
@@ -1510,6 +1503,9 @@ button.files-row:focus-visible {
   .webpi-composer-hint { text-align: left; }
 }
 
-@media (max-width: 720px) {
-  .resume-cta-actions .resume-cta-btn { flex: 1; }
+@container resume-cta (max-width: 480px) {
+  .resume-cta-actions .resume-cta-btn {
+    flex: 1 1 140px;
+    min-height: 40px;
+  }
 }

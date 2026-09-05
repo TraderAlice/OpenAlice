@@ -1,4 +1,4 @@
-import { Laptop, Moon, Settings, Sun } from 'lucide-react'
+import { Ellipsis, Laptop, Moon, Plug, Settings, Sun } from 'lucide-react'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
@@ -25,15 +25,19 @@ const THEME_MODES = [
 interface ActivityBarUtilityMenuProps {
   compactRail: boolean
   denseRail: boolean
-  active: boolean
   onOpenSettings: () => void
+  onOpenConnectors: () => void
+  connectorsActive?: boolean
+  connectorWarnings?: number
 }
 
 export function ActivityBarUtilityMenu({
   compactRail,
   denseRail,
-  active,
   onOpenSettings,
+  onOpenConnectors,
+  connectorsActive = false,
+  connectorWarnings = 0,
 }: ActivityBarUtilityMenuProps) {
   const { t } = useTranslation()
   const theme = useThemeStore((state) => state.theme)
@@ -48,21 +52,33 @@ export function ActivityBarUtilityMenu({
           <button
             type="button"
             aria-label={t('nav.applicationMenu')}
+            title={compactRail ? t('nav.applicationMenu') : undefined}
             onClick={() => {
               if (!menuOpen) setMenuOpen(true)
             }}
-            className={`oa-pressable flex min-w-0 cursor-pointer items-center rounded-md text-left text-[12px] text-sidebar-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring/45 ${
+            className={`oa-application-menu oa-pressable relative flex min-w-0 cursor-pointer items-center rounded-md text-left text-[13px] text-sidebar-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring/45 ${
               compactRail
                 ? `${denseRail ? 'h-[26px] w-[26px]' : 'h-8 w-8'} justify-center p-0`
-                : 'min-h-9 w-full gap-2 px-2 py-1.5'
-            } ${active ? 'bg-sidebar-accent text-sidebar-accent-foreground' : 'hover:bg-sidebar-accent/60'}`}
+                : 'min-h-10 w-full gap-2.5 px-2 py-1.5'
+            } ${menuOpen ? 'bg-sidebar-accent text-sidebar-accent-foreground' : 'hover:bg-sidebar-accent/60'}`}
           />
         )}
       >
-        <Settings size={denseRail ? 15 : 17} strokeWidth={1.75} aria-hidden />
+        <span aria-hidden className={`${denseRail ? 'size-6' : 'size-7'} flex shrink-0 items-center justify-center overflow-hidden rounded-full border border-sidebar-foreground/15 bg-sidebar-accent/60 p-0.5`}>
+          <img src="/alice.ico" alt="" draggable={false} className="size-full object-contain" />
+        </span>
         {!compactRail && (
-          <span className="min-w-0 flex-1 truncate font-medium">{t('nav.item.settings')}</span>
+          <span className="min-w-0 flex-1 truncate font-medium">{t('nav.yourAlice')}</span>
         )}
+        {connectorWarnings > 0 && (
+          <span
+            role="status"
+            aria-label={t('nav.connectorNeedsAttention', { count: connectorWarnings })}
+            className={`h-1.5 w-1.5 shrink-0 rounded-full bg-warning ${compactRail ? 'absolute right-1 top-1' : ''}`}
+          />
+        )}
+        {!compactRail && <Ellipsis size={16} strokeWidth={1.75} aria-hidden
+          className="oa-application-menu-more shrink-0 text-muted-foreground" />}
       </DropdownMenuTrigger>
 
       <DropdownMenuContent
@@ -77,6 +93,22 @@ export function ActivityBarUtilityMenu({
         >
           <Settings size={15} strokeWidth={1.75} aria-hidden />
           <span>{t('nav.item.settings')}</span>
+        </DropdownMenuItem>
+        <DropdownMenuItem
+          onClick={onOpenConnectors}
+          aria-current={connectorsActive ? 'page' : undefined}
+          className="min-h-9 cursor-pointer gap-2 px-2.5 text-[12px]"
+        >
+          <Plug size={15} strokeWidth={1.75} aria-hidden />
+          <span className="flex-1">{t('nav.item.connectors')}</span>
+          {connectorWarnings > 0 && (
+            <span
+              aria-label={t('nav.connectorNeedsAttention', { count: connectorWarnings })}
+              className="rounded-full bg-warning px-1.5 text-[10px] tabular-nums text-warning-foreground"
+            >
+              {connectorWarnings > 99 ? '99+' : connectorWarnings}
+            </span>
+          )}
         </DropdownMenuItem>
         <DropdownMenuSeparator />
         <DropdownMenuSub>

@@ -6,6 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { ActivityBar } from './ActivityBar'
 
 const mocks = vi.hoisted(() => ({
+  focusedKind: 'issue',
   selectedSidebar: 'issue',
   setSidebar: vi.fn(),
   openOrFocus: vi.fn(),
@@ -25,6 +26,11 @@ vi.mock('../tabs/store', () => ({
 
 vi.mock('../live/inbox-read', () => ({
   useUnreadInboxCount: () => 0,
+}))
+
+vi.mock('../tabs/types', () => ({ getFocusedTab: () => ({ spec: { kind: mocks.focusedKind } }) }))
+vi.mock('./workspace/ChatWorkspaceSection', () => ({
+  ChatWorkspaceSection: ({ mode }: { mode: string }) => <div data-testid={`harness-${mode}`} />,
 }))
 
 vi.mock('../live/trading-push', () => ({
@@ -47,7 +53,7 @@ vi.mock('../live/activity-bar-collapse', () => ({
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({
     t: (key: string) => ({
-      'nav.item.chat': 'Ask Alice',
+      'nav.quickStart': 'Quick Start',
       'nav.item.issue': 'Issues',
       'nav.item.connectors': 'Connectors',
       'nav.connectorNeedsAttention': '1 connector needs attention',
@@ -60,13 +66,19 @@ vi.mock('react-i18next', () => ({
 }))
 
 vi.mock('./ActivityBarUtilityMenu', () => ({
-  ActivityBarUtilityMenu: ({ onOpenSettings }: { onOpenSettings: () => void }) => (
-    <button type="button" data-testid="activity-bar-utility" onClick={onOpenSettings}>Utilities</button>
+  ActivityBarUtilityMenu: ({ onOpenSettings, onOpenConnectors, connectorWarnings, connectorsActive }: {
+    onOpenSettings: () => void; onOpenConnectors: () => void; connectorWarnings: number; connectorsActive: boolean
+  }) => (
+    <div data-testid="activity-bar-utility-state" data-warnings={connectorWarnings} data-active={connectorsActive}>
+      <button type="button" data-testid="activity-bar-utility" onClick={onOpenSettings}>Utilities</button>
+      <button type="button" onClick={onOpenConnectors}>Open Connectors</button>
+    </div>
   ),
 }))
 
 beforeEach(() => {
   mocks.selectedSidebar = 'issue'
+  mocks.focusedKind = 'issue'
   mocks.connectorWarnings = 0
   mocks.railCollapsed = false
   vi.stubGlobal('matchMedia', vi.fn(() => ({
@@ -94,27 +106,45 @@ describe('ActivityBar current destination', () => {
     const { rerender } = render(<ActivityBar open onClose={vi.fn()} />)
 
     expect(screen.getByRole('button', { name: 'Issues' }).getAttribute('aria-current')).toBe('page')
-    expect(screen.getByRole('button', { name: 'Ask Alice' }).getAttribute('aria-current')).toBeNull()
+    expect(screen.getByRole('button', { name: 'Quick Start' }).getAttribute('aria-current')).toBeNull()
     expect(document.querySelectorAll('nav [aria-current="page"]')).toHaveLength(1)
     expect(screen.getByTestId('activity-bar').getAttribute('data-rail-layout')).toBe('full')
 
-    mocks.selectedSidebar = 'chat'
+    mocks.selectedSidebar = 'quick-start'
+    mocks.focusedKind = 'quick-start'
     rerender(<ActivityBar open onClose={vi.fn()} />)
 
-    expect(screen.getByRole('button', { name: 'Ask Alice' }).getAttribute('aria-current')).toBe('page')
-    expect(screen.getByRole('button', { name: 'Ask Alice' }).getAttribute('aria-label')).toBe('Ask Alice')
+    expect(screen.getByRole('button', { name: 'Quick Start' }).getAttribute('aria-current')).toBe('page')
+    expect(screen.getByRole('button', { name: 'Quick Start' }).getAttribute('aria-label')).toBe('Quick Start')
     expect(screen.getByRole('button', { name: 'Issues' }).getAttribute('aria-current')).toBeNull()
     expect(document.querySelectorAll('nav [aria-current="page"]')).toHaveLength(1)
     expect(screen.getByTestId('activity-bar').getAttribute('data-rail-layout')).toBe('full')
     expect(screen.queryByRole('button', { name: 'Collapse activity bar' })).toBeNull()
-    expect(screen.getByTestId('activity-bar').firstElementChild?.querySelector('img')).toBeTruthy()
+    expect(screen.getByTestId('activity-bar').firstElementChild?.querySelector('img')).toBeNull()
   })
 
-  it('shows configured connector degradation on the Connector activity item', () => {
+  it('moves Connectors and its warning state into the utility menu', () => {
     mocks.connectorWarnings = 1
-    render(<ActivityBar open onClose={vi.fn()} />)
+    mocks.selectedSidebar = 'connectors'
+    const onClose = vi.fn()
+    render(<ActivityBar open onClose={onClose} />)
+    expect(screen.queryByRole('button', { name: 'Connectors' })).toBeNull()
+    expect(screen.getByTestId('activity-bar-utility-state').dataset.warnings).toBe('1')
+    expect(screen.getByTestId('activity-bar-utility-state').dataset.active).toBe('true')
+    screen.getByRole('button', { name: 'Open Connectors' }).click()
+    expect(mocks.setSidebar).toHaveBeenCalledWith('connectors')
+    expect(mocks.openOrFocus).toHaveBeenCalledWith({ kind: 'connectors', params: {} })
+    expect(onClose).toHaveBeenCalledOnce()
+  })
 
-    expect(screen.getByLabelText('1 connector needs attention').textContent).toBe('1')
+  it.each(['workspace', 'chat-landing'])('keeps Quick Start separate from the Chat Harness (%s)', focusedKind => {
+    mocks.selectedSidebar = 'chat'
+    mocks.focusedKind = focusedKind
+    render(<ActivityBar open onClose={vi.fn()} />)
+    expect(screen.getByRole('button', { name: 'Quick Start' }).hasAttribute('aria-current')).toBe(false)
+    expect(screen.getAllByTestId(/^harness-/).map(node => node.dataset.testid)).toEqual(['harness-chat', 'harness-auto-quant', 'harness-prediction'])
+    const tools = document.getElementById('activity-section-primary')!
+    expect(tools.contains(screen.getByTestId('harness-auto-quant'))).toBe(false)
   })
 
   it('opens Settings from the application utility menu', () => {
@@ -128,12 +158,12 @@ describe('ActivityBar current destination', () => {
     })
   })
 
-  it('leaves global toggling to the top bar and keeps its brand when compact', () => {
+  it('leaves global toggling to the top bar without duplicating the Alice portrait when compact', () => {
     mocks.railCollapsed = true
     render(<ActivityBar open onClose={vi.fn()} />)
     const activityBar = screen.getByTestId('activity-bar')
     expect(activityBar.getAttribute('data-rail-layout')).toBe('compact')
-    expect(activityBar.firstElementChild?.querySelector('img')).toBeTruthy()
+    expect(activityBar.firstElementChild?.querySelector('img')).toBeNull()
     expect(screen.queryByRole('button', { name: /activity bar/ })).toBeNull()
   })
 

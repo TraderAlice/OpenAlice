@@ -28,15 +28,15 @@ export function UrlAdopter() {
   return (
     <>
       <Routes>
-        {/* Root → Ask Alice. An AI product should open on how-to-use-it (the
-            chat front door), not an information summary (Inbox is task sync, à
-            la Linear — but Linear's comms live in Slack; ours live here). */}
-        <Route path="/" element={<Navigate to="/chat" replace />} />
+        {/* Adopt the launch surface directly so a previously focused tab cannot
+            race a redirect and replace the default entry during startup. */}
+        <Route path="/" element={<AdoptStatic spec={{ kind: 'quick-start', params: {} }} />} />
+        <Route path="/quick-start" element={<AdoptStatic spec={{ kind: 'quick-start', params: {} }} />} />
         <Route path="/onboarding" element={<AdoptStatic spec={{ kind: 'onboarding', params: {} }} />} />
         <Route path="/design/:project" element={<AdoptDesignProject />} />
 
         {/* Activities */}
-        {/* /chat → the "Ask Alice" quick-chat landing (composer). Legacy
+        {/* /chat → the Chat Harness landing (composer). Legacy
             /chat/:channelId (the retired traditional-chat channels) still
             redirects to Inbox so stale bookmarks land on a live surface. */}
         <Route path="/chat" element={<AdoptStatic spec={{ kind: 'chat-landing', params: {} }} />} />
@@ -468,6 +468,7 @@ function RedirectUtaDetail() {
  */
 function specToSection(spec: ViewSpec): ActivitySection {
   switch (spec.kind) {
+    case 'quick-start':        return 'quick-start'
     case 'inbox':              return 'inbox'
     case 'tracked':            return 'tracked'
     case 'tracked-issue-detail': return 'tracked'
