@@ -478,6 +478,12 @@ describe('runtime lock ownership', () => {
     await expect(acquireRuntimeLock(lockDir, {
       pid: 202,
       processStartedAt: 20_000,
+      heartbeatMs: 0,
+      processController: controller,
+    })).rejects.toThrow(/already running as pid 101 \(last heartbeat .*; owner belongs to another machine/)
+    await expect(acquireRuntimeLock(lockDir, {
+      pid: 202,
+      processStartedAt: 20_000,
       takeover: true,
       heartbeatMs: 0,
       processController: controller,

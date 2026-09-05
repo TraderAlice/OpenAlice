@@ -109,7 +109,7 @@ export class CrossMachineOwnerError extends RuntimeAlreadyRunningError {
 function describeUnavailableLock(inspection: RuntimeLockInspection): string {
   const owner = inspection.owner
   return owner
-    ? `OpenAlice ${owner.launcher} is already running as pid ${owner.pid} (last heartbeat ${owner.heartbeatAt})`
+    ? `OpenAlice ${owner.launcher} is already running as pid ${owner.pid} (last heartbeat ${owner.heartbeatAt}; ${inspection.reason})`
     : `OpenAlice runtime lock is not available: ${inspection.lockDir} (${inspection.reason})`
 }
 
