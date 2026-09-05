@@ -121,7 +121,9 @@ function readPublishedIntegrity(runNpm, entry) {
   if (result.error) throw result.error
   if (result.status === 0) {
     try {
-      const integrity = JSON.parse(result.stdout.trim())
+      const report = JSON.parse(result.stdout.trim())
+      // npm 12 wraps even an exact-version field query in a one-entry array.
+      const integrity = Array.isArray(report) && report.length === 1 ? report[0] : report
       if (typeof integrity !== 'string' || !integrity.startsWith('sha512-')) throw new Error()
       return integrity
     } catch {
