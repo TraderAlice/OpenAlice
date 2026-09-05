@@ -51,6 +51,12 @@ was accepted and merged to dev as 9d592d18. The maintainer authorized a serial
   Focused release/OIDC/publisher contracts pass 45 tests.
   Root typecheck and all 719 files / 6,425 tests pass (3 expected skips,
   202.39 seconds); /tmp/openalice-0911-npm-bootstrap-tests.log.
+  Bootstrap repair #1374 merged as 3fc3b966. Publication run 33958315820 then
+  successfully uploaded five platform packages through OIDC; the existing
+  Windows x64 check exposed npm 12's singleton-array JSON response. Clean
+  Node 22.22.2/npm 12.0.2 reproduces that exact response. Accept one string or
+  exactly one string entry, while rejecting ambiguous/malformed reports; retry
+  must preserve integrity verification and keep the meta package last.
 - [x] Prepare and publish 0.91.1 independently after beta acceptance; verify
   public release, direct upgrade, and Homebrew. AUR registration remains deferred.
   Stable preparation #1371 and full source run 33952791151 passed on f1ac9ece.
