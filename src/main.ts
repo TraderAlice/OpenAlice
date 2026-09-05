@@ -478,6 +478,9 @@ export async function startAliceRuntime(): Promise<void> {
     takeover: takeoverRequested(),
     ...(guardianPid ? { guardianPid } : {}),
     ...(guardianStartedAt ? { guardianStartedAt } : {}),
+    onOwnerReclaimed: ({ owner, state, reason }) => {
+      console.warn(`runtime-lock: reclaimed ${owner?.launcher ?? 'unknown'} lock from pid ${owner?.pid ?? 'unknown'} (${state}: ${reason})`)
+    },
     onOwnershipLost: (err) => {
       console.error('fatal: OpenAlice runtime ownership lost:', err)
       try { process.kill(process.pid, 'SIGTERM') } catch { process.exit(1) }

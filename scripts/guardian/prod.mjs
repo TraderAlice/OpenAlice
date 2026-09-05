@@ -638,6 +638,9 @@ export async function startGuardianRuntime() {
     launcher: GUARDIAN_LAUNCHER,
     takeover: TAKEOVER,
     processStartedAt: GUARDIAN_STARTED_AT,
+    onOwnerReclaimed: ({ owner, state, reason }) => {
+      console.warn(`[guardian/prod] reclaimed ${owner?.launcher ?? 'unknown'} lock from pid ${owner?.pid ?? 'unknown'} (${state}: ${reason})`)
+    },
     onOwnershipLost: (err) => {
       console.error('[guardian/prod] runtime ownership lost:', err)
       shutdown()
