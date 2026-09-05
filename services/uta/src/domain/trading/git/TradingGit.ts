@@ -956,11 +956,13 @@ export class TradingGit implements ITradingGit {
     const success = rawObj.success === true
 
     if (!success) {
+      // `||` not `??`: an empty-string error leaves the ledger row reading as a
+      // bare "rejected" with no reason, which invites a duplicate re-placement.
       return {
         action: op.action,
         success: false,
         status: 'rejected',
-        error: (rawObj.error as string) ?? 'Unknown error',
+        error: (rawObj.error as string) || 'Unknown error',
         raw,
       }
     }
@@ -980,12 +982,19 @@ export class TradingGit implements ITradingGit {
     }
   }
 
-  /** Map IBKR-style OrderState.status to OperationStatus. */
+  /**
+   * Maps IBKR-style OrderState.status to OperationStatus. Only reached on the
+   * `success: true` path, so `Inactive` is a legitimate hold and must stay in
+   * the pending lane rather than mapping to `rejected`.
+   */
   private mapOrderStatus(orderState?: { status?: string }): OperationStatus {
     switch (orderState?.status) {
       case 'Filled': return 'filled'
-      case 'Cancelled': return 'cancelled'
-      case 'Inactive': return 'rejected'
+      case 'Cancelled':
+      case 'ApiCancelled': return 'cancelled'
+      // Non-IBKR adapters surface a terminal venue refusal as 'Rejected'
+      // rather than 'Inactive', so it needs its own terminal mapping.
+      case 'Rejected': return 'rejected'
       default: return 'submitted'
     }
   }

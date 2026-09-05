@@ -372,6 +372,24 @@ describe('UTA — getState', () => {
     expect(spyOrders).toHaveBeenCalledTimes(1)
   })
 
+  it('keeps every working status in pendingOrders and drops only the terminal ones', async () => {
+    const withStatus = (symbol: string, status: string) => {
+      const orderState = new OrderState()
+      orderState.status = status
+      return makeOpenOrder({ contract: makeContract({ symbol }), orderState })
+    }
+    vi.spyOn(broker, 'getOrders').mockResolvedValue([
+      withStatus('HELD', 'Inactive'),
+      withStatus('CANCELING', 'PendingCancel'),
+      withStatus('GONE', 'Cancelled'),
+      withStatus('DONE', 'Filled'),
+    ])
+
+    const state = await uta.getState()
+
+    expect(state.pendingOrders.map((o) => o.contract.symbol)).toEqual(['HELD', 'CANCELING'])
+  })
+
   it('returns empty pendingOrders when no orders are pending', async () => {
     const filledState = new OrderState()
     filledState.status = 'Filled'
@@ -946,6 +964,59 @@ describe('UTA — sync', () => {
     expect(result.updates[0].filledQty).toBe('10')
     // (148*4 + 150*6) / 10 = 149.2
     expect(result.updates[0].filledPrice).toBe('149.2')
+  })
+
+  // `Inactive` is TWS's held state for an OCA sibling or bracket leg, not a
+  // reject.
+  it('does NOT mark a held (Inactive) order rejected — it stays working and reconcilable', async () => {
+    const { uta, broker } = createUTA()
+
+    uta.stagePlaceOrder({ aliceId: 'mock-paper|AAPL', symbol: 'AAPL', action: 'BUY', orderType: 'LMT', totalQuantity: '10', lmtPrice: '150' })
+    uta.commit('OCA target leg')
+    const orderId = (await uta.push(uta.status().pendingHash!)).submitted[0]!.orderId!
+
+    // TWS parks held OCA legs out of the open-order listing, so only the
+    // confirming getOrder reports them.
+    ;(broker as unknown as { getOpenOrders: () => Promise<unknown[]> }).getOpenOrders = async () => []
+    const heldState = new OrderState()
+    heldState.status = 'Inactive'
+    vi.spyOn(broker, 'getOrder').mockResolvedValue({
+      contract: makeContract({ symbol: 'AAPL' }),
+      order: new Order(),
+      orderState: heldState,
+      orderId,
+    } as never)
+
+    const result = await uta.sync()
+
+    expect(result.updates.map((u) => u.currentStatus)).not.toContain('rejected')
+    expect(result.updatedCount).toBe(0)
+    // Still polled next pass: a held order is not terminal.
+    expect(uta.getPendingOrderIds().map((p) => p.orderId)).toContain(orderId)
+  })
+
+  it('does NOT mark a PendingCancel order rejected — an unconfirmed cancel can still fill', async () => {
+    const { uta, broker } = createUTA()
+
+    uta.stagePlaceOrder({ aliceId: 'mock-paper|AAPL', symbol: 'AAPL', action: 'BUY', orderType: 'LMT', totalQuantity: '10', lmtPrice: '150' })
+    uta.commit('limit buy')
+    const orderId = (await uta.push(uta.status().pendingHash!)).submitted[0]!.orderId!
+
+    ;(broker as unknown as { getOpenOrders: () => Promise<unknown[]> }).getOpenOrders = async () => []
+    const cancellingState = new OrderState()
+    cancellingState.status = 'PendingCancel'
+    vi.spyOn(broker, 'getOrder').mockResolvedValue({
+      contract: makeContract({ symbol: 'AAPL' }),
+      order: new Order(),
+      orderState: cancellingState,
+      orderId,
+    } as never)
+
+    const result = await uta.sync()
+
+    expect(result.updates.map((u) => u.currentStatus)).not.toContain('rejected')
+    expect(result.updatedCount).toBe(0)
+    expect(uta.getPendingOrderIds().map((p) => p.orderId)).toContain(orderId)
   })
 
   it('listing mode: getOrder is spent ONLY on orders absent from the open-orders listing', async () => {

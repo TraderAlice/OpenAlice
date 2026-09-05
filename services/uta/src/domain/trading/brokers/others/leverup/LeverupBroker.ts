@@ -73,7 +73,7 @@ interface OrderTrackingRecord {
   side: 'BUY' | 'SELL'
   qty: Decimal
   /** Most-recent known status from relayer. */
-  status: 'Submitted' | 'Filled' | 'Cancelled' | 'Inactive'
+  status: 'Submitted' | 'Filled' | 'Cancelled' | 'Rejected'
   txnHash?: `0x${string}`
   reason?: string
 }
@@ -469,7 +469,9 @@ export class LeverupBroker implements IBroker {
       try {
         const status = await this.relayer.getStatus(tracked.inputHash)
         if (status.executed) {
-          tracked.status = status.success ? 'Filled' : 'Inactive'
+          // Not 'Inactive': that is IBKR's held state and order-sync keeps a
+          // held order in the pending lane, while this intent is terminal.
+          tracked.status = status.success ? 'Filled' : 'Rejected'
           tracked.txnHash = status.txnHash ?? undefined
           tracked.reason = status.reason ?? undefined
         }

@@ -709,7 +709,7 @@ export class LongbridgeBroker implements IBroker {
     const ret: OpenOrder = {
       contract,
       order,
-      orderState: makeOrderState(o.status, o.msg),
+      orderState: makeOrderState(o.status, o.msg, order.tif),
     }
     if (o.executedPrice) ret.avgFillPrice = new Decimal(o.executedPrice.toString()).toString()
     return ret

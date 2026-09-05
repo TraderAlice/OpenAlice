@@ -12,6 +12,20 @@ import { Contract, Order, ContractDescription, ContractDetails, UNSET_DECIMAL, U
 import { BrokerError, type IBroker, type AccountInfo, type Position, type OpenOrder, type PlaceOrderResult, type Quote, type MarketClock, type AccountCapabilities, type BrokerHealth, type BrokerHealthInfo, type BrokerConnectionStateEvent, type UTAReach, type UTATier, type TpSlParams, type Bar, type BarParams, type ExpandContractFilters, type ContractExpansion, type SubAccountRef } from './brokers/types.js'
 
 const REACH_RANK: Record<UTAReach, number> = { down: 0, connected: 1, readable: 2 }
+
+/**
+ * Broker statuses that mean "still working", which sync keeps in the pending
+ * lane. `Inactive` is a held order and `PendingCancel` an unconfirmed cancel;
+ * only `Cancelled` / `ApiCancelled` are terminal.
+ */
+const WORKING_ORDER_STATUSES = new Set([
+  'Submitted',
+  'PreSubmitted',
+  'PendingSubmit',
+  'PendingCancel',
+  'ApiPending',
+  'Inactive',
+])
 import { TradingGit } from './git/TradingGit.js'
 import { recomputeCostBasisFromCommits } from './cost-basis.js'
 import { projectOrderHistory, projectTradeHistory } from './order-history.js'
@@ -183,7 +197,9 @@ export class UnifiedTradingAccount {
         unrealizedPnL: accountInfo.unrealizedPnL,
         realizedPnL: accountInfo.realizedPnL ?? '0',
         positions,
-        pendingOrders: orders.filter(o => o.orderState.status === 'Submitted' || o.orderState.status === 'PreSubmitted'),
+        // Must stay the same predicate as sync: an order pending in one lane
+        // and terminal in the other can never be reconciled.
+        pendingOrders: orders.filter(o => WORKING_ORDER_STATUSES.has(o.orderState.status)),
       }
     }
 
@@ -940,7 +956,7 @@ export class UnifiedTradingAccount {
       if (!brokerOrder) continue
 
       const status = brokerOrder.orderState.status
-      if (status !== 'Submitted' && status !== 'PreSubmitted') {
+      if (!WORKING_ORDER_STATUSES.has(status)) {
         // Extract fill data when available — `.toFixed()` (not
         // `.toNumber()`) so sub-satoshi qty (OKX-style accounting)
         // round-trips into the persisted git operation record without
@@ -951,7 +967,9 @@ export class UnifiedTradingAccount {
           : undefined
 
         const currentStatus =
-          status === 'Filled' ? 'filled' : status === 'Cancelled' ? 'cancelled' : 'rejected'
+          status === 'Filled' ? 'filled'
+          : status === 'Cancelled' || status === 'ApiCancelled' ? 'cancelled'
+          : 'rejected'
         if (currentStatus === 'filled' && (!filledQty || !brokerOrder.avgFillPrice)) {
           // Loud, not fatal: a fill without qty/price still advances the
           // state machine, but cost-basis reconstruction downstream will be
