@@ -179,7 +179,8 @@ beta-to-stable promotion; installing a permanent runner on the user's daily Mac.
   remain unchanged; selected verifier identity is required again at final
   staging. Real temporary-git trust tests and CLI receipt binding pass (41
   focused tests initially; final identity/workflow selection checkpoint passes
-  71 tests and root typecheck). Native cross-verifier acceptance is still unproved.
+  71 tests and root typecheck). Native cross-verifier acceptance subsequently
+  passed in run 33962998628; evidence is recorded below.
   Final-gate audit additionally exercises source SHA, version and channel
   changes against an otherwise fully accepted three-platform set: each is
   rejected before an output directory is created. The receipt/workflow focused
@@ -244,8 +245,7 @@ beta-to-stable promotion; installing a permanent runner on the user's daily Mac.
   Added read-only `verify-desktop-rehearsal` to exercise the separate product
   and verifier identities against real unsigned candidates after the producer
   completes. It explicitly selects the rehearsal branch/artifact namespace;
-  production selection and publication remain unchanged. Positive cross-verifier
-  hosted evidence is still pending.
+  production selection and publication remain unchanged.
   First desktop rehearsal 33961658342 completed successfully at 11:18:27 UTC:
   dispatch-to-last-job 29m28s. Build/upgrade job durations were ARM 5m32s/3m17s,
   Intel 8m36s/4m06s and Windows 11m02s/18m18s. This unsigned desktop-only
@@ -257,9 +257,15 @@ beta-to-stable promotion; installing a permanent runner on the user's daily Mac.
   Same-source restore 33962287156 started after the producer completed;
   Windows restore passed in 32 seconds versus its original 11m02s build,
   and entered fresh N-1 acceptance. End-to-end retry timing remains pending.
-  Cross-verifier rehearsal 33962998628 now uses verifier 1a626328 against product
-  997dd0c2 and the original ARM candidate. No product build or publication is
-  requested by this operation; receipt identity comparison awaits completion.
+  Cross-verifier rehearsal 33962998628 passed: dispatch-to-completion 2m56s,
+  native job 2m48s. It used verifier 1a626328 against product 997dd0c2 and the
+  original ARM candidate, without rebuilding or publishing. Downloaded both
+  original and replay receipts and asserted exact candidate-ID equality
+  (1576e4579c1db7cb16a12716e0d67b7aad142803787a4e89e9e329a980b6a86a),
+  expected distinct verifier SHAs, identical previous tag and all 11 successful
+  N-1 checks. Receipt evidence is under the original/new-verifier subdirectories
+  of /tmp/openalice-release-receipts.xBW8cp. This proves real verifier-only
+  recovery, not signed publication. Three-target same-source retry is pending.
 - [ ] Update owner guides and applicable release skill instructions to match
   the implemented operation and acceptance boundaries; remove stale serial rules.
 - [ ] Record measured timings separately from estimates, inspect latest PR
