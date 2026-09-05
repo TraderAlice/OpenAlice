@@ -101,6 +101,15 @@ describe('desktop candidate acceptance integration', () => {
     expect(() => bindDesktopUpgrade({ ...record, previousTag: options.previousTag, verifierSha: options.verifierSha }))
       .toThrow('does not match')
   })
+  it.each([
+    ['sourceSha', 'f'.repeat(40)],
+    ['version', '0.91.2'],
+    ['channel', 'beta'],
+  ])('rejects accepted old bytes when publication changes %s', (field, value) => {
+    const { options } = fixture()
+    expect(() => stageDesktopCandidates({ ...options, [field]: value })).toThrow()
+    expect(existsSync(options.outputDirectory)).toBe(false)
+  })
   it('keeps beta separate from stable N-1 receipts while still verifying all bytes', () => {
     const { options } = fixture('beta')
     rmSync(options.receiptsDirectory, { recursive: true })

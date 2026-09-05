@@ -180,6 +180,10 @@ beta-to-stable promotion; installing a permanent runner on the user's daily Mac.
   staging. Real temporary-git trust tests and CLI receipt binding pass (41
   focused tests initially; final identity/workflow selection checkpoint passes
   71 tests and root typecheck). Native cross-verifier acceptance is still unproved.
+  Final-gate audit additionally exercises source SHA, version and channel
+  changes against an otherwise fully accepted three-platform set: each is
+  rejected before an output directory is created. The receipt/workflow focused
+  suite passes 43 tests after these publication-boundary regressions.
 - [ ] Increment 3: join exact-SHA full source validation at publication instead
   of serializing before candidate builds; reuse verified neutral CLI inputs.
   Test source failure/mismatch blocks publication, beta gates stay separate,
