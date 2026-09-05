@@ -152,6 +152,13 @@ beta-to-stable promotion; installing a permanent runner on the user's daily Mac.
   no signing secrets, and a separate concurrency group. Forty-nine focused
   tests pass. Final publication consumption of replay receipts and actual
   positive native replay remain outstanding.
+  Same-source release recovery is now wired: `operation=release` plus an
+  existing `candidate-run` skips desktop builds, authenticates and verifies the
+  three preserved candidates, then performs normal stable upgrade acceptance
+  and final staging. Product SHA must equal the current dispatch SHA. This
+  consumes reused bytes through the real publication gate, but does not yet
+  consume a separate verifier-only replay receipt or prove positive hosted
+  desktop recovery. Thirty-seven focused workflow/receipt tests pass.
 - [ ] Increment 3: join exact-SHA full source validation at publication instead
   of serializing before candidate builds; reuse verified neutral CLI inputs.
   Test source failure/mismatch blocks publication, beta gates stay separate,

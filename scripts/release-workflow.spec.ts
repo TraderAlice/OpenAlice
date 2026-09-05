@@ -233,8 +233,9 @@ describe('Release workflow critical path', () => {
     expect(desktop.steps?.map((candidate) => candidate.name)).not.toContain(
       'Prove final desktop artifact upgrades previous release state',
     )
-    expect(needs(upgrade)).toEqual(['build'])
-    expect(upgrade.if).toBe("inputs.channel == 'stable'")
+    expect(needs(upgrade)).toEqual(['build', 'restore'])
+    expect(upgrade.if).toContain("inputs.channel == 'stable'")
+    expect(upgrade.if).toContain("needs.build.result == 'success' || needs.restore.result == 'success'")
     expect(workflow.jobs['accept-desktop-upgrade']).toBeUndefined()
     expect(workflow.jobs['build-desktop'].uses).toBe('./.github/workflows/release-desktop-platform.yml')
     expect(workflow.jobs['build-desktop'].with).toMatchObject({
@@ -274,7 +275,7 @@ describe('Release workflow critical path', () => {
       "needs.accept-cli-aur.result == 'success'",
     ]) expect(publication).toContain(stable)
     // The reusable platform result includes upgrade acceptance for stable.
-    expect(desktopWorkflow.jobs.upgrade.if).toBe("inputs.channel == 'stable'")
+    expect(desktopWorkflow.jobs.upgrade.if).toContain("inputs.channel == 'stable'")
   })
 
   it('reserves public-channel authority checks for stable without delaying beta builders', () => {
@@ -356,6 +357,22 @@ describe('Release workflow critical path', () => {
     ]) {
       expect(step(publication, name).with?.files).toContain('dist/release-cli/*.tar.gz.sha256')
     }
+  })
+
+  it('reuses same-source desktop bytes through the normal final publication gate', () => {
+    expect(workflow.jobs['build-desktop'].with?.['candidate-run']).toBe('${{ inputs.candidate-run }}')
+    expect(desktopWorkflow.jobs.build.if).toBe("inputs.candidate-run == ''")
+    const restore = desktopWorkflow.jobs.restore
+    expect(restore.if).toBe("inputs.candidate-run != ''")
+    const selection = step(restore, 'Select same-source preserved candidate')
+    const verification = step(restore, 'Verify restored product and exact bytes')
+    const upload = step(restore, 'Preserve unchanged candidate in this run')
+    expect(selection.run).toContain('select-release-candidate.mjs')
+    expect(verification.run).toContain('verify-selected')
+    expect(restore.steps!.indexOf(verification)).toBeLessThan(restore.steps!.indexOf(upload))
+    expect(restore.steps?.some((entry) => entry.run?.includes('build') || entry.run?.includes('pnpm install'))).toBe(false)
+    expect(step(workflow.jobs['publish-release'], 'Verify and stage the complete desktop candidate set').run)
+      .toContain('desktop-candidate-receipt.mjs stage')
   })
 
   it('benchmarks actual CLI consumers without public or signing authority', () => {

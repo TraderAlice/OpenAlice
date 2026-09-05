@@ -534,6 +534,16 @@ Historical artifacts lacking `candidate-manifest.json` cannot use this path.
 At this implementation stage the retry receipt is diagnostic evidence only:
 final publication does not yet accept a receipt from a different run.
 
+For a new `operation=release` attempt on the exact same source commit, setting
+`candidate-run` reuses that run's three preserved desktop artifacts instead of
+packaging/signing again. Selection and exact-byte verification precede upload
+into the current run; stable N-1 acceptance runs again and the normal final
+publication gate checks its new receipts. All non-desktop gates remain intact.
+A different product SHA or missing/expired candidate fails closed; this path
+does not accept a verifier-only code change as equivalent product source.
+Omit `candidate-run` for a normal fresh build. This is separate from the
+diagnostic single-platform `verify-desktop` operation above.
+
 CLI candidates share one commit-bound platform-neutral input artifact containing
 only the approved UI and pure-JavaScript package outputs. Each of the six target
 jobs verifies its source SHA and exact file hashes before installing those

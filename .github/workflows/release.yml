@@ -28,7 +28,7 @@ on:
           - beta
           - stable
       candidate-run:
-        description: Completed master Release run to reuse for verify-desktop.
+        description: Completed master Release run to reuse for verify-desktop or same-source desktop release recovery.
         type: string
       source-sha:
         description: Exact product commit of the preserved desktop candidate.
@@ -264,6 +264,7 @@ jobs:
       arch: ${{ matrix.arch }}
       channel: ${{ needs.release.outputs.channel }}
       previous-tag: ${{ needs.release.outputs.previous_tag }}
+      candidate-run: ${{ inputs.candidate-run }}
     secrets:
       MACOS_CSC_LINK: ${{ secrets.MACOS_CSC_LINK }}
       MACOS_CSC_KEY_PASSWORD: ${{ secrets.MACOS_CSC_KEY_PASSWORD }}

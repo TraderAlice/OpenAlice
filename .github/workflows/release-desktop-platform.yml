@@ -15,6 +15,9 @@ on:
       previous-tag:
         required: true
         type: string
+      candidate-run:
+        type: string
+        default: ''
     secrets:
       MACOS_CSC_LINK:
         required: false
@@ -29,9 +32,11 @@ on:
 
 permissions:
   contents: read
+  actions: read
 
 jobs:
   build:
+    if: inputs.candidate-run == ''
     runs-on: ${{ inputs.os }}
     timeout-minutes: 45
     outputs:
@@ -159,16 +164,60 @@ jobs:
           retention-days: 3
 
 
+  restore:
+    if: inputs.candidate-run != ''
+    runs-on: ${{ inputs.os }}
+    timeout-minutes: 15
+    outputs:
+      candidate-id: ${{ steps.identity.outputs.candidate-id }}
+    env:
+      CANDIDATE_SOURCE_SHA: ${{ github.sha }}
+      CANDIDATE_CHANNEL: ${{ inputs.channel }}
+      CANDIDATE_ARCH: ${{ inputs.arch }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+      - name: Select same-source preserved candidate
+        id: select
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CANDIDATE_RUN: ${{ inputs.candidate-run }}
+          CANDIDATE_TARGET: ${{ runner.os }}-${{ inputs.arch }}
+        run: node scripts/select-release-candidate.mjs "$CANDIDATE_RUN" "$CANDIDATE_SOURCE_SHA" "$CANDIDATE_TARGET"
+      - uses: actions/download-artifact@v5
+        with:
+          github-token: ${{ github.token }}
+          run-id: ${{ inputs.candidate-run }}
+          artifact-ids: ${{ steps.select.outputs.artifact-id }}
+          merge-multiple: true
+          path: dist/electron-app
+      - name: Verify restored product and exact bytes
+        id: identity
+        run: node scripts/desktop-candidate-receipt.mjs verify-selected dist/electron-app
+      - name: Preserve unchanged candidate in this run
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-assets-${{ runner.os }}-${{ inputs.arch }}
+          path: dist/electron-app/*
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 3
+
   upgrade:
-    needs: build
-    if: inputs.channel == 'stable'
+    needs: [build, restore]
+    if: >-
+      !cancelled() && inputs.channel == 'stable' &&
+      (needs.build.result == 'success' || needs.restore.result == 'success')
     runs-on: ${{ inputs.os }}
     timeout-minutes: 35
     env:
       CANDIDATE_SOURCE_SHA: ${{ github.sha }}
       CANDIDATE_CHANNEL: ${{ inputs.channel }}
       CANDIDATE_ARCH: ${{ inputs.arch }}
-      CANDIDATE_ID: ${{ needs.build.outputs.candidate-id }}
+      CANDIDATE_ID: ${{ needs.build.outputs.candidate-id || needs.restore.outputs.candidate-id }}
       CANDIDATE_PREVIOUS_TAG: ${{ inputs.previous-tag }}
     steps:
       - uses: actions/checkout@v7

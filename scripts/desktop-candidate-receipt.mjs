@@ -107,6 +107,9 @@ function run(argv) {
       if (operation === 'verify-selected' && process.env.GITHUB_ENV) {
         appendFileSync(process.env.GITHUB_ENV, `CANDIDATE_ID=${selectedId}\n`)
       }
+      if (operation === 'verify-selected' && process.env.GITHUB_OUTPUT) {
+        appendFileSync(process.env.GITHUB_OUTPUT, `candidate-id=${selectedId}\n`)
+      }
     }
     else {
       const receipt = bindDesktopUpgrade({ directory, expected,
