@@ -46,8 +46,8 @@ the durable truth after it changes. Git history is the archive.
   coordination across CLI installers/package managers; Electron stays separate.
   Stable `0.91.1` and its Homebrew formula are publicly accepted after the
   separate beta checkpoint. Windows x64 npm first publication is complete;
-  all seven OIDC exchanges pass. npm/Bun activation is repairing an npm
-  self-upgrade failure before uploading the accepted stable packages.
+  all seven OIDC exchanges and complete npm/Bun publication now pass.
+  Public macOS npm/Bun and Linux npm 12 lifecycle acceptance passed.
   Native Intel acceptance passed; renderer latency remains tracked in #1350.
   AUR registration remains deferred.
   The CLI package owns OpenAlice only: Agent Runtime installation and Electron
