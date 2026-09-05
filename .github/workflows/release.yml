@@ -14,6 +14,7 @@ on:
           - publish-npm
           - verify-npm
           - verify-desktop
+          - benchmark-cli
       tag:
         description: Required except for verify-npm; for example v0.91.0 or v0.91.0-beta.1.
         required: false
@@ -45,10 +46,16 @@ on:
           - Windows-x64
 
 concurrency:
-  group: ${{ inputs.operation == 'verify-desktop' && format('desktop-replay-{0}-{1}', inputs.candidate-run, inputs.desktop-target) || 'openalice-release-publication' }}
+  group: ${{ inputs.operation == 'benchmark-cli' && format('cli-benchmark-{0}', github.ref) || inputs.operation == 'verify-desktop' && format('desktop-replay-{0}-{1}', inputs.candidate-run, inputs.desktop-target) || 'openalice-release-publication' }}
   cancel-in-progress: false
 
 jobs:
+  benchmark-cli:
+    if: inputs.operation == 'benchmark-cli'
+    uses: ./.github/workflows/release-cli-benchmark.yml
+    permissions:
+      contents: read
+
   replay-desktop:
     if: inputs.operation == 'verify-desktop' && inputs.channel == 'stable'
     uses: ./.github/workflows/release-desktop-replay.yml

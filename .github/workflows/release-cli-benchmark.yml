@@ -1,0 +1,83 @@
+name: CLI shared-input benchmark (no publication)
+
+on:
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  inputs:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22.19.0
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile --filter='!@traderalice/desktop'
+      - name: Build shared server inputs
+        run: pnpm build:server
+      - name: Prepare exact-commit inputs
+        run: >-
+          node scripts/prepare-cli-neutral-inputs.mjs prepare
+          --repository-root . --output-dir dist/benchmark-neutral
+          --commit "$GITHUB_SHA"
+      - name: Upload shared inputs
+        uses: actions/upload-artifact@v4
+        with:
+          name: benchmark-neutral
+          path: dist/benchmark-neutral
+          if-no-files-found: error
+          retention-days: 1
+
+  consumer:
+    # Both samples start after input preparation, isolating consumer latency.
+    # Include producer duration separately when assessing end-to-end cost.
+    needs: inputs
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        mode: [rebuild, restore]
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22.19.0
+          cache: pnpm
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version-file: .bun-version
+      - run: pnpm install --frozen-lockfile --filter='!@traderalice/desktop'
+      - name: Baseline repeated server build
+        if: matrix.mode == 'rebuild'
+        run: pnpm build:server
+      - name: Download shared inputs
+        if: matrix.mode == 'restore'
+        uses: actions/download-artifact@v4
+        with:
+          name: benchmark-neutral
+          path: dist/benchmark-neutral
+      - name: Verify and restore shared inputs
+        if: matrix.mode == 'restore'
+        run: >-
+          node scripts/prepare-cli-neutral-inputs.mjs verify
+          --repository-root . --input-dir dist/benchmark-neutral
+          --commit "$GITHUB_SHA" --install
+      - name: Accept real multiprocess Runtime
+        run: pnpm build:bun-runtime:feasibility
+      - name: Build and accept real native archive
+        run: pnpm build:bun:release
+      - name: Preserve acceptance reports only
+        uses: actions/upload-artifact@v4
+        with:
+          name: benchmark-${{ matrix.mode }}-reports
+          path: |
+            dist/bun-release/report.json
+          if-no-files-found: error
+          retention-days: 3

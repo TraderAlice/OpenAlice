@@ -121,7 +121,7 @@ describe('Release workflow critical path', () => {
       operation: {
         required: true,
         type: 'choice',
-        options: ['release', 'mirror', 'publish-npm', 'verify-npm', 'verify-desktop'],
+        options: ['release', 'mirror', 'publish-npm', 'verify-npm', 'verify-desktop', 'benchmark-cli'],
       },
       tag: {
         required: false,
@@ -134,7 +134,7 @@ describe('Release workflow critical path', () => {
       },
     })
     expect(workflow.concurrency).toEqual({
-      group: "${{ inputs.operation == 'verify-desktop' && format('desktop-replay-{0}-{1}', inputs.candidate-run, inputs.desktop-target) || 'openalice-release-publication' }}",
+      group: "${{ inputs.operation == 'benchmark-cli' && format('cli-benchmark-{0}', github.ref) || inputs.operation == 'verify-desktop' && format('desktop-replay-{0}-{1}', inputs.candidate-run, inputs.desktop-target) || 'openalice-release-publication' }}",
       'cancel-in-progress': false,
     })
 
@@ -356,6 +356,19 @@ describe('Release workflow critical path', () => {
     ]) {
       expect(step(publication, name).with?.files).toContain('dist/release-cli/*.tar.gz.sha256')
     }
+  })
+
+  it('benchmarks actual CLI consumers without public or signing authority', () => {
+    const job = workflow.jobs['benchmark-cli']
+    expect(job.if).toBe("inputs.operation == 'benchmark-cli'")
+    expect(job.permissions).toEqual({ contents: 'read' })
+    const text = readFileSync(resolve(root, '.github/workflows/release-cli-benchmark.yml'), 'utf8')
+    const benchmark = YAML.parse(text)
+    expect(benchmark.jobs.consumer.strategy.matrix.mode).toEqual(['rebuild', 'restore'])
+    expect(benchmark.jobs.consumer['runs-on']).toBe(benchmark.jobs.inputs['runs-on'])
+    expect(text).not.toMatch(/secrets:|contents: write|id-token: write|gh release|npm publish|electron-builder/)
+    expect(step(benchmark.jobs.consumer, 'Accept real multiprocess Runtime').run).toBe('pnpm build:bun-runtime:feasibility')
+    expect(step(benchmark.jobs.consumer, 'Build and accept real native archive').run).toBe('pnpm build:bun:release')
   })
 
   it('replays one selected desktop without build or publication authority', () => {
