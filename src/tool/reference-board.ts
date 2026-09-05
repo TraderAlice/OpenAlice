@@ -21,7 +21,7 @@ export function createReferenceBoardTools(reference: ReferenceDataService) {
 
 Available boards:
 - movers: gainers/losers/most-active + value/growth/size screener lists (intraday)
-- calendar: upcoming earnings, IPOs and ex-dividend dates (14-day window by default)
+- calendar: upcoming macro events, earnings, IPOs and ex-dividend dates (14-day window by default)
 - macro: 14 US macro series cards — rates, labor, CPI YoY, oil, dollar, M2, sentiment (FRED)
 - valuation: S&P 500 PE / Shiller CAPE / earnings yield / dividend yield (multpl)
 - term-structure: BTC/ETH futures curve with annualized basis vs perpetual (Deribit)

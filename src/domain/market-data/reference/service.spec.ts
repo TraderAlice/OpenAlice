@@ -2,7 +2,19 @@ import { describe, it, expect } from 'vitest'
 import { createReferenceData } from './service.js'
 import type { EconomyClientLike, EquityClientLike } from '../client/types.js'
 
-const ECONOMY_STUB = { fredSeries: async () => [] } as unknown as EconomyClientLike
+const ECONOMIC_EVENT = {
+  date: '2026-06-12 12:30:00', country: 'US', category: 'Employment', event: 'Nonfarm Payrolls',
+  importance: 'High', source: 'BLS', currency: 'USD', unit: 'K', consensus: 150,
+  previous: 139, revised: null, actual: null,
+}
+
+function mkEconomyClient(overrides: Partial<EconomyClientLike> = {}): EconomyClientLike {
+  return {
+    getCalendar: async () => [ECONOMIC_EVENT],
+    fredSeries: async () => [],
+    ...overrides,
+  } as unknown as EconomyClientLike
+}
 
 const ROW = {
   symbol: 'NVDA', name: 'NVIDIA', price: 1000, change: 50, percent_change: 0.052, volume: 1e8,
@@ -32,7 +44,7 @@ const INDEX_STUB = {} as never
 describe('reference service', () => {
   it('movers: one list failing does not kill the board', async () => {
     const ref = createReferenceData({
-      economyClient: ECONOMY_STUB,
+      economyClient: mkEconomyClient(),
       derivativesClient: DERIVATIVES_STUB,
       indexClient: INDEX_STUB,
       equityClient: mkEquityClient({ getLosers: async () => { throw new Error('boom') } }),
@@ -46,7 +58,7 @@ describe('reference service', () => {
 
   it('calendar: partial upstream failure is annotated per list, not silent', async () => {
     const ref = createReferenceData({
-      economyClient: ECONOMY_STUB,
+      economyClient: mkEconomyClient(),
       derivativesClient: DERIVATIVES_STUB,
       indexClient: INDEX_STUB,
       equityClient: mkEquityClient({
@@ -59,12 +71,29 @@ describe('reference service', () => {
     expect(board.ipos).toEqual([])
     expect(board.errors?.ipos).toMatch(/403/)
     expect(board.errors?.earnings).toBeUndefined()
+    expect(board.economicEvents).toEqual([ECONOMIC_EVENT])
   })
 
-  it('calendar: all three failing throws loud (missing/invalid key)', async () => {
+  it('calendar: macro events can fail independently without hiding company events', async () => {
+    const ref = createReferenceData({
+      economyClient: mkEconomyClient({
+        getCalendar: async () => { throw new Error('Economic calendar unavailable') },
+      }),
+      derivativesClient: DERIVATIVES_STUB,
+      indexClient: INDEX_STUB,
+      equityClient: mkEquityClient({}),
+      equityProvider: 'yfinance',
+    })
+    const board = await ref.calendar()
+    expect(board.economicEvents).toEqual([])
+    expect(board.earnings).toHaveLength(1)
+    expect(board.errors?.economicEvents).toMatch(/unavailable/)
+  })
+
+  it('calendar: all four lists failing throws loud (missing/invalid key)', async () => {
     const dead = async () => { throw new Error('FMP API key required') }
     const ref = createReferenceData({
-      economyClient: ECONOMY_STUB,
+      economyClient: mkEconomyClient({ getCalendar: dead }),
       derivativesClient: DERIVATIVES_STUB,
       indexClient: INDEX_STUB,
       equityClient: mkEquityClient({
@@ -76,7 +105,7 @@ describe('reference service', () => {
   })
 
   it('calendar: window defaults to 14 days from today', async () => {
-    const ref = createReferenceData({ economyClient: ECONOMY_STUB,
+    const ref = createReferenceData({ economyClient: mkEconomyClient(),
       derivativesClient: DERIVATIVES_STUB, indexClient: INDEX_STUB,
       equityClient: mkEquityClient({}), equityProvider: 'yfinance' })
     const board = await ref.calendar()
