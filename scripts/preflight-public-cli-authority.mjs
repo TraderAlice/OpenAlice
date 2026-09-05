@@ -11,8 +11,8 @@ export const NPM_PACKAGE_NAMES = Object.freeze([
   'openalice-darwin-x64',
   'openalice-linux-arm64',
   'openalice-linux-x64',
-  'openalice-win32-arm64',
-  'openalice-win32-x64',
+  'openalice-windows-arm64',
+  'openalice-windows-x64',
 ])
 
 const DEFAULT_NPM_REGISTRY = 'https://registry.npmjs.org'

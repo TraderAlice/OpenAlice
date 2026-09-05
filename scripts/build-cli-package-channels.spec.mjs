@@ -51,8 +51,8 @@ describe.skipIf(process.platform === 'win32')('CLI package-manager channel gener
       'openalice-darwin-x64': version,
       'openalice-linux-arm64': version,
       'openalice-linux-x64': version,
-      'openalice-win32-arm64': version,
-      'openalice-win32-x64': version,
+      'openalice-windows-arm64': version,
+      'openalice-windows-x64': version,
     })
     const platformExecutable = await readFile(join(
       output,
@@ -61,11 +61,17 @@ describe.skipIf(process.platform === 'win32')('CLI package-manager channel gener
     expect(platformExecutable).toEqual(Buffer.from(`#!/bin/sh\nprintf '${version}\\n'\n`))
 
     const formula = await readFile(join(output, 'homebrew/openalice.rb'), 'utf8')
+    expect(formula).toContain('depends_on "git"')
+    expect(formula).toContain('depends_on "bash"')
     expect(formula.match(/releases\/download\/v0\.90\.1/g)).toHaveLength(4)
     expect(formula).toContain('method\\\":\\\"brew')
     expect(formula).toContain('(share/"openalice/release.json").write(release_metadata)')
     expect(formula).toContain('(share/"openalice/install-source.json").write(content)')
     const pkgbuild = await readFile(join(output, 'aur/PKGBUILD'), 'utf8')
+    expect(pkgbuild).toContain("depends=('glibc' 'git' 'bash')")
+    const srcinfo = await readFile(join(output, 'aur/.SRCINFO'), 'utf8')
+    expect(srcinfo).toContain('\tdepends = git')
+    expect(srcinfo).toContain('\tdepends = bash')
     await expect(execFileAsync('bash', ['-n', join(output, 'aur/PKGBUILD')])).resolves.toBeDefined()
     expect(pkgbuild).toContain("method\": \"aur")
     expect(await readFile(join(output, 'aur/.SRCINFO'), 'utf8')).toContain('pkgname = openalice-bin')

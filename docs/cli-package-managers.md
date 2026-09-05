@@ -45,6 +45,17 @@ After npm or Bun installation, `openalice` is the accepted native executable.
 It is not a JavaScript forwarding wrapper and does not require Node.js, Bun, npm,
 or the installing package manager in `PATH` at Runtime.
 
+Dependency coordination is part of installation. New native CLI releases declare
+`dependencyPolicy: system` and do not contain Git/Bash or Agent Runtimes. First
+local startup continues the shared Git/Bash setup: working installations are
+reused, missing dependencies require explicit consent, and noninteractive
+startup reports how to finish rather than installing silently. `openalice setup`
+retries this step; `openalice setup --check` only inspects it. npm/Bun postinstall
+still only materializes the native package and never installs system tools.
+Homebrew declares `git` and `bash` dependencies; AUR declares `glibc`, `git`, and
+`bash`, allowing the owning package manager to resolve them during installation.
+Agent Runtimes remain user-selected and are not implicit system dependencies.
+
 ## One accepted artifact set
 
 The release build produces six archives:
@@ -75,8 +86,8 @@ openalice
 ├── optional openalice-darwin-x64
 ├── optional openalice-linux-arm64
 ├── optional openalice-linux-x64
-├── optional openalice-win32-arm64
-└── optional openalice-win32-x64
+├── optional openalice-windows-arm64
+└── optional openalice-windows-x64
 ```
 
 The meta package exposes the `openalice` command. Its postinstall step selects
@@ -222,8 +233,8 @@ normal promotion before the next stable release; do not restore the old token
 to operate historical tooling.
 
 For each of `openalice`, `openalice-darwin-arm64`, `openalice-darwin-x64`,
-`openalice-linux-arm64`, `openalice-linux-x64`, `openalice-win32-arm64`, and
-`openalice-win32-x64`, configure npm Package Settings
+`openalice-linux-arm64`, `openalice-linux-x64`, `openalice-windows-arm64`, and
+`openalice-windows-x64`, configure npm Package Settings
 → Trusted Publisher → GitHub Actions:
 
 - Organization/user: `TraderAlice`; repository: `OpenAlice`.
@@ -255,7 +266,7 @@ See [npm Trusted Publishing](https://docs.npmjs.com/trusted-publishers/) and
 the [registry OIDC exchange API](https://api-docs.npmjs.com/). Adding future
 platform packages (including Windows) requires first publication and their own
 trusted-publisher connections. The historical receipts above cover only the
-original five names. `openalice-win32-arm64` and `openalice-win32-x64` must be
+original five names. `openalice-windows-arm64` and `openalice-windows-x64` must be
 enrolled before seven-package publication. Do not restore the revoked bootstrap
 token or count the old receipt as Windows publishing authority.
 

@@ -1,9 +1,10 @@
 import { createServer } from 'node:net'
-import { mkdir, readFile, rm, stat, writeFile } from 'node:fs/promises'
+import { mkdir, readFile, rm, stat, symlink, writeFile } from 'node:fs/promises'
 import { basename, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 import { prepareBunBrokerPackFixture } from './bun-broker-pack-fixture.js'
+import { inspectSystemDependencies } from '../packages/cli/src/system-dependencies.mjs'
 
 const repositoryRoot = fileURLToPath(new URL('..', import.meta.url))
 const pinnedBunVersion = (await readFile(join(repositoryRoot, '.bun-version'), 'utf8')).trim()
@@ -61,6 +62,15 @@ if (!build.success) {
 const buildDurationMs = Math.round(performance.now() - buildStartedAt)
 
 const [webPort, mcpPort, utaPort, connectorPort] = await allocatePorts(4)
+// Expose only required system tools, not the host's Node/npm/Bun installation.
+const dependencyBin = join(outputRoot, 'system-bin')
+await mkdir(dependencyBin, { recursive: true })
+for (const dependency of await inspectSystemDependencies()) {
+  if (dependency.status !== 'available' || !dependency.executable) {
+    throw new Error(`Runtime acceptance requires working system ${dependency.id}`)
+  }
+  await symlink(dependency.executable, join(dependencyBin, dependency.id))
+}
 const smokeEnvironment = minimalSmokeEnvironment({
   home: smokeHome,
   executable: executablePath,
@@ -73,6 +83,7 @@ const version = runProbe(['--version'], smokeEnvironment)
 if (version.stdout.trim() !== product.version) {
   throw new Error(`compiled Runtime reported version ${JSON.stringify(version.stdout.trim())}`)
 }
+runProbe(['setup', '--check'], smokeEnvironment)
 
 const runtimeStartedAt = performance.now()
 const runtime = Bun.spawn([
@@ -390,7 +401,7 @@ function minimalSmokeEnvironment(options: {
 }): Record<string, string> {
   return {
     HOME: options.home,
-    PATH: '',
+    PATH: dependencyBin,
     TMPDIR: process.env['TMPDIR'] ?? '/tmp',
     OPENALICE_HOME: options.home,
     OPENALICE_APP_HOME: repositoryRoot,

@@ -7,6 +7,7 @@ import {
   mkdirSync,
   mkdtempSync,
   rmSync,
+  symlinkSync,
 } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
@@ -189,6 +190,18 @@ function commitFormula(source, message) {
 
 function assertInstalled(expectedVersion, expectedIdentity) {
   if (!existsSync(manager.executable)) fail(`${options.manager} did not install the openalice command`)
+  const setup = JSON.parse(capture(manager.executable, ['setup', '--check', '--json'], {
+    ...process.env, HOME: home,
+  }))
+  if (setup.status !== 'ready') fail(`${options.manager} did not provide system Git/Bash`)
+  // Retain interpreter-free acceptance while making only the declared system
+  // dependencies visible to the Runtime, not all host development tools.
+  for (const id of ['git', 'bash']) {
+    const executable = setup.checks.find(check => check.id === id && check.status === 'available')?.executable
+    if (!executable) fail(`Missing verified ${id} executable`)
+    const link = join(emptyPath, id)
+    if (!existsSync(link)) symlinkSync(executable, link)
+  }
   const version = JSON.parse(capture(manager.executable, ['version', '--json'], runtimeEnv))
   if (version.version !== expectedVersion || version.contentIdentity !== expectedIdentity) {
     fail(`installed identity mismatch: ${JSON.stringify(version)}`)

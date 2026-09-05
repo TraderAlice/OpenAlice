@@ -74,8 +74,11 @@ first or provide `-Yes` intentionally. A downloaded script also accepts:
   -Sha256 <64-hex-digest> -Channel beta -InstallDir "$env:USERPROFILE\.openalice" -Yes
 ```
 
-The host architecture must match the package. The payload includes private
-PortableGit/Bash but no Agent Runtime or host Node/Bun dependency. The installer
+The host architecture must match the package. New system-dependency payloads
+include neither Git/Bash nor an Agent Runtime and do not require host Node/Bun.
+Installation continues with a system Git/Bash check; installing missing tools
+requires separate consent and may require the package manager's elevation.
+The OpenAlice file installer itself
 requires Windows PowerShell 5.1 and the system `tar.exe`; it does not request
 administrator privileges, change persistent execution policy, or install a
 service. The updater and deferred uninstaller use `-ExecutionPolicy RemoteSigned`
@@ -141,8 +144,7 @@ openalice-cli-<version>-<platform>-<arch>/
 ├── share/openalice/
 │   ├── ui/dist/
 │   ├── default/
-│   ├── templates and external adapter resources
-│   └── runtime/git/
+│   └── templates and external adapter resources
 ├── LICENSE
 └── THIRD_PARTY_NOTICES.md
 ```
@@ -226,7 +228,7 @@ runner and preserve the report beside its archive.
 The direct installer owns only:
 
 - immutable OpenAlice CLI releases;
-- release-owned Git and OpenAlice resources;
+- immutable OpenAlice resources (not system Git/Bash or Agent Runtimes);
 - `openalice` and Workspace helper launchers;
 - the `cli/current` activation pointer;
 - the direct-install `cli/activation.json` readiness receipt;
@@ -281,6 +283,26 @@ method to the native executable. They never hard-code one release path, so an
 atomic pointer change is enough for update or rollback.
 
 ## Consent and transaction
+
+### System dependency continuation
+
+Releases declaring `dependencyPolicy: "system"` continue installation through
+`openalice setup` after successful activation. This continuation checks Git/Bash,
+shows the available system-package-manager installation commands, asks separate
+consent, and rechecks executable availability after installation. The manager
+owns those dependencies; OpenAlice never removes them during uninstall.
+
+`openalice setup --check` and `--json` are read-only. Noninteractive direct
+installation (`--yes` / `-Yes`) only runs that check; approval to install
+OpenAlice is not approval to install system software. Missing dependencies are
+reported with a continuation command. Declining or failing dependency setup
+does not roll back an otherwise successful OpenAlice installation. Historical
+releases without this policy keep their original bundled-dependency behavior.
+
+The shared setup entry currently supports Homebrew, WinGet and Linux apt-get,
+dnf, pacman, and apk when already installed. Missing managers produce manual
+guidance instead of downloading an additional bootstrap script. Existing but
+broken Git/Bash installations require repair rather than automatic replacement.
 
 Before creating the install root, the installer prints:
 

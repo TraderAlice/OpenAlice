@@ -8,12 +8,19 @@ $tarballs = Join-Path $scratch 'tarballs'
 $originalPath = $env:Path
 $bun = (Get-Command bun).Source
 $npm = (Get-Command npm.cmd).Source
+function Get-PackFilename([string]$Json) {
+  $parsed = ConvertFrom-Json -InputObject $Json
+  # ConvertFrom-Json can unwrap a one-element legacy JSON array into an object.
+  $entries = if ($parsed -is [array] -or $parsed.PSObject.Properties.Name -contains 'filename') { @($parsed) } else { @($parsed.PSObject.Properties | ForEach-Object { $_.Value }) }
+  if ($entries.Count -ne 1 -or -not $entries[0].filename) { throw 'Invalid npm pack JSON report.' }
+  return $entries[0].filename
+}
 & $bun scripts/build-cli-package-channels.mjs --input-dir $CandidateDir --output-dir $packages --version $candidate.version --released-at ([DateTime]::UtcNow.ToString('o')) --npm-only
 if ($LASTEXITCODE -ne 0) { throw 'Package generation failed.' }
-$platformName = "openalice-win32-$($candidate.arch)"
+$platformName = "openalice-windows-$($candidate.arch)"
 $report = & $npm pack (Join-Path $packages "npm\$platformName") --json --pack-destination $tarballs
 if ($LASTEXITCODE -ne 0) { throw 'Platform npm pack failed.' }
-$platformTarball = Join-Path $tarballs (($report | ConvertFrom-Json)[0].filename)
+$platformTarball = Join-Path $tarballs (Get-PackFilename ($report -join "`n"))
 $metaRoot = Join-Path $packages 'npm\openalice'
 $metaPath = Join-Path $metaRoot 'package.json'
 $meta = Get-Content -Raw -LiteralPath $metaPath | ConvertFrom-Json
@@ -21,7 +28,7 @@ $meta.optionalDependencies.$platformName = 'file:' + ($platformTarball -replace 
 [IO.File]::WriteAllText($metaPath, ($meta | ConvertTo-Json -Depth 10))
 $report = & $npm pack $metaRoot --json --pack-destination $tarballs
 if ($LASTEXITCODE -ne 0) { throw 'Meta npm pack failed.' }
-$metaTarball = Join-Path $tarballs (($report | ConvertFrom-Json)[0].filename)
+$metaTarball = Join-Path $tarballs (Get-PackFilename ($report -join "`n"))
 $npmVersion = & $npm --version
 $bunVersion = & $bun --version
 $limitations = @()
@@ -32,7 +39,7 @@ try {
     $env:BUN_INSTALL = $prefix
     $env:Path = $originalPath
     if ($manager -eq 'npm') {
-      & $npm install --global --prefix $prefix --allow-scripts=openalice --offline --no-audit --no-fund $metaTarball
+      & $npm install --global --prefix $prefix ("--allow-scripts=file:" + ($metaTarball -replace '\\', '/')) --offline --no-audit --no-fund $metaTarball
     } else {
       # Only Bun plus Windows system tools; postinstall must not need host Node.
       $env:Path = (Split-Path $bun) + ';' + (Join-Path $env:SystemRoot 'System32')
@@ -45,6 +52,9 @@ try {
     if ($LASTEXITCODE -ne 0) { throw "$manager native command still needs an interpreter." }
     $version = $value | ConvertFrom-Json
     if ($version.version -ne $candidate.version -or $version.contentIdentity -ne $candidate.contentIdentity -or $version.installSource.method -ne $manager) { throw "$manager installed identity mismatch." }
+    $setup = & $command setup --check --json
+    if ($LASTEXITCODE -ne 0) { throw "$manager needs system Git/Bash; finish openalice setup before acceptance." }
+    if (($setup | ConvertFrom-Json).status -ne 'ready') { throw "$manager dependency inspection failed." }
     $update = & $command update --yes
     if ($LASTEXITCODE -ne 0 -or "$update" -notmatch "$manager.*openalice") { throw 'Update ownership was not preserved.' }
     $uninstall = & $command uninstall --yes

@@ -26,6 +26,7 @@ export const ROOT_COMMANDS = Object.freeze([
   { name: 'status', description: 'Inspect the selected local Runtime' },
   { name: 'logs', description: 'Read a bounded redacted Runtime log tail' },
   { name: 'doctor', description: 'Run read-only Runtime diagnostics' },
+  { name: 'setup', description: 'Check and coordinate system Git/Bash installation' },
   { name: 'open', description: 'Open the verified local Web UI' },
   { name: 'start', description: 'Compatibility foreground browser launcher' },
   { name: 'server', description: 'Compatibility Server lifecycle commands' },
@@ -50,6 +51,7 @@ const LIFECYCLE_OPTIONS = Object.freeze({
   status: ['--project', '--instance', '--home', '--wait', '--json'],
   logs: ['--project', '--instance', '--home', '--lines', '--json'],
   doctor: ['--project', '--instance', '--home', '--wait', '--json'],
+  setup: ['--check', '--json'],
   open: ['--project', '--instance', '--home', '--wait'],
 })
 

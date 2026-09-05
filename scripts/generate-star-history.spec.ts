@@ -79,6 +79,18 @@ describe('renderStarHistorySvg', () => {
     expect(svg).not.toContain('starred_at')
   })
 
+  it('keeps month labels clear of the first and last dates in a long history', () => {
+    const points = aggregateStarHistory(['2026-02-19T00:00:00Z', '2026-09-05T00:00:00Z'])
+    const svg = renderStarHistorySvg({ points })
+    const labels = [...svg.matchAll(/<text x="([\d.]+)" y="508"[^>]*>([^<]+)<\/text>/g)]
+    expect(labels[0][2]).toBe('Feb 19')
+    expect(labels.at(-1)?.[2]).toBe('Sep 5')
+    expect(labels.map((label) => label[2])).toContain('Aug')
+    for (let index = 1; index < labels.length; index++) {
+      expect(Number(labels[index][1]) - Number(labels[index - 1][1])).toBeGreaterThanOrEqual(80)
+    }
+  })
+
   it('renders the matching dark-mode palette', () => {
     const points = aggregateStarHistory([
       '2026-02-19T10:40:01Z',

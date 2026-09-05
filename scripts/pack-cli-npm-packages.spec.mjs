@@ -43,18 +43,19 @@ describe('CLI npm package packing', () => {
     })).toThrow('platform package does not match')
   })
 
-  it('allows npm to report the complete native runtime inventory', async () => {
+  it.each(['array', 'keyed'])('accepts npm %s reports with the complete native runtime inventory', async format => {
     const root = await fixture()
     const calls = []
     const spawnNpm = (command, args, options) => {
       calls.push({ command, args, options })
+      const packed = {
+        filename: `package-${calls.length}.tgz`,
+        shasum: 'a'.repeat(40),
+        integrity: 'sha512-fixture',
+      }
       return {
         status: 0,
-        stdout: JSON.stringify([{
-          filename: `package-${calls.length}.tgz`,
-          shasum: 'a'.repeat(40),
-          integrity: 'sha512-fixture',
-        }]),
+        stdout: JSON.stringify(format === 'array' ? [packed] : { openalice: packed }),
         stderr: '',
       }
     }

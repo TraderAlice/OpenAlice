@@ -80,8 +80,10 @@ function pack(packageRoot, outputRoot, npm, spawnNpm) {
   if (result.status !== 0) {
     throw new Error(`npm pack failed for ${packageRoot}:\n${result.stdout}\n${result.stderr}`)
   }
-  const report = JSON.parse(result.stdout)
-  if (!Array.isArray(report) || report.length !== 1) {
+  const parsed = JSON.parse(result.stdout)
+  // npm 12 reports by package name; older npm reports a single-entry array.
+  const report = Array.isArray(parsed) ? parsed : Object.values(parsed ?? {})
+  if (report.length !== 1 || !report[0] || typeof report[0] !== 'object') {
     throw new Error(`npm pack returned an invalid report for ${packageRoot}`)
   }
   const packed = report[0]

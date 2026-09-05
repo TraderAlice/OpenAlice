@@ -1,4 +1,4 @@
-import { exec, type IGitStringExecutionOptions } from 'dugite';
+import { exec, type IGitStringExecutionOptions } from './git-execution.js';
 
 export interface GitLogEntry {
   readonly hash: string;

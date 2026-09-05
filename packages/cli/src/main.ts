@@ -1,4 +1,6 @@
 import { main as runLegacyCommand } from '../bin/openalice.mjs'
+import { isBunStandalone } from './bun-standalone.mjs'
+import { runDependencySetup } from './dependency-setup.mjs'
 import {
   parseTuiLaunchArgs,
   type TuiLaunchFlags,
@@ -6,6 +8,9 @@ import {
 import { runSupervisorTui } from './supervisor-tui.ts'
 
 export interface CliDependencies {
+  standalone?: boolean
+  runSetup?: (args: string[]) => Promise<number>
+  runCommand?: (args: string[]) => Promise<number>
   runTui?: (
     flags?: TuiLaunchFlags,
   ) => Promise<number>
@@ -16,6 +21,10 @@ export async function main(
   dependencies: CliDependencies = {},
 ): Promise<number> {
   const [command, ...args] = argv
+  const setup = async () => {
+    if (!(dependencies.standalone ?? isBunStandalone())) return 0
+    return (dependencies.runSetup ?? ((setupArgs: string[]) => runDependencySetup(setupArgs, { quietReady: true })))(args.includes('--json') ? ['--json'] : [])
+  }
   if (command === 'tui') {
     if (args.includes('--help') || args.includes('-h')) {
       process.stdout.write(`Usage:
@@ -34,15 +43,28 @@ Options:
 `)
       return 0
     }
-    return (dependencies.runTui ?? runSupervisorTui)(parseTuiLaunchArgs(args))
+    const flags = parseTuiLaunchArgs(args)
+    // Setup is offered here, but the TUI also manages remote Runtimes.
+    // Only local process startup requires local Git/Bash to be ready.
+    await setup()
+    return (dependencies.runTui ?? runSupervisorTui)(flags)
   }
   if (command === undefined) {
+    await setup()
     return (dependencies.runTui ?? runSupervisorTui)({})
   }
   if (command.startsWith('-') && !['--help', '-h', '--version'].includes(command)) {
-    return (dependencies.runTui ?? runSupervisorTui)(parseTuiLaunchArgs(argv))
+    const flags = parseTuiLaunchArgs(argv)
+    await setup()
+    return (dependencies.runTui ?? runSupervisorTui)(flags)
   }
-  return runLegacyCommand(argv)
+  const startsLocalRuntime = ['up', 'run', 'start'].includes(command)
+    || (command === 'server' && ['start', 'run'].includes(args[0] ?? ''))
+  if (startsLocalRuntime && !args.includes('--help') && !args.includes('-h')) {
+    const setupCode = await setup()
+    if (setupCode !== 0) return setupCode
+  }
+  return (dependencies.runCommand ?? runLegacyCommand)(argv)
 }
 
 function usageError(message: string): Error & { code: string; exitCode: number } {
