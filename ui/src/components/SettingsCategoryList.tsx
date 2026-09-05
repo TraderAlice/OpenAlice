@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
+  Activity,
   Bot,
   Camera,
   Cpu,
@@ -38,6 +39,8 @@ const DEVELOPER_ITEMS = [
   { labelKey: 'dev.onboarding', tab: 'onboarding', Icon: Compass },
   { labelKey: 'dev.snapshots', tab: 'snapshots', Icon: Camera },
   { labelKey: 'common.logs', tab: 'logs', Icon: ScrollText },
+  { labelKey: 'automation.runs', tab: 'runs', Icon: Activity },
+  { labelKey: 'automation.api', tab: 'api', Icon: Code2 },
   { labelKey: 'simulator.title', tab: 'simulator', Icon: FlaskConical },
 ] as const
 
@@ -107,7 +110,9 @@ export function SettingsCategoryList({ onSelect }: { onSelect?: () => void }) {
   const { project } = useAliceProject()
   const focused = useWorkspace((state) => getFocusedTab(state)?.spec)
   const openOrFocus = useWorkspace((state) => state.openOrFocus)
-  const developerActive = focused?.kind === 'dev'
+  const developerTab = focused?.kind === 'dev' ? focused.params.tab
+    : focused?.kind === 'automation' ? focused.params.section : null
+  const developerActive = developerTab !== null
   const [developerExpanded, setDeveloperExpanded] = useState(
     () => developerActive || readDeveloperDisclosure(),
   )
@@ -183,7 +188,7 @@ export function SettingsCategoryList({ onSelect }: { onSelect?: () => void }) {
             className="ml-5 border-l border-border/70 pl-1"
           >
             {DEVELOPER_ITEMS.map((item) => {
-              const active = focused?.kind === 'dev' && focused.params.tab === item.tab
+              const active = developerTab === item.tab
               return (
                 <SidebarRow
                   key={item.tab}

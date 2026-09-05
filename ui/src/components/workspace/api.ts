@@ -521,7 +521,7 @@ export async function fetchTemplateReadme(name: string): Promise<string | null> 
  * README body doesn't show the metadata to the user. Conservative: only
  * strips when frontmatter is at column 0; anything else passes through.
  */
-function stripFrontmatter(raw: string): string {
+export function stripFrontmatter(raw: string): string {
   const text = raw.replace(/^﻿/, '');
   if (!text.startsWith('---')) return text;
   const closeMatch = /^---\s*$/m.exec(text.slice(3));

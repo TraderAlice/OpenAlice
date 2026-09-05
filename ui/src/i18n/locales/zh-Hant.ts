@@ -10,6 +10,24 @@ import type { Resources } from './en'
  * Content is UI chrome only — no geographic or other non-technical terms.
  */
 export const zhHant: Resources = {
+  workspaceDetails: {
+    title: "工作區詳情",
+    back: "返回對話",
+    notFound: "此 Harness 中沒有可用的該工作區。",
+    harness: "Harness",
+    created: "建立時間",
+    baseline: "已套用的範本",
+    sourceVersion: "已安裝的 Harness 來源版本",
+    repository: "來源儲存庫",
+    location: "本機目錄",
+    documents: "工作區文件",
+    overview: "工作區概覽",
+    guide: "Harness 指南",
+    overviewHint: "此工作區內的 README.md。內容由工作區管理，會隨著你的使用而變化。",
+    guideHint: "目前範本目錄提供的參考說明，並非此工作區的即時設定。",
+    noReadme: "此工作區還沒有 README.md。你可以讓 Agent 撰寫一份說明，介紹它的用途和內容。",
+    noGuide: "暫無 Harness 指南。",
+  },
   nav: {
     item: {
       inbox: '收件匣',

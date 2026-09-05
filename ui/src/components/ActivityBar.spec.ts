@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import { defaultUiLayout, type UiLayout } from '../live/ui-layout'
-import { filterNavSections, joinNavLayout, NAV_SECTIONS, navSectionsForProduct } from './activity-navigation'
+import { editorGroupsFromLayout, filterNavSections, joinNavLayout, NAV_SECTIONS, navSectionsForProduct } from './activity-navigation'
 
 describe('ActivityBar navigation hierarchy', () => {
   it('keeps the primary workflow ordered with Quant below Issues', () => {
@@ -24,7 +24,7 @@ describe('ActivityBar navigation hierarchy', () => {
       'connectors',
     ])
     expect(beta?.items.find((item) => item.page === 'portfolio')?.labelKey).toBe('nav.item.trading')
-    expect(system?.items.map((item) => item.page)).toContain('workspaces')
+    expect(system?.items).toEqual([])
   })
 
   it('hides trading and market-data pages on NanoAlice', () => {
@@ -38,11 +38,19 @@ describe('ActivityBar navigation hierarchy', () => {
       'prediction',
       'office',
       'connectors',
-      'workspaces',
-      'automation',
     ])
     expect(pages).not.toContain('market')
     expect(pages).not.toContain('portfolio')
+  })
+
+  it('does not resurrect Workspaces or Automation from saved layouts or the editor', () => {
+    const layout = defaultUiLayout()
+    const pages = joinNavLayout(NAV_SECTIONS, layout, { office: true }).flatMap(s => s.items.map(i => i.page))
+    const editable = editorGroupsFromLayout(NAV_SECTIONS, layout).flatMap(g => g.items.map(i => i.page))
+    expect(pages).not.toContain('workspaces')
+    expect(editable).not.toContain('workspaces')
+    expect(pages).not.toContain('automation')
+    expect(editable).not.toContain('automation')
   })
 
   it('keeps Settings and Dev out of the default joined rail', () => {

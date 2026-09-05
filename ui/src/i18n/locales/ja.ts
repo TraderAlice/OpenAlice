@@ -2,6 +2,24 @@ import type { Resources } from './en'
 
 /** 日本語. Typed as `Resources` → must match en's key structure exactly. */
 export const ja: Resources = {
+  workspaceDetails: {
+    title: "ワークスペース詳細",
+    back: "会話に戻る",
+    notFound: "この Harness ではこのワークスペースを利用できません。",
+    harness: "Harness",
+    created: "作成日",
+    baseline: "適用済みテンプレート",
+    sourceVersion: "インストール済み Harness ソース",
+    repository: "ソースリポジトリ",
+    location: "ローカルフォルダー",
+    documents: "ワークスペースのドキュメント",
+    overview: "ワークスペース概要",
+    guide: "Harness ガイド",
+    overviewHint: "このワークスペース内の README.md です。内容はワークスペースが管理し、作業とともに変化します。",
+    guideHint: "現在のテンプレートカタログの参考資料です。このワークスペースの現在の設定ではありません。",
+    noReadme: "このワークスペースにはまだ README.md がありません。目的や内容の概要をエージェントに作成してもらえます。",
+    noGuide: "Harness ガイドはありません。",
+  },
   nav: {
     item: {
       inbox: '受信トレイ',

@@ -135,6 +135,7 @@ describe('AutoQuant setup', () => {
     render(<AutoQuantSetupPage />)
 
     expect(screen.getByRole('heading', { name: 'Choose your AutoQuant workspace' })).toBeTruthy()
+    expect(screen.queryByRole('button', { name: /Manage workspaces/i })).toBeNull()
     expect(screen.queryByRole('button', { name: 'Initialize AutoQuant' })).toBeNull()
     fireEvent.click(screen.getByRole('button', { name: /Quant desk/ }))
     await waitFor(() => {

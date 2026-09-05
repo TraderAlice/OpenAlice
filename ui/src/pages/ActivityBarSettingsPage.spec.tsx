@@ -60,12 +60,14 @@ describe('ActivityBarSettingsPage', () => {
   it('persists the first visibility edit instead of treating it as hydration', async () => {
     render(<ActivityBarSettingsPage />)
 
-    const toggle = screen.getByRole('switch', { name: 'Hide Workspaces' })
+    expect(screen.queryByRole('switch', { name: /Workspaces/ })).toBeNull()
+    expect(screen.queryByRole('switch', { name: /Automation/ })).toBeNull()
+    const toggle = screen.getByRole('switch', { name: 'Hide Inbox' })
     expect(toggle.getAttribute('aria-checked')).toBe('true')
     fireEvent.click(toggle)
-    expect(screen.getByRole('switch', { name: 'Show Workspaces' }).getAttribute('aria-checked')).toBe('false')
+    expect(screen.getByRole('switch', { name: 'Show Inbox' }).getAttribute('aria-checked')).toBe('false')
     await waitFor(() => expect(mocks.save).toHaveBeenCalledOnce(), { timeout: 1_500 })
-    expect(mocks.save.mock.calls[0]?.[0].hidden).toContain('workspaces')
+    expect(mocks.save.mock.calls[0]?.[0].hidden).toContain('inbox')
   })
 
   it('creates a custom group and can reset to the default document', () => {

@@ -7,7 +7,8 @@ import { SettingsCategoryList } from './SettingsCategoryList'
 
 const mocks = vi.hoisted(() => ({
   product: 'trader' as 'trader' | 'nano' | undefined,
-  focused: null as null | { kind: 'dev'; params: { tab: 'logs' } },
+  focused: null as null | { kind: 'dev'; params: { tab: 'logs' | 'runs' | 'api' } }
+    | { kind: 'automation'; params: { section: 'runs' | 'api' } },
   openOrFocus: vi.fn(),
 }))
 
@@ -101,5 +102,22 @@ describe('SettingsCategoryList', () => {
 
     expect(screen.getByRole('button', { name: 'settings.group.developer' }).getAttribute('aria-expanded')).toBe('true')
     expect(screen.getByRole('button', { name: 'common.logs' })).toBeTruthy()
+  })
+
+  it.each(['runs', 'api'] as const)('opens %s inside Developer and closes mobile navigation', (tab) => {
+    const onSelect = vi.fn()
+    render(<SettingsCategoryList onSelect={onSelect} />)
+    expect(screen.queryByRole('button', { name: `automation.${tab}` })).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: 'settings.group.developer' }))
+    fireEvent.click(screen.getByRole('button', { name: `automation.${tab}` }))
+    expect(mocks.openOrFocus).toHaveBeenCalledWith({ kind: 'dev', params: { tab } })
+    expect(onSelect).toHaveBeenCalledOnce()
+  })
+
+  it('expands Developer for a saved legacy Automation tab', () => {
+    mocks.focused = { kind: 'automation', params: { section: 'runs' } }
+    render(<SettingsCategoryList />)
+    expect(screen.getByRole('button', { name: 'settings.group.developer' }).getAttribute('aria-expanded')).toBe('true')
+    expect(screen.getByRole('button', { name: 'automation.runs' })).toBeTruthy()
   })
 })

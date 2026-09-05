@@ -127,7 +127,7 @@ export function ChatWorkspaceSection({
     ? { wsId: focused.params.wsId, sessionId: focused.params.sessionId ?? null }
     : null
   const landingOwnsStatus = focused?.kind === landingKind
-  const routeWorkspaceId = isWsFocus
+  const routeWorkspaceId = isWsFocus || (focused?.kind === 'workspace-details' && focused.params.source === source)
     ? focused.params.wsId
     : focused?.kind === landingKind
       ? focused.params.targetWsId ?? null
@@ -524,6 +524,7 @@ export function ChatWorkspaceSection({
           ? t('autoQuant.newWorkspace')
           : mode === 'prediction' ? t('autoPrediction.newWorkspace') : t('chat.newWorkspace')}
         onConfigure={() => focusedWorkspace && ctx.openAgentConfig(focusedWorkspace.id)}
+        onDetails={() => focusedWorkspace && navigate({ kind: 'workspace-details', params: { wsId: focusedWorkspace.id, source } })}
         onUpgrade={() => focusedWorkspace && ctx.openAgentConfig(focusedWorkspace.id, undefined, 'template')}
         onSelectWorkspace={(workspaceId) => {
           selectHarnessWorkspace(workspaceId, () => {
@@ -627,6 +628,7 @@ interface ChatWorkspaceContextFooterProps {
   createWorkspaceLabel: string
   onConfigure: () => void
   onUpgrade: () => void
+  onDetails: () => void
   onSelectWorkspace: (workspaceId: string) => void
   onBrowseSessions: (restoreFocus: HTMLElement | null) => void
   onCreateWorkspace: () => void
@@ -712,12 +714,15 @@ function ChatWorkspaceContextFooter(props: ChatWorkspaceContextFooterProps): Rea
             <DropdownMenuLabel className="text-micro px-2 py-1 font-medium text-muted-foreground/70">
               {t('settings.group.workspace')}
             </DropdownMenuLabel>
-            <DropdownMenuSub>
-              <DropdownMenuSubTrigger
+            <div className="flex items-stretch gap-1">
+              <DropdownMenuItem
+                disabled={!props.workspace}
+                onClick={() => queueAction(props.onDetails)}
+                title={t('workspaceDetails.title')}
                 aria-label={props.workspace
                   ? t('chat.currentWorkspaceLabel', { workspace: workspaceDisplayTitle(props.workspace) })
-                  : t('chat.switchWorkspace')}
-                className="oa-workspace-context-item min-h-12 items-start gap-2 rounded-lg px-2 py-2 text-foreground focus:bg-muted focus:text-foreground"
+                  : t('chat.currentWorkspace')}
+                className="oa-workspace-context-item min-h-12 min-w-0 flex-1 cursor-pointer items-start gap-2 rounded-lg px-2 py-2 text-foreground focus:bg-muted focus:text-foreground"
               >
                 <LayoutGrid size={15} strokeWidth={2} className="mt-0.5 shrink-0" aria-hidden />
                 <span className="min-w-0 flex-1">
@@ -728,37 +733,43 @@ function ChatWorkspaceContextFooter(props: ChatWorkspaceContextFooterProps): Rea
                     </span>
                   )}
                 </span>
-              </DropdownMenuSubTrigger>
-              <DropdownMenuSubContent
-                sideOffset={6}
-                className="flex max-h-[min(24rem,var(--available-height))] w-60 max-w-[calc(100vw-1rem)] flex-col overflow-hidden rounded-xl border border-border/70 p-1 shadow-lg ring-0"
-              >
-                <DropdownMenuGroup className="shrink-0">
-                  <DropdownMenuLabel className="text-micro px-2 py-1 font-medium text-muted-foreground/70">
-                    {t('chat.switchWorkspace')}
-                  </DropdownMenuLabel>
-                </DropdownMenuGroup>
-                <DropdownMenuRadioGroup value={props.workspace?.id ?? ''}
-                  className="min-h-0 overflow-y-auto overscroll-contain">
-                  {props.workspaces.map((workspace) => (
-                    <DropdownMenuRadioItem key={workspace.id} value={workspace.id} closeOnClick
-                      aria-label={workspaceDisplayTitle(workspace)}
-                      title={workspaceDisplayTitle(workspace)}
-                      onClick={() => queueAction(() => props.onSelectWorkspace(workspace.id))}
-                      className="oa-workspace-context-item min-h-8 gap-2 rounded-md py-1 pl-2 pr-8"
-                    >
-                      <span className="min-w-0 flex-1 truncate">{workspaceDisplayName(workspace)}</span>
-                    </DropdownMenuRadioItem>
-                  ))}
-                </DropdownMenuRadioGroup>
-                <DropdownMenuSeparator className="mx-0 shrink-0 bg-border/60" />
-                <DropdownMenuItem onClick={() => queueAction(props.onCreateWorkspace)}
-                  className={menuItemClass + ' shrink-0'}>
-                  <Plus size={14} strokeWidth={2} aria-hidden />
-                  <span className="min-w-0 flex-1 truncate">{props.createWorkspaceLabel}</span>
-                </DropdownMenuItem>
-              </DropdownMenuSubContent>
-            </DropdownMenuSub>
+              </DropdownMenuItem>
+              <DropdownMenuSub>
+                <DropdownMenuSubTrigger aria-label={t('chat.switchWorkspace')} title={t('chat.switchWorkspace')}
+                  className="oa-workspace-context-item min-h-12 w-8 shrink-0 justify-center rounded-lg px-1 text-muted-foreground focus:bg-muted focus:text-foreground [&>svg]:mx-auto">
+                  <span className="sr-only">{t('chat.switchWorkspace')}</span>
+                </DropdownMenuSubTrigger>
+                <DropdownMenuSubContent
+                  sideOffset={6}
+                  className="flex max-h-[min(24rem,var(--available-height))] w-60 max-w-[calc(100vw-1rem)] flex-col overflow-hidden rounded-xl border border-border/70 p-1 shadow-lg ring-0"
+                >
+                  <DropdownMenuGroup className="shrink-0">
+                    <DropdownMenuLabel className="text-micro px-2 py-1 font-medium text-muted-foreground/70">
+                      {t('chat.switchWorkspace')}
+                    </DropdownMenuLabel>
+                  </DropdownMenuGroup>
+                  <DropdownMenuRadioGroup value={props.workspace?.id ?? ''}
+                    className="min-h-0 overflow-y-auto overscroll-contain">
+                    {props.workspaces.map((workspace) => (
+                      <DropdownMenuRadioItem key={workspace.id} value={workspace.id} closeOnClick
+                        aria-label={workspaceDisplayTitle(workspace)}
+                        title={workspaceDisplayTitle(workspace)}
+                        onClick={() => queueAction(() => props.onSelectWorkspace(workspace.id))}
+                        className="oa-workspace-context-item min-h-8 gap-2 rounded-md py-1 pl-2 pr-8"
+                      >
+                        <span className="min-w-0 flex-1 truncate">{workspaceDisplayName(workspace)}</span>
+                      </DropdownMenuRadioItem>
+                    ))}
+                  </DropdownMenuRadioGroup>
+                  <DropdownMenuSeparator className="mx-0 shrink-0 bg-border/60" />
+                  <DropdownMenuItem onClick={() => queueAction(props.onCreateWorkspace)}
+                    className={menuItemClass + ' shrink-0'}>
+                    <Plus size={14} strokeWidth={2} aria-hidden />
+                    <span className="min-w-0 flex-1 truncate">{props.createWorkspaceLabel}</span>
+                  </DropdownMenuItem>
+                </DropdownMenuSubContent>
+              </DropdownMenuSub>
+            </div>
           </DropdownMenuGroup>
 
           <DropdownMenuSeparator className="mx-0 bg-border/60" />

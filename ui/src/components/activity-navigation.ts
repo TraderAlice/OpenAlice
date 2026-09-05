@@ -9,8 +9,6 @@ import {
   Binary,
   Plug,
   Telescope,
-  TerminalSquare,
-  Zap,
   type LucideIcon,
 } from 'lucide-react'
 
@@ -108,10 +106,6 @@ export const NAV_SECTIONS: NavSection[] = [
     sectionLabel: 'System',
     labelKey: 'nav.section.system',
     items: [
-      // Workspace management remains available for project/container control
-      // and provenance debugging; conversation continuation belongs to Chat.
-      { page: 'workspaces', labelKey: 'nav.item.workspaces', icon: TerminalSquare, defaultTab: { kind: 'workspace-list', params: {} } },
-      { page: 'automation', labelKey: 'nav.item.automation', icon: Zap, defaultTab: { kind: 'automation', params: { section: 'runs' } } },
     ],
   },
 ]
