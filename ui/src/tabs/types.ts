@@ -17,7 +17,7 @@ export type WorkspaceSource = 'chat' | 'auto-quant' | 'prediction'
 export type FileViewerSource = WorkspaceSource | 'tracked'
 
 /** One source of truth for the Developer section and its Settings URL contract. */
-export const DEV_TABS = ['frontend', 'tools', 'onboarding', 'snapshots', 'logs', 'simulator'] as const
+export const DEV_TABS = ['frontend', 'tools', 'onboarding', 'snapshots', 'logs', 'runs', 'api', 'simulator'] as const
 export type DevTab = typeof DEV_TABS[number]
 
 export function isDevTab(value: string): value is DevTab {
@@ -25,6 +25,7 @@ export function isDevTab(value: string): value is DevTab {
 }
 
 export type ViewSpec =
+  | { kind: 'workspace-details'; params: { wsId: string; source: WorkspaceSource } }
   | { kind: 'workspace-list'; params: Record<string, never> }
   | { kind: 'workspace';      params: { wsId: string; sessionId?: string; source?: WorkspaceSource } }
   | { kind: 'template-catalog'; params: Record<string, never> }

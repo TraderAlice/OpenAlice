@@ -13,6 +13,24 @@
  */
 
 export const en = {
+  workspaceDetails: {
+    title: "Workspace details",
+    back: "Back to conversations",
+    notFound: "This Workspace is unavailable in this Harness.",
+    harness: "Harness",
+    created: "Created",
+    baseline: "Applied template",
+    sourceVersion: "Installed Harness source",
+    repository: "Source repository",
+    location: "Local folder",
+    documents: "Workspace documentation",
+    overview: "Workspace overview",
+    guide: "Harness guide",
+    overviewHint: "README.md in this Workspace. This content belongs to the Workspace and may change as you work.",
+    guideHint: "Reference documentation from the current template catalog, not your Workspace’s live configuration.",
+    noReadme: "There is no README.md in this Workspace yet. You can ask your agent to write an overview of its purpose and contents.",
+    noGuide: "No Harness guide is available.",
+  },
   nav: {
     item: {
       inbox: 'Inbox',

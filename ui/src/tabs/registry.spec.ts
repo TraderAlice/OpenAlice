@@ -2,6 +2,12 @@ import { describe, expect, it } from 'vitest'
 
 import { getView, getViewShell } from './registry'
 
+it.each(['chat', 'auto-quant', 'prediction'] as const)('keeps %s Workspace details inside its Harness shell', source => {
+  const spec = { kind: 'workspace-details', params: { wsId: 'workspace one', source } } as const
+  expect(getView('workspace-details').toUrl(spec)).toBe(`/${source}/workspaces/workspace%20one/details`)
+  expect(getViewShell(spec)).toBe(source)
+})
+
 describe('file-viewer URL projection', () => {
   it('projects Ask Alice artifacts into the chat route with Session context', () => {
     expect(getView('file-viewer').toUrl({
@@ -17,11 +23,11 @@ describe('file-viewer URL projection', () => {
     )
   })
 
-  it('preserves the existing Workspace file URL', () => {
+  it('never projects unresolved Workspace files into the retired global area', () => {
     expect(getView('file-viewer').toUrl({
       kind: 'file-viewer',
       params: { wsId: 'workspace-1', path: 'README.md' },
-    })).toBe('/workspaces/workspace-1/view/README.md')
+    })).toBe('/chat')
   })
 
   it('projects AutoQuant artifacts into its Harness route', () => {
@@ -72,6 +78,11 @@ describe('Market News URL projection', () => {
 })
 
 describe('Settings URL projection', () => {
+  it.each(['runs', 'api'] as const)('projects current and saved legacy %s tabs into Developer', (tab) => {
+    expect(getView('dev').toUrl({ kind: 'dev', params: { tab } })).toBe(`/settings/developer/${tab}`)
+    expect(getView('automation').toUrl({ kind: 'automation', params: { section: tab } })).toBe(`/settings/developer/${tab}`)
+  })
+
   it('projects the Beta category onto /settings/beta', () => {
     expect(getView('settings').toUrl({
       kind: 'settings',

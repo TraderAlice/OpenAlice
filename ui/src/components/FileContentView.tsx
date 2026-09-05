@@ -20,18 +20,20 @@ import type { ReadFileResult } from './workspace/api'
 export function FileContentView({
   path,
   result,
+  resolveRelativeHref,
 }: {
   path: string
   result: ReadFileResult
+  resolveRelativeHref?: (href: string) => string
 }): ReactElement {
-  if (result.kind === 'ok') return <DocBody path={path} content={result.content} />
+  if (result.kind === 'ok') return <DocBody path={path} content={result.content} resolveRelativeHref={resolveRelativeHref} />
   return <DocTombstone result={result} />
 }
 
-function DocBody({ path, content }: { path: string; content: string }): ReactElement {
+function DocBody({ path, content, resolveRelativeHref }: { path: string; content: string; resolveRelativeHref?: (href: string) => string }): ReactElement {
   const lower = path.toLowerCase()
   if (lower.endsWith('.md') || lower.endsWith('.markdown')) {
-    return <MarkdownContent text={content} variant="reading" />
+    return <MarkdownContent text={content} variant="reading" resolveRelativeHref={resolveRelativeHref} />
   }
   if (lower.endsWith('.html')) {
     return <HtmlReportView path={path} content={content} />

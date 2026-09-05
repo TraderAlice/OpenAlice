@@ -3,6 +3,20 @@ import { describe, expect, it } from 'vitest'
 import { renderMarkdownHtml } from './MarkdownContent'
 
 describe('renderMarkdownHtml', () => {
+  it('lets the owning surface route relative document links without rewriting external links or anchors', () => {
+    const html = renderMarkdownHtml('[Guide](docs/guide.md) [Web](https://example.com) [Section](#section)', {
+      resolveRelativeHref: href => `/chat/workspaces/one/view/${encodeURIComponent(href)}`,
+    })
+    expect(html).toContain('href="/chat/workspaces/one/view/docs%2Fguide.md"')
+    expect(html).toContain('href="https://example.com"')
+    expect(html).toContain('href="#section"')
+  })
+
+  it('does not let a link resolver bypass URL sanitization', () => {
+    const html = renderMarkdownHtml('[Guide](guide.md)', { resolveRelativeHref: () => 'javascript:alert(1)' })
+    expect(html).not.toContain('javascript:')
+  })
+
   it('keeps GFM strikethrough enabled by default', () => {
     const html = renderMarkdownHtml('Keep ~~this~~ struck.')
 

@@ -48,6 +48,20 @@ beforeEach(() => {
 
 afterEach(cleanup)
 
+it.each(['/workspaces', '/workspaces/templates', '/workspaces/templates/chat'])('retires %s into Ask Alice', async path => {
+  render(<MemoryRouter initialEntries={[path]}><UrlAdopter /></MemoryRouter>)
+  await waitFor(() => expect(mocks.openOrFocus).toHaveBeenCalledWith({ kind: 'chat-landing', params: {} }))
+  expect(mocks.setSidebar).toHaveBeenCalledWith('chat')
+})
+
+it.each(['chat', 'auto-quant', 'prediction'] as const)('adopts a %s Workspace details deep link', async source => {
+  render(<MemoryRouter initialEntries={[`/${source}/workspaces/my%20workspace/details`]}><UrlAdopter /></MemoryRouter>)
+  await waitFor(() => expect(mocks.openOrFocus).toHaveBeenCalledWith({
+    kind: 'workspace-details', params: { wsId: 'my workspace', source },
+  }))
+  expect(mocks.setSidebar).toHaveBeenCalledWith(source)
+})
+
 describe('UrlAdopter file provenance', () => {
   it('restores an Auto Prediction file deep link with its Session return context', async () => {
     render(
@@ -102,7 +116,7 @@ describe('UrlAdopter file provenance', () => {
       kind: 'file-viewer',
       params: { wsId: 'workspace-1', path: 'README.md' },
     }))
-    expect(mocks.setSidebar).toHaveBeenCalledWith('workspaces')
+    expect(mocks.setSidebar).toHaveBeenCalledWith('chat')
   })
 
   it('restores a Tracked file deep link with its entity return context', async () => {
@@ -206,6 +220,19 @@ describe('UrlAdopter Settings Beta', () => {
 })
 
 describe('UrlAdopter Settings Developer', () => {
+  it.each([
+    ['/settings/developer/runs', 'runs'],
+    ['/settings/developer/api', 'api'],
+    ['/automation', 'runs'],
+    ['/automation/runs', 'runs'],
+    ['/automation/api', 'api'],
+  ])('adopts %s into Settings Developer', async (path, tab) => {
+    render(<MemoryRouter initialEntries={[path]}><UrlAdopter /></MemoryRouter>)
+    await waitFor(() => expect(mocks.openOrFocus).toHaveBeenCalledWith({ kind: 'dev', params: { tab } }))
+    expect(mocks.setSidebar).toHaveBeenCalledWith('settings')
+    expect(mocks.setSidebar).not.toHaveBeenCalledWith('automation')
+  })
+
   it('adopts a Developer page under Settings and highlights Settings', async () => {
     render(
       <MemoryRouter initialEntries={['/settings/developer/logs']}>

@@ -15,9 +15,11 @@ import {
 } from './ui-layout'
 
 describe('ui-layout document', () => {
-  it('covers every catalog page and starts with no hidden entries', () => {
+  it('covers every active catalog page while accepting retired layout ids', () => {
     const catalogPages = NAV_SECTIONS.flatMap((section) => section.items.map((item) => item.page))
-    expect(new Set(catalogPages)).toEqual(new Set(ACTIVITY_PAGE_IDS))
+    // Persisted layout validation stays compatible; the navigation catalog
+    // decides which accepted ids can actually appear or be configured.
+    expect(new Set(catalogPages)).toEqual(new Set(ACTIVITY_PAGE_IDS.filter(page => page !== 'workspaces' && page !== 'automation')))
     expect(defaultUiLayout().hidden).toEqual([])
     expect(defaultUiLayout().hidden).not.toContain(PINNED_ACTIVITY_PAGE)
   })

@@ -58,6 +58,37 @@ chatbot filler. Their visible titles should stay scannable while the inserted
 prompt carries the evidence, freshness, persistence, and permission boundaries
 needed for the real task. Prefer a small rotating set over a wall of commands.
 
+### Background execution surfaces
+
+The Automation activity entry and its dedicated navigator are retired. Runs
+and API remain unchanged under Settings → Developer, at
+`/settings/developer/runs` and `/settings/developer/api`. Old Automation links
+and saved tabs use this Settings destination; saved activity layouts cannot
+restore the retired entry. Developer expands for either page and uses the
+existing Settings scroll and mobile navigation behavior. This is an entry-point
+move, not a change to scheduling, run ownership, or an additional Issues view.
+
+### Current Workspace details
+
+The global Workspaces activity, overview, template catalog, and management
+navigator are retired. Saved layout entries cannot restore them. Old inventory
+links return to Ask Alice; legacy Session/file links resolve the Workspace's
+actual Harness and preserve their target identity without mounting a global
+Workspace interface. Missing or unsupported membership is an explicit recovery
+state, not permission to guess a Harness from a tag or show the old manager.
+
+The Harness footer identity opens the current Workspace's details in the same
+Harness shell (`/<harness>/workspaces/:wsId/details`); the adjacent chevron is an
+independent Workspace switcher. Keep configuration and conversation browsing
+as separate actions below it. Do not make the identity click switch Workspaces,
+open agent configuration, or navigate to the global Workspace catalog.
+
+Details distinguish the Workspace-owned README and recorded applied/source
+versions from the current catalog's Harness guide. Catalog documentation is
+reference material, not proof of the installed version or current Workspace
+configuration. Keep document loading/errors independent, retain the sessions
+sidebar, and use the shared reading renderer rather than a new Markdown stack.
+
 ### Long-form Markdown
 
 `MarkdownContent` owns one parser and interaction contract with two deliberate

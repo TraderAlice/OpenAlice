@@ -194,7 +194,7 @@ describe('ChatWorkspaceSection actions', () => {
     expect(onNavigate).toHaveBeenCalledOnce()
   })
 
-  it('combines the current Workspace metadata and switch action', async () => {
+  it('separates Workspace details and switching with keyboard-accessible actions', async () => {
     const user = userEvent.setup()
     renderSection([chatWorkspace], null, undefined, 'focused')
 
@@ -208,13 +208,25 @@ describe('ChatWorkspaceSection actions', () => {
     expect(currentWorkspace.textContent).toContain('0 conversations')
     expect(screen.queryByRole('menuitemradio', { name: 'Recent across Workspaces' })).toBeNull()
     expect(screen.queryByRole('menuitemradio', { name: 'Workspace tree' })).toBeNull()
-    expect(screen.queryByRole('menuitem', { name: 'Switch Workspace' })).toBeNull()
+    expect(screen.getByRole('menuitem', { name: 'Switch Workspace' })).toBeTruthy()
+
+    await user.keyboard('{ArrowDown}')
+    expect(document.activeElement).toBe(screen.getByRole('menuitem', { name: 'Switch Workspace' }))
 
     await user.keyboard('{ArrowDown}')
     expect(document.activeElement).toBe(screen.getByRole('menuitem', { name: 'Configure this workspace' }))
 
     await user.keyboard('{Escape}')
     await waitFor(() => expect(document.activeElement).toBe(trigger))
+  })
+
+  it('opens details from the current identity without opening configuration or switching', () => {
+    renderSection([chatWorkspace], null, undefined, 'focused')
+    fireEvent.click(screen.getByRole('button', { name: 'Chat Workspace options' }))
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Current Workspace: chat-jul11' }))
+    expect(openOrFocus).toHaveBeenCalledExactlyOnceWith({ kind: 'workspace-details', params: { wsId: 'chat-1', source: 'chat' } })
+    expect(actions.openAgentConfig).not.toHaveBeenCalled()
+    expect(screen.queryByRole('menu', { name: 'Chat Workspace options' })).toBeNull()
   })
 
   it('surfaces a template update from the bottom Workspace context', () => {
@@ -265,9 +277,9 @@ describe('ChatWorkspaceSection actions', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Chat Workspace options' }))
     expect(screen.queryByRole('menuitem', { name: 'Workspace Manager' })).toBeNull()
     expect(screen.queryByRole('menuitem', { name: 'New workspace' })).toBeNull()
-    fireEvent.click(screen.getByRole('menuitem', { name: 'Current Workspace: chat-aug3' }))
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Switch Workspace' }))
 
-    const picker = within(screen.getByRole('menu', { name: 'Current Workspace: chat-aug3' }))
+    const picker = within(screen.getByRole('menu', { name: 'Switch Workspace' }))
     expect(picker.getByRole('menuitemradio', { name: 'chat-aug3' }).getAttribute('aria-checked')).toBe('true')
     expect(picker.getByRole('menuitem', { name: 'New workspace' })).toBeTruthy()
     fireEvent.click(picker.getByRole('menuitemradio', { name: 'chat-jul11' }))
@@ -323,7 +335,7 @@ describe('ChatWorkspaceSection actions', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Chat Workspace options' }))
     expect(screen.queryByRole('menuitem', { name: 'New workspace' })).toBeNull()
-    fireEvent.click(screen.getByRole('menuitem', { name: 'Current Workspace: chat-jul11' }))
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Switch Workspace' }))
     expect(screen.getByRole('menuitem', { name: 'New workspace' })).toBeTruthy()
   })
 

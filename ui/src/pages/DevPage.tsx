@@ -6,6 +6,7 @@ import { Spinner, EmptyState } from '../components/StateViews'
 import { getIntlLocale } from '../lib/intl'
 import { useToast } from '../components/Toast'
 import { LogsPage } from './LogsPage'
+import { AutomationPage } from './AutomationPage'
 import { SimulatorPage } from './SimulatorPage'
 import { FrontendLabPage } from './FrontendLabPage'
 import { OnboardingDesignPage } from './OnboardingDesignPage'
@@ -31,6 +32,8 @@ const TAB_TITLE_KEYS = {
   onboarding: 'dev.onboarding',
   snapshots: 'dev.snapshots',
   logs: 'common.logs',
+  runs: 'automation.runs',
+  api: 'automation.api',
   simulator: 'simulator.title',
 } as const satisfies Record<Tab, string>
 
@@ -46,6 +49,10 @@ interface DevPageProps {
 export function DevPage({ spec }: DevPageProps) {
   const tab = spec.params.tab
   const { t } = useTranslation()
+
+  if (tab === 'runs' || tab === 'api') {
+    return <AutomationPage spec={{ kind: 'automation', params: { section: tab } }} />
+  }
 
   return (
     <div className="flex flex-col flex-1 min-h-0">

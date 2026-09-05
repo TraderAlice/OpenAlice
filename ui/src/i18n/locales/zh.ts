@@ -2,6 +2,24 @@ import type { Resources } from './en'
 
 /** 简体中文. Typed as `Resources` → must match en's key structure exactly. */
 export const zh: Resources = {
+  workspaceDetails: {
+    title: "工作区详情",
+    back: "返回会话",
+    notFound: "此 Harness 中没有可用的该工作区。",
+    harness: "Harness",
+    created: "创建时间",
+    baseline: "已应用的模板",
+    sourceVersion: "已安装的 Harness 来源版本",
+    repository: "来源仓库",
+    location: "本地目录",
+    documents: "工作区文档",
+    overview: "工作区概览",
+    guide: "Harness 指南",
+    overviewHint: "此工作区内的 README.md。内容由工作区管理，会随着你的使用而变化。",
+    guideHint: "当前模板目录提供的参考说明，并非此工作区的实时配置。",
+    noReadme: "此工作区还没有 README.md。你可以让 Agent 撰写一份说明，介绍它的用途和内容。",
+    noGuide: "暂无 Harness 指南。",
+  },
   nav: {
     item: {
       inbox: '收件箱',
