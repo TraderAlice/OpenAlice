@@ -7,8 +7,10 @@ owned by [[docs/cli-supervisor.md]] and [[docs/local-runtime.md]].
 
 The native target set is macOS, glibc Linux, and Windows on arm64 and x64.
 Windows direct installation lives in [[docs/cli-installer.md]]. Generated Windows
-packages are not public npm packages: first publication and Trusted Publisher
-enrollment remain required external activation steps.
+packages have completed first publication and Trusted Publisher enrollment.
+The complete seven-package stable npm activation still requires publication
+and public-install acceptance; the historical four-platform meta package is
+not evidence of Windows availability through `npm install openalice`.
 
 Public npm activation: `openalice` and its four platform packages were first
 published as `0.90.2` on 2026-09-04 under maintainer `jiaran258`. The registry
@@ -221,7 +223,7 @@ That skip alone is not proof of OIDC authorization.
 
 ### npm Trusted Publishing (OIDC)
 
-Activated on 2026-09-04: all five package connections were saved and
+Initially activated on 2026-09-04: all five package connections were saved and
 [real OIDC exchanges passed](https://github.com/TraderAlice/OpenAlice/actions/runs/33871780397)
 from integrated `dev` tooling in a single 15-second job. The temporary
 `openalice-first-publish` token was then revoked and the repository's
@@ -243,8 +245,15 @@ For each of `openalice`, `openalice-darwin-arm64`, `openalice-darwin-x64`,
   GitHub environment. Access to changing/running the trusted workflow is a
   publishing security boundary.
 
+On 2026-09-05 both Windows packages completed first publication and enrollment.
+The [seven-package exchange](https://github.com/TraderAlice/OpenAlice/actions/runs/33957933624)
+passed from `master`, including the new Windows x64 connection. This proves
+authority, not completion of the all-platform meta-package publication.
+
 Publication runs on GitHub-hosted Ubuntu with `id-token: write`, Node 22.22.2,
-and pinned npm 12.0.2. npm handles its own short-lived credential exchange when
+and pinned npm 12.0.2 installed in an isolated runner-temporary prefix. Verify
+its version and add its bin directory to `GITHUB_PATH`; do not globally replace
+the npm tree that is executing its own upgrade. npm handles its short-lived credential exchange when
 publishing; neither `NPM_TOKEN` nor `NODE_AUTH_TOKEN` is configured. The generated
 packages must retain the matching `TraderAlice/OpenAlice` repository URL.
 Provenance is not itself proof of OIDC authentication.
@@ -264,11 +273,11 @@ secret. npm's restrictive 2FA/token policy is compatible with OIDC.
 
 See [npm Trusted Publishing](https://docs.npmjs.com/trusted-publishers/) and
 the [registry OIDC exchange API](https://api-docs.npmjs.com/). Adding future
-platform packages (including Windows) requires first publication and their own
-trusted-publisher connections. The historical receipts above cover only the
-original five names. `openalice-windows-arm64` and `openalice-windows-x64` must be
-enrolled before seven-package publication. Do not restore the revoked bootstrap
-token or count the old receipt as Windows publishing authority.
+platform packages requires first publication and their own trusted-publisher
+connections. The 2026-09-04 receipts cover only the original five names; use
+the seven-package receipt above for Windows authority. Do not restore the
+revoked bootstrap token or count an older, smaller receipt as new-platform
+publishing authority.
 
 ## Update and uninstall ownership
 
