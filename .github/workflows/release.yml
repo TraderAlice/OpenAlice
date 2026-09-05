@@ -271,6 +271,9 @@ jobs:
   # Each matrix entry owns its build -> upgrade dependency. A fast platform
   # never waits for another platform's build; final publication joins them all.
   build-desktop:
+    permissions:
+      contents: read
+      actions: read
     needs: release
     if: needs.release.outputs.created == 'true'
     strategy:

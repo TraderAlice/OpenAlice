@@ -374,6 +374,7 @@ describe('Release workflow critical path', () => {
   })
 
   it('reuses same-source desktop bytes through the normal final publication gate', () => {
+    expect(workflow.jobs['build-desktop'].permissions).toEqual({ contents: 'read', actions: 'read' })
     expect(workflow.jobs['build-desktop'].with?.['candidate-run']).toBe('${{ inputs.candidate-run }}')
     expect(desktopWorkflow.jobs.build.if).toBe("inputs.candidate-run == ''")
     const restore = desktopWorkflow.jobs.restore
