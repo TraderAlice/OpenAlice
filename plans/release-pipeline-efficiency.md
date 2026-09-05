@@ -69,6 +69,14 @@ failed at trusted selection as expected; artifact download, dependencies,
 upgrade acceptance and all release/publication jobs were skipped. This proves
 early rejection and operation isolation, not positive replay or speedup.
 
+Hosted real CLI comparison [33960910945](https://github.com/TraderAlice/OpenAlice/actions/runs/33960910945)
+is running on 438e695b via `operation=benchmark-cli`. The input producer builds
+once and uploads the verified inventory; two identical Ubuntu consumers then
+compare rebuild versus download/restore, each running multiprocess feasibility
+and real native archive acceptance. Producer cost is recorded separately, since
+both consumers deliberately start after it. No public artifacts or signing
+credentials are involved. Results remain pending.
+
 1. Each platform builds and preserves its candidate, then its own downstream
    acceptance starts immediately. Final publication still joins all required
    platform results. Keep build and acceptance separate for selective retries.
