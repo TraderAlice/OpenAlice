@@ -3,9 +3,28 @@
  * Tests low-level message framing — encode/decode round-trips.
  */
 
+import { readFileSync } from 'node:fs'
+import { createRequire } from 'node:module'
+import { runInNewContext } from 'node:vm'
 import { describe, it, expect } from 'vitest'
+import Decimal from 'decimal.js'
 import { makeInitialMsg, makeField, makeFieldHandleEmpty, makeMsg, makeMsgProto, readMsg, readFields } from '../src/comm.js'
-import { UNSET_DOUBLE, UNSET_INTEGER, DOUBLE_INFINITY } from '../src/const.js'
+import { UNSET_DOUBLE, UNSET_INTEGER, UNSET_DECIMAL, DOUBLE_INFINITY } from '../src/const.js'
+
+/**
+ * A second, independent copy of decimal.js, as a broker pack release installs
+ * beside the bundled one. Its instances fail `instanceof Decimal` but are still
+ * real Decimals.
+ */
+function loadForeignDecimalRealm(): typeof Decimal {
+  const path = createRequire(import.meta.url).resolve('decimal.js')
+  const sandbox: Record<string, unknown> = { module: { exports: {} } }
+  sandbox['exports'] = (sandbox['module'] as { exports: unknown }).exports
+  sandbox['globalThis'] = sandbox
+  runInNewContext(readFileSync(path, 'utf8'), sandbox, { filename: path })
+  const exported = (sandbox['module'] as { exports: Record<string, unknown> }).exports
+  return (exported['default'] ?? exported) as typeof Decimal
+}
 
 describe('comm', () => {
 
@@ -79,6 +98,28 @@ describe('comm', () => {
 
   it('makeFieldHandleEmpty: INFINITY becomes "Infinity"', () => {
     expect(makeFieldHandleEmpty(DOUBLE_INFINITY)).toBe('Infinity\0')
+  })
+
+  describe('Decimal fields from a foreign realm', () => {
+    const ForeignDecimal = loadForeignDecimalRealm()
+
+    it('the fixture really is a foreign realm', () => {
+      const value = new ForeignDecimal('1')
+      expect(value instanceof Decimal).toBe(false)
+      expect(Decimal.isDecimal(value)).toBe(true)
+    })
+
+    it('makeFieldHandleEmpty: UNSET sentinel still means "field absent"', () => {
+      expect(makeFieldHandleEmpty(new ForeignDecimal(UNSET_DECIMAL.toFixed()))).toBe('\0')
+    })
+
+    it('makeFieldHandleEmpty: a set value is still transmitted', () => {
+      expect(makeFieldHandleEmpty(new ForeignDecimal('5000'))).toBe('5000\0')
+    })
+
+    it('makeField: small values keep fixed notation', () => {
+      expect(makeField(new ForeignDecimal('0.00000001'))).toBe('0.00000001\0')
+    })
   })
 
   it('readMsg: incomplete message returns empty payload', () => {

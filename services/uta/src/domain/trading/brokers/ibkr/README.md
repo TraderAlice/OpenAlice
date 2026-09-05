@@ -90,6 +90,56 @@ Known-dead transport state reaches UTA through an explicit connection-state list
 3. Error 1101/1102 nudges recovery immediately but does not mark the account alive; reconnect plus a private account read must still pass.
 4. Place/modify/cancel performs a coalesced `reqCurrentTime` round-trip on the same socket immediately before transmission. A timeout marks the bridge dead and no order bytes are sent.
 
+## Bracket orders (attached TP/SL)
+
+`placeOrder(contract, order, tpsl)` submits a native TWS bracket
+(`OrderSamples.BracketOrder`):
+
+1. Parent keeps the caller's entry type, price, and TIF; `transmit=false`.
+2. Opposite-side children: take-profit `LMT`, stop `STP` or `STP LMT`.
+3. Children share an OCA group with `ocaType=1` (cancel-with-block). The
+   parent is **not** in that group, a parent fill would otherwise cancel
+   the protective legs.
+4. Child TIF is `GTC` so protection survives a GTD/DAY entry fill.
+5. Children set `overridePercentageConstraints` so a far target is not
+   rejected by the default percentage price band.
+6. The last child has `transmit=true`, which sends the whole chain as one
+   unit. TWS holds the children until the parent fills; filling one child
+   cancels the other.
+
+`PlaceOrderResult.legs` carries the child ids so the ledger tracks them
+from birth. After fill, raising or trailing a stop is `modifyOrder` on
+that child id. `parentId` and the OCA group survive the merge.
+
+A standalone `--oca-group` without `ocaType` defaults to `ocaType=1` so a
+post-fill STP+TP pair can rest together. Same-name OCA with type 0 is
+ignored by TWS and looks like a second short.
+
+The entry must carry a share `totalQuantity`. A monetary-value
+(`cashQty`) entry is refused: notional sizes an ENTRY, and an opposite-side
+exit priced at the target is a different share count, so the position ends
+up partly uncovered or flipped short. TWS also rejects a notional STP leg
+(`10244`).
+
+If a child acknowledgement fails while the parent is still unfilled, the
+whole chain is cancelled. If the parent already filled, the surviving legs
+are kept and `PlaceOrderResult.message` records the missing protection:
+cancelling there would strip a real position and report that nothing was
+placed.
+
+`openOrder` status `Inactive` does not immediately complete `requestOrder`.
+TWS uses that status for untransmitted (`transmit=false`) holds, for
+exchange-closed/precautionary holds, and for rejects. It is parked for a
+short grace window so a reject's `error()` (or a later live status) wins;
+if neither arrives, the hold itself is the answer, because a live held
+order must not surface as a bare NETWORK timeout with no cancel issued.
+
+`cancelOrder` completes only on a cancel-confirming status
+(`Cancelled` / `ApiCancelled` / `PendingCancel`) via the `accepts`
+predicate on `requestOrder`. Accepting any live status would let a fill
+that beat the cancel resolve it, and the ledger would record a cancelled
+order over an open position.
+
 ## Known Limitations
 
 1. **Non-option position price staleness**: Stocks, futures, FX, warrants, and bonds still use `updatePortfolio()` marks. Only `OPT`/`FOP` rows receive the bounded snapshot-midpoint overlay.

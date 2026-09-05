@@ -9,6 +9,15 @@ import { ClientException, isAsciiPrintable } from './utils.js'
 import { INVALID_SYMBOL } from './errors.js'
 
 /**
+ * Realm-safe `Decimal` detection. A broker pack can load a second `decimal.js`
+ * copy, and `instanceof` would then miss the UNSET sentinel and transmit
+ * 2^127-1 as a real value.
+ */
+function isDecimal(val: unknown): val is Decimal {
+  return Decimal.isDecimal(val)
+}
+
+/**
  * Wrap protobuf data with 4-byte big-endian length prefix and msgId.
  * Wire format: [4-byte total length][4-byte msgId BE][protobuf bytes]
  */
@@ -60,7 +69,7 @@ export function makeField(val: unknown): string {
 
   // Decimal: use toFixed() to avoid scientific notation on small values
   // (Decimal.toString() uses '1e-8' by default; TWS wire expects '0.00000001').
-  if (val instanceof Decimal) {
+  if (isDecimal(val)) {
     return val.toFixed() + '\0'
   }
 
@@ -89,7 +98,7 @@ export function makeFieldHandleEmpty(val: unknown): string {
     throw new Error('Cannot send None to TWS')
   }
 
-  if (val instanceof Decimal) {
+  if (isDecimal(val)) {
     if (val.equals(UNSET_DECIMAL)) return makeField('')
     return makeField(val)
   }

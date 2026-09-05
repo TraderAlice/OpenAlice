@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest'
 import Decimal from 'decimal.js'
-import { Contract, Order } from '@traderalice/ibkr'
+import { Contract, Order, UNSET_DECIMAL } from '@traderalice/ibkr'
 import { IbkrBroker } from './IbkrBroker.js'
 import contractCorpus from './__fixtures__/contract-resolution.v1.json'
 
@@ -45,6 +45,7 @@ function brokerWithContractIo(resolvedContract = usdChfContract()): {
     requestCollector: ReturnType<typeof vi.fn>
     requestSnapshot: ReturnType<typeof vi.fn>
     requestCurrentTime: ReturnType<typeof vi.fn>
+    getNextOrderId: ReturnType<typeof vi.fn>
     requestOrder: ReturnType<typeof vi.fn>
     markDead: ReturnType<typeof vi.fn>
   }
@@ -56,14 +57,18 @@ function brokerWithContractIo(resolvedContract = usdChfContract()): {
   }
 } {
   const broker = new IbkrBroker({ id: 'ibkr-test', host: '127.0.0.1', port: 7497, clientId: 91 })
+  let nextOrderId = 42
   const bridge = {
     connectionDead: false,
     allocReqId: vi.fn(() => 17),
     requestCollector: vi.fn(async () => [{ contract: Object.assign(new Contract(), resolvedContract) }]),
     requestSnapshot: vi.fn(async () => ({ last: 0.8, bid: 0.79, ask: 0.81, volume: 1 })),
     requestCurrentTime: vi.fn(async () => 1_784_289_600),
-    getNextOrderId: vi.fn(() => 42),
-    requestOrder: vi.fn(async () => ({ orderState: { status: 'Submitted' } })),
+    getNextOrderId: vi.fn(() => nextOrderId++),
+    // Mirrors the bridge: only a cancel-confirming status satisfies `accepts`.
+    requestOrder: vi.fn(async (_orderId: number, _timeoutMs?: number, accepts?: (status: string) => boolean) => ({
+      orderState: { status: accepts && !accepts('Submitted') ? 'Cancelled' : 'Submitted' },
+    })),
     markDead: vi.fn(),
   }
   const client = {
@@ -259,32 +264,172 @@ describe('IbkrBroker — canonical conId contract resolution', () => {
   })
 })
 
-describe('IbkrBroker — attached TP/SL refusal gate', () => {
-  // Guards the silent naked-entry failure: the tpsl param used to be
-  // `_tpsl` (ignored) — the ledger recorded protection TWS never received.
-  it('refuses placeOrder with takeProfit', async () => {
+describe('IbkrBroker — native attached TP/SL bracket', () => {
+  it('submits parent + TP + SL and returns child ids as legs', async () => {
+    const { broker, bridge, client } = brokerWithContractIo(recordedContract('aapl-stock'))
     const { contract, order } = stkOrder()
-    const result = await bareBroker().placeOrder(contract, order, { takeProfit: { price: '120' } })
-    expect(result.success).toBe(false)
-    expect(result.error).toMatch(/TP\/SL.*not implemented|refusing/i)
+
+    const result = await broker.placeOrder(contract, order, {
+      takeProfit: { price: '120' },
+      stopLoss: { price: '90' },
+    })
+
+    expect(result.success).toBe(true)
+    expect(result.orderId).toBe('42')
+    expect(result.legs).toEqual([
+      { orderId: '43', kind: 'takeProfit' },
+      { orderId: '44', kind: 'stopLoss' },
+    ])
+    expect(client.placeOrder).toHaveBeenCalledTimes(3)
+    expect(bridge.requestOrder.mock.calls.map(call => call[0])).toEqual([42, 43, 44])
+    expect(bridge.requestCurrentTime).toHaveBeenCalledOnce()
+
+    const [parentId, , parent] = client.placeOrder.mock.calls[0] as [number, Contract, Order]
+    const [, , tp] = client.placeOrder.mock.calls[1] as [number, Contract, Order]
+    const [, , sl] = client.placeOrder.mock.calls[2] as [number, Contract, Order]
+    expect(parentId).toBe(42)
+    expect(parent.transmit).toBe(false)
+    expect(parent.ocaGroup).toBe('')
+    expect(tp.transmit).toBe(false)
+    expect(tp.parentId).toBe(42)
+    expect(tp.orderType).toBe('LMT')
+    expect(sl.transmit).toBe(true)
+    expect(sl.parentId).toBe(42)
+    expect(sl.orderType).toBe('STP')
+    expect(tp.ocaGroup).toBe(sl.ocaGroup)
+    expect(tp.ocaType).toBe(1)
+    expect(order.transmit).toBe(true)
   })
 
-  it('refuses placeOrder with stopLoss', async () => {
+  it('submits a one-child OTO when only stopLoss is attached', async () => {
+    const { broker, client } = brokerWithContractIo(recordedContract('aapl-stock'))
     const { contract, order } = stkOrder()
-    const result = await bareBroker().placeOrder(contract, order, { stopLoss: { price: '90' } })
-    expect(result.success).toBe(false)
-    expect(result.error).toMatch(/refusing/i)
+
+    const result = await broker.placeOrder(contract, order, {
+      stopLoss: { price: '90', limitPrice: '89' },
+    })
+
+    expect(result.success).toBe(true)
+    expect(result.legs).toEqual([{ orderId: '43', kind: 'stopLoss' }])
+    expect(client.placeOrder).toHaveBeenCalledTimes(2)
+    const child = client.placeOrder.mock.calls[1][2] as Order
+    expect(child.orderType).toBe('STP LMT')
+    expect(child.transmit).toBe(true)
   })
 
-  it('an empty tpsl object does not trip the gate', async () => {
+  it('cancels the chain when a child acknowledgement fails', async () => {
+    const { broker, bridge, client } = brokerWithContractIo(recordedContract('aapl-stock'))
+    bridge.requestOrder.mockImplementation(async (orderId: number) => {
+      if (orderId === 44) throw new Error('TWS error 110: The price does not conform to the minimum price variation')
+      return { orderState: { status: 'Submitted' } }
+    })
     const { contract, order } = stkOrder()
-    // No bridge on the bare instance — passing the gate means it throws on
-    // bridge access, NOT a refusal result.
-    await expect(async () => {
-      const r = await bareBroker().placeOrder(contract, order, {})
-      if (r.success === false && /refusing/i.test(r.error ?? '')) throw new Error('gate tripped')
-      return r
-    }).not.toThrow(/gate tripped/)
+
+    const result = await broker.placeOrder(contract, order, {
+      takeProfit: { price: '120' },
+      stopLoss: { price: '90' },
+    })
+
+    expect(result.success).toBe(false)
+    expect(result.error).toMatch(/minimum price variation/)
+    expect(client.cancelOrder).toHaveBeenCalledTimes(3)
+  })
+
+  it('keeps the surviving legs when a child fails after the entry filled', async () => {
+    const { broker, bridge, client } = brokerWithContractIo(recordedContract('aapl-stock'))
+    bridge.requestOrder.mockImplementation(async (orderId: number) => {
+      if (orderId === 44) throw new Error('TWS error 110: minimum price variation')
+      if (orderId === 42) return { orderState: { status: 'Filled' } }
+      return { orderState: { status: 'PreSubmitted' } }
+    })
+    const { contract, order } = stkOrder()
+
+    const result = await broker.placeOrder(contract, order, {
+      takeProfit: { price: '120' },
+      stopLoss: { price: '90' },
+    })
+
+    expect(result.success).toBe(true)
+    expect(result.orderId).toBe('42')
+    expect(result.legs).toEqual([{ orderId: '43', kind: 'takeProfit' }])
+    expect(result.message).toMatch(/protective leg/i)
+    expect(client.cancelOrder).not.toHaveBeenCalled()
+  })
+
+  it('refuses a monetary-value entry rather than mis-sizing the protective legs', async () => {
+    const { broker, client } = brokerWithContractIo(recordedContract('aapl-stock'))
+    const { contract, order } = stkOrder()
+    order.totalQuantity = UNSET_DECIMAL
+    order.cashQty = new Decimal('5000')
+
+    const result = await broker.placeOrder(contract, order, { stopLoss: { price: '90' } })
+
+    expect(result.success).toBe(false)
+    expect(result.error).toMatch(/monetary-value|totalQuantity/i)
+    expect(client.placeOrder).not.toHaveBeenCalled()
+  })
+
+  it('rejects a caller ocaGroup on a bracket entry instead of placing the legs', async () => {
+    const { broker, client } = brokerWithContractIo(recordedContract('aapl-stock'))
+    const { contract, order } = stkOrder()
+    order.ocaGroup = 'swing-mu'
+
+    await expect(broker.placeOrder(contract, order, { takeProfit: { price: '120' } }))
+      .rejects.toThrow(/mints its own OCA group/)
+    expect(client.placeOrder).not.toHaveBeenCalled()
+  })
+
+  it('defaults ocaType=1 on a standalone order that already has an ocaGroup', async () => {
+    const { broker, client } = brokerWithContractIo(recordedContract('aapl-stock'))
+    const { contract, order } = stkOrder()
+    order.ocaGroup = 'swing-mu'
+    order.action = 'SELL'
+    order.orderType = 'STP'
+    order.auxPrice = new Decimal('90')
+
+    const result = await broker.placeOrder(contract, order)
+    expect(result.success).toBe(true)
+    expect(client.placeOrder).toHaveBeenCalledOnce()
+    const sent = client.placeOrder.mock.calls[0][2] as Order
+    expect(sent.ocaGroup).toBe('swing-mu')
+    expect(sent.ocaType).toBe(1)
+    expect(order.ocaType).toBe(0)
+  })
+
+  it('observes every leg request when the parent write throws synchronously', async () => {
+    const { broker, bridge, client } = brokerWithContractIo(recordedContract('aapl-stock'))
+    // A plain function, not `vi.fn`: a spy attaches its own settled-result
+    // handler and would observe the rejection on the code's behalf.
+    ;(bridge as unknown as { requestOrder: unknown }).requestOrder = () => new Promise((_resolve, reject) => {
+      setTimeout(() => reject(new Error('order request timed out')), 0)
+    })
+    client.placeOrder.mockImplementation(() => { throw new Error('TWS socket write failed') })
+    const unhandled = vi.fn()
+    process.on('unhandledRejection', unhandled)
+    try {
+      const { contract, order } = stkOrder()
+
+      const result = await broker.placeOrder(contract, order, {
+        takeProfit: { price: '120' },
+        stopLoss: { price: '90' },
+      })
+
+      expect(result.success).toBe(false)
+      expect(result.error).toMatch(/socket write failed/)
+      await new Promise((resolve) => setTimeout(resolve, 20))
+      expect(unhandled).not.toHaveBeenCalled()
+    } finally {
+      process.off('unhandledRejection', unhandled)
+    }
+  })
+
+  it('an empty tpsl object still places a simple entry', async () => {
+    const { broker, client } = brokerWithContractIo(recordedContract('aapl-stock'))
+    const { contract, order } = stkOrder()
+    const result = await broker.placeOrder(contract, order, {})
+    expect(result.success).toBe(true)
+    expect(result.legs).toBeUndefined()
+    expect(client.placeOrder).toHaveBeenCalledOnce()
   })
 })
 

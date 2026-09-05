@@ -2,8 +2,8 @@ import { createServer, type Socket } from 'node:net'
 
 import { describe, it, expect, vi } from 'vitest'
 import Decimal from 'decimal.js'
-import { Connection, Contract, EClient, makeField, makeMsg, NO_VALID_ID, TickTypeEnum } from '@traderalice/ibkr'
-import { RequestBridge } from './request-bridge.js'
+import { Connection, Contract, EClient, makeField, makeMsg, NO_VALID_ID, Order, OrderState, TickTypeEnum } from '@traderalice/ibkr'
+import { RequestBridge, acceptsCancelStatus } from './request-bridge.js'
 
 function stk(conId: number, symbol: string): Contract {
   const c = new Contract()
@@ -315,5 +315,99 @@ describe('RequestBridge — currency-aware account values (issue #295)', () => {
     b.updateAccountValue('NetLiquidation', '1046101.70', 'USD', 'DU1')
     expect(b.getAccountCache()!.values.get('NetLiquidation')).toBe('1046101.70')
     expect(b.getAccountCache()!.values.get('ExchangeRate:USD')).toBeUndefined()
+  })
+})
+
+describe('RequestBridge — placeOrder Inactive hold', () => {
+  function state(status: string): OrderState {
+    const os = new OrderState()
+    os.status = status
+    return os
+  }
+
+  it('does not resolve requestOrder on Inactive; error() then carries the venue message', async () => {
+    const bridge = new RequestBridge()
+    const pending = bridge.requestOrder(19, 1_000)
+    bridge.openOrder(19, new Contract(), new Order(), state('Inactive'))
+
+    let settled = false
+    void pending.then(() => { settled = true }, () => { settled = true })
+    await Promise.resolve()
+    expect(settled).toBe(false)
+
+    bridge.error(19, 0, 202, 'Order Canceled - reason:')
+    await expect(pending).rejects.toThrow(/IBKR error 202.*Order Canceled/)
+  })
+
+  it('resolves after a later live openOrder', async () => {
+    const bridge = new RequestBridge()
+    const pending = bridge.requestOrder(10, 1_000)
+    const contract = new Contract()
+    const order = new Order()
+    bridge.openOrder(10, contract, order, state('Inactive'))
+    bridge.openOrder(10, contract, order, state('PreSubmitted'))
+    await expect(pending).resolves.toMatchObject({ orderState: { status: 'PreSubmitted' } })
+  })
+
+  it('resolves a live orderStatus after skipping Inactive', async () => {
+    const bridge = new RequestBridge()
+    const pending = bridge.requestOrder(10, 1_000)
+    bridge.openOrder(10, new Contract(), new Order(), state('Inactive'))
+    bridge.orderStatus(
+      10, 'Submitted', new Decimal(0), new Decimal(1),
+      0, 0, 0, 0, 0, '', 0,
+    )
+    await expect(pending).resolves.toMatchObject({ orderState: { status: 'Submitted' } })
+  })
+})
+
+describe('RequestBridge — order request status gating', () => {
+  function state(status: string): OrderState {
+    const os = new OrderState()
+    os.status = status
+    return os
+  }
+
+  it('does not complete a cancel request on a live status', async () => {
+    const bridge = new RequestBridge()
+    const pending = bridge.requestOrder(31, 1_000, acceptsCancelStatus)
+
+    bridge.orderStatus(31, 'Filled', new Decimal(5), new Decimal(0), 101, 0, 0, 0, 0, '', 0)
+    let settled = false
+    void pending.then(() => { settled = true }, () => { settled = true })
+    await Promise.resolve()
+    expect(settled).toBe(false)
+
+    bridge.orderStatus(31, 'Cancelled', new Decimal(0), new Decimal(5), 0, 0, 0, 0, 0, '', 0)
+    await expect(pending).resolves.toMatchObject({ orderState: { status: 'Cancelled' } })
+  })
+
+  it('answers with the Inactive hold when no error or live status follows', async () => {
+    // TWS marks exchange-closed and precautionary holds Inactive with no
+    // error() callback.
+    vi.useFakeTimers()
+    try {
+      const bridge = new RequestBridge()
+      const pending = bridge.requestOrder(32, 30_000)
+      bridge.openOrder(32, new Contract(), new Order(), state('Inactive'))
+      await vi.advanceTimersByTimeAsync(2_000)
+      await expect(pending).resolves.toMatchObject({ orderState: { status: 'Inactive' } })
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('lets a later live status beat the parked Inactive hold', async () => {
+    vi.useFakeTimers()
+    try {
+      const bridge = new RequestBridge()
+      const pending = bridge.requestOrder(33, 30_000)
+      bridge.openOrder(33, new Contract(), new Order(), state('Inactive'))
+      bridge.openOrder(33, new Contract(), new Order(), state('PreSubmitted'))
+      await vi.advanceTimersByTimeAsync(2_000)
+      await expect(pending).resolves.toMatchObject({ orderState: { status: 'PreSubmitted' } })
+    } finally {
+      vi.useRealTimers()
+    }
   })
 })

@@ -42,14 +42,19 @@ import {
 } from '../types.js'
 import '../../contract-ext.js'
 import { derivePositionMath } from '../../position-math.js'
-import { RequestBridge } from './request-bridge.js'
+import { RequestBridge, acceptsCancelStatus } from './request-bridge.js'
 import { resolveSymbol } from './ibkr-contracts.js'
+import { applyStandaloneOcaType, buildIbkrBracket, refuseBracketOcaGroup } from './ibkr-bracket.js'
 import type { IbkrBrokerConfig } from './ibkr-types.js'
 
 const WRITE_LIVENESS_TIMEOUT_MS = 3_000
 const OPTION_MARK_SUCCESS_TTL_MS = 15_000
 const OPTION_MARK_FAILURE_TTL_MS = 60_000
 const OPTION_MARK_CONCURRENCY = 8
+
+const FILLED_PARENT_STATUSES = new Set(['Filled', 'PartiallyFilled'])
+
+const CANCEL_CONFIRMED_STATUSES = new Set(['Cancelled', 'ApiCancelled', 'PendingCancel'])
 
 interface OptionMarkOverlay {
   marketPrice: string
@@ -478,23 +483,20 @@ export class IbkrBroker implements IBroker {
   // ==================== Trading operations ====================
 
   async placeOrder(contract: Contract, order: Order, tpsl?: TpSlParams): Promise<PlaceOrderResult> {
-    // Attached TP/SL: not implemented yet (native path = parent + child
-    // orders with parentId + transmit chain — see ANG-103 batch). Refuse
-    // loudly rather than silently placing an unprotected entry; the ledger
-    // would otherwise record protection the venue never received.
-    if (tpsl?.takeProfit || tpsl?.stopLoss) {
-      return {
-        success: false,
-        error: 'IBKR attached TP/SL (bracket) is not implemented yet — refusing to place a naked entry. Place the entry first, then a standalone STP/LMT protective order.',
-      }
-    }
+    // Refused outside the try/catch so it surfaces as a CONFIG error rather
+    // than an ordinary { success: false } venue rejection.
+    refuseBracketOcaGroup(order, tpsl)
     try {
       this._ensureAlive()
       const routedContract = await this.resolveRoutableContract(contract)
       await this._ensureWriteAlive()
+      if (tpsl?.takeProfit || tpsl?.stopLoss) {
+        return await this.placeBracketOrder(routedContract, order, tpsl)
+      }
+      const toSend = applyStandaloneOcaType(order)
       const orderId = this.bridge.getNextOrderId()
       const promise = this.bridge.requestOrder(orderId)
-      this.client.placeOrder(orderId, routedContract, order)
+      this.client.placeOrder(orderId, routedContract, toSend)
       const result = await promise
       return {
         success: true,
@@ -503,6 +505,77 @@ export class IbkrBroker implements IBroker {
       }
     } catch (err) {
       return { success: false, error: err instanceof Error ? err.message : String(err) }
+    }
+  }
+
+  /**
+   * Registers every orderId before the first write so a fast openOrder callback
+   * cannot land un-awaited.
+   */
+  private async placeBracketOrder(
+    contract: Contract,
+    order: Order,
+    tpsl: TpSlParams,
+  ): Promise<PlaceOrderResult> {
+    const bracket = buildIbkrBracket(order, tpsl, () => this.bridge.getNextOrderId())
+    const ids = [bracket.parentId, ...bracket.children.map(child => child.orderId)]
+    const pending = [
+      this.bridge.requestOrder(bracket.parentId),
+      ...bracket.children.map(child => this.bridge.requestOrder(child.orderId)),
+    ]
+    // A synchronous `placeOrder` throw skips the `allSettled` below, leaving
+    // these to reject unobserved at their own timeout.
+    for (const request of pending) request.catch(() => {})
+    try {
+      this.client.placeOrder(bracket.parentId, contract, bracket.parent)
+      for (const child of bracket.children) {
+        this.client.placeOrder(child.orderId, contract, child.order)
+      }
+      const settled = await Promise.allSettled(pending)
+      const parentSettled = settled[0]!
+      const parentResult = parentSettled.status === 'fulfilled' ? parentSettled.value : undefined
+      const acknowledged = bracket.children.flatMap((child, i) =>
+        settled[i + 1]?.status === 'fulfilled'
+          ? [{ orderId: String(child.orderId), kind: child.kind }]
+          : [],
+      )
+      const failure = settled.find(
+        (entry): entry is PromiseRejectedResult => entry.status === 'rejected',
+      )
+
+      if (!failure) {
+        return {
+          success: true,
+          orderId: String(bracket.parentId),
+          orderState: parentResult!.orderState,
+          legs: acknowledged,
+        }
+      }
+
+      // A filled entry is a real position, so cancelling the surviving legs
+      // would strip its protection. Report the entry plus the legs that landed.
+      if (parentResult && FILLED_PARENT_STATUSES.has(parentResult.orderState.status)) {
+        return {
+          success: true,
+          orderId: String(bracket.parentId),
+          orderState: parentResult.orderState,
+          legs: acknowledged,
+          message: `Entry ${bracket.parentId} is ${parentResult.orderState.status} but ${bracket.children.length - acknowledged.length} protective leg(s) were not acknowledged (${failure.reason instanceof Error ? failure.reason.message : String(failure.reason)}). Verify protection at the venue.`,
+        }
+      }
+
+      // Nothing filled: unwind the whole chain so no half-bracket rests.
+      throw failure.reason
+    } catch (err) {
+      this.cancelQuietly(ids)
+      throw err
+    }
+  }
+
+  /** Best-effort unwind: a cancel that TWS refuses must not mask the cause. */
+  private cancelQuietly(orderIds: number[]): void {
+    for (const id of orderIds) {
+      try { this.client.cancelOrder(id, new OrderCancel()) } catch { /* best-effort */ }
     }
   }
 
@@ -546,12 +619,23 @@ export class IbkrBroker implements IBroker {
     try {
       await this._ensureWriteAlive()
       const numericId = parseInt(orderId, 10)
-      const promise = this.bridge.requestOrder(numericId)
+      // A fill that beat the cancel must not resolve it, or the ledger records a
+      // cancelled order over an open position.
+      const promise = this.bridge.requestOrder(numericId, undefined, acceptsCancelStatus)
       this.client.cancelOrder(numericId, orderCancel ?? new OrderCancel())
-      await promise
+      const result = await promise
 
+      const status = result.orderState?.status || 'Cancelled'
       const os = new OrderState()
-      os.status = 'Cancelled'
+      os.status = status
+      if (!CANCEL_CONFIRMED_STATUSES.has(status)) {
+        return {
+          success: false,
+          orderId,
+          orderState: os,
+          error: `Cancel of order ${orderId} was not confirmed — TWS reports status ${status}.`,
+        }
+      }
       return { success: true, orderId, orderState: os }
     } catch (err) {
       return { success: false, error: err instanceof Error ? err.message : String(err) }

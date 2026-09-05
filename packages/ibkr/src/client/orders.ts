@@ -349,7 +349,10 @@ export function applyOrders(Client: typeof EClient): void {
       flds.push(makeField(order.action))
 
       if (this.serverVersion() >= SV.MIN_SERVER_VER_FRACTIONAL_POSITIONS) {
-        flds.push(makeField(order.totalQuantity))
+        // A monetary-value order leaves `totalQuantity` unset, and a raw
+        // sentinel goes out as a 39-digit share count that TWS rejects with
+        // `320 Error reading request. Unable to parse field`.
+        flds.push(makeFieldHandleEmpty(order.totalQuantity))
       } else {
         flds.push(makeField(order.totalQuantity.toNumber() | 0))
       }

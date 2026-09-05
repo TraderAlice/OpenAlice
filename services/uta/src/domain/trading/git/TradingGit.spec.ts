@@ -599,6 +599,43 @@ describe('TradingGit', () => {
       }
     })
 
+    it('strips sentinels from the OrderState IBKR sends back', async () => {
+      const inboundConfig = makeConfig({
+        executeOperation: vi.fn().mockResolvedValue({
+          success: true,
+          orderId: '1',
+          orderState: {
+            status: 'Inactive',
+            suggestedSize: UNSET_DECIMAL_STR,
+            commissionAndFees: Number.MAX_VALUE,
+            initMarginAfter: '',
+            rejectReason: '',
+          },
+        }),
+      })
+      const gitInbound = new TradingGit(inboundConfig)
+      gitInbound.add(buyOp())
+      gitInbound.commit('rejected outside RTH')
+      await gitInbound.push(gitInbound.status().pendingHash!)
+
+      const head = gitInbound.status().head!
+      for (const blob of [gitInbound.show(head), gitInbound.exportState()]) {
+        const serialised = JSON.stringify(blob)
+        expect(serialised).not.toContain(UNSET_DECIMAL_STR)
+        expect(serialised).not.toContain('1.7976931348623157e+308')
+      }
+      const commit = gitInbound.show(head)!
+      expect(commit.results[0].orderState?.status).toBe('Inactive')
+    })
+
+    it('strips sentinels from the Contract on a projected operation', () => {
+      // Contract.strike defaults to UNSET_DOUBLE.
+      git.add(buyOp())
+      const op = git.status().staged[0] as Extract<Operation, { action: 'placeOrder' }>
+      expect(op.contract).not.toHaveProperty('strike')
+      expect(op.contract.symbol).toBe('AAPL')
+    })
+
     it('modifyOrder.changes also strips sentinels', () => {
       const partialChanges = new Order()
       partialChanges.lmtPrice = new Decimal('150')

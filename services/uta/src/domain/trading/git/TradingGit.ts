@@ -547,17 +547,31 @@ export class TradingGit implements ITradingGit {
   // raw Order instances stay private to staging / push internals, never
   // observed by external callers (UI, MCP, c.json, on-disk commit.json).
   private projectOperation(op: Operation): Operation {
+    // Contract carries its own sentinels: `strike` defaults to UNSET_DOUBLE.
     if (op.action === 'placeOrder' || op.action === 'observeExternalOrder') {
-      return { ...op, order: OrderHelper.toWire(op.order) as unknown as Order }
+      return {
+        ...op,
+        contract: OrderHelper.scrub(op.contract),
+        order: OrderHelper.toWire(op.order) as unknown as Order,
+      }
     }
     if (op.action === 'modifyOrder') {
       return { ...op, changes: OrderHelper.toWire(op.changes) as unknown as Partial<Order> }
     }
+    if (op.action === 'closePosition') {
+      return { ...op, contract: OrderHelper.scrub(op.contract) }
+    }
     return op
   }
 
+  // Results carry sentinels too, scrubbed here rather than at every call site
+  // that builds one.
   private projectCommit(commit: GitCommit): GitCommit {
-    return { ...commit, operations: commit.operations.map((op) => this.projectOperation(op)) }
+    return {
+      ...commit,
+      operations: commit.operations.map((op) => this.projectOperation(op)),
+      results: commit.results.map((result) => OrderHelper.scrub(result)),
+    }
   }
 
   // ==================== Serialization ====================
