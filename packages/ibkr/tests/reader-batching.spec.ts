@@ -35,6 +35,19 @@ class FakeConnection extends EventEmitter {
   }
 }
 
+/** `count` framed messages whose payload is their own big-endian index. */
+function numberedFrames(count: number): Buffer[] {
+  const frames: Buffer[] = []
+  for (let i = 0; i < count; i++) {
+    const payload = Buffer.alloc(4)
+    payload.writeUInt32BE(i)
+    const header = Buffer.alloc(4)
+    header.writeUInt32BE(payload.length)
+    frames.push(Buffer.concat([header, payload]))
+  }
+  return frames
+}
+
 function currentTimeFrame(value: number): Buffer {
   return makeMsg(IN.CURRENT_TIME, true, makeField(1) + makeField(value))
 }
@@ -49,14 +62,7 @@ describe('EReader dispatch batching', () => {
     reader.start()
 
     const burst = MAX_MESSAGES_PER_TURN * 2 + 5
-    const frames: Buffer[] = []
-    for (let i = 0; i < burst; i++) {
-      const payload = Buffer.alloc(4)
-      payload.writeUInt32BE(i)
-      const header = Buffer.alloc(4)
-      header.writeUInt32BE(payload.length)
-      frames.push(Buffer.concat([header, payload]))
-    }
+    const frames = numberedFrames(burst)
 
     const timerFired = new Promise<void>((resolve) => {
       setTimeout(() => {
@@ -80,6 +86,38 @@ describe('EReader dispatch batching', () => {
     )
     // A timer got a turn before the last message was dispatched.
     expect(trace.indexOf('timer')).toBeLessThan(trace.length - 1)
+  })
+
+  it('drains a many-turn burst in order', async () => {
+    const connection = new FakeConnection()
+    const seen: number[] = []
+    const reader = new EReader(connection as never, (msg) => {
+      seen.push(msg.readUInt32BE(0))
+    })
+    reader.start()
+
+    const burst = MAX_MESSAGES_PER_TURN * 5 + 3
+    connection.push(Buffer.concat(numberedFrames(burst)))
+    await new Promise((resolve) => setTimeout(resolve, 50))
+
+    expect(seen).toEqual(Array.from({ length: burst }, (_, i) => i))
+  })
+
+  it('delivers nothing further when stop lands mid-burst', async () => {
+    const connection = new FakeConnection()
+    const seen: number[] = []
+    const reader = new EReader(connection as never, (msg) => {
+      seen.push(msg.readUInt32BE(0))
+    })
+    reader.start()
+
+    connection.push(Buffer.concat(numberedFrames(MAX_MESSAGES_PER_TURN * 3)))
+    expect(seen).toHaveLength(MAX_MESSAGES_PER_TURN)
+
+    reader.stop()
+    await new Promise((resolve) => setTimeout(resolve, 50))
+
+    expect(seen).toEqual(Array.from({ length: MAX_MESSAGES_PER_TURN }, (_, i) => i))
   })
 })
 
@@ -166,14 +204,7 @@ describe('EReader teardown', () => {
     reader.start()
 
     const burst = MAX_MESSAGES_PER_TURN * 2
-    const frames: Buffer[] = []
-    for (let i = 0; i < burst; i++) {
-      const payload = Buffer.alloc(4)
-      payload.writeUInt32BE(i)
-      const header = Buffer.alloc(4)
-      header.writeUInt32BE(payload.length)
-      frames.push(Buffer.concat([header, payload]))
-    }
+    const frames = numberedFrames(burst)
     connection.push(Buffer.concat(frames))
     expect(seen).toHaveLength(MAX_MESSAGES_PER_TURN)
 

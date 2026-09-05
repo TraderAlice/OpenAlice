@@ -18,6 +18,9 @@ export class EReader {
   private conn: Connection
   private buf: Buffer = Buffer.alloc(0)
   private queue: Buffer[] = []
+  /** Read cursor into `queue`. Removing from the head per message would make a
+   *  burst quadratic, so the dispatched prefix is dropped once per batch. */
+  private head = 0
   private draining = false
   private stopped = false
   private dataListener: (() => void) | null = null
@@ -53,6 +56,7 @@ export class EReader {
     this.stopped = true
     this.draining = false
     this.queue.length = 0
+    this.head = 0
     this.buf = Buffer.alloc(0)
     if (this.dataListener) {
       this.conn.off('data', this.dataListener)
@@ -95,8 +99,10 @@ export class EReader {
   private drain(): void {
     let dispatched = 0
 
-    while (this.queue.length > 0) {
+    while (this.head < this.queue.length) {
       if (dispatched >= MAX_MESSAGES_PER_TURN) {
+        this.queue = this.queue.slice(this.head)
+        this.head = 0
         setImmediate(() => {
           if (this.stopped) {
             this.draining = false
@@ -107,7 +113,8 @@ export class EReader {
         return
       }
 
-      const msg = this.queue.shift()!
+      const msg = this.queue[this.head]!
+      this.head++
       dispatched++
       try {
         this.onMessage(msg)
@@ -121,6 +128,8 @@ export class EReader {
       }
     }
 
+    this.queue.length = 0
+    this.head = 0
     this.draining = false
   }
 }
