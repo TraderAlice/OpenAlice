@@ -7,10 +7,23 @@ curl/PowerShell, npm/Bun, Homebrew, and AUR. CLI uses system Git/Bash; Electron
 retains its independent bundled runtime. Existing working tools are reused,
 not downgraded or overwritten. Agent Runtimes remain user-selected and external.
 
-Delivery: [Draft PR #1365](https://github.com/TraderAlice/OpenAlice/pull/1365)
-targets dev. Implementation and acceptance below are complete; the draft remains
-unmerged for maintainer acceptance. No version, registry package, public AUR
-entry, release asset, or production installation was changed by this goal.
+Delivery: [PR #1365](https://github.com/TraderAlice/OpenAlice/pull/1365)
+was accepted and merged to dev as 9d592d18. The maintainer authorized a serial
+0.91.1-beta.1 followed by 0.91.1 release journey, with separate public acceptance.
+
+### Active release journey
+
+- [ ] Repair and accept dev preview: run 33948606732 exposed the old multiprocess
+  fixture's empty PATH, which incorrectly hides required system Git/Bash. Give
+  that fixture an isolated tool-only PATH; keep Node/npm/Bun absent.
+  Local repaired four-process recovery and external Broker Pack acceptance pass;
+  root typecheck and 719 files / 6,424 tests pass (3 skipped). Public dev
+  acceptance remains required before promotion.
+- [ ] Promote accepted dev and prepare/publish 0.91.1-beta.1.
+- [ ] Verify public beta installation/update and unchanged stable surfaces.
+- [ ] Complete Windows x64 npm first-publication/OIDC prerequisites.
+- [ ] Prepare and publish 0.91.1 independently after beta acceptance; verify
+  public release, npm/Bun, and Homebrew. AUR registration remains deferred.
 
 ### Implemented boundary
 
