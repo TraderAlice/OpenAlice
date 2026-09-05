@@ -760,16 +760,22 @@ describe('UTA — stageModifyOrder', () => {
 
   it('refuses a malformed parentId on both staging paths instead of coercing it to 0', () => {
     expect(() => uta.stageModifyOrder({ orderId: 'ord-1', parentId: 'abc' }))
-      .toThrow(/parentId must be a numeric order id/)
+      .toThrow(/parentId must be a positive numeric order id/)
     expect(() => uta.stagePlaceOrder({
       aliceId: 'mock-paper|AAPL', action: 'BUY', orderType: 'MKT', totalQuantity: '1', parentId: 'abc',
-    })).toThrow(/parentId must be a numeric order id/)
+    })).toThrow(/parentId must be a positive numeric order id/)
   })
 
   it('refuses a partly numeric parentId and accepts a whole one', () => {
     for (const bad of ['12abc', '1.9']) {
       expect(() => uta.stageModifyOrder({ orderId: 'ord-1', parentId: bad }))
-        .toThrow(/parentId must be a numeric order id/)
+        .toThrow(/parentId must be a positive numeric order id/)
+    }
+    // IBKR reads parentId 0 as "no parent", so a non-positive id would drop
+    // the linkage the caller asked for.
+    for (const bad of ['0', 0, '-3', -3]) {
+      expect(() => uta.stageModifyOrder({ orderId: 'ord-1', parentId: bad }))
+        .toThrow(/parentId must be a positive numeric order id/)
     }
     for (const good of ['42', ' 42 ']) {
       uta.stageModifyOrder({ orderId: 'ord-1', parentId: good })

@@ -31,14 +31,15 @@ export function assertOcaType(value: number): OcaType {
 /**
  * Parses a caller-supplied `parentId` at the staging boundary. Coercing a
  * malformed id to `0` would rest the order standalone while the caller believes
- * it is bracket-attached.
+ * it is bracket-attached, and `0` is exactly how IBKR spells "no parent", so a
+ * non-positive id is refused rather than passed through.
  */
 export function parseOrderLinkId(value: string | number, op: string): number {
   // `parseInt` stops at the first non-digit, so '12abc' and '1.9' would pass
   // as ids the caller never meant.
   const parsed = typeof value === 'number' ? value : (/^-?\d+$/.test(value.trim()) ? Number(value.trim()) : NaN)
-  if (!Number.isFinite(parsed) || !Number.isInteger(parsed)) {
-    throw new Error(`${op}: parentId must be a numeric order id; got ${JSON.stringify(value)}.`)
+  if (!Number.isFinite(parsed) || !Number.isInteger(parsed) || parsed <= 0) {
+    throw new Error(`${op}: parentId must be a positive numeric order id; got ${JSON.stringify(value)}.`)
   }
   return parsed
 }
