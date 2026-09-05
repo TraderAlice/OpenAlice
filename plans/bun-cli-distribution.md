@@ -138,6 +138,15 @@ Supervisor rendered and detached normally, while `up --json` returned missing
 dependency diagnostics and exit 1. The 31 entry/environment tests and CLI
 typecheck pass. Native Windows and remaining manager acceptance are still open.
 
+System-manager acceptance tooling now exposes only verified Git/Bash through its
+isolated PATH instead of assuming bundled Git with an empty PATH. Actual
+Homebrew/AUR lifecycle execution remains pending; do not run its install/remove
+steps against the maintainer's existing Homebrew prefix. Production npm packing
+also needed npm 12's keyed JSON support (not only smoke tooling): four packing
+tests pass, and the production pack entry generated real Windows x64 plus meta
+tarballs and their integrity/publication-order manifest using npm 12. No upload
+was performed. PR #1365's latest inspected clean-build check passed.
+
 - [ ] Inventory CLI Git/Bash consumers, installer entry points, package-manager
   declarations, and runtime PATH injection; keep Electron ownership explicit.
 - [x] Implement shared executable detection and installation planning: reuse
