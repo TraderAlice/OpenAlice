@@ -177,6 +177,23 @@ beforeEach(async () => {
 afterEach(cleanup)
 
 describe('ChatWorkspaceSection actions', () => {
+  it('selects only the session in expanded navigation, then selects the Harness on its landing page', () => {
+    const current = { ...chatWorkspace, sessions: [chatSession(1)] }
+    const state = workspaceContext([current])
+    focusedTabState.tab = { spec: { kind: 'workspace', params: { source: 'chat', wsId: current.id, sessionId: current.sessions[0].id } } }
+    const view = render(<WorkspacesContext.Provider value={state}><ChatWorkspaceSection placement="navigation" /></WorkspacesContext.Provider>)
+    expect(screen.getByRole('button', { name: 'Chat Harness' }).getAttribute('aria-current')).toBeNull()
+    expect(screen.getByRole('button', { name: 'Conversation 1' }).getAttribute('aria-current')).toBe('page')
+
+    view.rerender(<WorkspacesContext.Provider value={state}><ChatWorkspaceSection placement="navigation" compact /></WorkspacesContext.Provider>)
+    expect(screen.getByRole('button', { name: 'Chat Harness' }).getAttribute('aria-current')).toBe('page')
+
+    focusedTabState.tab = { spec: { kind: 'chat-landing', params: {} } }
+    view.rerender(<WorkspacesContext.Provider value={state}><ChatWorkspaceSection placement="navigation" /></WorkspacesContext.Provider>)
+    expect(screen.getByRole('button', { name: 'Chat Harness' }).getAttribute('aria-current')).toBe('page')
+    expect(screen.getByRole('button', { name: 'Conversation 1' }).getAttribute('aria-current')).toBeNull()
+  })
+
   it('shows a bounded current workset and resumes paused sessions from the row', () => {
     const current = { ...chatWorkspace, sessions: Array.from({ length: 9 }, (_, index) => chatSession(index + 1)) }
     focusedTabState.tab = { spec: { kind: 'workspace', params: { source: 'chat', wsId: current.id, sessionId: current.sessions[0].id } } }

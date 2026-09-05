@@ -8,6 +8,7 @@ import {
   type ReactNode,
 } from 'react'
 import { useTranslation } from 'react-i18next'
+import { ComposerShell } from '../components/conversation/ComposerShell'
 import { PageTopBar } from '../components/PageTopBar'
 import {
   ArrowUp,
@@ -545,11 +546,8 @@ function HarnessLandingPage({
 
       <div className="shrink-0 px-3 pb-3 @min-[42rem]/harness:px-6 @min-[42rem]/harness:pb-5">
         <div className="mx-auto w-full max-w-[46rem]">
-          <div className="oa-harness-composer isolate">
-            <div
-              data-testid="harness-landing-context"
-              className="oa-harness-context-tray relative z-0 mx-[13px] -mb-3 flex min-h-12 min-w-0 items-center gap-0.5 overflow-hidden rounded-t-[20px] px-3 pb-4 pt-2 text-[12px] leading-4 text-muted-foreground"
-            >
+          <ComposerShell
+            context={<>
               <HarnessWorkspacePicker
                 mode={mode}
                 workspace={workspaceTarget}
@@ -571,33 +569,16 @@ function HarnessLandingPage({
                 menuPlacement="up"
                 toolbar
               />
-            </div>
-            <div
-              data-testid="harness-composer-shell"
-              className="oa-harness-composer-shell relative z-10 rounded-[26px] bg-card px-3 pb-2.5 pt-3"
-            >
-              <textarea
-                ref={textareaRef}
-                value={value}
-                onChange={(event) => setValue(event.target.value)}
-                onKeyDown={onKeyDown}
-                placeholder={t(`${copyKey}.placeholder`)}
-                rows={1}
-                autoFocus
-                className="block min-h-[68px] max-h-[168px] w-full resize-none bg-transparent px-1.5 py-1.5 text-[14px] leading-[21px] text-foreground outline-none placeholder:text-muted-foreground/70"
-              />
-              <div
-                data-testid="harness-landing-controls"
-                className="flex min-h-8 min-w-0 items-end justify-between gap-2 overflow-hidden px-0.5 pt-1"
-              >
-                <div className="flex min-w-0 flex-1 flex-wrap items-center gap-0.5 overflow-hidden">
+            </>}
+            controls={<>
                   <AgentLaunchSelectors
                     config={launchConfig}
                     onConfigureProvider={goConfigureProvider}
                     showRuntime={false}
                     toolbar
                   />
-                </div>
+            </>}
+            action={
                 <Tooltip>
                   <TooltipTrigger
                     render={(
@@ -618,15 +599,27 @@ function HarnessLandingPage({
                   </TooltipTrigger>
                   <TooltipContent>{t('chatLanding.send')}</TooltipContent>
                 </Tooltip>
-              </div>
+            }
+            details={
               <AgentLaunchDetails
                 config={launchConfig}
                 hasWorkspaceTarget={credentialWorkspace !== null && credentialWorkspace !== undefined}
                 showScopeDisclosure={false}
                 className="mx-1 mt-1.5 border-t border-border/45 px-1 pt-2"
               />
-            </div>
-          </div>
+            }
+          >
+              <textarea
+                ref={textareaRef}
+                value={value}
+                onChange={(event) => setValue(event.target.value)}
+                onKeyDown={onKeyDown}
+                placeholder={t(`${copyKey}.placeholder`)}
+                rows={1}
+                autoFocus
+                className="block min-h-[68px] max-h-[168px] w-full resize-none bg-transparent px-1.5 py-1.5 text-[14px] leading-[21px] text-foreground outline-none placeholder:text-muted-foreground/70"
+              />
+          </ComposerShell>
 
           {error !== null && (
             <ComposerNotice tone="error" icon={CircleAlert}>

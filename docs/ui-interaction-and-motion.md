@@ -72,6 +72,9 @@ restore shows a spinner and rejects repeated clicks; failures stay on the row
 and allow retry. Headless occupancy still opens the single-writer explanation.
 The primary row has no separate play/stop target; settings, stop and archive live
 in its options menu. Direct links and history browsers retain view-only opening.
+In expanded navigation, a selected Session does not also select its Harness
+header. The compact rail retains the Harness selection because Session rows
+are hidden there; returning to the Harness landing selects its header.
 Quant/Prediction retain their explicit default
 Workspace readiness gates before exposing sessions and Studio. The navigation
 distinguishes setup, existing-Workspace selection, loading, and
@@ -144,6 +147,33 @@ versions from the current catalog's Harness guide. Catalog documentation is
 reference material, not proof of the installed version or current Workspace
 configuration. Keep document loading/errors independent, retain the sessions
 sidebar, and use the shared reading renderer rather than a new Markdown stack.
+
+### Agent conversation presentation
+
+`components/conversation/` owns the adapter-neutral browser conversation view,
+content/activity rendering and composer shell. `ComposerShell` is shared with
+the Harness launch page; its context, controls and details are caller-owned
+slots, not embedded Pi selectors. Existing `oa-harness-composer-*` styling seams
+remain the shared visual material. Messages and composer use a 46rem reading
+measure, with local scrolling for wide output and wrapping toolbar controls.
+
+The normalized types in this folder are ephemeral presentation data, not a new
+persisted transcript or execution protocol. An adapter converts wire messages
+before rendering and supplies only supported send/stop actions. Missing actions
+do not produce fake controls. Reasoning, tool input/output, failed operations,
+and unknown payloads remain inspectable; failures expand their activity details.
+Presentation must not import runtime APIs, parse provider event discriminators,
+or fetch Workspace data. Pi's conversion lives in `webpi-presentation.ts` and
+its polling/commands in `useWebPiConversation`; `WebPiView` composes the adapter.
+
+Pending sends keep and lock their draft until acknowledgement, reject repeated
+submission, and preserve the draft on failure. Enter respects IME composition;
+Shift+Enter inserts a newline. Session identity changes remount local composition
+state and ignore prior requests. New revisions follow the tail only while the
+reader is already there; Jump to latest is explicit and honors reduced motion.
+Idle needs no top-bar badge; busy and failure states remain visible. Runtime
+settings remain in the existing Session settings until an adapter actually
+supports a corresponding inline control.
 
 ### Long-form Markdown
 

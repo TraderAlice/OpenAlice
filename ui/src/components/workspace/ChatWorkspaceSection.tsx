@@ -408,7 +408,7 @@ export function ChatWorkspaceSection({
           compact={compact}
           compactIcon={mode === 'chat' ? <MessageSquare size={15} strokeWidth={1.75} aria-hidden />
             : mode === 'auto-quant' ? <Microscope size={15} strokeWidth={1.75} aria-hidden /> : <Binary size={15} strokeWidth={1.75} aria-hidden />}
-          active={isWsFocus || landingOwnsStatus || studioActive || (focused?.kind === 'workspace-details' && focused.params.source === source)}
+          active={(isWsFocus && (compact || !selection?.sessionId)) || landingOwnsStatus || studioActive || (focused?.kind === 'workspace-details' && focused.params.source === source)}
           showNewAction={mode === 'chat' || Boolean(navigationLoaded && !navigationError && currentWorkspace)}
           newLabel={newLabel} onOpen={openLanding} menu={contextMenu}
         >
