@@ -21,6 +21,12 @@ on:
       rehearsal:
         type: boolean
         default: false
+      verifier-sha:
+        type: string
+        default: ''
+      version:
+        type: string
+        default: ''
     secrets:
       MACOS_CSC_LINK:
         required: false
@@ -229,8 +235,12 @@ jobs:
       CANDIDATE_ARCH: ${{ inputs.arch }}
       CANDIDATE_ID: ${{ needs.build.outputs.candidate-id || needs.restore.outputs.candidate-id }}
       CANDIDATE_PREVIOUS_TAG: ${{ inputs.previous-tag }}
+      CANDIDATE_VERIFIER_SHA: ${{ inputs.verifier-sha || github.sha }}
+      CANDIDATE_VERSION: ${{ inputs.version }}
     steps:
       - uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.verifier-sha || github.sha }}
 
       - uses: pnpm/action-setup@v6
 

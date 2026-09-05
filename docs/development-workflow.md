@@ -544,6 +544,16 @@ does not accept a verifier-only code change as equivalent product source.
 Omit `candidate-run` for a normal fresh build. This is separate from the
 diagnostic single-platform `verify-desktop` operation above.
 
+An optional `desktop-verifier-sha` selects a full commit already integrated into
+`origin/dev` or `origin/master` for desktop upgrade verification. The release
+intent validates that authority before building. Only the upgrade job checks
+out the selected verifier: product builds, source validation, candidate source
+identity and eventual tag remain on the original dispatch SHA. The explicit
+product version is passed to the smoke rather than inferred from the verifier's
+package manifest. Acceptance binds the selected verifier SHA, and publication
+requires that same identity. This lets a verifier repair inspect preserved
+product bytes without treating the repair commit as a new product build.
+
 CLI candidates share one commit-bound platform-neutral input artifact containing
 only the approved UI and pure-JavaScript package outputs. Each of the six target
 jobs verifies its source SHA and exact file hashes before installing those

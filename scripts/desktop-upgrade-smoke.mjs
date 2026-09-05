@@ -35,7 +35,7 @@ import { packagedElectronExecutable } from './smoke-packaged-toolchain.mjs'
 
 const repoRoot = resolve(import.meta.dirname, '..')
 const candidateVersion = process.env.CANDIDATE_VERSION
-  ?? JSON.parse(readFileSync(join(repoRoot, 'package.json'), 'utf8')).version
+  || JSON.parse(readFileSync(join(repoRoot, 'package.json'), 'utf8')).version
 if (!/^\d+\.\d+\.\d+(?:-beta(?:\.[1-9]\d*)?)?$/.test(candidateVersion)) {
   throw new Error('Invalid desktop candidate version')
 }

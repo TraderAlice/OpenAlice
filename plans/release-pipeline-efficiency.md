@@ -171,6 +171,13 @@ beta-to-stable promotion; installing a permanent runner on the user's daily Mac.
   consumes reused bytes through the real publication gate, but does not yet
   consume a separate verifier-only replay receipt or prove positive hosted
   desktop recovery. Thirty-seven focused workflow/receipt tests pass.
+  Verifier-only recovery follow-up:
+  `desktop-verifier-sha` is restricted to full commits integrated into dev/master;
+  only upgrade acceptance changes checkout. Product builds/source gates/tag SHA
+  remain unchanged; selected verifier identity is required again at final
+  staging. Real temporary-git trust tests and CLI receipt binding pass (41
+  focused tests initially; final identity/workflow selection checkpoint passes
+  71 tests and root typecheck). Native cross-verifier acceptance is still unproved.
 - [ ] Increment 3: join exact-SHA full source validation at publication instead
   of serializing before candidate builds; reuse verified neutral CLI inputs.
   Test source failure/mismatch blocks publication, beta gates stay separate,
@@ -204,6 +211,25 @@ beta-to-stable promotion; installing a permanent runner on the user's daily Mac.
   and then restore/accept those same bytes on the unchanged commit, measuring
   dependency ordering and build work avoided. Forty-three focused workflow and
   selection tests pass; positive hosted results are not yet available.
+  Run 33961558999 was rejected during workflow parsing because the production
+  caller did not pass actions:read to the reusable candidate reader. Fixed with
+  an explicit minimal caller grant and regression assertion. Run 33961658342 on
+  997dd0c2 is active: ARM build succeeded at 10:54:40 UTC and its upgrade started
+  at 10:54:47 while Intel/Windows builds continued, proving removal of that
+  cross-platform barrier. Full positive/reuse results remain pending.
+  Local full checkpoint: 6,478 passes, three skips, one existing Connector UI
+  test timed out at five seconds (722 files, 308.13 seconds). The unchanged
+  Connectors.demo.spec.tsx file passed all 32 tests in isolation in 12.03 seconds.
+  Record the timeout rather than claiming a green full run; resource sensitivity
+  is suspected, not established as the sole cause.
+  Both local release-related skills were updated using skill-creator and pass
+  quick_validate.py: remove nonexistent master-push waiting, defer to current
+  same-SHA parallel source gates, and distinguish measured job savings from
+  release latency and diagnostic replay from publication authority.
+  Same-byte restore rehearsal 33962287156 has been dispatched and is pending
+  behind the first run. Both are confirmed pinned to 997dd0c2, so later topic
+  commits do not change this comparison. Both Mac builds/upgrades are accepted;
+  first-run Windows upgrade remains active.
 - [ ] Update owner guides and applicable release skill instructions to match
   the implemented operation and acceptance boundaries; remove stale serial rules.
 - [ ] Record measured timings separately from estimates, inspect latest PR

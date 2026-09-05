@@ -37,6 +37,24 @@ function fixture(channel = 'stable') {
 }
 
 describe('desktop candidate acceptance integration', () => {
+  it('binds CLI acceptance to a selected verifier while preserving original product identity', () => {
+    const { options, records } = fixture()
+    const record = records[0]
+    const rawPath = join(options.inputDirectory, 'raw-receipt.json')
+    writeFileSync(rawPath, JSON.stringify(record.rawReceipt))
+    const original = readFileSync(join(record.directory, record.filename))
+    execFileSync(process.execPath, [join(import.meta.dirname, 'desktop-candidate-receipt.mjs'),
+      'bind-upgrade', record.directory, rawPath], { env: { ...process.env,
+      RUNNER_OS: 'macOS', CANDIDATE_ARCH: 'arm64', CANDIDATE_CHANNEL: 'stable',
+      GITHUB_SHA: options.sourceSha, CANDIDATE_SOURCE_SHA: options.sourceSha,
+      CANDIDATE_VERSION: options.version, CANDIDATE_VERIFIER_SHA: options.verifierSha,
+      CANDIDATE_PREVIOUS_TAG: options.previousTag, CANDIDATE_ID: record.expected.candidateId,
+    } })
+    expect(JSON.parse(readFileSync(rawPath, 'utf8'))).toMatchObject({
+      verifierSha: options.verifierSha, candidateId: record.expected.candidateId,
+    })
+    expect(readFileSync(join(record.directory, record.filename))).toEqual(original)
+  })
   it('pins an authenticated selected artifact only after byte and source verification', () => {
     const { options, records } = fixture()
     const record = records[0]

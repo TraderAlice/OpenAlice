@@ -78,7 +78,7 @@ function run(argv) {
   if (argv[0] === 'stage' && argv.length === 4) {
     stageDesktopCandidates({ inputDirectory: resolve(argv[1]), receiptsDirectory: resolve(argv[2]),
       outputDirectory: resolve(argv[3]), sourceSha: process.env.CANDIDATE_SOURCE_SHA,
-      verifierSha: process.env.GITHUB_SHA, version: process.env.CANDIDATE_VERSION,
+      verifierSha: process.env.CANDIDATE_VERIFIER_SHA || process.env.GITHUB_SHA, version: process.env.CANDIDATE_VERSION,
       channel: process.env.CANDIDATE_CHANNEL, previousTag: process.env.CANDIDATE_PREVIOUS_TAG })
     return
   }
@@ -90,7 +90,7 @@ function run(argv) {
   const directory = resolve(directoryArg)
   const platform = { macOS: 'darwin', Windows: 'win32', Linux: 'linux' }[process.env.RUNNER_OS] ?? process.platform
   const header = { sourceSha: process.env.CANDIDATE_SOURCE_SHA,
-    version: process.env.CANDIDATE_VERSION ?? readJson('package.json').version,
+    version: process.env.CANDIDATE_VERSION || readJson('package.json').version,
     channel: process.env.CANDIDATE_CHANNEL, platform,
     arch: process.env.CANDIDATE_ARCH, kind: 'desktop' }
   if (operation === 'create') {
@@ -113,7 +113,7 @@ function run(argv) {
     }
     else {
       const receipt = bindDesktopUpgrade({ directory, expected,
-        verifierSha: process.env.GITHUB_SHA, previousTag: process.env.CANDIDATE_PREVIOUS_TAG,
+        verifierSha: process.env.CANDIDATE_VERIFIER_SHA || process.env.GITHUB_SHA, previousTag: process.env.CANDIDATE_PREVIOUS_TAG,
         rawReceipt: readJson(receiptPath) })
       writeFileSync(receiptPath, `${JSON.stringify(receipt, null, 2)}\n`)
     }

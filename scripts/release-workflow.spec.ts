@@ -4,6 +4,7 @@ import { describe, expect, it } from 'vitest'
 import YAML from 'yaml'
 
 interface WorkflowStep {
+  env?: Record<string, string>
   if?: string
   name?: string
   run?: string
@@ -12,6 +13,7 @@ interface WorkflowStep {
 }
 
 interface WorkflowJob {
+  env?: Record<string, string>
   uses?: string
   with?: Record<string, unknown>
   permissions?: Record<string, string>
@@ -357,6 +359,22 @@ describe('Release workflow critical path', () => {
     ]) {
       expect(step(publication, name).with?.files).toContain('dist/release-cli/*.tar.gz.sha256')
     }
+  })
+
+  it('selects integrated verifier code without relabelling product bytes', () => {
+    const selection = step(workflow.jobs.release, 'Select trusted desktop verifier without changing product source')
+    expect(selection.run).toBe('node scripts/select-release-verifier.mjs')
+    expect(selection.env?.RELEASE_VERIFIER_SHA).toBe('${{ inputs.desktop-verifier-sha }}')
+    expect(workflow.jobs['build-desktop'].with?.['verifier-sha']).toBe('${{ needs.release.outputs.verifier_sha }}')
+    const upgrade = desktopWorkflow.jobs.upgrade
+    expect(upgrade.steps?.find((entry) => entry.uses === 'actions/checkout@v7')?.with?.ref)
+      .toBe('${{ inputs.verifier-sha || github.sha }}')
+    expect(desktopWorkflow.jobs.build.steps?.find((entry) => entry.uses === 'actions/checkout@v7')?.with?.ref).toBeUndefined()
+    expect(upgrade.env?.CANDIDATE_SOURCE_SHA).toBe('${{ github.sha }}')
+    expect(upgrade.env?.CANDIDATE_VERSION).toBe('${{ inputs.version }}')
+    expect(upgrade.env?.CANDIDATE_VERIFIER_SHA).toBe('${{ inputs.verifier-sha || github.sha }}')
+    expect(step(workflow.jobs['publish-release'], 'Verify and stage the complete desktop candidate set').env?.CANDIDATE_VERIFIER_SHA)
+      .toBe('${{ needs.release.outputs.verifier_sha }}')
   })
 
   it('keeps unsigned rehearsal artifacts and authority separate from publication', () => {

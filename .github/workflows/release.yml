@@ -34,6 +34,9 @@ on:
       source-sha:
         description: Exact product commit of the preserved desktop candidate.
         type: string
+      desktop-verifier-sha:
+        description: Optional integrated dev/master commit for desktop acceptance only; never changes product source.
+        type: string
       previous-tag:
         description: Previous stable tag for verify-desktop upgrade acceptance.
         type: string
@@ -114,6 +117,7 @@ jobs:
       prerelease: ${{ steps.plan.outputs.prerelease }}
       previous_tag: ${{ steps.plan.outputs.previous_tag }}
       source_sha: ${{ steps.plan.outputs.source_sha }}
+      verifier_sha: ${{ steps.verifier.outputs.verifier_sha }}
 
     steps:
       - uses: actions/checkout@v7
@@ -202,6 +206,13 @@ jobs:
           else
             echo "prerelease=false" >> "$GITHUB_OUTPUT"
           fi
+
+      - name: Select trusted desktop verifier without changing product source
+        id: verifier
+        if: steps.plan.outputs.created == 'true'
+        env:
+          RELEASE_VERIFIER_SHA: ${{ inputs.desktop-verifier-sha }}
+        run: node scripts/select-release-verifier.mjs
 
       - name: Install git-cliff
         if: steps.plan.outputs.created == 'true'
@@ -293,6 +304,8 @@ jobs:
       channel: ${{ needs.release.outputs.channel }}
       previous-tag: ${{ needs.release.outputs.previous_tag }}
       candidate-run: ${{ inputs.candidate-run }}
+      verifier-sha: ${{ needs.release.outputs.verifier_sha }}
+      version: ${{ needs.release.outputs.version }}
     secrets:
       MACOS_CSC_LINK: ${{ secrets.MACOS_CSC_LINK }}
       MACOS_CSC_KEY_PASSWORD: ${{ secrets.MACOS_CSC_KEY_PASSWORD }}
@@ -929,6 +942,7 @@ jobs:
 
       - name: Verify and stage the complete desktop candidate set
         env:
+          CANDIDATE_VERIFIER_SHA: ${{ needs.release.outputs.verifier_sha }}
           CANDIDATE_SOURCE_SHA: ${{ needs.release.outputs.source_sha }}
           CANDIDATE_VERSION: ${{ needs.release.outputs.version }}
           CANDIDATE_CHANNEL: ${{ needs.release.outputs.channel }}
