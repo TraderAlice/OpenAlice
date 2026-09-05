@@ -1,16 +1,19 @@
-import { useState, useEffect, useCallback, useId, useMemo, useRef } from 'react'
+import { memo, useCallback, useEffect, useId, useMemo, useRef, useState, type FormEvent } from 'react'
+import { ChevronDown, CircleAlert, RefreshCw, Search } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
-import { CircleAlert } from 'lucide-react'
-import { formatRelativeTime } from '../lib/intl'
-import { api, type NewsArticle } from '../api'
+
+import type { NewsArticle } from '../api'
+import type { NewsQuery } from '../api/news'
 import { PageHeader } from '../components/PageHeader'
+import { useNavigate } from 'react-router-dom'
+import type { ViewSpec } from '../tabs/types'
 import { EmptyState, Skeleton } from '../components/StateViews'
-import { Button, buttonVariants } from '../components/ui/button'
 import { inputClass } from '../components/form'
-
-// ==================== Helpers ====================
-
-
+import { Button } from '../components/ui/button'
+import { useNewsFeed } from '../hooks/useNewsFeed'
+import { useWatchlist } from '../tabs/watchlist-store'
+import { cn } from '../lib/utils'
+import { NEWS_CATEGORIES } from '../components/market/news-categories.js'
 const LOOKBACK_OPTIONS = [
   { value: '1h', labelKey: 'news.lookback1h' },
   { value: '12h', labelKey: 'news.lookback12h' },
@@ -18,389 +21,336 @@ const LOOKBACK_OPTIONS = [
   { value: '7d', labelKey: 'news.lookback7d' },
 ] as const
 
-type FetchMode = 'replace' | 'refresh'
+const NEWS_VIEWS = [
+  { id: 'latest', labelKey: 'news.viewLatest', tags: [] },
+  { id: 'important', labelKey: 'news.viewImportant', tags: ['important', 'breaking', 'urgent', 'top'] },
+  { id: 'positive', labelKey: 'news.viewPositive', tags: ['positive', 'bullish', 'benefit'] },
+  { id: 'negative', labelKey: 'news.viewNegative', tags: ['negative', 'bearish', 'risk'] },
+  { id: 'watchlist', labelKey: 'news.viewWatchlist', tags: [] },
+] as const
 
-// ==================== Article Row ====================
-
-interface ArticleGroup {
-  key: string
-  label: string
-  articles: NewsArticle[]
+type NewsViewId = typeof NEWS_VIEWS[number]['id']
+const INITIAL_FILTERS = { startDate: '', endDate: '', symbol: '', keyword: '' }
+const NEWS_PAGE_SIZE = 40
+const NEWS_TAG_DEFINITIONS = new Map<string, typeof NEWS_VIEWS[number] | typeof NEWS_CATEGORIES[number]>(
+  [...NEWS_VIEWS, ...NEWS_CATEGORIES].flatMap((definition) => definition.tags.map((tag) => [tag, definition] as const)),
+)
+const MARKET_FLAGS: Partial<Record<string, string>> = {
+  'a-shares': 'cn', hk: 'hk', us: 'us',
 }
 
-function localDayKey(date: Date): string {
-  return [
-    date.getFullYear(),
-    String(date.getMonth() + 1).padStart(2, '0'),
-    String(date.getDate()).padStart(2, '0'),
-  ].join('-')
-}
-
-function articleDayLabel(date: Date, locale: string): string {
-  const today = new Date()
-  const targetDay = new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime()
-  const todayStart = new Date(today.getFullYear(), today.getMonth(), today.getDate()).getTime()
-  const dayDistance = Math.round((targetDay - todayStart) / 86_400_000)
-  if (dayDistance >= -1 && dayDistance <= 1) {
-    return new Intl.RelativeTimeFormat(locale, { numeric: 'auto' }).format(dayDistance, 'day')
+export function NewsPage({ spec }: { spec: Extract<ViewSpec, { kind: 'news' }> }) {
+  const { t, i18n } = useTranslation()
+  const navigate = useNavigate()
+  const selection = NEWS_VIEWS.find((view) => view.id === spec.params.view)?.id ?? 'latest'
+  const category = NEWS_CATEGORIES.find((item) => item.id === spec.params.category)
+  const setSelection = (view: NewsViewId) => {
+    const next = new URLSearchParams()
+    if (spec.params.category) next.set('category', spec.params.category)
+    if (view !== 'latest') next.set('view', view)
+    navigate({ pathname: '/market/news', search: next.toString() })
   }
-  return new Intl.DateTimeFormat(locale, {
-    weekday: 'short',
-    month: 'short',
-    day: 'numeric',
-    ...(date.getFullYear() === today.getFullYear() ? {} : { year: 'numeric' }),
-  }).format(date)
-}
+  const [draft, setDraft] = useState(INITIAL_FILTERS)
+  const [query, setQuery] = useState<NewsQuery>({ lookback: '24h', limit: 200 })
+  const [dateError, setDateError] = useState(false)
+  const { articles, sources, loading, refreshing, loadError, retry } = useNewsFeed(query)
+  const watchlist = useWatchlist((state) => state.entries)
+  const locale = i18n.resolvedLanguage ?? i18n.language
 
-function groupArticlesByDay(articles: NewsArticle[], locale: string): ArticleGroup[] {
-  const groups = new Map<string, ArticleGroup>()
-  for (const article of articles) {
-    const date = new Date(article.time)
-    const valid = !Number.isNaN(date.getTime())
-    const key = valid ? localDayKey(date) : article.time
-    const group = groups.get(key) ?? {
-      key,
-      label: valid ? articleDayLabel(date, locale) : article.time,
-      articles: [],
+  const visibleArticles = useMemo(() => {
+    const scoped = category ? articles.filter((article) => category.tags.some((tag) => articleTags(article).includes(tag))) : articles
+    const sorted = [...scoped].sort((a, b) => new Date(b.time).getTime() - new Date(a.time).getTime())
+    if (selection === 'latest') return sorted
+    if (selection === 'watchlist') {
+      const symbols = watchlist.map((entry) => entry.symbol.trim().toLowerCase()).filter(Boolean)
+      return sorted.filter((article) => {
+        const words = [article.title, article.content, article.categories ?? ''].join(' ').toLowerCase().split(/[^\p{L}\p{N}.^-]+/u)
+        return symbols.some((symbol) => words.includes(symbol))
+      })
     }
-    group.articles.push(article)
-    groups.set(key, group)
-  }
-  return [...groups.values()]
-}
+    const definition = NEWS_VIEWS.find((item) => item.id === selection)
+    return definition ? sorted.filter((article) => definition.tags.some((tag) => articleTags(article).includes(tag))) : sorted
+  }, [articles, category, selection, watchlist])
+  const [visibleCount, setVisibleCount] = useState(NEWS_PAGE_SIZE)
+  const activeVisibleCount = Math.min(visibleCount, visibleArticles.length)
+  const hasMore = activeVisibleCount < visibleArticles.length
+  const streamRef = useRef<HTMLElement>(null)
+  const nextBatchRef = useRef<HTMLDivElement>(null)
+  const articleDays = useMemo(() => {
+    const days = new Map<string, NewsArticle[]>()
+    for (const article of visibleArticles.slice(0, activeVisibleCount)) {
+      const day = new Date(article.time).toDateString()
+      const entries = days.get(day)
+      if (entries) entries.push(article)
+      else days.set(day, [article])
+    }
+    return [...days]
+  }, [visibleArticles, activeVisibleCount])
 
-function ArticleRow({ article }: { article: NewsArticle }) {
-  const { t } = useTranslation()
-  const [expanded, setExpanded] = useState(false)
-  const disclosureId = useId().replace(/:/g, '')
-  const titleId = `news-title-${disclosureId}`
-  const panelId = `news-details-${disclosureId}`
-  const hasPreview = article.content.trim().length > 0
-  const categories = article.categories?.replaceAll(',', ', ')
+  useEffect(() => {
+    setVisibleCount(NEWS_PAGE_SIZE)
+    if (streamRef.current) streamRef.current.scrollTop = 0
+  }, [category?.id, query, selection])
+
+  useEffect(() => {
+    const root = streamRef.current
+    const target = nextBatchRef.current
+    if (!root || !target || !hasMore) return
+    let active = true
+    const observer = new IntersectionObserver((entries) => {
+      if (!active || !entries.some((entry) => entry.isIntersecting)) return
+      active = false
+      observer.disconnect()
+      setVisibleCount((count) => count + NEWS_PAGE_SIZE)
+    }, { root, rootMargin: '0px 0px 160px 0px' })
+    observer.observe(target)
+    return () => {
+      active = false
+      observer.disconnect()
+    }
+  }, [activeVisibleCount, hasMore])
+
+  const submit = (event: FormEvent) => {
+    event.preventDefault()
+    if (draft.startDate && draft.endDate && draft.startDate > draft.endDate) {
+      setDateError(true)
+      return
+    }
+    setDateError(false)
+    const start = draft.startDate ? new Date(`${draft.startDate}T00:00:00`) : null
+    const end = draft.endDate ? new Date(`${draft.endDate}T00:00:00`) : null
+    if (end) end.setDate(end.getDate() + 1)
+    setQuery({
+      ...query,
+      startTime: start ? new Date(start.getTime() - 1).toISOString() : undefined,
+      endTime: end ? new Date(end.getTime() - 1).toISOString() : undefined,
+      symbol: draft.symbol.trim() || undefined,
+      keyword: draft.keyword.trim() || undefined,
+    })
+  }
+  const clear = () => {
+    setDraft(INITIAL_FILTERS)
+    setQuery({ lookback: '24h', limit: 200 })
+    setDateError(false)
+  }
+  const selectTag = useCallback((tag: string) => {
+    setDraft((current) => ({ ...current, keyword: tag }))
+    setQuery((current) => ({ ...current, keyword: tag }))
+  }, [])
 
   return (
-    <article data-density={hasPreview ? 'preview' : 'compact'}>
-      <button
-        type="button"
-        aria-label={article.title}
-        aria-expanded={expanded}
-        aria-controls={panelId}
-        onClick={() => setExpanded((current) => !current)}
-        className={`group w-full px-1 text-left hover:bg-muted/30 focus-visible:outline-none focus-visible:[box-shadow:inset_0_0_0_1px_var(--oa-focus-ring)] sm:px-2 ${
-          hasPreview ? 'py-3 sm:py-3.5' : 'py-2.5'
-        }`}
-      >
-        <div className="flex items-start gap-3">
-          <div className="flex-1 min-w-0">
-            <p
-              id={titleId}
-              className="line-clamp-2 text-sm font-medium leading-snug text-foreground sm:line-clamp-1"
-            >
-              {article.title}
-            </p>
-            <div className="mt-1 flex min-w-0 items-center gap-1.5 text-[11px] leading-[15px] text-muted-foreground">
-              {article.source && (
-                <span className="shrink-0 font-semibold text-foreground/70">
-                  {article.source}
-                </span>
-              )}
-              <span className="shrink-0 tabular-nums">{formatRelativeTime(article.time)}</span>
-              {categories && (
+      <div className="flex min-h-0 flex-1 flex-col">
+        <PageHeader title={category ? t(category.labelKey) : t('nav.item.news')} />
+        <div className="flex min-h-0 flex-1 flex-col">
+          <div className="shrink-0 border-b border-border px-3 py-2 md:px-4">
+            <nav aria-label={t('news.viewsLabel')} className="mb-2 flex flex-wrap items-center gap-1">
+              {NEWS_VIEWS.map((view) => <Button key={view.id} size="sm" variant={selection === view.id ? 'secondary' : 'ghost'}
+                aria-pressed={selection === view.id} onClick={() => setSelection(view.id)}>{t(view.labelKey)}</Button>)}
+            </nav>
+            <form aria-label={t('news.filtersLabel')} onSubmit={submit} className="flex flex-wrap items-center gap-2">
+              <div className="flex min-w-0 basis-full items-center gap-1 sm:basis-auto">
+                <label className="min-w-0 flex-1 sm:flex-none">
+                  <span className="sr-only">{t('news.startDate')}</span>
+                  <input type="date" value={draft.startDate} onChange={(event) => setDraft({ ...draft, startDate: event.target.value })}
+                    className={`${inputClass} h-8 min-w-0 px-2 py-1 text-xs sm:w-[140px]`} />
+                </label>
+                <span aria-hidden="true" className="text-muted-foreground">–</span>
+                <label className="min-w-0 flex-1 sm:flex-none">
+                  <span className="sr-only">{t('news.endDate')}</span>
+                  <input type="date" value={draft.endDate} onChange={(event) => setDraft({ ...draft, endDate: event.target.value })}
+                    className={`${inputClass} h-8 min-w-0 px-2 py-1 text-xs sm:w-[140px]`} />
+                </label>
+              </div>
+              <input aria-label={t('news.symbolFilter')} placeholder={t('news.symbolFilter')} value={draft.symbol}
+                onChange={(event) => setDraft({ ...draft, symbol: event.target.value })}
+                className={`${inputClass} h-8 min-w-0 flex-1 basis-[130px] px-2 py-1 text-xs sm:max-w-[170px]`} />
+              <input aria-label={t('news.keywordFilter')} placeholder={t('news.keywordFilter')} value={draft.keyword}
+                onChange={(event) => setDraft({ ...draft, keyword: event.target.value })}
+                className={`${inputClass} h-8 min-w-0 flex-1 basis-[140px] px-2 py-1 text-xs`} />
+              <Button type="submit" variant="secondary" size="sm"><Search className="size-3.5" aria-hidden />{t('news.search')}</Button>
+              <Button type="button" variant="outline" className="h-8" onClick={clear}>{t('news.clear')}</Button>
+            </form>
+            {dateError && <p role="alert" className="mt-2 text-xs text-destructive">{t('news.dateRangeError')}</p>}
+            <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+              <select aria-label={t('news.lookbackLabel')} value={query.lookback ?? '24h'} disabled={Boolean(query.startTime)}
+                onChange={(event) => setQuery({ ...query, lookback: event.target.value })}
+                className={cn(inputClass, 'h-7 w-auto py-1 text-xs')}>
+                {LOOKBACK_OPTIONS.map((option) => <option key={option.value} value={option.value}>{t(option.labelKey)}</option>)}
+              </select>
+              <select aria-label={t('news.sourceLabel')} value={query.source ?? ''} onChange={(event) => setQuery({ ...query, source: event.target.value || undefined })}
+                className={cn(inputClass, 'h-7 w-auto max-w-36 py-1 text-xs')}>
+                <option value="">{t('news.allSources')}</option>
+                {sources.map((source) => <option key={source} value={source}>{source}</option>)}
+              </select>
+              <span aria-live="polite">{t('news.articleCount', { count: visibleArticles.length })}</span>
+              {articles.length === 200 && <span>{t('news.resultLimit', { count: 200 })}</span>}
+              <Button type="button" variant="ghost" size="icon-sm" className="ml-auto" aria-label={t('news.refresh')} onClick={retry} disabled={loading || refreshing}>
+                <RefreshCw className={`size-3.5 ${refreshing ? 'animate-spin motion-reduce:animate-none' : ''}`} aria-hidden />
+              </Button>
+            </div>
+          </div>
+          {loadError && articles.length > 0 && <NewsStaleNotice refreshing={refreshing} onRetry={retry} />}
+          <section ref={streamRef} aria-label={t('news.streamLabel')} className="min-h-0 flex-1 overflow-y-auto">
+            <div data-testid="news-feed" aria-busy={loading || refreshing}>
+              {loading && articles.length === 0 ? <NewsStreamSkeleton /> : loadError && articles.length === 0 ? (
+                <NewsLoadError refreshing={refreshing} onRetry={retry} />
+              ) : visibleArticles.length === 0 ? <EmptyState title={t('news.noArticles')} description={t('news.noArticlesDescription')} /> : (
                 <>
-                  <span className="hidden truncate text-muted-foreground/75 sm:inline">{categories}</span>
+                  <div className="px-3 pt-3 md:px-4">
+                    {articleDays.map(([dayKey, items]) => {
+                      const day = formatNewsDay(items[0].time, locale)
+                      return <section key={dayKey}>
+                        <h3 className="mb-1 text-xs font-medium text-muted-foreground">{day}</h3>
+                        <div role="list" aria-label={day}>
+                          {items.map((article) => <NewsStreamRow key={articleKey(article)} article={article} locale={locale} onTag={selectTag} />)}
+                        </div>
+                      </section>
+                    })}
+                  </div>
+                  {hasMore && <div ref={nextBatchRef} className="h-px" aria-hidden="true" />}
                 </>
               )}
             </div>
-          </div>
-          <span
-            className={`mt-0.5 inline-flex size-5 shrink-0 items-center justify-center text-muted-foreground group-hover:text-foreground ${expanded ? 'rotate-90' : ''}`}
-            aria-hidden
-          >
-            <svg viewBox="0 0 20 20" fill="none" className="size-3.5" stroke="currentColor" strokeWidth="1.8">
-              <path d="m7 4 6 6-6 6" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
-          </span>
-        </div>
-
-        {!expanded && hasPreview && (
-          <p className="mt-2 line-clamp-2 max-w-[88ch] text-[13px] leading-relaxed text-muted-foreground/80 md:line-clamp-1">
-            {article.content}
-          </p>
-        )}
-      </button>
-
-      {expanded && (
-        <div
-          id={panelId}
-          role="region"
-          aria-labelledby={titleId}
-          className="ml-1 space-y-3 border-l-2 border-primary/25 px-3 pb-4 pt-2 sm:ml-2 sm:px-4"
-        >
-          {hasPreview && (
-            <p className="max-w-[72ch] whitespace-pre-wrap text-sm leading-6 text-muted-foreground">{article.content}</p>
-          )}
-          {article.link && (
-            <a
-              href={article.link}
-              target="_blank"
-              rel="noopener noreferrer"
-              className={buttonVariants({ variant: 'ghost', size: 'sm', className: '-ml-3 min-h-10 text-[13px] text-primary hover:underline' })}
-            >
-              {t('news.openOriginal')}
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
-                <polyline points="15 3 21 3 21 9" />
-                <line x1="10" y1="14" x2="21" y2="3" />
-              </svg>
-            </a>
-          )}
-        </div>
-      )}
-    </article>
-  )
-}
-
-// ==================== Page ====================
-
-export function NewsPage() {
-  const { t, i18n } = useTranslation()
-  const [articles, setArticles] = useState<NewsArticle[]>([])
-  const [lookback, setLookback] = useState('24h')
-  const [sourceFilter, setSourceFilter] = useState('')
-  const [loading, setLoading] = useState(true)
-  const [refreshing, setRefreshing] = useState(false)
-  const [loadError, setLoadError] = useState(false)
-  const [sources, setSources] = useState<string[]>([])
-  const requestGeneration = useRef(0)
-  const orderedArticles = useMemo(
-    () => [...articles].sort(
-      (a, b) => new Date(b.time).getTime() - new Date(a.time).getTime(),
-    ),
-    [articles],
-  )
-  const locale = i18n.resolvedLanguage ?? i18n.language
-  const articleGroups = useMemo(
-    () => groupArticlesByDay(orderedArticles, locale),
-    [locale, orderedArticles],
-  )
-
-  const fetchArticles = useCallback(async (
-    lb: string,
-    src: string,
-    mode: FetchMode = 'refresh',
-  ) => {
-    const request = ++requestGeneration.current
-    if (mode === 'replace') {
-      setArticles([])
-      setLoadError(false)
-      setLoading(true)
-    } else {
-      setRefreshing(true)
-    }
-
-    try {
-      const res = await api.news.list({
-        lookback: lb,
-        limit: 200,
-        source: src || undefined,
-      })
-      if (request !== requestGeneration.current) return
-
-      setArticles(res.items)
-      setLoadError(false)
-      const seen = new Set<string>()
-      for (const item of res.items) {
-        if (item.source) seen.add(item.source)
-      }
-      setSources((prev) => {
-        const merged = new Set([...prev, ...seen])
-        return [...merged].sort()
-      })
-    } catch (err) {
-      if (request === requestGeneration.current) {
-        setLoadError(true)
-        console.warn('Failed to load news:', err)
-      }
-    } finally {
-      if (request === requestGeneration.current) {
-        setLoading(false)
-        setRefreshing(false)
-      }
-    }
-  }, [])
-
-  useEffect(() => {
-    void fetchArticles(lookback, sourceFilter, 'replace')
-  }, [lookback, sourceFilter, fetchArticles])
-
-  useEffect(() => {
-    const id = setInterval(() => {
-      void fetchArticles(lookback, sourceFilter, 'refresh')
-    }, 60_000)
-    return () => clearInterval(id)
-  }, [lookback, sourceFilter, fetchArticles])
-
-  useEffect(() => () => {
-    requestGeneration.current += 1
-  }, [])
-
-  const retry = useCallback(() => {
-    void fetchArticles(
-      lookback,
-      sourceFilter,
-      articles.length === 0 ? 'replace' : 'refresh',
-    )
-  }, [articles.length, fetchArticles, lookback, sourceFilter])
-
-  return (
-    <div className="flex flex-col flex-1 min-h-0">
-      <PageHeader title={t('nav.item.news')} />
-
-      <div className="flex min-h-0 flex-1 flex-col px-4 py-4 md:px-6 md:py-5">
-        <div className="mx-auto flex h-full w-full max-w-[1120px] flex-col gap-3">
-          {/* Controls */}
-          <div className="grid shrink-0 grid-cols-2 items-center gap-2 sm:flex sm:gap-3">
-            <select
-              aria-label={t('news.lookbackLabel')}
-              value={lookback}
-              onChange={(e) => setLookback(e.target.value)}
-              className={`${inputClass} min-h-10 w-full py-2 text-sm sm:w-auto`}
-            >
-              {LOOKBACK_OPTIONS.map((o) => (
-                <option key={o.value} value={o.value}>{t(o.labelKey)}</option>
-              ))}
-            </select>
-
-            <select
-              aria-label={t('news.sourceLabel')}
-              value={sourceFilter}
-              onChange={(e) => setSourceFilter(e.target.value)}
-              className={`${inputClass} min-h-10 w-full max-w-full py-2 text-sm sm:w-auto`}
-            >
-              <option value="">{t('news.allSources')}</option>
-              {sources.map((s) => (
-                <option key={s} value={s}>{s}</option>
-              ))}
-            </select>
-
-            <span aria-live="polite" className="col-span-2 inline-flex min-h-6 items-center justify-end text-xs tabular-nums text-muted-foreground sm:ml-auto sm:min-h-10">
-              {t('news.articleCount', { count: articles.length })}
-            </span>
-          </div>
-
-          {loadError && articles.length > 0 && (
-            <NewsStaleNotice refreshing={refreshing} onRetry={retry} />
-          )}
-
-          {/* Article list */}
-          <div
-            data-testid="news-feed"
-            aria-busy={loading || refreshing}
-            className="min-h-0 flex-1 overflow-y-auto"
-          >
-            {loading && articles.length === 0 ? (
-              <div className="divide-y divide-border/50 border-y border-border/70">
-                {Array.from({ length: 6 }).map((_, i) => (
-                  <div key={i} className="px-1 py-3 sm:px-2">
-                    <Skeleton className="h-3.5 w-3/4" />
-                    <Skeleton className="h-2.5 w-1/3 mt-2" />
-                  </div>
-                ))}
-              </div>
-            ) : loadError && articles.length === 0 ? (
-              <NewsLoadError refreshing={refreshing} onRetry={retry} />
-            ) : articles.length === 0 ? (
-              <EmptyState title={t('news.noArticles')} description={t('news.noArticlesDescription')} />
-            ) : (
-              <div className={articleGroups.length > 1 ? 'space-y-5 pb-1' : ''}>
-                {articleGroups.map((group) => (
-                  <section key={group.key} data-news-day={group.key}>
-                    {articleGroups.length > 1 && (
-                      <div className="flex min-h-9 items-center justify-between gap-3 px-1 pb-1 text-xs sm:px-2">
-                        <h3 className="font-semibold text-foreground/80">{group.label}</h3>
-                        <span className="tabular-nums text-muted-foreground">
-                          {t('news.articleCount', { count: group.articles.length })}
-                        </span>
-                      </div>
-                    )}
-                    <div className="divide-y divide-border/55 border-y border-border/70">
-                      {group.articles.map((article) => (
-                        <ArticleRow
-                          key={`${article.time}-${article.link ?? article.title}`}
-                          article={article}
-                        />
-                      ))}
-                    </div>
-                  </section>
-                ))}
-              </div>
-            )}
-          </div>
+          </section>
         </div>
       </div>
-    </div>
   )
 }
 
-function NewsLoadError({
-  refreshing,
-  onRetry,
-}: {
-  refreshing: boolean
-  onRetry: () => void
-}) {
+
+const NewsStreamRow = memo(function NewsStreamRow({ article, locale, onTag }: { article: NewsArticle; locale: string; onTag: (tag: string) => void }) {
   const { t } = useTranslation()
+  const [expanded, setExpanded] = useState(false)
+  const [failedImage, setFailedImage] = useState<string | null>(null)
+  const summaryId = useId()
+  const link = safeNewsUrl(article.link)
+  const image = safeNewsUrl(article.image, true)
+  const labels = new Map<string, { tag: string; flag?: string }>()
+  for (const tag of (article.categories ?? '').split(/[;,]/).map((value) => value.trim()).filter(Boolean)) {
+    const definition = NEWS_TAG_DEFINITIONS.get(tag.toLowerCase())
+    const label = definition ? t(definition.labelKey) : tag
+    if (!labels.has(label)) labels.set(label, { tag, flag: definition ? MARKET_FLAGS[definition.id] : undefined })
+  }
+  const content = article.content.trim()
+  const hasImage = Boolean(image && failedImage !== image)
+  const source = link ? (
+    <a href={link} target="_blank" rel="noopener noreferrer" aria-label={t('news.openOriginal')} title={article.source ?? t('news.openOriginal')}
+      className="inline-flex min-h-7 max-w-full items-center rounded-sm text-[11px] text-muted-foreground underline-offset-2 hover:text-foreground hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring [overflow-wrap:anywhere]">
+      {article.source ?? t('news.openOriginal')}
+    </a>
+  ) : article.source ? <span className="text-[11px] text-muted-foreground [overflow-wrap:anywhere]">{article.source}</span> : null
   return (
-    <div
-      role="alert"
-      className="mx-auto flex max-w-[520px] flex-col items-center px-6 py-16 text-center"
-    >
-      <CircleAlert size={24} strokeWidth={1.75} className="text-destructive" aria-hidden />
-      <h2 className="mt-3 text-[15px] font-medium text-foreground">
-        {t('news.loadErrorTitle')}
-      </h2>
-      <p className="mt-1.5 text-[13px] leading-relaxed text-muted-foreground">
-        {t('news.loadErrorDescription')}
-      </p>
-      <Button
-        type="button"
-        onClick={onRetry}
-        disabled={refreshing}
-        className="mt-4 text-[12px]"
-        variant="outline"
-        size="sm"
-      >
-        {refreshing ? t('common.loading') : t('common.retry')}
-      </Button>
-    </div>
+    <article role="listitem" className="grid min-w-0 grid-cols-[46px_minmax(0,1fr)] sm:grid-cols-[54px_minmax(0,1fr)]">
+      <div className="relative border-r border-border/60 pr-2 text-right">
+        <time className="text-xs leading-[22px] tabular-nums text-muted-foreground" dateTime={article.time} title={formatPublishedTime(article.time, locale)}>
+          {formatNewsTime(article.time, locale)}
+        </time>
+        <span aria-hidden className="absolute -right-[3px] top-2 size-[5px] rounded-full bg-muted-foreground/60" />
+      </div>
+      <div className={cn('grid min-w-0 items-start gap-x-3 pb-4 pl-3', hasImage && 'sm:grid-cols-[minmax(0,1fr)_124px]')}>
+        <div className="min-w-0">
+          <h4 className="text-sm font-semibold leading-[22px] text-foreground [overflow-wrap:anywhere]">
+            {link ? <a href={link} target="_blank" rel="noopener noreferrer" className="rounded-sm underline-offset-2 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring">{article.title}</a> : article.title}
+          </h4>
+          {content && <p id={summaryId} className={cn('mt-1 whitespace-pre-wrap text-[13px] leading-[21px] text-muted-foreground [overflow-wrap:anywhere]', !expanded && 'line-clamp-3')}>
+            {content}
+          </p>}
+          <div className="mt-2 flex min-w-0 flex-wrap items-center gap-1.5">
+            {[...labels].map(([label, { tag, flag }]) => (
+              <Button key={label} type="button" variant="outline" size="xs" onClick={() => onTag(tag)}
+                className="h-auto min-h-7 max-w-full gap-1.5 whitespace-normal rounded-sm bg-muted/20 px-2 text-left font-normal text-muted-foreground [overflow-wrap:anywhere]">
+                {flag && <img src={`/market/flags/${flag}.svg`} alt="" width={16} height={16} className="size-4 shrink-0" />}
+                {label}
+              </Button>
+            ))}
+            {(content || !hasImage && source) && <div className="ml-auto flex min-w-0 items-center gap-2">
+              {content && <Button type="button" variant="ghost" size="icon-xs" aria-expanded={expanded} aria-controls={summaryId}
+                aria-label={t(expanded ? 'news.showLess' : 'news.showMore')} title={t(expanded ? 'news.showLess' : 'news.showMore')}
+                onClick={() => setExpanded(!expanded)} className="size-7 text-muted-foreground">
+                <ChevronDown className={cn('size-3.5', expanded && 'rotate-180')} aria-hidden />
+              </Button>}
+              {!hasImage && source}
+            </div>}
+          </div>
+        </div>
+        {hasImage && <div className="mt-2 w-[124px] min-w-0 justify-self-end text-right sm:mt-0 sm:w-auto">
+          <img src={image} alt={t('news.imageAlt', { title: article.title })} loading="lazy" decoding="async" referrerPolicy="no-referrer"
+            onError={() => setFailedImage(image ?? null)} className="aspect-[3/2] w-full rounded-sm border border-border object-cover" />
+          {source && <div className="mt-1">{source}</div>}
+        </div>}
+      </div>
+    </article>
   )
+})
+
+function NewsStreamSkeleton() {
+  return <div className="space-y-6 px-4 py-4" aria-hidden="true">{Array.from({ length: 6 }, (_, index) => (
+    <div key={index} className="grid grid-cols-[46px_minmax(0,1fr)] gap-3 sm:grid-cols-[54px_minmax(0,1fr)]"><Skeleton className="h-3 w-10" /><div className="space-y-2"><Skeleton className="h-3 w-full" /><Skeleton className="h-3 w-4/5" /><Skeleton className="h-6 w-36" /></div></div>
+  ))}</div>
 }
 
-function NewsStaleNotice({
-  refreshing,
-  onRetry,
-}: {
-  refreshing: boolean
-  onRetry: () => void
-}) {
+function NewsLoadError({ refreshing, onRetry }: { refreshing: boolean; onRetry: () => void }) {
   const { t } = useTranslation()
-  return (
-    <div
-      role="status"
-      className="flex items-center gap-2 rounded-lg border border-warning/25 bg-warning/[0.06] px-3 py-2 text-[12px] leading-[18px] text-muted-foreground"
-    >
-      <CircleAlert size={14} className="shrink-0 text-warning" aria-hidden />
-      <span className="min-w-0 flex-1">{t('news.stale')}</span>
-      <Button
-        type="button"
-        onClick={onRetry}
-        disabled={refreshing}
-        className="shrink-0"
-        variant="ghost"
-        size="xs"
-      >
-        {refreshing ? t('common.loading') : t('common.retry')}
-      </Button>
-    </div>
-  )
+  return <div role="alert" className="mx-auto flex max-w-[520px] flex-col items-center px-6 py-16 text-center">
+    <CircleAlert size={24} strokeWidth={1.75} className="text-destructive" aria-hidden />
+    <h2 className="mt-3 text-[15px] font-medium">{t('news.loadErrorTitle')}</h2>
+    <p className="mt-1.5 text-[13px] leading-relaxed text-muted-foreground">{t('news.loadErrorDescription')}</p>
+    <Button type="button" onClick={onRetry} disabled={refreshing} className="mt-4" variant="outline" size="sm">{refreshing ? t('common.loading') : t('common.retry')}</Button>
+  </div>
+}
+
+function NewsStaleNotice({ refreshing, onRetry }: { refreshing: boolean; onRetry: () => void }) {
+  const { t } = useTranslation()
+  return <div role="status" className="flex items-center gap-2 border-b border-warning/25 bg-warning/[0.06] px-3 py-2 text-xs text-muted-foreground">
+    <CircleAlert size={14} className="shrink-0 text-warning" aria-hidden />
+    <span className="min-w-0 flex-1">{t('news.stale')}</span>
+    <Button type="button" onClick={onRetry} disabled={refreshing} variant="ghost" size="xs">{refreshing ? t('common.loading') : t('common.retry')}</Button>
+  </div>
+}
+
+function articleKey(article: NewsArticle): string { return `${article.time}-${article.link ?? article.title}` }
+function articleTags(article: NewsArticle): string[] { return (article.categories ?? '').split(/[;,]/).map((tag) => tag.trim().toLowerCase()).filter(Boolean) }
+
+function safeNewsUrl(value: string | null | undefined, allowLocal = false): string | undefined {
+  if (!value) return undefined
+  if (allowLocal && value.startsWith('/') && !value.startsWith('//') && !value.includes('\\')) return value
+  try {
+    const url = new URL(value)
+    return url.protocol === 'https:' || url.protocol === 'http:' ? url.href : undefined
+  } catch { return undefined }
+}
+
+const dateFormatterCache = new Map<string, Intl.DateTimeFormat>()
+
+function getDateFormatter(locale: string, kind: 'time' | 'date' | 'published'): Intl.DateTimeFormat {
+  const key = `${locale}:${kind}`
+  const cached = dateFormatterCache.get(key)
+  if (cached) return cached
+  const options: Intl.DateTimeFormatOptions = kind === 'time'
+    ? { hour: '2-digit', minute: '2-digit', hour12: false }
+    : kind === 'date'
+      ? { dateStyle: 'medium' }
+      : { dateStyle: 'medium', timeStyle: 'short' }
+  const formatter = new Intl.DateTimeFormat(locale, options)
+  dateFormatterCache.set(key, formatter)
+  return formatter
+}
+
+function formatNewsDay(value: string, locale: string): string {
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return value
+  if (date.toDateString() === new Date().toDateString()) {
+    return new Intl.RelativeTimeFormat(locale, { numeric: 'auto' }).format(0, 'day')
+  }
+  return getDateFormatter(locale, 'date').format(date)
+}
+
+function formatNewsTime(value: string, locale: string): string {
+  const date = new Date(value)
+  return Number.isNaN(date.getTime()) ? value : getDateFormatter(locale, 'time').format(date)
+}
+
+function formatPublishedTime(value: string, locale: string): string {
+  const date = new Date(value)
+  return Number.isNaN(date.getTime()) ? value : getDateFormatter(locale, 'published').format(date)
 }

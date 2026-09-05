@@ -1,5 +1,6 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
+import { useNavigate } from 'react-router-dom'
 import { X } from 'lucide-react'
 import { type AssetClass, type BarSourceCandidate } from '../api/market'
 import { useAssetSearch } from './market/useAssetSearch'
@@ -11,6 +12,7 @@ import { SidebarSectionHeader } from './SidebarSectionHeader'
 import { Spinner } from './StateViews'
 import { Button } from './ui/button'
 import { inputClass } from './form'
+import { NewsMarketNavigation } from './market/NewsMarketNavigation.js'
 
 const ASSET_CLASS_COLORS: Record<string, string> = {
   equity: 'bg-primary/15 text-primary',
@@ -40,8 +42,9 @@ function routeAssetClass(c: BarSourceCandidate['assetClass']): AssetClass {
  *
  * Search results are debounced 300ms.
  */
-export function MarketSidebar() {
+export function MarketSidebar({ onNavigate }: { onNavigate?: () => void }) {
   const { t } = useTranslation()
+  const navigate = useNavigate()
   const [query, setQuery] = useState('')
   // Shared with the main search box — one search logic, no drift.
   const { results, loading } = useAssetSearch(query)
@@ -53,7 +56,11 @@ export function MarketSidebar() {
 
   const watchlist = useWatchlist((s) => s.entries)
   const removeFromWatchlist = useWatchlist((s) => s.remove)
-  const openOrFocus = useWorkspace((s) => s.openOrFocus)
+  const openTab = useWorkspace((s) => s.openOrFocus)
+  const openOrFocus = (spec: ViewSpec) => {
+    openTab(spec)
+    onNavigate?.()
+  }
 
   const focusedSpec = useWorkspace((state) => getFocusedTab(state)?.spec)
   const isFocused = (kind: ViewSpec['kind']) => focusedSpec?.kind === kind
@@ -90,7 +97,7 @@ export function MarketSidebar() {
   }
 
   return (
-    <div className="flex flex-col gap-3 h-full overflow-hidden">
+    <div className="flex flex-col gap-1 h-full overflow-hidden">
       {/* Search box */}
       <div className="px-3 pt-2 shrink-0">
         <input
@@ -104,64 +111,7 @@ export function MarketSidebar() {
         />
       </div>
 
-      <div className="flex-1 overflow-y-auto min-h-0">
-        <SidebarRow
-          label={t('nav.item.news')}
-          active={isFocused('news')}
-          onClick={() => openOrFocus({ kind: 'news', params: {} })}
-        />
-        <div role="group" aria-label={t('market.marketsSection')}>
-          <SidebarSectionHeader>{t('market.marketsSection')}</SidebarSectionHeader>
-          <SidebarRow
-            label={t('market.browseMarkets')}
-            active={isFocused('market-list')}
-            onClick={() => openOrFocus({ kind: 'market-list', params: {} })}
-          />
-          <SidebarRow
-            label={t('market.boardMovers')}
-            active={focusedSpec?.kind === 'market-board' && focusedSpec.params.board === 'movers'}
-            onClick={() => openOrFocus({ kind: 'market-board', params: { board: 'movers' } })}
-          />
-          <SidebarRow
-            label={t('market.sectorRotation')}
-            active={isFocused('market-rotation')}
-            onClick={() => openOrFocus({ kind: 'market-rotation', params: {} })}
-          />
-          <SidebarRow
-            label={t('market.boardTermStructure')}
-            active={focusedSpec?.kind === 'market-board' && focusedSpec.params.board === 'term-structure'}
-            onClick={() => openOrFocus({ kind: 'market-board', params: { board: 'term-structure' } })}
-          />
-        </div>
-        <div role="group" aria-label={t('market.macroSection')}>
-          <SidebarSectionHeader>{t('market.macroSection')}</SidebarSectionHeader>
-          <SidebarRow
-            label={t('market.boardCalendar')}
-            active={focusedSpec?.kind === 'market-board' && focusedSpec.params.board === 'calendar'}
-            onClick={() => openOrFocus({ kind: 'market-board', params: { board: 'calendar' } })}
-          />
-          <SidebarRow
-            label={t('market.boardMacro')}
-            active={focusedSpec?.kind === 'market-board' && focusedSpec.params.board === 'macro'}
-            onClick={() => openOrFocus({ kind: 'market-board', params: { board: 'macro' } })}
-          />
-          <SidebarRow
-            label={t('market.boardGlobalMacro')}
-            active={focusedSpec?.kind === 'market-board' && focusedSpec.params.board === 'global-macro'}
-            onClick={() => openOrFocus({ kind: 'market-board', params: { board: 'global-macro' } })}
-          />
-          <SidebarRow
-            label={t('market.boardFed')}
-            active={focusedSpec?.kind === 'market-board' && focusedSpec.params.board === 'fed'}
-            onClick={() => openOrFocus({ kind: 'market-board', params: { board: 'fed' } })}
-          />
-          <SidebarRow
-            label={t('market.boardShipping')}
-            active={focusedSpec?.kind === 'market-board' && focusedSpec.params.board === 'shipping'}
-            onClick={() => openOrFocus({ kind: 'market-board', params: { board: 'shipping' } })}
-          />
-        </div>
-
+      <div className="flex-1 overflow-y-auto min-h-0 pb-4">
         {/* Search results — only when query is non-empty */}
         {query.trim() && (
           <>
@@ -200,8 +150,66 @@ export function MarketSidebar() {
           </>
         )}
 
+        <NewsMarketNavigation active={isFocused('news')} category={focusedSpec?.kind === 'news' ? focusedSpec.params.category ?? null : null} onSelect={(category) => {
+            const next = new URLSearchParams()
+            if (focusedSpec?.kind === 'news' && focusedSpec.params.view) next.set('view', focusedSpec.params.view)
+            if (category) next.set('category', category)
+            else next.delete('category')
+            navigate({ pathname: '/market/news', search: next.toString() })
+            onNavigate?.()
+          }} />
+        <MarketSection label={t('market.marketsSection')}>
+          <SidebarRow
+            label={t('market.browseMarkets')}
+            active={isFocused('market-list')}
+            onClick={() => openOrFocus({ kind: 'market-list', params: {} })}
+          />
+          <SidebarRow
+            label={t('market.boardMovers')}
+            active={focusedSpec?.kind === 'market-board' && focusedSpec.params.board === 'movers'}
+            onClick={() => openOrFocus({ kind: 'market-board', params: { board: 'movers' } })}
+          />
+          <SidebarRow
+            label={t('market.sectorRotation')}
+            active={isFocused('market-rotation')}
+            onClick={() => openOrFocus({ kind: 'market-rotation', params: {} })}
+          />
+          <SidebarRow
+            label={t('market.boardTermStructure')}
+            active={focusedSpec?.kind === 'market-board' && focusedSpec.params.board === 'term-structure'}
+            onClick={() => openOrFocus({ kind: 'market-board', params: { board: 'term-structure' } })}
+          />
+        </MarketSection>
+        <MarketSection label={t('market.macroSection')}>
+          <SidebarRow
+            label={t('market.boardCalendar')}
+            active={focusedSpec?.kind === 'market-board' && focusedSpec.params.board === 'calendar'}
+            onClick={() => openOrFocus({ kind: 'market-board', params: { board: 'calendar' } })}
+          />
+          <SidebarRow
+            label={t('market.boardMacro')}
+            active={focusedSpec?.kind === 'market-board' && focusedSpec.params.board === 'macro'}
+            onClick={() => openOrFocus({ kind: 'market-board', params: { board: 'macro' } })}
+          />
+          <SidebarRow
+            label={t('market.boardGlobalMacro')}
+            active={focusedSpec?.kind === 'market-board' && focusedSpec.params.board === 'global-macro'}
+            onClick={() => openOrFocus({ kind: 'market-board', params: { board: 'global-macro' } })}
+          />
+          <SidebarRow
+            label={t('market.boardFed')}
+            active={focusedSpec?.kind === 'market-board' && focusedSpec.params.board === 'fed'}
+            onClick={() => openOrFocus({ kind: 'market-board', params: { board: 'fed' } })}
+          />
+          <SidebarRow
+            label={t('market.boardShipping')}
+            active={focusedSpec?.kind === 'market-board' && focusedSpec.params.board === 'shipping'}
+            onClick={() => openOrFocus({ kind: 'market-board', params: { board: 'shipping' } })}
+          />
+        </MarketSection>
+
         {/* Watchlist */}
-        <SidebarSectionHeader>{t('market.watchlist')}{watchlist.length ? ` (${watchlist.length})` : ''}</SidebarSectionHeader>
+        <MarketSection label={t('market.watchlist')} count={watchlist.length}>
         {watchlist.length === 0 ? (
           <p className="px-3 py-2 text-[12px] leading-relaxed text-muted-foreground">
             {t('market.emptyWatchlistHint')}
@@ -239,8 +247,24 @@ export function MarketSidebar() {
             />
           ))
         )}
+        </MarketSection>
       </div>
     </div>
+  )
+}
+
+function MarketSection({ label, children, count }: {
+  label: string
+  children: ReactNode
+  count?: number
+}) {
+  return (
+    <section role="group" aria-label={label} className="mt-3">
+      <SidebarSectionHeader hierarchy trailing={count ? <span className="text-[11px] tabular-nums text-muted-foreground">{count}</span> : undefined}>
+        {label}
+      </SidebarSectionHeader>
+      <div className="ml-3">{children}</div>
+    </section>
   )
 }
 

@@ -39,7 +39,7 @@ export type ViewSpec =
   | { kind: 'tracked-issue-detail'; params: { wsId: string; id: string } }
   | { kind: 'automation';     params: { section: 'runs' | 'api' } }
   | { kind: 'office';         params: Record<string, never> }
-  | { kind: 'news';           params: Record<string, never> }
+  | { kind: 'news';           params: { category?: string; view?: string } }
   | { kind: 'market-list';    params: Record<string, never> }
   | { kind: 'market-rotation'; params: Record<string, never> }
   | { kind: 'market-board';   params: { board: 'movers' | 'calendar' | 'macro' | 'term-structure' | 'global-macro' | 'shipping' | 'fed' } }
@@ -156,7 +156,7 @@ export function specEquals(a: ViewSpec, b: ViewSpec): boolean {
  * rather than creating a separate editor identity for every anchor.
  */
 export function specTabIdentityEquals(a: ViewSpec, b: ViewSpec): boolean {
-  if (a.kind === 'tracked' && b.kind === 'tracked') return true
+  if (a.kind === b.kind && (a.kind === 'tracked' || a.kind === 'news')) return true
   return specEquals(a, b)
 }
 

@@ -126,6 +126,7 @@ export class NewsCollector {
           ingestSource: 'rss',
           dedupKey,
           ...(feed.categories ? { categories: feed.categories.join(',') } : {}),
+          ...(item.image ? { image: item.image } : {}),
         },
       })
 

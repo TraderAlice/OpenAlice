@@ -1725,3 +1725,19 @@ html[lang="ja"] .oa-onboarding-title {
     transition-duration: 0.01ms !important;
   }
 }
+
+/* Base UI owns measurement and mount lifetime; hidden panels leave the tab order. */
+.oa-collapsible-panel {
+  height: var(--collapsible-panel-height);
+  overflow: hidden;
+  opacity: 1;
+  transition: height 180ms var(--motion-ease-out), opacity 180ms var(--motion-ease-out);
+}
+.oa-collapsible-panel[data-starting-style],
+.oa-collapsible-panel[data-ending-style] {
+  height: 0;
+  opacity: 0;
+}
+@media (prefers-reduced-motion: reduce) {
+  .oa-collapsible-panel { transition: none; }
+}

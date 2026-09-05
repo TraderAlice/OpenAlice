@@ -34,6 +34,22 @@ information should recede without becoming illegible.
 - Keep copy direct and operational. Lead with the state or object, then the
   explanation and next action.
 
+News rows in `ui/src/pages/NewsPage.tsx` form a local-calendar-day timeline.
+Time stays in the left gutter. The headline is a separate, prominent block above
+the summary, which previews up to three lines. Editorial images align with the
+headline on the right, with the source below; narrow screens place this image
+and source beneath the text. Bordered market/topic labels and a compact
+disclosure arrow follow the summary; expanding never hides the image. Flags
+identify the supplied market classification, not a company's domicile or the
+country mentioned in a headline. The local flag assets retain their license
+under `ui/public/market/flags/`; unknown tags remain text. The current news
+contract has no structured related-company identity or company-logo field.
+
+The news scroller reveals already-fetched results in batches of 40 when its
+bottom sentinel approaches the viewport. Appending keeps the reading position;
+changing a filter resets the batch and scroll position. This is not server
+pagination: the existing query limit and refresh cadence remain unchanged.
+
 The stable page hierarchy is:
 
 1. global shell and activity rail;
@@ -403,6 +419,35 @@ shell mounted while replacing the active-only view content. Do not wrap every
 drill-in in a fresh copy of the same shell or mask the resulting remount with a
 transition. Session terminals and other heavy page content remain active-only
 unless their own lifecycle explicitly requires otherwise.
+
+Market's quotes, news, boards, rotation and instrument views share the
+`market` shell. News contributes content only; its grouped categories live
+inside MarketSidebar and use SidebarRow rather than feature-colored buttons.
+Category and news-view selection use separate URL parameters, so selecting an
+importance or sentiment view does not discard the current category. Existing
+source-tag matching is unchanged by this navigation and theme integration.
+News category/view selections are adopted into one news tab and projected back
+to the URL, including on a fresh load. Changing a selection does not create
+another tab. Narrow screens use the same news directory in the Market drawer.
+News initially mounts forty stories and reveals more on demand. Selection
+changes reset the visible batch; full story text remains expandable. Polling
+waits for an outstanding request instead of repeatedly replacing a slow load,
+while explicit refresh, query changes and unmount cancel superseded requests.
+
+Market directory headings (News, Markets, Macro, Watchlist) are static captions.
+Parent headings use the shared hierarchy variant (13px, medium weight), and
+each child navigation level adds a 12px inset. Clickable categories and leaf
+rows share 13px regular text and foreground color; gray is reserved for
+secondary summaries and chevrons. Only News category groups disclose children,
+with trailing chevrons. Only destination rows receive page selection
+styling; a collapsed category group shows the selected category as a plain
+summary. Restoring a News selection reveals its group, while users can still
+collapse it manually. Search results appear immediately below the search field.
+The shared Base UI Collapsible owns keyboard/ARIA and measured panel lifetime;
+its 180ms height/opacity transition is disabled with reduced motion. Closing
+panels become inert and aria-hidden immediately, including during animation.
+The same directory and touch-sized controls serve the narrow-screen drawer.
+No new persisted preference is added.
 
 Keyboard focus is not a motion effect. Interactive controls still require a
 clear `focus-visible` treatment, meaningful labels, and sensible tab order.

@@ -72,7 +72,7 @@ interface ViewProps<K extends ViewKind> {
 }
 
 export type ViewLifecycle = 'active-only' | 'keep-mounted'
-export type ViewShell = 'chat' | 'auto-quant' | 'prediction'
+export type ViewShell = 'chat' | 'auto-quant' | 'prediction' | 'market'
 
 export interface ViewModule<K extends ViewKind> {
   kind: K
@@ -200,13 +200,13 @@ const officeModule: ViewModule<'office'> = {
   Component: () => <PageContentLayout title="Office"><OfficePage /></PageContentLayout>,
 }
 
-function MarketArea({ children }: { children: ReactNode }) {
+export function MarketArea({ children }: { children: ReactNode }) {
   return (
     <PageSidebarShell
       storageKey="market"
       titleKey="nav.item.market"
       defaultWidth={300}
-      sidebar={<MarketSidebar />}
+      sidebar={({ closeMobileDrawer }) => <MarketSidebar onNavigate={closeMobileDrawer} />}
     >
       {children}
     </PageSidebarShell>
@@ -216,45 +216,38 @@ function MarketArea({ children }: { children: ReactNode }) {
 const newsModule: ViewModule<'news'> = {
   kind: 'news',
   title: () => 'News',
-  toUrl: () => '/market/news',
-  Component: () => (
-    <MarketArea>
-      <NewsPage />
-    </MarketArea>
-  ),
+  toUrl: ({ params }) => {
+    const search = new URLSearchParams()
+    if (params.category) search.set('category', params.category)
+    if (params.view) search.set('view', params.view)
+    return '/market/news' + (search.size ? '?' + search : '')
+  },
+  shell: 'market',
+  Component: ({ spec }) => <NewsPage spec={spec} />,
 }
 
 const marketListModule: ViewModule<'market-list'> = {
   kind: 'market-list',
   title: () => 'Market',
   toUrl: () => '/market',
-  Component: () => (
-    <MarketArea>
-      <MarketPage />
-    </MarketArea>
-  ),
+  shell: 'market',
+  Component: () => <MarketPage />,
 }
 
 const marketRotationModule: ViewModule<'market-rotation'> = {
   kind: 'market-rotation',
   title: () => 'Sector Rotation',
   toUrl: () => '/market/rotation',
-  Component: () => (
-    <MarketArea>
-      <MarketRotationPage />
-    </MarketArea>
-  ),
+  shell: 'market',
+  Component: () => <MarketRotationPage />,
 }
 
 const marketBoardModule: ViewModule<'market-board'> = {
   kind: 'market-board',
   title: (spec) => MARKET_BOARD_TITLES[spec.params.board],
   toUrl: (spec) => `/market/boards/${spec.params.board}`,
-  Component: (props) => (
-    <MarketArea>
-      <MarketBoardPage {...props} />
-    </MarketArea>
-  ),
+  shell: 'market',
+  Component: (props) => <MarketBoardPage {...props} />,
 }
 
 const marketDetailModule: ViewModule<'market-detail'> = {
@@ -263,11 +256,8 @@ const marketDetailModule: ViewModule<'market-detail'> = {
   toUrl: (spec) =>
     `/market/${spec.params.assetClass}/${encodeURIComponent(spec.params.symbol)}` +
     (spec.params.source ? `?source=${encodeURIComponent(spec.params.source)}` : ''),
-  Component: (props) => (
-    <MarketArea>
-      <MarketDetailPage {...props} />
-    </MarketArea>
-  ),
+  shell: 'market',
+  Component: (props) => <MarketDetailPage {...props} />,
 }
 
 const settingsCategoryTitle: Record<
