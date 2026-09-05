@@ -1,6 +1,7 @@
 # Release pipeline efficiency
 
-Status: active, planning accepted for implementation on 2026-09-05.
+Status: implementation and non-publishing acceptance complete on 2026-09-05;
+Draft PR awaits maintainer acceptance.
 Branch: `codex/release-pipeline-efficiency`; one topic Draft PR targeting dev.
 Delivery: ordered increments on one owned branch; leave the topic unmerged for
 maintainer acceptance. Do not promote master or publish a product for a rehearsal.
@@ -118,28 +119,28 @@ beta-to-stable promotion; installing a permanent runner on the user's daily Mac.
   seven seconds after its build, while Intel/Windows were still building.
   Intel upgrade started three seconds after its build. Final aggregation,
   signing paths and beta/stable distinctions remain in the workflow contracts.
-- [ ] Candidate identity, trusted selection and independent recovery acceptance.
+- [x] Candidate identity, trusted selection and independent recovery acceptance.
   Implemented exact-byte manifests, source/version/channel/platform pinning,
   required N-1 receipts, expiry/run/repository checks and fail-before-staging
   verification. Wrong source was rejected in hosted run 33960665604.
   Verifier-only native replay passed in 33962998628 (details below).
-  Same-source three-platform reuse 33962287156 is still running; all restores
-  and both Mac upgrades passed. Both Mac restored receipts exactly match their
-  originals, including candidate IDs and all checks. Windows remains pending.
+  Same-source three-platform reuse 33962287156 passed. All three restored
+  receipts exactly match their originals, including candidate IDs, verifier,
+  previous tag and all 11 successful checks, verified from downloaded JSON.
 - [x] Concurrent same-product-SHA full source validation and verified shared CLI
   inputs. Release calls local ci.yml at the dispatch SHA; no candidate builder
   depends on its completion, but stable publication requires success. Reusable
   source workflow retains complete source/native checks. Workflow tests inspect
   these dependencies and checkouts. Shared-input rejection tests and real
   native CLI benchmark 33960910945 passed; measured tradeoff is above.
-- [ ] Finish non-publishing rehearsal and final evidence audit. Full desktop
+- [x] Finish non-publishing rehearsal and final evidence audit. Full desktop
   build/acceptance and independent cross-verifier replay passed; three-platform
-  restored-candidate acceptance remains live. No signed full release was run.
+  restored-candidate acceptance passed. No signed full release was run.
 - [x] Update owner guide and local release skills. Development workflow documents
   recovery, verifier authority and unsigned rehearsal isolation. Local
   openalice-desktop-release-smoke and openalice-large-change-flow skills were
   adjusted and validated with quick_validate.py; they are not repository files.
-- [ ] Refresh final PR evidence/checks and present Draft PR #1377 for acceptance.
+- [x] Refresh final PR evidence/checks and present Draft PR #1377 for acceptance.
   Leave it unmerged. Once accepted, remove this plan and its PLANS.md entry;
   the owner guide and Git history retain the durable contract and evidence.
 
@@ -164,10 +165,21 @@ Same-source retry [33962287156](https://github.com/TraderAlice/OpenAlice/actions
 is frozen at the same product SHA. It waited behind the original rehearsal
 because it was submitted early; report that deliberate waiting separately.
 All build jobs skipped, authenticated restore jobs passed: ARM 58s, Intel
-1m46s, Windows 32s. Fresh upgrade acceptance follows each restore. Final
-critical-path timing and three-receipt identity comparison remain pending.
-ARM upgrade took 1m47s; Intel upgrade took 5m09s. Full JSON equality was checked
-for both Mac receipts against the original run, not inferred from job success.
+1m46s, Windows 32s. Fresh upgrade acceptance followed each restore and passed.
+ARM upgrade took 1m47s; Intel 5m09s; Windows 15m14s. Full JSON equality was
+checked for all three receipts against the original run, not inferred from
+job success. Windows candidate ID is
+5b3b6d1ce9c17f45cb6c74b28400ad5be822e836ad7db4c14d51801dfa9ac92c;
+Intel is bfdd1076a6b38834549c221c8f8575c1b4913bd3f00cf09236a1a7065288e9bb.
+
+First native job to last completion: original 29m23s, reuse 15m49s, observed
+reduction 13m34s (46.2%). This includes runtime variance: Windows acceptance
+itself was 3m04s faster, so not every saved second is attributable to reuse.
+Aggregate build work was 25m10s versus 3m16s for restore (21m54s removed).
+The retry was submitted at 11:03:20, first started at 11:18:30, and completed
+at 11:34:19 UTC. Its separate 15m10s pre-start wait was deliberately caused
+by queuing it before the producing run completed; total dispatch time was
+30m59s. Do not present that as a faster dispatch-to-completion run.
 
 Cross-verifier replay [33962998628](https://github.com/TraderAlice/OpenAlice/actions/runs/33962998628)
 passed in 2m56s dispatch-to-completion (native job 2m48s), with verifier
@@ -212,6 +224,15 @@ native evidence for changed execution paths. Never substitute unsigned rehearsal
 for signing/notarization, nor a diagnostic receipt for public-byte acceptance.
 
 ## Non-goals and follow-up boundaries
+
+Final audit: the owned branch is clean after delivery, targets unchanged dev
+5e209e9e, and remains an unmerged Draft PR. Product package versions are
+unchanged. Required source/publication gates, signing steps and channel checks
+remain in current workflow source and focused contracts. Current tests and
+native rehearsal establish this change's acceptance; a complete signed release,
+Apple notarization latency and public channel activation were not exercised.
+The modeled 34-35m clean stable release remains an estimate until a separately
+authorized release. No product tag or public release was created by this work.
 
 No ASAR conversion, Windows installer redesign, UTA version split, release
 version bump, channel activation, or dropping an artifact target. Installer
