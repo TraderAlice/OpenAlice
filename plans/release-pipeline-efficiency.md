@@ -90,12 +90,21 @@ beta-to-stable promotion; installing a permanent runner on the user's daily Mac.
   All 26 release/generator tests and root typecheck pass. actionlint 1.7.7
   passes with only its stale macos-15-intel label diagnostic excluded; no shell
   checker is installed. Actions semantics rehearsal and full
-  local regression remain outstanding; no measured speedup is claimed yet.
+  local regression completed: 719 files, 6,430 passes and three expected skips
+  in 220 seconds (/tmp/openalice-release-pipeline-step1-tests.log). Final
+  generator changes have additional focused coverage. Hosted Actions semantics
+  rehearsal remains outstanding; no measured speedup is claimed yet.
 - [ ] Increment 2: implement candidate identity, artifact-bound acceptance, and
   bounded replay of existing candidates using repaired trusted verification.
   Test wrong hash/source/channel/platform, missing receipt, failed checks,
   artifact expiry and tampering. Prove identical candidate hashes before/after
   a verifier-only retry; prove a product change cannot reuse old acceptance.
+  In progress: release-candidate-identity.mjs fingerprints exact regular-file
+  contents with source/version/channel/target identity, requires an explicitly
+  selected candidate hash at verification, and binds acceptance to a verifier
+  commit plus required named checks. Fifteen initial rejection/identity tests
+  pass. This module is not yet wired into workflow production/publication and
+  does not by itself prove trusted cross-run selection or replay support.
 - [ ] Increment 3: join exact-SHA full source validation at publication instead
   of serializing before candidate builds; reuse verified neutral CLI inputs.
   Test source failure/mismatch blocks publication, beta gates stay separate,
