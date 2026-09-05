@@ -1177,6 +1177,83 @@ describe('UTA — health tracking', () => {
     await uta.close()
   })
 
+  it('re-arms recovery when a stale in-flight success lands after a transport-dead event', async () => {
+    const broker = new MockBroker()
+    let connectionListener: (event: { state: 'alive' | 'dead' | 'restored'; error?: string }) => void = () => {
+      throw new Error('connection-state listener was not registered')
+    }
+    ;(broker as unknown as { setConnectionStateListener: unknown }).setConnectionStateListener = (
+      listener: typeof connectionListener | null,
+    ) => { if (listener) connectionListener = listener }
+    const { uta } = createUTA(broker) // funded → target "readable"
+    await flush()
+    expect(uta.health).toBe('healthy')
+
+    // The read passes the offline gate before the transport dies, so a success
+    // landing afterwards still reaches _onSuccess.
+    let release: () => void = () => {}
+    const gate = new Promise<void>((resolve) => { release = resolve })
+    const realGetAccount = broker.getAccount.bind(broker)
+    ;(broker as unknown as { getAccount: unknown }).getAccount = async () => {
+      await gate
+      return realGetAccount()
+    }
+    const inFlight = uta.getAccount()
+
+    connectionListener({ state: 'dead', error: 'Write-path liveness probe failed' })
+    expect(uta.health).toBe('offline')
+    expect(uta.getHealthInfo().recovering).toBe(true)
+
+    release()
+    await inFlight
+
+    const info = uta.getHealthInfo()
+    expect(info.consecutiveFailures).toBe(0)
+    // The account may never end up offline with no recovery in flight.
+    if (info.status === 'offline' || info.status === 'degraded') {
+      expect(info.recovering).toBe(true)
+    }
+    expect(info.reach).not.toBe('down')
+
+    await vi.advanceTimersByTimeAsync(60_000)
+    expect(uta.health).toBe('healthy')
+    expect(uta.getHealthInfo().recovering).toBe(false)
+    await uta.close()
+  })
+
+  it('discards a recovery probe whose result predates a mid-probe transport death', async () => {
+    const broker = new MockBroker()
+    let connectionListener: (event: { state: 'alive' | 'dead' | 'restored'; error?: string }) => void = () => {
+      throw new Error('connection-state listener was not registered')
+    }
+    ;(broker as unknown as { setConnectionStateListener: unknown }).setConnectionStateListener = (
+      listener: typeof connectionListener | null,
+    ) => { if (listener) connectionListener = listener }
+    // A probe that succeeds after its own socket died must not raise reach.
+    const realGetAccount = broker.getAccount.bind(broker)
+    let killed = false
+    ;(broker as unknown as { getAccount: unknown }).getAccount = async () => {
+      const result = await realGetAccount()
+      if (!killed) {
+        killed = true
+        connectionListener({ state: 'dead', error: 'gateway restarted mid-probe' })
+      }
+      return result
+    }
+    const { uta } = createUTA(broker)
+    await flush()
+
+    // The connect probe raced the death, so reach stays down and recovery armed.
+    expect(uta.reach).toBe('down')
+    expect(uta.health).toBe('offline')
+    expect(uta.getHealthInfo().recovering).toBe(true)
+
+    await vi.advanceTimersByTimeAsync(60_000)
+    expect(uta.health).toBe('healthy')
+    expect(uta.getHealthInfo().recovering).toBe(false)
+    await uta.close()
+  })
+
   it('transitions healthy → degraded after 3 consecutive failures', async () => {
     const broker = new MockBroker()
     const { uta } = createUTA(broker)
@@ -1187,6 +1264,39 @@ describe('UTA — health tracking', () => {
       await expect(uta.getAccount()).rejects.toThrow()
     }
     expect(uta.health).toBe('degraded')
+  })
+
+  it('keeps retrying when a broker probe never settles, and recovers when the venue returns', async () => {
+    const broker = new MockBroker()
+    const closeSpy = vi.spyOn(broker, 'close').mockResolvedValue(undefined)
+    const realInit = broker.init.bind(broker)
+    let hangsLeft = 2
+    ;(broker as unknown as { init: () => Promise<void> }).init = () => {
+      if (hangsLeft-- > 0) return new Promise<void>(() => { /* wedged transport: never settles */ })
+      return realInit()
+    }
+    const { uta } = createUTA(broker) // funded → target "readable"
+    uta.waitForConnect().catch(() => { /* initial connect is expected to fail */ })
+    await flush()
+
+    // Initial connect's probe is wedged: still "connecting", nothing decided.
+    expect(uta.getHealthInfo().connecting).toBe(true)
+
+    // The 45s probe deadline abandons the wedged attempt and arms recovery.
+    await vi.advanceTimersByTimeAsync(45_000)
+    expect(uta.health).toBe('offline')
+    expect(uta.getHealthInfo().recovering).toBe(true)
+    expect(closeSpy).toHaveBeenCalled()
+
+    // Recovery attempt 1 (t+5s) wedges too, and the loop must still come back.
+    await vi.advanceTimersByTimeAsync(5_000 + 45_000)
+    expect(uta.getHealthInfo().recovering).toBe(true)
+
+    // Attempt 2 (t+10s backoff) meets a healthy venue.
+    await vi.advanceTimersByTimeAsync(10_000)
+    expect(uta.health).toBe('healthy')
+    expect(uta.getHealthInfo().recovering).toBe(false)
+    await uta.close()
   })
 
   it('transitions degraded → offline after 6 consecutive failures', async () => {

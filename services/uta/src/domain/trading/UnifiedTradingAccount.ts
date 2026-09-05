@@ -107,6 +107,10 @@ export class UnifiedTradingAccount {
    *  it and the read returns "connecting" instead of blocking on the whole init.
    *  Bounds the cold-start first-read to this, not the full connect time. */
   private static readonly CONNECT_GRACE_MS = 1_500
+  /** Hard deadline for one capability-ladder probe. Larger than the slowest
+   *  legitimate broker connect (IBKR: 15s handshake plus 20s account download)
+   *  so it only ever fires on a genuine hang. */
+  private static readonly RECOVERY_PROBE_TIMEOUT_MS = 45_000
 
   private _consecutiveFailures = 0
   private _lastError?: string
@@ -115,6 +119,10 @@ export class UnifiedTradingAccount {
   private _recoveryTimer?: ReturnType<typeof setTimeout>
   private _recovering = false
   private _disabled = false
+  /** Monotonic transport generation, bumped whenever the broker reports the
+   *  connection dead. A probe whose generation moved underneath it must discard
+   *  its own result, or a success from a dead socket raises `_currentReach`. */
+  private _transportEpoch = 0
   /** True while the INITIAL broker connect is in flight (e.g. CCXT loadMarkets,
    *  which can take tens of seconds). Reads during this window return fast with
    *  a transient CONNECTING error instead of blocking on the slow connect — the
@@ -310,6 +318,43 @@ export class UnifiedTradingAccount {
     }
   }
 
+  /** `_attemptReach` bound to the transport generation it started on. An answer
+   *  describing a socket that has since died is downgraded to 'down' so the
+   *  caller keeps pursuing the target. */
+  private async _attemptReachGuarded(): Promise<UTAReach> {
+    const epoch = this._transportEpoch
+    const reached = await this._attemptReach()
+    if (epoch === this._transportEpoch) return reached
+    console.warn(`UTA[${this.id}]: reach probe discarded — transport died mid-probe (probe said "${reached}")`)
+    return 'down'
+  }
+
+  /** `_attemptReachGuarded` under a hard deadline. Always settles, because the
+   *  caller re-arms the retry timer from here. */
+  private async _probeReachBounded(): Promise<UTAReach> {
+    let timer: ReturnType<typeof setTimeout> | undefined
+    const deadline = new Promise<'timeout'>((resolve) => {
+      timer = setTimeout(() => resolve('timeout'), UnifiedTradingAccount.RECOVERY_PROBE_TIMEOUT_MS)
+      timer.unref?.()
+    })
+    const probe = this._attemptReachGuarded()
+    const outcome = await Promise.race([probe, deadline])
+      .finally(() => { if (timer) clearTimeout(timer) })
+    if (outcome !== 'timeout') return outcome
+
+    probe.catch(() => { /* abandoned; its answer is discarded by the epoch bump */ })
+    this._transportEpoch++
+    this._noteFailure(new BrokerError(
+      'NETWORK',
+      `Broker probe did not settle within ${UnifiedTradingAccount.RECOVERY_PROBE_TIMEOUT_MS}ms`,
+    ))
+    console.warn(`UTA[${this.id}]: reach probe timed out — abandoning the attempt and resetting the transport`)
+    // Not awaited: a broker whose probe is wedged can wedge its close() too, and
+    // the retry schedule must not depend on that.
+    void Promise.resolve().then(() => this.broker.close()).catch(() => { /* already torn down */ })
+    return 'down'
+  }
+
   private _notePermanent(err: unknown): void {
     // Broker packs may carry their own physical copy of uta-protocol. Preserve
     // the structured BrokerError contract across that module boundary instead
@@ -339,6 +384,7 @@ export class UnifiedTradingAccount {
     }
     if (this._disabled) return
 
+    this._transportEpoch++
     this._currentReach = 'down'
     this._consecutiveFailures = UnifiedTradingAccount.OFFLINE_THRESHOLD
     this._lastError = event.error ?? 'Broker transport reported a dead connection'
@@ -358,7 +404,7 @@ export class UnifiedTradingAccount {
     // CCXT loadMarkets is otherwise an invisible ~30s stall).
     const startedAt = Date.now()
     console.log(`UTA[${this.id}]: connecting (target ${this.targetReach})…`)
-    this._currentReach = await this._attemptReach()
+    this._currentReach = await this._probeReachBounded()
     // Initial connect has settled (reached, down, or disabled — _attemptReach
     // never throws). Clear the connecting gate now, BEFORE any _emitHealthChange
     // below, so the first health diff the UI receives reflects the real state.
@@ -445,11 +491,23 @@ export class UnifiedTradingAccount {
     const prev = this.health
     this._consecutiveFailures = 0
     this._lastSuccessAt = new Date()
-    if (this._recoveryTimer) {
-      clearTimeout(this._recoveryTimer)
-      this._recoveryTimer = undefined
+    // A completed round-trip proves the transport is up. Without this promotion
+    // a success landing after a 'dead' event leaves reach pinned at 'down', which
+    // `health` reads as permanently offline.
+    if (this._currentReach === 'down') this._currentReach = 'connected'
+    // Only a success that satisfies the target reach may dismantle the recovery
+    // machinery. Clearing it below target leaves nothing armed to retry, since
+    // `nudgeRecovery` no-ops when not already recovering.
+    if (this._reachedTarget()) {
+      if (this._recoveryTimer) {
+        clearTimeout(this._recoveryTimer)
+        this._recoveryTimer = undefined
+      }
+      this._recovering = false
+      if (prev !== this.health) this._emitHealthChange()
+      return
     }
-    this._recovering = false
+    if (!this._disabled && !this._recovering) this._startRecovery()
     if (prev !== this.health) this._emitHealthChange()
   }
 
@@ -486,7 +544,7 @@ export class UnifiedTradingAccount {
     )
     this._recoveryTimer = setTimeout(async () => {
       this._recoveryTimer = undefined
-      this._currentReach = await this._attemptReach()
+      this._currentReach = await this._probeReachBounded()
       if (this._disabled) {
         this._recovering = false
         console.warn(`UTA[${this.id}]: disabled — ${this._lastError}`)
