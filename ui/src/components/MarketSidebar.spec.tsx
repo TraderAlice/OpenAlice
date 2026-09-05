@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { cleanup, fireEvent, render, screen, within } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react'
 import { MemoryRouter, useLocation } from 'react-router-dom'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -59,13 +59,13 @@ function renderSidebar() {
 }
 
 describe('MarketSidebar search keyboard controls', () => {
-  it('selects grouped news categories while preserving the view URL param', () => {
-    useWorkspace.getState().openOrFocus({ kind: 'news', params: {} })
+  it('selects news categories using the focused tab view despite a stale router location', () => {
+    useWorkspace.getState().openOrFocus({ kind: 'news', params: { view: 'important' } })
     function Location() {
       const location = useLocation()
       return <output aria-label="Current route">{location.pathname + location.search}</output>
     }
-    render(<MemoryRouter initialEntries={['/market/news?view=important']}><MarketSidebar /><Location /></MemoryRouter>)
+    render(<MemoryRouter initialEntries={['/market']}><MarketSidebar /><Location /></MemoryRouter>)
     const categories = screen.getByRole('navigation', { name: 'News categories' })
     expect(within(categories).queryByRole('button', { name: 'US Stocks' })).toBeNull()
     expect(within(categories).queryByRole('button', { name: 'Markets' })).toBeNull()
@@ -74,6 +74,16 @@ describe('MarketSidebar search keyboard controls', () => {
     expect(screen.getByLabelText('Current route').textContent).toBe('/market/news?view=important&category=us')
     fireEvent.click(within(categories).getByRole('button', { name: 'All news' }))
     expect(screen.getByLabelText('Current route').textContent).toBe('/market/news?view=important')
+  })
+
+  it('reveals the selected category when an existing Market shell restores News', () => {
+    useWorkspace.getState().openOrFocus({ kind: 'market-list', params: {} })
+    renderSidebar()
+    act(() => useWorkspace.getState().openOrFocus({ kind: 'news', params: { category: 'us', view: 'positive' } }))
+    const navigation = screen.getByRole('navigation', { name: 'News categories' })
+    expect(within(navigation).getByRole('button', { name: 'US Stocks' }).getAttribute('aria-current')).toBe('page')
+    fireEvent.click(within(navigation).getByRole('button', { name: 'Equity markets' }))
+    expect(within(navigation).queryByRole('button', { name: 'US Stocks' })).toBeNull()
   })
 
   it('opens the first exact provider when Enter is pressed', () => {

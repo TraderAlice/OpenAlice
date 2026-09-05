@@ -2,7 +2,7 @@
 
 import type { ReactNode } from 'react'
 import { act, cleanup, fireEvent, render as renderView, screen, waitFor, within } from '@testing-library/react'
-import { MemoryRouter } from 'react-router-dom'
+import { MemoryRouter, useSearchParams } from 'react-router-dom'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { NewsListResponse } from '../api'
 import { i18n } from '../i18n'
@@ -13,6 +13,13 @@ vi.mock('../api', () => ({ api: { news: { list: mocks.list } } }))
 vi.mock('../tabs/watchlist-store', () => ({
   useWatchlist: (selector: (state: { entries: typeof mocks.watchlist }) => unknown) => selector({ entries: mocks.watchlist }),
 }))
+function RoutedNewsPage() {
+  const [search] = useSearchParams()
+  return <NewsPage spec={{ kind: 'news', params: {
+    category: search.get('category') ?? undefined,
+    view: search.get('view') ?? undefined,
+  } }} />
+}
 function render(node: ReactNode, entry = '/market/news') {
   return renderView(<MemoryRouter initialEntries={[entry]}>{node}</MemoryRouter>)
 }
@@ -42,7 +49,7 @@ afterEach(() => { cleanup(); vi.clearAllMocks(); vi.restoreAllMocks(); vi.unstub
 
 describe('NewsPage inline stream', () => {
   it('orders complete stories newest-first with their own source and original link', async () => {
-    render(<NewsPage />)
+    render(<RoutedNewsPage />)
     await screen.findByRole('heading', { name: 'Newest update' })
     const rows = screen.getAllByRole('listitem')
     expect(rows.map((row) => within(row).getByRole('heading').textContent)).toEqual(['Newest update', 'Middle update', 'Oldest update'])
@@ -63,7 +70,7 @@ describe('NewsPage inline stream', () => {
       { ...newsResponse('Before midnight').items[0], time: beforeMidnight.toISOString() },
       { ...newsResponse('After midnight').items[0], time: afterMidnight.toISOString() },
     ], count: 2, lookback: '24h' })
-    render(<NewsPage />)
+    render(<RoutedNewsPage />)
     await screen.findByRole('heading', { name: 'After midnight' })
     const day = new Intl.DateTimeFormat('en', { dateStyle: 'medium' })
     const latestDay = screen.getByRole('list', { name: day.format(afterMidnight) })
@@ -87,7 +94,7 @@ describe('NewsPage inline stream', () => {
       time: new Date(2026, 6, 29, 10, index).toISOString(),
     }))
     mocks.list.mockResolvedValueOnce({ items, count: items.length, lookback: '24h' })
-    render(<NewsPage />)
+    render(<RoutedNewsPage />)
     await screen.findByRole('heading', { name: 'Story 80' })
     expect(screen.getAllByRole('listitem')).toHaveLength(40)
     act(() => notify(false))
@@ -109,7 +116,7 @@ describe('NewsPage inline stream', () => {
   })
 
   it('applies the category from market navigation without rendering another navigator', async () => {
-    render(<NewsPage />, '/market/news?category=macro')
+    render(<RoutedNewsPage />, '/market/news?category=macro')
     await screen.findByRole('heading', { name: 'Oldest update' })
     expect(screen.queryByRole('heading', { name: 'Newest update' })).toBeNull()
     expect(screen.queryByRole('navigation', { name: 'News categories' })).toBeNull()
@@ -122,7 +129,7 @@ describe('NewsPage inline stream', () => {
       { ...newsResponse('NVDA advances after results').items[0], categories: 'markets,us,positive' },
       { ...newsResponse('XAAPL unrelated ticker').items[0], categories: 'markets,us' },
     ], count: 3, lookback: '24h' })
-    render(<NewsPage />)
+    render(<RoutedNewsPage />)
     await screen.findByRole('heading', { name: /AAPL supplier setback/ })
     const views = screen.getByRole('navigation', { name: 'News views' })
     fireEvent.click(within(views).getByRole('button', { name: 'Important' }))
@@ -138,7 +145,7 @@ describe('NewsPage inline stream', () => {
   })
 
   it('submits text filters deliberately and clears them without losing the stream', async () => {
-    render(<NewsPage />)
+    render(<RoutedNewsPage />)
     await screen.findByRole('heading', { name: 'Newest update' })
     const keyword = screen.getByRole('textbox', { name: 'Keyword' })
     fireEvent.change(keyword, { target: { value: 'earnings' } })
@@ -155,7 +162,7 @@ describe('NewsPage inline stream', () => {
   })
 
   it('rejects reversed dates without requesting or clearing the current feed', async () => {
-    render(<NewsPage />)
+    render(<RoutedNewsPage />)
     await screen.findByRole('heading', { name: 'Newest update' })
     fireEvent.change(screen.getByLabelText('Start date'), { target: { value: '2026-07-30' } })
     fireEvent.change(screen.getByLabelText('End date'), { target: { value: '2026-07-29' } })
@@ -167,7 +174,7 @@ describe('NewsPage inline stream', () => {
 
   it('keeps a broken thumbnail from obscuring a story and rejects executable links', async () => {
     mocks.list.mockResolvedValue({ ...newsResponse('Unsafe link story'), items: [{ ...newsResponse('Unsafe link story').items[0], link: 'javascript:alert(1)', image: 'https://example.com/story.jpg' }] })
-    render(<NewsPage />)
+    render(<RoutedNewsPage />)
     await screen.findByRole('heading', { name: 'Unsafe link story' })
     expect(screen.queryByRole('link')).toBeNull()
     expect(screen.getByText('Unsafe link story content')).toBeTruthy()
@@ -180,7 +187,7 @@ describe('NewsPage inline stream', () => {
 describe('NewsPage request recovery', () => {
   it('reports initial failure and retries without calling it an empty feed', async () => {
     mocks.list.mockRejectedValueOnce(new Error('offline')).mockResolvedValueOnce(newsResponse('Recovered update'))
-    render(<NewsPage />)
+    render(<RoutedNewsPage />)
     await screen.findByRole('alert')
     expect(screen.queryByText('No articles')).toBeNull()
     fireEvent.click(screen.getByRole('button', { name: 'Retry' }))
@@ -189,7 +196,7 @@ describe('NewsPage request recovery', () => {
   })
 
   it('clears mismatched articles when a new source filter fails', async () => {
-    render(<NewsPage />)
+    render(<RoutedNewsPage />)
     await screen.findByRole('heading', { name: 'Newest update' })
     mocks.list.mockRejectedValueOnce(new Error('filter unavailable'))
     fireEvent.change(screen.getByRole('combobox', { name: 'News source' }), { target: { value: 'Reuters' } })
@@ -204,7 +211,7 @@ describe('NewsPage request recovery', () => {
       if (delay === 60_000) refresh = handler as () => void
       return {} as ReturnType<typeof setInterval>
     })
-    render(<NewsPage />)
+    render(<RoutedNewsPage />)
     await screen.findByRole('heading', { name: 'Newest update' })
     expect(refresh).toBeTypeOf('function')
     mocks.list.mockRejectedValueOnce(new Error('refresh unavailable'))
@@ -218,7 +225,7 @@ describe('NewsPage request recovery', () => {
   })
 
   it('lets the latest query win when an older request finishes last', async () => {
-    render(<NewsPage />)
+    render(<RoutedNewsPage />)
     await screen.findByRole('heading', { name: 'Newest update' })
     const slow = deferred<NewsListResponse>()
     const fast = deferred<NewsListResponse>()

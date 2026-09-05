@@ -5,7 +5,8 @@ import { useTranslation } from 'react-i18next'
 import type { NewsArticle } from '../api'
 import type { NewsQuery } from '../api/news'
 import { PageHeader } from '../components/PageHeader'
-import { useSearchParams } from 'react-router-dom'
+import { useNavigate } from 'react-router-dom'
+import type { ViewSpec } from '../tabs/types'
 import { EmptyState, Skeleton } from '../components/StateViews'
 import { inputClass } from '../components/form'
 import { Button } from '../components/ui/button'
@@ -38,18 +39,16 @@ const MARKET_FLAGS: Partial<Record<string, string>> = {
   'a-shares': 'cn', hk: 'hk', us: 'us',
 }
 
-export function NewsPage() {
+export function NewsPage({ spec }: { spec: Extract<ViewSpec, { kind: 'news' }> }) {
   const { t, i18n } = useTranslation()
-  const [searchParams, setSearchParams] = useSearchParams()
-  const selection = NEWS_VIEWS.find((view) => view.id === searchParams.get('view'))?.id ?? 'latest'
-  const category = NEWS_CATEGORIES.find((item) => item.id === searchParams.get('category'))
+  const navigate = useNavigate()
+  const selection = NEWS_VIEWS.find((view) => view.id === spec.params.view)?.id ?? 'latest'
+  const category = NEWS_CATEGORIES.find((item) => item.id === spec.params.category)
   const setSelection = (view: NewsViewId) => {
-    setSearchParams((current) => {
-      const next = new URLSearchParams(current)
-      if (view === 'latest') next.delete('view')
-      else next.set('view', view)
-      return next
-    })
+    const next = new URLSearchParams()
+    if (spec.params.category) next.set('category', spec.params.category)
+    if (view !== 'latest') next.set('view', view)
+    navigate({ pathname: '/market/news', search: next.toString() })
   }
   const [draft, setDraft] = useState(INITIAL_FILTERS)
   const [query, setQuery] = useState<NewsQuery>({ lookback: '24h', limit: 200 })

@@ -1,6 +1,6 @@
 import { useEffect, useId, useState, type ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
-import { useNavigate, useSearchParams } from 'react-router-dom'
+import { useNavigate } from 'react-router-dom'
 import { ChevronRight, X } from 'lucide-react'
 import { type AssetClass, type BarSourceCandidate } from '../api/market'
 import { useAssetSearch } from './market/useAssetSearch'
@@ -45,7 +45,6 @@ function routeAssetClass(c: BarSourceCandidate['assetClass']): AssetClass {
 export function MarketSidebar({ onNavigate }: { onNavigate?: () => void }) {
   const { t } = useTranslation()
   const navigate = useNavigate()
-  const [searchParams] = useSearchParams()
   const [query, setQuery] = useState('')
   // Shared with the main search box — one search logic, no drift.
   const { results, loading } = useAssetSearch(query)
@@ -114,8 +113,9 @@ export function MarketSidebar({ onNavigate }: { onNavigate?: () => void }) {
 
       <div className="flex-1 overflow-y-auto min-h-0">
         <MarketSection label={t('nav.item.news')} initiallyOpen={isFocused('news')} active={isFocused('news')}>
-          <NewsMarketNavigation active={isFocused('news')} category={isFocused('news') ? searchParams.get('category') : null} onSelect={(category) => {
-            const next = new URLSearchParams(isFocused('news') ? searchParams : undefined)
+          <NewsMarketNavigation active={isFocused('news')} category={focusedSpec?.kind === 'news' ? focusedSpec.params.category ?? null : null} onSelect={(category) => {
+            const next = new URLSearchParams()
+            if (focusedSpec?.kind === 'news' && focusedSpec.params.view) next.set('view', focusedSpec.params.view)
             if (category) next.set('category', category)
             else next.delete('category')
             navigate({ pathname: '/market/news', search: next.toString() })

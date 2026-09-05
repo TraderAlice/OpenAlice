@@ -223,7 +223,7 @@ const newsModule: ViewModule<'news'> = {
     return '/market/news' + (search.size ? '?' + search : '')
   },
   shell: 'market',
-  Component: () => <NewsPage />,
+  Component: ({ spec }) => <NewsPage spec={spec} />,
 }
 
 const marketListModule: ViewModule<'market-list'> = {

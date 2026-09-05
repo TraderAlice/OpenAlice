@@ -1,4 +1,4 @@
-import { useId, useState } from 'react'
+import { useEffect, useId, useState } from 'react'
 import { ChevronRight } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { SidebarRow } from '../SidebarRow.js'
@@ -29,6 +29,9 @@ function CategoryGroup({ group, category, onSelect, active }: NavigationProps & 
   const { t } = useTranslation()
   const id = useId()
   const [expanded, setExpanded] = useState(() => group.categories.some((item) => item === category))
+  useEffect(() => {
+    if (active && group.categories.some((item) => item === category)) setExpanded(true)
+  }, [active, category, group])
   return (
     <div>
       <SidebarRow label={t(group.labelKey)} ariaExpanded={expanded} ariaControls={id}
