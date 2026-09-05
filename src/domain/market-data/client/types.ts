@@ -29,7 +29,7 @@ import type {
   // Commodity
   CommoditySpotPriceData, PetroleumStatusReportData, ShortTermEnergyOutlookData,
   // Economy (FRED + BLS + OECD)
-  FredSearchData, FredSeriesData, FredRegionalData,
+  EconomicCalendarData, FredSearchData, FredSeriesData, FredRegionalData,
   BlsSearchData, BlsSeriesData,
   ConsumerPriceIndexData, CountryInterestRatesData, CompositeLeadingIndicatorData,
   PortInfoData, PortVolumeData, ChokepointInfoData, ChokepointVolumeData,
@@ -105,6 +105,7 @@ export interface CommodityClientLike {
 }
 
 export interface EconomyClientLike {
+  getCalendar(params?: Record<string, unknown>): Promise<EconomicCalendarData[]>
   fredSearch(params: Record<string, unknown>): Promise<FredSearchData[]>
   fredSeries(params: Record<string, unknown>): Promise<FredSeriesData[]>
   fredRegional(params: Record<string, unknown>): Promise<FredRegionalData[]>

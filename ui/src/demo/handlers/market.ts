@@ -209,6 +209,18 @@ const demoMovers: MoversBoard = {
 }
 
 const demoCalendar: CalendarBoard = {
+  economicEvents: [
+    {
+      date: '2026-06-10 12:30:00', country: 'US', category: 'Inflation', event: 'Consumer Price Index',
+      importance: 'High', source: 'BLS', currency: 'USD', unit: '%', consensus: 2.5,
+      previous: 2.6, revised: null, actual: 2.4,
+    },
+    {
+      date: '2026-06-17 18:00:00', country: 'US', category: 'Central Bank', event: 'FOMC Rate Decision',
+      importance: 'High', source: 'Federal Reserve', currency: 'USD', unit: '%', consensus: 4.25,
+      previous: 4.25, revised: null, actual: null,
+    },
+  ],
   earnings: [
     { report_date: '2026-06-11', symbol: 'ORCL', name: 'Oracle Corporation', eps_previous: 1.41, eps_consensus: 1.65 },
     { report_date: '2026-06-12', symbol: 'ADBE', name: 'Adobe Inc.', eps_previous: 4.48, eps_consensus: 4.97 },

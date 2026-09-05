@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -195,14 +195,14 @@ describe('AgentLaunchSelectors keyboard menus', () => {
     trigger.focus()
     await user.keyboard('{ArrowUp}')
     expect(screen.getByText(i18n.t('chatLanding.credentialMenuTitle', { runtime: 'OpenCode' }))).toBeTruthy()
-    expect(document.activeElement).toBe(screen.getByRole('menuitem', { name: /Backup/ }))
+    await waitFor(() => expect(document.activeElement).toBe(screen.getByRole('menuitem', { name: /Backup/ })))
 
     await user.keyboard('{Escape}')
     expect(screen.queryByRole('menu')).toBeNull()
     expect(document.activeElement).toBe(trigger)
 
     await user.keyboard('{ArrowDown}')
-    expect(document.activeElement).toBe(screen.getByRole('menuitem', { name: /OpenCode account/ }))
+    await waitFor(() => expect(document.activeElement).toBe(screen.getByRole('menuitem', { name: /OpenCode account/ })))
     await user.keyboard('{End}')
     expect(document.activeElement).toBe(screen.getByRole('menuitem', { name: /Backup/ }))
     await user.keyboard('{Enter}')

@@ -15,6 +15,7 @@ import { createEconomyTools } from './economy.js'
 
 function makeMockEconomyClient(): EconomyClientLike {
   return {
+    getCalendar: vi.fn(async () => []),
     fredSearch: vi.fn(async () => []),
     fredSeries: vi.fn(async () => []),
     fredRegional: vi.fn(async () => []),

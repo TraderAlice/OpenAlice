@@ -15,6 +15,7 @@
 
 import type {
   EquityDiscoveryData, CalendarEarningsData, CalendarIpoData, CalendarDividendData,
+  EconomicCalendarData,
 } from '@traderalice/opentypebb'
 // Type-only circular imports (these modules import ReferenceMeta) — fine in TS.
 import type { TermStructureBoard } from './term-structure.js'
@@ -60,6 +61,7 @@ export interface MoversBoard {
 // ==================== Calendar board ====================
 
 export interface CalendarBoard {
+  economicEvents: EconomicCalendarData[]
   earnings: CalendarEarningsData[]
   ipos: CalendarIpoData[]
   dividends: CalendarDividendData[]
@@ -68,7 +70,7 @@ export interface CalendarBoard {
   /** Per-list upstream failures. A list can fail (e.g. FMP tier/suspension
    *  rejects one endpoint) while siblings succeed — surface it loudly
    *  instead of rendering a silently empty list. */
-  errors?: Partial<Record<'earnings' | 'ipos' | 'dividends', string>>
+  errors?: Partial<Record<'economicEvents' | 'earnings' | 'ipos' | 'dividends', string>>
   meta: ReferenceMeta
 }
 
@@ -109,7 +111,7 @@ export interface MacroBoard {
  *  the clients directly for now and converge here as the contract grows. */
 export interface ReferenceDataService {
   movers(): Promise<MoversBoard>
-  /** Upcoming earnings / IPOs / ex-dividend dates. Requires an FMP key —
+  /** Upcoming macro events / earnings / IPOs / ex-dividend dates. Requires an FMP key —
    *  fails loud with an actionable message when it's missing. */
   calendar(opts?: { days?: number }): Promise<CalendarBoard>
   /** Curated macro regime dashboard (rates, labor, inflation, oil, dollar).
