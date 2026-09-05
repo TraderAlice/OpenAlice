@@ -147,6 +147,16 @@ tests pass, and the production pack entry generated real Windows x64 plus meta
 tarballs and their integrity/publication-order manifest using npm 12. No upload
 was performed. PR #1365's latest inspected clean-build check passed.
 
+Real Homebrew acceptance passed inside a disposable Linux ARM64 Homebrew image:
+the production formula generator consumed the validated ARM64 archive, Homebrew
+installed Git/Bash dependencies, setup reported ready, Runtime started/statused/
+stopped successfully, and Homebrew removed the package. Receipt log:
+`/tmp/openalice-brew-dependency-acceptance.log`. No maintainer Homebrew prefix was
+mounted. Formula generation is exported for target-specific local acceptance;
+full release generation still requires its complete target set. Linux x64
+build/runtime smoke is now running under local amd64 container emulation,
+with output in `/tmp/openalice-linux-x64-native-build.log`; not yet accepted.
+
 - [ ] Inventory CLI Git/Bash consumers, installer entry points, package-manager
   declarations, and runtime PATH injection; keep Electron ownership explicit.
 - [x] Implement shared executable detection and installation planning: reuse

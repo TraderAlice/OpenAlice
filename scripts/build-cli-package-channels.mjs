@@ -167,7 +167,7 @@ function buildNpmPackages({ outputRoot, version, targets }) {
   return { metaPackage: npmMetaName, platformPackages }
 }
 
-function buildHomebrewFormula({ outputRoot, version, targets, assetBaseUrl }) {
+export function buildHomebrewFormula({ outputRoot, version, targets, assetBaseUrl }) {
   const formulaRoot = join(outputRoot, 'homebrew')
   mkdirSync(formulaRoot, { recursive: true })
   const formulaPath = join(formulaRoot, 'openalice.rb')
