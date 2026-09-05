@@ -154,4 +154,60 @@ describe('terminal keyboard controller', () => {
       fixture.dispose()
     }
   })
+
+  it('leaves IME-processed (keyCode 229) punctuation keydowns to xterm', () => {
+    // macOS Chromium reports every keydown with keyCode 229 while an IME is
+    // active — including its ASCII/English mode — and xterm then batches the
+    // inserted text behind CompositionHelper's 0ms textarea diff. Claiming
+    // these keydowns made the forwarder clear the shared textarea mid-window,
+    // which dropped fast-typed letters and could emit a DEL that swallowed
+    // the just-forwarded character (the "cannot type ?" symptom).
+    const fixture = setup({
+      platform: 'darwin',
+      inputSourceFeatures: {
+        forwardAsciiPunctuation: true,
+        forwardShortTextReplacements: false
+      }
+    })
+    try {
+      expect(
+        fixture.controller.handle(
+          keyEvent('keydown', '?', { code: 'Slash', keyCode: 229, shiftKey: true })
+        )
+      ).toBe(true)
+      expect(
+        fixture.controller.handle(keyEvent('keydown', '？', { code: 'Slash', keyCode: 229 }))
+      ).toBe(true)
+      fixture.textarea.value = 'why?'
+      fixture.textarea.dispatchEvent(new InputEvent('input', {
+        bubbles: true,
+        inputType: 'insertText',
+        data: '?'
+      }))
+      // Unclaimed input events must pass through untouched: nothing forwarded
+      // and the textarea (xterm's diff baseline) must not be cleared.
+      expect(fixture.sent).toEqual([])
+      expect(fixture.textarea.value).toBe('why?')
+    } finally {
+      fixture.dispose()
+    }
+  })
+
+  it('leaves IME-processed letter keydowns to xterm even when replacements are on', () => {
+    const fixture = setup({
+      platform: 'darwin',
+      inputSourceFeatures: {
+        forwardAsciiPunctuation: true,
+        forwardShortTextReplacements: true
+      }
+    })
+    try {
+      expect(
+        fixture.controller.handle(keyEvent('keydown', 'a', { code: 'KeyA', keyCode: 229 }))
+      ).toBe(true)
+      expect(fixture.sent).toEqual([])
+    } finally {
+      fixture.dispose()
+    }
+  })
 })
