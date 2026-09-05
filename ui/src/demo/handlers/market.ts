@@ -132,10 +132,12 @@ export const marketHandlers = [
           })
         })()
     const sourceId = barId ? barId.split('|')[0] : 'yfinance'
+    const session = url.searchParams.get('session')
     const meta: BarMeta = {
       symbol: selected.symbol, from: results[0]?.date ?? '', to: results[results.length - 1]?.date ?? '', bars: results.length,
       source: sourceId === 'alpaca-paper' ? 'uta' : 'vendor', sourceId, barId: barId ?? `${sourceId}|${selected.symbol}`,
       provider: sourceId, barCapability: sourceId === 'alpaca-paper' ? 'iex' : 'delayed',
+      ...(session === 'regular' || session === 'extended' ? { session, sessionForced: false } : {}),
     }
     return HttpResponse.json({ results, meta })
   }),

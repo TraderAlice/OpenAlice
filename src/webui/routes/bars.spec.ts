@@ -52,6 +52,37 @@ describe('bars routes', () => {
     )
   })
 
+  it('GET / forwards an explicit session to the bar service', async () => {
+    const ctx = mkCtx()
+    const getBars = vi.spyOn(ctx.barService, 'getBars')
+    const res = await createBarsRoutes(ctx).request('/?barId=alpaca-paper|AAPL&interval=1m&session=extended')
+
+    expect(res.status).toBe(200)
+    expect(getBars).toHaveBeenCalledWith(
+      { barId: 'alpaca-paper|AAPL' },
+      { interval: '1m', session: 'extended' },
+    )
+  })
+
+  it('GET / omits session when the caller does not ask for one', async () => {
+    const ctx = mkCtx()
+    const getBars = vi.spyOn(ctx.barService, 'getBars')
+    await createBarsRoutes(ctx).request('/?barId=yfinance|AAPL&interval=1d')
+
+    expect(getBars).toHaveBeenCalledWith({ barId: 'yfinance|AAPL' }, { interval: '1d' })
+  })
+
+  it('GET / with an unknown session → 400 without touching the bar service', async () => {
+    const ctx = mkCtx()
+    const getBars = vi.spyOn(ctx.barService, 'getBars')
+    const res = await createBarsRoutes(ctx).request('/?barId=yfinance|AAPL&interval=1d&session=premarket')
+    const body = await res.json()
+
+    expect(res.status).toBe(400)
+    expect(body.error).toMatch(/regular.*extended/)
+    expect(getBars).not.toHaveBeenCalled()
+  })
+
   it('GET / without barId or symbol → 400', async () => {
     const res = await createBarsRoutes(mkCtx()).request('/?interval=1d')
     expect(res.status).toBe(400)

@@ -8,7 +8,7 @@ import type { BarServiceDeps, UtaBarGateway } from './types.js'
 import type {
   EquityClientLike, CryptoClientLike, CurrencyClientLike, CommodityClientLike,
 } from '../client/types.js'
-import type { Bar } from '@traderalice/uta-protocol'
+import type { Bar, BarParams, HistoricalBarsResult } from '@traderalice/uta-protocol'
 
 // One unsorted batch with a null-OHLC row that must be filtered out.
 const RAW = [
@@ -141,9 +141,12 @@ describe('getBars — UTA branch', () => {
     { timestamp: '2024-02-02T00:00:00.000Z', open: '2', high: '3', low: '1', close: '2.5', volume: '200' },
     { timestamp: '2024-02-01T00:00:00.000Z', open: '1', high: '2', low: '0.5', close: '1.5', volume: '100' },
   ] as unknown as Bar[]
+  /** UTA reports the session it actually served, not an echo of the request. */
+  const result = (bars: Bar[] = WIRE, extra: Partial<HistoricalBarsResult> = {}): HistoricalBarsResult =>
+    ({ bars, session: 'extended', forced: false, ...extra })
 
   it('discriminates uta via gateway, converts string→number, tags realtime (Date arrives as string over the wire)', async () => {
-    const getHistorical = vi.fn(async () => WIRE)
+    const getHistorical = vi.fn(async () => result())
     const utaManager: UtaBarGateway = {
       has: async (id) => id === 'alpaca-paper',
       get: async () => ({ getHistorical }),
@@ -162,7 +165,7 @@ describe('getBars — UTA branch', () => {
   it('reports the broker\'s HONEST bar quality (alpaca free = iex), not a blanket realtime', async () => {
     const utaManager: UtaBarGateway = {
       has: async (id) => id === 'alpaca-paper',
-      get: async () => ({ getHistorical: async () => WIRE }),
+      get: async () => ({ getHistorical: async () => result() }),
       searchContracts: async () => [],
       getBarCapabilities: async () => ({ 'alpaca-paper': 'iex' }),
     }
@@ -174,7 +177,7 @@ describe('getBars — UTA branch', () => {
   it('falls back to realtime when the gateway cannot surface a quality', async () => {
     const utaManager: UtaBarGateway = {
       has: async (id) => id === 'alpaca-paper',
-      get: async () => ({ getHistorical: async () => WIRE }),
+      get: async () => ({ getHistorical: async () => result() }),
       searchContracts: async () => [],
       // no getBarCapabilities
     }
@@ -184,7 +187,7 @@ describe('getBars — UTA branch', () => {
   })
 
   it('rejects a UTA source that does not advertise historical-bar support', async () => {
-    const getHistorical = vi.fn(async () => WIRE)
+    const getHistorical = vi.fn(async () => result())
     const utaManager: UtaBarGateway = {
       has: async (id) => id === 'ibkr',
       get: async () => ({ getHistorical }),
@@ -207,7 +210,7 @@ describe('getBars — UTA branch', () => {
     ] as unknown as Bar[]
     const utaManager: UtaBarGateway = {
       has: async (id) => id === 'alpaca-paper',
-      get: async () => ({ getHistorical: async () => dailyWire }),
+      get: async () => ({ getHistorical: async () => result(dailyWire) }),
       searchContracts: async () => [],
     }
     const svc = createBarService(makeDeps({ utaManager }))
@@ -221,7 +224,7 @@ describe('getBars — UTA branch', () => {
     // upstream APIs that otherwise return the first N rows from `start`.
     const getHistorical = vi.fn(async (_ref: unknown, params: { start?: Date; limit?: number }) => {
       void params
-      return WIRE
+      return result()
     })
     const utaManager: UtaBarGateway = {
       has: async (id) => id === 'alpaca-paper',
@@ -233,6 +236,43 @@ describe('getBars — UTA branch', () => {
     const params = getHistorical.mock.calls[0][1]
     expect(params.start).toBeInstanceOf(Date)
     expect(params.limit).toBe(60)
+  })
+
+  it('stamps the session UTA actually served onto the meta', async () => {
+    const utaManager: UtaBarGateway = {
+      has: async (id) => id === 'ibkr',
+      get: async () => ({ getHistorical: async () => result(WIRE, { session: 'regular' }) }),
+      searchContracts: async () => [],
+    }
+    const svc = createBarService(makeDeps({ utaManager }))
+    const { meta } = await svc.getBars({ barId: 'ibkr|AAPL' }, { interval: '1d' })
+    expect(meta.session).toBe('regular')
+    expect(meta.sessionForced).toBeUndefined()
+  })
+
+  it('surfaces a forced session so a caller never mistakes it for what it asked', async () => {
+    const utaManager: UtaBarGateway = {
+      has: async (id) => id === 'alpaca-paper',
+      get: async () => ({ getHistorical: async () => result(WIRE, { session: 'extended', forced: true }) }),
+      searchContracts: async () => [],
+    }
+    const svc = createBarService(makeDeps({ utaManager }))
+    const { meta } = await svc.getBars({ barId: 'alpaca-paper|AAPL' }, { interval: '1d', session: 'regular' })
+    expect(meta).toMatchObject({ session: 'extended', sessionForced: true })
+  })
+
+  it('forwards an explicit session request to the broker and omits it otherwise', async () => {
+    const getHistorical = vi.fn(async (_ref: unknown, _params: BarParams) => result())
+    const utaManager: UtaBarGateway = {
+      has: async (id) => id === 'ibkr',
+      get: async () => ({ getHistorical }),
+      searchContracts: async () => [],
+    }
+    const svc = createBarService(makeDeps({ utaManager }))
+    await svc.getBars({ barId: 'ibkr|AAPL' }, { interval: '1d', session: 'regular' })
+    expect(getHistorical.mock.calls[0][1]).toMatchObject({ session: 'regular' })
+    await svc.getBars({ barId: 'ibkr|AAPL' }, { interval: '1d' })
+    expect(getHistorical.mock.calls[1][1]).not.toHaveProperty('session')
   })
 })
 

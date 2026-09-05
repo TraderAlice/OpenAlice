@@ -40,6 +40,7 @@ import {
   type MarketClock,
   type TpSlParams,
 } from '../types.js'
+import { refuseOcaLinkage } from '../../oca.js'
 import '../../contract-ext.js'
 import { buildPosition } from '../contract-builder.js'
 import type { FxService } from '../../fx-service.js'
@@ -269,6 +270,7 @@ export class LongbridgeBroker implements IBroker {
   // ---- Trading operations ----
 
   async placeOrder(contract: Contract, order: Order, _tpsl?: TpSlParams): Promise<PlaceOrderResult> {
+    refuseOcaLinkage('Longbridge', order)
     const symbol = resolveSymbol(contract)
     if (!symbol) {
       return { success: false, error: 'Cannot resolve contract to Longbridge symbol' }
@@ -313,6 +315,7 @@ export class LongbridgeBroker implements IBroker {
   }
 
   async modifyOrder(orderId: string, changes: Partial<Order>): Promise<PlaceOrderResult> {
+    refuseOcaLinkage('Longbridge', changes)
     if (changes.totalQuantity == null || changes.totalQuantity.equals(UNSET_DECIMAL)) {
       return { success: false, error: 'modifyOrder requires totalQuantity for Longbridge' }
     }

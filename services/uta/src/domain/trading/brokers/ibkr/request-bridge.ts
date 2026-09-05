@@ -25,6 +25,7 @@ import {
   type OrderState,
   type EClient,
   type TickAttrib,
+  type BarData,
 } from '@traderalice/ibkr'
 import { BrokerError, type BrokerConnectionStateEvent } from '../types.js'
 import { classifyIbkrError } from './ibkr-contracts.js'
@@ -61,6 +62,11 @@ interface CurrentTimeWaiter {
 const CURRENT_TIME_REPLY_GRACE_MS = 30_000
 
 const DEFAULT_TIMEOUT_MS = 10_000
+/**
+ * Historical bars come from the HMDS farm, not the trading socket, and a year
+ * of 1-minute bars outruns the ordinary 10s budget.
+ */
+const HISTORICAL_TIMEOUT_MS = 30_000
 const SNAPSHOT_TIMEOUT_MS = 12_500
 const ACCOUNT_READY_TIMEOUT_MS = 20_000
 
@@ -282,6 +288,14 @@ export class RequestBridge extends DefaultEWrapper {
     this.snapshots.set(reqId, {})
     if (options.resolveOnBidAsk) this.snapshotResolveOnBidAsk.add(reqId)
     return this.request<TickSnapshot>(reqId, timeoutMs)
+  }
+
+  /**
+   * Registers a historical-bar request. An empty result set is a legitimate
+   * answer, so the collector resolves with `[]` rather than timing out.
+   */
+  requestHistoricalBars(reqId: number, timeoutMs = HISTORICAL_TIMEOUT_MS): Promise<BarData[]> {
+    return this.requestCollector<BarData>(reqId, timeoutMs)
   }
 
   // ---- Mode B: orderId-based requests ----
@@ -699,6 +713,16 @@ export class RequestBridge extends DefaultEWrapper {
   }
 
   override contractDetailsEnd(reqId: number): void {
+    this.resolveCollector(reqId)
+  }
+
+  // ---- Historical bars (collector) ----
+
+  override historicalData(reqId: number, bar: BarData): void {
+    this.pushCollector(reqId, bar)
+  }
+
+  override historicalDataEnd(reqId: number, _start: string, _end: string): void {
     this.resolveCollector(reqId)
   }
 

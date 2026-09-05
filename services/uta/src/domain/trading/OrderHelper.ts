@@ -51,6 +51,7 @@ export interface OrderView {
   outsideRth?: boolean
   parentId?: number
   ocaGroup?: string
+  ocaType?: number
   goodTillDate?: string
 }
 
@@ -105,6 +106,7 @@ export const OrderHelper = {
       outsideRth: order.outsideRth || undefined,
       parentId: order.parentId || undefined,
       ocaGroup: order.ocaGroup || undefined,
+      ocaType: order.ocaType || undefined,
       goodTillDate: order.goodTillDate || undefined,
     }
   },

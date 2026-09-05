@@ -125,9 +125,16 @@ export function buildIbkrBracket(
   return { parentId, parent, children }
 }
 
-/** Same-name OCA with type 0 is ignored by TWS and looks like a second short. */
+/**
+ * Same-name OCA with type 0 is ignored by TWS and looks like a second short.
+ *
+ * The guard is falsiness, not `=== 0`: an `Order` rebuilt from `commit.json`
+ * (or any plain object reaching the modify path) can carry `ocaType:
+ * undefined`, which the encoder writes as 0 just the same. Matching only the
+ * literal 0 would let exactly the rehydrated case through unlinked.
+ */
 export function applyStandaloneOcaType(order: Order): Order {
-  if (order.ocaGroup && order.ocaType === 0) {
+  if (order.ocaGroup && !order.ocaType) {
     const clone = cloneOrder(order)
     clone.ocaType = IBKR_OCA_CANCEL_WITH_BLOCK
     return clone

@@ -70,6 +70,32 @@ All times in US/Eastern (ET):
 - **`reqMktData` (snapshot/streaming)**: CAN return overnight session prices if the contract supports overnight trading. This is why TWS front-end still shows last price changes after 20:00 ET.
 - **Conclusion**: If we need accurate overnight prices for snapshots, we must use `reqMktData` instead of relying on `updatePortfolio()` cached prices.
 
+### Historical bar sessions
+
+`reqHistoricalData`'s `useRTH` decides whether the returned series is the
+regular session only or the continuous tape (pre/post + overnight). Which one
+is correct is an INSTRUMENT property, not a caller preference, so the choice is
+not made in this adapter: `UnifiedTradingAccount.getHistorical` resolves it via
+`resolveBarSession` (`services/uta/src/domain/trading/bar-session.ts`) and
+passes `BarParams.session` down already decided. `ibkr-historical.ts` only maps
+`'regular' → useRTH 1` and anything else → `0`.
+
+| secType | Default session | Explicit request |
+|---|---|---|
+| `STK`, `OPT`, `WAR`, `BOND`, `IND`, `FUND`, unknown | `regular` | `extended` honored |
+| `FUT`, `FOP`, `CFD`, `CMDTY` | `extended` | `regular` honored |
+| `CASH`, `CRYPTO` | `extended` | `regular` REFUSED (forced back to `extended`) |
+
+IBKR declares `historicalBars.sessions: ['regular', 'extended']`, so both are
+served for real. A broker that declares no `sessions` (Alpaca, CCXT) has no
+filter at all; UTA then returns the continuous tape with `forced: true` rather
+than labeling extended bars "regular".
+
+The response is `{ bars, session, forced }` all the way out through
+`POST /uta/:id/historical` and the Alice SDK, and BarService stamps
+`meta.session` / `meta.sessionForced`. A consumer never has to guess whether a
+series contains overnight prints.
+
 ## Socket Error Handling
 
 The `@traderalice/ibkr` Connection class is a Node port of Python's `Connection`.
@@ -110,6 +136,30 @@ Known-dead transport state reaches UTA through an explicit connection-state list
 `PlaceOrderResult.legs` carries the child ids so the ledger tracks them
 from birth. After fill, raising or trailing a stop is `modifyOrder` on
 that child id. `parentId` and the OCA group survive the merge.
+
+## OCA membership is placement-time only
+
+`modifyOrder` refuses `ocaGroup`, `ocaType`, and `parentId` before touching
+the venue (`refuseOcaRevision`, a `CONFIG` `BrokerError`). Confirmed live:
+re-placing a resting STP LMT with a new group and `ocaType=1` is rejected
+with **error 10327** ("OCA group type revision is not allowed"), and with
+`ocaType` omitted TWS *accepts* the re-place and silently drops the group:
+the working order rests with no OCA membership while the caller believes the
+legs are linked.
+
+To link an existing protective order, place the new leg with `ocaGroup` set,
+then cancel the old order and re-place it with the same group (sequence the
+two so protection stays continuous).
+
+Because that failure mode was an accepted-but-ignored re-place, `modifyOrder`
+now verifies the venue echo generally: every requested field
+(`totalQuantity`, `lmtPrice`, `auxPrice`, `tif`, `orderType`,
+`trailingPercent`, `trailStopPrice`, `goodTillDate`, `outsideRth`) is
+compared against the `openOrder` echo (Decimal equality for numerics, UNSET
+sentinels treated as absent). A mismatch returns `success: false` naming the
+ignored fields, so the ledger keeps the old working values. An
+`orderStatus`-only answer carries no order body, so its fields are reported
+as "unverified" in `message` rather than failed.
 
 A standalone `--oca-group` without `ocaType` defaults to `ocaType=1` so a
 post-fill STP+TP pair can rest together. Same-name OCA with type 0 is

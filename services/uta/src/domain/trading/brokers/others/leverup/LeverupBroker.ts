@@ -30,6 +30,7 @@ import {
   type MarketClock,
   type TpSlParams,
 } from '../../types.js'
+import { refuseOcaLinkage } from '../../../oca.js'
 import '../../../contract-ext.js'
 import { buildContract, buildPosition } from '../../contract-builder.js'
 
@@ -212,6 +213,7 @@ export class LeverupBroker implements IBroker {
 
   async placeOrder(contract: Contract, order: Order, tpsl?: TpSlParams): Promise<PlaceOrderResult> {
     this.ensureInit()
+    refuseOcaLinkage('LeverUp', order)
 
     if (order.orderType !== 'MKT') {
       return { success: false, error: `LeverUp OCT only supports market orders (got ${order.orderType}). Limit orders are not exposed via the OCT relayer.` }

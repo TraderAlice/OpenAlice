@@ -789,3 +789,178 @@ describe('IbkrBroker — liveness policy', () => {
     }
   })
 })
+
+describe('IbkrBroker — OCA revision and echo verification on modifyOrder', () => {
+  function restingStop(): Order {
+    const order = new Order()
+    order.action = 'SELL'
+    order.orderType = 'STP LMT'
+    order.totalQuantity = new Decimal(10)
+    order.auxPrice = new Decimal('99')
+    order.lmtPrice = new Decimal('98.5')
+    return order
+  }
+
+  /** An `openOrder` echo body derived from the resting order. */
+  function echoOf(base: Order, overrides: Partial<Order> = {}): Order {
+    return Object.assign(new Order(), base, overrides)
+  }
+
+  function brokerWithRestingOrder(existing: Order = restingStop()): {
+    broker: IbkrBroker
+    client: { placeOrder: ReturnType<typeof vi.fn> }
+    bridge: { requestOrder: ReturnType<typeof vi.fn> }
+  } {
+    const { broker, client, bridge } = brokerWithContractIo()
+    ;(broker as unknown as { getOrder: unknown }).getOrder = vi.fn(async () => ({
+      contract: Object.assign(new Contract(), { conId: 12087820 }),
+      order: existing,
+      orderState: { status: 'Submitted' },
+    }))
+    return { broker, client, bridge }
+  }
+
+  // A re-place carrying a new ocaGroup + ocaType is rejected with 10327, and
+  // with ocaType omitted TWS accepts it and silently drops the group.
+  it.each(['ocaGroup', 'ocaType', 'parentId'] as const)(
+    'refuses %s revision on a working order without calling the venue',
+    async (field) => {
+      const { broker, client } = brokerWithRestingOrder()
+      const changes = { ocaGroup: 'aapl-exit', ocaType: 3, parentId: 17 }[field]
+
+      await expect(broker.modifyOrder('42', { [field]: changes } as Partial<Order>))
+        .rejects.toThrow(/10327/)
+      expect(client.placeOrder).not.toHaveBeenCalled()
+    },
+  )
+
+  it('names the cancel-and-re-place recipe in the refusal', async () => {
+    const { broker } = brokerWithRestingOrder()
+    await expect(broker.modifyOrder('42', { ocaGroup: 'aapl-exit' } as Partial<Order>))
+      .rejects.toThrow(/Cancel this order and re-place it with ocaGroup set at placement time/)
+  })
+
+  it('leaves an unrelated modification free of OCA fields', async () => {
+    const { broker, client } = brokerWithRestingOrder()
+
+    await broker.modifyOrder('42', { lmtPrice: new Decimal('97') })
+
+    const sent = client.placeOrder.mock.calls[0][2] as Order
+    expect(sent.ocaGroup).toBe('')
+    expect(sent.ocaType).toBe(0)
+    expect(sent.lmtPrice.toFixed()).toBe('97')
+  })
+
+  // IBKR modifies by re-placing on the same orderId, so TWS reads the message
+  // as a complete order and resets any field the merge fails to carry over.
+  it('preserves every untouched field of the resting order across the re-place', async () => {
+    const existing = restingStop()
+    existing.tif = 'GTC'
+    existing.outsideRth = true
+    existing.transmit = true
+    existing.account = 'DU1234567'
+    existing.ocaGroup = 'aapl-exit'
+    existing.ocaType = 1
+    const { broker, client } = brokerWithRestingOrder(existing)
+
+    await broker.modifyOrder('42', { lmtPrice: new Decimal('97') })
+
+    const [sentId, sentContract, sent] = client.placeOrder.mock.calls[0] as [number, Contract, Order]
+    expect(sentId).toBe(42)
+    expect(sentContract.conId).toBe(12087820)
+    expect(sent.action).toBe('SELL')
+    expect(sent.orderType).toBe('STP LMT')
+    expect(sent.totalQuantity.toFixed()).toBe('10')
+    expect(sent.auxPrice.toFixed()).toBe('99')
+    expect(sent.lmtPrice.toFixed()).toBe('97')
+    expect(sent.tif).toBe('GTC')
+    expect(sent.outsideRth).toBe(true)
+    expect(sent.transmit).toBe(true)
+    expect(sent.account).toBe('DU1234567')
+    // Carrying the working order's own group over is not a revision.
+    expect(sent.ocaGroup).toBe('aapl-exit')
+    expect(sent.ocaType).toBe(1)
+  })
+
+  // Rehydrated orders arrive with ocaType undefined rather than 0, and TWS
+  // encodes both as 0.
+  it('defaults an undefined ocaType on a group the working order already has', async () => {
+    const existing = restingStop()
+    existing.ocaGroup = 'aapl-exit'
+    ;(existing as unknown as { ocaType?: number }).ocaType = undefined
+    const { broker, client } = brokerWithRestingOrder(existing)
+
+    await broker.modifyOrder('42', { lmtPrice: new Decimal('97') })
+
+    expect((client.placeOrder.mock.calls[0][2] as Order).ocaType).toBe(1)
+  })
+
+  // TWS can accept a re-place and still ignore individual fields.
+  it('fails the modify when the venue echoes the OLD value of a requested field', async () => {
+    const existing = restingStop()
+    const { broker, bridge } = brokerWithRestingOrder(existing)
+    bridge.requestOrder.mockImplementation(async () => ({
+      contract: new Contract(),
+      order: echoOf(restingStop()),
+      orderState: { status: 'Submitted' },
+    }))
+
+    const result = await broker.modifyOrder('42', { lmtPrice: new Decimal('97') })
+
+    expect(result.success).toBe(false)
+    expect(result.error).toContain('ignored: lmtPrice (requested 97, working 98.5)')
+    expect(result.error).toContain('still working with its previous values')
+  })
+
+  it('succeeds when the echo carries the requested value', async () => {
+    const { broker, bridge } = brokerWithRestingOrder()
+    bridge.requestOrder.mockImplementation(async () => ({
+      contract: new Contract(),
+      order: echoOf(restingStop(), { lmtPrice: new Decimal('97') }),
+      orderState: { status: 'Submitted' },
+    }))
+
+    const result = await broker.modifyOrder('42', { lmtPrice: new Decimal('97') })
+
+    expect(result.success).toBe(true)
+    expect(result.error).toBeUndefined()
+    expect(result.message).toBeUndefined()
+  })
+
+  // An orderStatus-only answer carries a blank Order, which echoes nothing.
+  it('reports unverified fields when the answer is orderStatus-only', async () => {
+    const { broker, bridge } = brokerWithRestingOrder()
+    bridge.requestOrder.mockImplementation(async () => ({
+      contract: new Contract(),
+      order: new Order(),
+      orderState: { status: 'Submitted' },
+    }))
+
+    const result = await broker.modifyOrder('42', { lmtPrice: new Decimal('97'), tif: 'GTC' })
+
+    expect(result.success).toBe(true)
+    expect(result.message).toContain('did not carry lmtPrice, tif')
+    expect(result.message).toContain('unverified')
+  })
+
+  it('suppresses the unverified note when a real mismatch is present', async () => {
+    const { broker, bridge } = brokerWithRestingOrder()
+    bridge.requestOrder.mockImplementation(async () => ({
+      contract: new Contract(),
+      // tif is absent from the echo; lmtPrice is present and stale.
+      order: echoOf(restingStop(), { tif: '' }),
+      orderState: { status: 'Submitted' },
+    }))
+
+    const result = await broker.modifyOrder('42', { lmtPrice: new Decimal('97'), tif: 'GTC' })
+
+    expect(result.success).toBe(false)
+    expect(result.error).toContain('lmtPrice')
+    expect(result.error).not.toContain('unverified')
+  })
+
+  it('declares TRAIL LIMIT among the supported order types', () => {
+    const { broker } = brokerWithContractIo()
+    expect(broker.getCapabilities().supportedOrderTypes).toContain('TRAIL LIMIT')
+  })
+})

@@ -724,6 +724,53 @@ describe('UTA — stageModifyOrder', () => {
     expect(op.changes.tif).toBe('GTC')
   })
 
+  it('copies OCA / bracket linkage into changes so it round-trips to the broker', () => {
+    uta.stageModifyOrder({ orderId: 'ord-1', ocaGroup: 'aapl-exit', ocaType: 2, parentId: '17' })
+    const op = uta.status().staged[0] as Extract<Operation, { action: 'modifyOrder' }>
+    expect(op.changes.ocaGroup).toBe('aapl-exit')
+    expect(op.changes.ocaType).toBe(2)
+    expect(op.changes.parentId).toBe(17)
+  })
+
+  it('rejects an ocaType TWS would silently ignore', () => {
+    expect(() => uta.stageModifyOrder({ orderId: 'ord-1', ocaGroup: 'g', ocaType: 0 }))
+      .toThrow(/ocaType must be 1/)
+    expect(() => uta.stagePlaceOrder({
+      aliceId: 'mock-paper|AAPL', action: 'BUY', orderType: 'MKT', totalQuantity: '1', ocaGroup: 'g', ocaType: 9,
+    })).toThrow(/ocaType must be 1/)
+  })
+
+  it('refuses a malformed parentId on both staging paths instead of coercing it to 0', () => {
+    expect(() => uta.stageModifyOrder({ orderId: 'ord-1', parentId: 'abc' }))
+      .toThrow(/parentId must be a numeric order id/)
+    expect(() => uta.stagePlaceOrder({
+      aliceId: 'mock-paper|AAPL', action: 'BUY', orderType: 'MKT', totalQuantity: '1', parentId: 'abc',
+    })).toThrow(/parentId must be a numeric order id/)
+  })
+
+  it('refuses a partly numeric parentId and accepts a whole one', () => {
+    for (const bad of ['12abc', '1.9']) {
+      expect(() => uta.stageModifyOrder({ orderId: 'ord-1', parentId: bad }))
+        .toThrow(/parentId must be a numeric order id/)
+    }
+    for (const good of ['42', ' 42 ']) {
+      uta.stageModifyOrder({ orderId: 'ord-1', parentId: good })
+      const staged = uta.status().staged
+      const op = staged[staged.length - 1] as Extract<Operation, { action: 'modifyOrder' }>
+      expect(op.changes.parentId).toBe(42)
+    }
+  })
+
+  it('carries an explicit ocaType through stagePlaceOrder instead of forcing 1', () => {
+    uta.stagePlaceOrder({
+      aliceId: 'mock-paper|AAPL', action: 'BUY', orderType: 'MKT', totalQuantity: '1',
+      ocaGroup: 'aapl-exit', ocaType: 3,
+    })
+    const { order } = getStagedPlaceOrder(uta)
+    expect(order.ocaGroup).toBe('aapl-exit')
+    expect(order.ocaType).toBe(3)
+  })
+
   it('omits fields not provided', () => {
     uta.stageModifyOrder({ orderId: 'ord-1', lmtPrice: '160' })
     const staged = uta.status().staged
@@ -1683,5 +1730,69 @@ describe('UTA — connecting gate (non-blocking cold start)', () => {
     const { uta } = createUTA()
     await uta.waitForConnect()
     await expect(uta.getAccount()).resolves.toBeDefined()
+  })
+})
+
+// ==================== Historical bars: session resolution ====================
+
+describe('UTA — getHistorical session', () => {
+  /** MockBroker declares no session filter, so pin a filtering capability when
+   *  the test is about instrument policy rather than the fallback. */
+  function filteringBroker(): MockBroker {
+    const b = new MockBroker()
+    vi.spyOn(b, 'getCapabilities').mockReturnValue({
+      supportedSecTypes: ['STK', 'CASH', 'FUT'],
+      supportedOrderTypes: ['MKT'],
+      historicalBars: { supported: true, quality: 'realtime', sessions: ['regular', 'extended'] },
+    })
+    return b
+  }
+
+  const stk = () => makeContract({ aliceId: 'mock-paper|AAPL', symbol: 'AAPL', secType: 'STK' })
+
+  it('returns the bars alongside the effective session and forced flag', async () => {
+    const { uta } = createUTA(filteringBroker())
+    const res = await uta.getHistorical(stk(), { interval: '1d', limit: 3 })
+    expect(res.bars).toHaveLength(3)
+    expect(res).toMatchObject({ session: 'regular', forced: false })
+  })
+
+  it('forwards the RESOLVED session to the broker, not the caller request', async () => {
+    const broker = filteringBroker()
+    const { uta } = createUTA(broker)
+    await uta.getHistorical(stk(), { interval: '1d', limit: 1 })
+    const params = broker.calls('getHistorical')[0]!.args[1] as { session?: string }
+    expect(params.session).toBe('regular')
+  })
+
+  it('honors an explicit extended request on a stock', async () => {
+    const broker = filteringBroker()
+    const { uta } = createUTA(broker)
+    const res = await uta.getHistorical(stk(), { interval: '1d', limit: 1, session: 'extended' })
+    expect(res).toMatchObject({ session: 'extended', forced: false })
+  })
+
+  it('forces FX to the continuous tape even when regular hours are requested', async () => {
+    const broker = filteringBroker()
+    const { uta } = createUTA(broker)
+    const fx = makeContract({ aliceId: 'mock-paper|EURUSD', symbol: 'EUR', secType: 'CASH' })
+    const res = await uta.getHistorical(fx, { interval: '1h', limit: 1, session: 'regular' })
+    expect(res).toMatchObject({ session: 'extended', forced: true })
+    const params = broker.calls('getHistorical')[0]!.args[1] as { session?: string }
+    expect(params.session).toBe('extended')
+  })
+
+  it('marks the read forced when the broker cannot filter sessions at all', async () => {
+    // Plain MockBroker declares no `historicalBars.sessions`.
+    const { uta } = createUTA()
+    const res = await uta.getHistorical(stk(), { interval: '1d', limit: 1 })
+    expect(res).toMatchObject({ session: 'extended', forced: true })
+  })
+
+  it('loud-refuses when the broker has no historical support at all', async () => {
+    const broker = new MockBroker()
+    ;(broker as unknown as { getHistorical?: unknown }).getHistorical = undefined
+    const { uta } = createUTA(broker)
+    await expect(uta.getHistorical(stk(), { interval: '1d' })).rejects.toThrow(/does not support historical bars/)
   })
 })

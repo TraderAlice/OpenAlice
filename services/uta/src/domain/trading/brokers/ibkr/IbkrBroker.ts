@@ -23,6 +23,9 @@ import {
   OrderState,
   ContractDescription,
   type ContractDetails,
+  UNSET_DECIMAL,
+  UNSET_DOUBLE,
+  UNSET_INTEGER,
 } from '@traderalice/ibkr'
 import {
   BrokerError,
@@ -39,12 +42,21 @@ import {
   type TpSlParams,
   type ExpandContractFilters,
   type ContractExpansion,
+  type Bar,
+  type BarParams,
 } from '../types.js'
 import '../../contract-ext.js'
 import { derivePositionMath } from '../../position-math.js'
 import { RequestBridge, acceptsCancelStatus } from './request-bridge.js'
 import { resolveSymbol } from './ibkr-contracts.js'
 import { applyStandaloneOcaType, buildIbkrBracket, refuseBracketOcaGroup } from './ibkr-bracket.js'
+import { refuseOcaRevision } from '../../oca.js'
+import {
+  IBKR_SUPPORTED_BAR_SIZES,
+  buildHistoricalRequest,
+  classifyHistoricalError,
+  decodeBars,
+} from './ibkr-historical.js'
 import type { IbkrBrokerConfig } from './ibkr-types.js'
 
 // IB Gateway can defer a currentTime reply well past a second under its own
@@ -57,6 +69,68 @@ const HEARTBEAT_MISS_THRESHOLD = 2
 // accepts, so the exemption is bounded or a half-open socket hides forever
 // (issue #294).
 const HEARTBEAT_INBOUND_EXEMPTION_LIMIT = 3
+
+/** Order fields a modify may revise, checked against the venue echo. */
+const MODIFIABLE_ECHO_FIELDS = [
+  'totalQuantity', 'lmtPrice', 'auxPrice', 'tif', 'orderType',
+  'trailingPercent', 'trailStopPrice', 'goodTillDate', 'outsideRth',
+] as const
+
+/** Render a field value for an operator-facing diff message. */
+function renderEchoValue(value: unknown): string {
+  return Decimal.isDecimal(value) ? (value as Decimal).toString() : String(value)
+}
+
+/**
+ * Is a value the venue's "field absent" answer? IBKR sends UNSET sentinels and
+ * empty strings for fields it did not populate, which is not a rejected change.
+ */
+function isEchoAbsent(value: unknown): boolean {
+  if (value == null) return true
+  if (typeof value === 'string') return value === ''
+  if (Decimal.isDecimal(value)) return (value as Decimal).equals(UNSET_DECIMAL)
+  if (typeof value === 'number') return value === UNSET_DOUBLE || value === UNSET_INTEGER
+  return false
+}
+
+/** Did the venue actually apply `requested` for this field? */
+function echoMatches(requested: unknown, echoed: unknown): boolean {
+  if (Decimal.isDecimal(requested) || Decimal.isDecimal(echoed)) {
+    try {
+      return new Decimal(requested as Decimal.Value).equals(new Decimal(echoed as Decimal.Value))
+    } catch { return false }
+  }
+  return requested === echoed
+}
+
+/**
+ * Compares each requested change against the venue's openOrder echo, because
+ * TWS can accept a re-place and still ignore individual fields. Anything the
+ * echo did not carry is `unverified` rather than a rejection.
+ */
+function verifyModifyEcho(
+  changes: Partial<Order>,
+  echoed: Order | undefined,
+): { ignored: string[]; unverified: string[] } {
+  const ignored: string[] = []
+  const unverified: string[] = []
+  // An orderStatus-only answer carries a blank Order, which echoes nothing.
+  const hasBody = echoed != null && echoed.orderType !== ''
+  for (const field of MODIFIABLE_ECHO_FIELDS) {
+    const requested = changes[field]
+    if (requested == null) continue
+    if (!hasBody) { unverified.push(field); continue }
+    const actual = echoed[field]
+    if (isEchoAbsent(actual)) { unverified.push(field); continue }
+    if (!echoMatches(requested, actual)) {
+      ignored.push(`${field} (requested ${renderEchoValue(requested)}, working ${renderEchoValue(actual)})`)
+    }
+  }
+  // Confirmed mismatches are the actionable signal; only surface unverified
+  // fields when there is nothing concrete to report.
+  return { ignored, unverified: ignored.length > 0 ? [] : unverified }
+}
+
 const OPTION_MARK_SUCCESS_TTL_MS = 15_000
 const OPTION_MARK_FAILURE_TTL_MS = 60_000
 const OPTION_MARK_CONCURRENCY = 8
@@ -644,6 +718,9 @@ export class IbkrBroker implements IBroker {
   }
 
   async modifyOrder(orderId: string, changes: Partial<Order>): Promise<PlaceOrderResult> {
+    // Refused outside the try/catch so it surfaces as a CONFIG error rather
+    // than an ordinary { success: false } venue rejection.
+    refuseOcaRevision('IBKR', changes)
     try {
       this._ensureAlive()
       // IBKR modifies orders by re-calling placeOrder with the same orderId
@@ -661,18 +738,41 @@ export class IbkrBroker implements IBroker {
       if (changes.orderType) mergedOrder.orderType = changes.orderType
       if (changes.trailingPercent != null) mergedOrder.trailingPercent = changes.trailingPercent
       if (changes.trailStopPrice != null) mergedOrder.trailStopPrice = changes.trailStopPrice
+      if (changes.goodTillDate != null) mergedOrder.goodTillDate = changes.goodTillDate
+      if (changes.outsideRth != null) mergedOrder.outsideRth = changes.outsideRth
+
+      // A group whose type is still 0 is ignored by TWS, so the orders would
+      // look linked here and behave independently at the venue.
+      const toSend = applyStandaloneOcaType(mergedOrder)
 
       const routedContract = await this.resolveRoutableContract(original.contract)
       await this._ensureWriteAlive()
       const numericId = parseInt(orderId, 10)
       const promise = this.bridge.requestOrder(numericId)
-      this.client.placeOrder(numericId, routedContract, mergedOrder)
+      this.client.placeOrder(numericId, routedContract, toSend)
       const result = await promise
+
+      // TWS can accept a re-place and still ignore individual fields, so the
+      // echo is compared before the ledger records the requested values.
+      const echo = verifyModifyEcho(changes, result.order)
+      if (echo.ignored.length > 0) {
+        return {
+          success: false,
+          orderId,
+          orderState: result.orderState,
+          error:
+            `Venue accepted the re-place of order ${orderId} but ignored: ${echo.ignored.join(', ')}. ` +
+            'The order is still working with its previous values.',
+        }
+      }
 
       return {
         success: true,
         orderId,
         orderState: result.orderState,
+        ...(echo.unverified.length > 0
+          ? { message: `Modify of order ${orderId} accepted; the venue echo did not carry ${echo.unverified.join(', ')} (unverified).` }
+          : {}),
       }
     } catch (err) {
       return { success: false, error: err instanceof Error ? err.message : String(err) }
@@ -1017,12 +1117,83 @@ export class IbkrBroker implements IBroker {
     return { isOpen, timestamp: now }
   }
 
+  // ==================== Historical bars ====================
+
+  /**
+   * Serializes historical requests. TWS paces them across the whole connection
+   * (roughly 60 per 10 minutes, no identical request within 15s).
+   */
+  private historicalQueue_: Promise<unknown> = Promise.resolve()
+
+  private enqueueHistorical<T>(task: () => Promise<T>): Promise<T> {
+    const run = this.historicalQueue_.then(task, task)
+    // Keep the chain alive after a rejection so one failure can't wedge the
+    // queue, without swallowing the caller's error.
+    this.historicalQueue_ = run.catch(() => undefined)
+    return run
+  }
+
+  /**
+   * Historical OHLCV via `reqHistoricalData`. Entitlement, pacing, and empty
+   * windows all arrive as error 162 and are separated by message text.
+   */
+  async getHistorical(contract: Contract, params: BarParams): Promise<Bar[]> {
+    this._ensureAlive()
+    const routedContract = await this.resolveRoutableContract(contract)
+    // secType picks the default price stream: spot FX (`CASH`) has no TRADES.
+    const request = buildHistoricalRequest(params, new Date(), routedContract.secType)
+
+    return this.enqueueHistorical(async () => {
+      const reqId = this.bridge.allocReqId()
+      const promise = this.bridge.requestHistoricalBars(reqId)
+      this.client.reqHistoricalData(
+        reqId,
+        routedContract,
+        request.endDateTime,
+        request.durationStr,
+        request.barSizeSetting,
+        request.whatToShow,
+        request.useRTH,
+        request.formatDate,
+        false, // keepUpToDate: this is a one-shot query, not a subscription
+        [],
+      )
+      try {
+        return decodeBars(await promise, params)
+      } catch (err) {
+        // Frees the HMDS slot; a cancel for a finished query is a harmless no-op.
+        try { this.client.cancelHistoricalData(reqId) } catch { /* best-effort */ }
+        const kind = classifyHistoricalError(err)
+        if (kind === 'empty') return []
+        if (kind === 'pacing') {
+          throw new BrokerError(
+            'NETWORK',
+            `IBKR historical-data pacing limit hit for ${resolveSymbol(routedContract) ?? 'contract'} `
+            + `(${params.interval}). Retry shortly; reduce concurrent bar requests. Original: `
+            + `${err instanceof Error ? err.message : String(err)}`,
+          )
+        }
+        throw BrokerError.from(err)
+      }
+    })
+  }
+
   // ==================== Capabilities ====================
 
   getCapabilities(): AccountCapabilities {
     return {
       supportedSecTypes: ['STK', 'OPT', 'FUT', 'FOP', 'CASH', 'WAR', 'BOND'],
-      supportedOrderTypes: ['MKT', 'LMT', 'STP', 'STP LMT', 'TRAIL', 'MOC', 'LOC', 'REL'],
+      supportedOrderTypes: ['MKT', 'LMT', 'STP', 'STP LMT', 'TRAIL', 'TRAIL LIMIT', 'MOC', 'LOC', 'REL'],
+      // Without the market-data subscription TWS answers error 162 rather than
+      // degrading to delayed bars, so the source is entitlement-gated.
+      historicalBars: {
+        supported: true,
+        quality: 'subscription',
+        supportedBarSizes: IBKR_SUPPORTED_BAR_SIZES,
+        // `useRTH` is a real server-side filter, so both sessions are honored
+        // rather than approximated client-side.
+        sessions: ['regular', 'extended'],
+      },
     }
   }
 

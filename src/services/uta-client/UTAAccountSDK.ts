@@ -19,8 +19,8 @@ import type {
   Position,
   OpenOrder,
   Quote,
-  Bar,
   BarParams,
+  HistoricalBarsResult,
   MarketClock,
   BrokerHealth,
   BrokerHealthInfo,
@@ -181,17 +181,18 @@ export class UTAAccountSDK {
    * `getHistorical` land in Phase 1; until then this 404s at runtime (no
    * vendor flow calls it). `Date` fields serialize to ISO strings over the
    * wire; the route revives them.
+   *
+   * Returns the bars plus the session UTA actually served and whether the
+   * request had to be overridden.
    */
   getHistorical(
     query: Contract | (Partial<Contract> & { aliceId?: string }),
     params: BarParams,
-  ): Promise<Bar[]> {
-    return this.client
-      .post<{ bars: Bar[] }>(
-        `/api/trading/uta/${encodeURIComponent(this.id)}/historical`,
-        { contract: query, params },
-      )
-      .then((r) => r.bars)
+  ): Promise<HistoricalBarsResult> {
+    return this.client.post<HistoricalBarsResult>(
+      `/api/trading/uta/${encodeURIComponent(this.id)}/historical`,
+      { contract: query, params },
+    )
   }
 
   searchContracts(pattern: string): Promise<ContractDescription[]> {

@@ -19,6 +19,7 @@
  */
 
 import type { BarService, BarSourceRef, BarCapability, BarSourceKind } from '@/domain/market-data/bars/index'
+import type { BarSession } from '@traderalice/uta-protocol'
 import { SMA } from './indicator/functions/statistics.js'
 import { RSI } from './indicator/functions/technical.js'
 
@@ -32,6 +33,8 @@ export interface SnapshotOpts {
   /** How many recent dated bars to RETURN in `bars` (default 0 = summary only —
    *  the dated path is opt-in so a "how's X" read stays light). Capped at count. */
   barsOut?: number
+  /** Trading session for broker sources. Omit for the per-instrument default. */
+  session?: BarSession
 }
 
 export interface SnapshotBar {
@@ -49,6 +52,10 @@ export interface SnapshotResult {
   source?: BarSourceKind
   barCapability?: BarCapability
   interval: string
+  /** The session the bars actually cover (broker sources only). */
+  session?: BarSession
+  /** True when the requested session could not be honored. */
+  sessionForced?: boolean
   /** Effective anchor. */
   asOf: string
   /** LOUD freshness: did the data reach `asOf`? */
@@ -106,6 +113,7 @@ export async function getSnapshot(
     interval,
     count,
     ...(opts.asOf ? { end: opts.asOf, asOf: opts.asOf } : {}),
+    ...(opts.session ? { session: opts.session } : {}),
   })
 
   const asOf = meta.asOf ?? opts.asOf ?? new Date().toISOString().slice(0, 10)
@@ -121,6 +129,8 @@ export async function getSnapshot(
     source: meta.source,
     barCapability: meta.barCapability,
     interval,
+    ...(meta.session ? { session: meta.session } : {}),
+    ...(meta.sessionForced ? { sessionForced: true } : {}),
     asOf,
     isLatestActual,
     staleTradingDays,
