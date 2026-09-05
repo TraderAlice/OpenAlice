@@ -17,6 +17,7 @@ import { fileURLToPath } from 'node:url'
 
 import { INTERNAL_BOOTSTRAP_ROLE } from '../src/workspaces/bootstrap-runtime.js'
 import { bunReleaseContentIdentity } from './bun-release-content-identity.mjs'
+import { inspectSystemDependencies } from '../packages/cli/src/system-dependencies.mjs'
 
 const repositoryRoot = fileURLToPath(new URL('..', import.meta.url))
 const pinnedBunVersion = (await readFile(join(repositoryRoot, '.bun-version'), 'utf8')).trim()
@@ -43,7 +44,6 @@ const releaseName = `openalice-cli-${product.version}-${platformName}-${process.
 const releaseRoot = join(outputRoot, releaseName)
 const executablePath = join(releaseRoot, 'bin', 'openalice')
 const resourceRoot = join(releaseRoot, 'share', 'openalice')
-const gitRoot = join(resourceRoot, 'runtime', 'git')
 const archivePath = join(outputRoot, `${releaseName}.tar.gz`)
 const smokeHome = join(outputRoot, 'smoke-home')
 const releaseStartedAt = performance.now()
@@ -58,7 +58,6 @@ for (const required of [
   'ui/dist/index.html',
   'src/workspaces/templates/chat/bootstrap.mjs',
   'src/workspaces/cli/bin/pi-session-provider.ts',
-  'node_modules/dugite/git/bin/git',
 ]) {
   await stat(join(repositoryRoot, required)).catch(() => {
     throw new Error(`required Bun release input is missing: ${required}`)
@@ -96,10 +95,6 @@ await Promise.all([
 await mkdir(join(releaseRoot, 'licenses'), { recursive: true })
 await cp(join(repositoryRoot, 'node_modules/dugite/LICENSE'), join(releaseRoot, 'licenses/dugite-LICENSE'))
 await materializeWorkspaceCli()
-const gitReport = await buildPortableGit(
-  join(repositoryRoot, 'node_modules/dugite/git'),
-  gitRoot,
-)
 
 const files = await releaseFiles(releaseRoot, new Set(['release.json']))
 const unsignedReleaseMetadata = {
@@ -111,14 +106,8 @@ const unsignedReleaseMetadata = {
   bunVersion: Bun.version,
   executable: 'bin/openalice',
   resourceRoot: 'share/openalice',
-  git: {
-    root: 'share/openalice/runtime/git',
-    source: 'dugite',
-    sourceVersion: JSON.parse(
-      await readFile(join(repositoryRoot, 'node_modules/dugite/package.json'), 'utf8'),
-    ).version,
-    ...gitReport,
-  },
+  dependencyPolicy: 'system',
+  systemDependencies: ['git', 'bash'],
   files,
 }
 const contentIdentity = bunReleaseContentIdentity(unsignedReleaseMetadata)
@@ -135,7 +124,6 @@ const smokeStartedAt = performance.now()
 const smoke = await smokeRelease({
   executablePath,
   resourceRoot,
-  gitRoot,
   smokeHome,
   contentIdentity,
 })
@@ -188,7 +176,6 @@ const report = {
   releaseBytes: await directoryBytes(releaseRoot),
   archiveBytes: (await stat(archivePath)).size,
   archiveSha256: archiveHash,
-  git: gitReport,
   smoke,
 }
 await writeFile(join(outputRoot, 'report.json'), `${JSON.stringify(report, null, 2)}\n`)
@@ -222,118 +209,38 @@ exec "$OPENALICE_RUNTIME_EXECUTABLE" --workspace-cli ${binary} "$@"
   }
 }
 
-async function buildPortableGit(source: string, destination: string): Promise<{
-  version: string
-  files: number
-  symlinks: number
-  bytes: number
-}> {
-  await mkdir(join(destination, 'bin'), { recursive: true })
-  await mkdir(join(destination, 'libexec/git-core'), { recursive: true })
-  await cp(join(source, 'bin/git'), join(destination, 'bin/git'))
-  await cp(join(source, 'etc'), join(destination, 'etc'), { recursive: true })
-  await cp(join(source, 'share/git-core'), join(destination, 'share/git-core'), { recursive: true })
-  if (await exists(join(source, 'ssl'))) {
-    await cp(join(source, 'ssl'), join(destination, 'ssl'), { recursive: true })
-  }
-
-  const sourceCore = join(source, 'libexec/git-core')
-  const destinationCore = join(destination, 'libexec/git-core')
-  const canonicalByHash = new Map<string, string>()
-  canonicalByHash.set(await sha256File(join(destination, 'bin/git')), join(destination, 'bin/git'))
-  await symlink(join('..', '..', 'bin', 'git'), join(destinationCore, 'git'))
-  let symlinks = 1
-  for (const entry of await readdir(sourceCore, { withFileTypes: true })) {
-    if (entry.isDirectory()) {
-      if (entry.name === 'mergetools') {
-        await cp(join(sourceCore, entry.name), join(destinationCore, entry.name), { recursive: true })
-      }
-      continue
-    }
-    if (!entry.name.startsWith('git-')) continue
-    if (entry.name === 'git-lfs' || entry.name.startsWith('git-credential-manager')) continue
-    const sourceFile = join(sourceCore, entry.name)
-    const destinationFile = join(destinationCore, entry.name)
-    if (entry.isSymbolicLink()) {
-      const target = await readlink(sourceFile)
-      const resolvedTarget = resolve(sourceCore, target)
-      if (resolvedTarget !== sourceCore && !resolvedTarget.startsWith(`${sourceCore}/`)) {
-        throw new Error(`release-owned Git contains an escaping symlink: ${entry.name} -> ${target}`)
-      }
-      await symlink(target, destinationFile)
-      symlinks += 1
-      continue
-    }
-    if (!entry.isFile()) continue
-    const hash = await sha256File(sourceFile)
-    const canonical = canonicalByHash.get(hash)
-    if (canonical) {
-      await symlink(relative(dirname(destinationFile), canonical), destinationFile)
-      symlinks += 1
-    } else {
-      await cp(sourceFile, destinationFile)
-      canonicalByHash.set(hash, destinationFile)
-    }
-  }
-  // Git's local and SSH transports ask a shell to resolve these server-side
-  // programs by name. GIT_EXEC_PATH covers Git's own subcommand dispatch but
-  // does not replace the conventional bin entries on Linux.
-  for (const program of ['git-upload-pack', 'git-receive-pack', 'git-shell']) {
-    await symlink(join('..', 'libexec', 'git-core', program), join(destination, 'bin', program))
-    symlinks += 1
-  }
-  const entries = await releaseFiles(destination)
-  const bytes = await directoryBytes(destination)
-  if (bytes > 80 * 1024 * 1024) {
-    throw new Error(`release-owned Git is unexpectedly large: ${bytes} bytes`)
-  }
-  const version = Bun.spawnSync([join(destination, 'bin/git'), '--version'], {
-    env: {
-      PATH: join(destination, 'bin'),
-      GIT_EXEC_PATH: join(destination, 'libexec/git-core'),
-    },
-    stdout: 'pipe',
-    stderr: 'pipe',
-  })
-  if (version.exitCode !== 0) throw new Error(`release-owned Git failed: ${version.stderr.toString()}`)
-  return {
-    version: version.stdout.toString().trim(),
-    files: entries.filter((entry) => entry.type === 'file').length,
-    symlinks,
-    bytes,
-  }
-}
 
 async function smokeRelease(options: {
   executablePath: string
   resourceRoot: string
-  gitRoot: string
   smokeHome: string
   contentIdentity: string
 }): Promise<Record<string, unknown>> {
   await mkdir(options.smokeHome, { recursive: true })
+  const dependencies = await inspectSystemDependencies()
+  if (dependencies.some(check => check.status !== 'available')) {
+    throw new Error('CLI smoke requires system Git and Bash; run openalice setup')
+  }
+  const git = dependencies.find(check => check.id === 'git')!.executable!
   const gitEnv = {
     HOME: options.smokeHome,
-    PATH: join(options.gitRoot, 'bin'),
-    LOCAL_GIT_DIRECTORY: options.gitRoot,
-    GIT_EXEC_PATH: join(options.gitRoot, 'libexec/git-core'),
-    GIT_TEMPLATE_DIR: join(options.gitRoot, 'share/git-core/templates'),
-    GIT_CONFIG_SYSTEM: join(options.gitRoot, 'etc/gitconfig'),
+    PATH: process.env['PATH'] ?? '/usr/bin:/bin',
+    OPENALICE_SYSTEM_GIT_PATH: git,
+    GIT_CONFIG_NOSYSTEM: '1',
     TMPDIR: process.env['TMPDIR'] ?? '/tmp',
   }
-  const git = join(options.gitRoot, 'bin/git')
   const sourceRepository = join(options.smokeHome, 'git-source')
   const clonedRepository = join(options.smokeHome, 'git-clone')
   run([git, 'init', sourceRepository], gitEnv)
   run([git, '-C', sourceRepository, 'config', 'user.email', 'smoke@openalice.local'], gitEnv)
   run([git, '-C', sourceRepository, 'config', 'user.name', 'OpenAlice Smoke'], gitEnv)
-  await writeFile(join(sourceRepository, 'README.md'), 'release-owned git\n')
+  await writeFile(join(sourceRepository, 'README.md'), 'system git\n')
   run([git, '-C', sourceRepository, 'add', 'README.md'], gitEnv)
   run([git, '-C', sourceRepository, 'commit', '-m', 'initial'], gitEnv)
   const sourceCommit = run([git, '-C', sourceRepository, 'rev-parse', 'HEAD'], gitEnv).trim()
   run([git, 'clone', sourceRepository, clonedRepository], gitEnv)
-  if ((await readFile(join(clonedRepository, 'README.md'), 'utf8')).trim() !== 'release-owned git') {
-    throw new Error('release-owned Git clone did not preserve repository content')
+  if ((await readFile(join(clonedRepository, 'README.md'), 'utf8')).trim() !== 'system git') {
+    throw new Error('System Git clone did not preserve repository content')
   }
   if (process.env['OPENALICE_BUN_NETWORK_GIT'] === '1') {
     run([git, 'ls-remote', 'https://github.com/git/git.git', 'HEAD'], gitEnv)
@@ -448,7 +355,7 @@ printf '%s\\n' "${'$'}1" > "${'$'}OPENALICE_SMOKE_OPEN_RECEIPT"
   await Promise.all([chmod(externalOpenCode, 0o755), chmod(opener, 0o755)])
   const runtimeEnv = {
     HOME: userHome,
-    PATH: externalAgentBin,
+    PATH: [externalAgentBin, ...new Set(dependencies.map(check => dirname(check.executable!)))].join(':'),
     TMPDIR: process.env['TMPDIR'] ?? '/tmp',
     OPENALICE_HOME: runtimeHome,
     OPENALICE_TRADING_MODE: 'lite',

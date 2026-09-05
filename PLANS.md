@@ -42,6 +42,8 @@ the durable truth after it changes. Git history is the archive.
 - [[plans/bun-cli-distribution.md]] — Replaces the expanded Node headless
   Runtime with a Bun-compiled, multi-process CLI distribution. Direct,
   npm/Bun, Homebrew, and AUR channels consume one accepted artifact set.
+  Active follow-up: system-owned Git/Bash and consent-based dependency
+  coordination across CLI installers/package managers; Electron stays separate.
   Homebrew tap is public at `0.90.2` with lightweight hourly/manual stable sync.
   Stable `0.91.0` source and version preparation are merged; final validation
   exposed and repaired host-dependent TUI fixtures; the release then exposed

@@ -24,7 +24,7 @@ import {
   stopRuntimeServer,
 } from './server-control.mjs'
 import {
-  buildBunRuntimeEnvironment,
+  prepareBunRuntimeEnvironment,
   buildExternalAgentRuntimeEnvironment,
   bunGuardianProcessSpec,
   isBunStandalone,
@@ -120,10 +120,11 @@ export async function startRuntime(options, dependencies = {}) {
   runtimeEnv.OPENALICE_SERVER_MODE = detached ? 'detached' : 'foreground'
   runtimeEnv.OPENALICE_RUNTIME_PROVIDER = runtimeProvider.kind
   if (standalone) {
-    runtimeEnv = buildBunRuntimeEnvironment(
+    runtimeEnv = await prepareBunRuntimeEnvironment(
       runtimeEnv,
       appDir,
       dependencies.runtimeExecutable ?? process.execPath,
+      { inspectDependencies: dependencies.inspectDependencies },
     )
   }
   delete runtimeEnv.OPENALICE_RUNTIME_CONTENT_IDENTITY

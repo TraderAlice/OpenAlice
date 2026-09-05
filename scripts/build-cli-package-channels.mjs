@@ -167,7 +167,7 @@ function buildNpmPackages({ outputRoot, version, targets }) {
   return { metaPackage: npmMetaName, platformPackages }
 }
 
-function buildHomebrewFormula({ outputRoot, version, targets, assetBaseUrl }) {
+export function buildHomebrewFormula({ outputRoot, version, targets, assetBaseUrl }) {
   const formulaRoot = join(outputRoot, 'homebrew')
   mkdirSync(formulaRoot, { recursive: true })
   const formulaPath = join(formulaRoot, 'openalice.rb')
@@ -185,6 +185,8 @@ class Openalice < Formula
   homepage "https://openalice.ai"
   version "${version}"
   license "AGPL-3.0-only"
+  depends_on "git"
+  depends_on "bash"
 
 ${blocks}
 end
@@ -233,7 +235,7 @@ function homebrewTargetBlock(version, target, assetBaseUrl) {
 `
 }
 
-function buildAurPackage({ outputRoot, version, releasedAt, targets, assetBaseUrl }) {
+export function buildAurPackage({ outputRoot, version, releasedAt, targets, assetBaseUrl }) {
   const aurRoot = join(outputRoot, 'aur')
   mkdirSync(aurRoot, { recursive: true })
   const linuxArm = requireTarget(targets, 'linux', 'arm64')
@@ -250,7 +252,7 @@ pkgdesc='Local trading workspace for native coding-agent CLIs'
 arch=('aarch64' 'x86_64')
 url='https://github.com/${repository}'
 license=('AGPL-3.0-only')
-depends=('glibc')
+depends=('glibc' 'git' 'bash')
 provides=('openalice')
 conflicts=('openalice')
 options=('!debug' '!strip')
@@ -315,6 +317,8 @@ function aurSrcinfo({ version, pkgver, linuxArm, linuxX64, assetBaseUrl }) {
 \tarch = x86_64
 \tlicense = AGPL-3.0-only
 \tdepends = glibc
+\tdepends = git
+\tdepends = bash
 \tprovides = openalice
 \tconflicts = openalice
 \toptions = !debug
@@ -344,7 +348,7 @@ const arch = os.arch()
 if (!['darwin', 'linux', 'win32'].includes(platform) || !['arm64', 'x64'].includes(arch)) {
   throw new Error('OpenAlice npm packages support macOS, Linux and Windows on arm64 or x64.')
 }
-const packageName = 'openalice-' + platform + '-' + arch
+const packageName = 'openalice-' + (platform === 'win32' ? 'windows' : platform) + '-' + arch
 const packageJsonPath = require.resolve(packageName + '/package.json')
 const nativePackageRoot = path.dirname(packageJsonPath)
 const nativePackage = JSON.parse(fs.readFileSync(packageJsonPath, 'utf8'))
@@ -416,7 +420,7 @@ function npmReadme(version) {
 }
 
 function platformPackageName(platform, arch) {
-  return `openalice-${platform}-${arch}`
+  return `openalice-${platform === 'win32' ? 'windows' : platform}-${arch}`
 }
 
 function releaseAssetUrl(assetBaseUrl, archiveName) {

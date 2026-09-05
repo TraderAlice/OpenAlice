@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 
 import { realpathSync } from 'node:fs'
+import { runDependencySetup } from '../src/dependency-setup.mjs'
 import { fileURLToPath } from 'node:url'
 
 import {
@@ -42,6 +43,7 @@ import {
 
 export async function main(argv = process.argv.slice(2)) {
   const [command, ...args] = argv
+  if (command === 'setup') return runDependencySetup(args)
   if (command === '--help' || command === '-h' || command === 'help') {
     process.stdout.write(formatRootHelp())
     return 0

@@ -3,6 +3,7 @@ import { resolve } from 'node:path'
 
 import {
   buildBunRuntimeEnvironment,
+  prepareBunRuntimeEnvironment,
   buildExternalAgentRuntimeEnvironment,
   bunGuardianProcessSpec,
   bunInstallSourceLocations,
@@ -12,18 +13,24 @@ import {
 } from './bun-standalone.mjs'
 
 describe('Bun standalone launch boundary', () => {
-  it.each(['x64', 'arm64'])('uses private Windows Git/Bash without selecting managed Pi (%s)', (arch) => {
+  it.each(['x64', 'arm64'])('uses detected Windows Git/Bash without selecting managed Pi (%s)', (arch) => {
     const resourceRoot = resolve('/preview/share/openalice')
-    const prefix = arch === 'arm64' ? 'clangarm64' : 'mingw64'
+    const git = 'C:\\Program Files\\Git\\cmd\\git.exe'
+    const bash = 'C:\\Program Files\\Git\\bin\\bash.exe'
     const env = buildBunRuntimeEnvironment({ Path: 'user-tools', OPENALICE_MANAGED_PI_PATH: 'old' },
-      resourceRoot, '/preview/bin/openalice.exe', { platform: 'win32', arch, exists: () => false })
+      resourceRoot, '/preview/bin/openalice.exe', { platform: 'win32', arch, exists: () => false,
+        dependencyChecks: [
+          { id: 'git', status: 'available', executable: git },
+          { id: 'bash', status: 'available', executable: bash },
+        ],
+      })
     expect(env).not.toHaveProperty('Path')
     expect(env).not.toHaveProperty('OPENALICE_MANAGED_PI_PATH')
-    expect(env.OPENALICE_MANAGED_SHELL_PATH).toBe(resolve(resourceRoot, 'runtime/git/bin/bash.exe'))
-    expect(env.GIT_EXEC_PATH).toBe(resolve(resourceRoot, `runtime/git/${prefix}/libexec/git-core`))
-    expect(env.PATH).toBe([
-      'cmd', 'bin', 'usr/bin', `${prefix}/bin`,
-    ].map(path => resolve(resourceRoot, 'runtime/git', path)).concat('user-tools').join(';'))
+    expect(env.OPENALICE_MANAGED_SHELL_PATH).toBe(bash)
+    expect(env.OPENALICE_SYSTEM_GIT_PATH).toBe(git)
+    expect(env).not.toHaveProperty('GIT_EXEC_PATH')
+    expect(env).not.toHaveProperty('LOCAL_GIT_DIRECTORY')
+    expect(env.PATH).toBe('C:\\Program Files\\Git\\cmd;C:\\Program Files\\Git\\bin;user-tools')
   })
   it('derives an installed sidecar resource root from the executable', () => {
     expect(resolveBunResourceRoot({}, '/opt/openalice/releases/v1/bin/openalice'))
@@ -82,12 +89,14 @@ describe('Bun standalone launch boundary', () => {
     })
   })
 
-  it('injects the release-owned Git without discarding the user PATH', () => {
+  it('preserves system Git configuration without injecting resource paths', () => {
     const resourceRoot = resolve('/opt/openalice/share/openalice')
     expect(buildBunRuntimeEnvironment(
       {
         PATH: '/usr/local/bin',
         KEEP: 'yes',
+        GIT_EXEC_PATH: '/custom/git-core',
+        GIT_TEMPLATE_DIR: '/custom/templates',
         OPENALICE_INSTALL_SOURCE: '/opt/openalice/install-source.json',
       },
       resourceRoot,
@@ -96,11 +105,28 @@ describe('Bun standalone launch boundary', () => {
       KEEP: 'yes',
       OPENALICE_INSTALL_SOURCE: '/opt/openalice/install-source.json',
       OPENALICE_RUNTIME_EXECUTABLE: '/opt/openalice/bin/openalice',
-      LOCAL_GIT_DIRECTORY: resolve(resourceRoot, 'runtime/git'),
-      GIT_EXEC_PATH: resolve(resourceRoot, 'runtime/git/libexec/git-core'),
-      GIT_TEMPLATE_DIR: resolve(resourceRoot, 'runtime/git/share/git-core/templates'),
-      PATH: `${resolve(resourceRoot, 'runtime/git/bin')}${process.platform === 'win32' ? ';' : ':'}/usr/local/bin`,
+      GIT_EXEC_PATH: '/custom/git-core',
+      GIT_TEMPLATE_DIR: '/custom/templates',
+      PATH: '/usr/local/bin',
     }))
+  })
+
+  it('re-detects dependencies before launch and forwards the verified executable', async () => {
+    const env = await prepareBunRuntimeEnvironment({ PATH: '/usr/bin' }, '/resources', '/alice', {
+      platform: 'linux', exists: () => false,
+      inspectDependencies: async () => [
+        { id: 'git', status: 'available', executable: '/custom/bin/git' },
+        { id: 'bash', status: 'available', executable: '/bin/bash' },
+      ],
+    })
+    expect(env.OPENALICE_SYSTEM_GIT_PATH).toBe('/custom/bin/git')
+    expect(env.PATH).toBe('/custom/bin:/bin:/usr/bin')
+  })
+
+  it('does not launch or install silently with missing dependencies', async () => {
+    await expect(prepareBunRuntimeEnvironment({}, '/resources', '/alice', {
+      inspectDependencies: async () => [{ id: 'git', status: 'missing' }],
+    })).rejects.toThrow('Run openalice setup')
   })
 
   it('propagates discovered package-manager provenance into the Runtime', () => {

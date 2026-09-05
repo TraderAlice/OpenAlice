@@ -1,6 +1,6 @@
 import { pathToFileURL } from 'node:url';
 
-import { exec as bundledGitExec } from 'dugite';
+import { exec as bundledGitExec } from './git-execution.js';
 
 export const INTERNAL_BOOTSTRAP_ROLE = '--openalice-internal-bootstrap';
 

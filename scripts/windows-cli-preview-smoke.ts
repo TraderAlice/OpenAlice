@@ -52,6 +52,10 @@ const environment = {
 }
 let uninstalled = false
 try {
+  const setup = JSON.parse(await command(executable, ['setup', '--check', '--json'], environment))
+  if (setup.status !== 'ready') throw new Error('Windows acceptance requires system Git/Bash; finish openalice setup first')
+  const git = setup.checks.find((check: { id: string }) => check.id === 'git')?.executable
+  if (!git || git.startsWith(releaseDir)) throw new Error('CLI must use system-owned Git')
   await command(executable, ['up', '--home', home, '--port', String(port), '--wait', '90', '--no-update-check'], environment)
   const status = JSON.parse(await command(executable, ['status', '--home', home, '--json'], environment)).result.status
   if (status.class !== 'running' || status.provider?.kind !== 'bun' ||
@@ -60,7 +64,6 @@ try {
       status.owner.pid === status.componentDetail.alice.pid) throw new Error('Runtime status/identity mismatch')
   const html = await (await fetch(`http://127.0.0.1:${port}/`)).text()
   if (!html.includes('<div id="root">')) throw new Error('Real Web UI was not served')
-  const git = join(releaseDir, 'share/openalice/runtime/git/cmd/git.exe')
   await command(git, ['--version'], environment)
   await command(executable, ['down', '--home', home, '--wait', '30'], environment)
   const stopped = JSON.parse(await command(executable, ['status', '--home', home, '--json'], environment)).result.status

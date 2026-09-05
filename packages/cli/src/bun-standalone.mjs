@@ -1,5 +1,6 @@
 import { existsSync, readFileSync } from 'node:fs'
-import { delimiter, dirname, join, resolve } from 'node:path'
+import { dirname, posix, win32, resolve } from 'node:path'
+import { inspectSystemDependencies } from './system-dependencies.mjs'
 
 export function isBunStandalone() {
   return globalThis.__OPENALICE_BUN_STANDALONE__ === true
@@ -56,17 +57,20 @@ export function buildBunRuntimeEnvironment(
   executable = process.execPath,
   options = {},
 ) {
-  const gitRoot = join(resourceRoot, 'runtime', 'git')
-  const gitBin = join(gitRoot, 'bin')
   const windows = (options.platform ?? process.platform) === 'win32'
-  const gitPrefix = (options.arch ?? process.arch) === 'arm64' ? 'clangarm64' : 'mingw64'
+  const path = windows ? win32 : posix
   const runtimeEnv = buildExternalAgentRuntimeEnvironment(env)
   // Windows environment names are case-insensitive; do not pass both Path and PATH.
   const inheritedPath = runtimeEnv.PATH ?? runtimeEnv.Path ?? ''
   if (windows) delete runtimeEnv.Path
-  const gitPaths = windows
-    ? [join(gitRoot, 'cmd'), gitBin, join(gitRoot, 'usr', 'bin'), join(gitRoot, gitPrefix, 'bin')]
-    : [gitBin]
+  const checks = options.dependencyChecks ?? []
+  const git = checks.find(check => check.id === 'git' && check.status === 'available')?.executable
+  const bash = checks.find(check => check.id === 'bash' && check.status === 'available')?.executable
+  // These select desktop-owned runtimes, not the user's system installation.
+  delete runtimeEnv.LOCAL_GIT_DIRECTORY
+  delete runtimeEnv.OPENALICE_MANAGED_SHELL_PATH
+  delete runtimeEnv.OPENALICE_SYSTEM_GIT_PATH
+  const systemPaths = [...new Set([git, bash].filter(Boolean).map(file => path.dirname(file)))]
   const installSource = resolveBunInstallSourcePath(
     runtimeEnv,
     executable,
@@ -77,16 +81,20 @@ export function buildBunRuntimeEnvironment(
     ...runtimeEnv,
     ...(installSource ? { OPENALICE_INSTALL_SOURCE: installSource } : {}),
     OPENALICE_RUNTIME_EXECUTABLE: executable,
-    LOCAL_GIT_DIRECTORY: gitRoot,
-    ...(windows ? { OPENALICE_MANAGED_SHELL_PATH: join(gitBin, 'bash.exe') } : {}),
-    GIT_EXEC_PATH: windows
-      ? join(gitRoot, gitPrefix, 'libexec', 'git-core')
-      : join(gitRoot, 'libexec', 'git-core'),
-    GIT_TEMPLATE_DIR: windows
-      ? join(gitRoot, gitPrefix, 'share', 'git-core', 'templates')
-      : join(gitRoot, 'share', 'git-core', 'templates'),
-    PATH: [...gitPaths, ...(inheritedPath ? [inheritedPath] : [])].join(windows ? ';' : delimiter),
+    ...(git ? { OPENALICE_SYSTEM_GIT_PATH: git } : {}),
+    ...(windows && bash ? { OPENALICE_MANAGED_SHELL_PATH: bash } : {}),
+    PATH: [...systemPaths, ...(inheritedPath ? [inheritedPath] : [])].join(windows ? ';' : ':'),
   }
+}
+
+export async function prepareBunRuntimeEnvironment(env, resourceRoot, executable, options = {}) {
+  const inspect = options.inspectDependencies ?? inspectSystemDependencies
+  const dependencyChecks = await inspect({ env, platform: options.platform ?? process.platform })
+  const unavailable = dependencyChecks.filter(check => check.status !== 'available')
+  if (unavailable.length) {
+    throw new Error(`System dependencies unavailable: ${unavailable.map(check => `${check.id} (${check.status})`).join(', ')}. Run openalice setup to finish installation.`)
+  }
+  return buildBunRuntimeEnvironment(env, resourceRoot, executable, { ...options, dependencyChecks })
 }
 
 export function resolveBunContentIdentity(resourceRoot, env = process.env, read = readFileSync) {

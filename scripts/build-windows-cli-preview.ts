@@ -4,7 +4,6 @@ import { basename, dirname, join, relative, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 import { bunReleaseContentIdentity } from './bun-release-content-identity.mjs'
-import { resolveWindowsGitRuntimeSpec } from './vendor-managed-runtime.mjs'
 
 // Assembly never publishes a channel. Preserve bytes before native acceptance.
 const channelBuild = process.env.OPENALICE_WINDOWS_CHANNEL_BUILD === '1'
@@ -68,22 +67,6 @@ exec "$(cygpath -u "$OPENALICE_RUNTIME_EXECUTABLE")" --workspace-cli ${helper} "
 `, { mode: 0o755 })
 }
 
-const git = resolveWindowsGitRuntimeSpec({ platform: 'win32', arch })!
-const gitArchive = join(staging, basename(git.url))
-const response = await fetch(git.url, { signal: AbortSignal.timeout(180_000) })
-if (!response.ok) throw new Error(`PortableGit download: HTTP ${response.status}`)
-const gitBytes = new Uint8Array(await response.arrayBuffer())
-if (sha256(gitBytes) !== git.sha256) throw new Error('PortableGit SHA-256 mismatch')
-await writeFile(gitArchive, gitBytes)
-const gitRoot = join(resources, 'runtime/git')
-await mkdir(gitRoot, { recursive: true })
-if (process.platform === 'win32' && arch === process.arch) {
-  run([gitArchive, '-y', `-o${gitRoot}`])
-} else {
-  // Cross-builds extract data; they never execute the target's installer.
-  run([process.env.OPENALICE_7ZIP ?? '7zz', 'x', '-y', `-o${gitRoot}`, gitArchive])
-}
-for (const path of [git.gitBin, git.shellPath, git.shPath]) await stat(join(gitRoot, path))
 if (channelBuild) await cp(join(root, 'install.ps1'), join(resources, 'install.ps1'))
 if (!channelBuild) {
   await cp(join(root, 'install-preview.ps1'), join(release, 'install-preview.ps1'))
@@ -99,7 +82,8 @@ const unsigned = {
   schemaVersion: 1, product: 'OpenAlice CLI', version, platform: 'win32', arch,
   bunVersion: Bun.version, sourceCommit, sourceDirty, ...(!channelBuild ? { preview: true } : {}),
   executable: 'bin/openalice.exe', resourceRoot: 'share/openalice',
-  git: { source: 'PortableGit', sourceVersion: git.version, sourceSha256: git.sha256 },
+  dependencyPolicy: 'system',
+  systemDependencies: ['git', 'bash'],
   files: await files(release),
 }
 const metadata = { ...unsigned, contentIdentity: bunReleaseContentIdentity(unsigned) }
