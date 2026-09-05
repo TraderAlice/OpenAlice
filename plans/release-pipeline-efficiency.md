@@ -114,7 +114,7 @@ beta-to-stable promotion; installing a permanent runner on the user's daily Mac.
 
 - [x] Gather live job/step timing, distinguish dependency wait from runner queue,
   record the baseline and inspect existing artifact/retry mechanisms.
-- [ ] Increment 1: introduce reusable per-platform desktop build/acceptance
+- [x] Increment 1: introduce reusable per-platform desktop build/acceptance
   pipelines; remove Windows dependency from POSIX-only package acceptance where
   artifact generation permits. Preserve required final aggregation and beta rules.
   Verify dependency contracts and exercise fast/slow platform ordering without
@@ -131,8 +131,10 @@ beta-to-stable promotion; installing a permanent runner on the user's daily Mac.
   checker is installed. Full local regression completed: 719 files,
   6,430 passes and three expected skips
   in 220 seconds (/tmp/openalice-release-pipeline-step1-tests.log). Final
-  generator changes have additional focused coverage. Hosted Actions semantics
-  rehearsal remains outstanding; no measured speedup is claimed yet.
+  generator changes have additional focused coverage. Hosted run 33961658342
+  subsequently passed all three production platform pipelines in unsigned
+  rehearsal mode. ARM upgrade began seven seconds after its own build, before
+  the other builds finished; Intel began three seconds after its build.
 - [ ] Increment 2: implement candidate identity, artifact-bound acceptance, and
   bounded replay of existing candidates using repaired trusted verification.
   Test wrong hash/source/channel/platform, missing receipt, failed checks,
@@ -240,6 +242,20 @@ beta-to-stable promotion; installing a permanent runner on the user's daily Mac.
   completes. It explicitly selects the rehearsal branch/artifact namespace;
   production selection and publication remain unchanged. Positive cross-verifier
   hosted evidence is still pending.
+  First desktop rehearsal 33961658342 completed successfully at 11:18:27 UTC:
+  dispatch-to-last-job 29m28s. Build/upgrade job durations were ARM 5m32s/3m17s,
+  Intel 8m36s/4m06s and Windows 11m02s/18m18s. This unsigned desktop-only
+  rehearsal is not comparable to a complete signed release end to end. Its
+  Windows candidate launch/write/restart checks took approximately six seconds
+  after installer exit; installer work still dominates that native path.
+  Downloaded all three bound upgrade receipts to
+  /tmp/openalice-release-receipts.xBW8cp/original for exact-ID comparison.
+  Same-source restore 33962287156 started after the producer completed;
+  Windows restore passed in 32 seconds versus its original 11m02s build,
+  and entered fresh N-1 acceptance. End-to-end retry timing remains pending.
+  Cross-verifier rehearsal 33962998628 now uses verifier 1a626328 against product
+  997dd0c2 and the original ARM candidate. No product build or publication is
+  requested by this operation; receipt identity comparison awaits completion.
 - [ ] Update owner guides and applicable release skill instructions to match
   the implemented operation and acceptance boundaries; remove stale serial rules.
 - [ ] Record measured timings separately from estimates, inspect latest PR
