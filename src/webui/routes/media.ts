@@ -24,7 +24,15 @@ export function createMediaRoutes() {
 
   app.get('/:date/:name', async (c) => {
     const { date, name } = c.req.param()
-    const filePath = resolveMediaPath(join(date, name))
+    const ext = extname(name).toLowerCase()
+    if (!MIME[ext]) return c.notFound()
+
+    let filePath: string
+    try {
+      filePath = resolveMediaPath(join(date, name))
+    } catch {
+      return c.notFound()
+    }
 
     try {
       const buf = await readFile(filePath)
