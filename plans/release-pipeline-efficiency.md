@@ -80,6 +80,17 @@ beta-to-stable promotion; installing a permanent runner on the user's daily Mac.
   artifact generation permits. Preserve required final aggregation and beta rules.
   Verify dependency contracts and exercise fast/slow platform ordering without
   signing or publishing; failed acceptance must not rerun successful builds.
+  In progress: extracted release-desktop-platform.yml with separate build and
+  stable-only upgrade jobs. The caller matrix now joins complete platform
+  pipelines rather than placing a matrix-wide barrier before upgrade. Existing
+  signing, startup, update-metadata checks and artifact names are preserved.
+  POSIX system-package fixtures now use a strict four-target system-only mode;
+  byte-equivalence tests preserve Homebrew/AUR output while omitting unnecessary
+  npm materialization. Public channel generation still requires all six targets.
+  All 26 release/generator tests and root typecheck pass. actionlint 1.7.7
+  passes with only its stale macos-15-intel label diagnostic excluded; no shell
+  checker is installed. Actions semantics rehearsal and full
+  local regression remain outstanding; no measured speedup is claimed yet.
 - [ ] Increment 2: implement candidate identity, artifact-bound acceptance, and
   bounded replay of existing candidates using repaired trusted verification.
   Test wrong hash/source/channel/platform, missing receipt, failed checks,

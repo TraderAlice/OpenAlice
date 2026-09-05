@@ -30,8 +30,12 @@ export function buildCliPackageChannels({
   releasedAt,
   requireAll = false,
   npmOnly = false,
+  systemOnly = false,
   assetBaseUrl,
 }) {
+  if (systemOnly && (npmOnly || requireAll)) {
+    throw new Error('system-only cannot be combined with npm-only or require-all')
+  }
   if (!/^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/.test(version)) {
     throw new Error(`invalid OpenAlice version: ${version}`)
   }
@@ -49,6 +53,7 @@ export function buildCliPackageChannels({
 
   const targets = []
   for (const [platform, arch] of CLI_RELEASE_TARGETS) {
+    if (systemOnly && platform === 'win32') continue
     const archivePath = join(inputRoot, `openalice-cli-${version}-${platform}-${arch}.tar.gz`)
     if (!existsSync(archivePath)) continue
     const validated = validateCliReleaseArchive({ archivePath, version, platform, arch })
@@ -58,11 +63,14 @@ export function buildCliPackageChannels({
   if (requireAll && targets.length !== CLI_RELEASE_TARGETS.length) {
     throw new Error(`all ${CLI_RELEASE_TARGETS.length} native CLI targets are required; found ${targets.length}`)
   }
-  if (!npmOnly && targets.length !== CLI_RELEASE_TARGETS.length) {
+  if (systemOnly && targets.length !== CLI_RELEASE_TARGETS.filter(([platform]) => platform !== 'win32').length) {
+    throw new Error('System channel generation requires all POSIX CLI targets')
+  }
+  if (!npmOnly && !systemOnly && targets.length !== CLI_RELEASE_TARGETS.length) {
     throw new Error('Full channel generation requires all native CLI targets')
   }
 
-  const npm = buildNpmPackages({ outputRoot, version, targets })
+  const npm = systemOnly ? null : buildNpmPackages({ outputRoot, version, targets })
   let homebrew = null
   let aur = null
   if (!npmOnly) {
@@ -470,6 +478,7 @@ function parseArgs(argv) {
     const arg = argv[index]
     if (arg === '--require-all') options.requireAll = true
     else if (arg === '--npm-only') options.npmOnly = true
+    else if (arg === '--system-only') options.systemOnly = true
     else if (['--input-dir', '--output-dir', '--version', '--released-at', '--asset-base-url'].includes(arg)) {
       const value = argv[++index]
       if (!value || value.startsWith('--')) throw new Error(`${arg} requires a value`)
@@ -479,7 +488,7 @@ function parseArgs(argv) {
     }
   }
   if (!options.inputdir || !options.outputdir || !options.version || !options.releasedat) {
-    throw new Error('Usage: build-cli-package-channels.mjs --input-dir <dir> --output-dir <dir> --version <version> --released-at <iso> [--asset-base-url <url>] [--require-all] [--npm-only]')
+    throw new Error('Usage: build-cli-package-channels.mjs --input-dir <dir> --output-dir <dir> --version <version> --released-at <iso> [--asset-base-url <url>] [--require-all | --npm-only | --system-only]')
   }
   return {
     inputDir: options.inputdir,
@@ -488,6 +497,7 @@ function parseArgs(argv) {
     releasedAt: options.releasedat,
     requireAll: options.requireAll,
     npmOnly: options.npmOnly,
+    systemOnly: options.systemOnly,
     assetBaseUrl: options.assetbaseurl,
   }
 }

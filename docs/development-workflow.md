@@ -511,6 +511,13 @@ upgrade receipt and verifies each updater YAML reference, size, SHA-512, and
 blockmap before publishing. Missing receipts or mismatched update metadata must
 prevent the tag and public assets from being created.
 
+The release desktop matrix invokes one reusable platform pipeline per native
+host. Each pipeline's upgrade job depends only on its own build job; it does
+not wait for the other desktop architectures. The caller's aggregate success
+includes the stable upgrade result, so publication still requires every native
+platform. Build and upgrade remain separate jobs to preserve selective retries.
+Beta runs the current-candidate checks without the stable-only N-1 job.
+
 Do not delete `dev` after promotion. After a master hotfix, propagate the fix
 back to `dev` immediately so a later promotion cannot revert it.
 

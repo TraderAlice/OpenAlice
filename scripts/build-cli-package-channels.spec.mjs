@@ -29,6 +29,30 @@ afterEach(async () => {
 })
 
 describe.skipIf(process.platform === 'win32')('CLI package-manager channel generation', () => {
+  it('generates identical system metadata without Windows archives or npm materialization', async () => {
+    const root = await fixture()
+    const common = { inputDir: join(root, 'input'), version, releasedAt }
+    buildCliPackageChannels({ ...common, outputDir: join(root, 'all'), requireAll: true })
+    for (const arch of ['arm64', 'x64']) {
+      await rm(join(root, 'input', `openalice-cli-${version}-win32-${arch}.tar.gz`))
+    }
+    const manifest = buildCliPackageChannels({ ...common, outputDir: join(root, 'system'), systemOnly: true })
+    expect(manifest.targets).toHaveLength(4)
+    expect(manifest.npm).toBeNull()
+    for (const path of ['homebrew/openalice.rb', 'aur/PKGBUILD', 'aur/.SRCINFO']) {
+      expect(await readFile(join(root, 'system', path), 'utf8'))
+        .toBe(await readFile(join(root, 'all', path), 'utf8'))
+    }
+    await expect(readFile(join(root, 'system/npm/openalice/package.json'))).rejects.toThrow()
+    expect(() => buildCliPackageChannels({ ...common, outputDir: join(root, 'invalid'), requireAll: true }))
+      .toThrow('all 6 native CLI targets are required')
+    await rm(join(root, 'input', `openalice-cli-${version}-linux-arm64.tar.gz`))
+    expect(() => buildCliPackageChannels({ ...common, outputDir: join(root, 'missing'), systemOnly: true }))
+      .toThrow('all POSIX CLI targets')
+    expect(() => buildCliPackageChannels({ ...common, outputDir: join(root, 'conflict'), systemOnly: true, npmOnly: true }))
+      .toThrow('cannot be combined')
+  })
+
   it('derives npm, Homebrew, and AUR metadata from all accepted archives', async () => {
     const root = await fixture()
     const output = join(root, 'output')
