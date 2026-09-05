@@ -769,6 +769,9 @@ describe('composeHeadlessCommand (one-shot headless argv, prompt placed per-CLI)
       '{"enableAllProjectMcpServers":true}',
       '--allowedTools',
       'Bash(alice:*),Bash(alice-workspace:*),Bash(alice-uta:*),Bash(traderhub:*)',
+      // Without this, Write/Edit fall through to a permission prompt headless has no way to answer.
+      '--permission-mode',
+      'acceptEdits',
       '-p',
       '--output-format',
       'stream-json',
