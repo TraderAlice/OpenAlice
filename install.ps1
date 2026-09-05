@@ -291,3 +291,14 @@ exit /b %errorlevel%
     $guard.Dispose()
   }
 }
+
+# Dependency coordination is after the release transaction: declining a system
+# installation must not restore an older OpenAlice activation pointer.
+if ($metadata.PSObject.Properties.Name -contains 'dependencyPolicy' -and $metadata.dependencyPolicy -eq 'system') {
+  $setupArgs = @('setup')
+  if ($Yes -or [Console]::IsInputRedirected -or [Console]::IsOutputRedirected) { $setupArgs += '--check' }
+  & (Join-Path $bin 'openalice.cmd') @setupArgs
+  if ($LASTEXITCODE -ne 0) {
+    Write-Warning 'OpenAlice is installed; dependency setup is unfinished. Run openalice setup to continue.'
+  }
+}

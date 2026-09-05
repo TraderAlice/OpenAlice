@@ -351,10 +351,11 @@ Command         $INSTALL_DIR/bin/openalice
 Retention       $KEEP_RELEASES releases (including the active release)
 Legacy cutover  $legacy_detected
 
-OpenAlice manages: the native CLI release, release-owned Git, launch shims,
+OpenAlice manages: the native CLI release, immutable resources, launch shims,
 activation pointer, provenance, installer lock, and PATH entry.
 OpenAlice does not manage: Agent Runtime executables, their versions,
 credentials, native configuration, or user data.
+System Git/Bash remain system-owned; missing tools require separate installation consent.
 EOF
 
 if [[ "$plan_only" == true ]]; then
@@ -809,10 +810,21 @@ if [[ "$modify_path" == true && -n "$profile" ]]; then
   fi
 fi
 
-printf '\nOpenAlice %s is ready.\n' "$artifact_version"
+printf '\nOpenAlice %s is installed.\n' "$artifact_version"
 printf 'Active release: %s\n' "$final_release"
 if [[ ":${PATH:-}:" != *":$bin_dir:"* ]]; then
   printf 'Activate OpenAlice in this terminal now (no restart required):\n  %s\n' "$path_command"
 fi
 printf 'Run: openalice\n'
 printf 'Agent Runtimes remain user-owned and are discovered from PATH.\n'
+
+# Old immutable releases have no setup command and retain their own dependency
+# topology. New releases explicitly declare the system-owned policy.
+if grep -Eq '"dependencyPolicy"[[:space:]]*:[[:space:]]*"system"' "$final_release/release.json"; then
+  if [[ "$assume_yes" != true && -t 1 ]] && { exec 4<>/dev/tty; } 2>/dev/null; then
+    "$bin_dir/openalice" setup <&4 || printf 'OpenAlice is installed; dependency setup is unfinished. Run openalice setup to continue.\n' >&2
+    exec 4>&-
+  else
+    "$bin_dir/openalice" setup --check || printf 'OpenAlice is installed; run openalice setup in an interactive terminal to install missing dependencies.\n' >&2
+  fi
+fi

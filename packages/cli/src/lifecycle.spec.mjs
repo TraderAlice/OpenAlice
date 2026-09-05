@@ -305,6 +305,10 @@ describe('OpenAlice Runtime lifecycle core', () => {
           PI_CODING_AGENT_DIR: '/native/pi',
         },
         runtimeExecutable: '/opt/openalice/releases/v1/bin/openalice',
+        inspectDependencies: async () => [
+          { id: 'git', status: 'available', executable: '/usr/bin/git' },
+          { id: 'bash', status: 'available', executable: '/bin/bash' },
+        ],
         prepareSource,
         resolveRoot,
         spawnProcess,

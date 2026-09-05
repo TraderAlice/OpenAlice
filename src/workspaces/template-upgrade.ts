@@ -16,7 +16,7 @@ import { dirname, join, normalize, resolve, sep } from 'node:path';
 import { promisify } from 'node:util';
 import { gzip, gunzip } from 'node:zlib';
 
-import { exec as gitExec, type IGitStringExecutionOptions } from 'dugite';
+import { exec as gitExec, type IGitStringExecutionOptions } from './git-execution.js';
 
 import { injectWorkspaceContext } from './context-injector.js';
 import type { Logger } from './logger.js';
