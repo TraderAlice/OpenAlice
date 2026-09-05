@@ -1140,10 +1140,13 @@ export class IbkrBroker implements IBroker {
   async getHistorical(contract: Contract, params: BarParams): Promise<Bar[]> {
     this._ensureAlive()
     const routedContract = await this.resolveRoutableContract(contract)
-    // secType picks the default price stream: spot FX (`CASH`) has no TRADES.
-    const request = buildHistoricalRequest(params, new Date(), routedContract.secType)
 
     return this.enqueueHistorical(async () => {
+      // Queue time can be long, so the window is derived and the socket
+      // re-checked at dispatch rather than at enqueue.
+      this._ensureAlive()
+      // secType picks the default price stream: spot FX (`CASH`) has no TRADES.
+      const request = buildHistoricalRequest(params, new Date(), routedContract.secType)
       const reqId = this.bridge.allocReqId()
       const promise = this.bridge.requestHistoricalBars(reqId)
       this.client.reqHistoricalData(

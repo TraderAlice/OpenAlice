@@ -2,6 +2,8 @@ import { describe, it, expect, vi } from 'vitest'
 import Decimal from 'decimal.js'
 import { Contract, Order, UNSET_DECIMAL } from '@traderalice/ibkr'
 import { IbkrBroker } from './IbkrBroker.js'
+import { buildHistoricalRequest } from './ibkr-historical.js'
+import type { BarParams } from '../types.js'
 import contractCorpus from './__fixtures__/contract-resolution.v1.json'
 
 /**
@@ -42,9 +44,12 @@ function usdChfContract(): Contract {
 function brokerWithContractIo(resolvedContract = usdChfContract()): {
   broker: IbkrBroker
   bridge: {
+    connectionDead: boolean
+    allocReqId: ReturnType<typeof vi.fn>
     requestCollector: ReturnType<typeof vi.fn>
     requestSnapshot: ReturnType<typeof vi.fn>
     requestCurrentTime: ReturnType<typeof vi.fn>
+    requestHistoricalBars: ReturnType<typeof vi.fn>
     getNextOrderId: ReturnType<typeof vi.fn>
     lastInboundAt: number
     requestOrder: ReturnType<typeof vi.fn>
@@ -54,6 +59,8 @@ function brokerWithContractIo(resolvedContract = usdChfContract()): {
     isConnected: ReturnType<typeof vi.fn>
     reqContractDetails: ReturnType<typeof vi.fn>
     reqMktData: ReturnType<typeof vi.fn>
+    reqHistoricalData: ReturnType<typeof vi.fn>
+    cancelHistoricalData: ReturnType<typeof vi.fn>
     placeOrder: ReturnType<typeof vi.fn>
     cancelOrder: ReturnType<typeof vi.fn>
   }
@@ -66,6 +73,7 @@ function brokerWithContractIo(resolvedContract = usdChfContract()): {
     requestCollector: vi.fn(async () => [{ contract: Object.assign(new Contract(), resolvedContract) }]),
     requestSnapshot: vi.fn(async () => ({ last: 0.8, bid: 0.79, ask: 0.81, volume: 1 })),
     requestCurrentTime: vi.fn(async () => 1_784_289_600),
+    requestHistoricalBars: vi.fn(async () => []),
     getNextOrderId: vi.fn(() => nextOrderId++),
     // Mirrors the bridge: only a cancel-confirming status satisfies `accepts`.
     requestOrder: vi.fn(async (_orderId: number, _timeoutMs?: number, accepts?: (status: string) => boolean) => ({
@@ -78,6 +86,8 @@ function brokerWithContractIo(resolvedContract = usdChfContract()): {
     isConnected: vi.fn(() => true),
     reqContractDetails: vi.fn(),
     reqMktData: vi.fn(),
+    reqHistoricalData: vi.fn(),
+    cancelHistoricalData: vi.fn(),
     placeOrder: vi.fn(),
     cancelOrder: vi.fn(),
   }
@@ -962,5 +972,66 @@ describe('IbkrBroker — OCA revision and echo verification on modifyOrder', () 
   it('declares TRAIL LIMIT among the supported order types', () => {
     const { broker } = brokerWithContractIo()
     expect(broker.getCapabilities().supportedOrderTypes).toContain('TRAIL LIMIT')
+  })
+})
+
+describe('IbkrBroker — queued historical requests', () => {
+  const barParams: BarParams = { interval: '1m', start: new Date('2026-09-03T11:00:00.000Z') }
+
+  /** Resolves once the broker has dispatched everything it can right now. */
+  async function settle(): Promise<void> {
+    for (let i = 0; i < 10; i++) await Promise.resolve()
+  }
+
+  it('derives the window when the queued request runs, not when it is enqueued', async () => {
+    vi.useFakeTimers()
+    try {
+      vi.setSystemTime(new Date('2026-09-03T12:00:00.000Z'))
+      const { broker, bridge, client } = brokerWithContractIo(recordedContract('aapl-stock'))
+      let releaseFirst: (bars: never[]) => void = () => {}
+      bridge.requestHistoricalBars.mockImplementationOnce(
+        () => new Promise<never[]>((resolve) => { releaseFirst = resolve }),
+      )
+
+      const first = broker.getHistorical(recordedContract('aapl-stock'), barParams)
+      await settle()
+      const second = broker.getHistorical(recordedContract('aapl-stock'), barParams)
+      await settle()
+      expect(client.reqHistoricalData).toHaveBeenCalledOnce()
+
+      const dispatchedAt = new Date('2026-09-03T12:30:00.000Z')
+      vi.setSystemTime(dispatchedAt)
+      releaseFirst([])
+      await expect(first).resolves.toEqual([])
+      await expect(second).resolves.toEqual([])
+
+      const expected = buildHistoricalRequest(barParams, dispatchedAt, 'STK')
+      const queuedCall = client.reqHistoricalData.mock.calls[1]
+      expect(queuedCall[2]).toBe(expected.endDateTime)
+      expect(queuedCall[3]).toBe(expected.durationStr)
+      expect(queuedCall[3]).not.toBe(client.reqHistoricalData.mock.calls[0][3])
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('refuses a queued request whose socket died while it waited', async () => {
+    const { broker, bridge, client } = brokerWithContractIo(recordedContract('aapl-stock'))
+    let releaseFirst: (bars: never[]) => void = () => {}
+    bridge.requestHistoricalBars.mockImplementationOnce(
+      () => new Promise<never[]>((resolve) => { releaseFirst = resolve }),
+    )
+
+    const first = broker.getHistorical(recordedContract('aapl-stock'), barParams)
+    await settle()
+    const second = broker.getHistorical(recordedContract('aapl-stock'), barParams)
+    await settle()
+
+    bridge.connectionDead = true
+    releaseFirst([])
+
+    await expect(first).resolves.toEqual([])
+    await expect(second).rejects.toThrow(/connection lost/i)
+    expect(client.reqHistoricalData).toHaveBeenCalledOnce()
   })
 })
