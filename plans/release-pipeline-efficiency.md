@@ -112,171 +112,104 @@ beta-to-stable promotion; installing a permanent runner on the user's daily Mac.
 
 ## Ordered work and acceptance
 
-- [x] Gather live job/step timing, distinguish dependency wait from runner queue,
-  record the baseline and inspect existing artifact/retry mechanisms.
-- [x] Increment 1: introduce reusable per-platform desktop build/acceptance
-  pipelines; remove Windows dependency from POSIX-only package acceptance where
-  artifact generation permits. Preserve required final aggregation and beta rules.
-  Verify dependency contracts and exercise fast/slow platform ordering without
-  signing or publishing; failed acceptance must not rerun successful builds.
-  In progress: extracted release-desktop-platform.yml with separate build and
-  stable-only upgrade jobs. The caller matrix now joins complete platform
-  pipelines rather than placing a matrix-wide barrier before upgrade. Existing
-  signing, startup, update-metadata checks and artifact names are preserved.
-  POSIX system-package fixtures now use a strict four-target system-only mode;
-  byte-equivalence tests preserve Homebrew/AUR output while omitting unnecessary
-  npm materialization. Public channel generation still requires all six targets.
-  All 26 release/generator tests and root typecheck pass. actionlint 1.7.7
-  passes with only its stale macos-15-intel label diagnostic excluded; no shell
-  checker is installed. Full local regression completed: 719 files,
-  6,430 passes and three expected skips
-  in 220 seconds (/tmp/openalice-release-pipeline-step1-tests.log). Final
-  generator changes have additional focused coverage. Hosted run 33961658342
-  subsequently passed all three production platform pipelines in unsigned
-  rehearsal mode. ARM upgrade began seven seconds after its own build, before
-  the other builds finished; Intel began three seconds after its build.
-- [ ] Increment 2: implement candidate identity, artifact-bound acceptance, and
-  bounded replay of existing candidates using repaired trusted verification.
-  Test wrong hash/source/channel/platform, missing receipt, failed checks,
-  artifact expiry and tampering. Prove identical candidate hashes before/after
-  a verifier-only retry; prove a product change cannot reuse old acceptance.
-  In progress: release-candidate-identity.mjs fingerprints exact regular-file
-  contents with source/version/channel/target identity, requires an explicitly
-  selected candidate hash at verification, and binds acceptance to a verifier
-  commit plus required named checks. Fifteen initial rejection/identity tests
-  pass. Desktop build now records identity, upgrade checks the restored bytes
-  against its build output and binds the N-1 checks, and publication verifies
-  all three platform directories plus stable receipts before staging any file.
-  The raw previous-release identity and every named N-1 check are required;
-  beta retains byte verification without stable N-1. Initial integrated tests
-  pass (45 tests including primitive/workflow contracts); trusted cross-run
-  selection, candidate replay and real workflow rehearsal remain unfinished.
-  Added a GitHub-backed candidate selector which requires an exact completed
-  master Release run, product SHA and unique unexpired artifact from this
-  repository (including its head repository). Fourteen rejection/selection
-  tests pass. A read-only live selection against run 33955286757 resolved
-  macOS ARM64 artifact 9966357063 for source 52b51f29809178594b7b57bf666133829368b7b4.
-  This proves metadata selection only: historical assets predate the new
-  candidate identity manifest and cannot be represented as newly accepted
-  candidates. The selector is now wired into `operation=verify-desktop`:
-  an explicitly selected platform downloads only the authenticated artifact ID,
-  verifies its manifest and bytes before dependency installation, runs final
-  artifact N-1 acceptance, and binds the resulting receipt to the product bytes
-  and current verifier SHA. The operation has read-only repository permissions,
-  no signing secrets, and a separate concurrency group. Forty-nine focused
-  tests pass. Final publication consumption of replay receipts and actual
-  positive native replay remain outstanding.
-  Same-source release recovery is now wired: `operation=release` plus an
-  existing `candidate-run` skips desktop builds, authenticates and verifies the
-  three preserved candidates, then performs normal stable upgrade acceptance
-  and final staging. Product SHA must equal the current dispatch SHA. This
-  consumes reused bytes through the real publication gate, but does not yet
-  consume a separate verifier-only replay receipt or prove positive hosted
-  desktop recovery. Thirty-seven focused workflow/receipt tests pass.
-  Verifier-only recovery follow-up:
-  `desktop-verifier-sha` is restricted to full commits integrated into dev/master;
-  only upgrade acceptance changes checkout. Product builds/source gates/tag SHA
-  remain unchanged; selected verifier identity is required again at final
-  staging. Real temporary-git trust tests and CLI receipt binding pass (41
-  focused tests initially; final identity/workflow selection checkpoint passes
-  71 tests and root typecheck). Native cross-verifier acceptance subsequently
-  passed in run 33962998628; evidence is recorded below.
-  Final-gate audit additionally exercises source SHA, version and channel
-  changes against an otherwise fully accepted three-platform set: each is
-  rejected before an output directory is created. The receipt/workflow focused
-  suite passes 43 tests after these publication-boundary regressions.
-- [ ] Increment 3: join exact-SHA full source validation at publication instead
-  of serializing before candidate builds; reuse verified neutral CLI inputs.
-  Test source failure/mismatch blocks publication, beta gates stay separate,
-  and neutral inputs cannot cross commits or include host-native outputs.
-  In progress: the release now prepares the existing approved neutral input
-  inventory once, shares it with all six native CLI targets, and verifies its
-  exact commit and file hashes before installation. Windows uses a named input
-  artifact while dev retains its existing default. Native build, feasibility,
-  and channel-appropriate acceptance remain per-target. Source-validation
-  concurrency is now wired through the existing Full Source Validation reusable
-  workflow on the same dispatch SHA. Stable publication requires its success;
-  candidate jobs have no source-validation dependency, and beta does not call
-  the full workflow. Workflow contracts pass; real artifact and hosted
-  dependency rehearsal remain outstanding.
-  Local checkpoint: root typecheck passed; complete hermetic suite passed
-  (721 files, 6,458 passes, three skips, 201.31 seconds;
-  /tmp/openalice-release-pipeline-neutral-tests.log). Final source-concurrency
-  contracts were additionally checked after editing (35 passes), along with
-  actionlint under the previously documented tool limitations. These timings
-  measure local validation, not the optimized release critical path.
-- [ ] Complete a non-publishing workflow rehearsal of the new dependency and
-  replay paths. Prefer local Mac/OrbStack for tests; use hosted jobs only for
-  Actions semantics/native-host evidence unavailable locally. A routine rehearsal
-  uses unsigned candidates and no signing credentials. Report signing risk as
-  residual unless a specifically authorized signing rehearsal is needed.
-  `operation=rehearse-desktop` now calls the production platform pipelines for
-  all three hosts, with explicit unsigned Mac packaging and no passed signing
-  secrets. Rehearsal artifacts have a separate name prefix and may only be
-  restored through the explicitly selected rehearsal branch; ordinary release
-  selection rejects them. The next two runs will build/accept real candidates
-  and then restore/accept those same bytes on the unchanged commit, measuring
-  dependency ordering and build work avoided. Forty-three focused workflow and
-  selection tests pass; positive hosted results are not yet available.
-  Run 33961558999 was rejected during workflow parsing because the production
-  caller did not pass actions:read to the reusable candidate reader. Fixed with
-  an explicit minimal caller grant and regression assertion. Run 33961658342 on
-  997dd0c2 is active: ARM build succeeded at 10:54:40 UTC and its upgrade started
-  at 10:54:47 while Intel/Windows builds continued, proving removal of that
-  cross-platform barrier. Full positive/reuse results remain pending.
-  Local full checkpoint: 6,478 passes, three skips, one existing Connector UI
-  test timed out at five seconds (722 files, 308.13 seconds). The unchanged
-  Connectors.demo.spec.tsx file passed all 32 tests in isolation in 12.03 seconds.
-  Record the timeout rather than claiming a green full run; resource sensitivity
-  is suspected, not established as the sole cause.
-  Both local release-related skills were updated using skill-creator and pass
-  quick_validate.py: remove nonexistent master-push waiting, defer to current
-  same-SHA parallel source gates, and distinguish measured job savings from
-  release latency and diagnostic replay from publication authority.
-  Same-byte restore rehearsal 33962287156 has been dispatched and is pending
-  behind the first run. Both are confirmed pinned to 997dd0c2, so later topic
-  commits do not change this comparison. Both Mac builds/upgrades are accepted;
-  first-run Windows upgrade remains active.
-  Final local full regression passed with `pnpm test --maxWorkers=1`: 723 files,
-  6,482 passes and three skips, 406.82 seconds. This changes concurrency, not
-  assertions; the previous timeout remains recorded above. The final workflow
-  increment passed 44 focused tests and actionlint with the documented tool
-  limitations. Log: /tmp/openalice-release-pipeline-final-tests.log.
-  Added read-only `verify-desktop-rehearsal` to exercise the separate product
-  and verifier identities against real unsigned candidates after the producer
-  completes. It explicitly selects the rehearsal branch/artifact namespace;
-  production selection and publication remain unchanged.
-  First desktop rehearsal 33961658342 completed successfully at 11:18:27 UTC:
-  dispatch-to-last-job 29m28s. Build/upgrade job durations were ARM 5m32s/3m17s,
-  Intel 8m36s/4m06s and Windows 11m02s/18m18s. This unsigned desktop-only
-  rehearsal is not comparable to a complete signed release end to end. Its
-  Windows candidate launch/write/restart checks took approximately six seconds
-  after installer exit; installer work still dominates that native path.
-  Downloaded all three bound upgrade receipts to
-  /tmp/openalice-release-receipts.xBW8cp/original for exact-ID comparison.
-  Same-source restore 33962287156 started after the producer completed;
-  Windows restore passed in 32 seconds versus its original 11m02s build,
-  and entered fresh N-1 acceptance. End-to-end retry timing remains pending.
-  Cross-verifier rehearsal 33962998628 passed: dispatch-to-completion 2m56s,
-  native job 2m48s. It used verifier 1a626328 against product 997dd0c2 and the
-  original ARM candidate, without rebuilding or publishing. Downloaded both
-  original and replay receipts and asserted exact candidate-ID equality
-  (1576e4579c1db7cb16a12716e0d67b7aad142803787a4e89e9e329a980b6a86a),
-  expected distinct verifier SHAs, identical previous tag and all 11 successful
-  N-1 checks. Receipt evidence is under the original/new-verifier subdirectories
-  of /tmp/openalice-release-receipts.xBW8cp. This proves real verifier-only
-  recovery, not signed publication. Three-target same-source retry is pending.
-- [ ] Update owner guides and applicable release skill instructions to match
-  the implemented operation and acceptance boundaries; remove stale serial rules.
-- [ ] Record measured timings separately from estimates, inspect latest PR
-  checks, and present the single topic PR for acceptance. Once accepted, move
-  durable operational truth to owner guides and remove this plan/index entry.
+- [x] Record baseline timings and distinguish queue time from dependency waiting.
+- [x] Independent desktop pipelines plus POSIX-only system-package fixtures.
+  Three-platform native rehearsal 33961658342 passed. ARM upgrade started
+  seven seconds after its build, while Intel/Windows were still building.
+  Intel upgrade started three seconds after its build. Final aggregation,
+  signing paths and beta/stable distinctions remain in the workflow contracts.
+- [ ] Candidate identity, trusted selection and independent recovery acceptance.
+  Implemented exact-byte manifests, source/version/channel/platform pinning,
+  required N-1 receipts, expiry/run/repository checks and fail-before-staging
+  verification. Wrong source was rejected in hosted run 33960665604.
+  Verifier-only native replay passed in 33962998628 (details below).
+  Same-source three-platform reuse 33962287156 is still running; all restores
+  and both Mac upgrades passed. Both Mac restored receipts exactly match their
+  originals, including candidate IDs and all checks. Windows remains pending.
+- [x] Concurrent same-product-SHA full source validation and verified shared CLI
+  inputs. Release calls local ci.yml at the dispatch SHA; no candidate builder
+  depends on its completion, but stable publication requires success. Reusable
+  source workflow retains complete source/native checks. Workflow tests inspect
+  these dependencies and checkouts. Shared-input rejection tests and real
+  native CLI benchmark 33960910945 passed; measured tradeoff is above.
+- [ ] Finish non-publishing rehearsal and final evidence audit. Full desktop
+  build/acceptance and independent cross-verifier replay passed; three-platform
+  restored-candidate acceptance remains live. No signed full release was run.
+- [x] Update owner guide and local release skills. Development workflow documents
+  recovery, verifier authority and unsigned rehearsal isolation. Local
+  openalice-desktop-release-smoke and openalice-large-change-flow skills were
+  adjusted and validated with quick_validate.py; they are not repository files.
+- [ ] Refresh final PR evidence/checks and present Draft PR #1377 for acceptance.
+  Leave it unmerged. Once accepted, remove this plan and its PLANS.md entry;
+  the owner guide and Git history retain the durable contract and evidence.
 
-For workflow/shared infrastructure changes, run root typecheck, complete hermetic
-suite and focused workflow/receipt tests at meaningful integration checkpoints.
-Do not rerun the entire suite for every prose or test iteration. Run applicable
-native/unsigned package checks when execution paths change; keep user state,
-broker accounts and runtime credentials outside every test.
+## Native rehearsal measurements
+
+First build/upgrade run [33961658342](https://github.com/TraderAlice/OpenAlice/actions/runs/33961658342)
+used product commit 997dd0c249713544568bd821be16e4cb78a2cb05 and completed
+successfully at 11:18:27 UTC: 29m28s from dispatch. It was desktop-only and
+unsigned, so it is not an end-to-end signed-release benchmark.
+
+| Platform | Build | Upgrade acceptance | Build-to-upgrade gap |
+| --- | --- | --- | --- |
+| macOS ARM64 | 5m32s | 3m17s | 7s |
+| macOS Intel | 8m36s | 4m06s | 3s |
+| Windows x64 | 11m02s | 18m18s | 3s |
+
+Windows candidate launch/write/restart took approximately six seconds after
+installer exit; installer execution still dominates that native path. Do not
+attribute it to Defender or runner scarcity without further evidence.
+
+Same-source retry [33962287156](https://github.com/TraderAlice/OpenAlice/actions/runs/33962287156)
+is frozen at the same product SHA. It waited behind the original rehearsal
+because it was submitted early; report that deliberate waiting separately.
+All build jobs skipped, authenticated restore jobs passed: ARM 58s, Intel
+1m46s, Windows 32s. Fresh upgrade acceptance follows each restore. Final
+critical-path timing and three-receipt identity comparison remain pending.
+ARM upgrade took 1m47s; Intel upgrade took 5m09s. Full JSON equality was checked
+for both Mac receipts against the original run, not inferred from job success.
+
+Cross-verifier replay [33962998628](https://github.com/TraderAlice/OpenAlice/actions/runs/33962998628)
+passed in 2m56s dispatch-to-completion (native job 2m48s), with verifier
+1a626328fefefb5d8df26d3e04425d65c5719535 and the original ARM product bytes.
+Downloaded original/replay receipts and asserted identical candidate ID
+1576e4579c1db7cb16a12716e0d67b7aad142803787a4e89e9e329a980b6a86a,
+the two expected verifier SHAs, identical previous tag and all 11 successful
+N-1 checks. Evidence is in /tmp/openalice-release-receipts.xBW8cp under
+original/ and new-verifier/. No product build or publication job ran.
+
+Rehearsal artifacts use a distinct prefix; ordinary production selection
+rejects them. Diagnostic replay receipts are not imported as publication
+authority. Normal recovery restores authenticated product bytes into the
+current run, performs fresh acceptance with an explicitly trusted verifier,
+and verifies that bound receipt before staging. Product source remains fixed.
+
+## Local verification and known failures
+
+- Latest complete suite: `pnpm test --maxWorkers=1`, 723 files, 6,482 passes,
+  three skips, 406.82s. Log: /tmp/openalice-release-pipeline-final-tests.log.
+  Concurrency changed, not assertions. Root typecheck passed.
+- Final receipt/workflow regression: 43 passes, including rejection of changed
+  product SHA, version or channel before any staging directory is created.
+  Earlier combined identity/selector/verifier/workflow checkpoint: 71 passes.
+- Real temporary-git fixtures reject short, missing and unintegrated verifier
+  revisions. CLI binding tests preserve product bytes while changing verifier.
+  Final neutral-input/verifier fixtures passed 11 tests, including wrong commit,
+  modified bytes, extra files and manifest-envelope tampering rejection.
+- A prior full suite had 6,478 passes, three skips and one unchanged Connector
+  UI five-second timeout (722 files, 308.13s). Its complete 32-test file passed
+  independently in 12.03s, and the later complete suite passed. Resource
+  sensitivity is suspected, not a proven root cause; do not erase this record.
+- actionlint 1.7.7 passes with its obsolete macos-15-intel label diagnostic
+  excluded; shellcheck and pyflakes were unavailable.
+- Hosted rehearsal 33961558999 exposed a missing actions:read grant at the
+  reusable-workflow caller despite local YAML lint passing. Fixed in 997dd0c2
+  with a regression assertion; subsequent native rehearsal passed.
+
+For shared workflow infrastructure, use complete local regression at meaningful
+integration checkpoints, focused contracts for subsequent small edits, and real
+native evidence for changed execution paths. Never substitute unsigned rehearsal
+for signing/notarization, nor a diagnostic receipt for public-byte acceptance.
 
 ## Non-goals and follow-up boundaries
 
