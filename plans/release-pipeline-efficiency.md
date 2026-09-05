@@ -110,6 +110,14 @@ beta-to-stable promotion; installing a permanent runner on the user's daily Mac.
   beta retains byte verification without stable N-1. Initial integrated tests
   pass (45 tests including primitive/workflow contracts); trusted cross-run
   selection, candidate replay and real workflow rehearsal remain unfinished.
+  Added a GitHub-backed candidate selector which requires an exact completed
+  master Release run, product SHA and unique unexpired artifact from this
+  repository (including its head repository). Fourteen rejection/selection
+  tests pass. A read-only live selection against run 33955286757 resolved
+  macOS ARM64 artifact 9966357063 for source 52b51f29809178594b7b57bf666133829368b7b4.
+  This proves metadata selection only: historical assets predate the new
+  candidate identity manifest and cannot be represented as newly accepted
+  candidates. The selector is not yet wired into a replay/publication workflow.
 - [ ] Increment 3: join exact-SHA full source validation at publication instead
   of serializing before candidate builds; reuse verified neutral CLI inputs.
   Test source failure/mismatch blocks publication, beta gates stay separate,
