@@ -148,7 +148,6 @@ export function WorkspaceView(props: WorkspaceViewProps): ReactElement {
                     {...(props.label !== undefined ? { label: props.label } : {})}
                     sessionLabel={sessionCoworkerLabel(s)}
                     headerActions={props.terminalHeaderActions}
-                    chrome="canvas"
                     onSessionLost={props.onSessionLost}
                   />
                 )}

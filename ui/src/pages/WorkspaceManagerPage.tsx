@@ -186,7 +186,6 @@ export function WorkspaceManagerPage({ spec }: { spec: ManagerSpec }) {
               {...(terminalCanvas ? {
                 sessionLabel: session.title?.trim() || session.name,
                 headerActions: <>{backButton}{runtimeBadge}</>,
-                chrome: 'canvas' as const,
               } : {})}
               onSessionLost={() => void refreshWorkspaceManager()}
             />

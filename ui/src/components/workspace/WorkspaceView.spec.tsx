@@ -239,7 +239,6 @@ describe('WorkspaceView terminal canvas', () => {
       label: 'AutoQuant',
       sessionLabel: 'Conversation 2',
       headerActions,
-      chrome: 'canvas',
     }))
   })
 })

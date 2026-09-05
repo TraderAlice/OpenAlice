@@ -25,6 +25,7 @@ export function isDevTab(value: string): value is DevTab {
 }
 
 export type ViewSpec =
+  | { kind: 'quick-start'; params: Record<string, never> }
   | { kind: 'workspace-details'; params: { wsId: string; source: WorkspaceSource } }
   | { kind: 'workspace-list'; params: Record<string, never> }
   | { kind: 'workspace';      params: { wsId: string; sessionId?: string; source?: WorkspaceSource } }
@@ -86,6 +87,7 @@ export type ViewKind = ViewSpec['kind']
  * owns them, not in the app shell.
  */
 export type ActivitySection =
+  | 'quick-start'
   | 'chat'
   | 'auto-quant'
   | 'prediction'

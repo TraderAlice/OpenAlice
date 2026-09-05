@@ -77,22 +77,13 @@ export function ResumeCta(props: ResumeCtaProps): ReactElement {
                 <span>Session paused</span>
               </div>
               <div className="resume-cta-name-row">
-                <AgentRuntimeIcon agentId={r.agent} className="size-[18px] shrink-0" />
+                <AgentRuntimeIcon agentId={r.agent} className="mt-0.5 size-[18px] shrink-0" />
                 <h2 className="resume-cta-name">{sessionTitle}</h2>
               </div>
               <p className="resume-cta-state">
                 {agentDisplayName(r.agent)} · {formatRelativeTime(r.lastActiveAt)}
               </p>
             </div>
-
-            <dl className="resume-cta-runtime" aria-label="Session runtime">
-              {runtimeFacts.map((fact) => (
-                <div className="resume-cta-runtime-fact" key={fact.label}>
-                  <dt>{fact.label}</dt>
-                  <dd title={fact.value}>{fact.value}</dd>
-                </div>
-              ))}
-            </dl>
 
             <div className="resume-cta-actions">
               {canOpenSettings && (
@@ -131,6 +122,15 @@ export function ResumeCta(props: ResumeCtaProps): ReactElement {
                 </button>
               )}
             </div>
+
+            <dl className="resume-cta-runtime" aria-label="Session runtime">
+              {runtimeFacts.map((fact) => (
+                <div className="resume-cta-runtime-fact" key={fact.label}>
+                  <dt>{fact.label}</dt>
+                  <dd title={fact.value}>{fact.value}</dd>
+                </div>
+              ))}
+            </dl>
           </div>
 
           {error && (

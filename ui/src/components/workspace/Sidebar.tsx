@@ -628,6 +628,7 @@ function HeadlessTaskRow(props: {
 }
 
 export interface SessionRowProps {
+  enterOnSelect?: boolean;
   reorderId?: string;
   session: SessionRecord;
   subtitle?: string;
@@ -642,7 +643,7 @@ export interface SessionRowProps {
   /** Explain why an occupied headless Session cannot be opened yet. */
   onHeadlessBusy?: () => void;
   onPause: () => void;
-  onResume: () => void;
+  onResume: () => void | Promise<void>;
   onDelete: () => void;
   onArchive?: () => void;
   onRestore?: () => void;
@@ -651,6 +652,9 @@ export interface SessionRowProps {
 
 export function SessionRow(props: SessionRowProps): ReactElement {
   const { t } = useTranslation();
+  const pending = useRef(false);
+  const [opening, setOpening] = useState(false);
+  const [openError, setOpenError] = useState<string | null>(null);
   const s = props.session;
   const isPaused = s.state === 'paused';
   const headlessOccupying = props.headlessOccupying === true;
@@ -671,7 +675,7 @@ export function SessionRow(props: SessionRowProps): ReactElement {
   const restoreLabel = t('workspace.restoreSession', { title: display });
   const settingsLabel = t('workspace.sessionSettings.openFor', { title: display });
   const menuItems = [
-    ...(!headlessOccupying ? [isPaused ? {
+    ...(!headlessOccupying && !(props.enterOnSelect && isPaused) ? [isPaused ? {
       label: resumeLabel,
       ariaLabel: resumeLabel,
       icon: <Play size={11} strokeWidth={0} fill="currentColor" />,
@@ -711,6 +715,17 @@ export function SessionRow(props: SessionRowProps): ReactElement {
     }] : []),
   ];
   const selectLabel = headlessOccupying ? t('workspace.sessionRunning', { title: display }) : display;
+  const enter = async () => {
+    if (pending.current) return;
+    if (headlessOccupying) { (props.onHeadlessBusy ?? props.onSelect)(); return; }
+    if (!props.enterOnSelect || !isPaused || !resumable) { props.onSelect(); return; }
+    pending.current = true;
+    setOpening(true);
+    setOpenError(null);
+    try { await props.onResume(); }
+    catch (error) { setOpenError(error instanceof Error ? error.message : String(error)); }
+    finally { pending.current = false; setOpening(false); }
+  };
   let labelTone = 'text-foreground';
   if (props.failed) labelTone = 'text-muted-foreground/70';
   else if (isPaused && !headlessOccupying) labelTone = 'text-muted-foreground';
@@ -718,7 +733,7 @@ export function SessionRow(props: SessionRowProps): ReactElement {
     <div
       data-reorder-id={props.reorderId}
       data-active={props.isActive}
-      aria-busy={headlessOccupying || undefined}
+      aria-busy={headlessOccupying || opening || undefined}
       className={`oa-session-row text-body group relative mx-1.5 flex min-h-9 items-center gap-1 rounded-md px-2 py-1.5 transition-colors ${
         props.isActive ? 'bg-sidebar-accent text-sidebar-accent-foreground' : 'hover:bg-sidebar-accent/65'
       }`}
@@ -727,14 +742,15 @@ export function SessionRow(props: SessionRowProps): ReactElement {
       <button
         type="button"
         className="oa-session-row-main flex-1 min-w-0 flex items-center gap-2 text-left outline-none disabled:cursor-default"
-        onClick={headlessOccupying ? (props.onHeadlessBusy ?? props.onSelect) : props.onSelect}
+        onClick={() => void enter()}
+        disabled={opening}
         aria-label={selectLabel}
         aria-current={props.isActive ? 'page' : undefined}
       >
         {/* Runtime identity stays stable across Session state. The action at the
             right and the row treatment carry paused/running/selected state. */}
         <span className="flex h-4 w-4 shrink-0 items-center justify-center text-foreground/80">
-          <AgentBadgeGlyph agentId={s.agent} />
+          {opening ? <LoaderCircle size={14} className="animate-spin motion-reduce:animate-none" aria-hidden /> : <AgentBadgeGlyph agentId={s.agent} />}
         </span>
         <span className="min-w-0 flex-1">
           <span
@@ -748,12 +764,13 @@ export function SessionRow(props: SessionRowProps): ReactElement {
               {props.subtitle}
             </span>
           )}
+          {openError && <span role="alert" className="block text-caption text-destructive break-words">{openError}</span>}
         </span>
       </button>
       {/* Right-aligned, always-visible state-as-action: an interactive running
           Session shows STOP, a paused one shows PLAY, and headless occupancy
           shows live activity that opens the single-writer explanation. */}
-      {headlessOccupying ? (
+      {!props.enterOnSelect && (headlessOccupying ? (
         <button
           type="button"
           className={`${rowAction()} oa-session-state-action`}
@@ -798,9 +815,9 @@ export function SessionRow(props: SessionRowProps): ReactElement {
         >
           <Square size={10} strokeWidth={0} fill="currentColor" />
         </button>
-      )}
+      ))}
       {menuItems.length > 0 && (
-        <span className="oa-session-overflow-action flex shrink-0">
+        <span inert={opening} className="oa-session-overflow-action flex shrink-0">
           <SidebarActionMenu
             label={t('common.moreActions', { target: display })}
             items={menuItems}

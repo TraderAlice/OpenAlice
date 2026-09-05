@@ -39,7 +39,10 @@ describe('terminal responsive layout contract', () => {
   it('allows the terminal shell to shrink while the shared toolbar owns header geometry', () => {
     expect(declarationsFor('.terminal-shell')).toContain('min-width: 0')
     const source = readFileSync(resolve(uiRoot, 'src/components/workspace/Terminal.tsx'), 'utf8')
-    expect(source).toContain("props.chrome === 'canvas' ? PageTopBar : TopBar")
+    expect(source).toContain('<PageTopBar')
+    expect(source).not.toContain('props.chrome')
+    expect(declarationsFor('.terminal-shell')).toContain('grid-template-rows: minmax(0, 1fr)')
+    expect(css).not.toContain('.terminal-shell.is-canvas')
   })
 
   it('lets the Files overlay own the full Workspace width on a phone', () => {

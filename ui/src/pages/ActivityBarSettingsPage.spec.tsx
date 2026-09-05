@@ -98,7 +98,7 @@ describe('ActivityBarSettingsPage', () => {
     }
     try {
       render(<ActivityBarSettingsPage />)
-      fireEvent.pointerDown(screen.getByRole('button', { name: 'Reorder Ask Alice' }), {
+      fireEvent.pointerDown(screen.getByRole('button', { name: 'Reorder Quick Start' }), {
         pointerId: 1,
         button: 0,
         clientX: 20,

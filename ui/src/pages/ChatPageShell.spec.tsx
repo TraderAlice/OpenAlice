@@ -56,17 +56,19 @@ describe('ChatPageShell', () => {
   it('keeps Workspace view controls out of the title bar', () => {
     render(<ChatPageShell><div>Chat content</div></ChatPageShell>)
 
-    expect(screen.getByTestId('harness-sidebar')).toBeTruthy()
+    expect(screen.queryByTestId('harness-sidebar')).toBeNull()
     expect(screen.queryByRole('button', { name: 'Collapse Ask Alice' })).toBeNull()
-    expect(screen.getByRole('separator', { name: 'Resize Ask Alice' })).toBeTruthy()
+    expect(screen.queryByRole('separator')).toBeNull()
+    expect(screen.getByText('Chat content')).toBeTruthy()
     expect(screen.queryByRole('group', { name: 'Workspace display mode' })).toBeNull()
   })
 
-  it('reuses the Ask Alice shell chrome for a ready AutoQuant desk', () => {
+  it('gives a ready AutoQuant desk the content surface without a second navigator', () => {
     render(<ChatPageShell mode="auto-quant"><div>Quant content</div></ChatPageShell>)
     expect(screen.queryByRole('button', { name: 'Collapse Quant' })).toBeNull()
-    expect(screen.getByRole('separator', { name: 'Resize Quant' })).toBeTruthy()
-    expect(screen.getByTestId('harness-sidebar')).toBeTruthy()
+    expect(screen.queryByRole('separator')).toBeNull()
+    expect(screen.queryByTestId('harness-sidebar')).toBeNull()
+    expect(screen.getByText('Quant content')).toBeTruthy()
   })
 
   it('keeps AutoQuant navigation hidden until a default desk is ready', () => {

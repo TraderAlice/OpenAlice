@@ -48,6 +48,18 @@ beforeEach(() => {
 
 afterEach(cleanup)
 
+it.each(['/', '/quick-start'])('adopts %s as the independent Quick Start entry', async path => {
+  render(<MemoryRouter initialEntries={[path]}><UrlAdopter /></MemoryRouter>)
+  await waitFor(() => expect(mocks.openOrFocus).toHaveBeenCalledWith({ kind: 'quick-start', params: {} }))
+  expect(mocks.setSidebar).toHaveBeenCalledWith('quick-start')
+})
+
+it('preserves the Chat Harness landing route', async () => {
+  render(<MemoryRouter initialEntries={['/chat']}><UrlAdopter /></MemoryRouter>)
+  await waitFor(() => expect(mocks.openOrFocus).toHaveBeenCalledWith({ kind: 'chat-landing', params: {} }))
+  expect(mocks.setSidebar).toHaveBeenCalledWith('chat')
+})
+
 it.each(['/workspaces', '/workspaces/templates', '/workspaces/templates/chat'])('retires %s into Ask Alice', async path => {
   render(<MemoryRouter initialEntries={[path]}><UrlAdopter /></MemoryRouter>)
   await waitFor(() => expect(mocks.openOrFocus).toHaveBeenCalledWith({ kind: 'chat-landing', params: {} }))

@@ -74,19 +74,16 @@ vi.mock('../api/config', () => ({
 
 vi.mock('../components/workspace/Terminal', () => ({
   TerminalView: ({
-    chrome,
     headerActions,
     label,
     sessionLabel,
   }: {
-    chrome?: string
     headerActions?: ReactNode
     label?: string
     sessionLabel?: string
   }) => (
     <div
       data-testid="terminal-view"
-      data-chrome={chrome}
       data-label={label}
       data-session-label={sessionLabel}
     >
@@ -673,7 +670,6 @@ describe('WorkspaceManagerPage runtime selection', () => {
     }} />)
 
     const terminal = screen.getByTestId('terminal-view')
-    expect(terminal.getAttribute('data-chrome')).toBe('canvas')
     expect(terminal.getAttribute('data-label')).toBe('Workspace Manager')
     expect(terminal.getAttribute('data-session-label')).toBe('Inspect the floor')
     expect(container.firstElementChild?.classList.contains('workspace-manager-terminal-canvas')).toBe(true)
