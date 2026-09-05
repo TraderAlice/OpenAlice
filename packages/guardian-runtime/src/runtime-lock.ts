@@ -63,6 +63,7 @@ export interface RuntimeLockOptions {
   readonly initializationGraceMs?: number
   readonly processController?: ProcessController
   readonly onOwnershipLost?: (error: Error) => void
+  readonly onOwnerReclaimed?: (inspection: RuntimeLockInspection) => void
 }
 
 export interface OpenAliceRuntimeOptions extends RuntimeLockOptions {
@@ -279,12 +280,15 @@ export async function acquireRuntimeLock(
     if (current.state === 'active') {
       if (!opts.takeover || !current.owner) throw new RuntimeAlreadyRunningError(current)
       const signalled = await recoverRuntimeOwner(current, { processController: controller })
-      if (!signalled) await claimAndRemove(current)
+      if (!signalled && await claimAndRemove(current)) opts.onOwnerReclaimed?.(current)
       await controller.sleep(25)
       continue
     }
 
-    if (await claimAndRemove(current)) continue
+    if (await claimAndRemove(current)) {
+      opts.onOwnerReclaimed?.(current)
+      continue
+    }
     await controller.sleep(25)
   }
 

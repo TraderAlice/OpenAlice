@@ -5,6 +5,7 @@ import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 
 import type { ProcessController } from './process-control.js'
+import type { RuntimeLockInspection } from './runtime-lock.js'
 import {
   CrossMachineOwnerError,
   RuntimeAlreadyRunningError,
@@ -135,6 +136,51 @@ describe('runtime lock ownership', () => {
       owner: { pid: 202 },
     })
     await fresh.release()
+  })
+
+  it('reports the inspection that justified reclaiming a dead owner', async () => {
+    controller.add(101, 10_000)
+    controller.add(202, 20_000)
+    const lockDir = join(home, 'runtime.lock')
+    const reclaimed: RuntimeLockInspection[] = []
+    await acquireRuntimeLock(lockDir, {
+      pid: 101,
+      processStartedAt: 10_000,
+      launcher: 'guardian-docker',
+      heartbeatMs: 0,
+      processController: controller,
+    })
+    controller.alive.set(101, false)
+
+    const fresh = await acquireRuntimeLock(lockDir, {
+      pid: 202,
+      processStartedAt: 20_000,
+      heartbeatMs: 0,
+      processController: controller,
+      onOwnerReclaimed: (inspection) => { reclaimed.push(inspection) },
+    })
+    expect(reclaimed).toHaveLength(1)
+    expect(reclaimed[0]).toMatchObject({
+      state: 'stale',
+      reason: 'owner process is not running',
+      owner: { pid: 101, launcher: 'guardian-docker' },
+    })
+    await fresh.release()
+  })
+
+  it('does not report a reclaim when the lock was free', async () => {
+    controller.add(101, 10_000)
+    const lockDir = join(home, 'runtime.lock')
+    const reclaimed: RuntimeLockInspection[] = []
+    const lock = await acquireRuntimeLock(lockDir, {
+      pid: 101,
+      processStartedAt: 10_000,
+      heartbeatMs: 0,
+      processController: controller,
+      onOwnerReclaimed: (inspection) => { reclaimed.push(inspection) },
+    })
+    expect(reclaimed).toEqual([])
+    await lock.release()
   })
 
   it('keeps a live owner authoritative even when its heartbeat is stale', async () => {
@@ -332,6 +378,7 @@ describe('runtime lock ownership', () => {
     controller.currentMachineId = 'linux:bbb'
     controller.add(202, 20_000)
 
+    const reported: RuntimeLockInspection[] = []
     const reclaimed = await acquireRuntimeLock(lockDir, {
       pid: 202,
       processStartedAt: 20_000,
@@ -339,11 +386,18 @@ describe('runtime lock ownership', () => {
       takeover: true,
       staleHeartbeatMs: -1,
       processController: controller,
+      onOwnerReclaimed: (inspection) => { reported.push(inspection) },
     })
 
     expect(reclaimed.owner.pid).toBe(202)
     expect(controller.signals).toEqual([])
     expect(controller.isAlive(101)).toBe(true)
+    expect(reported).toHaveLength(1)
+    expect(reported[0]).toMatchObject({
+      state: 'active',
+      reason: expect.stringContaining('another machine'),
+      owner: { pid: 101 },
+    })
     await reclaimed.release()
   })
 

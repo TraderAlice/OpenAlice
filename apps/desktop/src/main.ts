@@ -711,6 +711,9 @@ app.whenReady().then(async () => {
       launcher: app.isPackaged ? 'guardian-electron-packaged' : 'guardian-electron-dev',
       takeover,
       processStartedAt: guardianStartedAt,
+      onOwnerReclaimed: ({ owner, state, reason }) => {
+        console.warn(`[guardian] reclaimed ${owner?.launcher ?? 'unknown'} lock from pid ${owner?.pid ?? 'unknown'} (${state}: ${reason})`)
+      },
       onOwnershipLost: (err) => {
         console.error('[guardian] runtime ownership lost:', err)
         shutdown()
