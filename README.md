@@ -5,8 +5,8 @@
 <h1 align="center">OpenAlice</h1>
 
 <p align="center">
-  <strong>Your one-person Wall Street.</strong><br>
-  OpenAlice turns coding agents into local trading agents by giving them a workspace, files, issues, market tools, and approval-gated trading primitives.
+  <strong>The AI orchestrator for trading.</strong><br>
+  Your one-person Wall Street — bring your AI agents, market tools, research, and trading accounts into one local workspace.
 </p>
 
 <p align="center">
@@ -14,91 +14,121 @@
 </p>
 
 <p align="center">
-  <img src="docs/images/ask-alice.jpg" alt="OpenAlice Ask Alice composer" width="760">
+  <a href="https://openalice.ai/docs/getting-started/installation">Install OpenAlice</a> · <a href="#features">Features</a> · <a href="https://openalice.ai/docs/getting-started/quick-start">Quick Start</a>
 </p>
 
-> [!CAUTION]
-> **OpenAlice is experimental software in active development.** Many features and interfaces are incomplete and subject to breaking changes. The trading layer is especially beta. Do not use OpenAlice for live trading with real funds unless you fully understand and accept the risks involved. The authors provide no guarantees of correctness, reliability, profitability, or loss prevention.
+<p align="center">
+  <img src="docs/images/ask-alice.jpg" alt="Ask Alice: choose a Workspace and agent, then start a market research task" width="960">
+</p>
 
-## What is OpenAlice?
+Research a company, test an idea, keep a thesis under review, or prepare a trade.
+OpenAlice connects the agents you already use to market data, dedicated research
+workspaces, scheduled tasks, and trading accounts. Work with one agent or several;
+your files, research history, and follow-ups stay in place between sessions.
 
-OpenAlice is a local trading workspace for coding agents.
+## Get Started
 
-The core idea is simple: coding agents became useful quickly because software work already has a collaboration substrate. Code has git, issues, markdown docs, review workflows, linters, terminals, logs, and reproducible project folders. A coding agent can enter that world and immediately understand how to inspect, modify, review, and report work.
+[Download the desktop app](https://github.com/TraderAlice/OpenAlice/releases/latest)
+for macOS or Windows. The desktop app includes Pi; connect a model credential or
+supported login to start researching. **You do not need a broker account.**
 
-Trading usually does not have that shape. A trader may read news, browse charts, hold broker positions, and keep private notes, but the work is rarely organized as a collaborative system that a human and multiple AI agents can share.
+Prefer a terminal or server? See the [CLI installer](docs/cli-installer.md),
+[remote quickstart](docs/remote-quickstart.md), or
+[Docker setup](https://openalice.ai/docs/deployment/docker).
+For platform details, see the [installation guide](https://openalice.ai/docs/getting-started/installation).
 
-OpenAlice tries to make trading agent-operable by mapping trading work onto the tools coding agents already understand:
+Try a first task in Ask Alice:
 
-- **Workspaces** - each serious task gets a directory, git repo, terminal session, and native agent CLI.
-- **Issues** - trading work becomes self-describing markdown tasks, similar to Linear tickets.
-- **Tracked entities** - assets, sectors, topics, theses, and people become an Obsidian-like memory graph.
-- **Inbox** - finished work is delivered as durable reports instead of disappearing into chat history.
-- **Market tools** - data, news, fundamentals, technical analysis, and trading account state are exposed through CLIs and local tools.
-- **Trading as Git** - optional account actions are staged, committed, reviewed, and pushed through an approval gate.
+> Build a thesis on NVDA. Compare fundamentals with sector trends and price
+> behavior, save the research in this Workspace, and explain what would prove
+> the thesis wrong.
 
-OpenAlice does not replace Claude Code, Codex, opencode, Pi, or other coding agents. It gives them a trading-shaped place to work.
+Continue with a follow-up, turn it into a recurring Issue, or take the idea into
+AutoQuant for quantitative research. [Walk through your first research workflow →](https://openalice.ai/docs/getting-started/quick-start)
 
-## The Core Loop
+## Features
 
-Start with read-only research. You do not need a broker account to get value from OpenAlice.
+### Put your agents to work with market tools
 
-1. **Ask Alice** for a market question, company overview, sector scan, or thesis check.
-2. **Track what should persist** as entities and `[[wikilinks]]`.
-3. **Create an issue** when the work should continue, recur, or be handed to an agent later.
-4. **Schedule the issue** by writing timing and instructions into the same markdown file.
-5. **Read the result in Inbox** when the agent has something worth showing you.
+Use Claude Code, Codex, OpenCode, Pi, Oh My Pi, and other supported native agents
+with Alice's market data, fundamentals, news, and quantitative tools. Inspect the
+same markets yourself in the UI, then ask an agent to investigate further.
+Available data depends on your configured providers.
+
+### Give each line of research a place to grow
+
+Keep conversations, files, and Git history together in reusable Workspaces.
+Use Chat for general research, AutoQuant for quantitative projects and experiments,
+and Auto Prediction for prediction-market research. The specialist workspaces
+have their own Studio interfaces and can be developed by the agent working inside them.
+
+### Keep following the ideas that matter
+
+Link research to assets and topics in Tracked. Turn follow-up work into Issues
+with instructions and a schedule: a morning scan, a weekly macro review, or a
+recurring check on a thesis. Scheduled runs use the Workspace's agent and context.
+
+### Get results you can follow up on
+
+Inbox brings together reports, questions, and updates from your Workspaces.
+Open the research file or reply to the Session that produced it. Use Workspace
+Manager to inspect who owns what, review scheduled work, and coordinate across
+Workspaces when you need a wider view.
 
 <table>
   <tr>
-    <td><img src="docs/images/issue-board.jpg" alt="OpenAlice Issue Board"></td>
-    <td><img src="docs/images/tracked.jpg" alt="OpenAlice Tracked Entities"></td>
+    <td><img src="docs/images/issue-board.jpg" alt="Issues with scheduled research, run status, and work awaiting human review"></td>
+    <td><img src="docs/images/tracked.jpg" alt="Tracked graph connecting assets, research topics, notes, and Issues"></td>
   </tr>
   <tr>
-    <td align="center"><strong>Issue Board</strong></td>
-    <td align="center"><strong>Tracked Entities</strong></td>
+    <td align="center"><strong>Keep research moving</strong><br>Issues, schedules, and work that needs attention.</td>
+    <td align="center"><strong>Connect your research</strong><br>Assets, topics, and the work behind your ideas.</td>
   </tr>
   <tr>
-    <td><img src="docs/images/inbox.jpg" alt="OpenAlice Inbox"></td>
-    <td><img src="docs/images/market.jpg" alt="OpenAlice Market tools"></td>
+    <td><img src="docs/images/inbox.jpg" alt="Inbox report with a research attachment and a reply to the originating Session"></td>
+    <td><img src="docs/images/market.jpg" alt="Market view with price history, company profile, and fundamental metrics"></td>
   </tr>
   <tr>
-    <td align="center"><strong>Inbox</strong></td>
-    <td align="center"><strong>Market Tools</strong></td>
+    <td align="center"><strong>Read, then follow up</strong><br>Reports and a direct path back to their author.</td>
+    <td align="center"><strong>Explore the market</strong><br>Prices, fundamentals, and context for your next question.</td>
   </tr>
 </table>
 
-That loop is the main product surface today. A timer does not call a magic trading endpoint. It launches an agent against a self-describing workspace issue, using the same files, tools, memory, and reporting path an attended session uses.
+### Bring research to a trading decision
 
-## What You Get
+Connect supported brokers through Unified Trading Account to inspect holdings,
+orders, and account state. With AI trading enabled, agents can stage proposed
+operations and commit their rationale. You review and approve execution through
+Trading as Git.
 
-| Surface | What it does |
-| --- | --- |
-| **Workspaces** | Per-task git repositories with a persistent terminal running `claude`, `codex`, `grok`, `opencode`, `pi`, or `shell`. |
-| **Issue Board** | Markdown-backed work items with status, priority, assignee, comments, links, and optional schedule metadata. |
-| **Tracked Entities** | A durable graph for tickers, themes, sectors, people, risks, and theses. |
-| **Inbox** | A delivery surface for reports, scheduled run output, and agent status updates. |
-| **Market Data** | Equities, crypto, macro, fundamentals, symbol search, technical indicators, news, and RSS tools. |
-| **Unified Trading Account** | Optional beta account abstraction for brokers such as Alpaca, IBKR, Longbridge, and CCXT venues. |
-| **Trading as Git** | Stage, commit, review, and push account operations instead of letting an agent fire orders directly. |
+> [!CAUTION]
+> **Trading execution is beta.** Start with simulator, paper, demo, or testnet
+> accounts. OpenAlice is experimental software; interfaces may change, and it
+> provides no guarantees of correctness, reliability, profitability, or loss prevention.
+> Use real funds only if you understand and accept the risks.
 
-## Why Local?
+[Unified Trading Account](https://openalice.ai/docs/core-concepts/unified-trading-account) · [Trading as Git](https://openalice.ai/docs/core-concepts/trading-as-git)
 
-Trading involves private notes, account state, credentials, strategy, and real money. OpenAlice runs on your machine by default, stores state as files under `~/.openalice`, and keeps broker credentials sealed at rest.
+## Local and Yours
 
-There is no Postgres or Redis to provision. Config, sessions, issues, inbox entries, workspace artifacts, news archives, and trading history are ordinary files and git repositories. That makes the system easier to inspect, back up, debug, patch, and reason about.
+OpenAlice runs on your machine by default. Workspaces are directories and Git
+repositories you can inspect, edit, and back up. Alice stores its own state under
+`~/.openalice` and seals broker credentials at rest. Your chosen agents and data
+providers still use their configured services.
 
-## Quick Start
+Native agents keep their own model loops and tool behavior. Workspace files,
+skills, and dedicated research projects give them the context to do trading work.
 
-Pick the run path that matches your machine:
+[Data, credentials, and backups →](https://openalice.ai/docs/deployment/data-and-credentials)
 
-- **macOS** - use the signed Apple Silicon or Intel desktop build: [macOS install](https://openalice.ai/docs/getting-started/install-macos).
-- **Windows** - choose the self-contained unsigned desktop beta or the source path: [Windows install](https://openalice.ai/docs/getting-started/install-windows).
-- **Linux, contributors, debugging** - use the source path: [Source & Dev](https://openalice.ai/docs/getting-started/developer-setup).
-- **Private SSH host or travel setup** - keep the browser local and run the Runtime remotely: [Remote quickstart](docs/remote-quickstart.md).
-- **Server or always-on machine** - use Docker Compose: [Docker deployment](https://openalice.ai/docs/deployment/docker).
+## Documentation and Help
 
-The source path is still the best early-adopter path because it gives you logs and local code:
+- [Documentation](https://openalice.ai/docs) — setup, research workflows, agents, and trading.
+- [Discord](https://discord.gg/zf4STmrQd8) · [QQ group](https://qm.qq.com/q/iSg6O4FmrC) — questions and community.
+- [GitHub Issues](https://github.com/TraderAlice/OpenAlice/issues) — report a bug or propose an improvement.
+- [DeepWiki](https://deepwiki.com/TraderAlice/OpenAlice) — explore the codebase.
+
+## Development
 
 ```bash
 git clone https://github.com/TraderAlice/OpenAlice.git
@@ -107,43 +137,10 @@ pnpm install
 pnpm dev
 ```
 
-Open the UI URL printed by the terminal, usually `http://localhost:5173`.
-
-The packaged desktop includes managed Pi; the Docker image pins Claude Code,
-Codex, opencode, and Pi. Both still need a model credential or supported CLI
-login. Source installs need at least one host agent CLI. OpenAlice runs the
-model loop inside that native runtime so you keep its conversation state,
-provider login, and tool behavior.
-
-## Documentation
-
-The README is intentionally short. The real docs live at [openalice.ai/docs](https://openalice.ai/docs).
-
-- [What is OpenAlice](https://openalice.ai/docs/getting-started/what-is-openalice) - the product model and current boundary.
-- [Quick Start](https://openalice.ai/docs/getting-started/quick-start) - your first research, tracking, issue, schedule, and Inbox loop.
-- [Installation Overview](https://openalice.ai/docs/getting-started/installation) - choose macOS, Windows, source, Docker, or remote access.
-- [Workspaces](https://openalice.ai/docs/workspaces/workspaces) - the directory, git, CLI, and file-backed substrate.
-- [Sessions & Collaboration](https://openalice.ai/docs/workspaces/sessions-and-collaboration) - durable Session identity, signatures, provenance, and attributable follow-up.
-- [Lifecycle & Offboarding](https://openalice.ai/docs/workspaces/lifecycle) - handoff, departed desks, restore, purge, and Session retirement.
-- [Workspace Automation](https://openalice.ai/docs/workspaces/automation) - scheduled runs through self-describing issues.
-- [Unified Trading Account](https://openalice.ai/docs/core-concepts/unified-trading-account) - the beta account layer and safety warnings.
-- [Trading as Git](https://openalice.ai/docs/core-concepts/trading-as-git) - staged, committed, approval-gated trading operations.
-- [Data & Credentials](https://openalice.ai/docs/deployment/data-and-credentials) - state layout, sealed credentials, ports, and backup.
-
-## Project Status
-
-OpenAlice is useful today for research, issue-based work, tracked memory, scheduled reports, and Inbox delivery.
-
-Treat broker execution as beta infrastructure. Start with simulator, paper, demo, or testnet accounts. If you hit UTA errors, broker connection failures, or confusing execution behavior, bring the error to Discord or open a GitHub issue so we can reproduce it.
-
-## Getting Help
-
-Stuck? The fastest path is usually:
-
-1. **Ask an AI coding agent to inspect the repo** - OpenAlice is intentionally file-backed and agent-readable.
-2. **Read the docs** - [openalice.ai/docs](https://openalice.ai/docs).
-3. **Ask DeepWiki** - [deepwiki.com/TraderAlice/OpenAlice](https://deepwiki.com/TraderAlice/OpenAlice).
-4. **Join the community** - [Discord](https://discord.gg/zf4STmrQd8) for English speakers, [QQ group](https://qm.qq.com/q/iSg6O4FmrC) for 中文开发者.
+Open the UI URL printed by the terminal. Source installs need at least one host
+agent CLI and its model credentials or login.
+See [Source & Dev](https://openalice.ai/docs/getting-started/developer-setup) for
+setup and [CONTRIBUTING.md](CONTRIBUTING.md) before opening a PR.
 
 ## Star History
 
