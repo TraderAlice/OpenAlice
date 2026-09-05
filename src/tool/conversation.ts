@@ -16,6 +16,16 @@ const MAX_TIMEOUT_MS = 2_147_478_647
 const MAX_PROMPT_CHARS = 16_000
 const AWAIT_POLL_MS = 250
 
+function unavailableRecovery(reason: string): string | undefined {
+  if (reason === 'prediction-not-initialized') {
+    return 'Open Prediction and initialize the Auto Prediction desk, then retry with --harness prediction.'
+  }
+  if (reason === 'autoquant-not-initialized') {
+    return 'Open Quant and initialize the AutoQuant desk, then retry with --harness autoquant.'
+  }
+  return undefined
+}
+
 export const conversationAskCommonShape = {
   prompt: z.string().trim().min(1).max(MAX_PROMPT_CHARS)
     .describe('Question for the responsible Session or reconstructing worker.'),
@@ -101,10 +111,12 @@ export async function askWorkspaceConversation(
       ...(input.reconstruct ? { reconstruct: true } : {}),
     })
     if (result.status === 'unavailable') {
+      const next = unavailableRecovery(result.resolution.reason)
       return {
         ok: false as const,
         status: result.status,
         resolution: { mode: result.resolution.mode, reason: result.resolution.reason },
+        ...(next ? { next } : {}),
       }
     }
     const dispatched = {
@@ -174,7 +186,7 @@ export const conversationAskFactory: WorkspaceToolFactory = {
         'Use exactly one addressing form: resumeId for an exact Session; inboxId for the',
         'sender of one delivery; issueId (optionally scoped by wsId) for Issue creation',
         'provenance; wsId for a fresh worker in an exact desk; or harness for a fresh',
-        'worker in the current default Chat/AutoQuant desk.',
+        'worker in the current default Chat, AutoQuant, or Prediction desk.',
         '',
         'Use --await when this turn needs the reply. Without it, the call returns a',
         'short taskId immediately for delegated work or several concurrent questions;',

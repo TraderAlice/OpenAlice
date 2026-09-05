@@ -58,13 +58,17 @@ alice-workspace conversation ask --inbox-id <entryId> \
 # Recruit a fresh Session in a Harness default Workspace.
 alice-workspace conversation ask --harness autoquant \
   --prompt 'Start a new quantitative research assignment.'
+
+alice-workspace conversation ask --harness prediction \
+  --prompt 'Investigate this prediction-market contract relationship and return evidence.'
 ```
 
 `--harness chat` follows the recent/default Chat desk policy and creates the
 stable starter Chat Workspace only when none exists. `--harness autoquant`
 requires the explicitly initialized AutoQuant default Workspace and never
-creates or guesses one. Both launch a fresh product Session in the resolved
-desk; use the returned `resumeId` for later continuation.
+creates or guesses one. `--harness prediction` follows the same initialized-
+default rule for the Auto Prediction desk. All three launch a fresh product
+Session in the resolved desk; use the returned `resumeId` for later continuation.
 
 Prompts are ordinary coworker messages. Add `--reconstruct` only when the task
 explicitly requires a fresh worker to reconstruct missing historical intent.

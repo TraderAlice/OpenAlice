@@ -95,7 +95,7 @@ function chatMeta(): TemplateMeta {
     defaultAgents: ['claude', 'codex'],
     injectTools: true,
     injectInstructions: true,
-    bundledSkills: ['scan-value-chain', 'delegate-autoquant'],
+    bundledSkills: ['scan-value-chain', 'delegate-autoquant', 'delegate-prediction'],
   };
 }
 
@@ -127,6 +127,8 @@ describe('chat workspace create: bootstrap → inject → commit', () => {
       '.agents/skills/scan-value-chain/SKILL.md',
       '.claude/skills/delegate-autoquant/SKILL.md',
       '.agents/skills/delegate-autoquant/SKILL.md',
+      '.claude/skills/delegate-prediction/SKILL.md',
+      '.agents/skills/delegate-prediction/SKILL.md',
       // per-CLI playbooks injected for every tool-bearing template
       '.claude/skills/alice/SKILL.md',
       '.claude/skills/alice-analysis/SKILL.md',
