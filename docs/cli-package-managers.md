@@ -8,9 +8,19 @@ owned by [[docs/cli-supervisor.md]] and [[docs/local-runtime.md]].
 The native target set is macOS, glibc Linux, and Windows on arm64 and x64.
 Windows direct installation lives in [[docs/cli-installer.md]]. Generated Windows
 packages have completed first publication and Trusted Publisher enrollment.
-The complete seven-package stable npm activation still requires publication
-and public-install acceptance; the historical four-platform meta package is
-not evidence of Windows availability through `npm install openalice`.
+The seven-package stable npm channel is active at `0.91.1`: the meta package
+declares all six platform dependencies, including Windows x64 and ARM64.
+
+On 2026-09-05 [OIDC publication](https://github.com/TraderAlice/OpenAlice/actions/runs/33958504645)
+completed for `0.91.1`. All seven registry SHA-1/SHA-512 values match the
+release-owned manifest. Fresh public npm/Bun installs on macOS ARM64 and npm
+12.0.2 on clean Linux ARM64 passed startup, stable version discovery, stop,
+and removal while preserving project data. Native Windows package mechanics
+passed release acceptance; a separate Windows public-registry install was not
+repeated on a maintainer-owned Windows machine.
+The [Homebrew sync](https://github.com/TraderAlice/homebrew-tap/actions/runs/33957271180)
+also activated `0.91.1`; a fresh public tap install, startup, and removal passed
+inside a clean native Linux ARM64 Homebrew container.
 
 Public npm activation: `openalice` and its four platform packages were first
 published as `0.90.2` on 2026-09-04 under maintainer `jiaran258`. The registry
@@ -247,8 +257,8 @@ For each of `openalice`, `openalice-darwin-arm64`, `openalice-darwin-x64`,
 
 On 2026-09-05 both Windows packages completed first publication and enrollment.
 The [seven-package exchange](https://github.com/TraderAlice/OpenAlice/actions/runs/33957933624)
-passed from `master`, including the new Windows x64 connection. This proves
-authority, not completion of the all-platform meta-package publication.
+passed from `master`, including the new Windows x64 connection. The later
+publication and public-install receipts above prove activation separately.
 
 Publication runs on GitHub-hosted Ubuntu with `id-token: write`, Node 22.22.2,
 and pinned npm 12.0.2 installed in an isolated runner-temporary prefix. Verify

@@ -39,7 +39,7 @@ was accepted and merged to dev as 9d592d18. The maintainer authorized a serial
 - [x] Enroll Windows x64 OIDC and verify all seven identities. npm confirmed
   TraderAlice/OpenAlice / release.yml with direct publishing permission;
   real exchange run 33957933624 passed for the complete seven-package set.
-- [ ] Publish and accept the complete public npm/Bun channel. Run 33957962527
+- [x] Publish and accept the complete public npm/Bun channel. Run 33957962527
   failed twice before publication while globally upgrading npm in place:
   the running npm could no longer resolve its own promise-retry dependency.
   Isolate pinned npm 12.0.2 in RUNNER_TEMP, verify its version, and prepend that
@@ -57,6 +57,16 @@ was accepted and merged to dev as 9d592d18. The maintainer authorized a serial
   Node 22.22.2/npm 12.0.2 reproduces that exact response. Accept one string or
   exactly one string entry, while rejecting ambiguous/malformed reports; retry
   must preserve integrity verification and keep the meta package last.
+  Parser repair #1375 merged as b2c12ba9; 50 focused tests and root types passed.
+  Publication run 33958504645 succeeded: identical platform packages were
+  skipped and openalice@0.91.1 was published last through OIDC. Independent
+  registry reads verify all seven SHA-1/SHA-512 values and all six exact-version
+  optional dependencies. Public macOS ARM64 npm/Bun and clean Linux ARM64 npm
+  12.0.2 installation, system dependency checks, Runtime start, stable version
+  API/update probe, stop, uninstall and data preservation passed. Receipts:
+  /tmp/openalice-0911-public-npm-macos.log,
+  /tmp/openalice-0911-public-bun-macos.log,
+  /tmp/openalice-0911-public-npm12-linux.log.
 - [x] Prepare and publish 0.91.1 independently after beta acceptance; verify
   public release, direct upgrade, and Homebrew. AUR registration remains deferred.
   Stable preparation #1371 and full source run 33952791151 passed on f1ac9ece.
@@ -80,8 +90,8 @@ was accepted and merged to dev as 9d592d18. The maintainer authorized a serial
   real Settings reports 0.91.1 Stable and up-to-date. Homebrew sync 33957271180
   passed, then a clean native Linux ARM64 container installed from the public
   tap, resolved dependencies, started 0.91.1, and uninstalled successfully
-  (/tmp/openalice-0911-public-brew.log). Copy the two accepted version values
-  back to dev; source launcher identity remains dev, not stable.
+  (/tmp/openalice-0911-public-brew.log). The two accepted version values were
+  copied back to dev in #1374; source launcher identity remains dev, not stable.
 
 ### Implemented boundary
 
@@ -152,9 +162,10 @@ was accepted and merged to dev as 9d592d18. The maintainer authorized a serial
   exercised. Other Linux manager plans are likewise not all live-installed.
 - Real agent/provider credentials, broker operations, signing/notarization, and
   network Git are separate opt-in release/product checks, not exercised here.
-- Public npm/AUR activation and release promotion remain separate actions.
-  The previously accepted `openalice-windows-arm64@0.91.0` is not overwritten;
-  this new topology requires a newly accepted version for publication.
+- Public npm activation completed at 0.91.1 without overwriting the previous
+  openalice-windows-arm64@0.91.0. AUR registration remains externally deferred.
+  Windows native candidate mechanics passed; public-registry installation was
+  not repeated on a maintainer-owned Windows machine.
 
 Owner guides: [[docs/cli-installer.md]], [[docs/cli-package-managers.md]],
 [[docs/local-runtime.md]], [[docs/managed-workspace-runtime.md]].
