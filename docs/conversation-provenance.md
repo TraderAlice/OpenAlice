@@ -394,12 +394,18 @@ live timeline. The Telegram phone desk already ships sealed mid-turn `text`
 blocks from that progress; tool and error blocks stay local to the workstation
 surfaces.
 
-For a human comment without a fixed owner, OpenAlice follows the Issue creation
-provenance and uses the universal follow-up rule: continue the attributable
-creator, or recruit a reconstructed Agent in the Issue Workspace when creation
-has no Session origin. This answering Session is a collaborator, not an
-execution owner; `assignee` stays unchanged. Agent-authored comments without a
-fixed owner remain durable notes so progress logging does not fan out workers.
+`@new-then-resume` is not an unowned Issue. A human comment on that pending
+owner policy recruits a fresh Session in the Issue Workspace and claims it,
+the same way the first scheduled fire does. Creator or prior-reconstruction
+provenance must not keep a previous Session after that rebind.
+
+For a human comment on `@new-each-run`, `@unassigned`, or `@human`, OpenAlice
+follows the Issue creation provenance and uses the universal follow-up rule:
+continue the attributable creator, or recruit a reconstructed Agent in the
+Issue Workspace when creation has no Session origin. This answering Session is
+a collaborator, not an execution owner; `assignee` stays unchanged.
+Agent-authored comments without a fixed owner remain durable notes so progress
+logging does not fan out workers.
 
 #### Mode A: one responsible Session
 
@@ -428,9 +434,13 @@ existing resumable Workspace Session.
 assignee: "@new-then-resume"
 ```
 
-- The first scheduled fire creates a new headless product Session.
+- The first scheduled fire **or** human comment reply creates a new headless
+  product Session.
 - OpenAlice immediately rewrites `@new-then-resume` to that Session's exact `@resumeId`.
 - Later fires and Issue comments continue the same accountable coworker.
+- Rebinding an existing Issue back to `@new-then-resume` is a new hire: the next
+  fire or comment recruits again. Creator or prior-reconstruction provenance
+  must not keep the previous Session.
 - The Issue may specify `agent` before the first claim; after the claim, the
   concrete Session owns its runtime.
 

@@ -296,7 +296,7 @@ export const en = {
       askAboutIssue: 'Ask about this Issue…',
       assignedSessionPrefix: 'The assigned Session',
       assignedSessionSuffix: 'will reply here.',
-      replyBeforeFirstRun: 'Until the first run assigns an owner, the creator or a reconstructed Workspace Agent will reply here.',
+      replyBeforeFirstRun: 'The next comment or scheduled run will create a Session and keep it as owner.',
       replyWithoutOwner: 'The creator or a reconstructed Workspace Agent will reply here; ownership stays unchanged.',
       sending: 'Sending…',
       commentNotify: 'Comment & notify',

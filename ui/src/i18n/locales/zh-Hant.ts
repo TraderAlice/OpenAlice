@@ -292,7 +292,7 @@ export const zhHant: Resources = {
       askAboutIssue: '詢問這個議題…',
       assignedSessionPrefix: '負責的工作階段',
       assignedSessionSuffix: '會在這裡回覆。',
-      replyBeforeFirstRun: '首次執行確定負責人前，建立者或負責重建脈絡的工作區 Agent 會在這裡回覆。',
+      replyBeforeFirstRun: '下一則評論或下一次執行會建立一個 Session，並把它固定為負責人。',
       replyWithoutOwner: '建立者或負責重建脈絡的工作區 Agent 會在這裡回覆；負責人維持不變。',
       sending: '正在傳送…',
       commentNotify: '留言並通知',

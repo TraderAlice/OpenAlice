@@ -43,6 +43,7 @@ import {
   readWorkspaceIssues,
   type IssueRecord,
 } from '../issues/declaration.js'
+import { issueRuntimeSelection } from '../issues/claim-session.js'
 import {
   extraConnectorDeskKeys,
   findConnectorDesks,
@@ -205,7 +206,7 @@ export class ScheduleScanner {
       issue.id,
       issueFirePrompt(issue),
       issue.agent,
-      issueRunOverrides(issue),
+      issueRuntimeSelection(issue),
       issueAssigneeResumeId(issue.assignee) ?? undefined,
       issueAssigneeClaimsFirstSession(issue.assignee),
       issueTimeoutMs(issue.timeout),
@@ -305,7 +306,7 @@ export class ScheduleScanner {
           when,
           issueFirePrompt(issue),
           issue.agent,
-          issueRunOverrides(issue),
+          issueRuntimeSelection(issue),
           issueAssigneeResumeId(issue.assignee) ?? undefined,
           issueAssigneeClaimsFirstSession(issue.assignee),
           issueTimeoutMs(issue.timeout),
@@ -541,12 +542,3 @@ export class ScheduleScanner {
   }
 }
 
-function issueRunOverrides(issue: IssueRecord): SessionRuntimeSelection | undefined {
-  if (!issue.credential && !issue.credentialSource && !issue.model && !issue.effort) return undefined
-  return {
-    ...(issue.credentialSource === 'native' ? { credentialSource: 'native' as const } : {}),
-    ...(issue.credential ? { credentialSlug: issue.credential } : {}),
-    ...(issue.model ? { model: issue.model } : {}),
-    ...(issue.effort ? { reasoningEffort: issue.effort } : {}),
-  }
-}

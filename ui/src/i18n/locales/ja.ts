@@ -285,7 +285,7 @@ export const ja: Resources = {
       askAboutIssue: 'この課題について質問…',
       assignedSessionPrefix: '担当セッション',
       assignedSessionSuffix: 'がここで返信します。',
-      replyBeforeFirstRun: '初回実行で担当が決まるまでは、作成者またはコンテキストを再構築したワークスペースエージェントがここで返信します。',
+      replyBeforeFirstRun: '次のコメントまたは次回の実行で Session を作成し、以後その Session を担当に固定します。',
       replyWithoutOwner: '作成者またはコンテキストを再構築したワークスペースエージェントがここで返信します。担当者は変わりません。',
       sending: '送信中…',
       commentNotify: 'コメントして通知',

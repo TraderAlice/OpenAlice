@@ -374,6 +374,35 @@ describe('POST /api/issues/:wsId/:id/comments', () => {
     }))
   })
 
+  it('recruits and claims a Session when assignee is @new-then-resume', async () => {
+    await createIssue(wsDir, {
+      id: 'i1',
+      title: 'T',
+      assignee: '@new-then-resume',
+      when: { kind: 'every', every: '4h' },
+    })
+    const { app, ask } = build()
+    const r = await req(app, 'POST', '/ws-1/i1/comments', { text: 'hello from the phone' })
+    expect(r.status).toBe(200)
+    expect(ask).toHaveBeenCalledWith(expect.objectContaining({
+      target: { kind: 'workspace', workspaceId: 'ws-1' },
+      source: { kind: 'human' },
+      subject: expect.objectContaining({
+        kind: 'issue',
+        issueId: 'i1',
+        relation: 'owner',
+        commentId: expect.any(String),
+      }),
+    }))
+    expect(ask).toHaveBeenCalledWith(expect.not.objectContaining({ reconstruct: true }))
+    expect(r.body.issue.assignee).toBe('@resume-kind-owl-abc123')
+    expect(r.body.comments[0].delivery).toEqual({
+      state: 'pending',
+      targetResumeId: 'resume-kind-owl-abc123',
+      taskId: 'run-comment-reply',
+    })
+  })
+
   it('asks the creator or reconstructs for a human comment without a fixed owner', async () => {
     await createIssue(wsDir, { id: 'i1', title: 'T' })
     const { app, ask } = build()

@@ -348,6 +348,7 @@ export function createWorkspaceConversationControl(
             resolution,
             subject: input.subject,
           })
+      const selection = continuingOrigin ? undefined : input.selection
       const dispatched = inquiry
         ? await svc.dispatchHeadlessTask(
             meta,
@@ -357,7 +358,7 @@ export function createWorkspaceConversationControl(
             undefined,
             continuingOrigin?.resumeId,
             inquiry,
-            undefined,
+            selection,
             conversation,
             createdBy,
           )
@@ -369,7 +370,7 @@ export function createWorkspaceConversationControl(
             undefined,
             continuingOrigin?.resumeId,
             undefined,
-            undefined,
+            selection,
             conversation,
             createdBy,
           )
