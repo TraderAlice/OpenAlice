@@ -19,6 +19,14 @@ was accepted and merged to dev as 9d592d18. The maintainer authorized a serial
   Local repaired four-process recovery and external Broker Pack acceptance pass;
   root typecheck and 719 files / 6,424 tests pass (3 skipped). Public dev
   acceptance remains required before promotion.
+  PR #1366 fixed multiprocess PATH. Promotion PR #1367 then exposed missing Git
+  in the SSH fixture's final Debian image; install host Git in SSH and live
+  channel fixtures, and assert live setup readiness without Node/Bun/agents.
+  Local SSH acceptance (including transfer, excluding the separate TUI journey)
+  and real exact-commit dev install at 046d5b03 pass. Fixture revision root
+  typecheck and full 6,424-test suite pass. Dev run 33949126590 is green.
+  Intel promotion PTY confirmation timed out after main logged attachment;
+  evidence was added to #1350, not dismissed as a proven infrastructure cause.
 - [ ] Promote accepted dev and prepare/publish 0.91.1-beta.1.
 - [ ] Verify public beta installation/update and unchanged stable surfaces.
 - [ ] Complete Windows x64 npm first-publication/OIDC prerequisites.
