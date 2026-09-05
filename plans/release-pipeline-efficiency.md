@@ -70,12 +70,24 @@ upgrade acceptance and all release/publication jobs were skipped. This proves
 early rejection and operation isolation, not positive replay or speedup.
 
 Hosted real CLI comparison [33960910945](https://github.com/TraderAlice/OpenAlice/actions/runs/33960910945)
-is running on 438e695b via `operation=benchmark-cli`. The input producer builds
+completed successfully on 438e695b via `operation=benchmark-cli`. The input producer builds
 once and uploads the verified inventory; two identical Ubuntu consumers then
 compare rebuild versus download/restore, each running multiprocess feasibility
 and real native archive acceptance. Producer cost is recorded separately, since
 both consumers deliberately start after it. No public artifacts or signing
-credentials are involved. Results remain pending.
+credentials are involved.
+
+Measured hosted results: producer job 115 seconds (server build 84 seconds,
+upload 2 seconds); original consumer 157 seconds (repeated server build 88
+seconds); shared consumer 65 seconds (download/verify approximately 2 seconds).
+Both consumers passed multiprocess Runtime and actual native archive acceptance.
+Per-consumer execution fell by 92 seconds, but producer start through restored
+consumer completion took 183 seconds: about 26 seconds longer than the original
+single consumer's execution. This is a repeated-compute reduction, not evidence
+of a faster first CLI artifact. Six-target aggregate savings require a model
+and cannot be presented as measured multi-platform time. Retain provisionally
+for shared work reduction; desktop/source dependency changes, not this input
+split alone, own the expected stable critical-path improvement.
 
 1. Each platform builds and preserves its candidate, then its own downstream
    acceptance starts immediately. Final publication still joins all required
