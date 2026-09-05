@@ -37,6 +37,18 @@ was accepted and merged to dev as 9d592d18. The maintainer authorized a serial
 - [ ] Complete Windows x64 npm first-publication/OIDC prerequisites.
 - [ ] Prepare and publish 0.91.1 independently after beta acceptance; verify
   public release, npm/Bun, and Homebrew. AUR registration remains deferred.
+  Stable preparation #1371 and full source run 33952791151 passed on f1ac9ece.
+  Release run 33953350725 accepted all six native CLI targets, then ARM64 AUR
+  acceptance exposed a fixture defect: later pacman -U dependency downloads
+  did not inherit the bootstrap command's Landlock sandbox exception. Apply
+  that existing exception to pacman configuration only inside the disposable
+  pinned container; retain dependency resolution and signature verification.
+  Local Docker ARM64 and emulated x64 replays of the exact 0.91.1 candidates
+  pass the complete pacman install/update/pending-activation/removal lifecycle. Root typecheck,
+  719 files / 6,425 tests pass (3 skipped); the added contract covers container
+  scope, read-only checkout and unchanged package-signature policy.
+  Intel signing independently failed to obtain a timestamp; no signature gate
+  is relaxed. Repair and re-promote through dev before retrying stable.
 
 ### Implemented boundary
 
