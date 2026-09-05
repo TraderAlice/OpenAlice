@@ -21,6 +21,9 @@ on:
       arch:
         required: true
         type: string
+      rehearsal:
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -54,6 +57,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           CANDIDATE_TARGET: ${{ runner.os }}-${{ inputs.arch }}
+          CANDIDATE_REHEARSAL_BRANCH: ${{ inputs.rehearsal && github.ref_name || '' }}
         run: node scripts/select-release-candidate.mjs "$CANDIDATE_RUN" "$CANDIDATE_SOURCE_SHA" "$CANDIDATE_TARGET"
       - uses: actions/download-artifact@v5
         with:

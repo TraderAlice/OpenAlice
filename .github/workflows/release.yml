@@ -14,6 +14,7 @@ on:
           - publish-npm
           - verify-npm
           - verify-desktop
+          - verify-desktop-rehearsal
           - benchmark-cli
           - rehearse-desktop
       tag:
@@ -50,7 +51,7 @@ on:
           - Windows-x64
 
 concurrency:
-  group: ${{ inputs.operation == 'rehearse-desktop' && format('desktop-rehearsal-{0}', github.ref) || inputs.operation == 'benchmark-cli' && format('cli-benchmark-{0}', github.ref) || inputs.operation == 'verify-desktop' && format('desktop-replay-{0}-{1}', inputs.candidate-run, inputs.desktop-target) || 'openalice-release-publication' }}
+  group: ${{ inputs.operation == 'rehearse-desktop' && format('desktop-rehearsal-{0}', github.ref) || inputs.operation == 'benchmark-cli' && format('cli-benchmark-{0}', github.ref) || startsWith(inputs.operation, 'verify-desktop') && format('desktop-replay-{0}-{1}', inputs.candidate-run, inputs.desktop-target) || 'openalice-release-publication' }}
   cancel-in-progress: false
 
 jobs:
@@ -85,7 +86,7 @@ jobs:
       contents: read
 
   replay-desktop:
-    if: inputs.operation == 'verify-desktop' && inputs.channel == 'stable'
+    if: (inputs.operation == 'verify-desktop' || inputs.operation == 'verify-desktop-rehearsal') && inputs.channel == 'stable'
     uses: ./.github/workflows/release-desktop-replay.yml
     permissions:
       contents: read
@@ -93,6 +94,7 @@ jobs:
     with:
       candidate-run: ${{ inputs.candidate-run }}
       source-sha: ${{ inputs.source-sha }}
+      rehearsal: ${{ inputs.operation == 'verify-desktop-rehearsal' }}
       tag: ${{ inputs.tag }}
       previous-tag: ${{ inputs.previous-tag }}
       os: ${{ inputs.desktop-target == 'macOS-arm64' && 'macos-14' || inputs.desktop-target == 'macOS-x64' && 'macos-15-intel' || 'windows-latest' }}

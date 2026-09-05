@@ -534,6 +534,15 @@ Historical artifacts lacking `candidate-manifest.json` cannot use this path.
 At this implementation stage the retry receipt is diagnostic evidence only:
 final publication does not yet accept a receipt from a different run.
 
+For non-publishing pipeline verification, `rehearse-desktop` builds unsigned
+desktop candidates on the dispatch branch and runs the same stable N-1 checks.
+Passing `candidate-run` to a second rehearsal on the same source restores those
+bytes instead of rebuilding. `verify-desktop-rehearsal` uses the single-target
+replay inputs above to check an older rehearsal candidate with the current
+branch's verifier. These operations have read-only repository permissions and
+no signing credentials. Their `rehearsal-assets-*` artifacts are deliberately
+distinct from production candidates; normal release selection rejects them.
+
 For a new `operation=release` attempt on the exact same source commit, setting
 `candidate-run` reuses that run's three preserved desktop artifacts instead of
 packaging/signing again. Selection and exact-byte verification precede upload

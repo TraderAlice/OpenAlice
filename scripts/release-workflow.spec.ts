@@ -123,7 +123,7 @@ describe('Release workflow critical path', () => {
       operation: {
         required: true,
         type: 'choice',
-        options: ['release', 'mirror', 'publish-npm', 'verify-npm', 'verify-desktop', 'benchmark-cli', 'rehearse-desktop'],
+        options: ['release', 'mirror', 'publish-npm', 'verify-npm', 'verify-desktop', 'verify-desktop-rehearsal', 'benchmark-cli', 'rehearse-desktop'],
       },
       tag: {
         required: false,
@@ -136,7 +136,7 @@ describe('Release workflow critical path', () => {
       },
     })
     expect(workflow.concurrency).toEqual({
-      group: "${{ inputs.operation == 'rehearse-desktop' && format('desktop-rehearsal-{0}', github.ref) || inputs.operation == 'benchmark-cli' && format('cli-benchmark-{0}', github.ref) || inputs.operation == 'verify-desktop' && format('desktop-replay-{0}-{1}', inputs.candidate-run, inputs.desktop-target) || 'openalice-release-publication' }}",
+      group: "${{ inputs.operation == 'rehearse-desktop' && format('desktop-rehearsal-{0}', github.ref) || inputs.operation == 'benchmark-cli' && format('cli-benchmark-{0}', github.ref) || startsWith(inputs.operation, 'verify-desktop') && format('desktop-replay-{0}-{1}', inputs.candidate-run, inputs.desktop-target) || 'openalice-release-publication' }}",
       'cancel-in-progress': false,
     })
 
@@ -423,7 +423,8 @@ describe('Release workflow critical path', () => {
 
   it('replays one selected desktop without build or publication authority', () => {
     const replay = workflow.jobs['replay-desktop']
-    expect(replay.if).toBe("inputs.operation == 'verify-desktop' && inputs.channel == 'stable'")
+    expect(replay.if).toBe("(inputs.operation == 'verify-desktop' || inputs.operation == 'verify-desktop-rehearsal') && inputs.channel == 'stable'")
+    expect(replay.with?.rehearsal).toBe("${{ inputs.operation == 'verify-desktop-rehearsal' }}")
     expect(replay.permissions).toEqual({ contents: 'read', actions: 'read' })
     expect(replay.uses).toBe('./.github/workflows/release-desktop-replay.yml')
     const source = readFileSync(resolve(root, '.github/workflows/release-desktop-replay.yml'), 'utf8')

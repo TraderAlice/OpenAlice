@@ -230,6 +230,16 @@ beta-to-stable promotion; installing a permanent runner on the user's daily Mac.
   behind the first run. Both are confirmed pinned to 997dd0c2, so later topic
   commits do not change this comparison. Both Mac builds/upgrades are accepted;
   first-run Windows upgrade remains active.
+  Final local full regression passed with `pnpm test --maxWorkers=1`: 723 files,
+  6,482 passes and three skips, 406.82 seconds. This changes concurrency, not
+  assertions; the previous timeout remains recorded above. The final workflow
+  increment passed 44 focused tests and actionlint with the documented tool
+  limitations. Log: /tmp/openalice-release-pipeline-final-tests.log.
+  Added read-only `verify-desktop-rehearsal` to exercise the separate product
+  and verifier identities against real unsigned candidates after the producer
+  completes. It explicitly selects the rehearsal branch/artifact namespace;
+  production selection and publication remain unchanged. Positive cross-verifier
+  hosted evidence is still pending.
 - [ ] Update owner guides and applicable release skill instructions to match
   the implemented operation and acceptance boundaries; remove stale serial rules.
 - [ ] Record measured timings separately from estimates, inspect latest PR
