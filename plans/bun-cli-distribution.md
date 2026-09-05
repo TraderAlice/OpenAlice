@@ -13,7 +13,7 @@ was accepted and merged to dev as 9d592d18. The maintainer authorized a serial
 
 ### Active release journey
 
-- [ ] Repair and accept dev preview: run 33948606732 exposed the old multiprocess
+- [x] Repair and accept dev preview: run 33948606732 exposed the old multiprocess
   fixture's empty PATH, which incorrectly hides required system Git/Bash. Give
   that fixture an isolated tool-only PATH; keep Node/npm/Bun absent.
   Local repaired four-process recovery and external Broker Pack acceptance pass;
@@ -27,11 +27,28 @@ was accepted and merged to dev as 9d592d18. The maintainer authorized a serial
   typecheck and full 6,424-test suite pass. Dev run 33949126590 is green.
   Intel promotion PTY confirmation timed out after main logged attachment;
   evidence was added to #1350, not dismissed as a proven infrastructure cause.
-- [ ] Promote accepted dev and prepare/publish 0.91.1-beta.1.
-- [ ] Verify public beta installation/update and unchanged stable surfaces.
+- [x] Promote accepted dev and prepare/publish 0.91.1-beta.1. PRs #1367/#1369;
+  release run 33950551159 succeeded, tag binds 1b509852.
+- [x] Verify public beta installation/update and unchanged stable surfaces.
+  Public macOS ARM64 0.91.0 -> beta update, real Settings version/channel,
+  retained Workspace, rollback to 0.91.0 and back to beta all passed. Stable
+  manifest and five update feeds match the pre-beta baseline byte-for-byte.
+  Isolated acceptance root: /tmp/openalice-0911-public.Iut9Ho.
 - [ ] Complete Windows x64 npm first-publication/OIDC prerequisites.
 - [ ] Prepare and publish 0.91.1 independently after beta acceptance; verify
   public release, npm/Bun, and Homebrew. AUR registration remains deferred.
+  Stable preparation #1371 and full source run 33952791151 passed on f1ac9ece.
+  Release run 33953350725 accepted all six native CLI targets, then ARM64 AUR
+  acceptance exposed a fixture defect: later pacman -U dependency downloads
+  did not inherit the bootstrap command's Landlock sandbox exception. Apply
+  that existing exception to pacman configuration only inside the disposable
+  pinned container; retain dependency resolution and signature verification.
+  Local Docker ARM64 and emulated x64 replays of the exact 0.91.1 candidates
+  pass the complete pacman install/update/pending-activation/removal lifecycle. Root typecheck,
+  719 files / 6,425 tests pass (3 skipped); the added contract covers container
+  scope, read-only checkout and unchanged package-signature policy.
+  Intel signing independently failed to obtain a timestamp; no signature gate
+  is relaxed. Repair and re-promote through dev before retrying stable.
 
 ### Implemented boundary
 

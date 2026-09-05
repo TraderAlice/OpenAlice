@@ -28,9 +28,11 @@ export function runAurContainerSmoke(options) {
   const currentPackageRoot = containerDirectory(options.currentPackage)
   const command = [
     // GitHub and OrbStack containers do not expose Landlock. Pacman 7's
-    // download sandbox must be disabled explicitly inside this disposable,
-    // digest-pinned acceptance container.
-    'pacman --disable-sandbox -Syu --noconfirm nodejs',
+    // download sandbox must be disabled for every pacman invocation inside
+    // this disposable, digest-pinned acceptance container, including later
+    // pacman -U dependency downloads. Keep signature checking unchanged.
+    "sed -i '/^\\[options\\]$/a DisableSandbox' /etc/pacman.conf",
+    'pacman -Syu --noconfirm nodejs',
     'useradd --create-home builder',
     'install -d -o builder -g builder /tmp/openalice-aur-previous /tmp/openalice-aur-current',
     'cp -a "$PREVIOUS_PACKAGE_ROOT/." /tmp/openalice-aur-previous/',
