@@ -127,8 +127,76 @@ describe('parseRSSXml', () => {
     const items = parseRSSXml(xml)
     expect(items[0].content).toBe('This is the full article text with much more detail.')
   })
-})
+  it('extracts safe RSS image media without adding image to old items', () => {
+    const xml = `<rss><channel>
+      <item>
+        <title>Thumbnail article</title>
+        <media:thumbnail url="https://cdn.example.com/thumb.jpg"/>
+      </item>
+      <item>
+        <title>Enclosure article</title>
+        <enclosure url="https://cdn.example.com/article.png" type="image/png"/>
+      </item>
+      <item>
+        <title>HTML article</title>
+        <description><![CDATA[<p>Summary <img src="https://cdn.example.com/summary.webp"></p>]]></description>
+      </item>
+      <item><title>No image</title></item>
+    </channel></rss>`
 
+    const items = parseRSSXml(xml)
+    expect(items[0].image).toBe('https://cdn.example.com/thumb.jpg')
+    expect(items[1].image).toBe('https://cdn.example.com/article.png')
+    expect(items[2].image).toBe('https://cdn.example.com/summary.webp')
+    expect(items[3]).not.toHaveProperty('image')
+  })
+
+  it('rejects unsafe and non-image media', () => {
+    const xml = `<rss><channel>
+      <item>
+        <title>Unsafe</title>
+        <media:thumbnail url="data:image/png;base64,abc"/>
+        <description><![CDATA[<img src="javascript:alert(1)">]]></description>
+      </item>
+      <item>
+        <title>Not an image</title>
+        <enclosure url="https://cdn.example.com/file.pdf" type="application/pdf"/>
+        <media:content url="https://cdn.example.com/audio.mp3" medium="audio"/>
+      </item>
+    </channel></rss>`
+
+    const items = parseRSSXml(xml)
+    expect(items[0]).not.toHaveProperty('image')
+    expect(items[1]).not.toHaveProperty('image')
+  })
+
+  it('accepts image media content and ignores non-image variants', () => {
+    const xml = `<rss><channel>
+      <item>
+        <title>Media article</title>
+        <media:content url="https://cdn.example.com/audio.mp3" medium="audio"/>
+        <media:content url="https://cdn.example.com/photo.jpg" medium="image"/>
+      </item>
+    </channel></rss>`
+
+    expect(parseRSSXml(xml)[0].image).toBe('https://cdn.example.com/photo.jpg')
+  })
+
+  it('does not confuse similarly named tags or attributes with the requested values', () => {
+    const xml = `<rss><channel><itemish><title>Wrong</title></itemish><item>
+      <title data-title="wrong">Right</title>
+      <description>Body</description>
+      <img-src src="https://cdn.example.com/wrong.jpg">
+      <description><![CDATA[<img data-src="https://cdn.example.com/data.jpg">]]></description>
+    </item></channel></rss>`
+
+    const items = parseRSSXml(xml)
+    expect(items).toHaveLength(1)
+    expect(items[0].title).toBe('Right')
+    expect(items[0].image).toBeUndefined()
+  })
+
+})
 // ==================== fetchAndParseFeed ====================
 
 const MINIMAL_RSS = `<?xml version="1.0"?><rss version="2.0"><channel>

@@ -1,6 +1,7 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useId, useState, type ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
-import { X } from 'lucide-react'
+import { useNavigate, useSearchParams } from 'react-router-dom'
+import { ChevronRight, X } from 'lucide-react'
 import { type AssetClass, type BarSourceCandidate } from '../api/market'
 import { useAssetSearch } from './market/useAssetSearch'
 import { useWorkspace } from '../tabs/store'
@@ -11,6 +12,7 @@ import { SidebarSectionHeader } from './SidebarSectionHeader'
 import { Spinner } from './StateViews'
 import { Button } from './ui/button'
 import { inputClass } from './form'
+import { NewsMarketNavigation } from './market/NewsMarketNavigation.js'
 
 const ASSET_CLASS_COLORS: Record<string, string> = {
   equity: 'bg-primary/15 text-primary',
@@ -40,8 +42,10 @@ function routeAssetClass(c: BarSourceCandidate['assetClass']): AssetClass {
  *
  * Search results are debounced 300ms.
  */
-export function MarketSidebar() {
+export function MarketSidebar({ onNavigate }: { onNavigate?: () => void }) {
   const { t } = useTranslation()
+  const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
   const [query, setQuery] = useState('')
   // Shared with the main search box — one search logic, no drift.
   const { results, loading } = useAssetSearch(query)
@@ -53,7 +57,11 @@ export function MarketSidebar() {
 
   const watchlist = useWatchlist((s) => s.entries)
   const removeFromWatchlist = useWatchlist((s) => s.remove)
-  const openOrFocus = useWorkspace((s) => s.openOrFocus)
+  const openTab = useWorkspace((s) => s.openOrFocus)
+  const openOrFocus = (spec: ViewSpec) => {
+    openTab(spec)
+    onNavigate?.()
+  }
 
   const focusedSpec = useWorkspace((state) => getFocusedTab(state)?.spec)
   const isFocused = (kind: ViewSpec['kind']) => focusedSpec?.kind === kind
@@ -105,13 +113,16 @@ export function MarketSidebar() {
       </div>
 
       <div className="flex-1 overflow-y-auto min-h-0">
-        <SidebarRow
-          label={t('nav.item.news')}
-          active={isFocused('news')}
-          onClick={() => openOrFocus({ kind: 'news', params: {} })}
-        />
-        <div role="group" aria-label={t('market.marketsSection')}>
-          <SidebarSectionHeader>{t('market.marketsSection')}</SidebarSectionHeader>
+        <MarketSection label={t('nav.item.news')} initiallyOpen={isFocused('news')} active={isFocused('news')}>
+          <NewsMarketNavigation active={isFocused('news')} category={isFocused('news') ? searchParams.get('category') : null} onSelect={(category) => {
+            const next = new URLSearchParams(isFocused('news') ? searchParams : undefined)
+            if (category) next.set('category', category)
+            else next.delete('category')
+            navigate({ pathname: '/market/news', search: next.toString() })
+            onNavigate?.()
+          }} />
+        </MarketSection>
+        <MarketSection label={t('market.marketsSection')}>
           <SidebarRow
             label={t('market.browseMarkets')}
             active={isFocused('market-list')}
@@ -132,9 +143,8 @@ export function MarketSidebar() {
             active={focusedSpec?.kind === 'market-board' && focusedSpec.params.board === 'term-structure'}
             onClick={() => openOrFocus({ kind: 'market-board', params: { board: 'term-structure' } })}
           />
-        </div>
-        <div role="group" aria-label={t('market.macroSection')}>
-          <SidebarSectionHeader>{t('market.macroSection')}</SidebarSectionHeader>
+        </MarketSection>
+        <MarketSection label={t('market.macroSection')}>
           <SidebarRow
             label={t('market.boardCalendar')}
             active={focusedSpec?.kind === 'market-board' && focusedSpec.params.board === 'calendar'}
@@ -160,7 +170,7 @@ export function MarketSidebar() {
             active={focusedSpec?.kind === 'market-board' && focusedSpec.params.board === 'shipping'}
             onClick={() => openOrFocus({ kind: 'market-board', params: { board: 'shipping' } })}
           />
-        </div>
+        </MarketSection>
 
         {/* Search results — only when query is non-empty */}
         {query.trim() && (
@@ -201,7 +211,7 @@ export function MarketSidebar() {
         )}
 
         {/* Watchlist */}
-        <SidebarSectionHeader>{t('market.watchlist')}{watchlist.length ? ` (${watchlist.length})` : ''}</SidebarSectionHeader>
+        <MarketSection label={t('market.watchlist')} count={watchlist.length}>
         {watchlist.length === 0 ? (
           <p className="px-3 py-2 text-[12px] leading-relaxed text-muted-foreground">
             {t('market.emptyWatchlistHint')}
@@ -239,8 +249,30 @@ export function MarketSidebar() {
             />
           ))
         )}
+        </MarketSection>
       </div>
     </div>
+  )
+}
+
+function MarketSection({ label, children, initiallyOpen = true, active = false, count }: {
+  label: string
+  children: ReactNode
+  initiallyOpen?: boolean
+  active?: boolean
+  count?: number
+}) {
+  const id = useId()
+  const [open, setOpen] = useState(initiallyOpen)
+  useEffect(() => { if (active) setOpen(true) }, [active])
+  return (
+    <section role="group" aria-label={label} className="mt-2">
+      <SidebarRow label={label} active={active && !open} ariaExpanded={open} ariaControls={id}
+        icon={<ChevronRight className={open ? 'size-3.5 rotate-90' : 'size-3.5'} aria-hidden />}
+        trail={count ? <span className="text-xs tabular-nums text-muted-foreground">{count}</span> : undefined}
+        onClick={() => setOpen((current) => !current)} />
+      <div id={id} hidden={!open}>{children}</div>
+    </section>
   )
 }
 

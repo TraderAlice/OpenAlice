@@ -99,6 +99,19 @@ describe('openOrFocus', () => {
     expect(group.activeTabId).toBe(group.tabIds[1])
   })
 
+  it('keeps news selections in one tab while updating its URL params', () => {
+    const store = useWorkspace.getState()
+    store.openOrFocus({ kind: 'news', params: { category: 'us', view: 'important' } })
+    const newsId = getFocusedGroup(useWorkspace.getState())?.activeTabId
+    store.openOrFocus(tab('AAPL'))
+    store.openOrFocus({ kind: 'news', params: { category: 'macro' } })
+
+    const state = useWorkspace.getState()
+    expect(getFocusedGroup(state)?.tabIds).toHaveLength(2)
+    expect(getFocusedGroup(state)?.activeTabId).toBe(newsId)
+    expect(getFocusedTab(state)?.spec).toEqual({ kind: 'news', params: { category: 'macro' } })
+  })
+
   it('updates Tracked selection without creating another Tracked tab', () => {
     const store = useWorkspace.getState()
     store.openOrFocus({ kind: 'tracked', params: { entity: 'stock-vst' } })

@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/react'
+import { MemoryRouter, useLocation } from 'react-router-dom'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import type { BarSourceCandidate } from '../api/market'
@@ -53,32 +54,30 @@ beforeEach(async () => {
 })
 
 afterEach(cleanup)
+function renderSidebar() {
+  return render(<MemoryRouter initialEntries={['/market']}><MarketSidebar /></MemoryRouter>)
+}
 
 describe('MarketSidebar search keyboard controls', () => {
-  it('groups peer destinations by purpose without nesting boards under News', () => {
-    render(<MarketSidebar />)
-    const markets = screen.getByRole('group', { name: 'Markets' })
-    const macro = screen.getByRole('group', { name: 'Macro' })
-    const news = screen.getByRole('button', { name: 'News' })
-    expect(news.closest('[role="group"]')).toBeNull()
-    expect(screen.getAllByRole('button')[0]).toBe(news)
-    expect(within(markets).getAllByRole('button').map((button) => button.textContent)).toEqual([
-      'Browse Markets', 'Movers', 'Sector Rotation', 'Term Structure',
-    ])
-    expect(within(macro).getAllByRole('button').map((button) => button.textContent)).toEqual([
-      'Calendar', 'Macro', 'Global Macro', 'Fed', 'Shipping',
-    ])
-    for (const group of [markets, macro]) {
-      expect(group.className).not.toContain('border-l')
-      for (const button of within(group).getAllByRole('button')) fireEvent.click(button)
+  it('selects grouped news categories while preserving the view URL param', () => {
+    useWorkspace.getState().openOrFocus({ kind: 'news', params: {} })
+    function Location() {
+      const location = useLocation()
+      return <output aria-label="Current route">{location.pathname + location.search}</output>
     }
-    expect(getFocusedTab(useWorkspace.getState())?.spec).toEqual({
-      kind: 'market-board', params: { board: 'shipping' },
-    })
+    render(<MemoryRouter initialEntries={['/market/news?view=important']}><MarketSidebar /><Location /></MemoryRouter>)
+    const categories = screen.getByRole('navigation', { name: 'News categories' })
+    expect(within(categories).queryByRole('button', { name: 'US Stocks' })).toBeNull()
+    expect(within(categories).queryByRole('button', { name: 'Markets' })).toBeNull()
+    fireEvent.click(within(categories).getByRole('button', { name: 'Equity markets' }))
+    fireEvent.click(within(categories).getByRole('button', { name: 'US Stocks' }))
+    expect(screen.getByLabelText('Current route').textContent).toBe('/market/news?view=important&category=us')
+    fireEvent.click(within(categories).getByRole('button', { name: 'All news' }))
+    expect(screen.getByLabelText('Current route').textContent).toBe('/market/news?view=important')
   })
 
   it('opens the first exact provider when Enter is pressed', () => {
-    render(<MarketSidebar />)
+    renderSidebar()
     const search = screen.getByRole('textbox', { name: 'Search assets…' })
 
     fireEvent.change(search, { target: { value: 'apple' } })
@@ -95,7 +94,7 @@ describe('MarketSidebar search keyboard controls', () => {
   })
 
   it('moves the provider highlight with arrow keys before selecting', () => {
-    const view = render(<MarketSidebar />)
+    const view = renderSidebar()
     const search = screen.getByRole('textbox', { name: 'Search assets…' })
 
     fireEvent.change(search, { target: { value: 'apple' } })
@@ -116,7 +115,7 @@ describe('MarketSidebar search keyboard controls', () => {
   })
 
   it('clears an inline search with Escape', () => {
-    render(<MarketSidebar />)
+    renderSidebar()
     const search = screen.getByRole('textbox', { name: 'Search assets…' })
 
     fireEvent.change(search, { target: { value: 'apple' } })
@@ -130,7 +129,7 @@ describe('MarketSidebar search keyboard controls', () => {
     useWatchlist.setState({
       entries: [{ assetClass: 'equity', symbol: 'AAPL', addedAt: 1 }],
     })
-    render(<MarketSidebar />)
+    renderSidebar()
 
     const remove = screen.getByRole('button', { name: 'Remove AAPL' })
     expect(remove.className).not.toContain('opacity-0')
@@ -141,14 +140,32 @@ describe('MarketSidebar search keyboard controls', () => {
     expect(getFocusedTab(useWorkspace.getState())).toBeNull()
   })
 
-  it('opens News as a Market browse leaf', () => {
-    render(<MarketSidebar />)
-
+  it('opens News through its child without making the group heading navigate', () => {
+    function Location() {
+      const location = useLocation()
+      return <output aria-label="Current route">{location.pathname}</output>
+    }
+    render(<MemoryRouter initialEntries={['/market']}><MarketSidebar /><Location /></MemoryRouter>)
     fireEvent.click(screen.getByRole('button', { name: 'News' }))
+    expect(screen.getByLabelText('Current route').textContent).toBe('/market')
+    fireEvent.click(screen.getByRole('button', { name: 'All news' }))
+    expect(screen.getByLabelText('Current route').textContent).toBe('/market/news')
+  })
 
-    expect(getFocusedTab(useWorkspace.getState())?.spec).toEqual({
-      kind: 'news',
-      params: {},
-    })
+  it('folds each market directory independently without changing the active view', () => {
+    useWorkspace.getState().openOrFocus({ kind: 'news', params: {} })
+    renderSidebar()
+    const active = getFocusedTab(useWorkspace.getState())
+    for (const label of ['News', 'Markets', 'Macro', 'Watchlist']) {
+      const group = screen.getByRole('group', { name: label })
+      const heading = within(group).getAllByRole('button')[0]
+      expect(heading.getAttribute('aria-expanded')).toBe('true')
+      fireEvent.click(heading)
+      expect(heading.getAttribute('aria-expanded')).toBe('false')
+      expect(within(group).getAllByRole('button')).toEqual([heading])
+      expect(getFocusedTab(useWorkspace.getState())).toBe(active)
+      fireEvent.keyDown(heading, { key: 'Enter' })
+      expect(heading.getAttribute('aria-expanded')).toBe('true')
+    }
   })
 })

@@ -76,7 +76,7 @@ export function UrlAdopter() {
         <Route path="/news" element={<Navigate to="/market/news" replace />} />
         <Route path="/market" element={<AdoptTraderStatic spec={{ kind: 'market-list', params: {} }} />} />
         <Route path="/market/rotation" element={<AdoptTraderStatic spec={{ kind: 'market-rotation', params: {} }} />} />
-        <Route path="/market/news" element={<AdoptTraderStatic spec={{ kind: 'news', params: {} }} />} />
+        <Route path="/market/news" element={<AdoptNewsSelection />} />
         {/* Static `boards` segment outranks /market/:assetClass/:symbol in
             react-router's specificity scoring, so order here doesn't matter —
             but keep it above the dynamic route for readability. */}
@@ -245,6 +245,13 @@ function AdoptIssueDetail() {
   const { wsId, id } = useParams<{ wsId: string; id: string }>()
   if (!wsId || !id) return <Navigate to="/issues" replace />
   return <AdoptStatic spec={{ kind: 'issue-detail', params: { wsId, id } }} />
+}
+
+function AdoptNewsSelection() {
+  const [search] = useSearchParams()
+  const category = search.get('category') || undefined
+  const view = search.get('view') || undefined
+  return <AdoptTraderStatic spec={{ kind: 'news', params: { ...(category ? { category } : {}), ...(view ? { view } : {}) } }} />
 }
 
 function AdoptTracked() {
