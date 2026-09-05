@@ -15,7 +15,7 @@ RUN corepack enable \
 FROM debian:bookworm-slim
 
 RUN DEBIAN_FRONTEND=noninteractive apt-get update \
-  && apt-get install -y --no-install-recommends bash ca-certificates curl openssh-server python3 \
+  && apt-get install -y --no-install-recommends bash ca-certificates curl git openssh-server python3 \
   && rm -rf /var/lib/apt/lists/* \
   && useradd --create-home --shell /bin/bash --uid 10001 smoke \
   && passwd --delete smoke \
