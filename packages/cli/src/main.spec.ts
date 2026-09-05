@@ -9,10 +9,10 @@ describe('OpenAlice TypeScript application entry', () => {
     expect(calls).toEqual(['setup', 'tui'])
   })
 
-  it('does not start after declined or failed dependency setup', async () => {
+  it.each([{ argv: [] }, { argv: ['tui'] }, { argv: ['--home', '/tmp/alice'] }])('keeps the remote-capable TUI accessible after unfinished setup ($argv)', async ({ argv }) => {
     const runTui = vi.fn(async () => 0)
-    expect(await main([], { standalone: true, runSetup: async () => 1, runTui })).toBe(1)
-    expect(runTui).not.toHaveBeenCalled()
+    expect(await main(argv, { standalone: true, runSetup: async () => 1, runTui })).toBe(0)
+    expect(runTui).toHaveBeenCalled()
   })
 
   it.each(['status', 'down', 'version', 'doctor', 'setup', 'completion', 'remote', 'ssh'])('does not gate %s on local dependencies', async command => {

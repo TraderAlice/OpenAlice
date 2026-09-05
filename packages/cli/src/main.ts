@@ -44,19 +44,18 @@ Options:
       return 0
     }
     const flags = parseTuiLaunchArgs(args)
-    const setupCode = await setup()
-    if (setupCode !== 0) return setupCode
+    // Setup is offered here, but the TUI also manages remote Runtimes.
+    // Only local process startup requires local Git/Bash to be ready.
+    await setup()
     return (dependencies.runTui ?? runSupervisorTui)(flags)
   }
   if (command === undefined) {
-    const setupCode = await setup()
-    if (setupCode !== 0) return setupCode
+    await setup()
     return (dependencies.runTui ?? runSupervisorTui)({})
   }
   if (command.startsWith('-') && !['--help', '-h', '--version'].includes(command)) {
     const flags = parseTuiLaunchArgs(argv)
-    const setupCode = await setup()
-    if (setupCode !== 0) return setupCode
+    await setup()
     return (dependencies.runTui ?? runSupervisorTui)(flags)
   }
   if (['up', 'run', 'start'].includes(command) && !args.includes('--help') && !args.includes('-h')) {

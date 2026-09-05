@@ -129,6 +129,15 @@ Git files; x64 tar inspection also found no hard-link entries. Native Windows
 execution remains unverified. The local Docker installer system suite passed.
 These are local candidates, not registry uploads or replacements for 0.91.0.
 
+Draft delivery: https://github.com/TraderAlice/OpenAlice/pull/1365 targets dev
+and remains unmerged. Updated full regression passed 719 files / 6,416 tests
+(3 skipped). A subsequent remote-only boundary correction no longer blocks TUI
+entry when setup is declined/unfinished; local startup still rejects missing
+dependencies. Verified the newly compiled CLI in a real PTY with Git/Bash absent:
+Supervisor rendered and detached normally, while `up --json` returned missing
+dependency diagnostics and exit 1. The 31 entry/environment tests and CLI
+typecheck pass. Native Windows and remaining manager acceptance are still open.
+
 - [ ] Inventory CLI Git/Bash consumers, installer entry points, package-manager
   declarations, and runtime PATH injection; keep Electron ownership explicit.
 - [x] Implement shared executable detection and installation planning: reuse
