@@ -30,6 +30,20 @@ describe('OpenAlice TypeScript application entry', () => {
     expect(runCommand).not.toHaveBeenCalled()
   })
 
+  it.each(['start', 'run'])('continues installation for compatibility server %s', async action => {
+    const runSetup = vi.fn(async () => 1)
+    const runCommand = vi.fn(async () => 0)
+    expect(await main(['server', action], { standalone: true, runSetup, runCommand })).toBe(1)
+    expect(runSetup).toHaveBeenCalledOnce()
+    expect(runCommand).not.toHaveBeenCalled()
+  })
+
+  it.each(['status', 'stop', 'help'])('does not gate compatibility server %s', async action => {
+    const runSetup = vi.fn(async () => 1)
+    expect(await main(['server', action], { standalone: true, runSetup, runCommand: async () => 0 })).toBe(0)
+    expect(runSetup).not.toHaveBeenCalled()
+  })
+
   it('does not run setup for startup help', async () => {
     const runSetup = vi.fn(async () => 1)
     await main(['up', '--help'], { standalone: true, runSetup, runCommand: async () => 0 })

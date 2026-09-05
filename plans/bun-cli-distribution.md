@@ -167,6 +167,12 @@ passed, and removal completed. Receipt:
 `/tmp/openalice-aur-dependency-acceptance.log`. This verifies local AUR package
 mechanics, not public AUR registration, paru discovery, or registry publication.
 
+Compatibility startup audit: `server start/run` now offers the same setup as
+`up/run/start`; server status/stop/help remain ungated. The 31 entry/server tests
+and CLI typecheck pass. Native Windows acceptance will use the existing isolated
+Windows CLI Preview manual workflow on this feature branch, with channel build
+and native acceptance enabled. It does not publish a release or npm packages.
+
 - [ ] Inventory CLI Git/Bash consumers, installer entry points, package-manager
   declarations, and runtime PATH injection; keep Electron ownership explicit.
 - [x] Implement shared executable detection and installation planning: reuse

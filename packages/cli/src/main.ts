@@ -58,7 +58,9 @@ Options:
     await setup()
     return (dependencies.runTui ?? runSupervisorTui)(flags)
   }
-  if (['up', 'run', 'start'].includes(command) && !args.includes('--help') && !args.includes('-h')) {
+  const startsLocalRuntime = ['up', 'run', 'start'].includes(command)
+    || (command === 'server' && ['start', 'run'].includes(args[0] ?? ''))
+  if (startsLocalRuntime && !args.includes('--help') && !args.includes('-h')) {
     const setupCode = await setup()
     if (setupCode !== 0) return setupCode
   }
