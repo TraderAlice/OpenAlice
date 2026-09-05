@@ -235,7 +235,7 @@ function homebrewTargetBlock(version, target, assetBaseUrl) {
 `
 }
 
-function buildAurPackage({ outputRoot, version, releasedAt, targets, assetBaseUrl }) {
+export function buildAurPackage({ outputRoot, version, releasedAt, targets, assetBaseUrl }) {
   const aurRoot = join(outputRoot, 'aur')
   mkdirSync(aurRoot, { recursive: true })
   const linuxArm = requireTarget(targets, 'linux', 'arm64')

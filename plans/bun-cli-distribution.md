@@ -157,6 +157,16 @@ full release generation still requires its complete target set. Linux x64
 build/runtime smoke is now running under local amd64 container emulation,
 with output in `/tmp/openalice-linux-x64-native-build.log`; not yet accepted.
 
+Linux x64 build/runtime smoke subsequently passed under local amd64 container
+emulation (not a physical x64 host), with Git/template/CLI/PTY checks and receipt
+`/tmp/openalice-linux-dependencies.HToP9a/x64-release/report.json`. Both real Linux
+archives then fed the exported production AUR generator. In the pinned native
+ARM64 Arch-family container, makepkg built the package, pacman resolved and
+installed its Git dependency, setup reported ready, Runtime start/status/stop
+passed, and removal completed. Receipt:
+`/tmp/openalice-aur-dependency-acceptance.log`. This verifies local AUR package
+mechanics, not public AUR registration, paru discovery, or registry publication.
+
 - [ ] Inventory CLI Git/Bash consumers, installer entry points, package-manager
   declarations, and runtime PATH injection; keep Electron ownership explicit.
 - [x] Implement shared executable detection and installation planning: reuse

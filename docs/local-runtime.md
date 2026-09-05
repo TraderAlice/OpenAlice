@@ -167,12 +167,13 @@ See [[docs/data-locations.md]] and [[docs/alice-project.md]].
 
 The native Runtime acceptance must prove:
 
-- execution outside a checkout with system Node, npm, Bun, and Git absent;
+- execution outside a checkout without system Node/npm/Bun on PATH, using
+  detected system Git/Bash rather than release-owned tool binaries;
 - distinct Guardian/Alice/UTA/Connector and Agent Session PIDs;
 - persistent `up`, detach, `status`, `open`, `down`, and restart behavior;
 - multiple independent Agent PTYs with input, resize, backpressure, and
   isolated termination;
-- real Web UI, defaults, templates, Workspace helpers, and portable Git;
+- real Web UI, defaults, templates, Workspace helpers, and system Git operations;
 - an external Agent Runtime-shaped process through its normal adapter without
   changing its config or version; the optional real-runtime smoke exercises
   OpenCode only when `OPENALICE_BUN_REAL_OPENCODE_PATH` explicitly selects its
