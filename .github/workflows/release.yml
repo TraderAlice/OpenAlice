@@ -15,6 +15,7 @@ on:
           - verify-npm
           - verify-desktop
           - benchmark-cli
+          - rehearse-desktop
       tag:
         description: Required except for verify-npm; for example v0.91.0 or v0.91.0-beta.1.
         required: false
@@ -46,10 +47,34 @@ on:
           - Windows-x64
 
 concurrency:
-  group: ${{ inputs.operation == 'benchmark-cli' && format('cli-benchmark-{0}', github.ref) || inputs.operation == 'verify-desktop' && format('desktop-replay-{0}-{1}', inputs.candidate-run, inputs.desktop-target) || 'openalice-release-publication' }}
+  group: ${{ inputs.operation == 'rehearse-desktop' && format('desktop-rehearsal-{0}', github.ref) || inputs.operation == 'benchmark-cli' && format('cli-benchmark-{0}', github.ref) || inputs.operation == 'verify-desktop' && format('desktop-replay-{0}-{1}', inputs.candidate-run, inputs.desktop-target) || 'openalice-release-publication' }}
   cancel-in-progress: false
 
 jobs:
+  rehearse-desktop:
+    if: inputs.operation == 'rehearse-desktop'
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-14
+            arch: arm64
+          - os: macos-15-intel
+            arch: x64
+          - os: windows-latest
+            arch: x64
+    uses: ./.github/workflows/release-desktop-platform.yml
+    permissions:
+      contents: read
+      actions: read
+    with:
+      os: ${{ matrix.os }}
+      arch: ${{ matrix.arch }}
+      channel: stable
+      previous-tag: ${{ inputs.previous-tag }}
+      candidate-run: ${{ inputs.candidate-run }}
+      rehearsal: true
+
   benchmark-cli:
     if: inputs.operation == 'benchmark-cli'
     uses: ./.github/workflows/release-cli-benchmark.yml

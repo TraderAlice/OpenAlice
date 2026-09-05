@@ -15,6 +15,19 @@ function fixture() {
 }
 
 describe('trusted release candidate selection', () => {
+  it('isolates explicitly selected rehearsal artifacts from release selection', () => {
+    const input = fixture()
+    input.rehearsalBranch = 'codex/release-pipeline-efficiency'
+    input.run.head_branch = input.rehearsalBranch
+    input.artifacts[0].workflow_run.head_branch = input.rehearsalBranch
+    input.artifacts[0].name = 'rehearsal-assets-macOS-arm64'
+    expect(selectReleaseCandidate(input).artifactId).toBe(456)
+    delete input.rehearsalBranch
+    expect(() => selectReleaseCandidate(input)).toThrow()
+    input.run.head_branch = 'master'
+    input.artifacts[0].workflow_run.head_branch = 'master'
+    expect(() => selectReleaseCandidate(input)).toThrow('Expected exactly one candidate')
+  })
   it('selects preserved bytes even when a later acceptance job failed', () => {
     expect(selectReleaseCandidate(fixture())).toEqual({ runId: 123, sourceSha: 'a'.repeat(40),
       target: 'macOS-arm64', artifactId: 456, artifactName: 'release-assets-macOS-arm64' })

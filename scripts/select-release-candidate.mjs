@@ -8,19 +8,20 @@ const TARGETS = new Set(['macOS-arm64', 'macOS-x64', 'Windows-x64'])
 
 // GitHub authenticates the producing run. The downloaded manifest subsequently
 // binds this source/target to exact candidate bytes; neither check replaces the other.
-export function selectReleaseCandidate({ run, artifacts, runId, sourceSha, target, now = Date.now() }) {
+export function selectReleaseCandidate({ run, artifacts, runId, sourceSha, target, rehearsalBranch, now = Date.now() }) {
+  const branch = rehearsalBranch || 'master'
   if (!Number.isSafeInteger(runId) || runId <= 0 || !/^[a-f0-9]{40}$/.test(sourceSha ?? '')
     || !TARGETS.has(target) || !Number.isFinite(now)) throw new Error('Invalid candidate selection')
   if (run?.id !== runId || run.repository?.full_name !== REPOSITORY
     || !Number.isSafeInteger(run.repository?.id) || run.repository.id <= 0
     || run.head_repository?.full_name !== REPOSITORY
     || run.path !== '.github/workflows/release.yml'
-    || run.event !== 'workflow_dispatch' || run.head_branch !== 'master'
+    || run.event !== 'workflow_dispatch' || run.head_branch !== branch
     || run.head_sha !== sourceSha || run.status !== 'completed'
     || !['success', 'failure', 'cancelled', 'timed_out'].includes(run.conclusion)) {
     throw new Error('Candidate must come from the selected completed master Release run')
   }
-  const name = `release-assets-${target}`
+  const name = `${rehearsalBranch ? 'rehearsal' : 'release'}-assets-${target}`
   const matches = artifacts.filter((artifact) => artifact.name === name)
   if (matches.length !== 1) throw new Error(`Expected exactly one candidate artifact: ${name}`)
   const artifact = matches[0]
@@ -28,7 +29,7 @@ export function selectReleaseCandidate({ run, artifacts, runId, sourceSha, targe
   if (!Number.isSafeInteger(artifact.id) || artifact.id <= 0 || artifact.expired !== false
     || !Number.isFinite(expiry) || expiry <= now
     || artifact.workflow_run?.id !== runId || artifact.workflow_run.head_sha !== sourceSha
-    || artifact.workflow_run.head_branch !== 'master'
+    || artifact.workflow_run.head_branch !== branch
     || artifact.workflow_run.repository_id !== run.repository.id
     || artifact.workflow_run.head_repository_id !== run.repository.id) {
     throw new Error('Candidate artifact is expired or belongs to another source/run')
@@ -40,7 +41,7 @@ function github(path) {
   return JSON.parse(execFileSync('gh', ['api', path], { encoding: 'utf8' }))
 }
 
-export function selectFromGitHub({ runId, sourceSha, target }) {
+export function selectFromGitHub({ runId, sourceSha, target, rehearsalBranch }) {
   const run = github(`repos/${REPOSITORY}/actions/runs/${runId}`)
   const artifacts = []
   for (let page = 1; ; page++) {
@@ -49,7 +50,7 @@ export function selectFromGitHub({ runId, sourceSha, target }) {
     if (artifacts.length >= response.total_count) break
     if (response.artifacts.length === 0) throw new Error('Incomplete artifact listing')
   }
-  return selectReleaseCandidate({ run, artifacts, runId, sourceSha, target })
+  return selectReleaseCandidate({ run, artifacts, runId, sourceSha, target, rehearsalBranch })
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {
@@ -58,7 +59,8 @@ if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1]
     if (process.argv.length !== 5 || !/^[1-9][0-9]*$/.test(id ?? '')) {
       throw new Error('Usage: select-release-candidate.mjs <run-id> <source-sha> <macOS-arm64|macOS-x64|Windows-x64>')
     }
-    const result = selectFromGitHub({ runId: Number(id), sourceSha, target })
+    const result = selectFromGitHub({ runId: Number(id), sourceSha, target,
+      rehearsalBranch: process.env.CANDIDATE_REHEARSAL_BRANCH })
     if (process.env.GITHUB_OUTPUT) {
       appendFileSync(process.env.GITHUB_OUTPUT, `artifact-id=${result.artifactId}\nsource-sha=${result.sourceSha}\n`)
     }

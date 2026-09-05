@@ -121,7 +121,7 @@ describe('Release workflow critical path', () => {
       operation: {
         required: true,
         type: 'choice',
-        options: ['release', 'mirror', 'publish-npm', 'verify-npm', 'verify-desktop', 'benchmark-cli'],
+        options: ['release', 'mirror', 'publish-npm', 'verify-npm', 'verify-desktop', 'benchmark-cli', 'rehearse-desktop'],
       },
       tag: {
         required: false,
@@ -134,7 +134,7 @@ describe('Release workflow critical path', () => {
       },
     })
     expect(workflow.concurrency).toEqual({
-      group: "${{ inputs.operation == 'benchmark-cli' && format('cli-benchmark-{0}', github.ref) || inputs.operation == 'verify-desktop' && format('desktop-replay-{0}-{1}', inputs.candidate-run, inputs.desktop-target) || 'openalice-release-publication' }}",
+      group: "${{ inputs.operation == 'rehearse-desktop' && format('desktop-rehearsal-{0}', github.ref) || inputs.operation == 'benchmark-cli' && format('cli-benchmark-{0}', github.ref) || inputs.operation == 'verify-desktop' && format('desktop-replay-{0}-{1}', inputs.candidate-run, inputs.desktop-target) || 'openalice-release-publication' }}",
       'cancel-in-progress': false,
     })
 
@@ -320,7 +320,7 @@ describe('Release workflow critical path', () => {
       { os: 'macos-15-intel', arch: 'x64' },
       { os: 'windows-latest', arch: 'x64' },
     ])
-    expect(step(desktop, 'Package macOS installer').if).toBe("runner.os == 'macOS'")
+    expect(step(desktop, 'Package macOS installer').if).toBe("runner.os == 'macOS' && !inputs.rehearsal")
     expect(step(desktop, 'Prove release candidate Workspace CLI acceptance').if).toBeUndefined()
     expect(step(desktop, 'Verify candidate update metadata and referenced bytes').if).toBeUndefined()
     const boot = step(nativeCli, 'Install and boot the native candidate outside the checkout').run ?? ''
@@ -357,6 +357,20 @@ describe('Release workflow critical path', () => {
     ]) {
       expect(step(publication, name).with?.files).toContain('dist/release-cli/*.tar.gz.sha256')
     }
+  })
+
+  it('keeps unsigned rehearsal artifacts and authority separate from publication', () => {
+    const rehearsal = workflow.jobs['rehearse-desktop']
+    expect(rehearsal.if).toBe("inputs.operation == 'rehearse-desktop'")
+    expect(rehearsal.uses).toBe(workflow.jobs['build-desktop'].uses)
+    expect(rehearsal.with?.rehearsal).toBe(true)
+    expect(workflow.jobs['build-desktop'].with?.rehearsal).toBeUndefined()
+    expect(rehearsal.permissions).toEqual({ contents: 'read', actions: 'read' })
+    expect(Object.keys(rehearsal)).not.toContain('secrets')
+    expect(step(desktopWorkflow.jobs.build, 'Write Apple notarization API key').if).toContain('!inputs.rehearsal')
+    expect(step(desktopWorkflow.jobs.build, 'Package unsigned macOS rehearsal').run).toContain('-c.mac.notarize=false')
+    expect(step(desktopWorkflow.jobs.build, 'Preserve desktop release candidate').with?.name)
+      .toBe("${{ inputs.rehearsal && 'rehearsal' || 'release' }}-assets-${{ runner.os }}-${{ inputs.arch }}")
   })
 
   it('reuses same-source desktop bytes through the normal final publication gate', () => {

@@ -196,6 +196,14 @@ beta-to-stable promotion; installing a permanent runner on the user's daily Mac.
   Actions semantics/native-host evidence unavailable locally. A routine rehearsal
   uses unsigned candidates and no signing credentials. Report signing risk as
   residual unless a specifically authorized signing rehearsal is needed.
+  `operation=rehearse-desktop` now calls the production platform pipelines for
+  all three hosts, with explicit unsigned Mac packaging and no passed signing
+  secrets. Rehearsal artifacts have a separate name prefix and may only be
+  restored through the explicitly selected rehearsal branch; ordinary release
+  selection rejects them. The next two runs will build/accept real candidates
+  and then restore/accept those same bytes on the unchanged commit, measuring
+  dependency ordering and build work avoided. Forty-three focused workflow and
+  selection tests pass; positive hosted results are not yet available.
 - [ ] Update owner guides and applicable release skill instructions to match
   the implemented operation and acceptance boundaries; remove stale serial rules.
 - [ ] Record measured timings separately from estimates, inspect latest PR
