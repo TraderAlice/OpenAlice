@@ -72,6 +72,9 @@ restore shows a spinner and rejects repeated clicks; failures stay on the row
 and allow retry. Headless occupancy still opens the single-writer explanation.
 The primary row has no separate play/stop target; settings, stop and archive live
 in its options menu. Direct links and history browsers retain view-only opening.
+In expanded navigation, a selected Session does not also select its Harness
+header. The compact rail retains the Harness selection because Session rows
+are hidden there; returning to the Harness landing selects its header.
 Quant/Prediction retain their explicit default
 Workspace readiness gates before exposing sessions and Studio. The navigation
 distinguishes setup, existing-Workspace selection, loading, and
