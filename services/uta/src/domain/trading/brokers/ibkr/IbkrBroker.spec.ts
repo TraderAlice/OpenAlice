@@ -46,10 +46,12 @@ function brokerWithContractIo(resolvedContract = usdChfContract()): {
     requestSnapshot: ReturnType<typeof vi.fn>
     requestCurrentTime: ReturnType<typeof vi.fn>
     getNextOrderId: ReturnType<typeof vi.fn>
+    lastInboundAt: number
     requestOrder: ReturnType<typeof vi.fn>
     markDead: ReturnType<typeof vi.fn>
   }
   client: {
+    isConnected: ReturnType<typeof vi.fn>
     reqContractDetails: ReturnType<typeof vi.fn>
     reqMktData: ReturnType<typeof vi.fn>
     placeOrder: ReturnType<typeof vi.fn>
@@ -70,8 +72,10 @@ function brokerWithContractIo(resolvedContract = usdChfContract()): {
       orderState: { status: accepts && !accepts('Submitted') ? 'Cancelled' : 'Submitted' },
     })),
     markDead: vi.fn(),
+    lastInboundAt: 0,
   }
   const client = {
+    isConnected: vi.fn(() => true),
     reqContractDetails: vi.fn(),
     reqMktData: vi.fn(),
     placeOrder: vi.fn(),
@@ -676,5 +680,112 @@ describe('IbkrBroker — dead-connection gate (issue #294)', () => {
     expect(bridge.requestCurrentTime).toHaveBeenCalledTimes(2)
     expect(client.placeOrder).toHaveBeenCalledOnce()
     expect(client.cancelOrder).toHaveBeenCalledOnce()
+  })
+})
+
+describe('IbkrBroker — liveness policy', () => {
+  it('retries a missed write probe once before failing the write', async () => {
+    const { broker, bridge, client } = brokerWithContractIo(recordedContract('aapl-stock'))
+    bridge.requestCurrentTime
+      .mockRejectedValueOnce(new Error('currentTime request timed out after 10000ms'))
+      .mockResolvedValueOnce(1_784_289_600)
+    const { contract, order } = stkOrder()
+
+    await expect(broker.placeOrder(contract, order)).resolves.toMatchObject({ success: true })
+
+    expect(bridge.requestCurrentTime).toHaveBeenCalledTimes(2)
+    expect(bridge.markDead).not.toHaveBeenCalled()
+    expect(client.placeOrder).toHaveBeenCalledOnce()
+  })
+
+  it('carries the underlying probe error into the refusal and the markDead reason', async () => {
+    const { broker, bridge } = brokerWithContractIo(recordedContract('aapl-stock'))
+    bridge.requestCurrentTime.mockRejectedValue(
+      new Error('currentTime request timed out after 10000ms'),
+    )
+    const { contract, order } = stkOrder()
+
+    const result = await broker.placeOrder(contract, order)
+
+    expect(result.error).toContain('currentTime request timed out after 10000ms')
+    expect(bridge.markDead).toHaveBeenCalledOnce()
+    expect(bridge.markDead.mock.calls[0][0]).toContain('currentTime request timed out after 10000ms')
+  })
+
+  it('reports the socket verdict when the transport itself is down', async () => {
+    const { broker, bridge, client } = brokerWithContractIo(recordedContract('aapl-stock'))
+    client.isConnected.mockReturnValue(false)
+    bridge.requestCurrentTime.mockRejectedValue(new Error('currentTime request timed out after 10000ms'))
+    const { contract, order } = stkOrder()
+
+    const result = await broker.placeOrder(contract, order)
+
+    expect(result.error).toMatch(/socket reported not connected/)
+    expect(bridge.markDead.mock.calls[0][0]).toMatch(/socket reported not connected/)
+  })
+
+  it('only marks the connection dead after two consecutive heartbeat misses', async () => {
+    vi.useFakeTimers()
+    try {
+      const { broker, bridge } = brokerWithContractIo(recordedContract('aapl-stock'))
+      bridge.requestCurrentTime.mockRejectedValue(
+        new Error('currentTime request timed out after 15000ms'),
+      )
+      ;(broker as unknown as { startHeartbeat(): void }).startHeartbeat()
+
+      await vi.advanceTimersByTimeAsync(45_000)
+      expect(bridge.markDead).not.toHaveBeenCalled()
+
+      await vi.advanceTimersByTimeAsync(45_000)
+      expect(bridge.markDead).toHaveBeenCalledOnce()
+      expect(bridge.markDead.mock.calls[0][0]).toContain('currentTime request timed out after 15000ms')
+
+      ;(broker as unknown as { stopHeartbeat(): void }).stopHeartbeat()
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('does not count a slow probe as a miss while inbound traffic continues', async () => {
+    vi.useFakeTimers()
+    try {
+      const { broker, bridge } = brokerWithContractIo(recordedContract('aapl-stock'))
+      bridge.requestCurrentTime.mockImplementation(() => {
+        bridge.lastInboundAt = Date.now() + 1
+        return Promise.reject(new Error('currentTime request timed out after 15000ms'))
+      })
+      ;(broker as unknown as { startHeartbeat(): void }).startHeartbeat()
+
+      await vi.advanceTimersByTimeAsync(45_000 * 3)
+      expect(bridge.markDead).not.toHaveBeenCalled()
+
+      // The exemption is bounded: account pushes on a half-open socket must
+      // not hide a silent request/reply path forever (issue #294).
+      await vi.advanceTimersByTimeAsync(45_000 * 2)
+      expect(bridge.markDead).toHaveBeenCalledOnce()
+
+      ;(broker as unknown as { stopHeartbeat(): void }).stopHeartbeat()
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('resets the miss counter after a successful probe', async () => {
+    vi.useFakeTimers()
+    try {
+      const { broker, bridge } = brokerWithContractIo(recordedContract('aapl-stock'))
+      bridge.requestCurrentTime
+        .mockRejectedValueOnce(new Error('probe miss'))
+        .mockResolvedValueOnce(1_784_289_600)
+        .mockRejectedValueOnce(new Error('probe miss'))
+      ;(broker as unknown as { startHeartbeat(): void }).startHeartbeat()
+
+      await vi.advanceTimersByTimeAsync(45_000 * 3)
+      expect(bridge.markDead).not.toHaveBeenCalled()
+
+      ;(broker as unknown as { stopHeartbeat(): void }).stopHeartbeat()
+    } finally {
+      vi.useRealTimers()
+    }
   })
 })

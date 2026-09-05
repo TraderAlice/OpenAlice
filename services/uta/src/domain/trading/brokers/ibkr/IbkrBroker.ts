@@ -47,7 +47,16 @@ import { resolveSymbol } from './ibkr-contracts.js'
 import { applyStandaloneOcaType, buildIbkrBracket, refuseBracketOcaGroup } from './ibkr-bracket.js'
 import type { IbkrBrokerConfig } from './ibkr-types.js'
 
-const WRITE_LIVENESS_TIMEOUT_MS = 3_000
+// IB Gateway can defer a currentTime reply well past a second under its own
+// load, so the probe is a coarse failure detector, not a latency assertion.
+const WRITE_LIVENESS_TIMEOUT_MS = 10_000
+const HEARTBEAT_INTERVAL_MS = 45_000
+const HEARTBEAT_PROBE_TIMEOUT_MS = 15_000
+const HEARTBEAT_MISS_THRESHOLD = 2
+// Inbound account pushes prove the socket still delivers, not that it still
+// accepts, so the exemption is bounded or a half-open socket hides forever
+// (issue #294).
+const HEARTBEAT_INBOUND_EXEMPTION_LIMIT = 3
 const OPTION_MARK_SUCCESS_TTL_MS = 15_000
 const OPTION_MARK_FAILURE_TTL_MS = 60_000
 const OPTION_MARK_CONCURRENCY = 8
@@ -140,6 +149,12 @@ export class IbkrBroker implements IBroker {
   /** Periodic socket probe — see _ensureAlive / issue #294. */
   private heartbeatTimer_: ReturnType<typeof setInterval> | null = null
 
+  /** Consecutive probe misses with no inbound traffic. Reset by any success. */
+  private heartbeatMisses_ = 0
+
+  /** Consecutive probe misses forgiven because inbound traffic continued. */
+  private heartbeatExemptions_ = 0
+
   /** Loud-refuse on a known-dead connection. The account surface is
    *  cache-backed, so without this gate a dead socket serves stale reads
    *  and accepts orders that never transmit (issue #294). */
@@ -157,13 +172,33 @@ export class IbkrBroker implements IBroker {
     this._ensureAlive()
     try {
       await this.bridge.requestCurrentTime(WRITE_LIVENESS_TIMEOUT_MS)
+      this.heartbeatMisses_ = 0
+      this.heartbeatExemptions_ = 0
       this._ensureAlive()
-    } catch (err) {
-      this.bridge.markDead('Write-path liveness probe failed')
-      throw new BrokerError(
-        'NETWORK',
-        `TWS/Gateway write-path liveness check failed; order was not transmitted: ${err instanceof Error ? err.message : String(err)}`,
-      )
+      return
+    } catch (firstErr) {
+      // One missed reply is not proof of a dead socket, so re-probe once and
+      // report the socket's own verdict alongside the probe error.
+      const socketHealthy = this.client.isConnected?.() ?? true
+      try {
+        await this.bridge.requestCurrentTime(WRITE_LIVENESS_TIMEOUT_MS)
+        this.heartbeatMisses_ = 0
+        this.heartbeatExemptions_ = 0
+        this._ensureAlive()
+        return
+      } catch (retryErr) {
+        const socketStillHealthy = socketHealthy && (this.client.isConnected?.() ?? true)
+        const cause = retryErr instanceof Error ? retryErr.message : String(retryErr)
+        const first = firstErr instanceof Error ? firstErr.message : String(firstErr)
+        const detail = socketStillHealthy
+          ? `2 consecutive misses (${first}; ${cause})`
+          : `socket reported not connected (${cause})`
+        this.bridge.markDead(`Write-path liveness probe failed: ${detail}`)
+        throw new BrokerError(
+          'NETWORK',
+          `TWS/Gateway write-path liveness check failed; order was not transmitted: ${detail}`,
+        )
+      }
     }
   }
 
@@ -173,13 +208,36 @@ export class IbkrBroker implements IBroker {
 
   private startHeartbeat(): void {
     if (this.heartbeatTimer_) clearInterval(this.heartbeatTimer_)
+    this.heartbeatMisses_ = 0
+    this.heartbeatExemptions_ = 0
     this.heartbeatTimer_ = setInterval(() => {
       if (this.bridge.connectionDead) return
-      this.bridge.requestCurrentTime(5000).catch(() => {
-        console.warn(`IbkrBroker[${this.id}]: heartbeat failed — marking connection dead`)
-        this.bridge.markDead('TWS/Gateway heartbeat timed out')
-      })
-    }, 45_000)
+      const startedAt = Date.now()
+      this.bridge.requestCurrentTime(HEARTBEAT_PROBE_TIMEOUT_MS).then(
+        () => { this.heartbeatMisses_ = 0; this.heartbeatExemptions_ = 0 },
+        (err: unknown) => {
+          const cause = err instanceof Error ? err.message : String(err)
+          // Inbound traffic during the probe window proves the socket still
+          // carries data, but only until the exemptions run out.
+          if ((this.bridge.lastInboundAt ?? 0) > startedAt
+            && this.heartbeatExemptions_ < HEARTBEAT_INBOUND_EXEMPTION_LIMIT) {
+            this.heartbeatExemptions_++
+            this.heartbeatMisses_ = 0
+            console.warn(`IbkrBroker[${this.id}]: heartbeat probe missed but inbound traffic continued (${this.heartbeatExemptions_}/${HEARTBEAT_INBOUND_EXEMPTION_LIMIT}): ${cause}`)
+            return
+          }
+          this.heartbeatMisses_++
+          if (this.heartbeatMisses_ < HEARTBEAT_MISS_THRESHOLD) {
+            console.warn(`IbkrBroker[${this.id}]: heartbeat miss ${this.heartbeatMisses_}/${HEARTBEAT_MISS_THRESHOLD}: ${cause}`)
+            return
+          }
+          console.warn(`IbkrBroker[${this.id}]: heartbeat failed ${this.heartbeatMisses_} times — marking connection dead: ${cause}`)
+          this.heartbeatMisses_ = 0
+          this.heartbeatExemptions_ = 0
+          this.bridge.markDead(`TWS/Gateway heartbeat timed out (${HEARTBEAT_MISS_THRESHOLD} consecutive misses): ${cause}`)
+        },
+      )
+    }, HEARTBEAT_INTERVAL_MS)
     // Don't hold the process open for the probe
     this.heartbeatTimer_.unref?.()
   }
@@ -227,8 +285,14 @@ export class IbkrBroker implements IBroker {
     }
   }
 
-  async close(): Promise<void> {
+  private stopHeartbeat(): void {
     if (this.heartbeatTimer_) { clearInterval(this.heartbeatTimer_); this.heartbeatTimer_ = null }
+    this.heartbeatMisses_ = 0
+    this.heartbeatExemptions_ = 0
+  }
+
+  async close(): Promise<void> {
+    this.stopHeartbeat()
     this.bridge.stopAccountSubscription()
     this.client.disconnect()
   }
