@@ -376,6 +376,30 @@ body {
 }
 
 @media (hover: hover) and (pointer: fine) {
+  /* Keep actions keyboard-reachable; focus reveals them before activation. */
+  .oa-application-menu-more {
+    opacity: 0;
+    transition: opacity var(--motion-fast);
+  }
+
+  .oa-application-menu:hover .oa-application-menu-more,
+  .oa-application-menu:focus-visible .oa-application-menu-more,
+  .oa-application-menu[aria-expanded="true"] .oa-application-menu-more {
+    opacity: 1;
+  }
+
+  .oa-harness-nav-actions {
+    opacity: 0;
+    pointer-events: none;
+  }
+
+  .oa-harness-nav-header:hover .oa-harness-nav-actions,
+  .oa-harness-nav-header:focus-within .oa-harness-nav-actions,
+  .oa-harness-nav-actions:has([aria-expanded="true"]) {
+    opacity: 1;
+    pointer-events: auto;
+  }
+
   .oa-session-overflow-action {
     position: absolute;
     inset-inline-end: 0.5rem;

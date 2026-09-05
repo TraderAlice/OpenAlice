@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { cleanup, render, screen } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import type { SessionRecord } from './api'
@@ -27,6 +27,29 @@ function record(runtime?: SessionRecord['runtime']): SessionRecord {
 afterEach(cleanup)
 
 describe('ResumeCta runtime facts', () => {
+  it('preserves a long title and all Pi actions without starting the session on mount', async () => {
+    const title = 'Research the complete cross-market impact of a changing policy regime across multiple portfolios'
+    const onResume = vi.fn(async () => {})
+    const onOpenWebPi = vi.fn(async () => { throw new Error('Surface unavailable') })
+    render(<ResumeCta
+      record={{ ...record(), agent: 'pi', title }}
+      workspaceId="workspace-1"
+      onSaveDisplayName={vi.fn(async () => {})}
+      onResume={onResume}
+      onOpenWebPi={onOpenWebPi}
+    />)
+
+    expect(screen.getByRole('heading', { name: title }).textContent).toBe(title)
+    expect(screen.getByRole('button', { name: 'Resume in TUI' })).toBeTruthy()
+    expect(document.querySelector('.resume-cta-actions')?.querySelectorAll('button')).toHaveLength(3)
+    expect(onResume).not.toHaveBeenCalled()
+    expect(onOpenWebPi).not.toHaveBeenCalled()
+    fireEvent.click(screen.getByRole('button', { name: 'Open in WebPi' }))
+    expect((await screen.findByRole('alert')).textContent).toBe('Surface unavailable')
+    expect(onResume).not.toHaveBeenCalled()
+    expect((screen.getByRole('button', { name: 'Resume in TUI' }) as HTMLButtonElement).disabled).toBe(false)
+  })
+
   it('shows the persisted Vault binding', () => {
     render(<ResumeCta
       record={record({

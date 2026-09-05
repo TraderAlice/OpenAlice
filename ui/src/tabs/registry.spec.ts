@@ -2,6 +2,11 @@ import { describe, expect, it } from 'vitest'
 
 import { getView, getViewShell } from './registry'
 
+it('keeps Quick Start and Chat as separate URL identities', () => {
+  expect(getView('quick-start').toUrl({ kind: 'quick-start', params: {} })).toBe('/quick-start')
+  expect(getView('chat-landing').toUrl({ kind: 'chat-landing', params: {} })).toBe('/chat')
+})
+
 it.each(['chat', 'auto-quant', 'prediction'] as const)('keeps %s Workspace details inside its Harness shell', source => {
   const spec = { kind: 'workspace-details', params: { wsId: 'workspace one', source } } as const
   expect(getView('workspace-details').toUrl(spec)).toBe(`/${source}/workspaces/workspace%20one/details`)

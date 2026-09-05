@@ -8,6 +8,7 @@ import {
   type ReactNode,
 } from 'react'
 import { useTranslation } from 'react-i18next'
+import { ComposerShell } from '../components/conversation/ComposerShell'
 import { PageTopBar } from '../components/PageTopBar'
 import {
   ArrowUp,
@@ -86,6 +87,12 @@ export { resolveChatWorkspaceTarget } from '../lib/chat-workspace-target'
  * fresh session seeded with that message, and focuses the session tab.
  */
 type HarnessLandingMode = 'chat' | 'auto-quant' | 'prediction'
+
+interface LandingPageProps {
+  spec: { params: { targetWsId?: string; initialPrompt?: string } }
+  showHeader?: boolean
+  onPromptChange?: (prompt: string) => void
+}
 
 const WORKFLOW_ICONS: Readonly<Record<string, LucideIcon>> = {
   market: ChartNoAxesCombined,
@@ -260,8 +267,9 @@ function HarnessWorkspacePicker({
 function HarnessLandingPage({
   spec,
   mode,
-}: {
-  spec: { params: { targetWsId?: string; initialPrompt?: string } }
+  showHeader = true,
+  onPromptChange,
+}: LandingPageProps & {
   mode: HarnessLandingMode
 }) {
   const { t } = useTranslation()
@@ -320,7 +328,11 @@ function HarnessLandingPage({
   // loop, so it can't be seeded with a first message).
   const cliAgents = agents.filter((a) => a.kind !== 'utility')
 
-  const [value, setValue] = useState(spec.params.initialPrompt ?? '')
+  const [value, setDraftValue] = useState(spec.params.initialPrompt ?? '')
+  const setValue = (next: string) => {
+    setDraftValue(next)
+    onPromptChange?.(next)
+  }
   const [launching, setLaunching] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [examplePage, setExamplePage] = useState(0)
@@ -448,7 +460,7 @@ function HarnessLandingPage({
       data-testid="harness-landing-root"
       className="@container/harness flex h-full min-h-0 w-full flex-col overflow-hidden bg-background"
     >
-      <PageTopBar title={t(mode === 'chat' ? 'chat.newChat' : mode === 'auto-quant' ? 'autoQuant.newResearch' : 'autoPrediction.newResearch')} />
+      {showHeader && <PageTopBar title={t(mode === 'chat' ? 'chat.newChat' : mode === 'auto-quant' ? 'autoQuant.newResearch' : 'autoPrediction.newResearch')} />}
       <div
         data-testid="harness-landing-scroll"
         className="oa-harness-scroll flex min-h-0 flex-1 justify-start overflow-x-hidden overflow-y-auto overscroll-contain px-5 py-8 @min-[42rem]/harness:px-8 @min-[42rem]/harness:py-10"
@@ -534,11 +546,8 @@ function HarnessLandingPage({
 
       <div className="shrink-0 px-3 pb-3 @min-[42rem]/harness:px-6 @min-[42rem]/harness:pb-5">
         <div className="mx-auto w-full max-w-[46rem]">
-          <div className="oa-harness-composer isolate">
-            <div
-              data-testid="harness-landing-context"
-              className="oa-harness-context-tray relative z-0 mx-[13px] -mb-3 flex min-h-12 min-w-0 items-center gap-0.5 overflow-hidden rounded-t-[20px] px-3 pb-4 pt-2 text-[12px] leading-4 text-muted-foreground"
-            >
+          <ComposerShell
+            context={<>
               <HarnessWorkspacePicker
                 mode={mode}
                 workspace={workspaceTarget}
@@ -560,33 +569,16 @@ function HarnessLandingPage({
                 menuPlacement="up"
                 toolbar
               />
-            </div>
-            <div
-              data-testid="harness-composer-shell"
-              className="oa-harness-composer-shell relative z-10 rounded-[26px] bg-card px-3 pb-2.5 pt-3"
-            >
-              <textarea
-                ref={textareaRef}
-                value={value}
-                onChange={(event) => setValue(event.target.value)}
-                onKeyDown={onKeyDown}
-                placeholder={t(`${copyKey}.placeholder`)}
-                rows={1}
-                autoFocus
-                className="block min-h-[68px] max-h-[168px] w-full resize-none bg-transparent px-1.5 py-1.5 text-[14px] leading-[21px] text-foreground outline-none placeholder:text-muted-foreground/70"
-              />
-              <div
-                data-testid="harness-landing-controls"
-                className="flex min-h-8 min-w-0 items-end justify-between gap-2 overflow-hidden px-0.5 pt-1"
-              >
-                <div className="flex min-w-0 flex-1 flex-wrap items-center gap-0.5 overflow-hidden">
+            </>}
+            controls={<>
                   <AgentLaunchSelectors
                     config={launchConfig}
                     onConfigureProvider={goConfigureProvider}
                     showRuntime={false}
                     toolbar
                   />
-                </div>
+            </>}
+            action={
                 <Tooltip>
                   <TooltipTrigger
                     render={(
@@ -607,15 +599,27 @@ function HarnessLandingPage({
                   </TooltipTrigger>
                   <TooltipContent>{t('chatLanding.send')}</TooltipContent>
                 </Tooltip>
-              </div>
+            }
+            details={
               <AgentLaunchDetails
                 config={launchConfig}
                 hasWorkspaceTarget={credentialWorkspace !== null && credentialWorkspace !== undefined}
                 showScopeDisclosure={false}
                 className="mx-1 mt-1.5 border-t border-border/45 px-1 pt-2"
               />
-            </div>
-          </div>
+            }
+          >
+              <textarea
+                ref={textareaRef}
+                value={value}
+                onChange={(event) => setValue(event.target.value)}
+                onKeyDown={onKeyDown}
+                placeholder={t(`${copyKey}.placeholder`)}
+                rows={1}
+                autoFocus
+                className="block min-h-[68px] max-h-[168px] w-full resize-none bg-transparent px-1.5 py-1.5 text-[14px] leading-[21px] text-foreground outline-none placeholder:text-muted-foreground/70"
+              />
+          </ComposerShell>
 
           {error !== null && (
             <ComposerNotice tone="error" icon={CircleAlert}>
@@ -666,27 +670,27 @@ function HarnessLandingPage({
   )
 }
 
-export function ChatLandingPage({ spec }: { spec: { params: { targetWsId?: string; initialPrompt?: string } } }) {
+export function ChatLandingPage({ spec, ...presentation }: LandingPageProps) {
   const ctx = useWorkspaces()
   const hasChatWorkspace = ctx.workspaces.some((workspace) => workspace.template === 'chat')
   if (!hasChatWorkspace) return <ChatSetupPage />
-  return <HarnessLandingPage spec={spec} mode="chat" />
+  return <HarnessLandingPage spec={spec} mode="chat" {...presentation} />
 }
 
-export function AutoQuantLandingPage({ spec }: { spec: { params: { targetWsId?: string; initialPrompt?: string } } }) {
+export function AutoQuantLandingPage({ spec, ...presentation }: LandingPageProps) {
   const ctx = useWorkspaces()
   const workspace = ctx.workspaces.find((candidate) =>
     candidate.id === ctx.autoQuantDefaultWorkspaceId
     && candidate.template === 'auto-quant-v2')
   if (!workspace) return <AutoQuantSetupPage />
-  return <HarnessLandingPage spec={{ params: { targetWsId: workspace.id, initialPrompt: spec.params.initialPrompt } }} mode="auto-quant" />
+  return <HarnessLandingPage spec={{ params: { targetWsId: workspace.id, initialPrompt: spec.params.initialPrompt } }} mode="auto-quant" {...presentation} />
 }
 
-export function AutoPredictionLandingPage({ spec }: { spec: { params: { targetWsId?: string; initialPrompt?: string } } }) {
+export function AutoPredictionLandingPage({ spec, ...presentation }: LandingPageProps) {
   const ctx = useWorkspaces()
   const workspace = ctx.workspaces.find((candidate) =>
     candidate.id === ctx.autoPredictionDefaultWorkspaceId
     && candidate.template === 'auto-prediction')
   if (!workspace) return <AutoPredictionSetupPage />
-  return <HarnessLandingPage spec={{ params: { targetWsId: workspace.id, initialPrompt: spec.params.initialPrompt } }} mode="prediction" />
+  return <HarnessLandingPage spec={{ params: { targetWsId: workspace.id, initialPrompt: spec.params.initialPrompt } }} mode="prediction" {...presentation} />
 }

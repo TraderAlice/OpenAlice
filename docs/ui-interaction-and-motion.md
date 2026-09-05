@@ -57,9 +57,56 @@ The stable page hierarchy is:
 3. one focused working view;
 4. dialogs, drawers, and popovers for temporary decisions.
 
-The activity rail's items, groups, and visibility are user-arranged from
-Settings → Activity bar and stored in `data/ui-layout.json`. The rail only
-renders the joined result. Deep links to a hidden surface still adopt.
+The activity rail's utility items, groups, and visibility are user-arranged from
+Settings → Activity bar and stored in `data/ui-layout.json`. The three Harnesses
+are a fixed work section below those utilities; their visibility follows the
+same saved entry settings. Deep links to a hidden surface still adopt.
+The former Beta navigation group is flattened into the primary list, including
+in the layout editor. Saved Beta items retain their order after primary items;
+custom groups, hidden entries, and feature gates remain unchanged. Beta feature
+availability is independent of navigation grouping.
+
+Quick Start (`/quick-start`) is the default general landing shortcut. Its Harness
+selector reuses Chat, Auto Quant, and Auto Prediction landing/setup flows and
+keeps per-Harness drafts while switching. It owns no Workspace or Session history.
+The saved primary `chat` layout slot now labels this shortcut; it remains pinned.
+Chat (`/chat`) and all existing Harness deep links retain their own route identity.
+Quick Start selection never marks a Harness current until navigation enters it.
+Below the utility list, Chat,
+Quant, and Prediction each show up to four sessions from their current Workspace
+(retaining an active older row), a new-session landing shortcut, and the shared
+Workspace options menu. More conversations remain available in the browser
+dialog. These are feature rows with their own icons, not collapsible folders or
+a labeled Harness tree. Recent sessions stay visible with a shallow indent.
+Trailing actions place options first and new-session last. The header owns the
+single new-session action; empty lists do not repeat a New chat/research row.
+These actions appear on header hover, keyboard focus,
+or while the menu is open; touch devices keep them visible. Clicking a primary
+navigation Session row enters its working surface: running Sessions open directly,
+paused resumable Sessions restore through the existing runtime action. A pending
+restore shows a spinner and rejects repeated clicks; failures stay on the row
+and allow retry. Headless occupancy still opens the single-writer explanation.
+The primary row has no separate play/stop target; settings, stop and archive live
+in its options menu. Direct links and history browsers retain view-only opening.
+In expanded navigation, a selected Session does not also select its Harness
+header. The compact rail retains the Harness selection because Session rows
+are hidden there; returning to the Harness landing selects its header.
+Quant/Prediction retain their explicit default
+Workspace readiness gates before exposing sessions and Studio. The navigation
+distinguishes setup, existing-Workspace selection, loading, and
+retryable errors. Without a Workspace, only the Harness header remains: clicking
+it opens the existing setup landing flow, without creating or selecting a
+Workspace. Do not repeat setup copy or a second setup button below it. Before
+readiness, the new-research shortcut is hidden.
+Studio is a compact outlined tool button with route-owned selection, separate
+from conversation rows; Quant and Prediction share its presentation.
+Harness working views use one content top bar, not a second conversation sidebar.
+TerminalView has no card/canvas mode: its header always uses PageTopBar and its
+single grid row fills the remaining height. Do not reserve a local header row
+for portaled content; xterm's FitAddon measures the padding-free terminal host.
+A compact rail keeps distinct Harness icons; mobile uses the same groups inside the global
+drawer. Quick Start hands new Sessions to their existing Harness-owned routes,
+not a second conversation hierarchy.
 The Settings editor reorders live: the list opens a gap under the pointer
 while the lifted row follows it. Sibling rows FLIP-animate into that slot.
 `prefers-reduced-motion: reduce` skips the sibling motion; the overlay still
@@ -75,6 +122,18 @@ prompt carries the evidence, freshness, persistence, and permission boundaries
 needed for the real task. Prefer a small rotating set over a wall of commands.
 
 ### Background execution surfaces
+
+The bottom Your Alice application menu uses the static Alice portrait and a
+text label when expanded, or only the portrait when compact. The brand header
+keeps the OpenAlice wordmark without a second portrait. Its trailing ellipsis
+appears on hover, keyboard focus, or while open; touch keeps it visible. The
+trigger highlights for interaction, not because a Settings or Connectors page
+is active. Settings remains an item inside this application menu.
+
+Connectors is accessed from the bottom Your Alice menu, alongside Settings and
+above Appearance, not from the primary activity list or its layout editor.
+The existing Connectors route and setup flows remain unchanged. Connector
+health warnings appear on the Your Alice trigger and the Connectors menu item.
 
 The Automation activity entry and its dedicated navigator are retired. Runs
 and API remain unchanged under Settings → Developer, at
@@ -93,7 +152,7 @@ actual Harness and preserve their target identity without mounting a global
 Workspace interface. Missing or unsupported membership is an explicit recovery
 state, not permission to guess a Harness from a tag or show the old manager.
 
-The Harness footer identity opens the current Workspace's details in the same
+The Harness options menu identity opens the current Workspace's details in the same
 Harness shell (`/<harness>/workspaces/:wsId/details`); the adjacent chevron is an
 independent Workspace switcher. Keep configuration and conversation browsing
 as separate actions below it. Do not make the identity click switch Workspaces,
@@ -104,6 +163,33 @@ versions from the current catalog's Harness guide. Catalog documentation is
 reference material, not proof of the installed version or current Workspace
 configuration. Keep document loading/errors independent, retain the sessions
 sidebar, and use the shared reading renderer rather than a new Markdown stack.
+
+### Agent conversation presentation
+
+`components/conversation/` owns the adapter-neutral browser conversation view,
+content/activity rendering and composer shell. `ComposerShell` is shared with
+the Harness launch page; its context, controls and details are caller-owned
+slots, not embedded Pi selectors. Existing `oa-harness-composer-*` styling seams
+remain the shared visual material. Messages and composer use a 46rem reading
+measure, with local scrolling for wide output and wrapping toolbar controls.
+
+The normalized types in this folder are ephemeral presentation data, not a new
+persisted transcript or execution protocol. An adapter converts wire messages
+before rendering and supplies only supported send/stop actions. Missing actions
+do not produce fake controls. Reasoning, tool input/output, failed operations,
+and unknown payloads remain inspectable; failures expand their activity details.
+Presentation must not import runtime APIs, parse provider event discriminators,
+or fetch Workspace data. Pi's conversion lives in `webpi-presentation.ts` and
+its polling/commands in `useWebPiConversation`; `WebPiView` composes the adapter.
+
+Pending sends keep and lock their draft until acknowledgement, reject repeated
+submission, and preserve the draft on failure. Enter respects IME composition;
+Shift+Enter inserts a newline. Session identity changes remount local composition
+state and ignore prior requests. New revisions follow the tail only while the
+reader is already there; Jump to latest is explicit and honors reduced motion.
+Idle needs no top-bar badge; busy and failure states remain visible. Runtime
+settings remain in the existing Session settings until an adapter actually
+supports a corresponding inline control.
 
 ### Long-form Markdown
 
@@ -226,10 +312,9 @@ keyboard navigation, outside dismissal, scroll locking, and focus return.
   control sits to the right of the OpenAlice brand. When compact, the expand
   control moves to the leading edge of the right-hand area's top bar. Only one
   copy is mounted; activation transfers keyboard focus to the new location.
-  Responsive compact mode is a default, never a lock. Chat, Quant, and
-  Prediction default compact and share a temporary expansion override while
-  inside that workbench group. Leaving the group clears the override and
-  restores the saved global preference; workbench toggles never rewrite it.
+  Responsive compact mode is a default, never a lock. Entering Chat, Quant, or
+  Prediction no longer auto-collapses the rail: it owns their session lists.
+  Explicit expanded/collapsed preferences apply across all product areas.
 - `TopBar` owns compact header geometry (40px desktop, at least 48px on phone).
   `PageContentLayout` owns a fixed header slot; `PageTopBar` portals a page's
   title and actions into it without copying business state or callbacks.
@@ -299,7 +384,8 @@ The application body establishes a 14px type size with 20px leading. Explicit
 display, heading, control, caption, and data roles build from that stable
 reading baseline.
 
-The compact activity rail retains its static Alice mark. Its expansion action
+The compact activity rail keeps its static Alice mark in the bottom application
+menu. Its expansion action
 lives in the content-side top bar, not in a brand-hover affordance. Small
 desktop windows still permit explicit expansion. The shell owns effective
 rail state so its toggle and the rendered rail always agree.

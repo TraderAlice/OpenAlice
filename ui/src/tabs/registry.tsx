@@ -2,6 +2,7 @@ import type { ComponentType, ReactNode } from 'react'
 import type { Workspace } from '../components/workspace/api'
 import type { ViewKind, ViewSpec } from './types'
 import { WorkspaceDetailsPage } from '../pages/WorkspaceDetailsPage'
+import { QuickStartPage } from '../pages/QuickStartPage'
 
 import { PortfolioPage } from '../pages/PortfolioPage'
 import { TradingAsGitPage } from '../pages/TradingAsGitPage'
@@ -415,7 +416,7 @@ const chatLandingModule: ViewModule<'chat-landing'> = {
   kind: 'chat-landing',
   shell: 'chat',
   title: (spec, ctx) => {
-    if (!spec.params.targetWsId) return 'Ask Alice'
+    if (!spec.params.targetWsId) return 'Chat'
     const tag = ctx.workspaces?.find((w) => w.id === spec.params.targetWsId)?.tag
     return tag ? `New session · ${tag}` : 'New session'
   },
@@ -608,6 +609,7 @@ const VIEWS = {
   dev: devModule,
   inbox: inboxModule,
   tracked: trackedModule,
+  'quick-start': { kind: 'quick-start', title: () => 'Quick Start', toUrl: () => '/quick-start', Component: QuickStartPage },
   'chat-landing': chatLandingModule,
   'auto-quant-landing': autoQuantLandingModule,
   'auto-prediction-landing': autoPredictionLandingModule,

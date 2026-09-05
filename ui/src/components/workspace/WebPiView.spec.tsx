@@ -65,7 +65,7 @@ describe('WebPi transcript scrolling', () => {
     )
     await waitFor(() => expect(mocks.getWebPiSession).toHaveBeenCalled())
 
-    const scroller = container.querySelector('.webpi-messages') as HTMLDivElement
+    const scroller = container.querySelector('.conversation-messages') as HTMLDivElement
     Object.defineProperties(scroller, {
       scrollTop: { configurable: true, writable: true, value: 120 },
       clientHeight: { configurable: true, value: 300 },
@@ -91,7 +91,7 @@ describe('WebPi transcript scrolling', () => {
       await vi.advanceTimersByTimeAsync(0)
     })
 
-    const scroller = container.querySelector('.webpi-messages') as HTMLDivElement
+    const scroller = container.querySelector('.conversation-messages') as HTMLDivElement
     Object.defineProperties(scroller, {
       scrollTop: { configurable: true, writable: true, value: 120 },
       clientHeight: { configurable: true, value: 300 },
@@ -112,6 +112,18 @@ describe('WebPi transcript scrolling', () => {
 })
 
 describe('WebPi composer keyboard submission', () => {
+  it('does not let a late response from the previous session replace the selected one', async () => {
+    let resolvePrevious!: (value: WebPiSnapshot) => void
+    mocks.getWebPiSession.mockImplementation((_workspace: string, id: string) => id === 'old'
+      ? new Promise<WebPiSnapshot>((resolve) => { resolvePrevious = resolve })
+      : Promise.resolve({ ...snapshot('idle'), recordId: 'new', messages: [{ role: 'user', content: 'New conversation' }] }))
+    const { rerender } = render(<WebPiView wsId="workspace-manager" sessionId="old" onSessionLost={vi.fn()} />)
+    rerender(<WebPiView wsId="workspace-manager" sessionId="new" onSessionLost={vi.fn()} />)
+    expect(await screen.findByText('New conversation')).toBeTruthy()
+    await act(async () => { resolvePrevious({ ...snapshot('idle'), messages: [{ role: 'user', content: 'Old conversation' }] }) })
+    expect(screen.queryByText('Old conversation')).toBeNull()
+  })
+
   it('uses the shared content-sized textarea so multiline prompts grow until the CSS cap', async () => {
     mocks.getWebPiSession.mockResolvedValue(snapshot('idle'))
     render(

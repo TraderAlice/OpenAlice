@@ -151,12 +151,14 @@ function renderSection(
   workspaceManager: ManagerWorkspaceSnapshot | null = null,
   onNavigate?: () => void,
   displayMode: 'focused' | 'recent' | 'multi' = 'multi',
+  placement: 'sidebar' | 'navigation' = 'sidebar',
 ) {
   return render(
     <WorkspacesContext.Provider value={workspaceContext(workspaces, workspaceManager)}>
       <ChatWorkspaceSection
         onNavigate={onNavigate}
         displayMode={displayMode}
+        placement={placement}
       />
     </WorkspacesContext.Provider>,
   )
@@ -175,6 +177,70 @@ beforeEach(async () => {
 afterEach(cleanup)
 
 describe('ChatWorkspaceSection actions', () => {
+  it('selects only the session in expanded navigation, then selects the Harness on its landing page', () => {
+    const current = { ...chatWorkspace, sessions: [chatSession(1)] }
+    const state = workspaceContext([current])
+    focusedTabState.tab = { spec: { kind: 'workspace', params: { source: 'chat', wsId: current.id, sessionId: current.sessions[0].id } } }
+    const view = render(<WorkspacesContext.Provider value={state}><ChatWorkspaceSection placement="navigation" /></WorkspacesContext.Provider>)
+    expect(screen.getByRole('button', { name: 'Chat Harness' }).getAttribute('aria-current')).toBeNull()
+    expect(screen.getByRole('button', { name: 'Conversation 1' }).getAttribute('aria-current')).toBe('page')
+
+    view.rerender(<WorkspacesContext.Provider value={state}><ChatWorkspaceSection placement="navigation" compact /></WorkspacesContext.Provider>)
+    expect(screen.getByRole('button', { name: 'Chat Harness' }).getAttribute('aria-current')).toBe('page')
+
+    focusedTabState.tab = { spec: { kind: 'chat-landing', params: {} } }
+    view.rerender(<WorkspacesContext.Provider value={state}><ChatWorkspaceSection placement="navigation" /></WorkspacesContext.Provider>)
+    expect(screen.getByRole('button', { name: 'Chat Harness' }).getAttribute('aria-current')).toBe('page')
+    expect(screen.getByRole('button', { name: 'Conversation 1' }).getAttribute('aria-current')).toBeNull()
+  })
+
+  it('shows a bounded current workset and resumes paused sessions from the row', () => {
+    const current = { ...chatWorkspace, sessions: Array.from({ length: 9 }, (_, index) => chatSession(index + 1)) }
+    focusedTabState.tab = { spec: { kind: 'workspace', params: { source: 'chat', wsId: current.id, sessionId: current.sessions[0].id } } }
+    const other = { ...chatWorkspace, id: 'other-chat', sessions: [{ ...chatSession(10), title: 'Other office conversation', wsId: 'other-chat' }] }
+    renderSection([current, other], null, undefined, 'focused', 'navigation')
+    expect(screen.getAllByRole('button', { name: /^Conversation \d+$/ })).toHaveLength(4)
+    expect(screen.queryByRole('button', { name: 'Other office conversation' })).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: 'Conversation 1' }))
+    expect(actions.resumeSession).toHaveBeenCalledWith(current.id, current.sessions[0].id, 'chat')
+    expect(actions.openWebPiSession).not.toHaveBeenCalled()
+    expect(screen.getByRole('button', { name: 'View all 9 conversations' })).toBeTruthy()
+  })
+
+  it('keeps recent sessions visible without a disclosure and retains landing and management actions', () => {
+    renderSection([{ ...chatWorkspace, sessions: [chatSession(1)] }], null, undefined, 'focused', 'navigation')
+    expect(screen.queryByRole('button', { name: 'Toggle Chat conversations' })).toBeNull()
+    expect(screen.getByRole('button', { name: 'Conversation 1' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Chat Workspace options' })).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: 'Chat: New chat' }))
+    expect(actions.openOrFocus).toHaveBeenCalledWith({ kind: 'chat-landing', params: { targetWsId: chatWorkspace.id } })
+  })
+
+  it('keeps the Chat office available before any workspace is initialized', () => {
+    renderSection([], null, undefined, 'focused', 'navigation')
+    fireEvent.click(screen.getByRole('button', { name: 'Chat Harness' }))
+    expect(actions.openOrFocus).toHaveBeenCalledWith({ kind: 'chat-landing', params: {} })
+  })
+
+  it('keeps one new-chat action after options when the navigation list is empty', () => {
+    renderSection([{ ...chatWorkspace, sessions: [] }], null, undefined, 'focused', 'navigation')
+    const create = screen.getByRole('button', { name: 'Chat: New chat' })
+    const options = screen.getByRole('button', { name: 'Chat Workspace options' })
+    expect(options.compareDocumentPosition(create) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(screen.queryByRole('button', { name: 'New chat' })).toBeNull()
+  })
+
+  it('retains the Chat workspace entered through a route when returning to a global tool', () => {
+    const current = { ...chatWorkspace, sessions: [chatSession(1)] }
+    const other = { ...chatWorkspace, id: 'other-chat', sessions: [{ ...chatSession(10), title: 'Other office conversation', wsId: 'other-chat' }] }
+    const state = workspaceContext([current, other])
+    focusedTabState.tab = { spec: { kind: 'workspace', params: { source: 'chat', wsId: current.id, sessionId: current.sessions[0].id } } }
+    const view = render(<WorkspacesContext.Provider value={state}><ChatWorkspaceSection placement="navigation" /></WorkspacesContext.Provider>)
+    focusedTabState.tab = { spec: { kind: 'connectors', params: {} } }
+    view.rerender(<WorkspacesContext.Provider value={state}><ChatWorkspaceSection placement="navigation" /></WorkspacesContext.Provider>)
+    expect(screen.getByRole('button', { name: 'Conversation 1' })).toBeTruthy()
+    expect(screen.queryByRole('button', { name: 'Other office conversation' })).toBeNull()
+  })
   it('keeps one durable Workspace focused and starts new conversations inside it', () => {
     const sessions = [chatSession(1), chatSession(2)]
     const focusedWorkspace = { ...chatWorkspace, sessions }
@@ -807,7 +873,7 @@ describe('ChatWorkspaceSection actions', () => {
       'session-headless-colleague',
       'chat',
     )
-    expect(onNavigate).toHaveBeenCalledOnce()
+    await waitFor(() => expect(onNavigate).toHaveBeenCalledOnce())
 
     const user = userEvent.setup()
     const more = screen.getByRole('button', { name: 'More actions for Morning scan complete. Semis still lead.' })
