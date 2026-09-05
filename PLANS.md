@@ -29,11 +29,6 @@ the durable truth after it changes. Git history is the archive.
 
 ## Active
 
-- [[plans/release-pipeline-efficiency.md]] — Shortens stable release waiting
-  through independent platform pipelines, artifact-bound verification/replay,
-  and concurrent same-commit source acceptance. One topic Draft PR; no product
-  publication during rehearsal and no weakened stable gates.
-
 - [[plans/unified-page-topbar.md]] — Unifies navigator and content toolbars
   across the UI, with fixed page actions and content-owned sidebar restoration.
   Held on `codex/ui-usability-followup` for visual acceptance.
