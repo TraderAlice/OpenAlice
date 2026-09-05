@@ -121,7 +121,7 @@ describe('Release workflow critical path', () => {
       operation: {
         required: true,
         type: 'choice',
-        options: ['release', 'mirror', 'publish-npm', 'verify-npm'],
+        options: ['release', 'mirror', 'publish-npm', 'verify-npm', 'verify-desktop'],
       },
       tag: {
         required: false,
@@ -134,7 +134,7 @@ describe('Release workflow critical path', () => {
       },
     })
     expect(workflow.concurrency).toEqual({
-      group: 'openalice-release-publication',
+      group: "${{ inputs.operation == 'verify-desktop' && format('desktop-replay-{0}-{1}', inputs.candidate-run, inputs.desktop-target) || 'openalice-release-publication' }}",
       'cancel-in-progress': false,
     })
 
@@ -356,6 +356,24 @@ describe('Release workflow critical path', () => {
     ]) {
       expect(step(publication, name).with?.files).toContain('dist/release-cli/*.tar.gz.sha256')
     }
+  })
+
+  it('replays one selected desktop without build or publication authority', () => {
+    const replay = workflow.jobs['replay-desktop']
+    expect(replay.if).toBe("inputs.operation == 'verify-desktop' && inputs.channel == 'stable'")
+    expect(replay.permissions).toEqual({ contents: 'read', actions: 'read' })
+    expect(replay.uses).toBe('./.github/workflows/release-desktop-replay.yml')
+    const source = readFileSync(resolve(root, '.github/workflows/release-desktop-replay.yml'), 'utf8')
+    const called = YAML.parse(source).jobs.upgrade as WorkflowJob
+    const selection = step(called, 'Select trusted candidate artifact')
+    const verification = step(called, 'Verify selected candidate bytes')
+    const acceptance = step(called, 'Accept preserved final artifact without rebuilding')
+    expect(called.steps!.indexOf(selection)).toBeLessThan(called.steps!.indexOf(verification))
+    expect(called.steps!.indexOf(verification)).toBeLessThan(called.steps!.indexOf(acceptance))
+    expect(called.steps?.find((entry) => entry.uses === 'actions/download-artifact@v4')?.with?.['artifact-ids'])
+      .toBe('${{ steps.candidate.outputs.artifact-id }}')
+    expect(source).not.toMatch(/secrets:|contents: write|electron-builder|pnpm electron:build|gh release/)
+    expect(step(called, 'Bind acceptance to unchanged bytes and current verifier').run).toContain('bind-upgrade')
   })
 
   it('joins full same-dispatch source validation only at stable publication', () => {

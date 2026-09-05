@@ -522,6 +522,18 @@ includes the stable upgrade result, so publication still requires every native
 platform. Build and upgrade remain separate jobs to preserve selective retries.
 Beta runs the current-candidate checks without the stable-only N-1 job.
 
+To retry a preserved stable desktop candidate without rebuilding, the Release
+operation `verify-desktop` takes `candidate-run`, `source-sha`, `tag`,
+`previous-tag`, and one `desktop-target` (`macOS-arm64`, `macOS-x64`, or
+`Windows-x64`), with `channel=stable`. The dispatch revision owns the verifier;
+the explicit source SHA owns the product. Selection requires a completed
+master Release from this repository and a unique unexpired artifact. It then
+verifies exact bytes, runs the installed N-1 journey, and uploads a receipt
+bound to both identities. No packaging, signing, tag, or publication occurs.
+Historical artifacts lacking `candidate-manifest.json` cannot use this path.
+At this implementation stage the retry receipt is diagnostic evidence only:
+final publication does not yet accept a receipt from a different run.
+
 CLI candidates share one commit-bound platform-neutral input artifact containing
 only the approved UI and pure-JavaScript package outputs. Each of the six target
 jobs verifies its source SHA and exact file hashes before installing those

@@ -117,7 +117,14 @@ beta-to-stable promotion; installing a permanent runner on the user's daily Mac.
   macOS ARM64 artifact 9966357063 for source 52b51f29809178594b7b57bf666133829368b7b4.
   This proves metadata selection only: historical assets predate the new
   candidate identity manifest and cannot be represented as newly accepted
-  candidates. The selector is not yet wired into a replay/publication workflow.
+  candidates. The selector is now wired into `operation=verify-desktop`:
+  an explicitly selected platform downloads only the authenticated artifact ID,
+  verifies its manifest and bytes before dependency installation, runs final
+  artifact N-1 acceptance, and binds the resulting receipt to the product bytes
+  and current verifier SHA. The operation has read-only repository permissions,
+  no signing secrets, and a separate concurrency group. Forty-nine focused
+  tests pass. Final publication consumption of replay receipts and actual
+  positive native replay remain outstanding.
 - [ ] Increment 3: join exact-SHA full source validation at publication instead
   of serializing before candidate builds; reuse verified neutral CLI inputs.
   Test source failure/mismatch blocks publication, beta gates stay separate,

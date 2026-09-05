@@ -1,0 +1,86 @@
+name: Replay desktop candidate acceptance
+
+on:
+  workflow_call:
+    inputs:
+      candidate-run:
+        required: true
+        type: string
+      source-sha:
+        required: true
+        type: string
+      tag:
+        required: true
+        type: string
+      previous-tag:
+        required: true
+        type: string
+      os:
+        required: true
+        type: string
+      arch:
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  upgrade:
+    runs-on: ${{ inputs.os }}
+    timeout-minutes: 35
+    env:
+      CANDIDATE_SOURCE_SHA: ${{ inputs.source-sha }}
+      REPLAY_TAG: ${{ inputs.tag }}
+      CANDIDATE_CHANNEL: stable
+      CANDIDATE_ARCH: ${{ inputs.arch }}
+      CANDIDATE_PREVIOUS_TAG: ${{ inputs.previous-tag }}
+      CANDIDATE_RUN: ${{ inputs.candidate-run }}
+      CANDIDATE_TARGET: ${{ runner.os }}-${{ inputs.arch }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+      - name: Validate stable replay intent
+        shell: bash
+        run: |
+          [[ "$REPLAY_TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] || exit 1
+          [[ "$CANDIDATE_PREVIOUS_TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] || exit 1
+          echo "CANDIDATE_VERSION=${REPLAY_TAG#v}" >> "$GITHUB_ENV"
+      - name: Select trusted candidate artifact
+        id: candidate
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: node scripts/select-release-candidate.mjs "$CANDIDATE_RUN" "$CANDIDATE_SOURCE_SHA" "$CANDIDATE_TARGET"
+      - uses: actions/download-artifact@v4
+        with:
+          github-token: ${{ github.token }}
+          run-id: ${{ inputs.candidate-run }}
+          artifact-ids: ${{ steps.candidate.outputs.artifact-id }}
+          path: dist/electron-app
+          merge-multiple: true
+      - name: Verify selected candidate bytes
+        run: node scripts/desktop-candidate-receipt.mjs verify-selected dist/electron-app
+      - uses: pnpm/action-setup@v6
+      - run: pnpm install --frozen-lockfile
+      - name: Accept preserved final artifact without rebuilding
+        shell: bash
+        run: >-
+          pnpm electron:smoke:upgrade --
+          --from "$CANDIDATE_PREVIOUS_TAG"
+          --candidate-artifact-dir dist/electron-app
+          --receipt "$RUNNER_TEMP/openalice-desktop-upgrade.json"
+      - name: Bind acceptance to unchanged bytes and current verifier
+        shell: bash
+        run: >-
+          node scripts/desktop-candidate-receipt.mjs bind-upgrade dist/electron-app
+          "$RUNNER_TEMP/openalice-desktop-upgrade.json"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release-upgrade-acceptance-${{ runner.os }}-${{ inputs.arch }}
+          path: ${{ runner.temp }}/openalice-desktop-upgrade.json
+          if-no-files-found: error
+          retention-days: 7

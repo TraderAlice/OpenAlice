@@ -83,7 +83,7 @@ function run(argv) {
     return
   }
   const [operation, directoryArg, receiptPath] = argv
-  if (!['create', 'verify', 'bind-upgrade'].includes(operation) || !directoryArg
+  if (!['create', 'verify', 'verify-selected', 'bind-upgrade'].includes(operation) || !directoryArg
     || argv.length > 3 || (operation === 'bind-upgrade' && !receiptPath)) {
     throw new Error('Usage: desktop-candidate-receipt.mjs create|verify|bind-upgrade <directory> [receipt]')
   }
@@ -98,8 +98,16 @@ function run(argv) {
     if (process.env.GITHUB_OUTPUT) appendFileSync(process.env.GITHUB_OUTPUT, `candidate-id=${manifest.candidateId}\n`)
     console.log(`Candidate recorded: ${manifest.candidateId}`)
   } else {
-    const expected = { ...header, candidateId: process.env.CANDIDATE_ID }
-    if (operation === 'verify') verifyDesktopCandidate({ directory, expected })
+    // Only for an artifact already selected by authenticated GitHub run/id.
+    const selectedId = operation === 'verify-selected'
+      ? readJson(join(directory, DESKTOP_CANDIDATE_MANIFEST)).candidateId : process.env.CANDIDATE_ID
+    const expected = { ...header, candidateId: selectedId }
+    if (operation === 'verify' || operation === 'verify-selected') {
+      verifyDesktopCandidate({ directory, expected })
+      if (operation === 'verify-selected' && process.env.GITHUB_ENV) {
+        appendFileSync(process.env.GITHUB_ENV, `CANDIDATE_ID=${selectedId}\n`)
+      }
+    }
     else {
       const receipt = bindDesktopUpgrade({ directory, expected,
         verifierSha: process.env.GITHUB_SHA, previousTag: process.env.CANDIDATE_PREVIOUS_TAG,

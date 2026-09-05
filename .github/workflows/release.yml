@@ -13,6 +13,7 @@ on:
           - mirror
           - publish-npm
           - verify-npm
+          - verify-desktop
       tag:
         description: Required except for verify-npm; for example v0.91.0 or v0.91.0-beta.1.
         required: false
@@ -25,12 +26,43 @@ on:
         options:
           - beta
           - stable
+      candidate-run:
+        description: Completed master Release run to reuse for verify-desktop.
+        type: string
+      source-sha:
+        description: Exact product commit of the preserved desktop candidate.
+        type: string
+      previous-tag:
+        description: Previous stable tag for verify-desktop upgrade acceptance.
+        type: string
+      desktop-target:
+        description: Native platform to retry without rebuilding or publishing.
+        type: choice
+        default: macOS-arm64
+        options:
+          - macOS-arm64
+          - macOS-x64
+          - Windows-x64
 
 concurrency:
-  group: openalice-release-publication
+  group: ${{ inputs.operation == 'verify-desktop' && format('desktop-replay-{0}-{1}', inputs.candidate-run, inputs.desktop-target) || 'openalice-release-publication' }}
   cancel-in-progress: false
 
 jobs:
+  replay-desktop:
+    if: inputs.operation == 'verify-desktop' && inputs.channel == 'stable'
+    uses: ./.github/workflows/release-desktop-replay.yml
+    permissions:
+      contents: read
+      actions: read
+    with:
+      candidate-run: ${{ inputs.candidate-run }}
+      source-sha: ${{ inputs.source-sha }}
+      tag: ${{ inputs.tag }}
+      previous-tag: ${{ inputs.previous-tag }}
+      os: ${{ inputs.desktop-target == 'macOS-arm64' && 'macos-14' || inputs.desktop-target == 'macOS-x64' && 'macos-15-intel' || 'windows-latest' }}
+      arch: ${{ inputs.desktop-target == 'macOS-arm64' && 'arm64' || 'x64' }}
+
   release:
     name: Plan release candidate
     if: inputs.operation == 'release' || inputs.operation == 'mirror'

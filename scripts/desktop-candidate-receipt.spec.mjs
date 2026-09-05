@@ -1,5 +1,6 @@
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
+import { execFileSync } from 'node:child_process'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 import { DESKTOP_UPGRADE_CHECKS, recordDesktopCandidate, verifyDesktopCandidate, bindDesktopUpgrade, stageDesktopCandidates } from './desktop-candidate-receipt.mjs'
@@ -36,6 +37,22 @@ function fixture(channel = 'stable') {
 }
 
 describe('desktop candidate acceptance integration', () => {
+  it('pins an authenticated selected artifact only after byte and source verification', () => {
+    const { options, records } = fixture()
+    const record = records[0]
+    const output = join(options.inputDirectory, 'github-env')
+    const env = { ...process.env, RUNNER_OS: 'macOS', CANDIDATE_ARCH: 'arm64',
+      CANDIDATE_SOURCE_SHA: options.sourceSha, CANDIDATE_VERSION: options.version,
+      CANDIDATE_CHANNEL: 'stable', GITHUB_ENV: output }
+    const args = [join(import.meta.dirname, 'desktop-candidate-receipt.mjs'), 'verify-selected', record.directory]
+    execFileSync(process.execPath, args, { env })
+    expect(readFileSync(output, 'utf8')).toBe(`CANDIDATE_ID=${record.expected.candidateId}\n`)
+    rmSync(output)
+    expect(() => execFileSync(process.execPath, args, {
+      env: { ...env, CANDIDATE_SOURCE_SHA: 'f'.repeat(40) }, stdio: 'pipe',
+    })).toThrow()
+    expect(existsSync(output)).toBe(false)
+  })
   it('verifies restored packages and stages the entire accepted stable set', () => {
     const { options, records } = fixture()
     expect(verifyDesktopCandidate(records[0]).candidateId).toBe(records[0].expected.candidateId)
