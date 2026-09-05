@@ -435,8 +435,11 @@ waits for an outstanding request instead of repeatedly replacing a slow load,
 while explicit refresh, query changes and unmount cancel superseded requests.
 
 Market directory headings (News, Markets, Macro, Watchlist) are static captions.
-Only News category groups disclose children, with one consistent indentation
-level and trailing chevrons. Only destination rows receive page selection
+Parent headings use the shared hierarchy variant (13px, medium weight), and
+each child navigation level adds a 12px inset. Clickable categories and leaf
+rows share 13px regular text and foreground color; gray is reserved for
+secondary summaries and chevrons. Only News category groups disclose children,
+with trailing chevrons. Only destination rows receive page selection
 styling; a collapsed category group shows the selected category as a plain
 summary. Restoring a News selection reveals its group, while users can still
 collapse it manually. Search results appear immediately below the search field.

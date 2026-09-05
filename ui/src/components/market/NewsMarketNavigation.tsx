@@ -17,8 +17,8 @@ export function NewsMarketNavigation({ category, onSelect, active = true }: Navi
   const selectedCategory = NEWS_CATEGORIES.find((item) => item.id === category)?.id ?? null
   return (
     <section role="group" aria-label={t('nav.item.news')}>
-      <SidebarSectionHeader>{t('nav.item.news')}</SidebarSectionHeader>
-      <nav aria-label={t('news.categoriesLabel')}>
+      <SidebarSectionHeader hierarchy>{t('nav.item.news')}</SidebarSectionHeader>
+      <nav aria-label={t('news.categoriesLabel')} className="ml-3">
         <SidebarRow label={t('news.allNews')} active={active && !selectedCategory} onClick={() => onSelect(null)} />
         {NEWS_CATEGORY_GROUPS.map((group) => (
           <CategoryGroup key={group.labelKey} group={group} category={selectedCategory} active={active} onSelect={onSelect} />
@@ -45,7 +45,7 @@ function CategoryGroup({ group, category, active, onSelect }: NavigationProps & 
         <ChevronDown className="ml-auto size-3.5 shrink-0 text-muted-foreground transition-transform duration-[180ms] group-aria-[expanded=false]:-rotate-90 motion-reduce:transition-none" aria-hidden />
       </CollapsibleTrigger>
       <CollapsibleContent aria-hidden={!open} inert={!open}>
-        <div className="ml-4 mb-1 border-l border-border/50 pl-1">
+        <div className="ml-3 mb-1 border-l border-border/50">
           {group.categories.map((categoryId) => {
             const item = NEWS_CATEGORIES.find((candidate) => candidate.id === categoryId)!
             return <SidebarRow key={categoryId} label={t(item.labelKey)}

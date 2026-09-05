@@ -260,10 +260,10 @@ function MarketSection({ label, children, count }: {
 }) {
   return (
     <section role="group" aria-label={label} className="mt-3">
-      <SidebarSectionHeader trailing={count ? <span className="text-[11px] tabular-nums text-muted-foreground">{count}</span> : undefined}>
+      <SidebarSectionHeader hierarchy trailing={count ? <span className="text-[11px] tabular-nums text-muted-foreground">{count}</span> : undefined}>
         {label}
       </SidebarSectionHeader>
-      {children}
+      <div className="ml-3">{children}</div>
     </section>
   )
 }
