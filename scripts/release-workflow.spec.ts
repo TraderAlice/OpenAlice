@@ -4,6 +4,7 @@ import { describe, expect, it } from 'vitest'
 import YAML from 'yaml'
 
 interface WorkflowStep {
+  env?: Record<string, string>
   if?: string
   name?: string
   run?: string
@@ -12,6 +13,9 @@ interface WorkflowStep {
 }
 
 interface WorkflowJob {
+  env?: Record<string, string>
+  uses?: string
+  with?: Record<string, unknown>
   permissions?: Record<string, string>
   if?: string
   needs?: string | string[]
@@ -50,12 +54,47 @@ function step(job: WorkflowJob, name: string): WorkflowStep {
   return found
 }
 
+const desktopWorkflow = YAML.parse(readFileSync(
+  resolve(root, '.github/workflows/release-desktop-platform.yml'), 'utf8',
+)) as { jobs: Record<string, WorkflowJob> }
+
 function needs(job: WorkflowJob): string[] {
   if (!job.needs) return []
   return Array.isArray(job.needs) ? job.needs : [job.needs]
 }
 
 describe('Release workflow critical path', () => {
+  it('verifies artifact identities before upgrade and before either publication path', () => {
+    const build = desktopWorkflow.jobs.build.steps ?? []
+    expect(build.findIndex((entry) => entry.name === 'Record desktop candidate identity'))
+      .toBeLessThan(build.findIndex((entry) => entry.name === 'Preserve desktop release candidate'))
+    const upgrade = desktopWorkflow.jobs.upgrade.steps ?? []
+    const verify = upgrade.findIndex((entry) => entry.name === 'Verify restored desktop candidate identity')
+    const run = upgrade.findIndex((entry) => entry.name === 'Prove final desktop artifact upgrades previous release state')
+    const bind = upgrade.findIndex((entry) => entry.name === 'Bind upgrade acceptance to candidate identity')
+    expect(verify).toBeGreaterThanOrEqual(0)
+    expect(run).toBeGreaterThan(verify)
+    expect(bind).toBeGreaterThan(run)
+    const publication = workflow.jobs['publish-release'].steps ?? []
+    const gate = publication.findIndex((entry) => entry.name === 'Verify and stage the complete desktop candidate set')
+    expect(gate).toBeGreaterThanOrEqual(0)
+    for (const [index, entry] of publication.entries()) {
+      if (entry.uses === 'softprops/action-gh-release@v2') expect(index).toBeGreaterThan(gate)
+    }
+  })
+
+  it('does not make POSIX system-package acceptance wait for Windows or generate npm packages', () => {
+    for (const name of ['accept-cli-homebrew', 'accept-cli-linuxbrew', 'accept-cli-aur']) {
+      const job = workflow.jobs[name]
+      expect(needs(job)).toEqual(['release', 'build-cli-release'])
+      const commands = job.steps?.map((entry) => entry.run ?? '').join('\n') ?? ''
+      expect(commands.match(/--system-only/g)).toHaveLength(2)
+      expect(commands).not.toContain('--require-all')
+    }
+    expect(needs(workflow.jobs['build-cli-package-channels'])).toContain('build-cli-windows')
+    expect(needs(workflow.jobs['publish-release'])).toContain('build-cli-windows')
+  })
+
   it('publishes existing stable npm assets without rebuilding or changing product channels', () => {
     const job = workflow.jobs['publish-existing-npm']
     expect(job.if).toBe("inputs.operation == 'publish-npm'")
@@ -84,7 +123,7 @@ describe('Release workflow critical path', () => {
       operation: {
         required: true,
         type: 'choice',
-        options: ['release', 'mirror', 'publish-npm', 'verify-npm'],
+        options: ['release', 'mirror', 'publish-npm', 'verify-npm', 'verify-desktop', 'verify-desktop-rehearsal', 'benchmark-cli', 'rehearse-desktop'],
       },
       tag: {
         required: false,
@@ -97,7 +136,7 @@ describe('Release workflow critical path', () => {
       },
     })
     expect(workflow.concurrency).toEqual({
-      group: 'openalice-release-publication',
+      group: "${{ inputs.operation == 'rehearse-desktop' && format('desktop-rehearsal-{0}', github.ref) || inputs.operation == 'benchmark-cli' && format('cli-benchmark-{0}', github.ref) || startsWith(inputs.operation, 'verify-desktop') && format('desktop-replay-{0}-{1}', inputs.candidate-run, inputs.desktop-target) || 'openalice-release-publication' }}",
       'cancel-in-progress': false,
     })
 
@@ -166,13 +205,13 @@ describe('Release workflow critical path', () => {
   })
 
   it('bounds native candidate jobs without weakening downstream gates', () => {
-    expect(workflow.jobs['build-desktop']['timeout-minutes']).toBe(45)
+    expect(desktopWorkflow.jobs.build['timeout-minutes']).toBe(45)
     expect(workflow.jobs['build-broker-packs']['timeout-minutes']).toBe(30)
     expect(workflow.jobs['build-cli-release']['timeout-minutes']).toBe(45)
   })
 
   it('builds native Broker Packs outside the desktop package jobs', () => {
-    const desktop = workflow.jobs['build-desktop']
+    const desktop = desktopWorkflow.jobs.build
     const brokerPacks = workflow.jobs['build-broker-packs']
 
     expect(desktop.steps?.map((candidate) => candidate.name)).not.toContain('Build optional Broker Packs')
@@ -188,16 +227,24 @@ describe('Release workflow critical path', () => {
   })
 
   it('keeps current desktop candidates on beta and N-1 acceptance on stable', () => {
-    const desktop = workflow.jobs['build-desktop']
-    const upgrade = workflow.jobs['accept-desktop-upgrade']
+    const desktop = desktopWorkflow.jobs.build
+    const upgrade = desktopWorkflow.jobs.upgrade
 
     expect(step(desktop, 'Preserve desktop release candidate').uses).toBe('actions/upload-artifact@v4')
     expect(step(desktop, 'Preserve desktop release candidate').with?.['retention-days']).toBe(3)
     expect(desktop.steps?.map((candidate) => candidate.name)).not.toContain(
       'Prove final desktop artifact upgrades previous release state',
     )
-    expect(needs(upgrade)).toEqual(['release', 'build-desktop'])
-    expect(upgrade.if).toContain("needs.release.outputs.channel == 'stable'")
+    expect(needs(upgrade)).toEqual(['build', 'restore'])
+    expect(upgrade.if).toContain("inputs.channel == 'stable'")
+    expect(upgrade.if).toContain("needs.build.result == 'success' || needs.restore.result == 'success'")
+    expect(workflow.jobs['accept-desktop-upgrade']).toBeUndefined()
+    expect(workflow.jobs['build-desktop'].uses).toBe('./.github/workflows/release-desktop-platform.yml')
+    expect(workflow.jobs['build-desktop'].with).toMatchObject({
+      os: '${{ matrix.os }}', arch: '${{ matrix.arch }}',
+      channel: '${{ needs.release.outputs.channel }}',
+      'previous-tag': '${{ needs.release.outputs.previous_tag }}',
+    })
     expect(step(upgrade, 'Restore desktop release candidate').uses).toBe('actions/download-artifact@v4')
     expect(step(upgrade, 'Prove final desktop artifact upgrades previous release state')).toBeDefined()
   })
@@ -206,7 +253,6 @@ describe('Release workflow critical path', () => {
     expect(needs(workflow.jobs['publish-release'])).toEqual(expect.arrayContaining([
       'preflight-public-cli-authority',
       'build-desktop',
-      'accept-desktop-upgrade',
       'build-broker-packs',
       'build-cli-release',
       'build-cli-package-channels',
@@ -225,15 +271,13 @@ describe('Release workflow critical path', () => {
     ]) expect(publication).toContain(common)
     for (const stable of [
       "needs.preflight-public-cli-authority.result == 'success'",
-      "needs.accept-desktop-upgrade.result == 'success'",
       "needs.accept-cli-legacy-cutover.result == 'success'",
       "needs.accept-cli-homebrew.result == 'success'",
       "needs.accept-cli-linuxbrew.result == 'success'",
       "needs.accept-cli-aur.result == 'success'",
     ]) expect(publication).toContain(stable)
-    expect(publication.indexOf("needs.release.outputs.channel == 'beta'")).toBeLessThan(
-      publication.indexOf("needs.accept-desktop-upgrade.result == 'success'"),
-    )
+    // The reusable platform result includes upgrade acceptance for stable.
+    expect(desktopWorkflow.jobs.upgrade.if).toContain("inputs.channel == 'stable'")
   })
 
   it('reserves public-channel authority checks for stable without delaying beta builders', () => {
@@ -269,16 +313,16 @@ describe('Release workflow critical path', () => {
   })
 
   it('keeps beta behind real candidate build, startup, installer, and integrity checks', () => {
-    const desktop = workflow.jobs['build-desktop']
+    const desktop = desktopWorkflow.jobs.build
     const nativeCli = workflow.jobs['build-cli-release']
     const installer = workflow.jobs['cli-installer-acceptance']
 
-    expect(desktop.strategy?.matrix?.include).toEqual([
+    expect(workflow.jobs['build-desktop'].strategy?.matrix?.include).toEqual([
       { os: 'macos-14', arch: 'arm64' },
       { os: 'macos-15-intel', arch: 'x64' },
       { os: 'windows-latest', arch: 'x64' },
     ])
-    expect(step(desktop, 'Package macOS installer').if).toBe("runner.os == 'macOS'")
+    expect(step(desktop, 'Package macOS installer').if).toBe("runner.os == 'macOS' && !inputs.rehearsal")
     expect(step(desktop, 'Prove release candidate Workspace CLI acceptance').if).toBeUndefined()
     expect(step(desktop, 'Verify candidate update metadata and referenced bytes').if).toBeUndefined()
     const boot = step(nativeCli, 'Install and boot the native candidate outside the checkout').run ?? ''
@@ -305,7 +349,7 @@ describe('Release workflow critical path', () => {
       { os: 'ubuntu-24.04-arm', platform: 'linux', arch: 'arm64' },
     ])
     expect(nativeCli.steps?.some((candidate) => candidate.uses === 'oven-sh/setup-bun@v2')).toBe(true)
-    expect(step(nativeCli, 'Build Alice and native CLI').run).toContain('build:bun-runtime:feasibility')
+    expect(step(nativeCli, 'Build native CLI').run).toContain('build:bun-runtime:feasibility')
     expect(step(nativeCli, 'Preserve accepted native CLI').with?.name).toBe(
       'cli-release-${{ matrix.platform }}-${{ matrix.arch }}',
     )
@@ -315,6 +359,125 @@ describe('Release workflow critical path', () => {
     ]) {
       expect(step(publication, name).with?.files).toContain('dist/release-cli/*.tar.gz.sha256')
     }
+  })
+
+  it('selects integrated verifier code without relabelling product bytes', () => {
+    const selection = step(workflow.jobs.release, 'Select trusted desktop verifier without changing product source')
+    expect(selection.run).toBe('node scripts/select-release-verifier.mjs')
+    expect(selection.env?.RELEASE_VERIFIER_SHA).toBe('${{ inputs.desktop-verifier-sha }}')
+    expect(workflow.jobs['build-desktop'].with?.['verifier-sha']).toBe('${{ needs.release.outputs.verifier_sha }}')
+    const upgrade = desktopWorkflow.jobs.upgrade
+    expect(upgrade.steps?.find((entry) => entry.uses === 'actions/checkout@v7')?.with?.ref)
+      .toBe('${{ inputs.verifier-sha || github.sha }}')
+    expect(desktopWorkflow.jobs.build.steps?.find((entry) => entry.uses === 'actions/checkout@v7')?.with?.ref).toBeUndefined()
+    expect(upgrade.env?.CANDIDATE_SOURCE_SHA).toBe('${{ github.sha }}')
+    expect(upgrade.env?.CANDIDATE_VERSION).toBe('${{ inputs.version }}')
+    expect(upgrade.env?.CANDIDATE_VERIFIER_SHA).toBe('${{ inputs.verifier-sha || github.sha }}')
+    expect(step(workflow.jobs['publish-release'], 'Verify and stage the complete desktop candidate set').env?.CANDIDATE_VERIFIER_SHA)
+      .toBe('${{ needs.release.outputs.verifier_sha }}')
+  })
+
+  it('keeps unsigned rehearsal artifacts and authority separate from publication', () => {
+    const rehearsal = workflow.jobs['rehearse-desktop']
+    expect(rehearsal.if).toBe("inputs.operation == 'rehearse-desktop'")
+    expect(rehearsal.uses).toBe(workflow.jobs['build-desktop'].uses)
+    expect(rehearsal.with?.rehearsal).toBe(true)
+    expect(workflow.jobs['build-desktop'].with?.rehearsal).toBeUndefined()
+    expect(rehearsal.permissions).toEqual({ contents: 'read', actions: 'read' })
+    expect(Object.keys(rehearsal)).not.toContain('secrets')
+    expect(step(desktopWorkflow.jobs.build, 'Write Apple notarization API key').if).toContain('!inputs.rehearsal')
+    expect(step(desktopWorkflow.jobs.build, 'Package unsigned macOS rehearsal').run).toContain('-c.mac.notarize=false')
+    expect(step(desktopWorkflow.jobs.build, 'Preserve desktop release candidate').with?.name)
+      .toBe("${{ inputs.rehearsal && 'rehearsal' || 'release' }}-assets-${{ runner.os }}-${{ inputs.arch }}")
+  })
+
+  it('reuses same-source desktop bytes through the normal final publication gate', () => {
+    expect(workflow.jobs['build-desktop'].permissions).toEqual({ contents: 'read', actions: 'read' })
+    expect(workflow.jobs['build-desktop'].with?.['candidate-run']).toBe('${{ inputs.candidate-run }}')
+    expect(desktopWorkflow.jobs.build.if).toBe("inputs.candidate-run == ''")
+    const restore = desktopWorkflow.jobs.restore
+    expect(restore.if).toBe("inputs.candidate-run != ''")
+    const selection = step(restore, 'Select same-source preserved candidate')
+    const verification = step(restore, 'Verify restored product and exact bytes')
+    const upload = step(restore, 'Preserve unchanged candidate in this run')
+    expect(selection.run).toContain('select-release-candidate.mjs')
+    expect(verification.run).toContain('verify-selected')
+    expect(restore.steps!.indexOf(verification)).toBeLessThan(restore.steps!.indexOf(upload))
+    expect(restore.steps?.some((entry) => entry.run?.includes('build') || entry.run?.includes('pnpm install'))).toBe(false)
+    expect(step(workflow.jobs['publish-release'], 'Verify and stage the complete desktop candidate set').run)
+      .toContain('desktop-candidate-receipt.mjs stage')
+  })
+
+  it('benchmarks actual CLI consumers without public or signing authority', () => {
+    const job = workflow.jobs['benchmark-cli']
+    expect(job.if).toBe("inputs.operation == 'benchmark-cli'")
+    expect(job.permissions).toEqual({ contents: 'read' })
+    const text = readFileSync(resolve(root, '.github/workflows/release-cli-benchmark.yml'), 'utf8')
+    const benchmark = YAML.parse(text)
+    expect(benchmark.jobs.consumer.strategy.matrix.mode).toEqual(['rebuild', 'restore'])
+    expect(benchmark.jobs.consumer['runs-on']).toBe(benchmark.jobs.inputs['runs-on'])
+    expect(text).not.toMatch(/secrets:|contents: write|id-token: write|gh release|npm publish|electron-builder/)
+    expect(step(benchmark.jobs.consumer, 'Accept real multiprocess Runtime').run).toBe('pnpm build:bun-runtime:feasibility')
+    expect(step(benchmark.jobs.consumer, 'Build and accept real native archive').run).toBe('pnpm build:bun:release')
+  })
+
+  it('replays one selected desktop without build or publication authority', () => {
+    const replay = workflow.jobs['replay-desktop']
+    expect(replay.if).toBe("(inputs.operation == 'verify-desktop' || inputs.operation == 'verify-desktop-rehearsal') && inputs.channel == 'stable'")
+    expect(replay.with?.rehearsal).toBe("${{ inputs.operation == 'verify-desktop-rehearsal' }}")
+    expect(replay.permissions).toEqual({ contents: 'read', actions: 'read' })
+    expect(replay.uses).toBe('./.github/workflows/release-desktop-replay.yml')
+    const source = readFileSync(resolve(root, '.github/workflows/release-desktop-replay.yml'), 'utf8')
+    const called = YAML.parse(source).jobs.upgrade as WorkflowJob
+    const selection = step(called, 'Select trusted candidate artifact')
+    const verification = step(called, 'Verify selected candidate bytes')
+    const acceptance = step(called, 'Accept preserved final artifact without rebuilding')
+    expect(called.steps!.indexOf(selection)).toBeLessThan(called.steps!.indexOf(verification))
+    expect(called.steps!.indexOf(verification)).toBeLessThan(called.steps!.indexOf(acceptance))
+    expect(called.steps?.find((entry) => entry.uses === 'actions/download-artifact@v5')?.with?.['artifact-ids'])
+      .toBe('${{ steps.candidate.outputs.artifact-id }}')
+    expect(source).not.toMatch(/secrets:|contents: write|electron-builder|pnpm electron:build|gh release/)
+    expect(step(called, 'Bind acceptance to unchanged bytes and current verifier').run).toContain('bind-upgrade')
+  })
+
+  it('joins full same-dispatch source validation only at stable publication', () => {
+    const source = workflow.jobs['validate-stable-source']
+    expect(source.uses).toBe('./.github/workflows/ci.yml')
+    expect(source.with).toBeUndefined() // No alternate product revision.
+    expect(needs(source)).toEqual(['release'])
+    expect(source.if).toContain("needs.release.outputs.channel == 'stable'")
+    for (const name of ['build-desktop', 'build-cli-neutral', 'build-cli-windows', 'build-cli-release']) {
+      expect(needs(workflow.jobs[name])).not.toContain('validate-stable-source')
+    }
+    const publication = workflow.jobs['publish-release']
+    expect(needs(publication)).toContain('validate-stable-source')
+    expect(publication.if).toContain("needs.validate-stable-source.result == 'success'")
+    const fullSource = YAML.parse(readFileSync(resolve(root, '.github/workflows/ci.yml'), 'utf8'))
+    expect(fullSource.on).toHaveProperty('workflow_call')
+    for (const name of ['workspace-build', 'hermetic-tests', 'cross-platform-test', 'dev-smoke']) {
+      expect(fullSource.jobs[name].if).toContain("github.event_name == 'workflow_dispatch'")
+      expect(fullSource.jobs[name]['continue-on-error']).toBeUndefined()
+      const checkout = fullSource.jobs[name].steps.find((entry: WorkflowStep) => entry.uses === 'actions/checkout@v7')
+      expect(checkout.with?.ref).toBeUndefined()
+    }
+  })
+
+  it('shares commit-bound neutral inputs without skipping native acceptance', () => {
+    const shared = workflow.jobs['build-cli-neutral']
+    const native = workflow.jobs['build-cli-release']
+    const windows = workflow.jobs['build-cli-windows']
+    expect(needs(shared)).toEqual(['release'])
+    expect(shared.steps?.filter((entry) => entry.run === 'pnpm build:server')).toHaveLength(1)
+    expect(step(shared, 'Record commit-bound platform-neutral inputs').run).toContain('--commit "$GITHUB_SHA"')
+    expect(needs(native)).toContain('build-cli-neutral')
+    expect(needs(windows)).toContain('build-cli-neutral')
+    const verify = step(native, 'Verify and install shared CLI inputs')
+    expect(verify.run).toContain('--commit "$GITHUB_SHA" --install')
+    expect(native.steps!.indexOf(verify)).toBeLessThan(native.steps!.indexOf(step(native, 'Build native CLI')))
+    expect(native.steps?.some((entry) => entry.run?.includes('pnpm build:server'))).toBe(false)
+    expect(windows.with?.neutral_inputs).toBe(true)
+    expect(windows.with?.neutral_artifact).toBe('release-neutral-inputs')
+    expect(windows.with?.native_acceptance).toBe("${{ needs.release.outputs.channel == 'stable' }}")
   })
 
   it('accepts manager installs and derives every channel from accepted archives', () => {

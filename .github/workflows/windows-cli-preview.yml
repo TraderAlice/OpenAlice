@@ -29,6 +29,9 @@ on:
       neutral_inputs:
         type: boolean
         default: false
+      neutral_artifact:
+        type: string
+        default: rolling-dev-neutral-inputs
       candidate_run:
         type: string
         default: ''
@@ -76,11 +79,11 @@ jobs:
         if: inputs.candidate_run == ''
       - run: pnpm build:server
         if: inputs.candidate_run == '' && !inputs.neutral_inputs
-      - name: Reuse shared server inputs on dev
+      - name: Reuse shared server inputs
         if: inputs.candidate_run == '' && inputs.neutral_inputs
         uses: actions/download-artifact@v4
         with:
-          name: rolling-dev-neutral-inputs
+          name: ${{ inputs.neutral_artifact }}
           path: dist/dev-neutral-inputs
       - name: Verify shared server inputs
         if: inputs.candidate_run == '' && inputs.neutral_inputs
