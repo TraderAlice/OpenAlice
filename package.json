@@ -1,6 +1,6 @@
 {
   "name": "open-alice",
-  "version": "0.91.1-beta.1",
+  "version": "0.91.1",
   "description": "File-based trading agent engine",
   "type": "module",
   "imports": {
