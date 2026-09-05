@@ -272,8 +272,12 @@ export class FeishuConnectorAdapter implements ConnectorAdapter {
 
   private registerCommands(context: ConnectorAdapterContext): void {
     context.commands.register('link', async ({ userId, chatId, reply }) => {
-      if (this.ownerUserId && this.ownerUserId !== userId) {
+if (this.ownerUserId && this.ownerUserId !== userId) {
         await reply('This connector is already linked to another account.')
+        return
+      }
+      if (!this.ownerUserId) {
+        await reply('This connector requires the owner account to be configured in Connector settings before linking. First-come /link binding is disabled to prevent a takeover by whoever messages the bot first.')
         return
       }
       if (!chatId) throw new Error('Feishu private chat ID is missing')
