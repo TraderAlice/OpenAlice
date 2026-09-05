@@ -434,11 +434,17 @@ changes reset the visible batch; full story text remains expandable. Polling
 waits for an outstanding request instead of repeatedly replacing a slow load,
 while explicit refresh, query changes and unmount cancel superseded requests.
 
-Market directory headings are independent disclosure controls: News, Markets,
-Macro and Watchlist fold without navigating; child rows navigate.
-Their local open state survives view changes inside the mounted market shell.
-Hidden descendants remain mounted but are excluded from focus and accessibility
-navigation by the native hidden attribute. No new persisted preference is added.
+Market directory headings (News, Markets, Macro, Watchlist) are static captions.
+Only News category groups disclose children, with one consistent indentation
+level and trailing chevrons. Only destination rows receive page selection
+styling; a collapsed category group shows the selected category as a plain
+summary. Restoring a News selection reveals its group, while users can still
+collapse it manually. Search results appear immediately below the search field.
+The shared Base UI Collapsible owns keyboard/ARIA and measured panel lifetime;
+its 180ms height/opacity transition is disabled with reduced motion. Closing
+panels become inert and aria-hidden immediately, including during animation.
+The same directory and touch-sized controls serve the narrow-screen drawer.
+No new persisted preference is added.
 
 Keyboard focus is not a motion effect. Interactive controls still require a
 clear `focus-visible` treatment, meaningful labels, and sensible tab order.

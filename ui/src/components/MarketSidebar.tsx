@@ -1,7 +1,7 @@
-import { useEffect, useId, useState, type ReactNode } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router-dom'
-import { ChevronRight, X } from 'lucide-react'
+import { X } from 'lucide-react'
 import { type AssetClass, type BarSourceCandidate } from '../api/market'
 import { useAssetSearch } from './market/useAssetSearch'
 import { useWorkspace } from '../tabs/store'
@@ -97,7 +97,7 @@ export function MarketSidebar({ onNavigate }: { onNavigate?: () => void }) {
   }
 
   return (
-    <div className="flex flex-col gap-3 h-full overflow-hidden">
+    <div className="flex flex-col gap-1 h-full overflow-hidden">
       {/* Search box */}
       <div className="px-3 pt-2 shrink-0">
         <input
@@ -111,9 +111,46 @@ export function MarketSidebar({ onNavigate }: { onNavigate?: () => void }) {
         />
       </div>
 
-      <div className="flex-1 overflow-y-auto min-h-0">
-        <MarketSection label={t('nav.item.news')} initiallyOpen={isFocused('news')} active={isFocused('news')}>
-          <NewsMarketNavigation active={isFocused('news')} category={focusedSpec?.kind === 'news' ? focusedSpec.params.category ?? null : null} onSelect={(category) => {
+      <div className="flex-1 overflow-y-auto min-h-0 pb-4">
+        {/* Search results — only when query is non-empty */}
+        {query.trim() && (
+          <>
+            <SidebarSectionHeader>
+              {t('market.searchResults')}{loading ? ` (${t('common.searching')})` : results.length ? ` (${results.length})` : ''}
+            </SidebarSectionHeader>
+            {loading && (
+              <div className="flex items-center gap-2 px-3 py-2 text-[12px] leading-[18px] text-muted-foreground">
+                <Spinner size="sm" />
+                <span>{t('common.searching')}</span>
+              </div>
+            )}
+            {!loading && results.length === 0 && (
+              <p className="px-3 py-2 text-[12px] leading-relaxed text-muted-foreground">{t('market.noMatches')}</p>
+            )}
+            {results.map((c, index) => (
+              <div
+                key={c.barId}
+                data-keyboard-highlighted={index === highlight ? 'true' : 'false'}
+                onMouseEnter={() => setHighlight(index)}
+                className={index === highlight ? 'bg-muted/70' : undefined}
+              >
+                <SidebarRow
+                  label={
+                    <span className="flex items-center gap-1.5 min-w-0">
+                      <span className="font-mono font-semibold shrink-0">{c.symbol}</span>
+                      {c.name && <span className="text-muted-foreground truncate">{c.name}</span>}
+                    </span>
+                  }
+                  active={isFocusedDetail(routeAssetClass(c.assetClass), c.symbol, c.barId)}
+                  onClick={() => handleSelectResult(c)}
+                  trail={<SourceTrail c={c} />}
+                />
+              </div>
+            ))}
+          </>
+        )}
+
+        <NewsMarketNavigation active={isFocused('news')} category={focusedSpec?.kind === 'news' ? focusedSpec.params.category ?? null : null} onSelect={(category) => {
             const next = new URLSearchParams()
             if (focusedSpec?.kind === 'news' && focusedSpec.params.view) next.set('view', focusedSpec.params.view)
             if (category) next.set('category', category)
@@ -121,7 +158,6 @@ export function MarketSidebar({ onNavigate }: { onNavigate?: () => void }) {
             navigate({ pathname: '/market/news', search: next.toString() })
             onNavigate?.()
           }} />
-        </MarketSection>
         <MarketSection label={t('market.marketsSection')}>
           <SidebarRow
             label={t('market.browseMarkets')}
@@ -172,44 +208,6 @@ export function MarketSidebar({ onNavigate }: { onNavigate?: () => void }) {
           />
         </MarketSection>
 
-        {/* Search results — only when query is non-empty */}
-        {query.trim() && (
-          <>
-            <SidebarSectionHeader>
-              {t('market.searchResults')}{loading ? ` (${t('common.searching')})` : results.length ? ` (${results.length})` : ''}
-            </SidebarSectionHeader>
-            {loading && (
-              <div className="flex items-center gap-2 px-3 py-2 text-[12px] leading-[18px] text-muted-foreground">
-                <Spinner size="sm" />
-                <span>{t('common.searching')}</span>
-              </div>
-            )}
-            {!loading && results.length === 0 && (
-              <p className="px-3 py-2 text-[12px] leading-relaxed text-muted-foreground">{t('market.noMatches')}</p>
-            )}
-            {results.map((c, index) => (
-              <div
-                key={c.barId}
-                data-keyboard-highlighted={index === highlight ? 'true' : 'false'}
-                onMouseEnter={() => setHighlight(index)}
-                className={index === highlight ? 'bg-muted/70' : undefined}
-              >
-                <SidebarRow
-                  label={
-                    <span className="flex items-center gap-1.5 min-w-0">
-                      <span className="font-mono font-semibold shrink-0">{c.symbol}</span>
-                      {c.name && <span className="text-muted-foreground truncate">{c.name}</span>}
-                    </span>
-                  }
-                  active={isFocusedDetail(routeAssetClass(c.assetClass), c.symbol, c.barId)}
-                  onClick={() => handleSelectResult(c)}
-                  trail={<SourceTrail c={c} />}
-                />
-              </div>
-            ))}
-          </>
-        )}
-
         {/* Watchlist */}
         <MarketSection label={t('market.watchlist')} count={watchlist.length}>
         {watchlist.length === 0 ? (
@@ -255,23 +253,17 @@ export function MarketSidebar({ onNavigate }: { onNavigate?: () => void }) {
   )
 }
 
-function MarketSection({ label, children, initiallyOpen = true, active = false, count }: {
+function MarketSection({ label, children, count }: {
   label: string
   children: ReactNode
-  initiallyOpen?: boolean
-  active?: boolean
   count?: number
 }) {
-  const id = useId()
-  const [open, setOpen] = useState(initiallyOpen)
-  useEffect(() => { if (active) setOpen(true) }, [active])
   return (
-    <section role="group" aria-label={label} className="mt-2">
-      <SidebarRow label={label} active={active && !open} ariaExpanded={open} ariaControls={id}
-        icon={<ChevronRight className={open ? 'size-3.5 rotate-90' : 'size-3.5'} aria-hidden />}
-        trail={count ? <span className="text-xs tabular-nums text-muted-foreground">{count}</span> : undefined}
-        onClick={() => setOpen((current) => !current)} />
-      <div id={id} hidden={!open}>{children}</div>
+    <section role="group" aria-label={label} className="mt-3">
+      <SidebarSectionHeader trailing={count ? <span className="text-[11px] tabular-nums text-muted-foreground">{count}</span> : undefined}>
+        {label}
+      </SidebarSectionHeader>
+      {children}
     </section>
   )
 }

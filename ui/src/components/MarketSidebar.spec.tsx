@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 
 import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { MemoryRouter, useLocation } from 'react-router-dom'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -156,26 +157,40 @@ describe('MarketSidebar search keyboard controls', () => {
       return <output aria-label="Current route">{location.pathname}</output>
     }
     render(<MemoryRouter initialEntries={['/market']}><MarketSidebar /><Location /></MemoryRouter>)
-    fireEvent.click(screen.getByRole('button', { name: 'News' }))
+    expect(screen.getByRole('heading', { name: 'News' })).toBeTruthy()
     expect(screen.getByLabelText('Current route').textContent).toBe('/market')
     fireEvent.click(screen.getByRole('button', { name: 'All news' }))
     expect(screen.getByLabelText('Current route').textContent).toBe('/market/news')
   })
 
-  it('folds each market directory independently without changing the active view', () => {
-    useWorkspace.getState().openOrFocus({ kind: 'news', params: {} })
+  it('keeps directory headings static and preserves selection when a category group is collapsed', async () => {
+    const user = userEvent.setup()
+    useWorkspace.getState().openOrFocus({ kind: 'news', params: { category: 'us' } })
     renderSidebar()
     const active = getFocusedTab(useWorkspace.getState())
     for (const label of ['News', 'Markets', 'Macro', 'Watchlist']) {
       const group = screen.getByRole('group', { name: label })
-      const heading = within(group).getAllByRole('button')[0]
-      expect(heading.getAttribute('aria-expanded')).toBe('true')
-      fireEvent.click(heading)
-      expect(heading.getAttribute('aria-expanded')).toBe('false')
-      expect(within(group).getAllByRole('button')).toEqual([heading])
-      expect(getFocusedTab(useWorkspace.getState())).toBe(active)
-      fireEvent.keyDown(heading, { key: 'Enter' })
-      expect(heading.getAttribute('aria-expanded')).toBe('true')
+      expect(within(group).getByRole('heading', { name: label })).toBeTruthy()
     }
+    const toggle = screen.getByRole('button', { name: 'Equity markets' })
+    toggle.focus()
+    await user.keyboard('{Enter}')
+    expect(toggle.getAttribute('aria-expanded')).toBe('false')
+    expect(toggle.textContent).toContain('US Stocks')
+    expect(toggle.getAttribute('aria-current')).toBeNull()
+    const navigation = screen.getByRole('navigation', { name: 'News categories' })
+    expect(within(navigation).queryByRole('button', { name: 'US Stocks' })).toBeNull()
+    expect(getFocusedTab(useWorkspace.getState())).toBe(active)
+    await user.keyboard(' ')
+    expect(toggle.getAttribute('aria-expanded')).toBe('true')
+    expect(within(navigation).getByRole('button', { name: 'US Stocks' }).getAttribute('aria-current')).toBe('page')
+  })
+
+  it('places search results before the news directory', () => {
+    renderSidebar()
+    fireEvent.change(screen.getByRole('textbox', { name: 'Search assets…' }), { target: { value: 'apple' } })
+    const headings = screen.getAllByRole('heading')
+    expect(headings[0].textContent).toContain(i18n.t('market.searchResults'))
+    expect(headings[1].textContent).toBe('News')
   })
 })
