@@ -547,17 +547,31 @@ export class TradingGit implements ITradingGit {
   // raw Order instances stay private to staging / push internals, never
   // observed by external callers (UI, MCP, c.json, on-disk commit.json).
   private projectOperation(op: Operation): Operation {
+    // Contract carries its own sentinels: `strike` defaults to UNSET_DOUBLE.
     if (op.action === 'placeOrder' || op.action === 'observeExternalOrder') {
-      return { ...op, order: OrderHelper.toWire(op.order) as unknown as Order }
+      return {
+        ...op,
+        contract: OrderHelper.scrub(op.contract),
+        order: OrderHelper.toWire(op.order) as unknown as Order,
+      }
     }
     if (op.action === 'modifyOrder') {
       return { ...op, changes: OrderHelper.toWire(op.changes) as unknown as Partial<Order> }
     }
+    if (op.action === 'closePosition') {
+      return { ...op, contract: OrderHelper.scrub(op.contract) }
+    }
     return op
   }
 
+  // Results carry sentinels too, scrubbed here rather than at every call site
+  // that builds one.
   private projectCommit(commit: GitCommit): GitCommit {
-    return { ...commit, operations: commit.operations.map((op) => this.projectOperation(op)) }
+    return {
+      ...commit,
+      operations: commit.operations.map((op) => this.projectOperation(op)),
+      results: commit.results.map((result) => OrderHelper.scrub(result)),
+    }
   }
 
   // ==================== Serialization ====================
@@ -942,11 +956,13 @@ export class TradingGit implements ITradingGit {
     const success = rawObj.success === true
 
     if (!success) {
+      // `||` not `??`: an empty-string error leaves the ledger row reading as a
+      // bare "rejected" with no reason, which invites a duplicate re-placement.
       return {
         action: op.action,
         success: false,
         status: 'rejected',
-        error: (rawObj.error as string) ?? 'Unknown error',
+        error: (rawObj.error as string) || 'Unknown error',
         raw,
       }
     }
@@ -966,12 +982,19 @@ export class TradingGit implements ITradingGit {
     }
   }
 
-  /** Map IBKR-style OrderState.status to OperationStatus. */
+  /**
+   * Maps IBKR-style OrderState.status to OperationStatus. Only reached on the
+   * `success: true` path, so `Inactive` is a legitimate hold and must stay in
+   * the pending lane rather than mapping to `rejected`.
+   */
   private mapOrderStatus(orderState?: { status?: string }): OperationStatus {
     switch (orderState?.status) {
       case 'Filled': return 'filled'
-      case 'Cancelled': return 'cancelled'
-      case 'Inactive': return 'rejected'
+      case 'Cancelled':
+      case 'ApiCancelled': return 'cancelled'
+      // Non-IBKR adapters surface a terminal venue refusal as 'Rejected'
+      // rather than 'Inactive', so it needs its own terminal mapping.
+      case 'Rejected': return 'rejected'
       default: return 'submitted'
     }
   }

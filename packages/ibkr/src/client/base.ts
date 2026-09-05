@@ -88,6 +88,9 @@ export class EClient {
   }
 
   reset(): void {
+    // A batched drain may still hold frames from this connection, and this
+    // instance is reused on reconnect.
+    this.reader?.stop()
     this.decoder = null
     this.conn = null
     this.host = null
@@ -307,10 +310,24 @@ export class EClient {
       throw error
     }
 
-    if (frame.kind === 'protobuf') {
-      this.decoder.processProtoBuf(frame.payload, frame.msgId)
-    } else {
-      this.decoder.interpret(frame.msgId, readFields(frame.payload))
+    try {
+      if (frame.kind === 'protobuf') {
+        this.decoder.processProtoBuf(frame.payload, frame.msgId)
+      } else {
+        this.decoder.interpret(frame.msgId, readFields(frame.payload))
+      }
+    } catch (error) {
+      // Lost framing alignment is unrecoverable, so rethrow and let the reader
+      // tear the connection down. Anything else is a consumer-side defect on one
+      // already-parsed message.
+      if (error instanceof BadMessage) throw error
+      this.wrapper.error(
+        NO_VALID_ID,
+        currentTimeMillis(),
+        errors.BAD_MESSAGE.code(),
+        `Handler failure for ${frame.kind} msgId=${frame.msgId}`,
+        '',
+      )
     }
   }
 

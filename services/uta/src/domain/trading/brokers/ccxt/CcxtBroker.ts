@@ -28,6 +28,7 @@ import {
   type BarParams,
   type SubAccountRef,
 } from '../types.js'
+import { refuseOcaLinkage } from '../../oca.js'
 import '../../contract-ext.js'
 import { buildPosition } from '../contract-builder.js'
 import { CCXT_CREDENTIAL_FIELDS, type CcxtBrokerConfig, type CcxtMarket, type FundingRate, type OrderBook, type OrderBookLevel } from './ccxt-types.js'
@@ -508,6 +509,7 @@ export class CcxtBroker implements IBroker<CcxtBrokerMeta> {
 
   async placeOrder(contract: Contract, order: Order, tpsl?: TpSlParams, extraParams?: Record<string, unknown>): Promise<PlaceOrderResult> {
     this.ensureInit()
+    refuseOcaLinkage(this.exchangeName, order)
 
 
     const ccxtSymbol = contractToCcxt(contract, this.markets, this.exchangeName)
@@ -646,6 +648,7 @@ export class CcxtBroker implements IBroker<CcxtBrokerMeta> {
 
   async modifyOrder(orderId: string, changes: Partial<Order>): Promise<PlaceOrderResult> {
     this.ensureInit()
+    refuseOcaLinkage(this.exchangeName, changes)
 
     try {
       const ccxtSymbol = this.orderSymbolCache.get(orderId)

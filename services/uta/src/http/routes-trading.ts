@@ -36,6 +36,9 @@ const placeOrderSchema = z.object({
   outsideRth: z.boolean().optional(),
   parentId: z.string().optional(),
   ocaGroup: z.string().optional(),
+  // Zod strips unknown keys, so a field omitted here never reaches staging and
+  // the order goes out with the broker default instead.
+  ocaType: z.union([z.literal(1), z.literal(2), z.literal(3)]).optional(),
   takeProfit: z.object({ price: numericString }).optional(),
   stopLoss: z.object({ price: numericString, limitPrice: numericString.optional() }).optional(),
   subAccountId: z.string().optional(),
@@ -353,8 +356,8 @@ export function createTradingRoutes(ctx: UTAEngineContext) {
       const params = { ...(body.params ?? {}) }
       if (params.start) params.start = new Date(params.start)
       if (params.end) params.end = new Date(params.end)
-      const bars = await account.getHistorical(contract, params)
-      return c.json({ bars })
+      // The effective session is part of the answer, not a request echo.
+      return c.json(await account.getHistorical(contract, params))
     } catch (err) {
       return c.json({ error: err instanceof Error ? err.message : String(err) }, 500)
     }

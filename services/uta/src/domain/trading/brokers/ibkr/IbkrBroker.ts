@@ -23,6 +23,9 @@ import {
   OrderState,
   ContractDescription,
   type ContractDetails,
+  UNSET_DECIMAL,
+  UNSET_DOUBLE,
+  UNSET_INTEGER,
 } from '@traderalice/ibkr'
 import {
   BrokerError,
@@ -39,17 +42,102 @@ import {
   type TpSlParams,
   type ExpandContractFilters,
   type ContractExpansion,
+  type Bar,
+  type BarParams,
 } from '../types.js'
 import '../../contract-ext.js'
 import { derivePositionMath } from '../../position-math.js'
-import { RequestBridge } from './request-bridge.js'
+import { RequestBridge, acceptsCancelStatus } from './request-bridge.js'
 import { resolveSymbol } from './ibkr-contracts.js'
+import { applyStandaloneOcaType, buildIbkrBracket, refuseBracketOcaGroup } from './ibkr-bracket.js'
+import { refuseOcaRevision } from '../../oca.js'
+import {
+  IBKR_SUPPORTED_BAR_SIZES,
+  buildHistoricalRequest,
+  classifyHistoricalError,
+  decodeBars,
+} from './ibkr-historical.js'
 import type { IbkrBrokerConfig } from './ibkr-types.js'
 
-const WRITE_LIVENESS_TIMEOUT_MS = 3_000
+// IB Gateway can defer a currentTime reply well past a second under its own
+// load, so the probe is a coarse failure detector, not a latency assertion.
+const WRITE_LIVENESS_TIMEOUT_MS = 10_000
+const HEARTBEAT_INTERVAL_MS = 45_000
+const HEARTBEAT_PROBE_TIMEOUT_MS = 15_000
+const HEARTBEAT_MISS_THRESHOLD = 2
+// Inbound account pushes prove the socket still delivers, not that it still
+// accepts, so the exemption is bounded or a half-open socket hides forever
+// (issue #294).
+const HEARTBEAT_INBOUND_EXEMPTION_LIMIT = 3
+
+/** Order fields a modify may revise, checked against the venue echo. */
+const MODIFIABLE_ECHO_FIELDS = [
+  'totalQuantity', 'lmtPrice', 'auxPrice', 'tif', 'orderType',
+  'trailingPercent', 'trailStopPrice', 'goodTillDate', 'outsideRth',
+] as const
+
+/** Render a field value for an operator-facing diff message. */
+function renderEchoValue(value: unknown): string {
+  return Decimal.isDecimal(value) ? (value as Decimal).toString() : String(value)
+}
+
+/**
+ * Is a value the venue's "field absent" answer? IBKR sends UNSET sentinels and
+ * empty strings for fields it did not populate, which is not a rejected change.
+ */
+function isEchoAbsent(value: unknown): boolean {
+  if (value == null) return true
+  if (typeof value === 'string') return value === ''
+  if (Decimal.isDecimal(value)) return (value as Decimal).equals(UNSET_DECIMAL)
+  if (typeof value === 'number') return value === UNSET_DOUBLE || value === UNSET_INTEGER
+  return false
+}
+
+/** Did the venue actually apply `requested` for this field? */
+function echoMatches(requested: unknown, echoed: unknown): boolean {
+  if (Decimal.isDecimal(requested) || Decimal.isDecimal(echoed)) {
+    try {
+      return new Decimal(requested as Decimal.Value).equals(new Decimal(echoed as Decimal.Value))
+    } catch { return false }
+  }
+  return requested === echoed
+}
+
+/**
+ * Compares each requested change against the venue's openOrder echo, because
+ * TWS can accept a re-place and still ignore individual fields. Anything the
+ * echo did not carry is `unverified` rather than a rejection.
+ */
+function verifyModifyEcho(
+  changes: Partial<Order>,
+  echoed: Order | undefined,
+): { ignored: string[]; unverified: string[] } {
+  const ignored: string[] = []
+  const unverified: string[] = []
+  // An orderStatus-only answer carries a blank Order, which echoes nothing.
+  const hasBody = echoed != null && echoed.orderType !== ''
+  for (const field of MODIFIABLE_ECHO_FIELDS) {
+    const requested = changes[field]
+    if (requested == null) continue
+    if (!hasBody) { unverified.push(field); continue }
+    const actual = echoed[field]
+    if (isEchoAbsent(actual)) { unverified.push(field); continue }
+    if (!echoMatches(requested, actual)) {
+      ignored.push(`${field} (requested ${renderEchoValue(requested)}, working ${renderEchoValue(actual)})`)
+    }
+  }
+  // Confirmed mismatches are the actionable signal; only surface unverified
+  // fields when there is nothing concrete to report.
+  return { ignored, unverified: ignored.length > 0 ? [] : unverified }
+}
+
 const OPTION_MARK_SUCCESS_TTL_MS = 15_000
 const OPTION_MARK_FAILURE_TTL_MS = 60_000
 const OPTION_MARK_CONCURRENCY = 8
+
+const FILLED_PARENT_STATUSES = new Set(['Filled', 'PartiallyFilled'])
+
+const CANCEL_CONFIRMED_STATUSES = new Set(['Cancelled', 'ApiCancelled', 'PendingCancel'])
 
 interface OptionMarkOverlay {
   marketPrice: string
@@ -135,6 +223,12 @@ export class IbkrBroker implements IBroker {
   /** Periodic socket probe — see _ensureAlive / issue #294. */
   private heartbeatTimer_: ReturnType<typeof setInterval> | null = null
 
+  /** Consecutive probe misses with no inbound traffic. Reset by any success. */
+  private heartbeatMisses_ = 0
+
+  /** Consecutive probe misses forgiven because inbound traffic continued. */
+  private heartbeatExemptions_ = 0
+
   /** Loud-refuse on a known-dead connection. The account surface is
    *  cache-backed, so without this gate a dead socket serves stale reads
    *  and accepts orders that never transmit (issue #294). */
@@ -152,13 +246,33 @@ export class IbkrBroker implements IBroker {
     this._ensureAlive()
     try {
       await this.bridge.requestCurrentTime(WRITE_LIVENESS_TIMEOUT_MS)
+      this.heartbeatMisses_ = 0
+      this.heartbeatExemptions_ = 0
       this._ensureAlive()
-    } catch (err) {
-      this.bridge.markDead('Write-path liveness probe failed')
-      throw new BrokerError(
-        'NETWORK',
-        `TWS/Gateway write-path liveness check failed; order was not transmitted: ${err instanceof Error ? err.message : String(err)}`,
-      )
+      return
+    } catch (firstErr) {
+      // One missed reply is not proof of a dead socket, so re-probe once and
+      // report the socket's own verdict alongside the probe error.
+      const socketHealthy = this.client.isConnected?.() ?? true
+      try {
+        await this.bridge.requestCurrentTime(WRITE_LIVENESS_TIMEOUT_MS)
+        this.heartbeatMisses_ = 0
+        this.heartbeatExemptions_ = 0
+        this._ensureAlive()
+        return
+      } catch (retryErr) {
+        const socketStillHealthy = socketHealthy && (this.client.isConnected?.() ?? true)
+        const cause = retryErr instanceof Error ? retryErr.message : String(retryErr)
+        const first = firstErr instanceof Error ? firstErr.message : String(firstErr)
+        const detail = socketStillHealthy
+          ? `2 consecutive misses (${first}; ${cause})`
+          : `socket reported not connected (${cause})`
+        this.bridge.markDead(`Write-path liveness probe failed: ${detail}`)
+        throw new BrokerError(
+          'NETWORK',
+          `TWS/Gateway write-path liveness check failed; order was not transmitted: ${detail}`,
+        )
+      }
     }
   }
 
@@ -168,13 +282,36 @@ export class IbkrBroker implements IBroker {
 
   private startHeartbeat(): void {
     if (this.heartbeatTimer_) clearInterval(this.heartbeatTimer_)
+    this.heartbeatMisses_ = 0
+    this.heartbeatExemptions_ = 0
     this.heartbeatTimer_ = setInterval(() => {
       if (this.bridge.connectionDead) return
-      this.bridge.requestCurrentTime(5000).catch(() => {
-        console.warn(`IbkrBroker[${this.id}]: heartbeat failed — marking connection dead`)
-        this.bridge.markDead('TWS/Gateway heartbeat timed out')
-      })
-    }, 45_000)
+      const startedAt = Date.now()
+      this.bridge.requestCurrentTime(HEARTBEAT_PROBE_TIMEOUT_MS).then(
+        () => { this.heartbeatMisses_ = 0; this.heartbeatExemptions_ = 0 },
+        (err: unknown) => {
+          const cause = err instanceof Error ? err.message : String(err)
+          // Inbound traffic during the probe window proves the socket still
+          // carries data, but only until the exemptions run out.
+          if ((this.bridge.lastInboundAt ?? 0) > startedAt
+            && this.heartbeatExemptions_ < HEARTBEAT_INBOUND_EXEMPTION_LIMIT) {
+            this.heartbeatExemptions_++
+            this.heartbeatMisses_ = 0
+            console.warn(`IbkrBroker[${this.id}]: heartbeat probe missed but inbound traffic continued (${this.heartbeatExemptions_}/${HEARTBEAT_INBOUND_EXEMPTION_LIMIT}): ${cause}`)
+            return
+          }
+          this.heartbeatMisses_++
+          if (this.heartbeatMisses_ < HEARTBEAT_MISS_THRESHOLD) {
+            console.warn(`IbkrBroker[${this.id}]: heartbeat miss ${this.heartbeatMisses_}/${HEARTBEAT_MISS_THRESHOLD}: ${cause}`)
+            return
+          }
+          console.warn(`IbkrBroker[${this.id}]: heartbeat failed ${this.heartbeatMisses_} times — marking connection dead: ${cause}`)
+          this.heartbeatMisses_ = 0
+          this.heartbeatExemptions_ = 0
+          this.bridge.markDead(`TWS/Gateway heartbeat timed out (${HEARTBEAT_MISS_THRESHOLD} consecutive misses): ${cause}`)
+        },
+      )
+    }, HEARTBEAT_INTERVAL_MS)
     // Don't hold the process open for the probe
     this.heartbeatTimer_.unref?.()
   }
@@ -222,8 +359,14 @@ export class IbkrBroker implements IBroker {
     }
   }
 
-  async close(): Promise<void> {
+  private stopHeartbeat(): void {
     if (this.heartbeatTimer_) { clearInterval(this.heartbeatTimer_); this.heartbeatTimer_ = null }
+    this.heartbeatMisses_ = 0
+    this.heartbeatExemptions_ = 0
+  }
+
+  async close(): Promise<void> {
+    this.stopHeartbeat()
     this.bridge.stopAccountSubscription()
     this.client.disconnect()
   }
@@ -478,23 +621,20 @@ export class IbkrBroker implements IBroker {
   // ==================== Trading operations ====================
 
   async placeOrder(contract: Contract, order: Order, tpsl?: TpSlParams): Promise<PlaceOrderResult> {
-    // Attached TP/SL: not implemented yet (native path = parent + child
-    // orders with parentId + transmit chain — see ANG-103 batch). Refuse
-    // loudly rather than silently placing an unprotected entry; the ledger
-    // would otherwise record protection the venue never received.
-    if (tpsl?.takeProfit || tpsl?.stopLoss) {
-      return {
-        success: false,
-        error: 'IBKR attached TP/SL (bracket) is not implemented yet — refusing to place a naked entry. Place the entry first, then a standalone STP/LMT protective order.',
-      }
-    }
+    // Refused outside the try/catch so it surfaces as a CONFIG error rather
+    // than an ordinary { success: false } venue rejection.
+    refuseBracketOcaGroup(order, tpsl)
     try {
       this._ensureAlive()
       const routedContract = await this.resolveRoutableContract(contract)
       await this._ensureWriteAlive()
+      if (tpsl?.takeProfit || tpsl?.stopLoss) {
+        return await this.placeBracketOrder(routedContract, order, tpsl)
+      }
+      const toSend = applyStandaloneOcaType(order)
       const orderId = this.bridge.getNextOrderId()
       const promise = this.bridge.requestOrder(orderId)
-      this.client.placeOrder(orderId, routedContract, order)
+      this.client.placeOrder(orderId, routedContract, toSend)
       const result = await promise
       return {
         success: true,
@@ -506,7 +646,81 @@ export class IbkrBroker implements IBroker {
     }
   }
 
+  /**
+   * Registers every orderId before the first write so a fast openOrder callback
+   * cannot land un-awaited.
+   */
+  private async placeBracketOrder(
+    contract: Contract,
+    order: Order,
+    tpsl: TpSlParams,
+  ): Promise<PlaceOrderResult> {
+    const bracket = buildIbkrBracket(order, tpsl, () => this.bridge.getNextOrderId())
+    const ids = [bracket.parentId, ...bracket.children.map(child => child.orderId)]
+    const pending = [
+      this.bridge.requestOrder(bracket.parentId),
+      ...bracket.children.map(child => this.bridge.requestOrder(child.orderId)),
+    ]
+    // A synchronous `placeOrder` throw skips the `allSettled` below, leaving
+    // these to reject unobserved at their own timeout.
+    for (const request of pending) request.catch(() => {})
+    try {
+      this.client.placeOrder(bracket.parentId, contract, bracket.parent)
+      for (const child of bracket.children) {
+        this.client.placeOrder(child.orderId, contract, child.order)
+      }
+      const settled = await Promise.allSettled(pending)
+      const parentSettled = settled[0]!
+      const parentResult = parentSettled.status === 'fulfilled' ? parentSettled.value : undefined
+      const acknowledged = bracket.children.flatMap((child, i) =>
+        settled[i + 1]?.status === 'fulfilled'
+          ? [{ orderId: String(child.orderId), kind: child.kind }]
+          : [],
+      )
+      const failure = settled.find(
+        (entry): entry is PromiseRejectedResult => entry.status === 'rejected',
+      )
+
+      if (!failure) {
+        return {
+          success: true,
+          orderId: String(bracket.parentId),
+          orderState: parentResult!.orderState,
+          legs: acknowledged,
+        }
+      }
+
+      // A filled entry is a real position, so cancelling the surviving legs
+      // would strip its protection. Report the entry plus the legs that landed.
+      if (parentResult && FILLED_PARENT_STATUSES.has(parentResult.orderState.status)) {
+        return {
+          success: true,
+          orderId: String(bracket.parentId),
+          orderState: parentResult.orderState,
+          legs: acknowledged,
+          message: `Entry ${bracket.parentId} is ${parentResult.orderState.status} but ${bracket.children.length - acknowledged.length} protective leg(s) were not acknowledged (${failure.reason instanceof Error ? failure.reason.message : String(failure.reason)}). Verify protection at the venue.`,
+        }
+      }
+
+      // Nothing filled: unwind the whole chain so no half-bracket rests.
+      throw failure.reason
+    } catch (err) {
+      this.cancelQuietly(ids)
+      throw err
+    }
+  }
+
+  /** Best-effort unwind: a cancel that TWS refuses must not mask the cause. */
+  private cancelQuietly(orderIds: number[]): void {
+    for (const id of orderIds) {
+      try { this.client.cancelOrder(id, new OrderCancel()) } catch { /* best-effort */ }
+    }
+  }
+
   async modifyOrder(orderId: string, changes: Partial<Order>): Promise<PlaceOrderResult> {
+    // Refused outside the try/catch so it surfaces as a CONFIG error rather
+    // than an ordinary { success: false } venue rejection.
+    refuseOcaRevision('IBKR', changes)
     try {
       this._ensureAlive()
       // IBKR modifies orders by re-calling placeOrder with the same orderId
@@ -524,18 +738,41 @@ export class IbkrBroker implements IBroker {
       if (changes.orderType) mergedOrder.orderType = changes.orderType
       if (changes.trailingPercent != null) mergedOrder.trailingPercent = changes.trailingPercent
       if (changes.trailStopPrice != null) mergedOrder.trailStopPrice = changes.trailStopPrice
+      if (changes.goodTillDate != null) mergedOrder.goodTillDate = changes.goodTillDate
+      if (changes.outsideRth != null) mergedOrder.outsideRth = changes.outsideRth
+
+      // A group whose type is still 0 is ignored by TWS, so the orders would
+      // look linked here and behave independently at the venue.
+      const toSend = applyStandaloneOcaType(mergedOrder)
 
       const routedContract = await this.resolveRoutableContract(original.contract)
       await this._ensureWriteAlive()
       const numericId = parseInt(orderId, 10)
       const promise = this.bridge.requestOrder(numericId)
-      this.client.placeOrder(numericId, routedContract, mergedOrder)
+      this.client.placeOrder(numericId, routedContract, toSend)
       const result = await promise
+
+      // TWS can accept a re-place and still ignore individual fields, so the
+      // echo is compared before the ledger records the requested values.
+      const echo = verifyModifyEcho(changes, result.order)
+      if (echo.ignored.length > 0) {
+        return {
+          success: false,
+          orderId,
+          orderState: result.orderState,
+          error:
+            `Venue accepted the re-place of order ${orderId} but ignored: ${echo.ignored.join(', ')}. ` +
+            'The order is still working with its previous values.',
+        }
+      }
 
       return {
         success: true,
         orderId,
         orderState: result.orderState,
+        ...(echo.unverified.length > 0
+          ? { message: `Modify of order ${orderId} accepted; the venue echo did not carry ${echo.unverified.join(', ')} (unverified).` }
+          : {}),
       }
     } catch (err) {
       return { success: false, error: err instanceof Error ? err.message : String(err) }
@@ -546,12 +783,23 @@ export class IbkrBroker implements IBroker {
     try {
       await this._ensureWriteAlive()
       const numericId = parseInt(orderId, 10)
-      const promise = this.bridge.requestOrder(numericId)
+      // A fill that beat the cancel must not resolve it, or the ledger records a
+      // cancelled order over an open position.
+      const promise = this.bridge.requestOrder(numericId, undefined, acceptsCancelStatus)
       this.client.cancelOrder(numericId, orderCancel ?? new OrderCancel())
-      await promise
+      const result = await promise
 
+      const status = result.orderState?.status || 'Cancelled'
       const os = new OrderState()
-      os.status = 'Cancelled'
+      os.status = status
+      if (!CANCEL_CONFIRMED_STATUSES.has(status)) {
+        return {
+          success: false,
+          orderId,
+          orderState: os,
+          error: `Cancel of order ${orderId} was not confirmed — TWS reports status ${status}.`,
+        }
+      }
       return { success: true, orderId, orderState: os }
     } catch (err) {
       return { success: false, error: err instanceof Error ? err.message : String(err) }
@@ -869,12 +1117,86 @@ export class IbkrBroker implements IBroker {
     return { isOpen, timestamp: now }
   }
 
+  // ==================== Historical bars ====================
+
+  /**
+   * Serializes historical requests. TWS paces them across the whole connection
+   * (roughly 60 per 10 minutes, no identical request within 15s).
+   */
+  private historicalQueue_: Promise<unknown> = Promise.resolve()
+
+  private enqueueHistorical<T>(task: () => Promise<T>): Promise<T> {
+    const run = this.historicalQueue_.then(task, task)
+    // Keep the chain alive after a rejection so one failure can't wedge the
+    // queue, without swallowing the caller's error.
+    this.historicalQueue_ = run.catch(() => undefined)
+    return run
+  }
+
+  /**
+   * Historical OHLCV via `reqHistoricalData`. Entitlement, pacing, and empty
+   * windows all arrive as error 162 and are separated by message text.
+   */
+  async getHistorical(contract: Contract, params: BarParams): Promise<Bar[]> {
+    this._ensureAlive()
+    const routedContract = await this.resolveRoutableContract(contract)
+
+    return this.enqueueHistorical(async () => {
+      // Queue time can be long, so the window is derived and the socket
+      // re-checked at dispatch rather than at enqueue.
+      this._ensureAlive()
+      // secType picks the default price stream: spot FX (`CASH`) has no TRADES.
+      const request = buildHistoricalRequest(params, new Date(), routedContract.secType)
+      const reqId = this.bridge.allocReqId()
+      const promise = this.bridge.requestHistoricalBars(reqId)
+      this.client.reqHistoricalData(
+        reqId,
+        routedContract,
+        request.endDateTime,
+        request.durationStr,
+        request.barSizeSetting,
+        request.whatToShow,
+        request.useRTH,
+        request.formatDate,
+        false, // keepUpToDate: this is a one-shot query, not a subscription
+        [],
+      )
+      try {
+        return decodeBars(await promise, params)
+      } catch (err) {
+        // Frees the HMDS slot; a cancel for a finished query is a harmless no-op.
+        try { this.client.cancelHistoricalData(reqId) } catch { /* best-effort */ }
+        const kind = classifyHistoricalError(err)
+        if (kind === 'empty') return []
+        if (kind === 'pacing') {
+          throw new BrokerError(
+            'NETWORK',
+            `IBKR historical-data pacing limit hit for ${resolveSymbol(routedContract) ?? 'contract'} `
+            + `(${params.interval}). Retry shortly; reduce concurrent bar requests. Original: `
+            + `${err instanceof Error ? err.message : String(err)}`,
+          )
+        }
+        throw BrokerError.from(err)
+      }
+    })
+  }
+
   // ==================== Capabilities ====================
 
   getCapabilities(): AccountCapabilities {
     return {
       supportedSecTypes: ['STK', 'OPT', 'FUT', 'FOP', 'CASH', 'WAR', 'BOND'],
-      supportedOrderTypes: ['MKT', 'LMT', 'STP', 'STP LMT', 'TRAIL', 'MOC', 'LOC', 'REL'],
+      supportedOrderTypes: ['MKT', 'LMT', 'STP', 'STP LMT', 'TRAIL', 'TRAIL LIMIT', 'MOC', 'LOC', 'REL'],
+      // Without the market-data subscription TWS answers error 162 rather than
+      // degrading to delayed bars, so the source is entitlement-gated.
+      historicalBars: {
+        supported: true,
+        quality: 'subscription',
+        supportedBarSizes: IBKR_SUPPORTED_BAR_SIZES,
+        // `useRTH` is a real server-side filter, so both sessions are honored
+        // rather than approximated client-side.
+        sessions: ['regular', 'extended'],
+      },
     }
   }
 

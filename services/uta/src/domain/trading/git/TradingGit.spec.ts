@@ -364,7 +364,9 @@ describe('TradingGit', () => {
       expect(result.submitted[0].status).toBe('submitted')
     })
 
-    it('maps Inactive orderState to rejected status', async () => {
+    // A held order is a working order, so `success: true` with orderState
+    // `Inactive` may not render as a rejection.
+    it('does NOT map a broker-accepted Inactive (held) order to rejected', async () => {
       const orderState = new OrderState()
       orderState.status = 'Inactive'
       const inactiveConfig = makeConfig({
@@ -377,13 +379,45 @@ describe('TradingGit', () => {
       const gitInactive = new TradingGit(inactiveConfig)
 
       gitInactive.add(buyOp())
-      gitInactive.commit('rejected by exchange')
+      gitInactive.commit('OCA target leg parked behind its sibling stop')
       const result = await gitInactive.push(gitInactive.status().pendingHash!)
 
-      // Inactive maps to rejected — but success is still true from broker
-      // so it lands in submitted (success-based), with status 'rejected'
+      expect(result.rejected).toHaveLength(0)
       expect(result.submitted).toHaveLength(1)
-      expect(result.submitted[0].status).toBe('rejected')
+      expect(result.submitted[0].status).toBe('submitted')
+      expect(result.submitted[0].error).toBeUndefined()
+    })
+
+    it('keeps a broker-accepted Inactive order in the order-sync pending lane', async () => {
+      const orderState = new OrderState()
+      orderState.status = 'Inactive'
+      const gitInactive = new TradingGit(makeConfig({
+        executeOperation: vi.fn().mockResolvedValue({
+          success: true,
+          orderId: '20',
+          orderState,
+        }),
+      }))
+
+      gitInactive.add(buyOp('MU'))
+      gitInactive.commit('MU protection target leg')
+      await gitInactive.push(gitInactive.status().pendingHash!)
+
+      // 'rejected' is terminal, and getPendingOrderIds() only polls 'submitted'.
+      expect(gitInactive.getPendingOrderIds().map((p) => p.orderId)).toContain('20')
+    })
+
+    it('never records an empty broker error string as a reason-less rejection', async () => {
+      const gitEmpty = new TradingGit(makeConfig({
+        executeOperation: vi.fn().mockResolvedValue({ success: false, error: '' }),
+      }))
+
+      gitEmpty.add(buyOp())
+      gitEmpty.commit('empty broker error')
+      const result = await gitEmpty.push(gitEmpty.status().pendingHash!)
+
+      expect(result.rejected).toHaveLength(1)
+      expect(result.rejected[0].error).toBe('Unknown error')
     })
 
     it('records failed cancelOrder in rejected array', async () => {
@@ -597,6 +631,43 @@ describe('TradingGit', () => {
         expect(serialised).not.toContain(UNSET_DECIMAL_STR)
         expect(serialised).not.toContain('170141183460469231731687303715884105727')
       }
+    })
+
+    it('strips sentinels from the OrderState IBKR sends back', async () => {
+      const inboundConfig = makeConfig({
+        executeOperation: vi.fn().mockResolvedValue({
+          success: true,
+          orderId: '1',
+          orderState: {
+            status: 'Inactive',
+            suggestedSize: UNSET_DECIMAL_STR,
+            commissionAndFees: Number.MAX_VALUE,
+            initMarginAfter: '',
+            rejectReason: '',
+          },
+        }),
+      })
+      const gitInbound = new TradingGit(inboundConfig)
+      gitInbound.add(buyOp())
+      gitInbound.commit('rejected outside RTH')
+      await gitInbound.push(gitInbound.status().pendingHash!)
+
+      const head = gitInbound.status().head!
+      for (const blob of [gitInbound.show(head), gitInbound.exportState()]) {
+        const serialised = JSON.stringify(blob)
+        expect(serialised).not.toContain(UNSET_DECIMAL_STR)
+        expect(serialised).not.toContain('1.7976931348623157e+308')
+      }
+      const commit = gitInbound.show(head)!
+      expect(commit.results[0].orderState?.status).toBe('Inactive')
+    })
+
+    it('strips sentinels from the Contract on a projected operation', () => {
+      // Contract.strike defaults to UNSET_DOUBLE.
+      git.add(buyOp())
+      const op = git.status().staged[0] as Extract<Operation, { action: 'placeOrder' }>
+      expect(op.contract).not.toHaveProperty('strike')
+      expect(op.contract.symbol).toBe('AAPL')
     })
 
     it('modifyOrder.changes also strips sentinels', () => {

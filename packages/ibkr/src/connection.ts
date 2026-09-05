@@ -32,6 +32,15 @@ export class Connection extends EventEmitter {
 
   connect(): Promise<void> {
     return new Promise<void>((resolve, reject) => {
+      // The attempt must settle on every terminal socket outcome: destroying a
+      // socket still in SYN_SENT emits 'close' without 'error', and a promise
+      // watching only 'connect'/'error' would hang every awaiting caller.
+      let settled = false
+      const settle = (fn: () => void): void => {
+        if (settled) return
+        settled = true
+        fn()
+      }
       try {
         this.socket = new net.Socket()
       } catch {
@@ -47,6 +56,9 @@ export class Connection extends EventEmitter {
       })
 
       this.socket.on('close', () => {
+        // Reject before the cleanup guard below, which returns early when
+        // disconnect() already nulled the field.
+        settle(() => reject(new Error(CONNECT_FAIL.msg())))
         // Guard: if socket is already null, disconnect() already handled cleanup.
         // Without this check, connectionClosed() would be called twice when
         // disconnect() is invoked (once by disconnect, once by the close event).
@@ -69,14 +81,14 @@ export class Connection extends EventEmitter {
       })
 
       this.socket.connect(this.port, this.host, () => {
-        resolve()
+        settle(resolve)
       })
 
       this.socket.once('error', (err: Error) => {
         if (this.wrapper) {
           this.wrapper.error(NO_VALID_ID, currentTimeMillis(), CONNECT_FAIL.code(), CONNECT_FAIL.msg())
         }
-        reject(err)
+        settle(() => reject(err))
       })
     })
   }

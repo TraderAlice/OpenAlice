@@ -86,7 +86,13 @@ BarService federates:
 
 - vendor K-lines from the embedded provider adapters;
 - broker/exchange K-lines exposed through UTA;
-- source metadata such as capability and freshness.
+- source metadata such as capability and freshness;
+- the trading SESSION a broker series covers.
+
+Session is resolved by UTA per instrument (stocks/options default to regular
+hours, FX/futures/crypto to the continuous tape), never by the caller, and the
+effective value plus a `sessionForced` flag ride back on `BarMeta`. See the
+IBKR adapter README for the default table and the broker capability fallback.
 
 UTA source discovery and Broker Pack installation are independent. `asVendor`
 controls whether a configured UTA joins default K-line/contract discovery;

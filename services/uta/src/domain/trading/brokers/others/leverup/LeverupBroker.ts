@@ -30,6 +30,7 @@ import {
   type MarketClock,
   type TpSlParams,
 } from '../../types.js'
+import { refuseOcaLinkage } from '../../../oca.js'
 import '../../../contract-ext.js'
 import { buildContract, buildPosition } from '../../contract-builder.js'
 
@@ -72,7 +73,7 @@ interface OrderTrackingRecord {
   side: 'BUY' | 'SELL'
   qty: Decimal
   /** Most-recent known status from relayer. */
-  status: 'Submitted' | 'Filled' | 'Cancelled' | 'Inactive'
+  status: 'Submitted' | 'Filled' | 'Cancelled' | 'Rejected'
   txnHash?: `0x${string}`
   reason?: string
 }
@@ -212,6 +213,7 @@ export class LeverupBroker implements IBroker {
 
   async placeOrder(contract: Contract, order: Order, tpsl?: TpSlParams): Promise<PlaceOrderResult> {
     this.ensureInit()
+    refuseOcaLinkage('LeverUp', order)
 
     if (order.orderType !== 'MKT') {
       return { success: false, error: `LeverUp OCT only supports market orders (got ${order.orderType}). Limit orders are not exposed via the OCT relayer.` }
@@ -467,7 +469,9 @@ export class LeverupBroker implements IBroker {
       try {
         const status = await this.relayer.getStatus(tracked.inputHash)
         if (status.executed) {
-          tracked.status = status.success ? 'Filled' : 'Inactive'
+          // Not 'Inactive': that is IBKR's held state and order-sync keeps a
+          // held order in the pending lane, while this intent is terminal.
+          tracked.status = status.success ? 'Filled' : 'Rejected'
           tracked.txnHash = status.txnHash ?? undefined
           tracked.reason = status.reason ?? undefined
         }

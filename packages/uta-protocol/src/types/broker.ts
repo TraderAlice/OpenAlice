@@ -333,6 +333,12 @@ export type BarInterval = '1m' | '5m' | '15m' | '30m' | '1h' | '4h' | '1d' | '1w
  */
 export type BarWhatToShow = 'TRADES' | 'MIDPOINT' | 'BID' | 'ASK'
 
+/**
+ * Which trading session a bar series covers: 'regular' is the instrument's
+ * regular trading hours, 'extended' the continuous tape including overnight.
+ */
+export type BarSession = 'regular' | 'extended'
+
 export interface BarParams {
   /** Normalized interval; the broker maps it to its native bar size. */
   interval: BarInterval
@@ -344,6 +350,11 @@ export interface BarParams {
   limit?: number
   /** Price-stream selector — only IBKR honors non-TRADES values; others ignore. */
   whatToShow?: BarWhatToShow
+  /**
+   * Which trading session the bars should cover. Omit to take the
+   * per-instrument default from `resolveBarSession`.
+   */
+  session?: BarSession
 }
 
 /**
@@ -361,6 +372,18 @@ export interface Bar {
   close: string
   /** Base-asset volume for the bar. */
   volume: string
+}
+
+/**
+ * A UTA-level historical-bar read. The session served is part of the answer,
+ * because regular-session and continuous bars are different series.
+ */
+export interface HistoricalBarsResult {
+  bars: Bar[]
+  /** The session these bars actually cover. */
+  session: BarSession
+  /** True when the requested session could not be honored. */
+  forced: boolean
 }
 
 // ==================== Broker health ====================
@@ -440,6 +463,11 @@ export interface HistoricalBarsCapability {
   quality?: 'realtime' | 'iex' | 'delayed' | 'subscription'
   /** Subset of BarInterval this broker actually maps to a native bar size. */
   supportedBarSizes?: BarInterval[]
+  /**
+   * Session filters this broker can honor. Absent means no filter at all, and
+   * UTA reports such a read as a forced 'extended'.
+   */
+  sessions?: BarSession[]
 }
 
 export interface AccountCapabilities {
@@ -591,6 +619,9 @@ export interface IBroker<TMeta = unknown> {
    * capability; `UnifiedTradingAccount.getHistorical` loud-refuses with a
    * `BrokerError('CONFIG', ...)` rather than silently returning `[]`. Each
    * implementation maps `BarParams.interval` to its native bar size.
+   *
+   * `params.session` arrives already resolved; an adapter never applies its own
+   * default and reads undefined as 'extended'.
    */
   getHistorical?(contract: Contract, params: BarParams): Promise<Bar[]>
 

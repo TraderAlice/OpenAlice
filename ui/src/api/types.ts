@@ -642,6 +642,8 @@ export interface PlaceOrderRequest {
   outsideRth?: boolean
   parentId?: string
   ocaGroup?: string
+  /** OCA semantics: 1 CANCEL_WITH_BLOCK, 2 REDUCE_WITH_BLOCK, 3 REDUCE_NON_BLOCK. */
+  ocaType?: number
   takeProfit?: { price: string }
   stopLoss?: { price: string; limitPrice?: string }
   /** Target wallet on multi-wallet venues — required when the account spans >1. */

@@ -277,6 +277,12 @@ export interface StagePlaceOrderParams {
   outsideRth?: boolean
   parentId?: string
   ocaGroup?: string
+  /**
+   * IBKR OCA semantics for `ocaGroup`: 1 CANCEL_WITH_BLOCK, 2 REDUCE_WITH_BLOCK,
+   * 3 REDUCE_NON_BLOCK. Omit to take the broker default, since TWS ignores a
+   * group whose type is 0.
+   */
+  ocaType?: number
   takeProfit?: { price: string }
   stopLoss?: { price: string; limitPrice?: string }
 }
@@ -291,6 +297,20 @@ export interface StageModifyOrderParams {
   orderType?: string
   tif?: string
   goodTillDate?: string
+  /**
+   * One-Cancels-All group name. Not revisable on a working order at IBKR, so
+   * link a resting order by placing the new leg with the group and re-placing
+   * the old one.
+   */
+  ocaGroup?: string
+  /**
+   * OCA semantics for `ocaGroup`, same meanings as
+   * `StagePlaceOrderParams.ocaType` (1 CANCEL_WITH_BLOCK,
+   * 2 REDUCE_WITH_BLOCK, 3 REDUCE_NON_BLOCK). Same revision rule as `ocaGroup`.
+   */
+  ocaType?: number
+  /** Re-parent the order (bracket attachment). Same revision rule as `ocaGroup`. */
+  parentId?: string | number
 }
 
 export interface StageClosePositionParams {

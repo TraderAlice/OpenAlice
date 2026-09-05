@@ -25,6 +25,7 @@ import {
   type OrderState,
   type EClient,
   type TickAttrib,
+  type BarData,
 } from '@traderalice/ibkr'
 import { BrokerError, type BrokerConnectionStateEvent } from '../types.js'
 import { classifyIbkrError } from './ibkr-contracts.js'
@@ -36,9 +37,62 @@ import type {
   CollectedOpenOrder,
 } from './ibkr-types.js'
 
+interface OrderBatchWaiter {
+  resolve: (orders: CollectedOpenOrder[]) => void
+  reject: (err: Error) => void
+  timer: ReturnType<typeof setTimeout>
+}
+
+interface OrderBatch {
+  orders: CollectedOpenOrder[]
+  waiters: OrderBatchWaiter[]
+}
+
+interface CurrentTimeWaiter {
+  resolve: (time: number) => void
+  reject: (err: Error) => void
+  timer: ReturnType<typeof setTimeout>
+}
+
+/**
+ * How long a reply is still assumed to belong to an already-expired currentTime
+ * probe. Past this window the credit is dropped, or a reply the gateway never
+ * sends starves every later probe.
+ */
+const CURRENT_TIME_REPLY_GRACE_MS = 30_000
+
 const DEFAULT_TIMEOUT_MS = 10_000
+/**
+ * Historical bars come from the HMDS farm, not the trading socket, and a year
+ * of 1-minute bars outruns the ordinary 10s budget.
+ */
+const HISTORICAL_TIMEOUT_MS = 30_000
 const SNAPSHOT_TIMEOUT_MS = 12_500
 const ACCOUNT_READY_TIMEOUT_MS = 20_000
+
+/**
+ * How long an `Inactive` status is parked before it is accepted as the answer.
+ * TWS uses `Inactive` for both a reject and a legitimate hold, so the window
+ * lets a reject's `error()` arrive first.
+ */
+const INACTIVE_GRACE_MS = 1_500
+
+const acceptsLiveStatus = (status: string): boolean => status !== 'Inactive'
+
+/**
+ * A cancel must not be completed by `Submitted`/`Filled`/`PreSubmitted`, or a
+ * fill that beat the cancel is recorded as a cancel.
+ */
+const CANCEL_CONFIRMING_STATUSES = new Set(['Cancelled', 'ApiCancelled', 'PendingCancel'])
+export const acceptsCancelStatus = (status: string): boolean =>
+  CANCEL_CONFIRMING_STATUSES.has(status)
+
+interface PendingOrderRequest extends PendingRequest<CollectedOpenOrder> {
+  /** Which callback status completes this request. */
+  accepts: (status: string) => boolean
+  /** Deferred `Inactive` answer, resolved if nothing better arrives. */
+  hold?: { value: CollectedOpenOrder; timer: ReturnType<typeof setTimeout> }
+}
 
 export class RequestBridge extends DefaultEWrapper {
   // ---- State ----
@@ -56,22 +110,14 @@ export class RequestBridge extends DefaultEWrapper {
   private snapshotResolveOnBidAsk = new Set<number>()
 
   // ---- Mode B: orderId-based pending requests ----
-  private orderPending = new Map<number, PendingRequest<CollectedOpenOrder>>()
+  private orderPending = new Map<number, PendingOrderRequest>()
 
-  // ---- Mode C: single-slot collectors ----
-  private openOrdersCollector: {
-    orders: CollectedOpenOrder[]
-    resolve: (orders: CollectedOpenOrder[]) => void
-    reject: (err: Error) => void
-    timer: ReturnType<typeof setTimeout>
-  } | null = null
-
-  private completedOrdersCollector: {
-    orders: CollectedOpenOrder[]
-    resolve: (orders: CollectedOpenOrder[]) => void
-    reject: (err: Error) => void
-    timer: ReturnType<typeof setTimeout>
-  } | null = null
+  // ---- Mode C: single-flight batch collectors ----
+  // One in-flight sweep per kind, joined by every concurrent caller. Each
+  // waiter keeps its own deadline; a waiter timing out never clobbers the
+  // batch that the others are still collecting.
+  private openOrdersBatch: OrderBatch | null = null
+  private completedOrdersBatch: OrderBatch | null = null
 
   // ---- Mode D: persistent account subscription cache ----
   private accountCache_: AccountDownloadResult | null = null
@@ -92,10 +138,19 @@ export class RequestBridge extends DefaultEWrapper {
   private connectResolve: (() => void) | null = null
   private connectReject: ((err: Error) => void) | null = null
   private connectTimer: ReturnType<typeof setTimeout> | null = null
+  private sawNextValidId_ = false
+  private sawManagedAccounts_ = false
 
-  // ---- Current time request ----
-  private currentTimePending: PendingRequest<number> | null = null
-  private currentTimePromise: Promise<number> | null = null
+  // ---- Current time probes (FIFO) ----
+  // currentTime carries no request id, so replies are matched to probes in
+  // send order. Each probe owns its deadline; replies owed to already-expired
+  // probes are discarded instead of resolving a later probe with a stale
+  // timestamp.
+  private currentTimeWaiters: CurrentTimeWaiter[] = []
+  private currentTimeExpired_: ReturnType<typeof setTimeout>[] = []
+
+  // ---- Inbound activity ----
+  private lastInboundAt_ = 0
 
   private connectionStateListener: ((event: BrokerConnectionStateEvent) => void) | null = null
 
@@ -136,6 +191,9 @@ export class RequestBridge extends DefaultEWrapper {
     timeoutMs = 15_000,
   ): Promise<void> {
     this.client_ = client
+    this.sawNextValidId_ = false
+    this.sawManagedAccounts_ = false
+    this.clearCurrentTimeCredits()
 
     if (this.connectReject) {
       this.rejectConnect(new BrokerError('NETWORK', 'Previous TWS/Gateway connection attempt was superseded'))
@@ -145,8 +203,12 @@ export class RequestBridge extends DefaultEWrapper {
       this.connectResolve = resolve
       this.connectReject = reject
       this.connectTimer = setTimeout(() => {
+        const missing = [
+          this.sawNextValidId_ ? null : 'nextValidId',
+          this.sawManagedAccounts_ ? null : 'managedAccounts',
+        ].filter(Boolean).join(' and ')
         this.rejectConnect(
-          new BrokerError('NETWORK', `Connection to TWS/Gateway timed out after ${timeoutMs}ms`),
+          new BrokerError('NETWORK', `Connection to TWS/Gateway timed out after ${timeoutMs}ms (no ${missing})`),
         )
       }, timeoutMs)
     })
@@ -228,45 +290,104 @@ export class RequestBridge extends DefaultEWrapper {
     return this.request<TickSnapshot>(reqId, timeoutMs)
   }
 
+  /**
+   * Registers a historical-bar request. An empty result set is a legitimate
+   * answer, so the collector resolves with `[]` rather than timing out.
+   */
+  requestHistoricalBars(reqId: number, timeoutMs = HISTORICAL_TIMEOUT_MS): Promise<BarData[]> {
+    return this.requestCollector<BarData>(reqId, timeoutMs)
+  }
+
   // ---- Mode B: orderId-based requests ----
 
-  /** Register a pending order request (waits for openOrder callback). */
-  requestOrder(orderId: number, timeoutMs = DEFAULT_TIMEOUT_MS): Promise<CollectedOpenOrder> {
+  /**
+   * Registers a pending order request. Cancels must pass `acceptsCancelStatus`
+   * so a fill cannot be mistaken for a cancel.
+   */
+  requestOrder(
+    orderId: number,
+    timeoutMs = DEFAULT_TIMEOUT_MS,
+    accepts: (status: string) => boolean = acceptsLiveStatus,
+  ): Promise<CollectedOpenOrder> {
     return new Promise<CollectedOpenOrder>((resolve, reject) => {
       const timer = setTimeout(() => {
-        this.orderPending.delete(orderId)
+        this.clearOrderPending(orderId)
         reject(new BrokerError('NETWORK', `Order ${orderId} timed out after ${timeoutMs}ms`))
       }, timeoutMs)
-      this.orderPending.set(orderId, { resolve, reject, timer })
+      this.orderPending.set(orderId, { resolve, reject, timer, accepts })
     })
   }
 
   // ---- Mode C: single-slot requests ----
 
+  /**
+   * Join or start an order sweep. Concurrent callers share one in-flight
+   * request and each receives the complete batch; a caller that gives up
+   * early only removes its own waiter.
+   */
+  private joinOrderBatch(
+    label: string,
+    read: () => OrderBatch | null,
+    write: (batch: OrderBatch | null) => void,
+    send: () => void,
+    timeoutMs: number,
+  ): Promise<CollectedOpenOrder[]> {
+    return new Promise<CollectedOpenOrder[]>((resolve, reject) => {
+      const existing = read()
+      const batch: OrderBatch = existing ?? { orders: [], waiters: [] }
+      const waiter: OrderBatchWaiter = {
+        resolve,
+        reject,
+        timer: setTimeout(() => {
+          const idx = batch.waiters.indexOf(waiter)
+          if (idx >= 0) batch.waiters.splice(idx, 1)
+          // The sweep is only abandoned once nobody is left waiting for it.
+          if (batch.waiters.length === 0 && read() === batch) write(null)
+          reject(new BrokerError('NETWORK', `${label} request timed out after ${timeoutMs}ms`))
+        }, timeoutMs),
+      }
+      batch.waiters.push(waiter)
+      if (existing) return
+
+      write(batch)
+      try {
+        send()
+      } catch (err) {
+        write(null)
+        this.settleOrderBatch(batch, BrokerError.from(err, 'NETWORK'))
+      }
+    })
+  }
+
+  private settleOrderBatch(batch: OrderBatch, error?: Error): void {
+    const waiters = batch.waiters.splice(0)
+    for (const waiter of waiters) {
+      clearTimeout(waiter.timer)
+      if (error) waiter.reject(error)
+      else waiter.resolve(batch.orders)
+    }
+  }
+
   /** Request all open orders (batch collector). */
   requestOpenOrders(timeoutMs = DEFAULT_TIMEOUT_MS): Promise<CollectedOpenOrder[]> {
-    return new Promise<CollectedOpenOrder[]>((resolve, reject) => {
-      const timer = setTimeout(() => {
-        this.openOrdersCollector = null
-        reject(new BrokerError('NETWORK', `Open orders request timed out after ${timeoutMs}ms`))
-      }, timeoutMs)
-
-      this.openOrdersCollector = { orders: [], resolve, reject, timer }
-      this.client_!.reqOpenOrders()
-    })
+    return this.joinOrderBatch(
+      'Open orders',
+      () => this.openOrdersBatch,
+      (batch) => { this.openOrdersBatch = batch },
+      () => this.client_!.reqOpenOrders(),
+      timeoutMs,
+    )
   }
 
   /** Request completed orders (filled/cancelled). */
   requestCompletedOrders(timeoutMs = DEFAULT_TIMEOUT_MS): Promise<CollectedOpenOrder[]> {
-    return new Promise<CollectedOpenOrder[]>((resolve, reject) => {
-      const timer = setTimeout(() => {
-        this.completedOrdersCollector = null
-        reject(new BrokerError('NETWORK', `Completed orders request timed out after ${timeoutMs}ms`))
-      }, timeoutMs)
-
-      this.completedOrdersCollector = { orders: [], resolve, reject, timer }
-      this.client_!.reqCompletedOrders(true)
-    })
+    return this.joinOrderBatch(
+      'Completed orders',
+      () => this.completedOrdersBatch,
+      (batch) => { this.completedOrdersBatch = batch },
+      () => this.client_!.reqCompletedOrders(true),
+      timeoutMs,
+    )
   }
 
   /** Get cached fill data from orderStatus callbacks. */
@@ -276,34 +397,36 @@ export class RequestBridge extends DefaultEWrapper {
 
   /** Request current TWS server time. */
   requestCurrentTime(timeoutMs = DEFAULT_TIMEOUT_MS): Promise<number> {
-    if (this.currentTimePromise) return this.currentTimePromise
+    return new Promise<number>((resolve, reject) => {
+      const waiter: CurrentTimeWaiter = {
+        resolve,
+        reject,
+        timer: setTimeout(() => {
+          const idx = this.currentTimeWaiters.indexOf(waiter)
+          if (idx < 0) return
+          this.currentTimeWaiters.splice(idx, 1)
+          // A reply may still be in flight, so remember that it is owed and
+          // cannot be handed to a later probe as a fresh timestamp.
+          const credit = setTimeout(() => {
+            const at = this.currentTimeExpired_.indexOf(credit)
+            if (at >= 0) this.currentTimeExpired_.splice(at, 1)
+          }, CURRENT_TIME_REPLY_GRACE_MS)
+          credit.unref?.()
+          this.currentTimeExpired_.push(credit)
+          reject(new BrokerError('NETWORK', `currentTime request timed out after ${timeoutMs}ms`))
+        }, timeoutMs),
+      }
+      this.currentTimeWaiters.push(waiter)
 
-    let resolvePromise!: (value: number) => void
-    let rejectPromise!: (error: Error) => void
-    const promise = new Promise<number>((resolve, reject) => {
-      resolvePromise = resolve
-      rejectPromise = reject
+      try {
+        this.client_!.reqCurrentTime()
+      } catch (err) {
+        const idx = this.currentTimeWaiters.indexOf(waiter)
+        if (idx >= 0) this.currentTimeWaiters.splice(idx, 1)
+        clearTimeout(waiter.timer)
+        reject(BrokerError.from(err, 'NETWORK'))
+      }
     })
-    this.currentTimePromise = promise
-    const clear = (): void => {
-      if (this.currentTimePromise === promise) this.currentTimePromise = null
-      this.currentTimePending = null
-    }
-    const timer = setTimeout(() => {
-      clear()
-      rejectPromise(new BrokerError('NETWORK', `currentTime request timed out`))
-    }, timeoutMs)
-    this.currentTimePending = {
-      resolve: (value) => { clearTimeout(timer); clear(); resolvePromise(value as number) },
-      reject: (error) => { clearTimeout(timer); clear(); rejectPromise(error) },
-      timer,
-    }
-    try {
-      this.client_!.reqCurrentTime()
-    } catch (err) {
-      this.currentTimePending?.reject(BrokerError.from(err, 'NETWORK'))
-    }
-    return promise
   }
 
   // ---- Mode D: persistent account subscription ----
@@ -348,6 +471,21 @@ export class RequestBridge extends DefaultEWrapper {
 
   // ==================== Internal helpers ====================
 
+  /** Drop every outstanding "a reply is still owed" credit. A connection that
+   *  just died or just came up owes nothing. */
+  private clearCurrentTimeCredits(): void {
+    for (const credit of this.currentTimeExpired_.splice(0)) clearTimeout(credit)
+  }
+
+  /** Wall-clock (Date.now) reading of the last inbound TWS callback observed. */
+  get lastInboundAt(): number { return this.lastInboundAt_ }
+
+  /** Record inbound traffic so liveness policy can treat any reply from the
+   *  gateway as evidence that the socket is still carrying data. */
+  private noteInbound(): void {
+    this.lastInboundAt_ = Date.now()
+  }
+
   private resolveRequest(reqId: number, value: unknown): void {
     const entry = this.pending.get(reqId)
     if (!entry) return
@@ -378,20 +516,41 @@ export class RequestBridge extends DefaultEWrapper {
     this.resolveRequest(reqId, this.collectors.get(reqId) ?? [])
   }
 
-  private resolveOrderRequest(orderId: number, value: CollectedOpenOrder): void {
+  /** Drop a pending order request and every timer it owns. */
+  private clearOrderPending(orderId: number): PendingOrderRequest | undefined {
     const entry = this.orderPending.get(orderId)
-    if (!entry) return
+    if (!entry) return undefined
     clearTimeout(entry.timer)
+    if (entry.hold) clearTimeout(entry.hold.timer)
     this.orderPending.delete(orderId)
-    entry.resolve(value)
+    return entry
+  }
+
+  private resolveOrderRequest(orderId: number, value: CollectedOpenOrder): void {
+    this.clearOrderPending(orderId)?.resolve(value)
   }
 
   private rejectOrderRequest(orderId: number, error: Error): void {
+    this.clearOrderPending(orderId)?.reject(error)
+  }
+
+  /**
+   * Routes an openOrder / orderStatus answer to its pending request. An
+   * `Inactive` status is parked for `INACTIVE_GRACE_MS` so a reject's `error()`
+   * or a later live status can win.
+   */
+  private answerOrderRequest(orderId: number, value: CollectedOpenOrder): void {
     const entry = this.orderPending.get(orderId)
     if (!entry) return
-    clearTimeout(entry.timer)
-    this.orderPending.delete(orderId)
-    entry.reject(error)
+    if (entry.accepts(value.orderState.status)) {
+      this.resolveOrderRequest(orderId, value)
+      return
+    }
+    if (value.orderState.status !== 'Inactive' || entry.hold) return
+    entry.hold = {
+      value,
+      timer: setTimeout(() => this.resolveOrderRequest(orderId, value), INACTIVE_GRACE_MS),
+    }
   }
 
   private rejectAll(error: Error): void {
@@ -406,6 +565,7 @@ export class RequestBridge extends DefaultEWrapper {
 
     for (const [, entry] of this.orderPending) {
       clearTimeout(entry.timer)
+      if (entry.hold) clearTimeout(entry.hold.timer)
       entry.reject(error)
     }
     this.orderPending.clear()
@@ -420,23 +580,23 @@ export class RequestBridge extends DefaultEWrapper {
     this.accountCache_ = null
     this.accountCachePending_ = null
 
-    if (this.openOrdersCollector) {
-      clearTimeout(this.openOrdersCollector.timer)
-      this.openOrdersCollector.reject(error)
-      this.openOrdersCollector = null
+    if (this.openOrdersBatch) {
+      const batch = this.openOrdersBatch
+      this.openOrdersBatch = null
+      this.settleOrderBatch(batch, error)
     }
 
-    if (this.completedOrdersCollector) {
-      clearTimeout(this.completedOrdersCollector.timer)
-      this.completedOrdersCollector.reject(error)
-      this.completedOrdersCollector = null
+    if (this.completedOrdersBatch) {
+      const batch = this.completedOrdersBatch
+      this.completedOrdersBatch = null
+      this.settleOrderBatch(batch, error)
     }
 
-    if (this.currentTimePending) {
-      clearTimeout(this.currentTimePending.timer)
-      this.currentTimePending.reject(error)
-      this.currentTimePending = null
+    for (const waiter of this.currentTimeWaiters.splice(0)) {
+      clearTimeout(waiter.timer)
+      waiter.reject(error)
     }
+    this.clearCurrentTimeCredits()
   }
 
   // ==================== EWrapper callback overrides ====================
@@ -444,16 +604,34 @@ export class RequestBridge extends DefaultEWrapper {
   // ---- Connection ----
 
   override nextValidId(orderId: number): void {
+    this.noteInbound()
     this.nextOrderId_ = orderId
-    // Resolve the connect promise (TWS is ready)
+    this.sawNextValidId_ = true
+    this.maybeResolveConnect()
+  }
+
+  /**
+   * A connection is only usable once both startApi replies have landed;
+   * nextValidId alone leaves `getAccountId()` depending on callback ordering.
+   */
+  private maybeResolveConnect(): void {
+    if (!this.sawNextValidId_ || !this.sawManagedAccounts_) return
     const resolve = this.connectResolve
     this.clearConnectWaiter()
     resolve?.()
   }
 
   override managedAccounts(accountsList: string): void {
+    this.noteInbound()
     const accounts = accountsList.split(',').map(s => s.trim()).filter(Boolean)
-    this.accountId_ = accounts[0] ?? null
+    // TWS re-pushes managedAccounts on FA re-login, so an empty push must not
+    // blank an id this session already has. Resolving connect on it would
+    // surface as a non-retryable CONFIG error from init().
+    const first = accounts[0]
+    if (!first) return
+    this.accountId_ = first
+    this.sawManagedAccounts_ = true
+    this.maybeResolveConnect()
   }
 
   /** True once the socket is known-dead (connectionClosed or a failed
@@ -471,6 +649,7 @@ export class RequestBridge extends DefaultEWrapper {
   markAlive(): void {
     const wasDead = this.connectionDead_
     this.connectionDead_ = false
+    this.clearCurrentTimeCredits()
     if (wasDead) this.connectionStateListener?.({ state: 'alive' })
   }
 
@@ -534,6 +713,16 @@ export class RequestBridge extends DefaultEWrapper {
   }
 
   override contractDetailsEnd(reqId: number): void {
+    this.resolveCollector(reqId)
+  }
+
+  // ---- Historical bars (collector) ----
+
+  override historicalData(reqId: number, bar: BarData): void {
+    this.pushCollector(reqId, bar)
+  }
+
+  override historicalDataEnd(reqId: number, _start: string, _end: string): void {
     this.resolveCollector(reqId)
   }
 
@@ -642,6 +831,7 @@ export class RequestBridge extends DefaultEWrapper {
   }
 
   override updateAccountValue(key: string, val: string, currency: string, _accountName: string): void {
+    this.noteInbound()
     // Multi-currency families (CashBalance, NetLiquidationByCurrency,
     // ExchangeRate, …) arrive once PER CURRENCY plus a consolidated BASE
     // line. Store the composite key always; the plain key is reserved for
@@ -658,6 +848,7 @@ export class RequestBridge extends DefaultEWrapper {
   }
 
   override accountDownloadEnd(_accountName: string): void {
+    this.noteInbound()
     if (!this.accountCachePending_) return
 
     // Swap pending buffer into cache (atomic replace)
@@ -680,6 +871,7 @@ export class RequestBridge extends DefaultEWrapper {
   // ---- Market data snapshot ----
 
   override tickPrice(reqId: number, tickType: number, price: number, _attrib: TickAttrib): void {
+    this.noteInbound()
     const snap = this.snapshots.get(reqId)
     if (!snap) return
 
@@ -736,15 +928,13 @@ export class RequestBridge extends DefaultEWrapper {
   // ---- Orders ----
 
   override openOrder(orderId: number, contract: Contract, order: Order, orderState: OrderState): void {
+    this.noteInbound()
     const collected: CollectedOpenOrder = { contract, order, orderState }
 
-    // Route to pending order request (placeOrder/modifyOrder)
-    if (this.orderPending.has(orderId)) {
-      this.resolveOrderRequest(orderId, collected)
-    }
+    this.answerOrderRequest(orderId, collected)
 
     // Also collect for openOrders batch
-    this.openOrdersCollector?.orders.push(collected)
+    this.openOrdersBatch?.orders.push(collected)
   }
 
   override orderStatus(
@@ -765,42 +955,51 @@ export class RequestBridge extends DefaultEWrapper {
       this.fillData_.set(orderId, { filled, avgFillPrice })
     }
 
-    // For cancel requests, we wait for status 'Cancelled'
-    if (this.orderPending.has(orderId) && status === 'Cancelled') {
-      const os = new OrderStateClass()
-      os.status = 'Cancelled'
-      this.resolveOrderRequest(orderId, {
-        contract: new ContractClass(),
-        order: new OrderClass(),
-        orderState: os,
-      })
-    }
+    if (!this.orderPending.has(orderId)) return
+
+    const os = new OrderStateClass()
+    os.status = status
+    this.answerOrderRequest(orderId, {
+      contract: new ContractClass(),
+      order: new OrderClass(),
+      orderState: os,
+    })
   }
 
   override openOrderEnd(): void {
-    if (!this.openOrdersCollector) return
-    clearTimeout(this.openOrdersCollector.timer)
-    this.openOrdersCollector.resolve(this.openOrdersCollector.orders)
-    this.openOrdersCollector = null
+    const batch = this.openOrdersBatch
+    if (!batch) return
+    this.openOrdersBatch = null
+    this.settleOrderBatch(batch)
   }
 
   // ---- Completed orders ----
 
   override completedOrder(contract: Contract, order: Order, orderState: OrderState): void {
-    this.completedOrdersCollector?.orders.push({ contract, order, orderState })
+    this.completedOrdersBatch?.orders.push({ contract, order, orderState })
   }
 
   override completedOrdersEnd(): void {
-    if (!this.completedOrdersCollector) return
-    clearTimeout(this.completedOrdersCollector.timer)
-    this.completedOrdersCollector.resolve(this.completedOrdersCollector.orders)
-    this.completedOrdersCollector = null
+    const batch = this.completedOrdersBatch
+    if (!batch) return
+    this.completedOrdersBatch = null
+    this.settleOrderBatch(batch)
   }
 
   // ---- Current time ----
 
   override currentTime(time: number): void {
-    if (!this.currentTimePending) return
-    this.currentTimePending.resolve(time)
+    this.noteInbound()
+    // Handing a reply owed to an abandoned probe to the next one would report
+    // a stale timestamp as fresh liveness evidence.
+    const credit = this.currentTimeExpired_.shift()
+    if (credit) {
+      clearTimeout(credit)
+      return
+    }
+    const waiter = this.currentTimeWaiters.shift()
+    if (!waiter) return
+    clearTimeout(waiter.timer)
+    waiter.resolve(time)
   }
 }

@@ -2,8 +2,8 @@ import { createServer, type Socket } from 'node:net'
 
 import { describe, it, expect, vi } from 'vitest'
 import Decimal from 'decimal.js'
-import { Connection, Contract, EClient, makeField, makeMsg, NO_VALID_ID, TickTypeEnum } from '@traderalice/ibkr'
-import { RequestBridge } from './request-bridge.js'
+import { Connection, Contract, EClient, makeField, makeMsg, NO_VALID_ID, Order, OrderState, TickTypeEnum } from '@traderalice/ibkr'
+import { RequestBridge, acceptsCancelStatus } from './request-bridge.js'
 
 function stk(conId: number, symbol: string): Contract {
   const c = new Contract()
@@ -34,6 +34,7 @@ describe('RequestBridge — connection handshake', () => {
         if (stage === 'start-api') {
           stage = 'done'
           socket.write(makeMsg(9, true, makeField(1) + makeField(700)))
+          socket.write(makeMsg(15, true, makeField(1) + makeField('DU1234567')))
         }
       })
     })
@@ -51,6 +52,7 @@ describe('RequestBridge — connection handshake', () => {
         .resolves.toBeUndefined()
       expect(client.isConnected()).toBe(true)
       expect(bridge.getNextOrderId()).toBe(700)
+      expect(bridge.getAccountId()).toBe('DU1234567')
     } finally {
       client.disconnect()
       await new Promise<void>((resolve) => server.close(() => resolve()))
@@ -158,20 +160,61 @@ describe('RequestBridge — error routing', () => {
 })
 
 describe('RequestBridge — socket probes and snapshots', () => {
-  it('coalesces concurrent current-time probes onto one wire request', async () => {
-    const b = new RequestBridge()
-    const reqCurrentTime = vi.fn()
-    b.setClient({ reqCurrentTime } as never)
+  it('gives every current-time probe its own deadline instead of a shared promise', async () => {
+    vi.useFakeTimers()
+    try {
+      const b = new RequestBridge()
+      const reqCurrentTime = vi.fn()
+      b.setClient({ reqCurrentTime } as never)
 
-    const first = b.requestCurrentTime()
-    const second = b.requestCurrentTime()
-    expect(reqCurrentTime).toHaveBeenCalledOnce()
+      const slow = b.requestCurrentTime(5_000)
+      const slowSettled = vi.fn()
+      slow.then(slowSettled, slowSettled)
+      vi.advanceTimersByTime(4_900)
 
-    b.currentTime(1_784_289_600)
-    await expect(Promise.all([first, second])).resolves.toEqual([
-      1_784_289_600,
-      1_784_289_600,
-    ])
+      // A short write probe started late must NOT inherit the heartbeat's
+      // nearly-expired deadline.
+      const fast = b.requestCurrentTime(3_000)
+      expect(reqCurrentTime).toHaveBeenCalledTimes(2)
+
+      vi.advanceTimersByTime(200)
+      await Promise.resolve()
+      await expect(slow).rejects.toThrow(/timed out after 5000ms/)
+
+      // The reply owed to the expired heartbeat must not settle the fresh probe.
+      b.currentTime(1_784_289_600)
+      b.currentTime(1_784_289_601)
+      await expect(fast).resolves.toBe(1_784_289_601)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('ignores a late reply when no probe is waiting for it', async () => {
+    vi.useFakeTimers()
+    try {
+      const b = new RequestBridge()
+      b.setClient({ reqCurrentTime: vi.fn() } as never)
+
+      const probe = b.requestCurrentTime(3_000)
+      const settled = vi.fn()
+      probe.then(settled, settled)
+      vi.advanceTimersByTime(3_000)
+      await expect(probe).rejects.toThrow(/timed out after 3000ms/)
+
+      b.currentTime(1_784_289_600) // late reply for the dead probe
+
+      const next = b.requestCurrentTime(3_000)
+      const nextSettled = vi.fn()
+      next.then(nextSettled, nextSettled)
+      await Promise.resolve()
+      expect(nextSettled).not.toHaveBeenCalled()
+
+      b.currentTime(1_784_289_777)
+      await expect(next).resolves.toBe(1_784_289_777)
+    } finally {
+      vi.useRealTimers()
+    }
   })
 
   it('clears a failed current-time probe so the next write can retry', async () => {
@@ -315,5 +358,274 @@ describe('RequestBridge — currency-aware account values (issue #295)', () => {
     b.updateAccountValue('NetLiquidation', '1046101.70', 'USD', 'DU1')
     expect(b.getAccountCache()!.values.get('NetLiquidation')).toBe('1046101.70')
     expect(b.getAccountCache()!.values.get('ExchangeRate:USD')).toBeUndefined()
+  })
+})
+
+describe('RequestBridge — placeOrder Inactive hold', () => {
+  function state(status: string): OrderState {
+    const os = new OrderState()
+    os.status = status
+    return os
+  }
+
+  it('does not resolve requestOrder on Inactive; error() then carries the venue message', async () => {
+    const bridge = new RequestBridge()
+    const pending = bridge.requestOrder(19, 1_000)
+    bridge.openOrder(19, new Contract(), new Order(), state('Inactive'))
+
+    let settled = false
+    void pending.then(() => { settled = true }, () => { settled = true })
+    await Promise.resolve()
+    expect(settled).toBe(false)
+
+    bridge.error(19, 0, 202, 'Order Canceled - reason:')
+    await expect(pending).rejects.toThrow(/IBKR error 202.*Order Canceled/)
+  })
+
+  it('resolves after a later live openOrder', async () => {
+    const bridge = new RequestBridge()
+    const pending = bridge.requestOrder(10, 1_000)
+    const contract = new Contract()
+    const order = new Order()
+    bridge.openOrder(10, contract, order, state('Inactive'))
+    bridge.openOrder(10, contract, order, state('PreSubmitted'))
+    await expect(pending).resolves.toMatchObject({ orderState: { status: 'PreSubmitted' } })
+  })
+
+  it('resolves a live orderStatus after skipping Inactive', async () => {
+    const bridge = new RequestBridge()
+    const pending = bridge.requestOrder(10, 1_000)
+    bridge.openOrder(10, new Contract(), new Order(), state('Inactive'))
+    bridge.orderStatus(
+      10, 'Submitted', new Decimal(0), new Decimal(1),
+      0, 0, 0, 0, 0, '', 0,
+    )
+    await expect(pending).resolves.toMatchObject({ orderState: { status: 'Submitted' } })
+  })
+})
+
+describe('RequestBridge — order request status gating', () => {
+  function state(status: string): OrderState {
+    const os = new OrderState()
+    os.status = status
+    return os
+  }
+
+  it('does not complete a cancel request on a live status', async () => {
+    const bridge = new RequestBridge()
+    const pending = bridge.requestOrder(31, 1_000, acceptsCancelStatus)
+
+    bridge.orderStatus(31, 'Filled', new Decimal(5), new Decimal(0), 101, 0, 0, 0, 0, '', 0)
+    let settled = false
+    void pending.then(() => { settled = true }, () => { settled = true })
+    await Promise.resolve()
+    expect(settled).toBe(false)
+
+    bridge.orderStatus(31, 'Cancelled', new Decimal(0), new Decimal(5), 0, 0, 0, 0, 0, '', 0)
+    await expect(pending).resolves.toMatchObject({ orderState: { status: 'Cancelled' } })
+  })
+
+  it('answers with the Inactive hold when no error or live status follows', async () => {
+    // TWS marks exchange-closed and precautionary holds Inactive with no
+    // error() callback.
+    vi.useFakeTimers()
+    try {
+      const bridge = new RequestBridge()
+      const pending = bridge.requestOrder(32, 30_000)
+      bridge.openOrder(32, new Contract(), new Order(), state('Inactive'))
+      await vi.advanceTimersByTimeAsync(2_000)
+      await expect(pending).resolves.toMatchObject({ orderState: { status: 'Inactive' } })
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('lets a later live status beat the parked Inactive hold', async () => {
+    vi.useFakeTimers()
+    try {
+      const bridge = new RequestBridge()
+      const pending = bridge.requestOrder(33, 30_000)
+      bridge.openOrder(33, new Contract(), new Order(), state('Inactive'))
+      bridge.openOrder(33, new Contract(), new Order(), state('PreSubmitted'))
+      await vi.advanceTimersByTimeAsync(2_000)
+      await expect(pending).resolves.toMatchObject({ orderState: { status: 'PreSubmitted' } })
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+})
+describe('RequestBridge — order sweep concurrency', () => {
+  function collectedOrder(orderId: number): { contract: Contract; order: { orderId: number }; orderState: { status: string } } {
+    const contract = new Contract()
+    contract.conId = orderId
+    return { contract, order: { orderId }, orderState: { status: 'Submitted' } }
+  }
+
+  it('joins concurrent open-order sweeps onto one request and gives each caller the full batch', async () => {
+    const b = new RequestBridge()
+    const reqOpenOrders = vi.fn()
+    b.setClient({ reqOpenOrders } as never)
+
+    const first = b.requestOpenOrders(5_000)
+    const second = b.requestOpenOrders(5_000)
+    expect(reqOpenOrders).toHaveBeenCalledOnce()
+
+    const a = collectedOrder(1)
+    const c = collectedOrder(2)
+    b.openOrder(1, a.contract, a.order as never, a.orderState as never)
+    b.openOrder(2, c.contract, c.order as never, c.orderState as never)
+    b.openOrderEnd()
+
+    const [one, two] = await Promise.all([first, second])
+    expect(one).toHaveLength(2)
+    expect(two).toEqual(one)
+  })
+
+  it('joins concurrent completed-order sweeps the same way', async () => {
+    const b = new RequestBridge()
+    const reqCompletedOrders = vi.fn()
+    b.setClient({ reqCompletedOrders } as never)
+
+    const first = b.requestCompletedOrders(5_000)
+    const second = b.requestCompletedOrders(5_000)
+    expect(reqCompletedOrders).toHaveBeenCalledOnce()
+
+    const done = collectedOrder(3)
+    b.completedOrder(done.contract, done.order as never, done.orderState as never)
+    b.completedOrdersEnd()
+
+    await expect(Promise.all([first, second])).resolves.toEqual([
+      [expect.objectContaining({ orderState: { status: 'Submitted' } })],
+      [expect.objectContaining({ orderState: { status: 'Submitted' } })],
+    ])
+  })
+
+  it('lets one caller time out without clobbering the sweep the others still await', async () => {
+    vi.useFakeTimers()
+    try {
+      const b = new RequestBridge()
+      const reqOpenOrders = vi.fn()
+      b.setClient({ reqOpenOrders } as never)
+
+      const impatient = b.requestOpenOrders(1_000)
+      const impatientSettled = vi.fn()
+      impatient.then(impatientSettled, impatientSettled)
+      const patient = b.requestOpenOrders(10_000)
+
+      vi.advanceTimersByTime(1_000)
+      await expect(impatient).rejects.toThrow(/Open orders request timed out after 1000ms/)
+
+      const a = collectedOrder(1)
+      b.openOrder(1, a.contract, a.order as never, a.orderState as never)
+      b.openOrderEnd()
+
+      await expect(patient).resolves.toHaveLength(1)
+      expect(reqOpenOrders).toHaveBeenCalledOnce()
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+})
+
+describe('RequestBridge — connect readiness', () => {
+  it('waits for managedAccounts as well as nextValidId', async () => {
+    const client = { connect: vi.fn(async () => {}), disconnect: vi.fn() }
+    const b = new RequestBridge()
+
+    const connected = b.waitForConnect(client as never, '127.0.0.1', 7497, 0, 5_000)
+    const settled = vi.fn()
+    connected.then(settled, settled)
+
+    b.nextValidId(700)
+    await Promise.resolve()
+    await Promise.resolve()
+    expect(settled).not.toHaveBeenCalled()
+
+    b.managedAccounts('DU1234567')
+    await expect(connected).resolves.toBeUndefined()
+    expect(b.getAccountId()).toBe('DU1234567')
+  })
+})
+
+describe('RequestBridge — current-time credit decay', () => {
+  it('drops the owed-reply credit when the gateway never answers, so later probes still work', async () => {
+    vi.useFakeTimers()
+    try {
+      const b = new RequestBridge()
+      b.setClient({ reqCurrentTime: vi.fn() } as never)
+
+      const dead = b.requestCurrentTime(3_000)
+      dead.catch(() => {})
+      vi.advanceTimersByTime(3_000)
+      await expect(dead).rejects.toThrow(/timed out after 3000ms/)
+
+      // The reply for `dead` never arrives. Past the grace window its credit
+      // must be released, or every probe after it starves forever.
+      vi.advanceTimersByTime(30_000)
+
+      const next = b.requestCurrentTime(3_000)
+      b.currentTime(1_784_289_777)
+      await expect(next).resolves.toBe(1_784_289_777)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('clears owed-reply credits when the connection comes back up', async () => {
+    vi.useFakeTimers()
+    try {
+      const b = new RequestBridge()
+      b.setClient({ reqCurrentTime: vi.fn() } as never)
+
+      const dead = b.requestCurrentTime(3_000)
+      dead.catch(() => {})
+      vi.advanceTimersByTime(3_000)
+      await expect(dead).rejects.toThrow(/timed out/)
+
+      b.markAlive()
+
+      const next = b.requestCurrentTime(3_000)
+      b.currentTime(1_784_289_888)
+      await expect(next).resolves.toBe(1_784_289_888)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+})
+
+describe('RequestBridge — managedAccounts re-push', () => {
+  it('keeps the established account id when TWS re-pushes an empty list', () => {
+    const b = new RequestBridge()
+
+    b.managedAccounts('DU1')
+    b.managedAccounts('')
+
+    expect(b.getAccountId()).toBe('DU1')
+  })
+})
+
+describe('RequestBridge — connect readiness (empty account list)', () => {
+  it('does not treat an empty managedAccounts list as a usable session', async () => {
+    vi.useFakeTimers()
+    try {
+      const client = { connect: vi.fn(async () => {}), disconnect: vi.fn() }
+      const b = new RequestBridge()
+
+      const connected = b.waitForConnect(client as never, '127.0.0.1', 7497, 0, 5_000)
+      const settled = vi.fn()
+      connected.then(settled, settled)
+
+      b.nextValidId(700)
+      b.managedAccounts('')
+      await Promise.resolve()
+      expect(settled).not.toHaveBeenCalled()
+
+      await vi.advanceTimersByTimeAsync(5_000)
+      // A retryable NETWORK timeout naming the missing reply, not a
+      // non-retryable CONFIG "No account detected" later in init().
+      await expect(connected).rejects.toThrow(/no managedAccounts/)
+    } finally {
+      vi.useRealTimers()
+    }
   })
 })

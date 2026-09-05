@@ -108,6 +108,13 @@ export function compactOrderFields(o: unknown): AnyRec {
   pick(out, 'tif', val(k['tif']))
   pick(out, 'goodTillDate', val(k['goodTillDate']))
   if (k['outsideRth'] === true) out['outsideRth'] = true
+  // Linkage is risk-relevant: without it an order row reads as standalone.
+  // `0`/`''` are IBKR's unset values, so only truthy values carry signal.
+  pick(out, 'ocaGroup', val(k['ocaGroup']))
+  const ocaType = val(k['ocaType'])
+  if (ocaType && ocaType !== '0') out['ocaType'] = ocaType
+  const parentId = val(k['parentId'])
+  if (parentId && parentId !== '0') out['parentId'] = parentId
   const filled = val(k['filledQuantity'])
   if (filled) out['filledQuantity'] = filled
   return out

@@ -372,6 +372,24 @@ describe('UTA — getState', () => {
     expect(spyOrders).toHaveBeenCalledTimes(1)
   })
 
+  it('keeps every working status in pendingOrders and drops only the terminal ones', async () => {
+    const withStatus = (symbol: string, status: string) => {
+      const orderState = new OrderState()
+      orderState.status = status
+      return makeOpenOrder({ contract: makeContract({ symbol }), orderState })
+    }
+    vi.spyOn(broker, 'getOrders').mockResolvedValue([
+      withStatus('HELD', 'Inactive'),
+      withStatus('CANCELING', 'PendingCancel'),
+      withStatus('GONE', 'Cancelled'),
+      withStatus('DONE', 'Filled'),
+    ])
+
+    const state = await uta.getState()
+
+    expect(state.pendingOrders.map((o) => o.contract.symbol)).toEqual(['HELD', 'CANCELING'])
+  })
+
   it('returns empty pendingOrders when no orders are pending', async () => {
     const filledState = new OrderState()
     filledState.status = 'Filled'
@@ -724,6 +742,59 @@ describe('UTA — stageModifyOrder', () => {
     expect(op.changes.tif).toBe('GTC')
   })
 
+  it('copies OCA / bracket linkage into changes so it round-trips to the broker', () => {
+    uta.stageModifyOrder({ orderId: 'ord-1', ocaGroup: 'aapl-exit', ocaType: 2, parentId: '17' })
+    const op = uta.status().staged[0] as Extract<Operation, { action: 'modifyOrder' }>
+    expect(op.changes.ocaGroup).toBe('aapl-exit')
+    expect(op.changes.ocaType).toBe(2)
+    expect(op.changes.parentId).toBe(17)
+  })
+
+  it('rejects an ocaType TWS would silently ignore', () => {
+    expect(() => uta.stageModifyOrder({ orderId: 'ord-1', ocaGroup: 'g', ocaType: 0 }))
+      .toThrow(/ocaType must be 1/)
+    expect(() => uta.stagePlaceOrder({
+      aliceId: 'mock-paper|AAPL', action: 'BUY', orderType: 'MKT', totalQuantity: '1', ocaGroup: 'g', ocaType: 9,
+    })).toThrow(/ocaType must be 1/)
+  })
+
+  it('refuses a malformed parentId on both staging paths instead of coercing it to 0', () => {
+    expect(() => uta.stageModifyOrder({ orderId: 'ord-1', parentId: 'abc' }))
+      .toThrow(/parentId must be a positive numeric order id/)
+    expect(() => uta.stagePlaceOrder({
+      aliceId: 'mock-paper|AAPL', action: 'BUY', orderType: 'MKT', totalQuantity: '1', parentId: 'abc',
+    })).toThrow(/parentId must be a positive numeric order id/)
+  })
+
+  it('refuses a partly numeric parentId and accepts a whole one', () => {
+    for (const bad of ['12abc', '1.9']) {
+      expect(() => uta.stageModifyOrder({ orderId: 'ord-1', parentId: bad }))
+        .toThrow(/parentId must be a positive numeric order id/)
+    }
+    // IBKR reads parentId 0 as "no parent", so a non-positive id would drop
+    // the linkage the caller asked for.
+    for (const bad of ['0', 0, '-3', -3]) {
+      expect(() => uta.stageModifyOrder({ orderId: 'ord-1', parentId: bad }))
+        .toThrow(/parentId must be a positive numeric order id/)
+    }
+    for (const good of ['42', ' 42 ']) {
+      uta.stageModifyOrder({ orderId: 'ord-1', parentId: good })
+      const staged = uta.status().staged
+      const op = staged[staged.length - 1] as Extract<Operation, { action: 'modifyOrder' }>
+      expect(op.changes.parentId).toBe(42)
+    }
+  })
+
+  it('carries an explicit ocaType through stagePlaceOrder instead of forcing 1', () => {
+    uta.stagePlaceOrder({
+      aliceId: 'mock-paper|AAPL', action: 'BUY', orderType: 'MKT', totalQuantity: '1',
+      ocaGroup: 'aapl-exit', ocaType: 3,
+    })
+    const { order } = getStagedPlaceOrder(uta)
+    expect(order.ocaGroup).toBe('aapl-exit')
+    expect(order.ocaType).toBe(3)
+  })
+
   it('omits fields not provided', () => {
     uta.stageModifyOrder({ orderId: 'ord-1', lmtPrice: '160' })
     const staged = uta.status().staged
@@ -899,6 +970,59 @@ describe('UTA — sync', () => {
     expect(result.updates[0].filledQty).toBe('10')
     // (148*4 + 150*6) / 10 = 149.2
     expect(result.updates[0].filledPrice).toBe('149.2')
+  })
+
+  // `Inactive` is TWS's held state for an OCA sibling or bracket leg, not a
+  // reject.
+  it('does NOT mark a held (Inactive) order rejected — it stays working and reconcilable', async () => {
+    const { uta, broker } = createUTA()
+
+    uta.stagePlaceOrder({ aliceId: 'mock-paper|AAPL', symbol: 'AAPL', action: 'BUY', orderType: 'LMT', totalQuantity: '10', lmtPrice: '150' })
+    uta.commit('OCA target leg')
+    const orderId = (await uta.push(uta.status().pendingHash!)).submitted[0]!.orderId!
+
+    // TWS parks held OCA legs out of the open-order listing, so only the
+    // confirming getOrder reports them.
+    ;(broker as unknown as { getOpenOrders: () => Promise<unknown[]> }).getOpenOrders = async () => []
+    const heldState = new OrderState()
+    heldState.status = 'Inactive'
+    vi.spyOn(broker, 'getOrder').mockResolvedValue({
+      contract: makeContract({ symbol: 'AAPL' }),
+      order: new Order(),
+      orderState: heldState,
+      orderId,
+    } as never)
+
+    const result = await uta.sync()
+
+    expect(result.updates.map((u) => u.currentStatus)).not.toContain('rejected')
+    expect(result.updatedCount).toBe(0)
+    // Still polled next pass: a held order is not terminal.
+    expect(uta.getPendingOrderIds().map((p) => p.orderId)).toContain(orderId)
+  })
+
+  it('does NOT mark a PendingCancel order rejected — an unconfirmed cancel can still fill', async () => {
+    const { uta, broker } = createUTA()
+
+    uta.stagePlaceOrder({ aliceId: 'mock-paper|AAPL', symbol: 'AAPL', action: 'BUY', orderType: 'LMT', totalQuantity: '10', lmtPrice: '150' })
+    uta.commit('limit buy')
+    const orderId = (await uta.push(uta.status().pendingHash!)).submitted[0]!.orderId!
+
+    ;(broker as unknown as { getOpenOrders: () => Promise<unknown[]> }).getOpenOrders = async () => []
+    const cancellingState = new OrderState()
+    cancellingState.status = 'PendingCancel'
+    vi.spyOn(broker, 'getOrder').mockResolvedValue({
+      contract: makeContract({ symbol: 'AAPL' }),
+      order: new Order(),
+      orderState: cancellingState,
+      orderId,
+    } as never)
+
+    const result = await uta.sync()
+
+    expect(result.updates.map((u) => u.currentStatus)).not.toContain('rejected')
+    expect(result.updatedCount).toBe(0)
+    expect(uta.getPendingOrderIds().map((p) => p.orderId)).toContain(orderId)
   })
 
   it('listing mode: getOrder is spent ONLY on orders absent from the open-orders listing', async () => {
@@ -1177,6 +1301,83 @@ describe('UTA — health tracking', () => {
     await uta.close()
   })
 
+  it('re-arms recovery when a stale in-flight success lands after a transport-dead event', async () => {
+    const broker = new MockBroker()
+    let connectionListener: (event: { state: 'alive' | 'dead' | 'restored'; error?: string }) => void = () => {
+      throw new Error('connection-state listener was not registered')
+    }
+    ;(broker as unknown as { setConnectionStateListener: unknown }).setConnectionStateListener = (
+      listener: typeof connectionListener | null,
+    ) => { if (listener) connectionListener = listener }
+    const { uta } = createUTA(broker) // funded → target "readable"
+    await flush()
+    expect(uta.health).toBe('healthy')
+
+    // The read passes the offline gate before the transport dies, so a success
+    // landing afterwards still reaches _onSuccess.
+    let release: () => void = () => {}
+    const gate = new Promise<void>((resolve) => { release = resolve })
+    const realGetAccount = broker.getAccount.bind(broker)
+    ;(broker as unknown as { getAccount: unknown }).getAccount = async () => {
+      await gate
+      return realGetAccount()
+    }
+    const inFlight = uta.getAccount()
+
+    connectionListener({ state: 'dead', error: 'Write-path liveness probe failed' })
+    expect(uta.health).toBe('offline')
+    expect(uta.getHealthInfo().recovering).toBe(true)
+
+    release()
+    await inFlight
+
+    const info = uta.getHealthInfo()
+    expect(info.consecutiveFailures).toBe(0)
+    // The account may never end up offline with no recovery in flight.
+    if (info.status === 'offline' || info.status === 'degraded') {
+      expect(info.recovering).toBe(true)
+    }
+    expect(info.reach).not.toBe('down')
+
+    await vi.advanceTimersByTimeAsync(60_000)
+    expect(uta.health).toBe('healthy')
+    expect(uta.getHealthInfo().recovering).toBe(false)
+    await uta.close()
+  })
+
+  it('discards a recovery probe whose result predates a mid-probe transport death', async () => {
+    const broker = new MockBroker()
+    let connectionListener: (event: { state: 'alive' | 'dead' | 'restored'; error?: string }) => void = () => {
+      throw new Error('connection-state listener was not registered')
+    }
+    ;(broker as unknown as { setConnectionStateListener: unknown }).setConnectionStateListener = (
+      listener: typeof connectionListener | null,
+    ) => { if (listener) connectionListener = listener }
+    // A probe that succeeds after its own socket died must not raise reach.
+    const realGetAccount = broker.getAccount.bind(broker)
+    let killed = false
+    ;(broker as unknown as { getAccount: unknown }).getAccount = async () => {
+      const result = await realGetAccount()
+      if (!killed) {
+        killed = true
+        connectionListener({ state: 'dead', error: 'gateway restarted mid-probe' })
+      }
+      return result
+    }
+    const { uta } = createUTA(broker)
+    await flush()
+
+    // The connect probe raced the death, so reach stays down and recovery armed.
+    expect(uta.reach).toBe('down')
+    expect(uta.health).toBe('offline')
+    expect(uta.getHealthInfo().recovering).toBe(true)
+
+    await vi.advanceTimersByTimeAsync(60_000)
+    expect(uta.health).toBe('healthy')
+    expect(uta.getHealthInfo().recovering).toBe(false)
+    await uta.close()
+  })
+
   it('transitions healthy → degraded after 3 consecutive failures', async () => {
     const broker = new MockBroker()
     const { uta } = createUTA(broker)
@@ -1187,6 +1388,39 @@ describe('UTA — health tracking', () => {
       await expect(uta.getAccount()).rejects.toThrow()
     }
     expect(uta.health).toBe('degraded')
+  })
+
+  it('keeps retrying when a broker probe never settles, and recovers when the venue returns', async () => {
+    const broker = new MockBroker()
+    const closeSpy = vi.spyOn(broker, 'close').mockResolvedValue(undefined)
+    const realInit = broker.init.bind(broker)
+    let hangsLeft = 2
+    ;(broker as unknown as { init: () => Promise<void> }).init = () => {
+      if (hangsLeft-- > 0) return new Promise<void>(() => { /* wedged transport: never settles */ })
+      return realInit()
+    }
+    const { uta } = createUTA(broker) // funded → target "readable"
+    uta.waitForConnect().catch(() => { /* initial connect is expected to fail */ })
+    await flush()
+
+    // Initial connect's probe is wedged: still "connecting", nothing decided.
+    expect(uta.getHealthInfo().connecting).toBe(true)
+
+    // The 45s probe deadline abandons the wedged attempt and arms recovery.
+    await vi.advanceTimersByTimeAsync(45_000)
+    expect(uta.health).toBe('offline')
+    expect(uta.getHealthInfo().recovering).toBe(true)
+    expect(closeSpy).toHaveBeenCalled()
+
+    // Recovery attempt 1 (t+5s) wedges too, and the loop must still come back.
+    await vi.advanceTimersByTimeAsync(5_000 + 45_000)
+    expect(uta.getHealthInfo().recovering).toBe(true)
+
+    // Attempt 2 (t+10s backoff) meets a healthy venue.
+    await vi.advanceTimersByTimeAsync(10_000)
+    expect(uta.health).toBe('healthy')
+    expect(uta.getHealthInfo().recovering).toBe(false)
+    await uta.close()
   })
 
   it('transitions degraded → offline after 6 consecutive failures', async () => {
@@ -1573,5 +1807,69 @@ describe('UTA — connecting gate (non-blocking cold start)', () => {
     const { uta } = createUTA()
     await uta.waitForConnect()
     await expect(uta.getAccount()).resolves.toBeDefined()
+  })
+})
+
+// ==================== Historical bars: session resolution ====================
+
+describe('UTA — getHistorical session', () => {
+  /** MockBroker declares no session filter, so pin a filtering capability when
+   *  the test is about instrument policy rather than the fallback. */
+  function filteringBroker(): MockBroker {
+    const b = new MockBroker()
+    vi.spyOn(b, 'getCapabilities').mockReturnValue({
+      supportedSecTypes: ['STK', 'CASH', 'FUT'],
+      supportedOrderTypes: ['MKT'],
+      historicalBars: { supported: true, quality: 'realtime', sessions: ['regular', 'extended'] },
+    })
+    return b
+  }
+
+  const stk = () => makeContract({ aliceId: 'mock-paper|AAPL', symbol: 'AAPL', secType: 'STK' })
+
+  it('returns the bars alongside the effective session and forced flag', async () => {
+    const { uta } = createUTA(filteringBroker())
+    const res = await uta.getHistorical(stk(), { interval: '1d', limit: 3 })
+    expect(res.bars).toHaveLength(3)
+    expect(res).toMatchObject({ session: 'regular', forced: false })
+  })
+
+  it('forwards the RESOLVED session to the broker, not the caller request', async () => {
+    const broker = filteringBroker()
+    const { uta } = createUTA(broker)
+    await uta.getHistorical(stk(), { interval: '1d', limit: 1 })
+    const params = broker.calls('getHistorical')[0]!.args[1] as { session?: string }
+    expect(params.session).toBe('regular')
+  })
+
+  it('honors an explicit extended request on a stock', async () => {
+    const broker = filteringBroker()
+    const { uta } = createUTA(broker)
+    const res = await uta.getHistorical(stk(), { interval: '1d', limit: 1, session: 'extended' })
+    expect(res).toMatchObject({ session: 'extended', forced: false })
+  })
+
+  it('forces FX to the continuous tape even when regular hours are requested', async () => {
+    const broker = filteringBroker()
+    const { uta } = createUTA(broker)
+    const fx = makeContract({ aliceId: 'mock-paper|EURUSD', symbol: 'EUR', secType: 'CASH' })
+    const res = await uta.getHistorical(fx, { interval: '1h', limit: 1, session: 'regular' })
+    expect(res).toMatchObject({ session: 'extended', forced: true })
+    const params = broker.calls('getHistorical')[0]!.args[1] as { session?: string }
+    expect(params.session).toBe('extended')
+  })
+
+  it('marks the read forced when the broker cannot filter sessions at all', async () => {
+    // Plain MockBroker declares no `historicalBars.sessions`.
+    const { uta } = createUTA()
+    const res = await uta.getHistorical(stk(), { interval: '1d', limit: 1 })
+    expect(res).toMatchObject({ session: 'extended', forced: true })
+  })
+
+  it('loud-refuses when the broker has no historical support at all', async () => {
+    const broker = new MockBroker()
+    ;(broker as unknown as { getHistorical?: unknown }).getHistorical = undefined
+    const { uta } = createUTA(broker)
+    await expect(uta.getHistorical(stk(), { interval: '1d' })).rejects.toThrow(/does not support historical bars/)
   })
 })

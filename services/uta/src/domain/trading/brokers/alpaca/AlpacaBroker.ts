@@ -27,6 +27,7 @@ import {
   type Bar,
   type BarParams,
 } from '../types.js'
+import { refuseOcaLinkage } from '../../oca.js'
 import '../../contract-ext.js'
 import type {
   AlpacaBrokerConfig,
@@ -271,6 +272,7 @@ export class AlpacaBroker implements IBroker {
   // ---- Trading operations ----
 
   async placeOrder(contract: Contract, order: Order, tpsl?: TpSlParams): Promise<PlaceOrderResult> {
+    refuseOcaLinkage('Alpaca', order)
     const symbol = resolveSymbol(contract)
     if (!symbol) {
       return { success: false, error: 'Cannot resolve contract to Alpaca symbol' }
@@ -347,6 +349,7 @@ export class AlpacaBroker implements IBroker {
   }
 
   async modifyOrder(orderId: string, changes: Partial<Order>): Promise<PlaceOrderResult> {
+    refuseOcaLinkage('Alpaca', changes)
     try {
       const patch: Record<string, unknown> = {}
       if (changes.totalQuantity != null && !changes.totalQuantity.equals(UNSET_DECIMAL)) patch.qty = changes.totalQuantity.toFixed()
@@ -535,6 +538,9 @@ export class AlpacaBroker implements IBroker {
    * capability quality 'iex'; full SIP needs a paid data subscription.
    */
   async getHistorical(contract: Contract, params: BarParams): Promise<Bar[]> {
+    // `params.session` is ignored: getBarsV2 has no RTH filter, so the feed is
+    // always the continuous tape (the capability declares no `sessions`, and
+    // UTA marks such a read forced).
     const symbol = resolveSymbol(contract)
     if (!symbol) throw new BrokerError('EXCHANGE', 'Cannot resolve contract to Alpaca symbol')
     const timeframe = ALPACA_TIMEFRAME[params.interval]
