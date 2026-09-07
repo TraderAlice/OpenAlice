@@ -1,5 +1,5 @@
 ---
-version: 0.1.2
+version: 0.1.3
 ---
 
 # Auto Prediction
@@ -14,8 +14,9 @@ venue evidence, develops semantic hypotheses, runs the repository's checks,
 and maintains research artifacts and local Git history. Auto Prediction owns
 its SQLite state, campaigns, evidence model, internal workers, and Studio.
 
-OpenAlice supplies native Agent Sessions, collaboration, Inbox, market-data
-tools, Workspace lifecycle, and the managed Studio route around the desk.
+OpenAlice supplies native Agent Sessions, peer discovery and conversation,
+Inbox, market-data tools, Workspace lifecycle, and the managed Studio route
+around the desk.
 OpenAlice supervises only the command declared by `harness.json`; Auto
 Prediction retains its complete Studio and control-plane ownership.
 

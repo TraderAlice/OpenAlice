@@ -99,6 +99,24 @@ describe('conversation_ask', () => {
     })
   })
 
+  it('gives stale guidance a recovery path when Prediction is not initialized', async () => {
+    const tool = conversationAskFactory.build(context({
+      conversation: {
+        ask: vi.fn(async () => ({
+          status: 'unavailable' as const,
+          resolution: { mode: 'unavailable' as const, reason: 'prediction-not-initialized' as const },
+        })),
+        read: vi.fn(),
+      },
+    }))
+    await expect(run(tool, {
+      prompt: 'Investigate this contract.', harness: 'prediction',
+    })).resolves.toMatchObject({
+      ok: false,
+      next: expect.stringContaining('retry with --harness prediction'),
+    })
+  })
+
   it('rejects ambiguous or missing addressing flags', async () => {
     const tool = conversationAskFactory.build(context({
       conversation: { ask: vi.fn(), read: vi.fn() },
@@ -149,7 +167,10 @@ describe('conversation_ask', () => {
     }))
   })
 
-  it('addresses a fresh Session through a Harness default', async () => {
+  it.each([
+    ['autoquant', 'Start a new study.'],
+    ['prediction', 'Investigate this contract relationship.'],
+  ] as const)('addresses a fresh Session through the %s Harness default', async (harness, prompt) => {
     const ask = vi.fn(async () => ({
       status: 'dispatched' as const,
       taskId: 'task-1', resumeId: 'resume-fresh', workspaceId: 'ws-aq',
@@ -164,10 +185,15 @@ describe('conversation_ask', () => {
       conversation: { ask, read: vi.fn() },
     }))
 
-    await run(tool, { prompt: 'Start a new study.', harness: 'autoquant' })
+    await run(tool, { prompt, harness })
     expect(ask).toHaveBeenCalledWith(expect.objectContaining({
-      target: { kind: 'harness', harness: 'autoquant' },
+      target: { kind: 'harness', harness },
     }))
+  })
+
+  it('advertises Prediction alongside Chat and AutoQuant in live CLI help', () => {
+    const tool = conversationAskFactory.build(context())
+    expect(tool.description).toContain('Chat, AutoQuant, or Prediction desk')
   })
 
   it('passes reconstruction guidance only when explicitly requested', async () => {

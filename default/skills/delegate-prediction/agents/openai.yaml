@@ -1,0 +1,4 @@
+interface:
+  display_name: "Auto Prediction Coworker"
+  short_description: "Delegate evidence research to Auto Prediction"
+  default_prompt: "Use $delegate-prediction to hand this prediction-market research assignment to the Auto Prediction desk."

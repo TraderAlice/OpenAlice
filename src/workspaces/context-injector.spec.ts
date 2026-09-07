@@ -121,6 +121,21 @@ describe('injectWorkspaceContext — skills', () => {
     }
   });
 
+  it('copies the Chat Auto Prediction delegation contract into both discovery paths', async () => {
+    await injectWorkspaceContext({
+      template: makeTemplate({ bundledSkills: ['delegate-prediction'] }),
+      wsId: 'ws-chat',
+      dir,
+    });
+    for (const root of ['.claude/skills', '.agents/skills']) {
+      const skill = await read(`${root}/delegate-prediction/SKILL.md`);
+      expect(skill).toContain('alice-workspace conversation ask --harness prediction');
+      expect(skill).toContain('Primary evidence directory: <absolute path>');
+      expect(skill).toContain('Do not rerun the research.');
+      expect(skill).toContain('has no authority to place a live order');
+    }
+  });
+
   it('injects the per-CLI playbooks (alice* + traderhub) for a tool-bearing template', async () => {
     await injectWorkspaceContext({
       template: makeTemplate({ injectTools: true, bundledSkills: ['scan-value-chain'] }),
@@ -146,6 +161,7 @@ describe('injectWorkspaceContext — skills', () => {
     expect(skill).toContain("Coding Agent's native Read/Search/Glob/Git capabilities");
     expect(skill).toContain('alice-workspace conversation ask --inbox-id <entryId>');
     expect(skill).toContain('alice-workspace conversation ask --harness autoquant');
+    expect(skill).toContain('alice-workspace conversation ask --harness prediction');
     expect(skill).not.toContain('peer file-read');
   });
 
