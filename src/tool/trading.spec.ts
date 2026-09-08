@@ -317,3 +317,14 @@ describe('tradingPush — AI-trading gate (#95)', () => {
     expect(pushed()).toBe(0)
   })
 })
+
+describe('ocaType input', () => {
+  it('accepts CLI string values, keeps numbers, rejects 0', () => {
+    const tools = createTradingTools(fakeManager([]))
+    const schema = (tools.modifyOrder as unknown as { inputSchema: { parse(v: unknown): { ocaType?: number }; safeParse(v: unknown): { success: boolean } } }).inputSchema
+    expect(schema.parse({ source: 'ibkr', orderId: '1', ocaType: '2' }).ocaType).toBe(2)
+    expect(schema.parse({ source: 'ibkr', orderId: '1', ocaType: 3 }).ocaType).toBe(3)
+    expect(schema.safeParse({ source: 'ibkr', orderId: '1', ocaType: '0' }).success).toBe(false)
+    expect(schema.safeParse({ source: 'ibkr', orderId: '1', ocaType: 4 }).success).toBe(false)
+  })
+})

@@ -70,6 +70,32 @@ All times in US/Eastern (ET):
 - **`reqMktData` (snapshot/streaming)**: CAN return overnight session prices if the contract supports overnight trading. This is why TWS front-end still shows last price changes after 20:00 ET.
 - **Conclusion**: If we need accurate overnight prices for snapshots, we must use `reqMktData` instead of relying on `updatePortfolio()` cached prices.
 
+### Historical bar sessions
+
+`reqHistoricalData`'s `useRTH` decides whether the returned series is the
+regular session only or the continuous tape (pre/post + overnight). Which one
+is correct is an INSTRUMENT property, not a caller preference, so the choice is
+not made in this adapter: `UnifiedTradingAccount.getHistorical` resolves it via
+`resolveBarSession` (`services/uta/src/domain/trading/bar-session.ts`) and
+passes `BarParams.session` down already decided. `ibkr-historical.ts` only maps
+`'regular' → useRTH 1` and anything else → `0`.
+
+| secType | Default session | Explicit request |
+|---|---|---|
+| `STK`, `OPT`, `WAR`, `BOND`, `IND`, `FUND`, unknown | `regular` | `extended` honored |
+| `FUT`, `FOP`, `CFD`, `CMDTY` | `extended` | `regular` honored |
+| `CASH`, `CRYPTO` | `extended` | `regular` REFUSED (forced back to `extended`) |
+
+IBKR declares `historicalBars.sessions: ['regular', 'extended']`, so both are
+served for real. A broker that declares no `sessions` (Alpaca, CCXT) has no
+filter at all; UTA then returns the continuous tape with `forced: true` rather
+than labeling extended bars "regular".
+
+The response is `{ bars, session, forced }` all the way out through
+`POST /uta/:id/historical` and the Alice SDK, and BarService stamps
+`meta.session` / `meta.sessionForced`. A consumer never has to guess whether a
+series contains overnight prints.
+
 ## Socket Error Handling
 
 The `@traderalice/ibkr` Connection class is a Node port of Python's `Connection`.
@@ -89,6 +115,80 @@ Known-dead transport state reaches UTA through an explicit connection-state list
 2. UTA moves directly to `offline` and starts recovery instead of waiting for passive cached-read failures.
 3. Error 1101/1102 nudges recovery immediately but does not mark the account alive; reconnect plus a private account read must still pass.
 4. Place/modify/cancel performs a coalesced `reqCurrentTime` round-trip on the same socket immediately before transmission. A timeout marks the bridge dead and no order bytes are sent.
+
+## Bracket orders (attached TP/SL)
+
+`placeOrder(contract, order, tpsl)` submits a native TWS bracket
+(`OrderSamples.BracketOrder`):
+
+1. Parent keeps the caller's entry type, price, and TIF; `transmit=false`.
+2. Opposite-side children: take-profit `LMT`, stop `STP` or `STP LMT`.
+3. Children share an OCA group with `ocaType=1` (cancel-with-block). The
+   parent is **not** in that group, a parent fill would otherwise cancel
+   the protective legs.
+4. Child TIF is `GTC` so protection survives a GTD/DAY entry fill.
+5. Children set `overridePercentageConstraints` so a far target is not
+   rejected by the default percentage price band.
+6. The last child has `transmit=true`, which sends the whole chain as one
+   unit. TWS holds the children until the parent fills; filling one child
+   cancels the other.
+
+`PlaceOrderResult.legs` carries the child ids so the ledger tracks them
+from birth. After fill, raising or trailing a stop is `modifyOrder` on
+that child id. `parentId` and the OCA group survive the merge.
+
+## OCA membership is placement-time only
+
+`modifyOrder` refuses `ocaGroup`, `ocaType`, and `parentId` before touching
+the venue (`refuseOcaRevision`, a `CONFIG` `BrokerError`). Confirmed live:
+re-placing a resting STP LMT with a new group and `ocaType=1` is rejected
+with **error 10327** ("OCA group type revision is not allowed"), and with
+`ocaType` omitted TWS *accepts* the re-place and silently drops the group:
+the working order rests with no OCA membership while the caller believes the
+legs are linked.
+
+To link an existing protective order, place the new leg with `ocaGroup` set,
+then cancel the old order and re-place it with the same group (sequence the
+two so protection stays continuous).
+
+Because that failure mode was an accepted-but-ignored re-place, `modifyOrder`
+now verifies the venue echo generally: every requested field
+(`totalQuantity`, `lmtPrice`, `auxPrice`, `tif`, `orderType`,
+`trailingPercent`, `trailStopPrice`, `goodTillDate`, `outsideRth`) is
+compared against the `openOrder` echo (Decimal equality for numerics, UNSET
+sentinels treated as absent). A mismatch returns `success: false` naming the
+ignored fields, so the ledger keeps the old working values. An
+`orderStatus`-only answer carries no order body, so its fields are reported
+as "unverified" in `message` rather than failed.
+
+A standalone `--oca-group` without `ocaType` defaults to `ocaType=1` so a
+post-fill STP+TP pair can rest together. Same-name OCA with type 0 is
+ignored by TWS and looks like a second short.
+
+The entry must carry a share `totalQuantity`. A monetary-value
+(`cashQty`) entry is refused: notional sizes an ENTRY, and an opposite-side
+exit priced at the target is a different share count, so the position ends
+up partly uncovered or flipped short. TWS also rejects a notional STP leg
+(`10244`).
+
+If a child acknowledgement fails while the parent is still unfilled, the
+whole chain is cancelled. If the parent already filled, the surviving legs
+are kept and `PlaceOrderResult.message` records the missing protection:
+cancelling there would strip a real position and report that nothing was
+placed.
+
+`openOrder` status `Inactive` does not immediately complete `requestOrder`.
+TWS uses that status for untransmitted (`transmit=false`) holds, for
+exchange-closed/precautionary holds, and for rejects. It is parked for a
+short grace window so a reject's `error()` (or a later live status) wins;
+if neither arrives, the hold itself is the answer, because a live held
+order must not surface as a bare NETWORK timeout with no cancel issued.
+
+`cancelOrder` completes only on a cancel-confirming status
+(`Cancelled` / `ApiCancelled` / `PendingCancel`) via the `accepts`
+predicate on `requestOrder`. Accepting any live status would let a fill
+that beat the cancel resolve it, and the ledger would record a cancelled
+order over an open position.
 
 ## Known Limitations
 

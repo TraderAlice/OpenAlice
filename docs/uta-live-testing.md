@@ -250,12 +250,14 @@ cancel. *Guards: editOrder venue quirks, id truncation.*
 `placeOrderWithTpSl` override this must REFUSE loudly (never place a naked
 entry). On a verified venue: after fill, confirm BOTH protective legs exist
 on the exchange — including the trigger/algo namespace — before calling it
-working. On a native-bracket venue (Alpaca): the push result must carry
+working. On a native-bracket venue (Alpaca, IBKR): the push result must carry
 `legs` ids, and after the entry fills `order list` must show BOTH legs as
-tracked orders. The held SL leg never appears in the venue's open-orders
-listing (Alpaca holds it while the TP works) — place-time is the ONLY
+tracked orders. Alpaca's held SL leg never appears in the venue's open-orders
+listing (it stays `held` while the TP works): place-time is the ONLY
 moment Alice can learn it exists, so a venue listing diff can NOT recover
-a missed leg. *Guards: the silent unprotected-position failure (okx,
+a missed leg. IBKR children do appear (an untriggered stop is
+`PreSubmitted`) and share an OCA group with `ocaType=1`; the parent is not
+in that group. *Guards: the silent unprotected-position failure (okx,
 ledger lied protected) and its mirror, the naked ledger (alpaca, ledger
 blind to real protection) — both fatal to "trust the log".*
 

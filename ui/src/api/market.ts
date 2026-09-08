@@ -157,6 +157,8 @@ export interface BarSourceCandidate {
 }
 
 /** Provenance of the bars currently shown — the explicit "who provided this". */
+export type BarSession = 'regular' | 'extended'
+
 export interface BarMeta {
   symbol: string
   from: string
@@ -167,6 +169,11 @@ export interface BarMeta {
   barId: string
   provider: string
   barCapability?: BarCapability
+  /** Session the bars actually cover. Absent for vendor feeds, which expose no
+   *  session filter. */
+  session?: BarSession
+  /** True when the requested session could not be honored. */
+  sessionForced?: boolean
 }
 
 export interface BarsResponse {
@@ -191,6 +198,7 @@ export const barsApi = {
     count?: number
     start?: string
     end?: string
+    session?: BarSession
   }): Promise<BarsResponse> {
     const qs = new URLSearchParams({ interval: params.interval })
     if (params.barId) qs.set('barId', params.barId)
@@ -199,6 +207,7 @@ export const barsApi = {
     if (params.count != null) qs.set('count', String(params.count))
     if (params.start) qs.set('start', params.start)
     if (params.end) qs.set('end', params.end)
+    if (params.session) qs.set('session', params.session)
     return fetchJson(`/api/bars?${qs}`)
   },
 }

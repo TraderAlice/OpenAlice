@@ -104,6 +104,16 @@ function summarizeOrder(o: OpenOrder, source: string, stringOrderId?: string) {
   }
 }
 
+/**
+ * IBKR OCA semantics. `0` is IBKR's unset value and TWS silently ignores a
+ * group with type 0, so it is not accepted here; omit the field for the default.
+ */
+const ocaTypeSchema = z.preprocess(
+  // CLI flags arrive as strings (`--oca-type 1`).
+  (value) => (typeof value === 'string' && /^[123]$/.test(value.trim()) ? Number(value.trim()) : value),
+  z.union([z.literal(1), z.literal(2), z.literal(3)]),
+).describe('OCA semantics for ocaGroup: 1 = CANCEL_WITH_BLOCK (cancel the siblings, block partial overfill), 2 = REDUCE_WITH_BLOCK (reduce sibling size, block overfill), 3 = REDUCE_NON_BLOCK (reduce sibling size, allow overfill). Omit for the broker default (IBKR: 1).')
+
 const sourceDesc = (required: boolean, extra?: string) => {
   const base = `Account source — matches account id (e.g. "alpaca-paper") or provider (e.g. "alpaca", "ccxt").`
   const req = required
@@ -642,7 +652,7 @@ Required params by orderType:
   TRAIL: totalQuantity + auxPrice (trailing offset) or trailingPercent
   TRAIL LIMIT: totalQuantity + auxPrice (trailing offset) + lmtPrice
   MOC: totalQuantity
-Optional: attach takeProfit and/or stopLoss for automatic exit orders.`,
+Optional: attach takeProfit and/or stopLoss for automatic exit orders (they get their own OCA group, so do not also pass ocaGroup).`,
       inputSchema: z.object({
         source: z.string().optional().describe(sourceDesc(false, 'Defaults to the account inside aliceId.')),
         aliceId: z.string().describe('Contract ID (format: accountId|nativeKey, from searchContracts)'),
@@ -659,7 +669,8 @@ Optional: attach takeProfit and/or stopLoss for automatic exit orders.`,
         goodTillDate: z.string().optional().describe('Expiration datetime for GTD orders'),
         outsideRth: z.boolean().optional().describe('Allow execution outside regular trading hours'),
         parentId: z.string().optional().describe('Parent order ID (bracket orders)'),
-        ocaGroup: z.string().optional().describe('One-Cancels-All group name'),
+        ocaGroup: z.string().optional().describe('One-Cancels-All group name. Placement time is the ONLY reliable way to establish OCA membership — it cannot be added to a working order later (see modifyOrder). Set the same group on every leg as you place it. Mutually exclusive with takeProfit/stopLoss: a bracket mints its own group for its exit legs. IBKR-only: other brokers refuse rather than place an unlinked order.'),
+        ocaType: ocaTypeSchema.optional(),
         takeProfit: z.object({
           price: z.string().describe('Take profit price'),
         }).optional().describe('Take profit order (single-level, full quantity)'),
@@ -692,8 +703,11 @@ Optional: attach takeProfit and/or stopLoss for automatic exit orders.`,
         orderType: z.enum(['MKT', 'LMT', 'STP', 'STP LMT', 'TRAIL', 'TRAIL LIMIT', 'MOC']).optional().describe('New order type'),
         tif: z.enum(['DAY', 'GTC', 'IOC', 'FOK', 'OPG', 'GTD']).optional().describe('New time in force'),
         goodTillDate: z.string().optional().describe('New expiration date'),
+        ocaGroup: z.string().optional().describe('One-Cancels-All group name. NOT revisable on a working order at IBKR: the venue rejects it with error 10327 ("OCA group type revision is not allowed"), and omitting ocaType makes TWS accept the re-place while SILENTLY dropping the group. Recipe instead: place the new leg with ocaGroup set at placement time, then cancel the old protective order and re-place it with the same ocaGroup (order the two steps so protection stays continuous). Kept on the schema for brokers that may support in-place linkage; IBKR refuses it.'),
+        ocaType: ocaTypeSchema.optional().describe('OCA semantics. Same restriction as ocaGroup: IBKR rejects an OCA revision on a working order (10327). Set it at placement time.'),
+        parentId: z.string().optional().describe('Re-parent the order (bracket attachment). Same restriction as ocaGroup: IBKR does not allow re-parenting a working order — cancel and re-place with parentId at placement time.'),
         commitMessage: z.string().optional().describe('Stage AND commit in one step with this message. Push/approval still required.'),
-      }).meta({ examples: [{ source: 'alpaca-paper', orderId: '1', lmtPrice: '150' }] }),
+      }).meta({ examples: [{ source: 'ibkr-paper', orderId: '17', lmtPrice: '182.50', commitMessage: 'Tighten the resting stop-limit' }] }),
       execute: async ({ source, commitMessage, ...params }) => {
         const uta = await manager.resolveOne(source)
         return {

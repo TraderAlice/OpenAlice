@@ -944,3 +944,52 @@ describe('AlpacaBroker — getHistorical() feed handling', () => {
     expect(getBarsV2).toHaveBeenCalledTimes(1)
   })
 })
+
+// ==================== OCA loud-refusal ====================
+
+describe('AlpacaBroker — OCA / bracket linkage refusal', () => {
+  beforeEach(() => { vi.clearAllMocks() })
+
+  function contract(): Contract {
+    const c = new Contract()
+    c.symbol = 'AAPL'
+    c.secType = 'STK'
+    return c
+  }
+
+  function limitBuy(): Order {
+    const o = new Order()
+    o.action = 'BUY'
+    o.orderType = 'LMT'
+    o.totalQuantity = new Decimal(1)
+    o.lmtPrice = new Decimal(100)
+    return o
+  }
+
+  // Alpaca has no OCA primitive, so dropping the field would place an unlinked
+  // order while the ledger believes the exits are linked.
+  it('refuses placeOrder carrying an ocaGroup instead of dropping it', async () => {
+    const acc = new AlpacaBroker({ apiKey: 'key', secretKey: 'secret', paper: true })
+    const order = limitBuy()
+    order.ocaGroup = 'aapl-exit'
+    await expect(acc.placeOrder(contract(), order)).rejects.toThrow(/One-Cancels-All/)
+  })
+
+  it('refuses modifyOrder carrying ocaGroup / ocaType / parentId', async () => {
+    const acc = new AlpacaBroker({ apiKey: 'key', secretKey: 'secret', paper: true })
+    await expect(acc.modifyOrder('1', { ocaGroup: 'aapl-exit' } as Partial<Order>)).rejects.toThrow(/One-Cancels-All/)
+    await expect(acc.modifyOrder('1', { ocaType: 1 } as Partial<Order>)).rejects.toThrow(/One-Cancels-All/)
+    await expect(acc.modifyOrder('1', { parentId: 17 } as Partial<Order>)).rejects.toThrow(/One-Cancels-All/)
+  })
+
+  it('leaves an ordinary modification unaffected', async () => {
+    const acc = new AlpacaBroker({ apiKey: 'key', secretKey: 'secret', paper: true })
+    const { default: Alpaca } = await import('@alpacahq/alpaca-trade-api')
+    const replaceOrder = vi.fn().mockResolvedValue({ id: '1', status: 'new' })
+    ;(acc as unknown as { client: unknown }).client = { replaceOrder }
+    void Alpaca
+    const result = await acc.modifyOrder('1', { lmtPrice: new Decimal('101') })
+    expect(result.success).toBe(true)
+    expect(replaceOrder).toHaveBeenCalledWith('1', { limit_price: '101' })
+  })
+})

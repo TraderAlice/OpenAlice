@@ -39,8 +39,10 @@ export function mapOrderStatus(status: string | undefined): string {
     case 'open': return 'Submitted'
     case 'canceled':
     case 'cancelled': return 'Cancelled'
+    // Not 'Inactive': that is IBKR's held state and order-sync keeps such an
+    // order in the pending lane, while these are terminal.
     case 'expired':
-    case 'rejected': return 'Inactive'
+    case 'rejected': return 'Rejected'
     default: return 'Submitted'
   }
 }

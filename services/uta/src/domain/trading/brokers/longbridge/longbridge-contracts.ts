@@ -108,15 +108,19 @@ export function marketToSuffix(market: number): string {
 
 /**
  * Map Longbridge's `OrderStatus` enum (numeric) to IBKR-style status string.
- * IBKR statuses we emit: Submitted, Filled, Cancelled, Inactive.
+ * IBKR statuses we emit: Submitted, Filled, Cancelled, Rejected. Never
+ * 'Inactive', which order-sync treats as a working order.
  */
-export function mapLbOrderStatus(status: number): string {
+export function mapLbOrderStatus(status: number, tif?: string): string {
   switch (status) {
     case 5:                         // Filled
       return 'Filled'
-    case 14:                        // Rejected
     case 16:                        // Expired
-      return 'Inactive'
+      // Longbridge parks GTC orders as Expired between sessions and reverts
+      // them to New at the open (upstream #1125).
+      return tif === 'GTC' ? 'Submitted' : 'Rejected'
+    case 14:                        // Rejected
+      return 'Rejected'
     case 15:                        // Canceled
     case 17:                        // PartialWithdrawal
       return 'Cancelled'
@@ -136,9 +140,9 @@ export function mapLbOrderStatus(status: number): string {
 }
 
 /** Make an OrderState from an LB status enum + optional reject message. */
-export function makeOrderState(status: number, msg?: string): OrderState {
+export function makeOrderState(status: number, msg?: string, tif?: string): OrderState {
   const s = new OrderState()
-  s.status = mapLbOrderStatus(status)
+  s.status = mapLbOrderStatus(status, tif)
   if (msg && (status === 14 /* Rejected */)) s.rejectReason = msg
   return s
 }

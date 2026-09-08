@@ -226,10 +226,16 @@ describe('ibkrTifToLb', () => {
 
 describe('mapLbOrderStatus', () => {
   it('Filled → Filled', () => expect(mapLbOrderStatus(5)).toBe('Filled'))
-  it('Rejected → Inactive', () => expect(mapLbOrderStatus(14)).toBe('Inactive'))
+  // Not 'Inactive': that is IBKR's held state and order-sync treats it as a
+  // working order, so a Longbridge reject would never leave the pending lane.
+  it('Rejected → Rejected', () => expect(mapLbOrderStatus(14)).toBe('Rejected'))
   it('Canceled → Cancelled', () => expect(mapLbOrderStatus(15)).toBe('Cancelled'))
   it('PartialFilled → Submitted (still active)', () => expect(mapLbOrderStatus(11)).toBe('Submitted'))
   it('New → Submitted', () => expect(mapLbOrderStatus(7)).toBe('Submitted'))
+  it('Expired + GTC → Submitted (parked between sessions)', () => expect(mapLbOrderStatus(16, 'GTC')).toBe('Submitted'))
+  it('Expired + DAY → Rejected', () => expect(mapLbOrderStatus(16, 'DAY')).toBe('Rejected'))
+  it('Expired + GTD → Rejected', () => expect(mapLbOrderStatus(16, 'GTD')).toBe('Rejected'))
+  it('Expired without a tif → Rejected', () => expect(mapLbOrderStatus(16)).toBe('Rejected'))
 })
 
 // ==================== init() ====================

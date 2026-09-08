@@ -30,18 +30,7 @@
 
 import Decimal from 'decimal.js'
 import type { Order } from '@traderalice/ibkr'
-import { UNSET_DECIMAL } from '@traderalice/ibkr'
-
-// Add new Decimal-valued optional Order fields here too.
-const SENTINEL_DECIMAL_FIELDS = [
-  'totalQuantity',
-  'cashQty',
-  'lmtPrice',
-  'auxPrice',
-  'trailStopPrice',
-  'trailingPercent',
-  'filledQuantity',
-] as const
+import { UNSET_DECIMAL, UNSET_DOUBLE, UNSET_INTEGER } from '@traderalice/ibkr'
 
 /**
  * Narrow nullable view for broker-internal consumption. Only the fields
@@ -62,11 +51,42 @@ export interface OrderView {
   outsideRth?: boolean
   parentId?: number
   ocaGroup?: string
+  ocaType?: number
   goodTillDate?: string
 }
 
 function unsetToUndef(d: Decimal): Decimal | undefined {
   return d.equals(UNSET_DECIMAL) ? undefined : d
+}
+
+/** Sentinel text as the decoder stringifies it, in either Decimal notation. */
+const SENTINEL_TEXT = new Set([
+  UNSET_DECIMAL.toString(),
+  UNSET_DECIMAL.toFixed(),
+  String(UNSET_DOUBLE),
+])
+
+/**
+ * Objects whose state does not live in enumerable own properties. Walking
+ * them with `Object.entries` yields `{}` and loses the value entirely.
+ */
+function isOpaqueObject(value: object): boolean {
+  return (
+    value instanceof Date
+    || value instanceof Map
+    || value instanceof Set
+    || value instanceof RegExp
+    || value instanceof Error
+    || ArrayBuffer.isView(value)
+    || value instanceof ArrayBuffer
+  )
+}
+
+function isSentinelValue(value: unknown): boolean {
+  if (typeof value === 'number') return value === UNSET_DOUBLE || value === UNSET_INTEGER
+  if (typeof value === 'string') return SENTINEL_TEXT.has(value)
+  if (Decimal.isDecimal(value)) return (value as Decimal).equals(UNSET_DECIMAL)
+  return false
 }
 
 export const OrderHelper = {
@@ -86,19 +106,38 @@ export const OrderHelper = {
       outsideRth: order.outsideRth || undefined,
       parentId: order.parentId || undefined,
       ocaGroup: order.ocaGroup || undefined,
+      ocaType: order.ocaType || undefined,
       goodTillDate: order.goodTillDate || undefined,
     }
   },
 
   // Accepts Order or Partial<Order> (modifyOrder.changes is the latter).
   toWire(order: Order | Partial<Order>): Record<string, unknown> {
-    const out: Record<string, unknown> = { ...order }
-    for (const field of SENTINEL_DECIMAL_FIELDS) {
-      const v = out[field]
-      if (Decimal.isDecimal(v) && v.equals(UNSET_DECIMAL)) {
-        delete out[field]
-      }
+    // Matching by value also covers the ~40 numeric fields Order class-defaults
+    // to UNSET_DOUBLE / UNSET_INTEGER (percentOffset, delta, minQty, scale*).
+    return OrderHelper.scrub({ ...order } as Record<string, unknown>)
+  },
+
+  /**
+   * Deep-remove IBKR sentinel values so they never cross the JSON boundary.
+   * Dropping a key is safe for resend: `TradingGit.rehydrateOrder` rebuilds from
+   * `new Order()`, whose fields already default to the sentinel.
+   */
+  scrub<T>(value: T): T {
+    if (Array.isArray(value)) {
+      return value.map((entry) => OrderHelper.scrub(entry)) as unknown as T
     }
-    return out
+    if (Decimal.isDecimal(value) || value === null || typeof value !== 'object') {
+      return value
+    }
+    // Object.entries() would flatten a Date/Map/Set/Buffer to `{}` and destroy
+    // the value.
+    if (isOpaqueObject(value)) return value
+    const out: Record<string, unknown> = {}
+    for (const [key, entry] of Object.entries(value as Record<string, unknown>)) {
+      if (isSentinelValue(entry)) continue
+      out[key] = OrderHelper.scrub(entry)
+    }
+    return out as unknown as T
   },
 }

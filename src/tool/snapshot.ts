@@ -36,9 +36,10 @@ FRESHNESS IS LOAD-BEARING. The result carries asOf / isLatestActual / staleTradi
         asOf: z.string().optional().describe('Point-in-time YYYY-MM-DD. Bars never run past it (no lookahead). Default: now.'),
         interval: z.string().optional().describe('Bar interval (default "1d").'),
         count: z.number().int().positive().optional().describe('Analysis window fetched for the levels (default 90; sma50 needs ≥50). NOT the output size.'),
+        session: z.enum(['regular', 'extended']).optional().describe('Default regular hours for stocks/options, continuous for FX/futures/crypto; extended opts in to pre/post/overnight. FX and crypto are always continuous. The response stamps the effective session.'),
         bars: z.number().int().nonnegative().optional().describe('How many recent dated bars to RETURN in `bars` (default 0 = summary only — latest + levels + freshness). Set e.g. 30/90 when you need the dated path (it can be large). `windowBars` tells how many are available.'),
       }).meta({ examples: [{ query: 'XLE' }, { query: 'NVDA', asOf: '2026-04-15', bars: 30 }] }),
-      execute: async ({ query, barId, asset, asOf, interval, count, bars }) => {
+      execute: async ({ query, barId, asset, asOf, interval, count, bars, session }) => {
         const resolved = await resolveBarSource(barService, { query, barId, asset })
         if ('error' in resolved) return resolved
         const snap = await getSnapshot(barService, resolved.ref as never, {
@@ -46,6 +47,7 @@ FRESHNESS IS LOAD-BEARING. The result carries asOf / isLatestActual / staleTradi
           ...(interval ? { interval } : {}),
           ...(count ? { count } : {}),
           ...(bars != null ? { barsOut: bars } : {}),
+          ...(session ? { session } : {}),
         })
         return resolved.pickedFrom ? { ...snap, autoPickedSource: resolved.pickedFrom } : snap
       },

@@ -1,7 +1,9 @@
 import { describe, it, expect, vi } from 'vitest'
 import Decimal from 'decimal.js'
-import { Contract, Order } from '@traderalice/ibkr'
+import { Contract, Order, UNSET_DECIMAL } from '@traderalice/ibkr'
 import { IbkrBroker } from './IbkrBroker.js'
+import { buildHistoricalRequest } from './ibkr-historical.js'
+import type { BarParams } from '../types.js'
 import contractCorpus from './__fixtures__/contract-resolution.v1.json'
 
 /**
@@ -42,33 +44,50 @@ function usdChfContract(): Contract {
 function brokerWithContractIo(resolvedContract = usdChfContract()): {
   broker: IbkrBroker
   bridge: {
+    connectionDead: boolean
+    allocReqId: ReturnType<typeof vi.fn>
     requestCollector: ReturnType<typeof vi.fn>
     requestSnapshot: ReturnType<typeof vi.fn>
     requestCurrentTime: ReturnType<typeof vi.fn>
+    requestHistoricalBars: ReturnType<typeof vi.fn>
+    getNextOrderId: ReturnType<typeof vi.fn>
+    lastInboundAt: number
     requestOrder: ReturnType<typeof vi.fn>
     markDead: ReturnType<typeof vi.fn>
   }
   client: {
+    isConnected: ReturnType<typeof vi.fn>
     reqContractDetails: ReturnType<typeof vi.fn>
     reqMktData: ReturnType<typeof vi.fn>
+    reqHistoricalData: ReturnType<typeof vi.fn>
+    cancelHistoricalData: ReturnType<typeof vi.fn>
     placeOrder: ReturnType<typeof vi.fn>
     cancelOrder: ReturnType<typeof vi.fn>
   }
 } {
   const broker = new IbkrBroker({ id: 'ibkr-test', host: '127.0.0.1', port: 7497, clientId: 91 })
+  let nextOrderId = 42
   const bridge = {
     connectionDead: false,
     allocReqId: vi.fn(() => 17),
     requestCollector: vi.fn(async () => [{ contract: Object.assign(new Contract(), resolvedContract) }]),
     requestSnapshot: vi.fn(async () => ({ last: 0.8, bid: 0.79, ask: 0.81, volume: 1 })),
     requestCurrentTime: vi.fn(async () => 1_784_289_600),
-    getNextOrderId: vi.fn(() => 42),
-    requestOrder: vi.fn(async () => ({ orderState: { status: 'Submitted' } })),
+    requestHistoricalBars: vi.fn(async () => []),
+    getNextOrderId: vi.fn(() => nextOrderId++),
+    // Mirrors the bridge: only a cancel-confirming status satisfies `accepts`.
+    requestOrder: vi.fn(async (_orderId: number, _timeoutMs?: number, accepts?: (status: string) => boolean) => ({
+      orderState: { status: accepts && !accepts('Submitted') ? 'Cancelled' : 'Submitted' },
+    })),
     markDead: vi.fn(),
+    lastInboundAt: 0,
   }
   const client = {
+    isConnected: vi.fn(() => true),
     reqContractDetails: vi.fn(),
     reqMktData: vi.fn(),
+    reqHistoricalData: vi.fn(),
+    cancelHistoricalData: vi.fn(),
     placeOrder: vi.fn(),
     cancelOrder: vi.fn(),
   }
@@ -259,32 +278,172 @@ describe('IbkrBroker — canonical conId contract resolution', () => {
   })
 })
 
-describe('IbkrBroker — attached TP/SL refusal gate', () => {
-  // Guards the silent naked-entry failure: the tpsl param used to be
-  // `_tpsl` (ignored) — the ledger recorded protection TWS never received.
-  it('refuses placeOrder with takeProfit', async () => {
+describe('IbkrBroker — native attached TP/SL bracket', () => {
+  it('submits parent + TP + SL and returns child ids as legs', async () => {
+    const { broker, bridge, client } = brokerWithContractIo(recordedContract('aapl-stock'))
     const { contract, order } = stkOrder()
-    const result = await bareBroker().placeOrder(contract, order, { takeProfit: { price: '120' } })
-    expect(result.success).toBe(false)
-    expect(result.error).toMatch(/TP\/SL.*not implemented|refusing/i)
+
+    const result = await broker.placeOrder(contract, order, {
+      takeProfit: { price: '120' },
+      stopLoss: { price: '90' },
+    })
+
+    expect(result.success).toBe(true)
+    expect(result.orderId).toBe('42')
+    expect(result.legs).toEqual([
+      { orderId: '43', kind: 'takeProfit' },
+      { orderId: '44', kind: 'stopLoss' },
+    ])
+    expect(client.placeOrder).toHaveBeenCalledTimes(3)
+    expect(bridge.requestOrder.mock.calls.map(call => call[0])).toEqual([42, 43, 44])
+    expect(bridge.requestCurrentTime).toHaveBeenCalledOnce()
+
+    const [parentId, , parent] = client.placeOrder.mock.calls[0] as [number, Contract, Order]
+    const [, , tp] = client.placeOrder.mock.calls[1] as [number, Contract, Order]
+    const [, , sl] = client.placeOrder.mock.calls[2] as [number, Contract, Order]
+    expect(parentId).toBe(42)
+    expect(parent.transmit).toBe(false)
+    expect(parent.ocaGroup).toBe('')
+    expect(tp.transmit).toBe(false)
+    expect(tp.parentId).toBe(42)
+    expect(tp.orderType).toBe('LMT')
+    expect(sl.transmit).toBe(true)
+    expect(sl.parentId).toBe(42)
+    expect(sl.orderType).toBe('STP')
+    expect(tp.ocaGroup).toBe(sl.ocaGroup)
+    expect(tp.ocaType).toBe(1)
+    expect(order.transmit).toBe(true)
   })
 
-  it('refuses placeOrder with stopLoss', async () => {
+  it('submits a one-child OTO when only stopLoss is attached', async () => {
+    const { broker, client } = brokerWithContractIo(recordedContract('aapl-stock'))
     const { contract, order } = stkOrder()
-    const result = await bareBroker().placeOrder(contract, order, { stopLoss: { price: '90' } })
-    expect(result.success).toBe(false)
-    expect(result.error).toMatch(/refusing/i)
+
+    const result = await broker.placeOrder(contract, order, {
+      stopLoss: { price: '90', limitPrice: '89' },
+    })
+
+    expect(result.success).toBe(true)
+    expect(result.legs).toEqual([{ orderId: '43', kind: 'stopLoss' }])
+    expect(client.placeOrder).toHaveBeenCalledTimes(2)
+    const child = client.placeOrder.mock.calls[1][2] as Order
+    expect(child.orderType).toBe('STP LMT')
+    expect(child.transmit).toBe(true)
   })
 
-  it('an empty tpsl object does not trip the gate', async () => {
+  it('cancels the chain when a child acknowledgement fails', async () => {
+    const { broker, bridge, client } = brokerWithContractIo(recordedContract('aapl-stock'))
+    bridge.requestOrder.mockImplementation(async (orderId: number) => {
+      if (orderId === 44) throw new Error('TWS error 110: The price does not conform to the minimum price variation')
+      return { orderState: { status: 'Submitted' } }
+    })
     const { contract, order } = stkOrder()
-    // No bridge on the bare instance — passing the gate means it throws on
-    // bridge access, NOT a refusal result.
-    await expect(async () => {
-      const r = await bareBroker().placeOrder(contract, order, {})
-      if (r.success === false && /refusing/i.test(r.error ?? '')) throw new Error('gate tripped')
-      return r
-    }).not.toThrow(/gate tripped/)
+
+    const result = await broker.placeOrder(contract, order, {
+      takeProfit: { price: '120' },
+      stopLoss: { price: '90' },
+    })
+
+    expect(result.success).toBe(false)
+    expect(result.error).toMatch(/minimum price variation/)
+    expect(client.cancelOrder).toHaveBeenCalledTimes(3)
+  })
+
+  it('keeps the surviving legs when a child fails after the entry filled', async () => {
+    const { broker, bridge, client } = brokerWithContractIo(recordedContract('aapl-stock'))
+    bridge.requestOrder.mockImplementation(async (orderId: number) => {
+      if (orderId === 44) throw new Error('TWS error 110: minimum price variation')
+      if (orderId === 42) return { orderState: { status: 'Filled' } }
+      return { orderState: { status: 'PreSubmitted' } }
+    })
+    const { contract, order } = stkOrder()
+
+    const result = await broker.placeOrder(contract, order, {
+      takeProfit: { price: '120' },
+      stopLoss: { price: '90' },
+    })
+
+    expect(result.success).toBe(true)
+    expect(result.orderId).toBe('42')
+    expect(result.legs).toEqual([{ orderId: '43', kind: 'takeProfit' }])
+    expect(result.message).toMatch(/protective leg/i)
+    expect(client.cancelOrder).not.toHaveBeenCalled()
+  })
+
+  it('refuses a monetary-value entry rather than mis-sizing the protective legs', async () => {
+    const { broker, client } = brokerWithContractIo(recordedContract('aapl-stock'))
+    const { contract, order } = stkOrder()
+    order.totalQuantity = UNSET_DECIMAL
+    order.cashQty = new Decimal('5000')
+
+    const result = await broker.placeOrder(contract, order, { stopLoss: { price: '90' } })
+
+    expect(result.success).toBe(false)
+    expect(result.error).toMatch(/monetary-value|totalQuantity/i)
+    expect(client.placeOrder).not.toHaveBeenCalled()
+  })
+
+  it('rejects a caller ocaGroup on a bracket entry instead of placing the legs', async () => {
+    const { broker, client } = brokerWithContractIo(recordedContract('aapl-stock'))
+    const { contract, order } = stkOrder()
+    order.ocaGroup = 'swing-mu'
+
+    await expect(broker.placeOrder(contract, order, { takeProfit: { price: '120' } }))
+      .rejects.toThrow(/mints its own OCA group/)
+    expect(client.placeOrder).not.toHaveBeenCalled()
+  })
+
+  it('defaults ocaType=1 on a standalone order that already has an ocaGroup', async () => {
+    const { broker, client } = brokerWithContractIo(recordedContract('aapl-stock'))
+    const { contract, order } = stkOrder()
+    order.ocaGroup = 'swing-mu'
+    order.action = 'SELL'
+    order.orderType = 'STP'
+    order.auxPrice = new Decimal('90')
+
+    const result = await broker.placeOrder(contract, order)
+    expect(result.success).toBe(true)
+    expect(client.placeOrder).toHaveBeenCalledOnce()
+    const sent = client.placeOrder.mock.calls[0][2] as Order
+    expect(sent.ocaGroup).toBe('swing-mu')
+    expect(sent.ocaType).toBe(1)
+    expect(order.ocaType).toBe(0)
+  })
+
+  it('observes every leg request when the parent write throws synchronously', async () => {
+    const { broker, bridge, client } = brokerWithContractIo(recordedContract('aapl-stock'))
+    // A plain function, not `vi.fn`: a spy attaches its own settled-result
+    // handler and would observe the rejection on the code's behalf.
+    ;(bridge as unknown as { requestOrder: unknown }).requestOrder = () => new Promise((_resolve, reject) => {
+      setTimeout(() => reject(new Error('order request timed out')), 0)
+    })
+    client.placeOrder.mockImplementation(() => { throw new Error('TWS socket write failed') })
+    const unhandled = vi.fn()
+    process.on('unhandledRejection', unhandled)
+    try {
+      const { contract, order } = stkOrder()
+
+      const result = await broker.placeOrder(contract, order, {
+        takeProfit: { price: '120' },
+        stopLoss: { price: '90' },
+      })
+
+      expect(result.success).toBe(false)
+      expect(result.error).toMatch(/socket write failed/)
+      await new Promise((resolve) => setTimeout(resolve, 20))
+      expect(unhandled).not.toHaveBeenCalled()
+    } finally {
+      process.off('unhandledRejection', unhandled)
+    }
+  })
+
+  it('an empty tpsl object still places a simple entry', async () => {
+    const { broker, client } = brokerWithContractIo(recordedContract('aapl-stock'))
+    const { contract, order } = stkOrder()
+    const result = await broker.placeOrder(contract, order, {})
+    expect(result.success).toBe(true)
+    expect(result.legs).toBeUndefined()
+    expect(client.placeOrder).toHaveBeenCalledOnce()
   })
 })
 
@@ -531,5 +690,348 @@ describe('IbkrBroker — dead-connection gate (issue #294)', () => {
     expect(bridge.requestCurrentTime).toHaveBeenCalledTimes(2)
     expect(client.placeOrder).toHaveBeenCalledOnce()
     expect(client.cancelOrder).toHaveBeenCalledOnce()
+  })
+})
+
+describe('IbkrBroker — liveness policy', () => {
+  it('retries a missed write probe once before failing the write', async () => {
+    const { broker, bridge, client } = brokerWithContractIo(recordedContract('aapl-stock'))
+    bridge.requestCurrentTime
+      .mockRejectedValueOnce(new Error('currentTime request timed out after 10000ms'))
+      .mockResolvedValueOnce(1_784_289_600)
+    const { contract, order } = stkOrder()
+
+    await expect(broker.placeOrder(contract, order)).resolves.toMatchObject({ success: true })
+
+    expect(bridge.requestCurrentTime).toHaveBeenCalledTimes(2)
+    expect(bridge.markDead).not.toHaveBeenCalled()
+    expect(client.placeOrder).toHaveBeenCalledOnce()
+  })
+
+  it('carries the underlying probe error into the refusal and the markDead reason', async () => {
+    const { broker, bridge } = brokerWithContractIo(recordedContract('aapl-stock'))
+    bridge.requestCurrentTime.mockRejectedValue(
+      new Error('currentTime request timed out after 10000ms'),
+    )
+    const { contract, order } = stkOrder()
+
+    const result = await broker.placeOrder(contract, order)
+
+    expect(result.error).toContain('currentTime request timed out after 10000ms')
+    expect(bridge.markDead).toHaveBeenCalledOnce()
+    expect(bridge.markDead.mock.calls[0][0]).toContain('currentTime request timed out after 10000ms')
+  })
+
+  it('reports the socket verdict when the transport itself is down', async () => {
+    const { broker, bridge, client } = brokerWithContractIo(recordedContract('aapl-stock'))
+    client.isConnected.mockReturnValue(false)
+    bridge.requestCurrentTime.mockRejectedValue(new Error('currentTime request timed out after 10000ms'))
+    const { contract, order } = stkOrder()
+
+    const result = await broker.placeOrder(contract, order)
+
+    expect(result.error).toMatch(/socket reported not connected/)
+    expect(bridge.markDead.mock.calls[0][0]).toMatch(/socket reported not connected/)
+  })
+
+  it('only marks the connection dead after two consecutive heartbeat misses', async () => {
+    vi.useFakeTimers()
+    try {
+      const { broker, bridge } = brokerWithContractIo(recordedContract('aapl-stock'))
+      bridge.requestCurrentTime.mockRejectedValue(
+        new Error('currentTime request timed out after 15000ms'),
+      )
+      ;(broker as unknown as { startHeartbeat(): void }).startHeartbeat()
+
+      await vi.advanceTimersByTimeAsync(45_000)
+      expect(bridge.markDead).not.toHaveBeenCalled()
+
+      await vi.advanceTimersByTimeAsync(45_000)
+      expect(bridge.markDead).toHaveBeenCalledOnce()
+      expect(bridge.markDead.mock.calls[0][0]).toContain('currentTime request timed out after 15000ms')
+
+      ;(broker as unknown as { stopHeartbeat(): void }).stopHeartbeat()
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('does not count a slow probe as a miss while inbound traffic continues', async () => {
+    vi.useFakeTimers()
+    try {
+      const { broker, bridge } = brokerWithContractIo(recordedContract('aapl-stock'))
+      bridge.requestCurrentTime.mockImplementation(() => {
+        bridge.lastInboundAt = Date.now() + 1
+        return Promise.reject(new Error('currentTime request timed out after 15000ms'))
+      })
+      ;(broker as unknown as { startHeartbeat(): void }).startHeartbeat()
+
+      await vi.advanceTimersByTimeAsync(45_000 * 3)
+      expect(bridge.markDead).not.toHaveBeenCalled()
+
+      // The exemption is bounded: account pushes on a half-open socket must
+      // not hide a silent request/reply path forever (issue #294).
+      await vi.advanceTimersByTimeAsync(45_000 * 2)
+      expect(bridge.markDead).toHaveBeenCalledOnce()
+
+      ;(broker as unknown as { stopHeartbeat(): void }).stopHeartbeat()
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('resets the miss counter after a successful probe', async () => {
+    vi.useFakeTimers()
+    try {
+      const { broker, bridge } = brokerWithContractIo(recordedContract('aapl-stock'))
+      bridge.requestCurrentTime
+        .mockRejectedValueOnce(new Error('probe miss'))
+        .mockResolvedValueOnce(1_784_289_600)
+        .mockRejectedValueOnce(new Error('probe miss'))
+      ;(broker as unknown as { startHeartbeat(): void }).startHeartbeat()
+
+      await vi.advanceTimersByTimeAsync(45_000 * 3)
+      expect(bridge.markDead).not.toHaveBeenCalled()
+
+      ;(broker as unknown as { stopHeartbeat(): void }).stopHeartbeat()
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+})
+
+describe('IbkrBroker — OCA revision and echo verification on modifyOrder', () => {
+  function restingStop(): Order {
+    const order = new Order()
+    order.action = 'SELL'
+    order.orderType = 'STP LMT'
+    order.totalQuantity = new Decimal(10)
+    order.auxPrice = new Decimal('99')
+    order.lmtPrice = new Decimal('98.5')
+    return order
+  }
+
+  /** An `openOrder` echo body derived from the resting order. */
+  function echoOf(base: Order, overrides: Partial<Order> = {}): Order {
+    return Object.assign(new Order(), base, overrides)
+  }
+
+  function brokerWithRestingOrder(existing: Order = restingStop()): {
+    broker: IbkrBroker
+    client: { placeOrder: ReturnType<typeof vi.fn> }
+    bridge: { requestOrder: ReturnType<typeof vi.fn> }
+  } {
+    const { broker, client, bridge } = brokerWithContractIo()
+    ;(broker as unknown as { getOrder: unknown }).getOrder = vi.fn(async () => ({
+      contract: Object.assign(new Contract(), { conId: 12087820 }),
+      order: existing,
+      orderState: { status: 'Submitted' },
+    }))
+    return { broker, client, bridge }
+  }
+
+  // A re-place carrying a new ocaGroup + ocaType is rejected with 10327, and
+  // with ocaType omitted TWS accepts it and silently drops the group.
+  it.each(['ocaGroup', 'ocaType', 'parentId'] as const)(
+    'refuses %s revision on a working order without calling the venue',
+    async (field) => {
+      const { broker, client } = brokerWithRestingOrder()
+      const changes = { ocaGroup: 'aapl-exit', ocaType: 3, parentId: 17 }[field]
+
+      await expect(broker.modifyOrder('42', { [field]: changes } as Partial<Order>))
+        .rejects.toThrow(/10327/)
+      expect(client.placeOrder).not.toHaveBeenCalled()
+    },
+  )
+
+  it('names the cancel-and-re-place recipe in the refusal', async () => {
+    const { broker } = brokerWithRestingOrder()
+    await expect(broker.modifyOrder('42', { ocaGroup: 'aapl-exit' } as Partial<Order>))
+      .rejects.toThrow(/Cancel this order and re-place it with ocaGroup set at placement time/)
+  })
+
+  it('leaves an unrelated modification free of OCA fields', async () => {
+    const { broker, client } = brokerWithRestingOrder()
+
+    await broker.modifyOrder('42', { lmtPrice: new Decimal('97') })
+
+    const sent = client.placeOrder.mock.calls[0][2] as Order
+    expect(sent.ocaGroup).toBe('')
+    expect(sent.ocaType).toBe(0)
+    expect(sent.lmtPrice.toFixed()).toBe('97')
+  })
+
+  // IBKR modifies by re-placing on the same orderId, so TWS reads the message
+  // as a complete order and resets any field the merge fails to carry over.
+  it('preserves every untouched field of the resting order across the re-place', async () => {
+    const existing = restingStop()
+    existing.tif = 'GTC'
+    existing.outsideRth = true
+    existing.transmit = true
+    existing.account = 'DU1234567'
+    existing.ocaGroup = 'aapl-exit'
+    existing.ocaType = 1
+    const { broker, client } = brokerWithRestingOrder(existing)
+
+    await broker.modifyOrder('42', { lmtPrice: new Decimal('97') })
+
+    const [sentId, sentContract, sent] = client.placeOrder.mock.calls[0] as [number, Contract, Order]
+    expect(sentId).toBe(42)
+    expect(sentContract.conId).toBe(12087820)
+    expect(sent.action).toBe('SELL')
+    expect(sent.orderType).toBe('STP LMT')
+    expect(sent.totalQuantity.toFixed()).toBe('10')
+    expect(sent.auxPrice.toFixed()).toBe('99')
+    expect(sent.lmtPrice.toFixed()).toBe('97')
+    expect(sent.tif).toBe('GTC')
+    expect(sent.outsideRth).toBe(true)
+    expect(sent.transmit).toBe(true)
+    expect(sent.account).toBe('DU1234567')
+    // Carrying the working order's own group over is not a revision.
+    expect(sent.ocaGroup).toBe('aapl-exit')
+    expect(sent.ocaType).toBe(1)
+  })
+
+  // Rehydrated orders arrive with ocaType undefined rather than 0, and TWS
+  // encodes both as 0.
+  it('defaults an undefined ocaType on a group the working order already has', async () => {
+    const existing = restingStop()
+    existing.ocaGroup = 'aapl-exit'
+    ;(existing as unknown as { ocaType?: number }).ocaType = undefined
+    const { broker, client } = brokerWithRestingOrder(existing)
+
+    await broker.modifyOrder('42', { lmtPrice: new Decimal('97') })
+
+    expect((client.placeOrder.mock.calls[0][2] as Order).ocaType).toBe(1)
+  })
+
+  // TWS can accept a re-place and still ignore individual fields.
+  it('fails the modify when the venue echoes the OLD value of a requested field', async () => {
+    const existing = restingStop()
+    const { broker, bridge } = brokerWithRestingOrder(existing)
+    bridge.requestOrder.mockImplementation(async () => ({
+      contract: new Contract(),
+      order: echoOf(restingStop()),
+      orderState: { status: 'Submitted' },
+    }))
+
+    const result = await broker.modifyOrder('42', { lmtPrice: new Decimal('97') })
+
+    expect(result.success).toBe(false)
+    expect(result.error).toContain('ignored: lmtPrice (requested 97, working 98.5)')
+    expect(result.error).toContain('still working with its previous values')
+  })
+
+  it('succeeds when the echo carries the requested value', async () => {
+    const { broker, bridge } = brokerWithRestingOrder()
+    bridge.requestOrder.mockImplementation(async () => ({
+      contract: new Contract(),
+      order: echoOf(restingStop(), { lmtPrice: new Decimal('97') }),
+      orderState: { status: 'Submitted' },
+    }))
+
+    const result = await broker.modifyOrder('42', { lmtPrice: new Decimal('97') })
+
+    expect(result.success).toBe(true)
+    expect(result.error).toBeUndefined()
+    expect(result.message).toBeUndefined()
+  })
+
+  // An orderStatus-only answer carries a blank Order, which echoes nothing.
+  it('reports unverified fields when the answer is orderStatus-only', async () => {
+    const { broker, bridge } = brokerWithRestingOrder()
+    bridge.requestOrder.mockImplementation(async () => ({
+      contract: new Contract(),
+      order: new Order(),
+      orderState: { status: 'Submitted' },
+    }))
+
+    const result = await broker.modifyOrder('42', { lmtPrice: new Decimal('97'), tif: 'GTC' })
+
+    expect(result.success).toBe(true)
+    expect(result.message).toContain('did not carry lmtPrice, tif')
+    expect(result.message).toContain('unverified')
+  })
+
+  it('suppresses the unverified note when a real mismatch is present', async () => {
+    const { broker, bridge } = brokerWithRestingOrder()
+    bridge.requestOrder.mockImplementation(async () => ({
+      contract: new Contract(),
+      // tif is absent from the echo; lmtPrice is present and stale.
+      order: echoOf(restingStop(), { tif: '' }),
+      orderState: { status: 'Submitted' },
+    }))
+
+    const result = await broker.modifyOrder('42', { lmtPrice: new Decimal('97'), tif: 'GTC' })
+
+    expect(result.success).toBe(false)
+    expect(result.error).toContain('lmtPrice')
+    expect(result.error).not.toContain('unverified')
+  })
+
+  it('declares TRAIL LIMIT among the supported order types', () => {
+    const { broker } = brokerWithContractIo()
+    expect(broker.getCapabilities().supportedOrderTypes).toContain('TRAIL LIMIT')
+  })
+})
+
+describe('IbkrBroker — queued historical requests', () => {
+  const barParams: BarParams = { interval: '1m', start: new Date('2026-09-03T11:00:00.000Z') }
+
+  /** Resolves once the broker has dispatched everything it can right now. */
+  async function settle(): Promise<void> {
+    for (let i = 0; i < 10; i++) await Promise.resolve()
+  }
+
+  it('derives the window when the queued request runs, not when it is enqueued', async () => {
+    vi.useFakeTimers()
+    try {
+      vi.setSystemTime(new Date('2026-09-03T12:00:00.000Z'))
+      const { broker, bridge, client } = brokerWithContractIo(recordedContract('aapl-stock'))
+      let releaseFirst: (bars: never[]) => void = () => {}
+      bridge.requestHistoricalBars.mockImplementationOnce(
+        () => new Promise<never[]>((resolve) => { releaseFirst = resolve }),
+      )
+
+      const first = broker.getHistorical(recordedContract('aapl-stock'), barParams)
+      await settle()
+      const second = broker.getHistorical(recordedContract('aapl-stock'), barParams)
+      await settle()
+      expect(client.reqHistoricalData).toHaveBeenCalledOnce()
+
+      const dispatchedAt = new Date('2026-09-03T12:30:00.000Z')
+      vi.setSystemTime(dispatchedAt)
+      releaseFirst([])
+      await expect(first).resolves.toEqual([])
+      await expect(second).resolves.toEqual([])
+
+      const expected = buildHistoricalRequest(barParams, dispatchedAt, 'STK')
+      const queuedCall = client.reqHistoricalData.mock.calls[1]
+      expect(queuedCall[2]).toBe(expected.endDateTime)
+      expect(queuedCall[3]).toBe(expected.durationStr)
+      expect(queuedCall[3]).not.toBe(client.reqHistoricalData.mock.calls[0][3])
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('refuses a queued request whose socket died while it waited', async () => {
+    const { broker, bridge, client } = brokerWithContractIo(recordedContract('aapl-stock'))
+    let releaseFirst: (bars: never[]) => void = () => {}
+    bridge.requestHistoricalBars.mockImplementationOnce(
+      () => new Promise<never[]>((resolve) => { releaseFirst = resolve }),
+    )
+
+    const first = broker.getHistorical(recordedContract('aapl-stock'), barParams)
+    await settle()
+    const second = broker.getHistorical(recordedContract('aapl-stock'), barParams)
+    await settle()
+
+    bridge.connectionDead = true
+    releaseFirst([])
+
+    await expect(first).resolves.toEqual([])
+    await expect(second).rejects.toThrow(/connection lost/i)
+    expect(client.reqHistoricalData).toHaveBeenCalledOnce()
   })
 })

@@ -12,11 +12,27 @@ import { Contract, Order, ContractDescription, ContractDetails, UNSET_DECIMAL, U
 import { BrokerError, type IBroker, type AccountInfo, type Position, type OpenOrder, type PlaceOrderResult, type Quote, type MarketClock, type AccountCapabilities, type BrokerHealth, type BrokerHealthInfo, type BrokerConnectionStateEvent, type UTAReach, type UTATier, type TpSlParams, type Bar, type BarParams, type ExpandContractFilters, type ContractExpansion, type SubAccountRef } from './brokers/types.js'
 
 const REACH_RANK: Record<UTAReach, number> = { down: 0, connected: 1, readable: 2 }
+
+/**
+ * Broker statuses that mean "still working", which sync keeps in the pending
+ * lane. `Inactive` is a held order and `PendingCancel` an unconfirmed cancel;
+ * only `Cancelled` / `ApiCancelled` are terminal.
+ */
+const WORKING_ORDER_STATUSES = new Set([
+  'Submitted',
+  'PreSubmitted',
+  'PendingSubmit',
+  'PendingCancel',
+  'ApiPending',
+  'Inactive',
+])
 import { TradingGit } from './git/TradingGit.js'
 import { recomputeCostBasisFromCommits } from './cost-basis.js'
 import { projectOrderHistory, projectTradeHistory } from './order-history.js'
-import type { OrderHistoryEntry, TradeHistoryEntry } from '@traderalice/uta-protocol'
+import type { OrderHistoryEntry, TradeHistoryEntry, HistoricalBarsResult } from '@traderalice/uta-protocol'
 import { pnlOf } from './position-math.js'
+import { resolveBarSession } from './bar-session.js'
+import { assertOcaType, parseOrderLinkId } from './oca.js'
 import type {
   Operation,
   AddResult,
@@ -107,6 +123,10 @@ export class UnifiedTradingAccount {
    *  it and the read returns "connecting" instead of blocking on the whole init.
    *  Bounds the cold-start first-read to this, not the full connect time. */
   private static readonly CONNECT_GRACE_MS = 1_500
+  /** Hard deadline for one capability-ladder probe. Larger than the slowest
+   *  legitimate broker connect (IBKR: 15s handshake plus 20s account download)
+   *  so it only ever fires on a genuine hang. */
+  private static readonly RECOVERY_PROBE_TIMEOUT_MS = 45_000
 
   private _consecutiveFailures = 0
   private _lastError?: string
@@ -115,6 +135,10 @@ export class UnifiedTradingAccount {
   private _recoveryTimer?: ReturnType<typeof setTimeout>
   private _recovering = false
   private _disabled = false
+  /** Monotonic transport generation, bumped whenever the broker reports the
+   *  connection dead. A probe whose generation moved underneath it must discard
+   *  its own result, or a success from a dead socket raises `_currentReach`. */
+  private _transportEpoch = 0
   /** True while the INITIAL broker connect is in flight (e.g. CCXT loadMarkets,
    *  which can take tens of seconds). Reads during this window return fast with
    *  a transient CONNECTING error instead of blocking on the slow connect — the
@@ -173,7 +197,9 @@ export class UnifiedTradingAccount {
         unrealizedPnL: accountInfo.unrealizedPnL,
         realizedPnL: accountInfo.realizedPnL ?? '0',
         positions,
-        pendingOrders: orders.filter(o => o.orderState.status === 'Submitted' || o.orderState.status === 'PreSubmitted'),
+        // Must stay the same predicate as sync: an order pending in one lane
+        // and terminal in the other can never be reconciled.
+        pendingOrders: orders.filter(o => WORKING_ORDER_STATUSES.has(o.orderState.status)),
       }
     }
 
@@ -310,6 +336,43 @@ export class UnifiedTradingAccount {
     }
   }
 
+  /** `_attemptReach` bound to the transport generation it started on. An answer
+   *  describing a socket that has since died is downgraded to 'down' so the
+   *  caller keeps pursuing the target. */
+  private async _attemptReachGuarded(): Promise<UTAReach> {
+    const epoch = this._transportEpoch
+    const reached = await this._attemptReach()
+    if (epoch === this._transportEpoch) return reached
+    console.warn(`UTA[${this.id}]: reach probe discarded — transport died mid-probe (probe said "${reached}")`)
+    return 'down'
+  }
+
+  /** `_attemptReachGuarded` under a hard deadline. Always settles, because the
+   *  caller re-arms the retry timer from here. */
+  private async _probeReachBounded(): Promise<UTAReach> {
+    let timer: ReturnType<typeof setTimeout> | undefined
+    const deadline = new Promise<'timeout'>((resolve) => {
+      timer = setTimeout(() => resolve('timeout'), UnifiedTradingAccount.RECOVERY_PROBE_TIMEOUT_MS)
+      timer.unref?.()
+    })
+    const probe = this._attemptReachGuarded()
+    const outcome = await Promise.race([probe, deadline])
+      .finally(() => { if (timer) clearTimeout(timer) })
+    if (outcome !== 'timeout') return outcome
+
+    probe.catch(() => { /* abandoned; its answer is discarded by the epoch bump */ })
+    this._transportEpoch++
+    this._noteFailure(new BrokerError(
+      'NETWORK',
+      `Broker probe did not settle within ${UnifiedTradingAccount.RECOVERY_PROBE_TIMEOUT_MS}ms`,
+    ))
+    console.warn(`UTA[${this.id}]: reach probe timed out — abandoning the attempt and resetting the transport`)
+    // Not awaited: a broker whose probe is wedged can wedge its close() too, and
+    // the retry schedule must not depend on that.
+    void Promise.resolve().then(() => this.broker.close()).catch(() => { /* already torn down */ })
+    return 'down'
+  }
+
   private _notePermanent(err: unknown): void {
     // Broker packs may carry their own physical copy of uta-protocol. Preserve
     // the structured BrokerError contract across that module boundary instead
@@ -339,6 +402,7 @@ export class UnifiedTradingAccount {
     }
     if (this._disabled) return
 
+    this._transportEpoch++
     this._currentReach = 'down'
     this._consecutiveFailures = UnifiedTradingAccount.OFFLINE_THRESHOLD
     this._lastError = event.error ?? 'Broker transport reported a dead connection'
@@ -358,7 +422,7 @@ export class UnifiedTradingAccount {
     // CCXT loadMarkets is otherwise an invisible ~30s stall).
     const startedAt = Date.now()
     console.log(`UTA[${this.id}]: connecting (target ${this.targetReach})…`)
-    this._currentReach = await this._attemptReach()
+    this._currentReach = await this._probeReachBounded()
     // Initial connect has settled (reached, down, or disabled — _attemptReach
     // never throws). Clear the connecting gate now, BEFORE any _emitHealthChange
     // below, so the first health diff the UI receives reflects the real state.
@@ -445,11 +509,23 @@ export class UnifiedTradingAccount {
     const prev = this.health
     this._consecutiveFailures = 0
     this._lastSuccessAt = new Date()
-    if (this._recoveryTimer) {
-      clearTimeout(this._recoveryTimer)
-      this._recoveryTimer = undefined
+    // A completed round-trip proves the transport is up. Without this promotion
+    // a success landing after a 'dead' event leaves reach pinned at 'down', which
+    // `health` reads as permanently offline.
+    if (this._currentReach === 'down') this._currentReach = 'connected'
+    // Only a success that satisfies the target reach may dismantle the recovery
+    // machinery. Clearing it below target leaves nothing armed to retry, since
+    // `nudgeRecovery` no-ops when not already recovering.
+    if (this._reachedTarget()) {
+      if (this._recoveryTimer) {
+        clearTimeout(this._recoveryTimer)
+        this._recoveryTimer = undefined
+      }
+      this._recovering = false
+      if (prev !== this.health) this._emitHealthChange()
+      return
     }
-    this._recovering = false
+    if (!this._disabled && !this._recovering) this._startRecovery()
     if (prev !== this.health) this._emitHealthChange()
   }
 
@@ -486,7 +562,7 @@ export class UnifiedTradingAccount {
     )
     this._recoveryTimer = setTimeout(async () => {
       this._recoveryTimer = undefined
-      this._currentReach = await this._attemptReach()
+      this._currentReach = await this._probeReachBounded()
       if (this._disabled) {
         this._recovering = false
         console.warn(`UTA[${this.id}]: disabled — ${this._lastError}`)
@@ -713,8 +789,9 @@ export class UnifiedTradingAccount {
     if (params.trailingPercent != null) order.trailingPercent = new Decimal(String(params.trailingPercent))
     if (params.goodTillDate != null) order.goodTillDate = params.goodTillDate
     if (params.outsideRth) order.outsideRth = true
-    if (params.parentId != null) order.parentId = parseInt(params.parentId, 10) || 0
+    if (params.parentId != null) order.parentId = parseOrderLinkId(params.parentId, 'placeOrder')
     if (params.ocaGroup != null) order.ocaGroup = params.ocaGroup
+    if (params.ocaType != null) order.ocaType = assertOcaType(params.ocaType)
 
     const tpsl: TpSlParams | undefined =
       (params.takeProfit || params.stopLoss)
@@ -735,6 +812,13 @@ export class UnifiedTradingAccount {
     if (params.orderType != null) changes.orderType = params.orderType
     if (params.tif != null) changes.tif = params.tif
     if (params.goodTillDate != null) changes.goodTillDate = params.goodTillDate
+    // Plain scalars, so they survive the toWire → commit.json → rehydrate
+    // round-trip unchanged.
+    if (params.ocaGroup != null) changes.ocaGroup = params.ocaGroup
+    if (params.ocaType != null) changes.ocaType = assertOcaType(params.ocaType)
+    if (params.parentId != null) {
+      changes.parentId = parseOrderLinkId(params.parentId, 'modifyOrder')
+    }
 
     return this.git.add({ action: 'modifyOrder', orderId: params.orderId, changes })
   }
@@ -872,7 +956,7 @@ export class UnifiedTradingAccount {
       if (!brokerOrder) continue
 
       const status = brokerOrder.orderState.status
-      if (status !== 'Submitted' && status !== 'PreSubmitted') {
+      if (!WORKING_ORDER_STATUSES.has(status)) {
         // Extract fill data when available — `.toFixed()` (not
         // `.toNumber()`) so sub-satoshi qty (OKX-style accounting)
         // round-trips into the persisted git operation record without
@@ -883,7 +967,9 @@ export class UnifiedTradingAccount {
           : undefined
 
         const currentStatus =
-          status === 'Filled' ? 'filled' : status === 'Cancelled' ? 'cancelled' : 'rejected'
+          status === 'Filled' ? 'filled'
+          : status === 'Cancelled' || status === 'ApiCancelled' ? 'cancelled'
+          : 'rejected'
         if (currentStatus === 'filled' && (!filledQty || !brokerOrder.avgFillPrice)) {
           // Loud, not fatal: a fill without qty/price still advances the
           // state machine, but cost-basis reconstruction downstream will be
@@ -1141,13 +1227,22 @@ export class UnifiedTradingAccount {
    * the broker has no `getHistorical`. Expands an aliceId-only stub to a
    * trade-ready contract first, same as getQuote. Bars carry no contract, so
    * there is no return-side aliceId stamping — the caller already holds it.
+   *
+   * The session is resolved here rather than in the adapter, and the result
+   * carries the effective `session` plus `forced`.
    */
-  async getHistorical(contract: Contract, params: BarParams): Promise<Bar[]> {
+  async getHistorical(contract: Contract, params: BarParams): Promise<HistoricalBarsResult> {
     if (typeof this.broker.getHistorical !== 'function') {
       throw new BrokerError('CONFIG', `Account "${this.label}" does not support historical bars.`)
     }
     const resolved = this._expandAliceIdIfNeeded(contract)
-    return this._callBroker(() => this.broker.getHistorical!(resolved, params))
+    const { session, forced } = resolveBarSession(
+      resolved.secType,
+      params.session,
+      this.getCapabilities().historicalBars,
+    )
+    const bars = await this._callBroker(() => this.broker.getHistorical!(resolved, { ...params, session }))
+    return { bars, session, forced }
   }
 
   getMarketClock(): Promise<MarketClock> {

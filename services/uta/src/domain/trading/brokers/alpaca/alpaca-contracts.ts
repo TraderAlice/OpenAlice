@@ -58,7 +58,9 @@ export function mapAlpacaOrderStatus(alpacaStatus: string): string {
     case 'done_for_day':
     case 'suspended':
     case 'rejected':
-      return 'Inactive'
+      // Not 'Inactive': that is IBKR's held state and order-sync treats it as a
+      // working order, while these Alpaca statuses are terminal refusals.
+      return 'Rejected'
     default:
       return 'Submitted'
   }
