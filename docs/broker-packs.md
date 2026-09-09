@@ -42,7 +42,14 @@ createBroker(config): IBroker
 
 The wrapper workspaces live under `packages/uta-broker-*`. They bundle the
 OpenAlice-owned adapter/protocol code needed at runtime; third-party broker SDKs
-remain external within each deployed Pack. Release assembly removes workspace
+remain external within each deployed Pack, except Alpaca: its pure-JavaScript
+dependency closure is bundled into the entry for compiled Bun compatibility.
+Alpaca acceptance must import the built entry with a compiled Bun executable;
+a Node or interpreted Bun import alone does not exercise that resolver. Run
+`pnpm -F @traderalice/uta-broker-alpaca build` followed by
+`pnpm -F @traderalice/uta-broker-alpaca test:packaged` (requires Bun). The probe
+uses an isolated entry with no node_modules and never contacts a broker.
+Release assembly removes workspace
 links, pnpm lock/workspace metadata, and build-machine paths before archiving.
 `services/uta/src/domain/trading/brokers/registry.ts`
 statically imports only Mock, then loads one active Pack by file URL when an
