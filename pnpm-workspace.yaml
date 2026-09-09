@@ -5,6 +5,7 @@ packages:
   - ui
 
 allowBuilds:
+  bufferutil: false
   ccxt: false
   dugite: true
   electron: true

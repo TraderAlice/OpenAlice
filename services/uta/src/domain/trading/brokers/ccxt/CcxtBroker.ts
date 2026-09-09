@@ -118,6 +118,13 @@ function applyEnvProxy(exchange: Exchange): void {
   else exchange.httpsProxy = proxy
 }
 
+/** A CCXT `urls.api` value that can actually build a request URL: a non-empty
+ *  string or a non-empty { public, private, … } map. */
+function hasUsableApiUrl(api: unknown): boolean {
+  if (typeof api === 'string') return api.length > 0
+  return typeof api === 'object' && api !== null && Object.keys(api).length > 0
+}
+
 // Treated as cash (1:1 to USD) when computing balances and as ineligible
 // for spot-position synthesis. Compared against `coin.toUpperCase()` so
 // CCXT's mixed-case codes like 'USDe' normalize correctly.
@@ -273,6 +280,14 @@ export class CcxtBroker implements IBroker<CcxtBrokerMeta> {
         // demoTrading branch below — instead of an unclassified UNKNOWN.
         throw new BrokerError('CONFIG', `${this.exchangeName}: cannot enable Sandbox — ${err instanceof Error ? err.message : String(err)}`)
       }
+      // Since ccxt 4.5.7x the base describe() carries `urls.test: undefined`
+      // for every exchange, so `'test' in urls` is always true and
+      // setSandboxMode no longer throws for venues without a testnet — it
+      // silently sets urls.api = {} and the first request fails with a cryptic
+      // URL error (kucoin, kraken, coinbase, htx, mexc, …). Fail loudly now.
+      if (!hasUsableApiUrl((this.exchange as unknown as { urls?: Record<string, unknown> }).urls?.['api'])) {
+        throw new BrokerError('CONFIG', `${this.exchangeName}: cannot enable Sandbox — ${this.exchangeName} does not have a sandbox URL`)
+      }
     }
 
     if (config.demoTrading) {
@@ -389,7 +404,7 @@ export class CcxtBroker implements IBroker<CcxtBrokerMeta> {
       throw BrokerError.from(err, 'NETWORK')
     }
 
-    const marketCount = Object.keys(this.exchange.markets).length
+    const marketCount = Object.keys(this.markets).length
     if (marketCount === 0) {
       throw new BrokerError('NETWORK', `CcxtBroker[${this.id}]: failed to load any markets`)
     }
@@ -410,7 +425,7 @@ export class CcxtBroker implements IBroker<CcxtBrokerMeta> {
   async refreshCatalog(): Promise<void> {
     this.ensureInit()
     await this.exchange.loadMarkets(true)
-    const marketCount = Object.keys(this.exchange.markets).length
+    const marketCount = Object.keys(this.markets).length
     console.log(`CcxtBroker[${this.id}]: catalog refreshed (${marketCount} markets)`)
   }
 
@@ -1051,7 +1066,7 @@ export class CcxtBroker implements IBroker<CcxtBrokerMeta> {
       const result: Position[] = []
 
       for (const p of raw) {
-        const market = this.markets[p.symbol]
+        const market = p.symbol ? this.markets[p.symbol] : undefined
         if (!market) continue
 
         // Use Decimal arithmetic to avoid IEEE 754 precision loss (e.g. 0.51 → 0.50999...)
@@ -1130,8 +1145,8 @@ export class CcxtBroker implements IBroker<CcxtBrokerMeta> {
   }
 
   private convertCcxtOrder(o: CcxtOrder): OpenOrder | null {
-    const market = this.markets[o.symbol]
-    if (!market) return null
+    const market = o.symbol ? this.markets[o.symbol] : undefined
+    if (!market || !o.symbol) return null
 
     if (o.id) {
       this.orderSymbolCache.set(o.id, o.symbol)
@@ -1147,7 +1162,7 @@ export class CcxtBroker implements IBroker<CcxtBrokerMeta> {
     // Fill data — without these, a sync that sees the order filled records
     // the transition but loses qty/price, breaking cost-basis downstream.
     if (o.filled != null) order.filledQuantity = new Decimal(o.filled)
-    order.orderId = parseInt(o.id, 10) || 0
+    order.orderId = parseInt(o.id ?? '', 10) || 0
 
     const tp = o.takeProfitPrice
     const sl = o.stopLossPrice

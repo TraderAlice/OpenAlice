@@ -17,7 +17,7 @@ beforeAll(async () => {
   const bybit = filterByProvider(all, 'ccxt').find(a => a.id.includes('bybit'))
   if (!bybit) { console.log('No Bybit account, skipping diagnostic'); return }
   exchange = (bybit.broker as any).exchange
-  console.log(`Diagnostic: using ${bybit.label}'s exchange (${Object.keys(exchange!.markets).length} markets)`)
+  console.log(`Diagnostic: using ${bybit.label}'s exchange (${Object.keys(exchange!.markets ?? {}).length} markets)`)
 }, 60_000)
 
 describe('Raw CCXT Bybit diagnostic', () => {
@@ -92,8 +92,8 @@ describe('Raw CCXT Bybit diagnostic', () => {
   it('compare orderId format: spot vs perp', async () => {
 
 
-    const hasSpot = !!e().markets['ETH/USDT']
-    const hasPerp = !!e().markets['ETH/USDT:USDT']
+    const hasSpot = !!e().markets?.['ETH/USDT']
+    const hasPerp = !!e().markets?.['ETH/USDT:USDT']
     console.log(`\n=== spot ETH/USDT exists: ${hasSpot}, perp ETH/USDT:USDT exists: ${hasPerp} ===`)
 
     if (hasPerp) {
@@ -114,7 +114,7 @@ describe('Raw CCXT Bybit diagnostic', () => {
 
   it('check market.id vs market.symbol for ETH perps', async () => {
 
-    const candidates = Object.values(e().markets).filter(
+    const candidates = Object.values(e().markets ?? {}).filter(
       m => m.base === 'ETH' && m.quote === 'USDT',
     )
     console.log('\n=== ETH/USDT markets ===')

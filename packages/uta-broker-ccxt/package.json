@@ -17,7 +17,7 @@
   "dependencies": {
     "@traderalice/ibkr": "workspace:*",
     "@traderalice/uta-protocol": "workspace:*",
-    "ccxt": "^4.5.38",
+    "ccxt": "^4.5.78",
     "decimal.js": "^10.6.0",
     "zod": "^4.3.6"
   },
