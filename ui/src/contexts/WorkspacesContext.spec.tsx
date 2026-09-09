@@ -26,6 +26,7 @@ const mocks = vi.hoisted(() => ({
   getIssueDefaultAgent: vi.fn(),
   openResumeSession: vi.fn(),
   getWorkspaceManager: vi.fn(),
+  getWorkspaceSessionDirectory: vi.fn(),
   pauseSession: vi.fn(),
   resumeSession: vi.fn(),
   openWebSession: vi.fn(),
@@ -57,6 +58,7 @@ vi.mock('../components/workspace/api', async (importOriginal) => {
     getIssueDefaultAgent: mocks.getIssueDefaultAgent,
     openResumeSession: mocks.openResumeSession,
     getWorkspaceManager: mocks.getWorkspaceManager,
+    getWorkspaceSessionDirectory: mocks.getWorkspaceSessionDirectory,
     pauseSession: mocks.pauseSession,
     resumeSession: mocks.resumeSession,
     openWebSession: mocks.openWebSession,
@@ -195,6 +197,7 @@ beforeEach(async () => {
   mocks.getWorkspaceDefaultAgent.mockResolvedValue(null)
   mocks.getIssueDefaultAgent.mockResolvedValue(null)
   mocks.openResumeSession.mockResolvedValue({ session: persistentSession() })
+  mocks.getWorkspaceSessionDirectory.mockResolvedValue({ sessions: [] })
   mocks.getWorkspaceManager.mockResolvedValue(managerSnapshot())
   mocks.pauseSession.mockResolvedValue(true)
   mocks.resumeSession.mockResolvedValue(null)
@@ -271,6 +274,22 @@ describe('WorkspacesProvider conversation routing', () => {
       },
     }))
     expect(mocks.setSidebar).toHaveBeenCalledWith('chat')
+  })
+
+  it('asks before activating an Issue owner and cancellation does not launch it', async () => {
+    mocks.getWorkspaceSessionDirectory.mockResolvedValue({ sessions: [
+      { resumeId: 'resume-headless', issueAttached: true },
+    ] })
+    render(<ToastProvider><WorkspacesProvider><Probe /></WorkspacesProvider></ToastProvider>)
+    fireEvent.click(screen.getByRole('button', { name: 'Continue' }))
+    const dialog = await screen.findByRole('alertdialog')
+    expect(dialog.textContent).toContain('Issue')
+    expect(mocks.openResumeSession).not.toHaveBeenCalled()
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }))
+    expect(mocks.openResumeSession).not.toHaveBeenCalled()
+    fireEvent.click(screen.getByRole('button', { name: 'Continue' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Open connection' }))
+    await waitFor(() => expect(mocks.openResumeSession).toHaveBeenCalledOnce())
   })
 
   it('routes Manager lifecycle actions through the separate launcher-owned state', async () => {

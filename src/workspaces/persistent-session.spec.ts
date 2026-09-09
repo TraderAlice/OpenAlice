@@ -27,6 +27,7 @@ const mockSpawn = vi.mocked(pty.spawn);
 /** Minimal IPty stand-in that lets the test inject PTY output and observe
  *  pause/resume calls. */
 function makeFakeTerm() {
+  const exits = new Set<(event: { exitCode: number }) => void>();
   let dataCb: ((d: unknown) => void) | undefined;
   return {
     pid: 4321,
@@ -40,7 +41,11 @@ function makeFakeTerm() {
       dataCb = cb;
       return { dispose: () => {} };
     },
-    onExit: () => ({ dispose: () => {} }),
+    onExit: (cb: (event: { exitCode: number }) => void) => {
+      exits.add(cb);
+      return { dispose: () => { exits.delete(cb); } };
+    },
+    emitExit: () => { for (const cb of exits) cb({ exitCode: 0 }); },
     /** test helper — push bytes through the captured onData handler */
     emitData: (d: Buffer) => dataCb?.(d),
   };
@@ -110,6 +115,19 @@ describe('PersistentSession backpressure / socket-drop deadlock', () => {
 
   afterEach(() => {
     vi.clearAllMocks();
+  });
+
+  it('waits for the disposed child to exit before handing off its transcript', async () => {
+    const session = new PersistentSession(makeOptions());
+    let complete = false;
+    const stop = session.disposeAndWait('background handoff').then(() => { complete = true; });
+    await Promise.resolve();
+    expect(term.kill).toHaveBeenCalled();
+    expect(complete).toBe(false);
+    term.emitExit();
+    await stop;
+    expect(complete).toBe(true);
+    expect(mockSpawn).toHaveBeenCalledTimes(1);
   });
 
   it('bounds a slow consumer without killing a ConPTY agent when pause is unavailable', () => {

@@ -130,3 +130,36 @@ it('hands a fresh-owner comment to the configured runtime and persists the new o
     }, { timeout: 10000 })
   } finally { command.mockRestore() }
 }, 20000)
+
+it.each(['terminal', 'webpi'] as const)('hands %s ownership to an Issue turn and excludes a racing dispatch', async (surface) => {
+  await service!.catalog.recordCreated(service!.registry.get('ws-1')!)
+  const resumeId = 'resume-handoff-owner'
+  const { session } = await service!.sessionCoordinator.ensure({
+    resumeId, wsId: 'ws-1', agent: 'codex', namePrefix: 'c',
+    agentSessionId: 'native-handoff-owner', state: 'running', surface,
+  })
+  const adapter = service!.adapters.get('codex')!
+  const command = vi.spyOn(adapter, 'composeHeadlessCommand').mockReturnValue([
+    process.execPath, '-e', `console.log(JSON.stringify({type:'item.completed',item:{type:'agent_message',text:'TAKEOVER_OK'}}));`,
+  ])
+  let release!: () => void
+  const stopped = new Promise<void>((resolve) => { release = resolve })
+  const stop = vi.fn(async () => { await stopped; return true })
+  const terminal = vi.spyOn(service!.pool, 'get').mockReturnValue(surface === 'terminal'
+    ? { disposeAndWait: stop } as never : undefined)
+  const web = vi.spyOn(service!.web, 'stop').mockImplementation(surface === 'webpi' ? stop : async () => false)
+  try {
+    const ws = service!.registry.get('ws-1')!
+    const trigger = { kind: 'issue' as const, workspaceId: ws.id, issueId: 'handoff' }
+    const pending = service!.dispatchHeadlessTask(ws, adapter, 'Reply', undefined, trigger, resumeId)
+    await vi.waitFor(() => expect(stop).toHaveBeenCalled())
+    expect(command).not.toHaveBeenCalled()
+    await expect(service!.dispatchHeadlessTask(ws, adapter, 'Duplicate', undefined, trigger, resumeId))
+      .rejects.toMatchObject({ code: 'busy' })
+    release()
+    const result = await pending
+    await vi.waitFor(() => expect(service!.headlessTasks.get(result.taskId)?.status).toBe('done'), { timeout: 10000 })
+    expect(service!.sessionRegistry.get(ws.id, session.id)?.state).toBe('paused')
+    expect(service!.isResumeActive(resumeId)).toBe(false)
+  } finally { release(); terminal.mockRestore(); web.mockRestore(); command.mockRestore() }
+})
