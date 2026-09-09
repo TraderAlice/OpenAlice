@@ -18,7 +18,7 @@
 
 import { useHarnessWorkbenchContext } from '../components/harness/context'
 import { useEffect } from 'react'
-import { Monitor, Settings } from 'lucide-react'
+import { ChevronDown, Unplug, Monitor, Settings } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import '@xterm/xterm/css/xterm.css'
 
@@ -32,6 +32,7 @@ import { WorkspaceView } from '../components/workspace/WorkspaceView'
 import { PageTopBar } from '../components/PageTopBar'
 import { WorkspaceFilesToggle } from '../components/workspace/WorkspaceFilesToggle'
 import { Button } from '../components/ui/button'
+import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from '../components/ui/dropdown-menu'
 import { AgentRuntimeIcon } from '../lib/agentRuntimeIcon'
 import type { ViewSpec } from '../tabs/types'
 
@@ -140,6 +141,14 @@ export function WorkspacePage({ spec, visible }: Props) {
           {webCanvas ? 'Open TUI' : 'Web Beta'}
         </Button>
       )}
+      {activeRecord && (terminalCanvas || webCanvas) && <DropdownMenu>
+        <DropdownMenuTrigger render={<Button variant="ghost" size="icon" aria-label={t('workspace.interactiveOwnership.actions')}><ChevronDown size={14} /></Button>} />
+        <DropdownMenuContent align="end" className="min-w-64">
+          <DropdownMenuItem onClick={() => void ctx.pauseSession(wsId, activeRecord.id)}>
+            <Unplug size={14} />{t('workspace.interactiveOwnership.disconnect')}
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>}
       <WorkspaceFilesToggle />
       {!workbench && <Button
         type="button"

@@ -185,6 +185,8 @@ const BASE_EXPORTS: Record<string, CliExport> = {
         list: 'issue_list',
         show: 'issue_show',
         ask: 'issue_ask',
+        run: 'issue_run',
+        retry: 'issue_retry',
       },
       provenance: {
         show: 'provenance_show',

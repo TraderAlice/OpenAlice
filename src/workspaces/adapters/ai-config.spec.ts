@@ -50,7 +50,7 @@ describe('claudeAdapter AI-config', () => {
   // Project-scoped `.mcp.json` servers park at "Pending approval" until the
   // user approves — and each workspace dir is a fresh project key, so every
   // spawn carries the auto-trust setting (see AUTOTRUST_SETTINGS in claude.ts).
-  const SETTINGS_FLAG = ['--settings', '{"enableAllProjectMcpServers":true}'];
+  const SETTINGS_FLAG = ['--settings', '{"enableAllProjectMcpServers":true,"sandbox":{"enabled":false}}', '--dangerously-skip-permissions'];
 
   it('composeCommand: fresh spawn injects the MCP auto-trust settings', () => {
     expect(claudeAdapter.composeCommand(['claude'], { cwd: dir, env: {} })).toEqual([
@@ -225,6 +225,8 @@ describe('codexAdapter AI-config', () => {
       '--ask-for-approval',
       'never',
       '-c',
+      'allow_login_shell=false',
+      '-c',
       'mcp_servers.openalice.url="http://127.0.0.1:47332/mcp"',
       '-c',
       'mcp_servers.openalice-workspace.url="http://127.0.0.1:47332/mcp/ws-abc"',
@@ -243,6 +245,8 @@ describe('codexAdapter AI-config', () => {
       '--ask-for-approval',
       'never',
       '-c',
+      'allow_login_shell=false',
+      '-c',
       'mcp_servers.openalice.url="http://127.0.0.1:47332/mcp"',
       '-c',
       'mcp_servers.openalice-workspace.url="http://127.0.0.1:47332/mcp/ws-abc"',
@@ -255,6 +259,8 @@ describe('codexAdapter AI-config', () => {
       'danger-full-access',
       '--ask-for-approval',
       'never',
+      '-c',
+      'allow_login_shell=false',
       '-c',
       'mcp_servers.openalice.url="http://127.0.0.1:47332/mcp"',
       '-c',
@@ -271,6 +277,8 @@ describe('codexAdapter AI-config', () => {
       'danger-full-access',
       '--ask-for-approval',
       'never',
+      '-c',
+      'allow_login_shell=false',
     ]);
   });
 
@@ -766,9 +774,8 @@ describe('composeHeadlessCommand (one-shot headless argv, prompt placed per-CLI)
     expect(claudeAdapter.composeHeadlessCommand!(['claude'], ctx(), 'do x')).toEqual([
       'claude',
       '--settings',
-      '{"enableAllProjectMcpServers":true}',
-      '--allowedTools',
-      'Bash(alice:*),Bash(alice-workspace:*),Bash(alice-uta:*),Bash(traderhub:*)',
+      '{"enableAllProjectMcpServers":true,"sandbox":{"enabled":false}}',
+      '--dangerously-skip-permissions',
       '-p',
       '--output-format',
       'stream-json',
@@ -784,9 +791,9 @@ describe('composeHeadlessCommand (one-shot headless argv, prompt placed per-CLI)
       '-c',
       'approval_policy="never"',
       '-c',
-      'sandbox_mode="workspace-write"',
+      'sandbox_mode="danger-full-access"',
       '-c',
-      'sandbox_workspace_write.network_access=true',
+      'allow_login_shell=false',
       'exec',
       '--json',
       '--',
@@ -811,7 +818,7 @@ describe('composeHeadlessCommand (one-shot headless argv, prompt placed per-CLI)
       '-p',
       '--output-format',
       'stream-json',
-      '--force',
+      '--force', '--sandbox', 'disabled',
       '--trust',
       '--',
       'do x',
@@ -820,9 +827,8 @@ describe('composeHeadlessCommand (one-shot headless argv, prompt placed per-CLI)
 
   it('grok: streaming-json --always-approve --single=<prompt>', () => {
     expect(grokAdapter.composeHeadlessCommand!(['grok'], ctx(), 'do x')).toEqual([
-      'grok',
-      '--no-leader',
-      '--always-approve',
+      'grok', '--sandbox', 'off',
+      '--no-leader', '--always-approve',
       '--output-format',
       'streaming-json',
       '--single=do x',
@@ -866,7 +872,7 @@ describe('composeHeadlessCommand (one-shot headless argv, prompt placed per-CLI)
       'opencode', 'run', '--format', 'json', '--session', 'native-session-1', '--', 'next',
     ]);
     expect(cursorAdapter.composeHeadlessCommand!(['cursor-agent'], { ...ctx(), resume }, 'next')).toEqual([
-      'cursor-agent', '-p', '--output-format', 'stream-json', '--force', '--trust',
+      'cursor-agent', '-p', '--output-format', 'stream-json', '--force', '--sandbox', 'disabled', '--trust',
       '--resume', 'native-session-1', '--', 'next',
     ]);
     expect(agyAdapter.composeHeadlessCommand!(['agy'], { ...ctx(), resume }, 'next')).toEqual([
@@ -874,7 +880,7 @@ describe('composeHeadlessCommand (one-shot headless argv, prompt placed per-CLI)
       '--conversation', 'native-session-1', '-p', 'next',
     ]);
     expect(grokAdapter.composeHeadlessCommand!(['grok'], { ...ctx(), resume }, 'next')).toEqual([
-      'grok', '--no-leader', '--always-approve', '--resume', 'native-session-1',
+      'grok', '--sandbox', 'off', '--no-leader', '--always-approve', '--resume', 'native-session-1',
       '--output-format', 'streaming-json', '--single=next',
     ]);
     expect(piAdapter.composeHeadlessCommand!(['pi'], { ...ctx(), resume }, 'next')).toEqual([

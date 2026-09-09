@@ -200,3 +200,12 @@ describe('injectWorkspaceContext — skills', () => {
     expect(existsSync(join(dir, '.pi/skills/scan-value-chain/SKILL.md'))).toBe(false);
   });
 });
+
+it('installs the optional sticker Skill only for a new full Chat projection', async () => {
+  const template = makeTemplate({ name: 'chat' })
+  await injectWorkspaceContext({ template, wsId: 'chat', dir, templateOnly: true })
+  expect(existsSync(join(dir, '.agents/skills/alice-stickers/SKILL.md'))).toBe(false)
+  await injectWorkspaceContext({ template, wsId: 'chat', dir })
+  expect(await readFile(join(dir, '.agents/skills/alice-stickers/SKILL.md'), 'utf8')).toContain('[[sticker/wave.png]]')
+  expect(existsSync(join(dir, 'sticker/wave.png'))).toBe(true)
+})

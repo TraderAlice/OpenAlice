@@ -376,7 +376,8 @@ edits remain explicitly unknown rather than crediting the wrong coworker.
 Each connector phone-desk Issue uses this same comment sidecar as that
 channel's chat transcript. Owner private-chat text arrives as a human comment
 with `via: <connectorId>` and `origin.kind: external`. Scheduled-fire replies
-and Alice comments are projected back unless they contain `[[no-reply]]`.
+and Alice comments are projected with their source context. Connector owns
+`[[no-reply]]` interpretation for automation and reply-file delivery.
 Connector does not create a second conversation object.
 
 When an Issue has a fixed `@resumeId` owner, a comment from somebody else is

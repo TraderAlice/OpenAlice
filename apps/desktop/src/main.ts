@@ -817,6 +817,7 @@ app.whenReady().then(async () => {
         ...process.env,
         ELECTRON_RUN_AS_NODE: '1',
         OPENALICE_CONNECTOR_PORT: String(connectorPort),
+        OPENALICE_TOOL_SOCKET: toolSocketPath,
         OPENALICE_LAUNCHER: 'electron',
         OPENALICE_GUARDIAN_PID: String(process.pid),
         OPENALICE_GUARDIAN_STARTED_AT: String(guardianStartedAt),

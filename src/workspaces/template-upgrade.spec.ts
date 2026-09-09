@@ -306,6 +306,24 @@ describe('TemplateUpgradeManager', () => {
     expect(await manager().currentVersion(workspace)).toBe('1.0.0');
   });
 
+  it('applies Alice Skill updates during an active Session', async () => {
+    incoming = { '.agents/skills/alice/SKILL.md': file('updated live skill') };
+    const upgrade = manager(true, true);
+    const plan = await upgrade.plan(workspace.id);
+    expect(plan.activity.busy).toBe(true);
+    expect(plan.blockers).toEqual([]);
+    await upgrade.apply(workspace.id, { planDigest: plan.planDigest });
+    expect(await readFile(join(workspace.dir, '.agents/skills/alice/SKILL.md'), 'utf8')).toBe('updated live skill');
+    expect(await upgrade.currentVersion(workspace)).toBe(plan.toVersion);
+
+    await writeFile(join(workspace.dir, 'staged.md'), 'user work');
+    await git(workspace.dir, ['add', 'staged.md']);
+    const blocked = await upgrade.plan(workspace.id);
+    expect(blocked.blockers).toEqual(['staged_changes']);
+    await expect(upgrade.apply(workspace.id, { planDigest: blocked.planDigest }))
+      .rejects.toMatchObject({ code: 'staged_changes' });
+  });
+
   it('keeps Alice skills outside template upgrade and blocks busy config writes', async () => {
     incoming = { ...incoming, '.agents/skills/alice/SKILL.md': file('not template-owned') };
     expect((await manager().plan(workspace.id)).files.some((file) => file.path.includes('/alice/'))).toBe(false);

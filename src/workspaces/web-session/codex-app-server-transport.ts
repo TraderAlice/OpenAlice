@@ -63,8 +63,8 @@ export class CodexAppServerTransport implements WebSessionTransport {
     // against `codex app-server generate-json-schema`, 0.153.x).
     const options = {
       cwd: this.ctx.input.cwd,
-      approvalPolicy: 'on-request',
-      sandbox: 'workspace-write',
+      approvalPolicy: 'never',
+      sandbox: 'danger-full-access',
       ...(this.ctx.input.model ? { model: this.ctx.input.model } : {}),
     }
     const result = this.threadId

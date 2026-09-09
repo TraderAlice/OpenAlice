@@ -9,7 +9,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 import { createWorkspaceRoutes } from './workspaces.js';
-import { HeadlessCapacityError, type WorkspaceService } from '../../workspaces/service.js';
+import { HeadlessCapacityError, HeadlessResumeError, type WorkspaceService } from '../../workspaces/service.js';
 import { TemplateUpgradeError } from '../../workspaces/template-upgrade.js';
 import { WorkspaceAbsorbError } from '../../workspaces/workspace-absorb.js';
 import { HarnessSourceUpgradeError } from '../../workspaces/harness-source-upgrade.js';
@@ -1722,8 +1722,27 @@ describe('Web surface routes', () => {
     const result = await post(app, `/ws-1/sessions/${TOKEN}/web/open`);
     expect(result.status).toBe(200);
     expect(result.body.snapshot).toMatchObject({ resumeId: 'resume-web', phase: 'idle' });
-    expect(order).toEqual(['prepare-workspace', 'terminal-stopped', 'web-started']);
+    expect(order).toEqual(['prepare-workspace', 'web-started']);
     expect(svc.startWebSession).toHaveBeenCalledOnce();
+  });
+
+  it('disconnects a live interactive Session without deleting its identity', async () => {
+    const { app, svc } = buildWeb();
+    const disposeAndWait = vi.fn(async () => undefined);
+    vi.mocked(svc.pool.get).mockReturnValue({ disposeAndWait } as never);
+    const result = await post(app, `/ws-1/sessions/${TOKEN}/pause`);
+    expect(result.status).toBe(200);
+    expect(disposeAndWait).toHaveBeenCalledWith('paused');
+    expect(svc.sessionRegistry.update).toHaveBeenCalledWith('ws-1', TOKEN,
+      expect.objectContaining({ state: 'paused' }));
+  });
+
+  it('does not overwrite background occupancy when Web loses the launch race', async () => {
+    const { app, svc } = buildWeb();
+    vi.mocked(svc.startWebSession).mockRejectedValue(new HeadlessResumeError('busy', 'running turn'));
+    const result = await post(app, `/ws-1/sessions/${TOKEN}/web/open`);
+    expect(result.status).toBe(409);
+    expect(svc.sessionRegistry.update).not.toHaveBeenCalled();
   });
 
   it('opens any runtime that declares a Web capability, not only Pi', async () => {

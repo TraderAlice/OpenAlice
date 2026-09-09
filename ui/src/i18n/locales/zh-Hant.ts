@@ -10,6 +10,38 @@ import type { Resources } from './en'
  * Content is UI chrome only — no geographic or other non-technical terms.
  */
 export const zhHant: Resources = {
+  stickers: {
+    "meaning": "含义（可选）",
+    "title": "表情包",
+    "hint": "Project 提供表情资源，通过可选 Skill 在 Chat 中使用，不向 AGENTS.md 添加引导。",
+    "importHint": "选择一张或多张 PNG/WebP，每张最多 512 KiB，总计最多 32 MiB。可填写图片含义；相同 ID 可发布新版。",
+    "workspaceHint": "新 Chat 默认安装所选表情包；已有工作区只在确认应用后改变。",
+    "empty": "还没有 Chat 工作区。",
+    "default": "默认",
+    "available": "可用版本",
+    "makeDefault": "设为新 Chat 默认",
+    "workspaces": "Chat 工作区",
+    "enabled": "已启用",
+    "disabled": "已关闭",
+    "missing": "Skill 缺失",
+    "notInstalled": "未安装",
+    "changed": "{{count}} 个文件缺失或有修改",
+    "restore": "更新 / 恢复",
+    "usePack": "使用 {{name}}",
+    "disable": "关闭",
+    "review": "确认表情包文件",
+    "reviewEnable": "安装所选图片和对应 Skill，保留其他工作区文件。",
+    "reviewDisable": "移除 Sticker Skill 及 Claude 镜像，图片保留。已有会话可能仍记得之前的说明。",
+    "conflicts": "以下文件有本地修改。仅允许明确替换原本由表情包管理的文件。",
+    "unowned": "非托管文件：请先重命名或移走",
+    "replaceManaged": "替换托管文件的修改",
+    "apply": "应用",
+    "packName": "表情包名称",
+    "packId": "表情包 ID",
+    "version": "版本",
+    "images": "选择图片",
+    "import": "导入表情包"
+},
   aliceHarness: {
     "unversioned": "尚未記錄",
     "manage": "管理",
@@ -3108,6 +3140,14 @@ export const zhHant: Resources = {
     notFoundBody: '沒有名為 {{name}} 的模板。',
   },
   workspace: {
+    interactiveOwnership: {
+      background: '此會話正在背景執行任務，互動連線已釋放。',
+      title: '開啟互動連線？',
+      message: '此會話負責 Connector 訊息或已指派的 Issue。開啟後你將接管互動；收到新訊息、Issue 評論或自動化觸發時，此連線會自動中斷，讓背景任務繼續。會話歷史會保留。',
+      confirm: '開啟連線',
+      actions: '會話操作',
+      disconnect: '中斷互動連線',
+    },
     newWorkspace: '新增工作區',
     overview: '總覽',
     templates: '範本',

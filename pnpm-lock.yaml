@@ -106,7 +106,7 @@ importers:
         version: 1.1.0
       openai:
         specifier: ^6.33.0
-        version: 6.33.0(ws@8.21.0)(zod@4.3.6)
+        version: 6.33.0(ws@8.21.0(bufferutil@4.1.0))(zod@4.3.6)
       pino:
         specifier: ^10.3.1
         version: 10.3.1
@@ -115,10 +115,10 @@ importers:
         version: 7.5.22
       viem:
         specifier: ^2.48.7
-        version: 2.48.7(typescript@5.9.3)(zod@4.3.6)
+        version: 2.48.7(bufferutil@4.1.0)(typescript@5.9.3)(zod@4.3.6)
       ws:
         specifier: ^8.20.1
-        version: 8.21.0
+        version: 8.21.0(bufferutil@4.1.0)
       yaml:
         specifier: ^2.9.0
         version: 2.9.0
@@ -284,7 +284,7 @@ importers:
     dependencies:
       '@alpacahq/alpaca-trade-api':
         specifier: ^3.1.3
-        version: 3.1.3
+        version: 3.1.3(bufferutil@4.1.0)
       '@traderalice/ibkr':
         specifier: workspace:*
         version: link:../ibkr
@@ -317,8 +317,8 @@ importers:
         specifier: workspace:*
         version: link:../uta-protocol
       ccxt:
-        specifier: ^4.5.38
-        version: 4.5.38
+        specifier: ^4.5.78
+        version: 4.5.78(protobufjs@7.6.5)
       decimal.js:
         specifier: ^10.6.0
         version: 10.6.0
@@ -374,7 +374,7 @@ importers:
         version: 10.6.0
       viem:
         specifier: ^2.48.7
-        version: 2.48.7(typescript@5.9.3)(zod@4.3.6)
+        version: 2.48.7(bufferutil@4.1.0)(typescript@5.9.3)(zod@4.3.6)
       zod:
         specifier: ^4.3.6
         version: 4.3.6
@@ -449,7 +449,7 @@ importers:
         version: 2.0.12(hono@4.12.32)
       '@larksuiteoapi/node-sdk':
         specifier: ^1.73.0
-        version: 1.73.0
+        version: 1.73.0(bufferutil@4.1.0)
       '@slack/socket-mode':
         specifier: ^3.0.0
         version: 3.0.0(undici@6.27.0)
@@ -464,7 +464,7 @@ importers:
         version: 1.19.0
       discord.js:
         specifier: 14.26.5
-        version: 14.26.5
+        version: 14.26.5(bufferutil@4.1.0)
       grammy:
         specifier: ^1.45.1
         version: 1.45.1(encoding@0.1.13)
@@ -526,13 +526,13 @@ importers:
     devDependencies:
       '@alpacahq/alpaca-trade-api':
         specifier: ^3.1.3
-        version: 3.1.3
+        version: 3.1.3(bufferutil@4.1.0)
       '@types/node':
         specifier: ^22.13.4
         version: 22.19.15
       ccxt:
-        specifier: ^4.5.38
-        version: 4.5.38
+        specifier: ^4.5.78
+        version: 4.5.78(protobufjs@7.6.5)
       longbridge:
         specifier: ^4.0.5
         version: 4.0.5
@@ -1343,6 +1343,10 @@ packages:
     resolution: {integrity: sha512-k11yZxZg+t+gWvBbIswW0yoJlu8cHOC7dhunwOzoWH/mXGBiYyR4YY6hAEK/3EUs4UpB8la1RfdRpeGsFHkWsA==}
     engines: {node: ^14.21.3 || >=16}
 
+  '@noble/curves@2.2.0':
+    resolution: {integrity: sha512-T/BoHgFXirb0ENSPBquzX0rcjXeM6Lo892a2jlYJkqk83LqZx0l1Of7DzlKJ6jkpvMrkHSnAcgb5JegL8SeIkQ==}
+    engines: {node: '>= 20.19.0'}
+
   '@noble/hashes@1.4.0':
     resolution: {integrity: sha512-V1JJ1WTRUqHHrOSh597hURcMqVKVGL/ea3kv0gSnEdsEZ0/+VyPghM1lMNGc00z7CIQorSvbKpuJkxvuHbvdbg==}
     engines: {node: '>= 16'}
@@ -1598,11 +1602,18 @@ packages:
   '@scure/base@1.2.6':
     resolution: {integrity: sha512-g/nm5FgUa//MCj1gV09zTJTaM6KBAHqLN907YVQqf7zC49+DcO4B1so4ZX07Ef10Twr6nuqYEH9GEggFXA4Fmg==}
 
+  '@scure/base@2.2.0':
+    resolution: {integrity: sha512-b8XEupJibegiXV+tDUseI8oLQc8ei3d/4Jkb2RpbHh3MfE054ov3uIz2dhFkB3FI8iwYkEh0gGCApkrYggkPNg==}
+
   '@scure/bip32@1.7.0':
     resolution: {integrity: sha512-E4FFX/N3f4B80AKWp5dP6ow+flD1LQZo/w8UnLGYZO674jS6YnYeepycOOksv+vLPSpgN35wgKgy+ybfTb2SMw==}
 
   '@scure/bip39@1.6.0':
     resolution: {integrity: sha512-+lF0BbLiJNwVlev4eKelw1WWLaiKXw7sSl8T6FvBlWkdX+94aGJ4o8XjUdlyhTCjd8c+B3KT3JfS8P0bLRNU6A==}
+
+  '@scure/starknet@2.2.0':
+    resolution: {integrity: sha512-FPgUFyEgbEG7ewrj9gWUeXpf2b6klBnqcZOSFz6z4ycVCIAeGhNqKQUPlvl2Ka8gfmrbCcdIrImyi+dINr06Uw==}
+    engines: {node: '>= 20.19.0'}
 
   '@sec-ant/readable-stream@0.4.1':
     resolution: {integrity: sha512-831qok9r2t8AlxLko40y2ebgSDhenenCatLVeW/uBtnHPyhHOvG0C7TvfgecV+wHzIm5KUICgzmVpWS+IMEAeg==}
@@ -2452,6 +2463,10 @@ packages:
   buffer@5.7.1:
     resolution: {integrity: sha512-EHcyIPBQ4BSGlvjB16k5KgAJ27CIsHY/2JBmCRReo48y9rQ3MaUzWX3KVlBa4U7MyX02HdVj0K7C3WaB3ju7FQ==}
 
+  bufferutil@4.1.0:
+    resolution: {integrity: sha512-ZMANVnAixE6AWWnPzlW2KpUrxhm9woycYvPOo67jWHyFowASTEd9s+QN1EIMsSDtwhIxN4sWE1jotpuDUIgyIw==}
+    engines: {node: '>=6.14.2'}
+
   builder-util-runtime@9.7.0:
     resolution: {integrity: sha512-g/kR520giAFYkSXTzcmF3kqQq7wi8F6N6SzeDgZrqTBN+VHdmgWOyTdD1yD7AATDId/yXLvuP34CxW46/BwCdw==}
     engines: {node: '>=12.0.0'}
@@ -2509,9 +2524,14 @@ packages:
     resolution: {integrity: sha512-zlOQ80VrQ2Ue+ymH5OuM/DlDq64mEm+B9UTdHULv5osUMD6HalNTblf2b1u/m6QecjsnOkBpqVZ+XPwIVsy7Ng==}
     engines: {node: '>=12.13'}
 
-  ccxt@4.5.38:
-    resolution: {integrity: sha512-mLNwzq/GbSExA5QxVaIjud5AlhYxKY0q48dV4IHjBaUQNThbBzsGM1DdL60ofO/A4/xoRyBSjOy/YIsAFird7g==}
-    engines: {node: '>=15.0.0'}
+  ccxt@4.5.78:
+    resolution: {integrity: sha512-Zx+HNH7VDTztUJd1szMqbtr7+lapU8JqoRXzLMWXVZKhNnzHy7IhIu0A10mT2gayfaqd8aCdyFqbGmRPdwjXhA==}
+    engines: {node: '>=18.0.0'}
+    peerDependencies:
+      protobufjs: ^7.6.5
+    peerDependenciesMeta:
+      protobufjs:
+        optional: true
 
   chai@5.3.3:
     resolution: {integrity: sha512-4zNhdJD/iOjSH0A05ea+Ke6MU5mmpQcbQsSOkgdaUMJ9zTlDTD/GYlwohmIE2u0gaxHYiVHEn1Fw9mZ/ktJWgw==}
@@ -3134,6 +3154,9 @@ packages:
 
   fetch-mock-cache@2.3.1:
     resolution: {integrity: sha512-hDk+Nbt0Y8Aq7KTEU6ASQAcpB34UjhkpD3QjzD6yvEKP4xVElAqXrjQ7maL+LYMGafx51Zq6qUfDM57PNu/qMw==}
+
+  fflate@0.8.3:
+    resolution: {integrity: sha512-tbZNuJrLwGUp3zshBtdy4W+ORxZuIh8a5ilyIEQDC5rY1f3U20JMry0Ll3WBzU58EZKsEuJFXhb5gwv8CsPvgA==}
 
   figures@6.1.0:
     resolution: {integrity: sha512-d+l3qxjSesT4V7v2fh+QnmFnUWv9lSpjarhShNTgBOfA0ttejbQUAlHLitbjkoRiDulW0OPoQPYIGhIC8ohejg==}
@@ -4117,6 +4140,10 @@ packages:
     peerDependenciesMeta:
       encoding:
         optional: true
+
+  node-gyp-build@4.8.4:
+    resolution: {integrity: sha512-LA4ZjwlnUblHVgq0oBF3Jl/6h/Nvs5fzBLwdEF4nuxnFdsfajde4WfxtJr3CaiH+F6ewcIB/q4jQ4UzPyid+CQ==}
+    hasBin: true
 
   node-gyp@12.4.0:
     resolution: {integrity: sha512-OMcPNvqTCFUnNaBlmdgq+lfNqY7gTiSmNRDjY3uAXRyudeKZEZxu3CLtjMQrx4zZxCX2b/mpNqTtwuCJgXhHkw==}
@@ -5608,7 +5635,7 @@ snapshots:
     dependencies:
       json-schema: 0.4.0
 
-  '@alpacahq/alpaca-trade-api@3.1.3':
+  '@alpacahq/alpaca-trade-api@3.1.3(bufferutil@4.1.0)':
     dependencies:
       axios: 0.33.0
       dotenv: 6.2.0
@@ -5619,7 +5646,7 @@ snapshots:
       msgpack5: 5.3.2
       nats: 1.4.12
       urljoin: 0.1.5
-      ws: 7.5.11
+      ws: 7.5.11(bufferutil@4.1.0)
     transitivePeerDependencies:
       - bufferutil
       - debug
@@ -5961,7 +5988,7 @@ snapshots:
     dependencies:
       discord-api-types: 0.38.49
 
-  '@discordjs/ws@1.2.3':
+  '@discordjs/ws@1.2.3(bufferutil@4.1.0)':
     dependencies:
       '@discordjs/collection': 2.1.1
       '@discordjs/rest': 2.6.1
@@ -5971,7 +5998,7 @@ snapshots:
       '@vladfrangu/async_event_emitter': 2.4.7
       discord-api-types: 0.38.49
       tslib: 2.8.1
-      ws: 8.21.0
+      ws: 8.21.0(bufferutil@4.1.0)
     transitivePeerDependencies:
       - bufferutil
       - utf-8-validate
@@ -6299,7 +6326,7 @@ snapshots:
       '@jridgewell/resolve-uri': 3.1.2
       '@jridgewell/sourcemap-codec': 1.5.5
 
-  '@larksuiteoapi/node-sdk@1.73.0':
+  '@larksuiteoapi/node-sdk@1.73.0(bufferutil@4.1.0)':
     dependencies:
       axios: 1.19.0
       lodash.identity: 3.0.0
@@ -6307,7 +6334,7 @@ snapshots:
       lodash.pickby: 4.6.0
       protobufjs: 7.6.5
       qs: 6.15.2
-      ws: 8.21.0
+      ws: 8.21.0(bufferutil@4.1.0)
     transitivePeerDependencies:
       - bufferutil
       - debug
@@ -6387,6 +6414,10 @@ snapshots:
   '@noble/curves@1.9.1':
     dependencies:
       '@noble/hashes': 1.8.0
+
+  '@noble/curves@2.2.0':
+    dependencies:
+      '@noble/hashes': 2.2.0
 
   '@noble/hashes@1.4.0': {}
 
@@ -6565,6 +6596,8 @@ snapshots:
 
   '@scure/base@1.2.6': {}
 
+  '@scure/base@2.2.0': {}
+
   '@scure/bip32@1.7.0':
     dependencies:
       '@noble/curves': 1.9.1
@@ -6575,6 +6608,11 @@ snapshots:
     dependencies:
       '@noble/hashes': 1.8.0
       '@scure/base': 1.2.6
+
+  '@scure/starknet@2.2.0':
+    dependencies:
+      '@noble/curves': 2.2.0
+      '@noble/hashes': 2.2.0
 
   '@sec-ant/readable-stream@0.4.1': {}
 
@@ -7440,6 +7478,11 @@ snapshots:
       base64-js: 1.5.1
       ieee754: 1.2.1
 
+  bufferutil@4.1.0:
+    dependencies:
+      node-gyp-build: 4.8.4
+    optional: true
+
   builder-util-runtime@9.7.0:
     dependencies:
       debug: 4.4.3
@@ -7509,11 +7552,19 @@ snapshots:
 
   case-anything@2.1.13: {}
 
-  ccxt@4.5.38:
+  ccxt@4.5.78(protobufjs@7.6.5):
     dependencies:
-      ws: 8.21.0
+      '@noble/curves': 2.2.0
+      '@noble/hashes': 2.2.0
+      '@scure/base': 2.2.0
+      '@scure/starknet': 2.2.0
+      undici: 7.28.0
+      ws: 8.21.0(bufferutil@4.1.0)
+    optionalDependencies:
+      bufferutil: 4.1.0
+      fflate: 0.8.3
+      protobufjs: 7.6.5
     transitivePeerDependencies:
-      - bufferutil
       - utf-8-validate
 
   chai@5.3.3:
@@ -7783,14 +7834,14 @@ snapshots:
 
   discord-api-types@0.38.49: {}
 
-  discord.js@14.26.5:
+  discord.js@14.26.5(bufferutil@4.1.0):
     dependencies:
       '@discordjs/builders': 1.14.1
       '@discordjs/collection': 1.5.3
       '@discordjs/formatters': 0.6.2
       '@discordjs/rest': 2.6.1
       '@discordjs/util': 1.2.0
-      '@discordjs/ws': 1.2.3
+      '@discordjs/ws': 1.2.3(bufferutil@4.1.0)
       '@sapphire/snowflake': 3.5.3
       discord-api-types: 0.38.49
       fast-deep-equal: 3.1.3
@@ -8192,6 +8243,9 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
+  fflate@0.8.3:
+    optional: true
+
   figures@6.1.0:
     dependencies:
       is-unicode-supported: 2.1.0
@@ -8589,9 +8643,9 @@ snapshots:
 
   isexe@4.0.0: {}
 
-  isows@1.0.7(ws@8.21.0):
+  isows@1.0.7(ws@8.21.0(bufferutil@4.1.0)):
     dependencies:
-      ws: 8.21.0
+      ws: 8.21.0(bufferutil@4.1.0)
 
   istanbul-lib-coverage@3.2.2: {}
 
@@ -9082,6 +9136,9 @@ snapshots:
     optionalDependencies:
       encoding: 0.1.13
 
+  node-gyp-build@4.8.4:
+    optional: true
+
   node-gyp@12.4.0:
     dependencies:
       env-paths: 2.2.1
@@ -9166,9 +9223,9 @@ snapshots:
       is-docker: 2.2.1
       is-wsl: 2.2.0
 
-  openai@6.33.0(ws@8.21.0)(zod@4.3.6):
+  openai@6.33.0(ws@8.21.0(bufferutil@4.1.0))(zod@4.3.6):
     optionalDependencies:
-      ws: 8.21.0
+      ws: 8.21.0(bufferutil@4.1.0)
       zod: 4.3.6
 
   ora@8.2.0:
@@ -10354,16 +10411,16 @@ snapshots:
       d3-time: 3.1.0
       d3-timer: 3.0.1
 
-  viem@2.48.7(typescript@5.9.3)(zod@4.3.6):
+  viem@2.48.7(bufferutil@4.1.0)(typescript@5.9.3)(zod@4.3.6):
     dependencies:
       '@noble/curves': 1.9.1
       '@noble/hashes': 1.8.0
       '@scure/bip32': 1.7.0
       '@scure/bip39': 1.6.0
       abitype: 1.2.3(typescript@5.9.3)(zod@4.3.6)
-      isows: 1.0.7(ws@8.21.0)
+      isows: 1.0.7(ws@8.21.0(bufferutil@4.1.0))
       ox: 0.14.20(typescript@5.9.3)(zod@4.3.6)
-      ws: 8.21.0
+      ws: 8.21.0(bufferutil@4.1.0)
     optionalDependencies:
       typescript: 5.9.3
     transitivePeerDependencies:
@@ -10561,9 +10618,13 @@ snapshots:
 
   wrappy@1.0.2: {}
 
-  ws@7.5.11: {}
+  ws@7.5.11(bufferutil@4.1.0):
+    optionalDependencies:
+      bufferutil: 4.1.0
 
-  ws@8.21.0: {}
+  ws@8.21.0(bufferutil@4.1.0):
+    optionalDependencies:
+      bufferutil: 4.1.0
 
   wsl-utils@0.3.1:
     dependencies:

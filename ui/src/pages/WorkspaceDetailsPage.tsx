@@ -1,3 +1,4 @@
+import { StickerManager } from '../components/workspace-capabilities/StickerManager'
 import { useCallback, useState, type ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
 import { ArrowLeft, Folder, Layers, RefreshCw } from 'lucide-react'
@@ -66,13 +67,14 @@ export function WorkspaceDetailsPage({ spec }: { spec: Extract<ViewSpec, { kind:
           <Tabs defaultValue="skills" key={wsId} className="min-w-0">
             <TabsList aria-label={t('workspaceDetails.documents')} className="mb-4 max-w-full h-auto flex-wrap justify-start">
               <TabsTrigger value="skills">{t('capabilities.skills')}</TabsTrigger>
-              <TabsTrigger value="cli">CLI</TabsTrigger>
+              <TabsTrigger value="cli">CLI</TabsTrigger>{workspace.template === 'chat' && <TabsTrigger value="stickers">{t('stickers.title')}</TabsTrigger>}
               <TabsTrigger value="instructions">{t('capabilities.instructions')}</TabsTrigger>
               <TabsTrigger value="injection">{t('capabilities.injection')}</TabsTrigger>
               <TabsTrigger value="workspace" className="flex-none max-[380px]:px-2">{t('workspaceDetails.overview')}</TabsTrigger>
               <TabsTrigger value="guide" className="flex-none max-[380px]:px-2"><Layers size={14} className="shrink-0" aria-hidden />{t('workspaceDetails.guide')}</TabsTrigger>
             </TabsList>
             {(['skills', 'instructions', 'injection'] as const).map(view => <TabsContent key={view} value={view}><CapabilityBrowser key={`${wsId}:${revision}:${view}`} wsId={wsId} view={view} resolvePath={path => `/${source}/workspaces/${encodeURIComponent(wsId)}/view/${encodeURIComponent(path)}`} /></TabsContent>)}
+            {workspace.template === 'chat' && <TabsContent value="stickers"><StickerManager wsId={wsId} /></TabsContent>}
             <TabsContent value="cli"><CliBrowser key={`${wsId}:${revision}`} wsId={wsId} /></TabsContent>
             <TabsContent value="workspace" className="min-w-0 space-y-5">
           <dl className="grid grid-cols-2 gap-x-5 gap-y-4 border-y border-border py-5 sm:gap-x-8">

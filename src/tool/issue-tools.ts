@@ -22,6 +22,7 @@
  */
 
 import { join } from 'node:path'
+import { awaitConversationTask, taskProjection } from './conversation.js'
 
 import { tool } from 'ai'
 import { z } from 'zod'
@@ -57,7 +58,7 @@ import {
   type IssueComment,
 } from '../workspaces/issues/comments.js'
 import { dispatchIssueCommentReply } from '../workspaces/issues/comment-delivery.js'
-import { projectDeskComment } from '../workspaces/issues/telegram-desk-project.js'
+import { deskProgressScope, projectDeskComment } from '../workspaces/issues/telegram-desk-project.js'
 import { issueMutation, issueMutationFingerprint } from '../workspaces/issues/change-tracker.js'
 import {
   NEW_THEN_RESUME_ASSIGNEE,
@@ -433,7 +434,16 @@ export const issueCommentFactory: WorkspaceToolFactory = {
             ...(origin ? { authorResumeId: origin.resumeId } : {}),
             source: origin ?? { kind: 'workspace', workspaceId: ctx.workspaceId },
           })
-          await projectDeskComment(res.issue, res.comment).catch(() => undefined)
+          const run = ctx.callerRun
+          const scope = run ? deskProgressScope(run) : null
+          await projectDeskComment(res.issue, res.comment, undefined, {
+            workspaceId: ctx.workspaceId,
+            ...(scope?.workspaceId === ctx.workspaceId && scope.issueId === id
+              ? { progressScopeId: scope.scopeId } : {}),
+            automated: run?.trigger?.kind === 'issue',
+            ...(run?.status === 'running' && scope?.workspaceId === ctx.workspaceId && scope.issueId === id
+              ? { phase: 'progress' as const } : {}),
+          }).catch(() => undefined)
           if (dispatched.status !== 'not_requested') {
             const updated = await updateIssueCommentDelivery(
               dir.dir,
@@ -739,6 +749,52 @@ async function readSelfIssue(
   return { ok: true, issue: parsed.issue, comments: comments.comments }
 }
 
+/** Dispatch through the same service as the Issue page, never through ask. */
+function issueRunFactory(retry: boolean): WorkspaceToolFactory {
+  return {
+    name: retry ? 'issue_retry' : 'issue_run',
+    build(ctx) {
+      return tool({
+        description: retry
+          ? 'Retry the latest failed or interrupted Issue run using its current canonical What and owner. Preserves schedule cadence and records retry lineage.'
+          : 'Run a live scheduled Issue now using its canonical What and configured owner/runtime. Preserves schedule cadence; rejects overlapping runs.',
+        inputSchema: z.object({
+          id: z.string().min(1).describe('Issue id or title on the global board.'),
+          wsId: z.string().min(1).optional().describe('Workspace id to disambiguate matching Issues.'),
+          ...(retry ? { runId: z.string().min(1).describe('Exact latest failed or interrupted taskId to retry.') } : {}),
+          await: z.boolean().optional().default(false).describe('Wait for completion; otherwise return taskId immediately.'),
+        }),
+        execute: async (input) => {
+          if (!ctx.board || !ctx.issueRuns) return { ok: false, error: 'Issue execution is unavailable' }
+          if (input.await && !ctx.conversation) return { ok: false, error: 'Conversation wait is unavailable' }
+          try {
+            const refs = (await ctx.board.resolveByName(input.id)).filter((ref) => !input.wsId || ref.wsId === input.wsId)
+            if (refs.length !== 1) return {
+              ok: false, error: refs.length ? 'Issue name is ambiguous; specify --ws-id' : 'Issue not found',
+              ...(refs.length ? { candidates: refs.map(({ wsId, id, title }) => ({ wsId, id, title })) } : {}),
+            }
+            const ref = refs[0]!
+            const result = await ctx.issueRuns.start(ref.wsId, ref.id, retry && typeof input.runId === 'string' ? input.runId : undefined)
+            const subject = { workspaceId: ref.wsId, issueId: ref.id }
+            if (input.await && ctx.conversation) {
+              const task = await awaitConversationTask(ctx.conversation, result.taskId)
+              if (!task) return { ok: false, ...result, error: 'Dispatched run is unavailable' }
+              return { ok: true, ...subject, ...taskProjection(task, 'summary'), awaited: task.status !== 'running' }
+            }
+            return { ok: true, ...subject, ...result, next: `alice conversation read --task-id ${result.taskId}` }
+          } catch (err) {
+            return { ok: false, error: err instanceof Error ? err.message : String(err),
+              ...((err && typeof err === 'object' && 'code' in err) ? { code: err.code } : {}) }
+          }
+        },
+      })
+    },
+  }
+}
+
+export const issueRunNowFactory = issueRunFactory(false)
+export const issueRetryFactory = issueRunFactory(true)
+
 /** All issue tool factories, in registration order. */
 export const issueToolFactories: WorkspaceToolFactory[] = [
   issueUpdateFactory,
@@ -746,4 +802,6 @@ export const issueToolFactories: WorkspaceToolFactory[] = [
   issueCreateFactory,
   issueListFactory,
   issueShowFactory,
+  issueRunNowFactory,
+  issueRetryFactory,
 ]

@@ -518,7 +518,7 @@ describe('WebSessionHost with the codex-app-server transport', () => {
     expect(started.nativeSessionId).toBe('thr_new')
     expect(onNativeSessionId).toHaveBeenCalledWith('record-1', 'thr_new')
     expect(process.received.map((c) => c['method'])).toEqual(['initialize', 'initialized', 'thread/start'])
-    expect(process.received[2]).toMatchObject({ params: { cwd: '/tmp/workspace', approvalPolicy: 'on-request', sandbox: 'workspace-write' } })
+    expect(process.received[2]).toMatchObject({ params: { cwd: '/tmp/workspace', approvalPolicy: 'never', sandbox: 'danger-full-access' } })
 
     await host.prompt('record-1', 'run the tests')
     await settle()

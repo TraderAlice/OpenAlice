@@ -36,6 +36,7 @@ describe('owner chat messages', () => {
       ...base,
       phase: 'accepted',
     }).phase).toBe('accepted')
+    expect(ownerChatMessageSchema.parse({ ...base, phase: 'final' })).not.toHaveProperty('text')
     expect(() => ownerChatMessageSchema.parse({
       ...base,
       phase: 'progress',

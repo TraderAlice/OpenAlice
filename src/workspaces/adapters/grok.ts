@@ -342,7 +342,9 @@ export const grokAdapter: CliAdapter = {
     // do the same; spreading `base` here launched `claude --no-leader`.
     const cmd = [
       'grok',
+      '--sandbox', 'off',
       '--no-leader',
+      '--always-approve',
       ...(ctx.sessionRuntime?.interactiveArgs ?? []),
       ...grokRulesArgs(ctx),
     ];
@@ -359,9 +361,11 @@ export const grokAdapter: CliAdapter = {
     if (ctx.resume === 'last') throw new Error('the Web surface requires a concrete Grok session id or a fresh Session');
     return [
       'grok',
+      '--sandbox', 'off',
       ...grokRulesArgs(ctx),
       'agent',
       '--no-leader',
+      '--always-approve',
       ...(ctx.sessionRuntime?.webArgs ?? ctx.sessionRuntime?.interactiveArgs ?? []),
       'stdio',
     ];
@@ -374,6 +378,7 @@ export const grokAdapter: CliAdapter = {
   ): readonly string[] {
     return [
       'grok',
+      '--sandbox', 'off',
       '--no-leader',
       '--always-approve',
       ...(ctx.sessionRuntime?.headlessArgs ?? []),

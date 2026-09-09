@@ -69,6 +69,18 @@ describe('issueCommentReplyPrompt', () => {
 })
 
 describe('dispatchIssueCommentReply', () => {
+  it.each([undefined, '15m', '60m'] as const)('uses the Issue timeout %s for owner replies', async (timeout) => {
+    const ask = vi.fn(async () => ({ status: 'dispatched', taskId: 'run-reply', resumeId: 'resume-owner' }))
+    await dispatchIssueCommentReply({
+      conversation: { ask } as unknown as WorkspaceConversationControl,
+      issueWorkspaceId: 'ws-home', issue: { ...issue('@resume-owner'), timeout }, comment,
+      source: { kind: 'human' },
+    })
+    expect(ask).toHaveBeenCalledWith(expect.objectContaining({
+      timeoutMs: timeout === undefined ? undefined : timeout === '15m' ? 900_000 : 3_600_000,
+    }))
+  })
+
   it('keeps agent-authored workspace-owned comments as notes', async () => {
     expect(await dispatchIssueCommentReply({
       issueWorkspaceId: 'ws-home',
@@ -101,7 +113,7 @@ describe('dispatchIssueCommentReply', () => {
     expect(await dispatchIssueCommentReply({
       conversation: control,
       issueWorkspaceId: 'ws-home',
-      issue: issue('@new-each-run'),
+      issue: issue('@unassigned'),
       comment,
       source: { kind: 'human' },
     })).toEqual({
@@ -267,5 +279,28 @@ describe('recordIssueCommentReply', () => {
     expect(comments.ok && comments.comments[0]?.delivery).toEqual({
       state: 'failed', targetResumeId: 'resume-owner', taskId: 'run-reply', error: 'runtime unavailable',
     })
+  })
+})
+
+describe('fresh Issue owner comments', () => {
+  it.each(['@new-then-resume', '@new-each-run'])('does not ask the historical creator for %s', async (assignee) => {
+    const ask = vi.fn()
+    const replyToIssue = vi.fn(async () => ({ taskId: 'new-run', resumeId: 'resume-new' }))
+    const result = await dispatchIssueCommentReply({
+      conversation: { ask, read: vi.fn(), replyToIssue }, issueWorkspaceId: 'ws-home',
+      issue: issue(assignee), comment, source: { kind: 'human' },
+    })
+    expect(ask).not.toHaveBeenCalled()
+    expect(replyToIssue).toHaveBeenCalledWith(expect.objectContaining({ issueId: 'audit', commentId: comment.id }))
+    expect(result).toEqual({ status: 'scheduled', delivery: { state: 'pending', taskId: 'new-run', targetResumeId: 'resume-new' } })
+  })
+  it('fails explicitly rather than falling back to the old creator when recruitment fails', async () => {
+    const ask = vi.fn()
+    const result = await dispatchIssueCommentReply({
+      conversation: { ask, read: vi.fn(), replyToIssue: async () => { throw new Error('busy') } },
+      issueWorkspaceId: 'ws-home', issue: issue('@new-then-resume'), comment, source: { kind: 'human' },
+    })
+    expect(result).toEqual({ status: 'failed', delivery: { state: 'failed', error: 'busy' } })
+    expect(ask).not.toHaveBeenCalled()
   })
 })

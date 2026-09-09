@@ -93,15 +93,15 @@ describe('omp composeCommand', () => {
     expect(ompAdapter.composeCommand(['omp'], ctx({
       resume: { sessionId: LIVE_SESSION_ID },
       initialPrompt: PROMPT,
-    }))).toEqual(['omp', '--resume', LIVE_SESSION_ID]);
+    }))).toEqual(['omp', '--auto-approve', '--resume', LIVE_SESSION_ID]);
     expect(ompAdapter.composeCommand(['omp'], ctx({ resume: 'last', initialPrompt: PROMPT })))
-      .toEqual(['omp', '--continue']);
+      .toEqual(['omp', '--auto-approve', '--continue']);
   });
 
   it('maps launcher-owned role guidance to --append-system-prompt', () => {
     expect(ompAdapter.composeCommand(['omp'], ctx({
       appendSystemPrompt: 'You are the desk closer.',
-    }))).toEqual(['omp', '--append-system-prompt', 'You are the desk closer.']);
+    }))).toEqual(['omp', '--auto-approve', '--append-system-prompt', 'You are the desk closer.']);
   });
 });
 

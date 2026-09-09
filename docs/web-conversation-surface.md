@@ -35,7 +35,7 @@ approval or cannot reopen an exact recorded conversation.
 | `pi-rpc` | `pi`, `omp` | `--mode rpc` JSONL; Pi additionally `--approve`, omp `--auto-approve` | none in RPC mode; launch-time approval | yes (RPC allocates the id) |
 | `acp` | `cursor`, `grok`, `opencode` | Agent Client Protocol JSON-RPC over stdio (`cursor-agent acp`, `grok agent --no-leader stdio`, `opencode acp`) | `session/request_permission` with the agent's own options | `session/new`; resume via `session/load` when advertised |
 | `claude-stream-json` | `claude` | `-p --input-format stream-json --output-format stream-json --include-partial-messages --permission-prompt-tool stdio` | `control_request` `can_use_tool`; answered with allow/deny | `--session-id <uuid>` chosen by the adapter |
-| `codex-app-server` | `codex` | `codex app-server --listen stdio://` with MCP registration, `approvalPolicy: on-request`, `sandbox: workspace-write` | `item/commandExecution/requestApproval`, `item/fileChange/requestApproval` (answered with a `decision` enum), `item/permissions/requestApproval` (answered with the granted `permissions` profile + `scope`), `item/tool/requestUserInput` | `thread/start`; resume via `thread/resume` |
+| `codex-app-server` | `codex` | `codex app-server --listen stdio://` with MCP registration, `approvalPolicy: never`, `sandbox: danger-full-access` | `item/commandExecution/requestApproval`, `item/fileChange/requestApproval` (answered with a `decision` enum), `item/permissions/requestApproval` (answered with the granted `permissions` profile + `scope`), `item/tool/requestUserInput` | `thread/start`; resume via `thread/resume` |
 
 If ACP does not advertise `loadSession`, opening an existing Session fails with
 terminal guidance and preserves its native ID. Never replace its transcript
@@ -152,3 +152,15 @@ an explicit model, a completed turn, errors, and exact-session restoration with
 the installed CLI. Keep login/provider/version failures distinct from parser
 or lifecycle defects, and never claim every runtime passed from one shared
 wire's fake-process fixture.
+
+Managed launch permissions follow [[docs/model-semantics-and-runtime-injection.md]]. Protocol permission handling remains available for native policy requests; normal managed tool execution is approved at launch.
+
+## Background ownership handoff
+
+Issue and Connector desk work can preempt a TUI/Web interactive connection on
+the same Session. Native context is retained. The shared resume lease excludes
+new interactive starts while the previous child is stopping and the background
+turn is running. A deliberate PTY disposal must not trigger browser reconnect.
+Web shutdown waits for child termination, including the SIGKILL fallback, before
+another writer may start. The UI renders background occupancy without attaching
+a terminal to a headless Session.

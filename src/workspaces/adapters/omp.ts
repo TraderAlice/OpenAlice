@@ -265,6 +265,7 @@ export const ompAdapter: CliAdapter = {
   composeCommand(_base: readonly string[], ctx: SpawnContext): readonly string[] {
     const cmd = [
       'omp',
+      '--auto-approve',
       ...(ctx.sessionRuntime?.interactiveArgs ?? []),
       ...ompRoleArgs(ctx),
     ];

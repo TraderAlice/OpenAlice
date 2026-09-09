@@ -115,6 +115,7 @@ describe('HeadlessTaskRegistry', () => {
         kind: 'issue',
         workspaceId: 'home',
         issueId: 'daily-scan',
+        retryOfTaskId: 'failed-occurrence',
         metadata: { kind: 'connector-cron-issue', connectorId: 'telegram' },
       },
     })
@@ -123,6 +124,7 @@ describe('HeadlessTaskRegistry', () => {
       kind: 'issue',
       workspaceId: 'home',
       issueId: 'daily-scan',
+      retryOfTaskId: 'failed-occurrence',
       metadata: { kind: 'connector-cron-issue', connectorId: 'telegram' },
     })
     // Manual runs leave the field absent (not undefined-valued) so the JSON stays clean.

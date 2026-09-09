@@ -351,6 +351,7 @@ export interface IssueRunRecord {
   taskId: string
   resumeId: string
   parentTaskId?: string
+  retryOfTaskId?: string
   wsId: string
   issueId?: string
   agent: string
@@ -386,6 +387,7 @@ export function issueRunRecord(task: HeadlessTaskRecord, resumable: boolean): Is
     taskId: task.taskId,
     resumeId: task.resumeId,
     ...(task.parentTaskId ? { parentTaskId: task.parentTaskId } : {}),
+    ...(task.trigger?.retryOfTaskId ? { retryOfTaskId: task.trigger.retryOfTaskId } : {}),
     wsId: task.wsId,
     ...(task.trigger?.kind === 'issue' ? { issueId: task.trigger.issueId } : {}),
     agent: task.agent,

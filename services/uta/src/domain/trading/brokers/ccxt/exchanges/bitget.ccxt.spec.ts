@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import ccxt from 'ccxt'
 
-describe('CCXT 4.5.38 Bitget Classic routing contract', () => {
+describe('CCXT 4.5.78 Bitget Classic routing contract', () => {
   it('defaults an unscoped balance read to the spot endpoint', async () => {
     const exchange = new ccxt.bitget()
     exchange.loadMarkets = vi.fn().mockResolvedValue({}) as typeof exchange.loadMarkets

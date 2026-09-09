@@ -38,7 +38,10 @@ describe('CcxtBroker construct-time demo/sandbox guards', () => {
   })
 
   it('throws a clear CONFIG error for sandbox on an exchange with no testnet URL', () => {
-    // kucoin has no urls.test → setSandboxMode throws NotSupported → wrapped CONFIG.
+    // kucoin has no testnet. ccxt ≤4.5.38 threw NotSupported from
+    // setSandboxMode; ≥4.5.7x carries `urls.test: undefined` on every exchange
+    // and silently leaves urls.api = {} instead — the constructor must catch
+    // both shapes as the same CONFIG error.
     expect(
       () => new CcxtBroker({ id: 't', exchange: 'kucoin', sandbox: true, demoTrading: false, apiKey: 'k', secret: 's', password: 'p' }),
     ).toThrow(/cannot enable Sandbox/)

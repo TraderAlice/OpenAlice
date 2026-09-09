@@ -14,6 +14,7 @@ import { join } from 'node:path';
 
 import { defaultPath } from '@/core/paths.js';
 
+import { StickerPacks } from './sticker-packs.js';
 import { injectAliceHarnessSkills } from './alice-harness-assets.js';
 import { ALICE_HARNESS_SKILLS, ALICE_HARNESS_CONFIG_PATH, DEFAULT_ALICE_HARNESS_CONFIG } from './alice-harness-policy.js';
 import { writeWorkspaceFile } from './file-service.js';
@@ -46,6 +47,7 @@ export async function injectWorkspaceContext(opts: {
   ];
   if (!opts.templateOnly) {
     await injectAliceHarnessSkills(dir, template.injectTools);
+    if (template.name === 'chat') await new StickerPacks().initialize(dir);
     await writeWorkspaceFile(dir, ALICE_HARNESS_CONFIG_PATH, JSON.stringify(DEFAULT_ALICE_HARNESS_CONFIG, null, 2) + '\n');
   }
 

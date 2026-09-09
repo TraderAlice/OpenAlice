@@ -1,4 +1,5 @@
 import { useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 import type { ReactElement, ReactNode } from 'react';
 
 import type { AgentInfo, PausedSessionRuntimeUpdate, SessionRecord } from './api';
@@ -38,6 +39,7 @@ export interface WorkspaceViewProps {
 }
 
 export function WorkspaceView(props: WorkspaceViewProps): ReactElement {
+  const { t } = useTranslation();
   // Mount ONLY this tab's own pinned session. Each session is its own tab with
   // its own WorkspaceView, and TabHost keeps every tab mounted (display:none
   // when inactive) — so a session's terminal already persists across tab
@@ -51,7 +53,7 @@ export function WorkspaceView(props: WorkspaceViewProps): ReactElement {
   // briefly occur before the post-spawn poll supplies it.
   const runningSlots = useMemo<readonly SessionRecord[]>(
     () =>
-      props.activeRecord !== null && props.activeRecord.state === 'running'
+      props.activeRecord !== null && props.activeRecord.state === 'running' && props.activeRecord.surface !== 'headless'
         ? [props.activeRecord]
         : [],
     [props.activeRecord],
@@ -77,6 +79,11 @@ export function WorkspaceView(props: WorkspaceViewProps): ReactElement {
   return (
     <div className={viewClass}>
       <div className="workspace-terminal">
+        {props.activeRecord?.state === 'running' && props.activeRecord.surface === 'headless' && (
+          <div role="status" className="flex h-full items-center justify-center p-6 text-sm text-muted-foreground">
+            {t('workspace.interactiveOwnership.background')}
+          </div>
+        )}
         {showPausedCta && props.activeRecord && (
           <ResumeCta
             record={props.activeRecord}

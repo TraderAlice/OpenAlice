@@ -305,3 +305,8 @@ otherwise do nothing and exit."
 - **Legacy:** the old single `.alice/issue.json` is retired. If you find one,
   split each issue into its own `.alice/issues/<id>.md` file with the
   frontmatter above.
+
+Run a scheduled Issue immediately with `alice issue run --id <id>`; add `--await`
+when its result is needed now. Retry its latest failed run with
+`alice issue retry --id <id> --run-id <taskId>`. Both use the current What and
+owner without moving the next scheduled occurrence.

@@ -1,4 +1,5 @@
 import type {
+  ConnectorAttachment,
   ConnectorAdapterConfig,
   ConnectorAdapterHealth,
   ConnectorArtifactDelivery,
@@ -53,6 +54,7 @@ export interface ConnectorAdapter {
   stop(): Promise<void>
   deliver(notification: InboxNotification): Promise<void>
   sendOwnerText(text: string): Promise<void>
+  sendOwnerFile?(attachment: ConnectorAttachment, presentation?: import('./reply-directives.js').ReplyMedia): Promise<void>
   /** Optional transport-native lifecycle projection for desk-capable adapters. */
   sendOwnerChat?(message: OwnerChatMessage): Promise<void>
   /** Directed current-file delivery. Must not send an Inbox summary. */

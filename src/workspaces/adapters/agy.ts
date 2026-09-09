@@ -213,6 +213,7 @@ export const agyAdapter: CliAdapter = {
     // Ignore the workspace default command (usually `claude`).
     const cmd = [
       'agy',
+      '--dangerously-skip-permissions',
       ...(ctx.sessionRuntime?.interactiveArgs ?? []),
     ];
     if (ctx.resume === undefined) {

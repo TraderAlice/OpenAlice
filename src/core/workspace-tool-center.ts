@@ -35,7 +35,7 @@ import type { ArtifactRef, SessionOrigin } from './provenance-store.js'
 import type { IssuesSnapshot, IssueDetail, WikilinkIssueRef } from '../workspaces/issues/board.js'
 import type { WorkspaceSessionDirectory } from '../workspaces/session-directory.js'
 import type { HeadlessStructuredOutput } from '../workspaces/headless-output.js'
-import type { HeadlessInquirySubject, HeadlessTaskStatus } from '../workspaces/headless-task-registry.js'
+import type { HeadlessTaskRecord, HeadlessInquirySubject, HeadlessTaskStatus } from '../workspaces/headless-task-registry.js'
 import type {
   ApplyTemplateUpgradeInput,
   TemplateUpgradePlan,
@@ -138,6 +138,9 @@ export type WorkspaceConversationAskResult =
     }
 
 export interface WorkspaceConversationControl {
+  /** Follow the live Issue ownership policy, including first-owner recruitment. */
+  replyToIssue?(input: { workspaceId: string; issueId: string; prompt: string; commentId: string }): Promise<{ taskId: string; resumeId: string }>
+
   ask(input: {
     readonly prompt: string
     /** Optional execution watchdog. Omit to let the Session run to completion. */
@@ -230,6 +233,7 @@ export interface WorkspaceToolContext {
    *  agent). Factories pass it through to call sites (e.g. inbox_push →
    *  inboxStore.append) so a pushed entry self-links to its originating run /
    *  issue. Absent (interactive session, or no header) → undefined. */
+  callerRun?: Pick<HeadlessTaskRecord, 'taskId' | 'status' | 'trigger' | 'inquiry'>
   origin?: InboxOrigin
   /** GLOBAL issue-board reader — the cross-workspace board the
    *  `alice` CLI surfaces (issue_list / issue_show read EVERY
@@ -243,6 +247,7 @@ export interface WorkspaceToolContext {
     detail(wsId: string, id: string): Promise<IssueDetail | null>
     resolveByName(name: string): Promise<WikilinkIssueRef[]>
   }
+  issueRuns?: { start(wsId: string, id: string, retryRunId?: string): Promise<{ taskId: string }> }
   /** Safe current-Workspace template preview/apply surface. */
   templateUpgrades?: WorkspaceTemplateUpgradeControl
   aliceHarnessUpgrades?: WorkspaceTemplateUpgradeControl

@@ -97,8 +97,9 @@ The filename stem is the stable issue id. Frontmatter:
 - `effort` — optional one-run reasoning effort:
   `none | minimal | low | medium | high | xhigh | max`. The chosen runtime must
   expose that level; omission inherits its Workspace/native default.
-- `timeout` — optional scheduled-run watchdog: `15m | 30m | 45m | 60m`. Omission
-  means no limit: the headless child runs until the agent exits. This is a run
+- `timeout` — optional scheduled-run and comment-reply watchdog: `15m | 30m | 45m | 60m`. Omission
+  means no limit: the headless child runs until the agent exits. Comment replies
+  have no separate fixed five-minute cap. This is a run
   budget, not Session birth, so an exact `@resumeId` owner may still set it.
 - `commentPrompt` — optional template for the Input Prompt sent when a comment
   needs a reply. Omission keeps the historical wrapper (Issue id, title, author,
@@ -120,8 +121,10 @@ The filename stem is the stable issue id. Frontmatter:
   queue; other connectors flush independently. Scheduled-fire
   `assistantText` is stamped as a comment. Scheduler and Run now / Retry now
   executions of this Issue carry `trigger.metadata.kind: connector-cron-issue`.
-  Only comments and progress from a run with that metadata consume
-  `[[no-reply]]`; ordinary chat mentions of the syntax are delivered as text.
+  Alice forwards source context with raw comments and progress. Connector
+  consumes `[[no-reply]]` for automation (including CLI comments from an Issue
+  run); ordinary chat and code examples remain literal. Reply file markers
+  are also Connector-owned; see [[docs/connector-service.md]].
   Connector does not echo comments that arrived from that connector.
   While a desk turn is running, it also ships sealed mid-turn `text` blocks —
   the last consecutive text before a tool or error — and never ships tool I/O.
@@ -172,8 +175,12 @@ structured run log remain durable. Inbox inquiries expose the same shape on the 
 Issue Activity and Inbox reply threads render that same field as a compact
 live timeline: semantic text, tool name/status, and errors. They do not fetch
 `/output` or show tool payloads. The Telegram phone desk
-already projects sealed `text` blocks from that same field. A human comment without a fixed owner
-uses the same provenance-aware fallback as Inbox: OpenAlice asks the
+already projects sealed `text` blocks from that same field. A human comment on
+`@new-then-resume` recruits and claims the first Session using the Issue's
+Agent, credential, model, and effort, sharing dispatch exclusion with scheduled
+fires. `@new-each-run` comments recruit fresh workers without claiming ownership.
+These comments never fall back to an earlier creator, and do not advance the
+schedule marker. Ordinary unassigned/human-owned Issue comments use the same provenance-aware fallback as Inbox: OpenAlice asks the
 attributable creator, or recruits a reconstruction Agent in the Issue
 Workspace when no creator Session exists. The answer is recorded in Activity
 without changing `assignee`; a temporary answerer never becomes the scheduling
@@ -254,6 +261,21 @@ selected historical run without adding a board comment.
 Reads such as list/show aggregate all workspaces. Writes from an autonomous or
 headless run stay inside its own Workspace. Editing a peer Workspace requires
 an attended, human-approved path and a commit in the peer repository.
+
+## Interactive handoff
+
+Opening a Connector desk or Issue-assigned Session in TUI/Web requires a UI
+acknowledgement. The shared Session actions menu offers **Disconnect interactive
+connection**; this stops the interactive process and preserves the native
+conversation. Closing a browser tab alone is not a disconnect.
+
+Issue dispatch (scheduled, manual, retry, and comment replies, including
+Connector desk messages) claims the same resume lease used by UI startup,
+stops any TUI/Web owner, and waits for process exit before starting the
+headless turn. Another background turn is never preempted. Capacity/busy
+admission still follows the existing scanner/Connector queue policy.
+The disconnected browser does not reconnect automatically and shows background
+occupancy until the turn finishes; returning to interactive mode is explicit.
 
 ## Execution Flow
 
@@ -348,8 +370,10 @@ Headless runs may overlap with interactive sessions or other runs in the same
 checkout. Agents must tolerate concurrent edits. The launcher currently admits
 at most eight headless processes globally and serializes registry persistence,
 but there is no per-Workspace exclusive lock. One small dispatch-start guard
-prevents a Run now / Retry now click and a schedule tick from launching the same
-Issue at the same instant; it is released as soon as the run is registered.
+prevents Run now / Retry now, CLI calls and a schedule tick from launching the
+same Issue at the same instant; it is released as soon as the run is registered.
+The shared dispatch path also rejects a new occurrence while that Issue still
+has a running task. Other Issues in the same Workspace remain independent.
 
 Offboarding is the lifecycle exception: a Workspace with a live headless run
 cannot depart. Once its Catalog row enters `offboarding`, new dispatch is
@@ -525,3 +549,18 @@ pnpm test
 For UI changes, run strict UI types and verify Issue board, issue detail,
 Activity comments/replies, the independent Runs section, schedule projection,
 and linked Inbox reports in the real browser surface.
+
+## Manual execution from CLI
+
+`alice issue run --id <id>` uses the same Run now dispatch as the Issue page.
+`alice issue retry --id <id> --run-id <taskId>` requires the latest failed or
+interrupted run of that Issue. Both resolve names on the global board; duplicate
+names require `--ws-id`. They return the exact dispatched `taskId`; `--await`
+waits for completion through the conversation reader. No prompt/runtime override
+is accepted. Current scheduled Issue semantics and next-fire markers are preserved.
+
+Retry persists `trigger.retryOfTaskId`, exposed by Issue run history as
+`retryOfTaskId`, independently of conversation `parentTaskId`. Existing records
+without that optional field have unknown retry lineage. Active Issue runs and
+dispatch-start races are rejected, including schedule ticks; there is no force
+override that launches concurrent turns against the same owner.

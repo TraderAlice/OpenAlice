@@ -2,7 +2,7 @@
  * Connector phone-desk chat hop.
  *
  * Connector only transports. Each adapter's Issue comments are that
- * specialist's transcript. The literal tag [[no-reply]] stays local only for
+ * specialist's transcript. Delivery syntax is interpreted by Connector using the source of
  * runs explicitly stamped with the connector-cron-issue execution profile.
  * Sealed mid-turn text blocks also project so the phone chat does not
  * wait for the final reply.
@@ -32,8 +32,6 @@ import {
 import { projectDeskComment, projectDeskLifecycle } from './telegram-desk-project.js'
 
 export {
-  TELEGRAM_NO_REPLY_TAG,
-  containsTelegramNoReply,
   projectDeskComment,
   projectDeskLifecycle,
   projectDeskTurnProgress,
@@ -223,6 +221,7 @@ export async function stampTelegramDeskScheduledFire(input: {
     fingerprint: `telegram-desk-fire:${input.task.taskId}`,
   })
   await projectDeskComment(appended.issue, appended.comment, input.client, {
+    workspaceId: input.task.wsId,
     progressScopeId: input.task.taskId,
     triggerMetadata,
   }).catch(() => undefined)

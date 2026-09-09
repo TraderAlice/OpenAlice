@@ -45,6 +45,7 @@ interface SocketMessageEventLike {
 
 interface SocketCloseEventLike {
   readonly code: number;
+  readonly reason?: string;
 }
 
 interface SocketLike {
@@ -93,7 +94,7 @@ class ElectronPtySocket implements SocketLike {
       }),
       bridge.onClose(this.connectionId, (msg) => {
         this.readyState = this.CLOSED;
-        for (const cb of this.listeners.close) cb({ code: msg.code });
+        for (const cb of this.listeners.close) cb({ code: msg.code, reason: msg.reason });
         this.cleanup();
       }),
     );
@@ -599,7 +600,7 @@ export function TerminalView(props: TerminalViewProps): ReactElement {
           setStatus('locked');
           return;
         }
-        if (ev.code === 4404) {
+        if (ev.code === 4404 || (ev.code === 1000 && ev.reason?.startsWith('disposed:'))) {
           recoverableTransportFailure = false;
           setClosedRecoverable(false);
           onSessionLostRef.current?.();

@@ -1,3 +1,4 @@
+import { StickerManager } from '../components/workspace-capabilities/StickerManager'
 import { InjectionVersion, SkillProjectionBrowser } from '../components/workspace-capabilities/SkillProjectionBrowser'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
@@ -27,8 +28,8 @@ export function WorkspaceInjectionPage() {
         {!state.data && !state.error && <p role="status">{t('common.loading')}</p>}
         {state.data && <>
           <Tabs defaultValue="skills">
-            <TabsList><TabsTrigger value="skills">{t('distribution.workspaces')}</TabsTrigger><TabsTrigger value="project">{t('skillManager.prototype')}</TabsTrigger><TabsTrigger value="cli">CLI</TabsTrigger></TabsList>
-            <TabsContent value="skills" className="mt-4"><SkillProjectionBrowser data={state.data} disabled={state.busy || !!state.error} onChange={state.refresh} />
+            <TabsList><TabsTrigger value="skills">{t('distribution.workspaces')}</TabsTrigger><TabsTrigger value="project">{t('skillManager.prototype')}</TabsTrigger><TabsTrigger value="cli">CLI</TabsTrigger><TabsTrigger value="stickers">{t('stickers.title')}</TabsTrigger></TabsList>
+            <TabsContent value="stickers" className="mt-4"><StickerManager /></TabsContent><TabsContent value="skills" className="mt-4"><SkillProjectionBrowser data={state.data} disabled={state.busy || !!state.error} onChange={state.refresh} />
               <details className="mt-6 border-t border-border pt-3"><summary className="cursor-pointer text-xs text-muted-foreground">{t('skillManager.bundleUpdates')}</summary>
               <div className="mt-4">
               <div className="mb-4 flex flex-wrap items-center justify-between gap-3"><p className="max-w-xl text-xs text-muted-foreground">{t('distribution.batchHint')}</p><Button disabled={state.busy || !!state.error || !ready} onClick={() => void state.updateReady()}>{state.busy ? t('common.loading') : t('distribution.updateReady', { count: ready })}</Button></div>

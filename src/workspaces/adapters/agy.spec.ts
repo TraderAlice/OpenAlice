@@ -51,10 +51,10 @@ describe('agy session layout', () => {
 describe('agy composeCommand', () => {
   it('seeds a fresh TUI with --prompt-interactive and never goes headless', () => {
     const argv = agyAdapter.composeCommand(['claude'], ctx({ initialPrompt: PROMPT }));
-    expect(argv).toEqual(['agy', '--prompt-interactive', PROMPT]);
+    expect(argv).toEqual(['agy', '--dangerously-skip-permissions', '--prompt-interactive', PROMPT]);
     expect(argv).not.toContain('-p');
     expect(argv).not.toContain('--print');
-    expect(argv).not.toContain('--dangerously-skip-permissions');
+    expect(argv).toContain('--dangerously-skip-permissions');
     expect(argv).not.toContain('--agent');
     expect(argv).not.toContain('--resume');
     expect(argv).not.toContain('--session-id');
@@ -66,18 +66,18 @@ describe('agy composeCommand', () => {
     expect(agyAdapter.composeCommand(['agy'], ctx({
       resume: { sessionId: LIVE_CONVERSATION_ID },
       initialPrompt: PROMPT,
-    }))).toEqual(['agy', '--conversation', LIVE_CONVERSATION_ID]);
+    }))).toEqual(['agy', '--dangerously-skip-permissions', '--conversation', LIVE_CONVERSATION_ID]);
     expect(agyAdapter.composeCommand(['agy'], ctx({
       resume: 'last',
       initialPrompt: PROMPT,
-    }))).toEqual(['agy', '--continue']);
+    }))).toEqual(['agy', '--dangerously-skip-permissions', '--continue']);
   });
 
   it('ignores Alice skills and role prompts (no native flags)', () => {
     expect(agyAdapter.composeCommand(['agy'], ctx({
       appendSystemPrompt: 'Stay in the Workspace.',
       skills: ['/tmp/skill'],
-    }))).toEqual(['agy']);
+    }))).toEqual(['agy', '--dangerously-skip-permissions']);
   });
 });
 

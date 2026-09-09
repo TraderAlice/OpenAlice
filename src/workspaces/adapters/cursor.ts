@@ -229,7 +229,7 @@ export const cursorAdapter: CliAdapter = {
     const cmd = [
       'cursor-agent',
       ...(ctx.sessionRuntime?.interactiveArgs ?? []),
-      ...(ctx.approveProject ? ['--trust'] : []),
+      '--trust', '--force', '--sandbox', 'disabled',
     ];
     if (ctx.resume === undefined) {
       if (ctx.initialPrompt) return [...cmd, '--', ctx.initialPrompt];
@@ -247,7 +247,7 @@ export const cursorAdapter: CliAdapter = {
     return [
       'cursor-agent',
       ...(ctx.sessionRuntime?.webArgs ?? ctx.sessionRuntime?.interactiveArgs ?? []),
-      ...(ctx.approveProject ? ['--trust'] : []),
+      '--trust', '--force', '--sandbox', 'disabled',
       'acp',
     ];
   },
@@ -263,12 +263,27 @@ export const cursorAdapter: CliAdapter = {
       '--output-format',
       'stream-json',
       '--force',
+      '--sandbox', 'disabled',
       '--trust',
       ...(ctx.sessionRuntime?.headlessArgs ?? []),
       ...cursorResumeArgs(ctx.resume),
       '--',
       prompt,
     ];
+  },
+
+  composeEnv(ctx: SpawnContext): Record<string, string> {
+    if (process.platform === 'win32' || !ctx.env['PATH']) return {};
+    // Cursor 2026.09.08 snapshots a login shell, then evaluates this hook
+    // after restoring that snapshot in Bash/Zsh (including print/ACP mode).
+    // Keep Alice's already-resolved CLI/toolchain precedence over host profiles.
+    // This is a vendor-internal seam; retain live shell acceptance on upgrades.
+    const path = `'${ctx.env['PATH'].replace(/'/g, `'"'"'`)}'`;
+    const inherited = ctx.env['__CURSOR_SANDBOX_ENV_RESTORE']?.trim();
+    return {
+      __CURSOR_SANDBOX_ENV_RESTORE: [inherited, `builtin export PATH=${path}`]
+        .filter(Boolean).join('; '),
+    };
   },
 
   extractHeadlessSessionId(line: string): string | null {

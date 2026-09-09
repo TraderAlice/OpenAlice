@@ -1,3 +1,7 @@
+import { serve } from '@hono/node-server'
+import { execFile } from 'node:child_process'
+import { promisify } from 'node:util'
+import { issueRunNowFactory, issueRetryFactory } from '../tool/issue-tools.js'
 import { describe, it, expect, vi } from 'vitest'
 import { Hono } from 'hono'
 import { tool } from 'ai'
@@ -529,5 +533,46 @@ describe('Workspace CLI configuration', () => {
       expect((await server.request('/cli/one/data/manifest')).status).toBe(503)
       expect((await server.request('/cli/one/workspace/invoke', { method: 'POST', body: JSON.stringify({ tool: 'workspace_list' }) })).status).toBe(503)
     } finally { await rm(dir, { recursive: true, force: true }) }
+  })
+})
+
+
+describe('Issue run CLI end to end', () => {
+  it('uses the actual launcher, manifest, schema and execution tool for run/retry', async () => {
+    const startIssueRun = vi.fn(async () => ({ taskId: 'run-new' }))
+    const workspaceToolCenter = new WorkspaceToolCenter()
+    workspaceToolCenter.register(issueRunNowFactory)
+    workspaceToolCenter.register(issueRetryFactory)
+    const app = new Hono()
+    registerCliRoutes(app, {
+      toolCenter: new ToolCenter(), workspaceToolCenter,
+      inboxStore: {} as never, entityStore: {} as never,
+      getWorkspaceService: () => ({
+        registry: { get: () => ({ id: 'ws1', tag: 'desk' }) },
+        resolveIssuesByName: async () => [{ wsId: 'ws1', wsTag: 'desk', id: 'daily', title: 'Daily' }],
+        startIssueRun,
+      }) as never,
+    })
+    const server = serve({ fetch: app.fetch, port: 0, hostname: '127.0.0.1' })
+    if (!server.listening) await new Promise<void>((resolve) => server.once('listening', resolve))
+    const address = server.address() as { port: number }
+    const execute = (args: string[]) => promisify(execFile)(process.execPath,
+      [resolve('src/workspaces/cli/bin/openalice-cli.cjs'), ...args], {
+        env: { ...process.env, OPENALICE_CLI_BIN: 'alice', AQ_WS_ID: 'ws1',
+          OPENALICE_TOOL_SOCKET: '', OPENALICE_TOOL_URL: `http://127.0.0.1:${address.port}/cli` },
+        timeout: 10000,
+      })
+    try {
+      expect((await execute(['issue', 'run', '--id', 'daily'])).stdout).toContain('run-new')
+      expect(startIssueRun).toHaveBeenLastCalledWith('ws1', 'daily', undefined)
+      expect((await execute(['issue', 'retry', '--id', 'daily', '--run-id', 'run-old'])).stdout).toContain('run-new')
+      expect(startIssueRun).toHaveBeenLastCalledWith('ws1', 'daily', 'run-old')
+      const before = startIssueRun.mock.calls.length
+      await expect(execute(['issue', 'retry', '--id', 'daily'])).rejects.toThrow()
+      expect(startIssueRun).toHaveBeenCalledTimes(before)
+    } finally {
+      if ('closeAllConnections' in server) server.closeAllConnections()
+      await new Promise<void>((resolve) => server.close(() => resolve()))
+    }
   })
 })

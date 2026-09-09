@@ -424,7 +424,7 @@ export function createIssuesRoutes(svc: WorkspaceService, deps: IssueRoutesDeps 
           })
         }
       }
-      await projectDeskComment(res.issue, res.comment).catch((err) => {
+      await projectDeskComment(res.issue, res.comment, undefined, { workspaceId: wsId }).catch((err) => {
         launcherLogger.warn('telegram_desk.comment_project_failed', { wsId, id, err })
       })
       launcherLogger.info('issue.comment_added', { wsId, id, author: 'human' })

@@ -7,7 +7,6 @@ import type { ConnectorClient } from '@traderalice/connector-protocol'
 
 import { createTelegramConnectorDesk } from './telegram-connector.js'
 import {
-  containsTelegramNoReply,
   formatTelegramInboundStack,
   ingestTelegramOwnerMessage,
   ingestTelegramOwnerMessages,
@@ -74,16 +73,13 @@ describe('telegram desk chat filter', () => {
       id: 'c3', author: '@resume-a', at: 'now', markdown: '[[no-reply]] nothing to say',
     }, {
       triggerMetadata: { kind: 'connector-cron-issue', connectorId: 'telegram' },
-    })).toBe(false)
+    })).toBe(true)
     expect(shouldProjectDeskComment({}, {
       id: 'c4', author: '@resume-a', at: 'now', markdown: 'ordinary issue',
     })).toBe(false)
   })
 
-  it('matches the no-reply tag as a literal substring', () => {
-    expect(containsTelegramNoReply('[[no-reply]] quiet')).toBe(true)
-    expect(containsTelegramNoReply('no reply')).toBe(false)
-  })
+
 })
 
 describe('telegram desk ingest and stamp', () => {
@@ -125,7 +121,7 @@ describe('telegram desk ingest and stamp', () => {
     const { client, sent } = mockClient()
     const result = await ingestTelegramOwnerMessage(host({
       conversation: () => ({
-        ask: async () => ({ status: 'accepted', taskId: 'run-1', resumeId: 'resume-1' }),
+        replyToIssue: async () => ({ taskId: 'run-1', resumeId: 'resume-1' }),
       } as unknown as NonNullable<ReturnType<TelegramDeskChatHost['conversation']>>),
     }), {
       connectorId: 'telegram',
@@ -175,11 +171,12 @@ describe('telegram desk ingest and stamp', () => {
     })
     expect(comment?.markdown).toContain('[[no-reply]]')
     expect(comment?.id).toBe('comment-fire-run-1')
-    expect(sent).toEqual([])
+    expect(sent).toEqual([expect.objectContaining({ phase: 'final', conversationId: 'run-1' })])
+    expect(sent[0]).toMatchObject({ source: 'automation', text: 'Markets are quiet. [[no-reply]] no send.' })
     if (!comment) return
     expect(shouldProjectDeskComment(created.issue, comment, {
       triggerMetadata: { kind: 'connector-cron-issue', connectorId: 'telegram' },
-    })).toBe(false)
+    })).toBe(true)
   })
 
   it('does not publish partial assistant text from a failed scheduled fire', async () => {

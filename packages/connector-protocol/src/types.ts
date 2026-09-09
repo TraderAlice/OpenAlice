@@ -195,15 +195,17 @@ export type OwnerChatPhase = z.infer<typeof ownerChatPhaseSchema>
 
 /** Lifecycle event for one owner-private Agent turn.
  * `accepted` starts transport-native activity without requiring model text.
- * `progress` is ephemeral; `final` and `failed` must remain visible. */
+ * `progress` is ephemeral; final without text silently ends activity. */
 export const ownerChatMessageSchema = z.object({
   id: z.string().min(1),
   adapterId: z.string().min(1),
   conversationId: z.string().min(1),
   phase: ownerChatPhaseSchema,
+  workspaceId: z.string().min(1).max(128).optional(),
+  source: z.enum(['conversation', 'automation']).optional(),
   text: z.string().min(1).max(OWNER_CHAT_TEXT_MAX).optional(),
 }).superRefine((message, ctx) => {
-  if (message.phase !== 'accepted' && !message.text) {
+  if (message.phase !== 'accepted' && message.phase !== 'final' && !message.text) {
     ctx.addIssue({
       code: z.ZodIssueCode.custom,
       path: ['text'],

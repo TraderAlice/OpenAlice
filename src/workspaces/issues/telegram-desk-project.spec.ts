@@ -92,7 +92,7 @@ describe('sealedProgressTexts', () => {
     ]))).toEqual([])
   })
 
-  it('consumes [[no-reply]] only for connector cron Issue progress', () => {
+  it('preserves syntax for Connector to interpret', () => {
     const snapshot = progress([
       { type: 'text', text: 'We discussed [[no-reply]] syntax.' },
       { type: 'tool', id: 't1', name: 'Read', status: 'running' },
@@ -101,7 +101,7 @@ describe('sealedProgressTexts', () => {
     expect(sealedProgressTexts(snapshot, {
       kind: 'connector-cron-issue',
       connectorId: 'telegram',
-    })).toEqual([])
+    })).toEqual(['We discussed [[no-reply]] syntax.'])
   })
 })
 
@@ -234,7 +234,7 @@ describe('owner-chat lifecycle', () => {
 })
 
 describe('final comment projection', () => {
-  it('treats [[no-reply]] as control syntax only with connector cron metadata', async () => {
+  it('forwards no-reply syntax unchanged for Connector interpretation', async () => {
     const { client, sent } = mockClient()
     const issue = { connectorDesk: 'telegram' }
     const comment = {
@@ -252,7 +252,20 @@ describe('final comment projection', () => {
         kind: 'connector-cron-issue',
         connectorId: 'telegram',
       },
-    })).toBe(false)
+    })).toBe(true)
+  })
+
+  it('forwards in-turn comments with their automation source and progress phase', async () => {
+    const { client, sent } = mockClient()
+    const issue = { connectorDesk: 'telegram' }
+    const comment = { id: 'note', author: '@agent', at: 'now', markdown: 'Still checking.' }
+    await projectDeskComment(issue, comment, client, { phase: 'progress', progressScopeId: 'run' })
+    expect(sent[0]).toMatchObject({ phase: 'progress', conversationId: 'run', text: 'Still checking.' })
+    await projectDeskComment(issue, { ...comment, markdown: '[[no-reply]] quiet' }, client, {
+      phase: 'progress', progressScopeId: 'run', automated: true,
+    })
+    expect(sent).toHaveLength(2)
+    expect(sent[1]).toMatchObject({ source: 'automation', text: '[[no-reply]] quiet', phase: 'progress' })
   })
 
   it('persists a final comment even when the same text was shown in an ephemeral draft', async () => {

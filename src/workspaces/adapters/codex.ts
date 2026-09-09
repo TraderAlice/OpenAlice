@@ -27,6 +27,9 @@ const CODEX_SESSION_KEY_ENV_NAME = 'OPENALICE_SESSION_KEY';
 const CODEX_PROVIDER_NAME = 'workspace';
 const CODEX_SESSION_PROVIDER_NAME = 'openalice_session';
 const CODEX_DEFAULT_BASE_URL = 'https://api.openai.com/v1';
+// Alice already composes the Workspace PATH. Login profiles can replace it
+// (notably /etc/profile on Linux), hiding every injected CLI from shell tools.
+const CODEX_SHELL_ARGS = ['-c', 'allow_login_shell=false'] as const;
 const CODEX_INTERACTIVE_PERMISSION_ARGS = [
   '--sandbox',
   'danger-full-access',
@@ -189,8 +192,7 @@ export const codexAdapter: CliAdapter = {
     transcriptDiscovery: 'subprocess',
     headless: true,
     // `codex app-server` speaks JSON-RPC over stdio; threads are created or
-    // resumed in-band, and command/file-change approvals round-trip to the
-    // browser under `approvalPolicy: onRequest`.
+    // resumed in-band with the same full-access policy as TUI/headless.
     web: { wire: 'codex-app-server', permissionPrompts: true, freshSession: true },
     aiProvider: {
       credentialSource: 'runtime-or-workspace',
@@ -253,12 +255,8 @@ export const codexAdapter: CliAdapter = {
   // call when there's no human to approve — even under approval_policy=never
   // (verified: "user cancelled MCP tool call") — so MCP is dead weight here.
   // Instead the agent reads data and reports via the unified `alice` CLI
-  // (shell commands codex runs autonomously). Three GLOBAL `-c` (before `exec`)
-  // make that work:
-  //   approval_policy=never                        — don't block on approval
-  //   sandbox_mode=workspace-write                 — let it write the workspace
-  //   sandbox_workspace_write.network_access=true  — let `alice*` reach the
-  //                       loopback CLI gateway (else: "...fetch failed").
+  // (shell commands codex runs autonomously). Full host access and no approval
+  // match the interactive launch, including resumed runs on container hosts.
   // No mcp_servers head (interactive composeCommand keeps it — MCP works there
   // with a human approver). `--` terminates options before the trailing prompt.
   composeHeadlessCommand(
@@ -280,9 +278,8 @@ export const codexAdapter: CliAdapter = {
       '-c',
       'approval_policy="never"',
       '-c',
-      'sandbox_mode="workspace-write"',
-      '-c',
-      'sandbox_workspace_write.network_access=true',
+      'sandbox_mode="danger-full-access"',
+      ...CODEX_SHELL_ARGS,
       'exec',
     ];
     if (ctx.resume === 'last') return [...head, 'resume', '--json', '--last', prompt];
@@ -297,18 +294,15 @@ export const codexAdapter: CliAdapter = {
 
   // Web surface: `codex app-server --listen stdio://`. Session identity,
   // approval policy, and sandbox are selected in-band by the transport
-  // (`thread/start` / `thread/resume` with `approvalPolicy: onRequest` and a
-  // workspace-write sandbox), so no TUI permission flags belong here. The
-  // network override keeps the injected `alice*` CLIs reachable from inside
-  // that sandbox, same as headless. MCP registration mirrors the TUI.
+  // (`thread/start` / `thread/resume` with never/danger-full-access).
+  // MCP registration mirrors the TUI.
   composeWebCommand(_base: readonly string[], ctx: SpawnContext): readonly string[] {
     if (ctx.resume === 'last') throw new Error('the Web surface requires a concrete Codex thread id or a fresh Session');
     return [
       'codex',
       ...(ctx.sessionRuntime?.webArgs ?? ctx.sessionRuntime?.interactiveArgs ?? []),
       ...codexMcpConfigArgs(ctx),
-      '-c',
-      'sandbox_workspace_write.network_access=true',
+      ...CODEX_SHELL_ARGS,
       'app-server',
       '--listen',
       'stdio://',
@@ -691,7 +685,7 @@ function codexMcpHead(ctx: SpawnContext): string[] {
         `model_provider=${tomlString(CODEX_PROVIDER_NAME)}`,
       ]
     : [];
-  return ['codex', ...selection, ...CODEX_INTERACTIVE_PERMISSION_ARGS, ...codexMcpConfigArgs(ctx)];
+  return ['codex', ...selection, ...CODEX_INTERACTIVE_PERMISSION_ARGS, ...CODEX_SHELL_ARGS, ...codexMcpConfigArgs(ctx)];
 }
 
 /** `-c mcp_servers.*` overrides that register the launcher's MCP gateway. */

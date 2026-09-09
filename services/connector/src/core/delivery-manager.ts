@@ -1,3 +1,5 @@
+import { parseReplyDirectives, replyMedia } from './reply-directives.js'
+import type { ConnectorAttachment } from '@traderalice/connector-protocol'
 import { randomUUID } from 'node:crypto'
 import {
   CONNECTOR_ACTION_TTL_MS,
@@ -43,6 +45,7 @@ import {
 } from './work-queue.js'
 
 export interface DeliveryManagerOptions {
+  readWorkspaceFile?(workspaceId: string, path: string): Promise<ConnectorAttachment>
   registry: ConnectorRegistry
   config: ConnectorConfig
   updateAdapterSettings(id: string, patch: Record<string, string | number | boolean>): Promise<void>
@@ -63,6 +66,8 @@ export const DEFAULT_ADAPTER_START_RETRY_DELAY_MS = 5_000
 const MAX_ADAPTER_START_RETRY_DELAY_MS = 60_000
 
 export class DeliveryManager {
+  private readonly replyDeliveries = new Map<string, Promise<void>>()
+  private readonly replyQueues = new Map<string, Promise<void>>()
   private readonly adapters = new Map<string, ConnectorAdapter>()
   private readonly commands = new Map<string, CommandRegistry>()
   private readonly bootRetries = new Map<string, ReturnType<typeof setTimeout>>()
@@ -406,6 +411,22 @@ export class DeliveryManager {
   }
 
   async sendOwnerChat(message: OwnerChatMessage, correlationId = message.id): Promise<void> {
+    const key = `${message.adapterId}:${message.id}:${message.phase}`
+    const existing = this.replyDeliveries.get(key)
+    if (existing) return existing
+    const queueKey = `${message.adapterId}:${message.conversationId}`
+    const operation = (this.replyQueues.get(queueKey) ?? Promise.resolve()).catch(() => undefined)
+      .then(() => this.deliverOwnerChat(message, correlationId))
+    this.replyDeliveries.set(key, operation)
+    this.replyQueues.set(queueKey, operation)
+    try { await operation } finally {
+      if (this.replyQueues.get(queueKey) === operation) this.replyQueues.delete(queueKey)
+      // Retain completed IDs, including uncertain network failures, to avoid duplicate uploads.
+      if (this.replyDeliveries.size > 1000) this.replyDeliveries.delete(this.replyDeliveries.keys().next().value!)
+    }
+  }
+
+  private async deliverOwnerChat(message: OwnerChatMessage, correlationId: string): Promise<void> {
     const adapter = this.adapters.get(message.adapterId)
     if (!adapter) throw new Error(`Connector is not running: ${message.adapterId}`)
     await this.record({
@@ -421,10 +442,63 @@ export class DeliveryManager {
       },
     })
     try {
-      if (adapter.sendOwnerChat) {
-        await adapter.sendOwnerChat(message)
-      } else if (message.phase !== 'accepted' && message.text) {
-        await adapter.sendOwnerText(message.text)
+      const parsed = parseReplyDirectives(message.text ?? '')
+      const silent = message.source === 'automation' && parsed.silent
+      const resolved = new Map<string, ConnectorAttachment>()
+      if (!silent && message.phase === 'final' && message.workspaceId && this.options.readWorkspaceFile && adapter.sendOwnerFile) {
+        for (const path of [...new Set(parsed.references.map(reference => reference.path))].slice(0, 20)) {
+          if (resolved.size >= 5) break
+          try {
+            resolved.set(path, await this.options.readWorkspaceFile(message.workspaceId, path))
+          } catch {
+            // A reference can be a discussion of a nonexistent path. Keep it literal.
+          }
+        }
+      }
+      const parts: Array<{ text: string } | { path: string; attachment: ConnectorAttachment }> = []
+      let cursor = 0
+      const sent = new Set<string>()
+      const raw = silent ? '' : message.text ?? ''
+      for (const reference of parsed.references) {
+        const attachment = resolved.get(reference.path)
+        if (!attachment) continue
+        const text = raw.slice(cursor, reference.start).trim()
+        if (text) parts.push({ text })
+        if (!sent.has(reference.path)) {
+          parts.push({ path: reference.path, attachment })
+          sent.add(reference.path)
+        }
+        cursor = reference.end
+      }
+      const tail = raw.slice(cursor).trim()
+      if (tail) parts.push({ text: tail })
+      // Finish the transport's live reply once, then preserve the remaining media/text order.
+      const first = parts[0]
+      const text = first && 'text' in first ? first.text : ''
+      if (text) parts.shift()
+      if (!silent || message.phase !== 'progress') {
+        if (adapter.sendOwnerChat) await adapter.sendOwnerChat({ ...message, text: text || undefined })
+        else if (message.phase !== 'accepted' && text) await adapter.sendOwnerText(text)
+      }
+      for (const part of parts) {
+        if ('text' in part) {
+          await adapter.sendOwnerText(part.text)
+          continue
+        }
+        const { path, attachment } = part
+        try {
+          const presentation = replyMedia(path)
+          await adapter.sendOwnerFile!(attachment, presentation)
+          await this.record({
+            correlationId, direction: 'outbound', stage: 'delivery.succeeded', connectorId: adapter.id,
+            payload: { kind: 'reply-file', presentation, filename: attachment.filename, mediaType: attachment.mediaType,
+              sizeBytes: attachment.sizeBytes, contentSha256: attachment.contentSha256 },
+          })
+        } catch {
+          await this.record({ correlationId, direction: 'outbound', stage: 'delivery.failed', connectorId: adapter.id,
+            payload: { kind: 'reply-file', path, reason: 'upload-failed' } })
+          await adapter.sendOwnerText(`Could not send file: ${path}. Upload failed; please try again.`)
+        }
       }
       await this.record({
         correlationId,

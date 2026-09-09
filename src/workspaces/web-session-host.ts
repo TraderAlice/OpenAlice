@@ -138,8 +138,8 @@ export class WebSessionHost {
   async stop(recordId: string, reason = 'stopped'): Promise<boolean> {
     const session = this.sessions.get(recordId)
     if (!session) return false
-    this.sessions.delete(recordId)
     await session.stop(reason)
+    if (this.sessions.get(recordId) === session) this.sessions.delete(recordId)
     return true
   }
 
@@ -265,7 +265,15 @@ class LiveWebSession {
       new Promise<void>((resolve) => this.child.once('exit', () => resolve())),
       new Promise<void>((resolve) => setTimeout(resolve, 2_000)),
     ])
-    if (!this.exited) this.child.kill('SIGKILL')
+    if (!this.exited) {
+      const exit = new Promise<void>((resolve) => this.child.once('exit', () => resolve()))
+      this.child.kill('SIGKILL')
+      let timer: ReturnType<typeof setTimeout> | undefined
+      try {
+        await Promise.race([exit, new Promise<void>((resolve) => { timer = setTimeout(resolve, 2_000) })])
+      } finally { if (timer) clearTimeout(timer) }
+      if (!this.exited) throw new Error('Web process did not exit; background handoff was not started')
+    }
   }
 
   private assertLive(): void {

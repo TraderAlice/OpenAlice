@@ -29,7 +29,7 @@ export const conversationAskCommonShape = {
     .describe('Explicitly add artifact-reconstruction guidance if OpenAlice must recruit a fallback worker.'),
 }
 
-function taskProjection(task: WorkspaceConversationTask, mode: 'summary' | 'detailed') {
+export function taskProjection(task: WorkspaceConversationTask, mode: 'summary' | 'detailed') {
   const structured = task.structured
   const tools = structured?.blocks
     .filter((block): block is Extract<HeadlessMessageBlock, { type: 'tool' }> => block.type === 'tool')
@@ -56,7 +56,7 @@ function taskProjection(task: WorkspaceConversationTask, mode: 'summary' | 'deta
   }
 }
 
-async function awaitConversationTask(
+export async function awaitConversationTask(
   conversation: WorkspaceConversationControl,
   taskId: string,
   timeoutMs?: number,

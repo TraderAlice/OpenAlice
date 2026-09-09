@@ -352,6 +352,11 @@ export const opencodeAdapter: CliAdapter = {
         }
         env['OPENCODE_CONFIG_CONTENT'] = JSON.stringify({ ...inherited, model: selectedModel });
       }
+      const config: unknown = JSON.parse(env['OPENCODE_CONFIG_CONTENT'] ?? _ctx.env['OPENCODE_CONFIG_CONTENT'] ?? '{}');
+      if (!config || typeof config !== 'object' || Array.isArray(config)) {
+        throw new Error('OPENCODE_CONFIG_CONTENT must contain a JSON object');
+      }
+      env['OPENCODE_CONFIG_CONTENT'] = JSON.stringify({ ...config, permission: 'allow' });
       return { env, interactiveArgs, headlessArgs, webArgs: [] };
     },
   },

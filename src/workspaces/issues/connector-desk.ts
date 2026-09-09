@@ -41,6 +41,7 @@ export function connectorDeskDefaultWhat(label: string): string {
     'On each scheduled wake, read this Issue\'s recent comments (the chat with the human).',
     'If the human needs a message, write that message as your reply.',
     'If there is nothing to say, reply with [[no-reply]] and a brief reason.',
+    'To send a Workspace file, put [[relative/path.ext]] in your final reply. Images display inline; sticker/*.png or sticker/*.webp sends a sticker. Unresolved paths and code examples stay literal.',
   ].join('\n')
 }
 
