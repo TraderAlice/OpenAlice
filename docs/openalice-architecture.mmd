@@ -1,0 +1,59 @@
+graph LR
+    User[User]
+    Browser[Browser / Web UI]
+    Electron[Electron Desktop]
+    CLI[OpenAlice CLI / SSH]
+
+    Guardian[Guardian<br/>supervision + single-writer control]
+    Alice[Alice backend<br/>workspace + product APIs]
+    Web[Web UI transport<br/>HTTP / Vite / Electron IPC]
+    Workspace[Workspace Service]
+    PTY[Workspace PTYs]
+    Agents[Native agent CLIs<br/>claude / codex / omp / pi / shell]
+    Tools[ToolCenter + domain tools<br/>market / analysis / news / Inbox]
+    State[File-backed OPENALICE_HOME<br/>config / sessions / issues / schedules]
+
+    UTA[UTA trading authority]
+    Contracts[Shared contracts<br/>uta-protocol / guardian-runtime]
+    Broker[Broker connections<br/>IBKR / Broker Packs]
+    Connector[Optional Connector Service]
+    Market[Market data + RSS providers]
+    Notify[Discord / Telegram Inbox targets]
+
+    User --> Browser
+    User --> Electron
+    User --> CLI
+    Browser --> Web
+    Electron --> Web
+    Electron --> Guardian
+    CLI --> Guardian
+    Guardian --> Alice
+    Guardian --> UTA
+    Guardian -. optional .-> Connector
+
+    Alice --> Web
+    Alice --> Workspace
+    Alice --> Tools
+    Alice --> State
+    Web --> Workspace
+    Workspace --> PTY
+    PTY --> Agents
+    Tools --> Market
+    Tools --> Connector
+    Connector --> Notify
+
+    Alice <-->|UTA client HTTP| UTA
+    Alice --> Contracts
+    UTA --> Contracts
+    UTA --> Broker
+
+    classDef entry fill:#e8f1ff,stroke:#2563eb,color:#0f172a
+    classDef control fill:#fff4d6,stroke:#d97706,color:#451a03
+    classDef alice fill:#e8f8ef,stroke:#16a34a,color:#052e16
+    classDef authority fill:#ffe8e8,stroke:#dc2626,color:#450a0a
+    classDef external fill:#f3e8ff,stroke:#9333ea,color:#3b0764
+    class User,Browser,Electron,CLI entry
+    class Guardian control
+    class Alice,Web,Workspace,PTY,Agents,Tools,State alice
+    class UTA,Contracts authority
+    class Connector,Broker,Market,Notify external
