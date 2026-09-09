@@ -1,3 +1,4 @@
+import { runtimeCompileOptions } from './bun-compile-options.js'
 import { mkdir, readFile, rm, stat, writeFile } from 'node:fs/promises'
 import { basename, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -32,8 +33,7 @@ const result = await Bun.build({
   entrypoints: [join(repositoryRoot, 'packages/cli/bin/openalice.ts')],
   compile: {
     outfile: executablePath,
-    autoloadBunfig: false,
-    autoloadDotenv: false,
+    ...runtimeCompileOptions,
   },
   define: {
     'globalThis.__OPENALICE_BUILD_VERSION__': JSON.stringify(cliPackage.version),

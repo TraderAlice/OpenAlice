@@ -1,3 +1,4 @@
+import { runtimeCompileOptions } from './bun-compile-options.js'
 import { createServer } from 'node:net'
 import { mkdir, readFile, rm, stat, writeFile } from 'node:fs/promises'
 import { basename, join, resolve } from 'node:path'
@@ -31,8 +32,7 @@ const result = await Bun.build({
   entrypoints: [join(repositoryRoot, 'src/main.ts')],
   compile: {
     outfile: executablePath,
-    autoloadBunfig: false,
-    autoloadDotenv: false,
+    ...runtimeCompileOptions,
   },
   define: {
     'globalThis.__OPENALICE_BUN_STANDALONE__': 'true',
@@ -92,8 +92,7 @@ const ptyBuild = await Bun.build({
   entrypoints: [join(repositoryRoot, 'scripts/bun-native-pty-smoke.ts')],
   compile: {
     outfile: ptySmokePath,
-    autoloadBunfig: false,
-    autoloadDotenv: false,
+    ...runtimeCompileOptions,
   },
   minify: true,
 })

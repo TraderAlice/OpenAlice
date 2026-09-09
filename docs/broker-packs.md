@@ -255,3 +255,18 @@ For desktop changes, follow [[docs/managed-workspace-runtime.md]] and require
 `pnpm electron:assert-package` plus the packaged Workspace smoke. For a broker
 implementation change, also follow the paper/demo scenarios in
 [[docs/uta-live-testing.md]]; never use a real-money account for acceptance.
+
+## Standalone CLI acceptance
+
+Bun standalone builds must enable `autoloadPackageJson` via the shared
+`scripts/bun-compile-options.ts`. Bun disables runtime package.json loading by
+default in compiled executables, preventing physical Pack SDK resolution even
+when the identical archive imports under Node. See [Bun executable configuration](https://bun.sh/docs/bundler/executables).
+
+After building the release archives, run
+`pnpm exec tsx scripts/verify-broker-packs.ts --compiled`. This extracts all five
+archives and uses a compiled probe with the release compile options to import
+and construct each broker, including Longbridge's platform-native binding.
+It uses synthetic configuration, never calls init, and does not connect or trade.
+Release pack jobs and Windows package smoke run this gate. Node-only archive
+verification remains available for environments without Bun.
