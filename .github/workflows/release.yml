@@ -867,8 +867,15 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version-file: ".bun-version"
+
       - name: Build optional Broker Packs
         run: pnpm broker-packs:build
+
+      - name: Verify Broker Packs in compiled runtime
+        run: pnpm exec tsx scripts/verify-broker-packs.ts --compiled
 
       - name: Prove previous-release Broker Pack upgrade
         if: needs.release.outputs.channel == 'stable'
