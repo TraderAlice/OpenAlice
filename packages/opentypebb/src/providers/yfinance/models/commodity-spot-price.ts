@@ -6,8 +6,7 @@
 import { z } from 'zod'
 import { Fetcher } from '../../../core/provider/abstract/fetcher.js'
 import { CommoditySpotPriceQueryParamsSchema, CommoditySpotPriceDataSchema } from '../../../standard-models/commodity-spot-price.js'
-import { EmptyDataError } from '../../../core/provider/utils/errors.js'
-import { getHistoricalData } from '../utils/helpers.js'
+import { getHistoricalData, emptyHistoricalError } from '../utils/helpers.js'
 
 export const YFinanceCommoditySpotPriceQueryParamsSchema = CommoditySpotPriceQueryParamsSchema
 export type YFinanceCommoditySpotPriceQueryParams = z.infer<typeof YFinanceCommoditySpotPriceQueryParamsSchema>
@@ -28,11 +27,15 @@ const COMMODITY_MAP: Record<string, string> = {
   corn: 'ZC=F',
   wheat: 'ZW=F',
   soybeans: 'ZS=F',
+  oats: 'ZO=F',
+  rice: 'ZR=F',
+  orange_juice: 'OJ=F',
+  feeder_cattle: 'GF=F',
   sugar: 'SB=F',
   coffee: 'KC=F',
   cocoa: 'CC=F',
   cotton: 'CT=F',
-  lumber: 'LBS=F',
+  lumber: 'LBR=F',
   live_cattle: 'LE=F',
   lean_hogs: 'HE=F',
 }
@@ -68,6 +71,7 @@ export class YFinanceCommoditySpotPriceFetcher extends Fetcher {
     const results = await Promise.allSettled(
       symbols.map(async (sym) => {
         const data = await getHistoricalData(sym, {
+          preserveIncomplete: true,
           startDate: query.start_date ?? undefined,
           endDate: query.end_date ?? undefined,
           interval: '1d',
@@ -83,7 +87,7 @@ export class YFinanceCommoditySpotPriceFetcher extends Fetcher {
     }
 
     if (allData.length === 0) {
-      throw new EmptyDataError('No commodity spot price data found.')
+      throw emptyHistoricalError(results, 'No commodity history returned')
     }
     return allData
   }

@@ -21,6 +21,13 @@ Canonical startup rules: [[AGENTS.md]]. Guide index: [[docs/README.md]].
   manifests must agree before candidate work begins. Each accepted tag may
   update only its own mutable product aliases; a newly accepted release may
   also refresh the shared channel-neutral `install` bootstrap.
+- The separate `Release` operation `publish-npm` only distributes an already
+  published stable release. It may use integrated `dev` or `master` tooling;
+  it cannot create a version, rebuild an artifact, or mutate product channels.
+  See [[docs/cli-package-managers.md]] for its first-publication/retry contract.
+- `Release` operation `verify-npm` checks the complete npm OIDC package set from
+  `dev` or `master` without a tag, build, or package upload. npm publishing uses
+  the workflow's identity, not a rotating repository token.
 - `archive/dev-pre-beta6` is a historical snapshot; do not modify or delete it.
 - `local` is a legacy shared-worktree branch. It is not the default workflow;
   audit its unmerged commits before deciding whether to retain or retire it.
@@ -273,7 +280,8 @@ delivery lane:
   and the native Windows dev-stack smoke. The hermetic Ubuntu suite, complete
   workspace build, and macOS build-and-test repetition run only when a
   maintainer explicitly dispatches Full Source Validation for the selected
-  commit. Windows desktop and Broker Pack packaging remain in the separate
+  commit or starts a stable Release (which calls the same full workflow).
+  Windows desktop and Broker Pack packaging remain in the separate
   package workflow. Local development owns macOS/Linux changed-test selection;
   hosted runners are a deliberate native-host or release-candidate tool, not a
   second purchase of every local check.
@@ -310,10 +318,13 @@ delivery lane:
   block related commits, but only the latest head is evidence and a completed
   failure blocks further scope until repaired. CI never grants merge authority.
 - A push to `dev` is a CLI-only rolling publication lane. It does not run the
-  generic CI workflow, build Electron, or build Docker. Four native macOS/Linux
-  CLI candidates are assembled and each candidate runs its packaged
+  generic CI workflow, build Electron, or build Docker. Six native CLI candidates
+  are assembled from one shared server input. macOS/Linux candidates run packaged
   Guardian/Alice, Web, Workspace, PTY, and release-owned Git acceptance before
-  one atomic dev manifest is activated. The heavier UTA/Connector recovery and
+  one atomic dev manifest is activated. Windows x64/ARM64 cross-build on Linux;
+  their native runner acceptance is manual or stable-only, so a Windows queue
+  is not a dev/beta publication dependency. Native rehearsal preserves artifacts
+  first and may replay acceptance after installer/fixture fixes. The heavier UTA/Connector recovery and
   external Broker Pack fixture run once on Linux x64; manual Full Source
   Validation and final Release lanes keep broader native-host coverage. Full
   Source Validation is an explicit maintainer action when that broader
@@ -329,8 +340,9 @@ delivery lane:
 - A beta promotion uses recorded local acceptance, the automatic source gate,
   Windows dev-stack smoke, and the final Release workflow's artifact acceptance;
   it does not wait for a duplicate hosted macOS/Linux full suite. A stable
-  candidate requires a manually dispatched Full Source Validation on its exact
-  commit before release. A real product failure still stops or withdraws a
+  candidate runs Full Source Validation on its exact dispatch commit alongside
+  candidate construction. Final publication requires the full workflow to
+  succeed; a separate serial dispatch is not required. A real product failure still stops or withdraws a
   candidate; hosted-runner starvation and a known non-product fixture timeout
   do not become product risk through repetition.
 
@@ -340,8 +352,8 @@ OrbStack, installer, unsigned Electron/package, and native runtime acceptance
 only when those surfaces change. Remote acceptance starts from a host the user
 already made reachable through ordinary SSH; CI and repository scripts do not
 provision or manage a cloud provider. Record the commands and results in the
-PR. Stable release preparation re-establishes the complete manually dispatched
-matrix even when routine integration and beta used lighter hosted feedback.
+PR. Stable Release re-establishes the complete source matrix alongside artifact
+construction even when routine integration and beta used lighter hosted feedback.
 
 ### Package signing boundary
 
@@ -457,10 +469,12 @@ version that disagrees with either the root or `packages/cli` package. It binds
 the accepted candidates and eventual tag to the dispatch commit SHA.
 
 An exact forward beta version-only PR uses the bounded CI fast lane described
-above. Stable version preparation deliberately does not: it retains the full
-PR matrix. The subsequent `master` push remains a complete asynchronous
-backstop for both channels, but only stable waits for it as a synchronous
-publication gate. The manually dispatched beta Release rebuilds and accepts
+above. Stable version preparation deliberately does not: it retains the normal
+master PR gates. The stable Release calls the complete source-validation workflow
+from the same commit, in parallel with artifact construction; publication waits
+for both. There is no full-source workflow triggered by a `master` push and no
+need to dispatch that suite separately before starting the stable candidate.
+The manually dispatched beta Release rebuilds and accepts
 its own final candidates from the exact dispatch SHA; the fast lane never
 supplies release artifacts.
 
@@ -500,6 +514,61 @@ signing, or notarization. `publish-release` still requires every platform's
 upgrade receipt and verifies each updater YAML reference, size, SHA-512, and
 blockmap before publishing. Missing receipts or mismatched update metadata must
 prevent the tag and public assets from being created.
+
+The release desktop matrix invokes one reusable platform pipeline per native
+host. Each pipeline's upgrade job depends only on its own build job; it does
+not wait for the other desktop architectures. The caller's aggregate success
+includes the stable upgrade result, so publication still requires every native
+platform. Build and upgrade remain separate jobs to preserve selective retries.
+Beta runs the current-candidate checks without the stable-only N-1 job.
+
+To retry a preserved stable desktop candidate without rebuilding, the Release
+operation `verify-desktop` takes `candidate-run`, `source-sha`, `tag`,
+`previous-tag`, and one `desktop-target` (`macOS-arm64`, `macOS-x64`, or
+`Windows-x64`), with `channel=stable`. The dispatch revision owns the verifier;
+the explicit source SHA owns the product. Selection requires a completed
+master Release from this repository and a unique unexpired artifact. It then
+verifies exact bytes, runs the installed N-1 journey, and uploads a receipt
+bound to both identities. No packaging, signing, tag, or publication occurs.
+Historical artifacts lacking `candidate-manifest.json` cannot use this path.
+At this implementation stage the retry receipt is diagnostic evidence only:
+final publication does not yet accept a receipt from a different run.
+
+For non-publishing pipeline verification, `rehearse-desktop` builds unsigned
+desktop candidates on the dispatch branch and runs the same stable N-1 checks.
+Passing `candidate-run` to a second rehearsal on the same source restores those
+bytes instead of rebuilding. `verify-desktop-rehearsal` uses the single-target
+replay inputs above to check an older rehearsal candidate with the current
+branch's verifier. These operations have read-only repository permissions and
+no signing credentials. Their `rehearsal-assets-*` artifacts are deliberately
+distinct from production candidates; normal release selection rejects them.
+
+For a new `operation=release` attempt on the exact same source commit, setting
+`candidate-run` reuses that run's three preserved desktop artifacts instead of
+packaging/signing again. Selection and exact-byte verification precede upload
+into the current run; stable N-1 acceptance runs again and the normal final
+publication gate checks its new receipts. All non-desktop gates remain intact.
+A different product SHA or missing/expired candidate fails closed; this path
+does not accept a verifier-only code change as equivalent product source.
+Omit `candidate-run` for a normal fresh build. This is separate from the
+diagnostic single-platform `verify-desktop` operation above.
+
+An optional `desktop-verifier-sha` selects a full commit already integrated into
+`origin/dev` or `origin/master` for desktop upgrade verification. The release
+intent validates that authority before building. Only the upgrade job checks
+out the selected verifier: product builds, source validation, candidate source
+identity and eventual tag remain on the original dispatch SHA. The explicit
+product version is passed to the smoke rather than inferred from the verifier's
+package manifest. Acceptance binds the selected verifier SHA, and publication
+requires that same identity. This lets a verifier repair inspect preserved
+product bytes without treating the repair commit as a new product build.
+
+CLI candidates share one commit-bound platform-neutral input artifact containing
+only the approved UI and pure-JavaScript package outputs. Each of the six target
+jobs verifies its source SHA and exact file hashes before installing those
+inputs. Native dependencies, executable compilation, and channel-specific
+acceptance remain on the target's existing host lane. Never use the neutral
+artifact as a substitute for an accepted native archive.
 
 Do not delete `dev` after promotion. After a master hotfix, propagate the fix
 back to `dev` immediately so a later promotion cannot revert it.

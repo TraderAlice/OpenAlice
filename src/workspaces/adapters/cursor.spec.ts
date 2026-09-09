@@ -1,4 +1,5 @@
 import { createHash } from 'node:crypto';
+import { execFileSync } from 'node:child_process';
 import { mkdir, mkdtemp, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
@@ -42,6 +43,18 @@ describe('cursor session layout', () => {
 });
 
 describe('cursor composeCommand', () => {
+  it.skipIf(process.platform === 'win32')('restores injected PATH after a login snapshot without evaluating path contents', () => {
+    const path = `/tmp/alice tools/it's-$(echo BAD)-\`echo BAD\`:/usr/bin:/bin`;
+    const env = cursorAdapter.composeEnv!(ctx({ env: {
+      PATH: path,
+      __CURSOR_SANDBOX_ENV_RESTORE: 'export OA_TEST_EXISTING=kept',
+    } }));
+    const output = execFileSync('/bin/bash', ['-c',
+      'PATH=/usr/bin:/bin; eval "$__CURSOR_SANDBOX_ENV_RESTORE"; printf "%s\\n%s" "$PATH" "$OA_TEST_EXISTING"',
+    ], { env, encoding: 'utf8' });
+    expect(output).toBe(`${path}\nkept`);
+  });
+
   it('seeds a fresh TUI with a trailing `-- <prompt>` and never goes headless', () => {
     const argv = cursorAdapter.composeCommand(['claude'], ctx({ initialPrompt: PROMPT }));
     expect(argv[0]).toBe('cursor-agent');
@@ -60,24 +73,24 @@ describe('cursor composeCommand', () => {
     expect(cursorAdapter.composeCommand(['cursor-agent'], ctx({
       resume: { sessionId: LIVE_SESSION_ID },
       initialPrompt: PROMPT,
-    }))).toEqual(['cursor-agent', '--resume', LIVE_SESSION_ID]);
+    }))).toEqual(['cursor-agent', '--trust', '--force', '--sandbox', 'disabled', '--resume', LIVE_SESSION_ID]);
     expect(cursorAdapter.composeCommand(['cursor-agent'], ctx({
       resume: 'last',
       initialPrompt: PROMPT,
-    }))).toEqual(['cursor-agent', '--continue']);
+    }))).toEqual(['cursor-agent', '--trust', '--force', '--sandbox', 'disabled', '--continue']);
   });
 
-  it('passes --trust only after an explicit project approval', () => {
+  it('trusts Alice-managed workspaces and enables unrestricted execution', () => {
     expect(cursorAdapter.composeCommand(['cursor-agent'], ctx({ approveProject: true })))
-      .toEqual(['cursor-agent', '--trust']);
-    expect(cursorAdapter.composeCommand(['cursor-agent'], ctx())).toEqual(['cursor-agent']);
+      .toEqual(['cursor-agent', '--trust', '--force', '--sandbox', 'disabled', ]);
+    expect(cursorAdapter.composeCommand(['cursor-agent'], ctx())).toEqual(['cursor-agent', '--trust', '--force', '--sandbox', 'disabled']);
   });
 
   it('ignores Alice skills and role prompts (no native flags)', () => {
     expect(cursorAdapter.composeCommand(['cursor-agent'], ctx({
       appendSystemPrompt: 'Stay in the Workspace.',
       skills: ['/tmp/skill'],
-    }))).toEqual(['cursor-agent']);
+    }))).toEqual(['cursor-agent', '--trust', '--force', '--sandbox', 'disabled']);
   });
 });
 
@@ -88,7 +101,7 @@ describe('cursor composeHeadlessCommand', () => {
       '-p',
       '--output-format',
       'stream-json',
-      '--force',
+      '--force', '--sandbox', 'disabled',
       '--trust',
       '--',
       'do x',
@@ -105,7 +118,7 @@ describe('cursor composeHeadlessCommand', () => {
       '-p',
       '--output-format',
       'stream-json',
-      '--force',
+      '--force', '--sandbox', 'disabled',
       '--trust',
       '--resume',
       'native-session-1',
@@ -121,7 +134,7 @@ describe('cursor composeHeadlessCommand', () => {
         '-p',
         '--output-format',
         'stream-json',
-        '--force',
+        '--force', '--sandbox', 'disabled',
         '--trust',
         '--continue',
         '--',
@@ -166,7 +179,7 @@ describe('cursor sessionRuntime', () => {
     });
     expect(argv.join(' ')).not.toContain(SECRET);
     expect(argv.join(' ')).not.toContain('[effort=');
-    expect(argv).toEqual(['cursor-agent', '--model', 'gpt-5']);
+    expect(argv).toEqual(['cursor-agent', '--model', 'gpt-5', '--trust', '--force', '--sandbox', 'disabled']);
   });
 
   it('ignores Session effort, including ultra, and leaves native login env empty', () => {

@@ -13,6 +13,8 @@ const packageNames = [
   'openalice-darwin-x64',
   'openalice-linux-arm64',
   'openalice-linux-x64',
+  'openalice-windows-arm64',
+  'openalice-windows-x64',
   'openalice',
 ]
 
@@ -62,6 +64,25 @@ describe('publish CLI npm packages', () => {
       .toThrow('openalice-darwin-arm64@0.90.2 is already published with different integrity')
   })
 
+  it('accepts npm 12 singleton arrays when retrying an already-published version', () => {
+    const root = fixture()
+    const manifest = JSON.parse(readFixture(root))
+    const integrity = new Map(manifest.packages.map((entry) => [`${entry.name}@${entry.version}`, entry.integrity]))
+    const runNpm = vi.fn((args) => result(0, JSON.stringify([integrity.get(args[1])])))
+    publishCliNpmPackages({ packagesDir: root, runNpm, logger: silent() })
+    expect(runNpm.mock.calls.every(([args]) => args[0] === 'view')).toBe(true)
+  })
+
+  it.each([[], ['sha512-one', 'sha512-two'], [null], { integrity: 'sha512-one' }].map((report) => [report]))(
+    'rejects ambiguous or malformed npm view output: %j', (report) => {
+      const root = fixture()
+      const runNpm = vi.fn(() => result(0, JSON.stringify(report)))
+      expect(() => publishCliNpmPackages({ packagesDir: root, runNpm, logger: silent() }))
+        .toThrow('npm returned invalid integrity')
+      expect(runNpm).toHaveBeenCalledTimes(1)
+    },
+  )
+
   it('accepts a successful publish that became visible after npm returned an error', () => {
     const root = fixture()
     const manifest = JSON.parse(readFixture(root))
@@ -83,7 +104,8 @@ describe('publish CLI npm packages', () => {
 
   it('verifies local tarball bytes before reading or mutating the registry', () => {
     const root = fixture()
-    writeFileSync(join(root, 'openalice-darwin-arm64-0.90.2.tgz'), 'tampered')
+    // Even the last package must be verified before the first platform publishes.
+    writeFileSync(join(root, 'openalice-0.90.2.tgz'), 'tampered')
     const runNpm = vi.fn()
 
     expect(() => publishCliNpmPackages({ packagesDir: root, runNpm, logger: silent() }))

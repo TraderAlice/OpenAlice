@@ -22,8 +22,8 @@ thing, and why."
 
 The data is on your CLIs: `alice market search` to turn a name into a barId,
 `traderhub equity` / `traderhub board` for valuation snapshots & macro,
-`alice analysis quant` for where each trades vs its own trend, `alice rss grep`
-for the news cluster. (See the `alice`, `alice-analysis`, `traderhub` skills.)
+`alice analysis quant` for where each trades vs its own trend. Choose news
+sources to suit the question. (See the `alice`, `alice-analysis`, `traderhub` skills.)
 
 1. **Decompose the chain, not a flat list.** Break the theme into structural
    layers — upstream (inputs, equipment, IP) → midstream (manufacture, core

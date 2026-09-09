@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type ReactElement, type RefObject } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
-  Bot,
   Check,
   Clock3,
   LayoutGrid,
@@ -26,6 +25,7 @@ import {
 } from './harness-sessions'
 import { harnessSessionSourceLabel } from './harness-session-presentation'
 import { orderSessionsForSidebar } from './sidebar-order'
+import { AgentRuntimeIcon } from '../../lib/agentRuntimeIcon'
 
 interface DialogFocusProps {
   restoreFocusRef?: RefObject<HTMLElement | null>
@@ -376,7 +376,7 @@ export function ConversationBrowserDialog(props: ConversationBrowserDialogProps)
                           ? 'border-success/25 bg-success/10 text-success'
                           : 'border-border/70 bg-secondary text-muted-foreground'
                       }`}>
-                        <Bot size={16} strokeWidth={2} aria-hidden />
+                        <AgentRuntimeIcon agentId={row.agent} className="size-[18px] shrink-0" />
                       </span>
                       <span className="min-w-0 flex-1">
                         <span className={`block truncate text-sm font-medium ${row.failed ? 'text-muted-foreground/70' : ''}`} title={row.title}>{row.title}</span>

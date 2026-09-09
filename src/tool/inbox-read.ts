@@ -51,7 +51,7 @@ export const inboxReadFactory: WorkspaceToolFactory = {
         '',
         'Each attachment appears in `files` with its stored `relativePath`, a directly usable `absolutePath`, and the published `revision` when known. `absolutePath` is null only when the source Workspace is unavailable or the stored path is unsafe.',
         '',
-        'The legacy `docs` relative-path list and `docRevisions` map remain for compatibility. `workspaceId` can still be resolved with `workspace_path` (CLI: `alice-workspace peer path`) when inspecting the source desk itself.',
+        'The legacy `docs` relative-path list and `docRevisions` map remain for compatibility. `workspaceId` can still be resolved with `workspace_path` (CLI: `alice peer path`) when inspecting the source desk itself.',
         '',
         'When an entry came from an agent run/session, `origin` carries its safe OpenAlice provenance (`runId` / `sessionId`, `resumeId`, `issueId`, `agent`). Native runtime session ids are never exposed.',
         '',

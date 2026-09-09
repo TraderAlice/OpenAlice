@@ -602,8 +602,9 @@ That is a later protocol, not a shortcut in the SSH phase.
 The existing Workspace PTY WebSocket crosses the SSH tunnel unchanged. The
 remote PTY and Agent TUI remain authoritative; the local xterm-compatible
 surface renders received terminal bytes. Shell, Claude Code, Codex, opencode,
-and Pi retain the same terminal semantics. WebPi remains an optional structured
-Pi surface, not a prerequisite or replacement for shell/TUI workflows.
+and Pi retain the same terminal semantics. The Web conversation surface remains
+an optional structured presentation of a runtime's own protocol, not a
+prerequisite or replacement for shell/TUI workflows.
 
 The browser's core health probe publishes a monotonic recovery generation only
 when Alice transitions from unavailable back to available. PTY views use that
@@ -942,7 +943,7 @@ behavior.
 - persistent terminal screen history by default;
 - simultaneous writable control from multiple clients;
 - replacing Electron with a browser wrapper;
-- replacing Shell or native Agent TUIs with Pi/WebPi;
+- replacing Shell or native Agent TUIs with the Web conversation surface;
 - scanning arbitrary remote directories or silently cloning OpenAlice; managed
   clone/update is restricted to the displayed destination and explicit plan;
 - installing, pinning, downgrading, or repairing Agent Runtime executables on a

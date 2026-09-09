@@ -225,6 +225,11 @@ export const ompAdapter: CliAdapter = {
     resumeById: true,
     transcriptDiscovery: 'subprocess',
     headless: true,
+    // omp keeps Pi's `--mode rpc` protocol (plus a `ready` frame). Like Pi it
+    // has no per-tool prompt in RPC mode, so the surface launches with
+    // `--auto-approve`; a fresh Session lets omp mint its snowflake id and the
+    // transport reads it back from `get_state`.
+    web: { wire: 'pi-rpc', permissionPrompts: false, freshSession: true },
     aiProvider: {
       credentialSource: 'runtime-or-workspace',
       wirePreference: ['google-generative-ai', 'openai-chat', 'anthropic', 'openai-responses'],
@@ -260,6 +265,7 @@ export const ompAdapter: CliAdapter = {
   composeCommand(_base: readonly string[], ctx: SpawnContext): readonly string[] {
     const cmd = [
       'omp',
+      '--auto-approve',
       ...(ctx.sessionRuntime?.interactiveArgs ?? []),
       ...ompRoleArgs(ctx),
     ];
@@ -285,6 +291,23 @@ export const ompAdapter: CliAdapter = {
       ...ompResumeArgs(ctx.resume),
       '--',
       prompt,
+    ];
+  },
+
+  // Web surface: omp's `--mode rpc` is Pi's RPC protocol. `--resume <id>`
+  // reopens the recorded conversation; a fresh Session omits it and omp mints
+  // the id. `--continue` is never used here because the surface must reopen
+  // exactly the Session the registry owns.
+  composeWebCommand(_base: readonly string[], ctx: SpawnContext): readonly string[] {
+    if (ctx.resume === 'last') throw new Error('the Web surface requires a concrete omp session id or a fresh Session');
+    return [
+      'omp',
+      ...(ctx.sessionRuntime?.webArgs ?? ctx.sessionRuntime?.interactiveArgs ?? []),
+      ...ompRoleArgs(ctx),
+      '--mode',
+      'rpc',
+      '--auto-approve',
+      ...ompResumeArgs(ctx.resume),
     ];
   },
 

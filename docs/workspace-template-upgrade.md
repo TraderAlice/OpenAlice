@@ -25,7 +25,8 @@ that a whole repository is a launcher-managed file set.
 The current managed set is intentionally narrow:
 
 - `README.md`, `AGENTS.md`, and `CLAUDE.md`;
-- `.agents/skills/**` and `.claude/skills/**`;
+- Template-owned `.agents/skills/**` and `.claude/skills/**`; Alice Harness CLI
+  companion skills are excluded and independently upgraded via [[docs/alice-harness.md]].
 - legacy `.pi/skills/**`, so an unchanged duplicate skill tree can be removed.
 
 Research, reports, Issues, Inbox records, credentials, Git history, runtime
@@ -84,7 +85,7 @@ Apply takes the shared checkout-operation lease and is serialized per Workspace.
 Offboarding uses the same lease; a future Merge/Absorb operation must do so as
 well, so directory reconciliation and directory moves cannot race. Apply also
 refuses to start while an interactive
-Session, WebPi Session, or headless run is active. It also refuses an already
+Session, Web Session, or headless run is active. It also refuses an already
 staged Git index so the template change cannot absorb an unrelated staged
 change.
 
@@ -117,10 +118,10 @@ The same transaction is available from inside the current Workspace without
 hand-authoring API calls:
 
 ```bash
-alice-workspace template upgrade          # read-only preview
-alice-workspace template upgrade --apply  # re-plan and apply the exact current plan
-alice-workspace template upgrade --id <workspaceId>          # preview a peer
-alice-workspace template upgrade --id <workspaceId> --apply  # upgrade a paused peer
+alice template upgrade          # read-only preview
+alice template upgrade --apply  # re-plan and apply the exact current plan
+alice template upgrade --id <workspaceId>          # preview a peer
+alice template upgrade --id <workspaceId> --apply  # upgrade a paused peer
 ```
 
 Conflicts require one repeatable `--keep-workspace <path>` or

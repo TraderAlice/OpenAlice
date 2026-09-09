@@ -271,7 +271,7 @@ describe.skipIf(process.platform === 'win32')('OpenAlice native CLI installer', 
     const path = await makeInstallerPathWithout(['lockf'])
 
     await expect(runInstaller(fixture, installRoot, ['--yes'], { PATH: path }))
-      .resolves.toMatchObject({ stdout: expect.stringContaining('OpenAlice 0.91.0 is ready') })
+      .resolves.toMatchObject({ stdout: expect.stringContaining('OpenAlice 0.91.0 is installed') })
     await expect(access(join(installRoot, '.cli-install.lock.guard')))
       .rejects.toMatchObject({ code: 'ENOENT' })
   })
@@ -340,7 +340,7 @@ describe.skipIf(process.platform === 'win32')('OpenAlice native CLI installer', 
 
     await expect(runInstaller(fixture, installRoot, ['--yes']))
       .rejects.toMatchObject({ stderr: expect.stringContaining('Another OpenAlice CLI installer is running') })
-    await expect(first).resolves.toMatchObject({ stdout: expect.stringContaining('OpenAlice 0.91.0 is ready') })
+    await expect(first).resolves.toMatchObject({ stdout: expect.stringContaining('OpenAlice 0.91.0 is installed') })
     await expect(access(lockDir)).rejects.toMatchObject({ code: 'ENOENT' })
 
     // lockf/flock keep a harmless inode after releasing their advisory lock;
@@ -348,7 +348,7 @@ describe.skipIf(process.platform === 'win32')('OpenAlice native CLI installer', 
     // successful install is the backend-independent proof that no live guard
     // remains after the first owner exits.
     await expect(runInstaller(fixture, installRoot, ['--yes']))
-      .resolves.toMatchObject({ stdout: expect.stringContaining('OpenAlice 0.91.0 is ready') })
+      .resolves.toMatchObject({ stdout: expect.stringContaining('OpenAlice 0.91.0 is installed') })
   })
 
   it('resolves the dev manifest to a commit-addressed archive and records dev provenance', async () => {
@@ -851,6 +851,22 @@ async function runInstaller(fixture, installRoot, extraArgs, extraEnv = {}) {
   ], { env: { ...process.env, HOME: fixture.root, ...extraEnv } })
 }
 
+describe.skipIf(process.platform === 'win32')('system dependency installation continuation', () => {
+  it('checks dependencies without treating --yes as system-install consent', async () => {
+    const fixture = await makeReleaseArchive('0.91.0', 'a'.repeat(16), { systemDependencies: true })
+    const result = await runInstaller(fixture, join(fixture.root, 'installed'), ['--yes'])
+    expect(result.stdout).toContain('setup-arguments: --check')
+  })
+  it('preserves the new activation when dependency setup is unfinished', async () => {
+    const fixture = await makeReleaseArchive('0.91.0', 'b'.repeat(16), { systemDependencies: true, setupFailure: true })
+    const installRoot = join(fixture.root, 'installed')
+    const result = await runInstaller(fixture, installRoot, ['--yes'])
+    expect(result.stderr).toContain('OpenAlice is installed; run openalice setup')
+    expect(await readlink(join(installRoot, 'cli/current'))).toContain('b'.repeat(16))
+    expect(await execFileAsync(join(installRoot, 'bin/openalice'), ['--version'])).toMatchObject({ stdout: '0.91.0\n' })
+  })
+})
+
 async function makeReleaseArchive(version, contentIdentity, options = {}) {
   const root = await mkdtemp(join(tmpdir(), 'openalice-native-installer-'))
   temporaryPaths.push(root)
@@ -868,6 +884,7 @@ async function makeReleaseArchive(version, contentIdentity, options = {}) {
   await writeFile(executable, `#!/bin/sh
 set -eu
 ${installedLauncherFailure}if [ "\${1:-}" = "--version" ]; then ${versionDelay}printf '%s\\n' '${version}'; exit 0; fi
+if [ "\${1:-}" = "setup" ]; then shift; printf 'setup-arguments: %s\\n' "$*"; exit ${options.setupFailure ? 1 : 0}; fi
 if [ "\${1:-}" = "debug-env" ]; then
   printf '%s|%s|%s|%s|%s\\n' "\$OPENALICE_INSTALL_ROOT" "\$OPENALICE_RELEASE_DIR" "\$OPENALICE_INSTALL_SOURCE" "\$OPENALICE_CONTENT_IDENTITY" "\$OPENALICE_INSTALL_METHOD"
   exit 0
@@ -882,6 +899,7 @@ printf 'fixture %s\\n' '${version}'
     platform,
     arch: architecture,
     contentIdentity,
+    ...(options.systemDependencies ? { dependencyPolicy: 'system' } : {}),
   })}\n`)
   const archive = join(root, `${releaseName}.tar.gz`)
   await execFileAsync('tar', ['-czf', archive, '-C', root, releaseName])

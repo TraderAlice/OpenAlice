@@ -128,8 +128,8 @@ vi.mock('@/components/ui/resizable', async () => {
       collapse() {
         resizableHarness.collapseCalls++
         resizableHarness.navigatorCollapsed = true
-        resizableHarness.navigatorSize = 44
-        onResize?.({ asPercentage: 4.4, inPixels: 44 })
+        resizableHarness.navigatorSize = 0
+        onResize?.({ asPercentage: 0, inPixels: 0 })
       },
       expand() {
         resizableHarness.expandCalls++
@@ -154,7 +154,7 @@ vi.mock('@/components/ui/resizable', async () => {
         const parsed = typeof nextSize === 'number' ? nextSize : Number.parseFloat(nextSize)
         if (!Number.isFinite(parsed)) return
         const applied = isNavigator && resizableHarness.navigatorCollapsible && parsed < 200
-          ? 44
+          ? 0
           : parsed
         resizableHarness.navigatorSize = applied
         resizableHarness.navigatorCollapsed = applied <= 45
@@ -319,37 +319,24 @@ beforeEach(async () => {
 
 afterEach(() => {
   cleanup()
+  vi.useRealTimers()
   vi.restoreAllMocks()
   vi.unstubAllGlobals()
 })
 
 describe('PageSidebarLayout applied state', () => {
-  it('derives the interactive surface from panel geometry without overwriting width preference', async () => {
+  it('disables primitive collapse and ignores the retired collapsed state', () => {
+    window.localStorage.setItem('openalice.page-sidebar-collapsed.market.v1', '1')
     window.localStorage.setItem('openalice.page-sidebar-width.market.v1', '312')
-    render(
-      <PageSidebarLayout storageKey="market" title="Market" sidebar={<div>Market navigation</div>}>
-        <div>Market content</div>
-      </PageSidebarLayout>,
-    )
-
-    driveNavigatorGeometry(44, true)
-    await waitFor(() => {
-      expect(screen.getByTestId('page-sidebar-desktop').getAttribute('data-state')).toBe('collapsed')
-    })
-    expect(screen.getByTestId('page-sidebar-expanded').hasAttribute('inert')).toBe(true)
-    expect(screen.getByTestId('page-sidebar-collapsed').hasAttribute('inert')).toBe(false)
-    expect(window.localStorage.getItem('openalice.page-sidebar-collapsed.market.v1')).toBe('1')
-    expect(window.localStorage.getItem('openalice.page-sidebar-width.market.v1')).toBe('312')
-
-    driveNavigatorGeometry(220, false)
-    await waitFor(() => {
-      expect(screen.getByTestId('page-sidebar-desktop').getAttribute('data-state')).toBe('expanded')
-    })
-    expect(screen.getByTestId('page-sidebar-expanded').hasAttribute('inert')).toBe(false)
-    expect(screen.getByTestId('page-sidebar-collapsed').hasAttribute('inert')).toBe(true)
-    expect(window.localStorage.getItem('openalice.page-sidebar-collapsed.market.v1')).toBe('0')
-    expect(window.localStorage.getItem('openalice.page-sidebar-width.market.v1')).toBe('312')
+    render(<PageSidebarLayout storageKey="market" title="Market" sidebar={<button>Navigation</button>}>
+      <div>Content</div>
+    </PageSidebarLayout>)
+    expect(resizableHarness.navigatorCollapsible).toBe(false)
+    expect(resizableHarness.navigatorDefaultSizes).toEqual([312])
+    expect(screen.getByRole('button', { name: 'Navigation' })).toBeTruthy()
+    expect(screen.queryByRole('button', { name: 'Collapse Market' })).toBeNull()
   })
+
 
   it('captures resize intent from a neighboring panel inside the enlarged hit region', () => {
     window.localStorage.setItem('openalice.page-sidebar-width.market.v1', '312')
@@ -397,54 +384,6 @@ describe('PageSidebarLayout applied state', () => {
     expect(window.localStorage.getItem('openalice.page-sidebar-width.market.v1')).toBe('276')
   })
 
-  it('resists pointer overdrag and springs back before the commit boundary', () => {
-    resizableHarness.navigatorSize = 200
-    window.localStorage.setItem('openalice.page-sidebar-width.market.v1', '200')
-    vi.spyOn(window, 'requestAnimationFrame').mockImplementation((callback) => {
-      callback(0)
-      return 1
-    })
-    render(
-      <PageSidebarLayout storageKey="market" title="Market" sidebar={<div>Market navigation</div>}>
-        <div>Market content</div>
-      </PageSidebarLayout>,
-    )
-
-    const group = screen.getByTestId('page-sidebar-market')
-    const handle = screen.getByRole('separator')
-    fireEvent.pointerDown(handle, {
-      button: 0,
-      buttons: 1,
-      clientX: 200,
-      isPrimary: true,
-      pointerId: 14,
-      pointerType: 'mouse',
-    })
-    expect(resizableHarness.navigatorCollapsible).toBe(true)
-
-    fireEvent.pointerMove(group, {
-      buttons: 1,
-      clientX: 160,
-      isPrimary: true,
-      pointerId: 14,
-      pointerType: 'mouse',
-    })
-    expect(group.getAttribute('data-overdrag-state')).toBe('resisting')
-    expect(Number.parseFloat(group.style.getPropertyValue('--oa-page-sidebar-overdrag'))).toBeCloseTo(22.14, 1)
-
-    fireEvent.pointerUp(group, {
-      button: 0,
-      buttons: 0,
-      clientX: 160,
-      isPrimary: true,
-      pointerId: 14,
-      pointerType: 'mouse',
-    })
-    expect(group.getAttribute('data-overdrag-motion')).toBe('returning')
-    expect(group.style.getPropertyValue('--oa-page-sidebar-overdrag')).toBe('0px')
-    expect(screen.getByTestId('page-sidebar-desktop').getAttribute('data-state')).toBe('expanded')
-    expect(window.localStorage.getItem('openalice.page-sidebar-collapsed.market.v1')).not.toBe('1')
-  })
 
   it('captures the active pointer so an outside release cannot strand gesture state', () => {
     resizableHarness.navigatorSize = 200
@@ -482,305 +421,13 @@ describe('PageSidebarLayout applied state', () => {
     expect(releasePointerCapture).toHaveBeenCalledWith(41)
   })
 
-  it('keeps resistance when a new drag interrupts the previous spring', () => {
-    vi.useFakeTimers()
-    resizableHarness.navigatorSize = 200
-    window.localStorage.setItem('openalice.page-sidebar-width.market.v1', '200')
-    vi.spyOn(window, 'requestAnimationFrame').mockImplementation((callback) => {
-      callback(0)
-      return 1
-    })
-    render(
-      <PageSidebarLayout storageKey="market" title="Market" sidebar={<div>Market navigation</div>}>
-        <div>Market content</div>
-      </PageSidebarLayout>,
-    )
 
-    const group = screen.getByTestId('page-sidebar-market')
-    const handle = screen.getByRole('separator')
-    fireEvent.pointerDown(handle, {
-      button: 0,
-      buttons: 1,
-      clientX: 200,
-      isPrimary: true,
-      pointerId: 30,
-      pointerType: 'mouse',
-    })
-    fireEvent.pointerMove(group, {
-      buttons: 1,
-      clientX: 160,
-      isPrimary: true,
-      pointerId: 30,
-      pointerType: 'mouse',
-    })
-    fireEvent.pointerUp(group, {
-      buttons: 0,
-      clientX: 160,
-      isPrimary: true,
-      pointerId: 30,
-      pointerType: 'mouse',
-    })
-    act(() => vi.advanceTimersByTime(50))
 
-    fireEvent.pointerDown(handle, {
-      button: 0,
-      buttons: 1,
-      clientX: 200,
-      isPrimary: true,
-      pointerId: 31,
-      pointerType: 'mouse',
-    })
-    fireEvent.pointerMove(group, {
-      buttons: 1,
-      clientX: 155,
-      isPrimary: true,
-      pointerId: 31,
-      pointerType: 'mouse',
-    })
-    act(() => vi.advanceTimersByTime(350))
 
-    expect(group.getAttribute('data-overdrag-state')).toBe('resisting')
-    expect(Number.parseFloat(group.style.getPropertyValue('--oa-page-sidebar-overdrag'))).toBeCloseTo(23.6, 1)
-    vi.useRealTimers()
-  })
 
-  it('keeps collapse motion cursor-attached when a held drag reverses direction', () => {
-    vi.useFakeTimers()
-    resizableHarness.navigatorSize = 200
-    window.localStorage.setItem('openalice.page-sidebar-width.market.v1', '200')
-    render(
-      <PageSidebarLayout storageKey="market" title="Market" sidebar={<div>Market navigation</div>}>
-        <div>Market content</div>
-      </PageSidebarLayout>,
-    )
 
-    const group = screen.getByTestId('page-sidebar-market')
-    fireEvent.pointerDown(screen.getByRole('separator'), {
-      button: 0,
-      buttons: 1,
-      clientX: 200,
-      isPrimary: true,
-      pointerId: 42,
-      pointerType: 'mouse',
-    })
-    fireEvent.pointerMove(group, {
-      buttons: 1,
-      clientX: 110,
-      isPrimary: true,
-      pointerId: 42,
-      pointerType: 'mouse',
-    })
-    expect(group.getAttribute('data-collapse-motion')).toBe('armed')
 
-    act(() => vi.advanceTimersByTime(400))
-    expect(group.getAttribute('data-collapse-motion')).toBe('armed')
 
-    fireEvent.pointerMove(group, {
-      buttons: 1,
-      clientX: 160,
-      isPrimary: true,
-      pointerId: 42,
-      pointerType: 'mouse',
-    })
-    expect(group.getAttribute('data-collapse-motion')).toBeNull()
-    expect(group.getAttribute('data-overdrag-state')).toBe('resisting')
-
-    fireEvent.pointerUp(group, {
-      buttons: 0,
-      clientX: 160,
-      isPrimary: true,
-      pointerId: 42,
-      pointerType: 'mouse',
-    })
-    vi.useRealTimers()
-  })
-
-  it('commits collapse only after deliberate pointer overdrag', async () => {
-    resizableHarness.navigatorSize = 200
-    window.localStorage.setItem('openalice.page-sidebar-width.market.v1', '200')
-    vi.spyOn(window, 'requestAnimationFrame').mockImplementation((callback) => {
-      callback(0)
-      return 1
-    })
-    render(
-      <PageSidebarLayout storageKey="market" title="Market" sidebar={<div>Market navigation</div>}>
-        <div>Market content</div>
-      </PageSidebarLayout>,
-    )
-
-    const group = screen.getByTestId('page-sidebar-market')
-    fireEvent.pointerDown(screen.getByRole('separator'), {
-      button: 0,
-      buttons: 1,
-      clientX: 200,
-      isPrimary: true,
-      pointerId: 15,
-      pointerType: 'mouse',
-    })
-    fireEvent.pointerMove(group, {
-      buttons: 1,
-      clientX: 110,
-      isPrimary: true,
-      pointerId: 15,
-      pointerType: 'mouse',
-    })
-    expect(group.getAttribute('data-overdrag-state')).toBe('armed')
-
-    // react-resizable-panels owns the actual midpoint transition. Product
-    // code observes that applied geometry but must not issue a second collapse
-    // after pointer-up.
-    driveNavigatorGeometry(44, true)
-
-    fireEvent.pointerUp(group, {
-      button: 0,
-      buttons: 0,
-      clientX: 110,
-      isPrimary: true,
-      pointerId: 15,
-      pointerType: 'mouse',
-    })
-    expect(group.getAttribute('data-overdrag-motion')).toBe('committing')
-    await waitFor(() => expect(resizableHarness.navigatorSize).toBe(44))
-    expect(resizableHarness.collapseCalls).toBe(0)
-    expect(screen.getByTestId('page-sidebar-desktop').getAttribute('data-state')).toBe('collapsed')
-    expect(window.localStorage.getItem('openalice.page-sidebar-width.market.v1')).toBe('200')
-  })
-
-  it('cancels an armed overdrag without collapsing', () => {
-    resizableHarness.navigatorSize = 200
-    window.localStorage.setItem('openalice.page-sidebar-width.market.v1', '200')
-    vi.spyOn(window, 'requestAnimationFrame').mockImplementation((callback) => {
-      callback(0)
-      return 1
-    })
-    render(
-      <PageSidebarLayout storageKey="market" title="Market" sidebar={<div>Market navigation</div>}>
-        <div>Market content</div>
-      </PageSidebarLayout>,
-    )
-
-    const group = screen.getByTestId('page-sidebar-market')
-    fireEvent.pointerDown(screen.getByRole('separator'), {
-      button: 0,
-      buttons: 1,
-      clientX: 200,
-      isPrimary: true,
-      pointerId: 16,
-      pointerType: 'mouse',
-    })
-    fireEvent.pointerMove(group, {
-      buttons: 1,
-      clientX: 130,
-      isPrimary: true,
-      pointerId: 16,
-      pointerType: 'mouse',
-    })
-    expect(group.getAttribute('data-overdrag-state')).toBe('armed')
-
-    fireEvent.pointerCancel(group, {
-      buttons: 0,
-      clientX: 130,
-      isPrimary: true,
-      pointerId: 16,
-      pointerType: 'mouse',
-    })
-    expect(group.getAttribute('data-overdrag-motion')).toBe('returning')
-    expect(resizableHarness.navigatorSize).toBe(200)
-    expect(screen.getByTestId('page-sidebar-desktop').getAttribute('data-state')).toBe('expanded')
-  })
-
-  it('keeps keyboard collapse motion independent from pointer overdrag', () => {
-    render(
-      <PageSidebarLayout storageKey="market" title="Market" sidebar={<div>Market navigation</div>}>
-        <div>Market content</div>
-      </PageSidebarLayout>,
-    )
-
-    const group = screen.getByTestId('page-sidebar-market')
-    fireEvent.keyDown(screen.getByRole('separator'), { key: 'Home' })
-    expect(group.getAttribute('data-collapse-motion')).toBe('armed')
-  })
-
-  it('collapses immediately when reduced motion is requested', () => {
-    vi.stubGlobal('matchMedia', vi.fn().mockImplementation((query: string) => ({
-      matches: query === '(min-width: 768px)' || query === '(prefers-reduced-motion: reduce)',
-      media: query,
-      onchange: null,
-      addEventListener: vi.fn(),
-      removeEventListener: vi.fn(),
-      addListener: vi.fn(),
-      removeListener: vi.fn(),
-      dispatchEvent: vi.fn(),
-    })))
-    const requestAnimationFrame = vi.spyOn(window, 'requestAnimationFrame')
-    render(
-      <PageSidebarLayout storageKey="market" title="Market" sidebar={<div>Market navigation</div>}>
-        <div>Market content</div>
-      </PageSidebarLayout>,
-    )
-
-    const resizeCallsBeforeCollapse = resizableHarness.resizeCalls
-    fireEvent.click(screen.getByRole('button', { name: 'Collapse Market' }))
-
-    expect(requestAnimationFrame).not.toHaveBeenCalled()
-    expect(screen.getByTestId('page-sidebar-desktop').getAttribute('data-state')).toBe('collapsed')
-    expect(resizableHarness.navigatorSize).toBe(44)
-    expect(resizableHarness.collapseCalls).toBe(0)
-    expect(resizableHarness.resizeCalls).toBe(resizeCallsBeforeCollapse + 1)
-  })
-
-  it('uses one geometry transaction per repeated collapse and restore cycle', async () => {
-    resizableHarness.navigatorSize = 312
-    window.localStorage.setItem('openalice.page-sidebar-width.market.v1', '312')
-    render(
-      <PageSidebarLayout storageKey="market" title="Market" sidebar={<div>Market navigation</div>}>
-        <div>Market content</div>
-      </PageSidebarLayout>,
-    )
-
-    for (let cycle = 0; cycle < 8; cycle++) {
-      fireEvent.click(screen.getByRole('button', { name: 'Collapse Market' }))
-      await waitFor(() => {
-        expect(screen.getByTestId('page-sidebar-desktop').getAttribute('data-state')).toBe('collapsed')
-      })
-      fireEvent.click(screen.getByRole('button', { name: 'Open Market' }))
-      await waitFor(() => {
-        expect(screen.getByTestId('page-sidebar-desktop').getAttribute('data-state')).toBe('expanded')
-      })
-      expect(resizableHarness.navigatorSize).toBe(312)
-    }
-
-    expect(resizableHarness.collapseCalls).toBe(0)
-    expect(resizableHarness.expandCalls).toBe(0)
-    expect(resizableHarness.resizeCalls).toBe(16)
-    expect(resizableHarness.groupMounts).toBe(1)
-    expect(resizableHarness.navigatorDefaultSizes).toEqual([312])
-    expect(window.localStorage.getItem('openalice.page-sidebar-width.market.v1')).toBe('312')
-  })
-
-  it('does not reopen after a collapsed percentage arrives with stale painted pixels', () => {
-    resizableHarness.navigatorSize = 312
-    render(
-      <PageSidebarLayout storageKey="market" title="Market" sidebar={<div>Market navigation</div>}>
-        <div>Market content</div>
-      </PageSidebarLayout>,
-    )
-
-    fireEvent.click(screen.getByRole('button', { name: 'Collapse Market' }))
-    expect(screen.getByTestId('page-sidebar-desktop').getAttribute('data-state')).toBe('collapsed')
-
-    // The primitive commits its percentage before the flex item paints. The
-    // callback can briefly pair the collapsed percentage with the previous
-    // expanded offsetWidth; percentage geometry must remain authoritative.
-    act(() => {
-      resizableHarness.onNavigatorResize?.({
-        asPercentage: (44 / (resizableHarness.groupWidth - 1)) * 100,
-        inPixels: 312,
-      })
-    })
-
-    expect(screen.getByTestId('page-sidebar-desktop').getAttribute('data-state')).toBe('collapsed')
-  })
 
   it('repairs an impossible one-panel layout without persisting it', () => {
     window.localStorage.setItem('openalice.page-sidebar-width.market.v1', '312')
@@ -846,64 +493,8 @@ describe('PageSidebarLayout applied state', () => {
     expect(resizableHarness.paintedNavigatorSize).toBeNull()
     expect(window.localStorage.getItem('openalice.page-sidebar-width.market.v1')).toBe('312')
 
-    fireEvent.click(screen.getByRole('button', { name: 'Collapse Market' }))
-
-    expect(screen.getByTestId('page-sidebar-desktop').getAttribute('data-state')).toBe('collapsed')
-    expect(resizableHarness.navigatorSize).toBe(44)
-    expect(screen.getByTestId('page-sidebar-collapsed').textContent).toBe('')
   })
 
-  it('clears pointer overdrag immediately when reduced motion is requested', () => {
-    resizableHarness.navigatorSize = 200
-    window.localStorage.setItem('openalice.page-sidebar-width.market.v1', '200')
-    vi.stubGlobal('matchMedia', vi.fn().mockImplementation((query: string) => ({
-      matches: query === '(min-width: 768px)' || query === '(prefers-reduced-motion: reduce)',
-      media: query,
-      onchange: null,
-      addEventListener: vi.fn(),
-      removeEventListener: vi.fn(),
-      addListener: vi.fn(),
-      removeListener: vi.fn(),
-      dispatchEvent: vi.fn(),
-    })))
-    const requestAnimationFrame = vi.spyOn(window, 'requestAnimationFrame')
-    render(
-      <PageSidebarLayout storageKey="market" title="Market" sidebar={<div>Market navigation</div>}>
-        <div>Market content</div>
-      </PageSidebarLayout>,
-    )
-
-    const group = screen.getByTestId('page-sidebar-market')
-    fireEvent.pointerDown(screen.getByRole('separator'), {
-      button: 0,
-      buttons: 1,
-      clientX: 200,
-      isPrimary: true,
-      pointerId: 17,
-      pointerType: 'mouse',
-    })
-    fireEvent.pointerMove(group, {
-      buttons: 1,
-      clientX: 160,
-      isPrimary: true,
-      pointerId: 17,
-      pointerType: 'mouse',
-    })
-    expect(group.getAttribute('data-overdrag-state')).toBe('resisting')
-
-    fireEvent.pointerUp(group, {
-      buttons: 0,
-      clientX: 160,
-      isPrimary: true,
-      pointerId: 17,
-      pointerType: 'mouse',
-    })
-    expect(requestAnimationFrame).not.toHaveBeenCalled()
-    expect(group.getAttribute('data-overdrag-state')).toBeNull()
-    expect(group.getAttribute('data-overdrag-motion')).toBeNull()
-    expect(group.style.getPropertyValue('--oa-page-sidebar-overdrag')).toBe('')
-    expect(screen.getByTestId('page-sidebar-desktop').getAttribute('data-state')).toBe('expanded')
-  })
 
   it('does not persist a passive responsive cap or a pointer click without resize', () => {
     window.localStorage.setItem('openalice.page-sidebar-width.market.v1', '312')
@@ -956,27 +547,4 @@ describe('PageSidebarLayout applied state', () => {
     expect(window.localStorage.getItem('openalice.page-sidebar-width.market.v1')).toBe('294')
   })
 
-  it('keeps the last expanded width when a pointer resize settles collapsed', () => {
-    window.localStorage.setItem('openalice.page-sidebar-width.market.v1', '312')
-    render(
-      <PageSidebarLayout storageKey="market" title="Market" sidebar={<div>Market navigation</div>}>
-        <div>Market content</div>
-      </PageSidebarLayout>,
-    )
-
-    fireEvent.pointerDown(screen.getByTestId('page-sidebar-market-content'), {
-      button: 0,
-      buttons: 1,
-      clientX: 315,
-      isPrimary: true,
-      pointerId: 9,
-      pointerType: 'mouse',
-    })
-    driveNavigatorGeometry(44, true)
-    settleNavigatorLayout(44)
-
-    expect(screen.getByTestId('page-sidebar-desktop').getAttribute('data-state')).toBe('collapsed')
-    expect(window.localStorage.getItem('openalice.page-sidebar-collapsed.market.v1')).toBe('1')
-    expect(window.localStorage.getItem('openalice.page-sidebar-width.market.v1')).toBe('312')
-  })
 })

@@ -33,8 +33,8 @@ function previewPayload(plan: TemplateUpgradePlan, mode: OutputMode, explicitTar
   const preserved = plan.files.filter((file) => file.status === 'preserved')
   const conflicts = plan.files.filter((file) => file.status === 'conflict')
   const sameVersion = plan.fromVersion === plan.toVersion
-  const versionMismatch = sameVersion && (changes.length > 0 || conflicts.length > 0)
-  const current = sameVersion && !versionMismatch
+  const versionMismatch = plan.template !== 'alice-harness' && sameVersion && (changes.length > 0 || conflicts.length > 0)
+  const current = sameVersion && changes.length === 0 && conflicts.length === 0
   const status = plan.blocked
     ? 'blocked'
     : versionMismatch
@@ -66,7 +66,7 @@ function previewPayload(plan: TemplateUpgradePlan, mode: OutputMode, explicitTar
       ? null
       : conflicts.length > 0
         ? 'Resolve every conflict with repeatable --keep-workspace <path> or --use-template <path>, then add --apply.'
-        : `alice-workspace template upgrade${explicitTarget ? ` --id ${plan.workspaceId}` : ''} --apply`,
+        : `alice ${plan.template === 'alice-harness' ? 'harness' : 'template'} upgrade${explicitTarget ? ` --id ${plan.workspaceId}` : ''} --apply`,
   }
 }
 
@@ -159,7 +159,7 @@ export const workspaceTemplateUpgradeFactory: WorkspaceToolFactory = {
               preview,
             }
           }
-          const changedAtSameVersion = plan.fromVersion === plan.toVersion
+          const changedAtSameVersion = plan.template !== 'alice-harness' && plan.fromVersion === plan.toVersion
             && plan.files.some((file) => file.status === 'ready' || file.status === 'conflict')
           if (changedAtSameVersion) {
             return {
@@ -171,7 +171,7 @@ export const workspaceTemplateUpgradeFactory: WorkspaceToolFactory = {
               preview,
             }
           }
-          if (plan.fromVersion === plan.toVersion) {
+          if (plan.fromVersion === plan.toVersion && !plan.files.some((file) => file.status === 'ready' || file.status === 'conflict')) {
             return { ok: true as const, action: 'noop' as const, preview }
           }
 
@@ -213,5 +213,14 @@ export const workspaceTemplateUpgradeFactory: WorkspaceToolFactory = {
         }
       },
     })
+  },
+}
+
+/** Same reconciliation contract, independently versioned Project injection layer. */
+export const aliceHarnessUpgradeFactory: WorkspaceToolFactory = {
+  name: 'alice_harness_upgrade',
+  build(ctx) {
+    const result = workspaceTemplateUpgradeFactory.build({ ...ctx, templateUpgrades: ctx.aliceHarnessUpgrades })
+    return { ...result, description: result.description?.replace('managed template upgrade', 'Alice Harness Skills file update (respects Workspace Skill preferences; CLI runtime updates with the Project, independently of this operation)') }
   },
 }

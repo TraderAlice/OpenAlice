@@ -17,7 +17,7 @@
  * which works from this CommonJS payload on every supported Node runtime.
  *
  *   alice                              list command groups (data export)
- *   alice-workspace inbox push ...     collaboration export
+ *   alice inbox push ...     collaboration export
  *   <bin> <group> <verb> --help        show a verb's flags
  *   <bin> <group> <verb> [--flags]     run it; JSON to stdout
  */
@@ -28,6 +28,13 @@ let BIN = 'alice'
 
 async function main() {
   const argv = process.argv.slice(2)
+  let outputPath
+  const outputIndex = argv.indexOf('--output')
+  if (outputIndex >= 0) {
+    outputPath = argv[outputIndex + 1]
+    if (!outputPath || outputPath.startsWith('-')) fail('--output requires a file path')
+    argv.splice(outputIndex, 2)
+  }
 
   // Launchers provide the public command name because argv[1] now points to
   // this shared payload. Keep argv fallback for direct diagnostics/tests.
@@ -36,15 +43,21 @@ async function main() {
     (process.argv[1] || 'alice').split(/[\\/]/).pop() ||
     'alice'
   ).split(/[\\/]/).pop() || 'alice'
-  const exportKey = BIN === 'alice' ? 'data' : BIN.replace(/^alice-/, '')
+  if (BIN === 'alice-workspace') {
+    console.error('alice-workspace is a compatibility alias; use alice <group> <verb>.')
+    BIN = 'alice'
+  }
+  const exportKey = (BIN === 'alice' || BIN === 'alice-workspace') ? 'data' : BIN.replace(/^alice-/, '')
 
   const toolSocket = process.env.OPENALICE_TOOL_SOCKET
   const toolUrl = process.env.OPENALICE_TOOL_URL
   const legacyMcpUrl = process.env.OPENALICE_MCP_URL || 'http://127.0.0.1:47332/mcp'
   const wsId = process.env.AQ_WS_ID
-  if (!wsId) {
-    fail('AQ_WS_ID is not set — run from inside an OpenAlice workspace.')
+  const projectId = process.env.OPENALICE_PROJECT_ID
+  if (!wsId && !projectId) {
+    fail('No Project context — use openalice exec --project <key> alice ... or run inside a Workspace.')
   }
+  if (!wsId && !toolUrl && !toolSocket) fail('No Project endpoint — use openalice exec --project <key> alice ...')
   // Prefer the dedicated CLI base. Fall back to legacy MCP-derived config so
   // older workspace envs keep working: .../mcp -> .../cli/<wsId>/<export>.
   const gateway = toolSocket
@@ -52,7 +65,7 @@ async function main() {
     : toolUrl
       ? toolUrl.replace(/\/+$/, '')
       : legacyMcpUrl.replace(/\/+$/, '').replace(/\/mcp$/, '/cli')
-  const base = gateway + '/' + wsId + '/' + exportKey
+  const base = gateway + '/' + (wsId ? encodeURIComponent(wsId) : 'project') + '/' + exportKey
   debug('runtime', { bin: BIN, wsId, toolSocket, toolUrl, base })
 
   const wantsHelp = argv.includes('--help') || argv.includes('-h')
@@ -92,8 +105,19 @@ async function main() {
 
   // Run it.
   const args = await parseFlags(argv.slice(argv.indexOf(verb) + 1), cmd.schema, { group, verb })
+  if (outputPath) {
+    const fs = await import('node:fs/promises')
+    try { await fs.lstat(outputPath); fail(`Output already exists: ${outputPath}`) }
+    catch (error) { if (error.code !== 'ENOENT') throw error }
+  }
   const res = await invoke(base, cmd.tool, args)
-  process.stdout.write(res.endsWith('\n') ? res : res + '\n')
+  const output = res.endsWith('\n') ? res : res + '\n'
+  if (outputPath) {
+    // Exclusive creation avoids destroying an existing dataset on a typo.
+    const fs = await import('node:fs/promises')
+    await fs.writeFile(outputPath, output, { flag: 'wx' })
+    process.stderr.write(`Saved ${outputPath}\n`)
+  } else process.stdout.write(output)
 }
 
 // ---- HTTP -----------------------------------------------------------------
@@ -128,9 +152,9 @@ async function invoke(base, tool, args) {
   // one. So at most one of these headers is ever sent.
   const headers = { 'Content-Type': 'application/json' }
   const runId = process.env.AQ_RUN_ID
-  if (runId) headers['x-openalice-run'] = runId
+  if (runId && process.env.AQ_WS_ID) headers['x-openalice-run'] = runId
   const sessionId = process.env.AQ_SESSION_ID
-  if (sessionId) headers['x-openalice-session'] = sessionId
+  if (sessionId && process.env.AQ_WS_ID) headers['x-openalice-session'] = sessionId
   const r = await fetchJson(base + '/invoke', {
     method: 'POST',
     headers,
@@ -150,6 +174,7 @@ async function invoke(base, tool, args) {
 }
 
 async function fetchJson(url, opts) {
+  opts = { ...opts, headers: { ...opts.headers, ...(process.env.OPENALICE_PROJECT_ID ? { 'x-openalice-project': process.env.OPENALICE_PROJECT_ID } : {}) } }
   if (process.env.OPENALICE_TOOL_SOCKET && url.startsWith('/')) {
     return fetchSocketJson(process.env.OPENALICE_TOOL_SOCKET, url, opts)
   }
@@ -333,6 +358,7 @@ function printVerbs(group, cmds, description) {
 }
 
 function printVerbHelp(group, verb, cmd) {
+  out('Use --output <file> to save the response without filling stdout (existing files are preserved).')
   out(`${BIN} ${group} ${verb} [--flags]\n`)
   if (cmd.description) out(cmd.description + '\n')
   const props = (cmd.schema && cmd.schema.properties) || {}
@@ -406,7 +432,7 @@ function out(s) {
 }
 function debug(label, value) {
   if (process.env.OPENALICE_CLI_DEBUG !== '1') return
-  out('[openalice-cli-debug] ' + label + ' ' + JSON.stringify(value))
+  process.stderr.write('[openalice-cli-debug] ' + label + ' ' + JSON.stringify(value) + '\n')
 }
 function fail(msg) {
   process.stderr.write(BIN + ': ' + msg + '\n')

@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -8,6 +8,56 @@ import type { HeadlessTaskRecord } from '../../api/headless'
 import { i18n } from '../../i18n'
 import type { AgentInfo, SessionRecord, Workspace } from './api'
 import { SessionRow, WorkspaceRow } from './Sidebar'
+
+describe('navigation entry', () => {
+const session: SessionRecord = { id: 's', resumeId: 'r', wsId: 'w', agent: 'pi', name: 'p',
+  createdAt: '2026-07-15T00:00:00.000Z', lastActiveAt: '2026-07-15T00:00:00.000Z',
+  state: 'paused', pid: null, startedAt: null, title: 'Review AAPL earnings' }
+afterEach(cleanup)
+it('enters paused navigation sessions once, reports failure, and permits retry', async () => {
+  let reject!: (reason: Error) => void
+  const onResume = vi.fn(() => new Promise<void>((_, fail) => { reject = fail }))
+  render(<SessionRow enterOnSelect session={{ ...session, state: 'paused' }} isActive={false}
+    onSelect={vi.fn()} onResume={onResume} onPause={vi.fn()} onDelete={vi.fn()} />)
+  const row = screen.getByRole('button', { name: 'Review AAPL earnings' })
+  fireEvent.click(row)
+  fireEvent.click(row)
+  expect(onResume).toHaveBeenCalledOnce()
+  expect(row.hasAttribute('disabled')).toBe(true)
+  expect(screen.queryByRole('button', { name: /^Resume / })).toBeNull()
+  reject(new Error('Runtime unavailable'))
+  expect((await screen.findByRole('alert')).textContent).toBe('Runtime unavailable')
+  await waitFor(() => expect(row.hasAttribute('disabled')).toBe(false))
+  onResume.mockResolvedValueOnce(undefined)
+  fireEvent.click(row)
+  await waitFor(() => expect(row.hasAttribute('disabled')).toBe(false))
+  expect(onResume).toHaveBeenCalledTimes(2)
+})
+
+it.each(['running', 'paused'] as const)('does not resume a non-resumable navigation session (%s)', state => {
+  const onSelect = vi.fn()
+  const onResume = vi.fn()
+  render(<SessionRow enterOnSelect session={{ ...session, state }} resumable={false} isActive={false}
+    onSelect={onSelect} onResume={onResume} onPause={vi.fn()} onDelete={vi.fn()} />)
+  fireEvent.click(screen.getByRole('button', { name: 'Review AAPL earnings' }))
+  expect(onSelect).toHaveBeenCalledOnce()
+  expect(onResume).not.toHaveBeenCalled()
+})
+it('opens a running session directly and explains headless occupancy without spawning', () => {
+  const onSelect = vi.fn()
+  const onResume = vi.fn()
+  const onHeadlessBusy = vi.fn()
+  const props = { enterOnSelect: true, session: { ...session, state: 'running' as const },
+    isActive: false, onSelect, onResume, onHeadlessBusy, onPause: vi.fn(), onDelete: vi.fn() }
+  const view = render(<SessionRow {...props} />)
+  fireEvent.click(screen.getByRole('button', { name: 'Review AAPL earnings' }))
+  expect(onSelect).toHaveBeenCalledOnce()
+  view.rerender(<SessionRow {...props} headlessOccupying />)
+  fireEvent.click(screen.getByRole('button', { name: 'Running · Review AAPL earnings' }))
+  expect(onHeadlessBusy).toHaveBeenCalledOnce()
+  expect(onResume).not.toHaveBeenCalled()
+})
+})
 
 const capabilities = {
   parallelPerCwd: true,

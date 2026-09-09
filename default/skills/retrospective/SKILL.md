@@ -10,7 +10,7 @@ description: >
   money?", "replay the SMH spike — policy or earnings?", "was there an entry
   signal at the time", "would an 8% trailing stop have saved me", "event study
   on the Hormuz escalation". It strings together the as-of snapshot, the
-  date-windowed news, and the backtest into one honest replay — and it is
+  date-windowed news, and Workspace research code into one honest replay — and it is
   ruthless about data freshness, because a retro built on a stale or
   future-leaking price is worse than no retro.
 ---
@@ -22,10 +22,9 @@ catalysts, and test whether a tradeable edge actually existed. The whole value
 is honesty: **no lookahead** (never use a price the moment didn't yet know) and
 **no stale data** (never report yesterday's close as "now").
 
-The tools (run them — don't answer from memory):
-`alice analysis snapshot`, `alice analysis simulate`, `alice rss window`,
-`alice rss grep` / `read`. (See the `alice`, `alice-analysis` skills for the
-quant scripting language.)
+`alice analysis snapshot` provides dated market summaries; the `alice-analysis`
+skill describes quantitative queries. Choose historical news sources with
+coverage of the period being studied.
 
 ## The freshness gate — DO THIS FIRST, every time
 
@@ -59,32 +58,18 @@ it.**
    can be large); add `--bars N` when you actually need the per-day series.
    `windowBars` tells you how many are available.
 
-2. **Align the catalysts to the price.** Pull the news IN the window,
-   oldest-first, and lay the timestamps against the bars.
-   ```bash
-   alice rss window --from 2026-04-01 --to 2026-04-10 --pattern "Iran|oil|OPEC"
-   ```
-   Each hit has an ISO `time` — put it next to the bar it moved. This is how you
-   answer "was the spike policy or earnings". Coverage is the user's SUBSCRIBED
-   feeds only: an empty window means "not in the feeds", NOT "nothing happened"
-   — say so, and don't pretend you saw everything. (Cookie-gated sources —
-   Barchart options flow, Reddit sentiment — are unreachable from a headless
-   run; if the call needs them, flag the gap rather than imply full coverage.)
+2. **Align the catalysts to the price.** Build a dated event timeline from
+   relevant sources and compare it with the bars. Distinguish evidence of a
+   catalyst from a coincident headline, and note material gaps in coverage.
 
-3. **Test the entry (backtest the hypothesis).** "If I'd bought at the anchor,
-   would a stop/exit have worked?"
-   ```bash
-   alice analysis simulate --query XLE --entryDate 2026-04-03 \
-     --exitRule trailing_stop --exitPct 8
-   # also try: --exitRule ma_break --exitPeriod 50   (trend exit)
-   #           --exitRule hold                        (just measure to now)
-   ```
-   Read `entry`/`exit` (date·price·reason), `returnPct`, and **MFE/MAE** (the
-   best and worst it went while you held — the round trip a single end-number
-   hides). `open: true` means it never triggered the exit; the return is
-   mark-to-market, not realized. Compare a couple of exit rules — the
-   interesting finding is usually "the move was real but giving it back to a
-   loose stop ate most of it", or vice-versa.
+3. **Test the hypothesis in Workspace research code.** If the question needs
+   a hypothetical trade, save the dated inputs and write an inspectable script
+   with the native Coding Agent. Pin the source and evaluation window. State
+   signal timing, executable entry/exit prices, position sizing, fees and
+   slippage explicitly. Do not use a closing-price signal to assume an
+   executable fill at that same close. Exclude pre-entry price extremes from
+   holding-period MFE/MAE. Save the script, inputs and results together so the
+   assumptions can be changed and the calculation reproduced.
 
 4. **Map the index to dates when you need the path in a quant script.** Most
    reads are covered by snapshot; when you must compute over the series and want

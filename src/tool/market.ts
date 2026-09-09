@@ -22,7 +22,7 @@ export function createMarketSearchTools(deps: MarketSearchDeps) {
 Returns matching symbols with assetClass attribution ("equity", "crypto", "currency", or "commodity").
 Equity results come from SEC/TMX listings (~13k US/CA stocks); crypto and currency results
 come from Yahoo Finance fuzzy search; commodity results come from a canonical catalog (~25 items).
-Currency results are filtered to XXXUSD pairs only.
+Currency results include USD-base pairs and cross pairs.
 
 For commodities, use the canonical id (e.g. "gold", "crude_oil", "copper") with calculateIndicator
 and other tools — provider-specific tickers (GC=F, GCUSD) are resolved automatically.

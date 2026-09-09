@@ -99,7 +99,7 @@ export interface TemplateMeta {
    * Launcher-owned context injection, post-bootstrap, gated per template
    * (defaults preserve each template's pre-standardization behavior):
    *   injectTools   — inject the per-CLI playbooks (alice / alice-uta /
-   *                   alice-workspace / traderhub skills) so the agent knows the `alice*` CLI
+   *                   traderhub skills) so the agent knows the `alice*` CLI
    *                   surface. The launcher injects NO MCP into workspaces;
    *                   `false` = a template that ships its own tool docs
    *                   (e.g. auto-quant).

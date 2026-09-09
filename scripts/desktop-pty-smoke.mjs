@@ -16,7 +16,10 @@ const args = new Set(process.argv.slice(2))
 const skipBuild = args.has('--skip-build')
 const keep = args.has('--keep')
 const guardianRecovery = args.has('--guardian-recovery')
-const timeoutMs = 90_000
+// Native Intel rehearsal recorded a valid response delayed ~62 seconds between
+// main and renderer. Allow bounded startup/transport slack without sleeping or
+// skipping PTY/CLI assertions; stage sentinels retain the slow boundary.
+const timeoutMs = 180_000
 const knownArgs = new Set(['--skip-build', '--keep', '--guardian-recovery', '--help', '-h'])
 const unknownArgs = [...args].filter((arg) => !knownArgs.has(arg))
 

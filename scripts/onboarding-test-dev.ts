@@ -1,3 +1,5 @@
+import { mkdir } from 'node:fs/promises'
+import { parseProjectWorkspaces, writeProjectWorkspaceRequest } from '../packages/cli/src/project-workspaces.js'
 import { spawn } from 'node:child_process'
 import type { AddressInfo } from 'node:net'
 
@@ -54,6 +56,14 @@ if (printOnly) {
     OPENALICE_UI_PORT: env['OPENALICE_UI_PORT'],
   }, null, 2))
   process.exit(0)
+}
+
+// Opt in to the same birth request as CLI/TUI creation; omit for legacy-home coverage.
+const workspaces = process.env['OPENALICE_ONBOARDING_WORKSPACES']
+if (workspaces !== undefined) {
+  const home = env['OPENALICE_HOME']!
+  await mkdir(home, { recursive: true })
+  await writeProjectWorkspaceRequest(home, parseProjectWorkspaces(workspaces))
 }
 
 const pnpm = process.platform === 'win32' ? 'pnpm.cmd' : 'pnpm'

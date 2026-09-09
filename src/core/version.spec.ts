@@ -411,12 +411,14 @@ describe('getVersionInfo', () => {
     expect(fetchMock).not.toHaveBeenCalled()
   })
 
-  it('uses installed beta provenance instead of inferring stable from the package version', async () => {
+  it.each(['linux', 'win32'])('uses installed %s beta provenance instead of package-version inference', async (platform) => {
     const fetchMock = mockJsonResponse(releaseManifest('beta', '999.999.999-beta.1'))
 
     const info = await getVersionInfo({
       env: { OPENALICE_INSTALL_SOURCE: '/runtime/install-source.json' },
-      readTextFile: () => JSON.stringify(installSource('beta')),
+      readTextFile: () => JSON.stringify(installSource('beta', {
+        artifact: { platform, arch: 'arm64', sha256: 'a'.repeat(64) },
+      })),
     })
 
     expect(fetchMock).toHaveBeenCalledWith(BETA_MANIFEST_URL, expect.any(Object))

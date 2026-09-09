@@ -398,7 +398,10 @@ describe('AutomationRunsSection run controls', () => {
     expect((await screen.findByRole('alert')).textContent).toContain(
       'Output unavailable: Structured output is temporarily unavailable',
     )
-    fireEvent.click(screen.getByRole('button', { name: 'Retry output' }))
+    const retryOutput = screen.getByRole('button', { name: 'Retry output' })
+    expect(retryOutput.className).toContain('border-border')
+    expect(retryOutput.className).not.toContain('bg-destructive')
+    fireEvent.click(retryOutput)
 
     expect(await screen.findByText('Recovered answer')).toBeTruthy()
     await waitFor(() => expect(screen.queryByText(/Output unavailable/)).toBeNull())

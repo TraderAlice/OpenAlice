@@ -398,7 +398,7 @@ export function ActivityBarSettingsPage() {
                       if (!value.trim()) return
                       update(renameCustomGroup(draft, group.id, value))
                     }}
-                    className="h-8 min-w-0 flex-1 rounded-md bg-transparent px-2 text-[13px] leading-[18px] font-semibold text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring/45"
+                    className="oa-field-control h-8 min-w-0 flex-1 rounded-md border border-transparent bg-transparent px-2 text-[13px] font-semibold leading-[18px] text-foreground outline-none"
                   />
                 )}
                 {!group.builtin && (

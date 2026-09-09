@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Bot, ExternalLink, Loader2, RefreshCw, RotateCcw, ScrollText } from 'lucide-react'
+import { Bot, MoreHorizontal, ExternalLink, Loader2, RefreshCw, RotateCcw, ScrollText } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 
 import {
@@ -10,6 +10,9 @@ import {
   type HarnessSurfaceResponse,
 } from '../api/harness-surfaces'
 import { Button } from '../components/ui/button'
+import { BrowserPane } from '../components/harness/BrowserPane'
+import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from '../components/ui/dropdown-menu'
+import { PageTopBar } from '../components/PageTopBar'
 import { harnessSurfaceFailureKind } from '../lib/harness-surface-failure'
 import { useWorkspace } from '../tabs/store'
 import type { WorkspaceSource } from '../tabs/types'
@@ -21,8 +24,10 @@ Inspect harness.json, the repository documentation, lockfiles, and package scrip
 export function HarnessSurfacePage({
   workspaceId,
   source,
+  embedded = false,
 }: {
   workspaceId: string
+  embedded?: boolean
   source: Exclude<WorkspaceSource, 'chat'>
 }) {
   const { t } = useTranslation()
@@ -81,15 +86,67 @@ export function HarnessSurfacePage({
     })
   }
 
+  const statusContent = (
+    <div className="flex h-full items-center justify-center overflow-auto p-4 sm:p-6">
+      <div className="w-full max-w-2xl text-center">
+        {phase !== 'failed' && !error && <Loader2 className="mx-auto mb-3 size-6 animate-spin text-primary motion-reduce:animate-none" aria-hidden />}
+        <h2 className="text-base font-semibold text-foreground">
+          {error ? t('harnessSurface.failedTitle') : t('harnessSurface.startingTitle')}
+        </h2>
+        {error ? (
+          <div className="mt-3 text-left">
+            <p className="text-sm text-muted-foreground">
+              {t(`harnessSurface.diagnosis.${failureKind}`)}
+            </p>
+            <div className="mt-3 rounded-lg border border-border bg-muted/30 p-3">
+              <p className="break-words font-mono text-xs text-foreground">{error}</p>
+              <details className="mt-2" open>
+                <summary className="cursor-pointer text-xs font-medium text-muted-foreground">
+                  {t('harnessSurface.studioOutput')}
+                </summary>
+                <pre className="mt-2 max-h-48 overflow-auto whitespace-pre-wrap break-words rounded-md bg-background p-3 text-xs text-muted-foreground">
+                  {logs || t('harnessSurface.noLogs')}
+                </pre>
+              </details>
+            </div>
+            <p className="mt-3 text-sm text-muted-foreground">
+              {t('harnessSurface.setupBody')}
+            </p>
+            <div className="mt-4 flex flex-wrap justify-center gap-2">
+              <Button onClick={openSetupQuickStart}>
+                <Bot aria-hidden />
+                {t('harnessSurface.setupWithAgent')}
+              </Button>
+              <Button variant="outline" onClick={() => void restart()}>
+                <RotateCcw aria-hidden />{t('harnessSurface.tryAgain')}
+              </Button>
+            </div>
+          </div>
+        ) : (
+          <p className="mt-1 text-sm text-muted-foreground">
+            {t('harnessSurface.startingBody')}
+          </p>
+        )}
+      </div>
+    </div>
+  )
+  if (embedded) return <BrowserPane
+    initialUrl={phase === 'ready' ? surfaceUrl : null}
+    title={t('harnessSurface.studio')}
+    generation={`${response?.surface.generation ?? 0}-${frameGeneration}`}
+    pending={statusContent}
+    actions={<DropdownMenu>
+      <DropdownMenuTrigger render={<Button variant="ghost" size="icon" aria-label={t('workbench.studioActions')}><MoreHorizontal size={16} /></Button>} />
+      <DropdownMenuContent align="end">
+        <DropdownMenuItem onClick={() => void restart()}><RotateCcw size={14} />{t('harnessSurface.restart')}</DropdownMenuItem>
+        <DropdownMenuItem onClick={() => setShowLogs((v) => !v)}><ScrollText size={14} />{t('harnessSurface.logs')}</DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>}
+    notice={showLogs ? <pre className="max-h-40 overflow-auto border-b border-border p-3 text-xs">{logs || t('harnessSurface.noLogs')}</pre> : undefined}
+  />
   return (
     <div className="flex h-full min-h-0 flex-col bg-background">
-      <div className="flex min-h-11 shrink-0 flex-wrap items-center gap-2 border-b border-border px-3 py-2">
-        <div className="min-w-0 flex-1">
-          <p className="truncate text-sm font-medium text-foreground">{t('harnessSurface.studio')}</p>
-          <p className="truncate text-xs text-muted-foreground" aria-live="polite">
-            {t(`harnessSurface.phase.${phase ?? 'starting'}`)}
-          </p>
-        </div>
+      <PageTopBar title={t('harnessSurface.studio')} actions={<>
         <Button variant="ghost" size="sm" onClick={() => setFrameGeneration((value) => value + 1)} disabled={!surfaceUrl}>
           <RefreshCw aria-hidden />{t('harnessSurface.refresh')}
         </Button>
@@ -104,7 +161,11 @@ export function HarnessSurfacePage({
         <Button variant="outline" size="sm" disabled={!surfaceUrl} onClick={() => surfaceUrl && window.open(surfaceUrl, '_blank', 'noopener,noreferrer')}>
           <ExternalLink aria-hidden />{t('harnessSurface.openSeparate')}
         </Button>
-      </div>
+      </>}>
+        <span className="truncate text-xs text-muted-foreground" aria-live="polite">
+          {t(`harnessSurface.phase.${phase ?? 'starting'}`)}
+        </span>
+      </PageTopBar>
 
       {showLogs && !error && (
         <pre className="max-h-48 shrink-0 overflow-auto border-b border-border bg-muted/40 p-3 text-xs text-muted-foreground" aria-label={t('harnessSurface.logs')}>
@@ -122,48 +183,7 @@ export function HarnessSurfacePage({
             allow="clipboard-read; clipboard-write"
           />
         ) : (
-          <div className="flex h-full items-center justify-center overflow-auto p-4 sm:p-6">
-            <div className="w-full max-w-2xl text-center">
-              {phase !== 'failed' && !error && <Loader2 className="mx-auto mb-3 size-6 animate-spin text-primary motion-reduce:animate-none" aria-hidden />}
-              <h2 className="text-base font-semibold text-foreground">
-                {error ? t('harnessSurface.failedTitle') : t('harnessSurface.startingTitle')}
-              </h2>
-              {error ? (
-                <div className="mt-3 text-left">
-                  <p className="text-sm text-muted-foreground">
-                    {t(`harnessSurface.diagnosis.${failureKind}`)}
-                  </p>
-                  <div className="mt-3 rounded-lg border border-border bg-muted/30 p-3">
-                    <p className="break-words font-mono text-xs text-foreground">{error}</p>
-                    <details className="mt-2" open>
-                      <summary className="cursor-pointer text-xs font-medium text-muted-foreground">
-                        {t('harnessSurface.studioOutput')}
-                      </summary>
-                      <pre className="mt-2 max-h-48 overflow-auto whitespace-pre-wrap break-words rounded-md bg-background p-3 text-xs text-muted-foreground">
-                        {logs || t('harnessSurface.noLogs')}
-                      </pre>
-                    </details>
-                  </div>
-                  <p className="mt-3 text-sm text-muted-foreground">
-                    {t('harnessSurface.setupBody')}
-                  </p>
-                  <div className="mt-4 flex flex-wrap justify-center gap-2">
-                    <Button onClick={openSetupQuickStart}>
-                      <Bot aria-hidden />
-                      {t('harnessSurface.setupWithAgent')}
-                    </Button>
-                    <Button variant="outline" onClick={() => void restart()}>
-                      <RotateCcw aria-hidden />{t('harnessSurface.tryAgain')}
-                    </Button>
-                  </div>
-                </div>
-              ) : (
-                <p className="mt-1 text-sm text-muted-foreground">
-                  {t('harnessSurface.startingBody')}
-                </p>
-              )}
-            </div>
-          </div>
+          statusContent
         )}
       </div>
     </div>

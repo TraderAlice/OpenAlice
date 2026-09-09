@@ -21,7 +21,7 @@ describe('workspace acceptance AI mock', () => {
 
     expect(call.function.name).toBe('bash')
     expect(JSON.parse(call.function.arguments).command).toContain(
-      `alice-workspace issue create --id ${WORKSPACE_ACCEPTANCE_AGENT_ISSUE_ID}`,
+      `alice issue create --id ${WORKSPACE_ACCEPTANCE_AGENT_ISSUE_ID}`,
     )
     expect(payloads.at(-1).choices[0].finish_reason).toBe('tool_calls')
   })

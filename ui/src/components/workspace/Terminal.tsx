@@ -1,5 +1,7 @@
 import { lazy, Suspense, useEffect, useRef, useState } from 'react';
 import type { ReactElement, ReactNode } from 'react';
+import { PageTopBar } from '../PageTopBar';
+import { Button } from '../ui/button';
 
 import { FitAddon } from '@xterm/addon-fit';
 import { WebLinksAddon } from '@xterm/addon-web-links';
@@ -43,6 +45,7 @@ interface SocketMessageEventLike {
 
 interface SocketCloseEventLike {
   readonly code: number;
+  readonly reason?: string;
 }
 
 interface SocketLike {
@@ -91,7 +94,7 @@ class ElectronPtySocket implements SocketLike {
       }),
       bridge.onClose(this.connectionId, (msg) => {
         this.readyState = this.CLOSED;
-        for (const cb of this.listeners.close) cb({ code: msg.code });
+        for (const cb of this.listeners.close) cb({ code: msg.code, reason: msg.reason });
         this.cleanup();
       }),
     );
@@ -180,8 +183,6 @@ export interface TerminalViewProps {
   readonly sessionLabel?: string;
   /** Product actions that share the titlebar when the terminal is the primary canvas. */
   readonly headerActions?: ReactNode;
-  /** Removes card chrome when the terminal itself is the page's primary canvas. */
-  readonly chrome?: 'card' | 'canvas';
   /** WebSocket URL base. Defaults to `${ws/wss}://${location.host}/pty`. */
   readonly wsUrl?: string;
   /** OpenTUI currently corrupts to an all-black canvas in xterm's WebGL addon. */
@@ -202,7 +203,7 @@ export function TerminalView(props: TerminalViewProps): ReactElement {
   if (import.meta.env.VITE_DEMO_MODE) {
     return (
       <Suspense fallback={null}>
-        <DemoTerminalReplay label={props.label ?? props.wsId} wsId={props.wsId} sessionId={props.sessionId} />
+        <DemoTerminalReplay label={props.sessionLabel ?? props.label ?? props.wsId} wsId={props.wsId} sessionId={props.sessionId} headerActions={props.headerActions} />
       </Suspense>
     );
   }
@@ -599,7 +600,7 @@ export function TerminalView(props: TerminalViewProps): ReactElement {
           setStatus('locked');
           return;
         }
-        if (ev.code === 4404) {
+        if (ev.code === 4404 || (ev.code === 1000 && ev.reason?.startsWith('disposed:'))) {
           recoverableTransportFailure = false;
           setClosedRecoverable(false);
           onSessionLostRef.current?.();
@@ -699,30 +700,12 @@ export function TerminalView(props: TerminalViewProps): ReactElement {
   }, [backendRecoveryGeneration]);
 
   return (
-    <div className={`terminal-shell${props.chrome === 'canvas' ? ' is-canvas' : ''}`}>
-      <header className="terminal-header">
-        <StatusDot status={status} />
-        <span className="terminal-title">{props.label ?? wsId}</span>
-        {props.sessionLabel && (
-          <>
-            <span className="terminal-title-separator" aria-hidden>·</span>
-            <span className="terminal-session-title">{props.sessionLabel}</span>
-          </>
-        )}
-        <span className="terminal-meta">
-          {pid !== null ? `pid ${pid}` : ''}
-          {childExited ? ' · child exited' : ''}
-          {scrollbackTruncated ? ' · scrollback truncated' : ''}
-          {exitInfo
-            ? ` · session ended code=${exitInfo.code}${
-                exitInfo.signal !== null ? ` signal=${exitInfo.signal}` : ''
-              }`
-            : ''}
-        </span>
+    <div className="terminal-shell">
+      <PageTopBar title={props.sessionLabel ?? props.label ?? wsId}
+        leading={<StatusDot status={status} />} actions={<>
         {status === 'locked' && (
-          <button
+          <Button variant="ghost" size="sm"
             type="button"
-            className="terminal-header-action"
             onClick={() => {
               takeoverNextAttachRef.current = true;
               setStatus('connecting');
@@ -731,25 +714,32 @@ export function TerminalView(props: TerminalViewProps): ReactElement {
             title="take over this session"
           >
             take over
-          </button>
+          </Button>
         )}
         {status === 'closed' && closedRecoverable && (
-          <button
+          <Button variant="ghost" size="sm"
             type="button"
-            className="terminal-header-action"
             onClick={() => retryRecoverableRef.current?.()}
             aria-label="retry this terminal connection"
             title="retry this terminal connection"
           >
             retry
-          </button>
+          </Button>
         )}
-        {props.headerActions && (
-          <span className="terminal-header-actions">
-            {props.headerActions}
-          </span>
-        )}
-      </header>
+        {props.headerActions}
+      </>}>
+        <span className="truncate text-xs text-muted-foreground" title={[
+          props.label ?? wsId,
+          pid !== null ? `pid ${pid}` : '',
+          childExited ? 'child exited' : '',
+          scrollbackTruncated ? 'scrollback truncated' : '',
+          exitInfo ? `session ended code=${exitInfo.code} signal=${exitInfo.signal ?? 'none'}` : '',
+        ].filter(Boolean).join(' · ')}>
+          {childExited ? 'child exited' : status}
+          {scrollbackTruncated ? ' · scrollback truncated' : ''}
+          {exitInfo ? ` · session ended code=${exitInfo.code}` : ''}
+        </span>
+      </PageTopBar>
       {/* FitAddon reads the computed size of xterm's direct parent. Keep that
           parent padding-free: putting the visual inset on `.terminal-host`
           makes FitAddon count the padding as usable columns, so the xterm

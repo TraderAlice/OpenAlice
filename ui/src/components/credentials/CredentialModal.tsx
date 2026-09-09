@@ -60,7 +60,7 @@ export function CredentialModal({ mode, cred, presets, agents, initialPresetId, 
   initialPresetId?: string
   initialApiKey?: string
   onClose: () => void
-  onSaved: () => Promise<void>
+  onSaved: (saved?: { slug: string; model: string; compatibleAgents: string[] }) => Promise<void>
 }) {
   const { t } = useTranslation()
   // In edit mode the vendor is fixed, so resolve its preset and matching region.
@@ -191,6 +191,7 @@ export function CredentialModal({ mode, cred, presets, agents, initialPresetId, 
     setSaving(true)
     setError('')
     try {
+      let savedSlug = cred?.slug
       if (mode === 'edit' && cred) {
         await api.config.updateCredential(cred.slug, {
           vendor,
@@ -203,7 +204,7 @@ export function CredentialModal({ mode, cred, presets, agents, initialPresetId, 
           ...(model.trim() ? { lastModel: model.trim() } : {}),
         })
       } else {
-        await api.config.addCredential({
+        const created = await api.config.addCredential({
           vendor,
           wires,
           ...(isDirect && directUrl.trim() ? { baseUrl: directUrl.trim() } : {}),
@@ -211,9 +212,10 @@ export function CredentialModal({ mode, cred, presets, agents, initialPresetId, 
           ...(label ? { label } : {}),
           ...(model.trim() ? { lastModel: model.trim() } : {}),
         })
+        savedSlug = created.slug
       }
       window.dispatchEvent(new CustomEvent('openalice:credentials-changed'))
-      await onSaved()
+      await onSaved(savedSlug ? { slug: savedSlug, model: model.trim(), compatibleAgents } : undefined)
     } catch (err) {
       setError(err instanceof Error ? err.message : t('aiProvider.saveFailed'))
       setSaving(false)

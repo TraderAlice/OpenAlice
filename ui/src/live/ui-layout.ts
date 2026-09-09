@@ -13,15 +13,15 @@ export const ACTIVITY_PAGE_IDS = [
   'market',
   'issue',
   'connectors',
-  'settings',
 ] as const satisfies readonly Page[]
 
 export type ActivityPageId = (typeof ACTIVITY_PAGE_IDS)[number]
 
+// Continue accepting the retired Beta id in saved version-1 layouts.
 export const BUILTIN_GROUP_IDS = ['primary', 'beta', 'system'] as const
 export type BuiltinGroupId = (typeof BUILTIN_GROUP_IDS)[number]
 
-export const PINNED_ACTIVITY_PAGE: ActivityPageId = 'settings'
+export const PINNED_ACTIVITY_PAGE: ActivityPageId = 'chat'
 export const MAX_CUSTOM_GROUP_LABEL = 40
 export const CUSTOM_GROUP_ID_RE = /^custom:[a-zA-Z0-9][a-zA-Z0-9_-]{0,62}$/
 
@@ -44,9 +44,8 @@ export function defaultUiLayout(): UiLayout {
   return {
     version: 1,
     groups: [
-      { id: 'primary', items: ['chat', 'inbox', 'issue', 'auto-quant', 'tracked', 'market'] },
-      { id: 'beta', items: ['prediction', 'office', 'portfolio', 'connectors'] },
-      { id: 'system', items: ['workspaces', 'automation', 'settings'] },
+      { id: 'primary', items: ['chat', 'inbox', 'issue', 'auto-quant', 'tracked', 'market', 'prediction', 'office', 'portfolio', 'connectors'] },
+      { id: 'system', items: ['workspaces', 'automation'] },
     ],
     hidden: [],
   }
@@ -110,7 +109,14 @@ export function normalizeUiLayout(input: unknown): UiLayout {
   if (!groups.some((group) => group.id === 'primary')) {
     groups.unshift({ id: 'primary', items: [] })
   }
-  for (const id of ['beta', 'system'] as const) {
+  // Project the old Beta group into primary for both the rail and its editor.
+  // This does not rewrite stored state on read or move custom-group entries.
+  const betaIndex = groups.findIndex((group) => group.id === 'beta')
+  if (betaIndex >= 0) {
+    const [beta] = groups.splice(betaIndex, 1)
+    groups.find((group) => group.id === 'primary')!.items.push(...beta.items)
+  }
+  for (const id of ['system'] as const) {
     if (!groups.some((group) => group.id === id)) {
       groups.push({ id, items: [] })
     }

@@ -1,6 +1,6 @@
 {
   "name": "open-alice",
-  "version": "0.91.0-beta.4",
+  "version": "0.92.1-beta",
   "description": "File-based trading agent engine",
   "type": "module",
   "imports": {
@@ -137,19 +137,14 @@
       "output": "dist/electron-app"
     },
     "electronVersion": "39.8.10",
-    "asar": false,
+    "asar": true,
     "files": [
       "dist/*.js",
       "dist/electron/**",
-      "ui/dist/**",
-      "default/**",
-      "src/workspaces/cli/**",
-      "src/workspaces/templates/**",
       "services/uta/dist/**",
       "services/uta/package.json",
       "services/connector/dist/**",
       "services/connector/package.json",
-      "vendor/**",
       "package.json",
       "!node_modules/**/*.d.ts",
       "!node_modules/**/*.d.ts.map",
@@ -175,7 +170,13 @@
       ],
       "icon": "apps/desktop/build/icon.ico",
       "files": [
-        "!node_modules/dugite/git/**"
+        {
+          "from": ".",
+          "filter": [
+            "package.json",
+            "!node_modules/dugite/git/**"
+          ]
+        }
       ]
     },
     "nsis": {
@@ -189,10 +190,34 @@
         "provider": "generic",
         "url": "https://download.openalice.ai/"
       }
-    ]
+    ],
+    "asarUnpack": [
+      "node_modules/node-pty/**",
+      "node_modules/dugite/git/**"
+    ],
+    "extraResources": [
+      {
+        "from": ".",
+        "to": "runtime",
+        "filter": [
+          "ui/dist/**",
+          "default/**",
+          "src/workspaces/cli/**",
+          "src/workspaces/templates/**",
+          "vendor/**",
+          "!**/node_modules/**/*.d.ts",
+          "!**/node_modules/**/*.d.ts.map",
+          "!**/node_modules/**/*.map",
+          "!**/node_modules/**/_types/**",
+          "!vendor/pi/package-lock.json"
+        ]
+      }
+    ],
+    "afterPack": "../../scripts/desktop-after-pack.mjs"
   },
   "devDependencies": {
     "@ai-sdk/provider": "^3.0.8",
+    "@electron/asar": "^4.3.0",
     "@testing-library/react": "^16.3.2",
     "@testing-library/user-event": "^14.6.1",
     "@types/node": "^25.2.3",

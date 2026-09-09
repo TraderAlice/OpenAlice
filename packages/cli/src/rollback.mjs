@@ -9,12 +9,14 @@ import {
   rm,
   stat,
   symlink,
+  writeFile,
 } from 'node:fs/promises'
 import { basename, dirname, join } from 'node:path'
 import { createInterface } from 'node:readline/promises'
 
 import { recordPendingActivation } from './activation.mjs'
-import { resolveInstalledLayout } from './install-layout.mjs'
+import { resolveCurrentRelease, resolveInstalledLayout } from './install-layout.mjs'
+import { cliExecutableName } from './release-targets.mjs'
 import { requireInstallSource } from './install-source.mjs'
 
 export function parseRollbackArgs(argv) {
@@ -76,7 +78,7 @@ export async function runRollbackCommand(argv, dependencies = {}) {
 
 export async function inspectRollback(layout, requestedTarget = null, dependencies = {}) {
   const realpathImpl = dependencies.realpathImpl ?? realpath
-  const currentPath = await realpathImpl(layout.currentPath)
+  const currentPath = await resolveCurrentRelease(layout, dependencies)
   const releasesPath = await realpathImpl(layout.releasesDir)
   if (dirname(currentPath) !== releasesPath) {
     throw new Error('The active OpenAlice release pointer leaves the installer-owned releases directory.')
@@ -105,10 +107,17 @@ export async function inspectRollback(layout, requestedTarget = null, dependenci
 }
 
 export async function activateRelease(layout, releaseName, dependencies = {}) {
+  if (!/^[A-Za-z0-9._+-]+$/.test(releaseName) || ['.', '..'].includes(releaseName)) {
+    throw new Error('Invalid release activation name')
+  }
   const nextPath = `${layout.currentPath}.next.${process.pid}.${randomUUID()}`
   await (dependencies.rmImpl ?? rm)(nextPath, { force: true })
   try {
-    await (dependencies.symlinkImpl ?? symlink)(join('releases', releaseName), nextPath)
+    if (layout.pointerKind === 'file') {
+      await (dependencies.writeFileImpl ?? writeFile)(nextPath, `${releaseName}\n`, { mode: 0o600 })
+    } else {
+      await (dependencies.symlinkImpl ?? symlink)(join('releases', releaseName), nextPath)
+    }
     await (dependencies.renameImpl ?? rename)(nextPath, layout.currentPath)
   } finally {
     await (dependencies.rmImpl ?? rm)(nextPath, { force: true })
@@ -137,7 +146,7 @@ async function validateRelease(layout, name, dependencies) {
   const path = join(layout.releasesDir, name)
   const status = await (dependencies.lstatImpl ?? lstat)(path)
   if (!status.isDirectory() || status.isSymbolicLink()) throw new Error(`Installed release is not an immutable directory: ${name}`)
-  await (dependencies.accessImpl ?? access)(join(path, 'bin', 'openalice'))
+  await (dependencies.accessImpl ?? access)(join(path, 'bin', cliExecutableName(layout.platform ?? process.platform)))
   const provenancePath = join(layout.provenanceDir, `${name}.json`)
   const source = requireInstallSource(JSON.parse(await (dependencies.readFileImpl ?? readFile)(provenancePath, 'utf8')))
   if (!name.startsWith(`${source.cliVersion}-`)) {

@@ -1,5 +1,18 @@
-import { existsSync, lstatSync, readlinkSync } from 'node:fs'
+import { existsSync, lstatSync, readFileSync, readlinkSync } from 'node:fs'
 import { join, resolve } from 'node:path'
+import { extractFile, uncache } from '@electron/asar'
+
+export function readInstalledDesktopVersion(installRoot) {
+  const resources = join(installRoot, 'resources')
+  const archive = join(resources, 'app.asar')
+  if (existsSync(archive)) {
+    // NSIS replaces this path in place. Never retain the previous archive header
+    // between polls, or fall back to a stale loose tree during replacement.
+    uncache(archive)
+    return JSON.parse(extractFile(archive, 'package.json').toString()).version
+  }
+  return JSON.parse(readFileSync(join(resources, 'app', 'package.json'), 'utf8')).version
+}
 
 export const DESKTOP_UPGRADE_RECEIPT_SCHEMA_VERSION = 1
 export const CHROMIUM_PROFILE_SINGLETON_NAMES = Object.freeze([

@@ -59,7 +59,7 @@ export const demoWorkspace: Workspace = {
 }
 
 // Chat workspace — populates the Chat activity sidebar (which filters
-// `template === 'chat'`). Its featured Session uses the real WebPi renderer
+// `template === 'chat'`). Its featured Session uses the real Web conversation renderer
 // over recorded native Pi messages; the remaining rows keep the multi-runtime
 // history visible.
 export const DEMO_CHAT_WORKSPACE_ID = 'demo-chat-ws'

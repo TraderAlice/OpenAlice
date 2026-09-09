@@ -7,7 +7,7 @@ import type { WorkspacesContextValue } from '../contexts/workspaces-context'
 import { i18n } from '../i18n'
 import type { AgentInfo, Workspace } from '../components/workspace/api'
 import { resetAgentRuntimesStore } from '../hooks/useAgentRuntimes'
-import { AutoPredictionLandingPage, AutoQuantLandingPage, ChatLandingPage } from './ChatLandingPage'
+import { AutoPredictionLandingPage, AutoQuantLandingPage, ChatLandingPage, HarnessLandingPage } from './ChatLandingPage'
 
 const mocks = vi.hoisted(() => ({
   useWorkspaces: vi.fn(),
@@ -171,7 +171,7 @@ function context(
     quickChat: mocks.quickChat,
     pauseSession: vi.fn(async () => undefined),
     resumeSession: vi.fn(async () => undefined),
-    openWebPiSession: vi.fn(async () => undefined),
+    openWebSession: vi.fn(async () => undefined),
     requestDeleteSession: vi.fn(),
     setSessionPresence: vi.fn(async () => undefined),
     setSessionDisplayName: vi.fn(async () => undefined),
@@ -985,5 +985,23 @@ describe('ChatLandingPage AI source disclosure', () => {
     expect(mocks.detectWorkspaceCredential).not.toHaveBeenCalled()
     expect(await findInferenceTrigger('deepseek-v3.2')).toBeTruthy()
     expect(screen.getByRole('button', { name: 'Model and reasoning' }).textContent).not.toContain('gemini-3.1-pro-preview')
+  })
+})
+
+
+describe('Workspace embedded composer', () => {
+  it('submits into the explicit Quant Workspace even when another is the default', async () => {
+    const target: Workspace = { ...chatWorkspace(), id: 'quant-target', template: 'auto-quant-v2' }
+    const other: Workspace = { ...target, id: 'quant-default' }
+    workspaces = [target, other]
+    mocks.useWorkspaces.mockImplementation(() => context(workspaces, other.id))
+    render(<HarnessLandingPage mode="auto-quant" spec={{ params: { targetWsId: target.id } }} showHeader={false} />)
+    await screen.findByRole('button', { name: 'Model and reasoning' })
+    const input = screen.getByPlaceholderText('Describe the strategy, market, hypothesis, or iteration goal…')
+    fireEvent.change(input, { target: { value: 'Inspect existing research' } })
+    fireEvent.keyDown(input, { key: 'Enter', code: 'Enter' })
+    await waitFor(() => expect(mocks.quickChat).toHaveBeenCalledWith(
+      'Inspect existing research', 'pi', undefined, target.id, 'auto-quant-v2', undefined, undefined, undefined,
+    ))
   })
 })

@@ -14,6 +14,7 @@ import { useTranslation } from 'react-i18next'
 import { ArrowLeft, FileText } from 'lucide-react'
 
 import { FileContentView } from '../components/FileContentView'
+import { PageTopBar } from '../components/PageTopBar'
 import { CenteredLoading } from '../components/StateViews'
 import { Button } from '../components/ui/button'
 import { Tooltip, TooltipContent, TooltipTrigger } from '../components/ui/tooltip'
@@ -86,7 +87,7 @@ export function FileViewerPage({ spec }: Props) {
 
   return (
     <div className="h-full flex flex-col min-h-0">
-      <div className="flex shrink-0 items-start gap-2 border-b border-border bg-secondary/30 px-4 py-2 sm:items-center">
+      <PageTopBar leading={
         <Tooltip>
           <TooltipTrigger
             render={(
@@ -104,6 +105,7 @@ export function FileViewerPage({ spec }: Props) {
           />
           <TooltipContent>{backLabel}</TooltipContent>
         </Tooltip>
+      }>
         <FileText size={13} strokeWidth={1.75} className="mt-1 shrink-0 text-muted-foreground/70 sm:mt-0" aria-hidden />
         <div className="min-w-0 flex-1 sm:contents">
           <span
@@ -119,7 +121,7 @@ export function FileViewerPage({ spec }: Props) {
             {workspaceName}
           </span>
         </div>
-      </div>
+      </PageTopBar>
       <OfficeInboxDutyReturnBar
         surface={{ kind: 'file', workspaceId: wsId, path }}
         onReturn={returnToOffice}

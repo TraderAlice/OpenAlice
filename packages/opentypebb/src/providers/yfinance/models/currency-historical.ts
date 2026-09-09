@@ -10,11 +10,11 @@ import { getHistoricalData, emptyHistoricalError } from '../utils/helpers.js'
 import { INTERVALS_DICT } from '../utils/references.js'
 
 export const YFinanceCurrencyHistoricalQueryParamsSchema = CurrencyHistoricalQueryParamsSchema.extend({
-  interval: z.enum(['1m', '2m', '5m', '15m', '30m', '60m', '90m', '1h', '1d', '5d', '1W', '1M', '1Q']).default('1d').describe('Data granularity.'),
+  interval: z.enum(['1m', '2m', '5m', '15m', '30m', '60m', '90m', '1h', '1d', '5d', '1w', '1W', '1M', '1Q']).default('1d').describe('Data granularity.'),
 })
 export type YFinanceCurrencyHistoricalQueryParams = z.infer<typeof YFinanceCurrencyHistoricalQueryParamsSchema>
 
-export const YFinanceCurrencyHistoricalDataSchema = CurrencyHistoricalDataSchema
+export const YFinanceCurrencyHistoricalDataSchema = CurrencyHistoricalDataSchema.extend({ close: z.number().nullable() })
 export type YFinanceCurrencyHistoricalData = z.infer<typeof YFinanceCurrencyHistoricalDataSchema>
 
 export class YFinanceCurrencyHistoricalFetcher extends Fetcher {
@@ -50,6 +50,7 @@ export class YFinanceCurrencyHistoricalFetcher extends Fetcher {
     const results = await Promise.allSettled(
       symbols.map(async (sym) => {
         return getHistoricalData(sym, {
+          preserveIncomplete: true,
           startDate: query.start_date,
           endDate: query.end_date,
           interval,

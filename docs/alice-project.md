@@ -67,9 +67,31 @@ plus the matching Settings categories
 Ask Alice or Settings. AutoQuant and Tracked stay visible until that
 boundary is reviewed separately.
 
-A new AliceProject with no Chat Workspace opens Ask Alice on the shared
-harness setup page rather than an empty composer; Chat does not pin a Harness
-version.
+Named AliceProject creation selects the workspaces to prepare. Chat is the
+default; Auto Quant and Auto Prediction are optional, and selecting none leaves
+setup for later. The TUI Foundry adds a third Workspaces step (arrows to move,
+Space/click to toggle) and finishes with Create & start. Scripted creation uses
+`--workspaces chat,auto-quant,auto-prediction` or `--workspaces none`; it records
+the selection without starting a Runtime. The next startup prepares it.
+
+The CLI and TUI share the same registration and `workspace-setup.json` birth
+request. Under its writer lease, the backend resolves or creates each selected
+Workspace and saves the canonical Harness default before checkpointing success.
+It never starts an Agent Session or copies credentials. An interrupted attempt
+reuses the existing Workspace. Failed items remain pending, while successful
+items are not recreated. Quick Start reports remaining setup and offers Retry;
+the existing per-Harness setup page still supports deferred/legacy projects.
+A missing request leaves older homes unchanged. Chat does not pin a Harness version.
+
+A prepared Workspace may still need an Agent or credentials before its first
+Session; the normal launch controls own that readiness, independently of setup.
+The first-run guide offers an explicit Pi provider connection action. Saving a
+compatible provider binds it to an unconfigured Chat's interactive defaults;
+existing runtime choices and headless defaults are preserved. The guide stays
+on the confirmed AI-ready step until the user continues. Its page layer sits
+below the shared credential/UTA dialogs so these remain visible and operable.
+Packaged onboarding smoke uses isolated Pi state, the local mock provider, and
+the same Chat birth request before verifying the renderer and provider binding.
 
 Create a named project from the CLI:
 
@@ -87,7 +109,11 @@ for AI credential rows: it copies only `credentials` from the per-home
 `ai-provider-manager.json`, writes into the destination home, and never prints
 secrets. Workspace launch preferences and broker credentials stay project-local.
 
-The Supervisor TUI create path still registers a Trader-equivalent home.
+The Supervisor TUI create path registers a Trader-equivalent home.
+
+For isolated first-run verification, use
+`OPENALICE_ONBOARDING_WORKSPACES=chat pnpm dev:onboarding`. Omit the variable
+to exercise the legacy/deferred setup page. `none` explicitly skips preparation.
 
 The application/source root is launch metadata, not identity. Ports and Web
 URLs are live discovery data and may change between launches. Guardian's

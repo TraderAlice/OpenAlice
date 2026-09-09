@@ -1,6 +1,8 @@
 import type { ComponentType, ReactNode } from 'react'
 import type { Workspace } from '../components/workspace/api'
 import type { ViewKind, ViewSpec } from './types'
+import { WorkspaceDetailsPage } from '../pages/WorkspaceDetailsPage'
+import { QuickStartPage } from '../pages/QuickStartPage'
 
 import { PortfolioPage } from '../pages/PortfolioPage'
 import { TradingAsGitPage } from '../pages/TradingAsGitPage'
@@ -9,7 +11,6 @@ import { IssueSettingsPage } from '../pages/IssueSettingsPage'
 import { HarnessSettingsPage } from '../pages/HarnessSettingsPage'
 import { IssueDetailPage } from '../pages/IssueDetailPage'
 import { TrackedIssueDetailPage } from '../pages/TrackedIssueDetailPage'
-import { AutomationPage } from '../pages/AutomationPage'
 import { OfficePage } from '../pages/OfficePage'
 import { NewsPage } from '../pages/NewsPage'
 import { MarketPage } from '../pages/MarketPage'
@@ -19,6 +20,7 @@ import { MARKET_BOARD_TITLES } from '../pages/market-board-titles'
 import { MarketDetailPage } from '../pages/MarketDetailPage'
 import { AppearanceSettingsPage, SettingsPage, ToolsSettingsPage } from '../pages/SettingsPage'
 import { ActivityBarSettingsPage } from '../pages/ActivityBarSettingsPage'
+import { WorkspaceInjectionPage } from '../pages/WorkspaceInjectionPage'
 import { BetaSettingsPage } from '../pages/BetaSettingsPage'
 import { AgentPermissionsPage } from '../pages/AgentPermissionsPage'
 import { AgentRuntimesSettingsPage } from '../pages/AgentRuntimesSettingsPage'
@@ -39,18 +41,15 @@ import { TrackedPage } from '../pages/TrackedPage'
 import { AutoPredictionLandingPage, AutoQuantLandingPage, ChatLandingPage } from '../pages/ChatLandingPage'
 import { WorkspaceManagerPage } from '../pages/WorkspaceManagerPage'
 import { PageSidebarShell } from '../pages/PageSidebarShell'
-import { WorkspaceListPage } from '../pages/WorkspaceListPage'
 import { WorkspacePage } from '../pages/WorkspacePage'
-import { TemplateCatalogPage } from '../pages/TemplateCatalogPage'
-import { TemplateDetailPage } from '../pages/TemplateDetailPage'
+import { WorkspaceHarnessRedirect } from './WorkspaceHarnessRedirect'
 import { FileViewerPage } from '../pages/FileViewerPage'
 import { HarnessSurfacePage } from '../pages/HarnessSurfacePage'
 import { TrackedSidebar } from '../components/TrackedSidebar'
-import { WorkspacesSidebar } from '../components/workspace/WorkspacesSidebar'
 import { SettingsCategoryList } from '../components/SettingsCategoryList'
 import { MarketSidebar } from '../components/MarketSidebar'
 import { PortfolioSidebar } from '../components/PortfolioSidebar'
-import { AutomationSidebar } from '../components/AutomationSidebar'
+import { PageContentLayout } from '../components/PageTopBar'
 import { getDesignProject } from '../design/projects'
 
 /**
@@ -74,7 +73,7 @@ interface ViewProps<K extends ViewKind> {
 }
 
 export type ViewLifecycle = 'active-only' | 'keep-mounted'
-export type ViewShell = 'chat' | 'auto-quant' | 'prediction'
+export type ViewShell = 'chat' | 'auto-quant' | 'prediction' | 'market'
 
 export interface ViewModule<K extends ViewKind> {
   kind: K
@@ -158,7 +157,7 @@ const issueDetailModule: ViewModule<'issue-detail'> = {
   title: (spec) => spec.params.id,
   toUrl: (spec) =>
     `/issues/${encodeURIComponent(spec.params.wsId)}/${encodeURIComponent(spec.params.id)}`,
-  Component: ({ spec }) => <IssueDetailPage spec={spec} />,
+  Component: ({ spec }) => <PageContentLayout title={spec.params.id}><IssueDetailPage spec={spec} /></PageContentLayout>,
 }
 
 const trackedIssueDetailModule: ViewModule<'tracked-issue-detail'> = {
@@ -189,16 +188,9 @@ const automationSectionTitle: Record<
 const automationModule: ViewModule<'automation'> = {
   kind: 'automation',
   title: (spec) => automationSectionTitle[spec.params.section],
-  toUrl: (spec) => `/automation/${spec.params.section}`,
+  toUrl: (spec) => `/settings/developer/${spec.params.section}`,
   Component: (props) => (
-    <PageSidebarShell
-      storageKey="automation"
-      titleKey="nav.item.automation"
-      defaultWidth={220}
-      sidebar={<AutomationSidebar />}
-    >
-      <AutomationPage {...props} />
-    </PageSidebarShell>
+    <devModule.Component {...props} spec={{ kind: 'dev', params: { tab: props.spec.params.section } }} />
   ),
 }
 
@@ -206,16 +198,16 @@ const officeModule: ViewModule<'office'> = {
   kind: 'office',
   title: () => 'Office',
   toUrl: () => '/office',
-  Component: () => <OfficePage />,
+  Component: () => <PageContentLayout title="Office"><OfficePage /></PageContentLayout>,
 }
 
-function MarketArea({ children }: { children: ReactNode }) {
+export function MarketArea({ children }: { children: ReactNode }) {
   return (
     <PageSidebarShell
       storageKey="market"
       titleKey="nav.item.market"
       defaultWidth={300}
-      sidebar={<MarketSidebar />}
+      sidebar={({ closeMobileDrawer }) => <MarketSidebar onNavigate={closeMobileDrawer} />}
     >
       {children}
     </PageSidebarShell>
@@ -225,45 +217,38 @@ function MarketArea({ children }: { children: ReactNode }) {
 const newsModule: ViewModule<'news'> = {
   kind: 'news',
   title: () => 'News',
-  toUrl: () => '/market/news',
-  Component: () => (
-    <MarketArea>
-      <NewsPage />
-    </MarketArea>
-  ),
+  toUrl: ({ params }) => {
+    const search = new URLSearchParams()
+    if (params.category) search.set('category', params.category)
+    if (params.view) search.set('view', params.view)
+    return '/market/news' + (search.size ? '?' + search : '')
+  },
+  shell: 'market',
+  Component: ({ spec }) => <NewsPage spec={spec} />,
 }
 
 const marketListModule: ViewModule<'market-list'> = {
   kind: 'market-list',
   title: () => 'Market',
   toUrl: () => '/market',
-  Component: () => (
-    <MarketArea>
-      <MarketPage />
-    </MarketArea>
-  ),
+  shell: 'market',
+  Component: () => <MarketPage />,
 }
 
 const marketRotationModule: ViewModule<'market-rotation'> = {
   kind: 'market-rotation',
   title: () => 'Sector Rotation',
   toUrl: () => '/market/rotation',
-  Component: () => (
-    <MarketArea>
-      <MarketRotationPage />
-    </MarketArea>
-  ),
+  shell: 'market',
+  Component: () => <MarketRotationPage />,
 }
 
 const marketBoardModule: ViewModule<'market-board'> = {
   kind: 'market-board',
   title: (spec) => MARKET_BOARD_TITLES[spec.params.board],
   toUrl: (spec) => `/market/boards/${spec.params.board}`,
-  Component: (props) => (
-    <MarketArea>
-      <MarketBoardPage {...props} />
-    </MarketArea>
-  ),
+  shell: 'market',
+  Component: (props) => <MarketBoardPage {...props} />,
 }
 
 const marketDetailModule: ViewModule<'market-detail'> = {
@@ -272,11 +257,8 @@ const marketDetailModule: ViewModule<'market-detail'> = {
   toUrl: (spec) =>
     `/market/${spec.params.assetClass}/${encodeURIComponent(spec.params.symbol)}` +
     (spec.params.source ? `?source=${encodeURIComponent(spec.params.source)}` : ''),
-  Component: (props) => (
-    <MarketArea>
-      <MarketDetailPage {...props} />
-    </MarketArea>
-  ),
+  shell: 'market',
+  Component: (props) => <MarketDetailPage {...props} />,
 }
 
 const settingsCategoryTitle: Record<
@@ -297,6 +279,7 @@ const settingsCategoryTitle: Record<
   mcp: 'MCP Server',
   'market-data': 'Market Data',
   'news-collector': 'News Sources',
+  'workspace-injection': 'Workspace injection',
   beta: 'Beta',
 }
 
@@ -316,6 +299,7 @@ function SettingsRouter({ spec }: ViewProps<'settings'>) {
     case 'mcp': return <MCPPage />
     case 'market-data': return <MarketDataPage />
     case 'news-collector': return <NewsCollectorPage />
+    case 'workspace-injection': return <WorkspaceInjectionPage />
     case 'beta': return <BetaSettingsPage />
   }
 }
@@ -371,6 +355,8 @@ const devTabTitle: Record<Extract<ViewSpec, { kind: 'dev' }>['params']['tab'], s
   onboarding: 'Onboarding',
   snapshots: 'Snapshots',
   logs: 'Logs',
+  runs: 'Runs',
+  api: 'API',
   simulator: 'Simulator',
 }
 
@@ -433,7 +419,7 @@ const chatLandingModule: ViewModule<'chat-landing'> = {
   kind: 'chat-landing',
   shell: 'chat',
   title: (spec, ctx) => {
-    if (!spec.params.targetWsId) return 'Ask Alice'
+    if (!spec.params.targetWsId) return 'Chat'
     const tag = ctx.workspaces?.find((w) => w.id === spec.params.targetWsId)?.tag
     return tag ? `New session · ${tag}` : 'New session'
   },
@@ -486,20 +472,22 @@ const workspaceManagerModule: ViewModule<'workspace-manager'> = {
   Component: ({ spec }) => <WorkspaceManagerPage spec={spec} />,
 }
 
+const workspaceDetailsModule: ViewModule<'workspace-details'> = {
+  kind: 'workspace-details',
+  shell: (spec) => spec.params.source,
+  title: (spec, ctx) => ctx.workspaces?.find((w) => w.id === spec.params.wsId)?.displayName
+    || ctx.workspaces?.find((w) => w.id === spec.params.wsId)?.tag || 'Workspace',
+  toUrl: (spec) => `/${spec.params.source}/workspaces/${encodeURIComponent(spec.params.wsId)}/details`,
+  Component: ({ spec }) => <WorkspaceDetailsPage spec={spec} />,
+}
+
+// Retained only for saved tabs; this no longer mounts a global management UI.
 const workspaceListModule: ViewModule<'workspace-list'> = {
   kind: 'workspace-list',
-  title: () => 'Workspaces',
-  toUrl: () => '/workspaces',
-  Component: () => (
-    <PageSidebarShell
-      storageKey="workspaces"
-      titleKey="nav.item.workspaces"
-      defaultWidth={300}
-      sidebar={<WorkspacesSidebar />}
-    >
-      <WorkspaceListPage />
-    </PageSidebarShell>
-  ),
+  shell: 'chat',
+  title: () => 'Ask Alice',
+  toUrl: () => '/chat',
+  Component: () => <ChatLandingPage spec={{ params: {} }} />,
 }
 
 const workspaceModule: ViewModule<'workspace'> = {
@@ -526,57 +514,32 @@ const workspaceModule: ViewModule<'workspace'> = {
           ? `/auto-quant/workspaces/${encodeURIComponent(spec.params.wsId)}`
           : spec.params.source === 'prediction'
             ? `/prediction/workspaces/${encodeURIComponent(spec.params.wsId)}`
-            : `/workspaces/${encodeURIComponent(spec.params.wsId)}`
+            : '/chat'
+    if (!spec.params.source) return '/chat'
     const sid = spec.params.sessionId
     return sid ? `${base}/s/${encodeURIComponent(sid)}` : base
   },
-  Component: (props) =>
-    props.spec.params.source === 'chat'
-      || props.spec.params.source === 'auto-quant'
-      || props.spec.params.source === 'prediction'
-      ? <WorkspacePage {...props} />
-      : (
-        <PageSidebarShell
-          storageKey="workspaces"
-          titleKey="nav.item.workspaces"
-          defaultWidth={300}
-          sidebar={<WorkspacesSidebar />}
-        >
-          <WorkspacePage {...props} />
-        </PageSidebarShell>
-      ),
+  Component: (props) => props.spec.params.source
+    ? <WorkspacePage {...props} />
+    : <WorkspaceHarnessRedirect spec={props.spec} />,
 }
 
+// Retained only for saved tabs; this no longer mounts a global management UI.
 const templateCatalogModule: ViewModule<'template-catalog'> = {
   kind: 'template-catalog',
-  title: () => 'Templates',
-  toUrl: () => '/workspaces/templates',
-  Component: () => (
-    <PageSidebarShell
-      storageKey="workspaces"
-      titleKey="nav.item.workspaces"
-      defaultWidth={300}
-      sidebar={<WorkspacesSidebar />}
-    >
-      <TemplateCatalogPage />
-    </PageSidebarShell>
-  ),
+  shell: 'chat',
+  title: () => 'Ask Alice',
+  toUrl: () => '/chat',
+  Component: () => <ChatLandingPage spec={{ params: {} }} />,
 }
 
+// Retained only for saved tabs; this no longer mounts a global management UI.
 const templateDetailModule: ViewModule<'template-detail'> = {
   kind: 'template-detail',
-  title: (spec) => `Template · ${spec.params.name}`,
-  toUrl: (spec) => `/workspaces/templates/${encodeURIComponent(spec.params.name)}`,
-  Component: ({ spec }) => (
-    <PageSidebarShell
-      storageKey="workspaces"
-      titleKey="nav.item.workspaces"
-      defaultWidth={300}
-      sidebar={<WorkspacesSidebar />}
-    >
-      <TemplateDetailPage spec={spec} />
-    </PageSidebarShell>
-  ),
+  shell: 'chat',
+  title: () => 'Ask Alice',
+  toUrl: () => '/chat',
+  Component: () => <ChatLandingPage spec={{ params: {} }} />,
 }
 
 const fileViewerModule: ViewModule<'file-viewer'> = {
@@ -601,7 +564,8 @@ const fileViewerModule: ViewModule<'file-viewer'> = {
         ? `/auto-quant/workspaces/${encodeURIComponent(spec.params.wsId)}`
         : spec.params.source === 'prediction'
           ? `/prediction/workspaces/${encodeURIComponent(spec.params.wsId)}`
-          : `/workspaces/${encodeURIComponent(spec.params.wsId)}`
+          : '/chat'
+    if (!spec.params.source) return '/chat'
     const query = spec.params.returnSessionId
       ? `?sessionId=${encodeURIComponent(spec.params.returnSessionId)}`
       : ''
@@ -622,16 +586,7 @@ const fileViewerModule: ViewModule<'file-viewer'> = {
           <FileViewerPage spec={spec} />
         </PageSidebarShell>
       )
-    : (
-      <PageSidebarShell
-        storageKey="workspaces"
-        titleKey="nav.item.workspaces"
-        defaultWidth={300}
-        sidebar={<WorkspacesSidebar />}
-      >
-        <FileViewerPage spec={spec} />
-      </PageSidebarShell>
-    ),
+    : <WorkspaceHarnessRedirect spec={spec} />,
 }
 
 // ==================== Aggregate ====================
@@ -657,12 +612,14 @@ const VIEWS = {
   dev: devModule,
   inbox: inboxModule,
   tracked: trackedModule,
+  'quick-start': { kind: 'quick-start', title: () => 'Quick Start', toUrl: () => '/quick-start', Component: QuickStartPage },
   'chat-landing': chatLandingModule,
   'auto-quant-landing': autoQuantLandingModule,
   'auto-prediction-landing': autoPredictionLandingModule,
   'harness-surface': harnessSurfaceModule,
   'workspace-manager': workspaceManagerModule,
   'workspace-list': workspaceListModule,
+  'workspace-details': workspaceDetailsModule,
   workspace: workspaceModule,
   'template-catalog': templateCatalogModule,
   'template-detail': templateDetailModule,

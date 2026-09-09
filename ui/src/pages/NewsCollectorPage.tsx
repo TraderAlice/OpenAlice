@@ -105,6 +105,88 @@ export function isValidFeedUrl(value: string): boolean {
   }
 }
 
+const RSSHUB_PRESETS = [
+  { name: '财联社 · 电报', source: 'cls', route: 'cls/telegraph', description: 'CLS telegraph news via your RSSHub instance.' },
+  { name: '格隆汇 · 实时快讯', source: 'gelonghui', route: 'gelonghui/live', description: 'Gelonghui live news via your RSSHub instance.' },
+  { name: '金十数据 · 市场快讯', source: 'jin10', route: 'jin10', description: 'Jin10 market news via your RSSHub instance.' },
+]
+
+function rssHubBaseUrl(value: string): string | null {
+  try {
+    const url = new URL(value.trim())
+    if (!['http:', 'https:'].includes(url.protocol) || url.username || url.password || url.search || url.hash) return null
+    return url.href.replace(/\/+$/, '') + '/'
+  } catch {
+    return null
+  }
+}
+
+function RssHubPresets({ feeds, onChange }: {
+  feeds: NewsCollectorFeed[]
+  onChange: (feeds: NewsCollectorFeed[]) => void
+}) {
+  const [instance, setInstance] = useState('')
+  const baseUrl = rssHubBaseUrl(instance)
+  const invalid = instance.trim().length > 0 && !baseUrl
+
+  return (
+    <div className="mb-4 space-y-3 border-b border-border/60 pb-4">
+      <h4 className="text-[13px] font-medium">Chinese news via RSSHub</h4>
+      <p id="rsshub-help" className="text-[12px] leading-5 text-muted-foreground">
+        Use an RSSHub instance reachable from the OpenAlice backend, not just this browser.
+        OpenAlice does not install RSSHub. Public instances may block requests.
+        Restart Alice after saving to start collecting the new feeds.
+      </p>
+      <Field label="RSSHub instance URL" controlId="rsshub-instance">
+        <input
+          id="rsshub-instance"
+          type="url"
+          className={inputClass}
+          value={instance}
+          onChange={(event) => setInstance(event.target.value)}
+          placeholder="http://localhost:1200"
+          aria-invalid={invalid}
+          aria-describedby={invalid ? 'rsshub-help rsshub-error' : 'rsshub-help'}
+        />
+        {invalid && (
+          <p id="rsshub-error" role="alert" className="mt-1 text-[12px] text-destructive">
+            Enter an HTTP(S) instance URL without credentials, a query, or a fragment.
+          </p>
+        )}
+      </Field>
+      <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
+        {RSSHUB_PRESETS.map((preset) => {
+          const added = feeds.some((feed) => feed.source.trim().toLowerCase() === preset.source)
+          return (
+            <Button
+              key={preset.source}
+              type="button"
+              variant="outline"
+              disabled={!baseUrl || added}
+              onClick={() => {
+                if (!baseUrl || added) return
+                onChange([...feeds, {
+                  name: preset.name,
+                  source: preset.source,
+                  url: new URL(preset.route, baseUrl).href,
+                  description: preset.description,
+                  enabled: true,
+                }])
+              }}
+            >
+              {added ? 'Added' : 'Add'} {preset.name}
+            </Button>
+          )
+        })}
+      </div>
+      <p className="text-[12px] leading-5 text-muted-foreground">
+        Each preset saves a normal feed URL. Changing this address does not modify existing feeds;
+        remove and re-add a preset to move it to another instance.
+      </p>
+    </div>
+  )
+}
+
 export function FeedsSection({
   feeds,
   onChange,
@@ -156,6 +238,7 @@ export function FeedsSection({
           : 'Add a feed to start collecting articles.'
       }
     >
+      <RssHubPresets feeds={feeds} onChange={onChange} />
       {/* Existing feeds */}
       {feeds.length > 0 && (
         <div className="space-y-2 mb-4">

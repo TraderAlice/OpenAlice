@@ -4,7 +4,7 @@ import { existsSync } from 'node:fs';
 import { mkdir, rename, rm, statfs } from 'node:fs/promises';
 import { join } from 'node:path';
 
-import { exec as gitExec } from 'dugite';
+import { exec as gitExec } from './git-execution.js';
 
 import {
   readCredentials,

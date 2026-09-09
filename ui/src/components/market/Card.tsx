@@ -23,8 +23,8 @@ interface Props {
  */
 export function Card({ title, info, right, className, headerClassName, contentClassName, children }: Props) {
   return (
-    <section className={`flex flex-col border border-border rounded bg-secondary/30 ${className ?? ''}`}>
-      <header className={`flex gap-3 border-b border-border/60 px-3 py-2 ${headerClassName ?? 'items-center justify-between'}`}>
+    <section className={`oa-data-surface flex flex-col overflow-hidden rounded-lg border ${className ?? ''}`}>
+      <header className={`oa-data-surface-header flex min-h-9 gap-3 border-b px-3 py-2 ${headerClassName ?? 'items-center justify-between'}`}>
         <div className="flex items-center gap-1.5 min-w-0">
           <h3 className="text-[13px] leading-[18px] font-medium text-foreground truncate">{title}</h3>
           {info && (

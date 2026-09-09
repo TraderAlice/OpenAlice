@@ -15,14 +15,16 @@ import {
 } from './ui-layout'
 
 describe('ui-layout document', () => {
-  it('covers every catalog page and starts with no hidden entries', () => {
+  it('covers every active catalog page while accepting retired layout ids', () => {
     const catalogPages = NAV_SECTIONS.flatMap((section) => section.items.map((item) => item.page))
-    expect(new Set(catalogPages)).toEqual(new Set(ACTIVITY_PAGE_IDS))
+    // Persisted layout validation stays compatible; the navigation catalog
+    // decides which accepted ids can actually appear or be configured.
+    expect(new Set(catalogPages)).toEqual(new Set(ACTIVITY_PAGE_IDS.filter(page => page !== 'workspaces' && page !== 'automation' && page !== 'connectors')))
     expect(defaultUiLayout().hidden).toEqual([])
     expect(defaultUiLayout().hidden).not.toContain(PINNED_ACTIVITY_PAGE)
   })
 
-  it('keeps Settings visible, drops retired Dev state, and restores missing catalog pages', () => {
+  it('keeps Chat visible, drops retired Settings and Dev state, and restores missing catalog pages', () => {
     const layout = normalizeUiLayout({
       version: 1,
       groups: [{ id: 'primary', items: ['chat'] }],
@@ -45,9 +47,9 @@ describe('ui-layout document', () => {
     expect(layout.groups.find((group) => group.id === 'primary')?.items).toContain('chat')
   })
 
-  it('cannot hide Settings', () => {
-    const layout = setPageHidden(defaultUiLayout(), 'settings', true)
-    expect(layout.hidden).not.toContain('settings')
+  it('cannot hide Chat', () => {
+    const layout = setPageHidden(defaultUiLayout(), 'chat', true)
+    expect(layout.hidden).not.toContain('chat')
   })
 
   it('drops a retired news rail entry from persisted layouts', () => {
@@ -67,13 +69,36 @@ describe('ui-layout document', () => {
       groups: [{ id: 'beta', items: ['office', 'trading-as-git', 'portfolio', 'connectors'] }],
       hidden: ['trading-as-git', 'dev'],
     })
-    expect(layout.groups.find((group) => group.id === 'beta')?.items).toEqual([
+    expect(layout.groups.some((group) => group.id === 'beta')).toBe(false)
+    expect(layout.groups.find((group) => group.id === 'primary')?.items.slice(0, 3)).toEqual([
       'office',
       'portfolio',
       'connectors',
-      'prediction',
     ])
     expect(layout.hidden).not.toContain('trading-as-git')
     expect(layout.hidden).toEqual([])
+  })
+
+  it('projects old Beta layouts without losing custom groups, ordering or visibility', () => {
+    const saved = {
+      version: 1,
+      groups: [
+        { id: 'beta', items: ['connectors', 'prediction'] },
+        { id: 'custom:desk', label: 'Desk', items: ['office', 'portfolio'] },
+        { id: 'primary', items: ['market', 'chat', 'inbox', 'issue', 'auto-quant', 'tracked'] },
+      ],
+      hidden: ['prediction'],
+    }
+    const original = structuredClone(saved)
+    const layout = normalizeUiLayout(saved)
+    expect(saved).toEqual(original)
+    expect(layout.groups.map(group => group.id)).toEqual(['custom:desk', 'primary', 'system'])
+    expect(layout.groups[0]).toEqual(saved.groups[1])
+    expect(layout.groups[1].items).toEqual([...saved.groups[2].items, 'connectors', 'prediction'])
+    expect(layout.hidden).toEqual(['prediction'])
+    expect(normalizeUiLayout(layout)).toEqual(layout)
+    expect(normalizeUiLayout(defaultUiLayout())).toEqual(defaultUiLayout())
+    const reordered = movePage(layout, 'prediction', 'primary', 1)
+    expect(reordered.groups[1].items.slice(0, 3)).toEqual(['market', 'prediction', 'chat'])
   })
 })

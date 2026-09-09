@@ -61,7 +61,11 @@ describe('demo Workspace file listings', () => {
   it('builds navigable directories for the Chat Workspace notes', async () => {
     const root = await listFiles(DEMO_CHAT_WORKSPACE_ID)
     expect(root.body.entries).toEqual([
+      expect.objectContaining({ name: '.agents', kind: 'dir' }),
+      expect.objectContaining({ name: '.claude', kind: 'dir' }),
       expect.objectContaining({ name: 'rotation', kind: 'dir', sizeBytes: null }),
+      expect.objectContaining({ name: 'AGENTS.md', kind: 'file' }),
+      expect.objectContaining({ name: 'CLAUDE.md', kind: 'file' }),
       expect.objectContaining({ name: 'power_buy_points_2026-06-02.md', kind: 'file' }),
     ])
 

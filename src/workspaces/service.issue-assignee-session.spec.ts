@@ -90,3 +90,76 @@ describe('WorkspaceService Issue assignee activity', () => {
     }
   })
 })
+
+it('hands a fresh-owner comment to the configured runtime and persists the new owner', async () => {
+  const { createWorkspaceConversationControl } = await import('./conversation-control.js')
+  const { appendIssueComment, readIssueComments, updateIssueCommentDelivery } = await import('./issues/comments.js')
+  const { dispatchIssueCommentReply } = await import('./issues/comment-delivery.js')
+  await service!.catalog.recordCreated(service!.registry.get('ws-1')!)
+  const adapter = service!.adapters.get('codex')!
+  const command = vi.spyOn(adapter, 'composeHeadlessCommand').mockReturnValue([
+    process.execPath, '-e', `console.log(JSON.stringify({type:'thread.started',thread_id:'native-handoff'}));console.log(JSON.stringify({type:'item.completed',item:{type:'agent_message',text:'HANDOFF_OK'}}));`,
+  ])
+  try {
+    const created = await createIssue(wsDir, { id: 'handoff', title: 'Handoff',
+      when: { kind: 'every', every: '4h' }, assignee: '@new-then-resume',
+      agent: 'codex', credentialSource: 'native', model: 'gpt-5.6-sol', effort: 'medium',
+    })
+    expect(created.ok).toBe(true)
+    if (!created.ok) return
+    await service!.provenanceStore.append({ artifact: { kind: 'issue', workspaceId: 'ws-1', issueId: 'handoff' },
+      action: 'created', origin: { kind: 'session', workspaceId: 'ws-1', resumeId: 'resume-old-pi', agent: 'pi' }, at: Date.now() })
+    const added = await appendIssueComment(wsDir, 'handoff', 'human', 'Hello')
+    if (!added.ok) throw new Error('Could not append fixture comment')
+    const result = await dispatchIssueCommentReply({ conversation: createWorkspaceConversationControl(service!),
+      issueWorkspaceId: 'ws-1', issue: created.issue, comment: added.comment, source: { kind: 'human' } })
+    expect(result, JSON.stringify(result)).toMatchObject({ status: 'scheduled' })
+    if (result.status !== 'scheduled') return
+    expect((await updateIssueCommentDelivery(wsDir, 'handoff', added.comment.id, result.delivery)).ok).toBe(true)
+    const taskId = result.delivery.taskId
+    await vi.waitFor(() => expect(service!.headlessTasks.get(taskId)?.status).toBe('done'), { timeout: 10000 })
+    const task = service!.headlessTasks.get(taskId)!
+    expect(task).toMatchObject({ agent: 'codex', model: 'gpt-5.6-sol', effort: 'medium' })
+    expect(task.resumeId).not.toBe('resume-old-pi')
+    expect((await service!.issueDetail('ws-1', 'handoff'))?.issue.assignee).toBe('@' + task.resumeId)
+    expect(command).toHaveBeenCalledTimes(1)
+    await vi.waitFor(async () => {
+      const comments = await readIssueComments(wsDir, 'handoff')
+      expect(comments.ok && comments.comments.some((entry) => entry.replyTo === added.comment.id && entry.markdown === 'HANDOFF_OK')).toBe(true)
+      expect(service!.isResumeActive(task.resumeId)).toBe(false)
+    }, { timeout: 10000 })
+  } finally { command.mockRestore() }
+}, 20000)
+
+it.each(['terminal', 'webpi'] as const)('hands %s ownership to an Issue turn and excludes a racing dispatch', async (surface) => {
+  await service!.catalog.recordCreated(service!.registry.get('ws-1')!)
+  const resumeId = 'resume-handoff-owner'
+  const { session } = await service!.sessionCoordinator.ensure({
+    resumeId, wsId: 'ws-1', agent: 'codex', namePrefix: 'c',
+    agentSessionId: 'native-handoff-owner', state: 'running', surface,
+  })
+  const adapter = service!.adapters.get('codex')!
+  const command = vi.spyOn(adapter, 'composeHeadlessCommand').mockReturnValue([
+    process.execPath, '-e', `console.log(JSON.stringify({type:'item.completed',item:{type:'agent_message',text:'TAKEOVER_OK'}}));`,
+  ])
+  let release!: () => void
+  const stopped = new Promise<void>((resolve) => { release = resolve })
+  const stop = vi.fn(async () => { await stopped; return true })
+  const terminal = vi.spyOn(service!.pool, 'get').mockReturnValue(surface === 'terminal'
+    ? { disposeAndWait: stop } as never : undefined)
+  const web = vi.spyOn(service!.web, 'stop').mockImplementation(surface === 'webpi' ? stop : async () => false)
+  try {
+    const ws = service!.registry.get('ws-1')!
+    const trigger = { kind: 'issue' as const, workspaceId: ws.id, issueId: 'handoff' }
+    const pending = service!.dispatchHeadlessTask(ws, adapter, 'Reply', undefined, trigger, resumeId)
+    await vi.waitFor(() => expect(stop).toHaveBeenCalled())
+    expect(command).not.toHaveBeenCalled()
+    await expect(service!.dispatchHeadlessTask(ws, adapter, 'Duplicate', undefined, trigger, resumeId))
+      .rejects.toMatchObject({ code: 'busy' })
+    release()
+    const result = await pending
+    await vi.waitFor(() => expect(service!.headlessTasks.get(result.taskId)?.status).toBe('done'), { timeout: 10000 })
+    expect(service!.sessionRegistry.get(ws.id, session.id)?.state).toBe('paused')
+    expect(service!.isResumeActive(resumeId)).toBe(false)
+  } finally { release(); terminal.mockRestore(); web.mockRestore(); command.mockRestore() }
+})

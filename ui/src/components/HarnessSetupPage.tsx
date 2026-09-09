@@ -5,7 +5,6 @@ import { ArrowRight, Check, Loader2, PanelsTopLeft } from 'lucide-react'
 import { useWorkspaces } from '../contexts/workspaces-context'
 import { RecoverySurface, RefreshNotice } from './StateViews'
 import { workspaceDisplayTitle } from './workspace/display'
-import { useWorkspace } from '../tabs/store'
 
 export type HarnessSetupCopyPrefix = 'autoQuantSetup' | 'autoPredictionSetup' | 'chatSetup'
 
@@ -38,7 +37,6 @@ export function HarnessSetupPage({
 }: HarnessSetupPageProps) {
   const { t } = useTranslation()
   const ctx = useWorkspaces()
-  const openOrFocus = useWorkspace((state) => state.openOrFocus)
   const [pendingWorkspaceId, setPendingWorkspaceId] = useState<string | null>(null)
   const [initializing, setInitializing] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -179,13 +177,6 @@ export function HarnessSetupPage({
                 </button>
               )
             })}
-            <button
-              type="button"
-              onClick={() => openOrFocus({ kind: 'workspace-list', params: {} })}
-              className="mx-auto mt-3 block text-xs text-muted-foreground hover:text-foreground"
-            >
-              {t(`${copyPrefix}.manageWorkspaces`)}
-            </button>
           </div>
         ) : (
           <div className="rounded-2xl border border-border/75 bg-secondary/70 p-5 shadow-[0_20px_60px_-48px_var(--foreground)]">

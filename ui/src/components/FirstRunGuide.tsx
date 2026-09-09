@@ -1,3 +1,4 @@
+import { prepareFirstChatProvider } from '../hooks/prepareFirstChatProvider'
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
@@ -580,7 +581,7 @@ export function FirstRunGuide() {
   }
 
   return (
-    <div className="fixed inset-0 z-[70] overflow-hidden bg-background text-foreground" data-testid="first-run-guide">
+    <div className="fixed inset-0 z-40 overflow-hidden bg-background text-foreground" data-testid="first-run-guide">
       <div className="flex h-full min-h-0 flex-col px-4 py-4 sm:px-6 lg:px-8">
         <div className="mx-auto flex h-full min-h-0 w-full max-w-[980px] flex-col">
           <header className="relative shrink-0 border-b border-border pb-4 pr-12">
@@ -638,7 +639,15 @@ export function FirstRunGuide() {
                 {activeStep.key === 'language' ? (
                   <LanguageChoices locale={locale} onSelect={setLocale} />
                 ) : activeStep.key === 'ai' ? (
-                  <RuntimeScanTable rows={model.runtimeRows} error={runtimeProbeError} />
+                  <>
+                    <RuntimeScanTable rows={model.runtimeRows} error={runtimeProbeError} />
+                    {model.hasManagedPi && !model.hasUsableAiChain && primaryAction !== 'add-credential' && (
+                      <Button variant="outline" className="mt-3" data-testid="first-run-guide-add-provider"
+                        onClick={() => setShowCredentialForm(true)}>
+                        {t('projectSetup.connectPi')}
+                      </Button>
+                    )}
+                  </>
                 ) : activeStep.key === 'broker' ? (
                   <TradingModeChoices
                     mode={model.mode}
@@ -744,26 +753,21 @@ export function FirstRunGuide() {
           initialPresetId={ONBOARDING_TEST_MODE && MOCK_CREDENTIAL_TEST ? ONBOARDING_TEST_PRESET_ID : undefined}
           initialApiKey={ONBOARDING_TEST_MODE && MOCK_CREDENTIAL_TEST ? ONBOARDING_TEST_API_KEY : undefined}
           onClose={() => setShowCredentialForm(false)}
-          onSaved={async () => {
-            const nextState = await refreshGuideState()
-            // The credential is durable now; release the modal immediately.
-            // Runtime probes continue in the onboarding surface and update rows
-            // incrementally, so a slow unrelated CLI cannot trap the user in a
-            // saving dialog after another runtime is already usable.
+          onSaved={async (saved) => {
+            // The credential is already durable; never invite a second Save if binding fails.
             setShowCredentialForm(false)
-            const runtimeReadiness = await runRuntimeReadinessProbe()
-            const nextModel = buildFirstRunGuideModel({
-              agents,
-              runtimeReadiness: runtimeReadiness ?? nextState.runtimeReadiness,
-              credentials: nextState.credentials,
-              tradingStatus: nextState.tradingStatus,
-              utas: nextState.utas,
-              loaded: true,
-              dismissed: false,
-            })
-            if (activeStep.key === 'ai' && nextModel.hasUsableAiChain) {
-              goToStep(activeStepIndex + 1)
+            if (saved?.compatibleAgents.includes('pi') && model.hasManagedPi) {
+              try { await prepareFirstChatProvider(saved.slug, saved.model) }
+              catch (error) {
+                setRuntimeProbeError(error instanceof Error ? error.message : String(error))
+                await refreshGuideState()
+                return
+              }
             }
+            await refreshGuideState()
+            // Stay on AI access so the user can see the confirmed result and continue.
+            // Advancing through this pre-probe closure would clamp to its stale readiness.
+            await runRuntimeReadinessProbe()
           }}
         />
       )}

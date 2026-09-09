@@ -1,8 +1,9 @@
-import { mkdtempSync, readFileSync, rmSync, symlinkSync, unlinkSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, unlinkSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 
 import { describe, expect, it } from 'vitest'
+import { createPackage, uncacheAll } from '@electron/asar'
 
 import {
   buildDesktopUpgradeSmokePlan,
@@ -14,10 +15,39 @@ import {
   desktopUpgradeWorkspaceTags,
   inspectChromiumProfileSingleton,
   previousDesktopAssetName,
+  readInstalledDesktopVersion,
   selectPreviousDesktopTag,
   waitForChromiumProfileRelease,
   windowsInstallerArgs,
 } from './desktop-upgrade-smoke-lib.mjs'
+
+describe('installed desktop version during NSIS replacement', () => {
+  it('observes loose-to-ASAR and subsequent in-place ASAR upgrades', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'desktop-version-'))
+    try {
+      const loose = join(root, 'resources', 'app')
+      const input = join(root, 'archive-input')
+      const archive = join(root, 'resources', 'app.asar')
+      mkdirSync(loose, { recursive: true })
+      mkdirSync(input)
+      writeFileSync(join(loose, 'package.json'), JSON.stringify({ version: '0.91.1' }))
+      expect(readInstalledDesktopVersion(root)).toBe('0.91.1')
+      writeFileSync(join(input, 'package.json'), JSON.stringify({ version: '0.92.0' }))
+      await createPackage(input, archive)
+      // The old loose manifest must not win over the newly installed archive.
+      expect(readInstalledDesktopVersion(root)).toBe('0.92.0')
+      writeFileSync(join(input, 'package.json'), JSON.stringify({ version: '0.93.0-beta.1', padding: 'changed archive header and entry size' }))
+      await createPackage(input, archive)
+      expect(readInstalledDesktopVersion(root)).toBe('0.93.0-beta.1')
+      // A partially replaced archive is retryable, never a stale loose success.
+      writeFileSync(archive, 'partial')
+      expect(() => readInstalledDesktopVersion(root)).toThrow()
+    } finally {
+      uncacheAll()
+      rmSync(root, { recursive: true, force: true })
+    }
+  })
+})
 
 describe('desktop upgrade smoke planning', () => {
   it('keeps the Windows builder and legacy takeover aligned with the upgrade contract', () => {

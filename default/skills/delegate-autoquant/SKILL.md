@@ -32,10 +32,10 @@ correct handoff.
 
 ## Recruit the default desk
 
-Use the `alice-workspace` collaboration surface:
+Use the `alice` collaboration surface:
 
 ```bash
-alice-workspace conversation ask --harness autoquant --await --prompt '
+alice conversation ask --harness autoquant --await --prompt '
 Research question: <question>
 Decision this supports: <decision>
 Caller-owned scope and constraints: <assets, direction, horizon, cadence, benchmark, costs, limits>
@@ -47,7 +47,7 @@ Ask before proceeding if a missing caller-owned fact would materially change the
 
 Add `--await` when the current turn needs the answer. For longer delegation,
 omit it, retain the returned `taskId`, and use `conversation await`, `read`, or
-`collect` as described by the `alice-workspace` skill. There is no unsolicited
+`collect` as described by the `alice` skill. There is no unsolicited
 Agent-to-Agent completion notification bus. AutoQuant assignments deliberately
 have no default runtime deadline; add `--timeout-ms` only when the caller has
 chosen a real hard stop for that particular study.
@@ -84,13 +84,13 @@ OpenAlice Inbox.
    worker:
 
    ```bash
-   alice-workspace conversation ask --resume-id <resumeId> --await \
+   alice conversation ask --resume-id <resumeId> --await \
      --prompt 'Please provide the absolute directory path of the primary Report, Dossier, or Project evidence from your completed assignment. Do not rerun the research.'
    ```
 
 3. Use native Read/Search/Git capabilities directly on the returned directory
    and only the named artifacts. Use
-   `alice-workspace peer path --id <workspaceId>` only as an addressing fallback
+   `alice peer path --id <workspaceId>` only as an addressing fallback
    when the reported absolute path is unavailable.
 4. If the answer needs substantive clarification, continue that same
    `resumeId`; do not recruit a new AutoQuant Session and discard its context.

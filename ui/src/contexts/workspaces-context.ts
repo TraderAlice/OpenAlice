@@ -73,7 +73,7 @@ export interface WorkspacesContextValue {
   ): Promise<string>
   pauseSession(wsId: string, sessionId: string): Promise<void>
   resumeSession(wsId: string, sessionId: string, source?: WorkspaceSource): Promise<void>
-  openWebPiSession(wsId: string, sessionId: string, source?: WorkspaceSource): Promise<void>
+  openWebSession(wsId: string, sessionId: string, source?: WorkspaceSource): Promise<void>
   requestDeleteSession(wsId: string, sessionId: string): void
   setSessionPresence(
     wsId: string,

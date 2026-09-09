@@ -284,7 +284,7 @@ describe('conversation_await', () => {
         ok: true,
         awaited: false,
         status: 'running',
-        next: 'alice-workspace conversation read --task-id task-1',
+        next: 'alice conversation read --task-id task-1',
       })
   })
 })

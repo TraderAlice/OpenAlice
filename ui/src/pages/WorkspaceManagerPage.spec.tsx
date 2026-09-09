@@ -24,7 +24,7 @@ const mocks = vi.hoisted(() => ({
   getWorkspaceCredentialDefaults: vi.fn(),
   getPresets: vi.fn(),
   quickStartWorkspaceManager: vi.fn(),
-  openWebPiSession: vi.fn(),
+  openWebSession: vi.fn(),
   resumeSession: vi.fn(),
   getQuickChat: vi.fn(),
   rememberQuickChatLaunch: vi.fn(),
@@ -53,7 +53,7 @@ vi.mock('../components/workspace/api', async (importOriginal) => {
     detectWorkspaceCredential: mocks.detectWorkspaceCredential,
     getAgentReadiness: mocks.getAgentReadiness,
     quickStartWorkspaceManager: mocks.quickStartWorkspaceManager,
-    openWebPiSession: mocks.openWebPiSession,
+    openWebSession: mocks.openWebSession,
     resumeSession: mocks.resumeSession,
   }
 })
@@ -74,19 +74,16 @@ vi.mock('../api/config', () => ({
 
 vi.mock('../components/workspace/Terminal', () => ({
   TerminalView: ({
-    chrome,
     headerActions,
     label,
     sessionLabel,
   }: {
-    chrome?: string
     headerActions?: ReactNode
     label?: string
     sessionLabel?: string
   }) => (
     <div
       data-testid="terminal-view"
-      data-chrome={chrome}
       data-label={label}
       data-session-label={sessionLabel}
     >
@@ -95,8 +92,8 @@ vi.mock('../components/workspace/Terminal', () => ({
   ),
 }))
 
-vi.mock('../components/workspace/WebPiView', () => ({
-  WebPiView: () => <div data-testid="webpi-view" />,
+vi.mock('../components/workspace/WebSessionView', () => ({
+  WebSessionView: () => <div data-testid="web-session-view" />,
 }))
 
 const runtimeIds = ['claude', 'codex', 'cursor', 'agy', 'grok', 'omp', 'opencode', 'pi'] as const
@@ -120,6 +117,11 @@ const runtimeAgents: AgentInfo[] = [
     resumeLast: true,
     resumeById: true,
     transcriptDiscovery: 'none',
+    ...(id === 'pi' || id === 'omp'
+      ? { web: { wire: 'pi-rpc' as const, permissionPrompts: false, freshSession: true } }
+      : id === 'claude'
+        ? { web: { wire: 'claude-stream-json' as const, permissionPrompts: true, freshSession: true } }
+        : {}),
     ...(id !== 'shell' ? {
       aiProvider: {
         credentialSource: id === 'opencode' || id === 'pi'
@@ -188,7 +190,7 @@ function context(
     quickChat: vi.fn(async () => ''),
     pauseSession: vi.fn(async () => undefined),
     resumeSession: mocks.resumeSession,
-    openWebPiSession: mocks.openWebPiSession,
+    openWebSession: mocks.openWebSession,
     requestDeleteSession: vi.fn(),
     setSessionPresence: vi.fn(async () => undefined),
     setSessionDisplayName: vi.fn(async () => undefined),
@@ -251,7 +253,7 @@ beforeEach(async () => {
   mocks.getPresets.mockResolvedValue({ presets: [] })
   mocks.getQuickChat.mockResolvedValue({ lastCredentialByAgent: {}, recentChatWorkspaceId: null })
   mocks.rememberQuickChatLaunch.mockResolvedValue(undefined)
-  mocks.openWebPiSession.mockResolvedValue(undefined)
+  mocks.openWebSession.mockResolvedValue(undefined)
   mocks.resumeSession.mockResolvedValue(undefined)
   mocks.refreshWorkspaceManager.mockResolvedValue(undefined)
   mocks.quickStartWorkspaceManager.mockResolvedValue({
@@ -647,7 +649,7 @@ describe('WorkspaceManagerPage runtime selection', () => {
       'workspace-manager',
       session.id,
     )
-    expect(mocks.openWebPiSession).not.toHaveBeenCalled()
+    expect(mocks.openWebSession).not.toHaveBeenCalled()
   })
 
   it('makes a running Manager terminal the owning canvas', () => {
@@ -673,7 +675,6 @@ describe('WorkspaceManagerPage runtime selection', () => {
     }} />)
 
     const terminal = screen.getByTestId('terminal-view')
-    expect(terminal.getAttribute('data-chrome')).toBe('canvas')
     expect(terminal.getAttribute('data-label')).toBe('Workspace Manager')
     expect(terminal.getAttribute('data-session-label')).toBe('Inspect the floor')
     expect(container.firstElementChild?.classList.contains('workspace-manager-terminal-canvas')).toBe(true)
@@ -681,7 +682,7 @@ describe('WorkspaceManagerPage runtime selection', () => {
     expect(screen.getByText('Codex TUI')).toBeTruthy()
   })
 
-  it('reopens a paused Pi Manager Session in its saved WebPi surface', () => {
+  it('reopens a paused Pi Manager Session in its saved Web surface', () => {
     const session: SessionRecord = {
       id: 'manager-pi',
       resumeId: 'manager-pi-resume',
@@ -694,7 +695,7 @@ describe('WorkspaceManagerPage runtime selection', () => {
       surface: 'webpi',
       pid: null,
       startedAt: null,
-      title: 'Resume WebPi manager',
+      title: 'Resume Web manager',
     }
     mocks.useWorkspaces.mockImplementation(() => context('pi', managerSnapshot([session])))
 
@@ -703,12 +704,12 @@ describe('WorkspaceManagerPage runtime selection', () => {
       params: { sessionId: session.id },
     }} />)
 
-    expect(mocks.openWebPiSession).not.toHaveBeenCalled()
-    const openWebPi = screen.getByText('Open in WebPi').closest('button')
-    expect(openWebPi).toBeTruthy()
-    fireEvent.click(openWebPi as HTMLButtonElement)
+    expect(mocks.openWebSession).not.toHaveBeenCalled()
+    const openWeb = screen.getByText('Open in Web').closest('button')
+    expect(openWeb).toBeTruthy()
+    fireEvent.click(openWeb as HTMLButtonElement)
 
-    expect(mocks.openWebPiSession).toHaveBeenCalledWith('workspace-manager', session.id)
+    expect(mocks.openWebSession).toHaveBeenCalledWith('workspace-manager', session.id)
     expect(mocks.resumeSession).not.toHaveBeenCalled()
   })
 })

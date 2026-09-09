@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs'
 import { readFile } from 'node:fs/promises'
 import { basename, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { isCliTarget } from './release-targets.mjs'
 
 import {
   bunInstallSourceLocations,
@@ -94,8 +95,7 @@ export function parseInstallSource(value) {
     ['direct', 'npm', 'bun', 'brew', 'aur'].includes(method)
     && artifact
     && typeof artifact === 'object'
-    && ['darwin', 'linux'].includes(artifact.platform)
-    && ['arm64', 'x64'].includes(artifact.arch)
+    && isCliTarget(artifact.platform, artifact.arch)
     && typeof artifact.sha256 === 'string'
     && /^[a-f0-9]{64}$/.test(artifact.sha256)
     && typeof installedAt === 'string'

@@ -94,6 +94,7 @@ export function prepareMirrorAssets({ outDir, tag, baseUrl, repository }) {
   const windowsX64Exe = findFirst(names, [`OpenAlice.Setup.${version}.exe`])
   const windowsX64Blockmap = findFirst(names, [`OpenAlice.Setup.${version}.exe.blockmap`])
   const installerAsset = findFirst(names, [`OpenAlice-${version}-install`])
+  const windowsInstallerAsset = findFirst(names, [`OpenAlice-${version}-install.ps1`])
 
   if (releaseChannel === 'stable') {
     copyAlias(outDir, macArm64Dmg, 'mac-arm64.dmg')
@@ -103,6 +104,7 @@ export function prepareMirrorAssets({ outDir, tag, baseUrl, repository }) {
     copyAlias(outDir, windowsX64Exe, 'windows-x64.exe')
   }
   copyAlias(outDir, installerAsset, 'install')
+  copyAlias(outDir, windowsInstallerAsset, 'install.ps1')
   if (releaseChannel === 'beta') {
     mkdirSync(join(outDir, 'beta'), { recursive: true })
   }
@@ -143,6 +145,11 @@ export function prepareMirrorAssets({ outDir, tag, baseUrl, repository }) {
       sha256: sha256File(join(outDir, installerAsset)),
       versionedUrl: urlFor(installerAsset),
     } : null,
+    ...(windowsInstallerAsset ? { windowsInstaller: {
+      url: urlFor('install.ps1'),
+      sha256: sha256File(join(outDir, windowsInstallerAsset)),
+      versionedUrl: urlFor(windowsInstallerAsset),
+    } } : {}),
     versioned: {
       macArm64Dmg: urlFor(macArm64Dmg),
       macArm64Zip: urlFor(macArm64Zip),

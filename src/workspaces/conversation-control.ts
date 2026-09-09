@@ -272,6 +272,7 @@ export function createWorkspaceConversationControl(
   harnessDependencies: ConversationHarnessDependencies = defaultHarnessDependencies,
 ): WorkspaceConversationControl {
   return {
+    replyToIssue: (input) => svc.replyToIssue(input),
     async ask(input): Promise<WorkspaceConversationAskResult> {
       const resolution = input.target.kind === 'harness'
         ? await resolveHarnessConversationTarget(svc, input.target.harness, harnessDependencies)

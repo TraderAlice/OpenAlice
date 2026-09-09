@@ -6,6 +6,7 @@ import { Spinner, EmptyState } from '../components/StateViews'
 import { getIntlLocale } from '../lib/intl'
 import { useToast } from '../components/Toast'
 import { LogsPage } from './LogsPage'
+import { AutomationPage } from './AutomationPage'
 import { SimulatorPage } from './SimulatorPage'
 import { FrontendLabPage } from './FrontendLabPage'
 import { OnboardingDesignPage } from './OnboardingDesignPage'
@@ -31,6 +32,8 @@ const TAB_TITLE_KEYS = {
   onboarding: 'dev.onboarding',
   snapshots: 'dev.snapshots',
   logs: 'common.logs',
+  runs: 'automation.runs',
+  api: 'automation.api',
   simulator: 'simulator.title',
 } as const satisfies Record<Tab, string>
 
@@ -46,6 +49,10 @@ interface DevPageProps {
 export function DevPage({ spec }: DevPageProps) {
   const tab = spec.params.tab
   const { t } = useTranslation()
+
+  if (tab === 'runs' || tab === 'api') {
+    return <AutomationPage spec={{ kind: 'automation', params: { section: tab } }} />
+  }
 
   return (
     <div className="flex flex-col flex-1 min-h-0">
@@ -347,7 +354,7 @@ function ToolsTab() {
             onChange={(e) => setFilter(e.target.value)}
             placeholder={t('dev.filterTools')}
             aria-label={t('dev.filterTools')}
-            className="h-8 w-full rounded-md border border-border bg-background px-2.5 py-1.5 text-xs text-foreground outline-none focus:border-primary"
+            className="oa-field-control h-8 w-full rounded-md border border-input bg-background px-2.5 py-1.5 text-xs text-foreground outline-none"
           />
         </div>
         <div className="flex-1 overflow-y-auto px-1 pb-3">
@@ -515,7 +522,7 @@ function ToolExecutePanel({ detail, result, onResult }: ToolExecutePanelProps) {
                 <select
                   value={inputs[prop.key] ?? ''}
                   onChange={(e) => setInputs((prev) => ({ ...prev, [prop.key]: e.target.value }))}
-                  className="h-8 rounded-md border border-border bg-background px-2.5 py-1.5 text-xs text-foreground outline-none focus:border-primary"
+                  className="oa-field-control h-8 rounded-md border border-input bg-background px-2.5 py-1.5 text-xs text-foreground outline-none"
                 >
                   <option value="">-</option>
                   <option value="true">true</option>
@@ -527,7 +534,7 @@ function ToolExecutePanel({ detail, result, onResult }: ToolExecutePanelProps) {
                   value={inputs[prop.key] ?? ''}
                   onChange={(e) => setInputs((prev) => ({ ...prev, [prop.key]: e.target.value }))}
                   placeholder={prop.description || prop.key}
-                  className="h-8 w-full rounded-md border border-border bg-background px-2.5 py-1.5 font-mono text-xs text-foreground outline-none focus:border-primary"
+                  className="oa-field-control h-8 w-full rounded-md border border-input bg-background px-2.5 py-1.5 font-mono text-xs text-foreground outline-none"
                 />
               )}
               {prop.description && (

@@ -53,20 +53,27 @@ categories.
   by the current trading mode. Callback data carries only page-local
   indexes; account ids and pending hashes stay in the Connector session
   and the Alice-validated action request.
-- Connector Service never interprets chat. Alice owns one phone-desk Issue
-  per `desk`-capable connector. Connector durably queues owner text keyed by
-  `connectorId`; Alice claims that stack only while that connector's live
-  desk exists and no generation is running on it. Several stacked DMs become
-  one quoted comment on that Issue. Alice suppresses a desk comment only when
-  its run carries the `connector-cron-issue` trigger metadata and its text
-  contains the literal tag `[[no-reply]]`. Ordinary chat replies treat that
-  tag as text. Inbound owner comments are not echoed back to that connector.
+- Connector Service owns outgoing reply syntax. Resolved file references are
+  delivered at their original position: text before, media, then text after. Alice owns one phone-desk Issue
+  per `desk`-capable connector and forwards raw reply text with a Workspace id
+  and server-derived `conversation | automation` source. Workspace/Issue
+  projection does not parse delivery markers. Inbound owner comments are not
+  echoed back. Automated `[[no-reply]]` outside code suppresses delivery;
+  ordinary conversations can discuss the marker literally. A silent final
+  still terminates transport activity.
+  Connector durably queues owner text by connector id. Alice claims it while
+  a live desk exists and no generation is running; stacked DMs become one
+  quoted Issue comment. This ingress contract is separate from reply parsing.
   While a desk turn is running, Alice also
   projects an explicit `accepted | progress | final | failed` lifecycle.
   Telegram turns `accepted` into a native Bot API live draft immediately,
   refreshes that draft every 20 seconds, and replaces it with sealed mid-turn
   `text` blocks (a tool or error followed them). If live drafts are unavailable,
-  Telegram refreshes the ordinary typing action every four seconds. Final and
+  Telegram refreshes the ordinary typing action every four seconds. Typing also
+  continues alongside text drafts during tool calls, until the terminal event.
+  In-turn CLI comments update the same draft rather than marking it final. A
+  suppressed automated reply sends a textless final event to stop activity
+  without publishing a message. Final and
   failed replies are always persistent messages; ephemeral progress never
   suppresses an identical final answer. Tool names, status, and payloads stay
   off the owner chat. The trailing text still becomes today's reply comment.
@@ -119,7 +126,7 @@ categories.
 
 ```text
 Workspace agent
-  -> alice-workspace inbox push (CLI)
+  -> alice inbox push (CLI)
   -> InboxStore durable JSONL append
   -> non-blocking Alice bridge
   -> Connector Service on loopback
@@ -175,10 +182,46 @@ Load-bearing paths:
   materialization, Alice-side health, and the resident artifact-request bridge.
 - `src/workspaces/issues/telegram-desk-chat.ts` — phone-desk inbound claim
   and scheduled-fire comment stamp.
-- `src/workspaces/issues/telegram-desk-project.ts` — `[[no-reply]]` filter
-  and owner-chat projection.
+- `src/workspaces/issues/telegram-desk-project.ts` — raw owner-chat projection
+  with trusted source and Workspace context.
+- `services/connector/src/core/reply-directives.ts` — reply syntax parser.
+- `src/workspaces/binary-file.ts` + `src/server/workspace-files.ts` — generic,
+  bounded file access on the existing local tool listener; no Connector types.
 - `src/webui/routes/connectors.ts` + `ui/src/pages/ConnectorsPage.tsx` — generic
   Settings surface.
+
+## Reply attachments
+
+A final reply may include `[[reports/chart.png]]`. Paths are relative to
+its source Workspace. Ordinary `[[name]]` references remain text; inline/fenced
+code and escaped brackets are literal, including examples of `[[no-reply]]`.
+The Connector extension parser preserves unknown syntax and unresolved paths.
+It removes only successfully resolved references from displayed text, reads files through Alice's generic `/cli/workspace-files/:id?path=...` interface,
+and asks the adapter to upload them. It never accepts a model-provided fetch
+host or reads Workspace directories itself. Dev/server pass the selected tool
+port; Electron passes its local tool socket. The existing local tool listener
+owns access, with no new public unauthenticated route.
+
+Files retain their bytes and filename. Binary formats such as PDF, PNG and CSV
+are supported; this path does not use Inbox or its report encoding conversion.
+At most five unique files, each at most 1 MiB, are sent per final reply.
+Absolute paths, escaping symlink targets, directories and oversized reads are
+rejected by the generic file API. Unreadable, missing, unsupported or over-limit references stay literal, including
+when the adapter cannot send files. At most 20 unique candidates are resolved;
+only five readable files are consumed. Upload failures produce a visible diagnostic
+and journal failure; remaining files are still attempted.
+Telegram sends PNG/JPEG/WebP images as photos and `sticker/*.png` or
+`sticker/*.webp` as native static stickers; other formats are documents.
+Files must satisfy Telegram's media requirements; no implicit image conversion
+occurs. Inbox artifact pulls remain documents. The old unreleased `file:` syntax
+is replaced directly, not maintained as a second syntax.
+
+Progress never uploads files. Events for a conversation are serialized;
+concurrent/repeated message IDs share one delivery attempt, including uncertain
+network failures. This bounded deduplication is process-local (last 1,000 IDs),
+not an exactly-once guarantee across service restarts. Owner-chat delivery is
+still best-effort; local comments remain the durable record. Automated silence
+suppresses both text and files before reading any file.
 
 ## Configuration and Secrets
 
@@ -463,8 +506,9 @@ The surfaces deliberately have different jobs:
   Workspaces do not fire. Owner DMs become comments on that connector's
   Issue; the desk is seeded with `commentPrompt: '{comment}'` so those
   comments are the reply Input Prompt as-is. Scheduled-fire `assistantText`
-  is stamped as a comment. Connector projects those comments unless they
-  contain the literal tag `[[no-reply]]` or arrived from that connector.
+  is stamped as a comment. Connector interprets automated silence from the
+  forwarded source; comments
+  that arrived from that connector are not echoed.
   Pending comment replies also carry compact turn progress. The connector chat
   ships sealed mid-turn `text` blocks (the last consecutive text before a
   tool or error) and skips tool/error blocks. A text already sent this way

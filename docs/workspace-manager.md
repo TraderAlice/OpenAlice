@@ -31,8 +31,13 @@ runtime.
 Its runtime picker consumes the same registered Agent list, saved default,
 install state, readiness, credential, model, and context contract as Quick
 Chat. `useAgentLaunchConfig` owns that resolution and the shared
-`AgentLaunchControls` components render it on both surfaces. Pi uses WebPi;
-Claude, Codex, and OpenCode retain their native TUI surfaces.
+`AgentLaunchControls` components render it on both surfaces. Quick Start opens
+Pi in the Web conversation surface; Claude, Codex, and OpenCode start in their
+native TUI surfaces. A paused Manager Session of any runtime that declares
+`capabilities.web` may later be reopened in the Web surface from its resume
+choice; that reopen carries the same manager options (`appendSystemPrompt`,
+skills, project approval) and each adapter projects what its structured mode
+supports.
 
 For OpenCode and Pi, the summary describes the exact credential, model, and
 context that the next launch will inject. An existing Manager config wins over
@@ -70,14 +75,14 @@ files remain owned by their Workspace at `.alice/sessions/<resumeId>.json`.
 ## Runtime Contract
 
 Every Manager runtime receives the same launcher-owned role contract. Pi appends
-it as a system prompt and loads `default/skills/workspace-manager` on every WebPi
+it as a system prompt and loads `default/skills/workspace-manager` on every Web
 start, including resume after restart. Native TUIs receive the contract in the
 fresh interactive seed because those CLIs do not share one portable system-
 prompt flag; their durable native transcript carries it across later resumes.
 The contract says:
 
 - inspect and coordinate the active floor;
-- use the embedded `alice-workspace` CLI instead of raw localhost APIs;
+- use the embedded `alice` CLI instead of raw localhost APIs;
 - ask attributable existing Sessions before reconstructing intent;
 - preview lifecycle/template mutations before applying them;
 - never write reports, research, Issues, or other business artifacts at the
@@ -85,9 +90,9 @@ The contract says:
 - choose a target Workspace for durable work, and commit any approved direct
   edit inside that target.
 
-WebPi explicitly approves this launcher-owned cwd. There is no TUI trust prompt
-to render, and entering the dedicated manager surface is the user's visible
-approval for the bundled skill and control-plane directory. Native runtimes keep
+The Web surface explicitly approves this launcher-owned cwd. There is no TUI
+trust prompt to render, and entering the dedicated manager surface is the
+user's visible approval for the bundled skill and control-plane directory. Native runtimes keep
 their existing login, provider-injection, install, and trust behavior.
 
 OpenCode's OpenTUI startup asks the terminal emulator for cursor, mode, color,
@@ -102,8 +107,8 @@ native runtimes retain the WebGL default.
 Start a floor audit from product indexes:
 
 ```bash
-alice-workspace peer list
-alice-workspace issue list --mode detailed
+alice peer list
+alice issue list --mode detailed
 ```
 
 `peer list` returns active Workspace ids, tags, templates, configured runtimes,
@@ -119,14 +124,14 @@ and the durable cached projection.
 Drill into one selected desk with:
 
 ```bash
-alice-workspace peer path --id <workspaceId>
-alice-workspace peer sessions --id <workspaceId>
-alice-workspace conversation ask --resume-id <resumeId> --prompt "..." --await
+alice peer path --id <workspaceId>
+alice peer sessions --id <workspaceId>
+alice conversation ask --resume-id <resumeId> --prompt "..." --await
 # Recruit a fresh coworker for new work:
-alice-workspace conversation ask --ws-id <workspaceId> --prompt "..."
+alice conversation ask --ws-id <workspaceId> --prompt "..."
 # Reconstruct missing historical intent explicitly:
-alice-workspace conversation ask --ws-id <workspaceId> --prompt "..." --reconstruct --await
-alice-workspace template upgrade --id <workspaceId>
+alice conversation ask --ws-id <workspaceId> --prompt "..." --reconstruct --await
+alice template upgrade --id <workspaceId>
 ```
 
 `--resume-id` continues the exact coworker and should report
@@ -144,7 +149,7 @@ apply remains preview-first.
 
 - `src/workspaces/manager-workspace.ts` — reserved identity and system contract.
 - `src/workspaces/service.ts` — special runtime resolution and durable Sessions.
-- `src/workspaces/adapters/pi.ts` — explicit WebPi prompt/skill/trust flags.
+- `src/workspaces/adapters/pi.ts` — explicit Web (RPC) prompt/skill/trust flags.
 - `src/tool/workspace-list.ts` — active floor inventory.
 - `src/server/cli.ts` and `src/server/cli-commands.ts` — embedded CLI exposure.
 - `src/webui/routes/workspaces.ts` — manager status, quick start, resume, and
@@ -154,7 +159,7 @@ apply remains preview-first.
   model, context, and launch-parameter resolution.
 - `ui/src/components/workspace/AgentLaunchControls.tsx` — shared selectors and
   truthful launch summary.
-- `ui/src/pages/WorkspaceManagerPage.tsx` — manager composer and WebPi/TUI shell.
+- `ui/src/pages/WorkspaceManagerPage.tsx` — manager composer and Web/TUI shell.
 - `ui/src/components/workspace/ChatWorkspaceSection.tsx` — Chat sidebar entry.
 
 ## Verification
@@ -175,7 +180,7 @@ Then use the real `/chat/manager` route with at least two available runtimes:
    saved default;
 2. on Pi or OpenCode, verify the visible model/context matches the Manager
    Workspace config, switch provider, and confirm the launch uses the new one;
-3. start one Pi/WebPi and one native-TUI Manager Session, then reopen both from
+3. start one Pi/Web and one native-TUI Manager Session, then reopen both from
    the collapsible Manager list in the Chat sidebar;
 4. inventory the active floor and confirm real `peer list` tool use;
 5. compare a harmless `--ws-id` reconstruction with an exact `--resume-id`

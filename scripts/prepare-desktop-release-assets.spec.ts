@@ -73,6 +73,20 @@ describe('prepareBuildMetadata', () => {
 })
 
 describe('prepareMirrorAssets', () => {
+  it('binds the PowerShell snapshot separately without changing the desktop updater', () => {
+    withTempDir((dir) => {
+      const name = 'OpenAlice-1.2.3-beta-install.ps1'
+      writeFileSync(join(dir, name), '# OpenAlice Windows CLI installer\n')
+      const manifest = prepareMirrorAssets({ outDir: dir, tag: 'v1.2.3-beta', repository: 'TraderAlice/OpenAlice', baseUrl: 'https://download.openalice.ai' })
+      expect(manifest.windowsInstaller).toEqual({
+        url: 'https://download.openalice.ai/install.ps1',
+        versionedUrl: `https://download.openalice.ai/${name}`,
+        sha256: createHash('sha256').update(readFileSync(join(dir, name))).digest('hex'),
+      })
+      expect(readFileSync(join(dir, 'install.ps1'))).toEqual(readFileSync(join(dir, name)))
+      expect(manifest.feeds.windows).toBe('https://download.openalice.ai/beta.yml')
+    })
+  })
   it('keeps beta feeds and manifests isolated while reusing the channel-neutral installer', () => {
     withTempDir((dir) => {
       const files = [

@@ -158,6 +158,32 @@ export interface BarSourceCandidate {
 
 /** Provenance of the bars currently shown — the explicit "who provided this". */
 export interface BarMeta {
+  quality?: {
+    scope: 'fetched_window_before_count'
+    inspectedRows: number
+    excludedRows: number
+    latestExcludedRecordAt: string | null
+    latestExcludedFields: string[]
+    reason: 'missing_or_non_finite_ohlc' | null
+  }
+  freshness?: {
+    earliestRecordAt?: string | null
+    earliestTimestampKind?: 'instant' | 'date' | 'unknown'
+    earliestTimezone?: string | null
+    latestTimezone?: string | null
+    timestampMeaning?: 'provider_bar_timestamp'
+    delay?: {
+      status: 'possible' | 'unknown'
+      estimatedSeconds: number | null
+      basis: 'source_classification' | 'insufficient_evidence' | 'historical_request' | 'no_records'
+      explanation: string
+    }
+    fetchedAt: string
+    latestRecordAt: string | null
+    timestampKind: 'instant' | 'date' | 'unknown'
+    recordAgeSeconds: number | null
+    historical: boolean
+  }
   symbol: string
   from: string
   to: string

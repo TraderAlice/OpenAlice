@@ -20,6 +20,7 @@ import {
   applyTemplateUpgrade,
   getTemplateUpgradePlan,
   TemplateUpgradeApiError,
+  type SkillProjectionRequest,
   type TemplateUpgradeFilePlan,
   type TemplateUpgradePlan,
   type TemplateUpgradeResolution,
@@ -27,6 +28,8 @@ import {
 } from './api'
 
 interface Props {
+  readonly projection?: SkillProjectionRequest
+  readonly layer?: 'template' | 'alice-harness'
   readonly wsId: string
   readonly onWorkspaceChanged: () => void
   readonly onClose: () => void
@@ -39,6 +42,7 @@ interface Props {
  */
 export function WorkspaceTemplateUpgradePanel({
   wsId,
+  layer = 'template', projection,
   onWorkspaceChanged,
   onClose,
 }: Props): ReactElement {
@@ -56,7 +60,7 @@ export function WorkspaceTemplateUpgradePanel({
     setError(null)
     setUnsupported(false)
     try {
-      const next = await getTemplateUpgradePlan(wsId)
+      const next = await (layer === 'template' ? getTemplateUpgradePlan(wsId) : getTemplateUpgradePlan(wsId, layer, projection))
       setPlan(next)
       setResolutions((current) => Object.fromEntries(
         Object.entries(current).filter(([path]) =>
@@ -70,7 +74,7 @@ export function WorkspaceTemplateUpgradePanel({
     } finally {
       setLoading(false)
     }
-  }, [wsId])
+  }, [wsId, layer, projection])
 
   useEffect(() => { void load() }, [load])
 
@@ -79,7 +83,7 @@ export function WorkspaceTemplateUpgradePanel({
     [plan],
   )
   const unresolved = conflicts.filter((file) => !resolutions[file.path]).length
-  const current = plan?.fromVersion === plan?.toVersion
+  const current = projection ? !plan?.files.some((file) => file.status === 'ready' || file.status === 'conflict') : plan?.fromVersion === plan?.toVersion && (layer === 'template' || !plan?.files.some((file) => file.status === 'ready' || file.status === 'conflict'))
   const canApply = !!plan && !current && !plan.blocked && unresolved === 0 && !applying
 
   const apply = async (): Promise<void> => {
@@ -87,12 +91,12 @@ export function WorkspaceTemplateUpgradePanel({
     setApplying(true)
     setError(null)
     try {
-      const next = await applyTemplateUpgrade(wsId, plan.planDigest, resolutions)
+      const next = await (layer === 'template' ? applyTemplateUpgrade(wsId, plan.planDigest, resolutions) : applyTemplateUpgrade(wsId, plan.planDigest, resolutions, layer, projection))
       setResult(next)
       onWorkspaceChanged()
       await load()
     } catch (err) {
-      if (err instanceof TemplateUpgradeApiError && err.plan) setPlan(err.plan)
+      if (err instanceof TemplateUpgradeApiError && err.plan) { setPlan(err.plan); setResolutions({}) }
       setError((err as Error).message)
     } finally {
       setApplying(false)
@@ -125,15 +129,16 @@ export function WorkspaceTemplateUpgradePanel({
                 <div className="min-w-0">
                   <div className="flex items-center gap-2 text-[12px] font-semibold text-muted-foreground">
                     <FileDiff size={14} />
-                    {t('workspace.upgradeManagedAssets')}
+                    {projection ? projection.skill : layer === 'alice-harness' ? 'Alice Harness' : t('workspace.upgradeManagedAssets')}
                   </div>
                   <div className="mt-2 flex flex-wrap items-center gap-2 text-[18px] font-semibold text-foreground">
-                    <span>v{plan.fromVersion}</span>
+                    {projection ? t(`skillManager.${projection.action}`) : <>
+                    <span className="break-all">{plan.fromVersion === 'unversioned' ? t('aliceHarness.unversioned') : `v${plan.fromVersion}`}</span>
                     <ArrowRight size={17} className="text-muted-foreground" />
-                    <span className={current ? '' : 'text-primary'}>v{plan.toVersion}</span>
+                    <span className={`break-all ${current ? '' : 'text-primary'}`}>v{plan.toVersion}</span></>}
                   </div>
                   <p className="mt-1 max-w-xl text-[12px] leading-relaxed text-muted-foreground">
-                    {current
+                    {projection ? t('skillManager.scopeHint') : current
                       ? t('workspace.upgradeCurrentDescription')
                       : t('workspace.upgradeDescription')}
                   </p>
@@ -179,7 +184,7 @@ export function WorkspaceTemplateUpgradePanel({
                       {t('workspace.upgradeBlockedSessionItem', {
                         name: session.name,
                         agent: session.agent,
-                        surface: session.surface === 'webpi' ? 'WebPi' : 'TUI',
+                        surface: session.surface === 'webpi' ? 'Web' : 'TUI',
                       })}
                     </li>
                   ))}
@@ -274,7 +279,7 @@ export function WorkspaceTemplateUpgradePanel({
               ? t('workspace.upgradeUnresolved', { count: unresolved })
               : t('workspace.upgradeAllResolved')
           )}
-          {plan && !current && conflicts.length === 0 && t('workspace.upgradeNoConflicts')}
+          {plan && !current && conflicts.length === 0 && (projection?.action === 'restore' ? t('skillManager.restoreHint') : t('workspace.upgradeNoConflicts'))}
         </div>
         <div className="flex justify-end gap-2">
           <Button type="button" variant="outline" onClick={onClose} disabled={applying}>
@@ -287,7 +292,7 @@ export function WorkspaceTemplateUpgradePanel({
               disabled={!canApply}
             >
               {applying ? <LoaderCircle size={14} className="animate-spin" /> : <GitCommitHorizontal size={14} />}
-              {applying ? t('workspace.upgradeApplying') : t('workspace.upgradeApply')}
+              {applying ? t('workspace.upgradeApplying') : projection ? t(`skillManager.${projection.action}`) : t('workspace.upgradeApply')}
             </Button>
           )}
         </div>

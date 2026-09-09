@@ -179,7 +179,7 @@ describe('issue_ask', () => {
       id: 'audit', runId: 'run-from-a-follow-up', prompt: 'what happened?',
     })).resolves.toMatchObject({
       ok: false,
-      error: expect.stringContaining('alice-workspace issue show --id audit'),
+      error: expect.stringContaining('alice issue show --id audit'),
     })
   })
 })

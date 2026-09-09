@@ -247,6 +247,10 @@ describe('OpenAlice local Runtime launcher', () => {
           PI_CODING_AGENT_DIR: '/native/pi',
         },
         runtimeExecutable: '/opt/openalice/releases/v1/bin/openalice',
+        inspectDependencies: async () => [
+          { id: 'git', status: 'available', executable: '/usr/bin/git' },
+          { id: 'bash', status: 'available', executable: '/bin/bash' },
+        ],
         probeRuntime: async () => false,
         readRuntimeStatus: async () => ({ class: 'absent', owner: null, endpoints: {} }),
         resolveRoot,
@@ -364,6 +368,10 @@ describe('OpenAlice local Runtime launcher', () => {
         activateReleaseImpl,
         markActivationRolledBackImpl: async () => undefined,
         runtimeExecutable: '/release/bin/openalice',
+        inspectDependencies: async () => [
+          { id: 'git', status: 'available', executable: '/usr/bin/git' },
+          { id: 'bash', status: 'available', executable: '/bin/bash' },
+        ],
         probeRuntime: async () => false,
         readRuntimeStatus: async () => ({ class: 'absent', owner: null, endpoints: {} }),
         spawnProcess,

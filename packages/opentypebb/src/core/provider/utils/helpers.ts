@@ -6,8 +6,8 @@
 import { OpenBBError, NetworkUnreachableError } from './errors.js'
 
 /**
- * Identify a fetch failure that never reached the provider — network
- * layer (DNS, routing, TLS, proxy) rather than HTTP-level.
+ * Identify a fetch failure before an HTTP response was received. This
+ * includes network failures and connections closed by the remote service.
  *
  * Node 18+ wraps low-level network errors in TypeError("fetch failed")
  * with the underlying cause attached as `.cause`. Common cause codes

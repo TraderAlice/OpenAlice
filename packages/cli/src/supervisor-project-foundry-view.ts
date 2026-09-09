@@ -5,7 +5,7 @@ import {
 } from './supervisor-tui-theme.ts'
 import { renderSupervisorPanel } from './supervisor-tui-view.ts'
 
-export type SupervisorProjectFoundryStep = 'identity' | 'home'
+export type SupervisorProjectFoundryStep = 'identity' | 'home' | 'workspaces'
 
 export interface SupervisorProjectFoundryView {
   step: SupervisorProjectFoundryStep
@@ -37,11 +37,12 @@ export function renderSupervisorProjectFoundry(
 ): SupervisorProjectFoundryRender {
   const safeWidth = Math.max(24, width)
   const home = view.step === 'home'
-  const active = home ? 1 : 0
-  const signal = home ? 'COMPLETE HOME' : 'IDENTITY'
-  const field = home ? 'Complete home' : 'AliceProject key'
-  const action = home
-    ? '◆ [ Enter ] Create & select  │  [ Esc ] Back'
+  const workspaces = view.step === 'workspaces'
+  const active = workspaces ? 2 : home ? 1 : 0
+  const signal = workspaces ? 'WORKSPACES' : home ? 'COMPLETE HOME' : 'IDENTITY'
+  const field = workspaces ? 'Choose workspaces' : home ? 'Complete home' : 'AliceProject key'
+  const action = workspaces
+    ? '◆ [ Enter ] Create & start  │  [ Esc ] Back'
     : '◆ [ Enter ] Continue  │  [ Esc ] Back'
   const inspectorRows = [
     `◆ ${field}`,
@@ -57,10 +58,11 @@ export function renderSupervisorProjectFoundry(
     const height = Math.max(5, inspectorRows.length)
     const path = renderSupervisorPanel(
       'Foundry',
-      `${active + 1}/2 · ${signal}`,
+      `${active + 1}/3 · ${signal}`,
       padRows([
-        labelAndTail(`${home ? '✓' : '◆'} 01 Identity`, home ? 'DONE' : 'CURRENT', PATH_WIDTH - 4),
-        labelAndTail(`${home ? '◆' : '·'} 02 Complete Home`, home ? 'CURRENT' : 'NEXT', PATH_WIDTH - 4),
+        labelAndTail(`${active > 0 ? '✓' : '◆'} 01 Identity`, active > 0 ? 'DONE' : 'CURRENT', PATH_WIDTH - 4),
+        labelAndTail(`${workspaces ? '✓' : home ? '◆' : '·'} 02 Complete Home`, workspaces ? 'DONE' : home ? 'CURRENT' : 'NEXT', PATH_WIDTH - 4),
+        labelAndTail(`${workspaces ? '◆' : '·'} 03 Workspaces`, workspaces ? 'CURRENT' : 'NEXT', PATH_WIDTH - 4),
         '',
         `From · ${view.currentProjectName}`,
         home ? `Key · ${view.projectKey ?? 'pending'}` : 'Key · not reserved yet',
@@ -69,7 +71,7 @@ export function renderSupervisorProjectFoundry(
     )
     const inspector = renderSupervisorPanel(
       'Create AliceProject',
-      home ? view.projectKey ?? 'Complete home' : 'Project key',
+      active > 0 ? view.projectKey ?? 'Workspaces' : 'Project key',
       padRows(inspectorRows, height),
       inspectorWidth,
     )
@@ -88,16 +90,18 @@ export function renderSupervisorProjectFoundry(
     }
   }
 
-  const route = home
-    ? '✓ Identity  ◆ Complete Home'
-    : '◆ Identity  → Complete Home'
+  const route = workspaces
+    ? '✓ Identity  ✓ Home  ◆ Workspaces'
+    : home
+    ? '✓ Identity  ◆ Home  → Workspaces'
+    : '◆ Identity  → Home  → Workspaces'
   return {
     lines: [
-      ...renderSupervisorPanel('AliceProject Foundry', `${active + 1}/2 · ${signal}`, [route], safeWidth),
+      ...renderSupervisorPanel('AliceProject Foundry', `${active + 1}/3 · ${signal}`, [route], safeWidth),
       '',
       ...renderSupervisorPanel(
         'Create AliceProject',
-        home ? view.projectKey ?? 'Complete home' : 'Project key',
+        active > 0 ? view.projectKey ?? 'Workspaces' : 'Project key',
         inspectorRows,
         safeWidth,
       ),
@@ -113,7 +117,7 @@ export function decorateSupervisorProjectFoundry(
   hoveredCommand?: string,
 ): string[] {
   const actions = [
-    '◆ [ Enter ] Create & select  │  [ Esc ] Back',
+    '◆ [ Enter ] Create & start  │  [ Esc ] Back',
     '◆ [ Enter ] Continue  │  [ Esc ] Back',
   ]
   return lines.map((line) => {

@@ -3,7 +3,7 @@ import { existsSync } from 'node:fs'
 import { mkdir, readFile, rename, rm, writeFile } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
 
-import { exec as gitExec, type IGitStringExecutionOptions } from 'dugite'
+import { exec as gitExec, type IGitStringExecutionOptions } from './git-execution.js'
 
 import { compareVersions } from '@/core/version.js'
 

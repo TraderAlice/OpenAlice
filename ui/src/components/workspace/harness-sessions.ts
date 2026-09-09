@@ -103,7 +103,7 @@ export function toHarnessSession(
 
 /**
  * A Session that was born on a headless turn and has never opened a TUI or
- * WebPi. Ask Alice / Auto Quant hide these by default; the Issue page still
+ * Web conversation. Ask Alice / Auto Quant hide these by default; the Issue page still
  * owns them.
  */
 export function isHeadlessBornWithoutInteractive(

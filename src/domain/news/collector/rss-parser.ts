@@ -2,7 +2,7 @@
  * News Collector — Zero-dependency RSS / Atom parser
  *
  * Handles standard RSS 2.0 (<item>) and Atom (<entry>) feeds.
- * Extracts: title, description/summary, link, guid/id, pubDate.
+ * Extracts: title, description/summary, link, guid, pubDate, and safe image URLs.
  * Supports CDATA-wrapped content.
  */
 
@@ -12,6 +12,8 @@ export interface ParsedFeedItem {
   link: string | null
   guid: string | null
   pubDate: Date | null
+  /** Safe HTTP(S) image URL when the feed supplied one. */
+  image?: string
 }
 
 /**
@@ -48,17 +50,16 @@ export function parseRSSXml(xml: string): ParsedFeedItem[] {
   let match: RegExpExecArray | null
   while ((match = itemRegex.exec(xml)) !== null) {
     const block = match[1]
-    // For title & content: strip HTML first, then decode XML entities.
-    // This prevents &lt;tag&gt; from being decoded to <tag> then stripped as HTML.
+    const contentRaw = extractTagRaw(block, 'content:encoded')
+      ?? extractTagRaw(block, 'description')
+      ?? extractTagRaw(block, 'summary')
+      ?? extractTagRaw(block, 'content')
+      ?? ''
+    const image = extractImage(block, contentRaw)
+
     items.push({
       title: cleanText(extractTagRaw(block, 'title') ?? ''),
-      content: cleanText(
-        extractTagRaw(block, 'content:encoded')
-        ?? extractTagRaw(block, 'description')
-        ?? extractTagRaw(block, 'summary')
-        ?? extractTagRaw(block, 'content')
-        ?? '',
-      ),
+      content: cleanText(contentRaw),
       link: extractTag(block, 'link') ?? extractAttr(block, 'link', 'href'),
       guid: extractTag(block, 'guid') ?? extractTag(block, 'id'),
       pubDate: parseDate(
@@ -66,6 +67,7 @@ export function parseRSSXml(xml: string): ParsedFeedItem[] {
         ?? extractTag(block, 'published')
         ?? extractTag(block, 'updated'),
       ),
+      ...(image ? { image } : {}),
     })
   }
 
@@ -81,7 +83,7 @@ export function parseRSSXml(xml: string): ParsedFeedItem[] {
 function extractTagRaw(xml: string, tag: string): string | null {
   // Try CDATA first: <tag><![CDATA[content]]></tag>
   const cdataRegex = new RegExp(
-    `<${escapeRegex(tag)}[^>]*>\\s*<!\\[CDATA\\[([\\s\\S]*?)\\]\\]>\\s*</${escapeRegex(tag)}>`,
+    String.raw`<${escapeRegex(tag)}\b[^>]*>\s*<!\[CDATA\[([\s\S]*?)\]\]>\s*</${escapeRegex(tag)}>`,
     'i',
   )
   const cdataMatch = cdataRegex.exec(xml)
@@ -89,11 +91,72 @@ function extractTagRaw(xml: string, tag: string): string | null {
 
   // Plain text: <tag>content</tag>
   const regex = new RegExp(
-    `<${escapeRegex(tag)}[^>]*>([\\s\\S]*?)</${escapeRegex(tag)}>`,
+    String.raw`<${escapeRegex(tag)}\b[^>]*>([\s\S]*?)</${escapeRegex(tag)}>`,
     'i',
   )
   const match = regex.exec(xml)
   return match ? match[1].trim() : null
+}
+
+/**
+ * Find the first feed-provided image that is both an image media item and a
+ * safe remote URL. Feed metadata is trusted only after this boundary check.
+ */
+function extractImage(block: string, contentRaw: string): string | null {
+  const thumbnail = safeHttpImageUrl(
+    extractAttr(block, 'media:thumbnail', 'url')
+      ?? extractAttr(block, 'media:thumbnail', 'href'),
+  )
+  if (thumbnail) return thumbnail
+
+  for (const tag of ['enclosure', 'media:content']) {
+    const tagRegex = new RegExp(`<${escapeRegex(tag)}\\b[^>]*>`, 'gi')
+    let match: RegExpExecArray | null
+    while ((match = tagRegex.exec(block)) !== null) {
+      const tagText = match[0]
+      const url = extractAttr(tagText, tag, 'url')
+      if (!url || !isImageMedia(tagText, tag, url)) continue
+      const image = safeHttpImageUrl(url)
+      if (image) return image
+    }
+  }
+
+  const nestedImage = extractTagRaw(block, 'image')
+  const imageUrl = nestedImage ? extractTag(nestedImage, 'url') : null
+  const feedImage = safeHttpImageUrl(imageUrl)
+  if (feedImage) return feedImage
+
+  const htmlImage = /<img\b[^>]*>/i.exec(decodeXmlEntities(contentRaw))
+  return htmlImage ? safeHttpImageUrl(extractAttr(htmlImage[0], 'img', 'src')) : null
+}
+
+function isImageMedia(tagText: string, tag: string, url: string): boolean {
+  const type = extractAttr(tagText, tag, 'type')?.toLowerCase()
+  const medium = extractAttr(tagText, tag, 'medium')?.toLowerCase()
+  if (medium && medium !== 'image') return false
+  if (type && !type.startsWith('image/')) return false
+  return Boolean(type || medium || hasImageExtension(url))
+}
+
+function hasImageExtension(url: string): boolean {
+  try {
+    return /\.(?:avif|gif|jpe?g|png|svg|webp)$/i.test(new URL(url).pathname)
+  } catch {
+    return false
+  }
+}
+
+function safeHttpImageUrl(raw: string | null): string | null {
+  if (!raw) return null
+  const url = decodeXmlEntities(raw.trim())
+  try {
+    const parsed = new URL(url)
+    if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') return null
+    if (parsed.username || parsed.password) return null
+    return url
+  } catch {
+    return null
+  }
 }
 
 /**
@@ -110,7 +173,7 @@ function cleanText(raw: string): string {
 function extractTag(xml: string, tag: string): string | null {
   // Try CDATA first: <tag><![CDATA[content]]></tag>
   const cdataRegex = new RegExp(
-    `<${escapeRegex(tag)}[^>]*>\\s*<!\\[CDATA\\[([\\s\\S]*?)\\]\\]>\\s*</${escapeRegex(tag)}>`,
+    String.raw`<${escapeRegex(tag)}\b[^>]*>\s*<!\[CDATA\[([\s\S]*?)\]\]>\s*</${escapeRegex(tag)}>`,
     'i',
   )
   const cdataMatch = cdataRegex.exec(xml)
@@ -118,7 +181,7 @@ function extractTag(xml: string, tag: string): string | null {
 
   // Plain text: <tag>content</tag>
   const regex = new RegExp(
-    `<${escapeRegex(tag)}[^>]*>([\\s\\S]*?)</${escapeRegex(tag)}>`,
+    String.raw`<${escapeRegex(tag)}\b[^>]*>([\s\S]*?)</${escapeRegex(tag)}>`,
     'i',
   )
   const match = regex.exec(xml)
@@ -130,9 +193,9 @@ function extractTag(xml: string, tag: string): string | null {
  * e.g. <link href="https://..."/> → "https://..."
  */
 function extractAttr(xml: string, tag: string, attr: string): string | null {
-  const regex = new RegExp(`<${escapeRegex(tag)}[^>]*${attr}="([^"]*)"`, 'i')
+  const regex = new RegExp(String.raw`<${escapeRegex(tag)}\b[^>]*\s${escapeRegex(attr)}\s*=(?:"([^"]*)"|'([^']*)')`, 'i')
   const match = regex.exec(xml)
-  return match ? match[1] : null
+  return match ? (match[1] ?? match[2]) : null
 }
 
 /**

@@ -1,42 +1,13 @@
-/**
- * CLI export registry — the public `alice* <group> <verb>` surface, split into
- * independently-exported binaries by tool CATEGORY.
- *
- * Each export is one PATH binary (the shim self-detects which via argv[0]) over
- * one tool-center scope:
- *   - `alice`           (key `data`)      → global ToolCenter — market/research
- *                                            DATA sources (finance-domain; swapped
- *                                            out when the workspace's domain changes).
- *   - `alice-workspace` (key `workspace`) → WorkspaceToolCenter — AGENT
- *                                            COLLABORATION (inbox push + entity
- *                                            tracking); scoped per workspace,
- *                                            launcher-universal (survives a domain swap).
- *   - `traderhub`       (key `traderhub`) → global ToolCenter — LOW-FREQUENCY
- *                                            market data via the TraderHub-first
- *                                            client chain (boards, fundamentals,
- *                                            macro series, calendars). Named after
- *                                            the hosted hub so the binary name IS
- *                                            the domain name.
- *   - `alice-uta`       (key `uta`)       → global ToolCenter — TRADING (accounts,
- *                                            portfolio, orders, trading-as-git approval
- *                                            flow). Boundary-reviewed 2026-06-11: broker
- *                                            mutations are deliberate product surface
- *                                            (users want agent trading); cron stays
- *                                            MCP-only — no scheduling from the CLI.
- *
- * The (group, verb) → internal-tool-name map IS each export's contract,
- * deliberately decoupled from internal tool names: a verb like `rss grep` maps
- * to `grepRss`, so internal renames don't break the CLI and vice-versa. Adding
- * a row makes the command reachable in every workspace with zero client change —
- * the `alice*` client is manifest-driven, and the gateway only lets an export
- * invoke tools listed in ITS map.
+/** Public CLI exports. alice combines research and Workspace collaboration;
+ * dispatch retains each tool's global or Workspace registry ownership.
+ * The workspace export remains a compatibility endpoint for old shims.
  */
 
 export interface CliExport {
   /** PATH binary name. The shim is one file; siblings are byte-identical copies. */
   readonly binary: string
   /** Which registry backs this export — global catalog vs per-workspace scoped. */
-  readonly scope: 'global' | 'scoped'
+  readonly scope: 'global' | 'scoped' | 'mixed'
   readonly description: string
   /** Short intent-first help for each command group. The live manifest exposes
    * this separately from verb descriptions so old Workspace skills can recover
@@ -46,7 +17,7 @@ export interface CliExport {
   readonly commands: Record<string, Record<string, string>>
 }
 
-export const CLI_EXPORTS: Record<string, CliExport> = {
+const BASE_EXPORTS: Record<string, CliExport> = {
   data: {
     binary: 'alice',
     scope: 'global',
@@ -54,8 +25,7 @@ export const CLI_EXPORTS: Record<string, CliExport> = {
     groupDescriptions: {
       rss: 'Search and read the user\'s collected subscribed-feed archive',
       market: 'Discover symbols, bar sources, and optional market-data vendors',
-      analysis: 'Read dated K-lines, calculate indicators, and run bounded simulations',
-      think: 'Evaluate side-effect-free calculations',
+      analysis: 'Read dated K-lines and calculate indicators',
     },
     commands: {
       // `rss`, not `news`: the backing store is the RSS collector's archive —
@@ -71,6 +41,8 @@ export const CLI_EXPORTS: Record<string, CliExport> = {
       },
       market: {
         search: 'marketSearchForResearch',
+        'search-bars': 'searchBars',
+        bars: 'getMarketBars',
         // Discover data sources + drive them: `vendors` lists what's available,
         // each with on/off state and a usage note (symbol convention, search
         // language); `vendor-set` flips one on/off, live on the next search.
@@ -78,15 +50,11 @@ export const CLI_EXPORTS: Record<string, CliExport> = {
         'vendor-set': 'setMarketVendor',
       },
       analysis: {
+        // Shipped alias; new raw-data workflows use market search-bars.
         'search-bars': 'searchBars',
         quant: 'calculateQuant',
-        // Honest as-of read (dated bars, no-lookahead, freshness contract) + a
-        // path-dependent backtest. The Retrospective / Time-Machine primitives.
+        // Dated as-of read with a freshness contract for retrospective analysis.
         snapshot: 'marketSnapshot',
-        simulate: 'simulate',
-      },
-      think: {
-        calc: 'calculate',
       },
     },
   },
@@ -176,6 +144,7 @@ export const CLI_EXPORTS: Record<string, CliExport> = {
       signature: 'Show this Session\'s safe product identity',
       session: 'Rename or inspect this Workspace\'s product Sessions',
       track: 'Maintain the shared index of durable assets and topics',
+      harness: 'Review and update Project-provided Skill files while respecting Workspace preferences',
       template: 'Preview or apply managed Workspace-template updates',
     },
     commands: {
@@ -216,6 +185,8 @@ export const CLI_EXPORTS: Record<string, CliExport> = {
         list: 'issue_list',
         show: 'issue_show',
         ask: 'issue_ask',
+        run: 'issue_run',
+        retry: 'issue_retry',
       },
       provenance: {
         show: 'provenance_show',
@@ -233,6 +204,7 @@ export const CLI_EXPORTS: Record<string, CliExport> = {
       },
       // Current-Workspace managed template reconciliation. Preview is the
       // default; `--apply` explicitly performs the reviewed safe operation.
+      harness: { upgrade: 'alice_harness_upgrade' },
       template: {
         upgrade: 'workspace_template_upgrade',
       },
@@ -297,13 +269,34 @@ export const CLI_EXPORTS: Record<string, CliExport> = {
   // cron: deliberately NOT exported — scheduling stays MCP-only.
 }
 
+// Fail loudly if future namespaces collide instead of silently hiding commands.
+for (const group of Object.keys(BASE_EXPORTS.workspace.commands)) {
+  if (group in BASE_EXPORTS.data.commands) throw new Error(`Duplicate alice command group: ${group}`)
+}
+export const CLI_EXPORTS: Record<string, CliExport> = {
+  ...BASE_EXPORTS,
+  data: {
+    ...BASE_EXPORTS.data,
+    scope: 'mixed',
+    description: 'OpenAlice research, assets and Workspace collaboration',
+    commands: { ...BASE_EXPORTS.data.commands, ...BASE_EXPORTS.workspace.commands },
+    groupDescriptions: { ...BASE_EXPORTS.data.groupDescriptions, ...BASE_EXPORTS.workspace.groupDescriptions },
+  },
+}
+
+export function toolRegistryScope(exp: CliExport, name: string): 'global' | 'scoped' {
+  if (exp.scope !== 'mixed') return exp.scope
+  return Object.values(BASE_EXPORTS.workspace.commands).some(verbs => Object.values(verbs).includes(name)) ? 'scoped' : 'global'
+}
+
 /**
- * Map a PATH binary name to its export key. `alice` → `data`; `alice-<x>` →
+ * Map a PATH binary name to its export key. `alice` and its legacy alias
+ * `alice-workspace` → `data`; other `alice-<x>` →
  * `<x>`; any other bare name (e.g. `traderhub`) is its own key. Mirrored in
  * the shim (bin/alice).
  */
 export function exportKeyForBinary(binary: string): string {
-  return binary === 'alice' ? 'data' : binary.replace(/^alice-/, '')
+  return (binary === 'alice' || binary === 'alice-workspace') ? 'data' : binary.replace(/^alice-/, '')
 }
 
 /** The export descriptor for a key, or null. */
@@ -328,8 +321,9 @@ export function mappedToolNames(exportKey: string): Set<string> {
 export function mappedToolNamesForScope(scope: CliExport['scope']): Set<string> {
   const names = new Set<string>()
   for (const [key, exp] of Object.entries(CLI_EXPORTS)) {
-    if (exp.scope !== scope) continue
-    for (const name of mappedToolNames(key)) names.add(name)
+    for (const name of mappedToolNames(key)) {
+      if (scope === 'mixed' || toolRegistryScope(exp, name) === scope) names.add(name)
+    }
   }
   return names
 }

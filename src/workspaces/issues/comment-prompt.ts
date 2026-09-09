@@ -23,7 +23,7 @@ export const DEFAULT_ISSUE_COMMENT_PROMPT = [
   '{comment}',
   '',
   'Reply directly to this comment. Your final assistant response will be recorded automatically in the Issue Activity timeline.',
-  'Do not call `alice-workspace issue comment` for this reply; that would create a second notification loop.',
+  'Do not call `alice issue comment` for this reply; that would create a second notification loop.',
 ].join('\n')
 
 const TOKEN_RE = /\{([A-Za-z][A-Za-z0-9]*)\}/g

@@ -323,7 +323,7 @@ function WorkspaceView({
                 {workspaceLabel}
               </span>
               {unread > 0 && (
-                <span className="shrink-0 min-w-[15px] h-[15px] px-1 rounded-full bg-primary text-primary-foreground text-[10px] leading-[14px] font-semibold tabular-nums flex items-center justify-center">
+                <span className="shrink-0 min-w-[15px] text-center text-muted-foreground text-[11px] leading-[15px] font-medium tabular-nums">
                   {unread}
                 </span>
               )}
@@ -393,7 +393,7 @@ function ClusterRow({
       {active && <SelectionIndicator />}
       <span
         aria-hidden
-        className={`mt-[7px] shrink-0 w-1.5 h-1.5 rounded-full ${unread ? 'bg-primary' : 'bg-transparent'}`}
+        className={`mt-[7px] shrink-0 w-1.5 h-1.5 rounded-full ${unread ? 'oa-inbox-unread-dot' : 'bg-transparent'}`}
       />
       <span className="min-w-0">
         <span
@@ -499,7 +499,7 @@ function TimeRow({
       <div className="flex min-w-0 items-start gap-1.5">
         <span
           aria-hidden
-          className={`mt-1.5 shrink-0 w-1.5 h-1.5 rounded-full ${unread ? 'bg-primary' : 'bg-transparent'}`}
+          className={`mt-1.5 shrink-0 w-1.5 h-1.5 rounded-full ${unread ? 'oa-inbox-unread-dot' : 'bg-transparent'}`}
         />
         <span className="min-w-0 flex-1">
           <span

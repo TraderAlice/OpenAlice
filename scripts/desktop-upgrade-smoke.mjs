@@ -26,6 +26,7 @@ import {
   DESKTOP_UPGRADE_RECEIPT_SCHEMA_VERSION,
   desktopUpgradeWorkspaceTags,
   previousDesktopAssetName,
+  readInstalledDesktopVersion,
   selectPreviousDesktopTag,
   versionFromTag,
   waitForChromiumProfileRelease,
@@ -34,7 +35,11 @@ import {
 import { packagedElectronExecutable } from './smoke-packaged-toolchain.mjs'
 
 const repoRoot = resolve(import.meta.dirname, '..')
-const candidateVersion = JSON.parse(readFileSync(join(repoRoot, 'package.json'), 'utf8')).version
+const candidateVersion = process.env.CANDIDATE_VERSION
+  || JSON.parse(readFileSync(join(repoRoot, 'package.json'), 'utf8')).version
+if (!/^\d+\.\d+\.\d+(?:-beta(?:\.[1-9]\d*)?)?$/.test(candidateVersion)) {
+  throw new Error('Invalid desktop candidate version')
+}
 const repository = process.env['GITHUB_REPOSITORY'] || 'TraderAlice/OpenAlice'
 
 function sleep(ms) {
@@ -95,7 +100,6 @@ async function waitForPath(path, timeoutMs = 30_000) {
 }
 
 async function waitForInstalledVersion(installRoot, expectedVersion, timeoutMs = 20 * 60_000) {
-  const packageJson = join(installRoot, 'resources', 'app', 'package.json')
   const startedAt = Date.now()
   const deadline = Date.now() + timeoutMs
   let lastObservedVersion = null
@@ -103,7 +107,7 @@ async function waitForInstalledVersion(installRoot, expectedVersion, timeoutMs =
   while (Date.now() < deadline) {
     let observedVersion = '<replacing>'
     try {
-      observedVersion = JSON.parse(readFileSync(packageJson, 'utf8')).version ?? '<missing>'
+      observedVersion = readInstalledDesktopVersion(installRoot) ?? '<missing>'
       if (observedVersion === expectedVersion) return
     } catch {
       // NSIS replaces the package tree in place; partial reads are expected while it runs.

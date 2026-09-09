@@ -153,11 +153,13 @@ interface MarkdownContentProps {
    * Pass an explicit handler to override (e.g. tests, alternate surfaces).
    */
   onWikilink?: (entityKey: string) => void
+  /** Optional owner-provided route for relative document links. */
+  resolveRelativeHref?: (href: string) => string
 }
 
 export function renderMarkdownHtml(
   text: string,
-  opts: { strikethrough?: boolean; codeSpanWikilinks?: boolean } = {},
+  opts: { strikethrough?: boolean; codeSpanWikilinks?: boolean; resolveRelativeHref?: (href: string) => string } = {},
 ): string {
   const parser = opts.codeSpanWikilinks
     ? opts.strikethrough === false
@@ -166,7 +168,20 @@ export function renderMarkdownHtml(
     : opts.strikethrough === false
       ? markedWithoutStrikethrough
       : markedWithStrikethrough
-  const raw = DOMPurify.sanitize(parser.parse(text) as string)
+  let raw = DOMPurify.sanitize(parser.parse(text) as string)
+  if (opts.resolveRelativeHref) {
+    // Parse inert, sanitized markup. Re-sanitize resolved URLs as well; an
+    // owner callback must not bypass the renderer's URL safety contract.
+    const fragment = document.createElement('template')
+    fragment.innerHTML = raw
+    for (const link of fragment.content.querySelectorAll('a[href]')) {
+      const href = link.getAttribute('href') ?? ''
+      if (href && !/^(?:[a-z][a-z\d+.-]*:|\/|#)/i.test(href)) {
+        link.setAttribute('href', opts.resolveRelativeHref(href))
+      }
+    }
+    raw = DOMPurify.sanitize(fragment.innerHTML)
+  }
   return addMarkdownStructure(addCodeBlockWrappers(raw))
 }
 
@@ -186,6 +201,7 @@ export function MarkdownContent({
   strikethrough = true,
   codeSpanWikilinks = false,
   onWikilink,
+  resolveRelativeHref,
 }: MarkdownContentProps) {
   const contentRef = useRef<HTMLDivElement>(null)
   const defaultWikilink = useWikilinkHandler()
@@ -193,8 +209,8 @@ export function MarkdownContent({
   const wikilink = onWikilink ?? defaultWikilink
 
   const html = useMemo(() => {
-    return renderMarkdownHtml(text, { strikethrough, codeSpanWikilinks })
-  }, [text, strikethrough, codeSpanWikilinks])
+    return renderMarkdownHtml(text, { strikethrough, codeSpanWikilinks, resolveRelativeHref })
+  }, [text, strikethrough, codeSpanWikilinks, resolveRelativeHref])
 
   const handleClick = useCallback(
     (e: MouseEvent) => {

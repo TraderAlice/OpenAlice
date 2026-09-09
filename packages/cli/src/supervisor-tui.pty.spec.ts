@@ -2977,7 +2977,7 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
     const childEnv = { ...process.env }
     delete childEnv.OPENALICE_HOME
     delete childEnv.OPENALICE_INSTANCE
-    const child = pty.spawn(process.execPath, [cliEntry], {
+    const child = pty.spawn(process.execPath, [join(dirname(cliEntry), '../src/__fixtures__/supervisor-project-create-fixture.ts')], {
       cols: 110,
       rows: 32,
       cwd: dirname(cliEntry),
@@ -2995,6 +2995,7 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
       let requestedCreate = false
       let submittedName = false
       let acceptedHome = false
+      let prepared = false
       let reopenedProjects = false
       let focusedDefault = false
       let defaultFocusOffset = 0
@@ -3017,22 +3018,20 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
           && output.includes('AliceProject key')
         ) {
           submittedName = true
-          child.write('research')
-          setTimeout(() => {
-            child.write('\u001b[<35;60;10M')
-            setTimeout(() => child.write('\u001b[<0;60;10M'), 100)
-          }, 100)
+          child.write('research\r')
         } else if (
           !acceptedHome
           && output.includes('Create AliceProject · research')
           && output.includes('Complete home')
         ) {
           acceptedHome = true
-          child.write('\u001b[<35;64;10M')
-          setTimeout(() => child.write('\u001b[<0;64;10M'), 100)
+          child.write('\r')
+        } else if (!prepared && output.includes('Choose workspaces')) {
+          prepared = true
+          child.write('\u001b[B \r')
         } else if (
           !reopenedProjects
-          && output.includes('Created and selected AliceProject Research')
+          && output.includes('OpenAlice started and opened in your browser.')
           && output.includes('Research')
         ) {
           reopenedProjects = true
@@ -3079,9 +3078,10 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
       home: await realpath(join(isolatedHome, '.openalice-research')),
     })
     expect(transcript).toContain('AliceProject Switchboard · 1 PROJECT')
-    expect(transcript).toContain('› [ Enter ] Continue')
-    expect(transcript).toContain('› [ Enter ] Create & select')
-    expect(transcript).toContain('Created and selected AliceProject Research')
+    expect(transcript).toContain('[ Enter ] Continue')
+    expect(transcript).toContain('Create & start')
+    expect(transcript).toContain('Choose workspaces')
+    expect(JSON.parse(await readFile(join(isolatedHome, '.openalice-research/workspace-setup.json'), 'utf8')).pending).toEqual(['chat', 'auto-quant'])
     expect(transcript).toContain('Selected AliceProject Default AliceProject')
     expect(transcript).toContain('\u001b[?25h')
     expect(transcript).toContain('\u001b[?2004l')
@@ -3123,7 +3123,7 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
         } else if (!requestedCreate && output.includes('+ Create AliceProject')) {
           requestedCreate = true
           child.write('\u001b[B\r')
-        } else if (!foundry && output.includes('AliceProject Foundry · 1/2 · IDENTITY')) {
+        } else if (!foundry && output.includes('AliceProject Foundry · 1/3 · IDENTITY')) {
           foundry = true
           child.write('\u001b')
         } else if (foundry && !returned && data.includes('AliceProject Switchboard')) {
@@ -3140,8 +3140,8 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
       })
     })
 
-    expect(transcript).toContain('AliceProject Foundry · 1/2 · IDENTITY')
-    expect(transcript).toContain('◆ Identity  → Complete Home')
+    expect(transcript).toContain('AliceProject Foundry · 1/3 · IDENTITY')
+    expect(transcript).toContain('◆ Identity  → Home  → Workspaces')
     expect(transcript).toContain('Create AliceProject · Project key')
     expect(transcript).toContain('◆ CONTRACT')
     expect(transcript).toContain('\u001b[?25h')

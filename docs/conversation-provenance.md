@@ -10,7 +10,7 @@ trade decisions. It is the design spine for features such as “ask the sender,�
 `resumeId` is OpenAlice's unique Session identity; `@resumeId` is its visible
 signature. Every live interactive/headless Agent receives
 `OPENALICE_RESUME_ID` and `OPENALICE_SIGNATURE`, while
-`alice-workspace signature show` resolves the same identity through the
+`alice signature show` resolves the same identity through the
 authoritative request origin. Environment values help the Agent remember its
 name; server-side origin resolution remains the authority for structured
 Inbox, Issue, and trade actions.
@@ -75,7 +75,7 @@ Ask Alice and AutoQuant list those colleagues from persistent
 Directory (`GET /api/workspaces/:id/resumes`) decorates those rows with
 identity, presence, birth, and latest-execution facts; it never invents roster
 membership. Settings → Harness controls whether a headless-born Session that
-has never opened a TUI or WebPi appears on that shared roster (default off);
+has never opened a TUI or Web conversation appears on that shared roster (default off);
 the Issue page still owns those rows. The roster shows only
 `presence=active` coworkers; Archive files them without destroying either
 their `resumeId` or Session record. Soft-delete (`presence=deleted`) is still
@@ -127,7 +127,7 @@ This is the coworker's nametag:
 - changing the nametag is metadata, not Session activity, and must not update
   recency or reorder the Session roster;
 - empty or `null` clears the field; the maximum is 120 characters after trim;
-- agents rename only through `alice-workspace session rename` or
+- agents rename only through `alice session rename` or
   `PATCH /api/workspaces/:id/resumes/:resumeId/metadata`;
 - the Ask Alice / Quant Session row overflow menu exposes **Settings** for the
   nametag plus paused credential/model/effort editing (same dialog as the
@@ -349,7 +349,7 @@ An Issue has two independent identity questions:
 `assignee` is the single answer to the second question; schedule is an intrinsic
 capability of that Work item, not a second ownership object.
 
-Issue detail and `alice-workspace issue show` expose creation/update provenance
+Issue detail and `alice issue show` expose creation/update provenance
 plus structured comments. Adjacent updates from the same origin are projected
 as one editing activity, including historical autosave records written before
 store-side coalescing existed. Session origins carry a product
@@ -376,7 +376,8 @@ edits remain explicitly unknown rather than crediting the wrong coworker.
 Each connector phone-desk Issue uses this same comment sidecar as that
 channel's chat transcript. Owner private-chat text arrives as a human comment
 with `via: <connectorId>` and `origin.kind: external`. Scheduled-fire replies
-and Alice comments are projected back unless they contain `[[no-reply]]`.
+and Alice comments are projected with their source context. Connector owns
+`[[no-reply]]` interpretation for automation and reply-file delivery.
 Connector does not create a second conversation object.
 
 When an Issue has a fixed `@resumeId` owner, a comment from somebody else is
@@ -496,7 +497,7 @@ records a `decided` occurrence. A call without an authoritative Session header
 remains unattributed rather than being guessed. Query it with:
 
 ```bash
-alice-workspace provenance show --kind trade-decision \
+alice provenance show --kind trade-decision \
   --account-id <account> --decision-id <uta-commit-hash>
 ```
 
@@ -569,7 +570,7 @@ useful without starting or messaging an agent.
 Phase 1 answers “what produced or changed this, and which Session was
 responsible?” It owns:
 
-- a safe Workspace Session directory (`alice-workspace peer sessions`) whose
+- a safe Workspace Session directory (`alice peer sessions`) whose
   only conversation handle is `resumeId`; it is an audit/addressing surface,
   not permission to choose an arbitrary old Session when provenance is absent;
 - the standard `SessionOrigin` envelope;
@@ -581,7 +582,7 @@ responsible?” It owns:
 - report revision/write attribution where observable;
 - trade-decision correlation across the Alice -> UTA boundary;
 - read-only artifact and reverse-Session queries through
-  `alice-workspace provenance show`;
+  `alice provenance show`;
 - honest `unknown`/`unavailable` records for legacy, human, or external changes;
 - read-only provenance queries and diagnostics.
 
@@ -605,25 +606,25 @@ Phase 2 consumes Phase 1; it does not infer provenance independently. It owns:
 The embedded generic entry point is:
 
 ```bash
-alice-workspace conversation ask --resume-id <resumeId> --prompt '<question>'
-alice-workspace conversation ask --inbox-id <entryId> --prompt '<question>'
-alice-workspace conversation ask --issue-id <issueId> [--ws-id <workspaceId>] --prompt '<question>'
-alice-workspace conversation ask --ws-id <workspaceId> --prompt '<question>'
-alice-workspace conversation ask --harness chat --prompt '<new assignment>'
-alice-workspace conversation ask --harness autoquant --prompt '<new assignment>'
-alice-workspace conversation ask --ws-id <workspaceId> --prompt '<reconstruction request>' --reconstruct
-alice-workspace conversation await --task-id <taskId>
-alice-workspace conversation collect --task-id <taskA> --task-id <taskB>
-alice-workspace conversation read --task-id <taskId>
+alice conversation ask --resume-id <resumeId> --prompt '<question>'
+alice conversation ask --inbox-id <entryId> --prompt '<question>'
+alice conversation ask --issue-id <issueId> [--ws-id <workspaceId>] --prompt '<question>'
+alice conversation ask --ws-id <workspaceId> --prompt '<question>'
+alice conversation ask --harness chat --prompt '<new assignment>'
+alice conversation ask --harness autoquant --prompt '<new assignment>'
+alice conversation ask --ws-id <workspaceId> --prompt '<reconstruction request>' --reconstruct
+alice conversation await --task-id <taskId>
+alice conversation collect --task-id <taskA> --task-id <taskB>
+alice conversation read --task-id <taskId>
 ```
 
 Inbox and Issue callers normally use the business-level wrappers instead:
 
 ```bash
-alice-workspace inbox ask --id <entryId> --prompt '<question>' --await
-alice-workspace issue ask --id <issueName> --creator --prompt '<question>' --await
-alice-workspace issue ask --id <issueName> --owner --prompt '<question>' --await
-alice-workspace issue ask --id <issueName> --run-id <taskId> --prompt '<question>' --await
+alice inbox ask --id <entryId> --prompt '<question>' --await
+alice issue ask --id <issueName> --creator --prompt '<question>' --await
+alice issue ask --id <issueName> --owner --prompt '<question>' --await
+alice issue ask --id <issueName> --run-id <taskId> --prompt '<question>' --await
 ```
 
 The public CLI accepts only flat identity flags. `resumeId` addresses one exact

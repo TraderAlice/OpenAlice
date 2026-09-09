@@ -123,6 +123,12 @@ export const demoInboxEntries: InboxEntry[] = [
 // File contents served back to readWorkspaceFile() for demo workspace docs.
 // Keyed by relative path.
 export const demoWorkspaceFiles: Record<string, string> = {
+  'AGENTS.md': '# Research workspace\n\nUse evidence, preserve dates, and return useful reports. This is demo guidance.',
+  'CLAUDE.md': '# Research workspace\n\nUse evidence, preserve dates, and return useful reports. This is demo guidance.',
+  '.agents/skills/alice/SKILL.md': '---\nname: alice\ndescription: Collaborate and deliver research reports.\n---\n\n# Workspace collaboration\n\nUse `alice inbox` to deliver committed research.\n\nRead [the example](examples/report.md) before preparing a report.',
+  '.claude/skills/alice/SKILL.md': '---\nname: alice\ndescription: Collaborate and deliver research reports.\n---\n\n# Workspace collaboration\n\nUse `alice inbox` to deliver committed research.\n\nRead [the example](examples/report.md) before preparing a report.',
+  '.agents/skills/alice/examples/report.md': '# Example report\n\nSummarize the evidence and its timestamp.',
+
   // Doc for demoMoversReport (auto-quant › morning-scan run).
   'reports/movers-2026-06-27.md': `# Pre-market movers — 2026-06-27
 
@@ -260,6 +266,7 @@ export const demoWorkspaceFilePaths: Readonly<Record<string, readonly string[]>>
     DEMO_REPORT_PATH,
   ],
   [DEMO_CHAT_WORKSPACE_ID]: [
+    'AGENTS.md', 'CLAUDE.md', '.agents/skills/alice/SKILL.md', '.claude/skills/alice/SKILL.md', '.agents/skills/alice/examples/report.md',
     'power_buy_points_2026-06-02.md',
     'rotation/2026-06-02.md',
     'rotation/ai-chain-2026-06-02.md',

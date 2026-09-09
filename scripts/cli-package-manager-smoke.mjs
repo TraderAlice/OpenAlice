@@ -176,6 +176,8 @@ function installPackage(metaTarball, manager, { force = false } = {}) {
   if (options.manager === 'npm') {
     run(options.npm, [
       'install', '--global', '--prefix', manager.root,
+      // npm 12 keys local tarball consent by resolved file identity, not name.
+      `--allow-scripts=file:${metaTarball}`,
       ...(force ? ['--force'] : []),
       metaTarball,
     ], manager.baseEnv)
@@ -293,8 +295,9 @@ function pack(packageRoot, destination) {
   const result = run(options.npm, [
     'pack', packageRoot, '--json', '--pack-destination', destination,
   ], { ...process.env, npm_config_cache: join(root, 'npm-cache') })
-  const report = JSON.parse(result.stdout)
-  if (!Array.isArray(report) || report.length !== 1 || !report[0]?.filename) {
+  const parsed = JSON.parse(result.stdout)
+  const report = Array.isArray(parsed) ? parsed : Object.values(parsed ?? {})
+  if (report.length !== 1 || !report[0]?.filename) {
     fail(`npm pack returned an invalid report for ${packageRoot}`)
   }
   return join(destination, report[0].filename)

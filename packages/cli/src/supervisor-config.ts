@@ -1,3 +1,4 @@
+import { writeProjectWorkspaceRequest, type ProjectWorkspace } from './project-workspaces.ts'
 import { randomUUID } from 'node:crypto'
 import { constants } from 'node:fs'
 import {
@@ -391,6 +392,7 @@ export async function createSupervisorAliceProject(
   home: string,
   options: PersistAliceProjectConfigOptions & {
     product?: AliceProjectProduct
+    workspaces?: readonly ProjectWorkspace[]
     displayName?: string
     select?: boolean
   } = {},
@@ -443,6 +445,8 @@ export async function createSupervisorAliceProject(
     },
   }
   await assertRegistryHomesSeparate(next, options)
+  // Registration also serves transfers: only new-project flows request setup.
+  if (options.workspaces !== undefined) await writeProjectWorkspaceRequest(normalizedHome, options.workspaces)
   await writeConfig(context.supervisorRoot, next)
 }
 

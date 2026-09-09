@@ -12,7 +12,7 @@ export type SessionInteractiveSurface = 'spawn' | 'quick-chat' | 'auto-quant' | 
 
 export type SessionIssueBirthPolicy = 'new-each-run' | 'new-then-resume'
 
-export type SessionIssueFire = 'schedule' | 'retry'
+export type SessionIssueFire = 'schedule' | 'manual' | 'retry' | 'comment'
 
 export type SessionConversationCaller =
   | { readonly kind: 'agent'; readonly resumeId: string; readonly workspaceId?: string }
@@ -96,7 +96,7 @@ export function parseSessionCreatedBy(value: unknown): SessionCreatedBy | null {
       && typeof issueId === 'string'
       && issueId.length > 0
       && (policy === 'new-each-run' || policy === 'new-then-resume')
-      && (fire === 'schedule' || fire === 'retry')
+      && (fire === 'schedule' || fire === 'manual' || fire === 'retry' || fire === 'comment')
     ) {
       return { kind: 'issue', workspaceId, issueId, policy, fire }
     }

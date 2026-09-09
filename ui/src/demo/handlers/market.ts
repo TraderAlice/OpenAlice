@@ -105,7 +105,8 @@ export const marketHandlers = [
     if (barId && !barId.startsWith('alpaca-paper|') && assetClass !== selected.assetClass) {
       return HttpResponse.json({ results: null, meta: null, error: `Vendor barId needs assetClass=${selected.assetClass}.` })
     }
-    const rawResults = demoMarketAAPL.historical.results ?? []
+    const end = url.searchParams.get('end') ?? url.searchParams.get('asOf')
+    const rawResults = (demoMarketAAPL.historical.results ?? []).filter(bar => !end || bar.date.slice(0, 10) <= end)
     const targetSpot = DEMO_FX[selected.symbol]?.spot
     const results = targetSpot == null
       ? rawResults
@@ -136,6 +137,16 @@ export const marketHandlers = [
       symbol: selected.symbol, from: results[0]?.date ?? '', to: results[results.length - 1]?.date ?? '', bars: results.length,
       source: sourceId === 'alpaca-paper' ? 'uta' : 'vendor', sourceId, barId: barId ?? `${sourceId}|${selected.symbol}`,
       provider: sourceId, barCapability: sourceId === 'alpaca-paper' ? 'iex' : 'delayed',
+    }
+    meta.quality = { scope: 'fetched_window_before_count', inspectedRows: results.length,
+      excludedRows: 0, latestExcludedRecordAt: null, latestExcludedFields: [], reason: null }
+    meta.freshness = {
+      earliestRecordAt: meta.from || null,
+      delay: { status: 'unknown', estimatedSeconds: null, basis: 'insufficient_evidence', explanation: 'Demo snapshot; actual feed delay cannot be assessed.' },
+      fetchedAt: new Date().toISOString(), latestRecordAt: meta.to || null,
+      timestampKind: /T.*Z$/.test(meta.to) ? 'instant' : 'date',
+      recordAgeSeconds: /T.*Z$/.test(meta.to) ? Math.max(0, Math.floor((Date.now() - Date.parse(meta.to)) / 1000)) : null,
+      historical: false,
     }
     return HttpResponse.json({ results, meta })
   }),

@@ -79,7 +79,7 @@ class FakeThirdPartyAdapter implements ConnectorAdapter {
     this.delivered.push(notification)
   }
 
-  async sendOwnerText(): Promise<void> {}
+  async sendOwnerText(_text: string): Promise<void> {}
 
   health(): ConnectorAdapterHealth {
     return { id: this.id, enabled: true, status: this.status }
@@ -848,4 +848,52 @@ describe('DeliveryManager connector registry', () => {
     expect(artifacts).toHaveLength(1)
     await manager.stop()
   })
+})
+
+it('owns reply syntax, sends final files once, and preserves ordinary syntax discussions', async () => {
+  const adapter = new FakeThirdPartyAdapter() as FakeThirdPartyAdapter & {
+    sendOwnerChat: ReturnType<typeof vi.fn>; sendOwnerFile: ReturnType<typeof vi.fn>
+  }
+  adapter.sendOwnerChat = vi.fn(async () => undefined)
+  adapter.sendOwnerFile = vi.fn(async () => undefined)
+  const warning = vi.spyOn(adapter, 'sendOwnerText')
+  const registry = new ConnectorRegistry()
+  registry.register({ definition: { id: adapter.id, label: 'Test', description: '', fields: [], commands: [] }, create: () => adapter })
+  const read = vi.fn(async () => ({ filename: 'a.pdf', mediaType: 'application/pdf', sizeBytes: 0, contentBase64: '', contentSha256: createHash('sha256').update('').digest('hex') }))
+  const manager = new DeliveryManager({ registry, config: { version: 1, adapters: { [adapter.id]: { enabled: true, settings: {} } } }, updateAdapterSettings: vi.fn(), readWorkspaceFile: read })
+  await manager.start()
+  const base = { adapterId: adapter.id, conversationId: 'turn', workspaceId: 'ws' }
+  await manager.sendOwnerChat({ ...base, id: 'progress', phase: 'progress', text: 'Preparing [[a.pdf]]' })
+  expect(read).not.toHaveBeenCalled()
+  await manager.sendOwnerChat({ ...base, id: 'progress', phase: 'final', text: 'Final text' })
+  expect(adapter.sendOwnerChat).toHaveBeenLastCalledWith(expect.objectContaining({ phase: 'final', text: 'Final text' }))
+  const final = { ...base, id: 'final', phase: 'final' as const, text: 'Done [[a.pdf]] [[a.pdf]]' }
+  await Promise.all([manager.sendOwnerChat(final), manager.sendOwnerChat(final)])
+  expect(read).toHaveBeenCalledExactlyOnceWith('ws', 'a.pdf')
+  expect(adapter.sendOwnerFile).toHaveBeenCalledOnce()
+  await manager.sendOwnerChat({ ...base, id: 'silent', phase: 'final', source: 'automation', text: '[[no-reply]] [[b.pdf]]' })
+  expect(adapter.sendOwnerChat).toHaveBeenLastCalledWith(expect.objectContaining({ phase: 'final', text: undefined }))
+  expect(read).toHaveBeenCalledOnce()
+  await manager.sendOwnerChat({ ...base, id: 'literal', phase: 'final', source: 'conversation', text: 'We discussed [[no-reply]]' })
+  expect(adapter.sendOwnerChat).toHaveBeenLastCalledWith(expect.objectContaining({ text: 'We discussed [[no-reply]]' }))
+  read.mockRejectedValueOnce(new Error('missing'))
+  await manager.sendOwnerChat({ ...base, id: 'missing', phase: 'final', text: '[[missing.pdf]]' })
+  expect(adapter.sendOwnerChat).toHaveBeenLastCalledWith(expect.objectContaining({ text: '[[missing.pdf]]' }))
+  expect(warning).not.toHaveBeenCalled()
+  adapter.sendOwnerFile.mockRejectedValueOnce(new Error('upload failed'))
+  await manager.sendOwnerChat({ ...base, id: 'upload-failed', phase: 'final', text: '[[a.pdf]]' })
+  expect(warning).toHaveBeenCalledWith(expect.stringContaining('Upload failed'))
+  read.mockClear()
+  await manager.sendOwnerChat({ ...base, id: 'limit', phase: 'final', text: Array.from({ length: 6 }, (_, i) => `[[${i}.pdf]]`).join(' ') })
+  expect(read).toHaveBeenCalledTimes(5)
+  expect(warning).toHaveBeenLastCalledWith('[[5.pdf]]')
+  await manager.sendOwnerChat({ ...base, id: 'sticker', phase: 'final', text: '[[sticker/hello.png]]' })
+  expect(adapter.sendOwnerFile).toHaveBeenLastCalledWith(expect.any(Object), 'sticker')
+  const order: string[] = []
+  adapter.sendOwnerChat.mockImplementation(async message => { order.push(message.text ?? 'finish') })
+  adapter.sendOwnerFile.mockImplementation(async () => { order.push('sticker') })
+  warning.mockImplementation(async text => { order.push(text) })
+  await manager.sendOwnerChat({ ...base, id: 'interleaved', phase: 'final', text: 'Before [[sticker/hello.png]] After' })
+  expect(order).toEqual(['Before', 'sticker', 'After'])
+  await manager.stop()
 })

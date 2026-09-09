@@ -84,6 +84,7 @@ first_content_identity="$(printf '%s' "$version_json" | jq -er \
   ')" || fail "installed CLI did not preserve native dev-channel provenance"
 
 [[ -n "$($openalice --version)" ]] || fail "installed OpenAlice CLI did not report a version"
+$openalice setup --check || fail "installed CLI could not use host Git/Bash"
 [[ -n "$($openalice completion bash)" ]] || fail "installed OpenAlice CLI could not render completion"
 
 runtime_status="$($openalice status --home "$HOME/runtime-smoke" --json)"

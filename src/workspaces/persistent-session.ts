@@ -97,6 +97,7 @@ export class PersistentSession {
   private ws: WebSocket | null = null;
   private paused = false;
   private disposed = false;
+  private currentChildExited = false;
   private cursorTimer: NodeJS.Timeout | null = null;
   private lastCursorSeq = 0;
   private messageHandler: ((raw: unknown, isBinary: boolean) => void) | null = null;
@@ -189,6 +190,7 @@ export class PersistentSession {
       this.log.warn('session.pty_flow_control_unavailable', { backend: backend.name });
     }
 
+    this.currentChildExited = false;
     term.onData((data) => this.onPtyData(data as unknown as Buffer | string));
     term.onExit(({ exitCode, signal }) => this.onChildExit(term, exitCode, signal));
     return term;
@@ -208,6 +210,7 @@ export class PersistentSession {
     if (this.disposed) return;
     // Ignore exits from an already-replaced term (paranoia).
     if (exited !== this.term) return;
+    this.currentChildExited = true;
     const signal = typeof signalRaw === 'number' ? signalRaw : null;
     this.log.info('session.child_exit', {
       pid: exited.pid,
@@ -465,6 +468,28 @@ export class PersistentSession {
     this.log.event('session.detached');
   }
 
+  /** Disable respawn and await the current child before another writer starts. */
+  async disposeAndWait(reason: string): Promise<void> {
+    if (this.disposed) return;
+    if (this.currentChildExited) { this.dispose(reason); return; }
+    const term = this.term;
+    let exited = false;
+    let resolveExit!: () => void;
+    const exit = new Promise<void>((resolve) => { resolveExit = resolve; });
+    const listener = term.onExit(() => { exited = true; resolveExit(); });
+    const wait = async (ms: number) => {
+      let timer: ReturnType<typeof setTimeout> | undefined;
+      try { await Promise.race([exit, new Promise<void>((resolve) => { timer = setTimeout(resolve, ms); })]); }
+      finally { if (timer) clearTimeout(timer); }
+    };
+    try {
+      this.dispose(reason);
+      await wait(2_000);
+      if (!exited) { term.kill('SIGKILL'); await wait(2_000); }
+      if (!exited) throw new Error('Interactive process did not exit; background handoff was not started');
+    } finally { listener.dispose(); }
+  }
+
   dispose(reason: string): void {
     if (this.disposed) return;
     this.disposed = true;
@@ -509,6 +534,15 @@ export class PersistentSession {
       forwardQueryReplies: ws === null || ws.readyState !== ws.OPEN,
     });
     if (ws !== null) {
+      // Backends without a native pause primitive (Windows Bun ConPTY) must
+      // not accumulate an unbounded socket queue. Preserve the agent and its
+      // bounded scrollback; the client can reconnect and replay that tail.
+      if (!this.term.pause && ws.bufferedAmount >= this.opts.highWatermarkBytes) {
+        this.log.warn('session.slow_consumer_detached');
+        this.detach();
+        ws.close(1013, 'Terminal consumer is too slow; reconnect to resume');
+        return;
+      }
       ws.send(buf, { binary: true }, (err) => {
         if (err) {
           this.log.warn('session.send_error', { err });

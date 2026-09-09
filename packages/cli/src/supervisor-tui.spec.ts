@@ -39,7 +39,6 @@ import {
 } from './supervisor-launch-flight.ts'
 
 const matchesKey = (data: string, key: string) => data === key
-const asyncTuiTimeoutMs = process.env.CI ? 15_000 : 5_000
 const pointerClick = (col: number, row: number) => ({
   button: 0,
   col,
@@ -3766,6 +3765,9 @@ describe('Supervisor TUI screen', () => {
         calls.push('open')
       },
       discoverUpdate: async () => null,
+      seedFleet: isolatedLocalFleet,
+      inspectFleet: isolatedLocalFleet,
+      readInbox: isolatedEmptyInbox,
       loadTui: async () => fakePiTui as never,
       version: '0.87.0-beta',
       channel: 'stable',
@@ -3773,7 +3775,7 @@ describe('Supervisor TUI screen', () => {
 
     expect(calls).toEqual(['start'])
     expect(screen?.snapshot.launchFlight).toBeNull()
-  }, asyncTuiTimeoutMs)
+  })
 
   it('returns to the Launcher when the active local Runtime disappears', async () => {
     let inputListener: ((data: string) => unknown) | undefined
@@ -4074,11 +4076,9 @@ describe('Supervisor TUI screen', () => {
         }
         throw new Error('fixture inspection timeout')
       },
-      seedFleet: async () => ({
-        schemaVersion: 1,
-        generatedAt: '2026-09-02T00:00:00Z',
-        machines: fleetMachines(),
-      }),
+      seedFleet: isolatedLocalFleet,
+      inspectFleet: isolatedLocalFleet,
+      readInbox: isolatedEmptyInbox,
       pollIntervalMs: 5,
       connectionPollIntervalMs: 60_000,
       discoverUpdate: async () => null,
@@ -4104,6 +4104,7 @@ describe('Supervisor TUI screen', () => {
       'unreachable',
       'recovered',
     ])
+    expect(inspections).toBeGreaterThanOrEqual(5)
   })
 
   it('preserves remote Fleet focus while the selected local Runtime polls', async () => {
@@ -4573,6 +4574,9 @@ describe('Supervisor TUI screen', () => {
         calls.push('open')
       },
       discoverUpdate: async () => null,
+      seedFleet: isolatedLocalFleet,
+      inspectFleet: isolatedLocalFleet,
+      readInbox: isolatedEmptyInbox,
       loadTui: async () => fakePiTui as never,
       version: '0.87.0-beta',
       channel: 'branch dev',
@@ -4584,7 +4588,7 @@ describe('Supervisor TUI screen', () => {
       'configure-project',
       'start',
     ])
-  }, asyncTuiTimeoutMs)
+  })
 
   it('keeps foreign-owned lifecycle mutations unavailable', () => {
     const actions: SupervisorAction[] = []
@@ -5171,6 +5175,20 @@ describe('Supervisor TUI screen', () => {
     expect(applyUpdate).not.toHaveBeenCalled()
   })
 })
+
+// Runtime polling fixtures must not discover the host's real registry or use
+// their scripted inspect responses to populate the independent Fleet inventory.
+async function isolatedLocalFleet(): Promise<MachineFleetEnvelope> {
+  return {
+    schemaVersion: 1,
+    generatedAt: '2026-09-02T00:00:00Z',
+    machines: fleetMachines().filter((machine) => machine.key === 'local'),
+  }
+}
+
+async function isolatedEmptyInbox(endpoint: string) {
+  return { endpoint, entries: [], hasMore: false, refreshedAt: 0 }
+}
 
 function fleetMachines(): MachineInventory[] {
   const project = (key: string): MachineInventory['projects'][number] => ({

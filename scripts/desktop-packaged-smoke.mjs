@@ -1,6 +1,7 @@
 #!/usr/bin/env node
+import { writeProjectWorkspaceRequest } from '../packages/cli/src/project-workspaces.ts'
 import { spawn, spawnSync } from 'node:child_process'
-import { existsSync, mkdtempSync, rmSync } from 'node:fs'
+import { existsSync, mkdirSync, mkdtempSync, rmSync } from 'node:fs'
 import { createServer as createNetServer } from 'node:net'
 import { homedir, tmpdir } from 'node:os'
 import { delimiter, join, resolve } from 'node:path'
@@ -214,6 +215,10 @@ async function main() {
     const smokeHome = smokeRoot ? join(smokeRoot, 'home') : null
     const smokeWorkspaces = smokeRoot ? join(smokeRoot, 'workspaces') : null
     const smokeGlobal = smokeRoot ? join(smokeRoot, 'global') : null
+    if (onboarding && smokeHome) {
+      mkdirSync(smokeHome, { recursive: true })
+      await writeProjectWorkspaceRequest(smokeHome, ['chat'])
+    }
 
     const pathAdditions = [
       process.env['OPENALICE_EXTRA_AGENT_PATH'],
@@ -236,6 +241,7 @@ async function main() {
       env.OPENALICE_HOME = smokeHome
       env.AQ_LAUNCHER_ROOT = smokeWorkspaces
       env.OPENALICE_GLOBAL_DIR = smokeGlobal
+      if (onboarding) env.PI_CODING_AGENT_DIR = join(smokeRoot, 'pi-agent')
     }
 
     const receiptPath = workspaceAcceptance

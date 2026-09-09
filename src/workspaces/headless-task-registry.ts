@@ -47,6 +47,8 @@ export type HeadlessTaskTriggerMetadata = {
 }
 
 export type HeadlessTaskTrigger = {
+  /** Exact failed occurrence retried; independent of conversation parentTaskId. */
+  readonly retryOfTaskId?: string
   readonly kind: 'issue'
   readonly workspaceId: string
   readonly issueId: string

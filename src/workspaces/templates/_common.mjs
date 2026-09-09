@@ -5,7 +5,8 @@
  * Plain ESM, run by the Electron-bundled Node or by the Bun standalone's
  * internal bootstrap role. So: NO TypeScript syntax, only `node:*` builtins
  * plus the launcher-owned dugite executor. Node resolves dugite through the
- * packaged dependency tree; the compiled Bun role injects its bundled copy.
+ * source dependency tree; archived Electron and compiled Bun bootstrap roles
+ * inject the launcher-owned executor.
  *
  * This is the SOLE importer of `dugite` among the templates: all git goes
  * through `git()` so workspace creation uses OpenAlice's bundled git — no

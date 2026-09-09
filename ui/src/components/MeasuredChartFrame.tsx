@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
+import { cn } from '@/lib/utils'
 
 interface ChartFrameSize {
   width: number
@@ -37,7 +38,7 @@ export function MeasuredChartFrame({ className, children }: MeasuredChartFramePr
   }, [])
 
   return (
-    <div ref={ref} className={className}>
+    <div ref={ref} className={cn('oa-chart', className)}>
       {size ? (typeof children === 'function' ? children(size) : children) : null}
     </div>
   )

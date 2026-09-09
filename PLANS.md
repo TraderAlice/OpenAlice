@@ -29,6 +29,16 @@ the durable truth after it changes. Git history is the archive.
 
 ## Active
 
+- [[plans/web-conversation-surface.md]] — Generalizes WebPi into one Web
+  conversation surface: a neutral `WebSessionHost` with `pi-rpc`, `acp`,
+  `claude-stream-json`, and `codex-app-server` transports, first-class
+  permission requests, and capability-gated UI. Live per-runtime acceptance
+  remains open.
+- [[plans/unified-page-topbar.md]] — Unifies navigator and content toolbars
+  across the UI, with fixed page actions and content-owned sidebar restoration.
+  Held on `codex/ui-usability-followup` for visual acceptance.
+
+- [[plans/interaction-density-convergence.md]] — Converges field focus, compact-rail expansion, Connector setup hierarchy, and dense market surfaces through shared interaction primitives on the current `dev` baseline.
 - [[plans/tui-experience.md]] — Rebuilds the Shell Supervisor as a polished,
   mouse-capable terminal control surface using Oh My Pi as the interaction and
   finish benchmark while preserving the Node CLI and Runtime ownership
@@ -36,15 +46,24 @@ the durable truth after it changes. Git history is the archive.
   before any `dev` PR.
 - [[plans/bun-cli-distribution.md]] — Replaces the expanded Node headless
   Runtime with a Bun-compiled, multi-process CLI distribution. Direct,
-  npm/Bun, Homebrew, and AUR channels consume one accepted artifact set. The
-  CLI package owns OpenAlice only: Agent Runtime installation and Electron
+  npm/Bun, Homebrew, and AUR channels consume one accepted artifact set.
+  Active follow-up: system-owned Git/Bash and consent-based dependency
+  coordination across CLI installers/package managers; Electron stays separate.
+  Stable `0.91.1` and its Homebrew formula are publicly accepted after the
+  separate beta checkpoint. Windows x64 npm first publication is complete;
+  all seven OIDC exchanges and complete npm/Bun publication now pass.
+  Public macOS npm/Bun and Linux npm 12 lifecycle acceptance passed.
+  Native Intel acceptance passed; renderer latency remains tracked in #1350.
+  AUR registration remains deferred.
+  The CLI package owns OpenAlice only: Agent Runtime installation and Electron
   packaging stay outside this plan. The native CLI is public through the
   separately dispatched `v0.91.0-beta.3`; stable/beta discovery now uses the
   OpenAlice CDN manifests. Managed SSH installation and Project transfer pass
   the disposable Docker target; beta3 core Runtime/PTY state survives a long
   tunnel outage, and the following `dev` increment refreshes Settings identity
-  after recovery. Native PowerShell and external package-manager activation
-  remain open on focused branches from current `dev`. Routine dev
+  after recovery. Native Windows x64/ARM64 now proceed from accepted previews
+  into the shared stable/beta/dev installer, updater, and npm topology; external
+  package-manager activation remains a separate checkpoint. Routine dev
   and exact-beta source feedback is reduced to local-first, lightweight
   hosted lanes while `master` promotion, stable, and final artifact acceptance
   retain the complete gates.

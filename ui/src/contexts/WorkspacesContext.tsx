@@ -42,13 +42,14 @@ import {
   getAutoQuantDefaultWorkspace,
   getAutoPredictionDefaultWorkspace,
   getWorkspaceManager,
+  getWorkspaceSessionDirectory,
   getWorkspaceDefaultAgent,
   listTemplates,
   listWorkspaces,
   initializeAutoQuantWorkspace as apiInitializeAutoQuantWorkspace,
   initializeAutoPredictionWorkspace as apiInitializeAutoPredictionWorkspace,
   initializeChatWorkspace as apiInitializeChatWorkspace,
-  openWebPiSession as apiOpenWebPiSession,
+  openWebSession as apiOpenWebSession,
   openResumeSession,
   pauseSession as apiPauseSession,
   quickChat as apiQuickChat,
@@ -313,12 +314,27 @@ export function WorkspacesProvider({ children }: { children: ReactNode }) {
     setDefaultAgentState(saved)
   }, [])
 
+  const [interactiveConsent, setInteractiveConsent] = useState<{ resolve: (confirmed: boolean) => void } | null>(null)
+  const confirmInteractiveSession = useCallback(async (wsId: string, resumeId: string): Promise<boolean> => {
+    if (wsId === MANAGER_WORKSPACE_ID) return true
+    const directory = await getWorkspaceSessionDirectory(wsId, resumeId)
+    const identity = directory.sessions.find((entry) => entry.resumeId === resumeId)
+    if (!identity?.issueAttached && identity?.rosterVisibility !== 'hidden') return true
+    return new Promise<boolean>((resolve) => {
+      setInteractiveConsent((previous) => {
+        previous?.resolve(false)
+        return { resolve }
+      })
+    })
+  }, [])
+
   const openHeadlessRun = useCallback(
     async (
       wsId: string,
       resumeId: string,
       opts: { title?: string } = {},
     ): Promise<void> => {
+      if (!await confirmInteractiveSession(wsId, resumeId)) return
       const { session } = await openResumeSession(wsId, resumeId, opts)
       let nextSession = session
       if (session.state === 'paused') {
@@ -359,7 +375,7 @@ export function WorkspacesProvider({ children }: { children: ReactNode }) {
       })
       void refresh()
     },
-    [ensureTerminalAppearancePublished, openOrFocus, refresh, setSidebar],
+    [confirmInteractiveSession, ensureTerminalAppearancePublished, openOrFocus, refresh, setSidebar],
   )
 
   const setIssueDefaultAgent = useCallback(async (agent: string | null): Promise<void> => {
@@ -527,6 +543,8 @@ export function WorkspacesProvider({ children }: { children: ReactNode }) {
 
   const resumeSession = useCallback(
     async (wsId: string, sessionId: string, source?: WorkspaceSource): Promise<void> => {
+      const record = workspaces.find((ws) => ws.id === wsId)?.sessions.find((entry) => entry.id === sessionId)
+      if (record && !await confirmInteractiveSession(wsId, record.resumeId)) return
       await ensureTerminalAppearancePublished()
       const resp = await apiResumeSession(wsId, sessionId)
       const patch = {
@@ -552,12 +570,14 @@ export function WorkspacesProvider({ children }: { children: ReactNode }) {
         void refresh()
       }
     },
-    [ensureTerminalAppearancePublished, refresh, refreshWorkspaceManager, openOrFocus],
+    [confirmInteractiveSession, workspaces, ensureTerminalAppearancePublished, refresh, refreshWorkspaceManager, openOrFocus],
   )
 
-  const openWebPiSession = useCallback(
+  const openWebSession = useCallback(
     async (wsId: string, sessionId: string, source?: WorkspaceSource): Promise<void> => {
-      const snapshot = await apiOpenWebPiSession(wsId, sessionId)
+      const record = workspaces.find((ws) => ws.id === wsId)?.sessions.find((entry) => entry.id === sessionId)
+      if (record && !await confirmInteractiveSession(wsId, record.resumeId)) return
+      const snapshot = await apiOpenWebSession(wsId, sessionId)
       const patch = {
         state: 'running' as const,
         surface: 'webpi' as const,
@@ -578,7 +598,7 @@ export function WorkspacesProvider({ children }: { children: ReactNode }) {
         void refresh()
       }
     },
-    [openOrFocus, refresh, refreshWorkspaceManager],
+    [confirmInteractiveSession, workspaces, openOrFocus, refresh, refreshWorkspaceManager],
   )
 
   const saveWorkspaceMetadata = useCallback(
@@ -614,7 +634,7 @@ export function WorkspacesProvider({ children }: { children: ReactNode }) {
           : false
 
       // Deleting the Session currently on screen has a deterministic landing:
-      // its Workspace-level Session library. Open/focus that hub before closing
+      // its Workspace-level new-conversation composer. Open/focus that hub before closing
       // the pinned tab so closeTab's neighbour rule cannot send the user to an
       // unrelated editor.
       if (focusedOwnsSession) {
@@ -792,7 +812,7 @@ export function WorkspacesProvider({ children }: { children: ReactNode }) {
     quickChat,
     pauseSession,
     resumeSession,
-    openWebPiSession,
+    openWebSession,
     requestDeleteSession,
     setSessionPresence,
     setSessionDisplayName,
@@ -817,7 +837,7 @@ export function WorkspacesProvider({ children }: { children: ReactNode }) {
     listError,
     openAgentConfig,
     openHeadlessRun,
-    openWebPiSession,
+    openWebSession,
     pauseSession,
     quickChat,
     quickStartWorkspaceManager,
@@ -886,6 +906,15 @@ export function WorkspacesProvider({ children }: { children: ReactNode }) {
             onClose={() => setConfiguringAgentTarget(null)}
           />
         )}
+        {interactiveConsent && <ConfirmDialog
+          title={t('workspace.interactiveOwnership.title')}
+          message={t('workspace.interactiveOwnership.message')}
+          confirmLabel={t('workspace.interactiveOwnership.confirm')}
+          cancelLabel={t('common.cancel')}
+          variant="primary"
+          onConfirm={() => { interactiveConsent.resolve(true); setInteractiveConsent(null) }}
+          onClose={() => { interactiveConsent.resolve(false); setInteractiveConsent(null) }}
+        />}
         {pendingSessionDelete !== null && (
           <ConfirmDialog
             title={t('chat.deleteSessionTitle')}

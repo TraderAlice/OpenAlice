@@ -1,27 +1,28 @@
 /**
- * "Ask Alice" secondary sidebar — your chat history.
- *
- * Makes the two lifecycle actions explicit: "New chat" creates a Session inside
- * the recent Chat Workspace; "New workspace" creates a new durable context
- * container. Workspaces keep their actual names and Sessions hang underneath.
- *
- * Named-workspace creation (a custom tag) lives in the Workspaces activity —
- * this surface is for chatting, not workspace management.
+ * Current-Workspace conversations and actions, shared by the primary Harness
+ * navigation and the internal sidebar presentation. Creating a conversation
+ * enters the existing launcher; opening one never implicitly resumes it.
  */
 
 import { useEffect, useId, useMemo, useRef, useState, type ReactElement } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
   AppWindow,
+  ChartNoAxesCombined,
+  Radar,
+  Layers,
   ChevronDown,
   ChevronRight,
   Clock3,
   LayoutGrid,
   Layers3,
   LoaderCircle,
+  MessageSquare,
   MessageSquarePlus,
+  MoreHorizontal,
   Network,
   PanelsTopLeft,
+  Plus,
   Settings as SettingsIcon,
   Trash2,
 } from 'lucide-react'
@@ -40,7 +41,6 @@ import { CreateWorkspaceDialog } from './CreateWorkspaceDialog'
 import { WorkspaceOffboardingDialog } from './WorkspaceOffboardingDialog'
 import {
   ConversationBrowserDialog,
-  WorkspacePickerDialog,
 } from './WorkspaceNavigationDialogs'
 import { SessionRow } from './Sidebar'
 import { SidebarActionMenu } from './SidebarActionMenu'
@@ -61,11 +61,15 @@ import { useHarnessPreferences } from '../../hooks/useHarnessPreferences'
 import {
   DropdownMenu,
   DropdownMenuContent,
+  DropdownMenuGroup,
   DropdownMenuItem,
   DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuSub,
+  DropdownMenuSubTrigger,
+  DropdownMenuSubContent,
   DropdownMenuRadioGroup,
   DropdownMenuRadioItem,
-  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import {
@@ -80,6 +84,8 @@ import {
 import { Button } from '@/components/ui/button'
 import type { ChatDisplayMode } from './chat-display-mode'
 import { SelectionIndicator } from '../SelectionIndicator'
+import { HarnessNavigationGroup } from './HarnessNavigationGroup'
+import { HarnessWorkspaceEntry } from './HarnessWorkspaceEntry'
 
 const CHAT_TEMPLATE = 'chat'
 const AUTO_QUANT_TEMPLATE = 'auto-quant-v2'
@@ -97,12 +103,15 @@ export function ChatWorkspaceSection({
   onNavigate = () => undefined,
   mode = 'chat',
   displayMode = 'focused',
-  onRequestDisplayMode = () => undefined,
+  placement = 'sidebar',
+  compact = false,
 }: {
   onNavigate?: () => void
   mode?: 'chat' | 'auto-quant' | 'prediction'
+  /** Legacy render variants stay internal while the product shell fixes this to Current Workspace. */
   displayMode?: ChatDisplayMode
-  onRequestDisplayMode?: (mode: ChatDisplayMode) => void
+  placement?: 'sidebar' | 'navigation'
+  compact?: boolean
 }): ReactElement | null {
   const { t } = useTranslation()
   const ctx = useWorkspaces()
@@ -123,8 +132,10 @@ export function ChatWorkspaceSection({
     ? { wsId: focused.params.wsId, sessionId: focused.params.sessionId ?? null }
     : null
   const landingOwnsStatus = focused?.kind === landingKind
-  const routeWorkspaceId = isWsFocus
+  const routeWorkspaceId = isWsFocus || (focused?.kind === 'workspace-details' && focused.params.source === source)
     ? focused.params.wsId
+    : focused?.kind === 'harness-surface' && focused.params.source === source
+      ? focused.params.wsId
     : focused?.kind === landingKind
       ? focused.params.targetWsId ?? null
       : null
@@ -174,7 +185,6 @@ export function ChatWorkspaceSection({
   const [pendingDelete, setPendingDelete] = useState<Workspace | null>(null)
   const [showCreate, setShowCreate] = useState(false)
   const [recentWorkspaceId, setRecentWorkspaceId] = useState<string | null>(null)
-  const [workspacePickerOpen, setWorkspacePickerOpen] = useState(false)
   const [conversationBrowserOpen, setConversationBrowserOpen] = useState(false)
   const [conversationWorkspaceId, setConversationWorkspaceId] = useState<string | null>(null)
   const [busySession, setBusySession] = useState<HarnessSession | null>(null)
@@ -196,13 +206,20 @@ export function ChatWorkspaceSection({
     let live = true
     void preferencesApi.getQuickChat()
       .then((preferences) => {
-        if (live) setRecentWorkspaceId(preferences.recentChatWorkspaceId)
+        if (live) setRecentWorkspaceId(current => current ?? preferences.recentChatWorkspaceId)
       })
       .catch(() => undefined)
     return () => {
       live = false
     }
   }, [mode])
+
+  // This component now stays mounted across product areas. Keep a Chat desk
+  // entered via a deep link or the general launcher when leaving that route;
+  // Quant/Prediction continue to use their explicit durable default pointers.
+  useEffect(() => {
+    if (mode === 'chat' && routeWorkspaceId) setRecentWorkspaceId(routeWorkspaceId)
+  }, [mode, routeWorkspaceId])
 
   const preferredWorkspaceId = routeWorkspaceId
     ?? (mode === 'auto-quant'
@@ -219,7 +236,7 @@ export function ChatWorkspaceSection({
   }
 
   const rememberViewedWorkspace = (workspaceId: string): void => {
-    if (mode === 'auto-quant') return
+    if (mode !== 'chat') return
     setRecentWorkspaceId(workspaceId)
     void preferencesApi.rememberRecentChatWorkspace(workspaceId).catch(() => undefined)
   }
@@ -258,13 +275,13 @@ export function ChatWorkspaceSection({
     if (!stillRunning) setBusySession(null)
   }, [busySession, recentRoster])
 
-  const resumeRosterSession = (row: HarnessSession): void => {
+  const resumeRosterSession = async (row: HarnessSession): Promise<void> => {
     if (row.headlessOccupying || !row.resumable) return
     rememberViewedWorkspace(row.workspaceId)
     if (row.session.surface === 'webpi') {
-      void ctx.openWebPiSession(row.workspaceId, row.session.id, source)
+      await ctx.openWebSession(row.workspaceId, row.session.id, source)
     } else {
-      void ctx.resumeSession(row.workspaceId, row.session.id, source)
+      await ctx.resumeSession(row.workspaceId, row.session.id, source)
     }
     onNavigate()
   }
@@ -320,11 +337,6 @@ export function ChatWorkspaceSection({
     onSelected()
   }
 
-  const openWorkspacePicker = (restoreFocus: HTMLElement | null): void => {
-    dialogRestoreFocusRef.current = restoreFocus
-    setWorkspacePickerOpen(true)
-  }
-
   const openConversationBrowser = (
     workspaceId: string | null,
     restoreFocus: HTMLElement | null,
@@ -338,10 +350,96 @@ export function ChatWorkspaceSection({
   // so hid the cold-load skeleton (and the New-chat CTA) during the exact 30s
   // window we want to fill, leaving a blank pane. Only bail once templates are
   // known-loaded AND there genuinely is no chat template (broken deployment).
-  if (ctx.templatesLoaded && !chatTemplate && ctx.templatesError === null) return null
+  if (placement === 'sidebar' && ctx.templatesLoaded && !chatTemplate && ctx.templatesError === null) return null
+
+  const navigation = placement === 'navigation'
+  const preferenceLoaded = mode === 'auto-quant' ? ctx.autoQuantPreferenceLoaded
+    : mode === 'prediction' ? ctx.autoPredictionPreferenceLoaded : true
+  const preferenceError = mode === 'auto-quant' ? ctx.autoQuantPreferenceError
+    : mode === 'prediction' ? ctx.autoPredictionPreferenceError : null
+  const navigationLoaded = ctx.hasLoaded && (mode === 'chat' || (ctx.templatesLoaded && preferenceLoaded))
+  const navigationError = ctx.listError || ctx.templatesError || preferenceError
+    || (mode !== 'chat' && ctx.templatesLoaded && !chatTemplate ? t('workspace.templatesUnavailableDescription') : null)
+  const refreshNavigation = () => Promise.all([
+    ctx.refresh(), ctx.refreshTemplates(), sessionDirectories.refresh(),
+    mode === 'auto-quant' ? ctx.refreshAutoQuantPreference()
+      : mode === 'prediction' ? ctx.refreshAutoPredictionPreference?.() : undefined,
+  ])
+  const ready = mode === 'chat' || (mode === 'auto-quant'
+    ? ctx.autoQuantPreferenceLoaded && chatWorkspaces.some(workspace => workspace.id === ctx.autoQuantDefaultWorkspaceId)
+    : ctx.autoPredictionPreferenceLoaded && chatWorkspaces.some(workspace => workspace.id === ctx.autoPredictionDefaultWorkspaceId))
+  const currentWorkspace = ready ? focusedWorkspace : null
+  const harnessTitle = mode === 'chat' ? t('office.harness.chat')
+    : t(mode === 'auto-quant' ? 'nav.item.autoQuant' : 'nav.item.autoPrediction')
+  const studioActive = focused?.kind === 'harness-surface' && focused.params.source === source
+    && focused.params.wsId === currentWorkspace?.id && focused.params.capability === 'studio'
+  const newLabel = mode === 'auto-quant' ? t('autoQuant.newResearch')
+    : mode === 'prediction' ? t('autoPrediction.newResearch') : t('chat.newChat')
+  const openLanding = () => navigate({
+    kind: landingKind,
+    params: currentWorkspace ? { targetWsId: currentWorkspace.id } : {},
+  })
+  const contextMenu = (
+    <ChatWorkspaceContextFooter
+      iconOnly={navigation}
+      harness={mode}
+      workspace={currentWorkspace}
+      workspaces={chatWorkspaces}
+      sessionCount={currentWorkspace ? rosterByWorkspace.get(currentWorkspace.id)?.length ?? 0 : 0}
+      createWorkspaceLabel={mode === 'auto-quant' ? t('autoQuant.newWorkspace')
+        : mode === 'prediction' ? t('autoPrediction.newWorkspace') : t('chat.newWorkspace')}
+      onConfigure={() => currentWorkspace && ctx.openAgentConfig(currentWorkspace.id)}
+      onDetails={() => currentWorkspace && navigate({ kind: 'workspace-details', params: { wsId: currentWorkspace.id, source } })}
+      onUpgrade={() => currentWorkspace && ctx.openAgentConfig(currentWorkspace.id, undefined, 'template')}
+      onSelectWorkspace={(workspaceId) => selectHarnessWorkspace(workspaceId, () => {
+        navigate({ kind: landingKind, params: { targetWsId: workspaceId } })
+      })}
+      onBrowseSessions={(restoreFocus) => openConversationBrowser(currentWorkspace?.id ?? null, restoreFocus)}
+      onCreateWorkspace={() => setShowCreate(true)}
+    />
+  )
+  const navigationSessions = currentWorkspace ? rosterByWorkspace.get(currentWorkspace.id) ?? [] : []
+  const visibleNavigationSessions = selectRecentSidebarWorkset(navigationSessions, isRosterRowActive, 4)
 
   return (
-    <div className="flex h-full min-h-0 flex-col">
+    <div className={navigation ? 'min-w-0' : 'flex h-full min-h-0 flex-col'}>
+      {navigation ? (
+        <HarnessNavigationGroup
+          title={harnessTitle}
+          compact={compact}
+          compactIcon={mode === 'chat' ? <MessageSquare size={15} strokeWidth={1.75} aria-hidden />
+            : mode === 'auto-quant' ? <ChartNoAxesCombined size={17} strokeWidth={1.75} aria-hidden /> : <Radar size={17} strokeWidth={1.75} aria-hidden />}
+          active={(isWsFocus && (compact || !selection?.sessionId)) || landingOwnsStatus || (compact && studioActive) || (focused?.kind === 'workspace-details' && focused.params.source === source)}
+          showNewAction={mode === 'chat' || Boolean(navigationLoaded && !navigationError && currentWorkspace)}
+          newLabel={newLabel} onOpen={openLanding} menu={contextMenu}
+        >
+          {(navigationError || sessionDirectories.error) ? (
+            <RefreshNotice message={t('workspace.dataUnavailableSidebar')} actionLabel={t('common.retry')}
+              onAction={() => void refreshNavigation()} />
+          ) : !navigationLoaded ? (
+            <div className="space-y-2 px-2 py-2" aria-label={t('common.loading')}><Skeleton className="h-3 w-24" /><Skeleton className="h-3 w-32" /></div>
+          ) : null}
+          {mode !== 'chat' && navigationLoaded && !navigationError && chatWorkspaces.length > 0 && (
+            <HarnessWorkspaceEntry active={studioActive}
+              state={currentWorkspace ? 'ready' : 'select'}
+              onOpen={() => currentWorkspace
+                ? navigate({ kind: 'harness-surface', params: { wsId: currentWorkspace.id, capability: 'studio', source: mode } })
+                : openLanding()} />
+          )}
+          {visibleNavigationSessions.map(row => (
+            <HarnessSessionRow enterOnSelect key={`${row.workspaceId}:${row.resumeId}`} row={row} isActive={isRosterRowActive(row)}
+              onSelect={() => activateRosterSession(row)} onPause={() => pauseRosterSession(row)}
+              onResume={() => resumeRosterSession(row)} onDelete={() => deleteRosterSession(row)}
+              onArchive={() => archiveRosterSession(row)} onSettings={() => openSessionSettings(row)} />
+          ))}
+          {navigationSessions.length > visibleNavigationSessions.length && (
+            <button type="button" onClick={event => openConversationBrowser(currentWorkspace?.id ?? null, event.currentTarget)}
+              className="oa-nav-row flex min-h-10 w-full items-center rounded-md px-2 text-left text-[12px] text-muted-foreground hover:bg-sidebar-accent md:min-h-8">
+              {t('chat.viewAllConversations', { count: navigationSessions.length })}
+            </button>
+          )}
+        </HarnessNavigationGroup>
+      ) : <>
       <div className="grid grid-cols-1 gap-1 px-1.5 pb-2 pt-2">
         <Button
           type="button"
@@ -352,10 +450,10 @@ export function ChatWorkspaceSection({
               : {},
           })}
           variant="secondary"
-          className="oa-chat-new-action min-h-10 w-full justify-start px-2 text-sm text-sidebar-accent-foreground"
+          className="oa-chat-new-action h-9 w-full justify-start px-2.5 text-sidebar-accent-foreground"
         >
-          <MessageSquarePlus size={16} strokeWidth={2} className="shrink-0 text-primary" />
-          <span>{mode === 'auto-quant'
+          <MessageSquarePlus size={15} strokeWidth={2} className="shrink-0 text-primary" />
+          <span className="text-body">{mode === 'auto-quant'
             ? t('autoQuant.newResearch')
             : mode === 'prediction' ? t('autoPrediction.newResearch') : t('chat.newChat')}</span>
         </Button>
@@ -368,10 +466,10 @@ export function ChatWorkspaceSection({
             })}
             variant="ghost"
             size="lg"
-            className="w-full justify-start px-2.5 text-sm text-muted-foreground"
+            className="w-full justify-start px-2.5 text-muted-foreground"
           >
-            <AppWindow size={15} strokeWidth={2.05} className="shrink-0 text-primary" />
-            <span>{t('harnessSurface.studio')}</span>
+            <Layers size={14} strokeWidth={1.5} className="shrink-0 text-muted-foreground" aria-hidden />
+            <span className="text-body">{t('harnessSurface.studio')}</span>
           </Button>
         )}
       </div>
@@ -444,7 +542,7 @@ export function ChatWorkspaceSection({
           onPauseSession={(sessionId) => void ctx.pauseSession(MANAGER_WORKSPACE_ID, sessionId)}
           onResumeSession={(sessionId, surface) => {
             if (surface === 'webpi') {
-              void ctx.openWebPiSession(MANAGER_WORKSPACE_ID, sessionId)
+              void ctx.openWebSession(MANAGER_WORKSPACE_ID, sessionId)
             } else {
               void ctx.resumeSession(MANAGER_WORKSPACE_ID, sessionId)
             }
@@ -455,7 +553,7 @@ export function ChatWorkspaceSection({
       )}
 
       <div className="px-3 pb-1 pt-1.5">
-        <h3 className="min-w-0 truncate text-[12px] leading-[18px] font-medium text-muted-foreground/70">
+        <h3 className="text-caption min-w-0 truncate font-medium text-muted-foreground/70">
           {t('nav.item.workspaces')}
         </h3>
       </div>
@@ -481,7 +579,7 @@ export function ChatWorkspaceSection({
         )}
         {ctx.hasLoaded && chatWorkspaces.length === 0 && !showListError && (
           <li className="px-3 py-2.5">
-            <p className="text-[12px] text-muted-foreground/60">
+            <p className="text-caption text-muted-foreground/60">
               {mode === 'auto-quant'
                 ? t('autoQuant.noWorkspacesYet')
                 : mode === 'prediction' ? t('autoPrediction.noWorkspacesYet') : t('chat.noChatWorkspacesYet')}
@@ -517,39 +615,9 @@ export function ChatWorkspaceSection({
       )}
       </div>
 
-      <ChatWorkspaceContextFooter
-        harness={mode}
-        workspace={focusedWorkspace}
-        workspaces={chatWorkspaces}
-        displayMode={displayMode}
-        showManager={mode === 'chat'}
-        createWorkspaceLabel={mode === 'auto-quant'
-          ? t('autoQuant.newWorkspace')
-          : mode === 'prediction' ? t('autoPrediction.newWorkspace') : t('chat.newWorkspace')}
-        onRequestDisplayMode={onRequestDisplayMode}
-        onConfigure={() => focusedWorkspace && ctx.openAgentConfig(focusedWorkspace.id)}
-        onUpgrade={() => focusedWorkspace && ctx.openAgentConfig(focusedWorkspace.id, undefined, 'template')}
-        onOpenWorkspacePicker={openWorkspacePicker}
-        onBrowseSessions={(restoreFocus) => openConversationBrowser(focusedWorkspace?.id ?? null, restoreFocus)}
-        onOpenManager={() => navigate({ kind: 'workspace-manager', params: {} })}
-        onCreateWorkspace={() => setShowCreate(true)}
-      />
+      {contextMenu}
+      </>}
 
-      <WorkspacePickerDialog
-        harness={mode}
-        open={workspacePickerOpen}
-        workspaces={chatWorkspaces}
-        currentWorkspaceId={focusedWorkspace?.id ?? null}
-        restoreFocusRef={dialogRestoreFocusRef}
-        onOpenChange={setWorkspacePickerOpen}
-        onSelectWorkspace={(workspaceId) => {
-          selectHarnessWorkspace(workspaceId, () => {
-            setWorkspacePickerOpen(false)
-            onRequestDisplayMode('focused')
-            navigate({ kind: landingKind, params: { targetWsId: workspaceId } })
-          })
-        }}
-      />
       <ConversationBrowserDialog
         harness={mode}
         open={conversationBrowserOpen}
@@ -614,7 +682,6 @@ export function ChatWorkspaceSection({
           onCreated={(workspace) => {
             ctx.refresh()
             selectHarnessWorkspace(workspace.id, () => {
-              onRequestDisplayMode('focused')
               navigate({ kind: landingKind, params: { targetWsId: workspace.id } })
             })
           }}
@@ -637,18 +704,17 @@ export function ChatWorkspaceSection({
 }
 
 interface ChatWorkspaceContextFooterProps {
+  iconOnly?: boolean
   harness: 'chat' | 'auto-quant' | 'prediction'
   workspace: Workspace | null
   workspaces: readonly Workspace[]
-  displayMode: ChatDisplayMode
-  showManager: boolean
+  sessionCount: number
   createWorkspaceLabel: string
-  onRequestDisplayMode: (mode: ChatDisplayMode) => void
   onConfigure: () => void
   onUpgrade: () => void
-  onOpenWorkspacePicker: (restoreFocus: HTMLElement | null) => void
+  onDetails: () => void
+  onSelectWorkspace: (workspaceId: string) => void
   onBrowseSessions: (restoreFocus: HTMLElement | null) => void
-  onOpenManager: () => void
   onCreateWorkspace: () => void
 }
 
@@ -659,27 +725,20 @@ function ChatWorkspaceContextFooter(props: ChatWorkspaceContextFooterProps): Rea
   const pendingActionRef = useRef<(() => void) | null>(null)
   const triggerRef = useRef<HTMLButtonElement | null>(null)
 
-  const title = props.displayMode === 'focused'
-    ? (props.workspace ? workspaceDisplayName(props.workspace) : t('chat.currentWorkspace'))
-    : props.displayMode === 'recent'
-      ? (props.harness === 'auto-quant'
-          ? t('autoQuant.recentResearch')
-          : props.harness === 'prediction'
-            ? t('autoPrediction.recentResearch')
-            : t('chat.recentConversations'))
-      : t('nav.item.workspaces')
-  const TriggerIcon = props.displayMode === 'recent'
-    ? Clock3
-    : props.displayMode === 'multi'
-      ? PanelsTopLeft
-      : LayoutGrid
+  const workspaceTitle = props.workspace ? workspaceDisplayName(props.workspace) : t('chat.currentWorkspace')
+  const harnessTitle = props.harness === 'auto-quant'
+    ? t('nav.item.autoQuant')
+    : props.harness === 'prediction' ? t('nav.item.autoPrediction') : t('office.harness.chat')
+  const workspaceSessionCount = props.harness === 'auto-quant'
+    ? t('autoQuant.workspaceSessionCount', { count: props.sessionCount })
+    : props.harness === 'prediction'
+      ? t('autoPrediction.workspaceSessionCount', { count: props.sessionCount })
+      : t('chat.workspaceSessionCount', { count: props.sessionCount })
+  const workspaceMeta = props.workspace?.displayName
+    ? `${props.workspace.tag} · ${workspaceSessionCount}`
+    : workspaceSessionCount
   const upgrade = props.workspace?.upgradeAvailable ?? null
   const upgradeVersion = upgrade?.to.replace(/^v(?=\d)/, '') ?? ''
-  const contextLabel = props.harness === 'auto-quant'
-    ? t('autoQuant.workspaceContextLabel', { name: title })
-    : props.harness === 'prediction'
-      ? t('autoPrediction.workspaceContextLabel', { name: title })
-      : t('chat.workspaceContextLabel', { name: title })
   const contextMenuLabel = props.harness === 'auto-quant'
     ? t('autoQuant.workspaceContextMenu')
     : props.harness === 'prediction'
@@ -690,11 +749,10 @@ function ChatWorkspaceContextFooter(props: ChatWorkspaceContextFooterProps): Rea
     pendingActionRef.current = action
   }
 
-  const menuItemClass = 'oa-workspace-context-item min-h-7 gap-2 rounded-md px-2 py-1 text-xs text-muted-foreground focus:bg-muted focus:text-foreground'
-  const modeItemClass = `${menuItemClass} pr-7 text-foreground`
+  const menuItemClass = 'oa-workspace-context-item min-h-7 gap-2 rounded-md px-2 py-1 text-muted-foreground focus:bg-muted focus:text-foreground'
 
   return (
-    <div className="shrink-0 border-t border-border/60 bg-secondary p-1.5">
+    <div className={props.iconOnly ? 'shrink-0' : 'shrink-0 border-t border-border/60 bg-secondary p-1.5'}>
       <DropdownMenu
         open={open}
         onOpenChange={setOpen}
@@ -712,69 +770,93 @@ function ChatWorkspaceContextFooter(props: ChatWorkspaceContextFooterProps): Rea
             ref={triggerRef}
             type="button"
             aria-label={upgrade
-              ? t('chat.workspaceContextUpdateLabel', { name: title, version: upgradeVersion })
-              : contextLabel}
-            className="oa-pressable flex min-h-8 w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-xs text-muted-foreground hover:bg-muted hover:text-foreground"
+              ? t('chat.workspaceContextUpdateLabel', { name: workspaceTitle, version: upgradeVersion })
+              : contextMenuLabel}
+            className={props.iconOnly ? 'oa-icon-action relative flex h-8 w-7 items-center justify-center rounded-md text-muted-foreground hover:bg-sidebar-accent hover:text-foreground' : 'oa-pressable text-caption flex min-h-8 w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-muted-foreground hover:bg-muted hover:text-foreground'}
           />}
         >
-          <TriggerIcon className="h-3.5 w-3.5 shrink-0" aria-hidden />
+          {!props.iconOnly && <AppWindow className="h-3.5 w-3.5 shrink-0" aria-hidden />}
           <span
-            className="min-w-0 flex-1 truncate font-medium text-foreground"
-            title={props.displayMode === 'focused' && props.workspace ? workspaceDisplayTitle(props.workspace) : title}
+            className={props.iconOnly ? 'sr-only' : 'min-w-0 flex-1 truncate font-medium text-foreground'}
+            title={harnessTitle}
           >
-            {title}
+            {harnessTitle}
           </span>
-          {upgrade && <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-primary" aria-hidden />}
-          <ChevronDown className={`h-3.5 w-3.5 shrink-0 transition-transform ${open ? 'rotate-180' : ''}`} aria-hidden />
+          {upgrade && <span className={`h-1.5 w-1.5 shrink-0 rounded-full bg-primary ${props.iconOnly ? 'absolute right-0 top-0' : ''}`} aria-hidden />}
+          <MoreHorizontal className="h-3.5 w-3.5 shrink-0" aria-hidden />
         </DropdownMenuTrigger>
 
         <DropdownMenuContent
           aria-labelledby={contextMenuLabelId}
-          side="top"
+          side={props.iconOnly ? 'bottom' : 'top'}
           align="start"
           sideOffset={4}
           className="z-40 max-h-[min(30rem,calc(100vh-1rem))] w-60 max-w-[calc(100vw-1rem)] overflow-y-auto overscroll-contain rounded-xl border border-border/70 bg-popover p-1 text-popover-foreground shadow-lg ring-0 [scrollbar-gutter:stable]"
         >
           <span id={contextMenuLabelId} className="sr-only">{contextMenuLabel}</span>
-          <DropdownMenuRadioGroup
-            value={props.displayMode}
-            onValueChange={(value) => {
-              queueAction(() => props.onRequestDisplayMode(value as ChatDisplayMode))
-            }}
-          >
-            <DropdownMenuLabel className="px-2 py-1 text-[11px] font-medium text-muted-foreground/70">
-              {t('chat.view')}
+          <DropdownMenuGroup>
+            <DropdownMenuLabel className="text-micro px-2 py-1 font-medium text-muted-foreground/70">
+              {t('settings.group.workspace')}
             </DropdownMenuLabel>
-            <DropdownMenuRadioItem
-              value="focused"
-              closeOnClick
-              disabled={props.workspace === null}
-              className={modeItemClass}
-            >
-              <LayoutGrid size={14} strokeWidth={2} aria-hidden />
-              <span className="min-w-0 flex-1 truncate">{t('chat.currentWorkspace')}</span>
-            </DropdownMenuRadioItem>
-            <DropdownMenuRadioItem value="recent" closeOnClick className={modeItemClass}>
-              <Clock3 size={14} strokeWidth={2} aria-hidden />
-              <span className="min-w-0 flex-1 truncate">{t('chat.recentMode')}</span>
-            </DropdownMenuRadioItem>
-            <DropdownMenuRadioItem value="multi" closeOnClick className={modeItemClass}>
-              <PanelsTopLeft size={14} strokeWidth={2} aria-hidden />
-              <span className="min-w-0 flex-1 truncate">{t('chat.multiMode')}</span>
-            </DropdownMenuRadioItem>
-          </DropdownMenuRadioGroup>
+            <div className="flex items-stretch gap-1">
+              <DropdownMenuItem
+                disabled={!props.workspace}
+                onClick={() => queueAction(props.onDetails)}
+                title={t('workspaceDetails.title')}
+                aria-label={props.workspace
+                  ? t('chat.currentWorkspaceLabel', { workspace: workspaceDisplayTitle(props.workspace) })
+                  : t('chat.currentWorkspace')}
+                className="oa-workspace-context-item min-h-12 min-w-0 flex-1 cursor-pointer items-start gap-2 rounded-lg px-2 py-2 text-foreground focus:bg-muted focus:text-foreground"
+              >
+                <LayoutGrid size={15} strokeWidth={2} className="mt-0.5 shrink-0" aria-hidden />
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate font-medium">{workspaceTitle}</span>
+                  {props.workspace && (
+                    <span className="text-micro mt-0.5 block truncate font-normal text-muted-foreground">
+                      {workspaceMeta}
+                    </span>
+                  )}
+                </span>
+              </DropdownMenuItem>
+              <DropdownMenuSub>
+                <DropdownMenuSubTrigger aria-label={t('chat.switchWorkspace')} title={t('chat.switchWorkspace')}
+                  className="oa-workspace-context-item min-h-12 w-8 shrink-0 justify-center rounded-lg px-1 text-muted-foreground focus:bg-muted focus:text-foreground [&>svg]:mx-auto">
+                  <span className="sr-only">{t('chat.switchWorkspace')}</span>
+                </DropdownMenuSubTrigger>
+                <DropdownMenuSubContent
+                  sideOffset={6}
+                  className="flex max-h-[min(24rem,var(--available-height))] w-60 max-w-[calc(100vw-1rem)] flex-col overflow-hidden rounded-xl border border-border/70 p-1 shadow-lg ring-0"
+                >
+                  <DropdownMenuGroup className="shrink-0">
+                    <DropdownMenuLabel className="text-micro px-2 py-1 font-medium text-muted-foreground/70">
+                      {t('chat.switchWorkspace')}
+                    </DropdownMenuLabel>
+                  </DropdownMenuGroup>
+                  <DropdownMenuRadioGroup value={props.workspace?.id ?? ''}
+                    className="min-h-0 overflow-y-auto overscroll-contain">
+                    {props.workspaces.map((workspace) => (
+                      <DropdownMenuRadioItem key={workspace.id} value={workspace.id} closeOnClick
+                        aria-label={workspaceDisplayTitle(workspace)}
+                        title={workspaceDisplayTitle(workspace)}
+                        onClick={() => queueAction(() => props.onSelectWorkspace(workspace.id))}
+                        className="oa-workspace-context-item min-h-8 gap-2 rounded-md py-1 pl-2 pr-8"
+                      >
+                        <span className="min-w-0 flex-1 truncate">{workspaceDisplayName(workspace)}</span>
+                      </DropdownMenuRadioItem>
+                    ))}
+                  </DropdownMenuRadioGroup>
+                  <DropdownMenuSeparator className="mx-0 shrink-0 bg-border/60" />
+                  <DropdownMenuItem onClick={() => queueAction(props.onCreateWorkspace)}
+                    className={menuItemClass + ' shrink-0'}>
+                    <Plus size={14} strokeWidth={2} aria-hidden />
+                    <span className="min-w-0 flex-1 truncate">{props.createWorkspaceLabel}</span>
+                  </DropdownMenuItem>
+                </DropdownMenuSubContent>
+              </DropdownMenuSub>
+            </div>
+          </DropdownMenuGroup>
 
           <DropdownMenuSeparator className="mx-0 bg-border/60" />
-
-          <DropdownMenuItem
-            onClick={() => queueAction(() => props.onOpenWorkspacePicker(triggerRef.current))}
-            disabled={props.workspaces.length === 0}
-            className={menuItemClass}
-          >
-            <LayoutGrid size={14} strokeWidth={2} aria-hidden />
-            <span className="min-w-0 flex-1 truncate">{t('chat.switchWorkspace')}</span>
-            <ChevronRight size={13} strokeWidth={2} className="shrink-0 text-muted-foreground/60" aria-hidden />
-          </DropdownMenuItem>
 
           <DropdownMenuItem
             onClick={() => queueAction(props.onConfigure)}
@@ -792,7 +874,7 @@ function ChatWorkspaceContextFooter(props: ChatWorkspaceContextFooterProps): Rea
             >
               <Layers3 size={14} strokeWidth={2} aria-hidden />
               <span className="min-w-0 flex-1 truncate">{t('chat.reviewWorkspaceUpdate')}</span>
-              <span className="shrink-0 tabular-nums text-[10px] leading-[14px] text-muted-foreground">v{upgradeVersion}</span>
+              <span className="text-micro shrink-0 tabular-nums text-muted-foreground">v{upgradeVersion}</span>
             </DropdownMenuItem>
           )}
           <DropdownMenuItem
@@ -808,22 +890,6 @@ function ChatWorkspaceContextFooter(props: ChatWorkspaceContextFooterProps): Rea
                   ? t('autoPrediction.browseResearch')
                   : t('chat.browseWorkspace')}
             </span>
-          </DropdownMenuItem>
-          {props.showManager && (
-            <DropdownMenuItem
-              onClick={() => queueAction(props.onOpenManager)}
-              className={menuItemClass}
-            >
-              <Network size={14} strokeWidth={2} aria-hidden />
-              <span className="min-w-0 flex-1 truncate">{t('workspaceManager.title')}</span>
-            </DropdownMenuItem>
-          )}
-          <DropdownMenuItem
-            onClick={() => queueAction(props.onCreateWorkspace)}
-            className={menuItemClass}
-          >
-            <PanelsTopLeft size={14} strokeWidth={2} aria-hidden />
-            <span className="min-w-0 flex-1 truncate">{props.createWorkspaceLabel}</span>
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
@@ -911,7 +977,7 @@ function HarnessSessionRoster(props: HarnessSessionRosterProps): ReactElement {
         <section className="border-b border-border/55 pb-1" aria-label={t('chat.runningInBackground')}>
           <button
             type="button"
-            className="oa-nav-row flex min-h-8 w-full items-center gap-2 px-3 text-left text-[11px] leading-[15px] font-medium text-muted-foreground hover:text-foreground"
+            className="oa-nav-row text-micro flex min-h-8 w-full items-center gap-2 px-3 text-left font-medium text-muted-foreground hover:text-foreground"
             onClick={() => setRunningExpanded((expanded) => !expanded)}
             aria-expanded={runningExpanded}
           >
@@ -936,7 +1002,7 @@ function HarnessSessionRoster(props: HarnessSessionRosterProps): ReactElement {
       )}
 
       <div className="flex min-h-8 items-center gap-2 px-3.5 pb-1 pt-2">
-        <span data-testid="harness-recent-heading" className="min-w-0 flex-1 truncate text-[12px] font-medium leading-4 text-muted-foreground/70">
+        <span data-testid="harness-recent-heading" className="text-caption min-w-0 flex-1 truncate font-medium text-muted-foreground/70">
           {props.harness === 'auto-quant'
             ? t('autoQuant.recentResearch')
             : props.harness === 'prediction'
@@ -944,17 +1010,17 @@ function HarnessSessionRoster(props: HarnessSessionRosterProps): ReactElement {
               : t('chat.recentConversations')}
         </span>
         {recent.length > 0 && (
-          <span className="text-[11px] leading-[15px] tabular-nums text-muted-foreground/50">{recent.length}</span>
+          <span className="text-micro tabular-nums text-muted-foreground/50">{recent.length}</span>
         )}
       </div>
 
       <div ref={recentRef}>
         {props.sessions.length === 0 ? (
-          <p className="px-3 py-3 text-[12px] leading-[18px] text-muted-foreground/60">
+          <p className="text-caption px-3 py-3 text-muted-foreground/60">
             {props.emptyCopy}
           </p>
         ) : recent.length === 0 ? (
-          <p className="px-3 py-2 text-[12px] leading-[18px] text-muted-foreground/55">
+          <p className="text-caption px-3 py-2 text-muted-foreground/55">
             {t('chat.allConversationsRunning')}
           </p>
         ) : visibleRecent.map(renderRow)}
@@ -963,7 +1029,7 @@ function HarnessSessionRoster(props: HarnessSessionRosterProps): ReactElement {
       {recent.length > visibleRecent.length && (
         <button
           type="button"
-          className="oa-nav-row group mx-1.5 flex min-h-8 w-[calc(100%-0.75rem)] items-center gap-2 rounded-md px-2 py-1 text-left text-[13px] leading-[18px] font-medium text-foreground hover:bg-sidebar-accent"
+          className="oa-nav-row text-body group mx-1.5 flex min-h-8 w-[calc(100%-0.75rem)] items-center gap-2 rounded-md px-2 py-1 text-left font-medium text-foreground hover:bg-sidebar-accent"
           onClick={(event) => props.onBrowseSessions(event.currentTarget)}
         >
           <span className="min-w-0 flex-1 truncate">
@@ -1073,7 +1139,7 @@ function FocusedChatWorkspace(props: FocusedChatWorkspaceProps): ReactElement {
   if (!props.workspace) {
     return (
       <div className="flex min-h-0 flex-1 flex-col px-3 py-3">
-        <p className="text-xs leading-relaxed text-muted-foreground">
+        <p className="text-caption leading-relaxed text-muted-foreground">
           {t('chat.focusedEmpty')}
         </p>
         <Button
@@ -1164,11 +1230,11 @@ function ManagerWorkspaceRow(props: ManagerWorkspaceRowProps): ReactElement {
           className="oa-pressable relative flex min-w-0 flex-1 items-center gap-2 py-2 pl-1 pr-3 text-left"
         >
           <Network size={14} strokeWidth={2.1} className="shrink-0 text-muted-foreground" />
-          <span className="min-w-0 flex-1 truncate text-[12px] font-medium">{t('workspaceManager.title')}</span>
+          <span className="text-caption min-w-0 flex-1 truncate font-medium">{t('workspaceManager.title')}</span>
           {!props.loaded ? (
             <span aria-hidden className="h-2.5 w-4 animate-pulse rounded bg-muted-foreground/15" />
           ) : sessions.length > 0 ? (
-            <span className="inline-flex shrink-0 items-center gap-1.5 text-[10px] leading-[14px] tabular-nums text-muted-foreground/55">
+            <span className="text-micro inline-flex shrink-0 items-center gap-1.5 tabular-nums text-muted-foreground/55">
               <span className={`h-1.5 w-1.5 rounded-full ${hasRunning ? 'bg-success' : 'bg-muted-foreground/35'}`} />
               {sessions.length}
             </span>
@@ -1216,12 +1282,13 @@ interface ChatWorkspaceRowProps {
 }
 
 function HarnessSessionRow(props: {
+  enterOnSelect?: boolean
   row: HarnessSession
   workspaceLabel?: string
   isActive: boolean
   onSelect: () => void
   onPause: () => void
-  onResume: () => void
+  onResume: () => void | Promise<void>
   onDelete: () => void
   onArchive?: () => void
   onRestore?: () => void
@@ -1231,6 +1298,7 @@ function HarnessSessionRow(props: {
   const row = props.row
   return (
     <SessionRow
+      enterOnSelect={props.enterOnSelect}
       reorderId={`${row.workspaceId}:${row.resumeId}`}
       session={row.session.title === row.title ? row.session : { ...row.session, title: row.title }}
       displayTitle={row.title}
@@ -1288,7 +1356,7 @@ function HeadlessSessionBusyDialog(props: {
             >
               {props.row.title}
             </p>
-            <p className="mt-1 text-xs text-muted-foreground">
+            <p className="text-caption mt-1 text-muted-foreground">
               {issueId
                 ? t('chat.headlessBusyIssue', { issue: issueId })
                 : t('chat.headlessBusyAgent', { agent: props.row.agent })}
@@ -1329,7 +1397,7 @@ function ChatWorkspaceRow(props: ChatWorkspaceRowProps): ReactElement {
   return (
     <li className="group relative" data-reorder-id={w.id}>
       <div
-        className={`relative flex items-center gap-1 py-1 pl-2 pr-2 text-[13px] leading-[18px] transition-colors ${
+        className={`text-body relative flex items-center gap-1 py-1 pl-2 pr-2 transition-colors ${
           isSelected ? 'bg-sidebar-accent text-sidebar-accent-foreground' : 'text-foreground hover:bg-sidebar-accent/65'
         }`}
       >
@@ -1364,13 +1432,13 @@ function ChatWorkspaceRow(props: ChatWorkspaceRowProps): ReactElement {
           <span className="min-w-0 flex-1">
             <span className="block truncate font-medium" title={props.label}>{props.label}</span>
             {subtitle && (
-              <span className="block truncate text-[11px] leading-3 text-muted-foreground/65" title={subtitle}>
+              <span className="text-micro block truncate text-muted-foreground/65" title={subtitle}>
                 {subtitle}
               </span>
             )}
           </span>
           {orderedSessions.length > 0 && (
-            <span className="text-[11px] leading-[15px] text-muted-foreground/45 tabular-nums shrink-0">
+            <span className="text-micro shrink-0 tabular-nums text-muted-foreground/45">
               {orderedSessions.length}
             </span>
           )}

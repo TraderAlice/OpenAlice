@@ -114,6 +114,52 @@ combines credential access, model selection, and those semantics before each
 adapter projects the result into one target CLI process. Follow
 [[docs/model-semantics-and-runtime-injection.md]] for that boundary.
 
+## Optional RSSHub News Sources
+
+Alice owns RSS collection and the JSONL archive in `src/domain/news/`.
+Settings → News Sources (`/settings/news-collector`) offers opt-in presets
+for 财联社 (CLS), 格隆汇 (Gelonghui), and 金十数据 (Jin10). Enter an RSSHub
+instance URL and add each wanted source. Existing subscriptions are preserved.
+A source already configured, even if disabled, cannot be added again by a preset.
+
+RSSHub is an independently operated service, not an Alice-managed process or a
+mandatory Docker dependency. For a native Alice backend on the same machine,
+this verified, pinned RSSHub image can run on loopback:
+
+```bash
+docker run -d --name openalice-news-rsshub --restart unless-stopped -p 127.0.0.1:1200:1200 -e CACHE_TYPE=memory -e CACHE_EXPIRE=600 diygod/rsshub@sha256:0c36f939df98144fc2cbba1c5d7feefbc1675cc6ad5e99544fa1c77ac84a4e0d
+```
+
+Use `http://127.0.0.1:1200` in the preset form. Docker must remain running;
+`docker stop openalice-news-rsshub` stops the service, and
+`docker start openalice-news-rsshub` starts it again. Operators own RSSHub
+updates and should recheck routes before replacing the pinned image.
+
+The address is resolved by the **Alice backend**, not the browser. With a remote
+backend, a browser-local RSSHub is not sufficient. For separate Alice and RSSHub
+containers, use a private shared Docker network and RSSHub's service name
+(for example `http://rsshub:1200`), not loopback. Do not expose an unauthenticated
+RSSHub publicly merely to make it reachable.
+
+HTTP(S) base URLs may include a reverse-proxy prefix, such as
+`https://news.example.com/rsshub/`. Presets preserve the prefix and append
+their route. Credentials, query strings, and fragments are rejected; do not put
+secrets in feed URLs, which can appear in collection errors. Public instances
+may rate-limit or return challenge pages. Adding a preset does not test connectivity.
+
+The form writes ordinary `news.feeds` entries through the existing config API.
+No new persisted shape or migration is needed. Existing installations see the
+presets without resetting config. The instance field is an add-time input, not a
+global setting: changing it does not rewrite saved feeds. Remove and re-add a
+preset to change its instance. Restart Alice after saving, when no Workspace
+session needs to remain running: the collector reads its feed list at startup.
+Then open News and filter by the saved source tag to verify reception.
+
+RSSHub owns provider adaptation; Alice owns parsing, deduplication, storage, and
+queries. Entries may lack an article link or body. Preserve available fields
+without inventing URLs or substituting headlines as full articles. Feed access
+does not grant redistribution rights or access to paid content.
+
 ## Workspace Architecture
 
 A Workspace is the primary capability boundary. It is a persistent directory
@@ -209,6 +255,12 @@ Load-bearing paths:
 
 - `src/workspaces/service.ts` — Workspace lifecycle and composition.
 - `src/workspaces/session-pool.ts` — PTY process ownership.
+- `src/workspaces/web-session-host.ts` and `src/workspaces/web-session/` —
+  the browser conversation surface: one long-lived structured-protocol
+  process per Session record, projected into a neutral snapshot. Transports
+  own the wire (`pi-rpc`, `acp`, `claude-stream-json`, `codex-app-server`);
+  adapters declare `capabilities.web` and compose the process command. The
+  persisted `SessionRecord.surface` value stays `webpi` for every runtime.
 - `src/workspaces/harness-surface-manager.ts` — managed Harness web processes,
   readiness, routes, logs, and cleanup.
 - `src/workspaces/session-registry.ts` — durable session metadata.
@@ -244,7 +296,7 @@ provenance link:
 
 Do not use a headless task id directly as a roster or process-attachment id,
 and do not create another `SessionRecord` when the same `resumeId` changes
-between headless, terminal, and WebPi execution. The run is execution
+between headless, terminal, and Web execution. The run is execution
 provenance; `resumeId` is the product identity; `SessionRecord` is its one
 durable launcher-owned roster record.
 
@@ -323,7 +375,7 @@ Inbox is the durable agent-to-user delivery surface. Agents publish reports or
 status by calling the injected `inbox_push` capability. Alice stamps the
 product Session and exact execution identity out-of-band. The user can return
 to the exact originating Session regardless of whether its first turn was
-headless or interactive; opening TUI/WebPi attaches a process to the existing
+headless or interactive; opening TUI/Web attaches a process to the existing
 durable Session record.
 
 ## Persistent State

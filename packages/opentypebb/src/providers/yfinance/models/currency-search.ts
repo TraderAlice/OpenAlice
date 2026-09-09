@@ -32,7 +32,8 @@ export class YFinanceCurrencySearchFetcher extends Fetcher {
     return quotes
       .filter((q: any) => q.quoteType === 'CURRENCY')
       .map((q: any) => ({
-        symbol: (q.symbol ?? '').replace('=X', ''),
+        // Yahoo abbreviates USD-base pairs, e.g. JPY=X means USD/JPY.
+        symbol: (q.symbol ?? '').replace('=X', '').replace(/^([A-Z]{3})$/, 'USD$1'),
         name: q.longname ?? q.shortname ?? null,
         exchange: q.exchDisp ?? null,
         quote_type: q.quoteType ?? null,

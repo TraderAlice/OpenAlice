@@ -12,7 +12,7 @@ export interface PublicSessionRuntime {
   readonly reasoningEffort?: ModelReasoningEffort;
 }
 
-/** A running terminal or WebPi record owns the interactive execution slot.
+/** A running terminal or Web-surface record owns the interactive execution slot.
  * Headless records use the separate launcher lease so stale persisted state
  * cannot make an Issue owner look busy after its process has exited. */
 export function isInteractiveSessionActive(
@@ -63,8 +63,8 @@ interface LiveSessionProjection {
 
 export interface PublicSessionProjectionContext {
   readonly terminal?: LiveSessionProjection | null;
-  readonly webPi?: LiveSessionProjection | null;
-  /** A one-shot execution currently owns the Session without a PTY/WebPi pid. */
+  readonly web?: LiveSessionProjection | null;
+  /** A one-shot execution currently owns the Session without a PTY/Web-surface pid. */
   readonly headless?: boolean;
   readonly runtimeBinding?: SessionRuntimeBinding | null;
   readonly displayName?: string;
@@ -85,7 +85,7 @@ export function projectPublicSession(
   context: PublicSessionProjectionContext = {},
 ): PublicSession {
   const terminal = context.terminal ?? null;
-  const webPi = context.webPi ?? null;
+  const web = context.web ?? null;
   const headless = context.headless === true;
   const binding = context.runtimeBinding ?? null;
 
@@ -96,11 +96,11 @@ export function projectPublicSession(
     name: record.name,
     createdAt: record.createdAt,
     lastActiveAt: record.lastActiveAt,
-    state: record.state === 'running' && (terminal || webPi || headless) ? 'running' : 'paused',
-    surface: webPi ? 'webpi' : terminal ? 'terminal' : (record.surface ?? 'terminal'),
+    state: record.state === 'running' && (terminal || web || headless) ? 'running' : 'paused',
+    surface: web ? 'webpi' : terminal ? 'terminal' : (record.surface ?? 'terminal'),
     resumeId: record.resumeId,
-    pid: terminal?.pid ?? webPi?.pid ?? null,
-    startedAt: terminal?.startedAt ?? webPi?.startedAt ?? null,
+    pid: terminal?.pid ?? web?.pid ?? null,
+    startedAt: terminal?.startedAt ?? web?.startedAt ?? null,
     title: projectSessionPresentationTitle({
       record,
       ...(context.createdBy ? { createdBy: context.createdBy } : {}),

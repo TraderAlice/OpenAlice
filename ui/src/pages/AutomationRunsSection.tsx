@@ -131,7 +131,7 @@ function RunOutput({ task }: { task: HeadlessTaskRecord }) {
         </span>
         <Button
           type="button"
-          variant="destructive"
+          variant="outline"
           size="sm"
           className="min-h-10 sm:min-h-0"
           onClick={() => setRetryKey((key) => key + 1)}

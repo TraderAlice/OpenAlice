@@ -143,8 +143,19 @@ OPENALICE_UTA_LIVE_PAPER=1 pnpm test:select \
 - **ccxt is an SDK, not a semantic layer.** Identical calls behave
   differently per venue (bybit's unscoped open-orders listing silently hides
   spot; okx rejects `reduceOnly` on spot; conditional orders live in
-  separate API namespaces). Anything that works on one venue is UNVERIFIED
-  on the next until tested there.
+  separate API namespaces; hyperliquid's unscoped `fetchBalance()` reads
+  the perp clearinghouse, which is 0 for a unified-mode wallet whose funds
+  sit in the spot clearinghouse). Anything that works on one venue is
+  UNVERIFIED on the next until tested there.
+- **Balance routing must remain authoritative.** Hyperliquid mode-query
+  failures or unknown modes must fail the account read, not fall back to a
+  partial ledger. Exercise mode changes with real CCXT routing: its cached
+  `enableUnifiedMargin` can override an explicit `type: swap`, so the venue
+  override must select physical pools explicitly.
+- **A zero balance is a finding, not a pass.** `getAccount()` returning
+  `netLiquidation: '0'` on a funded demo/testnet wallet is exactly how the
+  hyperliquid unified-account bug looked; compare against the venue UI's
+  portfolio value before accepting a balance read.
 - **Leave accounts flat.** Sell back fills, cancel hangers, `git reject`
   stray staging. Finish with: 0 open orders per account, `git status`
   clean, position quantities at their pre-session baseline.

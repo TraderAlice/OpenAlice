@@ -445,7 +445,7 @@ function isValidInstalledSource(source: Record<string, unknown>): boolean {
     && Boolean(artifact)
     && typeof artifact === 'object'
     && !Array.isArray(artifact)
-    && ['darwin', 'linux'].includes((artifact as Record<string, unknown>)['platform'] as string)
+    && ['darwin', 'linux', 'win32'].includes((artifact as Record<string, unknown>)['platform'] as string)
     && ['arm64', 'x64'].includes((artifact as Record<string, unknown>)['arch'] as string)
     && typeof (artifact as Record<string, unknown>)['sha256'] === 'string'
     && /^[a-f0-9]{64}$/.test((artifact as Record<string, unknown>)['sha256'] as string)

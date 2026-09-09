@@ -75,6 +75,12 @@ async function loadBrokerEngineUncached(engine: BrokerEngine): Promise<BrokerEng
   }
   if (!isInstallableBrokerEngine(engine)) throw new Error(`Unknown broker engine "${engine}"`)
 
+  if (process.env['OPENALICE_BROKER_PACK_PREFER_WORKSPACE'] === '1'
+      && (process.env['OPENALICE_LAUNCHER'] === 'dev' || process.env['NODE_ENV'] === 'test')
+      && workspacePacksAllowed()) {
+    return loadWorkspacePack(engine)
+  }
+
   let installed: ResolvedBrokerPack | null
   try {
     installed = await resolveActiveBrokerPack(engine)
@@ -95,19 +101,18 @@ async function loadBrokerEngineUncached(engine: BrokerEngine): Promise<BrokerEng
     }
   }
 
-  if (workspacePacksAllowed()) {
-    try {
-      const entry = resolve(appResourcesHome, workspaceEntries[engine])
-      return validateModule(engine, await import(pathToFileURL(entry).href))
-    } catch (err) {
-      throw new BrokerPackUnavailableError(
-        engine,
-        `Workspace broker pack "${engine}" failed to load: ${err instanceof Error ? err.message : String(err)}`,
-      )
-    }
-  }
+  if (workspacePacksAllowed()) return loadWorkspacePack(engine)
 
   throw new BrokerPackUnavailableError(engine)
+}
+
+async function loadWorkspacePack(engine: InstallableBrokerEngine): Promise<BrokerEngineEntry> {
+  try {
+    const entry = resolve(appResourcesHome, workspaceEntries[engine])
+    return validateModule(engine, await import(pathToFileURL(entry).href))
+  } catch (err) {
+    throw new BrokerPackUnavailableError(engine, `Workspace broker pack "${engine}" failed to load: ${err instanceof Error ? err.message : String(err)}`)
+  }
 }
 
 function validateModule(engine: InstallableBrokerEngine, raw: unknown): BrokerEngineEntry {

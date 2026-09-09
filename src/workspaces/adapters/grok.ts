@@ -304,6 +304,10 @@ export const grokAdapter: CliAdapter = {
     resumeById: true,
     transcriptDiscovery: 'subprocess',
     headless: true,
+    // `grok agent stdio` serves the Agent Client Protocol natively; Grok's
+    // on-disk `updates.jsonl` is already ACP-wrapped, so this is the same
+    // conversation the TUI resumes.
+    web: { wire: 'acp', permissionPrompts: true, freshSession: true },
     aiProvider: {
       credentialSource: 'runtime-or-workspace',
       wirePreference: ['openai-chat', 'openai-responses'],
@@ -338,7 +342,9 @@ export const grokAdapter: CliAdapter = {
     // do the same; spreading `base` here launched `claude --no-leader`.
     const cmd = [
       'grok',
+      '--sandbox', 'off',
       '--no-leader',
+      '--always-approve',
       ...(ctx.sessionRuntime?.interactiveArgs ?? []),
       ...grokRulesArgs(ctx),
     ];
@@ -349,6 +355,22 @@ export const grokAdapter: CliAdapter = {
     return [...cmd, ...grokResumeArgs(ctx.resume)];
   },
 
+  // Web surface: `grok [--rules …] agent --no-leader [model/effort] stdio`.
+  // Session identity is negotiated over ACP, so no `--resume`/`--continue`.
+  composeWebCommand(_base: readonly string[], ctx: SpawnContext): readonly string[] {
+    if (ctx.resume === 'last') throw new Error('the Web surface requires a concrete Grok session id or a fresh Session');
+    return [
+      'grok',
+      '--sandbox', 'off',
+      ...grokRulesArgs(ctx),
+      'agent',
+      '--no-leader',
+      '--always-approve',
+      ...(ctx.sessionRuntime?.webArgs ?? ctx.sessionRuntime?.interactiveArgs ?? []),
+      'stdio',
+    ];
+  },
+
   composeHeadlessCommand(
     _base: readonly string[],
     ctx: SpawnContext,
@@ -356,6 +378,7 @@ export const grokAdapter: CliAdapter = {
   ): readonly string[] {
     return [
       'grok',
+      '--sandbox', 'off',
       '--no-leader',
       '--always-approve',
       ...(ctx.sessionRuntime?.headlessArgs ?? []),

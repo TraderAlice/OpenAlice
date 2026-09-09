@@ -15,6 +15,7 @@ import { promisify } from 'node:util'
 
 import { afterEach, describe, expect, it } from 'vitest'
 
+import { cliExecutableName } from '../packages/cli/src/release-targets.mjs'
 import { bunReleaseContentIdentity } from './bun-release-content-identity.mjs'
 import { buildCliPackageChannels } from './build-cli-package-channels.mjs'
 
@@ -28,6 +29,30 @@ afterEach(async () => {
 })
 
 describe.skipIf(process.platform === 'win32')('CLI package-manager channel generation', () => {
+  it('generates identical system metadata without Windows archives or npm materialization', async () => {
+    const root = await fixture()
+    const common = { inputDir: join(root, 'input'), version, releasedAt }
+    buildCliPackageChannels({ ...common, outputDir: join(root, 'all'), requireAll: true })
+    for (const arch of ['arm64', 'x64']) {
+      await rm(join(root, 'input', `openalice-cli-${version}-win32-${arch}.tar.gz`))
+    }
+    const manifest = buildCliPackageChannels({ ...common, outputDir: join(root, 'system'), systemOnly: true })
+    expect(manifest.targets).toHaveLength(4)
+    expect(manifest.npm).toBeNull()
+    for (const path of ['homebrew/openalice.rb', 'aur/PKGBUILD', 'aur/.SRCINFO']) {
+      expect(await readFile(join(root, 'system', path), 'utf8'))
+        .toBe(await readFile(join(root, 'all', path), 'utf8'))
+    }
+    await expect(readFile(join(root, 'system/npm/openalice/package.json'))).rejects.toThrow()
+    expect(() => buildCliPackageChannels({ ...common, outputDir: join(root, 'invalid'), requireAll: true }))
+      .toThrow('all 6 native CLI targets are required')
+    await rm(join(root, 'input', `openalice-cli-${version}-linux-arm64.tar.gz`))
+    expect(() => buildCliPackageChannels({ ...common, outputDir: join(root, 'missing'), systemOnly: true }))
+      .toThrow('all POSIX CLI targets')
+    expect(() => buildCliPackageChannels({ ...common, outputDir: join(root, 'conflict'), systemOnly: true, npmOnly: true }))
+      .toThrow('cannot be combined')
+  })
+
   it('derives npm, Homebrew, and AUR metadata from all accepted archives', async () => {
     const root = await fixture()
     const output = join(root, 'output')
@@ -39,7 +64,7 @@ describe.skipIf(process.platform === 'win32')('CLI package-manager channel gener
       requireAll: true,
     })
 
-    expect(manifest.targets).toHaveLength(4)
+    expect(manifest.targets).toHaveLength(6)
     expect(manifest.executableBytesPreserved).toBe(true)
     expect(manifest.assetBaseUrl).toBe(
       `https://github.com/TraderAlice/OpenAlice/releases/download/v${version}`,
@@ -50,6 +75,8 @@ describe.skipIf(process.platform === 'win32')('CLI package-manager channel gener
       'openalice-darwin-x64': version,
       'openalice-linux-arm64': version,
       'openalice-linux-x64': version,
+      'openalice-windows-arm64': version,
+      'openalice-windows-x64': version,
     })
     const platformExecutable = await readFile(join(
       output,
@@ -58,11 +85,17 @@ describe.skipIf(process.platform === 'win32')('CLI package-manager channel gener
     expect(platformExecutable).toEqual(Buffer.from(`#!/bin/sh\nprintf '${version}\\n'\n`))
 
     const formula = await readFile(join(output, 'homebrew/openalice.rb'), 'utf8')
+    expect(formula).toContain('depends_on "git"')
+    expect(formula).toContain('depends_on "bash"')
     expect(formula.match(/releases\/download\/v0\.90\.1/g)).toHaveLength(4)
     expect(formula).toContain('method\\\":\\\"brew')
     expect(formula).toContain('(share/"openalice/release.json").write(release_metadata)')
     expect(formula).toContain('(share/"openalice/install-source.json").write(content)')
     const pkgbuild = await readFile(join(output, 'aur/PKGBUILD'), 'utf8')
+    expect(pkgbuild).toContain("depends=('glibc' 'git' 'bash')")
+    const srcinfo = await readFile(join(output, 'aur/.SRCINFO'), 'utf8')
+    expect(srcinfo).toContain('\tdepends = git')
+    expect(srcinfo).toContain('\tdepends = bash')
     await expect(execFileAsync('bash', ['-n', join(output, 'aur/PKGBUILD')])).resolves.toBeDefined()
     expect(pkgbuild).toContain("method\": \"aur")
     expect(await readFile(join(output, 'aur/.SRCINFO'), 'utf8')).toContain('pkgname = openalice-bin')
@@ -106,7 +139,7 @@ describe.skipIf(process.platform === 'win32')('CLI package-manager channel gener
       env: { ...process.env, npm_config_user_agent: 'npm/11.0.0 node/v22.0.0' },
     })
 
-    const installed = await execFileAsync(join(metaRoot, 'bin/openalice'), ['--version'])
+    const installed = await execFileAsync(join(metaRoot, 'bin/openalice.exe'), ['--version'])
     expect(installed.stdout).toBe(`${version}\n`)
     expect(JSON.parse(await readFile(join(metaRoot, 'install-source.json'), 'utf8'))).toMatchObject({
       method: 'npm',
@@ -114,7 +147,7 @@ describe.skipIf(process.platform === 'win32')('CLI package-manager channel gener
     })
     expect(await readFile(join(metaRoot, 'share/openalice/fixture.txt'), 'utf8')).toBe('resource\n')
     expect(await readFile(join(metaRoot, 'postinstall.mjs'), 'utf8')).not.toContain('npm install')
-    expect(await readFile(join(metaRoot, 'postinstall.sh'), 'utf8')).toContain('bun/*) exec bun')
+    expect(JSON.parse(await readFile(join(metaRoot, 'package.json'), 'utf8')).scripts.postinstall).toBe('node ./postinstall.mjs')
     expect(await readFile(join(metaRoot, 'README.md'), 'utf8')).toContain(
       'bun add -g --trust openalice',
     )
@@ -127,7 +160,7 @@ describe.skipIf(process.platform === 'win32')('CLI package-manager channel gener
       outputDir: join(root, 'all-output'),
       version,
       releasedAt,
-    })).toThrow('require all four')
+    })).toThrow('requires all native')
     expect(() => buildCliPackageChannels({
       inputDir: join(root, 'input'),
       outputDir: join(root, 'npm-output'),
@@ -148,11 +181,13 @@ async function fixture(options = {}) {
     ['darwin', 'x64'],
     ['linux', 'arm64'],
     ['linux', 'x64'],
+    ['win32', 'arm64'],
+    ['win32', 'x64'],
   ]
   for (const [platform, arch] of targets) {
     const releaseName = `openalice-cli-${version}-${platform}-${arch}`
     const releaseRoot = join(root, releaseName)
-    const executable = join(releaseRoot, 'bin/openalice')
+    const executable = join(releaseRoot, 'bin', cliExecutableName(platform))
     await mkdir(join(releaseRoot, 'bin'), { recursive: true })
     await mkdir(join(releaseRoot, 'share/openalice'), { recursive: true })
     await writeFile(executable, `#!/bin/sh\nprintf '${version}\\n'\n`)
@@ -170,10 +205,10 @@ async function fixture(options = {}) {
       platform,
       arch,
       bunVersion: '1.4.0',
-      executable: 'bin/openalice',
+      executable: `bin/${cliExecutableName(platform)}`,
       resourceRoot: 'share/openalice',
       files: [
-        fileEntry('bin/openalice', await readFile(executable), 0o755),
+        fileEntry(`bin/${cliExecutableName(platform)}`, await readFile(executable), 0o755),
         fileEntry('share/openalice/fixture.txt', await readFile(resource)),
         fileEntry('LICENSE', await readFile(license)),
         fileEntry('THIRD_PARTY_NOTICES.md', await readFile(notices)),

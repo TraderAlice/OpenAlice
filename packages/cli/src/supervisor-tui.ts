@@ -1,3 +1,4 @@
+import { PROJECT_WORKSPACES, PROJECT_WORKSPACE_LABELS, type ProjectWorkspace } from './project-workspaces.ts'
 import { spawn } from 'node:child_process'
 import {
   dirname,
@@ -461,6 +462,7 @@ export interface SupervisorTuiDependencies {
     context: ResolvedLaunchContext,
     name: string,
     home: string,
+    workspaces?: readonly ProjectWorkspace[],
   ) => Promise<ResolvedLaunchContext>
   prepareManagedSource?: () => Promise<ManagedSourceResult>
   inspectManagedSource?: () => Promise<ManagedSourcePlan>
@@ -1016,8 +1018,9 @@ export async function runSupervisorTui(
     currentContext,
     name,
     home,
+    workspaces,
   ) => {
-    await createSupervisorAliceProject(currentContext, name, home)
+    await createSupervisorAliceProject(currentContext, name, home, { workspaces: workspaces ?? ['chat'] })
     return resolveStoredLaunchContext(launchFlags, {
       env: dependencies.env,
     })
@@ -2829,6 +2832,7 @@ export async function runSupervisorTui(
     let component: Component = list
     let projectListActive = true
     let creatorView: Omit<SupervisorProjectFoundryView, 'fieldLines'> | null = null
+    let selectWorkspaceRow: ((index: number) => void) | undefined
     const overlayOptions = supervisorTaskSurfaceOptions(terminalSize(), {
       width: '92%',
       maxHeight: '90%',
@@ -2863,6 +2867,7 @@ export async function runSupervisorTui(
     const activateContext = async (
       operation: () => Promise<ResolvedLaunchContext>,
       notice: (next: ResolvedLaunchContext) => string,
+      start = false,
     ) => {
       if (changing) return
       changing = true
@@ -2886,8 +2891,42 @@ export async function runSupervisorTui(
         changing = false
         await refreshRuntime()
       }
+      if (start && !projectsActive) await requestAction('start-open')
     }
-    const showCreateHomeInput = (name: string) => {
+    const showCreateWorkspaces = (name: string, home: string) => {
+      const selected = new Set<ProjectWorkspace>(['chat'])
+      let cursor = 0
+      selectWorkspaceRow = index => { cursor = index; ui.requestRender() }
+      ui.setShowHardwareCursor(false)
+      creatorView = {
+        step: 'workspaces', currentProjectName: projectContext.aliceProject.displayName,
+        projectKey: name, detail: '↑↓ Choose · Space Toggle · Chat recommended; others optional.',
+        message: 'Prepare selected workspaces on startup. Agent Sessions start only when you ask.',
+      }
+      setMessage(creatorView.message)
+      component = {
+        render: (width) => PROJECT_WORKSPACES.map((kind, index) =>
+          truncateDisplayWidth(`${index === cursor ? '›' : ' '} [${selected.has(kind) ? 'x' : ' '}] ${PROJECT_WORKSPACE_LABELS[kind]}`, width)),
+        invalidate: () => {},
+        handleInput: (data) => {
+          if (piTui.matchesKey(data, 'escape')) { showCreateHomeInput(name, home); return }
+          if (piTui.matchesKey(data, 'up')) cursor = (cursor + 2) % 3
+          else if (piTui.matchesKey(data, 'down')) cursor = (cursor + 1) % 3
+          else if (data === ' ') {
+            const kind = PROJECT_WORKSPACES[cursor]!
+            if (selected.has(kind)) selected.delete(kind); else selected.add(kind)
+          } else if (piTui.matchesKey(data, 'enter')) {
+            void activateContext(
+              () => createProject(projectContext, name, home, PROJECT_WORKSPACES.filter(kind => selected.has(kind))),
+              (next) => `Created ${next.aliceProject.displayName}. Starting and preparing workspaces…`,
+              true,
+            )
+          }
+          ui.requestRender()
+        },
+      }
+    }
+    const showCreateHomeInput = (name: string, previousHome?: string) => {
       projectListActive = false
       const defaultHome = registry.projects.find(
         (entry) => entry.key === 'default',
@@ -2912,7 +2951,7 @@ export async function runSupervisorTui(
           return super.render(width)
         }
       })()
-      input.setValue(suggestedHome)
+      input.setValue(previousHome ?? suggestedHome)
       input.focused = true
       ui.setShowHardwareCursor(true)
       input.onEscape = () => {
@@ -2925,10 +2964,8 @@ export async function runSupervisorTui(
           input.setDetail('Enter a complete home for this AliceProject.')
           return
         }
-        void activateContext(
-          () => createProject(projectContext, name, home),
-          (next) => `Created and selected AliceProject ${next.aliceProject.displayName}.`,
-        )
+        input.focused = false
+        showCreateWorkspaces(name, home)
       }
       component = input
       creatorView = {
@@ -3027,7 +3064,15 @@ export async function runSupervisorTui(
             width,
             overlayOptions,
             (data) => this.handleInput(data),
-            undefined,
+            creatorView.step === 'workspaces' ? {
+              firstRow: Math.max(0, lines.findIndex(line => line.includes('[x] Chat') || line.includes('[ ] Chat'))),
+              indexes: [0, 1, 2],
+              startColumn: width >= 92 ? 42 : 3,
+              endColumn: width - 2,
+              select: index => selectWorkspaceRow?.(index),
+              activate: () => component.handleInput?.(' '),
+              move: delta => component.handleInput?.(delta < 0 ? '\u001b[A' : '\u001b[B'),
+            } : undefined,
             (label) => {
               if (projectsHoveredCommand === label) return
               projectsHoveredCommand = label

@@ -1,28 +1,24 @@
 ---
 name: alice
 description: >
-  Research & data on your shell PATH via the `alice` CLI — THIS WORKBENCH's
-  read surfaces: the collected-RSS archive (`alice rss`), cross-asset symbol
-  search (`alice market search` → barIds), and K-line quant analysis
-  (`alice analysis`). Use for: "grep the collected feeds for the Fed", "find
-  the barId for AAPL", "compute RSI on this chart", "I can't find a Taiwan/CN
-  stock — add a data vendor". Output is JSON; discover every flag with
-  `alice --help` / `alice <group> <verb> --help` — do NOT guess.
-  (Low-frequency market data — fundamentals, macro series, calendars, boards —
-  is the separate `traderhub` CLI; the quant scripting manual is the
-  `alice-analysis` skill.)
+  Research data and Workspace collaboration through the `alice` CLI:
+  symbol discovery, K-line analysis, optional subscribed-article lookup,
+  peer conversations, Inbox and Issues. Use CLI help for command parameters.
+  Also use alice for Workspace collaboration: peer discovery, Agent conversations,
+  Inbox delivery, Issues, Session identity, tracked assets and template upgrades.
+  Read references/collaboration.md for these workflows.
 ---
 
-# Research & data — `alice`
+# Research & collaboration — `alice`
 
-`alice` is OpenAlice's read surface on your PATH. Output is JSON on stdout
+`alice` is OpenAlice's research and collaboration interface on your PATH. Output is JSON on stdout
 (pipe it: `alice market search --query AAPL | jq '.results[0]'`); a non-zero
 exit means it failed, with the reason on stderr.
 
 ## Discover, don't guess
 
 ```bash
-alice --help                       # the groups: rss, market, analysis, think
+alice --help                       # discover research and collaboration groups
 alice <group> <verb> --help        # a verb's flags (which are required)
 ```
 
@@ -52,31 +48,35 @@ If a search for a non-US name comes up empty, check `alice market vendors`
 **before giving up** — the covering source may just be off. Each vendor's
 `howToUse` flags its quirks (e.g. twse wants 繁体 `台積電`, not 简体 `台积电`).
 
-**Search the collected-RSS archive, then read one article by its stable id**
-(the `id` is stable — you do **not** need to repeat `--lookback` to read it):
+`alice rss` is an optional quick scan of collected subscription articles,
+with limited coverage. Command parameters are available in `alice rss --help`.
+
+**Raw K-lines** use the same BarService as the Market chart:
 
 ```bash
-alice rss grep --pattern "interest rate" --lookback 2d
-alice rss read --id <id-from-the-results>
+alice market search-bars --query AAPL
+alice market bars --bar-id 'yfinance|AAPL' --asset-class equity --interval 1d --count 250 --output bars.json
 ```
 
-**Metadata filters** (`--meta` is repeatable):
+The JSON file contains `bars` and `meta`, suitable for local Python/JavaScript
+or shell pipelines. Omit `--output` for stdout. Existing files are preserved.
+Sources retain their own identity; inspect coverage and freshness metadata.
+`alice analysis quant` and `snapshot` remain optional conveniences; see the
+`alice-analysis` Skill for their formula syntax.
 
-```bash
-alice rss grep --pattern BTC --meta source=coindesk --meta category=crypto
-```
+Workspace shells inherit their Alice Project automatically. Outside a Workspace,
+use `openalice exec --project <key> alice <group> <verb> ...`; omitting the
+selector uses the configured Project context/default. Explicit Project selection
+clears inherited Workspace/Session scope. Workspace collaboration commands need
+Workspace context.
 
-Know what `rss` is: an archive of articles Alice's collector pulled from the
-user's **subscribed feeds** — coverage is exactly the feed list, nothing more.
-It is NOT a general news search. Empty results mean "not in the subscribed
-feeds", not "nothing happened" — so don't stop at "nothing found." For news
-beyond the feeds (frontpages, breaking, a specific outlet, social chatter),
-that's what `opencli` reaches (the `opencli-reader` skill, when this workspace
-has it — it'll ask to install if needed). Say what's missing rather than
-quietly returning thin.
+## Collaboration and durable assets
 
-**Technical / quantitative analysis** lives in its own surface — `alice analysis
-search-bars` (find a K-line barId) then `alice analysis quant` (compute). It's a
-small scripting language with a full function catalog, multi-timeframe panels,
-and source selection. **See the `alice-analysis` skill** for the manual; don't
-hand-roll indicators here.
+The same `alice` CLI also owns `peer`, `conversation`, `inbox`, `issue`,
+`provenance`, `signature`, `session`, `track`, and `template`. These are top-level
+groups, not an `alice workspace` subcommand.
+
+Read [the collaboration reference](references/collaboration.md) before sending
+messages, delivering reports or managing durable work. Workspace and Session
+identity are supplied by the launch context. Use live `alice --help` to discover
+commands and flags.

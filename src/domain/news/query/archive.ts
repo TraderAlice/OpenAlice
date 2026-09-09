@@ -9,7 +9,7 @@ import { tool } from 'ai'
 import { z } from 'zod'
 import type { INewsProvider, NewsItem } from '../types.js'
 
-const NEWS_LIMIT = 500
+const SEARCH_DEFAULT_LIMIT = 500
 /** Default cap on windowRss OUTPUT — a wide date window can match hundreds; we
  *  bound what's returned and report how many were omitted, rather than wall the
  *  caller's context. */
@@ -199,26 +199,25 @@ coverage is exactly the feed list, not the news at large. Empty results mean
 "not in the subscribed feeds", not "nothing happened".
 
 Returns matching headlines with a stable \`id\`, title, content length, and metadata preview.
-Pass an \`id\` to readRss to read the full article — the id is stable across calls,
+Pass an \`id\` to readRss to read the stored feed content — the id is stable across calls,
 so you do NOT need to repeat your \`lookback\`.
 Use this to quickly scan what the subscribed feeds picked up.
 
-Search pool: the most recent ${NEWS_LIMIT} items within \`lookback\` (or the
-most recent ${NEWS_LIMIT} overall when \`lookback\` is omitted). Older items
-within the lookback window are NOT searched. Your \`limit\` then bounds the
-match count returned from that pool.
+Searches the complete available recent index within \`lookback\`, then applies
+\`limit\` to matching results (default ${SEARCH_DEFAULT_LIMIT}, oldest-first). The collector
+index is bounded by its memory/retention settings; it is not the full disk archive.
 
 Example: globRss({ pattern: "BTC|Bitcoin", lookback: "1d" })`,
       inputSchema: z.object({
         pattern: z.string().describe('Regex to match against article titles'),
-        lookback: z.string().optional().describe(`Time range: "1h", "12h", "1d", "7d" (searches up to ${NEWS_LIMIT} most recent items in the window)`),
+        lookback: z.string().optional().describe('Time range: "1h", "12h", "1d", "7d" within the available recent index'),
         metadataFilter: z.record(z.string(), z.string()).optional().describe('Filter by metadata key-value'),
-        limit: z.number().int().positive().optional().describe('Max results'),
+        limit: z.number().int().positive().optional().describe(`Max matching results, oldest-first (default ${SEARCH_DEFAULT_LIMIT})`),
       }).meta({ examples: [{ pattern: 'BTC|Bitcoin', lookback: '1d' }] }),
       execute: async ({ pattern, lookback, metadataFilter, limit }) => {
         return globRss(
-          { getNews: () => provider.getNewsV2({ endTime: new Date(), lookback, limit: NEWS_LIMIT }) },
-          { pattern, metadataFilter, limit },
+          { getNews: () => provider.getNewsV2({ endTime: new Date(), lookback }) },
+          { pattern, metadataFilter, limit: limit ?? SEARCH_DEFAULT_LIMIT },
         )
       },
     }),
@@ -230,22 +229,22 @@ Searches articles pulled from the user's SUBSCRIBED RSS feeds (coverage = the
 feed list). Returns matched text with surrounding context.
 Use this to find specific mentions in the collected articles.
 
-Search pool: the most recent ${NEWS_LIMIT} items within \`lookback\` (or the
-most recent ${NEWS_LIMIT} overall when \`lookback\` is omitted). Older items
-within the lookback window are NOT searched.
+Searches the complete available recent index within \`lookback\`, then applies
+\`limit\` to matching results (default ${SEARCH_DEFAULT_LIMIT}, oldest-first). The collector
+index is bounded by its memory/retention settings; it is not the full disk archive.
 
 Example: grepRss({ pattern: "interest rate", lookback: "2d" })`,
       inputSchema: z.object({
         pattern: z.string().describe('Regex to search in title and content'),
-        lookback: z.string().optional().describe(`Time range: "1h", "12h", "1d", "7d" (searches up to ${NEWS_LIMIT} most recent items in the window)`),
+        lookback: z.string().optional().describe('Time range: "1h", "12h", "1d", "7d" within the available recent index'),
         contextChars: z.number().int().positive().optional().describe('Context chars around match (default: 50)'),
         metadataFilter: z.record(z.string(), z.string()).optional().describe('Filter by metadata key-value'),
-        limit: z.number().int().positive().optional().describe('Max results'),
+        limit: z.number().int().positive().optional().describe(`Max matching results, oldest-first (default ${SEARCH_DEFAULT_LIMIT})`),
       }).meta({ examples: [{ pattern: 'interest rate', lookback: '2d' }] }),
       execute: async ({ pattern, lookback, contextChars, metadataFilter, limit }) => {
         return grepRss(
-          { getNews: () => provider.getNewsV2({ endTime: new Date(), lookback, limit: NEWS_LIMIT }) },
-          { pattern, contextChars, metadataFilter, limit },
+          { getNews: () => provider.getNewsV2({ endTime: new Date(), lookback }) },
+          { pattern, contextChars, metadataFilter, limit: limit ?? SEARCH_DEFAULT_LIMIT },
         )
       },
     }),
@@ -253,9 +252,10 @@ Example: grepRss({ pattern: "interest rate", lookback: "2d" })`,
     windowRss: tool({
       description: `Articles within a DATE WINDOW (event study), oldest-first — for aligning news against a price path ("what hit between the gap-up and the fade").
 
-Returns id + ISO time + title (+ matched snippet when a pattern is given), sorted oldest→newest so the timeline lines up with bars. Pair with marketSnapshot/simulate to attribute a move to a catalyst.
+Returns id + ISO time + title (+ matched snippet when a pattern is given), sorted oldest→newest so the timeline lines up with bars. Pair with dated market snapshots to compare the price path with candidate catalysts.
 
-Coverage is the user's SUBSCRIBED RSS feeds only (not the news at large) — an empty window means "nothing in the subscribed feeds for that span", not "nothing happened". Pass a \`pattern\` to filter, or omit it to get everything in the window.
+Coverage is the available recent collector index, bounded by memory/retention settings,
+not the full disk archive. It contains the user's SUBSCRIBED RSS feeds only (not the news at large) — an empty window means "nothing in the subscribed feeds for that span", not "nothing happened". Pass a \`pattern\` to filter, or omit it to get everything in the window.
 
 Example: windowRss({ from: "2026-06-20", to: "2026-06-26", pattern: "Iran|oil" })`,
       inputSchema: z.object({
@@ -275,7 +275,7 @@ Example: windowRss({ from: "2026-06-20", to: "2026-06-26", pattern: "Iran|oil" }
         // Fetch ALL matches in the window, then bound the OUTPUT (a wide window can
         // be a wall of hundreds) — and say how many we left out, oldest-first.
         const all = await windowRss(
-          { getNews: () => provider.getNewsV2({ startTime, endTime, limit: 5000 }) },
+          { getNews: () => provider.getNewsV2({ startTime, endTime }) },
           { pattern, contextChars, metadataFilter },
         )
         const cap = limit ?? WINDOW_DEFAULT_LIMIT
@@ -293,17 +293,19 @@ Example: windowRss({ from: "2026-06-20", to: "2026-06-26", pattern: "Iran|oil" }
     }),
 
     readRss: tool({
-      description: `Read full content of a collected-RSS article by stable id (like "cat").
+      description: `Read stored feed content of a collected-RSS article by stable id (like "cat").
 
 Use after globRss/grepRss to read a specific article — pass the \`id\` from their
 results. The id is stable, so it resolves regardless of what \`lookback\` you used
-to find the item (no need to repeat it).`,
+to find the item (no need to repeat it). The collector can retrieve retained disk records
+even after they leave the recent search index. Content is what the feed supplied,
+which may be a summary; this does not fetch the publisher webpage.`,
       inputSchema: z.object({
         id: z.number().int().nonnegative().describe('Stable article id from globRss/grepRss results'),
       }).meta({ examples: [{ id: 0 }] }),
       execute: async ({ id }) => {
-        const result = await readRss(
-          { getNews: () => provider.getNewsV2({ endTime: new Date(), limit: NEWS_LIMIT }) },
+        const result = provider.getNewsById ? await provider.getNewsById(id) : await readRss(
+          { getNews: () => provider.getNewsV2({ endTime: new Date() }) },
           { id },
         )
         return result ?? { error: `Article id ${id} not found` }

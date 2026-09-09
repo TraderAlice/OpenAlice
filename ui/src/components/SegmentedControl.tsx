@@ -45,7 +45,7 @@ export function SegmentedControl<T extends string>({
             aria-label={option.ariaLabel}
             aria-controls={option.ariaControls}
             onClick={() => onChange(option.value)}
-            className={`shrink-0 whitespace-nowrap rounded-md font-medium outline-none transition-[background-color,color,box-shadow,transform] duration-[var(--motion-fast)] [transition-timing-function:var(--motion-ease-out)] focus-visible:ring-2 focus-visible:ring-ring/40 active:scale-[0.98] motion-reduce:transition-none ${
+            className={`shrink-0 whitespace-nowrap rounded-md font-medium outline-none transition-[background-color,color,box-shadow,transform] duration-[var(--motion-fast)] [transition-timing-function:var(--motion-ease-out)] focus-visible:[box-shadow:var(--oa-focus-shadow)] active:scale-[0.98] motion-reduce:transition-none ${
               compact ? 'min-h-6 px-2 text-[10px]' : 'min-h-7 px-2.5 text-[11px]'
             } ${
               active

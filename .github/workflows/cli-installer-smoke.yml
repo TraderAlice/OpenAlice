@@ -2,6 +2,19 @@ name: CLI Installer Smoke
 
 on:
   workflow_dispatch:
+    inputs:
+      windows_preview:
+        description: Build only the independent Windows x64/ARM64 preview
+        type: boolean
+        default: false
+      windows_candidate_run:
+        description: Optional existing Windows preview run ID; accept its ZIPs without rebuilding
+        type: string
+        default: ''
+      windows_channel_build:
+        description: Exercise the shared-channel Windows installer and candidate
+        type: boolean
+        default: false
   # Routine dev PRs prove the checkout installer locally, then the dev push
   # below builds every native candidate and accepts the live preview channel.
   # Hosted checkout/Bun/SSH candidate work begins at the master boundary.
@@ -54,14 +67,22 @@ on:
 
 permissions:
   contents: read
+  actions: read
 
 concurrency:
-  group: cli-installer-smoke-${{ github.event.pull_request.number || github.ref }}
+  group: cli-installer-smoke-${{ github.event.pull_request.number || github.ref }}-${{ inputs.windows_preview && 'windows-preview' || 'default' }}
   cancel-in-progress: true
 
 jobs:
+  windows-preview:
+    if: github.event_name == 'workflow_dispatch' && inputs.windows_preview
+    uses: ./.github/workflows/windows-cli-preview.yml
+    with:
+      candidate_run: ${{ inputs.windows_candidate_run || '' }}
+      channel_build: ${{ inputs.windows_channel_build || false }}
+
   release-prep-scope:
-    if: github.event_name != 'push'
+    if: github.event_name != 'push' && !inputs.windows_preview
     name: release-prep scope
     runs-on: ubuntu-latest
     timeout-minutes: 5
@@ -87,6 +108,7 @@ jobs:
     needs: release-prep-scope
     if: >-
       !cancelled() &&
+      !inputs.windows_preview &&
       github.event_name != 'push' &&
       (github.event_name != 'pull_request' || github.base_ref == 'master') &&
       (
@@ -153,6 +175,7 @@ jobs:
     needs: release-prep-scope
     if: >-
       !cancelled() &&
+      !inputs.windows_preview &&
       github.event_name != 'push' &&
       (
         needs.release-prep-scope.result != 'success' ||
@@ -176,6 +199,7 @@ jobs:
     needs: release-prep-scope
     if: >-
       !cancelled() &&
+      !inputs.windows_preview &&
       github.event_name != 'push' &&
       (github.event_name != 'pull_request' || github.base_ref == 'master') &&
       (
@@ -315,10 +339,20 @@ jobs:
           compression-level: 0
           retention-days: 7
 
+  build-dev-cli-windows:
+    needs: build-dev-cli-neutral
+    if: github.event_name == 'push'
+    uses: ./.github/workflows/windows-cli-preview.yml
+    with:
+      channel_build: true
+      artifact_prefix: dev-cli
+      neutral_inputs: true
+      native_acceptance: false
+
   publish-dev-cli-candidate:
     if: github.event_name == 'push'
     name: Publish immutable dev CLI candidate
-    needs: build-dev-cli
+    needs: [build-dev-cli, build-dev-cli-windows]
     runs-on: ubuntu-latest
     timeout-minutes: 15
 
@@ -396,6 +430,7 @@ jobs:
               *.tar.gz) content_type="application/gzip" ;;
               *.sha256) content_type="text/plain" ;;
               */install) content_type="text/x-shellscript" ;;
+              */install.ps1) content_type="text/plain" ;;
               *) echo "Unexpected immutable dev candidate file: $file" >&2; exit 1 ;;
             esac
             put_immutable \
@@ -537,7 +572,7 @@ jobs:
           echo "activated=true" >> "$GITHUB_OUTPUT"
 
   dev-channel-install:
-    if: always() && ((github.event_name == 'push' && needs.activate-dev-cli.result == 'success' && needs.activate-dev-cli.outputs.activated == 'true') || github.event_name == 'workflow_dispatch')
+    if: always() && !inputs.windows_preview && ((github.event_name == 'push' && needs.activate-dev-cli.result == 'success' && needs.activate-dev-cli.outputs.activated == 'true') || github.event_name == 'workflow_dispatch')
     name: Live raw dev channel install
     needs: activate-dev-cli
     runs-on: ubuntu-latest

@@ -1,3 +1,5 @@
+import { publishCliEndpoint } from './server/cli-endpoint.js'
+import { createMarketBarsTools } from './tool/market-bars.js'
 import {
   acquireOpenAliceRuntimeLocks,
   takeoverRequested,
@@ -62,7 +64,7 @@ import { inboxReadFactory } from './tool/inbox-read.js'
 import { workspacePathFactory } from './tool/workspace-path.js'
 import { workspaceSessionsFactory } from './tool/workspace-sessions.js'
 import { workspaceListFactory } from './tool/workspace-list.js'
-import { workspaceTemplateUpgradeFactory } from './tool/workspace-template-upgrade.js'
+import { workspaceTemplateUpgradeFactory, aliceHarnessUpgradeFactory } from './tool/workspace-template-upgrade.js'
 import { createEntityStore } from './core/entity-store.js'
 import { entityUpsertFactory } from './tool/entity-upsert.js'
 import { entitySearchFactory } from './tool/entity-search.js'
@@ -108,6 +110,7 @@ async function main() {
   workspaceToolCenter.register(workspaceSessionsFactory)
   workspaceToolCenter.register(workspaceListFactory)
   workspaceToolCenter.register(workspaceTemplateUpgradeFactory)
+  workspaceToolCenter.register(aliceHarnessUpgradeFactory)
   workspaceToolCenter.register(entityUpsertFactory)
   workspaceToolCenter.register(entitySearchFactory)
   for (const f of issueToolFactories) workspaceToolCenter.register(f)
@@ -263,6 +266,7 @@ async function main() {
   // v1 calculateIndicator (createAnalysisTools) is retired from the tool surface
   // — calculateQuant (v2, barId-keyed) supersedes it and the two descriptions
   // confused the model / bloated context. The code remains for now.
+  toolCenter.register(createMarketBarsTools({ barService }), 'market-bars')
   toolCenter.register(createQuantTools({ barService }), 'quant')
   toolCenter.register(createSnapshotTools(barService), 'snapshot')
   toolCenter.register(createSimulateTools(barService), 'simulate')
@@ -407,6 +411,8 @@ async function main() {
     console.log(`plugin started: ${plugin.name}`)
   }
 
+  const removeCliEndpoint = await publishCliEndpoint(toolBaseUrl, process.env['OPENALICE_TOOL_SOCKET'])
+
   // Optional products actively install their own journal producer after the
   // shared Workspace service is ready. NanoAlice can omit News entirely; the
   // journal core never imports or starts the collector.
@@ -449,6 +455,7 @@ async function main() {
   let stopped = false
   const shutdown = async () => {
     stopped = true
+    await removeCliEndpoint()
     newsCollector?.stop()
     for (const plugin of [...corePlugins, ...optionalPlugins.values()]) {
       await plugin.stop()

@@ -479,8 +479,8 @@
   --accent-foreground: #d9e4f2;
   --destructive: #ff6b75;
   --destructive-foreground: #19070b;
-  --border: #1c3049;
-  --input: #1c3049;
+  --border: rgba(194, 202, 214, 0.085);
+  --input: rgba(194, 202, 214, 0.16);
   --ring: #5aa2ff;
 
   --accent-strong: rgba(132, 183, 255, 0.12);
@@ -535,13 +535,13 @@
   --chart-axis: #8ca0b8;
   --chart-grid: #1c3049;
 
-  --sidebar: #081321;
+  --sidebar: #0b1623;
   --sidebar-foreground: #d9e4f2;
   --sidebar-primary: #5aa2ff;
   --sidebar-primary-foreground: #06101d;
-  --sidebar-accent: #122238;
+  --sidebar-accent: #172536;
   --sidebar-accent-foreground: #d9e4f2;
-  --sidebar-border: #1c3049;
+  --sidebar-border: rgba(194, 202, 214, 0.065);
   --sidebar-ring: #5aa2ff;
 
   --app-background-wash: radial-gradient(

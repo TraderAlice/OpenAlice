@@ -135,7 +135,7 @@ export function MarketRotationPage() {
 
 function QuadrantChart({ points, t }: { points: Point[]; t: TFunction }) {
   return (
-    <div className="relative">
+    <div className="relative shrink-0">
       {/* Quadrant corner labels */}
       <div className="pointer-events-none absolute inset-0 z-10">
         <CornerLabel className="top-1 right-2 text-success/70" text={t('market.quadRotatingIn')} />
@@ -145,7 +145,7 @@ function QuadrantChart({ points, t }: { points: Point[]; t: TFunction }) {
       </div>
       <MeasuredChartFrame className="h-[420px] w-full">
         {({ width, height }) => (
-          <ScatterChart width={width} height={height} margin={{ top: 24, right: 28, bottom: 28, left: 8 }}>
+          <ScatterChart accessibilityLayer width={width} height={height} margin={{ top: 24, right: 28, bottom: 28, left: 8 }}>
           <XAxis
             type="number" dataKey="x" name={t('market.axisRelStrength')}
             tickFormatter={(v: number) => `${v.toFixed(0)}%`}
@@ -161,7 +161,11 @@ function QuadrantChart({ points, t }: { points: Point[]; t: TFunction }) {
           />
           <ReferenceLine x={0} stroke="var(--border)" strokeDasharray="4 4" />
           <ReferenceLine y={0} stroke="var(--border)" strokeDasharray="4 4" />
-          <Tooltip cursor={{ strokeDasharray: '3 3' }} content={<PointTooltip t={t} />} />
+          <Tooltip
+            isAnimationActive={false}
+            cursor={{ strokeDasharray: '3 3' }}
+            content={<PointTooltip t={t} />}
+          />
           <Scatter data={points}>
             {points.map((p) => <Cell key={p.symbol} fill={dotColor(p.score)} />)}
             <LabelList dataKey="symbol" position="top" style={{ fontSize: 10, fill: 'var(--text)', fontWeight: 600 }} />
@@ -185,7 +189,7 @@ function PointTooltip({ active, payload, t }: { active?: boolean; payload?: Arra
   if (!active || !payload?.length) return null
   const p = payload[0].payload
   return (
-    <div className="rounded-xl border border-border bg-popover px-2.5 py-1.5 text-[11px] leading-[15px] shadow-md">
+    <div className="oa-chart-tooltip px-2.5 py-1.5 text-[11px] leading-[15px]">
       <div className="font-mono font-semibold text-foreground">{p.symbol} <span className="text-muted-foreground font-sans font-normal">{p.sector}</span></div>
       <div className="mt-0.5 grid grid-cols-[auto_auto] gap-x-3 gap-y-0.5">
         <span className="text-muted-foreground">{t('market.colScore')}</span><span className={signColor(p.score)}>{p.score ?? '—'}</span>
@@ -199,7 +203,8 @@ function PointTooltip({ active, payload, t }: { active?: boolean; payload?: Arra
 
 function RotationTable({ rows, benchmarkSymbol, t }: { rows: SectorRotationRow[]; benchmarkSymbol: string; t: TFunction }) {
   return (
-    <div className="-mx-4 overflow-x-auto px-4 md:mx-0 md:px-0" data-testid="sector-rotation-table-scroll">
+    <div className="-mx-4 shrink-0 overflow-x-auto px-4 md:mx-0 md:px-0" data-testid="sector-rotation-table-scroll">
+      {/* The page owns vertical scrolling; horizontal overflow must not let flex shrink the table's height. */}
       {/* Keep the market columns readable; narrow screens scroll instead of compressing headers together. */}
       <table className="w-full min-w-[820px] border-collapse text-caption" data-testid="sector-rotation-table">
         <thead>

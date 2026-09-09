@@ -15,20 +15,7 @@ import { runScript, type CalcDeps } from '@/domain/analysis/calc-v2/index'
 export function createQuantTools(deps: CalcDeps) {
   return {
     searchBars: tool({
-      description: `Find K-line sources for a symbol — returns barIds to paste into calculateQuant's bars(...).
-
-Federates connected brokers, user-enabled keyless data sources (binance-readonly, …), AND vendors (fmp, yfinance).
-Candidates come back relevance-first, then freshest within the same match quality. Each carries:
-  - barId: use directly, e.g. bars("<barId>", "1d", count=250).
-    · broker barIds ("accountId|symbol") need NO asset= in bars().
-    · vendor barIds ("provider|symbol") need asset="equity|crypto|currency|commodity".
-  - source: "uta" (broker) | "vendor"
-  - barCapability: "realtime" | "delayed" | "iex" | "subscription".
-Source preference: a broker you actually trade (realtime, and the chart matches your fills) >
-a paid vendor (fmp, …) > yfinance. yfinance is a FREE FALLBACK only — its end-of-day bars can
-lag a day or two, so don't use it for anything time-sensitive or to chart a live position when
-a broker source exists. The same asset appears from multiple sources (redundancy is expected);
-default to the freshest broker candidate.`,
+      description: `Find K-line sources for a symbol. Returns explicit barIds for market bars, charting or optional calculateQuant calls. Each source retains its own identity, asset class and advertised capability. Vendor barIds require assetClass when fetching; broker barIds do not. Sources can differ in coverage, freshness and entitlement.`,
       inputSchema: z.object({
         query: z.string().describe('Symbol or keyword, e.g. "AAPL", "BTC", "bitcoin"'),
         limit: z.number().int().positive().optional().describe('Max candidates (default 20)'),

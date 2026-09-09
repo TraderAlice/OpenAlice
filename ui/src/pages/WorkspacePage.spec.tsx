@@ -6,6 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import '../i18n'
 import type { Workspace } from '../components/workspace/api'
+import { HarnessWorkbenchContext } from '../components/harness/context'
 import { WorkspacePage } from './WorkspacePage'
 
 const mocks = vi.hoisted(() => ({
@@ -13,7 +14,7 @@ const mocks = vi.hoisted(() => ({
   spawn: vi.fn(),
   openAgentConfig: vi.fn(),
   resumeSession: vi.fn(),
-  openWebPiSession: vi.fn(),
+  openWebSession: vi.fn(),
   refresh: vi.fn(),
   workspaceViewProps: vi.fn(),
   workspaces: [] as Workspace[],
@@ -27,7 +28,7 @@ vi.mock('../contexts/workspaces-context', () => ({
     spawn: mocks.spawn,
     openAgentConfig: mocks.openAgentConfig,
     resumeSession: mocks.resumeSession,
-    openWebPiSession: mocks.openWebPiSession,
+    openWebSession: mocks.openWebSession,
     refresh: mocks.refresh,
   }),
 }))
@@ -36,6 +37,11 @@ vi.mock('../tabs/store', () => ({
   useWorkspace: (
     selector: (state: { openOrFocus: typeof mocks.openOrFocus }) => unknown,
   ) => selector({ openOrFocus: mocks.openOrFocus }),
+}))
+
+vi.mock('./ChatLandingPage', () => ({
+  HarnessLandingPage: (props: { mode: string; spec: { params: { targetWsId: string } } }) =>
+    <div data-testid="new-conversation" data-mode={props.mode} data-workspace={props.spec.params.targetWsId} />,
 }))
 
 vi.mock('../components/workspace/WorkspaceView', () => ({
@@ -98,8 +104,7 @@ describe('WorkspacePage identity', () => {
     expect(identity?.getAttribute('title')).toBe('Optical Networking Follow-up\nchat-jun30')
     expect(identity?.textContent).toContain('Optical Networking Follow-up')
     expect(identity?.textContent).toContain('chat-jun30')
-    expect(screen.getByTestId('workspace-view').getAttribute('data-label'))
-      .toBe('Optical Networking Follow-up')
+    expect(screen.getByTestId('new-conversation').getAttribute('data-workspace')).toBe('chat-1')
   })
 
   it('falls back to the stable tag when no display name is configured', () => {
@@ -113,7 +118,16 @@ describe('WorkspacePage identity', () => {
     )
 
     expect(screen.getByTitle('chat-jun30').textContent).toBe('chat-jun30')
-    expect(screen.getByTestId('workspace-view').getAttribute('data-label')).toBe('chat-jun30')
+    expect(screen.getByTestId('new-conversation').getAttribute('data-workspace')).toBe('chat-1')
+  })
+
+  it.each(['chat', 'auto-quant', 'prediction'] as const)('uses the targeted %s composer when no Session is pinned', (source) => {
+    render(<WorkspacePage spec={{ kind: 'workspace', params: { wsId: 'chat-1', source } }} visible />)
+    const composer = screen.getByTestId('new-conversation')
+    expect(composer.getAttribute('data-mode')).toBe(source)
+    expect(composer.getAttribute('data-workspace')).toBe('chat-1')
+    expect(screen.queryByTestId('workspace-view')).toBeNull()
+    expect(mocks.spawn).not.toHaveBeenCalled()
   })
 
   it('promotes Workspace actions into the running terminal canvas', () => {
@@ -183,4 +197,13 @@ describe('WorkspacePage identity', () => {
       .toBe('Optical Networking Follow-up\nchat-jun30')
     expect(screen.getByRole('button', { name: 'Files' })).toBeTruthy()
   })
+})
+
+it('leaves only the panel entry in the Harness header', () => {
+  render(<HarnessWorkbenchContext.Provider value={{ wsId: 'chat-1', open: false, toggle: vi.fn() }}>
+    <WorkspacePage spec={{ kind: 'workspace', params: { wsId: 'chat-1', source: 'chat' } }} visible />
+  </HarnessWorkbenchContext.Provider>)
+  expect(screen.getByRole('button', { name: 'Files' })).toBeTruthy()
+  expect(screen.queryByRole('button', { name: 'Settings' })).toBeNull()
+  expect(screen.queryByRole('button', { name: 'Web Beta' })).toBeNull()
 })

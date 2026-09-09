@@ -34,6 +34,28 @@ information should recede without becoming illegible.
 - Keep copy direct and operational. Lead with the state or object, then the
   explanation and next action.
 
+News rows in `ui/src/pages/NewsPage.tsx` form a local-calendar-day timeline.
+Time stays in the left gutter. The headline is a separate, prominent block above
+the summary, which previews up to three lines. Editorial images align with the
+headline on the right, with the source below; narrow screens place this image
+and source beneath the text. Bordered market/topic labels and a compact
+disclosure arrow follow the summary; expanding never hides the image. Flags
+identify the supplied market classification, not a company's domicile or the
+country mentioned in a headline. The local flag assets retain their license
+under `ui/public/market/flags/`; unknown tags remain text. The current news
+contract has no structured related-company identity or company-logo field.
+
+The news scroller reveals already-fetched results in batches of 40 when its
+bottom sentinel approaches the viewport. Appending keeps the reading position;
+changing a filter resets the batch and scroll position. This is not server
+pagination: the existing query limit and refresh cadence remain unchanged.
+
+Market navigation keeps News first, followed by Markets (market overview and
+an expandable watchlist), Analytics (movers, sector rotation, term structure),
+and Macro boards. Section headings are static; only news categories and the
+watchlist disclose child items. The watchlist uses the shared Collapsible
+primitive and keeps pinned entries intact when closed.
+
 The stable page hierarchy is:
 
 1. global shell and activity rail;
@@ -41,9 +63,62 @@ The stable page hierarchy is:
 3. one focused working view;
 4. dialogs, drawers, and popovers for temporary decisions.
 
-The activity rail's items, groups, and visibility are user-arranged from
-Settings → Activity bar and stored in `data/ui-layout.json`. The rail only
-renders the joined result. Deep links to a hidden surface still adopt.
+The activity rail's utility items, groups, and visibility are user-arranged from
+Settings → Activity bar and stored in `data/ui-layout.json`. The three Harnesses
+are a fixed work section below those utilities; their visibility follows the
+same saved entry settings. Deep links to a hidden surface still adopt.
+The former Beta navigation group is flattened into the primary list, including
+in the layout editor. Saved Beta items retain their order after primary items;
+custom groups, hidden entries, and feature gates remain unchanged. Beta feature
+availability is independent of navigation grouping.
+
+Quick Start (`/quick-start`) is the default general landing shortcut. Its Harness
+selector reuses Chat, Auto Quant, and Auto Prediction landing/setup flows and
+keeps per-Harness drafts while switching. It owns no Workspace or Session history.
+The saved primary `chat` layout slot now labels this shortcut; it remains pinned.
+Chat (`/chat`) and all existing Harness deep links retain their own route identity.
+Quick Start selection never marks a Harness current until navigation enters it.
+Below the utility list, Chat,
+Quant, and Prediction each show up to four sessions from their current Workspace
+(retaining an active older row), a new-session landing shortcut, and the shared
+Workspace options menu. More conversations remain available in the browser
+dialog. These are feature rows with their own icons, not collapsible folders or
+a labeled Harness tree. Recent sessions stay visible with a shallow indent.
+Trailing actions place options first and new-session last. The header owns the
+single new-session action; empty lists do not repeat a New chat/research row.
+These actions appear on header hover, keyboard focus,
+or while the menu is open; touch devices keep them visible. Clicking a primary
+navigation Session row enters its working surface: running Sessions open directly,
+paused resumable Sessions restore through the existing runtime action. A pending
+restore shows a spinner and rejects repeated clicks; failures stay on the row
+and allow retry. Headless occupancy still opens the single-writer explanation.
+The primary row has no separate play/stop target; settings, stop and archive live
+in its options menu. Direct links and history browsers retain view-only opening.
+In expanded navigation, a selected Session or Studio does not also select its
+Harness header. The compact rail retains the Harness selection because Session rows
+are hidden there; returning to the Harness landing selects its header.
+Quant/Prediction retain their explicit default
+Workspace readiness gates before exposing sessions and Studio. The navigation
+distinguishes setup, existing-Workspace selection, loading, and
+retryable errors. Without a Workspace, only the Harness header remains: clicking
+it opens the existing setup landing flow, without creating or selecting a
+Workspace. Do not repeat setup copy or a second setup button below it. Before
+readiness, the new-research shortcut is hidden.
+Studio is a quiet, borderless child navigation row aligned with Sessions, with
+route-owned selection. Its arrow appears on hover or keyboard focus and remains
+visible on touch devices; Quant and Prediction share its presentation.
+`SidebarChildRow` and `SidebarChildRowButton` own Harness child geometry for
+both Studio and Sessions: a 16px icon slot, 8px label gap, shared selection and
+keyboard focus, and sibling action controls. Expanded fine-pointer desktop rows
+are 30px tall with no additional per-destination vertical padding; other surfaces
+retain the existing Session row density. Keep runtime behavior in the caller.
+Harness working views use one content top bar, not a second conversation sidebar.
+TerminalView has no card/canvas mode: its header always uses PageTopBar and its
+single grid row fills the remaining height. Do not reserve a local header row
+for portaled content; xterm's FitAddon measures the padding-free terminal host.
+A compact rail keeps distinct Harness icons; mobile uses the same groups inside the global
+drawer. Quick Start hands new Sessions to their existing Harness-owned routes,
+not a second conversation hierarchy.
 The Settings editor reorders live: the list opens a gap under the pointer
 while the lifted row follows it. Sibling rows FLIP-animate into that slot.
 `prefers-reduced-motion: reduce` skips the sibling motion; the overlay still
@@ -57,6 +132,104 @@ Launch-surface example prompts are compact capability navigation, not generic
 chatbot filler. Their visible titles should stay scannable while the inserted
 prompt carries the evidence, freshness, persistence, and permission boundaries
 needed for the real task. Prefer a small rotating set over a wall of commands.
+
+### Background execution surfaces
+
+The bottom Your Alice application menu uses the static Alice portrait and a
+text label when expanded, or only the portrait when compact. The brand header
+keeps the OpenAlice wordmark without a second portrait. Its trailing ellipsis
+appears on hover, keyboard focus, or while open; touch keeps it visible. The
+trigger highlights for interaction, not because a Settings or Connectors page
+is active. Settings remains an item inside this application menu.
+
+Connectors is accessed from the bottom Your Alice menu, alongside Settings and
+above Appearance, not from the primary activity list or its layout editor.
+The existing Connectors route and setup flows remain unchanged. Connector
+health warnings appear on the Your Alice trigger and the Connectors menu item.
+
+The Automation activity entry and its dedicated navigator are retired. Runs
+and API remain unchanged under Settings → Developer, at
+`/settings/developer/runs` and `/settings/developer/api`. Old Automation links
+and saved tabs use this Settings destination; saved activity layouts cannot
+restore the retired entry. Developer expands for either page and uses the
+existing Settings scroll and mobile navigation behavior. This is an entry-point
+move, not a change to scheduling, run ownership, or an additional Issues view.
+
+### Current Workspace details
+
+The global Workspaces activity, overview, template catalog, and management
+navigator are retired. Saved layout entries cannot restore them. Old inventory
+links return to Ask Alice; legacy Session/file links resolve the Workspace's
+actual Harness and preserve their target identity without mounting a global
+Workspace interface. Missing or unsupported membership is an explicit recovery
+state, not permission to guess a Harness from a tag or show the old manager.
+
+The Harness options menu identity opens the current Workspace's details in the same
+Harness shell (`/<harness>/workspaces/:wsId/details`); the adjacent chevron is an
+independent Workspace switcher. Keep configuration and conversation browsing
+as separate actions below it. Do not make the identity click switch Workspaces,
+open agent configuration, or navigate to the global Workspace catalog.
+
+Details distinguish the Workspace-owned README and recorded applied/source
+versions from the current catalog's Harness guide. Catalog documentation is
+reference material, not proof of the installed version or current Workspace
+configuration. Keep document loading/errors independent, retain the sessions
+sidebar, and use the shared reading renderer rather than a new Markdown stack.
+
+### Agent conversation presentation
+
+`components/conversation/` owns the adapter-neutral browser conversation view,
+content/activity rendering and composer shell. `ComposerShell` is shared with
+the Harness launch page; its context, controls and details are caller-owned
+slots, not embedded Pi selectors. Existing `oa-harness-composer-*` styling seams
+remain the shared visual material. Messages and composer use a 46rem reading
+measure, with local scrolling for wide output and wrapping toolbar controls.
+User messages use a quiet, borderless bubble; assistant prose sits directly on
+the canvas. Execution summaries are lightweight disclosure rows, with an inset
+rail for individual actions rather than nested activity cards. Preserve the
+shared Markdown table scroll wrapper instead of overriding table display.
+Completed text has a copy action that copies only the displayed message, not
+reasoning or tool payloads. Older actions reveal on hover or keyboard focus;
+the latest message and touch surfaces keep them visible. Clipboard failures
+are actionable, and interrupted tools must say incomplete rather than completed.
+
+The normalized types in this folder are ephemeral presentation data, not a new
+persisted transcript or execution protocol. An adapter converts wire messages
+before rendering and supplies only supported send/stop actions. Missing actions
+do not produce fake controls. Reasoning, tool input/output, failed operations,
+and unknown payloads remain inspectable; failures expand their activity details.
+Presentation must not import runtime APIs, parse provider event discriminators,
+or fetch Workspace data. The backend already projects every runtime wire (Pi
+RPC, ACP, Claude stream-json, Codex app-server) into one neutral message list;
+`web-presentation.ts` converts that list, `useWebConversation` owns
+polling/commands, and `WebSessionView` composes the adapter for any runtime
+whose `capabilities.web` is declared. Runtime identity is a presentation fact
+(placeholder, stop label, wire tooltip), never a branch on the protocol.
+
+Runtime requests (tool permissions, file-change approvals, questions) render in
+`ConversationRequestCard`, pinned above the composer in the `status` slot
+rather than inline in the transcript, so the pending decision cannot scroll
+away while it is the only way forward. Options come verbatim from the runtime
+and answer with one option id; `allow`/`deny`/`neutral` tones map to the shared
+button variants. While a request is pending the phase is `awaiting-input`: the
+composer stays in stop mode, the card is the primary action, and further
+requests are counted rather than stacked. Answer failures keep the card and
+surface the error inline. `notice` items are neutral system remarks between
+turns (stopped turn, mode change), not assistant prose.
+
+Launch affordances (Resume CTA "Open in Web", the Workspace header surface
+toggle, Manager Quick Start) gate on `agentSupportsWeb(agents, agent)`; a
+runtime without a structured protocol keeps its terminal without a dead button,
+and an unloaded runtime list hides the affordance rather than guessing.
+
+Pending sends keep and lock their draft until acknowledgement, reject repeated
+submission, and preserve the draft on failure. Enter respects IME composition;
+Shift+Enter inserts a newline. Session identity changes remount local composition
+state and ignore prior requests. New revisions follow the tail only while the
+reader is already there; Jump to latest is explicit and honors reduced motion.
+Idle needs no top-bar badge; busy and failure states remain visible. Runtime
+settings remain in the existing Session settings until an adapter actually
+supports a corresponding inline control.
 
 ### Long-form Markdown
 
@@ -175,53 +348,48 @@ keyboard navigation, outside dismissal, scroll locking, and focus return.
 - Delete superseded event plumbing during migration. A component is not
   migrated if its old global Escape/outside-click/focus-loop implementation is
   still running beside the primitive.
-- Shared split layouts use the checked-in shadcn Resizable primitive for their
-  separator, pointer/touch capture, and keyboard resizing. Product adapters
-  such as `PageSidebarLayout` continue to own route content, responsive mode,
-  collapse affordances, and persisted preferences; they must not add a second
-  visible border or parallel document-level drag listeners beside the shared
-  separator. Responsive min/max values must be derived from the measured split
-  group rather than the window: app-shell chrome sits outside that group. Keep
-  the complete constraint set feasible at every supported width; when there is
-  not enough room for both preferred minimums, preserve the navigator minimum
-  and give the working view the measured remainder instead of sending mutually
-  impossible hard minimums to the primitive. Treat the primitive's applied
-  panel geometry as the authority for which expanded or collapsed surface is
-  interactive; input-source bookkeeping may decide whether a settled width is
-  persisted, but must never gate `aria-hidden`, `inert`, or collapse-state
-  synchronization. Capture resize intent at the split-group boundary so the
-  separator's enlarged fine/coarse pointer target behaves like its visible
-  one-pixel rule. Persist keyboard changes from the settled layout map rather
-  than a pre-paint DOM width, which can lag one key press behind. Direct pointer
-  resizing must stay attached to the cursor above the navigator minimum. Below
-  that minimum, keep the primitive layout and internal content measure fixed,
-  show only a bounded damped overdrag, and spring back on release before the
-  primitive's native collapsed-state midpoint. Arm the shared motion token as
-  that midpoint is crossed so the 200px-to-44px commit retains spatial
-  continuity without squeezing the navigator's controls or making ordinary
-  width changes feel lazy. Do not toggle the primitive's `collapsible`
-  metadata during an active pointer transaction; its native midpoint remains
-  the single collapse boundary.
-  Keep geometry transactions single-owner: native pointer and keyboard
-  interactions settle through the primitive, while a product collapse or
-  restore affordance issues exactly one imperative geometry call. Product
-  effects may reconcile applied geometry with persisted intent, but must not
-  repeat the same collapse/expand transaction. Because pixel constraint changes
-  can re-register v4 Panels after the group's settled callback, validate both
-  the settled layout and the final Panel ResizeObserver result; reject and
-  repair one-panel `100%` layouts instead of persisting them. A spring cleanup
-  timer begins only after release. When a new drag interrupts a returning
-  spring, cancel that timer and freeze the currently painted edge before
-  resuming direct manipulation so the handle never snaps away from the pointer.
-  Registration inputs such as `defaultSize` must remain stable during a held
-  pointer transaction; crossing a collapse midpoint is applied state, not a
-  reason to unregister and rebuild the Panel. If the product tracks gesture
-  state outside the primitive, capture that pointer at the split-group boundary
-  so an out-of-bounds release cannot strand it. A final invariant observer must
-  compare the painted navigator and content flex items, not only the primitive's
-  internal size callback. If those surfaces diverge into an impossible
-  `100%`/`0%` pair, rebuild one coherent group snapshot from the last valid
-  preference; repeating an already-satisfied internal resize is not recovery.
+- The app has one global navigation rail. When expanded, its desktop collapse
+  control sits to the right of the OpenAlice brand. When compact, the expand
+  control moves to the leading edge of the right-hand area's top bar. Only one
+  copy is mounted; activation transfers keyboard focus to the new location.
+  Responsive compact mode is a default, never a lock. Entering Chat, Quant, or
+  Prediction no longer auto-collapses the rail: it owns their session lists.
+  Explicit expanded/collapsed preferences apply across all product areas.
+- `TopBar` owns compact header geometry (40px desktop, at least 48px on phone).
+  `PageContentLayout` owns a fixed header slot; `PageTopBar` portals a page's
+  title and actions into it without copying business state or callbacks.
+  `PageHeader` adds description/live metadata below this bar. Keep large
+  onboarding prompts in the content rather than enlarging the global chrome.
+  Pages with dense actions wrap them and keep contextual metadata out of the
+  primary action row. Preserve full-title hints when labels truncate.
+- `PrimaryNavigationContext` supplies the expand control only while compact. A desktop
+  `PageSidebarLayout` consumes it in the navigator's top bar and masks it from
+  the content header. Without a static navigator, the content header consumes
+  it. There must be exactly one visible desktop primary-navigation toggle.
+  Phone navigation remains in `MobileContextBar`; feature drawers keep their
+  own labeled controls and shared Sheet focus/dismissal behavior.
+- A secondary navigator belongs to the feature's content layout, not to a
+  second global navigation layer. `PageSidebarLayout` keeps desktop resizing
+  but offers no generic collapse/restore, collapsed strip, or overdrag gesture.
+  Old saved secondary-collapse preferences are ignored; width preferences stay
+  intact. This does not prohibit a feature from owning collapsible internal
+  panels or a narrow-screen drawer where its workflow needs them.
+- Shared split layouts use the checked-in shadcn Resizable primitive for
+  separator geometry, pointer/touch capture, and keyboard resizing. Do not add
+  a second visible border or parallel document-level drag listeners.
+  Derive feasible min/max constraints from the measured split group, not the
+  window. When there is not enough room for preferred minimums, preserve the
+  navigator's 200px minimum and give content the measured remainder.
+  Capture intent at the group boundary so enlarged fine/coarse targets behave
+  like the visible separator, including an out-of-bounds pointer release.
+  Persist settled user widths, not temporary responsive caps; keyboard widths
+  come from the settled layout map rather than a pre-paint DOM measurement.
+  Keep Panel registration defaults stable during a gesture.
+  Because pixel constraint changes can re-register v4 Panels after a settled
+  callback, validate both the layout and painted navigator/content flex items.
+  Repair impossible `100%`/`0%` geometry with one coherent group snapshot from
+  the last valid preference; an already-satisfied internal resize is not
+  recovery.
 
 The `@/` alias resolves to `ui/src` in Vite, TypeScript, and the UI Vitest
 project. Backend tests keep their existing root `@` alias.
@@ -246,6 +414,28 @@ Prefer these primitives over copying arbitrary `duration-*`, easing curves, or
 keyframes into individual pages. A local animation is justified when it conveys
 domain-specific state that the shared vocabulary cannot express.
 
+Keyboard focus uses the neutral `--oa-focus-ring` and `--oa-focus-shadow`
+tokens. `oa-field-control` owns the shared input, textarea, and select border
+transition. The same shadow token covers buttons, navigation rows, tabs,
+segmented controls, switches, and resizable handles. Product accent color keeps
+its selection and action meaning.
+
+The application body establishes a 14px type size with 20px leading. Explicit
+display, heading, control, caption, and data roles build from that stable
+reading baseline.
+
+The compact activity rail keeps its static Alice mark in the bottom application
+menu. Its expansion action
+lives in the content-side top bar, not in a brand-hover affordance. Small
+desktop windows still permit explicit expansion. The shell owns effective
+rail state so its toggle and the rendered rail always agree.
+
+Dense market panels use `oa-data-surface` for the shared border and canvas and
+`oa-data-surface-header` for section hierarchy. Data components retain their
+domain-owned layout and use the shared surfaces to align cards, charts, quote
+summaries, and launch actions. Recharts tooltips set `isAnimationActive={false}`
+at the component boundary, and the shared chart class owns their visual material.
+
 Clickable native and ARIA controls receive a pointer cursor globally. Disabled
 controls keep the default cursor and must remain visually disabled. Hover-only
 transforms are gated to fine pointers, so touch devices do not inherit a fake
@@ -269,6 +459,35 @@ shell mounted while replacing the active-only view content. Do not wrap every
 drill-in in a fresh copy of the same shell or mask the resulting remount with a
 transition. Session terminals and other heavy page content remain active-only
 unless their own lifecycle explicitly requires otherwise.
+
+Market's quotes, news, boards, rotation and instrument views share the
+`market` shell. News contributes content only; its grouped categories live
+inside MarketSidebar and use SidebarRow rather than feature-colored buttons.
+Category and news-view selection use separate URL parameters, so selecting an
+importance or sentiment view does not discard the current category. Existing
+source-tag matching is unchanged by this navigation and theme integration.
+News category/view selections are adopted into one news tab and projected back
+to the URL, including on a fresh load. Changing a selection does not create
+another tab. Narrow screens use the same news directory in the Market drawer.
+News initially mounts forty stories and reveals more on demand. Selection
+changes reset the visible batch; full story text remains expandable. Polling
+waits for an outstanding request instead of repeatedly replacing a slow load,
+while explicit refresh, query changes and unmount cancel superseded requests.
+
+Market directory headings (News, Markets, Macro, Watchlist) are static captions.
+Parent headings use the shared hierarchy variant (13px, medium weight), and
+each child navigation level adds a 12px inset. Clickable categories and leaf
+rows share 13px regular text and foreground color; gray is reserved for
+secondary summaries and chevrons. Only News category groups disclose children,
+with trailing chevrons. Only destination rows receive page selection
+styling; a collapsed category group shows the selected category as a plain
+summary. Restoring a News selection reveals its group, while users can still
+collapse it manually. Search results appear immediately below the search field.
+The shared Base UI Collapsible owns keyboard/ARIA and measured panel lifetime;
+its 180ms height/opacity transition is disabled with reduced motion. Closing
+panels become inert and aria-hidden immediately, including during animation.
+The same directory and touch-sized controls serve the narrow-screen drawer.
+No new persisted preference is added.
 
 Keyboard focus is not a motion effect. Interactive controls still require a
 clear `focus-visible` treatment, meaningful labels, and sensible tab order.
@@ -302,3 +521,46 @@ For motion changes:
 
 Motion should be judged in the running UI. A class name or screenshot alone
 cannot prove timing, continuity, or pointer feedback.
+
+Web question cards keep the existing composer status placement. Text-capable
+questions show a labeled shared Textarea and an explicit Send answer button;
+offered options stay available above it. Secret questions use a masked field.
+The layout stacks vertically at narrow widths and does not steal focus.
+Permission cards remain option-only. A failed submission retains the draft,
+while a new request ID mounts a fresh card so answers do not leak between
+questions. This is owned by the shared ConversationRequestCard, not a
+runtime-specific presenter.
+
+## Harness work panel
+
+The application remains primary navigation plus content. `ChatPageShell` owns
+an internal `HarnessWorkbench` split for Chat, AutoQuant and Auto Prediction;
+it is not an application-level third rail. The conversation is one pane and a
+resizable tabbed work panel is the other. File browsing opens read-only file
+tabs in this panel. Existing Studio routes open managed Studio beside the last
+visited Session in that Workspace, or the new-conversation composer when none was visited.
+The split spans one continuous top bar: conversation title on the left and
+individually closable tabs on the right. There is no enclosing panel title bar.
+The plus button follows the last tab until the tab strip fills the available
+width; overflow scrolls inside the strip while add and collapse stay reachable.
+The plus menu opens Files, Browser or Studio. Studio supplies its managed URL
+and readiness state to the same BrowserPane used by ordinary browser tabs.
+The address bar contains reload and separate-open controls; Studio restart and
+logs live in its overflow menu. Web frames respect host embedding restrictions;
+address history tracks submitted URLs, not cross-origin in-page navigation.
+
+Workspace-keyed runtime view state retains open tabs, selected tab, width and
+last Session. Mounted file/Studio tabs survive disclosure and Session changes;
+closing a tab releases its view without stopping the managed Studio process.
+Reload resets this transient view state. At content widths below 720px the
+panel replaces the conversation region while the shared header and explicit
+collapse/return action remain available. Base UI Tabs and the shared resizable
+primitive own keyboard selection and splitter behavior.
+
+Harness headers expose a single icon-only work-panel disclosure with a tooltip
+and accessible expanded state. Workspace configuration stays in the existing
+sidebar menu. Web/TUI switching is available from the panel menu. Disclosure
+uses the shared 250ms ease-out curve for the resizable outer panels, with a
+subtle content fade/translation. Pointer and keyboard resizing remain immediate;
+reduced-motion mode disables the transitions. Content width is held during the
+short disclosure to avoid repeatedly wrapping file and Studio content.

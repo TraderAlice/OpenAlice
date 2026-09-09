@@ -1,14 +1,15 @@
-import { ChevronDown, PanelLeftClose, PanelLeftOpen, X } from 'lucide-react'
-import { useEffect, useMemo, useRef, useState, type RefObject } from 'react'
+import { ChevronDown, X } from 'lucide-react'
+import { useEffect, useMemo, useRef, useState, type ReactNode, type RefObject } from 'react'
 import { type Page } from '../App'
 import { useWorkspace } from '../tabs/store'
 import type { ActivitySection } from '../tabs/types'
+import { getFocusedTab } from '../tabs/types'
 import { useUnreadInboxCount } from '../live/inbox-read'
 import { usePendingPushCount } from '../live/trading-push'
 import { useConnectorWarningCount } from '../live/connector-health'
 import { useActivityBarCollapse } from '../live/activity-bar-collapse'
 import { useTranslation } from 'react-i18next'
-import { ThemeToggle } from './ThemeToggle'
+import { ActivityBarUtilityMenu } from './ActivityBarUtilityMenu'
 import { useAliceProject } from '../hooks/useAliceProject'
 import { useBetaFeatures } from '../live/beta-features'
 import { joinNavLayout, NAV_SECTIONS } from './activity-navigation'
@@ -21,6 +22,7 @@ import {
 } from '@/components/ui/tooltip'
 import { SelectionIndicator } from './SelectionIndicator'
 import { Button } from '@/components/ui/button'
+import { ChatWorkspaceSection } from './workspace/ChatWorkspaceSection'
 
 /**
  * Map ActivityBar page enum (visual layout grouping) to the ActivitySection
@@ -51,8 +53,10 @@ interface ActivityBarProps {
   desktopStatic?: boolean
   /** Static desktop rail width chosen by App's shell breakpoints. */
   railMode?: 'compact' | 'narrow' | 'full'
-  /** Force the static rail into icon-only mode for a compact workbench. */
-  compactRailForced?: boolean
+  /** Effective shell state, including temporary workbench expansion. */
+  collapsed?: boolean
+  /** Shell-owned collapse control, shown beside the expanded brand only. */
+  headerAction?: ReactNode
   /** Mobile drawer trigger that receives focus again when the drawer closes. */
   returnFocusRef?: RefObject<HTMLElement | null>
 }
@@ -79,7 +83,7 @@ function useMediaQuery(query: string): boolean {
  * (one elevation step up from the secondary Sidebar and the base main
  * pane) — rail → sidebar → main read as three distinct tiers. Top
  * section (no header) is the pinned product-navigation block — Chat, Inbox,
- * Issues, etc. — always visible. Labeled sections (Beta, System)
+ * Issues, etc. — always visible. User-arranged labeled sections
  * get collapsible chevron headers; collapse state persists to
  * localStorage.
  *
@@ -92,7 +96,8 @@ export function ActivityBar({
   onClose,
   desktopStatic = true,
   railMode = 'full',
-  compactRailForced = false,
+  collapsed,
+  headerAction,
   returnFocusRef,
 }: ActivityBarProps) {
   const { t } = useTranslation()
@@ -100,10 +105,13 @@ export function ActivityBar({
   const officeNav = useBetaFeatures((s) => s.office)
   const { layout } = useUiLayout()
   const navSections = useMemo(
-    () => joinNavLayout(NAV_SECTIONS, layout, { product: project?.product, office: officeNav }),
+    () => joinNavLayout(NAV_SECTIONS, layout, { product: project?.product, office: officeNav })
+      .map(section => ({ ...section, items: section.items.filter(item => item.page !== 'auto-quant' && item.page !== 'prediction') }))
+      .filter(section => section.items.length > 0),
     [layout, officeNav, project?.product],
   )
   const selectedSidebar = useWorkspace((state) => state.selectedSidebar)
+  const focusedKind = useWorkspace((state) => getFocusedTab(state)?.spec.kind)
   const setSidebar = useWorkspace((state) => state.setSidebar)
   const openOrFocus = useWorkspace((state) => state.openOrFocus)
   const unreadInbox = useUnreadInboxCount()
@@ -112,41 +120,29 @@ export function ActivityBar({
   const collapsedSections = useActivityBarCollapse((s) => s.collapsedSections)
   const setCollapsed = useActivityBarCollapse((s) => s.setCollapsed)
   const railCollapsed = useActivityBarCollapse((s) => s.railCollapsed)
-  const setRailCollapsed = useActivityBarCollapse((s) => s.setRailCollapsed)
   const shortRailHeight = useMediaQuery('(max-height: 700px)')
-  const veryShortRailHeight = useMediaQuery('(max-height: 520px)')
-  const workbenchRail = selectedSidebar === 'chat' ||
-    selectedSidebar === 'auto-quant' ||
-    selectedSidebar === 'prediction'
-  const forcedCompactRail = desktopStatic && (
-    compactRailForced || workbenchRail || railMode === 'compact' || veryShortRailHeight
-  )
-  const compactRail = desktopStatic && (forcedCompactRail || railCollapsed)
-  const narrowRail = desktopStatic && railMode === 'narrow' && !compactRail
+  const compactRail = desktopStatic && (collapsed ?? railCollapsed ?? railMode === 'compact')
+  const narrowRail = desktopStatic && railMode !== 'full' && !compactRail
   const denseRail = desktopStatic && shortRailHeight
   const mobileDrawerRef = useRef<HTMLDivElement>(null)
+  const harnesses = (['chat', 'auto-quant', 'prediction'] as const)
+    .filter(mode => mode === 'chat' || !layout.hidden.includes(mode))
   const railContent = (
     <>
-        <div className={`${denseRail ? 'h-10 md:h-8' : 'h-10'} flex shrink-0 items-center ${compactRail ? 'justify-center px-0' : narrowRail ? 'gap-2 px-3' : 'gap-2.5 px-3.5'}`}>
-          <img
-            src="/alice.ico"
-            alt="Alice"
-            className={`${denseRail ? 'h-6 w-6 md:h-5 md:w-5' : 'h-[22px] w-[22px]'} shrink-0 object-contain`}
-            draggable={false}
-          />
-          <h1 className={`min-w-0 flex-1 truncate text-[13px] font-semibold leading-[18px] tracking-[-0.01em] text-foreground ${compactRail ? 'md:hidden' : ''}`}>OpenAlice</h1>
-          {!desktopStatic && (
-            <Button
-              type="button"
-              onClick={onClose}
-              aria-label={t('common.closePanel', { title: t('nav.primaryNavigation') })}
-              className="-mr-1 shrink-0 text-muted-foreground"
-              variant="ghost"
-              size="icon"
-            >
-              <X size={15} strokeWidth={1.75} aria-hidden />
-            </Button>
-          )}
+        <div className={`${denseRail ? 'h-10 md:h-8' : 'h-10'} flex shrink-0 items-center ${compactRail ? 'justify-center px-0' : narrowRail ? 'gap-1.5 px-2.5' : 'gap-2.5 px-3.5'}`}>
+              <h1 className={`min-w-0 flex-1 truncate text-[13px] font-semibold leading-[18px] tracking-[-0.01em] text-foreground ${compactRail ? 'md:hidden' : ''}`}>OpenAlice</h1>
+              {!desktopStatic ? (
+                <Button
+                  type="button"
+                  onClick={onClose}
+                  aria-label={t('common.closePanel', { title: t('nav.primaryNavigation') })}
+                  className="-mr-1 shrink-0 text-muted-foreground"
+                  variant="ghost"
+                  size="icon"
+                >
+                  <X size={15} strokeWidth={1.75} aria-hidden />
+                </Button>
+              ) : !compactRail ? headerAction : null}
         </div>
 
         {/* Navigation */}
@@ -194,14 +190,14 @@ export function ActivityBar({
                   <div className={`flex flex-col ${denseRail ? 'gap-1 md:gap-px' : 'gap-px'}`} id={`activity-section-${section.id}`}>
                     {section.items.map((item) => {
                       const sec = activitySectionFor(item.page)
-                      const isActive = selectedSidebar === sec
+                      const isActive = item.page === 'chat' ? focusedKind === 'quick-start' : selectedSidebar === sec
                       const Icon = item.icon
                       let badge: { count: number; label: string; tone: string } | null = null
                       if (item.page === 'inbox' && unreadInbox > 0) {
                         badge = {
                           count: unreadInbox,
                           label: t('nav.unread', { count: unreadInbox }),
-                          tone: 'bg-sidebar-foreground text-sidebar',
+                          tone: 'oa-inbox-unread-count',
                         }
                       } else if (item.page === 'portfolio' && pendingPush > 0) {
                         badge = {
@@ -209,15 +205,9 @@ export function ActivityBar({
                           label: t('nav.pendingPush', { count: pendingPush }),
                           tone: 'bg-info text-info-foreground',
                         }
-                      } else if (item.page === 'connectors' && connectorWarnings > 0) {
-                        badge = {
-                          count: connectorWarnings,
-                          label: t('nav.connectorNeedsAttention', { count: connectorWarnings }),
-                          tone: 'bg-warning text-warning-foreground',
-                        }
                       }
                       const handleClick = () => {
-                        setSidebar(sec)
+                        setSidebar(item.page === 'chat' ? 'quick-start' : sec)
                         openOrFocus(item.defaultTab)
                         onClose()
                       }
@@ -273,42 +263,37 @@ export function ActivityBar({
               </div>
             )
           })}
+          <div className={compactRail ? 'mt-4 flex flex-col gap-1 border-t border-sidebar-border/70 pt-3' : 'mt-5 space-y-1'}>
+            {harnesses.map(mode => (
+              <ChatWorkspaceSection key={mode} mode={mode} placement="navigation" compact={compactRail} onNavigate={onClose} />
+            ))}
+          </div>
         </nav>
 
-        {/* Footer — global icon controls pinned to the bottom of the rail. */}
-        <div className={`flex shrink-0 items-center ${compactRail ? `${denseRail ? 'py-2 md:py-0.5 md:gap-px' : 'py-2 md:gap-1'} px-4 md:flex-col md:items-center md:px-2` : 'justify-between gap-2 border-t border-border/55 px-2 py-1'}`}>
-          <ThemeToggle compact={denseRail} />
-          {!forcedCompactRail && (
-            <Tooltip>
-              <TooltipTrigger
-                render={
-                  <Button
-                    type="button"
-                    onClick={() => setRailCollapsed(!railCollapsed)}
-                    aria-label={t(railCollapsed ? 'nav.expandRail' : 'nav.collapseRail')}
-                    aria-hidden={!desktopStatic ? true : undefined}
-                    tabIndex={!desktopStatic ? -1 : undefined}
-                    className={`hidden ${denseRail ? 'md:h-[26px] md:w-[26px]' : ''} shrink-0 text-muted-foreground md:flex`}
-                    variant="ghost"
-                    size="icon"
-                  />
-                }
-              >
-                {railCollapsed
-                  ? <PanelLeftOpen size={denseRail ? 14 : 17} strokeWidth={1.75} aria-hidden />
-                  : <PanelLeftClose size={denseRail ? 14 : 17} strokeWidth={1.75} aria-hidden />}
-              </TooltipTrigger>
-              <TooltipContent side="right" sideOffset={8}>
-                {t(railCollapsed ? 'nav.expandRail' : 'nav.collapseRail')}
-              </TooltipContent>
-            </Tooltip>
-          )}
+        {/* Application controls pinned to the bottom of the rail. */}
+        <div className={`shrink-0 border-t border-border/55 ${compactRail ? `flex justify-center ${denseRail ? 'py-0.5' : 'py-2'}` : 'p-1.5'}`}>
+          <ActivityBarUtilityMenu
+            compactRail={compactRail}
+            denseRail={denseRail}
+            connectorWarnings={connectorWarnings}
+            connectorsActive={selectedSidebar === 'connectors'}
+            onOpenConnectors={() => {
+              setSidebar('connectors')
+              openOrFocus({ kind: 'connectors', params: {} })
+              onClose()
+            }}
+            onOpenSettings={() => {
+              setSidebar('settings')
+              openOrFocus({ kind: 'settings', params: { category: 'general' } })
+              onClose()
+            }}
+          />
         </div>
     </>
   )
 
   const railClassName = `
-    w-[280px] ${compactRail ? 'md:w-[50px]' : narrowRail ? 'md:w-[152px]' : 'md:w-[188px]'} h-full flex flex-col shrink-0
+    w-[280px] ${compactRail ? 'md:w-[50px]' : narrowRail ? 'md:w-[232px]' : 'md:w-[260px]'} h-full flex flex-col shrink-0
     bg-sidebar border-r border-sidebar-border/70
   `
 

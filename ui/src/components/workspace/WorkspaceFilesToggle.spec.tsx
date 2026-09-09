@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { i18n } from '../../i18n'
 import { useWorkspaceSidePanels } from '../../live/workspace-side-panels'
+import { HarnessWorkbenchContext } from '../harness/context'
 import { WorkspaceFilesToggle } from './WorkspaceFilesToggle'
 
 const toggleMocks = vi.hoisted(() => ({ isDesktop: true }))
@@ -63,4 +64,14 @@ describe('WorkspaceFilesToggle', () => {
       mobileFilesOpen: false,
     })
   })
+})
+
+it('renders a single named icon control inside the Harness', () => {
+  const toggle = vi.fn()
+  render(<HarnessWorkbenchContext.Provider value={{ wsId: 'a', open: true, toggle }}><WorkspaceFilesToggle /></HarnessWorkbenchContext.Provider>)
+  const button = screen.getByRole('button', { name: 'Work panel' })
+  expect(button.textContent).toBe('')
+  expect(button.getAttribute('aria-expanded')).toBe('true')
+  fireEvent.click(button)
+  expect(toggle).toHaveBeenCalledOnce()
 })

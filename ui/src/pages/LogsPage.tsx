@@ -132,7 +132,7 @@ function ToolCallLogSection() {
         <select
           value={nameFilter}
           onChange={(e) => handleNameChange(e.target.value)}
-          className="h-8 rounded-md border border-border bg-muted px-2 text-sm text-foreground outline-none focus:border-primary"
+          className="oa-field-control h-8 rounded-md border border-input bg-muted px-2 text-sm text-foreground outline-none"
         >
           <option value="">All tools</option>
           {toolNames.map((n) => (
@@ -536,7 +536,7 @@ function ConversationRow({ record }: { record: AgentConversationRecord }) {
             type="button"
             aria-expanded={expanded}
             onClick={() => setExpanded((value) => !value)}
-            className="oa-nav-row flex w-full items-start gap-2 rounded-md px-1 py-0.5 text-left text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+            className="oa-nav-row flex w-full items-start gap-2 rounded-md px-1 py-0.5 text-left text-muted-foreground hover:text-foreground focus-visible:outline-none"
           >
             <span className="min-w-0 flex-1 line-clamp-2">{preview}</span>
             <ChevronRight

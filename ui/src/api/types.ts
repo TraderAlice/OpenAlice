@@ -258,13 +258,15 @@ export interface NewsArticle {
   source: string | null
   link: string | null
   categories: string | null
+  image?: string | null
 }
 
 export interface NewsListResponse {
   items: NewsArticle[]
   count: number
-  lookback: string
+  lookback: string | null
 }
+
 
 // ==================== Trading ====================
 

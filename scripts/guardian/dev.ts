@@ -290,7 +290,12 @@ async function main(): Promise<void> {
     name: 'connector',
     command: 'tsx',
     args: buildTsxWatchArgs('services/connector/src/main.ts', CONNECTOR_BACKEND_WATCH_INCLUDES, process.env),
-    env: { ...baseEnv, OPENALICE_CONNECTOR_PORT: String(ports.connectorPort) },
+    env: {
+      ...baseEnv,
+      OPENALICE_CONNECTOR_PORT: String(ports.connectorPort),
+      OPENALICE_MCP_PORT: String(ports.mcpPort),
+      OPENALICE_TOOL_SOCKET: '',
+    },
     prefixLogs: true,
   }
   const spawnConnectorController = () => {

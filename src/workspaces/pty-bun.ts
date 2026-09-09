@@ -40,10 +40,13 @@ interface BunPtyRuntime {
 }
 
 const bunRuntime = (globalThis as typeof globalThis & { Bun: BunPtyRuntime }).Bun;
+export const ptyBackend: PtyBackend = createBunPtyBackend(bunRuntime);
 
-export const ptyBackend: PtyBackend = {
+export function createBunPtyBackend(runtime: BunPtyRuntime, platform = process.platform): PtyBackend {
+  const windows = platform === 'win32';
+  return {
   name: 'bun-native',
-  supportsFlowControl: true,
+  supportsFlowControl: !windows,
   spawn(file, args, options) {
     const dataListeners = new Set<(data: Buffer) => void>();
     const exitListeners = new Set<(event: PtyExitEvent) => void>();
@@ -51,7 +54,7 @@ export const ptyBackend: PtyBackend = {
     let exitEvent: PtyExitEvent | undefined;
     let paused = false;
 
-    const child = bunRuntime.spawn([file, ...args], {
+    const child = runtime.spawn([file, ...args], {
       cwd: options.cwd,
       env: options.env,
       terminal: {
@@ -115,6 +118,13 @@ export const ptyBackend: PtyBackend = {
         terminal.resize(cols, rows);
       },
       kill(signal) {
+        if (windows) {
+          // ConPTY has no POSIX process groups or SIGSTOP/SIGCONT. Terminate
+          // the child before closing the pseudoconsole (older Windows can
+          // block ClosePseudoConsole while a child is still alive).
+          child.kill(signal as NodeJS.Signals | undefined);
+          return;
+        }
         const requestedSignal = signal as NodeJS.Signals | undefined;
         // A graceful signal remains pending while the process group is
         // stopped. Resume first so shutdown handlers can actually run.
@@ -124,17 +134,20 @@ export const ptyBackend: PtyBackend = {
         }
         signalProcessGroup(child, requestedSignal ?? 'SIGTERM');
       },
-      pause() {
-        if (paused || exitEvent) return;
-        if (signalProcessGroup(child, 'SIGSTOP')) paused = true;
-      },
-      resume() {
-        if (!paused || exitEvent) return;
-        if (signalProcessGroup(child, 'SIGCONT')) paused = false;
-      },
+      ...(!windows ? {
+        pause() {
+          if (paused || exitEvent) return;
+          if (signalProcessGroup(child, 'SIGSTOP')) paused = true;
+        },
+        resume() {
+          if (!paused || exitEvent) return;
+          if (signalProcessGroup(child, 'SIGCONT')) paused = false;
+        },
+      } : {}),
     } satisfies PtyProcess;
   },
 };
+}
 
 /**
  * Bun.Terminal is callback-only and currently has no read-side pause method.

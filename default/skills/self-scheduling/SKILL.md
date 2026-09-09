@@ -5,7 +5,7 @@ description: >
   `.alice/issues/<id>.md`: structured ownership and optional `when` frontmatter
   plus one canonical markdown What. Use for creating or editing an Issue,
   choosing its assignee, schedule, prompt, delivery behavior, or health state.
-  Use the `alice-workspace` skill instead when the goal is to ask another
+  Use the `alice` skill instead when the goal is to ask another
   Session for an answer.
 ---
 
@@ -34,7 +34,7 @@ The filename stem **is** the issue id (`morning-scan.md` → id `morning-scan`).
 You have two equivalent paths, and both write the **same**
 `.alice/issues/<id>.md` files:
 
-1. **`alice-workspace issue …` — the convenient agent surface, and what you
+1. **`alice issue …` — the convenient agent surface, and what you
    should reach for first.** A small set of verbs does the read-modify-write for
    you: id slug derivation, frontmatter validation against the allowed
    status/priority enums, structured comment sidecars, and not clobbering an
@@ -51,42 +51,42 @@ You have two equivalent paths, and both write the **same**
 
 ```bash
 # list — scan the WHOLE board: every workspace's issues as compact title rows
-alice-workspace issue list
+alice issue list
 
 # show — one issue in full, resolved by its (global) name: frontmatter + What + comments +
 # run history + inbox reports. --id takes a name OR id and resolves across the
 # board; a name two workspaces share returns the candidates to pick from.
-alice-workspace issue show --id morning-scan
+alice issue show --id morning-scan
 
 # create — a new issue. --title is required; --id is derived as a kebab slug
 # from the title when omitted. Creating over an existing id is refused.
-alice-workspace issue create --title "Split the data fetcher" \
+alice issue create --title "Split the data fetcher" \
   --priority medium \
   --what "src/fetch.ts mixes the HTTP call with the normalization step."
 
 # update — patch board fields, canonical What, or the optional run timeout;
 # scheduling cadence (`when`) is left untouched. Setting status done|canceled is how
 # you silence a self-scheduled issue (there is no separate enabled flag).
-alice-workspace issue update --id morning-scan --status done
-alice-workspace issue update --id morning-scan --timeout 30m
+alice issue update --id morning-scan --status done
+alice issue update --id morning-scan --timeout 30m
 
 # comment — append markdown to the structured `<id>.comments.json` sidecar. An
 # attributable Session signs with @resumeId. If somebody else comments on an
 # For a fixed @resumeId owner, OpenAlice asks that owner in the background.
 # Human comments without one ask the creator or a reconstructed Workspace Agent.
 # Agent-authored comments without a fixed owner remain timeline notes.
-alice-workspace issue comment --id morning-scan --text "Brief pushed; SPY gapped +0.4%."
+alice issue comment --id morning-scan --text "Brief pushed; SPY gapped +0.4%."
 ```
 
-Run `alice-workspace issue <verb> --help` for a verb's flags. Object-valued flags
+Run `alice issue <verb> --help` for a verb's flags. Object-valued flags
 take JSON — e.g. to create a self-scheduled issue in one call, pass the schedule
 as `--when`:
 
 ```bash
-alice-workspace issue create --title "Pre-market brief" --priority high \
+alice issue create --title "Pre-market brief" --priority high \
   --when '{"kind":"cron","cron":"30 8 * * 1-5","timezone":"America/New_York"}' \
   --assignee @me \
-  --what "Pull pre-market movers and overnight news for my watchlist, write a short brief to research/premarket.md, then run: alice-workspace inbox push --doc research/premarket.md --comments 'Pre-market brief'." \
+  --what "Pull pre-market movers and overnight news for my watchlist, write a short brief to research/premarket.md, then run: alice inbox push --doc research/premarket.md --comments 'Pre-market brief'." \
   --agent codex \
   --credential openai-primary \
   --model gpt-5.6 \
@@ -263,8 +263,8 @@ work and surfaces nothing has vanished. So:
 
 - If the run produces something the user should see — a brief, a finding, a
   result — **push it to the Inbox**, the only channel a headless run has:
-  `alice-workspace inbox push --comments "…"` (attach files with repeatable
-  `--doc <path>`; run `alice-workspace --help` for the flags). A report pushed
+  `alice inbox push --comments "…"` (attach files with repeatable
+  `--doc <path>`; run `alice --help` for the flags). A report pushed
   during a scheduled run is automatically linked back to the issue that
   triggered it — you don't pass any id.
 - If the run is a **check that didn't trigger** (condition not met, nothing
@@ -305,3 +305,8 @@ otherwise do nothing and exit."
 - **Legacy:** the old single `.alice/issue.json` is retired. If you find one,
   split each issue into its own `.alice/issues/<id>.md` file with the
   frontmatter above.
+
+Run a scheduled Issue immediately with `alice issue run --id <id>`; add `--await`
+when its result is needed now. Retry its latest failed run with
+`alice issue retry --id <id> --run-id <taskId>`. Both use the current What and
+owner without moving the next scheduled occurrence.

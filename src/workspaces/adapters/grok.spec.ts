@@ -45,7 +45,7 @@ describe('grok session layout', () => {
 describe('grok composeCommand', () => {
   it('seeds a fresh TUI with a trailing `-- <prompt>` and never goes headless', () => {
     const argv = grokAdapter.composeCommand(['grok'], ctx({ initialPrompt: PROMPT }));
-    expect(argv.slice(0, 2)).toEqual(['grok', '--no-leader']);
+    expect(argv.slice(0, 5)).toEqual(['grok', '--sandbox', 'off', '--no-leader', '--always-approve']);
     expect(argv.slice(-2)).toEqual(['--', PROMPT]);
     expect(argv).not.toContain('-p');
     expect(argv).not.toContain('--worktree');
@@ -57,19 +57,18 @@ describe('grok composeCommand', () => {
       resume: { sessionId: '019ff963-4d80-7650-a109-efd64717a05d' },
       initialPrompt: PROMPT,
     }))).toEqual([
-      'grok', '--no-leader', '--resume', '019ff963-4d80-7650-a109-efd64717a05d',
+      'grok', '--sandbox', 'off', '--no-leader', '--always-approve', '--resume', '019ff963-4d80-7650-a109-efd64717a05d',
     ]);
     expect(grokAdapter.composeCommand(['grok'], ctx({ resume: 'last', initialPrompt: PROMPT })))
-      .toEqual(['grok', '--no-leader', '--continue']);
+      .toEqual(['grok', '--sandbox', 'off', '--no-leader', '--always-approve', '--continue']);
   });
 });
 
 describe('grok composeHeadlessCommand', () => {
   it('uses streaming-json and binds the prompt with --single=', () => {
     expect(grokAdapter.composeHeadlessCommand!(['grok'], ctx(), 'do x')).toEqual([
-      'grok',
-      '--no-leader',
-      '--always-approve',
+      'grok', '--sandbox', 'off',
+      '--no-leader', '--always-approve',
       '--output-format',
       'streaming-json',
       '--single=do x',
@@ -82,9 +81,8 @@ describe('grok composeHeadlessCommand', () => {
       ctx({ resume: { sessionId: 'native-session-1' } }),
       'next',
     )).toEqual([
-      'grok',
-      '--no-leader',
-      '--always-approve',
+      'grok', '--sandbox', 'off',
+      '--no-leader', '--always-approve',
       '--resume',
       'native-session-1',
       '--output-format',
@@ -101,15 +99,14 @@ describe('grok composeHeadlessCommand', () => {
   });
 
   it('uses the grok binary even when the workspace default command is claude', () => {
-    expect(grokAdapter.composeCommand(['claude'], ctx())).toEqual(['grok', '--no-leader']);
+    expect(grokAdapter.composeCommand(['claude'], ctx())).toEqual(['grok', '--sandbox', 'off', '--no-leader', '--always-approve']);
     expect(grokAdapter.composeHeadlessCommand!(['claude'], ctx(), 'do x')[0]).toBe('grok');
   });
 
   it('resumes the last headless session with --continue', () => {
     expect(grokAdapter.composeHeadlessCommand!(['grok'], ctx({ resume: 'last' }), 'next')).toEqual([
-      'grok',
-      '--no-leader',
-      '--always-approve',
+      'grok', '--sandbox', 'off',
+      '--no-leader', '--always-approve',
       '--continue',
       '--output-format',
       'streaming-json',
@@ -123,16 +120,15 @@ describe('grok composeHeadlessCommand', () => {
       initialPrompt: PROMPT,
     }));
     expect(seeded).toEqual([
-      'grok', '--no-leader', '--rules', 'Stay in the Workspace.', '--', PROMPT,
+      'grok', '--sandbox', 'off', '--no-leader', '--always-approve', '--rules', 'Stay in the Workspace.', '--', PROMPT,
     ]);
     expect(grokAdapter.composeHeadlessCommand!(
       ['grok'],
       ctx({ appendSystemPrompt: 'Stay in the Workspace.' }),
       'do x',
     )).toEqual([
-      'grok',
-      '--no-leader',
-      '--always-approve',
+      'grok', '--sandbox', 'off',
+      '--no-leader', '--always-approve',
       '--rules',
       'Stay in the Workspace.',
       '--output-format',
@@ -168,7 +164,7 @@ describe('grok sessionRuntime', () => {
       sessionRuntime: projected,
     });
     expect(argv.join(' ')).not.toContain(SECRET);
-    expect(argv).toEqual(['grok', '--no-leader', '--model', 'grok-4.6', '--effort', 'high']);
+    expect(argv).toEqual(['grok', '--sandbox', 'off', '--no-leader', '--always-approve', '--model', 'grok-4.6', '--effort', 'high']);
   });
 
   it('points custom OpenAI-compatible endpoints at GROK_MODELS_BASE_URL', () => {

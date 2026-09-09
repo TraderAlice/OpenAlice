@@ -93,15 +93,15 @@ describe('CLI launchers and payload', () => {
       server.listen(socketPath, resolve)
     })
     try {
-      const { stdout } = await runCli('alice', [], {
+      const { stdout, stderr } = await runCli('alice', [], {
           ...process.env,
           AQ_WS_ID: 'ws1',
           OPENALICE_TOOL_SOCKET: socketPath,
           OPENALICE_TOOL_URL: '/cli',
           OPENALICE_CLI_DEBUG: '1',
       })
-      expect(stdout).toContain('[openalice-cli-debug] runtime')
-      expect(stdout).toContain('[openalice-cli-debug] socket.response')
+      expect(stderr).toContain('[openalice-cli-debug] runtime')
+      expect(stderr).toContain('[openalice-cli-debug] socket.response')
       expect(stdout).toContain('OpenAlice CLI')
       expect(stdout).toContain('market')
       expect(stdout).toContain('Discover symbols and bar sources')
@@ -141,13 +141,14 @@ describe('CLI launchers and payload', () => {
       server.listen(socketPath, resolve)
     })
     try {
-      const { stdout } = await runCli('alice-workspace', ['inbox'], {
+      const { stdout, stderr } = await runCli('alice-workspace', ['inbox'], {
         ...process.env,
         AQ_WS_ID: 'ws1',
         OPENALICE_TOOL_SOCKET: socketPath,
         OPENALICE_TOOL_URL: '/cli',
       })
-      expect(stdout).toContain('alice-workspace inbox <verb>')
+      expect(stdout).toContain('alice inbox <verb>')
+      expect(stderr).toContain('compatibility alias')
       expect(stdout).toContain('Deliver reports to the human Inbox')
       expect(stdout).toContain('push')
     } finally {

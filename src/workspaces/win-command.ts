@@ -57,6 +57,7 @@ export function resolveLaunchCommand(
     platform?: NodeJS.Platform;
     env?: NodeJS.ProcessEnv;
     nodeExecPath?: string;
+    bunStandalone?: boolean;
     cwd?: string;
   } = {},
 ): ResolvedCommand {
@@ -96,7 +97,14 @@ export function resolveLaunchCommand(
     // wrapper has the stock shape.  Besides avoiding an unnecessary shell,
     // this is what makes user-controlled headless prompts safe: cmd.exe never
     // gets a chance to re-parse &, |, %, ^, and friends.
-    const direct = resolveStockNpmShim(resolved, rest, opts.nodeExecPath ?? process.execPath);
+    const standalone = opts.bunStandalone
+      ?? (globalThis as typeof globalThis & { __OPENALICE_BUN_STANDALONE__?: boolean }).__OPENALICE_BUN_STANDALONE__ === true;
+    // A compiled OpenAlice executable is not a general Node interpreter.
+    // External npm agents retain their own host Node requirement.
+    const node = opts.nodeExecPath ?? (standalone
+      ? lookupExactOnWindowsPath('node.exe', env)
+      : process.execPath);
+    const direct = node ? resolveStockNpmShim(resolved, rest, node) : null;
     if (direct) return { argv: direct, viaShell: false, mode: 'node-shim' };
 
     // npm-style installs also publish an extensionless POSIX shim next to the

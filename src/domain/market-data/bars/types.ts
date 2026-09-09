@@ -1,3 +1,5 @@
+import type { BarQuality } from './quality.js'
+import type { BarFreshness } from './freshness.js'
 /**
  * Federated bar layer — types.
  *
@@ -69,6 +71,8 @@ export type BarCapability = 'free' | 'delayed' | 'subscription' | 'iex' | 'realt
 
 /** Data-source metadata — structurally a superset of `DataSourceMeta`. */
 export interface BarMeta {
+  quality?: BarQuality
+  freshness?: BarFreshness
   symbol: string
   from: string
   to: string
@@ -78,16 +82,19 @@ export interface BarMeta {
   barId?: string
   provider?: string
   barCapability?: BarCapability
-  // ---- freshness contract ----
-  // The point-in-time the request was anchored to (opts.end ?? asOf ?? today),
-  // and whether the data actually REACHES it. A delayed vendor silently
-  // stopping a day behind "now" is the failure mode this makes loud: never let
-  // a stale `to` masquerade as the current price.
+  /** Requested interval. Sources may reject unsupported intervals. */
+  interval?: string
+  /** Local response ceiling; not a guarantee of upstream history completeness. */
+  limit?: number
+  /** Rows omitted by this service's hard ceiling, before count selection. */
+  truncatedRows?: number
+  // Legacy weekday comparisons retained for existing consumers.
+  // Use freshness for record timestamps; neither establishes measured feed latency.
   /** Effective anchor of the request (YYYY-MM-DD): explicit end/asOf, else today. */
   asOf?: string
-  /** True when the last bar reaches `asOf` (no trading-day gap); false = stale. */
+  /** Legacy weekday comparison only; does not establish realtime freshness. */
   isLatestActual?: boolean
-  /** Trading-day gap between the last bar and `asOf` (0 when current). */
+  /** Weekday gap to `asOf`, ignoring exchange holidays and session hours. */
   staleTradingDays?: number
 }
 
@@ -117,7 +124,7 @@ export interface GetBarsOpts {
   count?: number
   /** Explicit lower bound (YYYY-MM-DD). */
   start?: string
-  /** Explicit upper bound (YYYY-MM-DD); also the count anchor. */
+  /** Inclusive upper calendar-day bound (YYYY-MM-DD); also the count anchor. */
   end?: string
   /** Point-in-time anchor for `count` (alias of `end`; default now). */
   asOf?: string

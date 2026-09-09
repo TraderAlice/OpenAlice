@@ -57,5 +57,8 @@ describe('MarketRotationPage recovery', () => {
     await screen.findByText('Recovered methodology')
     await waitFor(() => expect(mocks.sectorRotation).toHaveBeenCalledTimes(2))
     expect(screen.queryByRole('alert')).toBeNull()
+    // Keep both sections at their natural height inside the page's scroll area.
+    expect(screen.getByTestId('sector-rotation-table-scroll').classList.contains('shrink-0')).toBe(true)
+    expect(screen.getByTestId('rotation-chart').parentElement?.classList.contains('shrink-0')).toBe(true)
   })
 })

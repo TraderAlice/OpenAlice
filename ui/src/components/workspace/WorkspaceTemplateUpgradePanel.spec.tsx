@@ -143,6 +143,6 @@ describe('WorkspaceTemplateUpgradePanel', () => {
     render(<WorkspaceTemplateUpgradePanel wsId="chat-old" onWorkspaceChanged={vi.fn()} onClose={vi.fn()} />)
 
     expect(await screen.findByText('Prepare this Workspace before applying')).toBeTruthy()
-    expect(screen.getByText(/p1.*pi.*WebPi/i)).toBeTruthy()
+    expect(screen.getByText(/p1.*pi.*Web/i)).toBeTruthy()
   })
 })

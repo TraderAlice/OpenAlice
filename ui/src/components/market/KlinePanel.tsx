@@ -1,5 +1,7 @@
+import { BarFreshness } from './BarFreshness'
+import { WatchlistButton } from './WatchlistButton'
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { useSearchParams } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import {
   createChart,
   CandlestickSeries,
@@ -53,8 +55,9 @@ function startDateFromToday(days: number): string {
 }
 
 function toUTCTimestamp(s: string): UTCTimestamp {
-  // Daily bars use `YYYY-MM-DD`; intraday uses `YYYY-MM-DD HH:MM:SS`.
-  const iso = s.includes(' ') ? s.replace(' ', 'T') + 'Z' : `${s}T00:00:00Z`
+  // Calendar dates and timezone-bearing intraday instants are both valid.
+  const iso = /^\d{4}-\d{2}-\d{2}$/.test(s) ? `${s}T00:00:00Z`
+    : s.includes(' ') ? s.replace(' ', 'T') + 'Z' : s
   return Math.floor(new Date(iso).getTime() / 1000) as UTCTimestamp
 }
 
@@ -73,15 +76,17 @@ interface Props {
    * only on React Router state: tab switches project their URL with
    * history.replaceState, which intentionally does not notify the router. */
   source?: string
+  displayTitle?: string
   /** Read-only mirror of the displayed series for sibling analysis panels.
    *  This avoids a second bar request on bespoke detail pages. */
   onSnapshot?: (snapshot: KlineSnapshot) => void
 }
 
-export function KlinePanel({ selection, source, onSnapshot }: Props) {
+export function KlinePanel({ selection, source, onSnapshot, displayTitle }: Props) {
   const effectiveTheme = useEffectiveTheme()
   const effectivePalette = useEffectivePalette()
-  const [searchParams, setSearchParams] = useSearchParams()
+  const [searchParams] = useSearchParams()
+  const navigate = useNavigate()
   const interval = parseInterval(searchParams.get('interval'))
   const tf = parseTimeframe(searchParams.get('range'))
   // The provider picked at search time (a barId), if any — opens the chart on
@@ -93,21 +98,30 @@ export function KlinePanel({ selection, source, onSnapshot }: Props) {
 
   // Local setter named `selectInterval` rather than `setInterval` so it
   // doesn't shadow the global timer function we use for polling below.
+  const updateChartQuery = (update: (next: URLSearchParams) => void) => {
+    if (!selection) return
+    const next = new URLSearchParams(searchParams)
+    if (selectedBarId) next.set('source', selectedBarId)
+    else next.delete('source')
+    update(next)
+    // Focused market tabs may project their URL without updating Router state.
+    // Explicitly address this asset, never the router's previously visited page.
+    navigate({ pathname: `/market/${selection.assetClass}/${encodeURIComponent(selection.symbol)}`, search: next.toString() }, { replace: true })
+  }
   const selectInterval = (iv: KlineInterval) => {
-    setSearchParams((prev) => {
-      const next = new URLSearchParams(prev)
+    updateChartQuery((next) => {
       if (iv === DEFAULT_INTERVAL) next.delete('interval')
       else next.set('interval', iv)
-      return next
-    }, { replace: true })
+      const days = daysForTimeframe(tf)
+      if (iv === '1m' && (days == null || days > 5)) next.set('range', '5D')
+      if (iv === '5m' && (days == null || days > 30)) next.set('range', '1M')
+    })
   }
   const setTf = (t: KlineTimeframe) => {
-    setSearchParams((prev) => {
-      const next = new URLSearchParams(prev)
+    updateChartQuery((next) => {
       if (t === DEFAULT_RANGE) next.delete('range')
       else next.set('range', t)
-      return next
-    }, { replace: true })
+    })
   }
 
   const [bars, setBars] = useState<HistoricalBar[] | null>(null)
@@ -151,6 +165,10 @@ export function KlinePanel({ selection, source, onSnapshot }: Props) {
       grid: {
         vertLines: { color: colors.grid },
         horzLines: { color: colors.grid },
+      },
+      crosshair: {
+        vertLine: { color: colors.primaryMuted, labelBackgroundColor: colors.labelBackground },
+        horzLine: { color: colors.primaryMuted, labelBackgroundColor: colors.labelBackground },
       },
       rightPriceScale: { borderColor: colors.grid },
       timeScale: { borderColor: colors.grid, timeVisible: false, secondsVisible: false },
@@ -304,31 +322,40 @@ export function KlinePanel({ selection, source, onSnapshot }: Props) {
 
   return (
     <div className="flex flex-col h-full">
-      <div className="flex items-center justify-between py-2 px-1 gap-3 flex-wrap">
-        <div className="flex items-center gap-2 min-w-0">
-          <span className="text-[13px] font-medium text-foreground truncate">{title}</span>
+      <div className="flex flex-col py-2 px-1 gap-2">
+        <div className="flex items-center gap-x-3 gap-y-1 min-w-0 flex-wrap">
+          <div className="flex min-w-0 items-center gap-1">
+            <span className="text-[13px] font-medium text-foreground truncate">{displayTitle ?? title}</span>
+            {selection && <WatchlistButton assetClass={selection.assetClass} symbol={selection.symbol} />}
+          </div>
           {meta && (
             <span
               className="inline-flex items-center gap-1.5 text-[11px] leading-[15px] font-medium text-muted-foreground"
               title={`Provider: ${meta.barId}${meta.barCapability ? ` (${meta.barCapability})` : ''}`}
             >
-              <span>{meta.sourceId}</span>{meta.barCapability && <span>{meta.barCapability}</span>}
+              <span>{meta.sourceId === 'eastmoney' ? '东方财富 · 前复权' : meta.sourceId}</span>{meta.barCapability && <span>{meta.barCapability}</span>}
             </span>
           )}
           {bars && bars.length > 0 && (
-            <span className="text-[11px] text-muted-foreground/60 truncate">
-              {bars.length} bars, {bars[0].date} → {bars[bars.length - 1].date}
+            <span className="text-[11px] text-muted-foreground sm:ml-auto"
+              title={`${bars[0].date} → ${bars[bars.length - 1].date}`}>
+              {bars.length} bars · {bars[0].date.slice(0, 10)} — {bars[bars.length - 1].date.slice(0, 10)}
             </span>
           )}
         </div>
-        <div className="flex items-center gap-5 flex-wrap">
+        {meta && <BarFreshness meta={meta} />}
+        {meta?.quality && meta.quality.excludedRows > 0 && <p className="text-[11px] leading-5 text-warning" role="status">
+          {meta.quality.excludedRows} incomplete {meta.quality.excludedRows === 1 ? 'record' : 'records'} excluded from fetched window.
+          {meta.quality.latestExcludedRecordAt && ` Latest: ${meta.quality.latestExcludedRecordAt} (${meta.quality.latestExcludedFields.join(', ')} missing or invalid).`}
+        </p>}
+        <div className="flex items-center gap-x-5 gap-y-2 flex-wrap">
           {sourceOptions.length > 1 && (
             <label className="flex items-center gap-2">
               <span className="text-[11px] font-medium text-muted-foreground/70">Source</span>
               <select
                 value={selectedBarId ?? meta?.barId ?? ''}
                 onChange={(e) => setSelectedBarId(e.target.value || null)}
-                className="max-w-[240px] cursor-pointer rounded-md border border-border bg-background px-2 py-1 text-[12px] leading-[18px] text-foreground"
+                className="oa-field-control max-w-[240px] cursor-pointer rounded-md border border-input bg-background px-2 py-1 text-[12px] leading-[18px] text-foreground outline-none transition-[border-color,box-shadow] duration-[var(--motion-fast)] [transition-timing-function:var(--motion-ease-out)] motion-reduce:transition-none"
                 title="Which provider's K-line to show — sources are never merged; you pick"
               >
                 {sourceOptions.map((c) => (
@@ -368,7 +395,7 @@ export function KlinePanel({ selection, source, onSnapshot }: Props) {
         </div>
       </div>
 
-      <div className="relative min-h-0 flex-1 rounded-lg border border-border bg-card">
+      <div className="oa-data-surface relative min-h-0 flex-1 overflow-hidden rounded-lg border">
         <div ref={containerRef} className="absolute inset-0" />
         {!selection && (
           <div className="absolute inset-0 flex items-center justify-center text-[13px] leading-5 text-muted-foreground">
@@ -398,6 +425,7 @@ function readKlineChartColors() {
     text: readSemanticColor('chart-axis'),
     grid: readSemanticColor('chart-grid'),
     primaryMuted: readSemanticColor('primary-muted'),
+    labelBackground: readSemanticColor('popover'),
     positive: readSemanticColor('chart-positive'),
     negative: readSemanticColor('chart-negative'),
     positiveMuted: readSemanticColor('chart-positive-muted'),

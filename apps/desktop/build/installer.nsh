@@ -8,7 +8,7 @@
     Pop $0
     Sleep 1000
 
-    ; Releases before 0.89 were unpacked (asar=false) and can contain paths
+    ; Legacy non-ASAR releases and external runtime payloads can contain paths
     ; beyond the legacy MAX_PATH limit. Their NSIS uninstaller repeatedly
     ; fails while atomically renaming that tree. cmd's extended-length path
     ; removes the app directory without touching Electron/OpenAlice user data,

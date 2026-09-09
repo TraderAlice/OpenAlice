@@ -85,6 +85,21 @@ export interface AgentProviderVendorPolicy {
   readonly legacyRequestedWireFallbacks?: Readonly<Partial<Record<WireShape, WireShape>>>;
 }
 
+/** Alice-side transport that projects a runtime's live protocol onto the Web surface. */
+export type WebSessionWire = 'pi-rpc' | 'acp' | 'claude-stream-json' | 'codex-app-server';
+
+export interface WebSurfaceCapability {
+  readonly wire: WebSessionWire;
+  /**
+   * The runtime asks before running tools and the transport routes those
+   * prompts to the browser. Runtimes without a per-tool prompt in their
+   * structured mode launch with their own approve-all flag instead.
+   */
+  readonly permissionPrompts: boolean;
+  /** A Session with no native id yet may still open in the Web surface. */
+  readonly freshSession: boolean;
+}
+
 export interface AgentProviderCapabilities {
   /**
    * Whether the runtime can start from its own native/global login, or needs a
@@ -299,6 +314,14 @@ export interface CliAdapter {
      */
     readonly headless?: boolean;
     /**
+     * The adapter can serve the browser Web conversation surface through a
+     * long-lived structured process (`composeWebCommand`). `wire` selects the
+     * Alice transport that speaks the runtime's protocol; the UI reads this to
+     * decide whether a Session may open in the Web surface. Omit for runtimes
+     * whose only interactive mode is the TUI.
+     */
+    readonly web?: WebSurfaceCapability;
+    /**
      * Native AI-provider projection contract. Shared credential/model logic
      * consumes this declaration instead of branching on adapter ids. Omit for
      * utility adapters that cannot accept a Workspace AI binding.
@@ -338,10 +361,11 @@ export interface CliAdapter {
   /**
    * Optional long-lived structured interactive surface. Unlike headless mode,
    * this process remains alive and accepts multiple prompts over stdin/stdout.
-   * WebPi is the first consumer: it opens the SAME native Pi session through
-   * Pi's documented RPC mode while the ordinary terminal keeps using
-   * `composeCommand`. Keeping this opt-in prevents any other runtime's launch
-   * path from changing merely because WebPi exists.
+   * It opens the SAME native session the ordinary terminal would resume, so
+   * switching surfaces never forks a conversation. `ctx.resume` is `undefined`
+   * when the Session has no native id yet; runtimes that create sessions
+   * in-band (ACP `session/new`, Codex `thread/start`) accept that, runtimes
+   * that need an id at launch must throw. Present iff `capabilities.web`.
    */
   composeWebCommand?(base: readonly string[], ctx: SpawnContext): readonly string[];
 

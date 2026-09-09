@@ -10,6 +10,8 @@
  * Implements INewsProvider so globRss/grepRss/readRss tools work.
  */
 
+import { createReadStream } from 'node:fs'
+import { createInterface } from 'node:readline'
 import { appendFile, readFile, mkdir } from 'node:fs/promises'
 import { createHash } from 'node:crypto'
 import { dirname } from 'node:path'
@@ -252,6 +254,28 @@ export class NewsCollectorStore implements INewsProvider {
     }
 
     return filtered.map(recordToNewsItem)
+  }
+
+  /** Stable IDs address the durable archive, not just the recent memory index. */
+  async getNewsById(id: number): Promise<NewsItem | null> {
+    const cached = this.buffer.find((record) => record.seq === id)
+    if (cached) return recordToNewsItem(cached)
+    const input = createReadStream(this.logPath, { encoding: 'utf8' })
+    const lines = createInterface({ input, crlfDelay: Infinity })
+    try {
+      for await (const line of lines) {
+        let record: NewsRecord
+        try { record = JSON.parse(line) } catch { continue }
+        if (record?.seq === id) return recordToNewsItem(record)
+      }
+      return null
+    } catch (error) {
+      if (isENOENT(error)) return null
+      throw error
+    } finally {
+      lines.close()
+      input.destroy()
+    }
   }
 
   // ==================== Lifecycle ====================

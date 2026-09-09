@@ -533,7 +533,7 @@ export function TrackedGraphView({
                       onPointerLeave={() => setHoveredNodeId((value) => value === node.id ? null : value)}
                       onPointerDown={(event) => event.stopPropagation()}
                       onClick={() => activateNode(node)}
-                      className="h-full w-full rounded-full bg-transparent outline-none focus-visible:ring-2 focus-visible:ring-primary/70"
+                      className="h-full w-full rounded-full bg-transparent outline-none focus-visible:[box-shadow:var(--oa-focus-shadow)]"
                     >
                       <span className="sr-only">{node.label}</span>
                     </button>

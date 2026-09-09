@@ -59,6 +59,13 @@ function setup(currentPlan = plan()) {
 }
 
 describe('workspace_template_upgrade', () => {
+  it('applies Alice Harness configuration changes at the same source version', async () => {
+    const { tool, templateUpgrades } = setup(plan({ template: 'alice-harness', fromVersion: '1.0.0', toVersion: '1.0.0' }))
+    const result = await run(tool, { apply: true, mode: 'summary' })
+    expect(result.action).toBe('applied')
+    expect(templateUpgrades.apply).toHaveBeenCalledOnce()
+  })
+
   it('previews by default without dumping file bodies', async () => {
     const { tool, templateUpgrades } = setup()
     const result = await run(tool, { apply: false, mode: 'summary' })
@@ -70,7 +77,7 @@ describe('workspace_template_upgrade', () => {
         status: 'ready',
         fromVersion: '1.5.0',
         toVersion: '1.6.1',
-        nextCommand: 'alice-workspace template upgrade --apply',
+        nextCommand: 'alice template upgrade --apply',
       },
     })
     expect(result.preview.changes[0]).not.toHaveProperty('currentPreview')

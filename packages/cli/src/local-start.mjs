@@ -27,7 +27,7 @@ import {
 } from './runtime-deps.mjs'
 import { readRuntimeStatus as readGuardianRuntimeStatus } from './server-control.mjs'
 import {
-  buildBunRuntimeEnvironment,
+  prepareBunRuntimeEnvironment,
   buildExternalAgentRuntimeEnvironment,
   bunGuardianProcessSpec,
   isBunStandalone,
@@ -169,10 +169,11 @@ export async function startLocal(options, dependencies = {}) {
   })
   runtimeEnv.OPENALICE_RUNTIME_PROVIDER = runtimeProvider.kind
   if (standalone) {
-    runtimeEnv = buildBunRuntimeEnvironment(
+    runtimeEnv = await prepareBunRuntimeEnvironment(
       runtimeEnv,
       appDir,
       dependencies.runtimeExecutable ?? process.execPath,
+      { inspectDependencies: dependencies.inspectDependencies },
     )
   }
   delete runtimeEnv.OPENALICE_RUNTIME_CONTENT_IDENTITY

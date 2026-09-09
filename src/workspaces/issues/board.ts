@@ -133,7 +133,7 @@ export function annotateNameCollisions(workspaces: IssuesSnapshotWorkspace[]): s
 }
 
 // ==================== Flattened board rows (CLI / agent surface) ====================
-// The `alice-workspace issue list` (issue_list) agent surface wants the board as
+// The `alice issue list` (issue_list) agent surface wants the board as
 // ONE flat list of title rows tagged with their owning workspace — not the
 // per-workspace tree GET /api/issues returns. Each row keeps the snapshot's
 // display fields, replaces `when` with a plain `scheduled` boolean, and carries
@@ -351,6 +351,7 @@ export interface IssueRunRecord {
   taskId: string
   resumeId: string
   parentTaskId?: string
+  retryOfTaskId?: string
   wsId: string
   issueId?: string
   agent: string
@@ -386,6 +387,7 @@ export function issueRunRecord(task: HeadlessTaskRecord, resumable: boolean): Is
     taskId: task.taskId,
     resumeId: task.resumeId,
     ...(task.parentTaskId ? { parentTaskId: task.parentTaskId } : {}),
+    ...(task.trigger?.retryOfTaskId ? { retryOfTaskId: task.trigger.retryOfTaskId } : {}),
     wsId: task.wsId,
     ...(task.trigger?.kind === 'issue' ? { issueId: task.trigger.issueId } : {}),
     agent: task.agent,

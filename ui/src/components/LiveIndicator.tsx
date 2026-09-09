@@ -7,6 +7,7 @@ interface LiveIndicatorProps {
   lastUpdated: Date | null
   /** Hide the breathing dot — only show "updated Xs ago" microcopy. */
   hideDot?: boolean
+  label?: string
   className?: string
 }
 
@@ -19,7 +20,7 @@ interface LiveIndicatorProps {
  * without taking real estate. Drop it next to a PageHeader title or any
  * place a user might wonder "is this live?".
  */
-export function LiveIndicator({ lastUpdated, hideDot, className }: LiveIndicatorProps) {
+export function LiveIndicator({ lastUpdated, hideDot, className, label = 'updated' }: LiveIndicatorProps) {
   // Tick once every 5s so "Xs ago" doesn't go stale visually.
   const [, force] = useState(0)
   useEffect(() => {
@@ -34,7 +35,7 @@ export function LiveIndicator({ lastUpdated, hideDot, className }: LiveIndicator
       {!hideDot && (
         <span className="relative inline-block w-1.5 h-1.5 rounded-full bg-success live-pulse" aria-hidden />
       )}
-      <span className="tabular-nums">updated {ago}</span>
+      <span className="tabular-nums">{label} {ago}</span>
     </span>
   )
 }

@@ -12,6 +12,8 @@ const POLL_MS = 5000;
 
 interface FilesPanelProps {
   readonly wsId: string;
+  readonly embedded?: boolean;
+  readonly onOpenFile?: (path: string) => void;
   readonly sessionId: string | null;
   readonly source?: WorkspaceSource;
 }
@@ -60,6 +62,7 @@ export function FilesPanel(props: FilesPanelProps): ReactElement {
     if (entry.kind === 'file') {
       // Open the file in the dedicated viewer tab (VS Code-style).
       const rel = path ? `${path}/${entry.name}` : entry.name;
+      if (props.onOpenFile) { props.onOpenFile(rel); return; }
       openOrFocus({
         kind: 'file-viewer',
         params: {
@@ -75,9 +78,9 @@ export function FilesPanel(props: FilesPanelProps): ReactElement {
   const breadcrumb = path.split('/').filter(Boolean);
 
   return (
-    <section className="panel files-panel">
+    <section className={`panel files-panel${props.embedded ? ' is-embedded' : ''}`}>
       <header className="panel-header">
-        <span className="panel-title">files</span>
+        {!props.embedded && <span className="panel-title">files</span>}
         <nav className="files-breadcrumb">
           <button
             type="button"

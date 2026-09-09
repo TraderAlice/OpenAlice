@@ -11,8 +11,8 @@ the desks currently in service; departed desks have already moved elsewhere.
 Start with product indexes, not an unbounded filesystem crawl:
 
 ```bash
-alice-workspace peer list
-alice-workspace issue list --mode detailed
+alice peer list
+alice issue list --mode detailed
 ```
 
 `peer list` already includes recent attributable Session titles. Use those to
@@ -25,13 +25,13 @@ crawl.
 For one desk or coworker:
 
 ```bash
-alice-workspace peer path --id <workspaceId>
-alice-workspace peer sessions --id <workspaceId>
-alice-workspace conversation ask --resume-id <resumeId> --prompt "..." --await
+alice peer path --id <workspaceId>
+alice peer sessions --id <workspaceId>
+alice conversation ask --resume-id <resumeId> --prompt "..." --await
 # Recruit a fresh coworker for new work:
-alice-workspace conversation ask --ws-id <workspaceId> --prompt "..."
+alice conversation ask --ws-id <workspaceId> --prompt "..."
 # Explicit historical reconstruction when no attributable Session exists:
-alice-workspace conversation ask --ws-id <workspaceId> --prompt "..." --reconstruct --await
+alice conversation ask --ws-id <workspaceId> --prompt "..." --reconstruct --await
 ```
 
 This distinction is not cosmetic. `--resume-id` continues the exact coworker
@@ -41,7 +41,7 @@ missing historical intent; either way it must not impersonate an absent owner.
 Preserve and report `resolution.mode` (`exact` versus `reconstructed`) when the
 difference affects the answer.
 
-Use `alice-workspace <group> <verb> --help` whenever a flag is uncertain. The
+Use `alice <group> <verb> --help` whenever a flag is uncertain. The
 live manifest is authoritative even when an older Workspace carries stale
 instructions.
 
@@ -65,7 +65,7 @@ instructions.
 Template reconciliation is preview-first:
 
 ```bash
-alice-workspace template upgrade --id <workspaceId>
+alice template upgrade --id <workspaceId>
 ```
 
 Only add `--apply` after the user has asked to perform the reviewed mutation.

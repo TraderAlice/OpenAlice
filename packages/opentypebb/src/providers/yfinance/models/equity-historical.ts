@@ -10,7 +10,7 @@ import { getHistoricalData, emptyHistoricalError } from '../utils/helpers.js'
 import { INTERVALS_DICT } from '../utils/references.js'
 
 export const YFinanceEquityHistoricalQueryParamsSchema = EquityHistoricalQueryParamsSchema.extend({
-  interval: z.enum(['1m', '2m', '5m', '15m', '30m', '60m', '90m', '1h', '1d', '5d', '1W', '1M', '1Q']).default('1d').describe('Data granularity.'),
+  interval: z.enum(['1m', '2m', '5m', '15m', '30m', '60m', '90m', '1h', '1d', '5d', '1w', '1W', '1M', '1Q']).default('1d').describe('Data granularity.'),
   extended_hours: z.boolean().default(false).describe('Include Pre and Post market data.'),
   include_actions: z.boolean().default(true).describe('Include dividends and stock splits in results.'),
   adjustment: z.enum(['splits_only', 'splits_and_dividends']).default('splits_only').describe('The adjustment factor to apply.'),
@@ -48,9 +48,11 @@ export class YFinanceEquityHistoricalFetcher extends Fetcher {
     const results = await Promise.allSettled(
       symbols.map(async (sym) => {
         const data = await getHistoricalData(sym, {
+          preserveIncomplete: true,
           startDate: query.start_date,
           endDate: query.end_date,
           interval,
+          extendedHours: query.extended_hours,
         })
         return data.map(d => ({ ...d, symbol: sym }))
       })

@@ -642,7 +642,7 @@ describe('Connector demo routes', () => {
     expect(slackSection.className).toContain('md:scroll-mt-[9.5rem]')
     expect(slackSection.hasAttribute('tabindex')).toBe(false)
     expect(slackHeading.getAttribute('tabindex')).toBe('-1')
-    expect(slackHeading.className).toContain('focus:ring-2')
+    expect(slackHeading.className).toContain('focus-visible:[box-shadow:var(--oa-focus-shadow)]')
     navigation.style.position = 'sticky'
     discordSection.style.scrollMarginTop = '152px'
     scrollArea.getBoundingClientRect = () => ({ top: 101 }) as DOMRect

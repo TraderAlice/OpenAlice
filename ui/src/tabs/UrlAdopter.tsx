@@ -28,15 +28,15 @@ export function UrlAdopter() {
   return (
     <>
       <Routes>
-        {/* Root → Ask Alice. An AI product should open on how-to-use-it (the
-            chat front door), not an information summary (Inbox is task sync, à
-            la Linear — but Linear's comms live in Slack; ours live here). */}
-        <Route path="/" element={<Navigate to="/chat" replace />} />
+        {/* Adopt the launch surface directly so a previously focused tab cannot
+            race a redirect and replace the default entry during startup. */}
+        <Route path="/" element={<AdoptStatic spec={{ kind: 'quick-start', params: {} }} />} />
+        <Route path="/quick-start" element={<AdoptStatic spec={{ kind: 'quick-start', params: {} }} />} />
         <Route path="/onboarding" element={<AdoptStatic spec={{ kind: 'onboarding', params: {} }} />} />
         <Route path="/design/:project" element={<AdoptDesignProject />} />
 
         {/* Activities */}
-        {/* /chat → the "Ask Alice" quick-chat landing (composer). Legacy
+        {/* /chat → the Chat Harness landing (composer). Legacy
             /chat/:channelId (the retired traditional-chat channels) still
             redirects to Inbox so stale bookmarks land on a live surface. */}
         <Route path="/chat" element={<AdoptStatic spec={{ kind: 'chat-landing', params: {} }} />} />
@@ -44,22 +44,25 @@ export function UrlAdopter() {
         <Route path="/chat/manager/s/:sessionId" element={<AdoptWorkspaceManager />} />
         <Route path="/chat/workspaces/:wsId/view/:path" element={<AdoptChatFileViewer />} />
         <Route path="/chat/workspaces/:wsId" element={<AdoptChatWorkspace />} />
+        <Route path="/chat/workspaces/:wsId/details" element={<AdoptWorkspaceDetails source="chat" />} />
         <Route path="/chat/workspaces/:wsId/s/:sessionId" element={<AdoptChatWorkspace />} />
         <Route path="/chat/:channelId" element={<Navigate to="/inbox" replace />} />
         <Route path="/auto-quant" element={<AdoptStatic spec={{ kind: 'auto-quant-landing', params: {} }} />} />
         <Route path="/auto-quant/workspaces/:wsId/studio" element={<AdoptHarnessSurface source="auto-quant" />} />
         <Route path="/auto-quant/workspaces/:wsId/view/:path" element={<AdoptAutoQuantFileViewer />} />
         <Route path="/auto-quant/workspaces/:wsId" element={<AdoptAutoQuantWorkspace />} />
+        <Route path="/auto-quant/workspaces/:wsId/details" element={<AdoptWorkspaceDetails source="auto-quant" />} />
         <Route path="/auto-quant/workspaces/:wsId/s/:sessionId" element={<AdoptAutoQuantWorkspace />} />
         <Route path="/prediction" element={<AdoptStatic spec={{ kind: 'auto-prediction-landing', params: {} }} />} />
         <Route path="/prediction/workspaces/:wsId/studio" element={<AdoptHarnessSurface source="prediction" />} />
         <Route path="/prediction/workspaces/:wsId/view/:path" element={<AdoptAutoPredictionFileViewer />} />
         <Route path="/prediction/workspaces/:wsId" element={<AdoptAutoPredictionWorkspace />} />
+        <Route path="/prediction/workspaces/:wsId/details" element={<AdoptWorkspaceDetails source="prediction" />} />
         <Route path="/prediction/workspaces/:wsId/s/:sessionId" element={<AdoptAutoPredictionWorkspace />} />
         <Route path="/portfolio" element={<AdoptTraderStatic spec={{ kind: 'portfolio', params: {} }} />} />
         <Route path="/issues" element={<AdoptStatic spec={{ kind: 'issue', params: {} }} />} />
         <Route path="/issues/:wsId/:id" element={<AdoptIssueDetail />} />
-        <Route path="/automation" element={<Navigate to="/automation/runs" replace />} />
+        <Route path="/automation" element={<Navigate to="/settings/developer/runs" replace />} />
         <Route path="/automation/runtime" element={<Navigate to="/office" replace />} />
         <Route path="/automation/:section" element={<AdoptAutomation />} />
         <Route
@@ -73,7 +76,7 @@ export function UrlAdopter() {
         <Route path="/news" element={<Navigate to="/market/news" replace />} />
         <Route path="/market" element={<AdoptTraderStatic spec={{ kind: 'market-list', params: {} }} />} />
         <Route path="/market/rotation" element={<AdoptTraderStatic spec={{ kind: 'market-rotation', params: {} }} />} />
-        <Route path="/market/news" element={<AdoptTraderStatic spec={{ kind: 'news', params: {} }} />} />
+        <Route path="/market/news" element={<AdoptNewsSelection />} />
         {/* Static `boards` segment outranks /market/:assetClass/:symbol in
             react-router's specificity scoring, so order here doesn't matter —
             but keep it above the dynamic route for readability. */}
@@ -83,6 +86,7 @@ export function UrlAdopter() {
         <Route path="/connectors" element={<AdoptStatic spec={{ kind: 'connectors', params: {} }} />} />
 
         {/* Settings — one entry per category */}
+        <Route path="/settings/workspace-injection" element={<AdoptStatic spec={{ kind: 'settings', params: { category: 'workspace-injection' } }} />} />
         <Route path="/settings" element={<AdoptStatic spec={{ kind: 'settings', params: { category: 'general' } }} />} />
         <Route path="/settings/appearance" element={<AdoptStatic spec={{ kind: 'settings', params: { category: 'appearance' } }} />} />
         <Route path="/settings/activity-bar" element={<AdoptStatic spec={{ kind: 'settings', params: { category: 'activity-bar' } }} />} />
@@ -119,12 +123,9 @@ export function UrlAdopter() {
         <Route path="/tracked/issues/:wsId/:id" element={<AdoptTrackedIssueDetail />} />
 
         {/* Workspaces */}
-        <Route path="/workspaces" element={<AdoptStatic spec={{ kind: 'workspace-list', params: {} }} />} />
-        {/* Template catalog routes must come before /workspaces/:wsId so the
-            static `templates` segment wins the match even if a workspace id is
-            a human-readable slug. */}
-        <Route path="/workspaces/templates" element={<AdoptStatic spec={{ kind: 'template-catalog', params: {} }} />} />
-        <Route path="/workspaces/templates/:name" element={<AdoptTemplateDetail />} />
+        {/* Retired global inventory; old bookmarks return to the workbench. */}
+        <Route path="/workspaces" element={<Navigate to="/chat" replace />} />
+        <Route path="/workspaces/templates/*" element={<Navigate to="/chat" replace />} />
         <Route path="/workspaces/:wsId/view/:path" element={<AdoptFileViewer />} />
         <Route path="/workspaces/:wsId" element={<AdoptWorkspace />} />
         <Route path="/workspaces/:wsId/s/:sessionId" element={<AdoptWorkspace />} />
@@ -247,6 +248,13 @@ function AdoptIssueDetail() {
   return <AdoptStatic spec={{ kind: 'issue-detail', params: { wsId, id } }} />
 }
 
+function AdoptNewsSelection() {
+  const [search] = useSearchParams()
+  const category = search.get('category') || undefined
+  const view = search.get('view') || undefined
+  return <AdoptTraderStatic spec={{ kind: 'news', params: { ...(category ? { category } : {}), ...(view ? { view } : {}) } }} />
+}
+
 function AdoptTracked() {
   const [search] = useSearchParams()
   const entity = search.get('entity')?.trim() || undefined
@@ -295,15 +303,14 @@ function AdoptAutomation() {
   const { section } = useParams<{ section: string }>()
   if (section === 'runtime') return <Navigate to="/office" replace />
   const valid: ReadonlyArray<string> = ['runs', 'api']
-  if (!section || !valid.includes(section)) return <Navigate to="/automation/runs" replace />
-  return (
-    <AdoptStatic
-      spec={{
-        kind: 'automation',
-        params: { section: section as Extract<ViewSpec, { kind: 'automation' }>['params']['section'] },
-      }}
-    />
-  )
+  const tab = section && valid.includes(section) ? section : 'runs'
+  return <Navigate to={`/settings/developer/${tab}`} replace />
+}
+
+function AdoptWorkspaceDetails({ source }: { source: 'chat' | 'auto-quant' | 'prediction' }) {
+  const { wsId } = useParams<{ wsId: string }>()
+  if (!wsId) return <Navigate to={`/${source}`} replace />
+  return <AdoptStatic spec={{ kind: 'workspace-details', params: { wsId, source } }} />
 }
 
 function AdoptWorkspace() {
@@ -351,12 +358,6 @@ function AdoptWorkspaceManager() {
   const { sessionId } = useParams<{ sessionId: string }>()
   if (!sessionId) return <Navigate to="/chat/manager" replace />
   return <AdoptStatic spec={{ kind: 'workspace-manager', params: { sessionId } }} />
-}
-
-function AdoptTemplateDetail() {
-  const { name } = useParams<{ name: string }>()
-  if (!name) return <Navigate to="/workspaces/templates" replace />
-  return <AdoptStatic spec={{ kind: 'template-detail', params: { name } }} />
 }
 
 function AdoptFileViewer() {
@@ -475,6 +476,7 @@ function RedirectUtaDetail() {
  */
 function specToSection(spec: ViewSpec): ActivitySection {
   switch (spec.kind) {
+    case 'quick-start':        return 'quick-start'
     case 'inbox':              return 'inbox'
     case 'tracked':            return 'tracked'
     case 'tracked-issue-detail': return 'tracked'
@@ -483,12 +485,13 @@ function specToSection(spec: ViewSpec): ActivitySection {
     case 'auto-prediction-landing': return 'prediction'
     case 'harness-surface':    return spec.params.source
     case 'workspace-manager':  return 'chat'
+    case 'workspace-details': return spec.params.source
     case 'workspace':
       return spec.params.source === 'chat'
         ? 'chat'
         : spec.params.source === 'auto-quant'
           ? 'auto-quant'
-          : spec.params.source === 'prediction' ? 'prediction' : 'workspaces'
+          : spec.params.source === 'prediction' ? 'prediction' : 'chat'
     case 'file-viewer':
       return spec.params.source === 'chat'
         ? 'chat'
@@ -496,17 +499,17 @@ function specToSection(spec: ViewSpec): ActivitySection {
           ? 'auto-quant'
           : spec.params.source === 'prediction'
             ? 'prediction'
-            : spec.params.source === 'tracked' ? 'tracked' : 'workspaces'
+            : spec.params.source === 'tracked' ? 'tracked' : 'chat'
     case 'workspace-list':
     case 'template-catalog':
-    case 'template-detail':    return 'workspaces'
+    case 'template-detail':    return 'chat'
     case 'connectors':         return 'connectors'
     case 'trading-as-git':
     case 'portfolio':
     case 'uta-detail':         return 'portfolio'
     case 'issue':
     case 'issue-detail':       return 'issue'
-    case 'automation':         return 'automation'
+    case 'automation':         return 'settings'
     case 'office':             return 'office'
     case 'news':
     case 'market-list':

@@ -18,6 +18,7 @@ export function packCliNpmPackages({
   inputDir,
   outputDir,
   npm = process.platform === 'win32' ? 'npm.cmd' : 'npm',
+  spawnNpm = spawnSync,
 }) {
   const inputRoot = resolve(inputDir)
   const outputRoot = resolve(outputDir)
@@ -45,7 +46,7 @@ export function packCliNpmPackages({
   mkdirSync(outputRoot, { recursive: true })
   const packages = []
   for (const name of [...platformNames, meta.name]) {
-    const packed = pack(join(inputRoot, name), outputRoot, npm)
+    const packed = pack(join(inputRoot, name), outputRoot, npm, spawnNpm)
     packages.push({
       name,
       version: meta.version,
@@ -64,20 +65,25 @@ export function packCliNpmPackages({
   return manifest
 }
 
-function pack(packageRoot, outputRoot, npm) {
-  const result = spawnSync(npm, [
+function pack(packageRoot, outputRoot, npm, spawnNpm) {
+  const result = spawnNpm(npm, [
     'pack', packageRoot, '--json', '--pack-destination', outputRoot,
   ], {
     encoding: 'utf8',
     stdio: 'pipe',
     shell: process.platform === 'win32',
+    // npm --json includes the complete file inventory. Native runtime packages
+    // legitimately exceed Node's 1 MiB spawnSync default before compression.
+    maxBuffer: 64 * 1024 * 1024,
   })
   if (result.error) throw result.error
   if (result.status !== 0) {
     throw new Error(`npm pack failed for ${packageRoot}:\n${result.stdout}\n${result.stderr}`)
   }
-  const report = JSON.parse(result.stdout)
-  if (!Array.isArray(report) || report.length !== 1) {
+  const parsed = JSON.parse(result.stdout)
+  // npm 12 reports by package name; older npm reports a single-entry array.
+  const report = Array.isArray(parsed) ? parsed : Object.values(parsed ?? {})
+  if (report.length !== 1 || !report[0] || typeof report[0] !== 'object') {
     throw new Error(`npm pack returned an invalid report for ${packageRoot}`)
   }
   const packed = report[0]

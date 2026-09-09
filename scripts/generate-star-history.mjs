@@ -135,11 +135,17 @@ export function aggregateStarHistory(timestamps) {
   return points
 }
 
-function selectDateTicks(points) {
+function selectDateTicks(points, plotWidth) {
   const ticks = [points[0]]
+  const minGap = 80
+  let previousX = 0
   for (let index = 1; index < points.length - 1; index += 1) {
     const date = points[index].date
-    if (date.getUTCDate() === 1) ticks.push(points[index])
+    const x = index / (points.length - 1) * plotWidth
+    if (date.getUTCDate() === 1 && x - previousX >= minGap && plotWidth - x >= minGap) {
+      ticks.push(points[index])
+      previousX = x
+    }
   }
   if (points.length > 1) ticks.push(points.at(-1))
   return ticks
@@ -180,7 +186,7 @@ export function renderStarHistorySvg({
   const areaPath = `${linePath} L ${xForIndex(points.length - 1).toFixed(2)} ${plot.bottom} L ${plot.left} ${plot.bottom} Z`
   const intervalCount = Math.round(axis.maximum / axis.step)
   const yTicks = Array.from({ length: intervalCount + 1 }, (_, index) => index * axis.step)
-  const dateTicks = selectDateTicks(points)
+  const dateTicks = selectDateTicks(points, plotWidth)
   const pointIndexByTime = new Map(points.map((point, index) => [point.date.getTime(), index]))
   const title = `${repository} star history`
   const snapshotDate = points.at(-1).date

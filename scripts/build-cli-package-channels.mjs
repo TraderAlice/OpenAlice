@@ -30,8 +30,12 @@ export function buildCliPackageChannels({
   releasedAt,
   requireAll = false,
   npmOnly = false,
+  systemOnly = false,
   assetBaseUrl,
 }) {
+  if (systemOnly && (npmOnly || requireAll)) {
+    throw new Error('system-only cannot be combined with npm-only or require-all')
+  }
   if (!/^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/.test(version)) {
     throw new Error(`invalid OpenAlice version: ${version}`)
   }
@@ -49,6 +53,7 @@ export function buildCliPackageChannels({
 
   const targets = []
   for (const [platform, arch] of CLI_RELEASE_TARGETS) {
+    if (systemOnly && platform === 'win32') continue
     const archivePath = join(inputRoot, `openalice-cli-${version}-${platform}-${arch}.tar.gz`)
     if (!existsSync(archivePath)) continue
     const validated = validateCliReleaseArchive({ archivePath, version, platform, arch })
@@ -58,11 +63,14 @@ export function buildCliPackageChannels({
   if (requireAll && targets.length !== CLI_RELEASE_TARGETS.length) {
     throw new Error(`all ${CLI_RELEASE_TARGETS.length} native CLI targets are required; found ${targets.length}`)
   }
-  if (!npmOnly && targets.length !== CLI_RELEASE_TARGETS.length) {
-    throw new Error('Homebrew and AUR generation require all four native CLI targets')
+  if (systemOnly && targets.length !== CLI_RELEASE_TARGETS.filter(([platform]) => platform !== 'win32').length) {
+    throw new Error('System channel generation requires all POSIX CLI targets')
+  }
+  if (!npmOnly && !systemOnly && targets.length !== CLI_RELEASE_TARGETS.length) {
+    throw new Error('Full channel generation requires all native CLI targets')
   }
 
-  const npm = buildNpmPackages({ outputRoot, version, targets })
+  const npm = systemOnly ? null : buildNpmPackages({ outputRoot, version, targets })
   let homebrew = null
   let aur = null
   if (!npmOnly) {
@@ -146,40 +154,33 @@ function buildNpmPackages({ outputRoot, version, targets }) {
     license: 'AGPL-3.0-only',
     repository: { type: 'git', url: `git+https://github.com/${repository}.git` },
     homepage: 'https://openalice.ai',
-    bin: { openalice: './bin/openalice' },
-    scripts: { postinstall: 'sh ./postinstall.sh' },
+    // A PE executable needs its suffix for npm's Windows command shim. POSIX
+    // executes the same native bytes under this private filename as well.
+    bin: { openalice: './bin/openalice.exe' },
+    scripts: { postinstall: 'node ./postinstall.mjs' },
     os: [...new Set(targets.map(({ platform }) => platform))],
     cpu: [...new Set(targets.map(({ arch }) => arch))],
-    files: ['bin', 'postinstall.sh', 'postinstall.mjs', 'LICENSE', 'README.md'],
+    files: ['bin', 'postinstall.mjs', 'LICENSE', 'README.md'],
     optionalDependencies,
     publishConfig: { access: 'public' },
   })
   copyFileSync(join(repositoryRoot, 'LICENSE'), join(metaRoot, 'LICENSE'))
   writeFileSync(join(metaRoot, 'README.md'), npmReadme(version))
-  writeFileSync(join(metaRoot, 'postinstall.sh'), npmPostinstallLauncherSource())
   writeFileSync(join(metaRoot, 'postinstall.mjs'), npmPostinstallSource())
-  const placeholder = join(metaRoot, 'bin', 'openalice')
-  writeFileSync(placeholder, '#!/bin/sh\necho "OpenAlice native package installation did not finish." >&2\nexit 1\n')
+  const placeholder = join(metaRoot, 'bin', 'openalice.exe')
+  // npm constructs Windows shims before postinstall. A shell/Node shebang here
+  // would permanently make that shim require an interpreter after replacement.
+  writeFileSync(placeholder, 'OpenAlice native package installation did not finish.\n')
   chmodSync(placeholder, 0o755)
   return { metaPackage: npmMetaName, platformPackages }
 }
 
-function npmPostinstallLauncherSource() {
-  return `#!/bin/sh
-set -eu
-
-case "\${npm_config_user_agent-}" in
-  bun/*) exec bun ./postinstall.mjs ;;
-  *) exec node ./postinstall.mjs ;;
-esac
-`
-}
-
-function buildHomebrewFormula({ outputRoot, version, targets, assetBaseUrl }) {
+export function buildHomebrewFormula({ outputRoot, version, targets, assetBaseUrl }) {
   const formulaRoot = join(outputRoot, 'homebrew')
   mkdirSync(formulaRoot, { recursive: true })
   const formulaPath = join(formulaRoot, 'openalice.rb')
-  const blocks = targets.map((target) => homebrewTargetBlock(version, target, assetBaseUrl)).join('\n')
+  const blocks = targets.filter((target) => target.platform !== 'win32')
+    .map((target) => homebrewTargetBlock(version, target, assetBaseUrl)).join('\n')
   writeFileSync(formulaPath, `# typed: false
 # frozen_string_literal: true
 
@@ -192,6 +193,8 @@ class Openalice < Formula
   homepage "https://openalice.ai"
   version "${version}"
   license "AGPL-3.0-only"
+  depends_on "git"
+  depends_on "bash"
 
 ${blocks}
 end
@@ -240,7 +243,7 @@ function homebrewTargetBlock(version, target, assetBaseUrl) {
 `
 }
 
-function buildAurPackage({ outputRoot, version, releasedAt, targets, assetBaseUrl }) {
+export function buildAurPackage({ outputRoot, version, releasedAt, targets, assetBaseUrl }) {
   const aurRoot = join(outputRoot, 'aur')
   mkdirSync(aurRoot, { recursive: true })
   const linuxArm = requireTarget(targets, 'linux', 'arm64')
@@ -257,7 +260,7 @@ pkgdesc='Local trading workspace for native coding-agent CLIs'
 arch=('aarch64' 'x86_64')
 url='https://github.com/${repository}'
 license=('AGPL-3.0-only')
-depends=('glibc')
+depends=('glibc' 'git' 'bash')
 provides=('openalice')
 conflicts=('openalice')
 options=('!debug' '!strip')
@@ -322,6 +325,8 @@ function aurSrcinfo({ version, pkgver, linuxArm, linuxX64, assetBaseUrl }) {
 \tarch = x86_64
 \tlicense = AGPL-3.0-only
 \tdepends = glibc
+\tdepends = git
+\tdepends = bash
 \tprovides = openalice
 \tconflicts = openalice
 \toptions = !debug
@@ -348,18 +353,18 @@ const require = createRequire(import.meta.url)
 const packageRoot = path.dirname(fileURLToPath(import.meta.url))
 const platform = os.platform()
 const arch = os.arch()
-if (!['darwin', 'linux'].includes(platform) || !['arm64', 'x64'].includes(arch)) {
-  throw new Error('OpenAlice npm packages currently support macOS and Linux on arm64 or x64.')
+if (!['darwin', 'linux', 'win32'].includes(platform) || !['arm64', 'x64'].includes(arch)) {
+  throw new Error('OpenAlice npm packages support macOS, Linux and Windows on arm64 or x64.')
 }
-const packageName = 'openalice-' + platform + '-' + arch
+const packageName = 'openalice-' + (platform === 'win32' ? 'windows' : platform) + '-' + arch
 const packageJsonPath = require.resolve(packageName + '/package.json')
 const nativePackageRoot = path.dirname(packageJsonPath)
 const nativePackage = JSON.parse(fs.readFileSync(packageJsonPath, 'utf8'))
 const releaseRoot = path.join(nativePackageRoot, 'release')
-const executable = path.join(packageRoot, 'bin', 'openalice')
+const executable = path.join(packageRoot, 'bin', 'openalice.exe')
 const share = path.join(packageRoot, 'share')
 
-replaceFile(path.join(releaseRoot, 'bin', 'openalice'), executable)
+replaceFile(path.join(releaseRoot, 'bin', platform === 'win32' ? 'openalice.exe' : 'openalice'), executable)
 replaceDirectoryLink(path.join(releaseRoot, 'share'), share)
 fs.copyFileSync(path.join(releaseRoot, 'release.json'), path.join(packageRoot, 'release.json'))
 
@@ -407,7 +412,7 @@ function replaceFile(source, destination) {
 
 function replaceDirectoryLink(source, destination) {
   fs.rmSync(destination, { recursive: true, force: true })
-  fs.symlinkSync(path.relative(path.dirname(destination), source), destination, 'dir')
+  fs.symlinkSync(platform === 'win32' ? source : path.relative(path.dirname(destination), source), destination, platform === 'win32' ? 'junction' : 'dir')
 }
 
 function atomicWrite(destination, content) {
@@ -419,11 +424,11 @@ function atomicWrite(destination, content) {
 }
 
 function npmReadme(version) {
-  return `# OpenAlice CLI\n\nNative OpenAlice ${version} for macOS and Linux.\n\nInstall with npm:\n\n\`\`\`bash\nnpm install -g openalice\n\`\`\`\n\nOr install with Bun's explicit lifecycle-script trust:\n\n\`\`\`bash\nbun add -g --trust openalice\n\`\`\`\n\nThe install step selects the matching accepted platform package. The resulting \`openalice\` command is the native Bun-compiled executable and runs without the package manager or a host Node.js process. Agent Runtimes remain user-owned.\n`
+  return `# OpenAlice CLI\n\nNative OpenAlice ${version} for macOS, Linux and Windows (x64 and ARM64).\n\nInstall with npm:\n\n\`\`\`bash\nnpm install -g --allow-scripts=openalice openalice\n\`\`\`\n\nOr install with Bun's explicit lifecycle-script trust:\n\n\`\`\`bash\nbun add -g --trust openalice\n\`\`\`\n\nThe install step selects the matching accepted platform package. The resulting \`openalice\` command is the native Bun-compiled executable and runs without the package manager or a host Node.js process. Agent Runtimes remain user-owned.\n`
 }
 
 function platformPackageName(platform, arch) {
-  return `openalice-${platform}-${arch}`
+  return `openalice-${platform === 'win32' ? 'windows' : platform}-${arch}`
 }
 
 function releaseAssetUrl(assetBaseUrl, archiveName) {
@@ -473,6 +478,7 @@ function parseArgs(argv) {
     const arg = argv[index]
     if (arg === '--require-all') options.requireAll = true
     else if (arg === '--npm-only') options.npmOnly = true
+    else if (arg === '--system-only') options.systemOnly = true
     else if (['--input-dir', '--output-dir', '--version', '--released-at', '--asset-base-url'].includes(arg)) {
       const value = argv[++index]
       if (!value || value.startsWith('--')) throw new Error(`${arg} requires a value`)
@@ -482,7 +488,7 @@ function parseArgs(argv) {
     }
   }
   if (!options.inputdir || !options.outputdir || !options.version || !options.releasedat) {
-    throw new Error('Usage: build-cli-package-channels.mjs --input-dir <dir> --output-dir <dir> --version <version> --released-at <iso> [--asset-base-url <url>] [--require-all] [--npm-only]')
+    throw new Error('Usage: build-cli-package-channels.mjs --input-dir <dir> --output-dir <dir> --version <version> --released-at <iso> [--asset-base-url <url>] [--require-all | --npm-only | --system-only]')
   }
   return {
     inputDir: options.inputdir,
@@ -491,6 +497,7 @@ function parseArgs(argv) {
     releasedAt: options.releasedat,
     requireAll: options.requireAll,
     npmOnly: options.npmOnly,
+    systemOnly: options.systemOnly,
     assetBaseUrl: options.assetbaseurl,
   }
 }

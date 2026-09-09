@@ -82,7 +82,7 @@ function context(workspaces: readonly Workspace[]): WorkspacesContextValue {
     quickChat: vi.fn(async () => ''),
     pauseSession: vi.fn(async () => undefined),
     resumeSession: vi.fn(async () => undefined),
-    openWebPiSession: vi.fn(async () => undefined),
+    openWebSession: vi.fn(async () => undefined),
     requestDeleteSession: vi.fn(),
     setSessionPresence: vi.fn(async () => undefined),
     setSessionDisplayName: vi.fn(async () => undefined),

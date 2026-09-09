@@ -722,7 +722,7 @@ intentionally parameter-free:
   80-column baseline. Its Create row opens a two-stage AliceProject Foundry:
   Identity and Complete Home remain visible beside the focused Field Inspector
   on wide terminals and stack as a compact route at 80 columns. Validation
-  remains ordered, and only the final `Create & select` action registers the
+  remains ordered, and only the final `Create & start` action registers the
   new complete home. AI vault copy is a separate command:
   `openalice project copy-ai-creds`;
 - `p` opens Setup for data home, browser port, update checks, and resolved
@@ -898,7 +898,12 @@ switches the live Supervisor view and records it as the next bare-start
 default; it does not stop, move, copy, or delete another project. Creating an
 AliceProject collects a validated lowercase key and separate complete home
 inside the TUI, rejects equal or nested registered homes, and selects the new
-entry atomically. An existing target must be empty or recognizable as an
+entry atomically. The final Workspaces step defaults to Chat, allows optional
+Auto Quant and Auto Prediction (or none), then starts the selected project.
+The backend prepares those durable instances before the first page opens;
+Agent Sessions remain stopped. Failed preparation can be retried from Quick
+Start. CLI `create alice-project --workspaces` records the same selection
+for the next start. See [[docs/alice-project.md]]. An existing target must be empty or recognizable as an
 OpenAlice complete home; an unrelated non-empty directory is rejected. A new
 target is created and canonicalized when registered, so a later missing
 registered Home is never silently recreated. A bare TUI launch falls back to
@@ -1323,3 +1328,29 @@ Verify the real `/api/auth/status` and root page after `up`, prove the Runtime
 survives the starting shell, and prove `down` leaves no Guardian/Alice child.
 When shared Runtime or dependency topology changes, add the matching Electron
 PTY/package smoke even though this CLI does not own Electron.
+
+## Project capability CLI
+
+`openalice exec [--project <key> | --home <path>] <alice|traderhub|alice-uta>
+[command flags]` invokes the running Project's manifest-driven CLI. For example:
+
+```bash
+openalice exec --project research alice market search-bars --query AAPL
+openalice exec --project research alice market bars --symbol AAPL --asset-class equity --count 250 --output bars.json
+```
+
+Selection uses the existing Supervisor Project resolver. An injected Workspace
+inherits its Project and Workspace policy; an explicit Project/home selection
+clears inherited Workspace, run and Session attribution. Project-only calls
+expose globally owned tools, never construct a synthetic Workspace, and cannot
+invoke scoped collaboration tools. UTA continues owning all trading writes.
+
+Alice publishes ephemeral `state/cli-endpoint.json` after startup, including
+Project identity and the actual loopback/socket tool endpoint. Shutdown removes
+only its own descriptor. Missing/stale endpoints fail; the client does not scan
+ports or start a Runtime. The gateway checks the selected Project identity on
+every Project request. This is local routing consistency, not authentication.
+
+The native executable dispatches the same bundled Workspace CLI payload;
+source mode loads the running Project's payload. `--output` saves successful
+responses to a new file, preserving existing files; diagnostics stay on stderr.

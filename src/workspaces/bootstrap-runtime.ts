@@ -1,6 +1,6 @@
 import { pathToFileURL } from 'node:url';
 
-import { exec as bundledGitExec } from 'dugite';
+import { exec as bundledGitExec } from './git-execution.js';
 
 export const INTERNAL_BOOTSTRAP_ROLE = '--openalice-internal-bootstrap';
 
@@ -13,7 +13,9 @@ export interface BootstrapInvocation {
  * A Bun-compiled executable cannot interpret an external `.mjs` file merely
  * by re-executing `process.execPath`: that path is Alice itself. Re-enter the
  * same executable through a private role so the embedded Bun runtime imports
- * the bootstrap without requiring a system Node or Bun installation.
+ * the bootstrap without requiring a system Node or Bun installation. Packaged
+ * Electron also re-enters Alice: its physical templates cannot resolve the
+ * dependencies inside app.asar through normal parent-directory lookup.
  */
 export function resolveMjsBootstrapInvocation(
   script: string,
@@ -22,15 +24,20 @@ export function resolveMjsBootstrapInvocation(
   const standalone = (
     globalThis as { __OPENALICE_BUN_STANDALONE__?: boolean }
   ).__OPENALICE_BUN_STANDALONE__ === true;
+  const archivedEntry = process.versions.electron && process.argv[1]?.replaceAll('\\', '/').includes('/app.asar/')
+    ? process.argv[1]
+    : null;
   return {
     command: process.execPath,
     args: standalone
       ? [INTERNAL_BOOTSTRAP_ROLE, script, ...args]
-      : [script, ...args],
+      : archivedEntry
+        ? [archivedEntry, INTERNAL_BOOTSTRAP_ROLE, script, ...args]
+        : [script, ...args],
   };
 }
 
-/** Execute one external bootstrap in the Bun standalone's child process. */
+/** Execute one external bootstrap with the launcher-owned Git implementation. */
 export async function runInternalBootstrapRole(
   argv: readonly string[] = process.argv,
 ): Promise<boolean> {

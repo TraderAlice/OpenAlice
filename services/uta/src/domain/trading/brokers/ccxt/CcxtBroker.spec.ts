@@ -1641,6 +1641,25 @@ describe('CcxtBroker — getHistorical', () => {
     ])
   })
 
+  it('paginates a venue cap without returning a stale first page', async () => {
+    const acc = makeAccount()
+    setInitialized(acc, { 'BTC/USDT:USDT': makeSwapMarket('BTC', 'USDT', 'BTC/USDT:USDT') })
+    const end = new Date('2026-07-20T12:00:00Z')
+    const step = 3600000
+    const fetch = vi.fn(async (_symbol: string, _timeframe: string, since: number) => {
+      const first = Math.ceil(since / step) * step
+      return Array.from({ length: 300 }, (_, i) => first + i * step)
+        .filter(ts => ts <= end.getTime()).map(ts => [ts, 1, 2, 0.5, 1.5, 10])
+    })
+    ;(acc as any).exchange.fetchOHLCV = fetch
+    const contract = new Contract(); contract.localSymbol = 'BTC/USDT:USDT'
+    const bars = await acc.getHistorical(contract, { interval: '1h', end, limit: 400 })
+    expect(bars).toHaveLength(400)
+    expect(bars.at(-1)?.timestamp).toEqual(end)
+    expect(new Set(bars.map(b => b.timestamp.getTime())).size).toBe(400)
+    expect(fetch).toHaveBeenCalledTimes(2)
+  })
+
   it('loud-refuses an interval the exchange does not support', async () => {
     const acc = makeAccount()
     setInitialized(acc, { 'BTC/USDT:USDT': makeSwapMarket('BTC', 'USDT', 'BTC/USDT:USDT') })

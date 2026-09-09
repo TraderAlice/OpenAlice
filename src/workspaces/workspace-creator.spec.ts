@@ -236,6 +236,30 @@ describe('runScript platform branching', () => {
     );
   });
 
+  it('an archived Electron backend supplies its Git executor to physical templates', async () => {
+    const originalArgv = process.argv;
+    const electronVersion = Object.getOwnPropertyDescriptor(process.versions, 'electron');
+    const entry = '/Applications/Open Alice.app/Contents/Resources/app.asar/dist/main.js';
+    try {
+      Object.defineProperty(process.versions, 'electron', { value: '39.8.10', configurable: true });
+      process.argv = [process.execPath, entry];
+      const child = makeFakeChild();
+      mockSpawn.mockReturnValue(child as unknown as childProcess.ChildProcess);
+      const promise = runScript('/tmp/中文 templates/bootstrap.mjs', ['t', '/out'], {}, 60_000);
+      child.emit('close', 0);
+      expect((await promise).ok).toBe(true);
+      expect(mockSpawn).toHaveBeenCalledWith(
+        process.execPath,
+        [entry, INTERNAL_BOOTSTRAP_ROLE, '/tmp/中文 templates/bootstrap.mjs', 't', '/out'],
+        expect.objectContaining({ env: expect.objectContaining({ ELECTRON_RUN_AS_NODE: '1' }) }),
+      );
+    } finally {
+      process.argv = originalArgv;
+      if (electronVersion) Object.defineProperty(process.versions, 'electron', electronVersion);
+      else Reflect.deleteProperty(process.versions, 'electron');
+    }
+  });
+
   it('on win32, ENOENT spawn error surfaces a Git-for-Windows install hint', async () => {
     setPlatform('win32');
     const child = makeFakeChild();

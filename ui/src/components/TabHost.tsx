@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useWorkspace } from '../tabs/store'
 import { type Tab } from '../tabs/types'
-import { getView, getViewShell } from '../tabs/registry'
+import { getView, getViewShell, MarketArea } from '../tabs/registry'
 import { EmptyEditor } from './EmptyEditor'
 import { ChatPageShell } from '../pages/ChatPageShell'
 
@@ -82,9 +82,13 @@ function TabFrame({ tab, visible }: { tab: Tab; visible: boolean }) {
       inert={!visible}
     >
       {shell === 'chat' || shell === 'auto-quant' || shell === 'prediction' ? (
-        <ChatPageShell mode={shell}>
+        <ChatPageShell mode={shell} spec={tab.spec}>
           <Component key={tab.id} spec={tab.spec} visible={visible} />
         </ChatPageShell>
+      ) : shell === 'market' ? (
+        <MarketArea>
+          <Component key={tab.id} spec={tab.spec} visible={visible} />
+        </MarketArea>
       ) : (
         <Component key={tab.id} spec={tab.spec} visible={visible} />
       )}

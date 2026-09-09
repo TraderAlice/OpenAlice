@@ -37,16 +37,17 @@ resources resolve beside the active release under `share/openalice/`:
 - built Web UI;
 - defaults and migrations;
 - standard Workspace templates;
-- materialized adapter and Workspace CLI files external processes open by path;
-- release-owned portable Git.
+- materialized adapter and Workspace CLI files external processes open by path.
 
 The installed content identity covers the complete payload manifest, including
 these resources, file modes, and symlink targets. It is not derived from the
 primary executable alone.
 
-The provider prepends only the release-owned Git `bin` directory to Runtime
-children. The installed CLI therefore requires no system Node.js, Bun, npm, or
-Git and does not modify a user's system Git.
+The provider discovers working system Git/Bash, passes their executable locations
+to Runtime children, and preserves user Git configuration. CLI installation owns
+the consent-based setup continuation, not those tools' versions or lifecycle.
+The installed CLI itself requires no system Node.js, Bun, or npm. An external
+Agent Runtime can have its own requirements, such as Node.js.
 
 Source development remains ordinary:
 
@@ -87,6 +88,17 @@ Bun backend stops and continues the PTY process group at the producer/kernel
 boundary, avoiding an unbounded JavaScript spool. Graceful shutdown resumes a
 stopped group before terminating it. Electron and source-backed Node execution
 continue using `node-pty` pause/resume.
+
+The Windows CLI uses Bun ConPTY without pretending POSIX group
+signals work on Windows. This backend advertises no read-side pause support;
+when an attached WebSocket exceeds its high watermark, Alice detaches that
+consumer with retryable close code 1013, retaining the independent agent and
+bounded replay buffer. macOS/Linux keep producer pause/resume unchanged.
+Windows npm-installed agents use the user's `node.exe`, never the compiled
+OpenAlice executable as a general JavaScript interpreter. Native agent `.exe`
+files do not gain a Node dependency. Windows CLI uses a system Git-for-Windows
+installation for Git/Bash on x64 and ARM64; Electron's private PortableGit and
+managed Pi remain a separate distribution boundary.
 
 ## Broker Packs
 
@@ -155,12 +167,13 @@ See [[docs/data-locations.md]] and [[docs/alice-project.md]].
 
 The native Runtime acceptance must prove:
 
-- execution outside a checkout with system Node, npm, Bun, and Git absent;
+- execution outside a checkout without system Node/npm/Bun on PATH, using
+  detected system Git/Bash rather than release-owned tool binaries;
 - distinct Guardian/Alice/UTA/Connector and Agent Session PIDs;
 - persistent `up`, detach, `status`, `open`, `down`, and restart behavior;
 - multiple independent Agent PTYs with input, resize, backpressure, and
   isolated termination;
-- real Web UI, defaults, templates, Workspace helpers, and portable Git;
+- real Web UI, defaults, templates, Workspace helpers, and system Git operations;
 - an external Agent Runtime-shaped process through its normal adapter without
   changing its config or version; the optional real-runtime smoke exercises
   OpenCode only when `OPENALICE_BUN_REAL_OPENCODE_PATH` explicitly selects its

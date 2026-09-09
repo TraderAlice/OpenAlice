@@ -1,7 +1,7 @@
 FROM debian:bookworm-slim
 
 RUN DEBIAN_FRONTEND=noninteractive apt-get update \
-  && apt-get install -y --no-install-recommends bash ca-certificates coreutils curl jq tar \
+  && apt-get install -y --no-install-recommends bash ca-certificates coreutils curl git jq tar \
   && rm -rf /var/lib/apt/lists/* \
   && useradd --home-dir /home/smoke --no-create-home --shell /bin/bash --uid 10001 smoke \
   && mkdir -p /home/smoke \

@@ -87,7 +87,7 @@ const PRIORITY_OPTIONS: IssuePriority[] = ['urgent', 'high', 'medium', 'low', 'n
 
 // Shared control styling for the Inspector and its configuration dialog.
 const railControl =
-  'h-10 min-w-0 flex-1 rounded-md border border-border bg-background px-3 py-1 text-sm text-foreground outline-none transition-colors focus:border-primary/60 focus:shadow-[0_0_0_1px_var(--primary-muted)] disabled:cursor-not-allowed disabled:opacity-50 sm:h-9'
+  'oa-field-control h-10 min-w-0 flex-1 rounded-md border border-input bg-background px-3 py-1 text-sm text-foreground outline-none transition-[border-color,box-shadow] disabled:cursor-not-allowed disabled:opacity-50 sm:h-9'
 
 const CONFIGURABLE_AGENTS: readonly AgentId[] = ['claude', 'codex', 'cursor', 'agy', 'grok', 'omp', 'opencode', 'pi']
 
@@ -1140,7 +1140,7 @@ function PropertiesRail({
               {issue.lastFiredAtMs && (
                 <a
                   href="#issue-runs"
-                  className="inline-flex h-8 items-center rounded-md px-2.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  className="inline-flex h-8 items-center rounded-md px-2.5 text-xs font-medium text-muted-foreground transition-[color,background-color,box-shadow] hover:bg-secondary hover:text-foreground focus-visible:outline-none focus-visible:[box-shadow:var(--oa-focus-shadow)]"
                 >
                   {t('issues.detail.viewLastRun')}
                 </a>
@@ -1824,7 +1824,7 @@ export function IssueActivity({
                             type="button"
                             aria-label={t('issues.detail.showSessionDetails', { origin: originLabel })}
                             disabled={openingId !== null}
-                            className="inline-flex min-h-10 items-center rounded-sm font-medium text-foreground/80 underline decoration-border underline-offset-2 transition-colors hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 disabled:cursor-wait disabled:opacity-50 sm:min-h-0"
+                            className="inline-flex min-h-10 items-center rounded-sm font-medium text-foreground/80 underline decoration-border underline-offset-2 transition-[color,box-shadow] hover:text-primary focus-visible:outline-none focus-visible:[box-shadow:var(--oa-focus-shadow)] disabled:cursor-wait disabled:opacity-50 sm:min-h-0"
                           />}
                         >
                             {originLabel}

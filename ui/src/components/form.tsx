@@ -3,7 +3,7 @@ import type { ReactNode } from 'react'
 // ==================== Shared class constants ====================
 
 export const inputClass =
-  'oa-field-control h-8 w-full min-w-0 rounded-md border border-input bg-background px-3 py-1.5 font-sans text-[13px] leading-[18px] text-foreground outline-none transition-[border-color,background-color,box-shadow] duration-[var(--motion-fast)] [transition-timing-function:var(--motion-ease-out)] placeholder:text-muted-foreground focus:border-ring focus:shadow-[0_0_0_2px_color-mix(in_srgb,var(--ring)_35%,transparent)] motion-reduce:transition-none disabled:cursor-not-allowed disabled:bg-input/50 disabled:opacity-50'
+  'oa-field-control h-8 w-full min-w-0 rounded-md border border-input bg-background px-3 py-1.5 font-sans text-[13px] leading-[18px] text-foreground outline-none transition-[border-color,background-color,box-shadow] duration-[var(--motion-fast)] [transition-timing-function:var(--motion-ease-out)] placeholder:text-muted-foreground motion-reduce:transition-none disabled:cursor-not-allowed disabled:bg-input/50 disabled:opacity-50'
 
 // ==================== Settings scroll area ====================
 
@@ -83,7 +83,7 @@ export function ConfigSection({
           id={titleId}
           tabIndex={focusableTitle ? -1 : undefined}
           className={`text-[14px] font-semibold text-foreground ${focusableTitle
-            ? 'w-fit rounded-sm outline-none focus:ring-2 focus:ring-primary/30 focus:ring-offset-4 focus:ring-offset-background'
+            ? 'w-fit rounded-sm outline-none focus-visible:[box-shadow:var(--oa-focus-shadow)]'
             : ''
           }`}
         >

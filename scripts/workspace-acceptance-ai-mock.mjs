@@ -33,7 +33,7 @@ export function textCompletionStream(text, id = 'chatcmpl-openalice-smoke') {
 
 export function cliToolCallStream(id = 'chatcmpl-openalice-cli-tool') {
   const command = [
-    'alice-workspace issue create',
+    'alice issue create',
     `--id ${WORKSPACE_ACCEPTANCE_AGENT_ISSUE_ID}`,
     '--title "OpenAlice agent CLI acceptance"',
   ].join(' ')

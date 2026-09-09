@@ -49,6 +49,25 @@ describe('NewsCollectorStore', () => {
     try { await unlink(TEST_LOG_PATH) } catch { /* ignore */ }
   })
 
+  it('reads evicted and retention-expired IDs from disk, including after restart', async () => {
+    const small = new NewsCollectorStore({ logPath: TEST_LOG_PATH, maxInMemory: 1, retentionDays: 1 })
+    await small.init()
+    const old = await small.ingestRecord({ title: 'old', content: 'original feed content', pubTime: new Date(0), dedupKey: 'old', metadata: {} })
+    await small.ingest({ title: 'new', content: 'new', pubTime: new Date(), dedupKey: 'new', metadata: {} })
+    expect((await small.getNewsV2({ endTime: new Date() })).map(item => item.id)).not.toContain(old!.seq)
+    expect(await small.getNewsById(old!.seq)).toMatchObject({ title: 'old', content: 'original feed content' })
+    await small.close()
+    const recovered = new NewsCollectorStore({ logPath: TEST_LOG_PATH, maxInMemory: 1, retentionDays: 1 })
+    await recovered.init()
+    expect(await recovered.getNewsById(old!.seq)).toMatchObject({ title: 'old' })
+    expect(await recovered.getNewsById(99999)).toBeNull()
+    await recovered.close()
+  })
+
+  it('returns no article for an empty archive', async () => {
+    expect(await store.getNewsById(1)).toBeNull()
+  })
+
   it('starts empty', () => {
     expect(store.count).toBe(0)
     expect(store.dedupCount).toBe(0)

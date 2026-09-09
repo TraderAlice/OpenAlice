@@ -15,6 +15,8 @@ import { fileURLToPath } from 'node:url';
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
+import { initializeWorkspaceTemplateState } from './template-upgrade.js';
+import { aliceHarnessSourceVersion } from './alice-harness-assets.js';
 import { injectWorkspaceContext } from './context-injector.js';
 import type { TemplateMeta } from './template-registry.js';
 import { commitInitial } from './workspace-creator.js';
@@ -119,6 +121,10 @@ describe('chat workspace create: bootstrap → inject → commit', () => {
     await injectWorkspaceContext({ template: chatMeta(), wsId: 'ws-e2e-1', dir });
     // 3. launcher-owned initial commit
     await commitInitial(dir, 'chat: testtag');
+    await initializeWorkspaceTemplateState({ id: 'ws-e2e-1', tag: 'testtag', dir, createdAt: new Date().toISOString(), template: 'chat', spawnedFromVersion: '1.0.0' }, chatMeta());
+    const injection = JSON.parse(await readFile(join(dir, '.alice/alice-harness-version.json'), 'utf8'));
+    expect(injection.appliedVersion).toBe(await aliceHarnessSourceVersion());
+    expect(injection.template).toBe('alice-harness');
 
     // injected files all present
     for (const rel of [
@@ -131,7 +137,8 @@ describe('chat workspace create: bootstrap → inject → commit', () => {
       '.claude/skills/alice/SKILL.md',
       '.claude/skills/alice-analysis/SKILL.md',
       '.claude/skills/alice-uta/SKILL.md',
-      '.claude/skills/alice-workspace/SKILL.md',
+      '.claude/skills/alice/references/collaboration.md',
+      '.alice/alice-harness-config.json',
       '.claude/skills/traderhub/SKILL.md',
     ]) {
       expect(existsSync(join(dir, rel)), rel).toBe(true);

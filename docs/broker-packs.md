@@ -52,6 +52,10 @@ Development and tests may resolve the wrapper workspaces directly. Production
 launchers must use an activated downloaded Pack. Set
 `OPENALICE_BROKER_PACK_ALLOW_WORKSPACE=1` only for an intentional source-tree
 runtime; never use it to disguise a missing production artifact.
+For `pnpm dev`, `OPENALICE_BROKER_PACK_PREFER_WORKSPACE=1` explicitly prefers
+source wrappers over installed packs. This opt-in is ignored outside dev/tests
+and still requires workspace loading to be allowed. It changes no activated
+pack pointer and is useful when debugging adapters against an existing Project.
 
 Pack-local dependency copies cross a structural API boundary. Core code must
 not depend on class identity from a Pack's dependency tree; use structural

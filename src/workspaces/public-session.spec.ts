@@ -46,9 +46,9 @@ describe('projectPublicSession', () => {
     expect(projected).not.toHaveProperty('runtime');
   });
 
-  it('derives live state and WebPi surface from the same process snapshot', () => {
+  it('derives live state and Web surface from the same process snapshot', () => {
     expect(projectPublicSession(record, {
-      webPi: { pid: 42, startedAt: 1_723_337_000_000 },
+      web: { pid: 42, startedAt: 1_723_337_000_000 },
     })).toMatchObject({
       state: 'running',
       surface: 'webpi',

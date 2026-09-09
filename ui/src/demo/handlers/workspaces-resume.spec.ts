@@ -8,7 +8,7 @@ import {
   DEMO_CHAT_WORKSPACE_ID,
   DEMO_MACRO_WORKSPACE_ID,
 } from '../fixtures/workspaces'
-import { resetDemoWorkspaceWebPiState, workspacesHandlers } from './workspaces'
+import { resetDemoWorkspaceWebState, workspacesHandlers } from './workspaces'
 
 const server = setupServer(...workspacesHandlers)
 const baseUrl = window.location.origin
@@ -16,11 +16,28 @@ const baseUrl = window.location.origin
 beforeAll(() => server.listen({ onUnhandledRequest: 'error' }))
 afterEach(() => {
   server.resetHandlers()
-  resetDemoWorkspaceWebPiState()
+  resetDemoWorkspaceWebState()
 })
 afterAll(() => server.close())
 
 describe('demo Workspace resume handlers', () => {
+  it('restores a paused Session and retains running state across refreshes', async () => {
+    const url = `${baseUrl}/api/workspaces/${DEMO_CHAT_WORKSPACE_ID}/sessions/demo-chat-o1/resume`
+    const response = await fetch(url, { method: 'POST' })
+    expect(response.status).toBe(200)
+    const result = await response.json()
+    expect(result).toMatchObject({ sessionId: 'demo-chat-o1', wsId: DEMO_CHAT_WORKSPACE_ID, pid: 0, surface: 'terminal' })
+    expect(result.startedAt).toEqual(expect.any(Number))
+    const refreshed = await fetch(`${baseUrl}/api/workspaces`).then((res) => res.json())
+    expect(refreshed.workspaces.find((ws: { id: string }) => ws.id === DEMO_CHAT_WORKSPACE_ID).sessions)
+      .toContainEqual(expect.objectContaining({ id: 'demo-chat-o1', state: 'running', pid: 0 }))
+    expect(await fetch(url, { method: 'POST' }).then((res) => res.json())).toMatchObject({ startedAt: result.startedAt })
+  })
+
+  it('rejects unknown Sessions instead of returning a null success', async () => {
+    const response = await fetch(`${baseUrl}/api/workspaces/${DEMO_CHAT_WORKSPACE_ID}/sessions/missing/resume`, { method: 'POST' })
+    expect(response.status).toBe(404)
+  })
   it('registers Issue workspaces and materializes a resumable run conversation', async () => {
     const before = await fetch(`${baseUrl}/api/workspaces`).then((response) => response.json())
     expect(before.workspaces.map((workspace: { id: string }) => workspace.id)).toEqual(

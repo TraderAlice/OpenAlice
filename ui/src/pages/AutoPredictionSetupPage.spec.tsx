@@ -68,7 +68,7 @@ function context(workspaces: readonly Workspace[]): WorkspacesContextValue {
     setAutoQuantDefaultWorkspace: vi.fn(async () => undefined),
     setAutoPredictionDefaultWorkspace: mocks.select,
     quickChat: vi.fn(async () => ''), pauseSession: vi.fn(async () => undefined),
-    resumeSession: vi.fn(async () => undefined), openWebPiSession: vi.fn(async () => undefined),
+    resumeSession: vi.fn(async () => undefined), openWebSession: vi.fn(async () => undefined),
     requestDeleteSession: vi.fn(), setSessionPresence: vi.fn(async () => undefined),
     setSessionDisplayName: vi.fn(async () => undefined), updateSessionRuntime: vi.fn(async () => undefined),
     openAgentConfig: vi.fn(), saveWorkspaceMetadata: vi.fn(async () => undefined),

@@ -1,3 +1,5 @@
+import { userDataHome } from '../core/paths.js';
+import { resolveAliceProjectIdentity } from '@traderalice/guardian-runtime';
 /**
  * Composition root for the Workspaces feature.
  *
@@ -380,7 +382,7 @@ import {
   WorkspaceHeadlessActivityTracker,
   type WorkspaceRuntimeActivity,
 } from './workspace-runtime-activity.js';
-import { WebPiSessionHost, type WebPiSnapshot } from './webpi-session-host.js';
+import { WebSessionHost, type WebSessionSnapshot } from './web-session-host.js';
 import { WorkspaceRegistry, type WorkspaceMeta } from './workspace-registry.js';
 import { readHarnessSource } from './harness-source.js';
 import { HarnessSourceUpgradeManager } from './harness-source-upgrade.js';
@@ -419,6 +421,7 @@ export interface WorkspaceService {
   readonly catalog: WorkspaceCatalog;
   readonly lifecycle: WorkspaceLifecycleManager;
   readonly templateUpgrades: TemplateUpgradeManager;
+  readonly aliceHarnessUpgrades: TemplateUpgradeManager;
   readonly sourceUpgrades: HarnessSourceUpgradeManager;
   readonly workspaceAbsorbs: WorkspaceAbsorbManager;
   /** Coordinates runtime starts with directory-wide lifecycle operations. */
@@ -430,7 +433,8 @@ export interface WorkspaceService {
   readonly adapters: AdapterRegistry;
   readonly creator: WorkspaceCreator;
   readonly pool: SessionPool;
-  readonly webPi: WebPiSessionHost;
+  /** Long-lived structured Agent processes presented in the browser (Web surface). */
+  readonly web: WebSessionHost;
   /** Launcher-owned control plane. Not part of the business Workspace registry. */
   readonly managerWorkspace: WorkspaceMeta;
   /** Resolve a runtime target, including the special manager control plane. */
@@ -453,8 +457,8 @@ export interface WorkspaceService {
   /** Resolve the Workspace default, installation fallback, then first registered runtime. */
   resolveDefaultAgentId(meta: WorkspaceMeta): Promise<string | undefined>;
   resolveAdapter(meta: WorkspaceMeta, agentId?: string): CliAdapter;
-  /** Open the same persisted Pi Session through Pi RPC instead of its PTY. */
-  startWebPiSession(
+  /** Open the same persisted Session through its runtime's structured protocol instead of a PTY. */
+  startWebSession(
     meta: WorkspaceMeta,
     record: SessionRecord,
     opts?: {
@@ -462,7 +466,7 @@ export interface WorkspaceService {
       skills?: readonly string[];
       approveProject?: boolean;
     },
-  ): Promise<WebPiSnapshot>;
+  ): Promise<WebSessionSnapshot>;
   /** Best-effort background reconciliation of native runtime Session titles. */
   refreshSessionTitles?(meta: WorkspaceMeta): Promise<void>;
   publicMeta(w: WorkspaceMeta): Promise<unknown>;
@@ -564,12 +568,14 @@ export interface WorkspaceService {
    *  headless run history, newest first). `null` when the workspace or the issue
    *  id is absent. Powers GET /api/issues/:wsId/:id. */
   issueDetail(wsId: string, id: string): Promise<IssueDetail | null>;
-  /** Retry the latest unsuccessful scheduled execution now. Reuses the live
-   * Issue prompt/owner/runtime and never advances its schedule marker. */
+  /** Start a manual run or retry an exact failed occurrence; return its task id. */
+  startIssueRun(wsId: string, id: string, retryRunId?: string): Promise<{ taskId: string }>;
+  /** Retry the latest unsuccessful scheduled execution without moving its marker. */
   retryIssue(wsId: string, id: string): Promise<IssueDetail>;
   /** Dispatch a scheduled Issue immediately without requiring a failed last
    * run and without advancing its next-fire marker. */
   runIssueNow(wsId: string, id: string): Promise<IssueDetail>;
+  replyToIssue(input: { workspaceId: string; issueId: string; prompt: string; commentId: string }): Promise<{ taskId: string; resumeId: string }>;
   connectorDesk(connectorId: string): Promise<ConnectorDesk | null>;
   createConnectorDesk(connectorId: string, wsId: string): Promise<ConnectorDesk>;
   updateConnectorDesk(connectorId: string, patch: {
@@ -585,7 +591,7 @@ export interface WorkspaceService {
   }): Promise<ConnectorDesk>;
   disableTelegramConnectorDesk(): Promise<ConnectorDesk | null>;
   /** Safe Workspace Session index. resumeId is the only public conversation handle. */
-  sessionDirectory(wsId: string, limit?: number): Promise<WorkspaceSessionDirectory | null>;
+  sessionDirectory(wsId: string, limit?: number, resumeId?: string): Promise<WorkspaceSessionDirectory | null>;
   /** Change in-desk floor presence. Does not retire or delete the coworker. */
   setSessionPresence(input: {
     wsId: string
@@ -1193,6 +1199,8 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
   } => {
     const baseEnv = buildSpawnEnv(process.env, {
       AQ_WS_ID: ws.id,
+      OPENALICE_HOME: userDataHome,
+      OPENALICE_PROJECT_ID: resolveAliceProjectIdentity({ home: userDataHome }).id,
       AQ_LAUNCHER_REPO_ROOT: config.launcherRepoRoot,
       // Local tool gateway for the injected `alice*` CLI shims. Electron/dev
       // can point this at the web listener's `/cli`; Docker/public-web can keep
@@ -1862,23 +1870,43 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
         throw new HeadlessResumeError('not_ready', 'runtime session id has not been captured yet');
       }
       await sessionRegistry.ensureLoaded(ws.id);
-      const productSession = sessionRegistry.findByResumeId(ws.id, resumeId);
-      if (productSession?.state === 'running') {
-        throw new HeadlessResumeError('busy', 'this conversation already has a running execution');
-      }
-      // Reserve before the first await below. Without this, two HTTP requests
-      // can both pass the check and mutate one native transcript concurrently.
+      // Claim before stopping an interactive owner: no UI launch or second
+      // dispatch may enter the transcript during the handoff.
       if (!claimResume(resumeId)) {
         throw new HeadlessResumeError('busy', 'this conversation already has a running turn');
       }
-      nativeResume = { sessionId: identity.agentSessionId };
-      parentTaskId = identity.latestTaskId ?? headlessTasks.latestForResumeId(resumeId)?.taskId;
-      if (selection?.credentialSlug || selection?.model || selection?.reasoningEffort) {
-        throw new HeadlessResumeError('not_ready', 'a resumed Session reuses its persisted credential, model, and effort');
+      try {
+        const productSession = sessionRegistry.findByResumeId(ws.id, resumeId);
+        if (productSession?.state === 'running') {
+          const issueDispatch = trigger?.kind === 'issue' || inquiry?.subject.kind === 'issue';
+          if (!issueDispatch || productSession.surface === 'headless'
+            || headlessTasks.latestForResumeId(resumeId)?.status === 'running') {
+            throw new HeadlessResumeError('busy', 'this conversation already has a running execution');
+          }
+          const terminal = pool.get(productSession.id);
+          if (terminal) await terminal.disposeAndWait('background handoff');
+          await web.stop(productSession.id, 'background handoff');
+          await sessionRegistry.update(ws.id, productSession.id, {
+            state: 'paused', lastActiveAt: new Date().toISOString(),
+          });
+          await agentRuntimeLog.record('runtime.stopped', {
+            workspaceId: ws.id, resumeId, agent: adapter.id,
+            sessionRecordId: productSession.id,
+            surface: productSession.surface ?? 'terminal', status: 'paused',
+          });
+        }
+        nativeResume = { sessionId: identity.agentSessionId };
+        parentTaskId = identity.latestTaskId ?? headlessTasks.latestForResumeId(resumeId)?.taskId;
+        if (selection?.credentialSlug || selection?.model || selection?.reasoningEffort) {
+          throw new HeadlessResumeError('not_ready', 'a resumed Session reuses its persisted credential, model, and effort');
+        }
+        sessionRuntime = identity.runtimeBinding
+          ? await resolveSessionRuntimeBinding({ adapter, cwd: ws.dir, binding: identity.runtimeBinding })
+          : createNativeSessionRuntimeBinding({ adapter });
+      } catch (error) {
+        activeResumeIds.delete(resumeId);
+        throw error;
       }
-      sessionRuntime = identity.runtimeBinding
-        ? await resolveSessionRuntimeBinding({ adapter, cwd: ws.dir, binding: identity.runtimeBinding })
-        : createNativeSessionRuntimeBinding({ adapter });
     } else {
       const read = await readWorkspaceRuntimeSettings(ws.dir);
       if (!read.ok && read.reason === 'invalid') {
@@ -2244,6 +2272,11 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
     launcherLogger.child({ scope: 'schedule-markers' }),
   );
   const scheduleScanner = new ScheduleScanner({
+    canRetryIssueRun: (workspaceId, issueId, runId) => {
+      const latest = headlessTasks.list({ issue: { workspaceId, issueId } })[0];
+      return latest?.taskId === runId && (latest.status === 'failed' || latest.status === 'interrupted');
+    },
+    isIssueRunning: (workspaceId, issueId) => headlessTasks.list({ issue: { workspaceId, issueId } }).some((run) => run.status === 'running'),
     registry,
     resolveResumeWorkspace: (resumeId) => {
       const identity = resumeRegistry.get(resumeId);
@@ -2542,7 +2575,8 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
     wsId: string,
     id: string,
     kind: 'retry' | 'manual',
-  ): Promise<IssueDetail> => {
+    retryRunId?: string,
+  ): Promise<{ taskId: string }> => {
     const key = `${wsId}:${id}`;
     const ws = registry.get(wsId);
     if (!ws) throw new IssueRetryError('not_found', 'Workspace not found.');
@@ -2560,8 +2594,12 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
         `This Issue is ${issue.status}; reopen it before running.`,
       );
     }
-    const latest = headlessTasks.list({ issue: { workspaceId: wsId, issueId: id } })[0];
-    if (latest?.status === 'running' || retryingIssueKeys.has(key)) {
+    const runs = headlessTasks.list({ issue: { workspaceId: wsId, issueId: id } });
+    const latest = runs[0];
+    if (retryRunId && latest?.taskId !== retryRunId) {
+      throw new IssueRetryError('not_retryable', 'Retry must target this Issue’s latest failed or interrupted run.');
+    }
+    if (runs.some((run) => run.status === 'running') || retryingIssueKeys.has(key)) {
       throw new IssueRetryError('already_running', 'This Issue already has a run in progress.');
     }
     if (kind === 'retry' && (!latest || (latest.status !== 'failed' && latest.status !== 'interrupted'))) {
@@ -2573,13 +2611,14 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
 
     retryingIssueKeys.add(key);
     try {
-      const { taskId } = await scheduleScanner.runIssueNow(wsId, id);
+      const { taskId } = await scheduleScanner.runIssueNow(wsId, id, kind === 'retry' ? latest?.taskId : undefined);
       launcherLogger.info(kind === 'retry' ? 'issue.retry_dispatched' : 'issue.manual_run_dispatched', {
         wsId,
         issueId: id,
         previousTaskId: latest?.taskId,
         taskId,
       });
+      return { taskId };
     } catch (err) {
       if (err instanceof ScheduledIssueRunNowError) {
         throw new IssueRetryError(err.code, err.message);
@@ -2589,14 +2628,17 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
       retryingIssueKeys.delete(key);
     }
 
+  };
+  const startIssueRun = (wsId: string, id: string, retryRunId?: string) =>
+    dispatchScheduledIssueNow(wsId, id, retryRunId ? 'retry' : 'manual', retryRunId);
+  const issueRunDetail = async (wsId: string, id: string, kind: 'retry' | 'manual'): Promise<IssueDetail> => {
+    await dispatchScheduledIssueNow(wsId, id, kind);
     const detail = await issueDetail(wsId, id);
     if (!detail) throw new IssueRetryError('not_found', 'Issue not found.');
     return detail;
   };
-  const retryIssue = async (wsId: string, id: string): Promise<IssueDetail> =>
-    dispatchScheduledIssueNow(wsId, id, 'retry');
-  const runIssueNow = async (wsId: string, id: string): Promise<IssueDetail> =>
-    dispatchScheduledIssueNow(wsId, id, 'manual');
+  const retryIssue = (wsId: string, id: string) => issueRunDetail(wsId, id, 'retry');
+  const runIssueNow = (wsId: string, id: string) => issueRunDetail(wsId, id, 'manual');
 
   const setSessionPresence = async (input: {
     wsId: string
@@ -2679,6 +2721,7 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
   const sessionDirectory = async (
     wsId: string,
     limit = 50,
+    resumeId?: string,
   ): Promise<WorkspaceSessionDirectory | null> => {
     const ws = registry.get(wsId);
     if (!ws) return null;
@@ -2705,12 +2748,26 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
           }),
         })
       : new Set<string>();
+    // Activation reads target one identity, including assignments whose Issue
+    // lives in another Workspace. Ordinary roster polling remains local.
+    if (resumeId && !issueAttachments.has(resumeId)) {
+      for (const other of registry.list()) {
+        if (other.id === wsId) continue;
+        const read = await readWorkspaceIssues(other.dir);
+        if (read.ok && read.issues.some((issue) => issueAssigneeResumeId(issue.assignee) === resumeId)) {
+          issueAttachments.add(resumeId);
+          break;
+        }
+      }
+    }
     const issueTitles = issueRead.ok
       ? new Map(issueRead.issues.map((issue) => [issue.id, issue.title] as const))
       : new Map<string, string>();
     return buildWorkspaceSessionDirectory({
       workspace: { id: ws.id, tag: ws.tag },
-      identities: resumeRegistry.list({ wsId, limit }),
+      identities: resumeId
+        ? [resumeRegistry.get(resumeId)].filter((entry): entry is ResumeIdentityRecord => entry?.wsId === wsId)
+        : resumeRegistry.list({ wsId, limit }),
       interactiveFor: (resumeId) => sessionRegistry.findByResumeId(wsId, resumeId),
       latestExecutionFor: (resumeId) => headlessTasks.latestForResumeId(resumeId),
       isActive: (resumeId) => activeResumeIds.has(resumeId),
@@ -2851,20 +2908,22 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
     transcriptWatcher,
   );
 
-  const webPi = new WebPiSessionHost(
-    launcherLogger.child({ scope: 'webpi-host' }),
+  const web = new WebSessionHost(
+    launcherLogger.child({ scope: 'web-session-host' }),
     {
       onExit: (recordId, reason) => {
         // Intentional handoffs are followed by an explicit caller-owned state
         // update (paused, terminal-running, or deleted). Letting this async
-        // callback also write `paused` would race a WebPi -> TUI switch.
-        if (reason.intentional) return;
+        // callback also write `paused` would race a Web -> TUI switch.
+        // The opening route also owns rollback when the handshake fails.
+        // A second registry write here races its atomic-file replacement.
+        if (reason.intentional || reason.startupFailed) return;
         const record = sessionRegistry.findById(recordId);
         if (!record) return;
         void sessionRegistry.update(record.wsId, record.id, {
           state: 'paused',
           lastActiveAt: new Date().toISOString(),
-        }).catch((err) => launcherLogger.warn('webpi.pause_update_failed', { recordId, err }));
+        }).catch((err) => launcherLogger.warn('web_session.pause_update_failed', { recordId, err }));
         void agentRuntimeLog.record('runtime.stopped', {
           workspaceId: record.wsId,
           resumeId: record.resumeId,
@@ -2874,10 +2933,25 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
           status: 'paused',
         });
       },
+      onNativeSessionId: (recordId, nativeSessionId) => {
+        // Runtimes that create sessions in-band (ACP, Codex, fresh omp/Claude)
+        // announce their id after spawn; bind it exactly like PTY discovery so
+        // the TUI can resume the same conversation later.
+        const record = sessionRegistry.findById(recordId);
+        if (!record) return;
+        void resumeRegistry.bindAgentSessionId(record.resumeId, nativeSessionId).catch((err) =>
+          launcherLogger.warn('web_session.native_id_bind_failed', { recordId, resumeId: record.resumeId, err }),
+        );
+        if (record.resumeHint?.value !== nativeSessionId) {
+          void sessionRegistry.update(record.wsId, record.id, {
+            resumeHint: { kind: 'agent-session-id', value: nativeSessionId },
+          }).catch((err) => launcherLogger.warn('web_session.resume_hint_update_failed', { recordId, err }));
+        }
+      },
     },
   );
 
-  const startWebPiSession = async (
+  const startWebSession = async (
     meta: WorkspaceMeta,
     record: SessionRecord,
     opts: {
@@ -2885,17 +2959,26 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
       skills?: readonly string[];
       approveProject?: boolean;
     } = {},
-  ): Promise<WebPiSnapshot> => {
-    const operationLease = workspaceOperationGuard.acquire(meta.id, 'webpi-start');
-    if (!operationLease) throw new Error(`workspace is busy with ${workspaceOperationGuard.current(meta.id)}`);
+  ): Promise<WebSessionSnapshot> => {
+    if (!claimResume(record.resumeId)) throw new HeadlessResumeError('busy', 'this conversation already has a running turn');
+    const operationLease = workspaceOperationGuard.acquire(meta.id, 'web-session-start');
+    if (!operationLease) {
+      activeResumeIds.delete(record.resumeId);
+      throw new Error(`workspace is busy with ${workspaceOperationGuard.current(meta.id)}`);
+    }
     try {
-    if (record.agent !== 'pi') throw new Error('WebPi is available only for Pi Sessions');
-    const adapter = adapters.get('pi');
-    if (!adapter?.composeWebCommand) throw new Error('installed Pi adapter has no WebPi surface');
+    const adapter = adapters.get(record.agent);
+    if (!adapter) throw new Error(`unknown agent runtime: ${record.agent}`);
+    const webCapability = adapter.capabilities.web;
+    if (!webCapability || !adapter.composeWebCommand) {
+      throw new Error(`${adapter.displayName} has no Web conversation surface; open it in the terminal instead`);
+    }
     const nativeSessionId = resumeRegistry.get(record.resumeId)?.agentSessionId
       ?? record.resumeHint?.value;
-    if (!nativeSessionId) throw new Error('Pi Session has no resumable native session id');
-    const resume = { sessionId: nativeSessionId } as const;
+    if (!nativeSessionId && !webCapability.freshSession) {
+      throw new Error(`${adapter.displayName} Session has no resumable native session id`);
+    }
+    const resume = nativeSessionId ? { sessionId: nativeSessionId } as const : undefined;
     const identity = resumeRegistry.get(record.resumeId);
     const sessionRuntime = identity?.runtimeBinding
       ? await resolveSessionRuntimeBinding({
@@ -2927,21 +3010,30 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
       ...(opts.approveProject ? { approveProject: true } : {}),
     });
     launcherLogger.event('path.trace', {
-      where: 'webpi.spawn',
+      where: 'web_session.spawn',
       wsId: meta.id,
       recordId: record.id,
       resumeId: record.resumeId,
-      nativeSessionId,
+      agent: record.agent,
+      wire: webCapability.wire,
+      nativeSessionId: nativeSessionId ?? null,
       spawnCwd: cwd,
       composedCommand: command,
     });
-    const snapshot = await webPi.start({
+    const terminal = pool.get(record.id);
+    if (terminal) await terminal.disposeAndWait('switch to Web');
+    const snapshot = await web.start({
       recordId: record.id,
       wsId: record.wsId,
       resumeId: record.resumeId,
+      agent: record.agent,
+      wire: webCapability.wire,
       command,
       cwd,
       env,
+      ...(nativeSessionId ? { nativeSessionId } : {}),
+      ...(sessionRuntime.binding.model ? { model: sessionRuntime.binding.model } : {}),
+      ...(sessionRuntime.binding.reasoningEffort ? { reasoningEffort: sessionRuntime.binding.reasoningEffort } : {}),
     });
     await sessionRegistry.update(record.wsId, record.id, {
       state: 'running',
@@ -2958,6 +3050,7 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
     });
     return snapshot;
     } finally {
+      activeResumeIds.delete(record.resumeId);
       operationLease.release();
     }
   };
@@ -2965,7 +3058,7 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
   const workspaceRuntimeActivityMethod = (workspaceId: string): WorkspaceRuntimeActivity => {
     const sessions = sessionRegistry.listFor(workspaceId).flatMap((record) => {
       const terminal = pool.get(record.id);
-      const browser = webPi.get(record.id);
+      const browser = web.get(record.id);
       if (!terminal && !browser) return [];
       return [{
         sessionId: record.id,
@@ -2992,7 +3085,7 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
     scrollbackStore,
     headlessTasks,
     pool,
-    webPi,
+    web,
     isWorkspaceHeadlessActive: (id) => headlessActivity.has(id),
     operationGuard: workspaceOperationGuard,
     cleanupWorkspaceState: async (_record, cwd) => {
@@ -3010,6 +3103,13 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
     logger: launcherLogger.child({ scope: 'template-upgrade' }),
   });
   await templateUpgrades.recover();
+  const aliceHarnessUpgrades = new TemplateUpgradeManager({
+    aliceHarness: true, registry, templates,
+    workspaceRuntimeActivity: workspaceRuntimeActivityMethod,
+    operationGuard: workspaceOperationGuard,
+    logger: launcherLogger.child({ scope: 'alice-harness-upgrade' }),
+  });
+  await aliceHarnessUpgrades.recover();
   const sourceUpgrades = new HarnessSourceUpgradeManager({
     registry,
     templates,
@@ -3059,7 +3159,7 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
       if (!identity || identity.lifecycle === 'retired' || sessionPresence(identity) === 'deleted') return [];
       return [projectPublicSession(record, {
         terminal: pool.get(record.id),
-        webPi: webPi.get(record.id),
+        web: web.get(record.id),
         headless: activeResumeIds.has(record.resumeId),
         runtimeBinding: identity.runtimeBinding,
         displayName: identity.displayName,
@@ -3148,7 +3248,7 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
     stopInboxActivity?.();
     await harnessSurfaces.dispose();
     pool.disposeAll('plugin shutdown');
-    await webPi.stopAll('plugin shutdown');
+    await web.stopAll('plugin shutdown');
     transcriptWatcher.disposeAll();
   };
 
@@ -3236,6 +3336,7 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
     catalog,
     lifecycle,
     templateUpgrades,
+    aliceHarnessUpgrades,
     sourceUpgrades,
     workspaceAbsorbs,
     operationGuard: workspaceOperationGuard,
@@ -3246,7 +3347,7 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
     adapters,
     creator,
     pool,
-    webPi,
+    web,
     managerWorkspace,
     resolveRuntimeWorkspace,
     transcriptWatcher,
@@ -3256,7 +3357,7 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
     resolveOrCreateAutoPredictionWorkspace: resolveOrCreateAutoPredictionWorkspaceMethod,
     resolveDefaultAgentId,
     resolveAdapter,
-    startWebPiSession,
+    startWebSession,
     refreshSessionTitles,
     publicMeta,
     detectAgents,
@@ -3278,8 +3379,10 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
     createTelegramConnectorDesk: async (wsId: string) => createConnectorDeskOp('telegram', wsId),
     updateTelegramConnectorDesk: async (patch) => updateConnectorDeskOp('telegram', patch),
     disableTelegramConnectorDesk: async () => disableConnectorDeskOp('telegram'),
+    startIssueRun,
     retryIssue,
     runIssueNow,
+    replyToIssue: (input) => scheduleScanner.runIssueComment(input),
     sessionDirectory,
     setSessionPresence,
     setSessionDisplayName,

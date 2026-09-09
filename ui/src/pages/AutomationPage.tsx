@@ -11,8 +11,8 @@ interface AutomationPageProps {
 
 /**
  * Automation page is sub-section-driven — `spec.params.section` picks which
- * surface renders. The Automation sidebar holds one row per section so each
- * section is its own tab in the editor area. Occupancy lives on Office.
+ * surface renders. Both entries live under Settings → Developer, without a
+ * separate Automation navigator. Occupancy lives on Office.
  * Schedules live on self-described Workspace issues; the retired event-bus
  * surfaces are intentionally absent.
  */

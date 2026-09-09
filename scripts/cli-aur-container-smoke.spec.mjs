@@ -1,8 +1,30 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
+import { spawnSync } from 'node:child_process'
 
-import { AUR_IMAGES, parseArgs } from './cli-aur-container-smoke.mjs'
+import { AUR_IMAGES, parseArgs, runAurContainerSmoke } from './cli-aur-container-smoke.mjs'
+
+vi.mock('node:child_process', () => ({ spawnSync: vi.fn(() => ({ status: 0 })) }))
 
 describe('AUR container lifecycle smoke', () => {
+  it('scopes the unsupported download sandbox setting to the disposable container and all lifecycle commands', () => {
+    runAurContainerSmoke({
+      arch: 'arm64', docker: 'docker',
+      previousVersion: '0.91.0', currentVersion: '0.91.1',
+      previousContentIdentity: '0123456789abcdef',
+      currentContentIdentity: 'fedcba9876543210',
+      previousPackage: 'scripts/cli-aur-container-smoke.spec.mjs',
+      currentPackage: 'scripts/cli-aur-container-smoke.spec.mjs',
+    })
+    const [command, args] = vi.mocked(spawnSync).mock.calls.at(-1)
+    expect(command).toBe('docker')
+    expect(args.slice(0, 2)).toEqual(['run', '--rm'])
+    expect(args).not.toContain('--privileged')
+    expect(args.at(-1)).toMatch(/^sed -i .*DisableSandbox.*\/etc\/pacman.conf && pacman -Syu/)
+    expect(args.at(-1)).toContain('exec /usr/bin/node /work/scripts/cli-system-package-manager-smoke.mjs')
+    expect(args.at(-1)).not.toMatch(/SigLevel|--disable-sandbox|nodejs git/)
+    expect(args.find((value) => value.endsWith(':/work:ro'))).toBeDefined()
+  })
+
   it('pins native Arch-family images for Linux arm64 and x64', () => {
     expect(AUR_IMAGES.arm64).toMatchObject({ platform: 'linux/arm64' })
     expect(AUR_IMAGES.x64).toMatchObject({ platform: 'linux/amd64' })

@@ -11,6 +11,7 @@ import {
   preparePreviousCliReleaseArchives,
   syntheticPreviousVersion,
 } from './cli-release-fixture.mjs'
+import { cliExecutableName } from '../packages/cli/src/release-targets.mjs'
 import { bunReleaseContentIdentity } from './bun-release-content-identity.mjs'
 
 const execFileAsync = promisify(execFile)
@@ -32,7 +33,7 @@ describe.skipIf(process.platform === 'win32')('CLI prior-release fixture', () =>
     })
 
     expect(manifest.previousVersion).toBe('0.90.0')
-    expect(manifest.targets).toHaveLength(4)
+    expect(manifest.targets).toHaveLength(6)
     for (const target of manifest.targets) {
       expect(target.previousContentIdentity).not.toBe(target.currentContentIdentity)
       const name = `openalice-cli-0.90.0-${target.platform}-${target.arch}`
@@ -46,7 +47,7 @@ describe.skipIf(process.platform === 'win32')('CLI prior-release fixture', () =>
       })
       expect(release.contentIdentity).toBe(bunReleaseContentIdentity(release))
       expect((await execFileAsync('tar', [
-        '-xOzf', archive, `${name}/bin/openalice`,
+        '-xOzf', archive, `${name}/bin/${cliExecutableName(target.platform)}`,
       ])).stdout).toContain('0.90.0')
       const sidecar = await readFile(`${archive}.sha256`, 'utf8')
       expect(sidecar).toBe(`${sha256(await readFile(archive))}  ${basename(archive)}\n`)
@@ -72,10 +73,12 @@ async function fixture() {
     ['darwin', 'x64'],
     ['linux', 'arm64'],
     ['linux', 'x64'],
+    ['win32', 'arm64'],
+    ['win32', 'x64'],
   ]) {
     const releaseName = `openalice-cli-${version}-${platform}-${arch}`
     const releaseRoot = join(root, releaseName)
-    const executablePath = join(releaseRoot, 'bin/openalice')
+    const executablePath = join(releaseRoot, 'bin', cliExecutableName(platform))
     const packagePath = join(releaseRoot, 'share/openalice/package.json')
     await mkdir(join(releaseRoot, 'bin'), { recursive: true })
     await mkdir(join(releaseRoot, 'share/openalice'), { recursive: true })
@@ -89,10 +92,10 @@ async function fixture() {
       platform,
       arch,
       bunVersion: '1.4.0',
-      executable: 'bin/openalice',
+      executable: `bin/${cliExecutableName(platform)}`,
       resourceRoot: 'share/openalice',
       files: [
-        fileEntry('bin/openalice', await readFile(executablePath), 0o755),
+        fileEntry(`bin/${cliExecutableName(platform)}`, await readFile(executablePath), 0o755),
         fileEntry('share/openalice/package.json', await readFile(packagePath)),
       ],
     }

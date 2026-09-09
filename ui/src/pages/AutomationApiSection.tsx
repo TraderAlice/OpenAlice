@@ -40,7 +40,7 @@ export function AutomationApiSection() {
           checkout (the filename stem is the issue id). Each file is YAML
           frontmatter plus one canonical markdown What. The file remains the
           source of truth whether it is managed from <span className="text-foreground">Issues</span>,{' '}
-          <code className={CODE}>alice-workspace issue</code>, or edited directly.
+          <code className={CODE}>alice issue</code>, or edited directly.
           An issue with a{' '}
           <code className={CODE}>when</code> field self-schedules: a launcher
           scanner reads the dir and fires each due issue as a headless run. An
@@ -59,7 +59,7 @@ agent: claude
 
 Every trading morning before the open, assemble the pre-market picture for
 the watchlist — movers, gaps, and overnight headlines that move the thesis.
-Write research/premarket.md, then run alice-workspace inbox push --doc
+Write research/premarket.md, then run alice inbox push --doc
 research/premarket.md --comments "Pre-market brief".`}</Block>
         <ul className="ml-4 list-disc space-y-1 text-muted-foreground">
           <li>
@@ -138,7 +138,7 @@ research/premarket.md --comments "Pre-market brief".`}</Block>
           Every headless run preserves its structured reply and tool activity under{' '}
           <span className="text-foreground">Runs</span>. For a durable handoff or
           report, publish to the Inbox with the{' '}
-          <code className={CODE}>alice-workspace inbox push</code> CLI available on
+          <code className={CODE}>alice inbox push</code> CLI available on
           every Workspace&apos;s PATH. A no-change check may deliberately exit
           without creating Inbox noise.
         </p>

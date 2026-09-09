@@ -125,5 +125,5 @@ alice-uta sim price-change --help      # MockBroker only — move a mock price f
 ## Not here
 
 - **Scheduling is not in `alice-uta`.** Recurring/headless workspace work is
-  issue-backed: use `alice-workspace issue create` or write
+  issue-backed: use `alice issue create` or write
   `.alice/issues/<id>.md` with a `when` field (see the `self-scheduling` skill).

@@ -13,6 +13,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
+import { PageTopBar } from '../components/PageTopBar'
 import { ArchiveRestore, GitMerge, Trash2 } from 'lucide-react'
 
 import { useWorkspaces } from '../contexts/workspaces-context'
@@ -199,6 +200,11 @@ export function WorkspaceListPage() {
 
   return (
     <div className="h-full overflow-y-auto">
+      <PageTopBar title={t('workspace.overviewTitle')} actions={
+        <span className="text-xs text-muted-foreground">
+          {hasLoaded ? t(workspaces.length === 1 ? 'workspace.workspaceSingular' : 'workspace.workspacePlural', { count: workspaces.length }) : t('workspace.activeCountUnavailable')}
+        </span>
+      } />
       <div className="mx-auto max-w-5xl px-4 py-4 sm:px-6 sm:py-6">
         {(listError !== null || templatesError !== null) && (
           <RefreshNotice
@@ -212,16 +218,6 @@ export function WorkspaceListPage() {
             className="mb-4 sm:mb-5"
           />
         )}
-        <div className="mb-4 flex items-baseline justify-between gap-4 sm:mb-5">
-          <h2 className="text-[18px] font-semibold tracking-[-0.012em] text-foreground">{t('workspace.overviewTitle')}</h2>
-          <span className="text-[12px] text-muted-foreground">
-            {hasLoaded
-              ? t(workspaces.length === 1 ? 'workspace.workspaceSingular' : 'workspace.workspacePlural', {
-                  count: workspaces.length,
-                })
-              : t('workspace.activeCountUnavailable')}
-          </span>
-        </div>
 
         <div className="space-y-5 sm:space-y-6">
           {sections.map((sec) => (

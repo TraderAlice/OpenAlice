@@ -7,7 +7,7 @@ import { bunReleaseContentIdentity } from './bun-release-content-identity.mjs'
 describe('Bun native release content identity', () => {
   it.each([
     ['Web UI', 'share/openalice/ui/dist/index.html'],
-    ['default resources', 'share/openalice/default/skills/alice-workspace/SKILL.md'],
+    ['default resources', 'share/openalice/default/skills/alice/SKILL.md'],
     ['Workspace templates', 'share/openalice/src/workspaces/templates/chat/bootstrap.mjs'],
   ])('changes when %s changes while the executable stays byte-identical', (_label, changedPath) => {
     const original = releaseMetadata()
@@ -80,7 +80,7 @@ function releaseMetadata(overrides = {}) {
   const content = {
     'bin/openalice': '#!/bin/sh\nprintf openalice\\n\n',
     'share/openalice/ui/dist/index.html': '<main>OpenAlice</main>\n',
-    'share/openalice/default/skills/alice-workspace/SKILL.md': '# Alice Workspace\n',
+    'share/openalice/default/skills/alice/SKILL.md': '# Alice\n',
     'share/openalice/src/workspaces/templates/chat/bootstrap.mjs': 'export const chat = true\n',
     ...overrides,
   }
