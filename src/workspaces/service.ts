@@ -591,7 +591,7 @@ export interface WorkspaceService {
   }): Promise<ConnectorDesk>;
   disableTelegramConnectorDesk(): Promise<ConnectorDesk | null>;
   /** Safe Workspace Session index. resumeId is the only public conversation handle. */
-  sessionDirectory(wsId: string, limit?: number): Promise<WorkspaceSessionDirectory | null>;
+  sessionDirectory(wsId: string, limit?: number, resumeId?: string): Promise<WorkspaceSessionDirectory | null>;
   /** Change in-desk floor presence. Does not retire or delete the coworker. */
   setSessionPresence(input: {
     wsId: string
@@ -1870,23 +1870,43 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
         throw new HeadlessResumeError('not_ready', 'runtime session id has not been captured yet');
       }
       await sessionRegistry.ensureLoaded(ws.id);
-      const productSession = sessionRegistry.findByResumeId(ws.id, resumeId);
-      if (productSession?.state === 'running') {
-        throw new HeadlessResumeError('busy', 'this conversation already has a running execution');
-      }
-      // Reserve before the first await below. Without this, two HTTP requests
-      // can both pass the check and mutate one native transcript concurrently.
+      // Claim before stopping an interactive owner: no UI launch or second
+      // dispatch may enter the transcript during the handoff.
       if (!claimResume(resumeId)) {
         throw new HeadlessResumeError('busy', 'this conversation already has a running turn');
       }
-      nativeResume = { sessionId: identity.agentSessionId };
-      parentTaskId = identity.latestTaskId ?? headlessTasks.latestForResumeId(resumeId)?.taskId;
-      if (selection?.credentialSlug || selection?.model || selection?.reasoningEffort) {
-        throw new HeadlessResumeError('not_ready', 'a resumed Session reuses its persisted credential, model, and effort');
+      try {
+        const productSession = sessionRegistry.findByResumeId(ws.id, resumeId);
+        if (productSession?.state === 'running') {
+          const issueDispatch = trigger?.kind === 'issue' || inquiry?.subject.kind === 'issue';
+          if (!issueDispatch || productSession.surface === 'headless'
+            || headlessTasks.latestForResumeId(resumeId)?.status === 'running') {
+            throw new HeadlessResumeError('busy', 'this conversation already has a running execution');
+          }
+          const terminal = pool.get(productSession.id);
+          if (terminal) await terminal.disposeAndWait('background handoff');
+          await web.stop(productSession.id, 'background handoff');
+          await sessionRegistry.update(ws.id, productSession.id, {
+            state: 'paused', lastActiveAt: new Date().toISOString(),
+          });
+          await agentRuntimeLog.record('runtime.stopped', {
+            workspaceId: ws.id, resumeId, agent: adapter.id,
+            sessionRecordId: productSession.id,
+            surface: productSession.surface ?? 'terminal', status: 'paused',
+          });
+        }
+        nativeResume = { sessionId: identity.agentSessionId };
+        parentTaskId = identity.latestTaskId ?? headlessTasks.latestForResumeId(resumeId)?.taskId;
+        if (selection?.credentialSlug || selection?.model || selection?.reasoningEffort) {
+          throw new HeadlessResumeError('not_ready', 'a resumed Session reuses its persisted credential, model, and effort');
+        }
+        sessionRuntime = identity.runtimeBinding
+          ? await resolveSessionRuntimeBinding({ adapter, cwd: ws.dir, binding: identity.runtimeBinding })
+          : createNativeSessionRuntimeBinding({ adapter });
+      } catch (error) {
+        activeResumeIds.delete(resumeId);
+        throw error;
       }
-      sessionRuntime = identity.runtimeBinding
-        ? await resolveSessionRuntimeBinding({ adapter, cwd: ws.dir, binding: identity.runtimeBinding })
-        : createNativeSessionRuntimeBinding({ adapter });
     } else {
       const read = await readWorkspaceRuntimeSettings(ws.dir);
       if (!read.ok && read.reason === 'invalid') {
@@ -2701,6 +2721,7 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
   const sessionDirectory = async (
     wsId: string,
     limit = 50,
+    resumeId?: string,
   ): Promise<WorkspaceSessionDirectory | null> => {
     const ws = registry.get(wsId);
     if (!ws) return null;
@@ -2727,12 +2748,26 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
           }),
         })
       : new Set<string>();
+    // Activation reads target one identity, including assignments whose Issue
+    // lives in another Workspace. Ordinary roster polling remains local.
+    if (resumeId && !issueAttachments.has(resumeId)) {
+      for (const other of registry.list()) {
+        if (other.id === wsId) continue;
+        const read = await readWorkspaceIssues(other.dir);
+        if (read.ok && read.issues.some((issue) => issueAssigneeResumeId(issue.assignee) === resumeId)) {
+          issueAttachments.add(resumeId);
+          break;
+        }
+      }
+    }
     const issueTitles = issueRead.ok
       ? new Map(issueRead.issues.map((issue) => [issue.id, issue.title] as const))
       : new Map<string, string>();
     return buildWorkspaceSessionDirectory({
       workspace: { id: ws.id, tag: ws.tag },
-      identities: resumeRegistry.list({ wsId, limit }),
+      identities: resumeId
+        ? [resumeRegistry.get(resumeId)].filter((entry): entry is ResumeIdentityRecord => entry?.wsId === wsId)
+        : resumeRegistry.list({ wsId, limit }),
       interactiveFor: (resumeId) => sessionRegistry.findByResumeId(wsId, resumeId),
       latestExecutionFor: (resumeId) => headlessTasks.latestForResumeId(resumeId),
       isActive: (resumeId) => activeResumeIds.has(resumeId),
@@ -2925,8 +2960,12 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
       approveProject?: boolean;
     } = {},
   ): Promise<WebSessionSnapshot> => {
+    if (!claimResume(record.resumeId)) throw new HeadlessResumeError('busy', 'this conversation already has a running turn');
     const operationLease = workspaceOperationGuard.acquire(meta.id, 'web-session-start');
-    if (!operationLease) throw new Error(`workspace is busy with ${workspaceOperationGuard.current(meta.id)}`);
+    if (!operationLease) {
+      activeResumeIds.delete(record.resumeId);
+      throw new Error(`workspace is busy with ${workspaceOperationGuard.current(meta.id)}`);
+    }
     try {
     const adapter = adapters.get(record.agent);
     if (!adapter) throw new Error(`unknown agent runtime: ${record.agent}`);
@@ -2981,6 +3020,8 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
       spawnCwd: cwd,
       composedCommand: command,
     });
+    const terminal = pool.get(record.id);
+    if (terminal) await terminal.disposeAndWait('switch to Web');
     const snapshot = await web.start({
       recordId: record.id,
       wsId: record.wsId,
@@ -3009,6 +3050,7 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
     });
     return snapshot;
     } finally {
+      activeResumeIds.delete(record.resumeId);
       operationLease.release();
     }
   };

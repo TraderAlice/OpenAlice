@@ -986,8 +986,9 @@ export interface WorkspaceSessionDirectory {
   readonly sessions: readonly WorkspaceSessionDirectoryEntry[];
 }
 
-export async function getWorkspaceSessionDirectory(id: string): Promise<WorkspaceSessionDirectory> {
-  const res = await fetch(`/api/workspaces/${encodeURIComponent(id)}/resumes`);
+export async function getWorkspaceSessionDirectory(id: string, resumeId?: string): Promise<WorkspaceSessionDirectory> {
+  const query = resumeId ? `?resumeId=${encodeURIComponent(resumeId)}` : '';
+  const res = await fetch(`/api/workspaces/${encodeURIComponent(id)}/resumes${query}`);
   if (!res.ok) throw new Error(`Failed to load Workspace Sessions (${res.status})`);
   return res.json() as Promise<WorkspaceSessionDirectory>;
 }

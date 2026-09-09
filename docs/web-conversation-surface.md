@@ -154,3 +154,13 @@ or lifecycle defects, and never claim every runtime passed from one shared
 wire's fake-process fixture.
 
 Managed launch permissions follow [[docs/model-semantics-and-runtime-injection.md]]. Protocol permission handling remains available for native policy requests; normal managed tool execution is approved at launch.
+
+## Background ownership handoff
+
+Issue and Connector desk work can preempt a TUI/Web interactive connection on
+the same Session. Native context is retained. The shared resume lease excludes
+new interactive starts while the previous child is stopping and the background
+turn is running. A deliberate PTY disposal must not trigger browser reconnect.
+Web shutdown waits for child termination, including the SIGKILL fallback, before
+another writer may start. The UI renders background occupancy without attaching
+a terminal to a headless Session.

@@ -3164,6 +3164,14 @@ export const en = {
     notFoundBody: 'No template named {{name}}.',
   },
   workspace: {
+    interactiveOwnership: {
+      background: 'This Session is running in the background. The interactive connection has been released.',
+      title: 'Open an interactive connection?',
+      message: 'This Session handles Connector messages or assigned Issues. Opening it gives you interactive control. Incoming messages, Issue comments, and automation will disconnect this view and continue in the background. Conversation history is retained.',
+      confirm: 'Open connection',
+      actions: 'Session actions',
+      disconnect: 'Disconnect interactive connection',
+    },
     newWorkspace: 'New workspace',
     overview: 'Overview',
     templates: 'Templates',

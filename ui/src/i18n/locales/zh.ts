@@ -3131,6 +3131,14 @@ export const zh: Resources = {
     notFoundBody: '没有名为 {{name}} 的模板。',
   },
   workspace: {
+    interactiveOwnership: {
+      background: '此会话正在后台执行任务，交互连接已释放。',
+      title: '打开交互连接？',
+      message: '此会话负责 Connector 消息或已分配的 Issue。打开后你将接管交互；收到新消息、Issue 评论或自动化触发时，此连接会自动断开，让后台任务继续。会话历史会保留。',
+      confirm: '打开连接',
+      actions: '会话操作',
+      disconnect: '断开交互连接',
+    },
     newWorkspace: '新建工作区',
     overview: '总览',
     templates: '模板',

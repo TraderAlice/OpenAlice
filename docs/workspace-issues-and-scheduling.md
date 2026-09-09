@@ -262,6 +262,21 @@ Reads such as list/show aggregate all workspaces. Writes from an autonomous or
 headless run stay inside its own Workspace. Editing a peer Workspace requires
 an attended, human-approved path and a commit in the peer repository.
 
+## Interactive handoff
+
+Opening a Connector desk or Issue-assigned Session in TUI/Web requires a UI
+acknowledgement. The shared Session actions menu offers **Disconnect interactive
+connection**; this stops the interactive process and preserves the native
+conversation. Closing a browser tab alone is not a disconnect.
+
+Issue dispatch (scheduled, manual, retry, and comment replies, including
+Connector desk messages) claims the same resume lease used by UI startup,
+stops any TUI/Web owner, and waits for process exit before starting the
+headless turn. Another background turn is never preempted. Capacity/busy
+admission still follows the existing scanner/Connector queue policy.
+The disconnected browser does not reconnect automatically and shows background
+occupancy until the turn finishes; returning to interactive mode is explicit.
+
 ## Execution Flow
 
 ```text

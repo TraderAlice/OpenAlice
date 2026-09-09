@@ -64,6 +64,7 @@ export function ResumeCta(props: ResumeCtaProps): ReactElement {
       else await props.onResume();
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
+    } finally {
       setResuming(null);
     }
   };

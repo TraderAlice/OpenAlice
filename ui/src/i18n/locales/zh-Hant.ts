@@ -3140,6 +3140,14 @@ export const zhHant: Resources = {
     notFoundBody: '沒有名為 {{name}} 的模板。',
   },
   workspace: {
+    interactiveOwnership: {
+      background: '此會話正在背景執行任務，互動連線已釋放。',
+      title: '開啟互動連線？',
+      message: '此會話負責 Connector 訊息或已指派的 Issue。開啟後你將接管互動；收到新訊息、Issue 評論或自動化觸發時，此連線會自動中斷，讓背景任務繼續。會話歷史會保留。',
+      confirm: '開啟連線',
+      actions: '會話操作',
+      disconnect: '中斷互動連線',
+    },
     newWorkspace: '新增工作區',
     overview: '總覽',
     templates: '範本',

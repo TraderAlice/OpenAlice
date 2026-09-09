@@ -3133,6 +3133,14 @@ export const ja: Resources = {
     notFoundBody: '{{name}} という名前のテンプレートはありません。',
   },
   workspace: {
+    interactiveOwnership: {
+      background: 'このセッションはバックグラウンドで実行中です。対話接続は切断されました。',
+      title: '対話接続を開きますか？',
+      message: 'このセッションは Connector メッセージまたは Issue を担当しています。新着メッセージ、コメント、自動化の実行時には対話接続を切断し、バックグラウンド処理を優先します。会話履歴は保持されます。',
+      confirm: '接続を開く',
+      actions: 'セッション操作',
+      disconnect: '対話接続を切断',
+    },
     newWorkspace: '新しいワークスペース',
     overview: '概要',
     templates: 'テンプレート',

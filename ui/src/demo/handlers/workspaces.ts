@@ -1163,13 +1163,14 @@ export const workspacesHandlers = [
     demoSessionPresence.set(resumeId, presence)
     return HttpResponse.json({ resumeId, presence, lifecycle: 'active' })
   }),
-  http.get('/api/workspaces/:id/resumes', ({ params }) => {
+  http.get('/api/workspaces/:id/resumes', ({ params, request }) => {
+    const requestedResume = new URL(request.url).searchParams.get('resumeId')
     const wsId = String(params.id)
     if (wsId === DEMO_AUTO_QUANT_WORKSPACE_ID) {
       return HttpResponse.json({
         workspace: { id: wsId, tag: 'auto-quant' },
         sessions: [{
-          resumeId: 'resume-demo-thesis-owner', agent: 'claude',
+          resumeId: 'resume-demo-thesis-owner', agent: 'claude', issueAttached: true,
           createdAt: Date.now() - 86_400_000, updatedAt: Date.now() - 60_000,
           lifecycle: 'active', resumable: true, active: false,
           runtime: demoResumeRuntimes.get('resume-demo-thesis-owner'),
@@ -1179,7 +1180,7 @@ export const workspacesHandlers = [
             finishedAt: Date.now() - 60_000,
             assistantPreview: 'Reviewed the active thesis invalidation rules.',
           },
-        }],
+        }].filter((session) => !requestedResume || session.resumeId === requestedResume),
       })
     }
     const workspace = demoWorkspaces.find((candidate) => candidate.id === wsId)
@@ -1282,7 +1283,7 @@ export const workspacesHandlers = [
     }
     return HttpResponse.json({
       workspace: { id: wsId, tag: workspace?.tag ?? wsId },
-      sessions: sessions.map((session) => {
+      sessions: sessions.filter((session) => !requestedResume || session.resumeId === requestedResume).map((session) => {
         const presence = demoSessionPresence.get(session.resumeId) ?? session.presence
         return presence && presence !== 'active' ? { ...session, presence } : session
       }),

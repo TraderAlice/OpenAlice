@@ -1716,7 +1716,8 @@ export function createWorkspaceRoutes(
   app.get('/:id/resumes', async (c) => {
     const id = c.req.param('id');
     if (!validId(id)) return c.json({ error: 'not_found' }, 404);
-    const directory = await svc.sessionDirectory(id, 100);
+    const resumeId = c.req.query('resumeId');
+    const directory = await svc.sessionDirectory(id, 100, resumeId || undefined);
     if (!directory) return c.json({ error: 'workspace_not_found' }, 404);
     return c.json(directory);
   });
@@ -2174,6 +2175,9 @@ export function createWorkspaceRoutes(
       const live = svc.pool.get(token);
       if (!record && !live) return c.json({ error: 'not_found' }, 404);
 
+      const claimed = record ? (svc.claimResume?.(record.resumeId) ?? true) : false;
+      if (record && !claimed) return c.json({ error: 'resume_busy', message: 'A background turn owns this Session' }, 409);
+      try {
       let scrollbackRel: string | null = null;
       if (record?.agent === 'shell' && live) {
         try {
@@ -2185,7 +2189,8 @@ export function createWorkspaceRoutes(
           launcherLogger.warn('scrollback.dump_failed', { id, token, err });
         }
       }
-      const wasTerminalRunning = svc.pool.disposeToken(token, action === 'pause' ? 'paused' : 'tab stop');
+      const wasTerminalRunning = Boolean(live);
+      if (live) await live.disposeAndWait(action === 'pause' ? 'paused' : 'tab stop');
       const wasWebRunning = await svc.web?.stop(token, action === 'pause' ? 'paused' : 'tab stop') ?? false;
       const wasRunning = wasTerminalRunning || wasWebRunning;
       if (record) {
@@ -2218,6 +2223,7 @@ export function createWorkspaceRoutes(
         })
       }
       return c.json({ ok: true, wasRunning });
+      } finally { if (claimed && record) svc.releaseResume?.(record.resumeId); }
     });
   }
 
@@ -2558,7 +2564,6 @@ export function createWorkspaceRoutes(
         cwd: meta.dir,
         launcherRepoRoot: svc.config.launcherRepoRoot,
       });
-      if (svc.pool.get(token)) svc.pool.disposeToken(token, 'switch to Web');
       const snapshot = await svc.startWebSession(
         meta,
         record,
@@ -2566,6 +2571,9 @@ export function createWorkspaceRoutes(
       );
       return c.json({ ok: true, snapshot, session: publicSession(record) });
     } catch (err) {
+      if (err instanceof HeadlessResumeError) {
+        return c.json({ error: 'resume_busy', message: err.message }, 409);
+      }
       await svc.sessionRegistry.update(id, token, {
         state: 'paused',
         surface: 'webpi',
