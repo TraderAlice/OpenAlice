@@ -1,3 +1,4 @@
+import { runtimeCompileOptions } from './bun-compile-options.js'
 import { createHash } from 'node:crypto'
 import {
   chmod,
@@ -69,8 +70,7 @@ const build = await Bun.build({
   entrypoints: [join(repositoryRoot, 'packages/cli/bin/openalice-bun.ts')],
   compile: {
     outfile: executablePath,
-    autoloadBunfig: false,
-    autoloadDotenv: false,
+    ...runtimeCompileOptions,
   },
   define: {
     'globalThis.__OPENALICE_BUILD_VERSION__': JSON.stringify(product.version),
