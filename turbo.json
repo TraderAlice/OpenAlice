@@ -13,6 +13,31 @@
     "@traderalice/openalice-cli#build": {
       "dependsOn": [],
       "outputs": []
+    },
+    "@traderalice/uta-broker-alpaca#build": {
+      "dependsOn": ["^build"],
+      "outputs": ["dist/**"],
+      "inputs": ["$TURBO_DEFAULT$", "$TURBO_ROOT$/services/uta/src/**"]
+    },
+    "@traderalice/uta-broker-ccxt#build": {
+      "dependsOn": ["^build"],
+      "outputs": ["dist/**"],
+      "inputs": ["$TURBO_DEFAULT$", "$TURBO_ROOT$/services/uta/src/**"]
+    },
+    "@traderalice/uta-broker-ibkr#build": {
+      "dependsOn": ["^build"],
+      "outputs": ["dist/**"],
+      "inputs": ["$TURBO_DEFAULT$", "$TURBO_ROOT$/services/uta/src/**"]
+    },
+    "@traderalice/uta-broker-leverup#build": {
+      "dependsOn": ["^build"],
+      "outputs": ["dist/**"],
+      "inputs": ["$TURBO_DEFAULT$", "$TURBO_ROOT$/services/uta/src/**"]
+    },
+    "@traderalice/uta-broker-longbridge#build": {
+      "dependsOn": ["^build"],
+      "outputs": ["dist/**"],
+      "inputs": ["$TURBO_DEFAULT$", "$TURBO_ROOT$/services/uta/src/**"]
     }
   }
 }

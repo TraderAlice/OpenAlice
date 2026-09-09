@@ -154,7 +154,10 @@ ENV OPENALICE_APP_HOME=/app \
     OPENALICE_MCP_PORT=47332 \
     OPENALICE_UTA_PORT=47333 \
     OPENALICE_CONNECTOR_PORT=47334 \
-    OPENALICE_BIND_HOST=0.0.0.0
+    OPENALICE_BIND_HOST=0.0.0.0 \
+    # No /etc/machine-id in this image, and the hostname changes on every
+    # recreate. Override per host if one /data volume is shared (unsupported).
+    OPENALICE_MACHINE_ID=openalice-docker
 
 VOLUME ["/data"]
 EXPOSE 47331

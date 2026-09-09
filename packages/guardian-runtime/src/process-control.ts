@@ -1,4 +1,5 @@
 import { execFile } from 'node:child_process'
+import { readFileSync } from 'node:fs'
 import { readFile } from 'node:fs/promises'
 import { hostname } from 'node:os'
 import { promisify } from 'node:util'
@@ -40,8 +41,15 @@ export function machineIdentity(): Promise<string> {
   return machineIdPromise
 }
 
-/** Rounded to seconds so it can be compared with `ps lstart` on POSIX. */
+/**
+ * Must come from the same clock `ProcessController.startedAt()` reads back.
+ * `process.uptime()` counts from Node's main(), about 1s after exec, which
+ * eats most of `PROCESS_START_TOLERANCE_MS`. The fallback is rounded to
+ * seconds to match `ps lstart`.
+ */
 export function currentProcessStartedAt(): number {
+  const fromProcfs = readProcfsProcessStartedAtSync(process.pid)
+  if (fromProcfs !== null) return fromProcfs
   return Math.floor((Date.now() - process.uptime() * 1_000) / 1_000) * 1_000
 }
 
@@ -57,18 +65,45 @@ export function normalizeProcessExitCode(value: unknown): number {
     : 0
 }
 
+/**
+ * Result of comparing a live pid against the start time recorded for it.
+ *
+ * `unverified` means the platform could not report a start time at all, so the
+ * pid may or may not still be the recorded process. Callers decide how to treat
+ * that ambiguity: liveness checks fail open, while lock inspection combines it
+ * with heartbeat age.
+ */
+export type ProcessIdentityMatch = 'same' | 'different' | 'unverified'
+
+/** `ps lstart` reports whole seconds and the fallback in
+ * `currentProcessStartedAt()` rounds to whole seconds, so a small tolerance
+ * keeps every source comparable. */
+const PROCESS_START_TOLERANCE_MS = 2_000
+
+export async function compareProcessIdentity(
+  pid: number,
+  expectedStartedAt: string | undefined,
+  controller: ProcessController = defaultProcessController,
+): Promise<ProcessIdentityMatch> {
+  if (!expectedStartedAt) return 'unverified'
+  const expected = Date.parse(expectedStartedAt)
+  if (!Number.isFinite(expected)) return 'unverified'
+  // A recorded owner pid that is our own pid never needs an external lookup:
+  // we already know when this process started. A container restarted under the
+  // same pid namespace hands the fresh process the same low pid as the owner it
+  // is meant to replace, so this must resolve to `different`, not `unverified`.
+  const actual = pid === process.pid ? currentProcessStartedAt() : await controller.startedAt(pid)
+  if (actual === null) return 'unverified'
+  return Math.abs(actual - expected) <= PROCESS_START_TOLERANCE_MS ? 'same' : 'different'
+}
+
 export async function isSameProcess(
   pid: number,
   expectedStartedAt: string | undefined,
   controller: ProcessController = defaultProcessController,
 ): Promise<boolean> {
   if (!controller.isAlive(pid)) return false
-  if (!expectedStartedAt) return true
-  const expected = Date.parse(expectedStartedAt)
-  if (!Number.isFinite(expected)) return true
-  const actual = await controller.startedAt(pid)
-  if (actual === null) return true
-  return Math.abs(actual - expected) <= 2_000
+  return (await compareProcessIdentity(pid, expectedStartedAt, controller)) !== 'different'
 }
 
 export interface TerminateProcessTreeOptions {
@@ -128,7 +163,74 @@ async function waitForProcessesExit(
   return pids.every((pid) => !controller.isAlive(pid))
 }
 
+/**
+ * Linux exposes process start time in `/proc/<pid>/stat` field 22, counted in
+ * clock ticks since boot. `/proc` always reports these in USER_HZ (100), which
+ * is fixed in the kernel ABI regardless of the compiled-in scheduler HZ, so the
+ * conversion does not need `sysconf(_SC_CLK_TCK)`.
+ *
+ * Field 2 (`comm`) is unquoted and may itself contain spaces and parentheses,
+ * so the fields are parsed after the LAST `)` rather than by splitting the
+ * whole line.
+ */
+export function parseProcStatStartTicks(content: string): number | null {
+  const commEnd = content.lastIndexOf(')')
+  if (commEnd < 0) return null
+  const fields = content.slice(commEnd + 1).trim().split(/\s+/)
+  // Fields resume at 3 (state) after `comm`, so field 22 is index 19.
+  const ticks = Number(fields[19])
+  return Number.isFinite(ticks) && ticks >= 0 ? ticks : null
+}
+
+/** Seconds since the epoch at which the machine booted, from `/proc/stat`. */
+export function parseProcBootTimeSeconds(content: string): number | null {
+  const value = /^btime\s+(\d+)$/m.exec(content)?.[1]
+  if (value === undefined) return null
+  const seconds = Number(value)
+  return Number.isFinite(seconds) && seconds > 0 ? seconds : null
+}
+
+const USER_HZ = 100
+
+function procfsStartedAt(statContent: string, bootContent: string): number | null {
+  const ticks = parseProcStatStartTicks(statContent)
+  const bootSeconds = parseProcBootTimeSeconds(bootContent)
+  if (ticks === null || bootSeconds === null) return null
+  return bootSeconds * 1_000 + (ticks / USER_HZ) * 1_000
+}
+
+async function readProcfsProcessStartedAt(pid: number): Promise<number | null> {
+  try {
+    const [statContent, bootContent] = await Promise.all([
+      readFile(`/proc/${pid}/stat`, 'utf8'),
+      readFile('/proc/stat', 'utf8'),
+    ])
+    return procfsStartedAt(statContent, bootContent)
+  } catch {
+    return null
+  }
+}
+
+function readProcfsProcessStartedAtSync(pid: number): number | null {
+  if (process.platform !== 'linux') return null
+  try {
+    return procfsStartedAt(
+      readFileSync(`/proc/${pid}/stat`, 'utf8'),
+      readFileSync('/proc/stat', 'utf8'),
+    )
+  } catch {
+    return null
+  }
+}
+
 async function readProcessStartedAt(pid: number): Promise<number | null> {
+  // Prefer procfs on Linux. Minimal container images (including the OpenAlice
+  // server image) ship no `ps`, and a failed lookup there used to make every
+  // recorded owner look unverifiable forever.
+  if (process.platform === 'linux') {
+    const fromProcfs = await readProcfsProcessStartedAt(pid)
+    if (fromProcfs !== null) return fromProcfs
+  }
   try {
     if (process.platform === 'win32') {
       const script = `(Get-Process -Id ${pid} -ErrorAction Stop).StartTime.ToUniversalTime().ToString('o')`
@@ -146,6 +248,15 @@ async function readProcessStartedAt(pid: number): Promise<number | null> {
   } catch {
     return null
   }
+}
+
+/**
+ * `hostname:` ids are the fallback used when no stable machine id exists, e.g.
+ * slim containers without /etc/machine-id. Hostnames change on container
+ * recreate and are not unique, so such an id is not evidence of a machine.
+ */
+export function isWeakMachineId(id: string): boolean {
+  return id.startsWith('hostname:')
 }
 
 async function readMachineId(): Promise<string> {

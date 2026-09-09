@@ -57,6 +57,19 @@ source wrappers over installed packs. This opt-in is ignored outside dev/tests
 and still requires workspace loading to be allowed. It changes no activated
 pack pointer and is useful when debugging adapters against an existing Project.
 
+Each `packages/uta-broker-<engine>/src/index.ts` imports its broker
+implementation from outside the package
+(`services/uta/src/domain/trading/brokers/<engine>/...`), and tsup's
+`noExternal` bundles that source directly into `dist/index.js` rather than
+treating it as an external dependency. Because this is a relative-path import
+and not a `package.json` dependency edge, Turbo cannot infer it: `turbo.json`
+declares an explicit `inputs` override for each `uta-broker-*` package that
+adds `$TURBO_ROOT$/services/uta/src/**` on top of `$TURBO_DEFAULT$`, so editing
+UTA broker source correctly invalidates that pack's build cache. If a new
+broker wrapper package bundles files from outside its own directory, add a
+matching per-package `inputs` override or its `pnpm broker-packs:build` output
+can silently ship stale code from a cache hit.
+
 Pack-local dependency copies cross a structural API boundary. Core code must
 not depend on class identity from a Pack's dependency tree; use structural
 checks such as `Decimal.isDecimal` and stable error codes instead of
