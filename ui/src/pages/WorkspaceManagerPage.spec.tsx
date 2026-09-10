@@ -616,7 +616,7 @@ describe('WorkspaceManagerPage runtime selection', () => {
     expect(screen.getByRole('button', { name: 'AI access' }).textContent).toContain('Workspace AI setup')
   })
 
-  it('keeps a paused non-Pi Manager Session stopped until the user resumes it', async () => {
+  it('opens a paused Manager Session directly in its saved terminal', async () => {
     const session: SessionRecord = {
       id: 'manager-codex',
       resumeId: 'manager-codex-resume',
@@ -639,11 +639,10 @@ describe('WorkspaceManagerPage runtime selection', () => {
       params: { sessionId: session.id },
     }} />)
 
-    expect(mocks.resumeSession).not.toHaveBeenCalled()
+    expect(mocks.resumeSession).toHaveBeenCalledOnce()
     expect(screen.queryByTestId('terminal-view')).toBeNull()
     expect(container.firstElementChild?.classList.contains('workspaces-root')).toBe(true)
 
-    fireEvent.click(screen.getByRole('button', { name: 'Resume in TUI' }))
 
     expect(mocks.resumeSession).toHaveBeenCalledWith(
       'workspace-manager',
@@ -704,10 +703,6 @@ describe('WorkspaceManagerPage runtime selection', () => {
       params: { sessionId: session.id },
     }} />)
 
-    expect(mocks.openWebSession).not.toHaveBeenCalled()
-    const openWeb = screen.getByText('Open in Web').closest('button')
-    expect(openWeb).toBeTruthy()
-    fireEvent.click(openWeb as HTMLButtonElement)
 
     expect(mocks.openWebSession).toHaveBeenCalledWith('workspace-manager', session.id)
     expect(mocks.resumeSession).not.toHaveBeenCalled()

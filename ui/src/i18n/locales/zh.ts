@@ -3132,6 +3132,9 @@ export const zh: Resources = {
     notFoundBody: '没有名为 {{name}} 的模板。',
   },
   workspace: {
+    sessionNotFound: '这个会话已不存在。',
+    sessionOpening: '正在打开会话…',
+    sessionDisconnected: '交互连接已断开。',
     interactiveOwnership: {
       background: '此会话正在后台执行任务，交互连接已释放。',
       title: '打开交互连接？',

@@ -3165,6 +3165,9 @@ export const en = {
     notFoundBody: 'No template named {{name}}.',
   },
   workspace: {
+    sessionNotFound: 'This Session no longer exists.',
+    sessionOpening: 'Opening Session…',
+    sessionDisconnected: 'The interactive connection is disconnected.',
     interactiveOwnership: {
       background: 'This Session is running in the background. The interactive connection has been released.',
       title: 'Open an interactive connection?',
