@@ -132,7 +132,7 @@ jobs:
 
       - name: Build optional Broker Packs on Windows
         run: pnpm broker-packs:build
-        timeout-minutes: 10
+        timeout-minutes: 20
 
       - name: Verify Broker Packs in compiled runtime
         run: pnpm exec tsx scripts/verify-broker-packs.ts --compiled
