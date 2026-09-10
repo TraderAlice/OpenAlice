@@ -293,7 +293,12 @@ export const conversationCreateFactory: WorkspaceToolFactory = {
         wsId: z.string().min(1).optional().describe('Workspace in which to create a new Session.'),
         harness: z.enum(['chat', 'autoquant', 'prediction']).optional().describe('Create in this Harness default Workspace.'),
       }),
-      execute: async (input, options) => ask.execute!(input, options),
+      execute: async (input, options) => {
+        if (Number(Boolean(input.wsId)) + Number(Boolean(input.harness)) !== 1) {
+          return { ok: false, error: 'conversation create requires exactly one target: --ws-id or --harness; use conversation ask --resume-id to continue a Session' }
+        }
+        return ask.execute!(input, options)
+      },
     })
   },
 }

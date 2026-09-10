@@ -403,3 +403,12 @@ describe('conversation creation and selection', () => {
     expect(ask).toHaveBeenCalledWith(expect.objectContaining({ selection: { reasoningEffort: 'high' }, target: { kind: 'resume', resumeId: 'r' } }))
   })
 })
+
+
+it('creation target errors only suggest creation addresses', async () => {
+  const ask = vi.fn()
+  const tool = conversationCreateFactory.build(context({ conversation: { ask, read: vi.fn() } }))
+  expect(await run(tool, { prompt: 'work' })).toMatchObject({ ok: false, error: expect.stringContaining('exactly one target: --ws-id or --harness') })
+  expect(await run(tool, { prompt: 'work', wsId: 'w', harness: 'chat' })).toMatchObject({ ok: false })
+  expect(ask).not.toHaveBeenCalled()
+})
