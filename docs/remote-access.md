@@ -49,6 +49,14 @@ loop on a host with no Node, Bun, or Agent Runtime installed. Real long-latency
 Agent TUI measurements remain a separate release observation rather than a
 reason to invent a new terminal protocol preemptively.
 
+Native `server run/start` derives its content identity from the installed
+`release.json`, matching the interactive launcher. Readiness confirms pending
+activation only when the running identity matches the installed pointer.
+Ownership contention exits with code 75 and does not roll back the installed
+release; corrupted or non-starting releases retain the existing rollback path.
+On Linux, process identity prefers procfs start ticks plus boot time, with the
+existing conservative fallback when process metadata cannot be read.
+
 ## Product Decision
 
 OpenAlice has four first-class entry surfaces, not one replacement chain:

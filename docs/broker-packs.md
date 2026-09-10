@@ -112,7 +112,7 @@ have open. Pack directories are replaceable machine/runtime state: backup
 incompatible machine.
 
 On production startup Alice reconciles only Packs that already have an active
-downloaded release. A Pack produced by another OpenAlice version continues
+downloaded release. A Pack produced by another OpenAlice version or a different bound dev content revision continues
 serving through the supported Pack API while Alice downloads the current
 platform artifact, validates it, atomically switches `active.json`, and asks
 Guardian to restart UTA. A prior Pack with an old API is not loaded, but its
@@ -125,6 +125,20 @@ development and test runtimes skip automatic network reconciliation.
 Linux catalogs may declare a minimum glibc version. The current Longbridge GNU
 artifact requires glibc 2.39, so older Ubuntu/WSL systems are rejected before
 the native module is loaded instead of crashing UTA with `ERR_DLOPEN_FAILED`.
+
+Rolling dev CLI releases bundle `share/openalice/broker-pack-source.json`.
+Its catalog is bound to the same full source commit and covered by the CLI
+content identity. Status compares the active Pack content ID with the expected
+archive SHA-256 prefix, even when both have the same product version. This
+check is local; installed dev versions never consult a mutable latest catalog.
+Archives are downloaded on demand from `cli/dev/releases/<commit>/`.
+Explicit catalog/base URL overrides remain available for controlled tests.
+Stable/legacy releases without a binding retain their versioned catalog lookup.
+
+The dev publisher builds and loads Packs on native hosts, validates all archive
+hashes and the embedded catalog agreement, and publishes immutable Pack assets
+before advancing the CLI channel receipt. Longbridge is omitted on Windows
+ARM64 because its upstream native binding is unavailable there.
 
 ## Release Assets
 

@@ -77,6 +77,7 @@ main().then(
   (error: unknown) => {
     const message = error instanceof Error ? error.message : String(error)
     process.stderr.write(`openalice: ${message}\n`)
-    process.exitCode = 1
+    const exitCode = (error as { exitCode?: number } | null)?.exitCode
+    process.exitCode = Number.isInteger(exitCode) ? exitCode! : 1
   },
 )

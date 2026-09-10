@@ -1,3 +1,4 @@
+import { writeDevBrokerBinding } from './dev-broker-binding.mjs'
 import { createHash } from 'node:crypto'
 import { cp, mkdir, mkdtemp, readdir, readFile, stat, writeFile } from 'node:fs/promises'
 import { basename, dirname, join, relative, resolve } from 'node:path'
@@ -66,6 +67,8 @@ export MSYS2_ENV_CONV_EXCL='OPENALICE_TOOL_URL;OPENALICE_TOOL_SOCKET'
 exec "$(cygpath -u "$OPENALICE_RUNTIME_EXECUTABLE")" --workspace-cli ${helper} "$@"
 `, { mode: 0o755 })
 }
+
+await writeDevBrokerBinding(resources, { commit: process.env.OPENALICE_DEV_COMMIT, inputDir: join(root, 'dist/dev-broker-packs'), version, platform: 'win32', arch })
 
 if (channelBuild) await cp(join(root, 'install.ps1'), join(resources, 'install.ps1'))
 if (!channelBuild) {

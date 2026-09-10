@@ -699,6 +699,6 @@ export async function startGuardianRuntime() {
 if (!globalThis.__OPENALICE_INTERNAL_ROLE_DISPATCH__) {
   startGuardianRuntime().catch((err) => {
     console.error('[guardian/prod] fatal:', err)
-    shutdown(1)
+    shutdown(Number.isInteger(err?.exitCode) ? err.exitCode : 1)
   })
 }
