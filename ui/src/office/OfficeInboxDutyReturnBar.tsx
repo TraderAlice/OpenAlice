@@ -1,3 +1,4 @@
+import { inboxFiles } from '@traderalice/connector-protocol'
 import { useEffect, useState, type ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
 
@@ -37,7 +38,7 @@ function isExactFileSurface(
 ): boolean {
   return excursion.phase === 'presented'
     && excursion.duty.destination.workspaceId === surface.workspaceId
-    && (excursion.duty.delivery.entry.docs ?? []).some(
+    && inboxFiles(excursion.duty.delivery.entry).some(
       (document) => document.path === surface.path,
     )
 }

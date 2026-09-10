@@ -20,7 +20,8 @@ function duty(id = 'inbox-42'): OfficeInboxDutyCandidate {
       ts: 42,
       workspaceId: 'chat-1',
       workspaceLabel: 'Semis desk',
-      docs: [{ path: 'reports/nvda.md', revision: 'rev-a' }],
+      body: "[[reports/nvda.md]]",
+      fileRevisions: Object.fromEntries(([{ path: 'reports/nvda.md', revision: 'rev-a' }]).map(doc => [doc.path, doc.revision!]))
     },
   }], 'ready').candidates[0] as OfficeInboxDutyCandidate
 }

@@ -28,7 +28,7 @@ describe('presentInboxEntry', () => {
       'VST led on datacenter-power flow, and the rest of the tape was quiet enough to ignore.',
     ].join('\n')
 
-    expect(presentInboxEntry({ comments }, { ...copy, ...row })).toEqual({
+    expect(presentInboxEntry({ body: comments }, { ...copy, ...row })).toEqual({
       subject: 'Morning scan is in',
       documentTitle: 'Morning scan is in',
       excerpt: 'VST led on datacenter-power flow, and the rest of the tape was quiet enough to ignore.',
@@ -38,15 +38,15 @@ describe('presentInboxEntry', () => {
   })
 
   it('marks an exact leading Markdown heading so a reading surface can avoid duplicating it', () => {
-    expect(presentInboxEntry({ comments: '# Close report\n\nThe book is flat.' }, { ...copy, ...row }))
+    expect(presentInboxEntry({ body: '# Close report\n\nThe book is flat.' }, { ...copy, ...row }))
       .toMatchObject({ subject: 'Close report', documentTitle: 'Close report', repeatsLeadingHeading: true })
-    expect(presentInboxEntry({ comments: 'Close report\n\nThe book is flat.' }, { ...copy, ...row }))
+    expect(presentInboxEntry({ body: 'Close report\n\nThe book is flat.' }, { ...copy, ...row }))
       .toMatchObject({ subject: 'Close report', documentTitle: 'Close report', repeatsLeadingHeading: false })
   })
 
   it('keeps a long Markdown heading complete in the reading pane while bounding the scan subject', () => {
     const heading = 'A deliberately long close report heading that should remain complete in the document reading pane'
-    const presented = presentInboxEntry({ comments: `# ${heading}\n\nThe book is flat.` }, { ...copy, ...row })
+    const presented = presentInboxEntry({ body: `# ${heading}\n\nThe book is flat.` }, { ...copy, ...row })
 
     expect(presented.subject.endsWith('…')).toBe(true)
     expect(presented.documentTitle).toBe(heading)
@@ -57,7 +57,7 @@ describe('presentInboxEntry', () => {
     const tail = 'TAIL_MARKER_THAT_MUST_NOT_BECOME_THE_SUBJECT'
     const comments = `Services revenue growth has decelerated three quarters in a row and the headline EPS beat is masking the real story ${tail}`
 
-    const presented = presentInboxEntry({ comments }, { ...copy, ...row, unread: false })
+    const presented = presentInboxEntry({ body: comments }, { ...copy, ...row, unread: false })
 
     expect(presented.subject.endsWith('…')).toBe(true)
     expect(presented.subject.includes('Services revenue growth')).toBe(true)
@@ -77,7 +77,7 @@ describe('presentInboxEntry', () => {
       '> - first finding still holds after the revise',
     ].join('\n')
 
-    expect(inboxScan({ comments }, copy)).toEqual({
+    expect(inboxScan({ body: comments }, copy)).toEqual({
       subject: 'Close report',
       excerpt: 'first finding still holds after the revise',
     })
@@ -86,57 +86,48 @@ describe('presentInboxEntry', () => {
   it('ignores surrounding whitespace and empty Markdown-only lines', () => {
     const comments = '\n\n   \n##   Watchlist\n\n---\n\n| Ticker | Gap |\n| --- | --- |\n\nThe book is flat after the trim.\n'
 
-    expect(inboxScan({ comments }, copy).subject).toBe('Watchlist')
-    expect(inboxScan({ comments }, copy).excerpt).toBe('The book is flat after the trim.')
+    expect(inboxScan({ body: comments }, copy).subject).toBe('Watchlist')
+    expect(inboxScan({ body: comments }, copy).excerpt).toBe('The book is flat after the trim.')
   })
 
   it('treats CJK punctuation as a sentence boundary and truncates long CJK without spaces', () => {
-    const presented = presentInboxEntry({
-      comments: '今日市场扫描完成。利率与半导体均有变化，需要在收盘前再看一遍成交。',
-    }, { ...copy, ...row })
+    const presented = presentInboxEntry({ body: '今日市场扫描完成。利率与半导体均有变化，需要在收盘前再看一遍成交。' }, { ...copy, ...row })
 
     expect(presented.subject).toBe('今日市场扫描完成')
     expect(presented.excerpt?.startsWith('利率与半导体均有变化')).toBe(true)
 
     const uniqueTail = '尾部标记不得成为标题'
     const long = `${'这是一条没有标点的超长中文推送用于确认不会在字素中间切开'.repeat(3)}${uniqueTail}`
-    const truncated = inboxScan({ comments: long }, copy).subject
+    const truncated = inboxScan({ body: long }, copy).subject
     expect(truncated.endsWith('…')).toBe(true)
     expect(long.startsWith(truncated.replace(/…$/, ''))).toBe(true)
     expect(truncated.includes(uniqueTail)).toBe(false)
   })
 
   it('does not treat decimal numbers as sentence endings', () => {
-    expect(inboxScan({
-      comments: 'VST printed +7.4% on 3.1x relative volume and still touches the book.',
-    }, copy).subject).toBe('VST printed +7.4% on 3.1x relative volume and still touches the book')
+    expect(inboxScan({ body: 'VST printed +7.4% on 3.1x relative volume and still touches the book.' }, copy).subject).toBe('VST printed +7.4% on 3.1x relative volume and still touches the book')
   })
 
   it('names attachment-only pushes from the file name and notes extra documents', () => {
-    expect(inboxScan({
-      comments: '   ',
-      docs: [{ path: 'reports/movers-2026-06-27.md' }, { path: 'notes/context.txt' }],
-    }, copy)).toEqual({
+    expect(inboxScan({ body: "   \n\n[[reports/movers-2026-06-27.md]]\n\n[[notes/context.txt]]" }, copy)).toEqual({
       subject: 'movers-2026-06-27.md · +1 more',
     })
   })
 
   it('uses the untitled fallback for empty pushes and never invents a body', () => {
-    expect(inboxScan({ comments: '', docs: [] }, copy)).toEqual({
+    expect(inboxScan({ body: "" }, copy)).toEqual({
       subject: 'Update without a summary',
     })
-    expect(inboxScan({}, copy).subject).toBe('Update without a summary')
+    expect(inboxScan({ body: '' }, copy).subject).toBe('Update without a summary')
   })
 
   it('omits an excerpt when the remainder does not add scan value', () => {
-    expect(inboxScan({ comments: 'Book is flat.' }, copy).excerpt).toBeUndefined()
-    expect(inboxScan({ comments: 'Done.\n\nok' }, copy).excerpt).toBeUndefined()
+    expect(inboxScan({ body: 'Book is flat.' }, copy).excerpt).toBeUndefined()
+    expect(inboxScan({ body: 'Done.\n\nok' }, copy).excerpt).toBeUndefined()
   })
 
   it('prefers the next sentence as the excerpt when the first sentence is truncated', () => {
-    const presented = inboxScan({
-      comments: 'Weekly macro digest is up — rates steepened, dollar soft, core PCE inline. Next week\'s calendar is at the bottom of the note.',
-    }, copy)
+    const presented = inboxScan({ body: 'Weekly macro digest is up — rates steepened, dollar soft, core PCE inline. Next week\'s calendar is at the bottom of the note.' }, copy)
 
     expect(presented.subject.startsWith('Weekly macro digest is up')).toBe(true)
     expect(presented.subject.endsWith('…')).toBe(true)
@@ -147,7 +138,7 @@ describe('presentInboxEntry', () => {
   it('builds a short row label and never uses the full report as the accessible name', () => {
     const omitted = 'OMITTED_REPORT_PARAGRAPH'
     const comments = `Close is ready.\n\n${'More supporting detail. '.repeat(20)}${omitted}`
-    const label = presentInboxEntry({ comments }, { ...copy, ...row }).rowLabel
+    const label = presentInboxEntry({ body: comments }, { ...copy, ...row }).rowLabel
 
     expect(label).toBe('Unread · Close is ready · Research desk · 5m ago')
     expect(label.includes(omitted)).toBe(false)
@@ -162,9 +153,7 @@ describe('presentInboxEntry', () => {
   })
 
   it('keeps excerpts visually bounded', () => {
-    const excerpt = inboxScan({
-      comments: `Lead sentence.\n\n${'Additional context about the tape and the book. '.repeat(8)}`,
-    }, copy).excerpt
+    const excerpt = inboxScan({ body: `Lead sentence.\n\n${'Additional context about the tape and the book. '.repeat(8)}` }, copy).excerpt
 
     expect(excerpt?.endsWith('…')).toBe(true)
     expect([...excerpt ?? ''].length).toBeLessThanOrEqual(INBOX_EXCERPT_LIMIT + 1)

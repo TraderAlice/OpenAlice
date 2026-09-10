@@ -1,3 +1,4 @@
+import { useInboxContent } from '../hooks/useInboxContent'
 import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
@@ -63,7 +64,7 @@ export function OfficeInboxDutyDossier({
   const resolved = !latestDuty && sourceStatus === 'ready'
   const sourceReady = sourceStatus === 'ready'
   const backlogCount = currentBacklogCount ?? duty.count
-  const documents = duty.delivery.entry.docs ?? []
+  const { files: documents } = useInboxContent(duty.delivery.entry, { resolveFiles: false })
   const visibleDocuments = documents.slice(0, 4)
   // The durable Inbox row is the captured review subject, while Scheduled
   // Issue metadata is live control-plane data. Reuse the latest safe join for

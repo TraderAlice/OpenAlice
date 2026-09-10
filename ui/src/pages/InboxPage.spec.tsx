@@ -1,3 +1,4 @@
+import { inboxFiles } from '@traderalice/connector-protocol'
 // @vitest-environment jsdom
 
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
@@ -13,7 +14,7 @@ import {
 } from '../office/inbox-duty-excursion'
 import { inboxUnreadDutyRegistration, type OfficeInboxDutyCandidate } from '../office/duty-registry'
 import { readWorkspaceFile } from '../components/workspace/api'
-import { InboxAttachment, InboxPage } from './InboxPage'
+import { InboxPage } from './InboxPage'
 
 const workspaceMocks = vi.hoisted(() => ({
   openHeadlessRun: vi.fn(),
@@ -23,7 +24,7 @@ const officeReturnMock = vi.hoisted(() => vi.fn())
 
 function officeInboxDuty(entry: InboxEntry): OfficeInboxDutyCandidate {
   return inboxUnreadDutyRegistration([{
-    title: entry.comments ?? entry.docs?.[0]?.path ?? 'Inbox delivery',
+    title: entry.body ?? inboxFiles(entry)?.[0]?.path ?? 'Inbox delivery',
     entry,
   }], 'ready').candidates[0] as OfficeInboxDutyCandidate
 }
@@ -73,58 +74,6 @@ afterEach(() => {
   vi.clearAllMocks()
 })
 
-describe('InboxAttachment', () => {
-  it('keeps the collapsed state asset-like instead of leaking raw file content', async () => {
-    render(
-      <InboxAttachment
-        workspaceId="ws-1"
-        doc={{ path: 'research/close-report.html', revision: 'sha256:1234567890' }}
-        defaultExpanded={false}
-      />,
-    )
-
-    expect(await screen.findByText('HTML report')).toBeTruthy()
-    expect(screen.getByText('close-report.html')).toBeTruthy()
-    expect(screen.getByText('research')).toBeTruthy()
-    expect(screen.queryByText(/doctype html/i)).toBeNull()
-    expect(screen.queryByText(/sent 12345678/i)).toBeNull()
-  })
-
-  it('reveals the real viewer only after the attachment is opened', async () => {
-    render(
-      <InboxAttachment
-        workspaceId="ws-1"
-        doc={{ path: 'research/close-report.html' }}
-        defaultExpanded={false}
-      />,
-    )
-
-    fireEvent.click(screen.getByRole('button', { name: 'Preview attachment close-report.html' }))
-
-    expect(await screen.findByTitle('HTML report: research/close-report.html')).toBeTruthy()
-    expect(screen.getByRole('button', { name: 'Collapse attachment close-report.html' })).toBeTruthy()
-  })
-
-  it('keeps markdown asset actions touch-sized on mobile and compact on desktop', async () => {
-    render(
-      <InboxAttachment
-        workspaceId="ws-1"
-        doc={{ path: 'research/close-report.md' }}
-        defaultExpanded={false}
-      />,
-    )
-
-    const copy = await screen.findByRole('button', { name: 'Copy Markdown' })
-    const download = screen.getByRole('button', { name: 'Download Markdown' })
-    for (const action of [copy, download]) {
-      expect(action.className).toContain('h-10')
-      expect(action.className).toContain('w-10')
-      expect(action.className).toContain('sm:h-7')
-      expect(action.className).toContain('sm:w-7')
-    }
-  })
-})
-
 describe('InboxPage deletion', () => {
   it('requires confirmation for both the button and keyboard shortcut', async () => {
     const entry = {
@@ -132,7 +81,7 @@ describe('InboxPage deletion', () => {
       ts: Date.now(),
       workspaceId: 'ws-1',
       workspaceLabel: 'research',
-      comments: 'A durable research update.',
+      body: 'A durable research update.'
     }
     vi.spyOn(api.inbox, 'history').mockResolvedValue({
       entries: [entry],
@@ -167,7 +116,7 @@ describe('InboxPage deletion', () => {
       ts: Date.now(),
       workspaceId: 'ws-1',
       workspaceLabel: 'research',
-      comments: 'Keep this update until the server confirms deletion.',
+      body: 'Keep this update until the server confirms deletion.'
     }
     let serverHasEntry = true
     vi.spyOn(api.inbox, 'history').mockImplementation(async () => ({
@@ -190,7 +139,7 @@ describe('InboxPage deletion', () => {
     expect((await screen.findByRole('alert')).textContent).toBe(
       'Couldn’t delete this Inbox entry. It is still available. Try again.',
     )
-    expect(document.querySelector('[data-markdown-variant="reading"]')?.textContent).toContain(entry.comments)
+    expect(document.querySelector('[data-markdown-variant="reading"]')?.textContent).toContain(entry.body)
     expect(screen.getByText('Delete Inbox entry?')).toBeTruthy()
     expect(useInboxSelection.getState().selectedEntryId).toBe(entry.id)
 
@@ -211,14 +160,14 @@ describe('InboxPage deletion', () => {
         ts: Date.now(),
         workspaceId: 'ws-1',
         workspaceLabel: 'research',
-        comments: 'Delete this current update.',
+        body: 'Delete this current update.'
       }
       const successor: InboxEntry = {
         id: 'inbox-delete-successor',
         ts: current.ts - 1,
         workspaceId: 'ws-1',
         workspaceLabel: 'research',
-        comments: 'Select this successor.',
+        body: 'Select this successor.'
       }
       let serverEntries = [current, successor]
       vi.spyOn(api.inbox, 'history').mockImplementation(async () => ({
@@ -271,8 +220,7 @@ describe('InboxPage Office presentation handshake', () => {
       ts: Date.now(),
       workspaceId: 'ws-1',
       workspaceLabel: 'research',
-      comments: 'Exact Office delivery.',
-      docs: [{ path: 'research/close-report.md' }],
+      body: "Exact Office delivery.\n\n[[research/close-report.md]]"
     }
     vi.spyOn(api.inbox, 'history').mockResolvedValue({ entries: [entry], hasMore: false })
     rememberOfficeInboxDutyExcursion({
@@ -303,7 +251,7 @@ describe('InboxPage Office presentation handshake', () => {
       ts: Date.now(),
       workspaceId: 'ws-1',
       workspaceLabel: 'research',
-      comments: 'A newer default-selected delivery.',
+      body: 'A newer default-selected delivery.'
     }
     vi.spyOn(api.inbox, 'history').mockResolvedValue({ entries: [entry], hasMore: false })
     rememberOfficeInboxDutyExcursion({
@@ -312,8 +260,7 @@ describe('InboxPage Office presentation handshake', () => {
         ts: entry.ts - 1,
         workspaceId: 'ws-1',
         workspaceLabel: 'research',
-        comments: 'Captured delivery A.',
-        docs: [{ path: 'research/a.md' }],
+        body: "Captured delivery A.\n\n[[research/a.md]]"
       }),
       purpose: 'review',
       phase: 'away',
@@ -332,15 +279,14 @@ describe('InboxPage Office presentation handshake', () => {
       ts: Date.now() - 10_000,
       workspaceId: 'ws-1',
       workspaceLabel: 'research',
-      comments: '# Older weekly report\n\nThis exact report still needs review.',
-      docs: [{ path: 'research/older-weekly-report.md', revision: 'rev-old' }],
+      body: "# Older weekly report\n\nThis exact report still needs review.\n\n[[research/older-weekly-report.md]]"
     }
     const newest = {
       id: 'inbox-office-newest-live',
       ts: Date.now(),
       workspaceId: 'ws-1',
       workspaceLabel: 'research',
-      comments: 'A newer live-feed row.',
+      body: 'A newer live-feed row.'
     }
     vi.spyOn(api.inbox, 'history').mockResolvedValue({ entries: [newest], hasMore: false })
     rememberOfficeInboxDutyExcursion({
@@ -369,7 +315,6 @@ describe('InboxPage responsive detail header', () => {
       ts: Date.now(),
       workspaceId: 'ws-1',
       workspaceLabel: 'research',
-      comments: 'A durable research update.',
       origin: {
         kind: 'headless' as const,
         agent: 'pi',
@@ -377,6 +322,7 @@ describe('InboxPage responsive detail header', () => {
         resumeId: 'resume-plain-linen-river-2218b6',
         issueId: 'daily-us-market-close-with-a-long-name',
       },
+      body: 'A durable research update.'
     }
     vi.spyOn(api.inbox, 'history').mockResolvedValue({
       entries: [entry],
@@ -446,8 +392,7 @@ describe('InboxPage editorial reading surface', () => {
       ts: Date.now(),
       workspaceId: 'ws-1',
       workspaceLabel: 'research',
-      comments,
-      docs: [{ path: 'research/close-report.md' }],
+      body: [comments, "[[research/close-report.md]]"].filter(Boolean).join('\n\n')
     }
     vi.spyOn(api.inbox, 'history').mockResolvedValue({
       entries: [entry],
@@ -467,9 +412,8 @@ describe('InboxPage editorial reading surface', () => {
     expect(body?.querySelector('.markdown-content--reading')).toBeTruthy()
     expect(body?.closest('.inbox-report-body--repeats-heading')).toBeTruthy()
 
-    const attachments = screen.getByRole('heading', { name: /Attachments/ })
-    expect(attachments.tagName).toBe('H2')
-    expect(attachments.closest('section')?.className).toContain('border-t')
+    expect(screen.queryByRole('heading', { name: /Attachments/ })).toBeNull()
+    expect(body?.textContent).toContain('[[research/close-report.md]]')
   })
 
   it('keeps a long source heading complete above the report body', async () => {
@@ -479,8 +423,7 @@ describe('InboxPage editorial reading surface', () => {
       ts: Date.now(),
       workspaceId: 'ws-1',
       workspaceLabel: 'research',
-      comments: `# ${heading}\n\nThe book is flat.`,
-      docs: [],
+      body: `# ${heading}\n\nThe book is flat.`
     }
     vi.spyOn(api.inbox, 'history').mockResolvedValue({ entries: [entry], hasMore: false })
     useInboxSelection.getState().select(entry.id)
@@ -498,8 +441,7 @@ describe('InboxPage editorial reading surface', () => {
       ts: Date.now(),
       workspaceId: 'ws-1',
       workspaceLabel: 'research',
-      comments: '   ',
-      docs: [{ path: 'research/close-report.md' }, { path: 'notes/context.txt' }],
+      body: "   \n\n[[research/close-report.md]]\n\n[[notes/context.txt]]"
     }
     vi.spyOn(api.inbox, 'history').mockResolvedValue({
       entries: [entry],
@@ -511,8 +453,8 @@ describe('InboxPage editorial reading surface', () => {
 
     expect(await screen.findByRole('heading', { level: 1, name: 'close-report.md · +1 more' })).toBeTruthy()
     expect(screen.queryByRole('heading', { name: 'Update without a summary' })).toBeNull()
-    expect(screen.getByRole('heading', { name: /Attachments/ })).toBeTruthy()
-    expect(screen.getByText('close-report.md')).toBeTruthy()
-    expect(screen.getByText('context.txt')).toBeTruthy()
+    expect(screen.queryByRole('heading', { name: /Attachments/ })).toBeNull()
+    expect(screen.getByText(/\[\[research\/close-report.md\]\]/)).toBeTruthy()
+    expect(screen.getByText(/\[\[notes\/context.txt\]\]/)).toBeTruthy()
   })
 })

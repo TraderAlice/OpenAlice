@@ -92,7 +92,8 @@ function routineInboxDuty(): OfficeInboxDutyCandidate {
         ts: 1_100,
         workspaceId: 'chat-1',
         workspaceLabel: 'Macro desk',
-        docs: [{ path: 'reports/asian-close.md', revision: 'rev-close' }],
+        body: "[[reports/asian-close.md]]",
+        fileRevisions: Object.fromEntries(([{ path: 'reports/asian-close.md', revision: 'rev-close' }]).map(doc => [doc.path, doc.revision!]))
       },
     }],
     'ready',
@@ -2184,7 +2185,8 @@ describe('OfficeBuilding', () => {
           ts: 1_100,
           workspaceId: 'chat-1',
           workspaceLabel: 'Semis desk',
-          docs: [{ path: 'reports/weekly.md', revision: 'rev-weekly' }],
+          body: "[[reports/weekly.md]]",
+          fileRevisions: Object.fromEntries(([{ path: 'reports/weekly.md', revision: 'rev-weekly' }]).map(doc => [doc.path, doc.revision!]))
         },
       }],
       'ready',
@@ -2499,7 +2501,8 @@ describe('OfficeBuilding', () => {
           ts: 1_100,
           workspaceId: 'chat-1',
           workspaceLabel: 'Macro desk',
-          docs: [{ path: 'reports/overnight.md', revision: 'rev-overnight' }],
+          body: "[[reports/overnight.md]]",
+          fileRevisions: Object.fromEntries(([{ path: 'reports/overnight.md', revision: 'rev-overnight' }]).map(doc => [doc.path, doc.revision!]))
         },
       }],
       'ready',
@@ -2563,7 +2566,8 @@ describe('OfficeBuilding', () => {
           ts: 1_100,
           workspaceId: 'chat-1',
           workspaceLabel: 'Macro desk',
-          docs: [{ path: 'reports/cross-asset.md', revision: 'rev-cross-asset' }],
+          body: "[[reports/cross-asset.md]]",
+          fileRevisions: Object.fromEntries(([{ path: 'reports/cross-asset.md', revision: 'rev-cross-asset' }]).map(doc => [doc.path, doc.revision!]))
         },
       }],
       'ready',
@@ -2911,7 +2915,8 @@ describe('OfficeBuilding', () => {
           ts: 1_100,
           workspaceId: 'chat-1',
           workspaceLabel: 'Semis desk',
-          docs: [{ path: 'reports/weekly.md', revision: 'rev-weekly' }],
+          body: "[[reports/weekly.md]]",
+          fileRevisions: Object.fromEntries(([{ path: 'reports/weekly.md', revision: 'rev-weekly' }]).map(doc => [doc.path, doc.revision!]))
         },
       }],
       'ready',
@@ -3118,8 +3123,8 @@ describe('OfficeBuilding', () => {
           ts: 1_100,
           workspaceId: 'chat-1',
           workspaceLabel: 'codex',
-          comments: 'Agent report delivered',
-          docs: [{ path: 'reports/inbox-11.md', revision: 'rev-inbox-11' }],
+          body: "Agent report delivered\n\n[[reports/inbox-11.md]]",
+          fileRevisions: Object.fromEntries(([{ path: 'reports/inbox-11.md', revision: 'rev-inbox-11' }]).map(doc => [doc.path, doc.revision!]))
         },
       }],
       'ready',

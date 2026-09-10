@@ -10,7 +10,7 @@
  * without ever asking the AI agent to traffic its own workspaceId.
  *
  * The MCP server's `/mcp/:wsId` route invokes every factory with the URL's
- * wsId at request time. From the agent's POV, `inbox_push({ docs, comments })`
+ * wsId at request time. From the agent's POV, `inbox_push({ body })`
  * has no identity parameter — workspaceId is invisible, baked into the
  * tool by the server. Forgery surface is zero because the URL is the
  * only identity carrier and `.mcp.json` is per-workspace.

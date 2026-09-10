@@ -61,8 +61,9 @@ describe('business inquiry routes', () => {
   it('asks an Inbox sender by exact resumeId and persists its business subject', async () => {
     const { app, inboxStore, dispatchHeadlessTask } = build()
     const entry = await inboxStore.append({
-      workspaceId: 'ws-1', comments: 'report',
+      workspaceId: 'ws-1',
       origin: { kind: 'headless', runId: 'run-source', resumeId: 'resume-author', agent: 'pi' },
+      body: 'report'
     })
     const response = await app.request(`/inbox/${entry.id}`, {
       method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ prompt: 'Why?' }),
@@ -89,7 +90,10 @@ describe('business inquiry routes', () => {
 
   it('stamps conversation birth for an unattributed Inbox reconstruction', async () => {
     const { app, inboxStore, dispatchHeadlessTask } = build()
-    const entry = await inboxStore.append({ workspaceId: 'ws-1', comments: 'manual note' })
+    const entry = await inboxStore.append({
+      workspaceId: 'ws-1',
+      body: 'manual note'
+    })
     await app.request(`/inbox/${entry.id}`, {
       method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ prompt: 'Recover context' }),
     })
@@ -103,7 +107,10 @@ describe('business inquiry routes', () => {
 
   it('keeps reconstruction provenance without changing an unattributed Inbox prompt by default', async () => {
     const { app, inboxStore, dispatchHeadlessTask } = build()
-    const entry = await inboxStore.append({ workspaceId: 'ws-1', comments: 'manual note' })
+    const entry = await inboxStore.append({
+      workspaceId: 'ws-1',
+      body: 'manual note'
+    })
     const response = await app.request(`/inbox/${entry.id}`, {
       method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ prompt: 'Recover context' }),
     })
@@ -116,7 +123,10 @@ describe('business inquiry routes', () => {
 
   it('adds reconstruction guidance when the UI request explicitly opts in', async () => {
     const { app, inboxStore, dispatchHeadlessTask } = build()
-    const entry = await inboxStore.append({ workspaceId: 'ws-1', comments: 'manual note' })
+    const entry = await inboxStore.append({
+      workspaceId: 'ws-1',
+      body: 'manual note'
+    })
     const response = await app.request(`/inbox/${entry.id}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },

@@ -156,7 +156,7 @@ describe('FileViewerPage back navigation', () => {
         ts: 42,
         workspaceId: 'chat-1',
         workspaceLabel: 'chat-jul20',
-        docs: [{ path: 'research/note.md' }],
+        body: "[[research/note.md]]"
       },
     }], 'ready').candidates[0] as OfficeInboxDutyCandidate
     rememberOfficeInboxDutyExcursion({

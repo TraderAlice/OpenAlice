@@ -81,8 +81,8 @@ function inboxDelivery(id = 'inbox-a') {
       ts: NOW - 5_000,
       workspaceId: 'research-desk',
       workspaceLabel: 'Research desk',
-      docs,
-      comments: '# Review the risk report\n\nThe report is ready for exact review.',
+      body: '# Review the risk report\n\nThe report is ready for exact review.\n\n[[reports/risk-review.md]]',
+      fileRevisions: { 'reports/risk-review.md': 'rev-a' },
     },
   }
 }
