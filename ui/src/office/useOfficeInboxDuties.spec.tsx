@@ -51,9 +51,9 @@ function entry(id: string, ts: number, overrides: Partial<InboxEntry> = {}): Inb
     ts,
     workspaceId: 'research-desk',
     workspaceLabel: 'Research desk',
-    comments: `# Delivery ${id}\n\nEvidence is ready.`,
-    docs: [{ path: `reports/${id}.md`, revision: `rev-${id}` }],
-    ...overrides,
+    body: [`# Delivery ${id}\n\nEvidence is ready.`, ...([{ path: `reports/${id}.md`, revision: `rev-${id}` }]).map(doc => '[[' + doc.path + ']]')].filter(Boolean).join('\n\n'),
+    fileRevisions: Object.fromEntries(([{ path: `reports/${id}.md`, revision: `rev-${id}` }]).map(doc => [doc.path, doc.revision!])),
+    ...overrides
   }
 }
 
@@ -120,7 +120,7 @@ describe('readOfficeInboxHistory', () => {
 describe('projectOfficeInboxDeliveries', () => {
   it('keeps every durable unread entry and excludes server-confirmed reads', () => {
     const unread = entry('unread', 200)
-    const commentsOnly = entry('comments', 100, { docs: undefined })
+    const commentsOnly = entry('comments', 100, { body: 'comments' })
     const read = entry('read', 300, { readAt: 400 })
 
     const projected = projectOfficeInboxDeliveries([read, unread, commentsOnly], {

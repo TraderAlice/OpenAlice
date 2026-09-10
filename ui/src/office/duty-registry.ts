@@ -1,3 +1,4 @@
+import { inboxFiles } from '@traderalice/connector-protocol'
 import type {
   IssueAutomationHealthState,
   IssueListItem,
@@ -376,8 +377,8 @@ export function inboxUnreadDutyRegistration(
   // those same layer positions but put their newest version first within each
   // layer, so a finite shift sees current evidence without hiding older rows.
   const baseline = [...enriched].sort((left, right) => {
-    const documented = Number((right.entry.docs?.length ?? 0) > 0)
-      - Number((left.entry.docs?.length ?? 0) > 0)
+    const documented = Number((inboxFiles(right.entry).length ?? 0) > 0)
+      - Number((inboxFiles(left.entry).length ?? 0) > 0)
     if (documented !== 0) return documented
     return compareChronology(left, right)
   })
@@ -391,8 +392,8 @@ export function inboxUnreadDutyRegistration(
   }
   for (const [key, group] of newestRoutineGroups) {
     newestRoutineGroups.set(key, [...group].sort((left, right) => {
-      const documented = Number((right.entry.docs?.length ?? 0) > 0)
-        - Number((left.entry.docs?.length ?? 0) > 0)
+      const documented = Number((inboxFiles(right.entry).length ?? 0) > 0)
+        - Number((inboxFiles(left.entry).length ?? 0) > 0)
       return documented !== 0 ? documented : compareChronology(right, left)
     }))
   }
@@ -425,7 +426,7 @@ export function inboxUnreadDutyRegistration(
         delivery.entry.workspaceId,
         delivery.entry.id,
         delivery.entry.ts,
-        (delivery.entry.docs ?? []).map((document) => [document.path, document.revision ?? null]),
+        inboxFiles(delivery.entry).map((document) => [document.path, document.revision ?? null]),
       ]),
     },
     delivery,
@@ -574,7 +575,7 @@ export function officeDutyTier(duty: OfficeDutyCandidate): number {
 export function officeDutyEstimateMinutes(duty: OfficeDutyCandidate): number {
   if (duty.kind === 'cadence') return 3
   if (duty.kind === 'inbox') {
-    const documents = duty.delivery.entry.docs?.length ?? 0
+    const documents = inboxFiles(duty.delivery.entry).length ?? 0
     return documents > 0 ? Math.min(8, 2 + documents) : 1
   }
   return 2

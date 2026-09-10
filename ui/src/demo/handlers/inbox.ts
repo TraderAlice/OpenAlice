@@ -1,5 +1,6 @@
+import { inboxFiles } from '@traderalice/connector-protocol'
 import { http, HttpResponse } from 'msw'
-import { demoInboxEntries } from '../fixtures/inbox'
+import { demoInboxEntries, demoWorkspaceFiles } from '../fixtures/inbox'
 
 const demoInboxReadState = new Map<string, number>()
 
@@ -8,6 +9,16 @@ export function demoInboxReadAt(inboxEntryId: string): number | undefined {
 }
 
 export const inboxHandlers = [
+  http.get('/api/inbox/:id/files/:index', ({ params }) => {
+    const entry = demoInboxEntries.find(entry => entry.id === params.id)
+    const file = entry && inboxFiles(entry)[Number(params.index)]
+    const content = file && demoWorkspaceFiles[file.path]
+    return content === undefined ? new HttpResponse(null, { status: 404 }) : HttpResponse.text(content)
+  }),
+  http.get('/api/inbox/:id/files', ({ params }) => {
+    const entry = demoInboxEntries.find(entry => entry.id === params.id)
+    return entry ? HttpResponse.json({ files: inboxFiles(entry).map((file, index) => ({ ...file, available: true, href: `/api/inbox/${entry.id}/files/${index}` })) }) : HttpResponse.json({ error: 'not_found' }, { status: 404 })
+  }),
   http.get('/api/inbox/history', () =>
     HttpResponse.json({
       entries: demoInboxEntries.map((entry) => {

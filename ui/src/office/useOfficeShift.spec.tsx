@@ -39,7 +39,7 @@ function inboxDuty(id: string): OfficeDutyCandidate {
       entry: {
         id,
         ts: 1_000,
-        workspaceId: 'research-desk',
+        workspaceId: 'research-desk', body: 'Report',
       },
     },
   }

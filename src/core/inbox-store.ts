@@ -1,39 +1,5 @@
-/**
- * InboxStore — workspace-anchored push surface, Linear-inbox model.
- *
- * Atomic concept here is the **Workspace**, not Linear's "Issue". The
- * workspace's author (the AI agent) lives inside the workspace, and its
- * work product is the workspace folder's files — not single comments
- * authored at notification time. So an inbox entry carries:
- *
- *   - `docs`     pointers to files in the workspace ("go read these")
- *                — rendered live at view time, never snapshotted
- *   - `comments` the agent's voice — markdown, the actual message body
- *                ("hey boss, here's what I want to say about it")
- *
- * Both are optional but at least one must be present. Pointer-only on
- * docs is deliberate (matches Linear's "inbox row is a notification, the
- * issue is the SOR"): the workspace folder is its own version-controlled
- * source of truth, so snapshotting into the inbox would just create a
- * stale parallel copy. Workspace deletion → inbox tombstones; that's
- * correct semantics, not a lifecycle bug.
- *
- * v0.5 contract: append-only JSONL at `data/inbox/entries.jsonl`,
- * `workspaceId` required, at least one of {docs, comments} required.
- * No connector subscription, no outputGate, no dedup.
- *
- * Read/unread is deliberately NOT written back into entries.jsonl. An entry is
- * the immutable notification record; read state is mutable user-attention state
- * and lives beside it in `data/inbox/read-state.json`. Keeping the two files
- * separate preserves append-only inbox history while making read state shared
- * across Electron, browser, and any other client using the same data root.
- *
- * Write path: the production writer is the `inbox_push` MCP tool
- * (`tool/inbox-push.ts`), workspace-scoped via WorkspaceToolCenter at
- * `/mcp/:wsId` — the agent inside a workspace calls it; the wsId is
- * bound by the router, never supplied by the agent. The dev `/seed`
- * HTTP endpoint remains for manual/testing appends.
- */
+/** Immutable Markdown notifications with live source-Workspace file references.
+ * Read state lives separately in read-state.json. */
 
 import { randomUUID } from 'node:crypto'
 import { readFile, appendFile, mkdir, writeFile, rename } from 'node:fs/promises'
@@ -88,11 +54,10 @@ export interface InboxInput {
   /** Display snapshot of the workspace label. Optional; readers fall
    *  back to workspaceId. */
   workspaceLabel?: string
-  /** Workspace files to render. Each entry is a pointer — content is
-   *  fetched live from the workspace folder at view time. */
-  docs?: InboxDoc[]
-  /** Agent's message body (markdown). Renders below docs. */
-  comments?: string
+  /** Markdown, frozen at publication. File references remain live. */
+  body: string
+  /** Published file fingerprints; paths are derived from body. */
+  fileRevisions?: Record<string, string>
   /** Agent-INVISIBLE provenance, stamped server-side from the spawn-injected
    *  run header (never supplied by the agent). Optional + additive: old JSONL
    *  entries parse with `origin === undefined`, so NO migration is needed. */
@@ -146,17 +111,8 @@ function validateInput(input: InboxInput): void {
   if (!input.workspaceId) {
     throw new Error('InboxStore.append: workspaceId is required')
   }
-  const hasDocs = (input.docs?.length ?? 0) > 0
-  const hasComments = (input.comments ?? '').trim().length > 0
-  if (!hasDocs && !hasComments) {
-    throw new Error('InboxStore.append: at least one of docs or comments must be present')
-  }
-  if (input.docs) {
-    for (const d of input.docs) {
-      if (!d.path || typeof d.path !== 'string') {
-        throw new Error('InboxStore.append: each doc must have a non-empty `path` string')
-      }
-    }
+  if (typeof input.body !== 'string' || !input.body.trim()) {
+    throw new Error('InboxStore.append: non-empty body is required')
   }
 }
 

@@ -233,7 +233,6 @@ async function fetchSocketJson(socketPath, path, opts) {
 async function parseFlags(tokens, schema, command) {
   const args = {}
   const meta = {}
-  const docs = []
   const properties = (schema && schema.properties) || {}
   for (let i = 0; i < tokens.length; i++) {
     let tok = tokens[i]
@@ -286,8 +285,7 @@ async function parseFlags(tokens, schema, command) {
     const schemaKey = fileSchemaKey || directSchemaKey
     const propertySchema = properties[schemaKey]
     const supportedAlias =
-      (schemaKey === 'meta' && Object.prototype.hasOwnProperty.call(properties, 'metadataFilter')) ||
-      (schemaKey === 'doc' && Object.prototype.hasOwnProperty.call(properties, 'docs'))
+      (schemaKey === 'meta' && Object.prototype.hasOwnProperty.call(properties, 'metadataFilter'))
     if (!propertySchema && !supportedAlias) {
       const available = Object.keys(properties).map(shellFlagName)
       const accepted = available.length > 0
@@ -303,7 +301,8 @@ async function parseFlags(tokens, schema, command) {
     if (fileSchemaKey) {
       const { readFileSync } = await import('node:fs')
       try {
-        val = readFileSync(val === '-' ? 0 : String(val), 'utf8').replace(/\r?\n$/, '')
+        const content = readFileSync(val === '-' ? 0 : String(val), 'utf8')
+        val = schemaKey === 'body' ? content : content.replace(/\r?\n$/, '')
       } catch (error) {
         fail(`cannot read --${key} value from "${val}": ${error && error.message ? error.message : String(error)}`)
       }
@@ -315,11 +314,6 @@ async function parseFlags(tokens, schema, command) {
       // repeatable: --meta key=value -> metadataFilter
       const e = val.indexOf('=')
       if (e >= 0) meta[val.slice(0, e)] = val.slice(e + 1)
-    } else if (schemaKey === 'doc') {
-      // repeatable: --doc <path> -> docs: [{ path }] (inbox_push attachments).
-      // A JSON object value (--doc '{"path":"x"}') is kept as-is so future
-      // per-doc fields keep working; a bare path is wrapped into { path }.
-      docs.push(val && typeof val === 'object' ? val : { path: String(val) })
     } else if (propertySchema && propertySchema.type === 'array') {
       const current = Array.isArray(args[schemaKey]) ? args[schemaKey] : []
       args[schemaKey] = current.concat(Array.isArray(val) ? val : [val])
@@ -328,7 +322,6 @@ async function parseFlags(tokens, schema, command) {
     }
   }
   if (Object.keys(meta).length) args.metadataFilter = meta
-  if (docs.length) args.docs = docs
   return args
 }
 
@@ -424,7 +417,6 @@ function flagRecoveryHint(group, verb, flag) {
 }
 
 function shellFlagName(name) {
-  if (name === 'docs') return 'doc'
   if (name === 'metadataFilter') return 'meta'
   return name.replace(/([a-z0-9])([A-Z])/g, '$1-$2').toLowerCase()
 }

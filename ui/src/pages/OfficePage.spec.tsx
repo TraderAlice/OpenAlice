@@ -280,8 +280,8 @@ function inboxEvidence(
       ts,
       workspaceId: 'chat-1',
       workspaceLabel: '研究台',
-      comments: title,
-      docs: [{ path: `reports/${id}.md`, revision: `rev-${id}` }],
+      body: [title, ...([{ path: `reports/${id}.md`, revision: `rev-${id}` }]).map(doc => '[[' + doc.path + ']]')].filter(Boolean).join('\n\n'),
+      fileRevisions: Object.fromEntries(([{ path: `reports/${id}.md`, revision: `rev-${id}` }]).map(doc => [doc.path, doc.revision!]))
     },
   }
 }

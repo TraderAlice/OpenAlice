@@ -1,3 +1,4 @@
+import { inboxFiles } from '@traderalice/connector-protocol'
 import { headlessFailureSummary } from './headless-failure.js';
 import { userDataHome } from '../core/paths.js';
 import { resolveAliceProjectIdentity } from '@traderalice/guardian-runtime';
@@ -763,7 +764,7 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
     types: ['inbox.received'] as const,
   });
   const stopInboxActivity = inboxStore?.onAppended((entry) => {
-    const summary = entry.comments?.replace(/\s+/g, ' ').trim().slice(0, 240);
+    const summary = entry.body?.replace(/\s+/g, ' ').trim().slice(0, 240);
     void inboxActivity.record('inbox.received', {
       workspaceId: entry.workspaceId,
       inboxEntryId: entry.id,
@@ -774,7 +775,7 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
       ...(entry.origin?.runId ? { taskId: entry.origin.runId } : {}),
       ...(entry.origin?.kind ? { originKind: entry.origin.kind } : {}),
       ...(summary ? { summary } : {}),
-      documentCount: entry.docs?.length ?? 0,
+      documentCount: inboxFiles(entry).length ?? 0,
     });
   });
   const recordAgentRuntime = async (

@@ -119,8 +119,8 @@ describe('conversation_ask', () => {
     const inboxStore = createMemoryInboxStore()
     const entry = await inboxStore.append({
       workspaceId: 'ws-peer',
-      comments: 'report ready',
       origin: { kind: 'headless', runId: 'run-peer', agent: 'pi' },
+      body: 'report ready'
     })
     const ask = vi.fn(async () => ({
       status: 'dispatched' as const,
