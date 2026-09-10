@@ -93,7 +93,7 @@ export interface WorkspacesContextValue {
   openAgentConfig(wsId: string, agent?: AgentId, section?: 'general' | 'launch' | 'ai' | 'template' | 'absorb'): void
   saveWorkspaceMetadata(
     wsId: string,
-    metadata: { displayName?: string | null; description?: string | null; defaultAgent?: string | null },
+    metadata: { displayName?: string | null; description?: string | null },
   ): Promise<void>
   renameWorkspace(wsId: string, displayName: string): Promise<void>
 }

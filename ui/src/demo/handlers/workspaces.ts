@@ -861,10 +861,12 @@ export const workspacesHandlers = [
     const mutableWorkspace = workspace as {
       displayName?: string
       description?: string
-      defaultAgent?: string
     }
 
     const body = (await request.json().catch(() => ({}))) as WorkspaceMetadataPatch
+    if ('defaultAgent' in body) {
+      return HttpResponse.json({ error: 'invalid_metadata', message: 'Agent preferences belong in runtime-settings, not metadata' }, { status: 400 })
+    }
     if ('displayName' in body) {
       if (body.displayName == null || body.displayName.trim() === '') {
         delete mutableWorkspace.displayName
@@ -877,13 +879,6 @@ export const workspacesHandlers = [
         delete mutableWorkspace.description
       } else {
         mutableWorkspace.description = body.description.trim()
-      }
-    }
-    if ('defaultAgent' in body) {
-      if (body.defaultAgent == null || body.defaultAgent.trim() === '') {
-        delete mutableWorkspace.defaultAgent
-      } else {
-        mutableWorkspace.defaultAgent = body.defaultAgent.trim()
       }
     }
     return HttpResponse.json({ workspace })
@@ -919,7 +914,7 @@ export const workspacesHandlers = [
       version: 3 as const,
       runtime: { interactive: mode('interactive'), headless: mode('headless') },
     }
-    const nextWorkspace = { ...workspace, runtimeSettings: nextSettings }
+    const nextWorkspace = { ...workspace, runtimeSettings: nextSettings, defaultAgent: nextSettings.runtime.interactive.defaultAgent ?? nextSettings.runtime.interactive.recent.agent }
     demoWorkspaces[index] = nextWorkspace
     return HttpResponse.json({ settings: nextSettings, workspace: nextWorkspace })
   }),

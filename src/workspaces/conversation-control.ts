@@ -306,7 +306,7 @@ export function createWorkspaceConversationControl(
       }
       const agentId = continuingOrigin
         ? continuingOrigin.agent
-        : input.agent ?? await svc.resolveDefaultAgentId(meta)
+        : input.agent ?? await svc.resolveHeadlessDefaultAgentId(meta)
       if (!agentId) throw new Error(`workspace has no agent runtime: ${meta.tag}`)
       const adapter = svc.adapters.get(agentId)
       if (!adapter || !isAgentRuntime(adapter)) throw new Error(`unknown agent runtime: ${agentId}`)
