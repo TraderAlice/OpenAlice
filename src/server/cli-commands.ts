@@ -156,6 +156,7 @@ const BASE_EXPORTS: Record<string, CliExport> = {
         sessions: 'workspace_sessions',
       },
       conversation: {
+        create: 'conversation_create',
         ask: 'conversation_ask',
         await: 'conversation_await',
         collect: 'conversation_collect',

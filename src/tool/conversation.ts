@@ -1,5 +1,7 @@
 import { headlessFailureSummary } from '../workspaces/headless-failure.js'
 import { tool } from 'ai'
+import { MODEL_REASONING_EFFORTS } from '../ai-providers/model-semantics.js'
+import type { SessionRuntimeSelection } from '../workspaces/session-runtime-binding.js'
 import { z } from 'zod'
 
 import type {
@@ -17,9 +19,16 @@ const MAX_TIMEOUT_MS = 2_147_478_647
 const MAX_PROMPT_CHARS = 16_000
 const AWAIT_POLL_MS = 250
 
+const conversationSelectionShape = {
+  credential: z.string().min(1).optional().describe('OpenAlice vault credential slug, never an API key. Omit to retain the Session or Workspace selection.'),
+  credentialSource: z.literal('native').optional().describe('Use the runtime own authentication; mutually exclusive with credential.'),
+  model: z.string().min(1).optional().describe('Optional model id; custom model ids are accepted.'),
+  effort: z.enum(MODEL_REASONING_EFFORTS).optional().describe('Optional reasoning effort.'),
+}
+
 export const conversationAskCommonShape = {
   prompt: z.string().trim().min(1).max(MAX_PROMPT_CHARS)
-    .describe('Question for the responsible Session or reconstructing worker.'),
+    .describe('First task for a new Session, or a follow-up message for an existing Session.'),
   agent: z.string().min(1).optional()
     .describe('Optional runtime for reconstructed/fresh work only; exact Session runtime cannot be overridden.'),
   timeoutMs: z.coerce.number().int().positive().max(MAX_TIMEOUT_MS).optional()
@@ -85,6 +94,7 @@ export async function askWorkspaceConversation(
     target: WorkspaceConversationTarget
     subject?: HeadlessInquirySubject
     agent?: string
+    selection?: SessionRuntimeSelection
     timeoutMs?: number
     await?: boolean
     reconstruct?: boolean
@@ -97,6 +107,7 @@ export async function askWorkspaceConversation(
     const result = await ctx.conversation.ask({
       prompt: input.prompt,
       target: input.target,
+      ...(input.selection ? { selection: input.selection } : {}),
       ...(input.timeoutMs !== undefined ? { timeoutMs: input.timeoutMs } : {}),
       source: sessionOriginFromInboxOrigin(ctx.workspaceId, ctx.origin) ?? {
         kind: 'workspace',
@@ -175,7 +186,7 @@ export const conversationAskFactory: WorkspaceToolFactory = {
   build(ctx) {
     return tool({
       description: [
-        "Ask a known product Session, an Inbox sender, an Issue's attributable creator, or a fresh worker.",
+        "Send a follow-up to a Session or attributable author. Use conversation create for a new Session; fresh-target flags here remain compatibility aliases.",
         '',
         'Use exactly one addressing form: resumeId for an exact Session; inboxId for the',
         'sender of one delivery; issueId (optionally scoped by wsId) for Issue creation',
@@ -191,6 +202,7 @@ export const conversationAskFactory: WorkspaceToolFactory = {
       ].join('\n'),
       inputSchema: z.object({
         ...conversationAskCommonShape,
+        ...conversationSelectionShape,
         resumeId: z.string().min(1).optional()
           .describe('Exact product Session to continue. Cannot be combined with another target flag.'),
         inboxId: z.string().min(1).optional()
@@ -210,6 +222,7 @@ export const conversationAskFactory: WorkspaceToolFactory = {
         issueId,
         harness,
         agent,
+        credential, credentialSource, model, effort,
         timeoutMs,
         await: shouldAwait = false,
         reconstruct = false,
@@ -217,6 +230,7 @@ export const conversationAskFactory: WorkspaceToolFactory = {
         if (!ctx.conversation) {
           return { ok: false as const, error: 'workspace conversation control is unavailable' }
         }
+        if (credential && credentialSource) return { ok: false, error: 'credential and credential-source are mutually exclusive' }
         const targetCount = Number(Boolean(resumeId))
           + Number(Boolean(inboxId))
           + Number(Boolean(issueId))
@@ -245,6 +259,12 @@ export const conversationAskFactory: WorkspaceToolFactory = {
               : { kind: 'workspace' as const, workspaceId: wsId! }
         const result = await askWorkspaceConversation(ctx, {
           prompt,
+          ...((credential || credentialSource || model || effort) ? { selection: {
+            ...(credential ? { credentialSlug: credential } : {}),
+            ...(credentialSource ? { credentialSource } : {}),
+            ...(model ? { model } : {}),
+            ...(effort ? { reasoningEffort: effort } : {}),
+          } } : {}),
           target,
           ...(inboxAddress ? { subject: inboxAddress.subject } : {}),
           ...(agent ? { agent } : {}),
@@ -260,6 +280,24 @@ export const conversationAskFactory: WorkspaceToolFactory = {
   },
 }
 
+/** Fresh creation has its own manifest, so no author/Session address can slip in. */
+export const conversationCreateFactory: WorkspaceToolFactory = {
+  name: 'conversation_create',
+  build(ctx) {
+    const ask = conversationAskFactory.build(ctx)
+    return tool({
+      description: 'Create a new Session and deliver its first prompt. Choose exactly one Workspace or Harness. Retain resumeId and use conversation ask for follow-ups; taskId identifies only this turn.',
+      inputSchema: z.object({
+        ...conversationAskCommonShape,
+        ...conversationSelectionShape,
+        wsId: z.string().min(1).optional().describe('Workspace in which to create a new Session.'),
+        harness: z.enum(['chat', 'autoquant', 'prediction']).optional().describe('Create in this Harness default Workspace.'),
+      }),
+      execute: async (input, options) => ask.execute!(input, options),
+    })
+  },
+}
+
 export const conversationAwaitFactory: WorkspaceToolFactory = {
   name: 'conversation_await',
   build(ctx) {
@@ -267,13 +305,13 @@ export const conversationAwaitFactory: WorkspaceToolFactory = {
       description: [
         'Wait server-side for one conversation task to finish.',
         '',
-        'Use after dispatching several conversation_ask calls so their headless runs execute',
+        'Use after dispatching several conversation_create or conversation_ask calls so their headless runs execute',
         'concurrently. This replaces hand-written sleep loops. With an explicit wait budget,',
         'an expired wait returns while the task keeps running; without one, this waits until',
         'the task reaches a terminal state.',
       ].join('\n'),
       inputSchema: z.object({
-        taskId: z.string().min(1).describe('Short taskId returned by conversation_ask.'),
+        taskId: z.string().min(1).describe('Short taskId returned by conversation create or ask.'),
         timeoutMs: z.coerce.number().int().positive().max(MAX_TIMEOUT_MS).optional()
           .describe('Optional server-side wait budget in milliseconds. Omit to wait until the task finishes.'),
       }),
@@ -366,14 +404,14 @@ export const conversationReadFactory: WorkspaceToolFactory = {
   build(ctx) {
     return tool({
       description: [
-        'Read one headless follow-up started by conversation_ask.',
+        'Read one turn started by conversation create or ask.',
         '',
         'Summary returns the latest assistant reply and one compact failure when present.',
         'Tool activity and normalized message blocks are available only in detailed mode.',
         'Running tasks may have partial output.',
       ].join('\n'),
       inputSchema: z.object({
-        taskId: z.string().min(1).describe('taskId returned by conversation_ask.'),
+        taskId: z.string().min(1).describe('taskId returned by conversation create or ask.'),
         mode: z.enum(['summary', 'detailed']).optional().default('summary')
           .describe('`summary` returns status and assistant text; `detailed` also returns normalized tool, error, and message blocks.'),
       }),
@@ -397,6 +435,7 @@ export const conversationReadFactory: WorkspaceToolFactory = {
 }
 
 export const conversationToolFactories: WorkspaceToolFactory[] = [
+  conversationCreateFactory,
   conversationAskFactory,
   conversationAwaitFactory,
   conversationCollectFactory,

@@ -163,3 +163,35 @@ it.each(['terminal', 'webpi'] as const)('hands %s ownership to an Issue turn and
     expect(service!.isResumeActive(resumeId)).toBe(false)
   } finally { release(); terminal.mockRestore(); web.mockRestore(); command.mockRestore() }
 })
+
+it('persists explicit conversation edits while keeping busy and Issue dispatches from changing them', async () => {
+  const { createWorkspaceConversationControl } = await import('./conversation-control.js')
+  await service!.catalog.recordCreated(service!.registry.get('ws-1')!)
+  const resumeId = 'resume-selection-test'
+  await service!.sessionCoordinator.ensure({
+    resumeId, wsId: 'ws-1', agent: 'codex', namePrefix: 'c',
+    agentSessionId: 'native-selection-test', state: 'paused', surface: 'headless',
+    runtimeBinding: { version: 1, credential: { source: 'native' }, model: 'test-model', reasoningEffort: 'medium' },
+  })
+  const adapter = service!.adapters.get('codex')!
+  const command = vi.spyOn(adapter, 'composeHeadlessCommand').mockReturnValue([
+    process.execPath, '-e', `console.log(JSON.stringify({type:'item.completed',item:{type:'agent_message',text:'OK'}}));`,
+  ])
+  try {
+    const control = createWorkspaceConversationControl(service!)
+    const input = { target: { kind: 'resume' as const, resumeId }, prompt: 'reply', selection: { reasoningEffort: 'high' as const } }
+    service!.claimResume(resumeId)
+    await expect(control.ask(input)).rejects.toMatchObject({ code: 'busy' })
+    expect(service!.resumeRegistry.get(resumeId)?.runtimeBinding?.reasoningEffort).toBe('medium')
+    service!.releaseResume(resumeId)
+    const result = await control.ask(input)
+    if (result.status !== 'dispatched') throw new Error('not dispatched')
+    await vi.waitFor(() => expect(service!.isResumeActive(resumeId)).toBe(false), { timeout: 10000 })
+    expect(service!.headlessTasks.get(result.taskId)).toMatchObject({ model: 'test-model', effort: 'high', status: 'done' })
+    expect(service!.resumeRegistry.get(resumeId)?.runtimeBinding).toMatchObject({ model: 'test-model', reasoningEffort: 'high' })
+    await expect(service!.dispatchHeadlessTask(service!.registry.get('ws-1')!, adapter, 'issue', undefined,
+      { kind: 'issue', workspaceId: 'ws-1', issueId: 'test' }, resumeId, undefined, { model: 'other-model' }))
+      .rejects.toMatchObject({ code: 'not_ready' })
+    expect(service!.resumeRegistry.get(resumeId)?.runtimeBinding?.model).toBe('test-model')
+  } finally { command.mockRestore() }
+})

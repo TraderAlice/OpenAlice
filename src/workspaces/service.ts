@@ -42,6 +42,7 @@ import {
 import { loadConfig, type ServerConfig } from './config.js';
 import {
   createNativeSessionRuntimeBinding,
+  mergeSessionRuntimeSelection,
   createSessionRuntimeBinding,
   resolveSessionRuntimeBinding,
   type SessionRuntimeSelection,
@@ -551,7 +552,7 @@ export interface WorkspaceService {
     resumeId?: string,
     /** Optional Inbox/Issue reverse link for a user-initiated inquiry. */
     inquiry?: HeadlessTaskInquiry,
-    /** Fresh-Session runtime selection. Ignored on exact resume, which replays its binding. */
+    /** Optional selection. Fresh Sessions inherit Workspace defaults; exact resumes patch their own binding under the execution lock. */
     selection?: SessionRuntimeSelection,
     /** Cross-Agent message metadata for the independent conversation log. */
     conversation?: AgentConversationDispatch,
@@ -1902,12 +1903,20 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
         }
         nativeResume = { sessionId: identity.agentSessionId };
         parentTaskId = identity.latestTaskId ?? headlessTasks.latestForResumeId(resumeId)?.taskId;
-        if (selection?.credentialSlug || selection?.model || selection?.reasoningEffort) {
-          throw new HeadlessResumeError('not_ready', 'a resumed Session reuses its persisted credential, model, and effort');
+        const previous = identity.runtimeBinding ?? createNativeSessionRuntimeBinding({ adapter }).binding;
+        if (conversation && selection && Object.values(selection).some(value => value !== undefined)) {
+          sessionRuntime = await createSessionRuntimeBinding({
+            adapter, cwd: ws.dir, selection: mergeSessionRuntimeSelection(previous, selection),
+          });
+          await resumeRegistry.replaceRuntimeBinding({
+            resumeId, wsId: ws.id, agent: adapter.id, runtimeBinding: sessionRuntime.binding,
+          });
+        } else {
+          if (selection?.credentialSlug || selection?.model || selection?.reasoningEffort) {
+            throw new HeadlessResumeError('not_ready', 'a resumed Session reuses its persisted credential, model, and effort; edit it through Session settings or conversation ask');
+          }
+          sessionRuntime = await resolveSessionRuntimeBinding({ adapter, cwd: ws.dir, binding: previous });
         }
-        sessionRuntime = identity.runtimeBinding
-          ? await resolveSessionRuntimeBinding({ adapter, cwd: ws.dir, binding: identity.runtimeBinding })
-          : createNativeSessionRuntimeBinding({ adapter });
       } catch (error) {
         activeResumeIds.delete(resumeId);
         throw error;

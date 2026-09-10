@@ -25,6 +25,7 @@
  */
 
 import type { Tool } from 'ai'
+import type { SessionRuntimeSelection } from '../workspaces/session-runtime-binding.js'
 import type { IInboxStore, InboxEntry, InboxOrigin } from './inbox-store.js'
 import type { IEntityStore } from './entity-store.js'
 import type { IProvenanceStore } from './provenance-store.js'
@@ -153,6 +154,7 @@ export interface WorkspaceConversationControl {
     readonly timeoutMs?: number
     readonly target: WorkspaceConversationTarget
     readonly agent?: string
+    readonly selection?: SessionRuntimeSelection
     /** Add the artifact-reconstruction preamble when a fresh fallback worker is
      * required. Provenance may still resolve as reconstructed when this is
      * false; prompt semantics and attribution are deliberately independent. */

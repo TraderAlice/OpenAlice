@@ -69,6 +69,31 @@ export function createNativeSessionRuntimeBinding(input: {
   }
 }
 
+/** Patch an existing Session without importing Workspace defaults or another credential's model. */
+export function mergeSessionRuntimeSelection(
+  binding: SessionRuntimeBinding,
+  selection: SessionRuntimeSelection,
+): SessionRuntimeSelection {
+  const current = binding.credential
+  const changed = selection.credentialSource === 'native'
+    ? current.source !== 'native'
+    : selection.credentialSlug !== undefined
+      ? current.source !== 'vault' || current.credentialSlug !== selection.credentialSlug
+      : false
+  if (current.source === 'workspace' && !selection.credentialSource && !selection.credentialSlug) {
+    throw new SessionRuntimeBindingError('workspace_binding_changed', 'Select native authentication or a vault credential before editing a legacy Workspace binding')
+  }
+  return {
+    ...(selection.credentialSource ? { credentialSource: selection.credentialSource }
+      : selection.credentialSlug ? { credentialSlug: selection.credentialSlug }
+      : current.source === 'vault' ? { credentialSlug: current.credentialSlug }
+      : { credentialSource: 'native' as const }),
+    ...(!changed && binding.model ? { model: binding.model } : {}),
+    ...(!changed && binding.reasoningEffort ? { reasoningEffort: binding.reasoningEffort } : {}),
+    ...selection,
+  }
+}
+
 function providerFingerprint(ai: WorkspaceAiCred): string {
   return createHash('sha256').update(JSON.stringify({
     baseUrl: ai.baseUrl ?? null,

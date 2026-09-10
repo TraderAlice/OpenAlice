@@ -34,7 +34,7 @@ Use `conversation`, not Inbox, for ordinary coworker communication.
 alice peer list
 
 # Recruit a fresh Session at that Workspace for new work.
-alice conversation ask --ws-id <workspaceId> \
+alice conversation create --ws-id <workspaceId> \
   --prompt 'Investigate this bounded question and report back.'
 
 # Continue one exact attributable product Session.
@@ -46,7 +46,7 @@ alice conversation ask --inbox-id <entryId> \
   --prompt 'What did you send, and what should I inspect first?' --await
 
 # Recruit a fresh Session in a Harness default Workspace.
-alice conversation ask --harness autoquant \
+alice conversation create --harness autoquant \
   --prompt 'Start a new quantitative research assignment.'
 ```
 
@@ -55,6 +55,18 @@ stable starter Chat Workspace only when none exists. `--harness autoquant`
 requires the explicitly initialized AutoQuant default Workspace and never
 creates or guesses one. Both launch a fresh product Session in the resolved
 desk; use the returned `resumeId` for later continuation.
+
+`create` always creates a new Session and sends its first prompt. `ask --resume-id`
+continues an existing Session. Keep `resumeId` as the coworker's address and
+`taskId` as one turn's execution handle.
+
+Both commands accept optional `--credential <vault-slug>` or
+`--credential-source native` (mutually exclusive), `--model <id>`, and
+`--effort <level>`. Never pass API keys. New Sessions inherit Workspace headless
+preferences; existing Sessions retain their own binding for omitted fields.
+Changing credential drops inherited model/effort from the previous credential.
+Explicit changes to an existing Session persist for later turns and require it
+to be idle. Its Agent runtime cannot change. `--agent` selects only a new worker.
 
 Prompts are ordinary coworker messages. Add `--reconstruct` only when the task
 explicitly requires a fresh worker to reconstruct missing historical intent.
