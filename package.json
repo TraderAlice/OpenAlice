@@ -149,7 +149,9 @@
       "!node_modules/**/*.d.ts",
       "!node_modules/**/*.d.ts.map",
       "!node_modules/**/*.map",
-      "!node_modules/**/_types/**"
+      "!node_modules/**/_types/**",
+      "!node_modules/node-pty/build/**/obj/**",
+      "!node_modules/node-pty/build/**/*.{exp,iobj,ipdb,lib,pdb,tlog}"
     ],
     "mac": {
       "target": [

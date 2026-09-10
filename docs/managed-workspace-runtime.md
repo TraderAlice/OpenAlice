@@ -270,6 +270,30 @@ which would remove Electron's own application metadata. Packaging commands run
 through `pnpm -F @traderalice/desktop` (the configured hook is relative to that
 working directory).
 
+The same hook then writes `openalice-integrity.json` beside `app.asar`: the
+product version plus every file under `app.asar`, `app.asar.unpacked/` and
+`runtime/` with its byte size (`scripts/desktop-install-integrity.mjs`). Two
+consumers compare the installed tree against it:
+
+- The Windows NSIS `customInstall` macro (`apps/desktop/build/installer.nsh`)
+  runs after extraction and before electron-builder's force-run launch. A
+  missing or truncated file aborts the install with exit level 3 and a
+  reinstall message instead of handing off to a partial tree. The `customInit`
+  update path also waits for processes under `$INSTDIR` to exit (up to 20 s)
+  before removing the previous app directory.
+- The packaged desktop main process (`apps/desktop/src/install-integrity.ts`)
+  verifies the inventory before resolving the data home. A damaged install
+  shows a reinstall dialog that links to the latest release and quits; the
+  result is recorded in the desktop diagnostic log as `install-integrity`.
+  `OPENALICE_DESKTOP_SKIP_INSTALL_INTEGRITY=1` bypasses the check for
+  diagnosis only.
+
+Both checks exist because electron-builder's extraction falls back to a
+non-atomic 7z extract that ignores per-file errors when its atomic copy fails
+(locked files, antivirus scans, `MAX_PATH`). `pnpm electron:assert-package`
+verifies the inventory against the unpacked package, so a stale inventory or a
+payload change without `afterPack` fails locally before release.
+
 Windows installed-version polling reads the authoritative `app.asar/package.json`
 when an archive exists, and the loose `app/package.json` for older releases.
 Clear the ASAR header cache between polls because NSIS replaces the archive in
@@ -279,8 +303,11 @@ separate checks before the upgrade journey launches the candidate.
 
 `asarUnpack` explicitly retains node-pty and dugite's embedded Git under
 `app.asar.unpacked`, with other native dependencies handled by builder's
-native-module detection. The package assertion verifies archive contents,
-physical native files, runtime resources and matching product versions.
+native-module detection. node-pty's compiler intermediates (`build/**/obj/`,
+`.exp`, `.iobj`, `.ipdb`, `.lib`, `.pdb`, `.tlog`) are excluded from the
+package; only its `.node`, `.dll` and `.exe` outputs are runtime payload. The
+package assertion verifies archive contents, physical native files, runtime
+resources, the absence of those intermediates and matching product versions.
 Contributors who run `pnpm vendor:runtime` also get the generated search-tool
 directory on `pnpm dev`'s managed PATH; dev startup never downloads or mutates
 that payload implicitly.

@@ -8,6 +8,7 @@ import { describe, expect, it } from 'vitest'
 import { createPackageWithOptions, uncache } from '@electron/asar'
 
 import { ASAR_REQUIRED_FILES, BASE_REQUIRED_FILES, assertDesktopPackage } from './assert-desktop-package.mjs'
+import { INSTALL_INTEGRITY_FILE, collectInstallIntegrity } from './desktop-install-integrity.mjs'
 
 const PI_CLI = 'vendor/pi/node_modules/@earendil-works/pi-coding-agent/dist/cli.js'
 
@@ -17,7 +18,16 @@ function writePackageFile(appRoot: string, file: string, content = '') {
   writeFileSync(path, content)
 }
 
-async function writeBasePackage(appRoot: string, manifest: unknown, duplicateResource = false) {
+function writeIntegrityManifest(appRoot: string) {
+  const resources = dirname(appRoot)
+  writePackageFile(resources, INSTALL_INTEGRITY_FILE, JSON.stringify(collectInstallIntegrity(resources, { version: '0.91.1' })))
+}
+
+async function writeBasePackage(
+  appRoot: string,
+  manifest: unknown,
+  options: { duplicateResource?: boolean; buildIntermediate?: boolean } = {},
+) {
   for (const file of BASE_REQUIRED_FILES) {
     if (file === 'vendor/manifest.json') continue
     writePackageFile(appRoot, file)
@@ -30,12 +40,14 @@ async function writeBasePackage(appRoot: string, manifest: unknown, duplicateRes
   for (const dir of ['default', 'vendor', 'ui/dist', 'src/workspaces/templates']) {
     mkdirSync(join(input, dir), { recursive: true })
   }
-  if (duplicateResource) writePackageFile(input, 'default/duplicated.md', 'duplicate')
+  if (options.duplicateResource) writePackageFile(input, 'default/duplicated.md', 'duplicate')
+  if (options.buildIntermediate) writePackageFile(input, 'node_modules/node-pty/build/Release/obj/pty/pty.obj', 'obj')
   for (const file of ASAR_REQUIRED_FILES) writePackageFile(input, file)
   writePackageFile(input, 'package.json', JSON.stringify({ version: '0.91.1' }))
   writePackageFile(input, 'node_modules/node-pty/build/Release/pty.node')
   await createPackageWithOptions(input, join(dirname(appRoot), 'app.asar'), { unpack: '**/*.node' })
   rmSync(input, { recursive: true, force: true })
+  writeIntegrityManifest(appRoot)
 }
 
 function piManifest() {
@@ -101,15 +113,64 @@ describe('assertDesktopPackage', () => {
     const dependencyFilter = getNodeModuleFileMatcher(root, destination, expand, config[platform], info).createFilter()
     expect(dependencyFilter(join(root, 'node_modules/dugite/build/lib/index.js'), fileStat)).toBe(true)
     expect(dependencyFilter(join(root, 'node_modules/dugite/git/bin/git'), fileStat)).toBe(platform === 'mac')
+    expect(dependencyFilter(join(root, 'node_modules/node-pty/build/Release/pty.node'), fileStat)).toBe(true)
+    expect(dependencyFilter(join(root, 'node_modules/node-pty/build/Release/winpty-agent.exe'), fileStat)).toBe(true)
+    for (const file of [
+      'node_modules/node-pty/build/Release/obj/pty/pty.obj',
+      'node_modules/node-pty/build/Release/obj/conpty/conpty.tlog/CL.command.1.tlog',
+      'node_modules/node-pty/build/deps/winpty/src/Release/obj/agent/Agent.obj',
+      'node_modules/node-pty/build/Release/pty.lib',
+      'node_modules/node-pty/build/Release/winpty.iobj',
+      'node_modules/node-pty/build/Release/conpty.ipdb',
+      'node_modules/node-pty/build/Release/conpty.exp',
+    ]) {
+      expect(dependencyFilter(join(root, file), fileStat), file).toBe(false)
+    }
   })
 
   it('rejects duplicated resource files while permitting empty archive directories', async () => {
     const root = mkdtempSync(join(tmpdir(), 'openalice-package-duplicate-'))
     try {
       const appRoot = join(root, 'mac-arm64/OpenAlice.app/Contents/Resources/runtime')
-      await writeBasePackage(appRoot, { ...piManifest(), ...searchToolsManifest('darwin-arm64') }, true)
+      await writeBasePackage(appRoot, { ...piManifest(), ...searchToolsManifest('darwin-arm64') }, { duplicateResource: true })
       expect(assertDesktopPackage({ packageRoot: root, arch: 'arm64' }).errors.join('\n'))
         .toContain('external runtime resource duplicated in ASAR: default/duplicated.md')
+    } finally {
+      rmSync(root, { recursive: true, force: true })
+    }
+  })
+
+  it('rejects node-pty compiler intermediates inside the archive', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'openalice-package-intermediates-'))
+    try {
+      const appRoot = join(root, 'win-unpacked/resources/runtime')
+      await writeBasePackage(appRoot, piManifest(), { buildIntermediate: true })
+      expect(assertDesktopPackage({ packageRoot: root, arch: 'x64' }).errors.join('\n'))
+        .toContain('node-pty build intermediates must not ship: node_modules/node-pty/build/Release/obj/pty/pty.obj')
+    } finally {
+      rmSync(root, { recursive: true, force: true })
+    }
+  })
+
+  it('requires the install integrity inventory to match the packaged payload', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'openalice-package-integrity-'))
+    const appRoot = join(root, 'mac-arm64/OpenAlice.app/Contents/Resources/runtime')
+    try {
+      await writeBasePackage(appRoot, { ...piManifest(), ...searchToolsManifest('darwin-arm64') })
+      writeSearchToolFiles(appRoot, 'darwin-arm64')
+      writePackageFile(join(dirname(appRoot), 'app.asar.unpacked'), 'node_modules/dugite/git/bin/git')
+      writeIntegrityManifest(appRoot)
+      expect(assertDesktopPackage({ packageRoot: root, arch: 'arm64' }).ok).toBe(true)
+
+      rmSync(join(appRoot, 'src/workspaces/templates/_common.mjs'))
+      writePackageFile(appRoot, 'ui/dist/index.html', 'truncated differently')
+      const errors = assertDesktopPackage({ packageRoot: root, arch: 'arm64' }).errors.join('\n')
+      expect(errors).toContain(`${INSTALL_INTEGRITY_FILE} lists a missing file: runtime/src/workspaces/templates/_common.mjs`)
+      expect(errors).toContain(`${INSTALL_INTEGRITY_FILE} size differs on disk: runtime/ui/dist/index.html`)
+
+      rmSync(join(dirname(appRoot), INSTALL_INTEGRITY_FILE))
+      expect(assertDesktopPackage({ packageRoot: root, arch: 'arm64' }).errors.join('\n'))
+        .toContain(`unreadable ${INSTALL_INTEGRITY_FILE}`)
     } finally {
       rmSync(root, { recursive: true, force: true })
     }

@@ -4,6 +4,7 @@ import { dirname, join, normalize, relative, resolve } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { extractFile, listPackage, statFile } from '@electron/asar'
 import { DEFAULT_DESKTOP_PACKAGE_ROOT, resolveDesktopPackageRootArg } from './desktop-package-artifact.mjs'
+import { INSTALL_INTEGRITY_FILE, readInstallIntegrity, verifyInstallIntegrity } from './desktop-install-integrity.mjs'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = dirname(__filename)
@@ -117,8 +118,24 @@ export function assertDesktopPackage(options = {}) {
         throw new Error(`native payload must be unpacked: ${file}`)
       }
     }
+    // Compiler intermediates only add extraction surface to the installer.
+    const buildIntermediates = archiveEntries.filter((entry) =>
+      /^node_modules\/node-pty\/build\/.*(\/obj\/|\.(exp|iobj|ipdb|lib|pdb|tlog)$)/.test(entry) &&
+      !('files' in statFile(archivePath, normalize(entry))))
+    if (buildIntermediates.length > 0) {
+      throw new Error(`node-pty build intermediates must not ship: ${buildIntermediates[0]}`)
+    }
   } catch (error) {
     errors.push(`[desktop-package] invalid app.asar: ${error instanceof Error ? error.message : String(error)}`)
+  }
+
+  const resourcesRoot = dirname(appRoot)
+  try {
+    const integrity = verifyInstallIntegrity(resourcesRoot, readInstallIntegrity(resourcesRoot))
+    for (const file of integrity.missing) errors.push(`[desktop-package] ${INSTALL_INTEGRITY_FILE} lists a missing file: ${file}`)
+    for (const file of integrity.mismatched) errors.push(`[desktop-package] ${INSTALL_INTEGRITY_FILE} size differs on disk: ${file}`)
+  } catch (error) {
+    errors.push(`[desktop-package] unreadable ${INSTALL_INTEGRITY_FILE}: ${error instanceof Error ? error.message : String(error)}`)
   }
 
   const nodeModules = join(unpackedRoot, 'node_modules')

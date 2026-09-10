@@ -21,7 +21,7 @@
  * Out of scope (future iterations): tray icon, multi-window, native menus.
  */
 
-import { app, BrowserWindow, dialog, Menu, Notification, protocol, session } from 'electron'
+import { app, BrowserWindow, dialog, Menu, Notification, protocol, session, shell } from 'electron'
 import { runRendererTradingModeSmoke } from './trading-mode-smoke.js'
 import { runRendererDataHomeSmoke } from './data-home-smoke.js'
 import { runRendererWorkspaceAcceptanceSmoke } from './workspace-acceptance-smoke.js'
@@ -59,6 +59,13 @@ import { existingOwnerSmokeMode, resolveExistingOwnerStartup } from './existing-
 import { inspectPreviousUpdateAttempt, recordUpdateAttempt } from './update-attempt.js'
 import { childIsRunning, stopChild } from './child-shutdown.js'
 import { exitDesktopProcess } from './app-exit.js'
+import {
+  INSTALL_INTEGRITY_SKIP_ENV,
+  REINSTALL_URL,
+  describeInstallIntegrityFailure,
+  summarizeInstallIntegrity,
+  verifyInstallIntegrity,
+} from './install-integrity.js'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = dirname(__filename)
@@ -581,6 +588,35 @@ app.whenReady().then(async () => {
       'updater',
       `could not inspect previous update attempt: ${error instanceof Error ? error.stack ?? error.message : String(error)}`,
     )
+  }
+
+  // A partially extracted or partially deleted install otherwise fails later
+  // with an arbitrary missing module or toolchain error. Refuse to start and
+  // point at a reinstall before touching the selected data home.
+  if (app.isPackaged && !truthyEnv(process.env[INSTALL_INTEGRITY_SKIP_ENV])) {
+    const integrity = await verifyInstallIntegrity(process.resourcesPath)
+    desktopDiagnostics.write('install-integrity', summarizeInstallIntegrity(integrity))
+    if (integrity.status !== 'verified') {
+      const choice = dialog.showMessageBoxSync({
+        type: 'error',
+        title: 'OpenAlice — installation incomplete',
+        message: 'OpenAlice cannot start because its installation is incomplete.',
+        detail: describeInstallIntegrityFailure(integrity, {
+          version: app.getVersion(),
+          installRoot: process.platform === 'darwin'
+            ? dirname(dirname(process.resourcesPath))
+            : dirname(process.resourcesPath),
+          diagnosticsPath: desktopDiagnostics.path,
+        }),
+        buttons: ['Download installer', 'Quit'],
+        defaultId: 0,
+        cancelId: 1,
+        noLink: true,
+      })
+      if (choice === 0) await shell.openExternal(REINSTALL_URL)
+      app.quit()
+      return
+    }
   }
 
   // Build output lives at <repo>/dist/electron/main.js, <repo>/dist/main.js

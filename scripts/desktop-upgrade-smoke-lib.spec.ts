@@ -63,11 +63,26 @@ describe('desktop upgrade smoke planning', () => {
     expect(packageJson.build.nsis.include).toBe('apps/desktop/build/installer.nsh')
     expect(installerInclude).toContain('${if} ${isUpdated}')
     expect(installerInclude).toContain('/T /F /IM "${APP_EXECUTABLE_FILENAME}"')
-    expect(installerInclude).toContain("ExecutablePath.StartsWith('$INSTDIR'")
+    expect(installerInclude).toContain('ExecutablePath.StartsWith($$Root')
     expect(installerInclude).toContain('Stop-Process -Id')
+    expect(installerInclude).toContain('openalice-stop-install-processes.ps1" -Root "$INSTDIR"')
+    expect(installerInclude).not.toContain('Sleep 1000')
     expect(installerInclude).toContain('SetOutPath "$TEMP"')
     expect(installerInclude).toContain('/D /C RD /S /Q "\\\\?\\$INSTDIR"')
     expect(installerInclude).toContain('DeleteRegValue SHELL_CONTEXT "${UNINSTALL_REGISTRY_KEY}" "UninstallString"')
+    // Post-extraction verification must run before electron-builder's
+    // force-run launch and abort the install instead of handing off.
+    expect(installerInclude).toContain('!macro customInstall')
+    expect(installerInclude).toContain("Join-Path $$Root 'openalice-integrity.json'")
+    expect(installerInclude).toContain('openalice-verify-install.ps1" -Root "$INSTDIR\\resources"')
+    expect(installerInclude).toContain('Abort "OpenAlice was not installed completely."')
+    for (const macro of ['writeStopInstallProcessesScript', 'writeVerifyInstallScript']) {
+      const body = installerInclude.split(`!macro ${macro} PATH`)[1]?.split('!macroend')[0] ?? ''
+      // NSIS expands `${name}` and `$(name)` inside strings; the helpers must
+      // only use `$$` escapes so PowerShell receives literal `$` variables.
+      expect(body, macro).not.toMatch(/\$\(|\$\{(?!PATH\})/)
+      expect(body, macro).toMatch(/FileWrite \$R9 "exit /)
+    }
   })
 
   it('selects the newest published version different from the candidate', () => {
