@@ -169,3 +169,24 @@ Quick Start exposes a TUI / GUI selector beside the runtime. GUI is available
 only with `web.freshSession`; `quick-chat` accepts `surface: webpi` and starts
 the structured host directly with the same Session runtime binding. Omission
 keeps the terminal default. The initial prompt is sent once after Web startup.
+
+## File references in GUI prose
+
+`useConversationFiles` consumes unified assistant progress and answer text in
+`WebSessionView`, outside every runtime/transport. It uses Connector Protocol's
+bracket parser; code, escaped brackets and incomplete references remain text.
+The read-only Workspace content endpoint checks realpath containment before
+returning metadata or bounded bytes. Missing references stay literal and retry
+briefly so a reference can precede a file write.
+
+The shared conversation renderer receives resolved hrefs and a click callback.
+Images/stickers stay in prose order; file cards open the existing workbench.
+New references automatically open a file tab once per turn/path, except
+`sticker/` references, which stay inline. The initial snapshot never opens
+historical references. Unmounting cancels resolution and pending opens. The
+consumer does not require a runtime-specific final channel or interpret
+Connector automation silence markers.
+
+Opening an existing file tab refreshes its content without duplicating the tab.
+On narrow screens the workbench takes the content width and its collapse control
+returns to the conversation. Sticker images retain transparent backgrounds.

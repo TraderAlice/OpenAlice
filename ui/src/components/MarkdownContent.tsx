@@ -62,7 +62,7 @@ function createWikilinkExtension(opts: { codeSpanWikilinks: boolean; fileHrefs?:
         if (!href) return escapeHtml(token.raw)
         const attributes = `href="${escapeHtml(href)}" data-file-path="${escapeHtml(name)}"`
         if (/\.(png|jpe?g|webp|gif)$/i.test(name)) {
-          return `<a class="markdown-file-image" ${attributes}><img src="${escapeHtml(href)}" alt="${escapeHtml(name)}" loading="lazy" /></a>`
+          return `<a class="markdown-file-image${name.startsWith('sticker/') ? ' is-sticker' : ''}" ${attributes}><img src="${escapeHtml(href)}" alt="${escapeHtml(name)}" loading="lazy" /></a>`
         }
         const filename = name.split('/').pop() ?? name
         const extension = filename.split('.').pop()?.toUpperCase() ?? 'FILE'
