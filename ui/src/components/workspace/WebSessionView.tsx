@@ -1,3 +1,4 @@
+import { ConversationImagePreview } from '../conversation/ConversationImagePreview'
 import { useConversationFiles } from '../../hooks/useConversationFiles'
 import { useHarnessWorkbench } from '../../live/harness-workbench'
 import { useCallback, useMemo, type ReactNode } from 'react'
@@ -51,7 +52,8 @@ function WebSession({ wsId, sessionId, agent, agents, label, headerActions, onSe
       </span>}
     </PageTopBar>
     <ConversationView
-      {...files}
+      fileHrefs={files.fileHrefs}
+      onFileReference={files.onFileReference}
       items={session.items}
       revision={snapshot?.revision ?? 0}
       busy={busy}
@@ -81,6 +83,7 @@ function WebSession({ wsId, sessionId, agent, agents, label, headerActions, onSe
       retry={() => void session.refresh()}
       recover={onSessionLost}
     />
+    <ConversationImagePreview image={files.imagePreview} onClose={files.closeImage} />
   </>
 }
 
