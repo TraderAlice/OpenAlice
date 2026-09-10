@@ -151,6 +151,43 @@ describe('OpenAlice Runtime lifecycle core', () => {
     expect(child.kill).toHaveBeenCalledWith('SIGTERM')
   })
 
+  it.skipIf(process.platform === 'win32')('preserves pending installation when the writer lease is occupied', async () => {
+    const fixture = await makeActivationLayout()
+    await recordPendingActivation(fixture.layout, {
+      activeRelease: fixture.currentName,
+      previousRelease: fixture.previousName,
+      productVersion: '0.92.0',
+    })
+    const child = new FakeChild()
+    child.pid = 456
+    const spawnProcess = () => {
+      setImmediate(() => child.emit('exit', 75, null))
+      return child
+    }
+
+    await expect(startRuntime(startOptions(), {
+      activationLayout: fixture.layout,
+      installedContentIdentityImpl: () => 'bbbbbbbbbbbbbbbb',
+      detached: true,
+      env: {},
+      nodeBinary: '/test/node',
+      resolveRoot: async (path) => path,
+      prepareSource: async () => ({ prepared: false }),
+      spawnProcess,
+      openFile: async () => ({ fd: 9, close: async () => undefined }),
+      mkdirImpl: async () => undefined,
+      readStatus: async () => absentStatus(),
+      sleep: async () => new Promise(() => undefined),
+    })).rejects.toMatchObject({
+      code: 'EOWNED',
+    })
+    expect(await readlink(fixture.layout.currentPath)).toBe(join('releases', fixture.currentName))
+    expect(await readActivationReceipt(fixture.layout)).toMatchObject({
+      state: 'pending',
+    })
+    expect(child.kill).toHaveBeenCalledWith('SIGTERM')
+  })
+
   it('does not race a live installer while handling readiness failure', async () => {
     const fixture = await makeActivationLayout()
     await recordPendingActivation(fixture.layout, {
@@ -284,6 +321,11 @@ describe('OpenAlice Runtime lifecycle core', () => {
   it('starts the Bun Guardian role without source preparation', async () => {
     vi.stubGlobal('__OPENALICE_BUN_STANDALONE__', true)
     try {
+      const root = await mkdtemp(join(tmpdir(), 'alice-native-identity-'))
+      temporaryPaths.push(root)
+      const resources = join(root, 'share/openalice')
+      await mkdir(resources, {recursive: true})
+      await writeFile(join(root, 'release.json'), JSON.stringify({contentIdentity: 'bbbbbbbbbbbbbbbb'}))
       const child = new FakeChild()
       const prepareSource = vi.fn()
       const resolveRoot = vi.fn()
@@ -295,11 +337,10 @@ describe('OpenAlice Runtime lifecycle core', () => {
       await startRuntime({
         ...startOptions(),
         appDir: null,
-        runtimeProvider: { kind: 'bun', contentIdentity: 'release-content-1' },
       }, {
         detached: true,
         env: {
-          OPENALICE_APP_HOME: '/opt/openalice/releases/v1/share/openalice',
+          OPENALICE_APP_HOME: resources,
           OPENALICE_MANAGED_PI_PATH: '/desktop/pi/cli.js',
           OPENALICE_MANAGED_PI_NODE_PATH: '/desktop/node',
           PI_CODING_AGENT_DIR: '/native/pi',
@@ -324,9 +365,10 @@ describe('OpenAlice Runtime lifecycle core', () => {
         '/opt/openalice/releases/v1/bin/openalice',
         ['--internal-role', 'guardian'],
         expect.objectContaining({
-          cwd: resolve('/opt/openalice/releases/v1/share/openalice'),
+          cwd: resources,
           env: expect.objectContaining({
             OPENALICE_RUNTIME_PROVIDER: 'bun',
+            OPENALICE_RUNTIME_CONTENT_IDENTITY: 'bbbbbbbbbbbbbbbb',
             OPENALICE_RUNTIME_EXECUTABLE: '/opt/openalice/releases/v1/bin/openalice',
             PI_CODING_AGENT_DIR: '/native/pi',
           }),

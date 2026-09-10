@@ -29,6 +29,7 @@ import {
   bunGuardianProcessSpec,
   isBunStandalone,
   resolveBunResourceRoot,
+  resolveBunContentIdentity,
 } from './bun-standalone.mjs'
 
 const NULL_OUTPUT = Object.freeze({ write: () => undefined })
@@ -173,8 +174,10 @@ export async function startRuntime(options, dependencies = {}) {
     const rejectExit = (code, signal) => {
       if (!ready) {
         reject(lifecycleError(
-          'EEARLYEXIT',
-          `OpenAlice Runtime exited before it was ready (code=${String(code)}, signal=${String(signal)})`,
+          code === 75 ? 'EOWNED' : 'EEARLYEXIT',
+          code === 75
+            ? 'OpenAlice Runtime could not acquire its writer lease; the installed release was preserved'
+            : `OpenAlice Runtime exited before it was ready (code=${String(code)}, signal=${String(signal)})`,
         ))
       }
     }
@@ -256,8 +259,7 @@ function resolveRuntimeProvider(explicit, appDir, env) {
     return {
       kind: 'bun',
       contentIdentity: explicit?.contentIdentity
-        ?? env['OPENALICE_RUNTIME_CONTENT_IDENTITY']?.trim()
-        ?? null,
+        ?? resolveBunContentIdentity(appDir, env),
     }
   }
   if (explicit?.kind === 'bundle') {

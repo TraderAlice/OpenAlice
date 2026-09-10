@@ -10,6 +10,8 @@ import { fileURLToPath, pathToFileURL } from 'node:url'
 import { bunReleaseContentIdentity } from './bun-release-content-identity.mjs'
 import { CLI_RELEASE_TARGETS, cliExecutableName } from '../packages/cli/src/release-targets.mjs'
 
+import { readDevBrokerCatalog } from './dev-broker-binding.mjs'
+
 export { CLI_RELEASE_TARGETS }
 const PINNED_BUN_VERSION = readFileSync(new URL('../.bun-version', import.meta.url), 'utf8').trim()
 // PortableGit's complete file inventory exceeds child_process's 1 MiB default.
@@ -61,6 +63,18 @@ export function prepareCliDevAssets({ inputDir, outputDir, commit, version, inst
       platform,
       arch,
     })
+
+    const catalog = readDevBrokerCatalog(inputRoot, { commit, version, platform, arch }, immutableRoot)
+    const bindingPath = `${archiveName.slice(0, -'.tar.gz'.length)}/share/openalice/broker-pack-source.json`
+    const bindingBytes = execFileSync('tar', ['-xOzf', archivePath, bindingPath])
+    const binding = JSON.parse(bindingBytes.toString('utf8'))
+    const bindingEntry = metadata.files.find(entry => entry.path === 'share/openalice/broker-pack-source.json')
+    if (bindingEntry?.sha256 !== createHash('sha256').update(bindingBytes).digest('hex') || bindingEntry?.bytes !== bindingBytes.length) {
+      throw new Error('CLI content identity does not cover its broker catalog')
+    }
+    if (binding.schemaVersion !== 1 || binding.commit !== commit || JSON.stringify(binding.catalog) !== JSON.stringify(catalog)) {
+      throw new Error('CLI broker binding differs from published catalog')
+    }
 
     copyFileSync(archivePath, join(immutableRoot, archiveName))
     copyFileSync(checksumPath, join(immutableRoot, `${archiveName}.sha256`))

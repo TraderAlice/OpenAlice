@@ -9,6 +9,7 @@ import { afterEach, describe, expect, it } from 'vitest'
 
 import { cliExecutableName } from '../packages/cli/src/release-targets.mjs'
 import { bunReleaseContentIdentity } from './bun-release-content-identity.mjs'
+import { writeDevBrokerBinding } from './dev-broker-binding.mjs'
 import { prepareCliDevAssets } from './prepare-cli-dev-assets.mjs'
 
 const execFileAsync = promisify(execFile)
@@ -66,6 +67,13 @@ describe.skipIf(process.platform === 'win32')('CLI dev channel assets', () => {
       sha256: createHash('sha256').update('#!/usr/bin/env bash\n').digest('hex'),
     })
     expect(JSON.parse(await readFile(join(output, 'manifest.json'), 'utf8'))).toEqual(manifest)
+  })
+
+  it('rejects changed broker bytes before producing a channel receipt', async () => {
+    const root = await fixture()
+    await writeFile(join(root, 'input', `OpenAlice-Broker-alpaca-${version}-linux-x64.tgz`), 'broken')
+    expect(() => prepareCliDevAssets({ inputDir: join(root, 'input'), outputDir: join(root, 'output'), commit, version, installerPath: join(root, 'install') })).toThrow('Dev broker checksum mismatch')
+    await expect(access(join(root, 'output/manifest.json'))).rejects.toMatchObject({code: 'ENOENT'})
   })
 
   it('rejects a candidate whose sidecar does not match its bytes', async () => {
@@ -132,6 +140,19 @@ async function fixture({ tamperedIdentityTarget, largeWindowsMetadata = false } 
         sha256: createHash('sha256').update(executableBytes).digest('hex'),
       }],
     }
+    const packs = []
+    for (const engine of ['ccxt', 'alpaca', 'ibkr', 'leverup', 'longbridge'].filter(e => !(e === 'longbridge' && platform === 'win32' && arch === 'arm64'))) {
+      const file = `OpenAlice-Broker-${engine}-${version}-${platform}-${arch}.tgz`
+      const bytes = Buffer.from(`fixture-${engine}-${platform}-${arch}`)
+      await writeFile(join(input, file), bytes)
+      packs.push({engine, version, apiVersion: 1, file, entry: 'dist/index.js', size: bytes.length, sha256: createHash('sha256').update(bytes).digest('hex')})
+    }
+    await writeFile(join(input, `OpenAlice-Broker-Packs-${version}-${platform}-${arch}.json`), JSON.stringify({schemaVersion: 1, sourceCommit: commit, openAliceVersion: version, platform, arch, packs}))
+    const resources = join(releaseRoot, 'share/openalice')
+    await mkdir(resources, {recursive: true})
+    await writeDevBrokerBinding(resources, {inputDir: input, commit, version, platform, arch})
+    const binding = await readFile(join(resources, 'broker-pack-source.json'))
+    release.files.push({path: 'share/openalice/broker-pack-source.json', type: 'file', bytes: binding.length, mode: 0o644, sha256: createHash('sha256').update(binding).digest('hex')})
     release.contentIdentity = bunReleaseContentIdentity(release)
     if (tamperedIdentityTarget === `${platform}-${arch}`) {
       release.contentIdentity = release.contentIdentity === 'ffffffffffffffff'

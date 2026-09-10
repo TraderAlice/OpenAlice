@@ -89,7 +89,7 @@ describe('CLI installer dev publication workflow', () => {
       'retention-days': 7,
     })
     expect(String(neutralUpload?.name)).not.toMatch(/^dev-cli-/)
-    expect(build.needs).toBe('build-dev-cli-neutral')
+    expect(build.needs).toEqual(['build-dev-cli-neutral', 'build-dev-broker-packs'])
     expect(build.strategy?.matrix?.include).toEqual([
       { os: 'macos-14', platform: 'darwin', arch: 'arm64' },
       { os: 'macos-15-intel', platform: 'darwin', arch: 'x64' },

@@ -3,6 +3,7 @@ import { createMarketBarsTools } from './tool/market-bars.js'
 import {
   acquireOpenAliceRuntimeLocks,
   takeoverRequested,
+  RuntimeAlreadyRunningError,
   type OpenAliceRuntimeLock,
 } from '@traderalice/guardian-runtime'
 // The in-process AI loop (AgentCenter, then GenerateRouter + AgentWork) is gone
@@ -514,6 +515,6 @@ export async function runAliceEntrypoint(): Promise<void> {
 if (!(globalThis as { __OPENALICE_INTERNAL_ROLE_DISPATCH__?: boolean }).__OPENALICE_INTERNAL_ROLE_DISPATCH__) {
   runAliceEntrypoint().catch((err) => {
     console.error('fatal:', err)
-    process.exit(1)
+    process.exit(err instanceof RuntimeAlreadyRunningError ? err.exitCode : 1)
   })
 }
