@@ -1,4 +1,5 @@
 import { readFile } from 'node:fs/promises'
+import { headlessFailureSummary, readHeadlessStderr } from './headless-failure.js'
 
 import {
   readAutoPredictionPreferences,
@@ -412,6 +413,10 @@ export function createWorkspaceConversationControl(
       const structured = await readStructuredSnapshot(
         headlessLogPaths(svc.headlessLogsDir, taskId).structured,
       )
+      const stderr = task.status === 'failed' || task.status === 'interrupted'
+        ? await readHeadlessStderr(headlessLogPaths(svc.headlessLogsDir, taskId).stderr)
+        : undefined
+      const error = headlessFailureSummary({ ...task, structured, ...stderr })
       const result: WorkspaceConversationTask = {
         taskId: task.taskId,
         resumeId: task.resumeId,
@@ -424,7 +429,12 @@ export function createWorkspaceConversationControl(
         ...(task.trigger?.kind === 'issue' ? { issueId: task.trigger.issueId } : {}),
         ...(task.finishedAt !== undefined ? { finishedAt: task.finishedAt } : {}),
         ...(task.durationMs !== undefined ? { durationMs: task.durationMs } : {}),
-        ...(task.error ? { error: task.error } : {}),
+        ...(error ? { error } : {}),
+        ...(task.exitCode !== undefined ? { exitCode: task.exitCode } : {}),
+        ...(task.signal !== undefined ? { signal: task.signal } : {}),
+        ...(task.killed !== undefined ? { killed: task.killed } : {}),
+        ...(task.processStarted !== undefined ? { processStarted: task.processStarted } : {}),
+        ...stderr,
       }
       return result
     },
