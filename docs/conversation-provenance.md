@@ -791,3 +791,19 @@ shapes should point back here rather than restating the rules differently.
 | `src/workspaces/issues/board.ts` | Issue/run/Inbox projections |
 | `src/services/uta-client/` | Alice -> UTA decision-correlation boundary |
 | `services/uta/src/domain/trading/` | Broker operation and execution authority |
+
+
+### Conversation failure diagnostics
+
+`conversation read`, `await`, `collect`, and `ask --await` return a concise
+`error` for failed/interrupted tasks, plus recorded `exitCode`, `signal`,
+`killed`, and `processStarted` fields when available. Terminal structured
+errors take priority over stderr; launch failures and watchdog termination
+retain their explicit causes. Successful turns do not promote warnings or
+recovered errors into a failure.
+
+`conversation read --task-id <id> --mode detailed` also exposes the last 16 KiB
+of stderr for failed/interrupted tasks, with `stderrTruncated` indicating a
+clipped log. Existing tasks can recover this diagnostic from their log file;
+missing logs still leave an exit/signal or generic failure explanation. Logs
+remain diagnostics, never assistant replies.

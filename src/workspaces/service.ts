@@ -1,3 +1,4 @@
+import { headlessFailureSummary } from './headless-failure.js';
 import { userDataHome } from '../core/paths.js';
 import { resolveAliceProjectIdentity } from '@traderalice/guardian-runtime';
 /**
@@ -2109,6 +2110,7 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
         progressPublisher.offer(projectTurnProgress(r.structured));
         await Promise.all([turnJournal.flush(), progressPublisher.flush()]);
         const status = headlessTaskStatus(r);
+        const failure = headlessFailureSummary({ ...r, status });
         await headlessTasks.complete(rec.taskId, {
           status,
           finishedAt: Date.now(),
@@ -2118,7 +2120,7 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
           exitCode: r.exitCode,
           signal: r.signal,
           killed: r.killed,
-          ...(r.error ? { error: r.error } : {}),
+          ...(failure ? { error: failure } : {}),
           output: {
             hasAssistantReply: r.structured.assistantText !== null,
             ...(r.structured.assistantText
@@ -2136,21 +2138,21 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
             finishedAt: rec.finishedAt ?? Date.now(),
             assistantText: r.structured.assistantText,
             durationMs: r.durationMs,
-            ...(status !== 'done' && r.stderrTail ? { error: r.stderrTail.slice(-1000) } : {}),
+            ...(failure ? { error: failure } : {}),
           });
         }
         if (r.processStarted === false) {
           await agentRuntimeLog.record('runtime.spawn_failed', {
             ...occupancySubject,
             ...(r.launchErrorCode ? { launchErrorCode: r.launchErrorCode } : {}),
-            ...(r.error ? { error: r.error } : {}),
+            ...(failure ? { error: failure } : {}),
           });
         } else {
           await agentRuntimeLog.record('runtime.stopped', {
             ...occupancySubject,
             status,
             exitCode: r.exitCode,
-            ...(r.error ? { error: r.error } : {}),
+            ...(failure ? { error: failure } : {}),
             ...headlessCompletionAssets(r.structured),
           });
         }
@@ -2158,7 +2160,7 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
           task: rec,
           status,
           assistantText: r.structured.assistantText,
-          ...(status !== 'done' && r.stderrTail ? { error: r.stderrTail.slice(-1000) } : {}),
+          ...(failure ? { error: failure } : {}),
         });
         await stampTelegramDeskFire(rec, r.structured.assistantText);
         // Scheduled one-shot issues are the only board items whose lifecycle can

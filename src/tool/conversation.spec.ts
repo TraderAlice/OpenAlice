@@ -8,6 +8,7 @@ import {
   conversationAwaitFactory,
   conversationCollectFactory,
   conversationReadFactory,
+  taskProjection,
 } from './conversation.js'
 
 async function run(tool: Tool, args: Record<string, unknown>) {
@@ -361,5 +362,19 @@ describe('conversation_read', () => {
         tools: [{ name: 'Read', status: 'completed' }],
         blocks: completedTask.structured.blocks,
       })
+  })
+})
+
+
+describe('conversation diagnostics projection', () => {
+  it('keeps stderr out of summaries but includes it in detailed failed output', () => {
+    const task = { ...completedTask, status: 'failed' as const, exitCode: 1,
+      stderrTail: 'No API key found', stderrTruncated: false }
+    expect(taskProjection(task, 'summary')).toMatchObject({ error: 'No API key found', exitCode: 1 })
+    expect(taskProjection(task, 'summary')).not.toHaveProperty('stderrTail')
+    expect(taskProjection(task, 'detailed')).toMatchObject({ stderrTail: 'No API key found', stderrTruncated: false })
+  })
+  it('does not label a recovered successful turn as an error', () => {
+    expect(taskProjection({ ...completedTask, error: 'warning' }, 'summary')).not.toHaveProperty('error')
   })
 })

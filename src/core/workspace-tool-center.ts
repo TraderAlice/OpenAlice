@@ -119,6 +119,12 @@ export interface WorkspaceConversationTask {
   readonly finishedAt?: number
   readonly durationMs?: number
   readonly error?: string
+  readonly exitCode?: number | null
+  readonly signal?: string | null
+  readonly killed?: boolean
+  readonly processStarted?: boolean
+  readonly stderrTail?: string
+  readonly stderrTruncated?: boolean
   readonly structured: HeadlessStructuredOutput | null
 }
 

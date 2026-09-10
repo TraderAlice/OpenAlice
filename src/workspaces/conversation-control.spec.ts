@@ -408,6 +408,39 @@ describe('Workspace conversation control', () => {
     expect(dispatchHeadlessTask).not.toHaveBeenCalled()
   })
 
+  it('recovers bounded stderr for a historical failure with no recorded error', async () => {
+    const logsDir = await mkdtemp(join(tmpdir(), 'conversation-failure-'))
+    dirs.push(logsDir)
+    const task: HeadlessTaskRecord = {
+      taskId: 'task-failed', resumeId: 'resume-1', wsId: 'ws-peer', agent: 'pi',
+      prompt: 'test', status: 'failed', startedAt: 1, exitCode: 1, processStarted: true,
+    }
+    await writeFile(headlessLogPaths(logsDir, task.taskId).stderr,
+      'x'.repeat(100_000) + '\nNo API key found for the selected model\n')
+    const { svc } = fakeService({ task, logsDir })
+    const result = await createWorkspaceConversationControl(svc).read(task.taskId)
+    expect(result).toMatchObject({ status: 'failed', exitCode: 1, processStarted: true, stderrTruncated: true })
+    expect(result?.error).toContain('No API key found')
+    expect(Buffer.byteLength(result?.stderrTail ?? '')).toBeLessThanOrEqual(16 * 1024)
+    task.status = 'done'
+    const successful = await createWorkspaceConversationControl(svc).read(task.taskId)
+    expect(successful).not.toHaveProperty('error')
+    expect(successful).not.toHaveProperty('stderrTail')
+  })
+
+  it('returns the exit reason when a failed task has no log file', async () => {
+    const logsDir = await mkdtemp(join(tmpdir(), 'conversation-no-log-'))
+    dirs.push(logsDir)
+    const task: HeadlessTaskRecord = {
+      taskId: 'task-failed', resumeId: 'resume-1', wsId: 'ws-peer', agent: 'pi',
+      prompt: 'test', status: 'failed', startedAt: 1, signal: 'SIGKILL', exitCode: null,
+    }
+    const { svc } = fakeService({ task, logsDir })
+    expect(await createWorkspaceConversationControl(svc).read(task.taskId)).toMatchObject({
+      signal: 'SIGKILL', error: 'Agent process terminated by signal SIGKILL.',
+    })
+  })
+
   it('reads normalized output without exposing the native runtime session id', async () => {
     const logsDir = await mkdtemp(join(tmpdir(), 'conversation-control-'))
     dirs.push(logsDir)

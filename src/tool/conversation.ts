@@ -1,3 +1,4 @@
+import { headlessFailureSummary } from '../workspaces/headless-failure.js'
 import { tool } from 'ai'
 import { z } from 'zod'
 
@@ -37,7 +38,7 @@ export function taskProjection(task: WorkspaceConversationTask, mode: 'summary' 
   const errors = structured?.blocks
     .filter((block): block is Extract<HeadlessMessageBlock, { type: 'error' }> => block.type === 'error')
     .map((block) => block.message) ?? []
-  const compactError = task.error ?? errors.at(-1)
+  const compactError = headlessFailureSummary(task)
   return {
     taskId: task.taskId,
     resumeId: task.resumeId,
@@ -48,7 +49,12 @@ export function taskProjection(task: WorkspaceConversationTask, mode: 'summary' 
     ...(task.parentTaskId ? { parentTaskId: task.parentTaskId } : {}),
     ...(task.durationMs !== undefined ? { durationMs: task.durationMs } : {}),
     ...(compactError ? { error: compactError } : {}),
+    ...(task.exitCode !== undefined ? { exitCode: task.exitCode } : {}),
+    ...(task.signal !== undefined ? { signal: task.signal } : {}),
+    ...(task.killed !== undefined ? { killed: task.killed } : {}),
+    ...(task.processStarted !== undefined ? { processStarted: task.processStarted } : {}),
     ...(mode === 'detailed' ? {
+      ...(task.stderrTail !== undefined ? { stderrTail: task.stderrTail, stderrTruncated: task.stderrTruncated ?? false } : {}),
       tools,
       errors,
       blocks: structured?.blocks ?? [],
