@@ -190,3 +190,7 @@ Connector automation silence markers.
 Opening an existing file tab refreshes its content without duplicating the tab.
 On narrow screens the workbench takes the content width and its collapse control
 returns to the conversation. Sticker images retain transparent backgrounds.
+
+User prose is displayed as plain text, preserving line breaks and literal syntax.
+It does not re-enter Markdown or Workspace reference parsing after submission;
+structured content retains its presentation independently of prose.
