@@ -233,8 +233,11 @@ the Workspace sidebar, and interactive CLI/API starts use `interactive`;
 Issues, schedules, automation, and headless CLI/API starts use `headless`. An explicit
 Quick Chat, sidebar, Issue, CLI, or API runtime choice wins for that one
 Session. Otherwise OpenAlice uses the mode's fixed Agent, then its recent
-Agent, then the legacy `.alice/workspace.json` `defaultAgent`, then the
-installation-wide `workspaceDefaultAgent`. If none resolves to a registered
+Agent, then the installation-wide `workspaceDefaultAgent`. Headless dispatch
+first uses its mode defaults, then `issueDefaultAgent`, then the interactive
+fallback. `.alice/workspace.json` contains display metadata only; migration
+0042 moves its shipped `defaultAgent` to the interactive fixed default without
+overwriting an existing fixed default. If none resolves to a registered
 Agent runtime, Alice falls back to the first registered runtime. Headless mode
 defaults must resolve to a headless-capable Agent.
 

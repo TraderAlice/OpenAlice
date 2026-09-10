@@ -37,7 +37,7 @@ function build(opts: { assignee?: string } = {}) {
         : undefined,
     },
     config: { launcherRepoRoot: '/tmp/repo' },
-    resolveDefaultAgentId: vi.fn(async () => 'pi'),
+    resolveHeadlessDefaultAgentId: vi.fn(async () => 'pi'),
     dispatchHeadlessTask,
     headlessTasks: { list, get: vi.fn() },
     headlessLogsDir: '/tmp/missing-inquiry-logs',

@@ -25,7 +25,6 @@ import {
   TemplateWorkspaceResolver,
 } from '../../workspaces/chat-workspace-resolver.js';
 import { createBuiltinAdapterRegistry } from '../../workspaces/adapters/index.js';
-import { writeWorkspaceMetadata } from '../../workspaces/workspace-metadata.js';
 import {
   emptyWorkspaceRuntimeSettings,
   readWorkspaceRuntimeSettings,
@@ -1036,7 +1035,10 @@ describe('POST /quick-chat — native auth and explicit credential overrides', (
   it('omitted agent prefers the target Workspace runtime over the installation default', async () => {
     const dir = await mkdtemp(join(tmpdir(), 'quick-chat-runtime-'));
     try {
-      await writeWorkspaceMetadata(dir, { defaultAgent: 'opencode' });
+      const settings = emptyWorkspaceRuntimeSettings();
+      settings.runtime.interactive.defaultAgent = 'opencode';
+      settings.runtime.interactive.recent.agent = 'claude';
+      await writeWorkspaceRuntimeSettings(dir, settings);
       vi.mocked(readWorkspaceDefaultAgent).mockResolvedValue('claude');
       vi.mocked(readCredentials).mockResolvedValue({ 'openai-1': openaiKey });
       const workspace = { id: 'ws-1', dir, template: 'chat', tag: 'chat-x' };

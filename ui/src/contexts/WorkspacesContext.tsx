@@ -604,7 +604,7 @@ export function WorkspacesProvider({ children }: { children: ReactNode }) {
   const saveWorkspaceMetadata = useCallback(
     async (
       wsId: string,
-      metadata: { displayName?: string | null; description?: string | null; defaultAgent?: string | null },
+      metadata: { displayName?: string | null; description?: string | null },
     ): Promise<void> => {
       const updated = await updateWorkspaceMetadata(wsId, metadata)
       setWorkspaces((prev) => prev.map((w) => (w.id === wsId ? updated : w)))

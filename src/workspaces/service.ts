@@ -456,6 +456,7 @@ export interface WorkspaceService {
   ): Promise<TemplateWorkspaceResolution>;
   /** Resolve the Workspace default, installation fallback, then first registered runtime. */
   resolveDefaultAgentId(meta: WorkspaceMeta): Promise<string | undefined>;
+  resolveHeadlessDefaultAgentId(meta: WorkspaceMeta): Promise<string | undefined>;
   resolveAdapter(meta: WorkspaceMeta, agentId?: string): CliAdapter;
   /** Open the same persisted Session through its runtime's structured protocol instead of a PTY. */
   startWebSession(
@@ -1104,21 +1105,24 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
 
   /** Default for fresh interactive Sessions without an explicit runtime. */
   const resolveDefaultAgentId = async (wsMeta: WorkspaceMeta): Promise<string | undefined> => {
-    const metadata = await readWorkspaceMetadata(wsMeta.dir);
-    const workspaceDefault = metadata.ok
-      ? validRegisteredRuntime(metadata.metadata.defaultAgent ?? null)
-      : undefined;
+    const settings = await readWorkspaceRuntimeSettings(wsMeta.dir);
+    if (!settings.ok && settings.reason === 'invalid') {
+      throw new Error(`invalid Workspace runtime settings: ${settings.error}`);
+    }
+    const workspaceDefault = validRegisteredRuntime(settings.ok
+      ? resolveWorkspaceRuntimeAgent(settings.settings, 'interactive') ?? null
+      : null);
     return workspaceDefault ??
       validRegisteredRuntime(await readWorkspaceDefaultAgent().catch(() => null)) ??
       firstRegisteredRuntime();
   };
 
   /**
-   * Default for scheduled issues with no frontmatter `agent`: the Workspace's
-   * headless recent runtime first, then the legacy installation Issue default,
+   * Default for fresh headless work without an explicit Agent: the Workspace's
+   * headless fixed default, then recent runtime, then the installation Issue default,
    * its Session default, and finally the first registered runtime.
    */
-  const resolveIssueDefaultAgentId = async (wsMeta: WorkspaceMeta): Promise<string | undefined> => {
+  const resolveHeadlessDefaultAgentId = async (wsMeta: WorkspaceMeta): Promise<string | undefined> => {
     const runtimeSettings = await readWorkspaceRuntimeSettings(wsMeta.dir);
     if (!runtimeSettings.ok && runtimeSettings.reason === 'invalid') {
       throw new Error(`invalid Workspace runtime settings: ${runtimeSettings.error}`);
@@ -2294,7 +2298,7 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
         return resolveAdapter(ws, identity.agent);
       }
       if (agentId) return resolveAdapter(ws, agentId);
-      return resolveAdapter(ws, await resolveIssueDefaultAgentId(ws));
+      return resolveAdapter(ws, await resolveHeadlessDefaultAgentId(ws));
     },
     dispatch: dispatchHeadlessTaskMethod,
     claimFreshSession: async ({ issueWorkspace, issueId, taskId, resumeId, agent }) => {
@@ -2430,7 +2434,7 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
           Boolean(issue.when) && !issueAssigneeResumeId(issue.assignee) && !issue.agent,
         );
         const defaultIssueAgent = needsDefaultAgent
-          ? await resolveIssueDefaultAgentId(ws)
+          ? await resolveHeadlessDefaultAgentId(ws)
           : undefined;
         const issues: IssuesSnapshotIssue[] = res.issues.filter((issue) => !isConnectorDeskIssue(issue)).map((issue) => {
           // Unscheduled ⇒ pure board work item, no firing markers.
@@ -2491,7 +2495,7 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
     if (ownerIdentity) await sessionRegistry.ensureLoaded(ownerIdentity.wsId);
     const assigneeSession = resolveIssueAssigneeSession(issue.assignee);
     const defaultIssueAgent = issue.when && !issueAssigneeResumeId(issue.assignee) && !issue.agent
-      ? await resolveIssueDefaultAgentId(ws)
+      ? await resolveHeadlessDefaultAgentId(ws)
       : undefined;
     const runtimeAvailability = issue.when
       ? issueRuntimeAvailability(issue, defaultIssueAgent, detectAgents())
@@ -3228,7 +3232,10 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
       ...w,
       ...(metadata.ok ? metadata.metadata : {}),
       ...(!metadata.ok && metadata.reason === 'invalid' ? { metadataError: metadata.error } : {}),
-      ...(runtimeSettings.ok ? { runtimeSettings: runtimeSettings.settings } : {}),
+      ...(runtimeSettings.ok ? {
+        runtimeSettings: runtimeSettings.settings,
+        defaultAgent: resolveWorkspaceRuntimeAgent(runtimeSettings.settings, 'interactive'),
+      } : {}),
       ...(!runtimeSettings.ok && runtimeSettings.reason === 'invalid'
         ? { runtimeSettingsError: runtimeSettings.error }
         : {}),
@@ -3356,6 +3363,7 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
     resolveOrCreateAutoQuantWorkspace: resolveOrCreateAutoQuantWorkspaceMethod,
     resolveOrCreateAutoPredictionWorkspace: resolveOrCreateAutoPredictionWorkspaceMethod,
     resolveDefaultAgentId,
+    resolveHeadlessDefaultAgentId,
     resolveAdapter,
     startWebSession,
     refreshSessionTitles,

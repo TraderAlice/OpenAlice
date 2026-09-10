@@ -306,10 +306,14 @@ export function createWorkspaceRoutes(
   });
 
   const resolveDefaultAgentId = async (meta: WorkspaceMeta): Promise<string | undefined> => {
-    const metadata = await readWorkspaceMetadata(meta.dir);
-    if (metadata.ok && metadata.metadata.defaultAgent) {
-      const adapter = svc.adapters.get(metadata.metadata.defaultAgent);
-      if (adapter && isAgentRuntime(adapter)) return metadata.metadata.defaultAgent;
+    const settings = await readWorkspaceRuntimeSettings(meta.dir);
+    if (!settings.ok && settings.reason === 'invalid') {
+      throw new Error(`invalid Workspace runtime settings: ${settings.error}`);
+    }
+    const agent = settings.ok ? resolveWorkspaceRuntimeAgent(settings.settings, 'interactive') : undefined;
+    if (agent) {
+      const adapter = svc.adapters.get(agent);
+      if (adapter && isAgentRuntime(adapter)) return agent;
     }
     const configured = await readWorkspaceDefaultAgent().catch(() => null);
     if (configured) {
@@ -1276,18 +1280,7 @@ export function createWorkspaceRoutes(
       else nextObj['description'] = v;
     }
     if ('defaultAgent' in fields) {
-      const v = fields['defaultAgent'];
-      if (v === null) {
-        delete nextObj['defaultAgent'];
-      } else if (typeof v === 'string') {
-        const adapter = svc.adapters.get(v);
-        if (!adapter || !isAgentRuntime(adapter)) {
-          return c.json({ error: 'invalid_agent', message: `unknown agent runtime: ${v}` }, 400);
-        }
-        nextObj['defaultAgent'] = v;
-      } else {
-        return c.json({ error: 'invalid_agent', message: 'defaultAgent must be a runtime id or null' }, 400);
-      }
+      return c.json({ error: 'invalid_metadata', message: 'Agent preferences belong in runtime-settings, not metadata' }, 400);
     }
     const next = workspaceMetadataSchema.safeParse(nextObj);
     if (!next.success) {

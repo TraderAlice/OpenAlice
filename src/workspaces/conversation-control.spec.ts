@@ -33,9 +33,10 @@ function fakeService(opts: {
   reconstruction?: ProvenanceRecord | null
   task?: HeadlessTaskRecord | null
   logsDir?: string
+  defaultAgent?: string
   workspaceTemplate?: string
 } = {}) {
-  const adapter = fakeAdapter()
+  const adapter = fakeAdapter(opts.defaultAgent)
   const workspace = {
     id: 'ws-peer',
     tag: 'peer-desk',
@@ -59,6 +60,7 @@ function fakeService(opts: {
         : opts.provenance ?? null),
       append: appendProvenance,
     },
+    resolveHeadlessDefaultAgentId: vi.fn(async () => opts.defaultAgent ?? 'pi'),
     resolveDefaultAgentId: vi.fn(async () => 'pi'),
     resolveOrCreateChatWorkspace: vi.fn(async () => ({ ok: true as const, workspace })),
     dispatchHeadlessTask,
@@ -221,7 +223,7 @@ describe('Workspace conversation control', () => {
   })
 
   it('creates a fresh Session only in the initialized default AutoQuant Workspace', async () => {
-    const { svc, workspace } = fakeService({ workspaceTemplate: 'auto-quant-v2' })
+    const { svc, workspace, dispatchHeadlessTask } = fakeService({ workspaceTemplate: 'auto-quant-v2', defaultAgent: 'codex' })
     const dependencies = {
       readQuickChatPreferences: vi.fn(async () => ({ recentChatWorkspaceId: null })),
       rememberRecentChatWorkspace: vi.fn(async () => undefined),
@@ -236,6 +238,9 @@ describe('Workspace conversation control', () => {
       workspaceId: workspace.id,
       resolution: { mode: 'reconstructed', reason: 'harness-default' },
     })
+    expect(svc.resolveHeadlessDefaultAgentId).toHaveBeenCalledWith(workspace)
+    expect(svc.resolveDefaultAgentId).not.toHaveBeenCalled()
+    expect((dispatchHeadlessTask.mock.calls as unknown[][])[0]?.[1]).toMatchObject({ id: 'codex' })
   })
 
   it('does not create an AutoQuant Workspace when the Harness is not initialized', async () => {
