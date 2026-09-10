@@ -51,7 +51,8 @@ If a search for a non-US name comes up empty, check `alice market vendors`
 `alice rss` is an optional quick scan of collected subscription articles,
 with limited coverage. Command parameters are available in `alice rss --help`.
 
-**Raw K-lines** use the same BarService as the Market chart:
+**Raw K-lines** use the same BarService as the Market chart. The `market-data`
+skill covers source discovery, raw data and chart references in replies:
 
 ```bash
 alice market search-bars --query AAPL
