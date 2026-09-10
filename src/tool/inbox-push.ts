@@ -32,11 +32,13 @@ export const inboxPushFactory: WorkspaceToolFactory = {
   build(ctx: WorkspaceToolContext) {
     return tool({
       description: [
-        "Push an update to the user's inbox from this workspace.",
+        "Send an outward-facing notification or report to the human Inbox from this workspace.",
         'Use this when you have something the user should see —',
         'a finished analysis (point to the report file via `docs`),',
         'a question back to the user (write it as `comments`),',
         'a blocked task that needs input, or a status check-in.',
+        'Use a normal conversation reply for in-chat responses; reply attachments do not require an Inbox entry.',
+        'Inbox is not a file store or a general Agent-to-Agent channel.',
         '',
         '`docs` are paths relative to this workspace root. Each one',
         'is rendered live in the inbox UI when the user opens the',

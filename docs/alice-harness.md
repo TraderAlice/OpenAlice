@@ -25,7 +25,7 @@ accepted and available revisions separately.
 ## Ownership
 
 Alice Harness owns complete trees for `alice`, `alice-analysis`, `alice-uta`,
-`traderhub`, and `self-scheduling`, plus removal/reconciliation of legacy
+`traderhub`, `self-scheduling`, and `file-delivery`, plus removal/reconciliation of legacy
 `alice-workspace` copies. `.agents/skills` is primary and `.claude/skills` is its
 runtime mirror; old `.pi/skills` duplicates are included only for reconciliation.
 Template-declared instructions, README and other bundled Skills remain template

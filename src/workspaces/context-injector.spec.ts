@@ -127,7 +127,7 @@ describe('injectWorkspaceContext — skills', () => {
       wsId: 'ws-abc',
       dir,
     });
-    for (const name of ['alice', 'alice-analysis', 'alice-uta', 'traderhub', 'scan-value-chain']) {
+    for (const name of ['alice', 'alice-analysis', 'alice-uta', 'traderhub', 'file-delivery', 'scan-value-chain']) {
       expect(existsSync(join(dir, '.claude/skills', name, 'SKILL.md')), name).toBe(true);
       expect(existsSync(join(dir, '.agents/skills', name, 'SKILL.md')), name).toBe(true);
     }

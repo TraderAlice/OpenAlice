@@ -1,5 +1,5 @@
 /**
- * inbox_read — workspace's inbound view of the user's inbox.
+ * inbox_read — view of the human's notification and reporting history.
  *
  * The read counterpart to {@link inboxPushFactory}. inbox_push is the
  * outbound channel (workspace → user); this is the agent looking *back*
@@ -43,7 +43,7 @@ export const inboxReadFactory: WorkspaceToolFactory = {
   build(ctx: WorkspaceToolContext) {
     return tool({
       description: [
-        "Read recent entries from the user's inbox — the push log workspaces post finished work and questions to.",
+        "Read the human Inbox notification and reporting history — what Workspaces have surfaced to the user.",
         '',
         'Use this to recall what you already reported, or to see the broader stream of what every workspace has surfaced to the user.',
         '',
