@@ -95,6 +95,10 @@ export interface TemplateUpgradeFilePlan {
   readonly path: string;
   readonly status: TemplateUpgradeFileStatus;
   readonly operation: 'add' | 'update' | 'remove' | 'keep' | 'none';
+  readonly basePreview?: string | null;
+  readonly baseTruncated?: boolean;
+  readonly mergedPreview?: string;
+  readonly mergedTruncated?: boolean;
   readonly currentPreview: string | null;
   readonly templatePreview: string | null;
   readonly currentTruncated: boolean;
@@ -179,9 +183,9 @@ export interface TemplateUpgradeManagerOptions {
  *
  * This is intentionally a three-way merge instead of a template re-copy:
  * the last applied template snapshot is Base, the live Workspace is Local,
- * and today's template snapshot is Incoming. Only Incoming-only changes are
- * automatic. Local-only changes are preserved and dual edits require an
- * explicit file-level choice from the user.
+ * and today's template snapshot is Incoming. Non-overlapping edits merge
+ * with Git. Local-only changes are preserved; overlapping edits require
+ * explicit resolution.
  *
  * The change-plan vocabulary is source-neutral on purpose. Workspace Absorb
  * can reuse the same Base/Local/Incoming classification later without making
@@ -190,6 +194,7 @@ export interface TemplateUpgradeManagerOptions {
 export class TemplateUpgradeManager {
   private readonly operationGuard: WorkspaceOperationGuard;
   private readonly paths: UpgradePaths;
+  private sourceVersionCache?: { expires: number; value: Promise<string> };
 
   constructor(private readonly opts: TemplateUpgradeManagerOptions) {
     this.paths = upgradePaths(opts.aliceHarness);
@@ -298,6 +303,18 @@ export class TemplateUpgradeManager {
     } finally { lease.release(); }
   }
 
+  async upgradeNotice(workspaceId: string): Promise<string | undefined> {
+    const workspace = this.opts.registry.get(workspaceId);
+    if (!this.opts.aliceHarness || !workspace) return;
+    if (!this.sourceVersionCache || this.sourceVersionCache.expires <= Date.now()) {
+      this.sourceVersionCache = { expires: Date.now() + 30_000, value: aliceHarnessSourceVersion() };
+      void this.sourceVersionCache.value.catch(() => { this.sourceVersionCache = undefined; });
+    }
+    const [available, installed] = await Promise.all([this.sourceVersionCache.value, this.currentVersion(workspace)]);
+    if (available === installed) return;
+    return `Alice Harness Skills ${installed ?? 'unversioned'} -> ${available}. Run alice harness upgrade --apply to update the injected files. Non-overlapping edits merge automatically; if conflicts remain, inspect alice harness upgrade --mode detailed and resolve them before retrying. Workspace Skill preferences are preserved.`;
+  }
+
   async currentVersion(workspace: WorkspaceMeta): Promise<string | undefined> {
     const state = await readState(workspace.dir, this.paths);
     if (state && state.template === (this.opts.aliceHarness ? 'alice-harness' : workspace.template)) return state.appliedVersion;
@@ -347,10 +364,11 @@ export class TemplateUpgradeManager {
     await this.recoverWorkspace(workspace);
 
     // Materialize once: the exact Incoming snapshot included in the reviewed
-    // digest is also the one written to disk. Regenerating it after validation
+    // digest also determines the merged output. Regenerating it after validation
     // would leave a small but real time-of-check/time-of-use race.
     const incoming = await this.materializeTemplate(template, workspace.id, input.projection);
-    const plan = await this.buildPlan(workspace, template, incoming, input.projection);
+    const merged: Record<string, SnapshotFile> = {};
+    const plan = await this.buildPlan(workspace, template, incoming, input.projection, merged);
     if (plan.blocked) {
       const code = plan.blockers.includes('active_sessions') ? 'busy' : 'staged_changes';
       throw new TemplateUpgradeError(code, blockerMessage(plan.blockers), plan);
@@ -428,7 +446,7 @@ export class TemplateUpgradeManager {
 
     try {
       for (const path of changedPaths) {
-        await writeSnapshotFile(workspace.dir, path, incoming[path] ?? missingFile());
+        await writeSnapshotFile(workspace.dir, path, merged[path] ?? incoming[path] ?? missingFile());
       }
       if (changedPaths.length > 0) {
         await runGit(workspace.dir, ['add', '-A', '--', ...changedPaths]);
@@ -478,6 +496,7 @@ export class TemplateUpgradeManager {
     template: TemplateMeta,
     incoming: Snapshot,
     projection?: SkillProjectionRequest,
+    merged: Record<string, SnapshotFile> = {},
   ): Promise<TemplateUpgradePlan> {
     const state = await readState(workspace.dir, this.paths);
     const stored = state?.template === template.name ? await readBaseline(workspace.dir, this.paths) : null;
@@ -498,12 +517,13 @@ export class TemplateUpgradeManager {
       .filter((path) => !projection || path === ALICE_HARNESS_CONFIG_PATH || isProjectionPath(path, projection.skill))
       .sort();
     const localEntries = await Promise.all(paths.map((path) => readLocalFile(workspace.dir, path)));
-    const files = paths.map((path, index) => classifyFile(
+    const files = await Promise.all(paths.map((path, index) => classifyFile(
       path,
       baseline[path] ?? missingFile(),
       localEntries[index] ?? missingFile(),
       incoming[path] ?? missingFile(),
-    ));
+      merged,
+    )));
     if (this.opts.aliceHarness) {
       const policy = await readAliceHarnessConfig(workspace.dir);
       for (const [index, file] of files.entries()) {
@@ -514,11 +534,15 @@ export class TemplateUpgradeManager {
           const replace = file.path === ALICE_HARNESS_CONFIG_PATH
             || projection.action === 'restore'
             || (projection.action === 'install' && local.kind === 'missing');
-          if (replace) Object.assign(file, {
-            status: regular ? 'ready' : 'conflict', operation: operationFor(local, next),
-            canUseTemplate: regular,
-            note: regular ? 'Apply the reviewed Project projection.' : 'Repair this non-regular entry before replacing it.',
-          });
+          if (replace) {
+            delete merged[file.path];
+            Object.assign(file, {
+              status: regular ? 'ready' : 'conflict', operation: operationFor(local, next),
+              canUseTemplate: regular,
+              note: regular ? 'Apply the reviewed Project projection.' : 'Repair this non-regular entry before replacing it.',
+              mergedPreview: undefined, mergedTruncated: undefined,
+            });
+          }
         }
         const skill = file.path.split('/')[2] as typeof ALICE_HARNESS_SKILLS[number];
         if (isAliceHarnessSkillPath(file.path) && (projection ? projection.action === 'remove' : policy.skills?.[skill] === false) && file.status === 'preserved') {
@@ -700,12 +724,13 @@ function isProjectionPath(path: string, skill: string): boolean {
   return MANAGED_TREE_ROOTS.some((root) => path.startsWith(`${root}/${skill}/`));
 }
 
-function classifyFile(
+async function classifyFile(
   path: string,
   base: SnapshotFile,
   local: SnapshotFile,
   incoming: SnapshotFile,
-): TemplateUpgradeFilePlan {
+  merged: Record<string, SnapshotFile>,
+): Promise<TemplateUpgradeFilePlan> {
   const current = preview(local);
   const next = preview(incoming);
   const operation = operationFor(local, incoming);
@@ -748,10 +773,26 @@ function classifyFile(
       note: 'Changed only in this Workspace; it will stay as-is.',
     };
   }
+  if (base.kind === 'file' && local.kind === 'file' && incoming.kind === 'file') {
+    const content = await mergeText(base.content ?? '', local.content ?? '', incoming.content ?? '');
+    if (content !== null) {
+      merged[path] = fileContent(content);
+      const result = preview(merged[path]);
+      return {
+        path, status: 'ready', operation,
+        currentPreview: current.value, currentTruncated: current.truncated,
+        templatePreview: next.value, templateTruncated: next.truncated,
+        mergedPreview: result.value!, mergedTruncated: result.truncated,
+        canUseTemplate: true,
+        note: 'Git merged non-overlapping changes; Workspace edits are retained.',
+      };
+    }
+  }
   const canUseTemplate = local.kind !== 'other' && incoming.kind !== 'other';
   return {
     path,
     status: 'conflict',
+    basePreview: preview(base).value, baseTruncated: preview(base).truncated,
     operation,
     currentPreview: current.value,
     templatePreview: next.value,
@@ -759,9 +800,27 @@ function classifyFile(
     templateTruncated: next.truncated,
     canUseTemplate,
     ...(canUseTemplate
-      ? { note: 'Both the Workspace and template changed this file.' }
+      ? { note: 'Git could not merge this file automatically. Review Base, Workspace and template to resolve the conflict.' }
       : { note: `Workspace entry is ${local.detail ?? 'not a regular file'}; repair it manually or keep it.` }),
   };
+}
+
+/** Work on temporary files; conflict markers never enter the live Workspace. */
+async function mergeText(base: string, local: string, incoming: string): Promise<string | null> {
+  if ([base, local, incoming].some((value) => value.includes('\0'))) return null;
+  const dir = await mkdtemp(join(tmpdir(), 'alice-skill-merge-'));
+  try {
+    await Promise.all(Object.entries({ base, local, incoming }).map(
+      ([name, content]) => writeFile(join(dir, name), content),
+    ));
+    const result = await gitExec(['merge-file', '-p', '--diff3', 'local', 'base', 'incoming'], dir, gitOptions());
+    if (result.exitCode === 0) return result.stdout;
+    // Positive exit codes count conflicts; 255 represents Git's operational error.
+    if (result.exitCode > 0 && result.exitCode < 128) return null;
+    throw new Error(`Git merge-file failed: ${result.stderr}`);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
 }
 
 function operationFor(local: SnapshotFile, incoming: SnapshotFile): TemplateUpgradeFilePlan['operation'] {

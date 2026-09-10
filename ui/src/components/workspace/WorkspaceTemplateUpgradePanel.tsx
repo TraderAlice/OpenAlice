@@ -15,6 +15,7 @@ import { useTranslation } from 'react-i18next'
 
 import { CenteredLoading, EmptyState } from '../StateViews'
 import { Button } from '../ui/button'
+import { useWorkspace } from '../../tabs/store'
 import { SelectionCheckIcon } from '../ui/selection-check-icon'
 import {
   applyTemplateUpgrade,
@@ -47,6 +48,7 @@ export function WorkspaceTemplateUpgradePanel({
   onClose,
 }: Props): ReactElement {
   const { t } = useTranslation()
+  const { openOrFocus } = useWorkspace()
   const [plan, setPlan] = useState<TemplateUpgradePlan | null>(null)
   const [loading, setLoading] = useState(true)
   const [applying, setApplying] = useState(false)
@@ -231,6 +233,13 @@ export function WorkspaceTemplateUpgradePanel({
                   <p className="mt-1 text-[11px] leading-relaxed text-muted-foreground">
                     {t('workspace.upgradeConflictDescription')}
                   </p>
+                  <Button type="button" variant="outline" className="mt-3" onClick={() => {
+                    openOrFocus({ kind: 'chat-landing', params: {
+                      targetWsId: wsId,
+                      initialPrompt: `Upgrade this Workspace's ${layer === 'alice-harness' ? 'Alice Harness Skills' : 'managed template files'} to the current Project version. Run alice ${layer === 'alice-harness' ? 'harness' : 'template'} upgrade${projection ? ` --skill ${projection.skill} --action ${projection.action}` : ''} --mode detailed. Git could not merge some edits automatically. Compare the base, local and incoming files; preserve my custom intent while adopting current instructions and CLI syntax. Edit the conflicting files, preview again, then apply the same scoped command using --keep-workspace for files you resolved. Do not change unrelated files or Skill enablement preferences.`,
+                    } })
+                    onClose()
+                  }}>{t('workspace.upgradeResolveInChat')}</Button>
                 </div>
                 <div className="divide-y divide-border">
                   {conflicts.map((file) => (
@@ -324,6 +333,7 @@ function FileGroup({ title, files, defaultOpen = false, tone }: {
   defaultOpen?: boolean
   tone: 'accent' | 'neutral'
 }): ReactElement {
+  const { t } = useTranslation()
   const [open, setOpen] = useState(defaultOpen)
   return (
     <section className="rounded-lg border border-border bg-secondary/20">
@@ -352,7 +362,7 @@ function FileGroup({ title, files, defaultOpen = false, tone }: {
                 ? <Check size={13} className="shrink-0 text-primary" />
                 : <ShieldCheck size={13} className="shrink-0 text-muted-foreground" />}
               <code className="min-w-0 flex-1 truncate font-mono text-[11px] text-foreground" title={file.path}>{file.path}</code>
-              <span className="shrink-0 text-[10px] capitalize text-muted-foreground">{file.operation}</span>
+              <span className="shrink-0 text-[10px] capitalize text-muted-foreground">{file.mergedPreview !== undefined ? t('workspace.upgradeMerged') : file.operation}</span>
             </div>
           ))}
         </div>
@@ -400,7 +410,8 @@ function ConflictFile({ file, value, onChange }: {
         {t('workspace.upgradeCompare')}
       </Button>
       {previewOpen && (
-        <div className="mt-2 grid gap-2 lg:grid-cols-2">
+        <div className={`mt-2 grid gap-2 ${file.basePreview !== undefined ? 'lg:grid-cols-3' : 'lg:grid-cols-2'}`}>
+          {file.basePreview !== undefined && <Preview title={t('workspace.upgradeBaseCopy')} value={file.basePreview} truncated={file.baseTruncated ?? false} />}
           <Preview title={t('workspace.upgradeWorkspaceCopy')} value={file.currentPreview} truncated={file.currentTruncated} />
           <Preview title={t('workspace.upgradeTemplateCopy')} value={file.templatePreview} truncated={file.templateTruncated} />
         </div>

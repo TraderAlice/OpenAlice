@@ -229,7 +229,7 @@ guards, and managed-file boundaries are reported by the live command.
 The Alice Project supplies this CLI and its companion Skills independently of
 Chat, AutoQuant and Auto Prediction source versions. Inspect or update only this
 injection layer with `alice harness upgrade` (preview) and `alice harness upgrade
---apply` (a paused Workspace is required; a manager may target a peer with `--id`).
+--apply` (allowed while this Workspace is active; a manager may target a peer with `--id`).
 Use `alice template upgrade` only for template-owned instructions and skills.
 
 `.alice/alice-harness-version.json` records the accepted Skills file-bundle revision.
@@ -242,3 +242,11 @@ CLI implementation updates follow the running Alice Project; they do not require
 a per-Workspace file update. `alice harness upgrade` updates Skills files only.
 A CLI switch does not remove its Skill, and excluding a Skill does not disable
 its commands. Respect the Workspace's `skills` preferences during later updates.
+
+When the CLI warns that companion Skills are outdated, update this Workspace
+with `alice harness upgrade --apply`. Git merges non-overlapping edits. If it
+reports conflicts, use `--mode detailed` to compare the previous source, local
+and incoming versions. Preserve user intent while adopting current commands,
+edit the conflicting files, and apply with `--keep-workspace <path>` for your
+resolved copies. Use `--use-template <path>` only to deliberately replace one.
+Do not re-enable excluded Skills or change unrelated files during an upgrade.

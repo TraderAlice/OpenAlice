@@ -398,7 +398,8 @@ const demoTemplateUpgradePlan = (workspaceId: string) => ({
     },
     {
       path: '.agents/skills/template-research/SKILL.md', status: 'ready', operation: 'update', canUseTemplate: true,
-      currentPreview: 'Old collaboration guidance.', templatePreview: 'Current collaboration guidance.',
+      currentPreview: 'Old collaboration guidance.\n\nLocal preference.', templatePreview: 'Current collaboration guidance.',
+      mergedPreview: 'Current collaboration guidance.\n\nLocal preference.', mergedTruncated: false,
       currentTruncated: false, templateTruncated: false,
     },
     {
@@ -409,10 +410,11 @@ const demoTemplateUpgradePlan = (workspaceId: string) => ({
     },
     {
       path: '.claude/skills/template-research/SKILL.md', status: 'conflict', operation: 'update', canUseTemplate: true,
+      basePreview: 'Report scheduled work to the owner.', baseTruncated: false,
       currentPreview: 'Report scheduled work to the owner with the local checklist.',
       templatePreview: 'Report scheduled work to Inbox with a signed artifact.',
       currentTruncated: false, templateTruncated: false,
-      note: 'Both the Workspace and template changed this file.',
+      note: 'Git could not merge these overlapping edits automatically.',
     },
   ],
   summary: { ready: 2, preserved: 1, conflicts: 1, unchanged: 0 },
@@ -699,6 +701,7 @@ export const workspacesHandlers = [
     const files = demoSkillProjection().files.map((file) => ({
       path: file.path, status: action === 'restore' || action === 'install' ? 'ready' : 'conflict',
       operation: action === 'remove' ? 'remove' : 'update', currentPreview: file.currentPreview,
+      basePreview: '# Alice\n\nPrevious Project guidance.', baseTruncated: false,
       templatePreview: action === 'remove' ? null : file.sourcePreview,
       currentTruncated: false, templateTruncated: false, canUseTemplate: true,
     }))

@@ -79,6 +79,38 @@ afterEach(async () => rm(root, {
 }));
 
 describe('TemplateUpgradeManager', () => {
+  it('merges separate lines and keeps the upstream baseline independent from local edits', async () => {
+    const base = 'heading\n\nold command\n\nclosing\n';
+    await writeFile(join(workspace.dir, 'AGENTS.md'), base);
+    await initializeWorkspaceTemplateState(workspace, { ...template, version: '1.0.0' });
+    await writeFile(join(workspace.dir, 'AGENTS.md'), base.replace('heading', 'my preference'));
+    incoming = { ...incoming, 'AGENTS.md': file(base.replace('old command', 'new command')) };
+    const upgrade = manager();
+    const plan = await upgrade.plan(workspace.id);
+    expect(plan.files.find(f => f.path === 'AGENTS.md')).toMatchObject({ status: 'ready', mergedPreview: 'my preference\n\nnew command\n\nclosing\n' });
+    await upgrade.apply(workspace.id, { planDigest: plan.planDigest });
+    expect(await readFile(join(workspace.dir, 'AGENTS.md'), 'utf8')).toBe('my preference\n\nnew command\n\nclosing\n');
+    const again = await upgrade.plan(workspace.id);
+    expect(again.files.find(f => f.path === 'AGENTS.md')?.status).toBe('preserved');
+  });
+
+  it('returns the base for overlapping edits without writing conflict markers', async () => {
+    const original = 'template agents v1\n';
+    await writeFile(join(workspace.dir, 'AGENTS.md'), 'my competing edit\n');
+    const plan = await manager().plan(workspace.id);
+    expect(plan.files.find(f => f.path === 'AGENTS.md')).toMatchObject({ status: 'conflict', basePreview: original });
+    await expect(manager().apply(workspace.id, { planDigest: plan.planDigest })).rejects.toMatchObject({ code: 'unresolved_conflict' });
+    expect(await readFile(join(workspace.dir, 'AGENTS.md'), 'utf8')).toBe('my competing edit\n');
+  });
+
+  it('warns for an old receipt and becomes quiet after accepting current injection', async () => {
+    const upgrade = manager(false, true);
+    expect(await upgrade.upgradeNotice(workspace.id)).toContain('alice harness upgrade --apply');
+    await initializeWorkspaceTemplateState(workspace, template);
+    expect(await upgrade.upgradeNotice(workspace.id)).toBeUndefined();
+    expect(await upgrade.upgradeNotice('unknown')).toBeUndefined();
+  });
+
   it('exposes the injection-owned Skill inventory including legacy names', async () => {
     const status = await manager(false, true).harnessStatus(workspace.id);
     expect(status.managedSkillNames).toEqual(expect.arrayContaining(['alice', 'traderhub', 'alice-workspace']));

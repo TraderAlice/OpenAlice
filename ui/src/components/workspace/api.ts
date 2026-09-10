@@ -121,6 +121,10 @@ export type TemplateUpgradeFileStatus = 'ready' | 'preserved' | 'conflict' | 'un
 export type TemplateUpgradeResolution = 'workspace' | 'template'
 
 export interface TemplateUpgradeFilePlan {
+  readonly basePreview?: string | null
+  readonly baseTruncated?: boolean
+  readonly mergedPreview?: string
+  readonly mergedTruncated?: boolean
   readonly path: string
   readonly status: TemplateUpgradeFileStatus
   readonly operation: 'add' | 'update' | 'remove' | 'keep' | 'none'
