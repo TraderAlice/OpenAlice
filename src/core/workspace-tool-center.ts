@@ -39,6 +39,7 @@ import type { HeadlessStructuredOutput } from '../workspaces/headless-output.js'
 import type { HeadlessTaskRecord, HeadlessInquirySubject, HeadlessTaskStatus } from '../workspaces/headless-task-registry.js'
 import type {
   ApplyTemplateUpgradeInput,
+  SkillProjectionRequest,
   TemplateUpgradePlan,
   TemplateUpgradeResult,
 } from '../workspaces/template-upgrade.js'
@@ -169,7 +170,7 @@ export interface WorkspaceConversationControl {
 
 /** Launcher-owned reconciliation for the caller's current Workspace. */
 export interface WorkspaceTemplateUpgradeControl {
-  plan(workspaceId: string): Promise<TemplateUpgradePlan>
+  plan(workspaceId: string, projection?: SkillProjectionRequest): Promise<TemplateUpgradePlan>
   apply(workspaceId: string, input: ApplyTemplateUpgradeInput): Promise<TemplateUpgradeResult>
 }
 

@@ -265,7 +265,12 @@ export function registerCliRoutes(app: Hono, deps: CliGatewayDeps, manifestOnly 
     const mapped = mappedToolNamesForScope(r.exp.scope)
     const unmapped = cat.inventoryNames().filter((n) => !mapped.has(n))
 
+    // Discovery must remain usable even if the optional upgrade receipt is unreadable.
+    const upgradeWarning = !manifestOnly && r.ws.dir
+      ? await getWorkspaceService()?.aliceHarnessUpgrades?.upgradeNotice(r.ws.id).catch(() => undefined)
+      : undefined
     return c.json({
+      ...(upgradeWarning ? { warnings: [upgradeWarning] } : {}),
       export: c.req.param('export'),
       description: r.exp.description,
       groupDescriptions: r.exp.groupDescriptions,

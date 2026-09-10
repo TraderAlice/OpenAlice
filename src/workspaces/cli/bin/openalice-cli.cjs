@@ -140,6 +140,11 @@ async function manifest(base) {
         'check OPENALICE_TOOL_URL / OPENALICE_TOOL_SOCKET and point at the tools endpoint, not the Vite UI page.',
     )
   }
+  if (Array.isArray(r.body.warnings)) {
+    for (const warning of r.body.warnings) {
+      if (typeof warning === 'string') process.stderr.write(`Warning: ${warning}\n`)
+    }
+  }
   return r.body
 }
 

@@ -74,6 +74,7 @@ describe('CLI launchers and payload', () => {
       res.writeHead(200, { 'content-type': 'application/json' })
       res.end(JSON.stringify({
         description: 'test manifest',
+        warnings: ['Skills are outdated; run alice harness upgrade --apply.'],
         groupDescriptions: {
           market: 'Discover symbols and bar sources',
         },
@@ -102,6 +103,8 @@ describe('CLI launchers and payload', () => {
       })
       expect(stderr).toContain('[openalice-cli-debug] runtime')
       expect(stderr).toContain('[openalice-cli-debug] socket.response')
+      expect(stderr).toContain('Warning: Skills are outdated; run alice harness upgrade --apply.')
+      expect(stdout).not.toContain('Warning:')
       expect(stdout).toContain('OpenAlice CLI')
       expect(stdout).toContain('market')
       expect(stdout).toContain('Discover symbols and bar sources')
