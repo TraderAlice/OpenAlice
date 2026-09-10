@@ -20,7 +20,7 @@ export function ConversationTranscriptItem({
   if (item.kind === 'user') {
     return (
       <article className={`conversation-message is-user${latest ? ' is-latest' : ''}`}>
-        <div className="conversation-message-body"><ConversationContentView content={item.content} /></div>
+        <div className="conversation-message-body"><ConversationContentView content={item.content} plainText /></div>
         {item.content.some(block => block.kind === 'markdown') && <MessageActions text={item.content.flatMap(block => block.kind === 'markdown' ? [block.text] : []).join('\n\n')} />}
       </article>
     )
@@ -164,10 +164,11 @@ function ConversationReasoning({ notes, label }: { readonly notes: readonly stri
 }
 
 
-export function ConversationContentView({ content }: { readonly content: ConversationContent }): ReactElement {
+export function ConversationContentView({ content, plainText = false }: { readonly content: ConversationContent; readonly plainText?: boolean }): ReactElement {
   return <div className="conversation-content-parts">{content.map((block, index) => {
+    if (block.kind === 'markdown' && plainText) return <div key={index} className="whitespace-pre-wrap break-words">{block.text}</div>
     if (block.kind === 'markdown') return <MarkdownContent key={index} text={block.text} />
-    if (block.kind === 'disclosure') return <details key={index} className="conversation-detail"><summary>{block.label}</summary><ConversationContentView content={block.content} /></details>
+    if (block.kind === 'disclosure') return <details key={index} className="conversation-detail"><summary>{block.label}</summary><ConversationContentView content={block.content} plainText={plainText} /></details>
     return <pre key={index} className="conversation-unknown">{block.text}</pre>
   })}</div>
 }
