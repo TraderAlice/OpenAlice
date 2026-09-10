@@ -1,3 +1,4 @@
+import { createWorkspaceContentRoutes } from './workspace-content.js';
 import { createStickerRoutes } from './stickers.js';
 import { prepareProjectWorkspaces, readProjectWorkspaceSetup } from '../../workspaces/project-workspace-setup.js';
 /**
@@ -1693,6 +1694,8 @@ export function createWorkspaceRoutes(
       resumable: identity.lifecycle !== 'retired' && Boolean(identity.agentSessionId),
     });
   });
+
+  app.route('/', createWorkspaceContentRoutes(id => svc.registry.get(id)?.dir));
 
   app.get('/:id/file', async (c) => {
     const id = c.req.param('id');

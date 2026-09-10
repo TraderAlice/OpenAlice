@@ -1068,6 +1068,14 @@ export const workspacesHandlers = [
     }
     return HttpResponse.json(listing)
   }),
+  http.get('/api/workspaces/:id/content', ({ request }) => {
+    const url = new URL(request.url)
+    const path = url.searchParams.get('path') ?? ''
+    const content = demoWorkspaceFiles[path]
+    if (content == null) return HttpResponse.json({ error: 'file_not_found' }, { status: 404 })
+    if (url.searchParams.get('metadata') === '1') return HttpResponse.json({ path, size: content.length })
+    return new HttpResponse(content, { headers: { 'Content-Type': 'application/octet-stream' } })
+  }),
   http.get('/api/workspaces/:id/file', ({ request }) => {
     const url = new URL(request.url)
     const path = url.searchParams.get('path') ?? ''

@@ -50,6 +50,14 @@ function rec(over: Partial<SessionRecord> = {}): SessionRecord {
 }
 
 describe('SessionRegistry persistence', () => {
+  it('serializes overlapping writes to the same workspace', async () => {
+    const reg = await SessionRegistry.load(root, noopLogger)
+    await reg.create(rec())
+    await Promise.all(Array.from({ length: 20 }, (_, i) => reg.create(rec({ id: `codex-concurrent-${i}`, resumeId: `resume-concurrent-${i}`, state: 'paused' }))))
+    const restored = await SessionRegistry.load(root, noopLogger)
+    expect(restored.listFor(WS)).toHaveLength(21)
+  })
+
   it('round-trips native and fallback titles across a reload', async () => {
     const reg = await SessionRegistry.load(root, noopLogger)
     await reg.create(rec({

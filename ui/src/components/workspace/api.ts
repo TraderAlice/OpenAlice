@@ -1979,3 +1979,8 @@ export async function testAgentConfig(
     return { ok: false, error: `HTTP ${res.status}` };
   }
 }
+
+/** Read-only content URL, also forwarded through the desktop app protocol. */
+export function workspaceContentHref(wsId: string, path: string) {
+  return `/api/workspaces/${encodeURIComponent(wsId)}/content?path=${encodeURIComponent(path)}`
+}

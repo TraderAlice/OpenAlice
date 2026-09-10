@@ -111,6 +111,7 @@ export class SessionRegistry {
   private readonly byWs = new Map<string, Map<string, SessionRecord>>();
   /** wsId set of workspaces whose file has been loaded (or known-absent). */
   private readonly loaded = new Set<string>();
+  private readonly writes = new Map<string, Promise<void>>();
 
   private constructor(
     private readonly dir: string,
@@ -315,6 +316,14 @@ export class SessionRegistry {
   }
 
   private async flush(wsId: string): Promise<void> {
+    const previous = this.writes.get(wsId) ?? Promise.resolve();
+    const pending = previous.catch(() => {}).then(() => this.writeSnapshot(wsId));
+    this.writes.set(wsId, pending);
+    try { await pending; }
+    finally { if (this.writes.get(wsId) === pending) this.writes.delete(wsId); }
+  }
+
+  private async writeSnapshot(wsId: string): Promise<void> {
     const records = this.byWs.get(wsId);
     if (!records) return;
     const payload: FileShape = {

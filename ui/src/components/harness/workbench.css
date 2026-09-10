@@ -13,7 +13,7 @@
 .harness-work .oa-topbar { flex-wrap:wrap; height:auto; min-height:40px; padding:6px; }
 .harness-work .oa-topbar-actions { flex-wrap:wrap; }
 @container (max-width: 720px) {
-  .harness-workbench.is-open [data-panel]:has(> .harness-conversation) { display:none; }
+  .harness-workbench.is-open [data-panel]:has(> .harness-conversation) { display:none!important; }
   .harness-workbench.is-open [data-panel]:has(> .harness-work) { flex:1!important; }
   .harness-divider { display:none; }
 }
