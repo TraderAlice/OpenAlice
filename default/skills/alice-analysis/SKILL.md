@@ -160,11 +160,7 @@ supported here).
 - For arbitrary/looping logic beyond these primitives, spawn a separate
   Auto-Quant workspace, not this tool.
 
-## Show a K-line in chat
+## Raw data and chart delivery
 
-Use `[[market/{barId}/{interval}]]` in reply prose, for example
-`[[market/yfinance|AAPL/1d]]`. Copy the exact barId from `alice market search-bars`;
-do not guess or rewrite its native symbol. This loads the latest 300 bars.
-GUI opens an interactive chart in the right panel; attachment-capable Connectors
-send a chart image in that position. Code examples stay literal. Unsupported
-sources or intervals report a failure rather than switching feeds.
+See the `market-data` skill for raw OHLCV reads and `[[market/{barId}/{interval}]]`
+references that display charts in GUI chat and supported Connectors.
