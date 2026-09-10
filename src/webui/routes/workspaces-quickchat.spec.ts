@@ -257,6 +257,7 @@ function build(opts: {
     rememberAutoPredictionDefaultWorkspace,
   });
   return {
+    svc,
     app,
     opencode,
     spawn,
@@ -566,6 +567,28 @@ describe('GET /credentials — Quick Chat launch metadata', () => {
 });
 
 describe('POST /quick-chat — native auth and explicit credential overrides', () => {
+  it('starts GUI directly without spawning a terminal and forwards the prompt', async () => {
+    vi.mocked(readCredentials).mockResolvedValue({});
+    const { app, svc, opencode, spawn } = build();
+    (opencode.capabilities as any).web = { wire: 'acp', freshSession: true };
+    (opencode as any).composeWebCommand = vi.fn();
+    svc.startWebSession = vi.fn(async () => ({} as any));
+    (svc as any).web = { prompt: vi.fn(async () => ({})) } as any;
+    const r = await quickChat(app, { prompt: 'GUI hello', agent: 'opencode', surface: 'webpi' });
+    expect(r.status).toBe(201);
+    expect(r.body.session.surface).toBe('webpi');
+    expect(spawn).not.toHaveBeenCalled();
+    expect(svc.startWebSession).toHaveBeenCalledOnce();
+    expect(svc.web.prompt).toHaveBeenCalledWith(r.body.session.sessionId, 'GUI hello');
+  });
+
+  it('rejects GUI for a runtime without fresh Web support before spawning', async () => {
+    const { app, spawn } = build();
+    const r = await quickChat(app, { prompt: 'hello', agent: 'shell', surface: 'webpi' });
+    expect(r.status).toBe(400);
+    expect(spawn).not.toHaveBeenCalled();
+  });
+
   it('opencode + empty vault → native launch without injection', async () => {
     vi.mocked(readCredentials).mockResolvedValue({});
     const { app, opencode, spawn } = build();

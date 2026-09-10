@@ -439,6 +439,7 @@ export function WorkspacesProvider({ children }: { children: ReactNode }) {
       model?: string | null,
       reasoningEffort?: import('../api').ModelReasoningEffort,
       credentialSource?: 'native',
+      surface?: 'terminal' | 'webpi',
     ): Promise<string> => {
       await ensureTerminalAppearancePublished()
       const { workspace, session } = await apiQuickChat(
@@ -450,6 +451,7 @@ export function WorkspacesProvider({ children }: { children: ReactNode }) {
         model,
         reasoningEffort,
         credentialSource,
+        surface,
       )
       const nowIso = new Date().toISOString()
       const newRecord: SessionRecord = {

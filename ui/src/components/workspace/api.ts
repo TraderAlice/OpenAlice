@@ -1295,8 +1295,10 @@ export async function quickChat(
   model?: string | null,
   reasoningEffort?: ModelReasoningEffort,
   credentialSource?: 'native',
+      surface?: 'terminal' | 'webpi',
 ): Promise<QuickChatResult> {
   const body: Record<string, unknown> = { prompt };
+  if (surface) body['surface'] = surface;
   if (credentialSource !== undefined) body['credentialSource'] = credentialSource;
   if (agent !== undefined) body['agent'] = agent;
   if (credentialSlug !== undefined) body['credentialSlug'] = credentialSlug;

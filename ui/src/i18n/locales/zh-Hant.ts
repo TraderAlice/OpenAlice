@@ -1432,6 +1432,7 @@ export const zhHant: Resources = {
     resumeError: '無法恢復這段主管對話。',
   },
   chatLanding: {
+    uiMode: 'UI 模式',
     heading: '先讓 Alice 處理什麼？',
     subheading: '在選定的 Workspace 中進行研究、分析與交易工作。',
     targetHeading: '在此工作區新增對話',

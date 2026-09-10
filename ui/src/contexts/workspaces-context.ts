@@ -70,6 +70,7 @@ export interface WorkspacesContextValue {
     model?: string | null,
     reasoningEffort?: import('../api').ModelReasoningEffort,
     credentialSource?: 'native',
+      surface?: 'terminal' | 'webpi',
   ): Promise<string>
   pauseSession(wsId: string, sessionId: string): Promise<void>
   resumeSession(wsId: string, sessionId: string, source?: WorkspaceSource): Promise<void>
