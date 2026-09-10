@@ -138,7 +138,7 @@ const BASE_EXPORTS: Record<string, CliExport> = {
     groupDescriptions: {
       peer: 'Discover active desks, their Sessions, and absolute filesystem locations',
       conversation: 'Send ordinary Agent-to-Agent requests and retrieve their replies',
-      inbox: 'Deliver reports to the human Inbox or inspect and follow up on deliveries',
+      inbox: 'Send outward-facing notifications and reports to the human Inbox; inspect and follow up on deliveries',
       issue: 'Read the shared work board and manage this Workspace\'s durable work',
       provenance: 'Trace business artifacts to attributable product Sessions',
       signature: 'Show this Session\'s safe product identity',

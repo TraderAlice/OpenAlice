@@ -192,6 +192,10 @@ Load-bearing paths:
 
 ## Reply attachments
 
+The Project-owned `file-delivery` Skill teaches this reply path separately from
+Inbox notifications and reports. It follows Alice Harness injection preferences
+and upgrades; optional sticker-pack guidance remains owned by the sticker pack.
+
 A final reply may include `[[reports/chart.png]]`. Paths are relative to
 its source Workspace. Ordinary `[[name]]` references remain text; inline/fenced
 code and escaped brackets are literal, including examples of `[[no-reply]]`.

@@ -33,3 +33,12 @@ it('keeps CLI switches separate from Skill inclusion and creates both runtime co
   expect(await readFile(join(dir, '.claude/skills/alice/SKILL.md'), 'utf8')).toBe('# alice')
   await expect(readFile(join(dir, '.agents/skills/traderhub/SKILL.md'))).rejects.toMatchObject({ code: 'ENOENT' })
 })
+
+it('restores an excluded file-delivery projection without enabling the CLI', async () => {
+  const dir = join(paths.root, 'workspace')
+  const config = { schemaVersion: 1 as const, cli: { alice: { enabled: false } }, skills: { 'file-delivery': false } }
+  await injectAliceHarnessSkills(dir, true, config)
+  for (const root of ['.agents', '.claude']) await expect(readFile(join(dir, root, 'skills/file-delivery/SKILL.md'))).rejects.toMatchObject({ code: 'ENOENT' })
+  await injectAliceHarnessSkills(dir, true, { ...config, skills: { 'file-delivery': true } })
+  for (const root of ['.agents', '.claude']) expect(await readFile(join(dir, root, 'skills/file-delivery/SKILL.md'), 'utf8')).toBe('# file-delivery')
+})

@@ -9,7 +9,7 @@ keep using their native file, search, and Git tools inside any resolved path.
 |---|---|---|
 | `peer` | Active Workspace discovery, absolute paths, Session directory | File reading or research |
 | `conversation` | Ordinary Agent-to-Agent requests and replies | Human notification |
-| `inbox` | Human-facing report delivery and follow-up | General peer chat |
+| `inbox` | Outward-facing human notifications, reports and follow-up | General peer chat or file storage |
 | `issue` | Durable work, ownership, scheduling, Activity | Ad-hoc questions |
 | `provenance` | Artifact-to-Session attribution | Guessing intent |
 | `signature` | The current Session's safe `@resumeId` | Runtime-native ids |
@@ -96,11 +96,18 @@ There is no unsolicited Agent-to-Agent completion notification bus. Inbox
 notifies the human; `await`, `read`, and `collect` retrieve direct Agent replies.
 Do not build shell sleep loops.
 
-## Deliver and read reports
+## Notify the human and deliver reports
 
-Inbox is the outbound human delivery surface. A normal attended Chat reply
-already reaches the user; scheduled/headless work must push explicitly when its
-result deserves human attention.
+Inbox is OpenAlice's outward-facing notification and reporting surface for the
+human. Use it for alerts, findings, reports or requests for attention that need
+a separate delivery record. It is not the Workspace's file store or a general
+Agent-to-Agent message channel.
+
+A normal conversation reply already reaches the user. For attachments in a
+Connector reply, use `[[reports/summary.pdf]]` as described in `file-delivery`;
+no Inbox entry is required just to send a file. Use Inbox when a separate
+notification/report handoff is intended, including unattended work whose result
+needs human attention.
 
 ```bash
 alice inbox push \
