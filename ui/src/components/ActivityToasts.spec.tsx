@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 
+import { StrictMode } from 'react'
 import { render, waitFor } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { toast } from 'sonner'
@@ -64,9 +65,45 @@ beforeEach(() => {
 })
 
 describe('ActivityToasts', () => {
-  it('keeps one loading toast per Agent request and dismisses it on completion', async () => {
-    useActivity.mockReturnValue(data([signal()]))
+  it('silences the initial snapshot across effect replay, then announces a new revision', () => {
+    const initial = Array.from({ length: 250 }, (_, index) => signal({
+      id: `news:${index + 1}`, kind: 'news', revision: index + 1,
+    }))
+    useActivity.mockReturnValue(data([...initial, signal({ revision: 251 })]))
+    const view = render(<StrictMode><ActivityToasts /></StrictMode>)
+    view.rerender(<StrictMode><ActivityToasts /></StrictMode>)
+    expect(toast.info).not.toHaveBeenCalled()
+    expect(toast.loading).not.toHaveBeenCalled()
+
+    useActivity.mockReturnValue(data([...initial, signal({
+      kind: 'conversation-failed', revision: 252,
+    })]))
+    view.rerender(<StrictMode><ActivityToasts /></StrictMode>)
+    expect(toast.error).toHaveBeenCalledTimes(1)
+    expect(toast.info).not.toHaveBeenCalled()
+  })
+
+  it('waits through loading and an initial failure before establishing the baseline', () => {
+    useActivity.mockReturnValue({ ...data([]), loading: true })
     const view = render(<ActivityToasts />)
+    useActivity.mockReturnValue({ ...data([]), error: 'Unavailable' })
+    view.rerender(<ActivityToasts />)
+    useActivity.mockReturnValue(data([signal()]))
+    view.rerender(<ActivityToasts />)
+    expect(toast.loading).not.toHaveBeenCalled()
+
+    useActivity.mockReturnValue(data([signal(), signal({ taskId: 'task-2', revision: 2 })]))
+    view.rerender(<ActivityToasts />)
+    expect(toast.loading).toHaveBeenCalledTimes(1)
+    expect(toast.loading).toHaveBeenCalledWith(
+      expect.any(String), expect.objectContaining({ id: 'openalice-activity:task:task-2' }),
+    )
+  })
+
+  it('keeps one loading toast per Agent request and dismisses it on completion', async () => {
+    const view = render(<ActivityToasts />)
+    useActivity.mockReturnValue(data([signal()]))
+    view.rerender(<ActivityToasts />)
 
     await waitFor(() => expect(toast.loading).toHaveBeenCalledWith(
       'activityToast.conversationRunning:pi',
@@ -84,8 +121,9 @@ describe('ActivityToasts', () => {
   })
 
   it('updates a running Agent request in place when it fails', async () => {
-    useActivity.mockReturnValue(data([signal()]))
     const view = render(<ActivityToasts />)
+    useActivity.mockReturnValue(data([signal()]))
+    view.rerender(<ActivityToasts />)
     await waitFor(() => expect(toast.loading).toHaveBeenCalledTimes(1))
 
     useActivity.mockReturnValue(data([signal({
@@ -102,12 +140,13 @@ describe('ActivityToasts', () => {
   })
 
   it('announces an Agent-originated Inbox delivery once', async () => {
+    const view = render(<ActivityToasts />)
     useActivity.mockReturnValue(data([signal({
       id: 'inbox:entry-1',
       kind: 'inbox',
       inboxEntryId: 'entry-1',
     })]))
-    const view = render(<ActivityToasts />)
+    view.rerender(<ActivityToasts />)
 
     await waitFor(() => expect(toast.success).toHaveBeenCalledWith(
       'activityToast.inboxDelivered:pi',
@@ -118,6 +157,7 @@ describe('ActivityToasts', () => {
   })
 
   it('renders a dedicated Sonner test signal through the production bridge', async () => {
+    const view = render(<ActivityToasts />)
     useActivity.mockReturnValue(data([signal({
       id: 'sonner-test:42',
       kind: 'sonner-test-success',
@@ -128,7 +168,7 @@ describe('ActivityToasts', () => {
       detail: 'Sonner success test',
       revision: 42,
     })]))
-    render(<ActivityToasts />)
+    view.rerender(<ActivityToasts />)
 
     await waitFor(() => expect(toast.success).toHaveBeenCalledWith(
       'Sonner success test',
@@ -137,6 +177,7 @@ describe('ActivityToasts', () => {
   })
 
   it('announces each News activity with its source and headline', async () => {
+    const view = render(<ActivityToasts />)
     useActivity.mockReturnValue(data([signal({
       id: 'news:42',
       kind: 'news',
@@ -149,7 +190,7 @@ describe('ActivityToasts', () => {
       detail: 'Markets reopen after holiday',
       revision: 42,
     })]))
-    render(<ActivityToasts />)
+    view.rerender(<ActivityToasts />)
 
     await waitFor(() => expect(toast.info).toHaveBeenCalledWith(
       'activityToast.newsIngested:',

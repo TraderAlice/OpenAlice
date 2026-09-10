@@ -26,12 +26,20 @@ function toastId(signal: AgentActivitySignal): string {
 export function ActivityToasts() {
   const { t } = useTranslation()
   const openOrFocus = useWorkspace((state) => state.openOrFocus)
-  const { signals, loading } = useGlobalAgentActivity()
+  const { signals, loading, error } = useGlobalAgentActivity()
+  const initialRevision = useRef<number | null>(null)
   const announced = useRef(new Map<string, number>())
   const persistentSignals = useRef(new Set<string>())
 
   useEffect(() => {
     if (loading) return
+    if (initialRevision.current === null) {
+      // A failed request is not a snapshot. Wait for the first successful load,
+      // including an empty one, before announcing subsequent journal events.
+      if (error) return
+      initialRevision.current = Math.max(0, ...signals.map((signal) => signal.revision))
+      return
+    }
 
     const nextActive = new Set(
       signals
@@ -44,6 +52,7 @@ export function ActivityToasts() {
     }
 
     for (const signal of signals) {
+      if (signal.revision <= initialRevision.current) continue
       const id = toastId(signal)
       if ((announced.current.get(id) ?? -1) >= signal.revision) continue
       announced.current.set(id, signal.revision)
@@ -98,7 +107,7 @@ export function ActivityToasts() {
       if (!oldest) break
       announced.current.delete(oldest)
     }
-  }, [loading, openOrFocus, signals, t])
+  }, [error, loading, openOrFocus, signals, t])
 
   return null
 }
