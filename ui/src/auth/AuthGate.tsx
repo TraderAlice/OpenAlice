@@ -16,6 +16,7 @@ import { getBackendConnection, type BackendConnection } from './backendConnectio
 import { LoginPage, NoTokenPage } from './LoginPage'
 import { Spinner } from '../components/StateViews'
 import { Button } from '../components/ui/button'
+import { useWindowsChrome } from '../hooks/useWindowsChrome'
 
 function remoteTargetLabel(connection: Extract<BackendConnection, { kind: 'remote' }>): string {
   return connection.sshPort === 22
@@ -117,6 +118,7 @@ export function BackendUnavailableScreen({
 }
 
 export function AuthGate({ children }: { children: ReactNode }) {
+  useWindowsChrome()
   const { state, backendUnavailable, refresh } = useAuth()
   const connection = getBackendConnection()
 

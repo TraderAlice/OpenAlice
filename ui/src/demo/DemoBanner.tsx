@@ -6,7 +6,7 @@ export function DemoBanner(): ReactElement {
   const { t } = useTranslation()
 
   return (
-    <div className="oa-demo-banner flex min-h-9 items-center gap-2 border-b px-2 py-1 text-[12px] leading-[18px] text-foreground sm:gap-3 sm:px-3">
+    <div data-desktop-banner className="oa-demo-banner flex min-h-9 items-center gap-2 border-b px-2 py-1 text-[12px] leading-[18px] text-foreground sm:gap-3 sm:px-3">
       <span className="inline-flex h-6 shrink-0 items-center px-1 text-[11px] leading-[15px] font-medium text-warning">
         {t('demoBanner.badge')}
       </span>

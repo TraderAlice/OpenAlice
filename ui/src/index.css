@@ -761,6 +761,35 @@ body {
 /* One chrome row for navigator and working view. Body descriptions are not
    toolbar content. Layout owns the header slot; pages retain their actions. */
 .oa-topbar-host { container-type: inline-size; }
+/* Windows keeps native caption controls. Only header rows intersecting their
+   actual geometry reserve space; nested toolbars keep their normal density. */
+.oa-windows-chrome-fallback {
+  position: fixed;
+  z-index: 101;
+  -webkit-app-region: drag;
+}
+:root[data-window-chrome="windows"] [data-caption-row] {
+  min-height: max(44px, var(--desktop-caption-height, 44px));
+  height: auto;
+  flex-shrink: 0;
+  padding-left: max(12px, calc(var(--caption-left, 0px) + 8px));
+  padding-right: max(12px, calc(var(--caption-right, 0px) + 8px));
+  -webkit-app-region: drag;
+}
+:root[data-window-chrome="windows"] [data-caption-stacked] {
+  padding: calc(var(--desktop-caption-height, 44px) + 4px) 12px 4px;
+}
+:root[data-window-chrome="windows"] [data-caption-row] :is(button, a, input, textarea, select, [role="button"], [role="tab"], [role="tablist"], [role="separator"], [contenteditable="true"]),
+:root[data-window-chrome="windows"] [data-caption-row] :is(.oa-topbar-actions, .oa-topbar-leading) {
+  -webkit-app-region: no-drag;
+}
+/* Portaled edge drawers also stay below the native caption controls. */
+:root[data-window-chrome="windows"] [data-slot="sheet-content"]:is([data-side="left"], [data-side="right"], [data-side="top"]) {
+  padding-top: max(16px, var(--desktop-caption-height, 44px));
+}
+:root[data-window-chrome="windows"] [data-slot="sheet-content"] [data-slot="sheet-close"] {
+  top: calc(var(--desktop-caption-height, 44px) + 8px);
+}
 /* macOS owns the traffic lights; the existing navigation and page headers
    share their row. Browser windows keep their original geometry. */
 .oa-desktop-mac .oa-topbar,

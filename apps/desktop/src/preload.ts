@@ -126,7 +126,11 @@ ipcRenderer.on('openalice:updater:status', (_event, raw: unknown) => {
 })
 
 const api = {
-  windowChrome: { platform: process.platform },
+  windowChrome: {
+    platform: process.platform,
+    setTheme: (theme: { color: string; symbolColor: string }) =>
+      process.platform === 'win32' ? ipcRenderer.invoke('openalice:window-chrome:theme', theme) : Promise.resolve(),
+  },
   runtime: {
     info: () => ipcRenderer.invoke('openalice:runtime:info'),
   },
