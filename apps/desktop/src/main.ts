@@ -1007,6 +1007,10 @@ app.whenReady().then(async () => {
     width: 1280,
     height: 800,
     title: 'OpenAlice',
+    ...(process.platform === 'darwin' ? {
+      titleBarStyle: 'hidden' as const,
+      trafficLightPosition: { x: 16, y: 15 },
+    } : {}),
     webPreferences: {
       preload: resolve(__dirname, 'preload.js'),
       contextIsolation: true,

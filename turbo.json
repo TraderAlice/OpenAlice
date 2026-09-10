@@ -7,7 +7,11 @@
       "outputs": ["dist/**"]
     },
     "open-alice-ui#build": {
-      "dependsOn": [],
+      "dependsOn": ["^build"],
+      "outputs": ["dist/**"]
+    },
+    "open-alice-ui#build:demo": {
+      "dependsOn": ["^build"],
       "outputs": ["dist/**"]
     },
     "@traderalice/openalice-cli#build": {

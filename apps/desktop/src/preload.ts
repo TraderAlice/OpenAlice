@@ -126,6 +126,7 @@ ipcRenderer.on('openalice:updater:status', (_event, raw: unknown) => {
 })
 
 const api = {
+  windowChrome: { platform: process.platform },
   runtime: {
     info: () => ipcRenderer.invoke('openalice:runtime:info'),
   },
