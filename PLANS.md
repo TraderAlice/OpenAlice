@@ -29,6 +29,8 @@ the durable truth after it changes. Git history is the archive.
 
 ## Active
 
+- [[plans/inbox-markdown-body.md]] — Unifies Inbox Markdown authoring, Workspace file references, and consuming surfaces.
+
 - [[plans/web-conversation-surface.md]] — Generalizes WebPi into one Web
   conversation surface: a neutral `WebSessionHost` with `pi-rpc`, `acp`,
   `claude-stream-json`, and `codex-app-server` transports, first-class
