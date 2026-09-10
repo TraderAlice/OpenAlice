@@ -1,3 +1,4 @@
+import { optionResearchSchema, orderBookSchema, type BrokerResearch } from '@traderalice/uta-protocol'
 import { Hono } from 'hono'
 import type { Context } from 'hono'
 import { z } from 'zod'
@@ -325,6 +326,36 @@ export function createTradingRoutes(ctx: UTAEngineContext) {
     } catch (err) {
       return c.json({ error: err instanceof Error ? err.message : String(err) }, 500)
     }
+  })
+
+  for (const [route, method] of [['option-contracts', 'getOptionContracts'], ['option-chain', 'getOptionChain']] as const) {
+    app.post(`/uta/:id/contract/${route}`, async c => {
+      const account = resolveAccount(ctx, c)
+      if (!account) return c.json({ error: 'Account not found' }, 404)
+      const parsed = optionResearchSchema.safeParse(await c.req.json().catch(() => null))
+      if (!parsed.success) return c.json({ error: parsed.error.message }, 400)
+      return queryAccount(c, account, async () => {
+        const { aliceId, ...filters } = parsed.data
+        const contract = account.contractFromAliceId(aliceId)
+        if (contract.secType !== 'STK') throw new Error('Option research requires an underlying stock aliceId.')
+        const broker = account.broker as typeof account.broker & BrokerResearch
+        const read = broker[method]
+        if (!read) throw new Error(`${method} is not supported by this broker pack.`)
+        return read.call(broker, contract.symbol, filters)
+      })
+    })
+  }
+  app.post('/uta/:id/contract/order-book', async c => {
+    const account = resolveAccount(ctx, c)
+    if (!account) return c.json({ error: 'Account not found' }, 404)
+    const parsed = orderBookSchema.safeParse(await c.req.json().catch(() => null))
+    if (!parsed.success) return c.json({ error: parsed.error.message }, 400)
+    return queryAccount(c, account, async () => {
+      const contract = account.contractFromAliceId(parsed.data.aliceId)
+      const broker = account.broker as typeof account.broker & BrokerResearch
+      if (!broker.getOrderBook) throw new Error('Order books are not supported by this broker pack.')
+      return broker.getOrderBook(contract, parsed.data.limit ?? 20)
+    })
   })
 
   // Hub → leaves expansion (bond issuers, option chains, futures months).
