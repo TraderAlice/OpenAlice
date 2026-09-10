@@ -109,7 +109,6 @@ function AppShellContent() {
 
   const mainContent = (
     <main className="flex flex-col min-w-0 min-h-0 bg-background h-full">
-      {macDesktop && <UpdateBanner />}
       {/* Mobile header — visible only below md */}
       <MobileContextBar
         railOpen={sidebarOpen}
@@ -118,6 +117,7 @@ function AppShellContent() {
         openRail={() => setSidebarOpen(true)}
         closeRail={() => setSidebarOpen(false)}
       />
+      {macDesktop && <UpdateBanner />}
 
       <PrimaryNavigationContext.Provider value={railCollapsed ? railToggle : null}>
         <TabHost />
