@@ -34,7 +34,8 @@ function inboxDuty(id: string): OfficeDutyCandidate {
         id,
         ts: 1_000,
         workspaceId: 'research-desk',
-        docs: [{ path: `reports/${id}.md`, revision: `revision-${id}` }],
+        body: ['', ...([{ path: `reports/${id}.md`, revision: `revision-${id}` }]).map(doc => '[[' + doc.path + ']]')].filter(Boolean).join('\n\n'),
+        fileRevisions: Object.fromEntries(([{ path: `reports/${id}.md`, revision: `revision-${id}` }]).map(doc => [doc.path, doc.revision!]))
       },
     },
   }

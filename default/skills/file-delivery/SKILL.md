@@ -45,3 +45,7 @@ It does not need an Inbox entry merely because it is a file. Files and Git hold
 the work; Inbox communicates it to the human; peer conversations carry
 Agent-to-Agent handoffs. Avoid duplicating a reply into Inbox unless a separate
 notification or report handoff is intended.
+
+## Inbox reports
+
+For a separate notification to the human, use `alice inbox push --body 'See [[report/summary.pdf]]'` or `alice inbox push --body-file report/summary.md`. The latter publishes the Markdown itself. References remain relative to the publishing Workspace root. A normal reply does not need an Inbox entry.

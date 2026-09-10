@@ -44,8 +44,8 @@ describe('makeInboxEntryOriginResolver', () => {
     id: 'inbox-1',
     ts: 1,
     workspaceId: 'ws2',
-    comments: 'hello',
     ...(origin ? { origin } : {}),
+    body: 'hello'
   })
 
   it('backfills a headless resumeId from the durable run registry', () => {

@@ -1,3 +1,4 @@
+import { inboxFiles } from '@traderalice/connector-protocol'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Clock, Layers, Search, X } from 'lucide-react'
@@ -231,13 +232,13 @@ function inboxSearchText(
     workspaceTags.get(entry.workspaceId),
     entry.workspaceLabel,
     entry.workspaceId,
-    entry.comments,
+    entry.body,
     entry.origin?.agent,
     entry.origin?.resumeId,
     entry.origin?.issueId,
     entry.origin?.runId,
     entry.origin?.sessionId,
-    ...(entry.docs ?? []).map((doc) => doc.path),
+    ...inboxFiles(entry).map((doc) => doc.path),
   ].filter(Boolean).join(' '))
 }
 

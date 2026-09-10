@@ -37,10 +37,10 @@ describe('inbox_push provenance', () => {
         resolveWorkspace: () => ({ id: 'ws-1', tag: 'desk', dir }),
       })
 
-      await run(inboxPushFactory.build(ctx), { docs: [{ path: 'research/a.md' }] })
+      await run(inboxPushFactory.build(ctx), { body: '[[research/a.md]]' })
       const revision = reportContentRevision('# Published\n')
       expect(appendInbox).toHaveBeenCalledWith(expect.objectContaining({
-        docs: [{ path: 'research/a.md', revision }],
+        body: '[[research/a.md]]', fileRevisions: { 'research/a.md': revision },
       }))
       expect(appendProvenance).toHaveBeenCalledWith(expect.objectContaining({
         artifact: { kind: 'report', workspaceId: 'ws-1', path: 'research/a.md', revision },
@@ -64,8 +64,7 @@ describe('inbox_push provenance', () => {
     })
 
     await expect(run(inboxPushFactory.build(ctx), {
-      comments: 'done',
-      docs: [{ path: 'research/a.md' }],
+      body: 'done [[research/a.md]]',
     })).resolves.toMatchObject({ ok: true, entryId: 'entry-1' })
 
     const origin = {
@@ -90,7 +89,7 @@ describe('inbox_push provenance', () => {
   it('records an honest unknown origin when no Session context is available', async () => {
     const append = vi.fn(async (input) => ({ id: 'p-1', ...input }))
     const ctx = context({ provenanceStore: { append, list: vi.fn(), latest: vi.fn() } })
-    await run(inboxPushFactory.build(ctx), { comments: 'manual' })
+    await run(inboxPushFactory.build(ctx), { body: 'manual' })
     expect(append).toHaveBeenCalledWith(expect.objectContaining({
       origin: { kind: 'unknown', reason: 'missing-session-origin' },
     }))

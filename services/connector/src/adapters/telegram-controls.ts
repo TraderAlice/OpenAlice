@@ -1,3 +1,4 @@
+import { inboxFiles, parseContentReferences } from '@traderalice/connector-protocol'
 import { TELEGRAM_PLAIN_TEXT_MAX } from '@traderalice/connector-protocol'
 import type { InboxEntry } from '@/core/inbox-store.js'
 
@@ -110,12 +111,18 @@ export function inboxFileDisplayName(path: string): string {
   return name || 'file'
 }
 
+function inboxProse(body: string): string {
+  let result = body
+  for (const ref of parseContentReferences(body).references.reverse()) result = result.slice(0, ref.start) + result.slice(ref.end)
+  return result.trim()
+}
+
 export function inboxEntryTitle(entry: InboxEntry): string {
-  const comment = entry.comments?.trim()
+  const comment = inboxProse(entry.body)
   if (comment) {
     return truncateTelegramText(comment.split('\n')[0] ?? comment, TELEGRAM_INBOX_TITLE_MAX)
   }
-  const fallback = entry.docs?.[0]?.path
+  const fallback = inboxFiles(entry)[0]?.path
   if (fallback) return truncateTelegramText(inboxFileDisplayName(fallback), TELEGRAM_INBOX_TITLE_MAX)
   return 'Inbox item'
 }
@@ -149,8 +156,8 @@ export function formatTelegramInboxPage(input: {
       TELEGRAM_INBOX_WORKSPACE_MAX,
     )
     const when = formatInboxWhen(entry.ts)
-    const body = collapseWhitespace(entry.comments ?? '')
-    const docCount = entry.docs?.length ?? 0
+    const body = collapseWhitespace(inboxProse(entry.body))
+    const docCount = inboxFiles(entry).length ?? 0
     lines.push(`${index + 1}. ${inboxEntryTitle(entry)}`)
     lines.push(`${workspace} · ${when}`)
     if (body) lines.push(truncateTelegramText(body, TELEGRAM_INBOX_BODY_MAX))
@@ -175,8 +182,8 @@ export function formatTelegramInboxDetailPage(entry: InboxEntry): TelegramForm {
     entry.workspaceLabel ?? entry.workspaceId,
     TELEGRAM_INBOX_WORKSPACE_MAX,
   )
-  const body = entry.comments?.trim()
-  const docCount = entry.docs?.length ?? 0
+  const body = entry.body?.trim()
+  const docCount = inboxFiles(entry).length ?? 0
   const lines = [
     inboxEntryTitle(entry),
     `${workspace} · ${formatInboxWhen(entry.ts)}`,
@@ -191,7 +198,7 @@ export function formatTelegramInboxDetailPage(entry: InboxEntry): TelegramForm {
 }
 
 export function formatTelegramInboxFilesPage(entry: InboxEntry, page: number): TelegramForm {
-  const docs = entry.docs ?? []
+  const docs = inboxFiles(entry)
   if (docs.length === 0) {
     return {
       text: 'This Inbox item has no files.',
@@ -359,7 +366,7 @@ export async function transitionTelegramInbox(
     if (!entryId) return { kind: 'expired' }
     const entry = await deps.getEntry(entryId)
     if (!entry) return missingEntry(session)
-    const doc = entry.docs?.[control.docIndex]
+    const doc = inboxFiles(entry)[control.docIndex]
     if (!doc) {
       return {
         kind: 'error',
@@ -400,7 +407,7 @@ export async function transitionTelegramInbox(
     if (session.view?.kind !== 'confirm') return { kind: 'expired' }
     const entry = await deps.getEntry(session.view.entryId)
     if (!entry) return missingEntry(session)
-    const doc = entry.docs?.[session.view.docIndex]
+    const doc = inboxFiles(entry)[session.view.docIndex]
     if (!doc) {
       return {
         kind: 'error',

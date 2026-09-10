@@ -110,14 +110,15 @@ notification/report handoff is intended, including unattended work whose result
 needs human attention.
 
 ```bash
-alice inbox push \
-  --doc research/report.md \
-  --comments 'Finished — the report contains the evidence and conclusion.'
+alice inbox push --body 'Finished — see [[research/report.md]] for evidence.'
+# Publish the Markdown itself as the notification body:
+alice inbox push --body-file research/report.md
 ```
 
-`--doc` is repeatable and Workspace-relative. The Inbox renders the live file
-and records the exact published content hash. Commit before pushing so Git can
-recover what was sent even if the path later changes.
+The body is frozen at publication. `[[relative/path.ext]]` references resolve
+against the publishing Workspace root and stay live; a published hash identifies
+the file revision. Code examples and missing paths remain literal. Commit files
+before publishing if you want Git to preserve their published content.
 
 Read recent deliveries with:
 
@@ -128,7 +129,7 @@ alice inbox read --self
 
 Each attachment is returned in `files[]` with a directly usable `absolutePath`,
 its original `relativePath`, and the published `revision` when available. The
-legacy `docs` relative-path list remains for compatibility.
+body preserves the Markdown and reference positions.
 
 If `absolutePath` is null because the Workspace is unavailable or the stored
 path is unsafe, do not guess it. For broader inspection of an available peer

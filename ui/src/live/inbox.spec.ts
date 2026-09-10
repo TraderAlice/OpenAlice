@@ -3,12 +3,12 @@ import { describe, expect, it } from 'vitest'
 import type { InboxEntry } from '../api/inbox'
 import { reconcileInboxHistoryState, type InboxState } from './inbox'
 
-function entry(id: string, comments: string): InboxEntry {
+function entry(id: string, body: string): InboxEntry {
   return {
     id,
     ts: 1,
     workspaceId: 'research-desk',
-    comments,
+    body
   }
 }
 

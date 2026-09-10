@@ -1,3 +1,4 @@
+import { inboxFiles } from '@traderalice/connector-protocol'
 import { createHash } from 'node:crypto'
 import { readFile, realpath, stat } from 'node:fs/promises'
 import { basename, extname, isAbsolute, normalize, resolve, sep } from 'node:path'
@@ -167,11 +168,7 @@ export function toNotification(
   entry: InboxEntry,
   attachments: readonly InboxAttachmentProjection[] = [],
 ): InboxNotification {
-  const docs = entry.docs?.map((doc) => doc.path) ?? []
-  const body = [
-    entry.comments?.trim(),
-    docs.length > 0 ? `Reports:\n${docs.map((path) => `- ${path}`).join('\n')}` : undefined,
-  ].filter(Boolean).join('\n\n')
+  const body = entry.body
   const baseUrl = process.env['OPENALICE_PUBLIC_URL']?.replace(/\/+$/, '')
   return {
     id: entry.id,
@@ -201,7 +198,7 @@ export async function projectInboxAttachments(
   warn: (message: string) => void = () => undefined,
 ): Promise<InboxAttachmentProjection[]> {
   const reportDocs: Array<{ doc: InboxDoc; mediaType: ConnectorTextMediaType }> = []
-  for (const doc of entry.docs ?? []) {
+  for (const doc of inboxFiles(entry)) {
     const mediaType = textMediaTypeForPath(doc.path)
     if (mediaType) reportDocs.push({ doc, mediaType })
   }
@@ -236,7 +233,7 @@ export async function projectInboxDoc(
   resolveWorkspace: InboxConnectorBridgeDeps['resolveWorkspace'],
   warn: (message: string) => void = () => undefined,
 ): Promise<InboxDocProjectionResult> {
-  const doc = entry.docs?.[docIndex]
+  const doc = inboxFiles(entry)[docIndex]
   if (!doc?.path) {
     return {
       ok: false,

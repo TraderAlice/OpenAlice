@@ -47,10 +47,10 @@ export interface InboxEntry {
   readAt?: number
   workspaceId: string
   workspaceLabel?: string
-  /** Pointers to workspace files. Rendered live (no snapshot). */
-  docs?: InboxDoc[]
-  /** Agent's message body (markdown). Renders below docs. */
-  comments?: string
+  /** Published file fingerprints; the file index is derived from body. */
+  fileRevisions?: Record<string, string>
+  /** Published Markdown body with inline file references. */
+  body: string
   /** Agent-INVISIBLE provenance, stamped server-side. Absent on legacy entries
    *  and on interactive/manual pushes that carried no run header. */
   origin?: InboxOrigin
@@ -64,11 +64,20 @@ export interface InboxHistoryResponse {
 export interface InboxSeedBody {
   workspaceId: string
   workspaceLabel?: string
-  docs?: InboxDoc[]
-  comments?: string
+  body: string
+}
+
+export interface InboxFile {
+  path: string
+  revision?: string
+  available: boolean
+  href: string
 }
 
 export const inboxApi = {
+  files(id: string): Promise<{ files: InboxFile[] }> {
+    return fetchJson(`/api/inbox/${encodeURIComponent(id)}/files`)
+  },
   async history(
     opts: { limit?: number; before?: string; workspaceId?: string } = {},
   ): Promise<InboxHistoryResponse> {

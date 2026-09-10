@@ -1,3 +1,4 @@
+import { inboxFiles } from '@traderalice/connector-protocol'
 import { describe, expect, it } from 'vitest'
 
 import type {
@@ -67,7 +68,8 @@ function inboxDelivery(
       ts: NOW,
       workspaceId: 'chat-1',
       workspaceLabel: 'Semis desk',
-      docs: [{ path: `reports/${id}.md`, revision: `rev-${id}` }],
+      body: ['', ...([{ path: `reports/${id}.md`, revision: `rev-${id}` }]).map(doc => '[[' + doc.path + ']]')].filter(Boolean).join('\n\n'),
+      fileRevisions: Object.fromEntries(([{ path: `reports/${id}.md`, revision: `rev-${id}` }]).map(doc => [doc.path, doc.revision!]))
     },
     ...overrides,
   }
@@ -346,7 +348,12 @@ describe('Office duty registry', () => {
       activityStatus: 'ready',
       inboxDeliveries: [
         inboxDelivery('new-doc', { entry: { ...inboxDelivery('new-doc').entry, ts: NOW + 20 } }),
-        inboxDelivery('message', { entry: { ...inboxDelivery('message').entry, ts: NOW - 20, docs: [] } }),
+        inboxDelivery('message', {
+          entry: {
+            ...inboxDelivery('message').entry,
+            ts: NOW - 20,
+            body: ""
+          } }),
         inboxDelivery('old-doc', { entry: { ...inboxDelivery('old-doc').entry, ts: NOW - 10 } }),
       ],
       inboxStatus: 'ready',
@@ -406,13 +413,13 @@ describe('Office duty registry', () => {
       entry: {
         ...inboxDelivery(id).entry,
         ts,
-        docs: documented ? inboxDelivery(id).entry.docs : [],
         origin: {
           kind: 'headless',
           runId: `run-${id}`,
           issueId: 'layered-report',
           issueWorkspaceId: 'ws-a',
         },
+        body: ['', ...(documented ? inboxFiles(inboxDelivery(id).entry) : []).map(doc => '[[' + doc.path + ']]')].filter(Boolean).join('\n\n')
       },
     })
     const candidates = coreOfficeDutyRegistrations({

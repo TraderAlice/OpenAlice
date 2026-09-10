@@ -5,6 +5,8 @@ configuration, delivery guarantees, adapter extension, health, and packaging.
 It complements [[docs/workspace-issues-and-scheduling.md]] and
 [[docs/managed-workspace-runtime.md]].
 
+Inbox body and shared reference semantics live in [[docs/inbox-content.md]].
+
 ## Product Contract
 
 Connector Service projects durable OpenAlice Inbox entries into optional

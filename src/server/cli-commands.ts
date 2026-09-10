@@ -162,10 +162,8 @@ const BASE_EXPORTS: Record<string, CliExport> = {
         collect: 'conversation_collect',
         read: 'conversation_read',
       },
-      // inbox push: surface doc(s) + comment to the user's Inbox tab. Attach
-      // files with repeatable `--doc <path>` (the shim folds them into the
-      // `docs: [{ path }]` array; bare paths wrap, JSON objects pass through);
-      // `--comments` carries the markdown note. At least one of the two.
+      // inbox push: one Markdown body with inline Workspace file references.
+      // --body-file publishes Markdown read from a local file.
       // inbox read: look back at the inbox stream — `--self` narrows to this
       // workspace's own pushes (whose doc paths are cwd-relative, so readable
       // with the shell); `--limit N` caps the newest-first window.

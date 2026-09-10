@@ -1,3 +1,4 @@
+import { inboxFiles } from '@traderalice/connector-protocol'
 // @vitest-environment jsdom
 
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
@@ -63,7 +64,7 @@ vi.mock('../contexts/workspaces-context', () => ({
 
 function officeInboxDuty(entry: InboxEntry): OfficeInboxDutyCandidate {
   return inboxUnreadDutyRegistration([{
-    title: entry.comments ?? entry.docs?.[0]?.path ?? 'Inbox delivery',
+    title: entry.body ?? inboxFiles(entry)?.[0]?.path ?? 'Inbox delivery',
     entry,
   }], 'ready').candidates[0] as OfficeInboxDutyCandidate
 }
@@ -76,7 +77,7 @@ beforeEach(async () => {
     ts: Date.now(),
     workspaceId: 'workspace-1',
     workspaceLabel: 'old-desk',
-    comments: 'Research is ready.',
+    body: 'Research is ready.'
   }]
   mocks.loading = false
   mocks.selectedEntryId = 'inbox-1'
@@ -126,7 +127,10 @@ describe('InboxSidebar Workspace labels', () => {
 
   it('keeps entries without comments or attachments scannable', () => {
     mocks.mode = 'time'
-    mocks.entries = [{ ...mocks.entries[0]!, comments: '', docs: [] }]
+    mocks.entries = [{
+      ...mocks.entries[0]!,
+      body: ""
+    }]
 
     render(<InboxSidebar />)
 
@@ -138,11 +142,11 @@ describe('InboxSidebar Workspace labels', () => {
     mocks.mode = 'time'
     mocks.entries = [{
       ...mocks.entries[0]!,
-      comments: [
+      body: [
         'Morning scan is in.',
         '',
         `VST led on datacenter-power flow, and the rest of the tape stayed quiet. ${omittedTail}`,
-      ].join('\n'),
+      ].join('\n')
     }]
 
     render(<InboxSidebar />)
@@ -165,8 +169,7 @@ describe('InboxSidebar Workspace labels', () => {
         id: 'inbox-docs',
         ts: Date.now(),
         workspaceId: 'workspace-1',
-        comments: '',
-        docs: [{ path: 'reports/close-report.md' }, { path: 'notes/context.txt' }],
+        body: "[[reports/close-report.md]]\n\n[[notes/context.txt]]"
       },
     ]
 
@@ -189,16 +192,16 @@ describe('InboxSidebar search', () => {
         ts: Date.now(),
         workspaceId: 'workspace-1',
         workspaceLabel: 'old-desk',
-        comments: 'Research is ready.',
         origin: { kind: 'headless', agent: 'codex', resumeId: 'resume-research' },
+        body: 'Research is ready.'
       },
       {
         id: 'inbox-2',
         ts: Date.now() - 1000,
         workspaceId: 'workspace-2',
         workspaceLabel: 'macro-desk',
-        comments: 'Macro alert published.',
         origin: { kind: 'headless', agent: 'opencode', resumeId: 'resume-macro' },
+        body: 'Macro alert published.'
       },
     ]
     mocks.workspaces = [
@@ -238,7 +241,7 @@ describe('InboxSidebar Office review selection', () => {
       ...newest,
       id: 'inbox-office-older-than-feed',
       ts: newest.ts - 10_000,
-      comments: 'Exact older Office report.',
+      body: 'Exact older Office report.'
     }
     mocks.mode = 'time'
     mocks.selectedEntryId = null
@@ -286,7 +289,7 @@ describe('InboxSidebar Office review selection', () => {
       ts: target.ts - 1,
       workspaceId: 'workspace-1',
       workspaceLabel: 'old-desk',
-      comments: 'Unrelated update.',
+      body: 'Unrelated update.'
     }
     mocks.entries = [target, unrelated]
     mocks.mode = 'time'

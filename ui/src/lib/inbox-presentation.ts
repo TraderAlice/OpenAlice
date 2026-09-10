@@ -1,3 +1,4 @@
+import { inboxFiles } from '@traderalice/connector-protocol'
 import type { InboxDoc } from '../api/inbox'
 
 /**
@@ -15,8 +16,7 @@ const EXCERPT_MIN = 12
 const SENTENCE_END = /[.!?…](?=$|\s)|[。！？]/u
 
 export interface InboxPresentationInput {
-  comments?: string
-  docs?: ReadonlyArray<Pick<InboxDoc, 'path'>>
+  body: string
 }
 
 export interface InboxPresentationCopy {
@@ -46,7 +46,7 @@ export function presentInboxEntry(
   options: InboxPresentationOptions,
 ): InboxPresentation {
   const { subject, excerpt } = inboxScan(entry, options)
-  const heading = leadingMarkdownHeading(entry.comments ?? '')
+  const heading = leadingMarkdownHeading(entry.body ?? '')
   return {
     subject,
     documentTitle: heading || subject,
@@ -71,7 +71,7 @@ export function inboxScan(
   entry: InboxPresentationInput,
   copy: InboxPresentationCopy,
 ): Pick<InboxPresentation, 'subject' | 'excerpt'> {
-  const blocks = collectPlainBlocks(entry.comments ?? '')
+  const blocks = collectPlainBlocks((entry.body ?? '').replace(/^\s*\[\[[^\]\n]+\]\]\s*$/gm, ''))
   let rawSubject = ''
   let remainder = ''
   let subject = ''
@@ -97,7 +97,7 @@ export function inboxScan(
       ].filter(Boolean).join(' ')
     }
   } else {
-    subject = attachmentSubject(entry.docs, copy) || copy.untitled
+    subject = attachmentSubject(inboxFiles(entry), copy) || copy.untitled
   }
 
   const excerpt = excerptFromRemainder(remainder, rawSubject, subject)
@@ -125,7 +125,7 @@ function documentFileName(path: string): string {
 }
 
 function attachmentSubject(
-  docs: InboxPresentationInput['docs'],
+  docs: ReadonlyArray<Pick<InboxDoc, 'path'>>,
   copy: InboxPresentationCopy,
 ): string {
   if (!docs || docs.length === 0) return ''

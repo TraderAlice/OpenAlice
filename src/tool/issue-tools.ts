@@ -703,13 +703,8 @@ export const issueShowFactory: WorkspaceToolFactory = {
                   workspaceId: entry.workspaceId,
                   workspaceLabel: entry.workspaceLabel,
                   ts: entry.ts,
-                  ...(entry.docs ? {
-                    docs: entry.docs.map((doc) => ({
-                      path: doc.path,
-                      ...(doc.revision ? { revision: doc.revision } : {}),
-                    })),
-                  } : {}),
-                  ...(entry.comments ? { comments: entry.comments } : {}),
+                  body: entry.body,
+                  fileRevisions: entry.fileRevisions,
                   ...(entry.origin ? { origin: entry.origin } : {}),
                 })),
                 provenance: detail.provenance,

@@ -86,7 +86,7 @@ as `--when`:
 alice issue create --title "Pre-market brief" --priority high \
   --when '{"kind":"cron","cron":"30 8 * * 1-5","timezone":"America/New_York"}' \
   --assignee @me \
-  --what "Pull pre-market movers and overnight news for my watchlist, write a short brief to research/premarket.md, then run: alice inbox push --doc research/premarket.md --comments 'Pre-market brief'." \
+  --what "Pull pre-market movers and overnight news for my watchlist, write a short brief to research/premarket.md, then run: alice inbox push --body-file research/premarket.md." \
   --agent codex \
   --credential openai-primary \
   --model gpt-5.6 \
@@ -262,8 +262,8 @@ Decide whether the run should notify the human or simply update its work:
 
 - If the run produces something the user should see — a brief, a finding, a
   result — use **Inbox for an outward-facing notification or report**:
-  `alice inbox push --comments "…"` (attach files with repeatable
-  `--doc <path>`; run `alice --help` for the flags). A report pushed
+  `alice inbox push --body "…"` (reference files with `[[relative/path.ext]]`,
+  or publish Markdown using `--body-file <path>`). A report pushed
   during a scheduled run is automatically linked back to the issue that
   triggered it — you don't pass any id.
 - If the run is a **check that didn't trigger** (condition not met, nothing
