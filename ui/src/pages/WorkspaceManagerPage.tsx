@@ -23,7 +23,7 @@ import {
 } from '../components/workspace/AgentLaunchControls'
 import { TerminalView } from '../components/workspace/Terminal'
 import { WebSessionView } from '../components/workspace/WebSessionView'
-import { ResumeCta } from '../components/workspace/ResumeCta'
+import { SessionActivation } from '../components/workspace/SessionActivation'
 import { Button } from '../components/ui/button'
 import { useWorkspaces } from '../contexts/workspaces-context'
 import { useAgentLaunchConfig, useAgentLaunchPreferences } from '../hooks/useAgentLaunchConfig'
@@ -37,7 +37,7 @@ type ManagerSpec = Extract<ViewSpec, { kind: 'workspace-manager' }>
 
 const SUGGESTION_ICONS = [ClipboardCheck, UsersRound, GitMerge, RefreshCw] as const
 
-export function WorkspaceManagerPage({ spec }: { spec: ManagerSpec }) {
+export function WorkspaceManagerPage({ spec, visible = true }: { spec: ManagerSpec; visible?: boolean }) {
   const { t } = useTranslation()
   const { recordSuccessfulUse } = useAgentRuntimes()
   const {
@@ -68,6 +68,7 @@ export function WorkspaceManagerPage({ spec }: { spec: ManagerSpec }) {
   })
   const effectiveAgent = launchConfig.effectiveAgent
 
+  const connectedSessions = useRef(new Set<string>())
   const sessionId = spec.params.sessionId
   const session = sessionId
     ? manager?.sessions.find((candidate) => candidate.id === sessionId) ?? null
@@ -133,6 +134,7 @@ export function WorkspaceManagerPage({ spec }: { spec: ManagerSpec }) {
   }
 
   if (sessionId && session) {
+    if (session?.state === 'running') connectedSessions.current.add(session.id)
     const terminalCanvas =
       session.state === 'running' &&
       (session.surface ?? 'terminal') === 'terminal'
@@ -164,9 +166,11 @@ export function WorkspaceManagerPage({ spec }: { spec: ManagerSpec }) {
         )}
         <div className={`flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden${terminalCanvas ? '' : ' p-2 md:p-3'}`}>
           {session.state === 'paused' ? (
-            <ResumeCta
+            <SessionActivation
+              key={session.id}
               record={session}
-              agents={agents}
+              automatic={!connectedSessions.current.has(session.id)}
+              enabled={visible}
               onResume={() => resumeSession(MANAGER_WORKSPACE_ID, session.id)}
               onOpenWeb={() => openWebSession(MANAGER_WORKSPACE_ID, session.id)}
             />

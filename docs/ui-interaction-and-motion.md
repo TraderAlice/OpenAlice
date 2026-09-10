@@ -114,7 +114,14 @@ paused resumable Sessions restore through the existing runtime action. A pending
 restore shows a spinner and rejects repeated clicks; failures stay on the row
 and allow retry. Headless occupancy still opens the single-writer explanation.
 The primary row has no separate play/stop target; settings, stop and archive live
-in its options menu. Direct links and history browsers retain view-only opening.
+in its options menu. Direct links and history browsers use the same activation contract: an idle
+Session opens its saved TUI/Web surface without a paused-session interstitial.
+Activation checks the Session Directory for background occupancy before
+requesting a runtime; the server remains the final concurrency authority.
+Failures show the concrete cause and an explicit retry. Hidden Workspace tabs
+do not auto-start, and losing/disconnecting an already-open interactive surface
+does not automatically reclaim it. The former decorative terminal backdrop and
+Resume CTA are removed.
 In expanded navigation, a selected Session or Studio does not also select its
 Harness header. The compact rail retains the Harness selection because Session rows
 are hidden there; returning to the Harness landing selects its header.

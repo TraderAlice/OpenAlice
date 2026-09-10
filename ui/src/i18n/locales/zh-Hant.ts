@@ -3141,6 +3141,9 @@ export const zhHant: Resources = {
     notFoundBody: '沒有名為 {{name}} 的模板。',
   },
   workspace: {
+    sessionNotFound: '這個會話已不存在。',
+    sessionOpening: '正在開啟會話…',
+    sessionDisconnected: '互動連線已中斷。',
     interactiveOwnership: {
       background: '此會話正在背景執行任務，互動連線已釋放。',
       title: '開啟互動連線？',
