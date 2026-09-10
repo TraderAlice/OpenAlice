@@ -716,3 +716,17 @@ Changes to this subsystem require:
 Real Telegram/Discord delivery needs user-owned platform credentials and is a
 manual acceptance lane; credential-free CI must not pretend that a live
 third-party message was delivered.
+
+### Market reply snapshots
+
+Final owner-chat references beginning with `market/` resolve through the local
+Alice market gateway rather than Workspace file access. DeliveryManager sends
+the generated PNG as a photo at the reference position, using the same ordered
+parts and five-media limit as files. Automation silence skips resolution;
+failed charts retain the reference with an unavailable notice. Inbox's derived
+file index excludes market references.
+
+The renderer uses bundled JavaScript and a bundled OFL Liberation Sans font;
+it needs neither a browser nor a platform-native graphics library. Font paths
+are filled as compound contours to preserve digit/letter counters. PNGs are
+2400 by 1600 for legible mobile zoom; the attachment byte ceiling still applies.

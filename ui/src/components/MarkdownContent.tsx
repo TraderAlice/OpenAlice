@@ -1,4 +1,4 @@
-import { isFileReference } from '@traderalice/connector-protocol'
+import { isFileReference, parseMarketReference } from '@traderalice/connector-protocol'
 /**
  * Reusable markdown renderer with syntax-highlighted code blocks and copy buttons.
  *
@@ -57,6 +57,12 @@ function createWikilinkExtension(opts: { codeSpanWikilinks: boolean; fileHrefs?:
     },
     renderer(token) {
       const name = token.text as string
+      if (name.startsWith('market/')) {
+        const market = parseMarketReference(name)
+        const href = opts.fileHrefs?.[name]
+        if (!market || !href) return escapeHtml(token.raw)
+        return `<a class="markdown-file-card" href="${escapeHtml(href)}" data-file-path="${escapeHtml(name)}"><span class="markdown-file-type">K</span><span class="markdown-file-label"><strong>${escapeHtml(market.barId.split('|').slice(1).join('|'))} · ${market.interval}</strong><span>${escapeHtml(market.barId)} · K-line</span></span><span aria-hidden="true">↗</span></a>`
+      }
       if (opts.fileHrefs && isFileReference(name)) {
         const href = opts.fileHrefs[name]
         if (!href) return escapeHtml(token.raw)
