@@ -761,6 +761,35 @@ body {
 /* One chrome row for navigator and working view. Body descriptions are not
    toolbar content. Layout owns the header slot; pages retain their actions. */
 .oa-topbar-host { container-type: inline-size; }
+/* macOS owns the traffic lights; the existing navigation and page headers
+   share their row. Browser windows keep their original geometry. */
+.oa-desktop-mac .oa-topbar,
+.oa-desktop-mac .oa-activity-brand,
+.oa-desktop-mac [data-testid="mobile-context-bar"] {
+  -webkit-app-region: drag;
+}
+.oa-desktop-mac :is(button, a, input, textarea, select, [role="button"], [role="tab"], [role="separator"]),
+.oa-desktop-mac .oa-topbar-actions,
+.oa-desktop-mac .oa-topbar-leading {
+  -webkit-app-region: no-drag;
+}
+.oa-desktop-mac [data-testid="mobile-context-bar"] {
+  height: 44px;
+  flex-shrink: 0;
+  padding-left: 88px;
+  background: var(--sidebar);
+}
+@media (min-width: 768px) {
+  .oa-desktop-mac .oa-topbar { min-height: 44px; }
+  .oa-desktop-mac #activity-bar .oa-activity-brand {
+    height: 44px;
+    min-height: 44px;
+    padding-left: 88px;
+    justify-content: flex-end;
+  }
+  .oa-desktop-mac #activity-bar .oa-activity-brand h1 { display: none; }
+  .oa-desktop-mac #activity-bar[data-rail-layout="compact"] { width: 88px; }
+}
 .oa-topbar {
   display: flex;
   flex: 0 0 auto;
