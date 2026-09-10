@@ -59,7 +59,14 @@ function createWikilinkExtension(opts: { codeSpanWikilinks: boolean; fileHrefs?:
       const name = token.text as string
       if (opts.fileHrefs && isFileReference(name)) {
         const href = opts.fileHrefs[name]
-        return href ? `<a href="${escapeHtml(href)}" data-file-path="${escapeHtml(name)}">${escapeHtml(name)}</a>` : escapeHtml(token.raw)
+        if (!href) return escapeHtml(token.raw)
+        const attributes = `href="${escapeHtml(href)}" data-file-path="${escapeHtml(name)}"`
+        if (/\.(png|jpe?g|webp|gif)$/i.test(name)) {
+          return `<a class="markdown-file-image" ${attributes}><img src="${escapeHtml(href)}" alt="${escapeHtml(name)}" loading="lazy" /></a>`
+        }
+        const filename = name.split('/').pop() ?? name
+        const extension = filename.split('.').pop()?.toUpperCase() ?? 'FILE'
+        return `<a class="markdown-file-card" ${attributes}><span class="markdown-file-type">${escapeHtml(extension)}</span><span class="markdown-file-label"><strong>${escapeHtml(filename)}</strong><span>${escapeHtml(name)}</span></span><span aria-hidden="true">↗</span></a>`
       }
       const key = name.toLowerCase()
       return `<a class="wikilink" data-entity="${escapeHtml(key)}">${escapeHtml(name)}</a>`

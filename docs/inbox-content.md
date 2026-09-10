@@ -31,7 +31,9 @@ untouched. There is no legacy authoring or dual-read contract.
   lazy preview. It discards responses from an earlier selection. Summary-only
   consumers use `resolveFiles: false`. Inbox and Office share this projection.
 - `MarkdownContent` renders available file references in their original position
-  using exact-case paths. The shared Dialog owns focus, keyboard dismissal and
+  using exact-case paths. Documents use compact file blocks; images render in place
+  within 256px width and 512px height, preserving aspect ratio without upscaling.
+  Both remain keyboard-accessible preview links. The shared Dialog owns focus, keyboard dismissal and
   responsive previews. There is no separate Inbox attachment section.
 - Connector notifications carry the body unchanged. The existing bounded
   adapter upload / Telegram on-demand file controls derive their files from it.

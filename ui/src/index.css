@@ -1778,3 +1778,41 @@ html[lang="ja"] .oa-onboarding-title {
 @media (prefers-reduced-motion: reduce) {
   .oa-collapsible-panel { transition: none; }
 }
+
+/* Resolved Workspace files retain their position in the Markdown body. */
+.markdown-content a.markdown-file-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: fit-content;
+  max-width: 100%;
+  margin: 12px 0;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--muted);
+  color: var(--foreground);
+  text-decoration: none;
+  font-size: 13px;
+  line-height: 1.5;
+}
+.markdown-file-type {
+  flex: none;
+  color: var(--muted-foreground);
+  font-size: 10px;
+  font-weight: 600;
+}
+.markdown-file-label { display: grid; min-width: 0; }
+.markdown-file-label > span { color: var(--muted-foreground); font-size: 12px; }
+.markdown-content a.markdown-file-image { display: block; width: fit-content; max-width: 100%; }
+.markdown-content a.markdown-file-image img {
+  display: block;
+  width: auto;
+  height: auto;
+  max-width: min(256px, 100%);
+  max-height: 512px;
+  object-fit: contain;
+  margin: 12px 0;
+}
+.markdown-content a.markdown-file-card:hover { border-color: var(--muted-foreground); }
+.markdown-content a[data-file-path]:focus-visible { outline: 2px solid var(--ring); outline-offset: 3px; }
