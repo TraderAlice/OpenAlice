@@ -296,11 +296,21 @@ extended-hours flags are rejected. Venue minimums and increments still apply.
 Contract details expose the asset's minimum size and increments when supplied.
 Notional orders retain cash quantity separately from filled base quantity.
 
-Options are a **read-only** capability in this pack. `alice-uta contract
+Options support **single-leg trading** when the account reports a positive
+`options_trading_level`. Permission is refreshed before entry/amendment; Alpaca
+validates strategy approval and collateral. Orders accept whole contract
+quantities, per-unit premium prices, MKT/LMT/STP/STP LMT and DAY/GTC. Cash
+notional, trailing, attached exits and extended hours are refused. Close and
+amend routes preserve the OCC symbol, rather than matching the underlying.
+Position quantities are positive contract counts with direction in `side`;
+Alpaca's signed short quantities must not be passed through and signed again.
+Multi-leg strategies and explicit exercise are not implemented.
+
+For research, `alice-uta contract
 option-contracts` exposes paginated definitions and dated open interest;
 `option-chain` exposes paginated snapshots with feed provenance and individual
 trade/quote timestamps. `contract expand` requires an expiry for concrete
-Alpaca option leaves. Option place/modify/close operations remain refused.
+Alpaca option leaves. Option historical bars are not exposed by this pack.
 The default snapshot feed is `indicative`: trades are delayed and quotes are
 modified, not executable OPRA. Explicit OPRA requests preserve entitlement
 errors instead of silently changing feeds. Missing IV/Greeks/OI stay missing.
