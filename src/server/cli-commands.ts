@@ -235,6 +235,9 @@ const BASE_EXPORTS: Record<string, CliExport> = {
         details: 'getContractDetails',
         quote: 'getQuote',
         expand: 'expandContract',
+        'option-contracts': 'getOptionContracts',
+        'option-chain': 'getOptionChain',
+        'order-book': 'getOrderBook',
       },
       order: {
         list: 'getOrders',

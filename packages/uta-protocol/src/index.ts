@@ -18,3 +18,5 @@ export * from './client/UTAClient.js'
 export * from './brokers/preset-catalog.js'
 export * from './brokers/presets.js'
 export * from './brokers/search-rules.js'
+
+export * from './broker-research.js'

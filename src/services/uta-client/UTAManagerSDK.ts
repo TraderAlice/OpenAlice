@@ -132,7 +132,7 @@ export class UTAManagerSDK {
   /** sourceId → declared historical-bar quality, for the federated bar layer to
    *  report each broker's honest entitlement (Alpaca free = 'iex', CCXT =
    *  'realtime') rather than blanket-labeling broker sources 'realtime'. */
-  async getBarCapabilities(): Promise<Record<string, 'realtime' | 'iex' | 'delayed' | 'subscription'>> {
+  async getBarCapabilities(aliceId?: string): Promise<Record<string, 'realtime' | 'iex' | 'delayed' | 'subscription'>> {
     if (this.getUnavailableReason()) return {}
     const all = await this.listUTAs()
     const out: Record<string, 'realtime' | 'iex' | 'delayed' | 'subscription'> = {}
@@ -141,6 +141,11 @@ export class UTAManagerSDK {
       const historical = u.capabilities.historicalBars
       if (!historical?.supported) continue
       out[u.id] = historical.quality ?? 'realtime'
+      if (aliceId?.startsWith(`${u.id}|`) && historical.qualityBySecType) {
+        const account = await this.get(u.id)
+        const details = await account?.getContractDetails({ aliceId })
+        if (details) out[u.id] = historical.qualityBySecType[details.contract.secType] ?? out[u.id]
+      }
     }
     return out
   }

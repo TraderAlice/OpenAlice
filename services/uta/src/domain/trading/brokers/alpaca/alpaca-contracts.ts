@@ -16,27 +16,31 @@ export const ALPACA_TIMEFRAME: Record<BarInterval, string> = {
   '1h': '1Hour', '4h': '4Hour', '1d': '1Day', '1w': '1Week',
 }
 
-/** Build a fully qualified IBKR Contract for an Alpaca ticker. */
-export function makeContract(ticker: string): Contract {
-  return buildContract({
-    symbol: ticker,
-    secType: 'STK',
-    exchange: 'SMART',
-    currency: 'USD',
-  })
+/** Build venue identity without treating crypto pairs or OCC options as stocks. */
+export function makeContract(ticker: string, assetClass?: string): Contract {
+  ticker = ticker.toUpperCase()
+  const option = /^([A-Z0-9.]+)(\d{6})([CP])(\d{8})$/.exec(ticker)
+  if (option && assetClass !== 'us_equity') {
+    return buildContract({
+      symbol: option[1], localSymbol: ticker, secType: 'OPT', exchange: 'SMART', currency: 'USD',
+      lastTradeDateOrContractMonth: `20${option[2]}`, right: option[3] as 'C' | 'P',
+      strike: Number(option[4]) / 1000, multiplier: '100',
+    })
+  }
+  if (assetClass === 'crypto' || ticker.includes('/')) {
+    // Position/order APIs can return the legacy compact symbol. Only split it
+    // when the venue explicitly identifies it as crypto.
+    const symbol = ticker.includes('/') ? ticker : ticker.replace(/(USDT|USDC|USD|BTC)$/, '/$1')
+    if (!symbol.includes('/')) throw new Error(`Unrecognized Alpaca crypto pair: ${ticker}`)
+    return buildContract({ symbol, secType: 'CRYPTO', exchange: 'ALPACA', currency: symbol.split('/')[1] })
+  }
+  return buildContract({ symbol: ticker, secType: 'STK', exchange: 'SMART', currency: 'USD' })
 }
 
-/**
- * Resolve a Contract to an Alpaca ticker symbol.
- * Uses symbol directly. aliceId is managed by UTA layer, not broker.
- */
 export function resolveSymbol(contract: Contract): string | null {
-  if (contract.symbol) {
-    // If secType is specified and not STK, not our domain
-    if (contract.secType && contract.secType !== 'STK') return null
-    return contract.symbol.toUpperCase()
-  }
-  return null
+  if (contract.secType === 'OPT') return contract.localSymbol || null
+  if (contract.secType && !['STK', 'CRYPTO'].includes(contract.secType)) return null
+  return contract.symbol?.toUpperCase() || null
 }
 
 /** Map Alpaca order status string to IBKR-style OrderState status. */
