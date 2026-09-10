@@ -242,6 +242,7 @@ function redactLaunchCommand(argv: readonly string[]): readonly string[] {
 
 /** The 201 body both `/:id/sessions/spawn` and `/quick-chat` return. */
 interface SpawnedSessionBody {
+  readonly surface?: 'terminal' | 'webpi';
   readonly sessionId: string;
   readonly wsId: string;
   readonly name: string;
@@ -339,6 +340,7 @@ export function createWorkspaceRoutes(
       /** Product-level conversation id. Resolved to a native id only here. */
       readonly resumeId?: string;
       readonly initialPrompt?: string;
+      readonly surface?: 'terminal' | 'webpi';
       readonly title?: string;
       readonly sourceRunId?: string;
       readonly credentialSource?: 'native';
@@ -410,6 +412,10 @@ export function createWorkspaceRoutes(
       return { ok: false, status: 400, body: { error: 'unknown_agent', message: `no adapter: ${agentId}` } };
     }
     const adapter = svc.resolveAdapter(meta, agentId);
+    if (opts.surface === 'webpi' && (!adapter.capabilities.web?.freshSession || !adapter.composeWebCommand)) {
+      return { ok: false, status: 400, body: { error: 'unsupported_surface', message: 'This runtime cannot start a fresh GUI session' } };
+    }
+
     if (requestedIdentity && requestedIdentity.agent !== adapter.id) {
       return { ok: false, status: 400, body: { error: 'resume_wrong_agent' } };
     }
@@ -503,7 +509,7 @@ export function createWorkspaceRoutes(
           ? { metadata: sessionMetadata(opts.createdBy) }
           : {}),
         state: 'running',
-        surface: 'terminal',
+        surface: opts.surface ?? 'terminal',
         ...(fallbackTitle ? { fallbackTitle } : {}),
         ...(opts.sourceRunId ? { sourceRunId: opts.sourceRunId } : {}),
       });
@@ -523,6 +529,14 @@ export function createWorkspaceRoutes(
           agent: adapter.id,
           sessionRecordId: record.id,
         })
+      }
+      if (opts.surface === 'webpi') {
+        operationLease?.release();
+        releaseClaim();
+        const snapshot = await svc.startWebSession(meta, record);
+        if (initialPrompt) await svc.web.prompt(record.id, initialPrompt);
+        releaseClaim();
+        return { ok: true, session: { sessionId: record.id, wsId: id, name: record.name, agent: adapter.id, resumeId: record.resumeId, pid: snapshot.pid ?? 0, startedAt: snapshot.startedAt, title: sessionPreferredTitle(record) ?? null, surface: 'webpi' } };
       }
       const ctx: SessionFactoryContext = {
         ...(resume !== undefined ? { resume } : {}),
@@ -560,7 +574,7 @@ export function createWorkspaceRoutes(
         resumeId: identity.resumeId,
         agent: adapter.id,
         sessionRecordId: record.id,
-        surface: 'terminal',
+        surface: opts.surface ?? 'terminal',
         cause: { kind: 'ui' },
       })
       releaseClaim();
@@ -579,11 +593,12 @@ export function createWorkspaceRoutes(
       };
     } catch (err) {
       releaseClaim();
+      if (opts.surface === 'webpi') await svc.web.stop(record.id, 'GUI launch failed').catch(() => undefined);
       await svc.sessionCoordinator.transition({
         wsId: id,
         resumeId: record.resumeId,
         state: 'paused',
-        surface: 'terminal',
+        surface: opts.surface ?? 'terminal',
       }).catch(() => undefined);
       launcherLogger.error('workspace.session_spawn_failed', { id, err });
       await svc.recordAgentRuntime?.('runtime.spawn_failed', {
@@ -591,7 +606,7 @@ export function createWorkspaceRoutes(
         resumeId: record.resumeId,
         agent: adapter.id,
         sessionRecordId: record.id,
-        surface: 'terminal',
+        surface: opts.surface ?? 'terminal',
         cause: { kind: 'ui' },
         error: (err as Error).message,
       })
@@ -2002,6 +2017,7 @@ export function createWorkspaceRoutes(
   // Workspace template; the native Coding Agent remains the worker.
   // Body: { prompt, agent?, targetWsId?, template? }
   app.post('/quick-chat', async (c) => {
+    let surface: 'terminal' | 'webpi' | undefined;
     let prompt: string;
     let agentId: string | undefined;
     let credentialSource: 'native' | undefined;
@@ -2013,6 +2029,8 @@ export function createWorkspaceRoutes(
     try {
       const body = await safeJson(c);
       const fields = body && typeof body === 'object' ? (body as Record<string, unknown>) : {};
+      if (fields['surface'] !== undefined && fields['surface'] !== 'terminal' && fields['surface'] !== 'webpi') return c.json({ error: 'invalid_surface' }, 400);
+      surface = fields['surface'] as typeof surface;
       const seed = parseSeedPrompt(fields['prompt']);
       if (seed === null) return c.json({ error: 'prompt_required' }, 400);
       if ('error' in seed) return c.json(seed, 400);
@@ -2139,6 +2157,7 @@ export function createWorkspaceRoutes(
     }
 
     const spawn = await spawnInteractiveSession(meta, {
+      surface,
       ...(agentId !== undefined ? { agentId } : {}),
       ...(credentialSource !== undefined ? { credentialSource } : {}),
       ...(credentialSlug !== undefined ? { credentialSlug } : {}),

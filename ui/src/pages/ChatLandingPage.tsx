@@ -348,7 +348,10 @@ export function HarnessLandingPage({
     managedWorkspaceLaunch: mode === 'chat' && credentialWorkspace !== null && credentialWorkspace !== undefined,
   })
   const effectiveAgent = launchConfig.effectiveAgent
+  const [uiMode, setUiMode] = useState<'terminal' | 'webpi'>('terminal')
   const selectedInfo = launchConfig.selectedAgent
+  const supportsGui = Boolean(selectedInfo?.capabilities.web?.freshSession)
+  const surface = supportsGui ? uiMode : 'terminal'
   const installHint = selectedInfo ? installHintFor(selectedInfo.id) : undefined
   const exampleGroups = mode === 'chat'
     ? chatLandingExampleGroups((key) => t(key as never), project?.product)
@@ -411,6 +414,7 @@ export function HarnessLandingPage({
         launchConfig.launchModel,
         launchConfig.launchReasoningEffort,
         launchConfig.accessMode === 'native' ? 'native' : undefined,
+        surface,
       )
       void recordSuccessfulUse(effectiveAgent).catch(() => undefined)
       if (mode === 'chat') launchPreferences.adoptRecentChatWorkspace(workspaceId)
@@ -569,6 +573,19 @@ export function HarnessLandingPage({
                 menuPlacement="up"
                 toolbar
               />
+              <DropdownMenu>
+                <DropdownMenuTrigger render={<Button variant="ghost" size="sm" aria-label={`${t('chatLanding.uiMode')}: ${surface === 'webpi' ? 'GUI' : 'TUI'}`} disabled={launching} />}>
+                  <LayoutGrid size={14} aria-hidden />
+                  <span>{surface === 'webpi' ? 'GUI' : 'TUI'}</span><ChevronDown size={14} aria-hidden />
+                </DropdownMenuTrigger>
+                <DropdownMenuContent side="top" align="start">
+                  <DropdownMenuRadioGroup value={surface} onValueChange={value => setUiMode(value as 'terminal' | 'webpi')}>
+                    <DropdownMenuRadioItem value="terminal" closeOnClick>TUI</DropdownMenuRadioItem>
+                    <DropdownMenuRadioItem value="webpi" disabled={!supportsGui} closeOnClick>GUI</DropdownMenuRadioItem>
+                  </DropdownMenuRadioGroup>
+                </DropdownMenuContent>
+              </DropdownMenu>
+
             </>}
             controls={<>
                   <AgentLaunchSelectors

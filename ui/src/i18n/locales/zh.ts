@@ -1423,6 +1423,7 @@ export const zh: Resources = {
     resumeError: '无法恢复这段主管对话。',
   },
   chatLanding: {
+    uiMode: 'UI 模式',
     heading: '先让 Alice 处理什么？',
     subheading: '在选定的 Workspace 中开展研究、分析和交易工作。',
     targetHeading: '在此工作区中新建对话',

@@ -1425,6 +1425,7 @@ export const ja: Resources = {
     resumeError: 'この管理者会話を再開できませんでした。',
   },
   chatLanding: {
+    uiMode: 'UI モード',
     heading: 'Alice に何を任せますか？',
     subheading: '選択した Workspace で調査、分析、取引を進めます。',
     targetHeading: 'このワークスペースで新規セッション',

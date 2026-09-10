@@ -1323,6 +1323,7 @@ export const workspacesHandlers = [
   // is multi-runtime.
   http.post('/api/workspaces/quick-chat', async ({ request }) => {
     const body = (await request.json().catch(() => null)) as {
+      surface?: unknown
       prompt?: unknown
       agent?: unknown
       targetWsId?: unknown
@@ -1355,7 +1356,8 @@ export const workspacesHandlers = [
     const prefix = ({ claude: 'c', codex: 'x', grok: 'g', omp: 'om', opencode: 'o', pi: 'p' } as Record<string, string>)[agent]
       ?? agent.slice(0, 1)
     const name = `${prefix}${ws.sessions.filter((session) => session.agent === agent).length + 1}`
-    const surface = agent in demoWebCapabilities ? 'webpi' as const : 'terminal' as const
+    if (body?.surface === 'webpi' && !(agent in demoWebCapabilities)) return HttpResponse.json({ error: 'unsupported_surface' }, { status: 400 })
+    const surface = body?.surface === 'terminal' ? 'terminal' as const : agent in demoWebCapabilities ? 'webpi' as const : 'terminal' as const
     const record: SessionRecord = {
       id: sessionId,
       wsId: ws.id,
