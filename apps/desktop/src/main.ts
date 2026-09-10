@@ -59,6 +59,7 @@ import { existingOwnerSmokeMode, resolveExistingOwnerStartup } from './existing-
 import { inspectPreviousUpdateAttempt, recordUpdateAttempt } from './update-attempt.js'
 import { childIsRunning, stopChild } from './child-shutdown.js'
 import { exitDesktopProcess } from './app-exit.js'
+import { configureWindowChrome, windowChromeOptions } from './window-chrome.js'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = dirname(__filename)
@@ -1007,10 +1008,7 @@ app.whenReady().then(async () => {
     width: 1280,
     height: 800,
     title: 'OpenAlice',
-    ...(process.platform === 'darwin' ? {
-      titleBarStyle: 'hidden' as const,
-      trafficLightPosition: { x: 16, y: 15 },
-    } : {}),
+    ...windowChromeOptions(),
     webPreferences: {
       preload: resolve(__dirname, 'preload.js'),
       contextIsolation: true,
@@ -1021,6 +1019,7 @@ app.whenReady().then(async () => {
       sandbox: false,
     },
   })
+  configureWindowChrome(win)
   win.webContents.on('preload-error', (_event, preloadPath, error) => {
     console.error(`[guardian] renderer preload failed path=${preloadPath}: ${error.message}`)
   })

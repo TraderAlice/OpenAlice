@@ -69,7 +69,20 @@ native-control space; its compact width is 88px. Below 768px the mobile context
 bar reserves that same left inset, and the navigation drawer reserves 44px at
 the top. Header whitespace is draggable; controls remain interactive. The
 preload's read-only `windowChrome.platform` selects this shell treatment.
-Browser and other desktop platforms retain their existing window chrome.
+Windows Electron uses native Window Controls Overlay in the same 44px header
+band. `useWindowsChrome` measures the shared page, navigation, work-panel and
+banner rows against the overlay's reported CSS-pixel rectangle; only rows
+intersecting native controls reserve horizontal space. Geometry changes cover
+resize, display scaling, maximization and fullscreen, without imitating native
+caption buttons or Snap Layouts. Very narrow split toolbars move below the
+caption band instead of overflowing into its controls. Loading and disconnected
+screens retain a draggable caption region without mounting the authenticated
+App. App palette/surface colors update the native
+overlay through a validated color-only preload bridge. Edge drawers reserve
+the caption band's height, and header controls remain non-draggable.
+Browser and Linux retain their existing window chrome. Windows native visual
+and Snap/high-DPI acceptance requires a Windows runtime; Mac geometry tests
+and browser layout checks do not replace that gate.
 
 The activity rail's utility items, groups, and visibility are user-arranged from
 Settings → Activity bar and stored in `data/ui-layout.json`. The three Harnesses
