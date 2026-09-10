@@ -63,9 +63,13 @@ export async function probeAnthropic(input: ClaudeProbeInput): Promise<ProbeResu
   // `authToken` makes the SDK send `Authorization: Bearer`; `apiKey` makes it
   // send `x-api-key`. Pick exactly one — sending both can trip gateways that
   // reject ambiguous auth, and Anthropic's own API now 401s OAuth-via-Bearer.
+  // The SDK silently falls back to the ambient ANTHROPIC_API_KEY /
+  // ANTHROPIC_AUTH_TOKEN env vars when the matching option is `undefined`, so
+  // pin the unused credential to `null` (null skips the env fallback) to keep
+  // the wire carrying the configured key only.
   const client = input.authMode === 'bearer'
-    ? new Anthropic({ authToken: input.apiKey, baseURL: input.baseUrl, timeout: PROBE_TIMEOUT_MS, maxRetries: 0 })
-    : new Anthropic({ apiKey: input.apiKey, baseURL: input.baseUrl, timeout: PROBE_TIMEOUT_MS, maxRetries: 0 });
+    ? new Anthropic({ authToken: input.apiKey, apiKey: null, baseURL: input.baseUrl, timeout: PROBE_TIMEOUT_MS, maxRetries: 0 })
+    : new Anthropic({ apiKey: input.apiKey, authToken: null, baseURL: input.baseUrl, timeout: PROBE_TIMEOUT_MS, maxRetries: 0 });
 
   const extract = (msg: Anthropic.Message): string => msg.content
     .filter((b): b is Anthropic.TextBlock => b.type === 'text')
