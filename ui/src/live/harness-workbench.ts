@@ -1,6 +1,7 @@
+import type { MarketReference } from '@traderalice/connector-protocol'
 import { create } from 'zustand'
 
-export type WorkTab = { id: string; kind: 'files' | 'studio' | 'browser'; title?: string } | { id: string; kind: 'file'; path: string; revision?: number }
+export type WorkTab = ({ id: string; kind: 'market' } & MarketReference) | { id: string; kind: 'files' | 'studio' | 'browser'; title?: string } | { id: string; kind: 'file'; path: string; revision?: number }
 export interface WorkbenchState {
   tabs: WorkTab[]
   active: string | null

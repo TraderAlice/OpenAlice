@@ -29,7 +29,8 @@ sources for the same asset remain separate barIds.
 For custom processing, `alice market bars ... --output bars.json` returns raw
 OHLCV and metadata for local scripts. The calculator is an optional shortcut.
 
-Vendor barIds (`yfinance|…`, `fmp|…`) need `asset=`; broker barIds infer it.
+Vendor barIds infer the asset class from an exact catalog match. If lookup is
+unavailable or ambiguous, the calculator accepts an explicit `asset=` hint.
 Keyless exchange data sources such as `binance-readonly` are opt-in in
 Trading settings, so do not assume they exist before `search-bars` returns them.
 
@@ -51,8 +52,8 @@ sma(s.close, 50) - sma(s.close, 200)        # +ve = 50 above 200 (uptrend)
 **`bars(barId, interval, count=, asOf=, start=, end=, asset=)`**
 - `barId`: `"{source}|{symbol}"` from search-bars. Broker (`alpaca-paper|AAPL`)
   or opt-in keyless exchange data (`binance-readonly|BTC/USDT`) needs NO
-  `asset=`; vendor (`yfinance|AAPL`, `fmp|AAPL`) needs
-  `asset="equity"|"crypto"|"currency"|"commodity"`.
+  `asset=`. Vendor sources resolve exact catalog matches; pass
+  `asset="equity"|"crypto"|"currency"|"commodity"` when an explicit hint is needed.
 - `interval`: `1m 5m 15m 30m 1h 4h 1d 1w`.
 - Window: `count=N` (most-recent N bars — the natural window for indicators), OR
   `start=/end=` (YYYY-MM-DD date range), OR `end=+count=` (point-in-time backtest).
@@ -151,10 +152,19 @@ supported here).
 
 - Indicators return the latest **scalar** — never `[-1]` them; only raw columns
   are series.
-- Vendor barIds need `asset=`; broker barIds infer it.
+- Ambiguous or unavailable vendor catalog lookups need an explicit `asset=`.
 - **Source freshness:** `yfinance`/`fmp` are delayed (yfinance EOD can lag a day
   or two). Prefer a broker barId for anything you trade or anything time-sensitive.
 - No conditionals/booleans (no `if`, no crossover operator) — compute the parts
   and compare in your own reasoning, or return them in a panel.
 - For arbitrary/looping logic beyond these primitives, spawn a separate
   Auto-Quant workspace, not this tool.
+
+## Show a K-line in chat
+
+Use `[[market/{barId}/{interval}]]` in reply prose, for example
+`[[market/yfinance|AAPL/1d]]`. Copy the exact barId from `alice market search-bars`;
+do not guess or rewrite its native symbol. This loads the latest 300 bars.
+GUI opens an interactive chart in the right panel; attachment-capable Connectors
+send a chart image in that position. Code examples stay literal. Unsupported
+sources or intervals report a failure rather than switching feeds.

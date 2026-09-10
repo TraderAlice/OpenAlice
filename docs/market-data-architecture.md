@@ -257,3 +257,29 @@ incomplete rows until this boundary so a missing latest close is observable.
 The chart displays exclusions separately from freshness; neither CLI nor UI
 substitutes a quote or switches sources to manufacture a complete candle.
 Diagnostics describe rows reaching the bar service, not invisible upstream gaps.
+
+## Market references in replies
+
+`[[market/{barId}/{interval}]]` is a reserved Connector Protocol reference,
+separate from files and Tracked entities. The last slash delimits the interval;
+native broker keys may themselves contain slashes, pipes and colons. Supported
+intervals match BarService, and consumers request the latest 300 bars.
+
+Vendor calls without an asset-class hint resolve an exact catalog identity.
+Lookup can broaden a normalized pair/secid into a base query, but never the
+result identity. Ambiguous/unavailable catalogs fail with guidance to pass an
+explicit hint; there is no equity default or provider substitution. Broker
+identities retain their existing UTA routing.
+
+`/cli/market-reference` exposes only the registered read-only getMarketBars
+operation on the local tool gateway. Connector owns the portable PNG renderer;
+it does not read Workspace files to obtain market data. Snapshots include the
+source, interval, returned window, last bar and fetched timestamp, and qualify
+possible delay. Snapshot age is not measured feed latency.
+
+Acceptance (2026-09-11): full hermetic suite 792 files / 6,988 passed / 4 skipped;
+root, UI, Connector and protocol typechecks; bundled Connector startup smoke;
+real CLI AAPL bars; real GUI streamed card, history reopen, interval tab dedup,
+390px layout; real Yahoo equity/crypto/currency/commodity reads and inspected
+PNG. Connector ordering/failure tests passed; no new live Telegram delivery
+or real trading write was performed in this acceptance.

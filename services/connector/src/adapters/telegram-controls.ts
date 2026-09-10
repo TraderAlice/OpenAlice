@@ -1,4 +1,4 @@
-import { inboxFiles, parseContentReferences } from '@traderalice/connector-protocol'
+import { inboxFiles, parseContentReferences, isFileReference } from '@traderalice/connector-protocol'
 import { TELEGRAM_PLAIN_TEXT_MAX } from '@traderalice/connector-protocol'
 import type { InboxEntry } from '@/core/inbox-store.js'
 
@@ -113,7 +113,7 @@ export function inboxFileDisplayName(path: string): string {
 
 function inboxProse(body: string): string {
   let result = body
-  for (const ref of parseContentReferences(body).references.reverse()) result = result.slice(0, ref.start) + result.slice(ref.end)
+  for (const ref of parseContentReferences(body).references.filter(ref => isFileReference(ref.path)).reverse()) result = result.slice(0, ref.start) + result.slice(ref.end)
   return result.trim()
 }
 

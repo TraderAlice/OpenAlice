@@ -1,3 +1,4 @@
+import { fetchMarketChart } from './core/market-chart.js'
 import { fetchWorkspaceAttachment } from './core/workspace-files.js'
 /**
  * OpenAlice Connector Service.
@@ -54,6 +55,7 @@ export async function startConnectorService(): Promise<void> {
     startedAt,
     recorder: journal,
     readWorkspaceFile: fetchWorkspaceAttachment,
+    renderMarket: fetchMarketChart,
     updateAdapterSettings: (id, patch) => configStore.patchAdapter(id, patch),
   })
   // Install before opening the loopback port so health can say `starting`

@@ -1,3 +1,6 @@
+import { useMarketBars } from '../../hooks/useMarketBars'
+import { Button } from '../ui/button'
+import { MARKET_INTERVALS, MARKET_REFERENCE_COUNT, type MarketInterval } from '@traderalice/connector-protocol'
 import { BarFreshness } from './BarFreshness'
 import { WatchlistButton } from './WatchlistButton'
 import { useEffect, useMemo, useRef, useState } from 'react'
@@ -18,23 +21,23 @@ import { useEffectivePalette, useEffectiveTheme } from '../../theme/useEffective
 import { Skeleton } from '../StateViews'
 import { SegmentedControl } from '../SegmentedControl'
 
-export type KlineInterval = '1m' | '5m' | '1h' | '1d'
+export type KlineInterval = MarketInterval
 export type KlineTimeframe = '1D' | '5D' | '1M' | '3M' | '1Y' | '5Y' | 'All'
 
-const INTERVALS: KlineInterval[] = ['1m', '5m', '1h', '1d']
+const INTERVALS = MARKET_INTERVALS
 const TIMEFRAMES: KlineTimeframe[] = ['1D', '5D', '1M', '3M', '1Y', '5Y', 'All']
 const DEFAULT_INTERVAL: KlineInterval = '1d'
 const DEFAULT_RANGE: KlineTimeframe = '1Y'
 
 function parseInterval(s: string | null): KlineInterval {
-  return (INTERVALS as string[]).includes(s ?? '') ? (s as KlineInterval) : DEFAULT_INTERVAL
+  return (INTERVALS as readonly string[]).includes(s ?? '') ? (s as KlineInterval) : DEFAULT_INTERVAL
 }
 
 function parseTimeframe(s: string | null): KlineTimeframe {
   return (TIMEFRAMES as string[]).includes(s ?? '') ? (s as KlineTimeframe) : DEFAULT_RANGE
 }
 
-const INTRADAY: ReadonlySet<KlineInterval> = new Set(['1m', '5m', '1h'])
+const INTRADAY: ReadonlySet<KlineInterval> = new Set(['1m', '5m', '15m', '30m', '1h', '4h'])
 
 function daysForTimeframe(tf: KlineTimeframe): number | null {
   switch (tf) {
@@ -77,17 +80,21 @@ interface Props {
    * history.replaceState, which intentionally does not notify the router. */
   source?: string
   displayTitle?: string
+  embeddedInterval?: MarketInterval
+  onEmbeddedIntervalChange?: (interval: MarketInterval) => void
   /** Read-only mirror of the displayed series for sibling analysis panels.
    *  This avoids a second bar request on bespoke detail pages. */
   onSnapshot?: (snapshot: KlineSnapshot) => void
 }
 
-export function KlinePanel({ selection, source, onSnapshot, displayTitle }: Props) {
+export function KlinePanel({ selection, source, onSnapshot, displayTitle, embeddedInterval, onEmbeddedIntervalChange }: Props) {
   const effectiveTheme = useEffectiveTheme()
   const effectivePalette = useEffectivePalette()
   const [searchParams] = useSearchParams()
   const navigate = useNavigate()
-  const interval = parseInterval(searchParams.get('interval'))
+  const [localInterval, setLocalInterval] = useState(embeddedInterval ?? DEFAULT_INTERVAL)
+  const embedded = embeddedInterval !== undefined
+  const interval = embedded ? localInterval : parseInterval(searchParams.get('interval'))
   const tf = parseTimeframe(searchParams.get('range'))
   // The provider picked at search time (a barId), if any — opens the chart on
   // it. Unlike interval/range, source comes from the focused tab spec. Router
@@ -109,6 +116,7 @@ export function KlinePanel({ selection, source, onSnapshot, displayTitle }: Prop
     navigate({ pathname: `/market/${selection.assetClass}/${encodeURIComponent(selection.symbol)}`, search: next.toString() }, { replace: true })
   }
   const selectInterval = (iv: KlineInterval) => {
+    if (embedded) { if (onEmbeddedIntervalChange) onEmbeddedIntervalChange(iv); else setLocalInterval(iv); return }
     updateChartQuery((next) => {
       if (iv === DEFAULT_INTERVAL) next.delete('interval')
       else next.set('interval', iv)
@@ -124,14 +132,22 @@ export function KlinePanel({ selection, source, onSnapshot, displayTitle }: Prop
     })
   }
 
-  const [bars, setBars] = useState<HistoricalBar[] | null>(null)
-  const [meta, setMeta] = useState<BarMeta | null>(null)
   const [candidates, setCandidates] = useState<BarSourceCandidate[]>([])
   // null = vendor default for this symbol; a barId = an explicitly-picked source.
   // Seed from the focused tab so the first fetch is right (no vendor flicker).
   const [selectedBarId, setSelectedBarId] = useState<string | null>(requestedBarId)
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+  const query = useMemo(() => {
+    if (!selectedBarId && (!selectionSymbol || !selectionAssetClass)) return null
+    const params: Parameters<typeof barsApi.bars>[0] = { interval }
+    if (selectedBarId) params.barId = selectedBarId
+    else params.symbol = selectionSymbol!
+    if (selectionAssetClass) params.assetClass = selectionAssetClass
+    const days = daysForTimeframe(tf)
+    if (embedded) params.count = MARKET_REFERENCE_COUNT
+    else if (days != null) params.start = startDateFromToday(days)
+    return params
+  }, [selectedBarId, selectionSymbol, selectionAssetClass, interval, tf, embedded])
+  const { bars, meta, loading, error, retry } = useMarketBars(query)
 
   useEffect(() => {
     onSnapshot?.({ bars, meta, loading, error, interval, timeframe: tf })
@@ -141,15 +157,6 @@ export function KlinePanel({ selection, source, onSnapshot, displayTitle }: Prop
   const chartRef = useRef<IChartApi | null>(null)
   const candleRef = useRef<ISeriesApi<'Candlestick'> | null>(null)
   const volumeRef = useRef<ISeriesApi<'Histogram'> | null>(null)
-
-  // A focused market tab can change identity without remounting this panel.
-  // Never let the previous pair's last close leak into sibling analytics while
-  // the new source is loading.
-  useEffect(() => {
-    setBars(null)
-    setMeta(null)
-    setError(null)
-  }, [selectionSymbol, selectionAssetClass, requestedBarId])
 
   // Canvas renderers cannot resolve CSS variables themselves. Rebuild on a
   // concrete theme change and read the same semantic card used by DOM/SVG UI.
@@ -231,52 +238,6 @@ export function KlinePanel({ selection, source, onSnapshot, displayTitle }: Prop
     return () => { cancelled = true }
   }, [selectionSymbol, selectionAssetClass, requestedBarId])
 
-  // Fetch bars: an explicitly-picked source (barId) or the vendor default
-  // (symbol+assetClass). Re-polls so a long-open tab doesn't show stale bars.
-  useEffect(() => {
-    if (!selectionSymbol || !selectionAssetClass) { setBars(null); setMeta(null); setError(null); return }
-    let cancelled = false
-    const run = (isInitial: boolean) => {
-      if (isInitial) setLoading(true)
-      setError(null)
-      const days = daysForTimeframe(tf)
-      const params: Parameters<typeof barsApi.bars>[0] = { interval }
-      // Vendor barIds share the same `{source}|{nativeSymbol}` shape as UTA
-      // aliceIds, so the server needs the selected asset class to distinguish
-      // which vendor client owns the native symbol. UTA sources safely ignore
-      // this extra routing hint.
-      if (selectedBarId) {
-        params.barId = selectedBarId
-        params.assetClass = selectionAssetClass
-      }
-      else { params.symbol = selectionSymbol; params.assetClass = selectionAssetClass }
-      if (days != null) params.start = startDateFromToday(days)
-
-      barsApi.bars(params)
-        .then((res) => {
-          if (cancelled) return
-          if (res.error || !res.results) {
-            setError(res.error ?? 'No data returned.'); setBars(null); setMeta(null)
-          } else if (res.results.length === 0) {
-            setError('No bars in this range.'); setBars([]); setMeta(res.meta)
-          } else {
-            setBars(res.results); setMeta(res.meta)
-          }
-        })
-        .catch((e) => {
-          if (cancelled) return
-          setError(e instanceof Error ? e.message : String(e)); setBars(null); setMeta(null)
-        })
-        .finally(() => { if (!cancelled && isInitial) setLoading(false) })
-    }
-    run(true)
-    // 60s for intraday intervals (1m/5m/1h) because each tick is a fresh bar;
-    // 5min for daily because a refresh within a single day is cosmetic.
-    const pollMs = INTRADAY.has(interval) ? 60_000 : 300_000
-    const timer = setInterval(() => run(false), pollMs)
-    return () => { cancelled = true; clearInterval(timer) }
-  }, [selectionSymbol, selectionAssetClass, selectedBarId, interval, tf])
-
   // Push bars into chart and fit.
   useEffect(() => {
     if (!candleRef.current || !volumeRef.current || !chartRef.current) return
@@ -349,7 +310,7 @@ export function KlinePanel({ selection, source, onSnapshot, displayTitle }: Prop
           {meta.quality.latestExcludedRecordAt && ` Latest: ${meta.quality.latestExcludedRecordAt} (${meta.quality.latestExcludedFields.join(', ')} missing or invalid).`}
         </p>}
         <div className="flex items-center gap-x-5 gap-y-2 flex-wrap">
-          {sourceOptions.length > 1 && (
+          {!embedded && sourceOptions.length > 1 && (
             <label className="flex items-center gap-2">
               <span className="text-[11px] font-medium text-muted-foreground/70">Source</span>
               <select
@@ -379,7 +340,7 @@ export function KlinePanel({ selection, source, onSnapshot, displayTitle }: Prop
               compact
             />
           </div>
-          <div
+          {!embedded && <div
             className="flex items-center gap-2"
             title="How far back to load history"
           >
@@ -391,28 +352,30 @@ export function KlinePanel({ selection, source, onSnapshot, displayTitle }: Prop
               ariaLabel="Range"
               compact
             />
-          </div>
+          </div>}
+          {embedded && <span className="text-xs text-muted-foreground">Latest {MARKET_REFERENCE_COUNT} bars</span>}
         </div>
       </div>
 
       <div className="oa-data-surface relative min-h-0 flex-1 overflow-hidden rounded-lg border">
         <div ref={containerRef} className="absolute inset-0" />
-        {!selection && (
+        {!selection && !requestedBarId && (
           <div className="absolute inset-0 flex items-center justify-center text-[13px] leading-5 text-muted-foreground">
             Pick an asset to see the K-line.
           </div>
         )}
-        {selection && loading && !bars && (
+        {(selection || requestedBarId) && loading && !bars && (
           <div className="absolute inset-0 p-2" aria-hidden="true">
             <Skeleton className="w-full h-full rounded" />
           </div>
         )}
-        {selection && loading && (
+        {(selection || requestedBarId) && loading && (
           <div className="absolute top-2 right-2 text-[11px] text-muted-foreground">Loading…</div>
         )}
-        {selection && error && !loading && (
-          <div className="absolute inset-0 flex items-center justify-center text-[13px] leading-5 text-muted-foreground px-8 text-center">
+        {(selection || requestedBarId) && error && !loading && (
+          <div className="absolute inset-0 flex items-center justify-center flex-col gap-3 text-[13px] leading-5 text-muted-foreground px-8 text-center">
             {error}
+            <Button variant="outline" size="sm" onClick={retry}>Retry</Button>
           </div>
         )}
       </div>
