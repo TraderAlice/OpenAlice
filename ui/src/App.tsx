@@ -80,6 +80,7 @@ function AppShell() {
 }
 
 function AppShellContent() {
+  const macDesktop = window.openAlice?.windowChrome?.platform === 'darwin'
   // Re-render the shell on a language switch so formatter-only subtrees
   // (charts, money/date labels that don't call t()) refresh too.
   useLocale()
@@ -108,6 +109,7 @@ function AppShellContent() {
 
   const mainContent = (
     <main className="flex flex-col min-w-0 min-h-0 bg-background h-full">
+      {macDesktop && <UpdateBanner />}
       {/* Mobile header — visible only below md */}
       <MobileContextBar
         railOpen={sidebarOpen}
@@ -124,10 +126,10 @@ function AppShellContent() {
   )
 
   return (
-    <div className="flex flex-col h-full">
+    <div className={`flex flex-col h-full ${macDesktop ? 'oa-desktop-mac' : ''}`}>
       {import.meta.env.VITE_DEMO_MODE && <DemoBanner />}
       {import.meta.env.VITE_DEMO_MODE && <DemoAnalytics />}
-      <UpdateBanner />
+      {!macDesktop && <UpdateBanner />}
       <DesktopUpdatePrompt />
       <div className="flex flex-1 min-h-0">
         <ActivityBar

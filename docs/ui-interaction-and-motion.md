@@ -63,6 +63,14 @@ The stable page hierarchy is:
 3. one focused working view;
 4. dialogs, drawers, and popovers for temporary decisions.
 
+On macOS Electron, native traffic lights share a 44px row with the primary
+navigation and page title. The desktop rail header replaces the wordmark with
+native-control space; its compact width is 88px. Below 768px the mobile context
+bar reserves that same left inset, and the navigation drawer reserves 44px at
+the top. Header whitespace is draggable; controls remain interactive. The
+preload's read-only `windowChrome.platform` selects this shell treatment.
+Browser and other desktop platforms retain their existing window chrome.
+
 The activity rail's utility items, groups, and visibility are user-arranged from
 Settings → Activity bar and stored in `data/ui-layout.json`. The three Harnesses
 are a fixed work section below those utilities; their visibility follows the
