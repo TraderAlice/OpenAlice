@@ -1,7 +1,9 @@
 import { workspaceContentHref } from '../components/workspace/api'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { parseContentReferences } from '@traderalice/connector-protocol'
 import type { ConversationItem } from '../components/conversation/types'
+
+const isImage = (path: string) => /\.(png|jpe?g|webp|gif)$/i.test(path)
 
 export function conversationReferences(items: readonly ConversationItem[]) {
   return items.flatMap(item => item.kind === 'assistant-turn'
@@ -14,6 +16,8 @@ export function conversationReferences(items: readonly ConversationItem[]) {
 export function useConversationFiles(wsId: string, items: readonly ConversationItem[], ready: boolean, open: (path: string) => void) {
   const references = useMemo(() => conversationReferences(items), [items])
   const signature = JSON.stringify(references)
+  const [imagePreview, setImagePreview] = useState<{ path: string; href: string } | null>(null)
+  const closeImage = useCallback(() => setImagePreview(null), [])
   const baseline = useRef(false)
   const consumed = useRef(new Set<string>())
   const [fileHrefs, setFileHrefs] = useState<Record<string, string>>({})
@@ -45,7 +49,7 @@ export function useConversationFiles(wsId: string, items: readonly ConversationI
       for (const ref of refs) {
         if (!hrefs[ref.path] || consumed.current.has(ref.key)) continue
         consumed.current.add(ref.key)
-        if (!ref.path.startsWith('sticker/')) open(ref.path)
+        if (!isImage(ref.path) && !ref.path.startsWith('sticker/')) open(ref.path)
       }
       // A reference can precede its tool's file write. Retry without a render loop.
       if (available.some(entry => entry === null) && ++attempts < 30) timer = setTimeout(() => void resolve(), 2000)
@@ -53,5 +57,10 @@ export function useConversationFiles(wsId: string, items: readonly ConversationI
     void resolve()
     return () => { cancelled = true; controller.abort(); clearTimeout(timer) }
   }, [wsId, signature, ready, open])
-  return { fileHrefs, onFileReference: open }
+  const onFileReference = useCallback((path: string) => {
+    if (isImage(path)) {
+      if (fileHrefs[path]) setImagePreview({ path, href: fileHrefs[path] })
+    } else open(path)
+  }, [fileHrefs, open])
+  return { fileHrefs, onFileReference, imagePreview, closeImage }
 }

@@ -182,7 +182,9 @@ briefly so a reference can precede a file write.
 The shared conversation renderer receives resolved hrefs and a click callback.
 Images/stickers stay in prose order; file cards open the existing workbench.
 New references automatically open a file tab once per turn/path, except
-`sticker/` references, which stay inline. The initial snapshot never opens
+images and `sticker/` references, which stay inline. Clicking an image opens
+the shared Dialog for a viewport-bounded preview; image loading never opens
+either a dialog or a workbench tab. The initial snapshot never opens
 historical references. Unmounting cancels resolution and pending opens. The
 consumer does not require a runtime-specific final channel or interpret
 Connector automation silence markers.
