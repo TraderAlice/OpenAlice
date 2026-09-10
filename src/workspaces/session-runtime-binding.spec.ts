@@ -19,6 +19,7 @@ import { ompAdapter } from './adapters/omp.js'
 import { opencodeAdapter } from './adapters/opencode.js'
 import { piAdapter } from './adapters/pi.js'
 import {
+  mergeSessionRuntimeSelection,
   createNativeSessionRuntimeBinding,
   createSessionRuntimeBinding,
   resolveSessionRuntimeBinding,
@@ -391,5 +392,20 @@ describe('built-in Agent Session runtime projection', () => {
       expect(args).not.toContain('--setting-sources=project')
       expect(args).not.toContain('--plugin-dir')
     }
+  })
+})
+
+
+describe('Session follow-up selection', () => {
+  const binding = { version: 1 as const, credential: { source: 'vault' as const, credentialSlug: 'a' }, model: 'model-a', reasoningEffort: 'medium' as const }
+  it('retains the Session selection on partial edits', () => {
+    expect(mergeSessionRuntimeSelection(binding, { reasoningEffort: 'high' })).toEqual({ credentialSlug: 'a', model: 'model-a', reasoningEffort: 'high' })
+  })
+  it('does not transfer the old model to a different credential', () => {
+    expect(mergeSessionRuntimeSelection(binding, { credentialSlug: 'b' })).toEqual({ credentialSlug: 'b' })
+    expect(mergeSessionRuntimeSelection(binding, { credentialSource: 'native' })).toEqual({ credentialSource: 'native' })
+  })
+  it('keeps model choices when explicitly supplied with a new credential', () => {
+    expect(mergeSessionRuntimeSelection(binding, { credentialSource: 'native', model: 'new' })).toEqual({ credentialSource: 'native', model: 'new' })
   })
 })

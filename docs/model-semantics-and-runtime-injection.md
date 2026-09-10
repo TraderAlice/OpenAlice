@@ -585,3 +585,16 @@ namespaces that many remote containers cannot create.
 Do not implement this by rewriting global user configuration. Native runtime
 enterprise policies and OS permissions remain authoritative. UTA still owns
 trading permissions; these launch settings do not change its trading mode.
+
+
+### CLI conversation selection
+
+`conversation create` accepts credential/model/effort overrides for a new
+Session; `conversation ask` accepts the same optional dimensions for an idle
+existing Session. Credential is a vault slug or explicit native access, never
+secret material. Follow-up edits patch the stored binding under the headless
+execution claim and do not consult Workspace defaults. Changing credential
+clears inherited model/effort; omitted fields otherwise retain the Session's
+selection. Runtime identity remains fixed. Web paused-Session editing and CLI
+selection both resolve through `createSessionRuntimeBinding` and persist via
+`replaceRuntimeBinding`.

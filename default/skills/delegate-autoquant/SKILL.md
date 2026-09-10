@@ -35,7 +35,7 @@ correct handoff.
 Use the `alice` collaboration surface:
 
 ```bash
-alice conversation ask --harness autoquant --await --prompt '
+alice conversation create --harness autoquant --await --prompt '
 Research question: <question>
 Decision this supports: <decision>
 Caller-owned scope and constraints: <assets, direction, horizon, cadence, benchmark, costs, limits>

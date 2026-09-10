@@ -359,7 +359,7 @@ export function createWorkspaceConversationControl(
             undefined,
             continuingOrigin?.resumeId,
             inquiry,
-            undefined,
+            input.selection,
             conversation,
             createdBy,
           )
@@ -371,7 +371,7 @@ export function createWorkspaceConversationControl(
             undefined,
             continuingOrigin?.resumeId,
             undefined,
-            undefined,
+            input.selection,
             conversation,
             createdBy,
           )

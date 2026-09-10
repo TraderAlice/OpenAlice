@@ -319,6 +319,7 @@ describe('Workspace conversation control', () => {
     const result = await createWorkspaceConversationControl(svc).ask({
       target: { kind: 'issue', workspaceId: 'ws-peer', issueId: 'audit' },
       prompt: 'Why did you create this?',
+      selection: { model: 'custom-model', reasoningEffort: 'high' },
       timeoutMs: 300_000,
     })
 
@@ -334,7 +335,7 @@ describe('Workspace conversation control', () => {
       undefined,
       'resume-peer',
       undefined,
-      undefined,
+      { model: 'custom-model', reasoningEffort: 'high' },
       expect.objectContaining({
         originalPrompt: 'Why did you create this?',
         deliveredPrompt: 'Why did you create this?',
