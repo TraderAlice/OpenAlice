@@ -5,6 +5,8 @@ configuration, delivery guarantees, adapter extension, health, and packaging.
 It complements [[docs/workspace-issues-and-scheduling.md]] and
 [[docs/managed-workspace-runtime.md]].
 
+Inbox body and shared reference semantics live in [[docs/inbox-content.md]].
+
 ## Product Contract
 
 Connector Service projects durable OpenAlice Inbox entries into optional
@@ -191,6 +193,10 @@ Load-bearing paths:
   Settings surface.
 
 ## Reply attachments
+
+The Project-owned `file-delivery` Skill teaches this reply path separately from
+Inbox notifications and reports. It follows Alice Harness injection preferences
+and upgrades; optional sticker-pack guidance remains owned by the sticker pack.
 
 A final reply may include `[[reports/chart.png]]`. Paths are relative to
 its source Workspace. Ordinary `[[name]]` references remain text; inline/fenced

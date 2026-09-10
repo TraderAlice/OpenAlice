@@ -28,6 +28,10 @@ interface Window {
    * sync with apps/desktop/src/preload.ts; never expose raw ipcRenderer.
    */
   readonly openAlice?: {
+    readonly windowChrome?: {
+      readonly platform: string
+      setTheme?(theme: { color: string; symbolColor: string }): Promise<void>
+    }
     readonly runtime: {
       info(): Promise<{
         mode: 'electron-dev' | 'electron-packaged'

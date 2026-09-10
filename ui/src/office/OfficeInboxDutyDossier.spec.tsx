@@ -22,14 +22,15 @@ function duty(): OfficeInboxDutyCandidate {
       ts: NOW - 3_600_000,
       workspaceId: 'ws-semis',
       workspaceLabel: 'Semis desk',
-      docs: [
+      body: "[[reports/alpha/nvda-weekly-evidence.md]]\n\n[[reports/alpha/risk-register.csv]]\n\n[[reports/alpha/position-notes.txt]]\n\n[[reports/alpha/source-map.json]]\n\n[[reports/alpha/appendix.pdf]]\n\n[[reports/alpha/raw-observations.parquet]]",
+      fileRevisions: Object.fromEntries(([
         { path: 'reports/alpha/nvda-weekly-evidence.md', revision: 'sha256:abcdef123456' },
         { path: 'reports/alpha/risk-register.csv', revision: 'rev-risk-123456' },
         { path: 'reports/alpha/position-notes.txt' },
         { path: 'reports/alpha/source-map.json', revision: 'rev-map-123456' },
         { path: 'reports/alpha/appendix.pdf' },
         { path: 'reports/alpha/raw-observations.parquet' },
-      ],
+      ]).map(doc => [doc.path, doc.revision!]))
     },
   }], 'ready').candidates[0] as OfficeInboxDutyCandidate
 

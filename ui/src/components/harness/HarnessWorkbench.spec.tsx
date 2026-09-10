@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { beforeEach, afterEach, expect, it, vi } from 'vitest'
 import { HarnessWorkbench } from './HarnessWorkbench'
 import { useHarnessWorkbench as store } from '../../live/harness-workbench'
@@ -41,4 +41,14 @@ it('closes the addressed background tab without changing the selected document',
   fireEvent.click(screen.getByRole('button', { name: 'Close Files' }))
   expect(screen.getByRole('tab', { name: 'README.md' }).getAttribute('aria-selected')).toBe('true')
   expect(screen.queryByRole('tab', { name: 'Files' })).toBeNull()
+})
+
+it('reopening a file refreshes its preview without adding another tab', () => {
+  const tab = { kind: 'file' as const, id: 'file:report.md', path: 'report.md' }
+  store.getState().openTab('a', tab)
+  render(<HarnessWorkbench source="chat" spec={{ kind: 'workspace', params: { wsId: 'a' } }}>Conversation</HarnessWorkbench>)
+  const previous = screen.getByText('Document content')
+  act(() => store.getState().openTab('a', tab))
+  expect(screen.getByText('Document content')).not.toBe(previous)
+  expect(screen.getAllByRole('tab', { name: 'report.md' })).toHaveLength(1)
 })

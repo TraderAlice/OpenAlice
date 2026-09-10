@@ -232,10 +232,13 @@ describe('CLI gateway — inbox read (scoped, string-arg coercion)', () => {
     await inboxStore.append({
       workspaceId: 'ws1',
       workspaceLabel: 'demo',
-      comments: 'mine',
-      docs: [{ path: 'reports/mine.md' }],
+      body: "mine\n\n[[reports/mine.md]]"
     })
-    await inboxStore.append({ workspaceId: 'other', workspaceLabel: 'them', comments: 'theirs' })
+    await inboxStore.append({
+      workspaceId: 'other',
+      workspaceLabel: 'them',
+      body: 'theirs'
+    })
 
     const wtc = new WorkspaceToolCenter()
     wtc.register(inboxReadFactory)
@@ -281,7 +284,7 @@ describe('CLI gateway — inbox read (scoped, string-arg coercion)', () => {
     expect(payload.entries[0].mine).toBe(true)
     expect(payload.entries[0].files).toEqual([{
       relativePath: 'reports/mine.md',
-      absolutePath: resolve('/workspaces/ws1/reports/mine.md'),
+      absolutePath: null,
     }])
   })
 
@@ -345,7 +348,7 @@ describe('CLI gateway — agent-invisible origin (x-openalice-run → registry)'
     app.request(`/cli/ws1/${exportKey}/invoke`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', ...headers },
-      body: JSON.stringify({ tool: 'inbox_push', args: { comments: 'report' } }),
+      body: JSON.stringify({ tool: 'inbox_push', args: { body: 'report' } }),
     })
 
   it.each(['data', 'workspace'])('stamps registry origin through the %s export', async (exportKey) => {
@@ -421,7 +424,7 @@ describe('CLI gateway — agent-invisible origin (x-openalice-run → registry)'
     // The tool's input schema keys must be exactly the two content fields —
     // never a self-identity parameter.
     const keys = Object.keys(extractMcpShape(built))
-    expect(keys.sort()).toEqual(['comments', 'docs'])
+    expect(keys.sort()).toEqual(['body'])
     expect(keys).not.toContain('origin')
     expect(keys).not.toContain('runId')
     expect(keys).not.toContain('issueId')

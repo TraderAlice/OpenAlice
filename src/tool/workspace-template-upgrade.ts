@@ -1,8 +1,10 @@
 import { tool } from 'ai'
 import { z } from 'zod'
 
+import { ALICE_HARNESS_SKILLS } from '../workspaces/alice-harness-policy.js'
 import type { WorkspaceToolFactory } from '../core/workspace-tool-center.js'
 import type {
+  SkillProjectionRequest,
   TemplateUpgradeFilePlan,
   TemplateUpgradePlan,
   TemplateUpgradeResolution,
@@ -19,6 +21,10 @@ function fileSummary(file: TemplateUpgradeFilePlan, mode: OutputMode) {
     ...(file.note ? { note: file.note } : {}),
     ...(mode === 'detailed'
       ? {
+          basePreview: file.basePreview,
+          baseTruncated: file.baseTruncated,
+          mergedPreview: file.mergedPreview,
+          mergedTruncated: file.mergedTruncated,
           currentPreview: file.currentPreview,
           templatePreview: file.templatePreview,
           currentTruncated: file.currentTruncated,
@@ -65,7 +71,7 @@ function previewPayload(plan: TemplateUpgradePlan, mode: OutputMode, explicitTar
     nextCommand: plan.blocked || current || versionMismatch
       ? null
       : conflicts.length > 0
-        ? 'Resolve every conflict with repeatable --keep-workspace <path> or --use-template <path>, then add --apply.'
+        ? 'Run with --mode detailed to compare Base, Workspace and incoming content. Edit conflicting files to retain user intent and adopt current CLI instructions, then re-run the preview. Use --keep-workspace <path> for your resolved file or --use-template <path> to replace it; add --apply to finish.'
         : `alice ${plan.template === 'alice-harness' ? 'harness' : 'template'} upgrade${explicitTarget ? ` --id ${plan.workspaceId}` : ''} --apply`,
   }
 }
@@ -101,7 +107,8 @@ export const workspaceTemplateUpgradeFactory: WorkspaceToolFactory = {
         'With --apply it re-plans and submits the exact current plan through the launcher transaction.',
         'Omit --id for this Workspace, or pass a peer Workspace id when acting as an interactive manager.',
         'Research, reports, Issues, credentials, runtime state, and other user files are outside the managed set.',
-        'If conflicts exist, resolve every one with repeatable --keep-workspace <path> or --use-template <path>.',
+        'Non-overlapping text changes merge automatically with Git; the official source remains the next baseline.',
+        'If conflicts exist, inspect --mode detailed, edit the files to resolve them, then resolve every one with repeatable --keep-workspace <path> or --use-template <path>.',
       ].join('\n'),
       inputSchema: z.object({
         id: z.string().min(1).optional()
@@ -112,10 +119,12 @@ export const workspaceTemplateUpgradeFactory: WorkspaceToolFactory = {
           .describe('Conflict path to keep from the Workspace (repeatable; requires --apply).'),
         useTemplate: z.array(z.string().min(1)).optional()
           .describe('Conflict path to replace with the template copy (repeatable; requires --apply).'),
+        skill: z.enum(ALICE_HARNESS_SKILLS).optional().describe('Alice Harness only: scope the operation to this Skill.'),
+        action: z.enum(['install', 'update', 'remove', 'restore']).optional().describe('Requires --skill. Defaults to update; restore replaces local files with the Project copy.'),
         mode: z.enum(['summary', 'detailed']).optional().default('summary')
           .describe('Detailed includes conflict file previews; summary is the compact default.'),
       }),
-      execute: async ({ id, apply, keepWorkspace = [], useTemplate = [], mode }) => {
+      execute: async ({ id, apply, keepWorkspace = [], useTemplate = [], mode, skill, action }) => {
         const manager = ctx.templateUpgrades
         const workspaceId = id ?? ctx.workspaceId
         const explicitTarget = id !== undefined
@@ -148,9 +157,14 @@ export const workspaceTemplateUpgradeFactory: WorkspaceToolFactory = {
           }
         }
 
+        if (action && !skill) return { ok: false as const, error: { code: 'skill_required', message: '--action requires --skill.' } }
+        const projection: SkillProjectionRequest | undefined = skill ? { skill, action: action ?? 'update' } : undefined
         try {
-          const plan = await manager.plan(workspaceId)
+          const plan = await (projection ? manager.plan(workspaceId, projection) : manager.plan(workspaceId))
           const preview = previewPayload(plan, mode, explicitTarget)
+          if (projection && typeof preview.nextCommand === 'string' && preview.nextCommand.startsWith('alice ')) {
+            preview.nextCommand += ` --skill ${projection.skill} --action ${projection.action}`
+          }
           if (!apply) return { ok: true as const, action: 'preview' as const, preview }
           if (plan.blocked) {
             return {
@@ -201,6 +215,7 @@ export const workspaceTemplateUpgradeFactory: WorkspaceToolFactory = {
           for (const path of useTemplate) resolutions[path] = 'template'
           const result = await manager.apply(workspaceId, {
             planDigest: plan.planDigest,
+            ...(projection ? { projection } : {}),
             ...(Object.keys(resolutions).length > 0 ? { resolutions } : {}),
           })
           return {

@@ -791,3 +791,35 @@ shapes should point back here rather than restating the rules differently.
 | `src/workspaces/issues/board.ts` | Issue/run/Inbox projections |
 | `src/services/uta-client/` | Alice -> UTA decision-correlation boundary |
 | `services/uta/src/domain/trading/` | Broker operation and execution authority |
+
+
+### Conversation failure diagnostics
+
+`conversation read`, `await`, `collect`, and `ask --await` return a concise
+`error` for failed/interrupted tasks, plus recorded `exitCode`, `signal`,
+`killed`, and `processStarted` fields when available. Terminal structured
+errors take priority over stderr; launch failures and watchdog termination
+retain their explicit causes. Successful turns do not promote warnings or
+recovered errors into a failure.
+
+`conversation read --task-id <id> --mode detailed` also exposes the last 16 KiB
+of stderr for failed/interrupted tasks, with `stderrTruncated` indicating a
+clipped log. Existing tasks can recover this diagnostic from their log file;
+missing logs still leave an exit/signal or generic failure explanation. Logs
+remain diagnostics, never assistant replies.
+
+
+### Explicit creation and follow-up selection
+
+`alice conversation create --ws-id <id> | --harness <name> --prompt <text>`
+creates a new Session and dispatches its first turn. `conversation ask
+--resume-id <id>` continues an existing Session; author addressing remains on
+`ask`. Legacy `ask --ws-id/--harness` remains supported for copied Skills.
+
+Both accept optional `credential` (vault slug), `credentialSource: native`,
+`model`, and `effort`. Credential forms are mutually exclusive. Creation merges
+with headless Workspace preferences. Exact follow-up patches only the Session's
+binding under the execution claim: omitted fields retain that binding, changing
+credential discards inherited model/effort, and explicit fields persist for
+subsequent turns. Busy Sessions reject before editing the binding. Runtime
+identity cannot change. No new persisted format is introduced.

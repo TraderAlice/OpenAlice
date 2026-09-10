@@ -138,7 +138,7 @@ const BASE_EXPORTS: Record<string, CliExport> = {
     groupDescriptions: {
       peer: 'Discover active desks, their Sessions, and absolute filesystem locations',
       conversation: 'Send ordinary Agent-to-Agent requests and retrieve their replies',
-      inbox: 'Deliver reports to the human Inbox or inspect and follow up on deliveries',
+      inbox: 'Send outward-facing notifications and reports to the human Inbox; inspect and follow up on deliveries',
       issue: 'Read the shared work board and manage this Workspace\'s durable work',
       provenance: 'Trace business artifacts to attributable product Sessions',
       signature: 'Show this Session\'s safe product identity',
@@ -156,15 +156,14 @@ const BASE_EXPORTS: Record<string, CliExport> = {
         sessions: 'workspace_sessions',
       },
       conversation: {
+        create: 'conversation_create',
         ask: 'conversation_ask',
         await: 'conversation_await',
         collect: 'conversation_collect',
         read: 'conversation_read',
       },
-      // inbox push: surface doc(s) + comment to the user's Inbox tab. Attach
-      // files with repeatable `--doc <path>` (the shim folds them into the
-      // `docs: [{ path }]` array; bare paths wrap, JSON objects pass through);
-      // `--comments` carries the markdown note. At least one of the two.
+      // inbox push: one Markdown body with inline Workspace file references.
+      // --body-file publishes Markdown read from a local file.
       // inbox read: look back at the inbox stream — `--self` narrows to this
       // workspace's own pushes (whose doc paths are cwd-relative, so readable
       // with the shell); `--limit N` caps the newest-first window.
@@ -234,6 +233,9 @@ const BASE_EXPORTS: Record<string, CliExport> = {
         details: 'getContractDetails',
         quote: 'getQuote',
         expand: 'expandContract',
+        'option-contracts': 'getOptionContracts',
+        'option-chain': 'getOptionChain',
+        'order-book': 'getOrderBook',
       },
       order: {
         list: 'getOrders',

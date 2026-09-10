@@ -1,3 +1,4 @@
+import { isFileReference } from '@traderalice/connector-protocol'
 /**
  * Reusable markdown renderer with syntax-highlighted code blocks and copy buttons.
  *
@@ -35,7 +36,7 @@ function escapeHtml(s: string): string {
  * are case-insensitive); MarkdownContent delegates the actual navigation
  * on click so this module stays a pure string renderer.
  */
-function createWikilinkExtension(opts: { codeSpanWikilinks: boolean }): TokenizerAndRendererExtension {
+function createWikilinkExtension(opts: { codeSpanWikilinks: boolean; fileHrefs?: Record<string, string> }): TokenizerAndRendererExtension {
   return {
     name: 'wikilink',
     level: 'inline',
@@ -56,6 +57,17 @@ function createWikilinkExtension(opts: { codeSpanWikilinks: boolean }): Tokenize
     },
     renderer(token) {
       const name = token.text as string
+      if (opts.fileHrefs && isFileReference(name)) {
+        const href = opts.fileHrefs[name]
+        if (!href) return escapeHtml(token.raw)
+        const attributes = `href="${escapeHtml(href)}" data-file-path="${escapeHtml(name)}"`
+        if (/\.(png|jpe?g|webp|gif)$/i.test(name)) {
+          return `<a class="markdown-file-image${name.startsWith('sticker/') ? ' is-sticker' : ''}" ${attributes}><img src="${escapeHtml(href)}" alt="${escapeHtml(name)}" loading="lazy" /></a>`
+        }
+        const filename = name.split('/').pop() ?? name
+        const extension = filename.split('.').pop()?.toUpperCase() ?? 'FILE'
+        return `<a class="markdown-file-card" ${attributes}><span class="markdown-file-type">${escapeHtml(extension)}</span><span class="markdown-file-label"><strong>${escapeHtml(filename)}</strong><span>${escapeHtml(name)}</span></span><span aria-hidden="true">↗</span></a>`
+      }
       const key = name.toLowerCase()
       return `<a class="wikilink" data-entity="${escapeHtml(key)}">${escapeHtml(name)}</a>`
     },
@@ -78,7 +90,7 @@ const sessionSignatureExtension: TokenizerAndRendererExtension = {
   },
 }
 
-function createMarked(opts: { strikethrough: boolean; codeSpanWikilinks: boolean }): Marked {
+function createMarked(opts: { strikethrough: boolean; codeSpanWikilinks: boolean; fileHrefs?: Record<string, string> }): Marked {
   const instance = new Marked(
     markedHighlight({
       langPrefix: 'hljs language-',
@@ -92,7 +104,7 @@ function createMarked(opts: { strikethrough: boolean; codeSpanWikilinks: boolean
     { breaks: true },
   )
   instance.use({ extensions: [
-    createWikilinkExtension({ codeSpanWikilinks: opts.codeSpanWikilinks }),
+    createWikilinkExtension(opts),
     sessionSignatureExtension,
   ] })
   if (!opts.strikethrough) {
@@ -130,6 +142,8 @@ function addCodeBlockWrappers(html: string): string {
 
 interface MarkdownContentProps {
   text: string
+  fileHrefs?: Record<string, string>
+  onFileReference?: (path: string) => void
   className?: string
   /**
    * Long-form documents need a calmer measure and stronger hierarchy than
@@ -159,9 +173,9 @@ interface MarkdownContentProps {
 
 export function renderMarkdownHtml(
   text: string,
-  opts: { strikethrough?: boolean; codeSpanWikilinks?: boolean; resolveRelativeHref?: (href: string) => string } = {},
+  opts: { fileHrefs?: Record<string, string>; strikethrough?: boolean; codeSpanWikilinks?: boolean; resolveRelativeHref?: (href: string) => string } = {},
 ): string {
-  const parser = opts.codeSpanWikilinks
+  const parser = opts.fileHrefs ? createMarked({ strikethrough: opts.strikethrough !== false, codeSpanWikilinks: false, fileHrefs: opts.fileHrefs }) : opts.codeSpanWikilinks
     ? opts.strikethrough === false
       ? markedComment
       : markedWithCodeSpanWikilinks
@@ -202,6 +216,8 @@ export function MarkdownContent({
   codeSpanWikilinks = false,
   onWikilink,
   resolveRelativeHref,
+  fileHrefs,
+  onFileReference,
 }: MarkdownContentProps) {
   const contentRef = useRef<HTMLDivElement>(null)
   const defaultWikilink = useWikilinkHandler()
@@ -209,12 +225,14 @@ export function MarkdownContent({
   const wikilink = onWikilink ?? defaultWikilink
 
   const html = useMemo(() => {
-    return renderMarkdownHtml(text, { strikethrough, codeSpanWikilinks, resolveRelativeHref })
-  }, [text, strikethrough, codeSpanWikilinks, resolveRelativeHref])
+    return renderMarkdownHtml(text, { strikethrough, codeSpanWikilinks, resolveRelativeHref, fileHrefs })
+  }, [text, strikethrough, codeSpanWikilinks, resolveRelativeHref, fileHrefs])
 
   const handleClick = useCallback(
     (e: MouseEvent) => {
       const target = e.target as HTMLElement
+      const file = target.closest('a[data-file-path]')
+      if (file && onFileReference) { e.preventDefault(); onFileReference(file.getAttribute('data-file-path')!); return }
       const link = target.closest('a.wikilink') as HTMLElement | null
       if (link) {
         e.preventDefault()
@@ -249,7 +267,7 @@ export function MarkdownContent({
         }, 2000)
       })
     },
-    [wikilink, openHeadlessRun],
+    [wikilink, openHeadlessRun, onFileReference],
   )
 
   useEffect(() => {

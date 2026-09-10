@@ -4,10 +4,12 @@ import { describe, expect, it, vi } from 'vitest'
 import { createMemoryInboxStore } from '../core/inbox-store.js'
 import type { WorkspaceToolContext } from '../core/workspace-tool-center.js'
 import {
+  conversationCreateFactory,
   conversationAskFactory,
   conversationAwaitFactory,
   conversationCollectFactory,
   conversationReadFactory,
+  taskProjection,
 } from './conversation.js'
 
 async function run(tool: Tool, args: Record<string, unknown>) {
@@ -117,8 +119,8 @@ describe('conversation_ask', () => {
     const inboxStore = createMemoryInboxStore()
     const entry = await inboxStore.append({
       workspaceId: 'ws-peer',
-      comments: 'report ready',
       origin: { kind: 'headless', runId: 'run-peer', agent: 'pi' },
+      body: 'report ready'
     })
     const ask = vi.fn(async () => ({
       status: 'dispatched' as const,
@@ -362,4 +364,51 @@ describe('conversation_read', () => {
         blocks: completedTask.structured.blocks,
       })
   })
+})
+
+
+describe('conversation diagnostics projection', () => {
+  it('keeps stderr out of summaries but includes it in detailed failed output', () => {
+    const task = { ...completedTask, status: 'failed' as const, exitCode: 1,
+      stderrTail: 'No API key found', stderrTruncated: false }
+    expect(taskProjection(task, 'summary')).toMatchObject({ error: 'No API key found', exitCode: 1 })
+    expect(taskProjection(task, 'summary')).not.toHaveProperty('stderrTail')
+    expect(taskProjection(task, 'detailed')).toMatchObject({ stderrTail: 'No API key found', stderrTruncated: false })
+  })
+  it('does not label a recovered successful turn as an error', () => {
+    expect(taskProjection({ ...completedTask, error: 'warning' }, 'summary')).not.toHaveProperty('error')
+  })
+})
+
+
+describe('conversation creation and selection', () => {
+  it('creates in a Harness with the complete explicit runtime selection', async () => {
+    const ask = vi.fn(async () => ({ status: 'dispatched', taskId: 't', resumeId: 'r', workspaceId: 'w', workspace: 'w', agent: 'codex', resolution: { mode: 'reconstructed' } }))
+    const tool = conversationCreateFactory.build(context({ conversation: { ask, read: vi.fn() } as never }))
+    await run(tool, { harness: 'autoquant', prompt: 'work', agent: 'codex', credentialSource: 'native', model: 'custom-model', effort: 'medium' })
+    expect(ask).toHaveBeenCalledWith(expect.objectContaining({
+      target: { kind: 'harness', harness: 'autoquant' }, agent: 'codex',
+      selection: { credentialSource: 'native', model: 'custom-model', reasoningEffort: 'medium' },
+    }))
+  })
+  it('rejects conflicting authentication without dispatching', async () => {
+    const ask = vi.fn()
+    const tool = conversationCreateFactory.build(context({ conversation: { ask, read: vi.fn() } }))
+    expect(await run(tool, { wsId: 'w', prompt: 'work', credential: 'saved', credentialSource: 'native' })).toMatchObject({ ok: false })
+    expect(ask).not.toHaveBeenCalled()
+  })
+  it('forwards a partial follow-up selection without inventing defaults', async () => {
+    const ask = vi.fn(async () => ({ status: 'unavailable', resolution: { mode: 'unavailable', reason: 'missing' } }))
+    await run(conversationAskFactory.build(context({ conversation: { ask, read: vi.fn() } as never })), { resumeId: 'r', prompt: 'continue', effort: 'high' })
+    expect(ask).toHaveBeenCalledWith(expect.objectContaining({ selection: { reasoningEffort: 'high' }, target: { kind: 'resume', resumeId: 'r' } }))
+  })
+})
+
+
+it('creation target errors only suggest creation addresses', async () => {
+  const ask = vi.fn()
+  const tool = conversationCreateFactory.build(context({ conversation: { ask, read: vi.fn() } }))
+  expect(await run(tool, { prompt: 'work' })).toMatchObject({ ok: false, error: expect.stringContaining('exactly one target: --ws-id or --harness') })
+  expect(await run(tool, { prompt: 'work', wsId: 'w', harness: 'chat' })).toMatchObject({ ok: false })
+  expect(ask).not.toHaveBeenCalled()
 })

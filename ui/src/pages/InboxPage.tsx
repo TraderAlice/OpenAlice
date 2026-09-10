@@ -1,17 +1,12 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent } from 'react'
+import { useInboxContent } from '../hooks/useInboxContent'
+import { Dialog, DialogContent, DialogTitle } from '../components/ui/dialog'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { formatRelativeTime, getIntlLocale } from '../lib/intl'
 import {
   Bot,
-  Check,
-  ChevronDown,
-  Copy,
-  Download,
-  FileCode2,
-  FileText,
   ListChecks,
   MessageSquare,
-  Paperclip,
   Terminal,
   Trash2,
 } from 'lucide-react'
@@ -30,7 +25,6 @@ import { useInboxRead } from '../live/inbox-read'
 import { useIssues } from '../hooks/useIssues'
 import { useWorkspace } from '../tabs/store'
 import { useWorkspaces } from '../contexts/workspaces-context'
-import { readWorkspaceFile, type ReadFileResult } from '../components/workspace/api'
 import { workspaceDisplayName, workspaceDisplayTitle } from '../components/workspace/display'
 import { presentInboxEntry } from '../lib/inbox-presentation'
 import {
@@ -39,7 +33,7 @@ import {
 } from '../office/inbox-duty-excursion'
 import { OfficeInboxDutyReturnBar } from '../office/OfficeInboxDutyReturnBar'
 import { useOfficeInboxDutyReturn } from '../office/useOfficeInboxDutyReturn'
-import type { InboxEntry, InboxDoc } from '../api/inbox'
+import type { InboxEntry } from '../api/inbox'
 
 interface InboxPageProps {
   /** Gates the page-level Delete/Backspace shortcut so background
@@ -53,7 +47,7 @@ interface InboxPageProps {
  * own entry, because a workspace's pushes are usually unrelated topics
  * (we have no Issue layer to make them one thread) — merging them into a
  * combined timeline read badly. So selection is a single entry, and this
- * pane shows just that one: its message first, compact attachments second,
+ * pane shows just that one: its Markdown body and inline file references,
  * then one conversation surface that can either ask the sender in the
  * background or open the same Session interactively.
  *
@@ -250,8 +244,8 @@ function InboxLoadingSkeleton() {
 
 function Detail({ entry, onDelete }: { entry: InboxEntry; onDelete?: () => void }) {
   const { t } = useTranslation()
-  const hasDocs = (entry.docs?.length ?? 0) > 0
-  const hasComments = (entry.comments ?? '').trim().length > 0
+  const content = useInboxContent(entry)
+  const previewPath = content.selectedFile?.path ?? null
 
   // Workspace liveness — drives whether the jump-to-workspace affordance
   // is enabled. A deleted workspace's inbox entry stays as a record but
@@ -330,7 +324,7 @@ function Detail({ entry, onDelete }: { entry: InboxEntry; onDelete?: () => void 
         // native runtime session id.
         const resumeId = origin.resumeId ?? (await api.headless.get(origin.runId!)).resumeId
         await workspacesCtx.openHeadlessRun(entry.workspaceId, resumeId, {
-          ...(entry.comments ? { title: entry.comments.slice(0, 200) } : {}),
+          ...(entry.body ? { title: entry.body.slice(0, 200) } : {}),
         })
       } else if (sessionId && sessionRecord) {
         setSidebar('chat')
@@ -511,43 +505,22 @@ function Detail({ entry, onDelete }: { entry: InboxEntry; onDelete?: () => void 
       </header>
       {continueError && <div className="-mt-4 mb-6 text-[12px] leading-[18px] text-destructive">{continueError}</div>}
 
-      {hasComments && (
-        <div className="min-w-0">
-          <MarkdownContent
-            text={entry.comments!}
-            className={repeatsLeadingHeading ? 'inbox-report-body--repeats-heading' : undefined}
-            variant="reading"
-            strikethrough={false}
-            codeSpanWikilinks
-          />
-        </div>
-      )}
-
-      {hasDocs && (
-        <section
-          className={hasComments ? 'mt-10 border-t border-border/60 pt-7' : ''}
-          aria-labelledby={`inbox-attachments-${entry.id}`}
-        >
-          <h2
-            id={`inbox-attachments-${entry.id}`}
-            className="mb-3 flex items-center gap-2 text-[12px] leading-[18px] font-medium text-muted-foreground/70"
-          >
-            <Paperclip size={12} aria-hidden />
-            {t('inbox.documentsSection')}
-            <span className="font-normal tabular-nums text-muted-foreground/40">{entry.docs!.length}</span>
-          </h2>
-          <div className="space-y-2">
-            {entry.docs!.map((doc) => (
-              <InboxAttachment
-                key={doc.path}
-                workspaceId={entry.workspaceId}
-                doc={doc}
-                defaultExpanded={!hasComments}
-              />
-            ))}
-          </div>
-        </section>
-      )}
+      <div className="min-w-0">
+        <MarkdownContent text={content.body} variant="reading" strikethrough={false}
+          className={repeatsLeadingHeading ? 'inbox-report-body--repeats-heading' : undefined}
+          fileHrefs={content.fileHrefs} onFileReference={content.openFile} />
+        {content.error && <button type="button" onClick={content.retry} className="text-sm text-muted-foreground">{t('common.retry')}</button>}
+      </div>
+      <Dialog open={previewPath !== null} onOpenChange={open => { if (!open) content.closeFile() }}>
+        <DialogContent className="sm:max-w-4xl max-h-[85vh] overflow-y-auto" closeLabel={t('common.close')}>
+          <DialogTitle className="break-all pr-8">{previewPath}</DialogTitle>
+          {previewPath && (/\.(png|jpe?g|webp|gif)$/i.test(previewPath)
+            ? <img src={content.fileHrefs[previewPath]} alt={previewPath} className="max-h-[65vh] mx-auto object-contain" />
+            : /\.(md|markdown|html?|txt|json|csv|log)$/i.test(previewPath)
+              ? content.preview ? <FileContentView path={previewPath} result={content.preview} /> : <p role="status">{t('common.loading')}</p>
+              : <a href={content.fileHrefs[previewPath]} target="_blank" rel="noreferrer">{previewPath}</a>)}
+        </DialogContent>
+      </Dialog>
 
       {wsAlive ? (
         <InboxReplyThread
@@ -565,208 +538,9 @@ function Detail({ entry, onDelete }: { entry: InboxEntry; onDelete?: () => void 
   )
 }
 
-// ==================== Attachment (live fetch from workspace) ====================
-
-export function InboxAttachment({
-  workspaceId, doc, defaultExpanded,
-}: {
-  workspaceId: string
-  doc: InboxDoc
-  defaultExpanded: boolean
-}) {
-  const { t } = useTranslation()
-  const [expanded, setExpanded] = useState(defaultExpanded)
-  const [result, setResult] = useState<ReadFileResult | null>(null)
-  const [copied, setCopied] = useState(false)
-
-  // Fetch on mount so the compact row can show type/size immediately. The
-  // actual content stays hidden until the user asks to preview the asset.
-  useEffect(() => {
-    let cancelled = false
-    setResult(null)
-    readWorkspaceFile(workspaceId, doc.path).then((r) => {
-      if (!cancelled) setResult(r)
-    })
-    return () => { cancelled = true }
-  }, [workspaceId, doc.path])
-
-  const markdownActionsAvailable = isMarkdownPath(doc.path) && result?.kind === 'ok'
-  const name = fileNameFromPath(doc.path) || doc.path
-  const directory = fileDirectoryFromPath(doc.path)
-  const isHtml = /\.html$/i.test(doc.path)
-  const fileKind = isHtml
-    ? t('inbox.docTypeHtml')
-    : isMarkdownPath(doc.path)
-      ? t('inbox.docTypeMarkdown')
-      : fileExtension(doc.path)
-  const size = result?.kind === 'ok'
-    ? formatBytes(new TextEncoder().encode(result.content).byteLength)
-    : result?.kind === 'too_large'
-      ? formatBytes(result.sizeBytes)
-      : null
-
-  const copyMarkdown = async (e: MouseEvent<HTMLButtonElement>) => {
-    e.stopPropagation()
-    if (!markdownActionsAvailable) return
-    try {
-      await copyText(result.content)
-      setCopied(true)
-      window.setTimeout(() => setCopied(false), 1400)
-    } catch {
-      setCopied(false)
-    }
-  }
-
-  const downloadMarkdown = (e: MouseEvent<HTMLButtonElement>) => {
-    e.stopPropagation()
-    if (!markdownActionsAvailable) return
-    const blob = new Blob([result.content], { type: 'text/markdown;charset=utf-8' })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = fileNameFromPath(doc.path) || 'report.md'
-    document.body.appendChild(a)
-    a.click()
-    a.remove()
-    URL.revokeObjectURL(url)
-  }
-
-  return (
-    <div
-      className={`group overflow-hidden rounded-lg border bg-background/55 ${expanded ? 'border-primary/25' : 'border-border hover:border-muted-foreground/35'}`}
-      title={doc.revision ? t('inbox.docRevisionTitle', { revision: doc.revision }) : undefined}
-    >
-      <div className="flex min-w-0 items-center gap-1">
-        <button
-          type="button"
-          onClick={() => setExpanded((v) => !v)}
-          aria-expanded={expanded}
-          aria-label={t(expanded ? 'inbox.docCollapseAria' : 'inbox.docExpandAria', { name })}
-          className="oa-pressable flex min-w-0 flex-1 items-center gap-3 px-3 py-2.5 text-left"
-        >
-          <span className="flex h-8 w-6 shrink-0 items-center justify-center text-muted-foreground/70">
-            {isHtml
-              ? <FileCode2 size={15} strokeWidth={1.75} aria-hidden />
-              : <FileText size={15} strokeWidth={1.75} aria-hidden />}
-          </span>
-          <span className="min-w-0 flex-1">
-            <span className="block truncate text-[12px] font-medium text-foreground/90">{name}</span>
-            <span className="mt-0.5 block truncate font-mono text-[10px] leading-[14px] text-muted-foreground/50">
-              {directory || t('inbox.workspaceRoot')}
-            </span>
-          </span>
-          <span className="hidden shrink-0 items-center gap-1.5 text-[10px] leading-[14px] text-muted-foreground/50 sm:flex">
-            <span>{fileKind}</span>
-            {size && <span>{size}</span>}
-          </span>
-          <ChevronDown
-            size={14}
-            strokeWidth={1.75}
-            aria-hidden
-            className={`shrink-0 text-muted-foreground/50 transition-transform duration-[var(--motion-fast)] motion-reduce:transition-none ${expanded ? 'rotate-180' : ''}`}
-          />
-        </button>
-        {isMarkdownPath(doc.path) && (
-          <div className="flex shrink-0 items-center gap-0.5 border-l border-border/60 px-1 sm:px-2">
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon"
-              onClick={copyMarkdown}
-              disabled={!markdownActionsAvailable}
-              title={copied ? t('inbox.docCopiedMarkdown') : t('inbox.docCopyMarkdown')}
-              aria-label={copied ? t('inbox.docCopiedMarkdown') : t('inbox.docCopyMarkdown')}
-              className="h-10 w-10 text-muted-foreground/55 hover:text-foreground disabled:cursor-default disabled:opacity-30 sm:h-7 sm:w-7"
-            >
-              {copied ? <Check size={14} strokeWidth={2} /> : <Copy size={14} strokeWidth={1.75} />}
-            </Button>
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon"
-              onClick={downloadMarkdown}
-              disabled={!markdownActionsAvailable}
-              title={t('inbox.docDownloadMarkdown')}
-              aria-label={t('inbox.docDownloadMarkdown')}
-              className="h-10 w-10 text-muted-foreground/55 hover:text-foreground disabled:cursor-default disabled:opacity-30 sm:h-7 sm:w-7"
-            >
-              <Download size={14} strokeWidth={1.75} />
-            </Button>
-          </div>
-        )}
-      </div>
-      {expanded && (
-        <div className="border-t border-border/60 bg-background px-3 py-3 sm:px-4">
-          {result === null ? (
-            <div className="py-3 text-center text-[12px] text-muted-foreground">{t('common.loading')}</div>
-          ) : (
-            <FileContentView path={doc.path} result={result} />
-          )}
-        </div>
-      )}
-    </div>
-  )
-}
-
-function isMarkdownPath(path: string): boolean {
-  return /\.(md|markdown|mdx)$/i.test(path)
-}
-
-function fileNameFromPath(path: string): string {
-  return path.replace(/\\/g, '/').split('/').filter(Boolean).pop() ?? ''
-}
-
-function fileDirectoryFromPath(path: string): string {
-  const normalized = path.replace(/\\/g, '/')
-  const index = normalized.lastIndexOf('/')
-  return index > 0 ? normalized.slice(0, index) : ''
-}
-
-function fileExtension(path: string): string {
-  const name = fileNameFromPath(path)
-  const index = name.lastIndexOf('.')
-  return index > 0 ? name.slice(index + 1).toUpperCase() : 'FILE'
-}
-
-function formatBytes(bytes: number): string {
-  if (bytes < 1024) return `${bytes} B`
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(bytes < 10 * 1024 ? 1 : 0)} KB`
-  return `${(bytes / 1024 / 1024).toFixed(1)} MB`
-}
-
-async function copyText(text: string): Promise<void> {
-  const clipboard = globalThis.navigator?.clipboard
-  try {
-    if (clipboard?.writeText) {
-      await clipboard.writeText(text)
-      return
-    }
-  } catch {
-    // Fall through to the selection-based path below.
-  }
-
-  if (typeof document.execCommand !== 'function') {
-    throw new Error('copy unavailable')
-  }
-
-  const ta = document.createElement('textarea')
-  ta.value = text
-  ta.setAttribute('readonly', '')
-  ta.style.position = 'fixed'
-  ta.style.left = '-9999px'
-  ta.style.top = '0'
-  document.body.appendChild(ta)
-  ta.select()
-  const ok = document.execCommand('copy')
-  ta.remove()
-  if (!ok) throw new Error('copy failed')
-}
-
-// ==================== Date formatting ====================
 
 function formatAbsolute(ts: number): string {
   return new Date(ts).toLocaleString(getIntlLocale(), {
-    month: 'short', day: 'numeric', year: 'numeric',
-    hour: '2-digit', minute: '2-digit',
+    month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit',
   })
 }

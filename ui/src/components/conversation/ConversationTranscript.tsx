@@ -6,9 +6,13 @@ import { MessageActions } from './MessageActions'
 
 export function ConversationTranscriptItem({
   item,
+  fileHrefs,
+  onFileReference,
   working,
   latest = false,
 }: {
+  readonly fileHrefs?: Record<string, string>
+  readonly onFileReference?: (path: string) => void
   readonly item: ConversationItem
   readonly working: boolean
   readonly latest?: boolean
@@ -16,7 +20,7 @@ export function ConversationTranscriptItem({
   if (item.kind === 'user') {
     return (
       <article className={`conversation-message is-user${latest ? ' is-latest' : ''}`}>
-        <div className="conversation-message-body"><ConversationContentView content={item.content} /></div>
+        <div className="conversation-message-body"><ConversationContentView content={item.content} plainText /></div>
         {item.content.some(block => block.kind === 'markdown') && <MessageActions text={item.content.flatMap(block => block.kind === 'markdown' ? [block.text] : []).join('\n\n')} />}
       </article>
     )
@@ -39,10 +43,10 @@ export function ConversationTranscriptItem({
     <article className={`conversation-message is-assistant is-turn${latest ? ' is-latest' : ''}`}>
       <div className="conversation-message-body">
         {item.progress.map((text, index) => (
-          <div key={index} className="conversation-progress-text"><MarkdownContent text={text} /></div>
+          <div key={index} className="conversation-progress-text"><MarkdownContent text={text} fileHrefs={fileHrefs} onFileReference={onFileReference} /></div>
         ))}
         {item.activity && <ConversationActivityGroup activity={item.activity} working={working} />}
-        {item.final && <div className="conversation-final-text"><MarkdownContent text={item.final} /></div>}
+        {item.final && <div className="conversation-final-text"><MarkdownContent text={item.final} fileHrefs={fileHrefs} onFileReference={onFileReference} /></div>}
       </div>
       {!working && item.final && <MessageActions text={item.final} />}
     </article>
@@ -160,10 +164,11 @@ function ConversationReasoning({ notes, label }: { readonly notes: readonly stri
 }
 
 
-export function ConversationContentView({ content }: { readonly content: ConversationContent }): ReactElement {
+export function ConversationContentView({ content, plainText = false }: { readonly content: ConversationContent; readonly plainText?: boolean }): ReactElement {
   return <div className="conversation-content-parts">{content.map((block, index) => {
+    if (block.kind === 'markdown' && plainText) return <div key={index} className="whitespace-pre-wrap break-words">{block.text}</div>
     if (block.kind === 'markdown') return <MarkdownContent key={index} text={block.text} />
-    if (block.kind === 'disclosure') return <details key={index} className="conversation-detail"><summary>{block.label}</summary><ConversationContentView content={block.content} /></details>
+    if (block.kind === 'disclosure') return <details key={index} className="conversation-detail"><summary>{block.label}</summary><ConversationContentView content={block.content} plainText={plainText} /></details>
     return <pre key={index} className="conversation-unknown">{block.text}</pre>
   })}</div>
 }

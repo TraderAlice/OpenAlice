@@ -1,3 +1,5 @@
+import { inboxFiles } from '@traderalice/connector-protocol'
+import { headlessFailureSummary } from './headless-failure.js';
 import { userDataHome } from '../core/paths.js';
 import { resolveAliceProjectIdentity } from '@traderalice/guardian-runtime';
 /**
@@ -41,6 +43,7 @@ import {
 import { loadConfig, type ServerConfig } from './config.js';
 import {
   createNativeSessionRuntimeBinding,
+  mergeSessionRuntimeSelection,
   createSessionRuntimeBinding,
   resolveSessionRuntimeBinding,
   type SessionRuntimeSelection,
@@ -456,6 +459,7 @@ export interface WorkspaceService {
   ): Promise<TemplateWorkspaceResolution>;
   /** Resolve the Workspace default, installation fallback, then first registered runtime. */
   resolveDefaultAgentId(meta: WorkspaceMeta): Promise<string | undefined>;
+  resolveHeadlessDefaultAgentId(meta: WorkspaceMeta): Promise<string | undefined>;
   resolveAdapter(meta: WorkspaceMeta, agentId?: string): CliAdapter;
   /** Open the same persisted Session through its runtime's structured protocol instead of a PTY. */
   startWebSession(
@@ -549,7 +553,7 @@ export interface WorkspaceService {
     resumeId?: string,
     /** Optional Inbox/Issue reverse link for a user-initiated inquiry. */
     inquiry?: HeadlessTaskInquiry,
-    /** Fresh-Session runtime selection. Ignored on exact resume, which replays its binding. */
+    /** Optional selection. Fresh Sessions inherit Workspace defaults; exact resumes patch their own binding under the execution lock. */
     selection?: SessionRuntimeSelection,
     /** Cross-Agent message metadata for the independent conversation log. */
     conversation?: AgentConversationDispatch,
@@ -760,7 +764,7 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
     types: ['inbox.received'] as const,
   });
   const stopInboxActivity = inboxStore?.onAppended((entry) => {
-    const summary = entry.comments?.replace(/\s+/g, ' ').trim().slice(0, 240);
+    const summary = entry.body?.replace(/\s+/g, ' ').trim().slice(0, 240);
     void inboxActivity.record('inbox.received', {
       workspaceId: entry.workspaceId,
       inboxEntryId: entry.id,
@@ -771,7 +775,7 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
       ...(entry.origin?.runId ? { taskId: entry.origin.runId } : {}),
       ...(entry.origin?.kind ? { originKind: entry.origin.kind } : {}),
       ...(summary ? { summary } : {}),
-      documentCount: entry.docs?.length ?? 0,
+      documentCount: inboxFiles(entry).length ?? 0,
     });
   });
   const recordAgentRuntime = async (
@@ -1104,21 +1108,24 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
 
   /** Default for fresh interactive Sessions without an explicit runtime. */
   const resolveDefaultAgentId = async (wsMeta: WorkspaceMeta): Promise<string | undefined> => {
-    const metadata = await readWorkspaceMetadata(wsMeta.dir);
-    const workspaceDefault = metadata.ok
-      ? validRegisteredRuntime(metadata.metadata.defaultAgent ?? null)
-      : undefined;
+    const settings = await readWorkspaceRuntimeSettings(wsMeta.dir);
+    if (!settings.ok && settings.reason === 'invalid') {
+      throw new Error(`invalid Workspace runtime settings: ${settings.error}`);
+    }
+    const workspaceDefault = validRegisteredRuntime(settings.ok
+      ? resolveWorkspaceRuntimeAgent(settings.settings, 'interactive') ?? null
+      : null);
     return workspaceDefault ??
       validRegisteredRuntime(await readWorkspaceDefaultAgent().catch(() => null)) ??
       firstRegisteredRuntime();
   };
 
   /**
-   * Default for scheduled issues with no frontmatter `agent`: the Workspace's
-   * headless recent runtime first, then the legacy installation Issue default,
+   * Default for fresh headless work without an explicit Agent: the Workspace's
+   * headless fixed default, then recent runtime, then the installation Issue default,
    * its Session default, and finally the first registered runtime.
    */
-  const resolveIssueDefaultAgentId = async (wsMeta: WorkspaceMeta): Promise<string | undefined> => {
+  const resolveHeadlessDefaultAgentId = async (wsMeta: WorkspaceMeta): Promise<string | undefined> => {
     const runtimeSettings = await readWorkspaceRuntimeSettings(wsMeta.dir);
     if (!runtimeSettings.ok && runtimeSettings.reason === 'invalid') {
       throw new Error(`invalid Workspace runtime settings: ${runtimeSettings.error}`);
@@ -1897,12 +1904,20 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
         }
         nativeResume = { sessionId: identity.agentSessionId };
         parentTaskId = identity.latestTaskId ?? headlessTasks.latestForResumeId(resumeId)?.taskId;
-        if (selection?.credentialSlug || selection?.model || selection?.reasoningEffort) {
-          throw new HeadlessResumeError('not_ready', 'a resumed Session reuses its persisted credential, model, and effort');
+        const previous = identity.runtimeBinding ?? createNativeSessionRuntimeBinding({ adapter }).binding;
+        if (conversation && selection && Object.values(selection).some(value => value !== undefined)) {
+          sessionRuntime = await createSessionRuntimeBinding({
+            adapter, cwd: ws.dir, selection: mergeSessionRuntimeSelection(previous, selection),
+          });
+          await resumeRegistry.replaceRuntimeBinding({
+            resumeId, wsId: ws.id, agent: adapter.id, runtimeBinding: sessionRuntime.binding,
+          });
+        } else {
+          if (selection?.credentialSlug || selection?.model || selection?.reasoningEffort) {
+            throw new HeadlessResumeError('not_ready', 'a resumed Session reuses its persisted credential, model, and effort; edit it through Session settings or conversation ask');
+          }
+          sessionRuntime = await resolveSessionRuntimeBinding({ adapter, cwd: ws.dir, binding: previous });
         }
-        sessionRuntime = identity.runtimeBinding
-          ? await resolveSessionRuntimeBinding({ adapter, cwd: ws.dir, binding: identity.runtimeBinding })
-          : createNativeSessionRuntimeBinding({ adapter });
       } catch (error) {
         activeResumeIds.delete(resumeId);
         throw error;
@@ -2105,6 +2120,7 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
         progressPublisher.offer(projectTurnProgress(r.structured));
         await Promise.all([turnJournal.flush(), progressPublisher.flush()]);
         const status = headlessTaskStatus(r);
+        const failure = headlessFailureSummary({ ...r, status });
         await headlessTasks.complete(rec.taskId, {
           status,
           finishedAt: Date.now(),
@@ -2114,7 +2130,7 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
           exitCode: r.exitCode,
           signal: r.signal,
           killed: r.killed,
-          ...(r.error ? { error: r.error } : {}),
+          ...(failure ? { error: failure } : {}),
           output: {
             hasAssistantReply: r.structured.assistantText !== null,
             ...(r.structured.assistantText
@@ -2132,21 +2148,21 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
             finishedAt: rec.finishedAt ?? Date.now(),
             assistantText: r.structured.assistantText,
             durationMs: r.durationMs,
-            ...(status !== 'done' && r.stderrTail ? { error: r.stderrTail.slice(-1000) } : {}),
+            ...(failure ? { error: failure } : {}),
           });
         }
         if (r.processStarted === false) {
           await agentRuntimeLog.record('runtime.spawn_failed', {
             ...occupancySubject,
             ...(r.launchErrorCode ? { launchErrorCode: r.launchErrorCode } : {}),
-            ...(r.error ? { error: r.error } : {}),
+            ...(failure ? { error: failure } : {}),
           });
         } else {
           await agentRuntimeLog.record('runtime.stopped', {
             ...occupancySubject,
             status,
             exitCode: r.exitCode,
-            ...(r.error ? { error: r.error } : {}),
+            ...(failure ? { error: failure } : {}),
             ...headlessCompletionAssets(r.structured),
           });
         }
@@ -2154,7 +2170,7 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
           task: rec,
           status,
           assistantText: r.structured.assistantText,
-          ...(status !== 'done' && r.stderrTail ? { error: r.stderrTail.slice(-1000) } : {}),
+          ...(failure ? { error: failure } : {}),
         });
         await stampTelegramDeskFire(rec, r.structured.assistantText);
         // Scheduled one-shot issues are the only board items whose lifecycle can
@@ -2294,7 +2310,7 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
         return resolveAdapter(ws, identity.agent);
       }
       if (agentId) return resolveAdapter(ws, agentId);
-      return resolveAdapter(ws, await resolveIssueDefaultAgentId(ws));
+      return resolveAdapter(ws, await resolveHeadlessDefaultAgentId(ws));
     },
     dispatch: dispatchHeadlessTaskMethod,
     claimFreshSession: async ({ issueWorkspace, issueId, taskId, resumeId, agent }) => {
@@ -2430,7 +2446,7 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
           Boolean(issue.when) && !issueAssigneeResumeId(issue.assignee) && !issue.agent,
         );
         const defaultIssueAgent = needsDefaultAgent
-          ? await resolveIssueDefaultAgentId(ws)
+          ? await resolveHeadlessDefaultAgentId(ws)
           : undefined;
         const issues: IssuesSnapshotIssue[] = res.issues.filter((issue) => !isConnectorDeskIssue(issue)).map((issue) => {
           // Unscheduled ⇒ pure board work item, no firing markers.
@@ -2491,7 +2507,7 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
     if (ownerIdentity) await sessionRegistry.ensureLoaded(ownerIdentity.wsId);
     const assigneeSession = resolveIssueAssigneeSession(issue.assignee);
     const defaultIssueAgent = issue.when && !issueAssigneeResumeId(issue.assignee) && !issue.agent
-      ? await resolveIssueDefaultAgentId(ws)
+      ? await resolveHeadlessDefaultAgentId(ws)
       : undefined;
     const runtimeAvailability = issue.when
       ? issueRuntimeAvailability(issue, defaultIssueAgent, detectAgents())
@@ -3228,7 +3244,10 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
       ...w,
       ...(metadata.ok ? metadata.metadata : {}),
       ...(!metadata.ok && metadata.reason === 'invalid' ? { metadataError: metadata.error } : {}),
-      ...(runtimeSettings.ok ? { runtimeSettings: runtimeSettings.settings } : {}),
+      ...(runtimeSettings.ok ? {
+        runtimeSettings: runtimeSettings.settings,
+        defaultAgent: resolveWorkspaceRuntimeAgent(runtimeSettings.settings, 'interactive'),
+      } : {}),
       ...(!runtimeSettings.ok && runtimeSettings.reason === 'invalid'
         ? { runtimeSettingsError: runtimeSettings.error }
         : {}),
@@ -3356,6 +3375,7 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
     resolveOrCreateAutoQuantWorkspace: resolveOrCreateAutoQuantWorkspaceMethod,
     resolveOrCreateAutoPredictionWorkspace: resolveOrCreateAutoPredictionWorkspaceMethod,
     resolveDefaultAgentId,
+    resolveHeadlessDefaultAgentId,
     resolveAdapter,
     startWebSession,
     refreshSessionTitles,

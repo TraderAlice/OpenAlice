@@ -13,7 +13,7 @@ import { FilesPanel } from '../workspace/FilesPanel'
 import { FileContentView } from '../FileContentView'
 import { useWorkspaceSessionData } from '../../hooks/useWorkspaceData'
 import { useWorkspaces } from '../../contexts/workspaces-context'
-import { agentSupportsWeb } from '../workspace/api'
+import { agentSupportsWeb, workspaceContentHref } from '../workspace/api'
 import { useWorkbenchFile } from '../../hooks/useWorkbenchFile'
 import { HarnessSurfacePage } from '../../pages/HarnessSurfacePage'
 import { PageContentLayout } from '../PageTopBar'
@@ -125,11 +125,18 @@ function WorkPanel({ wsId, source, onCollapse }: { wsId: string; source: Workspa
             if (current) patch(wsId, { tabs: current.tabs.map((item) => item.id === tab.id ? { ...item, title: new URL(url).host } : item) })
           }} />
         : tab.kind === 'studio' && source !== 'chat' ? <HarnessSurfacePage workspaceId={wsId} source={source} embedded />
-          : tab.kind === 'file' ? <WorkFile wsId={wsId} path={tab.path} /> : null}
+          : tab.kind === 'file' ? <WorkFile key={`${tab.id}:${tab.revision ?? 0}`} wsId={wsId} path={tab.path} /> : null}
     </TabsContent>)}
   </Tabs>
 }
 function WorkFile({ wsId, path }: { wsId: string; path: string }) {
+  const href = workspaceContentHref(wsId, path)
+  if (/\.(png|jpe?g|gif|webp)$/i.test(path)) return <div className="h-full overflow-auto p-5"><img src={href} alt={path} className="max-w-full h-auto" /><a href={href} download className="block mt-4 text-sm underline">{path}</a></div>
+  if (/\.pdf$/i.test(path)) return <iframe src={href} title={path} className="h-full w-full border-0" />
+  if (/\.[^/.]+$/.test(path) && !/\.(md|markdown|html?|txt|log|csv|json|ya?ml|toml|ini|conf|cfg|env|ts|tsx|js|jsx|mjs|cjs|css|scss|sql|py|rb|rs|go|java|c|cpp|h|sh|bash|zsh|xml|svg)$/i.test(path)) return <a href={href} download className="block p-5 underline">Download {path}</a>
+  return <WorkTextFile wsId={wsId} path={path} />
+}
+function WorkTextFile({ wsId, path }: { wsId: string; path: string }) {
   const result = useWorkbenchFile(wsId, path)
   return <div className="h-full overflow-auto p-5"><div className="mb-5 break-all text-xs text-muted-foreground">{path}</div>{result ? <FileContentView path={path} result={result} /> : <div role="status">Loading…</div>}</div>
 }

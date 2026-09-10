@@ -128,7 +128,22 @@ async function waitForProcessesExit(
   return pids.every((pid) => !controller.isAlive(pid))
 }
 
-async function readProcessStartedAt(pid: number): Promise<number | null> {
+export async function readProcessStartedAt(pid: number): Promise<number | null> {
+  try {
+    if (process.platform === 'linux') {
+      // procfs has stable machine-readable timestamps, independent of ps,
+      // locale and process-spawn contention during container startup.
+      const [processStat, bootStat, ticks] = await Promise.all([
+        readFile(`/proc/${pid}/stat`, 'utf8'),
+        readFile('/proc/stat', 'utf8'),
+        linuxClockTicks(),
+      ])
+      const started = linuxProcessStartedAt(processStat, bootStat, ticks)
+      if (started !== null) return started
+    }
+  } catch {
+    // Restricted procfs: retain the conservative cross-platform fallback.
+  }
   try {
     if (process.platform === 'win32') {
       const script = `(Get-Process -Id ${pid} -ErrorAction Stop).StartTime.ToUniversalTime().ToString('o')`
@@ -235,4 +250,26 @@ export async function listDescendantPids(rootPid: number): Promise<number[]> {
   } catch {
     return []
   }
+}
+
+
+let clockTicks: Promise<number> | undefined
+function linuxClockTicks(): Promise<number> {
+  clockTicks ??= execFileAsync('getconf', ['CLK_TCK'], { timeout: 2_000 })
+    .then(({ stdout }) => {
+      const value = Number(stdout.trim())
+      if (!Number.isSafeInteger(value) || value <= 0) throw new Error('Invalid CLK_TCK')
+      return value
+    }).catch((error) => { clockTicks = undefined; throw error })
+  return clockTicks
+}
+
+/** /proc/<pid>/stat field 22; comm may itself contain spaces and parentheses. */
+export function linuxProcessStartedAt(processStat: string, bootStat: string, ticks: number): number | null {
+  const fields = processStat.slice(processStat.lastIndexOf(')') + 2).trim().split(/\s+/)
+  const startTicks = Number(fields[19])
+  const bootSeconds = Number(/^btime\s+(\d+)$/m.exec(bootStat)?.[1])
+  if (!Number.isFinite(startTicks) || startTicks < 0 || !Number.isFinite(bootSeconds)
+      || !Number.isFinite(ticks) || ticks <= 0 || !processStat.includes(')')) return null
+  return Math.floor((bootSeconds + startTicks / ticks) * 1_000)
 }

@@ -424,9 +424,12 @@ Structured headless output is the live control-plane result, while Inbox is the
 durable user-delivery channel. A run with a meaningful report or artifact calls:
 
 ```bash
-alice inbox push --doc <path> --comments "<summary>"
+alice inbox push --body "<summary> [[reports/close.md]]"
+# Or publish the Markdown body itself:
+alice inbox push --body-file reports/close.md
 ```
 
+The body/file contract is defined in [[docs/inbox-content.md]].
 The launcher binds the run/issue origin; the agent does not pass its own
 identity. Attached reports also receive a publication-time SHA-256 revision;
 the Inbox still renders the live file, but provenance can distinguish the sent

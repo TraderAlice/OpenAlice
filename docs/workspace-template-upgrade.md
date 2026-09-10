@@ -49,13 +49,14 @@ Files are classified by fingerprints, not timestamps:
 |---|---|---|
 | Ready | Incoming changed; Local still matches Base | Apply Incoming |
 | Preserved | Local changed; Incoming still matches Base | Keep Local |
-| Conflict | Local and Incoming both changed | Require an explicit per-file choice |
+| Ready | Both changed separate lines | Apply Git three-way merge |
+| Conflict | Overlapping edits or incompatible add/delete changes | Require explicit resolution |
 | Unchanged | Local already equals Incoming | Do nothing |
 
 The preview digest covers Base, Local, Incoming, template identity, and both
 versions. Apply must present that digest. The manager materializes Incoming
-once for an apply attempt; the snapshot validated by the digest is the exact
-snapshot written to disk. A Local or template change after preview therefore
+once for an apply attempt; the source validated by the digest determines the exact
+merged snapshot written to disk. A Local or template change after preview therefore
 returns a stale-plan error instead of silently changing the reviewed operation.
 
 ## Baseline and Version State
@@ -167,3 +168,22 @@ pretend that merging coworkers is merely a template update.
   conflict decisions.
 - `src/workspaces/template-upgrade.spec.ts` — classification, stale preview,
   concurrency, rollback, baseline, and real-template materialization coverage.
+
+## Line-level merging and conflict handoff
+
+Regular text files changed on both sides use `git merge-file --diff3` against
+the accepted baseline. Non-overlapping changes are ready to apply. Overlapping
+edits and add/delete conflicts remain reviewable; conflict markers are never
+written into the Workspace automatically. Operational Git failures abort the
+preview instead of pretending to be content conflicts.
+
+The transaction writes merged content but records the **official incoming**
+snapshot as the next baseline. User edits therefore remain local changes on the
+next upgrade. Existing rollback and committed-transaction recovery use the same
+before/incoming journal snapshots.
+
+Detailed CLI plans expose previous-source, local, incoming and clean-merge
+previews (with truncation flags). The UI offers an unsent, Workspace-targeted
+chat draft for unresolved conflicts alongside explicit keep/replace choices.
+The AI can edit files, refresh the plan, and accept its resolved copies with
+`--keep-workspace`. The updater does not dispatch a background agent.

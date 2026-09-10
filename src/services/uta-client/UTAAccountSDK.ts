@@ -12,6 +12,7 @@
 
 import type {
   UTAClient,
+  OptionResearchRequest,
   AccountInfo,
   SubAccountRef,
   OrderHistoryEntry,
@@ -160,6 +161,18 @@ export class UTAAccountSDK {
       `/api/trading/uta/${encodeURIComponent(this.id)}/quote`,
       query,
     )
+  }
+
+  getOptionContracts(request: OptionResearchRequest): Promise<Record<string, unknown>> {
+    return this.client.post(`/api/trading/uta/${encodeURIComponent(this.id)}/contract/option-contracts`, request)
+  }
+
+  getOptionChain(request: OptionResearchRequest): Promise<Record<string, unknown>> {
+    return this.client.post(`/api/trading/uta/${encodeURIComponent(this.id)}/contract/option-chain`, request)
+  }
+
+  getOrderBook(request: { aliceId: string; limit?: number }): Promise<Record<string, unknown>> {
+    return this.client.post(`/api/trading/uta/${encodeURIComponent(this.id)}/contract/order-book`, request)
   }
 
   getMarketClock(): Promise<MarketClock> {

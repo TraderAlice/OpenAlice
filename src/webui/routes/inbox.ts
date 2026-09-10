@@ -1,3 +1,6 @@
+import { inboxFiles } from '@traderalice/connector-protocol'
+import { resolveInboxFile } from '../../core/inbox-files.js'
+import { readFile, stat } from 'node:fs/promises'
 /**
  * Inbox HTTP route — read history + dev-only seed.
  *
@@ -11,9 +14,10 @@
  * appends. Read/unread writes are user actions and stay in this HTTP surface.
  */
 import { Hono } from 'hono'
-import type { IInboxStore, InboxDoc } from '../../core/inbox-store.js'
+import type { IInboxStore } from '../../core/inbox-store.js'
 
 export interface InboxRoutesDeps {
+  resolveWorkspace?: (id: string) => { dir: string } | undefined
   inboxStore: IInboxStore
 }
 
@@ -26,6 +30,37 @@ export function createInboxRoutes(deps: InboxRoutesDeps) {
     const workspaceId = c.req.query('workspaceId') || undefined
     const result = await deps.inboxStore.read({ limit, before, workspaceId })
     return c.json(result)
+  })
+
+  app.get('/:id/files', async c => {
+    const entry = await deps.inboxStore.get(c.req.param('id'))
+    if (!entry) return c.json({ error: 'not_found' }, 404)
+    const root = deps.resolveWorkspace?.(entry.workspaceId)?.dir
+    const files = await Promise.all(inboxFiles(entry).map(async (file, index) => ({
+      ...file, available: Boolean(await resolveInboxFile(root, file.path)),
+      href: `/api/inbox/${encodeURIComponent(entry.id)}/files/${index}`,
+    })))
+    return c.json({ files })
+  })
+
+  app.get('/:id/files/:index', async c => {
+    const entry = await deps.inboxStore.get(c.req.param('id'))
+    const index = c.req.param('index')
+    if (!entry || !/^\d+$/.test(index)) return c.json({ error: 'not_found' }, 404)
+    const file = inboxFiles(entry)[Number(index)]
+    const path = file && await resolveInboxFile(deps.resolveWorkspace?.(entry.workspaceId)?.dir, file.path)
+    if (!path) return c.json({ error: 'file_not_found' }, 404)
+    const info = await stat(path)
+    if (info.size > 16 * 1024 * 1024) return c.json({ error: 'file_too_large' }, 413)
+    const bytes = await readFile(path)
+    const extension = file.path.split('.').pop()?.toLowerCase() ?? ''
+    const media: Record<string, string> = { png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', webp: 'image/webp', gif: 'image/gif', pdf: 'application/pdf' }
+    c.header('Content-Type', media[extension] ?? 'application/octet-stream')
+    c.header('X-Content-Type-Options', 'nosniff')
+    c.header('Content-Security-Policy', "sandbox; default-src 'none'")
+    c.header('Cache-Control', 'no-store')
+    c.header('Content-Disposition', `${media[extension] ? 'inline' : 'attachment'}; filename*=UTF-8''${encodeURIComponent(file.path.split('/').pop()!)}`)
+    return c.body(bytes)
   })
 
   app.put('/:id/read', async (c) => {
@@ -53,40 +88,19 @@ export function createInboxRoutes(deps: InboxRoutesDeps) {
     const b = body as Partial<{
       workspaceId: string
       workspaceLabel: string
-      docs: unknown
-      comments: string
+      body: string
     }>
     if (!b.workspaceId || typeof b.workspaceId !== 'string') {
       return c.json({ error: 'workspaceId required' }, 400)
     }
 
-    // Validate docs shape if present
-    let docs: InboxDoc[] | undefined
-    if (b.docs !== undefined) {
-      if (!Array.isArray(b.docs)) {
-        return c.json({ error: 'docs must be an array' }, 400)
-      }
-      docs = []
-      for (const d of b.docs) {
-        if (typeof d !== 'object' || d === null) {
-          return c.json({ error: 'each doc must be an object' }, 400)
-        }
-        const path = (d as { path?: unknown }).path
-        if (typeof path !== 'string' || !path) {
-          return c.json({ error: 'each doc must have a non-empty `path` string' }, 400)
-        }
-        docs.push({ path })
-      }
-    }
-
-    const comments = typeof b.comments === 'string' ? b.comments : undefined
+    if (typeof b.body !== 'string' || !b.body.trim()) return c.json({ error: 'non-empty body required' }, 400)
 
     try {
       const entry = await deps.inboxStore.append({
         workspaceId: b.workspaceId,
         workspaceLabel: typeof b.workspaceLabel === 'string' ? b.workspaceLabel : undefined,
-        docs,
-        comments,
+        body: b.body,
       })
       return c.json({ entry })
     } catch (err) {

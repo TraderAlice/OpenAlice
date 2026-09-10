@@ -16,6 +16,7 @@ import {
 } from '../src/core/broker-packs.js'
 import {
   brokerPackCatalogFileName,
+  supportedBrokerPackEngines,
   type BrokerPackReleaseAsset,
   type BrokerPackReleaseCatalog,
 } from '../src/core/broker-pack-catalog.js'
@@ -27,7 +28,7 @@ const outDir = resolve(repoRoot, outputArg >= 0 ? process.argv[outputArg + 1] : 
 const catalogPath = resolve(outDir, brokerPackCatalogFileName(packageJson.version))
 const catalog = parseCatalog(JSON.parse(await readFile(catalogPath, 'utf8')))
 
-const expectedEngines = new Set<string>(INSTALLABLE_BROKER_ENGINES)
+const expectedEngines = new Set<string>(supportedBrokerPackEngines())
 const actualEngines = new Set(catalog.packs.map((asset) => asset.engine))
 if (catalog.packs.length !== expectedEngines.size || actualEngines.size !== expectedEngines.size) {
   throw new Error(`Broker Pack catalog must contain each engine exactly once; got ${catalog.packs.map((row) => row.engine).join(', ')}`)
@@ -46,6 +47,7 @@ try {
     const builder = resolve(tempRoot, 'build.ts')
     compiledProbe = resolve(tempRoot, process.platform === 'win32' ? 'probe.exe' : 'probe')
     await writeFile(probe, `
+if (process.arch !== ${JSON.stringify(process.arch)}) throw new Error('Compiled probe architecture mismatch');
 const m = await import(process.argv[2]);
 const engine = process.argv[3];
 if (m.BROKER_ENGINE !== engine || m.BROKER_PACK_API_VERSION !== 1) throw new Error('Invalid pack');
@@ -60,7 +62,7 @@ await broker.close();
 console.log('COMPILED_PACK_OK', engine);
 `)
     await writeFile(builder, `import {runtimeCompileOptions} from ${JSON.stringify(options)};
-const r=await Bun.build({entrypoints:[${JSON.stringify(probe)}],compile:{...runtimeCompileOptions,outfile:${JSON.stringify(compiledProbe)}}}); if(!r.success) throw new Error(String(r.logs));`)
+const r=await Bun.build({entrypoints:[${JSON.stringify(probe)}],compile:{...runtimeCompileOptions,target:${JSON.stringify(`bun-${process.platform === 'win32' ? 'windows' : process.platform}-${process.arch}`)},outfile:${JSON.stringify(compiledProbe)}}}); if(!r.success) throw new Error(String(r.logs));`)
     const result = spawnSync('bun', [builder], {cwd: tempRoot, encoding:'utf8', timeout:120_000})
     if (result.error || result.status !== 0) throw new Error(`Compiled probe build failed: ${result.error ?? result.stderr}`)
   }

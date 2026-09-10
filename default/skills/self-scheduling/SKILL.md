@@ -86,7 +86,7 @@ as `--when`:
 alice issue create --title "Pre-market brief" --priority high \
   --when '{"kind":"cron","cron":"30 8 * * 1-5","timezone":"America/New_York"}' \
   --assignee @me \
-  --what "Pull pre-market movers and overnight news for my watchlist, write a short brief to research/premarket.md, then run: alice inbox push --doc research/premarket.md --comments 'Pre-market brief'." \
+  --what "Pull pre-market movers and overnight news for my watchlist, write a short brief to research/premarket.md, then run: alice inbox push --body-file research/premarket.md." \
   --agent codex \
   --credential openai-primary \
   --model gpt-5.6 \
@@ -258,22 +258,23 @@ conversation.** Write What as a
 **complete, standalone instruction**, as if handing the job to a fresh teammate
 who has only this workspace's files. Say exactly what to read, do, and produce.
 
-**Decide what it outputs — and decide on purpose.** A headless run that does real
-work and surfaces nothing has vanished. So:
+Decide whether the run should notify the human or simply update its work:
 
 - If the run produces something the user should see — a brief, a finding, a
-  result — **push it to the Inbox**, the only channel a headless run has:
-  `alice inbox push --comments "…"` (attach files with repeatable
-  `--doc <path>`; run `alice --help` for the flags). A report pushed
+  result — use **Inbox for an outward-facing notification or report**:
+  `alice inbox push --body "…"` (reference files with `[[relative/path.ext]]`,
+  or publish Markdown using `--body-file <path>`). A report pushed
   during a scheduled run is automatically linked back to the issue that
   triggered it — you don't pass any id.
 - If the run is a **check that didn't trigger** (condition not met, nothing
   changed), **exit silently — that is the correct outcome**, not a failure.
   Don't manufacture noise.
 
-The Agent Runtime returning a reply only means the scheduler received the run's
-control-plane result. It does **not** mean the user saw it. Put the Inbox command
-inside What whenever human delivery is part of completion.
+A Connector-backed Issue may deliver its reply directly to the connected chat;
+other headless runs need not have a chat recipient. Do not assume every runtime
+reply is delivered. Put an Inbox push in What when a separate notification or
+report is part of completion, and avoid duplicating a reply that already serves
+that purpose. Inbox is a human delivery record, not storage for every run result.
 
 Put **conditions inside `what`**, not in the schedule — there is no condition
 field. For "ping me only if X", write: "check X; if it holds, push an alert;

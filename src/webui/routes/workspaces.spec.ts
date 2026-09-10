@@ -828,26 +828,12 @@ describe('PATCH /:id/metadata', () => {
     }
   });
 
-  it('persists a registered Workspace default agent runtime', async () => {
+  it('rejects runtime preferences in display metadata', async () => {
     const dir = await mkdtemp(join(tmpdir(), 'workspace-route-runtime-'));
     try {
-      const codex = { id: 'codex', capabilities: { headless: true } };
-      const { app } = build({
-        meta: { id: 'ws-1', tag: 'stable-tag', dir },
-        adapters: { codex },
-      });
-
-      const saved = await patch(app, '/ws-1/metadata', { defaultAgent: 'codex' });
-      expect(saved.status).toBe(200);
-      expect(saved.body.workspace.defaultAgent).toBe('codex');
-      expect(await readWorkspaceMetadata(dir)).toEqual({
-        ok: true,
-        metadata: { defaultAgent: 'codex' },
-      });
-
-      const cleared = await patch(app, '/ws-1/metadata', { defaultAgent: null });
-      expect(cleared.status).toBe(200);
-      expect(cleared.body.workspace.defaultAgent).toBeUndefined();
+      const { app } = build({ meta: { id: 'ws-1', tag: 'stable-tag', dir } });
+      expect((await patch(app, '/ws-1/metadata', { defaultAgent: 'codex' })).status).toBe(400);
+      expect(await readWorkspaceMetadata(dir)).toEqual({ ok: false, reason: 'absent' });
     } finally {
       await rm(dir, { recursive: true, force: true });
     }

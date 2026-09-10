@@ -70,6 +70,7 @@ export interface WorkspacesContextValue {
     model?: string | null,
     reasoningEffort?: import('../api').ModelReasoningEffort,
     credentialSource?: 'native',
+      surface?: 'terminal' | 'webpi',
   ): Promise<string>
   pauseSession(wsId: string, sessionId: string): Promise<void>
   resumeSession(wsId: string, sessionId: string, source?: WorkspaceSource): Promise<void>
@@ -93,7 +94,7 @@ export interface WorkspacesContextValue {
   openAgentConfig(wsId: string, agent?: AgentId, section?: 'general' | 'launch' | 'ai' | 'template' | 'absorb'): void
   saveWorkspaceMetadata(
     wsId: string,
-    metadata: { displayName?: string | null; description?: string | null; defaultAgent?: string | null },
+    metadata: { displayName?: string | null; description?: string | null },
   ): Promise<void>
   renameWorkspace(wsId: string, displayName: string): Promise<void>
 }

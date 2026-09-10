@@ -398,7 +398,8 @@ const demoTemplateUpgradePlan = (workspaceId: string) => ({
     },
     {
       path: '.agents/skills/template-research/SKILL.md', status: 'ready', operation: 'update', canUseTemplate: true,
-      currentPreview: 'Old collaboration guidance.', templatePreview: 'Current collaboration guidance.',
+      currentPreview: 'Old collaboration guidance.\n\nLocal preference.', templatePreview: 'Current collaboration guidance.',
+      mergedPreview: 'Current collaboration guidance.\n\nLocal preference.', mergedTruncated: false,
       currentTruncated: false, templateTruncated: false,
     },
     {
@@ -409,10 +410,11 @@ const demoTemplateUpgradePlan = (workspaceId: string) => ({
     },
     {
       path: '.claude/skills/template-research/SKILL.md', status: 'conflict', operation: 'update', canUseTemplate: true,
+      basePreview: 'Report scheduled work to the owner.', baseTruncated: false,
       currentPreview: 'Report scheduled work to the owner with the local checklist.',
       templatePreview: 'Report scheduled work to Inbox with a signed artifact.',
       currentTruncated: false, templateTruncated: false,
-      note: 'Both the Workspace and template changed this file.',
+      note: 'Git could not merge these overlapping edits automatically.',
     },
   ],
   summary: { ready: 2, preserved: 1, conflicts: 1, unchanged: 0 },
@@ -699,6 +701,7 @@ export const workspacesHandlers = [
     const files = demoSkillProjection().files.map((file) => ({
       path: file.path, status: action === 'restore' || action === 'install' ? 'ready' : 'conflict',
       operation: action === 'remove' ? 'remove' : 'update', currentPreview: file.currentPreview,
+      basePreview: '# Alice\n\nPrevious Project guidance.', baseTruncated: false,
       templatePreview: action === 'remove' ? null : file.sourcePreview,
       currentTruncated: false, templateTruncated: false, canUseTemplate: true,
     }))
@@ -861,10 +864,12 @@ export const workspacesHandlers = [
     const mutableWorkspace = workspace as {
       displayName?: string
       description?: string
-      defaultAgent?: string
     }
 
     const body = (await request.json().catch(() => ({}))) as WorkspaceMetadataPatch
+    if ('defaultAgent' in body) {
+      return HttpResponse.json({ error: 'invalid_metadata', message: 'Agent preferences belong in runtime-settings, not metadata' }, { status: 400 })
+    }
     if ('displayName' in body) {
       if (body.displayName == null || body.displayName.trim() === '') {
         delete mutableWorkspace.displayName
@@ -877,13 +882,6 @@ export const workspacesHandlers = [
         delete mutableWorkspace.description
       } else {
         mutableWorkspace.description = body.description.trim()
-      }
-    }
-    if ('defaultAgent' in body) {
-      if (body.defaultAgent == null || body.defaultAgent.trim() === '') {
-        delete mutableWorkspace.defaultAgent
-      } else {
-        mutableWorkspace.defaultAgent = body.defaultAgent.trim()
       }
     }
     return HttpResponse.json({ workspace })
@@ -919,7 +917,7 @@ export const workspacesHandlers = [
       version: 3 as const,
       runtime: { interactive: mode('interactive'), headless: mode('headless') },
     }
-    const nextWorkspace = { ...workspace, runtimeSettings: nextSettings }
+    const nextWorkspace = { ...workspace, runtimeSettings: nextSettings, defaultAgent: nextSettings.runtime.interactive.defaultAgent ?? nextSettings.runtime.interactive.recent.agent }
     demoWorkspaces[index] = nextWorkspace
     return HttpResponse.json({ settings: nextSettings, workspace: nextWorkspace })
   }),
@@ -1069,6 +1067,14 @@ export const workspacesHandlers = [
       )
     }
     return HttpResponse.json(listing)
+  }),
+  http.get('/api/workspaces/:id/content', ({ request }) => {
+    const url = new URL(request.url)
+    const path = url.searchParams.get('path') ?? ''
+    const content = demoWorkspaceFiles[path]
+    if (content == null) return HttpResponse.json({ error: 'file_not_found' }, { status: 404 })
+    if (url.searchParams.get('metadata') === '1') return HttpResponse.json({ path, size: content.length })
+    return new HttpResponse(content, { headers: { 'Content-Type': 'application/octet-stream' } })
   }),
   http.get('/api/workspaces/:id/file', ({ request }) => {
     const url = new URL(request.url)
@@ -1325,6 +1331,7 @@ export const workspacesHandlers = [
   // is multi-runtime.
   http.post('/api/workspaces/quick-chat', async ({ request }) => {
     const body = (await request.json().catch(() => null)) as {
+      surface?: unknown
       prompt?: unknown
       agent?: unknown
       targetWsId?: unknown
@@ -1357,7 +1364,8 @@ export const workspacesHandlers = [
     const prefix = ({ claude: 'c', codex: 'x', grok: 'g', omp: 'om', opencode: 'o', pi: 'p' } as Record<string, string>)[agent]
       ?? agent.slice(0, 1)
     const name = `${prefix}${ws.sessions.filter((session) => session.agent === agent).length + 1}`
-    const surface = agent in demoWebCapabilities ? 'webpi' as const : 'terminal' as const
+    if (body?.surface === 'webpi' && !(agent in demoWebCapabilities)) return HttpResponse.json({ error: 'unsupported_surface' }, { status: 400 })
+    const surface = body?.surface === 'terminal' ? 'terminal' as const : agent in demoWebCapabilities ? 'webpi' as const : 'terminal' as const
     const record: SessionRecord = {
       id: sessionId,
       wsId: ws.id,

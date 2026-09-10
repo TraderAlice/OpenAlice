@@ -25,7 +25,7 @@ accepted and available revisions separately.
 ## Ownership
 
 Alice Harness owns complete trees for `alice`, `alice-analysis`, `alice-uta`,
-`traderhub`, and `self-scheduling`, plus removal/reconciliation of legacy
+`traderhub`, `self-scheduling`, and `file-delivery`, plus removal/reconciliation of legacy
 `alice-workspace` copies. `.agents/skills` is primary and `.claude/skills` is its
 runtime mirror; old `.pi/skills` duplicates are included only for reconciliation.
 Template-declared instructions, README and other bundled Skills remain template
@@ -182,3 +182,21 @@ This is dated acceptance evidence, not a permanent runtime compatibility claim.
 Chat sticker packs use a separate Project-owned projection and generated Skill.
 They do not participate in this bundle or template Skill upgrades; see
 [[docs/sticker-packs.md]].
+
+## Upgrade discovery
+
+Workspace CLI discovery includes a warning when the accepted Skills revision
+is missing or differs from the current Project source. The shim prints it to
+stderr, leaving command JSON and `--output` files unchanged. Source hashing is
+cached for 30 seconds; the Workspace receipt is reread each time. Project-only
+CLI calls have no Workspace injection to compare. Receipt errors cannot block
+normal command discovery.
+
+The warning points to `alice harness upgrade --apply`. Clean line-level merges
+are automatic; actual conflicts require resolution through the same CLI or the
+UI's chat handoff. This updates files, not the already-loaded model context,
+and does not restore excluded Skills or alter CLI preferences.
+
+Use `alice harness upgrade --skill alice --action update` for the same scoped
+operation offered by the UI. Actions are install, update, remove and restore;
+restore explicitly replaces the local copy. Omit --skill for the whole bundle.

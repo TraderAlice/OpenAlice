@@ -17,6 +17,7 @@
     "@tiptap/markdown": "3.27.3",
     "@tiptap/react": "3.27.3",
     "@tiptap/starter-kit": "3.27.3",
+    "@traderalice/connector-protocol": "workspace:*",
     "@vercel/analytics": "^2.0.1",
     "@xterm/addon-fit": "0.12.0-beta.287",
     "@xterm/addon-web-links": "0.13.0-beta.287",

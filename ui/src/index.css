@@ -761,6 +761,64 @@ body {
 /* One chrome row for navigator and working view. Body descriptions are not
    toolbar content. Layout owns the header slot; pages retain their actions. */
 .oa-topbar-host { container-type: inline-size; }
+/* Windows keeps native caption controls. Only header rows intersecting their
+   actual geometry reserve space; nested toolbars keep their normal density. */
+.oa-windows-chrome-fallback {
+  position: fixed;
+  z-index: 101;
+  -webkit-app-region: drag;
+}
+:root[data-window-chrome="windows"] [data-caption-row] {
+  min-height: max(44px, var(--desktop-caption-height, 44px));
+  height: auto;
+  flex-shrink: 0;
+  padding-left: max(12px, calc(var(--caption-left, 0px) + 8px));
+  padding-right: max(12px, calc(var(--caption-right, 0px) + 8px));
+  -webkit-app-region: drag;
+}
+:root[data-window-chrome="windows"] [data-caption-stacked] {
+  padding: calc(var(--desktop-caption-height, 44px) + 4px) 12px 4px;
+}
+:root[data-window-chrome="windows"] [data-caption-row] :is(button, a, input, textarea, select, [role="button"], [role="tab"], [role="tablist"], [role="separator"], [contenteditable="true"]),
+:root[data-window-chrome="windows"] [data-caption-row] :is(.oa-topbar-actions, .oa-topbar-leading) {
+  -webkit-app-region: no-drag;
+}
+/* Portaled edge drawers also stay below the native caption controls. */
+:root[data-window-chrome="windows"] [data-slot="sheet-content"]:is([data-side="left"], [data-side="right"], [data-side="top"]) {
+  padding-top: max(16px, var(--desktop-caption-height, 44px));
+}
+:root[data-window-chrome="windows"] [data-slot="sheet-content"] [data-slot="sheet-close"] {
+  top: calc(var(--desktop-caption-height, 44px) + 8px);
+}
+/* macOS owns the traffic lights; the existing navigation and page headers
+   share their row. Browser windows keep their original geometry. */
+.oa-desktop-mac .oa-topbar,
+.oa-desktop-mac .oa-activity-brand,
+.oa-desktop-mac [data-testid="mobile-context-bar"] {
+  -webkit-app-region: drag;
+}
+.oa-desktop-mac :is(button, a, input, textarea, select, [role="button"], [role="tab"], [role="separator"]),
+.oa-desktop-mac .oa-topbar-actions,
+.oa-desktop-mac .oa-topbar-leading {
+  -webkit-app-region: no-drag;
+}
+.oa-desktop-mac [data-testid="mobile-context-bar"] {
+  height: 44px;
+  flex-shrink: 0;
+  padding-left: 88px;
+  background: var(--sidebar);
+}
+@media (min-width: 768px) {
+  .oa-desktop-mac .oa-topbar { min-height: 44px; }
+  .oa-desktop-mac #activity-bar .oa-activity-brand {
+    height: 44px;
+    min-height: 44px;
+    padding-left: 88px;
+    justify-content: flex-end;
+  }
+  .oa-desktop-mac #activity-bar .oa-activity-brand h1 { display: none; }
+  .oa-desktop-mac #activity-bar[data-rail-layout="compact"] { width: 88px; }
+}
 .oa-topbar {
   display: flex;
   flex: 0 0 auto;
@@ -1778,3 +1836,43 @@ html[lang="ja"] .oa-onboarding-title {
 @media (prefers-reduced-motion: reduce) {
   .oa-collapsible-panel { transition: none; }
 }
+
+/* Resolved Workspace files retain their position in the Markdown body. */
+.markdown-content a.markdown-file-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: fit-content;
+  max-width: 100%;
+  margin: 12px 0;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--muted);
+  color: var(--foreground);
+  text-decoration: none;
+  font-size: 13px;
+  line-height: 1.5;
+}
+.markdown-file-type {
+  flex: none;
+  color: var(--muted-foreground);
+  font-size: 10px;
+  font-weight: 600;
+}
+.markdown-file-label { display: grid; min-width: 0; }
+.markdown-file-label > span { color: var(--muted-foreground); font-size: 12px; }
+.markdown-content a.markdown-file-image { display: block; width: fit-content; max-width: 100%; }
+.markdown-content a.markdown-file-image img {
+  display: block;
+  width: auto;
+  height: auto;
+  max-width: min(256px, 100%);
+  max-height: 512px;
+  object-fit: contain;
+  margin: 12px 0;
+}
+.markdown-content a.markdown-file-card:hover { border-color: var(--muted-foreground); }
+.markdown-content a[data-file-path]:focus-visible { outline: 2px solid var(--ring); outline-offset: 3px; }
+
+.markdown-content a.markdown-file-image.is-sticker img { border: 0; border-radius: 0; background: transparent; }

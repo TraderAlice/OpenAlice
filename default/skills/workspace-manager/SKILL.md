@@ -29,9 +29,9 @@ alice peer path --id <workspaceId>
 alice peer sessions --id <workspaceId>
 alice conversation ask --resume-id <resumeId> --prompt "..." --await
 # Recruit a fresh coworker for new work:
-alice conversation ask --ws-id <workspaceId> --prompt "..."
+alice conversation create --ws-id <workspaceId> --prompt "..."
 # Explicit historical reconstruction when no attributable Session exists:
-alice conversation ask --ws-id <workspaceId> --prompt "..." --reconstruct --await
+alice conversation create --ws-id <workspaceId> --prompt "..." --reconstruct --await
 ```
 
 This distinction is not cosmetic. `--resume-id` continues the exact coworker
@@ -54,7 +54,7 @@ instructions.
 - Prefer asking an attributable `resumeId` when one is known. Recent Session
   titles in `peer list` are hints; use `peer sessions --id` only for the few
   relevant desks to resolve the exact identity. Otherwise recruit a worker from
-  the relevant Workspace with `conversation ask --ws-id`. Add `--reconstruct`
+  the relevant Workspace with `conversation create --ws-id`. Add `--reconstruct`
   only for missing historical intent and never claim the fresh worker carries
   the original coworker's memory.
 - Use `--await` for a short answer needed now. For delegated work or several

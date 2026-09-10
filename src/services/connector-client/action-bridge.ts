@@ -1,3 +1,4 @@
+import { inboxFiles } from '@traderalice/connector-protocol'
 import {
   ConnectorClient,
   artifactFailureMessage,
@@ -206,7 +207,7 @@ async function fulfillArtifactRequest(
     return fail('entry_not_found')
   }
 
-  const displayName = entry.docs?.[request.docIndex]?.path
+  const displayName = inboxFiles(entry)[request.docIndex]?.path
     ?.replace(/\\/g, '/')
     .split('/')
     .at(-1)

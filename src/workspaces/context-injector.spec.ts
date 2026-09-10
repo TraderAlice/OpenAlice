@@ -113,7 +113,7 @@ describe('injectWorkspaceContext — skills', () => {
     });
     for (const root of ['.claude/skills', '.agents/skills']) {
       const skill = await read(`${root}/delegate-autoquant/SKILL.md`);
-      expect(skill).toContain('alice conversation ask --harness autoquant');
+      expect(skill).toContain('alice conversation create --harness autoquant');
       expect(skill).toContain('The universal result is the Agent\'s ordinary `assistantText` handoff');
       expect(skill).toContain('does not automatically publish either artifact to the');
       expect(skill).toContain('Primary deliverable directory: <absolute path>');
@@ -127,7 +127,7 @@ describe('injectWorkspaceContext — skills', () => {
       wsId: 'ws-abc',
       dir,
     });
-    for (const name of ['alice', 'alice-analysis', 'alice-uta', 'traderhub', 'scan-value-chain']) {
+    for (const name of ['alice', 'alice-analysis', 'alice-uta', 'traderhub', 'file-delivery', 'scan-value-chain']) {
       expect(existsSync(join(dir, '.claude/skills', name, 'SKILL.md')), name).toBe(true);
       expect(existsSync(join(dir, '.agents/skills', name, 'SKILL.md')), name).toBe(true);
     }
@@ -145,7 +145,7 @@ describe('injectWorkspaceContext — skills', () => {
     expect(skill).toContain('alice peer path --id <workspaceId>');
     expect(skill).toContain("Coding Agent's native Read/Search/Glob/Git capabilities");
     expect(skill).toContain('alice conversation ask --inbox-id <entryId>');
-    expect(skill).toContain('alice conversation ask --harness autoquant');
+    expect(skill).toContain('alice conversation create --harness autoquant');
     expect(skill).not.toContain('peer file-read');
   });
 

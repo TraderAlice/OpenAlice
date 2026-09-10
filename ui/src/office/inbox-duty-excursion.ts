@@ -90,7 +90,7 @@ function isInboxDuty(value: unknown): value is OfficeInboxDutyCandidate {
     && entry.workspaceId === destination.workspaceId
     && Number.isFinite(entry.ts)
     && (entry.workspaceLabel === undefined || typeof entry.workspaceLabel === 'string')
-    && (entry.comments === undefined || typeof entry.comments === 'string')
+    && typeof entry.body === 'string'
     && docsValid
     && declaredIssueValid
 }

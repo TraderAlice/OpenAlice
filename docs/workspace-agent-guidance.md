@@ -37,7 +37,8 @@ One concept has one primary owner:
 
 | Concept | Owner |
 |---|---|
-| Inbox, Issue collaboration, provenance, peer questions, Session nametags | `alice` (collaboration reference) |
+| Human notifications/reports through Inbox, Issue collaboration, provenance, peer questions, Session nametags | `alice` (collaboration reference) |
+| Connector reply file attachments (`[[relative/path.ext]]`) | `file-delivery` |
 | Delegating quantitative research from Chat to AutoQuant | `delegate-autoquant` |
 | Issue file shape, ownership, schedules, headless delivery | `self-scheduling` |
 | Low-frequency market/fundamental/macro data | `traderhub` |

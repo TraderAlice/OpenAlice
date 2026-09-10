@@ -161,7 +161,7 @@ export interface UtaBarGateway {
    *  the BROKER's honest entitlement (Alpaca free = 'iex', CCXT = 'realtime')
    *  instead of blanket-labeling every broker source 'realtime'. Optional: a
    *  gateway that can't surface it falls back to 'realtime'. */
-  getBarCapabilities?(): Promise<Record<string, BarCapability>>
+  getBarCapabilities?(aliceId?: string): Promise<Record<string, BarCapability>>
 }
 
 export interface BarServiceDeps {

@@ -44,7 +44,7 @@ export interface Workspace {
   readonly description?: string;
   /** Validation/read error for `.alice/workspace.json`, when present. */
   readonly metadataError?: string;
-  /** Workspace-local runtime used for fresh Sessions when no launch overrides it. */
+  /** Read-only projection of the interactive Agent preference in `.alice/settings.json`. */
   readonly defaultAgent?: string;
   readonly dir: string;
   readonly createdAt: string;
@@ -121,6 +121,10 @@ export type TemplateUpgradeFileStatus = 'ready' | 'preserved' | 'conflict' | 'un
 export type TemplateUpgradeResolution = 'workspace' | 'template'
 
 export interface TemplateUpgradeFilePlan {
+  readonly basePreview?: string | null
+  readonly baseTruncated?: boolean
+  readonly mergedPreview?: string
+  readonly mergedTruncated?: boolean
   readonly path: string
   readonly status: TemplateUpgradeFileStatus
   readonly operation: 'add' | 'update' | 'remove' | 'keep' | 'none'
@@ -1291,8 +1295,10 @@ export async function quickChat(
   model?: string | null,
   reasoningEffort?: ModelReasoningEffort,
   credentialSource?: 'native',
+      surface?: 'terminal' | 'webpi',
 ): Promise<QuickChatResult> {
   const body: Record<string, unknown> = { prompt };
+  if (surface) body['surface'] = surface;
   if (credentialSource !== undefined) body['credentialSource'] = credentialSource;
   if (agent !== undefined) body['agent'] = agent;
   if (credentialSlug !== undefined) body['credentialSlug'] = credentialSlug;
@@ -1591,7 +1597,6 @@ export async function purgeDepartedWorkspace(id: string): Promise<void> {
 export type WorkspaceMetadataPatch = {
   displayName?: string | null;
   description?: string | null;
-  defaultAgent?: string | null;
 };
 
 export async function updateWorkspaceMetadata(
@@ -1973,4 +1978,9 @@ export async function testAgentConfig(
   } catch {
     return { ok: false, error: `HTTP ${res.status}` };
   }
+}
+
+/** Read-only content URL, also forwarded through the desktop app protocol. */
+export function workspaceContentHref(wsId: string, path: string) {
+  return `/api/workspaces/${encodeURIComponent(wsId)}/content?path=${encodeURIComponent(path)}`
 }

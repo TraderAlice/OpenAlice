@@ -266,7 +266,7 @@ export function createBarService(deps: BarServiceDeps): BarService {
     // The broker's HONEST entitlement (Alpaca free = 'iex', CCXT = 'realtime'),
     // not a blanket 'realtime'. Falls back to 'realtime' when the gateway can't
     // surface it (mocks / brokers that declare no quality).
-    const caps: Record<string, BarCapability> = (await deps.utaManager.getBarCapabilities?.()) ?? {}
+    const caps: Record<string, BarCapability> = (await deps.utaManager.getBarCapabilities?.(barId)) ?? {}
     const cap = caps[sourceId]
     if (deps.utaManager.getBarCapabilities && !cap) {
       throw new Error(`UTA source "${sourceId}" does not advertise historical-bar support.`)

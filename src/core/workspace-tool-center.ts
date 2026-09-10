@@ -10,7 +10,7 @@
  * without ever asking the AI agent to traffic its own workspaceId.
  *
  * The MCP server's `/mcp/:wsId` route invokes every factory with the URL's
- * wsId at request time. From the agent's POV, `inbox_push({ docs, comments })`
+ * wsId at request time. From the agent's POV, `inbox_push({ body })`
  * has no identity parameter — workspaceId is invisible, baked into the
  * tool by the server. Forgery surface is zero because the URL is the
  * only identity carrier and `.mcp.json` is per-workspace.
@@ -25,6 +25,7 @@
  */
 
 import type { Tool } from 'ai'
+import type { SessionRuntimeSelection } from '../workspaces/session-runtime-binding.js'
 import type { IInboxStore, InboxEntry, InboxOrigin } from './inbox-store.js'
 import type { IEntityStore } from './entity-store.js'
 import type { IProvenanceStore } from './provenance-store.js'
@@ -38,6 +39,7 @@ import type { HeadlessStructuredOutput } from '../workspaces/headless-output.js'
 import type { HeadlessTaskRecord, HeadlessInquirySubject, HeadlessTaskStatus } from '../workspaces/headless-task-registry.js'
 import type {
   ApplyTemplateUpgradeInput,
+  SkillProjectionRequest,
   TemplateUpgradePlan,
   TemplateUpgradeResult,
 } from '../workspaces/template-upgrade.js'
@@ -119,6 +121,12 @@ export interface WorkspaceConversationTask {
   readonly finishedAt?: number
   readonly durationMs?: number
   readonly error?: string
+  readonly exitCode?: number | null
+  readonly signal?: string | null
+  readonly killed?: boolean
+  readonly processStarted?: boolean
+  readonly stderrTail?: string
+  readonly stderrTruncated?: boolean
   readonly structured: HeadlessStructuredOutput | null
 }
 
@@ -147,6 +155,7 @@ export interface WorkspaceConversationControl {
     readonly timeoutMs?: number
     readonly target: WorkspaceConversationTarget
     readonly agent?: string
+    readonly selection?: SessionRuntimeSelection
     /** Add the artifact-reconstruction preamble when a fresh fallback worker is
      * required. Provenance may still resolve as reconstructed when this is
      * false; prompt semantics and attribution are deliberately independent. */
@@ -161,7 +170,7 @@ export interface WorkspaceConversationControl {
 
 /** Launcher-owned reconciliation for the caller's current Workspace. */
 export interface WorkspaceTemplateUpgradeControl {
-  plan(workspaceId: string): Promise<TemplateUpgradePlan>
+  plan(workspaceId: string, projection?: SkillProjectionRequest): Promise<TemplateUpgradePlan>
   apply(workspaceId: string, input: ApplyTemplateUpgradeInput): Promise<TemplateUpgradeResult>
 }
 
