@@ -19,6 +19,7 @@ import { z } from 'zod'
 import Decimal from 'decimal.js'
 import { Contract, ContractDescription, ContractDetails, Order, UNSET_DECIMAL } from '@traderalice/ibkr'
 import {
+  Decimal as LongbridgeDecimal,
   Config,
   TradeContext,
   QuoteContext,
@@ -67,6 +68,10 @@ import type {
 // Longbridge SDK DerivativeType enum (mirrors `const enum DerivativeType`).
 const DERIVATIVE_OPTION = 0
 const DERIVATIVE_WARRANT = 1
+
+function toLongbridgeDecimal(value: Decimal): LongbridgeDecimal {
+  return new LongbridgeDecimal(value.toString())
+}
 
 // ==================== Order-type translation ====================
 
@@ -294,11 +299,11 @@ export class LongbridgeBroker implements IBroker {
       orderType: lbType,
       side,
       timeInForce: lbTif,
-      submittedQuantity: order.totalQuantity as unknown as never,  // SDK accepts decimal.js or its own Decimal
+      submittedQuantity: toLongbridgeDecimal(order.totalQuantity),
     }
-    if (!order.lmtPrice.equals(UNSET_DECIMAL)) opts.submittedPrice = order.lmtPrice as unknown as never
-    if (!order.auxPrice.equals(UNSET_DECIMAL)) opts.triggerPrice = order.auxPrice as unknown as never
-    if (!order.trailingPercent.equals(UNSET_DECIMAL)) opts.trailingPercent = order.trailingPercent as unknown as never
+    if (!order.lmtPrice.equals(UNSET_DECIMAL)) opts.submittedPrice = toLongbridgeDecimal(order.lmtPrice)
+    if (!order.auxPrice.equals(UNSET_DECIMAL)) opts.triggerPrice = toLongbridgeDecimal(order.auxPrice)
+    if (!order.trailingPercent.equals(UNSET_DECIMAL)) opts.trailingPercent = toLongbridgeDecimal(order.trailingPercent)
 
     try {
       const resp = await this.tradeCtx.submitOrder(opts)
@@ -318,13 +323,13 @@ export class LongbridgeBroker implements IBroker {
     }
     const opts: ReplaceOrderOptions = {
       orderId,
-      quantity: changes.totalQuantity as unknown as never,
+      quantity: toLongbridgeDecimal(changes.totalQuantity),
     }
     if (changes.lmtPrice != null && !changes.lmtPrice.equals(UNSET_DECIMAL)) {
-      opts.price = changes.lmtPrice as unknown as never
+      opts.price = toLongbridgeDecimal(changes.lmtPrice)
     }
     if (changes.auxPrice != null && !changes.auxPrice.equals(UNSET_DECIMAL)) {
-      opts.triggerPrice = changes.auxPrice as unknown as never
+      opts.triggerPrice = toLongbridgeDecimal(changes.auxPrice)
     }
     try {
       await this.tradeCtx.replaceOrder(opts)

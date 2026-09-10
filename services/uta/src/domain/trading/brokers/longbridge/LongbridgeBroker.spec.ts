@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import Decimal from 'decimal.js'
 import { Contract, Order } from '@traderalice/ibkr'
+import { Decimal as LongbridgeDecimal } from 'longbridge'
 import { LongbridgeBroker, ibkrOrderTypeToLb, ibkrTifToLb } from './LongbridgeBroker.js'
 import { makeContract, parseLbSymbol, resolveSymbol, mapLbOrderStatus } from './longbridge-contracts.js'
 import '../../contract-ext.js'
@@ -8,6 +9,18 @@ import '../../contract-ext.js'
 // ==================== Longbridge SDK mock ====================
 
 vi.mock('longbridge', () => {
+  class MockLongbridgeDecimal {
+    private readonly value: string
+
+    constructor(value: string | number) {
+      this.value = String(value)
+    }
+
+    toString(): string {
+      return this.value
+    }
+  }
+
   // Numeric enum values mirror the const enum in node_modules/longbridge/index.d.ts.
   const OrderSide = { Unknown: 0, Buy: 1, Sell: 2 } as const
   const OrderType = {
@@ -18,6 +31,7 @@ vi.mock('longbridge', () => {
   const Market = { Unknown: 0, US: 1, HK: 2, CN: 3, SG: 4, Crypto: 5 } as const
 
   return {
+    Decimal: MockLongbridgeDecimal,
     Config: { fromApikey: vi.fn(() => ({ __config: true })) },
     TradeContext: {
       new: vi.fn(() => ({
@@ -43,6 +57,11 @@ vi.mock('longbridge', () => {
     Market,
   }
 })
+
+function expectLongbridgeDecimal(value: unknown, expected: string): void {
+  expect(value).toBeInstanceOf(LongbridgeDecimal)
+  expect(String(value)).toBe(expected)
+}
 
 // Helper: stamp mock contexts onto a freshly-constructed broker so we can
 // drive method outcomes without going through init().
@@ -534,6 +553,29 @@ describe('LongbridgeBroker — getPositions()', () => {
 describe('LongbridgeBroker — placeOrder()', () => {
   beforeEach(() => vi.clearAllMocks())
 
+  it('converts decimal.js submit values to SDK Decimal instances', async () => {
+    const broker = makeBroker()
+    const { trade } = attachMockContexts(broker)
+    trade.submitOrder.mockResolvedValue({ orderId: 'decimal-submit' })
+    const contract = makeContract('AAPL.US')
+    const order = new Order()
+    order.action = 'BUY'
+    order.orderType = 'TRAIL LIMIT'
+    order.totalQuantity = new Decimal('1.25')
+    order.lmtPrice = new Decimal('201.125')
+    order.auxPrice = new Decimal('199.875')
+    order.trailingPercent = new Decimal('1.5')
+    order.tif = 'DAY'
+
+    await broker.placeOrder(contract, order)
+
+    const sent = trade.submitOrder.mock.calls[0][0]
+    expectLongbridgeDecimal(sent.submittedQuantity, '1.25')
+    expectLongbridgeDecimal(sent.submittedPrice, '201.125')
+    expectLongbridgeDecimal(sent.triggerPrice, '199.875')
+    expectLongbridgeDecimal(sent.trailingPercent, '1.5')
+  })
+
   it('translates HK MKT → ELO (HK quirk)', async () => {
     const b = makeBroker()
     const { trade } = attachMockContexts(b)
@@ -702,6 +744,23 @@ describe('LongbridgeBroker — modifyOrder()', () => {
     const sent = trade.replaceOrder.mock.calls[0][0]
     expect(sent.orderId).toBe('ord-1')
     expect(sent.quantity.toString()).toBe('150')
+  })
+
+  it('converts decimal.js replacement values to SDK Decimal instances', async () => {
+    const broker = makeBroker()
+    const { trade } = attachMockContexts(broker)
+    trade.replaceOrder.mockResolvedValue(undefined)
+
+    await broker.modifyOrder('ord-1', {
+      totalQuantity: new Decimal('2.5'),
+      lmtPrice: new Decimal('202.25'),
+      auxPrice: new Decimal('198.75'),
+    })
+
+    const sent = trade.replaceOrder.mock.calls[0][0]
+    expectLongbridgeDecimal(sent.quantity, '2.5')
+    expectLongbridgeDecimal(sent.price, '202.25')
+    expectLongbridgeDecimal(sent.triggerPrice, '198.75')
   })
 })
 
