@@ -146,7 +146,7 @@ specifically requires `openai-responses`). It writes only the selected
 credential into the temporary runtime volume over stdin, asks the agent to
 remember a generated codeword, resumes the same OpenAlice `resumeId`, and
 requires the second turn to recall it. A final turn requires the agent to use
-`alice-workspace` to create and read back marker-bearing Issue data; the smoke
+`alice` to create and read back marker-bearing Issue data; the smoke
 requires both a normalized tool block containing the marker and the agent's
 confirmation. The credential check then requires a completed
 `traderhub board get --board macro` call and a metric summary from its live,

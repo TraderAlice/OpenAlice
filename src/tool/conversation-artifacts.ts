@@ -129,7 +129,7 @@ export const issueAskFactory: WorkspaceToolFactory = {
             if (!run) {
               return {
                 ok: false as const,
-                error: `issue run not found: ${runId}; use alice-workspace issue show --id ${ref.id} to list this Issue's runs`,
+                error: `issue run not found: ${runId}; use alice issue show --id ${ref.id} to list this Issue's runs`,
               }
             }
             target = { kind: 'resume' as const, resumeId: run.resumeId }

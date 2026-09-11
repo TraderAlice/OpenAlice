@@ -142,7 +142,7 @@ describe('createTradingTools — getOrders summarization', () => {
 
     uta.stagePlaceOrder({ aliceId: 'mock-paper|AAPL', action: 'BUY', orderType: 'MKT', totalQuantity: '10' })
     uta.commit('buy')
-    await uta.push()
+    await uta.push(uta.status().pendingHash!)
 
     const tools = createTradingTools(asSDK(mgr))
     const ids = uta.getPendingOrderIds().map(p => p.orderId)

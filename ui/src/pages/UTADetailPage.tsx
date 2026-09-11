@@ -1,17 +1,20 @@
 import { Fragment, useState, useEffect, useLayoutEffect, useCallback, useMemo, useRef } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
-import { ChevronDown } from 'lucide-react'
+import { ChevronDown, CircleCheck, Clock3, TriangleAlert } from 'lucide-react'
 import type { ViewSpec } from '../tabs/types'
 import { api } from '../api'
 import { getIntlLocale } from '../lib/intl'
 import type { UTAConfig, BrokerPreset, AccountInfo, SubAccountRef, Position, BrokerHealthInfo, UTASnapshotSummary, EquityCurvePoint, OrderHistoryEntry, OrderHistoryStatus, TradeHistoryEntry } from '../api/types'
 import { useTradingConfig } from '../hooks/useTradingConfig'
 import { useAccountHealth } from '../hooks/useAccountHealth'
+import { deriveAccountInteractionPolicy, useBrokerPackReadiness } from '../hooks/useBrokerPackReadiness'
 import { PageHeader } from '../components/PageHeader'
 import { EmptyState, Skeleton } from '../components/StateViews'
+import { Button, buttonVariants } from '../components/ui/button'
 import { ReconnectButton } from '../components/ReconnectButton'
 import { Toggle } from '../components/Toggle'
-import { HealthBadge } from '../components/uta/HealthBadge'
+import { SegmentedControl } from '../components/SegmentedControl'
+import { AccountReadinessBadge, BrokerSupportGate } from '../components/uta/BrokerPackGate'
 import { EditUTADialog } from '../components/uta/EditUTADialog'
 import { OrderEntryDialog, type OrderEntryMode } from '../components/uta/OrderEntryDialog'
 import { EquityCurve } from '../components/EquityCurve'
@@ -20,6 +23,7 @@ import { fmt, fmtPnl, fmtNum, fmtPctSigned, isUnsetDecimal } from '../lib/format
 import { secTypeToClass, assetClassLabel, ASSET_CLASS_ORDER, type AssetClass } from '../lib/asset-class'
 import { ContractCell, contractPrimary } from '../lib/contract-display'
 import { displayNameForUTA } from '../lib/uta-account-filter'
+import { ensureTradingModePolling, useTradingMode } from '../live/trading-mode'
 
 // ==================== Page ====================
 
@@ -33,6 +37,9 @@ export function UTADetailPage({ spec }: UTADetailPageProps) {
   const navigate = useNavigate()
   const tc = useTradingConfig()
   const healthMap = useAccountHealth()
+  const brokerReadiness = useBrokerPackReadiness()
+  const tradingMode = useTradingMode((state) => state.status.mode)
+  const tradingModeLoading = useTradingMode((state) => state.loading)
   const [presets, setPresets] = useState<BrokerPreset[]>([])
   const [account, setAccount] = useState<AccountInfo | null>(null)
   const [positions, setPositions] = useState<Position[]>([])
@@ -48,6 +55,7 @@ export function UTADetailPage({ spec }: UTADetailPageProps) {
   const [dataError, setDataError] = useState<string | null>(null)
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null)
   const [clock, setClock] = useState<MarketClockState>(null)
+  const [interactionNotice, setInteractionNotice] = useState<string | null>(null)
 
   useEffect(() => {
     api.trading.getBrokerPresets().then(r => setPresets(r.presets)).catch(() => {})
@@ -56,18 +64,26 @@ export function UTADetailPage({ spec }: UTADetailPageProps) {
   const uta = useMemo<UTAConfig | undefined>(() => tc.utas.find(u => u.id === id), [tc.utas, id])
   const preset = useMemo<BrokerPreset | undefined>(() => presets.find(p => p.id === uta?.presetId), [presets, uta])
   const health: BrokerHealthInfo | undefined = id ? healthMap[id] : undefined
+  const readiness = uta ? brokerReadiness.forAccount(uta) : null
+  const policy = uta && readiness ? deriveAccountInteractionPolicy({ account: uta, readiness, health, tradingMode }) : null
+
+  useEffect(() => { ensureTradingModePolling() }, [])
 
   // Sub-account discovery — once per UTA. A failure (or a single-wallet
   // broker) leaves the list empty, so the selector simply never renders.
   useEffect(() => {
-    if (!id) return
+    if (!id || !policy?.canRead) {
+      setSubAccounts([])
+      setSelectedSub(undefined)
+      return
+    }
     let cancelled = false
     api.trading.utaSubAccounts(id)
       .then(r => { if (!cancelled) setSubAccounts(r.subAccounts ?? []) })
       .catch(() => { if (!cancelled) setSubAccounts([]) })
     setSelectedSub(undefined)  // reset to aggregate when switching UTAs
     return () => { cancelled = true }
-  }, [id])
+  }, [id, policy?.canRead])
 
   // Live polling — account/positions/orders refresh every 15s. Account +
   // positions scope to the selected wallet (undefined ⇒ aggregate); orders
@@ -81,25 +97,43 @@ export function UTADetailPage({ spec }: UTADetailPageProps) {
   // the newest in flight.
   const reqSeq = useRef(0)
   const refreshLive = useCallback(async () => {
-    if (!id) return
+    if (!id || !policy?.canRead) {
+      setAccount(null)
+      setPositions([])
+      setOrders([])
+      setLastUpdated(null)
+      setDataError(null)
+      return
+    }
     const seq = ++reqSeq.current
     setDataError(null)
     try {
-      const [acct, pos, ord] = await Promise.all([
-        api.trading.utaAccount(id, selectedSub).catch(() => null),
-        api.trading.utaPositions(id, selectedSub).catch(() => ({ positions: [] as Position[] })),
-        api.trading.utaOrders(id).catch(() => ({ orders: [] as unknown[] })),
+      const [acct, pos, ord] = await Promise.allSettled([
+        api.trading.utaAccount(id, selectedSub),
+        api.trading.utaPositions(id, selectedSub),
+        api.trading.utaOrders(id),
       ])
       if (seq !== reqSeq.current) return  // superseded by a newer refresh — discard
-      setAccount(acct)
-      setPositions(pos.positions)
-      setOrders(ord.orders)
+      if (acct.status === 'rejected') {
+        setAccount(null)
+        setPositions([])
+        setOrders([])
+        setLastUpdated(null)
+        setDataError(acct.reason instanceof Error ? acct.reason.message : String(acct.reason))
+        return
+      }
+      setAccount(acct.value)
+      setPositions(pos.status === 'fulfilled' ? pos.value.positions : [])
+      setOrders(ord.status === 'fulfilled' ? ord.value.orders : [])
+      setDataError(pos.status === 'rejected' || ord.status === 'rejected'
+        ? 'Some live account details could not be loaded.'
+        : null)
       setLastUpdated(new Date())
     } catch (err) {
       if (seq !== reqSeq.current) return
       setDataError(err instanceof Error ? err.message : String(err))
     }
-  }, [id, selectedSub])
+  }, [id, policy?.canRead, selectedSub])
 
   // Snapshots refresh more slowly (60s); same data feeds the NAV chart and
   // the 24h-delta anchor — no extra fetches needed.
@@ -124,7 +158,10 @@ export function UTADetailPage({ spec }: UTADetailPageProps) {
   // Market clock — mount + every 60s. The poll itself re-renders the
   // "opens in Xh Ym" countdown, so no separate ticker is needed.
   useEffect(() => {
-    if (!id) return
+    if (!id || !policy?.canRead) {
+      setClock(null)
+      return
+    }
     let cancelled = false
     const load = () => api.trading.marketClock(id)
       .then(c => { if (!cancelled) setClock(c) })
@@ -132,19 +169,20 @@ export function UTADetailPage({ spec }: UTADetailPageProps) {
     load()
     const t = setInterval(load, 60_000)
     return () => { cancelled = true; clearInterval(t) }
-  }, [id])
+  }, [id, policy?.canRead])
 
   // ?aliceId=... auto-opens the place-order form prefilled (e.g. clicked
   // from TradeableContractsPanel on the market workbench).
   useEffect(() => {
     const queryAlice = searchParams.get('aliceId')
-    if (queryAlice && !orderMode) {
-      setOrderMode({ kind: 'place', aliceId: queryAlice })
+    if (queryAlice && !orderMode && policy && readiness?.state !== 'checking' && !tradingModeLoading) {
+      if (policy.canTrade) setOrderMode({ kind: 'place', aliceId: queryAlice })
+      else setInteractionNotice(policy.reason ?? 'Trading is unavailable for this account.')
       const next = new URLSearchParams(searchParams)
       next.delete('aliceId')
       setSearchParams(next, { replace: true })
     }
-  }, [searchParams, setSearchParams, orderMode])
+  }, [searchParams, setSearchParams, orderMode, policy, readiness?.state, tradingModeLoading])
 
   // 24h delta = current NLV − the oldest snapshot still within the trailing
   // 24h window. Labeled "24h" in the UI — it IS a trailing-24h diff, not a
@@ -192,7 +230,7 @@ export function UTADetailPage({ spec }: UTADetailPageProps) {
           description="It may have been deleted or never configured. Head back to Trading to create one or pick a different UTA."
         />
         <div className="mt-4">
-          <Link to="/trading" className="btn-secondary">← Back to Trading</Link>
+          <Link to="/trading" className={buttonVariants({ variant: 'outline', size: 'sm' })}>← Back to Trading</Link>
         </div>
       </Shell>
     )
@@ -200,67 +238,90 @@ export function UTADetailPage({ spec }: UTADetailPageProps) {
 
   const isDisabled = uta.enabled === false
   const displayName = displayNameForUTA(uta, preset)
+  if (!readiness || !policy) return <Shell title={displayName}><UTADetailMainSkeleton /></Shell>
 
   return (
     <div className="flex flex-col flex-1 min-h-0">
       <PageHeader
         title={displayName}
-        live={{ lastUpdated }}
-        stackActionsOnNarrow
+        live={lastUpdated && policy.canRead ? { lastUpdated } : undefined}
         description={
-          <>
+          <span className="inline-flex flex-wrap items-center gap-x-3 gap-y-2">
             <Link to="/trading" className="text-muted-foreground hover:text-foreground">← Trading</Link>
-            <span className="mx-2 text-muted-foreground/40">·</span>
             <span className="font-mono text-muted-foreground">{uta.id}</span>
-            <span className="mx-2 text-muted-foreground/40">·</span>
-            <HealthBadge health={health} size="sm" />
-          </>
-        }
-        right={
-          // One action row, one visual language: the enable toggle (state
-          // control) sits apart from the buttons behind a divider; the
-          // secondary actions share btn-secondary-sm; Place Order is the
-          // single filled-accent primary at the same size. No hand-rolled
-          // paddings — mixed sizes were what made this row look drunk.
-          <div className="flex w-full flex-wrap items-center gap-2">
-            <div className="mr-auto flex items-center gap-2">
+            <AccountReadinessBadge readiness={readiness} health={health} size="sm" />
+            <span className="inline-flex items-center gap-2">
               <Toggle
                 ariaLabel={`${preset?.label ?? uta.id} enabled`}
                 size="sm"
                 checked={!isDisabled}
+                disabled={isDisabled && !readiness.operational}
+                title={isDisabled && !readiness.operational ? policy.reason : undefined}
                 onChange={async (v) => { await tc.saveUTA({ ...uta, enabled: v }) }}
               />
               <span className="text-[11px] text-muted-foreground">
-                {isDisabled ? 'Account disabled' : 'Account enabled'}
+                {isDisabled ? 'Configured off' : 'Configured on'}
               </span>
-            </div>
-            <div className="oa-uta-header-divider h-5 w-px bg-border" />
+            </span>
+          </span>
+        }
+        right={
             <div className="flex flex-wrap items-center gap-2">
-              <ReconnectButton accountId={uta.id} />
-              <button onClick={() => setEditing(true)} className="btn-secondary-sm">
+              <ReconnectButton accountId={uta.id} disabled={!policy.canReconnect} disabledReason={policy.reason} />
+              <Button onClick={() => setEditing(true)} variant="outline" size="sm">
                 Edit
-              </button>
-              <button
+              </Button>
+              <Button
                 onClick={() => setOrderMode({ kind: 'place' })}
-                disabled={isDisabled}
-                className="btn-primary-sm"
+                disabled={!policy.canTrade}
+                title={!policy.canTrade ? policy.reason : undefined}
+                size="sm"
               >
                 + Place Order
-              </button>
+              </Button>
             </div>
-          </div>
         }
       />
 
       <div className="flex-1 overflow-y-auto px-4 md:px-6 py-5">
         <div className="max-w-[1240px] mx-auto">
           {dataError && (
-            <div className="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-[12px] text-destructive mb-4">
+            <div className="mb-4 rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2 text-[12px] leading-[18px] text-destructive">
               Failed to load live data: {dataError}
             </div>
           )}
 
-          {!lastUpdated ? <UTADetailMainSkeleton /> : (
+          {interactionNotice && (
+            <div className="mb-4 rounded-lg border border-warning/30 bg-warning/5 px-3 py-2 text-[12px] leading-[18px] text-warning" role="status">
+              {interactionNotice}
+            </div>
+          )}
+
+          {!policy.canRead ? (
+            <div className="space-y-4">
+              <BrokerSupportGate
+                readiness={readiness}
+                installingEngine={brokerReadiness.installingEngine}
+                onInstall={brokerReadiness.install}
+                onRetry={brokerReadiness.refresh}
+              />
+              {curvePoints.length >= 2 && (
+                <div className="space-y-2">
+                  <p className="text-[11px] text-warning" role="status">
+                    Historical snapshot. Broker support is unavailable on this Runtime, so these values are stale.
+                  </p>
+                  <EquityCurve
+                    points={curvePoints}
+                    accounts={[{ id, label: displayName }]}
+                    selectedAccountId={id}
+                    onAccountChange={() => {}}
+                  />
+                </div>
+              )}
+            </div>
+          ) : !lastUpdated && !dataError ? <UTADetailMainSkeleton /> : !lastUpdated ? (
+            <EmptyState title="Live account data is unavailable." description="Retry after checking the broker connection and account health." />
+          ) : (
             <div className="space-y-5">
               {/* Keep the visual overview together, then give the operational
                   tables the full content width. The auto-fit grid responds to
@@ -302,6 +363,8 @@ export function UTADetailPage({ spec }: UTADetailPageProps) {
 
               <PositionsSection
                 positions={positions}
+                canClose={policy.canTrade}
+                closeDisabledReason={policy.reason}
                 onCloseClick={(p) => setOrderMode({
                   kind: 'close',
                   aliceId: p.contract.aliceId ?? p.contract.localSymbol ?? p.contract.symbol ?? '',
@@ -321,6 +384,11 @@ export function UTADetailPage({ spec }: UTADetailPageProps) {
           uta={uta}
           preset={preset}
           health={health}
+          readiness={readiness}
+          policy={policy}
+          installingEngine={brokerReadiness.installingEngine}
+          onInstallBrokerPack={brokerReadiness.install}
+          onRetryBrokerPack={brokerReadiness.refresh}
           onSave={async (next) => { await tc.saveUTA(next) }}
           onDelete={async () => {
             await tc.deleteUTA(uta.id)
@@ -331,7 +399,7 @@ export function UTADetailPage({ spec }: UTADetailPageProps) {
         />
       )}
 
-      {orderMode && (
+      {orderMode && policy.canTrade && (
         <OrderEntryDialog
           utaId={uta.id}
           mode={orderMode}
@@ -368,19 +436,16 @@ function SubAccountSelector({ subAccounts, selected, onSelect }: {
   selected: string | undefined
   onSelect: (id: string | undefined) => void
 }) {
-  const pill = (active: boolean) =>
-    `px-2.5 py-1 rounded text-xs font-medium transition-colors ${
-      active ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground hover:bg-accent'
-    }`
   return (
-    <div className="flex items-center gap-1 p-1 rounded-lg bg-surface border border-border">
-      <button type="button" className={pill(selected === undefined)} onClick={() => onSelect(undefined)}>All</button>
-      {subAccounts.map(s => (
-        <button key={s.id} type="button" className={pill(selected === s.id)} onClick={() => onSelect(s.id)} title={`${s.kind} wallet`}>
-          {s.label}
-        </button>
-      ))}
-    </div>
+    <SegmentedControl
+      value={selected ?? 'all'}
+      options={[
+        { value: 'all', label: 'All' },
+        ...subAccounts.map(account => ({ value: account.id, label: account.label, ariaLabel: `${account.label}, ${account.kind} wallet` })),
+      ]}
+      onChange={(value) => onSelect(value === 'all' ? undefined : value)}
+      ariaLabel="Trading wallet"
+    />
   )
 }
 
@@ -434,7 +499,7 @@ function AccountPanel({ account, positions, delta24h, clock, connecting }: {
 }) {
   if (!account) {
     return (
-      <div className="border border-border rounded-lg bg-secondary p-4">
+      <div className="rounded-lg border border-border bg-card p-4">
         {clock != null && (
           <div className="text-[12px] mb-3"><MarketClockChip clock={clock} /></div>
         )}
@@ -491,7 +556,7 @@ function AccountPanel({ account, positions, delta24h, clock, connecting }: {
     : null
 
   return (
-    <div className="border border-border rounded-lg bg-secondary p-4">
+    <div className="rounded-lg border border-border bg-card p-4">
       {clock != null && (
         <div className="text-[12px] mb-3"><MarketClockChip clock={clock} /></div>
       )}
@@ -514,8 +579,8 @@ function AccountPanel({ account, positions, delta24h, clock, connecting }: {
         {utilizationPct != null && (
           <div className="py-2">
             <div className="flex items-baseline justify-between gap-3">
-              <span className="text-[11px] uppercase tracking-wide text-muted-foreground">Utilization</span>
-              <span className="text-[13px] font-medium tabular-nums text-foreground">{utilizationPct.toFixed(1)}%</span>
+              <span className="text-[11px] font-medium text-muted-foreground">Utilization</span>
+              <span className="text-[13px] leading-[18px] font-medium tabular-nums text-foreground">{utilizationPct.toFixed(1)}%</span>
             </div>
             <div className="mt-1.5 h-[2px] rounded-full bg-muted overflow-hidden">
               <div
@@ -566,8 +631,8 @@ function AccountRow({ label, value, sign }: {
   const valueColor = sign === 'up' ? 'text-success' : sign === 'down' ? 'text-destructive' : 'text-foreground'
   return (
     <div className="flex items-baseline justify-between gap-3 py-2">
-      <span className="text-[11px] uppercase tracking-wide text-muted-foreground">{label}</span>
-      <span className={`text-[13px] font-medium tabular-nums text-right ${valueColor}`}>{value}</span>
+      <span className="text-[11px] font-medium text-muted-foreground">{label}</span>
+      <span className={`text-[13px] leading-[18px] font-medium tabular-nums text-right ${valueColor}`}>{value}</span>
     </div>
   )
 }
@@ -578,7 +643,7 @@ function Section({ title, action, children }: { title: string; action?: React.Re
   return (
     <section>
       <div className="flex items-center justify-between mb-2.5">
-        <h3 className="text-[13px] font-semibold text-muted-foreground uppercase tracking-wide">{title}</h3>
+        <h3 className="text-[13px] leading-[18px] font-semibold text-foreground">{title}</h3>
         {action}
       </div>
       {children}
@@ -590,9 +655,11 @@ function Section({ title, action, children }: { title: string; action?: React.Re
 
 interface PositionGroup { class: AssetClass; positions: Position[] }
 
-export function PositionsSection({ positions, onCloseClick }: {
+export function PositionsSection({ positions, onCloseClick, canClose = true, closeDisabledReason }: {
   positions: Position[]
   onCloseClick: (p: Position) => void
+  canClose?: boolean
+  closeDisabledReason?: string
 }) {
   const groups = useMemo<PositionGroup[]>(() => {
     const buckets = new Map<AssetClass, Position[]>()
@@ -609,9 +676,7 @@ export function PositionsSection({ positions, onCloseClick }: {
   if (positions.length === 0) {
     return (
       <Section title="Positions (0)">
-        <div className="border border-border rounded-lg px-4 py-3 text-[12px] text-muted-foreground">
-          No open positions.
-        </div>
+        <p className="py-3 text-caption text-muted-foreground">No open positions.</p>
       </Section>
     )
   }
@@ -631,10 +696,9 @@ export function PositionsSection({ positions, onCloseClick }: {
           const groupCcy = currencies.size === 1 ? [...currencies][0] : undefined
           return (
             <div key={g.class} className="border-t border-border first:border-t-0">
-              <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 bg-muted/40 px-3 py-2 text-[11px]">
+              <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 bg-muted/40 px-3 py-2 text-[11px] leading-[15px]">
                 <div className="flex items-center gap-1.5">
                   <span className="font-semibold text-foreground">{assetClassLabel(g.class)}</span>
-                  <span className="text-muted-foreground/60">·</span>
                   <span className="text-muted-foreground">
                     {g.positions.length} position{g.positions.length > 1 ? 's' : ''}
                   </span>
@@ -653,6 +717,8 @@ export function PositionsSection({ positions, onCloseClick }: {
                   key={`${g.class}-${index}`}
                   position={position}
                   onClose={() => onCloseClick(position)}
+                  canClose={canClose}
+                  closeDisabledReason={closeDisabledReason}
                 />
               ))}
             </div>
@@ -689,10 +755,9 @@ export function PositionsSection({ positions, onCloseClick }: {
                 <Fragment key={g.class}>
                   <tr className="bg-muted/40 border-t border-border">
                     <td colSpan={cols} className="px-3 py-1.5">
-                      <div className="flex items-center justify-between text-[12px]">
+                      <div className="flex items-center justify-between text-[12px] leading-[18px]">
                         <div className="flex items-center gap-2">
                           <span className="font-semibold text-foreground">{assetClassLabel(g.class)}</span>
-                          <span className="text-muted-foreground/60">·</span>
                           <span className="text-muted-foreground">{g.positions.length} position{g.positions.length > 1 ? 's' : ''}</span>
                           {!groupCcy && (
                             <span className="text-muted-foreground/60 text-[11px]">mixed ccy</span>
@@ -708,7 +773,7 @@ export function PositionsSection({ positions, onCloseClick }: {
                     </td>
                   </tr>
                   {g.positions.map((p, i) => (
-                    <PositionRow key={`${g.class}-${i}`} position={p} onClose={() => onCloseClick(p)} />
+                    <PositionRow key={`${g.class}-${i}`} position={p} onClose={() => onCloseClick(p)} canClose={canClose} closeDisabledReason={closeDisabledReason} />
                   ))}
                 </Fragment>
               )
@@ -731,13 +796,13 @@ function PositionMetric({
 }) {
   return (
     <div className="min-w-0">
-      <dt className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">{label}</dt>
-      <dd className={`mt-0.5 truncate text-[12px] tabular-nums ${valueClassName}`} title={value}>{value}</dd>
+      <dt className="text-[11px] font-medium text-muted-foreground">{label}</dt>
+      <dd className={`mt-0.5 truncate text-caption tabular-nums ${valueClassName}`} title={value}>{value}</dd>
     </div>
   )
 }
 
-function PositionMobileRow({ position: p, onClose }: { position: Position; onClose: () => void }) {
+function PositionMobileRow({ position: p, onClose, canClose, closeDisabledReason }: { position: Position; onClose: () => void; canClose: boolean; closeDisabledReason?: string }) {
   const ccy = p.currency ?? 'USD'
   const cost = Number(p.avgCost) * Number(p.quantity)
   const pnl = Number(p.unrealizedPnL)
@@ -749,19 +814,20 @@ function PositionMobileRow({ position: p, onClose }: { position: Position; onClo
     <details className="group border-t border-border">
       <summary
         aria-label={`${name} ${p.side} position, market value ${fmt(p.marketValue, ccy)}, PnL ${fmtPnl(pnl, ccy)}, ${fmtPctSigned(pct)}. Expand for position details.`}
-        className="list-none px-3 py-3 outline-none transition-colors hover:bg-muted/30 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary [&::-webkit-details-marker]:hidden"
+        className="list-none px-3 py-3 outline-none hover:bg-muted/30 focus-visible:[box-shadow:inset_0_0_0_1px_var(--oa-focus-ring)] [&::-webkit-details-marker]:hidden"
       >
         <div className="grid grid-cols-[minmax(0,1fr)_auto_16px] items-start gap-2">
           <div className="min-w-0">
             <ContractCell contract={p.contract} />
-            <span className={`mt-1 inline-flex rounded px-1.5 py-0.5 text-[10px] font-medium ${p.side === 'long' ? 'bg-success/15 text-success' : 'bg-destructive/15 text-destructive'}`}>
+            <span className={`mt-1 inline-flex rounded-sm px-1.5 py-0.5 text-[10px] leading-[14px] font-medium ${p.side === 'long' ? 'bg-success/15 text-success' : 'bg-destructive/15 text-destructive'}`}>
               {p.side}
             </span>
           </div>
           <div className="shrink-0 text-right">
-            <div className="text-[13px] font-semibold tabular-nums text-foreground">{fmt(p.marketValue, ccy)}</div>
-            <div className={`mt-1 text-[11px] tabular-nums ${pnlTone}`}>
-              {fmtPnl(pnl, ccy)} · {fmtPctSigned(pct)}
+            <div className="text-[13px] leading-[18px] font-semibold tabular-nums text-foreground">{fmt(p.marketValue, ccy)}</div>
+            <div className={`mt-1 flex justify-end gap-2 text-[11px] leading-[15px] tabular-nums ${pnlTone}`}>
+              <span>{fmtPnl(pnl, ccy)}</span>
+              <span>{fmtPctSigned(pct)}</span>
             </div>
           </div>
           <ChevronDown
@@ -783,32 +849,36 @@ function PositionMobileRow({ position: p, onClose }: { position: Position; onClo
       </dl>
       <div className="flex items-center justify-between gap-3 border-t border-border bg-secondary/20 px-3 py-2">
         <span className="text-[11px] text-muted-foreground">Position action</span>
-        <button
+        <Button
           type="button"
           onClick={onClose}
+          disabled={!canClose}
+          title={!canClose ? closeDisabledReason : undefined}
           aria-label={`Close ${name} position`}
-          className="oa-pressable inline-flex min-h-10 items-center justify-center rounded-md border border-destructive/30 px-3 text-[12px] font-medium text-destructive transition-colors hover:bg-destructive/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-destructive/40"
+          className="min-h-10"
+          variant="destructive"
+          size="sm"
         >
           Close position
-        </button>
+        </Button>
       </div>
     </details>
   )
 }
 
-function PositionRow({ position: p, onClose }: { position: Position; onClose: () => void }) {
+function PositionRow({ position: p, onClose, canClose, closeDisabledReason }: { position: Position; onClose: () => void; canClose: boolean; closeDisabledReason?: string }) {
   const ccy = p.currency ?? 'USD'
   const cost = Number(p.avgCost) * Number(p.quantity)
   const pnl = Number(p.unrealizedPnL)
   const pct = cost > 0 ? (pnl / cost) * 100 : 0
 
   return (
-    <tr className="border-t border-border hover:bg-muted/30 transition-colors">
+    <tr className="border-t border-border hover:bg-muted/30">
       <td className="px-3 py-2">
         <ContractCell contract={p.contract} />
       </td>
       <td className="px-3 py-2">
-        <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${p.side === 'long' ? 'bg-success/15 text-success' : 'bg-destructive/15 text-destructive'}`}>
+        <span className={`rounded-sm px-1.5 py-0.5 text-[10px] leading-[14px] font-medium ${p.side === 'long' ? 'bg-success/15 text-success' : 'bg-destructive/15 text-destructive'}`}>
           {p.side}
         </span>
       </td>
@@ -822,14 +892,18 @@ function PositionRow({ position: p, onClose }: { position: Position; onClose: ()
         <div className="text-[11px] font-normal opacity-80">{fmtPctSigned(pct)}</div>
       </td>
       <td className="px-3 py-2 text-right">
-        <button
+        <Button
           type="button"
           onClick={onClose}
+          disabled={!canClose}
+          title={!canClose ? closeDisabledReason : undefined}
           aria-label={`Close ${contractPrimary(p.contract)} position`}
-          className="text-[11px] text-muted-foreground hover:text-destructive transition-colors"
+          variant="ghost"
+          size="xs"
+          className="text-muted-foreground hover:text-destructive"
         >
           Close
-        </button>
+        </Button>
       </td>
     </tr>
   )
@@ -840,28 +914,34 @@ function PositionRow({ position: p, onClose }: { position: Position; onClose: ()
 type MarketClockState = { isOpen: boolean; nextOpen?: string; nextClose?: string } | 'error' | null
 
 function MarketClockChip({ clock }: { clock: NonNullable<MarketClockState> }) {
-  let dotClass = 'bg-success'
+  let Icon = CircleCheck
+  let iconClass = 'text-success'
   let label = '24/7'
 
-  if (clock !== 'error') {
+  if (clock === 'error') {
+    Icon = TriangleAlert
+    iconClass = 'text-warning'
+    label = 'Schedule unavailable'
+  } else {
     if (clock.isOpen) {
       const closes = clock.nextClose ? new Date(clock.nextClose) : null
       if (closes && !Number.isNaN(closes.getTime())) {
         const at = closes.toLocaleTimeString(getIntlLocale(), { hour: '2-digit', minute: '2-digit', hour12: false })
-        label = `Market Open · closes ${at}`
+        label = `Market open, closes ${at}`
       } else if (!clock.nextOpen && !clock.nextClose) {
         label = '24/7'  // crypto venues report open with no schedule
       } else {
         label = 'Market Open'
       }
     } else {
-      dotClass = 'bg-muted-foreground/50'
+      Icon = Clock3
+      iconClass = 'text-muted-foreground/70'
       const opens = clock.nextOpen ? new Date(clock.nextOpen) : null
       if (opens && !Number.isNaN(opens.getTime())) {
         const mins = Math.max(0, Math.round((opens.getTime() - Date.now()) / 60_000))
         const h = Math.floor(mins / 60)
         const m = mins % 60
-        label = `Market Closed · opens in ${h > 0 ? `${h}h ` : ''}${m}m`
+        label = `Market closed, opens in ${h > 0 ? `${h}h ` : ''}${m}m`
       } else {
         label = 'Market Closed'
       }
@@ -870,7 +950,7 @@ function MarketClockChip({ clock }: { clock: NonNullable<MarketClockState> }) {
 
   return (
     <span className="inline-flex items-center gap-1.5 whitespace-nowrap text-muted-foreground">
-      <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${dotClass}`} aria-hidden />
+      <Icon aria-hidden className={`size-3 shrink-0 ${iconClass}`} />
       {label}
     </span>
   )
@@ -927,24 +1007,17 @@ export function OrdersArea({ utaId, openOrders }: { utaId: string; openOrders: u
     <Section
       title="Orders"
       action={
-        <div className="flex gap-1" role="group" aria-label="Order views">
-          {tabs.map(t => (
-            <button
-              key={t.id}
-              type="button"
-              onClick={() => setTab(t.id)}
-              aria-pressed={tab === t.id}
-              aria-controls={`orders-${t.id}-panel`}
-              className={`px-2 py-0.5 text-[11px] rounded transition-colors ${
-                tab === t.id
-                  ? 'bg-primary/15 text-primary font-medium'
-                  : 'text-muted-foreground hover:text-foreground hover:bg-muted'
-              }`}
-            >
-              {t.label}
-            </button>
-          ))}
-        </div>
+        <SegmentedControl
+          value={tab}
+          options={tabs.map(candidate => ({
+            value: candidate.id,
+            label: candidate.label,
+            ariaControls: `orders-${candidate.id}-panel`,
+          }))}
+          onChange={setTab}
+          ariaLabel="Order views"
+          compact
+        />
       }
     >
       <div
@@ -964,9 +1037,7 @@ function OpenOrdersTable({ orders }: { orders: unknown[] }) {
   const rows = orders as OpenOrderRow[]
   if (rows.length === 0) {
     return (
-      <div className="border border-border rounded-lg px-4 py-3 text-[12px] text-muted-foreground">
-        No open orders.
-      </div>
+      <p className="py-3 text-caption text-muted-foreground">No open orders.</p>
     )
   }
   return (
@@ -986,7 +1057,7 @@ function OpenOrdersTable({ orders }: { orders: unknown[] }) {
         <tbody>
           {rows.map((o, i) => (
             <tr key={i} className="border-t border-border">
-              <td className="px-3 py-2 font-mono text-muted-foreground text-[11px]">{String(o.orderId ?? '—')}</td>
+              <td className="px-3 py-2 font-mono text-muted-foreground text-[11px] leading-[15px]">{String(o.orderId ?? '—')}</td>
               <td className="px-3 py-2 font-mono text-foreground" title={o.contract?.aliceId}>
                 {o.contract?.symbol ?? o.contract?.localSymbol ?? o.contract?.aliceId ?? '?'}
               </td>
@@ -1019,7 +1090,7 @@ const ORDER_HISTORY_COMPACT_WIDTH = 760
 
 function OrderStatusBadge({ status }: { status: OrderHistoryStatus }) {
   return (
-    <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${ORDER_STATUS_STYLES[status] ?? 'bg-muted text-muted-foreground'}`}>
+    <span className={`rounded-sm px-1.5 py-0.5 text-[10px] leading-[14px] font-medium ${ORDER_STATUS_STYLES[status] ?? 'bg-muted text-muted-foreground'}`}>
       {status}
     </span>
   )
@@ -1027,7 +1098,7 @@ function OrderStatusBadge({ status }: { status: OrderHistoryStatus }) {
 
 function SideBadge({ side }: { side: 'BUY' | 'SELL' }) {
   return (
-    <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${side === 'BUY' ? 'bg-success/15 text-success' : 'bg-destructive/15 text-destructive'}`}>
+    <span className={`rounded-sm px-1.5 py-0.5 text-[10px] leading-[14px] font-medium ${side === 'BUY' ? 'bg-success/15 text-success' : 'bg-destructive/15 text-destructive'}`}>
       {side}
     </span>
   )
@@ -1035,7 +1106,7 @@ function SideBadge({ side }: { side: 'BUY' | 'SELL' }) {
 
 function SourceChip({ label }: { label: string }) {
   return (
-    <span className="text-[10px] px-1.5 rounded bg-muted text-muted-foreground">
+    <span className="rounded-sm bg-muted px-1.5 text-[10px] leading-[14px] text-muted-foreground">
       {label}
     </span>
   )
@@ -1057,16 +1128,12 @@ export function OrderHistoryTable({ orders }: { orders: OrderHistoryEntry[] | nu
 
   if (orders == null) {
     return (
-      <div className="border border-border rounded-lg px-4 py-3 text-[12px] text-muted-foreground">
-        Loading order history…
-      </div>
+      <p className="py-3 text-caption text-muted-foreground">Loading order history…</p>
     )
   }
   if (orders.length === 0) {
     return (
-      <div className="border border-border rounded-lg px-4 py-3 text-[12px] text-muted-foreground">
-        No order history yet.
-      </div>
+      <p className="py-3 text-caption text-muted-foreground">No order history yet.</p>
     )
   }
 
@@ -1078,7 +1145,7 @@ export function OrderHistoryTable({ orders }: { orders: OrderHistoryEntry[] | nu
             const detailsId = `order-history-card-details-${i}`
             const isExpanded = expanded === i
             return (
-              <li key={`${o.commitHash}-${i}`} className="overflow-hidden rounded-lg border border-border bg-background">
+              <li key={`${o.commitHash}-${i}`} className="overflow-hidden rounded-lg border border-border bg-card">
                 <div className="p-3">
                   <div className="flex items-start justify-between gap-3">
                     <ContractCell contract={o.contract} />
@@ -1088,48 +1155,48 @@ export function OrderHistoryTable({ orders }: { orders: OrderHistoryEntry[] | nu
                     </span>
                   </div>
 
-                  <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-muted-foreground">
+                  <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] leading-[15px] text-muted-foreground">
                     <span className="tabular-nums">{formatHistoryTime(o.timestamp)}</span>
-                    <span aria-hidden>·</span>
                     <SideBadge side={o.side} />
-                    <span aria-hidden>·</span>
                     <span>{o.orderType ?? '—'}</span>
                   </div>
 
                   <dl className="mt-3 grid grid-cols-3 gap-2">
-                    <div className="min-w-0 rounded-md bg-muted/35 px-2.5 py-2">
-                      <dt className="text-[10px] uppercase tracking-wide text-muted-foreground">Qty</dt>
-                      <dd className="mt-0.5 truncate text-[12px] text-foreground tabular-nums">
+                    <div className="min-w-0 border-l border-border pl-2.5">
+                      <dt className="text-[11px] font-medium text-muted-foreground">Qty</dt>
+                      <dd className="mt-0.5 truncate text-[12px] leading-[18px] text-foreground tabular-nums">
                         {o.quantity != null ? fmtNum(o.quantity) : '—'}
                       </dd>
                     </div>
-                    <div className="min-w-0 rounded-md bg-muted/35 px-2.5 py-2">
-                      <dt className="text-[10px] uppercase tracking-wide text-muted-foreground">Limit</dt>
-                      <dd className="mt-0.5 truncate text-[12px] text-foreground tabular-nums">{o.limitPrice ?? '—'}</dd>
+                    <div className="min-w-0 border-l border-border pl-2.5">
+                      <dt className="text-[11px] font-medium text-muted-foreground">Limit</dt>
+                      <dd className="mt-0.5 truncate text-[12px] leading-[18px] text-foreground tabular-nums">{o.limitPrice ?? '—'}</dd>
                     </div>
-                    <div className="min-w-0 rounded-md bg-muted/35 px-2.5 py-2">
-                      <dt className="text-[10px] uppercase tracking-wide text-muted-foreground">Fill</dt>
-                      <dd className="mt-0.5 truncate text-[12px] text-foreground tabular-nums">
+                    <div className="min-w-0 border-l border-border pl-2.5">
+                      <dt className="text-[11px] font-medium text-muted-foreground">Fill</dt>
+                      <dd className="mt-0.5 truncate text-[12px] leading-[18px] text-foreground tabular-nums">
                         {o.avgFillPrice ? `${o.avgFillPrice}${o.filledQty ? ` × ${o.filledQty}` : ''}` : '—'}
                       </dd>
                     </div>
                   </dl>
 
-                  <button
+                  <Button
                     type="button"
                     aria-expanded={isExpanded}
                     aria-controls={detailsId}
                     aria-label={`${isExpanded ? 'Hide' : 'Show'} details for ${contractPrimary(o.contract)} order`}
                     onClick={() => setExpanded(prev => prev === i ? null : i)}
-                    className="oa-pressable mt-3 flex w-full items-center justify-between rounded-md border border-border px-3 py-2 text-[11px] text-muted-foreground hover:text-foreground"
+                    className="mt-3 w-full justify-between text-[11px]"
+                    variant="outline"
+                    size="sm"
                   >
                     <span>Order details</span>
                     <span>{isExpanded ? 'Hide' : 'Show'}</span>
-                  </button>
+                  </Button>
                 </div>
 
                 {isExpanded && (
-                  <div id={detailsId} className="oa-disclosure-enter border-t border-border bg-muted/20 px-3 py-2.5 text-[11px] text-muted-foreground">
+                  <div id={detailsId} className="border-t border-border bg-muted/20 px-3 py-2.5 text-[11px] text-muted-foreground">
                     <div className="font-mono text-foreground">{o.commitHash}</div>
                     <p className="mt-1 break-words leading-5">{o.message}</p>
                     {o.error && <p className="mt-1 break-words text-destructive">{o.error}</p>}
@@ -1164,7 +1231,7 @@ export function OrderHistoryTable({ orders }: { orders: OrderHistoryEntry[] | nu
           {orders.map((o, i) => (
             <Fragment key={`${o.commitHash}-${i}`}>
               <tr
-                className="border-t border-border hover:bg-muted/30 transition-colors cursor-pointer"
+                className="cursor-pointer border-t border-border hover:bg-muted/30"
                 onClick={() => setExpanded(prev => prev === i ? null : i)}
               >
                 <td className="px-3 py-2 text-muted-foreground tabular-nums whitespace-nowrap">{formatHistoryTime(o.timestamp)}</td>
@@ -1183,7 +1250,7 @@ export function OrderHistoryTable({ orders }: { orders: OrderHistoryEntry[] | nu
                   </span>
                 </td>
                 <td className="px-3 py-2 text-right">
-                  <button
+                  <Button
                     type="button"
                     aria-expanded={expanded === i}
                     aria-controls={`order-history-details-${i}`}
@@ -1192,10 +1259,12 @@ export function OrderHistoryTable({ orders }: { orders: OrderHistoryEntry[] | nu
                       event.stopPropagation()
                       setExpanded(prev => prev === i ? null : i)
                     }}
-                    className="text-[11px] text-muted-foreground hover:text-foreground transition-colors"
+                    className="text-muted-foreground"
+                    variant="ghost"
+                    size="xs"
                   >
                     {expanded === i ? 'Hide' : 'Details'}
-                  </button>
+                  </Button>
                 </td>
               </tr>
               {expanded === i && (
@@ -1223,16 +1292,12 @@ export function OrderHistoryTable({ orders }: { orders: OrderHistoryEntry[] | nu
 function TradeHistoryTable({ trades }: { trades: TradeHistoryEntry[] | null }) {
   if (trades == null) {
     return (
-      <div className="border border-border rounded-lg px-4 py-3 text-[12px] text-muted-foreground">
-        Loading trade history…
-      </div>
+      <p className="py-3 text-caption text-muted-foreground">Loading trade history…</p>
     )
   }
   if (trades.length === 0) {
     return (
-      <div className="border border-border rounded-lg px-4 py-3 text-[12px] text-muted-foreground">
-        No trades yet.
-      </div>
+      <p className="py-3 text-caption text-muted-foreground">No trades yet.</p>
     )
   }
   return (
@@ -1251,7 +1316,7 @@ function TradeHistoryTable({ trades }: { trades: TradeHistoryEntry[] | null }) {
         </thead>
         <tbody>
           {trades.map((t, i) => (
-            <tr key={`${t.commitHash}-${i}`} className="border-t border-border hover:bg-muted/30 transition-colors">
+            <tr key={`${t.commitHash}-${i}`} className="border-t border-border hover:bg-muted/30">
               <td className="px-3 py-2 text-muted-foreground tabular-nums whitespace-nowrap">{formatHistoryTime(t.timestamp)}</td>
               <td className="px-3 py-2"><ContractCell contract={t.contract} /></td>
               <td className="px-3 py-2"><SideBadge side={t.side} /></td>

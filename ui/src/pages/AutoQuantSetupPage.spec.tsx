@@ -32,8 +32,12 @@ const template: TemplateInfo = {
   hasReadme: true,
   source: {
     repository: 'https://github.com/TraderAlice/Auto-Quant-V2.git',
-    defaultVersion: 'v0.8.31',
+    defaultVersion: 'v0.9.31',
     versions: [
+      {
+        version: 'v0.9.31',
+        commit: 'adc6363a7af5a9105811735973d4d5cfac58cf36',
+      },
       {
         version: 'v0.8.31',
         commit: '426d815b18450172fbcf4c6b6af77c6ae05a4967',
@@ -95,7 +99,7 @@ function context(workspaces: readonly Workspace[]): WorkspacesContextValue {
     quickChat: vi.fn(async () => ''),
     pauseSession: vi.fn(async () => undefined),
     resumeSession: vi.fn(async () => undefined),
-    openWebPiSession: vi.fn(async () => undefined),
+    openWebSession: vi.fn(async () => undefined),
     requestDeleteSession: vi.fn(),
     setSessionPresence: vi.fn(async () => undefined),
     setSessionDisplayName: vi.fn(async () => undefined),
@@ -121,7 +125,7 @@ describe('AutoQuant setup', () => {
     render(<AutoQuantSetupPage />)
 
     expect(screen.queryByPlaceholderText('Describe the strategy, market, hypothesis, or iteration goal…')).toBeNull()
-    expect(screen.getByText('v0.8.31')).toBeTruthy()
+    expect(screen.getByText('v0.9.31')).toBeTruthy()
     fireEvent.click(screen.getByRole('button', { name: 'Initialize AutoQuant' }))
     await waitFor(() => expect(mocks.initializeAutoQuant).toHaveBeenCalledOnce())
   })
@@ -131,6 +135,7 @@ describe('AutoQuant setup', () => {
     render(<AutoQuantSetupPage />)
 
     expect(screen.getByRole('heading', { name: 'Choose your AutoQuant workspace' })).toBeTruthy()
+    expect(screen.queryByRole('button', { name: /Manage workspaces/i })).toBeNull()
     expect(screen.queryByRole('button', { name: 'Initialize AutoQuant' })).toBeNull()
     fireEvent.click(screen.getByRole('button', { name: /Quant desk/ }))
     await waitFor(() => {

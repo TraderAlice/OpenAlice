@@ -1,7 +1,11 @@
 import { describe, expect, it } from 'vitest'
 
 import type { SessionRecord, Workspace } from './api'
-import { orderSessionsForSidebar, orderWorkspacesForSidebar } from './sidebar-order'
+import {
+  orderSessionsForSidebar,
+  orderWorkspacesForSidebar,
+  workspaceActivityMs,
+} from './sidebar-order'
 
 function session(
   id: string,
@@ -69,6 +73,14 @@ describe('sidebar attention order', () => {
 
     expect(orderWorkspacesForSidebar([older, newer]).map((candidate) => candidate.id))
       .toEqual(['newer', 'older'])
+  })
+
+  it('projects recent Session activity instead of the Workspace birth date', () => {
+    const candidate = workspace('long-lived', '2026-06-15T00:00:00Z', [
+      session('recent', 'paused', '2026-09-01T07:00:00Z'),
+    ])
+
+    expect(workspaceActivityMs(candidate)).toBe(Date.parse('2026-09-01T07:00:00Z'))
   })
 
   it('lifts running sessions, then recent activity', () => {

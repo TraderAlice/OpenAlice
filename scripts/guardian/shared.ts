@@ -25,6 +25,7 @@ import { existsSync } from 'node:fs'
 import { dirname, basename, resolve } from 'node:path'
 import { probeFreePort } from '../probe-port.js'
 import { resolveLaunchCommand, resolveStockNpmShim } from '../../src/workspaces/win-command.js'
+import { listDescendantPids } from '../../packages/guardian-runtime/src/process-control.js'
 
 export {
   isLiteModeEnv,
@@ -273,16 +274,36 @@ export function spawnChild(spec: SpawnSpec): ChildProcess {
  * holding its port. That breaks UTA restart (the fresh UTA can't bind the
  * still-occupied port) and leaves zombies on shutdown. `taskkill /T` walks
  * the whole process tree; `/F` is the only reliable kill for a detached
- * console child. POSIX has no wrapper, so a direct signal is correct and
- * keeps graceful SIGTERM (which taskkill /F can't offer anyway).
+ * console child. On POSIX, OptionalServiceController keeps a bounded snapshot
+ * of descendants so a tsx watch worker can still be signaled after its tracked
+ * wrapper exits.
  */
+const knownDescendants = new WeakMap<ChildProcess, readonly number[]>()
+
 export function killTree(child: ChildProcess, signal: NodeJS.Signals = 'SIGTERM'): void {
   if (child.pid == null) return
   if (process.platform === 'win32') {
     try { spawnSync('taskkill', ['/pid', String(child.pid), '/T', '/F']) } catch { /* already gone */ }
   } else {
+    for (const pid of knownDescendants.get(child) ?? []) {
+      try { process.kill(pid, signal) } catch { /* already gone */ }
+    }
     try { child.kill(signal) } catch { /* already gone */ }
   }
+}
+
+function childTreeAlive(child: ChildProcess): boolean {
+  if (child.pid == null) return false
+  if (child.exitCode === null && child.signalCode === null) return true
+  return (knownDescendants.get(child) ?? []).some((pid) => {
+    try { process.kill(pid, 0); return true } catch { return false }
+  })
+}
+
+async function waitForChildTreeExit(child: ChildProcess, timeoutMs: number): Promise<boolean> {
+  const deadline = Date.now() + timeoutMs
+  while (childTreeAlive(child) && Date.now() < deadline) await sleep(50)
+  return !childTreeAlive(child)
 }
 
 function writePrefixed(stream: NodeJS.WriteStream, buf: Buffer, tag: string): void {
@@ -363,15 +384,11 @@ export function installCascadeShutdown(opts: CascadeOpts): CascadeControl {
     if (stopping) return
     stopping = true
     for (const c of children) {
-      if (c.exitCode === null && !c.killed) {
-        killTree(c, 'SIGTERM')
-      }
+      if (childTreeAlive(c)) killTree(c, 'SIGTERM')
     }
     setTimeout(() => {
       for (const c of children) {
-        if (c.exitCode === null && !c.killed) {
-          killTree(c, 'SIGKILL')
-        }
+        if (childTreeAlive(c)) killTree(c, 'SIGKILL')
       }
       void Promise.resolve(opts.onShutdown?.())
         .catch((err) => console.error('[guardian] shutdown cleanup failed:', err))
@@ -441,6 +458,7 @@ function childTag(c: ChildProcess, _all: ChildProcess[]): string {
 export class OptionalServiceController {
   private child: ChildProcess
   private restarting = false
+  private treeScanInProgress = false
   /** Optional cascade hooks. UTA respawn must inform cascade so SIGINT
    *  still finds the live child, and the intentional kill of the old
    *  child isn't mistaken for a crash. */
@@ -452,28 +470,44 @@ export class OptionalServiceController {
     initial: ChildProcess,
   ) {
     this.child = initial
+    this.captureProcessTree()
+    const treeTimer = setInterval(() => this.captureProcessTree(), 1_000)
+    treeTimer.unref()
+  }
+
+  private captureProcessTree(): void {
+    if (this.treeScanInProgress || this.child.pid == null) return
+    this.treeScanInProgress = true
+    const current = this.child
+    void listDescendantPids(current.pid).then((pids) => {
+      if (pids.length > 0) knownDescendants.set(current, pids)
+    }).catch(() => undefined).finally(() => { this.treeScanInProgress = false })
   }
 
   get process(): ChildProcess {
     return this.child
   }
 
-  async restart(): Promise<void> {
+  get restartInProgress(): boolean {
+    return this.restarting
+  }
+
+  async restart(): Promise<boolean> {
     if (this.restarting) {
       console.log(`[guardian] ${this.spec.name} restart already in progress, skipping`)
-      return
+      return false
     }
     this.restarting = true
     try {
       console.log(`[guardian] restarting ${this.spec.name}`)
       const old = this.child
       this.cascade?.expectExit(old)
-      const exited = new Promise<void>((resolve) => old.once('exit', () => resolve()))
-      killTree(old, 'SIGTERM')
-      await Promise.race([exited, sleep(8_000)])
-      if (old.exitCode === null) {
-        killTree(old, 'SIGKILL')
-        await exited
+      if (childTreeAlive(old)) {
+        killTree(old, 'SIGTERM')
+        if (!await waitForChildTreeExit(old, 8_000)) {
+          killTree(old, 'SIGKILL')
+          await waitForChildTreeExit(old, 5_000)
+        }
       }
 
       const next = spawnChild(this.spec)
@@ -483,9 +517,10 @@ export class OptionalServiceController {
       const ready = await waitForHttp(this.healthUrl, { timeoutMs: 15_000 })
       if (!ready) {
         console.error(`[guardian] ${this.spec.name} failed to come back up after restart`)
-        return
+        return false
       }
       console.log(`[guardian] ${this.spec.name} back online`)
+      return true
     } finally {
       this.restarting = false
     }

@@ -2,8 +2,14 @@ name: Desktop Package Smoke
 
 on:
   workflow_dispatch:
+    inputs:
+      host:
+        description: Native host for manual rehearsal; promotion PRs always retain every host.
+        type: choice
+        default: all
+        options: [all, macos-14, macos-15-intel, windows-latest]
   pull_request:
-    branches: [dev, master]
+    branches: [master]
     paths:
       - ".github/workflows/desktop-package-smoke.yml"
       - ".github/workflows/release.yml"
@@ -13,6 +19,7 @@ on:
       - "package.json"
       - "pnpm-lock.yaml"
       - "scripts/assert-desktop-package.mjs"
+      - "scripts/desktop-after-pack.mjs"
       - "scripts/desktop-package-artifact.mjs"
       - "scripts/desktop-packaged-smoke.mjs"
       - "scripts/desktop-packaged-smoke-plan.mjs"
@@ -55,34 +62,52 @@ jobs:
     name: fast preflight
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    outputs:
+      beta_release_prep: ${{ steps.beta-release-prep.outcome == 'success' && steps.beta-release-prep.outputs.beta_release_prep || 'false' }}
 
     steps:
       - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Detect exact beta release preparation
+        id: beta-release-prep
+        if: github.event_name == 'pull_request'
+        continue-on-error: true
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          git show "${BASE_SHA}:scripts/classify-beta-release-prep.mjs" > "$RUNNER_TEMP/classify-beta-release-prep.mjs"
+          node "$RUNNER_TEMP/classify-beta-release-prep.mjs" --github-output "$GITHUB_OUTPUT"
 
       - uses: pnpm/action-setup@v6
+        if: steps.beta-release-prep.outcome != 'success' || steps.beta-release-prep.outputs.beta_release_prep != 'true'
 
       - uses: actions/setup-node@v7
+        if: steps.beta-release-prep.outcome != 'success' || steps.beta-release-prep.outputs.beta_release_prep != 'true'
         with:
           node-version: 22
           cache: pnpm
 
       - name: Install dependencies
+        if: steps.beta-release-prep.outcome != 'success' || steps.beta-release-prep.outputs.beta_release_prep != 'true'
         run: pnpm install --frozen-lockfile
 
       - name: Verify CI workflow contracts
-        run: >-
-          pnpm exec vitest run
-          scripts/ci-workflow.spec.ts
-          scripts/desktop-package-workflow.spec.ts
-          scripts/release-workflow.spec.ts
+        if: steps.beta-release-prep.outcome != 'success' || steps.beta-release-prep.outputs.beta_release_prep != 'true'
+        run: pnpm test:contract:workflow
 
       - name: Typecheck root workspace
+        if: steps.beta-release-prep.outcome != 'success' || steps.beta-release-prep.outputs.beta_release_prep != 'true'
         run: npx tsc --noEmit
         timeout-minutes: 5
 
   broker-packs-windows:
     name: broker-packs windows-latest
     needs: preflight
+    if: >-
+      needs.preflight.outputs.beta_release_prep != 'true' &&
+      (github.event_name != 'workflow_dispatch' || inputs.host == 'all' || inputs.host == 'windows-latest')
     runs-on: windows-latest
     timeout-minutes: 25
 
@@ -101,8 +126,16 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version-file: ".bun-version"
+
       - name: Build optional Broker Packs on Windows
         run: pnpm broker-packs:build
+        timeout-minutes: 20
+
+      - name: Verify Broker Packs in compiled runtime
+        run: pnpm exec tsx scripts/verify-broker-packs.ts --compiled
         timeout-minutes: 10
 
       - name: Prove previous-release Broker Pack upgrade on Windows
@@ -112,18 +145,19 @@ jobs:
   package:
     name: package ${{ matrix.os }}
     needs: preflight
+    if: needs.preflight.outputs.beta_release_prep != 'true'
     runs-on: ${{ matrix.os }}
     timeout-minutes: 45
     strategy:
       fail-fast: false
       matrix:
-        include:
-          - os: macos-14
-            arch: arm64
-          - os: macos-15-intel
-            arch: x64
-          - os: windows-latest
-            arch: x64
+        include: >-
+          ${{ fromJSON(
+            github.event_name == 'workflow_dispatch' && inputs.host == 'macos-14' && '[{"os":"macos-14","arch":"arm64"}]' ||
+            github.event_name == 'workflow_dispatch' && inputs.host == 'macos-15-intel' && '[{"os":"macos-15-intel","arch":"x64"}]' ||
+            github.event_name == 'workflow_dispatch' && inputs.host == 'windows-latest' && '[{"os":"windows-latest","arch":"x64"}]' ||
+            '[{"os":"macos-14","arch":"arm64"},{"os":"macos-15-intel","arch":"x64"},{"os":"windows-latest","arch":"x64"}]'
+          ) }}
 
     steps:
       - uses: actions/checkout@v7
@@ -147,6 +181,9 @@ jobs:
         shell: bash
         run: |
           node -e "const{existsSync}=require('fs');const{dirname,join}=require('path');const g=join(dirname(require.resolve('dugite/package.json')),'git');if(!existsSync(g)){console.error('dugite embedded git MISSING at '+g);process.exit(1)}console.log('dugite embedded git OK '+g)"
+
+      - name: Verify package inspectors on the native host
+        run: pnpm exec vitest run scripts/assert-desktop-package.spec.ts scripts/desktop-after-pack.spec.ts scripts/smoke-packaged-toolchain.spec.ts
 
       - name: Build Alice + UTA + desktop shell
         run: pnpm electron:build

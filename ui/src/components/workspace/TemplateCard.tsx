@@ -1,6 +1,7 @@
-import { Bot, Code, Cpu, Sparkles, Terminal, type LucideIcon } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 
+import { Button } from '../ui/button'
+import { AgentRuntimeIcon } from '../../lib/agentRuntimeIcon'
 import type { AgentInfo, TemplateInfo } from './api'
 
 /**
@@ -10,18 +11,8 @@ import type { AgentInfo, TemplateInfo } from './api'
  * detail tab where the README and spawn form live.
  */
 
-const AGENT_ICONS: Record<string, LucideIcon> = {
-  claude: Sparkles,
-  codex: Cpu,
-  opencode: Code,
-  pi: Bot,
-  shell: Terminal,
-}
-
 function AgentGlyph({ agent }: { agent: string }) {
-  const Icon = AGENT_ICONS[agent]
-  if (Icon) return <Icon size={12} strokeWidth={2.25} aria-hidden="true" />
-  return <span aria-hidden="true" className="text-[11px] font-mono">·</span>
+  return <AgentRuntimeIcon agentId={agent} className="size-3.5 shrink-0" />
 }
 
 function humanize(name: string): string {
@@ -45,36 +36,37 @@ export function TemplateCard({ template: t, agents, onOpen }: Props) {
   const { t: tr } = useTranslation()
   const title = t.displayName ?? humanize(t.name)
   return (
-    <button
+    <Button
       type="button"
+      variant="outline"
       onClick={onOpen}
-      className="group rounded-lg border border-border bg-secondary hover:bg-muted/40 hover:border-border/80 transition-colors cursor-pointer p-4 flex flex-col gap-3 text-left"
+      className="group h-auto min-h-0 w-full cursor-pointer items-stretch justify-start gap-3 rounded-lg bg-secondary/45 p-4 text-left whitespace-normal"
     >
       <div className="flex items-start gap-2.5">
         <div className="flex-1 min-w-0">
           <div className="flex items-baseline gap-2">
-            <h3 className="text-[14px] font-semibold text-foreground truncate" title={t.name}>
+            <h3 className="text-[14px] leading-[19px] font-semibold text-foreground truncate" title={t.name}>
               {title}
             </h3>
-            <span className="text-[11px] font-mono text-muted-foreground tabular-nums">
+            <span className="text-[11px] leading-[15px] font-mono text-muted-foreground tabular-nums">
               v{t.version}
             </span>
             {t.community && (
-              <span className="text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded border border-border text-muted-foreground">
+              <span className="rounded-sm border border-border px-1.5 py-0.5 text-[10px] leading-[14px] font-medium text-muted-foreground">
                 {tr('templates.communityBadge')}
               </span>
             )}
           </div>
           {t.description && (
-            <p className="text-[12px] text-muted-foreground line-clamp-3 mt-1">
+            <p className="text-[12px] leading-[18px] text-muted-foreground line-clamp-3 mt-1">
               {t.description}
             </p>
           )}
         </div>
       </div>
 
-      <div className="border-t border-border pt-3 flex items-center gap-3 flex-wrap">
-        <div className="text-[10px] uppercase tracking-wider text-muted-foreground/70">
+      <div className="flex flex-wrap items-center gap-3 border-t border-border pt-3">
+        <div className="text-[11px] leading-[15px] font-medium text-muted-foreground/70">
           {tr('templates.agentsLabel')}
         </div>
         <div className="flex items-center gap-2 text-muted-foreground flex-wrap">
@@ -85,7 +77,7 @@ export function TemplateCard({ template: t, agents, onOpen }: Props) {
             return (
               <span
                 key={a.id}
-                className={`flex items-center gap-1 text-[11px] ${missing ? 'opacity-40' : ''}`}
+                className={`flex items-center gap-1 text-[11px] leading-[15px] ${missing ? 'opacity-40' : ''}`}
                 title={missing ? `${a.id} — ${tr('templates.agentNotInstalled')}` : a.id}
               >
                 <AgentGlyph agent={a.id} />
@@ -95,6 +87,6 @@ export function TemplateCard({ template: t, agents, onOpen }: Props) {
           })}
         </div>
       </div>
-    </button>
+    </Button>
   )
 }

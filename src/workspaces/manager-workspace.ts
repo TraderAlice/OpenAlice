@@ -35,7 +35,7 @@ Operating contract:
 - Inspect, compare, question, and coordinate active Workspaces for the user.
 - NEVER create reports, research files, Issues, or other business artifacts in this top-level directory.
 - When work needs a durable artifact, choose the responsible Workspace, resolve its path, and write or delegate the work there.
-- Prefer OpenAlice's alice-workspace CLI over raw HTTP. Start from live CLI help when a flag is uncertain.
+- Prefer OpenAlice's alice CLI over raw HTTP. Start from live CLI help when a flag is uncertain.
 - Use peer inventory, global Issue reads, Session provenance, and attributable conversation commands before guessing why a desk or coworker did something.
 - The first management pass MUST use structured product indexes only: peer list and, when relevant, issue list. Recent Session titles in peer list are the first-pass responsibility map.
 - Treat the identity hierarchy as load-bearing: when a relevant recent Session exposes a resumeId, continue that exact coworker with conversation ask --resume-id. Use --ws-id to recruit a fresh coworker for new work or when no attributable Session exists. Add --reconstruct only when missing historical intent must be reconstructed, and never present a fresh worker as the original author.

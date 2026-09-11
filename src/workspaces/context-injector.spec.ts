@@ -85,9 +85,9 @@ describe('injectWorkspaceContext — instructions', () => {
     expect(instruction).toContain('Every price, return, date, ratio');
     expect(instruction).toContain('A comment is a board');
     expect(instruction).toContain('OpenAlice does not wrap');
-    expect(instruction).toContain('The `alice-workspace` skill contains the exact commands');
-    expect(instruction).not.toContain('alice-workspace issue comment --text');
-    expect(instruction).not.toContain('alice-workspace inbox push --doc');
+    expect(instruction).toContain('The `alice` skill contains the exact commands');
+    expect(instruction).not.toContain('alice issue comment --text');
+    expect(instruction).not.toContain('alice inbox push --doc');
     expect(instruction).not.toContain('--when');
   });
 });
@@ -113,7 +113,7 @@ describe('injectWorkspaceContext — skills', () => {
     });
     for (const root of ['.claude/skills', '.agents/skills']) {
       const skill = await read(`${root}/delegate-autoquant/SKILL.md`);
-      expect(skill).toContain('alice-workspace conversation ask --harness autoquant');
+      expect(skill).toContain('alice conversation create --harness autoquant');
       expect(skill).toContain('The universal result is the Agent\'s ordinary `assistantText` handoff');
       expect(skill).toContain('does not automatically publish either artifact to the');
       expect(skill).toContain('Primary deliverable directory: <absolute path>');
@@ -127,7 +127,7 @@ describe('injectWorkspaceContext — skills', () => {
       wsId: 'ws-abc',
       dir,
     });
-    for (const name of ['alice', 'alice-analysis', 'alice-uta', 'alice-workspace', 'traderhub', 'scan-value-chain']) {
+    for (const name of ['alice', 'alice-analysis', 'alice-uta', 'traderhub', 'file-delivery', 'scan-value-chain']) {
       expect(existsSync(join(dir, '.claude/skills', name, 'SKILL.md')), name).toBe(true);
       expect(existsSync(join(dir, '.agents/skills', name, 'SKILL.md')), name).toBe(true);
     }
@@ -140,12 +140,12 @@ describe('injectWorkspaceContext — skills', () => {
       wsId: 'ws-abc',
       dir,
     });
-    const skill = await read('.agents/skills/alice-workspace/SKILL.md');
+    const skill = await read('.agents/skills/alice/references/collaboration.md');
     expect(skill).toContain('There is deliberately no Workspace-level file-read command');
-    expect(skill).toContain('alice-workspace peer path --id <workspaceId>');
+    expect(skill).toContain('alice peer path --id <workspaceId>');
     expect(skill).toContain("Coding Agent's native Read/Search/Glob/Git capabilities");
-    expect(skill).toContain('alice-workspace conversation ask --inbox-id <entryId>');
-    expect(skill).toContain('alice-workspace conversation ask --harness autoquant');
+    expect(skill).toContain('alice conversation ask --inbox-id <entryId>');
+    expect(skill).toContain('alice conversation create --harness autoquant');
     expect(skill).not.toContain('peer file-read');
   });
 
@@ -200,3 +200,12 @@ describe('injectWorkspaceContext — skills', () => {
     expect(existsSync(join(dir, '.pi/skills/scan-value-chain/SKILL.md'))).toBe(false);
   });
 });
+
+it('installs the optional sticker Skill only for a new full Chat projection', async () => {
+  const template = makeTemplate({ name: 'chat' })
+  await injectWorkspaceContext({ template, wsId: 'chat', dir, templateOnly: true })
+  expect(existsSync(join(dir, '.agents/skills/alice-stickers/SKILL.md'))).toBe(false)
+  await injectWorkspaceContext({ template, wsId: 'chat', dir })
+  expect(await readFile(join(dir, '.agents/skills/alice-stickers/SKILL.md'), 'utf8')).toContain('[[sticker/wave.png]]')
+  expect(existsSync(join(dir, 'sticker/wave.png'))).toBe(true)
+})

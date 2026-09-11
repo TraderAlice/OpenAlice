@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { globRss, grepRss, readRss, windowRss, type NewsToolContext } from './archive'
+import { createNewsArchiveTools, globRss, grepRss, readRss, windowRss, type NewsToolContext } from './archive'
 import type { NewsItem } from '../types'
 
 describe('news tools (pure functions)', () => {
@@ -311,5 +311,36 @@ describe('news tools (pure functions)', () => {
       expect(out.map((r) => r.id)).toEqual([10, 30]) // both mention Bitcoin, oldest-first
       expect(out[0].matchedText).toMatch(/Bitcoin/)
     })
+  })
+})
+
+
+describe('archive tool provider boundary', () => {
+  const articles = Array.from({ length: 501 }, (_, index) => ({
+    id: index + 1, time: new Date(Date.now() - (502 - index) * 1000),
+    title: index === 0 ? 'rare catalyst' : 'routine update',
+    content: index === 0 ? 'rare catalyst evidence' : 'routine', metadata: {},
+  }))
+  const provider = {
+    getNewsV2: async ({ limit }: { limit?: number }) => limit ? articles.slice(-limit) : articles,
+  }
+  it('matches before limiting results, including articles older than the newest 500', async () => {
+    const tools = createNewsArchiveTools(provider)
+    for (const name of ['globRss', 'grepRss'] as const) {
+      const result = await tools[name].execute!({ pattern: 'rare catalyst', limit: 1 }, { toolCallId: 'test', messages: [] })
+      expect(result).toMatchObject([{ id: 1 }])
+    }
+    expect(await tools.readRss.execute!({ id: 1 }, { toolCallId: 'test', messages: [] })).toMatchObject({ id: 1 })
+  })
+  it('counts the complete indexed window before applying its output cap', async () => {
+    const many = Array.from({ length: 5001 }, (_, index) => ({ ...articles[0], id: index + 1 }))
+    const tools = createNewsArchiveTools({ getNewsV2: async ({ limit }) => limit ? many.slice(-limit) : many })
+    const result = await tools.windowRss.execute!({ from: '2020-01-01', limit: 1 }, { toolCallId: 'test', messages: [] })
+    expect(result).toMatchObject({ total: 5001, shown: 1, omitted: 5000, results: [{ id: 1 }] })
+  })
+  it('reads by durable id when the provider supports it', async () => {
+    const tools = createNewsArchiveTools({ getNewsV2: async () => [], getNewsById: async (id) => id === 1 ? articles[0] : null })
+    expect(await tools.readRss.execute!({ id: 1 }, { toolCallId: 'test', messages: [] })).toMatchObject({ id: 1 })
+    expect(await tools.readRss.execute!({ id: 9999 }, { toolCallId: 'test', messages: [] })).toMatchObject({ error: expect.any(String) })
   })
 })

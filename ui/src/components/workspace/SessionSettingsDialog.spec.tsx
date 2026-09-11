@@ -5,11 +5,13 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { i18n } from '../../i18n'
 import type { AgentLaunchConfigState } from '../../hooks/useAgentLaunchConfig'
+import type { PinnedRuntimeDraft } from '../../hooks/usePinnedRuntimeDraft'
 import type { SessionRecord } from './api'
 import { SessionSettingsDialog } from './SessionSettingsDialog'
 
 const launchConfig = {
   effectiveAgent: 'claude',
+  selectedAgent: { id: 'claude', displayName: 'Claude Code' },
   accessMode: 'vault',
   launchCredentialSlug: 'deepseek-1',
   launchModel: 'deepseek-v4-flash',
@@ -18,9 +20,36 @@ const launchConfig = {
   selectRuntimeDefault: vi.fn(),
 } as unknown as AgentLaunchConfigState
 
-vi.mock('../../hooks/useAgentLaunchConfig', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../../hooks/useAgentLaunchConfig')>()),
-  useAgentLaunchConfig: () => launchConfig,
+const editor = {
+  config: launchConfig,
+  draft: {
+    agent: 'claude',
+    accessMode: 'vault',
+    credentialSlug: 'deepseek-1',
+    model: 'deepseek-v4-flash',
+    reasoningEffort: 'high',
+  },
+  initial: {
+    agent: 'claude',
+    accessMode: 'vault',
+    credentialSlug: 'deepseek-1',
+    model: 'deepseek-v4-flash',
+    reasoningEffort: 'high',
+  },
+  dirty: false,
+  toRuntimeUpdate: () => ({
+    credentialSource: 'vault' as const,
+    credentialSlug: 'deepseek-1',
+    model: launchConfig.launchModel ?? null,
+    reasoningEffort: launchConfig.launchReasoningEffort ?? null,
+  }),
+  capability: () => ({ access: 'DeepSeek API', model: 'deepseek-v4-flash', effort: 'high' }),
+  formatCapability: () => 'DeepSeek API · deepseek-v4-flash · high',
+} as unknown as PinnedRuntimeDraft
+
+vi.mock('../../hooks/usePinnedRuntimeDraft', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../hooks/usePinnedRuntimeDraft')>()),
+  usePinnedRuntimeDraft: () => editor,
 }))
 
 vi.mock('./AgentLaunchControls', () => ({
@@ -71,11 +100,11 @@ describe('SessionSettingsDialog', () => {
     const onOpenChange = vi.fn()
     const onSaveDisplayName = vi.fn(async () => {})
     const onSaveRuntime = vi.fn(async () => {})
-    // Force a dirty AI save by changing the mocked launch selection.
     Object.assign(launchConfig, {
       launchModel: 'deepseek-v4-pro',
       launchReasoningEffort: 'xhigh',
     })
+    Object.assign(editor, { dirty: true })
 
     render(<SessionSettingsDialog
       open
@@ -108,6 +137,7 @@ describe('SessionSettingsDialog', () => {
       launchModel: 'deepseek-v4-flash',
       launchReasoningEffort: 'high',
     })
+    Object.assign(editor, { dirty: false })
 
     render(<SessionSettingsDialog
       open
@@ -136,6 +166,7 @@ describe('SessionSettingsDialog', () => {
       launchModel: null,
       launchReasoningEffort: null,
     })
+    Object.assign(editor, { dirty: true })
 
     render(<SessionSettingsDialog
       open

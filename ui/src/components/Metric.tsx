@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react'
+import { ArrowDownRight, ArrowUpRight, Minus } from 'lucide-react'
 
 export type MetricSize = 'sm' | 'md' | 'lg'
 export type MetricSign = 'up' | 'down' | 'flat'
@@ -43,11 +44,12 @@ export function Metric({ label, value, delta, valueSign, size = 'md', className 
 
   return (
     <div className={className}>
-      <p className="text-[11px] text-muted-foreground uppercase tracking-wide">{label}</p>
+      <p className="text-[11px] font-medium leading-4 text-muted-foreground">{label}</p>
       <p className={valueClass}>{value}</p>
       {delta && (
-        <p className={`text-[12px] tabular-nums mt-0.5 ${signColor(delta.sign)}`}>
-          {arrowFor(delta.sign)} {delta.value}
+        <p className={`mt-0.5 inline-flex items-center gap-1 text-[12px] leading-4 tabular-nums ${signColor(delta.sign)}`}>
+          <DeltaIcon sign={delta.sign} />
+          {delta.value}
         </p>
       )}
     </div>
@@ -60,10 +62,9 @@ function signColor(sign?: MetricSign): string {
   return 'text-foreground'
 }
 
-function arrowFor(sign: MetricSign): string {
-  if (sign === 'up') return '▲'
-  if (sign === 'down') return '▼'
-  return '·'
+function DeltaIcon({ sign }: { sign: MetricSign }) {
+  const Icon = sign === 'up' ? ArrowUpRight : sign === 'down' ? ArrowDownRight : Minus
+  return <Icon aria-hidden className="size-3 shrink-0" />
 }
 
 /** Pick a sign from a numeric delta. `flat` for `0` (or NaN). */

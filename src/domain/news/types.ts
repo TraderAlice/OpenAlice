@@ -82,4 +82,6 @@ export interface INewsProvider {
    * @returns News list (ascending by time, newest last)
    */
   getNewsV2(options: GetNewsV2Options): Promise<NewsItem[]>
+  /** Resolve a durable id beyond the recent search index, when supported. */
+  getNewsById?(id: number): Promise<NewsItem | null>
 }

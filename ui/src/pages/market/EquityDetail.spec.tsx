@@ -10,7 +10,7 @@ vi.mock('../../components/market/ProfilePanel', () => ({ ProfilePanel: () => <di
 vi.mock('../../components/market/KeyMetricsPanel', () => ({ KeyMetricsPanel: () => <div>metrics-panel</div> }))
 vi.mock('../../components/market/FinancialStatementsPanel', () => ({ FinancialStatementsPanel: () => <div>statements-panel</div> }))
 vi.mock('../../components/market/KlinePanel', () => ({ KlinePanel: () => <div>kline-panel</div> }))
-vi.mock('../../components/market/TradeableContractsPanel', () => ({ TradeableContractsPanel: () => <div>contracts-panel</div> }))
+vi.mock('../../components/market/TradeableContractsPanel', () => ({ TradeableContractsPanel: ({ symbol }: { symbol: string }) => <div>contracts-panel {symbol}</div> }))
 
 afterEach(cleanup)
 
@@ -18,9 +18,9 @@ describe('EquityDetail provider namespaces', () => {
   it('keeps Eastmoney native secids on the supported K-line-only surface', () => {
     render(<EquityDetail symbol="1.600519" source="eastmoney|1.600519" />)
 
-    expect(screen.getByText(/Eastmoney provides Chinese A-share discovery/)).toBeTruthy()
+    expect(screen.queryByText(/This Eastmoney view/)).toBeNull()
     expect(screen.getByText('kline-panel')).toBeTruthy()
-    expect(screen.getByText('contracts-panel')).toBeTruthy()
+    expect(screen.getByText('contracts-panel 600519')).toBeTruthy()
     expect(screen.queryByText('quote-panel')).toBeNull()
     expect(screen.queryByText('profile-panel')).toBeNull()
     expect(screen.queryByText('metrics-panel')).toBeNull()

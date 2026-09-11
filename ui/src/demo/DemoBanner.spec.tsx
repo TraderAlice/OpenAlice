@@ -16,10 +16,12 @@ describe('DemoBanner', () => {
   it('uses the active interface language for the global demo notice', () => {
     render(<DemoBanner />)
 
-    expect(screen.getByText('演示')).toBeTruthy()
-    expect(screen.getByText('快照数据 · 模拟 AI')).toBeTruthy()
+    const badge = screen.getByText('演示')
+    expect(badge.children).toHaveLength(0)
+    expect(screen.getByText('录制预览')).toBeTruthy()
     expect(screen.getByText(/更改不会保存/)).toBeTruthy()
-    expect(screen.getByRole('link', { name: '安装 →' }).getAttribute('href')).toBe(
+    expect(document.body.textContent).not.toContain('·')
+    expect(screen.getByRole('link', { name: '安装 OpenAlice' }).getAttribute('href')).toBe(
       'https://github.com/TraderAlice/OpenAlice',
     )
   })

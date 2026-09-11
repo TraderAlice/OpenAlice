@@ -104,7 +104,7 @@ describe('issueRunRecord', () => {
       taskId: 'task-1',
       resumeId: 'resume-gentle-otter-abc123',
       wsId: 'ws-1',
-      trigger: { kind: 'issue', workspaceId: 'ws-home', issueId: 'audit' },
+      trigger: { kind: 'issue', workspaceId: 'ws-home', issueId: 'audit', retryOfTaskId: 'failed-occurrence' },
       agent: 'codex',
       prompt: 'inspect it',
       status: 'done',
@@ -116,6 +116,7 @@ describe('issueRunRecord', () => {
       taskId: 'task-1',
       resumeId: 'resume-gentle-otter-abc123',
       resumable: true,
+      retryOfTaskId: 'failed-occurrence',
     })
     expect(projected).not.toHaveProperty('agentSessionId')
   })

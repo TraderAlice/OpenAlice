@@ -18,6 +18,7 @@ export interface AlpacaBrokerRaw {
 }
 
 export interface AlpacaPositionRaw {
+  asset_class?: string
   symbol: string
   side: string
   qty: string
@@ -30,6 +31,7 @@ export interface AlpacaPositionRaw {
 }
 
 export interface AlpacaOrderRaw {
+  asset_class?: string
   id: string
   symbol: string
   side: string

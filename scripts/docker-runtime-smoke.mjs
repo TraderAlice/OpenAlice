@@ -224,8 +224,8 @@ async function runCredentialedConversation(baseUrl, workspaceId, agent, model) {
     resumeId: first.resumeId,
     prompt: [
       'Use the Bash tool to run these commands in order:',
-      `alice-workspace issue create --title "${issueId}" --what "Docker CLI marker ${dataMarker}"`,
-      `alice-workspace issue show --id "${issueId}"`,
+      `alice issue create --title "${issueId}" --what "Docker CLI marker ${dataMarker}"`,
+      `alice issue show --id "${issueId}"`,
       `Only if the second command output contains ${dataMarker}, reply exactly: CLI_DATA_OK ${dataMarker}`,
     ].join('\n'),
   })

@@ -29,8 +29,8 @@ export interface IssueComment {
   replyTo?: string
   /** Delivery is optional for agent-authored notes and owner self-comments. */
   delivery?: IssueCommentDelivery
-  /** Present when the comment arrived through a Connector owner chat. */
-  via?: 'telegram'
+  /** Connector id when the comment arrived through that adapter's owner chat. */
+  via?: string
 }
 
 const headlessTurnProgressSchema = z.object({
@@ -102,7 +102,7 @@ const issueCommentSchema = z.object({
   markdown: z.string().min(1),
   replyTo: z.string().min(1).optional(),
   delivery: issueCommentDeliverySchema.optional(),
-  via: z.literal('telegram').optional(),
+  via: z.string().min(1).max(64).optional(),
 })
 
 const issueCommentsFileSchema = z.object({
@@ -136,7 +136,7 @@ export async function readIssueComments(
 }
 
 export type AppendIssueCommentResult =
-  | { ok: true; issue: IssueRecord; comment: IssueComment }
+  | { ok: true; issue: IssueRecord; comment: IssueComment; created: boolean }
   | { ok: false; reason: 'not_found' }
   | { ok: false; reason: 'invalid'; error: string }
 
@@ -146,7 +146,7 @@ export interface AppendIssueCommentOptions {
   at?: string
   replyTo?: string
   delivery?: IssueCommentDelivery
-  via?: 'telegram'
+  via?: string
 }
 
 async function writeIssueComments(wsDir: string, id: string, comments: IssueComment[]): Promise<void> {
@@ -202,7 +202,7 @@ export async function appendIssueComment(
 
     if (options.id) {
       const duplicate = existing.comments.find((comment) => comment.id === options.id)
-      if (duplicate) return { ok: true, issue: issue.issue, comment: duplicate }
+      if (duplicate) return { ok: true, issue: issue.issue, comment: duplicate, created: false }
     }
 
     const comment: IssueComment = {
@@ -215,7 +215,7 @@ export async function appendIssueComment(
       ...(options.via ? { via: options.via } : {}),
     }
     await writeIssueComments(wsDir, id, [...existing.comments, comment])
-    return { ok: true, issue: issue.issue, comment }
+    return { ok: true, issue: issue.issue, comment, created: true }
   })
 }
 

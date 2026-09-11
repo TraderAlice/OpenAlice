@@ -33,7 +33,7 @@ describe('UTA — full trading lifecycle', () => {
     const commitResult = uta.commit('buy 10 AAPL')
     expect(commitResult.prepared).toBe(true)
 
-    const pushResult = await uta.push()
+    const pushResult = await uta.push(uta.status().pendingHash!)
     // Push only returns submitted — never filled
     expect(pushResult.submitted).toHaveLength(1)
     expect(pushResult.rejected).toHaveLength(0)
@@ -53,7 +53,7 @@ describe('UTA — full trading lifecycle', () => {
   it('market buy fills at push time — no sync needed', async () => {
     uta.stagePlaceOrder({ aliceId: 'mock-paper|AAPL', symbol: 'AAPL', action: 'BUY', orderType: 'MKT', totalQuantity: '10' })
     uta.commit('buy AAPL')
-    const pushResult = await uta.push()
+    const pushResult = await uta.push(uta.status().pendingHash!)
 
     // Market order fills synchronously — status is 'filled' at push time
     expect(pushResult.submitted[0].status).toBe('filled')
@@ -66,12 +66,12 @@ describe('UTA — full trading lifecycle', () => {
   it('getState reflects positions and pending orders', async () => {
     uta.stagePlaceOrder({ aliceId: 'mock-paper|AAPL', symbol: 'AAPL', action: 'BUY', orderType: 'MKT', totalQuantity: '10' })
     uta.commit('buy AAPL')
-    await uta.push()
+    await uta.push(uta.status().pendingHash!)
 
     // Place a limit order (goes submitted)
     uta.stagePlaceOrder({ aliceId: 'mock-paper|ETH', symbol: 'ETH', action: 'BUY', orderType: 'LMT', totalQuantity: '1', lmtPrice: '1800' })
     uta.commit('limit buy ETH')
-    const limitPush = await uta.push()
+    const limitPush = await uta.push(uta.status().pendingHash!)
     expect(limitPush.submitted).toHaveLength(1)
 
     const state = await uta.getState()
@@ -83,7 +83,7 @@ describe('UTA — full trading lifecycle', () => {
   it('limit order → submitted → fill → sync detects filled', async () => {
     uta.stagePlaceOrder({ aliceId: 'mock-paper|AAPL', symbol: 'AAPL', action: 'BUY', orderType: 'LMT', totalQuantity: '5', lmtPrice: '145' })
     uta.commit('limit buy AAPL')
-    const pushResult = await uta.push()
+    const pushResult = await uta.push(uta.status().pendingHash!)
     expect(pushResult.submitted).toHaveLength(1)
 
     const orderId = pushResult.submitted[0].orderId!
@@ -110,11 +110,11 @@ describe('UTA — full trading lifecycle', () => {
   it('partial close reduces position', async () => {
     uta.stagePlaceOrder({ aliceId: 'mock-paper|AAPL', symbol: 'AAPL', action: 'BUY', orderType: 'MKT', totalQuantity: '10' })
     uta.commit('buy')
-    await uta.push()
+    await uta.push(uta.status().pendingHash!)
 
     uta.stageClosePosition({ aliceId: 'mock-paper|AAPL', qty: '3' })
     uta.commit('partial close')
-    const closeResult = await uta.push()
+    const closeResult = await uta.push(uta.status().pendingHash!)
     expect(closeResult.submitted).toHaveLength(1)
 
     const positions = await broker.getPositions()
@@ -125,11 +125,11 @@ describe('UTA — full trading lifecycle', () => {
   it('full close removes position + restores cash', async () => {
     uta.stagePlaceOrder({ aliceId: 'mock-paper|AAPL', symbol: 'AAPL', action: 'BUY', orderType: 'MKT', totalQuantity: '10' })
     uta.commit('buy')
-    await uta.push()
+    await uta.push(uta.status().pendingHash!)
 
     uta.stageClosePosition({ aliceId: 'mock-paper|AAPL' })
     uta.commit('close all')
-    await uta.push()
+    await uta.push(uta.status().pendingHash!)
 
     expect(await broker.getPositions()).toHaveLength(0)
     const account = await broker.getAccount()
@@ -139,12 +139,12 @@ describe('UTA — full trading lifecycle', () => {
   it('cancel pending order', async () => {
     uta.stagePlaceOrder({ aliceId: 'mock-paper|AAPL', symbol: 'AAPL', action: 'BUY', orderType: 'LMT', totalQuantity: '5', lmtPrice: '140' })
     uta.commit('limit buy')
-    const pushResult = await uta.push()
+    const pushResult = await uta.push(uta.status().pendingHash!)
     const orderId = pushResult.submitted[0].orderId!
 
     uta.stageCancelOrder({ orderId })
     uta.commit('cancel')
-    await uta.push()
+    await uta.push(uta.status().pendingHash!)
 
     const order = await broker.getOrder(orderId)
     expect(order!.orderState.status).toBe('Cancelled')
@@ -153,11 +153,11 @@ describe('UTA — full trading lifecycle', () => {
   it('trading history records all commits', async () => {
     uta.stagePlaceOrder({ aliceId: 'mock-paper|AAPL', symbol: 'AAPL', action: 'BUY', orderType: 'MKT', totalQuantity: '10' })
     uta.commit('buy AAPL')
-    await uta.push()
+    await uta.push(uta.status().pendingHash!)
 
     uta.stageClosePosition({ aliceId: 'mock-paper|AAPL' })
     uta.commit('close AAPL')
-    await uta.push()
+    await uta.push(uta.status().pendingHash!)
 
     const history = uta.log()
     expect(history).toHaveLength(2)
@@ -178,7 +178,7 @@ describe('UTA — TPSL end-to-end', () => {
       stopLoss: { price: '140', limitPrice: '139.50' },
     })
     uta.commit('buy AAPL with TPSL')
-    const result = await uta.push()
+    const result = await uta.push(uta.status().pendingHash!)
 
     expect(result.submitted).toHaveLength(1)
     expect(spy).toHaveBeenCalledTimes(1)
@@ -196,7 +196,7 @@ describe('UTA — TPSL end-to-end', () => {
 
     uta.stagePlaceOrder({ aliceId: 'mock-paper|AAPL', symbol: 'AAPL', action: 'BUY', orderType: 'MKT', totalQuantity: '10' })
     uta.commit('buy AAPL no TPSL')
-    await uta.push()
+    await uta.push(uta.status().pendingHash!)
 
     const tpslArg = spy.mock.calls[0][2]
     expect(tpslArg).toBeUndefined()
@@ -210,7 +210,7 @@ describe('UTA — precision end-to-end', () => {
     broker.setQuote('ETH', 1920)
     uta.stagePlaceOrder({ aliceId: 'mock-paper|ETH', symbol: 'ETH', action: 'BUY', orderType: 'MKT', totalQuantity: '0.123456789' })
     uta.commit('buy fractional ETH')
-    const result = await uta.push()
+    const result = await uta.push(uta.status().pendingHash!)
 
     expect(result.submitted).toHaveLength(1)
     const positions = await broker.getPositions()
@@ -221,11 +221,11 @@ describe('UTA — precision end-to-end', () => {
     broker.setQuote('ETH', 1920)
     uta.stagePlaceOrder({ aliceId: 'mock-paper|ETH', symbol: 'ETH', action: 'BUY', orderType: 'MKT', totalQuantity: '1.0' })
     uta.commit('buy 1 ETH')
-    await uta.push()
+    await uta.push(uta.status().pendingHash!)
 
     uta.stageClosePosition({ aliceId: 'mock-paper|ETH', qty: '0.3' })
     uta.commit('close 0.3 ETH')
-    await uta.push()
+    await uta.push(uta.status().pendingHash!)
 
     const positions = await broker.getPositions()
     expect(positions[0].quantity.toString()).toBe('0.7')
@@ -238,7 +238,7 @@ describe('UTA — precision end-to-end', () => {
       totalQuantity: '0.12345678', lmtPrice: '0.00001234',
     })
     uta.commit('buy ETH limit precise')
-    const result = await uta.push()
+    const result = await uta.push(uta.status().pendingHash!)
 
     expect(result.submitted).toHaveLength(1)
     const orderId = result.submitted[0].orderId!
@@ -273,7 +273,7 @@ describe('UTA — precision end-to-end', () => {
       totalQuantity: '100', lmtPrice: '0.3',
     })
     uta.commit('clean price')
-    const result = await uta.push()
+    const result = await uta.push(uta.status().pendingHash!)
     const orderId = result.submitted[0].orderId!
     const orders = await broker.getOrders([orderId])
     expect(orders[0].order.lmtPrice.equals(new Decimal('0.3'))).toBe(true)

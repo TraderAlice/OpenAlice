@@ -13,10 +13,15 @@ import {
 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 
+import { CenteredLoading, EmptyState } from '../StateViews'
+import { Button } from '../ui/button'
+import { useWorkspace } from '../../tabs/store'
+import { SelectionCheckIcon } from '../ui/selection-check-icon'
 import {
   applyTemplateUpgrade,
   getTemplateUpgradePlan,
   TemplateUpgradeApiError,
+  type SkillProjectionRequest,
   type TemplateUpgradeFilePlan,
   type TemplateUpgradePlan,
   type TemplateUpgradeResolution,
@@ -24,6 +29,8 @@ import {
 } from './api'
 
 interface Props {
+  readonly projection?: SkillProjectionRequest
+  readonly layer?: 'template' | 'alice-harness'
   readonly wsId: string
   readonly onWorkspaceChanged: () => void
   readonly onClose: () => void
@@ -36,10 +43,12 @@ interface Props {
  */
 export function WorkspaceTemplateUpgradePanel({
   wsId,
+  layer = 'template', projection,
   onWorkspaceChanged,
   onClose,
 }: Props): ReactElement {
   const { t } = useTranslation()
+  const { openOrFocus } = useWorkspace()
   const [plan, setPlan] = useState<TemplateUpgradePlan | null>(null)
   const [loading, setLoading] = useState(true)
   const [applying, setApplying] = useState(false)
@@ -53,7 +62,7 @@ export function WorkspaceTemplateUpgradePanel({
     setError(null)
     setUnsupported(false)
     try {
-      const next = await getTemplateUpgradePlan(wsId)
+      const next = await (layer === 'template' ? getTemplateUpgradePlan(wsId) : getTemplateUpgradePlan(wsId, layer, projection))
       setPlan(next)
       setResolutions((current) => Object.fromEntries(
         Object.entries(current).filter(([path]) =>
@@ -67,7 +76,7 @@ export function WorkspaceTemplateUpgradePanel({
     } finally {
       setLoading(false)
     }
-  }, [wsId])
+  }, [wsId, layer, projection])
 
   useEffect(() => { void load() }, [load])
 
@@ -76,7 +85,7 @@ export function WorkspaceTemplateUpgradePanel({
     [plan],
   )
   const unresolved = conflicts.filter((file) => !resolutions[file.path]).length
-  const current = plan?.fromVersion === plan?.toVersion
+  const current = projection ? !plan?.files.some((file) => file.status === 'ready' || file.status === 'conflict') : plan?.fromVersion === plan?.toVersion && (layer === 'template' || !plan?.files.some((file) => file.status === 'ready' || file.status === 'conflict'))
   const canApply = !!plan && !current && !plan.blocked && unresolved === 0 && !applying
 
   const apply = async (): Promise<void> => {
@@ -84,12 +93,12 @@ export function WorkspaceTemplateUpgradePanel({
     setApplying(true)
     setError(null)
     try {
-      const next = await applyTemplateUpgrade(wsId, plan.planDigest, resolutions)
+      const next = await (layer === 'template' ? applyTemplateUpgrade(wsId, plan.planDigest, resolutions) : applyTemplateUpgrade(wsId, plan.planDigest, resolutions, layer, projection))
       setResult(next)
       onWorkspaceChanged()
       await load()
     } catch (err) {
-      if (err instanceof TemplateUpgradeApiError && err.plan) setPlan(err.plan)
+      if (err instanceof TemplateUpgradeApiError && err.plan) { setPlan(err.plan); setResolutions({}) }
       setError((err as Error).message)
     } finally {
       setApplying(false)
@@ -97,20 +106,17 @@ export function WorkspaceTemplateUpgradePanel({
   }
 
   if (loading && !plan) {
-    return (
-      <div className="flex min-h-[360px] items-center justify-center gap-2 text-[13px] text-muted-foreground">
-        <LoaderCircle size={16} className="animate-spin" />
-        {t('workspace.upgradeLoading')}
-      </div>
-    )
+    return <CenteredLoading label={t('workspace.upgradeLoading')} />
   }
 
   if (unsupported) {
     return (
-      <div className="flex min-h-[360px] flex-col items-center justify-center px-6 text-center">
-        <ShieldCheck size={28} className="mb-3 text-muted-foreground/60" />
-        <h3 className="text-[14px] font-semibold text-foreground">{t('workspace.upgradeUnavailableTitle')}</h3>
-        <p className="mt-1 max-w-md text-[12px] leading-relaxed text-muted-foreground">{error}</p>
+      <div className="flex min-h-[360px] items-center justify-center px-6">
+        <EmptyState
+          icon={<ShieldCheck />}
+          title={t('workspace.upgradeUnavailableTitle')}
+          description={error ?? undefined}
+        />
       </div>
     )
   }
@@ -120,33 +126,35 @@ export function WorkspaceTemplateUpgradePanel({
       <div className="flex-1 space-y-4 overflow-y-auto p-4 sm:p-5">
         {plan && (
           <>
-            <section className="oa-status-surface overflow-hidden rounded-xl border border-border bg-secondary/35">
+            <section className="oa-status-surface overflow-hidden rounded-lg border border-border bg-secondary/35">
               <div className="flex flex-col gap-4 p-4 sm:flex-row sm:items-center sm:justify-between">
                 <div className="min-w-0">
-                  <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground/75">
+                  <div className="flex items-center gap-2 text-[12px] font-semibold text-muted-foreground">
                     <FileDiff size={14} />
-                    {t('workspace.upgradeManagedAssets')}
+                    {projection ? projection.skill : layer === 'alice-harness' ? 'Alice Harness' : t('workspace.upgradeManagedAssets')}
                   </div>
                   <div className="mt-2 flex flex-wrap items-center gap-2 text-[18px] font-semibold text-foreground">
-                    <span>v{plan.fromVersion}</span>
+                    {projection ? t(`skillManager.${projection.action}`) : <>
+                    <span className="break-all">{plan.fromVersion === 'unversioned' ? t('aliceHarness.unversioned') : `v${plan.fromVersion}`}</span>
                     <ArrowRight size={17} className="text-muted-foreground" />
-                    <span className={current ? '' : 'text-primary'}>v{plan.toVersion}</span>
+                    <span className={`break-all ${current ? '' : 'text-primary'}`}>v{plan.toVersion}</span></>}
                   </div>
                   <p className="mt-1 max-w-xl text-[12px] leading-relaxed text-muted-foreground">
-                    {current
+                    {projection ? t('skillManager.scopeHint') : current
                       ? t('workspace.upgradeCurrentDescription')
                       : t('workspace.upgradeDescription')}
                   </p>
                 </div>
-                <button
+                <Button
                   type="button"
                   onClick={() => void load()}
                   disabled={loading || applying}
-                  className="oa-pressable inline-flex min-h-9 shrink-0 items-center justify-center gap-2 rounded-lg border border-border bg-background px-3 text-[12px] text-muted-foreground hover:border-primary/40 hover:text-foreground disabled:opacity-50"
+                  variant="outline"
+                  className="shrink-0"
                 >
                   <RefreshCw size={13} className={loading ? 'animate-spin' : ''} />
                   {t('workspace.upgradeRefresh')}
-                </button>
+                </Button>
               </div>
               {!current && (
                 <div className="grid grid-cols-3 border-t border-border bg-background/45">
@@ -178,7 +186,7 @@ export function WorkspaceTemplateUpgradePanel({
                       {t('workspace.upgradeBlockedSessionItem', {
                         name: session.name,
                         agent: session.agent,
-                        surface: session.surface === 'webpi' ? 'WebPi' : 'TUI',
+                        surface: session.surface === 'webpi' ? 'Web' : 'TUI',
                       })}
                     </li>
                   ))}
@@ -198,7 +206,6 @@ export function WorkspaceTemplateUpgradePanel({
             {!current && plan.summary.ready > 0 && (
               <FileGroup
                 title={t('workspace.upgradeReadyTitle')}
-                description={t('workspace.upgradeReadyDescription')}
                 files={plan.files.filter((file) => file.status === 'ready')}
                 defaultOpen
                 tone="accent"
@@ -208,14 +215,13 @@ export function WorkspaceTemplateUpgradePanel({
             {!current && plan.summary.preserved > 0 && (
               <FileGroup
                 title={t('workspace.upgradePreservedTitle')}
-                description={t('workspace.upgradePreservedDescription')}
                 files={plan.files.filter((file) => file.status === 'preserved')}
                 tone="neutral"
               />
             )}
 
             {!current && conflicts.length > 0 && (
-              <section className="rounded-xl border border-warning/35 bg-secondary/20">
+              <section className="rounded-lg border border-warning/35 bg-secondary/20">
                 <div className="border-b border-border px-4 py-3">
                   <div className="flex items-center gap-2 text-[13px] font-semibold text-foreground">
                     <AlertTriangle size={15} className="text-warning" />
@@ -227,6 +233,13 @@ export function WorkspaceTemplateUpgradePanel({
                   <p className="mt-1 text-[11px] leading-relaxed text-muted-foreground">
                     {t('workspace.upgradeConflictDescription')}
                   </p>
+                  <Button type="button" variant="outline" className="mt-3" onClick={() => {
+                    openOrFocus({ kind: 'chat-landing', params: {
+                      targetWsId: wsId,
+                      initialPrompt: `Upgrade this Workspace's ${layer === 'alice-harness' ? 'Alice Harness Skills' : 'managed template files'} to the current Project version. Run alice ${layer === 'alice-harness' ? 'harness' : 'template'} upgrade${projection ? ` --skill ${projection.skill} --action ${projection.action}` : ''} --mode detailed. Git could not merge some edits automatically. Compare the base, local and incoming files; preserve my custom intent while adopting current instructions and CLI syntax. Edit the conflicting files, preview again, then apply the same scoped command using --keep-workspace for files you resolved. Do not change unrelated files or Skill enablement preferences.`,
+                    } })
+                    onClose()
+                  }}>{t('workspace.upgradeResolveInChat')}</Button>
                 </div>
                 <div className="divide-y divide-border">
                   {conflicts.map((file) => (
@@ -245,7 +258,7 @@ export function WorkspaceTemplateUpgradePanel({
             )}
 
             {result && current && (
-              <div className="oa-disclosure-enter rounded-xl border border-success/35 bg-success/8 px-4 py-3">
+              <div className="rounded-lg border border-success/35 bg-success/8 px-4 py-3">
                 <div className="flex items-center gap-2 text-[13px] font-semibold text-success">
                   <Check size={16} />
                   {t('workspace.upgradeCompleteTitle')}
@@ -275,22 +288,21 @@ export function WorkspaceTemplateUpgradePanel({
               ? t('workspace.upgradeUnresolved', { count: unresolved })
               : t('workspace.upgradeAllResolved')
           )}
-          {plan && !current && conflicts.length === 0 && t('workspace.upgradeNoConflicts')}
+          {plan && !current && conflicts.length === 0 && (projection?.action === 'restore' ? t('skillManager.restoreHint') : t('workspace.upgradeNoConflicts'))}
         </div>
         <div className="flex justify-end gap-2">
-          <button type="button" onClick={onClose} disabled={applying} className="btn-secondary">
+          <Button type="button" variant="outline" onClick={onClose} disabled={applying}>
             {current ? t('common.close') : t('createWorkspace.cancel')}
-          </button>
+          </Button>
           {!current && (
-            <button
+            <Button
               type="button"
               onClick={() => void apply()}
               disabled={!canApply}
-              className="oa-pressable inline-flex min-h-9 items-center gap-2 rounded-lg bg-primary px-4 text-[12px] font-semibold text-primary-foreground hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-40"
             >
               {applying ? <LoaderCircle size={14} className="animate-spin" /> : <GitCommitHorizontal size={14} />}
-              {applying ? t('workspace.upgradeApplying') : t('workspace.upgradeApply')}
-            </button>
+              {applying ? t('workspace.upgradeApplying') : projection ? t(`skillManager.${projection.action}`) : t('workspace.upgradeApply')}
+            </Button>
           )}
         </div>
       </div>
@@ -315,21 +327,22 @@ function Metric({ value, label, tone }: {
   )
 }
 
-function FileGroup({ title, description, files, defaultOpen = false, tone }: {
+function FileGroup({ title, files, defaultOpen = false, tone }: {
   title: string
-  description: string
   files: readonly TemplateUpgradeFilePlan[]
   defaultOpen?: boolean
   tone: 'accent' | 'neutral'
 }): ReactElement {
+  const { t } = useTranslation()
   const [open, setOpen] = useState(defaultOpen)
   return (
-    <section className="rounded-xl border border-border bg-secondary/20">
-      <button
+    <section className="rounded-lg border border-border bg-secondary/20">
+      <Button
         type="button"
         onClick={() => setOpen((value) => !value)}
         aria-expanded={open}
-        className="oa-pressable flex w-full items-start gap-3 rounded-xl px-4 py-3 text-left"
+        variant="ghost"
+        className="h-auto w-full justify-start gap-3 whitespace-normal rounded-lg px-4 py-3 text-left"
       >
         {open ? <ChevronDown size={15} className="mt-0.5 text-muted-foreground" /> : <ChevronRight size={15} className="mt-0.5 text-muted-foreground" />}
         <div className="min-w-0 flex-1">
@@ -339,18 +352,17 @@ function FileGroup({ title, description, files, defaultOpen = false, tone }: {
               {files.length}
             </span>
           </div>
-          <p className="mt-0.5 text-[11px] leading-relaxed text-muted-foreground">{description}</p>
         </div>
-      </button>
+      </Button>
       {open && (
-        <div className="oa-disclosure-enter border-t border-border px-4 py-2">
+        <div className="border-t border-border px-4 py-2">
           {files.map((file) => (
             <div key={file.path} className="flex items-center gap-2 border-b border-border/60 py-2 last:border-b-0">
               {file.status === 'ready'
                 ? <Check size={13} className="shrink-0 text-primary" />
                 : <ShieldCheck size={13} className="shrink-0 text-muted-foreground" />}
               <code className="min-w-0 flex-1 truncate font-mono text-[11px] text-foreground" title={file.path}>{file.path}</code>
-              <span className="shrink-0 text-[10px] capitalize text-muted-foreground">{file.operation}</span>
+              <span className="shrink-0 text-[10px] capitalize text-muted-foreground">{file.mergedPreview !== undefined ? t('workspace.upgradeMerged') : file.operation}</span>
             </div>
           ))}
         </div>
@@ -386,17 +398,20 @@ function ConflictFile({ file, value, onChange }: {
           </Choice>
         </div>
       </div>
-      <button
+      <Button
         type="button"
         onClick={() => setPreviewOpen((open) => !open)}
-        className="oa-pressable mt-2 inline-flex items-center gap-1.5 rounded-md px-1 py-1 text-[11px] text-muted-foreground hover:text-foreground"
+        variant="ghost"
+        size="sm"
+        className="mt-2 px-1 text-[11px] text-muted-foreground"
         aria-expanded={previewOpen}
       >
         {previewOpen ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
         {t('workspace.upgradeCompare')}
-      </button>
+      </Button>
       {previewOpen && (
-        <div className="oa-disclosure-enter mt-2 grid gap-2 lg:grid-cols-2">
+        <div className={`mt-2 grid gap-2 ${file.basePreview !== undefined ? 'lg:grid-cols-3' : 'lg:grid-cols-2'}`}>
+          {file.basePreview !== undefined && <Preview title={t('workspace.upgradeBaseCopy')} value={file.basePreview} truncated={file.baseTruncated ?? false} />}
           <Preview title={t('workspace.upgradeWorkspaceCopy')} value={file.currentPreview} truncated={file.currentTruncated} />
           <Preview title={t('workspace.upgradeTemplateCopy')} value={file.templatePreview} truncated={file.templateTruncated} />
         </div>
@@ -412,18 +427,19 @@ function Choice({ active, disabled = false, onClick, children }: {
   children: React.ReactNode
 }): ReactElement {
   return (
-    <button
+    <Button
       type="button"
       role="radio"
       aria-checked={active}
       disabled={disabled}
       onClick={onClick}
-      className={`oa-pressable rounded-md px-2.5 py-1.5 text-[10px] font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-35 ${
-        active ? 'bg-primary text-primary-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'
-      }`}
+      variant="ghost"
+      size="xs"
+      className={active ? 'bg-muted text-foreground' : 'text-muted-foreground'}
     >
+      {active && <SelectionCheckIcon />}
       {children}
-    </button>
+    </Button>
   )
 }
 

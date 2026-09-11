@@ -22,8 +22,8 @@ together."
 ## Procedure (don't answer from memory — go to the data)
 
 The data is on your CLIs: `traderhub board` / `traderhub etf` for sector & theme
-performance, `alice analysis quant` for momentum across timeframes and breadth,
-`alice rss grep` for the news narrative. (See the `traderhub`, `alice-analysis`
+performance, `alice analysis quant` for momentum across timeframes and breadth.
+Choose news sources to suit the question. (See the `traderhub`, `alice-analysis`
 skills.)
 
 1. **Rank the field across timeframes.** Look at sector/theme performance and

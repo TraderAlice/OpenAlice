@@ -366,7 +366,7 @@ describe('AlpacaBroker — modifyOrder()', () => {
     const replaceOrder = vi.fn().mockResolvedValue({
       id: 'ord-modified', status: 'accepted',
     })
-    ;(acc as any).client = { replaceOrder }
+    ;(acc as any).client = { replaceOrder, getOrder: vi.fn().mockResolvedValue({ symbol: 'AAPL' }) }
 
     const changes = new Order()
     changes.totalQuantity = new Decimal(20)
@@ -388,6 +388,7 @@ describe('AlpacaBroker — modifyOrder()', () => {
     const acc = new AlpacaBroker({ apiKey: 'k', secretKey: 's', paper: true })
     ;(acc as any).client = {
       replaceOrder: vi.fn().mockRejectedValue(new Error('Order not found')),
+      getOrder: vi.fn().mockRejectedValue(new Error('Order not found')),
     }
 
     const changes = new Order()
@@ -409,7 +410,7 @@ describe('AlpacaBroker — modifyOrder null-check', () => {
   it('does not send undefined lmtPrice/auxPrice/trailingPercent when only qty changes', async () => {
     const acc = new AlpacaBroker({ apiKey: 'k', secretKey: 's', paper: true })
     const replaceOrder = vi.fn().mockResolvedValue({ id: 'ord-mod', status: 'accepted' })
-    ;(acc as any).client = { replaceOrder }
+    ;(acc as any).client = { replaceOrder, getOrder: vi.fn().mockResolvedValue({ symbol: 'AAPL' }) }
 
     // Partial<Order> — only totalQuantity set, everything else is undefined
     const changes: Partial<Order> = { totalQuantity: new Decimal(20) }
@@ -427,7 +428,7 @@ describe('AlpacaBroker — modifyOrder null-check', () => {
   it('sends lmtPrice when explicitly set in changes', async () => {
     const acc = new AlpacaBroker({ apiKey: 'k', secretKey: 's', paper: true })
     const replaceOrder = vi.fn().mockResolvedValue({ id: 'ord-mod', status: 'accepted' })
-    ;(acc as any).client = { replaceOrder }
+    ;(acc as any).client = { replaceOrder, getOrder: vi.fn().mockResolvedValue({ symbol: 'AAPL' }) }
 
     const changes: Partial<Order> = { lmtPrice: new Decimal('155.50') }
 
@@ -442,7 +443,7 @@ describe('AlpacaBroker — modifyOrder null-check', () => {
   it('sends auxPrice as stop_price when explicitly set', async () => {
     const acc = new AlpacaBroker({ apiKey: 'k', secretKey: 's', paper: true })
     const replaceOrder = vi.fn().mockResolvedValue({ id: 'ord-mod', status: 'accepted' })
-    ;(acc as any).client = { replaceOrder }
+    ;(acc as any).client = { replaceOrder, getOrder: vi.fn().mockResolvedValue({ symbol: 'AAPL' }) }
 
     const changes: Partial<Order> = { auxPrice: new Decimal(140) }
 
@@ -827,7 +828,7 @@ describe('AlpacaBroker — getHistorical()', () => {
       { timestamp: new Date('2025-01-02T00:00:00Z'), open: '101', high: '103', low: '100', close: '102.5', volume: '6000' },
     ])
     expect(getBarsV2).toHaveBeenCalledWith('AAPL', expect.objectContaining({ timeframe: '1Day', adjustment: 'all', limit: 2 }))
-    expect(acc.getCapabilities().historicalBars).toEqual({ supported: true, quality: 'iex' })
+    expect(acc.getCapabilities().historicalBars).toEqual({ supported: true, quality: 'iex', qualityBySecType: { CRYPTO: 'realtime' } })
   })
 
   it('tail-slices a bounded window instead of forwarding Alpaca first-N limit semantics', async () => {
@@ -898,7 +899,7 @@ describe('AlpacaBroker — getCapabilities()', () => {
   it('returns correct supportedSecTypes and supportedOrderTypes', () => {
     const acc = new AlpacaBroker({ apiKey: 'k', secretKey: 's', paper: true })
     const caps = acc.getCapabilities()
-    expect(caps.supportedSecTypes).toEqual(['STK'])
+    expect(caps.supportedSecTypes).toEqual(['STK', 'CRYPTO'])
     expect(caps.supportedOrderTypes).toEqual(['MKT', 'LMT', 'STP', 'STP LMT', 'TRAIL'])
   })
 })

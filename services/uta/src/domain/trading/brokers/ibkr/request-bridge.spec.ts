@@ -60,7 +60,7 @@ describe('RequestBridge — connection handshake', () => {
   it('contains a server-side handshake close as a normal rejected connect', async () => {
     const originalSendMsg = Connection.prototype.sendMsg
     let handshakeListenersReady = false
-    const sendMsg = vi.spyOn(Connection.prototype, 'sendMsg').mockImplementation(function (msg) {
+    const sendMsg = vi.spyOn(Connection.prototype, 'sendMsg').mockImplementation(function (this: Connection, msg) {
       handshakeListenersReady = this.listenerCount('data') > 0
         && (this.socket?.listenerCount('close') ?? 0) > 1
       return originalSendMsg.call(this, msg)

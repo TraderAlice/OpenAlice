@@ -51,8 +51,8 @@ export interface ResumeIdentityRecord {
   readonly wsId: string
   readonly agent: string
   /** Runtime-only hydration of the Workspace-owned AI config. Launch paths
-   * keep it immutable; a paused Session may replace it through the explicit
-   * edit boundary. */
+   * keep the Agent runtime frozen; an idle Session may replace credential,
+   * model, and effort through Session settings or the Issue page. */
   runtimeBinding?: SessionRuntimeBinding
   /** Workspace-owned coworker nametag. Hydrated from the Session dossier; never flushed here. */
   displayName?: string

@@ -1,6 +1,7 @@
 /** Build platform-specific, self-contained broker-pack release archives. */
 
 import { createHash } from 'node:crypto'
+import { execFileSync } from 'node:child_process'
 import { createReadStream } from 'node:fs'
 import { mkdtemp, mkdir, readFile, readdir, rm, stat, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
@@ -14,6 +15,7 @@ import {
 import {
   brokerPackArchiveFileName,
   brokerPackCatalogFileName,
+  supportedBrokerPackEngines,
   type BrokerPackReleaseAsset,
   type BrokerPackRequirement,
   type BrokerPackReleaseCatalog,
@@ -23,6 +25,7 @@ import { runPnpmSync } from './pnpm-command.mjs'
 const repoRoot = resolve(import.meta.dirname, '..')
 const packageJson = JSON.parse(await readFile(resolve(repoRoot, 'package.json'), 'utf8')) as { version: string }
 const outputArg = process.argv.indexOf('--out-dir')
+if (process.env['OPENALICE_DEV_COMMIT'] && !/^[a-f0-9]{40}$/.test(process.env['OPENALICE_DEV_COMMIT'])) throw new Error('Invalid dev commit')
 const outDir = resolve(repoRoot, outputArg >= 0 ? process.argv[outputArg + 1] : 'dist/broker-packs')
 
 const packageNames: Record<InstallableBrokerEngine, string> = {
@@ -39,7 +42,7 @@ await mkdir(outDir, { recursive: true })
 const tempRoot = await mkdtemp(resolve(tmpdir(), 'openalice-broker-packs-'))
 const packs: BrokerPackReleaseAsset[] = []
 try {
-  for (const engine of INSTALLABLE_BROKER_ENGINES) {
+  for (const engine of supportedBrokerPackEngines()) {
     const deployRoot = resolve(tempRoot, engine)
     deployPackage(packageNames[engine], deployRoot)
     await sanitizeDeployment(engine, deployRoot)
@@ -54,6 +57,7 @@ try {
       cwd: deployRoot,
       file: archivePath,
       portable: true,
+      noMtime: true,
       sync: true,
     }, ['.'])
     const archiveStat = await stat(archivePath)
@@ -75,7 +79,10 @@ try {
     openAliceVersion: packageJson.version,
     platform: process.platform,
     arch: process.arch,
-    generatedAt: new Date().toISOString(),
+    ...(process.env['OPENALICE_DEV_COMMIT'] ? { sourceCommit: process.env['OPENALICE_DEV_COMMIT'] } : {}),
+    generatedAt: process.env['OPENALICE_DEV_COMMIT']
+      ? new Date(execFileSync('git', ['show', '-s', '--format=%cI', process.env['OPENALICE_DEV_COMMIT']], {cwd: repoRoot, encoding: 'utf8'}).trim()).toISOString()
+      : new Date().toISOString(),
     packs,
   }
   const catalogPath = resolve(outDir, brokerPackCatalogFileName(packageJson.version))

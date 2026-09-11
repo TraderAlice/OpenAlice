@@ -5,7 +5,9 @@
  * - Bybit: fetchOrder requires { acknowledged: true }, limited to last 500 orders
  * - Binance: fetchOrder works fine, but conditional orders need { stop: true }
  * - OKX/Bitget: no fetchOpenOrder/fetchClosedOrder singular methods
- * - Hyperliquid: market orders require a ref price, fetchPositions omits markPrice
+ * - Hyperliquid: market orders require a ref price, fetchPositions omits markPrice,
+ *   balances live in the spot or perp clearinghouse depending on the wallet's
+ *   account-abstraction mode (unified wallets read 0 from the perp default)
  *
  * Each tested exchange gets its own override file in exchanges/. Only override
  * what's different — unset methods fall through to the default.

@@ -112,7 +112,10 @@ function bytesToUtf8(value: unknown): string | null {
 }
 
 function textFromContent(value: unknown): string | null {
-  if (typeof value === 'string' && value.trim()) return value;
+  // Streaming text can legitimately arrive as a standalone space or newline.
+  // Reject only empty strings so concatenating deltas preserves the model's
+  // exact Markdown layout.
+  if (typeof value === 'string' && value.length > 0) return value;
   if (Array.isArray(value)) {
     const parts = value.flatMap((item) => {
       if (!isRecord(item)) return [];
@@ -126,8 +129,8 @@ function textFromContent(value: unknown): string | null {
     return parts.length > 0 ? parts.join('') : null;
   }
   if (!isRecord(value)) return null;
-  if (typeof value['text'] === 'string' && value['text'].trim()) return value['text'];
-  if (typeof value['data'] === 'string' && value['data'].trim()) return value['data'];
+  if (typeof value['text'] === 'string' && value['text'].length > 0) return value['text'];
+  if (typeof value['data'] === 'string' && value['data'].length > 0) return value['data'];
   return null;
 }
 
@@ -288,6 +291,7 @@ async function readSummary(path: string): Promise<Record<string, unknown> | null
  * byte array — prefer `output_for_prompt`. There is no workspace-local Grok
  * project file, so this adapter has no deprecated `writeAiConfig` export:
  * managed Sessions use `sessionRuntime` env only. Trust is read-only.
+ * Native `--model` suggestions live in `grok-models.ts` (live `grok models`).
  */
 export const grokAdapter: CliAdapter = {
   id: 'grok',
@@ -300,6 +304,10 @@ export const grokAdapter: CliAdapter = {
     resumeById: true,
     transcriptDiscovery: 'subprocess',
     headless: true,
+    // `grok agent stdio` serves the Agent Client Protocol natively; Grok's
+    // on-disk `updates.jsonl` is already ACP-wrapped, so this is the same
+    // conversation the TUI resumes.
+    web: { wire: 'acp', permissionPrompts: true, freshSession: true },
     aiProvider: {
       credentialSource: 'runtime-or-workspace',
       wirePreference: ['openai-chat', 'openai-responses'],
@@ -334,7 +342,9 @@ export const grokAdapter: CliAdapter = {
     // do the same; spreading `base` here launched `claude --no-leader`.
     const cmd = [
       'grok',
+      '--sandbox', 'off',
       '--no-leader',
+      '--always-approve',
       ...(ctx.sessionRuntime?.interactiveArgs ?? []),
       ...grokRulesArgs(ctx),
     ];
@@ -345,6 +355,22 @@ export const grokAdapter: CliAdapter = {
     return [...cmd, ...grokResumeArgs(ctx.resume)];
   },
 
+  // Web surface: `grok [--rules …] agent --no-leader [model/effort] stdio`.
+  // Session identity is negotiated over ACP, so no `--resume`/`--continue`.
+  composeWebCommand(_base: readonly string[], ctx: SpawnContext): readonly string[] {
+    if (ctx.resume === 'last') throw new Error('the Web surface requires a concrete Grok session id or a fresh Session');
+    return [
+      'grok',
+      '--sandbox', 'off',
+      ...grokRulesArgs(ctx),
+      'agent',
+      '--no-leader',
+      '--always-approve',
+      ...(ctx.sessionRuntime?.webArgs ?? ctx.sessionRuntime?.interactiveArgs ?? []),
+      'stdio',
+    ];
+  },
+
   composeHeadlessCommand(
     _base: readonly string[],
     ctx: SpawnContext,
@@ -352,6 +378,7 @@ export const grokAdapter: CliAdapter = {
   ): readonly string[] {
     return [
       'grok',
+      '--sandbox', 'off',
       '--no-leader',
       '--always-approve',
       ...(ctx.sessionRuntime?.headlessArgs ?? []),

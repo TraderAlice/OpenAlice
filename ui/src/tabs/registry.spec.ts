@@ -2,6 +2,17 @@ import { describe, expect, it } from 'vitest'
 
 import { getView, getViewShell } from './registry'
 
+it('keeps Quick Start and Chat as separate URL identities', () => {
+  expect(getView('quick-start').toUrl({ kind: 'quick-start', params: {} })).toBe('/quick-start')
+  expect(getView('chat-landing').toUrl({ kind: 'chat-landing', params: {} })).toBe('/chat')
+})
+
+it.each(['chat', 'auto-quant', 'prediction'] as const)('keeps %s Workspace details inside its Harness shell', source => {
+  const spec = { kind: 'workspace-details', params: { wsId: 'workspace one', source } } as const
+  expect(getView('workspace-details').toUrl(spec)).toBe(`/${source}/workspaces/workspace%20one/details`)
+  expect(getViewShell(spec)).toBe(source)
+})
+
 describe('file-viewer URL projection', () => {
   it('projects Ask Alice artifacts into the chat route with Session context', () => {
     expect(getView('file-viewer').toUrl({
@@ -17,11 +28,11 @@ describe('file-viewer URL projection', () => {
     )
   })
 
-  it('preserves the existing Workspace file URL', () => {
+  it('never projects unresolved Workspace files into the retired global area', () => {
     expect(getView('file-viewer').toUrl({
       kind: 'file-viewer',
       params: { wsId: 'workspace-1', path: 'README.md' },
-    })).toBe('/workspaces/workspace-1/view/README.md')
+    })).toBe('/chat')
   })
 
   it('projects AutoQuant artifacts into its Harness route', () => {
@@ -65,7 +76,18 @@ describe('Office URL projection', () => {
   })
 })
 
+describe('Market News URL projection', () => {
+  it('projects News onto the Market navigator route', () => {
+    expect(getView('news').toUrl({ kind: 'news', params: {} })).toBe('/market/news')
+  })
+})
+
 describe('Settings URL projection', () => {
+  it.each(['runs', 'api'] as const)('projects current and saved legacy %s tabs into Developer', (tab) => {
+    expect(getView('dev').toUrl({ kind: 'dev', params: { tab } })).toBe(`/settings/developer/${tab}`)
+    expect(getView('automation').toUrl({ kind: 'automation', params: { section: tab } })).toBe(`/settings/developer/${tab}`)
+  })
+
   it('projects the Beta category onto /settings/beta', () => {
     expect(getView('settings').toUrl({
       kind: 'settings',
@@ -78,6 +100,20 @@ describe('Settings URL projection', () => {
       kind: 'settings',
       params: { category: 'activity-bar' },
     })).toBe('/settings/activity-bar')
+  })
+
+  it('projects the Agent runtimes category onto /settings/agent-runtimes', () => {
+    expect(getView('settings').toUrl({
+      kind: 'settings',
+      params: { category: 'agent-runtimes' },
+    })).toBe('/settings/agent-runtimes')
+  })
+
+  it('projects Developer tools into the Settings route', () => {
+    expect(getView('dev').toUrl({
+      kind: 'dev',
+      params: { tab: 'logs' },
+    })).toBe('/settings/developer/logs')
   })
 })
 
@@ -116,5 +152,24 @@ describe('shared product shells', () => {
       kind: 'file-viewer',
       params: { wsId: 'aq-1', path: 'README.md', source: 'auto-quant' },
     })).toBe('auto-quant')
+    expect(getViewShell({
+      kind: 'harness-surface',
+      params: { wsId: 'aq-1', capability: 'studio', source: 'auto-quant' },
+    })).toBe('auto-quant')
+  })
+
+  it('assigns every Auto Prediction surface to its own shared Harness shell', () => {
+    expect(getViewShell({ kind: 'auto-prediction-landing', params: {} })).toBe('prediction')
+    expect(getViewShell({
+      kind: 'workspace',
+      params: { wsId: 'prediction-1', sessionId: 'codex-1', source: 'prediction' },
+    })).toBe('prediction')
+    expect(getViewShell({
+      kind: 'file-viewer',
+      params: { wsId: 'prediction-1', path: 'README.md', source: 'prediction' },
+    })).toBe('prediction')
+    const studio = { kind: 'harness-surface', params: { wsId: 'prediction-1', capability: 'studio', source: 'prediction' } } as const
+    expect(getViewShell(studio)).toBe('prediction')
+    expect(getView('harness-surface').toUrl(studio)).toBe('/prediction/workspaces/prediction-1/studio')
   })
 })

@@ -3,7 +3,7 @@
 import { spawnSync } from 'node:child_process'
 import { createHash } from 'node:crypto'
 import { createReadStream } from 'node:fs'
-import { access, lstat, mkdir, mkdtemp, readFile, readdir, realpath, rm, stat } from 'node:fs/promises'
+import { access, lstat, mkdir, mkdtemp, readFile, readdir, realpath, rm, stat, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { basename, resolve, sep } from 'node:path'
 import { pathToFileURL } from 'node:url'
@@ -16,6 +16,7 @@ import {
 } from '../src/core/broker-packs.js'
 import {
   brokerPackCatalogFileName,
+  supportedBrokerPackEngines,
   type BrokerPackReleaseAsset,
   type BrokerPackReleaseCatalog,
 } from '../src/core/broker-pack-catalog.js'
@@ -27,7 +28,7 @@ const outDir = resolve(repoRoot, outputArg >= 0 ? process.argv[outputArg + 1] : 
 const catalogPath = resolve(outDir, brokerPackCatalogFileName(packageJson.version))
 const catalog = parseCatalog(JSON.parse(await readFile(catalogPath, 'utf8')))
 
-const expectedEngines = new Set<string>(INSTALLABLE_BROKER_ENGINES)
+const expectedEngines = new Set<string>(supportedBrokerPackEngines())
 const actualEngines = new Set(catalog.packs.map((asset) => asset.engine))
 if (catalog.packs.length !== expectedEngines.size || actualEngines.size !== expectedEngines.size) {
   throw new Error(`Broker Pack catalog must contain each engine exactly once; got ${catalog.packs.map((row) => row.engine).join(', ')}`)
@@ -36,8 +37,35 @@ for (const engine of expectedEngines) {
   if (!actualEngines.has(engine)) throw new Error(`Broker Pack catalog is missing ${engine}`)
 }
 
+const compiled = process.argv.includes('--compiled')
+let compiledProbe: string | undefined
 const tempRoot = await mkdtemp(resolve(tmpdir(), 'openalice-broker-pack-verify-'))
 try {
+  if (compiled) {
+    const probe = resolve(tempRoot, 'probe.ts')
+    const options = pathToFileURL(resolve(repoRoot, 'scripts/bun-compile-options.ts')).href
+    const builder = resolve(tempRoot, 'build.ts')
+    compiledProbe = resolve(tempRoot, process.platform === 'win32' ? 'probe.exe' : 'probe')
+    await writeFile(probe, `
+if (process.arch !== ${JSON.stringify(process.arch)}) throw new Error('Compiled probe architecture mismatch');
+const m = await import(process.argv[2]);
+const engine = process.argv[3];
+if (m.BROKER_ENGINE !== engine || m.BROKER_PACK_API_VERSION !== 1) throw new Error('Invalid pack');
+const configs = {
+  ccxt: {exchange:'binance', keyless:true}, alpaca:{paper:true}, ibkr:{},
+  leverup:{network:'testnet',privateKey:'0x'+'1'.repeat(64)},
+  longbridge:{appKey:'offline',appSecret:'offline',accessToken:'offline',paper:true},
+};
+const broker = m.createBroker({id:'offline-pack-smoke',brokerConfig:configs[engine]});
+if (typeof broker.getAccount !== 'function') throw new Error('Invalid broker');
+await broker.close();
+console.log('COMPILED_PACK_OK', engine);
+`)
+    await writeFile(builder, `import {runtimeCompileOptions} from ${JSON.stringify(options)};
+const r=await Bun.build({entrypoints:[${JSON.stringify(probe)}],compile:{...runtimeCompileOptions,target:${JSON.stringify(`bun-${process.platform === 'win32' ? 'windows' : process.platform}-${process.arch}`)},outfile:${JSON.stringify(compiledProbe)}}}); if(!r.success) throw new Error(String(r.logs));`)
+    const result = spawnSync('bun', [builder], {cwd: tempRoot, encoding:'utf8', timeout:120_000})
+    if (result.error || result.status !== 0) throw new Error(`Compiled probe build failed: ${result.error ?? result.stderr}`)
+  }
   for (const asset of catalog.packs) await verifyAsset(asset, tempRoot)
 } finally {
   await rm(tempRoot, { recursive: true, force: true })
@@ -100,6 +128,13 @@ async function verifyAsset(asset: BrokerPackReleaseAsset, root: string): Promise
   }
 
   verifyModuleInCleanProcess(asset.engine, realEntry, packageRoot)
+  if (compiledProbe) {
+    const result = spawnSync(compiledProbe, [realEntry, asset.engine], {cwd:packageRoot, encoding:'utf8', timeout:60_000, env:{...process.env, NODE_PATH:''}})
+    if (result.error || result.status !== 0 || !result.stdout.includes('COMPILED_PACK_OK')) {
+      throw new Error(`${asset.engine} compiled import/construction failed: ${result.error ?? result.stderr}`)
+    }
+    console.log(result.stdout.trim())
+  }
   await rm(packageRoot, { recursive: true, force: true })
   console.log(`[broker-packs] verified ${asset.engine} (${formatBytes(asset.size)})`)
 }

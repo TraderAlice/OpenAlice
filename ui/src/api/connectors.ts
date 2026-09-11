@@ -18,9 +18,15 @@ export interface ConnectorDefinition {
     learnedBy?: string
     group?: 'credentials' | 'preferences'
     defaultValue?: string | number | boolean
+    options?: Array<{
+      value: string
+      label: string
+      description?: string
+    }>
   }>
   commands: Array<{ name: string; description: string }>
-  capabilities?: Array<'inbox' | 'settings'>
+  capabilities?: Array<'inbox' | 'settings' | 'uta' | 'desk'>
+  setupLinks?: Array<{ key: string; url: string }>
 }
 
 export interface PublicConnectorConfig {
@@ -30,6 +36,26 @@ export interface PublicConnectorConfig {
     settings: Record<string, string | number | boolean>
     configuredSecrets: string[]
   }>
+}
+
+export interface ConnectorAdapterMutation {
+  enabled?: boolean
+  set?: Record<string, string | number | boolean>
+  unset?: string[]
+  setSecrets?: Record<string, string>
+  removeSecrets?: string[]
+}
+
+export interface ConnectorAdapterMutationResult {
+  serviceEnabled: boolean
+  serviceChanged: boolean
+  adapterChanged: boolean
+  adapter: PublicConnectorConfig['adapters'][string]
+  runtime: {
+    scope: 'adapter' | 'service'
+    status: 'unchanged' | 'reconciled' | 'degraded' | 'starting'
+    message?: string
+  }
 }
 
 export interface ConnectorHealth {
@@ -52,6 +78,8 @@ export interface ConnectorHealth {
       owner?: string
       lastAttemptAt?: string
       lastSuccessAt?: string
+      nextAttemptAt?: string
+      consecutiveFailures?: number
       lastError?: string
     }>
   }
@@ -63,55 +91,76 @@ export interface ConnectorSettingsSnapshot {
   health: ConnectorHealth
 }
 
-export interface TelegramConnectorDesk {
+export interface ConnectorDesk {
   wsId: string
   issue: IssueDetailIssue
 }
 
-export interface TelegramConnectorDeskSnapshot {
-  desk: TelegramConnectorDesk | null
+/** @deprecated Use {@link ConnectorDesk}. */
+export type TelegramConnectorDesk = ConnectorDesk
+
+export interface ConnectorDeskSnapshot {
+  desk: ConnectorDesk | null
 }
 
-export const TELEGRAM_DESK_CADENCES = ['1h', '2h', '4h', '8h', '12h', '24h'] as const
-export type TelegramDeskCadence = (typeof TELEGRAM_DESK_CADENCES)[number]
+/** @deprecated Use {@link ConnectorDeskSnapshot}. */
+export type TelegramConnectorDeskSnapshot = ConnectorDeskSnapshot
+
+export const CONNECTOR_DESK_CADENCES = ['1h', '2h', '4h', '8h', '12h', '24h'] as const
+export type ConnectorDeskCadence = (typeof CONNECTOR_DESK_CADENCES)[number]
+export const TELEGRAM_DESK_CADENCES = CONNECTOR_DESK_CADENCES
+export type TelegramDeskCadence = ConnectorDeskCadence
 
 export const connectorsApi = {
   async load(): Promise<ConnectorSettingsSnapshot> {
     return decodeConnectorSettingsSnapshot(await fetchJson<unknown>('/api/connectors'))
   },
-  save(config: PublicConnectorConfig): Promise<{ config: PublicConnectorConfig }> {
-    return fetchJson('/api/connectors', {
-      method: 'PUT',
+  setService(enabled: boolean): Promise<{ serviceEnabled: boolean; serviceChanged: boolean }> {
+    return fetchJson('/api/connectors/service', {
+      method: 'PATCH',
       headers,
-      body: JSON.stringify(config),
+      body: JSON.stringify({ enabled }),
+    })
+  },
+  mutateAdapter(id: string, mutation: ConnectorAdapterMutation): Promise<ConnectorAdapterMutationResult> {
+    return fetchJson(`/api/connectors/${encodeURIComponent(id)}`, {
+      method: 'PATCH',
+      headers,
+      body: JSON.stringify(mutation),
     })
   },
   test(id: string): Promise<{ ok: boolean; probeId: string }> {
     return fetchJson(`/api/connectors/${encodeURIComponent(id)}/test`, { method: 'POST' })
   },
+  reconnect(id: string): Promise<{ ok: true; scope: 'adapter' | 'service'; adapterId: string }> {
+    return fetchJson(`/api/connectors/${encodeURIComponent(id)}/reconnect`, { method: 'POST' })
+  },
   desk: {
-    async load(): Promise<TelegramConnectorDeskSnapshot> {
-      return decodeTelegramConnectorDeskSnapshot(await fetchJson<unknown>('/api/connectors/telegram/desk'))
+    async load(connectorId = 'telegram'): Promise<ConnectorDeskSnapshot> {
+      return decodeConnectorDeskSnapshot(await fetchJson<unknown>(`/api/connectors/${encodeURIComponent(connectorId)}/desk`))
     },
-    async create(wsId: string): Promise<TelegramConnectorDesk> {
-      const body = await fetchJson<unknown>('/api/connectors/telegram/desk', {
+    async create(wsId: string, connectorId = 'telegram'): Promise<ConnectorDesk> {
+      const body = await fetchJson<unknown>(`/api/connectors/${encodeURIComponent(connectorId)}/desk`, {
         method: 'POST',
         headers,
         body: JSON.stringify({ wsId }),
       })
-      return decodeTelegramConnectorDeskResponse(body)
+      return decodeConnectorDeskResponse(body)
     },
-    async update(patch: { what?: string; when?: Extract<ScheduleWhen, { kind: 'every' }> }): Promise<TelegramConnectorDesk> {
-      const body = await fetchJson<unknown>('/api/connectors/telegram/desk', {
+    async update(
+      patch: { what?: string; when?: Extract<ScheduleWhen, { kind: 'every' }> },
+      connectorId = 'telegram',
+    ): Promise<ConnectorDesk> {
+      const body = await fetchJson<unknown>(`/api/connectors/${encodeURIComponent(connectorId)}/desk`, {
         method: 'PATCH',
         headers,
         body: JSON.stringify(patch),
       })
-      return decodeTelegramConnectorDeskResponse(body)
+      return decodeConnectorDeskResponse(body)
     },
-    async disable(): Promise<TelegramConnectorDesk | null> {
-      const body = await fetchJson<unknown>('/api/connectors/telegram/desk', { method: 'DELETE' })
-      return decodeTelegramConnectorDeskSnapshot(body).desk
+    async disable(connectorId = 'telegram'): Promise<ConnectorDesk | null> {
+      const body = await fetchJson<unknown>(`/api/connectors/${encodeURIComponent(connectorId)}/desk`, { method: 'DELETE' })
+      return decodeConnectorDeskSnapshot(body).desk
     },
   },
 }
@@ -145,14 +194,31 @@ function isConnectorDefinition(value: unknown): boolean {
       && (field.defaultValue === undefined
         || typeof field.defaultValue === 'string'
         || typeof field.defaultValue === 'number'
-        || typeof field.defaultValue === 'boolean'))
+        || typeof field.defaultValue === 'boolean')
+      && (field.options === undefined
+        || (Array.isArray(field.options)
+          && field.options.length >= 2
+          && field.options.length <= 6
+          && field.options.every((option) => isRecord(option)
+            && typeof option.value === 'string'
+            && option.value.length > 0
+            && typeof option.label === 'string'
+            && option.label.length > 0
+            && isOptionalString(option.description)))))
     && Array.isArray(value.commands)
     && value.commands.every((command) => isRecord(command)
       && typeof command.name === 'string'
       && typeof command.description === 'string')
     && (value.capabilities === undefined
       || (Array.isArray(value.capabilities)
-        && value.capabilities.every((capability) => capability === 'inbox' || capability === 'settings')))
+        && value.capabilities.every((capability) => (
+          capability === 'inbox' || capability === 'settings' || capability === 'uta' || capability === 'desk'
+        ))))
+    && (value.setupLinks === undefined
+      || (Array.isArray(value.setupLinks)
+        && value.setupLinks.every((link) => isRecord(link)
+          && typeof link.key === 'string'
+          && typeof link.url === 'string')))
 }
 
 function isPublicConnectorConfig(value: unknown): boolean {
@@ -190,6 +256,11 @@ function isConnectorHealth(value: unknown): boolean {
       && isOptionalString(adapter.owner)
       && isOptionalString(adapter.lastAttemptAt)
       && isOptionalString(adapter.lastSuccessAt)
+      && isOptionalString(adapter.nextAttemptAt)
+      && (adapter.consecutiveFailures === undefined
+        || (typeof adapter.consecutiveFailures === 'number'
+          && Number.isInteger(adapter.consecutiveFailures)
+          && adapter.consecutiveFailures >= 0))
       && isOptionalString(adapter.lastError))
 }
 
@@ -213,26 +284,26 @@ function isOneOf(value: unknown, options: readonly string[]): value is string {
   return typeof value === 'string' && options.includes(value)
 }
 
-function decodeTelegramConnectorDeskSnapshot(value: unknown): TelegramConnectorDeskSnapshot {
+function decodeConnectorDeskSnapshot(value: unknown): ConnectorDeskSnapshot {
   if (!isRecord(value) || !('desk' in value)) {
-    throw new Error('Invalid Telegram phone-desk response.')
+    throw new Error('Invalid phone-desk response.')
   }
   if (value.desk === null) return { desk: null }
-  return { desk: decodeTelegramConnectorDesk(value.desk) }
+  return { desk: decodeConnectorDesk(value.desk) }
 }
 
-function decodeTelegramConnectorDeskResponse(value: unknown): TelegramConnectorDesk {
-  if (!isRecord(value)) throw new Error('Invalid Telegram phone-desk response.')
-  return decodeTelegramConnectorDesk(value.desk)
+function decodeConnectorDeskResponse(value: unknown): ConnectorDesk {
+  if (!isRecord(value)) throw new Error('Invalid phone-desk response.')
+  return decodeConnectorDesk(value.desk)
 }
 
-function decodeTelegramConnectorDesk(value: unknown): TelegramConnectorDesk {
+function decodeConnectorDesk(value: unknown): ConnectorDesk {
   if (!isRecord(value) || typeof value.wsId !== 'string' || !isRecord(value.issue)) {
-    throw new Error('Invalid Telegram phone-desk response.')
+    throw new Error('Invalid phone-desk response.')
   }
   const issue = value.issue
   if (typeof issue.id !== 'string' || typeof issue.title !== 'string' || typeof issue.what !== 'string') {
-    throw new Error('Invalid Telegram phone-desk response.')
+    throw new Error('Invalid phone-desk response.')
   }
   return {
     wsId: value.wsId,

@@ -12,6 +12,7 @@
 
 import type {
   UTAClient,
+  OptionResearchRequest,
   AccountInfo,
   SubAccountRef,
   OrderHistoryEntry,
@@ -162,6 +163,18 @@ export class UTAAccountSDK {
     )
   }
 
+  getOptionContracts(request: OptionResearchRequest): Promise<Record<string, unknown>> {
+    return this.client.post(`/api/trading/uta/${encodeURIComponent(this.id)}/contract/option-contracts`, request)
+  }
+
+  getOptionChain(request: OptionResearchRequest): Promise<Record<string, unknown>> {
+    return this.client.post(`/api/trading/uta/${encodeURIComponent(this.id)}/contract/option-chain`, request)
+  }
+
+  getOrderBook(request: { aliceId: string; limit?: number }): Promise<Record<string, unknown>> {
+    return this.client.post(`/api/trading/uta/${encodeURIComponent(this.id)}/contract/order-book`, request)
+  }
+
   getMarketClock(): Promise<MarketClock> {
     return this.client.get<MarketClock>(`/api/trading/uta/${encodeURIComponent(this.id)}/market-clock`)
   }
@@ -271,15 +284,21 @@ export class UTAAccountSDK {
 
   // ==================== Write / lifecycle (existing routes) ====================
 
-  async push(): Promise<PushResult> {
+  async push(expectedPendingHash: string): Promise<PushResult> {
     this.assertVenueWritable()
-    return this.client.post<PushResult>(`/api/trading/uta/${encodeURIComponent(this.id)}/wallet/push`)
+    return this.client.post<PushResult>(
+      `/api/trading/uta/${encodeURIComponent(this.id)}/wallet/push`,
+      { expectedPendingHash },
+    )
   }
 
-  reject(reason?: string): Promise<RejectResult> {
+  reject(reason: string | undefined, expectedPendingHash: string): Promise<RejectResult> {
     return this.client.post<RejectResult>(
       `/api/trading/uta/${encodeURIComponent(this.id)}/wallet/reject`,
-      reason !== undefined ? { reason } : undefined,
+      {
+        ...(reason !== undefined ? { reason } : {}),
+        expectedPendingHash,
+      },
     )
   }
 

@@ -3,10 +3,12 @@
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-import type {
-  IssueDetail as IssueDetailData,
-  IssueProvenanceRecord,
+import {
+  DEFAULT_ISSUE_COMMENT_PROMPT,
+  type IssueDetail as IssueDetailData,
+  type IssueProvenanceRecord,
 } from '../api/issues'
+import { resetAgentRuntimesStore } from '../hooks/useAgentRuntimes'
 import { i18n } from '../i18n'
 import { IssueActivity, IssueDetail } from './IssueDetail'
 
@@ -25,7 +27,10 @@ const mocks = vi.hoisted(() => ({
   openHeadlessRun: vi.fn(),
   getWorkspaceSessionDirectory: vi.fn(),
   listAgentCredentials: vi.fn(),
+  updateResumeRuntime: vi.fn(),
   getPresets: vi.fn(),
+  getWorkspaceCredentialDefaults: vi.fn(),
+  getAgentRuntimeReadiness: vi.fn(),
   updateIssue: vi.fn(),
   runNow: vi.fn(),
   retry: vi.fn(),
@@ -64,8 +69,32 @@ vi.mock('../hooks/useIssueDetail', () => ({
 vi.mock('../contexts/workspaces-context', () => ({
   useWorkspaces: () => ({
     agents: [
-      { id: 'codex', displayName: 'Codex', kind: 'agent', installed: true },
-      { id: 'pi', displayName: 'Pi', kind: 'agent', installed: true },
+      {
+        id: 'codex',
+        displayName: 'Codex',
+        kind: 'agent',
+        installed: true,
+        capabilities: {
+          parallelPerCwd: true,
+          resumeLast: true,
+          resumeById: true,
+          transcriptDiscovery: 'subprocess',
+          aiProvider: { credentialSource: 'runtime-or-workspace', wirePreference: ['openai-responses'] },
+        },
+      },
+      {
+        id: 'pi',
+        displayName: 'Pi',
+        kind: 'agent',
+        installed: true,
+        capabilities: {
+          parallelPerCwd: true,
+          resumeLast: true,
+          resumeById: true,
+          transcriptDiscovery: 'none',
+          aiProvider: { credentialSource: 'runtime-or-workspace', wirePreference: ['openai-chat'] },
+        },
+      },
     ],
     defaultAgent: 'pi',
     issueDefaultAgent: null,
@@ -75,15 +104,24 @@ vi.mock('../contexts/workspaces-context', () => ({
   }),
 }))
 
-vi.mock('./workspace/api', () => ({
-  detectWorkspaceCredential: mocks.detectWorkspaceCredential,
-  getAgentReadiness: vi.fn().mockResolvedValue({ agents: {} }),
-  getWorkspaceSessionDirectory: mocks.getWorkspaceSessionDirectory,
-  listAgentCredentials: mocks.listAgentCredentials,
-}))
+vi.mock('./workspace/api', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('./workspace/api')>()
+  return {
+    ...actual,
+    detectWorkspaceCredential: mocks.detectWorkspaceCredential,
+    getAgentReadiness: vi.fn().mockResolvedValue({ agents: {} }),
+    getAgentRuntimeReadiness: mocks.getAgentRuntimeReadiness,
+    getWorkspaceSessionDirectory: mocks.getWorkspaceSessionDirectory,
+    listAgentCredentials: mocks.listAgentCredentials,
+    updateResumeRuntime: mocks.updateResumeRuntime,
+  }
+})
 
 vi.mock('../api/config', () => ({
-  configApi: { getPresets: mocks.getPresets },
+  configApi: {
+    getPresets: mocks.getPresets,
+    getWorkspaceCredentialDefaults: mocks.getWorkspaceCredentialDefaults,
+  },
 }))
 
 vi.mock('../api/issues', async (importOriginal) => {
@@ -104,15 +142,45 @@ vi.mock('./MarkdownWhatEditor', () => ({
 }))
 
 beforeEach(async () => {
+  resetAgentRuntimesStore()
   await i18n.changeLanguage('en')
   delete scheduledIssue.issue.automationHealth
+  delete scheduledIssue.assigneeSession
   delete scheduledIssue.issue.credential
   delete scheduledIssue.issue.model
   delete scheduledIssue.issue.effort
   delete scheduledIssue.issue.timeout
   scheduledIssue.runs = []
+  scheduledIssue.issue.assignee = '@new-each-run'
+  scheduledIssue.issue.agent = 'codex'
+  delete scheduledIssue.issue.commentPrompt
   mocks.updateIssue.mockResolvedValue(scheduledIssue)
+  mocks.updateResumeRuntime.mockClear()
+  mocks.updateResumeRuntime.mockResolvedValue({
+    resumeId: 'resume-kind-owl-abc123',
+    agent: 'codex',
+    runtime: { credentialSource: 'vault', credentialSlug: 'longcat-1', model: 'LongCat-2.0', reasoningEffort: 'high' },
+  })
   mocks.getWorkspaceSessionDirectory.mockResolvedValue({ sessions: [] })
+  mocks.getWorkspaceCredentialDefaults.mockResolvedValue({ defaults: {} })
+  mocks.getAgentRuntimeReadiness.mockResolvedValue({
+    checkedAt: '2026-08-17T00:00:00.000Z',
+    overallReady: true,
+    agents: {
+      codex: {
+        agent: 'codex',
+        displayName: 'Codex',
+        installed: true,
+        binPath: null,
+        status: 'ready',
+        ready: true,
+        source: 'global-login',
+        checkedAt: '2026-08-17T00:00:00.000Z',
+        durationMs: 1,
+        message: 'ready',
+      },
+    },
+  })
   mocks.listAgentCredentials.mockResolvedValue([{
     slug: 'longcat-1',
     vendor: 'longcat',
@@ -274,7 +342,7 @@ describe('IssueActivity provenance identity', () => {
 
     expect(screen.queryByRole('button', { name: 'Continue' })).toBeNull()
     fireEvent.click(screen.getByRole('button', {
-      name: 'Show Session details for opencode · resume-open-coral-harbor-j76vuu',
+      name: 'Show Session details for opencode, resume-open-coral-harbor-j76vuu',
     }))
     expect(onOpenSession).not.toHaveBeenCalled()
     expect(screen.getByRole('dialog', {
@@ -287,7 +355,7 @@ describe('IssueActivity provenance identity', () => {
     })).toBeNull()
 
     fireEvent.click(screen.getByRole('button', {
-      name: 'Show Session details for opencode · resume-open-coral-harbor-j76vuu',
+      name: 'Show Session details for opencode, resume-open-coral-harbor-j76vuu',
     }))
     fireEvent.click(screen.getByRole('button', { name: 'Open conversation' }))
     await waitFor(() => expect(onOpenSession).toHaveBeenCalledWith(expect.objectContaining(record)))
@@ -316,21 +384,20 @@ describe('IssueDetail property controls', () => {
     expect(screen.getByRole('button', { name: 'Configure codex' }).className).toContain('size-10')
     expect(screen.getByRole('heading', { level: 3, name: 'Schedule' })).toBeTruthy()
     expect(screen.getByRole('heading', { level: 3, name: 'Agent' })).toBeTruthy()
+    const commentBehavior = screen.getByRole('button', { name: 'Comment behavior' })
+    expect(commentBehavior.className).toContain('w-full')
+    expect(commentBehavior.textContent).toContain('Default')
+    expect(commentBehavior.textContent).toContain('Standard reply wrapper')
     expect(screen.getByText('America/New_York').className).toContain('break-all')
     expect(screen.getByRole('button', { name: 'AI configuration' }).textContent)
       .toContain('Runtime managed')
     fireEvent.click(screen.getByRole('button', { name: 'AI configuration' }))
-    const credential = screen.getByRole('combobox', { name: 'AI access' }) as HTMLSelectElement
-    const model = screen.getByRole('combobox', { name: 'Run model' }) as HTMLSelectElement
-    const effort = screen.getByRole('combobox', { name: 'Effort' }) as HTMLSelectElement
-    await waitFor(() => {
-      expect(credential.value).toBe('inherit')
-      expect(model.selectedOptions[0]?.textContent).toBe('Default · runtime managed')
-      expect(effort.selectedOptions[0]?.textContent).toBe('Runtime managed')
-    })
-
-    fireEvent.change(model, { target: { value: 'custom' } })
-    expect(screen.getByRole('textbox', { name: 'Custom run model' })).toBeTruthy()
+    const inherit = await screen.findByRole('checkbox', { name: 'Follow Workspace headless preference' }) as HTMLInputElement
+    expect(inherit.checked).toBe(true)
+    fireEvent.click(screen.getByRole('button', { name: i18n.t('chatLanding.selectModelAndEffort') }))
+    fireEvent.click(await screen.findByRole('menuitem', { name: /Model/ }))
+    fireEvent.click(await screen.findByRole('menuitem', { name: i18n.t('chatLanding.customModel') }))
+    expect(await screen.findByRole('textbox', { name: i18n.t('chatLanding.customModelId') })).toBeTruthy()
   })
 
   it('patches the optional run timeout from the execution inspector', async () => {
@@ -378,16 +445,151 @@ describe('IssueDetail property controls', () => {
     scheduledIssue.issue.credential = 'deepseek-1'
     render(<IssueDetail wsId="demo-ws-auto-quant" id="morning-scan" />)
     fireEvent.click(await screen.findByRole('button', { name: 'AI configuration' }))
-    const credential = screen.getByRole('combobox', { name: 'AI access' }) as HTMLSelectElement
-    const model = screen.getByRole('combobox', { name: 'Run model' }) as HTMLSelectElement
-    const effort = screen.getByRole('combobox', { name: 'Effort' }) as HTMLSelectElement
+    expect((screen.getByRole('checkbox', { name: 'Follow Workspace headless preference' }) as HTMLInputElement).checked).toBe(false)
     await waitFor(() => {
-      expect(credential.value).toBe('vault:deepseek-1')
-      expect(Array.from(model.options).map((option) => option.value)).toContain('deepseek-v4-flash')
-      expect(Array.from(model.options).map((option) => option.value)).not.toContain('LongCat-2.0')
-      expect(Array.from(effort.options).map((option) => option.value))
-        .toEqual(['', 'low', 'high', 'max'])
+      expect(screen.getByRole('button', { name: i18n.t('chatLanding.selectCredential') }).textContent)
+        .toContain('DeepSeek')
     })
+    fireEvent.click(screen.getByRole('button', { name: i18n.t('chatLanding.selectModelAndEffort') }))
+    fireEvent.click(await screen.findByRole('menuitem', { name: /Model/ }))
+    expect(await screen.findByRole('menuitemradio', { name: /deepseek-v4-flash/i })).toBeTruthy()
+    expect(screen.queryByRole('menuitemradio', { name: /LongCat/ })).toBeNull()
+    fireEvent.click(screen.getByRole('menuitem', { name: /Effort/ }))
+    expect(await screen.findByRole('menuitemradio', { name: /low/ })).toBeTruthy()
+    expect(screen.getByRole('menuitemradio', { name: /high/ })).toBeTruthy()
+    expect(screen.getByRole('menuitemradio', { name: /max/ })).toBeTruthy()
+  })
+
+  it('confirms a bound Session capability change without rewriting Issue frontmatter', async () => {
+    scheduledIssue.issue.assignee = '@resume-kind-owl-abc123'
+    delete scheduledIssue.issue.agent
+    scheduledIssue.assigneeSession = {
+      resumeId: 'resume-kind-owl-abc123',
+      state: 'ready',
+      workspace: { id: 'demo-ws-remote', tag: 'remote' },
+      agent: 'codex',
+      displayName: 'Remote researcher',
+      active: false,
+      runtime: {
+        credentialSource: 'native',
+        model: 'claude-sonnet-4-5',
+        reasoningEffort: 'high',
+      },
+    }
+    mocks.getWorkspaceSessionDirectory.mockResolvedValue({ sessions: [] })
+
+    render(<IssueDetail wsId="demo-ws-auto-quant" id="morning-scan" />)
+
+    const trigger = await screen.findByRole('button', { name: 'AI configuration' })
+    await waitFor(() => expect((trigger as HTMLButtonElement).disabled).toBe(false))
+    expect(trigger.textContent).toContain('Runtime managed')
+    expect(trigger.textContent).toContain('claude-sonnet-4-5, high')
+    expect(screen.queryByRole('combobox', { name: 'Runtime' })).toBeNull()
+    expect(screen.getByText('codex')).toBeTruthy()
+    expect(screen.queryByText('This bound Session is no longer available.')).toBeNull()
+
+    fireEvent.click(trigger)
+    expect(screen.queryByRole('checkbox', { name: 'Follow Workspace headless preference' })).toBeNull()
+    fireEvent.click(await screen.findByRole('button', { name: i18n.t('chatLanding.selectModelAndEffort') }))
+    fireEvent.click(await screen.findByRole('menuitem', { name: /Effort/ }))
+    fireEvent.click(await screen.findByRole('menuitemradio', { name: /low/ }))
+    fireEvent.click(screen.getByRole('button', { name: 'Apply configuration' }))
+
+    const confirm = await screen.findByRole('alertdialog')
+    expect(confirm.textContent).toContain(
+      'This will change the planned assignee\'s capabilities from Runtime managed · claude-sonnet-4-5 · high to Runtime managed · claude-sonnet-4-5 · low.',
+    )
+    fireEvent.click(within(confirm).getByRole('button', { name: 'Change capabilities' }))
+
+    await waitFor(() => expect(mocks.updateResumeRuntime).toHaveBeenCalledWith(
+      'demo-ws-remote',
+      'resume-kind-owl-abc123',
+      {
+        credentialSource: 'native',
+        model: 'claude-sonnet-4-5',
+        reasoningEffort: 'low',
+      },
+    ))
+    expect(mocks.updateIssue).not.toHaveBeenCalled()
+    await waitFor(() => expect(screen.queryByRole('alertdialog')).toBeNull())
+  })
+
+  it('accepts a typed custom model id on a bound Session', async () => {
+    scheduledIssue.issue.assignee = '@resume-kind-owl-abc123'
+    delete scheduledIssue.issue.agent
+    mocks.getWorkspaceSessionDirectory.mockResolvedValue({
+      sessions: [{
+        resumeId: 'resume-kind-owl-abc123',
+        agent: 'codex',
+        createdAt: Date.now() - 86_400_000,
+        updatedAt: Date.now() - 60_000,
+        resumable: true,
+        active: false,
+        runtime: {
+          credentialSource: 'native',
+          model: 'claude-sonnet-4-5',
+          reasoningEffort: 'high',
+        },
+      }],
+    })
+
+    render(<IssueDetail wsId="demo-ws-auto-quant" id="morning-scan" />)
+    const trigger = await screen.findByRole('button', { name: 'AI configuration' })
+    await waitFor(() => expect((trigger as HTMLButtonElement).disabled).toBe(false))
+    fireEvent.click(trigger)
+    fireEvent.click(await screen.findByRole('button', { name: i18n.t('chatLanding.selectModelAndEffort') }))
+    fireEvent.click(await screen.findByRole('menuitem', { name: /Model/ }))
+    fireEvent.click(await screen.findByRole('menuitem', { name: i18n.t('chatLanding.customModel') }))
+    fireEvent.change(await screen.findByRole('textbox', { name: i18n.t('chatLanding.customModelId') }), {
+      target: { value: 'openrouter/some-new-id' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: i18n.t('common.save') }))
+    fireEvent.click(screen.getByRole('button', { name: 'Apply configuration' }))
+
+    const confirm = await screen.findByRole('alertdialog')
+    expect(confirm.textContent).toContain('openrouter/some-new-id')
+    fireEvent.click(within(confirm).getByRole('button', { name: 'Change capabilities' }))
+    await waitFor(() => expect(mocks.updateResumeRuntime).toHaveBeenCalledWith(
+      'demo-ws-auto-quant',
+      'resume-kind-owl-abc123',
+      expect.objectContaining({
+        credentialSource: 'native',
+        model: 'openrouter/some-new-id',
+      }),
+    ))
+    expect(mocks.updateIssue).not.toHaveBeenCalled()
+  })
+
+  it('locks bound Session AI configuration while a turn is running', async () => {
+    scheduledIssue.issue.assignee = '@resume-kind-owl-abc123'
+    delete scheduledIssue.issue.agent
+    mocks.getWorkspaceSessionDirectory.mockResolvedValue({
+      sessions: [{
+        resumeId: 'resume-kind-owl-abc123',
+        agent: 'codex',
+        createdAt: Date.now() - 86_400_000,
+        updatedAt: Date.now() - 60_000,
+        resumable: true,
+        active: true,
+        runtime: {
+          credentialSource: 'native',
+          model: 'claude-sonnet-4-5',
+          reasoningEffort: 'high',
+        },
+        latestExecution: {
+          taskId: 'task-running',
+          status: 'running',
+          startedAt: Date.now() - 10_000,
+        },
+      }],
+    })
+
+    render(<IssueDetail wsId="demo-ws-auto-quant" id="morning-scan" />)
+
+    const trigger = await screen.findByRole('button', { name: 'AI configuration' })
+    await waitFor(() => expect((trigger as HTMLButtonElement).disabled).toBe(true))
+    expect(screen.getByText('Wait for the current turn to finish before changing credential, model, or effort.')).toBeTruthy()
+    expect(mocks.updateResumeRuntime).not.toHaveBeenCalled()
   })
 
   it('places mobile work-item controls before long-form Issue content', async () => {
@@ -399,7 +601,10 @@ describe('IssueDetail property controls', () => {
     const sectionNavigation = screen.getByRole('navigation', { name: 'Issue sections' })
 
     expect(workItem.compareDocumentPosition(what) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
-    expect(workItem.compareDocumentPosition(activity) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(what.compareDocumentPosition(activity) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(document.getElementById('issue-comment-prompt')).toBeNull()
+    expect(screen.queryByRole('heading', { level: 2, name: 'Comment prompt' })).toBeNull()
+    expect(screen.queryByRole('textbox', { name: 'Comment prompt' })).toBeNull()
     expect(sectionNavigation.className).toContain('sticky')
     expect(sectionNavigation.className).toContain('overflow-x-auto')
     expect(sectionNavigation.className).toContain('flex-nowrap')
@@ -566,13 +771,13 @@ describe('IssueDetail property controls', () => {
 
     expect(activeIndex).toBeGreaterThanOrEqual(0)
     expect(recentIndex).toBeGreaterThan(activeIndex)
-    expect(choices[activeIndex]?.textContent).toContain('resume-active-owner · pi · active')
-    expect(choices[recentIndex]?.textContent).toContain('resume-recent-worker · codex')
+    expect(choices[activeIndex]?.textContent).toContain('resume-active-owner, pi, active')
+    expect(choices[recentIndex]?.textContent).toContain('resume-recent-worker, codex')
 
     fireEvent.click(choices[activeIndex]!)
     expect(mocks.updateIssue).not.toHaveBeenCalled()
     expect(within(dialog).getByText('Pending assignment')).toBeTruthy()
-    expect(within(dialog).getByText('resume-active-owner · pi · active now')).toBeTruthy()
+    expect(within(dialog).getByText('resume-active-owner, pi, active now')).toBeTruthy()
     fireEvent.click(within(dialog).getByRole('button', { name: 'Confirm assignment' }))
     await waitFor(() => expect(mocks.updateIssue).toHaveBeenCalledWith(
       'demo-ws-auto-quant',
@@ -589,5 +794,191 @@ describe('IssueDetail property controls', () => {
     expect(within(reopenedDialog).queryByText('Current thesis room')).toBeNull()
     expect(within(reopenedDialog).getByText(/^Updated a very long financial.*…$/)).toBeTruthy()
     expect(within(reopenedDialog).queryByText(/END-OF-PREVIEW/)).toBeNull()
+  })
+
+  it('stacks the pending assignment above confirmation actions and keeps a long Session label inside the footer', async () => {
+    const longTitle = `Overnight rotation desk for cross-market financials and industrials ${'with execution notes across regions '.repeat(4)}END-OF-TITLE`
+    mocks.getWorkspaceSessionDirectory.mockResolvedValue({
+      sessions: [{
+        resumeId: 'resume-long-label-owner',
+        agent: 'pi',
+        createdAt: Date.now() - 86_400_000,
+        updatedAt: Date.now() - 3_600_000,
+        resumable: true,
+        active: true,
+        interactive: {
+          name: 'p1',
+          title: longTitle,
+          state: 'running',
+          lastActiveAt: new Date().toISOString(),
+        },
+      }],
+    })
+
+    render(<IssueDetail wsId="demo-ws-auto-quant" id="morning-scan" />)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Assignee' }))
+    const dialog = await screen.findByRole('dialog', { name: 'Choose responsibility' })
+    const choice = within(dialog).getByRole('button', { name: /Overnight rotation desk/ })
+    fireEvent.click(choice)
+
+    const footer = dialog.querySelector('[data-slot="dialog-footer"]')
+    expect(footer).toBeTruthy()
+    const pending = within(footer as HTMLElement).getByText('Pending assignment')
+    const cancel = within(footer as HTMLElement).getByRole('button', { name: 'Cancel' })
+    const confirm = within(footer as HTMLElement).getByRole('button', { name: 'Confirm assignment' })
+    expect(pending.compareDocumentPosition(cancel) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(cancel.compareDocumentPosition(confirm) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+
+    const results = within(dialog).getByText('Assignment policy').parentElement
+    expect(results?.contains(choice)).toBe(true)
+    expect(results?.contains(footer)).toBe(false)
+    expect(footer?.previousElementSibling).toBe(results)
+
+    const normalizedTitle = longTitle.replace(/\s+/g, ' ').trim()
+    const truncatedTitle = `${normalizedTitle.slice(0, 117).trimEnd()}…`
+    expect(within(footer as HTMLElement).getByText(truncatedTitle)).toBeTruthy()
+    expect(within(footer as HTMLElement).queryByText(normalizedTitle)).toBeNull()
+    expect(within(footer as HTMLElement).queryByText(/END-OF-TITLE/)).toBeNull()
+
+    expect(footer?.className).toContain('flex-col')
+    expect(footer?.className).not.toContain('flex-col-reverse')
+    expect(footer?.className).toContain('sm:flex-row')
+    expect(pending.parentElement?.className).toContain('min-w-0')
+    expect(pending.parentElement?.className).toContain('max-w-full')
+  })
+})
+
+describe('IssueDetail comment behavior', () => {
+  it('summarizes Default in the Agent inspector and keeps the reading column as What then Activity', () => {
+    render(<IssueDetail wsId="demo-ws-auto-quant" id="morning-scan" />)
+
+    const trigger = screen.getByRole('button', { name: 'Comment behavior' })
+    expect(trigger.textContent).toContain('Default')
+    expect(trigger.textContent).toContain('Standard reply wrapper')
+    expect(screen.queryByRole('heading', { level: 2, name: 'Comment prompt' })).toBeNull()
+    expect(document.getElementById('issue-comment-prompt')).toBeNull()
+    expect(screen.queryByRole('textbox', { name: 'Comment prompt' })).toBeNull()
+
+    const what = screen.getByRole('heading', { level: 2, name: 'What' })
+    const activity = screen.getByRole('heading', { level: 2, name: 'Activity' })
+    expect(what.compareDocumentPosition(activity) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+  })
+
+  it('summarizes a stored custom template without opening the editor', () => {
+    scheduledIssue.issue.commentPrompt = '{comment}'
+    render(<IssueDetail wsId="demo-ws-auto-quant" id="morning-scan" />)
+
+    const trigger = screen.getByRole('button', { name: 'Comment behavior' })
+    expect(trigger.textContent).toContain('Custom')
+    expect(trigger.textContent).toContain('{comment}')
+    expect(screen.queryByRole('dialog', { name: 'Comment behavior' })).toBeNull()
+    expect(screen.queryByRole('textbox', { name: 'Comment prompt' })).toBeNull()
+    expect(mocks.updateIssue).not.toHaveBeenCalled()
+  })
+
+  it('opens the shared dialog on the default template without persisting', async () => {
+    render(<IssueDetail wsId="demo-ws-auto-quant" id="morning-scan" />)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Comment behavior' }))
+    const dialog = await screen.findByRole('dialog', { name: 'Comment behavior' })
+    expect(dialog.className).toContain('max-h-[min(42rem,calc(100dvh-2rem))]')
+    expect(dialog.className).toContain('min-w-0')
+    expect(dialog.className).toContain('overflow-hidden')
+    expect(dialog.className).toContain('grid-rows-[auto_minmax(0,1fr)_auto]')
+    expect(within(dialog).getByText('Supported tokens')).toBeTruthy()
+    expect(within(dialog).getByText('{comment} {title} {id} {workspaceId} {author} {what}')).toBeTruthy()
+
+    const editor = within(dialog).getByRole('textbox', { name: 'Comment prompt' }) as HTMLTextAreaElement
+    expect(editor.value).toBe(DEFAULT_ISSUE_COMMENT_PROMPT)
+    expect(editor.className).toContain('resize-y')
+    expect(editor.className).toContain('overflow-y-auto')
+    expect(within(dialog).getByRole('button', { name: 'Save comment prompt' })).toHaveProperty('disabled', true)
+    expect(within(dialog).queryByRole('button', { name: 'Use default wrapper' })).toBeNull()
+    expect(mocks.updateIssue).not.toHaveBeenCalled()
+
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Cancel' }))
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Comment behavior' })).toBeNull())
+    expect(mocks.updateIssue).not.toHaveBeenCalled()
+  })
+
+  it('saves a custom template through the existing commentPrompt patch', async () => {
+    mocks.updateIssue.mockResolvedValue({
+      ...scheduledIssue,
+      issue: { ...scheduledIssue.issue, commentPrompt: '{comment}' },
+    })
+    render(<IssueDetail wsId="demo-ws-auto-quant" id="morning-scan" />)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Comment behavior' }))
+    const dialog = await screen.findByRole('dialog', { name: 'Comment behavior' })
+    fireEvent.change(within(dialog).getByRole('textbox', { name: 'Comment prompt' }), {
+      target: { value: '{comment}' },
+    })
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Save comment prompt' }))
+
+    await waitFor(() => expect(mocks.updateIssue).toHaveBeenCalledWith(
+      'demo-ws-auto-quant',
+      'morning-scan',
+      { commentPrompt: '{comment}' },
+    ))
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Comment behavior' })).toBeNull())
+  })
+
+  it('resets a custom template to the omitted default without writing the canonical wrapper', async () => {
+    scheduledIssue.issue.commentPrompt = '{comment}'
+    mocks.updateIssue.mockResolvedValue({
+      ...scheduledIssue,
+      issue: { ...scheduledIssue.issue, commentPrompt: undefined },
+    })
+    render(<IssueDetail wsId="demo-ws-auto-quant" id="morning-scan" />)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Comment behavior' }))
+    const dialog = await screen.findByRole('dialog', { name: 'Comment behavior' })
+    expect((within(dialog).getByRole('textbox', { name: 'Comment prompt' }) as HTMLTextAreaElement).value)
+      .toBe('{comment}')
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Use default wrapper' }))
+
+    await waitFor(() => expect(mocks.updateIssue).toHaveBeenCalledWith(
+      'demo-ws-auto-quant',
+      'morning-scan',
+      { commentPrompt: null },
+    ))
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Comment behavior' })).toBeNull())
+  })
+
+  it('keeps comment behavior in the Agent inspector when the Issue is unscheduled', () => {
+    const when = scheduledIssue.issue.when
+    delete scheduledIssue.issue.when
+    try {
+      render(<IssueDetail wsId="demo-ws-auto-quant" id="morning-scan" />)
+
+      expect(screen.getByRole('heading', { level: 3, name: 'Agent' })).toBeTruthy()
+      expect(screen.getByRole('button', { name: 'Comment behavior' }).textContent).toContain('Default')
+      expect(screen.queryByRole('heading', { level: 3, name: 'Schedule' })).toBeNull()
+      expect(document.getElementById('issue-comment-prompt')).toBeNull()
+    } finally {
+      scheduledIssue.issue.when = when
+    }
+  })
+
+  it.each([
+    ['en', 'Comment behavior', 'Default', 'Custom'],
+    ['zh', '评论行为', '默认', '自定义'],
+    ['zh-Hant', '留言行為', '預設', '自訂'],
+    ['ja', 'コメントの動作', 'デフォルト', 'カスタム'],
+  ] as const)('localizes the Default versus Custom inspector summary in %s', async (
+    locale,
+    commentBehavior,
+    defaultLabel,
+    customLabel,
+  ) => {
+    await i18n.changeLanguage(locale)
+    const { unmount } = render(<IssueDetail wsId="demo-ws-auto-quant" id="morning-scan" />)
+    expect(screen.getByRole('button', { name: commentBehavior }).textContent).toContain(defaultLabel)
+    unmount()
+
+    scheduledIssue.issue.commentPrompt = '{comment}'
+    render(<IssueDetail wsId="demo-ws-auto-quant" id="morning-scan" />)
+    expect(screen.getByRole('button', { name: commentBehavior }).textContent).toContain(customLabel)
   })
 })

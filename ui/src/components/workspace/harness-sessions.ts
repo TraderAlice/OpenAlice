@@ -5,14 +5,20 @@ import type {
   WorkspaceSessionDirectory,
   WorkspaceSessionDirectoryEntry,
 } from './api'
+import {
+  projectHarnessSessionPresentation,
+  type HarnessSessionSourceKind,
+} from './harness-session-presentation'
 
-const PREVIEW_TITLE_LIMIT = 48
+export { shortResumeId } from './harness-session-presentation'
 
 export interface HarnessSession {
   readonly workspaceId: string
   readonly resumeId: string
   readonly agent: string
   readonly title: string
+  readonly sourceKind?: HarnessSessionSourceKind
+  readonly issueId?: string
   readonly occupancyAt: number
   readonly occupancyRunning: boolean
   readonly headlessOccupying: boolean
@@ -37,33 +43,11 @@ function timestamp(value: string | number | undefined): number {
   return Number.isFinite(parsed) ? parsed : 0
 }
 
-export function shortResumeId(resumeId: string): string {
-  const trimmed = resumeId.replace(/^resume-/, '')
-  return trimmed.length <= 12 ? trimmed : trimmed.slice(0, 12)
-}
-
 export function harnessSessionTitle(
   session: SessionRecord | null,
   entry: WorkspaceSessionDirectoryEntry | null,
 ): string {
-  const coworkerName = session?.displayName?.trim() || entry?.displayName?.trim()
-  if (coworkerName) return coworkerName
-
-  const interactiveTitle = session?.title?.trim() || entry?.interactive?.title?.trim()
-  if (interactiveTitle) return interactiveTitle
-
-  const preview = entry?.latestExecution?.assistantPreview?.replace(/\s+/g, ' ').trim()
-  if (preview) {
-    return preview.length > PREVIEW_TITLE_LIMIT
-      ? `${preview.slice(0, PREVIEW_TITLE_LIMIT - 1)}…`
-      : preview
-  }
-
-  const issueId = entry?.latestExecution?.issueId?.trim()
-  if (issueId) return issueId
-
-  if (session?.name.trim()) return session.name.trim()
-  return shortResumeId(session?.resumeId ?? entry?.resumeId ?? 'session')
+  return projectHarnessSessionPresentation(session, entry).title
 }
 
 export function harnessOccupancyAt(
@@ -98,11 +82,14 @@ export function toHarnessSession(
   const resumeId = session.resumeId
   const interactiveRunning = session.state === 'running'
   const headlessOccupying = isHeadlessOccupying(session, entry)
+  const presentation = projectHarnessSessionPresentation(session, entry)
   return {
     workspaceId,
     resumeId,
     agent: session.agent,
-    title: harnessSessionTitle(session, entry),
+    title: presentation.title,
+    ...(presentation.sourceKind ? { sourceKind: presentation.sourceKind } : {}),
+    ...(presentation.issueId ? { issueId: presentation.issueId } : {}),
     occupancyAt: harnessOccupancyAt(session, entry),
     occupancyRunning: interactiveRunning || headlessOccupying,
     headlessOccupying,
@@ -112,6 +99,32 @@ export function toHarnessSession(
     session,
     directory: entry,
   }
+}
+
+/**
+ * A Session that was born on a headless turn and has never opened a TUI or
+ * Web conversation. Ask Alice / Auto Quant hide these by default; the Issue page still
+ * owns them.
+ */
+export function isHeadlessBornWithoutInteractive(
+  session: SessionRecord,
+  entry: WorkspaceSessionDirectoryEntry | null,
+): boolean {
+  if (entry?.interactive) return false
+  if (session.surface === 'terminal' || session.surface === 'webpi') return false
+  const createdBy = entry?.createdBy?.kind
+  if (createdBy === 'interactive') return false
+  if (createdBy === 'issue' || createdBy === 'headless') return true
+  if (session.surface === 'headless') return true
+  return Boolean(session.sourceRunId)
+}
+
+export interface HarnessSessionJoinOptions {
+  readonly presence?: SessionPresence
+  /** When false (Ask Alice / Auto Quant default), hide headless-born never-TUI rows. */
+  readonly includeHeadlessBornSessions?: boolean
+  /** When false (shared Harness default), keep current Issue owners/workers on Issue surfaces. */
+  readonly includeIssueAttachedSessions?: boolean
 }
 
 /** Running occupancy first (TUI or headless), then latest occupancy. */
@@ -137,14 +150,17 @@ export function orderHarnessSessions<T extends {
 export function joinWorkspaceHarnessSessions(
   workspace: Workspace,
   directory: WorkspaceSessionDirectory | null,
-  opts: { presence?: SessionPresence } = {},
+  opts: HarnessSessionJoinOptions = {},
 ): HarnessSession[] {
   const wanted = opts.presence ?? 'active'
+  const includeHeadlessBorn = opts.includeHeadlessBornSessions === true
+  const includeIssueAttached = opts.includeIssueAttachedSessions === true
   if (!directory) {
     if (wanted !== 'active') return []
     return orderHarnessSessions(
       workspace.sessions
         .filter((session) => (session.presence ?? 'active') === 'active')
+        .filter((session) => includeHeadlessBorn || !isHeadlessBornWithoutInteractive(session, null))
         .map((session) => toHarnessSession(workspace.id, session, null)),
     )
   }
@@ -156,8 +172,11 @@ export function joinWorkspaceHarnessSessions(
   )
   const rows = workspace.sessions.flatMap((session) => {
     const entry = directoryByResume.get(session.resumeId) ?? null
+    if (entry?.rosterVisibility === 'hidden') return []
+    if (!includeIssueAttached && entry?.issueAttached) return []
     const presence = entryPresence(entry, session.presence ?? 'active')
     if (presence !== wanted) return []
+    if (!includeHeadlessBorn && isHeadlessBornWithoutInteractive(session, entry)) return []
     return [toHarnessSession(workspace.id, session, entry)]
   })
   return orderHarnessSessions(rows)
@@ -166,7 +185,8 @@ export function joinWorkspaceHarnessSessions(
 export function flattenHarnessSessions(
   workspaces: readonly Workspace[],
   directories: ReadonlyMap<string, WorkspaceSessionDirectory>,
+  opts: HarnessSessionJoinOptions = {},
 ): HarnessSession[] {
   return orderHarnessSessions(workspaces.flatMap((workspace) =>
-    joinWorkspaceHarnessSessions(workspace, directories.get(workspace.id) ?? null)))
+    joinWorkspaceHarnessSessions(workspace, directories.get(workspace.id) ?? null, opts)))
 }

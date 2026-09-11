@@ -1,8 +1,17 @@
-/**
- * Read-only Office building. Each Workspace is one room. Never a spawn surface.
- */
+/** Office building plus Project-owned Day state. Never a spawn surface. */
 import { Hono } from 'hono'
+import { ZodError } from 'zod'
 
+import { OfficeDayUnavailableError } from '../../core/office-day-store.js'
+import {
+  RoutineFollowUpConflictError,
+  RoutineFollowUpCreateDisallowedError,
+  RoutineFollowUpDecisionConflictError,
+  RoutineFollowUpDecisionMissingError,
+  RoutineFollowUpStaleObservationError,
+  RoutineFollowUpUnavailableError,
+  routineDecisionInputSchema,
+} from '../../core/routine-follow-up-store.js'
 import { sessionPreferredTitle } from '../../workspaces/session-registry.js'
 import {
   OFFICE_CONFIG,
@@ -40,30 +49,48 @@ async function projectRoom(
   harness: ReturnType<typeof officeHarnessForTemplate>,
   events: Parameters<typeof projectOfficeFloor>[2],
   now: number,
+  includeLatestResult: boolean,
 ) {
   const directory = await svc.sessionDirectory(workspaceId, 200)
   if (!directory) return null
   const roster: OfficeRosterPerson[] = directory.sessions.map((entry) => {
     const record = svc.sessionRegistry.findByResumeId(workspaceId, entry.resumeId)
+    const latestPrompt = entry.latestExecution
+      ? svc.headlessTasks.get(entry.latestExecution.taskId)?.prompt.trim()
+      : undefined
+    const assignment = latestPrompt || (record ? sessionPreferredTitle(record) : undefined)
     return {
       resumeId: entry.resumeId,
       agent: entry.agent,
       name: record?.name ?? entry.resumeId,
       ...(entry.displayName ? { displayName: entry.displayName } : {}),
-      ...(record && sessionPreferredTitle(record) ? { title: sessionPreferredTitle(record) } : {}),
+      ...(assignment ? { title: assignment } : {}),
       ...(record ? { sessionRecordId: record.id } : {}),
       ...(entry.presence ? { presence: entry.presence } : {}),
       lifecycle: entry.lifecycle === 'retired' ? 'retired' : 'active',
+      active: entry.active,
       lastInteractionAt: sessionLastInteractionAt(entry),
     }
   })
   const floor = projectOfficeFloor(workspaceId, roster, events, now)
+  const directoryByResumeId = new Map(directory.sessions.map((entry) => [entry.resumeId, entry]))
   return {
     workspace: { ...directory.workspace, harness },
     lastInteractionAt: floor.lastInteractionAt,
     sleeping: floor.sleeping,
     employees: floor.employees.map((employee) => ({
       ...employee,
+      ...(() => {
+        const execution = directoryByResumeId.get(employee.resumeId)?.latestExecution
+        const finishedAt = execution?.finishedAt
+        return includeLatestResult
+          && execution?.status === 'done'
+          && execution.assistantPreview
+          && finishedAt !== undefined
+          && finishedAt <= now
+          ? { latestResult: { text: execution.assistantPreview, at: finishedAt } }
+          : {}
+      })(),
       drawers: projectOfficeDrawers(
         workspaceId,
         employee.resumeId,
@@ -75,15 +102,378 @@ async function projectRoom(
 
 export function createOfficeRoutes(svc: WorkspaceService): Hono {
   const app = new Hono()
+  const activityJournal = svc.activityJournal ?? svc.agentRuntimeLog
+
+  app.get('/day', (c) => {
+    try {
+      return c.json(svc.officeDayStore.observe())
+    } catch (error) {
+      if (error instanceof OfficeDayUnavailableError) {
+        return c.json({ error: error.code, message: error.message }, 503)
+      }
+      return c.json({
+        error: 'office_day_read_failed',
+        message: error instanceof Error ? error.message : String(error),
+      }, 500)
+    }
+  })
+
+  app.post('/day/open', async (c) => {
+    try {
+      const input: unknown = await c.req.json()
+      return c.json(await svc.officeDayStore.open(input))
+    } catch (error) {
+      if (error instanceof ZodError || error instanceof SyntaxError) {
+        return c.json({
+          error: 'invalid_office_day_request',
+          message: 'The Office Day request body is invalid.',
+        }, 400)
+      }
+      if (error instanceof OfficeDayUnavailableError) {
+        return c.json({ error: error.code, message: error.message }, 503)
+      }
+      return c.json({
+        error: 'office_day_write_failed',
+        message: error instanceof Error ? error.message : String(error),
+      }, 500)
+    }
+  })
+
+  app.post('/day/commands', async (c) => {
+    try {
+      const input: unknown = await c.req.json()
+      return c.json(await svc.officeDayStore.execute(input))
+    } catch (error) {
+      if (error instanceof ZodError || error instanceof SyntaxError) {
+        return c.json({
+          error: 'invalid_office_day_request',
+          message: 'The Office Day request body is invalid.',
+        }, 400)
+      }
+      if (error instanceof OfficeDayUnavailableError) {
+        return c.json({ error: error.code, message: error.message }, 503)
+      }
+      return c.json({
+        error: 'office_day_write_failed',
+        message: error instanceof Error ? error.message : String(error),
+      }, 500)
+    }
+  })
+
+  app.get('/routine-follow-ups', (c) => {
+    try {
+      return c.json({
+        followUps: svc.routineFollowUpStore.list(),
+        decisions: svc.routineFollowUpStore.listDecisions(),
+      })
+    } catch (error) {
+      if (error instanceof RoutineFollowUpUnavailableError) {
+        return c.json({ error: error.code, message: error.message }, 503)
+      }
+      return c.json({
+        error: 'routine_follow_up_read_failed',
+        message: error instanceof Error ? error.message : String(error),
+      }, 500)
+    }
+  })
+
+  app.put('/routine-follow-ups/:inboxEntryId', async (c) => {
+    const inboxEntryId = c.req.param('inboxEntryId')
+    if (!inboxEntryId) {
+      return c.json({
+        error: 'inbox_entry_id_required',
+        message: 'An Inbox entry id is required.',
+      }, 400)
+    }
+
+    let observation
+    let existingDecision = false
+    try {
+      observation = svc.routineFollowUpStore.observe(inboxEntryId)
+      existingDecision = !observation.followUp
+        && svc.routineFollowUpStore.listDecisions().some(
+          (decision) => decision.inboxEntryId === inboxEntryId,
+        )
+    } catch (error) {
+      if (error instanceof RoutineFollowUpUnavailableError) {
+        return c.json({ error: error.code, message: error.message }, 503)
+      }
+      return c.json({
+        error: 'routine_follow_up_read_failed',
+        message: error instanceof Error ? error.message : String(error),
+      }, 500)
+    }
+    if (existingDecision) {
+      return c.json({
+        error: 'routine_follow_up_no_longer_active',
+        message: 'This report already has an authoritative decision receipt.',
+      }, 409)
+    }
+    const existing = observation.followUp
+    if (!svc.inboxStore) {
+      return c.json({
+        error: 'inbox_unavailable',
+        message: 'Inbox authority is unavailable.',
+      }, 503)
+    }
+
+    // This exact read snapshots fresh-Carry attention authority. Once the live
+    // Issue check below passes, overlapping read/delete cannot revoke that intent;
+    // the Decision Desk already degrades honestly if the report later disappears.
+    let entry
+    try {
+      entry = await svc.inboxStore.get(inboxEntryId)
+    } catch (error) {
+      return c.json({
+        error: 'inbox_read_failed',
+        message: error instanceof Error ? error.message : String(error),
+      }, 500)
+    }
+    if (!entry) {
+      return c.json({
+        error: 'inbox_entry_not_found',
+        message: 'The Inbox report no longer exists.',
+      }, 404)
+    }
+
+    const issueWorkspaceId = entry.origin?.issueWorkspaceId
+    const issueId = entry.origin?.issueId
+    if (
+      entry.origin?.kind !== 'headless'
+      || typeof issueWorkspaceId !== 'string'
+      || issueWorkspaceId.length === 0
+      || issueWorkspaceId.trim() !== issueWorkspaceId
+      || typeof issueId !== 'string'
+      || issueId.length === 0
+      || issueId.trim() !== issueId
+      || !Number.isFinite(entry.ts)
+      || !Number.isInteger(entry.ts)
+      || entry.ts < 0
+    ) {
+      return c.json({
+        error: 'not_a_routine_report',
+        message: 'Only a server-attributed scheduled Issue report can be carried for follow-up.',
+      }, 422)
+    }
+
+    const inboxAllowsCreate = !(
+      typeof entry.readAt === 'number'
+      && Number.isFinite(entry.readAt)
+      && entry.readAt > 0
+    )
+    let allowCreate = false
+    if (!existing && inboxAllowsCreate) {
+      let detail
+      try {
+        detail = await svc.issueDetail(issueWorkspaceId, issueId)
+      } catch (error) {
+        return c.json({
+          error: 'routine_issue_read_failed',
+          message: error instanceof Error ? error.message : String(error),
+        }, 500)
+      }
+      if (!detail) {
+        return c.json({
+          error: 'routine_issue_not_found',
+          message: 'The Issue that produced this report no longer exists.',
+        }, 404)
+      }
+      if (!detail.issue.when) {
+        return c.json({
+          error: 'routine_issue_not_scheduled',
+          message: 'The Issue that produced this report is not scheduled.',
+        }, 422)
+      }
+      allowCreate = true
+    }
+
+    try {
+      const result = await svc.routineFollowUpStore.put({
+        inboxEntryId: entry.id,
+        reportTs: entry.ts,
+        issueWorkspaceId,
+        issueId,
+      }, {
+        allowCreate,
+        observedRevision: observation.revision,
+      })
+      return c.json(result)
+    } catch (error) {
+      if (error instanceof RoutineFollowUpStaleObservationError) {
+        return c.json({
+          error: 'routine_follow_up_no_longer_active',
+          message: 'This decision changed while the request was in flight. Refresh before retrying.',
+        }, 409)
+      }
+      if (error instanceof RoutineFollowUpCreateDisallowedError) {
+        if (error.reason === 'already-decided') {
+          return c.json({
+            error: 'routine_follow_up_no_longer_active',
+            message: 'This report already has an authoritative decision receipt.',
+          }, 409)
+        }
+        return c.json({
+          error: 'routine_report_already_reviewed',
+          message: 'This Inbox report was already reviewed and cannot be carried again.',
+        }, 409)
+      }
+      if (error instanceof RoutineFollowUpConflictError) {
+        return c.json({ error: error.code, message: error.message }, 409)
+      }
+      if (error instanceof RoutineFollowUpUnavailableError) {
+        return c.json({ error: error.code, message: error.message }, 503)
+      }
+      return c.json({
+        error: 'routine_follow_up_write_failed',
+        message: error instanceof Error ? error.message : String(error),
+      }, 500)
+    }
+  })
+
+  app.post('/routine-follow-ups/:inboxEntryId/decision', async (c) => {
+    const inboxEntryId = c.req.param('inboxEntryId')
+    if (!inboxEntryId) {
+      return c.json({
+        error: 'inbox_entry_id_required',
+        message: 'An Inbox entry id is required.',
+      }, 400)
+    }
+
+    let input
+    try {
+      input = routineDecisionInputSchema.parse(await c.req.json())
+    } catch (error) {
+      if (error instanceof ZodError || error instanceof SyntaxError) {
+        return c.json({
+          error: 'invalid_routine_follow_up_decision',
+          message: 'A strict routine decision outcome is required.',
+        }, 400)
+      }
+      return c.json({
+        error: 'routine_follow_up_decision_read_failed',
+        message: error instanceof Error ? error.message : String(error),
+      }, 500)
+    }
+
+    let observation
+    let existingDecision = false
+    try {
+      existingDecision = svc.routineFollowUpStore.listDecisions().some(
+        (decision) => decision.inboxEntryId === inboxEntryId,
+      )
+      observation = svc.routineFollowUpStore.observe(inboxEntryId)
+    } catch (error) {
+      if (error instanceof RoutineFollowUpUnavailableError) {
+        return c.json({ error: error.code, message: error.message }, 503)
+      }
+      return c.json({
+        error: 'routine_follow_up_read_failed',
+        message: error instanceof Error ? error.message : String(error),
+      }, 500)
+    }
+    const activeFollowUp = existingDecision ? null : observation.followUp
+    if (!existingDecision && !activeFollowUp) {
+      return c.json({
+        error: 'routine_follow_up_decision_missing',
+        message: `Routine follow-up ${inboxEntryId} has neither an active carry nor a decision receipt.`,
+      }, 409)
+    }
+
+    // Idempotent/conflicting retries use their durable receipt as authority.
+    // A new decision must match the same exact report + scheduled Issue that
+    // the UI presents; a stale or direct caller cannot manufacture a judgment.
+    if (activeFollowUp) {
+      if (!svc.inboxStore) {
+        return c.json({
+          error: 'routine_follow_up_evidence_check_unavailable',
+          message: 'Inbox authority is unavailable, so this evidence cannot be classified.',
+        }, 503)
+      }
+
+      let entry
+      try {
+        entry = await svc.inboxStore.get(inboxEntryId)
+      } catch {
+        return c.json({
+          error: 'routine_follow_up_evidence_check_unavailable',
+          message: 'The exact Inbox report could not be checked, so no decision was recorded.',
+        }, 503)
+      }
+      const reportAvailable = Boolean(
+        entry
+        && entry.id === activeFollowUp.inboxEntryId
+        && entry.ts === activeFollowUp.reportTs
+        && entry.origin?.kind === 'headless'
+        && entry.origin.issueWorkspaceId === activeFollowUp.issueWorkspaceId
+        && entry.origin.issueId === activeFollowUp.issueId,
+      )
+
+      let detail
+      try {
+        detail = await svc.issueDetail(
+          activeFollowUp.issueWorkspaceId,
+          activeFollowUp.issueId,
+        )
+      } catch {
+        return c.json({
+          error: 'routine_follow_up_evidence_check_unavailable',
+          message: 'The exact Scheduled Issue could not be checked, so no decision was recorded.',
+        }, 503)
+      }
+      const issueAvailable = Boolean(
+        detail
+        && detail.issue.id === activeFollowUp.issueId
+        && detail.issue.when,
+      )
+
+      const evidenceAvailable = reportAvailable && issueAvailable
+      if (input.outcome === 'evidence-unavailable' && evidenceAvailable) {
+        return c.json({
+          error: 'routine_follow_up_evidence_available',
+          message: 'The exact report and Scheduled Issue are available for a judgment.',
+        }, 409)
+      }
+      if (input.outcome !== 'evidence-unavailable' && !evidenceAvailable) {
+        return c.json({
+          error: 'routine_follow_up_evidence_unavailable',
+          message: 'The exact report and Scheduled Issue must both be available for a judgment.',
+        }, 409)
+      }
+    }
+
+    try {
+      return c.json(await svc.routineFollowUpStore.decide(inboxEntryId, input, {
+        observedRevision: observation.revision,
+      }))
+    } catch (error) {
+      if (error instanceof RoutineFollowUpStaleObservationError) {
+        return c.json({
+          error: error.code,
+          message: 'This follow-up changed while the judgment was in flight. Refresh before retrying.',
+        }, 409)
+      }
+      if (error instanceof RoutineFollowUpDecisionConflictError
+        || error instanceof RoutineFollowUpDecisionMissingError) {
+        return c.json({ error: error.code, message: error.message }, 409)
+      }
+      if (error instanceof RoutineFollowUpUnavailableError) {
+        return c.json({ error: error.code, message: error.message }, 503)
+      }
+      return c.json({
+        error: 'routine_follow_up_decision_failed',
+        message: error instanceof Error ? error.message : String(error),
+      }, 500)
+    }
+  })
 
   app.get('/floor', async (c) => {
-    const lastSeq = svc.agentRuntimeLog.lastSeq()
+    const lastSeq = activityJournal.lastSeq()
     const asOfSeq = parseAsOfSeq(c.req.query('asOfSeq'), lastSeq)
     // Live Office is a bounded current-state projection. Only explicit replay
     // pays the cost of reading immutable history from disk.
     const events = asOfSeq === undefined
-      ? svc.agentRuntimeLog.projectionEvents()
-      : await svc.agentRuntimeLog.read({})
+      ? activityJournal.projectionEvents()
+      : await activityJournal.read({})
     const sliced = asOfSeq === undefined ? events : eventsThroughSeq(events, asOfSeq)
     const now = officeProjectionNow(sliced, asOfSeq, lastSeq)
     const requested = c.req.query('workspaceId')?.trim()
@@ -105,14 +495,21 @@ export function createOfficeRoutes(svc: WorkspaceService): Hono {
     if (requested && rooms.length === 0) return c.json({ error: 'workspace_not_found' }, 404)
     const offices = []
     for (const room of rooms) {
-      const office = await projectRoom(svc, room.id, room.harness, sliced, now)
+      const office = await projectRoom(
+        svc,
+        room.id,
+        room.harness,
+        sliced,
+        now,
+        asOfSeq === undefined,
+      )
       if (office) offices.push(office)
     }
     return c.json({
       config: OFFICE_CONFIG,
       offices,
       lastSeq,
-      firstSeq: svc.agentRuntimeLog.firstSeq(),
+      firstSeq: activityJournal.firstSeq(),
       ...(asOfSeq !== undefined ? { asOfSeq } : {}),
     })
   })

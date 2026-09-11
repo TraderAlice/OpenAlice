@@ -32,6 +32,19 @@ A credential answers **how the user may reach an AI resource**. It owns the
 secret, authentication kind, vendor identity, and the wire-shape-to-endpoint
 map accepted by that key. It does not own a model's capabilities.
 
+OpenRouter is a third-party gateway credential, not a first-party model
+vendor. One key declares three wires: OpenAI Chat and Responses at
+`https://openrouter.ai/api/v1`, and Anthropic Messages at
+`https://openrouter.ai/api` (no `/v1`; the Anthropic SDK appends
+`/v1/messages`). The Anthropic skin uses Bearer auth
+(`ANTHROPIC_AUTH_TOKEN`). Suggested model IDs are OpenRouter slugs
+(`provider/model`); any other catalog ID may be pasted. The current coding
+default is `openai/gpt-5.6-luna`. The suggestion list also includes
+OpenRouter's current top-weekly text models (`deepseek/deepseek-v4-flash-0731`,
+`tencent/hy3`, `openai/gpt-5.6-luna`, `z-ai/glm-5.2`, `xiaomi/mimo-v2.5`).
+Existing Custom credentials that already point at `openrouter.ai` keep
+working as `custom`.
+
 `Credential.lastModel` is a remembered selection hint. It saves the user from
 retyping the last model used with an account, but it does not make the model an
 intrinsic property of the credential and must never store a copied capability
@@ -74,6 +87,12 @@ runtime's native launch interface:
   as `CURSOR_API_KEY`, plus `--model` only (live CLI rejects
   `id[effort=…]`; catalog ids already
   encode effort as suffixes such as `gpt-5.2-low`);
+- Antigravity native authentication or an optional Gemini key projected as
+  `GEMINI_API_KEY` (and `GOOGLE_GEMINI_BASE_URL` only for a custom host), plus
+  `--model` and `--effort low|medium|high`. `GEMINI_API_KEY` alone has no
+  effect unless the user already set `modelProvider: "gemini"` in
+  `~/.gemini/antigravity-cli/settings.json`; Alice does not write that file.
+  Alice launches PATH `agy` only — never `antigravity` or `gemini`;
 - Grok Build `XAI_API_KEY` / optional `GROK_MODELS_BASE_URL` plus `--model`
   and `--effort`;
 - Oh My Pi provider env plus `--model` and `--thinking`;
@@ -112,6 +131,12 @@ control, whether it resolves from login, environment, user settings, or local
 project files. Launcher-owned explicit `--settings` remain available in both
 modes.
 
+Headless streaming adapters must preserve incremental assistant text exactly,
+including standalone spaces and newlines. Those whitespace-only deltas carry
+Markdown structure and must not pass through truthiness checks based on
+`trim()`. Trimming remains appropriate only at a final-result or display
+boundary where the adapter has received one complete message.
+
 A registered provider default is descriptive model metadata, not an implicit
 Session launch parameter. OpenAlice may label that default in selection help,
 but it persists and projects an effort only when a Workspace preference, Issue,
@@ -146,7 +171,22 @@ resolved value:
   (`src/workspaces/adapters/cursor-models.ts`); third-party ids stay
   free-typed. Effort and Fast are suffixes on the CLI id
   (`cursor-grok-4.6-high-fast`), not a separate picker;
-- Grok Build: `--effort` (`none` through `max` / `xhigh`; `ultra` is rejected);
+- Antigravity: `--model <slug>` plus `--effort low|medium|high`. `agy models`
+  is filtered by auth type and billing tier — a free Gemini API key returns
+  raw API ids; an Antigravity account returns effort-suffixed slugs. Do not
+  invent a suffix mapper. Issue / launch suggestions are the union of those
+  Gemini pools (`src/workspaces/adapters/agy-models.ts`); Claude and other
+  third-party ids stay free-typed. `ultra` / `xhigh` / `max` / `none` /
+  `minimal` are rejected. Headless stdout is documented `stream-json`
+  (`init` carries `conversation_id`). Resume is `--conversation` /
+  `--continue`, not `--resume`. Bind the prompt with `-p <prompt>`; do not
+  use a `--` terminator;
+- Grok Build: `--effort` (`none` through `max` / `xhigh`; `ultra` is rejected).
+  Issue / launch suggestions are the live `grok models` ids
+  (`src/workspaces/adapters/grok-models.ts`): `grok-4.6` (CLI default) and
+  `grok-4.5`. grok-4.6 advertises low / medium / high / xhigh; grok-4.5 omits
+  xhigh. A free-typed unknown id keeps the canonical CLI set. Do not offer
+  the retired `grok-build` alias;
 - Codex: project `model_reasoning_effort`.
 
 ### Workspace settings and durable Session bindings
@@ -193,8 +233,11 @@ the Workspace sidebar, and interactive CLI/API starts use `interactive`;
 Issues, schedules, automation, and headless CLI/API starts use `headless`. An explicit
 Quick Chat, sidebar, Issue, CLI, or API runtime choice wins for that one
 Session. Otherwise OpenAlice uses the mode's fixed Agent, then its recent
-Agent, then the legacy `.alice/workspace.json` `defaultAgent`, then the
-installation-wide `workspaceDefaultAgent`. If none resolves to a registered
+Agent, then the installation-wide `workspaceDefaultAgent`. Headless dispatch
+first uses its mode defaults, then `issueDefaultAgent`, then the interactive
+fallback. `.alice/workspace.json` contains display metadata only; migration
+0042 moves its shipped `defaultAgent` to the interactive fixed default without
+overwriting an existing fixed default. If none resolves to a registered
 Agent runtime, Alice falls back to the first registered runtime. Headless mode
 defaults must resolve to a headless-capable Agent.
 
@@ -222,8 +265,14 @@ Session binding when its owner is `@new-then-resume` or `@new-each-run`.
 `credential` is
 only an OpenAlice-vault slug. Omitting both inherits the Workspace headless
 tuple. Neither form ever contains a key or endpoint. Once an exact
-`@resumeId` exists, those fields cannot replace its credential source, model, or
-effort. Follow-up turns replay the stored binding instead of consulting newly
+`@resumeId` exists, Issue frontmatter cannot replace its credential source,
+model, or effort. The Issue page and paused Session settings may still replace
+those three dimensions on the stored binding; the Agent runtime stays frozen.
+Those editors, plus Workspace interactive/headless preference rows, share one
+pinned runtime draft (`usePinnedRuntimeDraft`) and `AgentLaunchSelectors`.
+Unknown model ids are typed through the shared custom-model dialog; they are
+not limited to the preset catalog.
+Follow-up turns replay the stored binding instead of consulting newly
 changed Workspace defaults.
 
 The persisted credential component records only an ownership reference:
@@ -395,6 +444,14 @@ Manager, Session spawn, and Session resume proceed through the selected native
 runtime without waiting for a probe. Onboarding, explicit Retry, and background
 health surfaces may probe and cache the result without becoming a launch gate.
 
+Readiness results are scoped to the executable identity that was probed. Every
+cheap runtime discovery compares installed state, resolved path, and a file
+fingerprint with that cached identity. Installing, removing, replacing, or
+rerouting a CLI invalidates the old probe result back to `unknown` (or
+`not_installed`). Returning focus to the UI refreshes inventory and the cached
+readiness snapshot with GET requests only; an explicit user action remains the
+only path that starts a headless readiness probe.
+
 Choosing an OpenAlice credential is an explicit override. A fresh Session may
 bind that vault reference without writing it into the Workspace or changing the
 runtime's global state. An absent choice means
@@ -420,7 +477,7 @@ Native Agent configuration files may contain user- or runtime-owned settings.
 The compatibility exporter must update only OpenAlice-owned keys/nodes,
 preserve unknown data, and restore the prior value on reset where a shared
 scalar is overridden. It is reached through the advanced deprecated surface;
-normal Workspace creation, Quick Chat, Issues, probes, WebPi, and resume do not
+normal Workspace creation, Quick Chat, Issues, probes, Web Sessions, and resume do not
 call it.
 
 Pi uses one generic OpenAlice-managed project extension plus local provider and
@@ -505,3 +562,39 @@ is deliberately absent.
 When a provider changes a model in place, update the registry and its unit
 tests together. Existing Workspace files are not rewritten in the background;
 the new facts apply on the next explicit provider apply or Workspace creation.
+
+## Managed Session execution permissions
+
+Alice-managed interactive, headless, and Web Sessions launch with full host
+filesystem/network access and automatic tool approval. Apply the same policy
+to fresh Sessions and exact resumes; approval `never` alone does not disable
+a native sandbox. In particular, Codex workspace-write requires Linux
+namespaces that many remote containers cannot create.
+
+| Runtime | Process-local execution policy |
+| --- | --- |
+| Codex | `danger-full-access`, approval `never`; Web thread start/resume use the same wire values |
+| Claude | `--dangerously-skip-permissions`, injected `sandbox.enabled=false` |
+| Cursor | `--force --trust --sandbox disabled` |
+| Grok | `--always-approve`, `--sandbox off` |
+| Antigravity | `--dangerously-skip-permissions`; no sandbox opt-in |
+| Oh My Pi | `--auto-approve` on all surfaces |
+| opencode | Process-local `OPENCODE_CONFIG_CONTENT` with `permission: "allow"` |
+| Pi | Native tools have no per-tool sandbox/approval; existing Workspace resource trust bootstrap applies |
+
+Do not implement this by rewriting global user configuration. Native runtime
+enterprise policies and OS permissions remain authoritative. UTA still owns
+trading permissions; these launch settings do not change its trading mode.
+
+
+### CLI conversation selection
+
+`conversation create` accepts credential/model/effort overrides for a new
+Session; `conversation ask` accepts the same optional dimensions for an idle
+existing Session. Credential is a vault slug or explicit native access, never
+secret material. Follow-up edits patch the stored binding under the headless
+execution claim and do not consult Workspace defaults. Changing credential
+clears inherited model/effort; omitted fields otherwise retain the Session's
+selection. Runtime identity remains fixed. Web paused-Session editing and CLI
+selection both resolve through `createSessionRuntimeBinding` and persist via
+`replaceRuntimeBinding`.

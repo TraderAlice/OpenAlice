@@ -1,3 +1,4 @@
+import { spawnSync } from 'node:child_process'
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
@@ -18,7 +19,7 @@ describe('buildPackagedToolchainSmokePlan', () => {
   it('builds a macOS packaged Electron + Pi smoke plan', () => {
     const root = mkdtempSync(join(tmpdir(), 'openalice-toolchain-mac-'))
     try {
-      const appRoot = join(root, 'OpenAlice.app/Contents/Resources/app')
+      const appRoot = join(root, 'OpenAlice.app/Contents/Resources/runtime')
       touch(join(root, 'OpenAlice.app/Contents/MacOS/OpenAlice'))
       const plan = buildPackagedToolchainSmokePlan({
         ok: true,
@@ -51,6 +52,12 @@ describe('buildPackagedToolchainSmokePlan', () => {
         'managed Pi resolves packaged fd/rg without download',
         'workspace CLI payload through packaged Electron Node',
       ])
+      const cli = plan.commands.at(-1)!
+      const result = spawnSync(process.execPath, ['src/workspaces/cli/bin/openalice-cli.cjs'], {
+        encoding: 'utf8', env: { ...process.env, ...cli.env, ELECTRON_RUN_AS_NODE: '' },
+      })
+      expect(result.status).toBe(cli.expectStatus)
+      expect(result.stderr).toMatch(cli.expectStderr)
       expect(plan.commands[1].expectStdout.test('0.83.0\n')).toBe(true)
       expect(plan.commands[1].expectStdout.test('0x83x0\n')).toBe(false)
       expect(packagedElectronExecutable(appRoot, 'darwin')?.replaceAll('\\', '/'))
@@ -63,7 +70,7 @@ describe('buildPackagedToolchainSmokePlan', () => {
   it('adds Windows managed Git Bash command probes', () => {
     const root = mkdtempSync(join(tmpdir(), 'openalice-toolchain-win-'))
     try {
-      const appRoot = join(root, 'win-unpacked/resources/app')
+      const appRoot = join(root, 'win-unpacked/resources/runtime')
       touch(join(root, 'win-unpacked/OpenAlice.exe'))
       const plan = buildPackagedToolchainSmokePlan({
         ok: true,
@@ -121,7 +128,22 @@ describe('buildPackagedToolchainSmokePlan', () => {
       expect(plan.commands[9].env?.PATH.replaceAll('\\', '/')).toContain('vendor/tools/win32-x64/bin')
       expect(plan.commands[10].env?.OPENALICE_MANAGED_PI_NODE_PATH.replaceAll('\\', '/'))
         .toContain('win-unpacked/OpenAlice.exe')
-      expect(plan.commands[11].env?.OPENALICE_TOOL_URL).toBe('/cli')
+      const transport = plan.commands[11]
+      expect(transport.env?.OPENALICE_TOOL_URL).toBe('/cli')
+      const result = spawnSync(process.execPath, ['src/workspaces/cli/bin/openalice-cli.cjs', '--help'], {
+        encoding: 'utf8',
+        timeout: 10_000,
+        env: {
+          ...process.env,
+          ...transport.env,
+          OPENALICE_PROJECT_ID: '',
+          OPENALICE_TOOL_SOCKET: join(root, 'missing.sock'),
+          ELECTRON_RUN_AS_NODE: '',
+        },
+      })
+      expect(result.status).toBe(transport.expectStatus)
+      expect(result.stderr).toMatch(transport.expectStderr)
+      expect(result.stdout).toBe('')
     } finally {
       rmSync(root, { recursive: true, force: true })
     }
@@ -131,7 +153,7 @@ describe('buildPackagedToolchainSmokePlan', () => {
     const plan = buildPackagedToolchainSmokePlan({
       ok: true,
       errors: [],
-      appRoot: '/tmp/missing/OpenAlice.app/Contents/Resources/app',
+      appRoot: '/tmp/missing/OpenAlice.app/Contents/Resources/runtime',
       platform: 'darwin',
       platformArch: null,
       manifest: {

@@ -2,41 +2,185 @@ name: CLI Installer Smoke
 
 on:
   workflow_dispatch:
+    inputs:
+      windows_preview:
+        description: Build only the independent Windows x64/ARM64 preview
+        type: boolean
+        default: false
+      windows_candidate_run:
+        description: Optional existing Windows preview run ID; accept its ZIPs without rebuilding
+        type: string
+        default: ''
+      windows_channel_build:
+        description: Exercise the shared-channel Windows installer and candidate
+        type: boolean
+        default: false
+  # Routine dev PRs prove the checkout installer locally, then the dev push
+  # below builds every native candidate and accepts the live preview channel.
+  # Hosted checkout/Bun/SSH candidate work begins at the master boundary.
   pull_request:
-    branches: [dev, master]
+    branches: [master]
     paths:
+      - ".bun-version"
       - ".github/workflows/cli-installer-smoke.yml"
       - ".github/workflows/release.yml"
       - "install"
       - "package.json"
       - "packages/cli/**"
+      - "packages/guardian-runtime/**"
+      - "packages/uta-protocol/**"
+      - "src/**"
+      - "ui/**"
       - "scripts/install-docker-smoke.mjs"
       - "scripts/install-channel-smoke.mjs"
       - "scripts/install-channel-smoke/**"
       - "scripts/install-smoke/**"
+      - "scripts/build-bun-cli-feasibility.ts"
+      - "scripts/build-bun-alice-feasibility.ts"
+      - "scripts/bun-broker-pack-fixture.ts"
+      - "scripts/build-bun-runtime-feasibility.ts"
+      - "scripts/build-bun-release.ts"
+      - "scripts/build-cli-package-channels.mjs"
+      - "scripts/build-cli-package-channels.spec.mjs"
+      - "scripts/pack-cli-npm-packages.mjs"
+      - "scripts/pack-cli-npm-packages.spec.mjs"
+      - "scripts/cli-package-manager-smoke.mjs"
+      - "scripts/cli-release-fixture.mjs"
+      - "scripts/cli-release-fixture.spec.mjs"
+      - "scripts/cli-system-package-manager-smoke.mjs"
+      - "scripts/cli-aur-container-smoke.mjs"
+      - "scripts/cli-aur-container-smoke.spec.mjs"
+      - "scripts/cli-linuxbrew-smoke.mjs"
+      - "scripts/cli-linuxbrew-smoke.spec.mjs"
+      - "scripts/cli-legacy-cutover-smoke.mjs"
+      - "scripts/cli-legacy-cutover-smoke.spec.mjs"
+      - "scripts/prepare-cli-previous-release.mjs"
+      - "scripts/prepare-cli-dev-assets.mjs"
+      - "scripts/prepare-cli-dev-assets.spec.mjs"
+      - "scripts/prepare-cli-neutral-inputs.mjs"
+      - "scripts/prepare-cli-neutral-inputs.spec.mjs"
+      - "THIRD_PARTY_NOTICES.md"
       - "scripts/remote-ssh-smoke.mjs"
       - "scripts/remote-smoke/**"
   push:
     branches: [dev]
-    paths:
-      - ".github/workflows/cli-installer-smoke.yml"
-      - ".github/workflows/release.yml"
-      - "install"
-      - "package.json"
-      - "packages/cli/**"
-      - "scripts/install-channel-smoke.mjs"
-      - "scripts/install-channel-smoke/**"
 
 permissions:
   contents: read
+  actions: read
 
 concurrency:
-  group: cli-installer-smoke-${{ github.event.pull_request.number || github.ref }}
+  group: cli-installer-smoke-${{ github.event.pull_request.number || github.ref }}-${{ inputs.windows_preview && 'windows-preview' || 'default' }}
   cancel-in-progress: true
 
 jobs:
+  windows-preview:
+    if: github.event_name == 'workflow_dispatch' && inputs.windows_preview
+    uses: ./.github/workflows/windows-cli-preview.yml
+    with:
+      candidate_run: ${{ inputs.windows_candidate_run || '' }}
+      channel_build: ${{ inputs.windows_channel_build || false }}
+
+  release-prep-scope:
+    if: github.event_name != 'push' && !inputs.windows_preview
+    name: release-prep scope
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      beta_release_prep: ${{ steps.beta-release-prep.outcome == 'success' && steps.beta-release-prep.outputs.beta_release_prep || 'false' }}
+
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Detect exact beta release preparation
+        id: beta-release-prep
+        if: github.event_name == 'pull_request'
+        continue-on-error: true
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          git show "${BASE_SHA}:scripts/classify-beta-release-prep.mjs" > "$RUNNER_TEMP/classify-beta-release-prep.mjs"
+          node "$RUNNER_TEMP/classify-beta-release-prep.mjs" --github-output "$GITHUB_OUTPUT"
+
+  bun-cli-feasibility:
+    needs: release-prep-scope
+    if: >-
+      !cancelled() &&
+      !inputs.windows_preview &&
+      github.event_name != 'push' &&
+      (github.event_name != 'pull_request' || github.base_ref == 'master') &&
+      (
+        needs.release-prep-scope.result != 'success' ||
+        needs.release-prep-scope.outputs.beta_release_prep != 'true'
+      )
+    name: Bun feasibility (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-14]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 25
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: pnpm/action-setup@v6
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22.19.0
+          cache: pnpm
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version-file: ".bun-version"
+
+      - run: pnpm install --frozen-lockfile --filter='!@traderalice/desktop'
+
+      - run: pnpm build:server
+
+      - run: pnpm build:bun-cli:feasibility
+
+      - run: pnpm build:bun-alice:feasibility
+
+      - run: pnpm build:bun-runtime:feasibility
+
+      - run: pnpm build:bun:release
+
+      - name: Accept npm and Bun installs from the current native candidate
+        shell: bash
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          CONTENT_IDENTITY=$(node -p "require('./dist/bun-release/report.json').contentIdentity")
+          node scripts/build-cli-package-channels.mjs \
+            --input-dir dist/bun-release \
+            --output-dir "$RUNNER_TEMP/cli-package-channels" \
+            --version "$VERSION" \
+            --released-at "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+            --npm-only
+          node scripts/cli-package-manager-smoke.mjs \
+            --manager npm \
+            --packages-dir "$RUNNER_TEMP/cli-package-channels/npm" \
+            --expected-version "$VERSION" \
+            --expected-content-identity "$CONTENT_IDENTITY"
+          node scripts/cli-package-manager-smoke.mjs \
+            --manager bun \
+            --packages-dir "$RUNNER_TEMP/cli-package-channels/npm" \
+            --expected-version "$VERSION" \
+            --expected-content-identity "$CONTENT_IDENTITY"
+
   checkout-install:
-    if: github.event_name != 'push'
+    needs: release-prep-scope
+    if: >-
+      !cancelled() &&
+      !inputs.windows_preview &&
+      github.event_name != 'push' &&
+      (
+        needs.release-prep-scope.result != 'success' ||
+        needs.release-prep-scope.outputs.beta_release_prep != 'true'
+      )
     name: Current checkout install
     runs-on: ubuntu-latest
     timeout-minutes: 20
@@ -52,10 +196,212 @@ jobs:
         run: node scripts/install-docker-smoke.mjs
 
   checkout-remote:
-    if: github.event_name != 'push'
+    needs: release-prep-scope
+    if: >-
+      !cancelled() &&
+      !inputs.windows_preview &&
+      github.event_name != 'push' &&
+      (github.event_name != 'pull_request' || github.base_ref == 'master') &&
+      (
+        needs.release-prep-scope.result != 'success' ||
+        needs.release-prep-scope.outputs.beta_release_prep != 'true'
+      )
     name: Current checkout managed remote
     runs-on: ubuntu-latest
     timeout-minutes: 25
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: pnpm/action-setup@v6
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22.19.0
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile --filter @traderalice/openalice-cli
+
+      - name: Exercise clean SSH host fixture
+        run: node scripts/remote-ssh-smoke.mjs --skip-tui
+
+  build-dev-cli-neutral:
+    if: github.event_name == 'push'
+    name: Build dev platform-neutral inputs
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: pnpm/action-setup@v6
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22.19.0
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile --filter='!@traderalice/desktop'
+
+      - name: Build platform-neutral server inputs
+        run: pnpm build:server
+
+      - name: Prepare commit-bound neutral input receipt
+        run: >-
+          node scripts/prepare-cli-neutral-inputs.mjs prepare
+          --repository-root .
+          --output-dir dist/dev-neutral-inputs
+          --commit "$GITHUB_SHA"
+
+      - name: Preserve platform-neutral inputs
+        uses: actions/upload-artifact@v4
+        with:
+          name: rolling-dev-neutral-inputs
+          path: dist/dev-neutral-inputs
+          if-no-files-found: error
+          retention-days: 7
+
+  build-dev-broker-packs:
+    if: github.event_name == 'push'
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { os: macos-14, platform: darwin, arch: arm64 }
+          - { os: macos-15-intel, platform: darwin, arch: x64 }
+          - { os: ubuntu-24.04, platform: linux, arch: x64 }
+          - { os: ubuntu-24.04-arm, platform: linux, arch: arm64 }
+          - { os: windows-latest, platform: win32, arch: x64 }
+          - { os: windows-11-arm, platform: win32, arch: arm64 }
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 35
+    env:
+      OPENALICE_DEV_COMMIT: ${{ github.sha }}
+      ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22.19.0
+          architecture: ${{ matrix.arch }}
+          cache: pnpm
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version-file: .bun-version
+      - run: pnpm install --frozen-lockfile --filter='!@traderalice/desktop'
+      - run: pnpm broker-packs:build
+      - run: pnpm exec tsx scripts/verify-broker-packs.ts --compiled
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dev-broker-${{ matrix.platform }}-${{ matrix.arch }}
+          path: |
+            dist/broker-packs/*.json
+            dist/broker-packs/*.tgz
+          if-no-files-found: error
+          compression-level: 0
+
+  build-dev-cli:
+    needs: [build-dev-cli-neutral, build-dev-broker-packs]
+    if: github.event_name == 'push'
+    name: Build dev native CLI (${{ matrix.platform }}-${{ matrix.arch }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-14
+            platform: darwin
+            arch: arm64
+          - os: macos-15-intel
+            platform: darwin
+            arch: x64
+          - os: ubuntu-24.04
+            platform: linux
+            arch: x64
+          - os: ubuntu-24.04-arm
+            platform: linux
+            arch: arm64
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 35
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: pnpm/action-setup@v6
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22.19.0
+          cache: pnpm
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version-file: ".bun-version"
+
+      - run: pnpm install --frozen-lockfile --filter='!@traderalice/desktop'
+
+      - name: Download platform-neutral inputs
+        uses: actions/download-artifact@v4
+        with:
+          name: rolling-dev-neutral-inputs
+          path: dist/dev-neutral-inputs
+
+      - name: Verify and install commit-bound neutral inputs
+        run: >-
+          node scripts/prepare-cli-neutral-inputs.mjs verify
+          --repository-root .
+          --input-dir dist/dev-neutral-inputs
+          --commit "$GITHUB_SHA"
+          --install
+
+      - name: Accept multiprocess recovery once per dev commit
+        if: matrix.platform == 'linux' && matrix.arch == 'x64'
+        run: pnpm build:bun-runtime:feasibility
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: dev-broker-${{ matrix.platform }}-${{ matrix.arch }}
+          path: dist/dev-broker-packs
+      - name: Build native CLI
+        env:
+          OPENALICE_DEV_COMMIT: ${{ github.sha }}
+        run: pnpm build:bun:release
+
+      - name: Name the native acceptance report
+        shell: bash
+        run: >-
+          cp dist/bun-release/report.json
+          dist/bun-release/openalice-cli-${{ matrix.platform }}-${{ matrix.arch }}.report.json
+
+      - name: Preserve accepted dev candidate
+        uses: actions/upload-artifact@v4
+        with:
+          name: dev-cli-${{ matrix.platform }}-${{ matrix.arch }}
+          path: |
+            dist/bun-release/*.tar.gz
+            dist/bun-release/*.tar.gz.sha256
+            dist/bun-release/openalice-cli-*.report.json
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 7
+
+  build-dev-cli-windows:
+    needs: [build-dev-cli-neutral, build-dev-broker-packs]
+    if: github.event_name == 'push'
+    uses: ./.github/workflows/windows-cli-preview.yml
+    with:
+      channel_build: true
+      artifact_prefix: dev-cli
+      neutral_inputs: true
+      dev_broker_packs: true
+      native_acceptance: false
+
+  publish-dev-cli-candidate:
+    if: github.event_name == 'push'
+    name: Publish immutable dev CLI candidate
+    needs: [build-dev-cli, build-dev-cli-windows]
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
 
     steps:
       - uses: actions/checkout@v7
@@ -64,12 +410,225 @@ jobs:
         with:
           node-version: 22.19.0
 
-      - name: Exercise clean SSH host fixture
-        run: node scripts/remote-ssh-smoke.mjs
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: dev-cli-*
+          path: dist/dev-cli-candidates
+          merge-multiple: true
+
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: dev-broker-*
+          path: dist/dev-cli-candidates
+          merge-multiple: true
+
+      - name: Validate candidates and prepare candidate receipt
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          node scripts/prepare-cli-dev-assets.mjs \
+            --input-dir dist/dev-cli-candidates \
+            --output-dir dist/dev-cli-upload \
+            --commit "$GITHUB_SHA" \
+            --version "$VERSION" \
+            --installer install
+
+      - name: Install AWS CLI
+        run: |
+          python3 -m pip install --user awscli
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+
+      - name: Publish immutable candidate without overwriting accepted bytes
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: auto
+          AWS_EC2_METADATA_DISABLED: true
+          R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
+          R2_BUCKET: ${{ secrets.R2_BUCKET }}
+        run: |
+          ENDPOINT="https://${R2_ACCOUNT_ID}.r2.cloudflarestorage.com"
+          put_immutable() {
+            file="$1"
+            key="$2"
+            content_type="$3"
+            error_path="$RUNNER_TEMP/r2-put-$(basename "$file").err"
+            existing_path="$RUNNER_TEMP/r2-existing-$(basename "$file")"
+            if aws s3api put-object \
+              --bucket "$R2_BUCKET" \
+              --key "$key" \
+              --body "$file" \
+              --cache-control "public, max-age=31536000, immutable" \
+              --content-type "$content_type" \
+              --if-none-match '*' \
+              --endpoint-url "$ENDPOINT" > /dev/null 2>"$error_path"; then
+              return
+            fi
+            rm -f "$existing_path"
+            if aws s3api get-object \
+              --bucket "$R2_BUCKET" \
+              --key "$key" \
+              "$existing_path" \
+              --endpoint-url "$ENDPOINT" > /dev/null 2>&1 \
+              && cmp -s "$file" "$existing_path"; then
+              echo "Reusing byte-identical immutable object $key"
+              return
+            fi
+            cat "$error_path" >&2
+            echo "Immutable dev candidate collision or upload failure at $key" >&2
+            return 1
+          }
+
+          for file in "dist/dev-cli-upload/releases/${GITHUB_SHA}"/*; do
+            case "$file" in
+              *.tar.gz|*.tgz) content_type="application/gzip" ;;
+              *.json) content_type="application/json" ;;
+              *.sha256) content_type="text/plain" ;;
+              */install) content_type="text/x-shellscript" ;;
+              */install.ps1) content_type="text/plain" ;;
+              *) echo "Unexpected immutable dev candidate file: $file" >&2; exit 1 ;;
+            esac
+            put_immutable \
+              "$file" \
+              "cli/dev/releases/${GITHUB_SHA}/$(basename "$file")" \
+              "$content_type"
+          done
+
+      - name: Preserve candidate activation receipt
+        uses: actions/upload-artifact@v4
+        with:
+          name: dev-channel-receipt
+          path: |
+            dist/dev-cli-upload/manifest.json
+            dist/dev-cli-upload/aliases/*.sha256
+          if-no-files-found: error
+          retention-days: 7
+
+  activate-dev-cli:
+    if: github.event_name == 'push'
+    name: Activate current dev CLI channel
+    needs: publish-dev-cli-candidate
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    outputs:
+      activated: ${{ steps.activate.outputs.activated || 'false' }}
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Check whether candidate is current dev head
+        id: dev-head
+        shell: bash
+        run: |
+          REMOTE_DEV_SHA=$(git ls-remote --exit-code origin refs/heads/dev | awk '$2 == "refs/heads/dev" { print $1 }')
+          [[ "$REMOTE_DEV_SHA" =~ ^[a-f0-9]{40}$ ]] || {
+            echo "Could not resolve exactly one remote refs/heads/dev commit" >&2
+            exit 1
+          }
+          if [[ "$REMOTE_DEV_SHA" != "$GITHUB_SHA" ]]; then
+            echo "current=false" >> "$GITHUB_OUTPUT"
+            echo "Dev candidate $GITHUB_SHA is superseded by $REMOTE_DEV_SHA; activation is a no-op."
+            exit 0
+          fi
+          echo "current=true" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/setup-node@v7
+        if: steps.dev-head.outputs.current == 'true'
+        with:
+          node-version: 22.19.0
+
+      - uses: actions/download-artifact@v4
+        if: steps.dev-head.outputs.current == 'true'
+        with:
+          pattern: dev-cli-*
+          path: dist/dev-cli-candidates
+          merge-multiple: true
+
+      - uses: actions/download-artifact@v4
+        if: steps.dev-head.outputs.current == 'true'
+        with:
+          name: dev-channel-receipt
+          path: dist/dev-channel-receipt
+
+      - name: Install AWS CLI
+        if: steps.dev-head.outputs.current == 'true'
+        run: |
+          python3 -m pip install --user awscli
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+
+      - name: Revalidate dev head before mutable activation
+        id: dev-head-final
+        if: steps.dev-head.outputs.current == 'true'
+        shell: bash
+        run: |
+          REMOTE_DEV_SHA=$(git ls-remote --exit-code origin refs/heads/dev | awk '$2 == "refs/heads/dev" { print $1 }')
+          [[ "$REMOTE_DEV_SHA" =~ ^[a-f0-9]{40}$ ]] || {
+            echo "Could not resolve exactly one remote refs/heads/dev commit" >&2
+            exit 1
+          }
+          if [[ "$REMOTE_DEV_SHA" != "$GITHUB_SHA" ]]; then
+            echo "current=false" >> "$GITHUB_OUTPUT"
+            echo "Dev candidate $GITHUB_SHA became superseded by $REMOTE_DEV_SHA; activation is a no-op."
+            exit 0
+          fi
+          echo "current=true" >> "$GITHUB_OUTPUT"
+
+      - name: Activate manifest and transitional aliases
+        id: activate
+        if: steps.dev-head-final.outputs.current == 'true'
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: auto
+          AWS_EC2_METADATA_DISABLED: true
+          R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
+          R2_BUCKET: ${{ secrets.R2_BUCKET }}
+        shell: bash
+        run: |
+          echo "activated=false" >> "$GITHUB_OUTPUT"
+          ENDPOINT="https://${R2_ACCOUNT_ID}.r2.cloudflarestorage.com"
+          VERSION=$(node -p "require('./package.json').version")
+
+          # Compatibility only: the currently published shared installer still
+          # resolves fixed aliases. New dev installers use the immutable path
+          # derived from manifest.commit and manifest.version.
+          for target in darwin-arm64 darwin-x64 linux-arm64 linux-x64; do
+            platform="${target%-*}"
+            arch="${target#*-}"
+            archive="dist/dev-cli-candidates/openalice-cli-${VERSION}-${platform}-${arch}.tar.gz"
+            alias="openalice-cli-dev-${platform}-${arch}.tar.gz"
+            checksum="dist/dev-channel-receipt/aliases/${alias}.sha256"
+            aws s3 cp "$archive" "s3://${R2_BUCKET}/cli/dev/${alias}" \
+              --cache-control "no-cache" \
+              --content-type "application/gzip" \
+              --endpoint-url "$ENDPOINT"
+            aws s3 cp "$checksum" "s3://${R2_BUCKET}/cli/dev/${alias}.sha256" \
+              --cache-control "no-cache" \
+              --content-type "text/plain" \
+              --endpoint-url "$ENDPOINT"
+          done
+
+          REMOTE_DEV_SHA=$(git ls-remote --exit-code origin refs/heads/dev | awk '$2 == "refs/heads/dev" { print $1 }')
+          [[ "$REMOTE_DEV_SHA" =~ ^[a-f0-9]{40}$ ]] || {
+            echo "Could not resolve exactly one remote refs/heads/dev commit before manifest activation" >&2
+            exit 1
+          }
+          if [[ "$REMOTE_DEV_SHA" != "$GITHUB_SHA" ]]; then
+            echo "Dev candidate $GITHUB_SHA became superseded by $REMOTE_DEV_SHA; manifest remains unchanged."
+            exit 0
+          fi
+          aws s3api put-object \
+            --bucket "$R2_BUCKET" \
+            --key "cli/dev/manifest.json" \
+            --body dist/dev-channel-receipt/manifest.json \
+            --cache-control "no-cache" \
+            --content-type "application/json" \
+            --endpoint-url "$ENDPOINT" > /dev/null
+          echo "activated=true" >> "$GITHUB_OUTPUT"
 
   dev-channel-install:
-    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+    if: always() && !inputs.windows_preview && ((github.event_name == 'push' && needs.activate-dev-cli.result == 'success' && needs.activate-dev-cli.outputs.activated == 'true') || github.event_name == 'workflow_dispatch')
     name: Live raw dev channel install
+    needs: activate-dev-cli
     runs-on: ubuntu-latest
     timeout-minutes: 20
 
@@ -81,4 +640,12 @@ jobs:
           node-version: 22.19.0
 
       - name: Install raw dev script and dev payload in a clean host
-        run: node scripts/install-channel-smoke.mjs
+        env:
+          EXPECTED_COMMIT: ${{ github.event_name == 'push' && github.sha || '' }}
+        shell: bash
+        run: |
+          args=()
+          if [[ -n "$EXPECTED_COMMIT" ]]; then
+            args+=(--expected-commit "$EXPECTED_COMMIT")
+          fi
+          node scripts/install-channel-smoke.mjs "${args[@]}"

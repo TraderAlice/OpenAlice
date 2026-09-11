@@ -18,19 +18,23 @@ export const ROOT_COMMANDS = Object.freeze([
   { name: 'version', description: 'Print the OpenAlice product and install version' },
   { name: 'tui', description: 'Open the local Supervisor TUI' },
   { name: 'create', description: 'Create a named AliceProject (Trader or Nano)' },
-  { name: 'project', description: 'List, select, or copy AI credentials between AliceProjects' },
+  { name: 'exec', description: 'Run a capability CLI in the selected AliceProject' },
+  { name: 'project', description: 'List, select, or transfer AliceProjects' },
+  { name: 'machine', description: 'Register SSH hosts and inspect their AliceProjects' },
   { name: 'up', description: 'Start a persistent local Runtime in the background' },
   { name: 'run', description: 'Run a local Runtime in the foreground' },
   { name: 'down', description: 'Stop the persistent local Runtime' },
   { name: 'status', description: 'Inspect the selected local Runtime' },
   { name: 'logs', description: 'Read a bounded redacted Runtime log tail' },
   { name: 'doctor', description: 'Run read-only Runtime diagnostics' },
+  { name: 'setup', description: 'Check and coordinate system Git/Bash installation' },
   { name: 'open', description: 'Open the verified local Web UI' },
   { name: 'start', description: 'Compatibility foreground browser launcher' },
   { name: 'server', description: 'Compatibility Server lifecycle commands' },
   { name: 'ssh', description: 'Open a tunnel to an existing remote Runtime' },
   { name: 'remote', description: 'Plan, prepare, and connect to a remote Runtime' },
-  { name: 'update', description: 'Check for or install a stable OpenAlice update' },
+  { name: 'update', description: 'Check or switch the stable, beta, or dev channel' },
+  { name: 'rollback', description: 'Switch a direct install to a retained release' },
   { name: 'uninstall', description: 'Remove installer-owned CLI files and preserve data' },
   { name: 'completion', description: 'Generate shell completion' },
 ])
@@ -48,6 +52,7 @@ const LIFECYCLE_OPTIONS = Object.freeze({
   status: ['--project', '--instance', '--home', '--wait', '--json'],
   logs: ['--project', '--instance', '--home', '--lines', '--json'],
   doctor: ['--project', '--instance', '--home', '--wait', '--json'],
+  setup: ['--check', '--json'],
   open: ['--project', '--instance', '--home', '--wait'],
 })
 
@@ -441,6 +446,9 @@ function formatExistingRuntime(status) {
   const lines = [`OpenAlice Runtime is already running at ${status.endpoints.web ?? 'an unknown endpoint'}`]
   lines.push(`Home: ${status.home}`)
   if (status.owner) lines.push(`Owner: ${status.owner.surface} (pid ${status.owner.pid})`)
+  if (status.pendingActivation?.productVersion) {
+    lines.push(`Pending activation: ${status.pendingActivation.productVersion}${status.pendingActivation.restartRequired ? ' (restart required)' : ''}`)
+  }
   return `${lines.join('\n')}\n`
 }
 
@@ -545,7 +553,8 @@ function bashCompletionCases() {
     .map(([command, options]) => `    ${command}) COMPREPLY=( $(compgen -W "${options.join(' ')}" -- "$current") ) ;;`)
     .join('\n')
   return `${lifecycle}
-    project) COMPREPLY=( $(compgen -W "list use copy-ai-creds --json --from --to --yes" -- "$current") ) ;;`
+    project) COMPREPLY=( $(compgen -W "list use copy-ai-creds transfer --json --from --to --to-machine --to-project --to-home --name --plan --yes --without-credentials --session-owner-policy --stop-source" -- "$current") ) ;;
+    machine) COMPREPLY=( $(compgen -W "list add remove inspect --target --name --ssh-port --identity --json --yes" -- "$current") ) ;;`
 }
 
 function zshCompletionCases() {
@@ -553,16 +562,24 @@ function zshCompletionCases() {
     .map(([command, options]) => `  ${command}) _values 'option' ${options.map(shellQuote).join(' ')} ;;`)
     .join('\n')
   return `${lifecycle}
-  project) _values 'option' 'list' 'use' 'copy-ai-creds' '--json' '--from' '--to' '--yes' ;;`
+  project) _values 'option' 'list' 'use' 'copy-ai-creds' 'transfer' '--json' '--from' '--to' '--to-machine' '--to-project' '--to-home' '--name' '--plan' '--yes' '--without-credentials' '--session-owner-policy' '--stop-source' ;;
+  machine) _values 'option' 'list' 'add' 'remove' 'inspect' '--target' '--name' '--ssh-port' '--identity' '--json' '--yes' ;;`
 }
 
 function fishCompletionOptions() {
-  return Object.entries(LIFECYCLE_OPTIONS)
+  const lifecycle = Object.entries(LIFECYCLE_OPTIONS)
     .flatMap(([command, options]) => options.map((option) => {
       const name = option.slice(2)
       return `complete -c openalice -n '__fish_seen_subcommand_from ${command}' -l ${name}`
     }))
     .join('\n')
+  const machine = ['target', 'name', 'ssh-port', 'identity', 'json', 'yes']
+    .map((name) => `complete -c openalice -n '__fish_seen_subcommand_from machine' -l ${name}`)
+    .join('\n')
+  const project = ['json', 'from', 'to', 'to-machine', 'to-project', 'to-home', 'name', 'plan', 'yes', 'without-credentials', 'session-owner-policy', 'stop-source']
+    .map((name) => `complete -c openalice -n '__fish_seen_subcommand_from project' -l ${name}`)
+    .join('\n')
+  return `${lifecycle}\n${machine}\n${project}`
 }
 
 function shellQuote(value) {

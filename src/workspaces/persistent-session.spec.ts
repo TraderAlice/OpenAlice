@@ -27,6 +27,7 @@ const mockSpawn = vi.mocked(pty.spawn);
 /** Minimal IPty stand-in that lets the test inject PTY output and observe
  *  pause/resume calls. */
 function makeFakeTerm() {
+  const exits = new Set<(event: { exitCode: number }) => void>();
   let dataCb: ((d: unknown) => void) | undefined;
   return {
     pid: 4321,
@@ -40,7 +41,11 @@ function makeFakeTerm() {
       dataCb = cb;
       return { dispose: () => {} };
     },
-    onExit: () => ({ dispose: () => {} }),
+    onExit: (cb: (event: { exitCode: number }) => void) => {
+      exits.add(cb);
+      return { dispose: () => { exits.delete(cb); } };
+    },
+    emitExit: () => { for (const cb of exits) cb({ exitCode: 0 }); },
     /** test helper — push bytes through the captured onData handler */
     emitData: (d: Buffer) => dataCb?.(d),
   };
@@ -83,6 +88,7 @@ function makeOptions(over: Partial<PersistentSessionOptions> = {}): PersistentSe
     highWatermarkBytes: 1024, // small so one write trips backpressure
     lowWatermarkBytes: 256,
     onDisposed: () => {},
+    pty: { name: 'node-pty', supportsFlowControl: true, spawn: mockSpawn },
     ...over,
   };
 }
@@ -109,6 +115,37 @@ describe('PersistentSession backpressure / socket-drop deadlock', () => {
 
   afterEach(() => {
     vi.clearAllMocks();
+  });
+
+  it('waits for the disposed child to exit before handing off its transcript', async () => {
+    const session = new PersistentSession(makeOptions());
+    let complete = false;
+    const stop = session.disposeAndWait('background handoff').then(() => { complete = true; });
+    await Promise.resolve();
+    expect(term.kill).toHaveBeenCalled();
+    expect(complete).toBe(false);
+    term.emitExit();
+    await stop;
+    expect(complete).toBe(true);
+    expect(mockSpawn).toHaveBeenCalledTimes(1);
+  });
+
+  it('bounds a slow consumer without killing a ConPTY agent when pause is unavailable', () => {
+    const unpausable = { ...term, pause: undefined, resume: undefined };
+    const session = new PersistentSession(makeOptions({
+      pty: { name: 'bun-native', supportsFlowControl: false, spawn: () => unpausable as never },
+    }));
+    const ws = new FakeWs();
+    session.attach(ws as never, 80, 24, undefined);
+    ws.send.mockClear();
+    ws.bufferedAmount = 2048;
+    term.emitData(Buffer.from('slow consumer output'));
+    expect(ws.send).not.toHaveBeenCalled();
+    expect(ws.close).toHaveBeenCalledWith(1013, expect.stringContaining('reconnect'));
+    expect(term.kill).not.toHaveBeenCalled();
+    term.emitData(Buffer.from('agent survives detached'));
+    expect(ws.send).not.toHaveBeenCalled();
+    session.dispose('test complete');
   });
 
   it('resumes the PTY when a backpressure-paused socket drops (detach)', () => {

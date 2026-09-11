@@ -12,10 +12,11 @@ import {
   type IssueCommentDelivery,
 } from './comments.js'
 import { renderIssueCommentPrompt } from './comment-prompt.js'
-import { issueAssigneeResumeId, type IssueRecord } from './declaration.js'
-import { projectDeskComment } from './telegram-desk-project.js'
-
-const COMMENT_REPLY_TIMEOUT_MS = 300_000
+import { issueAssigneeResumeId, issueTimeoutMs, type IssueRecord } from './declaration.js'
+import {
+  projectDeskComment,
+  projectWorkspaceDeskFailure,
+} from './telegram-desk-project.js'
 
 export type IssueCommentDispatchResult =
   | { status: 'not_requested'; reason: 'non_human_note' | 'owner_commented' }
@@ -39,8 +40,9 @@ export function issueCommentReplyPrompt(input: {
 
 /**
  * A fixed Issue owner is a real colleague: comments from somebody else are
- * delivered to that exact product Session. Human comments on Issues without a
- * fixed owner use the same provenance-aware fallback as Inbox: continue the
+ * delivered to that exact product Session. Fresh-owner policies recruit via
+ * the shared Issue dispatcher. Human comments on ordinary unassigned Issues
+ * use the same provenance-aware fallback as Inbox: continue the
  * creator when attributable, otherwise recruit a reconstruction worker in the
  * Issue Workspace. That answering Session is a collaborator, not a new owner;
  * the Issue assignee and scheduling contract stay unchanged.
@@ -75,6 +77,16 @@ export async function dispatchIssueCommentReply(input: {
   }
 
   try {
+    if (input.issue.assignee === '@new-then-resume' || input.issue.assignee === '@new-each-run') {
+      if (!input.conversation.replyToIssue) throw new Error('Issue owner recruitment is unavailable in this runtime.')
+      const result = await input.conversation.replyToIssue({
+        workspaceId: input.issueWorkspaceId,
+        issueId: input.issue.id,
+        prompt: issueCommentReplyPrompt(input),
+        commentId: input.comment.id,
+      })
+      return { status: 'scheduled', delivery: { state: 'pending', targetResumeId: result.resumeId, taskId: result.taskId } }
+    }
     const target = targetResumeId
       ? { kind: 'resume' as const, resumeId: targetResumeId }
       : {
@@ -86,7 +98,7 @@ export async function dispatchIssueCommentReply(input: {
     const result = await input.conversation.ask({
       prompt: issueCommentReplyPrompt(input),
       target,
-      timeoutMs: COMMENT_REPLY_TIMEOUT_MS,
+      timeoutMs: issueTimeoutMs(input.issue.timeout),
       ...(!targetResumeId ? { reconstruct: true } : {}),
       ...(input.source ? { source: input.source } : {}),
       subject: {
@@ -185,10 +197,14 @@ export async function recordIssueCommentReply(input: {
       },
     )
     if (!updated.ok) throw new Error(updated.error)
-    await projectDeskComment(appended.issue, appended.comment).catch(() => undefined)
+    await projectDeskComment(appended.issue, appended.comment, undefined, { workspaceId: input.task.wsId }).catch(() => undefined)
     return 'replied'
   }
 
+  const failureText = input.error
+    ?? (input.status === 'done'
+      ? 'The Issue reply Agent finished without a final reply.'
+      : `The Issue reply run ended as ${input.status}.`)
   const updated = await updateIssueCommentDelivery(
     input.issueWorkspaceDir,
     input.issueId,
@@ -197,12 +213,15 @@ export async function recordIssueCommentReply(input: {
       state: 'failed',
       targetResumeId: input.task.resumeId,
       taskId: input.task.taskId,
-      error: input.error
-        ?? (input.status === 'done'
-          ? 'The Issue reply Agent finished without a final reply.'
-          : `The Issue reply run ended as ${input.status}.`),
+      error: failureText,
     },
   )
   if (!updated.ok) throw new Error(updated.error)
+  await projectWorkspaceDeskFailure({
+    wsDir: input.issueWorkspaceDir,
+    issueId: input.issueId,
+    conversationId: input.sourceCommentId,
+    text: `The Agent could not complete this reply: ${failureText}`,
+  }).catch(() => undefined)
   return 'failed'
 }

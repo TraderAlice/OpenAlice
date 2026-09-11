@@ -1,6 +1,8 @@
 import { readFile } from 'node:fs/promises'
+import { headlessFailureSummary, readHeadlessStderr } from './headless-failure.js'
 
 import {
+  readAutoPredictionPreferences,
   readAutoQuantPreferences,
   readQuickChatPreferences,
   rememberRecentChatWorkspace,
@@ -30,17 +32,20 @@ import { logger as launcherLogger } from './logger.js'
 import { conversationCause } from './agent-runtime-log.js'
 import type { WorkspaceService } from './service.js'
 import { AUTO_QUANT_WORKSPACE_TEMPLATE } from './chat-workspace-resolver.js'
+import { AUTO_PREDICTION_WORKSPACE_TEMPLATE } from './chat-workspace-resolver.js'
 
 interface ConversationHarnessDependencies {
   readQuickChatPreferences(): Promise<{ recentChatWorkspaceId: string | null }>
   rememberRecentChatWorkspace(workspaceId: string): Promise<unknown>
   readAutoQuantPreferences(): Promise<{ defaultWorkspaceId: string | null }>
+  readAutoPredictionPreferences?(): Promise<{ defaultWorkspaceId: string | null }>
 }
 
 const defaultHarnessDependencies: ConversationHarnessDependencies = {
   readQuickChatPreferences,
   rememberRecentChatWorkspace,
   readAutoQuantPreferences,
+  readAutoPredictionPreferences,
 }
 
 interface ArtifactTarget {
@@ -268,6 +273,7 @@ export function createWorkspaceConversationControl(
   harnessDependencies: ConversationHarnessDependencies = defaultHarnessDependencies,
 ): WorkspaceConversationControl {
   return {
+    replyToIssue: (input) => svc.replyToIssue(input),
     async ask(input): Promise<WorkspaceConversationAskResult> {
       const resolution = input.target.kind === 'harness'
         ? await resolveHarnessConversationTarget(svc, input.target.harness, harnessDependencies)
@@ -301,7 +307,7 @@ export function createWorkspaceConversationControl(
       }
       const agentId = continuingOrigin
         ? continuingOrigin.agent
-        : input.agent ?? await svc.resolveDefaultAgentId(meta)
+        : input.agent ?? await svc.resolveHeadlessDefaultAgentId(meta)
       if (!agentId) throw new Error(`workspace has no agent runtime: ${meta.tag}`)
       const adapter = svc.adapters.get(agentId)
       if (!adapter || !isAgentRuntime(adapter)) throw new Error(`unknown agent runtime: ${agentId}`)
@@ -353,7 +359,7 @@ export function createWorkspaceConversationControl(
             undefined,
             continuingOrigin?.resumeId,
             inquiry,
-            undefined,
+            input.selection,
             conversation,
             createdBy,
           )
@@ -365,7 +371,7 @@ export function createWorkspaceConversationControl(
             undefined,
             continuingOrigin?.resumeId,
             undefined,
-            undefined,
+            input.selection,
             conversation,
             createdBy,
           )
@@ -407,6 +413,10 @@ export function createWorkspaceConversationControl(
       const structured = await readStructuredSnapshot(
         headlessLogPaths(svc.headlessLogsDir, taskId).structured,
       )
+      const stderr = task.status === 'failed' || task.status === 'interrupted'
+        ? await readHeadlessStderr(headlessLogPaths(svc.headlessLogsDir, taskId).stderr)
+        : undefined
+      const error = headlessFailureSummary({ ...task, structured, ...stderr })
       const result: WorkspaceConversationTask = {
         taskId: task.taskId,
         resumeId: task.resumeId,
@@ -419,7 +429,12 @@ export function createWorkspaceConversationControl(
         ...(task.trigger?.kind === 'issue' ? { issueId: task.trigger.issueId } : {}),
         ...(task.finishedAt !== undefined ? { finishedAt: task.finishedAt } : {}),
         ...(task.durationMs !== undefined ? { durationMs: task.durationMs } : {}),
-        ...(task.error ? { error: task.error } : {}),
+        ...(error ? { error } : {}),
+        ...(task.exitCode !== undefined ? { exitCode: task.exitCode } : {}),
+        ...(task.signal !== undefined ? { signal: task.signal } : {}),
+        ...(task.killed !== undefined ? { killed: task.killed } : {}),
+        ...(task.processStarted !== undefined ? { processStarted: task.processStarted } : {}),
+        ...stderr,
       }
       return result
     },
@@ -462,7 +477,9 @@ function conversationBirthReason(
   if (subject?.kind === 'issue' && subject.commentId) return 'issue-comment'
   if (resolution.mode === 'exact') return 'explicit-workspace'
   if (target.kind === 'harness') {
-    return target.harness === 'autoquant' ? 'harness-autoquant' : 'harness-chat'
+    if (target.harness === 'autoquant') return 'harness-autoquant'
+    if (target.harness === 'prediction') return 'harness-prediction'
+    return 'harness-chat'
   }
   switch (resolution.reason) {
     case 'explicit-workspace':
@@ -482,7 +499,7 @@ function conversationBirthReason(
 
 async function resolveHarnessConversationTarget(
   svc: WorkspaceService,
-  harness: 'chat' | 'autoquant',
+  harness: 'chat' | 'autoquant' | 'prediction',
   dependencies: ConversationHarnessDependencies,
 ): Promise<WorkspaceConversationResolution> {
   if (harness === 'chat') {
@@ -508,15 +525,25 @@ async function resolveHarnessConversationTarget(
     }
   }
 
-  const preferences = await dependencies.readAutoQuantPreferences().catch((err) => {
-    launcherLogger.warn('conversation.harness_autoquant_preference_read_failed', { err })
+  const prediction = harness === 'prediction'
+  const preferences = await (prediction
+    ? (dependencies.readAutoPredictionPreferences ?? readAutoPredictionPreferences)()
+    : dependencies.readAutoQuantPreferences()).catch((err) => {
+    launcherLogger.warn(prediction
+      ? 'conversation.harness_prediction_preference_read_failed'
+      : 'conversation.harness_autoquant_preference_read_failed', { err })
     return { defaultWorkspaceId: null }
   })
   const workspace = preferences.defaultWorkspaceId
     ? svc.registry.get(preferences.defaultWorkspaceId)
     : undefined
-  if (!workspace || workspace.template !== AUTO_QUANT_WORKSPACE_TEMPLATE) {
-    return { mode: 'unavailable', reason: 'autoquant-not-initialized' }
+  const expectedTemplate = prediction
+    ? AUTO_PREDICTION_WORKSPACE_TEMPLATE
+    : AUTO_QUANT_WORKSPACE_TEMPLATE
+  if (!workspace || workspace.template !== expectedTemplate) {
+    return { mode: 'unavailable', reason: prediction
+      ? 'prediction-not-initialized'
+      : 'autoquant-not-initialized' }
   }
   return {
     mode: 'reconstructed',

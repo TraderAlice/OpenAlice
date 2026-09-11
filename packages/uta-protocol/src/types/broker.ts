@@ -438,6 +438,8 @@ export interface BrokerConnectionStateEvent {
 export interface HistoricalBarsCapability {
   supported: boolean
   quality?: 'realtime' | 'iex' | 'delayed' | 'subscription'
+  /** Overrides for mixed-asset brokers (e.g. Alpaca equities vs crypto). */
+  qualityBySecType?: Record<string, 'realtime' | 'iex' | 'delayed' | 'subscription'>
   /** Subset of BarInterval this broker actually maps to a native bar size. */
   supportedBarSizes?: BarInterval[]
 }

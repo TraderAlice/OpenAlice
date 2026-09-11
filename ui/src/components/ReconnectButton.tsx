@@ -1,7 +1,11 @@
 import { useState, useEffect, useRef } from 'react'
 import { api } from '../api'
 
-export function ReconnectButton({ accountId }: { accountId: string }) {
+export function ReconnectButton({ accountId, disabled = false, disabledReason }: {
+  accountId: string
+  disabled?: boolean
+  disabledReason?: string
+}) {
   const [status, setStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle')
   const [message, setMessage] = useState('')
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -9,6 +13,7 @@ export function ReconnectButton({ accountId }: { accountId: string }) {
   useEffect(() => () => { if (timerRef.current) clearTimeout(timerRef.current) }, [])
 
   const handleReconnect = async () => {
+    if (disabled) return
     setStatus('loading')
     setMessage('')
     try {
@@ -34,7 +39,8 @@ export function ReconnectButton({ accountId }: { accountId: string }) {
     <div className="flex items-center gap-2">
       <button
         onClick={handleReconnect}
-        disabled={status === 'loading'}
+        disabled={disabled || status === 'loading'}
+        title={disabled ? disabledReason : undefined}
         className="btn-secondary-sm"
       >
         {status === 'loading' ? 'Connecting...' : 'Reconnect'}

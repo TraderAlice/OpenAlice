@@ -27,8 +27,8 @@ favoring this?) is usually what drives realized P&L. Don't stop at "it's cheap."
 
 The tools: `traderhub equity` for valuation / estimates / consensus,
 `alice analysis quant` for relative strength, momentum, and z-score vs history,
-`traderhub board` for the sector/macro frame, `alice rss grep` for the
-narrative. (See the `traderhub`, `alice-analysis`, `alice` skills.)
+`traderhub board` for the sector/macro frame. Choose news sources to suit
+the question. (See the `traderhub`, `alice-analysis`, `alice` skills.)
 
 0. **Anchor the comparison set.** The right side is *relative* — "strong" only
    means something against peers. If a value-chain map for this name's theme

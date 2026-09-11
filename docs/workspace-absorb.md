@@ -60,7 +60,7 @@ target Session the author of the source's old work.
 
 Preview and apply inspect process-backed Workspace activity, not persisted
 `state: running` flags or a bare counter. The review lists the exact open TUI,
-WebPi, and headless turns. An exited child process is pruned from the guard even
+Web, and headless turns. An exited child process is pruned from the guard even
 if an outer cleanup promise was lost, preventing a zombie “someone is working”
 blocker.
 

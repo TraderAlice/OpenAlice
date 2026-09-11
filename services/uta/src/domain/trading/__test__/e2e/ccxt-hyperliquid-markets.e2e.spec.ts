@@ -9,7 +9,7 @@
  * that pass checkRequiredCredentials() but never make any private API calls.
  * Hyperliquid's loadMarkets is a public endpoint.
  *
- * Run: pnpm test:e2e
+ * Run: pnpm test:external:readonly
  */
 
 import { describe, it, expect, beforeAll } from 'vitest'

@@ -1,15 +1,17 @@
 import { useState } from 'react';
 import { formatRelativeTime } from '../../lib/intl';
 import type { ReactElement } from 'react';
-import { Bot, ChevronDown, Settings2, SquareTerminal } from 'lucide-react';
+import { Bot, ChevronDown, CirclePause, Settings2, SquareTerminal } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
+import { AgentRuntimeIcon } from '../../lib/agentRuntimeIcon';
 import { SessionSettingsDialog } from './SessionSettingsDialog';
 import { sessionCoworkerLabel } from './display';
-import type {
-  AgentInfo,
-  PausedSessionRuntimeUpdate,
-  SessionRecord,
+import {
+  agentSupportsWeb,
+  type AgentInfo,
+  type PausedSessionRuntimeUpdate,
+  type SessionRecord,
 } from './api';
 
 export interface ResumeCtaProps {
@@ -19,7 +21,8 @@ export interface ResumeCtaProps {
   readonly onUpdateRuntime?: (update: PausedSessionRuntimeUpdate) => Promise<void>;
   readonly onSaveDisplayName?: (displayName: string | null) => Promise<void>;
   readonly onResume: () => Promise<void>;
-  readonly onOpenWebPi?: () => Promise<void>;
+  /** Offered only when the runtime declares a Web conversation surface. */
+  readonly onOpenWeb?: () => Promise<void>;
 }
 
 /**
@@ -43,23 +46,25 @@ export interface ResumeCtaProps {
  */
 export function ResumeCta(props: ResumeCtaProps): ReactElement {
   const { t } = useTranslation();
-  const [resuming, setResuming] = useState<'terminal' | 'webpi' | null>(null);
+  const [resuming, setResuming] = useState<'terminal' | 'web' | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const r = props.record;
   const sessionTitle = sessionCoworkerLabel(r);
   const runtimeFacts = sessionRuntimeFacts(r);
   const canOpenSettings = Boolean(props.workspaceId && props.onSaveDisplayName);
+  const canOpenWeb = Boolean(props.onOpenWeb) && agentSupportsWeb(props.agents, r.agent);
 
-  const run = async (surface: 'terminal' | 'webpi'): Promise<void> => {
+  const run = async (surface: 'terminal' | 'web'): Promise<void> => {
     if (resuming) return;
     setError(null);
     setResuming(surface);
     try {
-      if (surface === 'webpi') await props.onOpenWebPi?.();
+      if (surface === 'web') await props.onOpenWeb?.();
       else await props.onResume();
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
+    } finally {
       setResuming(null);
     }
   };
@@ -72,23 +77,17 @@ export function ResumeCta(props: ResumeCtaProps): ReactElement {
           <div className="resume-cta-card-main">
             <div className="resume-cta-card-header">
               <div className="resume-cta-kicker">
-                <span className="resume-cta-state-dot" aria-hidden="true" />
+                <CirclePause aria-hidden="true" size={13} />
                 <span>Session paused</span>
               </div>
-              <h2 className="resume-cta-name">{sessionTitle}</h2>
+              <div className="resume-cta-name-row">
+                <AgentRuntimeIcon agentId={r.agent} className="mt-0.5 size-[18px] shrink-0" />
+                <h2 className="resume-cta-name">{sessionTitle}</h2>
+              </div>
               <p className="resume-cta-state">
                 {agentDisplayName(r.agent)} · {formatRelativeTime(r.lastActiveAt)}
               </p>
             </div>
-
-            <dl className="resume-cta-runtime" aria-label="Session runtime">
-              {runtimeFacts.map((fact) => (
-                <div className="resume-cta-runtime-fact" key={fact.label}>
-                  <dt>{fact.label}</dt>
-                  <dd title={fact.value}>{fact.value}</dd>
-                </div>
-              ))}
-            </dl>
 
             <div className="resume-cta-actions">
               {canOpenSettings && (
@@ -113,20 +112,29 @@ export function ResumeCta(props: ResumeCtaProps): ReactElement {
                 <SquareTerminal size={15} strokeWidth={2.1} aria-hidden="true" />
                 <span>{resuming === 'terminal' ? 'Restoring…' : 'Resume in TUI'}</span>
               </button>
-              {r.agent === 'pi' && props.onOpenWebPi && (
+              {canOpenWeb && (
                 <button
                   type="button"
-                  className="resume-cta-btn is-webpi oa-pressable"
-                  onClick={() => void run('webpi')}
+                  className="resume-cta-btn is-web oa-pressable"
+                  onClick={() => void run('web')}
                   disabled={resuming !== null}
-                  aria-label="Open in WebPi"
+                  aria-label="Open in Web"
                 >
                   <Bot size={14} strokeWidth={2.25} aria-hidden="true" />
-                  <span>{resuming === 'webpi' ? 'Opening…' : 'Open in WebPi'}</span>
-                  {resuming !== 'webpi' && <span className="resume-cta-beta">Beta</span>}
+                  <span>{resuming === 'web' ? 'Opening…' : 'Open in Web'}</span>
+                  {resuming !== 'web' && <span className="resume-cta-beta">Beta</span>}
                 </button>
               )}
             </div>
+
+            <dl className="resume-cta-runtime" aria-label="Session runtime">
+              {runtimeFacts.map((fact) => (
+                <div className="resume-cta-runtime-fact" key={fact.label}>
+                  <dt>{fact.label}</dt>
+                  <dd title={fact.value}>{fact.value}</dd>
+                </div>
+              ))}
+            </dl>
           </div>
 
           {error && (
@@ -245,13 +253,6 @@ function FauxTuiBackdrop(): ReactElement {
       </div>
     </div>
   );
-}
-
-export function prefixOf(agent: string): string {
-  if (agent === 'claude') return 'c';
-  if (agent === 'codex') return 'x';
-  if (agent === 'shell') return 'sh';
-  return agent[0] ?? '?';
 }
 
 function agentDisplayName(agent: string): string {

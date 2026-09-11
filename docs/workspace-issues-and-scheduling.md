@@ -81,7 +81,9 @@ The filename stem is the stable issue id. Frontmatter:
   - `{ kind: cron, cron: <5-field expression>, timezone: local | <IANA zone> }`
 - `agent` — optional CLI adapter id for `@new-then-resume` / `@new-each-run` scheduled work;
   otherwise Workspace/default resolution is used. A Session assignee already
-  owns its runtime and cannot be overridden here.
+  owns its Agent runtime and cannot be overridden here. After the first
+  successful run, the Issue page may still replace that Session's credential,
+  model, and effort.
 - `credential` — optional secret-free OpenAlice vault slug for the fresh
   Session. The slug selects provider routing; keys and endpoints never enter
   the Issue file.
@@ -95,8 +97,9 @@ The filename stem is the stable issue id. Frontmatter:
 - `effort` — optional one-run reasoning effort:
   `none | minimal | low | medium | high | xhigh | max`. The chosen runtime must
   expose that level; omission inherits its Workspace/native default.
-- `timeout` — optional scheduled-run watchdog: `15m | 30m | 45m | 60m`. Omission
-  means no limit: the headless child runs until the agent exits. This is a run
+- `timeout` — optional scheduled-run and comment-reply watchdog: `15m | 30m | 45m | 60m`. Omission
+  means no limit: the headless child runs until the agent exits. Comment replies
+  have no separate fixed five-minute cap. This is a run
   budget, not Session birth, so an exact `@resumeId` owner may still set it.
 - `commentPrompt` — optional template for the Input Prompt sent when a comment
   needs a reply. Omission keeps the historical wrapper (Issue id, title, author,
@@ -106,32 +109,38 @@ The filename stem is the stable issue id. Frontmatter:
   `{comment}`. Chat-style Issues (including the Telegram phone desk) set
   `{comment}` alone so the inbound text is the prompt. Empty/null write drops
   the field and restores the default.
-- `telegramConnector: true` — present only on the Alice Project's Telegram
-  phone-desk Issue. Omission is a normal Issue. Any other value is invalid. At
-  most one live desk exists in the Project. Settings → Connectors is the only
-  writer of this flag; generic create/CLI/MCP cannot set it. The board and
-  Tracked list omit the row. What remains the exact scheduled Input Prompt.
-  Comments are the chat transcript. The desk is created with
-  `commentPrompt: '{comment}'` so inbound DMs are the Input Prompt as-is.
-  Owner Telegram DMs become comments. While a desk fire or comment reply is
-  running, later DMs stay in the Connector queue; Alice flushes that stack as
-  one quoted comment when the desk is idle again. Scheduled-fire
-  `assistantText` is stamped as a comment. Connector projects comments that
-  do not contain `[[no-reply]]` and did not arrive from Telegram. While a
-  desk turn is running, it also ships sealed mid-turn `text` blocks — the
-  last consecutive text before a tool or error — and never ships tool I/O.
-  The trailing text stays with the final comment. Projected comments use
-  Telegram MarkdownV2; a parse failure tries `sendRichMessage`, then plain
-  text.
+- `connectorDesk: <adapter id>` — present only on that connector's phone-desk
+  Issue (one live desk per connector, not one desk for the whole Project).
+  Omission is a normal Issue. Settings → Connectors on that adapter card is
+  the only writer; generic create/CLI/MCP cannot set it. The board and
+  Tracked list omit every desk row. What remains the exact scheduled Input
+  Prompt. Comments are that channel's chat transcript. Each desk is created
+  with `commentPrompt: '{comment}'` so inbound DMs are the Input Prompt as-is.
+  Owner DMs for that connector become comments on that Issue. While that desk
+  is generating, later DMs for the same connector stay in the Connector
+  queue; other connectors flush independently. Scheduled-fire
+  `assistantText` is stamped as a comment. Scheduler and Run now / Retry now
+  executions of this Issue carry `trigger.metadata.kind: connector-cron-issue`.
+  Alice forwards source context with raw comments and progress. Connector
+  consumes `[[no-reply]]` for automation (including CLI comments from an Issue
+  run); ordinary chat and code examples remain literal. Reply file markers
+  are also Connector-owned; see [[docs/connector-service.md]].
+  Connector does not echo comments that arrived from that connector.
+  While a desk turn is running, it also ships sealed mid-turn `text` blocks —
+  the last consecutive text before a tool or error — and never ships tool I/O.
+  The trailing text stays with the final comment. Shipped
+  `telegramConnector: true` files are read as `connectorDesk: telegram`.
 
 `agent`, `credential`/`credentialSource`, `model`, and `effort` are one Session-creation tuple.
 Only the credential slug is persisted; endpoint and key material remain in the
 vault and are resolved just in time. The scheduler freezes the tuple into the
 new Session's durable runtime binding without rewriting Workspace files. All
-fields are forbidden when `assignee` is an exact `@resumeId`, because that
-Session owns its runtime conversation. `@new-then-resume` may use them for its first
-dispatch; after it becomes an exact Session owner, the claim rewrite removes
-the tuple.
+fields are forbidden on the Issue file when `assignee` is an exact `@resumeId`,
+because that Session owns its runtime conversation. `@new-then-resume` may use
+them for its first dispatch; after it becomes an exact Session owner, the claim
+rewrite removes the tuple. The Issue page may still replace the Session's
+credential, model, and effort (not the Agent runtime) after a successful first
+run; the next scheduled or comment-reply turn replays the updated binding.
 
 The 0.89.2-beta baseline has one ownership field and behavior-named scheduling
 tokens. `@workspace` remains a deprecated read alias for `@new-each-run`, and
@@ -166,8 +175,12 @@ structured run log remain durable. Inbox inquiries expose the same shape on the 
 Issue Activity and Inbox reply threads render that same field as a compact
 live timeline: semantic text, tool name/status, and errors. They do not fetch
 `/output` or show tool payloads. The Telegram phone desk
-already projects sealed `text` blocks from that same field. A human comment without a fixed owner
-uses the same provenance-aware fallback as Inbox: OpenAlice asks the
+already projects sealed `text` blocks from that same field. A human comment on
+`@new-then-resume` recruits and claims the first Session using the Issue's
+Agent, credential, model, and effort, sharing dispatch exclusion with scheduled
+fires. `@new-each-run` comments recruit fresh workers without claiming ownership.
+These comments never fall back to an earlier creator, and do not advance the
+schedule marker. Ordinary unassigned/human-owned Issue comments use the same provenance-aware fallback as Inbox: OpenAlice asks the
 attributable creator, or recruits a reconstruction Agent in the Issue
 Workspace when no creator Session exists. The answer is recorded in Activity
 without changing `assignee`; a temporary answerer never becomes the scheduling
@@ -216,15 +229,23 @@ accepted and later failed; that occurrence stays one attempt and uses
 
 ## Agent and Human Surfaces
 
+Ask Alice, Auto Quant, and Auto Prediction share one Session roster policy.
+Sessions currently owned by an exact Issue assignee, plus Sessions actively
+executing an Issue, stay on Issue and Automation surfaces by default. Settings
+→ Harness may opt them into the shared roster independently from the separate
+headless-born Session preference. Connector-desk Sessions remain hidden
+regardless of either preference because they are transport-owned rather than
+ordinary coworkers.
+
 Agents normally use:
 
 ```bash
-alice-workspace issue list
-alice-workspace issue show --id <id-or-title>
-alice-workspace issue create --title "..." --what "..." --when '{"kind":"every","every":"1h"}' --assignee @new-each-run --agent codex --credential openai-primary --model gpt-5.6-sol --effort high --timeout 30m
-alice-workspace issue update --id <id> --credential openai-primary --model gpt-5.6-sol --effort high
-alice-workspace issue update --id <id> --timeout 45m
-alice-workspace issue comment --id <id> --text "..."
+alice issue list
+alice issue show --id <id-or-title>
+alice issue create --title "..." --what "..." --when '{"kind":"every","every":"1h"}' --assignee @new-each-run --agent codex --credential openai-primary --model gpt-5.6-sol --effort high --timeout 30m
+alice issue update --id <id> --credential openai-primary --model gpt-5.6-sol --effort high
+alice issue update --id <id> --timeout 45m
+alice issue comment --id <id> --text "..."
 ```
 
 The CLI and MCP tools use the same implementation and write the same files.
@@ -240,6 +261,21 @@ selected historical run without adding a board comment.
 Reads such as list/show aggregate all workspaces. Writes from an autonomous or
 headless run stay inside its own Workspace. Editing a peer Workspace requires
 an attended, human-approved path and a commit in the peer repository.
+
+## Interactive handoff
+
+Opening a Connector desk or Issue-assigned Session in TUI/Web requires a UI
+acknowledgement. The shared Session actions menu offers **Disconnect interactive
+connection**; this stops the interactive process and preserves the native
+conversation. Closing a browser tab alone is not a disconnect.
+
+Issue dispatch (scheduled, manual, retry, and comment replies, including
+Connector desk messages) claims the same resume lease used by UI startup,
+stops any TUI/Web owner, and waits for process exit before starting the
+headless turn. Another background turn is never preempted. Capacity/busy
+admission still follows the existing scanner/Connector queue policy.
+The disconnected browser does not reconnect automatically and shows background
+occupancy until the turn finishes; returning to interactive mode is explicit.
 
 ## Execution Flow
 
@@ -281,7 +317,8 @@ by that Workspace; otherwise dispatch fails with an actionable message instead
 of mutating provider registration during a concurrent run.
 
 The Issue API also derives an `automationHealth` projection from these markers,
-the latest scheduled run, and the assignee's resume availability. It is not
+the latest scheduled run, the assignee's resume availability, and the effective
+Agent runtime installed on the current host. It is not
 persisted in markdown and does not create another Issue workflow status:
 
 - `not_started`, `due`, `running`, and `healthy` describe normal progress;
@@ -290,8 +327,11 @@ persisted in markdown and does not create another Issue workflow status:
   launcher suspension); this is operational interruption, not an agent-work failure;
 - `failed` retains a real timeout, launch error, runtime error, or non-zero
   process exit until a later success;
-- `blocked` means the schedule has no future fire, or an exact Session owner is
-  missing, retired, or not resumable;
+- `blocked` means the schedule has no future fire, an exact Session owner is
+  missing, retired, deleted, or not resumable, or the effective Agent runtime
+  is not installed. Runtime absence is exposed as the structured blocker
+  `agent_runtime_missing`; this read path performs only cheap executable
+  discovery and never starts a readiness probe or Agent;
 - `inactive` means Issue status `done`/`canceled` has stopped the schedule.
 
 Health measures scheduler fulfillment, not human attention. A successful run
@@ -330,8 +370,10 @@ Headless runs may overlap with interactive sessions or other runs in the same
 checkout. Agents must tolerate concurrent edits. The launcher currently admits
 at most eight headless processes globally and serializes registry persistence,
 but there is no per-Workspace exclusive lock. One small dispatch-start guard
-prevents a Run now / Retry now click and a schedule tick from launching the same
-Issue at the same instant; it is released as soon as the run is registered.
+prevents Run now / Retry now, CLI calls and a schedule tick from launching the
+same Issue at the same instant; it is released as soon as the run is registered.
+The shared dispatch path also rejects a new occurrence while that Issue still
+has a running task. Other Issues in the same Workspace remain independent.
 
 Offboarding is the lifecycle exception: a Workspace with a live headless run
 cannot depart. Once its Catalog row enters `offboarding`, new dispatch is
@@ -382,14 +424,17 @@ Structured headless output is the live control-plane result, while Inbox is the
 durable user-delivery channel. A run with a meaningful report or artifact calls:
 
 ```bash
-alice-workspace inbox push --doc <path> --comments "<summary>"
+alice inbox push --body "<summary> [[reports/close.md]]"
+# Or publish the Markdown body itself:
+alice inbox push --body-file reports/close.md
 ```
 
+The body/file contract is defined in [[docs/inbox-content.md]].
 The launcher binds the run/issue origin; the agent does not pass its own
 identity. Attached reports also receive a publication-time SHA-256 revision;
 the Inbox still renders the live file, but provenance can distinguish the sent
 revision from later edits. A no-change check should exit silently rather than
-generating Inbox noise. `alice-workspace inbox read` returns this safe provenance to internal
+generating Inbox noise. `alice inbox read` returns this safe provenance to internal
 agents as `origin` (`runId` / `sessionId`, `resumeId`, `issueId`, and `agent`
 when available). For append-only entries created before `resumeId` was stamped,
 the read path joins the stored run/session handle against the live registries;
@@ -408,12 +453,12 @@ remain valid and are never renamed. `taskId` remains one execution, while
 rather than silently pruned.
 
 Internal agents use the same product handle through the embedded collaboration
-path. `alice-workspace issue ask --id <name> --creator --prompt '<question>'`
+path. `alice issue ask --id <name> --creator --prompt '<question>'`
 queries Issue provenance first without making the caller extract a Workspace or
 resume id: it resumes the exact attributable Session,
 reconstructs with a fresh worker only when the Workspace is known and no
 Session origin exists, or returns unavailable without substituting another
-agent. `alice-workspace conversation read --task-id <id>` returns the latest
+agent. `alice conversation read --task-id <id>` returns the latest
 assistant reply by default; diagnostic tool/message blocks require
 `--mode detailed`. New task ids are short `run-xxxxxxxx` codes; existing UUID
 task ids remain readable.
@@ -507,3 +552,18 @@ pnpm test
 For UI changes, run strict UI types and verify Issue board, issue detail,
 Activity comments/replies, the independent Runs section, schedule projection,
 and linked Inbox reports in the real browser surface.
+
+## Manual execution from CLI
+
+`alice issue run --id <id>` uses the same Run now dispatch as the Issue page.
+`alice issue retry --id <id> --run-id <taskId>` requires the latest failed or
+interrupted run of that Issue. Both resolve names on the global board; duplicate
+names require `--ws-id`. They return the exact dispatched `taskId`; `--await`
+waits for completion through the conversation reader. No prompt/runtime override
+is accepted. Current scheduled Issue semantics and next-fire markers are preserved.
+
+Retry persists `trigger.retryOfTaskId`, exposed by Issue run history as
+`retryOfTaskId`, independently of conversation `parentTaskId`. Existing records
+without that optional field have unknown retry lineage. Active Issue runs and
+dispatch-start races are rejected, including schedule ticks; there is no force
+override that launches concurrent turns against the same owner.

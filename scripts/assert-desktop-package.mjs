@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 import { existsSync, readFileSync, readdirSync } from 'node:fs'
-import { dirname, join, relative, resolve } from 'node:path'
+import { dirname, join, normalize, relative, resolve } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
+import { extractFile, listPackage, statFile } from '@electron/asar'
 import { DEFAULT_DESKTOP_PACKAGE_ROOT, resolveDesktopPackageRootArg } from './desktop-package-artifact.mjs'
 
 const __filename = fileURLToPath(import.meta.url)
@@ -9,20 +10,16 @@ const __dirname = dirname(__filename)
 const repoRoot = resolve(__dirname, '..')
 
 export const RESOURCE_ROOT_RELATIVE_CANDIDATES = [
-  'mac-arm64/OpenAlice.app/Contents/Resources/app',
-  'mac/OpenAlice.app/Contents/Resources/app',
-  'OpenAlice.app/Contents/Resources/app',
-  'win-unpacked/resources/app',
-  'linux-unpacked/resources/app',
+  'mac-arm64/OpenAlice.app/Contents/Resources/runtime',
+  'mac/OpenAlice.app/Contents/Resources/runtime',
+  'OpenAlice.app/Contents/Resources/runtime',
+  'win-unpacked/resources/runtime',
+  'linux-unpacked/resources/runtime',
 ]
 
 export const BASE_REQUIRED_FILES = [
   'package.json',
-  'dist/main.js',
-  'dist/electron/main.js',
   'ui/dist/index.html',
-  'services/uta/dist/uta.js',
-  'services/connector/dist/connector.cjs',
   'src/workspaces/cli/bin/openalice-cli.cjs',
   'src/workspaces/cli/bin/alice',
   'src/workspaces/cli/bin/alice.cmd',
@@ -35,11 +32,20 @@ export const BASE_REQUIRED_FILES = [
   'src/workspaces/cli/bin/pi-session-provider.ts',
   'src/workspaces/templates/_common.mjs',
   'src/workspaces/templates/chat/bootstrap.mjs',
-  'node_modules/dugite/package.json',
-  'node_modules/dugite/build/lib/index.js',
   'vendor/manifest.json',
   'vendor/pi/package.json',
   'vendor/pi/node_modules/@earendil-works/pi-coding-agent/dist/cli.js',
+]
+
+export const ASAR_REQUIRED_FILES = [
+  'package.json',
+  'dist/main.js',
+  'dist/electron/main.js',
+  'dist/electron/preload.js',
+  'services/uta/dist/uta.js',
+  'services/connector/dist/connector.cjs',
+  'node_modules/dugite/package.json',
+  'node_modules/dugite/build/lib/index.js',
 ]
 
 export const FORBIDDEN_BROKER_SDKS = [
@@ -76,10 +82,50 @@ export function assertDesktopPackage(options = {}) {
     for (const file of missing) errors.push(`  - ${file}`)
   }
 
-  const nodeModules = join(appRoot, 'node_modules')
+  const archivePath = join(dirname(appRoot), 'app.asar')
+  const unpackedRoot = `${archivePath}.unpacked`
+  let archiveEntries = []
+  try {
+    archiveEntries = listPackage(archivePath).map((entry) => entry.replaceAll('\\', '/').replace(/^\//, ''))
+    for (const file of ASAR_REQUIRED_FILES) {
+      // ASAR's directory lookup splits on path.sep, including on Windows.
+      const stat = statFile(archivePath, normalize(file))
+      if ('files' in stat) throw new Error(`${file} must be a file`)
+      if (stat.unpacked && (!file.startsWith('node_modules/') || !existsSync(join(unpackedRoot, file)))) {
+        throw new Error(`${file} must be packed or an available native dependency`)
+      }
+    }
+    const archiveMetadata = JSON.parse(extractFile(archivePath, 'package.json').toString())
+    const runtimeMetadata = JSON.parse(readFileSync(join(appRoot, 'package.json'), 'utf8'))
+    if (archiveMetadata.version !== runtimeMetadata.version) throw new Error('archive/runtime product versions differ')
+    for (const entry of archiveEntries) {
+      const externalResource = /^(vendor|ui|default)(\/|$)/.test(entry) || entry.startsWith('src/workspaces/')
+      // Windows builder can retain empty parent directories after excluding
+      // extraResources. Only actual files represent duplicated payloads.
+      if (externalResource && !('files' in statFile(archivePath, normalize(entry)))) {
+        throw new Error(`external runtime resource duplicated in ASAR: ${entry}`)
+      }
+    }
+    // Every native payload advertised by the archive must exist on disk;
+    // successful JS imports alone cannot prove PTY/helper executability.
+    const nativeFiles = archiveEntries.filter((entry) => /\.node$|\/spawn-helper$/.test(entry))
+    if (!nativeFiles.some((entry) => entry.startsWith('node_modules/node-pty/'))) {
+      throw new Error('node-pty native payload is missing')
+    }
+    for (const file of nativeFiles) {
+      if (!statFile(archivePath, normalize(file)).unpacked || !existsSync(join(unpackedRoot, file))) {
+        throw new Error(`native payload must be unpacked: ${file}`)
+      }
+    }
+  } catch (error) {
+    errors.push(`[desktop-package] invalid app.asar: ${error instanceof Error ? error.message : String(error)}`)
+  }
+
+  const nodeModules = join(unpackedRoot, 'node_modules')
   const virtualStore = join(nodeModules, '.pnpm')
   const virtualEntries = existsSync(virtualStore) ? readdirSync(virtualStore) : []
   const bundledBrokerSdks = FORBIDDEN_BROKER_SDKS.filter(({ packagePath, pnpmPrefix }) =>
+    archiveEntries.some((entry) => entry === `node_modules/${packagePath}` || entry.startsWith(`node_modules/${packagePath}/`)) ||
     existsSync(join(nodeModules, packagePath)) || virtualEntries.some((entry) => entry.startsWith(pnpmPrefix)),
   )
   if (bundledBrokerSdks.length > 0) {
@@ -127,8 +173,8 @@ export function assertDesktopPackage(options = {}) {
   }
 
   if (platform === 'win32') {
-    const embeddedDugiteGit = join(appRoot, 'node_modules', 'dugite', 'git')
-    if (existsSync(embeddedDugiteGit)) {
+    const embeddedDugiteGit = join(unpackedRoot, 'node_modules', 'dugite', 'git')
+    if (existsSync(embeddedDugiteGit) || archiveEntries.some((entry) => entry.startsWith('node_modules/dugite/git/'))) {
       errors.push(
         '[desktop-package] Windows must use managed PortableGit; dugite\'s embedded Git payload is forbidden',
       )
@@ -153,14 +199,18 @@ export function assertDesktopPackage(options = {}) {
     }
   }
 
-  return { ok: errors.length === 0, errors, appRoot, manifest, platform, platformArch }
+  if (platform === 'darwin' && !existsSync(join(unpackedRoot, 'node_modules/dugite/git/bin/git'))) {
+    errors.push('[desktop-package] macOS requires unpacked node_modules/dugite/git/bin/git')
+  }
+
+  return { ok: errors.length === 0, errors, appRoot, archivePath, unpackedRoot, manifest, platform, platformArch }
 }
 
 export function platformFromAppRoot(appRoot) {
   const normalized = appRoot.replaceAll('\\', '/')
   if (normalized.includes('/win-unpacked/')) return 'win32'
   if (normalized.includes('/linux-unpacked/')) return 'linux'
-  if (normalized.includes('.app/Contents/Resources/app')) return 'darwin'
+  if (normalized.includes('.app/Contents/Resources/runtime')) return 'darwin'
   return process.platform
 }
 
@@ -181,9 +231,7 @@ function platformRequiredFiles(platform, platformArch) {
         `vendor/git/${platformArch}/bin/bash.exe`,
         `vendor/git/${platformArch}/bin/sh.exe`,
       ]
-    : platform === 'darwin'
-      ? ['node_modules/dugite/git/bin/git']
-      : []
+    : []
   return [...searchTools, ...git]
 }
 

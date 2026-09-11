@@ -3,6 +3,7 @@
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
+import { resetAgentRuntimesStore } from '../hooks/useAgentRuntimes'
 import { i18n } from '../i18n'
 import { AIProviderPage } from './AIProviderPage'
 
@@ -32,8 +33,14 @@ vi.mock('../components/workspace/api', async (importOriginal) => {
   return { ...actual, listAgents: mocks.listAgents }
 })
 
+vi.mock('../tabs/store', () => ({
+  useWorkspace: (selector: (state: { openOrFocus: () => void }) => unknown) =>
+    selector({ openOrFocus: vi.fn() }),
+}))
+
 beforeEach(async () => {
   vi.clearAllMocks()
+  resetAgentRuntimesStore()
   await i18n.changeLanguage('zh')
   mocks.getCredentials.mockResolvedValue({
     credentials: [{
@@ -78,18 +85,17 @@ beforeEach(async () => {
 afterEach(cleanup)
 
 describe('AIProviderPage', () => {
-  it('puts creation defaults before collapsed runtime reference and localizes the primary UI', async () => {
+  it('puts creation defaults before the Agent runtimes link and localizes the primary UI', async () => {
     render(<AIProviderPage />)
 
     const credentials = await screen.findByRole('heading', { name: '凭证库' })
     const defaults = await screen.findByRole('heading', { name: '新工作区默认值' })
-    const runtimeReference = screen.getByText('Agent 运行时参考')
-    const details = runtimeReference.closest('details')
+    const runtimesLink = screen.getByRole('button', { name: '打开 Agent 运行时' })
 
     expect(screen.getByRole('heading', { name: 'AI 提供方' })).toBeTruthy()
-    expect(details?.open).toBe(false)
-    expect(credentials.compareDocumentPosition(runtimeReference) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
-    expect(defaults.compareDocumentPosition(runtimeReference) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(screen.queryByText('Agent 运行时参考')).toBeNull()
+    expect(credentials.compareDocumentPosition(runtimesLink) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(defaults.compareDocumentPosition(runtimesLink) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
   })
 
   it('persists a Pi creation default and acknowledges the save', async () => {
@@ -109,6 +115,43 @@ describe('AIProviderPage', () => {
 
     expect(await screen.findByRole('button', { name: '编辑 Gemini' })).toBeTruthy()
     expect(screen.queryByRole('button', { name: '编辑' })).toBeNull()
+    expect(screen.getByText('Google Gemini')).toBeTruthy()
+  })
+
+  it('filters the vault list without removing unmatched saved credentials', async () => {
+    mocks.getCredentials.mockResolvedValue({
+      credentials: [
+        {
+          slug: 'google-1',
+          vendor: 'google',
+          label: 'Gemini',
+          authType: 'api-key',
+          wires: { 'google-generative-ai': 'https://generativelanguage.googleapis.com/v1beta' },
+          apiKey: null,
+          hasApiKey: true,
+          lastModel: 'gemini-3.1-pro-preview',
+        },
+        {
+          slug: 'openrouter-1',
+          vendor: 'openrouter',
+          label: 'Work gateway',
+          authType: 'api-key',
+          wires: { 'openai-chat': 'https://openrouter.ai/api/v1' },
+          apiKey: null,
+          hasApiKey: true,
+          lastModel: 'anthropic/claude-sonnet-5',
+        },
+      ],
+    })
+    render(<AIProviderPage />)
+
+    expect(await screen.findByRole('button', { name: '编辑 Gemini' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: '编辑 Work gateway' })).toBeTruthy()
+
+    fireEvent.change(screen.getByLabelText('搜索凭证…'), { target: { value: 'openrouter' } })
+    expect(screen.queryByRole('button', { name: '编辑 Gemini' })).toBeNull()
+    expect(screen.getByRole('button', { name: '编辑 Work gateway' })).toBeTruthy()
+    expect(screen.getByText('OpenRouter')).toBeTruthy()
   })
 
   it('confirms credential deletion and explains the default cleanup', async () => {

@@ -1,13 +1,7 @@
-import { createContext, useContext, useCallback, useState, useEffect, useRef, type ReactNode } from 'react'
+import { createContext, useContext, useMemo, type ReactNode } from 'react'
+import { toast } from 'sonner'
 
-// ==================== Types ====================
-
-interface ToastItem {
-  id: number
-  message: string
-  type: 'success' | 'error'
-  removing?: boolean
-}
+import { Toaster } from './ui/sonner'
 
 interface ToastContextValue {
   success: (message: string) => void
@@ -24,104 +18,20 @@ export function useToast(): ToastContextValue {
   return ctx
 }
 
-// ==================== Provider ====================
-
-const MAX_TOASTS = 3
-const DISMISS_MS = 3000
-const FADE_MS = 200
-
 export function ToastProvider({ children }: { children: ReactNode }) {
-  const [toasts, setToasts] = useState<ToastItem[]>([])
-  const nextId = useRef(0)
-
-  const remove = useCallback((id: number) => {
-    // Start fade-out
-    setToasts((prev) => prev.map((t) => (t.id === id ? { ...t, removing: true } : t)))
-    // Actually remove after animation
-    setTimeout(() => {
-      setToasts((prev) => prev.filter((t) => t.id !== id))
-    }, FADE_MS)
-  }, [])
-
-  const add = useCallback((message: string, type: 'success' | 'error') => {
-    const id = nextId.current++
-    setToasts((prev) => {
-      const next = [...prev, { id, message, type }]
-      // Trim excess toasts (remove oldest)
-      return next.length > MAX_TOASTS ? next.slice(-MAX_TOASTS) : next
-    })
-    // Auto-dismiss
-    setTimeout(() => remove(id), DISMISS_MS)
-  }, [remove])
-
-  const success = useCallback((message: string) => add(message, 'success'), [add])
-  const error = useCallback((message: string) => add(message, 'error'), [add])
+  const value = useMemo<ToastContextValue>(() => ({
+    success: (message) => { toast.success(message) },
+    error: (message) => { toast.error(message) },
+  }), [])
 
   return (
-    <ToastContext.Provider value={{ success, error }}>
+    <ToastContext.Provider value={value}>
       {children}
-      <ToastContainer toasts={toasts} onDismiss={remove} />
+      <Toaster
+        position="top-right"
+        visibleToasts={3}
+        closeButton
+      />
     </ToastContext.Provider>
-  )
-}
-
-// ==================== Container ====================
-
-function ToastContainer({ toasts, onDismiss }: { toasts: ToastItem[]; onDismiss: (id: number) => void }) {
-  if (toasts.length === 0) return null
-
-  return (
-    <div className="fixed bottom-4 right-4 z-[70] flex flex-col gap-2 pointer-events-none">
-      {toasts.map((toast) => (
-        <ToastNotification key={toast.id} toast={toast} onDismiss={() => onDismiss(toast.id)} />
-      ))}
-    </div>
-  )
-}
-
-// ==================== Single Toast ====================
-
-function ToastNotification({ toast, onDismiss }: { toast: ToastItem; onDismiss: () => void }) {
-  const [mounted, setMounted] = useState(false)
-
-  useEffect(() => {
-    // Trigger enter animation on next frame
-    requestAnimationFrame(() => setMounted(true))
-  }, [])
-
-  const isSuccess = toast.type === 'success'
-
-  return (
-    <div
-      className={`
-        pointer-events-auto flex items-center gap-2 px-4 py-2.5 rounded-lg shadow-lg border text-sm
-        transition-[opacity,transform] duration-[var(--motion-standard)] [transition-timing-function:var(--motion-ease-out)] motion-reduce:transform-none motion-reduce:transition-none
-        ${isSuccess ? 'bg-success/10 border-success/30 text-success' : 'bg-destructive/10 border-destructive/30 text-destructive'}
-        ${mounted && !toast.removing ? 'opacity-100 translate-x-0' : 'opacity-0 translate-x-4'}
-      `}
-      role="alert"
-    >
-      {/* Icon */}
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="shrink-0">
-        {isSuccess ? (
-          <><path d="M20 6L9 17l-5-5" /></>
-        ) : (
-          <><circle cx="12" cy="12" r="10" /><path d="M15 9l-6 6M9 9l6 6" /></>
-        )}
-      </svg>
-
-      <span className="flex-1 min-w-0 truncate">{toast.message}</span>
-
-      {/* Dismiss */}
-      <button
-        onClick={onDismiss}
-        className="shrink-0 opacity-60 hover:opacity-100 transition-opacity"
-        aria-label="Dismiss"
-      >
-        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-          <path d="M18 6L6 18M6 6l12 12" />
-        </svg>
-      </button>
-    </div>
   )
 }

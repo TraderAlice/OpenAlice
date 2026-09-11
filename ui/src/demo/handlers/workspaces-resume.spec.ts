@@ -8,7 +8,7 @@ import {
   DEMO_CHAT_WORKSPACE_ID,
   DEMO_MACRO_WORKSPACE_ID,
 } from '../fixtures/workspaces'
-import { resetDemoWorkspaceWebPiState, workspacesHandlers } from './workspaces'
+import { resetDemoWorkspaceWebState, workspacesHandlers } from './workspaces'
 
 const server = setupServer(...workspacesHandlers)
 const baseUrl = window.location.origin
@@ -16,11 +16,28 @@ const baseUrl = window.location.origin
 beforeAll(() => server.listen({ onUnhandledRequest: 'error' }))
 afterEach(() => {
   server.resetHandlers()
-  resetDemoWorkspaceWebPiState()
+  resetDemoWorkspaceWebState()
 })
 afterAll(() => server.close())
 
 describe('demo Workspace resume handlers', () => {
+  it('restores a paused Session and retains running state across refreshes', async () => {
+    const url = `${baseUrl}/api/workspaces/${DEMO_CHAT_WORKSPACE_ID}/sessions/demo-chat-o1/resume`
+    const response = await fetch(url, { method: 'POST' })
+    expect(response.status).toBe(200)
+    const result = await response.json()
+    expect(result).toMatchObject({ sessionId: 'demo-chat-o1', wsId: DEMO_CHAT_WORKSPACE_ID, pid: 0, surface: 'terminal' })
+    expect(result.startedAt).toEqual(expect.any(Number))
+    const refreshed = await fetch(`${baseUrl}/api/workspaces`).then((res) => res.json())
+    expect(refreshed.workspaces.find((ws: { id: string }) => ws.id === DEMO_CHAT_WORKSPACE_ID).sessions)
+      .toContainEqual(expect.objectContaining({ id: 'demo-chat-o1', state: 'running', pid: 0 }))
+    expect(await fetch(url, { method: 'POST' }).then((res) => res.json())).toMatchObject({ startedAt: result.startedAt })
+  })
+
+  it('rejects unknown Sessions instead of returning a null success', async () => {
+    const response = await fetch(`${baseUrl}/api/workspaces/${DEMO_CHAT_WORKSPACE_ID}/sessions/missing/resume`, { method: 'POST' })
+    expect(response.status).toBe(404)
+  })
   it('registers Issue workspaces and materializes a resumable run conversation', async () => {
     const before = await fetch(`${baseUrl}/api/workspaces`).then((response) => response.json())
     expect(before.workspaces.map((workspace: { id: string }) => workspace.id)).toEqual(
@@ -94,5 +111,42 @@ describe('demo Workspace resume handlers', () => {
     expect(chat.sessions.map((session: { resumeId: string }) => session.resumeId)).toEqual(
       expect.arrayContaining(['resume-demo-headless-colleague', 'resume-demo-headless-running']),
     )
+  })
+
+  it('replaces an idle Issue owner Session binding by resumeId', async () => {
+    const list = await fetch(`${baseUrl}/api/workspaces/${DEMO_AUTO_QUANT_WORKSPACE_ID}/resumes`)
+    const before = await list.json() as {
+      sessions: Array<{ resumeId: string; runtime?: { model?: string; reasoningEffort?: string } }>
+    }
+    expect(before.sessions.find((session) => session.resumeId === 'resume-demo-thesis-owner')?.runtime)
+      .toMatchObject({ credentialSource: 'native', model: 'claude-opus-4-6', reasoningEffort: 'high' })
+
+    const response = await fetch(
+      `${baseUrl}/api/workspaces/${DEMO_AUTO_QUANT_WORKSPACE_ID}/resumes/resume-demo-thesis-owner/runtime`,
+      {
+        method: 'PUT',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          credentialSource: 'native',
+          model: 'claude-sonnet-4-6',
+          reasoningEffort: 'low',
+        }),
+      },
+    )
+    expect(response.status).toBe(200)
+    expect(await response.json()).toMatchObject({
+      resumeId: 'resume-demo-thesis-owner',
+      agent: 'claude',
+      runtime: {
+        credentialSource: 'native',
+        model: 'claude-sonnet-4-6',
+        reasoningEffort: 'low',
+      },
+    })
+
+    const after = await fetch(`${baseUrl}/api/workspaces/${DEMO_AUTO_QUANT_WORKSPACE_ID}/resumes`)
+      .then((next) => next.json()) as typeof before
+    expect(after.sessions.find((session) => session.resumeId === 'resume-demo-thesis-owner')?.runtime)
+      .toMatchObject({ model: 'claude-sonnet-4-6', reasoningEffort: 'low' })
   })
 })

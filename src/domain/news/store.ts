@@ -10,6 +10,8 @@
  * Implements INewsProvider so globRss/grepRss/readRss tools work.
  */
 
+import { createReadStream } from 'node:fs'
+import { createInterface } from 'node:readline'
 import { appendFile, readFile, mkdir } from 'node:fs/promises'
 import { createHash } from 'node:crypto'
 import { dirname } from 'node:path'
@@ -131,6 +133,21 @@ export class NewsCollectorStore implements INewsProvider {
     dedupKey: string
     metadata: Record<string, string | null>
   }): Promise<boolean> {
+    return (await this.ingestRecord(item)) !== null
+  }
+
+  /**
+   * Ingest and return the durable record. Optional product integrations use
+   * the returned identity to publish an activity fact without coupling this
+   * store to Office, Sonner, or a particular Alice product.
+   */
+  async ingestRecord(item: {
+    title: string
+    content: string
+    pubTime: Date
+    dedupKey: string
+    metadata: Record<string, string | null>
+  }): Promise<NewsRecord | null> {
     const next = this.writeChain.then(() => this._ingestImpl(item))
     this.writeChain = next.catch(() => {})
     return next
@@ -142,8 +159,8 @@ export class NewsCollectorStore implements INewsProvider {
     pubTime: Date
     dedupKey: string
     metadata: Record<string, string | null>
-  }): Promise<boolean> {
-    if (this.dedupSet.has(item.dedupKey)) return false
+  }): Promise<NewsRecord | null> {
+    if (this.dedupSet.has(item.dedupKey)) return null
 
     this.seq += 1
     const record: NewsRecord = {
@@ -169,7 +186,7 @@ export class NewsCollectorStore implements INewsProvider {
       this.buffer = this.buffer.slice(-this.maxInMemory)
     }
 
-    return true
+    return record
   }
 
   /**
@@ -237,6 +254,28 @@ export class NewsCollectorStore implements INewsProvider {
     }
 
     return filtered.map(recordToNewsItem)
+  }
+
+  /** Stable IDs address the durable archive, not just the recent memory index. */
+  async getNewsById(id: number): Promise<NewsItem | null> {
+    const cached = this.buffer.find((record) => record.seq === id)
+    if (cached) return recordToNewsItem(cached)
+    const input = createReadStream(this.logPath, { encoding: 'utf8' })
+    const lines = createInterface({ input, crlfDelay: Infinity })
+    try {
+      for await (const line of lines) {
+        let record: NewsRecord
+        try { record = JSON.parse(line) } catch { continue }
+        if (record?.seq === id) return recordToNewsItem(record)
+      }
+      return null
+    } catch (error) {
+      if (isENOENT(error)) return null
+      throw error
+    } finally {
+      lines.close()
+      input.destroy()
+    }
   }
 
   // ==================== Lifecycle ====================

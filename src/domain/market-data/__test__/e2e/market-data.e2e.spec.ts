@@ -6,7 +6,7 @@
  * and miss the credential-mapping / route-wiring layer where the
  * community-reported "fred 配不下来" failure modes live.
  *
- * Run: pnpm test:e2e
+ * Run: pnpm test:external:readonly
  * Skips if OpenAlice config has no `fred` key configured.
  */
 

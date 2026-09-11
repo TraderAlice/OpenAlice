@@ -44,7 +44,7 @@ export interface Workspace {
   readonly description?: string;
   /** Validation/read error for `.alice/workspace.json`, when present. */
   readonly metadataError?: string;
-  /** Workspace-local runtime used for fresh Sessions when no launch overrides it. */
+  /** Read-only projection of the interactive Agent preference in `.alice/settings.json`. */
   readonly defaultAgent?: string;
   readonly dir: string;
   readonly createdAt: string;
@@ -61,7 +61,13 @@ export interface Workspace {
    * Set when the source template is newer than the recorded applied baseline.
    * Opens the reviewed three-way Template Upgrade flow.
    */
-  readonly upgradeAvailable?: { from: string; to: string } | null;
+  readonly upgradeAvailable?: {
+    from: string;
+    to: string;
+    kind?: 'template' | 'source';
+    verified?: boolean;
+    commit?: string;
+  } | null;
   /** Exact external Harness source selected when this Workspace was created. */
   readonly harnessSource?: {
     readonly schemaVersion: 1;
@@ -115,6 +121,10 @@ export type TemplateUpgradeFileStatus = 'ready' | 'preserved' | 'conflict' | 'un
 export type TemplateUpgradeResolution = 'workspace' | 'template'
 
 export interface TemplateUpgradeFilePlan {
+  readonly basePreview?: string | null
+  readonly baseTruncated?: boolean
+  readonly mergedPreview?: string
+  readonly mergedTruncated?: boolean
   readonly path: string
   readonly status: TemplateUpgradeFileStatus
   readonly operation: 'add' | 'update' | 'remove' | 'keep' | 'none'
@@ -182,8 +192,10 @@ export class TemplateUpgradeApiError extends Error {
   }
 }
 
-export async function getTemplateUpgradePlan(wsId: string): Promise<TemplateUpgradePlan> {
-  const res = await fetch(`/api/workspaces/${encodeURIComponent(wsId)}/template-upgrade`)
+export interface SkillProjectionRequest { skill: string; action: 'install' | 'update' | 'remove' | 'restore' }
+
+export async function getTemplateUpgradePlan(wsId: string, layer: 'template' | 'alice-harness' = 'template', projection?: SkillProjectionRequest): Promise<TemplateUpgradePlan> {
+  const res = await fetch(`/api/workspaces/${encodeURIComponent(wsId)}/${layer}-upgrade${projection ? `?${new URLSearchParams({ ...projection })}` : ''}`)
   const body = await res.json().catch(() => ({})) as {
     plan?: TemplateUpgradePlan
     error?: string
@@ -204,11 +216,13 @@ export async function applyTemplateUpgrade(
   wsId: string,
   planDigest: string,
   resolutions: Readonly<Record<string, TemplateUpgradeResolution>>,
+  layer: 'template' | 'alice-harness' = 'template',
+  projection?: SkillProjectionRequest,
 ): Promise<TemplateUpgradeResult> {
-  const res = await fetch(`/api/workspaces/${encodeURIComponent(wsId)}/template-upgrade`, {
+  const res = await fetch(`/api/workspaces/${encodeURIComponent(wsId)}/${layer}-upgrade`, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ planDigest, resolutions }),
+    body: JSON.stringify({ planDigest, resolutions, ...(projection ? { projection } : {}) }),
   })
   const body = await res.json().catch(() => ({})) as {
     result?: TemplateUpgradeResult
@@ -220,6 +234,90 @@ export async function applyTemplateUpgrade(
     throw new TemplateUpgradeApiError(
       body.error ?? 'upgrade_apply_failed',
       body.message ?? `Template upgrade failed: HTTP ${res.status}`,
+      res.status,
+      body.plan,
+    )
+  }
+  return body.result
+}
+
+export interface HarnessSourceUpgradePlan {
+  readonly workspaceId: string
+  readonly template: string
+  readonly fromVersion: string
+  readonly fromCommit: string
+  readonly toVersion: string
+  readonly toCommit: string
+  readonly verified: boolean
+  readonly strategy: 'source-merge'
+  readonly protocolCompatible: boolean
+  readonly manifestVersion: number | null
+  readonly planDigest: string
+  readonly blocked: boolean
+  readonly blockers: readonly string[]
+  readonly activity: TemplateUpgradePlan['activity']
+  readonly changedPaths: readonly string[]
+  readonly conflictedPaths: readonly string[]
+}
+
+export interface HarnessSourceUpgradeResult {
+  readonly workspaceId: string
+  readonly fromVersion: string
+  readonly toVersion: string
+  readonly commit: string
+  readonly verified: boolean
+}
+
+export class HarnessSourceUpgradeApiError extends Error {
+  constructor(
+    readonly code: string,
+    message: string,
+    readonly status: number,
+    readonly plan?: HarnessSourceUpgradePlan,
+  ) {
+    super(message)
+    this.name = 'HarnessSourceUpgradeApiError'
+  }
+}
+
+export async function getHarnessSourceUpgradePlan(wsId: string): Promise<HarnessSourceUpgradePlan> {
+  const res = await fetch(`/api/workspaces/${encodeURIComponent(wsId)}/source-upgrade`)
+  const body = await res.json().catch(() => ({})) as {
+    plan?: HarnessSourceUpgradePlan
+    error?: string
+    message?: string
+  }
+  if (!res.ok || !body.plan) {
+    throw new HarnessSourceUpgradeApiError(
+      body.error ?? 'upgrade_plan_failed',
+      body.message ?? `Harness source upgrade preview failed: HTTP ${res.status}`,
+      res.status,
+      body.plan,
+    )
+  }
+  return body.plan
+}
+
+export async function applyHarnessSourceUpgrade(
+  wsId: string,
+  planDigest: string,
+  targetVersion: string,
+): Promise<HarnessSourceUpgradeResult> {
+  const res = await fetch(`/api/workspaces/${encodeURIComponent(wsId)}/source-upgrade`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ planDigest, targetVersion }),
+  })
+  const body = await res.json().catch(() => ({})) as {
+    result?: HarnessSourceUpgradeResult
+    plan?: HarnessSourceUpgradePlan
+    error?: string
+    message?: string
+  }
+  if (!res.ok || !body.result) {
+    throw new HarnessSourceUpgradeApiError(
+      body.error ?? 'upgrade_apply_failed',
+      body.message ?? `Harness source upgrade failed: HTTP ${res.status}`,
       res.status,
       body.plan,
     )
@@ -431,7 +529,7 @@ export async function fetchTemplateReadme(name: string): Promise<string | null> 
  * README body doesn't show the metadata to the user. Conservative: only
  * strips when frontmatter is at column 0; anything else passes through.
  */
-function stripFrontmatter(raw: string): string {
+export function stripFrontmatter(raw: string): string {
   const text = raw.replace(/^﻿/, '');
   if (!text.startsWith('---')) return text;
   const closeMatch = /^---\s*$/m.exec(text.slice(3));
@@ -448,7 +546,24 @@ export interface AgentCapabilities {
   readonly transcriptDiscovery: 'fs-watch' | 'subprocess' | 'none';
   readonly assignsSessionId?: boolean;
   readonly headless?: boolean;
+  /** Present when the runtime can drive the browser conversation surface. */
+  readonly web?: WebSurfaceCapability;
   readonly aiProvider?: AgentProviderCapabilities;
+}
+
+export type WebSessionWire = 'pi-rpc' | 'acp' | 'claude-stream-json' | 'codex-app-server';
+
+export interface WebSurfaceCapability {
+  readonly wire: WebSessionWire;
+  /** The runtime asks before tools run and those prompts reach the browser. */
+  readonly permissionPrompts: boolean;
+  /** A Session with no native id yet may still open in the Web surface. */
+  readonly freshSession: boolean;
+}
+
+/** Whether a Session's runtime can present in the Web conversation surface. */
+export function agentSupportsWeb(agents: readonly AgentInfo[] | undefined, agentId: string): boolean {
+  return Boolean(agents?.find((agent) => agent.id === agentId)?.capabilities.web);
 }
 
 export interface AgentProviderCapabilities {
@@ -480,6 +595,8 @@ export interface AgentInfo {
   readonly installed?: boolean;
   /** Absolute path the CLI resolved to, when installed. */
   readonly binPath?: string | null;
+  /** Opaque identity for the currently resolved executable. */
+  readonly fingerprint?: string | null;
 }
 
 export type AgentRuntimeReadinessStatus =
@@ -512,6 +629,7 @@ export interface AgentRuntimeReadinessRow {
   readonly displayName: string;
   readonly installed: boolean;
   readonly binPath: string | null;
+  readonly fingerprint?: string | null;
   readonly status: AgentRuntimeReadinessStatus;
   readonly ready: boolean;
   readonly source: AgentRuntimeReadinessSource;
@@ -667,7 +785,7 @@ export async function setIssueDefaultAgent(agent: string | null): Promise<string
 // ── sessions ─────────────────────────────────────────────────────────────────
 //
 // One persistent product Session record shared by headless, terminal, and
-// WebPi execution surfaces. `pid` + `startedAt` are live read-side projections
+// Web execution surfaces. `pid` + `startedAt` are live read-side projections
 // and are non-null only when an interactive process is attached.
 // Persisted server-side at <OPENALICE_HOME>/workspaces/state/sessions/<wsId>.json
 // so records survive PTY death and server restarts.
@@ -681,7 +799,10 @@ export interface SessionRecord {
   readonly createdAt: string;
   readonly lastActiveAt: string;
   readonly state: 'running' | 'paused';
-  /** UI surface only; `agent` remains `pi` for WebPi. */
+  /**
+   * UI surface only; `agent` stays the runtime id. `webpi` is the persisted
+   * name of the browser conversation surface for every web-capable runtime.
+   */
   readonly surface?: 'terminal' | 'webpi' | 'headless';
   readonly pid: number | null;
   readonly startedAt: number | null;
@@ -715,16 +836,74 @@ export interface SpawnedSession {
   readonly surface?: 'terminal' | 'webpi';
 }
 
-export interface WebPiSnapshot {
+// ── web conversation surface ─────────────────────────────────────────────────
+//
+// Mirrors src/workspaces/web-session/model.ts. The backend projects each
+// runtime's structured protocol (Pi RPC, ACP, Claude stream-json, Codex
+// app-server) into this one neutral shape; the browser never sees the wire.
+
+export type WebContentPart =
+  | { readonly type: 'text'; readonly text: string }
+  | { readonly type: 'thinking'; readonly thinking: string }
+  | { readonly type: 'toolCall'; readonly id: string; readonly name: string; readonly arguments: unknown }
+  | { readonly type: 'data'; readonly value: unknown };
+
+export type WebConversationMessage =
+  | { readonly role: 'user'; readonly content: readonly WebContentPart[] | string; readonly timestamp?: number }
+  | { readonly role: 'assistant'; readonly content: readonly WebContentPart[]; readonly timestamp?: number }
+  | {
+      readonly role: 'toolResult';
+      readonly toolCallId: string;
+      readonly toolName: string;
+      readonly content: readonly WebContentPart[] | string;
+      readonly isError: boolean;
+      readonly timestamp?: number;
+    }
+  | { readonly role: 'notice'; readonly text: string; readonly timestamp?: number }
+  | { readonly role: 'unknown'; readonly value: unknown; readonly timestamp?: number };
+
+export interface WebRequestOption {
+  readonly id: string;
+  readonly label: string;
+  readonly tone: 'allow' | 'deny' | 'neutral';
+}
+
+/** A tool permission, file-change approval, or question the runtime needs answered. */
+export interface WebPermissionRequest {
+  readonly id: string;
+  readonly kind: 'permission' | 'question';
+  readonly allowText?: boolean;
+  readonly secret?: boolean;
+  readonly title: string;
+  readonly description?: string;
+  readonly tool?: { readonly name: string; readonly input: unknown };
+  readonly options: readonly WebRequestOption[];
+  readonly createdAt: number;
+}
+
+export type WebSessionPhase =
+  | 'starting'
+  | 'idle'
+  | 'working'
+  | 'awaiting-input'
+  | 'compacting'
+  | 'retrying'
+  | 'stopped'
+  | 'failed';
+
+export interface WebSessionSnapshot {
   readonly recordId: string;
   readonly wsId: string;
   readonly resumeId: string;
+  readonly agent: string;
+  readonly wire: WebSessionWire;
+  readonly nativeSessionId: string | null;
   readonly pid: number | null;
   readonly startedAt: number;
-  readonly phase: 'starting' | 'idle' | 'working' | 'compacting' | 'retrying' | 'stopped' | 'failed';
-  readonly state: Record<string, unknown> | null;
-  readonly messages: readonly unknown[];
-  readonly streamingMessage: unknown | null;
+  readonly phase: WebSessionPhase;
+  readonly messages: readonly WebConversationMessage[];
+  readonly streamingMessage: WebConversationMessage | null;
+  readonly requests: readonly WebPermissionRequest[];
   readonly error: string | null;
   readonly stderrTail: string;
   readonly revision: number;
@@ -751,7 +930,7 @@ export type SessionCreatedBy =
       readonly workspaceId: string;
       readonly issueId: string;
       readonly policy: 'new-each-run' | 'new-then-resume';
-      readonly fire: 'schedule' | 'retry';
+      readonly fire: 'schedule' | 'manual' | 'retry' | 'comment';
     }
   | { readonly kind: 'headless'; readonly surface: 'api' }
   | {
@@ -777,12 +956,18 @@ export interface WorkspaceSessionDirectoryEntry {
   readonly active: boolean;
   /** Present when this product Session was allocated after birth metadata shipped. */
   readonly createdBy?: SessionCreatedBy;
+  /** Hidden Sessions remain available to their owning Issue and diagnostics. */
+  readonly rosterVisibility?: 'hidden';
+  /** Current Issue ownership/occupancy; shared roster preferences may hide it. */
+  readonly issueAttached?: true;
   readonly runtime?: {
     readonly credentialSource: 'native' | 'vault' | 'workspace';
     readonly credentialSlug?: string;
     readonly model?: string;
     readonly reasoningEffort?: ModelReasoningEffort;
   };
+  /** Backend-authoritative title with internal launch wrappers projected away. */
+  readonly presentationTitle?: string;
   readonly latestExecution?: {
     readonly taskId: string;
     readonly status: 'running' | 'done' | 'failed' | 'interrupted';
@@ -805,8 +990,9 @@ export interface WorkspaceSessionDirectory {
   readonly sessions: readonly WorkspaceSessionDirectoryEntry[];
 }
 
-export async function getWorkspaceSessionDirectory(id: string): Promise<WorkspaceSessionDirectory> {
-  const res = await fetch(`/api/workspaces/${encodeURIComponent(id)}/resumes`);
+export async function getWorkspaceSessionDirectory(id: string, resumeId?: string): Promise<WorkspaceSessionDirectory> {
+  const query = resumeId ? `?resumeId=${encodeURIComponent(resumeId)}` : '';
+  const res = await fetch(`/api/workspaces/${encodeURIComponent(id)}/resumes${query}`);
   if (!res.ok) throw new Error(`Failed to load Workspace Sessions (${res.status})`);
   return res.json() as Promise<WorkspaceSessionDirectory>;
 }
@@ -982,6 +1168,47 @@ export async function initializeAutoQuantWorkspace(): Promise<Workspace> {
   return body.workspace
 }
 
+export type AutoPredictionDefaultWorkspaceStatus = AutoQuantDefaultWorkspaceStatus
+
+export async function getAutoPredictionDefaultWorkspace(): Promise<AutoPredictionDefaultWorkspaceStatus> {
+  const res = await fetch('/api/workspaces/auto-prediction/default-workspace')
+  const body = (await res.json().catch(() => null)) as
+    | (AutoPredictionDefaultWorkspaceStatus & { message?: string })
+    | null
+  if (!res.ok || !body) {
+    throw new Error(body?.message ?? `Auto Prediction preference load failed: ${res.status}`)
+  }
+  return body
+}
+
+export async function setAutoPredictionDefaultWorkspace(
+  workspaceId: string,
+): Promise<{ defaultWorkspaceId: string; ready: true }> {
+  const res = await fetch('/api/workspaces/auto-prediction/default-workspace', {
+    method: 'PUT',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ workspaceId }),
+  })
+  const body = (await res.json().catch(() => null)) as
+    | { defaultWorkspaceId?: string; ready?: boolean; message?: string; error?: string }
+    | null
+  if (!res.ok || body?.ready !== true || typeof body.defaultWorkspaceId !== 'string') {
+    throw new Error(body?.message ?? body?.error ?? `Auto Prediction preference save failed: ${res.status}`)
+  }
+  return { defaultWorkspaceId: body.defaultWorkspaceId, ready: true }
+}
+
+export async function initializeAutoPredictionWorkspace(): Promise<Workspace> {
+  const res = await fetch('/api/workspaces/auto-prediction/initialize', { method: 'POST' })
+  const body = (await res.json().catch(() => null)) as
+    | { workspace?: Workspace; message?: string; error?: string }
+    | null
+  if (!res.ok || !body?.workspace) {
+    throw new Error(body?.message ?? body?.error ?? `Auto Prediction initialization failed: ${res.status}`)
+  }
+  return body.workspace
+}
+
 export async function initializeChatWorkspace(): Promise<Workspace> {
   const res = await fetch('/api/workspaces/chat/initialize', { method: 'POST' })
   const body = (await res.json().catch(() => null)) as
@@ -1005,8 +1232,8 @@ export interface ManagerWorkspaceSnapshot {
 export interface ManagerQuickStartResult {
   readonly manager: ManagerWorkspaceSnapshot
   readonly session: SessionRecord
-  /** Pi opens in WebPi; native TUI runtimes return no structured snapshot. */
-  readonly snapshot: WebPiSnapshot | null
+  /** Pi opens in the Web surface; native TUI runtimes return no structured snapshot. */
+  readonly snapshot: WebSessionSnapshot | null
 }
 
 export async function getWorkspaceManager(): Promise<ManagerWorkspaceSnapshot> {
@@ -1064,12 +1291,14 @@ export async function quickChat(
   agent?: string,
   credentialSlug?: string,
   targetWsId?: string,
-  template?: 'chat' | 'auto-quant-v2',
+  template?: 'chat' | 'auto-quant-v2' | 'auto-prediction',
   model?: string | null,
   reasoningEffort?: ModelReasoningEffort,
   credentialSource?: 'native',
+      surface?: 'terminal' | 'webpi',
 ): Promise<QuickChatResult> {
   const body: Record<string, unknown> = { prompt };
+  if (surface) body['surface'] = surface;
   if (credentialSource !== undefined) body['credentialSource'] = credentialSource;
   if (agent !== undefined) body['agent'] = agent;
   if (credentialSlug !== undefined) body['credentialSlug'] = credentialSlug;
@@ -1115,7 +1344,13 @@ export async function resumeSession(
     const body = (await res.json().catch(() => null)) as { error?: string; message?: string } | null;
     throw new Error(body?.message ?? body?.error ?? `resume session failed: ${res.status}`);
   }
-  return (await res.json()) as SpawnedSession;
+  const body = await res.json().catch(() => null) as SpawnedSession | null;
+  if (!body || body.sessionId !== sessionId || body.wsId !== wsId
+    || typeof body.pid !== 'number' || !Number.isFinite(body.pid)
+    || typeof body.startedAt !== 'number' || !Number.isFinite(body.startedAt)) {
+    throw new Error('Unable to resume this Session: the server returned an invalid response. Please try again.');
+  }
+  return body;
 }
 
 export interface PausedSessionRuntimeUpdate {
@@ -1151,62 +1386,100 @@ export async function updatePausedSessionRuntime(
   return body.session;
 }
 
-export async function openWebPiSession(wsId: string, sessionId: string): Promise<WebPiSnapshot> {
+export interface ResumeRuntimeUpdateResult {
+  readonly resumeId: string;
+  readonly agent: string;
+  readonly runtime: NonNullable<WorkspaceSessionDirectoryEntry['runtime']>;
+}
+
+/** Replace credential/model/effort on an idle product Session by resumeId.
+ * Agent runtime stays frozen. Used by the Issue page after a Session owner
+ * has already been materialized. */
+export async function updateResumeRuntime(
+  wsId: string,
+  resumeId: string,
+  update: PausedSessionRuntimeUpdate,
+): Promise<ResumeRuntimeUpdateResult> {
   const res = await fetch(
-    `/api/workspaces/${encodeURIComponent(wsId)}/sessions/${encodeURIComponent(sessionId)}/webpi/open`,
-    { method: 'POST' },
+    `/api/workspaces/${encodeURIComponent(wsId)}/resumes/${encodeURIComponent(resumeId)}/runtime`,
+    {
+      method: 'PUT',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(update),
+    },
   );
-  const body = (await res.json().catch(() => null)) as { snapshot?: WebPiSnapshot; message?: string } | null;
-  if (!res.ok || !body?.snapshot) throw new Error(body?.message ?? `WebPi open failed: ${res.status}`);
+  const body = (await res.json().catch(() => null)) as {
+    resumeId?: string;
+    agent?: string;
+    runtime?: ResumeRuntimeUpdateResult['runtime'];
+    error?: string;
+    message?: string;
+  } | null;
+  if (!res.ok || !body?.resumeId || !body.agent || !body.runtime) {
+    throw new Error(body?.message ?? body?.error ?? `Session AI configuration update failed: ${res.status}`);
+  }
+  return { resumeId: body.resumeId, agent: body.agent, runtime: body.runtime };
+}
+
+function webSessionUrl(wsId: string, sessionId: string, tail = ''): string {
+  return `/api/workspaces/${encodeURIComponent(wsId)}/sessions/${encodeURIComponent(sessionId)}/web${tail}`;
+}
+
+async function webSessionMutation(url: string, action: string, payload?: unknown): Promise<WebSessionSnapshot> {
+  const res = await fetch(url, {
+    method: 'POST',
+    ...(payload === undefined
+      ? {}
+      : { headers: { 'content-type': 'application/json' }, body: JSON.stringify(payload) }),
+  });
+  const body = (await res.json().catch(() => null)) as { snapshot?: WebSessionSnapshot; message?: string } | null;
+  if (!res.ok || !body?.snapshot) throw new Error(body?.message ?? `Web ${action} failed: ${res.status}`);
   return body.snapshot;
 }
 
-export async function getWebPiSession(
+export async function openWebSession(wsId: string, sessionId: string): Promise<WebSessionSnapshot> {
+  return webSessionMutation(webSessionUrl(wsId, sessionId, '/open'), 'open');
+}
+
+export async function getWebSession(
   wsId: string,
   sessionId: string,
   revision?: number,
-): Promise<WebPiSnapshot | null> {
+): Promise<WebSessionSnapshot | null> {
   const query = revision === undefined ? '' : `?revision=${encodeURIComponent(String(revision))}`;
-  const res = await fetch(
-    `/api/workspaces/${encodeURIComponent(wsId)}/sessions/${encodeURIComponent(sessionId)}/webpi${query}`,
-  );
+  const res = await fetch(webSessionUrl(wsId, sessionId, query));
   const body = (await res.json().catch(() => null)) as {
-    snapshot?: WebPiSnapshot;
+    snapshot?: WebSessionSnapshot;
     unchanged?: boolean;
     message?: string;
   } | null;
-  if (!res.ok) throw new Error(body?.message ?? `WebPi read failed: ${res.status}`);
+  if (!res.ok) throw new Error(body?.message ?? `Web read failed: ${res.status}`);
   if (body?.unchanged) return null;
-  if (!body?.snapshot) throw new Error('WebPi response has no snapshot');
+  if (!body?.snapshot) throw new Error('Web response has no snapshot');
   return body.snapshot;
 }
 
-export async function promptWebPiSession(
+export async function promptWebSession(
   wsId: string,
   sessionId: string,
   message: string,
-): Promise<WebPiSnapshot> {
-  const res = await fetch(
-    `/api/workspaces/${encodeURIComponent(wsId)}/sessions/${encodeURIComponent(sessionId)}/webpi/prompt`,
-    {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ message }),
-    },
-  );
-  const body = (await res.json().catch(() => null)) as { snapshot?: WebPiSnapshot; message?: string } | null;
-  if (!res.ok || !body?.snapshot) throw new Error(body?.message ?? `WebPi prompt failed: ${res.status}`);
-  return body.snapshot;
+): Promise<WebSessionSnapshot> {
+  return webSessionMutation(webSessionUrl(wsId, sessionId, '/prompt'), 'prompt', { message });
 }
 
-export async function abortWebPiSession(wsId: string, sessionId: string): Promise<WebPiSnapshot> {
-  const res = await fetch(
-    `/api/workspaces/${encodeURIComponent(wsId)}/sessions/${encodeURIComponent(sessionId)}/webpi/abort`,
-    { method: 'POST' },
-  );
-  const body = (await res.json().catch(() => null)) as { snapshot?: WebPiSnapshot; message?: string } | null;
-  if (!res.ok || !body?.snapshot) throw new Error(body?.message ?? `WebPi abort failed: ${res.status}`);
-  return body.snapshot;
+export async function abortWebSession(wsId: string, sessionId: string): Promise<WebSessionSnapshot> {
+  return webSessionMutation(webSessionUrl(wsId, sessionId, '/abort'), 'abort');
+}
+
+/** Answer an offered option, or use an empty optionId and text for a question. */
+export async function respondWebSession(
+  wsId: string,
+  sessionId: string,
+  requestId: string,
+  optionId: string,
+  text?: string,
+): Promise<WebSessionSnapshot> {
+  return webSessionMutation(webSessionUrl(wsId, sessionId, '/respond'), 'respond', { requestId, optionId, ...(text !== undefined ? { text } : {}) });
 }
 
 /** Remove a conversation from the active floor (kills its process first). */
@@ -1324,7 +1597,6 @@ export async function purgeDepartedWorkspace(id: string): Promise<void> {
 export type WorkspaceMetadataPatch = {
   displayName?: string | null;
   description?: string | null;
-  defaultAgent?: string | null;
 };
 
 export async function updateWorkspaceMetadata(
@@ -1509,7 +1781,7 @@ export interface AgentConfigBundle {
   readonly pi: AgentConfig | null;
 }
 
-export type AgentId = 'claude' | 'codex' | 'cursor' | 'grok' | 'omp' | 'opencode' | 'pi';
+export type AgentId = 'claude' | 'codex' | 'cursor' | 'agy' | 'grok' | 'omp' | 'opencode' | 'pi';
 
 export type AgentCredentialSource =
   | 'runtime-login'
@@ -1706,4 +1978,9 @@ export async function testAgentConfig(
   } catch {
     return { ok: false, error: `HTTP ${res.status}` };
   }
+}
+
+/** Read-only content URL, also forwarded through the desktop app protocol. */
+export function workspaceContentHref(wsId: string, path: string) {
+  return `/api/workspaces/${encodeURIComponent(wsId)}/content?path=${encodeURIComponent(path)}`
 }

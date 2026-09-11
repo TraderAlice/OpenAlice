@@ -3,7 +3,8 @@ import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router-dom'
 import { TrendingUp, Hash, FileText, ListChecks, CircleAlert, List, Network, ArrowUpRight } from 'lucide-react'
 import { PageHeader } from '../components/PageHeader'
-import { PageLoading, Skeleton } from '../components/StateViews'
+import { EmptyState as SharedEmptyState, PageLoading, Skeleton } from '../components/StateViews'
+import { Button } from '../components/ui/button'
 import { SegmentedControl } from '../components/SegmentedControl'
 import { TrackedGraphView } from '../components/TrackedGraphView'
 import { MarkdownContent } from '../components/MarkdownContent'
@@ -179,7 +180,6 @@ export function TrackedPage() {
     <div className="flex flex-col flex-1 min-h-0">
       <PageHeader
         title={t('nav.item.tracked')}
-        description={t('tracked.pageDescription', { count: entities.length + issueAnchors.length })}
         right={(
           <SegmentedControl
             value={viewMode}
@@ -202,7 +202,10 @@ export function TrackedPage() {
         ) : !hasAnchors && (listError || issueListError) ? (
           <CollectionLoadError refreshing={refreshing} onRetry={refreshEntities} />
         ) : !hasAnchors ? (
-          <EmptyState />
+          <SharedEmptyState
+            icon={<TrendingUp aria-hidden />}
+            title={t('tracked.nothingTrackedYet')}
+          />
         ) : viewMode === 'graph' ? (
           graphLoading && !graphWithIssues ? (
             <PageLoading />
@@ -270,13 +273,15 @@ function GraphLoadError({ onRetry }: { onRetry: () => void }) {
       <CircleAlert size={24} strokeWidth={1.75} className="text-destructive" aria-hidden />
       <h2 className="mt-3 text-[15px] font-medium text-foreground">{t('tracked.graph.loadErrorTitle')}</h2>
       <p className="mt-1.5 text-[13px] leading-relaxed text-muted-foreground">{t('tracked.graph.loadErrorDescription')}</p>
-      <button
+      <Button
         type="button"
         onClick={onRetry}
-        className="oa-pressable mt-4 rounded-md border border-border bg-secondary px-3 py-1.5 text-[12px] font-medium text-foreground transition-colors hover:border-primary/50 hover:bg-muted"
+        variant="outline"
+        size="sm"
+        className="mt-4"
       >
         {t('common.retry')}
-      </button>
+      </Button>
     </div>
   )
 }
@@ -301,14 +306,16 @@ function CollectionLoadError({
       <p className="mt-1.5 text-[13px] leading-relaxed text-muted-foreground">
         {t('tracked.listLoadErrorDescription')}
       </p>
-      <button
+      <Button
         type="button"
         onClick={onRetry}
         disabled={refreshing}
-        className="oa-pressable mt-4 rounded-md border border-border bg-secondary px-3 py-1.5 text-[12px] font-medium text-foreground transition-colors hover:border-primary/50 hover:bg-muted disabled:cursor-wait disabled:opacity-60"
+        variant="outline"
+        size="sm"
+        className="mt-4 disabled:cursor-wait"
       >
         {refreshing ? t('common.loading') : t('common.retry')}
-      </button>
+      </Button>
     </div>
   )
 }
@@ -324,18 +331,20 @@ function StaleCollectionNotice({
   return (
     <div
       role="status"
-      className="mx-4 mt-4 flex items-center gap-2 rounded-md border border-warning/25 bg-warning/[0.06] px-3 py-2 text-[12px] text-muted-foreground md:mx-8"
+      className="mx-4 mt-4 flex items-center gap-2 rounded-md border border-warning/25 bg-warning/[0.06] px-3 py-2 text-[12px] leading-[18px] text-muted-foreground md:mx-8"
     >
       <CircleAlert size={14} className="shrink-0 text-warning" aria-hidden />
       <span className="min-w-0 flex-1">{t('tracked.listStale')}</span>
-      <button
+      <Button
         type="button"
         onClick={onRetry}
         disabled={refreshing}
-        className="oa-pressable shrink-0 rounded px-2 py-1 font-medium text-foreground hover:bg-warning/10 disabled:cursor-wait disabled:opacity-60"
+        variant="ghost"
+        size="sm"
+        className="shrink-0 disabled:cursor-wait"
       >
         {refreshing ? t('common.loading') : t('common.retry')}
-      </button>
+      </Button>
     </div>
   )
 }
@@ -354,13 +363,15 @@ function DetailLoadError({ name, onRetry }: { name: string; onRetry: () => void 
       <p className="mt-1.5 text-[13px] leading-relaxed text-muted-foreground">
         {t('tracked.detailLoadErrorDescription')}
       </p>
-      <button
+      <Button
         type="button"
         onClick={onRetry}
-        className="oa-pressable mt-4 rounded-md border border-border bg-secondary px-3 py-1.5 text-[12px] font-medium text-foreground transition-colors hover:border-primary/50 hover:bg-muted"
+        variant="outline"
+        size="sm"
+        className="mt-4"
       >
         {t('common.retry')}
-      </button>
+      </Button>
     </div>
   )
 }
@@ -370,11 +381,11 @@ function DetailLoadError({ name, onRetry }: { name: string; onRetry: () => void 
 function TrackedListSkeleton() {
   const widths = ['w-24', 'w-32', 'w-28', 'w-36', 'w-20', 'w-28']
   return (
-    <div className="flex flex-col gap-1 max-w-[820px] mx-auto py-6 px-4 md:px-8" aria-hidden="true">
+    <div className="mx-auto max-w-[820px] divide-y divide-border/60 px-4 py-6 md:px-8" aria-hidden="true">
       {widths.map((w, i) => (
         <div
           key={i}
-          className="flex items-center gap-2.5 px-3 py-2 rounded-lg border border-border bg-muted/30"
+          className="flex items-center gap-2.5 px-3 py-2.5"
         >
           <Skeleton className="h-3.5 w-3.5 rounded shrink-0" />
           <Skeleton className={`h-3.5 ${w} rounded`} />
@@ -382,22 +393,6 @@ function TrackedListSkeleton() {
           <Skeleton className="h-3 w-10 rounded shrink-0" />
         </div>
       ))}
-    </div>
-  )
-}
-
-function EmptyState() {
-  const { t } = useTranslation()
-  return (
-    <div className="px-6 py-16 text-center max-w-[520px] mx-auto">
-      <div className="text-[15px] text-foreground mb-2">{t('tracked.nothingTrackedYet')}</div>
-      <p className="text-[13px] text-muted-foreground leading-relaxed">
-        As an agent works, it registers the assets and topics worth following with the
-        <code className="mx-1 px-1 py-0.5 rounded bg-muted text-[11px]">entity_upsert</code>
-        tool, and links to them from its notes with
-        <code className="mx-1 px-1 py-0.5 rounded bg-muted text-[11px]">[[name]]</code>. They
-        show up here as a running watchlist — each with the notes that reference it.
-      </p>
     </div>
   )
 }
@@ -413,13 +408,13 @@ function Detail({ detail }: { detail: EntityDetail }) {
         <h2 className="min-w-0 break-words font-mono text-[18px] font-semibold leading-snug text-foreground sm:text-[20px]">
           {entity.name}
         </h2>
-        <span className="shrink-0 rounded bg-muted px-1.5 py-0.5 text-[11px] uppercase tracking-wide text-muted-foreground">
+        <span className="shrink-0 rounded-full bg-muted px-2 py-0.5 text-[11px] leading-[15px] font-medium text-muted-foreground">
           {entity.type}
         </span>
       </div>
       <p className="text-[14px] text-muted-foreground leading-relaxed mb-6">{entity.description}</p>
 
-      <div className="text-[11px] font-medium text-muted-foreground/60 uppercase tracking-wider mb-3">
+      <div className="mb-3 text-[12px] font-medium text-muted-foreground/70">
         {t('tracked.referencedIn', { count: backlinks.length })}
       </div>
       {backlinks.length === 0 ? (
@@ -427,7 +422,7 @@ function Detail({ detail }: { detail: EntityDetail }) {
           No notes link <span className="font-mono">[[{entity.name}]]</span> yet.
         </div>
       ) : (
-        <div className="flex flex-col gap-1">
+        <div className="divide-y divide-border/60 border-y border-border/60">
           {backlinks.map((b, i) => (
             <BacklinkRow
               key={`${b.workspaceId}:${b.path}:${i}`}
@@ -455,18 +450,14 @@ function IssueAnchorDetail({
   const body = withoutDuplicateLeadingTitle(issue.what, issue.title)
   return (
     <div className="mx-auto max-w-[900px] px-4 py-6 md:px-8 md:py-8">
-      <article className="overflow-hidden rounded-xl border border-border/80 bg-card/35 shadow-sm">
+      <article className="overflow-hidden rounded-lg border border-border/80 bg-card/35">
         <header className="border-b border-border/70 bg-secondary/20 px-5 py-5 md:px-7">
           <div className="flex items-start gap-3">
-            <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-border bg-background text-muted-foreground shadow-sm">
-              <ListChecks size={17} strokeWidth={1.8} aria-hidden />
-            </div>
+            <ListChecks size={17} strokeWidth={1.8} className="mt-1 shrink-0 text-muted-foreground" aria-hidden />
             <div className="min-w-0 flex-1">
-              <div className="mb-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] font-medium text-muted-foreground">
-                <span className="uppercase tracking-[0.14em]">{t('tracked.issue')}</span>
-                <span className="text-border" aria-hidden>·</span>
+              <div className="mb-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] leading-[15px] font-medium text-muted-foreground">
+                <span>{t('tracked.issue')}</span>
                 <span>{workspaceTag}</span>
-                <span className="text-border" aria-hidden>·</span>
                 <span className="font-mono">{issue.id}</span>
               </div>
               <h2 className="break-words text-[20px] font-semibold leading-snug tracking-[-0.01em] text-foreground md:text-[24px]">
@@ -477,14 +468,16 @@ function IssueAnchorDetail({
                 <IssueMetaPill>{t(`issues.priority.${issue.priority}`)}</IssueMetaPill>
               </div>
             </div>
-            <button
+            <Button
               type="button"
+              variant="outline"
+              size="sm"
               onClick={onOpenDetails}
-              className="oa-pressable inline-flex min-h-9 shrink-0 items-center gap-1.5 rounded-md border border-border bg-background px-2.5 py-1.5 text-[12px] font-medium text-foreground shadow-sm transition-colors hover:border-primary/45 hover:bg-muted"
+              className="min-h-9 shrink-0"
             >
               {t('tracked.openIssueDetails')}
               <ArrowUpRight size={13} strokeWidth={1.8} aria-hidden />
-            </button>
+            </Button>
           </div>
         </header>
         <div className="px-5 py-6 md:px-7 md:py-7">
@@ -501,7 +494,7 @@ function IssueAnchorDetail({
 
 function IssueMetaPill({ children }: { children: React.ReactNode }) {
   return (
-    <span className="rounded-full border border-border/80 bg-background/70 px-2.5 py-1 text-[11px] font-medium text-muted-foreground">
+    <span className="rounded-full border border-border/80 bg-background/70 px-2.5 py-1 text-[11px] leading-[15px] font-medium text-muted-foreground">
       {children}
     </span>
   )
@@ -574,16 +567,17 @@ function BacklinkRow({
   const Icon = issueId ? ListChecks : FileText
   const label = issueId ?? backlink.path
   return (
-    <button
+    <Button
       type="button"
+      variant="ghost"
       onClick={open}
       title={issueId ? `Open issue ${issueId}` : `Open ${backlink.path}`}
-      className="group flex min-h-10 items-start gap-2.5 rounded-lg border border-border bg-muted/30 px-3 py-2.5 text-left transition-colors hover:border-primary/40 hover:bg-muted sm:items-center sm:py-2"
+      className="group h-auto min-h-10 w-full items-start justify-start gap-2.5 rounded-none px-3 py-2.5 text-left whitespace-normal sm:items-center sm:py-2"
     >
       <Icon
         size={14}
         strokeWidth={1.75}
-        className="mt-0.5 shrink-0 text-muted-foreground/70 transition-colors group-hover:text-primary sm:mt-0"
+        className="mt-0.5 shrink-0 text-muted-foreground/70 group-hover:text-foreground sm:mt-0"
         aria-hidden
       />
       <span className="min-w-0 flex-1">
@@ -597,6 +591,6 @@ function BacklinkRow({
       <span className="hidden max-w-[35%] shrink-0 truncate text-[11px] text-muted-foreground/60 sm:block">
         {backlink.workspaceTag}
       </span>
-    </button>
+    </Button>
   )
 }

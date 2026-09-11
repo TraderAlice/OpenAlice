@@ -27,6 +27,14 @@ const longcatKey: Credential = {
   vendor: 'longcat', authType: 'api-key', apiKey: 'lc-key',
   wires: { 'openai-chat': 'https://api.longcat.chat/openai' },
 }
+const openrouterKey: Credential = {
+  vendor: 'openrouter', authType: 'api-key', apiKey: 'sk-or',
+  wires: {
+    'openai-chat': 'https://openrouter.ai/api/v1',
+    'openai-responses': 'https://openrouter.ai/api/v1',
+    anthropic: 'https://openrouter.ai/api',
+  },
+}
 
 const builtinAdapters = createBuiltinAdapterRegistry()
 
@@ -255,6 +263,35 @@ describe('credentialToWorkspaceAiCred', () => {
     })).not.toHaveProperty('reasoningEffort')
   })
 
+  it('routes an OpenRouter key by each runtime\'s preferred compatible wire', () => {
+    expect(credentialToWorkspaceAiCred(openrouterKey, 'claude', {
+      model: 'anthropic/claude-sonnet-5',
+    })).toMatchObject({
+      baseUrl: 'https://openrouter.ai/api',
+      wireShape: 'anthropic',
+      authMode: 'bearer',
+      model: 'anthropic/claude-sonnet-5',
+    })
+    expect(credentialToWorkspaceAiCred(openrouterKey, 'codex', {
+      model: 'openai/gpt-5.6-sol',
+    })).toMatchObject({
+      baseUrl: 'https://openrouter.ai/api/v1',
+      wireShape: 'openai-responses',
+    })
+    expect(credentialToWorkspaceAiCred(openrouterKey, 'pi', {
+      model: 'anthropic/claude-sonnet-5',
+    })).toMatchObject({
+      baseUrl: 'https://openrouter.ai/api/v1',
+      wireShape: 'openai-chat',
+    })
+    expect(credentialToWorkspaceAiCred(openrouterKey, 'grok', {
+      model: 'openai/gpt-5.6-sol',
+    })).toMatchObject({
+      baseUrl: 'https://openrouter.ai/api/v1',
+      wireShape: 'openai-chat',
+    })
+  })
+
   it('injects Google through the native wire for opencode and Pi only', () => {
     for (const agent of ['opencode', 'pi']) {
       expect(credentialToWorkspaceAiCred(googleKey, agent, { model: 'gemini-3.1-flash-lite' })).toMatchObject({
@@ -450,6 +487,10 @@ describe('compatibleCredentials', () => {
     expect(compatibleCredentials(vault, 'cursor').map(([s]) => s)).toEqual(['cursor-1'])
   })
 
+  it('agy accepts only the Google Generative AI wire', () => {
+    expect(compatibleCredentials(vault, 'agy').map(([s]) => s)).toEqual(['google-1'])
+  })
+
   it('opencode/pi/omp accept every supported wire including native Google', () => {
     expect(compatibleCredentials(vault, 'opencode').map(([s]) => s)).toEqual(['anthropic-1', 'openai-1', 'custom-1', 'google-1'])
     expect(compatibleCredentials(vault, 'pi').map(([s]) => s)).toEqual(['anthropic-1', 'openai-1', 'custom-1', 'google-1'])
@@ -501,6 +542,7 @@ describe('resolveInjectionModel', () => {
     expect(resolveInjectionModel({ vendor: 'google' })).toBe('gemini-3.6-flash')
     expect(resolveInjectionModel({ vendor: 'glm' })).toBe('glm-5.2')
     expect(resolveInjectionModel({ vendor: 'longcat' })).toBe('LongCat-2.0')
+    expect(resolveInjectionModel({ vendor: 'openrouter' })).toBe('openai/gpt-5.6-luna')
   })
 
   it('returns null for a vendor with no catalog default (custom)', () => {

@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useState } from 'react'
-import { CheckCircle2, Download, ExternalLink, FolderKanban, LoaderCircle, RefreshCw, Server } from 'lucide-react'
+import { Cable, CheckCircle2, Download, ExternalLink, FolderKanban, LoaderCircle, RefreshCw, Server } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 
-import { api } from '../../api'
-import type { VersionInfo } from '../../api/types'
+import { getBackendConnection } from '../../auth/backendConnection'
 import { useAliceProject } from '../../hooks/useAliceProject'
+import { useVersionInfo } from '../../hooks/useVersionInfo'
 import { Button } from '../ui/button'
 import { ConfigSection } from '../form'
 
@@ -24,12 +24,23 @@ const RELEASES_URL = 'https://github.com/TraderAlice/OpenAlice/releases'
 
 export function AboutOpenAliceSection() {
   const { t } = useTranslation()
-  const [versionInfo, setVersionInfo] = useState<VersionInfo | null>(null)
+  const backendConnection = getBackendConnection()
+  const remoteConnection = backendConnection.kind === 'remote' ? backendConnection : null
+  const remoteTarget = remoteConnection
+    ? remoteConnection.sshPort === 22
+      ? remoteConnection.target
+      : `${remoteConnection.target}:${remoteConnection.sshPort}`
+    : null
   const [runtimeMode, setRuntimeMode] = useState<RuntimeMode>('browser')
   const [nativeStatus, setNativeStatus] = useState<NativeUpdaterStatus | null>(null)
   const [checking, setChecking] = useState(false)
   const [installing, setInstalling] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const {
+    info: versionInfo,
+    error: versionError,
+    check: checkVersion,
+  } = useVersionInfo()
   const {
     project,
     loading: projectLoading,
@@ -39,14 +50,6 @@ export function AboutOpenAliceSection() {
 
   useEffect(() => {
     let active = true
-    void api.version.get()
-      .then((next) => {
-        if (active) setVersionInfo(next)
-      })
-      .catch(() => {
-        if (active) setError(t('settings.about.checkError'))
-      })
-
     const runtime = window.openAlice?.runtime
     if (runtime) {
       void runtime.info()
@@ -70,7 +73,7 @@ export function AboutOpenAliceSection() {
       active = false
       unsubscribe()
     }
-  }, [t])
+  }, [])
 
   const currentVersion = versionInfo?.current ?? t('settings.about.versionLoading')
   const updateVersion = nativeStatus && 'version' in nativeStatus && nativeStatus.version
@@ -81,7 +84,12 @@ export function AboutOpenAliceSection() {
   const releaseUrl = nativeStatus && 'releaseUrl' in nativeStatus && nativeStatus.releaseUrl
     ? nativeStatus.releaseUrl
     : versionInfo?.releaseUrl ?? RELEASES_URL
-  const channel = versionInfo?.current.includes('-') ? 'beta' : 'stable'
+  const channel = versionInfo?.channel ?? 'stable'
+  const webUpdateCheckOwned = versionInfo === null || (
+    versionInfo.updateAuthority === 'source'
+    || versionInfo.updateAuthority === 'desktop'
+    || (versionInfo.updateAuthority === 'cli' && versionInfo.channel !== 'dev')
+  )
 
   const status = useMemo(() => {
     if (checking) {
@@ -115,14 +123,23 @@ export function AboutOpenAliceSection() {
           : t('settings.about.status.availableUnknown'),
       }
     }
-    if (nativeStatus?.phase === 'error' || versionInfo?.error || error) {
+    if (nativeStatus?.phase === 'error' || versionInfo?.error || versionError || error) {
       return { kind: 'error' as const, text: t('settings.about.status.error') }
+    }
+    if (versionInfo?.updateAuthority === 'service') {
+      return { kind: 'current' as const, text: t('settings.about.status.serviceManaged') }
+    }
+    if (versionInfo?.updateAuthority === 'none') {
+      return { kind: 'current' as const, text: t('settings.about.status.noUpdater') }
+    }
+    if (versionInfo?.updateAuthority === 'cli' && versionInfo.channel === 'dev') {
+      return { kind: 'current' as const, text: t('settings.about.status.cliManaged') }
     }
     if (versionInfo) {
       return { kind: 'current' as const, text: t('settings.about.status.current') }
     }
     return { kind: 'checking' as const, text: t('settings.about.status.loading') }
-  }, [checking, error, nativeStatus, t, updateVersion, versionInfo])
+  }, [checking, error, nativeStatus, t, updateVersion, versionError, versionInfo])
 
   const checkForUpdates = async () => {
     setChecking(true)
@@ -131,10 +148,9 @@ export function AboutOpenAliceSection() {
       const nativeCheck = window.openAlice?.updater?.checkForUpdates().catch(() => null)
       const [, next] = await Promise.all([
         nativeCheck ?? Promise.resolve(null),
-        api.version.check(),
+        checkVersion(),
       ])
-      setVersionInfo(next)
-      if (next.error) setError(t('settings.about.checkError'))
+      if (next?.error) setError(t('settings.about.checkError'))
     } catch {
       setError(t('settings.about.checkError'))
     } finally {
@@ -183,163 +199,192 @@ export function AboutOpenAliceSection() {
       : 'border-primary/25 bg-primary-muted/30 text-primary'
 
   return (
-    <ConfigSection title={t('settings.about.title')} description={t('settings.about.description')}>
+    <ConfigSection title={t('settings.about.title')}>
       <div className="grid min-w-0 gap-3">
-        <div className="rounded-xl border border-border/70 bg-secondary/35 p-4">
+        <div className="rounded-lg border border-border/70 bg-secondary/35 p-4">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div className="flex min-w-0 items-center gap-3">
-              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-border bg-background shadow-sm">
-                <img src="/alice.ico" alt="" className="h-8 w-8" />
-              </div>
+              <img src="/alice.ico" alt="" className="h-11 w-11 shrink-0 object-contain" />
               <div className="min-w-0">
                 <p className="text-[14px] font-semibold text-foreground">OpenAlice</p>
-                <p className="mt-0.5 font-mono text-[12px] text-muted-foreground">v{currentVersion}</p>
+                <p className="mt-0.5 font-mono text-[12px] leading-[18px] text-muted-foreground">v{currentVersion}</p>
               </div>
             </div>
             <div className="flex flex-wrap justify-end gap-1.5">
-              <span className="rounded-full border border-border bg-background px-2 py-0.5 text-[10px] text-muted-foreground">
+              <span className="rounded-full border border-border bg-background px-2 py-0.5 text-[10px] leading-[14px] text-muted-foreground">
                 {t(`settings.about.runtime.${runtimeMode}`)}
               </span>
-              <span className="rounded-full border border-border bg-background px-2 py-0.5 text-[10px] text-muted-foreground">
+              <span className="rounded-full border border-border bg-background px-2 py-0.5 text-[10px] leading-[14px] text-muted-foreground">
                 {t(`settings.about.channel.${channel}`)}
               </span>
             </div>
           </div>
 
-          <div className={`oa-status-surface mt-4 flex items-center gap-2 rounded-lg border px-3 py-2.5 text-[12px] ${statusTone}`} aria-live="polite">
+          <div className={`oa-status-surface mt-4 flex items-center gap-2 rounded-lg border px-3 py-2.5 text-[12px] leading-[18px] ${statusTone}`} aria-live="polite">
             <StatusIcon className={`h-4 w-4 shrink-0 ${status.kind === 'checking' ? 'animate-spin motion-reduce:animate-none' : ''}`} />
             <span className="font-medium">{status.text}</span>
           </div>
 
-        {(nativeStatus?.phase === 'downloading' || nativeStatus?.phase === 'installing') && (
-          <div
-            className="mt-2 h-1.5 overflow-hidden rounded-full bg-primary/15"
-            role="progressbar"
-            aria-label={status.text}
-            aria-valuemin={0}
-            aria-valuemax={100}
-            {...(nativeStatus.phase === 'downloading' && typeof nativeStatus.percent === 'number'
-              ? { 'aria-valuenow': Math.round(nativeStatus.percent) }
-              : {})}
-          >
+          {(nativeStatus?.phase === 'downloading' || nativeStatus?.phase === 'installing') && (
             <div
-              className={`h-full rounded-full bg-primary transition-[width] duration-300 motion-reduce:transition-none ${nativeStatus.phase === 'installing' ? 'animate-pulse motion-reduce:animate-none' : ''}`}
-              style={{
-                width: nativeStatus.phase === 'downloading' && typeof nativeStatus.percent === 'number'
-                  ? `${Math.max(2, Math.min(100, nativeStatus.percent))}%`
-                  : '100%',
-              }}
-            />
-          </div>
-        )}
-
-        {nativeStatus?.phase === 'installing' && (
-          <p className="mt-2 text-[11px] leading-relaxed text-muted-foreground">
-            {t('settings.about.installHandoffNote')}
-          </p>
-        )}
-
-        {error && (
-          <p className="mt-2 text-[11px] leading-relaxed text-destructive">{error}</p>
-        )}
-
-          <div className="mt-4 flex flex-wrap gap-2">
-          {nativeStatus?.phase === 'downloaded' || nativeStatus?.phase === 'installing' ? (
-            <button
-              type="button"
-              onClick={() => void installAndRestart()}
-              disabled={installing || nativeStatus.phase === 'installing'}
-              className="btn-primary-sm inline-flex min-h-10 items-center gap-1.5 sm:min-h-0"
+              className="mt-2 h-1.5 overflow-hidden rounded-full bg-primary/15"
+              role="progressbar"
+              aria-label={status.text}
+              aria-valuemin={0}
+              aria-valuemax={100}
+              {...(nativeStatus.phase === 'downloading' && typeof nativeStatus.percent === 'number'
+                ? { 'aria-valuenow': Math.round(nativeStatus.percent) }
+                : {})}
             >
-              <RefreshCw className={`h-3.5 w-3.5 ${installing ? 'animate-spin motion-reduce:animate-none' : ''}`} />
-              {installing || nativeStatus.phase === 'installing'
-                ? t('settings.about.installing')
-                : t('settings.about.installAndRestart')}
-            </button>
-          ) : (
-            <button
-              type="button"
-              onClick={() => void checkForUpdates()}
-              disabled={checking}
-              className="btn-primary-sm inline-flex min-h-10 items-center gap-1.5 sm:min-h-0"
-            >
-              <RefreshCw className={`h-3.5 w-3.5 ${checking ? 'animate-spin motion-reduce:animate-none' : ''}`} />
-              {checking ? t('settings.about.checking') : t('settings.about.check')}
-            </button>
-          )}
-          <button
-            type="button"
-            onClick={() => void openRelease()}
-            className="btn-secondary-sm inline-flex min-h-10 items-center gap-1.5 sm:min-h-0"
-          >
-            <ExternalLink className="h-3.5 w-3.5" />
-            {t('settings.about.viewReleases')}
-          </button>
-          </div>
-        </div>
-
-        <section className="overflow-hidden rounded-xl border border-border/70 bg-secondary/35" aria-labelledby="current-alice-project-title">
-        <div className="flex flex-col gap-3 border-b border-border/70 px-4 py-4 sm:flex-row sm:items-start sm:justify-between">
-          <div className="flex min-w-0 items-start gap-3">
-            <div className="relative flex size-10 shrink-0 items-center justify-center rounded-lg border border-border bg-background text-muted-foreground shadow-sm">
-              <FolderKanban size={18} aria-hidden />
-              <span
-                className={`absolute -bottom-1 -right-1 size-2.5 rounded-full ring-2 ring-secondary ${projectError ? 'bg-destructive' : projectLoading ? 'bg-muted-foreground/40' : 'bg-success'}`}
-                aria-hidden
+              <div
+                className={`h-full rounded-full bg-primary transition-[width] duration-300 motion-reduce:transition-none ${nativeStatus.phase === 'installing' ? 'animate-pulse motion-reduce:animate-none' : ''}`}
+                style={{
+                  width: nativeStatus.phase === 'downloading' && typeof nativeStatus.percent === 'number'
+                    ? `${Math.max(2, Math.min(100, nativeStatus.percent))}%`
+                    : '100%',
+                }}
               />
             </div>
-            <div className="min-w-0">
-              <h4 id="current-alice-project-title" className="text-[13px] font-semibold text-foreground">
-                {t('settings.about.aliceProject.title')}
-              </h4>
-              <p className="mt-1 text-[12px] leading-relaxed text-muted-foreground">
-                {t('settings.about.aliceProject.description')}
-              </p>
-            </div>
-          </div>
-          {!projectLoading && !projectError && project && (
-            <span className="inline-flex w-fit shrink-0 items-center gap-1.5 rounded-full border border-success/25 bg-success/10 px-2 py-1 text-[10px] font-medium text-success">
-              <span className="size-1.5 rounded-full bg-success" aria-hidden />
-              {t('settings.about.aliceProject.statusRunning')}
-            </span>
           )}
+
+          {nativeStatus?.phase === 'installing' && (
+            <p className="mt-2 text-[11px] leading-relaxed text-muted-foreground">
+              {t('settings.about.installHandoffNote')}
+            </p>
+          )}
+
+          {error && (
+            <p className="mt-2 text-[11px] leading-relaxed text-destructive">{error}</p>
+          )}
+
+          <div className="mt-4 flex flex-wrap gap-2">
+            {nativeStatus?.phase === 'downloaded' || nativeStatus?.phase === 'installing' ? (
+              <Button
+                type="button"
+                onClick={() => void installAndRestart()}
+                disabled={installing || nativeStatus.phase === 'installing'}
+                size="sm"
+                className="min-h-10 sm:min-h-8"
+              >
+                <RefreshCw className={`h-3.5 w-3.5 ${installing ? 'animate-spin motion-reduce:animate-none' : ''}`} />
+                {installing || nativeStatus.phase === 'installing'
+                  ? t('settings.about.installing')
+                  : t('settings.about.installAndRestart')}
+              </Button>
+            ) : webUpdateCheckOwned ? (
+              <Button
+                type="button"
+                onClick={() => void checkForUpdates()}
+                disabled={checking}
+                size="sm"
+                className="min-h-10 sm:min-h-8"
+              >
+                <RefreshCw className={`h-3.5 w-3.5 ${checking ? 'animate-spin motion-reduce:animate-none' : ''}`} />
+                {checking ? t('settings.about.checking') : t('settings.about.check')}
+              </Button>
+            ) : null}
+            <Button
+              type="button"
+              onClick={() => void openRelease()}
+              variant="outline"
+              size="sm"
+              className="min-h-10 sm:min-h-8"
+            >
+              <ExternalLink className="h-3.5 w-3.5" />
+              {t('settings.about.viewReleases')}
+            </Button>
+          </div>
         </div>
 
-        {project ? (
-          <>
-            <div className="px-4 py-4">
-              <p className="truncate text-[14px] font-semibold text-foreground">{project.displayName}</p>
-              <p className="mt-0.5 font-mono text-[11px] text-muted-foreground">{project.key}</p>
-              <dl className="mt-4 grid min-w-0 gap-2 sm:grid-cols-2">
-                <ProjectField label={t('settings.about.aliceProject.dataHome')} value={project.home} />
-                <ProjectField label={t('settings.about.aliceProject.stableId')} value={project.id} />
-                <ProjectField
-                  className="sm:col-span-2"
-                  label={t('settings.about.aliceProject.appRoot')}
-                  value={project.appRoot ?? t('settings.about.aliceProject.runtimeManaged')}
-                />
-              </dl>
+        {remoteConnection && remoteTarget && (
+          <section className="overflow-hidden rounded-lg border border-border/70 bg-secondary/35" aria-labelledby="backend-connection-title">
+            <div className="flex flex-col gap-3 border-b border-border/70 px-4 py-4 sm:flex-row sm:items-start sm:justify-between">
+              <div className="flex min-w-0 items-start gap-3">
+                <div className="flex size-10 shrink-0 items-center justify-center text-muted-foreground">
+                  <Cable size={18} aria-hidden />
+                </div>
+                <div className="min-w-0">
+                  <h4 id="backend-connection-title" className="text-[13px] leading-[18px] font-semibold text-foreground">
+                    {t('settings.about.connection.title')}
+                  </h4>
+                  <p className="mt-1 text-[12px] leading-relaxed text-muted-foreground">
+                    {t('settings.about.connection.description')}
+                  </p>
+                </div>
+              </div>
+              <span className="inline-flex w-fit shrink-0 rounded-full border border-success/25 bg-success/10 px-2 py-1 text-[10px] leading-[14px] font-medium text-success">
+                {t('settings.about.connection.connected')}
+              </span>
             </div>
-            <div className="flex gap-2 border-t border-border/70 bg-background/30 px-4 py-3 text-[11px] leading-relaxed text-muted-foreground">
-              <Server size={14} className="mt-0.5 shrink-0" aria-hidden />
-              <p>{t('settings.about.aliceProject.browserNote')}</p>
+            <dl className="grid min-w-0 gap-2 px-4 py-4 sm:grid-cols-2">
+              <ProjectField label={t('auth.remoteTarget')} value={remoteTarget} />
+              <ProjectField label={t('auth.localTunnelEndpoint')} value={remoteConnection.localEndpoint} />
+              <ProjectField
+                className="sm:col-span-2"
+                label={t('auth.remoteRuntimeEndpoint')}
+                value={`127.0.0.1:${remoteConnection.runtimePort}`}
+              />
+            </dl>
+          </section>
+        )}
+
+        <section className="overflow-hidden rounded-lg border border-border/70 bg-secondary/35" aria-labelledby="current-alice-project-title">
+          <div className="flex flex-col gap-3 border-b border-border/70 px-4 py-4 sm:flex-row sm:items-start sm:justify-between">
+            <div className="flex min-w-0 items-start gap-3">
+              <div className="flex size-10 shrink-0 items-center justify-center text-muted-foreground">
+                <FolderKanban size={18} aria-hidden />
+              </div>
+              <div className="min-w-0">
+                <h4 id="current-alice-project-title" className="text-[13px] leading-[18px] font-semibold text-foreground">
+                  {t('settings.about.aliceProject.title')}
+                </h4>
+                <p className="mt-1 text-[12px] leading-relaxed text-muted-foreground">
+                  {t('settings.about.aliceProject.description')}
+                </p>
+              </div>
             </div>
-          </>
-        ) : (
-          <div className="px-4 py-5">
-            <p className="text-[12px] text-muted-foreground">
-              {projectLoading
-                ? t('settings.about.aliceProject.loading')
-                : t('settings.about.aliceProject.unavailable')}
-            </p>
-            {!projectLoading && (
-              <Button variant="outline" size="sm" className="mt-3" onClick={() => void refreshProject()}>
-                <RefreshCw aria-hidden />
-                {t('settings.about.aliceProject.retry')}
-              </Button>
+            {!projectLoading && !projectError && project && (
+              <span className="inline-flex w-fit shrink-0 items-center rounded-full border border-success/25 bg-success/10 px-2 py-1 text-[10px] leading-[14px] font-medium text-success">
+                {t('settings.about.aliceProject.statusRunning')}
+              </span>
             )}
           </div>
-        )}
+
+          {project ? (
+            <>
+              <div className="px-4 py-4">
+                <p className="truncate text-[14px] font-semibold text-foreground">{project.displayName}</p>
+                <p className="mt-0.5 font-mono text-[11px] leading-[15px] text-muted-foreground">{project.key}</p>
+                <dl className="mt-4 grid min-w-0 gap-2 sm:grid-cols-2">
+                  <ProjectField label={t('settings.about.aliceProject.dataHome')} value={project.home} />
+                  <ProjectField label={t('settings.about.aliceProject.stableId')} value={project.id} />
+                  <ProjectField
+                    className="sm:col-span-2"
+                    label={t('settings.about.aliceProject.appRoot')}
+                    value={project.appRoot ?? t('settings.about.aliceProject.runtimeManaged')}
+                  />
+                </dl>
+              </div>
+              <div className="flex gap-2 border-t border-border/70 bg-background/30 px-4 py-3 text-[11px] leading-relaxed text-muted-foreground">
+                <Server size={14} className="mt-0.5 shrink-0" aria-hidden />
+                <p>{t('settings.about.aliceProject.browserNote')}</p>
+              </div>
+            </>
+          ) : (
+            <div className="px-4 py-5">
+              <p className="text-[12px] text-muted-foreground">
+                {projectLoading
+                  ? t('settings.about.aliceProject.loading')
+                  : t('settings.about.aliceProject.unavailable')}
+              </p>
+              {!projectLoading && (
+                <Button variant="outline" size="sm" className="mt-3" onClick={() => void refreshProject()}>
+                  <RefreshCw aria-hidden />
+                  {t('settings.about.aliceProject.retry')}
+                </Button>
+              )}
+            </div>
+          )}
         </section>
       </div>
     </ConfigSection>
@@ -348,8 +393,8 @@ export function AboutOpenAliceSection() {
 
 function ProjectField({ className = '', label, value }: { className?: string; label: string; value: string }) {
   return (
-    <div className={`min-w-0 rounded-lg border border-border/60 bg-background/55 px-3 py-2.5 ${className}`}>
-      <dt className="text-[10px] font-medium uppercase tracking-[0.08em] text-muted-foreground">{label}</dt>
+    <div className={`min-h-12 min-w-0 border-t border-border/60 py-2.5 ${className}`}>
+      <dt className="text-[11px] font-medium text-muted-foreground">{label}</dt>
       <dd className="mt-1 break-all font-mono text-[11px] leading-relaxed text-foreground">{value}</dd>
     </div>
   )

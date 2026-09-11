@@ -30,4 +30,13 @@ describe('DevPage', () => {
     )
     expect(screen.getByText('请从左侧面板选择一个工具。')).toBeTruthy()
   })
+
+  it('exposes the frontend feedback lab as a first-class Dev Panel surface', () => {
+    render(<DevPage spec={{ kind: 'dev', params: { tab: 'frontend' } }} />)
+
+    expect(screen.getByRole('heading', { name: 'Frontend lab' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Show running' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Show success' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Show error' })).toBeTruthy()
+  })
 })

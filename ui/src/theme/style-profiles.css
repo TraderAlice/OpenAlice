@@ -168,7 +168,13 @@
   border-radius: 0 !important;
 }
 
-:root[data-ui-style="win98"] :where(button, [role="button"]):focus-visible {
+:root[data-ui-style="win98"] :where(
+  button,
+  [role="button"],
+  input:not([type="checkbox"]):not([type="radio"]),
+  select,
+  textarea
+):focus-visible {
   outline: 1px dotted currentColor;
   outline-offset: -4px;
 }

@@ -123,6 +123,22 @@ describe('UTAManagerSDK — readonly product mode', () => {
     const [account] = await m.resolve()
 
     await expect(account.stagePlaceOrder({} as never)).resolves.toEqual({ hash: 'stage' })
-    await expect(account.push()).rejects.toThrow('Trading mode is readonly')
+    await expect(account.push('abc12345')).rejects.toThrow('Trading mode is readonly')
+  })
+})
+
+describe('mixed-asset historical quality', () => {
+  it('uses the resolved contract type instead of labelling crypto as IEX', async () => {
+    const calls: string[] = []
+    const client = {
+      get: async () => ({ utas: [summary('alpaca', 'trading', {
+        capabilities: { supportedSecTypes: ['STK', 'CRYPTO'], supportedOrderTypes: [], historicalBars: { supported: true, quality: 'iex', qualityBySecType: { CRYPTO: 'realtime' } } },
+      })] }),
+      post: async (path: string) => { calls.push(path); return { contract: { secType: 'CRYPTO' } } },
+    } as never
+    const m = new UTAManagerSDK({ client })
+    expect(await m.getBarCapabilities('alpaca|BTC/USD')).toEqual({ alpaca: 'realtime' })
+    expect(calls[0]).toContain('/contracts/details')
+    expect(await m.getBarCapabilities()).toEqual({ alpaca: 'iex' })
   })
 })

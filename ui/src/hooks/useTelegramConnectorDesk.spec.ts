@@ -55,7 +55,7 @@ describe('useTelegramConnectorDesk', () => {
       await expect(result.current.enable('ws-a')).resolves.toBe(true)
     })
     expect(result.current.desk?.wsId).toBe('ws-a')
-    expect(api.connectors.desk.create).toHaveBeenCalledWith('ws-a')
+    expect(api.connectors.desk.create).toHaveBeenCalledWith('ws-a', 'telegram')
   })
 
   it('keeps the bound desk when a later save fails', async () => {

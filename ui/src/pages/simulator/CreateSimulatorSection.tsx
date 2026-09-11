@@ -5,9 +5,10 @@
  */
 
 import { useState } from 'react'
-import { Section } from '../../components/form'
+import { Section, inputClass } from '../../components/form'
 import { useToast } from '../../components/Toast'
 import { api } from '../../api'
+import { Button } from '../../components/ui/button'
 
 export function CreateSimulatorSection({ onCreated }: {
   onCreated: (id: string) => Promise<void>
@@ -51,43 +52,45 @@ export function CreateSimulatorSection({ onCreated }: {
 
   if (!open) {
     return (
-      <button
+      <Button
         onClick={() => setOpen(true)}
-        className="btn-secondary-sm"
+        variant="outline"
+        size="sm"
       >
         + New simulator account
-      </button>
+      </Button>
     )
   }
 
   return (
     <Section
       title="Create simulator account"
-      description="In-memory only — wiped on dev server restart. For repro & regression testing."
+      description="The development server restart clears this account."
     >
       <div className="flex items-center gap-2 flex-wrap">
         <input
-          className="px-2 py-1 bg-background text-foreground border border-border rounded text-sm outline-none transition-colors focus:border-primary w-48"
+          className={`${inputClass} min-h-8 w-48 py-1 text-sm`}
           placeholder="name (e.g. simulator)"
           value={name}
           onChange={(e) => setName(e.target.value)}
         />
         <input
-          className="px-2 py-1 bg-background text-foreground border border-border rounded font-mono text-xs outline-none transition-colors focus:border-primary w-32"
+          className={`${inputClass} min-h-8 w-32 py-1 font-mono text-xs`}
           placeholder="cash (USD)"
           value={cash}
           onChange={(e) => setCash(e.target.value)}
         />
-        <button disabled={busy} onClick={submit} className="btn-primary-sm">
+        <Button disabled={busy} onClick={submit} size="sm">
           {busy ? 'Creating…' : 'Create'}
-        </button>
-        <button
+        </Button>
+        <Button
           disabled={busy}
           onClick={() => { setOpen(false); setName(''); setCash('100000') }}
-          className="btn-secondary-sm"
+          variant="outline"
+          size="sm"
         >
           Cancel
-        </button>
+        </Button>
       </div>
     </Section>
   )

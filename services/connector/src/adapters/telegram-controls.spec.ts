@@ -24,9 +24,9 @@ function entry(overrides: Partial<InboxEntry> = {}): InboxEntry {
     id: 'entry-1',
     workspaceId: 'ws-1',
     workspaceLabel: 'Research',
-    comments: 'Overnight risk\nThree findings.',
     ts: Date.parse('2026-08-14T15:02:00.000Z'),
-    ...overrides,
+    body: 'Overnight risk\nThree findings.',
+    ...overrides
   }
 }
 
@@ -79,12 +79,7 @@ describe('Telegram interactive controls', () => {
 
   it('summarizes attachments by count and opens the entry detail', () => {
     const page = formatTelegramInboxPage({
-      entries: [entry({
-        docs: [
-          { path: 'research/deep/nested/overnight-risk.md' },
-          { path: 'research/deep/nested/dashboard.html' },
-        ],
-      })],
+      entries: [entry({ body: "[[research/deep/nested/overnight-risk.md]]\n\n[[research/deep/nested/dashboard.html]]" })],
       hasMore: false,
       canGoNewer: false,
       scope: 'unread',
@@ -101,8 +96,7 @@ describe('Telegram interactive controls', () => {
     const entries = Array.from({ length: TELEGRAM_INBOX_PAGE_SIZE }, (_, index) => entry({
       id: `entry-${index}`,
       workspaceLabel: long,
-      comments: `${long}\n${long}\n${long}`,
-      docs: [{ path: longPath }, { path: `${long}/notes.txt` }],
+      body: [`${long}\n${long}\n${long}`, ...([{ path: longPath }, { path: `${long}/notes.txt` }]).map(doc => '[[' + doc.path + ']]')].filter(Boolean).join('\n\n')
     }))
     const page = formatTelegramInboxPage({
       entries,
@@ -147,10 +141,7 @@ describe('Telegram interactive controls', () => {
   })
 
   it('renders a bounded detail view before exposing its files', () => {
-    const detail = formatTelegramInboxDetailPage(entry({
-      comments: `Overnight risk\n\n${'Finding. '.repeat(400)}`,
-      docs: [{ path: 'research/close.md' }],
-    }))
+    const detail = formatTelegramInboxDetailPage(entry({ body: [`Overnight risk\n\n${'Finding. '.repeat(400)}`, ...([{ path: 'research/close.md' }]).map(doc => '[[' + doc.path + ']]')].filter(Boolean).join('\n\n') }))
     expect(detail.text).toContain('Overnight risk')
     expect(detail.text).toContain('Files: 1')
     expect(detail.text.length).toBeLessThanOrEqual(TELEGRAM_INBOX_PAGE_HARD_MAX)
@@ -181,7 +172,7 @@ describe('Telegram interactive controls', () => {
     const docs = Array.from({ length: 7 }, (_, index) => ({
       path: `research/very/deep/${'x'.repeat(80)}-${index}.md`,
     }))
-    const page = formatTelegramInboxFilesPage(entry({ comments: 'Risk', docs }), 0)
+    const page = formatTelegramInboxFilesPage(entry({ body: ['Risk', ...docs.map(doc => '[[' + doc.path + ']]')].filter(Boolean).join('\n\n') }), 0)
     expect(page.text).toContain('Files · Risk')
     expect(page.text).not.toContain('research/very/deep')
     expect(page.text).toContain('1. ')
@@ -195,7 +186,7 @@ describe('Telegram interactive controls', () => {
       'i:fp:1',
     ])
     assertTelegramFormBounds(page)
-    const next = formatTelegramInboxFilesPage(entry({ comments: 'Risk', docs }), 1)
+    const next = formatTelegramInboxFilesPage(entry({ body: ['Risk', ...docs.map(doc => '[[' + doc.path + ']]')].filter(Boolean).join('\n\n') }), 1)
     expect(collectActions(next).some((action) => action.data === 'i:d:5')).toBe(true)
     assertTelegramFormBounds(next)
   })
@@ -215,7 +206,7 @@ describe('Telegram interactive controls', () => {
 describe('Telegram inbox control transitions', () => {
   const listed = entry({
     id: 'entry-1',
-    docs: [{ path: 'research/close.md' }, { path: 'research/dash.html' }],
+    body: "[[research/close.md]]\n\n[[research/dash.html]]"
   })
 
   it('rejects non-owner callbacks before any settings or file action', async () => {
@@ -257,7 +248,7 @@ describe('Telegram inbox control transitions', () => {
     expect(detail.kind).toBe('show')
     if (detail.kind !== 'show') return
     expect(detail.session.view).toEqual({ kind: 'detail', entryId: 'entry-1' })
-    expect(detail.form.text).toContain('Overnight risk')
+    expect(detail.form.text).toContain('close.md')
 
     const files = await transitionTelegramInbox(
       detail.session,

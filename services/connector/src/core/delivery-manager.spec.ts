@@ -7,8 +7,53 @@ import type {
 } from '@traderalice/connector-protocol'
 import type { ConnectorAdapter, ConnectorAdapterContext } from './adapter.js'
 import { ConnectorRegistry } from './adapter.js'
-import { DeliveryManager, MAX_INBOUND_OWNER_MESSAGES } from './delivery-manager.js'
+import {
+  DeliveryManager,
+  MAX_INBOUND_OWNER_MESSAGES,
+} from './delivery-manager.js'
 import { createConnectorIOEvent, type ConnectorIOEvent, type ConnectorIORecorder } from './io-events.js'
+import type { ConnectorWorkKind, ConnectorWorkQueueStore } from './work-queue.js'
+
+class MemoryWorkQueue implements ConnectorWorkQueueStore {
+  private entries: Array<{ id: string; kind: ConnectorWorkKind; payload: unknown; claimId?: string }> = []
+  async enqueue<T>(kind: ConnectorWorkKind, id: string, payload: T): Promise<void> {
+    const limit = kind === 'inbound' ? 100 : 20
+    if (this.entries.filter((entry) => entry.kind === kind).length >= limit) throw new Error(`Connector ${kind} queue is full. Try again.`)
+    this.entries.push({ id, kind, payload })
+  }
+  async claim<T>(kind: ConnectorWorkKind, limit: number) {
+    const claimId = `claim-${kind}`
+    const selected = this.entries.filter((entry) => entry.kind === kind && !entry.claimId).slice(0, limit)
+    selected.forEach((entry) => { entry.claimId = claimId })
+    return { claimId, items: selected.map((entry) => ({ id: entry.id, payload: entry.payload as T })) }
+  }
+  async ack(claimId: string, itemIds: readonly string[]): Promise<void> {
+    this.entries = this.entries.filter((entry) => entry.claimId !== claimId || !itemIds.includes(entry.id))
+  }
+  async release(claimId: string, itemIds: readonly string[]): Promise<void> {
+    this.entries.forEach((entry) => {
+      if (entry.claimId === claimId && itemIds.includes(entry.id)) delete entry.claimId
+    })
+  }
+}
+
+async function drainInbound(manager: DeliveryManager) {
+  const claim = await manager.claimInbound()
+  await manager.ackInbound(claim.claimId, claim.items.map((item) => item.id))
+  return claim.items.map((item) => item.payload)
+}
+
+async function drainActions(manager: DeliveryManager) {
+  const claim = await manager.claimActions()
+  await manager.ackActions(claim.claimId, claim.items.map((item) => item.id))
+  return claim.items.map((item) => item.payload)
+}
+
+async function drainUtaActions(manager: DeliveryManager) {
+  const claim = await manager.claimUtaActions()
+  await manager.ackActions(claim.claimId, claim.items.map((item) => item.id))
+  return claim.items.map((item) => item.payload)
+}
 
 class MemoryRecorder implements ConnectorIORecorder {
   readonly events: ConnectorIOEvent[] = []
@@ -34,7 +79,7 @@ class FakeThirdPartyAdapter implements ConnectorAdapter {
     this.delivered.push(notification)
   }
 
-  async sendOwnerText(): Promise<void> {}
+  async sendOwnerText(_text: string): Promise<void> {}
 
   health(): ConnectorAdapterHealth {
     return { id: this.id, enabled: true, status: this.status }
@@ -59,6 +104,7 @@ describe('DeliveryManager connector registry', () => {
       registry,
       config: { version: 1, adapters: { 'carrier-pigeon': { enabled: true, settings: {} } } },
       updateAdapterSettings: vi.fn(),
+      workQueue: new MemoryWorkQueue(),
     })
 
     await manager.start()
@@ -72,20 +118,109 @@ describe('DeliveryManager connector registry', () => {
 
     expect(adapter.delivered).toHaveLength(1)
     expect(manager.health()).toMatchObject({ status: 'healthy' })
-    manager.acceptInbound({ connectorId: 'carrier-pigeon', userId: '1', text: 'hello' })
-    expect(manager.drainInbound()).toEqual([
+    await manager.acceptInbound({ connectorId: 'carrier-pigeon', userId: '1', text: 'hello' })
+    expect(await drainInbound(manager)).toEqual([
       { connectorId: 'carrier-pigeon', userId: '1', text: 'hello' },
     ])
-    expect(manager.drainInbound()).toEqual([])
-    manager.acceptInbound({ connectorId: 'carrier-pigeon', userId: '1', text: '' })
-    expect(manager.drainInbound()).toEqual([])
-    for (let i = 0; i < MAX_INBOUND_OWNER_MESSAGES + 1; i += 1) {
-      manager.acceptInbound({ connectorId: 'carrier-pigeon', userId: '1', text: `m${i}` })
+    expect(await drainInbound(manager)).toEqual([])
+    await manager.acceptInbound({ connectorId: 'carrier-pigeon', userId: '1', text: '' })
+    expect(await drainInbound(manager)).toEqual([])
+    for (let i = 0; i < MAX_INBOUND_OWNER_MESSAGES; i += 1) {
+      await manager.acceptInbound({ connectorId: 'carrier-pigeon', userId: '1', text: `m${i}` })
     }
-    const kept = manager.drainInbound(MAX_INBOUND_OWNER_MESSAGES)
+    await expect(manager.acceptInbound({ connectorId: 'carrier-pigeon', userId: '1', text: 'overflow' }))
+      .rejects.toThrow('queue is full')
+    const kept = await drainInbound(manager)
     expect(kept).toHaveLength(MAX_INBOUND_OWNER_MESSAGES)
-    expect(kept[0]?.text).toBe('m1')
-    expect(kept.at(-1)?.text).toBe(`m${MAX_INBOUND_OWNER_MESSAGES}`)
+    expect(kept[0]?.text).toBe('m0')
+    expect(kept.at(-1)?.text).toBe(`m${MAX_INBOUND_OWNER_MESSAGES - 1}`)
+    await manager.stop()
+  })
+
+  it('replaces only the requested adapter during an explicit reconnect', async () => {
+    const created: FakeThirdPartyAdapter[] = []
+    const registry = new ConnectorRegistry()
+    registry.register({
+      definition: {
+        id: 'carrier-pigeon',
+        label: 'Carrier Pigeon',
+        description: 'Test-only third connector.',
+        fields: [],
+        commands: [],
+      },
+      create: () => {
+        const adapter = new FakeThirdPartyAdapter()
+        created.push(adapter)
+        return adapter
+      },
+    })
+    const manager = new DeliveryManager({
+      registry,
+      config: { version: 1, adapters: { 'carrier-pigeon': { enabled: true, settings: {} } } },
+      updateAdapterSettings: vi.fn(),
+    })
+
+    await manager.start()
+    const health = await manager.reconnect('carrier-pigeon')
+
+    expect(created).toHaveLength(2)
+    expect(created[0]?.health().status).toBe('stopped')
+    expect(health.status).toBe('healthy')
+    await manager.stop()
+  })
+
+  it('reconciles one adapter without stopping or recreating its peers', async () => {
+    const calls = new Map<string, { starts: ReturnType<typeof vi.fn>; stops: ReturnType<typeof vi.fn>; created: number }>()
+    const registry = new ConnectorRegistry()
+    for (const id of ['alpha', 'beta']) {
+      const state = { starts: vi.fn(), stops: vi.fn(), created: 0 }
+      calls.set(id, state)
+      registry.register({
+        definition: { id, label: id, description: `${id} adapter`, fields: [], commands: [] },
+        create: () => {
+          state.created += 1
+          let status: ConnectorAdapterHealth['status'] = 'stopped'
+          return {
+            id,
+            start: async () => { state.starts(); status = 'healthy' },
+            stop: async () => { state.stops(); status = 'stopped' },
+            deliver: async () => undefined,
+            sendOwnerText: async () => undefined,
+            health: () => ({ id, enabled: true, status }),
+          }
+        },
+      })
+    }
+    const manager = new DeliveryManager({
+      registry,
+      config: {
+        version: 1,
+        adapters: {
+          alpha: { enabled: true, settings: { inboxPush: true } },
+          beta: { enabled: true, settings: { inboxPush: true } },
+        },
+      },
+      updateAdapterSettings: vi.fn(),
+    })
+
+    await manager.start()
+    expect(calls.get('alpha')).toMatchObject({ created: 1 })
+    expect(calls.get('beta')).toMatchObject({ created: 1 })
+
+    expect(await manager.reconcile('alpha', { enabled: false, settings: {} })).toEqual({
+      id: 'alpha',
+      enabled: false,
+      status: 'disabled',
+    })
+    expect(calls.get('alpha')?.stops).toHaveBeenCalledOnce()
+    expect(calls.get('beta')?.stops).not.toHaveBeenCalled()
+    expect(calls.get('beta')).toMatchObject({ created: 1 })
+
+    await manager.reconcile('alpha', { enabled: true, settings: { inboxPush: false } })
+    expect(calls.get('alpha')).toMatchObject({ created: 2 })
+    expect(calls.get('alpha')?.starts).toHaveBeenCalledTimes(2)
+    expect(calls.get('beta')?.starts).toHaveBeenCalledOnce()
+    expect(calls.get('beta')?.stops).not.toHaveBeenCalled()
     await manager.stop()
   })
 
@@ -146,6 +281,7 @@ describe('DeliveryManager connector registry', () => {
       registry,
       config: { version: 1, adapters: { broken: { enabled: true, settings: {} } } },
       updateAdapterSettings: async () => undefined,
+      adapterStartRetryDelayMs: 60_000,
     })
 
     await manager.start()
@@ -155,6 +291,114 @@ describe('DeliveryManager connector registry', () => {
       adapters: [{ id: 'broken', status: 'degraded', lastError: 'Telegram API did not become ready' }],
     })
     await manager.stop()
+  })
+
+  it('retries a transient adapter start failure without dropping the registration', async () => {
+    let attempts = 0
+    let status: ConnectorAdapterHealth['status'] = 'degraded'
+    const adapter: ConnectorAdapter = {
+      id: 'flaky',
+      classifyStartFailure: () => 'retry',
+      start: async () => {
+        attempts += 1
+        if (attempts === 1) throw new Error('Telegram polling did not become ready within 15000ms')
+        status = 'healthy'
+      },
+      stop: async () => { status = 'stopped' },
+      deliver: async () => undefined,
+      sendOwnerText: async () => undefined,
+      health: () => ({ id: 'flaky', enabled: true, status }),
+    }
+    const registry = new ConnectorRegistry()
+    registry.register({
+      definition: { id: 'flaky', label: 'Flaky', description: 'Flaky adapter.', fields: [], commands: [] },
+      create: () => adapter,
+    })
+    const manager = new DeliveryManager({
+      registry,
+      config: { version: 1, adapters: { flaky: { enabled: true, settings: {} } } },
+      updateAdapterSettings: async () => undefined,
+      adapterStartRetryDelayMs: 5,
+    })
+
+    await manager.start()
+    expect(attempts).toBe(1)
+    expect(manager.health().adapters[0]?.status).toBe('degraded')
+
+    await vi.waitFor(() => {
+      expect(attempts).toBe(2)
+      expect(manager.health().adapters[0]?.status).toBe('healthy')
+    })
+    await manager.stop()
+  })
+
+  it('does not retry a configuration error', async () => {
+    let attempts = 0
+    const adapter: ConnectorAdapter = {
+      id: 'invalid',
+      start: async () => {
+        attempts += 1
+        throw new Error('Telegram setting botToken is required')
+      },
+      stop: async () => undefined,
+      deliver: async () => undefined,
+      sendOwnerText: async () => undefined,
+      health: () => ({
+        id: 'invalid',
+        enabled: true,
+        status: 'degraded',
+        lastError: 'Telegram setting botToken is required',
+      }),
+    }
+    const registry = new ConnectorRegistry()
+    registry.register({
+      definition: { id: 'invalid', label: 'Invalid', description: 'Invalid adapter.', fields: [], commands: [] },
+      create: () => adapter,
+    })
+    const manager = new DeliveryManager({
+      registry,
+      config: { version: 1, adapters: { invalid: { enabled: true, settings: {} } } },
+      updateAdapterSettings: async () => undefined,
+      adapterStartRetryDelayMs: 5,
+    })
+
+    await manager.start()
+    await new Promise((resolve) => setTimeout(resolve, 20))
+    expect(attempts).toBe(1)
+    await manager.stop()
+  })
+
+  it('cancels a pending start retry on stop', async () => {
+    let attempts = 0
+    const adapter: ConnectorAdapter = {
+      id: 'slow-fail',
+      classifyStartFailure: () => 'retry',
+      start: async () => {
+        attempts += 1
+        throw new Error('Network request for \'getMe\' failed!')
+      },
+      stop: async () => undefined,
+      deliver: async () => undefined,
+      sendOwnerText: async () => undefined,
+      health: () => ({ id: 'slow-fail', enabled: true, status: 'degraded' }),
+    }
+    const registry = new ConnectorRegistry()
+    registry.register({
+      definition: { id: 'slow-fail', label: 'Slow fail', description: 'Fails.', fields: [], commands: [] },
+      create: () => adapter,
+    })
+    const manager = new DeliveryManager({
+      registry,
+      config: { version: 1, adapters: { 'slow-fail': { enabled: true, settings: {} } } },
+      updateAdapterSettings: async () => undefined,
+      adapterStartRetryDelayMs: 50,
+    })
+
+    await manager.start()
+    expect(attempts).toBe(1)
+    await manager.stop()
+    await new Promise((resolve) => setTimeout(resolve, 80))
+    expect(attempts).toBe(1)
   })
 
   it('contains adapter delivery failures', async () => {
@@ -238,7 +482,13 @@ describe('DeliveryManager connector registry', () => {
     })
     await manager.start()
 
-    expect(manager.enqueueOwnerChat({ id: 'desk-comment-1', adapterId: 'broken', text: 'hello' }))
+    expect(manager.enqueueOwnerChat({
+      id: 'desk-comment-1',
+      adapterId: 'broken',
+      conversationId: 'comment-1',
+      phase: 'final',
+      text: 'hello',
+    }))
       .toEqual({ accepted: true, deliveryId: 'desk-comment-1' })
     await vi.waitFor(() => expect(warn).toHaveBeenCalledWith(
       '[connector] broken owner-chat delivery failed:',
@@ -287,6 +537,7 @@ describe('DeliveryManager connector registry', () => {
       recorder,
       config: { version: 1, adapters: { [adapter.id]: { enabled: true, settings: {} } } },
       updateAdapterSettings: vi.fn(),
+      workQueue: new MemoryWorkQueue(),
     })
     await manager.start()
     const content = Buffer.from('# Report\n')
@@ -369,44 +620,45 @@ describe('DeliveryManager connector registry', () => {
       registry,
       config: { version: 1, adapters: { [adapter.id]: { enabled: true, settings: {} } } },
       updateAdapterSettings: vi.fn(),
+      workQueue: new MemoryWorkQueue(),
     })
     try {
       await manager.start()
 
-      const requestId = manager.enqueueArtifactRequest(adapter.id, { entryId: 'entry-1', docIndex: 0 })
+      const requestId = await manager.enqueueArtifactRequest(adapter.id, { entryId: 'entry-1', docIndex: 0 })
       expect(requestId.startsWith('art-')).toBe(true)
-      manager.acceptInbound({ connectorId: adapter.id, userId: '1', text: 'desk' })
-      expect(manager.drainInbound()).toEqual([
+      await manager.acceptInbound({ connectorId: adapter.id, userId: '1', text: 'desk' })
+      expect(await drainInbound(manager)).toEqual([
         { connectorId: adapter.id, userId: '1', text: 'desk' },
       ])
-      expect(manager.drainActions()).toEqual([expect.objectContaining({
+      expect(await drainActions(manager)).toEqual([expect.objectContaining({
         requestId,
         connectorId: adapter.id,
         entryId: 'entry-1',
         docIndex: 0,
       })])
-      expect(manager.drainActions()).toEqual([])
+      expect(await drainActions(manager)).toEqual([])
 
-      manager.enqueueArtifactRequest(adapter.id, { entryId: 'stale', docIndex: 1 })
+      await manager.enqueueArtifactRequest(adapter.id, { entryId: 'stale', docIndex: 1 })
       vi.setSystemTime(now + 60_001)
-      expect(manager.drainActions()).toEqual([expect.objectContaining({
+      expect(await drainActions(manager)).toEqual([expect.objectContaining({
         connectorId: adapter.id,
         entryId: 'stale',
         docIndex: 1,
       })])
 
       for (let index = 0; index < 20; index += 1) {
-        manager.enqueueArtifactRequest(adapter.id, { entryId: `entry-${index}`, docIndex: 0 })
+        await manager.enqueueArtifactRequest(adapter.id, { entryId: `entry-${index}`, docIndex: 0 })
       }
-      expect(() => manager.enqueueArtifactRequest(adapter.id, { entryId: 'overflow', docIndex: 0 }))
-        .toThrow('Too many pending file requests')
+      await expect(manager.enqueueArtifactRequest(adapter.id, { entryId: 'overflow', docIndex: 0 }))
+        .rejects.toThrow('queue is full')
     } finally {
       vi.useRealTimers()
       await manager.stop()
     }
   })
 
-  it('notifies the originating connector when a queued file request expires', async () => {
+  it('leaves request expiry to Alice after a durable claim', async () => {
     const now = Date.parse('2026-08-14T15:02:00.000Z')
     vi.useFakeTimers()
     vi.setSystemTime(now)
@@ -427,20 +679,72 @@ describe('DeliveryManager connector registry', () => {
       registry,
       config: { version: 1, adapters: { telegram: { enabled: true, settings: {} } } },
       updateAdapterSettings: vi.fn(),
+      workQueue: new MemoryWorkQueue(),
     })
     try {
       await manager.start()
-      manager.enqueueArtifactRequest('telegram', { entryId: 'stale', docIndex: 0 })
+      await manager.enqueueArtifactRequest('telegram', { entryId: 'stale', docIndex: 0 })
       vi.setSystemTime(now + 60_001)
-      manager.enqueueArtifactRequest('telegram', { entryId: 'fresh', docIndex: 0 })
-      await Promise.resolve()
-      await Promise.resolve()
-      expect(notices).toEqual(['That file request expired. Ask for the file again.'])
-      expect(manager.drainActions()).toEqual([expect.objectContaining({ entryId: 'fresh' })])
+      await manager.enqueueArtifactRequest('telegram', { entryId: 'fresh', docIndex: 0 })
+      expect(notices).toEqual([])
+      expect(await drainActions(manager)).toEqual([
+        expect.objectContaining({ entryId: 'stale' }),
+        expect.objectContaining({ entryId: 'fresh' }),
+      ])
     } finally {
       vi.useRealTimers()
       await manager.stop()
     }
+  })
+
+  it('keeps UTA review requests off the Inbox artifact drain', async () => {
+    const presented: unknown[] = []
+    const registry = new ConnectorRegistry()
+    registry.register({
+      definition: { id: 'telegram', label: 'Telegram', description: 'Telegram.', fields: [], commands: [] },
+      create: () => ({
+        id: 'telegram',
+        start: async () => undefined,
+        stop: async () => undefined,
+        deliver: async () => undefined,
+        sendOwnerText: async () => undefined,
+        presentUta: async (presentation) => { presented.push(presentation) },
+        health: () => ({ id: 'telegram', enabled: true, status: 'healthy' as const }),
+      }),
+    })
+    const manager = new DeliveryManager({
+      registry,
+      config: { version: 1, adapters: { telegram: { enabled: true, settings: {} } } },
+      updateAdapterSettings: vi.fn(),
+      workQueue: new MemoryWorkQueue(),
+    })
+    await manager.start()
+    const requestId = await manager.enqueueUtaRequest('telegram', { action: 'review' })
+    expect(requestId.startsWith('uta-')).toBe(true)
+    expect(await drainActions(manager)).toEqual([])
+    expect(await drainUtaActions(manager)).toEqual([expect.objectContaining({
+      requestId,
+      connectorId: 'telegram',
+      action: 'review',
+    })])
+    await manager.presentUta({
+      requestId,
+      connectorId: 'telegram',
+      review: {
+        generatedAt: '2026-08-19T12:00:00.000Z',
+        accounts: [{
+          id: 'alpaca-paper',
+          label: 'Alpaca paper',
+          pendingMessage: 'long AAPL',
+          pendingHash: 'abc12345',
+          stagedCount: 1,
+          hiddenOperationCount: 0,
+          operations: [{ action: 'placeOrder', summary: 'BUY AAPL MKT × 10' }],
+        }],
+      },
+    })
+    expect(presented).toHaveLength(1)
+    await manager.stop()
   })
 
   it('delivers an artifact only to the requesting connector', async () => {
@@ -544,4 +848,52 @@ describe('DeliveryManager connector registry', () => {
     expect(artifacts).toHaveLength(1)
     await manager.stop()
   })
+})
+
+it('owns reply syntax, sends final files once, and preserves ordinary syntax discussions', async () => {
+  const adapter = new FakeThirdPartyAdapter() as FakeThirdPartyAdapter & {
+    sendOwnerChat: ReturnType<typeof vi.fn>; sendOwnerFile: ReturnType<typeof vi.fn>
+  }
+  adapter.sendOwnerChat = vi.fn(async () => undefined)
+  adapter.sendOwnerFile = vi.fn(async () => undefined)
+  const warning = vi.spyOn(adapter, 'sendOwnerText')
+  const registry = new ConnectorRegistry()
+  registry.register({ definition: { id: adapter.id, label: 'Test', description: '', fields: [], commands: [] }, create: () => adapter })
+  const read = vi.fn(async () => ({ filename: 'a.pdf', mediaType: 'application/pdf', sizeBytes: 0, contentBase64: '', contentSha256: createHash('sha256').update('').digest('hex') }))
+  const manager = new DeliveryManager({ registry, config: { version: 1, adapters: { [adapter.id]: { enabled: true, settings: {} } } }, updateAdapterSettings: vi.fn(), readWorkspaceFile: read })
+  await manager.start()
+  const base = { adapterId: adapter.id, conversationId: 'turn', workspaceId: 'ws' }
+  await manager.sendOwnerChat({ ...base, id: 'progress', phase: 'progress', text: 'Preparing [[a.pdf]]' })
+  expect(read).not.toHaveBeenCalled()
+  await manager.sendOwnerChat({ ...base, id: 'progress', phase: 'final', text: 'Final text' })
+  expect(adapter.sendOwnerChat).toHaveBeenLastCalledWith(expect.objectContaining({ phase: 'final', text: 'Final text' }))
+  const final = { ...base, id: 'final', phase: 'final' as const, text: 'Done [[a.pdf]] [[a.pdf]]' }
+  await Promise.all([manager.sendOwnerChat(final), manager.sendOwnerChat(final)])
+  expect(read).toHaveBeenCalledExactlyOnceWith('ws', 'a.pdf')
+  expect(adapter.sendOwnerFile).toHaveBeenCalledOnce()
+  await manager.sendOwnerChat({ ...base, id: 'silent', phase: 'final', source: 'automation', text: '[[no-reply]] [[b.pdf]]' })
+  expect(adapter.sendOwnerChat).toHaveBeenLastCalledWith(expect.objectContaining({ phase: 'final', text: undefined }))
+  expect(read).toHaveBeenCalledOnce()
+  await manager.sendOwnerChat({ ...base, id: 'literal', phase: 'final', source: 'conversation', text: 'We discussed [[no-reply]]' })
+  expect(adapter.sendOwnerChat).toHaveBeenLastCalledWith(expect.objectContaining({ text: 'We discussed [[no-reply]]' }))
+  read.mockRejectedValueOnce(new Error('missing'))
+  await manager.sendOwnerChat({ ...base, id: 'missing', phase: 'final', text: '[[missing.pdf]]' })
+  expect(adapter.sendOwnerChat).toHaveBeenLastCalledWith(expect.objectContaining({ text: '[[missing.pdf]]' }))
+  expect(warning).not.toHaveBeenCalled()
+  adapter.sendOwnerFile.mockRejectedValueOnce(new Error('upload failed'))
+  await manager.sendOwnerChat({ ...base, id: 'upload-failed', phase: 'final', text: '[[a.pdf]]' })
+  expect(warning).toHaveBeenCalledWith(expect.stringContaining('Upload failed'))
+  read.mockClear()
+  await manager.sendOwnerChat({ ...base, id: 'limit', phase: 'final', text: Array.from({ length: 6 }, (_, i) => `[[${i}.pdf]]`).join(' ') })
+  expect(read).toHaveBeenCalledTimes(5)
+  expect(warning).toHaveBeenLastCalledWith('[[5.pdf]]')
+  await manager.sendOwnerChat({ ...base, id: 'sticker', phase: 'final', text: '[[sticker/hello.png]]' })
+  expect(adapter.sendOwnerFile).toHaveBeenLastCalledWith(expect.any(Object), 'sticker')
+  const order: string[] = []
+  adapter.sendOwnerChat.mockImplementation(async message => { order.push(message.text ?? 'finish') })
+  adapter.sendOwnerFile.mockImplementation(async () => { order.push('sticker') })
+  warning.mockImplementation(async text => { order.push(text) })
+  await manager.sendOwnerChat({ ...base, id: 'interleaved', phase: 'final', text: 'Before [[sticker/hello.png]] After' })
+  expect(order).toEqual(['Before', 'sticker', 'After'])
+  await manager.stop()
 })

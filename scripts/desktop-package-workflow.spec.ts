@@ -4,11 +4,14 @@ import { describe, expect, it } from 'vitest'
 import YAML from 'yaml'
 
 interface WorkflowStep {
+  if?: string
   name?: string
   run?: string
 }
 
 interface WorkflowJob {
+  if?: string
+  strategy?: { matrix?: { include?: string } }
   name?: string
   needs?: string | string[]
   'runs-on'?: string
@@ -16,7 +19,11 @@ interface WorkflowJob {
 }
 
 interface Workflow {
-  on?: Record<string, unknown>
+  on?: {
+    workflow_dispatch?: unknown
+    pull_request?: { branches?: string[] }
+    push?: unknown
+  }
   concurrency?: {
     group?: string
     'cancel-in-progress'?: boolean
@@ -30,9 +37,22 @@ const workflow = YAML.parse(
 ) as Workflow
 
 describe('Desktop Package Smoke workflow critical path', () => {
-  it('keeps manual and pull-request coverage without duplicating master releases', () => {
+  it('narrows only explicitly selected manual rehearsals, not promotion gates', () => {
+    expect(workflow.on?.workflow_dispatch).toMatchObject({
+      inputs: { host: { type: 'choice', default: 'all', options: ['all', 'macos-14', 'macos-15-intel', 'windows-latest'] } },
+    })
+    const matrix = workflow.jobs.package.strategy?.matrix?.include ?? ''
+    for (const host of ['macos-14', 'macos-15-intel', 'windows-latest']) {
+      expect(matrix).toContain(`github.event_name == 'workflow_dispatch' && inputs.host == '${host}'`)
+    }
+    expect(matrix).toContain('[{"os":"macos-14","arch":"arm64"},{"os":"macos-15-intel","arch":"x64"},{"os":"windows-latest","arch":"x64"}]')
+    expect(workflow.jobs['broker-packs-windows'].if).toContain("github.event_name != 'workflow_dispatch' || inputs.host == 'all' || inputs.host == 'windows-latest'")
+  })
+
+  it('keeps manual and master-promotion coverage without taxing dev PRs', () => {
     expect(workflow.on).toHaveProperty('workflow_dispatch')
     expect(workflow.on).toHaveProperty('pull_request')
+    expect(workflow.on?.pull_request?.branches).toEqual(['master'])
     expect(workflow.on).not.toHaveProperty('push')
   })
 
@@ -58,13 +78,15 @@ describe('Desktop Package Smoke workflow critical path', () => {
     })
     expect(preflight.needs).toBeUndefined()
     const preflightSteps = preflight.steps?.map((step) => step.name) ?? []
+    expect(preflightSteps).toContain('Detect exact beta release preparation')
     expect(preflightSteps).toEqual(expect.arrayContaining([
       'Verify CI workflow contracts',
       'Typecheck root workspace',
     ]))
-    expect(preflightSteps.indexOf('Verify CI workflow contracts')).toBeLessThan(
-      preflightSteps.indexOf('Typecheck root workspace'),
-    )
+    for (const stepName of ['Verify CI workflow contracts', 'Typecheck root workspace']) {
+      const candidate = preflight.steps?.find((step) => step.name === stepName)
+      expect(candidate?.if).toContain("beta_release_prep != 'true'")
+    }
     expect(brokerPacks).toMatchObject({
       name: 'broker-packs windows-latest',
       'runs-on': 'windows-latest',

@@ -150,7 +150,7 @@ describe('Snapshot Builder', () => {
 
     uta.git.add({ action: 'placeOrder', contract, order })
     uta.git.commit('buy limit')
-    await uta.push()
+    await uta.push(uta.status().pendingHash!)
 
     const snap = await buildSnapshot(uta, 'manual')
     expect(snap).not.toBeNull()
@@ -576,7 +576,7 @@ describe('UTA — post-push/reject hooks', () => {
     broker.setQuote('AAPL', 150)
     uta.git.add({ action: 'placeOrder', contract: makeContract(), order: new Order() })
     uta.git.commit('buy')
-    await uta.push()
+    await uta.push(uta.status().pendingHash!)
 
     // fire-and-forget, but should be called
     await new Promise(r => setTimeout(r, 10))
@@ -590,7 +590,7 @@ describe('UTA — post-push/reject hooks', () => {
 
     uta.git.add({ action: 'placeOrder', contract: makeContract(), order: new Order() })
     uta.git.commit('buy')
-    await uta.reject('changed mind')
+    await uta.reject('changed mind', uta.status().pendingHash!)
 
     await new Promise(r => setTimeout(r, 10))
     expect(onPostReject).toHaveBeenCalledWith(uta.id)
@@ -605,7 +605,7 @@ describe('UTA — post-push/reject hooks', () => {
     uta.git.add({ action: 'placeOrder', contract: makeContract(), order: new Order() })
     uta.git.commit('buy')
 
-    await expect(uta.push()).rejects.toThrow()
+    await expect(uta.push(uta.status().pendingHash!)).rejects.toThrow()
     expect(onPostPush).not.toHaveBeenCalled()
   })
 
@@ -616,7 +616,7 @@ describe('UTA — post-push/reject hooks', () => {
 
     uta.git.add({ action: 'placeOrder', contract: makeContract(), order: new Order() })
     uta.git.commit('buy')
-    const result = await uta.push()
+    const result = await uta.push(uta.status().pendingHash!)
 
     expect(result).toBeDefined()
     expect(result.hash).toBeTruthy()

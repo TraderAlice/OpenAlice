@@ -1,5 +1,5 @@
 ---
-version: 1.8.5
+version: 1.8.9
 ---
 
 # Chat
@@ -18,7 +18,8 @@ archive, run indicators, write research files, track entities with `[[name]]`,
 and turn follow-up into `.alice/issues/<id>.md` work items. The bundled
 `opencli-reader` skill additionally teaches it to reach long-tail sources
 (social sentiment, options flow, global news frontpages) through the optional
-community `opencli` CLI — it will ask before assuming you have it.
+community `opencli` CLI when installed. Research can also use the Coding
+Agent’s other available tools.
 
 When an Inbox result or Issue is hard to interpret, the workspace can ask its
 attributable product Session directly. It can also dispatch several peer

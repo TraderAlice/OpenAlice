@@ -23,11 +23,13 @@ product E2E. It will not start unless both its explicit script and acknowledgeme
 are present:
 
 ```bash
-OPENALICE_UTA_LIVE_PAPER=1 pnpm test:uta:live-paper
+OPENALICE_UTA_LIVE_PAPER=1 pnpm test:live:bybit-paper
 ```
 
-`pnpm test:e2e` never submits broker orders. It contains only local product
-integration tests and read-only network/provider checks.
+`pnpm test:integration` never submits broker orders or contacts public
+providers. It contains only deterministic local product integration tests.
+Public providers, locally configured API keys, and read-only TWS/Gateway checks
+live in the explicit `pnpm test:external:readonly` lane.
 
 ## Choose the verification layer
 
@@ -37,8 +39,8 @@ touched contract requires it.
 
 | Change surface | Minimum verification | When live-paper is required |
 |---|---|---|
-| UTA staging, commit, ledger, reconciliation, or state transitions | Targeted unit specs, then `pnpm test:e2e` (`uta-lifecycle` uses `MockBroker`) | Only when venue behavior or a real execution response is part of the claim |
-| Public market loading or read-only provider integration | Targeted read-only E2E; failures from DNS/TLS/provider downtime must be reported separately from product failures | Not required when no configured account or private endpoint is used |
+| UTA staging, commit, ledger, reconciliation, or state transitions | Targeted unit specs, then `pnpm test:integration:uta` (`uta-lifecycle` uses `MockBroker`) | Only when venue behavior or a real execution response is part of the claim |
+| Public market loading or read-only provider integration | `pnpm test:external:readonly` or a targeted spec with `vitest.external.config.ts`; report DNS/TLS/provider downtime separately from product failures | Not required when no configured account or private endpoint is used |
 | Broker account parsing, order ids, status mapping, modify/cancel, permissions, TP/SL, or venue-specific parameters | Targeted broker spec against one verified demo/paper account | Required: these semantics cannot be proven by `MockBroker` |
 | Alice-to-UTA protocol or `alice-uta` CLI changes | Protocol/unit specs, then the relevant scenario through a real Workspace CLI | Required if the changed command reaches an order write or approval boundary |
 | New broker or new traded market type | Full applicable S1-S14 catalog for that venue | Always required before claiming support |
@@ -50,8 +52,8 @@ as `alice analysis bars(..., count=50)`, and asserts that Binance, OKX, and
 Bybit still return a latest bar across 1m, 15m, 1h, 4h, and 1d:
 
 ```bash
-CCXT_E2E=1 pnpm exec vitest run \
-  --config vitest.e2e.config.ts \
+pnpm exec vitest run \
+  --config vitest.external.config.ts \
   services/uta/src/domain/trading/brokers/ccxt/CcxtBroker.e2e.spec.ts
 ```
 
@@ -64,16 +66,21 @@ The commands are intentionally asymmetric:
 
 ```bash
 # Ordinary product E2E: safe for routine local development and CI.
-pnpm test:e2e
+pnpm test:integration
 
-# One explicitly selected account-trading spec. Invoke Vitest directly so
-# pnpm does not forward a literal `--` that defeats Vitest's file filter.
-OPENALICE_UTA_LIVE_PAPER=1 pnpm exec vitest run \
-  --config vitest.uta-live.config.ts \
-  services/uta/src/domain/trading/__test__/e2e/uta-bybit.e2e.spec.ts
+# Explicit read-only external integration: may use public network APIs, local
+# provider keys, or a locally running TWS/Gateway, but never submits orders.
+pnpm test:external:readonly
 
-# Full configured demo/paper account suite. Use only for a deliberate sweep.
-OPENALICE_UTA_LIVE_PAPER=1 pnpm test:uta:live-paper
+# Provider-specific account-trading acceptance. Prefer one provider at a time.
+OPENALICE_UTA_LIVE_PAPER=1 pnpm test:live:bybit-paper
+
+# Full configured demo/paper sweep. Use only deliberately. This excludes the
+# raw Bybit market-buy diagnostic below.
+OPENALICE_UTA_LIVE_PAPER=1 pnpm test:live:uta-paper
+
+# Destructive diagnostic: performs a market buy and best-effort close.
+OPENALICE_UTA_LIVE_PAPER=1 pnpm test:live:bybit-diagnostic
 ```
 
 The environment variable is an acknowledgement, not proof that an account is
@@ -110,13 +117,13 @@ position payloads. When live contract data should become an offline regression
 input, manually review and copy only stable canonical contract fields into a
 tracked fixture; never make a test overwrite tracked fixtures directly.
 
-When selecting a test by name, keep the same direct invocation pattern:
+When selecting a test by name, keep the shared lane and file selection explicit:
 
 ```bash
-OPENALICE_UTA_LIVE_PAPER=1 pnpm exec vitest run \
-  --config vitest.uta-live.config.ts \
-  services/uta/src/domain/trading/__test__/e2e/ibkr-paper.e2e.spec.ts \
-  -t 'canonical conId routing'
+OPENALICE_UTA_LIVE_PAPER=1 pnpm test:select \
+  --lane live-paper \
+  --path services/uta/src/domain/trading/__test__/e2e/ibkr-paper.e2e.spec.ts \
+  -- -t 'canonical conId routing'
 ```
 
 ## Ground rules
@@ -136,8 +143,19 @@ OPENALICE_UTA_LIVE_PAPER=1 pnpm exec vitest run \
 - **ccxt is an SDK, not a semantic layer.** Identical calls behave
   differently per venue (bybit's unscoped open-orders listing silently hides
   spot; okx rejects `reduceOnly` on spot; conditional orders live in
-  separate API namespaces). Anything that works on one venue is UNVERIFIED
-  on the next until tested there.
+  separate API namespaces; hyperliquid's unscoped `fetchBalance()` reads
+  the perp clearinghouse, which is 0 for a unified-mode wallet whose funds
+  sit in the spot clearinghouse). Anything that works on one venue is
+  UNVERIFIED on the next until tested there.
+- **Balance routing must remain authoritative.** Hyperliquid mode-query
+  failures or unknown modes must fail the account read, not fall back to a
+  partial ledger. Exercise mode changes with real CCXT routing: its cached
+  `enableUnifiedMargin` can override an explicit `type: swap`, so the venue
+  override must select physical pools explicitly.
+- **A zero balance is a finding, not a pass.** `getAccount()` returning
+  `netLiquidation: '0'` on a funded demo/testnet wallet is exactly how the
+  hyperliquid unified-account bug looked; compare against the venue UI's
+  portfolio value before accepting a balance read.
 - **Leave accounts flat.** Sell back fills, cancel hangers, `git reject`
   stray staging. Finish with: 0 open orders per account, `git status`
   clean, position quantities at their pre-session baseline.
@@ -157,7 +175,9 @@ export AQ_WS_ID=<any live workspace id>     # from ~/.openalice/workspaces/works
 BIN=src/workspaces/cli/bin/alice-uta
 node $BIN                                    # discover groups/verbs
 node $BIN order place --help                 # flags come from the manifest
-# "user approves": curl -s -X POST http://127.0.0.1:47333/api/trading/uta/<id>/wallet/push
+# "user approves": curl -s -X POST http://127.0.0.1:47333/api/trading/uta/<id>/wallet/push \
+#   -H 'content-type: application/json' \
+#   -d '{"expectedPendingHash":"<pendingHash from wallet/status>"}'
 ```
 
 Running inside a real OpenAlice Workspace is preferred: the launcher injects

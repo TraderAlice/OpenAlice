@@ -6,7 +6,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { WorkspacesContextValue } from '../contexts/workspaces-context'
 import { i18n } from '../i18n'
 import type { AgentInfo, Workspace } from '../components/workspace/api'
-import { AutoQuantLandingPage, ChatLandingPage } from './ChatLandingPage'
+import { resetAgentRuntimesStore } from '../hooks/useAgentRuntimes'
+import { AutoPredictionLandingPage, AutoQuantLandingPage, ChatLandingPage, HarnessLandingPage } from './ChatLandingPage'
 
 const mocks = vi.hoisted(() => ({
   useWorkspaces: vi.fn(),
@@ -16,6 +17,7 @@ const mocks = vi.hoisted(() => ({
   getAgentReadiness: vi.fn(),
   getAgentRuntimeReadiness: vi.fn(),
   probeAgentRuntimeReadiness: vi.fn(),
+  listAgents: vi.fn(),
   getWorkspaceCredentialDefaults: vi.fn(),
   getPresets: vi.fn(),
   getQuickChat: vi.fn(),
@@ -42,6 +44,7 @@ vi.mock('../components/workspace/api', async (importOriginal) => {
     getAgentReadiness: mocks.getAgentReadiness,
     getAgentRuntimeReadiness: mocks.getAgentRuntimeReadiness,
     probeAgentRuntimeReadiness: mocks.probeAgentRuntimeReadiness,
+    listAgents: mocks.listAgents,
   }
 })
 
@@ -129,6 +132,7 @@ function withInteractivePreference(
 function context(
   workspaces: readonly Workspace[],
   autoQuantDefaultWorkspaceId: string | null = null,
+  autoPredictionDefaultWorkspaceId: string | null = null,
 ): WorkspacesContextValue {
   return {
     workspaces,
@@ -146,9 +150,13 @@ function context(
     autoQuantDefaultWorkspaceId,
     autoQuantPreferenceLoaded: true,
     autoQuantPreferenceError: null,
+    autoPredictionDefaultWorkspaceId,
+    autoPredictionPreferenceLoaded: true,
+    autoPredictionPreferenceError: null,
     refresh: vi.fn(),
     refreshTemplates: vi.fn(async () => undefined),
     refreshAutoQuantPreference: vi.fn(async () => undefined),
+    refreshAutoPredictionPreference: vi.fn(async () => undefined),
     refreshWorkspaceManager: vi.fn(async () => undefined),
     quickStartWorkspaceManager: vi.fn(async () => { throw new Error('not used') }),
     spawn: vi.fn(async () => undefined),
@@ -156,12 +164,14 @@ function context(
     setDefaultAgent: vi.fn(async () => undefined),
     setIssueDefaultAgent: vi.fn(async () => undefined),
     initializeAutoQuant: vi.fn(async () => { throw new Error('not used') }),
+    initializeAutoPrediction: vi.fn(async () => { throw new Error('not used') }),
     initializeChat: vi.fn(async () => { throw new Error('not used') }),
     setAutoQuantDefaultWorkspace: vi.fn(async () => undefined),
+    setAutoPredictionDefaultWorkspace: vi.fn(async () => undefined),
     quickChat: mocks.quickChat,
     pauseSession: vi.fn(async () => undefined),
     resumeSession: vi.fn(async () => undefined),
-    openWebPiSession: vi.fn(async () => undefined),
+    openWebSession: vi.fn(async () => undefined),
     requestDeleteSession: vi.fn(),
     setSessionPresence: vi.fn(async () => undefined),
     setSessionDisplayName: vi.fn(async () => undefined),
@@ -195,6 +205,7 @@ let workspaces: Workspace[]
 
 beforeEach(async () => {
   vi.clearAllMocks()
+  resetAgentRuntimesStore()
   await i18n.changeLanguage('en')
   workspaces = [chatWorkspace()]
   mocks.useWorkspaces.mockImplementation(() => context(workspaces))
@@ -250,6 +261,7 @@ beforeEach(async () => {
     overallReady: true,
     checkedAt: '2026-07-16T00:00:00.000Z',
   })
+  mocks.listAgents.mockResolvedValue([piAgent, opencodeAgent])
   mocks.probeAgentRuntimeReadiness.mockImplementation(() => mocks.getAgentRuntimeReadiness())
   mocks.getWorkspaceCredentialDefaults.mockResolvedValue({
     defaults: {},
@@ -291,13 +303,20 @@ describe('ChatLandingPage compact-height layout', () => {
     const scrollArea = screen.getByTestId('harness-landing-scroll')
     const stack = screen.getByTestId('harness-landing-stack')
     const controls = screen.getByTestId('harness-landing-controls')
-    const composer = screen.getByPlaceholderText('Ask Alice…')
+    const composer = screen.getByPlaceholderText('Describe the task, question, or decision…')
+    const composerShell = screen.getByTestId('harness-composer-shell')
+    const contextTray = screen.getByTestId('harness-landing-context')
 
     expect(scrollArea.className).toContain('justify-start')
     expect(scrollArea.className).toContain('overflow-x-hidden')
     expect(scrollArea.className).toContain('overflow-y-auto')
     expect(stack.className).toContain('my-auto')
-    expect(composer.className).toContain('min-h-[72px]')
+    expect(composer.className).toContain('min-h-[68px]')
+    expect(composer.className).toContain('max-h-[168px]')
+    expect(composerShell.parentElement?.contains(contextTray)).toBe(true)
+    expect(composerShell.contains(contextTray)).toBe(false)
+    expect(composerShell.className).not.toContain('border')
+    expect(composerShell.contains(composer)).toBe(true)
     expect(controls.className).toContain('items-end')
     expect(controls.className).not.toContain('flex-col')
     expect(controls.lastElementChild?.className).toContain('shrink-0')
@@ -318,7 +337,48 @@ describe('ChatLandingPage compact-height layout', () => {
     expect(screen.getByTestId('harness-landing-scroll').className).toContain('justify-start')
     expect(screen.getByTestId('harness-landing-stack').className).toContain('my-auto')
     expect(screen.getByPlaceholderText('Describe the strategy, market, hypothesis, or iteration goal…').className)
-      .toContain('min-h-[72px]')
+      .toContain('min-h-[68px]')
+  })
+
+  it('shares the compact-height contract with the Auto Prediction landing', () => {
+    const predictionWorkspace: Workspace = {
+      ...chatWorkspace(),
+      id: 'prediction-1',
+      tag: 'prediction',
+      template: 'auto-prediction',
+    }
+    workspaces = [predictionWorkspace]
+    mocks.useWorkspaces.mockImplementation(() => context(workspaces, null, predictionWorkspace.id))
+
+    render(<AutoPredictionLandingPage spec={{ params: {} }} />)
+
+    expect(screen.getByTestId('harness-landing-scroll').className).toContain('justify-start')
+    expect(screen.getByTestId('harness-landing-stack').className).toContain('my-auto')
+    expect(screen.getByPlaceholderText('Describe the market relationship, settlement question, or evidence gap…').className)
+      .toContain('min-h-[68px]')
+  })
+
+  it('prefills an Auto Prediction Quick Start without launching it', () => {
+    const predictionWorkspace: Workspace = {
+      ...chatWorkspace(),
+      id: 'prediction-1',
+      tag: 'prediction',
+      template: 'auto-prediction',
+    }
+    workspaces = [predictionWorkspace]
+    mocks.useWorkspaces.mockImplementation(() => context(workspaces, null, predictionWorkspace.id))
+
+    render(<AutoPredictionLandingPage spec={{
+      params: {
+        targetWsId: predictionWorkspace.id,
+        initialPrompt: 'Install the declared dependencies, then verify Studio.',
+      },
+    }} />)
+
+    expect((screen.getByPlaceholderText(
+      'Describe the market relationship, settlement question, or evidence gap…',
+    ) as HTMLTextAreaElement).value).toBe('Install the declared dependencies, then verify Studio.')
+    expect(mocks.quickChat).not.toHaveBeenCalled()
   })
 })
 
@@ -334,7 +394,7 @@ describe('ChatLandingPage Workspace inventory states', () => {
     render(<ChatLandingPage spec={{ params: {} }} />)
 
     expect(screen.getByRole('heading', { name: 'Workspace data is unavailable' })).toBeTruthy()
-    expect(screen.queryByPlaceholderText('Ask Alice…')).toBeNull()
+    expect(screen.queryByPlaceholderText('Describe the task, question, or decision…')).toBeNull()
     fireEvent.click(screen.getByRole('button', { name: 'Retry' }))
     expect(failed.refresh).toHaveBeenCalledOnce()
   })
@@ -346,7 +406,7 @@ describe('ChatLandingPage Workspace inventory states', () => {
 
     expect(screen.getByRole('heading', { name: 'Initialize Ask Alice' })).toBeTruthy()
     expect(screen.getByRole('button', { name: 'Initialize Ask Alice' })).toBeTruthy()
-    expect(screen.queryByPlaceholderText('Ask Alice…')).toBeNull()
+    expect(screen.queryByPlaceholderText('Describe the task, question, or decision…')).toBeNull()
     expect(screen.queryByText('Pinned Harness version')).toBeNull()
   })
 
@@ -359,7 +419,7 @@ describe('ChatLandingPage Workspace inventory states', () => {
     render(<ChatLandingPage spec={{ params: {} }} />)
 
     expect(screen.getByText('Live refresh failed. Showing the last known Workspace data.')).toBeTruthy()
-    expect(screen.getByPlaceholderText('Ask Alice…')).toBeTruthy()
+    expect(screen.getByPlaceholderText('Describe the task, question, or decision…')).toBeTruthy()
   })
 })
 
@@ -373,51 +433,102 @@ describe('ChatLandingPage adapter inventory', () => {
     expect(screen.getByRole('menuitem', { name: /opencode/ })).toBeTruthy()
   })
 
-  it('separates Session context from the AI inference controls', async () => {
-    render(<ChatLandingPage spec={{ params: { targetWsId: 'chat-1' } }} />)
+  it('keeps Session context and AI inference in distinct groups on one surface', async () => {
+    render(<ChatLandingPage spec={{ params: {} }} />)
 
     const contextRow = screen.getByTestId('harness-landing-context')
     const inferenceRow = screen.getByTestId('harness-landing-controls')
-    expect(contextRow.contains(await screen.findByRole('button', { name: 'Choose Chat workspace' }))).toBe(true)
+    expect(contextRow.contains(await screen.findByRole('button', { name: 'Start in: chat-jul16' }))).toBe(true)
     expect(contextRow.contains(screen.getByRole('button', { name: 'Select agent' }))).toBe(true)
     expect(inferenceRow.contains(await screen.findByRole('button', { name: 'AI access' }))).toBe(true)
     expect(inferenceRow.contains(screen.getByRole('button', { name: 'Model and reasoning' }))).toBe(true)
-    expect(inferenceRow.querySelectorAll('button').length).toBe(4)
+    expect(inferenceRow.querySelectorAll('button').length).toBe(3)
+    expect(screen.queryByRole('button', { name: 'Attach' })).toBeNull()
     expect(screen.queryByRole('combobox', { name: 'AI model' })).toBeNull()
     expect(screen.queryByRole('combobox', { name: 'Reasoning effort' })).toBeNull()
   })
+
+  it('selects the Session Workspace from the attached context tray', async () => {
+    const researchWorkspace: Workspace = {
+      ...chatWorkspace(),
+      id: 'chat-2',
+      tag: 'research-desk',
+      displayName: 'Research Desk',
+      createdAt: '2026-07-17T00:00:00.000Z',
+    }
+    workspaces = [chatWorkspace(), researchWorkspace]
+
+    render(<ChatLandingPage spec={{ params: {} }} />)
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Start in: chat-jul16' }))
+    const researchOption = await screen.findByRole('menuitemradio', { name: /Research Desk/ })
+    fireEvent.click(researchOption)
+
+    expect(await screen.findByRole('button', { name: /Start in: Research Desk/ })).toBeTruthy()
+    expect(mocks.quickChat).not.toHaveBeenCalled()
+  })
 })
 
-describe('ChatLandingPage suggestion strip', () => {
-  it('separates the label from the staggered prompt actions and fills the composer', () => {
+describe('ChatLandingPage workflow starters', () => {
+  it('keeps starter rows flat, rotates the workflow set, and fills the composer', () => {
     render(<ChatLandingPage spec={{ params: { targetWsId: 'chat-1' } }} />)
 
     const strip = screen.getByTestId('harness-landing-suggestions')
-    expect(strip.textContent).toContain('Try asking')
-    const suggestions = strip.querySelectorAll<HTMLButtonElement>('button.oa-suggestion-enter')
+    expect(strip.textContent).toContain('Suggested workflows')
+    const starterGroup = strip.querySelector<HTMLElement>('[role="group"]')!
+    const suggestions = starterGroup.querySelectorAll<HTMLButtonElement>('button')
     expect(suggestions).toHaveLength(3)
-    expect(suggestions[0]?.className).toContain('oa-suggestion-enter')
-    expect(suggestions[1]?.style.animationDelay).toBe('55ms')
+    expect(suggestions[0]?.className).not.toContain('oa-suggestion-enter')
+    expect(suggestions[0]?.className).toContain('border-b')
     expect(suggestions[0]?.textContent).toContain("Read today's cross-asset signals")
 
-    fireEvent.click(suggestions[0]!)
-    expect((screen.getByPlaceholderText('Ask Alice…') as HTMLTextAreaElement).value)
-      .toContain("Read today's macro backdrop")
-
-    fireEvent.click(screen.getByRole('button', { name: 'More ideas' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Show more workflows' }))
     expect(strip.textContent).toContain('Find what actually needs follow-up')
     expect(strip.textContent).toContain('Turn research into a scheduled Issue')
     expect(strip.textContent).toContain('Delegate a reproducible study')
     expect(strip.textContent).not.toContain("Read today's cross-asset signals")
+
+    fireEvent.click(screen.getByRole('button', { name: 'Find what actually needs follow-up' }))
+    expect((screen.getByPlaceholderText('Describe the task, question, or decision…') as HTMLTextAreaElement).value)
+      .toContain("Read this Workspace's files")
+    expect(strip.dataset.state).toBe('hidden')
+    expect(strip.className).toContain('hidden')
+
+    fireEvent.change(screen.getByPlaceholderText('Describe the task, question, or decision…'), { target: { value: '' } })
+    expect(strip.dataset.state).toBe('visible')
+    expect(strip.className).not.toContain('hidden')
+
+    const firstSetButton = screen.getByRole('button', { name: 'Show more workflows' })
+    fireEvent.click(firstSetButton)
+    const refreshedStarter = screen.getByRole('button', { name: "Read today's cross-asset signals" })
+    fireEvent.click(refreshedStarter)
+    expect((screen.getByPlaceholderText('Describe the task, question, or decision…') as HTMLTextAreaElement).value)
+      .toContain("Read today's macro backdrop")
   })
 })
 
 describe('ChatLandingPage keyboard submission', () => {
+  it('offers GUI for a capable runtime and passes the selected surface', async () => {
+    mocks.useWorkspaces.mockImplementation(() => ({
+      ...context([chatWorkspace()]),
+      agents: [{ ...piAgent, capabilities: { ...piAgent.capabilities, web: { wire: 'pi-rpc', freshSession: true } } }],
+    }))
+    render(<ChatLandingPage spec={{ params: { targetWsId: 'chat-1' } }} />)
+    await screen.findByRole('button', { name: 'Model and reasoning' })
+    fireEvent.click(screen.getByRole('button', { name: 'UI mode: TUI' }))
+    fireEvent.click(await screen.findByRole('menuitemradio', { name: 'GUI' }))
+    const composer = screen.getByPlaceholderText('Describe the task, question, or decision…')
+    fireEvent.change(composer, { target: { value: 'GUI hello' } })
+    fireEvent.keyDown(composer, { key: 'Enter', code: 'Enter' })
+    await waitFor(() => expect(mocks.quickChat).toHaveBeenCalled())
+    expect(mocks.quickChat.mock.calls[0]?.[8]).toBe('webpi')
+  })
+
   it('does not submit when Enter confirms an IME composition candidate', async () => {
     render(<ChatLandingPage spec={{ params: { targetWsId: 'chat-1' } }} />)
 
     await screen.findByRole('button', { name: 'Model and reasoning' })
-    const composer = screen.getByPlaceholderText('Ask Alice…')
+    const composer = screen.getByPlaceholderText('Describe the task, question, or decision…')
     fireEvent.change(composer, { target: { value: '你好' } })
 
     fireEvent.keyDown(composer, { key: 'Enter', code: 'Enter', isComposing: true })
@@ -433,6 +544,7 @@ describe('ChatLandingPage keyboard submission', () => {
       undefined,
       undefined,
       'native',
+      'terminal',
     ))
   })
 
@@ -500,7 +612,7 @@ describe('ChatLandingPage keyboard submission', () => {
 
     expect((await screen.findByRole('button', { name: 'Select agent' })).textContent).toContain('Pi')
     expect(screen.queryByText('Model, reasoning, and context are managed by Pi')).toBeNull()
-    fireEvent.change(screen.getByPlaceholderText('Ask Alice…'), { target: { value: 'hello' } })
+    fireEvent.change(screen.getByPlaceholderText('Describe the task, question, or decision…'), { target: { value: 'hello' } })
     fireEvent.click(screen.getByRole('button', { name: 'Send' }))
 
     await waitFor(() => expect(mocks.quickChat).toHaveBeenCalledWith(
@@ -512,6 +624,7 @@ describe('ChatLandingPage keyboard submission', () => {
       undefined,
       undefined,
       'native',
+      'terminal',
     ))
     expect(mocks.probeAgentRuntimeReadiness).not.toHaveBeenCalled()
     expect(screen.queryByText('The runtime reported an error: 429: balance exhausted')).toBeNull()
@@ -560,7 +673,7 @@ describe('ChatLandingPage keyboard submission', () => {
     render(<ChatLandingPage spec={{ params: { targetWsId: 'chat-1' } }} />)
 
     expect((await screen.findByRole('button', { name: 'Model and reasoning' })).textContent)
-      .toContain('Model managed by runtime')
+      .toContain('Default model')
     fireEvent.click(screen.getByRole('button', { name: 'AI access' }))
     fireEvent.click(screen.getByRole('menuitem', { name: /deepseek-1/ }))
     expect(await findInferenceTrigger('deepseek-v4-flash')).toBeTruthy()
@@ -568,7 +681,7 @@ describe('ChatLandingPage keyboard submission', () => {
     expect(screen.queryByText(/instead of Workspace/)).toBeNull()
     expect(screen.queryByText('Workspace settings stay unchanged')).toBeNull()
 
-    fireEvent.change(screen.getByPlaceholderText('Ask Alice…'), { target: { value: 'Use DeepSeek.' } })
+    fireEvent.change(screen.getByPlaceholderText('Describe the task, question, or decision…'), { target: { value: 'Use DeepSeek.' } })
     fireEvent.click(screen.getByRole('button', { name: 'Send' }))
 
     await waitFor(() => expect(mocks.quickChat).toHaveBeenCalledWith(
@@ -580,6 +693,7 @@ describe('ChatLandingPage keyboard submission', () => {
       undefined,
       undefined,
       undefined,
+      'terminal',
     ))
   })
 
@@ -596,7 +710,7 @@ describe('ChatLandingPage keyboard submission', () => {
     fireEvent.click(await screen.findByRole('menuitemradio', { name: 'high reasoning' }))
 
     expect(mocks.rememberQuickChatLaunch).not.toHaveBeenCalled()
-    fireEvent.change(screen.getByPlaceholderText('Ask Alice…'), { target: { value: 'Go deeper.' } })
+    fireEvent.change(screen.getByPlaceholderText('Describe the task, question, or decision…'), { target: { value: 'Go deeper.' } })
     fireEvent.click(screen.getByRole('button', { name: 'Send' }))
 
     await waitFor(() => expect(mocks.quickChat).toHaveBeenCalledWith(
@@ -608,6 +722,7 @@ describe('ChatLandingPage keyboard submission', () => {
       'gemini-3.1-pro-preview',
       'high',
       'native',
+      'terminal',
     ))
   })
 })
@@ -646,12 +761,12 @@ describe('ChatLandingPage AI source disclosure', () => {
     render(<ChatLandingPage spec={{ params: { targetWsId: 'chat-1' } }} />)
 
     fireEvent.click(await screen.findByRole('button', { name: 'AI access' }))
-    fireEvent.click(screen.getByRole('menuitem', { name: /Managed by Pi/ }))
+    fireEvent.click(screen.getByRole('menuitem', { name: /Pi account/ }))
     expect(mocks.rememberQuickChatLaunch).not.toHaveBeenCalled()
     expect(screen.getByRole('button', { name: 'Model and reasoning' }).textContent)
-      .toContain('Model managed by runtime')
+      .toContain('Default model')
 
-    fireEvent.change(screen.getByPlaceholderText('Ask Alice…'), { target: { value: 'Use my account.' } })
+    fireEvent.change(screen.getByPlaceholderText('Describe the task, question, or decision…'), { target: { value: 'Use my account.' } })
     fireEvent.click(screen.getByRole('button', { name: 'Send' }))
     await waitFor(() => expect(mocks.quickChat).toHaveBeenCalledWith(
       'Use my account.',
@@ -662,6 +777,7 @@ describe('ChatLandingPage AI source disclosure', () => {
       undefined,
       undefined,
       'native',
+      'terminal',
     ))
   })
 
@@ -710,7 +826,7 @@ describe('ChatLandingPage AI source disclosure', () => {
       expect(summary).toContain('deepseek-v4-flash')
       expect(summary).toContain('high reasoning')
     })
-    fireEvent.change(screen.getByPlaceholderText('Ask Alice…'), { target: { value: 'Continue.' } })
+    fireEvent.change(screen.getByPlaceholderText('Describe the task, question, or decision…'), { target: { value: 'Continue.' } })
     fireEvent.click(screen.getByRole('button', { name: 'Send' }))
 
     await waitFor(() => expect(mocks.quickChat).toHaveBeenCalledWith(
@@ -722,6 +838,7 @@ describe('ChatLandingPage AI source disclosure', () => {
       'deepseek-v4-flash',
       'high',
       undefined,
+      'terminal',
     ))
   })
 
@@ -783,8 +900,8 @@ describe('ChatLandingPage AI source disclosure', () => {
 
     render(<ChatLandingPage spec={{ params: { targetWsId: 'chat-1' } }} />)
 
-    expect((await findInferenceTrigger('gpt-5.6-sol')).textContent).toContain('Effort not specified')
-    fireEvent.change(screen.getByPlaceholderText('Ask Alice…'), { target: { value: 'Use model defaults.' } })
+    expect((await findInferenceTrigger('gpt-5.6-sol')).textContent).toContain('Default effort')
+    fireEvent.change(screen.getByPlaceholderText('Describe the task, question, or decision…'), { target: { value: 'Use model defaults.' } })
     fireEvent.click(screen.getByRole('button', { name: 'Send' }))
 
     await waitFor(() => expect(mocks.quickChat).toHaveBeenCalledWith(
@@ -796,6 +913,7 @@ describe('ChatLandingPage AI source disclosure', () => {
       'gpt-5.6-sol',
       undefined,
       'native',
+      'terminal',
     ))
   })
 
@@ -825,7 +943,7 @@ describe('ChatLandingPage AI source disclosure', () => {
     expect(screen.queryByText('Workspace settings stay unchanged')).toBeNull()
     expect(await findInferenceTrigger('gemini-3.1-flash-lite')).toBeTruthy()
     expect(screen.queryByRole('button', { name: 'Configure workspace AI' })).toBeNull()
-    expectDefaultEffort('Effort not specified')
+    expectDefaultEffort('Default effort')
   })
 
   it('keeps effort unspecified when a required reasoning model exposes no effort tiers', async () => {
@@ -848,7 +966,7 @@ describe('ChatLandingPage AI source disclosure', () => {
     render(<ChatLandingPage spec={{ params: { targetWsId: 'chat-1' } }} />)
 
     await findInferenceTrigger('kimi-k2.7-code')
-    expectDefaultEffort('Effort not specified')
+    expectDefaultEffort('Default effort')
   })
 
   it('keeps an in-progress provider choice when polling replaces equivalent Workspace settings', async () => {
@@ -890,5 +1008,24 @@ describe('ChatLandingPage AI source disclosure', () => {
     expect(mocks.detectWorkspaceCredential).not.toHaveBeenCalled()
     expect(await findInferenceTrigger('deepseek-v3.2')).toBeTruthy()
     expect(screen.getByRole('button', { name: 'Model and reasoning' }).textContent).not.toContain('gemini-3.1-pro-preview')
+  })
+})
+
+
+describe('Workspace embedded composer', () => {
+  it('submits into the explicit Quant Workspace even when another is the default', async () => {
+    const target: Workspace = { ...chatWorkspace(), id: 'quant-target', template: 'auto-quant-v2' }
+    const other: Workspace = { ...target, id: 'quant-default' }
+    workspaces = [target, other]
+    mocks.useWorkspaces.mockImplementation(() => context(workspaces, other.id))
+    render(<HarnessLandingPage mode="auto-quant" spec={{ params: { targetWsId: target.id } }} showHeader={false} />)
+    await screen.findByRole('button', { name: 'Model and reasoning' })
+    const input = screen.getByPlaceholderText('Describe the strategy, market, hypothesis, or iteration goal…')
+    fireEvent.change(input, { target: { value: 'Inspect existing research' } })
+    fireEvent.keyDown(input, { key: 'Enter', code: 'Enter' })
+    await waitFor(() => expect(mocks.quickChat).toHaveBeenCalledWith(
+      'Inspect existing research', 'pi', undefined, target.id, 'auto-quant-v2', undefined, undefined, undefined,
+      'terminal',
+    ))
   })
 })

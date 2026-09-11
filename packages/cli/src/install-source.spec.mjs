@@ -1,6 +1,6 @@
-import { mkdtemp, rm, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { join, resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
 
 import { afterEach, describe, expect, it } from 'vitest'
@@ -75,15 +75,96 @@ describe('OpenAlice install source', () => {
     const stableRelease = {
       schemaVersion: 2,
       repository: 'TraderAlice/OpenAlice',
-      cliVersion: '0.89.0-beta',
-      selector: { kind: 'version', value: 'v0.89.0-beta' },
-      installerUrl: 'https://raw.githubusercontent.com/TraderAlice/OpenAlice/v0.89.0-beta/install',
+      cliVersion: '0.90.1',
+      selector: { kind: 'version', value: 'v0.90.1' },
+      installerUrl: 'https://openalice.ai/install',
       updateChannel: 'stable',
     }
     const explicitPin = { ...stableRelease, updateChannel: 'pinned' }
 
     expect(installSourceUpdateChannel(stableRelease)).toBe('stable')
     expect(installSourcesMatch(stableRelease, explicitPin)).toBe(false)
+  })
+
+  it('recognizes beta as an explicit update channel', () => {
+    const betaRelease = {
+      schemaVersion: 2,
+      repository: 'TraderAlice/OpenAlice',
+      cliVersion: '0.90.2-beta.1',
+      selector: { kind: 'version', value: 'v0.90.2-beta.1' },
+      installerUrl: 'https://openalice.ai/install',
+      updateChannel: 'beta',
+    }
+
+    expect(parseInstallSource(betaRelease)).toEqual(betaRelease)
+    expect(installSourceUpdateChannel(betaRelease)).toBe('beta')
+  })
+
+  it('accepts complete native install provenance and rejects incomplete schema 3 metadata', () => {
+    const native = {
+      schemaVersion: 3,
+      repository: 'TraderAlice/OpenAlice',
+      cliVersion: '0.91.0',
+      selector: { kind: 'version', value: 'v0.91.0' },
+      installerUrl: 'https://openalice.ai/install',
+      updateChannel: 'stable',
+      method: 'direct',
+      artifact: {
+        platform: 'darwin',
+        arch: 'arm64',
+        sha256: 'a'.repeat(64),
+      },
+      installedAt: '2026-08-29T00:00:00Z',
+    }
+    expect(parseInstallSource(native)).toEqual(native)
+    expect(parseInstallSource({ ...native, artifact: undefined })).toBeNull()
+    expect(parseInstallSource({ ...native, method: 'mystery' })).toBeNull()
+  })
+
+  it('discovers package-manager provenance beside a standalone executable', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'openalice-package-source-'))
+    temporaryPaths.push(root)
+    await writeFile(join(root, 'install-source.json'), JSON.stringify({
+      schemaVersion: 3,
+      repository: 'TraderAlice/OpenAlice',
+      cliVersion: '0.91.0',
+      selector: { kind: 'version', value: 'v0.91.0' },
+      installerUrl: 'https://www.npmjs.com/package/openalice',
+      updateChannel: 'stable',
+      method: 'npm',
+      artifact: { platform: 'darwin', arch: 'arm64', sha256: 'a'.repeat(64) },
+      installedAt: '2026-08-30T00:00:00Z',
+    }))
+
+    await expect(readInstallSource({
+      bunStandalone: true,
+      executable: join(root, 'bin', 'openalice'),
+      env: {},
+    })).resolves.toMatchObject({ method: 'npm', cliVersion: '0.91.0' })
+  })
+
+  it('discovers system-manager provenance in the linked resource root', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'openalice-system-source-'))
+    temporaryPaths.push(root)
+    const resourceRoot = join(root, 'share', 'openalice')
+    await mkdir(resourceRoot, { recursive: true })
+    await writeFile(join(resourceRoot, 'install-source.json'), JSON.stringify({
+      schemaVersion: 3,
+      repository: 'TraderAlice/OpenAlice',
+      cliVersion: '0.91.0',
+      selector: { kind: 'version', value: 'v0.91.0' },
+      installerUrl: 'https://github.com/TraderAlice/homebrew-tap',
+      updateChannel: 'stable',
+      method: 'brew',
+      artifact: { platform: 'darwin', arch: 'arm64', sha256: 'b'.repeat(64) },
+      installedAt: '2026-08-30T00:00:00Z',
+    }))
+
+    await expect(readInstallSource({
+      bunStandalone: true,
+      executable: join(root, 'bin', 'openalice'),
+      env: { OPENALICE_APP_HOME: resourceRoot },
+    })).resolves.toMatchObject({ method: 'brew', cliVersion: '0.91.0' })
   })
 
   it('derives installed content identity only from an immutable release directory', () => {
@@ -106,5 +187,21 @@ describe('OpenAlice install source', () => {
     expect(installedContentIdentity(installedModuleUrl))
       .toBe('0123456789abcdef')
     expect(installedContentIdentity(sourceModuleUrl)).toBeNull()
+    expect(installedContentIdentity(sourceModuleUrl, {
+      env: { OPENALICE_CONTENT_IDENTITY: 'fedcba9876543210' },
+    })).toBe('fedcba9876543210')
+    expect(installedContentIdentity(sourceModuleUrl, {
+      bunStandalone: true,
+      executable: '/usr/bin/openalice',
+      env: {},
+      readFileSync: (path) => {
+        if (path === resolve('/usr/share/openalice/release.json')) {
+          return JSON.stringify({ contentIdentity: 'aaaaaaaaaaaaaaaa' })
+        }
+        const error = new Error('missing')
+        error.code = 'ENOENT'
+        throw error
+      },
+    })).toBe('aaaaaaaaaaaaaaaa')
   })
 })

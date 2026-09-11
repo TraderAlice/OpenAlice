@@ -82,7 +82,7 @@ describe('TradeableContractsPanel', () => {
     expect(row?.className).toContain('grid-cols-[minmax(0,1fr)_auto]')
     expect(row?.className).toContain('sm:flex')
 
-    const description = screen.getByText('AAPL equity · NASDAQ · USD')
+    const description = screen.getByText('AAPL equity, NASDAQ, USD')
     expect(description.className).toContain('col-span-2')
     expect(description.className).toContain('sm:flex-1')
 

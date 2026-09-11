@@ -17,7 +17,7 @@
  * which works from this CommonJS payload on every supported Node runtime.
  *
  *   alice                              list command groups (data export)
- *   alice-workspace inbox push ...     collaboration export
+ *   alice inbox push ...     collaboration export
  *   <bin> <group> <verb> --help        show a verb's flags
  *   <bin> <group> <verb> [--flags]     run it; JSON to stdout
  */
@@ -28,6 +28,13 @@ let BIN = 'alice'
 
 async function main() {
   const argv = process.argv.slice(2)
+  let outputPath
+  const outputIndex = argv.indexOf('--output')
+  if (outputIndex >= 0) {
+    outputPath = argv[outputIndex + 1]
+    if (!outputPath || outputPath.startsWith('-')) fail('--output requires a file path')
+    argv.splice(outputIndex, 2)
+  }
 
   // Launchers provide the public command name because argv[1] now points to
   // this shared payload. Keep argv fallback for direct diagnostics/tests.
@@ -36,15 +43,21 @@ async function main() {
     (process.argv[1] || 'alice').split(/[\\/]/).pop() ||
     'alice'
   ).split(/[\\/]/).pop() || 'alice'
-  const exportKey = BIN === 'alice' ? 'data' : BIN.replace(/^alice-/, '')
+  if (BIN === 'alice-workspace') {
+    console.error('alice-workspace is a compatibility alias; use alice <group> <verb>.')
+    BIN = 'alice'
+  }
+  const exportKey = (BIN === 'alice' || BIN === 'alice-workspace') ? 'data' : BIN.replace(/^alice-/, '')
 
   const toolSocket = process.env.OPENALICE_TOOL_SOCKET
   const toolUrl = process.env.OPENALICE_TOOL_URL
   const legacyMcpUrl = process.env.OPENALICE_MCP_URL || 'http://127.0.0.1:47332/mcp'
   const wsId = process.env.AQ_WS_ID
-  if (!wsId) {
-    fail('AQ_WS_ID is not set — run from inside an OpenAlice workspace.')
+  const projectId = process.env.OPENALICE_PROJECT_ID
+  if (!wsId && !projectId) {
+    fail('No Project context — use openalice exec --project <key> alice ... or run inside a Workspace.')
   }
+  if (!wsId && !toolUrl && !toolSocket) fail('No Project endpoint — use openalice exec --project <key> alice ...')
   // Prefer the dedicated CLI base. Fall back to legacy MCP-derived config so
   // older workspace envs keep working: .../mcp -> .../cli/<wsId>/<export>.
   const gateway = toolSocket
@@ -52,7 +65,7 @@ async function main() {
     : toolUrl
       ? toolUrl.replace(/\/+$/, '')
       : legacyMcpUrl.replace(/\/+$/, '').replace(/\/mcp$/, '/cli')
-  const base = gateway + '/' + wsId + '/' + exportKey
+  const base = gateway + '/' + (wsId ? encodeURIComponent(wsId) : 'project') + '/' + exportKey
   debug('runtime', { bin: BIN, wsId, toolSocket, toolUrl, base })
 
   const wantsHelp = argv.includes('--help') || argv.includes('-h')
@@ -91,9 +104,20 @@ async function main() {
   if (wantsHelp) return printVerbHelp(group, verb, cmd)
 
   // Run it.
-  const args = parseFlags(argv.slice(argv.indexOf(verb) + 1), cmd.schema, { group, verb })
+  const args = await parseFlags(argv.slice(argv.indexOf(verb) + 1), cmd.schema, { group, verb })
+  if (outputPath) {
+    const fs = await import('node:fs/promises')
+    try { await fs.lstat(outputPath); fail(`Output already exists: ${outputPath}`) }
+    catch (error) { if (error.code !== 'ENOENT') throw error }
+  }
   const res = await invoke(base, cmd.tool, args)
-  process.stdout.write(res.endsWith('\n') ? res : res + '\n')
+  const output = res.endsWith('\n') ? res : res + '\n'
+  if (outputPath) {
+    // Exclusive creation avoids destroying an existing dataset on a typo.
+    const fs = await import('node:fs/promises')
+    await fs.writeFile(outputPath, output, { flag: 'wx' })
+    process.stderr.write(`Saved ${outputPath}\n`)
+  } else process.stdout.write(output)
 }
 
 // ---- HTTP -----------------------------------------------------------------
@@ -116,6 +140,11 @@ async function manifest(base) {
         'check OPENALICE_TOOL_URL / OPENALICE_TOOL_SOCKET and point at the tools endpoint, not the Vite UI page.',
     )
   }
+  if (Array.isArray(r.body.warnings)) {
+    for (const warning of r.body.warnings) {
+      if (typeof warning === 'string') process.stderr.write(`Warning: ${warning}\n`)
+    }
+  }
   return r.body
 }
 
@@ -128,9 +157,9 @@ async function invoke(base, tool, args) {
   // one. So at most one of these headers is ever sent.
   const headers = { 'Content-Type': 'application/json' }
   const runId = process.env.AQ_RUN_ID
-  if (runId) headers['x-openalice-run'] = runId
+  if (runId && process.env.AQ_WS_ID) headers['x-openalice-run'] = runId
   const sessionId = process.env.AQ_SESSION_ID
-  if (sessionId) headers['x-openalice-session'] = sessionId
+  if (sessionId && process.env.AQ_WS_ID) headers['x-openalice-session'] = sessionId
   const r = await fetchJson(base + '/invoke', {
     method: 'POST',
     headers,
@@ -150,6 +179,7 @@ async function invoke(base, tool, args) {
 }
 
 async function fetchJson(url, opts) {
+  opts = { ...opts, headers: { ...opts.headers, ...(process.env.OPENALICE_PROJECT_ID ? { 'x-openalice-project': process.env.OPENALICE_PROJECT_ID } : {}) } }
   if (process.env.OPENALICE_TOOL_SOCKET && url.startsWith('/')) {
     return fetchSocketJson(process.env.OPENALICE_TOOL_SOCKET, url, opts)
   }
@@ -200,10 +230,9 @@ async function fetchSocketJson(socketPath, path, opts) {
 
 // ---- flag parsing ---------------------------------------------------------
 
-function parseFlags(tokens, schema, command) {
+async function parseFlags(tokens, schema, command) {
   const args = {}
   const meta = {}
-  const docs = []
   const properties = (schema && schema.properties) || {}
   for (let i = 0; i < tokens.length; i++) {
     let tok = tokens[i]
@@ -239,15 +268,24 @@ function parseFlags(tokens, schema, command) {
     // Preserve an exact schema key first (some data tools intentionally use
     // hyphenated keys), then normalize only when the camelCase key exists.
     const camelKey = key.replace(/-([a-zA-Z0-9])/g, (_, ch) => ch.toUpperCase())
-    const schemaKey = Object.prototype.hasOwnProperty.call(properties, key)
+    const directSchemaKey = Object.prototype.hasOwnProperty.call(properties, key)
       ? key
       : Object.prototype.hasOwnProperty.call(properties, camelKey)
         ? camelKey
         : key
+    // A file-backed string flag avoids the caller shell interpreting values
+    // such as "$971" before this process receives them. Every string option
+    // automatically gains `--<name>-file <path>`; `-` reads stdin.
+    const fileBaseKey = key.endsWith('-file') ? key.slice(0, -5) : ''
+    const fileBaseCamelKey = fileBaseKey.replace(/-([a-zA-Z0-9])/g, (_, ch) => ch.toUpperCase())
+    const fileSchemaKey = !Object.prototype.hasOwnProperty.call(properties, directSchemaKey) &&
+      fileBaseKey && properties[fileBaseCamelKey]?.type === 'string'
+      ? fileBaseCamelKey
+      : null
+    const schemaKey = fileSchemaKey || directSchemaKey
     const propertySchema = properties[schemaKey]
     const supportedAlias =
-      (schemaKey === 'meta' && Object.prototype.hasOwnProperty.call(properties, 'metadataFilter')) ||
-      (schemaKey === 'doc' && Object.prototype.hasOwnProperty.call(properties, 'docs'))
+      (schemaKey === 'meta' && Object.prototype.hasOwnProperty.call(properties, 'metadataFilter'))
     if (!propertySchema && !supportedAlias) {
       const available = Object.keys(properties).map(shellFlagName)
       const accepted = available.length > 0
@@ -260,7 +298,15 @@ function parseFlags(tokens, schema, command) {
           `Run \`${BIN} ${command.group} ${command.verb} --help\` before retrying.`,
       )
     }
-    if (propertySchema && propertySchema.type === 'boolean' && typeof val === 'string') {
+    if (fileSchemaKey) {
+      const { readFileSync } = await import('node:fs')
+      try {
+        const content = readFileSync(val === '-' ? 0 : String(val), 'utf8')
+        val = schemaKey === 'body' ? content : content.replace(/\r?\n$/, '')
+      } catch (error) {
+        fail(`cannot read --${key} value from "${val}": ${error && error.message ? error.message : String(error)}`)
+      }
+    } else if (propertySchema && propertySchema.type === 'boolean' && typeof val === 'string') {
       if (val === 'true') val = true
       else if (val === 'false') val = false
     }
@@ -268,11 +314,6 @@ function parseFlags(tokens, schema, command) {
       // repeatable: --meta key=value -> metadataFilter
       const e = val.indexOf('=')
       if (e >= 0) meta[val.slice(0, e)] = val.slice(e + 1)
-    } else if (schemaKey === 'doc') {
-      // repeatable: --doc <path> -> docs: [{ path }] (inbox_push attachments).
-      // A JSON object value (--doc '{"path":"x"}') is kept as-is so future
-      // per-doc fields keep working; a bare path is wrapped into { path }.
-      docs.push(val && typeof val === 'object' ? val : { path: String(val) })
     } else if (propertySchema && propertySchema.type === 'array') {
       const current = Array.isArray(args[schemaKey]) ? args[schemaKey] : []
       args[schemaKey] = current.concat(Array.isArray(val) ? val : [val])
@@ -281,7 +322,6 @@ function parseFlags(tokens, schema, command) {
     }
   }
   if (Object.keys(meta).length) args.metadataFilter = meta
-  if (docs.length) args.docs = docs
   return args
 }
 
@@ -316,6 +356,7 @@ function printVerbs(group, cmds, description) {
 }
 
 function printVerbHelp(group, verb, cmd) {
+  out('Use --output <file> to save the response without filling stdout (existing files are preserved).')
   out(`${BIN} ${group} ${verb} [--flags]\n`)
   if (cmd.description) out(cmd.description + '\n')
   const props = (cmd.schema && cmd.schema.properties) || {}
@@ -339,6 +380,9 @@ function printVerbHelp(group, verb, cmd) {
         : ''
     const repeatable = type === 'array' ? ' (repeatable)' : ''
     out(`  --${flag}${valueHint}${req}${repeatable}   ${firstLine(p.description || '')}`)
+    if (type === 'string') {
+      out(`  --${flag}-file <path>   Read the exact value from a file (use - for stdin; avoids shell interpolation).`)
+    }
   }
 }
 
@@ -373,7 +417,6 @@ function flagRecoveryHint(group, verb, flag) {
 }
 
 function shellFlagName(name) {
-  if (name === 'docs') return 'doc'
   if (name === 'metadataFilter') return 'meta'
   return name.replace(/([a-z0-9])([A-Z])/g, '$1-$2').toLowerCase()
 }
@@ -386,11 +429,15 @@ function out(s) {
 }
 function debug(label, value) {
   if (process.env.OPENALICE_CLI_DEBUG !== '1') return
-  out('[openalice-cli-debug] ' + label + ' ' + JSON.stringify(value))
+  process.stderr.write('[openalice-cli-debug] ' + label + ' ' + JSON.stringify(value) + '\n')
 }
 function fail(msg) {
   process.stderr.write(BIN + ': ' + msg + '\n')
   process.exit(1)
 }
 
-main().catch((e) => fail(e && e.stack ? e.stack : String(e)))
+module.exports.main = main
+
+if (!globalThis.__OPENALICE_INTERNAL_ROLE_DISPATCH__) {
+  main().catch((e) => fail(e && e.stack ? e.stack : String(e)))
+}

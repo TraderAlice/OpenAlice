@@ -1,13 +1,16 @@
 import { useState, useEffect, useMemo } from 'react'
+import { ChevronRight, ExternalLink, X } from 'lucide-react'
 import { Section } from '../form'
 import { Toggle } from '../Toggle'
+import { Button } from '../ui/button'
 import { GuardsSection, CRYPTO_GUARD_TYPES, SECURITIES_GUARD_TYPES } from '../guards'
 import { ReconnectButton } from '../ReconnectButton'
 import { useSchemaForm } from '../../hooks/useSchemaForm'
-import type { UTAConfig, BrokerPreset, BrokerHealthInfo } from '../../api/types'
+import type { UTAConfig, BrokerPreset, BrokerHealthInfo, BrokerEngine } from '../../api/types'
+import type { AccountInteractionPolicy, AccountPackReadiness } from '../../hooks/useBrokerPackReadiness'
 import { displayNameForUTA } from '../../lib/uta-account-filter'
 import { Dialog } from './Dialog'
-import { HealthBadge } from './HealthBadge'
+import { AccountReadinessBadge, BrokerSupportGate } from './BrokerPackGate'
 import { SchemaFormFields } from './SchemaFormFields'
 
 /**
@@ -20,10 +23,15 @@ import { SchemaFormFields } from './SchemaFormFields'
  * drill-in for this account. When opened from inside Portfolio's detail
  * page, that prop is omitted (the user is already in that context).
  */
-export function EditUTADialog({ uta, preset, health, onSave, onDelete, onViewInPortfolio, onClose }: {
+export function EditUTADialog({ uta, preset, health, readiness, policy, installingEngine, onInstallBrokerPack, onRetryBrokerPack, onSave, onDelete, onViewInPortfolio, onClose }: {
   uta: UTAConfig
   preset?: BrokerPreset
   health?: BrokerHealthInfo
+  readiness: AccountPackReadiness
+  policy: AccountInteractionPolicy
+  installingEngine?: BrokerEngine | null
+  onInstallBrokerPack: (engine: Exclude<BrokerEngine, 'mock'>) => Promise<void>
+  onRetryBrokerPack: () => Promise<void>
   onSave: (a: UTAConfig) => Promise<void>
   onDelete: () => Promise<void>
   onViewInPortfolio?: () => void
@@ -80,36 +88,34 @@ export function EditUTADialog({ uta, preset, health, onSave, onDelete, onViewInP
       <div className="relative shrink-0 border-b border-border px-4 py-3 sm:flex sm:items-center sm:justify-between sm:px-6 sm:py-4">
         <div className="flex min-w-0 items-center gap-2 pr-8 sm:gap-3 sm:pr-0">
           <div className="min-w-0 flex-1">
-            <h3 className="text-[14px] font-semibold text-foreground truncate">{displayName}</h3>
+            <h3 className="text-[14px] leading-[19px] font-semibold text-foreground truncate">{displayName}</h3>
             {displayName !== uta.id && (
-              <div className="mt-0.5 truncate font-mono text-[10px] text-muted-foreground">{uta.id}</div>
+              <div className="mt-0.5 truncate font-mono text-[10px] leading-[14px] text-muted-foreground">{uta.id}</div>
             )}
           </div>
-          <HealthBadge health={health} size="md" />
+          <AccountReadinessBadge readiness={readiness} health={health} size="md" />
         </div>
         <div className={`${onViewInPortfolio ? 'mt-2' : ''} flex shrink-0 items-center sm:mt-0 sm:gap-3`}>
           {onViewInPortfolio && (
-            <button
+            <Button
+              variant="ghost"
+              size="sm"
               onClick={onViewInPortfolio}
-              className="text-[11px] text-muted-foreground hover:text-foreground inline-flex items-center gap-1 transition-colors"
-              title="See this account's positions and equity in Portfolio"
+              className="text-muted-foreground"
             >
               View in Portfolio
-              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M7 17L17 7M9 7h8v8" />
-              </svg>
-            </button>
+              <ExternalLink aria-hidden />
+            </Button>
           )}
-          <button
-            type="button"
+          <Button
+            variant="ghost"
+            size="icon-sm"
             onClick={onClose}
             aria-label={`Close ${displayName} editor`}
-            className="absolute right-4 top-3 rounded-md p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground sm:static"
+            className="absolute right-4 top-3 text-muted-foreground sm:static"
           >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-              <path d="M18 6L6 18M6 6l12 12" />
-            </svg>
-          </button>
+            <X aria-hidden />
+          </Button>
         </div>
       </div>
 
@@ -118,6 +124,15 @@ export function EditUTADialog({ uta, preset, health, onSave, onDelete, onViewInP
         data-testid="edit-uta-scroll"
         className="min-h-0 flex-1 space-y-5 overflow-y-auto overscroll-contain px-4 py-4 [scrollbar-gutter:stable] sm:px-6 sm:py-6"
       >
+        {!readiness.operational && (
+          <BrokerSupportGate
+            readiness={readiness}
+            installingEngine={installingEngine}
+            onInstall={onInstallBrokerPack}
+            onRetry={onRetryBrokerPack}
+            compact
+          />
+        )}
         <Section title="Configuration">
           <div className="mb-3">
             <span className="text-[12px] text-muted-foreground">Type</span>
@@ -158,30 +173,32 @@ export function EditUTADialog({ uta, preset, health, onSave, onDelete, onViewInP
             showSecrets={showKeys}
           />
           {hasSensitive && (
-            <button
+            <Button
+              variant="ghost"
+              size="sm"
               onClick={() => setShowKeys(!showKeys)}
-              className="text-[11px] text-muted-foreground hover:text-foreground transition-colors mt-2"
+              className="mt-2 px-0 text-muted-foreground hover:bg-transparent"
             >
               {showKeys ? 'Hide secrets' : 'Show secrets'}
-            </button>
+            </Button>
           )}
         </Section>
 
         {/* Guards */}
         <div>
-          <button
+          <Button
+            variant="ghost"
+            size="sm"
             onClick={() => setGuardsOpen(!guardsOpen)}
-            className="flex items-center gap-1.5 text-[13px] font-semibold text-muted-foreground uppercase tracking-wide"
+            className="px-0 text-[13px] text-muted-foreground hover:bg-transparent"
+            aria-expanded={guardsOpen}
           >
-            <svg
-              width="12" height="12" viewBox="0 0 24 24"
-              fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
-              className={`transition-transform duration-150 ${guardsOpen ? 'rotate-90' : ''}`}
-            >
-              <polyline points="9 18 15 12 9 6" />
-            </svg>
+            <ChevronRight
+              aria-hidden
+              className={`transition-transform duration-[110ms] [transition-timing-function:var(--motion-ease-out)] motion-reduce:transition-none ${guardsOpen ? 'rotate-90' : ''}`}
+            />
             Guards ({draft.guards.length})
-          </button>
+          </Button>
           {guardsOpen && (
             <div className="mt-3">
               <GuardsSection
@@ -203,22 +220,26 @@ export function EditUTADialog({ uta, preset, health, onSave, onDelete, onViewInP
       >
         <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2 sm:gap-3">
           {dirty && (
-            <button onClick={handleSave} disabled={saving} className="btn-primary">
-              {saving ? 'Saving...' : 'Save'}
-            </button>
+            <Button onClick={handleSave} disabled={saving}>
+              {saving ? 'Saving…' : 'Save'}
+            </Button>
           )}
-          {draft.enabled !== false && <ReconnectButton accountId={uta.id} />}
+          {draft.enabled !== false && (
+            <ReconnectButton accountId={uta.id} disabled={!policy.canReconnect} disabledReason={policy.reason} />
+          )}
           <label className="flex items-center gap-2 cursor-pointer">
             <Toggle
               ariaLabel={`${uta.id} enabled`}
               checked={draft.enabled !== false}
+              disabled={draft.enabled === false && !readiness.operational}
+              title={draft.enabled === false && !readiness.operational ? policy.reason : undefined}
               onChange={async (v) => {
                 const updated = { ...draft, enabled: v }
                 setDraft(updated)
                 await onSave(updated)
               }}
             />
-            <span className="text-[12px] text-muted-foreground">{draft.enabled !== false ? 'Enabled' : 'Disabled'}</span>
+            <span className="text-[12px] text-muted-foreground">{draft.enabled !== false ? 'Configured on' : 'Configured off'}</span>
           </label>
           {msg && <span className="text-[12px] text-muted-foreground">{msg}</span>}
         </div>
@@ -234,19 +255,19 @@ function DeleteButton({ label, onConfirm }: { label: string; onConfirm: () => vo
   if (confirming) {
     return (
       <div className="flex shrink-0 items-center gap-2">
-        <button onClick={() => { onConfirm(); setConfirming(false) }} className="btn-danger">
+        <Button variant="destructive" onClick={() => { onConfirm(); setConfirming(false) }}>
           Confirm
-        </button>
-        <button onClick={() => setConfirming(false)} className="btn-secondary">
+        </Button>
+        <Button variant="outline" onClick={() => setConfirming(false)}>
           Cancel
-        </button>
+        </Button>
       </div>
     )
   }
 
   return (
-    <button onClick={() => setConfirming(true)} className="btn-danger shrink-0">
+    <Button variant="destructive" onClick={() => setConfirming(true)} className="shrink-0">
       {label}
-    </button>
+    </Button>
   )
 }

@@ -70,6 +70,7 @@ describe('detectBinary', () => {
     expect(detectBinary('claude', { platform: 'linux', env: { PATH: dir } })).toEqual({
       installed: true,
       path: p,
+      fingerprint: expect.any(String),
     });
   });
 
@@ -77,6 +78,7 @@ describe('detectBinary', () => {
     expect(detectBinary('claude', { platform: 'linux', env: { PATH: dir } })).toEqual({
       installed: false,
       path: null,
+      fingerprint: null,
     });
   });
 });
@@ -91,7 +93,7 @@ describe('detectAgentBinary', () => {
         OPENALICE_MANAGED_PI_PATH: managedPi,
         PATH: dir,
       },
-    })).toEqual({ installed: true, path: managedPi });
+    })).toEqual({ installed: true, path: managedPi, fingerprint: expect.any(String) });
     expect(findExecutableOnPath('pi', { platform: 'linux', env: { PATH: dir } })).toBe(pathPi);
   });
 
@@ -103,7 +105,7 @@ describe('detectAgentBinary', () => {
         OPENALICE_MANAGED_PI_PATH: join(dir, 'missing-pi'),
         PATH: dir,
       },
-    })).toEqual({ installed: true, path: pathPi });
+    })).toEqual({ installed: true, path: pathPi, fingerprint: expect.any(String) });
   });
 });
 

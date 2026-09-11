@@ -58,6 +58,8 @@ import {
 import { existingOwnerSmokeMode, resolveExistingOwnerStartup } from './existing-owner-startup.js'
 import { inspectPreviousUpdateAttempt, recordUpdateAttempt } from './update-attempt.js'
 import { childIsRunning, stopChild } from './child-shutdown.js'
+import { exitDesktopProcess } from './app-exit.js'
+import { configureWindowChrome, windowChromeOptions } from './window-chrome.js'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = dirname(__filename)
@@ -252,19 +254,18 @@ async function resolveChildProxyEnv(): Promise<Record<string, string>> {
   // Existing env is authoritative on every platform. Electron 39 embeds Node
   // 22.22, whose fetch stack consumes it only when NODE_USE_ENV_PROXY is set.
   const explicit = proxyEnvFromRules('', process.env)
-  if (Object.keys(explicit).length > 0 || process.env['HTTPS_PROXY'] || process.env['HTTP_PROXY'] || process.env['ALL_PROXY']) {
+  if (Object.keys(explicit).length > 0) {
     return explicit
   }
-  if (process.platform !== 'win32') return {}
 
   try {
-    // Chromium already understands Windows Internet Options, including PAC.
+    // Chromium already understands the host system proxy, including PAC.
     // Resolve one representative HTTPS API URL and pass a concrete proxy to
     // the pure-Node Alice/UTA children, whose fetch does not consult Chromium.
     const rules = await session.defaultSession.resolveProxy('https://api.openai.com/')
     return proxyEnvFromRules(rules, process.env)
   } catch (err) {
-    console.warn(`[guardian] could not resolve Windows system proxy: ${err instanceof Error ? err.message : String(err)}`)
+    console.warn(`[guardian] could not resolve system proxy: ${err instanceof Error ? err.message : String(err)}`)
     return {}
   }
 }
@@ -323,6 +324,8 @@ async function waitForUTA(utaUrl: string, timeoutMs = UTA_READY_TIMEOUT_MS): Pro
 async function runRendererPtySmoke(win: BrowserWindow): Promise<void> {
   const keepWorkspace = process.env['OPENALICE_ELECTRON_SMOKE_KEEP_WORKSPACE'] === '1'
   const result = await win.webContents.executeJavaScript(`(async () => {
+    const stage = (value) => console.warn('[desktop-pty-smoke] renderer stage=' + value)
+    stage('bridge')
     const bridge = window.openAlice?.pty
     if (!bridge) throw new Error('window.openAlice.pty missing')
     const keyboard = window.openAlice?.keyboard
@@ -333,7 +336,9 @@ async function runRendererPtySmoke(win: BrowserWindow): Promise<void> {
     }
     const tag = 'electron-smoke-' + Date.now().toString(36)
     const json = async (res) => {
+      stage('response-headers status=' + res.status)
       const text = await res.text()
+      stage('response-body')
       let body = null
       try { body = text ? JSON.parse(text) : null } catch { body = text }
       if (!res.ok) throw new Error(res.status + ' ' + text)
@@ -343,18 +348,21 @@ async function runRendererPtySmoke(win: BrowserWindow): Promise<void> {
     let sessionId = ''
     let connectionId = ''
     try {
+      stage('create-workspace')
       const created = await json(await fetch('/api/workspaces', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ tag, template: 'chat' }),
       }))
       workspaceId = created.workspace.id
+      stage('spawn-shell')
       const spawned = await json(await fetch('/api/workspaces/' + encodeURIComponent(workspaceId) + '/sessions/spawn', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ agent: 'shell' }),
       }))
       sessionId = spawned.sessionId
+      stage('connect-pty')
       const attached = await new Promise((resolve, reject) => {
         const timer = setTimeout(() => reject(new Error('PTY attached timeout')), 10000)
         connectionId = bridge.connect({ sessionId, cols: 80, rows: 24 })
@@ -383,6 +391,7 @@ async function runRendererPtySmoke(win: BrowserWindow): Promise<void> {
       if (typeof attached.kittyKeyboardFlags !== 'number') {
         throw new Error('PTY attach omitted Kitty keyboard flags')
       }
+      stage('attached')
       return { ok: true, workspaceId, sessionId, attached, keyboardInputSourceId }
     } finally {
       if (connectionId) bridge.close(connectionId)
@@ -453,6 +462,12 @@ async function runRendererOnboardingSmoke(win: BrowserWindow): Promise<void> {
       throw new Error('isolated packaged smoke should be locked by OPENALICE_HOME')
     }
 
+    const setup = await json(await fetch('/api/workspaces/project-setup'))
+    const workspaceList = await json(await fetch('/api/workspaces'))
+    if (setup.pending?.length || !workspaceList.workspaces?.some(ws => ws.template === 'chat')) {
+      throw new Error('new project did not prepare Chat before opening the renderer')
+    }
+
     const agents = await json(await fetch('/api/workspaces/agents'))
     const pi = agents.agents?.find((agent) => agent.id === 'pi')
     if (!pi?.installed) throw new Error('managed Pi was not detected by packaged /agents')
@@ -476,15 +491,15 @@ async function runRendererOnboardingSmoke(win: BrowserWindow): Promise<void> {
     }, 60000)
 
     if (!initialReadiness.agents.pi?.ready) {
-      await waitFor('AI credential action', () => {
+      const addCredential = await waitFor('AI credential action', () => {
         const button = document.querySelector('[data-testid="first-run-guide-primary"]')
         return button &&
           !button.disabled &&
           button.getAttribute('data-onboarding-action') === 'add-credential'
-          ? true
-          : false
+          ? button
+          : document.querySelector('[data-testid="first-run-guide-add-provider"]')
       })
-      clickPrimary()
+      addCredential.click()
       await waitFor('credential modal', () => credentialPrimary())
       credentialPrimary().click()
       await waitFor('verified credential', () => {
@@ -510,13 +525,10 @@ async function runRendererOnboardingSmoke(win: BrowserWindow): Promise<void> {
       const snapshot = await json(await fetch('/api/agent-runtimes/readiness'))
       const row = snapshot.agents?.pi
       const button = document.querySelector('[data-testid="first-run-guide-primary"]')
-      return activeStep() === 'ai' &&
-        row?.ready === true &&
-        button &&
-        !button.disabled &&
-        button.getAttribute('data-onboarding-action') === 'continue'
+      return row?.ready === true && (activeStep() === 'broker' || (activeStep() === 'ai' &&
+        button && !button.disabled && button.getAttribute('data-onboarding-action') === 'continue'))
     }, 60000)
-    clickPrimary()
+    if (activeStep() === 'ai') clickPrimary()
     await waitFor('broker step', () => activeStep() === 'broker' ? true : false)
 
     return {
@@ -686,11 +698,9 @@ app.whenReady().then(async () => {
   const homeEnv = app.isPackaged
     ? {
         OPENALICE_HOME: userDataHome,
-        // The app dir itself (Contents/Resources/app with asar:false) — it's
-        // what *contains* default/, ui/dist, src/workspaces, services/uta/dist,
-        // matching how src/core/paths.ts resolves resources (APP_HOME/<dir>).
-        // NOT dirname() — that points one level above the shipped files.
-        OPENALICE_APP_HOME: app.getAppPath(),
+        // External tools need real paths. Code and dependencies stay in
+        // app.asar; shipped Workspace assets/toolchains live beside it.
+        OPENALICE_APP_HOME: join(process.resourcesPath, 'runtime'),
       }
     : {
         OPENALICE_HOME: userDataHome,
@@ -808,6 +818,7 @@ app.whenReady().then(async () => {
         ...process.env,
         ELECTRON_RUN_AS_NODE: '1',
         OPENALICE_CONNECTOR_PORT: String(connectorPort),
+        OPENALICE_TOOL_SOCKET: toolSocketPath,
         OPENALICE_LAUNCHER: 'electron',
         OPENALICE_GUARDIAN_PID: String(process.pid),
         OPENALICE_GUARDIAN_STARTED_AT: String(guardianStartedAt),
@@ -927,8 +938,14 @@ app.whenReady().then(async () => {
     }),
   })
   protocol.handle('app', async (request) => {
+    const smokeTrace = process.env['OPENALICE_ELECTRON_SMOKE_PTY'] === '1'
+      && request.method === 'POST'
+      && new URL(request.url).pathname.startsWith('/api/workspaces')
+    if (smokeTrace) console.log('[desktop-pty-smoke] main stage=web-request')
     try {
-      return await fetchAliceWebRequest(request, alice)
+      const response = await fetchAliceWebRequest(request, alice)
+      if (smokeTrace) console.log('[desktop-pty-smoke] main stage=web-response status=' + response.status)
+      return response
     } catch (err) {
       return new Response(err instanceof Error ? err.message : String(err), { status: 503 })
     }
@@ -991,6 +1008,7 @@ app.whenReady().then(async () => {
     width: 1280,
     height: 800,
     title: 'OpenAlice',
+    ...windowChromeOptions(),
     webPreferences: {
       preload: resolve(__dirname, 'preload.js'),
       contextIsolation: true,
@@ -1001,6 +1019,7 @@ app.whenReady().then(async () => {
       sandbox: false,
     },
   })
+  configureWindowChrome(win)
   win.webContents.on('preload-error', (_event, preloadPath, error) => {
     console.error(`[guardian] renderer preload failed path=${preloadPath}: ${error.message}`)
   })
@@ -1317,7 +1336,11 @@ function shutdown(): void {
   void stopChildren().finally(async () => {
     await releaseGuardianRuntimeLock()
     const exitCode = typeof process.exitCode === 'number' ? process.exitCode : 0
-    app.exit(exitCode)
+    console.log(`[guardian] shutdown complete → exit ${exitCode}`)
+    exitDesktopProcess(exitCode, {
+      appExit: (code) => app.exit(code),
+      processExit: (code) => process.exit(code),
+    })
   })
 }
 

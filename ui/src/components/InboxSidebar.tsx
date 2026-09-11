@@ -1,3 +1,4 @@
+import { inboxFiles } from '@traderalice/connector-protocol'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Clock, Layers, Search, X } from 'lucide-react'
@@ -7,9 +8,22 @@ import { inboxLive } from '../live/inbox'
 import { useInboxRead } from '../live/inbox-read'
 import { useInboxSelection } from '../live/inbox-selection'
 import { useInboxViewMode } from '../live/inbox-view-mode'
-import { groupThreads, previewForEntry } from '../live/inbox-threads'
+import { presentInboxEntry } from '../lib/inbox-presentation'
+import { groupThreads } from '../live/inbox-threads'
+import {
+  isActiveOfficeInboxDutyReviewTarget,
+  readOfficeInboxDutyExcursion,
+} from '../office/inbox-duty-excursion'
 import { workspaceDisplayName } from './workspace/display'
 import { Skeleton } from './StateViews'
+import { Button } from './ui/button'
+import { inputClass } from './form'
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from './ui/tooltip'
+import { SelectionIndicator } from './SelectionIndicator'
 import type { InboxEntry } from '../api/inbox'
 
 /**
@@ -22,8 +36,9 @@ import type { InboxEntry } from '../api/inbox'
  *
  * Selection + detail stay per-push in BOTH modes — a workspace's pushes
  * are usually unrelated topics (no Issue layer to make them one thread),
- * so clustering is a sidebar affordance, not a merge. Selecting a row
- * marks just that push read; j/k walks the currently-displayed order.
+ * so clustering is a sidebar affordance, not a merge. Ordinary selection
+ * marks just that push read; an active Office review target remains pending
+ * for its dossier disposition. j/k walks the currently-displayed order.
  */
 export function InboxSidebar({ onNavigate }: { onNavigate?: () => void } = {}) {
   const { t } = useTranslation()
@@ -35,6 +50,7 @@ export function InboxSidebar({ onNavigate }: { onNavigate?: () => void } = {}) {
   const mode = useInboxViewMode((s) => s.mode)
   const { workspaces } = useWorkspaces()
   const [query, setQuery] = useState('')
+  const officeReviewTargetId = readOfficeInboxDutyExcursion()?.duty.destination.inboxEntryId ?? null
 
   const workspaceLabels = useMemo(
     () => new Map(workspaces.map((workspace) => [workspace.id, workspaceDisplayName(workspace)])),
@@ -67,10 +83,17 @@ export function InboxSidebar({ onNavigate }: { onNavigate?: () => void } = {}) {
     [mode, threads, filteredEntries],
   )
 
-  /** select + mark read in one. Used by every selection mutation site. */
+  /** Select one row and apply ordinary Inbox read semantics. Office review
+   *  targets stay unread until their dossier records a disposition. */
   const selectAndRead = (id: string) => {
     select(id)
-    markRead(id)
+    const entry = entries.find((candidate) => candidate.id === id)
+    if (!entry || !isActiveOfficeInboxDutyReviewTarget({
+      workspaceId: entry.workspaceId,
+      inboxEntryId: entry.id,
+    })) {
+      markRead(id)
+    }
     onNavigate?.()
   }
 
@@ -78,11 +101,16 @@ export function InboxSidebar({ onNavigate }: { onNavigate?: () => void } = {}) {
   const everSelectedRef = useRef(false)
   useEffect(() => {
     if (everSelectedRef.current) return
+    if (!selectedId && officeReviewTargetId) {
+      select(officeReviewTargetId)
+      everSelectedRef.current = true
+      return
+    }
     if (ordered.length === 0) return
     if (!selectedId) selectAndRead(ordered[0]!.id)
     everSelectedRef.current = true
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ordered, selectedId])
+  }, [officeReviewTargetId, ordered, selectedId])
 
   // Keyboard nav — j/k move within the currently-displayed order.
   useEffect(() => {
@@ -117,9 +145,6 @@ export function InboxSidebar({ onNavigate }: { onNavigate?: () => void } = {}) {
     return (
       <div className="px-3 py-4 text-[12px] text-muted-foreground/70 leading-relaxed">
         {t('inbox.noMessages')}
-        <div className="mt-1 text-muted-foreground/50">
-          {t('inbox.emptyHint')}
-        </div>
       </div>
     )
   }
@@ -141,23 +166,25 @@ export function InboxSidebar({ onNavigate }: { onNavigate?: () => void } = {}) {
             onChange={(event) => setQuery(event.target.value)}
             placeholder={t('inbox.searchPlaceholder')}
             aria-label={t('inbox.searchPlaceholder')}
-            className="h-8 w-full rounded-md border border-border/70 bg-background/65 pl-7.5 pr-7 text-[11px] text-foreground outline-none transition-colors placeholder:text-muted-foreground/45 focus:border-primary/50 focus:ring-2 focus:ring-primary/10"
+            className={`${inputClass} bg-background/65 pl-7.5 pr-7 text-[11px]`}
           />
           {query && (
-            <button
+            <Button
               type="button"
               onClick={() => setQuery('')}
               aria-label={t('inbox.clearSearch')}
-              className="oa-icon-action absolute right-1 top-1/2 flex h-6 w-6 -translate-y-1/2 items-center justify-center text-muted-foreground/55 hover:text-foreground"
+              variant="ghost"
+              size="icon-xs"
+              className="absolute right-1 top-1/2 -translate-y-1/2 text-muted-foreground/55"
             >
               <X size={12} strokeWidth={1.8} aria-hidden />
-            </button>
+            </Button>
           )}
         </div>
         {normalizedQuery && (
           <div
             aria-live="polite"
-            className="px-1 pt-1 text-[10px] tabular-nums text-muted-foreground/55"
+            className="px-1 pt-1 text-[10px] leading-[14px] tabular-nums text-muted-foreground/55"
           >
             {t('inbox.searchResults', { count: filteredEntries.length, total: entries.length })}
           </div>
@@ -205,13 +232,13 @@ function inboxSearchText(
     workspaceTags.get(entry.workspaceId),
     entry.workspaceLabel,
     entry.workspaceId,
-    entry.comments,
+    entry.body,
     entry.origin?.agent,
     entry.origin?.resumeId,
     entry.origin?.issueId,
     entry.origin?.runId,
     entry.origin?.sessionId,
-    ...(entry.docs ?? []).map((doc) => doc.path),
+    ...inboxFiles(entry).map((doc) => doc.path),
   ].filter(Boolean).join(' '))
 }
 
@@ -223,7 +250,7 @@ export function InboxViewToggle() {
   const setMode = useInboxViewMode((s) => s.setMode)
 
   return (
-    <div className="flex items-center rounded-md border border-border/70 overflow-hidden">
+    <div className="flex items-center overflow-hidden rounded-md border border-border/70 bg-background p-px">
       <ToggleBtn
         active={mode === 'time'}
         onClick={() => setMode('time')}
@@ -251,18 +278,24 @@ function ToggleBtn({
   children: React.ReactNode
 }) {
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      title={title}
-      aria-label={title}
-      aria-pressed={active}
-      className={`flex items-center justify-center w-8 h-8 transition-colors ${
-        active ? 'bg-muted text-foreground' : 'text-muted-foreground/60 hover:text-foreground hover:bg-muted/50'
-      }`}
-    >
-      {children}
-    </button>
+    <Tooltip>
+      <TooltipTrigger
+        render={(
+          <Button
+            type="button"
+            onClick={onClick}
+            aria-label={title}
+            aria-pressed={active}
+            variant="ghost"
+            size="icon-sm"
+            className={active ? 'bg-muted text-foreground' : 'text-muted-foreground/60'}
+          />
+        )}
+      >
+        {children}
+      </TooltipTrigger>
+      <TooltipContent>{title}</TooltipContent>
+    </Tooltip>
   )
 }
 
@@ -291,7 +324,7 @@ function WorkspaceView({
                 {workspaceLabel}
               </span>
               {unread > 0 && (
-                <span className="shrink-0 min-w-[15px] h-[15px] px-1 rounded-full bg-primary text-primary-foreground text-[9px] font-semibold tabular-nums flex items-center justify-center">
+                <span className="shrink-0 min-w-[15px] text-center text-muted-foreground text-[11px] leading-[15px] font-medium tabular-nums">
                   {unread}
                 </span>
               )}
@@ -308,6 +341,7 @@ function WorkspaceView({
                   entry={entry}
                   active={entry.id === selectedId}
                   unread={!readIds[entry.id]}
+                  source={workspaceLabel}
                   onClick={() => onSelect(entry.id)}
                 />
               ))}
@@ -319,22 +353,33 @@ function WorkspaceView({
   )
 }
 
-/** Row inside a workspace cluster — label lives in the header, so the
- *  row shows just the push preview + time. */
+/** Row inside a workspace cluster — the workspace label lives in the
+ *  header, so the row leads with the scan subject. */
 function ClusterRow({
-  entry, active, unread, onClick,
+  entry, active, unread, source, onClick,
 }: {
   entry: InboxEntry
   active: boolean
   unread: boolean
+  source: string
   onClick: () => void
 }) {
   const { t } = useTranslation()
-  const preview = previewForEntry(entry) || t('inbox.untitledUpdate')
+  const time = formatRelativeTime(entry.ts)
+  const { subject, excerpt, rowLabel } = presentInboxEntry(entry, {
+    source,
+    unread,
+    time,
+    untitled: t('inbox.untitledUpdate'),
+    unreadLabel: t('inbox.unread'),
+    moreAttachments: (count) => t('inbox.moreAttachments', { count }),
+  })
   return (
     <div
       role="button"
       tabIndex={0}
+      aria-label={rowLabel}
+      aria-current={active || undefined}
       onClick={onClick}
       onKeyDown={(e) => {
         if (e.key === 'Enter' || e.key === ' ') {
@@ -346,18 +391,27 @@ function ClusterRow({
         active ? 'bg-muted' : 'hover:bg-muted/50'
       }`}
     >
-      {active && (
-        <span aria-hidden className="absolute left-0 top-0 bottom-0 w-[2px] bg-primary" />
-      )}
+      {active && <SelectionIndicator />}
       <span
         aria-hidden
-        className={`mt-[7px] shrink-0 w-1.5 h-1.5 rounded-full ${unread ? 'bg-primary' : 'bg-transparent'}`}
+        className={`mt-[7px] shrink-0 w-1.5 h-1.5 rounded-full ${unread ? 'oa-inbox-unread-dot' : 'bg-transparent'}`}
       />
-      <span className={`min-w-0 truncate text-[11px] leading-5 ${unread ? 'text-muted-foreground' : 'text-muted-foreground/70'}`}>
-        {preview}
+      <span className="min-w-0">
+        <span
+          className={`block truncate text-[12px] leading-5 ${
+            unread ? 'font-semibold text-foreground' : 'font-medium text-foreground/90'
+          }`}
+        >
+          {subject}
+        </span>
+        {excerpt && (
+          <span className="mt-0.5 hidden truncate text-[11px] leading-4 text-muted-foreground/65 sm:block">
+            {excerpt}
+          </span>
+        )}
       </span>
       <span className="col-start-2 text-[10px] text-muted-foreground/50 tabular-nums">
-        {formatRelativeTime(entry.ts)}
+        {time}
       </span>
     </div>
   )
@@ -381,7 +435,7 @@ function TimeView({
     <>
       {groups.map(([bucket, items]) => (
         <div key={bucket} className="mb-1">
-          <div className="px-3 mt-2 mb-1 text-[10px] font-medium text-muted-foreground/60 uppercase tracking-wider">
+          <div className="mb-1 mt-2 px-3 text-[11px] font-medium text-muted-foreground/65">
             {t(BUCKET_KEYS[bucket])}
           </div>
           <div className="flex flex-col">
@@ -414,12 +468,22 @@ function TimeRow({
   onClick: () => void
 }) {
   const { t } = useTranslation()
-  const preview = previewForEntry(entry) || t('inbox.untitledUpdate')
   const source = workspaceLabel ?? entry.workspaceLabel ?? entry.workspaceId
+  const time = formatRelativeTime(entry.ts)
+  const { subject, excerpt, rowLabel } = presentInboxEntry(entry, {
+    source,
+    unread,
+    time,
+    untitled: t('inbox.untitledUpdate'),
+    unreadLabel: t('inbox.unread'),
+    moreAttachments: (count) => t('inbox.moreAttachments', { count }),
+  })
   return (
     <div
       role="button"
       tabIndex={0}
+      aria-label={rowLabel}
+      aria-current={active || undefined}
       onClick={onClick}
       onKeyDown={(e) => {
         if (e.key === 'Enter' || e.key === ' ') {
@@ -431,33 +495,35 @@ function TimeRow({
         active ? 'bg-muted' : 'hover:bg-muted/50'
       }`}
     >
-      {active && (
-        <span aria-hidden className="absolute left-0 top-0 bottom-0 w-[2px] bg-primary" />
-      )}
+      {active && <SelectionIndicator />}
 
-      {/* Line 1: the update itself is the object users are scanning. */}
-      <div className="flex min-w-0 items-center gap-1.5">
+      <div className="flex min-w-0 items-start gap-1.5">
         <span
           aria-hidden
-          className={`shrink-0 w-1.5 h-1.5 rounded-full ${unread ? 'bg-primary' : 'bg-transparent'}`}
+          className={`mt-1.5 shrink-0 w-1.5 h-1.5 rounded-full ${unread ? 'oa-inbox-unread-dot' : 'bg-transparent'}`}
         />
-        <span
-          className={`min-w-0 flex-1 truncate text-[12px] ${
-            unread ? 'font-semibold text-foreground' : 'font-medium text-foreground/90'
-          }`}
-          title={preview}
-        >
-          {preview}
+        <span className="min-w-0 flex-1">
+          <span
+            className={`block truncate text-[12px] leading-5 ${
+              unread ? 'font-semibold text-foreground' : 'font-medium text-foreground/90'
+            }`}
+          >
+            {subject}
+          </span>
+          {excerpt && (
+            <span className="mt-0.5 hidden truncate text-[11px] leading-4 text-muted-foreground/65 sm:block">
+              {excerpt}
+            </span>
+          )}
         </span>
       </div>
 
-      {/* Line 2: source and time are supporting provenance. */}
       <div className="flex min-w-0 items-center gap-2 pl-3">
         <span className="min-w-0 flex-1 truncate text-[10px] text-muted-foreground/60">
           {source}
         </span>
         <span className="shrink-0 text-[10px] text-muted-foreground/60 tabular-nums">
-          {formatRelativeTime(entry.ts)}
+          {time}
         </span>
       </div>
     </div>

@@ -40,14 +40,16 @@ import {
   type AgentId,
   getIssueDefaultAgent,
   getAutoQuantDefaultWorkspace,
+  getAutoPredictionDefaultWorkspace,
   getWorkspaceManager,
+  getWorkspaceSessionDirectory,
   getWorkspaceDefaultAgent,
-  listAgents,
   listTemplates,
   listWorkspaces,
   initializeAutoQuantWorkspace as apiInitializeAutoQuantWorkspace,
+  initializeAutoPredictionWorkspace as apiInitializeAutoPredictionWorkspace,
   initializeChatWorkspace as apiInitializeChatWorkspace,
-  openWebPiSession as apiOpenWebPiSession,
+  openWebSession as apiOpenWebSession,
   openResumeSession,
   pauseSession as apiPauseSession,
   quickChat as apiQuickChat,
@@ -58,11 +60,11 @@ import {
   type SessionPresence,
   setIssueDefaultAgent as apiSetIssueDefaultAgent,
   setAutoQuantDefaultWorkspace as apiSetAutoQuantDefaultWorkspace,
+  setAutoPredictionDefaultWorkspace as apiSetAutoPredictionDefaultWorkspace,
   setWorkspaceDefaultAgent as apiSetWorkspaceDefaultAgent,
   spawnSession,
   updatePausedSessionRuntime as apiUpdatePausedSessionRuntime,
   updateWorkspaceMetadata,
-  type AgentInfo,
   type PausedSessionRuntimeUpdate,
   MANAGER_WORKSPACE_ID,
   type ManagerQuickStartResult,
@@ -81,6 +83,7 @@ import {
 import { WorkspaceActionsContext } from './workspace-actions-context'
 import { reconcileWorkspaceList } from './workspace-list-reconcile'
 import { reconcileJsonSnapshot } from '../lib/reconcile-json-state'
+import { useAgentRuntimes } from '../hooks/useAgentRuntimes'
 
 function deprecatedExportTab(agent: AgentId | undefined): Tab | undefined {
   if (agent === 'claude' || agent === 'codex' || agent === 'opencode' || agent === 'pi') return agent
@@ -97,7 +100,10 @@ export function WorkspacesProvider({ children }: { children: ReactNode }) {
   const [autoQuantDefaultWorkspaceId, setAutoQuantDefaultWorkspaceId] = useState<string | null>(null)
   const [autoQuantPreferenceLoaded, setAutoQuantPreferenceLoaded] = useState(false)
   const [autoQuantPreferenceError, setAutoQuantPreferenceError] = useState<string | null>(null)
-  const [agents, setAgents] = useState<AgentInfo[]>([])
+  const [autoPredictionDefaultWorkspaceId, setAutoPredictionDefaultWorkspaceId] = useState<string | null>(null)
+  const [autoPredictionPreferenceLoaded, setAutoPredictionPreferenceLoaded] = useState(false)
+  const [autoPredictionPreferenceError, setAutoPredictionPreferenceError] = useState<string | null>(null)
+  const { agents } = useAgentRuntimes()
   const [defaultAgent, setDefaultAgentState] = useState<string | null>(null)
   const [issueDefaultAgent, setIssueDefaultAgentState] = useState<string | null>(null)
   const [listError, setListError] = useState<string | null>(null)
@@ -183,6 +189,18 @@ export function WorkspacesProvider({ children }: { children: ReactNode }) {
     }
   }, [])
 
+  const refreshAutoPredictionPreference = useCallback(async (): Promise<void> => {
+    try {
+      const status = await getAutoPredictionDefaultWorkspace()
+      setAutoPredictionDefaultWorkspaceId(status.defaultWorkspaceId)
+      setAutoPredictionPreferenceError(null)
+    } catch (error) {
+      setAutoPredictionPreferenceError((error as Error).message)
+    } finally {
+      setAutoPredictionPreferenceLoaded(true)
+    }
+  }, [])
+
   useEffect(() => {
     void ensureTerminalAppearancePublished()
   }, [ensureTerminalAppearancePublished])
@@ -201,11 +219,11 @@ export function WorkspacesProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     void refreshTemplates()
-    void listAgents().then(setAgents).catch(() => setAgents([]))
     void getWorkspaceDefaultAgent().then(setDefaultAgentState).catch(() => setDefaultAgentState(null))
     void getIssueDefaultAgent().then(setIssueDefaultAgentState).catch(() => setIssueDefaultAgentState(null))
     void refreshAutoQuantPreference()
-  }, [refreshAutoQuantPreference, refreshTemplates])
+    void refreshAutoPredictionPreference()
+  }, [refreshAutoPredictionPreference, refreshAutoQuantPreference, refreshTemplates])
 
   // Reconcile tabs against the workspaces list. If a workspace or session
   // disappeared (deleted on disk / on the server), close any tabs that
@@ -296,12 +314,27 @@ export function WorkspacesProvider({ children }: { children: ReactNode }) {
     setDefaultAgentState(saved)
   }, [])
 
+  const [interactiveConsent, setInteractiveConsent] = useState<{ resolve: (confirmed: boolean) => void } | null>(null)
+  const confirmInteractiveSession = useCallback(async (wsId: string, resumeId: string): Promise<boolean> => {
+    if (wsId === MANAGER_WORKSPACE_ID) return true
+    const directory = await getWorkspaceSessionDirectory(wsId, resumeId)
+    const identity = directory.sessions.find((entry) => entry.resumeId === resumeId)
+    if (!identity?.issueAttached && identity?.rosterVisibility !== 'hidden') return true
+    return new Promise<boolean>((resolve) => {
+      setInteractiveConsent((previous) => {
+        previous?.resolve(false)
+        return { resolve }
+      })
+    })
+  }, [])
+
   const openHeadlessRun = useCallback(
     async (
       wsId: string,
       resumeId: string,
       opts: { title?: string } = {},
     ): Promise<void> => {
+      if (!await confirmInteractiveSession(wsId, resumeId)) return
       const { session } = await openResumeSession(wsId, resumeId, opts)
       let nextSession = session
       if (session.state === 'paused') {
@@ -342,7 +375,7 @@ export function WorkspacesProvider({ children }: { children: ReactNode }) {
       })
       void refresh()
     },
-    [ensureTerminalAppearancePublished, openOrFocus, refresh, setSidebar],
+    [confirmInteractiveSession, ensureTerminalAppearancePublished, openOrFocus, refresh, setSidebar],
   )
 
   const setIssueDefaultAgent = useCallback(async (agent: string | null): Promise<void> => {
@@ -358,6 +391,18 @@ export function WorkspacesProvider({ children }: { children: ReactNode }) {
     ])
     setAutoQuantDefaultWorkspaceId(workspace.id)
     setAutoQuantPreferenceError(null)
+    void refresh()
+    return workspace
+  }, [refresh])
+
+  const initializeAutoPrediction = useCallback(async (): Promise<Workspace> => {
+    const workspace = await apiInitializeAutoPredictionWorkspace()
+    setWorkspaces((current) => [
+      workspace,
+      ...current.filter((candidate) => candidate.id !== workspace.id),
+    ])
+    setAutoPredictionDefaultWorkspaceId(workspace.id)
+    setAutoPredictionPreferenceError(null)
     void refresh()
     return workspace
   }, [refresh])
@@ -378,16 +423,23 @@ export function WorkspacesProvider({ children }: { children: ReactNode }) {
     setAutoQuantPreferenceError(null)
   }, [])
 
+  const setAutoPredictionDefaultWorkspace = useCallback(async (workspaceId: string): Promise<void> => {
+    const saved = await apiSetAutoPredictionDefaultWorkspace(workspaceId)
+    setAutoPredictionDefaultWorkspaceId(saved.defaultWorkspaceId)
+    setAutoPredictionPreferenceError(null)
+  }, [])
+
   const quickChat = useCallback(
     async (
       prompt: string,
       agent?: string,
       credentialSlug?: string,
       targetWsId?: string,
-      template?: 'chat' | 'auto-quant-v2',
+      template?: 'chat' | 'auto-quant-v2' | 'auto-prediction',
       model?: string | null,
       reasoningEffort?: import('../api').ModelReasoningEffort,
       credentialSource?: 'native',
+      surface?: 'terminal' | 'webpi',
     ): Promise<string> => {
       await ensureTerminalAppearancePublished()
       const { workspace, session } = await apiQuickChat(
@@ -399,6 +451,7 @@ export function WorkspacesProvider({ children }: { children: ReactNode }) {
         model,
         reasoningEffort,
         credentialSource,
+        surface,
       )
       const nowIso = new Date().toISOString()
       const newRecord: SessionRecord = {
@@ -437,7 +490,9 @@ export function WorkspacesProvider({ children }: { children: ReactNode }) {
         params: {
           wsId: workspace.id,
           sessionId: session.sessionId,
-          source: workspace.template === 'auto-quant-v2' ? 'auto-quant' : 'chat',
+          source: workspace.template === 'auto-quant-v2'
+            ? 'auto-quant'
+            : workspace.template === 'auto-prediction' ? 'prediction' : 'chat',
         },
       })
       void refresh()
@@ -490,6 +545,8 @@ export function WorkspacesProvider({ children }: { children: ReactNode }) {
 
   const resumeSession = useCallback(
     async (wsId: string, sessionId: string, source?: WorkspaceSource): Promise<void> => {
+      const record = workspaces.find((ws) => ws.id === wsId)?.sessions.find((entry) => entry.id === sessionId)
+      if (record && !await confirmInteractiveSession(wsId, record.resumeId)) return
       await ensureTerminalAppearancePublished()
       const resp = await apiResumeSession(wsId, sessionId)
       const patch = {
@@ -515,12 +572,14 @@ export function WorkspacesProvider({ children }: { children: ReactNode }) {
         void refresh()
       }
     },
-    [ensureTerminalAppearancePublished, refresh, refreshWorkspaceManager, openOrFocus],
+    [confirmInteractiveSession, workspaces, ensureTerminalAppearancePublished, refresh, refreshWorkspaceManager, openOrFocus],
   )
 
-  const openWebPiSession = useCallback(
+  const openWebSession = useCallback(
     async (wsId: string, sessionId: string, source?: WorkspaceSource): Promise<void> => {
-      const snapshot = await apiOpenWebPiSession(wsId, sessionId)
+      const record = workspaces.find((ws) => ws.id === wsId)?.sessions.find((entry) => entry.id === sessionId)
+      if (record && !await confirmInteractiveSession(wsId, record.resumeId)) return
+      const snapshot = await apiOpenWebSession(wsId, sessionId)
       const patch = {
         state: 'running' as const,
         surface: 'webpi' as const,
@@ -541,13 +600,13 @@ export function WorkspacesProvider({ children }: { children: ReactNode }) {
         void refresh()
       }
     },
-    [openOrFocus, refresh, refreshWorkspaceManager],
+    [confirmInteractiveSession, workspaces, openOrFocus, refresh, refreshWorkspaceManager],
   )
 
   const saveWorkspaceMetadata = useCallback(
     async (
       wsId: string,
-      metadata: { displayName?: string | null; description?: string | null; defaultAgent?: string | null },
+      metadata: { displayName?: string | null; description?: string | null },
     ): Promise<void> => {
       const updated = await updateWorkspaceMetadata(wsId, metadata)
       setWorkspaces((prev) => prev.map((w) => (w.id === wsId ? updated : w)))
@@ -577,7 +636,7 @@ export function WorkspacesProvider({ children }: { children: ReactNode }) {
           : false
 
       // Deleting the Session currently on screen has a deterministic landing:
-      // its Workspace-level Session library. Open/focus that hub before closing
+      // its Workspace-level new-conversation composer. Open/focus that hub before closing
       // the pinned tab so closeTab's neighbour rule cannot send the user to an
       // unrelated editor.
       if (focusedOwnsSession) {
@@ -734,9 +793,13 @@ export function WorkspacesProvider({ children }: { children: ReactNode }) {
     autoQuantDefaultWorkspaceId,
     autoQuantPreferenceLoaded,
     autoQuantPreferenceError,
+    autoPredictionDefaultWorkspaceId,
+    autoPredictionPreferenceLoaded,
+    autoPredictionPreferenceError,
     refresh,
     refreshTemplates,
     refreshAutoQuantPreference,
+    refreshAutoPredictionPreference,
     refreshWorkspaceManager,
     quickStartWorkspaceManager,
     spawn,
@@ -744,12 +807,14 @@ export function WorkspacesProvider({ children }: { children: ReactNode }) {
     setDefaultAgent,
     setIssueDefaultAgent,
     initializeAutoQuant,
+    initializeAutoPrediction,
     initializeChat,
     setAutoQuantDefaultWorkspace,
+    setAutoPredictionDefaultWorkspace,
     quickChat,
     pauseSession,
     resumeSession,
-    openWebPiSession,
+    openWebSession,
     requestDeleteSession,
     setSessionPresence,
     setSessionDisplayName,
@@ -759,22 +824,27 @@ export function WorkspacesProvider({ children }: { children: ReactNode }) {
     renameWorkspace,
   }), [
     agents,
+    autoPredictionDefaultWorkspaceId,
+    autoPredictionPreferenceError,
+    autoPredictionPreferenceLoaded,
     autoQuantDefaultWorkspaceId,
     autoQuantPreferenceError,
     autoQuantPreferenceLoaded,
     defaultAgent,
     hasLoaded,
     initializeAutoQuant,
+    initializeAutoPrediction,
     initializeChat,
     issueDefaultAgent,
     listError,
     openAgentConfig,
     openHeadlessRun,
-    openWebPiSession,
+    openWebSession,
     pauseSession,
     quickChat,
     quickStartWorkspaceManager,
     refresh,
+    refreshAutoPredictionPreference,
     refreshAutoQuantPreference,
     refreshTemplates,
     refreshWorkspaceManager,
@@ -786,6 +856,7 @@ export function WorkspacesProvider({ children }: { children: ReactNode }) {
     resumeSession,
     saveWorkspaceMetadata,
     setAutoQuantDefaultWorkspace,
+    setAutoPredictionDefaultWorkspace,
     setDefaultAgent,
     setIssueDefaultAgent,
     spawn,
@@ -837,6 +908,15 @@ export function WorkspacesProvider({ children }: { children: ReactNode }) {
             onClose={() => setConfiguringAgentTarget(null)}
           />
         )}
+        {interactiveConsent && <ConfirmDialog
+          title={t('workspace.interactiveOwnership.title')}
+          message={t('workspace.interactiveOwnership.message')}
+          confirmLabel={t('workspace.interactiveOwnership.confirm')}
+          cancelLabel={t('common.cancel')}
+          variant="primary"
+          onConfirm={() => { interactiveConsent.resolve(true); setInteractiveConsent(null) }}
+          onClose={() => { interactiveConsent.resolve(false); setInteractiveConsent(null) }}
+        />}
         {pendingSessionDelete !== null && (
           <ConfirmDialog
             title={t('chat.deleteSessionTitle')}

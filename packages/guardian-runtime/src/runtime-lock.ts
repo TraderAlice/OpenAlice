@@ -86,6 +86,8 @@ export interface PrepareOpenAliceRuntimeOptions {
 }
 
 export class RuntimeAlreadyRunningError extends Error {
+  /** EX_TEMPFAIL: ownership contention must not roll back installed bytes. */
+  readonly exitCode = 75
   constructor(readonly inspection: RuntimeLockInspection) {
     const owner = inspection.owner
     super(owner

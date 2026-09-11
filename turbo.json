@@ -1,12 +1,17 @@
 {
   "$schema": "https://turbo.build/schema.json",
+  "concurrency": "50%",
   "tasks": {
     "build": {
       "dependsOn": ["^build"],
       "outputs": ["dist/**"]
     },
     "open-alice-ui#build": {
-      "dependsOn": [],
+      "dependsOn": ["^build"],
+      "outputs": ["dist/**"]
+    },
+    "open-alice-ui#build:demo": {
+      "dependsOn": ["^build"],
       "outputs": ["dist/**"]
     },
     "@traderalice/openalice-cli#build": {

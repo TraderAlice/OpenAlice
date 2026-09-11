@@ -2,6 +2,7 @@ export type ChatDisplayMode = 'focused' | 'recent' | 'multi'
 
 export const CHAT_DISPLAY_MODE_STORAGE_KEY = 'openalice.chat-sidebar-display-mode.v1'
 export const AUTO_QUANT_DISPLAY_MODE_STORAGE_KEY = 'openalice.auto-quant-sidebar-display-mode.v1'
+export const AUTO_PREDICTION_DISPLAY_MODE_STORAGE_KEY = 'openalice.auto-prediction-sidebar-display-mode.v1'
 
 export function readChatDisplayMode(
   storageKey = CHAT_DISPLAY_MODE_STORAGE_KEY,

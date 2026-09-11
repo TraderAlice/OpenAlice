@@ -3,8 +3,6 @@ import type { ViewSpec } from '../tabs/types'
 
 export const NANO_HIDDEN_ACTIVITY_PAGES = [
   'market',
-  'news',
-  'trading-as-git',
   'portfolio',
 ] as const satisfies readonly Page[]
 

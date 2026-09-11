@@ -22,6 +22,10 @@ export interface UseIssues {
   error: string | null
   /** True only before the very first load this session (cache cold). */
   loading: boolean
+  /** Latest authoritative Issue request started by this hook. */
+  requestEpoch: number
+  /** Request-start epoch of the latest Issue snapshot accepted by this hook. */
+  successEpoch: number
 }
 
 /**
@@ -32,20 +36,27 @@ export interface UseIssues {
 export function useIssues(): UseIssues {
   const [data, setData] = useState<IssueSnapshot | null>(cached)
   const [error, setError] = useState<string | null>(null)
+  const [requestEpoch, setRequestEpoch] = useState(0)
+  const [successEpoch, setSuccessEpoch] = useState(0)
   const mounted = useRef(true)
+  const requestEpochRef = useRef(0)
 
   useEffect(() => {
     mounted.current = true
     const load = async () => {
+      const request = ++requestEpochRef.current
+      if (mounted.current) setRequestEpoch(request)
       try {
         const next = omitTelegramConnectorIssues(await api.issues.get())
+        if (!mounted.current || request !== requestEpochRef.current) return
         cached = next
-        if (mounted.current) {
-          setData(next)
-          setError(null)
-        }
+        setData(next)
+        setError(null)
+        setSuccessEpoch(request)
       } catch (e) {
-        if (mounted.current) setError(e instanceof Error ? e.message : String(e))
+        if (mounted.current && request === requestEpochRef.current) {
+          setError(e instanceof Error ? e.message : String(e))
+        }
       }
     }
     void load()
@@ -56,5 +67,11 @@ export function useIssues(): UseIssues {
     }
   }, [])
 
-  return { data, error, loading: data === null && error === null }
+  return {
+    data,
+    error,
+    loading: data === null && error === null,
+    requestEpoch,
+    successEpoch,
+  }
 }

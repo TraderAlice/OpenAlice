@@ -104,7 +104,7 @@ const apiKeysSchema = z.object({
 
 export const credentialVendorEnum = z.enum([
   'anthropic', 'openai', 'google', 'xai',
-  'minimax', 'glm', 'kimi', 'deepseek', 'longcat', 'cursor', 'custom',
+  'minimax', 'glm', 'kimi', 'deepseek', 'longcat', 'openrouter', 'cursor', 'custom',
 ])
 export type CredentialVendor = z.infer<typeof credentialVendorEnum>
 
@@ -224,7 +224,7 @@ export const aiProviderSchema = z.object({
   workspaceCredentialDefaults: z.record(z.string(), workspaceCredentialDefaultSchema).default({}),
   /**
    * Installation-level fallback for a fresh interactive Session when its
-   * Workspace has no `.alice/workspace.json` defaultAgent. Explicit launch
+   * Workspace has no `.alice/settings.json` interactive preference. Explicit launch
    * choices still win and must not rewrite this value. Shell is a utility
    * adapter, not a valid stored default.
    */

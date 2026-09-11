@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import type { SpawnContext } from '../cli-adapter.js';
 import { claudeAdapter } from './claude.js';
 import { codexAdapter } from './codex.js';
+import { agyAdapter } from './agy.js';
 import { cursorAdapter } from './cursor.js';
 import { grokAdapter } from './grok.js';
 import { ompAdapter } from './omp.js';
@@ -18,6 +19,7 @@ import { shellAdapter } from './shell.js';
  *   codex    → … -- <prompt>        (`--` terminator; codex accepts it top-level)
  *   opencode → … --prompt <prompt>  (flag value; no terminator needed)
  *   cursor   → … -- <prompt>        (`--` terminator; cursor-agent accepts it)
+ *   agy      → … --prompt-interactive <prompt>  (documented TUI seed)
  *   omp      → … -- <prompt>        (`--` terminator; 17.3.4 accepts it)
  *   pi       → … <prompt>           (bare trailing positional; pi REJECTS `--`)
  *   shell    → ignored              (no agent to receive a prompt)
@@ -77,9 +79,16 @@ describe('interactive seed — composeCommand initialPrompt', () => {
 
     it('cursor: trailing `-- <prompt>`', () => {
       const argv = cursorAdapter.composeCommand(['claude'], ctx({ initialPrompt: PROMPT }));
-      expect(argv).toEqual(['cursor-agent', '--', PROMPT]);
+      expect(argv).toEqual(['cursor-agent', '--trust', '--force', '--sandbox', 'disabled', '--', PROMPT]);
       expect(argv).not.toContain('-p');
       expect(argv).not.toContain('agent');
+    });
+
+    it('agy: `--prompt-interactive <prompt>`', () => {
+      const argv = agyAdapter.composeCommand(['claude'], ctx({ initialPrompt: PROMPT }));
+      expect(argv).toEqual(['agy', '--dangerously-skip-permissions', '--prompt-interactive', PROMPT]);
+      expect(argv).not.toContain('-p');
+      expect(argv).not.toContain('antigravity');
     });
 
     it('grok: trailing `-- <prompt>` after --no-leader', () => {
@@ -91,7 +100,7 @@ describe('interactive seed — composeCommand initialPrompt', () => {
 
     it('omp: trailing `-- <prompt>`', () => {
       const argv = ompAdapter.composeCommand(['claude'], ctx({ initialPrompt: PROMPT }));
-      expect(argv).toEqual(['omp', '--', PROMPT]);
+      expect(argv).toEqual(['omp', '--auto-approve', '--', PROMPT]);
       expect(argv).not.toContain('-p');
       expect(argv).not.toContain('--session-id');
     });
@@ -108,10 +117,13 @@ describe('interactive seed — composeCommand initialPrompt', () => {
       expect(piAdapter.composeCommand([], ctx())).toEqual(['pi']);
     });
     it('cursor', () => {
-      expect(cursorAdapter.composeCommand([], ctx())).toEqual(['cursor-agent']);
+      expect(cursorAdapter.composeCommand([], ctx())).toEqual(['cursor-agent', '--trust', '--force', '--sandbox', 'disabled']);
+    });
+    it('agy', () => {
+      expect(agyAdapter.composeCommand([], ctx())).toEqual(['agy', '--dangerously-skip-permissions']);
     });
     it('omp', () => {
-      expect(ompAdapter.composeCommand([], ctx())).toEqual(['omp']);
+      expect(ompAdapter.composeCommand([], ctx())).toEqual(['omp', '--auto-approve']);
     });
   });
 
@@ -141,7 +153,12 @@ describe('interactive seed — composeCommand initialPrompt', () => {
     });
     it('cursor resume ignores the prompt', () => {
       const argv = cursorAdapter.composeCommand(['cursor-agent'], ctx({ resume: RESUME, initialPrompt: PROMPT }));
-      expect(argv).toEqual(['cursor-agent', '--resume', 'sess-1234abcd']);
+      expect(argv).toEqual(['cursor-agent', '--trust', '--force', '--sandbox', 'disabled', '--resume', 'sess-1234abcd']);
+      expect(argv).not.toContain(PROMPT);
+    });
+    it('agy resume ignores the prompt', () => {
+      const argv = agyAdapter.composeCommand(['agy'], ctx({ resume: RESUME, initialPrompt: PROMPT }));
+      expect(argv).toEqual(['agy', '--dangerously-skip-permissions', '--conversation', 'sess-1234abcd']);
       expect(argv).not.toContain(PROMPT);
     });
     it('grok resume ignores the prompt', () => {
@@ -151,7 +168,7 @@ describe('interactive seed — composeCommand initialPrompt', () => {
     });
     it('omp resume ignores the prompt', () => {
       const argv = ompAdapter.composeCommand(['omp'], ctx({ resume: RESUME, initialPrompt: PROMPT }));
-      expect(argv).toEqual(['omp', '--resume', 'sess-1234abcd']);
+      expect(argv).toEqual(['omp', '--auto-approve', '--resume', 'sess-1234abcd']);
       expect(argv).not.toContain(PROMPT);
     });
   });

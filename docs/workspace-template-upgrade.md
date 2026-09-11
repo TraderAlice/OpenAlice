@@ -16,14 +16,17 @@ never replaces the complete Workspace directory.
 
 Only a template that explicitly declares
 `"upgradeStrategy": "managed-context"` participates. Chat opts in. AutoQuant
-V2 source pins and third-party templates remain outside this generic path.
-Choosing an AutoQuant version is a creation-time Harness decision; a future
-upgrade must define an AutoQuant-aware workflow rather than replay bootstrap.
+and Auto Prediction source pins remain outside this managed-file path: they use
+the exact-commit Git merge workflow owned by
+[[docs/harness-web-surfaces.md]]. The two operations share checkout
+serialization and recovery principles but do not replay bootstrap or pretend
+that a whole repository is a launcher-managed file set.
 
 The current managed set is intentionally narrow:
 
 - `README.md`, `AGENTS.md`, and `CLAUDE.md`;
-- `.agents/skills/**` and `.claude/skills/**`;
+- Template-owned `.agents/skills/**` and `.claude/skills/**`; Alice Harness CLI
+  companion skills are excluded and independently upgraded via [[docs/alice-harness.md]].
 - legacy `.pi/skills/**`, so an unchanged duplicate skill tree can be removed.
 
 Research, reports, Issues, Inbox records, credentials, Git history, runtime
@@ -46,13 +49,14 @@ Files are classified by fingerprints, not timestamps:
 |---|---|---|
 | Ready | Incoming changed; Local still matches Base | Apply Incoming |
 | Preserved | Local changed; Incoming still matches Base | Keep Local |
-| Conflict | Local and Incoming both changed | Require an explicit per-file choice |
+| Ready | Both changed separate lines | Apply Git three-way merge |
+| Conflict | Overlapping edits or incompatible add/delete changes | Require explicit resolution |
 | Unchanged | Local already equals Incoming | Do nothing |
 
 The preview digest covers Base, Local, Incoming, template identity, and both
 versions. Apply must present that digest. The manager materializes Incoming
-once for an apply attempt; the snapshot validated by the digest is the exact
-snapshot written to disk. A Local or template change after preview therefore
+once for an apply attempt; the source validated by the digest determines the exact
+merged snapshot written to disk. A Local or template change after preview therefore
 returns a stale-plan error instead of silently changing the reviewed operation.
 
 ## Baseline and Version State
@@ -82,7 +86,7 @@ Apply takes the shared checkout-operation lease and is serialized per Workspace.
 Offboarding uses the same lease; a future Merge/Absorb operation must do so as
 well, so directory reconciliation and directory moves cannot race. Apply also
 refuses to start while an interactive
-Session, WebPi Session, or headless run is active. It also refuses an already
+Session, Web Session, or headless run is active. It also refuses an already
 staged Git index so the template change cannot absorb an unrelated staged
 change.
 
@@ -115,10 +119,10 @@ The same transaction is available from inside the current Workspace without
 hand-authoring API calls:
 
 ```bash
-alice-workspace template upgrade          # read-only preview
-alice-workspace template upgrade --apply  # re-plan and apply the exact current plan
-alice-workspace template upgrade --id <workspaceId>          # preview a peer
-alice-workspace template upgrade --id <workspaceId> --apply  # upgrade a paused peer
+alice template upgrade          # read-only preview
+alice template upgrade --apply  # re-plan and apply the exact current plan
+alice template upgrade --id <workspaceId>          # preview a peer
+alice template upgrade --id <workspaceId> --apply  # upgrade a paused peer
 ```
 
 Conflicts require one repeatable `--keep-workspace <path>` or
@@ -164,3 +168,22 @@ pretend that merging coworkers is merely a template update.
   conflict decisions.
 - `src/workspaces/template-upgrade.spec.ts` — classification, stale preview,
   concurrency, rollback, baseline, and real-template materialization coverage.
+
+## Line-level merging and conflict handoff
+
+Regular text files changed on both sides use `git merge-file --diff3` against
+the accepted baseline. Non-overlapping changes are ready to apply. Overlapping
+edits and add/delete conflicts remain reviewable; conflict markers are never
+written into the Workspace automatically. Operational Git failures abort the
+preview instead of pretending to be content conflicts.
+
+The transaction writes merged content but records the **official incoming**
+snapshot as the next baseline. User edits therefore remain local changes on the
+next upgrade. Existing rollback and committed-transaction recovery use the same
+before/incoming journal snapshots.
+
+Detailed CLI plans expose previous-source, local, incoming and clean-merge
+previews (with truncation flags). The UI offers an unsent, Workspace-targeted
+chat draft for unresolved conflicts alongside explicit keep/replace choices.
+The AI can edit files, refresh the plan, and accept its resolved copies with
+`--keep-workspace`. The updater does not dispatch a background agent.

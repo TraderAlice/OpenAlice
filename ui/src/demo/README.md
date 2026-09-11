@@ -15,11 +15,13 @@ Gated by `import.meta.env.VITE_DEMO_MODE`; tree-shaken in production builds.
   last in `handlers/index.ts`.
 - `fixtures/` — typed const exports. Only non-trivial shapes get their own
   file; empty arrays / nulls live inline in handlers.
-- `fixtures/webpi.ts` — recorded native Pi messages for the featured Sessions.
-  The normal `WebPiView` renders them; demo mode replaces only the HTTP
-  transport and never forks the conversation UI.
+- `fixtures/web-session.ts` — recorded neutral Web messages for the featured
+  Sessions plus the per-runtime Web capability table and the scripted
+  permission-request turn for runtimes that prompt before tools. The normal
+  `WebSessionView` renders them; demo mode replaces only the HTTP transport
+  and never forks the conversation UI.
 - `DemoTerminalReplay.tsx` / `DemoTerminalStub.tsx` — legacy TUI preview and
-  fallback for the non-Pi runtime rows retained in the demo.
+  fallback for runtime rows without a Web surface (Antigravity, shell).
 
 ## Running
 
@@ -35,5 +37,9 @@ endpoints that need real handlers. Then:
 
 - Rich fixtures (multiple UTAs, varied positions, P&L, workspace sessions).
 - Scripted timelines for the remaining event-driven surfaces.
-- Richer multi-turn WebPi recordings and explicit scenario selection.
+- Richer multi-turn Web recordings and explicit scenario selection.
 - In-memory mutation coverage beyond Quick Chat (create-then-reload survives).
+
+In a Codex Web conversation, send "Ask me for a project name" to exercise the
+free-text question card and response path. Other prompts retain the permission
+card scenario.

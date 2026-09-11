@@ -18,7 +18,7 @@ async function placePendingLimitBuy(uta: UnifiedTradingAccount): Promise<string>
     action: 'BUY', orderType: 'LMT', totalQuantity: '10', lmtPrice: '150',
   })
   uta.commit('limit buy')
-  const pushResult = await uta.push()
+  const pushResult = await uta.push(uta.status().pendingHash!)
   const orderId = pushResult.submitted[0]?.orderId
   expect(orderId).toBeDefined()
   return orderId!

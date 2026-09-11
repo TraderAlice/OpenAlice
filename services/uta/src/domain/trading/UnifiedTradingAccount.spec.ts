@@ -49,7 +49,7 @@ describe('UTA — read-only / keyless account-mutation guard', () => {
     uta.stagePlaceOrder({ aliceId: 'mock-paper|AAPL', action: 'BUY', orderType: 'MKT', totalQuantity: '1' })
     uta.commit('proposal: buy AAPL')
 
-    await expect(uta.push()).rejects.toThrow(/read-only.*mutate the external account/)
+    await expect(uta.push(uta.status().pendingHash!)).rejects.toThrow(/read-only.*mutate the external account/)
     expect(placeSpy).not.toHaveBeenCalled()
     expect(uta.status().pendingMessage).toBe('proposal: buy AAPL')
     expect(uta.status().staged).toHaveLength(1)
@@ -61,7 +61,7 @@ describe('UTA — read-only / keyless account-mutation guard', () => {
 
     uta.git.add({ action: 'cancelOrder', orderId: 'ord-1' })
     uta.git.commit('proposal: cancel stale order')
-    const result = await uta.git.push()
+    const result = await uta.git.push(uta.git.status().pendingHash!)
 
     expect(cancelSpy).not.toHaveBeenCalled()
     expect(result.submitted).toHaveLength(0)
@@ -141,7 +141,9 @@ describe('UTA — sub-account write disambiguation', () => {
     await uta.listSubAccounts()
 
     uta.stagePlaceOrder(placeParams('spot'))
-    expect(uta.commit('first').message).toBe('first [sub:spot]')
+    const first = uta.commit('first')
+    expect(first.message).toBe('first [sub:spot]')
+    await uta.reject(undefined, first.hash)
 
     // Second cycle: the tracker was cleared by the first commit, so this stamps
     // only its own sub-account (not 'first's leftover 'spot' duplicated).
@@ -172,7 +174,7 @@ describe('UTA — operation dispatch', () => {
 
       uta.git.add({ action: 'placeOrder', contract, order })
       uta.git.commit('buy AAPL')
-      await uta.push()
+      await uta.push(uta.status().pendingHash!)
 
       expect(spy).toHaveBeenCalledTimes(1)
       const [passedContract, passedOrder] = spy.mock.calls[0]
@@ -199,7 +201,7 @@ describe('UTA — operation dispatch', () => {
 
       uta.git.add({ action: 'placeOrder', contract, order })
       uta.git.commit('limit buy AAPL')
-      await uta.push()
+      await uta.push(uta.status().pendingHash!)
 
       const [passedContract, passedOrder] = spy.mock.calls[0]
       expect(passedContract.aliceId).toBe('mock-paper|AAPL')
@@ -218,7 +220,7 @@ describe('UTA — operation dispatch', () => {
 
       uta.git.add({ action: 'placeOrder', contract, order })
       uta.git.commit('buy AAPL')
-      const result = await uta.push()
+      const result = await uta.push(uta.status().pendingHash!)
 
       expect(result.submitted).toHaveLength(1)
       expect(result.submitted[0].orderId).toBeDefined()
@@ -236,7 +238,7 @@ describe('UTA — operation dispatch', () => {
 
       uta.git.add({ action: 'placeOrder', contract, order })
       uta.git.commit('buy AAPL')
-      const result = await uta.push()
+      const result = await uta.push(uta.status().pendingHash!)
 
       expect(result.rejected).toHaveLength(1)
     })
@@ -249,7 +251,7 @@ describe('UTA — operation dispatch', () => {
       const contract = makeContract({ symbol: 'AAPL' })
       uta.git.add({ action: 'closePosition', contract, quantity: new Decimal(5) })
       uta.git.commit('partial close AAPL')
-      await uta.push()
+      await uta.push(uta.status().pendingHash!)
 
       expect(spy).toHaveBeenCalledTimes(1)
       const [passedContract, qty] = spy.mock.calls[0]
@@ -263,7 +265,7 @@ describe('UTA — operation dispatch', () => {
       const contract = makeContract({ symbol: 'AAPL' })
       uta.git.add({ action: 'closePosition', contract, quantity: new Decimal(11) })
       uta.git.commit('oversized close AAPL')
-      const result = await uta.push()
+      const result = await uta.push(uta.status().pendingHash!)
 
       expect(spy).not.toHaveBeenCalled()
       expect(result.submitted).toHaveLength(0)
@@ -276,7 +278,7 @@ describe('UTA — operation dispatch', () => {
       const contract = makeContract({ symbol: 'AAPL' })
       uta.git.add({ action: 'closePosition', contract, quantity: new Decimal(5) })
       uta.git.commit('stale close AAPL')
-      const result = await uta.push()
+      const result = await uta.push(uta.status().pendingHash!)
 
       expect(spy).not.toHaveBeenCalled()
       expect(result.rejected[0].error).toMatch(/no open position found for AAPL/)
@@ -287,7 +289,7 @@ describe('UTA — operation dispatch', () => {
       const contract = makeContract({ symbol: 'AAPL' })
       uta.git.add({ action: 'closePosition', contract })
       uta.git.commit('close AAPL')
-      await uta.push()
+      await uta.push(uta.status().pendingHash!)
 
       const [, qty] = spy.mock.calls[0]
       expect(qty).toBeUndefined()
@@ -303,7 +305,7 @@ describe('UTA — operation dispatch', () => {
       })
       uta.git.add({ action: 'cancelOrder', orderId: 'ord-789' })
       uta.git.commit('cancel order')
-      const result = await uta.push()
+      const result = await uta.push(uta.status().pendingHash!)
 
       expect(spy).toHaveBeenCalledWith('ord-789', undefined)
       expect(result.submitted).toHaveLength(1)
@@ -318,7 +320,7 @@ describe('UTA — operation dispatch', () => {
       const changes: Partial<Order> = { lmtPrice: 155, totalQuantity: new Decimal(20) } as any
       uta.git.add({ action: 'modifyOrder', orderId: 'ord-123', changes })
       uta.git.commit('modify order')
-      await uta.push()
+      await uta.push(uta.status().pendingHash!)
 
       expect(spy).toHaveBeenCalledTimes(1)
       const [orderId, passedChanges] = spy.mock.calls[0]
@@ -345,7 +347,7 @@ describe('UTA — getState', () => {
     // Push a limit order to create a pending entry in git history
     uta.stagePlaceOrder({ aliceId: 'mock-paper|AAPL', symbol: 'AAPL', action: 'BUY', orderType: 'LMT', totalQuantity: '5', lmtPrice: '145' })
     uta.commit('limit buy')
-    await uta.push()
+    await uta.push(uta.status().pendingHash!)
 
     const state = await uta.getState()
 
@@ -826,7 +828,7 @@ describe('UTA — git flow', () => {
 
   it('push throws when not committed', async () => {
     uta.stagePlaceOrder({ aliceId: 'mock-paper|AAPL', action: 'BUY', orderType: 'MKT', totalQuantity: '10' })
-    await expect(uta.push()).rejects.toThrow('please commit first')
+    await expect(uta.push(uta.status().pendingHash!)).rejects.toThrow('please commit first')
   })
 
   it('executes multiple operations in a single push', async () => {
@@ -835,7 +837,7 @@ describe('UTA — git flow', () => {
     u.stagePlaceOrder({ aliceId: 'mock-paper|AAPL', action: 'BUY', orderType: 'MKT', totalQuantity: '10' })
     u.stagePlaceOrder({ aliceId: 'mock-paper|MSFT', symbol: 'MSFT', action: 'BUY', orderType: 'MKT', totalQuantity: '5' })
     u.commit('buy both')
-    await u.push()
+    await u.push(u.status().pendingHash!)
 
     expect(spy).toHaveBeenCalledTimes(2)
   })
@@ -843,7 +845,7 @@ describe('UTA — git flow', () => {
   it('clears staging area after push', async () => {
     uta.stagePlaceOrder({ aliceId: 'mock-paper|AAPL', action: 'BUY', orderType: 'MKT', totalQuantity: '10' })
     uta.commit('buy')
-    await uta.push()
+    await uta.push(uta.status().pendingHash!)
 
     expect(uta.status().staged).toHaveLength(0)
   })
@@ -864,7 +866,7 @@ describe('UTA — sync', () => {
     // Limit order → MockBroker keeps it pending naturally
     uta.stagePlaceOrder({ aliceId: 'mock-paper|AAPL', symbol: 'AAPL', action: 'BUY', orderType: 'LMT', totalQuantity: '10', lmtPrice: '150' })
     uta.commit('limit buy')
-    const pushResult = await uta.push()
+    const pushResult = await uta.push(uta.status().pendingHash!)
     const orderId = pushResult.submitted[0]?.orderId
     expect(orderId).toBeDefined()
 
@@ -886,7 +888,7 @@ describe('UTA — sync', () => {
 
     uta.stagePlaceOrder({ aliceId: 'mock-paper|AAPL', symbol: 'AAPL', action: 'BUY', orderType: 'LMT', totalQuantity: '10', lmtPrice: '150' })
     uta.commit('limit buy')
-    const pushResult = await uta.push()
+    const pushResult = await uta.push(uta.status().pendingHash!)
     const orderId = pushResult.submitted[0]!.orderId!
 
     broker.fillOrder(orderId, { qty: '4', price: '148' })
@@ -904,9 +906,9 @@ describe('UTA — sync', () => {
 
     // Two pending limit orders; one fills (vanishes from the listing).
     uta.stagePlaceOrder({ aliceId: 'mock-paper|AAPL', symbol: 'AAPL', action: 'BUY', orderType: 'LMT', totalQuantity: '10', lmtPrice: '150' })
-    uta.commit('a'); const a = (await uta.push()).submitted[0]!.orderId!
+    uta.commit('a'); const a = (await uta.push(uta.status().pendingHash!)).submitted[0]!.orderId!
     uta.stagePlaceOrder({ aliceId: 'mock-paper|AAPL', symbol: 'AAPL', action: 'BUY', orderType: 'LMT', totalQuantity: '5', lmtPrice: '140' })
-    uta.commit('b'); const b = (await uta.push()).submitted[0]!.orderId!
+    uta.commit('b'); const b = (await uta.push(uta.status().pendingHash!)).submitted[0]!.orderId!
     broker.fillOrder(a, { price: '149' })
 
     const getOrderSpy = vi.spyOn(broker, 'getOrder')
@@ -936,7 +938,7 @@ describe('UTA — sync', () => {
 
     uta.stagePlaceOrder({ aliceId: 'mock-paper|AAPL', symbol: 'AAPL', action: 'BUY', orderType: 'LMT', totalQuantity: '10', lmtPrice: '150' })
     uta.commit('limit buy')
-    const orderId = (await uta.push()).submitted[0]!.orderId!
+    const orderId = (await uta.push(uta.status().pendingHash!)).submitted[0]!.orderId!
     broker.fillPendingOrder(orderId, 149)
 
     const result = await uta.sync()
@@ -952,7 +954,7 @@ describe('UTA — sync', () => {
 
       uta.stagePlaceOrder({ aliceId: 'mock-paper|AAPL', symbol: 'AAPL', action: 'BUY', orderType: 'LMT', totalQuantity: '10', lmtPrice: '150' })
       uta.commit('limit buy')
-      await uta.push()
+      await uta.push(uta.status().pendingHash!)
 
       const getOrderSpy = vi.spyOn(broker, 'getOrder')
       await uta.sync() // fresh — polls (registers firstSeen)
@@ -979,7 +981,7 @@ describe('UTA — sync', () => {
 
     uta.stagePlaceOrder({ aliceId: 'mock-paper|AAPL', symbol: 'AAPL', action: 'BUY', orderType: 'LMT', totalQuantity: '10', lmtPrice: '150' })
     uta.commit('limit buy')
-    const pushResult = await uta.push()
+    const pushResult = await uta.push(uta.status().pendingHash!)
     const orderId = pushResult.submitted[0]!.orderId!
     broker.fillPendingOrder(orderId, 149)
 
@@ -997,7 +999,7 @@ describe('UTA — sync', () => {
     // Limit order → pending
     uta.stagePlaceOrder({ aliceId: 'mock-paper|AAPL', symbol: 'AAPL', action: 'BUY', orderType: 'LMT', totalQuantity: '10', lmtPrice: '150' })
     uta.commit('limit buy')
-    const pushResult = await uta.push()
+    const pushResult = await uta.push(uta.status().pendingHash!)
     const orderId = pushResult.submitted[0]?.orderId
     expect(orderId).toBeDefined()
 
@@ -1027,7 +1029,7 @@ describe('UTA — wallet reconcile defers while orders are in flight', () => {
     // In-flight order on the same aliceId.
     uta.stagePlaceOrder({ aliceId, symbol: 'AAPL', action: 'BUY', orderType: 'LMT', totalQuantity: '5', lmtPrice: '150' })
     uta.commit('limit buy')
-    const orderId = (await uta.push()).submitted[0]!.orderId!
+    const orderId = (await uta.push(uta.status().pendingHash!)).submitted[0]!.orderId!
 
     // The dfb01435 race: positions read while the fill is in flight must
     // NOT record drift as a mark-price reconcile.
@@ -1057,7 +1059,7 @@ describe('UTA — guards', () => {
 
     uta.stagePlaceOrder({ aliceId: 'mock-paper|TSLA', symbol: 'TSLA', action: 'BUY', orderType: 'MKT', totalQuantity: '10' })
     uta.commit('buy TSLA (should be blocked)')
-    const result = await uta.push()
+    const result = await uta.push(uta.status().pendingHash!)
 
     expect(result.rejected).toHaveLength(1)
     expect(result.rejected[0].error).toContain('guard')
@@ -1072,7 +1074,7 @@ describe('UTA — guards', () => {
 
     uta.stagePlaceOrder({ aliceId: 'mock-paper|AAPL', symbol: 'AAPL', action: 'BUY', orderType: 'MKT', totalQuantity: '10' })
     uta.commit('buy AAPL (allowed)')
-    await uta.push()
+    await uta.push(uta.status().pendingHash!)
 
     expect(spy).toHaveBeenCalledTimes(1)
   })
@@ -1086,7 +1088,7 @@ describe('UTA — constructor', () => {
     const { uta: original } = createUTA()
     original.stagePlaceOrder({ aliceId: 'mock-paper|AAPL', symbol: 'AAPL', action: 'BUY', orderType: 'MKT', totalQuantity: '10' })
     original.commit('initial buy')
-    await original.push()
+    await original.push(original.status().pendingHash!)
 
     const savedState = original.exportGitState()
     expect(original.log()).toHaveLength(1)
@@ -1246,7 +1248,7 @@ describe('UTA — health tracking', () => {
 
     uta.stagePlaceOrder({ aliceId: 'mock-paper|AAPL', action: 'BUY', orderType: 'MKT', totalQuantity: '10' })
     uta.commit('buy AAPL')
-    await expect(uta.push()).rejects.toThrow(/offline/)
+    await expect(uta.push(uta.status().pendingHash!)).rejects.toThrow(/offline/)
     await uta.close()
   })
 

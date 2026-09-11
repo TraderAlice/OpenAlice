@@ -20,7 +20,7 @@
  *
  * Get testnet funds at app.hyperliquid-testnet.xyz/drip.
  *
- * Run: OPENALICE_UTA_LIVE_PAPER=1 pnpm test:uta:live-paper
+ * Run: OPENALICE_UTA_LIVE_PAPER=1 pnpm test:live:hyperliquid-paper
  */
 
 import { describe, it, expect, beforeAll, beforeEach } from 'vitest'
@@ -54,7 +54,10 @@ describe('CcxtBroker — Hyperliquid e2e', () => {
   it('fetches account info with USD baseCurrency', async () => {
     const account = await b().getAccount()
     expect(account.baseCurrency).toBeDefined()
-    expect(Number(account.netLiquidation)).toBeGreaterThanOrEqual(0)
+    // The rest of this suite places orders, so the wallet must hold drip
+    // USDC. A zero here is the unified-account balance bug (perp
+    // clearinghouse read while the funds sit in spot), not an empty wallet.
+    expect(Number(account.netLiquidation), 'funded testnet wallet reads as 0 equity').toBeGreaterThan(0)
     console.log(`  equity: $${Number(account.netLiquidation).toFixed(2)}, cash: $${Number(account.totalCashValue).toFixed(2)}, base=${account.baseCurrency}`)
   })
 

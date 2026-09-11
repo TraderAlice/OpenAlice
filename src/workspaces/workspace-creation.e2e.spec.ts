@@ -15,6 +15,8 @@ import { fileURLToPath } from 'node:url';
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
+import { initializeWorkspaceTemplateState } from './template-upgrade.js';
+import { aliceHarnessSourceVersion } from './alice-harness-assets.js';
 import { injectWorkspaceContext } from './context-injector.js';
 import type { TemplateMeta } from './template-registry.js';
 import { commitInitial } from './workspace-creator.js';
@@ -25,6 +27,8 @@ const CHAT_FILES = join(CHAT_DIR, 'files');
 const CHAT_BOOTSTRAP = join(CHAT_DIR, 'bootstrap.mjs');
 const AQ_DIR = join(HERE, 'templates', 'auto-quant-v2');
 const AQ_BOOTSTRAP = join(AQ_DIR, 'bootstrap.mjs');
+const AP_DIR = join(HERE, 'templates', 'auto-prediction');
+const AP_BOOTSTRAP = join(AP_DIR, 'bootstrap.mjs');
 
 /**
  * Run a bootstrap.mjs exactly as the launcher's runScript does: on the bundled
@@ -51,6 +55,20 @@ function autoQuantMeta(): TemplateMeta {
     templateDir: AQ_DIR,
     version: '1.0.0',
     defaultAgents: ['claude', 'codex'],
+    injectTools: true,
+    injectInstructions: false,
+    bundledSkills: [],
+  };
+}
+
+function autoPredictionMeta(): TemplateMeta {
+  return {
+    name: 'auto-prediction',
+    bootstrapScript: AP_BOOTSTRAP,
+    filesDir: join(AP_DIR, 'files'),
+    templateDir: AP_DIR,
+    version: '0.1.0',
+    defaultAgents: ['codex', 'claude'],
     injectTools: true,
     injectInstructions: false,
     bundledSkills: [],
@@ -103,6 +121,10 @@ describe('chat workspace create: bootstrap → inject → commit', () => {
     await injectWorkspaceContext({ template: chatMeta(), wsId: 'ws-e2e-1', dir });
     // 3. launcher-owned initial commit
     await commitInitial(dir, 'chat: testtag');
+    await initializeWorkspaceTemplateState({ id: 'ws-e2e-1', tag: 'testtag', dir, createdAt: new Date().toISOString(), template: 'chat', spawnedFromVersion: '1.0.0' }, chatMeta());
+    const injection = JSON.parse(await readFile(join(dir, '.alice/alice-harness-version.json'), 'utf8'));
+    expect(injection.appliedVersion).toBe(await aliceHarnessSourceVersion());
+    expect(injection.template).toBe('alice-harness');
 
     // injected files all present
     for (const rel of [
@@ -115,7 +137,8 @@ describe('chat workspace create: bootstrap → inject → commit', () => {
       '.claude/skills/alice/SKILL.md',
       '.claude/skills/alice-analysis/SKILL.md',
       '.claude/skills/alice-uta/SKILL.md',
-      '.claude/skills/alice-workspace/SKILL.md',
+      '.claude/skills/alice/references/collaboration.md',
+      '.alice/alice-harness-config.json',
       '.claude/skills/traderhub/SKILL.md',
     ]) {
       expect(existsSync(join(dir, rel)), rel).toBe(true);
@@ -187,6 +210,46 @@ describe('auto-quant workspace create: clone → branch → commit', () => {
     );
     expect((await run('git', ['-C', aqDir, 'status', '--porcelain'])).trim()).toBe('');
     expect((await run('git', ['-C', aqDir, 'rev-parse', '--abbrev-ref', 'HEAD'])).trim()).toBe('research/aqtag');
+  });
+});
+
+describe('auto-prediction workspace create: clone → branch → commit', () => {
+  it('retains exact upstream ancestry, instructions, origin, and source receipt', async () => {
+    const src = join(parent, 'fake-auto-prediction');
+    await run('git', ['init', '-q', '-b', 'main', src]);
+    await writeFile(join(src, 'package.json'), '{"name":"auto-prediction"}\n');
+    await writeFile(join(src, 'AGENTS.md'), '# Auto Prediction upstream instructions\n');
+    await run('git', ['-C', src, 'add', '.']);
+    await run('git', ['-C', src, '-c', 'user.email=u@x', '-c', 'user.name=u', 'commit', '-q', '-m', 'upstream history']);
+    const sourceCommit = (await run('git', ['-C', src, 'rev-parse', 'HEAD'])).trim();
+    await run('git', ['-C', src, 'remote', 'add', 'origin', 'https://github.com/TraderAlice/Auto-Prediction.git']);
+
+    const apDir = join(parent, 'prediction-workspace');
+    await runBootstrap(AP_BOOTSTRAP, ['prediction', apDir], {
+      AUTO_PREDICTION_TEMPLATE_DIR: src,
+      AQ_LAUNCHER_ROOT: parent,
+      OPENALICE_TEMPLATE_SOURCE_REPOSITORY: 'https://github.com/TraderAlice/Auto-Prediction.git',
+      OPENALICE_TEMPLATE_SOURCE_VERSION: 'snapshot-test',
+      OPENALICE_TEMPLATE_SOURCE_COMMIT: sourceCommit,
+    });
+    await injectWorkspaceContext({ template: autoPredictionMeta(), wsId: 'ws-ap-1', dir: apDir });
+    await commitInitial(apDir, 'auto-prediction: prediction');
+
+    expect(await readFile(join(apDir, 'AGENTS.md'), 'utf8')).toBe('# Auto Prediction upstream instructions\n');
+    expect(existsSync(join(apDir, '.agents/skills/alice/SKILL.md'))).toBe(true);
+    expect(JSON.parse(await readFile(join(apDir, '.alice/harness-source.json'), 'utf8'))).toEqual({
+      schemaVersion: 1,
+      template: 'auto-prediction',
+      repository: 'https://github.com/TraderAlice/Auto-Prediction.git',
+      version: 'snapshot-test',
+      commit: sourceCommit,
+    });
+    expect((await run('git', ['-C', apDir, 'rev-parse', 'HEAD^'])).trim()).toBe(sourceCommit);
+    expect((await run('git', ['-C', apDir, 'remote', 'get-url', 'origin'])).trim()).toBe(
+      'https://github.com/TraderAlice/Auto-Prediction.git',
+    );
+    expect((await run('git', ['-C', apDir, 'status', '--porcelain'])).trim()).toBe('');
+    expect((await run('git', ['-C', apDir, 'rev-parse', '--abbrev-ref', 'HEAD'])).trim()).toBe('research/prediction');
   });
 });
 

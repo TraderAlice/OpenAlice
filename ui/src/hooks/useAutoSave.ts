@@ -66,7 +66,10 @@ export function useAutoSave<T>({
       if (skipInitialSave) return
     }
     if (timerRef.current) clearTimeout(timerRef.current)
-    timerRef.current = setTimeout(doSave, delay)
+    timerRef.current = setTimeout(() => {
+      timerRef.current = null
+      void doSave()
+    }, delay)
     return () => {
       if (timerRef.current) clearTimeout(timerRef.current)
     }
@@ -80,8 +83,10 @@ export function useAutoSave<T>({
   }, [])
 
   const flush = useCallback(() => {
-    if (timerRef.current) clearTimeout(timerRef.current)
-    doSave()
+    if (!timerRef.current) return
+    clearTimeout(timerRef.current)
+    timerRef.current = null
+    void doSave()
   }, [doSave])
 
   const retry = useCallback(() => {

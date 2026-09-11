@@ -11,6 +11,8 @@ import { useConfigPage } from '../hooks/useConfigPage'
 import { SaveIndicator } from '../components/SaveIndicator'
 import { ConfigSection, Field, SettingsScrollArea, inputClass } from '../components/form'
 import { PageHeader } from '../components/PageHeader'
+import { Button } from '../components/ui/button'
+import { Toggle } from '../components/Toggle'
 import type { AppConfig, McpConfig } from '../api'
 
 export function MCPPage() {
@@ -21,31 +23,32 @@ export function MCPPage() {
 
   return (
     <div className="flex flex-col flex-1 min-h-0">
-      <PageHeader
-        title="MCP Server"
-        description="Optional Streamable-HTTP endpoint for external MCP clients. Workspace tools use the built-in CLI gateway by default."
-        right={<SaveIndicator status={status} onRetry={retry} />}
-      />
+      <PageHeader title="MCP Server" right={<SaveIndicator status={status} onRetry={retry} />} />
 
       <SettingsScrollArea className="px-4 py-5 md:px-8">
         {config && (
           <div className="max-w-[880px] mx-auto">
             <ConfigSection
               title="HTTP Server"
-              description="Disabled by default. Enable only when you intentionally want another local MCP client to call OpenAlice."
+              description="Expose a local Streamable HTTP endpoint to external MCP clients."
             >
-              <Field label="Enabled">
-                <label className="inline-flex items-center gap-2 text-[13px] text-foreground">
-                  <input
-                    type="checkbox"
-                    checked={config.enabled}
-                    onChange={(e) => updateConfig({ enabled: e.target.checked })}
-                  />
-                  Run the MCP endpoint
-                </label>
-              </Field>
-              <Field label="Port">
+              <div className="flex min-h-12 items-center justify-between gap-4 border-b border-border/60 py-2">
+                <div className="min-w-0">
+                  <p className="text-[13px] font-medium text-foreground">Run endpoint</p>
+                  <p className="mt-0.5 text-[12px] leading-5 text-muted-foreground">
+                    Available to local clients while OpenAlice is running.
+                  </p>
+                </div>
+                <Toggle
+                  ariaLabel="Run the MCP endpoint"
+                  size="sm"
+                  checked={config.enabled}
+                  onChange={(enabled) => updateConfig({ enabled })}
+                />
+              </div>
+              <Field label="Port" controlId="mcp-server-port">
                 <input
+                  id="mcp-server-port"
                   className={inputClass}
                   type="number"
                   disabled={!config.enabled}
@@ -59,9 +62,9 @@ export function MCPPage() {
         {loadError && (
           <div role="alert" className="mx-auto max-w-[880px] text-center">
             <p className="text-[13px] text-destructive">Failed to load configuration.</p>
-            <button type="button" className="btn-secondary-sm mt-3" onClick={() => void reload()}>
+            <Button type="button" variant="outline" size="sm" className="mt-3" onClick={() => void reload()}>
               Retry
-            </button>
+            </Button>
           </div>
         )}
       </SettingsScrollArea>

@@ -4,6 +4,7 @@ import { Link } from 'react-router-dom'
 import { tradingApi, type ContractSearchHit } from '../../api/trading'
 import type { AssetClass } from '../../api/market'
 import { Card } from './Card'
+import { Button } from '../ui/button'
 
 interface Props {
   /** The data-vendor symbol the user is currently viewing. */
@@ -81,14 +82,16 @@ export function TradeableContractsPanel({ symbol, assetClass }: Props) {
               ))}
             </ul>
             {overflow && (
-              <button
+              <Button
                 onClick={() => setExpanded((v) => !v)}
-                className="mt-2 text-[11px] text-muted-foreground/70 hover:text-primary transition-colors cursor-pointer"
+                className="mt-2 text-[11px] text-muted-foreground"
+                variant="ghost"
+                size="xs"
               >
                 {expanded
                   ? t('market.tradeableShowFewer')
                   : t('market.tradeableShowMore', { hidden, total: sorted.length })}
-              </button>
+              </Button>
             )}
           </>
         )
@@ -135,13 +138,13 @@ function ContractRow({ hit }: { hit: ContractSearchHit }) {
     : null
   const description = [c.description || c.localSymbol, c.primaryExchange ?? c.exchange, c.currency]
     .filter(Boolean)
-    .join(' · ')
+    .join(', ')
   return (
-    <li className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto] gap-x-3 gap-y-1 px-3 py-2 text-[12px] transition-colors hover:bg-muted/40 sm:flex sm:items-baseline sm:gap-3">
+    <li className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto] gap-x-3 gap-y-1 px-3 py-2 text-[12px] hover:bg-muted/40 sm:flex sm:items-baseline sm:gap-3">
       <span className="flex min-w-0 items-center gap-2 sm:contents">
         <span className="truncate font-mono font-semibold text-foreground">{c.symbol ?? '—'}</span>
         {c.secType && (
-          <span className="shrink-0 rounded bg-muted px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+          <span className="shrink-0 rounded-sm bg-muted px-1.5 py-0.5 text-[10px] leading-[14px] font-medium text-muted-foreground">
             {c.secType}
           </span>
         )}
@@ -157,7 +160,7 @@ function ContractRow({ hit }: { hit: ContractSearchHit }) {
         </span>
         {aliceId && (
           <code
-            className="min-w-0 max-w-full truncate font-mono text-[10px] text-muted-foreground sm:max-w-[260px]"
+            className="min-w-0 max-w-full truncate font-mono text-[10px] leading-[14px] text-muted-foreground sm:max-w-[260px]"
             title={aliceId}
           >
             {aliceId}
@@ -168,7 +171,7 @@ function ContractRow({ hit }: { hit: ContractSearchHit }) {
       {orderHref && (
         <Link
           to={orderHref}
-          className="row-start-1 col-start-2 inline-flex min-h-8 shrink-0 items-center rounded-md px-2 text-[11px] text-primary hover:bg-primary/10 sm:min-h-0 sm:rounded-none sm:px-0 sm:hover:bg-transparent sm:hover:underline"
+          className="row-start-1 col-start-2 inline-flex min-h-8 shrink-0 items-center rounded-md px-2 text-[11px] leading-[15px] text-primary hover:bg-primary/10 sm:min-h-0 sm:rounded-none sm:px-0 sm:hover:bg-transparent sm:hover:underline"
           title={t('market.tradeableOrderTitle')}
         >
           {t('market.tradeableOrder')} →

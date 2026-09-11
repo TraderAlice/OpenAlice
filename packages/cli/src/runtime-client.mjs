@@ -60,7 +60,8 @@ export async function waitForOpenAlice(baseUrl, options = {}) {
   throw new Error(`OpenAlice did not become ready at ${baseUrl} within ${Math.ceil(timeoutMs / 1_000)}s (${lastError})`)
 }
 
-export function createStartupSignalGuard(runtime, label) {
+export function createStartupSignalGuard(runtime, label, options = {}) {
+  const signalSource = options.signalSource ?? process
   let interrupted = false
   let rejectSignal
   const promise = new Promise((_, rejectPromise) => {
@@ -74,13 +75,13 @@ export function createStartupSignalGuard(runtime, label) {
   }
   const onSigint = () => interrupt('SIGINT')
   const onSigterm = () => interrupt('SIGTERM')
-  process.once('SIGINT', onSigint)
-  process.once('SIGTERM', onSigterm)
+  signalSource.once('SIGINT', onSigint)
+  signalSource.once('SIGTERM', onSigterm)
   return {
     promise,
     release() {
-      process.off('SIGINT', onSigint)
-      process.off('SIGTERM', onSigterm)
+      signalSource.off('SIGINT', onSigint)
+      signalSource.off('SIGTERM', onSigterm)
     },
   }
 }

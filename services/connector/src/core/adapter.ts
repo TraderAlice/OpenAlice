@@ -1,9 +1,13 @@
 import type {
+  ConnectorAttachment,
   ConnectorAdapterConfig,
   ConnectorAdapterHealth,
   ConnectorArtifactDelivery,
   ConnectorDefinition,
+  ConnectorUtaFailure,
+  ConnectorUtaPresentation,
   InboxNotification,
+  OwnerChatMessage,
 } from '@traderalice/connector-protocol'
 import { randomUUID } from 'node:crypto'
 import {
@@ -23,23 +27,41 @@ export interface ConnectorCommandContext {
 
 export type ConnectorCommandHandler = (context: ConnectorCommandContext) => Promise<void>
 
+export type ConnectorStartFailureDisposition = 'fatal' | 'retry'
+
 export interface ConnectorAdapterContext {
   commands: CommandRegistry
   updateSettings(patch: Record<string, string | number | boolean>): Promise<void>
   getServiceStatus(): string
   sendTest(connectorId: string): Promise<string>
-  forwardOwnerText(input: { text: string; userId: string; chatId?: string }): Promise<void>
-  enqueueArtifactRequest(input: { entryId: string; docIndex: number }): string
+  forwardOwnerText(input: { text: string; userId: string; chatId?: string; eventId?: string }): Promise<void>
+  enqueueArtifactRequest(input: { entryId: string; docIndex: number }): Promise<string>
+  enqueueUtaRequest(input: {
+    action: 'review' | 'push' | 'reject'
+    utaId?: string
+    pendingHash?: string
+  }): Promise<string>
 }
 
 export interface ConnectorAdapter {
   readonly id: string
   start(config: ConnectorAdapterConfig, context: ConnectorAdapterContext): Promise<void>
+  /**
+   * Classify failures that escape start(). Core owns retry scheduling, while
+   * each adapter owns the meaning of its SDK errors. The default is fatal.
+   */
+  classifyStartFailure?(error: unknown): ConnectorStartFailureDisposition
   stop(): Promise<void>
   deliver(notification: InboxNotification): Promise<void>
   sendOwnerText(text: string): Promise<void>
+  sendOwnerFile?(attachment: ConnectorAttachment, presentation?: import('./reply-directives.js').ReplyMedia): Promise<void>
+  /** Optional transport-native lifecycle projection for desk-capable adapters. */
+  sendOwnerChat?(message: OwnerChatMessage): Promise<void>
   /** Directed current-file delivery. Must not send an Inbox summary. */
   deliverArtifact?(delivery: ConnectorArtifactDelivery): Promise<void>
+  /** Directed UTA review panel. Must not send an Inbox summary. */
+  presentUta?(presentation: ConnectorUtaPresentation): Promise<void>
+  failUta?(failure: ConnectorUtaFailure): Promise<void>
   health(): ConnectorAdapterHealth
 }
 

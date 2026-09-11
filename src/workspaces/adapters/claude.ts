@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import { createReadStream } from 'node:fs';
 import { readFile, realpath } from 'node:fs/promises';
 import { homedir } from 'node:os';
@@ -75,19 +76,7 @@ function claudeProjectEffort(value: unknown): ModelReasoningEffort | null {
  * same flag so automation doesn't silently lose MCP if a future version
  * closes that gap.
  */
-const AUTOTRUST_SETTINGS = '{"enableAllProjectMcpServers":true}';
-
-// `claude -p` has nobody available to answer a permission prompt. Keep its
-// autonomous Bash surface limited to the four launcher-owned CLI shims rather
-// than bypassing every Claude Code permission. The gateway still validates the
-// Workspace/run identity and each command's argument schema server-side.
-// Syntax follows Claude Code's documented command-prefix permission rules.
-const HEADLESS_ALLOWED_TOOLS = [
-  'Bash(alice:*)',
-  'Bash(alice-workspace:*)',
-  'Bash(alice-uta:*)',
-  'Bash(traderhub:*)',
-].join(',');
+const AUTOTRUST_SETTINGS = '{"enableAllProjectMcpServers":true,"sandbox":{"enabled":false}}';
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -188,6 +177,11 @@ export const claudeAdapter: CliAdapter = {
     resumeById: true,
     transcriptDiscovery: 'fs-watch',
     headless: true,
+    // Bidirectional stream-json keeps one `claude -p` alive across turns and
+    // routes tool permission prompts over stdio (`--permission-prompt-tool
+    // stdio`). `--session-id <uuid>` creates the session on a fresh Session so
+    // the same id resumes in the TUI later.
+    web: { wire: 'claude-stream-json', permissionPrompts: true, freshSession: true },
     aiProvider: {
       credentialSource: 'runtime-or-workspace',
       wirePreference: ['anthropic'],
@@ -237,7 +231,7 @@ export const claudeAdapter: CliAdapter = {
   readInteractiveSetupStatus: readClaudeInteractiveSetupStatus,
 
   composeCommand(base: readonly string[], ctx: SpawnContext): readonly string[] {
-    const cmd = [...base, '--settings', AUTOTRUST_SETTINGS, ...(ctx.sessionRuntime?.interactiveArgs ?? [])];
+    const cmd = [...base, '--settings', AUTOTRUST_SETTINGS, '--dangerously-skip-permissions', ...(ctx.sessionRuntime?.interactiveArgs ?? [])];
     if (ctx.resume === undefined) {
       // Quick-chat seed: `claude [flags] -- <prompt>` opens the interactive TUI
       // and auto-submits the prompt. The `--` end-of-options terminator (same as
@@ -275,12 +269,36 @@ export const claudeAdapter: CliAdapter = {
     }
     return [
       ...base,
-      '--settings', AUTOTRUST_SETTINGS,
-      '--allowedTools', HEADLESS_ALLOWED_TOOLS,
+      '--settings', AUTOTRUST_SETTINGS, '--dangerously-skip-permissions',
       ...(ctx.sessionRuntime?.headlessArgs ?? []),
       ...(ctx.resume ? ['--resume', ctx.resume.sessionId] : []),
       '-p', '--output-format', 'stream-json', '--verbose',
       '--', prompt,
+    ];
+  },
+
+  // Web surface: bidirectional stream-json. `--input-format stream-json` keeps
+  // the process alive between turns, `--include-partial-messages` streams text
+  // deltas, and `--permission-prompt-tool stdio` turns tool permission prompts
+  // into `control_request` frames the transport can present in the browser
+  // (managed launches bypass tool approvals). A fresh Session mints its
+  // uuid up front so `--resume <id>` reopens the identical conversation in the
+  // TUI afterwards. MCP still rides the workspace `.mcp.json` via the same
+  // autotrust settings as the TUI.
+  composeWebCommand(base: readonly string[], ctx: SpawnContext): readonly string[] {
+    if (ctx.resume === 'last') throw new Error('the Web surface requires a concrete Claude session id or a fresh Session');
+    return [
+      ...base,
+      '--settings', AUTOTRUST_SETTINGS, '--dangerously-skip-permissions',
+      ...(ctx.sessionRuntime?.webArgs ?? ctx.sessionRuntime?.interactiveArgs ?? []),
+      ...(ctx.appendSystemPrompt ? ['--append-system-prompt', ctx.appendSystemPrompt] : []),
+      ...(ctx.resume ? ['--resume', ctx.resume.sessionId] : ['--session-id', randomUUID()]),
+      '-p',
+      '--input-format', 'stream-json',
+      '--output-format', 'stream-json',
+      '--verbose',
+      '--include-partial-messages',
+      '--permission-prompt-tool', 'stdio',
     ];
   },
 

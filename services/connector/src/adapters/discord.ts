@@ -11,7 +11,12 @@ import type {
   ConnectorAdapterRegistration,
 } from '../core/adapter.js'
 import {
+  DIRECT_CONNECTOR_PROXY_TRANSPORT,
+  type ConnectorProxyTransport,
+} from '../core/proxy.js'
+import {
   AdapterHealthTracker,
+  classifyNetworkStartFailure,
   decodeInboxAttachments,
   formatInboxNotification,
 } from './shared.js'
@@ -21,6 +26,13 @@ export class DiscordConnectorAdapter implements ConnectorAdapter {
   private readonly tracker = new AdapterHealthTracker(this.id)
   private client?: Client
   private ownerUserId?: string
+  private readonly proxy: ConnectorProxyTransport
+
+  classifyStartFailure = classifyNetworkStartFailure
+
+  constructor(options: { proxy?: ConnectorProxyTransport } = {}) {
+    this.proxy = options.proxy ?? DIRECT_CONNECTOR_PROXY_TRANSPORT
+  }
 
   async start(config: ConnectorAdapterConfig, context: ConnectorAdapterContext): Promise<void> {
     try {
@@ -41,6 +53,7 @@ export class DiscordConnectorAdapter implements ConnectorAdapter {
       const client = new Client({
         intents: [GatewayIntentBits.Guilds, GatewayIntentBits.DirectMessages],
         partials: [Partials.Channel],
+        ...(this.proxy.dispatcher ? { rest: { agent: this.proxy.dispatcher } } : {}),
       })
       this.client = client
       client.on(Events.InteractionCreate, async (interaction) => {
@@ -162,6 +175,10 @@ export class DiscordConnectorAdapter implements ConnectorAdapter {
       if (!this.isOwner(userId)) return reply('This command is only available to the linked owner.')
       await reply('Discord settings buttons are not implemented yet. Change Inbox push in OpenAlice → Settings → Connectors.')
     })
+    context.commands.register('uta', async ({ userId, reply }) => {
+      if (!this.isOwner(userId)) return reply('This command is only available to the linked owner.')
+      await reply('UTA review buttons are not implemented for Discord yet. Approve pending trades in OpenAlice → Trading as Git.')
+    })
   }
 
   private isOwner(userId: string): boolean {
@@ -185,12 +202,17 @@ export class DiscordConnectorAdapter implements ConnectorAdapter {
       integration_types: [ApplicationIntegrationType.UserInstall],
       contexts: [InteractionContextType.BotDM],
     }))
-    await new REST({ version: '10' }).setToken(token).put(Routes.applicationCommands(applicationId), { body })
+    await new REST({
+      version: '10',
+      ...(this.proxy.dispatcher ? { agent: this.proxy.dispatcher } : {}),
+    }).setToken(token).put(Routes.applicationCommands(applicationId), { body })
   }
 }
 
-export function discordConnectorRegistration(): ConnectorAdapterRegistration {
-  return { definition: DISCORD_CONNECTOR_DEFINITION, create: () => new DiscordConnectorAdapter() }
+export function discordConnectorRegistration(
+  proxy: ConnectorProxyTransport = DIRECT_CONNECTOR_PROXY_TRANSPORT,
+): ConnectorAdapterRegistration {
+  return { definition: DISCORD_CONNECTOR_DEFINITION, create: () => new DiscordConnectorAdapter({ proxy }) }
 }
 
 function requiredString(config: ConnectorAdapterConfig, key: string): string {

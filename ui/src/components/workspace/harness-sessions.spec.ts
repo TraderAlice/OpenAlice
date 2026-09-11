@@ -4,6 +4,7 @@ import type { SessionRecord, Workspace, WorkspaceSessionDirectoryEntry } from '.
 import {
   flattenHarnessSessions,
   harnessSessionTitle,
+  isHeadlessBornWithoutInteractive,
   joinWorkspaceHarnessSessions,
   orderHarnessSessions,
   shortResumeId,
@@ -81,12 +82,22 @@ describe('harness session titles', () => {
     expect(harnessSessionTitle(null, entry({ displayName: 'AAPL desk' }))).toBe('AAPL desk')
   })
 
-  it('prefers the interactive title, then preview, issue, then a short resume id', () => {
+  it('prefers the interactive title, then preview, a readable Issue id, then a short resume id', () => {
     expect(harnessSessionTitle(session(), entry({ resumeId: 'resume-interactive' }))).toBe('Interactive thesis')
     expect(harnessSessionTitle(null, entry())).toBe('Morning scan complete. Semis still lead.')
     expect(harnessSessionTitle(null, entry({
       latestExecution: { taskId: 'task-1', status: 'done', startedAt: 1, issueId: 'scan-open' },
-    }))).toBe('scan-open')
+    }))).toBe('Scan Open')
+    expect(harnessSessionTitle(session({ title: '# Launch prompt\n\nWrite the close brief.' }), entry({
+      resumeId: 'resume-interactive',
+      createdBy: {
+        kind: 'issue',
+        workspaceId: 'ws-1',
+        issueId: 'daily-market-close',
+        policy: 'new-then-resume',
+        fire: 'schedule',
+      },
+    }))).toBe('Daily Market Close')
     expect(harnessSessionTitle(null, entry({
       resumeId: 'resume-calm-amber-river-a1b2c3',
       latestExecution: undefined,
@@ -95,6 +106,27 @@ describe('harness session titles', () => {
 })
 
 describe('joinWorkspaceHarnessSessions', () => {
+  it('keeps Issue-attached Sessions off the shared roster unless explicitly enabled', () => {
+    const issueOwner = session({ resumeId: 'resume-issue-owner' })
+    const directory = {
+      workspace: { id: 'ws-1', tag: 'chat-aug1' },
+      sessions: [entry({
+        resumeId: 'resume-issue-owner',
+        issueAttached: true,
+        interactive: {
+          name: 'p1',
+          state: 'paused' as const,
+          lastActiveAt: '2026-08-03T00:00:00.000Z',
+        },
+      })],
+    }
+
+    expect(joinWorkspaceHarnessSessions(workspace([issueOwner]), directory)).toEqual([])
+    expect(joinWorkspaceHarnessSessions(workspace([issueOwner]), directory, {
+      includeIssueAttachedSessions: true,
+    }).map((row) => row.resumeId)).toEqual(['resume-issue-owner'])
+  })
+
   it('uses the persistent Session roster until Directory arrives', () => {
     const rows = joinWorkspaceHarnessSessions(workspace(), null)
     expect(rows.map((row) => row.resumeId)).toEqual(['resume-interactive'])
@@ -126,7 +158,7 @@ describe('joinWorkspaceHarnessSessions', () => {
         entry(),
         entry({ resumeId: 'resume-directory-only' }),
       ],
-    })
+    }, { includeHeadlessBornSessions: true })
 
     expect(rows.map((row) => row.resumeId)).toEqual([
       'resume-headless-only',
@@ -135,6 +167,27 @@ describe('joinWorkspaceHarnessSessions', () => {
     expect(rows[0]?.session.id).toBe('session-headless')
     expect(rows[0]?.title).toBe('Morning scan complete. Semis still lead.')
     expect(rows.some((row) => row.resumeId === 'resume-directory-only')).toBe(false)
+  })
+
+  it('always hides connector-owned Sessions even when ordinary headless rows are enabled', () => {
+    const connector = headlessSession({
+      id: 'session-connector',
+      resumeId: 'resume-connector',
+    })
+    const ordinary = headlessSession()
+    const rows = joinWorkspaceHarnessSessions(workspace([session(), connector, ordinary]), {
+      workspace: { id: 'ws-1', tag: 'chat-aug1' },
+      sessions: [
+        entry({ resumeId: 'resume-interactive' }),
+        entry({ resumeId: 'resume-connector', rosterVisibility: 'hidden' }),
+        entry(),
+      ],
+    }, { includeHeadlessBornSessions: true })
+
+    expect(rows.map((row) => row.resumeId)).toEqual([
+      'resume-headless-only',
+      'resume-interactive',
+    ])
   })
 
   it('locks TUI while headless occupies and sorts running occupancy first', () => {
@@ -176,7 +229,7 @@ describe('joinWorkspaceHarnessSessions', () => {
         runningHeadless,
         failed,
       ],
-    })
+    }, { includeHeadlessBornSessions: true })
 
     expect(rows.map((row) => row.resumeId)).toEqual([
       'resume-running',
@@ -238,6 +291,60 @@ describe('joinWorkspaceHarnessSessions', () => {
     expect(row.occupancyRunning).toBe(true)
     expect(row.headlessOccupying).toBe(false)
   })
+
+  it('hides headless-born Sessions that have never opened a TUI', () => {
+    const bornHeadless = headlessSession({ sourceRunId: 'run-1' })
+    const openedLater = headlessSession({
+      id: 'session-opened',
+      resumeId: 'resume-opened',
+      sourceRunId: 'run-2',
+    })
+    expect(isHeadlessBornWithoutInteractive(bornHeadless, entry())).toBe(true)
+    expect(isHeadlessBornWithoutInteractive(openedLater, entry({
+      resumeId: 'resume-opened',
+      interactive: {
+        name: 'x2',
+        state: 'paused',
+        lastActiveAt: '2026-08-03T00:00:00.000Z',
+      },
+    }))).toBe(false)
+
+    const rows = joinWorkspaceHarnessSessions(workspace([session(), bornHeadless, openedLater]), {
+      workspace: { id: 'ws-1', tag: 'chat-aug1' },
+      sessions: [
+        entry({ resumeId: 'resume-interactive' }),
+        entry(),
+        entry({
+          resumeId: 'resume-opened',
+          interactive: {
+            name: 'x2',
+            state: 'paused',
+            lastActiveAt: '2026-08-03T00:00:00.000Z',
+          },
+        }),
+      ],
+    })
+    expect(rows.map((row) => row.resumeId)).toEqual([
+      'resume-opened',
+      'resume-interactive',
+    ])
+  })
+
+  it('does not treat a Directory projection of a headless record as an interactive opening', () => {
+    const bornHeadless = headlessSession({ sourceRunId: 'run-1' })
+    const projected = entry({
+      interactive: undefined,
+      createdBy: {
+        kind: 'issue',
+        workspaceId: 'ws-1',
+        issueId: 'daily-scan',
+        policy: 'new-then-resume',
+        fire: 'schedule',
+      },
+    })
+
+    expect(isHeadlessBornWithoutInteractive(bornHeadless, projected)).toBe(true)
+  })
 })
 
 describe('orderHarnessSessions', () => {
@@ -265,6 +372,7 @@ describe('orderHarnessSessions', () => {
           })],
         }],
       ]),
+      { includeHeadlessBornSessions: true },
     )
     expect(rows.map((row) => `${row.workspaceId}:${row.resumeId}`)).toEqual([
       'ws-2:resume-headless-only',

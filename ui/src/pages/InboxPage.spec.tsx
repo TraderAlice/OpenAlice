@@ -1,3 +1,4 @@
+import { inboxFiles } from '@traderalice/connector-protocol'
 // @vitest-environment jsdom
 
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
@@ -5,14 +6,28 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { i18n } from '../i18n'
 import { api } from '../api'
+import type { InboxEntry } from '../api/inbox'
 import { useInboxSelection } from '../live/inbox-selection'
+import {
+  readOfficeInboxDutyExcursion,
+  rememberOfficeInboxDutyExcursion,
+} from '../office/inbox-duty-excursion'
+import { inboxUnreadDutyRegistration, type OfficeInboxDutyCandidate } from '../office/duty-registry'
 import { readWorkspaceFile } from '../components/workspace/api'
-import { InboxAttachment, InboxPage } from './InboxPage'
+import { InboxPage } from './InboxPage'
 
 const workspaceMocks = vi.hoisted(() => ({
   openHeadlessRun: vi.fn(),
   resumeSession: vi.fn(),
 }))
+const officeReturnMock = vi.hoisted(() => vi.fn())
+
+function officeInboxDuty(entry: InboxEntry): OfficeInboxDutyCandidate {
+  return inboxUnreadDutyRegistration([{
+    title: entry.body ?? inboxFiles(entry)?.[0]?.path ?? 'Inbox delivery',
+    entry,
+  }], 'ready').candidates[0] as OfficeInboxDutyCandidate
+}
 
 vi.mock('../contexts/workspaces-context', () => ({
   useWorkspaces: () => ({
@@ -34,6 +49,10 @@ vi.mock('../components/InboxReplyThread', () => ({
   InboxReplyThread: () => null,
 }))
 
+vi.mock('../office/useOfficeInboxDutyReturn', () => ({
+  useOfficeInboxDutyReturn: () => officeReturnMock,
+}))
+
 vi.mock('../components/workspace/api', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../components/workspace/api')>()
   return { ...actual, readWorkspaceFile: vi.fn() }
@@ -41,6 +60,7 @@ vi.mock('../components/workspace/api', async (importOriginal) => {
 
 beforeEach(async () => {
   await i18n.changeLanguage('en')
+  window.sessionStorage.clear()
   vi.mocked(readWorkspaceFile).mockResolvedValue({
     kind: 'ok',
     content: '<!doctype html><html><body><h1>Close report</h1></body></html>',
@@ -50,59 +70,8 @@ beforeEach(async () => {
 afterEach(() => {
   cleanup()
   useInboxSelection.getState().select(null)
+  window.sessionStorage.clear()
   vi.clearAllMocks()
-})
-
-describe('InboxAttachment', () => {
-  it('keeps the collapsed state asset-like instead of leaking raw file content', async () => {
-    render(
-      <InboxAttachment
-        workspaceId="ws-1"
-        doc={{ path: 'research/close-report.html', revision: 'sha256:1234567890' }}
-        defaultExpanded={false}
-      />,
-    )
-
-    expect(await screen.findByText('HTML report')).toBeTruthy()
-    expect(screen.getByText('close-report.html')).toBeTruthy()
-    expect(screen.getByText('research')).toBeTruthy()
-    expect(screen.queryByText(/doctype html/i)).toBeNull()
-    expect(screen.queryByText(/sent 12345678/i)).toBeNull()
-  })
-
-  it('reveals the real viewer only after the attachment is opened', async () => {
-    render(
-      <InboxAttachment
-        workspaceId="ws-1"
-        doc={{ path: 'research/close-report.html' }}
-        defaultExpanded={false}
-      />,
-    )
-
-    fireEvent.click(screen.getByRole('button', { name: 'Preview attachment close-report.html' }))
-
-    expect(await screen.findByTitle('HTML report: research/close-report.html')).toBeTruthy()
-    expect(screen.getByRole('button', { name: 'Collapse attachment close-report.html' })).toBeTruthy()
-  })
-
-  it('keeps markdown asset actions touch-sized on mobile and compact on desktop', async () => {
-    render(
-      <InboxAttachment
-        workspaceId="ws-1"
-        doc={{ path: 'research/close-report.md' }}
-        defaultExpanded={false}
-      />,
-    )
-
-    const copy = await screen.findByRole('button', { name: 'Copy Markdown' })
-    const download = screen.getByRole('button', { name: 'Download Markdown' })
-    for (const action of [copy, download]) {
-      expect(action.className).toContain('h-10')
-      expect(action.className).toContain('w-10')
-      expect(action.className).toContain('sm:h-7')
-      expect(action.className).toContain('sm:w-7')
-    }
-  })
 })
 
 describe('InboxPage deletion', () => {
@@ -112,7 +81,7 @@ describe('InboxPage deletion', () => {
       ts: Date.now(),
       workspaceId: 'ws-1',
       workspaceLabel: 'research',
-      comments: 'A durable research update.',
+      body: 'A durable research update.'
     }
     vi.spyOn(api.inbox, 'history').mockResolvedValue({
       entries: [entry],
@@ -147,7 +116,7 @@ describe('InboxPage deletion', () => {
       ts: Date.now(),
       workspaceId: 'ws-1',
       workspaceLabel: 'research',
-      comments: 'Keep this update until the server confirms deletion.',
+      body: 'Keep this update until the server confirms deletion.'
     }
     let serverHasEntry = true
     vi.spyOn(api.inbox, 'history').mockImplementation(async () => ({
@@ -170,7 +139,7 @@ describe('InboxPage deletion', () => {
     expect((await screen.findByRole('alert')).textContent).toBe(
       'Couldn’t delete this Inbox entry. It is still available. Try again.',
     )
-    expect(screen.getByText(entry.comments)).toBeTruthy()
+    expect(document.querySelector('[data-markdown-variant="reading"]')?.textContent).toContain(entry.body)
     expect(screen.getByText('Delete Inbox entry?')).toBeTruthy()
     expect(useInboxSelection.getState().selectedEntryId).toBe(entry.id)
 
@@ -178,6 +147,164 @@ describe('InboxPage deletion', () => {
 
     await waitFor(() => expect(deleteEntry).toHaveBeenCalledTimes(2))
     await waitFor(() => expect(screen.queryByText('Delete Inbox entry?')).toBeNull())
+  })
+
+  it.each([
+    { activeTarget: true, expectedReadCalls: 0 },
+    { activeTarget: false, expectedReadCalls: 1 },
+  ])(
+    'advances after delete without bypassing Office review settlement (active target: $activeTarget)',
+    async ({ activeTarget, expectedReadCalls }) => {
+      const current: InboxEntry = {
+        id: 'inbox-delete-current',
+        ts: Date.now(),
+        workspaceId: 'ws-1',
+        workspaceLabel: 'research',
+        body: 'Delete this current update.'
+      }
+      const successor: InboxEntry = {
+        id: 'inbox-delete-successor',
+        ts: current.ts - 1,
+        workspaceId: 'ws-1',
+        workspaceLabel: 'research',
+        body: 'Select this successor.'
+      }
+      let serverEntries = [current, successor]
+      vi.spyOn(api.inbox, 'history').mockImplementation(async () => ({
+        entries: serverEntries,
+        hasMore: false,
+      }))
+      vi.spyOn(api.inbox, 'delete').mockImplementation(async () => {
+        serverEntries = [successor]
+        return true
+      })
+      const markRead = vi.spyOn(api.inbox, 'markRead').mockResolvedValue({
+        ok: true,
+        id: successor.id,
+        readAt: Date.now(),
+      })
+      if (activeTarget) {
+        rememberOfficeInboxDutyExcursion({
+          duty: officeInboxDuty(successor),
+          purpose: 'review',
+          phase: 'presented',
+          shift: { position: 1, total: 2 },
+        })
+      } else {
+        rememberOfficeInboxDutyExcursion({
+          duty: officeInboxDuty({ ...successor, id: 'different-entry' }),
+          purpose: 'review',
+          phase: 'presented',
+          shift: { position: 1, total: 2 },
+        })
+      }
+      useInboxSelection.getState().select(current.id)
+
+      render(<InboxPage visible />)
+      fireEvent.click(await screen.findByRole('button', { name: 'Delete this inbox entry' }))
+      fireEvent.click(screen.getByRole('button', { name: 'Delete' }))
+
+      await waitFor(() => {
+        expect(useInboxSelection.getState().selectedEntryId).toBe(successor.id)
+      })
+      await waitFor(() => expect(markRead).toHaveBeenCalledTimes(expectedReadCalls))
+      if (expectedReadCalls > 0) expect(markRead).toHaveBeenCalledWith(successor.id)
+    },
+  )
+})
+
+describe('InboxPage Office presentation handshake', () => {
+  it('marks the exact selected delivery only after its reading surface is visible', async () => {
+    const entry = {
+      id: 'inbox-office-a',
+      ts: Date.now(),
+      workspaceId: 'ws-1',
+      workspaceLabel: 'research',
+      body: "Exact Office delivery.\n\n[[research/close-report.md]]"
+    }
+    vi.spyOn(api.inbox, 'history').mockResolvedValue({ entries: [entry], hasMore: false })
+    rememberOfficeInboxDutyExcursion({
+      duty: officeInboxDuty(entry),
+      purpose: 'review',
+      phase: 'away',
+      shift: { position: 1, total: 2 },
+    })
+    useInboxSelection.getState().select(entry.id)
+
+    const view = render(<InboxPage visible={false} />)
+    expect(await screen.findByText('Exact Office delivery.')).toBeTruthy()
+    expect(readOfficeInboxDutyExcursion()?.phase).toBe('away')
+
+    view.rerender(<InboxPage visible />)
+    await waitFor(() => expect(readOfficeInboxDutyExcursion()?.phase).toBe('presented'))
+    expect(await screen.findByRole('region', {
+      name: /Office shift 1 of 2.*Inbox evidence.*Exact Office delivery/,
+    })).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: 'Return to Office' }))
+    expect(officeReturnMock).toHaveBeenCalledTimes(1)
+    expect(readOfficeInboxDutyExcursion()?.phase).toBe('presented')
+  })
+
+  it('does not present captured delivery A when Inbox renders delivery B', async () => {
+    const entry = {
+      id: 'inbox-office-b',
+      ts: Date.now(),
+      workspaceId: 'ws-1',
+      workspaceLabel: 'research',
+      body: 'A newer default-selected delivery.'
+    }
+    vi.spyOn(api.inbox, 'history').mockResolvedValue({ entries: [entry], hasMore: false })
+    rememberOfficeInboxDutyExcursion({
+      duty: officeInboxDuty({
+        id: 'inbox-office-a',
+        ts: entry.ts - 1,
+        workspaceId: 'ws-1',
+        workspaceLabel: 'research',
+        body: "Captured delivery A.\n\n[[research/a.md]]"
+      }),
+      purpose: 'review',
+      phase: 'away',
+      shift: { position: 1, total: 2 },
+    })
+    useInboxSelection.getState().select(entry.id)
+
+    render(<InboxPage visible />)
+    expect(await screen.findByText('A newer default-selected delivery.')).toBeTruthy()
+    expect(readOfficeInboxDutyExcursion()?.phase).toBe('away')
+  })
+
+  it('restores an exact captured duty after reload even when it is older than the live feed', async () => {
+    const captured = {
+      id: 'inbox-office-older-than-feed',
+      ts: Date.now() - 10_000,
+      workspaceId: 'ws-1',
+      workspaceLabel: 'research',
+      body: "# Older weekly report\n\nThis exact report still needs review.\n\n[[research/older-weekly-report.md]]"
+    }
+    const newest = {
+      id: 'inbox-office-newest-live',
+      ts: Date.now(),
+      workspaceId: 'ws-1',
+      workspaceLabel: 'research',
+      body: 'A newer live-feed row.'
+    }
+    vi.spyOn(api.inbox, 'history').mockResolvedValue({ entries: [newest], hasMore: false })
+    rememberOfficeInboxDutyExcursion({
+      duty: officeInboxDuty(captured),
+      purpose: 'review',
+      phase: 'away',
+      shift: { position: 1, total: 2 },
+    })
+    expect(useInboxSelection.getState().selectedEntryId).toBeNull()
+
+    render(<InboxPage visible />)
+
+    await waitFor(() => expect(useInboxSelection.getState().selectedEntryId).toBe(captured.id))
+    expect(await screen.findAllByRole('heading', { level: 1, name: 'Older weekly report' }))
+      .toHaveLength(2)
+    expect(screen.getByText('This exact report still needs review.')).toBeTruthy()
+    expect(screen.queryByRole('button', { name: 'Delete this inbox entry' })).toBeNull()
+    await waitFor(() => expect(readOfficeInboxDutyExcursion()?.phase).toBe('presented'))
   })
 })
 
@@ -188,7 +315,6 @@ describe('InboxPage responsive detail header', () => {
       ts: Date.now(),
       workspaceId: 'ws-1',
       workspaceLabel: 'research',
-      comments: 'A durable research update.',
       origin: {
         kind: 'headless' as const,
         agent: 'pi',
@@ -196,6 +322,7 @@ describe('InboxPage responsive detail header', () => {
         resumeId: 'resume-plain-linen-river-2218b6',
         issueId: 'daily-us-market-close-with-a-long-name',
       },
+      body: 'A durable research update.'
     }
     vi.spyOn(api.inbox, 'history').mockResolvedValue({
       entries: [entry],
@@ -209,7 +336,7 @@ describe('InboxPage responsive detail header', () => {
     expect(sender.textContent).toContain('from pi')
     expect(sender.textContent).not.toContain('resume-plain-linen-river-2218b6')
     expect(sender.className).toContain('min-h-10')
-    expect(sender.className).toContain('sm:min-h-0')
+    expect(sender.className).toContain('sm:min-h-8')
     expect(screen.queryByText('@resume-plain-linen-river-2218b6')).toBeNull()
     expect(screen.queryByRole('button', { name: 'Open conversation' })).toBeNull()
 
@@ -217,11 +344,11 @@ describe('InboxPage responsive detail header', () => {
       name: 'from daily-us-market-close-with-a-long-name',
     })
     expect(issue.className).toContain('min-h-10')
-    expect(issue.className).toContain('sm:min-h-0')
+    expect(issue.className).toContain('sm:min-h-8')
 
     fireEvent.click(sender)
     expect(screen.getByRole('dialog', {
-      name: 'Sender identity: pi · @resume-plain-linen-river-2218b6',
+      name: 'Sender identity: pi — @resume-plain-linen-river-2218b6',
     })).toBeTruthy()
     expect(screen.getByText('@resume-plain-linen-river-2218b6').className).toContain('break-all')
     const openConversation = screen.getByRole('button', { name: 'Open conversation' })
@@ -229,7 +356,7 @@ describe('InboxPage responsive detail header', () => {
 
     fireEvent.keyDown(document, { key: 'Escape' })
     expect(screen.queryByRole('dialog', {
-      name: 'Sender identity: pi · @resume-plain-linen-river-2218b6',
+      name: 'Sender identity: pi — @resume-plain-linen-river-2218b6',
     })).toBeNull()
     await waitFor(() => expect(document.activeElement).toBe(sender))
 
@@ -241,11 +368,93 @@ describe('InboxPage responsive detail header', () => {
       { title: 'A durable research update.' },
     ))
     expect(screen.queryByRole('dialog', {
-      name: 'Sender identity: pi · @resume-plain-linen-river-2218b6',
+      name: 'Sender identity: pi — @resume-plain-linen-river-2218b6',
     })).toBeNull()
 
     const deleteEntry = screen.getByRole('button', { name: 'Delete this inbox entry' })
     expect(deleteEntry.className).toContain('h-10')
     expect(deleteEntry.className).toContain('w-10')
+  })
+})
+
+describe('InboxPage editorial reading surface', () => {
+  it('leads with a concise subject and keeps the exact comments in a reading measure', async () => {
+    const omittedTail = 'DETAIL_BODY_TAIL_MARKER'
+    const comments = [
+      '# Close report',
+      '',
+      'The book is flat after the trim.',
+      '',
+      `${'More analysis of the tape and the book. '.repeat(6)}${omittedTail}`,
+    ].join('\n')
+    const entry = {
+      id: 'inbox-reading',
+      ts: Date.now(),
+      workspaceId: 'ws-1',
+      workspaceLabel: 'research',
+      body: [comments, "[[research/close-report.md]]"].filter(Boolean).join('\n\n')
+    }
+    vi.spyOn(api.inbox, 'history').mockResolvedValue({
+      entries: [entry],
+      hasMore: false,
+    })
+    useInboxSelection.getState().select(entry.id)
+
+    render(<InboxPage visible />)
+
+    const article = await screen.findByRole('article')
+    expect(article.className).toContain('max-w-[46rem]')
+    expect(article.className).not.toMatch(/rounded-(xl|lg)|border-border/)
+    expect(screen.getAllByRole('heading', { name: 'Close report' })[0]?.tagName).toBe('H1')
+    const body = document.querySelector('[data-markdown-variant="reading"]')
+    expect(body?.textContent).toContain('The book is flat after the trim.')
+    expect(body?.textContent).toContain(omittedTail)
+    expect(body?.querySelector('.markdown-content--reading')).toBeTruthy()
+    expect(body?.closest('.inbox-report-body--repeats-heading')).toBeTruthy()
+
+    expect(screen.queryByRole('heading', { name: /Attachments/ })).toBeNull()
+    expect(body?.textContent).toContain('[[research/close-report.md]]')
+  })
+
+  it('keeps a long source heading complete above the report body', async () => {
+    const heading = 'A deliberately long close report heading that remains complete in the reading pane'
+    const entry = {
+      id: 'inbox-long-heading',
+      ts: Date.now(),
+      workspaceId: 'ws-1',
+      workspaceLabel: 'research',
+      body: `# ${heading}\n\nThe book is flat.`
+    }
+    vi.spyOn(api.inbox, 'history').mockResolvedValue({ entries: [entry], hasMore: false })
+    useInboxSelection.getState().select(entry.id)
+
+    render(<InboxPage visible />)
+
+    await screen.findAllByRole('heading', { level: 1, name: heading })
+    expect(document.querySelector('article > header h1')?.textContent).toBe(heading)
+    expect(document.querySelector('.inbox-report-body--repeats-heading')).toBeTruthy()
+  })
+
+  it('names attachment-only and empty updates without inventing a report body', async () => {
+    const entry = {
+      id: 'inbox-empty',
+      ts: Date.now(),
+      workspaceId: 'ws-1',
+      workspaceLabel: 'research',
+      body: "   \n\n[[research/close-report.md]]\n\n[[notes/context.txt]]"
+    }
+    vi.spyOn(api.inbox, 'history').mockResolvedValue({
+      entries: [entry],
+      hasMore: false,
+    })
+    useInboxSelection.getState().select(entry.id)
+
+    render(<InboxPage visible />)
+
+    expect(await screen.findByRole('heading', { level: 1, name: 'close-report.md · +1 more' })).toBeTruthy()
+    expect(screen.queryByRole('heading', { name: 'Update without a summary' })).toBeNull()
+    expect(screen.queryByRole('heading', { name: /Attachments/ })).toBeNull()
+    expect(screen.getByText(/\[\[research\/close-report.md\]\]/)).toBeTruthy()
+    expect(screen.getByText(/\[\[notes\/context.txt\]\]/)).toBeTruthy()
   })
 })

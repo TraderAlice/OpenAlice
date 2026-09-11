@@ -29,10 +29,64 @@ the durable truth after it changes. Git history is the archive.
 
 ## Active
 
-- [[plans/agent-runtime-log.md]] — Append-only agent runtime lifecycle log
-  (`session.born` / started / stopped / rejected / headless turn assets).
-  Occupancy + Office timeline + headless text/tool/completion are in;
-  the floor canvas lives in [[plans/office-floor.md]].
+- [[plans/web-conversation-surface.md]] — Generalizes WebPi into one Web
+  conversation surface: a neutral `WebSessionHost` with `pi-rpc`, `acp`,
+  `claude-stream-json`, and `codex-app-server` transports, first-class
+  permission requests, and capability-gated UI. Live per-runtime acceptance
+  remains open.
+- [[plans/unified-page-topbar.md]] — Unifies navigator and content toolbars
+  across the UI, with fixed page actions and content-owned sidebar restoration.
+  Held on `codex/ui-usability-followup` for visual acceptance.
+
+- [[plans/interaction-density-convergence.md]] — Converges field focus, compact-rail expansion, Connector setup hierarchy, and dense market surfaces through shared interaction primitives on the current `dev` baseline.
+- [[plans/tui-experience.md]] — Rebuilds the Shell Supervisor as a polished,
+  mouse-capable terminal control surface using Oh My Pi as the interaction and
+  finish benchmark while preserving the Node CLI and Runtime ownership
+  boundary. Work remains on `codex/tui-usability` for integrated acceptance
+  before any `dev` PR.
+- [[plans/bun-cli-distribution.md]] — Replaces the expanded Node headless
+  Runtime with a Bun-compiled, multi-process CLI distribution. Direct,
+  npm/Bun, Homebrew, and AUR channels consume one accepted artifact set.
+  Active follow-up: system-owned Git/Bash and consent-based dependency
+  coordination across CLI installers/package managers; Electron stays separate.
+  Stable `0.91.1` and its Homebrew formula are publicly accepted after the
+  separate beta checkpoint. Windows x64 npm first publication is complete;
+  all seven OIDC exchanges and complete npm/Bun publication now pass.
+  Public macOS npm/Bun and Linux npm 12 lifecycle acceptance passed.
+  Native Intel acceptance passed; renderer latency remains tracked in #1350.
+  AUR registration remains deferred.
+  The CLI package owns OpenAlice only: Agent Runtime installation and Electron
+  packaging stay outside this plan. The native CLI is public through the
+  separately dispatched `v0.91.0-beta.3`; stable/beta discovery now uses the
+  OpenAlice CDN manifests. Managed SSH installation and Project transfer pass
+  the disposable Docker target; beta3 core Runtime/PTY state survives a long
+  tunnel outage, and the following `dev` increment refreshes Settings identity
+  after recovery. Native Windows x64/ARM64 now proceed from accepted previews
+  into the shared stable/beta/dev installer, updater, and npm topology; external
+  package-manager activation remains a separate checkpoint. Routine dev
+  and exact-beta source feedback is reduced to local-first, lightweight
+  hosted lanes while `master` promotion, stable, and final artifact acceptance
+  retain the complete gates.
+- [[plans/remote-project-fleet.md]] — Adds a machine-aware Supervisor fleet,
+  remote AliceProject inventory/connection, and safe local-to-SSH project
+  transfer for portable configuration and Workspaces while deliberately
+  excluding native/OpenAlice Session continuation state. The completed
+  remote-readiness increment makes the attached browser truthful about remote
+  identity, Agent and Broker Pack capability, scheduled-work blockers,
+  reconnect recovery, and public Session titles. Controller/remote release
+  negotiation remains a separate SSH-managed increment without background
+  polling or infrastructure-provider ownership.
+- [[plans/auto-prediction-harness.md]] — Auto Prediction Beta conversation
+  Harness is in `dev`; managed AP/AQ Studio supervision, opaque routing, and
+  embedded product surfaces are implemented. Shared verified/unverified source
+  release management and cross-runtime acceptance remain active.
+- [[plans/antigravity-adapter.md]] — Antigravity (`agy`) CliAdapter.
+  PATH `agy` only; never spawn `antigravity` / `gemini`.
+  Serial PR from `feat/agy-adapter`; do not merge until Ame says so.
+- [[plans/product-activity-journal.md]] — Standard append-only product activity
+  journal consumed by Office and Sonner. Agent runtime facts are live; Inbox
+  and per-item News facts are the current increment. It remains a projection,
+  never a dispatch bus.
 - [[plans/office-floor.md]] — Office overworld rebuild: one continuous 4:3
   top-down tilemap; Harness=functional neighborhood, Workspace=furniture pod,
   `resumeId`=employee. Scene graph, top-down placeholders, game chrome, camera,
@@ -44,6 +98,9 @@ the durable truth after it changes. Git history is the archive.
   Telegram phone desk: What is the heartbeat prompt, comments are the chat,
   Connector only transports. Increment 1 bound the desk in Settings.
   Increment 2 projects comments unless `[[no-reply]]`.
+- [[plans/connector-desk.md]] — Desk specimen is shared; each `desk` adapter
+  owns its own Issue. Increment 1 generalizes `telegramConnector` →
+  `connectorDesk: <id>`. Feishu adapter is a later increment.
 - [[plans/connector-inbox-commands.md]] — Connectors declare `inbox` and
   `settings` capabilities and implement their own slash-command forms.
   Telegram uses a bounded `/inbox` summary plus on-demand file pull;
@@ -53,9 +110,6 @@ the durable truth after it changes. Git history is the archive.
   (`active` / `archived` / `deleted`) separate from workspace `retired`, uncap
   the Ask Alice roster, and make Archive the floor action instead of deleting
   a coworker. Increment 1 landed in PR #1069; persisted presence remains open.
-- [[plans/release-feedback-reliability.md]] — Batch 1 (deterministic/early
-  release feedback) landed in PR #1061. Batch 2 still needs per-platform N-1
-  fan-in and accepted-tree provenance without weakening release gates.
 - [[plans/shell-first-cli-supervisor.md]] — Delivers a first-class Shell
   Supervisor TUI, persistent Guardian-owned Runtime lifecycle, standalone
   headless release bundle, atomic update/rollback, and real N-1 plus PTY

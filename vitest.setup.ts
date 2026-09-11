@@ -9,8 +9,9 @@
  * specific home (paths.spec, global-provider-keys.spec) still override via
  * vi.resetModules() + their own env handling.
  *
- * Deliberately NOT wired into vitest.e2e.config.ts: the e2e suite reads real
- * broker credentials from the real store by design.
+ * Wired into both hermetic unit/component tests and deterministic local
+ * integration tests. Only the explicit external-readonly and live-paper
+ * configs intentionally retain access to real local provider configuration.
  */
 import { mkdtempSync } from 'node:fs'
 import { tmpdir } from 'node:os'

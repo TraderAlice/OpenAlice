@@ -1,8 +1,9 @@
 /**
  * Tiny structured logger. One JSON line per log record on stdout (errors on
  * stderr), with an additional append-only file sink at
- * `logs/workspace-sessions.log` so every spawn / resume / transcript event is
- * grep-able in isolation without scrolling past every other backend log line.
+ * `<OPENALICE_HOME>/logs/workspace-sessions.log` so every spawn / resume /
+ * transcript event is grep-able in isolation without scrolling past every
+ * other backend log line.
  *
  * Hand-rolled — keep the dep surface zero. The file sink failure must never
  * take down session lifecycle, so all fs errors are swallowed.
@@ -10,6 +11,7 @@
 
 import { createWriteStream, mkdirSync, type WriteStream } from 'node:fs';
 import { dirname, resolve } from 'node:path';
+import { userDataHome } from '@/core/paths.js';
 
 type Level = 'debug' | 'info' | 'warn' | 'error';
 
@@ -18,8 +20,8 @@ const LEVELS: Record<Level, number> = { debug: 10, info: 20, warn: 30, error: 40
 const envLevel = (process.env['WEB_TERMINAL_LOG_LEVEL'] ?? 'info').toLowerCase();
 const minLevel: number = LEVELS[envLevel as Level] ?? LEVELS.info;
 
-const FILE_PATH = resolve(process.cwd(), 'logs', 'workspace-sessions.log');
-const fileStream = openFileSink(FILE_PATH);
+const FILE_PATH = resolve(userDataHome, 'logs', 'workspace-sessions.log');
+let fileStream: WriteStream | null | undefined;
 
 function openFileSink(path: string): WriteStream | null {
   try {
@@ -30,6 +32,14 @@ function openFileSink(path: string): WriteStream | null {
   } catch {
     return null;
   }
+}
+
+function getFileSink(): WriteStream | null {
+  // Importing Alice modules must stay read-only until the Runtime lifecycle
+  // fence has been validated and acquired. Defer the first filesystem write
+  // until Alice actually emits a Workspace log record after that gate.
+  if (fileStream === undefined) fileStream = openFileSink(FILE_PATH);
+  return fileStream;
 }
 
 function write(level: Level, msg: string, fields: Record<string, unknown>, toConsole: boolean): void {
@@ -47,8 +57,9 @@ function write(level: Level, msg: string, fields: Record<string, unknown>, toCon
       process.stdout.write(line);
     }
   }
-  if (fileStream) {
-    try { fileStream.write(line); } catch { /* swallow */ }
+  const sink = getFileSink();
+  if (sink) {
+    try { sink.write(line); } catch { /* swallow */ }
   }
 }
 
@@ -60,7 +71,7 @@ function emit(level: Level, msg: string, fields: Record<string, unknown>): void 
 /**
  * Routine connection-lifecycle events (attach / detach / upgrade) — high
  * frequency, useful for forensics but pure noise on the console. Always written
- * to `logs/workspace-sessions.log`; surfaced on the console ONLY when
+ * to `<OPENALICE_HOME>/logs/workspace-sessions.log`; surfaced on the console ONLY when
  * WEB_TERMINAL_LOG_LEVEL=debug. Keeps `pnpm dev` readable without losing the trail.
  */
 function emitEvent(msg: string, fields: Record<string, unknown>): void {

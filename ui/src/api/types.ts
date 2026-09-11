@@ -1,19 +1,26 @@
 // ==================== Version / Update awareness ====================
 
+export type UpdateChannel = 'stable' | 'beta' | 'dev' | 'pinned' | 'custom'
+export type UpdateAuthority = 'source' | 'desktop' | 'cli' | 'service' | 'none'
+
 export interface VersionInfo {
   /** App version from package.json. */
   current: string
-  /** Latest release tag from GitHub, or null if fetch failed / no releases. */
+  /** Running installation's normalized update channel. */
+  channel: UpdateChannel
+  /** Surface that owns update discovery and application. */
+  updateAuthority: UpdateAuthority
+  /** Latest version from the installed channel's release manifest. */
   latest: string | null
-  /** True when latest > current (semver). */
+  /** True when the update owner reports a newer release. */
   hasUpdate: boolean
-  /** GitHub release page URL — UI links to this for changelog. */
+  /** Release notes URL supplied by the channel manifest. */
   releaseUrl: string | null
-  /** Markdown release body. */
+  /** Reserved release notes body; channel manifests currently omit it. */
   releaseNotes: string | null
   /** ISO timestamp when the release was published. */
   publishedAt: string | null
-  /** Non-null when fetch failed (rate limit, network, etc.). */
+  /** Non-null when manifest fetch or validation failed. */
   error: string | null
 }
 
@@ -37,7 +44,7 @@ export interface Profile {
 
 export type CredentialVendor =
   | 'anthropic' | 'openai' | 'google' | 'xai'
-  | 'minimax' | 'glm' | 'kimi' | 'deepseek' | 'longcat'
+  | 'minimax' | 'glm' | 'kimi' | 'deepseek' | 'longcat' | 'openrouter'
   | 'cursor'
   | 'custom'
 
@@ -251,13 +258,15 @@ export interface NewsArticle {
   source: string | null
   link: string | null
   categories: string | null
+  image?: string | null
 }
 
 export interface NewsListResponse {
   items: NewsArticle[]
   count: number
-  lookback: string
+  lookback: string | null
 }
+
 
 // ==================== Trading ====================
 
@@ -368,7 +377,21 @@ export interface Position {
 export interface WalletCommitLog {
   hash: string
   message: string
-  operations: Array<{ symbol: string; action: string; change: string; status: string }>
+  operations: Array<{
+    symbol: string
+    action: string
+    change: string
+    status: string
+    order?: {
+      side?: string
+      orderType?: string
+      totalQuantity?: string
+      cashQuantity?: string
+      limitPrice?: string
+      auxPrice?: string
+      timeInForce?: string
+    }
+  }>
   timestamp: string
   round?: number
 }
@@ -393,6 +416,7 @@ export interface WalletOperation {
 export interface WalletStatus {
   staged: WalletOperation[]
   pendingMessage: string | null
+  pendingHash?: string | null
   head: string | null
   commitCount: number
 }
@@ -513,6 +537,8 @@ export interface UTAConfig {
   presetConfig: Record<string, unknown>
   /** Whether broker-side account mutations are refused. */
   readOnly: boolean
+  /** Public-data-only UTA; excluded from account and portfolio surfaces. */
+  keyless?: boolean
   /** Whether this UTA participates in broker-backed market-data discovery. */
   asVendor: boolean
 }
@@ -557,6 +583,29 @@ export interface BrokerPackStatus {
   updateAvailable?: boolean
   reason?: string
   requiredBy: string[]
+}
+
+export type BrokerAccountPackState =
+  | 'ready'
+  | 'needs-install'
+  | 'needs-repair'
+  | 'unsupported-preset'
+
+export interface BrokerAccountPackReadiness {
+  accountId: string
+  label: string
+  presetId: string
+  configuredEnabled: boolean
+  engine?: BrokerEngine
+  state: BrokerAccountPackState
+  operational: boolean
+  action?: 'install' | 'repair' | 'update'
+  reason?: string
+}
+
+export interface BrokerPackReadinessResponse {
+  packs: BrokerPackStatus[]
+  accounts: BrokerAccountPackReadiness[]
 }
 
 export interface GuardEntry {

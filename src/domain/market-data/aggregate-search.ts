@@ -8,7 +8,7 @@
  * equity    — SymbolIndex (SEC/TMX local cache, regex, zero-latency)
  * commodity — CommodityCatalog (canonical catalog, ~25 items)
  * crypto    — cryptoClient.search on yfinance (online fuzzy)
- * currency  — currencyClient.search on yfinance (online fuzzy, XXXUSD filter)
+ * currency  — currencyClient.search on yfinance (online fuzzy, including crosses)
  */
 import type { SymbolIndex } from './equity/symbol-index.js'
 import type { CommodityCatalog } from './commodity/commodity-catalog.js'
@@ -123,10 +123,6 @@ export async function aggregateSymbolSearch(
   )
 
   const currencyResults = (currencySettled.status === 'fulfilled' ? currencySettled.value : [])
-    .filter((r) => {
-      const sym = (r as Record<string, unknown>).symbol as string | undefined
-      return sym?.endsWith('USD')
-    })
     .map((r) => ({ ...r, assetClass: 'currency' as const }))
 
   // Merge equity online hits, de-duped WITHIN each vendor's namespace by

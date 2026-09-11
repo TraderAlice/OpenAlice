@@ -52,6 +52,13 @@ describe('bars routes', () => {
     )
   })
 
+  it('forwards an asOf date to the shared bar service', async () => {
+    const ctx = mkCtx()
+    const getBars = vi.spyOn(ctx.barService, 'getBars')
+    await createBarsRoutes(ctx).request('/?barId=yfinance|AAPL&assetClass=equity&asOf=2024-01-02')
+    expect(getBars).toHaveBeenCalledWith({ barId: 'yfinance|AAPL', assetClass: 'equity' }, { interval: '1d', asOf: '2024-01-02' })
+  })
+
   it('GET / without barId or symbol → 400', async () => {
     const res = await createBarsRoutes(mkCtx()).request('/?interval=1d')
     expect(res.status).toBe(400)

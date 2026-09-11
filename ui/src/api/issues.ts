@@ -15,7 +15,7 @@ export const DEFAULT_ISSUE_COMMENT_PROMPT = [
   '{comment}',
   '',
   'Reply directly to this comment. Your final assistant response will be recorded automatically in the Issue Activity timeline.',
-  'Do not call `alice-workspace issue comment` for this reply; that would create a second notification loop.',
+  'Do not call `alice issue comment` for this reply; that would create a second notification loop.',
 ].join('\n')
 
 /**
@@ -49,6 +49,11 @@ export type IssueAutomationHealthState =
 export interface IssueAutomationHealth {
   state: IssueAutomationHealthState
   message: string
+  blocker?: {
+    kind: 'agent_runtime_missing'
+    agent: string
+    displayName: string
+  }
   latestTaskId?: string
 }
 export type IssueProvenanceAction = 'created' | 'updated' | 'commented' | 'sent' | 'decided' | 'reconstructed'
@@ -146,7 +151,8 @@ export interface IssueListItem {
   nextDueAtMs?: number | null
   /** Live scheduler/worker health; present iff the Issue has a schedule. */
   automationHealth?: IssueAutomationHealth
-  /** Present only on the Project Telegram phone-desk Issue. */
+  /** Adapter id when this row is that connector's phone-desk Issue. */
+  connectorDesk?: string
   telegramConnector?: true
   /**
    * True iff this issue's NAME (title, case-insensitive) is also claimed by an
@@ -178,10 +184,17 @@ export interface IssueSnapshot {
   duplicateNames?: string[]
 }
 
-export function isTelegramConnectorIssue(
-  issue: Pick<IssueListItem, 'telegramConnector'>,
+export function isConnectorDeskIssue(
+  issue: Pick<IssueListItem, 'connectorDesk' | 'telegramConnector'>,
 ): boolean {
-  return issue.telegramConnector === true
+  return typeof issue.connectorDesk === 'string' && issue.connectorDesk.length > 0
+    || issue.telegramConnector === true
+}
+
+export function isTelegramConnectorIssue(
+  issue: Pick<IssueListItem, 'connectorDesk' | 'telegramConnector'>,
+): boolean {
+  return issue.connectorDesk === 'telegram' || issue.telegramConnector === true
 }
 
 export function omitTelegramConnectorIssues(snapshot: IssueSnapshot): IssueSnapshot {
@@ -189,7 +202,7 @@ export function omitTelegramConnectorIssues(snapshot: IssueSnapshot): IssueSnaps
     ...snapshot,
     workspaces: snapshot.workspaces.map((workspace) => ({
       ...workspace,
-      issues: workspace.issues.filter((issue) => !isTelegramConnectorIssue(issue)),
+      issues: workspace.issues.filter((issue) => !isConnectorDeskIssue(issue)),
     })),
   }
 }
@@ -264,12 +277,32 @@ export interface IssueDetailIssue {
   nextDueAtMs?: number | null
   /** Live scheduler/worker health; present iff the Issue has a schedule. */
   automationHealth?: IssueAutomationHealth
+  connectorDesk?: string
   telegramConnector?: true
+}
+
+export interface IssueAssigneeSession {
+  resumeId: string
+  state: 'ready' | 'missing' | 'retired' | 'deleted' | 'unbound' | 'workspace_missing'
+  workspace?: { id: string; tag: string }
+  agent?: string
+  displayName?: string
+  createdAt?: number
+  updatedAt?: number
+  active: boolean
+  runtime?: {
+    credentialSource: 'native' | 'vault' | 'workspace'
+    credentialSlug?: string
+    model?: string
+    reasoningEffort?: ModelReasoningEffort
+  }
 }
 
 /** GET /api/issues/:wsId/:id — one issue + Activity, Runs, and reports. */
 export interface IssueDetail {
   issue: IssueDetailIssue
+  /** Authoritative global lookup for an exact @resume assignee. */
+  assigneeSession?: IssueAssigneeSession
   /** Structured markdown comments from `<id>.comments.json`. */
   comments?: IssueComment[]
   /** This issue's headless runs (wsId + issueId match), newest first. */

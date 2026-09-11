@@ -46,6 +46,7 @@ function makeMockUTA(opts: { stageThrows?: 'stage' | 'commit' | 'push' | null; p
         calls.push({ method: 'commit', args: [msg] })
         if (opts.stageThrows === 'commit') throw new Error('Guard rejected')
         pendingMessage = msg
+        return { prepared: true, hash: 'pending-hash', message: msg, operationCount: 1 }
       }),
       push: vi.fn(async () => {
         calls.push({ method: 'push', args: [] })
@@ -157,7 +158,7 @@ describe('POST /uta/:id/wallet/place-order', () => {
     expect(failing.calls.map(c => c.method)).toEqual(['stagePlaceOrder'])
   })
 
-  it('returns phase=commit when commit throws (and rolls back staging)', async () => {
+  it('returns phase=commit without attempting reject when commit returns no hash', async () => {
     const failing = makeMockUTA({ stageThrows: 'commit' })
     const routes = makeRoutes(failing.uta)
     const { status, body } = await post(routes, '/uta/mock-uta/wallet/place-order', {
@@ -170,7 +171,7 @@ describe('POST /uta/:id/wallet/place-order', () => {
 
     expect(status).toBe(400)
     expect((body as { phase: string }).phase).toBe('commit')
-    expect(failing.calls.map(c => c.method)).toContain('reject') // auto-rollback
+    expect(failing.calls.map(c => c.method)).toEqual(['stagePlaceOrder', 'commit'])
     expect(failing.uta.push).not.toHaveBeenCalled()
   })
 

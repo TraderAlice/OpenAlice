@@ -1,5 +1,6 @@
 import { Gauge, Settings } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
+import { Button } from './ui/button'
 import { useWorkspace } from '../tabs/store'
 
 interface TradingModeGateProps {
@@ -19,7 +20,7 @@ export function TradingModeGate({ title, description }: TradingModeGateProps) {
             <Gauge size={18} strokeWidth={1.8} aria-hidden />
           </span>
           <div className="min-w-0">
-            <div className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+            <div className="text-[11px] font-medium leading-4 text-muted-foreground">
               {t('tradingModeGate.liteMode')}
             </div>
             <h2 className="mt-1 text-[17px] font-semibold text-foreground">{title}</h2>
@@ -27,14 +28,15 @@ export function TradingModeGate({ title, description }: TradingModeGateProps) {
           </div>
         </div>
 
-        <button
+        <Button
           type="button"
+          variant="outline"
           onClick={() => openOrFocus({ kind: 'settings', params: { category: 'agent-permissions' } })}
-          className="mt-4 inline-flex min-h-9 items-center gap-2 rounded-md border border-border bg-background px-3 py-2 text-[12px] font-medium text-foreground transition-colors hover:border-primary/50 hover:bg-muted"
+          className="mt-4"
         >
           <Settings size={14} strokeWidth={1.8} aria-hidden />
           {t('tradingModeGate.openPermissions')}
-        </button>
+        </Button>
       </div>
     </div>
   )

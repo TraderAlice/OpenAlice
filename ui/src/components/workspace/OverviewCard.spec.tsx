@@ -106,9 +106,9 @@ describe('OverviewCard', () => {
       />,
     )
 
-    expect(screen.getAllByRole('button', { name: / (running|paused)$/ })).toHaveLength(5)
-    expect(screen.getByRole('button', { name: 'x5 paused' })).toBeTruthy()
-    expect(screen.queryByRole('button', { name: 'x6 paused' })).toBeNull()
+    expect(screen.getAllByRole('button', { name: / (running|paused)$/ })).toHaveLength(3)
+    expect(screen.getByRole('button', { name: 'x3 paused' })).toBeTruthy()
+    expect(screen.queryByRole('button', { name: 'x4 paused' })).toBeNull()
     expect(screen.getByRole('button', { name: 'x1 running' }).className).toContain('min-h-10')
     expect(screen.getByRole('button', { name: 'x3 paused' }).closest('li')?.className)
       .toContain('hidden sm:list-item')
@@ -116,7 +116,7 @@ describe('OverviewCard', () => {
     const viewAll = screen.getByRole('button', { name: 'View all 8 sessions' })
     expect(viewAll.className).toContain('min-h-10')
     expect(viewAll.textContent).toContain('+6')
-    expect(viewAll.textContent).toContain('+3')
+    expect(viewAll.textContent).toContain('+5')
     fireEvent.click(viewAll)
     expect(onOpen).toHaveBeenCalledTimes(1)
     expect(onOpenSession).not.toHaveBeenCalled()

@@ -1,5 +1,5 @@
 import { fetchJson } from './client'
-import type { UTASummary, AccountInfo, SubAccountRef, Position, WalletCommitLog, ReconnectResult, UTAConfig, WalletStatus, WalletPushResult, WalletRejectResult, TestConnectionResult, BrokerPreset, BrokerEngine, BrokerPackStatus, UTASnapshotSummary, EquityCurvePoint, PlaceOrderRequest, ClosePositionRequest, CancelOrderRequest, OrderErrorResponse, OrderHistoryEntry, TradeHistoryEntry } from './types'
+import type { UTASummary, AccountInfo, SubAccountRef, Position, WalletCommitLog, ReconnectResult, UTAConfig, WalletStatus, WalletPushResult, WalletRejectResult, TestConnectionResult, BrokerPreset, BrokerEngine, BrokerPackStatus, BrokerPackReadinessResponse, UTASnapshotSummary, EquityCurvePoint, PlaceOrderRequest, ClosePositionRequest, CancelOrderRequest, OrderErrorResponse, OrderHistoryEntry, TradeHistoryEntry } from './types'
 
 /** Thrown by the one-shot order endpoints when the server returns non-2xx. Carries the phase. */
 export class OrderEntryError extends Error {
@@ -133,11 +133,18 @@ export const tradingApi = {
     return fetchJson(`/api/trading/uta/${utaId}/wallet/status`)
   },
 
-  async walletReject(utaId: string, reason?: string): Promise<WalletRejectResult> {
+  async walletReject(
+    utaId: string,
+    reason: string | undefined,
+    expectedPendingHash: string,
+  ): Promise<WalletRejectResult> {
     const res = await fetch(`/api/trading/uta/${utaId}/wallet/reject`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(reason ? { reason } : {}),
+      body: JSON.stringify({
+        ...(reason ? { reason } : {}),
+        expectedPendingHash,
+      }),
     })
     if (!res.ok) {
       const body = await res.json().catch(() => ({}))
@@ -146,8 +153,12 @@ export const tradingApi = {
     return res.json()
   },
 
-  async walletPush(utaId: string): Promise<WalletPushResult> {
-    const res = await fetch(`/api/trading/uta/${utaId}/wallet/push`, { method: 'POST' })
+  async walletPush(utaId: string, expectedPendingHash: string): Promise<WalletPushResult> {
+    const res = await fetch(`/api/trading/uta/${utaId}/wallet/push`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ expectedPendingHash }),
+    })
     if (!res.ok) {
       const body = await res.json().catch(() => ({}))
       throw new Error(body.error || `Push failed (${res.status})`)
@@ -179,7 +190,7 @@ export const tradingApi = {
     return fetchJson('/api/trading/config/broker-presets')
   },
 
-  async getBrokerPacks(): Promise<{ packs: BrokerPackStatus[] }> {
+  async getBrokerPacks(): Promise<BrokerPackReadinessResponse> {
     return fetchJson('/api/trading/config/broker-packs')
   },
 

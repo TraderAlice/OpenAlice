@@ -8,9 +8,11 @@ import { TradeableContractsPanel } from '../../components/market/TradeableContra
 interface Props {
   symbol: string
   source?: string
+  displayName?: string
+  securityCode?: string
 }
 
-export function EquityDetail({ symbol, source }: Props) {
+export function EquityDetail({ symbol, source, displayName, securityCode }: Props) {
   // Eastmoney intentionally owns only Chinese-name discovery + forward-adjusted
   // K-lines. Its native secid (`1.600519`) is not a Yahoo/FMP ticker, so feeding
   // it into the default quote/fundamental panels produces misleading failures.
@@ -18,17 +20,10 @@ export function EquityDetail({ symbol, source }: Props) {
 
   return (
     <div className="flex flex-col gap-3">
-      {klineOnly ? (
-        <div className="rounded-md border border-border bg-secondary/40 px-3 py-2 text-[12px] leading-relaxed text-muted-foreground">
-          Eastmoney provides Chinese A-share discovery and forward-adjusted price history for this source.
-          Quote and fundamental panels are not available in its native symbol namespace.
-        </div>
-      ) : (
-        <QuoteHeader symbol={symbol} />
-      )}
+      {!klineOnly && <QuoteHeader symbol={symbol} />}
 
-      <div className="h-[360px] shrink-0">
-        <KlinePanel selection={{ symbol, assetClass: 'equity' }} source={source} />
+      <div className="h-[440px] shrink-0">
+        <KlinePanel selection={{ symbol, assetClass: 'equity' }} source={source} displayTitle={klineOnly ? (displayName ?? securityCode ?? symbol.replace(/^[01]\./, '')) : undefined} />
       </div>
 
       {!klineOnly && (
@@ -38,7 +33,7 @@ export function EquityDetail({ symbol, source }: Props) {
         </div>
       )}
 
-      <TradeableContractsPanel symbol={symbol} assetClass="equity" />
+      <TradeableContractsPanel symbol={klineOnly ? (securityCode ?? symbol.replace(/^[01]\./, '')) : symbol} assetClass="equity" />
 
       {!klineOnly && <FinancialStatementsPanel symbol={symbol} />}
     </div>

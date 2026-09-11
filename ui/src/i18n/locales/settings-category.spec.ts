@@ -31,4 +31,15 @@ describe.each(Object.entries(locales))('%s locale', (_locale, resources) => {
     expect(resources.settings.category.beta).toBeTruthy()
     expect(resources.settings.beta.office).toBeTruthy()
   })
+
+  it('exposes Harness as a Settings category for Ask Alice and Auto Quant', () => {
+    expect(resources.settings.category.harness).toBe('Harness')
+    expect(resources.settings.harness.showHeadlessBorn).toBeTruthy()
+  })
+
+  it('exposes Agent runtimes as a Settings category', () => {
+    expect(resources.settings.category.agentRuntimes).toBeTruthy()
+    expect(resources.settings.agentRuntimes.quickAccess).toBeTruthy()
+    expect(resources.chatLanding.otherRuntimes).toBeTruthy()
+  })
 })

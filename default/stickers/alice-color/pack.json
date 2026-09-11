@@ -1,0 +1,88 @@
+{
+  "schemaVersion": 1,
+  "id": "alice-color",
+  "name": "Alice · Color",
+  "version": "1.0.1",
+  "stickers": [
+    {
+      "file": "wave.png",
+      "description": "Greeting / saying hello"
+    },
+    {
+      "file": "goodbye.png",
+      "description": "Saying goodbye"
+    },
+    {
+      "file": "thanks.png",
+      "description": "Thanks / appreciation"
+    },
+    {
+      "file": "sorry.png",
+      "description": "Apology / feeling sorry"
+    },
+    {
+      "file": "cheer.png",
+      "description": "Encouragement / cheering on"
+    },
+    {
+      "file": "heart.png",
+      "description": "Affection / caring"
+    },
+    {
+      "file": "laugh.png",
+      "description": "Laughter / amusement"
+    },
+    {
+      "file": "shocked.png",
+      "description": "Surprise / shock"
+    },
+    {
+      "file": "puff.png",
+      "description": "Playful frustration / pouting"
+    },
+    {
+      "file": "nope.png",
+      "description": "Refusal / saying no"
+    },
+    {
+      "file": "wait.png",
+      "description": "Wait a moment"
+    },
+    {
+      "file": "thinking.png",
+      "description": "Thinking / considering"
+    },
+    {
+      "file": "typing.png",
+      "description": "Busy / working"
+    },
+    {
+      "file": "exhausted.png",
+      "description": "Exhaustion / needing rest"
+    },
+    {
+      "file": "hungry.png",
+      "description": "Feeling hungry"
+    },
+    {
+      "file": "coffee.png",
+      "description": "Coffee break"
+    },
+    {
+      "file": "popcorn.png",
+      "description": "Watching with interest"
+    },
+    {
+      "file": "hush.png",
+      "description": "Hush / keeping quiet"
+    },
+    {
+      "file": "skeptical.png",
+      "description": "Skepticism / doubt"
+    },
+    {
+      "file": "celebrate.png",
+      "description": "Celebration / success"
+    }
+  ]
+}

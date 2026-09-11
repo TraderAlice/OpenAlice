@@ -1,3 +1,4 @@
+import { fetchWorkspaceAttachment } from './core/workspace-files.js'
 /**
  * OpenAlice Connector Service.
  *
@@ -11,6 +12,8 @@ import {
   connectorArtifactDeliverySchema,
   connectorArtifactFailureSchema,
   connectorDeliveryReceiptSchema,
+  connectorUtaFailureSchema,
+  connectorUtaPresentationSchema,
   inboxNotificationSchema,
   ownerChatMessageSchema,
 } from '@traderalice/connector-protocol'
@@ -20,21 +23,26 @@ import { ConnectorConfigStore } from './config-store.js'
 import { discordConnectorRegistration } from './adapters/discord.js'
 import { slackConnectorRegistration } from './adapters/slack.js'
 import { telegramConnectorRegistration } from './adapters/telegram.js'
+import { feishuConnectorRegistration } from './adapters/feishu.js'
 import { ConnectorIOJournal } from './core/io-journal.js'
 import { dataPath } from '@/core/paths.js'
+import { installConnectorProxyTransport } from './core/proxy.js'
 
 const CONNECTOR_PORT = Number(process.env['OPENALICE_CONNECTOR_PORT'] ?? 47334)
 
-async function main(): Promise<void> {
+export async function startConnectorService(): Promise<void> {
   const startedAt = new Date().toISOString()
   console.log(`[connector] bootstrap @ ${startedAt}`)
 
   const configStore = new ConnectorConfigStore()
   const config = await configStore.read()
+  const proxy = installConnectorProxyTransport()
+  if (proxy.active) console.log('[connector] shared HTTP proxy transport enabled')
   const registry = new ConnectorRegistry()
-  registry.register(discordConnectorRegistration())
-  registry.register(telegramConnectorRegistration())
-  registry.register(slackConnectorRegistration())
+  registry.register(discordConnectorRegistration(proxy))
+  registry.register(telegramConnectorRegistration(proxy))
+  registry.register(slackConnectorRegistration(proxy))
+  registry.register(feishuConnectorRegistration(proxy))
   const journal = new ConnectorIOJournal({
     path: dataPath('logs', 'connector-io.jsonl'),
     warn: (message) => console.warn(`[connector] ${message}`),
@@ -45,6 +53,7 @@ async function main(): Promise<void> {
     config,
     startedAt,
     recorder: journal,
+    readWorkspaceFile: fetchWorkspaceAttachment,
     updateAdapterSettings: (id, patch) => configStore.patchAdapter(id, patch),
   })
   // Install before opening the loopback port so health can say `starting`
@@ -63,11 +72,32 @@ async function main(): Promise<void> {
     const message = ownerChatMessageSchema.parse(await c.req.json())
     return c.json(connectorDeliveryReceiptSchema.parse(manager.enqueueOwnerChat(message)), 202)
   })
-  app.post('/v1/inbound/drain', async (c) => {
-    return c.json({ messages: manager.drainInbound() })
+  app.post('/v1/inbound/claim', async (c) => {
+    const claim = await manager.claimInbound()
+    return c.json({
+      claimId: claim.claimId,
+      messages: claim.items.map((item) => ({ ...item.payload, queueId: item.id })),
+    })
   })
-  app.post('/v1/actions/drain', (c) => {
-    return c.json({ requests: manager.drainActions() })
+  app.post('/v1/inbound/:claimId/ack', async (c) => {
+    await manager.ackInbound(c.req.param('claimId'), await workItemIds(c))
+    return c.json({ ok: true })
+  })
+  app.post('/v1/inbound/:claimId/release', async (c) => {
+    await manager.releaseInbound(c.req.param('claimId'), await workItemIds(c))
+    return c.json({ ok: true })
+  })
+  app.post('/v1/actions/claim', async (c) => {
+    const claim = await manager.claimActions()
+    return c.json({ claimId: claim.claimId, requests: claim.items.map((item) => item.payload) })
+  })
+  app.post('/v1/actions/:claimId/ack', async (c) => {
+    await manager.ackActions(c.req.param('claimId'), await workItemIds(c))
+    return c.json({ ok: true })
+  })
+  app.post('/v1/actions/:claimId/release', async (c) => {
+    await manager.releaseActions(c.req.param('claimId'), await workItemIds(c))
+    return c.json({ ok: true })
   })
   app.post('/v1/artifacts/deliver', async (c) => {
     const delivery = connectorArtifactDeliverySchema.parse(await c.req.json())
@@ -79,9 +109,41 @@ async function main(): Promise<void> {
     await manager.failArtifact(failure)
     return c.json(connectorDeliveryReceiptSchema.parse({ accepted: true, deliveryId: failure.requestId }))
   })
+  app.post('/v1/actions/uta/claim', async (c) => {
+    const claim = await manager.claimUtaActions()
+    return c.json({ claimId: claim.claimId, requests: claim.items.map((item) => item.payload) })
+  })
+  app.post('/v1/actions/uta/:claimId/ack', async (c) => {
+    await manager.ackActions(c.req.param('claimId'), await workItemIds(c))
+    return c.json({ ok: true })
+  })
+  app.post('/v1/actions/uta/:claimId/release', async (c) => {
+    await manager.releaseActions(c.req.param('claimId'), await workItemIds(c))
+    return c.json({ ok: true })
+  })
+  app.post('/v1/uta/present', async (c) => {
+    const presentation = connectorUtaPresentationSchema.parse(await c.req.json())
+    await manager.presentUta(presentation)
+    return c.json(connectorDeliveryReceiptSchema.parse({ accepted: true, deliveryId: presentation.requestId }))
+  })
+  app.post('/v1/uta/fail', async (c) => {
+    const failure = connectorUtaFailureSchema.parse(await c.req.json())
+    await manager.failUta(failure)
+    return c.json(connectorDeliveryReceiptSchema.parse({ accepted: true, deliveryId: failure.requestId }))
+  })
   app.post('/v1/connectors/:id/test', async (c) => {
     const probeId = await manager.sendTest(c.req.param('id'))
     return c.json({ ok: true, probeId })
+  })
+  app.post('/v1/connectors/:id/reconnect', async (c) => {
+    const adapter = await manager.reconnect(c.req.param('id'))
+    return c.json({ ok: true, adapter })
+  })
+  app.post('/v1/connectors/:id/reconcile', async (c) => {
+    const id = c.req.param('id')
+    const latest = await configStore.read()
+    const adapter = await manager.reconcile(id, latest.adapters[id] ?? { enabled: false, settings: {} })
+    return c.json({ ok: true, adapter })
   })
   app.onError((error, c) => {
     console.warn('[connector] request failed:', error instanceof Error ? error.message : error)
@@ -99,6 +161,7 @@ async function main(): Promise<void> {
     server.close()
     await manager.stop()
     await journal.flush()
+    await proxy.close()
     process.exit(0)
   }
   process.on('SIGINT', () => { void shutdown('SIGINT') })
@@ -107,7 +170,16 @@ async function main(): Promise<void> {
   await manager.start()
 }
 
-main().catch((error) => {
-  console.error('[connector] fatal:', error)
-  process.exit(1)
-})
+async function workItemIds(c: { req: { json(): Promise<unknown> } }): Promise<string[]> {
+  const body = await c.req.json().catch(() => null) as { itemIds?: unknown } | null
+  return Array.isArray(body?.itemIds)
+    ? body.itemIds.filter((id): id is string => typeof id === 'string' && id.length > 0)
+    : []
+}
+
+if (!(globalThis as { __OPENALICE_INTERNAL_ROLE_DISPATCH__?: boolean }).__OPENALICE_INTERNAL_ROLE_DISPATCH__) {
+  startConnectorService().catch((error) => {
+    console.error('[connector] fatal:', error)
+    process.exit(1)
+  })
+}

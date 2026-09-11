@@ -1,0 +1,260 @@
+# Workspace collaboration — `alice`
+
+OpenAlice owns addresses, delivery, durable work, and provenance. Coding Agents
+keep using their native file, search, and Git tools inside any resolved path.
+
+## The command model
+
+| Group | Owns | Does not own |
+|---|---|---|
+| `peer` | Active Workspace discovery, absolute paths, Session directory | File reading or research |
+| `conversation` | Ordinary Agent-to-Agent requests and replies | Human notification |
+| `inbox` | Outward-facing human notifications, reports and follow-up | General peer chat or file storage |
+| `issue` | Durable work, ownership, scheduling, Activity | Ad-hoc questions |
+| `provenance` | Artifact-to-Session attribution | Guessing intent |
+| `signature` | The current Session's safe `@resumeId` | Runtime-native ids |
+| `session` | This Workspace's coworker nametag | Conversation title, AI binding, or launcher nickname |
+| `track` | Shared durable asset/topic index | Work status |
+| `template` | Managed Workspace guidance upgrades | Harness research lifecycle |
+
+Start with live intent help whenever the route is unclear:
+
+```bash
+alice
+alice <group>
+alice <group> <verb> --help
+```
+
+## Talk to another Agent
+
+Use `conversation`, not Inbox, for ordinary coworker communication.
+
+```bash
+# Discover the active office floor and choose a desk.
+alice peer list
+
+# Recruit a fresh Session at that Workspace for new work.
+alice conversation create --ws-id <workspaceId> \
+  --prompt 'Investigate this bounded question and report back.'
+
+# Continue one exact attributable product Session.
+alice conversation ask --resume-id <resumeId> \
+  --prompt 'Explain the missing context.' --await
+
+# Ask the attributable sender of one Inbox delivery.
+alice conversation ask --inbox-id <entryId> \
+  --prompt 'What did you send, and what should I inspect first?' --await
+
+# Recruit a fresh Session in a Harness default Workspace.
+alice conversation create --harness autoquant \
+  --prompt 'Start a new quantitative research assignment.'
+```
+
+`--harness chat` follows the recent/default Chat desk policy and creates the
+stable starter Chat Workspace only when none exists. `--harness autoquant`
+requires the explicitly initialized AutoQuant default Workspace and never
+creates or guesses one. Both launch a fresh product Session in the resolved
+desk; use the returned `resumeId` for later continuation.
+
+`create` always creates a new Session and sends its first prompt. `ask --resume-id`
+continues an existing Session. Keep `resumeId` as the coworker's address and
+`taskId` as one turn's execution handle.
+
+Both commands accept optional `--credential <vault-slug>` or
+`--credential-source native` (mutually exclusive), `--model <id>`, and
+`--effort <level>`. Never pass API keys. New Sessions inherit Workspace headless
+preferences; existing Sessions retain their own binding for omitted fields.
+Changing credential drops inherited model/effort from the previous credential.
+Explicit changes to an existing Session persist for later turns and require it
+to be idle. Its Agent runtime cannot change. `--agent` selects only a new worker.
+
+Prompts are ordinary coworker messages. Add `--reconstruct` only when the task
+explicitly requires a fresh worker to reconstruct missing historical intent.
+Provenance may still report `resolution.mode: reconstructed` without changing
+the prompt when no original author is available.
+
+Choose the waiting rhythm from the work:
+
+- A short answer needed now: add `--await`.
+- A longer delegation: omit `--await`, retain `taskId`, then retrieve it later.
+- Several independent peers: dispatch first, then collect the task ids together.
+
+```bash
+alice conversation await --task-id <taskId>
+alice conversation read --task-id <taskId>
+alice conversation collect --task-id <taskA> --task-id <taskB>
+```
+
+Conversation work has no implicit execution deadline. `--await`, `conversation
+await`, and `conversation collect` also wait for terminal task state when no
+limit is supplied. Add `--timeout-ms <milliseconds>` only when the caller
+deliberately wants a hard execution watchdog (for `conversation ask`) or a
+bounded server-side wait (for `await`/`collect`). A bounded wait returning does
+not stop a task unless that same explicit timeout was attached at dispatch.
+
+There is no unsolicited Agent-to-Agent completion notification bus. Inbox
+notifies the human; `await`, `read`, and `collect` retrieve direct Agent replies.
+Do not build shell sleep loops.
+
+## Notify the human and deliver reports
+
+Inbox is OpenAlice's outward-facing notification and reporting surface for the
+human. Use it for alerts, findings, reports or requests for attention that need
+a separate delivery record. It is not the Workspace's file store or a general
+Agent-to-Agent message channel.
+
+A normal conversation reply already reaches the user. For attachments in a
+Connector reply, use `[[reports/summary.pdf]]` as described in `file-delivery`;
+no Inbox entry is required just to send a file. Use Inbox when a separate
+notification/report handoff is intended, including unattended work whose result
+needs human attention.
+
+```bash
+alice inbox push --body 'Finished — see [[research/report.md]] for evidence.'
+# Publish the Markdown itself as the notification body:
+alice inbox push --body-file research/report.md
+```
+
+The body is frozen at publication. `[[relative/path.ext]]` references resolve
+against the publishing Workspace root and stay live; a published hash identifies
+the file revision. Code examples and missing paths remain literal. Commit files
+before publishing if you want Git to preserve their published content.
+
+Read recent deliveries with:
+
+```bash
+alice inbox read --limit 5
+alice inbox read --self
+```
+
+Each attachment is returned in `files[]` with a directly usable `absolutePath`,
+its original `relativePath`, and the published `revision` when available. The
+body preserves the Markdown and reference positions.
+
+If `absolutePath` is null because the Workspace is unavailable or the stored
+path is unsafe, do not guess it. For broader inspection of an available peer
+desk, resolve its root explicitly:
+
+```bash
+alice peer path --id <workspaceId>
+# Then use the Coding Agent's native Read/Search/Glob/Git capabilities.
+```
+
+There is deliberately no Workspace-level file-read command. `peer path` owns
+addressing; the Coding Agent owns file operations. Reading another Workspace is
+normal. Autonomous/headless work writes only its own Workspace. An attended
+cross-Workspace edit requires explicit human approval and must be committed in
+the peer repository so its owner can review or revert it.
+
+For AutoQuant, a lane Report is the focused handoff and a Dossier is the
+cross-lane deliverable. AutoQuant owns their contents and evidence; OpenAlice
+only delivers the exact committed files and stamps their origin.
+
+## Follow up on an existing object
+
+Prefer the business object when one already identifies the responsible work:
+
+```bash
+alice inbox ask --id <entryId> \
+  --prompt 'Why did you send this result?' --await
+
+alice issue ask --id <issueName> --creator \
+  --prompt 'Why was this Issue created?' --await
+alice issue ask --id <issueName> --owner \
+  --prompt 'What is the current state and next decision?' --await
+alice issue ask --id <issueName> --run-id <taskId> \
+  --prompt 'What happened in this execution?' --await
+```
+
+These wrappers resolve provenance without making you extract a `resumeId`.
+Never choose an arbitrary old Session when an artifact lacks an exact author.
+
+Resolution means:
+
+- `exact`: the attributable product Session continued;
+- `reconstructed`: a fresh worker was recruited only in the known Workspace;
+- `unavailable`: the attributed Session or safe Workspace target cannot resume.
+
+## Trace provenance
+
+```bash
+alice provenance show --kind inbox --inbox-entry-id <entryId>
+alice provenance show --kind issue --issue-id <id>
+alice provenance show --kind report --workspace-id <workspaceId> \
+  --path research/report.md --revision <sha256:...>
+alice provenance show --resume-id <resumeId>
+alice signature show
+alice session rename --resume-id <resumeId> --display-name 'AAPL desk'
+```
+
+`resumeId` is the product follow-up handle; `taskId` is one execution. Native
+runtime Session ids remain backend-only. `inbox ask` identifies the sender of a
+delivery, which may differ from whoever last edited its live document.
+
+## Coordinate durable work
+
+Issue reads span the shared board; writes belong to this Workspace:
+
+```bash
+alice issue list
+alice issue list --mode detailed
+alice issue show --id <name>
+alice issue create --title 'Investigate the anomaly'
+alice issue update --id <id> --status in_progress
+alice issue comment --id <id> --text 'Evidence collected; review next.'
+```
+
+Use `issue comment` for durable discussion on this Workspace's Issue. Use
+`issue ask` to interrogate a creator, fixed owner, or selected historical run.
+Scheduling and the complete Issue file/assignee contract belong to the
+`self-scheduling` skill.
+
+Tracked entities are the durable cross-Workspace subject index, not tasks:
+
+```bash
+alice track search --query uranium
+alice track add --name uranium-ccj --description 'Cameco — uranium miner'
+```
+
+## Upgrade managed Workspace guidance
+
+Preview first; apply only after reviewing the plan:
+
+```bash
+alice template upgrade
+alice template upgrade --mode detailed
+alice template upgrade --apply
+alice template upgrade --id <workspaceId>
+```
+
+Applying to a live current Workspace is blocked. A headless run may preview a
+peer but cannot apply a cross-Workspace upgrade. Conflict resolution, lifecycle
+guards, and managed-file boundaries are reported by the live command.
+
+
+## Alice Harness injection
+
+The Alice Project supplies this CLI and its companion Skills independently of
+Chat, AutoQuant and Auto Prediction source versions. Inspect or update only this
+injection layer with `alice harness upgrade` (preview) and `alice harness upgrade
+--apply` (allowed while this Workspace is active; a manager may target a peer with `--id`).
+Use `alice template upgrade` only for template-owned instructions and skills.
+
+`.alice/alice-harness-version.json` records the accepted Skills file-bundle revision.
+`.alice/alice-harness-config.json` controls enabled CLIs/command groups and independent Skill inclusion preferences;
+disabled commands are unavailable through the gateway, including old aliases.
+The live Project supplies execution, so the recorded revision does not pin an
+old binary. Always discover available commands with `alice --help`.
+
+CLI implementation updates follow the running Alice Project; they do not require
+a per-Workspace file update. `alice harness upgrade` updates Skills files only.
+A CLI switch does not remove its Skill, and excluding a Skill does not disable
+its commands. Respect the Workspace's `skills` preferences during later updates.
+
+When the CLI warns that companion Skills are outdated, update this Workspace
+with `alice harness upgrade --apply`. Git merges non-overlapping edits. If it
+reports conflicts, use `--mode detailed` to compare the previous source, local
+and incoming versions. Preserve user intent while adopting current commands,
+edit the conflicting files, and apply with `--keep-workspace <path>` for your
+resolved copies. Use `--use-template <path>` only to deliberately replace one.
+Do not re-enable excluded Skills or change unrelated files during an upgrade.

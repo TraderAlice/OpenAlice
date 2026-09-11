@@ -46,9 +46,9 @@ describe('projectPublicSession', () => {
     expect(projected).not.toHaveProperty('runtime');
   });
 
-  it('derives live state and WebPi surface from the same process snapshot', () => {
+  it('derives live state and Web surface from the same process snapshot', () => {
     expect(projectPublicSession(record, {
-      webPi: { pid: 42, startedAt: 1_723_337_000_000 },
+      web: { pid: 42, startedAt: 1_723_337_000_000 },
     })).toMatchObject({
       state: 'running',
       surface: 'webpi',
@@ -79,5 +79,23 @@ describe('projectPublicSession', () => {
       displayName: 'AAPL desk',
       title: 'Investigate the market',
     });
+  });
+
+  it('projects structured Issue identity without mutating the stored launch title', () => {
+    const scheduledPrompt = 'Run every instruction in the scheduled Issue body.';
+    expect(projectPublicSession({
+      ...record,
+      surface: 'headless',
+      fallbackTitle: scheduledPrompt,
+    }, {
+      createdBy: {
+        kind: 'issue',
+        workspaceId: 'workspace-1',
+        issueId: 'daily-close-review',
+        policy: 'new-then-resume',
+        fire: 'schedule',
+      },
+    })).toMatchObject({ title: 'Daily Close Review' });
+    expect(scheduledPrompt).toBe('Run every instruction in the scheduled Issue body.');
   });
 });

@@ -35,3 +35,11 @@ describe('aggregateSymbolSearch limits', () => {
     expect(searchDeps.commodityCatalog.search).toHaveBeenCalledWith('EURUSD', 2)
   })
 })
+
+
+it('retains USD-base and cross-currency pairs in discovery', async () => {
+  const d = deps()
+  vi.mocked(d.currencyClient.search).mockResolvedValue([{ symbol: 'USDJPY' }, { symbol: 'EURGBP' }])
+  const results = await aggregateSymbolSearch(d, 'USDJPY', 20)
+  expect(results.filter(r => r.assetClass === 'currency').map(r => r.symbol)).toEqual(['USDJPY', 'EURGBP'])
+})

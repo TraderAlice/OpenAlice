@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { formatRelativeTime } from '../../lib/intl';
 import type { ReactElement } from 'react';
+import { File, FileQuestion, Folder, Link } from 'lucide-react';
 
 import { listFiles, type DirListing, type FileEntry } from './api';
 import { Skeleton } from '../StateViews';
@@ -11,6 +12,8 @@ const POLL_MS = 5000;
 
 interface FilesPanelProps {
   readonly wsId: string;
+  readonly embedded?: boolean;
+  readonly onOpenFile?: (path: string) => void;
   readonly sessionId: string | null;
   readonly source?: WorkspaceSource;
 }
@@ -59,6 +62,7 @@ export function FilesPanel(props: FilesPanelProps): ReactElement {
     if (entry.kind === 'file') {
       // Open the file in the dedicated viewer tab (VS Code-style).
       const rel = path ? `${path}/${entry.name}` : entry.name;
+      if (props.onOpenFile) { props.onOpenFile(rel); return; }
       openOrFocus({
         kind: 'file-viewer',
         params: {
@@ -74,9 +78,9 @@ export function FilesPanel(props: FilesPanelProps): ReactElement {
   const breadcrumb = path.split('/').filter(Boolean);
 
   return (
-    <section className="panel files-panel">
+    <section className={`panel files-panel${props.embedded ? ' is-embedded' : ''}`}>
       <header className="panel-header">
-        <span className="panel-title">files</span>
+        {!props.embedded && <span className="panel-title">files</span>}
         <nav className="files-breadcrumb">
           <button
             type="button"
@@ -148,16 +152,16 @@ export function FilesPanel(props: FilesPanelProps): ReactElement {
   );
 }
 
-function iconFor(e: FileEntry): string {
-  if (e.kind === 'dir') return '📁';
-  if (e.kind === 'symlink') return '🔗';
-  if (e.kind === 'other') return '◦';
-  return '·';
+function iconFor(e: FileEntry): ReactElement {
+  if (e.kind === 'dir') return <Folder size={13} aria-hidden />;
+  if (e.kind === 'symlink') return <Link size={13} aria-hidden />;
+  if (e.kind === 'other') return <FileQuestion size={13} aria-hidden />;
+  return <File size={13} aria-hidden />;
 }
 
 function formatMeta(e: FileEntry): string {
   if (e.kind !== 'file' || e.sizeBytes === null) return formatRelativeTime(e.mtime);
-  return `${formatSize(e.sizeBytes)} · ${formatRelativeTime(e.mtime)}`;
+  return `${formatSize(e.sizeBytes)}, ${formatRelativeTime(e.mtime)}`;
 }
 
 function formatSize(n: number): string {

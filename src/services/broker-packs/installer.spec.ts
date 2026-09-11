@@ -19,11 +19,15 @@ let savedEnv: Record<string, string | undefined>
 beforeEach(async () => {
   savedEnv = {
     OPENALICE_HOME: process.env['OPENALICE_HOME'],
+    OPENALICE_APP_HOME: process.env['OPENALICE_APP_HOME'],
+    OPENALICE_BROKER_PACK_BASE_URL: process.env['OPENALICE_BROKER_PACK_BASE_URL'],
     OPENALICE_BROKER_PACK_CATALOG_URL: process.env['OPENALICE_BROKER_PACK_CATALOG_URL'],
     OPENALICE_BROKER_PACK_ALLOW_WORKSPACE: process.env['OPENALICE_BROKER_PACK_ALLOW_WORKSPACE'],
   }
   home = await mkdtemp(resolve(tmpdir(), 'openalice-broker-pack-home-'))
   fixture = await mkdtemp(resolve(tmpdir(), 'openalice-broker-pack-fixture-'))
+  delete process.env['OPENALICE_APP_HOME']
+  delete process.env['OPENALICE_BROKER_PACK_BASE_URL']
   process.env['OPENALICE_HOME'] = home
   process.env['OPENALICE_BROKER_PACK_ALLOW_WORKSPACE'] = '0'
 })
@@ -37,6 +41,7 @@ afterEach(async () => {
     if (value === undefined) delete process.env[key]
     else process.env[key] = value
   }
+  vi.unstubAllGlobals()
   vi.resetModules()
 })
 
@@ -143,6 +148,32 @@ async function seedCompatibleCcxtPack(version = '0.84.0-beta', apiVersion = 1) {
 }
 
 describe('broker-pack installer', () => {
+  it('updates same-version dev bytes from its immutable catalog and preserves the active pack on download failure', async () => {
+    const version = getCurrentVersion()
+    await seedCompatibleCcxtPack(version)
+    await publishCcxtPack()
+    const catalog = await (await fetch(process.env['OPENALICE_BROKER_PACK_CATALOG_URL']!)).json()
+    const commit = 'a'.repeat(40)
+    catalog.sourceCommit = commit
+    const resources = resolve(fixture, 'resources')
+    await mkdir(resources)
+    await writeFile(resolve(resources, 'broker-pack-source.json'), JSON.stringify({schemaVersion: 1, commit, catalog}))
+    delete process.env['OPENALICE_BROKER_PACK_CATALOG_URL']
+    process.env['OPENALICE_APP_HOME'] = resources
+    const fetchMock = vi.fn().mockRejectedValue(new Error('offline'))
+    vi.stubGlobal('fetch', fetchMock)
+    const { getBrokerPackLocalStatus, installBrokerPack } = await loadInstaller()
+    expect(await getBrokerPackLocalStatus('ccxt')).toMatchObject({installed: true, version, updateAvailable: true})
+    expect(fetchMock).not.toHaveBeenCalled()
+    await expect(installBrokerPack('ccxt')).rejects.toThrow('offline')
+    expect(await getBrokerPackLocalStatus('ccxt')).toMatchObject({installed: true, version, updateAvailable: true})
+    const bytes = await readFile(resolve(fixture, catalog.packs[0].file))
+    fetchMock.mockResolvedValue(new Response(bytes))
+    await installBrokerPack('ccxt')
+    expect(fetchMock).toHaveBeenLastCalledWith(`https://download.openalice.ai/cli/dev/releases/${commit}/${catalog.packs[0].file}`, expect.anything())
+    expect(await getBrokerPackLocalStatus('ccxt')).toMatchObject({installed: true, version, updateAvailable: false})
+  })
+
   it('distinguishes built-in, workspace, missing, and broken local status', async () => {
     const { brokerPackEngineRoot } = await import('../../core/broker-packs.js')
     const engineRoot = brokerPackEngineRoot('ccxt')

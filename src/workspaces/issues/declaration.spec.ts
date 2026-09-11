@@ -216,20 +216,20 @@ describe('readWorkspaceIssues', () => {
     expect(bad.invalid.some((issue) => issue.id === 'bad-prompt' && /commentPrompt/.test(issue.error))).toBe(true)
   })
 
-  it('treats omitted telegramConnector as a normal issue', async () => {
+  it('treats omitted connectorDesk as a normal issue', async () => {
     await writeIssue('plain', fm('title: Plain'))
     const result = await readWorkspaceIssues(dir)
     expect(result.ok).toBe(true)
     if (!result.ok) return
-    expect(result.issues[0]?.telegramConnector).toBeUndefined()
+    expect(result.issues[0]?.connectorDesk).toBeUndefined()
   })
 
-  it('reads an explicit telegramConnector flag', async () => {
+  it('reads a legacy telegramConnector flag as connectorDesk telegram', async () => {
     await writeIssue('desk', fm('title: Desk\ntelegramConnector: true\nwhen: { kind: every, every: 4h }'))
     const result = await readWorkspaceIssues(dir)
     expect(result.ok).toBe(true)
     if (!result.ok) return
-    expect(result.issues[0]?.telegramConnector).toBe(true)
+    expect(result.issues[0]?.connectorDesk).toBe('telegram')
   })
 
   it('rejects telegramConnector values other than true', async () => {
@@ -241,13 +241,14 @@ describe('readWorkspaceIssues', () => {
     expect(result.invalid[0]?.error).toMatch(/telegramConnector/)
   })
 
-  it('keeps only the first telegramConnector issue in one workspace', async () => {
-    await writeIssue('alpha-desk', fm('title: Alpha\ntelegramConnector: true\nwhen: { kind: every, every: 4h }'))
-    await writeIssue('zeta-desk', fm('title: Zeta\ntelegramConnector: true\nwhen: { kind: every, every: 4h }'))
+  it('keeps one desk per connector in one workspace', async () => {
+    await writeIssue('alpha-desk', fm('title: Alpha\nconnectorDesk: telegram\nwhen: { kind: every, every: 4h }'))
+    await writeIssue('zeta-desk', fm('title: Zeta\nconnectorDesk: telegram\nwhen: { kind: every, every: 4h }'))
+    await writeIssue('feishu-desk', fm('title: Feishu\nconnectorDesk: feishu\nwhen: { kind: every, every: 4h }'))
     const result = await readWorkspaceIssues(dir)
     expect(result.ok).toBe(true)
     if (!result.ok) return
-    expect(result.issues.map((issue) => issue.id)).toEqual(['alpha-desk'])
+    expect(result.issues.map((issue) => issue.id).sort()).toEqual(['alpha-desk', 'feishu-desk'])
     expect(result.invalid.map((issue) => issue.id)).toEqual(['zeta-desk'])
   })
 

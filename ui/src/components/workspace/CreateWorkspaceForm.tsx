@@ -20,6 +20,8 @@ import { useTranslation } from 'react-i18next'
 
 import { TAG_HINT, defaultTagFor, useCreateWorkspace } from '../../hooks/useCreateWorkspace'
 import { useWorkspaces } from '../../contexts/workspaces-context'
+import { inputClass } from '../form'
+import { Button } from '../ui/button'
 import type { TemplateInfo, Workspace } from './api'
 
 export interface CreateWorkspaceFormProps {
@@ -42,9 +44,8 @@ export interface CreateWorkspaceFormProps {
   readonly submitLabel?: string
 }
 
-const FIELD =
-  'w-full px-3 py-2 text-[13px] bg-background border border-border rounded text-foreground focus:outline-none focus:border-primary'
-const LABEL = 'block text-[11px] uppercase tracking-wider text-muted-foreground/70'
+const FIELD = `${inputClass} text-[13px]`
+const LABEL = 'block text-[12px] font-medium text-muted-foreground'
 const HINT = 'text-[11px] text-muted-foreground/70'
 
 export function CreateWorkspaceForm(props: CreateWorkspaceFormProps): ReactElement {
@@ -195,22 +196,20 @@ export function CreateWorkspaceForm(props: CreateWorkspaceFormProps): ReactEleme
 
       <div className="flex items-center justify-end gap-2 pt-1">
         {onCancel && (
-          <button
-            type="button"
+          <Button
+            variant="outline"
             onClick={onCancel}
             disabled={create.creating}
-            className="px-3 py-2 text-[13px] rounded text-muted-foreground hover:text-foreground hover:bg-secondary"
           >
             {t('createWorkspace.cancel')}
-          </button>
+          </Button>
         )}
-        <button
+        <Button
           type="submit"
           disabled={create.creating || create.tag.length === 0 || effectiveTemplate === ''}
-          className="btn-primary"
         >
           {create.creating ? t('createWorkspace.creating') : (props.submitLabel ?? t('createWorkspace.create'))}
-        </button>
+        </Button>
       </div>
     </form>
   )

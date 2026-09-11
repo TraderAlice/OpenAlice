@@ -44,8 +44,8 @@ describe('inbox_ask', () => {
     const inboxStore = createMemoryInboxStore()
     const entry = await inboxStore.append({
       workspaceId: 'ws-peer',
-      comments: 'result',
       origin: { kind: 'headless', runId: 'run-old', agent: 'pi' },
+      body: 'result'
     })
     const ask = dispatchedAsk()
     const tool = inboxAskFactory.build(baseContext({
@@ -71,7 +71,10 @@ describe('inbox_ask', () => {
 
   it('uses the Inbox provenance resolver with a Workspace fallback for unattributed entries', async () => {
     const inboxStore = createMemoryInboxStore()
-    const entry = await inboxStore.append({ workspaceId: 'ws-peer', comments: 'manual result' })
+    const entry = await inboxStore.append({
+      workspaceId: 'ws-peer',
+      body: 'manual result'
+    })
     const ask = dispatchedAsk()
     const tool = inboxAskFactory.build(baseContext({
       inboxStore,
@@ -85,7 +88,10 @@ describe('inbox_ask', () => {
 
   it('forwards an explicit reconstruction request', async () => {
     const inboxStore = createMemoryInboxStore()
-    const entry = await inboxStore.append({ workspaceId: 'ws-peer', comments: 'manual result' })
+    const entry = await inboxStore.append({
+      workspaceId: 'ws-peer',
+      body: 'manual result'
+    })
     const ask = dispatchedAsk()
     const tool = inboxAskFactory.build(baseContext({
       inboxStore,
@@ -179,7 +185,7 @@ describe('issue_ask', () => {
       id: 'audit', runId: 'run-from-a-follow-up', prompt: 'what happened?',
     })).resolves.toMatchObject({
       ok: false,
-      error: expect.stringContaining('alice-workspace issue show --id audit'),
+      error: expect.stringContaining('alice issue show --id audit'),
     })
   })
 })

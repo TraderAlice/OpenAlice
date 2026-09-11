@@ -144,11 +144,11 @@ describe('MarketBoardPage', () => {
     expect(metricGroups[0]?.className).toContain('grid-cols-3')
     expect(metricGroups[1]?.className).toContain('grid-cols-2')
 
-    expect(within(mobile).getByLabelText('CPI YoY: 4.25% · 2026-06-01').className).toContain('text-destructive')
-    expect(within(mobile).getByLabelText('Short rate (3M): 3.63% · 2026-07-29')).toBeTruthy()
-    expect(within(mobile).getByLabelText('CLI: 100.8 · 2026-06-01').className).toContain('text-success')
-    expect(within(mobile).getByLabelText('House (2015=100): 156.4 · 2026-05-01')).toBeTruthy()
-    expect(within(mobile).getByLabelText('Equity (2015=100): — · market closed').className).toContain('text-muted-foreground/50')
+    expect(within(mobile).getByLabelText('CPI YoY: 4.25%, 2026-06-01').className).toContain('text-destructive')
+    expect(within(mobile).getByLabelText('Short rate (3M): 3.63%, 2026-07-29')).toBeTruthy()
+    expect(within(mobile).getByLabelText('CLI: 100.8, 2026-06-01').className).toContain('text-success')
+    expect(within(mobile).getByLabelText('House (2015=100): 156.4, 2026-05-01')).toBeTruthy()
+    expect(within(mobile).getByLabelText('Equity (2015=100): —, market closed').className).toContain('text-muted-foreground/50')
 
     const comparisonTable = within(desktop).getByRole('table')
     expect(within(comparisonTable).getAllByRole('columnheader')).toHaveLength(6)

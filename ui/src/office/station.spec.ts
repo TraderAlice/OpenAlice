@@ -8,7 +8,7 @@ describe('officeStationComposition', () => {
     expect(station.spriteAnchor).toBe('desk-front-edge')
     expect(station.spriteBehindDesk).toBe(true)
     expect(station.sprite.zIndex).toBeLessThan(station.desk.zIndex)
-    expect(station.backToFront).toEqual(['sprite', 'desk', 'name', 'bubble'])
+    expect(station.backToFront).toEqual(['sprite', 'desk', 'name'])
     expect(station.sprite.bottomPx).toBeGreaterThan(station.desk.bottomPx)
     expect(OFFICE_STATION.heightPx).toBeGreaterThan(OFFICE_STATION.sprite.bottomPx)
   })

@@ -1,7 +1,8 @@
-import * as pty from 'node-pty';
 import type { WebSocket } from 'ws';
 
 import type { Logger } from './logger.js';
+import { loadPtyBackend } from './pty-runtime.js';
+import type { PtyBackend, PtyProcess } from './pty-types.js';
 import { HeadlessTerminalSnapshot } from './headless-terminal-snapshot.js';
 import {
   isClientControlMessage,
@@ -31,6 +32,8 @@ export interface PersistentSessionOptions {
   readonly highWatermarkBytes: number;
   readonly lowWatermarkBytes: number;
   readonly onDisposed: () => void;
+  /** Test seam; production loads the platform module only when spawning. */
+  readonly pty?: PtyBackend;
   readonly initialTerminalViewAttributes?: TerminalViewAttributes;
   readonly onTerminalViewAttributes?: (attributes: TerminalViewAttributes) => void;
   /**
@@ -85,7 +88,7 @@ const RESPAWN_WINDOW_LIMIT = 3;
  * reattach.
  */
 export class PersistentSession {
-  private term: pty.IPty;
+  private term: PtyProcess;
   private readonly buffer: ReplayBuffer;
   private readonly headless: HeadlessTerminalSnapshot;
   private terminalViewAttributes: TerminalViewAttributes | null = null;
@@ -94,6 +97,7 @@ export class PersistentSession {
   private ws: WebSocket | null = null;
   private paused = false;
   private disposed = false;
+  private currentChildExited = false;
   private cursorTimer: NodeJS.Timeout | null = null;
   private lastCursorSeq = 0;
   private messageHandler: ((raw: unknown, isBinary: boolean) => void) | null = null;
@@ -160,7 +164,7 @@ export class PersistentSession {
     });
   }
 
-  private spawnChild(): pty.IPty {
+  private spawnChild(): PtyProcess {
     if (this.opts.command.length === 0) {
       throw new Error('command must contain at least one argv element');
     }
@@ -173,16 +177,20 @@ export class PersistentSession {
     }).argv;
     if (!argv0) throw new Error('command must contain at least one argv element');
 
-    const term = pty.spawn(argv0, args, {
+    const backend = this.opts.pty ?? loadPtyBackend();
+    const term = backend.spawn(argv0, args, {
       name: 'xterm-256color',
       cols: this.currentCols,
       rows: this.currentRows,
       cwd: this.opts.cwd,
       env: this.opts.env,
-      // Raw bytes; xterm.js decodes UTF-8 with proper streaming state.
-      encoding: null,
     });
 
+    if (!backend.supportsFlowControl) {
+      this.log.warn('session.pty_flow_control_unavailable', { backend: backend.name });
+    }
+
+    this.currentChildExited = false;
     term.onData((data) => this.onPtyData(data as unknown as Buffer | string));
     term.onExit(({ exitCode, signal }) => this.onChildExit(term, exitCode, signal));
     return term;
@@ -195,13 +203,14 @@ export class PersistentSession {
    * we open the circuit breaker and dispose for real.
    */
   private onChildExit(
-    exited: pty.IPty,
+    exited: PtyProcess,
     exitCode: number,
     signalRaw: number | undefined,
   ): void {
     if (this.disposed) return;
     // Ignore exits from an already-replaced term (paranoia).
     if (exited !== this.term) return;
+    this.currentChildExited = true;
     const signal = typeof signalRaw === 'number' ? signalRaw : null;
     this.log.info('session.child_exit', {
       pid: exited.pid,
@@ -459,6 +468,28 @@ export class PersistentSession {
     this.log.event('session.detached');
   }
 
+  /** Disable respawn and await the current child before another writer starts. */
+  async disposeAndWait(reason: string): Promise<void> {
+    if (this.disposed) return;
+    if (this.currentChildExited) { this.dispose(reason); return; }
+    const term = this.term;
+    let exited = false;
+    let resolveExit!: () => void;
+    const exit = new Promise<void>((resolve) => { resolveExit = resolve; });
+    const listener = term.onExit(() => { exited = true; resolveExit(); });
+    const wait = async (ms: number) => {
+      let timer: ReturnType<typeof setTimeout> | undefined;
+      try { await Promise.race([exit, new Promise<void>((resolve) => { timer = setTimeout(resolve, ms); })]); }
+      finally { if (timer) clearTimeout(timer); }
+    };
+    try {
+      this.dispose(reason);
+      await wait(2_000);
+      if (!exited) { term.kill('SIGKILL'); await wait(2_000); }
+      if (!exited) throw new Error('Interactive process did not exit; background handoff was not started');
+    } finally { listener.dispose(); }
+  }
+
   dispose(reason: string): void {
     if (this.disposed) return;
     this.disposed = true;
@@ -503,6 +534,15 @@ export class PersistentSession {
       forwardQueryReplies: ws === null || ws.readyState !== ws.OPEN,
     });
     if (ws !== null) {
+      // Backends without a native pause primitive (Windows Bun ConPTY) must
+      // not accumulate an unbounded socket queue. Preserve the agent and its
+      // bounded scrollback; the client can reconnect and replay that tail.
+      if (!this.term.pause && ws.bufferedAmount >= this.opts.highWatermarkBytes) {
+        this.log.warn('session.slow_consumer_detached');
+        this.detach();
+        ws.close(1013, 'Terminal consumer is too slow; reconnect to resume');
+        return;
+      }
       ws.send(buf, { binary: true }, (err) => {
         if (err) {
           this.log.warn('session.send_error', { err });
@@ -511,14 +551,18 @@ export class PersistentSession {
         if (this.paused && ws.bufferedAmount <= this.opts.lowWatermarkBytes) {
           this.paused = false;
           try {
-            this.term.resume();
+            this.term.resume?.();
           } catch {
             // ignore
           }
         }
       });
 
-      if (!this.paused && ws.bufferedAmount >= this.opts.highWatermarkBytes) {
+      if (
+        !this.paused
+        && this.term.pause
+        && ws.bufferedAmount >= this.opts.highWatermarkBytes
+      ) {
         this.paused = true;
         try {
           this.term.pause();
@@ -540,7 +584,7 @@ export class PersistentSession {
     if (!this.paused) return;
     this.paused = false;
     try {
-      this.term.resume();
+      this.term.resume?.();
     } catch {
       // PTY may be dying; ignore.
     }

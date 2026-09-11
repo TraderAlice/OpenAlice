@@ -71,7 +71,8 @@ describe('Portfolio positions responsive presentation', () => {
       'AAPL in alpaca-paper, market value $24,587.28, PnL +19.46%, +$4,005.73. Expand for position details.',
     )
     expect(appleSummary.textContent).toContain('AAPL')
-    expect(appleSummary.textContent).toContain('alpaca-paper · USD')
+    expect(appleSummary.textContent).toContain('alpaca-paper')
+    expect(appleSummary.textContent).toContain('USD')
     expect(appleSummary.textContent).toContain('$24,587.28')
     expect(appleSummary.textContent).toContain('+19.46%')
     expect(appleSummary.textContent).toContain('+$4,005.73')

@@ -8,6 +8,8 @@ export const devMiscHandlers = [
   http.get('/api/version', () =>
     HttpResponse.json({
       current: currentVersion,
+      channel: 'stable',
+      updateAuthority: 'source',
       latest: null,
       hasUpdate: false,
       releaseUrl: null,
@@ -20,6 +22,8 @@ export const devMiscHandlers = [
   http.post('/api/version/check', () =>
     HttpResponse.json({
       current: currentVersion,
+      channel: 'stable',
+      updateAuthority: 'source',
       latest: null,
       hasUpdate: false,
       releaseUrl: null,

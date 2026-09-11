@@ -18,6 +18,7 @@ export const INTERVALS_DICT: Record<string, string> = {
   '1h': '1h',
   '1d': '1d',
   '5d': '5d',
+  '1w': '1wk',
   '1W': '1wk',
   '1M': '1mo',
   '1Q': '3mo',

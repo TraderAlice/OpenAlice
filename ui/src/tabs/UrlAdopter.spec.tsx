@@ -33,13 +33,69 @@ vi.mock('./registry', () => ({
   getView: vi.fn(),
 }))
 
+vi.mock('../hooks/useAliceProject', () => ({
+  useAliceProject: () => ({
+    project: { product: 'trader' },
+    loading: false,
+    error: null,
+    refresh: async () => undefined,
+  }),
+}))
+
 beforeEach(() => {
   vi.clearAllMocks()
 })
 
 afterEach(cleanup)
 
+it.each(['/', '/quick-start'])('adopts %s as the independent Quick Start entry', async path => {
+  render(<MemoryRouter initialEntries={[path]}><UrlAdopter /></MemoryRouter>)
+  await waitFor(() => expect(mocks.openOrFocus).toHaveBeenCalledWith({ kind: 'quick-start', params: {} }))
+  expect(mocks.setSidebar).toHaveBeenCalledWith('quick-start')
+})
+
+it('preserves the Chat Harness landing route', async () => {
+  render(<MemoryRouter initialEntries={['/chat']}><UrlAdopter /></MemoryRouter>)
+  await waitFor(() => expect(mocks.openOrFocus).toHaveBeenCalledWith({ kind: 'chat-landing', params: {} }))
+  expect(mocks.setSidebar).toHaveBeenCalledWith('chat')
+})
+
+it.each(['/workspaces', '/workspaces/templates', '/workspaces/templates/chat'])('retires %s into Ask Alice', async path => {
+  render(<MemoryRouter initialEntries={[path]}><UrlAdopter /></MemoryRouter>)
+  await waitFor(() => expect(mocks.openOrFocus).toHaveBeenCalledWith({ kind: 'chat-landing', params: {} }))
+  expect(mocks.setSidebar).toHaveBeenCalledWith('chat')
+})
+
+it.each(['chat', 'auto-quant', 'prediction'] as const)('adopts a %s Workspace details deep link', async source => {
+  render(<MemoryRouter initialEntries={[`/${source}/workspaces/my%20workspace/details`]}><UrlAdopter /></MemoryRouter>)
+  await waitFor(() => expect(mocks.openOrFocus).toHaveBeenCalledWith({
+    kind: 'workspace-details', params: { wsId: 'my workspace', source },
+  }))
+  expect(mocks.setSidebar).toHaveBeenCalledWith(source)
+})
+
 describe('UrlAdopter file provenance', () => {
+  it('restores an Auto Prediction file deep link with its Session return context', async () => {
+    render(
+      <MemoryRouter initialEntries={[
+        '/prediction/workspaces/prediction-1/view/evidence%2Fmarket.md?sessionId=codex-forecast',
+      ]}>
+        <UrlAdopter />
+      </MemoryRouter>,
+    )
+
+    await waitFor(() => expect(mocks.openOrFocus).toHaveBeenCalledWith({
+      kind: 'file-viewer',
+      params: {
+        wsId: 'prediction-1',
+        path: 'evidence/market.md',
+        source: 'prediction',
+        returnSessionId: 'codex-forecast',
+      },
+    }))
+    expect(mocks.setSidebar).toHaveBeenCalledWith('prediction')
+  })
+
   it('restores an Ask Alice file deep link with its Session return context', async () => {
     render(
       <MemoryRouter initialEntries={[
@@ -72,7 +128,7 @@ describe('UrlAdopter file provenance', () => {
       kind: 'file-viewer',
       params: { wsId: 'workspace-1', path: 'README.md' },
     }))
-    expect(mocks.setSidebar).toHaveBeenCalledWith('workspaces')
+    expect(mocks.setSidebar).toHaveBeenCalledWith('chat')
   })
 
   it('restores a Tracked file deep link with its entity return context', async () => {
@@ -97,6 +153,68 @@ describe('UrlAdopter file provenance', () => {
   })
 })
 
+describe('UrlAdopter Auto Prediction', () => {
+  it('adopts the managed Prediction Studio route', async () => {
+    render(
+      <MemoryRouter initialEntries={['/prediction/workspaces/prediction-1/studio']}>
+        <UrlAdopter />
+      </MemoryRouter>,
+    )
+
+    await waitFor(() => expect(mocks.openOrFocus).toHaveBeenCalledWith({
+      kind: 'harness-surface',
+      params: { wsId: 'prediction-1', capability: 'studio', source: 'prediction' },
+    }))
+    expect(mocks.setSidebar).toHaveBeenCalledWith('prediction')
+  })
+
+  it('adopts the Prediction landing route', async () => {
+    render(
+      <MemoryRouter initialEntries={['/prediction']}>
+        <UrlAdopter />
+      </MemoryRouter>,
+    )
+
+    await waitFor(() => expect(mocks.openOrFocus).toHaveBeenCalledWith({
+      kind: 'auto-prediction-landing',
+      params: {},
+    }))
+    expect(mocks.setSidebar).toHaveBeenCalledWith('prediction')
+  })
+})
+
+describe('UrlAdopter Settings Harness', () => {
+  it('adopts the Harness settings category from /settings/harness', async () => {
+    render(
+      <MemoryRouter initialEntries={['/settings/harness']}>
+        <UrlAdopter />
+      </MemoryRouter>,
+    )
+
+    await waitFor(() => expect(mocks.openOrFocus).toHaveBeenCalledWith({
+      kind: 'settings',
+      params: { category: 'harness' },
+    }))
+    expect(mocks.setSidebar).toHaveBeenCalledWith('settings')
+  })
+})
+
+describe('UrlAdopter Settings Agent runtimes', () => {
+  it('adopts the Agent runtimes settings category from /settings/agent-runtimes', async () => {
+    render(
+      <MemoryRouter initialEntries={['/settings/agent-runtimes']}>
+        <UrlAdopter />
+      </MemoryRouter>,
+    )
+
+    await waitFor(() => expect(mocks.openOrFocus).toHaveBeenCalledWith({
+      kind: 'settings',
+      params: { category: 'agent-runtimes' },
+    }))
+    expect(mocks.setSidebar).toHaveBeenCalledWith('settings')
+  })
+})
+
 describe('UrlAdopter Settings Beta', () => {
   it('adopts the Beta settings category from /settings/beta', async () => {
     render(
@@ -113,7 +231,62 @@ describe('UrlAdopter Settings Beta', () => {
   })
 })
 
+describe('UrlAdopter Settings Developer', () => {
+  it.each([
+    ['/settings/developer/runs', 'runs'],
+    ['/settings/developer/api', 'api'],
+    ['/automation', 'runs'],
+    ['/automation/runs', 'runs'],
+    ['/automation/api', 'api'],
+  ])('adopts %s into Settings Developer', async (path, tab) => {
+    render(<MemoryRouter initialEntries={[path]}><UrlAdopter /></MemoryRouter>)
+    await waitFor(() => expect(mocks.openOrFocus).toHaveBeenCalledWith({ kind: 'dev', params: { tab } }))
+    expect(mocks.setSidebar).toHaveBeenCalledWith('settings')
+    expect(mocks.setSidebar).not.toHaveBeenCalledWith('automation')
+  })
+
+  it('adopts a Developer page under Settings and highlights Settings', async () => {
+    render(
+      <MemoryRouter initialEntries={['/settings/developer/logs']}>
+        <UrlAdopter />
+      </MemoryRouter>,
+    )
+
+    await waitFor(() => expect(mocks.openOrFocus).toHaveBeenCalledWith({
+      kind: 'dev',
+      params: { tab: 'logs' },
+    }))
+    expect(mocks.setSidebar).toHaveBeenCalledWith('settings')
+  })
+
+  it('redirects the legacy standalone Dev Panel route', async () => {
+    render(
+      <MemoryRouter initialEntries={['/dev/simulator']}>
+        <UrlAdopter />
+      </MemoryRouter>,
+    )
+
+    await waitFor(() => expect(mocks.openOrFocus).toHaveBeenCalledWith({
+      kind: 'dev',
+      params: { tab: 'simulator' },
+    }))
+    expect(mocks.setSidebar).toHaveBeenCalledWith('settings')
+  })
+})
+
 describe('UrlAdopter Office occupancy', () => {
+  it('keeps the internal Office return checkpoint passive during an excursion', async () => {
+    render(
+      <MemoryRouter initialEntries={['/office/return']}>
+        <UrlAdopter />
+      </MemoryRouter>,
+    )
+
+    await Promise.resolve()
+    expect(mocks.openOrFocus).not.toHaveBeenCalled()
+    expect(mocks.setSidebar).not.toHaveBeenCalled()
+  })
+
   it('adopts the Office surface from /office', async () => {
     render(
       <MemoryRouter initialEntries={['/office']}>
@@ -158,5 +331,35 @@ describe('UrlAdopter Tracked selection', () => {
       params: { workspace: 'workspace-1', issue: 'power-watch' },
     }))
     expect(mocks.setSidebar).toHaveBeenCalledWith('tracked')
+  })
+})
+
+describe('UrlAdopter Market News', () => {
+  it('adopts News under Market from /market/news', async () => {
+    render(
+      <MemoryRouter initialEntries={['/market/news']}>
+        <UrlAdopter />
+      </MemoryRouter>,
+    )
+
+    await waitFor(() => expect(mocks.openOrFocus).toHaveBeenCalledWith({
+      kind: 'news',
+      params: {},
+    }))
+    expect(mocks.setSidebar).toHaveBeenCalledWith('market')
+  })
+
+  it('redirects the retired /news rail route into Market', async () => {
+    render(
+      <MemoryRouter initialEntries={['/news']}>
+        <UrlAdopter />
+      </MemoryRouter>,
+    )
+
+    await waitFor(() => expect(mocks.openOrFocus).toHaveBeenCalledWith({
+      kind: 'news',
+      params: {},
+    }))
+    expect(mocks.setSidebar).toHaveBeenCalledWith('market')
   })
 })

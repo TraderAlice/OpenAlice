@@ -53,6 +53,18 @@ describe('EditUTADialog compact layout', () => {
         uta={uta}
         preset={preset}
         health={health}
+        readiness={{
+          accountId: uta.id,
+          label: uta.label!,
+          presetId: uta.presetId,
+          configuredEnabled: true,
+          engine: 'alpaca',
+          state: 'ready',
+          operational: true,
+        }}
+        policy={{ canRead: true, canReconnect: true, canTrade: false, reason: 'This account is configured read-only.' }}
+        onInstallBrokerPack={vi.fn().mockResolvedValue(undefined)}
+        onRetryBrokerPack={vi.fn().mockResolvedValue(undefined)}
         onSave={vi.fn().mockResolvedValue(undefined)}
         onDelete={vi.fn().mockResolvedValue(undefined)}
         onViewInPortfolio={vi.fn()}

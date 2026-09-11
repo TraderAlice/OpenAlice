@@ -134,6 +134,7 @@ describe('PushApprovalPanel localization', () => {
           },
         }],
         pendingMessage: '调整 AAPL 仓位',
+        pendingHash: 'abc12345',
         head: 'abc123456789',
         commitCount: 1,
       })
@@ -162,6 +163,7 @@ describe('PushApprovalPanel localization', () => {
         },
       }],
       pendingMessage: '调整 AAPL 仓位',
+      pendingHash: 'abc12345',
       head: 'abc123456789',
       commitCount: 1,
     })
@@ -182,6 +184,37 @@ describe('PushApprovalPanel localization', () => {
     expect(screen.getByRole('button', { name: '确认推送' })).toBeTruthy()
     expect(screen.getByRole('button', { name: '取消' })).toBeTruthy()
     expect(mocks.walletPush).not.toHaveBeenCalled()
+  })
+
+  it('shows exact order terms for pushed Trading as Git commits', async () => {
+    mocks.walletLog.mockResolvedValue({
+      commits: [{
+        hash: '8ecf74c612345678',
+        message: 'MU tactical swing long',
+        timestamp: '2026-08-17T08:00:00.000Z',
+        operations: [{
+          symbol: 'MU',
+          action: 'placeOrder',
+          change: 'BUY 10 LMT @971 GTC (submitted)',
+          status: 'submitted',
+          order: {
+            side: 'BUY',
+            orderType: 'LMT',
+            totalQuantity: '10',
+            limitPrice: '971',
+            timeInForce: 'GTC',
+          },
+        }],
+      }],
+    })
+
+    render(<PushApprovalPanel />)
+
+    fireEvent.click(await screen.findByText('买入 MU, 10, @ 971'))
+    expect(await screen.findByText('MU tactical swing long')).toBeTruthy()
+    expect(await screen.findByText('买入 MU')).toBeTruthy()
+    expect(screen.getByText('LMT, 数量 10, 限价 971, GTC')).toBeTruthy()
+    expect(screen.getByText('已提交')).toBeTruthy()
   })
 
   it('uses a queue-to-detail drill-in on narrow layouts while preserving the desktop split view', async () => {

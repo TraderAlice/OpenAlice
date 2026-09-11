@@ -18,6 +18,31 @@ it does not vendor Herdr code or make Herdr an OpenAlice dependency.
 Line links below are pinned to that commit so this note remains reproducible
 when Herdr's main branch changes.
 
+## Current Remote-Bootstrap Check (2026-09-03)
+
+Herdr's current public documentation and `herdrdev/herdr` source retain the
+same useful ownership boundary. `herdr --remote` accepts an ordinary OpenSSH
+config target or `ssh://user@host:port`; users are told to make plain `ssh`
+work first, and Herdr uses the normal OpenSSH authentication and host policy.
+It detects a Linux or macOS remote, prefers a compatible binary already on
+`PATH` or in common direct, Homebrew, mise, and Nix locations, and prompts
+before installing a missing match into `~/.local/bin/herdr`. Non-interactive
+runs fail instead of silently modifying the host.
+
+When local and remote platforms match, Herdr may copy the invoking binary;
+otherwise it downloads the exact current-client release target, installs it
+through a remote temporary file and atomic move, verifies the version, then
+starts or attaches to its server. The remote feature has no cloud-provider,
+machine-provisioning, Volume, or service-deployment abstraction. OpenAlice
+adopts that boundary while retaining its own checksum-bound installer,
+Guardian process tree, browser tunnel, and explicit plan/apply consent model.
+
+Current references:
+
+- [Persistence and remote access](https://herdr.dev/docs/persistence-remote/)
+- [`src/remote/attach.rs`](https://github.com/herdrdev/herdr/blob/master/src/remote/attach.rs)
+- [`src/remote/host_unix.rs`](https://github.com/herdrdev/herdr/blob/master/src/remote/host_unix.rs)
+
 ## Executive Summary
 
 Herdr is not merely a TUI launched inside SSH. Its default architecture is a

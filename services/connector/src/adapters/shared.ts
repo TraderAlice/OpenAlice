@@ -4,6 +4,19 @@ import type {
   ConnectorAttachment,
   InboxNotification,
 } from '@traderalice/connector-protocol'
+import type { ConnectorStartFailureDisposition } from '../core/adapter.js'
+
+/**
+ * Shared default for adapters whose SDK exposes transport failures only as
+ * errors. Keep this at the adapter boundary: DeliveryManager must never infer
+ * platform lifecycle semantics from third-party error text.
+ */
+export function classifyNetworkStartFailure(error: unknown): ConnectorStartFailureDisposition {
+  const message = formatAdapterError(error)
+  return /did not become ready|did not answer getme|api is unreachable|network request|fetch failed|econn|etimedout|enotfound|enetunreach|ehostunreach|socket disconnected|aborted delay|certificate|eai_again|socket hang up|tls connection/i.test(message)
+    ? 'retry'
+    : 'fatal'
+}
 
 export class AdapterHealthTracker {
   private value: ConnectorAdapterHealth
@@ -13,7 +26,15 @@ export class AdapterHealthTracker {
   }
 
   healthy(owner?: string): void {
-    this.value = { ...this.value, status: 'healthy', detail: undefined, lastError: undefined, owner }
+    this.value = {
+      ...this.value,
+      status: 'healthy',
+      detail: undefined,
+      lastError: undefined,
+      nextAttemptAt: undefined,
+      consecutiveFailures: 0,
+      owner,
+    }
   }
 
   awaitingLink(): void {
@@ -22,6 +43,8 @@ export class AdapterHealthTracker {
       status: 'awaiting_link',
       detail: 'Bot is online and waiting for the owner to run /link.',
       lastError: undefined,
+      nextAttemptAt: undefined,
+      consecutiveFailures: 0,
       owner: undefined,
     }
   }
@@ -31,12 +54,24 @@ export class AdapterHealthTracker {
       ...this.value,
       status: 'degraded',
       detail: 'External connector is unavailable.',
-      lastError: error instanceof Error ? error.message : String(error),
+      lastError: formatAdapterError(error),
     }
   }
 
   attempt(): void {
-    this.value = { ...this.value, lastAttemptAt: new Date().toISOString() }
+    this.value = {
+      ...this.value,
+      lastAttemptAt: new Date().toISOString(),
+      nextAttemptAt: undefined,
+    }
+  }
+
+  retryScheduled(delayMs: number, consecutiveFailures: number): void {
+    this.value = {
+      ...this.value,
+      nextAttemptAt: new Date(Date.now() + delayMs).toISOString(),
+      consecutiveFailures,
+    }
   }
 
   success(owner?: string): void {
@@ -46,9 +81,19 @@ export class AdapterHealthTracker {
       status: 'healthy',
       detail: undefined,
       lastError: undefined,
+      nextAttemptAt: undefined,
+      consecutiveFailures: 0,
       lastAttemptAt: this.value.lastAttemptAt ?? now,
       lastSuccessAt: now,
       owner: owner ?? this.value.owner,
+    }
+  }
+
+  connecting(detail?: string): void {
+    this.value = {
+      ...this.value,
+      status: 'starting',
+      detail: detail ?? 'Connecting to the external platform.',
     }
   }
 
@@ -59,6 +104,72 @@ export class AdapterHealthTracker {
   get(): ConnectorAdapterHealth {
     return { ...this.value }
   }
+}
+
+export const DEFAULT_CONNECTION_ATTEMPT_TIMEOUT_MS = 30_000
+export const DEFAULT_CONNECTION_RETRY_DELAY_MS = 5_000
+export const MAX_CONNECTION_RETRY_DELAY_MS = 60_000
+
+export async function superviseLongConnection(options: {
+  isStopped: () => boolean
+  runSession: () => Promise<void>
+  isSessionHealthy?: () => boolean
+  disconnect: () => Promise<void>
+  onFailure: (error: unknown) => void
+  onAttempt?: () => void
+  onRetryScheduled?: (delayMs: number, consecutiveFailures: number) => void
+  delay: (ms: number) => Promise<void>
+  reconnectDelayMs?: number
+  retryJitterRatio?: number
+  random?: () => number
+  label: string
+}): Promise<void> {
+  let failures = 0
+  const baseDelay = options.reconnectDelayMs ?? DEFAULT_CONNECTION_RETRY_DELAY_MS
+  while (!options.isStopped()) {
+    try {
+      options.onAttempt?.()
+      await options.runSession()
+      if (options.isStopped()) return
+      if (options.isSessionHealthy?.()) failures = 0
+      failures += 1
+      options.onFailure(new Error(`${options.label} session ended`))
+    } catch (error) {
+      if (options.isStopped()) return
+      if (options.isSessionHealthy?.()) failures = 0
+      failures += 1
+      options.onFailure(error)
+    }
+    await options.disconnect().catch(() => undefined)
+    if (options.isStopped()) return
+    const unjittered = Math.min(baseDelay * 2 ** Math.max(0, failures - 1), MAX_CONNECTION_RETRY_DELAY_MS)
+    const jitterRatio = options.retryJitterRatio ?? 0.2
+    const random = options.random ?? Math.random
+    const delayMs = Math.max(0, Math.round(unjittered * (1 + (random() * 2 - 1) * jitterRatio)))
+    options.onRetryScheduled?.(delayMs, failures)
+    console.warn(`[connector] ${options.label} reconnect in ${delayMs}ms`)
+    await options.delay(delayMs)
+  }
+}
+
+export function formatAdapterError(error: unknown): string {
+  if (!(error instanceof Error)) return String(error)
+  const parts = [error.message]
+  const nested = 'error' in error ? (error as { error?: unknown }).error : undefined
+  let current: unknown = error.cause ?? nested
+  const seen = new Set<unknown>([error])
+  while (current && !seen.has(current) && parts.length < 4) {
+    seen.add(current)
+    if (current instanceof Error) {
+      if (current.message && !parts.includes(current.message)) parts.push(current.message)
+      current = current.cause
+      continue
+    }
+    const text = String(current)
+    if (text && !parts.includes(text)) parts.push(text)
+    break
+  }
+  return parts.join(' — ')
 }
 
 export function formatInboxNotification(notification: InboxNotification): string {

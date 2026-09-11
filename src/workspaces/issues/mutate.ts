@@ -74,7 +74,9 @@ export interface IssueFieldPatch {
   catchUp?: boolean
   /** Settings-only cadence edit for the phone desk. */
   when?: unknown
-  /** Settings-only: `true` binds the desk; `null` removes the flag. */
+  /** Settings-only: adapter id binds the desk; `null` removes the flag. */
+  connectorDesk?: string | null
+  /** @deprecated Dual-write helper. Prefer {@link connectorDesk}. */
   telegramConnector?: true | null
 }
 
@@ -99,7 +101,9 @@ export interface CreateIssueInput {
   /** @deprecated Compatibility alias for callers written before What became the
    * sole markdown document. New callers must use `what`. */
   body?: string
-  /** Only the Settings Telegram chat helper may set this. */
+  /** Only the Settings connector desk helper may set this. */
+  connectorDesk?: string
+  /** @deprecated Dual-write helper. Prefer {@link connectorDesk}. */
   telegramConnector?: true
 }
 
@@ -153,7 +157,7 @@ export async function updateIssueFields(
   wsDir: string,
   id: string,
   patch: IssueFieldPatch,
-  options?: { allowTelegramConnector?: boolean },
+  options?: { allowConnectorDesk?: boolean; allowTelegramConnector?: boolean },
 ): Promise<MutateResult> {
   if (!ID_RE.test(id)) return { ok: false, reason: 'not_found' }
   const raw = await readWorkspaceFile(wsDir, relFor(id))
@@ -279,16 +283,25 @@ export async function updateIssueFields(
       data.commentPrompt = parsed.template
     }
   }
-  if (patch.telegramConnector !== undefined) {
-    if (!options?.allowTelegramConnector) {
+  if (patch.connectorDesk !== undefined || patch.telegramConnector !== undefined) {
+    if (!options?.allowConnectorDesk && !options?.allowTelegramConnector) {
       return {
         ok: false,
         reason: 'invalid',
-        error: 'telegramConnector can only be changed from Connector Settings',
+        error: 'connectorDesk can only be changed from Connector Settings',
       }
     }
-    if (patch.telegramConnector === null) delete data.telegramConnector
-    else data.telegramConnector = true
+    const next = patch.connectorDesk === undefined
+      ? (patch.telegramConnector === null ? null : 'telegram')
+      : patch.connectorDesk
+    delete data.telegramConnector
+    if (next === null || next === '') delete data.connectorDesk
+    else data.connectorDesk = next
+  } else {
+    if (data.telegramConnector === true && data.connectorDesk === undefined) {
+      data.connectorDesk = 'telegram'
+    }
+    delete data.telegramConnector
   }
   if (patch.when !== undefined) {
     const when = issueWhenSchema.safeParse(patch.when)
@@ -333,7 +346,7 @@ export async function updateIssueFields(
 export async function createIssue(
   wsDir: string,
   input: CreateIssueInput,
-  options?: { allowTelegramConnector?: boolean },
+  options?: { allowConnectorDesk?: boolean; allowTelegramConnector?: boolean },
 ): Promise<CreateResult> {
   const title = input.title?.trim()
   if (!title) return { ok: false, reason: 'invalid', error: 'title is required' }
@@ -380,15 +393,16 @@ export async function createIssue(
     if (!parsed.ok) return { ok: false, reason: 'invalid', error: parsed.error }
     data.commentPrompt = parsed.template
   }
-  if (input.telegramConnector === true) {
-    if (!options?.allowTelegramConnector) {
+  const requestedDesk = input.connectorDesk ?? (input.telegramConnector === true ? 'telegram' : undefined)
+  if (requestedDesk) {
+    if (!options?.allowConnectorDesk && !options?.allowTelegramConnector) {
       return {
         ok: false,
         reason: 'invalid',
-        error: 'telegramConnector can only be set from Connector Settings',
+        error: 'connectorDesk can only be set from Connector Settings',
       }
     }
-    data.telegramConnector = true
+    data.connectorDesk = requestedDesk
   }
 
   const parsed = issueFrontmatterSchema.safeParse(data)

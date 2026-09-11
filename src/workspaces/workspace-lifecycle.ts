@@ -9,7 +9,7 @@ import type { Logger } from './logger.js'
 import type { ResumeRegistry } from './resume-registry.js'
 import type { ScrollbackStore } from './scrollback-store.js'
 import type { SessionPool } from './session-pool.js'
-import type { WebPiSessionHost } from './webpi-session-host.js'
+import type { WebSessionHost } from './web-session-host.js'
 import type { SessionRecord, SessionRegistry } from './session-registry.js'
 import {
   catalogRecordToMeta,
@@ -47,7 +47,7 @@ export interface WorkspaceLifecycleManagerDeps {
   scrollbackStore: ScrollbackStore
   headlessTasks: HeadlessTaskRegistry
   pool: SessionPool
-  webPi?: WebPiSessionHost
+  web?: WebSessionHost
   /** Includes synchronous wait:true/probe-style runs not yet in HeadlessTaskRegistry. */
   isWorkspaceHeadlessActive?: (workspaceId: string) => boolean
   /** Serializes checkout-wide mutations with Template Upgrade and Merge. */
@@ -398,7 +398,7 @@ export class WorkspaceLifecycleManager {
         if (dump.length > 0) scrollbackFile = await this.deps.scrollbackStore.dump(wsId, record.id, dump)
       }
       this.deps.pool.disposeToken(record.id, 'workspace offboarded')
-      await this.deps.webPi?.stop(record.id, 'workspace offboarded')
+      await this.deps.web?.stop(record.id, 'workspace offboarded')
       if (record.state === 'running' || scrollbackFile) {
         await this.deps.sessionRegistry.update(wsId, record.id, {
           state: 'paused',

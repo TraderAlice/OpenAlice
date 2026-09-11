@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest'
 
-import { issueAutomationHealth, type IssueAutomationHealthInput } from './automation-health.js'
+import {
+  issueAutomationHealth,
+  issueAutomationOwnerState,
+  issueAutomationRuntime,
+  type IssueAutomationHealthInput,
+} from './automation-health.js'
 
 const base: IssueAutomationHealthInput = {
   status: 'todo',
@@ -10,6 +15,33 @@ const base: IssueAutomationHealthInput = {
 }
 
 describe('issueAutomationHealth', () => {
+  it('resolves effective runtime from Session, Issue, then default precedence', () => {
+    const availability = {
+      pi: { installed: true },
+      codex: { installed: false },
+      grok: { installed: false },
+    }
+    const displayNameFor = (agent: string) => agent.toUpperCase()
+    expect(issueAutomationRuntime({
+      sessionAgent: 'grok',
+      issueAgent: 'codex',
+      defaultAgent: 'pi',
+      availability,
+      displayNameFor,
+    })).toEqual({ agent: 'grok', displayName: 'GROK', installed: false })
+    expect(issueAutomationRuntime({
+      issueAgent: 'codex',
+      defaultAgent: 'pi',
+      availability,
+      displayNameFor,
+    })?.agent).toBe('codex')
+    expect(issueAutomationRuntime({
+      defaultAgent: 'pi',
+      availability,
+      displayNameFor,
+    })?.agent).toBe('pi')
+  })
+
   it('distinguishes an untouched schedule from one that is due', () => {
     expect(issueAutomationHealth(base).state).toBe('not_started')
     expect(issueAutomationHealth({ ...base, nextDueAtMs: base.nowMs }).state).toBe('due')
@@ -51,6 +83,17 @@ describe('issueAutomationHealth', () => {
     expect(issueAutomationHealth({ ...base, ownerState: 'missing' }).state).toBe('blocked')
     expect(issueAutomationHealth({ ...base, ownerState: 'retired' }).message).toMatch(/retired/)
     expect(issueAutomationHealth({ ...base, ownerState: 'unbound' }).message).toMatch(/resumable/)
+    expect(issueAutomationHealth({ ...base, ownerState: 'workspace_missing' })).toMatchObject({
+      state: 'blocked',
+      message: expect.stringMatching(/Workspace is unavailable/),
+    })
+  })
+
+  it('uses the authoritative assignee projection for exact Session health', () => {
+    expect(issueAutomationOwnerState('@new-each-run')).toBe('workspace')
+    expect(issueAutomationOwnerState('@resume-1', { state: 'workspace_missing' }))
+      .toBe('workspace_missing')
+    expect(issueAutomationOwnerState('@resume-missing')).toBe('missing')
   })
 
   it('lets an in-flight run finish before surfacing a newly blocked owner', () => {
@@ -59,6 +102,31 @@ describe('issueAutomationHealth', () => {
       ownerState: 'retired',
       latestRun: { taskId: 'run-live', status: 'running' },
     }).state).toBe('running')
+  })
+
+  it('projects a missing effective runtime as a structured blocker', () => {
+    expect(issueAutomationHealth({
+      ...base,
+      runtime: { agent: 'grok', displayName: 'Grok', installed: false },
+    })).toMatchObject({
+      state: 'blocked',
+      blocker: {
+        kind: 'agent_runtime_missing',
+        agent: 'grok',
+        displayName: 'Grok',
+      },
+      message: expect.stringMatching(/Grok.*not installed/),
+    })
+  })
+
+  it('does not let a missing runtime hide an in-flight run or terminal Issue', () => {
+    const runtime = { agent: 'grok', displayName: 'Grok', installed: false }
+    expect(issueAutomationHealth({
+      ...base,
+      runtime,
+      latestRun: { taskId: 'run-live', status: 'running' },
+    }).state).toBe('running')
+    expect(issueAutomationHealth({ ...base, status: 'done', runtime }).state).toBe('inactive')
   })
 
   it('makes terminal Issue status the schedule switch', () => {

@@ -24,15 +24,22 @@ import {
   buildUpgradeVerifyExpression,
   candidateDesktopAssetName,
   DESKTOP_UPGRADE_RECEIPT_SCHEMA_VERSION,
+  desktopUpgradeWorkspaceTags,
   previousDesktopAssetName,
+  readInstalledDesktopVersion,
   selectPreviousDesktopTag,
   versionFromTag,
+  waitForChromiumProfileRelease,
   windowsInstallerArgs,
 } from './desktop-upgrade-smoke-lib.mjs'
 import { packagedElectronExecutable } from './smoke-packaged-toolchain.mjs'
 
 const repoRoot = resolve(import.meta.dirname, '..')
-const candidateVersion = JSON.parse(readFileSync(join(repoRoot, 'package.json'), 'utf8')).version
+const candidateVersion = process.env.CANDIDATE_VERSION
+  || JSON.parse(readFileSync(join(repoRoot, 'package.json'), 'utf8')).version
+if (!/^\d+\.\d+\.\d+(?:-beta(?:\.[1-9]\d*)?)?$/.test(candidateVersion)) {
+  throw new Error('Invalid desktop candidate version')
+}
 const repository = process.env['GITHUB_REPOSITORY'] || 'TraderAlice/OpenAlice'
 
 function sleep(ms) {
@@ -93,7 +100,6 @@ async function waitForPath(path, timeoutMs = 30_000) {
 }
 
 async function waitForInstalledVersion(installRoot, expectedVersion, timeoutMs = 20 * 60_000) {
-  const packageJson = join(installRoot, 'resources', 'app', 'package.json')
   const startedAt = Date.now()
   const deadline = Date.now() + timeoutMs
   let lastObservedVersion = null
@@ -101,7 +107,7 @@ async function waitForInstalledVersion(installRoot, expectedVersion, timeoutMs =
   while (Date.now() < deadline) {
     let observedVersion = '<replacing>'
     try {
-      observedVersion = JSON.parse(readFileSync(packageJson, 'utf8')).version ?? '<missing>'
+      observedVersion = readInstalledDesktopVersion(installRoot) ?? '<missing>'
       if (observedVersion === expectedVersion) return
     } catch {
       // NSIS replaces the package tree in place; partial reads are expected while it runs.
@@ -368,6 +374,13 @@ async function runRendererJourney({ executable, env, electronUserData, expressio
     client = null
     const exitCode = await waitForExit(child)
     if (exitCode !== 0) throw new Error(`${label} exited ${exitCode}`)
+    if (process.platform === 'darwin') {
+      await waitForChromiumProfileRelease(electronUserData, {
+        label,
+        childExitCode: child.exitCode,
+        childPid: child.pid,
+      })
+    }
     return result
   } catch (error) {
     client?.close()
@@ -454,8 +467,7 @@ async function main() {
       OPENALICE_UTA_DISABLED: '1',
     }
     delete commonEnv.OPENALICE_TAKEOVER
-    const tag = `desktop-upgrade-${previousVersion.replace(/[^a-z0-9]+/gi, '-').toLowerCase()}`
-    const postUpgradeTag = `${tag}-post`
+    const { tag, postUpgradeTag } = desktopUpgradeWorkspaceTags(previousVersion)
     const sentinelKey = 'openalice-desktop-upgrade-smoke'
     const sentinelValue = `${fromTag}->${candidateVersion}`
 

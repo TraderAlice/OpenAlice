@@ -66,6 +66,19 @@ alice-uta contract expand --help       # expand a directory-style result (chains
 - **Resolve the contract before any order** (`contract search` →
   `contract details`) — never guess a symbol's broker-native identity.
 
+## Broker research
+
+`contract option-contracts` returns paginated option definitions and dated open
+interest; `contract option-chain` returns paginated snapshots with IV/Greeks
+when supplied. Currently Alpaca supports these reads. Keep the same filters
+when following `nextPageToken`. The default indicative feed contains modified
+quotes and delayed trades; use observation timestamps and do not treat it as
+executable OPRA. Options reads do not imply options trading permission.
+`contract order-book` provides depth on Alpaca crypto and CCXT.
+
+Alpaca crypto uses `CRYPTO` contracts, with GTC or IOC orders. Its equity
+market clock does not describe the 24/7 crypto session.
+
 ## Place / modify / cancel orders
 
 ```bash
@@ -103,6 +116,18 @@ alice-uta git reject --help            # reject a staged change
 alice-uta git sync --help              # reconcile against the venue
 ```
 
+Shells expand `$` inside double-quoted values. For any trading thesis that
+contains currency, either use single quotes or the generated file-backed flag:
+
+```bash
+alice-uta order place ... --commit-message 'Buy below $971 after support confirmation'
+alice-uta order place ... --commit-message-file /path/to/thesis.txt
+```
+
+Never put a dollar-denominated thesis in a double-quoted `--commit-message`;
+`"$971"` can reach OpenAlice as `"71"`. File-backed string flags accept `-` to
+read stdin when the exact value is already available as a stream.
+
 ## Market clock & simulator
 
 ```bash
@@ -113,5 +138,5 @@ alice-uta sim price-change --help      # MockBroker only — move a mock price f
 ## Not here
 
 - **Scheduling is not in `alice-uta`.** Recurring/headless workspace work is
-  issue-backed: use `alice-workspace issue create` or write
+  issue-backed: use `alice issue create` or write
   `.alice/issues/<id>.md` with a `when` field (see the `self-scheduling` skill).

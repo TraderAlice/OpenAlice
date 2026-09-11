@@ -296,6 +296,9 @@ export const opencodeAdapter: CliAdapter = {
     // `opencode --session <id>` (composeCommand) resumes by id.
     transcriptDiscovery: 'subprocess',
     headless: true,
+    // `opencode acp` serves the Agent Client Protocol from the same SQLite
+    // session store the TUI uses, so `session/load` reopens `ses_…` ids.
+    web: { wire: 'acp', permissionPrompts: true, freshSession: true },
     aiProvider: {
       credentialSource: 'runtime-or-workspace',
       wirePreference: ['google-generative-ai', 'openai-chat', 'anthropic', 'openai-responses'],
@@ -339,7 +342,22 @@ export const opencodeAdapter: CliAdapter = {
           ...(selectedModel ? { model: selectedModel } : {}),
         });
       }
-      return { env, interactiveArgs, headlessArgs, webArgs: interactiveArgs };
+      // ACP has no --model flag. Its native config selects the default model
+      // for session/new; keep this process-local and preserve other settings.
+      if (selectedModel && !env['OPENCODE_CONFIG_CONTENT']) {
+        const raw = _ctx.env['OPENCODE_CONFIG_CONTENT'];
+        const inherited: unknown = raw ? JSON.parse(raw) : {};
+        if (!inherited || typeof inherited !== 'object' || Array.isArray(inherited)) {
+          throw new Error('OPENCODE_CONFIG_CONTENT must contain a JSON object');
+        }
+        env['OPENCODE_CONFIG_CONTENT'] = JSON.stringify({ ...inherited, model: selectedModel });
+      }
+      const config: unknown = JSON.parse(env['OPENCODE_CONFIG_CONTENT'] ?? _ctx.env['OPENCODE_CONFIG_CONTENT'] ?? '{}');
+      if (!config || typeof config !== 'object' || Array.isArray(config)) {
+        throw new Error('OPENCODE_CONFIG_CONTENT must contain a JSON object');
+      }
+      env['OPENCODE_CONFIG_CONTENT'] = JSON.stringify({ ...config, permission: 'allow' });
+      return { env, interactiveArgs, headlessArgs, webArgs: [] };
     },
   },
 
@@ -364,6 +382,17 @@ export const opencodeAdapter: CliAdapter = {
     }
     if (ctx.resume === 'last') return [...head, '--continue'];
     return [...head, '--session', ctx.resume.sessionId];
+  },
+
+  // Web surface: `opencode acp`. ACP rejects --model; sessionRuntime
+  // projects model selection into OPENCODE_CONFIG_CONTENT instead.
+  composeWebCommand(_base: readonly string[], ctx: SpawnContext): readonly string[] {
+    if (ctx.resume === 'last') throw new Error('the Web surface requires a concrete opencode session id or a fresh Session');
+    return [
+      'opencode',
+      ...(ctx.sessionRuntime?.webArgs ?? ctx.sessionRuntime?.interactiveArgs ?? []),
+      'acp',
+    ];
   },
 
   // Headless: `opencode run <prompt>` is non-interactive and exits at the turn

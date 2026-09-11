@@ -6,11 +6,11 @@ import { filterAccountTierUTAs } from '../lib/uta-account-filter'
 reloadOnHotUpdate('live/trading-push')
 
 /**
- * Live count of staged-but-unpushed trading operations, for the
- * Trading-as-Git activity-bar badge. Mirrors the Inbox unread badge:
- * pending pushes are an attention state the user must be reminded of,
- * otherwise a staged order sits forgotten because nothing surfaces it
- * outside the Trading-as-Git panel.
+ * Live count of staged-but-unpushed trading operations, for the Broker
+ * activity-bar badge and Trading-as-Git navigator row. Mirrors the Inbox
+ * unread badge: pending pushes are an attention state the user must be
+ * reminded of, otherwise a staged order sits forgotten because nothing
+ * surfaces it outside the Trading-as-Git panel.
  *
  * Polls `listUTAs` + per-account `walletStatus` (the same data the
  * PushApprovalPanel reads, summed). 15s cadence: this is a passive

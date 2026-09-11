@@ -13,9 +13,44 @@ import {
   KIMI,
   LONGCAT,
   MINIMAX,
+  OPENROUTER,
   XAI_API,
 } from './preset-catalog.js';
 import { BUILTIN_PRESETS } from './presets.js';
+
+describe('OPENROUTER preset', () => {
+  it('declares OpenAI and Anthropic skins with the documented base URLs', () => {
+    expect(OPENROUTER.regions?.[0]?.wires).toEqual({
+      'openai-chat': 'https://openrouter.ai/api/v1',
+      'openai-responses': 'https://openrouter.ai/api/v1',
+      anthropic: 'https://openrouter.ai/api',
+    });
+    const parsed = OPENROUTER.zodSchema.parse({
+      backend: 'vercel-ai-sdk',
+      provider: 'openai-compatible',
+      apiKey: 'sk-or-test',
+    }) as { baseUrl?: string; model?: string };
+    expect(parsed.baseUrl).toBe('https://openrouter.ai/api/v1');
+    expect(parsed.model).toBe('openai/gpt-5.6-luna');
+    expect(OPENROUTER.models?.map((model) => model.id)).toEqual([
+      'openai/gpt-5.6-luna',
+      'anthropic/claude-sonnet-5',
+      'deepseek/deepseek-v4-flash-0731',
+      'tencent/hy3',
+      'z-ai/glm-5.2',
+      'xiaomi/mimo-v2.5',
+      'anthropic/claude-opus-5',
+      'anthropic/claude-fable-5',
+      'openai/gpt-5.6-sol',
+      'openai/gpt-5.6-terra',
+      'x-ai/grok-4.6',
+      'google/gemini-3.7-flash',
+      'minimax/minimax-m3',
+      'moonshotai/kimi-k3',
+      'deepseek/deepseek-v4-pro',
+    ]);
+  });
+});
 
 describe('LONGCAT preset', () => {
   it('uses the versioned OpenAI base URL required by the OpenAI SDK', () => {
@@ -111,6 +146,10 @@ describe('credential form catalog', () => {
       contextWindow: 500_000,
       reasoning: { efforts: ['low', 'medium', 'high', 'xhigh'], defaultEffort: 'high' },
     });
+    expect(XAI_API.models?.find((model) => model.id === 'grok-4.5')?.semantics).toMatchObject({
+      contextWindow: 500_000,
+      reasoning: { efforts: ['low', 'medium', 'high'], defaultEffort: 'high' },
+    });
   });
 
   it('offers current general-purpose Gemini tiers without mixing in media-only models', () => {
@@ -176,6 +215,7 @@ describe('credential form catalog', () => {
       kimi: 'kimi-k3',
       deepseek: 'deepseek-v4-pro',
       longcat: 'LongCat-2.0',
+      openrouter: 'openai/gpt-5.6-luna',
       'atlas-cloud': 'deepseek-ai/deepseek-v4-pro',
       // Runtime-direct provider: `auto` is Cursor routing, not a model API id.
       cursor: 'auto',
@@ -230,6 +270,7 @@ describe('credential form catalog', () => {
       kimi: 'kimi',
       deepseek: 'deepseek',
       longcat: 'longcat',
+      openrouter: 'openrouter',
       'atlas-cloud': 'atlas-cloud',
     };
 

@@ -10,11 +10,13 @@ let savedEnv: Record<string, string | undefined>
 beforeEach(async () => {
   savedEnv = {
     OPENALICE_HOME: process.env['OPENALICE_HOME'],
+    OPENALICE_BROKER_PACK_PREFER_WORKSPACE: process.env['OPENALICE_BROKER_PACK_PREFER_WORKSPACE'],
     OPENALICE_BROKER_PACK_ALLOW_WORKSPACE: process.env['OPENALICE_BROKER_PACK_ALLOW_WORKSPACE'],
   }
   home = await mkdtemp(resolve(tmpdir(), 'openalice-broker-registry-'))
   process.env['OPENALICE_HOME'] = home
   process.env['OPENALICE_BROKER_PACK_ALLOW_WORKSPACE'] = '0'
+  delete process.env['OPENALICE_BROKER_PACK_PREFER_WORKSPACE']
   vi.resetModules()
 })
 
@@ -77,6 +79,18 @@ describe('broker engine registry', () => {
     const mock = await loadBrokerEngine('mock')
     expect(mock.configSchema).toBeTruthy()
     expect(mock.createBroker({ id: 'sim', brokerConfig: {} }).brokerEngine).toBe('mock')
+  })
+
+  it('uses source code only when explicitly preferred and workspace loading is allowed', async () => {
+    await activateCcxtModule('valid-release', validModuleSource())
+    process.env['OPENALICE_BROKER_PACK_PREFER_WORKSPACE'] = '1'
+    const { loadBrokerEngine, clearBrokerEngineCache } = await import('./registry.js')
+    const installed = await loadBrokerEngine('ccxt')
+    expect('safeParse' in installed.configSchema).toBe(false)
+    process.env['OPENALICE_BROKER_PACK_ALLOW_WORKSPACE'] = '1'
+    clearBrokerEngineCache()
+    const source = await loadBrokerEngine('ccxt')
+    expect(typeof source.configSchema.safeParse).toBe('function')
   })
 
   it('loads and validates an activated pack module', async () => {

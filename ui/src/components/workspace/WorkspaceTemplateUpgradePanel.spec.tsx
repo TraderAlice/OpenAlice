@@ -9,6 +9,9 @@ import {
 } from './api'
 import { WorkspaceTemplateUpgradePanel } from './WorkspaceTemplateUpgradePanel'
 
+const openOrFocus = vi.hoisted(() => vi.fn())
+vi.mock('../../tabs/store', () => ({ useWorkspace: () => ({ openOrFocus }) }))
+
 vi.mock('./api', async (importOriginal) => ({
   ...(await importOriginal<typeof import('./api')>()),
   getTemplateUpgradePlan: vi.fn(),
@@ -80,6 +83,15 @@ afterEach(() => {
 })
 
 describe('WorkspaceTemplateUpgradePanel', () => {
+  it('opens an unsent upgrade request in the same Workspace', async () => {
+    const close = vi.fn()
+    render(<WorkspaceTemplateUpgradePanel wsId="chat-old" layer="alice-harness" onWorkspaceChanged={vi.fn()} onClose={close} />)
+    fireEvent.click(await screen.findByRole('button', { name: 'Resolve in chat' }))
+    expect(openOrFocus).toHaveBeenCalledWith({ kind: 'chat-landing', params: { targetWsId: 'chat-old', initialPrompt: expect.stringContaining('alice harness upgrade --mode detailed') } })
+    expect(applyTemplateUpgrade).not.toHaveBeenCalled()
+    expect(close).toHaveBeenCalled()
+  })
+
   it('separates safe updates, protected customizations, and explicit conflict choices', async () => {
     render(<WorkspaceTemplateUpgradePanel wsId="chat-old" onWorkspaceChanged={vi.fn()} onClose={vi.fn()} />)
 
@@ -143,6 +155,6 @@ describe('WorkspaceTemplateUpgradePanel', () => {
     render(<WorkspaceTemplateUpgradePanel wsId="chat-old" onWorkspaceChanged={vi.fn()} onClose={vi.fn()} />)
 
     expect(await screen.findByText('Prepare this Workspace before applying')).toBeTruthy()
-    expect(screen.getByText(/p1.*pi.*WebPi/i)).toBeTruthy()
+    expect(screen.getByText(/p1.*pi.*Web/i)).toBeTruthy()
   })
 })

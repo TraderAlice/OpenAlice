@@ -1,0 +1,63 @@
+import { pathToFileURL } from 'node:url';
+
+import { exec as bundledGitExec } from './git-execution.js';
+
+export const INTERNAL_BOOTSTRAP_ROLE = '--openalice-internal-bootstrap';
+
+export interface BootstrapInvocation {
+  readonly command: string;
+  readonly args: string[];
+}
+
+/**
+ * A Bun-compiled executable cannot interpret an external `.mjs` file merely
+ * by re-executing `process.execPath`: that path is Alice itself. Re-enter the
+ * same executable through a private role so the embedded Bun runtime imports
+ * the bootstrap without requiring a system Node or Bun installation. Packaged
+ * Electron also re-enters Alice: its physical templates cannot resolve the
+ * dependencies inside app.asar through normal parent-directory lookup.
+ */
+export function resolveMjsBootstrapInvocation(
+  script: string,
+  args: readonly string[],
+): BootstrapInvocation {
+  const standalone = (
+    globalThis as { __OPENALICE_BUN_STANDALONE__?: boolean }
+  ).__OPENALICE_BUN_STANDALONE__ === true;
+  const archivedEntry = process.versions.electron && process.argv[1]?.replaceAll('\\', '/').includes('/app.asar/')
+    ? process.argv[1]
+    : null;
+  return {
+    command: process.execPath,
+    args: standalone
+      ? [INTERNAL_BOOTSTRAP_ROLE, script, ...args]
+      : archivedEntry
+        ? [archivedEntry, INTERNAL_BOOTSTRAP_ROLE, script, ...args]
+        : [script, ...args],
+  };
+}
+
+/** Execute one external bootstrap with the launcher-owned Git implementation. */
+export async function runInternalBootstrapRole(
+  argv: readonly string[] = process.argv,
+): Promise<boolean> {
+  const roleIndex = argv.indexOf(INTERNAL_BOOTSTRAP_ROLE);
+  if (roleIndex < 0) return false;
+
+  const script = argv[roleIndex + 1];
+  if (!script?.endsWith('.mjs')) {
+    throw new Error(`${INTERNAL_BOOTSTRAP_ROLE} requires an .mjs script path`);
+  }
+  const scriptArgs = argv.slice(roleIndex + 2);
+  process.argv = [process.execPath, script, ...scriptArgs];
+  const runtimeGlobal = globalThis as typeof globalThis & {
+    __OPENALICE_BOOTSTRAP_GIT_EXEC__?: typeof bundledGitExec;
+  };
+  runtimeGlobal.__OPENALICE_BOOTSTRAP_GIT_EXEC__ = bundledGitExec;
+  try {
+    await import(pathToFileURL(script).href);
+  } finally {
+    delete runtimeGlobal.__OPENALICE_BOOTSTRAP_GIT_EXEC__;
+  }
+  return true;
+}

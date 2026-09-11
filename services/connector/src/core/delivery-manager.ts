@@ -1,3 +1,5 @@
+import { parseReplyDirectives, replyMedia } from './reply-directives.js'
+import type { ConnectorAttachment } from '@traderalice/connector-protocol'
 import { randomUUID } from 'node:crypto'
 import {
   CONNECTOR_ACTION_TTL_MS,
@@ -5,9 +7,10 @@ import {
   connectorArtifactDeliverySchema,
   connectorArtifactFailureSchema,
   connectorArtifactRequestSchema,
-  artifactFailureMessage,
+  connectorUtaFailureSchema,
+  connectorUtaPresentationSchema,
+  connectorUtaRequestSchema,
   inboundOwnerMessageSchema,
-  isConnectorActionExpired,
   isInboxPushEnabled,
   type ConnectorAdapterConfig,
   type ConnectorAdapterHealth,
@@ -17,6 +20,9 @@ import {
   type ConnectorConfig,
   type ConnectorDeliveryReceipt,
   type ConnectorServiceHealth,
+  type ConnectorUtaFailure,
+  type ConnectorUtaPresentation,
+  type ConnectorUtaRequest,
   type InboxNotification,
   type InboundOwnerMessage,
   type OwnerChatMessage,
@@ -32,13 +38,22 @@ import {
   type ConnectorIOEventInput,
   type ConnectorIORecorder,
 } from './io-events.js'
+import {
+  ConnectorWorkQueue,
+  type ConnectorWorkClaim,
+  type ConnectorWorkQueueStore,
+} from './work-queue.js'
 
 export interface DeliveryManagerOptions {
+  readWorkspaceFile?(workspaceId: string, path: string): Promise<ConnectorAttachment>
   registry: ConnectorRegistry
   config: ConnectorConfig
   updateAdapterSettings(id: string, patch: Record<string, string | number | boolean>): Promise<void>
   startedAt?: string
   recorder?: ConnectorIORecorder
+  /** First retry delay after a transient adapter start failure. Doubles each attempt up to 60s. */
+  adapterStartRetryDelayMs?: number
+  workQueue?: ConnectorWorkQueueStore
 }
 
 /**
@@ -47,17 +62,23 @@ export interface DeliveryManagerOptions {
  * durable notification and performs external delivery after returning.
  */
 export const MAX_INBOUND_OWNER_MESSAGES = 100
+export const DEFAULT_ADAPTER_START_RETRY_DELAY_MS = 5_000
+const MAX_ADAPTER_START_RETRY_DELAY_MS = 60_000
 
 export class DeliveryManager {
+  private readonly replyDeliveries = new Map<string, Promise<void>>()
+  private readonly replyQueues = new Map<string, Promise<void>>()
   private readonly adapters = new Map<string, ConnectorAdapter>()
   private readonly commands = new Map<string, CommandRegistry>()
-  private readonly inbound: InboundOwnerMessage[] = []
-  private readonly actions: ConnectorArtifactRequest[] = []
+  private readonly bootRetries = new Map<string, ReturnType<typeof setTimeout>>()
+  private readonly reconnects = new Map<string, Promise<ConnectorAdapterHealth>>()
   private readonly startedAt: string
   private stopped = false
+  private readonly workQueue: ConnectorWorkQueueStore
 
   constructor(private readonly options: DeliveryManagerOptions) {
     this.startedAt = options.startedAt ?? new Date().toISOString()
+    this.workQueue = options.workQueue ?? new ConnectorWorkQueue()
   }
 
   /**
@@ -77,7 +98,7 @@ export class DeliveryManager {
     for (const [id, config] of Object.entries(this.options.config.adapters)) {
       if (!config.enabled || !this.adapters.has(id)) continue
       await this.bootAdapter(id, config).catch((error) => {
-        console.warn(`[connector] ${id} failed to start:`, error instanceof Error ? error.message : error)
+        this.handleAdapterStartFailure(id, config, error, 0)
       })
     }
   }
@@ -129,38 +150,73 @@ export class DeliveryManager {
     return probeId
   }
 
-  acceptInbound(input: InboundOwnerMessage): void {
+  async reconnect(id: string): Promise<ConnectorAdapterHealth> {
+    const config = this.options.config.adapters[id]
+    if (!config?.enabled) throw new Error(`Connector is not enabled: ${id}`)
+    return this.reconcile(id, config)
+  }
+
+  async reconcile(id: string, config: ConnectorAdapterConfig): Promise<ConnectorAdapterHealth> {
+    const active = this.reconnects.get(id)
+    if (active) return active
+    const operation = this.reconcileAdapter(id, config)
+    this.reconnects.set(id, operation)
+    try {
+      return await operation
+    } finally {
+      if (this.reconnects.get(id) === operation) this.reconnects.delete(id)
+    }
+  }
+
+  private async reconcileAdapter(id: string, config: ConnectorAdapterConfig): Promise<ConnectorAdapterHealth> {
+    if (!this.options.registry.has(id)) throw new Error(`Unknown connector adapter: ${id}`)
+    this.clearAdapterStartRetry(id)
+    const previous = this.adapters.get(id)
+    try {
+      if (previous) await previous.stop()
+    } finally {
+      this.adapters.delete(id)
+      this.commands.delete(id)
+    }
+    this.options.config.adapters[id] = {
+      enabled: config.enabled,
+      settings: { ...config.settings },
+    }
+    if (!config.enabled) {
+      return { id, enabled: false, status: 'disabled' }
+    }
+    this.installAdapter(id)
+    try {
+      await this.bootAdapter(id, config)
+    } catch (error) {
+      this.handleAdapterStartFailure(id, config, error, 0)
+      throw error
+    }
+    return this.adapters.get(id)!.health()
+  }
+
+  async acceptInbound(input: InboundOwnerMessage): Promise<void> {
     const parsed = inboundOwnerMessageSchema.safeParse(input)
     if (!parsed.success) return
-    this.inbound.push(parsed.data)
-    const overflow = this.inbound.length - MAX_INBOUND_OWNER_MESSAGES
-    if (overflow > 0) this.inbound.splice(0, overflow)
+    const id = parsed.data.eventId
+      ? `in-${parsed.data.connectorId}-${parsed.data.eventId}`
+      : `in-${randomUUID()}`
+    await this.workQueue.enqueue('inbound', id, parsed.data)
   }
 
-  drainInbound(limit = MAX_INBOUND_OWNER_MESSAGES): InboundOwnerMessage[] {
-    return this.inbound.splice(0, Math.max(0, limit))
+  claimInbound(limit = MAX_INBOUND_OWNER_MESSAGES): Promise<ConnectorWorkClaim<InboundOwnerMessage>> {
+    return this.workQueue.claim('inbound', limit)
   }
 
-  enqueueArtifactRequest(connectorId: string, input: { entryId: string; docIndex: number }): string {
-    const expired = this.expireActions()
-    for (const request of expired) {
-      void this.failArtifact({
-        requestId: request.requestId,
-        connectorId: request.connectorId,
-        entryId: request.entryId,
-        docIndex: request.docIndex,
-        reason: 'expired',
-        message: artifactFailureMessage('expired'),
-      }).catch((error) => {
-        console.warn(
-          `[connector] ${request.connectorId} expired file-request notify failed:`,
-          error instanceof Error ? error.message : error,
-        )
-      })
-    }
-    if (this.actions.length >= MAX_CONNECTOR_ACTION_REQUESTS) {
-      throw new Error('Too many pending file requests. Try again in a moment.')
-    }
+  ackInbound(claimId: string, itemIds: readonly string[]): Promise<void> {
+    return this.workQueue.ack(claimId, itemIds)
+  }
+
+  releaseInbound(claimId: string, itemIds: readonly string[]): Promise<void> {
+    return this.workQueue.release(claimId, itemIds)
+  }
+
+  async enqueueArtifactRequest(connectorId: string, input: { entryId: string; docIndex: number }): Promise<string> {
     const request = connectorArtifactRequestSchema.parse({
       requestId: `art-${randomUUID()}`,
       connectorId,
@@ -168,8 +224,8 @@ export class DeliveryManager {
       docIndex: input.docIndex,
       createdAt: new Date().toISOString(),
     })
-    this.actions.push(request)
-    void this.record({
+    await this.workQueue.enqueue('artifact', request.requestId, request)
+    await this.record({
       correlationId: request.requestId,
       direction: 'inbound',
       stage: 'action.enqueued',
@@ -184,8 +240,109 @@ export class DeliveryManager {
     return request.requestId
   }
 
-  drainActions(limit = MAX_CONNECTOR_ACTION_REQUESTS): ConnectorArtifactRequest[] {
-    return this.actions.splice(0, Math.max(0, limit))
+  claimActions(limit = MAX_CONNECTOR_ACTION_REQUESTS): Promise<ConnectorWorkClaim<ConnectorArtifactRequest>> {
+    return this.workQueue.claim('artifact', limit)
+  }
+
+  async enqueueUtaRequest(connectorId: string, input: {
+    action: 'review' | 'push' | 'reject'
+    utaId?: string
+    pendingHash?: string
+  }): Promise<string> {
+    const request = connectorUtaRequestSchema.parse({
+      requestId: `uta-${randomUUID()}`,
+      connectorId,
+      createdAt: new Date().toISOString(),
+      action: input.action,
+      ...(input.utaId ? { utaId: input.utaId } : {}),
+      ...(input.pendingHash ? { pendingHash: input.pendingHash } : {}),
+    })
+    await this.workQueue.enqueue('uta', request.requestId, request)
+    await this.record({
+      correlationId: request.requestId,
+      direction: 'inbound',
+      stage: 'action.enqueued',
+      connectorId,
+      payload: {
+        kind: 'uta',
+        requestId: request.requestId,
+        action: request.action,
+        utaId: request.utaId,
+        ttlMs: CONNECTOR_ACTION_TTL_MS,
+      },
+    })
+    return request.requestId
+  }
+
+  claimUtaActions(limit = MAX_CONNECTOR_ACTION_REQUESTS): Promise<ConnectorWorkClaim<ConnectorUtaRequest>> {
+    return this.workQueue.claim('uta', limit)
+  }
+
+  ackActions(claimId: string, itemIds: readonly string[]): Promise<void> {
+    return this.workQueue.ack(claimId, itemIds)
+  }
+
+  releaseActions(claimId: string, itemIds: readonly string[]): Promise<void> {
+    return this.workQueue.release(claimId, itemIds)
+  }
+
+  async presentUta(presentation: ConnectorUtaPresentation): Promise<void> {
+    const parsed = connectorUtaPresentationSchema.parse(presentation)
+    const adapter = this.adapters.get(parsed.connectorId)
+    if (!adapter) throw new Error(`Connector is not running: ${parsed.connectorId}`)
+    await this.record({
+      correlationId: parsed.requestId,
+      direction: 'outbound',
+      stage: 'delivery.attempted',
+      connectorId: adapter.id,
+      payload: {
+        kind: 'uta',
+        requestId: parsed.requestId,
+        accountCount: parsed.review.accounts.length,
+        result: parsed.result?.kind,
+      },
+    })
+    try {
+      if (adapter.presentUta) await adapter.presentUta(parsed)
+      else {
+        const waiting = parsed.review.accounts.filter((account) => account.pendingMessage).length
+        await adapter.sendOwnerText(
+          parsed.result?.message
+          ?? parsed.review.unavailable
+          ?? (waiting > 0
+            ? `UTA: ${waiting} account${waiting === 1 ? '' : 's'} waiting for approval. Open /uta in Telegram or Trading as Git in OpenAlice.`
+            : 'UTA: nothing waiting for approval.'),
+        )
+      }
+      await this.record({
+        correlationId: parsed.requestId,
+        direction: 'outbound',
+        stage: 'delivery.succeeded',
+        connectorId: adapter.id,
+        payload: { kind: 'uta', requestId: parsed.requestId },
+      })
+    } catch (error) {
+      await this.record({
+        correlationId: parsed.requestId,
+        direction: 'outbound',
+        stage: 'delivery.failed',
+        connectorId: adapter.id,
+        payload: {
+          kind: 'uta',
+          requestId: parsed.requestId,
+          error: error instanceof Error ? error.message : String(error),
+        },
+      })
+      throw error
+    }
+  }
+
+  async failUta(failure: ConnectorUtaFailure): Promise<void> {
+    const parsed = connectorUtaFailureSchema.parse(failure)
+    const adapter = this.adapters.get(parsed.connectorId)
+    if (!adapter) throw new Error(`Connector is not running: ${parsed.connectorId}`)
+    if (adapter.failUta) await adapter.failUta(parsed)
+    else await adapter.sendOwnerText(parsed.message)
   }
 
   async deliverArtifact(delivery: ConnectorArtifactDelivery): Promise<void> {
@@ -254,6 +411,22 @@ export class DeliveryManager {
   }
 
   async sendOwnerChat(message: OwnerChatMessage, correlationId = message.id): Promise<void> {
+    const key = `${message.adapterId}:${message.id}:${message.phase}`
+    const existing = this.replyDeliveries.get(key)
+    if (existing) return existing
+    const queueKey = `${message.adapterId}:${message.conversationId}`
+    const operation = (this.replyQueues.get(queueKey) ?? Promise.resolve()).catch(() => undefined)
+      .then(() => this.deliverOwnerChat(message, correlationId))
+    this.replyDeliveries.set(key, operation)
+    this.replyQueues.set(queueKey, operation)
+    try { await operation } finally {
+      if (this.replyQueues.get(queueKey) === operation) this.replyQueues.delete(queueKey)
+      // Retain completed IDs, including uncertain network failures, to avoid duplicate uploads.
+      if (this.replyDeliveries.size > 1000) this.replyDeliveries.delete(this.replyDeliveries.keys().next().value!)
+    }
+  }
+
+  private async deliverOwnerChat(message: OwnerChatMessage, correlationId: string): Promise<void> {
     const adapter = this.adapters.get(message.adapterId)
     if (!adapter) throw new Error(`Connector is not running: ${message.adapterId}`)
     await this.record({
@@ -261,16 +434,78 @@ export class DeliveryManager {
       direction: 'outbound',
       stage: 'delivery.attempted',
       connectorId: adapter.id,
-      payload: { kind: 'owner-chat', textLength: message.text.length },
+      payload: {
+        kind: 'owner-chat',
+        phase: message.phase,
+        conversationId: message.conversationId,
+        textLength: message.text?.length ?? 0,
+      },
     })
     try {
-      await adapter.sendOwnerText(message.text)
+      const parsed = parseReplyDirectives(message.text ?? '')
+      const silent = message.source === 'automation' && parsed.silent
+      const resolved = new Map<string, ConnectorAttachment>()
+      if (!silent && message.phase === 'final' && message.workspaceId && this.options.readWorkspaceFile && adapter.sendOwnerFile) {
+        for (const path of [...new Set(parsed.references.map(reference => reference.path))].slice(0, 20)) {
+          if (resolved.size >= 5) break
+          try {
+            resolved.set(path, await this.options.readWorkspaceFile(message.workspaceId, path))
+          } catch {
+            // A reference can be a discussion of a nonexistent path. Keep it literal.
+          }
+        }
+      }
+      const parts: Array<{ text: string } | { path: string; attachment: ConnectorAttachment }> = []
+      let cursor = 0
+      const sent = new Set<string>()
+      const raw = silent ? '' : message.text ?? ''
+      for (const reference of parsed.references) {
+        const attachment = resolved.get(reference.path)
+        if (!attachment) continue
+        const text = raw.slice(cursor, reference.start).trim()
+        if (text) parts.push({ text })
+        if (!sent.has(reference.path)) {
+          parts.push({ path: reference.path, attachment })
+          sent.add(reference.path)
+        }
+        cursor = reference.end
+      }
+      const tail = raw.slice(cursor).trim()
+      if (tail) parts.push({ text: tail })
+      // Finish the transport's live reply once, then preserve the remaining media/text order.
+      const first = parts[0]
+      const text = first && 'text' in first ? first.text : ''
+      if (text) parts.shift()
+      if (!silent || message.phase !== 'progress') {
+        if (adapter.sendOwnerChat) await adapter.sendOwnerChat({ ...message, text: text || undefined })
+        else if (message.phase !== 'accepted' && text) await adapter.sendOwnerText(text)
+      }
+      for (const part of parts) {
+        if ('text' in part) {
+          await adapter.sendOwnerText(part.text)
+          continue
+        }
+        const { path, attachment } = part
+        try {
+          const presentation = replyMedia(path)
+          await adapter.sendOwnerFile!(attachment, presentation)
+          await this.record({
+            correlationId, direction: 'outbound', stage: 'delivery.succeeded', connectorId: adapter.id,
+            payload: { kind: 'reply-file', presentation, filename: attachment.filename, mediaType: attachment.mediaType,
+              sizeBytes: attachment.sizeBytes, contentSha256: attachment.contentSha256 },
+          })
+        } catch {
+          await this.record({ correlationId, direction: 'outbound', stage: 'delivery.failed', connectorId: adapter.id,
+            payload: { kind: 'reply-file', path, reason: 'upload-failed' } })
+          await adapter.sendOwnerText(`Could not send file: ${path}. Upload failed; please try again.`)
+        }
+      }
       await this.record({
         correlationId,
         direction: 'outbound',
         stage: 'delivery.succeeded',
         connectorId: adapter.id,
-        payload: { kind: 'owner-chat' },
+        payload: { kind: 'owner-chat', phase: message.phase, conversationId: message.conversationId },
       })
     } catch (error) {
       await this.record({
@@ -278,7 +513,12 @@ export class DeliveryManager {
         direction: 'outbound',
         stage: 'delivery.failed',
         connectorId: adapter.id,
-        payload: { kind: 'owner-chat', error: error instanceof Error ? error.message : String(error) },
+        payload: {
+          kind: 'owner-chat',
+          phase: message.phase,
+          conversationId: message.conversationId,
+          error: error instanceof Error ? error.message : String(error),
+        },
       })
       throw error
     }
@@ -304,6 +544,7 @@ export class DeliveryManager {
 
   async stop(): Promise<void> {
     this.stopped = true
+    for (const id of [...this.bootRetries.keys()]) this.clearAdapterStartRetry(id)
     await Promise.allSettled([...this.adapters.values()].map((adapter) => adapter.stop()))
     this.adapters.clear()
     this.commands.clear()
@@ -332,18 +573,57 @@ export class DeliveryManager {
       getServiceStatus: () => this.health().status,
       sendTest: (connectorId) => this.sendTest(connectorId),
       forwardOwnerText: async (input) => {
-        this.acceptInbound({
+        await this.acceptInbound({
           connectorId: id,
           userId: input.userId,
           text: input.text,
           ...(input.chatId ? { chatId: input.chatId } : {}),
+          ...(input.eventId ? { eventId: input.eventId } : {}),
         })
       },
       enqueueArtifactRequest: (input) => this.enqueueArtifactRequest(id, input),
+      enqueueUtaRequest: (input) => this.enqueueUtaRequest(id, input),
     }
     // Keep a failed adapter registered. start() may record a useful degraded
     // reason; dropping it here reduced Settings to "configured but not running".
     await adapter.start(config, context)
+  }
+
+  private handleAdapterStartFailure(
+    id: string,
+    config: ConnectorAdapterConfig,
+    error: unknown,
+    attempt: number,
+  ): void {
+    console.warn(`[connector] ${id} failed to start:`, error instanceof Error ? error.message : error)
+    const adapter = this.adapters.get(id)
+    if (adapter?.classifyStartFailure?.(error) !== 'retry') return
+    this.scheduleAdapterStartRetry(id, config, attempt)
+  }
+
+  private scheduleAdapterStartRetry(id: string, config: ConnectorAdapterConfig, attempt: number): void {
+    if (this.stopped) return
+    this.clearAdapterStartRetry(id)
+    const base = this.options.adapterStartRetryDelayMs ?? DEFAULT_ADAPTER_START_RETRY_DELAY_MS
+    const delayMs = Math.min(base * 2 ** attempt, MAX_ADAPTER_START_RETRY_DELAY_MS)
+    console.warn(`[connector] ${id} will retry start in ${delayMs}ms`)
+    const timer = setTimeout(() => {
+      this.bootRetries.delete(id)
+      if (this.stopped) return
+      const current = this.options.config.adapters[id]
+      if (!current?.enabled) return
+      void this.bootAdapter(id, current).catch((error) => {
+        this.handleAdapterStartFailure(id, current, error, attempt + 1)
+      })
+    }, delayMs)
+    timer.unref?.()
+    this.bootRetries.set(id, timer)
+  }
+
+  private clearAdapterStartRetry(id: string): void {
+    const timer = this.bootRetries.get(id)
+    if (timer) clearTimeout(timer)
+    this.bootRetries.delete(id)
   }
 
   private get recorder(): ConnectorIORecorder {
@@ -381,18 +661,6 @@ export class DeliveryManager {
       })
       throw error
     }
-  }
-
-  private expireActions(now = Date.now()): ConnectorArtifactRequest[] {
-    const expired: ConnectorArtifactRequest[] = []
-    for (let index = this.actions.length - 1; index >= 0; index -= 1) {
-      const request = this.actions[index]
-      if (!request || isConnectorActionExpired(request.createdAt, now)) {
-        if (request) expired.push(request)
-        this.actions.splice(index, 1)
-      }
-    }
-    return expired
   }
 
   private async record(event: ConnectorIOEventInput): Promise<void> {

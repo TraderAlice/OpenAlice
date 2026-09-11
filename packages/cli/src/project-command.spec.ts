@@ -1,11 +1,15 @@
-import { mkdtemp, mkdir, writeFile } from 'node:fs/promises'
+import { mkdtemp, mkdir, readFile, realpath, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { Readable, Writable } from 'node:stream'
 
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { AI_PROVIDER_FILE_REL } from './ai-credential-copy.ts'
+import { writeAliceProjectProductStamp } from './alice-project-product.ts'
 import { formatProjectHelp, runProjectCommand } from './project-command.ts'
+import { planProjectTransfer } from './project-transfer.ts'
+import { writeProjectTransferStream } from './project-transfer-stream.ts'
 import {
   createSupervisorAliceProject,
   persistMachineLaunchConfig,
@@ -104,9 +108,187 @@ describe('openalice project', () => {
     })).rejects.toMatchObject({ code: 'EUSAGE' })
   })
 
+  it('prints a blocked transfer plan without stopping a running source', async () => {
+    const env = await setupProjects()
+    const stdout: string[] = []
+    const stop = vi.fn()
+    const send = vi.fn()
+    const code = await runProjectCommand([
+      'transfer',
+      '--from', 'default',
+      '--to-machine', 'cloud',
+      '--to-project', 'remote-copy',
+      '--to-home', '/srv/openalice/remote-copy',
+      '--session-owner-policy', 'keep-blocked',
+      '--plan',
+      '--json',
+    ], transferIo(env, {
+      stdout: { write: (chunk: string) => { stdout.push(chunk) } },
+      inspectSourceRuntime: async () => ({ class: 'running', owner: { surface: 'cli-server' } }),
+      stopSourceRuntime: stop,
+      sendTransfer: send,
+    }))
+    expect(code).toBe(1)
+    const result = JSON.parse(stdout.join('')) as { plan: { blockers: Array<{ code: string }> } }
+    expect(result.plan.blockers).toContainEqual(expect.objectContaining({ code: 'ESOURCERUNNING' }))
+    expect(stop).not.toHaveBeenCalled()
+    expect(send).not.toHaveBeenCalled()
+  })
+
+  it('requires and honors separate source-stop authority before transfer apply', async () => {
+    const env = await setupProjects()
+    const inspectSource = vi.fn()
+      .mockResolvedValueOnce({ class: 'running', owner: { surface: 'cli-server' } })
+      .mockResolvedValue({ class: 'absent', owner: null })
+    const stop = vi.fn(async () => undefined)
+    const send = vi.fn(async ({ plan }) => receipt(plan.transferId, plan.destination.home))
+    const stdout: string[] = []
+    await expect(runProjectCommand([
+      'transfer',
+      '--from', 'default',
+      '--to-machine', 'cloud',
+      '--to-project', 'remote-copy',
+      '--to-home', '/srv/openalice/remote-copy',
+      '--session-owner-policy', 'keep-blocked',
+      '--yes',
+      '--stop-source',
+    ], transferIo(env, {
+      stdout: { write: (chunk: string) => { stdout.push(chunk) } },
+      inspectSourceRuntime: inspectSource,
+      stopSourceRuntime: stop,
+      sendTransfer: send,
+    }))).resolves.toBe(0)
+    expect(stop).toHaveBeenCalledWith(env.defaultHome)
+    expect(send).toHaveBeenCalledOnce()
+    expect(stdout.join('')).toContain('AliceProject transfer complete')
+    expect(stdout.join('')).toContain('Sessions imported: 0')
+  })
+
+  it('refuses to stop a foreign source owner', async () => {
+    const env = await setupProjects()
+    const stop = vi.fn()
+    await expect(runProjectCommand([
+      'transfer',
+      '--from', 'default',
+      '--to-machine', 'cloud',
+      '--to-project', 'remote-copy',
+      '--to-home', '/srv/openalice/remote-copy',
+      '--session-owner-policy', 'keep-blocked',
+      '--yes',
+      '--stop-source',
+    ], transferIo(env, {
+      inspectSourceRuntime: async () => ({ class: 'running', owner: { surface: 'electron' } }),
+      stopSourceRuntime: stop,
+    }))).rejects.toThrow('owned by electron')
+    expect(stop).not.toHaveBeenCalled()
+  })
+
+  it('re-probes and refuses a destination collision introduced after consent', async () => {
+    const env = await setupProjects()
+    const inspectMachine = vi.fn()
+      .mockResolvedValueOnce(remoteInventory())
+      .mockResolvedValueOnce(remoteInventory([{
+        key: 'remote-copy',
+        home: '/srv/openalice/another-home',
+      }]))
+    const send = vi.fn()
+    await expect(runProjectCommand([
+      'transfer',
+      '--from', 'default',
+      '--to-machine', 'cloud',
+      '--to-project', 'remote-copy',
+      '--to-home', '/srv/openalice/remote-copy',
+      '--session-owner-policy', 'keep-blocked',
+      '--yes',
+    ], transferIo(env, {
+      inspectMachine,
+      sendTransfer: send,
+      stdout: { write: () => undefined },
+    })))
+      .rejects.toThrow('Destination changed after planning')
+    expect(send).not.toHaveBeenCalled()
+  })
+
+  it('dispatches the private receive endpoint without exposing another parser', async () => {
+    const stdout: string[] = []
+    await expect(runProjectCommand(['transfer-receive'], {
+      stdout: { write: (chunk) => { stdout.push(chunk) } },
+      receiveTransfer: async () => receipt('transfer-receive', '/srv/openalice/received'),
+    })).resolves.toBe(0)
+    expect(JSON.parse(stdout.join(''))).toMatchObject({ transferId: 'transfer-receive' })
+  })
+
+  it('receives a real stream into the Supervisor registry without changing the default', async () => {
+    const env = await setupProjects()
+    await persistSelectedSupervisorAliceProject(env.context, 'office')
+    const transferRoot = await realpath(env.root)
+    const source = join(transferRoot, 'transfer-source')
+    const destination = join(transferRoot, 'received-home')
+    await mkdir(source)
+    await writeAliceProjectProductStamp(source, 'nano')
+    await writeFile(join(source, 'portable.txt'), 'portable project\n')
+    const sourceSummary = {
+      id: 'alice-project-transfer-source',
+      key: 'source',
+      displayName: 'Source',
+      home: source,
+      port: 47331,
+      portAutomatic: true,
+      isDefault: false,
+    }
+    const plan = await planProjectTransfer({
+      source: sourceSummary,
+      destinationMachineKey: 'cloud',
+      destinationProjectKey: 'remote-copy',
+      destinationDisplayName: 'Remote Copy',
+      destinationHome: destination,
+      scheduledIssues: 'keep-blocked',
+      credentials: 'omit',
+    })
+    const stream = await serializeTransfer(plan)
+    const receiveIo = {
+      supervisorRoot: env.context.supervisorRoot,
+      transferSource: Readable.from(stream),
+      stdout: { write: () => undefined },
+    }
+
+    await expect(runProjectCommand(['transfer-receive'], receiveIo)).resolves.toBe(0)
+    const registered = JSON.parse(await env.readConfig()) as {
+      defaultProject?: string
+      projects?: Record<string, { displayName?: string; home?: string; product?: string }>
+    }
+    expect(registered.defaultProject).toBe('office')
+    expect(registered.projects?.['remote-copy']).toMatchObject({
+      displayName: 'Remote Copy',
+      home: destination,
+      product: 'nano',
+    })
+    expect(await readFile(join(destination, 'portable.txt'), 'utf8')).toBe('portable project\n')
+
+    await expect(runProjectCommand(['transfer-receive'], {
+      ...receiveIo,
+      transferSource: Readable.from(stream),
+    })).resolves.toBe(0)
+
+    const conflictingPlan = await planProjectTransfer({
+      source: sourceSummary,
+      destinationMachineKey: 'cloud',
+      destinationProjectKey: 'remote-copy',
+      destinationDisplayName: 'Conflicting Copy',
+      destinationHome: join(transferRoot, 'conflicting-home'),
+      scheduledIssues: 'keep-blocked',
+      credentials: 'omit',
+    })
+    await expect(runProjectCommand(['transfer-receive'], {
+      ...receiveIo,
+      transferSource: Readable.from(await serializeTransfer(conflictingPlan)),
+    })).rejects.toThrow('already registered to another Home')
+  })
+
   it('documents the command surface', () => {
     expect(formatProjectHelp()).toContain('copy-ai-creds')
     expect(formatProjectHelp()).toContain('project use')
+    expect(formatProjectHelp()).toContain('project transfer')
   })
 })
 
@@ -129,6 +311,7 @@ async function setupProjects() {
   await persistSelectedSupervisorAliceProject(withHome, 'default', options)
   const ready = await resolveStoredLaunchContext({}, options)
   return {
+    root,
     context: ready,
     defaultHome,
     officeHome,
@@ -140,5 +323,132 @@ async function setupProjects() {
       const { readFile } = await import('node:fs/promises')
       return readFile(join(officeHome, AI_PROVIDER_FILE_REL), 'utf8')
     },
+  }
+}
+
+async function serializeTransfer(plan: Awaited<ReturnType<typeof planProjectTransfer>>): Promise<Buffer> {
+  const chunks: Buffer[] = []
+  const output = new Writable({
+    write(chunk, _encoding, callback) {
+      chunks.push(Buffer.from(chunk))
+      callback()
+    },
+  })
+  await writeProjectTransferStream({ plan, output })
+  return Buffer.concat(chunks)
+}
+
+function transferIo(
+  env: Awaited<ReturnType<typeof setupProjects>>,
+  overrides: Record<string, unknown> = {},
+) {
+  const source = {
+    id: 'alice-project-source',
+    key: 'default',
+    displayName: 'Default AliceProject',
+    home: env.defaultHome,
+    port: 47331,
+    portAutomatic: true,
+    isDefault: true,
+  }
+  return {
+    resolveContext: async () => env.context,
+    loadRegistry: async () => ({ defaultProject: 'default', projects: [source] }),
+    loadMachines: async () => ({
+      defaultMachine: 'local',
+      machines: [{
+        key: 'cloud',
+        displayName: 'Cloud',
+        sshTarget: 'alice@example.com',
+        isDefault: false,
+      }],
+    }),
+    inspectMachine: async () => remoteInventory(),
+    inspectSourceRuntime: async () => ({ class: 'absent', owner: null }),
+    planTransfer: async (input: { destinationHome: string; destinationProjectKey: string }) => ({
+      schemaVersion: 1 as const,
+      transferId: 'transfer-command',
+      generatedAt: '2026-08-23T00:00:00Z',
+      source: { projectId: source.id, key: source.key, displayName: source.displayName, home: source.home, product: 'trader' as const },
+      destination: {
+        machineKey: 'cloud',
+        projectId: 'alice-project-destination',
+        key: input.destinationProjectKey,
+        displayName: 'Remote Copy',
+        home: input.destinationHome,
+        requiredFreeBytes: 64 * 1024 * 1024,
+      },
+      policy: { credentials: 'include' as const, scheduledIssues: 'keep-blocked' as const },
+      portable: { entries: [], files: 0, directories: 0, symlinks: 0, bytes: 0 },
+      excluded: [],
+      credentials: {
+        ai: { count: 0, vendors: [] },
+        broker: { count: 0, presets: [] },
+        connector: { count: 0, adapters: [] },
+        providerKeys: { count: 0, vendors: [] },
+      },
+      scheduledIssues: [],
+      blockers: [],
+      readyToApply: true,
+    }),
+    ...overrides,
+  }
+}
+
+function remoteInventory(projects: Array<{ key: string; home: string }> = []) {
+  return {
+    key: 'cloud',
+    displayName: 'Cloud',
+    registered: true,
+    connection: 'online' as const,
+    sshTarget: 'alice@example.com',
+    platform: 'linux',
+    arch: 'x64',
+    hostname: 'cloud',
+    cliVersion: '0.90.0-beta',
+    defaultProject: 'default',
+    projects: projects.map((project) => ({
+      id: `alice-project-${project.key}-test`,
+      key: project.key,
+      displayName: project.key,
+      home: project.home,
+      product: 'trader' as const,
+      port: 47331,
+      portAutomatic: true,
+      isDefault: false,
+      available: true,
+      runtime: {
+        class: 'absent' as const,
+        state: 'absent',
+        ownerSurface: null,
+        uptimeSeconds: null,
+        webEndpoint: null,
+        components: {},
+      },
+    })),
+    capabilities: {
+      inspect: true,
+      lifecycle: true,
+      openTunnel: true,
+      transferReceive: true,
+      credentialReseal: true,
+    },
+    issue: null,
+  }
+}
+
+function receipt(transferId: string, destinationHome: string) {
+  return {
+    schemaVersion: 1 as const,
+    transferId,
+    sourceProjectId: 'alice-project-source',
+    destinationProjectId: 'alice-project-destination',
+    destinationHome,
+    files: 0,
+    bytes: 0,
+    manifestSha256: 'a'.repeat(64),
+    credentials: 'included' as const,
+    sessionsImported: 0 as const,
+    publishedAt: '2026-08-23T01:00:00Z',
   }
 }

@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { createMemoryInboxStore } from '../../core/inbox-store.js'
-import { processConnectorArtifactRequests } from './action-bridge.js'
+import { processConnectorArtifactClaims, processConnectorArtifactRequests } from './action-bridge.js'
 
 const tempDirs: string[] = []
 
@@ -12,6 +12,45 @@ afterEach(async () => {
 })
 
 describe('Connector action bridge', () => {
+  it('acks a completed claim and releases it when terminal delivery cannot be reported', async () => {
+    const store = createMemoryInboxStore()
+    const ackActions = vi.fn(async () => undefined)
+    const releaseActions = vi.fn(async () => undefined)
+    const base = {
+      isEnabled: async () => true,
+      drainActions: async () => [],
+      claimActions: async () => ({
+        claimId: 'claim-art',
+        items: [{
+          requestId: 'art-missing',
+          connectorId: 'telegram',
+          entryId: 'gone',
+          docIndex: 0,
+          createdAt: new Date().toISOString(),
+        }],
+      }),
+      ackActions,
+      releaseActions,
+      deliverArtifact: async () => undefined,
+      warn: vi.fn(),
+    }
+
+    await processConnectorArtifactClaims(store, {
+      ...base,
+      failArtifact: async () => undefined,
+    })
+    expect(ackActions).toHaveBeenCalledWith('claim-art', ['art-missing'])
+    expect(releaseActions).not.toHaveBeenCalled()
+
+    ackActions.mockClear()
+    await processConnectorArtifactClaims(store, {
+      ...base,
+      failArtifact: async () => { throw new Error('connector offline') },
+    })
+    expect(releaseActions).toHaveBeenCalledWith('claim-art', ['art-missing'])
+    expect(ackActions).not.toHaveBeenCalled()
+  })
+
   it('materializes the selected current file and delivers it only as an artifact', async () => {
     const root = await mkdtemp(join(tmpdir(), 'openalice-action-bridge-'))
     tempDirs.push(root)
@@ -20,8 +59,7 @@ describe('Connector action bridge', () => {
     const store = createMemoryInboxStore()
     const entry = await store.append({
       workspaceId: 'ws-1',
-      comments: 'See the report.',
-      docs: [{ path: 'research/close.md' }],
+      body: "See the report.\n\n[[research/close.md]]"
     })
     const markRead = vi.spyOn(store, 'markRead')
     const deliverArtifact = vi.fn(async () => undefined)
@@ -84,7 +122,10 @@ describe('Connector action bridge', () => {
 
   it('does not read a file after the request has expired', async () => {
     const store = createMemoryInboxStore()
-    const entry = await store.append({ workspaceId: 'ws-1', comments: 'later', docs: [{ path: 'a.md' }] })
+    const entry = await store.append({
+      workspaceId: 'ws-1',
+      body: "later\n\n[[a.md]]"
+    })
     const resolveWorkspace = vi.fn(() => ({ dir: '/tmp' }))
     const failArtifact = vi.fn(async () => undefined)
     await processConnectorArtifactRequests(store, {
@@ -113,8 +154,7 @@ describe('Connector action bridge', () => {
     const store = createMemoryInboxStore()
     const entry = await store.append({
       workspaceId: 'ws-1',
-      comments: 'file',
-      docs: [{ path: 'note.md' }],
+      body: "file\n\n[[note.md]]"
     })
     const failArtifact = vi.fn(async () => undefined)
     await processConnectorArtifactRequests(store, {

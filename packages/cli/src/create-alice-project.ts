@@ -1,3 +1,4 @@
+import { parseProjectWorkspaces, type ProjectWorkspace } from './project-workspaces.ts'
 /**
  * `openalice create alice-project` — interactive or scripted AliceProject birth.
  */
@@ -33,6 +34,7 @@ Options:
   --name <key>       Project key (lowercase, not "default")
   --home <path>      Complete OPENALICE_HOME for this project
   --product <kind>   trader (default) or nano
+  --workspaces <list> chat (default), auto-quant, auto-prediction; or none
   --yes              Non-interactive; requires --name and --home
 `
 }
@@ -42,6 +44,7 @@ export interface CreateAliceProjectOptions {
   home?: string
   product?: AliceProjectProduct
   yes?: boolean
+  workspaces?: ProjectWorkspace[]
 }
 
 export function parseCreateAliceProjectArgs(argv: string[]): CreateAliceProjectOptions {
@@ -50,6 +53,10 @@ export function parseCreateAliceProjectArgs(argv: string[]): CreateAliceProjectO
     const arg = argv[index]
     if (arg === '--yes' || arg === '-y') {
       options.yes = true
+      continue
+    }
+    if (arg === '--workspaces') {
+      options.workspaces = parseProjectWorkspaces(requireValue(argv, ++index, arg))
       continue
     }
     if (arg === '--name') {
@@ -115,6 +122,10 @@ export async function runCreateAliceProjectCommand(
       ?? (interactive ? await prompt(`Complete home [${suggestedHome}]: `) : suggestedHome)
   ).trim() || suggestedHome
 
+  const workspaces = options.workspaces ?? (interactive
+    ? parseProjectWorkspaces((await prompt('Workspaces: chat, auto-quant, auto-prediction, or none [chat]: ')).trim() || 'chat')
+    : ['chat'] as ProjectWorkspace[])
+
   if (interactive && !options.yes) {
     stdout.write(
       `Create AliceProject "${name}" as ${product === 'nano' ? 'NanoAlice' : 'TraderAlice'} at ${home}?\n`,
@@ -129,12 +140,14 @@ export async function runCreateAliceProjectCommand(
   const context = await (io.resolveContext ?? (() => resolveStoredLaunchContext({})))()
   await createSupervisorAliceProject(context, name, home, {
     product,
+    workspaces,
     homeDir: io.homeDir,
     cwd: home,
   })
   stdout.write(
     `Created AliceProject ${name} (${product === 'nano' ? 'NanoAlice' : 'TraderAlice'}).\n`
     + `Home: ${home}\n`
+    + `Workspaces: ${workspaces.join(', ') || 'none (set up later)'}. Prepared automatically on first start; no Agent is launched.\n`
     + `Selected as the next bare-start default. Start with: openalice up --project ${name}\n`,
   )
   return 0

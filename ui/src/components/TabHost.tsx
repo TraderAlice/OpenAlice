@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useWorkspace } from '../tabs/store'
 import { type Tab } from '../tabs/types'
-import { getView, getViewShell } from '../tabs/registry'
+import { getView, getViewShell, MarketArea } from '../tabs/registry'
 import { EmptyEditor } from './EmptyEditor'
 import { ChatPageShell } from '../pages/ChatPageShell'
 
@@ -70,7 +70,7 @@ function TabFrame({ tab, visible }: { tab: Tab; visible: boolean }) {
     <div
       data-view-frame={tab.spec.kind}
       data-view-visible={visible ? 'true' : 'false'}
-      className={`absolute inset-0 flex min-h-0 min-w-0 flex-col ${visible ? 'oa-view-enter' : ''}`}
+      className="absolute inset-0 flex min-h-0 min-w-0 flex-col"
       style={{
         visibility: visible ? 'visible' : 'hidden',
         pointerEvents: visible ? 'auto' : 'none',
@@ -81,10 +81,14 @@ function TabFrame({ tab, visible }: { tab: Tab; visible: boolean }) {
       // React 19 supports it as a JSX attribute.
       inert={!visible}
     >
-      {shell === 'chat' || shell === 'auto-quant' ? (
-        <ChatPageShell mode={shell === 'auto-quant' ? 'auto-quant' : 'chat'}>
+      {shell === 'chat' || shell === 'auto-quant' || shell === 'prediction' ? (
+        <ChatPageShell mode={shell} spec={tab.spec}>
           <Component key={tab.id} spec={tab.spec} visible={visible} />
         </ChatPageShell>
+      ) : shell === 'market' ? (
+        <MarketArea>
+          <Component key={tab.id} spec={tab.spec} visible={visible} />
+        </MarketArea>
       ) : (
         <Component key={tab.id} spec={tab.spec} visible={visible} />
       )}

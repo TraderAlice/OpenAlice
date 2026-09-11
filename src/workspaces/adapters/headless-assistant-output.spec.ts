@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import { claudeAdapter } from './claude.js';
 import { codexAdapter } from './codex.js';
+import { agyAdapter } from './agy.js';
 import { cursorAdapter } from './cursor.js';
 import { grokAdapter } from './grok.js';
 import { ompAdapter } from './omp.js';
@@ -53,6 +54,23 @@ describe('extractHeadlessAssistantText', () => {
     expect(opencodeAdapter.extractHeadlessAssistantText?.(line)).toBe(
       'Hello! How can I help you today?',
     );
+  });
+
+  it('agy: reads the terminal stream-json result.response only', () => {
+    const assistant = JSON.stringify({
+      event: 'step_update',
+      step_update: { step_type: 'agent_response', text_delta: 'Hello!' },
+    });
+    const result = JSON.stringify({
+      event: 'result',
+      result: {
+        conversation_id: 'c3b66b04-872b-4fbe-a3a4-058a026ef20a',
+        status: 'SUCCESS',
+        response: 'Done.',
+      },
+    });
+    expect(agyAdapter.extractHeadlessAssistantText?.(assistant)).toBeNull();
+    expect(agyAdapter.extractHeadlessAssistantText?.(result)).toBe('Done.');
   });
 
   it('cursor: reads the terminal stream-json result only', () => {
@@ -113,14 +131,14 @@ describe('extractHeadlessAssistantText', () => {
   });
 
   it('rejects malformed and unrelated output for every adapter', () => {
-    for (const adapter of [claudeAdapter, codexAdapter, cursorAdapter, grokAdapter, ompAdapter, opencodeAdapter, piAdapter]) {
+    for (const adapter of [claudeAdapter, codexAdapter, cursorAdapter, agyAdapter, grokAdapter, ompAdapter, opencodeAdapter, piAdapter]) {
       expect(adapter.extractHeadlessAssistantText?.('plain text noise')).toBeNull();
       expect(adapter.extractHeadlessAssistantText?.('{"type":"system"}')).toBeNull();
     }
   });
 
   it('every headless runtime declares a structured assistant decoder', () => {
-    for (const adapter of [claudeAdapter, codexAdapter, cursorAdapter, grokAdapter, ompAdapter, opencodeAdapter, piAdapter]) {
+    for (const adapter of [claudeAdapter, codexAdapter, cursorAdapter, agyAdapter, grokAdapter, ompAdapter, opencodeAdapter, piAdapter]) {
       expect(adapter.capabilities.headless).toBe(true);
       expect(typeof adapter.extractHeadlessAssistantText).toBe('function');
     }

@@ -31,6 +31,7 @@ import type { IssuePriority, IssueRecord, IssueStatus, IssueTimeout } from './de
 import type { IssueComment } from './comments.js'
 import type { IssueAutomationHealth } from './automation-health.js'
 import { issueRunFailure, type IssueRunFailure } from './run-failure.js'
+import type { PublicSessionRuntime } from '../public-session.js'
 
 /** One board row: the issue's display fields, plus — iff it self-schedules — its
  *  `when` and the scanner's firing markers. No markdown What (Phase 2 loads it). */
@@ -58,7 +59,9 @@ export interface IssuesSnapshotIssue {
   nextDueAtMs?: number | null
   /** Live scheduler/worker health; present iff the Issue has a schedule. */
   automationHealth?: IssueAutomationHealth
-  /** Present only on the Project Telegram phone-desk Issue. */
+  /** Adapter id when this row is that connector's phone-desk Issue. */
+  connectorDesk?: string
+  /** @deprecated Dual-read of the 0.89.4 Telegram-only flag. */
   telegramConnector?: true
   /** True iff this issue's NAME (title, case-insensitive) is also used by an
    *  issue in a DIFFERENT workspace. A name is a global team object, so a clash
@@ -130,7 +133,7 @@ export function annotateNameCollisions(workspaces: IssuesSnapshotWorkspace[]): s
 }
 
 // ==================== Flattened board rows (CLI / agent surface) ====================
-// The `alice-workspace issue list` (issue_list) agent surface wants the board as
+// The `alice issue list` (issue_list) agent surface wants the board as
 // ONE flat list of title rows tagged with their owning workspace — not the
 // per-workspace tree GET /api/issues returns. Each row keeps the snapshot's
 // display fields, replaces `when` with a plain `scheduled` boolean, and carries
@@ -261,13 +264,31 @@ export interface IssueDetailIssue {
   nextDueAtMs?: number | null
   /** Live scheduler/worker health; present iff the Issue has a schedule. */
   automationHealth?: IssueAutomationHealth
+  connectorDesk?: string
   telegramConnector?: true
+}
+
+/** Authoritative resolution of an Issue's exact @resume owner. Unlike a
+ * Workspace directory page, this lookup is global, uncapped, and tied to the
+ * detail read, so it cannot become stale while the Issue assignee advances. */
+export interface IssueAssigneeSession {
+  resumeId: string
+  state: 'ready' | 'missing' | 'retired' | 'deleted' | 'unbound' | 'workspace_missing'
+  workspace?: { id: string; tag: string }
+  agent?: string
+  displayName?: string
+  createdAt?: number
+  updatedAt?: number
+  active: boolean
+  runtime?: PublicSessionRuntime
 }
 
 /** GET /api/issues/:wsId/:id — one issue + its human-facing Activity timeline,
  *  operational run history, and the inbox reports it produced. */
 export interface IssueDetail {
   issue: IssueDetailIssue
+  /** Present when assignee is an exact @resume identity. */
+  assigneeSession?: IssueAssigneeSession
   /** Structured markdown comments loaded from the adjacent JSON sidecar. */
   comments: IssueComment[]
   /** This issue's headless runs (wsId + issueId match), newest first.
@@ -330,6 +351,7 @@ export interface IssueRunRecord {
   taskId: string
   resumeId: string
   parentTaskId?: string
+  retryOfTaskId?: string
   wsId: string
   issueId?: string
   agent: string
@@ -365,6 +387,7 @@ export function issueRunRecord(task: HeadlessTaskRecord, resumable: boolean): Is
     taskId: task.taskId,
     resumeId: task.resumeId,
     ...(task.parentTaskId ? { parentTaskId: task.parentTaskId } : {}),
+    ...(task.trigger?.retryOfTaskId ? { retryOfTaskId: task.trigger.retryOfTaskId } : {}),
     wsId: task.wsId,
     ...(task.trigger?.kind === 'issue' ? { issueId: task.trigger.issueId } : {}),
     agent: task.agent,
@@ -448,7 +471,7 @@ export function detailIssue(
     ...(issue.effort ? { effort: issue.effort } : {}),
     ...(issue.timeout ? { timeout: issue.timeout } : {}),
     ...(issue.commentPrompt ? { commentPrompt: issue.commentPrompt } : {}),
-    ...(issue.telegramConnector ? { telegramConnector: true as const } : {}),
+    ...(issue.connectorDesk ? { connectorDesk: issue.connectorDesk, telegramConnector: issue.connectorDesk === 'telegram' ? true as const : undefined } : {}),
     ...(markers ? {
       lastFiredAtMs: markers.lastFiredAtMs,
       nextDueAtMs: markers.nextDueAtMs,
@@ -476,7 +499,7 @@ export function snapshotBoardIssue(
     ...(issue.model ? { model: issue.model } : {}),
     ...(issue.effort ? { effort: issue.effort } : {}),
     ...(issue.timeout ? { timeout: issue.timeout } : {}),
-    ...(issue.telegramConnector ? { telegramConnector: true as const } : {}),
+    ...(issue.connectorDesk ? { connectorDesk: issue.connectorDesk, telegramConnector: issue.connectorDesk === 'telegram' ? true as const : undefined } : {}),
     ...(issue.when ? { when: issue.when } : {}),
     ...(markers ? {
       lastFiredAtMs: markers.lastFiredAtMs,

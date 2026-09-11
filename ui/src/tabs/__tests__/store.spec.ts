@@ -18,7 +18,7 @@ function resetStore() {
 beforeEach(resetStore)
 
 describe('Dev URL tabs', () => {
-  it('keeps product surfaces out of the internal Dev Panel', () => {
+  it('keeps product surfaces out of the internal Developer section', () => {
     expect(isDevTab('connectors')).toBe(false)
     expect(isDevTab('connector')).toBe(false)
     expect(isDevTab('tools')).toBe(true)
@@ -97,6 +97,19 @@ describe('openOrFocus', () => {
     const focused = getFocusedTab(useWorkspace.getState())
     expect(focused?.spec).toEqual({ kind: 'portfolio', params: {} })
     expect(group.activeTabId).toBe(group.tabIds[1])
+  })
+
+  it('keeps news selections in one tab while updating its URL params', () => {
+    const store = useWorkspace.getState()
+    store.openOrFocus({ kind: 'news', params: { category: 'us', view: 'important' } })
+    const newsId = getFocusedGroup(useWorkspace.getState())?.activeTabId
+    store.openOrFocus(tab('AAPL'))
+    store.openOrFocus({ kind: 'news', params: { category: 'macro' } })
+
+    const state = useWorkspace.getState()
+    expect(getFocusedGroup(state)?.tabIds).toHaveLength(2)
+    expect(getFocusedGroup(state)?.activeTabId).toBe(newsId)
+    expect(getFocusedTab(state)?.spec).toEqual({ kind: 'news', params: { category: 'macro' } })
   })
 
   it('updates Tracked selection without creating another Tracked tab', () => {
@@ -221,8 +234,8 @@ describe('setSidebar / toggleSidebar', () => {
   it('toggleSidebar to a different section switches without collapsing first', () => {
     const s = useWorkspace.getState()
     s.toggleSidebar('settings')
-    s.toggleSidebar('dev')
-    expect(useWorkspace.getState().selectedSidebar).toBe('dev')
+    s.toggleSidebar('chat')
+    expect(useWorkspace.getState().selectedSidebar).toBe('chat')
   })
 
   it('sidebar selection is independent of focused tab', () => {

@@ -157,7 +157,7 @@ describe('OrderEntryDialog sizing', () => {
     const placeOrder = setupPlaceOrder()
     const quantity = screen.getByPlaceholderText('0.001') as HTMLInputElement
     fireEvent.change(quantity, { target: { value: '1' } })
-    fireEvent.click(screen.getByRole('button', { name: '▸ Show advanced (cash qty, TIF)' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Show advanced' }))
     const cashQty = screen.getByPlaceholderText('50') as HTMLInputElement
     fireEvent.change(cashQty, { target: { value: '100' } })
 
@@ -174,7 +174,7 @@ describe('OrderEntryDialog sizing', () => {
 
   it('clears Cash Qty when Quantity becomes authoritative', async () => {
     const placeOrder = setupPlaceOrder()
-    fireEvent.click(screen.getByRole('button', { name: '▸ Show advanced (cash qty, TIF)' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Show advanced' }))
     const cashQty = screen.getByPlaceholderText('50') as HTMLInputElement
     fireEvent.change(cashQty, { target: { value: '100' } })
     const quantity = screen.getByPlaceholderText('0.001') as HTMLInputElement
@@ -193,7 +193,7 @@ describe('OrderEntryDialog sizing', () => {
 
   it('removes Cash Qty when switching to a Limit order', () => {
     setupPlaceOrder()
-    fireEvent.click(screen.getByRole('button', { name: '▸ Show advanced (cash qty, TIF)' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Show advanced' }))
     fireEvent.change(screen.getByPlaceholderText('50'), { target: { value: '100' } })
 
     fireEvent.click(screen.getByRole('button', { name: 'Limit' }))

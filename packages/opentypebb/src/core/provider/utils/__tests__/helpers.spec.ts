@@ -1,12 +1,4 @@
-/**
- * amakeRequest network-error classification.
- *
- * The point of these tests: when fetch fails at the network layer (DNS,
- * TLS, routing, refused), the helper must throw a NetworkUnreachableError
- * with a "do not retry" hint that surfaces verbatim to AI agents — NOT
- * the generic "Request failed (TypeError: fetch failed)" string that
- * looks indistinguishable from a transient flake.
- */
+/** Transport failures preserve diagnostic causes without assigning blame. */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { amakeRequest } from '../helpers.js'
@@ -28,7 +20,7 @@ describe('amakeRequest — network failure classification', () => {
     await expect(amakeRequest(URL_OK)).rejects.toThrowError(NetworkUnreachableError)
   })
 
-  it('the thrown error message contains NETWORK_UNREACHABLE + the host + a "do not retry" instruction', async () => {
+  it('preserves the host and error code without prescribing an agent workflow', async () => {
     fetchMock.mockRejectedValueOnce(new TypeError('fetch failed'))
     try {
       await amakeRequest(URL_OK)
@@ -37,7 +29,8 @@ describe('amakeRequest — network failure classification', () => {
       const err = e as Error
       expect(err.message).toMatch(/NETWORK_UNREACHABLE/)
       expect(err.message).toMatch(/api\.example\.com/)
-      expect(err.message.toLowerCase()).toMatch(/do not retry/i)
+      expect(err.message).toContain('no HTTP response')
+      expect(err.message).not.toMatch(/do not retry|ask the user|not a provider error/i)
     }
   })
 
@@ -53,6 +46,19 @@ describe('amakeRequest — network failure classification', () => {
       expect(err).toBeInstanceOf(NetworkUnreachableError)
       expect(err.message).toContain('ENOTFOUND')
     }
+  })
+
+  it('does not misdiagnose a remote socket closure as a proven local-network failure', async () => {
+    const cause = Object.assign(new Error('other side closed'), { code: 'UND_ERR_SOCKET' })
+    const wrapped = Object.assign(new TypeError('fetch failed'), { cause })
+    fetchMock.mockRejectedValueOnce(wrapped)
+    const error = await amakeRequest(URL_OK).catch(e => e)
+    expect(error).toBeInstanceOf(NetworkUnreachableError)
+    if (!(error instanceof NetworkUnreachableError)) throw new Error('Expected transport failure')
+    expect(error.original).toBe(wrapped)
+    expect(error.message).toContain('UND_ERR_SOCKET: other side closed')
+    expect(error.message).toContain('remote service closing the connection')
+    expect(error.message).toContain('does not identify which')
   })
 
   it('still uses generic OpenBBError for non-network failures (e.g. unhandled non-TypeError throws)', async () => {

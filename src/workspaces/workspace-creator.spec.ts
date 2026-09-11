@@ -15,6 +15,7 @@ import * as childProcess from 'node:child_process';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { orderCreateAdapters, resolveTemplateSource, runScript } from './workspace-creator.js';
+import { INTERNAL_BOOTSTRAP_ROLE } from './bootstrap-runtime.js';
 import type { TemplateMeta } from './template-registry.js';
 
 vi.mock('node:child_process', async (importOriginal) => ({
@@ -51,23 +52,23 @@ function setPlatform(value: NodeJS.Platform): void {
 }
 
 describe('orderCreateAdapters', () => {
-  const ALL = ['claude', 'codex', 'cursor', 'grok', 'omp', 'opencode', 'pi', 'shell'];
+  const ALL = ['claude', 'codex', 'cursor', 'agy', 'grok', 'omp', 'opencode', 'pi', 'shell'];
 
   it('uses template defaults only as a transient preparation order', () => {
     expect(orderCreateAdapters(['codex'], ALL)).toEqual([
-      'codex', 'claude', 'cursor', 'grok', 'omp', 'opencode', 'pi', 'shell',
+      'codex', 'claude', 'cursor', 'agy', 'grok', 'omp', 'opencode', 'pi', 'shell',
     ]);
   });
 
   it('first-wins dedupes when the head repeats a registered id', () => {
     expect(orderCreateAdapters(['pi', 'claude'], ALL)).toEqual([
-      'pi', 'claude', 'codex', 'cursor', 'grok', 'omp', 'opencode', 'shell',
+      'pi', 'claude', 'codex', 'cursor', 'agy', 'grok', 'omp', 'opencode', 'shell',
     ]);
   });
 
   it('keeps utility adapters behind agent runtimes', () => {
     expect(orderCreateAdapters(['shell', 'codex'], ALL)).toEqual([
-      'codex', 'claude', 'cursor', 'grok', 'omp', 'opencode', 'pi', 'shell',
+      'codex', 'claude', 'cursor', 'agy', 'grok', 'omp', 'opencode', 'pi', 'shell',
     ]);
   });
 
@@ -77,7 +78,7 @@ describe('orderCreateAdapters', () => {
 
   it('ignores stale template defaults that are not registered', () => {
     expect(orderCreateAdapters(['future-agent', 'codex'], ALL)).toEqual([
-      'codex', 'claude', 'cursor', 'grok', 'omp', 'opencode', 'pi', 'shell',
+      'codex', 'claude', 'cursor', 'agy', 'grok', 'omp', 'opencode', 'pi', 'shell',
     ]);
   });
 });
@@ -95,8 +96,9 @@ describe('resolveTemplateSource', () => {
     bundledSkills: [],
     source: {
       repository: 'https://github.com/TraderAlice/Auto-Quant-V2.git',
-      defaultVersion: 'v0.8.31',
+      defaultVersion: 'v0.9.31',
       versions: [
+        { version: 'v0.9.31', commit: 'adc6363a7af5a9105811735973d4d5cfac58cf36' },
         { version: 'v0.8.31', commit: '426d815b18450172fbcf4c6b6af77c6ae05a4967' },
         { version: 'v0.8.30', commit: 'cba95f8718e8396a3147a9cc5f5275cd44feae5f' },
         { version: 'v0.8.27', commit: '4bf9eb45763776ab5fc2e02829b804594fc377a3' },
@@ -106,8 +108,8 @@ describe('resolveTemplateSource', () => {
 
   it('uses the catalog default when the caller omits a version', () => {
     expect(resolveTemplateSource(template)).toEqual({
-      version: 'v0.8.31',
-      commit: '426d815b18450172fbcf4c6b6af77c6ae05a4967',
+      version: 'v0.9.31',
+      commit: 'adc6363a7af5a9105811735973d4d5cfac58cf36',
     });
   });
 
@@ -129,6 +131,7 @@ describe('runScript platform branching', () => {
   afterEach(() => {
     setPlatform(originalPlatform);
     mockSpawn.mockReset();
+    vi.unstubAllGlobals();
   });
 
   it('on macOS / Linux, spawns the script directly so kernel reads the shebang', async () => {
@@ -213,6 +216,48 @@ describe('runScript platform branching', () => {
       ['/tmp/foo/bootstrap.mjs', 't', '/out'],
       expect.objectContaining({ env: expect.objectContaining({ ELECTRON_RUN_AS_NODE: '1' }) }),
     );
+  });
+
+  it('a Bun standalone re-enters Alice through the internal bootstrap role', async () => {
+    setPlatform('darwin');
+    vi.stubGlobal('__OPENALICE_BUN_STANDALONE__', true);
+    const child = makeFakeChild();
+    mockSpawn.mockReturnValue(child as unknown as childProcess.ChildProcess);
+
+    const promise = runScript('/tmp/foo/bootstrap.mjs', ['t', '/out'], {}, 60_000);
+    child.emit('close', 0);
+    const res = await promise;
+
+    expect(res.ok).toBe(true);
+    expect(mockSpawn).toHaveBeenCalledWith(
+      process.execPath,
+      [INTERNAL_BOOTSTRAP_ROLE, '/tmp/foo/bootstrap.mjs', 't', '/out'],
+      expect.objectContaining({ env: expect.objectContaining({ ELECTRON_RUN_AS_NODE: '1' }) }),
+    );
+  });
+
+  it('an archived Electron backend supplies its Git executor to physical templates', async () => {
+    const originalArgv = process.argv;
+    const electronVersion = Object.getOwnPropertyDescriptor(process.versions, 'electron');
+    const entry = '/Applications/Open Alice.app/Contents/Resources/app.asar/dist/main.js';
+    try {
+      Object.defineProperty(process.versions, 'electron', { value: '39.8.10', configurable: true });
+      process.argv = [process.execPath, entry];
+      const child = makeFakeChild();
+      mockSpawn.mockReturnValue(child as unknown as childProcess.ChildProcess);
+      const promise = runScript('/tmp/中文 templates/bootstrap.mjs', ['t', '/out'], {}, 60_000);
+      child.emit('close', 0);
+      expect((await promise).ok).toBe(true);
+      expect(mockSpawn).toHaveBeenCalledWith(
+        process.execPath,
+        [entry, INTERNAL_BOOTSTRAP_ROLE, '/tmp/中文 templates/bootstrap.mjs', 't', '/out'],
+        expect.objectContaining({ env: expect.objectContaining({ ELECTRON_RUN_AS_NODE: '1' }) }),
+      );
+    } finally {
+      process.argv = originalArgv;
+      if (electronVersion) Object.defineProperty(process.versions, 'electron', electronVersion);
+      else Reflect.deleteProperty(process.versions, 'electron');
+    }
   });
 
   it('on win32, ENOENT spawn error surfaces a Git-for-Windows install hint', async () => {

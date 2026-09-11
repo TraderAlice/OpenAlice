@@ -1,0 +1,113 @@
+import { useEffect, useRef } from 'react'
+import { toast } from 'sonner'
+import { useTranslation } from 'react-i18next'
+
+import type { AgentActivitySignal } from '../hooks/useGlobalAgentActivity'
+import { useGlobalAgentActivity } from '../hooks/useGlobalAgentActivity'
+import { useWorkspace } from '../tabs/store'
+
+const MAX_ANNOUNCED_SIGNALS = 200
+
+function toastId(signal: AgentActivitySignal): string {
+  if (signal.kind === 'inbox' || signal.kind === 'news' || signal.kind.startsWith('sonner-test-')) {
+    return `openalice-activity:${signal.id}`
+  }
+  const operation = signal.taskId
+    ? `task:${signal.taskId}`
+    : `session:${signal.workspaceId}:${signal.resumeId ?? 'unknown'}`
+  return `openalice-activity:${operation}`
+}
+
+/**
+ * Projects significant Agent orchestration onto the shared notification layer.
+ * This owns no history or navigation surface: Inbox, Sessions, Automation, and
+ * Office remain the authoritative places for detail.
+ */
+export function ActivityToasts() {
+  const { t } = useTranslation()
+  const openOrFocus = useWorkspace((state) => state.openOrFocus)
+  const { signals, loading, error } = useGlobalAgentActivity()
+  const initialRevision = useRef<number | null>(null)
+  const announced = useRef(new Map<string, number>())
+  const persistentSignals = useRef(new Set<string>())
+
+  useEffect(() => {
+    if (loading) return
+    if (initialRevision.current === null) {
+      // A failed request is not a snapshot. Wait for the first successful load,
+      // including an empty one, before announcing subsequent journal events.
+      if (error) return
+      initialRevision.current = Math.max(0, ...signals.map((signal) => signal.revision))
+      return
+    }
+
+    const nextActive = new Set(
+      signals
+        .filter((signal) => signal.kind === 'conversation' || signal.kind === 'sonner-test-running')
+        .map(toastId),
+    )
+    const currentChannels = new Set(signals.map(toastId))
+    for (const id of persistentSignals.current) {
+      if (!currentChannels.has(id)) toast.dismiss(id)
+    }
+
+    for (const signal of signals) {
+      if (signal.revision <= initialRevision.current) continue
+      const id = toastId(signal)
+      if ((announced.current.get(id) ?? -1) >= signal.revision) continue
+      announced.current.set(id, signal.revision)
+
+      const agent = signal.agent ?? t('activityToast.agent')
+      if (signal.kind === 'conversation') {
+        toast.loading(t('activityToast.conversationRunning', { agent }), {
+          id,
+          duration: Number.POSITIVE_INFINITY,
+        })
+      } else if (signal.kind === 'conversation-failed') {
+        toast.error(t('activityToast.conversationFailed', { agent }), {
+          id,
+          duration: 8_000,
+        })
+      } else if (signal.kind === 'inbox') {
+        toast.success(t('activityToast.inboxDelivered', { agent }), {
+          id,
+          duration: 4_000,
+          action: {
+            label: t('activityToast.viewInbox'),
+            onClick: () => openOrFocus({ kind: 'inbox', params: {} }),
+          },
+        })
+      } else if (signal.kind === 'news') {
+        toast.info(t('activityToast.newsIngested', {
+          source: signal.source ?? t('activityToast.newsSource'),
+        }), {
+          id,
+          description: signal.detail,
+          duration: 6_000,
+          action: {
+            label: t('activityToast.viewNews'),
+            onClick: () => openOrFocus({ kind: 'news', params: {} }),
+          },
+        })
+      } else if (signal.kind === 'sonner-test-running') {
+        toast.loading(signal.detail ?? 'Sonner running test', {
+          id,
+          duration: Number.POSITIVE_INFINITY,
+        })
+      } else if (signal.kind === 'sonner-test-success') {
+        toast.success(signal.detail ?? 'Sonner success test', { id, duration: 4_000 })
+      } else {
+        toast.error(signal.detail ?? 'Sonner error test', { id, duration: 8_000 })
+      }
+    }
+
+    persistentSignals.current = nextActive
+    while (announced.current.size > MAX_ANNOUNCED_SIGNALS) {
+      const oldest = announced.current.keys().next().value as string | undefined
+      if (!oldest) break
+      announced.current.delete(oldest)
+    }
+  }, [error, loading, openOrFocus, signals, t])
+
+  return null
+}

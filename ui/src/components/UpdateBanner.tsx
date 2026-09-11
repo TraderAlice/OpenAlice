@@ -1,13 +1,12 @@
 import { useEffect, useState } from 'react'
-import { api } from '../api'
-import type { VersionInfo } from '../api/types'
+import { useVersionInfo } from '../hooks/useVersionInfo'
 
 const SKIP_STORAGE_KEY = 'openalice.update.skipVersion'
 type RuntimeMode = 'browser' | 'electron-dev' | 'electron-packaged'
 
 /**
- * Top-of-app banner shown when GitHub Releases reports a version newer
- * than the running app's package.json.
+ * Top-of-app banner shown when the Runtime's update owner reports a newer
+ * version than the running app.
  *
  * Three actions for the user:
  *  - "Release notes" — opens the GitHub release page (changelog)
@@ -16,39 +15,45 @@ type RuntimeMode = 'browser' | 'electron-dev' | 'electron-packaged'
  *    when a newer version is released.
  *  - "×" close — session-only dismiss (until next page load).
  *
- * The action text is runtime-aware: source/Docker installs update from git,
- * while packaged Electron is handled by the native auto-updater.
+ * The action text follows the backend's update authority: source checkouts use
+ * Git, installed CLI releases use the CLI, and packaged Electron uses its
+ * native updater. Service-managed and non-updating installs do not render.
  */
 export function UpdateBanner() {
-  const [info, setInfo] = useState<VersionInfo | null>(null)
+  const { info } = useVersionInfo()
   const [runtimeMode, setRuntimeMode] = useState<RuntimeMode>('browser')
   const [sessionDismissed, setSessionDismissed] = useState(false)
+  const [sessionSkippedVersion, setSessionSkippedVersion] = useState<string | null>(null)
 
   useEffect(() => {
-    api.version.get().then(setInfo).catch(() => {})
     window.openAlice?.runtime.info()
       .then((runtime) => setRuntimeMode(runtime.mode))
       .catch(() => setRuntimeMode('browser'))
   }, [])
 
-  if (!info || !info.hasUpdate || !info.latest) return null
+  if (
+    !info
+    || !['source', 'desktop', 'cli'].includes(info.updateAuthority)
+    || !info.hasUpdate
+    || !info.latest
+  ) return null
   if (sessionDismissed) return null
 
   const skippedVersion = (() => {
     try { return localStorage.getItem(SKIP_STORAGE_KEY) } catch { return null }
   })()
-  if (skippedVersion === info.latest) return null
+  if (skippedVersion === info.latest || sessionSkippedVersion === info.latest) return null
 
   const handleSkip = () => {
     try { localStorage.setItem(SKIP_STORAGE_KEY, info.latest!) } catch { /* ignore */ }
-    setSessionDismissed(true)
+    setSessionSkippedVersion(info.latest)
   }
   const handleDismiss = () => {
     setSessionDismissed(true)
   }
 
   return (
-    <div className="flex items-center gap-3 px-4 py-2 bg-primary-muted/30 border-b border-primary/40 text-[12px] text-foreground">
+    <div data-desktop-banner className="flex items-center gap-3 px-4 py-2 bg-primary-muted/30 border-b border-primary/40 text-[12px] text-foreground">
       <span className="shrink-0">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-primary">
           <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
@@ -63,9 +68,13 @@ export function UpdateBanner() {
           <span className="text-muted-foreground hidden lg:inline"> · released {info.publishedAt.slice(0, 10)}</span>
         )}
       </span>
-      {runtimeMode === 'electron-packaged' ? (
+      {runtimeMode === 'electron-packaged' || info.updateAuthority === 'desktop' ? (
         <span className="text-muted-foreground shrink-0 hidden md:inline">
           Desktop updater will prompt when the download is ready
+        </span>
+      ) : info.updateAuthority === 'cli' ? (
+        <span className="text-muted-foreground shrink-0 hidden md:inline">
+          Run <code className="text-primary bg-muted px-1 rounded">openalice update</code> to continue
         </span>
       ) : (
         <span className="text-muted-foreground shrink-0 hidden md:inline">

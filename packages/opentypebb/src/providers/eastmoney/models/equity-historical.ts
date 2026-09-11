@@ -40,7 +40,8 @@ export class EastmoneyEquityHistoricalFetcher extends Fetcher {
     _credentials: Record<string, string> | null,
   ): Promise<string[]> {
     const secid = query.symbol // already "{MktNum}.{Code}"; toUpperCase is a no-op on digits
-    const klt = KLT[query.interval] ?? '101'
+    const klt = KLT[query.interval]
+    if (!klt) throw new Error(`eastmoney does not supply ${query.interval} bars`)
     const beg = query.start_date ? query.start_date.replace(/-/g, '') : '0'
     const end = query.end_date ? query.end_date.replace(/-/g, '') : '20500101'
     const url =
@@ -58,7 +59,8 @@ export class EastmoneyEquityHistoricalFetcher extends Fetcher {
       // OCHL: date, open, close, high, low, volume, amount
       const [date, open, close, high, low, volume] = line.split(',')
       return EquityHistoricalDataSchema.parse({
-        date,
+        // Mainland exchange timestamps are Asia/Shanghai wall time, not UTC.
+        date: date.includes(' ') ? new Date(date.replace(' ', 'T') + '+08:00').toISOString() : date,
         open: Number(open),
         high: Number(high),
         low: Number(low),

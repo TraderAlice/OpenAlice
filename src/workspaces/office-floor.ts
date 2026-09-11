@@ -5,19 +5,20 @@
 import type { ProvenanceRecord } from '../core/provenance-store.js'
 import type {
   AgentRuntimeEvent,
-  AgentRuntimePayload,
   AgentRuntimeSurface,
 } from './agent-runtime-log.js'
 
 export const OFFICE_REVIEW_HOLD_MS = 30_000
+export const OFFICE_INTERACTIVE_ACTIVITY_HOLD_MS = 30_000
 export const OFFICE_DRAWER_LIMIT = 6
-export type OfficeHarness = 'chat' | 'auto-quant' | 'other'
+export type OfficeHarness = 'chat' | 'auto-quant' | 'prediction' | 'other'
 
 export const OFFICE_CONFIG = {
   workspaceSleepAfterMs: 3 * 24 * 60 * 60 * 1000,
   harnessMinimumVisibleGroups: {
     chat: 1,
     'auto-quant': 1,
+    prediction: 1,
     other: 0,
   } satisfies Record<OfficeHarness, number>,
 } as const
@@ -45,6 +46,7 @@ export interface OfficeRosterPerson {
   readonly sessionRecordId?: string
   readonly presence?: 'active' | 'archived' | 'deleted'
   readonly lifecycle?: 'active' | 'retired'
+  readonly active: boolean
   readonly lastInteractionAt: number
 }
 
@@ -69,8 +71,13 @@ export interface OfficeFloorEmployee {
   readonly displayName?: string
   readonly sessionRecordId?: string
   readonly mood: OfficeEmployeeMood
+  readonly awake: boolean
   readonly surface?: AgentRuntimeSurface
   readonly bubble: OfficeBubble | null
+  readonly latestResult?: {
+    readonly text: string
+    readonly at: number
+  }
   readonly lastSeq: number
   readonly lastInteractionAt: number
   readonly drawers: readonly OfficeDrawerItem[]
@@ -91,7 +98,9 @@ interface MutableEmployee {
   lastTs: number
 }
 
-type FloorPayload = AgentRuntimePayload & {
+type FloorPayload = {
+  readonly workspaceId?: string
+  readonly resumeId?: string
   readonly surface?: AgentRuntimeSurface
   readonly toolStatus?: 'running' | 'completed' | 'failed'
   readonly toolName?: string
@@ -117,7 +126,7 @@ function applyEvent(state: MutableEmployee, event: AgentRuntimeEvent, now: numbe
       if (state.lastSeq === event.seq && state.mood === 'idle' && !state.bubble) return
       break
     case 'runtime.started':
-      state.mood = 'working'
+      state.mood = payload.surface === 'headless' ? 'working' : 'idle'
       state.bubble = null
       break
     case 'runtime.turn.tool': {
@@ -163,6 +172,14 @@ function applyEvent(state: MutableEmployee, event: AgentRuntimeEvent, now: numbe
   }
 }
 
+function settleInteractiveActivity(state: MutableEmployee, now: number): void {
+  if (state.surface === 'headless') return
+  if (state.mood !== 'working' && state.mood !== 'talking') return
+  if (now - state.lastTs < OFFICE_INTERACTIVE_ACTIVITY_HOLD_MS) return
+  state.mood = 'idle'
+  state.bubble = null
+}
+
 export function isOnOfficeFloor(person: OfficeRosterPerson): boolean {
   return person.lifecycle !== 'retired'
     && person.presence !== 'archived'
@@ -180,10 +197,11 @@ export function isOfficeWorkspaceSleeping(
 export function officeHarnessForTemplate(template: string): OfficeHarness {
   if (template === 'chat') return 'chat'
   if (template === 'auto-quant-v2') return 'auto-quant'
+  if (template === 'auto-prediction') return 'prediction'
   return 'other'
 }
 
-/** Chat then Quant, then everyone else. Stable id tie-break. */
+/** Chat, Quant, Prediction, then everyone else. Stable id tie-break. */
 export function compareOfficeRooms(
   a: { readonly tag: string; readonly id: string },
   b: { readonly tag: string; readonly id: string },
@@ -191,7 +209,8 @@ export function compareOfficeRooms(
   const rank = (tag: string): number => {
     if (tag === 'chat') return 0
     if (tag === 'auto-quant') return 1
-    return 2
+    if (tag === 'prediction') return 2
+    return 3
   }
   const byKind = rank(a.tag) - rank(b.tag)
   return byKind !== 0 ? byKind : a.id.localeCompare(b.id)
@@ -219,6 +238,7 @@ export function projectOfficeFloor(
     applyEvent(current, event, now)
     byResume.set(resumeId, current)
   }
+  for (const state of byResume.values()) settleInteractiveActivity(state, now)
 
   const employees = present.map((person) => {
       const live = byResume.get(person.resumeId)
@@ -231,6 +251,7 @@ export function projectOfficeFloor(
         ...(person.displayName ? { displayName: person.displayName } : {}),
         ...(person.sessionRecordId ? { sessionRecordId: person.sessionRecordId } : {}),
         mood: live?.mood ?? 'idle',
+        awake: person.active,
         ...(live?.surface ? { surface: live.surface } : {}),
         bubble: live?.bubble ?? null,
         lastSeq: live?.lastSeq ?? 0,
@@ -289,6 +310,14 @@ function drawerLabel(record: ProvenanceRecord): string {
   return artifact.decisionId
 }
 
+function drawerArtifactKey(record: ProvenanceRecord): string {
+  const { artifact } = record
+  if (artifact.kind === 'report') return `report:${artifact.workspaceId}:${artifact.path}`
+  if (artifact.kind === 'issue') return `issue:${artifact.workspaceId}:${artifact.issueId}`
+  if (artifact.kind === 'inbox') return `inbox:${artifact.inboxEntryId}`
+  return `trade-decision:${artifact.accountId}:${artifact.decisionId}`
+}
+
 export function projectOfficeDrawers(
   workspaceId: string,
   resumeId: string,
@@ -296,11 +325,15 @@ export function projectOfficeDrawers(
   limit = OFFICE_DRAWER_LIMIT,
 ): OfficeDrawerItem[] {
   const items: OfficeDrawerItem[] = []
-  for (const record of records) {
+  const seenArtifacts = new Set<string>()
+  for (const record of [...records].sort((a, b) => b.at - a.at)) {
     if (items.length >= limit) break
     if (!drawerBelongsToOffice(record, workspaceId)) continue
     if (record.origin.kind === 'session' && record.origin.resumeId !== resumeId) continue
     if (record.origin.kind !== 'session') continue
+    const artifactKey = drawerArtifactKey(record)
+    if (seenArtifacts.has(artifactKey)) continue
+    seenArtifacts.add(artifactKey)
     const { artifact } = record
     items.push({
       id: record.id,

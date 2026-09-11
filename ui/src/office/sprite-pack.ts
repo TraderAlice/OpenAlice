@@ -1,18 +1,19 @@
-/**
- * Office only depends on this pack interface. Codex pet v2 is the first
- * adapter — not part of the employee / desk / office model. Swap `pose()`
- * and `sheetUrl` to change generators later.
- */
-export type OfficeEmployeeMood =
-  | 'idle'
-  | 'working'
-  | 'talking'
-  | 'waiting'
-  | 'review'
-  | 'failed'
+export type OfficeAlicePose =
+  | 'idle-down'
+  | 'idle-left'
+  | 'idle-right'
+  | 'idle-up'
+  | 'walk-down'
+  | 'walk-left'
+  | 'walk-right'
+  | 'walk-up'
 
 export interface OfficeSpritePose {
+  readonly sheetUrl: string
+  readonly cell: { readonly width: number; readonly height: number }
+  readonly atlas: { readonly columns: number; readonly rows: number }
   readonly row: number
+  readonly column: number
   readonly frames: number
   readonly durationsMs: readonly number[]
 }
@@ -20,31 +21,31 @@ export interface OfficeSpritePose {
 export interface OfficeSpritePack {
   readonly id: string
   readonly displayName: string
-  readonly sheetUrl: string
-  readonly cell: { readonly width: number; readonly height: number }
-  readonly atlas: { readonly columns: number; readonly rows: number }
-  pose(mood: OfficeEmployeeMood): OfficeSpritePose
+  pose(action: OfficeAlicePose): OfficeSpritePose
 }
 
-/** Codex v2 atlas: 1536×2288, 8×11, 192×208 cells. Rows 0–8 are moods. */
-const V2_CELL = { width: 192, height: 208 } as const
+/** Generated Office overworld atlas: 144×192, 3×4, native 48×48 cells. */
+const OVERWORLD_SHEET = {
+  sheetUrl: '/office/packs/alice-overworld-v1.png',
+  cell: { width: 48, height: 48 },
+  atlas: { columns: 3, rows: 4 },
+} as const
 
-const V2_POSES: Record<OfficeEmployeeMood, OfficeSpritePose> = {
-  idle: { row: 0, frames: 6, durationsMs: [280, 110, 110, 140, 140, 320] },
-  working: { row: 7, frames: 6, durationsMs: [120, 120, 120, 120, 120, 220] },
-  talking: { row: 3, frames: 4, durationsMs: [140, 140, 140, 280] },
-  waiting: { row: 6, frames: 6, durationsMs: [150, 150, 150, 150, 150, 260] },
-  review: { row: 8, frames: 6, durationsMs: [150, 150, 150, 150, 150, 280] },
-  failed: { row: 5, frames: 8, durationsMs: [140, 140, 140, 140, 140, 140, 140, 240] },
+const OFFICE_POSES: Record<OfficeAlicePose, OfficeSpritePose> = {
+  'idle-down': { ...OVERWORLD_SHEET, row: 0, column: 1, frames: 1, durationsMs: [320] },
+  'idle-left': { ...OVERWORLD_SHEET, row: 1, column: 1, frames: 1, durationsMs: [320] },
+  'idle-right': { ...OVERWORLD_SHEET, row: 2, column: 1, frames: 1, durationsMs: [320] },
+  'idle-up': { ...OVERWORLD_SHEET, row: 3, column: 1, frames: 1, durationsMs: [320] },
+  'walk-down': { ...OVERWORLD_SHEET, row: 0, column: 0, frames: 3, durationsMs: [120, 120, 120] },
+  'walk-left': { ...OVERWORLD_SHEET, row: 1, column: 0, frames: 3, durationsMs: [120, 120, 120] },
+  'walk-right': { ...OVERWORLD_SHEET, row: 2, column: 0, frames: 3, durationsMs: [120, 120, 120] },
+  'walk-up': { ...OVERWORLD_SHEET, row: 3, column: 0, frames: 3, durationsMs: [120, 120, 120] },
 }
 
 export const defaultOfficeSpritePack: OfficeSpritePack = {
-  id: 'alice-maid',
+  id: 'alice-overworld',
   displayName: 'Alice',
-  sheetUrl: '/office/packs/alice-maid/spritesheet.webp',
-  cell: V2_CELL,
-  atlas: { columns: 8, rows: 11 },
-  pose(mood) {
-    return V2_POSES[mood]
+  pose(action) {
+    return OFFICE_POSES[action]
   },
 }

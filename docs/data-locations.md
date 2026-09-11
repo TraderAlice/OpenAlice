@@ -33,6 +33,14 @@ complete home and are not part of any Workspace repository. Treat the
 conversation stream as sensitive history when backing up or sharing a home;
 the occupancy journal has no prompt bodies.
 
+The explicit `openalice project transfer` operation is narrower than a raw
+complete-home backup or filesystem copy. It deliberately excludes both of
+those launcher journals, resume identities, headless tasks/logs, Runtime state,
+ports, auth, and untracked Session dossiers. It preserves portable data and
+Workspace repositories, rebases their absolute paths, and reports zero imported
+resumable Sessions. Git-tracked `.alice/sessions` bytes may remain for repository
+fidelity, but are inert without a destination resume identity.
+
 Each Workspace repository carries `.alice/settings.json`, a versioned,
 secret-free description of its recent interactive and headless Agent runtime
 choices. It may contain vault credential slugs, model ids, and effort values,
@@ -45,6 +53,43 @@ order, custom groups, and which rail entries are hidden. It is user chrome,
 not operator config, and travels with the complete home. Missing or
 malformed files equal the default document (Dev Panel hidden). Settings
 cannot be hidden. Deep links to a hidden surface still adopt.
+
+`<OPENALICE_HOME>/data/inbox/routine-follow-ups.json` is the Office decision
+queue and receipt ledger. Its version-2 document contains active scheduled-report
+references the human explicitly carried out of a review shift and immutable
+decision receipts. Both retain the Inbox entry identity, immutable report
+timestamp, exact Issue coordinates, and first-carried timestamp; a receipt also
+stores the declared disposition, any required normalized note, and the server
+decision time. Saving a decision atomically removes the exact active row and
+appends its receipt. A new receipt is bound to the per-entry revision observed
+before its exact Inbox and Scheduled-Issue evidence checks, so it cannot consume
+a carry that appeared later. Source loading or read failure is never classified
+as missing evidence; `evidence-unavailable` requires successful authority reads
+that prove at least one exact source absent. Receipts are never silently pruned:
+every retained identity continues to make an identical retry idempotent and
+prevents that report from becoming active again. The ledger never owns Issue
+status or scheduling, and writing it never dispatches an Agent. Missing means an empty queue and ledger;
+malformed state is a load error rather than something the product silently
+discards or overwrites. Alice keeps serving its other surfaces, while the Office
+decision-queue API fails closed until the sidecar is repaired. The file moves
+with the complete AliceProject so browser and Electron views share one durable
+diligence workflow.
+
+`<OPENALICE_HOME>/data/office/day.json` is the AliceProject-wide Office Day
+sidecar. It stores one server-local IANA calendar day, the current finite shift
+of up to four exact duty keys, their pending order, a same-day ledger of every
+exact duty key already admitted, and exact evidence receipts. The admission
+ledger is append-only within the day and capped at 1,024 exact keys. The
+ledger prevents a stale renderer from reopening an older evidence version as a
+new shift while still allowing a genuinely new fingerprint.
+It is presentation/workflow state only: Inbox, Issues, schedules, and Decision
+Desk records remain the completion authorities. The backend supplies the day
+key and next local-midnight rollover; browser tabs mutate it through commands
+guarded by that day key and the current monotonic shift id. Missing means no day
+has been opened. Malformed state is never replaced: Alice keeps serving other
+surfaces while every Office Day API fails closed until the sidecar is repaired.
+Atomic replacement and process-local command serialization make every browser
+and Electron view of one AliceProject converge on the same day.
 
 Each product Session created in that Workspace owns a secret-free dossier
 at `.alice/sessions/<resumeId>.json`. The `ai` object records the Agent
@@ -149,6 +194,20 @@ value is a pin, so a seeded `3002` (or `47331`) would refuse to move when
 another home already holds it. Existing shipped `{ "web": 3002 }` files stay
 pins; delete the key or the file to restore probing. `openalice up --port`
 and `OPENALICE_WEB_PORT` remain one-run pins and do not rewrite the file.
+
+The machine-wide Supervisor root also owns `machines.json`. This second
+registry names SSH Machines for fleet inspection; it does not move with a
+complete home and does not belong to the Electron browser profile. The local
+Machine is implicit. Stored rows contain only connection metadata (target,
+port, display name, and optional local identity-file path), never key bytes or
+AliceProject data. `remote-targets.json` beside it remains a hashed,
+non-enumerable tunnel-port cache rather than durable fleet identity.
+
+A received AliceProject is registered in this machine-wide registry only after
+its sibling staging Home has passed checksum and space validation and has been
+atomically published. Registration does not select it as the remote default.
+The new Home owns a new `sealing.key`; source machine locks, Runtime payloads,
+installer state, and sealing material never travel with it.
 
 `OPENALICE_PROJECT`, `OPENALICE_HOME`, `--project`, and `--home` remain
 higher-priority one-run/automation inputs. When they fix the selected project

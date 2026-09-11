@@ -24,6 +24,14 @@ describe('built-in adapter provider capabilities', () => {
     expect(registry.get('cursor')?.capabilities.transcriptDiscovery).toBe('subprocess');
     expect(registry.get('cursor')?.capabilities.assignsSessionId ?? false).toBe(false);
     expect(registry.get('cursor')?.binary).toBe('cursor-agent');
+    expect(registry.get('agy')?.capabilities.aiProvider).toMatchObject({
+      credentialSource: 'runtime-or-workspace',
+      wirePreference: ['google-generative-ai'],
+      defaultWire: 'google-generative-ai',
+    });
+    expect(registry.get('agy')?.capabilities.transcriptDiscovery).toBe('subprocess');
+    expect(registry.get('agy')?.capabilities.assignsSessionId ?? false).toBe(false);
+    expect(registry.get('agy')?.binary).toBe('agy');
     expect(registry.get('grok')?.capabilities.aiProvider).toMatchObject({
       credentialSource: 'runtime-or-workspace',
       wirePreference: ['openai-chat', 'openai-responses'],

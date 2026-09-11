@@ -39,7 +39,7 @@ describe('buildDesktopPackagedSmokePlan', () => {
     expect(plan.launchEnv).toMatchObject({
       OPENALICE_ONBOARDING_TEST: '1',
       OPENALICE_CREDENTIAL_TEST_MODE: 'mock',
-      OPENALICE_AGENT_RUNTIME_INSTALLS: 'real',
+      OPENALICE_AGENT_RUNTIME_INSTALLS: 'only:pi',
       OPENALICE_MCP_ENABLED: '0',
       OPENALICE_ELECTRON_SMOKE_ONBOARDING: '1',
       OPENALICE_ELECTRON_SMOKE_EXIT: '1',

@@ -336,8 +336,8 @@ export const CCXT_CUSTOM_PRESET: BrokerPresetDef = {
 
 export const ALPACA_PRESET: BrokerPresetDef = {
   id: 'alpaca',
-  label: 'Alpaca (US Equities)',
-  description: 'Commission-free US stocks and ETFs with fractional shares.',
+  label: 'Alpaca (Stocks & Crypto)',
+  description: 'US stocks, ETFs and spot crypto trading; read-only option contracts and snapshots.',
   category: 'recommended',
   hint: 'Paper and Live use **separate** API keys — generate from the matching dashboard at alpaca.markets. Paper is free and unlimited; Live places real orders on real money.',
   defaultName: 'alpaca-paper',

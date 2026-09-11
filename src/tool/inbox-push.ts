@@ -1,96 +1,43 @@
-/**
- * inbox_push — workspace's outbound channel to the user's inbox.
- *
- * This is a **workspace-scoped tool factory**. The agent inside a workspace
- * sees only `{ docs?, comments? }` in the schema; the workspaceId is filled
- * by the MCP router from the URL path (`/mcp/:wsId`) and closed over by
- * the factory's build() at request time. Hiding workspaceId from the
- * schema is deliberate: it makes forgery impossible (agent can't push to
- * a different workspace's inbox) and removes a wsId parameter the agent
- * would otherwise have to manage.
- *
- * Registered with WorkspaceToolCenter, exposed only at `/mcp/:wsId`. The
- * generic `/mcp` route (workspace-independent tools) does not see it —
- * external MCP consumers won't accidentally find a workspace-shaped tool
- * they can't sensibly use.
- */
-
+import { inboxFiles } from '@traderalice/connector-protocol'
 import { createHash } from 'node:crypto'
 
 import { tool } from 'ai'
 import { z } from 'zod'
 import type { WorkspaceToolFactory, WorkspaceToolContext } from '../core/workspace-tool-center.js'
 import { sessionOriginFromInboxOrigin } from '../core/provenance-store.js'
-import { readWorkspaceFile } from '../workspaces/file-service.js'
+import { createReadStream } from 'node:fs'
+import { resolveInboxFile } from '../core/inbox-files.js'
 
-export function reportContentRevision(content: string): string {
-  return `sha256:${createHash('sha256').update(content, 'utf8').digest('hex')}`
+export function reportContentRevision(content: string | Buffer): string {
+  return `sha256:${createHash('sha256').update(content).digest('hex')}`
 }
 
 export const inboxPushFactory: WorkspaceToolFactory = {
   name: 'inbox_push',
   build(ctx: WorkspaceToolContext) {
     return tool({
-      description: [
-        "Push an update to the user's inbox from this workspace.",
-        'Use this when you have something the user should see —',
-        'a finished analysis (point to the report file via `docs`),',
-        'a question back to the user (write it as `comments`),',
-        'a blocked task that needs input, or a status check-in.',
-        '',
-        '`docs` are paths relative to this workspace root. Each one',
-        'is rendered live in the inbox UI when the user opens the',
-        'entry — later edits remain visible. OpenAlice also records a content',
-        'hash for the exact revision published, so later readers can distinguish',
-        '“what was sent then” from the current live file.',
-        '',
-        '`comments` is markdown — your voice to the user about what',
-        'you did or want to ask. Keep it short and direct; if more',
-        'detail is needed put it in a doc and reference it.',
-        '',
-        'At least one of `docs` or `comments` must be present.',
-        '',
-        'Entries are automatically linked back to the run that produced',
-        'them — you do not pass any run, session, or issue identity.',
-      ].join(' '),
+      description: 'Send a notification or report to the human Inbox. body is Markdown; use [[report/file.pdf]] for live files relative to this Workspace root. CLI --body-file reads a Markdown file as the published body. Use normal replies for in-chat responses. Inbox is not a file store or an Agent-to-Agent channel. Origin is recorded automatically.',
       inputSchema: z.object({
-        docs: z
-          .array(
-            z.object({
-              path: z
-                .string()
-                .min(1)
-                .describe(
-                  "Relative path to a file inside this workspace, e.g. 'research/macro-2026-05-14.md'.",
-                ),
-            }),
-          )
-          .optional()
-          .describe(
-            'Workspace files to surface in the inbox entry. Rendered live, not snapshotted.',
-          ),
-        comments: z
-          .string()
-          .optional()
-          .describe(
-            "Your message to the user (markdown). Renders below docs in the inbox detail pane.",
-          ),
+        body: z.string().min(1).describe('Markdown message to the human. Inline [[relative/path.ext]] references resolve in this Workspace.'),
       }),
-      execute: async ({ docs, comments }) => {
+      execute: async ({ body }) => {
         try {
           const workspace = ctx.resolveWorkspace?.(ctx.workspaceId)
-          const publishedDocs = await Promise.all((docs ?? []).map(async (doc) => {
-            if (!workspace) return doc
-            const content = await readWorkspaceFile(workspace.dir, doc.path)
-            return content === null
-              ? doc
-              : { ...doc, revision: reportContentRevision(content) }
+          const publishedDocs = await Promise.all(inboxFiles({ body }).map(async (doc) => {
+            const path = await resolveInboxFile(workspace?.dir, doc.path)
+            if (!path) return doc
+            try {
+              const hash = createHash('sha256')
+              for await (const chunk of createReadStream(path)) hash.update(chunk)
+              return { ...doc, revision: `sha256:${hash.digest('hex')}` }
+            }
+            catch { return doc } // A live file can disappear; keep the notification intact.
           }))
           const entry = await ctx.inboxStore.append({
             workspaceId: ctx.workspaceId,
             workspaceLabel: ctx.workspaceLabel,
-            ...(docs ? { docs: publishedDocs } : {}),
-            comments,
+            body,
+            fileRevisions: Object.fromEntries(publishedDocs.filter(doc => doc.revision).map(doc => [doc.path, doc.revision!])),
             // Agent-invisible: stamped from the server-resolved run origin, NOT
             // from anything in the tool's input schema. Omit the key entirely
             // when absent (interactive / no run header) so the JSONL stays clean.
@@ -106,7 +53,7 @@ export const inboxPushFactory: WorkspaceToolFactory = {
               at: entry.ts,
               fingerprint: `inbox:${entry.id}:sent`,
             })
-            for (const doc of entry.docs ?? []) {
+            for (const doc of inboxFiles(entry)) {
               await ctx.provenanceStore.append({
                 artifact: {
                   kind: 'report',

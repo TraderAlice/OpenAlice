@@ -1,6 +1,9 @@
+import { stickerHandlers } from './stickers'
 import { http, HttpResponse } from 'msw'
+import type { AliceHarnessConfig } from '../../hooks/useAliceHarness'
 import {
   DEMO_AUTO_QUANT_WORKSPACE_ID,
+  DEMO_AUTO_PREDICTION_WORKSPACE_ID,
   DEMO_CHAT_WORKSPACE_ID,
   demoChatWorkspace,
   demoWorkspaces,
@@ -8,11 +11,16 @@ import {
 } from '../fixtures/workspaces'
 import { demoWorkspaceFilePaths, demoWorkspaceFiles } from '../fixtures/inbox'
 import {
-  createDemoWebPiSnapshot,
-  demoWebPiFollowUp,
-  demoWebPiSeeds,
-  type DemoWebPiSeed,
-} from '../fixtures/webpi'
+  createDemoWebSnapshot,
+  demoWebCapabilities,
+  demoWebFollowUp,
+  demoWebPendingToolCall,
+  demoWebPermissionOutcome,
+  demoWebPermissionRequest,
+  demoWebSeeds,
+  demoWebWire,
+  type DemoWebSeed,
+} from '../fixtures/web-session'
 import type {
   AgentConfig,
   AgentConfigBundle,
@@ -20,13 +28,21 @@ import type {
   DepartedWorkspace,
   PausedSessionRuntimeUpdate,
   SessionRecord,
-  WebPiSnapshot,
+  WebConversationMessage,
+  WebSessionSnapshot,
   Workspace,
   WorkspaceMetadataPatch,
   WorkspaceRuntimePreference,
 } from '../../components/workspace/api'
 
 const demoSessionPresence = new Map<string, 'active' | 'archived' | 'deleted'>()
+const demoResumeRuntimes = new Map<string, NonNullable<SessionRecord['runtime']>>([
+  ['resume-demo-thesis-owner', {
+    credentialSource: 'native',
+    model: 'claude-opus-4-6',
+    reasoningEffort: 'high',
+  }],
+])
 
 const demoManagerSession = {
   id: 'demo-manager-session',
@@ -43,10 +59,12 @@ const demoManagerSession = {
   title: 'Audit the active Workspace floor',
 }
 
-let demoManagerMessages: unknown[] = []
+let demoManagerMessages: WebConversationMessage[] = []
 let demoQuickChatSequence = 0
+const demoResumedSessions = new Map<string, SessionRecord>()
 let demoWorkspaceCreateSequence = 0
 let demoAutoQuantDefaultWorkspaceId: string | null = DEMO_AUTO_QUANT_WORKSPACE_ID
+let demoAutoPredictionDefaultWorkspaceId: string | null = DEMO_AUTO_PREDICTION_WORKSPACE_ID
 const demoCreatedWorkspaceIds = new Set<string>()
 const DEMO_WORKSPACE_TAG_RE = /^[a-z0-9][a-z0-9_-]{0,32}$/
 
@@ -58,60 +76,83 @@ export function resetDemoWorkspaceCreateState(): void {
   demoCreatedWorkspaceIds.clear()
   demoWorkspaceCreateSequence = 0
   demoAutoQuantDefaultWorkspaceId = DEMO_AUTO_QUANT_WORKSPACE_ID
+  demoAutoPredictionDefaultWorkspaceId = DEMO_AUTO_PREDICTION_WORKSPACE_ID
 }
 
-function webPiKey(wsId: string, sessionId: string): string {
+function webKey(wsId: string, sessionId: string): string {
   return `${wsId}::${sessionId}`
 }
 
-function createSeededWebPiSessions(): Map<string, WebPiSnapshot> {
-  return new Map(demoWebPiSeeds.map((seed) => [
-    webPiKey(seed.wsId, seed.sessionId),
-    createDemoWebPiSnapshot(seed),
+function createSeededWebSessions(): Map<string, WebSessionSnapshot> {
+  return new Map(demoWebSeeds.map((seed) => [
+    webKey(seed.wsId, seed.sessionId),
+    createDemoWebSnapshot(seed),
   ]))
 }
 
-let demoWebPiSessions = createSeededWebPiSessions()
+let demoWebSessions = createSeededWebSessions()
+let demoWebRequestSequence = 0
 
-export function resetDemoWorkspaceWebPiState(): void {
+export function resetDemoWorkspaceWebState(): void {
   demoManagerMessages = []
   demoQuickChatSequence = 0
-  demoWebPiSessions = createSeededWebPiSessions()
+  demoWebRequestSequence = 0
+  demoWebSessions = createSeededWebSessions()
+  demoResumeRuntimes.clear()
+  demoResumeRuntimes.set('resume-demo-thesis-owner', {
+    credentialSource: 'native',
+    model: 'claude-opus-4-6',
+    reasoningEffort: 'high',
+  })
   for (let index = 0; index < demoWorkspaces.length; index += 1) {
     const workspace = demoWorkspaces[index]!
     demoWorkspaces[index] = {
       ...workspace,
-      sessions: workspace.sessions.filter((session) =>
+      sessions: workspace.sessions.map((session) => demoResumedSessions.get(webKey(workspace.id, session.id)) ?? session).filter((session) =>
         !session.id.startsWith('demo-quick-chat-')
         && !session.id.startsWith('run-demo-resume-')),
     }
   }
+  demoResumedSessions.clear()
 }
 
-function setDemoWebPiSession(seed: DemoWebPiSeed): WebPiSnapshot {
-  const snapshot = createDemoWebPiSnapshot(seed)
-  demoWebPiSessions.set(webPiKey(seed.wsId, seed.sessionId), snapshot)
+function setDemoWebSession(seed: DemoWebSeed): WebSessionSnapshot {
+  const snapshot = createDemoWebSnapshot(seed)
+  demoWebSessions.set(webKey(seed.wsId, seed.sessionId), snapshot)
   return snapshot
 }
 
-function findDemoWebPiSession(wsId: string, sessionId: string): WebPiSnapshot | null {
-  return demoWebPiSessions.get(webPiKey(wsId, sessionId)) ?? null
+function findDemoWebSession(wsId: string, sessionId: string): WebSessionSnapshot | null {
+  return demoWebSessions.get(webKey(wsId, sessionId)) ?? null
 }
 
-function ensureDemoWebPiSession(wsId: string, sessionId: string): WebPiSnapshot | null {
-  const existing = findDemoWebPiSession(wsId, sessionId)
+function ensureDemoWebSession(wsId: string, sessionId: string): WebSessionSnapshot | null {
+  const existing = findDemoWebSession(wsId, sessionId)
   if (existing) return existing
   const record = demoWorkspaces
     .find((workspace) => workspace.id === wsId)
-    ?.sessions.find((session) => session.id === sessionId && session.agent === 'pi')
+    ?.sessions.find((session) => session.id === sessionId && session.agent in demoWebCapabilities)
   if (!record) return null
-  return setDemoWebPiSession({
+  return setDemoWebSession({
     wsId,
     sessionId,
     resumeId: record.resumeId,
+    agent: record.agent,
     startedAt: record.startedAt ?? Date.now(),
     messages: [],
   })
+}
+
+function updateDemoWebSession(
+  wsId: string,
+  sessionId: string,
+  patch: (current: WebSessionSnapshot) => Partial<WebSessionSnapshot>,
+): WebSessionSnapshot | null {
+  const current = ensureDemoWebSession(wsId, sessionId)
+  if (!current) return null
+  const next: WebSessionSnapshot = { ...current, ...patch(current), revision: current.revision + 1 }
+  demoWebSessions.set(webKey(wsId, sessionId), next)
+  return next
 }
 
 const DEMO_FILE_MTIME = new Date().toISOString()
@@ -158,22 +199,66 @@ function demoDirectoryListing(workspaceId: string, requestedPath: string) {
   }
 }
 
-function appendDemoWebPiMessages(
+function appendDemoWebMessages(
   wsId: string,
   sessionId: string,
-  messages: readonly unknown[],
-): WebPiSnapshot | null {
-  const current = ensureDemoWebPiSession(wsId, sessionId)
-  if (!current) return null
-  const next: WebPiSnapshot = {
-    ...current,
+  messages: readonly WebConversationMessage[],
+): WebSessionSnapshot | null {
+  return updateDemoWebSession(wsId, sessionId, (current) => ({
     phase: 'idle',
     messages: [...current.messages, ...messages],
     streamingMessage: null,
-    revision: current.revision + 1,
+    requests: [],
+  }))
+}
+
+// Runtimes that ask before running tools pause on the first prompt with a
+// pending permission request; the user's answer decides how the turn ends.
+function startDemoWebTurn(wsId: string, sessionId: string, message: string): WebSessionSnapshot | null {
+  const current = ensureDemoWebSession(wsId, sessionId)
+  if (!current) return null
+  if (!demoWebCapabilities[current.agent]?.permissionPrompts) {
+    return appendDemoWebMessages(wsId, sessionId, demoWebFollowUp(current.agent, message))
   }
-  demoWebPiSessions.set(webPiKey(wsId, sessionId), next)
-  return next
+  const requestId = `demo-web-request-${++demoWebRequestSequence}`
+  if (current.agent === 'codex' && /ask me/i.test(message)) {
+    return updateDemoWebSession(wsId, sessionId, () => ({
+      phase: 'awaiting-input',
+      messages: [...current.messages, { role: 'user', content: message }],
+      streamingMessage: null,
+      requests: [{ id: requestId, kind: 'question', title: 'Project name', description: 'What should we call this project?', options: [], allowText: true, createdAt: Date.now() }],
+    }))
+  }
+  return updateDemoWebSession(wsId, sessionId, () => ({
+    phase: 'awaiting-input',
+    messages: [...current.messages, { role: 'user', content: message }],
+    streamingMessage: demoWebPendingToolCall(requestId),
+    requests: [demoWebPermissionRequest(current.agent, requestId)],
+  }))
+}
+
+function answerDemoWebRequest(
+  wsId: string,
+  sessionId: string,
+  requestId: string,
+  optionId: string,
+  text?: string,
+): WebSessionSnapshot | null | 'unknown_request' | 'unknown_option' {
+  const current = findDemoWebSession(wsId, sessionId)
+  if (!current) return null
+  const request = current.requests.find((entry) => entry.id === requestId)
+  if (!request) return 'unknown_request'
+  if (text !== undefined) {
+    if (request.kind !== 'question' || !request.allowText || optionId !== '' || !text.trim()) return 'unknown_option'
+    return appendDemoWebMessages(wsId, sessionId, [{ role: 'assistant', content: [{ type: 'text', text: `Project name: ${text}` }] }])
+  }
+  const option = request.options.find((entry) => entry.id === optionId)
+  if (!option) return 'unknown_option'
+  return appendDemoWebMessages(
+    wsId,
+    sessionId,
+    demoWebPermissionOutcome(current.agent, requestId, option.tone === 'allow'),
+  )
 }
 
 // Demo mutations live only for the current MSW worker lifetime. Keeping agent
@@ -191,17 +276,20 @@ function demoAgentConfigBundle(workspaceId: string): AgentConfigBundle {
   }
 }
 
-function demoManagerSnapshot(): WebPiSnapshot {
+function demoManagerSnapshot(): WebSessionSnapshot {
   return {
     recordId: demoManagerSession.id,
     wsId: demoManagerSession.wsId,
     resumeId: demoManagerSession.resumeId,
+    agent: demoManagerSession.agent,
+    wire: demoWebWire(demoManagerSession.agent),
+    nativeSessionId: 'demo-native-manager',
     pid: 0,
     startedAt: demoManagerSession.startedAt,
     phase: 'idle' as const,
-    state: null,
     messages: demoManagerMessages,
     streamingMessage: null,
+    requests: [],
     error: null,
     stderrTail: '',
     revision: demoManagerMessages.length,
@@ -283,6 +371,13 @@ const demoAgentRuntimeReadiness = {
   checkedAt: '2026-07-08T00:00:00.000Z',
 }
 
+const demoSkillProjection = () => ({
+  injectedVersion: '1.0.0+previous', injectedAt: '2026-07-08T00:00:00.000Z',
+  name: 'alice', enabled: true, installed: true, canonicalPresent: true,
+  customized: true, sourceChanged: true, mirrorDiverged: false,
+  files: ['.agents', '.claude'].map((root) => ({ path: `${root}/skills/alice/SKILL.md`, currentPreview: '# Alice\n\nLocal research instructions.', sourcePreview: '# Alice\n\nProject-provided collaboration and data CLI guidance.', differs: true, truncated: false, unverified: false })),
+})
+
 const demoTemplateUpgradePlan = (workspaceId: string) => ({
   workspaceId,
   template: 'chat',
@@ -302,8 +397,9 @@ const demoTemplateUpgradePlan = (workspaceId: string) => ({
       currentTruncated: false, templateTruncated: false,
     },
     {
-      path: '.agents/skills/alice-workspace/SKILL.md', status: 'ready', operation: 'update', canUseTemplate: true,
-      currentPreview: 'Old collaboration guidance.', templatePreview: 'Current collaboration guidance.',
+      path: '.agents/skills/template-research/SKILL.md', status: 'ready', operation: 'update', canUseTemplate: true,
+      currentPreview: 'Old collaboration guidance.\n\nLocal preference.', templatePreview: 'Current collaboration guidance.',
+      mergedPreview: 'Current collaboration guidance.\n\nLocal preference.', mergedTruncated: false,
       currentTruncated: false, templateTruncated: false,
     },
     {
@@ -313,17 +409,22 @@ const demoTemplateUpgradePlan = (workspaceId: string) => ({
       note: 'Changed only in this Workspace; it will stay as-is.',
     },
     {
-      path: '.claude/skills/self-scheduling/SKILL.md', status: 'conflict', operation: 'update', canUseTemplate: true,
+      path: '.claude/skills/template-research/SKILL.md', status: 'conflict', operation: 'update', canUseTemplate: true,
+      basePreview: 'Report scheduled work to the owner.', baseTruncated: false,
       currentPreview: 'Report scheduled work to the owner with the local checklist.',
       templatePreview: 'Report scheduled work to Inbox with a signed artifact.',
       currentTruncated: false, templateTruncated: false,
-      note: 'Both the Workspace and template changed this file.',
+      note: 'Git could not merge these overlapping edits automatically.',
     },
   ],
   summary: { ready: 2, preserved: 1, conflicts: 1, unchanged: 0 },
 })
 
+const demoHarnessConfigs = new Map<string, AliceHarnessConfig>()
+const demoHarnessCommands = { alice: ['rss', 'market', 'analysis', 'peer', 'inbox', 'issue', 'harness'], traderhub: ['equity', 'economy'], 'alice-uta': ['account', 'order'] }
+
 export const workspacesHandlers = [
+  ...stickerHandlers,
   http.get('/api/workspaces/auto-quant/default-workspace', () => {
     const workspace = demoAutoQuantDefaultWorkspaceId
       ? demoWorkspaces.find((candidate) =>
@@ -349,6 +450,8 @@ export const workspacesHandlers = [
     demoAutoQuantDefaultWorkspaceId = workspace.id
     return HttpResponse.json({ defaultWorkspaceId: workspace.id, ready: true })
   }),
+  http.get('/api/workspaces/project-setup', () => HttpResponse.json({ schemaVersion: 1, pending: [], errors: {} })),
+  http.post('/api/workspaces/project-setup/retry', () => HttpResponse.json({ schemaVersion: 1, pending: [], errors: {} })),
   http.post('/api/workspaces/chat/initialize', () => {
     const workspace = demoWorkspaces.find((candidate) => candidate.template === 'chat')
     if (!workspace) {
@@ -363,6 +466,39 @@ export const workspacesHandlers = [
       return HttpResponse.json({ error: 'workspace_not_found' }, { status: 404 })
     }
     demoAutoQuantDefaultWorkspaceId = workspace.id
+    return HttpResponse.json({ workspace })
+  }),
+  http.get('/api/workspaces/auto-prediction/default-workspace', () => {
+    const workspace = demoAutoPredictionDefaultWorkspaceId
+      ? demoWorkspaces.find((candidate) =>
+          candidate.id === demoAutoPredictionDefaultWorkspaceId
+          && candidate.template === 'auto-prediction')
+      : undefined
+    return HttpResponse.json({
+      defaultWorkspaceId: workspace?.id ?? null,
+      configuredWorkspaceId: demoAutoPredictionDefaultWorkspaceId,
+      ready: workspace !== undefined,
+    })
+  }),
+  http.put('/api/workspaces/auto-prediction/default-workspace', async ({ request }) => {
+    const body = (await request.json().catch(() => null)) as { workspaceId?: unknown } | null
+    const workspace = typeof body?.workspaceId === 'string'
+      ? demoWorkspaces.find((candidate) =>
+          candidate.id === body.workspaceId
+          && candidate.template === 'auto-prediction')
+      : undefined
+    if (!workspace) {
+      return HttpResponse.json({ error: 'workspace_not_found' }, { status: 404 })
+    }
+    demoAutoPredictionDefaultWorkspaceId = workspace.id
+    return HttpResponse.json({ defaultWorkspaceId: workspace.id, ready: true })
+  }),
+  http.post('/api/workspaces/auto-prediction/initialize', () => {
+    const workspace = demoWorkspaces.find((candidate) => candidate.template === 'auto-prediction')
+    if (!workspace) {
+      return HttpResponse.json({ error: 'workspace_not_found' }, { status: 404 })
+    }
+    demoAutoPredictionDefaultWorkspaceId = workspace.id
     return HttpResponse.json({ workspace })
   }),
   http.put('/api/workspaces/terminal-view-attributes', () =>
@@ -385,7 +521,7 @@ export const workspacesHandlers = [
     }
     demoManagerMessages = [
       { role: 'user', content: body.prompt ?? 'Audit the active Workspace floor.' },
-      { role: 'assistant', content: 'Demo manager: active desks are inventoried and ready for coordination.' },
+      { role: 'assistant', content: [{ type: 'text', text: 'Demo manager: active desks are inventoried and ready for coordination.' }] },
     ]
     return HttpResponse.json({
       manager: {
@@ -537,6 +673,45 @@ export const workspacesHandlers = [
     })
     return HttpResponse.json({ ok: true })
   }),
+  http.get('/api/workspaces/alice-harness/catalog', () => HttpResponse.json({
+    version: '1.0.0+demo-skills',
+    commands: { alice: { rss: ['glob', 'grep', 'read'], harness: ['upgrade'] }, traderhub: { equity: ['profile'] }, 'alice-uta': { account: ['list'] } },
+    skills: [{ name: 'alice', files: [{ path: 'SKILL.md', content: '# Alice\n\nProject-provided collaboration and data CLI guidance.' }] }],
+    workspaces: demoWorkspaces.map((ws) => ({ id: ws.id, name: ws.tag, template: ws.template, projections: [demoSkillProjection()], plan: {
+      ...demoTemplateUpgradePlan(ws.id), template: 'alice-harness',
+      fromVersion: 'unversioned', toVersion: '1.0.0+demo-skills',
+      files: demoTemplateUpgradePlan(ws.id).files.filter((file) => file.path.includes('/skills/')).map((file) => ({ ...file, path: file.path.replace('template-research', 'alice') })),
+      summary: { ready: 1, preserved: 0, conflicts: 1, unchanged: 0 },
+    } })),
+  })),
+  http.get('/api/workspaces/:id/alice-harness/skills/:skill', () => HttpResponse.json(demoSkillProjection())),
+  http.get('/api/workspaces/:id/alice-harness', ({ params }) => HttpResponse.json({
+    appliedVersion: '1.0.0+demo', availableVersion: '1.1.0+demo', runtimeAuthority: 'alice-project',
+    skillDefaults: { alice: true, 'alice-analysis': true, 'alice-uta': true, traderhub: true, 'self-scheduling': true },
+    managedSkillNames: ['alice', 'alice-analysis', 'alice-uta', 'traderhub', 'self-scheduling', 'alice-workspace'],
+    config: demoHarnessConfigs.get(String(params.id)) ?? { schemaVersion: 1, cli: {} },
+    commands: demoHarnessCommands,
+  })),
+  http.put('/api/workspaces/:id/alice-harness/config', async ({ params, request }) => {
+    demoHarnessConfigs.set(String(params.id), await request.json() as AliceHarnessConfig)
+    return HttpResponse.json({ ok: true })
+  }),
+  http.get('/api/workspaces/:id/alice-harness-upgrade', ({ params, request }) => {
+    const action = new URL(request.url).searchParams.get('action')
+    const files = demoSkillProjection().files.map((file) => ({
+      path: file.path, status: action === 'restore' || action === 'install' ? 'ready' : 'conflict',
+      operation: action === 'remove' ? 'remove' : 'update', currentPreview: file.currentPreview,
+      basePreview: '# Alice\n\nPrevious Project guidance.', baseTruncated: false,
+      templatePreview: action === 'remove' ? null : file.sourcePreview,
+      currentTruncated: false, templateTruncated: false, canUseTemplate: true,
+    }))
+    return HttpResponse.json({ plan: {
+      ...demoTemplateUpgradePlan(String(params.id)), template: 'alice-harness',
+      fromVersion: '1.0.0+demo', toVersion: '1.1.0+demo', files,
+      summary: { ready: files.filter((file) => file.status === 'ready').length, preserved: 0, conflicts: files.filter((file) => file.status === 'conflict').length, unchanged: 0 },
+    } })
+  }),
+  http.post('/api/workspaces/:id/alice-harness-upgrade', () => HttpResponse.json({ error: 'demo_read_only', message: 'This recorded preview does not modify Workspace files.' }, { status: 409 })),
   http.get('/api/workspaces/:id/template-upgrade', ({ params }) => {
     const workspace = demoWorkspaces.find((candidate) => candidate.id === String(params.id))
     if (!workspace) return HttpResponse.json({ error: 'not_found' }, { status: 404 })
@@ -575,7 +750,7 @@ export const workspacesHandlers = [
         fromVersion: '0.1.0',
         toVersion: '0.2.0',
         commit: 'd3m0c0de12345678',
-        changedPaths: ['README.md', '.agents/skills/alice-workspace/SKILL.md'],
+        changedPaths: ['README.md', '.agents/skills/alice/SKILL.md'],
         keptPaths: ['AGENTS.md'],
       },
       workspace,
@@ -689,10 +864,12 @@ export const workspacesHandlers = [
     const mutableWorkspace = workspace as {
       displayName?: string
       description?: string
-      defaultAgent?: string
     }
 
     const body = (await request.json().catch(() => ({}))) as WorkspaceMetadataPatch
+    if ('defaultAgent' in body) {
+      return HttpResponse.json({ error: 'invalid_metadata', message: 'Agent preferences belong in runtime-settings, not metadata' }, { status: 400 })
+    }
     if ('displayName' in body) {
       if (body.displayName == null || body.displayName.trim() === '') {
         delete mutableWorkspace.displayName
@@ -705,13 +882,6 @@ export const workspacesHandlers = [
         delete mutableWorkspace.description
       } else {
         mutableWorkspace.description = body.description.trim()
-      }
-    }
-    if ('defaultAgent' in body) {
-      if (body.defaultAgent == null || body.defaultAgent.trim() === '') {
-        delete mutableWorkspace.defaultAgent
-      } else {
-        mutableWorkspace.defaultAgent = body.defaultAgent.trim()
       }
     }
     return HttpResponse.json({ workspace })
@@ -747,7 +917,7 @@ export const workspacesHandlers = [
       version: 3 as const,
       runtime: { interactive: mode('interactive'), headless: mode('headless') },
     }
-    const nextWorkspace = { ...workspace, runtimeSettings: nextSettings }
+    const nextWorkspace = { ...workspace, runtimeSettings: nextSettings, defaultAgent: nextSettings.runtime.interactive.defaultAgent ?? nextSettings.runtime.interactive.recent.agent }
     demoWorkspaces[index] = nextWorkspace
     return HttpResponse.json({ settings: nextSettings, workspace: nextWorkspace })
   }),
@@ -763,13 +933,14 @@ export const workspacesHandlers = [
       // probe, so present everything as installed (a clean showcase, not a
       // "go install things" prompt).
       agents: [
-        { id: 'claude', displayName: 'Claude Code', installed: true, binPath: '/usr/local/bin/claude', capabilities: { parallelPerCwd: true, resumeLast: false, resumeById: true, transcriptDiscovery: 'fs-watch', headless: true, aiProvider: { credentialSource: 'runtime-or-workspace', wirePreference: ['anthropic'], defaultWire: 'anthropic' } } },
-        { id: 'codex', displayName: 'Codex', installed: true, binPath: '/usr/local/bin/codex', capabilities: { parallelPerCwd: true, resumeLast: true, resumeById: true, transcriptDiscovery: 'subprocess', headless: true, aiProvider: { credentialSource: 'runtime-or-workspace', wirePreference: ['openai-responses'], defaultWire: 'openai-responses' } } },
-        { id: 'cursor', displayName: 'Cursor Agent', installed: true, binPath: '/usr/local/bin/cursor-agent', capabilities: { parallelPerCwd: true, resumeLast: true, resumeById: true, transcriptDiscovery: 'subprocess', headless: true, aiProvider: { credentialSource: 'runtime-or-workspace', wirePreference: [], directVendors: ['cursor'] } } },
-        { id: 'grok', displayName: 'Grok Build', installed: true, binPath: '/usr/local/bin/grok', capabilities: { parallelPerCwd: true, resumeLast: true, resumeById: true, transcriptDiscovery: 'subprocess', headless: true, aiProvider: { credentialSource: 'runtime-or-workspace', wirePreference: ['openai-chat', 'openai-responses'], defaultWire: 'openai-chat' } } },
-        { id: 'omp', displayName: 'Oh My Pi', installed: true, binPath: '/usr/local/bin/omp', capabilities: { parallelPerCwd: true, resumeLast: true, resumeById: true, transcriptDiscovery: 'subprocess', headless: true, aiProvider: { credentialSource: 'runtime-or-workspace', wirePreference: ['google-generative-ai', 'openai-chat', 'anthropic', 'openai-responses'], defaultWire: 'openai-chat', vendorPolicies: { minimax: { wirePreference: ['anthropic'], legacyRequestedWireFallbacks: { 'openai-chat': 'anthropic' } } }, modelRegistration: { contextWindow: true, reasoning: true } } } },
-        { id: 'opencode', displayName: 'opencode', installed: true, binPath: '/usr/local/bin/opencode', capabilities: { parallelPerCwd: true, resumeLast: true, resumeById: true, transcriptDiscovery: 'subprocess', headless: true, aiProvider: { credentialSource: 'runtime-or-workspace', wirePreference: ['google-generative-ai', 'openai-chat', 'anthropic', 'openai-responses'], defaultWire: 'openai-chat', vendorPolicies: { minimax: { wirePreference: ['anthropic'], legacyRequestedWireFallbacks: { 'openai-chat': 'anthropic' } } }, modelRegistration: { contextWindow: true, reasoning: true, effortVariants: true } } } },
-        { id: 'pi', displayName: 'Pi', installed: true, binPath: '/usr/local/bin/pi', capabilities: { parallelPerCwd: true, resumeLast: true, resumeById: true, transcriptDiscovery: 'none', headless: true, aiProvider: { credentialSource: 'runtime-or-workspace', wirePreference: ['google-generative-ai', 'openai-chat', 'anthropic', 'openai-responses'], defaultWire: 'openai-chat', vendorPolicies: { minimax: { wirePreference: ['anthropic'], legacyRequestedWireFallbacks: { 'openai-chat': 'anthropic' } } }, modelRegistration: { contextWindow: true, reasoning: true } } } },
+        { id: 'claude', displayName: 'Claude Code', installed: true, binPath: '/usr/local/bin/claude', capabilities: { parallelPerCwd: true, resumeLast: false, resumeById: true, transcriptDiscovery: 'fs-watch', headless: true, web: { wire: 'claude-stream-json', permissionPrompts: true, freshSession: true }, aiProvider: { credentialSource: 'runtime-or-workspace', wirePreference: ['anthropic'], defaultWire: 'anthropic' } } },
+        { id: 'codex', displayName: 'Codex', installed: true, binPath: '/usr/local/bin/codex', capabilities: { parallelPerCwd: true, resumeLast: true, resumeById: true, transcriptDiscovery: 'subprocess', headless: true, web: { wire: 'codex-app-server', permissionPrompts: true, freshSession: true }, aiProvider: { credentialSource: 'runtime-or-workspace', wirePreference: ['openai-responses'], defaultWire: 'openai-responses' } } },
+        { id: 'cursor', displayName: 'Cursor Agent', installed: true, binPath: '/usr/local/bin/cursor-agent', capabilities: { parallelPerCwd: true, resumeLast: true, resumeById: true, transcriptDiscovery: 'subprocess', headless: true, web: { wire: 'acp', permissionPrompts: true, freshSession: true }, aiProvider: { credentialSource: 'runtime-or-workspace', wirePreference: [], directVendors: ['cursor'] } } },
+        { id: 'agy', displayName: 'Antigravity', installed: true, binPath: '/usr/local/bin/agy', capabilities: { parallelPerCwd: true, resumeLast: true, resumeById: true, transcriptDiscovery: 'subprocess', headless: true, aiProvider: { credentialSource: 'runtime-or-workspace', wirePreference: ['google-generative-ai'], defaultWire: 'google-generative-ai' } } },
+        { id: 'grok', displayName: 'Grok Build', installed: true, binPath: '/usr/local/bin/grok', capabilities: { parallelPerCwd: true, resumeLast: true, resumeById: true, transcriptDiscovery: 'subprocess', headless: true, web: { wire: 'acp', permissionPrompts: true, freshSession: true }, aiProvider: { credentialSource: 'runtime-or-workspace', wirePreference: ['openai-chat', 'openai-responses'], defaultWire: 'openai-chat' } } },
+        { id: 'omp', displayName: 'Oh My Pi', installed: true, binPath: '/usr/local/bin/omp', capabilities: { parallelPerCwd: true, resumeLast: true, resumeById: true, transcriptDiscovery: 'subprocess', headless: true, web: { wire: 'pi-rpc', permissionPrompts: false, freshSession: true }, aiProvider: { credentialSource: 'runtime-or-workspace', wirePreference: ['google-generative-ai', 'openai-chat', 'anthropic', 'openai-responses'], defaultWire: 'openai-chat', vendorPolicies: { minimax: { wirePreference: ['anthropic'], legacyRequestedWireFallbacks: { 'openai-chat': 'anthropic' } } }, modelRegistration: { contextWindow: true, reasoning: true } } } },
+        { id: 'opencode', displayName: 'opencode', installed: true, binPath: '/usr/local/bin/opencode', capabilities: { parallelPerCwd: true, resumeLast: true, resumeById: true, transcriptDiscovery: 'subprocess', headless: true, web: { wire: 'acp', permissionPrompts: true, freshSession: true }, aiProvider: { credentialSource: 'runtime-or-workspace', wirePreference: ['google-generative-ai', 'openai-chat', 'anthropic', 'openai-responses'], defaultWire: 'openai-chat', vendorPolicies: { minimax: { wirePreference: ['anthropic'], legacyRequestedWireFallbacks: { 'openai-chat': 'anthropic' } } }, modelRegistration: { contextWindow: true, reasoning: true, effortVariants: true } } } },
+        { id: 'pi', displayName: 'Pi', installed: true, binPath: '/usr/local/bin/pi', capabilities: { parallelPerCwd: true, resumeLast: true, resumeById: true, transcriptDiscovery: 'none', headless: true, web: { wire: 'pi-rpc', permissionPrompts: false, freshSession: true }, aiProvider: { credentialSource: 'runtime-or-workspace', wirePreference: ['google-generative-ai', 'openai-chat', 'anthropic', 'openai-responses'], defaultWire: 'openai-chat', vendorPolicies: { minimax: { wirePreference: ['anthropic'], legacyRequestedWireFallbacks: { 'openai-chat': 'anthropic' } } }, modelRegistration: { contextWindow: true, reasoning: true } } } },
       ],
     }),
   ),
@@ -782,6 +953,7 @@ export const workspacesHandlers = [
       claude: 'Claude Code',
       codex: 'Codex',
       cursor: 'Cursor Agent',
+      agy: 'Antigravity',
       grok: 'Grok Build',
       omp: 'Oh My Pi',
       opencode: 'opencode',
@@ -792,6 +964,7 @@ export const workspacesHandlers = [
       claude: ['claude', '--settings', '.claude/openalice-autotrust.json'],
       codex: ['codex', '--sandbox', 'danger-full-access', '--ask-for-approval', 'never'],
       cursor: ['cursor-agent'],
+      agy: ['agy'],
       grok: ['grok', '--no-leader'],
       omp: ['omp'],
       opencode: ['opencode'],
@@ -875,6 +1048,15 @@ export const workspacesHandlers = [
   http.get('/api/workspaces/:id/git/status', () =>
     HttpResponse.json({ branch: 'main', clean: true, files: [] }),
   ),
+  http.get('/api/workspaces/:id/cli/:export/manifest', ({ params }) => {
+    const binary = params.export === 'data' ? 'alice' : params.export === 'traderhub' ? 'traderhub' : 'alice-uta'
+    const policy = demoHarnessConfigs.get(String(params.id))?.cli[binary]
+    const groups = policy?.enabled === false ? [] : demoHarnessCommands[binary].filter((group) => policy?.groups?.[group] !== false)
+    return HttpResponse.json({
+      export: params.export, description: 'Demonstration command catalog',
+      groups: Object.fromEntries(groups.map((group) => [group, { show: { description: 'Demonstration command. Production uses the live registry.', schema: { type: 'object', properties: {} } } }])),
+    })
+  }),
   http.get('/api/workspaces/:id/files', ({ params, request }) => {
     const path = new URL(request.url).searchParams.get('path') ?? ''
     const listing = demoDirectoryListing(String(params.id), path)
@@ -885,6 +1067,14 @@ export const workspacesHandlers = [
       )
     }
     return HttpResponse.json(listing)
+  }),
+  http.get('/api/workspaces/:id/content', ({ request }) => {
+    const url = new URL(request.url)
+    const path = url.searchParams.get('path') ?? ''
+    const content = demoWorkspaceFiles[path]
+    if (content == null) return HttpResponse.json({ error: 'file_not_found' }, { status: 404 })
+    if (url.searchParams.get('metadata') === '1') return HttpResponse.json({ path, size: content.length })
+    return new HttpResponse(content, { headers: { 'Content-Type': 'application/octet-stream' } })
   }),
   http.get('/api/workspaces/:id/file', ({ request }) => {
     const url = new URL(request.url)
@@ -947,6 +1137,28 @@ export const workspacesHandlers = [
       ...(displayName ? { displayName } : {}),
     })
   }),
+  http.put('/api/workspaces/:id/resumes/:resumeId/runtime', async ({ params, request }) => {
+    const resumeId = String(params.resumeId)
+    const body = await request.json().catch(() => ({})) as Partial<PausedSessionRuntimeUpdate>
+    if (
+      (body.credentialSource !== 'native' && body.credentialSource !== 'vault')
+      || (body.credentialSource === 'vault' && !body.credentialSlug)
+    ) {
+      return HttpResponse.json({ error: 'bad_request' }, { status: 400 })
+    }
+    const runtime = {
+      credentialSource: body.credentialSource,
+      ...(body.credentialSource === 'vault' ? { credentialSlug: body.credentialSlug! } : {}),
+      ...(body.model ? { model: body.model } : {}),
+      ...(body.reasoningEffort ? { reasoningEffort: body.reasoningEffort } : {}),
+    }
+    demoResumeRuntimes.set(resumeId, runtime)
+    return HttpResponse.json({
+      resumeId,
+      agent: resumeId === 'resume-demo-thesis-owner' ? 'claude' : 'pi',
+      runtime,
+    })
+  }),
   http.patch('/api/workspaces/:id/resumes/:resumeId', async ({ params, request }) => {
     const resumeId = String(params.resumeId)
     const body = await request.json().catch(() => ({})) as { presence?: unknown }
@@ -957,22 +1169,24 @@ export const workspacesHandlers = [
     demoSessionPresence.set(resumeId, presence)
     return HttpResponse.json({ resumeId, presence, lifecycle: 'active' })
   }),
-  http.get('/api/workspaces/:id/resumes', ({ params }) => {
+  http.get('/api/workspaces/:id/resumes', ({ params, request }) => {
+    const requestedResume = new URL(request.url).searchParams.get('resumeId')
     const wsId = String(params.id)
     if (wsId === DEMO_AUTO_QUANT_WORKSPACE_ID) {
       return HttpResponse.json({
         workspace: { id: wsId, tag: 'auto-quant' },
         sessions: [{
-          resumeId: 'resume-demo-thesis-owner', agent: 'claude',
+          resumeId: 'resume-demo-thesis-owner', agent: 'claude', issueAttached: true,
           createdAt: Date.now() - 86_400_000, updatedAt: Date.now() - 60_000,
           lifecycle: 'active', resumable: true, active: false,
+          runtime: demoResumeRuntimes.get('resume-demo-thesis-owner'),
           latestExecution: {
             taskId: 'demo-thesis-owner-run', status: 'done',
             startedAt: Date.now() - 180_000,
             finishedAt: Date.now() - 60_000,
             assistantPreview: 'Reviewed the active thesis invalidation rules.',
           },
-        }],
+        }].filter((session) => !requestedResume || session.resumeId === requestedResume),
       })
     }
     const workspace = demoWorkspaces.find((candidate) => candidate.id === wsId)
@@ -985,6 +1199,7 @@ export const workspacesHandlers = [
       presence?: 'active' | 'archived' | 'deleted'
       resumable: boolean
       active: boolean
+      runtime?: SessionRecord['runtime']
       interactive?: {
         name: string
         title?: string
@@ -1007,12 +1222,17 @@ export const workspacesHandlers = [
       lifecycle: 'active',
       resumable: session.agent !== 'shell',
       active: session.state === 'running',
-      interactive: {
-        name: session.name,
-        ...(session.title ? { title: session.title } : {}),
-        state: session.state,
-        lastActiveAt: session.lastActiveAt,
-      },
+      runtime: demoResumeRuntimes.get(session.resumeId) ?? session.runtime,
+      ...(session.surface === 'headless'
+        ? {}
+        : {
+            interactive: {
+              name: session.name,
+              ...(session.title ? { title: session.title } : {}),
+              state: session.state,
+              lastActiveAt: session.lastActiveAt,
+            },
+          }),
     }))
     if (wsId === DEMO_CHAT_WORKSPACE_ID) {
       const completedHeadless = sessions.find(
@@ -1069,7 +1289,7 @@ export const workspacesHandlers = [
     }
     return HttpResponse.json({
       workspace: { id: wsId, tag: workspace?.tag ?? wsId },
-      sessions: sessions.map((session) => {
+      sessions: sessions.filter((session) => !requestedResume || session.resumeId === requestedResume).map((session) => {
         const presence = demoSessionPresence.get(session.resumeId) ?? session.presence
         return presence && presence !== 'active' ? { ...session, presence } : session
       }),
@@ -1105,11 +1325,13 @@ export const workspacesHandlers = [
   }),
 
   // Quick-chat launch — honor an explicit Chat Workspace target and otherwise
-  // reuse the recent demo Chat workspace. Pi launches use the real WebPi UI
-  // with a recorded native-message response; other runtimes retain the TUI
-  // placeholder so visitors can still see that OpenAlice is multi-runtime.
+  // reuse the recent demo Chat workspace. Runtimes with a structured protocol
+  // open in the real Web conversation UI with a recorded response; runtimes
+  // without one keep the TUI placeholder so visitors still see that OpenAlice
+  // is multi-runtime.
   http.post('/api/workspaces/quick-chat', async ({ request }) => {
     const body = (await request.json().catch(() => null)) as {
+      surface?: unknown
       prompt?: unknown
       agent?: unknown
       targetWsId?: unknown
@@ -1123,7 +1345,9 @@ export const workspacesHandlers = [
       : undefined
     const fallback = body?.template === 'auto-quant-v2'
       ? demoWorkspaces.find((workspace) => workspace.template === 'auto-quant-v2')
-      : demoWorkspaces.find((workspace) => workspace.id === demoChatWorkspace.id)
+      : body?.template === 'auto-prediction'
+        ? demoWorkspaces.find((workspace) => workspace.template === 'auto-prediction')
+        : demoWorkspaces.find((workspace) => workspace.id === demoChatWorkspace.id)
     const ws = explicit ?? fallback
     if (!ws) return HttpResponse.json({ error: 'workspace_not_found' }, { status: 404 })
 
@@ -1140,7 +1364,8 @@ export const workspacesHandlers = [
     const prefix = ({ claude: 'c', codex: 'x', grok: 'g', omp: 'om', opencode: 'o', pi: 'p' } as Record<string, string>)[agent]
       ?? agent.slice(0, 1)
     const name = `${prefix}${ws.sessions.filter((session) => session.agent === agent).length + 1}`
-    const surface = agent === 'pi' ? 'webpi' as const : 'terminal' as const
+    if (body?.surface === 'webpi' && !(agent in demoWebCapabilities)) return HttpResponse.json({ error: 'unsupported_surface' }, { status: 400 })
+    const surface = body?.surface === 'terminal' ? 'terminal' as const : agent in demoWebCapabilities ? 'webpi' as const : 'terminal' as const
     const record: SessionRecord = {
       id: sessionId,
       wsId: ws.id,
@@ -1163,13 +1388,15 @@ export const workspacesHandlers = [
     demoWorkspaces[workspaceIndex] = updatedWorkspace
 
     if (surface === 'webpi') {
-      setDemoWebPiSession({
+      setDemoWebSession({
         wsId: ws.id,
         sessionId,
         resumeId,
+        agent,
         startedAt,
-        messages: demoWebPiFollowUp(prompt),
+        messages: [],
       })
+      startDemoWebTurn(ws.id, sessionId, prompt)
     }
     return HttpResponse.json(
       {
@@ -1228,7 +1455,28 @@ export const workspacesHandlers = [
     }
     return HttpResponse.json({ session: updatedSession })
   }),
-  http.post('/api/workspaces/:id/sessions/:sid/resume', () => HttpResponse.json(null)),
+  http.post('/api/workspaces/:id/sessions/:sid/resume', ({ params }) => {
+    const workspace = demoWorkspaces.find((candidate) => candidate.id === String(params.id))
+    const session = workspace?.sessions.find((candidate) => candidate.id === String(params.sid))
+    if (!workspace || !session) {
+      return HttpResponse.json({ error: 'not_found', message: 'This demo Session is unavailable.' }, { status: 404 })
+    }
+    const key = webKey(workspace.id, session.id)
+    if (!demoResumedSessions.has(key)) demoResumedSessions.set(key, session)
+    // Demo never starts a PTY; pid 0 represents the existing terminal preview.
+    const updated: SessionRecord = {
+      ...session, state: 'running', surface: 'terminal', pid: 0,
+      startedAt: session.state === 'running' ? (session.startedAt ?? Date.now()) : Date.now(),
+      lastActiveAt: new Date().toISOString(),
+    }
+    const index = demoWorkspaces.indexOf(workspace)
+    demoWorkspaces[index] = { ...workspace, sessions: workspace.sessions.map((row) => row.id === session.id ? updated : row) }
+    return HttpResponse.json({
+      sessionId: updated.id, wsId: workspace.id, name: updated.name,
+      pid: updated.pid, startedAt: updated.startedAt, agent: updated.agent,
+      resumeId: updated.resumeId, title: updated.title ?? null, surface: 'terminal',
+    })
+  }),
   http.delete('/api/workspaces/:id/sessions/:sid', ({ params }) => {
     const wsId = String(params.id)
     const sessionId = String(params.sid)
@@ -1240,61 +1488,105 @@ export const workspacesHandlers = [
         sessions: workspace.sessions.filter((session) => session.id !== sessionId),
       }
     }
-    demoWebPiSessions.delete(webPiKey(wsId, sessionId))
+    demoWebSessions.delete(webKey(wsId, sessionId))
     return HttpResponse.json(true)
   }),
   http.get('/api/workspaces/:id/sessions/:sid/diagnostics', () =>
     HttpResponse.json({ status: 'demo' }),
   ),
-  http.post('/api/workspaces/:id/sessions/:sid/webpi/open', ({ params }) => {
+  http.post('/api/workspaces/:id/sessions/:sid/web/open', ({ params }) => {
     const wsId = String(params.id)
     const sessionId = String(params.sid)
-    const snapshot = wsId === demoManagerSession.wsId && sessionId === demoManagerSession.id
-      ? demoManagerSnapshot()
-      : ensureDemoWebPiSession(wsId, sessionId)
+    if (wsId === demoManagerSession.wsId && sessionId === demoManagerSession.id) {
+      return HttpResponse.json({ snapshot: demoManagerSnapshot() })
+    }
+    const record = demoWorkspaces
+      .find((workspace) => workspace.id === wsId)
+      ?.sessions.find((session) => session.id === sessionId)
+    if (record && !(record.agent in demoWebCapabilities)) {
+      return HttpResponse.json({
+        error: 'unsupported_surface',
+        message: `${record.agent} has no Web conversation surface; open it in the terminal instead`,
+      }, { status: 409 })
+    }
+    const snapshot = ensureDemoWebSession(wsId, sessionId)
     return snapshot
       ? HttpResponse.json({ snapshot })
-      : HttpResponse.json({ error: 'webpi_session_not_found' }, { status: 404 })
+      : HttpResponse.json({ error: 'web_session_not_found' }, { status: 404 })
   }),
-  http.get('/api/workspaces/:id/sessions/:sid/webpi', ({ params, request }) => {
+  http.get('/api/workspaces/:id/sessions/:sid/web', ({ params, request }) => {
     const wsId = String(params.id)
     const sessionId = String(params.sid)
     const snapshot = wsId === demoManagerSession.wsId && sessionId === demoManagerSession.id
       ? demoManagerSnapshot()
-      : findDemoWebPiSession(wsId, sessionId)
-    if (!snapshot) return HttpResponse.json({ error: 'webpi_session_not_found' }, { status: 404 })
+      : findDemoWebSession(wsId, sessionId)
+    if (!snapshot) return HttpResponse.json({ error: 'web_not_running' }, { status: 409 })
     const revision = Number.parseInt(new URL(request.url).searchParams.get('revision') ?? '', 10)
     return Number.isFinite(revision) && revision === snapshot.revision
-      ? HttpResponse.json({ unchanged: true })
+      ? HttpResponse.json({ unchanged: true, revision: snapshot.revision })
       : HttpResponse.json({ snapshot })
   }),
-  http.post('/api/workspaces/:id/sessions/:sid/webpi/prompt', async ({ params, request }) => {
+  http.post('/api/workspaces/:id/sessions/:sid/web/prompt', async ({ params, request }) => {
     const body = await request.json().catch(() => ({})) as { message?: string }
     const wsId = String(params.id)
     const sessionId = String(params.sid)
     const message = body.message?.trim() ?? ''
+    if (!message) return HttpResponse.json({ error: 'bad_request', message: 'message is required' }, { status: 400 })
     if (wsId === demoManagerSession.wsId && sessionId === demoManagerSession.id) {
       demoManagerMessages = [
         ...demoManagerMessages,
         { role: 'user', content: message },
-        { role: 'assistant', content: 'Demo manager: I would inspect the live CLI indexes before changing any desk.' },
+        { role: 'assistant', content: [{ type: 'text', text: 'Demo manager: I would inspect the live CLI indexes before changing any desk.' }] },
       ]
       return HttpResponse.json({ snapshot: demoManagerSnapshot() })
     }
-    const snapshot = appendDemoWebPiMessages(wsId, sessionId, demoWebPiFollowUp(message))
+    const current = findDemoWebSession(wsId, sessionId)
+    if (current && current.phase === 'awaiting-input') {
+      return HttpResponse.json({
+        error: 'web_prompt_failed',
+        message: 'answer the pending request before sending another message',
+      }, { status: 409 })
+    }
+    const snapshot = startDemoWebTurn(wsId, sessionId, message)
     return snapshot
       ? HttpResponse.json({ snapshot })
-      : HttpResponse.json({ error: 'webpi_session_not_found' }, { status: 404 })
+      : HttpResponse.json({ error: 'web_not_running' }, { status: 409 })
   }),
-  http.post('/api/workspaces/:id/sessions/:sid/webpi/abort', ({ params }) => {
+  http.post('/api/workspaces/:id/sessions/:sid/web/abort', ({ params }) => {
     const wsId = String(params.id)
     const sessionId = String(params.sid)
-    const snapshot = wsId === demoManagerSession.wsId && sessionId === demoManagerSession.id
-      ? demoManagerSnapshot()
-      : findDemoWebPiSession(wsId, sessionId)
+    if (wsId === demoManagerSession.wsId && sessionId === demoManagerSession.id) {
+      return HttpResponse.json({ snapshot: demoManagerSnapshot() })
+    }
+    // Aborting mid-request drops the pending question and records the stop.
+    const snapshot = updateDemoWebSession(wsId, sessionId, (current) => ({
+      phase: 'idle',
+      streamingMessage: null,
+      requests: [],
+      messages: current.requests.length > 0 || current.streamingMessage
+        ? [...current.messages, { role: 'notice', text: 'Turn stopped by the user.' }]
+        : current.messages,
+    }))
     return snapshot
       ? HttpResponse.json({ snapshot })
-      : HttpResponse.json({ error: 'webpi_session_not_found' }, { status: 404 })
+      : HttpResponse.json({ error: 'web_not_running' }, { status: 409 })
+  }),
+  http.post('/api/workspaces/:id/sessions/:sid/web/respond', async ({ params, request }) => {
+    const body = await request.json().catch(() => ({})) as { requestId?: unknown; optionId?: unknown; text?: unknown }
+    const wsId = String(params.id)
+    const sessionId = String(params.sid)
+    if (typeof body.requestId !== 'string' || typeof body.optionId !== 'string' || (body.text !== undefined && typeof body.text !== 'string')) {
+      return HttpResponse.json({ error: 'bad_request', message: 'requestId and optionId are required' }, { status: 400 })
+    }
+    const result = answerDemoWebRequest(wsId, sessionId, body.requestId, body.optionId, body.text as string | undefined)
+    if (result === null) return HttpResponse.json({ error: 'web_not_running' }, { status: 409 })
+    if (result === 'unknown_request') {
+      return HttpResponse.json({ error: 'web_respond_failed', message: `no pending request ${body.requestId}` }, { status: 409 })
+    }
+    if (result === 'unknown_option') {
+      return HttpResponse.json({ error: 'web_respond_failed', message: `unknown option ${body.optionId}` }, { status: 409 })
+    }
+    return HttpResponse.json({ snapshot: result })
   }),
 
   http.get('/api/workspaces/:id/agent-config', ({ params }) =>
@@ -1370,6 +1662,9 @@ export const workspacesHandlers = [
       reasoningEffort: configured ? config?.reasoningEffort ?? null : null,
       reasoningMode: null,
       reasoningDefaultEnabled: null,
+      ...(agent === 'grok' && !configured
+        ? { interactiveSetupStatus: 'workspace-trust-required' as const }
+        : {}),
     })
   }),
   http.put('/api/workspaces/:id/agent-config/:agent', async ({ params, request }) => {

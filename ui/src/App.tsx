@@ -1,6 +1,7 @@
 import { lazy, Suspense, useEffect, useRef, useState } from 'react'
 import { useLocation } from 'react-router-dom'
 import { ActivityBar } from './components/ActivityBar'
+import { ActivityToasts } from './components/ActivityToasts'
 import { MobileContextBar } from './components/MobileContextBar'
 import { TabHost } from './components/TabHost'
 import { DesktopUpdatePrompt } from './components/DesktopUpdatePrompt'
@@ -14,17 +15,19 @@ import {
 } from './contexts/MobilePageNavigationContext'
 import { UrlAdopter } from './tabs/UrlAdopter'
 import { useLocale } from './i18n/useLocale'
+import { useActivityRailState } from './hooks/useActivityRailState'
+import { PrimaryNavigationContext } from './contexts/PrimaryNavigationContext'
+import { PrimaryNavigationToggle, useNavigationToggleFocus } from './components/PrimaryNavigationToggle'
 
 /**
  * Activity-bar pages — only items that appear as icons in the ActivityBar.
  * Each maps to one or more tab kinds via tabs/registry.ts (defaultSpecForActivity).
  */
 export type Page =
-  | 'chat' | 'auto-quant' | 'inbox' | 'tracked' | 'workspaces' | 'portfolio' | 'news' | 'office' | 'automation' | 'market'
+  | 'chat' | 'auto-quant' | 'prediction' | 'inbox' | 'tracked' | 'workspaces' | 'portfolio' | 'office' | 'automation' | 'market'
   | 'issue'
-  | 'trading-as-git'
   | 'connectors'
-  | 'settings' | 'dev'
+  | 'settings'
 
 /** Subscribe to a CSS media query, SSR-safe (defaults to matched). */
 function useMediaQuery(query: string): boolean {
@@ -44,11 +47,12 @@ function useMediaQuery(query: string): boolean {
 /**
  * Three breakpoints drive the responsive shell:
  *  - <768  (phone):  rail = drawer (hamburger), sidebar = drawer (drill-in)
- *  - 768–959 (small desktop): rail = compact static icon column.
+ *  - 768–959 (small desktop): rail defaults to a compact static icon column.
  *    Page-owned sidebars stay static here, so the business navigator does not
  *    disappear just because the app is in a partial-width browser window.
  *  - 960–1279 (narrow desktop): rail keeps text labels in a slimmer column.
  *  - ≥1280 (roomy desktop): rail gets its full text width.
+ * Explicit expanded/collapsed preference overrides the desktop default.
  */
 const useIsDesktop = () => useMediaQuery('(min-width: 768px)') // rail static
 const useHasRailText = () => useMediaQuery('(min-width: 960px)') // text rail allowed
@@ -76,6 +80,7 @@ function AppShell() {
 }
 
 function AppShellContent() {
+  const macDesktop = window.openAlice?.windowChrome?.platform === 'darwin'
   // Re-render the shell on a language switch so formatter-only subtrees
   // (charts, money/date labels that don't call t()) refresh too.
   useLocale()
@@ -85,6 +90,14 @@ function AppShellContent() {
   const hasRailText = useHasRailText() // ≥960 — text rail is allowed
   const hasFullRail = useHasFullRail() // ≥1280 — full rail width
   const railMode = !isDesktop ? 'full' : hasFullRail ? 'full' : hasRailText ? 'narrow' : 'compact'
+  const { collapsed: railCollapsed, toggle: toggleRail } = useActivityRailState(railMode === 'compact')
+  const toggleFocus = useNavigationToggleFocus()
+  const railToggle = isDesktop ? (
+    <PrimaryNavigationToggle ref={toggleFocus.ref} collapsed={railCollapsed} onToggle={() => {
+      toggleFocus.requestFocus()
+      toggleRail()
+    }} />
+  ) : null
   const location = useLocation()
   const mobilePageNavigation = useMobilePageNavigation()
   const showFirstRunGuide = firstRunGuideEnabled && !location.pathname.startsWith('/design/')
@@ -104,16 +117,19 @@ function AppShellContent() {
         openRail={() => setSidebarOpen(true)}
         closeRail={() => setSidebarOpen(false)}
       />
+      {macDesktop && <UpdateBanner />}
 
-      <TabHost />
+      <PrimaryNavigationContext.Provider value={railCollapsed ? railToggle : null}>
+        <TabHost />
+      </PrimaryNavigationContext.Provider>
     </main>
   )
 
   return (
-    <div className="flex flex-col h-full">
+    <div className={`flex flex-col h-full ${macDesktop ? 'oa-desktop-mac' : ''}`}>
       {import.meta.env.VITE_DEMO_MODE && <DemoBanner />}
       {import.meta.env.VITE_DEMO_MODE && <DemoAnalytics />}
-      <UpdateBanner />
+      {!macDesktop && <UpdateBanner />}
       <DesktopUpdatePrompt />
       <div className="flex flex-1 min-h-0">
         <ActivityBar
@@ -121,6 +137,8 @@ function AppShellContent() {
           onClose={() => setSidebarOpen(false)}
           desktopStatic={isDesktop}
           railMode={railMode}
+          collapsed={railCollapsed}
+          headerAction={!railCollapsed ? railToggle : null}
           returnFocusRef={mobileRailMenuButtonRef}
         />
         <div
@@ -131,6 +149,7 @@ function AppShellContent() {
           {mainContent}
         </div>
         <UrlAdopter />
+        <ActivityToasts />
         {showFirstRunGuide && (
           <Suspense fallback={null}>
             <FirstRunGuide />

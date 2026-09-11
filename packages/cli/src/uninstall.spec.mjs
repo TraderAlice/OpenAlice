@@ -9,6 +9,7 @@ import {
   removeManagedPathBlock,
   removeMatchingBlocks,
   runUninstallCommand,
+  windowsUninstallBootstrap,
 } from './uninstall.mjs'
 
 const temporaryPaths = []
@@ -18,6 +19,17 @@ afterEach(async () => {
 })
 
 describe('OpenAlice CLI uninstall', () => {
+  it('uses an awaited cmd/start bootstrap and quotes Windows shell metacharacters', () => {
+    const root = 'C:\\Alice & Co'
+    const command = windowsUninstallBootstrap('C:\\Windows\\powershell.exe', root + '\\.cli-uninstall.ps1', root, 1234)
+    expect(command).toContain('start "" /b "C:\\Windows\\powershell.exe"')
+    expect(command).toContain('-InstallDir "C:\\Alice & Co"')
+    expect(command).toContain('-WaitForPid 1234 -Yes')
+    expect(command).toContain('-ExecutionPolicy RemoteSigned')
+    for (const path of ['C:\\%TEMP%', 'C:\\bad!path', 'C:\\bad"path', 'C:\\bad\npath']) {
+      expect(() => windowsUninstallBootstrap('powershell.exe', path, path, 1234)).toThrow('Unsupported')
+    }
+  })
   it('removes only the managed PATH block for this install root', () => {
     const content = `before
 # >>> OpenAlice CLI >>>
@@ -84,6 +96,20 @@ after
     })).resolves.toBe(0)
     expect(output.join('')).toContain(join(layout.installRoot, 'workspaces'))
     await expect(access(layout.versionsDir)).resolves.toBeUndefined()
+  })
+
+  it('routes package-managed removal back to the owning manager', async () => {
+    const output = []
+    await expect(runUninstallCommand(['--yes'], {
+      layout: null,
+      readInstallSourceImpl: async () => ({
+        schemaVersion: 3,
+        method: 'aur',
+      }),
+      stdout: { write: (value) => output.push(value) },
+    })).resolves.toBe(0)
+    expect(output.join('')).toContain('paru -Rns openalice-bin')
+    expect(output.join('')).toContain('did not modify')
   })
 
   it('refuses to race a live installer', async () => {

@@ -10,6 +10,7 @@ import {
   type ResolvedSessionRuntimeBinding,
   type WorkspaceAiCred,
 } from './cli-adapter.js'
+import { agyAdapter } from './adapters/agy.js'
 import { claudeAdapter } from './adapters/claude.js'
 import { codexAdapter } from './adapters/codex.js'
 import { cursorAdapter } from './adapters/cursor.js'
@@ -18,6 +19,7 @@ import { ompAdapter } from './adapters/omp.js'
 import { opencodeAdapter } from './adapters/opencode.js'
 import { piAdapter } from './adapters/pi.js'
 import {
+  mergeSessionRuntimeSelection,
   createNativeSessionRuntimeBinding,
   createSessionRuntimeBinding,
   resolveSessionRuntimeBinding,
@@ -276,7 +278,7 @@ describe('built-in Agent Session runtime projection', () => {
     env: { AQ_LAUNCHER_REPO_ROOT: '/openalice' },
   }
 
-  it.each([claudeAdapter, codexAdapter, cursorAdapter, grokAdapter, ompAdapter, opencodeAdapter, piAdapter])(
+  it.each([claudeAdapter, codexAdapter, cursorAdapter, agyAdapter, grokAdapter, ompAdapter, opencodeAdapter, piAdapter])(
     '$id implements a secret-free argv projection',
     (adapter) => {
       const projected = adapter.sessionRuntime!.project(ctx, runtime)
@@ -303,7 +305,7 @@ describe('built-in Agent Session runtime projection', () => {
     },
   )
 
-  it.each([claudeAdapter, codexAdapter, cursorAdapter, grokAdapter, ompAdapter, opencodeAdapter, piAdapter])(
+  it.each([claudeAdapter, codexAdapter, cursorAdapter, agyAdapter, grokAdapter, ompAdapter, opencodeAdapter, piAdapter])(
     '$id accepts a credentialless native binding and still projects model/effort',
     (adapter) => {
       const native = createNativeSessionRuntimeBinding({
@@ -341,6 +343,8 @@ describe('built-in Agent Session runtime projection', () => {
       .toContain('--extension')
     expect(ompAdapter.sessionRuntime!.project(ctx, runtime).interactiveArgs)
       .toEqual(['--model', 'session-model', '--thinking', 'high'])
+    expect(agyAdapter.sessionRuntime!.project(ctx, runtime).interactiveArgs)
+      .toEqual(['--model', 'session-model', '--effort', 'high'])
   })
 
   it.each([
@@ -388,5 +392,20 @@ describe('built-in Agent Session runtime projection', () => {
       expect(args).not.toContain('--setting-sources=project')
       expect(args).not.toContain('--plugin-dir')
     }
+  })
+})
+
+
+describe('Session follow-up selection', () => {
+  const binding = { version: 1 as const, credential: { source: 'vault' as const, credentialSlug: 'a' }, model: 'model-a', reasoningEffort: 'medium' as const }
+  it('retains the Session selection on partial edits', () => {
+    expect(mergeSessionRuntimeSelection(binding, { reasoningEffort: 'high' })).toEqual({ credentialSlug: 'a', model: 'model-a', reasoningEffort: 'high' })
+  })
+  it('does not transfer the old model to a different credential', () => {
+    expect(mergeSessionRuntimeSelection(binding, { credentialSlug: 'b' })).toEqual({ credentialSlug: 'b' })
+    expect(mergeSessionRuntimeSelection(binding, { credentialSource: 'native' })).toEqual({ credentialSource: 'native' })
+  })
+  it('keeps model choices when explicitly supplied with a new credential', () => {
+    expect(mergeSessionRuntimeSelection(binding, { credentialSource: 'native', model: 'new' })).toEqual({ credentialSource: 'native', model: 'new' })
   })
 })

@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from 'vitest'
 
 import type { WorkspaceToolContext } from '../core/workspace-tool-center.js'
 import type { TemplateUpgradePlan } from '../workspaces/template-upgrade.js'
-import { workspaceTemplateUpgradeFactory } from './workspace-template-upgrade.js'
+import { aliceHarnessUpgradeFactory, workspaceTemplateUpgradeFactory } from './workspace-template-upgrade.js'
 
 async function run(tool: Tool, args: Record<string, unknown>) {
   return await tool.execute!(args, { toolCallId: 'upgrade', messages: [] }) as Record<string, any>
@@ -59,6 +59,22 @@ function setup(currentPlan = plan()) {
 }
 
 describe('workspace_template_upgrade', () => {
+  it('passes a scoped Skill operation through preview and apply', async () => {
+    const { templateUpgrades } = setup(plan({ template: 'alice-harness' }))
+    const tool = aliceHarnessUpgradeFactory.build({ workspaceId: 'ws-1', workspaceLabel: 'desk', inboxStore: {} as never, entityStore: {} as never, aliceHarnessUpgrades: templateUpgrades })
+    const result = await run(tool, { skill: 'alice', action: 'update', apply: true, mode: 'detailed' })
+    expect(result.action).toBe('applied')
+    expect(templateUpgrades.plan).toHaveBeenCalledWith('ws-1', { skill: 'alice', action: 'update' })
+    expect(templateUpgrades.apply).toHaveBeenCalledWith('ws-1', { planDigest: 'digest-1', projection: { skill: 'alice', action: 'update' } })
+  })
+
+  it('applies Alice Harness configuration changes at the same source version', async () => {
+    const { tool, templateUpgrades } = setup(plan({ template: 'alice-harness', fromVersion: '1.0.0', toVersion: '1.0.0' }))
+    const result = await run(tool, { apply: true, mode: 'summary' })
+    expect(result.action).toBe('applied')
+    expect(templateUpgrades.apply).toHaveBeenCalledOnce()
+  })
+
   it('previews by default without dumping file bodies', async () => {
     const { tool, templateUpgrades } = setup()
     const result = await run(tool, { apply: false, mode: 'summary' })
@@ -70,7 +86,7 @@ describe('workspace_template_upgrade', () => {
         status: 'ready',
         fromVersion: '1.5.0',
         toVersion: '1.6.1',
-        nextCommand: 'alice-workspace template upgrade --apply',
+        nextCommand: 'alice template upgrade --apply',
       },
     })
     expect(result.preview.changes[0]).not.toHaveProperty('currentPreview')

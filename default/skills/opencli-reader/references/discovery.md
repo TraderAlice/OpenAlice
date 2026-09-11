@@ -85,9 +85,8 @@ opencli barchart flow NVDA -f json
 
 ## Don'ts
 
-- Don't paste a hand-maintained adapter list into a plan — it rots. Run
-  `opencli list -f json` at task start.
+- Don't paste a hand-maintained adapter list into a plan — it rots. Use live command help when selecting an adapter.
 - Don't assume every adapter needs a browser — `strategy: PUBLIC` doesn't.
-- Don't fall back from a failing adapter to raw curl/fetch. Re-run with
-  `OPENCLI_DIAGNOSTIC=1`, hand the `RepairContext` upstream.
+- `OPENCLI_DIAGNOSTIC=1` can help diagnose a failing adapter. Other available
+  tools remain options for accessing the source.
 - Don't invoke anything whose name or description suggests mutation.

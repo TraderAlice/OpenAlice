@@ -47,18 +47,18 @@ files, Issues, Inbox reports, tracked entities, and attributable Sessions.
 
 ## Choose the right surface
 
-OpenAlice places four boundary-specific CLIs on PATH. Their live top-level help
-explains each group; their skills own procedures and exact examples. Read the
-relevant skill before the first domain command and never guess flags.
+OpenAlice provides the CLIs below. Use their help for current parameters and
+the relevant skills for domain-specific guidance. Choose sources and tools to
+fit the task.
 
 | Need | Surface | Skill |
 |---|---|---|
 | Current market boards, fundamentals, macro, calendars | `traderhub` | `traderhub` |
 | Symbol discovery, collected RSS, K-lines and bounded analysis | `alice` | `alice`, `alice-analysis` |
-| Peer addressing, Agent conversation, Inbox, Issues and provenance | `alice-workspace` | `alice-workspace` |
-| Issue files, schedules, headless delivery contracts | `.alice/issues/` + `alice-workspace issue` | `self-scheduling` |
+| Peer addressing, Agent conversation, Inbox, Issues and provenance | `alice` | `alice` |
+| Issue files, schedules, headless delivery contracts | `.alice/issues/` + `alice issue` | `self-scheduling` |
 | Accounts, positions, orders, trading-as-git | `alice-uta` | `alice-uta` |
-| Optional sources Alice does not ship | `opencli` | `opencli-reader` |
+| Optional website adapters, if installed separately | `opencli` | `opencli-reader` |
 
 Use the bundled research skills (`build-thesis`, `sector-rotation`,
 `scan-value-chain`, `retrospective`) when their workflow matches the request.
@@ -80,7 +80,7 @@ For long delegation, let the peer manage its work locally and return an
 ordinary reply; when the result also deserves human attention, have it commit
 the report and push the exact file to Inbox.
 
-The `alice-workspace` skill contains the exact commands. It also owns waiting
+The `alice` skill contains the exact commands. It also owns waiting
 rhythms, reconstruction rules, and the report-reading flow.
 
 ## Durable objects

@@ -1,8 +1,14 @@
+import { serve } from '@hono/node-server'
+import { execFile } from 'node:child_process'
+import { promisify } from 'node:util'
+import { issueRunNowFactory, issueRetryFactory } from '../tool/issue-tools.js'
 import { describe, it, expect, vi } from 'vitest'
 import { Hono } from 'hono'
 import { tool } from 'ai'
 import { z } from 'zod'
-import { resolve } from 'node:path'
+import { resolve, join } from 'node:path'
+import { mkdtemp, mkdir, writeFile, rm } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
 import { ToolCenter } from '../core/tool-center.js'
 import { WorkspaceToolCenter } from '../core/workspace-tool-center.js'
 import { createThinkingTools } from '../tool/thinking.js'
@@ -14,12 +20,23 @@ import { inboxPushFactory } from '../tool/inbox-push.js'
 import { registerCliRoutes, type CliGatewayDeps } from './cli.js'
 
 /**
- * End-to-end gateway test using the real `calculate` tool (no client deps), so
- * the validate -> execute -> unwrap path is exercised for real, not mocked.
+ * Exercise gateway validation, dispatch and response unwrapping with a local
+ * search fixture; no market provider is contacted.
  */
-function makeApp(): Hono {
+function makeApp(manifestOnly = false): Hono {
   const toolCenter = new ToolCenter()
-  toolCenter.register(createThinkingTools(), 'thinking') // registers `calculate`
+  toolCenter.register(createThinkingTools(), 'thinking') // must remain unreachable from CLI
+  toolCenter.register({ marketSearchForResearch: tool({
+    description: 'Local search fixture',
+    inputSchema: z.object({ query: z.string() }),
+    execute: ({ query }) => ({ symbol: query }),
+  }) }, 'market-search')
+
+  toolCenter.register({ simulate: tool({
+    description: 'Unexported simulation fixture',
+    inputSchema: z.object({}),
+    execute: (): { executed: boolean } => { throw new Error('Removed simulation must not execute') },
+  }) }, 'simulation')
 
   const fakeSvc = {
     registry: {
@@ -36,7 +53,7 @@ function makeApp(): Hono {
   }
 
   const app = new Hono()
-  registerCliRoutes(app, deps)
+  registerCliRoutes(app, deps, manifestOnly)
   return app
 }
 
@@ -58,7 +75,19 @@ describe('CLI gateway — data export', () => {
       unmapped: string[]
     }
     expect(body.export).toBe('data')
-    expect(body.groups['think']?.['calc']?.tool).toBe('calculate')
+    expect(body.groups['market']?.['search']?.tool).toBe('marketSearchForResearch')
+    expect(body.groups).not.toHaveProperty('think')
+    expect(body.groups['analysis'] ?? {}).not.toHaveProperty('simulate')
+  })
+
+  it('rejects the removed calculator even when the tool remains registered', async () => {
+    const response = await post('/cli/ws1/data/invoke', { tool: 'calculate', args: { expression: '2 + 2' } })
+    expect(response.status).toBe(404)
+  })
+
+  it('rejects direct invocation of the removed simulator', async () => {
+    const response = await post('/cli/ws1/data/invoke', { tool: 'simulate', args: {} })
+    expect(response.status).toBe(404)
   })
 
   it('manifest 404s on unknown workspace', async () => {
@@ -72,11 +101,11 @@ describe('CLI gateway — data export', () => {
   })
 
   it('invoke runs a mapped tool and returns its payload', async () => {
-    const res = await post('/cli/ws1/data/invoke', { tool: 'calculate', args: { expression: '2 + 2' } })
+    const res = await post('/cli/ws1/data/invoke', { tool: 'marketSearchForResearch', args: { query: 'AAPL' } })
     expect(res.status).toBe(200)
     const body = (await res.json()) as { content: Array<{ type: string; text?: string }> }
     const text = body.content.map((b) => b.text ?? '').join('')
-    expect(text).toContain('4')
+    expect(text).toContain('AAPL')
   })
 
   it('invoke rejects a tool name not on the CLI map (e.g. trading)', async () => {
@@ -85,7 +114,7 @@ describe('CLI gateway — data export', () => {
   })
 
   it('invoke 400s on invalid args', async () => {
-    const res = await post('/cli/ws1/data/invoke', { tool: 'calculate', args: {} })
+    const res = await post('/cli/ws1/data/invoke', { tool: 'marketSearchForResearch', args: {} })
     expect(res.status).toBe(400)
   })
 
@@ -94,28 +123,28 @@ describe('CLI gateway — data export', () => {
     // --totalQuantity) was stripped by non-strict parsing, staging a
     // quantity-less order that validated clean.
     const res = await post('/cli/ws1/data/invoke', {
-      tool: 'calculate',
-      args: { expression: '1 + 1', expresion: 'typo' },
+      tool: 'marketSearchForResearch',
+      args: { query: 'AAPL', qurey: 'typo' },
     })
     expect(res.status).toBe(400)
     const body = (await res.json()) as { error: string; details?: string }
-    expect(body.details).toMatch(/expresion/)
+    expect(body.details).toMatch(/qurey/)
   })
 
   it('invoke 404s on unknown workspace', async () => {
-    const res = await post('/cli/nope/data/invoke', { tool: 'calculate', args: { expression: '1' } })
+    const res = await post('/cli/nope/data/invoke', { tool: 'marketSearchForResearch', args: { query: 'AAPL' } })
     expect(res.status).toBe(404)
   })
 })
 
 describe('CLI gateway — export scope isolation', () => {
-  it('the data export cannot reach a collaboration tool (inbox_push)', async () => {
+  it('unified alice reports an unavailable scoped tool instead of using a global fallback', async () => {
     const res = await post('/cli/ws1/data/invoke', { tool: 'inbox_push', args: {} })
-    expect(res.status).toBe(404) // not in the data map → gated out
+    expect(res.status).toBe(404) // mapped, but not registered in this fixture
   })
 
-  it('the workspace export cannot reach a data tool (calculate)', async () => {
-    const res = await post('/cli/ws1/workspace/invoke', { tool: 'calculate', args: { expression: '1' } })
+  it('the workspace export cannot reach a data tool (marketSearchForResearch)', async () => {
+    const res = await post('/cli/ws1/workspace/invoke', { tool: 'marketSearchForResearch', args: { query: 'AAPL' } })
     expect(res.status).toBe(404) // not in the workspace map → gated out
   })
 
@@ -203,10 +232,13 @@ describe('CLI gateway — inbox read (scoped, string-arg coercion)', () => {
     await inboxStore.append({
       workspaceId: 'ws1',
       workspaceLabel: 'demo',
-      comments: 'mine',
-      docs: [{ path: 'reports/mine.md' }],
+      body: "mine\n\n[[reports/mine.md]]"
     })
-    await inboxStore.append({ workspaceId: 'other', workspaceLabel: 'them', comments: 'theirs' })
+    await inboxStore.append({
+      workspaceId: 'other',
+      workspaceLabel: 'them',
+      body: 'theirs'
+    })
 
     const wtc = new WorkspaceToolCenter()
     wtc.register(inboxReadFactory)
@@ -234,7 +266,7 @@ describe('CLI gateway — inbox read (scoped, string-arg coercion)', () => {
   }
 
   const invoke = async (app: Hono, args: Record<string, string>) => {
-    const res = await app.request('/cli/ws1/workspace/invoke', {
+    const res = await app.request('/cli/ws1/data/invoke', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ tool: 'inbox_read', args }),
@@ -252,7 +284,7 @@ describe('CLI gateway — inbox read (scoped, string-arg coercion)', () => {
     expect(payload.entries[0].mine).toBe(true)
     expect(payload.entries[0].files).toEqual([{
       relativePath: 'reports/mine.md',
-      absolutePath: resolve('/workspaces/ws1/reports/mine.md'),
+      absolutePath: null,
     }])
   })
 
@@ -299,9 +331,11 @@ describe('CLI gateway — agent-invisible origin (x-openalice-run → registry)'
     }
     const wtc = new WorkspaceToolCenter()
     wtc.register(inboxPushFactory)
+    const globals = new ToolCenter()
+    globals.register({ inbox_push: tool({ inputSchema: z.object({ comments: z.string() }), execute: (): string => { throw new Error('Global shadow must never run') } }) }, 'shadow')
     const app = new Hono()
     registerCliRoutes(app, {
-      toolCenter: new ToolCenter(),
+      toolCenter: globals,
       workspaceToolCenter: wtc,
       inboxStore,
       entityStore: {} as never,
@@ -310,16 +344,16 @@ describe('CLI gateway — agent-invisible origin (x-openalice-run → registry)'
     return { app, inboxStore }
   }
 
-  const pushWith = (app: Hono, headers: Record<string, string>) =>
-    app.request('/cli/ws1/workspace/invoke', {
+  const pushWith = (app: Hono, headers: Record<string, string>, exportKey = 'data') =>
+    app.request(`/cli/ws1/${exportKey}/invoke`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', ...headers },
-      body: JSON.stringify({ tool: 'inbox_push', args: { comments: 'report' } }),
+      body: JSON.stringify({ tool: 'inbox_push', args: { body: 'report' } }),
     })
 
-  it('stamps origin from the registry record when the run header is present', async () => {
+  it.each(['data', 'workspace'])('stamps registry origin through the %s export', async (exportKey) => {
     const { app, inboxStore } = makeOriginApp()
-    const res = await pushWith(app, { 'x-openalice-run': 'run-7' })
+    const res = await pushWith(app, { 'x-openalice-run': 'run-7' }, exportKey)
     expect(res.status).toBe(200)
     const { entries } = await inboxStore.read({ workspaceId: 'ws1' })
     expect(entries[0].origin).toEqual({
@@ -390,7 +424,7 @@ describe('CLI gateway — agent-invisible origin (x-openalice-run → registry)'
     // The tool's input schema keys must be exactly the two content fields —
     // never a self-identity parameter.
     const keys = Object.keys(extractMcpShape(built))
-    expect(keys.sort()).toEqual(['comments', 'docs'])
+    expect(keys.sort()).toEqual(['body'])
     expect(keys).not.toContain('origin')
     expect(keys).not.toContain('runId')
     expect(keys).not.toContain('issueId')
@@ -423,7 +457,7 @@ describe('CLI gateway — peer path (cross-workspace resolution)', () => {
   }
 
   const invoke = async (app: Hono, args: Record<string, string>) => {
-    const res = await app.request('/cli/ws1/workspace/invoke', {
+    const res = await app.request('/cli/ws1/data/invoke', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ tool: 'workspace_path', args }),
@@ -460,5 +494,88 @@ describe('CLI gateway — peer path (cross-workspace resolution)', () => {
     expect(status).toBe(200)
     expect(payload.ok).toBe(false)
     expect(payload.error).toMatch(/unknown workspace/)
+  })
+})
+
+
+describe('Workspace CLI documentation', () => {
+  it('shares the live manifest but exposes no invocation routes', async () => {
+    const docs = makeApp(true)
+    const expected = await app.request('/cli/ws1/data/manifest')
+    const actual = await docs.request('/api/workspaces/ws1/cli/data/manifest')
+    expect(await actual.json()).toEqual(await expected.json())
+    expect((await docs.request('/api/workspaces/missing/cli/data/manifest')).status).toBe(404)
+    expect((await docs.request('/api/workspaces/ws1/cli/data/invoke', { method: 'POST' })).status).toBe(404)
+    expect((await docs.request('/cli/ws1/data/invoke', { method: 'POST' })).status).toBe(404)
+  })
+})
+
+
+describe('Workspace CLI configuration', () => {
+  it('filters discovery and rejects direct invocation through both canonical and legacy exports', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'alice-cli-policy-'))
+    try {
+      await mkdir(join(dir, '.alice'))
+      const wtc = new WorkspaceToolCenter()
+      const execute = vi.fn(async () => ({ ok: true }))
+      wtc.register({ name: 'workspace_list', build: () => tool({ inputSchema: z.object({}), execute }) })
+      const server = new Hono()
+      registerCliRoutes(server, {
+        toolCenter: new ToolCenter(), workspaceToolCenter: wtc, inboxStore: {} as never, entityStore: {} as never,
+        getWorkspaceService: () => ({ registry: { get: () => ({ id: 'one', tag: 'one', dir }) } }) as never,
+      })
+      await writeFile(join(dir, '.alice/alice-harness-config.json'), JSON.stringify({ schemaVersion: 1, cli: { alice: { groups: { peer: false } } } }))
+      for (const exp of ['data', 'workspace']) {
+        const manifest = await (await server.request(`/cli/one/${exp}/manifest`)).json() as { groups: object }
+        expect(manifest.groups).not.toHaveProperty('peer')
+        const response = await server.request(`/cli/one/${exp}/invoke`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ tool: 'workspace_list', args: {} }) })
+        expect(response.status).toBe(403)
+      }
+      expect(execute).not.toHaveBeenCalled()
+      await writeFile(join(dir, '.alice/alice-harness-config.json'), '{broken')
+      expect((await server.request('/cli/one/data/manifest')).status).toBe(503)
+      expect((await server.request('/cli/one/workspace/invoke', { method: 'POST', body: JSON.stringify({ tool: 'workspace_list' }) })).status).toBe(503)
+    } finally { await rm(dir, { recursive: true, force: true }) }
+  })
+})
+
+
+describe('Issue run CLI end to end', () => {
+  it('uses the actual launcher, manifest, schema and execution tool for run/retry', async () => {
+    const startIssueRun = vi.fn(async () => ({ taskId: 'run-new' }))
+    const workspaceToolCenter = new WorkspaceToolCenter()
+    workspaceToolCenter.register(issueRunNowFactory)
+    workspaceToolCenter.register(issueRetryFactory)
+    const app = new Hono()
+    registerCliRoutes(app, {
+      toolCenter: new ToolCenter(), workspaceToolCenter,
+      inboxStore: {} as never, entityStore: {} as never,
+      getWorkspaceService: () => ({
+        registry: { get: () => ({ id: 'ws1', tag: 'desk' }) },
+        resolveIssuesByName: async () => [{ wsId: 'ws1', wsTag: 'desk', id: 'daily', title: 'Daily' }],
+        startIssueRun,
+      }) as never,
+    })
+    const server = serve({ fetch: app.fetch, port: 0, hostname: '127.0.0.1' })
+    if (!server.listening) await new Promise<void>((resolve) => server.once('listening', resolve))
+    const address = server.address() as { port: number }
+    const execute = (args: string[]) => promisify(execFile)(process.execPath,
+      [resolve('src/workspaces/cli/bin/openalice-cli.cjs'), ...args], {
+        env: { ...process.env, OPENALICE_CLI_BIN: 'alice', AQ_WS_ID: 'ws1',
+          OPENALICE_TOOL_SOCKET: '', OPENALICE_TOOL_URL: `http://127.0.0.1:${address.port}/cli` },
+        timeout: 10000,
+      })
+    try {
+      expect((await execute(['issue', 'run', '--id', 'daily'])).stdout).toContain('run-new')
+      expect(startIssueRun).toHaveBeenLastCalledWith('ws1', 'daily', undefined)
+      expect((await execute(['issue', 'retry', '--id', 'daily', '--run-id', 'run-old'])).stdout).toContain('run-new')
+      expect(startIssueRun).toHaveBeenLastCalledWith('ws1', 'daily', 'run-old')
+      const before = startIssueRun.mock.calls.length
+      await expect(execute(['issue', 'retry', '--id', 'daily'])).rejects.toThrow()
+      expect(startIssueRun).toHaveBeenCalledTimes(before)
+    } finally {
+      if ('closeAllConnections' in server) server.closeAllConnections()
+      await new Promise<void>((resolve) => server.close(() => resolve()))
+    }
   })
 })

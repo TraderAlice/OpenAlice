@@ -36,11 +36,13 @@ describe('terminal responsive layout contract', () => {
     expect(css).not.toMatch(/\.terminal-host\s+\.xterm-screen\s*\{/)
   })
 
-  it('allows the terminal shell and header text to shrink', () => {
+  it('allows the terminal shell to shrink while the shared toolbar owns header geometry', () => {
     expect(declarationsFor('.terminal-shell')).toContain('min-width: 0')
-    expect(declarationsFor('.terminal-header')).toContain('overflow: hidden')
-    expect(declarationsFor('.terminal-title')).toContain('text-overflow: ellipsis')
-    expect(declarationsFor('.terminal-meta')).toContain('text-overflow: ellipsis')
+    const source = readFileSync(resolve(uiRoot, 'src/components/workspace/Terminal.tsx'), 'utf8')
+    expect(source).toContain('<PageTopBar')
+    expect(source).not.toContain('props.chrome')
+    expect(declarationsFor('.terminal-shell')).toContain('grid-template-rows: minmax(0, 1fr)')
+    expect(css).not.toContain('.terminal-shell.is-canvas')
   })
 
   it('lets the Files overlay own the full Workspace width on a phone', () => {
@@ -51,7 +53,7 @@ describe('terminal responsive layout contract', () => {
 
   it('keeps the terminal titlebar exposed above a narrow Files overlay', () => {
     expect(css).toMatch(
-      /@container \(max-width: 900px\)[\s\S]*?\.workspace-page-shell\.is-terminal-canvas \.workspace-side\s*\{[\s\S]*?inset-block-start: 37px/,
+      /@container \(max-width: 900px\)[\s\S]*?\.workspace-page-shell\.is-terminal-canvas \.workspace-side\s*\{[\s\S]*?inset-block-start: 0/,
     )
   })
 })

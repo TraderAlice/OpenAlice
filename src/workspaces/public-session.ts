@@ -1,12 +1,38 @@
 import type { ModelReasoningEffort } from '../ai-providers/model-semantics.js';
 import type { SessionRuntimeBinding } from './cli-adapter.js';
-import { sessionPreferredTitle, type SessionRecord } from './session-registry.js';
+import type { HeadlessTaskRecord } from './headless-task-registry.js';
+import type { SessionCreatedBy } from './session-metadata.js';
+import { projectSessionPresentationTitle } from './session-presentation.js';
+import type { SessionRecord } from './session-registry.js';
 
 export interface PublicSessionRuntime {
   readonly credentialSource: 'native' | 'vault' | 'workspace';
   readonly credentialSlug?: string;
   readonly model?: string;
   readonly reasoningEffort?: ModelReasoningEffort;
+}
+
+/** A running terminal or Web-surface record owns the interactive execution slot.
+ * Headless records use the separate launcher lease so stale persisted state
+ * cannot make an Issue owner look busy after its process has exited. */
+export function isInteractiveSessionActive(
+  record: Pick<SessionRecord, 'state' | 'surface'> | null | undefined,
+): boolean {
+  return record?.state === 'running' && record.surface !== 'headless';
+}
+
+/** Secret-free credential/model/effort projection of a persisted Session binding. */
+export function projectPublicSessionRuntime(
+  binding: SessionRuntimeBinding,
+): PublicSessionRuntime {
+  return {
+    credentialSource: binding.credential.source,
+    ...(binding.credential.source === 'vault'
+      ? { credentialSlug: binding.credential.credentialSlug }
+      : {}),
+    ...(binding.model ? { model: binding.model } : {}),
+    ...(binding.reasoningEffort ? { reasoningEffort: binding.reasoningEffort } : {}),
+  };
 }
 
 export interface PublicSession {
@@ -37,12 +63,16 @@ interface LiveSessionProjection {
 
 export interface PublicSessionProjectionContext {
   readonly terminal?: LiveSessionProjection | null;
-  readonly webPi?: LiveSessionProjection | null;
-  /** A one-shot execution currently owns the Session without a PTY/WebPi pid. */
+  readonly web?: LiveSessionProjection | null;
+  /** A one-shot execution currently owns the Session without a PTY/Web-surface pid. */
   readonly headless?: boolean;
   readonly runtimeBinding?: SessionRuntimeBinding | null;
   readonly displayName?: string;
   readonly presence?: 'active' | 'archived' | 'deleted';
+  /** Structured provenance used only for the public read-side title. */
+  readonly createdBy?: SessionCreatedBy;
+  readonly latestExecution?: Pick<HeadlessTaskRecord, 'trigger' | 'inquiry' | 'output'> | null;
+  readonly issueTitleFor?: (workspaceId: string, issueId: string) => string | undefined;
 }
 
 /**
@@ -55,7 +85,7 @@ export function projectPublicSession(
   context: PublicSessionProjectionContext = {},
 ): PublicSession {
   const terminal = context.terminal ?? null;
-  const webPi = context.webPi ?? null;
+  const web = context.web ?? null;
   const headless = context.headless === true;
   const binding = context.runtimeBinding ?? null;
 
@@ -66,26 +96,22 @@ export function projectPublicSession(
     name: record.name,
     createdAt: record.createdAt,
     lastActiveAt: record.lastActiveAt,
-    state: record.state === 'running' && (terminal || webPi || headless) ? 'running' : 'paused',
-    surface: webPi ? 'webpi' : terminal ? 'terminal' : (record.surface ?? 'terminal'),
+    state: record.state === 'running' && (terminal || web || headless) ? 'running' : 'paused',
+    surface: web ? 'webpi' : terminal ? 'terminal' : (record.surface ?? 'terminal'),
     resumeId: record.resumeId,
-    pid: terminal?.pid ?? webPi?.pid ?? null,
-    startedAt: terminal?.startedAt ?? webPi?.startedAt ?? null,
-    title: sessionPreferredTitle(record) ?? null,
+    pid: terminal?.pid ?? web?.pid ?? null,
+    startedAt: terminal?.startedAt ?? web?.startedAt ?? null,
+    title: projectSessionPresentationTitle({
+      record,
+      ...(context.createdBy ? { createdBy: context.createdBy } : {}),
+      ...(context.latestExecution !== undefined
+        ? { latestExecution: context.latestExecution }
+        : {}),
+      ...(context.issueTitleFor ? { issueTitleFor: context.issueTitleFor } : {}),
+    }) ?? null,
     ...(context.displayName ? { displayName: context.displayName } : {}),
     sourceRunId: record.sourceRunId ?? null,
     ...(context.presence ? { presence: context.presence } : {}),
-    ...(binding
-      ? {
-          runtime: {
-            credentialSource: binding.credential.source,
-            ...(binding.credential.source === 'vault'
-              ? { credentialSlug: binding.credential.credentialSlug }
-              : {}),
-            ...(binding.model ? { model: binding.model } : {}),
-            ...(binding.reasoningEffort ? { reasoningEffort: binding.reasoningEffort } : {}),
-          },
-        }
-      : {}),
+    ...(binding ? { runtime: projectPublicSessionRuntime(binding) } : {}),
   };
 }

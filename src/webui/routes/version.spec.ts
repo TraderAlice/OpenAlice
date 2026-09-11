@@ -3,6 +3,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 const mocks = vi.hoisted(() => ({
   getVersionInfo: vi.fn(async (options?: { force?: boolean }) => ({
     current: '0.82.0-beta',
+    channel: 'beta',
+    updateAuthority: 'source',
     latest: '0.83.0-beta',
     hasUpdate: true,
     releaseUrl: 'https://example.test/v0.83.0-beta',

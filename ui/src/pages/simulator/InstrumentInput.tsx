@@ -9,11 +9,12 @@
 
 import type { InstrumentDraft, SecType } from './instruments'
 import { SEC_TYPES } from './instruments'
+import { inputClass as sharedInputClass } from '../../components/form'
 
 const inputClass =
-  'px-2 py-1 bg-background text-foreground border border-border rounded text-sm outline-none transition-colors focus:border-primary'
+  `${sharedInputClass} min-h-8 py-1 text-sm`
 const inputClassMono =
-  'px-2 py-1 bg-background text-foreground border border-border rounded font-mono text-xs outline-none transition-colors focus:border-primary'
+  `${sharedInputClass} min-h-8 py-1 font-mono text-xs`
 
 export function InstrumentInput({ draft, onChange, knownSymbols }: {
   draft: InstrumentDraft

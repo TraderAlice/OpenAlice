@@ -16,6 +16,28 @@ export interface QuickChatPreferences {
   recentLaunch?: QuickChatLaunchPreference | null
 }
 
+export interface HarnessPreferences {
+  readonly showHeadlessBornSessions: boolean
+  readonly showIssueAttachedSessions: boolean
+  readonly showUnverifiedHarnessReleases: boolean
+}
+
+export const DEFAULT_HARNESS_PREFERENCES: HarnessPreferences = {
+  showHeadlessBornSessions: false,
+  showIssueAttachedSessions: false,
+  showUnverifiedHarnessReleases: false,
+}
+
+export interface AgentRuntimesPreferences {
+  readonly quickAccessIds: readonly string[]
+  readonly recentAgentIds: readonly string[]
+}
+
+export const DEFAULT_AGENT_RUNTIMES_PREFERENCES: AgentRuntimesPreferences = {
+  quickAccessIds: [],
+  recentAgentIds: [],
+}
+
 export type WorkspaceShellStatus =
   | { supported: false }
   | {
@@ -72,6 +94,38 @@ export const preferencesApi = {
       method: 'PUT',
       headers,
       body: JSON.stringify(input),
+    })
+  },
+
+  getHarness(): Promise<HarnessPreferences> {
+    return fetchJson('/api/preferences/harness')
+  },
+
+  saveHarness(next: HarnessPreferences): Promise<HarnessPreferences> {
+    return fetchJson('/api/preferences/harness', {
+      method: 'PUT',
+      headers,
+      body: JSON.stringify(next),
+    })
+  },
+
+  getAgentRuntimes(): Promise<AgentRuntimesPreferences> {
+    return fetchJson('/api/preferences/agent-runtimes')
+  },
+
+  saveAgentRuntimes(next: Pick<AgentRuntimesPreferences, 'quickAccessIds'>): Promise<AgentRuntimesPreferences> {
+    return fetchJson('/api/preferences/agent-runtimes', {
+      method: 'PUT',
+      headers,
+      body: JSON.stringify(next),
+    })
+  },
+
+  rememberAgentRuntimeUse(agentId: string): Promise<AgentRuntimesPreferences> {
+    return fetchJson('/api/preferences/agent-runtimes/recent', {
+      method: 'PUT',
+      headers,
+      body: JSON.stringify({ agentId }),
     })
   },
 }

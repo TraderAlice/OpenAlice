@@ -12,6 +12,7 @@ import {
   deskProgressMessageId,
   deskProgressScope,
   projectDeskComment,
+  projectDeskLifecycle,
   projectDeskTurnProgress,
   projectWorkspaceDeskTurnProgress,
   resetProjectedDeskTexts,
@@ -48,10 +49,10 @@ function progress(blocks: HeadlessTurnProgress['blocks']): HeadlessTurnProgress 
 }
 
 function mockClient() {
-  const sent: { id: string; text: string }[] = []
+  const sent: Array<{ id: string; conversationId: string; phase: string; text?: string }> = []
   const client = {
-    sendOwnerMessage: async (message: { id: string; text: string }) => {
-      sent.push({ id: message.id, text: message.text })
+    sendOwnerMessage: async (message: { id: string; conversationId: string; phase: string; text?: string }) => {
+      sent.push(message)
       return { accepted: true }
     },
   } as unknown as ConnectorClient
@@ -78,7 +79,7 @@ describe('sealedProgressTexts', () => {
     ]))).toEqual(['Looking at the book.', 'Checking another file.'])
   })
 
-  it('does not ship a lone trailing text, tools, errors, or [[no-reply]]', () => {
+  it('does not ship a lone trailing text, tools, or errors', () => {
     expect(sealedProgressTexts(progress([
       { type: 'text', text: 'Final answer only.' },
     ]))).toEqual([])
@@ -87,12 +88,20 @@ describe('sealedProgressTexts', () => {
       { type: 'text', text: 'After the tool.' },
     ]))).toEqual([])
     expect(sealedProgressTexts(progress([
-      { type: 'text', text: '[[no-reply]] quiet' },
-      { type: 'tool', id: 't1', name: 'Read', status: 'running' },
-    ]))).toEqual([])
-    expect(sealedProgressTexts(progress([
       { type: 'error', message: 'boom' },
     ]))).toEqual([])
+  })
+
+  it('preserves syntax for Connector to interpret', () => {
+    const snapshot = progress([
+      { type: 'text', text: 'We discussed [[no-reply]] syntax.' },
+      { type: 'tool', id: 't1', name: 'Read', status: 'running' },
+    ])
+    expect(sealedProgressTexts(snapshot)).toEqual(['We discussed [[no-reply]] syntax.'])
+    expect(sealedProgressTexts(snapshot, {
+      kind: 'connector-cron-issue',
+      connectorId: 'telegram',
+    })).toEqual(['We discussed [[no-reply]] syntax.'])
   })
 })
 
@@ -132,7 +141,7 @@ describe('deskProgressScope', () => {
 })
 
 describe('projectDeskTurnProgress', () => {
-  const desk = { telegramConnector: true as const, status: 'todo' as const }
+  const desk = { connectorDesk: 'telegram', status: 'todo' as const }
 
   it('sends sealed texts once and skips tools', async () => {
     const { client, sent } = mockClient()
@@ -153,10 +162,12 @@ describe('projectDeskTurnProgress', () => {
       progress: snapshot,
       client,
     })
-    expect(sent).toEqual([{
+    expect(sent).toEqual([expect.objectContaining({
       id: deskProgressMessageId('telegram-1', 'Looking at the book.'),
+      conversationId: 'telegram-1',
+      phase: 'progress',
       text: 'Looking at the book.',
-    }])
+    })])
     expect(alreadyProjectedDeskText('telegram-1', 'Looking at the book.')).toBe(true)
   })
 
@@ -173,7 +184,7 @@ describe('projectDeskTurnProgress', () => {
       client,
     })
     await projectDeskTurnProgress({
-      issue: { telegramConnector: true, status: 'canceled' },
+      issue: { connectorDesk: 'telegram', status: 'canceled' },
       scopeId: 'c1',
       progress: snapshot,
       client,
@@ -202,10 +213,64 @@ describe('projectDeskTurnProgress', () => {
   })
 })
 
-describe('final comment dedup', () => {
-  it('skips a final comment whose markdown was already shipped as progress', async () => {
+describe('owner-chat lifecycle', () => {
+  it('projects accepted without fake text and failed as a visible terminal event', async () => {
     const { client, sent } = mockClient()
-    const issue = { telegramConnector: true as const }
+    const issue = { connectorDesk: 'telegram', status: 'todo' as const }
+    await projectDeskLifecycle({ issue, conversationId: 'comment-1', phase: 'accepted', client })
+    await projectDeskLifecycle({
+      issue,
+      conversationId: 'comment-1',
+      phase: 'failed',
+      text: 'The Agent could not start.',
+      client,
+    })
+    expect(sent[0]).toMatchObject({ conversationId: 'comment-1', phase: 'accepted' })
+    expect(sent[0]).not.toHaveProperty('text')
+    expect(sent[1]).toMatchObject({
+      conversationId: 'comment-1', phase: 'failed', text: 'The Agent could not start.',
+    })
+  })
+})
+
+describe('final comment projection', () => {
+  it('forwards no-reply syntax unchanged for Connector interpretation', async () => {
+    const { client, sent } = mockClient()
+    const issue = { connectorDesk: 'telegram' }
+    const comment = {
+      id: 'comment-reply-run-quoted',
+      author: '@resume-a',
+      at: 'now',
+      markdown: 'Here is how `[[no-reply]]` works.',
+    }
+    expect(shouldProjectDeskComment(issue, comment)).toBe(true)
+    await projectDeskComment(issue, comment, client)
+    expect(sent.map((item) => item.text)).toEqual(['Here is how `[[no-reply]]` works.'])
+
+    expect(shouldProjectDeskComment(issue, comment, {
+      triggerMetadata: {
+        kind: 'connector-cron-issue',
+        connectorId: 'telegram',
+      },
+    })).toBe(true)
+  })
+
+  it('forwards in-turn comments with their automation source and progress phase', async () => {
+    const { client, sent } = mockClient()
+    const issue = { connectorDesk: 'telegram' }
+    const comment = { id: 'note', author: '@agent', at: 'now', markdown: 'Still checking.' }
+    await projectDeskComment(issue, comment, client, { phase: 'progress', progressScopeId: 'run' })
+    expect(sent[0]).toMatchObject({ phase: 'progress', conversationId: 'run', text: 'Still checking.' })
+    await projectDeskComment(issue, { ...comment, markdown: '[[no-reply]] quiet' }, client, {
+      phase: 'progress', progressScopeId: 'run', automated: true,
+    })
+    expect(sent).toHaveLength(2)
+    expect(sent[1]).toMatchObject({ source: 'automation', text: '[[no-reply]] quiet', phase: 'progress' })
+  })
+
+  it('persists a final comment even when the same text was shown in an ephemeral draft', async () => {
+    const { client, sent } = mockClient()
+    const issue = { connectorDesk: 'telegram' }
     await projectDeskTurnProgress({
       issue: { ...issue, status: 'todo' },
       scopeId: 'telegram-1',
@@ -223,15 +288,20 @@ describe('final comment dedup', () => {
       markdown: 'Looking at the book.',
       replyTo: 'telegram-1',
     }
-    expect(shouldProjectDeskComment(issue, comment)).toBe(false)
+    expect(shouldProjectDeskComment(issue, comment)).toBe(true)
     await projectDeskComment(issue, comment, client)
-    expect(sent).toHaveLength(1)
+    expect(sent).toHaveLength(2)
+    expect(sent[1]).toMatchObject({
+      conversationId: 'telegram-1',
+      phase: 'final',
+      text: 'Looking at the book.',
+    })
     expect(alreadyProjectedDeskText('telegram-1', 'Looking at the book.')).toBe(false)
   })
 
   it('still ships a different final reply', async () => {
     const { client, sent } = mockClient()
-    const issue = { telegramConnector: true as const }
+    const issue = { connectorDesk: 'telegram' }
     await projectDeskTurnProgress({
       issue: { ...issue, status: 'todo' },
       scopeId: 'run-1',

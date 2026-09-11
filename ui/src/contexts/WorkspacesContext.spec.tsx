@@ -9,6 +9,7 @@ import {
   type SessionRecord,
   type Workspace,
 } from '../components/workspace/api'
+import { resetAgentRuntimesStore } from '../hooks/useAgentRuntimes'
 import { i18n } from '../i18n'
 import { ToastProvider } from '../components/Toast'
 import { useWorkspaces } from './workspaces-context'
@@ -25,9 +26,10 @@ const mocks = vi.hoisted(() => ({
   getIssueDefaultAgent: vi.fn(),
   openResumeSession: vi.fn(),
   getWorkspaceManager: vi.fn(),
+  getWorkspaceSessionDirectory: vi.fn(),
   pauseSession: vi.fn(),
   resumeSession: vi.fn(),
-  openWebPiSession: vi.fn(),
+  openWebSession: vi.fn(),
   quickChat: vi.fn(),
   deleteSession: vi.fn(),
   getWorkspaceState: vi.fn(),
@@ -56,9 +58,10 @@ vi.mock('../components/workspace/api', async (importOriginal) => {
     getIssueDefaultAgent: mocks.getIssueDefaultAgent,
     openResumeSession: mocks.openResumeSession,
     getWorkspaceManager: mocks.getWorkspaceManager,
+    getWorkspaceSessionDirectory: mocks.getWorkspaceSessionDirectory,
     pauseSession: mocks.pauseSession,
     resumeSession: mocks.resumeSession,
-    openWebPiSession: mocks.openWebPiSession,
+    openWebSession: mocks.openWebSession,
     quickChat: mocks.quickChat,
     deleteSession: mocks.deleteSession,
   }
@@ -145,7 +148,7 @@ function ManagerProbe() {
     workspaceManager,
     pauseSession,
     resumeSession,
-    openWebPiSession,
+    openWebSession,
     requestDeleteSession,
   } = useWorkspaces()
   const session = workspaceManager?.sessions[0]
@@ -155,7 +158,7 @@ function ManagerProbe() {
       <span>{session.title}</span>
       <button type="button" onClick={() => void pauseSession(MANAGER_WORKSPACE_ID, session.id)}>Pause manager</button>
       <button type="button" onClick={() => void resumeSession(MANAGER_WORKSPACE_ID, session.id)}>Resume manager</button>
-      <button type="button" onClick={() => void openWebPiSession(MANAGER_WORKSPACE_ID, session.id)}>Open manager WebPi</button>
+      <button type="button" onClick={() => void openWebSession(MANAGER_WORKSPACE_ID, session.id)}>Open manager Web</button>
       <button type="button" onClick={() => requestDeleteSession(MANAGER_WORKSPACE_ID, session.id)}>Delete manager</button>
     </div>
   )
@@ -186,6 +189,7 @@ function QuickChatProbe() {
 
 beforeEach(async () => {
   vi.clearAllMocks()
+  resetAgentRuntimesStore()
   await i18n.changeLanguage('en')
   mocks.listWorkspaces.mockResolvedValue([workspace()])
   mocks.listTemplates.mockResolvedValue([])
@@ -193,10 +197,11 @@ beforeEach(async () => {
   mocks.getWorkspaceDefaultAgent.mockResolvedValue(null)
   mocks.getIssueDefaultAgent.mockResolvedValue(null)
   mocks.openResumeSession.mockResolvedValue({ session: persistentSession() })
+  mocks.getWorkspaceSessionDirectory.mockResolvedValue({ sessions: [] })
   mocks.getWorkspaceManager.mockResolvedValue(managerSnapshot())
   mocks.pauseSession.mockResolvedValue(true)
   mocks.resumeSession.mockResolvedValue(null)
-  mocks.openWebPiSession.mockResolvedValue({ pid: 43, startedAt: 3 })
+  mocks.openWebSession.mockResolvedValue({ pid: 43, startedAt: 3 })
   mocks.quickChat.mockResolvedValue({
     workspace: workspace(),
     session: {
@@ -226,7 +231,7 @@ beforeEach(async () => {
 afterEach(cleanup)
 
 describe('WorkspacesProvider conversation routing', () => {
-  it('adopts an explicit WebPi surface returned by quick-chat', async () => {
+  it('adopts an explicit Web surface returned by quick-chat', async () => {
     mocks.listWorkspaces
       .mockResolvedValueOnce([workspace()])
       .mockImplementation(() => new Promise(() => undefined))
@@ -271,6 +276,22 @@ describe('WorkspacesProvider conversation routing', () => {
     expect(mocks.setSidebar).toHaveBeenCalledWith('chat')
   })
 
+  it('asks before activating an Issue owner and cancellation does not launch it', async () => {
+    mocks.getWorkspaceSessionDirectory.mockResolvedValue({ sessions: [
+      { resumeId: 'resume-headless', issueAttached: true },
+    ] })
+    render(<ToastProvider><WorkspacesProvider><Probe /></WorkspacesProvider></ToastProvider>)
+    fireEvent.click(screen.getByRole('button', { name: 'Continue' }))
+    const dialog = await screen.findByRole('alertdialog')
+    expect(dialog.textContent).toContain('Issue')
+    expect(mocks.openResumeSession).not.toHaveBeenCalled()
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }))
+    expect(mocks.openResumeSession).not.toHaveBeenCalled()
+    fireEvent.click(screen.getByRole('button', { name: 'Continue' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Open connection' }))
+    await waitFor(() => expect(mocks.openResumeSession).toHaveBeenCalledOnce())
+  })
+
   it('routes Manager lifecycle actions through the separate launcher-owned state', async () => {
     mocks.resumeSession.mockResolvedValue({ pid: 42, startedAt: 2 })
     render(
@@ -295,8 +316,8 @@ describe('WorkspacesProvider conversation routing', () => {
       params: { sessionId: 'opencode-manager-session' },
     }))
 
-    fireEvent.click(screen.getByRole('button', { name: 'Open manager WebPi' }))
-    await waitFor(() => expect(mocks.openWebPiSession).toHaveBeenCalledWith(
+    fireEvent.click(screen.getByRole('button', { name: 'Open manager Web' }))
+    await waitFor(() => expect(mocks.openWebSession).toHaveBeenCalledWith(
       MANAGER_WORKSPACE_ID,
       'opencode-manager-session',
     ))
@@ -310,7 +331,7 @@ describe('WorkspacesProvider conversation routing', () => {
     ))
   })
 
-  it('lands a deleted focused Session on its Workspace Session library', async () => {
+  it('lands a deleted focused Session on its Workspace new-conversation composer', async () => {
     const focusedSession = persistentSession()
     mocks.listWorkspaces.mockResolvedValue([{ ...workspace(), sessions: [focusedSession] }])
     mocks.getWorkspaceState.mockReturnValue({

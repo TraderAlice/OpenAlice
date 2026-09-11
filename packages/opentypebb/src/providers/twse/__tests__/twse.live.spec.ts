@@ -17,7 +17,7 @@ async function run(F: any, params: any) {
   return F.transformData(q, raw)
 }
 
-// Network-dependent — run with TWSE_LIVE=1 (kept out of default CI).
+// Network-dependent — run through `pnpm test:external:readonly`.
 describe.skipIf(!process.env.TWSE_LIVE)('twse provider — live', () => {
   it('search 台積 → 2330.TW (Chinese name)', async () => {
     const r = await run(TWSEEquitySearchFetcher, { query: '台積' })

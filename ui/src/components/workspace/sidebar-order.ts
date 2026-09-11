@@ -5,7 +5,8 @@ function timestamp(value: string): number {
   return Number.isFinite(parsed) ? parsed : 0
 }
 
-function workspaceActivityMs(workspace: Workspace): number {
+/** Canonical Workspace recency used by every overview and navigation surface. */
+export function workspaceActivityMs(workspace: Workspace): number {
   const sessionActivity = workspace.sessions.map((session) => timestamp(session.lastActiveAt))
   return sessionActivity.length > 0
     ? Math.max(timestamp(workspace.createdAt), ...sessionActivity)

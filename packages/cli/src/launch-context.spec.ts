@@ -1,6 +1,6 @@
 import { join, resolve } from 'node:path'
 
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 
 import {
   buildManagedPiEnv,
@@ -135,6 +135,58 @@ describe('ResolvedLaunchContext', () => {
       kind: 'source',
       contentIdentity: null,
     })
+  })
+
+  it('selects the Bun executable provider and its sidecar resource root', () => {
+    vi.stubGlobal('__OPENALICE_BUN_STANDALONE__', true)
+    try {
+      const context = resolveLaunchContext({
+        homeDir: '/home/alice',
+        cwd: '/outside/repository',
+        platform: 'linux',
+        env: {
+          OPENALICE_APP_HOME: '/opt/openalice/releases/v1/share/openalice',
+          OPENALICE_RUNTIME_CONTENT_IDENTITY: 'release-content-1',
+        },
+      })
+
+      expect(context.appDir).toBe(resolve('/opt/openalice/releases/v1/share/openalice'))
+      expect(context.aliceProject.appRoot).toBe(resolve('/opt/openalice/releases/v1/share/openalice'))
+      expect(context.runtimeProvider).toEqual({
+        kind: 'bun',
+        contentIdentity: 'release-content-1',
+      })
+    } finally {
+      vi.unstubAllGlobals()
+    }
+  })
+
+  it('keeps user-owned Pi state and drops desktop-managed Pi in the Bun provider', () => {
+    vi.stubGlobal('__OPENALICE_BUN_STANDALONE__', true)
+    try {
+      const context = resolveLaunchContext({
+        homeDir: '/home/alice',
+        platform: 'linux',
+        env: {
+          OPENALICE_APP_HOME: '/opt/openalice/releases/v1/share/openalice',
+          OPENALICE_RUNTIME_CONTENT_IDENTITY: 'release-content-1',
+        },
+      })
+      const base = {
+        OPENALICE_MANAGED_PI_PATH: '/desktop/pi/cli.js',
+        OPENALICE_MANAGED_PI_NODE_PATH: '/desktop/node',
+        PI_CODING_AGENT_DIR: '/native/pi',
+        PI_CODING_AGENT_SESSION_DIR: '/native/pi/sessions',
+      }
+
+      expect(buildManagedPiEnv(context, base)).toEqual({
+        PI_CODING_AGENT_DIR: '/native/pi',
+        PI_CODING_AGENT_SESSION_DIR: '/native/pi/sessions',
+      })
+      expect(base).toHaveProperty('OPENALICE_MANAGED_PI_PATH')
+    } finally {
+      vi.unstubAllGlobals()
+    }
   })
 
   it('refuses an installed Runtime without its paired content identity', () => {

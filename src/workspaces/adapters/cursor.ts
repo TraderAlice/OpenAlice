@@ -199,6 +199,10 @@ export const cursorAdapter: CliAdapter = {
     resumeById: true,
     transcriptDiscovery: 'subprocess',
     headless: true,
+    // `cursor-agent acp` is a native Agent Client Protocol agent: sessions are
+    // created/loaded in-band and tool permissions arrive as
+    // `session/request_permission`.
+    web: { wire: 'acp', permissionPrompts: true, freshSession: true },
     aiProvider: {
       credentialSource: 'runtime-or-workspace',
       // Cursor Dashboard credentials stay in the shared provider vault, but
@@ -225,13 +229,27 @@ export const cursorAdapter: CliAdapter = {
     const cmd = [
       'cursor-agent',
       ...(ctx.sessionRuntime?.interactiveArgs ?? []),
-      ...(ctx.approveProject ? ['--trust'] : []),
+      '--trust', '--force', '--sandbox', 'disabled',
     ];
     if (ctx.resume === undefined) {
       if (ctx.initialPrompt) return [...cmd, '--', ctx.initialPrompt];
       return cmd;
     }
     return [...cmd, ...cursorResumeArgs(ctx.resume)];
+  },
+
+  // Web surface: `cursor-agent [global flags] acp`. Global options (model,
+  // trust) precede the subcommand, as in Cursor's own ACP documentation
+  // (`agent --api-key … acp`). Resume/new is negotiated in ACP
+  // (`session/load` / `session/new`), so no resume flag belongs here.
+  composeWebCommand(_base: readonly string[], ctx: SpawnContext): readonly string[] {
+    if (ctx.resume === 'last') throw new Error('the Web surface requires a concrete Cursor session id or a fresh Session');
+    return [
+      'cursor-agent',
+      ...(ctx.sessionRuntime?.webArgs ?? ctx.sessionRuntime?.interactiveArgs ?? []),
+      '--trust', '--force', '--sandbox', 'disabled',
+      'acp',
+    ];
   },
 
   composeHeadlessCommand(
@@ -245,12 +263,27 @@ export const cursorAdapter: CliAdapter = {
       '--output-format',
       'stream-json',
       '--force',
+      '--sandbox', 'disabled',
       '--trust',
       ...(ctx.sessionRuntime?.headlessArgs ?? []),
       ...cursorResumeArgs(ctx.resume),
       '--',
       prompt,
     ];
+  },
+
+  composeEnv(ctx: SpawnContext): Record<string, string> {
+    if (process.platform === 'win32' || !ctx.env['PATH']) return {};
+    // Cursor 2026.09.08 snapshots a login shell, then evaluates this hook
+    // after restoring that snapshot in Bash/Zsh (including print/ACP mode).
+    // Keep Alice's already-resolved CLI/toolchain precedence over host profiles.
+    // This is a vendor-internal seam; retain live shell acceptance on upgrades.
+    const path = `'${ctx.env['PATH'].replace(/'/g, `'"'"'`)}'`;
+    const inherited = ctx.env['__CURSOR_SANDBOX_ENV_RESTORE']?.trim();
+    return {
+      __CURSOR_SANDBOX_ENV_RESTORE: [inherited, `builtin export PATH=${path}`]
+        .filter(Boolean).join('; '),
+    };
   },
 
   extractHeadlessSessionId(line: string): string | null {

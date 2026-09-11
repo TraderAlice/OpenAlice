@@ -15,7 +15,7 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock('../tabs/store', () => ({
   useWorkspace: (selector: (state: Record<string, unknown>) => unknown) => selector({
-    selectedSidebar: 'settings',
+    selectedSidebar: 'issue',
     setSidebar: mocks.setSidebar,
     openOrFocus: mocks.openOrFocus,
   }),
@@ -25,13 +25,22 @@ vi.mock('../live/inbox-read', () => ({
   useUnreadInboxCount: () => 0,
 }))
 
+vi.mock('../tabs/types', () => ({ getFocusedTab: () => ({ spec: { kind: 'issue' } }) }))
+vi.mock('./workspace/ChatWorkspaceSection', () => ({
+  ChatWorkspaceSection: ({ mode }: { mode: string }) => <button className="min-h-10 md:min-h-8">{mode} Harness</button>,
+}))
+
 vi.mock('../live/trading-push', () => ({
   usePendingPushCount: () => 0,
 }))
 
+vi.mock('../live/connector-health', () => ({
+  useConnectorWarningCount: () => 0,
+}))
+
 vi.mock('../live/activity-bar-collapse', () => ({
   useActivityBarCollapse: (selector: (state: Record<string, unknown>) => unknown) => selector({
-    collapsedSections: {},
+    collapsedSections: { beta: true },
     setCollapsed: mocks.setCollapsed,
     railCollapsed: false,
     setRailCollapsed: mocks.setRailCollapsed,
@@ -41,9 +50,9 @@ vi.mock('../live/activity-bar-collapse', () => ({
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({
     t: (key: string) => ({
-      'nav.item.chat': 'Ask Alice',
-      'nav.item.settings': 'Settings',
-      'nav.item.dev': 'Dev Panel',
+      'nav.quickStart': 'Quick Start',
+      'nav.item.issue': 'Issues',
+      'nav.item.automation': 'Automation',
       'nav.section.beta': 'Beta',
       'nav.section.system': 'System',
       'nav.primaryNavigation': 'Primary navigation',
@@ -51,8 +60,8 @@ vi.mock('react-i18next', () => ({
   }),
 }))
 
-vi.mock('./ThemeToggle', () => ({
-  ThemeToggle: () => null,
+vi.mock('./ActivityBarUtilityMenu', () => ({
+  ActivityBarUtilityMenu: () => <button type="button">Project menu</button>,
 }))
 
 beforeEach(() => {
@@ -100,18 +109,15 @@ describe('ActivityBar mobile drawer state', () => {
   it('keeps mobile drawer actions tappable without changing desktop density', () => {
     render(<ActivityBar open onClose={vi.fn()} desktopStatic={false} />)
 
-    const primaryAction = screen.getByRole('button', { name: 'Ask Alice' })
-    const sectionToggle = screen.getByRole('button', { name: 'Beta' })
-    const sectionInfo = screen.getByRole('button', { name: 'nav.about' })
+    const primaryAction = screen.getByRole('button', { name: 'Quick Start' })
+    const predictionAction = screen.getByRole('button', { name: 'prediction Harness' })
 
     expect(primaryAction.className).toContain('min-h-10')
-    expect(primaryAction.className).toContain('md:min-h-[34px]')
-    expect(sectionToggle.className).toContain('min-h-10')
-    expect(sectionToggle.className).toContain('md:min-h-7')
-    expect(sectionInfo.className).toContain('min-h-10')
-    expect(sectionInfo.className).toContain('min-w-10')
-    expect(sectionInfo.className).toContain('md:min-h-7')
-    expect(sectionInfo.className).toContain('md:min-w-7')
+    expect(primaryAction.className).toContain('md:min-h-8')
+    expect(predictionAction.className).toContain('min-h-10')
+    expect(predictionAction.className).toContain('md:min-h-8')
+    expect(screen.queryByRole('button', { name: 'Beta' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'nav.about' })).toBeNull()
   })
 
   it('dismisses through the shared Sheet overlay', async () => {
@@ -142,17 +148,19 @@ describe('ActivityBar mobile drawer state', () => {
     )
 
     const drawer = screen.getByRole('dialog', { name: 'Primary navigation' })
-    const currentDestination = screen.getByRole('button', { name: 'Settings' })
+    const currentDestination = screen.getByRole('button', { name: 'Issues' })
     const focusableActions = Array.from(
       drawer.querySelectorAll<HTMLButtonElement>('button:not([disabled])'),
     ).filter((element) => element.tabIndex >= 0 && element.getAttribute('aria-hidden') !== 'true')
     const firstAction = focusableActions[0]!
+    const firstDestination = focusableActions[1]!
     const lastAction = focusableActions.at(-1)!
     const backdrop = document.querySelector<HTMLElement>('[data-slot="sheet-overlay"]')
 
     expect(drawer.getAttribute('aria-modal')).toBe('true')
-    expect(firstAction.textContent).toContain('Ask Alice')
-    expect(lastAction.textContent).toContain('Settings')
+    expect(firstAction.getAttribute('aria-label')).toBe('common.closePanel')
+    expect(firstDestination.textContent).toContain('Quick Start')
+    expect(lastAction.textContent).toContain('Project menu')
     await waitFor(() => expect(document.activeElement).toBe(currentDestination))
     expect(drawer.className).toContain('motion-reduce:transition-none')
     expect(backdrop?.getAttribute('aria-hidden')).toBe('true')

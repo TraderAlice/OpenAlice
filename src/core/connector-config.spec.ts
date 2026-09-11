@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { mkdtemp, rm } from 'node:fs/promises'
+import { mkdtemp, rm, stat } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
@@ -25,6 +25,91 @@ afterEach(async () => {
 })
 
 describe('public connector config', () => {
+  it('preserves concurrent mutations to different adapters', async () => {
+    const config = await loadModule()
+
+    await Promise.all([
+      config.mutatePublicConnectorAdapter('telegram', {
+        enabled: true,
+        set: { inboxPush: false },
+        unset: [],
+        setSecrets: { botToken: '123456789:AAHreal-telegram-bot-token-value' },
+        removeSecrets: [],
+      }),
+      config.mutatePublicConnectorAdapter('feishu', {
+        enabled: true,
+        set: { appId: 'cli_openalice', domain: 'feishu' },
+        unset: [],
+        setSecrets: { appSecret: 'feishu-app-secret-long-enough' },
+        removeSecrets: [],
+      }),
+    ])
+
+    const stored = await config.readConnectorConfig()
+    expect(stored.adapters.telegram).toEqual({
+      enabled: true,
+      settings: {
+        inboxPush: false,
+        botToken: '123456789:AAHreal-telegram-bot-token-value',
+      },
+    })
+    expect(stored.adapters.feishu).toEqual({
+      enabled: true,
+      settings: {
+        appId: 'cli_openalice',
+        domain: 'feishu',
+        appSecret: 'feishu-app-secret-long-enough',
+      },
+    })
+    expect(await config.readConnectorServiceEnabled()).toBe(true)
+  })
+
+  it('preserves bot-learned owner fields while the UI changes a preference', async () => {
+    const config = await loadModule()
+    await config.writeConnectorConfig({
+      version: 1,
+      adapters: {
+        telegram: {
+          enabled: true,
+          settings: { botToken: '123456789:AAHreal-telegram-bot-token-value' },
+        },
+      },
+    })
+
+    await Promise.all([
+      config.updateConnectorAdapterSettings('telegram', { ownerUserId: 'owner-42', chatId: 'chat-42' }),
+      config.mutatePublicConnectorAdapter('telegram', {
+        set: { inboxPush: false },
+        unset: [],
+        setSecrets: {},
+        removeSecrets: [],
+      }),
+    ])
+
+    expect((await config.readConnectorConfig()).adapters.telegram.settings).toEqual({
+      botToken: '123456789:AAHreal-telegram-bot-token-value',
+      ownerUserId: 'owner-42',
+      chatId: 'chat-42',
+      inboxPush: false,
+    })
+  })
+
+  it('does not signal a process restart for an adapter-only mutation', async () => {
+    const config = await loadModule()
+    await config.writeConnectorServiceEnabled(true)
+
+    const result = await config.mutatePublicConnectorAdapter('discord', {
+      enabled: false,
+      set: { inboxPush: false },
+      unset: [],
+      setSecrets: {},
+      removeSecrets: [],
+    })
+
+    expect(result).toMatchObject({ serviceEnabled: true, serviceChanged: false, adapterChanged: true })
+    await expect(stat(join(home, 'data/control/restart-connector.flag'))).rejects.toMatchObject({ code: 'ENOENT' })
+  })
+
   it('clears learned owner fields on unlink without dropping the sealed token', async () => {
     const config = await loadModule()
     await config.writeConnectorConfig({
@@ -42,25 +127,16 @@ describe('public connector config', () => {
     })
     await config.writeConnectorServiceEnabled(true)
 
-    const publicConfig = await config.readPublicConnectorConfig()
-    const written = await config.writePublicConnectorConfig({
-      ...publicConfig,
-      adapters: {
-        ...publicConfig.adapters,
-        telegram: {
-          ...publicConfig.adapters.telegram,
-          settings: {
-            ...publicConfig.adapters.telegram.settings,
-            ownerUserId: '',
-            chatId: '',
-          },
-        },
-      },
+    const written = await config.mutatePublicConnectorAdapter('telegram', {
+      set: {},
+      unset: ['ownerUserId', 'chatId'],
+      setSecrets: {},
+      removeSecrets: [],
     })
 
-    expect(written.adapters.telegram.settings.ownerUserId).toBeUndefined()
-    expect(written.adapters.telegram.settings.chatId).toBeUndefined()
-    expect(written.adapters.telegram.configuredSecrets).toEqual(['botToken'])
+    expect(written.adapter.settings.ownerUserId).toBeUndefined()
+    expect(written.adapter.settings.chatId).toBeUndefined()
+    expect(written.adapter.configuredSecrets).toEqual(['botToken'])
 
     const stored = await config.readConnectorConfig()
     expect(stored.adapters.telegram.settings).toEqual({ botToken: 'secret-token' })
@@ -77,18 +153,11 @@ describe('public connector config', () => {
         },
       },
     })
-    const publicConfig = await config.readPublicConnectorConfig()
-
-    await expect(config.writePublicConnectorConfig({
-      ...publicConfig,
-      adapters: {
-        ...publicConfig.adapters,
-        telegram: {
-          ...publicConfig.adapters.telegram,
-          settings: { botToken: 'qweqw' },
-          configuredSecrets: ['botToken'],
-        },
-      },
+    await expect(config.mutatePublicConnectorAdapter('telegram', {
+      set: {},
+      unset: [],
+      setSecrets: { botToken: 'qweqw' },
+      removeSecrets: [],
     })).rejects.toThrow('too short or malformed')
 
     const stored = await config.readConnectorConfig()
@@ -106,19 +175,13 @@ describe('public connector config', () => {
         },
       },
     })
-    const publicConfig = await config.readPublicConnectorConfig()
     const next = '987654321:BBHanother-plausible-bot-token'
 
-    await config.writePublicConnectorConfig({
-      ...publicConfig,
-      adapters: {
-        ...publicConfig.adapters,
-        telegram: {
-          ...publicConfig.adapters.telegram,
-          settings: { botToken: next },
-          configuredSecrets: ['botToken'],
-        },
-      },
+    await config.mutatePublicConnectorAdapter('telegram', {
+      set: {},
+      unset: [],
+      setSecrets: { botToken: next },
+      removeSecrets: [],
     })
 
     const stored = await config.readConnectorConfig()

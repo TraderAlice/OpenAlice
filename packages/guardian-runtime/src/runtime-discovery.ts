@@ -336,7 +336,7 @@ function sanitizeProvider(
   provider: unknown,
   owner: SanitizedRuntimeOwner | null,
 ): ClassifiedRuntimeStatus['provider'] {
-  const allowedKinds = new Set(['source', 'bundle', 'docker', 'electron', 'remote', 'unknown'])
+  const allowedKinds = new Set(['source', 'bundle', 'bun', 'docker', 'electron', 'remote', 'unknown'])
   const fallbackKind = owner?.launchRoot ? 'source' : 'unknown'
   if (!provider || typeof provider !== 'object') {
     return {

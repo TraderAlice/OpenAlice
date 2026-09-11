@@ -8,6 +8,11 @@ let recentLaunch = {
   model: null as string | null,
   reasoningEffort: null as string | null,
 }
+let showHeadlessBornSessions = false
+let showIssueAttachedSessions = false
+let showUnverifiedHarnessReleases = false
+let agentRuntimeQuickAccessIds: string[] = []
+let recentAgentRuntimeIds: string[] = []
 
 export const preferencesHandlers = [
   http.get('/api/preferences/quick-chat', () =>
@@ -68,4 +73,66 @@ export const preferencesHandlers = [
   http.get('/api/preferences/workspace-shell', () =>
     HttpResponse.json({ supported: false }),
   ),
+  http.get('/api/preferences/harness', () =>
+    HttpResponse.json({ showHeadlessBornSessions, showIssueAttachedSessions, showUnverifiedHarnessReleases }),
+  ),
+  http.put('/api/preferences/harness', async ({ request }) => {
+    const body = (await request.json().catch(() => null)) as {
+      showHeadlessBornSessions?: unknown
+      showIssueAttachedSessions?: unknown
+      showUnverifiedHarnessReleases?: unknown
+    } | null
+    if (
+      !body
+      || typeof body.showHeadlessBornSessions !== 'boolean'
+      || typeof body.showIssueAttachedSessions !== 'boolean'
+      || typeof body.showUnverifiedHarnessReleases !== 'boolean'
+    ) {
+      return HttpResponse.json({ error: 'invalid_harness_preference' }, { status: 400 })
+    }
+    showHeadlessBornSessions = body.showHeadlessBornSessions
+    showIssueAttachedSessions = body.showIssueAttachedSessions
+    showUnverifiedHarnessReleases = body.showUnverifiedHarnessReleases
+    return HttpResponse.json({ showHeadlessBornSessions, showIssueAttachedSessions, showUnverifiedHarnessReleases })
+  }),
+  http.get('/api/preferences/agent-runtimes', () =>
+    HttpResponse.json({
+      quickAccessIds: [...agentRuntimeQuickAccessIds],
+      recentAgentIds: [...recentAgentRuntimeIds],
+    }),
+  ),
+  http.put('/api/preferences/agent-runtimes', async ({ request }) => {
+    const body = (await request.json().catch(() => null)) as {
+      quickAccessIds?: unknown
+    } | null
+    if (!body || !Array.isArray(body.quickAccessIds) || body.quickAccessIds.length > 4) {
+      return HttpResponse.json({ error: 'invalid_agent_runtime_preference' }, { status: 400 })
+    }
+    const ids: string[] = []
+    for (const id of body.quickAccessIds) {
+      if (typeof id !== 'string' || id.trim().length === 0 || ids.includes(id)) {
+        return HttpResponse.json({ error: 'invalid_agent_runtime_preference' }, { status: 400 })
+      }
+      ids.push(id)
+    }
+    agentRuntimeQuickAccessIds = ids
+    return HttpResponse.json({
+      quickAccessIds: [...agentRuntimeQuickAccessIds],
+      recentAgentIds: [...recentAgentRuntimeIds],
+    })
+  }),
+  http.put('/api/preferences/agent-runtimes/recent', async ({ request }) => {
+    const body = (await request.json().catch(() => null)) as { agentId?: unknown } | null
+    if (!body || typeof body.agentId !== 'string' || body.agentId.trim().length === 0) {
+      return HttpResponse.json({ error: 'invalid_agent_runtime_preference' }, { status: 400 })
+    }
+    recentAgentRuntimeIds = [
+      body.agentId,
+      ...recentAgentRuntimeIds.filter((id) => id !== body.agentId),
+    ].slice(0, 4)
+    return HttpResponse.json({
+      quickAccessIds: [...agentRuntimeQuickAccessIds],
+      recentAgentIds: [...recentAgentRuntimeIds],
+    })
+  }),
 ]

@@ -1,3 +1,4 @@
+import { optionResearchSchema, orderBookSchema } from '@traderalice/uta-protocol'
 /**
  * AI Trading Tool Factory — pure tool shell layer
  *
@@ -470,6 +471,43 @@ If the result is an object with a \`degraded\` array, one or more accounts could
       },
     }),
 
+    getOptionContracts: tool({
+      description: 'Read one page of option contracts, including open interest and its observation date when supplied. Currently Alpaca. Returns nextPageToken; reuse filters to continue. Read-only; does not enable options trading.',
+      inputSchema: optionResearchSchema,
+      execute: async request => {
+        try {
+          const parsed = parseAliceId(request.aliceId)
+          if (!parsed) return { error: 'Invalid aliceId. Use contract search first.' }
+          const uta = await manager.resolveOne(parsed.utaId)
+          return { source: uta.id, ...await uta.getOptionContracts(request) }
+        } catch (err) { return handleBrokerError(err) }
+      },
+    }),
+    getOptionChain: tool({
+      description: 'Read one page of option snapshots: latest trade, quote, IV and Greeks when available. Currently Alpaca. Indicative feed has modified quotes and delayed trades; not executable OPRA. Inspect metadata and per-observation timestamps. Follow nextPageToken for more contracts.',
+      inputSchema: optionResearchSchema,
+      execute: async request => {
+        try {
+          const parsed = parseAliceId(request.aliceId)
+          if (!parsed) return { error: 'Invalid aliceId. Use contract search first.' }
+          const uta = await manager.resolveOne(parsed.utaId)
+          return { source: uta.id, ...await uta.getOptionChain(request) }
+        } catch (err) { return handleBrokerError(err) }
+      },
+    }),
+    getOrderBook: tool({
+      description: 'Read broker order-book depth for a contract. Available on Alpaca crypto and CCXT. Bids/asks are [price, quantity] levels; inspect the observation timestamp.',
+      inputSchema: orderBookSchema,
+      execute: async request => {
+        try {
+          const parsed = parseAliceId(request.aliceId)
+          if (!parsed) return { error: 'Invalid aliceId. Use contract search first.' }
+          const uta = await manager.resolveOne(parsed.utaId)
+          return { source: uta.id, ...await uta.getOrderBook(request) }
+        } catch (err) { return handleBrokerError(err) }
+      },
+    }),
+
     getQuote: tool({
       description: `Query the latest quote/price for a contract.
 If this tool returns an error with transient=true, wait a few seconds and retry once before reporting to the user.`,
@@ -506,7 +544,7 @@ Venue search returns two species: LEAVES (tradeable, with conId-style aliceId) a
 - Bond issuer hub (aliceId like "ibkr-x|issuer:e1400789"): expands to the issuer's individual bonds.
 - Stock underlying (numeric aliceId): no expiry → option-chain parameter grid (expirations × strikes); with expiry → concrete option contracts for that expiry.
 - secType=FUT on an underlying: futures contract months.
-Every returned leaf carries its own aliceId usable with getQuote / placeOrder.`,
+Returned leaves carry aliceId. Broker capabilities still govern trading; Alpaca options are read-only (use option-chain for snapshots).`,
       inputSchema: z.object({
         aliceId: z.string().describe('Hub or underlying contract ID (format: accountId|nativeKey, from searchContracts)'),
         expiry: z.string().optional().describe('Expiry YYYYMMDD or YYYYMM — switches option expansion from the grid to concrete contracts'),
@@ -794,9 +832,12 @@ ONLY if the operator has enabled "Allow AI to push trades" in Settings → Agent
         }
         // AI trading enabled — execute for real. Each push() sends the committed
         // operations to the broker. Per-account failures degrade individually.
-        const results = await Promise.all(pending.map(async ({ uta }) => {
+        const results = await Promise.all(pending.map(async ({ uta, status }) => {
           try {
-            return { source: uta.id, ...compactPushResult(await uta.push()) }
+            if (!status.pendingHash) {
+              return { source: uta.id, error: 'Pending commit has no hash; refresh Trading as Git and approve there.' }
+            }
+            return { source: uta.id, ...compactPushResult(await uta.push(status.pendingHash)) }
           } catch (err) {
             return { source: uta.id, ...handleBrokerError(err) }
           }
@@ -819,7 +860,9 @@ ONLY if the operator has enabled "Allow AI to push trades" in Settings → Agent
           // reject() requires a prepared commit — prepare one transparently
           // so the AI's mental model stays "stage → reject = undo".
           if (!status.pendingHash) await uta.commit(reason ?? 'discarding staged operations')
-          return { source: uta.id, ...await uta.reject(reason) }
+          const pendingHash = status.pendingHash ?? (await uta.status()).pendingHash
+          if (!pendingHash) return { message: 'Nothing staged to reject.' }
+          return { source: uta.id, ...await uta.reject(reason, pendingHash) }
         } catch (err) {
           return handleBrokerError(err)
         }

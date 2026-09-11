@@ -15,10 +15,8 @@ describe('Nano product surfaces', () => {
   })
 
   it('hides trading and market-data activity pages', () => {
-    expect(isNanoHiddenActivityPage('trading-as-git')).toBe(true)
     expect(isNanoHiddenActivityPage('portfolio')).toBe(true)
     expect(isNanoHiddenActivityPage('market')).toBe(true)
-    expect(isNanoHiddenActivityPage('news')).toBe(true)
     expect(isNanoHiddenActivityPage('chat')).toBe(false)
     expect(isNanoHiddenActivityPage('auto-quant')).toBe(false)
     expect(isNanoHiddenActivityPage('tracked')).toBe(false)
@@ -32,6 +30,9 @@ describe('Nano product surfaces', () => {
     expect(isNanoHiddenSettingsCategory('ai-provider')).toBe(false)
     expect(isNanoHiddenSettingsCategory('beta')).toBe(false)
     expect(isNanoHiddenViewSpec({ kind: 'portfolio', params: {} })).toBe(true)
+    expect(isNanoHiddenViewSpec({ kind: 'trading-as-git', params: {} })).toBe(true)
+    expect(isNanoHiddenViewSpec({ kind: 'uta-detail', params: { id: 'uta-1' } })).toBe(true)
+    expect(isNanoHiddenViewSpec({ kind: 'news', params: {} })).toBe(true)
     expect(isNanoHiddenViewSpec({ kind: 'settings', params: { category: 'trading' } })).toBe(true)
     expect(isNanoHiddenViewSpec({ kind: 'settings', params: { category: 'general' } })).toBe(false)
     expect(isNanoHiddenViewSpec({ kind: 'settings', params: { category: 'beta' } })).toBe(false)

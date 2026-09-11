@@ -94,35 +94,65 @@ export function createTradingConfigRoutes(ctx: EngineContext) {
       const [accounts, config, statuses] = await Promise.all([
         readUTAsConfig(),
         loadConfig(),
-        Promise.all(INSTALLABLE_BROKER_ENGINES.map((engine) => getBrokerPackLocalStatus(engine))),
+        Promise.all([
+          getBrokerPackLocalStatus('mock'),
+          ...INSTALLABLE_BROKER_ENGINES.map((engine) => getBrokerPackLocalStatus(engine)),
+        ]),
       ])
       const requiredBy = new Map<string, string[]>()
-      for (const account of accounts) {
-        if (account.enabled === false) continue
-        let engine: string
+      const statusByEngine = new Map(statuses.map((status) => [status.engine, status]))
+      const accountReadiness = accounts.map((account) => {
+        const label = account.label ?? account.id
         try {
-          engine = getBrokerPreset(account.presetId).engine
+          const engine = getBrokerPreset(account.presetId).engine
+          const status = statusByEngine.get(engine)
+          if (account.enabled !== false) {
+            const rows = requiredBy.get(engine) ?? []
+            rows.push(label)
+            requiredBy.set(engine, rows)
+          }
+          const operational = status?.installed === true && status.source !== 'broken'
+          return {
+            accountId: account.id,
+            label,
+            presetId: account.presetId,
+            configuredEnabled: account.enabled !== false,
+            engine,
+            state: operational ? 'ready' as const : status?.source === 'broken' ? 'needs-repair' as const : 'needs-install' as const,
+            operational,
+            ...(status?.source === 'broken'
+              ? { action: 'repair' as const }
+              : !operational
+                ? { action: 'install' as const }
+                : status.updateAvailable
+                  ? { action: 'update' as const }
+                  : {}),
+            ...(status?.reason ? { reason: status.reason } : {}),
+          }
         } catch (err) {
           console.warn(
             `[trading-config] unable to map UTA ${account.id} to a Broker Pack:`,
             err instanceof Error ? err.message : err,
           )
-          continue
+          return {
+            accountId: account.id,
+            label,
+            presetId: account.presetId,
+            configuredEnabled: account.enabled !== false,
+            state: 'unsupported-preset' as const,
+            operational: false,
+            reason: `Unknown broker preset: ${account.presetId}`,
+          }
         }
-        const rows = requiredBy.get(engine) ?? []
-        rows.push(account.label ?? account.id)
-        requiredBy.set(engine, rows)
-      }
+      })
       if (config.trading.keylessDataSources.length > 0) {
         const rows = requiredBy.get('ccxt') ?? []
         rows.push(...config.trading.keylessDataSources.map((source) => `${source} K-line vendor`))
         requiredBy.set('ccxt', rows)
       }
       return c.json({
-        packs: [
-          { ...(await getBrokerPackLocalStatus('mock')), requiredBy: requiredBy.get('mock') ?? [] },
-          ...statuses.map((status) => ({ ...status, requiredBy: requiredBy.get(status.engine) ?? [] })),
-        ],
+        packs: statuses.map((status) => ({ ...status, requiredBy: requiredBy.get(status.engine) ?? [] })),
+        accounts: accountReadiness,
       })
     } catch (err) {
       return c.json({ error: err instanceof Error ? err.message : String(err) }, 500)

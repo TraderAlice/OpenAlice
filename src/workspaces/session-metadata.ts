@@ -8,11 +8,11 @@
  */
 import type { HeadlessInquirySubject } from './headless-task-registry.js'
 
-export type SessionInteractiveSurface = 'spawn' | 'quick-chat' | 'auto-quant' | 'manager'
+export type SessionInteractiveSurface = 'spawn' | 'quick-chat' | 'auto-quant' | 'prediction' | 'manager'
 
 export type SessionIssueBirthPolicy = 'new-each-run' | 'new-then-resume'
 
-export type SessionIssueFire = 'schedule' | 'retry'
+export type SessionIssueFire = 'schedule' | 'manual' | 'retry' | 'comment'
 
 export type SessionConversationCaller =
   | { readonly kind: 'agent'; readonly resumeId: string; readonly workspaceId?: string }
@@ -22,6 +22,7 @@ export type SessionConversationBirthReason =
   | 'explicit-workspace'
   | 'harness-chat'
   | 'harness-autoquant'
+  | 'harness-prediction'
   | 'missing-origin'
   | 'non-session-origin'
   | 'unavailable-reconstruction'
@@ -77,6 +78,7 @@ export function parseSessionCreatedBy(value: unknown): SessionCreatedBy | null {
       surface === 'spawn'
       || surface === 'quick-chat'
       || surface === 'auto-quant'
+      || surface === 'prediction'
       || surface === 'manager'
     ) {
       return { kind: 'interactive', surface }
@@ -94,7 +96,7 @@ export function parseSessionCreatedBy(value: unknown): SessionCreatedBy | null {
       && typeof issueId === 'string'
       && issueId.length > 0
       && (policy === 'new-each-run' || policy === 'new-then-resume')
-      && (fire === 'schedule' || fire === 'retry')
+      && (fire === 'schedule' || fire === 'manual' || fire === 'retry' || fire === 'comment')
     ) {
       return { kind: 'issue', workspaceId, issueId, policy, fire }
     }
@@ -141,6 +143,7 @@ function parseConversationReason(value: unknown): SessionConversationBirthReason
     case 'explicit-workspace':
     case 'harness-chat':
     case 'harness-autoquant':
+    case 'harness-prediction':
     case 'missing-origin':
     case 'non-session-origin':
     case 'unavailable-reconstruction':

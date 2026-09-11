@@ -8,6 +8,8 @@ import {
   demoSubAccountsByUTA,
   demoCryptoAccountBySub,
   demoCryptoPositionsBySub,
+  DEMO_UTA_PAPER,
+  DEMO_UTA_IBKR,
   DEMO_UTA_CRYPTO,
   demoUTAConfigs,
   demoUTAConfig,
@@ -200,6 +202,11 @@ export const tradingHandlers = [
       { engine: 'ibkr', installed: false, source: 'missing', requiredBy: [] },
       { engine: 'leverup', installed: false, source: 'missing', requiredBy: [] },
       { engine: 'longbridge', installed: false, source: 'missing', requiredBy: [] },
+    ],
+    accounts: [
+      { accountId: DEMO_UTA_PAPER, label: 'Alpaca Paper', presetId: 'alpaca-paper', configuredEnabled: true, engine: 'alpaca', state: 'needs-install', operational: false, action: 'install' },
+      { accountId: DEMO_UTA_IBKR, label: 'IBKR Demo', presetId: 'ibkr', configuredEnabled: true, engine: 'ibkr', state: 'needs-install', operational: false, action: 'install' },
+      { accountId: DEMO_UTA_CRYPTO, label: 'Binance', presetId: 'ccxt', configuredEnabled: true, engine: 'ccxt', state: 'ready', operational: true },
     ],
   })),
   http.post('/api/trading/config/broker-packs/:engine/install', ({ params }) => HttpResponse.json({

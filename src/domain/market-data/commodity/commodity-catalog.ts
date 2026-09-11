@@ -100,7 +100,7 @@ const CATALOG: CommodityCatalogEntry[] = [
   { id: 'coffee',      name: 'Coffee',            category: 'softs', aliases: ['咖啡', 'KC=F', 'KCUSX'] },
   { id: 'cocoa',       name: 'Cocoa',             category: 'softs', aliases: ['可可', 'CC=F', 'CCUSX'] },
   { id: 'cotton',      name: 'Cotton',            category: 'softs', aliases: ['棉花', 'CT=F', 'CTUSX'] },
-  { id: 'lumber',      name: 'Lumber',            category: 'softs', aliases: ['木材', 'LBS=F'] },
+  { id: 'lumber',      name: 'Lumber',            category: 'softs', aliases: ['木材', 'LBR=F', 'LBS=F'] },
   { id: 'orange_juice', name: 'Orange Juice',     category: 'softs', aliases: ['橙汁', 'OJ=F'] },
 
   // Livestock

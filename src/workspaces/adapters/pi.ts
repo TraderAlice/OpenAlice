@@ -231,6 +231,10 @@ export const piAdapter: CliAdapter = {
     // immune to pi's lazy transcript write.
     assignsSessionId: true,
     headless: true,
+    // Pi's RPC mode has no per-tool permission prompt; the Web surface launches
+    // it approved like headless does. The launcher mints the id at spawn, so
+    // a fresh Session always arrives here with a concrete `--session-id`.
+    web: { wire: 'pi-rpc', permissionPrompts: false, freshSession: true },
     aiProvider: {
       credentialSource: 'runtime-or-workspace',
       wirePreference: ['google-generative-ai', 'openai-chat', 'anthropic', 'openai-responses'],
@@ -327,14 +331,14 @@ export const piAdapter: CliAdapter = {
       : null;
   },
 
-  // WebPi is a second VIEW over the same Pi session, not another runtime.
-  // RPC stays completely separate from the TUI argv above: selecting WebPi
-  // cannot change ordinary Pi startup, trust prompts, input handling, or PTY
-  // behavior. It is always by-id so switching surfaces reopens the exact
+  // The Web surface is a second VIEW over the same Pi session, not another
+  // runtime. RPC stays completely separate from the TUI argv above: selecting
+  // it cannot change ordinary Pi startup, trust prompts, input handling, or
+  // PTY behavior. It is always by-id so switching surfaces reopens the exact
   // conversation that the OpenAlice resume registry already owns.
   composeWebCommand(_base: readonly string[], ctx: SpawnContext): readonly string[] {
     if (!ctx.resume || ctx.resume === 'last') {
-      throw new Error('WebPi requires a concrete Pi session id');
+      throw new Error('the Pi Web surface requires a concrete Pi session id');
     }
     return [
       ...piCommandHead(ctx.env),

@@ -9,6 +9,7 @@ import { BoardMeta } from '../components/market/BoardMeta'
 import { MeasuredChartFrame } from '../components/MeasuredChartFrame'
 import { PageHeader } from '../components/PageHeader'
 import { CenteredLoading } from '../components/StateViews'
+import { Button } from '../components/ui/button'
 import { marketApi, type SectorRotationResult, type SectorRotationRow } from '../api/market'
 
 const GREEN = 'var(--success)'
@@ -89,10 +90,11 @@ export function MarketRotationPage() {
       <PageHeader
         title={t('market.sectorRotation')}
         description={
-          <>
-            {t('market.rotationSubtitle')}
-            {data && <><span className="text-muted-foreground/50"> · {t('market.asOf')} {data.asOf}</span>{data.meta && <BoardMeta meta={data.meta} />}</>}
-          </>
+          <span className="inline-flex flex-wrap items-center gap-x-2 gap-y-0.5">
+            <span>{t('market.rotationSubtitle')}</span>
+            {data && <span className="text-muted-foreground/70">{t('market.asOf')} {data.asOf}</span>}
+            {data?.meta && <BoardMeta meta={data.meta} />}
+          </span>
         }
         live={{ lastUpdated: updatedAt }}
       />
@@ -101,16 +103,18 @@ export function MarketRotationPage() {
         {error && (
           <div
             role="alert"
-            className="flex items-center justify-between gap-3 rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-[13px] text-destructive"
+            className="flex items-center justify-between gap-3 rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2 text-[13px] leading-5 text-destructive"
           >
             <span className="min-w-0 break-words">{error}</span>
-            <button
+            <Button
               type="button"
-              className="shrink-0 rounded-md border border-destructive/30 px-2.5 py-1 font-medium hover:bg-destructive/10"
+              className="shrink-0"
+              variant="destructive"
+              size="sm"
               onClick={retry}
             >
               {t('common.retry')}
-            </button>
+            </Button>
           </div>
         )}
 
@@ -131,7 +135,7 @@ export function MarketRotationPage() {
 
 function QuadrantChart({ points, t }: { points: Point[]; t: TFunction }) {
   return (
-    <div className="relative">
+    <div className="relative shrink-0">
       {/* Quadrant corner labels */}
       <div className="pointer-events-none absolute inset-0 z-10">
         <CornerLabel className="top-1 right-2 text-success/70" text={t('market.quadRotatingIn')} />
@@ -141,7 +145,7 @@ function QuadrantChart({ points, t }: { points: Point[]; t: TFunction }) {
       </div>
       <MeasuredChartFrame className="h-[420px] w-full">
         {({ width, height }) => (
-          <ScatterChart width={width} height={height} margin={{ top: 24, right: 28, bottom: 28, left: 8 }}>
+          <ScatterChart accessibilityLayer width={width} height={height} margin={{ top: 24, right: 28, bottom: 28, left: 8 }}>
           <XAxis
             type="number" dataKey="x" name={t('market.axisRelStrength')}
             tickFormatter={(v: number) => `${v.toFixed(0)}%`}
@@ -157,7 +161,11 @@ function QuadrantChart({ points, t }: { points: Point[]; t: TFunction }) {
           />
           <ReferenceLine x={0} stroke="var(--border)" strokeDasharray="4 4" />
           <ReferenceLine y={0} stroke="var(--border)" strokeDasharray="4 4" />
-          <Tooltip cursor={{ strokeDasharray: '3 3' }} content={<PointTooltip t={t} />} />
+          <Tooltip
+            isAnimationActive={false}
+            cursor={{ strokeDasharray: '3 3' }}
+            content={<PointTooltip t={t} />}
+          />
           <Scatter data={points}>
             {points.map((p) => <Cell key={p.symbol} fill={dotColor(p.score)} />)}
             <LabelList dataKey="symbol" position="top" style={{ fontSize: 10, fill: 'var(--text)', fontWeight: 600 }} />
@@ -174,14 +182,14 @@ function QuadrantChart({ points, t }: { points: Point[]; t: TFunction }) {
 }
 
 function CornerLabel({ className, text }: { className: string; text: string }) {
-  return <span className={`absolute text-[10px] font-medium uppercase tracking-wide ${className}`}>{text}</span>
+  return <span className={`absolute text-[11px] font-medium ${className}`}>{text}</span>
 }
 
 function PointTooltip({ active, payload, t }: { active?: boolean; payload?: Array<{ payload: Point }>; t: TFunction }) {
   if (!active || !payload?.length) return null
   const p = payload[0].payload
   return (
-    <div className="rounded-md border border-border bg-secondary px-2.5 py-1.5 text-[11px] shadow-lg">
+    <div className="oa-chart-tooltip px-2.5 py-1.5 text-[11px] leading-[15px]">
       <div className="font-mono font-semibold text-foreground">{p.symbol} <span className="text-muted-foreground font-sans font-normal">{p.sector}</span></div>
       <div className="mt-0.5 grid grid-cols-[auto_auto] gap-x-3 gap-y-0.5">
         <span className="text-muted-foreground">{t('market.colScore')}</span><span className={signColor(p.score)}>{p.score ?? '—'}</span>
@@ -195,9 +203,10 @@ function PointTooltip({ active, payload, t }: { active?: boolean; payload?: Arra
 
 function RotationTable({ rows, benchmarkSymbol, t }: { rows: SectorRotationRow[]; benchmarkSymbol: string; t: TFunction }) {
   return (
-    <div className="-mx-4 overflow-x-auto px-4 md:mx-0 md:px-0" data-testid="sector-rotation-table-scroll">
+    <div className="-mx-4 shrink-0 overflow-x-auto px-4 md:mx-0 md:px-0" data-testid="sector-rotation-table-scroll">
+      {/* The page owns vertical scrolling; horizontal overflow must not let flex shrink the table's height. */}
       {/* Keep the market columns readable; narrow screens scroll instead of compressing headers together. */}
-      <table className="w-full min-w-[820px] border-collapse text-[12px]" data-testid="sector-rotation-table">
+      <table className="w-full min-w-[820px] border-collapse text-caption" data-testid="sector-rotation-table">
         <thead>
           <tr className="whitespace-nowrap border-b border-border text-left text-muted-foreground/70">
             <th className="w-[220px] py-1.5 pr-3 font-medium">{t('market.colSector')}</th>

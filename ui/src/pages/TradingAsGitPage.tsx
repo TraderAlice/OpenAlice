@@ -16,7 +16,6 @@ export function TradingAsGitPage() {
     <div className="flex flex-col flex-1 min-h-0">
       <PageHeader
         title={t('nav.item.tradingAsGit')}
-        description={t('tradingReview.description')}
       />
       <div className="flex-1 min-h-0 min-w-0 px-4 md:px-6 py-5">
         {modeLoading ? (

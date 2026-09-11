@@ -252,7 +252,35 @@ preference remains the source of truth.
 - writes `vendor/manifest.json` with versions, paths, and toolchain entries.
 
 `pnpm electron:pack` runs this through `pnpm vendor:runtime`. The desktop
-builder keeps `asar` disabled and includes `vendor/**` in the packaged files.
+builder enables `asar`. JavaScript entrypoints (desktop, Alice, UTA and
+Connector) and ordinary dependencies live in `app.asar`; backend children use
+Electron's `ELECTRON_RUN_AS_NODE=1` support to load that archive.
+
+`extraResources` copies vendor, Workspace CLI/templates, default assets and UI
+assets to the physical `Resources/runtime` directory (`resources/runtime` on
+Windows). `OPENALICE_APP_HOME` points there so external shells, bootstrap
+scripts and managed tools always receive real filesystem paths. Code paths
+remain relative to the archive; do not derive a backend entrypoint from
+`OPENALICE_APP_HOME`.
+
+The `afterPack` hook projects the archive's product name/version/module type
+into `runtime/package.json`. It cannot be listed as an extraResource from the
+root package.json: electron-builder excludes extraResource inputs from ASAR,
+which would remove Electron's own application metadata. Packaging commands run
+through `pnpm -F @traderalice/desktop` (the configured hook is relative to that
+working directory).
+
+Windows installed-version polling reads the authoritative `app.asar/package.json`
+when an archive exists, and the loose `app/package.json` for older releases.
+Clear the ASAR header cache between polls because NSIS replaces the archive in
+place. A partial archive must remain retryable rather than falling back to a
+stale loose manifest. Final installer completion and version detection remain
+separate checks before the upgrade journey launches the candidate.
+
+`asarUnpack` explicitly retains node-pty and dugite's embedded Git under
+`app.asar.unpacked`, with other native dependencies handled by builder's
+native-module detection. The package assertion verifies archive contents,
+physical native files, runtime resources and matching product versions.
 Contributors who run `pnpm vendor:runtime` also get the generated search-tool
 directory on `pnpm dev`'s managed PATH; dev startup never downloads or mutates
 that payload implicitly.
@@ -345,10 +373,10 @@ authorize complete argv, prompts, credentials, or environment values in logs.
 
 Pi project trust follows the runtime boundary:
 
-- before TUI or WebPi startup, the Pi adapter records a genuinely undecided
+- before TUI or Web startup, the Pi adapter records a genuinely undecided
   OpenAlice-managed Workspace in the trust store used by that Pi process. This
   prevents a fresh Quick Chat from stalling behind a terminal-only trust
-  selector that WebPi cannot render;
+  selector that the Web surface cannot render;
 - an explicit saved allow or deny decision on the Workspace or its nearest
   parent remains authoritative. OpenAlice never flips that decision;
 - interactive argv does not receive the version-sensitive `--approve` flag.
@@ -432,21 +460,29 @@ and their approval rules remain enforced by UTA.
 ## Workspace Bootstrap and Skills
 
 Built-in templates run `bootstrap.mjs` on Electron's Node using
-`ELECTRON_RUN_AS_NODE=1`. Their Git operations go through `_common.mjs` and
-dugite; on packaged Windows, `LOCAL_GIT_DIRECTORY` points those calls at the
+`ELECTRON_RUN_AS_NODE=1`. The packaged backend re-enters its archived Alice
+entrypoint with `--openalice-internal-bootstrap` and injects the launcher-owned
+Git executor before importing the physical template. This shares the existing
+Bun bootstrap role and avoids dependency lookup from the external resource
+tree. Source/dev Node bootstraps keep their direct script invocation. Their
+Git operations go through `_common.mjs` and dugite; on packaged Windows, `LOCAL_GIT_DIRECTORY` points those calls at the
 managed PortableGit directory.
 
 Do not add new Bash bootstraps for built-in templates. `bootstrap.sh` remains
 a compatibility fallback for third-party templates and only works where a
 POSIX shell exists.
 
-A source-backed Harness receives only repository, release, and exact commit
-values approved by its template catalog. AutoQuant V2 verifies that tuple,
+A source-backed Harness receives only repository, release/snapshot, and exact commit
+values approved by its template catalog. AutoQuant V2 and Auto Prediction verify that tuple,
 copies the repository, keeps its upstream ancestry and canonical `origin`,
 starts a local research branch at the approved commit, and writes
-`.alice/harness-source.json`. Bootstrap does not install Python or quantitative
-dependencies; the native Coding Agent owns environment setup, later research
-commits, and explicit fetch/merge upgrades inside the Workspace.
+`.alice/harness-source.json`. Bootstrap does not install Harness dependencies;
+the native Coding Agent owns environment setup, later research commits, and
+explicit fetch/merge upgrades inside the Workspace. When a pinned source
+declares a v1 Studio capability, Alice may launch it with allocator-owned
+loopback ports. Electron keeps its main UI on `app://` and uses the restricted
+streaming Surface Gateway described in [[docs/harness-web-surfaces.md]]; it does
+not re-enable the ordinary Alice web listener.
 
 OpenAlice copies Workspace skills into two canonical project paths:
 
@@ -476,20 +512,36 @@ and warns before writing it.
 ### Version and update surface
 
 **Settings → General → About OpenAlice** is the user-facing source for the
-running version and update state on every distribution surface. The passive
-read uses `GET /api/version`, whose GitHub release lookup is cached. An
-explicit **Check for updates** uses the authenticated
-`POST /api/version/check` route to bypass that cache without exposing a public
-rate-limit bypass.
+running version, normalized channel, and update owner on every distribution
+surface. The backend derives that state from installed provenance and the
+runtime profile rather than guessing from package semver. A source checkout
+uses Git, packaged Electron uses its native updater, a directly installed
+  stable or beta CLI uses `openalice update` as its entry point (with that command
+  handing package-manager installs back to their manager), and Docker remains
+  owned by its service deployment. Pinned and custom installs have no
+implicit updater.
+Invalid installed provenance fails closed as custom/non-updating instead of
+silently falling back to a stable package version.
+
+The passive read uses `GET /api/version`. An explicit **Check for updates**
+uses the authenticated `POST /api/version/check` route to bypass the
+application cache, but neither route crosses the running surface's authority.
+Stable and beta source, desktop, or CLI contexts may read their matching
+OpenAlice CDN manifest. Dev identity is the complete native payload identity,
+not its reused package version, so the Web surface does not duplicate the
+native CLI or deployment selector. Service-managed, dev, pinned, and custom
+contexts therefore make no Web manifest request and never render a Git or CLI
+update instruction that their owner cannot apply. GitHub remains the immutable
+release-asset and release-notes host rather than the runtime discovery API.
 
 Packaged Electron also invokes the existing `electron-updater` check through
 the narrow preload bridge. That check starts the native download path when an
 eligible release exists; download progress and the ready-to-restart action are
 projected into the same Settings card. Electron development and unsigned
 directory packages may not have updater metadata, so the native check reports
-that it is unsupported and the shared version route remains the non-installing
-fallback. The top-level update banner and downloaded-update prompt remain
-secondary notifications over the same backend and updater state.
+that it is unsupported without transferring authority to the Web route. The
+top-level update banner and downloaded-update prompt remain secondary
+notifications over the same backend and updater state.
 
 The update UI must distinguish determinate download progress from the native
 installer handoff. Before closing, the old app reports `preparing`,
@@ -514,12 +566,18 @@ backend must never present as an unexplained desktop flash-and-exit.
 
 Keep these true together:
 
-- `vendor/**` remains in the Electron builder file list.
-- `asar` remains disabled while packaged scripts and binaries are executed
-  from the resource tree.
+- `vendor/**` and external Workspace assets remain in `extraResources`.
+- `asar` stays enabled; `OPENALICE_APP_HOME` is the physical runtime tree.
+  Code entrypoints stay in the archive and executable native payloads stay
+  unpacked. Never disable Electron RunAsNode while these children use it.
 - `dugite` remains in `pnpm.onlyBuiltDependencies` because macOS packages use
   its embedded Git. The Windows builder excludes `node_modules/dugite/git/**`,
-  keeps the JS wrapper, and must route it through managed PortableGit.
+  keeps the JS wrapper, and must route it through managed PortableGit. Keep
+  that Windows FileSet anchored by the positive `package.json` pattern before
+  the Git exclusion. A pure exclusion (string or FileSet) becomes an all-files
+  matcher during builder's matching or AppFileWalker stage, admitting unrelated
+  source and duplicate resources. The package inspector spec exercises both
+  builder normalization and the actual AppFileWalker filter.
 - Pi and PortableGit versions, download URLs, and checksums remain pinned in
   `scripts/vendor-managed-runtime.mjs`.
 - Managed `fd` and `ripgrep` versions, release URLs, checksums, binaries, and
@@ -551,11 +609,11 @@ contract:
    the production-composed Workspace environment. It resolves `alice`,
    `alice-workspace`, `traderhub`, and `alice-uta`, loads every CLI manifest over
    the Electron tool socket, verifies Git, and creates then reads an issue with
-   the real `alice-workspace` shim.
+   the real `alice` shim (with `alice-workspace` retained as a compatibility alias).
 2. The shell creates a one-shot scheduled Issue containing metacharacters in
    its visible What. The real `ScheduleScanner` dispatches the packaged managed
    Pi runtime, which performs a deterministic `bash` tool call that invokes
-   `alice-workspace issue create`. The smoke accepts the run only when it is
+   `alice issue create`. The smoke accepts the run only when it is
    process-backed, structured assistant output is decoded, the one-shot Issue
    auto-completes, and the created side-effect Issue is visible from the
    external `/api/issues` surface.
@@ -674,6 +732,20 @@ universal so native dependencies are installed, built, signed, and notarized
 on their matching architecture. Apple Silicon uses the canonical
 `latest-mac.yml` update feed; Intel uses `latest-mac-intel.yml` with the
 electron-updater compatibility alias `latest-intel-mac.yml`.
+
+Manual rehearsal can select one `host` (`macos-14`, `macos-15-intel`, or
+`windows-latest`); the default `all` and promotion PRs retain the full matrix.
+For example, dispatch `desktop-package-smoke.yml --ref <branch> -f host=macos-15-intel`
+with `gh workflow run` to investigate a native Intel failure without rebuilding
+the other hosts. PTY smoke logs fixed renderer and main-process stages around
+Workspace creation, response consumption, shell spawn and PTY attachment; these
+diagnostics are enabled only by the existing isolated smoke flag and never log
+request bodies, headers, credentials or user prompts.
+The outer PTY/CLI smoke deadline is 180 seconds, not a fixed delay: it exits
+immediately after acceptance and cleanup. Native Intel evidence showed an
+otherwise successful 88-second run, including a roughly 62-second main-to-renderer
+response delay. Preserve that timing as a separate performance finding rather
+than interpreting a larger smoke budget as a runtime performance fix.
 
 A release-facing change should also verify a clean-machine flow:
 

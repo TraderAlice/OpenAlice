@@ -38,6 +38,7 @@ export function createBarsRoutes(ctx: EngineContext): Hono {
     const count = c.req.query('count')
     const start = c.req.query('start')
     const end = c.req.query('end')
+    const asOf = c.req.query('asOf')
 
     let ref: BarSourceRef
     if (barId) ref = assetClass ? { barId, assetClass } : { barId }
@@ -48,6 +49,7 @@ export function createBarsRoutes(ctx: EngineContext): Hono {
     if (count) opts.count = Number(count)
     if (start) opts.start = start
     if (end) opts.end = end
+    if (asOf) opts.asOf = asOf
 
     try {
       const { bars, meta } = await ctx.barService.getBars(ref, opts)

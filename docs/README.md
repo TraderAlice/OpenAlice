@@ -12,21 +12,29 @@ GitHub navigation.
 | [[docs/alice-project.md]] | [AliceProject](alice-project.md) | Top-level local runtime identity, one-project/one-backend topology, concurrency, and display contract |
 | [[docs/project-structure.md]] | [Project structure](project-structure.md) | Process boundaries, source ownership, state roots, architectural entry points |
 | [[docs/development-workflow.md]] | [Development workflow](development-workflow.md) | Branches, delivery modes, PRs, promotions, external review, risk gates |
+| [[docs/testing.md]] | [Testing](testing.md) | Test ownership, risk lanes, command namespace, selector composition, side effects, and package-local semantics |
 | [[docs/managed-workspace-runtime.md]] | [Managed Workspace runtime](managed-workspace-runtime.md) | Electron packaging, managed Pi, PortableGit/Bash, runtime profile, Workspace PATH |
+| [[docs/harness-web-surfaces.md]] | [Harness web surfaces](harness-web-surfaces.md) | Harness manifests, managed Studio ports, readiness, routing, transport, lifecycle, and embedding |
 | [[docs/model-semantics-and-runtime-injection.md]] | [Model semantics and runtime injection](model-semantics-and-runtime-injection.md) | AI credential access, model semantics, Workspace selection, and native Agent projection |
 | [[docs/broker-packs.md]] | [Broker Packs](broker-packs.md) | Optional broker SDK packaging, UI installation, activation, runtime loading, release assets |
 | [[docs/cli-installer.md]] | [CLI installer](cli-installer.md) | Bootstrap consent, installed layout, atomic updates, PATH integration, installer tests, and release checks |
+| [[docs/cli-package-managers.md]] | [CLI package-manager channels](cli-package-managers.md) | npm/Bun platform packages, Homebrew formula, AUR package, provenance, update ownership, and publication order |
 | [[docs/cli-supervisor.md]] | [Shell CLI Supervisor](cli-supervisor.md) | Top-level Runtime lifecycle, status/JSON presentation, browser opening, completion, compatibility aliases, and TUI boundary |
 | [[docs/local-runtime.md]] | [Local Runtime and CLI bootstrap](local-runtime.md) | Source-backed localhost startup, dependency bootstrap, Runtime ownership, and headless bundle boundary |
 | [[docs/data-locations.md]] | [Data locations](data-locations.md) | Complete-home selection, desktop launcher preferences, concurrent instances, and directory safety |
 | [[docs/docker-deployment.md]] | [Docker deployment](docker-deployment.md) | Server image topology, remote-host safety, persistence, health, and container acceptance |
 | [[docs/remote-access.md]] | [Remote Runtime and access](remote-access.md) | Server lifecycle, SSH transport, managed remote bootstrap, client authority, and staged Studio protocol |
+| [[docs/inbox-content.md]] | [Inbox content](inbox-content.md) | Markdown publication, shared file references, migration and UI hook |
 | [[docs/connector-service.md]] | [Connector Service](connector-service.md) | Optional Discord/Telegram Inbox projection, adapters, secrets, health, Guardian lifecycle |
 | [[docs/ui-interaction-and-motion.md]] | [UI interaction and motion](ui-interaction-and-motion.md) | Clickable affordances, shared motion tokens, entrances/disclosures, reduced-motion policy |
-| [[docs/workspace-agent-guidance.md]] | [Workspace agent guidance](workspace-agent-guidance.md) | Always-loaded prompt contract, skill ownership, live CLI authority, guidance versioning |
+| [[docs/alice-harness.md]] | [Alice Harness injection](alice-harness.md) | Project CLI runtime, Skill prototypes/distribution, Workspace preferences and scoped file operations |
+| [[docs/sticker-packs.md]] | [Sticker packs](sticker-packs.md) | Project-owned sticker prototypes, optional Chat Skill projection, imports and file ownership |
+| [[docs/workspace-agent-guidance.md]] | [Workspace agent guidance](workspace-agent-guidance.md) | Always-loaded prompt contract, skill ownership, Workspace capability browser, live CLI authority, guidance versioning |
 | [[docs/workspace-lifecycle.md]] | [Workspace and Session lifecycle](workspace-lifecycle.md) | Offboarding, departed directories, handoff, restore/purge, Session retirement |
-| [[docs/workspace-manager.md]] | [Workspace Manager](workspace-manager.md) | Launcher-owned control plane, WebPi quick start, active-desk inventory, and management boundaries |
+| [[docs/workspace-manager.md]] | [Workspace Manager](workspace-manager.md) | Launcher-owned control plane, Web quick start, active-desk inventory, and management boundaries |
+| [[docs/web-conversation-surface.md]] | [Web conversation surface](web-conversation-surface.md) | Structured-protocol browser conversation for any runtime: wires, transports, neutral snapshot, permission requests, routes |
 | [[docs/workspace-template-upgrade.md]] | [Workspace Template Upgrade](workspace-template-upgrade.md) | Managed-asset baselines, three-way review, apply transactions, recovery, and the future Merge/Absorb boundary |
+| [[docs/workspace-absorb.md]] | [Workspace Absorb](workspace-absorb.md) | Directional Workspace consolidation, collision review, archived source identity, and recovery |
 | [[docs/workspace-issues-and-scheduling.md]] | [Workspace issues and scheduling](workspace-issues-and-scheduling.md) | Markdown issue contract, global board, schedule scanner, headless execution, Inbox delivery |
 | [[docs/conversation-provenance.md]] | [Workspace Session and artifact provenance](conversation-provenance.md) | `resumeId` identity, artifact trails, Issue execution responsibility, and provenance-before-collaboration sequencing |
 | [[docs/event-system.md]] | [Event-system retirement note](event-system.md) | Removed Alice event-bus scheduler and the remaining UTA journal boundary |
@@ -36,6 +44,9 @@ GitHub navigation.
 
 Other files under `docs/images/` are README/product assets rather than owner
 guides.
+
+Generated migration inventory: [[src/migrations/INDEX.md]]
+([Migration index](../src/migrations/INDEX.md)).
 
 ## User Quickstarts
 
