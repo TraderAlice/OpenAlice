@@ -1,3 +1,4 @@
+import type { ConnectorModelRequest, ConnectorModelPanel } from '@traderalice/connector-protocol'
 import { parseMarketReference } from '@traderalice/connector-protocol'
 import { parseReplyDirectives, replyMedia } from './reply-directives.js'
 import type { ConnectorAttachment } from '@traderalice/connector-protocol'
@@ -47,6 +48,7 @@ import {
 
 export interface DeliveryManagerOptions {
   renderMarket?(reference: string): Promise<ConnectorAttachment>
+  sessionModel?(connectorId: string, request: ConnectorModelRequest): Promise<ConnectorModelPanel>
   readWorkspaceFile?(workspaceId: string, path: string): Promise<ConnectorAttachment>
   registry: ConnectorRegistry
   config: ConnectorConfig
@@ -575,6 +577,7 @@ export class DeliveryManager {
     if (!adapter || !commands) throw new Error(`Connector adapter is not installed: ${id}`)
     const context: ConnectorAdapterContext = {
       commands,
+      ...(this.options.sessionModel ? { sessionModel: (request: ConnectorModelRequest) => this.options.sessionModel!(id, request) } : {}),
       updateSettings: async (patch) => {
         await this.options.updateAdapterSettings(id, patch)
         const current = this.options.config.adapters[id] ?? { enabled: false, settings: {} }

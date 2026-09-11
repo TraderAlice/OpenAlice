@@ -5,6 +5,7 @@ import { CommandRegistry } from '../core/adapter.js'
 import { formatInboxNotification } from './shared.js'
 import { TelegramConnectorAdapter, withTimeout } from './telegram.js'
 
+const handlers = new Map<string, (ctx: any) => Promise<void>>()
 const startMock = vi.fn()
 const stopMock = vi.fn()
 const getMe = vi.fn(async () => ({ id: 1, is_bot: true, first_name: 'OpenAlice', username: 'openalice_bot' }))
@@ -36,8 +37,8 @@ vi.mock('grammy', async (importOriginal) => {
         sendPhoto,
         sendSticker,
       }
-      command() {}
-      on() {}
+      command(name: string, handler: (ctx: any) => Promise<void>) { handlers.set(name, handler) }
+      on(name: string, handler: (ctx: any) => Promise<void>) { handlers.set(name, handler) }
       start(options: { onStart?: () => void }) {
         return startMock(options)
       }
@@ -473,4 +474,26 @@ describe('Telegram rich outbound text', () => {
     await adapter.stop()
   })
 
+})
+
+
+it('keeps model commands and callbacks owner-only and outside the agent message stream', async () => {
+  startMock.mockImplementation(async ({ onStart }) => { onStart?.() })
+  const adapter = new TelegramConnectorAdapter()
+  const call = vi.fn(async () => ({ resumeId: 'resume-1', revision: 'v1', runtime: 'codex', selection: { credential: 'native', model: null, effort: null }, credentials: [{ id: 'native', label: 'Runtime login' }], models: [], efforts: [], running: false, saved: false }))
+  const forwardOwnerText = vi.fn()
+  try {
+    await adapter.start({ enabled: true, settings: { botToken: 'test-token', ownerUserId: '42', chatId: '42' } }, { ...context(), sessionModel: call, forwardOwnerText })
+    await vi.waitFor(() => expect(handlers.has('model')).toBe(true))
+    const ctx = { chat: { id: 42, type: 'private' }, from: { id: 77 }, reply: vi.fn(async () => ({ message_id: 5 })), answerCallbackQuery: vi.fn(), callbackQuery: { data: 'mdl:wrong:save' } }
+    await handlers.get('model')!(ctx)
+    await handlers.get('callback_query:data')!(ctx)
+    expect(call).not.toHaveBeenCalled()
+    ctx.from.id = 42; ctx.chat.type = 'group'
+    await handlers.get('model')!(ctx); expect(call).not.toHaveBeenCalled()
+    ctx.chat.type = 'private'
+    await handlers.get('model')!(ctx); expect(call).toHaveBeenCalledTimes(1)
+    expect(ctx.reply).toHaveBeenCalledWith(expect.stringContaining('Runtime: codex'), expect.objectContaining({ reply_markup: expect.any(Object) }))
+    expect(forwardOwnerText).not.toHaveBeenCalled()
+  } finally { await adapter.stop() }
 })

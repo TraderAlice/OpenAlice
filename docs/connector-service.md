@@ -730,3 +730,33 @@ The renderer uses bundled JavaScript and a bundled OFL Liberation Sans font;
 it needs neither a browser nor a platform-native graphics library. Font paths
 are filled as compound contours to preserve digit/letter counters. PNGs are
 2400 by 1600 for legible mobile zoom; the attachment byte ceiling still applies.
+
+## Session model controls
+
+Telegram `/model` opens an owner-only private-chat inline panel for the existing
+phone-desk Session. Runtime is fixed. Credential, model, and effort use the same
+picker policy as Chat and Issues. Options are suggestions, not a claim that an
+account can access every model; `/model <model-id>` previews a custom model ID.
+Changing credential clears model/effort; changing model clears effort. Each
+choice previews, and **Save** commits. **Close** discards unsaved choices.
+
+Connector's optional `sessionModel` adapter context calls Alice's fixed local
+HTTP/Unix-socket gateway at `/cli/connector-model/:connectorId`. Alice resolves
+the desk and validates compatibility; only credential IDs/labels cross the
+boundary, never credential contents. There is no caller-selected Workspace or
+runtime. The command is consumed by Connector, not posted as an agent comment.
+
+Saving changes only the assigned Session binding. A running headless turn keeps
+its captured settings; subsequent comments/scheduled turns resolve the new
+binding. An active interactive TUI/GUI must first disconnect. Workspace defaults
+and other Sessions are unchanged. Missing or unassigned desks instruct the owner
+to send a first message. The menu does not silently create a replacement Session.
+
+Telegram panels expire after ten minutes and use bounded pagination and opaque
+callback coordinates. Owner checks apply to both commands and callbacks. A
+Session handoff or intervening binding edit invalidates a save, and concurrent
+saves are rejected. Transport or validation errors remain visible; they never
+produce a success acknowledgement. Connector restart invalidates old panels.
+The control contract is platform-neutral; Telegram currently implements its UI.
+See [Telegram inline keyboards](https://core.telegram.org/bots/api#inlinekeyboardbutton)
+and [callback acknowledgement](https://core.telegram.org/bots/api#answercallbackquery).

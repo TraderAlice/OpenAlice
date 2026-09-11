@@ -19,12 +19,12 @@ function mediaType(filename: string): string {
 }
 
 /** Fixed local gateway; model input cannot choose a host or socket. */
-export async function fetchAliceJson(route: string): Promise<string> {
+export async function fetchAliceJson(route: string, body?: unknown): Promise<string> {
   const port = Number(process.env['OPENALICE_MCP_PORT'] ?? 47332)
   const url = new URL(route, `http://127.0.0.1:${port}`)
   const socketPath = process.env['OPENALICE_TOOL_SOCKET']
   const raw = await new Promise<string>((resolve, reject) => {
-    const req = request(socketPath ? { socketPath, path: url.pathname + url.search } : url, res => {
+    const req = request({ ...(socketPath ? { socketPath } : { hostname: url.hostname, port: url.port }), path: url.pathname + url.search, method: body === undefined ? 'GET' : 'POST', headers: { 'Content-Type': 'application/json' } }, res => {
       let size = 0
       const chunks: Buffer[] = []
       res.on('data', (chunk: Buffer) => {
@@ -33,11 +33,19 @@ export async function fetchAliceJson(route: string): Promise<string> {
         chunks.push(chunk)
       })
       res.on('error', reject)
-      res.on('end', () => res.statusCode === 200 ? resolve(Buffer.concat(chunks).toString('utf8')) : reject(new Error(`Alice resource unavailable (${res.statusCode})`)))
+      res.on('end', () => {
+        const text = Buffer.concat(chunks).toString('utf8')
+        if (res.statusCode === 200) { resolve(text); return }
+        // Only the model control endpoint returns deliberately user-facing errors.
+        if (res.statusCode === 400 && route.startsWith('/cli/connector-model/')) {
+          try { const result = JSON.parse(text); if (typeof result.error === 'string') { reject(new Error(result.error)); return } } catch { /* generic transport error */ }
+        }
+        reject(new Error(`Alice resource unavailable (${res.statusCode})`))
+      })
     })
     req.setTimeout(10_000, () => req.destroy(new Error('Alice request timed out')))
     req.on('error', reject)
-    req.end()
+    req.end(body === undefined ? undefined : JSON.stringify(body))
   })
   return raw
 }

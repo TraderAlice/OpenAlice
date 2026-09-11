@@ -103,6 +103,7 @@ export const TELEGRAM_CONNECTOR_DEFINITION: ConnectorDefinition = {
       { name: 'test', description: 'Send a test notification.' },
       { name: 'inbox', description: 'Browse recent Inbox items.' },
       { name: 'settings', description: 'Change Inbox push for this chat.' },
+      { name: 'model', description: 'Choose Session credential, model and effort.' },
       { name: 'uta', description: 'Review and approve pending trades.' },
     ],
     capabilities: ['inbox', 'settings', 'uta', 'desk'],
