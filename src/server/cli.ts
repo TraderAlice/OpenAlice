@@ -1,3 +1,4 @@
+import { registerConnectorModelRoutes } from './connector-model.js'
 import { registerMarketReferenceRoute } from './market-reference.js'
 import { registerWorkspaceFileRoutes } from './workspace-files.js'
 import { registerProjectCliRoutes } from './project-cli.js'
@@ -68,6 +69,7 @@ type WsMeta = { id: string; tag: string; dir?: string }
 export function registerCliRoutes(app: Hono, deps: CliGatewayDeps, manifestOnly = false): void {
   const { toolCenter, workspaceToolCenter, inboxStore, entityStore, getWorkspaceService } = deps
   if (!manifestOnly) {
+    registerConnectorModelRoutes(app, getWorkspaceService)
     registerProjectCliRoutes(app, toolCenter)
     registerMarketReferenceRoute(app, toolCenter)
     registerWorkspaceFileRoutes(app, id => getWorkspaceService()?.registry.get(id))
