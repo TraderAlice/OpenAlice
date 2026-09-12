@@ -60,7 +60,7 @@ present the result as a responsive dashboard with deterministic demo data.
 - [x] Add strategy/provider registries, API discovery and dashboard selection.
 - [x] Isolate chart persistence, history and evaluation by strategy ID.
 - [x] Re-run demo/live acceptance for the modularity increment.
-- [ ] Publish the modularity increment to the draft pull request.
+- [x] Publish the modularity increment to the draft pull request.
 - [ ] Verify decision-scale BTC fingerprinting with consecutive live scans.
 - [ ] Run the live command on macOS and observe scheduling for 24–72 hours.
 
