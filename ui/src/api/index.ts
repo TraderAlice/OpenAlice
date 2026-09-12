@@ -11,6 +11,7 @@ import { toolsApi } from './tools'
 import { agentStatusApi } from './agentStatus'
 import { newsApi } from './news'
 import { marketApi } from './market'
+import { marketMonitorApi } from './market-monitor'
 import { inboxApi } from './inbox'
 import { entitiesApi } from './entities'
 import { versionApi } from './version'
@@ -33,6 +34,7 @@ export const api = {
   agentStatus: agentStatusApi,
   news: newsApi,
   market: marketApi,
+  marketMonitor: marketMonitorApi,
   inbox: inboxApi,
   entities: entitiesApi,
   version: versionApi,

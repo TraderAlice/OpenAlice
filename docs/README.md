@@ -41,6 +41,7 @@ GitHub navigation.
 | [[docs/uta-live-testing.md]] | [UTA live testing](uta-live-testing.md) | Real broker/demo acceptance scenarios and trading invariants |
 | [[docs/ibkr-wire-protocol.md]] | [IBKR wire protocol](ibkr-wire-protocol.md) | TWS/Gateway inbound framing, payload-only decoder contract, failure isolation, and verification |
 | [[docs/market-data-architecture.md]] | [Market data architecture](market-data-architecture.md) | TraderHub/reference data, BarService K-lines, and the private provider compatibility layer |
+| [[docs/market-evidence-monitor.md]] | [Market evidence monitor](market-evidence-monitor.md) | Read-only BTC/TSLA evidence strategy, observations, alerts, and dashboard |
 
 Other files under `docs/images/` are README/product assets rather than owner
 guides.

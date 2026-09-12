@@ -29,6 +29,11 @@ the durable truth after it changes. Git history is the archive.
 
 ## Active
 
+- [[plans/market-evidence-monitor.md]] — Adds a read-only, modular BTC/TSLA
+  evidence monitor to the Market workspace, with explicit source health,
+  daily/intraday evidence, durable observations and alerts, deterministic demo
+  data, and a responsive web dashboard. The feature branch remains unmerged
+  pending Mac live-data acceptance.
 - [[plans/web-conversation-surface.md]] — Generalizes WebPi into one Web
   conversation surface: a neutral `WebSessionHost` with `pi-rpc`, `acp`,
   `claude-stream-json`, and `codex-app-server` transports, first-class

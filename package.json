@@ -13,6 +13,7 @@
   "scripts": {
     "cli": "node packages/cli/bin/openalice.ts",
     "dev": "tsx scripts/guardian/dev.ts",
+    "market-monitor:preview": "node scripts/market-monitor-preview.mjs",
     "dev:onboarding": "tsx scripts/onboarding-test-dev.ts",
     "remote:ssh": "node packages/cli/bin/openalice.mjs ssh",
     "docker:build": "docker build --tag openalice:local .",

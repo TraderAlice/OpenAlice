@@ -24,6 +24,7 @@ import { createAgentRuntimeLogRoutes } from './routes/agent-runtime.js'
 import { createOfficeRoutes } from './routes/office.js'
 import { createNewsRoutes } from './routes/news.js'
 import { createMarketRoutes } from './routes/market.js'
+import { createMarketMonitorRoutes } from './routes/market-monitor.js'
 import { createBarsRoutes } from './routes/bars.js'
 import { createReferenceRoutes } from './routes/reference.js'
 import { createInboxRoutes } from './routes/inbox.js'
@@ -268,6 +269,7 @@ export class WebPlugin implements Plugin {
     app.route('/api/agent-status', createAgentStatusRoutes(ctx))
     app.route('/api/news', createNewsRoutes(ctx))
     app.route('/api/market', createMarketRoutes(ctx))
+    app.route('/api/market-monitor', createMarketMonitorRoutes(ctx))
     app.route('/api/bars', createBarsRoutes(ctx))
     app.route('/api/reference', createReferenceRoutes(ctx))
     app.route('/api/inbox', createInboxRoutes({ inboxStore: ctx.inboxStore, resolveWorkspace: id => this.workspaceService?.registry.get(id) }))

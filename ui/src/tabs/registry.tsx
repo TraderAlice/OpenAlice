@@ -14,6 +14,7 @@ import { TrackedIssueDetailPage } from '../pages/TrackedIssueDetailPage'
 import { OfficePage } from '../pages/OfficePage'
 import { NewsPage } from '../pages/NewsPage'
 import { MarketPage } from '../pages/MarketPage'
+import { MarketEvidenceMonitorPage } from '../pages/MarketEvidenceMonitorPage'
 import { MarketRotationPage } from '../pages/MarketRotationPage'
 import { MarketBoardPage } from '../pages/MarketBoardPage'
 import { MARKET_BOARD_TITLES } from '../pages/market-board-titles'
@@ -233,6 +234,15 @@ const marketListModule: ViewModule<'market-list'> = {
   toUrl: () => '/market',
   shell: 'market',
   Component: () => <MarketPage />,
+}
+
+const marketMonitorModule: ViewModule<'market-monitor'> = {
+  kind: 'market-monitor',
+  title: () => 'Evidence Monitor',
+  toUrl: () => '/market/evidence',
+  shell: 'market',
+  lifecycle: 'keep-mounted',
+  Component: ({ visible }) => <MarketEvidenceMonitorPage visible={visible} />,
 }
 
 const marketRotationModule: ViewModule<'market-rotation'> = {
@@ -602,6 +612,7 @@ const VIEWS = {
   office: officeModule,
   news: newsModule,
   'market-list': marketListModule,
+  'market-monitor': marketMonitorModule,
   'market-rotation': marketRotationModule,
   'market-board': marketBoardModule,
   'market-detail': marketDetailModule,

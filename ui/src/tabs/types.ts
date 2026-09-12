@@ -41,6 +41,7 @@ export type ViewSpec =
   | { kind: 'office';         params: Record<string, never> }
   | { kind: 'news';           params: { category?: string; view?: string } }
   | { kind: 'market-list';    params: Record<string, never> }
+  | { kind: 'market-monitor'; params: Record<string, never> }
   | { kind: 'market-rotation'; params: Record<string, never> }
   | { kind: 'market-board';   params: { board: 'movers' | 'calendar' | 'macro' | 'term-structure' | 'global-macro' | 'shipping' | 'fed' } }
   | { kind: 'market-detail';  params: { assetClass: 'equity' | 'crypto' | 'currency' | 'commodity'; symbol: string; source?: string } }
