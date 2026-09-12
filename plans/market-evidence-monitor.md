@@ -33,6 +33,9 @@ present the result as a responsive dashboard with deterministic demo data.
   second navigation hierarchy.
 - Browser notifications are opt-in and only available while the dashboard is
   open. Native/background delivery is a later product increment.
+- Live acceptance is a separate, loopback-only smoke command. Its default mode
+  is read-only; explicit `--scan` performs two monitor scans per selected asset
+  and records a machine-readable receipt without touching trading routes.
 
 ## Checklist
 
@@ -44,6 +47,8 @@ present the result as a responsive dashboard with deterministic demo data.
 - [x] Add focused backend/UI tests and run owner typechecks.
 - [x] Exercise the demo build and record live Mac acceptance as a residual gap.
 - [x] Commit and push the held feature branch without merging.
+- [x] Add and verify the Mac live-API acceptance command on the draft branch.
+- [ ] Run the live command on macOS and observe scheduling for 24–72 hours.
 
 ## Verification
 
@@ -53,6 +58,8 @@ present the result as a responsive dashboard with deterministic demo data.
 - `pnpm test:changed` when the origin exposes a compatible `dev` base;
   otherwise explicit owner/path selection against `upstream/dev`
 - `pnpm -F open-alice-ui build:demo`
+- `pnpm market-monitor:acceptance -- --help`
+- `pnpm vitest run scripts/market-monitor-live-smoke.spec.ts`
 - Real `/market/evidence` demo route; Mac live-data acceptance remains external
 
 Verified in the managed Linux workspace on 2026-09-12:
@@ -65,6 +72,8 @@ Verified in the managed Linux workspace on 2026-09-12:
   and temporary-Git suites that require host capabilities unavailable in this
   workspace. No Market Monitor test failed; native Mac acceptance remains the
   final environment-specific check.
+- The live-acceptance helper and the original monitor closure pass five files
+  and 16 tests; its help/argument contract also passes under pnpm 11.
 
 ## Completion
 

@@ -69,6 +69,24 @@ pnpm market-monitor:preview -- --check
 
 For real configured providers, run `pnpm dev`, choose **Market → Evidence
 Monitor**, and inspect every source-health row before using an interpretation.
+In a second terminal, the default acceptance command only checks the live page
+and read APIs:
+
+```bash
+pnpm market-monitor:acceptance
+```
+
+To exercise real scans for both assets and verify receipts, chart restoration,
+source attribution and semantic de-duplication consistency:
+
+```bash
+pnpm market-monitor:acceptance -- --scan
+```
+
+The command accepts `--base-url=http://127.0.0.1:<port>` when Guardian selected
+a non-default port, and writes `dist/market-monitor-acceptance.json`. Non-local
+URLs are rejected unless the caller explicitly adds `--allow-remote`.
+
 Mac/Electron acceptance must confirm desktop and narrow-window layout, live
 timestamps, the 1D/1H switch, persistence after restart and no duplicate scan
 records across a 24–72 hour observation window.
