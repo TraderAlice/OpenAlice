@@ -23,7 +23,7 @@ export function createReferenceRoutes(ctx: EngineContext): Hono {
     }
   })
 
-  // GET /api/reference/calendar?days= → earnings / IPO / ex-dividend board
+  // GET /api/reference/calendar?days= → macro events / earnings / IPO / ex-dividend board
   app.get('/calendar', async (c) => {
     const daysRaw = c.req.query('days')
     const days = daysRaw ? Math.max(1, Math.min(60, Number(daysRaw) || 14)) : undefined

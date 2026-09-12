@@ -85,7 +85,9 @@ export function createReferenceData(deps: ReferenceDataDeps): ReferenceDataServi
 
   const calendarCached = cachedBoard(TTL.calendar, async (): Promise<CalendarBoard> => {
     const hub = await viaHub<CalendarBoard>('calendar')
-    if (hub) return hub
+    // Older hosted deployments predate the macro-events field. Keep the
+    // OpenAlice-owned response contract stable while the hub rolls forward.
+    if (hub) return { ...hub, economicEvents: hub.economicEvents ?? [] }
     const days = CALENDAR_DAYS
     const start = new Date()
     const end = new Date(start.getTime() + days * 24 * 60 * 60 * 1000)
@@ -93,17 +95,23 @@ export function createReferenceData(deps: ReferenceDataDeps): ReferenceDataServi
     // Calendars are FMP-only in the provider catalog — explicit, same as
     // the equityGetEarningsCalendar tool.
     const params = { provider: 'fmp', start_date: window.start, end_date: window.end }
-    const [earnings, ipos, dividends] = await Promise.allSettled([
+    const [economicEvents, earnings, ipos, dividends] = await Promise.allSettled([
+      deps.economyClient.getCalendar(params),
       deps.equityClient.getCalendarEarnings(params),
       deps.equityClient.getCalendarIpo(params),
       deps.equityClient.getCalendarDividend(params),
     ])
-    // All three down = the key is missing/invalid — fail loud with the
+    // All four down = the key is missing/invalid — fail loud with the
     // upstream message instead of rendering a silently empty board.
-    if (earnings.status === 'rejected' && ipos.status === 'rejected' && dividends.status === 'rejected') {
-      throw earnings.reason instanceof Error
-        ? earnings.reason
-        : new Error(String(earnings.reason))
+    if (
+      economicEvents.status === 'rejected'
+      && earnings.status === 'rejected'
+      && ipos.status === 'rejected'
+      && dividends.status === 'rejected'
+    ) {
+      throw economicEvents.reason instanceof Error
+        ? economicEvents.reason
+        : new Error(String(economicEvents.reason))
     }
     const rows = <T>(r: PromiseSettledResult<T[]>) => (r.status === 'fulfilled' ? r.value : [])
     // Partial failures stay loud too: a suspended/limited FMP tier can
@@ -114,10 +122,12 @@ export function createReferenceData(deps: ReferenceDataDeps): ReferenceDataServi
         errors[key] = r.reason instanceof Error ? r.reason.message : String(r.reason)
       }
     }
+    note('economicEvents', economicEvents)
     note('earnings', earnings)
     note('ipos', ipos)
     note('dividends', dividends)
     return {
+      economicEvents: rows(economicEvents),
       earnings: rows(earnings),
       ipos: rows(ipos),
       dividends: rows(dividends),
@@ -168,23 +178,31 @@ async function uncachedCalendar(deps: ReferenceDataDeps, days: number): Promise<
   const end = new Date(start.getTime() + days * 24 * 60 * 60 * 1000)
   const window = { start: isoDay(start), end: isoDay(end) }
   const params = { provider: 'fmp', start_date: window.start, end_date: window.end }
-  const [earnings, ipos, dividends] = await Promise.allSettled([
+  const [economicEvents, earnings, ipos, dividends] = await Promise.allSettled([
+    deps.economyClient.getCalendar(params),
     deps.equityClient.getCalendarEarnings(params),
     deps.equityClient.getCalendarIpo(params),
     deps.equityClient.getCalendarDividend(params),
   ])
-  if (earnings.status === 'rejected' && ipos.status === 'rejected' && dividends.status === 'rejected') {
-    throw earnings.reason instanceof Error ? earnings.reason : new Error(String(earnings.reason))
+  if (
+    economicEvents.status === 'rejected'
+    && earnings.status === 'rejected'
+    && ipos.status === 'rejected'
+    && dividends.status === 'rejected'
+  ) {
+    throw economicEvents.reason instanceof Error ? economicEvents.reason : new Error(String(economicEvents.reason))
   }
   const rows = <T>(r: PromiseSettledResult<T[]>) => (r.status === 'fulfilled' ? r.value : [])
   const errors: NonNullable<CalendarBoard['errors']> = {}
   const note = (key: keyof NonNullable<CalendarBoard['errors']>, r: PromiseSettledResult<unknown>) => {
     if (r.status === 'rejected') errors[key] = r.reason instanceof Error ? r.reason.message : String(r.reason)
   }
+  note('economicEvents', economicEvents)
   note('earnings', earnings)
   note('ipos', ipos)
   note('dividends', dividends)
   return {
+    economicEvents: rows(economicEvents),
     earnings: rows(earnings),
     ipos: rows(ipos),
     dividends: rows(dividends),

@@ -16,6 +16,11 @@ function mkCtx(overrides?: Partial<ReferenceDataService>): EngineContext {
       meta: { provider: 'yfinance', asOf: '2026-06-10T00:00:00.000Z' },
     }),
     calendar: async () => ({
+      economicEvents: [{
+        date: '2026-06-12 12:30:00', country: 'US', category: 'Employment', event: 'Nonfarm Payrolls',
+        importance: 'High', source: 'BLS', currency: 'USD', unit: 'K', consensus: 150,
+        previous: 139, revised: null, actual: null,
+      }],
       earnings: [{ report_date: '2026-06-12', symbol: 'AAPL', name: 'Apple', eps_previous: 1.2, eps_consensus: 1.4 }],
       ipos: [], dividends: [],
       window: { start: '2026-06-10', end: '2026-06-24' },
@@ -69,6 +74,7 @@ describe('reference routes', () => {
   it('GET /calendar returns the board with the window', async () => {
     const res = await createReferenceRoutes(mkCtx()).request('/calendar')
     const body = await res.json()
+    expect(body.economicEvents[0].event).toBe('Nonfarm Payrolls')
     expect(body.earnings[0].symbol).toBe('AAPL')
     expect(body.window.start).toBe('2026-06-10')
     expect(body.meta.provider).toBe('fmp')

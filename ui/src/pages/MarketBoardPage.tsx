@@ -13,7 +13,7 @@ import { MeasuredChartFrame } from '../components/MeasuredChartFrame'
 import {
   referenceApi,
   type MoversBoard, type MoverRow, type ReferenceMeta, type CalendarBoard,
-  type EarningsEvent, type IpoEvent, type DividendEvent,
+  type EarningsEvent, type IpoEvent, type DividendEvent, type EconomicEvent,
   type MacroBoard, type MacroSeriesCard, type TermStructureBoard, type TermCurve,
   type GlobalMacroBoard, type GlobalMacroCell, type ShippingBoard, type ShippingCurve,
   type FedBoard,
@@ -157,26 +157,36 @@ function MoversTable({ rows }: { rows: MoverRow[] }) {
 
 // ==================== Calendar ====================
 
-type CalendarList = 'earnings' | 'ipos' | 'dividends'
+type CalendarList = 'economic' | 'earnings' | 'ipos' | 'dividends'
+type ImportanceFilter = 'all' | 'high' | 'medium' | 'low'
 const CALENDAR_PAGE_SIZE = 50
 
 function CalendarBoardView() {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
   const { data, updatedAt, loading, slow, error, retry } = useReferenceBoard<CalendarBoard>(referenceApi.calendar, 30 * 60 * 1000)
-  const [list, setList] = useState<CalendarList>('earnings')
+  const [list, setList] = useState<CalendarList>('economic')
   const [query, setQuery] = useState('')
+  const [countryFilter, setCountryFilter] = useState('')
+  const [importanceFilter, setImportanceFilter] = useState<ImportanceFilter>('all')
   const [visibleCount, setVisibleCount] = useState(CALENDAR_PAGE_SIZE)
   const sortedRows = useMemo(() => ({
+    economic: data ? [...(data.economicEvents ?? [])].sort(compareEconomicEvents) : [],
     earnings: data ? [...data.earnings].sort((a, b) => a.report_date.localeCompare(b.report_date)) : [],
     ipos: data ? [...data.ipos].sort((a, b) => (a.ipo_date ?? '').localeCompare(b.ipo_date ?? '')) : [],
     dividends: data ? [...data.dividends].sort((a, b) => a.ex_dividend_date.localeCompare(b.ex_dividend_date)) : [],
   }), [data])
   const filteredRows = useMemo(() => {
     const normalized = query.trim().toLocaleLowerCase()
-    if (!normalized) return sortedRows
     const includesQuery = (...parts: unknown[]) =>
       parts.some((part) => String(part ?? '').toLocaleLowerCase().includes(normalized))
     return {
+      economic: sortedRows.economic.filter((row) =>
+        (!countryFilter || row.country === countryFilter)
+        && (importanceFilter === 'all' || normalizeImportance(row.importance) === importanceFilter)
+        && (!normalized || includesQuery(
+          row.date, row.country, row.currency, row.category, row.event,
+          row.importance, row.source, row.previous, row.consensus, row.actual,
+        ))),
       earnings: sortedRows.earnings.filter((row) =>
         includesQuery(row.report_date, row.symbol, row.name)),
       ipos: sortedRows.ipos.filter((row) =>
@@ -184,9 +194,15 @@ function CalendarBoardView() {
       dividends: sortedRows.dividends.filter((row) =>
         includesQuery(row.ex_dividend_date, row.payment_date, row.symbol, row.name)),
     }
-  }, [query, sortedRows])
+  }, [countryFilter, importanceFilter, query, sortedRows])
+  const countries = useMemo(() => [...new Set(
+    sortedRows.economic.map((row) => row.country).filter((country): country is string => Boolean(country)),
+  )].sort(), [sortedRows.economic])
+  const locale = i18n.resolvedLanguage ?? i18n.language
   const activeRows = filteredRows[list]
+  const sourceRowCount = sortedRows[list].length
   const activeVisibleCount = Math.min(visibleCount, activeRows.length)
+  const activeError = data?.errors?.[calendarErrorKey(list)]
 
   useEffect(() => {
     setVisibleCount(CALENDAR_PAGE_SIZE)
@@ -206,17 +222,17 @@ function CalendarBoardView() {
       />
       <div className="flex-1 overflow-y-auto px-4 md:px-8 py-4 flex flex-col gap-4 min-h-0">
         <div
-          className="grid grid-cols-3 gap-0.5 rounded-lg border border-border/70 bg-muted/60 p-0.5"
+          className="grid grid-cols-2 gap-0.5 rounded-lg border border-border/70 bg-muted/60 p-0.5 sm:grid-cols-4"
           role="group"
           aria-label={t('market.boardCalendar')}
         >
-          {(['earnings', 'ipos', 'dividends'] as const).map((k) => (
+          {(['economic', 'earnings', 'ipos', 'dividends'] as const).map((k) => (
             <button
               key={k}
               type="button"
               onClick={() => setList(k)}
               aria-pressed={list === k}
-              aria-label={`${t(calendarLabelKey(k))} (${data?.[k].length ?? 0})`}
+              aria-label={`${t(calendarLabelKey(k))} (${calendarRowCount(data, k)})`}
               className={`oa-pressable flex min-h-11 min-w-0 flex-col items-center justify-center rounded-md px-2 py-1 text-[12px] leading-[18px] font-medium sm:flex-row sm:gap-1.5 ${
                 list === k
                   ? 'bg-background text-foreground shadow-sm ring-1 ring-border/60'
@@ -225,7 +241,7 @@ function CalendarBoardView() {
             >
               <span className="truncate">{t(calendarLabelKey(k))}</span>
               <span className="font-mono text-[10px] leading-[14px] text-muted-foreground">
-                {data?.[k].length ?? 0}
+                {calendarRowCount(data, k)}
               </span>
             </button>
           ))}
@@ -249,11 +265,11 @@ function CalendarBoardView() {
           </div>
         )}
         {/* Per-list upstream failure — loud, with the provider's own message. */}
-        {data?.errors?.[list] && (
-          <div className="rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2 text-[13px] leading-5 text-destructive">{data.errors[list]}</div>
+        {activeError && (
+          <div className="rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2 text-[13px] leading-5 text-destructive">{activeError}</div>
         )}
 
-        {data && data[list].length > 0 && !data.errors?.[list] && (
+        {data && sourceRowCount > 0 && !activeError && (
           <div className="space-y-2">
             <label htmlFor="market-calendar-search" className="sr-only">
               {t('market.calendarSearch')}
@@ -272,6 +288,32 @@ function CalendarBoardView() {
                 className={`${inputClass} min-h-11 py-2 pl-9 pr-3`}
               />
             </div>
+            {list === 'economic' && (
+              <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                <label className="sr-only" htmlFor="market-calendar-country">{t('market.calendarCountry')}</label>
+                <select
+                  id="market-calendar-country"
+                  value={countryFilter}
+                  onChange={(event) => setCountryFilter(event.target.value)}
+                  className={`${inputClass} min-h-11`}
+                >
+                  <option value="">{t('market.calendarAllCountries')}</option>
+                  {countries.map((country) => <option key={country} value={country}>{country}</option>)}
+                </select>
+                <label className="sr-only" htmlFor="market-calendar-importance">{t('market.calendarImportance')}</label>
+                <select
+                  id="market-calendar-importance"
+                  value={importanceFilter}
+                  onChange={(event) => setImportanceFilter(event.target.value as ImportanceFilter)}
+                  className={`${inputClass} min-h-11`}
+                >
+                  <option value="all">{t('market.calendarAllImportance')}</option>
+                  <option value="high">{t('market.importanceHigh')}</option>
+                  <option value="medium">{t('market.importanceMedium')}</option>
+                  <option value="low">{t('market.importanceLow')}</option>
+                </select>
+              </div>
+            )}
             {activeRows.length > 0 && (
               <div className="text-[11px] text-muted-foreground">
                 {t('market.calendarShowing', {
@@ -283,8 +325,11 @@ function CalendarBoardView() {
           </div>
         )}
 
-        {data && activeRows.length === 0 && !loading && !data.errors?.[list] && (
+        {data && activeRows.length === 0 && !loading && !activeError && (
           <div className="text-[13px] text-muted-foreground">{t('market.noMatches')}</div>
+        )}
+        {data && list === 'economic' && filteredRows.economic.length > 0 && (
+          <EconomicEventsTable rows={filteredRows.economic.slice(0, visibleCount)} locale={locale} />
         )}
         {data && list === 'earnings' && filteredRows.earnings.length > 0 && (
           <EarningsTable rows={filteredRows.earnings.slice(0, visibleCount)} />
@@ -314,10 +359,147 @@ function CalendarBoardView() {
 
 function calendarLabelKey(k: CalendarList) {
   switch (k) {
+    case 'economic': return 'market.calEconomic' as const
     case 'earnings': return 'market.calEarnings' as const
     case 'ipos': return 'market.calIpos' as const
     case 'dividends': return 'market.calDividends' as const
   }
+}
+
+function calendarRowCount(data: CalendarBoard | null, list: CalendarList): number {
+  if (!data) return 0
+  return list === 'economic' ? (data.economicEvents?.length ?? 0) : data[list].length
+}
+
+function calendarErrorKey(list: CalendarList): keyof NonNullable<CalendarBoard['errors']> {
+  return list === 'economic' ? 'economicEvents' : list
+}
+
+function economicEventTimestamp(value: string | null): number {
+  if (!value) return Number.POSITIVE_INFINITY
+  const normalized = /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}(?::\d{2})?$/.test(value)
+    ? `${value.replace(' ', 'T')}Z`
+    : value
+  const timestamp = new Date(normalized).getTime()
+  return Number.isNaN(timestamp) ? Number.POSITIVE_INFINITY : timestamp
+}
+
+function compareEconomicEvents(a: EconomicEvent, b: EconomicEvent): number {
+  return economicEventTimestamp(a.date) - economicEventTimestamp(b.date)
+}
+
+function normalizeImportance(value: string | null): Exclude<ImportanceFilter, 'all'> | 'other' {
+  const normalized = value?.trim().toLocaleLowerCase() ?? ''
+  if (normalized.includes('high')) return 'high'
+  if (normalized.includes('medium') || normalized.includes('moderate')) return 'medium'
+  if (normalized.includes('low')) return 'low'
+  return 'other'
+}
+
+function formatEconomicEventDate(value: string | null, locale: string): string {
+  const timestamp = economicEventTimestamp(value)
+  if (!Number.isFinite(timestamp)) return value ?? '—'
+  return new Intl.DateTimeFormat(locale, {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+    timeZoneName: 'short',
+  }).format(timestamp)
+}
+
+function formatEconomicValue(value: string | number | null, unit: string | null): string {
+  if (value === null || value === '') return '—'
+  const text = String(value)
+  return unit && !text.includes(unit) ? `${text} ${unit}` : text
+}
+
+function ImportanceBadge({ value }: { value: string | null }) {
+  const { t } = useTranslation()
+  const importance = normalizeImportance(value)
+  const label = importance === 'high'
+    ? t('market.importanceHigh')
+    : importance === 'medium'
+      ? t('market.importanceMedium')
+      : importance === 'low'
+        ? t('market.importanceLow')
+        : value || t('market.importanceUnknown')
+  const className = importance === 'high'
+    ? 'border-destructive/30 bg-destructive/10 text-destructive'
+    : importance === 'medium'
+      ? 'border-warning/30 bg-warning/10 text-warning'
+      : 'border-border bg-muted/60 text-muted-foreground'
+  return (
+    <span className={`inline-flex rounded-full border px-2 py-0.5 text-[10px] font-medium leading-4 ${className}`}>
+      {label}
+    </span>
+  )
+}
+
+function EconomicEventsTable({ rows, locale }: { rows: EconomicEvent[]; locale: string }) {
+  const { t } = useTranslation()
+  return (
+    <>
+      <div data-testid="calendar-mobile" className="space-y-2 md:hidden">
+        {rows.map((row, index) => (
+          <article key={`${row.date}-${row.country}-${row.event}-${index}`} className="rounded-lg border border-border/70 bg-card px-3 py-3">
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <h3 className="text-[13px] font-semibold leading-[18px] text-foreground">{row.event ?? row.category ?? '—'}</h3>
+                <p className="mt-0.5 text-[11px] text-muted-foreground">
+                  {[row.country, row.currency, row.category].filter(Boolean).join(' · ') || '—'}
+                </p>
+              </div>
+              <ImportanceBadge value={row.importance} />
+            </div>
+            <time dateTime={row.date ?? undefined} className="mt-2 block text-[11px] tabular-nums text-muted-foreground">
+              {formatEconomicEventDate(row.date, locale)}
+            </time>
+            <dl className="mt-3 grid grid-cols-3 gap-2 border-t border-border/60 pt-2 text-right">
+              {[
+                [t('market.colPrevious'), formatEconomicValue(row.previous, row.unit)],
+                [t('market.colConsensus'), formatEconomicValue(row.consensus, row.unit)],
+                [t('market.colActual'), formatEconomicValue(row.actual, row.unit)],
+              ].map(([label, value]) => (
+                <div key={label}>
+                  <dt className="text-[10px] font-medium text-muted-foreground/70">{label}</dt>
+                  <dd className="mt-0.5 whitespace-nowrap font-mono text-[11px] text-foreground">{value}</dd>
+                </div>
+              ))}
+            </dl>
+          </article>
+        ))}
+      </div>
+      <CalTable
+        head={[
+          t('market.colLocalTime'), t('market.colEvent'), t('market.colCountry'),
+          t('market.colImportance'), t('market.colPrevious'), t('market.colConsensus'), t('market.colActual'),
+        ]}
+        rightCols={[4, 5, 6]}
+      >
+        {rows.map((row, index) => (
+          <tr key={`${row.date}-${row.country}-${row.event}-${index}`} className="border-b border-border/50 hover:bg-secondary/40">
+            <td className="py-1.5 pr-3 text-muted-foreground whitespace-nowrap">
+              <time dateTime={row.date ?? undefined}>{formatEconomicEventDate(row.date, locale)}</time>
+            </td>
+            <td className="min-w-[220px] py-1.5 px-3">
+              <div className="font-medium text-foreground">{row.event ?? row.category ?? '—'}</div>
+              {row.category && row.category !== row.event && <div className="text-[10px] text-muted-foreground">{row.category}</div>}
+            </td>
+            <td className="py-1.5 px-3 text-muted-foreground whitespace-nowrap">
+              {[row.country, row.currency].filter(Boolean).join(' · ') || '—'}
+            </td>
+            <td className="py-1.5 px-3"><ImportanceBadge value={row.importance} /></td>
+            <td className="py-1.5 px-3 text-right font-mono text-foreground whitespace-nowrap">{formatEconomicValue(row.previous, row.unit)}</td>
+            <td className="py-1.5 px-3 text-right font-mono text-foreground whitespace-nowrap">{formatEconomicValue(row.consensus, row.unit)}</td>
+            <td className="py-1.5 pl-3 text-right font-mono text-foreground whitespace-nowrap">{formatEconomicValue(row.actual, row.unit)}</td>
+          </tr>
+        ))}
+      </CalTable>
+    </>
+  )
 }
 
 function useOpenEquity() {
