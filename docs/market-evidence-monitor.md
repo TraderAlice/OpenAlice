@@ -23,6 +23,12 @@ never relabelled as intraday data.
 
 - `src/domain/market-monitor/analysis.ts` owns the first strategy
   (`evidence-chain-v1`), semantic fingerprints and observation evaluation.
+- `src/domain/market-monitor/strategy.ts` owns the strategy contract and
+  registry. A strategy declares a stable ID, version, required inputs, analysis
+  function and semantic fingerprint function.
+- `src/domain/market-monitor/context.ts` owns composable asset-context
+  providers. Multiple providers may support the same asset; one provider
+  failure becomes a source-health row without discarding successful modules.
 - `src/domain/market-monitor/service.ts` owns source orchestration, explicit
   fallback health, snapshot de-duplication and alert conditions.
 - `src/domain/market-monitor/store.ts` owns append-only JSONL observations,
@@ -33,8 +39,11 @@ never relabelled as intraday data.
 - `ui/src/pages/MarketEvidenceMonitorPage.tsx` owns the responsive dashboard,
   visible-page scheduling, 1D/1H switch, export and opt-in browser alerts.
 
-Adding another strategy should add a typed analysis implementation and select
-it through a registry; it should not embed rules in HTTP routes or React.
+Adding another strategy now means implementing `MarketMonitorStrategy` and
+registering it. It automatically appears in `GET /api/market-monitor/strategies`
+and the dashboard settings selector; HTTP routes and React do not need new
+decision rules. A new context source implements `MarketContextProvider` and may
+be composed with existing providers for BTC, TSLA or a future asset.
 
 ## Runtime Behaviour
 
@@ -52,6 +61,11 @@ positioning or basis changes remain visible. If a context provider becomes
 temporarily unavailable, the last valid values remain visible while source
 health clearly marks them as retained and unavailable/degraded. Alerts are
 deduplicated by asset, evidence state and latest attributed candle.
+
+Settings persist the active strategy ID. Observation histories, latest chart
+series and evaluation results remain separated by asset and strategy, so
+switching algorithms never mixes their evidence or accuracy records. Existing
+pre-registry settings and default-strategy chart files remain readable.
 
 Browser notifications are opt-in and work only while the dashboard is open.
 Native/background delivery is intentionally outside this increment.

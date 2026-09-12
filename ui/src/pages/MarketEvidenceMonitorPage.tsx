@@ -7,6 +7,7 @@ import type {
   MonitorEvaluation,
   MonitorSettings,
   MonitorSnapshot,
+  MonitorStrategy,
 } from '../api/market-monitor'
 import type { HistoricalBar } from '../api/market'
 import { PageHeader } from '../components/PageHeader'
@@ -17,6 +18,7 @@ import { cn } from '../lib/utils'
 const ASSETS: MonitorAsset[] = ['BTC', 'TSLA']
 const DEFAULT_SETTINGS: MonitorSettings = {
   enabledAssets: ASSETS,
+  strategyId: 'evidence-chain-v1',
   intervalMinutes: 15,
   notifications: false,
   alertConfidence: 68,
@@ -55,6 +57,7 @@ export function MarketEvidenceMonitorPage({ visible = true }: { visible?: boolea
   const [asset, setAsset] = usePersistedAsset()
   const [timeframe, setTimeframe] = useState<Timeframe>('1D')
   const [settings, setSettings] = useState<MonitorSettings>(DEFAULT_SETTINGS)
+  const [strategies, setStrategies] = useState<MonitorStrategy[]>([])
   const [history, setHistory] = useState<Record<MonitorAsset, MonitorSnapshot[]>>({ BTC: [], TSLA: [] })
   const [alerts, setAlerts] = useState<MonitorAlert[]>([])
   const [evaluation, setEvaluation] = useState<MonitorEvaluation | null>(null)
@@ -81,13 +84,17 @@ export function MarketEvidenceMonitorPage({ visible = true }: { visible?: boolea
 
   const loadState = useCallback(async (initial = false) => {
     try {
-      const [nextSettings, btc, tsla, nextAlerts] = await Promise.all([
+      const [nextSettings, nextStrategies] = await Promise.all([
         api.marketMonitor.settings(),
-        api.marketMonitor.snapshots('BTC', 120),
-        api.marketMonitor.snapshots('TSLA', 120),
+        api.marketMonitor.strategies(),
+      ])
+      const [btc, tsla, nextAlerts] = await Promise.all([
+        api.marketMonitor.snapshots('BTC', 120, nextSettings.strategyId),
+        api.marketMonitor.snapshots('TSLA', 120, nextSettings.strategyId),
         api.marketMonitor.alerts(undefined, 100),
       ])
       setSettings(nextSettings)
+      setStrategies(nextStrategies.strategies)
       setHistory({ BTC: btc.snapshots, TSLA: tsla.snapshots })
       setAlerts(nextAlerts.alerts)
       notifyNewAlerts(nextAlerts.alerts, nextSettings.notifications)
@@ -171,6 +178,10 @@ export function MarketEvidenceMonitorPage({ visible = true }: { visible?: boolea
     }
     const saved = await api.marketMonitor.saveSettings(next)
     setSettings(saved)
+    setHistory((current) => ({
+      BTC: current.BTC.filter((row) => row.strategyId === saved.strategyId),
+      TSLA: current.TSLA.filter((row) => row.strategyId === saved.strategyId),
+    }))
   }
 
   const exportData = (format: 'json' | 'csv') => {
@@ -190,7 +201,7 @@ export function MarketEvidenceMonitorPage({ visible = true }: { visible?: boolea
     <div className="flex h-full min-h-0 flex-col overflow-hidden">
       <PageHeader
         title="Evidence Monitor"
-        description="BTC + TSLA · read-only evidence chain · facts, hypotheses, confirmation and invalidation"
+        description={`BTC + TSLA · ${strategies.find((strategy) => strategy.id === settings.strategyId)?.label ?? settings.strategyId} · facts, hypotheses, confirmation and invalidation`}
         live={{ lastUpdated: snapshot ? new Date(snapshot.capturedAt) : null, label: snapshot ? `scanned ${formatDate(snapshot.capturedAt)}` : 'waiting for first scan', hideDot: !snapshot }}
         right={<div className="flex items-center gap-1.5">
           {import.meta.env.VITE_DEMO_MODE && <span className="rounded-sm border border-warning/50 bg-warning/10 px-2 py-1 text-[10px] font-semibold tracking-wide text-warning">DEMO DATA · NOT LIVE</span>}
@@ -201,7 +212,7 @@ export function MarketEvidenceMonitorPage({ visible = true }: { visible?: boolea
 
       {refreshError && <div role="status" className="mx-4 mt-2 flex items-center justify-between border-l-2 border-warning bg-warning/5 px-3 py-2 text-xs text-muted-foreground md:mx-6"><span>Refresh failed; the last successful view is retained. {refreshError}</span><Button variant="ghost" size="sm" onClick={() => void loadState(false)}>Retry</Button></div>}
 
-      {settingsOpen && <SettingsPanel settings={settings} onSave={saveSettings} onClose={() => setSettingsOpen(false)} />}
+      {settingsOpen && <SettingsPanel settings={settings} strategies={strategies} onSave={saveSettings} onClose={() => setSettingsOpen(false)} />}
 
       <div className="flex shrink-0 flex-wrap items-center justify-between gap-3 border-b border-border/60 px-4 py-3 md:px-6">
         <div role="tablist" aria-label="Monitored asset" className="inline-flex rounded-md border border-border bg-muted/35 p-0.5">
@@ -309,11 +320,11 @@ function HistoryPanel({ snapshots, evaluation, alerts }: { snapshots: MonitorSna
   return <Panel title="Observation history" trailing={evaluation ? <span className="text-[11px] text-muted-foreground">{evaluation.resolved} resolved · accuracy {evaluation.directionalAccuracy == null ? '—' : `${formatNumber(evaluation.directionalAccuracy)}%`}</span> : undefined}><div className="grid gap-4 lg:grid-cols-[minmax(0,1.4fr)_minmax(280px,0.6fr)]"><div className="overflow-x-auto"><table className="w-full min-w-[560px] text-xs"><thead className="border-b border-border text-left text-[11px] text-muted-foreground"><tr><th className="pb-2 font-medium">Captured</th><th className="pb-2 font-medium">Price</th><th className="pb-2 font-medium">Hypothesis</th><th className="pb-2 text-right font-medium">Confidence</th><th className="pb-2 text-right font-medium">Trigger</th></tr></thead><tbody>{snapshots.slice(-12).reverse().map((row) => <tr key={row.id} className="border-b border-border/50"><td className="py-2.5 text-muted-foreground">{formatDate(row.capturedAt)}</td><td className="py-2.5 tabular-nums">{formatNumber(row.metrics.lastPrice)}</td><td className="py-2.5">{row.hypothesis.label}</td><td className="py-2.5 text-right tabular-nums">{row.hypothesis.confidence}%</td><td className="py-2.5 text-right text-muted-foreground">{row.trigger}</td></tr>)}</tbody></table></div><div><div className="mb-2 flex items-center gap-2 text-[11px] font-semibold text-muted-foreground"><Bell className="size-3.5" />Recent alerts</div>{alerts.length ? <ul className="space-y-2">{alerts.slice(-6).reverse().map((alert) => <li key={alert.id} className="border-l-2 border-warning pl-2 text-xs"><div className="font-medium">{alert.title}</div><div className="mt-0.5 text-[11px] leading-4 text-muted-foreground">{alert.message}</div></li>)}</ul> : <p className="text-xs text-muted-foreground">No alert conditions recorded.</p>}</div></div></Panel>
 }
 
-function SettingsPanel({ settings, onSave, onClose }: { settings: MonitorSettings; onSave: (settings: MonitorSettings) => Promise<void>; onClose: () => void }) {
+function SettingsPanel({ settings, strategies, onSave, onClose }: { settings: MonitorSettings; strategies: MonitorStrategy[]; onSave: (settings: MonitorSettings) => Promise<void>; onClose: () => void }) {
   const [draft, setDraft] = useState(settings)
   const [saving, setSaving] = useState(false)
   const commit = async () => { setSaving(true); try { await onSave(draft); onClose() } finally { setSaving(false) } }
-  return <div className="shrink-0 border-b border-border bg-muted/20 px-4 py-3 md:px-6"><div className="mx-auto grid max-w-[980px] gap-3 md:grid-cols-5"><label className="text-[11px] text-muted-foreground">Scan interval (min)<input className="mt-1 w-full rounded border border-border bg-background px-2 py-1.5 text-xs text-foreground" type="number" min={1} max={1440} value={draft.intervalMinutes} onChange={(event) => setDraft({ ...draft, intervalMinutes: Number(event.target.value) })} /></label><label className="text-[11px] text-muted-foreground">Alert confidence<input className="mt-1 w-full rounded border border-border bg-background px-2 py-1.5 text-xs text-foreground" type="number" min={50} max={95} value={draft.alertConfidence} onChange={(event) => setDraft({ ...draft, alertConfidence: Number(event.target.value) })} /></label><label className="text-[11px] text-muted-foreground">Volume ratio<input className="mt-1 w-full rounded border border-border bg-background px-2 py-1.5 text-xs text-foreground" type="number" min={1} max={10} step={0.1} value={draft.abnormalVolumeRatio} onChange={(event) => setDraft({ ...draft, abnormalVolumeRatio: Number(event.target.value) })} /></label><label className="text-[11px] text-muted-foreground">Hourly move %<input className="mt-1 w-full rounded border border-border bg-background px-2 py-1.5 text-xs text-foreground" type="number" min={0.1} max={25} step={0.1} value={draft.abnormalMovePercent} onChange={(event) => setDraft({ ...draft, abnormalMovePercent: Number(event.target.value) })} /></label><div className="flex items-end justify-between gap-2"><label className="flex items-center gap-2 pb-1.5 text-xs"><input type="checkbox" checked={draft.notifications} onChange={(event) => setDraft({ ...draft, notifications: event.target.checked })} />Browser alerts</label><div className="flex gap-1"><Button variant="ghost" size="sm" onClick={onClose}>Cancel</Button><Button size="sm" onClick={() => void commit()} disabled={saving}>{saving ? 'Saving…' : 'Save'}</Button></div></div></div></div>
+  return <div className="shrink-0 border-b border-border bg-muted/20 px-4 py-3 md:px-6"><div className="mx-auto grid max-w-[1160px] gap-3 md:grid-cols-6"><label className="text-[11px] text-muted-foreground">Strategy<select className="mt-1 w-full rounded border border-border bg-background px-2 py-1.5 text-xs text-foreground" value={draft.strategyId} onChange={(event) => setDraft({ ...draft, strategyId: event.target.value })}>{strategies.map((strategy) => <option key={strategy.id} value={strategy.id}>{strategy.label} v{strategy.version}</option>)}</select></label><label className="text-[11px] text-muted-foreground">Scan interval (min)<input className="mt-1 w-full rounded border border-border bg-background px-2 py-1.5 text-xs text-foreground" type="number" min={1} max={1440} value={draft.intervalMinutes} onChange={(event) => setDraft({ ...draft, intervalMinutes: Number(event.target.value) })} /></label><label className="text-[11px] text-muted-foreground">Alert confidence<input className="mt-1 w-full rounded border border-border bg-background px-2 py-1.5 text-xs text-foreground" type="number" min={50} max={95} value={draft.alertConfidence} onChange={(event) => setDraft({ ...draft, alertConfidence: Number(event.target.value) })} /></label><label className="text-[11px] text-muted-foreground">Volume ratio<input className="mt-1 w-full rounded border border-border bg-background px-2 py-1.5 text-xs text-foreground" type="number" min={1} max={10} step={0.1} value={draft.abnormalVolumeRatio} onChange={(event) => setDraft({ ...draft, abnormalVolumeRatio: Number(event.target.value) })} /></label><label className="text-[11px] text-muted-foreground">Hourly move %<input className="mt-1 w-full rounded border border-border bg-background px-2 py-1.5 text-xs text-foreground" type="number" min={0.1} max={25} step={0.1} value={draft.abnormalMovePercent} onChange={(event) => setDraft({ ...draft, abnormalMovePercent: Number(event.target.value) })} /></label><div className="flex items-end justify-between gap-2"><label className="flex items-center gap-2 pb-1.5 text-xs"><input type="checkbox" checked={draft.notifications} onChange={(event) => setDraft({ ...draft, notifications: event.target.checked })} />Browser alerts</label><div className="flex gap-1"><Button variant="ghost" size="sm" onClick={onClose}>Cancel</Button><Button size="sm" onClick={() => void commit()} disabled={saving}>{saving ? 'Saving…' : 'Save'}</Button></div></div></div></div>
 }
 
 function MonitorSkeleton() {

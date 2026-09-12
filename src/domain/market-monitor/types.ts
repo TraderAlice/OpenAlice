@@ -4,6 +4,9 @@ export const MARKET_MONITOR_ASSETS = ['BTC', 'TSLA'] as const
 export type MarketMonitorAsset = typeof MARKET_MONITOR_ASSETS[number]
 export type MarketMonitorTrigger = 'manual' | 'scheduled'
 export type EvidenceTone = 'positive' | 'negative' | 'neutral'
+export type MarketMonitorStrategyId = string
+
+export const DEFAULT_MARKET_MONITOR_STRATEGY_ID = 'evidence-chain-v1'
 
 export interface MarketMonitorAssetConfig {
   asset: MarketMonitorAsset
@@ -20,6 +23,7 @@ export const MARKET_MONITOR_ASSET_CONFIG: Record<MarketMonitorAsset, MarketMonit
 
 export interface MarketMonitorSettings {
   enabledAssets: MarketMonitorAsset[]
+  strategyId: MarketMonitorStrategyId
   intervalMinutes: number
   notifications: boolean
   alertConfidence: number
@@ -29,11 +33,27 @@ export interface MarketMonitorSettings {
 
 export const DEFAULT_MARKET_MONITOR_SETTINGS: MarketMonitorSettings = {
   enabledAssets: ['BTC', 'TSLA'],
+  strategyId: DEFAULT_MARKET_MONITOR_STRATEGY_ID,
   intervalMinutes: 15,
   notifications: false,
   alertConfidence: 68,
   abnormalVolumeRatio: 1.8,
   abnormalMovePercent: 1.5,
+}
+
+export interface MarketMonitorStrategyManifest {
+  id: MarketMonitorStrategyId
+  label: string
+  version: number
+  description: string
+  requiredData: Array<'daily-bars' | 'hourly-bars' | 'asset-context'>
+}
+
+export interface MarketContextProviderManifest {
+  id: string
+  label: string
+  assets: MarketMonitorAsset[]
+  description: string
 }
 
 export interface SourceHealth {
@@ -107,7 +127,7 @@ export interface MarketMonitorSnapshot {
   asset: MarketMonitorAsset
   capturedAt: string
   trigger: MarketMonitorTrigger
-  strategyId: 'evidence-chain-v1'
+  strategyId: MarketMonitorStrategyId
   fingerprint: string
   metrics: MarketMonitorMetrics
   hypothesis: MarketHypothesis

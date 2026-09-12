@@ -6,11 +6,27 @@ export type MonitorTrigger = 'manual' | 'scheduled'
 
 export interface MonitorSettings {
   enabledAssets: MonitorAsset[]
+  strategyId: string
   intervalMinutes: number
   notifications: boolean
   alertConfidence: number
   abnormalVolumeRatio: number
   abnormalMovePercent: number
+}
+
+export interface MonitorStrategy {
+  id: string
+  label: string
+  version: number
+  description: string
+  requiredData: Array<'daily-bars' | 'hourly-bars' | 'asset-context'>
+}
+
+export interface MonitorContextProvider {
+  id: string
+  label: string
+  assets: MonitorAsset[]
+  description: string
 }
 
 export interface SourceHealth {
@@ -37,7 +53,7 @@ export interface MonitorSnapshot {
   asset: MonitorAsset
   capturedAt: string
   trigger: MonitorTrigger
-  strategyId: 'evidence-chain-v1'
+  strategyId: string
   fingerprint: string
   metrics: {
     lastPrice: number
@@ -117,17 +133,20 @@ export interface MonitorEvaluation {
   }>
 }
 
-function query(asset?: MonitorAsset, limit = 100): string {
+function query(asset?: MonitorAsset, limit = 100, strategyId?: string): string {
   const params = new URLSearchParams({ limit: String(limit) })
   if (asset) params.set('asset', asset)
+  if (strategyId) params.set('strategyId', strategyId)
   return params.toString()
 }
 
 export const marketMonitorApi = {
   settings: () => fetchJson<MonitorSettings>('/api/market-monitor/settings'),
+  strategies: () => fetchJson<{ strategies: MonitorStrategy[] }>('/api/market-monitor/strategies'),
+  contextProviders: () => fetchJson<{ providers: MonitorContextProvider[] }>('/api/market-monitor/context-providers'),
   saveSettings: (settings: MonitorSettings) => fetchJson<MonitorSettings>('/api/market-monitor/settings', { method: 'PUT', headers, body: JSON.stringify(settings) }),
   scan: (asset: MonitorAsset, trigger: MonitorTrigger = 'manual') => fetchJson<ScanResult>('/api/market-monitor/scan', { method: 'POST', headers, body: JSON.stringify({ asset, trigger }) }),
-  snapshots: (asset?: MonitorAsset, limit = 100) => fetchJson<{ snapshots: MonitorSnapshot[]; count: number }>(`/api/market-monitor/snapshots?${query(asset, limit)}`),
+  snapshots: (asset?: MonitorAsset, limit = 100, strategyId?: string) => fetchJson<{ snapshots: MonitorSnapshot[]; count: number }>(`/api/market-monitor/snapshots?${query(asset, limit, strategyId)}`),
   alerts: (asset?: MonitorAsset, limit = 100) => fetchJson<{ alerts: MonitorAlert[]; count: number }>(`/api/market-monitor/alerts?${query(asset, limit)}`),
   receipts: (asset?: MonitorAsset, limit = 100) => fetchJson<{ receipts: MonitorReceipt[]; count: number }>(`/api/market-monitor/receipts?${query(asset, limit)}`),
   evaluation: (asset: MonitorAsset) => fetchJson<MonitorEvaluation>(`/api/market-monitor/evaluation?asset=${asset}`),

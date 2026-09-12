@@ -7,6 +7,7 @@ import { DEFAULT_MARKET_MONITOR_SETTINGS, MARKET_MONITOR_ASSETS, type MarketMoni
 const assetSchema = z.enum(MARKET_MONITOR_ASSETS)
 const settingsSchema = z.object({
   enabledAssets: z.array(assetSchema).min(1),
+  strategyId: z.string().trim().min(1).default(DEFAULT_MARKET_MONITOR_SETTINGS.strategyId),
   intervalMinutes: z.number().int().min(1).max(1440),
   notifications: z.boolean(),
   alertConfidence: z.number().int().min(50).max(95),
@@ -35,10 +36,17 @@ export function createMarketMonitorRoutes(ctx: EngineContext, provided?: MarketM
 
   app.get('/settings', async (c) => c.json(await service.settings()))
 
+  app.get('/strategies', (c) => c.json({ strategies: service.strategies() }))
+
+  app.get('/context-providers', (c) => c.json({ providers: service.contextProviders() }))
+
   app.put('/settings', async (c) => {
     const body = await c.req.json().catch(() => null)
     const parsed = settingsSchema.safeParse(body)
     if (!parsed.success) return c.json({ error: 'Invalid monitor settings', issues: parsed.error.issues }, 400)
+    if (!service.strategies().some((strategy) => strategy.id === parsed.data.strategyId)) {
+      return c.json({ error: 'Unknown monitor strategy' }, 400)
+    }
     await service.saveSettings(parsed.data)
     return c.json(parsed.data)
   })
@@ -58,7 +66,11 @@ export function createMarketMonitorRoutes(ctx: EngineContext, provided?: MarketM
     const raw = c.req.query('asset')
     const asset = assetFrom(raw)
     if (raw && !asset) return c.json({ error: 'asset must be BTC or TSLA' }, 400)
-    const snapshots = await service.snapshots(asset, limitFrom(c.req.query('limit')))
+    const strategyId = c.req.query('strategyId')
+    if (strategyId && !service.strategies().some((strategy) => strategy.id === strategyId)) {
+      return c.json({ error: 'Unknown monitor strategy' }, 400)
+    }
+    const snapshots = await service.snapshots(asset, limitFrom(c.req.query('limit')), strategyId)
     return c.json({ snapshots, count: snapshots.length })
   })
 

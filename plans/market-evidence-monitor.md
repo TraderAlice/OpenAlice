@@ -42,6 +42,9 @@ present the result as a responsive dashboard with deterministic demo data.
 - The same live pass exposed a transient Deribit timeout. Context orchestration
   now retains the last valid values while recording the outage in source
   health, rather than replacing a useful dashboard state with empty fields.
+- Strategy and context collection are now runtime registries rather than
+  service conditionals. Multiple context modules may compose for one asset;
+  histories, chart series and evaluation remain isolated by strategy ID.
 
 ## Checklist
 
@@ -54,6 +57,10 @@ present the result as a responsive dashboard with deterministic demo data.
 - [x] Exercise the demo build and record live Mac acceptance as a residual gap.
 - [x] Commit and push the held feature branch without merging.
 - [x] Add and verify the Mac live-API acceptance command on the draft branch.
+- [x] Add strategy/provider registries, API discovery and dashboard selection.
+- [x] Isolate chart persistence, history and evaluation by strategy ID.
+- [x] Re-run demo/live acceptance for the modularity increment.
+- [ ] Publish the modularity increment to the draft pull request.
 - [ ] Verify decision-scale BTC fingerprinting with consecutive live scans.
 - [ ] Run the live command on macOS and observe scheduling for 24–72 hours.
 
@@ -72,7 +79,8 @@ present the result as a responsive dashboard with deterministic demo data.
 Verified in the managed Linux workspace on 2026-09-12:
 
 - Root and UI TypeScript checks passed.
-- Four focused files passed 12 tests.
+- Seven focused files passed 28 tests, including registry validation,
+  multi-provider failure isolation and cross-strategy history isolation.
 - The deterministic demo production build passed and reported
   `/market/evidence` ready.
 - The broader affected-test command reaches unrelated PTY, socket, installer,
@@ -85,6 +93,10 @@ Verified in the managed Linux workspace on 2026-09-12:
   BTC exercised healthy, timeout-with-retained-context and recovery states;
   TSLA exercised duplicate suppression and a meaningful new-news transition.
   Native macOS visual and long-window scheduling acceptance remains external.
+- The modular runtime pass discovered `evidence-chain-v1`,
+  `deribit-btc-v1` and `openalice-tsla-v1`, then completed BTC and TSLA scans.
+  Restricted workspace access left Deribit visibly unavailable without
+  interrupting BTC price evidence; TSLA fundamentals remained healthy.
 
 ## Completion
 

@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import type { EngineContext } from '../../core/types.js'
 import type { MarketMonitorService } from '../../domain/market-monitor/service.js'
-import { DEFAULT_MARKET_MONITOR_SETTINGS } from '../../domain/market-monitor/types.js'
+import { DEFAULT_MARKET_MONITOR_SETTINGS, type MarketContextProviderManifest, type MarketMonitorStrategyManifest } from '../../domain/market-monitor/types.js'
 import { createMarketMonitorRoutes } from './market-monitor.js'
 
 function service(): MarketMonitorService {
@@ -11,6 +11,8 @@ function service(): MarketMonitorService {
     scan: vi.fn(async () => ({ snapshot: {} as never, stored: true, alert: null, receipt: {} as never })),
     snapshots: vi.fn(async () => []), alerts: vi.fn(async () => []), receipts: vi.fn(async () => []),
     evaluation: vi.fn(async (asset) => ({ asset, samples: 0, resolved: 0, directionalAccuracy: null, averageForwardChangePercent: null, rows: [] })),
+    strategies: vi.fn((): MarketMonitorStrategyManifest[] => [{ id: 'evidence-chain-v1', label: 'Evidence chain', version: 1, description: 'fixture', requiredData: ['daily-bars', 'hourly-bars', 'asset-context'] }]),
+    contextProviders: vi.fn((): MarketContextProviderManifest[] => [{ id: 'fixture-context', label: 'Fixture', assets: ['BTC', 'TSLA'], description: 'fixture' }]),
   }
 }
 
@@ -31,11 +33,23 @@ describe('market monitor routes', () => {
     expect(fake.saveSettings).not.toHaveBeenCalled()
   })
 
+  it('lists modules and rejects an unregistered strategy', async () => {
+    const fake = service()
+    const app = createMarketMonitorRoutes({} as EngineContext, fake)
+    expect((await app.request('/strategies')).status).toBe(200)
+    expect((await app.request('/context-providers')).status).toBe(200)
+    const response = await app.request('/settings', { method: 'PUT', body: JSON.stringify({ ...DEFAULT_MARKET_MONITOR_SETTINGS, strategyId: 'unknown' }), headers: { 'Content-Type': 'application/json' } })
+    expect(response.status).toBe(400)
+    expect(fake.saveSettings).not.toHaveBeenCalled()
+  })
+
   it('provides bounded histories and evaluation', async () => {
     const fake = service()
     const app = createMarketMonitorRoutes({} as EngineContext, fake)
     expect((await app.request('/snapshots?asset=TSLA&limit=99999')).status).toBe(200)
-    expect(fake.snapshots).toHaveBeenCalledWith('TSLA', 1000)
+    expect(fake.snapshots).toHaveBeenCalledWith('TSLA', 1000, undefined)
+    expect((await app.request('/snapshots?asset=BTC&strategyId=evidence-chain-v1')).status).toBe(200)
+    expect(fake.snapshots).toHaveBeenCalledWith('BTC', 100, 'evidence-chain-v1')
     expect((await app.request('/evaluation?asset=BTC')).status).toBe(200)
   })
 })

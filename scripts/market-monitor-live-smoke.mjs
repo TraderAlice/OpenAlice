@@ -102,8 +102,18 @@ export async function runAcceptance(options, dependencies = {}) {
   const html = await page.text()
   if (!html.includes('id="root"')) throw new Error('market page did not return the OpenAlice application shell')
   const settings = await json(fetcher, options.baseUrl, '/api/market-monitor/settings')
-  if (!Array.isArray(settings.enabledAssets) || !Number.isFinite(settings.intervalMinutes)) {
+  const strategies = await json(fetcher, options.baseUrl, '/api/market-monitor/strategies')
+  const contextProviders = await json(fetcher, options.baseUrl, '/api/market-monitor/context-providers')
+  if (!Array.isArray(settings.enabledAssets) || !Number.isFinite(settings.intervalMinutes) || typeof settings.strategyId !== 'string') {
     throw new Error('monitor settings response is invalid')
+  }
+  if (!strategies.strategies?.some((strategy) => strategy.id === settings.strategyId)) {
+    throw new Error(`configured strategy is not registered: ${settings.strategyId}`)
+  }
+  for (const asset of options.assets) {
+    if (!contextProviders.providers?.some((provider) => provider.assets?.includes(asset))) {
+      throw new Error(`${asset}: no registered context provider`)
+    }
   }
 
   const assets = []
@@ -149,6 +159,11 @@ export async function runAcceptance(options, dependencies = {}) {
     platform: process.platform,
     arch: process.arch,
     node: process.version,
+    modules: {
+      strategyId: settings.strategyId,
+      strategies: strategies.strategies.map((strategy) => strategy.id),
+      contextProviders: contextProviders.providers.map((provider) => provider.id),
+    },
     assets,
   }
 }

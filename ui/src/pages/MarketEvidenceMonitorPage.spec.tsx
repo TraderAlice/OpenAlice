@@ -6,14 +6,15 @@ import { demoMonitorSnapshot } from '../demo/fixtures/market-monitor'
 import { MarketEvidenceMonitorPage } from './MarketEvidenceMonitorPage'
 
 const mocks = vi.hoisted(() => ({
-  settings: vi.fn(), snapshots: vi.fn(), alerts: vi.fn(), evaluation: vi.fn(), scan: vi.fn(), saveSettings: vi.fn(),
+  settings: vi.fn(), strategies: vi.fn(), snapshots: vi.fn(), alerts: vi.fn(), evaluation: vi.fn(), scan: vi.fn(), saveSettings: vi.fn(),
 }))
 vi.mock('../api', () => ({ api: { marketMonitor: mocks } }))
 
 beforeEach(() => {
   window.localStorage.clear()
-  const settings = { enabledAssets: ['BTC', 'TSLA'], intervalMinutes: 15, notifications: false, alertConfidence: 68, abnormalVolumeRatio: 1.8, abnormalMovePercent: 1.5 }
+  const settings = { enabledAssets: ['BTC', 'TSLA'], strategyId: 'evidence-chain-v1', intervalMinutes: 15, notifications: false, alertConfidence: 68, abnormalVolumeRatio: 1.8, abnormalMovePercent: 1.5 }
   mocks.settings.mockResolvedValue(settings)
+  mocks.strategies.mockResolvedValue({ strategies: [{ id: 'evidence-chain-v1', label: 'Evidence chain', version: 1, description: 'fixture', requiredData: ['daily-bars', 'hourly-bars', 'asset-context'] }] })
   mocks.snapshots.mockImplementation(async (asset: 'BTC' | 'TSLA') => ({ snapshots: [demoMonitorSnapshot(asset)], count: 1 }))
   mocks.alerts.mockResolvedValue({ alerts: [], count: 0 })
   mocks.evaluation.mockImplementation(async (asset: 'BTC' | 'TSLA') => ({ asset, samples: 1, resolved: 0, directionalAccuracy: null, averageForwardChangePercent: null, rows: [] }))
@@ -37,8 +38,8 @@ it('switches from BTC to TSLA without losing the other asset history', async () 
   fireEvent.click(screen.getByRole('tab', { name: /TSLA/ }))
   expect((await screen.findAllByText('Evidence remains balanced')).length).toBeGreaterThan(0)
   expect(screen.getByText('Trailing P/E')).toBeTruthy()
-  expect(mocks.snapshots).toHaveBeenCalledWith('BTC', 120)
-  expect(mocks.snapshots).toHaveBeenCalledWith('TSLA', 120)
+  expect(mocks.snapshots).toHaveBeenCalledWith('BTC', 120, 'evidence-chain-v1')
+  expect(mocks.snapshots).toHaveBeenCalledWith('TSLA', 120, 'evidence-chain-v1')
 })
 
 it('keeps the rendered snapshot when a background refresh fails', async () => {
@@ -48,4 +49,12 @@ it('keeps the rendered snapshot when a background refresh fails', async () => {
   fireEvent.click(screen.getByRole('button', { name: /Scan now/ }))
   await waitFor(() => expect(screen.getByText(/last successful view is retained/i)).toBeTruthy())
   expect(screen.getAllByText('Demand has provisional control').length).toBeGreaterThan(0)
+})
+
+it('renders the registered strategy in monitor settings', async () => {
+  render(<MarketEvidenceMonitorPage />)
+  await screen.findAllByText('Demand has provisional control')
+  fireEvent.click(screen.getByRole('button', { name: 'Monitor settings' }))
+  expect((screen.getByRole('combobox', { name: 'Strategy' }) as HTMLSelectElement).value).toBe('evidence-chain-v1')
+  expect(screen.getByRole('option', { name: 'Evidence chain v1' })).toBeTruthy()
 })

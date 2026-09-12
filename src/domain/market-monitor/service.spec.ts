@@ -2,8 +2,10 @@ import { describe, expect, it, vi } from 'vitest'
 import type { BarService, OhlcvBar } from '../market-data/bars/index.js'
 import type { EquityClientLike } from '../market-data/client/types.js'
 import type { ReferenceDataService } from '../market-data/reference/types.js'
+import { MarketContextProviderRegistry } from './context.js'
 import { createMarketMonitorService } from './service.js'
 import type { MarketMonitorStore } from './store.js'
+import { createMarketMonitorStrategyRegistry, evidenceChainV1Strategy } from './strategy.js'
 import { DEFAULT_MARKET_MONITOR_SETTINGS, type MarketMonitorAlert, type MarketMonitorReceipt, type MarketMonitorSnapshot } from './types.js'
 
 function bars(count: number, step: number): OhlcvBar[] {
@@ -24,8 +26,8 @@ function memoryStore(): MarketMonitorStore & { data: { snapshots: MarketMonitorS
     appendAlert: async (row) => { data.alerts.push(row) },
     receipts: async (asset, limit = 100) => data.receipts.filter((row) => !asset || row.asset === asset).slice(-limit),
     appendReceipt: async (row) => { data.receipts.push(row) },
-    latestSeries: async (asset) => series.get(asset) ?? null,
-    saveLatestSeries: async (asset, chart) => { series.set(asset, chart) },
+    latestSeries: async (asset, strategyId = 'evidence-chain-v1') => series.get(`${asset}:${strategyId}`) ?? null,
+    saveLatestSeries: async (asset, chart, strategyId = 'evidence-chain-v1') => { series.set(`${asset}:${strategyId}`, chart) },
   }
 }
 
@@ -84,6 +86,46 @@ describe('market monitor service', () => {
     const second = await service.scan('BTC', 'scheduled')
     expect(second.snapshot.context).toMatchObject({ fundingRate: first.snapshot.context.fundingRate, openInterest: first.snapshot.context.openInterest })
     expect(second.snapshot.sourceHealth.find((source) => source.id === 'btc-derivatives')).toMatchObject({ status: 'unavailable' })
-    expect(second.snapshot.sourceHealth.find((source) => source.id === 'btc-derivatives')?.detail).toContain('Last valid context retained')
+    expect(second.snapshot.sourceHealth.find((source) => source.id === 'btc-derivatives')?.detail).toContain('Last valid fields retained')
+  })
+
+  it('selects an injected strategy through persisted settings', async () => {
+    const store = memoryStore()
+    const analyze = vi.fn(evidenceChainV1Strategy.analyze)
+    const strategyRegistry = createMarketMonitorStrategyRegistry([{
+      manifest: { id: 'review-strategy-v1', label: 'Review strategy', version: 1, description: 'Test strategy module.', requiredData: ['daily-bars'] },
+      analyze,
+      fingerprint: evidenceChainV1Strategy.fingerprint,
+    }])
+    const service = createMarketMonitorService({ ...dependencies(), store, strategyRegistry, now: () => new Date('2026-04-01T00:00:00Z') })
+    await service.scan('TSLA', 'manual')
+    await service.saveSettings({ ...DEFAULT_MARKET_MONITOR_SETTINGS, strategyId: 'review-strategy-v1' })
+    const result = await service.scan('TSLA', 'manual')
+    expect(result.snapshot.strategyId).toBe('review-strategy-v1')
+    expect(analyze).toHaveBeenCalledOnce()
+    expect(service.strategies().map((strategy) => strategy.id)).toEqual(['evidence-chain-v1', 'review-strategy-v1'])
+    expect((await service.snapshots('TSLA', 1, 'evidence-chain-v1')).at(-1)?.chart.daily).toHaveLength(90)
+    expect((await service.snapshots('TSLA', 1, 'review-strategy-v1')).at(-1)?.chart.daily).toHaveLength(90)
+    expect((await service.evaluation('TSLA')).samples).toBe(1)
+  })
+
+  it('composes multiple context providers and isolates a provider failure', async () => {
+    const contextProviderRegistry = new MarketContextProviderRegistry([
+      {
+        manifest: { id: 'btc-positioning', label: 'BTC positioning', assets: ['BTC'], description: 'fixture' },
+        load: vi.fn(async () => ({ context: { fundingRate: 0.0001 }, health: [{ id: 'btc-positioning', label: 'BTC positioning', status: 'ok' as const, provider: 'fixture', asOf: '2026-04-01T00:00:00Z', detail: 'loaded' }] })),
+      },
+      {
+        manifest: { id: 'btc-onchain', label: 'BTC on-chain', assets: ['BTC'], description: 'fixture' },
+        load: vi.fn(async () => { throw new Error('on-chain unavailable') }),
+      },
+    ])
+    const service = createMarketMonitorService({ ...dependencies(), store: memoryStore(), contextProviderRegistry, now: () => new Date('2026-04-01T00:00:00Z') })
+    const result = await service.scan('BTC', 'manual')
+    expect(result.snapshot.context.fundingRate).toBe(0.0001)
+    expect(result.snapshot.sourceHealth).toEqual(expect.arrayContaining([
+      expect.objectContaining({ id: 'btc-positioning', status: 'ok' }),
+      expect.objectContaining({ id: 'context-provider:btc-onchain', status: 'unavailable' }),
+    ]))
   })
 })
