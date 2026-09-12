@@ -66,4 +66,24 @@ describe('market monitor service', () => {
     expect(result.snapshot.chart.intraday).toEqual([])
     expect(result.snapshot.sourceHealth.find((source) => source.id === 'intraday-bars')?.status).toBe('unavailable')
   })
+
+  it('retains the last valid BTC context when Deribit is temporarily unavailable', async () => {
+    const store = memoryStore()
+    let unavailable = false
+    const fetcher = vi.fn(async (input: string | URL | Request) => {
+      if (unavailable) throw new Error('temporary derivatives outage')
+      const isOption = String(input).includes('kind=option')
+      const result = isOption
+        ? [{ instrument_name: 'BTC-27SEP26-100000-C', open_interest: 25 }, { instrument_name: 'BTC-27SEP26-100000-P', open_interest: 10 }]
+        : [{ instrument_name: 'BTC-PERPETUAL', funding_8h: 0.0001, open_interest: 100_000, mark_price: 90_000 }]
+      return new Response(JSON.stringify({ result }), { status: 200, headers: { 'content-type': 'application/json' } })
+    }) as typeof fetch
+    const service = createMarketMonitorService({ ...dependencies(), store, fetcher, now: () => new Date('2026-04-01T00:00:00Z') })
+    const first = await service.scan('BTC', 'manual')
+    unavailable = true
+    const second = await service.scan('BTC', 'scheduled')
+    expect(second.snapshot.context).toMatchObject({ fundingRate: first.snapshot.context.fundingRate, openInterest: first.snapshot.context.openInterest })
+    expect(second.snapshot.sourceHealth.find((source) => source.id === 'btc-derivatives')).toMatchObject({ status: 'unavailable' })
+    expect(second.snapshot.sourceHealth.find((source) => source.id === 'btc-derivatives')?.detail).toContain('Last valid context retained')
+  })
 })

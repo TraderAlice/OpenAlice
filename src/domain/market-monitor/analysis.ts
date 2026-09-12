@@ -20,6 +20,26 @@ const pct = (latest: number, prior: number): number | null =>
 const rounded = (value: number | null, digits = 2): number | null =>
   value == null || !Number.isFinite(value) ? null : Number(value.toFixed(digits))
 
+const significant = (value: number | null | undefined, digits: number): number | null | undefined =>
+  value == null || !Number.isFinite(value) ? value : Number(value.toPrecision(digits))
+
+function semanticContext(context: MarketContext): MarketContext {
+  return {
+    fundingRate: context.fundingRate == null ? context.fundingRate : rounded(context.fundingRate, 5),
+    openInterest: significant(context.openInterest, 3),
+    annualizedBasisPercent: context.annualizedBasisPercent == null ? context.annualizedBasisPercent : rounded(context.annualizedBasisPercent, 0),
+    optionOpenInterest: significant(context.optionOpenInterest, 3),
+    putCallOpenInterestRatio: context.putCallOpenInterestRatio == null ? context.putCallOpenInterestRatio : rounded(context.putCallOpenInterestRatio, 2),
+    marketCap: significant(context.marketCap, 4),
+    trailingPe: context.trailingPe == null ? context.trailingPe : rounded(context.trailingPe, 2),
+    forwardPe: context.forwardPe == null ? context.forwardPe : rounded(context.forwardPe, 2),
+    analystTargetMean: context.analystTargetMean == null ? context.analystTargetMean : rounded(context.analystTargetMean, 2),
+    shortPercentFloat: context.shortPercentFloat == null ? context.shortPercentFloat : rounded(context.shortPercentFloat, 4),
+    nextEarningsAt: context.nextEarningsAt,
+    recentNews: context.recentNews?.map(({ title, time, source }) => ({ title, time, source })),
+  }
+}
+
 function sortedBars(bars: OhlcvBar[]): OhlcvBar[] {
   return bars
     .filter((bar) => [bar.open, bar.high, bar.low, bar.close].every(Number.isFinite))
@@ -188,7 +208,10 @@ export function semanticFingerprint(input: {
     intradayChange: input.metrics.intraday.latestChangePercent,
     hypothesis: input.hypothesis.id,
     confidence: input.hypothesis.confidence,
-    context: input.context,
+    // Continuously moving derivatives fields are quantized to decision-scale
+    // buckets. A new headline or meaningful positioning/basis change is still
+    // semantic; a provider's last decimal ticking between two requests is not.
+    context: semanticContext(input.context),
     // Freshness/fetch timestamps and cache mechanics are deliberately absent:
     // the latest attributed candle already anchors market time. Only a real
     // source-state/provider change should create another observation.

@@ -36,6 +36,12 @@ present the result as a responsive dashboard with deterministic demo data.
 - Live acceptance is a separate, loopback-only smoke command. Its default mode
   is read-only; explicit `--scan` performs two monitor scans per selected asset
   and records a machine-readable receipt without touching trading routes.
+- Live BTC acceptance showed raw derivatives decimals changing between
+  consecutive requests. Fingerprints therefore quantize those fields at
+  decision scale while snapshots retain the full observed values.
+- The same live pass exposed a transient Deribit timeout. Context orchestration
+  now retains the last valid values while recording the outage in source
+  health, rather than replacing a useful dashboard state with empty fields.
 
 ## Checklist
 
@@ -48,6 +54,7 @@ present the result as a responsive dashboard with deterministic demo data.
 - [x] Exercise the demo build and record live Mac acceptance as a residual gap.
 - [x] Commit and push the held feature branch without merging.
 - [x] Add and verify the Mac live-API acceptance command on the draft branch.
+- [ ] Verify decision-scale BTC fingerprinting with consecutive live scans.
 - [ ] Run the live command on macOS and observe scheduling for 24–72 hours.
 
 ## Verification
@@ -73,7 +80,11 @@ Verified in the managed Linux workspace on 2026-09-12:
   workspace. No Market Monitor test failed; native Mac acceptance remains the
   final environment-specific check.
 - The live-acceptance helper and the original monitor closure pass five files
-  and 16 tests; its help/argument contract also passes under pnpm 11.
+  and 18 tests; its help/argument contract also passes under pnpm 11.
+- A full isolated Linux runtime passed both read-only and live-scan acceptance.
+  BTC exercised healthy, timeout-with-retained-context and recovery states;
+  TSLA exercised duplicate suppression and a meaningful new-news transition.
+  Native macOS visual and long-window scheduling acceptance remains external.
 
 ## Completion
 

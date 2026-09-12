@@ -35,6 +35,23 @@ describe('market evidence analysis', () => {
     expect(a).toBe(b)
   })
 
+  it('buckets continuously moving derivatives fields at decision scale', () => {
+    const analysis = analyzeEvidence({ dailyBars: series(90, 86400000), intradayBars: series(48, 3600000), abnormalVolumeRatio: 1.8, abnormalMovePercent: 1.5 })
+    const base = {
+      asset: 'BTC' as const, ...analysis,
+      context: { fundingRate: 0.00012341, openInterest: 100_010, annualizedBasisPercent: 4.21, optionOpenInterest: 50_001, putCallOpenInterestRatio: 0.751 },
+      sourceHealth: [],
+    }
+    expect(semanticFingerprint(base)).toBe(semanticFingerprint({
+      ...base,
+      context: { fundingRate: 0.00012349, openInterest: 100_020, annualizedBasisPercent: 4.27, optionOpenInterest: 50_002, putCallOpenInterestRatio: 0.752 },
+    }))
+    expect(semanticFingerprint(base)).not.toBe(semanticFingerprint({
+      ...base,
+      context: { ...base.context, openInterest: 102_000 },
+    }))
+  })
+
   it('evaluates only resolved directional hypotheses', () => {
     const make = (price: number, bias: 'bullish' | 'bearish' | 'neutral', capturedAt: string): MarketMonitorSnapshot => ({
       id: capturedAt, asset: 'BTC', capturedAt, trigger: 'manual', strategyId: 'evidence-chain-v1', fingerprint: capturedAt,

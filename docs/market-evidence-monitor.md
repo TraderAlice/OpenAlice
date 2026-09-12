@@ -45,7 +45,12 @@ the last successful render visible.
 
 Every scan writes a receipt labelled `manual` or `scheduled`. A snapshot is
 written only when its semantic fingerprint changes; cache-hit text, fetch time
-and other transport mechanics do not create a new observation. Alerts are
+and other transport mechanics do not create a new observation. Continuously
+moving derivatives values are bucketed at decision scale, so insignificant
+last-decimal changes do not create observation noise while meaningful funding,
+positioning or basis changes remain visible. If a context provider becomes
+temporarily unavailable, the last valid values remain visible while source
+health clearly marks them as retained and unavailable/degraded. Alerts are
 deduplicated by asset, evidence state and latest attributed candle.
 
 Browser notifications are opt-in and work only while the dashboard is open.

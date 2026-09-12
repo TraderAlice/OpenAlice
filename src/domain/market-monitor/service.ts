@@ -63,6 +63,32 @@ function stringFrom(row: unknown, keys: string[]): string | null {
   return null
 }
 
+function retainPreviousContext(current: MarketContext, previous: MarketContext | undefined): { context: MarketContext; retained: boolean } {
+  if (!previous) return { context: current, retained: false }
+  const merged: MarketContext = { ...previous, ...current }
+  let retained = false
+  const numeric = [
+    'fundingRate', 'openInterest', 'annualizedBasisPercent', 'optionOpenInterest',
+    'putCallOpenInterestRatio', 'marketCap', 'trailingPe', 'forwardPe',
+    'analystTargetMean', 'shortPercentFloat',
+  ] as const
+  for (const key of numeric) {
+    if (current[key] == null && previous[key] != null) {
+      merged[key] = previous[key]
+      retained = true
+    }
+  }
+  if (current.nextEarningsAt == null && previous.nextEarningsAt != null) {
+    merged.nextEarningsAt = previous.nextEarningsAt
+    retained = true
+  }
+  if (!current.recentNews?.length && previous.recentNews?.length) {
+    merged.recentNews = previous.recentNews
+    retained = true
+  }
+  return { context: merged, retained }
+}
+
 async function fetchJson(fetcher: FetchLike, url: string): Promise<unknown> {
   const controller = new AbortController()
   const timer = setTimeout(() => controller.abort(), 6000)
@@ -210,15 +236,27 @@ export function createMarketMonitorService(deps: MarketMonitorServiceDeps): Mark
             ? healthFromMeta('intraday-bars', 'Hourly OHLCV', intraday.result.meta, intraday.fallback)
             : { id: 'intraday-bars', label: 'Hourly OHLCV', status: 'unavailable', provider: 'OpenAlice BarService', asOf: null, detail: intradayError instanceof Error ? intradayError.message : 'Hourly source unavailable.' },
         ]
+        const previous = (await store.snapshots(asset, 1)).at(-1)
+        const previousCapturedAt = previous?.capturedAt ?? 'an earlier scan'
         let context: MarketContext
         if (asset === 'BTC') {
           const result = await bitcoinContext(fetcher, new Date(requestedAt))
-          context = result.context
-          sourceHealth.push(result.health)
+          const fallback = result.health.status !== 'ok'
+            ? retainPreviousContext(result.context, previous?.context)
+            : { context: result.context, retained: false }
+          context = fallback.context
+          sourceHealth.push(fallback.retained
+            ? { ...result.health, detail: `${result.health.detail} Last valid context retained from ${previousCapturedAt}.` }
+            : result.health)
         } else {
           const result = await teslaContext(deps, now())
-          context = result.context
-          sourceHealth.push(...result.health)
+          const fallback = result.health.some((source) => source.status !== 'ok')
+            ? retainPreviousContext(result.context, previous?.context)
+            : { context: result.context, retained: false }
+          context = fallback.context
+          sourceHealth.push(...result.health.map((source) => fallback.retained && source.status !== 'ok'
+            ? { ...source, detail: `${source.detail} Last valid fields retained from ${previousCapturedAt}.` }
+            : source))
         }
         const fingerprint = semanticFingerprint({ asset, ...analysis, context, sourceHealth })
         const snapshot: MarketMonitorSnapshot = {
@@ -229,7 +267,6 @@ export function createMarketMonitorService(deps: MarketMonitorServiceDeps): Mark
             dailyMeta: daily.result.meta, intradayMeta: intraday?.result.meta ?? null,
           },
         }
-        const previous = (await store.snapshots(asset, 1)).at(-1)
         const stored = previous?.fingerprint !== fingerprint
         await store.saveLatestSeries(asset, snapshot.chart)
         if (stored) {
