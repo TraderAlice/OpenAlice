@@ -4,7 +4,8 @@ import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { i18n } from '../../i18n'
-import type { SessionRecord } from './api'
+import { getWorkspaceSessionDirectory, type SessionRecord } from './api'
+vi.mock('./api', async (original) => ({ ...await original<typeof import('./api')>(), getWorkspaceSessionDirectory: vi.fn(async () => ({ sessions: [] })) }))
 import { WorkspaceView } from './WorkspaceView'
 
 const viewMocks = vi.hoisted(() => ({
@@ -129,23 +130,12 @@ describe('WorkspaceView paused Session recovery', () => {
       />,
     )
 
-    expect(screen.getByText('Session paused')).toBeTruthy()
-    expect(screen.getByRole('heading', { name: 'Conversation 2' })).toBeTruthy()
-    expect(screen.getByText('deepseek-1')).toBeTruthy()
-    expect(screen.getByText('deepseek-v4-flash')).toBeTruthy()
-    expect(screen.getByText('high reasoning')).toBeTruthy()
-    const details = screen.getByText('Session details').closest('details') as HTMLDetailsElement
-    expect(details.open).toBe(false)
-
-    fireEvent.click(screen.getByText('Session details'))
-    expect(details.open).toBe(true)
-    expect(screen.getByText('Transcript')).toBeTruthy()
-    expect(screen.getByText('resume-2')).toBeTruthy()
-
-    fireEvent.click(screen.getByRole('button', { name: 'Resume in TUI' }))
-
     expect((await screen.findByRole('alert')).textContent).toContain('Pi CLI login is required')
-    expect((screen.getByRole('button', { name: 'Resume in TUI' }) as HTMLButtonElement).disabled).toBe(false)
+    expect(onResume).toHaveBeenCalledOnce()
+    expect(screen.queryByText('Session paused')).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: 'Retry' }))
+    await vi.waitFor(() => expect(onResume).toHaveBeenCalledTimes(2))
+
   })
 })
 

@@ -469,7 +469,7 @@ const workspaceManagerModule: ViewModule<'workspace-manager'> = {
   toUrl: (spec) => spec.params.sessionId
     ? `/chat/manager/s/${encodeURIComponent(spec.params.sessionId)}`
     : '/chat/manager',
-  Component: ({ spec }) => <WorkspaceManagerPage spec={spec} />,
+  Component: ({ spec, visible }) => <WorkspaceManagerPage spec={spec} visible={visible} />,
 }
 
 const workspaceDetailsModule: ViewModule<'workspace-details'> = {

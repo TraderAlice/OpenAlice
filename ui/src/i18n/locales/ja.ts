@@ -3134,6 +3134,9 @@ export const ja: Resources = {
     notFoundBody: '{{name}} という名前のテンプレートはありません。',
   },
   workspace: {
+    sessionNotFound: 'このセッションは存在しません。',
+    sessionOpening: 'セッションを開いています…',
+    sessionDisconnected: '対話接続が切断されました。',
     interactiveOwnership: {
       background: 'このセッションはバックグラウンドで実行中です。対話接続は切断されました。',
       title: '対話接続を開きますか？',

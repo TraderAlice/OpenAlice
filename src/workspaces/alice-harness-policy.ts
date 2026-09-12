@@ -5,7 +5,7 @@ import { CLI_EXPORTS } from '../server/cli-commands.js'
 
 export const ALICE_HARNESS_CONFIG_PATH = '.alice/alice-harness-config.json'
 export const ALICE_HARNESS_VERSION_PATH = '.alice/alice-harness-version.json'
-export const ALICE_HARNESS_SKILLS = ['alice', 'alice-analysis', 'alice-uta', 'traderhub', 'self-scheduling', 'file-delivery'] as const
+export const ALICE_HARNESS_SKILLS = ['alice', 'market-data', 'alice-analysis', 'alice-uta', 'traderhub', 'self-scheduling', 'file-delivery'] as const
 export const LEGACY_ALICE_HARNESS_SKILLS = [...ALICE_HARNESS_SKILLS, 'alice-workspace']
 export const aliceHarnessConfigSchema = z.object({
   schemaVersion: z.literal(1),

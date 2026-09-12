@@ -1,3 +1,4 @@
+import { TelegramModelControls } from './telegram-model.js'
 import { createHash } from 'node:crypto'
 import { Bot, InlineKeyboard, InputFile, type Context } from 'grammy'
 import { autoRetry } from '@grammyjs/auto-retry'
@@ -345,7 +346,14 @@ export class TelegramConnectorAdapter implements ConnectorAdapter {
     await Promise.resolve(bot?.stop()).catch(() => undefined)
   }
 
+  private readonly modelControls = new TelegramModelControls()
+
   private attachBot(bot: Bot, context: ConnectorAdapterContext): void {
+    bot.command('model', async ctx => {
+      if (ctx.chat.type !== 'private' || !this.isOwner(String(ctx.from?.id ?? ''))) return
+      if (!context.sessionModel) { await ctx.reply('Model controls are unavailable. Update OpenAlice.'); return }
+      await this.modelControls.open(ctx, context.sessionModel, typeof ctx.match === 'string' ? ctx.match.trim() || undefined : undefined)
+    })
     bot.command('inbox', async (ctx) => {
       if (ctx.chat.type !== 'private' || !ctx.from) return
       await this.presentInbox(ctx, context, { stack: [], scope: 'unread' }).catch(async (error) => {
@@ -375,7 +383,7 @@ export class TelegramConnectorAdapter implements ConnectorAdapter {
     })
 
     for (const command of TELEGRAM_CONNECTOR_DEFINITION.commands) {
-      if (command.name === 'inbox' || command.name === 'settings' || command.name === 'uta') continue
+      if (command.name === 'model' || command.name === 'inbox' || command.name === 'settings' || command.name === 'uta') continue
       bot.command(command.name, async (ctx) => {
         if (ctx.chat.type !== 'private' || !ctx.from) return
         const handled = await context.commands.execute({
@@ -548,6 +556,12 @@ export class TelegramConnectorAdapter implements ConnectorAdapter {
   private async handleControl(ctx: Context, context: ConnectorAdapterContext): Promise<void> {
     const data = ctx.callbackQuery?.data
     if (!data) return
+    if (data.startsWith('mdl:')) {
+      if (ctx.chat?.type !== 'private' || !this.isOwner(String(ctx.from?.id ?? '')) || !context.sessionModel) {
+        await ctx.answerCallbackQuery({ text: 'Only the linked owner can change settings.' }); return
+      }
+      await this.modelControls.handle(ctx, context.sessionModel); return
+    }
     const utaControl = parseTelegramUtaControl(data)
     if (utaControl) {
       await this.handleUtaControl(ctx, context, utaControl)

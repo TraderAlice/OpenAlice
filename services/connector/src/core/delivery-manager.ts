@@ -1,3 +1,5 @@
+import type { ConnectorModelRequest, ConnectorModelPanel } from '@traderalice/connector-protocol'
+import { parseMarketReference } from '@traderalice/connector-protocol'
 import { parseReplyDirectives, replyMedia } from './reply-directives.js'
 import type { ConnectorAttachment } from '@traderalice/connector-protocol'
 import { randomUUID } from 'node:crypto'
@@ -45,6 +47,8 @@ import {
 } from './work-queue.js'
 
 export interface DeliveryManagerOptions {
+  renderMarket?(reference: string): Promise<ConnectorAttachment>
+  sessionModel?(connectorId: string, request: ConnectorModelRequest): Promise<ConnectorModelPanel>
   readWorkspaceFile?(workspaceId: string, path: string): Promise<ConnectorAttachment>
   registry: ConnectorRegistry
   config: ConnectorConfig
@@ -445,12 +449,22 @@ export class DeliveryManager {
       const parsed = parseReplyDirectives(message.text ?? '')
       const silent = message.source === 'automation' && parsed.silent
       const resolved = new Map<string, ConnectorAttachment>()
-      if (!silent && message.phase === 'final' && message.workspaceId && this.options.readWorkspaceFile && adapter.sendOwnerFile) {
+      const failedMarkets = new Set<string>()
+      if (!silent && message.phase === 'final' && adapter.sendOwnerFile) {
         for (const path of [...new Set(parsed.references.map(reference => reference.path))].slice(0, 20)) {
           if (resolved.size >= 5) break
           try {
-            resolved.set(path, await this.options.readWorkspaceFile(message.workspaceId, path))
+            if (parseMarketReference(path)) {
+              if (this.options.renderMarket) resolved.set(path, await this.options.renderMarket(path))
+            } else if (message.workspaceId && this.options.readWorkspaceFile) {
+              resolved.set(path, await this.options.readWorkspaceFile(message.workspaceId, path))
+            }
           } catch {
+            if (parseMarketReference(path)) {
+              failedMarkets.add(path)
+              await this.record({ correlationId, direction: 'outbound', stage: 'delivery.failed', connectorId: adapter.id,
+                payload: { kind: 'market-chart', path, reason: 'render-unavailable' } })
+            }
             // A reference can be a discussion of a nonexistent path. Keep it literal.
           }
         }
@@ -461,10 +475,11 @@ export class DeliveryManager {
       const raw = silent ? '' : message.text ?? ''
       for (const reference of parsed.references) {
         const attachment = resolved.get(reference.path)
-        if (!attachment) continue
+        if (!attachment && !failedMarkets.has(reference.path)) continue
         const text = raw.slice(cursor, reference.start).trim()
         if (text) parts.push({ text })
-        if (!sent.has(reference.path)) {
+        if (!attachment) parts.push({ text: `${raw.slice(reference.start, reference.end)} (Chart unavailable; try again later.)` })
+        else if (!sent.has(reference.path)) {
           parts.push({ path: reference.path, attachment })
           sent.add(reference.path)
         }
@@ -562,6 +577,7 @@ export class DeliveryManager {
     if (!adapter || !commands) throw new Error(`Connector adapter is not installed: ${id}`)
     const context: ConnectorAdapterContext = {
       commands,
+      ...(this.options.sessionModel ? { sessionModel: (request: ConnectorModelRequest) => this.options.sessionModel!(id, request) } : {}),
       updateSettings: async (patch) => {
         await this.options.updateAdapterSettings(id, patch)
         const current = this.options.config.adapters[id] ?? { enabled: false, settings: {} }

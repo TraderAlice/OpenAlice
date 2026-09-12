@@ -48,8 +48,8 @@ categories.
   through the existing attachment safety path, and posts a directed
   artifact delivery back to that Connector only. Cancel does not enqueue.
   First-version pull does not change Inbox read state. Discord and Slack
-  keep `/inbox` as a placeholder and reject artifact delivery as
-  unimplemented. `/uta` is the same shape: Telegram renders the review
+  keep `/inbox` as a placeholder; all four adapters support directed artifact
+  delivery, independently of whether they expose file-pull controls. `/uta` is the same shape: Telegram renders the review
   panel; Discord and Slack reply with a placeholder. Connector never
   talks to UTA. Push and reject stay Alice-owned wallet writes, gated
   by the current trading mode. Callback data carries only page-local
@@ -221,6 +221,28 @@ Telegram sends PNG/JPEG/WebP images as photos and `sticker/*.png` or
 Files must satisfy Telegram's media requirements; no implicit image conversion
 occurs. Inbox artifact pulls remain documents. The old unreleased `file:` syntax
 is replaced directly, not maintained as a second syntax.
+
+The same `sendOwnerFile(attachment, presentation)` adapter interface handles
+reply files on Telegram, Discord, Slack, and Feishu/Lark. Core never branches
+on platform IDs. Discord sends local stickers and images as uploaded image
+attachments, not native sticker IDs. Slack uses `filesUploadV2` in the owner's
+DM and lets Slack preview image uploads. Feishu uploads images with
+`im.image.create` (`image_type: message`) and sends an `image_key` message;
+local stickers use this same image path. Ordinary files use its file upload
+and `file_key` message path. Directed Inbox artifacts default to files on every
+adapter, without adding another Inbox summary.
+
+Slack requires `files:write` in addition to its existing owner-DM permissions.
+Feishu requires image/file resource upload permission (`im:resource`) and bot
+message sending permission. Existing installations may need updated app scopes.
+No adapter converts image bytes or creates server-wide emoji/sticker resources.
+Reply media support does not itself enable private chat ingress or advertise
+the `desk` capability.
+
+Official API references:
+- [Discord message files and sticker IDs](https://docs.discord.com/developers/resources/message)
+- [Slack SDK file uploads](https://docs.slack.dev/tools/node-slack-sdk/web-api/)
+- [Feishu image upload](https://open.feishu.cn/document/server-docs/im-v1/image/create)
 
 Progress never uploads files. Events for a conversation are serialized;
 concurrent/repeated message IDs share one delivery attempt, including uncertain
@@ -694,3 +716,47 @@ Changes to this subsystem require:
 Real Telegram/Discord delivery needs user-owned platform credentials and is a
 manual acceptance lane; credential-free CI must not pretend that a live
 third-party message was delivered.
+
+### Market reply snapshots
+
+Final owner-chat references beginning with `market/` resolve through the local
+Alice market gateway rather than Workspace file access. DeliveryManager sends
+the generated PNG as a photo at the reference position, using the same ordered
+parts and five-media limit as files. Automation silence skips resolution;
+failed charts retain the reference with an unavailable notice. Inbox's derived
+file index excludes market references.
+
+The renderer uses bundled JavaScript and a bundled OFL Liberation Sans font;
+it needs neither a browser nor a platform-native graphics library. Font paths
+are filled as compound contours to preserve digit/letter counters. PNGs are
+2400 by 1600 for legible mobile zoom; the attachment byte ceiling still applies.
+
+## Session model controls
+
+Telegram `/model` opens an owner-only private-chat inline panel for the existing
+phone-desk Session. Runtime is fixed. Credential, model, and effort use the same
+picker policy as Chat and Issues. Options are suggestions, not a claim that an
+account can access every model; `/model <model-id>` previews a custom model ID.
+Changing credential clears model/effort; changing model clears effort. Each
+choice previews, and **Save** commits. **Close** discards unsaved choices.
+
+Connector's optional `sessionModel` adapter context calls Alice's fixed local
+HTTP/Unix-socket gateway at `/cli/connector-model/:connectorId`. Alice resolves
+the desk and validates compatibility; only credential IDs/labels cross the
+boundary, never credential contents. There is no caller-selected Workspace or
+runtime. The command is consumed by Connector, not posted as an agent comment.
+
+Saving changes only the assigned Session binding. A running headless turn keeps
+its captured settings; subsequent comments/scheduled turns resolve the new
+binding. An active interactive TUI/GUI must first disconnect. Workspace defaults
+and other Sessions are unchanged. Missing or unassigned desks instruct the owner
+to send a first message. The menu does not silently create a replacement Session.
+
+Telegram panels expire after ten minutes and use bounded pagination and opaque
+callback coordinates. Owner checks apply to both commands and callbacks. A
+Session handoff or intervening binding edit invalidates a save, and concurrent
+saves are rejected. Transport or validation errors remain visible; they never
+produce a success acknowledgement. Connector restart invalidates old panels.
+The control contract is platform-neutral; Telegram currently implements its UI.
+See [Telegram inline keyboards](https://core.telegram.org/bots/api#inlinekeyboardbutton)
+and [callback acknowledgement](https://core.telegram.org/bots/api#answercallbackquery).
