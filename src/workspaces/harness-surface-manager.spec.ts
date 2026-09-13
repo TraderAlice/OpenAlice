@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 
-import { HarnessSurfaceManager } from './harness-surface-manager.js'
+import { HarnessSurfaceManager, resolveSurfaceDomain } from './harness-surface-manager.js'
 import type { WorkspaceRegistry } from './workspace-registry.js'
 
 const managers: HarnessSurfaceManager[] = []
@@ -105,6 +105,71 @@ describe('HarnessSurfaceManager', () => {
     expect(manager.snapshot('ws-timeout', 'studio').error)
       .toBe('Studio readiness timed out after 50ms')
   })
+
+  it('validates the configured surface domain instead of falling back to localhost', () => {
+    expect(resolveSurfaceDomain(undefined)).toBe('localhost')
+    expect(resolveSurfaceDomain('')).toBe('localhost')
+    expect(resolveSurfaceDomain('   ')).toBe('localhost')
+    expect(resolveSurfaceDomain('LOCALHOST')).toBe('localhost')
+    expect(resolveSurfaceDomain('10.10.10.44.nip.io')).toBe('10.10.10.44.nip.io')
+    expect(resolveSurfaceDomain('Surface.Example.COM.')).toBe('surface.example.com')
+    expect(resolveSurfaceDomain('trading.lan')).toBe('trading.lan')
+
+    const unusable = [
+      '10.10.10.44',
+      'http://surfaces.example',
+      'surfaces.example:47331',
+      'surfaces.example/studio',
+      '*.surfaces.example',
+      '-surfaces.example',
+      'surfaces-.example',
+      'a..example',
+      '.',
+    ]
+    for (const value of unusable) {
+      expect(() => resolveSurfaceDomain(value), value).toThrow(/OPENALICE_SURFACE_DOMAIN/)
+    }
+  })
+
+  it('publishes and resolves only the configured surface domain', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'openalice-harness-domain-'))
+    dirs.push(dir)
+    const program = [
+      "const http=require('node:http')",
+      "const ports=JSON.parse(process.env.HARNESS_PORTS)",
+      "const server=http.createServer((req,res)=>{res.end('ok')})",
+      "server.listen(ports.http,process.env.HARNESS_HOST)",
+      "process.on('SIGTERM',()=>server.close(()=>process.exit(0)))",
+    ].join(';')
+    await writeFile(join(dir, 'harness.json'), JSON.stringify({
+      manifestVersion: 1,
+      version: 'test-domain',
+      capabilities: {
+        studio: {
+          command: [process.execPath, '-e', program],
+          ports: ['http'],
+          entryPort: 'http',
+          readinessPath: '/',
+        },
+      },
+    }))
+    const registry = { get: (id: string) => id === 'ws-domain' ? { id, dir } : undefined } as WorkspaceRegistry
+    const manager = new HarnessSurfaceManager(registry, { surfaceDomain: '10.10.10.44.nip.io' })
+    managers.push(manager)
+
+    await manager.start('ws-domain', 'studio')
+    const ready = await waitFor(() => manager.snapshot('ws-domain', 'studio'), (value) => value.phase === 'ready')
+    const routeHost = ready.routeHost ?? ''
+    expect(routeHost).toMatch(/^oa-surface-[a-f0-9]{24}\.10\.10\.10\.44\.nip\.io$/)
+
+    expect(manager.resolveHost(`${routeHost}:47331`)).not.toBeNull()
+    expect(manager.resolveHost(routeHost.toUpperCase())).not.toBeNull()
+    // The default loopback shape and any other suffix stay unrouted.
+    expect(manager.resolveHost(routeHost.replace('.10.10.10.44.nip.io', '.localhost'))).toBeNull()
+    expect(manager.resolveHost('oa-surface-aabbccddeeff001122334455.localhost')).toBeNull()
+    expect(manager.resolveHost('oa-surface-aabbccddeeff001122334455.surfaces.example')).toBeNull()
+    expect(manager.resolveHost(null)).toBeNull()
+  }, 30_000)
 })
 
 async function waitFor<T>(read: () => T, done: (value: T) => boolean): Promise<T> {

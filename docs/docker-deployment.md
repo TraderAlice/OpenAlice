@@ -76,6 +76,17 @@ For the Stage 1 SSH path, keep `47331` private on the host and use
 `openalice ssh <host>` as described in [[docs/remote-access.md]]. The tunnel
 targets host loopback; it does not expose the internal CLI/MCP or UTA ports.
 
+A remote browser that reaches the app through HTTPS or a LAN address needs one
+more setting for Harness surfaces (Studio): their route hosts are subdomains of
+`OPENALICE_SURFACE_DOMAIN`, which defaults to `localhost` — a name each browser
+resolves to its own loopback, so the surfaces only load for a browser on the
+Runtime host or over a loopback tunnel. Set it to a wildcard name that resolves
+to the deployment, for example `OPENALICE_SURFACE_DOMAIN=10.10.10.44.nip.io`
+for a LAN address or `alice.example.com` with `*.alice.example.com` pointing at
+the same HTTPS front end. Without it the rest of the app works and Studio panes
+stay blank for remote browsers. Startup refuses a non-localhost surface domain
+unless an admin token is provisioned. See [[docs/harness-web-surfaces.md]].
+
 ## Health and Lifecycle
 
 The image healthcheck calls the public `/api/version` route from container
