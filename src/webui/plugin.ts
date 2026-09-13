@@ -1,4 +1,5 @@
 import { prepareProjectWorkspaces } from '../workspaces/project-workspace-setup.js'
+import { resolveSurfaceDomain } from '../workspaces/harness-surface-manager.js'
 import { Hono, type Context } from 'hono'
 import { cors } from 'hono/cors'
 import { createAdaptorServer, serve } from '@hono/node-server'
@@ -133,11 +134,19 @@ export class WebPlugin implements Plugin {
     // OPENALICE_BIND_HOST=0.0.0.0 for testing and forgot auth" footgun.
     const bindHost = (process.env['OPENALICE_BIND_HOST'] ?? '127.0.0.1').trim()
     const bindIsPublic = bindHost !== '127.0.0.1' && bindHost !== '::1' && bindHost !== 'localhost'
-    if (bindIsPublic) {
+    // A non-localhost surface domain publishes Harness surface routes to every
+    // client that can reach Alice's port, so it is a public-exposure decision
+    // as well. An unusable value throws here, before any listener starts.
+    const surfaceDomain = resolveSurfaceDomain(process.env['OPENALICE_SURFACE_DOMAIN'])
+    const surfaceDomainIsLocal = surfaceDomain === 'localhost'
+    if (bindIsPublic || !surfaceDomainIsLocal) {
       const tokenInfo = await getTokenInfo()
       if (!tokenInfo.exists && process.env['OPENALICE_DISABLE_AUTH'] !== '1') {
+        const exposed = bindIsPublic
+          ? `OPENALICE_BIND_HOST="${bindHost}" exposes Alice `
+          : `OPENALICE_SURFACE_DOMAIN="${surfaceDomain}" exposes Harness surface routes `
         throw new Error(
-          `Refusing to start: OPENALICE_BIND_HOST="${bindHost}" exposes Alice ` +
+          `Refusing to start: ${exposed}` +
           `to non-localhost callers, but no admin token has been provisioned. ` +
           `Start once with OPENALICE_BIND_HOST=127.0.0.1 to generate the token, ` +
           `then re-set the bind. Set OPENALICE_DISABLE_AUTH=1 only when you ` +

@@ -99,9 +99,36 @@ the same launch contract without pretending to be OpenAlice. The loopback host
 is the child bind address on local and remote Runtime hosts; it is never the
 browser-visible address.
 
+### Surface domain
+
+`oa-surface-<opaque>.<suffix>` is the published route identity. The default
+suffix is `localhost`, which every browser resolves to its own loopback, so it
+reaches a Runtime only from a browser on the Runtime host, an Electron Surface
+Gateway, or a loopback tunnel such as `openalice ssh`.
+
+A deployment that serves a remote browser sets a suffix the client resolves to
+this Runtime host:
+
+```bash
+OPENALICE_SURFACE_DOMAIN=10.10.10.44.nip.io   # wildcard name resolving to the host
+```
+
+The value is a lowercase dotted DNS suffix with no scheme, port, path, or
+wildcard, and an unusable value stops startup instead of falling back. Route
+hosts are subdomains of it, so it needs a wildcard DNS record — or a
+`nip.io`/`sslip.io`-style service in front of the host's address — and clients
+reach those hosts on Alice's own port (the port the browser already uses). A
+non-localhost suffix publishes surface routes to every client that can reach
+Alice's port, so startup requires a provisioned admin token exactly as a
+non-loopback `OPENALICE_BIND_HOST` does. The child still binds
+`HARNESS_HOST=127.0.0.1`; only the name the browser uses changes. Leave the
+variable unset for Electron, local-browser, and SSH-tunnel use, where the
+loopback identity carries the same security property without exposing a name.
+
 ## Routing and transport
 
-A ready generation receives `oa-surface-<opaque>.localhost`. The route table
+A ready generation receives `oa-surface-<opaque>.<surface domain>`, `localhost`
+by default. The route table
 maps only that identity to its supervised entry port; no `/proxy/<port>` or
 arbitrary user target exists. The route is published after readiness and
 removed before termination. Generation checks make stale exits harmless.
