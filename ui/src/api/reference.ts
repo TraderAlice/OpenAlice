@@ -72,13 +72,30 @@ export interface DividendEvent {
   payment_date: string | null
 }
 
+export interface EconomicEvent {
+  date: string | null
+  country: string | null
+  category: string | null
+  event: string | null
+  importance: string | null
+  source: string | null
+  currency: string | null
+  unit: string | null
+  consensus: string | number | null
+  previous: string | number | null
+  revised: string | number | null
+  actual: string | number | null
+}
+
 export interface CalendarBoard {
+  /** Optional while older hosted TraderHub deployments roll onto this contract. */
+  economicEvents?: EconomicEvent[]
   earnings: EarningsEvent[]
   ipos: IpoEvent[]
   dividends: DividendEvent[]
   window: { start: string; end: string }
   /** Per-list upstream failures (e.g. FMP tier rejects one endpoint). */
-  errors?: Partial<Record<'earnings' | 'ipos' | 'dividends', string>>
+  errors?: Partial<Record<'economicEvents' | 'earnings' | 'ipos' | 'dividends', string>>
   meta: ReferenceMeta
 }
 
