@@ -48,13 +48,11 @@ describe('Alpaca multi-asset identities and writes', () => {
     expect((await broker.placeOrder(contract, order)).success).toBe(true)
     expect(createOrder).toHaveBeenCalledWith(expect.objectContaining({ symbol: 'BTC/USD', qty: '0.00012345', time_in_force: 'gtc' }))
   })
-  it('keeps option local identity and multiplier while rejecting trading', async () => {
+  it('keeps option local identity and multiplier', async () => {
     const broker = new AlpacaBroker(config)
     const contract = broker.resolveNativeKey('SPY260918C00600000')
     expect(contract).toMatchObject({ symbol: 'SPY', localSymbol: 'SPY260918C00600000', secType: 'OPT', strike: 600, multiplier: '100', right: 'C', lastTradeDateOrContractMonth: '20260918' })
     expect(broker.getNativeKey(contract)).toBe('SPY260918C00600000')
-    expect((await broker.placeOrder(contract, new Order())).error).toMatch(/read-only/)
-    expect((await broker.closePosition(contract)).error).toMatch(/read-only/)
   })
 })
 
@@ -108,9 +106,92 @@ describe('Alpaca close and amendment boundaries', () => {
     const broker = new AlpacaBroker(config)
     const replaceOrder = vi.fn()
     const getOrder = vi.fn().mockResolvedValueOnce({ symbol: 'SPY260918C00600000', asset_class: 'us_option' }).mockResolvedValueOnce({ symbol: 'BTCUSD', asset_class: 'crypto' })
-    Object.assign(broker, { client: { getOrder, replaceOrder } })
-    expect((await broker.modifyOrder('option', { tif: 'DAY' })).error).toMatch(/read-only/)
+    Object.assign(broker, { client: { getOrder, replaceOrder, getAccount: async () => ({ options_trading_level: 0 }) } })
+    expect((await broker.modifyOrder('option', { tif: 'DAY' })).error).toMatch(/disabled/)
     expect((await broker.modifyOrder('crypto', { tif: 'DAY' })).error).toMatch(/GTC or IOC/)
     expect(replaceOrder).not.toHaveBeenCalled()
+  })
+})
+
+
+describe('Alpaca single-leg options execution', () => {
+  const symbol = 'SPY260918C00600000'
+  const order = () => Object.assign(new Order(), { action: 'BUY', orderType: 'LMT', tif: 'DAY', totalQuantity: new Decimal(1), lmtPrice: new Decimal('1.25') })
+  function setup(level = 2) {
+    const broker = new AlpacaBroker(config)
+    const client = {
+      getAccount: vi.fn().mockResolvedValue({ options_trading_level: level }),
+      createOrder: vi.fn().mockResolvedValue({ id: 'entry', status: 'new' }),
+      getOrder: vi.fn().mockResolvedValue({ symbol, asset_class: 'us_option', type: 'limit' }),
+      replaceOrder: vi.fn().mockResolvedValue({ id: 'replacement', status: 'new' }),
+      closePosition: vi.fn().mockResolvedValue({ id: 'exit', status: 'new' }),
+    }
+    Object.assign(broker, { client })
+    return { broker, client, contract: broker.resolveNativeKey(symbol) }
+  }
+  it('sends OCC identity, contract quantity and per-unit price and advertises approved options', async () => {
+    const { broker, client, contract } = setup()
+    expect(broker.getCapabilities().supportedSecTypes).not.toContain('OPT')
+    expect((await broker.placeOrder(contract, order())).success).toBe(true)
+    expect(client.createOrder).toHaveBeenCalledWith({ symbol, side: 'buy', type: 'limit', time_in_force: 'day', qty: '1', limit_price: '1.25' })
+    expect(broker.getCapabilities().supportedSecTypes).toContain('OPT')
+    expect((await broker.getContractDetails(contract))?.orderTypes).toBe('MKT,LMT,STP,STP LMT')
+  })
+  it('refreshes permissions and preserves venue rejection reasons', async () => {
+    const { broker, client, contract } = setup(0)
+    expect((await broker.placeOrder(contract, order())).error).toMatch(/options_trading_level=0/)
+    expect(client.createOrder).not.toHaveBeenCalled()
+    client.getAccount.mockResolvedValue({ options_trading_level: 1 })
+    client.createOrder.mockRejectedValue({ response: { data: { message: 'insufficient options approval level' } } })
+    expect((await broker.placeOrder(contract, order())).error).toContain('insufficient options approval level')
+  })
+  it.each([
+    { totalQuantity: new Decimal('0.5') }, { totalQuantity: new Decimal(0) },
+    { totalQuantity: new Decimal(-1) }, { cashQty: new Decimal(100) },
+    { tif: 'IOC' }, { outsideRth: true }, { orderType: 'TRAIL' },
+    { trailingPercent: new Decimal(1) }, { parentId: 1 }, { ocaGroup: 'group' },
+    { trailStopPrice: new Decimal(1) }, { goodTillDate: '20260918' },
+  ])('rejects unsupported option fields before dispatch: %j', async changes => {
+    const { broker, client, contract } = setup()
+    expect((await broker.placeOrder(contract, Object.assign(order(), changes))).success).toBe(false)
+    expect(client.createOrder).not.toHaveBeenCalled()
+  })
+  it('fails closed when the account lookup fails or reports a block', async () => {
+    const { broker, client, contract } = setup()
+    client.getAccount.mockRejectedValueOnce(new Error('account unavailable'))
+    expect((await broker.placeOrder(contract, order())).error).toContain('account unavailable')
+    client.getAccount.mockResolvedValueOnce({ options_trading_level: 2, trading_blocked: true } as never)
+    expect((await broker.placeOrder(contract, order())).error).toContain('blocked')
+    expect(client.createOrder).not.toHaveBeenCalled()
+  })
+  it.each(['C', 'P'])('keeps long/short %s positions in contract units', async right => {
+    const { broker } = setup()
+    const localSymbol = `SPY260918${right}00600000`
+    const raw = (side: string, qty: string) => ({ symbol: localSymbol, asset_class: 'us_option', side, qty, avg_entry_price: '2', current_price: '3', market_value: side === 'long' ? '600' : '-600', unrealized_pl: side === 'long' ? '200' : '-200' })
+    Object.assign(broker, { client: { getPositions: async () => [raw('long', '2'), raw('short', '-2')] } })
+    const positions = await broker.getPositions()
+    expect(positions.map(p => ({ side: p.side, qty: p.quantity.toString(), value: p.marketValue, pnl: p.unrealizedPnL }))).toEqual([
+      { side: 'long', qty: '2', value: '600', pnl: '200' },
+      { side: 'short', qty: '2', value: '600', pnl: '-200' },
+    ])
+    for (const p of positions) expect(p.contract).toMatchObject({ secType: 'OPT', localSymbol, multiplier: '100', right })
+  })
+  it('rejects bracket attachment and applies whole-contract checks to replacements', async () => {
+    const { broker, client, contract } = setup()
+    expect((await broker.placeOrder(contract, order(), { takeProfit: { price: '2' } })).success).toBe(false)
+    expect((await broker.modifyOrder('entry', { totalQuantity: new Decimal('0.5') })).success).toBe(false)
+    expect((await broker.modifyOrder('entry', { orderType: 'MKT' })).success).toBe(false)
+    expect(client.replaceOrder).not.toHaveBeenCalled()
+    expect((await broker.modifyOrder('entry', { totalQuantity: new Decimal(2), lmtPrice: new Decimal('1.15'), tif: 'GTC' })).orderId).toBe('replacement')
+    expect(client.replaceOrder).toHaveBeenCalledWith('entry', { qty: '2', limit_price: '1.15', time_in_force: 'gtc' })
+  })
+  it('closes the precise option rather than matching the underlying; never over-closes', async () => {
+    const { broker, client, contract } = setup()
+    vi.spyOn(broker, 'getPositions').mockResolvedValue([{ contract, side: 'long', quantity: '2' } as never])
+    expect((await broker.closePosition(contract, new Decimal(3))).success).toBe(false)
+    expect((await broker.closePosition(contract, new Decimal(1))).success).toBe(true)
+    expect(client.createOrder).toHaveBeenCalledWith({ symbol, side: 'sell', type: 'market', time_in_force: 'day', qty: '1' })
+    expect((await broker.closePosition(contract)).orderId).toBe('exit')
+    expect(client.closePosition).toHaveBeenCalledWith(symbol)
   })
 })
