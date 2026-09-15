@@ -59,7 +59,7 @@ import { existingOwnerSmokeMode, resolveExistingOwnerStartup } from './existing-
 import { inspectPreviousUpdateAttempt, recordUpdateAttempt } from './update-attempt.js'
 import { childIsRunning, stopChild } from './child-shutdown.js'
 import { exitDesktopProcess } from './app-exit.js'
-import { configureWindowChrome, windowChromeOptions } from './window-chrome.js'
+import { createAppWindow } from './app-window.js'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = dirname(__filename)
@@ -1004,22 +1004,7 @@ app.whenReady().then(async () => {
       : null,
   )
 
-  const win = new BrowserWindow({
-    width: 1280,
-    height: 800,
-    title: 'OpenAlice',
-    ...windowChromeOptions(),
-    webPreferences: {
-      preload: resolve(__dirname, 'preload.js'),
-      contextIsolation: true,
-      nodeIntegration: false,
-      // Keep preload in Electron's full preload environment. The renderer page
-      // stays isolated and has no Node globals, but the preload itself imports
-      // Electron modules and exposes the app-mode transport bridge.
-      sandbox: false,
-    },
-  })
-  configureWindowChrome(win)
+  const win = createAppWindow(resolve(__dirname, 'preload.js'))
   win.webContents.on('preload-error', (_event, preloadPath, error) => {
     console.error(`[guardian] renderer preload failed path=${preloadPath}: ${error.message}`)
   })

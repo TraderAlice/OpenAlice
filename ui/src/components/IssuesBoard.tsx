@@ -1,8 +1,8 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import type { TFunction } from 'i18next'
 import { useTranslation } from 'react-i18next'
 import {
-  Bot,
+  Layers,
   ChevronDown,
   ChevronRight,
   Clock,
@@ -15,6 +15,7 @@ import type {
   IssueAutomationHealthState,
   IssueListItem,
   IssuePriority,
+  IssuePatch,
   IssueStatus,
   IssueWorkspace,
 } from '../api/issues'
@@ -24,8 +25,12 @@ import { useWorkspaces } from '../contexts/workspaces-context'
 import { formatRelativeTime } from '../lib/intl'
 import { useWorkspace } from '../tabs/store'
 import { CenteredLoading } from './StateViews'
+import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from './ui/dropdown-menu'
+import { SelectionCheckIcon } from './ui/selection-check-icon'
+import { IssueAssigneePopover } from './IssueAssigneePopover'
+import { IssueListToolbar } from './IssueListToolbar'
+import { matchesIssueView, readIssueView, type IssueColumn } from './issue-list-view'
 import { STATUS_META } from './issue-status-meta'
-import type { Workspace } from './workspace/api'
 
 // ==================== Cadence pill (lifted from AutomationSchedulesSection) ====================
 
@@ -159,11 +164,11 @@ export function CadencePill({ when }: { when: ScheduleWhen }) {
  * gives the wall-clock label and timezone their own lines so a narrow details
  * rail never turns schedule metadata into an oversized wrapping capsule.
  */
-export function CadenceSummary({ when }: { when: ScheduleWhen }) {
+export function CadenceSummary({ when, compact = false }: { when: ScheduleWhen; compact?: boolean }) {
   const { t } = useTranslation()
   return (
     <div className="flex min-w-0 items-start gap-2.5">
-      <span className="mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-md bg-muted text-muted-foreground">
+      <span className={`mt-0.5 flex shrink-0 items-center justify-center text-muted-foreground ${compact ? "size-4" : "size-7 rounded-md bg-muted"}`}>
         <Clock size={14} aria-hidden />
       </span>
       <span className="min-w-0">
@@ -175,7 +180,7 @@ export function CadenceSummary({ when }: { when: ScheduleWhen }) {
             {when.timezone ?? t('issues.cadence.localTime')}
           </span>
         )}
-        {when.kind === 'cron' && (
+        {when.kind === 'cron' && !compact && (
           <span className="mt-0.5 block text-xs leading-snug text-muted-foreground">
             {when.catchUp === false
               ? t('issues.cadence.calendarOnly')
@@ -196,17 +201,6 @@ const AUTOMATION_HEALTH_CLASS: Record<IssueAutomationHealthState, string> = {
   interrupted: 'bg-warning/15 text-warning',
   failed: 'bg-destructive/15 text-destructive',
   blocked: 'bg-destructive/15 text-destructive',
-}
-
-const BOARD_HEALTH_CLASS: Record<IssueAutomationHealthState, string> = {
-  inactive: 'text-muted-foreground',
-  not_started: 'text-muted-foreground',
-  due: 'text-warning',
-  running: 'text-info',
-  healthy: 'text-success',
-  interrupted: 'rounded-md bg-warning/15 px-2 py-1 text-warning',
-  failed: 'rounded-md bg-destructive/15 px-2 py-1 text-destructive',
-  blocked: 'rounded-md bg-destructive/15 px-2 py-1 text-destructive',
 }
 
 export function AutomationHealthPill({ health }: { health: IssueAutomationHealth }) {
@@ -242,6 +236,7 @@ export function PriorityIndicator({ priority }: { priority: IssuePriority }) {
       </span>
     )
   }
+  if (priority === 'none') return <span title={t('issues.priority.label', { priority: t('issues.priority.none') })} aria-label={t('issues.priority.label', { priority: t('issues.priority.none') })} className="inline-flex w-3.5 justify-center text-xs font-semibold text-muted-foreground">···</span>
   const filled = priority === 'high' ? 3 : priority === 'medium' ? 2 : priority === 'low' ? 1 : 0
   const heights = [4, 7, 10]
   return (
@@ -270,19 +265,10 @@ interface BoardRow {
   wsId: string
   wsTag: string
   issue: IssueListItem
-  agentRuntime?: AgentRuntime
   /** When this issue's name collides across workspaces (`issue.nameCollision`),
    *  how many OTHER workspaces also claim the name — drives the warning tooltip.
    *  Absent ⇒ no collision. */
   dupOthers?: number
-}
-
-interface AgentRuntime {
-  id: string
-  displayName: string
-  source: 'override' | 'issue-default' | 'workspace-default' | 'workspace'
-  /** Explicit frontmatter only matters in the board when it differs from the effective default. */
-  distinctOverride?: boolean
 }
 
 /** Normalised collision key — title, trimmed + lowercased. Mirrors the server's
@@ -290,54 +276,6 @@ interface AgentRuntime {
 const nameKey = (title: string): string => title.trim().toLowerCase()
 
 // ==================== Rows + groups ====================
-
-function agentName(id: string, agents: readonly { id: string; displayName: string }[]): string {
-  return agents.find((agent) => agent.id === id)?.displayName ?? id
-}
-
-function resolveAgentRuntime(
-  issue: IssueListItem,
-  workspace: Workspace | null,
-  agents: readonly { id: string; displayName: string; kind?: 'agent' | 'utility' }[],
-  issueDefaultAgent: string | null,
-  defaultAgent: string | null,
-): AgentRuntime | undefined {
-  if (!workspace) {
-    return issue.agent
-      ? { id: issue.agent, displayName: agentName(issue.agent, agents), source: 'override', distinctOverride: true }
-      : undefined
-  }
-  const runtimeIds = agents
-    .filter((agent) => agent.kind !== 'utility')
-    .map((agent) => agent.id)
-  const workspaceIssueDefault = workspace.runtimeSettings?.runtime.headless.defaultAgent
-    ?? workspace.runtimeSettings?.runtime.headless.recent.agent
-    ?? null
-  const issueDefaultId = workspaceIssueDefault && runtimeIds.includes(workspaceIssueDefault)
-    ? workspaceIssueDefault
-    : issueDefaultAgent && runtimeIds.includes(issueDefaultAgent) ? issueDefaultAgent : null
-  const legacyWorkspaceDefault = workspace.defaultAgent ?? defaultAgent
-  const workspaceDefaultId = legacyWorkspaceDefault && runtimeIds.includes(legacyWorkspaceDefault) ? legacyWorkspaceDefault : null
-  const effectiveDefaultId = issueDefaultId ?? workspaceDefaultId ?? runtimeIds[0] ?? null
-  if (issue.agent) {
-    return {
-      id: issue.agent,
-      displayName: agentName(issue.agent, agents),
-      source: 'override',
-      distinctOverride: issue.agent !== effectiveDefaultId,
-    }
-  }
-  if (issueDefaultId) {
-    return { id: issueDefaultId, displayName: agentName(issueDefaultId, agents), source: 'issue-default' }
-  }
-  if (workspaceDefaultId) {
-    return { id: workspaceDefaultId, displayName: agentName(workspaceDefaultId, agents), source: 'workspace-default' }
-  }
-  const fallbackId = runtimeIds[0]
-  return fallbackId
-    ? { id: fallbackId, displayName: agentName(fallbackId, agents), source: 'workspace' }
-    : undefined
-}
 
 const ATTENTION_ORDER: Record<IssueAutomationHealthState, number> = {
   blocked: 0,
@@ -372,25 +310,6 @@ function boardRowOrder(a: BoardRow, b: BoardRow): number {
   return a.issue.title.localeCompare(b.issue.title)
 }
 
-function BoardHealth({ issue }: { issue: IssueListItem }) {
-  const { t } = useTranslation()
-  const health = issue.automationHealth
-  if (!health) return null
-  const active = health.state === 'running' || health.state === 'due'
-  const lastRun = issue.lastFiredAtMs ? formatRelativeTime(issue.lastFiredAtMs) : ''
-
-  return (
-    <span
-      title={health.message}
-      className={`inline-flex shrink-0 items-center gap-1.5 text-[11px] font-medium ${BOARD_HEALTH_CLASS[health.state]}`}
-    >
-      <span className={`h-1.5 w-1.5 rounded-full bg-current ${active ? 'animate-pulse' : ''}`} aria-hidden />
-      {t(`issues.health.${health.state}`)}
-      {lastRun && <span className="font-normal text-muted-foreground/80">· {lastRun}</span>}
-    </span>
-  )
-}
-
 function BoardCadence({ issue }: { issue: IssueListItem }) {
   const { t } = useTranslation()
   if (!issue.when) return null
@@ -401,145 +320,156 @@ function BoardCadence({ issue }: { issue: IssueListItem }) {
       className="inline-flex min-w-0 items-center gap-1.5 text-[11px] text-muted-foreground"
     >
       <Clock size={11} className="shrink-0 text-muted-foreground/70" aria-hidden />
-      <span className={`truncate ${nextRun ? 'hidden sm:inline' : ''}`}>{cadenceLabel(issue.when, t)}</span>
-      {nextRun && (
-        <>
-          <span className="hidden shrink-0 text-muted-foreground/50 sm:inline" aria-hidden>·</span>
-          <span className="shrink-0 text-muted-foreground/80">{nextRun}</span>
-        </>
-      )}
+      <span className="truncate tabular-nums">{nextRun || cadenceLabel(issue.when, t)}</span>
     </span>
   )
 }
 
-function IssueRow({ wsId, wsTag, issue, agentRuntime, dupOthers, onOpen }: BoardRow & { onOpen: () => void }) {
+export function PropertyMenu({ field, issue, onPatch, controlId, showLabel = false, disabled = false }: {
+  field: 'priority' | 'status'
+  controlId: string
+  issue: Pick<IssueListItem, 'priority' | 'status'>
+  showLabel?: boolean
+  disabled?: boolean
+  onPatch: (patch: IssuePatch) => Promise<void>
+}) {
+  const { t } = useTranslation()
+  const [open, setOpen] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const values = field === 'priority' ? ['none', 'urgent', 'high', 'medium', 'low'] as const : ['backlog', 'todo', 'in_progress', 'done', 'canceled'] as const
+  const icon = (value: string) => {
+    if (field === 'priority') return <PriorityIndicator priority={value as IssuePriority} />
+    const meta = STATUS_META[value as IssueStatus]
+    return <meta.Icon size={14} className={meta.className} aria-hidden />
+  }
+  const choose = async (value: string) => {
+    if (saving || disabled) return
+    if (value === issue[field]) { setOpen(false); return }
+    setSaving(true)
+    setError(null)
+    try {
+      await onPatch({ [field]: value })
+      setOpen(false)
+      requestAnimationFrame(() => document.getElementById(controlId)?.focus())
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e))
+    } finally { setSaving(false) }
+  }
+  const optionLabel = (value: string) => field === 'priority' && value === 'none' ? t('issues.priority.label', { priority: t('issues.priority.none') }) : field === 'priority' ? t(`issues.priority.${value as IssuePriority}`) : t(`issues.status.${value as IssueStatus}`)
+  const label = `${t(`issues.detail.${field}`)}: ${field === 'priority' ? t(`issues.priority.${issue.priority}`) : t(`issues.status.${issue.status}`)}`
+  return <DropdownMenu open={open} onOpenChange={(next) => { if (!saving) { setOpen(next); setError(null) } }}>
+    <DropdownMenuTrigger id={controlId} onClick={() => { if (!open) setOpen(true) }} aria-label={label} title={label} disabled={disabled || saving} className={`flex shrink-0 items-center gap-2.5 rounded hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50 ${showLabel ? "min-h-9 w-full justify-start px-2 text-sm" : "size-6 justify-center"}`}>
+      {icon(issue[field])}{showLabel && <span>{optionLabel(issue[field])}</span>}
+    </DropdownMenuTrigger>
+    <DropdownMenuContent className="w-56" onKeyDown={(event) => {
+      const index = Number(event.key) - (field === 'priority' ? 0 : 1)
+      if (/^[0-5]$/.test(event.key) && values[index]) { event.preventDefault(); void choose(values[index]) }
+    }}>
+      <div className="mb-1 border-b border-border px-2 py-2 text-xs text-muted-foreground">{t(`issues.detail.${field}`)}</div>
+      {values.map((value, index) => <DropdownMenuItem key={value} disabled={saving} closeOnClick={false} onClick={() => void choose(value)} className={`gap-2.5 text-[13px] ${issue[field] === value ? 'bg-muted' : ''}`} aria-label={optionLabel(value)}>
+        {icon(value)}<span className="flex-1">{optionLabel(value)}</span>
+        {issue[field] === value && <SelectionCheckIcon />}
+        <span className="w-3 text-right text-xs text-muted-foreground">{index + (field === 'priority' ? 0 : 1)}</span>
+      </DropdownMenuItem>)}
+      {error && <p role="alert" className="px-2 py-2 text-xs text-destructive">{error}</p>}
+    </DropdownMenuContent>
+  </DropdownMenu>
+}
+
+function IssueRow({ wsId, wsTag, issue, dupOthers, onOpen, onPatch, columns }: BoardRow & { columns: IssueColumn[]; onOpen: () => void; onPatch: (patch: IssuePatch) => Promise<void> }) {
   const { t } = useTranslation()
   const terminal = issue.status === 'done' || issue.status === 'canceled'
-  const titleMatchesId = issue.title.trim().toLowerCase() === issue.id.trim().toLowerCase()
-  const explicitAssignee = issue.assignee !== '@unassigned'
-  const explicitAgent = agentRuntime?.source === 'override' && agentRuntime.distinctOverride !== false
-  const assigneeLabel = issue.assignee === '@new-then-resume'
-    ? t('issues.assignOnFirstRun')
-    : issue.assignee === '@new-each-run'
-      ? t('issues.detail.mutationValue.newSessionEachRun')
-      : issue.assignee
   return (
-    <li>
+    <li className="group flex h-11 min-w-0 items-center gap-1 px-3 hover:bg-muted/45 sm:px-6">
+      {columns.includes('priority') && <PropertyMenu controlId={`issue-priority-${wsId}-${issue.id}`} field="priority" issue={issue} onPatch={onPatch} />}
+      {columns.includes('id') && <span className="hidden w-16 shrink-0 truncate text-xs text-muted-foreground sm:block" title={t('issues.issueIdTitle', { id: issue.id })}>#{issue.id}</span>}
+      {columns.includes('status') && <PropertyMenu controlId={`issue-status-${wsId}-${issue.id}`} field="status" issue={issue} onPatch={onPatch} />}
       <button
         type="button"
         onClick={onOpen}
         title={t('issues.openIssue', { id: issue.id })}
-        className="oa-pressable grid min-h-11 w-full grid-cols-[1rem_minmax(0,1fr)] items-start gap-x-3 px-3 py-2.5 text-left transition-colors hover:bg-muted/35 sm:px-4 lg:grid-cols-[1rem_minmax(16rem,1.25fr)_minmax(9rem,.65fr)_minmax(19rem,1fr)] lg:items-center lg:gap-x-5"
+        className="oa-pressable flex h-11 min-w-0 flex-1 items-center gap-3 px-1 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
       >
-        <span className="col-start-1 row-start-1 mt-0.5 flex h-5 w-4 shrink-0 items-center justify-center">
-          <PriorityIndicator priority={issue.priority} />
+        <span className={`min-w-0 flex-1 truncate text-[13px] ${terminal ? 'text-muted-foreground' : 'text-foreground'}`}>
+          {issue.title}
         </span>
-
-        <div className="col-start-2 row-start-1 min-w-0">
-          <div className="flex min-w-0 items-center gap-2">
-            <span
-              title={issue.title}
-              className={`min-w-0 text-[13px] font-medium leading-5 sm:text-[13.5px] lg:truncate ${
-                terminal ? 'text-muted-foreground' : 'text-foreground'
-              } line-clamp-2 lg:line-clamp-1`}
-            >
-              {issue.title}
-            </span>
-            {issue.nameCollision && (
-              <span
-                title={t((dupOthers ?? 1) === 1 ? 'issues.duplicateOne' : 'issues.duplicateMany', {
-                  count: dupOthers ?? 1,
-                })}
-                aria-label={t('issues.duplicateLabel')}
-                className="inline-flex shrink-0 items-center gap-1 rounded-full bg-warning/10 px-1.5 py-0.5 text-[9px] font-medium text-warning"
-              >
-                <Copy size={9} aria-hidden /> {t('issues.duplicateShort')}
-              </span>
-            )}
-          </div>
-        </div>
-
-        {(issue.when || issue.automationHealth) && (
-          <div
-            data-testid="issue-automation-summary"
-            className="col-start-2 row-start-2 mt-1.5 grid min-w-0 grid-cols-[auto_minmax(0,1fr)] items-center gap-x-3 gap-y-1 lg:col-start-4 lg:row-start-1 lg:mt-0 lg:grid-cols-[minmax(7rem,.65fr)_minmax(0,1fr)] lg:items-start lg:gap-x-4"
-          >
-            <BoardHealth issue={issue} />
-            <BoardCadence issue={issue} />
-          </div>
-        )}
-
-        <div className="col-start-2 mt-1 flex min-w-0 flex-wrap items-center gap-x-2.5 gap-y-1 text-[10.5px] text-muted-foreground/80 lg:col-start-3 lg:row-start-1 lg:mt-0">
-          <span className="truncate" title={t('issues.workspaceTitle', { workspace: wsTag, id: wsId.slice(0, 8) })}>
-            {wsTag}
+        {issue.nameCollision && (
+          <span title={t((dupOthers ?? 1) === 1 ? 'issues.duplicateOne' : 'issues.duplicateMany', { count: dupOthers ?? 1 })} aria-label={t('issues.duplicateLabel')} className="shrink-0 text-warning">
+            <Copy size={12} aria-hidden />
           </span>
-          {!titleMatchesId && (
-            <span className="hidden max-w-[14rem] truncate font-mono text-muted-foreground/60 sm:inline" title={t('issues.issueIdTitle', { id: issue.id })}>
-              #{issue.id}
-            </span>
-          )}
-          {explicitAssignee && (
-            <span className="max-w-[14rem] truncate text-muted-foreground" title={t('issues.assigneeTitle', { assignee: issue.assignee })}>
-              {assigneeLabel}
-            </span>
-          )}
-          {explicitAgent && agentRuntime && (
-            <span className="inline-flex items-center gap-1 text-muted-foreground" title={t('issues.agentOverrideTitle', { agent: agentRuntime.displayName })}>
-              <Bot size={10} aria-hidden /> {t('issues.agentOverrideShort', { agent: agentRuntime.id })}
-            </span>
-          )}
-        </div>
+        )}
+        {columns.includes('workspace') && <span className="hidden max-w-36 shrink-0 items-center gap-1.5 rounded-full border border-border/70 px-2 py-0.5 text-[11px] text-muted-foreground lg:inline-flex" title={t('issues.workspaceTitle', { workspace: wsTag, id: wsId.slice(0, 8) })}>
+          <Layers size={11} className="shrink-0" aria-hidden />
+          <span className="truncate">{wsTag}</span>
+        </span>}
+        {columns.includes('schedule') && <span data-testid="issue-automation-summary" className="flex shrink-0 items-center gap-4">
+          <span className="hidden w-28 items-center justify-end sm:flex"><BoardCadence issue={issue} /></span>
+        </span>}
       </button>
+      {columns.includes('assignee') && <div className="ml-2 shrink-0"><IssueAssigneePopover wsId={wsId} id={issue.id} assignee={issue.assignee} health={issue.automationHealth} /></div>}
     </li>
   )
 }
 
 function StatusGroup({
   status,
+  groupKey = status,
+  label,
+  columns,
+  hideHeading = false,
   rows,
   collapsed,
   onToggle,
   onOpenRow,
+  onPatch,
 }: {
   status: IssueStatus
+  groupKey?: string
+  label?: string
+  columns: IssueColumn[]
+  hideHeading?: boolean
   rows: BoardRow[]
   collapsed: boolean
   onToggle: () => void
+  onPatch: (wsId: string, id: string, patch: IssuePatch) => Promise<void>
   onOpenRow: (row: BoardRow) => void
 }) {
   const { t } = useTranslation()
   const meta = STATUS_META[status]
-  const statusLabel = t(`issues.status.${status}`)
-  const listId = `issues-status-${status}`
+  const statusLabel = label ?? t(`issues.status.${status}`)
+  const listId = `issues-status-${groupKey}`
   return (
     <section
-      data-testid={`issue-status-group-${status}`}
-      className="border-y border-border/70"
+      data-testid={`issue-status-group-${groupKey}`}
+      className="min-w-0"
     >
-      <button
+      {!hideHeading && <button
         type="button"
         onClick={onToggle}
         aria-expanded={!collapsed}
         aria-controls={listId}
         aria-label={t(collapsed ? 'issues.expandStatus' : 'issues.collapseStatus', { status: statusLabel })}
-        className="flex min-h-11 w-full items-center gap-2 bg-secondary/25 px-2 py-2.5 text-left transition-colors hover:bg-muted/40 sm:px-3"
+        className="flex h-9 w-full items-center gap-2 rounded-lg bg-muted/45 px-3 text-left transition-colors hover:bg-muted/60 sm:px-4"
       >
         {collapsed ? (
           <ChevronRight size={14} className="shrink-0 text-muted-foreground/70" />
         ) : (
           <ChevronDown size={14} className="shrink-0 text-muted-foreground/70" />
         )}
-        <meta.Icon size={14} className={`shrink-0 ${meta.className}`} />
-        <span className="text-[13px] font-semibold text-foreground">{statusLabel}</span>
+        {!label && <meta.Icon size={14} className={`shrink-0 ${meta.className}`} />}
+        <span className="text-[13px] font-medium text-foreground">{statusLabel}</span>
         <span className="text-xs text-muted-foreground">{rows.length}</span>
-      </button>
-      {!collapsed && (
-        <ul id={listId} className="divide-y divide-border/60 border-t border-border/70">
+      </button>}
+      {(!collapsed || hideHeading) && (
+        <ul id={listId} className="py-1">
           {rows.map((row) => (
             <IssueRow
               key={`${row.wsId}:${row.issue.id}`}
               {...row}
+              columns={columns}
               onOpen={() => onOpenRow(row)}
+              onPatch={(patch) => onPatch(row.wsId, row.issue.id, patch)}
             />
           ))}
         </ul>
@@ -571,28 +501,25 @@ function InvalidWorkspaces({ workspaces }: { workspaces: IssueWorkspace[] }) {
 
 // ==================== Board ====================
 
-/**
- * Global Issue board — a read-only, Linear-style list of every workspace's
- * issues (GET /api/issues), grouped by status. An issue with a `when` is
- * scheduled (carries a cadence pill + still fires headless runs via the
- * scanner); an issue without is a pure tracked work item. Each workspace owns
- * its issues as `.alice/issues/<id>.md` files — there is no central registry
- * and nothing to create here (Phase 1).
- */
+/** Workspace-owned Issues with local view preferences and inline property editing. */
 export function IssuesBoard() {
   const { t } = useTranslation()
-  const { data, error, loading } = useIssues()
-  const { agents, defaultAgent, issueDefaultAgent, workspaces: workspaceMetas } = useWorkspaces()
+  const { data, error, loading, updateIssue } = useIssues()
+  const { workspaces: workspaceMetas } = useWorkspaces()
   const openOrFocus = useWorkspace((s) => s.openOrFocus)
   const setSidebar = useWorkspace((s) => s.setSidebar)
-  const [collapsed, setCollapsed] = useState<Set<IssueStatus>>(new Set())
+  const [collapsed, setCollapsed] = useState<Set<string>>(new Set())
+  const [view, setView] = useState(readIssueView)
+  useEffect(() => {
+    try { localStorage.setItem('openalice-issue-list-view', JSON.stringify({ tab: view.tab, grouping: view.grouping, ordering: view.ordering, completed: view.completed, columns: view.columns })) } catch { /* Storage may be unavailable. */ }
+  }, [view.tab, view.grouping, view.ordering, view.completed, view.columns])
 
   const openRow = (row: BoardRow) => {
     setSidebar('issue')
     openOrFocus({ kind: 'issue-detail', params: { wsId: row.wsId, id: row.issue.id } })
   }
 
-  const toggle = (status: IssueStatus) =>
+  const toggle = (status: string) =>
     setCollapsed((prev) => {
       const next = new Set(prev)
       if (next.has(status)) next.delete(status)
@@ -634,25 +561,31 @@ export function IssuesBoard() {
   const rows: BoardRow[] = okWorkspaces.flatMap((w) =>
     (w.issues ?? []).map((issue) => ({
       wsId: w.wsId,
-      wsTag: w.tag,
+      wsTag: workspaceMetas.find((workspace) => workspace.id === w.wsId)?.displayName || w.tag,
       issue,
-      agentRuntime: resolveAgentRuntime(
-        issue,
-        workspaceMetas.find((workspace) => workspace.id === w.wsId) ?? null,
-        agents,
-        issueDefaultAgent,
-        defaultAgent,
-      ),
       dupOthers: issue.nameCollision
         ? Math.max(0, (wsByName.get(nameKey(issue.title))?.size ?? 1) - 1)
         : undefined,
     })),
   )
 
-  const groups = STATUS_ORDER.map((status) => ({
-    status,
-    rows: rows.filter((r) => r.issue.status === status).sort(boardRowOrder),
-  })).filter((g) => g.rows.length > 0)
+  const visibleRows = rows.filter((row) => matchesIssueView(row.issue, row.wsId, view))
+  const compare = (a: BoardRow, b: BoardRow) => view.ordering === 'title' ? a.issue.title.localeCompare(b.issue.title)
+    : view.ordering === 'due' ? (a.issue.nextDueAtMs ?? Infinity) - (b.issue.nextDueAtMs ?? Infinity) || boardRowOrder(a, b)
+    : view.ordering === 'priority' ? PRIORITY_ORDER[a.issue.priority] - PRIORITY_ORDER[b.issue.priority] || boardRowOrder(a, b)
+    : boardRowOrder(a, b)
+  const keys = view.grouping === 'status' ? STATUS_ORDER : view.grouping === 'priority' ? Object.keys(PRIORITY_ORDER)
+    : view.grouping === 'workspace' ? okWorkspaces.map((ws) => ws.wsId) : ['all']
+  const groups = keys.map((key) => ({
+    key,
+    status: (view.grouping === 'status' ? key : 'todo') as IssueStatus,
+    label: view.grouping === 'status' ? undefined : view.grouping === 'priority' ? (key === 'none' ? t('issues.priority.label', { priority: t('issues.priority.none') }) : t(`issues.priority.${key as IssuePriority}`))
+      : view.grouping === 'workspace' ? rows.find((row) => row.wsId === key)?.wsTag : undefined,
+    rows: visibleRows.filter((row) => view.grouping === 'none' || (view.grouping === 'workspace' ? row.wsId : row.issue[view.grouping]) === key).sort(compare),
+  })).filter((group) => group.rows.length)
+  const toolbar = <IssueListToolbar view={view} onChange={(patch) => setView((current) => ({ ...current, ...patch }))}
+    workspaces={okWorkspaces.map((ws) => ({ id: ws.wsId, label: rows.find((row) => row.wsId === ws.wsId)?.wsTag || ws.tag }))}
+    visible={visibleRows.length} total={rows.length} />
 
   const staleBanner = error ? (
     <div className="rounded-lg border border-warning/30 bg-warning/10 px-3 py-1.5 text-xs text-warning">
@@ -660,9 +593,10 @@ export function IssuesBoard() {
     </div>
   ) : null
 
-  if (groups.length === 0 && invalid.length === 0) {
+  if (rows.length === 0 && invalid.length === 0) {
     return (
       <div className="mx-auto max-w-[1240px] space-y-3">
+        {toolbar}
         {staleBanner}
         <div className="rounded-lg border border-dashed border-border px-6 py-12 text-center">
           <ListChecks size={24} className="mx-auto text-muted-foreground/50" />
@@ -680,17 +614,24 @@ export function IssuesBoard() {
   }
 
   return (
-    <div data-testid="issues-board" className="mx-auto max-w-[1240px] space-y-5">
+    <div data-testid="issues-board" className="w-full space-y-1">
+      {toolbar}
       {staleBanner}
+      {groups.length === 0 && rows.length > 0 && <p className="py-16 text-center text-sm text-muted-foreground">{t('issues.view.noMatches')}</p>}
       <InvalidWorkspaces workspaces={invalid} />
       {groups.map((g) => (
         <StatusGroup
-          key={g.status}
+          key={`${view.grouping}:${g.key}`}
           status={g.status}
+          groupKey={g.key}
+          label={g.label}
+          columns={view.columns}
+          hideHeading={view.grouping === 'none'}
           rows={g.rows}
-          collapsed={collapsed.has(g.status)}
-          onToggle={() => toggle(g.status)}
+          collapsed={collapsed.has(`${view.grouping}:${g.key}`)}
+          onToggle={() => toggle(`${view.grouping}:${g.key}`)}
           onOpenRow={openRow}
+          onPatch={updateIssue}
         />
       ))}
     </div>

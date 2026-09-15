@@ -17,18 +17,20 @@
  * (`ultra` is rejected). A model only honors the levels its menu lists.
  *
  * Refresh: run `grok models` on a logged-in machine and compare.
- * The launch copy of this list is `ui/src/lib/grok-models.ts` — keep ids
- * identical.
+ * The UI re-exports this catalog, including the same effort semantics.
  */
 
+import type { ModelSemantics } from '../../ai-providers/model-semantics.js'
+
 export interface GrokSuggestedModel {
+  readonly semantics?: ModelSemantics;
   readonly id: string;
   readonly label: string;
 }
 
 export const GROK_FIRST_PARTY_MODELS: readonly GrokSuggestedModel[] = [
-  { id: 'grok-4.6', label: 'Grok 4.6' },
-  { id: 'grok-4.5', label: 'Grok 4.5' },
+  { id: 'grok-4.6', label: 'Grok 4.6', semantics: { contextWindow: 500_000, reasoning: { mode: 'required', efforts: ['low', 'medium', 'high', 'xhigh'], defaultEffort: 'high' } } },
+  { id: 'grok-4.5', label: 'Grok 4.5', semantics: { contextWindow: 500_000, reasoning: { mode: 'required', efforts: ['low', 'medium', 'high'], defaultEffort: 'high' } } },
 ];
 
 export const GROK_FIRST_PARTY_MODEL_IDS: readonly string[] =

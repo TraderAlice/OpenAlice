@@ -62,3 +62,9 @@ describe('adapter-neutral conversation', () => {
     expect(screen.queryByRole('button')).toBeNull()
   })
 })
+
+ it('does not animate the first asynchronously loaded active history', () => {
+   const { rerender } = render(<ConversationView {...base} />)
+   rerender(<ConversationView {...base} busy items={[{ kind: 'assistant-turn', key: 'history', progress: [], final: 'Already in progress', activity: null }]} />)
+   expect(screen.getByText('Already in progress')).toBeTruthy()
+ })

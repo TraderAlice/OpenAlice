@@ -150,3 +150,17 @@ describe('demo Workspace resume handlers', () => {
       .toMatchObject({ model: 'claude-sonnet-4-6', reasoningEffort: 'low' })
   })
 })
+
+it('persists pause, archive and restore in both roster and resume listings', async () => {
+  const roster = async () => (await fetch(`${baseUrl}/api/workspaces`).then(r => r.json())).workspaces.find((w: { id: string }) => w.id === DEMO_CHAT_WORKSPACE_ID)
+  const session = (await roster()).sessions[0]
+  await fetch(`${baseUrl}/api/workspaces/${DEMO_CHAT_WORKSPACE_ID}/sessions/${session.id}/pause`, { method: 'POST' })
+  expect((await roster()).sessions[0].state).toBe('paused')
+  for (const presence of ['archived', 'active']) {
+    const response = await fetch(`${baseUrl}/api/workspaces/${DEMO_CHAT_WORKSPACE_ID}/resumes/${session.resumeId}`, { method: 'PATCH', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ presence }) })
+    expect(response.status).toBe(200)
+    expect((await roster()).sessions[0].presence).toBe(presence)
+    const resumes = await fetch(`${baseUrl}/api/workspaces/${DEMO_CHAT_WORKSPACE_ID}/resumes`).then(r => r.json())
+    expect(resumes.sessions.find((row: { resumeId: string }) => row.resumeId === session.resumeId).presence).toBe(presence)
+  }
+})

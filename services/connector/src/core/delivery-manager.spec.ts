@@ -897,3 +897,34 @@ it('owns reply syntax, sends final files once, and preserves ordinary syntax dis
   expect(order).toEqual(['Before', 'sticker', 'After'])
   await manager.stop()
 })
+
+it('renders market snapshots in prose order without Workspace files, and retains failures', async () => {
+  const adapter = new FakeThirdPartyAdapter() as FakeThirdPartyAdapter & {
+    sendOwnerChat: ReturnType<typeof vi.fn>; sendOwnerFile: ReturnType<typeof vi.fn>
+  }
+  const order: string[] = []
+  adapter.sendOwnerChat = vi.fn(async message => { order.push(message.text ?? '') })
+  adapter.sendOwnerFile = vi.fn(async (_file, media) => { order.push(media) })
+  vi.spyOn(adapter, 'sendOwnerText').mockImplementation(async text => { order.push(text) })
+  const registry = new ConnectorRegistry()
+  registry.register({ definition: { id: adapter.id, label: 'Test', description: '', fields: [], commands: [] }, create: () => adapter })
+  const read = vi.fn()
+  const renderMarket = vi.fn(async () => ({ filename: 'chart.png', mediaType: 'image/png', sizeBytes: 0, contentBase64: '', contentSha256: createHash('sha256').update('').digest('hex') }))
+  const manager = new DeliveryManager({ registry, config: { version: 1, adapters: { [adapter.id]: { enabled: true, settings: {} } } }, updateAdapterSettings: vi.fn(), readWorkspaceFile: read, renderMarket })
+  await manager.start()
+  try {
+    const base = { adapterId: adapter.id, conversationId: 'market', phase: 'final' as const }
+    const reference = 'market/alpaca|BTC/USD/1h'
+    await manager.sendOwnerChat({ ...base, id: 'ok', text: `Before [[${reference}]] After` })
+    expect(order).toEqual(['Before', 'image', 'After'])
+    expect(read).not.toHaveBeenCalled()
+    expect(renderMarket).toHaveBeenCalledExactlyOnceWith(reference)
+    renderMarket.mockRejectedValueOnce(new Error('no bars'))
+    order.length = 0
+    await manager.sendOwnerChat({ ...base, id: 'bad', text: `[[${reference}]]` })
+    expect(order.join(' ')).toContain(`[[${reference}]]`)
+    expect(order.join(' ')).toContain('Chart unavailable')
+    await manager.sendOwnerChat({ ...base, id: 'silent', source: 'automation', text: `[[no-reply]] [[${reference}]]` })
+    expect(renderMarket).toHaveBeenCalledTimes(2)
+  } finally { await manager.stop() }
+})

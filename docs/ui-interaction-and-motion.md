@@ -11,9 +11,9 @@ OpenAlice is a working console, not a static report. Motion should make the
 interface feel responsive and help the eye retain context without turning live
 trading surfaces into ambient animation.
 
-## Visual Language: Warm Editorial Workstation
+## Visual Language: Neutral Working Surface
 
-OpenAlice should feel like a calm, paper-like professional desk: warm,
+OpenAlice should feel like a calm professional desk: neutral,
 information-dense, precise, and operational. It is neither a generic admin
 dashboard nor a decorative consumer-finance app.
 
@@ -21,7 +21,9 @@ Build hierarchy with typography, spacing, alignment, and thin separators before
 adding another container. One dominant surface should own a task; supporting
 information should recede without becoming illegible.
 
-- Use warm neutral surfaces and the existing theme tokens. Do not introduce
+- Use neutral surfaces and the existing theme tokens. Codex is the default Day
+  card (white content and cool-gray sidebar); Graphite remains the default Night
+  card. Paper remains available, and saved palette choices are preserved. Do not introduce
   isolated hard-coded palettes.
 - Reserve blue for interaction and selection. Reserve green and red for
   financial or safety meaning, and amber for warnings. Do not use semantic
@@ -114,7 +116,14 @@ paused resumable Sessions restore through the existing runtime action. A pending
 restore shows a spinner and rejects repeated clicks; failures stay on the row
 and allow retry. Headless occupancy still opens the single-writer explanation.
 The primary row has no separate play/stop target; settings, stop and archive live
-in its options menu. Direct links and history browsers retain view-only opening.
+in its options menu. Direct links and history browsers use the same activation contract: an idle
+Session opens its saved TUI/Web surface without a paused-session interstitial.
+Activation checks the Session Directory for background occupancy before
+requesting a runtime; the server remains the final concurrency authority.
+Failures show the concrete cause and an explicit retry. Hidden Workspace tabs
+do not auto-start, and losing/disconnecting an already-open interactive surface
+does not automatically reclaim it. The former decorative terminal backdrop and
+Resume CTA are removed.
 In expanded navigation, a selected Session or Studio does not also select its
 Harness header. The compact rail retains the Harness selection because Session rows
 are hidden there; returning to the Harness landing selects its header.
@@ -153,6 +162,56 @@ Launch-surface example prompts are compact capability navigation, not generic
 chatbot filler. Their visible titles should stay scannable while the inserted
 prompt carries the evidence, freshness, persistence, and permission boundaries
 needed for the real task. Prefer a small rotating set over a wall of commands.
+
+### Issue list
+
+The global Issues list uses compact 44px rows and 36px status disclosure bars.
+Its toolbar separates Active / Backlog / All issues from filter and display
+popovers. Filters combine text, status, priority, Workspace, assignment policy,
+and schedule presence; display preferences control grouping, ordering, completed
+visibility, and six optional properties. Display preferences persist locally;
+filters reset on remount. Shared Popover, DropdownMenu, Button, and Switch own
+keyboard/focus behavior. The toolbar wraps and popovers scroll within short or
+narrow viewports. Unsupported subscription and sub-issue options are omitted.
+Priority, the stable Issue ID in a 64px truncated slot, status icon, and title occupy the leading edge;
+Workspace display name and next scheduled time sit on the right. Execution
+health is a small dot on the Assignee control, with localized status in its
+accessible name and hover description; the popover shows the full health message. Long titles and IDs truncate without increasing row height. Execution
+configuration remains in the Issue detail. Each row has an independent Assignee
+button using the shared Popover primitive. Unassigned uses a dashed person avatar;
+bound Sessions and human responsibility use solid neutral avatars. New-Session
+policies use dashed plus/repeat avatars, with the exact responsibility in the
+hover description and accessible description. Assignment confirmation updates
+the avatar immediately from the server response. Its upper section reads the
+authoritative Issue owner on demand, shows Session runtime parameters, and
+opens that Session through the existing conversation activation path. The
+lower section reuses `IssueAssigneeEditor`, also used by the detail inspector,
+including its search, eligibility filtering, and confirmation dialog. Missing
+owners cannot open a conversation; assignment policies explain Session creation. Health messages,
+last-fire time, and full cadence remain available as hover descriptions.
+Below 1024px the Workspace chip hides; below 640px IDs and schedule metadata
+hide so the title and Assignee health indicator remain readable. Priority and status are independent shared-menu triggers with current-value
+checks, keyboard navigation, and numeric selection. Writes apply the returned
+Issue immediately so status changes move rows into the matching group; failures
+keep the menu open with an error. The title opens detail through a sibling
+button rather than nesting controls. Collapsed groups leave the tab order.
+
+### Issue detail
+
+Issue detail follows a reading-first layout: a compact Issues / ID breadcrumb,
+a 28–32px title, flush editable Markdown, then Activity and operational Runs.
+The desktop grid reserves 256px for a borderless property rail. Status and
+priority reuse the board's labeled menu triggers; assignment reuses the shared
+picker and avatar states. Properties, Agent, and Schedule are equal, visible
+sections with consistent spacing. Agent contains assignment, runtime, AI model
+selection and comment behavior as quiet property rows. Execution health is a
+dot on the assignee avatar; its explanation and an available owner conversation
+link live in the existing assignment dialog. Schedule exposes a clickable
+cadence summary, next run and secondary run/history actions. Catch-up policy
+stays in the schedule dialog. Running health suppresses a duplicate Run now action.
+No nested rail scroll container competes with the page. Below 1024px the rail
+stacks before the body with the existing section navigation. Editing, scheduling,
+confirmation, and server-error semantics stay in their existing owners.
 
 ### Background execution surfaces
 

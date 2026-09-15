@@ -277,7 +277,7 @@ beforeEach(async () => {
   mocks.rememberQuickChatLaunch.mockResolvedValue(undefined)
 })
 
-afterEach(cleanup)
+afterEach(() => { cleanup(); vi.unstubAllEnvs() })
 
 describe('ChatLandingPage polling stability', () => {
   it('does not inspect deprecated native config when a poll replaces the Workspace object with the same id', async () => {
@@ -508,6 +508,21 @@ describe('ChatLandingPage workflow starters', () => {
 })
 
 describe('ChatLandingPage keyboard submission', () => {
+  it('defaults the demo to GUI and sends a selected starter through quick chat', async () => {
+    vi.stubEnv('VITE_DEMO_MODE', 'true')
+    mocks.useWorkspaces.mockImplementation(() => ({
+      ...context([chatWorkspace()]),
+      agents: [{ ...piAgent, capabilities: { ...piAgent.capabilities, web: { wire: 'pi-rpc', freshSession: true } } }],
+    }))
+    render(<ChatLandingPage spec={{ params: { targetWsId: 'chat-1' } }} />)
+    await screen.findByRole('button', { name: 'UI mode: GUI' })
+    fireEvent.click(screen.getByRole('button', { name: "Read today's cross-asset signals" }))
+    fireEvent.click(screen.getByRole('button', { name: 'Send' }))
+    await waitFor(() => expect(mocks.quickChat).toHaveBeenCalled())
+    expect(mocks.quickChat.mock.calls[0]?.[8]).toBe('webpi')
+    expect(mocks.quickChat.mock.calls[0]?.join(' ')).toContain("Read today's macro backdrop")
+  })
+
   it('offers GUI for a capable runtime and passes the selected surface', async () => {
     mocks.useWorkspaces.mockImplementation(() => ({
       ...context([chatWorkspace()]),

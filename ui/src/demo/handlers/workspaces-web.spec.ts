@@ -1,7 +1,8 @@
 // @vitest-environment jsdom
 
-import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest'
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 import { setupServer } from 'msw/node'
+import { en } from '../../i18n/locales/en'
 
 import {
   DEMO_CHAT_SESSION_ID,
@@ -16,6 +17,7 @@ const baseUrl = window.location.origin
 
 beforeAll(() => server.listen({ onUnhandledRequest: 'error' }))
 afterEach(() => {
+  vi.restoreAllMocks()
   server.resetHandlers()
   resetDemoWorkspaceWebState()
 })
@@ -43,6 +45,49 @@ async function quickChat(agent: string, prompt: string) {
 }
 
 describe('demo Web Session handlers', () => {
+  it('shows a suggested workflow in the standard GUI snapshot without a fake tool approval', async () => {
+    const body = await quickChat('codex', en.chatLanding.researchMemoPrompt)
+    const url = webUrl(body.workspace.id, body.session.sessionId)
+    const first = await fetch(url).then(response => response.json())
+    expect(first.snapshot.phase).toBe('working')
+    expect(first.snapshot.messages).toHaveLength(1)
+    const now = Date.now()
+    vi.spyOn(Date, 'now').mockReturnValue(now + 2500)
+    const partial = await fetch(url).then(response => response.json())
+    expect(partial.snapshot.streamingMessage.content[0].text.length).toBeGreaterThan(0)
+    expect(partial.snapshot.phase).toBe('working')
+    vi.spyOn(Date, 'now').mockReturnValue(now + 60000)
+    const { snapshot } = await fetch(url).then(response => response.json())
+    expect(snapshot.revision).toBeGreaterThan(partial.snapshot.revision)
+    expect(snapshot.streamingMessage).toBeNull()
+    expect(body.session.surface).toBe('webpi')
+    expect(body.session.title).toBe(en.chatLanding.researchMemoTitle)
+    expect(snapshot.phase).toBe('idle')
+    expect(snapshot.requests).toEqual([])
+    expect(snapshot.messages[0]).toMatchObject({ role: 'user', content: en.chatLanding.researchMemoPrompt })
+    expect(JSON.stringify(snapshot.messages[1])).toContain('a thesis with an exit condition')
+    expect(JSON.stringify(snapshot.messages[1])).toContain('[Install OpenAlice]')
+  })
+
+  it('stops a demo stream without later restoring the pending answer', async () => {
+    const body = await quickChat('pi', en.chatLanding.marketBriefPrompt)
+    const url = webUrl(body.workspace.id, body.session.sessionId)
+    await postJson(url + '/abort')
+    vi.spyOn(Date, 'now').mockReturnValue(Date.now() + 60000)
+    const { snapshot } = await fetch(url).then(response => response.json())
+    expect(snapshot.phase).toBe('idle')
+    expect(snapshot.streamingMessage).toBeNull()
+    expect(snapshot.messages.some((message: { role: string }) => message.role === 'assistant')).toBe(false)
+  })
+
+  it('serves a real inline sticker through Workspace content', async () => {
+    const url = `${baseUrl}/api/workspaces/${DEMO_CHAT_WORKSPACE_ID}/content?path=sticker/wave.png`
+    expect(await fetch(url + '&metadata=1').then(response => response.json())).toMatchObject({ path: 'sticker/wave.png' })
+    const response = await fetch(url)
+    expect(response.headers.get('content-type')).toBe('image/png')
+    expect([...new Uint8Array(await response.arrayBuffer()).slice(0, 8)]).toEqual([137, 80, 78, 71, 13, 10, 26, 10])
+  })
+
   it('serves each featured Session with its own recorded transcript in the neutral shape', async () => {
     const semisResponse = await fetch(webUrl(DEMO_CHAT_WORKSPACE_ID, DEMO_CHAT_SESSION_ID))
     const aaplResponse = await fetch(webUrl(DEMO_WORKSPACE_ID, DEMO_SESSION_ID))

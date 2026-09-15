@@ -1,3 +1,4 @@
+import { demoWorkspaces, demoResumeRuntimes } from './workspaces'
 import type {
   IssueComment,
   IssueDetail,
@@ -195,7 +196,7 @@ interface IssueDetailExtras {
 const demoIssueExtras: Record<string, IssueDetailExtras> = {
   'demo-ws-auto-quant/morning-scan': {
     body: [
-      'Scan the pre-market movers and surface anything the book should react to before the open.',
+      'Track AI data-center power demand before the open: VST generation economics and VRT equipment order conversion. Publish material changes; retain quiet scans in history.',
       '',
       '## What to look for',
       '',
@@ -219,7 +220,7 @@ const demoIssueExtras: Record<string, IssueDetailExtras> = {
       '- Coordinated with [[Thesis invalidation watch]].',
       '- Sizing for any new names feeds the [[Liquidity risk review]] (heads-up: that title is used in two workspaces — pick the right one).',
     ].join('\n'),
-    what: 'Run the morning movers scan and push a ranked Inbox digest.',
+    what: 'Review VST and VRT: signed supply contracts, commissioning delays, backlog conversion and unusual volume. Push only material changes to Inbox; do not place trades.',
     agent: 'codex',
     runs: [
       {
@@ -228,7 +229,7 @@ const demoIssueExtras: Record<string, IssueDetailExtras> = {
         resumable: true,
         wsId: 'demo-ws-auto-quant',
         agent: 'codex',
-        prompt: 'Run the morning movers scan and push a ranked Inbox digest.',
+        prompt: 'Review VST and VRT: signed supply contracts, commissioning delays, backlog conversion and unusual volume. Push only material changes to Inbox; do not place trades.',
         status: 'done',
         startedAt: now - HOUR,
         finishedAt: now - HOUR + 84_000,
@@ -236,7 +237,7 @@ const demoIssueExtras: Record<string, IssueDetailExtras> = {
         exitCode: 0,
         output: {
           hasAssistantReply: true,
-          assistantPreview: 'Morning scan complete: three actionable gaps, led by the semiconductor cluster.',
+          assistantPreview: 'Morning scan complete: VST leads the power watchlist; compare generation delivery with VRT equipment demand.',
           blockCount: 7,
           toolCalls: 3,
           toolFailures: 0,
@@ -248,7 +249,7 @@ const demoIssueExtras: Record<string, IssueDetailExtras> = {
         resumable: false,
         wsId: 'demo-ws-auto-quant',
         agent: 'codex',
-        prompt: 'Run the morning movers scan and push a ranked Inbox digest.',
+        prompt: 'Review VST and VRT: signed supply contracts, commissioning delays, backlog conversion and unusual volume. Push only material changes to Inbox; do not place trades.',
         status: 'failed',
         startedAt: now - DAY,
         finishedAt: now - DAY + 12_000,
@@ -268,7 +269,7 @@ const demoIssueExtras: Record<string, IssueDetailExtras> = {
         resumable: true,
         wsId: 'demo-ws-auto-quant',
         agent: 'codex',
-        prompt: 'Run the morning movers scan and push a ranked Inbox digest.',
+        prompt: 'Review VST and VRT: signed supply contracts, commissioning delays, backlog conversion and unusual volume. Push only material changes to Inbox; do not place trades.',
         status: 'done',
         startedAt: now - 2 * DAY,
         finishedAt: now - 2 * DAY + 79_000,
@@ -449,23 +450,16 @@ function findBoardIssue(wsId: string, id: string) {
   return ws?.issues.find((i) => i.id === id) ?? null
 }
 
-const demoAssigneeSessions: Record<string, NonNullable<IssueDetail['assigneeSession']>> = {
-  'resume-demo-thesis-owner': {
-    resumeId: 'resume-demo-thesis-owner',
-    state: 'ready',
-    workspace: { id: 'demo-ws-auto-quant', tag: 'auto-quant' },
-    agent: 'codex',
-    displayName: 'Thesis monitor',
-    createdAt: now - 14 * DAY,
-    updatedAt: now - HOUR / 2,
-    active: false,
-    runtime: { credentialSource: 'native' },
-  },
-  'resume-demo-cpi-owner': {
-    resumeId: 'resume-demo-cpi-owner',
-    state: 'missing',
-    active: false,
-  },
+function demoAssigneeSession(resumeId: string): NonNullable<IssueDetail['assigneeSession']> {
+  const workspace = demoWorkspaces.find((ws) => ws.sessions.some((session) => session.resumeId === resumeId))
+  const session = workspace?.sessions.find((entry) => entry.resumeId === resumeId)
+  if (!workspace || !session) return { resumeId, state: 'missing', active: false }
+  return {
+    resumeId, state: 'ready', workspace: { id: workspace.id, tag: workspace.tag },
+    agent: session.agent, displayName: session.displayName ?? session.title ?? session.name,
+    createdAt: Date.parse(session.createdAt), updatedAt: Date.parse(session.lastActiveAt),
+    active: session.state === 'running', runtime: demoResumeRuntimes.get(resumeId) ?? session.runtime,
+  }
 }
 
 /** Build the IssueDetail the GET /api/issues/:wsId/:id mock returns, or null if
@@ -494,11 +488,7 @@ export function demoIssueDetail(wsId: string, id: string): IssueDetail | null {
       ...(extras?.commentPrompt ? { commentPrompt: extras.commentPrompt } : {}),
     },
     ...(assigneeResumeId
-      ? { assigneeSession: demoAssigneeSessions[assigneeResumeId] ?? {
-          resumeId: assigneeResumeId,
-          state: 'missing' as const,
-          active: false,
-        } }
+      ? { assigneeSession: demoAssigneeSession(assigneeResumeId) }
       : {}),
     comments,
     runs,
@@ -637,7 +627,7 @@ export function demoIssueAddComment(
     },
   })
   demoIssueComments[key] = comments
-  window.setTimeout(() => {
+  globalThis.setTimeout(() => {
     const source = comments.find((comment) => comment.id === commentId)
     if (!source || source.delivery?.state !== 'pending') return
     const replyCommentId = `demo-reply-${commentId}`

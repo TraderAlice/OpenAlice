@@ -152,7 +152,7 @@ describe('AppearanceSection palette pair editor', () => {
     expect(screen.getByText('Used for Day & Night')).toBeTruthy()
   })
 
-  it('restores the default Paper and Graphite pair without changing color mode', () => {
+  it('restores the default Codex and Graphite pair without changing color mode', () => {
     useThemeStore.setState({ theme: 'night', dayPalette: 'linen', nightPalette: 'midnight' })
     render(<AppearanceSection />)
 
@@ -160,7 +160,7 @@ describe('AppearanceSection palette pair editor', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Reset pair' }))
 
     expect(useThemeStore.getState().theme).toBe('night')
-    expect(useThemeStore.getState().dayPalette).toBe('paper')
+    expect(useThemeStore.getState().dayPalette).toBe('codex')
     expect(useThemeStore.getState().nightPalette).toBe('graphite')
   })
 

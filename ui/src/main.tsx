@@ -15,7 +15,7 @@ import './i18n' // side-effect: init react-i18next + seed locale before first re
 initializeBackendConnection()
 installBackendRequestObserver()
 
-if (import.meta.env.VITE_DEMO_MODE) {
+if (import.meta.env.VITE_DEMO_MODE && window.location.protocol !== 'app:') {
   await (await import('./demo')).startWorker()
 } else if (import.meta.env.DEV) {
   // Dev-only: expose window.__demoRecord for capturing real PTY transcripts.

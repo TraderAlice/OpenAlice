@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en" data-theme="auto" data-palette="paper" data-day-palette="paper" data-night-palette="graphite" data-ui-style="default" data-style-palette-mode="saved">
+<html lang="en" data-theme="auto" data-palette="codex" data-day-palette="codex" data-night-palette="graphite" data-ui-style="default" data-style-palette-mode="saved">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
@@ -18,16 +18,16 @@
           var t = storedTheme === 'day' || storedTheme === 'night' || storedTheme === 'auto'
             ? storedTheme
             : storedTheme === 'light' ? 'day' : storedTheme === 'dark' ? 'night' : 'auto';
-          var palettes = ['paper', 'porcelain', 'linen', 'windows-classic', 'graphite', 'midnight', 'moss', 'iris'];
+          var palettes = ['codex', 'paper', 'porcelain', 'linen', 'windows-classic', 'graphite', 'midnight', 'moss', 'iris'];
           var storedDay = palettes.indexOf(state.dayPalette) >= 0 ? state.dayPalette : state.lightPalette;
           var storedNight = palettes.indexOf(state.nightPalette) >= 0 ? state.nightPalette : state.darkPalette;
-          var day = palettes.indexOf(storedDay) >= 0 ? storedDay : 'paper';
+          var day = palettes.indexOf(storedDay) >= 0 ? storedDay : 'codex';
           var night = palettes.indexOf(storedNight) >= 0 ? storedNight : 'graphite';
           var uiStyles = ['default', 'win98', 'broker-classic'];
           var uiStyle = uiStyles.indexOf(state.uiStyle) >= 0 ? state.uiStyle : 'default';
           var stylePaletteMode = state.stylePaletteMode === 'recommended' ? 'recommended' : 'saved';
           if ((persisted.version || 0) < 2 && day === 'windows-classic' && night === 'windows-classic') {
-            day = 'paper';
+            day = 'codex';
             night = 'graphite';
             stylePaletteMode = 'recommended';
           }
@@ -47,11 +47,11 @@
         } catch (e) {
           var root = document.documentElement;
           root.dataset.theme = 'auto';
-          root.dataset.dayPalette = 'paper';
+          root.dataset.dayPalette = 'codex';
           root.dataset.nightPalette = 'graphite';
           root.dataset.uiStyle = 'default';
           root.dataset.stylePaletteMode = 'saved';
-          root.dataset.palette = 'paper';
+          root.dataset.palette = 'codex';
         }
       })();
     </script>

@@ -1,3 +1,4 @@
+import { POWER_SESSION_ID, POWER_RESUME_ID, POWER_REPORT_PATH, POWER_RISK_PATH, powerReport, powerRiskChecklist } from './power-research'
 import type { InboxEntry, InboxOrigin } from '../../api/inbox'
 import {
   DEMO_CHAT_WORKSPACE_ID,
@@ -104,7 +105,15 @@ export const demoMoversReportOlder: InboxEntry = {
 /** GET /api/inbox/history order — newest-first. `demoInboxEntry` (the AAPL
  *  research push) carries NO origin: the interactive/manual case, which renders
  *  without an originating-issue breadcrumb. */
+export const demoPowerReport: InboxEntry = {
+  id: 'demo-inbox-power-research', ts: nowMs - 2 * 60_000,
+  workspaceId: DEMO_CHAT_WORKSPACE_ID, workspaceLabel: 'research',
+  origin: { kind: 'interactive', sessionId: POWER_SESSION_ID, resumeId: POWER_RESUME_ID, agent: 'pi' },
+  body: '# AI power: demand is only the first step\n\nVST and VRT share a catalyst, but generation and equipment have different risks. The research compares contract delivery, order conversion and the assumptions that would invalidate the thesis.\n\n[[' + POWER_REPORT_PATH + ']]\n\nThe recurring morning scan follows material changes. No trade was placed.\n\n[[' + POWER_RISK_PATH + ']]',
+}
+
 export const demoInboxEntries: InboxEntry[] = [
+  demoPowerReport,
   demoInboxEntry,
   demoHeadlessSessionReport,
   demoMoversReport,
@@ -115,6 +124,8 @@ export const demoInboxEntries: InboxEntry[] = [
 // File contents served back to readWorkspaceFile() for demo workspace docs.
 // Keyed by relative path.
 export const demoWorkspaceFiles: Record<string, string> = {
+  [POWER_REPORT_PATH]: powerReport,
+  [POWER_RISK_PATH]: powerRiskChecklist,
   'AGENTS.md': '# Research workspace\n\nUse evidence, preserve dates, and return useful reports. This is demo guidance.',
   'CLAUDE.md': '# Research workspace\n\nUse evidence, preserve dates, and return useful reports. This is demo guidance.',
   '.agents/skills/alice/SKILL.md': '---\nname: alice\ndescription: Collaborate and deliver research reports.\n---\n\n# Workspace collaboration\n\nUse `alice inbox` to deliver committed research.\n\nRead [the example](examples/report.md) before preparing a report.',
@@ -258,6 +269,7 @@ export const demoWorkspaceFilePaths: Readonly<Record<string, readonly string[]>>
     DEMO_REPORT_PATH,
   ],
   [DEMO_CHAT_WORKSPACE_ID]: [
+    POWER_REPORT_PATH, POWER_RISK_PATH,
     'AGENTS.md', 'CLAUDE.md', '.agents/skills/alice/SKILL.md', '.claude/skills/alice/SKILL.md', '.agents/skills/alice/examples/report.md',
     'power_buy_points_2026-06-02.md',
     'rotation/2026-06-02.md',

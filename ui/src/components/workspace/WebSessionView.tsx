@@ -1,3 +1,4 @@
+import { parseMarketReference } from '@traderalice/connector-protocol'
 import { ConversationImagePreview } from '../conversation/ConversationImagePreview'
 import { useConversationFiles } from '../../hooks/useConversationFiles'
 import { useHarnessWorkbench } from '../../live/harness-workbench'
@@ -36,7 +37,16 @@ export function WebSessionView(props: Props) {
 function WebSession({ wsId, sessionId, agent, agents, label, headerActions, onSessionLost }: Props) {
   const session = useWebConversation(wsId, sessionId)
   const { snapshot, busy, requests } = session
-  const openFile = useCallback((path: string) => useHarnessWorkbench.getState().openTab(wsId, { id: `file:${path}`, kind: 'file', path }), [wsId])
+  const openFile = useCallback((path: string) => {
+    if (import.meta.env.VITE_DEMO_MODE && path === 'demo/autoquant-studio.html') {
+      useHarnessWorkbench.getState().openTab(wsId, { id: 'studio', kind: 'studio' })
+      return
+    }
+    const market = parseMarketReference(path)
+    useHarnessWorkbench.getState().openTab(wsId, market
+      ? { id: path, kind: 'market', ...market }
+      : { id: `file:${path}`, kind: 'file', path })
+  }, [wsId])
   const files = useConversationFiles(wsId, session.items, !!snapshot && snapshot.phase !== 'starting', openFile)
   const agentId = snapshot?.agent ?? agent ?? 'agent'
   const agentLabel = agents?.find((entry) => entry.id === agentId)?.displayName ?? fallbackAgentLabel(agentId)

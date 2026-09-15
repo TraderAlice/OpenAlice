@@ -1,3 +1,4 @@
+import { KlinePanel } from '../market/KlinePanel'
 import { useEffect, useLayoutEffect, useRef, type ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
 import { PanelRightClose, Plus, X, Folder, PanelsTopLeft, Globe } from 'lucide-react'
@@ -95,7 +96,7 @@ function WorkPanel({ wsId, source, onCollapse }: { wsId: string; source: Workspa
   const ctx = useWorkspaces()
   const { session } = useWorkspaceSessionData(wsId, state.sessionId ?? null)
   const canSwitch = session?.state === 'running' && agentSupportsWeb(ctx.agents, session.agent)
-  const label = (tab: WorkTab) => tab.kind === 'file' ? tab.path.split('/').at(-1)! : tab.kind === 'files' ? t('workspace.files') : tab.kind === 'browser' ? tab.title || t('workbench.browser') : t('harnessSurface.studio')
+  const label = (tab: WorkTab) => tab.kind === 'market' ? `${tab.barId.split('|').slice(1).join('|')} · ${tab.interval}` : tab.kind === 'file' ? tab.path.split('/').at(-1)! : tab.kind === 'files' ? t('workspace.files') : tab.kind === 'browser' ? tab.title || t('workbench.browser') : t('harnessSurface.studio')
   return <Tabs value={state.active ?? ''} onValueChange={(value) => patch(wsId, { active: String(value) })} className="harness-work-tabs">
     <div className="harness-work-toolbar">
       <TabsList aria-label={t('workbench.tabs', { defaultValue: 'Work panel tabs' })} className="harness-work-tablist">
@@ -109,7 +110,7 @@ function WorkPanel({ wsId, source, onCollapse }: { wsId: string; source: Workspa
         <DropdownMenuContent align="end">
           <DropdownMenuItem onClick={() => openTab(wsId, { kind: 'browser', id: `browser:${Date.now()}-${Math.random().toString(36).slice(2)}` })}><Globe size={14} />{t('workbench.browser')}</DropdownMenuItem>
           <DropdownMenuItem onClick={() => openTab(wsId, { kind: 'files', id: 'files' })}><Folder size={14} />{t('workspace.files')}</DropdownMenuItem>
-          {source !== 'chat' && <DropdownMenuItem onClick={() => openTab(wsId, { kind: 'studio', id: 'studio' })}><PanelsTopLeft size={14} />{t('harnessSurface.studio')}</DropdownMenuItem>}
+          {(source !== 'chat' || import.meta.env.VITE_DEMO_MODE) && <DropdownMenuItem onClick={() => openTab(wsId, { kind: 'studio', id: 'studio' })}><PanelsTopLeft size={14} />{t('harnessSurface.studio')}</DropdownMenuItem>}
           {canSwitch && session && <DropdownMenuItem onClick={() => {
             if (session.surface === 'webpi') void ctx.resumeSession(wsId, session.id, source)
             else void ctx.openWebSession(wsId, session.id, source)
@@ -119,11 +120,12 @@ function WorkPanel({ wsId, source, onCollapse }: { wsId: string; source: Workspa
       <Button variant="ghost" size="icon" className="harness-work-collapse" onClick={onCollapse} aria-label={t('workbench.collapse', { defaultValue: 'Return to conversation / collapse panel' })}><PanelRightClose size={16} /></Button>
     </div>
     {state.tabs.map((tab) => <TabsContent key={tab.id} value={tab.id} keepMounted className="harness-work-content">
-      {tab.kind === 'files' ? <FilesPanel embedded wsId={wsId} sessionId={state.sessionId ?? null} source={source} onOpenFile={(path) => openTab(wsId, { id: `file:${path}`, kind: 'file', path })} />
+      {tab.kind === 'market' ? <div className="h-full min-h-[360px] p-3"><KlinePanel selection={null} source={tab.barId} embeddedInterval={tab.interval} onEmbeddedIntervalChange={interval => openTab(wsId, { id: `market/${tab.barId}/${interval}`, kind: 'market', barId: tab.barId, interval })} displayTitle={tab.barId} /></div> : tab.kind === 'files' ? <FilesPanel embedded wsId={wsId} sessionId={state.sessionId ?? null} source={source} onOpenFile={(path) => openTab(wsId, { id: `file:${path}`, kind: 'file', path })} />
         : tab.kind === 'browser' ? <BrowserPane title={label(tab)} onNavigate={(url) => {
             const current = useHarnessWorkbench.getState().workspaces[wsId]
             if (current) patch(wsId, { tabs: current.tabs.map((item) => item.id === tab.id ? { ...item, title: new URL(url).host } : item) })
           }} />
+        : tab.kind === 'studio' && import.meta.env.VITE_DEMO_MODE && source !== 'prediction' ? <BrowserPane title="AutoQuant Studio · Demo" initialUrl={new URL('/demo-studio/index.html', window.location.href).href} />
         : tab.kind === 'studio' && source !== 'chat' ? <HarnessSurfacePage workspaceId={wsId} source={source} embedded />
           : tab.kind === 'file' ? <WorkFile key={`${tab.id}:${tab.revision ?? 0}`} wsId={wsId} path={tab.path} /> : null}
     </TabsContent>)}

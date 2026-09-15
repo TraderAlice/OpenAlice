@@ -425,13 +425,26 @@ export function createBarService(deps: BarServiceDeps): BarService {
       if (!parsed) throw new Error(`Invalid barId "${ref.barId}" (expected "sourceId|nativeSymbol")`)
       const isUta = await deps.utaManager.has(parsed.sourceId)
       if (isUta) return getUtaBars(parsed.sourceId, ref.barId, opts)
-      // vendor barId — needs an assetClass to route to the right client
-      if (!ref.assetClass) {
-        throw new Error(
-          `Vendor barId "${ref.barId}" needs an assetClass to route. Pass { barId, assetClass } or use { symbol, assetClass }.`,
-        )
+      // References carry source identity only. Resolve an exact catalog match,
+      // never a fuzzy hit or an equity fallback. Explicit hints remain supported.
+      let assetClass = ref.assetClass
+      if (!assetClass) {
+        // Search providers sometimes accept the base symbol but not their own
+        // normalized pair/secid (BTCUSD -> BTC, 1.600519 -> 600519). Broaden
+        // only the lookup query; the returned identity must still match exactly.
+        const queries = [...new Set([parsed.nativeSymbol,
+          ...parsed.nativeSymbol.split(/[.\/-]/).filter(part => part.length >= 3),
+          ...(/^[A-Z0-9]{6,}$/.test(parsed.nativeSymbol) ? [parsed.nativeSymbol.slice(0, -3)] : []),
+        ])].slice(0, 4)
+        const matches = (await Promise.all(queries.map(query => aggregateSymbolSearch(deps.marketSearch, query, 100)))).flat()
+        const classes = new Set(matches.filter(hit =>
+          String(hit.symbol ?? hit.id ?? '') === parsed.nativeSymbol &&
+          (hit.sourceId ?? deps.vendorProviders[hit.assetClass]) === parsed.sourceId,
+        ).map(hit => hit.assetClass))
+        if (classes.size !== 1) throw new Error(`Cannot uniquely resolve asset class for "${ref.barId}". Use market search-bars and an exact barId, or pass assetClass explicitly.`)
+        assetClass = [...classes][0]
       }
-      return getVendorBars(parsed.sourceId, ref.assetClass, parsed.nativeSymbol, opts)
+      return getVendorBars(parsed.sourceId, assetClass!, parsed.nativeSymbol, opts)
     },
   }
 }

@@ -19,6 +19,7 @@ import {
   AdapterHealthTracker,
   classifyNetworkStartFailure,
   decodeInboxAttachments,
+  decodeConnectorAttachment,
   formatAdapterError,
   formatInboxNotification,
   formatPlainInboxNotification,
@@ -116,6 +117,11 @@ interface FeishuImClient {
         params: { receive_id_type: 'chat_id' | 'open_id' }
         data: { receive_id: string; msg_type: string; content: string }
       }) => Promise<{ code?: number; msg?: string } | null | undefined>
+    }
+    image: {
+      create: (payload: {
+        data: { image_type: 'message'; image: Buffer }
+      }) => Promise<{ image_key?: string; data?: { image_key?: string } } | null | undefined>
     }
     file: {
       create: (payload: {
@@ -250,8 +256,31 @@ export class FeishuConnectorAdapter implements ConnectorAdapter {
     }
   }
 
-  async deliverArtifact(): Promise<void> {
-    throw new Error('Inbox file delivery is not implemented for Feishu yet.')
+  async deliverArtifact(delivery: ConnectorArtifactDelivery): Promise<void> {
+    await this.sendOwnerFile(delivery.attachment)
+  }
+
+  async sendOwnerFile(attachment: ConnectorArtifactDelivery['attachment'],
+    presentation: import('../core/reply-directives.js').ReplyMedia = 'file'): Promise<void> {
+    this.assertReady()
+    this.tracker.attempt()
+    try {
+      const file = decodeConnectorAttachment(attachment)
+      if (presentation === 'image' || presentation === 'sticker') {
+        const uploaded = await this.client!.im.image.create({
+          data: { image_type: 'message', image: file.content },
+        })
+        const imageKey = uploaded?.image_key ?? uploaded?.data?.image_key
+        if (!imageKey) throw new Error('Feishu image upload did not return an image_key')
+        await this.createMessage('image', JSON.stringify({ image_key: imageKey }))
+      } else {
+        await this.sendFile(file.filename, file.content)
+      }
+      this.tracker.success(this.ownerUserId)
+    } catch (error) {
+      this.tracker.degraded(error)
+      throw error
+    }
   }
 
   async sendOwnerText(text: string): Promise<void> {

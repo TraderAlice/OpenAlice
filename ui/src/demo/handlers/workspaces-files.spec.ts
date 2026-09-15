@@ -63,6 +63,7 @@ describe('demo Workspace file listings', () => {
     expect(root.body.entries).toEqual([
       expect.objectContaining({ name: '.agents', kind: 'dir' }),
       expect.objectContaining({ name: '.claude', kind: 'dir' }),
+      expect.objectContaining({ name: 'research', kind: 'dir', sizeBytes: null }),
       expect.objectContaining({ name: 'rotation', kind: 'dir', sizeBytes: null }),
       expect.objectContaining({ name: 'AGENTS.md', kind: 'file' }),
       expect.objectContaining({ name: 'CLAUDE.md', kind: 'file' }),

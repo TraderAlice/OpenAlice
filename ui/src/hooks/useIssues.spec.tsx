@@ -4,6 +4,7 @@ import { act, renderHook, waitFor } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 
 import type { IssueSnapshot } from '../api/issues'
+import { issuesApi } from '../api/issues'
 import { useIssues } from './useIssues'
 
 const { getIssuesMock } = vi.hoisted(() => ({ getIssuesMock: vi.fn() }))
@@ -65,4 +66,20 @@ describe('useIssues source epochs', () => {
     }))
     expect(remounted.result.current.data?.workspaces[0]?.issues[0]?.id).toBe('fresh')
   })
+})
+
+
+it('applies the server Issue after a write and preserves data on failure', async () => {
+  getIssuesMock.mockResolvedValue(snapshot('editable'))
+  const hook = renderHook(() => useIssues())
+  await waitFor(() => expect(hook.result.current.successEpoch).toBe(1))
+  const updated = { ...snapshot('editable').workspaces[0].issues[0], status: 'done' as const }
+  const update = vi.spyOn(issuesApi, 'update').mockResolvedValue({ issue: updated } as Awaited<ReturnType<typeof issuesApi.update>>)
+  await act(async () => { await hook.result.current.updateIssue('ws-a', 'editable', { status: 'done' }) })
+  expect(hook.result.current.data?.workspaces[0].issues[0].status).toBe('done')
+  update.mockRejectedValueOnce(new Error('write rejected'))
+  await act(async () => { await expect(hook.result.current.updateIssue('ws-a', 'editable', { status: 'todo' })).rejects.toThrow('write rejected') })
+  expect(hook.result.current.data?.workspaces[0].issues[0].status).toBe('done')
+  update.mockRestore()
+  hook.unmount()
 })

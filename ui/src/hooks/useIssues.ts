@@ -1,7 +1,7 @@
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 
 import { api } from '../api'
-import { omitTelegramConnectorIssues, type IssueSnapshot } from '../api/issues'
+import { issuesApi, omitTelegramConnectorIssues, type IssuePatch, type IssueSnapshot } from '../api/issues'
 
 /**
  * Process-level cache of the last snapshot. It survives unmount, so reopening
@@ -33,7 +33,7 @@ export interface UseIssues {
  * mounted and keeps a process-level cache so the data is already on screen when
  * a consumer mounts.
  */
-export function useIssues(): UseIssues {
+export function useIssues(): UseIssues & { updateIssue: (wsId: string, id: string, patch: IssuePatch) => Promise<void> } {
   const [data, setData] = useState<IssueSnapshot | null>(cached)
   const [error, setError] = useState<string | null>(null)
   const [requestEpoch, setRequestEpoch] = useState(0)
@@ -67,7 +67,23 @@ export function useIssues(): UseIssues {
     }
   }, [])
 
+  const updateIssue = useCallback(async (wsId: string, id: string, patch: IssuePatch) => {
+    const next = await issuesApi.update(wsId, id, patch)
+    if (!mounted.current) return
+    // Discard reads started before this authoritative write completed.
+    requestEpochRef.current += 1
+    setData((current) => {
+      if (!current) return current
+      const updated = { ...current, workspaces: current.workspaces.map((workspace) => workspace.wsId !== wsId ? workspace : {
+        ...workspace, issues: workspace.issues.map((issue) => issue.id === id ? { ...issue, ...next.issue } : issue),
+      }) }
+      cached = updated
+      return updated
+    })
+  }, [])
+
   return {
+    updateIssue,
     data,
     error,
     loading: data === null && error === null,

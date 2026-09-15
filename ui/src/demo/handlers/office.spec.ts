@@ -492,13 +492,14 @@ describe('demo Office handlers', () => {
       DEMO_AUTO_QUANT_WORKSPACE_ID,
       DEMO_AUTO_PREDICTION_WORKSPACE_ID,
     ])
-    expect(body.offices[0]?.employees[0]?.sessionRecordId).toBe(DEMO_CHAT_SESSION_ID)
-    expect(body.offices[0]?.employees[0]?.resumeId).toBe(DEMO_CHAT_RESUME_ID)
+    const semisEmployee = body.offices[0]?.employees.find(employee => employee.sessionRecordId === DEMO_CHAT_SESSION_ID)
+    expect(semisEmployee?.sessionRecordId).toBe(DEMO_CHAT_SESSION_ID)
+    expect(semisEmployee?.resumeId).toBe(DEMO_CHAT_RESUME_ID)
     expect(body.offices[0]?.employees).toHaveLength(demoChatWorkspace.sessions.length)
     expect(body.offices[0]?.employees.map((employee) => employee.sessionRecordId)).toEqual(
       demoChatWorkspace.sessions.map((session) => session.id),
     )
-    const drawerPath = body.offices[0]?.employees[0]?.drawers[0]?.path
+    const drawerPath = semisEmployee?.drawers[0]?.path
     expect(drawerPath).toBe('rotation/ai-chain-2026-06-02.md')
     expect(demoWorkspaceFiles[drawerPath ?? '']).toBeTruthy()
   })

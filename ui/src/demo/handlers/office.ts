@@ -1,3 +1,4 @@
+import { POWER_SESSION_ID, POWER_REPORT_PATH } from '../fixtures/power-research'
 import { http, HttpResponse } from 'msw'
 
 import type {
@@ -104,9 +105,17 @@ function emptyDemoOfficeDayState(): DemoOfficeDayState {
   return { version: 1, revision: 0, day: null }
 }
 
+// Electron demo runs these same handlers in a disposable Node child.
+let inMemoryOfficeDay: string | null = null
+const officeStorage = typeof localStorage === 'undefined' ? {
+  getItem: (_key: string) => inMemoryOfficeDay,
+  setItem: (_key: string, value: string) => { inMemoryOfficeDay = value },
+  removeItem: (_key: string) => { inMemoryOfficeDay = null },
+} : localStorage
+
 const demoOfficeDayStorage = {
   read(): DemoOfficeDayState {
-    const raw = globalThis.localStorage.getItem(DEMO_OFFICE_DAY_STORAGE_KEY)
+    const raw = officeStorage.getItem(DEMO_OFFICE_DAY_STORAGE_KEY)
     if (raw === null) return emptyDemoOfficeDayState()
     try {
       const value: unknown = JSON.parse(raw)
@@ -128,10 +137,10 @@ const demoOfficeDayStorage = {
     }
   },
   write(state: DemoOfficeDayState): void {
-    globalThis.localStorage.setItem(DEMO_OFFICE_DAY_STORAGE_KEY, JSON.stringify(state))
+    officeStorage.setItem(DEMO_OFFICE_DAY_STORAGE_KEY, JSON.stringify(state))
   },
   reset(): void {
-    globalThis.localStorage.removeItem(DEMO_OFFICE_DAY_STORAGE_KEY)
+    officeStorage.removeItem(DEMO_OFFICE_DAY_STORAGE_KEY)
   },
 }
 
@@ -307,7 +316,10 @@ export const officeHandlers = [
               : null,
             lastSeq: working && session.state === 'running' ? 4 : 2,
             lastInteractionAt: Date.parse(session.lastActiveAt),
-            drawers: index === 0 ? [{
+            drawers: session.id === POWER_SESSION_ID ? [{
+              id: 'prov-power', kind: 'report' as const, action: 'created', at: Date.now() - 60_000,
+              label: 'data-center-power.md', path: POWER_REPORT_PATH,
+            }] : session.id === 'demo-chat-session' ? [{
               id: 'prov-demo',
               kind: 'report' as const,
               action: 'created',

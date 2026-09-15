@@ -81,3 +81,12 @@ describe('renderMarkdownHtml', () => {
     expect(html).toContain('<button type="button" class="code-copy-btn"')
   })
 })
+
+it('renders market cards with exact-case identities and keeps unsupported syntax literal', () => {
+  const path = 'market/okx|BTC/USDT:USDT/4h'
+  const html = renderMarkdownHtml(`Before [[${path}]] After`, { fileHrefs: { [path]: '#chart' } })
+  expect(html).toContain('data-file-path="market/okx|BTC/USDT:USDT/4h"')
+  expect(html).toContain('BTC/USDT:USDT · 4h')
+  expect(html).not.toContain('<img')
+  expect(renderMarkdownHtml('[[market/foo/2m]]', { fileHrefs: {} })).toContain('[[market/foo/2m]]')
+})

@@ -1,6 +1,6 @@
 import { workspaceContentHref } from '../components/workspace/api'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { parseContentReferences } from '@traderalice/connector-protocol'
+import { parseContentReferences, parseMarketReference } from '@traderalice/connector-protocol'
 import type { ConversationItem } from '../components/conversation/types'
 
 const isImage = (path: string) => /\.(png|jpe?g|webp|gif)$/i.test(path)
@@ -35,6 +35,10 @@ export function useConversationFiles(wsId: string, items: readonly ConversationI
     async function resolve() {
       const paths = [...new Set(refs.map(ref => ref.path))]
       const available = await Promise.all(paths.map(async path => {
+        const market = parseMarketReference(path)
+        // A valid market reference is a view request, not a Workspace file.
+        // The chart hook owns loading/errors and retries on the selected source.
+        if (market) return [path, `#${encodeURIComponent(path)}`] as const
         const href = workspaceContentHref(wsId, path)
         try {
           const response = await fetch(`${href}&metadata=1`, { signal: controller.signal })

@@ -97,11 +97,17 @@ describe('no-flash theme bootstrap', () => {
       uiStyle: 'default',
     }, false, 1)).toEqual({
       theme: 'day',
-      dayPalette: 'paper',
+      dayPalette: 'codex',
       nightPalette: 'graphite',
       uiStyle: 'default',
       stylePaletteMode: 'recommended',
-      palette: 'paper',
+      palette: 'codex',
     })
   })
+})
+
+it('starts with Codex by day and Graphite by night while preserving saved Paper', () => {
+  expect(applyNoFlashTheme({}, false).palette).toBe('codex')
+  expect(applyNoFlashTheme({}, true).palette).toBe('graphite')
+  expect(applyNoFlashTheme({ dayPalette: 'paper' }, false).palette).toBe('paper')
 })

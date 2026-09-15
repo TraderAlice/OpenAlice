@@ -92,10 +92,15 @@ describe('theme preference persistence', () => {
       uiStyle: 'default',
     }, 1)).toEqual({
       theme: 'day',
-      dayPalette: 'paper',
+      dayPalette: 'codex',
       nightPalette: 'graphite',
       uiStyle: 'default',
       stylePaletteMode: 'recommended',
     })
   })
+})
+
+it('defaults to Codex without replacing an explicit Paper preference', () => {
+  expect(normalizeThemePreferences({}).dayPalette).toBe('codex')
+  expect(normalizeThemePreferences({ dayPalette: 'paper' }).dayPalette).toBe('paper')
 })

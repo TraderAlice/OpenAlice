@@ -64,3 +64,18 @@ it('never auto-opens images and routes image clicks to a dismissible preview', a
   act(() => result.current.onFileReference('sticker/wave.png'))
   expect(result.current.imagePreview?.path).toBe('sticker/wave.png')
 })
+
+it('opens streamed market references without resolving Workspace files or replaying history', async () => {
+  const fetch = vi.fn(); vi.stubGlobal('fetch', fetch)
+  const open = vi.fn()
+  const old = 'market/yfinance|AAPL/1d', live = 'market/okx|BTC/USDT:USDT/4h'
+  const { result, rerender } = renderHook(({ items }) => useConversationFiles('ws', items, true, open), { initialProps: { items: turn(`[[${old}]]`) } })
+  await waitFor(() => expect(result.current.fileHrefs[old]).toBeTruthy())
+  expect(open).not.toHaveBeenCalled()
+  rerender({ items: turn(`[[${old}]] [[${live}]]`) })
+  await waitFor(() => expect(open).toHaveBeenCalledExactlyOnceWith(live))
+  expect(fetch).not.toHaveBeenCalled()
+  rerender({ items: turn(`[[${old}]] [[${live}]] more [[${live}]]`) })
+  await act(async () => {})
+  expect(open).toHaveBeenCalledOnce()
+})

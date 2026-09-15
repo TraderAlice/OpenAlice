@@ -1,0 +1,890 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="color-scheme" content="dark">
+    <meta
+      name="description"
+      content="AutoQuant Studio — a local read-only workbench for quantitative research evidence."
+    >
+    <title>AutoQuant Studio</title>
+    <link rel="stylesheet" href="./studio.css">
+    <script src="./studio.js" defer></script>
+  </head>
+  <body>
+    <div style="padding:8px 16px;background:#263d46;color:white;font:12px system-ui">DEMO · Synthetic test data · No live research or trading</div>
+    <a class="skip-link" href="#research-main">Skip to research</a>
+    <div class="studio-shell inspector-collapsed" id="studio" aria-busy="true">
+      <header class="topbar">
+        <div class="brand-lockup">
+          <span class="brand-mark" aria-hidden="true">AQ</span>
+          <span>
+            <b>AutoQuant</b>
+            <small>Quant research desk</small>
+          </span>
+        </div>
+        <div class="source-lockup">
+          <span class="source-kicker" id="source-scope">LOCAL / READ ONLY</span>
+          <strong id="source-name">Loading research workspace…</strong>
+        </div>
+        <div class="sync-controls">
+          <span class="sync-state" id="sync-state" role="status" aria-live="polite">
+            <i aria-hidden="true"></i>
+            <span>Connecting</span>
+          </span>
+          <button
+            class="quiet-button"
+            id="inspector-toggle"
+            type="button"
+            aria-controls="research-inspector"
+            aria-pressed="false"
+          >
+            Inspect
+          </button>
+          <button class="quiet-button" id="auto-refresh" type="button" aria-pressed="true">
+            Auto
+          </button>
+          <button class="refresh-button" id="refresh" type="button">
+            Refresh
+          </button>
+        </div>
+      </header>
+
+      <aside class="project-rail" aria-label="Research Projects">
+        <div class="rail-heading">
+          <span>Workspace</span>
+          <b id="workspace-scope">LOCAL</b>
+        </div>
+        <div class="workspace-context" aria-label="Current research context">
+          <strong id="rail-workspace">Loading…</strong>
+          <dl>
+            <div>
+              <dt>Projects</dt>
+              <dd id="rail-projects">—</dd>
+            </div>
+            <div>
+              <dt>Project</dt>
+              <dd id="rail-project">—</dd>
+            </div>
+            <div>
+              <dt>Study</dt>
+              <dd id="rail-study">—</dd>
+            </div>
+            <div>
+              <dt>Run</dt>
+              <dd id="rail-run">—</dd>
+            </div>
+          </dl>
+        </div>
+        <div class="rail-heading rail-projects-heading">
+          <span>Projects</span>
+          <b id="project-count">0</b>
+        </div>
+        <nav id="project-list"></nav>
+        <nav class="desk-nav" id="desk-nav" aria-label="Research desk sections"></nav>
+        <div class="rail-note">
+          <span>Authority</span>
+          <p>Verified Core evidence. Mutable progress is marked live.</p>
+        </div>
+      </aside>
+
+      <main id="research-main" tabindex="-1">
+        <section class="research-hero" id="research-overview" aria-labelledby="project-title">
+          <div class="hero-heading">
+            <div class="hero-copy">
+              <span class="eyebrow" id="project-state">RESEARCH PROJECT</span>
+              <h1 id="project-title">Waiting for evidence</h1>
+              <p id="project-description">
+                AutoQuant is assembling a verified research snapshot.
+              </p>
+            </div>
+            <article
+              class="decision-brief"
+              id="decision-brief"
+              aria-label="Current research decision brief"
+            ></article>
+          </div>
+          <div class="hero-scoreboard" id="scoreboard" aria-label="Project research readout"></div>
+        </section>
+
+        <section
+          class="research-agenda-section"
+          id="research-agenda"
+          aria-labelledby="research-agenda-title"
+          hidden
+        >
+          <header class="section-header">
+            <span>
+              <small>VERIFIED EVIDENCE → BOUNDED EXPERIMENT</small>
+              <h2 id="research-agenda-title">Research agenda</h2>
+            </span>
+            <span class="section-meta" id="research-agenda-meta">Waiting for evidence</span>
+          </header>
+          <div class="research-agenda-board" id="research-agenda-board"></div>
+          <p class="research-agenda-authority" id="research-agenda-authority"></p>
+        </section>
+
+        <section
+          class="holdout-section"
+          id="external-holdout"
+          aria-labelledby="external-holdout-title"
+          hidden
+        >
+          <header class="section-header">
+            <span>
+              <small>FROZEN DOSSIER → STRICTLY LATER PERIOD</small>
+              <h2 id="external-holdout-title">External holdout challenge</h2>
+            </span>
+            <span class="section-meta" id="external-holdout-meta">No binding</span>
+          </header>
+          <div class="holdout-board" id="external-holdout-board"></div>
+          <p class="holdout-authority" id="external-holdout-authority"></p>
+        </section>
+
+        <section class="diagnostic-banner" id="diagnostics" role="alert" hidden></section>
+
+        <section
+          class="program-section"
+          id="research-program-status"
+          aria-labelledby="research-program-title"
+          hidden
+        >
+          <header class="section-header">
+            <span>
+              <small>QUESTION → FACTOR → PORTFOLIO → ADAPTIVITY</small>
+              <h2 id="research-program-title">Research cockpit</h2>
+            </span>
+            <span class="section-meta" id="research-program-meta">No multi-Study program</span>
+          </header>
+          <div class="program-summary" id="research-program-summary"></div>
+          <div class="program-assessment" id="research-program-assessment"></div>
+          <div class="program-lanes" id="research-program-lanes"></div>
+          <div class="program-footer" id="research-program-footer"></div>
+        </section>
+
+        <section class="handoff-section" id="research-handoff" aria-labelledby="handoff-title">
+          <header class="section-header">
+            <span>
+              <small id="handoff-flow">REQUEST → EVIDENCE → REPORT</small>
+              <h2 id="handoff-title">Research handoff</h2>
+            </span>
+            <span class="section-meta" id="handoff-meta">No delegated request</span>
+          </header>
+          <div class="handoff-board" id="handoff-board"></div>
+        </section>
+
+        <section
+          class="evidence-workbench"
+          id="evidence-workbench"
+          aria-labelledby="evidence-workbench-title"
+          hidden
+        >
+          <header class="section-header">
+            <span>
+              <small>SELECT A LANE → INSPECT IMMUTABLE EVIDENCE</small>
+              <h2 id="evidence-workbench-title">Evidence workbench</h2>
+            </span>
+            <span class="section-meta" id="evidence-workbench-meta">No lane selected</span>
+          </header>
+          <div
+            class="evidence-lane-tabs"
+            id="evidence-lane-tabs"
+            role="tablist"
+            aria-label="Research evidence lane"
+          ></div>
+        </section>
+
+        <section
+          class="portfolio-section"
+          id="book-path-stress-explorer"
+          aria-labelledby="book-path-stress-title"
+          hidden
+        >
+          <header class="section-header">
+            <span>
+              <small>REPORTED BOOK → FIXED UNITS → WORST HISTORICAL PATHS</small>
+              <h2 id="book-path-stress-title">Reported book path stress explorer</h2>
+            </span>
+            <span class="section-meta" id="book-path-stress-meta">No Path Stress Run</span>
+          </header>
+          <div class="portfolio-summary" id="book-path-stress-summary"></div>
+          <article class="portfolio-viability-panel">
+            <header class="panel-toolbar">
+              <span>
+                <b>Worst non-overlapping episodes</b>
+                <small>Terminal loss ranking · worst interim point · dominant holding</small>
+              </span>
+              <span class="section-meta">HISTORICAL SUPPORT · NO FORECAST</span>
+            </header>
+            <div id="book-path-stress-episodes"></div>
+          </article>
+          <article class="portfolio-attribution-panel">
+            <header class="panel-toolbar">
+              <span>
+                <b>Terminal contribution reconciliation</b>
+                <small>Opening weight × holding cumulative return, including flat cash</small>
+              </span>
+            </header>
+            <div id="book-path-stress-contributions"></div>
+          </article>
+          <div class="factor-warning" id="book-path-stress-warning"></div>
+        </section>
+
+        <section
+          class="portfolio-section"
+          id="allocation-explorer"
+          aria-labelledby="allocation-title"
+          hidden
+        >
+          <header class="section-header">
+            <span>
+              <small>CAUSAL COVARIANCE → ERC TARGET → SAME-CLOCK REFERENCE</small>
+              <h2 id="allocation-title">Portfolio allocation explorer</h2>
+            </span>
+            <span class="section-meta" id="allocation-meta">No Allocation Run</span>
+          </header>
+          <div class="portfolio-summary" id="allocation-summary"></div>
+          <article class="portfolio-viability-panel">
+            <header class="panel-toolbar">
+              <span>
+                <b>Latest mechanical research allocation</b>
+                <small>Target, executed book, fixed-weight reference, cap and risk evidence</small>
+              </span>
+              <span class="section-meta">DECISION SUPPORT · NO TRADING</span>
+            </header>
+            <div id="allocation-weights"></div>
+          </article>
+          <article class="portfolio-attribution-panel">
+            <header class="panel-toolbar">
+              <span>
+                <b>Sampled candidate versus reference path</b>
+                <small>Immutable net returns, exposure, and causal forecast volatility</small>
+              </span>
+            </header>
+            <div id="allocation-path"></div>
+          </article>
+          <div class="factor-warning" id="allocation-warning"></div>
+        </section>
+
+        <section
+          class="portfolio-section"
+          id="event-study-explorer"
+          aria-labelledby="event-study-title"
+          hidden
+        >
+          <header class="section-header">
+            <span>
+              <small>PRICE EVENT → DELAYED OUTCOME → EXPLICIT REFERENCES</small>
+              <h2 id="event-study-title">Price event study explorer</h2>
+            </span>
+            <span class="section-meta" id="event-study-meta">No Event Study Run</span>
+          </header>
+          <div class="portfolio-summary" id="event-study-summary"></div>
+          <article class="portfolio-viability-panel">
+            <header class="panel-toolbar">
+              <span>
+                <b>Conditional outcome versus references</b>
+                <small>Primary non-overlapping events · unconditional asset · matched-date reference</small>
+              </span>
+              <span class="section-meta">DESCRIPTIVE ASSOCIATION · NO TRADING</span>
+            </header>
+            <div id="event-study-distributions"></div>
+          </article>
+          <article class="portfolio-attribution-panel">
+            <header class="panel-toolbar">
+              <span>
+                <b>Immutable event ledger</b>
+                <small>Event, entry, exit, gap, outcome, overlap eligibility, and matched excess</small>
+              </span>
+            </header>
+            <div id="event-study-events"></div>
+          </article>
+          <div class="factor-warning" id="event-study-warning"></div>
+        </section>
+
+        <section
+          class="portfolio-section"
+          id="book-risk-explorer"
+          aria-labelledby="book-risk-title"
+          hidden
+        >
+          <header class="section-header">
+            <span>
+              <small>REPORTED BOOK → COVARIANCE → REDUCTION SENSITIVITY</small>
+              <h2 id="book-risk-title">Reported book risk explorer</h2>
+            </span>
+            <span class="section-meta" id="book-risk-meta">No Book Risk Run</span>
+          </header>
+          <div class="portfolio-summary" id="book-risk-summary"></div>
+          <article class="portfolio-viability-panel">
+            <header class="panel-toolbar">
+              <span>
+                <b>Lookback stability</b>
+                <small>Fixed windows · contribution leader · standardized first reduction</small>
+              </span>
+              <span class="section-meta">DESCRIPTIVE EVIDENCE</span>
+            </header>
+            <div id="book-risk-lookbacks"></div>
+          </article>
+          <article class="portfolio-viability-panel">
+            <header class="panel-toolbar">
+              <span>
+                <b>Caller-supplied reallocation scenarios</b>
+                <small>Complete funded books · same covariance windows · deltas versus reported baseline</small>
+              </span>
+              <span class="section-meta">NO OPTIMIZATION</span>
+            </header>
+            <div id="book-risk-scenarios"></div>
+            <div id="book-risk-scenario-contributions"></div>
+          </article>
+          <article class="portfolio-viability-panel">
+            <header class="panel-toolbar">
+              <span>
+                <b>Caller-bounded historical risk sizing</b>
+                <small>One authorized asset/cash leg · fixed direction · fixed volatility ceiling</small>
+              </span>
+              <span class="section-meta">TARGET POSITION · NO ORDER</span>
+            </header>
+            <div id="book-risk-sizing"></div>
+          </article>
+          <div class="portfolio-secondary-grid">
+            <article class="portfolio-attribution-panel">
+              <header class="panel-toolbar">
+                <span>
+                  <b>Component risk</b>
+                  <small>Signed and absolute variance contribution</small>
+                </span>
+              </header>
+              <div id="book-risk-contributions"></div>
+            </article>
+            <article class="portfolio-attribution-panel">
+              <header class="panel-toolbar">
+                <span>
+                  <b>Reduction priority</b>
+                  <small>One percentage point toward cash</small>
+                </span>
+              </header>
+              <div id="book-risk-reductions"></div>
+            </article>
+          </div>
+          <article class="portfolio-attribution-panel">
+            <header class="panel-toolbar">
+              <span>
+                <b>Pairwise correlation</b>
+                <small>Strongest absolute relationship first</small>
+              </span>
+            </header>
+            <div id="book-risk-correlations"></div>
+          </article>
+          <div class="factor-warning" id="book-risk-warning"></div>
+        </section>
+
+        <section
+          class="factor-section"
+          id="factor-explorer"
+          aria-labelledby="factor-title"
+          hidden
+        >
+          <header class="section-header">
+            <span>
+              <small>IC PATH → DECAY → STABILITY</small>
+              <h2 id="factor-title">Factor evidence explorer</h2>
+            </span>
+            <span class="section-meta" id="factor-meta">No Factor Run</span>
+          </header>
+          <div class="factor-summary" id="factor-summary"></div>
+          <article class="factor-qualification-panel">
+            <header class="panel-toolbar">
+              <span>
+                <b>Factor qualification funnel</b>
+                <small>Raw edge → train-selected style → neutral edge → blend uplift → temporal breadth</small>
+              </span>
+              <span class="section-meta">VALIDATION DIAGNOSIS · TEST AUDIT ONLY</span>
+            </header>
+            <div id="factor-qualification"></div>
+          </article>
+          <article class="factor-components-panel">
+            <header class="panel-toolbar">
+              <span>
+                <b>Declared factor components</b>
+                <small>Raw edge → nearest-peer residual → fixed-blend leave-one-out</small>
+              </span>
+              <span class="section-meta">EXPLICIT DECLARATION · NO SOURCE INFERENCE</span>
+            </header>
+            <div id="factor-components"></div>
+          </article>
+          <div class="factor-primary-grid">
+            <article class="factor-chart-panel">
+              <header class="panel-toolbar factor-toolbar">
+                <span>
+                  <b id="factor-chart-title">Rank &amp; Pearson IC path</b>
+                  <small id="factor-chart-note">Full evidence · bounded verified sample</small>
+                </span>
+                <div class="factor-toolbar-controls">
+                  <div class="segmented-control compact" role="tablist" aria-label="Factor chart">
+                    <button type="button" role="tab" aria-selected="true" data-factor-view="ic">
+                      IC path
+                    </button>
+                    <button type="button" role="tab" aria-selected="false" data-factor-view="quantiles">
+                      Quantiles
+                    </button>
+                  </div>
+                  <div id="factor-horizon-controls" class="segmented-control compact" role="tablist" aria-label="Factor horizon">
+                    <button type="button" role="tab" aria-selected="true" data-factor-horizon="1">
+                      1 bar
+                    </button>
+                    <button type="button" role="tab" aria-selected="false" data-factor-horizon="5">
+                      5
+                    </button>
+                    <button type="button" role="tab" aria-selected="false" data-factor-horizon="10">
+                      10
+                    </button>
+                  </div>
+                  <div class="segmented-control compact" role="tablist" aria-label="Factor split">
+                    <button type="button" role="tab" aria-selected="true" data-factor-split="validation">
+                      Validation
+                    </button>
+                    <button type="button" role="tab" aria-selected="false" data-factor-split="test">
+                      Test audit
+                    </button>
+                  </div>
+                </div>
+              </header>
+              <div class="factor-chart" id="factor-chart"></div>
+            </article>
+            <article class="factor-horizon-panel">
+              <header class="panel-toolbar">
+                <span>
+                  <b>Horizon profile</b>
+                  <small>Request-bound decision-bar decay · test is audit-only</small>
+                </span>
+              </header>
+              <div id="factor-horizons"></div>
+            </article>
+          </div>
+          <article class="factor-stability-panel">
+            <header class="panel-toolbar factor-toolbar">
+              <span>
+                <b>Stability &amp; distinctiveness</b>
+                <small>Fold, causal regime, asset, and fixed-style evidence</small>
+              </span>
+              <div class="segmented-control compact" role="tablist" aria-label="Factor stability">
+                <button type="button" role="tab" aria-selected="true" data-factor-stability="regimes">
+                  Regimes
+                </button>
+                <button type="button" role="tab" aria-selected="false" data-factor-stability="folds">
+                  Folds
+                </button>
+                <button type="button" role="tab" aria-selected="false" data-factor-stability="assets">
+                  Assets
+                </button>
+                <button type="button" role="tab" aria-selected="false" data-factor-stability="styles">
+                  Style overlap
+                </button>
+              </div>
+            </header>
+            <div id="factor-stability"></div>
+          </article>
+          <div class="factor-warning" id="factor-warning"></div>
+        </section>
+
+        <section
+          class="portfolio-section"
+          id="portfolio-explorer"
+          aria-labelledby="portfolio-title"
+          hidden
+        >
+          <header class="section-header">
+            <span>
+              <small>PATH → BOOK → ATTRIBUTION</small>
+              <h2 id="portfolio-title">Portfolio decision explorer</h2>
+            </span>
+            <span class="section-meta" id="portfolio-meta">No Portfolio Run</span>
+          </header>
+          <div class="mandate-strip" id="portfolio-mandate"></div>
+          <div class="portfolio-summary" id="portfolio-summary"></div>
+          <article class="portfolio-viability-panel">
+            <header class="panel-toolbar">
+              <span>
+                <b>Strategy viability</b>
+                <small>Factor edge → gross monetization → friction → post-cost evidence</small>
+              </span>
+              <span class="section-meta">VALIDATION DIAGNOSIS · TEST AUDIT ONLY</span>
+            </header>
+            <div id="portfolio-strategy-viability"></div>
+          </article>
+          <article class="portfolio-monetization-panel">
+            <header class="panel-toolbar">
+              <span>
+                <b>Signal monetization bridge</b>
+                <small>Equal intent → sizing → governance → execution → cost</small>
+              </span>
+              <span class="section-meta">ADDITIVE DIAGNOSTIC · NO SELECTION AUTHORITY</span>
+            </header>
+            <div id="portfolio-signal-monetization"></div>
+          </article>
+          <article class="portfolio-decision-panel">
+            <header class="panel-toolbar">
+              <span>
+                <b>Current mechanical decision</b>
+                <small>Signal threshold → target construction → risk governor → execution gate</small>
+              </span>
+              <span class="section-meta">RESEARCH WEIGHTS · NO ORDER AUTHORITY</span>
+            </header>
+            <div id="portfolio-mechanical-decision"></div>
+          </article>
+          <article class="portfolio-sizing-panel">
+            <header class="panel-toolbar">
+              <span>
+                <b>Position sizing anatomy</b>
+                <small>Conviction ÷ volatility → capped water-fill → covariance risk</small>
+              </span>
+              <span class="section-meta">HISTORICAL · CORE RECONCILED</span>
+            </header>
+            <div id="portfolio-sizing-anatomy"></div>
+          </article>
+          <article class="portfolio-diversification-panel">
+            <header class="panel-toolbar">
+              <span>
+                <b>Diversification &amp; correlation breakdown</b>
+                <small>Effective risk bets → 25% / 50% / 100% correlation-breakdown ladder</small>
+              </span>
+              <span class="section-meta">CONTEXT ONLY · NO RESIZING AUTHORITY</span>
+            </header>
+            <div id="portfolio-diversification-stress"></div>
+          </article>
+          <div class="portfolio-primary-grid">
+            <article class="portfolio-chart-panel">
+              <header class="panel-toolbar">
+                <span>
+                  <b id="portfolio-chart-title">Growth &amp; drawdown</b>
+                  <small id="portfolio-chart-note">Full history · bounded verified sample</small>
+                </span>
+                <div class="segmented-control compact" role="tablist" aria-label="Portfolio chart">
+                  <button type="button" role="tab" aria-selected="true" data-portfolio-view="performance">
+                    Performance
+                  </button>
+                  <button type="button" role="tab" aria-selected="false" data-portfolio-view="exposure">
+                    Exposure
+                  </button>
+                </div>
+              </header>
+              <div class="portfolio-chart" id="portfolio-chart"></div>
+            </article>
+            <article class="portfolio-book-panel">
+              <header class="panel-toolbar">
+                <span>
+                  <b>Latest mechanical book</b>
+                  <small id="portfolio-book-note">Historical research weights</small>
+                </span>
+              </header>
+              <div id="portfolio-book"></div>
+            </article>
+          </div>
+          <div class="portfolio-secondary-grid">
+            <article class="portfolio-attribution-panel">
+              <header class="panel-toolbar">
+                <span>
+                  <b>Asset contribution &amp; risk</b>
+                  <small>Exact immutable Run attribution</small>
+                </span>
+                <div class="segmented-control compact" role="tablist" aria-label="Attribution split">
+                  <button type="button" role="tab" aria-selected="true" data-attribution-split="validation">
+                    Validation
+                  </button>
+                  <button type="button" role="tab" aria-selected="false" data-attribution-split="test">
+                    Test audit
+                  </button>
+                </div>
+              </header>
+              <div id="portfolio-attribution"></div>
+            </article>
+            <article class="portfolio-transitions-panel">
+              <header class="panel-toolbar">
+                <span>
+                  <b>Recent mechanical transitions</b>
+                  <small>Signal state versus executed action</small>
+                </span>
+              </header>
+              <div id="portfolio-transitions"></div>
+            </article>
+          </div>
+          <article class="portfolio-parameter-panel">
+            <header class="panel-toolbar">
+              <span>
+                <b>Target translation robustness</b>
+                <small>Predeclared 40 / 60 / 120 causal history windows · context only · no window selection</small>
+              </span>
+            </header>
+            <div id="portfolio-translation-robustness"></div>
+          </article>
+          <article class="portfolio-parameter-panel">
+            <header class="panel-toolbar">
+              <span>
+                <b>Mechanical parameter neighborhood</b>
+                <small>Predeclared entry / exit × no-trade surface · context only · no parameter selection</small>
+              </span>
+              <div class="segmented-control compact" role="tablist" aria-label="Parameter neighborhood split">
+                <button type="button" role="tab" aria-selected="true" data-parameter-split="validation">
+                  Validation
+                </button>
+                <button type="button" role="tab" aria-selected="false" data-parameter-split="test">
+                  Test audit
+                </button>
+              </div>
+            </header>
+            <div id="portfolio-parameter-neighborhood"></div>
+          </article>
+          <article class="portfolio-lifecycle-panel">
+            <header class="panel-toolbar">
+              <span>
+                <b>Mechanical position lifecycle</b>
+                <small>Executed position episodes · additive contribution · contextual only</small>
+              </span>
+              <div class="segmented-control compact" role="tablist" aria-label="Position lifecycle split">
+                <button type="button" role="tab" aria-selected="true" data-lifecycle-split="validation">
+                  Validation
+                </button>
+                <button type="button" role="tab" aria-selected="false" data-lifecycle-split="test">
+                  Test audit
+                </button>
+              </div>
+            </header>
+            <div id="portfolio-lifecycle"></div>
+          </article>
+        </section>
+
+        <section
+          class="rl-section"
+          id="rl-explorer"
+          aria-labelledby="rl-title"
+          hidden
+        >
+          <header class="section-header">
+            <span>
+              <small>BASELINES → FOLDS / SEEDS → POLICY BEHAVIOR</small>
+              <h2 id="rl-title">RL policy evidence explorer</h2>
+            </span>
+            <span class="section-meta" id="rl-meta">No governed RL Run</span>
+          </header>
+          <div class="mandate-strip" id="rl-mandate"></div>
+          <div class="rl-summary" id="rl-summary"></div>
+          <article class="rl-fusion-diagnosis-panel">
+            <header class="panel-toolbar">
+              <span>
+                <b>RL factor-fusion diagnosis</b>
+                <small>Candidate sleeve → local capture → adaptive gross → cost → stable net value</small>
+              </span>
+              <span class="section-meta">VALIDATION DIAGNOSIS · TEST AUDIT ONLY</span>
+            </header>
+            <div id="rl-fusion-diagnosis"></div>
+          </article>
+          <div class="rl-primary-grid">
+            <article class="rl-chart-panel">
+              <header class="panel-toolbar">
+                <span>
+                  <b id="rl-chart-title">RL versus selected baseline</b>
+                  <small id="rl-chart-note">Every declared fold and seed</small>
+                </span>
+                <div class="rl-toolbar-controls">
+                  <div class="segmented-control compact" role="tablist" aria-label="RL evidence view">
+                    <button type="button" role="tab" aria-selected="true" data-rl-view="performance">
+                      Performance
+                    </button>
+                    <button type="button" role="tab" aria-selected="false" data-rl-view="training">
+                      Training
+                    </button>
+                    <button type="button" role="tab" aria-selected="false" data-rl-view="actions">
+                      Actions
+                    </button>
+                  </div>
+                  <div class="segmented-control compact" role="tablist" aria-label="RL evidence split">
+                    <button type="button" role="tab" aria-selected="true" data-rl-split="validation">
+                      Validation
+                    </button>
+                    <button type="button" role="tab" aria-selected="false" data-rl-split="test">
+                      Test audit
+                    </button>
+                  </div>
+                </div>
+              </header>
+              <div class="rl-chart" id="rl-chart"></div>
+            </article>
+            <article class="rl-trials-panel">
+              <header class="panel-toolbar">
+                <span>
+                  <b>Fold × seed audit</b>
+                  <small>No lucky-seed selection</small>
+                </span>
+              </header>
+              <div id="rl-trials"></div>
+            </article>
+          </div>
+          <div class="rl-secondary-grid">
+            <article class="rl-baselines-panel">
+              <header class="panel-toolbar">
+                <span>
+                  <b>Declared baseline ladder</b>
+                  <small>Judge-owned comparison set</small>
+                </span>
+              </header>
+              <div id="rl-baselines"></div>
+            </article>
+            <article class="rl-detail-panel">
+              <header class="panel-toolbar">
+                <span>
+                  <b id="rl-detail-title">Policy implementation</b>
+                  <small>Locked candidate + reference sleeves · research evidence</small>
+                </span>
+              </header>
+              <div id="rl-detail"></div>
+            </article>
+          </div>
+          <article class="rl-incremental-panel">
+            <header class="panel-toolbar">
+              <span>
+                <b>Incremental value attribution</b>
+                <small>Independent full paths · RL minus validation-selected mechanical baseline</small>
+              </span>
+              <span class="section-meta">ACTIVE RETURN · CONTEXT ONLY</span>
+            </header>
+            <div id="rl-incremental"></div>
+          </article>
+          <article class="rl-behavior-panel">
+            <header class="panel-toolbar">
+              <span>
+                <b>Policy behavior &amp; decision rationale</b>
+                <small>Action persistence · chosen vs runner-up · exact linear decomposition</small>
+              </span>
+              <span class="section-meta">UNCALIBRATED · CONTEXT ONLY</span>
+            </header>
+            <div id="rl-behavior"></div>
+          </article>
+          <article class="rl-opportunity-panel">
+            <header class="panel-toolbar">
+              <span>
+                <b>One-step factor opportunity audit</b>
+                <small>Same actual pretrade book · all governed sleeves · no alternate path propagation</small>
+              </span>
+              <span class="section-meta">EX-POST AUDIT · CONTEXT ONLY</span>
+            </header>
+            <div id="rl-opportunity"></div>
+          </article>
+          <div class="rl-warning" id="rl-warning"></div>
+        </section>
+
+        <section class="pulse-section" id="research-pulse" aria-labelledby="pulse-title">
+          <header class="section-header">
+            <span>
+              <small>LIVE RESEARCH STATE</small>
+              <h2 id="pulse-title">Research pulse</h2>
+            </span>
+            <span class="section-meta" id="pulse-meta">No active Sessions</span>
+          </header>
+          <div class="session-lanes" id="session-lanes"></div>
+        </section>
+
+        <section
+          class="decision-matrix-section"
+          id="decision-matrix"
+          aria-labelledby="decision-matrix-title"
+          hidden
+        >
+          <header class="section-header">
+            <span>
+              <small>BASELINE → CANDIDATES → LEADER</small>
+              <h2 id="decision-matrix-title">Session decision matrix</h2>
+            </span>
+            <span class="section-meta" id="decision-matrix-meta">No Session</span>
+          </header>
+          <div class="decision-summary" id="decision-summary"></div>
+          <article class="decision-matrix-panel">
+            <header class="panel-toolbar">
+              <span>
+                <b>Professional evidence comparison</b>
+                <small id="decision-matrix-note">
+                  Validation-only comparison · immutable verdicts
+                </small>
+              </span>
+              <div class="segmented-control compact" role="tablist" aria-label="Decision matrix evidence">
+                <button type="button" role="tab" aria-selected="true" data-matrix-view="selection">
+                  Selection
+                </button>
+                <button type="button" role="tab" aria-selected="false" data-matrix-view="all">
+                  + Test audit
+                </button>
+              </div>
+            </header>
+            <div class="decision-matrix-scroll" id="decision-matrix-table"></div>
+            <p class="decision-tradeoff-note" id="decision-tradeoff-note"></p>
+          </article>
+        </section>
+
+        <div class="workbench-grid" id="research-iteration">
+          <section class="trajectory-panel" aria-labelledby="trajectory-title">
+            <header class="section-header compact">
+              <span>
+                <small>EDIT → JUDGE → VERDICT</small>
+                <h2 id="trajectory-title">Optimization trace</h2>
+              </span>
+              <span class="section-meta" id="trajectory-meta">No Experiments</span>
+            </header>
+            <div class="trajectory-chart" id="trajectory-chart"></div>
+            <div class="verdict-legend" aria-label="Verdict legend">
+              <span><i class="keep"></i>KEEP</span>
+              <span><i class="revert"></i>REVERT</span>
+              <span><i class="crash"></i>CRASH</span>
+            </div>
+          </section>
+
+          <section class="evidence-panel" aria-labelledby="evidence-title">
+            <header class="section-header compact">
+              <span>
+                <small>VERIFIED CHRONOLOGY</small>
+                <h2 id="evidence-title">Evidence stream</h2>
+              </span>
+              <a href="./snapshot.json" target="_blank" rel="noreferrer">JSON ↗</a>
+            </header>
+            <ol class="evidence-stream" id="evidence-stream"></ol>
+          </section>
+        </div>
+
+        <section class="catalog-section" id="research-catalog" aria-labelledby="catalog-title">
+          <header class="section-header">
+            <span>
+              <small>FIXED QUESTIONS &amp; EXECUTIONS</small>
+              <h2 id="catalog-title">Research catalog</h2>
+            </span>
+            <div class="segmented-control" role="tablist" aria-label="Catalog view">
+              <button type="button" role="tab" aria-selected="true" data-catalog="studies">
+                Studies
+              </button>
+              <button type="button" role="tab" aria-selected="false" data-catalog="runs">
+                Runs
+              </button>
+            </div>
+          </header>
+          <div id="catalog"></div>
+        </section>
+      </main>
+
+      <aside class="inspector" id="research-inspector" aria-label="Selected research detail" aria-hidden="true">
+        <header>
+          <span>Inspector</span>
+          <b id="inspector-kind">PROJECT</b>
+        </header>
+        <div id="inspector-content">
+          <p class="empty-copy">Select a Session to inspect its leader and evidence.</p>
+        </div>
+      </aside>
+    </div>
+
+    <template id="loading-template">
+      <div class="loading-state" role="status">
+        <span></span><span></span><span></span>
+        <p>Verifying research evidence…</p>
+      </div>
+    </template>
+  </body>
+</html>

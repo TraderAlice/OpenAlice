@@ -1,3 +1,4 @@
+import type { ConnectorModelRequest, ConnectorModelPanel } from '@traderalice/connector-protocol'
 import type {
   ConnectorAttachment,
   ConnectorAdapterConfig,
@@ -30,6 +31,7 @@ export type ConnectorCommandHandler = (context: ConnectorCommandContext) => Prom
 export type ConnectorStartFailureDisposition = 'fatal' | 'retry'
 
 export interface ConnectorAdapterContext {
+  sessionModel?(request: ConnectorModelRequest): Promise<ConnectorModelPanel>
   commands: CommandRegistry
   updateSettings(patch: Record<string, string | number | boolean>): Promise<void>
   getServiceStatus(): string

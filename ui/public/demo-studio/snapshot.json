@@ -1,0 +1,700 @@
+{
+  "schemaVersion": 1,
+  "kind": "autoquant-studio-snapshot",
+  "generatedAt": "2026-09-13T11:54:03.036712+00:00",
+  "harness": {
+    "id": "autoquant.python-judge",
+    "version": "0.9.34",
+    "commit": "52d63148d826e6c35d48c3167d95a4cc7a4eb6c4",
+    "dirty": false,
+    "buildProvenance": "source-checkout",
+    "sourceHash": "f018f00363e9e3ea7500887c1e33a8a17882a8c67f7bce63ae1d474915782138",
+    "python": "3.11.14"
+  },
+  "source": {
+    "scope": "workspace",
+    "rootDir": "/private/demo/research/workspace",
+    "workspace": {
+      "name": "Test Quant Desk",
+      "rootDir": "/private/demo/research/workspace",
+      "projectsDir": "/private/demo/research/workspace/projects",
+      "defaultProject": "factor-project",
+      "configurationSource": "workspace-manifest",
+      "configurationPath": "/private/demo/research/workspace/autoquant-workspace.json"
+    }
+  },
+  "valid": true,
+  "diagnostics": [],
+  "projects": [
+    {
+      "id": "factor-project",
+      "name": "Factor Project",
+      "description": "",
+      "rootDir": "/private/demo/research/workspace/projects/factor-project",
+      "researchProgram": {
+        "path": "/private/demo/research/workspace/projects/factor-project/research.md",
+        "text": "# Factor Project\n\n## Research brief and clarification\n\nBefore downloading data, editing research code, training a model, or running a\nbacktest, rewrite the assignment in this file as a bounded English research\nbrief. The caller may use any language; English is the internal working\nlanguage of the AutoQuant desk.\n\nUse researcher judgment for methods, but do not invent caller-owned intent. If\nan ambiguity could materially change the decision being supported, universe,\nhorizon or cadence, direction, risk constraints, benchmark, evaluation\nmeaning, or expected deliverable, record it under **Open questions** and ask\nthe delegating Agent or user. Repeat until the question is falsifiable and\nsafe to turn into fixed Study authority.\n\n## Research question\n\nDescribe the quantitative research question here.\n\n## Decision context and motivation\n\nDescribe the decision this research should inform and why the answer matters.\n\n## Scope, evidence, and constraints\n\nRecord the known asset scope, horizon or cadence, available data and evidence,\nmaterial constraints, evaluation meaning, and any relevant source context.\n\n## Assumptions\n\nDistinguish provisional researcher assumptions from confirmed caller intent.\n\n## Open questions\n\nRecord material questions and their answers. Do not begin quantitative work\nwhile a caller-owned ambiguity here could change the Study.\n\n## Proposed bounded route\n\nDescribe the initial research approach, fast checks, evaluation boundary, and\nthe evidence needed to support or reject the hypothesis.\n\n## Completion and deliverable\n\nState what a useful answer should contain and who will consume it.\n\n## Evidence contract\n\n- Record the asset universe, dataset identity or time range, and Harness version.\n- Keep evaluation inputs and acceptance criteria fixed while comparing candidates.\n- Treat completed Runs as immutable evidence.\n- Separate measured findings from forward-looking trading decisions.\n\n## Agent instructions\n\nKeep this brief current as the research evolves. Once it is clear enough to\nstart, work only inside this Project. Propose one falsifiable change at a time,\nrun the bounded Project evaluation contract, inspect structured evidence, and\nKEEP, REVERT, or BRANCH explicitly. Do not change the Harness or locked Judge\nto make a candidate win.\n"
+      },
+      "researchProgramStatus": null,
+      "agentWorkBrief": {
+        "schemaVersion": 1,
+        "kind": "autoquant-agent-work-brief",
+        "method": "verified-project-agent-orientation-v13",
+        "project": {
+          "id": "factor-project",
+          "name": "Factor Project",
+          "rootDir": "/private/demo/research/workspace/projects/factor-project"
+        },
+        "question": {
+          "title": "Factor Project",
+          "text": "Describe the quantitative research question here.",
+          "origin": "project-research-brief",
+          "sourcePath": "/private/demo/research/workspace/projects/factor-project/research.md",
+          "requestPath": null
+        },
+        "candidateContract": {
+          "schemaVersion": 1,
+          "kind": "autoquant-factor-candidate-contract",
+          "api": {
+            "kind": "panel-v2",
+            "function": "compute_factor(panel) -> pandas.Series",
+            "identityColumns": [
+              "asset",
+              "timestamp"
+            ]
+          },
+          "data": {
+            "surfaceSource": "legacy-ohlcv-v1",
+            "baseInterval": null,
+            "featureIntervals": [],
+            "panelColumns": [
+              "asset",
+              "timestamp",
+              "open",
+              "high",
+              "low",
+              "close",
+              "volume"
+            ],
+            "availabilityRule": "Only baseInterval and featureIntervals are available; candidate source branches and component declarations do not add panel inputs.",
+            "observationSemantics": {
+              "timestampMeaning": "session-date",
+              "panelShape": "rectangular",
+              "missingObservation": "not-applicable-rectangular",
+              "contextVisibility": "Candidate code may use only observations whose timestamp is at or before the evaluated row timestamp; absent context remains absent unless the candidate performs an explicit backward as-of operation.",
+              "targetClock": "shared-base-bars"
+            }
+          },
+          "components": {
+            "optional": true,
+            "metadataFields": [
+              "label",
+              "role",
+              "intervals",
+              "hypothesis"
+            ],
+            "roles": [
+              "cross-sectional-score",
+              "timestamp-context"
+            ]
+          }
+        },
+        "constructionFidelity": null,
+        "factorSplitContrast": null,
+        "researchAgenda": {
+          "schemaVersion": 1,
+          "kind": "autoquant-evidence-driven-research-agenda",
+          "method": "verified-lane-diagnostics-to-bounded-moves-v2",
+          "status": "unsupported-study",
+          "reason": "Objective metric score has no evidence-driven agenda recipe.",
+          "laneId": null,
+          "run": {
+            "id": "run-20260913T115402568415Z-01b6439e8cd5",
+            "inputHash": "1f06c597553d994eb4f0252eb5fe0e56b16338c92ccc5672eea3bc04cc166392"
+          },
+          "diagnosis": null,
+          "moves": [],
+          "moveRole": "unavailable",
+          "authority": {
+            "source": "verified-immutable-run",
+            "prioritization": "diagnostic-only",
+            "selectionSplit": "validation",
+            "testRole": "visible-audit-only",
+            "testEntersPrioritization": false,
+            "automaticExecution": false,
+            "automaticPromotion": false,
+            "tradingAuthority": "none"
+          }
+        },
+        "externalHoldout": null,
+        "focus": {
+          "laneId": null,
+          "laneName": null,
+          "studyId": "factor-quality",
+          "studyName": "Factor Quality",
+          "coordinationPhase": "researching",
+          "scientificStage": "study-defined",
+          "operatingMode": "promote"
+        },
+        "evidence": {
+          "runId": "run-20260913T115402382686Z-35ae3d5af212",
+          "runStatus": "succeeded",
+          "failureDisposition": null,
+          "sessionId": "session-20260913T115402412657Z-ad0c2942d55d",
+          "sessionStatus": "active",
+          "leaderRunId": "run-20260913T115402568415Z-01b6439e8cd5",
+          "reportId": null,
+          "reportLineage": null,
+          "candidateCheckId": null,
+          "candidateCheckStatus": null,
+          "latestExperiment": {
+            "id": "exp-0001-778ec0a7121d",
+            "verdict": "KEEP",
+            "runId": "run-20260913T115402568415Z-01b6439e8cd5",
+            "candidateSourceHash": "778ec0a7121d17c820e8d9169ce39c670e2223ad8026b154872fc5a06c2538db",
+            "completedAt": "2026-09-13T11:54:02.597293+00:00",
+            "verdictAuthority": "session-objective-only",
+            "candidateCheck": null
+          }
+        },
+        "reasons": [
+          {
+            "code": "promotion-ready",
+            "category": "authority",
+            "message": "The Session worktree matches its non-baseline KEEP leader and is ready for guarded promotion, which terminally closes this Session."
+          }
+        ],
+        "filesystem": {
+          "operatingRoot": "/private/demo/research/workspace/projects/factor-project/sessions/session-20260913T115402412657Z-ad0c2942d55d/worktree/factor-project",
+          "writable": true,
+          "editablePaths": [
+            "factors/**"
+          ],
+          "declaredEditablePaths": [
+            "factors/**"
+          ],
+          "protectedCategories": [
+            "request",
+            "dataset",
+            "study",
+            "program",
+            "judge",
+            "mandate",
+            "dependencies",
+            "upstream-evidence",
+            "runs",
+            "experiments",
+            "reports",
+            "dossiers"
+          ]
+        },
+        "authority": {
+          "researchAuthority": "study-defined",
+          "selectionSplit": "study-defined",
+          "testRole": "study-defined",
+          "testEntersSelection": false,
+          "tradingAuthority": "none"
+        },
+        "primaryAction": {
+          "id": "session.promote",
+          "description": "Promote the exact current KEEP after review to preserve the source and terminally close this Session as promoted; promotion is not scientific qualification.",
+          "argv": [
+            "aq",
+            "session",
+            "promote",
+            "/private/demo/research/workspace/projects/factor-project",
+            "--session",
+            "session-20260913T115402412657Z-ad0c2942d55d",
+            "--json"
+          ],
+          "display": "aq session promote /private/demo/research/workspace/projects/factor-project --session session-20260913T115402412657Z-ad0c2942d55d --json",
+          "effect": "mutates-project",
+          "workingDirectory": "/private/demo/research/workspace/projects/factor-project/sessions/session-20260913T115402412657Z-ad0c2942d55d/worktree/factor-project",
+          "expectedEvidenceKind": "promotion-receipt"
+        },
+        "supportingActions": [],
+        "review": {
+          "status": "active",
+          "label": "PROMOTION READY",
+          "title": "Factor Quality",
+          "detail": "The Session worktree matches its non-baseline KEEP leader and is ready for guarded promotion, which terminally closes this Session.",
+          "next": "Promote the exact current KEEP after review to preserve the source and terminally close this Session as promoted; promotion is not scientific qualification.",
+          "boundary": "fixed Study authority · no trading authority"
+        },
+        "continuation": null
+      },
+      "agentWorkBriefHash": "926089de8df5a46b5922da761418d9260fbfa51a7c4fbfb8de40bb8406cbc54b",
+      "externalHoldout": null,
+      "dossierStatus": null,
+      "dossiers": [],
+      "runReports": [],
+      "reviews": [],
+      "intake": null,
+      "factorExplorer": null,
+      "portfolioExplorer": null,
+      "rlExplorer": null,
+      "bookRiskExplorer": null,
+      "eventStudyExplorer": null,
+      "bookPathStressExplorer": null,
+      "allocationExplorer": null,
+      "commands": [],
+      "valid": true,
+      "diagnostics": [],
+      "counts": {
+        "studies": 1,
+        "runs": 2,
+        "sessions": 1,
+        "activeSessions": 1,
+        "campaigns": 0,
+        "runningCampaigns": 0,
+        "delegatedSessions": 0,
+        "reports": 0,
+        "reviews": 0,
+        "dossiers": 0,
+        "verdicts": {
+          "KEEP": 1,
+          "REVERT": 0,
+          "CRASH": 0
+        }
+      },
+      "studies": [
+        {
+          "id": "factor-quality",
+          "name": "Factor Quality",
+          "description": "Measure one synthetic factor without market data",
+          "subjectKind": "factor",
+          "primaryMetric": "score",
+          "direction": "maximize",
+          "path": "/private/demo/research/workspace/projects/factor-project/studies/factor-quality",
+          "dataset": {
+            "id": "synthetic-bars",
+            "version": "v1",
+            "asset_class": "equity",
+            "universe": [
+              "AAA/USD"
+            ],
+            "time_range": {
+              "start": "2026-01-01",
+              "end": "2026-01-31"
+            }
+          },
+          "datasetHash": "3cdb97c1f07f8ef87c2ef16b8105dd6e7a70226e29612bbbcf25267226042a2c",
+          "researchRequest": null,
+          "upstreamEvidence": null,
+          "datasetContext": null
+        }
+      ],
+      "runs": [
+        {
+          "id": "run-20260913T115402382686Z-35ae3d5af212",
+          "status": "succeeded",
+          "failureDisposition": null,
+          "studyId": "factor-quality",
+          "subject": {
+            "kind": "factor",
+            "name": "candidate-factor"
+          },
+          "primaryMetric": "score",
+          "primaryValue": 1.25,
+          "startedAt": "2026-09-13T11:54:02.382686+00:00",
+          "durationMs": 22,
+          "path": "/private/demo/research/workspace/projects/factor-project/runs/run-20260913T115402382686Z-35ae3d5af212",
+          "summary": "candidate score 1.25",
+          "errors": [],
+          "researchRequest": null,
+          "upstreamEvidence": null
+        },
+        {
+          "id": "run-20260913T115402568415Z-01b6439e8cd5",
+          "status": "succeeded",
+          "failureDisposition": null,
+          "studyId": "factor-quality",
+          "subject": {
+            "kind": "factor",
+            "name": "candidate-factor"
+          },
+          "primaryMetric": "score",
+          "primaryValue": 2.0,
+          "startedAt": "2026-09-13T11:54:02.568415+00:00",
+          "durationMs": 22,
+          "path": "/private/demo/research/workspace/projects/factor-project/runs/run-20260913T115402568415Z-01b6439e8cd5",
+          "summary": "candidate score 2.0",
+          "errors": [],
+          "researchRequest": null,
+          "upstreamEvidence": null
+        }
+      ],
+      "sessions": [
+        {
+          "session": {
+            "baseProjectSourceHash": "428829b27f94eaef2ae92e360c1b6ca93dc52752fef1c104e100945c11227618",
+            "baseline": {
+              "metric": "score",
+              "runId": "run-20260913T115402382686Z-35ae3d5af212",
+              "sourceHash": "428829b27f94eaef2ae92e360c1b6ca93dc52752fef1c104e100945c11227618",
+              "value": 1.25
+            },
+            "baselineGuard": {
+              "baselineRunId": "run-20260913T115402382686Z-35ae3d5af212",
+              "mode": "fresh-run-no-preflight",
+              "preflight": null
+            },
+            "createdAt": "2026-09-13T11:54:02.412657+00:00",
+            "editablePaths": [
+              "factors/**"
+            ],
+            "id": "session-20260913T115402412657Z-ad0c2942d55d",
+            "leader": {
+              "metric": "score",
+              "runId": "run-20260913T115402568415Z-01b6439e8cd5",
+              "sourceHash": "778ec0a7121d17c820e8d9169ce39c670e2223ad8026b154872fc5a06c2538db",
+              "value": 2.0
+            },
+            "locks": {
+              "datasetHash": "3cdb97c1f07f8ef87c2ef16b8105dd6e7a70226e29612bbbcf25267226042a2c",
+              "fixedHashes": {
+                ".autoquant-session-worktree.json": "d374d91bf70f5f64cfcadd50b99fd411c46bbf95e2c4275941e0019bb7564148",
+                "autoquant.json": "3638ae2a793c9bc25a2707b2a67fff98259bb7a434a7d3aef4fe2d962eefff57",
+                "framework-needs.md": "00d25be32c46afdf41b80203bde36a404fbb04fca7b9d3e7952aae10df8af9df",
+                "judges/evaluate.py": "2d21e6e7dace4a3d0895d2de49bd74ff1406ae6e83bf7014f5e8ce19d461b6ad",
+                "research.md": "02fd1be2899d8a5b08263ddb52cca86ba3f646b242f9010b227c864805845c77",
+                "studies/factor-quality/program.md": "709c336023aadeb793dc31ff63f508ecf2410d63f41f4233bd7dd876d9a0d637",
+                "studies/factor-quality/study.json": "4c897dbd50e75430d9ad2da13bfccb3735b1814bcf0d43b5b34e0ffc3885cc92"
+              },
+              "harness": {
+                "buildProvenance": "source-checkout",
+                "commit": "52d63148d826e6c35d48c3167d95a4cc7a4eb6c4",
+                "dirty": false,
+                "id": "autoquant.python-judge",
+                "python": "3.11.14",
+                "sourceHash": "f018f00363e9e3ea7500887c1e33a8a17882a8c67f7bce63ae1d474915782138",
+                "version": "0.9.34"
+              },
+              "judgeHash": "4ee05795fd8dcba83264a0690f76799e16a786ef947c008ae89656770e5a0cfb",
+              "programHash": "709c336023aadeb793dc31ff63f508ecf2410d63f41f4233bd7dd876d9a0d637",
+              "studyHash": "f5bc713a8cd6593e919a1f56a809d2f673d6e3446dc734119926a5bc2839c6a1"
+            },
+            "nextExperiment": 2,
+            "projectId": "factor-project",
+            "schemaVersion": 1,
+            "status": "active",
+            "studyId": "factor-quality",
+            "updatedAt": "2026-09-13T11:54:02.597293+00:00",
+            "worktree": "worktree/factor-project"
+          },
+          "worktree": "/private/demo/research/workspace/projects/factor-project/sessions/session-20260913T115402412657Z-ad0c2942d55d/worktree/factor-project",
+          "candidate": {
+            "sourceHash": "778ec0a7121d17c820e8d9169ce39c670e2223ad8026b154872fc5a06c2538db",
+            "sourceHashes": {
+              "factors/candidate.py": "1ae8746858cb361437c993c0821b11ca736c195f0c7b8dd0acc414cfa75dcfeb"
+            },
+            "differsFromLeader": false
+          },
+          "delegation": null,
+          "selectionIntegrity": {
+            "selectionMetric": "score",
+            "selectionSplit": "unspecified",
+            "testRole": "unspecified",
+            "testEntersSelection": null,
+            "testExposureState": "unspecified",
+            "postAuditCandidateIterations": null,
+            "testGuidanceObservability": "not-declared",
+            "declaredExternalHoldoutRule": "unspecified",
+            "externalHoldoutRule": "unspecified",
+            "externalHoldoutReason": null,
+            "candidateTrials": 1,
+            "evaluatedRuns": 2,
+            "verdicts": {
+              "KEEP": 1,
+              "REVERT": 0,
+              "CRASH": 0
+            },
+            "externalHoldoutRequired": null,
+            "warning": "This Study does not declare selection/test semantics; Core makes no holdout or objective-isolation claim.",
+            "researchFamily": {
+              "schemaVersion": 1,
+              "kind": "autoquant-research-family",
+              "id": "family-a0a13cd153ec3d37",
+              "boundary": "project-fixed-evaluation-v1",
+              "ledgerHash": "3791129f72f998035f041a0e5430585d2d24197045ee02c9c816cb30117c3153",
+              "cutoff": "current",
+              "trialCountAssumption": "unique-source-upper-bound",
+              "totalExecutions": 2,
+              "uniqueSourceTrials": 2,
+              "successfulSourceTrials": 2,
+              "failedSourceTrials": 0,
+              "duplicateExecutions": 0,
+              "reproducible": true,
+              "inconsistentSourceTrials": 0
+            },
+            "selectionAdjustment": {
+              "schemaVersion": 1,
+              "status": "unsupported",
+              "method": null,
+              "reason": "unsupported-objective-family",
+              "interpretation": "The verified evidence does not justify a selection-adjusted statistic for this objective family.",
+              "confidenceLevel": 0.95,
+              "passes": null,
+              "verdictAuthority": "diagnostic-only",
+              "trialCountAssumption": "unique-source-upper-bound",
+              "statistics": null
+            },
+            "verdictAuthority": "diagnostic-only"
+          },
+          "decisionMatrix": {
+            "schemaVersion": 1,
+            "kind": "autoquant-session-decision-matrix",
+            "session": {
+              "id": "session-20260913T115402412657Z-ad0c2942d55d",
+              "status": "active",
+              "studyId": "factor-quality",
+              "baselineRunId": "run-20260913T115402382686Z-35ae3d5af212",
+              "leaderRunId": "run-20260913T115402568415Z-01b6439e8cd5",
+              "updatedAt": "2026-09-13T11:54:02.597293+00:00"
+            },
+            "fixedIdentity": {
+              "studyHash": "f5bc713a8cd6593e919a1f56a809d2f673d6e3446dc734119926a5bc2839c6a1",
+              "datasetHash": "3cdb97c1f07f8ef87c2ef16b8105dd6e7a70226e29612bbbcf25267226042a2c",
+              "judgeHash": "4ee05795fd8dcba83264a0690f76799e16a786ef947c008ae89656770e5a0cfb",
+              "harness": {
+                "buildProvenance": "source-checkout",
+                "commit": "52d63148d826e6c35d48c3167d95a4cc7a4eb6c4",
+                "dirty": false,
+                "id": "autoquant.python-judge",
+                "python": "3.11.14",
+                "sourceHash": "f018f00363e9e3ea7500887c1e33a8a17882a8c67f7bce63ae1d474915782138",
+                "version": "0.9.34"
+              }
+            },
+            "metricFamily": "generic",
+            "objective": {
+              "direction": "maximize",
+              "metric": "score",
+              "minimumImprovement": 0.01
+            },
+            "selectionIntegrity": {
+              "selectionMetric": "score",
+              "selectionSplit": "unspecified",
+              "testRole": "unspecified",
+              "testEntersSelection": null,
+              "testExposureState": "unspecified",
+              "postAuditCandidateIterations": null,
+              "testGuidanceObservability": "not-declared",
+              "declaredExternalHoldoutRule": "unspecified",
+              "externalHoldoutRule": "unspecified",
+              "externalHoldoutReason": null,
+              "candidateTrials": 1,
+              "evaluatedRuns": 2,
+              "verdicts": {
+                "KEEP": 1,
+                "REVERT": 0,
+                "CRASH": 0
+              },
+              "externalHoldoutRequired": null,
+              "warning": "This Study does not declare selection/test semantics; Core makes no holdout or objective-isolation claim.",
+              "researchFamily": {
+                "schemaVersion": 1,
+                "kind": "autoquant-research-family",
+                "id": "family-a0a13cd153ec3d37",
+                "boundary": "project-fixed-evaluation-v1",
+                "ledgerHash": "3791129f72f998035f041a0e5430585d2d24197045ee02c9c816cb30117c3153",
+                "cutoff": "current",
+                "trialCountAssumption": "unique-source-upper-bound",
+                "totalExecutions": 2,
+                "uniqueSourceTrials": 2,
+                "successfulSourceTrials": 2,
+                "failedSourceTrials": 0,
+                "duplicateExecutions": 0,
+                "reproducible": true,
+                "inconsistentSourceTrials": 0
+              },
+              "selectionAdjustment": {
+                "schemaVersion": 1,
+                "status": "unsupported",
+                "method": null,
+                "reason": "unsupported-objective-family",
+                "interpretation": "The verified evidence does not justify a selection-adjusted statistic for this objective family.",
+                "confidenceLevel": 0.95,
+                "passes": null,
+                "verdictAuthority": "diagnostic-only",
+                "trialCountAssumption": "unique-source-upper-bound",
+                "statistics": null
+              },
+              "verdictAuthority": "diagnostic-only"
+            },
+            "scope": {
+              "trialLimit": 12,
+              "totalCandidateTrials": 1,
+              "displayedCandidateTrials": 1,
+              "omittedCandidateTrials": 0,
+              "baselineAnchored": true,
+              "leaderAnchored": true
+            },
+            "metrics": [
+              {
+                "key": "primaryObjective",
+                "label": "score",
+                "group": "objective",
+                "split": "declared",
+                "unit": "number",
+                "preference": "higher",
+                "selectionEligible": true,
+                "primary": true
+              }
+            ],
+            "trials": [
+              {
+                "role": "baseline",
+                "sequence": 0,
+                "experimentId": null,
+                "runId": "run-20260913T115402382686Z-35ae3d5af212",
+                "status": "succeeded",
+                "verdict": "BASELINE",
+                "hypothesis": "Fixed Session baseline",
+                "sourceHash": "428829b27f94eaef2ae92e360c1b6ca93dc52752fef1c104e100945c11227618",
+                "primaryValue": 1.25,
+                "objectiveImprovementVsPriorLeader": null,
+                "objectiveImprovementVsBaseline": 0.0,
+                "isCurrentLeader": false,
+                "metrics": {
+                  "primaryObjective": 1.25
+                },
+                "vsBaseline": {
+                  "primaryObjective": "same"
+                },
+                "errors": []
+              },
+              {
+                "role": "candidate",
+                "sequence": 1,
+                "experimentId": "exp-0001-778ec0a7121d",
+                "runId": "run-20260913T115402568415Z-01b6439e8cd5",
+                "status": "succeeded",
+                "verdict": "KEEP",
+                "hypothesis": "Improve the factor",
+                "sourceHash": "778ec0a7121d17c820e8d9169ce39c670e2223ad8026b154872fc5a06c2538db",
+                "primaryValue": 2.0,
+                "objectiveImprovementVsPriorLeader": 0.75,
+                "objectiveImprovementVsBaseline": 0.75,
+                "isCurrentLeader": true,
+                "metrics": {
+                  "primaryObjective": 2.0
+                },
+                "vsBaseline": {
+                  "primaryObjective": "better"
+                },
+                "errors": []
+              }
+            ],
+            "tradeoffs": {
+              "scope": "displayed-successful-trials",
+              "selectionEligibleMetricKeys": [
+                "primaryObjective"
+              ],
+              "testExcluded": true,
+              "contextExcluded": true,
+              "nonDominatedRunIds": [
+                "run-20260913T115402568415Z-01b6439e8cd5"
+              ],
+              "incompleteRunIds": [],
+              "leaderVsBaseline": {
+                "improved": [
+                  "primaryObjective"
+                ],
+                "regressed": [],
+                "unchanged": [],
+                "unavailable": []
+              },
+              "warning": "Descriptive validation-only comparison; immutable Experiment verdicts and the fixed primary objective remain authoritative."
+            }
+          },
+          "authority": {
+            "valid": true,
+            "issues": []
+          },
+          "experiments": [
+            {
+              "id": "exp-0001-778ec0a7121d",
+              "sequence": 1,
+              "verdict": "KEEP",
+              "hypothesis": "Improve the factor",
+              "leaderValue": 1.25,
+              "candidateValue": 2.0,
+              "improvement": 0.75,
+              "runId": "run-20260913T115402568415Z-01b6439e8cd5",
+              "completedAt": "2026-09-13T11:54:02.597293+00:00",
+              "path": "/private/demo/research/workspace/projects/factor-project/sessions/session-20260913T115402412657Z-ad0c2942d55d/experiments/exp-0001-778ec0a7121d"
+            }
+          ],
+          "campaigns": [],
+          "reports": [],
+          "progress": [],
+          "commands": [
+            {
+              "id": "session.show",
+              "argv": [
+                "aq",
+                "session",
+                "show",
+                "/private/demo/research/workspace/projects/factor-project",
+                "--session",
+                "session-20260913T115402412657Z-ad0c2942d55d",
+                "--json"
+              ],
+              "display": "aq session show /private/demo/research/workspace/projects/factor-project --session session-20260913T115402412657Z-ad0c2942d55d --json",
+              "effect": "read-only"
+            },
+            {
+              "id": "session.compare",
+              "argv": [
+                "aq",
+                "session",
+                "compare",
+                "/private/demo/research/workspace/projects/factor-project",
+                "--session",
+                "session-20260913T115402412657Z-ad0c2942d55d",
+                "--json"
+              ],
+              "display": "aq session compare /private/demo/research/workspace/projects/factor-project --session session-20260913T115402412657Z-ad0c2942d55d --json",
+              "effect": "read-only"
+            }
+          ]
+        }
+      ],
+      "timeline": [
+        {
+          "kind": "session",
+          "id": "session-20260913T115402412657Z-ad0c2942d55d",
+          "at": "2026-09-13T11:54:02.597293+00:00",
+          "status": "active",
+          "title": "factor-quality",
+          "value": 2.0
+        },
+        {
+          "kind": "experiment",
+          "id": "exp-0001-778ec0a7121d",
+          "at": "2026-09-13T11:54:02.597293+00:00",
+          "status": "KEEP",
+          "title": "Improve the factor",
+          "value": 2.0
+        },
+        {
+          "kind": "run",
+          "id": "run-20260913T115402568415Z-01b6439e8cd5",
+          "at": "2026-09-13T11:54:02.568415+00:00",
+          "status": "succeeded",
+          "title": "factor-quality · score",
+          "value": 2.0
+        },
+        {
+          "kind": "run",
+          "id": "run-20260913T115402382686Z-35ae3d5af212",
+          "at": "2026-09-13T11:54:02.382686+00:00",
+          "status": "succeeded",
+          "title": "factor-quality · score",
+          "value": 1.25
+        }
+      ]
+    }
+  ]
+}

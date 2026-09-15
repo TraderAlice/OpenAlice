@@ -259,3 +259,15 @@ it('explains a newer rejected candle without substituting it into the chart', as
   expect((await screen.findByRole('status')).textContent).toContain('2026-07-18 (close missing or invalid)')
   expect(screen.getByText('Latest record: 2026-07-17')).toBeTruthy()
 })
+
+it('embedded market references stay in chat and request 300 exact-source bars', async () => {
+  mocks.bars.mockResolvedValue(response('AAPL', 'yfinance|AAPL'))
+  function Location() { return <output data-testid="location">{useLocation().pathname}</output> }
+  render(<MemoryRouter initialEntries={['/chat/workspaces/test/s/session']}><Location /><KlinePanel selection={null} source="yfinance|AAPL" embeddedInterval="1d" /></MemoryRouter>)
+  await waitFor(() => expect(mocks.bars).toHaveBeenCalledWith({ barId: 'yfinance|AAPL', interval: '1d', count: 300 }))
+  expect(mocks.searchSources).not.toHaveBeenCalled()
+  fireEvent.click(screen.getByRole('button', { name: '4h' }))
+  await waitFor(() => expect(mocks.bars).toHaveBeenLastCalledWith({ barId: 'yfinance|AAPL', interval: '4h', count: 300 }))
+  expect(screen.getByTestId('location').textContent).toBe('/chat/workspaces/test/s/session')
+  expect(screen.queryByRole('radiogroup', { name: 'Range' })).toBeNull()
+})

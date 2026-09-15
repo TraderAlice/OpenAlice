@@ -1,3 +1,4 @@
+import { POWER_SESSION_ID, POWER_RESUME_ID } from './power-research'
 import type { Workspace, TemplateInfo, SessionRecord } from '../../components/workspace/api'
 
 // The flagship demo workspace — the one inbox/transcript fixtures tie to.
@@ -73,6 +74,12 @@ export const DEMO_MACRO_WORKSPACE_ID = 'demo-ws-macro'
 // styling (per-agent badge colours for claude/codex/opencode/pi, the paused
 // treatment, and the hover pause/resume/delete icons).
 const demoChatSessions: SessionRecord[] = [
+  {
+    id: POWER_SESSION_ID, resumeId: POWER_RESUME_ID, wsId: DEMO_CHAT_WORKSPACE_ID,
+    agent: 'pi', name: 'power', createdAt: new Date().toISOString(),
+    lastActiveAt: new Date().toISOString(), state: 'running', surface: 'webpi',
+    pid: 0, startedAt: Date.now(), title: 'AI power: from demand to delivery',
+  },
   {
     id: DEMO_CHAT_SESSION_ID,
     resumeId: DEMO_CHAT_RESUME_ID,
@@ -161,7 +168,7 @@ const demoChatSessions: SessionRecord[] = [
 export const demoChatWorkspace: Workspace = {
   id: DEMO_CHAT_WORKSPACE_ID,
   tag: 'chat-may26',
-  displayName: 'Semis and supply chain',
+  displayName: 'Infrastructure research',
   dir: '/demo/workspaces/chat-may26',
   createdAt: new Date().toISOString(),
   template: 'chat',
@@ -171,6 +178,21 @@ export const demoChatWorkspace: Workspace = {
   sessions: demoChatSessions,
   agentOverride: { claude: false, codex: false, opencode: false, pi: false },
 }
+
+export const demoResumeRuntimes = new Map<string, NonNullable<SessionRecord['runtime']>>()
+
+const demoQuantSessions: SessionRecord[] = [
+  { resumeId: 'resume-demo-thesis-owner', agent: 'claude', displayName: 'Thesis monitor', model: 'claude-opus-4-6' },
+  { resumeId: 'resume-demo-power-research', agent: 'codex', displayName: 'Power infrastructure research', model: 'gpt-5.6-sol' },
+  { resumeId: 'resume-demo-risk-review', agent: 'pi', displayName: 'Portfolio risk review', model: 'claude-sonnet-4-5' },
+].map((seed, index) => ({
+  id: `session-${seed.resumeId}`, resumeId: seed.resumeId, wsId: DEMO_AUTO_QUANT_WORKSPACE_ID,
+  agent: seed.agent, displayName: seed.displayName, title: seed.displayName, name: `research-${index + 1}`,
+  createdAt: new Date(Date.now() - 86400000 * (index + 1)).toISOString(),
+  lastActiveAt: new Date(Date.now() - 60000 * (index + 1)).toISOString(),
+  state: 'paused', surface: 'headless', pid: null, startedAt: null,
+  runtime: { credentialSource: 'native', model: seed.model, reasoningEffort: 'high' },
+}))
 
 const demoIssueWorkspaces: Workspace[] = [
   {
@@ -187,7 +209,7 @@ const demoIssueWorkspaces: Workspace[] = [
       version: 'v0.8.31',
       commit: '426d815b18450172fbcf4c6b6af77c6ae05a4967',
     },
-    sessions: [],
+    sessions: demoQuantSessions,
     agentOverride: { claude: false, codex: false, opencode: false, pi: false },
   },
   {

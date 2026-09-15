@@ -196,3 +196,23 @@ returns to the conversation. Sticker images retain transparent backgrounds.
 User prose is displayed as plain text, preserving line breaks and literal syntax.
 It does not re-enter Markdown or Workspace reference parsing after submission;
 structured content retains its presentation independently of prose.
+
+### Market references
+
+The same assistant-stream consumer recognizes `[[market/{barId}/{interval}]]`.
+History renders a keyboard-accessible card without opening a tab; new references
+open one native workbench chart per identity. `useMarketBars` owns request,
+poll, stale-response cancellation and retry state for KlinePanel, shared with
+the Market pages. Embedded interval selection opens/focuses the corresponding
+market tab and never navigates away from chat. Missing sources keep the card
+and show an actionable chart error. User prose is not parsed.
+
+### Text reveal
+
+The shared ConversationView buffers newly arriving assistant prose for an
+animation-frame reveal; runtime polling and authoritative snapshots are unchanged.
+It reveals Unicode graphemes, accelerates large batches, and keeps rich references
+and inline links whole. History (including the first asynchronously loaded
+snapshot) appears immediately. Completion, Stop, and reduced-motion preference
+flush the visual buffer; unmount cancels animation. A ResizeObserver follows
+text growth only while the reader remains near the bottom.

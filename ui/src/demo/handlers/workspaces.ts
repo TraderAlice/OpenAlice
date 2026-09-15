@@ -1,3 +1,5 @@
+import stickerWave from '../fixtures/sticker-wave.json'
+import { demoChatWorkflowReply, demoChatWorkflowTitle } from '../fixtures/chat-workflows'
 import { stickerHandlers } from './stickers'
 import { http, HttpResponse } from 'msw'
 import type { AliceHarnessConfig } from '../../hooks/useAliceHarness'
@@ -7,6 +9,7 @@ import {
   DEMO_CHAT_WORKSPACE_ID,
   demoChatWorkspace,
   demoWorkspaces,
+  demoResumeRuntimes,
   demoTemplates,
 } from '../fixtures/workspaces'
 import { demoWorkspaceFilePaths, demoWorkspaceFiles } from '../fixtures/inbox'
@@ -36,13 +39,7 @@ import type {
 } from '../../components/workspace/api'
 
 const demoSessionPresence = new Map<string, 'active' | 'archived' | 'deleted'>()
-const demoResumeRuntimes = new Map<string, NonNullable<SessionRecord['runtime']>>([
-  ['resume-demo-thesis-owner', {
-    credentialSource: 'native',
-    model: 'claude-opus-4-6',
-    reasoningEffort: 'high',
-  }],
-])
+
 
 const demoManagerSession = {
   id: 'demo-manager-session',
@@ -94,6 +91,8 @@ let demoWebSessions = createSeededWebSessions()
 let demoWebRequestSequence = 0
 
 export function resetDemoWorkspaceWebState(): void {
+  demoReplyStreams.clear()
+  demoSessionPresence.clear()
   demoManagerMessages = []
   demoQuickChatSequence = 0
   demoWebRequestSequence = 0
@@ -199,6 +198,24 @@ function demoDirectoryListing(workspaceId: string, requestedPath: string) {
   }
 }
 
+
+const demoReplyStreams = new Map<string, { text: string; startedAt: number; emitted: number }>()
+
+function advanceDemoReply(wsId: string, sessionId: string): WebSessionSnapshot | null {
+  const key = webKey(wsId, sessionId)
+  const stream = demoReplyStreams.get(key)
+  if (!stream) return findDemoWebSession(wsId, sessionId)
+  const count = Math.min(stream.text.length, Math.floor(Math.max(0, Date.now() - stream.startedAt - 200) / 4))
+  if (count === stream.emitted) return findDemoWebSession(wsId, sessionId)
+  stream.emitted = count
+  const message = { role: 'assistant' as const, content: [{ type: 'text' as const, text: stream.text.slice(0, count) }] }
+  if (count === stream.text.length) {
+    demoReplyStreams.delete(key)
+    return appendDemoWebMessages(wsId, sessionId, [message])
+  }
+  return updateDemoWebSession(wsId, sessionId, () => ({ streamingMessage: message }))
+}
+
 function appendDemoWebMessages(
   wsId: string,
   sessionId: string,
@@ -217,6 +234,16 @@ function appendDemoWebMessages(
 function startDemoWebTurn(wsId: string, sessionId: string, message: string): WebSessionSnapshot | null {
   const current = ensureDemoWebSession(wsId, sessionId)
   if (!current) return null
+  const workflowReply = demoChatWorkflowReply(message)
+  if (workflowReply) {
+    demoReplyStreams.set(webKey(wsId, sessionId), { text: workflowReply, startedAt: Date.now(), emitted: 0 })
+    return updateDemoWebSession(wsId, sessionId, current => ({
+      phase: 'working',
+      messages: [...current.messages, { role: 'user', content: message }],
+      streamingMessage: { role: 'assistant', content: [{ type: 'text', text: '' }] },
+      requests: [],
+    }))
+  }
   if (!demoWebCapabilities[current.agent]?.permissionPrompts) {
     return appendDemoWebMessages(wsId, sessionId, demoWebFollowUp(current.agent, message))
   }
@@ -503,7 +530,7 @@ export const workspacesHandlers = [
   }),
   http.put('/api/workspaces/terminal-view-attributes', () =>
     HttpResponse.json({ ok: true, changed: true })),
-  http.get('/api/workspaces', () => HttpResponse.json({ workspaces: demoWorkspaces })),
+  http.get('/api/workspaces', () => HttpResponse.json({ workspaces: demoWorkspaces.map(workspace => ({ ...workspace, sessions: workspace.sessions.map(session => ({ ...session, presence: demoSessionPresence.get(webKey(workspace.id, session.resumeId)) ?? session.presence ?? 'active' })) })) })),
   http.get('/api/workspaces/manager', () => HttpResponse.json({
     manager: {
       id: 'workspace-manager', tag: 'Workspace Manager',
@@ -1071,6 +1098,12 @@ export const workspacesHandlers = [
   http.get('/api/workspaces/:id/content', ({ request }) => {
     const url = new URL(request.url)
     const path = url.searchParams.get('path') ?? ''
+    if (path === 'demo/autoquant-studio.html') return HttpResponse.json({ path, size: 0 })
+    if (path === 'sticker/wave.png') {
+      const bytes = Uint8Array.from(atob(stickerWave.base64), char => char.charCodeAt(0))
+      if (url.searchParams.get('metadata') === '1') return HttpResponse.json({ path, size: bytes.length })
+      return new HttpResponse(bytes, { headers: { 'Content-Type': stickerWave.mime } })
+    }
     const content = demoWorkspaceFiles[path]
     if (content == null) return HttpResponse.json({ error: 'file_not_found' }, { status: 404 })
     if (url.searchParams.get('metadata') === '1') return HttpResponse.json({ path, size: content.length })
@@ -1100,9 +1133,7 @@ export const workspacesHandlers = [
     const resumeId = String(params.resumeId)
     const workspace = demoWorkspaces.find((candidate) =>
       candidate.sessions.some((session) => session.resumeId === resumeId),
-    ) ?? (resumeId === 'resume-demo-thesis-owner'
-      ? demoWorkspaces.find((candidate) => candidate.id === DEMO_AUTO_QUANT_WORKSPACE_ID)
-      : undefined)
+    )
     if (!workspace) return HttpResponse.json({ error: 'not_found' }, { status: 404 })
     const session = workspace.sessions.find((candidate) => candidate.resumeId === resumeId)
     return HttpResponse.json({
@@ -1155,7 +1186,7 @@ export const workspacesHandlers = [
     demoResumeRuntimes.set(resumeId, runtime)
     return HttpResponse.json({
       resumeId,
-      agent: resumeId === 'resume-demo-thesis-owner' ? 'claude' : 'pi',
+      agent: demoWorkspaces.find(ws => ws.id === String(params.id))?.sessions.find(session => session.resumeId === resumeId)?.agent ?? 'pi',
       runtime,
     })
   }),
@@ -1166,32 +1197,16 @@ export const workspacesHandlers = [
     if (presence !== 'active' && presence !== 'archived' && presence !== 'deleted') {
       return HttpResponse.json({ error: 'invalid_presence' }, { status: 400 })
     }
-    demoSessionPresence.set(resumeId, presence)
+    demoSessionPresence.set(webKey(String(params.id), resumeId), presence)
     return HttpResponse.json({ resumeId, presence, lifecycle: 'active' })
   }),
   http.get('/api/workspaces/:id/resumes', ({ params, request }) => {
     const requestedResume = new URL(request.url).searchParams.get('resumeId')
     const wsId = String(params.id)
-    if (wsId === DEMO_AUTO_QUANT_WORKSPACE_ID) {
-      return HttpResponse.json({
-        workspace: { id: wsId, tag: 'auto-quant' },
-        sessions: [{
-          resumeId: 'resume-demo-thesis-owner', agent: 'claude', issueAttached: true,
-          createdAt: Date.now() - 86_400_000, updatedAt: Date.now() - 60_000,
-          lifecycle: 'active', resumable: true, active: false,
-          runtime: demoResumeRuntimes.get('resume-demo-thesis-owner'),
-          latestExecution: {
-            taskId: 'demo-thesis-owner-run', status: 'done',
-            startedAt: Date.now() - 180_000,
-            finishedAt: Date.now() - 60_000,
-            assistantPreview: 'Reviewed the active thesis invalidation rules.',
-          },
-        }].filter((session) => !requestedResume || session.resumeId === requestedResume),
-      })
-    }
     const workspace = demoWorkspaces.find((candidate) => candidate.id === wsId)
     const sessions: Array<{
       resumeId: string
+      displayName?: string
       agent: string
       createdAt: number
       updatedAt: number
@@ -1216,6 +1231,7 @@ export const workspacesHandlers = [
       }
     }> = (workspace?.sessions ?? []).map((session) => ({
       resumeId: session.resumeId,
+      displayName: session.displayName,
       agent: session.agent,
       createdAt: Date.parse(session.createdAt),
       updatedAt: Date.parse(session.lastActiveAt),
@@ -1290,8 +1306,8 @@ export const workspacesHandlers = [
     return HttpResponse.json({
       workspace: { id: wsId, tag: workspace?.tag ?? wsId },
       sessions: sessions.filter((session) => !requestedResume || session.resumeId === requestedResume).map((session) => {
-        const presence = demoSessionPresence.get(session.resumeId) ?? session.presence
-        return presence && presence !== 'active' ? { ...session, presence } : session
+        const presence = demoSessionPresence.get(webKey(wsId, session.resumeId)) ?? session.presence
+        return { ...session, presence: presence ?? 'active' }
       }),
     })
   }),
@@ -1378,7 +1394,7 @@ export const workspacesHandlers = [
       resumeId,
       pid: 0,
       startedAt,
-      title: prompt,
+      title: demoChatWorkflowTitle(prompt) ?? prompt,
     }
     const updatedWorkspace = {
       ...ws,
@@ -1409,14 +1425,24 @@ export const workspacesHandlers = [
           startedAt,
           agent,
           resumeId,
-          title: prompt,
+          title: demoChatWorkflowTitle(prompt) ?? prompt,
           surface,
         },
       },
       { status: 201 },
     )
   }),
-  http.post('/api/workspaces/:id/sessions/:sid/pause', () => HttpResponse.json(true)),
+  http.post('/api/workspaces/:id/sessions/:sid/pause', ({ params }) => {
+    const workspace = demoWorkspaces.find(row => row.id === String(params.id))
+    const session = workspace?.sessions.find(row => row.id === String(params.sid))
+    if (!workspace || !session) return HttpResponse.json({ error: 'not_found' }, { status: 404 })
+    const key = webKey(workspace.id, session.id)
+    if (!demoResumedSessions.has(key)) demoResumedSessions.set(key, session)
+    demoReplyStreams.delete(key)
+    updateDemoWebSession(workspace.id, session.id, () => ({ phase: 'idle', streamingMessage: null, requests: [] }))
+    demoWorkspaces[demoWorkspaces.indexOf(workspace)] = { ...workspace, sessions: workspace.sessions.map(row => row.id === session.id ? { ...row, state: 'paused' as const, pid: null } : row) }
+    return HttpResponse.json(true)
+  }),
   http.put('/api/workspaces/:id/sessions/:sid/runtime', async ({ params, request }) => {
     const workspaceIndex = demoWorkspaces.findIndex((candidate) => candidate.id === String(params.id))
     const workspace = workspaceIndex >= 0 ? demoWorkspaces[workspaceIndex] : undefined
@@ -1519,7 +1545,7 @@ export const workspacesHandlers = [
     const sessionId = String(params.sid)
     const snapshot = wsId === demoManagerSession.wsId && sessionId === demoManagerSession.id
       ? demoManagerSnapshot()
-      : findDemoWebSession(wsId, sessionId)
+      : advanceDemoReply(wsId, sessionId)
     if (!snapshot) return HttpResponse.json({ error: 'web_not_running' }, { status: 409 })
     const revision = Number.parseInt(new URL(request.url).searchParams.get('revision') ?? '', 10)
     return Number.isFinite(revision) && revision === snapshot.revision
@@ -1541,10 +1567,10 @@ export const workspacesHandlers = [
       return HttpResponse.json({ snapshot: demoManagerSnapshot() })
     }
     const current = findDemoWebSession(wsId, sessionId)
-    if (current && current.phase === 'awaiting-input') {
+    if (current && (current.phase === 'awaiting-input' || current.phase === 'working')) {
       return HttpResponse.json({
         error: 'web_prompt_failed',
-        message: 'answer the pending request before sending another message',
+        message: current.phase === 'working' ? 'wait for the current reply or stop it first' : 'answer the pending request before sending another message',
       }, { status: 409 })
     }
     const snapshot = startDemoWebTurn(wsId, sessionId, message)
@@ -1558,6 +1584,7 @@ export const workspacesHandlers = [
     if (wsId === demoManagerSession.wsId && sessionId === demoManagerSession.id) {
       return HttpResponse.json({ snapshot: demoManagerSnapshot() })
     }
+    demoReplyStreams.delete(webKey(wsId, sessionId))
     // Aborting mid-request drops the pending question and records the stop.
     const snapshot = updateDemoWebSession(wsId, sessionId, (current) => ({
       phase: 'idle',

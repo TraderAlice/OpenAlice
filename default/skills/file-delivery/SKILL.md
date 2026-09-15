@@ -29,8 +29,9 @@ text and attachments. This does not create an Inbox entry.
   as documents. `sticker/*.png` and `sticker/*.webp` use sticker delivery; follow
   the installed sticker Skill for the available pack and usage.
 
-This syntax is interpreted by Connectors that support attachments. Do not
-assume a terminal or another chat surface will upload it. To discuss the syntax
+Attachment-capable Connectors send files; GUI chat renders previews and opens
+documents in the right panel. Images open a preview dialog when clicked.
+Terminals display the text without uploading it. To discuss the syntax
 without sending a file, put the reference in inline code or a code fence.
 
 ## When to use Inbox

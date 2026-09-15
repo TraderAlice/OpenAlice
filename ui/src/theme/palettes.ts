@@ -1,4 +1,5 @@
 export type ThemePaletteId =
+  | 'codex'
   | 'paper'
   | 'porcelain'
   | 'linen'
@@ -19,7 +20,7 @@ export interface ThemePaletteDefinition {
   readonly descriptionKey: `theme.paletteDescription.${ThemePaletteId}`
 }
 
-export const DEFAULT_DAY_PALETTE: ThemePaletteId = 'paper'
+export const DEFAULT_DAY_PALETTE: ThemePaletteId = 'codex'
 export const DEFAULT_NIGHT_PALETTE: ThemePaletteId = 'graphite'
 
 /**
@@ -27,6 +28,7 @@ export const DEFAULT_NIGHT_PALETTE: ThemePaletteId = 'graphite'
  * restrict which preference slot can select it.
  */
 export const THEME_PALETTES = [
+  { id: 'codex', appearance: 'light', labelKey: 'theme.palette.codex', descriptionKey: 'theme.paletteDescription.codex' },
   { id: 'paper', appearance: 'light', labelKey: 'theme.palette.paper', descriptionKey: 'theme.paletteDescription.paper' },
   { id: 'porcelain', appearance: 'light', labelKey: 'theme.palette.porcelain', descriptionKey: 'theme.paletteDescription.porcelain' },
   { id: 'linen', appearance: 'light', labelKey: 'theme.palette.linen', descriptionKey: 'theme.paletteDescription.linen' },

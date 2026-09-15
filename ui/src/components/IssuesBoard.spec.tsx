@@ -12,6 +12,7 @@ const mocks = vi.hoisted(() => ({
   useIssues: vi.fn(),
   openOrFocus: vi.fn(),
   setSidebar: vi.fn(),
+  updateIssue: vi.fn(),
 }))
 
 vi.mock('../hooks/useIssues', () => ({
@@ -55,11 +56,13 @@ function snapshot(issues: IssueListItem[]): IssueSnapshot {
 }
 
 beforeEach(async () => {
+  localStorage.removeItem('openalice-issue-list-view')
   await i18n.changeLanguage('en')
   mocks.useIssues.mockReturnValue({
     data: snapshot([]),
     error: null,
     loading: false,
+    updateIssue: mocks.updateIssue,
   })
 })
 
@@ -83,6 +86,7 @@ describe('IssuesBoard', () => {
       ]),
       error: null,
       loading: false,
+    updateIssue: mocks.updateIssue,
     })
 
     render(<IssuesBoard />)
@@ -94,11 +98,11 @@ describe('IssuesBoard', () => {
     expect(screen.queryByText('pi override')).toBeNull()
 
     const rowText = screen.getByTitle('Open daily-close-scan').textContent ?? ''
-    expect(rowText.indexOf('收盘扫描')).toBeLessThan(rowText.indexOf('Healthy'))
-    expect(rowText.indexOf('Healthy')).toBeLessThan(rowText.indexOf('market-desk'))
+    expect(rowText).not.toContain('Healthy')
+    expect(screen.getByRole('button', { name: 'Assignee · Healthy' })).toBeTruthy()
   })
 
-  it('orders operational failures first and exposes only meaningful exceptions', () => {
+  it('orders operational failures first without exposing execution configuration', () => {
     mocks.useIssues.mockReturnValue({
       data: snapshot([
         issue({
@@ -120,6 +124,7 @@ describe('IssuesBoard', () => {
       ]),
       error: null,
       loading: false,
+    updateIssue: mocks.updateIssue,
     })
 
     render(<IssuesBoard />)
@@ -127,11 +132,11 @@ describe('IssuesBoard', () => {
     const rows = screen.getAllByRole('listitem')
     expect(rows).toHaveLength(2)
     expect(rows[0]?.textContent).toContain('Failed scheduled work')
-    expect(screen.getByText('@resume-calm-market-desk-a1b2c3')).toBeTruthy()
-    expect(screen.getByText('claude override')).toBeTruthy()
+    expect(screen.queryByText('@resume-calm-market-desk-a1b2c3')).toBeNull()
+    expect(screen.queryByText('claude override')).toBeNull()
   })
 
-  it('explains transitional ownership without exposing the raw @new-then-resume token', () => {
+  it('keeps transitional ownership in the detail instead of the list', () => {
     mocks.useIssues.mockReturnValue({
       data: snapshot([
         issue({
@@ -143,11 +148,12 @@ describe('IssuesBoard', () => {
       ]),
       error: null,
       loading: false,
+    updateIssue: mocks.updateIssue,
     })
 
     render(<IssuesBoard />)
 
-    expect(screen.getByText('Assign on first run')).toBeTruthy()
+    expect(screen.queryByText('Assign on first run')).toBeNull()
     expect(screen.queryByText('@new-then-resume')).toBeNull()
   })
 
@@ -168,15 +174,16 @@ describe('IssuesBoard', () => {
       ]),
       error: null,
       loading: false,
+    updateIssue: mocks.updateIssue,
     })
 
     render(<IssuesBoard />)
 
     expect(screen.getByText('进行中')).toBeTruthy()
-    expect(screen.getAllByText('运行中')).toHaveLength(1)
+    expect(screen.getByRole('button', { name: '负责人 · 运行中' })).toBeTruthy()
     expect(screen.getAllByText('每工作日 08:30')).toHaveLength(1)
-    expect(screen.getByText('首次运行时指派')).toBeTruthy()
-    expect(screen.getByText('claude 覆盖')).toBeTruthy()
+    expect(screen.queryByText('首次运行时指派')).toBeNull()
+    expect(screen.queryByText('claude 覆盖')).toBeNull()
     expect(screen.getByLabelText('高优先级')).toBeTruthy()
     expect(screen.getByLabelText('折叠“进行中”议题')).toBeTruthy()
     expect(screen.getByTitle('打开 weekday-scan')).toBeTruthy()
@@ -197,18 +204,19 @@ describe('IssuesBoard', () => {
       ]),
       error: null,
       loading: false,
+    updateIssue: mocks.updateIssue,
     })
 
     render(<IssuesBoard />)
 
     const board = screen.getByTestId('issues-board')
     const group = screen.getByTestId('issue-status-group-todo')
-    expect(board.className).toContain('max-w-[1240px]')
-    expect(group.className).toContain('border-y')
+    expect(board.className).toContain('w-full')
+    expect(group.className).not.toContain('border-y')
     expect(group.className).not.toContain('rounded-lg')
     expect(screen.getAllByTestId('issue-automation-summary')).toHaveLength(1)
-    expect(screen.getAllByText('Healthy')).toHaveLength(1)
-    expect(screen.getAllByText('Every 1h')).toHaveLength(1)
+    expect(screen.getByRole('button', { name: 'Assignee · Healthy' })).toBeTruthy()
+    expect(screen.getByTitle('Every 1h')).toBeTruthy()
 
     const priority = screen.getByLabelText('High priority')
     expect(priority.querySelectorAll('.bg-muted-foreground\\/80')).toHaveLength(3)
@@ -220,6 +228,7 @@ describe('IssuesBoard', () => {
       data: snapshot([issue({ id: 'keyboard-issue', title: 'Keyboard issue' })]),
       error: null,
       loading: false,
+    updateIssue: mocks.updateIssue,
     })
 
     render(<IssuesBoard />)
@@ -254,6 +263,7 @@ describe('IssuesBoard', () => {
       })]),
       error: null,
       loading: false,
+    updateIssue: mocks.updateIssue,
     })
 
     render(<IssuesBoard />)
@@ -265,5 +275,76 @@ describe('IssuesBoard', () => {
       kind: 'issue-detail',
       params: { wsId: 'ws-1', id: 'completed-issue' },
     })
+  })
+})
+
+
+describe('inline Issue properties', () => {
+  it('changes priority without opening the Issue and retains failed choices for retry', async () => {
+    const user = userEvent.setup()
+    mocks.useIssues.mockReturnValue({ data: snapshot([issue({ id: 'editable' })]), loading: false, error: null, updateIssue: mocks.updateIssue })
+    mocks.updateIssue.mockRejectedValueOnce(new Error('Write failed'))
+    render(<IssuesBoard />)
+    await user.click(screen.getByRole('button', { name: 'Priority: No' }))
+    await user.click(screen.getByRole('menuitem', { name: 'High' }))
+    expect(mocks.updateIssue).toHaveBeenCalledWith('ws-1', 'editable', { priority: 'high' })
+    expect(await screen.findByRole('alert')).toHaveProperty('textContent', 'Write failed')
+    expect(mocks.openOrFocus).not.toHaveBeenCalled()
+    mocks.updateIssue.mockResolvedValueOnce(undefined)
+    await user.click(screen.getByRole('menuitem', { name: 'High' }))
+    expect(screen.queryByRole('alert')).toBeNull()
+  })
+
+  it('changes status from the list menu', async () => {
+    const user = userEvent.setup()
+    mocks.useIssues.mockReturnValue({ data: snapshot([issue({ id: 'editable' })]), loading: false, error: null, updateIssue: mocks.updateIssue })
+    mocks.updateIssue.mockResolvedValue(undefined)
+    render(<IssuesBoard />)
+    await user.click(screen.getByRole('button', { name: 'Status: Todo' }))
+    await user.click(screen.getByRole('menuitem', { name: 'Done' }))
+    expect(mocks.updateIssue).toHaveBeenCalledWith('ws-1', 'editable', { status: 'done' })
+    expect(mocks.openOrFocus).not.toHaveBeenCalled()
+  })
+})
+
+describe('Issue views', () => {
+  const seed = () => mocks.useIssues.mockReturnValue({ data: snapshot([
+    issue({ id: 'active', title: 'Active task', priority: 'urgent' }),
+    issue({ id: 'later', title: 'Later task', status: 'backlog' }),
+    issue({ id: 'finished', title: 'Finished task', status: 'done' }),
+  ]), loading: false, error: null, updateIssue: mocks.updateIssue })
+
+  it('switches tabs, combines text and priority filters, and clears filters', async () => {
+    seed()
+    const user = userEvent.setup()
+    render(<IssuesBoard />)
+    await user.click(screen.getByRole('button', { name: 'Active' }))
+    expect(screen.queryByText('Later task')).toBeNull()
+    expect(screen.queryByText('Finished task')).toBeNull()
+    await user.click(screen.getByRole('button', { name: 'All issues' }))
+    await user.click(screen.getByRole('button', { name: 'Filter' }))
+    await user.type(screen.getByRole('textbox', { name: 'Search issues…' }), 'task')
+    await user.click(screen.getByRole('button', { name: 'Urgent' }))
+    expect(screen.getByText('Active task')).toBeTruthy()
+    expect(screen.queryByText('Later task')).toBeNull()
+    await user.click(screen.getAllByRole('button', { name: 'Clear filters' })[0])
+    expect(screen.getByText('Later task')).toBeTruthy()
+    expect(mocks.updateIssue).not.toHaveBeenCalled()
+  })
+
+  it('hides columns and completed issues and restores display preferences after remount', async () => {
+    seed()
+    const user = userEvent.setup()
+    const mounted = render(<IssuesBoard />)
+    await user.click(screen.getByRole('button', { name: 'Display options' }))
+    await user.click(screen.getByRole('button', { name: 'ID' }))
+    await user.click(screen.getByRole('switch', { name: 'Show completed issues' }))
+    expect(screen.queryByText('#active')).toBeNull()
+    expect(screen.queryByText('Finished task')).toBeNull()
+    mounted.unmount()
+    render(<IssuesBoard />)
+    expect(screen.queryByText('#active')).toBeNull()
+    expect(screen.queryByText('Finished task')).toBeNull()
+    expect(screen.getByText('Active task')).toBeTruthy()
   })
 })

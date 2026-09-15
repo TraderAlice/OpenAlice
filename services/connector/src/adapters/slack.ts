@@ -2,6 +2,7 @@ import type { SocketModeClient } from '@slack/socket-mode'
 import type { WebClient } from '@slack/web-api'
 import type {
   ConnectorAdapterConfig,
+  ConnectorArtifactDelivery,
   ConnectorAdapterHealth,
   InboxNotification,
 } from '@traderalice/connector-protocol'
@@ -19,6 +20,7 @@ import {
   AdapterHealthTracker,
   classifyNetworkStartFailure,
   decodeInboxAttachments,
+  decodeConnectorAttachment,
   formatInboxNotification,
 } from './shared.js'
 
@@ -133,8 +135,28 @@ export class SlackConnectorAdapter implements ConnectorAdapter {
     }
   }
 
-  async deliverArtifact(): Promise<void> {
-    throw new Error('Inbox file delivery is not implemented for Slack yet.')
+  async deliverArtifact(delivery: ConnectorArtifactDelivery): Promise<void> {
+    await this.sendOwnerFile(delivery.attachment)
+  }
+
+  async sendOwnerFile(attachment: ConnectorArtifactDelivery['attachment'],
+    _presentation: import('../core/reply-directives.js').ReplyMedia = 'file'): Promise<void> {
+    if (!this.web) throw new Error('Slack client is not ready')
+    if (!this.ownerUserId) throw new Error('Slack owner is not linked')
+    this.tracker.attempt()
+    try {
+      const file = decodeConnectorAttachment(attachment)
+      // Slack previews uploaded images, including local stickers.
+      await this.web.filesUploadV2({
+        channel_id: await this.openOwnerDm(),
+        file: file.content,
+        filename: file.filename,
+      })
+      this.tracker.success(this.ownerUserId)
+    } catch (error) {
+      this.tracker.degraded(error)
+      throw error
+    }
   }
 
   async sendOwnerText(text: string): Promise<void> {

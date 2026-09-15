@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { ReactElement, ReactNode } from 'react';
 
@@ -6,7 +6,7 @@ import type { AgentInfo, PausedSessionRuntimeUpdate, SessionRecord } from './api
 import { sessionCoworkerLabel } from './display';
 import { useHarnessWorkbenchContext } from '../harness/context';
 import { FilesPanel } from './FilesPanel';
-import { ResumeCta } from './ResumeCta';
+import { SessionActivation } from './SessionActivation';
 import { TerminalView } from './Terminal';
 import { WebSessionView } from './WebSessionView';
 import { useIsDesktop } from '../../live/use-is-desktop';
@@ -15,6 +15,7 @@ import type { WorkspaceSource } from '../../tabs/types';
 
 export interface WorkspaceViewProps {
   readonly wsId: string;
+  readonly visible?: boolean;
   /** Pinned record id, or null = no session pinned (empty pane). */
   readonly sessionId: string | null;
   /** Product area that owns this Workspace view (for provenance-aware drill-ins). */
@@ -40,6 +41,8 @@ export interface WorkspaceViewProps {
 
 export function WorkspaceView(props: WorkspaceViewProps): ReactElement {
   const { t } = useTranslation();
+  const connected = useRef(false);
+  if (props.activeRecord?.state === 'running') connected.current = true;
   // Mount ONLY this tab's own pinned session. Each session is its own tab with
   // its own WorkspaceView, and TabHost keeps every tab mounted (display:none
   // when inactive) — so a session's terminal already persists across tab
@@ -80,24 +83,17 @@ export function WorkspaceView(props: WorkspaceViewProps): ReactElement {
     <div className={viewClass}>
       <div className="workspace-terminal">
         {props.activeRecord?.state === 'running' && props.activeRecord.surface === 'headless' && (
-          <div role="status" className="flex h-full items-center justify-center p-6 text-sm text-muted-foreground">
+          <div role="alert" className="flex h-full items-center justify-center p-6 text-sm text-muted-foreground">
             {t('workspace.interactiveOwnership.background')}
           </div>
         )}
         {showPausedCta && props.activeRecord && (
-          <ResumeCta
+          <SessionActivation
+            key={props.activeRecord.id}
             record={props.activeRecord}
-            agents={props.agents}
             workspaceId={props.wsId}
-            onUpdateRuntime={props.onUpdateSessionRuntime
-              ? (update) => props.onUpdateSessionRuntime!(props.activeRecord!.id, update)
-              : undefined}
-            onSaveDisplayName={props.onSaveSessionDisplayName && props.activeRecord.resumeId
-              ? (displayName) => props.onSaveSessionDisplayName!(
-                props.activeRecord!.resumeId,
-                displayName,
-              )
-              : undefined}
+            enabled={props.visible !== false}
+            automatic={!connected.current}
             onResume={() => props.onResume(props.activeRecord!.id)}
             onOpenWeb={() => props.onOpenWeb(props.activeRecord!.id)}
           />

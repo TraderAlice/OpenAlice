@@ -1,6 +1,7 @@
 import type { Client } from 'discord.js'
 import type {
   ConnectorAdapterConfig,
+  ConnectorArtifactDelivery,
   ConnectorAdapterHealth,
   InboxNotification,
 } from '@traderalice/connector-protocol'
@@ -18,6 +19,7 @@ import {
   AdapterHealthTracker,
   classifyNetworkStartFailure,
   decodeInboxAttachments,
+  decodeConnectorAttachment,
   formatInboxNotification,
 } from './shared.js'
 
@@ -125,8 +127,25 @@ export class DiscordConnectorAdapter implements ConnectorAdapter {
     }
   }
 
-  async deliverArtifact(): Promise<void> {
-    throw new Error('Inbox file delivery is not implemented for Discord yet.')
+  async deliverArtifact(delivery: ConnectorArtifactDelivery): Promise<void> {
+    await this.sendOwnerFile(delivery.attachment)
+  }
+
+  async sendOwnerFile(attachment: ConnectorArtifactDelivery['attachment'],
+    _presentation: import('../core/reply-directives.js').ReplyMedia = 'file'): Promise<void> {
+    if (!this.client?.isReady()) throw new Error('Discord client is not ready')
+    if (!this.ownerUserId) throw new Error('Discord owner is not linked')
+    this.tracker.attempt()
+    try {
+      const file = decodeConnectorAttachment(attachment)
+      const user = await this.client.users.fetch(this.ownerUserId)
+      // Local stickers are image attachments; native Discord stickers require registered IDs.
+      await user.send({ files: [{ attachment: file.content, name: file.filename }] })
+      this.tracker.success(this.ownerUserId)
+    } catch (error) {
+      this.tracker.degraded(error)
+      throw error
+    }
   }
 
   async sendOwnerText(text: string): Promise<void> {

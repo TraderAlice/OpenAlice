@@ -39,7 +39,7 @@ const CORE_TOKENS = [
 ] as const
 
 const PALETTE_IDS: readonly ThemePaletteId[] = [
-  'paper', 'porcelain', 'linen', 'windows-classic', 'graphite', 'midnight', 'moss', 'iris',
+  'codex', 'paper', 'porcelain', 'linen', 'windows-classic', 'graphite', 'midnight', 'moss', 'iris',
 ]
 
 const ALLOWED_LITERAL_COLOR_FILES = new Set([
@@ -98,12 +98,12 @@ function hexContrast(a: string, b: string): number {
 }
 
 describe('semantic color contract', () => {
-  it('ships one universal library with eight complete semantic cards', () => {
+  it('ships one universal library with nine complete semantic cards', () => {
     expect(THEME_PALETTES.map(({ id }) => id)).toEqual(PALETTE_IDS)
     expect(THEME_PALETTES.map(({ appearance }) => appearance)).toEqual([
-      'light', 'light', 'light', 'light', 'dark', 'dark', 'dark', 'dark',
+      'light', 'light', 'light', 'light', 'light', 'dark', 'dark', 'dark', 'dark',
     ])
-    expect(new Set(PALETTE_IDS).size).toBe(8)
+    expect(new Set(PALETTE_IDS).size).toBe(9)
 
     for (const id of PALETTE_IDS) {
       const block = paletteBlock(id)
@@ -114,7 +114,7 @@ describe('semantic color contract', () => {
     }
   })
 
-  it('keeps every semantic token symmetric across all eight cards', () => {
+  it('keeps every semantic token symmetric across all nine cards', () => {
     const tokens = [...paletteBlock('paper').matchAll(/^\s*(--[\w-]+):/gm)].map((match) => match[1])
     expect(tokens.length).toBeGreaterThan(CORE_TOKENS.length)
 

@@ -122,9 +122,10 @@ describe('getBars — barId forms', () => {
     expect(deps.equityClient.getHistorical).toHaveBeenCalled()
   })
 
-  it('vendor barId without assetClass throws a clear error', async () => {
+  it('vendor barId without assetClass resolves an exact catalog match', async () => {
     const svc = createBarService(makeDeps())
-    await expect(svc.getBars({ barId: 'yfinance|AAPL' }, { interval: '1d' })).rejects.toThrow(/needs an assetClass/)
+    expect((await svc.getBars({ barId: 'yfinance|AAPL' }, { interval: '1d' })).meta.barId).toBe('yfinance|AAPL')
+    await expect(svc.getBars({ barId: 'yfinance|AA' }, { interval: '1d' })).rejects.toThrow(/Cannot uniquely resolve/)
   })
 
   it('invalid barId throws', async () => {
@@ -432,4 +433,13 @@ it('explains excluded OHLC rows before count selection and respects the requeste
   expect(result.meta.quality).toMatchObject({ inspectedRows: 4, excludedRows: 1, latestExcludedRecordAt: '2024-01-04', latestExcludedFields: ['open', 'close'] })
   const historical = await service.getBars({ symbol: 'AAPL', assetClass: 'equity' }, { interval: '1d', end: '2024-01-03' })
   expect(historical.meta.quality?.excludedRows).toBe(0)
+})
+
+it('refuses ambiguous catalogs and never substitutes another provider', async () => {
+  const deps = makeDeps()
+  deps.marketSearch.cryptoClient.search = vi.fn(async () => [{ symbol: 'AAPL' }]) as never
+  const svc = createBarService(deps)
+  await expect(svc.getBars({ barId: 'yfinance|AAPL' }, { interval: '1d' })).rejects.toThrow(/Cannot uniquely resolve/)
+  await expect(svc.getBars({ barId: 'unavailable|AAPL' }, { interval: '1d' })).rejects.toThrow(/Cannot uniquely resolve/)
+  expect(deps.equityClient.getHistorical).not.toHaveBeenCalled()
 })

@@ -1,8 +1,10 @@
+import { parseMarketReference } from '@traderalice/connector-protocol'
 /** Connector-owned extensions. Unknown/unresolved references remain literal. */
 export interface ReplyReference { path: string; start: number; end: number }
 export type ReplyMedia = 'file' | 'image' | 'sticker'
 
 export function replyMedia(path: string): ReplyMedia {
+  if (parseMarketReference(path)) return 'image'
   if (/^sticker\/.+\.(png|webp)$/i.test(path)) return 'sticker'
   if (/\.(png|jpe?g|webp)$/i.test(path)) return 'image'
   return 'file'

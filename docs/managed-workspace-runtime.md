@@ -769,3 +769,10 @@ Windows package.
 
 That cleanup must not weaken the first-run contract: install OpenAlice,
 configure a credential, open a Workspace, and let Alice work.
+
+## Populated desktop preview
+
+For an isolated native frontend preview with shared mock data, use
+`pnpm electron:demo`. It preserves app protocol, preload and child IPC without
+starting managed agents or trading services. See [[docs/demo-mode.md]] for
+commands, data ownership and acceptance limits.

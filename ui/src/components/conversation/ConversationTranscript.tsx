@@ -2,6 +2,7 @@ import { useEffect, useState, type ReactElement } from 'react'
 import { Check, ChevronRight, CircleAlert, CircleDashed, LoaderCircle } from 'lucide-react'
 import { MarkdownContent } from '../MarkdownContent'
 import type { ConversationActivity, ConversationContent, ConversationItem, ConversationToolStep } from './types'
+import { useTextReveal } from './useTextReveal'
 import { MessageActions } from './MessageActions'
 
 export function ConversationTranscriptItem({
@@ -10,12 +11,14 @@ export function ConversationTranscriptItem({
   onFileReference,
   working,
   latest = false,
+  animate = false,
 }: {
   readonly fileHrefs?: Record<string, string>
   readonly onFileReference?: (path: string) => void
   readonly item: ConversationItem
   readonly working: boolean
   readonly latest?: boolean
+  readonly animate?: boolean
 }): ReactElement {
   if (item.kind === 'user') {
     return (
@@ -43,10 +46,10 @@ export function ConversationTranscriptItem({
     <article className={`conversation-message is-assistant is-turn${latest ? ' is-latest' : ''}`}>
       <div className="conversation-message-body">
         {item.progress.map((text, index) => (
-          <div key={index} className="conversation-progress-text"><MarkdownContent text={text} fileHrefs={fileHrefs} onFileReference={onFileReference} /></div>
+          <div key={index} className="conversation-progress-text"><RevealedMarkdown text={text} animate={animate && !item.final && !item.activity && index === item.progress.length - 1} fileHrefs={fileHrefs} onFileReference={onFileReference} /></div>
         ))}
         {item.activity && <ConversationActivityGroup activity={item.activity} working={working} />}
-        {item.final && <div className="conversation-final-text"><MarkdownContent text={item.final} fileHrefs={fileHrefs} onFileReference={onFileReference} /></div>}
+        {item.final && <div className="conversation-final-text"><RevealedMarkdown text={item.final} animate={animate} fileHrefs={fileHrefs} onFileReference={onFileReference} /></div>}
       </div>
       {!working && item.final && <MessageActions text={item.final} />}
     </article>
@@ -176,4 +179,9 @@ export function ConversationContentView({ content, plainText = false }: { readon
 function formatChars(chars: number): string {
   if (chars < 1_000) return `${chars} chars`
   return `${(chars / 1_000).toFixed(chars < 10_000 ? 1 : 0)}k chars`
+}
+
+function RevealedMarkdown(props: { text: string; animate: boolean; fileHrefs?: Record<string, string>; onFileReference?: (path: string) => void }) {
+  const text = useTextReveal(props.text, props.animate)
+  return <MarkdownContent text={text} fileHrefs={props.fileHrefs} onFileReference={props.onFileReference} />
 }

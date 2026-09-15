@@ -53,6 +53,8 @@ export function WorkspacePage({ spec, visible }: Props) {
     workspace,
     session: activeRecord,
     updateRuntime,
+    loading,
+    error: loadError,
   } = useWorkspaceSessionData(wsId, sessionId)
   const effectiveDefaultAgent = workspace?.defaultAgent ?? ctx.defaultAgent
   const defaultAgentEnabled =
@@ -98,10 +100,16 @@ export function WorkspacePage({ spec, visible }: Props) {
   if (!workspace) {
     return (
       <div className="workspaces-root flex flex-col items-center justify-center h-full text-muted-foreground text-sm">
-        {t('workspace.notFound')}
+        {loadError ?? (loading ? t('workspace.sessionOpening') : t('workspace.notFound'))}
       </div>
     )
   }
+
+  if (sessionId && !activeRecord) return (
+    <div role={loading ? 'status' : 'alert'} className="flex h-full items-center justify-center p-6 text-sm text-muted-foreground">
+      {loadError ?? (loading ? t('workspace.sessionOpening') : t('workspace.sessionNotFound'))}
+    </div>
+  )
 
   const workspaceName = workspaceDisplayName(workspace)
   const hasCustomName = workspaceName !== workspace.tag
@@ -113,7 +121,7 @@ export function WorkspacePage({ spec, visible }: Props) {
   const workspaceCanvas = terminalCanvas || pausedCanvas
   // The surface toggle is offered only for runtimes that expose a structured
   // protocol; a TUI-only runtime keeps its terminal without a dead button.
-  const canSwitchSurface = activeRecord?.state === 'running'
+  const canSwitchSurface = activeRecord?.state === 'running' && activeRecord.surface !== 'headless'
     && (webCanvas || agentSupportsWeb(ctx.agents, activeRecord.agent))
   const runtimeLabel = activeRecord
     ? ctx.agents.find((agent) => agent.id === activeRecord.agent)?.displayName ?? activeRecord.agent
@@ -189,6 +197,7 @@ export function WorkspacePage({ spec, visible }: Props) {
 
       <div className={`flex min-h-0 min-w-0 flex-1 flex-col${workspaceCanvas ? '' : ' p-3'}`}>
         <WorkspaceView
+          visible={visible}
           wsId={wsId}
           sessionId={sessionId}
           {...(source ? { source } : {})}

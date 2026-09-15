@@ -5,10 +5,10 @@ import { demoInboxEntries } from '../fixtures/inbox'
 import { demoTurnProgress } from '../fixtures/turn-progress'
 
 const records: InquiryRecord[] = []
-const timers: number[] = []
+const timers: ReturnType<typeof globalThis.setTimeout>[] = []
 
 export function resetDemoInquiryState(): void {
-  for (const timer of timers) window.clearTimeout(timer)
+  for (const timer of timers) globalThis.clearTimeout(timer)
   timers.length = 0
   records.length = 0
 }
@@ -44,7 +44,7 @@ function startInquiry(
       resolution: { mode: 'exact' },
     },
   }
-  timers.push(window.setTimeout(() => {
+  timers.push(globalThis.setTimeout(() => {
     record.status = 'done'
     record.finishedAt = Date.now()
     record.durationMs = Date.now() - record.startedAt

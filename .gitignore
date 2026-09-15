@@ -59,3 +59,6 @@ packages/ibkr/ref/CMakeLists.txt
 # Credential sealing key — lands at the user-data root, which is the repo
 # root whenever OPENALICE_HOME is pinned here (smoke tests, $PWD escape hatch).
 /sealing.key
+
+# Isolated Electron demo UI bundle
+/ui/dist-demo/

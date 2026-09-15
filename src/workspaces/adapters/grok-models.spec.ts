@@ -1,7 +1,3 @@
-import { readFileSync } from 'node:fs';
-import { dirname, resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
-
 import { describe, expect, it } from 'vitest';
 
 import {
@@ -9,7 +5,7 @@ import {
   GROK_FIRST_PARTY_MODELS,
 } from './grok-models.js';
 
-const here = dirname(fileURLToPath(import.meta.url));
+import { GROK_FIRST_PARTY_MODELS as UI_MODELS } from '../../../ui/src/lib/grok-models.js';
 
 describe('Grok Build first-party model suggestions', () => {
   it('stays on the live grok.com CLI catalog, default first', () => {
@@ -17,9 +13,8 @@ describe('Grok Build first-party model suggestions', () => {
     expect(GROK_FIRST_PARTY_MODELS.some((model) => model.id === 'grok-build')).toBe(false);
   });
 
-  it('keeps the Issue/launch copy on the same ids', () => {
-    const ui = readFileSync(resolve(here, '../../../ui/src/lib/grok-models.ts'), 'utf8');
-    const uiIds = [...ui.matchAll(/id: '([^']+)'/g)].map((match) => match[1]);
-    expect(uiIds).toEqual([...GROK_FIRST_PARTY_MODEL_IDS]);
+  it('shares the same models and effort semantics with the Issue/launch picker', () => {
+    expect(UI_MODELS).toBe(GROK_FIRST_PARTY_MODELS);
+    expect(UI_MODELS[0].semantics?.reasoning?.efforts).toEqual(['low', 'medium', 'high', 'xhigh']);
   });
 });

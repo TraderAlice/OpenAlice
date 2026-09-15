@@ -33,7 +33,7 @@ export function IssuePage() {
           </Button>
         }
       />
-      <div className="flex-1 min-h-0 overflow-y-auto px-3 py-4 sm:px-4 md:px-6 md:py-5">
+      <div className="flex-1 min-h-0 overflow-y-auto px-2 py-2">
         <IssuesBoard />
       </div>
     </div>
