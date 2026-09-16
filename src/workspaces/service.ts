@@ -389,7 +389,7 @@ import { WebSessionHost, type WebSessionSnapshot } from './web-session-host.js';
 import { WorkspaceRegistry, type WorkspaceMeta } from './workspace-registry.js';
 import { readHarnessSource } from './harness-source.js';
 import { HarnessSourceUpgradeManager } from './harness-source-upgrade.js';
-import { HarnessSurfaceManager } from './harness-surface-manager.js';
+import { HarnessSurfaceManager, resolveSurfaceDomain } from './harness-surface-manager.js';
 import {
   createManagerWorkspaceMeta,
   MANAGER_WORKSPACE_ID,
@@ -716,7 +716,9 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
     `${config.launcherRoot}/workspaces.json`,
     launcherLogger.child({ scope: 'registry' }),
   );
-  const harnessSurfaces = new HarnessSurfaceManager(registry);
+  const harnessSurfaces = new HarnessSurfaceManager(registry, {
+    surfaceDomain: resolveSurfaceDomain(process.env['OPENALICE_SURFACE_DOMAIN']),
+  });
   const catalog = await WorkspaceCatalog.load(
     join(config.launcherRoot, 'state', 'workspace-catalog.json'),
     registry.list(),

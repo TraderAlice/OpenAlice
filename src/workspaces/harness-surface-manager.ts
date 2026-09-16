@@ -11,8 +11,46 @@ import type { WorkspaceRegistry } from './workspace-registry.js'
 import { logger as launcherLogger } from './logger.js'
 
 const BIND_HOST = '127.0.0.1'
+const DEFAULT_SURFACE_DOMAIN = 'localhost'
 const READINESS_TIMEOUT_MS = 60_000
 const LOG_LIMIT = 64 * 1024
+
+/**
+ * Resolves the configured surface domain suffix.
+ *
+ * A managed route host is always `oa-surface-<opaque>.<suffix>`. The default
+ * suffix `localhost` is resolved by the browser itself to its own loopback, so
+ * it reaches this Runtime only from a browser on this host or through a
+ * loopback tunnel. A deployment that serves a remote browser — a Docker host
+ * reached over LAN or Tailnet, or an HTTPS front end with wildcard DNS — sets
+ * a suffix the client can resolve, for example `10.10.10.44.nip.io`.
+ *
+ * The child still binds loopback and Alice still proxies to it; only the
+ * published route identity changes. Fails closed: an unusable value stops
+ * startup instead of falling back to the default and leaving dead routes.
+ */
+export function resolveSurfaceDomain(raw: string | null | undefined): string {
+  const trimmed = (raw ?? '').trim().toLowerCase()
+  if (!trimmed) return DEFAULT_SURFACE_DOMAIN
+  const value = trimmed.replace(/\.$/, '')
+  const labels = value.split('.')
+  const isLabel = (label: string) => /^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/.test(label)
+  if (value.length === 0 || value.length > 253 || !labels.every(isLabel)) {
+    throw new Error(
+      `OPENALICE_SURFACE_DOMAIN="${raw}" is not a valid DNS suffix. Use a ` +
+      `lowercase dotted name that resolves to this host, such as ` +
+      `"10.10.10.44.nip.io" — without scheme, port, path, or wildcard.`,
+    )
+  }
+  if (/^\d{1,3}(?:\.\d{1,3}){3}$/.test(value)) {
+    throw new Error(
+      `OPENALICE_SURFACE_DOMAIN="${raw}" is an IP literal, which cannot be a ` +
+      `surface domain suffix because route hosts are subdomains of it. Use a ` +
+      `name that resolves to this host, such as "10.10.10.44.nip.io".`,
+    )
+  }
+  return value
+}
 
 export type HarnessSurfacePhase = 'stopped' | 'starting' | 'ready' | 'failed' | 'stopping'
 
@@ -61,13 +99,20 @@ export class HarnessSurfaceManager {
   private readonly runtimes = new Map<string, SurfaceRuntime>()
   private readonly routes = new Map<string, SurfaceRuntime>()
   private readonly operations = new Map<string, Promise<unknown>>()
+  private readonly surfaceDomain: string
+  private readonly routeHostPattern: RegExp
   private generation = 0
   private disposed = false
 
   constructor(
     private readonly registry: WorkspaceRegistry,
-    private readonly options: { readinessTimeoutMs?: number } = {},
-  ) {}
+    private readonly options: { readinessTimeoutMs?: number; surfaceDomain?: string } = {},
+  ) {
+    this.surfaceDomain = options.surfaceDomain ?? DEFAULT_SURFACE_DOMAIN
+    this.routeHostPattern = new RegExp(
+      `^oa-surface-[a-f0-9]{24}\\.${escapeRegExp(this.surfaceDomain)}$`,
+    )
+  }
 
   snapshot(workspaceId: string, capability: string): HarnessSurfaceSnapshot {
     const runtime = this.runtimes.get(keyOf(workspaceId, capability))
@@ -85,11 +130,21 @@ export class HarnessSurfaceManager {
   }
 
   resolveHost(hostHeader: string | null | undefined): HarnessSurfaceTarget | null {
-    const host = normalizeHost(hostHeader)
+    const host = this.normalizeHost(hostHeader)
     if (!host) return null
     const runtime = this.routes.get(host)
     if (!runtime || runtime.phase !== 'ready') return null
     return { host: BIND_HOST, port: runtime.entryPort, generation: runtime.generation }
+  }
+
+  /**
+   * Accepts only this Runtime's own opaque route host, without trusting any
+   * other name that could reach Alice's listener.
+   */
+  private normalizeHost(value: string | null | undefined): string | null {
+    if (!value) return null
+    const host = value.trim().toLowerCase().replace(/:\d+$/, '')
+    return this.routeHostPattern.test(host) ? host : null
   }
 
   async start(workspaceId: string, capability: string): Promise<HarnessSurfaceSnapshot> {
@@ -142,7 +197,7 @@ export class HarnessSurfaceManager {
 
     const ports = await allocatePorts(declared.ports)
     const generation = ++this.generation
-    const routeHost = `oa-surface-${randomBytes(12).toString('hex')}.localhost`
+    const routeHost = `oa-surface-${randomBytes(12).toString('hex')}.${this.surfaceDomain}`
     const runtime: SurfaceRuntime = {
       key: keyOf(workspaceId, capability),
       workspaceId,
@@ -347,10 +402,8 @@ function keyOf(workspaceId: string, capability: string): string {
   return `${workspaceId}\u0000${capability}`
 }
 
-function normalizeHost(value: string | null | undefined): string | null {
-  if (!value) return null
-  const host = value.trim().toLowerCase().replace(/:\d+$/, '')
-  return /^oa-surface-[a-f0-9]{24}\.localhost$/.test(host) ? host : null
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 }
 
 async function allocatePorts(names: readonly string[]): Promise<Record<string, number>> {
