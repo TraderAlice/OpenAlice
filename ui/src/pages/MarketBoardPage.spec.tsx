@@ -236,6 +236,23 @@ describe('MarketBoardPage', () => {
     mocks.boardData = {
       meta: {},
       window: { start: '2026-08-04', end: '2026-08-13' },
+      economicEvents: [
+        {
+          date: '2026-08-07 12:30:00', country: 'US', currency: 'USD', category: 'Employment',
+          event: 'Nonfarm Payrolls', importance: 'High', source: 'BLS', unit: 'K',
+          previous: 120, consensus: 135, revised: null, actual: null,
+        },
+        {
+          date: '2026-08-08 06:00:00', country: 'DE', currency: 'EUR', category: 'Industry',
+          event: 'Industrial Production', importance: 'Medium', source: 'Destatis', unit: '%',
+          previous: -0.5, consensus: 0.2, revised: null, actual: 0.4,
+        },
+        {
+          date: '2026-08-09 12:30:00', country: 'US', currency: 'USD', category: 'Inflation',
+          event: 'Consumer Price Index', importance: 'High', source: 'BLS', unit: '%',
+          previous: 2.6, consensus: 2.5, revised: null, actual: null,
+        },
+      ],
       earnings: Array.from({ length: 120 }, (_, index) => ({
         report_date: index < 60 ? '2026-08-04' : '2026-08-05',
         symbol: `E${String(index).padStart(3, '0')}`,
@@ -257,6 +274,17 @@ describe('MarketBoardPage', () => {
       />,
     )
 
+    expect(screen.getByRole('button', { name: 'Macro events (3)' }).getAttribute('aria-pressed')).toBe('true')
+    expect(screen.getByRole('columnheader', { name: 'Local time' })).toBeTruthy()
+    expect(screen.getAllByText('Nonfarm Payrolls')).toHaveLength(2)
+    expect(screen.getAllByText('High').length).toBeGreaterThan(0)
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Importance' }), 'high')
+    await waitFor(() => expect(screen.getByText('Showing 2 of 2 events')).toBeTruthy())
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Country' }), 'DE')
+    expect(screen.getByText('No matches')).toBeTruthy()
+    expect(screen.getByRole('combobox', { name: 'Country' })).toBeTruthy()
+
+    await user.click(screen.getByRole('button', { name: 'Earnings (120)' }))
     expect(screen.getByRole('button', { name: 'Earnings (120)' }).getAttribute('aria-pressed')).toBe('true')
     expect(screen.getByText('Showing 50 of 120 events')).toBeTruthy()
     expect(within(screen.getByTestId('calendar-mobile')).getAllByRole('button')).toHaveLength(50)
