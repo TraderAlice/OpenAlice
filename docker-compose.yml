@@ -22,7 +22,7 @@ services:
     ports:
       # Web UI. The MCP server (47332) is intentionally NOT exposed — it's
       # only consumed by the CLIs running inside this container.
-      - "47331:47331"
+      - "47331"
     volumes:
       - openalice-data:/data
       # Optional: reuse host auth instead of authenticating inside the
