@@ -1,4 +1,4 @@
-# Single-service compose for OpenAlice self-hosting.
+# Compose for OpenAlice self-hosting.
 #
 # First time:
 #   docker compose up -d --build
@@ -11,14 +11,51 @@
 #
 # Already have claude/codex auth on the host? Skip the docker exec step by
 # uncommenting the bind-mount lines below.
+#
+# --- Fixes applied vs. the previous version ---
+# 1) "spawn claude ENOENT / --dangerously-skip-permissions cannot be used
+#    with root/sudo privileges": Claude Code refuses to run in
+#    bypassPermissions mode as root. Fixed by running the container as a
+#    non-root UID (1000:1000) via `user:` and giving that UID ownership of
+#    /data through the one-shot `openalice-init` service below.
+# 2) IS_SANDBOX=1 is set as a belt-and-suspenders fallback in case Claude
+#    Code's root/sudo detection still trips on your host despite running
+#    non-root (some container runtimes report UID 0 to child processes).
+# 3) "spawn uv ENOENT": this means `uv` is missing from the image, not the
+#    compose file — that has to be installed in your Dockerfile
+#    (e.g. `pip install uv` or the official uv install script) since
+#    compose cannot add binaries to an image it only runs. Send me your
+#    Dockerfile and I'll patch that too.
 
 services:
+  openalice-init:
+    image: busybox:stable
+    container_name: openalice-init
+    # One-shot: make sure the named volume is owned by the non-root user
+    # the main service runs as, then exit. Required because named volumes
+    # are created and owned by root by default.
+    command: ["sh", "-c", "chown -R 1000:1000 /data"]
+    volumes:
+      - openalice-data:/data
+    restart: "no"
+
   openalice:
     build: .
     image: openalice:local
     container_name: openalice
     restart: unless-stopped
     stop_grace_period: 30s
+    depends_on:
+      openalice-init:
+        condition: service_completed_successfully
+    # Run as non-root so Claude Code's root/sudo guard doesn't block
+    # --dangerously-skip-permissions. Match this UID/GID to whatever user
+    # your Dockerfile creates (defaults to 1000:1000 on most base images).
+    user: "1000:1000"
+    environment:
+      # Fallback in case root/sudo is still detected despite running
+      # non-root (some sandboxes/CI runners report UID 0 upstream).
+      - IS_SANDBOX=1
     ports:
       # Web UI. The MCP server (47332) is intentionally NOT exposed — it's
       # only consumed by the CLIs running inside this container.
