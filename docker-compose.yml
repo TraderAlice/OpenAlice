@@ -12,20 +12,20 @@
 # Already have claude/codex auth on the host? Skip the docker exec step by
 # uncommenting the bind-mount lines below.
 #
-# --- Fixes applied vs. the previous version ---
-# 1) "spawn claude ENOENT / --dangerously-skip-permissions cannot be used
-#    with root/sudo privileges": Claude Code refuses to run in
-#    bypassPermissions mode as root. Fixed by running the container as a
-#    non-root UID (1000:1000) via `user:` and giving that UID ownership of
-#    /data through the one-shot `openalice-init` service below.
-# 2) IS_SANDBOX=1 is set as a belt-and-suspenders fallback in case Claude
-#    Code's root/sudo detection still trips on your host despite running
-#    non-root (some container runtimes report UID 0 to child processes).
-# 3) "spawn uv ENOENT": this means `uv` is missing from the image, not the
-#    compose file — that has to be installed in your Dockerfile
-#    (e.g. `pip install uv` or the official uv install script) since
-#    compose cannot add binaries to an image it only runs. Send me your
-#    Dockerfile and I'll patch that too.
+# --- Fix history ---
+# 1) "--dangerously-skip-permissions cannot be used with root/sudo
+#    privileges": fixed by running as non-root UID 1000 (`user:`) plus a
+#    one-shot chown of the /data volume via `openalice-init`.
+# 2) "Auto-update failed: no write permission": once the container runs as
+#    UID 1000, Claude Code can no longer write to the npm global install
+#    dir it was installed into as root during the build. Rather than
+#    chown that directory too (which just relocates the same conflict),
+#    disable the auto-updater outright with DISABLE_AUTOUPDATER=1. Manual
+#    `claude update` inside the container still works if you ever need it.
+# 3) Studio not loading / blank page: `uv`/`uvx` only live in ~/.local/bin
+#    inside the session, which isn't on PATH for every shell the harness
+#    spawns. Fixed by explicitly prepending ~/.local/bin to PATH so any
+#    child shell can find uv/uvx regardless of how it's invoked.
 
 services:
   openalice-init:
@@ -56,6 +56,13 @@ services:
       # Fallback in case root/sudo is still detected despite running
       # non-root (some sandboxes/CI runners report UID 0 upstream).
       - IS_SANDBOX=1
+      # Claude Code can no longer write to its own npm global install dir
+      # once running non-root — stop it from trying instead of chowning
+      # a root-owned system path.
+      - DISABLE_AUTOUPDATER=1
+      # Make sure uv/uvx (installed to ~/.local/bin) resolve for every
+      # shell the harness spawns, not just the one that installed them.
+      - PATH=/data/home/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
     ports:
       # Web UI. The MCP server (47332) is intentionally NOT exposed — it's
       # only consumed by the CLIs running inside this container.
