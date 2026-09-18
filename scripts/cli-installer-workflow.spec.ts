@@ -130,6 +130,8 @@ describe('CLI installer dev publication workflow', () => {
       'dev-cli-${{ matrix.platform }}-${{ matrix.arch }}',
     )
     expect(step(build, 'Preserve accepted dev candidate').with?.['retention-days']).toBe(7)
+    expect(String(step(build, 'Preserve accepted dev candidate').with?.path))
+      .toContain('dist/bun-release/openalice-bootstrap-*')
   })
 
   it('shares only the reviewed platform-neutral build roots', async () => {

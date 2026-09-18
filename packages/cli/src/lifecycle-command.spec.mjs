@@ -293,7 +293,7 @@ describe('OpenAlice top-level lifecycle commands', () => {
 
   it('generates root help and four shell completions from one command registry', () => {
     const help = formatRootHelp()
-    for (const command of ['up', 'run', 'down', 'status', 'logs', 'doctor', 'open', 'create', 'project', 'completion']) {
+    for (const command of ['up', 'run', 'down', 'status', 'logs', 'doctor', 'bootstrap', 'open', 'create', 'project', 'completion']) {
       expect(help).toContain(command)
     }
     expect(formatLifecycleHelp('up')).toContain('installed OpenAlice Runtime in the background')

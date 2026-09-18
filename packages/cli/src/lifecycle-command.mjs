@@ -28,6 +28,7 @@ export const ROOT_COMMANDS = Object.freeze([
   { name: 'logs', description: 'Read a bounded redacted Runtime log tail' },
   { name: 'doctor', description: 'Run read-only Runtime diagnostics' },
   { name: 'setup', description: 'Check and coordinate system Git/Bash installation' },
+  { name: 'bootstrap', description: 'Verify and install a native release artifact' },
   { name: 'open', description: 'Open the verified local Web UI' },
   { name: 'start', description: 'Compatibility foreground browser launcher' },
   { name: 'server', description: 'Compatibility Server lifecycle commands' },

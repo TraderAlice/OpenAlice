@@ -148,6 +148,7 @@ off the Alice host.
 
 ### 🚀 Features
 
+- Add checksum-bound native Bootstrap deployment with transactional activation, per-user persistence, rollback receipts, and Windows/Linux target acceptance
 - Add MCP Ask connector for external agent conversation
 - Add evolution mode — two-tier permission system
 - Auto-seed config files on first startup, untrack from git

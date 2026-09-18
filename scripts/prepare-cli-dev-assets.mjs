@@ -2,7 +2,7 @@
 
 import { createHash } from 'node:crypto'
 import { execFileSync } from 'node:child_process'
-import { copyFileSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
+import { copyFileSync, lstatSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { basename, join, parse, resolve } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
@@ -11,6 +11,7 @@ import { bunReleaseContentIdentity } from './bun-release-content-identity.mjs'
 import { CLI_RELEASE_TARGETS, cliExecutableName } from '../packages/cli/src/release-targets.mjs'
 
 import { readDevBrokerCatalog } from './dev-broker-binding.mjs'
+import { verifyNativeBootstrapFormat } from './native-bootstrap-format.mjs'
 
 export { CLI_RELEASE_TARGETS }
 const PINNED_BUN_VERSION = readFileSync(new URL('../.bun-version', import.meta.url), 'utf8').trim()
@@ -52,7 +53,9 @@ export function prepareCliDevAssets({ inputDir, outputDir, commit, version, inst
   copyFileSync(windowsInstallerSource, join(immutableRoot, 'install.ps1'))
 
   const expectedArchives = new Set()
+  const expectedBootstraps = new Set()
   const targets = []
+  const bootstrapTargets = []
   for (const [platform, arch] of CLI_RELEASE_TARGETS) {
     const archiveName = `openalice-cli-${version}-${platform}-${arch}.tar.gz`
     expectedArchives.add(archiveName)
@@ -82,6 +85,28 @@ export function prepareCliDevAssets({ inputDir, outputDir, commit, version, inst
     const aliasName = `openalice-cli-dev-${platform}-${arch}.tar.gz`
     writeFileSync(join(aliasRoot, `${aliasName}.sha256`), `${checksum}  ${aliasName}\n`)
     targets.push({ platform, arch, archive: aliasName, sha256: checksum, contentIdentity: metadata.contentIdentity })
+    const bootstrapName = `openalice-bootstrap-${version}-${platform}-${arch}${platform === 'win32' ? '.exe' : ''}`
+    expectedBootstraps.add(bootstrapName)
+    const bootstrapPath = join(inputRoot, bootstrapName)
+    const bootstrapChecksumPath = `${bootstrapPath}.sha256`
+    requireRegularFile(bootstrapPath, bootstrapName)
+    requireRegularFile(bootstrapChecksumPath, `${bootstrapName}.sha256`)
+    verifyNativeBootstrapFormat(bootstrapPath, platform, arch)
+    const bootstrapChecksum = parseChecksum(readFileSync(bootstrapChecksumPath, 'utf8'), bootstrapName)
+    const bootstrapBytes = readFileSync(bootstrapPath)
+    const actualBootstrapChecksum = createHash('sha256').update(bootstrapBytes).digest('hex')
+    if (bootstrapChecksum !== actualBootstrapChecksum) {
+      throw new Error(`${bootstrapName} does not match its SHA-256 sidecar`)
+    }
+    copyFileSync(bootstrapPath, join(immutableRoot, bootstrapName))
+    copyFileSync(`${bootstrapPath}.sha256`, join(immutableRoot, `${bootstrapName}.sha256`))
+    bootstrapTargets.push({
+      platform,
+      arch,
+      asset: bootstrapName,
+      sha256: bootstrapChecksum,
+      url: `https://download.openalice.ai/cli/dev/releases/${commit}/${bootstrapName}`,
+    })
   }
 
   const unexpected = readdirSync(inputRoot)
@@ -89,6 +114,10 @@ export function prepareCliDevAssets({ inputDir, outputDir, commit, version, inst
   if (unexpected.length > 0) {
     throw new Error(`unexpected native CLI archives: ${unexpected.join(', ')}`)
   }
+  const unexpectedBootstraps = readdirSync(inputRoot)
+    .filter((name) => /^openalice-bootstrap-/.test(name)
+      && !expectedBootstraps.has(name.endsWith('.sha256') ? name.slice(0, -'.sha256'.length) : name))
+  if (unexpectedBootstraps.length > 0) throw new Error(`unexpected native bootstrap assets: ` + unexpectedBootstraps.join(', '))
 
   const manifest = {
     schemaVersion: 1,
@@ -108,6 +137,7 @@ export function prepareCliDevAssets({ inputDir, outputDir, commit, version, inst
     },
     targets: targets.filter((target) => target.platform !== 'win32'),
     additionalTargets: targets.filter((target) => target.platform === 'win32'),
+    bootstraps: bootstrapTargets,
   }
   writeFileSync(join(outputRoot, 'manifest.json'), `${JSON.stringify(manifest, null, 2)}\n`)
   return manifest
@@ -161,6 +191,10 @@ export function validateCliReleaseArchive({ archivePath, version, platform, arch
     throw new Error(`${archiveName} does not contain bin/${cliExecutableName(platform)}`)
   }
   return { archiveName, releaseName, checksumPath, checksum, metadata, entries }
+}
+
+function requireRegularFile(path, name) {
+  if (!lstatSync(path).isFile()) throw new Error(`${name} must be a regular file`)
 }
 
 function parseChecksum(content, archiveName) {

@@ -11,6 +11,29 @@ parallel first-class deployment surfaces: Docker owns an image, volume,
 healthcheck, and container lifecycle, while managed remote prepares an existing
 SSH host without requiring it to adopt Docker.
 
+## When to choose Docker
+
+Docker is one deployment model, not the universal installer for every host.
+Choose it when the operational unit should be an image plus a persistent volume:
+reproducible image build, container health, easy replacement, and isolation from
+host packages. The Runtime, Workspaces, Agent processes, and state then live
+inside the Linux container boundary. The current Compose path builds that image
+from the checked-out repository; this guide does not define a registry-pull
+installation path.
+
+Choose native host deployment instead when OpenAlice must use host-native Agent
+CLIs, work directly with host files, or be owned by Windows Task Scheduler,
+Linux user systemd, or a macOS LaunchAgent. Choose native-over-SSH when those
+same native resources belong on a private remote machine but the browser should
+remain local. See [[docs/cli-installer.md]] for the decision matrix and the
+three native persistence paths.
+
+Installing Docker Desktop on Windows or macOS does not turn this into a Windows
+or macOS native deployment. The host runs Docker, while OpenAlice still runs as
+the Linux server image and persists through `/data`. Native Bootstrap artifacts,
+compatibility scripts, and package-manager installs are not used inside this
+image lifecycle.
+
 ## Topology
 
 The image is the non-Electron production topology:
@@ -48,6 +71,17 @@ auto-approve project resources because the image owns its pinned Pi version;
 interactive Pi still leaves that trust decision visible to the user.
 
 ## Start and Authenticate
+
+The current path is source-backed. Pin the deployment to an immutable published
+release tag or a reviewed commit before building; use the moving `dev` branch
+only for an intentional preview:
+
+```bash
+git clone https://github.com/TraderAlice/OpenAlice.git
+cd OpenAlice
+git fetch --tags origin
+git checkout --detach <release-tag-or-reviewed-commit>
+```
 
 ```bash
 docker compose up -d --build

@@ -1,9 +1,11 @@
 #!/usr/bin/env node
 
 import { createHash } from 'node:crypto'
-import { copyFileSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
+import { copyFileSync, existsSync, lstatSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
 import { basename, join, resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
+
+import { verifyNativeBootstrapFormat } from './native-bootstrap-format.mjs'
 
 function prereleaseChannel(version) {
   return version.match(/^\d+\.\d+\.\d+-([0-9A-Za-z-]+)/)?.[1] ?? 'latest'
@@ -78,7 +80,64 @@ function sha256File(path) {
   return createHash('sha256').update(readFileSync(path)).digest('hex')
 }
 
-export function prepareMirrorAssets({ outDir, tag, baseUrl, repository }) {
+const NATIVE_BOOTSTRAP_TARGETS = [
+  ['darwin', 'arm64'],
+  ['darwin', 'x64'],
+  ['linux', 'arm64'],
+  ['linux', 'x64'],
+  ['win32', 'arm64'],
+  ['win32', 'x64'],
+]
+
+function collectNativeBootstraps({ names, outDir, version, baseUrl, required }) {
+  const expected = NATIVE_BOOTSTRAP_TARGETS.map(([platform, arch]) => ({
+    platform,
+    arch,
+    asset: `openalice-bootstrap-${version}-${platform}-${arch}${platform === 'win32' ? '.exe' : ''}`,
+  }))
+  const expectedNames = new Set(expected.flatMap(({ asset }) => [asset, `${asset}.sha256`]))
+  const unexpected = names.filter((name) => /^openalice-bootstrap-/.test(name) && !expectedNames.has(name))
+  if (unexpected.length > 0) {
+    throw new Error(`[release-assets] unexpected native bootstrap assets: ${unexpected.join(', ')}`)
+  }
+  const present = expected.filter(({ asset }) => names.includes(asset) || names.includes(`${asset}.sha256`))
+  if (present.length === 0) {
+    if (required) throw new Error('[release-assets] native bootstrap set is required')
+    return []
+  }
+
+  const missing = [...expectedNames].filter((name) => !names.includes(name))
+  if (missing.length > 0) {
+    throw new Error(`[release-assets] incomplete native bootstrap set: missing ${missing.join(', ')}`)
+  }
+
+  return expected.map(({ platform, arch, asset }) => {
+    const assetPath = join(outDir, asset)
+    const sidecarPath = join(outDir, `${asset}.sha256`)
+    if (!lstatSync(assetPath).isFile() || !lstatSync(sidecarPath).isFile()) {
+      throw new Error(`[release-assets] native bootstrap assets must be regular files: ${asset}`)
+    }
+    verifyNativeBootstrapFormat(assetPath, platform, arch)
+    const sidecar = readFileSync(sidecarPath, 'utf8').trim()
+    const match = sidecar.match(/^([a-f0-9]{64})  ([^/]+)$/)
+    if (!match || match[2] !== asset) {
+      throw new Error(`[release-assets] malformed native bootstrap checksum: ${asset}.sha256`)
+    }
+    const actual = sha256File(assetPath)
+    if (match[1] !== actual) {
+      throw new Error(`[release-assets] native bootstrap checksum mismatch: ${asset}`)
+    }
+    return {
+      platform,
+      arch,
+      asset,
+      url: `${baseUrl}/${asset}`,
+      sha256: actual,
+    }
+  })
+}
+
+export function prepareMirrorAssets({ outDir, tag, baseUrl, repository, requireNativeBootstraps = false }) {
   const version = tag.replace(/^v/, '')
   const channel = prereleaseChannel(version)
   const releaseChannel = channel === 'latest' ? 'stable' : channel
@@ -124,6 +183,13 @@ export function prepareMirrorAssets({ outDir, tag, baseUrl, repository }) {
     : urlFor(versionedAsset)
   const releaseNotesUrl = `https://github.com/${repository}/releases/tag/${tag}`
   const intelFeed = `${channel}-mac-intel.yml`
+  const bootstraps = collectNativeBootstraps({
+    names,
+    outDir,
+    version,
+    baseUrl: normalizedBaseUrl,
+    required: requireNativeBootstraps,
+  })
   const manifest = {
     channel: releaseChannel,
     version,
@@ -145,6 +211,7 @@ export function prepareMirrorAssets({ outDir, tag, baseUrl, repository }) {
       sha256: sha256File(join(outDir, installerAsset)),
       versionedUrl: urlFor(installerAsset),
     } : null,
+    bootstraps,
     ...(windowsInstallerAsset ? { windowsInstaller: {
       url: urlFor('install.ps1'),
       sha256: sha256File(join(outDir, windowsInstallerAsset)),
@@ -209,6 +276,7 @@ function main() {
       tag: values.tag,
       baseUrl: values['base-url'],
       repository: values.repository,
+      requireNativeBootstraps: values['require-native-bootstraps'] === 'true',
     })
     return
   }

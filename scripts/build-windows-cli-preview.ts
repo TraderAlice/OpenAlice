@@ -1,4 +1,5 @@
 import { writeDevBrokerBinding } from './dev-broker-binding.mjs'
+import { buildNativeBootstrap } from './build-native-bootstrap.ts'
 import { createHash } from 'node:crypto'
 import { cp, mkdir, mkdtemp, readdir, readFile, stat, writeFile } from 'node:fs/promises'
 import { basename, dirname, join, relative, resolve } from 'node:path'
@@ -100,11 +101,22 @@ else if (process.platform === 'win32') run(['tar.exe', '-a', '-cf', archive, '-C
 else run(['zip', '-qr', archive, name], staging)
 const digest = sha256(await readFile(archive))
 await writeFile(`${archive}.sha256`, `${digest}  ${basename(archive)}\n`)
+const bootstrap = await buildNativeBootstrap({
+  repositoryRoot: root,
+  outputRoot: output,
+  version,
+  platform: 'win32',
+  arch: arch as 'arm64' | 'x64',
+  target: `bun-windows-${arch}` as 'bun-windows-arm64' | 'bun-windows-x64',
+})
 await cp(join(root, 'install-preview.ps1'), join(output, 'install-preview.ps1'))
 if (channelBuild) await cp(join(root, 'install.ps1'), join(output, 'install.ps1'))
 await writeFile(join(output, 'candidate.json'), JSON.stringify({
   archive, sha256: digest, release, executable, sourceCommit, sourceDirty, version, arch,
   contentIdentity: metadata.contentIdentity, channelBuild, runtimeVerification: 'not-run',
+  bootstrapExecutable: bootstrap.executablePath, bootstrapSha256: bootstrap.sha256,
+  bootstrapFormatVerification: bootstrap.formatVerification,
+  bootstrapRuntimeVerification: bootstrap.runtimeVerification,
 }, null, 2) + '\n')
 console.log(`Windows ${arch} preview built (native runtime verification pending): ${archive}`)
 

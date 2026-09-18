@@ -4,10 +4,12 @@
   "description": "OpenAlice local runtime and remote connection CLI",
   "type": "module",
   "bin": {
-    "openalice": "./bin/openalice.ts"
+    "openalice": "./bin/openalice.ts",
+    "openalice-bootstrap": "./bin/openalice-bootstrap.ts"
   },
   "files": [
     "bin/openalice.ts",
+    "bin/openalice-bootstrap.ts",
     "bin/openalice.mjs",
     "src/alice-project.ts",
     "src/alice-project-product.ts",
@@ -59,6 +61,7 @@
     "src/activation.mjs",
     "src/activation-runtime.mjs",
     "src/bun-standalone.mjs",
+    "src/bootstrap-service.mjs",
     "src/dependency-installation.mjs",
     "src/dependency-provider.mjs",
     "src/dependency-setup.mjs",
@@ -68,6 +71,7 @@
     "src/install-source.mjs",
     "src/release-targets.mjs",
     "src/lifecycle-command.mjs",
+    "src/native-bootstrap.mjs",
     "src/lifecycle.mjs",
     "src/local-start.mjs",
     "src/logs.mjs",
@@ -85,7 +89,7 @@
     "src/project-workspaces.ts"
   ],
   "scripts": {
-    "build": "tsc -p tsconfig.json --noEmit && node --check bin/openalice.ts && node --check bin/openalice.mjs && node --check src/alice-project.ts && node --check src/alice-project-product.ts && node --check src/ai-credential-copy.ts && node --check src/create-alice-project.ts && node --check src/project-command.ts && node --check src/project-transfer.ts && node --check src/project-transfer-files.ts && node --check src/project-transfer-secrets.ts && node --check src/project-transfer-ssh.ts && node --check src/project-transfer-stream.ts && node --check src/machine-command.ts && node --check src/machine-inventory.ts && node --check src/machine-registry.ts && node --check src/managed-source.ts && node --check src/supervisor-config.ts && node --check src/supervisor-boot-sequence.ts && node --check src/supervisor-connection-chronicle.ts && node --check src/supervisor-command-deck.ts && node --check src/supervisor-confirmation.ts && node --check src/supervisor-display.ts && node --check src/supervisor-doctor-view.ts && node --check src/supervisor-fleet.ts && node --check src/supervisor-help-view.ts && node --check src/supervisor-inbox.ts && node --check src/supervisor-launch-flight.ts && node --check src/supervisor-navigation.ts && node --check src/supervisor-transfer.ts && node --check src/supervisor-transfer-view.ts && node --check src/supervisor-overlay-pointer.ts && node --check src/supervisor-projects-view.ts && node --check src/supervisor-project-foundry-view.ts && node --check src/supervisor-source-view.ts && node --check src/supervisor-release-view.ts && node --check src/supervisor-task-surface.ts && node --check src/supervisor-scroll-rail.ts && node --check src/supervisor-setup-view.ts && node --check src/supervisor-tui-pointer.ts && node --check src/supervisor-tui-feedback.ts && node --check src/supervisor-tui-logs.ts && node --check src/supervisor-terminal-clipboard.ts && node --check src/supervisor-tui-theme.ts && node --check src/supervisor-tui-view.ts && node --check src/activation.mjs && node --check src/activation-runtime.mjs && node --check src/bun-standalone.mjs && node --check src/doctor.mjs && node --check src/install-layout.mjs && node --check src/install-source.mjs && node --check src/lifecycle-command.mjs && node --check src/lifecycle.mjs && node --check src/local-start.mjs && node --check src/logs.mjs && node --check src/observability-command.mjs && node --check src/package-manager.mjs && node --check src/remote.mjs && node --check src/runtime-deps.mjs && node --check src/runtime-bundle.mjs && node --check src/runtime-client.mjs && node --check src/server.mjs && node --check src/server-control.mjs && node --check src/ssh-connect.mjs && node --check src/uninstall.mjs && node --check src/update.mjs",
+    "build": "tsc -p tsconfig.json --noEmit && node --check bin/openalice.ts && node --check bin/openalice.mjs && node --check bin/openalice-bootstrap.ts && node --check src/alice-project.ts && node --check src/alice-project-product.ts && node --check src/ai-credential-copy.ts && node --check src/create-alice-project.ts && node --check src/project-command.ts && node --check src/project-transfer.ts && node --check src/project-transfer-files.ts && node --check src/project-transfer-secrets.ts && node --check src/project-transfer-ssh.ts && node --check src/project-transfer-stream.ts && node --check src/machine-command.ts && node --check src/machine-inventory.ts && node --check src/machine-registry.ts && node --check src/managed-source.ts && node --check src/supervisor-config.ts && node --check src/supervisor-boot-sequence.ts && node --check src/supervisor-connection-chronicle.ts && node --check src/supervisor-command-deck.ts && node --check src/supervisor-confirmation.ts && node --check src/supervisor-display.ts && node --check src/supervisor-doctor-view.ts && node --check src/supervisor-fleet.ts && node --check src/supervisor-help-view.ts && node --check src/supervisor-inbox.ts && node --check src/supervisor-launch-flight.ts && node --check src/supervisor-navigation.ts && node --check src/supervisor-transfer.ts && node --check src/supervisor-transfer-view.ts && node --check src/supervisor-overlay-pointer.ts && node --check src/supervisor-projects-view.ts && node --check src/supervisor-project-foundry-view.ts && node --check src/supervisor-source-view.ts && node --check src/supervisor-release-view.ts && node --check src/supervisor-task-surface.ts && node --check src/supervisor-scroll-rail.ts && node --check src/supervisor-setup-view.ts && node --check src/supervisor-tui-pointer.ts && node --check src/supervisor-tui-feedback.ts && node --check src/supervisor-tui-logs.ts && node --check src/supervisor-terminal-clipboard.ts && node --check src/supervisor-tui-theme.ts && node --check src/supervisor-tui-view.ts && node --check src/activation.mjs && node --check src/activation-runtime.mjs && node --check src/bun-standalone.mjs && node --check src/doctor.mjs && node --check src/install-layout.mjs && node --check src/install-source.mjs && node --check src/lifecycle-command.mjs && node --check src/bootstrap-service.mjs && node --check src/native-bootstrap.mjs && node --check src/lifecycle.mjs && node --check src/local-start.mjs && node --check src/logs.mjs && node --check src/observability-command.mjs && node --check src/package-manager.mjs && node --check src/remote.mjs && node --check src/runtime-deps.mjs && node --check src/runtime-bundle.mjs && node --check src/runtime-client.mjs && node --check src/server.mjs && node --check src/server-control.mjs && node --check src/ssh-connect.mjs && node --check src/uninstall.mjs && node --check src/update.mjs",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run --root ../.. --config vitest.config.ts --project node packages/cli/src"
   },

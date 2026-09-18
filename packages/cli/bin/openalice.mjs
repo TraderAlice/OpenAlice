@@ -16,6 +16,7 @@ import {
   parseLifecycleArgs,
   runLifecycleCommand,
 } from '../src/lifecycle-command.mjs'
+import { runNativeBootstrap } from '../src/native-bootstrap.mjs'
 import { formatLocalStartHelp, parseLocalStartArgs, startLocal } from '../src/local-start.mjs'
 import {
   formatObservabilityHelp,
@@ -44,6 +45,7 @@ import {
 export async function main(argv = process.argv.slice(2)) {
   const [command, ...args] = argv
   if (command === 'setup') return runDependencySetup(args)
+  if (command === 'bootstrap') return runNativeBootstrap(args)
   if (command === '--help' || command === '-h' || command === 'help') {
     process.stdout.write(formatRootHelp())
     return 0

@@ -111,6 +111,7 @@ jobs:
             dist/windows-cli-preview/${{ matrix.arch }}/*.zip
             dist/windows-cli-preview/${{ matrix.arch }}/*.tar.gz
             dist/windows-cli-preview/${{ matrix.arch }}/*.sha256
+            dist/windows-cli-preview/${{ matrix.arch }}/openalice-bootstrap-*
             dist/windows-cli-preview/${{ matrix.arch }}/install-preview.ps1
             dist/windows-cli-preview/${{ matrix.arch }}/install.ps1
             dist/windows-cli-preview/${{ matrix.arch }}/candidate.json

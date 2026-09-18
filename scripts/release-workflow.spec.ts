@@ -358,7 +358,12 @@ describe('Release workflow critical path', () => {
       'Create stable tag and GitHub Release from accepted candidates',
     ]) {
       expect(step(publication, name).with?.files).toContain('dist/release-cli/*.tar.gz.sha256')
+      expect(step(publication, name).with?.files).toContain('dist/release-cli/openalice-bootstrap-*')
     }
+    const mirror = step(workflow.jobs['mirror-release-assets'], 'Prepare CDN download aliases')
+    expect(mirror.run).toContain('--require-native-bootstraps "$REQUIRE_NATIVE_BOOTSTRAPS"')
+    expect(mirror.env?.REQUIRE_NATIVE_BOOTSTRAPS)
+      .toBe("${{ needs.release.outputs.operation == 'mirror' && 'false' || 'true' }}")
   })
 
   it('selects integrated verifier code without relabelling product bytes', () => {

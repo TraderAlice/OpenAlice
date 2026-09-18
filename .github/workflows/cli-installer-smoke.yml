@@ -380,6 +380,7 @@ jobs:
           path: |
             dist/bun-release/*.tar.gz
             dist/bun-release/*.tar.gz.sha256
+            dist/bun-release/openalice-bootstrap-*
             dist/bun-release/openalice-cli-*.report.json
           if-no-files-found: error
           compression-level: 0

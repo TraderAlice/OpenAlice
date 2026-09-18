@@ -17,10 +17,12 @@ describe('Windows preview delivery boundary', () => {
     expect(job.strategy.matrix.include).toEqual([
       { os: 'windows-latest', arch: 'x64' }, { os: 'windows-11-arm', arch: 'arm64' },
     ])
-    const steps = job.steps as Array<{ name?: string; run?: string }>
+    const steps = job.steps as Array<{ name?: string; run?: string; with?: Record<string, unknown> }>
     expect(steps.findIndex(s => s.name === 'Preserve complete candidate for reproduction'))
       .toBeLessThan(steps.findIndex(s => s.name === 'Install and start the packaged Runtime'))
     expect(steps.some(s => /pnpm test(?:\s|$)|npm publish|electron:pack/.test(s.run ?? ''))).toBe(false)
+    const candidatePath = String(steps.find(s => s.name === 'Preserve complete candidate for reproduction')?.with?.path)
+    expect(candidatePath).toContain('openalice-bootstrap-*')
   })
 
   it('replays existing bytes without dependency setup, compilation, or candidate re-upload', () => {

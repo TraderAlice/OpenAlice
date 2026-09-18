@@ -1,6 +1,7 @@
 import { acceptNativeUpgrade } from './native-upgrade-acceptance.mjs'
 import { writeDevBrokerBinding } from './dev-broker-binding.mjs'
 import { runtimeCompileOptions } from './bun-compile-options.js'
+import { buildNativeBootstrap } from './build-native-bootstrap.ts'
 import { createHash } from 'node:crypto'
 import {
   chmod,
@@ -161,6 +162,13 @@ if (archive.exitCode !== 0) {
 const archiveHash = await sha256File(archivePath)
 await writeFile(`${archivePath}.sha256`, `${archiveHash}  ${basename(archivePath)}\n`)
 const archiveDurationMs = Math.round(performance.now() - archiveStartedAt)
+const bootstrap = await buildNativeBootstrap({
+  repositoryRoot,
+  outputRoot,
+  version: product.version,
+  platform: platformName,
+  arch: process.arch as 'arm64' | 'x64',
+})
 
 const report = {
   schemaVersion: 1,
@@ -180,6 +188,10 @@ const report = {
   releaseBytes: await directoryBytes(releaseRoot),
   archiveBytes: (await stat(archivePath)).size,
   archiveSha256: archiveHash,
+  bootstrapExecutable: basename(bootstrap.executablePath),
+  bootstrapSha256: bootstrap.sha256,
+  bootstrapFormatVerification: bootstrap.formatVerification,
+  bootstrapRuntimeVerification: bootstrap.runtimeVerification,
   smoke,
 }
 await writeFile(join(outputRoot, 'report.json'), `${JSON.stringify(report, null, 2)}\n`)

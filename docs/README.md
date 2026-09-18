@@ -17,7 +17,7 @@ GitHub navigation.
 | [[docs/harness-web-surfaces.md]] | [Harness web surfaces](harness-web-surfaces.md) | Harness manifests, managed Studio ports, readiness, routing, transport, lifecycle, and embedding |
 | [[docs/model-semantics-and-runtime-injection.md]] | [Model semantics and runtime injection](model-semantics-and-runtime-injection.md) | AI credential access, model semantics, Workspace selection, and native Agent projection |
 | [[docs/broker-packs.md]] | [Broker Packs](broker-packs.md) | Optional broker SDK packaging, UI installation, activation, runtime loading, release assets |
-| [[docs/cli-installer.md]] | [CLI installer](cli-installer.md) | Bootstrap consent, installed layout, atomic updates, PATH integration, installer tests, and release checks |
+| [[docs/cli-installer.md]] | [Deployment models and CLI installer](cli-installer.md) | Deployment choice, native Windows/Linux/macOS persistence, Bootstrap, compatibility installers, activation, provenance, release checks, and uninstall |
 | [[docs/cli-package-managers.md]] | [CLI package-manager channels](cli-package-managers.md) | npm/Bun platform packages, Homebrew formula, AUR package, provenance, update ownership, and publication order |
 | [[docs/cli-supervisor.md]] | [Shell CLI Supervisor](cli-supervisor.md) | Top-level Runtime lifecycle, status/JSON presentation, browser opening, completion, compatibility aliases, and TUI boundary |
 | [[docs/local-runtime.md]] | [Local Runtime and CLI bootstrap](local-runtime.md) | Source-backed localhost startup, dependency bootstrap, Runtime ownership, and headless bundle boundary |
@@ -67,6 +67,9 @@ and running-update comparison behind the Shell CLI plan. The
 [Herdr remote Runtime note](reference/herdr-remote-architecture.md) records a
 pinned public-source architecture comparison behind the authoritative remote
 guide, also without vendoring third-party code.
+The [native Bootstrap LAN experiment](reference/native-bootstrap-lan-experiment.md)
+records the Windows/Linux evidence and design tradeoffs behind the formal
+Agent-driven deployment protocol.
 
 ## Incident Records
 
