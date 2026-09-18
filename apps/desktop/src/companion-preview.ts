@@ -11,7 +11,7 @@ app.setPath('userData', home)
 app.on('window-all-closed', () => app.quit())
 void app.whenReady().then(async () => {
   const owner = new BrowserWindow({ show: false, width: 900, height: 700 })
-  const pet = createCompanion(owner)!
+  const pet = createCompanion(owner)!.window
   pet.webContents.on('preload-error', (_event, path, error) => console.error(path, error))
   pet.webContents.on('console-message', (_event, level, message) => { if (level >= 2) console.error(message) })
   await new Promise<void>((done, reject) => {

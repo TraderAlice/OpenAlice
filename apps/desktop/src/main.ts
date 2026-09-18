@@ -10,18 +10,22 @@
  * Lifecycle:
  *   relocate data → resolve ports → spawn UTA unless lite mode disables it
  *   → spawn Alice (UTA URL or lite env injected) → wait Alice ready
- *   → open window. Watch `data/control/restart-uta.flag` → respawn UTA.
- *   On quit or unexpected Alice exit: cascade tree-kill both children.
+ *   → open window, install the tray. Watch `data/control/restart-uta.flag`
+ *   → respawn UTA. On quit or unexpected Alice exit: cascade tree-kill both
+ *   children.
+ *
+ * Closing the window hides it rather than quitting: the tray keeps the process
+ * alive so scheduled jobs and running agents survive. Quitting is explicit.
  *
  * The port + supervision logic is an inline mirror of
  * scripts/guardian/{shared.ts,prod.mjs} — the desktop package is a separate
  * release surface with no TS-dev-tooling dependency, the same reason
  * probe-port.ts is duplicated rather than imported.
  *
- * Out of scope (future iterations): tray icon, multi-window, native menus.
+ * Out of scope (future iterations): multi-window, native menus.
  */
 
-import { app, BrowserWindow, dialog, Menu, Notification, protocol, session } from 'electron'
+import { app, BrowserWindow, dialog, Menu, nativeImage, Notification, protocol, session, Tray } from 'electron'
 import { runRendererTradingModeSmoke } from './trading-mode-smoke.js'
 import { runRendererDataHomeSmoke } from './data-home-smoke.js'
 import { runRendererWorkspaceAcceptanceSmoke } from './workspace-acceptance-smoke.js'
@@ -60,6 +64,7 @@ import { inspectPreviousUpdateAttempt, recordUpdateAttempt } from './update-atte
 import { childIsRunning, stopChild } from './child-shutdown.js'
 import { exitDesktopProcess } from './app-exit.js'
 import { createAppWindow } from './app-window.js'
+import type { CompanionHandle } from './companion.js'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = dirname(__filename)
@@ -70,6 +75,8 @@ let alice: ChildProcess | null = null
 let appQuitting = false
 let restartingUTA = false
 let restartingConnector = false
+let tray: Tray | null = null
+
 let pendingUTAMode: GuardianTradingModePlan | null = null
 let rendererOnboardingSmokeStarted = false
 let rendererDataHomeSmokeStarted = false
@@ -1004,7 +1011,16 @@ app.whenReady().then(async () => {
       : null,
   )
 
-  const win = createAppWindow(resolve(__dirname, 'preload.js'))
+  const { window: win, companion } = createAppWindow(resolve(__dirname, 'preload.js'))
+
+  createTray(win, companion)
+
+  win.on('close', (e) => {
+    if (appQuitting) return
+    e.preventDefault()
+    win.hide()
+  })
+
   win.webContents.on('preload-error', (_event, preloadPath, error) => {
     console.error(`[guardian] renderer preload failed path=${preloadPath}: ${error.message}`)
   })
@@ -1329,6 +1345,51 @@ function shutdown(): void {
   })
 }
 
+/**
+ * Reuse the companion portrait so the tray and the on-screen pet read as the
+ * same character. `companion/**` ships inside ui/dist in packaged builds.
+ */
+function resolveTrayIconPath(): string {
+  const here = dirname(fileURLToPath(import.meta.url))
+  return app.isPackaged
+    ? join(process.resourcesPath, 'runtime/ui/dist/companion/alice.png')
+    : resolve(here, '../../ui/public/companion/alice.png')
+}
+
+function createTray(win: BrowserWindow, companion?: CompanionHandle): void {
+  const image = nativeImage.createFromPath(resolveTrayIconPath())
+  // 22px matches the size the companion tray icon used before the merge.
+  tray = new Tray(image.resize({ width: 22, height: 22 }))
+
+  const show = () => {
+    if (win.isDestroyed()) return
+    if (win.isMinimized()) win.restore()
+    win.show()
+    win.focus()
+  }
+
+  // Rebuild on every open so stateful entries (Show/Hide pet) reflect the
+  // current pet state instead of the state at the time the tray was created.
+  const trayMenu = () => Menu.buildFromTemplate([
+    { label: 'Show OpenAlice', click: show },
+    // The pet is disposable, so its entries live under the application tray
+    // rather than owning a second tray icon that dies with the pet window.
+    ...(companion ? [{ label: 'Pet', submenu: companion.trayMenuItems() }] : []),
+    { type: 'separator' },
+    {
+      label: 'Quit',
+      click: () => {
+        appQuitting = true
+        app.quit()
+      },
+    },
+  ])
+  tray.setToolTip('OpenAlice')
+  tray.setContextMenu(trayMenu())
+  tray.on('click', show)
+  tray.on('right-click', () => tray?.popUpContextMenu(trayMenu()))
+}
+
 app.on('before-quit', (e) => {
   if (appQuitting) return
   e.preventDefault()
@@ -1336,8 +1397,6 @@ app.on('before-quit', (e) => {
 })
 
 app.on('window-all-closed', () => {
-  // MVP: quit on last-window-close everywhere (including macOS).
-  // Future: tray icon + macOS "stay alive in background" semantics so the
-  // user can close the window without killing in-flight cron jobs.
-  app.quit()
+  // Tray keeps the process alive so background jobs (cron, agents) survive
+  // closing the window. Quit is explicit: tray menu or before-quit.
 })
