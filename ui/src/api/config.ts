@@ -1,6 +1,18 @@
 import { headers } from './client'
 import type { AppConfig, Profile, Preset, Credential, SdkAdapterInfo, WireShape } from './types'
 
+export type ModelDiscoveryRequest = {
+  wireShape?: string
+  credentialSlug?: string
+  baseUrl?: string
+  apiKey?: string
+}
+
+export type ModelDiscoveryResult =
+  | { status: 'success'; models: string[] }
+  | { status: 'unsupported' }
+  | { status: 'failure'; retryable: boolean }
+
 export const configApi = {
   async load(): Promise<AppConfig> {
     const res = await fetch('/api/config')
@@ -71,6 +83,36 @@ export const configApi = {
   }): Promise<{ ok: boolean; response?: string; error?: string }> {
     const res = await fetch('/api/config/credentials/test', { method: 'POST', headers, body: JSON.stringify(input) })
     return res.json()
+  },
+
+  async discoverModels(input: ModelDiscoveryRequest): Promise<ModelDiscoveryResult> {
+    const res = await fetch('/api/config/credentials/models', {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(input),
+    })
+    const body = await res.json().catch(() => null) as unknown
+    if (!body || typeof body !== 'object' || !('status' in body)) {
+      throw new Error('Failed to discover models')
+    }
+    const result = body as { status?: unknown; models?: unknown; retryable?: unknown }
+    if (result.status === 'success') {
+      const models = result.models
+      const validModels = Array.isArray(models) && models.every((model) => {
+        if (typeof model !== 'string') return false
+        const trimmed = model.trim()
+        return trimmed.length > 0
+          && trimmed.length <= 128
+          && !/[\u0000-\u001f\u007f-\u009f]/.test(trimmed)
+      })
+      if (!validModels) throw new Error('Failed to discover models')
+      return result as ModelDiscoveryResult
+    }
+    if (result.status === 'unsupported') return result as ModelDiscoveryResult
+    if (result.status === 'failure' && typeof result.retryable === 'boolean') {
+      return result as ModelDiscoveryResult
+    }
+    throw new Error('Failed to discover models')
   },
 
   // ============ Default Workspace Credentials (per-agent) ============

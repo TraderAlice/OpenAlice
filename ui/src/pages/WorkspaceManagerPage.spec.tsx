@@ -19,6 +19,7 @@ const mocks = vi.hoisted(() => ({
   probeAgentRuntimeReadiness: vi.fn(),
   listAgents: vi.fn(),
   listAgentCredentials: vi.fn(),
+  discoverModels: vi.fn().mockResolvedValue({ status: 'unsupported' }),
   detectWorkspaceCredential: vi.fn(),
   getAgentReadiness: vi.fn(),
   getWorkspaceCredentialDefaults: vi.fn(),
@@ -69,6 +70,7 @@ vi.mock('../api/config', () => ({
   configApi: {
     getWorkspaceCredentialDefaults: mocks.getWorkspaceCredentialDefaults,
     getPresets: mocks.getPresets,
+    discoverModels: mocks.discoverModels,
   },
 }))
 

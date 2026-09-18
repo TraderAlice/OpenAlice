@@ -28,6 +28,7 @@ import { BUILTIN_PRESETS } from '../../ai-providers/presets.js'
 import type { WireShape } from '../../ai-providers/preset-catalog.js'
 import { resolveModelSemantics } from '../../ai-providers/model-semantics.js'
 import { resolveAnthropicAuthMode } from '../../core/credential-inference.js'
+import { discoverOpenAIModels } from './model-discovery.js'
 import { probeByWireShape } from '../../workspaces/agent-probe.js'
 import { createBuiltinAdapterRegistry } from '../../workspaces/adapters/index.js'
 import {
@@ -223,6 +224,46 @@ export function createConfigRoutes(opts?: ConfigRouteOpts) {
       return c.json({ success: true })
     } catch (err) {
       return c.json({ error: String(err) }, 400)
+    }
+  })
+
+  /**
+   * POST /credentials/models — transient model discovery for OpenAI-compatible chat wires.
+   * Saved credentials are resolved server-side; draft credentials are accepted only
+   * for the current request and are never persisted.
+   */
+  app.post('/credentials/models', async (c) => {
+    try {
+      const body = await c.req.json<{
+        wireShape?: string
+        credentialSlug?: string
+        baseUrl?: string
+        apiKey?: string
+      }>()
+      if (body.wireShape && body.wireShape !== 'openai-chat') {
+        return c.json({ status: 'unsupported' as const })
+      }
+
+      let baseUrl = body.baseUrl
+      let apiKey = body.apiKey
+      if (body.credentialSlug?.trim()) {
+        const credential = await resolveCredential(body.credentialSlug.trim())
+        const openaiBaseUrl = credentialWires(credential)['openai-chat']
+        if (openaiBaseUrl === undefined) {
+          return c.json({ status: 'unsupported' as const })
+        }
+        baseUrl = openaiBaseUrl
+        apiKey = credential.apiKey
+      }
+
+      const result = await discoverOpenAIModels({
+        wireShape: body.wireShape ?? 'openai-chat',
+        baseUrl,
+        apiKey,
+      })
+      return c.json(result, result.status === 'failure' ? 502 : 200)
+    } catch {
+      return c.json({ status: 'failure' as const, retryable: false as const }, 400)
     }
   })
 

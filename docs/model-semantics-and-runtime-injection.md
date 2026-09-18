@@ -50,6 +50,12 @@ retyping the last model used with an account, but it does not make the model an
 intrinsic property of the credential and must never store a copied capability
 snapshot.
 
+Model discovery is a transient, advisory suggestion source. Its response is not persisted;
+enumerated model ids do not become credential capabilities.
+
+`Credential.lastModel` remains only a remembered hint, and launch readiness and runtime
+projection never depend on discovery being available or on `lastModel` being present.
+
 ### Model selection and semantics
 
 A selection answers **which model the Workspace should use**. The model

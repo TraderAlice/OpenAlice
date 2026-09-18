@@ -14,6 +14,7 @@ vi.mock('../../api', () => ({
   api: {
     config: {
       testCredential: vi.fn(),
+      discoverModels: vi.fn().mockResolvedValue({ status: 'success', models: [] }),
       addCredential: vi.fn(),
       updateCredential: vi.fn(),
     },
@@ -526,4 +527,161 @@ describe('CredentialModal', () => {
     }))
     expect(onSaved).toHaveBeenCalled()
   })
+  it('waits for an explicit refresh before discovering add-mode models', async () => {
+    vi.mocked(api.config.discoverModels).mockResolvedValue({
+      status: 'success',
+      models: ['remote-model-from-provider'],
+    })
+    render(
+      <CredentialModal
+        mode="add"
+        presets={[onboardingTestPreset]}
+        initialPresetId="openalice-onboarding-test"
+        agents={agents}
+        onClose={vi.fn()}
+        onSaved={vi.fn().mockResolvedValue(undefined)}
+      />,
+    )
+    const keyInput = screen.getByPlaceholderText('Enter API key')
+    const refresh = screen.getByRole('button', { name: 'Refresh' }) as HTMLButtonElement
+    expect(refresh.disabled).toBe(true)
+    const finalKey = 'oa_test_ok'
+    for (let index = 1; index <= finalKey.length; index += 1) {
+      fireEvent.change(keyInput, { target: { value: finalKey.slice(0, index) } })
+    }
+    expect(api.config.discoverModels).not.toHaveBeenCalled()
+    expect(refresh.disabled).toBe(false)
+
+    fireEvent.click(refresh)
+    await waitFor(() => expect(api.config.discoverModels).toHaveBeenCalledTimes(1))
+    expect(api.config.discoverModels).toHaveBeenCalledWith({
+      wireShape: 'openai-chat',
+      baseUrl: 'http://127.0.0.1:0/v1',
+      apiKey: finalKey,
+    })
+
+    const modelInput = screen.getByRole('combobox')
+    fireEvent.focus(modelInput)
+    await waitFor(() => expect(screen.getByRole('option', { name: 'remote-model-from-provider' })).toBeTruthy())
+    fireEvent.click(screen.getByRole('option', { name: 'remote-model-from-provider' }))
+    expect((modelInput as HTMLInputElement).value).toBe('remote-model-from-provider')
+  })
+
+  it('keeps manual model entry usable when discovery fails', async () => {
+    vi.mocked(api.config.discoverModels).mockResolvedValue({ status: 'failure', retryable: true })
+    render(
+      <CredentialModal
+        mode="add"
+        presets={[onboardingTestPreset]}
+        initialPresetId="openalice-onboarding-test"
+        agents={agents}
+        onClose={vi.fn()}
+        onSaved={vi.fn().mockResolvedValue(undefined)}
+      />,
+    )
+    fireEvent.change(screen.getByPlaceholderText('Enter API key'), { target: { value: 'oa_test_ok' } })
+    const modelInput = screen.getByRole('combobox')
+    fireEvent.change(modelInput, { target: { value: 'manual-model-entry' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Refresh' }))
+
+    await waitFor(() => expect(screen.getByText('Model discovery failed. You can still enter a model manually.')).toBeTruthy())
+    expect((modelInput as HTMLInputElement).value).toBe('manual-model-entry')
+  })
+
+  it('ignores a late draft response after discovery inputs change', async () => {
+    let resolveDiscovery!: (result: { status: 'success'; models: string[] }) => void
+    const pending = new Promise<{ status: 'success'; models: string[] }>((resolve) => {
+      resolveDiscovery = resolve
+    })
+    vi.mocked(api.config.discoverModels).mockReturnValueOnce(pending)
+    render(
+      <CredentialModal
+        mode="add"
+        presets={[onboardingTestPreset]}
+        initialPresetId="openalice-onboarding-test"
+        agents={agents}
+        onClose={vi.fn()}
+        onSaved={vi.fn().mockResolvedValue(undefined)}
+      />,
+    )
+    const keyInput = screen.getByPlaceholderText('Enter API key')
+    fireEvent.change(keyInput, { target: { value: 'oa_test_ok' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Refresh' }))
+    await waitFor(() => expect(api.config.discoverModels).toHaveBeenCalledTimes(1))
+
+    fireEvent.change(keyInput, { target: { value: 'oa_test_changed' } })
+    expect(screen.queryByText('1 models discovered.')).toBeNull()
+    resolveDiscovery({ status: 'success', models: ['stale-model'] })
+    await waitFor(() => expect(screen.queryByText('1 models discovered.')).toBeNull())
+
+    const modelInput = screen.getByRole('combobox')
+    fireEvent.focus(modelInput)
+    expect(screen.queryByRole('option', { name: 'stale-model' })).toBeNull()
+  })
+
+
+  it('does not let a stale saved-credential response cross into another credential', async () => {
+    let resolveFirst!: (result: { status: 'success'; models: string[] }) => void
+    let resolveSecond!: (result: { status: 'success'; models: string[] }) => void
+    const first = new Promise<{ status: 'success'; models: string[] }>((resolve) => { resolveFirst = resolve })
+    const second = new Promise<{ status: 'success'; models: string[] }>((resolve) => { resolveSecond = resolve })
+    vi.mocked(api.config.discoverModels)
+      .mockReturnValueOnce(first)
+      .mockReturnValueOnce(second)
+
+    const makeCredential = (slug: string, model: string) => ({
+      slug,
+      vendor: 'openai',
+      authType: 'api-key' as const,
+      wires: { 'openai-responses': 'https://gateway.example/responses' },
+      apiKey: 'sk-' + slug,
+      hasApiKey: true,
+      lastModel: model,
+    })
+    const view = render(
+      <CredentialModal
+        mode="edit"
+        cred={makeCredential('credential-a', 'model-a')}
+        presets={[openAiPreset]}
+        agents={agents}
+        onClose={vi.fn()}
+        onSaved={vi.fn().mockResolvedValue(undefined)}
+      />,
+    )
+    await waitFor(() => expect(api.config.discoverModels).toHaveBeenCalledTimes(1))
+    expect(vi.mocked(api.config.discoverModels).mock.calls[0]?.[0]).toEqual({
+      credentialSlug: 'credential-a',
+      wireShape: 'openai-responses',
+    })
+    expect(vi.mocked(api.config.discoverModels).mock.calls[0]?.[0]).not.toHaveProperty('apiKey')
+    expect(vi.mocked(api.config.discoverModels).mock.calls[0]?.[0]).not.toHaveProperty('baseUrl')
+
+    view.rerender(
+      <CredentialModal
+        mode="edit"
+        cred={makeCredential('credential-b', 'model-b')}
+        presets={[openAiPreset]}
+        agents={agents}
+        onClose={vi.fn()}
+        onSaved={vi.fn().mockResolvedValue(undefined)}
+      />,
+    )
+    await waitFor(() => expect(api.config.discoverModels).toHaveBeenCalledTimes(2))
+    expect(vi.mocked(api.config.discoverModels).mock.calls[1]?.[0]).toEqual({
+      credentialSlug: 'credential-b',
+      wireShape: 'openai-responses',
+    })
+    expect(vi.mocked(api.config.discoverModels).mock.calls[1]?.[0]).not.toHaveProperty('apiKey')
+    expect(vi.mocked(api.config.discoverModels).mock.calls[1]?.[0]).not.toHaveProperty('baseUrl')
+
+    resolveFirst({ status: 'success', models: ['model-from-a'] })
+    await Promise.resolve()
+    const modelInput = screen.getByRole('combobox', { name: 'Default model' })
+    fireEvent.focus(modelInput)
+    await waitFor(() => expect(screen.queryByRole('option', { name: 'model-from-a' })).toBeNull())
+
+    resolveSecond({ status: 'success', models: ['model-from-b'] })
+    await waitFor(() => expect(screen.getByRole('option', { name: 'model-from-b' })).toBeTruthy())
+  })
+
 })

@@ -1,9 +1,9 @@
-import { useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { X } from 'lucide-react'
 
 import { api, type Preset, type WireShape } from '../../api'
-import type { CredentialSummary } from '../../api/config'
+import type { CredentialSummary, ModelDiscoveryRequest, ModelDiscoveryResult } from '../../api/config'
 import type { AgentInfo } from '../workspace/api'
 import { Field, inputClass } from '../form'
 import {
@@ -28,6 +28,33 @@ import { ModelCombobox } from './PresetFields'
 
 const SHAPE_ORDER: WireShape[] = ['anthropic', 'google-generative-ai', 'openai-chat', 'openai-responses']
 const STORED_REGION_ID = '__stored__'
+
+type DiscoveryStatus = 'idle' | 'loading' | 'success' | 'empty' | 'unsupported' | 'failure'
+
+type DiscoveryState = {
+  status: DiscoveryStatus
+  models: string[]
+  retryable?: boolean
+}
+
+function mergeModelOptions(
+  currentModel: string,
+  discoveredModels: readonly string[],
+  staticModels: readonly { id: string; label: string }[],
+): { id: string; label: string }[] {
+  const options: { id: string; label: string }[] = []
+  const seen = new Set<string>()
+  const add = (id: string, label = id) => {
+    const normalized = id.trim()
+    if (!normalized || seen.has(normalized)) return
+    seen.add(normalized)
+    options.push({ id: normalized, label: label.trim() || normalized })
+  }
+  add(currentModel)
+  discoveredModels.forEach((id) => add(id))
+  staticModels.forEach((item) => add(item.id, item.label))
+  return options
+}
 
 /** Find the region whose wires match a stored credential (for edit mode). */
 function matchRegionId(preset: Preset | null, wires: Partial<Record<WireShape, string>>): string | undefined {
@@ -91,6 +118,14 @@ export function CredentialModal({ mode, cred, presets, agents, initialPresetId, 
   const [error, setError] = useState('')
   const searchInputRef = useRef<HTMLInputElement>(null)
   const gate = useTestGate()
+  const [discovery, setDiscovery] = useState<DiscoveryState>({ status: 'idle', models: [] })
+  const discoveryGenerationRef = useRef(0)
+  const discoveryLoadingRef = useRef(false)
+  const discoveryMountedRef = useRef(false)
+  const discoveryDirtyRef = useRef(mode === 'add')
+  const discoveryAutoIdentityRef = useRef<string | null>(null)
+  const discoveryOwner = mode + ':' + (cred?.slug ?? '')
+  const discoveryOwnerRef = useRef(discoveryOwner)
 
   const regions = presetRegions(preset)
   const isDirect = !!preset?.directAgentId
@@ -115,8 +150,85 @@ export function CredentialModal({ mode, cred, presets, agents, initialPresetId, 
   const compatibleAgents = isDirect && preset?.directAgentId
     ? agents.some((agent) => agent.id === preset.directAgentId) ? [preset.directAgentId] : []
     : compatibleAgentIds(compatibilityWires, agents)
+  const draftDiscoveryRequest = useMemo<ModelDiscoveryRequest | null>(() => {
+    if (!preset || isDirect || !primaryShape) return null
+    const trimmedKey = apiKey.trim()
+    const trimmedUrl = primaryUrl.trim()
+    if (!trimmedKey || (trimmedUrl && !validEndpoint(trimmedUrl))) return null
+    return {
+      wireShape: primaryShape,
+      ...(trimmedUrl ? { baseUrl: trimmedUrl } : {}),
+      apiKey: trimmedKey,
+    }
+  }, [apiKey, isDirect, preset, primaryShape, primaryUrl])
+  const cleanSavedDiscoveryRequest = useMemo<ModelDiscoveryRequest | null>(() => {
+    if (mode !== 'edit' || !cred?.slug || !primaryShape || isDirect) return null
+    return { credentialSlug: cred.slug, wireShape: primaryShape }
+  }, [cred?.slug, isDirect, mode, primaryShape])
+  const discoveryRefreshRequest = discoveryDirtyRef.current
+    ? draftDiscoveryRequest
+    : cleanSavedDiscoveryRequest ?? draftDiscoveryRequest
 
+  const invalidateDiscovery = () => {
+    discoveryDirtyRef.current = true
+    discoveryLoadingRef.current = false
+    discoveryGenerationRef.current += 1
+    setDiscovery({ status: 'idle', models: [] })
+  }
+
+  const runDiscovery = useCallback((request: ModelDiscoveryRequest) => {
+    if (!discoveryMountedRef.current || discoveryLoadingRef.current) return
+    const generation = ++discoveryGenerationRef.current
+    discoveryLoadingRef.current = true
+    setDiscovery({ status: 'loading', models: [] })
+    void api.config.discoverModels(request)
+      .then((result: ModelDiscoveryResult) => {
+        if (!discoveryMountedRef.current || generation !== discoveryGenerationRef.current) return
+        discoveryLoadingRef.current = false
+        if (result.status === 'success') {
+          setDiscovery({ status: result.models.length > 0 ? 'success' : 'empty', models: result.models })
+        } else if (result.status === 'unsupported') {
+          setDiscovery({ status: 'unsupported', models: [] })
+        } else {
+          setDiscovery({ status: 'failure', models: [], retryable: result.retryable })
+        }
+      })
+      .catch(() => {
+        if (discoveryMountedRef.current && generation === discoveryGenerationRef.current) {
+          discoveryLoadingRef.current = false
+          setDiscovery({ status: 'failure', models: [], retryable: true })
+        }
+      })
+  }, [])
+
+  useEffect(() => {
+    discoveryMountedRef.current = true
+    return () => {
+      discoveryMountedRef.current = false
+    }
+  }, [])
+
+  useEffect(() => {
+    if (discoveryOwnerRef.current === discoveryOwner) return
+    discoveryOwnerRef.current = discoveryOwner
+    discoveryDirtyRef.current = mode === 'add'
+    discoveryAutoIdentityRef.current = null
+    discoveryLoadingRef.current = false
+    discoveryGenerationRef.current += 1
+    setDiscovery({ status: 'idle', models: [] })
+  }, [discoveryOwner, mode])
+
+  useEffect(() => {
+    if (!cleanSavedDiscoveryRequest || discoveryDirtyRef.current) return
+    const identity = JSON.stringify(cleanSavedDiscoveryRequest)
+    if (discoveryAutoIdentityRef.current === identity) return
+    discoveryAutoIdentityRef.current = identity
+    runDiscovery(cleanSavedDiscoveryRequest)
+  }, [cleanSavedDiscoveryRequest, discoveryOwner, runDiscovery])
+
+  const modelSuggestions = mergeModelOptions(model, discovery.models, models)
   const pickPreset = (next: Preset) => {
+    invalidateDiscovery()
     setPreset(next)
     setRegionId(presetRegions(next)[0]?.id ?? '')
     setDirectUrl('')
@@ -174,6 +286,10 @@ export function CredentialModal({ mode, cred, presets, agents, initialPresetId, 
         model: model.trim(),
       }),
     )
+  }
+  const handleDiscoveryRefresh = () => {
+    if (!discoveryRefreshRequest || discoveryLoadingRef.current) return
+    runDiscovery(discoveryRefreshRequest)
   }
 
   const handleSave = async () => {
@@ -321,7 +437,7 @@ export function CredentialModal({ mode, cred, presets, agents, initialPresetId, 
                   <span className="min-w-0 truncate text-[11px] text-muted-foreground">{preset.description}</span>
                 </div>
                 {mode === 'add' && (
-                  <button onClick={() => { setPreset(null); gate.reset() }} className="text-[11px] text-primary hover:underline">{t('common.change')}</button>
+                  <button onClick={() => { invalidateDiscovery(); setPreset(null); gate.reset() }} className="text-[11px] text-primary hover:underline">{t('common.change')}</button>
                 )}
               </div>
 
@@ -349,7 +465,7 @@ export function CredentialModal({ mode, cred, presets, agents, initialPresetId, 
                   <input
                     className={inputClass + ' font-mono text-[12px]'}
                     value={directUrl}
-                    onChange={(event) => setDirectUrl(event.target.value)}
+                    onChange={(event) => { invalidateDiscovery(); setDirectUrl(event.target.value) }}
                     placeholder="Cursor default endpoint"
                     spellCheck={false}
                     autoCapitalize="off"
@@ -368,7 +484,7 @@ export function CredentialModal({ mode, cred, presets, agents, initialPresetId, 
                     />
                   </Field>
                   <Field label={t('aiProvider.credentialModal.compatibilityMode')} description={t('aiProvider.credentialModal.compatibilityModeHelp')}>
-                    <select className={inputClass} value={customShape} onChange={(event) => { setCustomShape(event.target.value as WireShape); gate.reset() }}>
+                    <select className={inputClass} value={customShape} onChange={(event) => { invalidateDiscovery(); setCustomShape(event.target.value as WireShape); gate.reset() }}>
                       {SHAPE_ORDER.map((shape) => (
                         <option key={shape} value={shape}>
                           {WIRE_SHAPE_GUIDANCE[shape]} — {
@@ -382,7 +498,7 @@ export function CredentialModal({ mode, cred, presets, agents, initialPresetId, 
                     <input
                       className={inputClass + ' font-mono text-[12px]'}
                       value={customUrl}
-                      onChange={(event) => { setCustomUrl(event.target.value); gate.reset() }}
+                      onChange={(event) => { invalidateDiscovery(); setCustomUrl(event.target.value); gate.reset() }}
                       placeholder="https://provider.example/v1"
                       spellCheck={false}
                       autoCapitalize="off"
@@ -397,7 +513,7 @@ export function CredentialModal({ mode, cred, presets, agents, initialPresetId, 
                       label={t('aiProvider.credentialModal.accountRegion')}
                       description={preset.setup?.regionHelp ?? t('aiProvider.credentialModal.accountRegionHelp')}
                     >
-                      <select className={inputClass} value={regionId} onChange={(event) => { setRegionId(event.target.value); gate.reset() }}>
+                      <select className={inputClass} value={regionId} onChange={(event) => { invalidateDiscovery(); setRegionId(event.target.value); gate.reset() }}>
                         {usingStoredRegion && <option value={STORED_REGION_ID}>{t('aiProvider.credentialModal.storedEndpoint')}</option>}
                         {regions.map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}
                       </select>
@@ -433,7 +549,7 @@ export function CredentialModal({ mode, cred, presets, agents, initialPresetId, 
                     className={inputClass + ' flex-1'}
                     type={showKey ? 'text' : 'password'}
                     value={apiKey}
-                    onChange={(event) => setApiKey(event.target.value)}
+                    onChange={(event) => { invalidateDiscovery(); setApiKey(event.target.value) }}
                     placeholder={preset.setup?.apiKeyPlaceholder ?? t('aiProvider.credentialModal.apiKeyPlaceholder')}
                     spellCheck={false}
                     autoCapitalize="off"
@@ -456,12 +572,47 @@ export function CredentialModal({ mode, cred, presets, agents, initialPresetId, 
               >
                 <ModelCombobox
                   value={model}
-                  suggestions={models}
+                  suggestions={modelSuggestions}
                   onChange={setModel}
                   placeholder={t('aiProvider.credentialModal.modelPlaceholder')}
                   ariaLabel={t('aiProvider.credentialModal.defaultModel')}
                   suggestionsLabel={t('aiProvider.credentialModal.defaultModelHelp')}
                 />
+                <div className="mt-1 flex items-center justify-between gap-2">
+                  <p
+                    id="credential-model-discovery-status"
+                    aria-live="polite"
+                    aria-atomic="true"
+                    className="min-h-4 text-[10.5px] leading-4 text-muted-foreground"
+                  >
+                    {discovery.status === 'loading' && t('common.loading')}
+                    {discovery.status === 'success' && t('aiProvider.credentialModal.discoveryFound', {
+                      count: discovery.models.length,
+                      defaultValue: '{{count}} models discovered.',
+                    })}
+                    {discovery.status === 'empty' && t('aiProvider.credentialModal.discoveryEmpty', {
+                      defaultValue: 'No models discovered. You can still enter a model manually.',
+                    })}
+                    {discovery.status === 'unsupported' && t('aiProvider.credentialModal.discoveryUnsupported', {
+                      defaultValue: 'Model discovery is not supported for this connection.',
+                    })}
+                    {discovery.status === 'failure' && t('aiProvider.credentialModal.discoveryFailure', {
+                      defaultValue: 'Model discovery failed. You can still enter a model manually.',
+                    })}
+                  </p>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    aria-label={t('settings.agentRuntimes.refresh')}
+                    aria-controls="credential-model-discovery-status"
+                    disabled={!discoveryRefreshRequest || discovery.status === 'loading'}
+                    onClick={handleDiscoveryRefresh}
+                    className="shrink-0 px-2 text-[10.5px]"
+                  >
+                    {discovery.status === 'failure' ? t('common.retry') : t('settings.agentRuntimes.refresh')}
+                  </Button>
+                </div>
               </Field>
 
               {!isDirect && <details className="rounded-lg border border-border bg-secondary/20 px-3 py-2">

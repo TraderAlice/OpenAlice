@@ -27,6 +27,7 @@ const mocks = vi.hoisted(() => ({
   openHeadlessRun: vi.fn(),
   getWorkspaceSessionDirectory: vi.fn(),
   listAgentCredentials: vi.fn(),
+  discoverModels: vi.fn().mockResolvedValue({ status: 'unsupported' }),
   updateResumeRuntime: vi.fn(),
   getPresets: vi.fn(),
   getWorkspaceCredentialDefaults: vi.fn(),
@@ -120,6 +121,7 @@ vi.mock('./workspace/api', async (importOriginal) => {
 vi.mock('../api/config', () => ({
   configApi: {
     getPresets: mocks.getPresets,
+    discoverModels: mocks.discoverModels,
     getWorkspaceCredentialDefaults: mocks.getWorkspaceCredentialDefaults,
   },
 }))
@@ -492,7 +494,7 @@ describe('IssueDetail property controls', () => {
     expect(screen.queryByRole('menuitemradio', { name: /LongCat/ })).toBeNull()
     fireEvent.click(screen.getByRole('menuitem', { name: /Effort/ }))
     expect(await screen.findByRole('menuitemradio', { name: /low/ })).toBeTruthy()
-    expect(screen.getByRole('menuitemradio', { name: /high/ })).toBeTruthy()
+    expect(screen.getByRole('menuitemradio', { name: /^high reasoning$/i })).toBeTruthy()
     expect(screen.getByRole('menuitemradio', { name: /max/ })).toBeTruthy()
   })
 

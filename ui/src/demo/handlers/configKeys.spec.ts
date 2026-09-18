@@ -87,3 +87,44 @@ describe('demo snapshot config', () => {
     expect(await valid.json()).toEqual({ enabled: false, every: '2h15m' })
   })
 })
+
+describe('demo model discovery', () => {
+  it.each([
+    ['without an explicit wire shape', {}],
+    ['with the supported OpenAI chat wire shape', { wireShape: 'openai-chat' }],
+  ])('returns the demo model for requests %s', async (_label, body) => {
+    const response = await fetch(baseUrl + '/api/config/credentials/models', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    })
+
+    expect(response.status).toBe(200)
+    expect(await response.json()).toEqual({
+      status: 'success',
+      models: ['demo-discovered-model-2026-09'],
+    })
+  })
+
+  it('returns unsupported for a non-chat wire shape', async () => {
+    const response = await fetch(baseUrl + '/api/config/credentials/models', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ wireShape: 'openai-responses' }),
+    })
+
+    expect(response.status).toBe(200)
+    expect(await response.json()).toEqual({ status: 'unsupported' })
+  })
+
+  it('preserves the designated demo failure fixture', async () => {
+    const response = await fetch(baseUrl + '/api/config/credentials/models', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ credentialSlug: 'demo-failure' }),
+    })
+
+    expect(response.status).toBe(502)
+    expect(await response.json()).toEqual({ status: 'failure', retryable: false })
+  })
+})

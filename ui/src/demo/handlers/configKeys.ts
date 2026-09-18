@@ -283,6 +283,20 @@ export const configKeysHandlers = [
       ],
     }),
   ),
+  http.post('/api/config/credentials/models', async ({ request }) => {
+    const body = (await request.json().catch(() => ({}))) as {
+      credentialSlug?: string
+      apiKey?: string
+      wireShape?: string
+    }
+    if (body.wireShape && body.wireShape !== 'openai-chat') {
+      return HttpResponse.json({ status: 'unsupported' })
+    }
+    if (body.credentialSlug === 'demo-failure' || body.apiKey === 'demo-model-discovery-failure') {
+      return HttpResponse.json({ status: 'failure', retryable: false }, { status: 502 })
+    }
+    return HttpResponse.json({ status: 'success', models: ['demo-discovered-model-2026-09'] })
+  }),
   http.post('/api/config/credentials', () =>
     HttpResponse.json({ slug: 'custom-1', vendor: 'custom' }, { status: 201 }),
   ),

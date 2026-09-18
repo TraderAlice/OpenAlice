@@ -78,6 +78,26 @@ function injectedReasoningDetails(credential: Pick<
   }
 }
 
+function mergeLaunchModelOptions(
+  currentModel: string | undefined,
+  defaultModel: string | null,
+  baseOptions: readonly PresetModel[],
+  discoveredModels: readonly string[],
+): PresetModel[] {
+  const options: PresetModel[] = []
+  const seen = new Set<string>()
+  const add = (id: string | null | undefined, option?: PresetModel) => {
+    const normalized = id?.trim()
+    if (!normalized || seen.has(normalized)) return
+    seen.add(normalized)
+    options.push(option && option.id === normalized ? option : { id: normalized, label: normalized })
+  }
+  add(currentModel)
+  add(defaultModel)
+  baseOptions.forEach((option) => add(option.id, option))
+  discoveredModels.forEach((id) => add(id))
+  return options
+}
 /** Resolve the visible credential without allowing global defaults to flash
  * over a Workspace whose on-disk agent config is still being inspected. */
 export function resolveAgentCredential(
@@ -471,6 +491,11 @@ export function useAgentLaunchConfig({
   const [workspaceCredentialDefaults, setWorkspaceCredentialDefaults] = useState<Record<string, WorkspaceCredentialDefault>>({})
   const [presets, setPresets] = useState<Awaited<ReturnType<typeof configApi.getPresets>>['presets']>([])
   const [agentConfigRevision, setAgentConfigRevision] = useState(0)
+  const [discoveredModels, setDiscoveredModels] = useState<{
+    credentialSlug: string
+    models: string[]
+  }>({ credentialSlug: '', models: [] })
+  const discoveryGenerationRef = useRef(0)
   const immediateLaunchRef = useRef<QuickChatLaunchPreference | null>(preferences.recentLaunch)
   if (preferences.recentLaunch !== immediateLaunchRef.current) {
     immediateLaunchRef.current = preferences.recentLaunch
@@ -647,6 +672,31 @@ export function useAgentLaunchConfig({
       )
     : resolveExplicitLoginBackedCredential(credentials, explicitLoginBackedCredential)
   const credential = credentials?.find((candidate) => candidate.slug === effectiveCredential) ?? null
+  const discoveryCredentialSlug = accessMode === 'native' ? null : credential?.slug ?? null
+
+  useEffect(() => {
+    const generation = ++discoveryGenerationRef.current
+    let active = true
+    if (!discoveryCredentialSlug) {
+      setDiscoveredModels({ credentialSlug: '', models: [] })
+      return () => { active = false }
+    }
+    setDiscoveredModels({ credentialSlug: discoveryCredentialSlug, models: [] })
+    void configApi.discoverModels({ credentialSlug: discoveryCredentialSlug })
+      .then((result) => {
+        if (!active || generation !== discoveryGenerationRef.current) return
+        setDiscoveredModels({
+          credentialSlug: discoveryCredentialSlug,
+          models: result.status === 'success' ? result.models : [],
+        })
+      })
+      .catch(() => {
+        if (active && generation === discoveryGenerationRef.current) {
+          setDiscoveredModels({ credentialSlug: discoveryCredentialSlug, models: [] })
+        }
+      })
+    return () => { active = false }
+  }, [discoveryCredentialSlug])
   const launchCredentialSlug = typeof preferredCredential === 'string' &&
     credentials?.some((candidate) => candidate.slug === preferredCredential) === true
     ? preferredCredential
@@ -673,7 +723,7 @@ export function useAgentLaunchConfig({
   const defaultModel = launchCredentialSlug
     ? credential?.resolvedModel ?? null
     : baseAiDetails?.model ?? null
-  const modelOptions = runtimeModelOptions({
+  const staticModelOptions = runtimeModelOptions({
     agent: effectiveAgent,
     // Catalog ownership follows the resolved access source, not whether the
     // user explicitly picked the credential in this launch row. Installation
@@ -682,6 +732,12 @@ export function useAgentLaunchConfig({
     defaultModel,
     presets,
   })
+  const modelOptions = mergeLaunchModelOptions(
+    launchModel,
+    defaultModel,
+    staticModelOptions,
+    discoveredModels.credentialSlug === discoveryCredentialSlug ? discoveredModels.models : [],
+  )
   const effectiveModel = launchModel ?? defaultModel
   const selectedModelSemantics = runtimeModelSemantics(effectiveModel, modelOptions)
   const launchReasoningEffort = selectedReasoningEffort
