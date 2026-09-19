@@ -10,6 +10,18 @@ Related guides: [[docs/project-structure.md]] and
 
 ## The Three-Layer Contract
 
+Model pickers discover IDs from the selected access source. Saved credentials
+use `GET /api/config/credentials/:slug/models?agent=…` with the runtime's wire
+preference; draft credentials use `POST /api/config/credentials/models`.
+OpenAI-compatible, Anthropic, and Google model-list APIs are read-only (no
+generation probe). Native Oh My Pi uses `omp models --json --no-extensions`
+in the selected Workspace and retains provider-qualified selectors.
+Only model IDs and labels leave discovery; known semantics still come from
+the shared registry. UI requests follow account changes, discard stale
+responses, and expose loading, empty, and retry states. Static suggestions
+and manual IDs remain a fallback when discovery is unavailable. An empty
+successful catalog is not replaced with guessed models.
+
 OpenAlice does not run an in-process model loop. It prepares a native Agent CLI
 to reach a selected model. That preparation has three distinct inputs:
 
@@ -95,7 +107,11 @@ runtime's native launch interface:
   Alice launches PATH `agy` only — never `antigravity` or `gemini`;
 - Grok Build `XAI_API_KEY` / optional `GROK_MODELS_BASE_URL` plus `--model`
   and `--effort`;
-- Oh My Pi provider env plus `--model` and `--thinking`;
+- Oh My Pi process-local provider registration (reusing Pi's explicit extension
+  and secret-bearing child environment) plus provider-qualified `--model` and
+  `--thinking`; generic Anthropic/OpenAI environment keys do not authenticate
+  MiniMax or register a custom gateway's model in OMP. Native bindings retain
+  OMP's own provider selection and login;
 - Codex provider arguments/environment plus `--model` and
   `model_reasoning_effort` configuration arguments.
 

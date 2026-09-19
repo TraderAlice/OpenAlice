@@ -20,6 +20,7 @@ import {
   type WorkspaceCredentialDetection,
 } from '../components/workspace/api'
 import { useAgentRuntimes } from './useAgentRuntimes'
+import { catalogModelOptions, useModelCatalog } from './useModelCatalog'
 import { requiresWorkspaceCredential, resolveAgentRuntime } from '../lib/agentRuntime'
 import {
   runtimeEffortOptions,
@@ -410,6 +411,7 @@ export interface AgentLaunchConfigState {
   readonly workspaceConfigResolved: boolean
   readonly defaultModel: string | null
   readonly modelOptions: readonly PresetModel[]
+  readonly modelCatalog?: ReturnType<typeof useModelCatalog>
   readonly launchModel: string | undefined
   readonly effortOptions: readonly ModelReasoningEffort[]
   /** Explicit picker value. Undefined means use the selected model's registered default. */
@@ -673,7 +675,11 @@ export function useAgentLaunchConfig({
   const defaultModel = launchCredentialSlug
     ? credential?.resolvedModel ?? null
     : baseAiDetails?.model ?? null
-  const modelOptions = runtimeModelOptions({
+  const modelCatalog = useModelCatalog(accessMode !== 'native' && credential && effectiveAgent
+    ? { slug: credential.slug, agent: effectiveAgent }
+    : effectiveAgent === 'omp' && accessMode !== 'vault' && !effectiveCredential
+      ? { native: 'omp', ...(workspaceId ? { workspaceId } : {}) } : null)
+  const modelOptions = catalogModelOptions(modelCatalog.models, runtimeModelOptions({
     agent: effectiveAgent,
     // Catalog ownership follows the resolved access source, not whether the
     // user explicitly picked the credential in this launch row. Installation
@@ -681,7 +687,7 @@ export function useAgentLaunchConfig({
     credential: accessMode === 'native' ? null : credential,
     defaultModel,
     presets,
-  })
+  }))
   const effectiveModel = launchModel ?? defaultModel
   const selectedModelSemantics = runtimeModelSemantics(effectiveModel, modelOptions)
   const launchReasoningEffort = selectedReasoningEffort
@@ -818,6 +824,7 @@ export function useAgentLaunchConfig({
     workspaceConfigResolved,
     defaultModel,
     modelOptions,
+    modelCatalog,
     launchModel,
     effortOptions,
     selectedReasoningEffort,
@@ -856,6 +863,7 @@ export function useAgentLaunchConfig({
     selectedReasoningEffort,
     launchReasoningEffort,
     modelOptions,
+    modelCatalog,
     needsCredential,
     noCredentials,
     runtimeReadiness,

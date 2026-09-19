@@ -10,6 +10,15 @@ import type { Resources } from './en'
  * Content is UI chrome only — no geographic or other non-technical terms.
  */
 export const zhHant: Resources = {
+  modelCatalog: {
+    loading: "正在讀取此 AI 存取的模型清單…",
+    failed: "讀取模型失敗，請重試；若服務商未提供模型清單 API，可手動輸入 ID。",
+    empty: "未發現模型。請先為此帳戶設定模型提供商，再重新整理。",
+    loaded: "可選 {{count}} 個模型",
+    refresh: "重新整理",
+    selectHelp: "選擇此 AI 存取提供的模型。",
+    selectPlaceholder: "選擇模型",
+  },
   stickers: {
     "meaning": "含义（可选）",
     "title": "表情包",
@@ -1526,12 +1535,14 @@ export const zhHant: Resources = {
     noAgentsBody: 'OpenAlice 通常會自帶 Pi 用於工作區對話。如果打包版出現這個提示，表示執行環境包需要檢查；你仍然可以先以 Lite 模式繼續使用。',
     selectCredential: 'AI 存取',
     aiAccess: 'AI 存取',
-    credentialMenuTitle: '{{runtime}} 要如何存取 AI？',
+    credentialMenuTitle: '選擇 {{runtime}} 使用的 AI 帳戶',
+    addApiAccount: '新增 API 帳戶…',
+    addApiAccountDetail: '在設定中新增 Coding Plan 或自訂 API',
     modelField: '模型',
     effortField: '推理強度',
     runtimeFallback: '執行環境',
     runtimeAccount: '{{runtime}} 帳戶',
-    runtimeAccountDetail: '使用 {{runtime}} 目前登入的帳戶',
+    runtimeAccountDetail: '使用 {{runtime}} 自己的登入或 API 設定',
     workspaceAiAccess: 'Workspace AI 設定',
     workspaceAccessDetail: '此 Workspace 的 {{credential}}',
     savedAccessDetail: '已儲存的 {{credential}}',

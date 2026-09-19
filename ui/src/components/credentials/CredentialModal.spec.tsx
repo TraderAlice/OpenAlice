@@ -9,6 +9,9 @@ import { api } from '../../api'
 import { i18n } from '../../i18n'
 import type { AgentInfo } from '../workspace/api'
 import { CredentialModal } from './CredentialModal'
+import { configApi } from '../../api/config'
+
+vi.mock('../../api/config', () => ({ configApi: { discoverModels: vi.fn().mockResolvedValue([]), getCredentialModels: vi.fn().mockResolvedValue([]) } }))
 
 vi.mock('../../api', () => ({
   api: {
@@ -217,6 +220,37 @@ afterEach(() => {
 })
 
 describe('CredentialModal', () => {
+  it('reads an existing account catalog without asking for its saved secret again', async () => {
+    vi.mocked(configApi.getCredentialModels).mockResolvedValueOnce([{ id: 'saved/model', label: 'Saved model' }])
+    render(<CredentialModal mode="edit" presets={[openAiPreset]} agents={agents}
+      cred={{ slug: 'openai-1', vendor: 'openai', authType: 'api-key', apiKey: null, hasApiKey: true,
+        wires: { 'openai-responses': 'https://api.openai.com/v1' }, lastModel: 'gpt-test' }}
+      onClose={vi.fn()} onSaved={vi.fn()} />)
+    await screen.findByText(i18n.t('modelCatalog.loaded', { count: 1 }))
+    expect(configApi.getCredentialModels).toHaveBeenCalledWith('openai-1', undefined, expect.any(AbortSignal), 'openai-responses')
+    fireEvent.focus(screen.getByRole('combobox', { name: /model/i }))
+    fireEvent.click(screen.getByRole('option', { name: /saved\/model/ }))
+    expect(screen.getByDisplayValue('saved/model')).toBeTruthy()
+  })
+
+  it('clears a draft key when changing providers so discovery cannot send it to the next provider', () => {
+    setup()
+    fireEvent.click(screen.getByRole('button', { name: i18n.t('common.change') }))
+    fireEvent.click(screen.getByText('OpenAI'))
+    expect((screen.getByPlaceholderText('Enter API key') as HTMLInputElement).value).toBe('')
+  })
+
+  it('selects an exact discovered model ID and uses it for the credential test', async () => {
+    vi.mocked(configApi.discoverModels).mockResolvedValueOnce([{ id: 'account-only/model-9', label: 'Account model' }])
+    vi.mocked(api.config.testCredential).mockResolvedValue({ ok: true, response: 'ok' })
+    setup()
+    await screen.findByText(i18n.t('modelCatalog.loaded', { count: 1 }))
+    fireEvent.focus(screen.getByRole('combobox', { name: /model/i }))
+    fireEvent.click(screen.getByRole('option', { name: /account-only\/model-9/ }))
+    fireEvent.click(screen.getByRole('button', { name: 'Test connection' }))
+    await waitFor(() => expect(api.config.testCredential).toHaveBeenCalledWith(expect.objectContaining({ model: 'account-only/model-9' })))
+  })
+
   it('uses the shared long-form dialog contract and restores the opener', async () => {
     const opener = document.createElement('button')
     opener.textContent = 'Open credentials'
@@ -317,7 +351,7 @@ describe('CredentialModal', () => {
     )
 
     expect(screen.getByText('Use a Gemini API key from Google AI Studio. AQ and AIza keys are supported.')).toBeTruthy()
-    expect(screen.getByText('Choose a Gemini model exposed by the native endpoint.')).toBeTruthy()
+    expect(screen.getByText(i18n.t('modelCatalog.selectHelp'))).toBeTruthy()
     expect(screen.getByText('Pi')).toBeTruthy()
     expect(screen.getByText('opencode')).toBeTruthy()
     expect(screen.queryByText('Claude Code')).toBeNull()
@@ -340,7 +374,7 @@ describe('CredentialModal', () => {
 
     fireEvent.change(screen.getByPlaceholderText('e.g. Local vLLM'), { target: { value: 'Gateway' } })
     fireEvent.change(screen.getByPlaceholderText('Enter API key'), { target: { value: 'sk-gateway' } })
-    fireEvent.change(screen.getByPlaceholderText('Exact provider model ID'), { target: { value: 'gateway-model' } })
+    fireEvent.change(screen.getByPlaceholderText(i18n.t('modelCatalog.selectPlaceholder')), { target: { value: 'gateway-model' } })
 
     expect(screen.getByRole('option', { name: /OpenAI Chat Completions — opencode, Pi/ })).toBeTruthy()
     const testButton = screen.getByRole('button', { name: 'Test connection' }) as HTMLButtonElement

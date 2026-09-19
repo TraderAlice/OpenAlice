@@ -40,6 +40,7 @@ import {
 import { ModelCombobox } from '../credentials/PresetFields'
 import { useTestGate } from '../../lib/useTestGate'
 import { useWorkspaces } from '../../contexts/workspaces-context'
+import { useWorkspace } from '../../tabs/store'
 import { notifyWorkspaceAgentConfigChanged } from '../../lib/workspaceAiEvents'
 import { AgentRuntimeIcon } from '../../lib/agentRuntimeIcon'
 import { WorkspaceTemplateUpgradePanel } from './WorkspaceTemplateUpgradePanel'
@@ -288,6 +289,7 @@ export function WorkspaceAIConfigModal({
   initialSection = 'general',
 }: Props) {
   const { t } = useTranslation()
+  const openOrFocus = useWorkspace((state) => state.openOrFocus)
   const backdropRef = useRef<HTMLDivElement>(null)
   const dialogRef = useRef<HTMLDivElement>(null)
   const onCloseRef = useRef(onClose)
@@ -1398,7 +1400,10 @@ export function WorkspaceAIConfigModal({
                 workspace={workspace}
                 agents={agents}
                 onSaved={refresh}
-                onConfigureProvider={() => setSection('ai')}
+                onConfigureProvider={() => {
+                  onClose()
+                  openOrFocus({ kind: 'settings', params: { category: 'ai-provider' } })
+                }}
               />
             )}
 

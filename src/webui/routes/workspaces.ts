@@ -10,6 +10,7 @@ import { prepareProjectWorkspaces, readProjectWorkspaceSetup } from '../../works
  */
 
 import { Hono, type Context } from 'hono';
+import { listOmpModels } from '../../workspaces/omp-models.js';
 import { existsSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import { join, resolve as resolvePath } from 'node:path';
@@ -976,6 +977,17 @@ export function createWorkspaceRoutes(
         transcriptDir: plan.transcriptDir,
       },
     });
+  });
+
+  app.get('/agents/omp/models', async (c) => {
+    const workspaceId = c.req.query('workspaceId');
+    const workspace = workspaceId ? svc.resolveRuntimeWorkspace(workspaceId) : undefined;
+    if (workspaceId && !workspace) return c.json({ error: 'Workspace not found' }, 404);
+    try {
+      return c.json({ models: await listOmpModels(workspace?.dir ?? process.cwd()) });
+    } catch (error) {
+      return c.json({ error: error instanceof Error ? error.message : 'Model discovery failed' }, 502);
+    }
   });
 
   app.get('/agent-runtime-readiness', (c) => {

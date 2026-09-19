@@ -7,7 +7,7 @@
  * the GET's per-agent options reflect actual wire compatibility.
  */
 
-import { describe, it, expect, beforeEach, vi } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import type { Credential, WorkspaceCredentialDefault } from '../../core/config.js'
 
 let credStore: Record<string, Credential> = {}
@@ -91,6 +91,23 @@ beforeEach(() => {
 })
 
 describe('generic config sections', () => {
+  afterEach(() => vi.unstubAllGlobals())
+
+  it('discovers saved credential models on its compatible wire and rejects unknown accounts and protocols', async () => {
+    const fetcher = vi.fn().mockResolvedValue(Response.json({ data: [{ id: 'account-model' }] }))
+    vi.stubGlobal('fetch', fetcher)
+    const routes = createConfigRoutes()
+    expect(await req(routes, 'GET', '/credentials/chat-1/models?agent=omp')).toEqual({
+      status: 200, body: { models: [{ id: 'account-model', label: 'account-model' }] },
+    })
+    expect(String(fetcher.mock.calls[0]![0])).toBe('https://gw/v1/models')
+    expect(fetcher.mock.calls[0]![1].headers).toEqual({ Authorization: 'Bearer k' })
+    expect((await req(routes, 'GET', '/credentials/missing/models')).status).toBe(404)
+    expect((await req(routes, 'GET', '/credentials/chat-1/models?agent=invalid')).status).toBe(400)
+    expect((await req(routes, 'POST', '/credentials/models', { wireShape: 'invalid', apiKey: 'secret' })).status).toBe(400)
+    expect(fetcher).toHaveBeenCalledTimes(1)
+  })
+
   it('rejects the retired global compaction policy', async () => {
     const routes = createConfigRoutes()
     const { status, body } = await req(routes, 'PUT', '/compaction', {

@@ -342,7 +342,11 @@ describe('built-in Agent Session runtime projection', () => {
     expect(piAdapter.sessionRuntime!.project(ctx, runtime).webArgs)
       .toContain('--extension')
     expect(ompAdapter.sessionRuntime!.project(ctx, runtime).interactiveArgs)
-      .toEqual(['--model', 'session-model', '--thinking', 'high'])
+      .toEqual([
+        '--extension', expect.stringMatching(/pi-session-provider\.ts$/),
+        '--model', 'openalice-session/session-model',
+        '--thinking', 'high',
+      ])
     expect(agyAdapter.sessionRuntime!.project(ctx, runtime).interactiveArgs)
       .toEqual(['--model', 'session-model', '--effort', 'high'])
   })

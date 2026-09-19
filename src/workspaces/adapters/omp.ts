@@ -3,6 +3,7 @@ import { readdir, readFile, stat } from 'node:fs/promises';
 import { homedir, tmpdir } from 'node:os';
 import { isAbsolute, join, relative, resolve } from 'node:path';
 
+import { cliBinPath } from '../../core/paths.js';
 import type { ModelReasoningEffort } from '../../ai-providers/model-semantics.js';
 import type {
   CliAdapter,
@@ -11,6 +12,7 @@ import type {
   SpawnContext,
 } from '../cli-adapter.js';
 import type { HeadlessOutputEvent } from '../headless-output.js';
+import { buildPiProvider } from './pi-config.js';
 
 const OMP_RUN_EFFORTS = new Set<ModelReasoningEffort>([
   'none',
@@ -135,24 +137,6 @@ function ompRoleArgs(ctx: SpawnContext): readonly string[] {
   return ctx.appendSystemPrompt ? ['--append-system-prompt', ctx.appendSystemPrompt] : [];
 }
 
-function ompCredentialEnv(ai: NonNullable<ResolvedSessionRuntimeBinding['ai']>): Record<string, string> {
-  const env: Record<string, string> = {};
-  const key = ai.apiKey?.trim();
-  const base = ai.baseUrl?.trim();
-  if (ai.wireShape === 'anthropic') {
-    if (key) env['ANTHROPIC_API_KEY'] = key;
-    if (base) env['ANTHROPIC_BASE_URL'] = base;
-    return env;
-  }
-  if (ai.wireShape === 'google-generative-ai') {
-    if (key) env['GEMINI_API_KEY'] = key;
-    return env;
-  }
-  if (key) env['OPENAI_API_KEY'] = key;
-  if (base) env['OPENAI_BASE_URL'] = base;
-  return env;
-}
-
 function parseJsonRecord(line: string): Record<string, unknown> | null {
   try {
     const parsed: unknown = JSON.parse(line);
@@ -248,16 +232,33 @@ export const ompAdapter: CliAdapter = {
   },
 
   sessionRuntime: {
-    project(_ctx, runtime: ResolvedSessionRuntimeBinding) {
+    project(ctx, runtime: ResolvedSessionRuntimeBinding) {
       const effort = runtime.binding.reasoningEffort;
       if (effort && !OMP_RUN_EFFORTS.has(effort)) {
         throw new Error(`Oh My Pi cannot use Session effort ${effort}`);
       }
+      const ai = runtime.ai;
+      const customProvider = !!ai && !!(ai.apiKey || ai.baseUrl);
+      const providerId = 'openalice-session';
+      const model = runtime.binding.model;
       const args = [
-        ...(runtime.binding.model ? ['--model', runtime.binding.model] : []),
+        ...(customProvider
+          ? ['--extension', join(cliBinPath(), 'pi-session-provider.ts')]
+          : []),
+        ...(model ? ['--model', customProvider ? `${providerId}/${model}` : model] : []),
         ...(effort ? ['--thinking', ompThinkingArg(effort)] : []),
       ];
-      const env = runtime.ai ? ompCredentialEnv(runtime.ai) : {};
+      // OMP shares Pi's extension API. Register the complete account locally:
+      // generic ANTHROPIC/OPENAI env keys do not authenticate other providers.
+      const env: Record<string, string> = {};
+      if (customProvider && ai) {
+        env['OPENALICE_PI_SESSION_PROVIDER'] = JSON.stringify({
+          providerId,
+          // OMP requires apiKey even for a provider with explicit Bearer headers;
+          // its Anthropic transport suppresses X-Api-Key for those endpoints.
+          provider: { ...buildPiProvider(ctx.cwd, ai), ...(ai.apiKey ? { apiKey: ai.apiKey } : {}) },
+        });
+      }
       return { env, interactiveArgs: args, headlessArgs: args, webArgs: args };
     },
   },

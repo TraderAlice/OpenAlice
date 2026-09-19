@@ -13,6 +13,15 @@
  */
 
 export const en = {
+  modelCatalog: {
+    loading: "Loading models from this AI access…",
+    failed: "Could not load models. Retry, or enter an ID manually if this provider has no model list API.",
+    empty: "No models found. Configure a provider in this account, then refresh.",
+    loaded: "{{count}} models available",
+    refresh: "Refresh",
+    selectHelp: "Choose a model available through this AI access.",
+    selectPlaceholder: "Choose a model",
+  },
   stickers: {
     "meaning": "Meaning (optional)",
     "title": "Stickers",
@@ -1544,12 +1553,14 @@ export const en = {
     noAgentsBody: 'OpenAlice normally includes Pi for workspace chat. If this appears in a packaged build, the runtime bundle needs attention; you can continue in Lite while setup is checked.',
     selectCredential: 'AI access',
     aiAccess: 'AI access',
-    credentialMenuTitle: 'Who should manage AI access for {{runtime}}?',
+    credentialMenuTitle: 'Select an AI account for {{runtime}}',
+    addApiAccount: 'Add API account…',
+    addApiAccountDetail: 'Configure a Coding Plan or custom API in Settings',
     modelField: 'Model',
     effortField: 'Effort',
     runtimeFallback: 'Runtime',
     runtimeAccount: '{{runtime}} account',
-    runtimeAccountDetail: 'Uses the account signed in to {{runtime}}',
+    runtimeAccountDetail: 'Uses {{runtime}}’s own login or API configuration',
     workspaceAiAccess: 'Workspace AI setup',
     workspaceAccessDetail: '{{credential}} from this Workspace',
     savedAccessDetail: 'Saved {{credential}}',

@@ -2,6 +2,15 @@ import type { Resources } from './en'
 
 /** 简体中文. Typed as `Resources` → must match en's key structure exactly. */
 export const zh: Resources = {
+  modelCatalog: {
+    loading: "正在读取此 AI 访问的模型列表…",
+    failed: "读取模型失败，请重试；若服务商不提供模型列表 API，可手动输入 ID。",
+    empty: "未发现模型。请先为此账户配置模型提供商，再刷新。",
+    loaded: "可选 {{count}} 个模型",
+    refresh: "刷新",
+    selectHelp: "选择此 AI 访问提供的模型。",
+    selectPlaceholder: "选择模型",
+  },
   stickers: {
     "meaning": "含义（可选）",
     "title": "表情包",
@@ -1517,12 +1526,14 @@ export const zh: Resources = {
     noAgentsBody: 'OpenAlice 通常会自带 Pi 用于工作区对话。如果打包版出现这个提示，说明运行时包需要检查；你仍然可以先以 Lite 模式继续使用。',
     selectCredential: 'AI 访问',
     aiAccess: 'AI 访问',
-    credentialMenuTitle: '由谁管理 {{runtime}} 的 AI 访问？',
+    credentialMenuTitle: '选择 {{runtime}} 使用的 AI 账户',
+    addApiAccount: '添加 API 账户…',
+    addApiAccountDetail: '在设置中添加 Coding Plan 或自定义 API',
     modelField: '模型',
     effortField: '推理强度',
     runtimeFallback: '运行时',
     runtimeAccount: '{{runtime}} 账户',
-    runtimeAccountDetail: '使用 {{runtime}} 当前登录的账户',
+    runtimeAccountDetail: '使用 {{runtime}} 自己的登录或 API 配置',
     workspaceAiAccess: 'Workspace AI 配置',
     workspaceAccessDetail: '此 Workspace 的 {{credential}}',
     savedAccessDetail: '已保存的 {{credential}}',

@@ -25,6 +25,8 @@ import { AIProviderIcon } from '../../lib/aiProviderIcon'
 import { Dialog } from '../uta/Dialog'
 import { Button } from '../ui/button'
 import { ModelCombobox } from './PresetFields'
+import { catalogModelOptions, useModelCatalog } from '../../hooks/useModelCatalog'
+import { ModelCatalogStatus } from '../ModelCatalogStatus'
 
 const SHAPE_ORDER: WireShape[] = ['anthropic', 'google-generative-ai', 'openai-chat', 'openai-responses']
 const STORED_REGION_ID = '__stored__'
@@ -97,7 +99,6 @@ export function CredentialModal({ mode, cred, presets, agents, initialPresetId, 
   const isCustom = !!preset && !isDirect && regions.length === 0
   const usingStoredRegion = !isCustom && regionId === STORED_REGION_ID
   const region = usingStoredRegion ? undefined : regionById(preset, regionId)
-  const models = preset ? presetModels(preset) : []
 
   const wires: Partial<Record<WireShape, string>> = isCustom
     ? (customUrl.trim() ? { [customShape]: customUrl.trim() } : {})
@@ -111,6 +112,13 @@ export function CredentialModal({ mode, cred, presets, agents, initialPresetId, 
       : regionShapes(region)
   const primaryShape = shapes[0]
   const primaryUrl = primaryShape ? (wires[primaryShape] ?? '') : ''
+  const storedAccess = cred && primaryShape && primaryShape in (cred.wires ?? {})
+    && primaryUrl === cred.wires?.[primaryShape] && (!apiKey.trim() || apiKey === cred.apiKey)
+  const modelCatalog = useModelCatalog(!isDirect && primaryShape && (!isCustom || primaryUrl.trim()) && (!primaryUrl || validEndpoint(primaryUrl))
+    ? storedAccess ? { slug: cred.slug, wireShape: primaryShape }
+      : apiKey.trim() ? { wireShape: primaryShape, baseUrl: primaryUrl, apiKey: apiKey.trim() } : null
+    : null)
+  const models = catalogModelOptions(modelCatalog.models, preset ? presetModels(preset) : [])
   const compatibilityWires = isCustom ? { [customShape]: customUrl.trim() } : wires
   const compatibleAgents = isDirect && preset?.directAgentId
     ? agents.some((agent) => agent.id === preset.directAgentId) ? [preset.directAgentId] : []
@@ -321,7 +329,12 @@ export function CredentialModal({ mode, cred, presets, agents, initialPresetId, 
                   <span className="min-w-0 truncate text-[11px] text-muted-foreground">{preset.description}</span>
                 </div>
                 {mode === 'add' && (
-                  <button onClick={() => { setPreset(null); gate.reset() }} className="text-[11px] text-primary hover:underline">{t('common.change')}</button>
+                  <button onClick={() => {
+                    setPreset(null)
+                    // Automatic discovery must not carry a key to a different provider.
+                    setApiKey('')
+                    gate.reset()
+                  }} className="text-[11px] text-primary hover:underline">{t('common.change')}</button>
                 )}
               </div>
 
@@ -452,16 +465,17 @@ export function CredentialModal({ mode, cred, presets, agents, initialPresetId, 
 
               <Field
                 label={t('aiProvider.credentialModal.defaultModel')}
-                description={preset.setup?.modelHelp ?? t('aiProvider.credentialModal.defaultModelHelp')}
+                description={t('modelCatalog.selectHelp')}
               >
                 <ModelCombobox
                   value={model}
                   suggestions={models}
                   onChange={setModel}
-                  placeholder={t('aiProvider.credentialModal.modelPlaceholder')}
+                  placeholder={t('modelCatalog.selectPlaceholder')}
                   ariaLabel={t('aiProvider.credentialModal.defaultModel')}
                   suggestionsLabel={t('aiProvider.credentialModal.defaultModelHelp')}
                 />
+                <ModelCatalogStatus catalog={modelCatalog} />
               </Field>
 
               {!isDirect && <details className="rounded-lg border border-border bg-secondary/20 px-3 py-2">

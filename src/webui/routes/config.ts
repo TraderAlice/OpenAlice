@@ -27,6 +27,7 @@ import { triggerUTARestart } from '../../services/uta-supervisor/restart-trigger
 import { BUILTIN_PRESETS } from '../../ai-providers/presets.js'
 import type { WireShape } from '../../ai-providers/preset-catalog.js'
 import { resolveModelSemantics } from '../../ai-providers/model-semantics.js'
+import { discoverModels, modelDiscoveryInput } from '../../ai-providers/model-discovery.js'
 import { resolveAnthropicAuthMode } from '../../core/credential-inference.js'
 import { probeByWireShape } from '../../workspaces/agent-probe.js'
 import { createBuiltinAdapterRegistry } from '../../workspaces/adapters/index.js'
@@ -138,6 +139,39 @@ export function createConfigRoutes(opts?: ConfigRouteOpts) {
       return c.json({ credentials: list })
     } catch (err) {
       return c.json({ error: String(err) }, 500)
+    }
+  })
+
+  app.get('/credentials/:slug/models', async (c) => {
+    const credential = (await readCredentials())[c.req.param('slug')]
+    if (!credential) return c.json({ error: 'Credential not found' }, 404)
+    const agent = c.req.query('agent')
+    const capabilities = agent ? adapters.get(agent)?.capabilities.aiProvider : undefined
+    if (agent && !capabilities) return c.json({ error: 'Unknown AI runtime' }, 400)
+    const wires = credentialWires(credential)
+    const requestedShape = c.req.query('wireShape')
+    if (requestedShape && !credentialWireShapeEnum.safeParse(requestedShape).success) return c.json({ error: 'Unknown wire shape' }, 400)
+    const wire = pickAgentWire(wires, capabilities ?? {
+      credentialSource: 'runtime-or-workspace',
+      wirePreference: ['openai-chat', 'openai-responses', 'anthropic', 'google-generative-ai'],
+    }, requestedShape as CredentialWireShape | undefined, credential.vendor)
+    if (!wire) return c.json({ error: 'This access does not expose a model API' }, 400)
+    const parsed = modelDiscoveryInput.safeParse({ wireShape: wire.shape, baseUrl: wire.baseUrl, apiKey: credential.apiKey })
+    if (!parsed.success) return c.json({ error: 'A configured API key is required to load models' }, 400)
+    try {
+      return c.json({ models: await discoverModels(parsed.data) })
+    } catch (error) {
+      return c.json({ error: error instanceof Error ? error.message : 'Model discovery failed' }, 502)
+    }
+  })
+
+  app.post('/credentials/models', async (c) => {
+    const parsed = modelDiscoveryInput.safeParse(await c.req.json().catch(() => null))
+    if (!parsed.success) return c.json({ error: 'A valid protocol, endpoint and API key are required' }, 400)
+    try {
+      return c.json({ models: await discoverModels(parsed.data) })
+    } catch (error) {
+      return c.json({ error: error instanceof Error ? error.message : 'Model discovery failed' }, 502)
     }
   })
 

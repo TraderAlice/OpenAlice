@@ -2,6 +2,7 @@ import stickerWave from '../fixtures/sticker-wave.json'
 import { demoChatWorkflowReply, demoChatWorkflowTitle } from '../fixtures/chat-workflows'
 import { stickerHandlers } from './stickers'
 import { http, HttpResponse } from 'msw'
+import { demoCredentialPresets } from './configKeys'
 import type { AliceHarnessConfig } from '../../hooks/useAliceHarness'
 import {
   DEMO_AUTO_QUANT_WORKSPACE_ID,
@@ -451,6 +452,9 @@ const demoHarnessConfigs = new Map<string, AliceHarnessConfig>()
 const demoHarnessCommands = { alice: ['rss', 'market', 'analysis', 'peer', 'inbox', 'issue', 'harness'], traderhub: ['equity', 'economy'], 'alice-uta': ['account', 'order'] }
 
 export const workspacesHandlers = [
+  http.get('/api/workspaces/agents/omp/models', () => HttpResponse.json({
+    models: demoCredentialPresets[1]!.models!.map((model) => ({ ...model, id: `openai/${model.id}` })),
+  })),
   ...stickerHandlers,
   http.get('/api/workspaces/auto-quant/default-workspace', () => {
     const workspace = demoAutoQuantDefaultWorkspaceId

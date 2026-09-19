@@ -410,7 +410,7 @@ describe('IssueDetail property controls', () => {
     fireEvent.click(screen.getByRole('button', { name: i18n.t('chatLanding.selectModelAndEffort') }))
     fireEvent.click(await screen.findByRole('menuitem', { name: /Model/ }))
     fireEvent.click(await screen.findByRole('menuitem', { name: i18n.t('chatLanding.customModel') }))
-    expect(await screen.findByRole('textbox', { name: i18n.t('chatLanding.customModelId') })).toBeTruthy()
+    expect(await screen.findByRole('combobox', { name: i18n.t('chatLanding.customModelId') })).toBeTruthy()
   })
 
   it('patches the optional run timeout from the execution inspector', async () => {
@@ -579,7 +579,7 @@ describe('IssueDetail property controls', () => {
     fireEvent.click(await screen.findByRole('button', { name: i18n.t('chatLanding.selectModelAndEffort') }))
     fireEvent.click(await screen.findByRole('menuitem', { name: /Model/ }))
     fireEvent.click(await screen.findByRole('menuitem', { name: i18n.t('chatLanding.customModel') }))
-    fireEvent.change(await screen.findByRole('textbox', { name: i18n.t('chatLanding.customModelId') }), {
+    fireEvent.change(await screen.findByRole('combobox', { name: i18n.t('chatLanding.customModelId') }), {
       target: { value: 'openrouter/some-new-id' },
     })
     fireEvent.click(screen.getByRole('button', { name: i18n.t('common.save') }))

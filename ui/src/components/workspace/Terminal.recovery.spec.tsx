@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+// @vitest-environment-options {"url":"http://192.0.2.42:47361"}
 
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -182,6 +183,13 @@ afterEach(() => {
 })
 
 describe('TerminalView backend recovery', () => {
+  it('keeps remote dev terminal traffic on the forwarded UI origin', async () => {
+    vi.stubGlobal('__OPENALICE_DEV_BACKEND_PORT__', 47332)
+    render(<TerminalView wsId="research" sessionId="session-1" />)
+    await startTerminal()
+    expect(mocks.sockets[0]!.url).toMatch(/^ws:\/\/192\.0\.2\.42:47361\/api\/workspaces\/pty\?/)
+  })
+
   it('exhausts the retry budget when sockets open but close before attached', async () => {
     render(<TerminalView wsId="research" sessionId="session-1" wsUrl="ws://127.0.0.1:40123/pty" />)
     await startTerminal()

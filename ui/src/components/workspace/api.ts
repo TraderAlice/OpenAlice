@@ -1852,6 +1852,15 @@ export async function listAgentCredentials(agent: string): Promise<SavedCredenti
 }
 
 /** Which vault credential a workspace's agent is currently configured with (null = none/hand-edited). */
+export async function listNativeModels(agent: 'omp', workspaceId?: string, signal?: AbortSignal): Promise<import('../../api').PresetModel[]> {
+  const query = workspaceId ? `?workspaceId=${encodeURIComponent(workspaceId)}` : '';
+  const response = await fetch(`/api/workspaces/agents/${agent}/models${query}`, { signal });
+  const body = await response.json();
+  if (!response.ok) throw new Error(body.error || 'Model discovery failed');
+  return body.models;
+}
+
+/** Which vault credential a workspace's agent is currently configured with (null = none/hand-edited). */
 export interface WorkspaceCredentialDetection {
   /** True when the runtime has any usable native Workspace config, even when its key is hand-edited. */
   readonly configured: boolean;

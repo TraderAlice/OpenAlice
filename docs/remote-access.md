@@ -47,6 +47,11 @@ and the tunnel loop on a context with no Node, Bun, or Agent Runtime installed.
 Real long-latency Agent TUI measurements remain a separate release observation
 rather than a reason to invent a new terminal protocol preemptively.
 
+Browser terminals on a remote source-dev UI keep their WebSocket on the page's
+origin, including its forwarded port. Only loopback browser access bypasses the
+Vite proxy for the development backend port; a LAN client cannot assume that
+the backend's loopback-only listener is exposed alongside the UI.
+
 Native `server run/start` derives its content identity from the installed
 `release.json`, matching the interactive launcher. Readiness confirms pending
 activation only when the running identity matches the installed pointer.

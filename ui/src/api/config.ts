@@ -1,5 +1,11 @@
 import { headers } from './client'
-import type { AppConfig, Profile, Preset, Credential, SdkAdapterInfo, WireShape } from './types'
+import type { AppConfig, Profile, Preset, PresetModel, Credential, SdkAdapterInfo, WireShape } from './types'
+
+export interface ModelDiscoveryInput {
+  wireShape: WireShape
+  baseUrl?: string
+  apiKey: string
+}
 
 export const configApi = {
   async load(): Promise<AppConfig> {
@@ -35,6 +41,21 @@ export const configApi = {
     const res = await fetch('/api/config/credentials')
     if (!res.ok) throw new Error('Failed to load credentials')
     return res.json()
+  },
+
+  async getCredentialModels(slug: string, agent?: string, signal?: AbortSignal, wireShape?: WireShape): Promise<PresetModel[]> {
+    const query = new URLSearchParams({ ...(agent ? { agent } : {}), ...(wireShape ? { wireShape } : {}) })
+    const res = await fetch(`/api/config/credentials/${encodeURIComponent(slug)}/models?${query}`, { signal })
+    const body = await res.json()
+    if (!res.ok) throw new Error(body.error || 'Failed to load models')
+    return body.models
+  },
+
+  async discoverModels(input: ModelDiscoveryInput, signal?: AbortSignal): Promise<PresetModel[]> {
+    const res = await fetch('/api/config/credentials/models', { method: 'POST', headers, body: JSON.stringify(input), signal })
+    const body = await res.json()
+    if (!res.ok) throw new Error(body.error || 'Failed to load models')
+    return body.models
   },
 
   async addCredential(input: { vendor: string; label?: string; wires: Partial<Record<WireShape, string>>; baseUrl?: string; apiKey: string; lastModel?: string }): Promise<{ slug: string; vendor: string }> {

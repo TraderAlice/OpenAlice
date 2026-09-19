@@ -222,6 +222,13 @@ function isValidDuration(value: string): boolean {
 }
 
 export const configKeysHandlers = [
+  http.get('/api/config/credentials/:slug/models', ({ params }) => HttpResponse.json({
+    models: demoCredentialPresets.find((preset) => String(params.slug).startsWith(preset.id.split('-')[0]!))?.models ?? demoCredentialPresets[1]!.models,
+  })),
+  http.post('/api/config/credentials/models', async ({ request }) => {
+    const body = await request.json() as { wireShape?: string }
+    return HttpResponse.json({ models: demoCredentialPresets[body.wireShape === 'anthropic' ? 0 : 1]!.models })
+  }),
   http.get('/api/config/api-keys/status', () => HttpResponse.json({})),
   http.put('/api/config/apiKeys', () => new HttpResponse(null, { status: 204 })),
   // Echo the body back — the real route returns the validated section,

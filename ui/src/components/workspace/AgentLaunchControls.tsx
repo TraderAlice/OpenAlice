@@ -48,6 +48,8 @@ import { formatContextWindow, type AgentLaunchConfigState } from '../../hooks/us
 import { useAgentRuntimes } from '../../hooks/useAgentRuntimes'
 import { projectAgentRuntimeQuickAccess } from '../../lib/agentRuntimeQuickAccess'
 import { AIProviderIcon } from '@/lib/aiProviderIcon'
+import { ModelCatalogStatus } from '../ModelCatalogStatus'
+import { ModelCombobox } from '../credentials/PresetFields'
 import {
   AgentRuntimePicker,
   type AgentRuntimePickerHandle,
@@ -307,7 +309,9 @@ function AgentLaunchInferenceMenu({
               <span className="ml-auto max-w-[170px] truncate text-muted-foreground">{resolvedModel}</span>
             </DropdownMenuSubTrigger>
             <DropdownMenuSubContent className="w-[300px] max-w-[calc(100vw-2rem)] border border-border/70 bg-secondary p-1.5 shadow-lg ring-0">
+              <ModelCatalogStatus catalog={config.modelCatalog} />
               <DropdownMenuRadioGroup
+                className="max-h-64 overflow-y-auto"
                 value={modelValue}
                 onValueChange={(value) => config.selectModel(value ? String(value) : null)}
               >
@@ -382,22 +386,16 @@ function AgentLaunchInferenceMenu({
         <DialogContent overlayClassName="z-[80]" className="z-[80]">
           <DialogHeader>
             <DialogTitle>{t('chatLanding.customModelTitle')}</DialogTitle>
-            <DialogDescription>{t('chatLanding.customModelDescription')}</DialogDescription>
+            <DialogDescription>{t('modelCatalog.selectHelp')}</DialogDescription>
           </DialogHeader>
-          <input
+          <ModelCombobox
             value={customModelDraft}
-            onChange={(event) => setCustomModelDraft(event.target.value)}
-            onKeyDown={(event) => {
-              if (event.key === 'Enter') {
-                event.preventDefault()
-                saveCustomModel()
-              }
-            }}
-            aria-label={t('chatLanding.customModelId')}
-            placeholder={t('chatLanding.customModelId')}
-            autoFocus
-            className={`${inputClass} min-h-9 text-[12px] leading-[18px]`}
+            suggestions={config.modelOptions}
+            onChange={setCustomModelDraft}
+            ariaLabel={t('chatLanding.customModelId')}
+            placeholder={t('modelCatalog.selectPlaceholder')}
           />
+          <ModelCatalogStatus catalog={config.modelCatalog} />
           <DialogFooter>
             <DialogClose render={<Button variant="outline" />}>
               {t('common.cancel')}
@@ -595,6 +593,14 @@ export const AgentLaunchSelectors = forwardRef<AgentLaunchSelectorsHandle, Agent
                   </DropdownMenuItem>
                 )
               })}
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={onConfigureProvider} className="min-h-11 px-2.5 py-2 text-[12px]">
+                <KeyRound className="h-4 w-4 shrink-0" aria-hidden />
+                <span className="min-w-0 flex-1">
+                  <span className="block">{t('chatLanding.addApiAccount')}</span>
+                  <span className="block text-[10px] text-muted-foreground">{t('chatLanding.addApiAccountDetail')}</span>
+                </span>
+              </DropdownMenuItem>
             </DropdownMenuGroup>
           </DropdownMenuContent>
         </DropdownMenu>

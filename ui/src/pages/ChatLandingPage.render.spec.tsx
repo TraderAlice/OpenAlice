@@ -717,7 +717,7 @@ describe('ChatLandingPage keyboard submission', () => {
 
     await openInferenceSubmenu('Model')
     fireEvent.click(await screen.findByRole('menuitem', { name: 'Custom model…' }))
-    const customModel = await screen.findByRole('textbox', { name: 'Model ID' })
+    const customModel = await screen.findByRole('combobox', { name: 'Model ID' })
     fireEvent.change(customModel, { target: { value: 'gemini-3.1-pro-preview' } })
     fireEvent.click(screen.getByRole('button', { name: 'Save' }))
 

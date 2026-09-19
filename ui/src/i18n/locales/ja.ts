@@ -2,6 +2,15 @@ import type { Resources } from './en'
 
 /** 日本語. Typed as `Resources` → must match en's key structure exactly. */
 export const ja: Resources = {
+  modelCatalog: {
+    loading: "この AI アクセスのモデルを読み込み中…",
+    failed: "モデルを取得できませんでした。再試行するか、一覧 API がない場合は ID を入力してください。",
+    empty: "モデルがありません。このアカウントのプロバイダーを設定して更新してください。",
+    loaded: "{{count}} 個のモデルを利用可能",
+    refresh: "更新",
+    selectHelp: "この AI アクセスで利用できるモデルを選択してください。",
+    selectPlaceholder: "モデルを選択",
+  },
   stickers: {
     "meaning": "Meaning (optional)",
     "title": "Stickers",
@@ -1519,12 +1528,14 @@ export const ja: Resources = {
     noAgentsBody: 'OpenAlice には通常、ワークスペースチャット用の Pi が同梱されます。パッケージ版でこの表示が出る場合は、ランタイム同梱を確認してください。確認中も Lite モードで続行できます。',
     selectCredential: 'AI アクセス',
     aiAccess: 'AI アクセス',
-    credentialMenuTitle: '{{runtime}} はどの方法で AI にアクセスしますか？',
+    credentialMenuTitle: '{{runtime}} で使う AI アカウントを選択',
+    addApiAccount: 'API アカウントを追加…',
+    addApiAccountDetail: '設定で Coding Plan またはカスタム API を追加',
     modelField: 'モデル',
     effortField: '推論強度',
     runtimeFallback: 'ランタイム',
     runtimeAccount: '{{runtime}} アカウント',
-    runtimeAccountDetail: '{{runtime}} でサインイン中のアカウントを使用',
+    runtimeAccountDetail: '{{runtime}} 自身のログインまたは API 設定を使用',
     workspaceAiAccess: 'Workspace AI 設定',
     workspaceAccessDetail: 'この Workspace の {{credential}}',
     savedAccessDetail: '保存済みの {{credential}}',
