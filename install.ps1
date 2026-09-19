@@ -79,7 +79,14 @@ $commit = $null
 $identity = $null
 function Download-Text([string]$url) {
   if ($url -notmatch '^https://') { throw "Downloads require HTTPS: $url" }
-  return (Invoke-WebRequest -UseBasicParsing -Uri $url -TimeoutSec 30).Content
+  $content = (Invoke-WebRequest -UseBasicParsing -Uri $url -TimeoutSec 30).Content
+  # Windows PowerShell 5.1 returns a byte[] whenever the response content
+  # type is binary, and GitHub serves release assets - including the .sha256
+  # sidecar - as application/octet-stream. Decode here so callers always
+  # receive text; under StrictMode a member call on the array otherwise fails
+  # with "[System.Byte] does not contain a method named 'Trim'".
+  if ($content -is [byte[]]) { return [Text.Encoding]::UTF8.GetString($content) }
+  return [string]$content
 }
 if (-not $Archive) {
   if (-not $Version -or $Channel -eq 'dev') {
