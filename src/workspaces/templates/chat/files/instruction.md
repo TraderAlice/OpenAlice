@@ -61,7 +61,10 @@ fit the task.
 | Optional website adapters, if installed separately | `opencli` | `opencli-reader` |
 
 Use the bundled research skills (`build-thesis`, `sector-rotation`,
-`scan-value-chain`, `retrospective`) when their workflow matches the request.
+`scan-value-chain`, `retrospective`, `equity-tearsheet`) when their workflow
+matches the request. `equity-tearsheet` turns a saved `date,equity[,bench]`
+CSV into an HTML equity/drawdown report; run it with the AutoQuant Workspace
+Python so matplotlib is available.
 They are methods, not mandatory ceremony.
 
 ## Collaboration model

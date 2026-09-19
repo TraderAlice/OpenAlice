@@ -183,7 +183,10 @@ async function main() {
   {
     const executor = getSDKExecutor()
     const routeMap = buildRouteMap()
-    const credentials = buildSDKCredentials(config.marketData.providerKeys, config.marketData.hub)
+    // Lazy: Settings PUT refreshes ctx.config in place; CLI equity/FMP tools
+    // must see new providerKeys without an engine restart (HTTP compat already did).
+    const credentials = () =>
+      buildSDKCredentials(config.marketData.providerKeys, config.marketData.hub)
     equityClient = new SDKEquityClient(executor, 'equity', providers.equity, credentials, routeMap)
     cryptoClient = new SDKCryptoClient(executor, 'crypto', providers.crypto, credentials, routeMap)
     currencyClient = new SDKCurrencyClient(executor, 'currency', providers.currency, credentials, routeMap)

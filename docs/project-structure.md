@@ -104,6 +104,9 @@ apps/desktop/                  Electron main/preload/IPC shell
 scripts/guardian/              dev/prod supervisors, local control + recovery tests
 default/                       shipped skills and factory defaults
 docs/                          owner guides and contributor documentation
+satellites/                    optional side-car data bridges (not in pnpm/Turbo);
+                               e.g. astock-data Tushare MCP — see
+                               satellites/astock-data/README.md
 ```
 
 The model execution loop is not in `src/ai-providers/`. Native coding-agent
@@ -113,7 +116,9 @@ combines credential access, model selection, and those semantics before each
 adapter projects the result into one target CLI process. Follow
 [[docs/model-semantics-and-runtime-injection.md]] for that boundary.
 
-## Optional RSSHub News Sources
+`satellites/` trees are independently installed runtimes (today Python MCP).
+They must not be imported from `src/` or added to `pnpm-workspace.yaml`. Wire
+them through MCP or a future thin ToolCenter client only.
 
 Alice owns RSS collection and the JSONL archive in `src/domain/news/`.
 Settings → News Sources (`/settings/news-collector`) offers opt-in presets

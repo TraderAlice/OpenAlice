@@ -95,12 +95,13 @@ describe('MarketDataPage provider credentials', () => {
   })
 
   it('announces a failed provider test without changing another provider action', async () => {
-    mocks.testProvider.mockResolvedValueOnce({ ok: false })
+    mocks.testProvider.mockResolvedValueOnce({ ok: false, error: 'Restricted Endpoint' })
     openProviderKeys()
 
     fireEvent.click(screen.getByRole('button', { name: 'Test BLS key' }))
 
     expect(await screen.findByRole('button', { name: 'BLS key test failed' })).toBeTruthy()
+    expect(screen.getByText('Restricted Endpoint')).toBeTruthy()
     expect(screen.getByRole('button', { name: 'Test FRED key' })).toBeTruthy()
   })
 })

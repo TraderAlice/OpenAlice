@@ -542,10 +542,16 @@ function KeyProvidersSection({
     return init
   })
   const [testStatus, setTestStatus] = useState<Record<string, ProviderTestStatus>>({})
+  const [testErrors, setTestErrors] = useState<Record<string, string>>({})
 
   const handleKeyChange = (keyName: string, value: string) => {
     setLocalKeys((prev) => ({ ...prev, [keyName]: value }))
     setTestStatus((prev) => ({ ...prev, [keyName]: 'idle' }))
+    setTestErrors((prev) => {
+      const next = { ...prev }
+      delete next[keyName]
+      return next
+    })
     onKeyChange(keyName, value)
   }
 
@@ -553,11 +559,23 @@ function KeyProvidersSection({
     const key = localKeys[keyName]
     if (!key) return
     setTestStatus((prev) => ({ ...prev, [keyName]: 'testing' }))
+    setTestErrors((prev) => {
+      const next = { ...prev }
+      delete next[keyName]
+      return next
+    })
     try {
       const result = await api.marketData.testProvider(keyName, key)
       setTestStatus((prev) => ({ ...prev, [keyName]: result.ok ? 'ok' : 'error' }))
-    } catch {
+      if (!result.ok && result.error) {
+        setTestErrors((prev) => ({ ...prev, [keyName]: result.error! }))
+      }
+    } catch (err) {
       setTestStatus((prev) => ({ ...prev, [keyName]: 'error' }))
+      setTestErrors((prev) => ({
+        ...prev,
+        [keyName]: err instanceof Error ? err.message : 'Request failed',
+      }))
     }
   }
 
@@ -577,11 +595,13 @@ function KeyProvidersSection({
             <div className="space-y-4">
               {group.providers.map(({ key, name, desc, hint }) => {
                 const status = testStatus[key] || 'idle'
+                const testError = testErrors[key]
                 const isFmp = key === 'fmp'
                 const inputId = `market-data-provider-${key}-key`
                 const descriptionId = `${inputId}-description`
                 const hintId = `${inputId}-hint`
                 const statusId = `${inputId}-test-status`
+                const errorId = `${inputId}-test-error`
                 return (
                   <div
                     key={key}
@@ -606,7 +626,7 @@ function KeyProvidersSection({
                           value={localKeys[key]}
                           onChange={(e) => handleKeyChange(key, e.target.value)}
                           aria-label={`${name} API key`}
-                          aria-describedby={`${descriptionId} ${hintId} ${statusId}`}
+                          aria-describedby={`${descriptionId} ${hintId} ${statusId}${testError ? ` ${errorId}` : ''}`}
                           placeholder="Not configured"
                         />
                         <TestButton
@@ -619,6 +639,11 @@ function KeyProvidersSection({
                       <p id={hintId} className="text-[12px] text-muted-foreground/60 mt-1">
                         {hint}
                       </p>
+                      {testError && (
+                        <p id={errorId} className="mt-1 text-[12px] text-destructive">
+                          {testError}
+                        </p>
+                      )}
                       <span
                         id={statusId}
                         className="sr-only"

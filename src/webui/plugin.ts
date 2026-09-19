@@ -334,7 +334,8 @@ export class WebPlugin implements Plugin {
       // Read config lazily so UI edits to marketData.providerKeys /
       // marketData.providers take effect on the next request — no remount
       // needed. Requires the config-write route to refresh ctx.config.
-      defaultCredentials: () => buildSDKCredentials(ctx.config.marketData.providerKeys),
+      defaultCredentials: () =>
+        buildSDKCredentials(ctx.config.marketData.providerKeys, ctx.config.marketData.hub),
       defaultProviders: () => ctx.config.marketData.providers,
     })
 
