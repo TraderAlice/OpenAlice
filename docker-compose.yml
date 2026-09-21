@@ -56,6 +56,8 @@ services:
       # Fallback in case root/sudo is still detected despite running
       # non-root (some sandboxes/CI runners report UID 0 upstream).
       - IS_SANDBOX=1
+  		- NOTION_API_KEY=${NOTION_API_KEY}
+  		- NOTION_DATABASE_ID=${NOTION_DATABASE_ID}
       # Claude Code can no longer write to its own npm global install dir
       # once running non-root — stop it from trying instead of chowning
       # a root-owned system path.
