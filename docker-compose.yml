@@ -62,6 +62,7 @@ services:
       # once running non-root — stop it from trying instead of chowning
       # a root-owned system path.
       - DISABLE_AUTOUPDATER=1
+      - DEBUG=grammy*
       # Make sure uv/uvx (installed to ~/.local/bin) resolve for every
       # shell the harness spawns, not just the one that installed them.
       - PATH=/data/home/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
