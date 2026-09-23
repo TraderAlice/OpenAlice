@@ -14,10 +14,6 @@ it('requires the spawn token on /cli and /mcp and leaves /api alone', async () =
     expect((await app.request('/cli/ws/data/invoke', { method: 'POST' })).status).toBe(401)
     expect((await app.request('/mcp', { method: 'POST' })).status).toBe(401)
     expect((await app.request('/api/version')).status).toBe(200)
-    const ok = await app.request('/cli/ws/data/invoke', { method: 'POST', headers: { Authorization: 'Bearer test-token' } })
-    expect(ok.status).toBe(200)
-  } finally {
-    if (previous === undefined) delete process.env['OPENALICE_TOOL_TOKEN']
-    else process.env['OPENALICE_TOOL_TOKEN'] = previous
-  }
+    expect((await app.request('/cli/ws/data/invoke', { method: 'POST', headers: { Authorization: 'Bearer test-token' } })).status).toBe(200)
+  } finally { if (previous === undefined) delete process.env['OPENALICE_TOOL_TOKEN']; else process.env['OPENALICE_TOOL_TOKEN'] = previous }
 })

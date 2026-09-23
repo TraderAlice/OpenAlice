@@ -192,6 +192,7 @@ export class WebPlugin implements Plugin {
     })
 
     app.use('/api/*', cors())
+    useToolToken(app)
 
     if (this.config.localCliOnWeb) {
       if (bindIsPublic) {
@@ -200,7 +201,6 @@ export class WebPlugin implements Plugin {
       // Electron/dev can reuse the loopback web listener for workspace CLI
       // shims, eliminating the old default MCP/CLI side port. Docker/public-web
       // keeps this off and uses a separate loopback-only local tool gateway.
-      useToolToken(app)
       mountLocalToolGateway(app, {
         toolCenter: ctx.toolCenter,
         workspaceToolCenter: ctx.workspaceToolCenter,
