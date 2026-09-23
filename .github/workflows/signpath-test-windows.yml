@@ -1,0 +1,137 @@
+name: SignPath Windows test signing
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [dev]
+    paths:
+      - .github/workflows/signpath-test-windows.yml
+      - signpath/windows-installer.xml
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  test-sign:
+    # A signing token must never be usable by a workflow dispatched from an
+    # arbitrary feature branch or fork. This workflow does not publish a release.
+    if: >-
+      github.repository == 'TraderAlice/OpenAlice' &&
+      github.ref == 'refs/heads/dev' &&
+      (github.event_name == 'workflow_dispatch' || vars.SIGNPATH_TEST_ENABLED == 'true')
+    runs-on: windows-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: pnpm/action-setup@v6
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Check SignPath test configuration
+        shell: pwsh
+        env:
+          SIGNPATH_API_TOKEN: ${{ secrets.SIGNPATH_API_TOKEN }}
+          SIGNPATH_ORGANIZATION_ID: ${{ vars.SIGNPATH_ORGANIZATION_ID }}
+          SIGNPATH_PROJECT_SLUG: ${{ vars.SIGNPATH_PROJECT_SLUG }}
+          SIGNPATH_TEST_POLICY_SLUG: ${{ vars.SIGNPATH_TEST_POLICY_SLUG }}
+          SIGNPATH_ARTIFACT_CONFIGURATION_SLUG: ${{ vars.SIGNPATH_ARTIFACT_CONFIGURATION_SLUG }}
+        run: |
+          foreach ($name in @('SIGNPATH_API_TOKEN', 'SIGNPATH_ORGANIZATION_ID', 'SIGNPATH_PROJECT_SLUG', 'SIGNPATH_TEST_POLICY_SLUG', 'SIGNPATH_ARTIFACT_CONFIGURATION_SLUG')) {
+            if (-not [Environment]::GetEnvironmentVariable($name)) { throw "Missing $name" }
+          }
+
+      - name: Build unsigned Windows installer
+        shell: pwsh
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+        run: |
+          pnpm install --frozen-lockfile
+          if ($LASTEXITCODE -ne 0) { throw 'pnpm install failed' }
+          pnpm electron:build
+          if ($LASTEXITCODE -ne 0) { throw 'electron:build failed' }
+          pnpm vendor:runtime
+          if ($LASTEXITCODE -ne 0) { throw 'vendor:runtime failed' }
+          pnpm -F @traderalice/desktop exec electron-builder --projectDir ../.. --publish never --x64
+          if ($LASTEXITCODE -ne 0) { throw 'electron-builder failed' }
+
+      - name: Verify packaged Workspace before signing
+        run: pnpm electron:smoke:workspace --skip-build --skip-pack
+        timeout-minutes: 5
+
+      - name: Inspect installer metadata
+        id: installer
+        shell: pwsh
+        run: |
+          $files = @(Get-ChildItem dist/electron-app/OpenAlice.Setup.*.exe -File)
+          if ($files.Count -ne 1) { throw "Expected one installer, got $($files.Count)" }
+          $info = $files[0].VersionInfo
+          if ($info.ProductName -ne 'OpenAlice' -or -not $info.ProductVersion) {
+            throw "Unexpected installer metadata: ProductName=$($info.ProductName), ProductVersion=$($info.ProductVersion)"
+          }
+          "version=$($info.ProductVersion)" >> $env:GITHUB_OUTPUT
+          "name=$($files[0].Name)" >> $env:GITHUB_OUTPUT
+
+      - name: Upload unsigned installer for SignPath
+        id: unsigned
+        uses: actions/upload-artifact@v4
+        with:
+          name: signpath-unsigned-windows-${{ github.run_id }}
+          path: dist/electron-app/OpenAlice.Setup.*.exe
+          if-no-files-found: error
+          retention-days: 3
+
+      - name: Sign with the self-signed test certificate
+        id: signpath
+        uses: signpath/github-action-submit-signing-request@v3
+        with:
+          api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
+          organization-id: ${{ vars.SIGNPATH_ORGANIZATION_ID }}
+          project-slug: ${{ vars.SIGNPATH_PROJECT_SLUG }}
+          signing-policy-slug: ${{ vars.SIGNPATH_TEST_POLICY_SLUG }}
+          artifact-configuration-slug: ${{ vars.SIGNPATH_ARTIFACT_CONFIGURATION_SLUG }}
+          github-artifact-id: ${{ steps.unsigned.outputs.artifact-id }}
+          wait-for-completion: true
+          wait-for-completion-timeout-in-seconds: 3600
+          output-artifact-directory: dist/signpath-signed
+          parameters: |
+            version: ${{ toJSON(steps.installer.outputs.version) }}
+
+      - name: Verify signed test installer
+        shell: pwsh
+        env:
+          INSTALLER_NAME: ${{ steps.installer.outputs.name }}
+        run: |
+          $unsigned = Join-Path dist/electron-app $env:INSTALLER_NAME
+          $signed = Join-Path dist/signpath-signed $env:INSTALLER_NAME
+          if (-not (Test-Path $signed)) { throw "Signed installer missing: $signed" }
+          $signature = Get-AuthenticodeSignature $signed
+          if (-not $signature.SignerCertificate -or $signature.SignatureType -ne 'Authenticode') {
+            throw "Installer has no Authenticode signer: $($signature.Status)"
+          }
+          if ((Get-FileHash $unsigned).Hash -eq (Get-FileHash $signed).Hash) {
+            throw 'SignPath returned unchanged installer bytes'
+          }
+          Write-Host "Test signer: $($signature.SignerCertificate.Subject)"
+          Write-Host "Windows trust status (self-signed test certificate): $($signature.Status)"
+
+      - name: Preserve signed test installer
+        uses: actions/upload-artifact@v4
+        with:
+          name: signpath-signed-test-windows-${{ github.run_id }}
+          path: dist/signpath-signed/OpenAlice.Setup.*.exe
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Record review links
+        shell: pwsh
+        env:
+          SIGNING_REQUEST_URL: ${{ steps.signpath.outputs.signing-request-web-url }}
+        run: |
+          "GitHub workflow: $env:GITHUB_SERVER_URL/$env:GITHUB_REPOSITORY/actions/runs/$env:GITHUB_RUN_ID" >> $env:GITHUB_STEP_SUMMARY
+          "SignPath test request: $env:SIGNING_REQUEST_URL" >> $env:GITHUB_STEP_SUMMARY
+          "This self-signed test artifact is not for public release." >> $env:GITHUB_STEP_SUMMARY
