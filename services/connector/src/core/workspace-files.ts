@@ -1,5 +1,8 @@
 import { request } from 'node:http'
 import { createHash } from 'node:crypto'
+import { readFileSync } from 'node:fs'
+import { homedir } from 'node:os'
+import { join } from 'node:path'
 import { connectorAttachmentSchema, type ConnectorAttachment } from '@traderalice/connector-protocol'
 
 /** Calls Alice's generic file API. Neither paths nor URLs come from model-selected hosts. */
@@ -18,13 +21,23 @@ function mediaType(filename: string): string {
     json: 'application/json' } as Record<string, string>)[extension] ?? 'application/octet-stream'
 }
 
+function toolToken(): string {
+  if (process.env['OPENALICE_TOOL_TOKEN']) return process.env['OPENALICE_TOOL_TOKEN']
+  try {
+    const home = process.env['OPENALICE_HOME'] || join(homedir(), '.openalice')
+    const parsed = JSON.parse(readFileSync(join(home, 'state', 'cli-endpoint.json'), 'utf8')) as { token?: unknown }
+    return typeof parsed.token === 'string' ? parsed.token : ''
+  } catch { return '' }
+}
+
 /** Fixed local gateway; model input cannot choose a host or socket. */
 export async function fetchAliceJson(route: string, body?: unknown): Promise<string> {
   const port = Number(process.env['OPENALICE_MCP_PORT'] ?? 47332)
   const url = new URL(route, `http://127.0.0.1:${port}`)
   const socketPath = process.env['OPENALICE_TOOL_SOCKET']
+  const token = toolToken()
   const raw = await new Promise<string>((resolve, reject) => {
-    const req = request({ ...(socketPath ? { socketPath } : { hostname: url.hostname, port: url.port }), path: url.pathname + url.search, method: body === undefined ? 'GET' : 'POST', headers: { 'Content-Type': 'application/json' } }, res => {
+    const req = request({ ...(socketPath ? { socketPath } : { hostname: url.hostname, port: url.port }), path: url.pathname + url.search, method: body === undefined ? 'GET' : 'POST', headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) } }, res => {
       let size = 0
       const chunks: Buffer[] = []
       res.on('data', (chunk: Buffer) => {

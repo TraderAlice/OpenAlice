@@ -15,7 +15,7 @@ import { userDataHome } from '@/core/paths.js'
 import { resolveLauncherRoot } from '@/workspaces/config.js'
 import type { Plugin, EngineContext } from './core/types.js'
 import { McpPlugin } from './server/mcp.js'
-import { LocalToolGatewayPlugin } from './server/local-tool-gateway.js'
+import { ensureToolToken, LocalToolGatewayPlugin } from './server/local-tool-gateway.js'
 import { WebPlugin } from './webui/index.js'
 import { createWorkspaceServiceRef } from './webui/plugin.js'
 import { createThinkingTools } from './tool/thinking.js'
@@ -328,6 +328,7 @@ async function main() {
   // ==================== Plugins ====================
 
   // Core plugins — always-on, not toggleable at runtime
+  ensureToolToken()
   const corePlugins: Plugin[] = []
 
   // workspaceServiceRef is created earlier (Cron Listener section) so cron

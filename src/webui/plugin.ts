@@ -60,7 +60,7 @@ import { attachWorkspacesWS, type AttachedWS } from './workspaces-ws.js'
 import { attachWorkspacesIpc, type AttachedWorkspaceIpc } from './workspaces-ipc.js'
 import { attachWebIpc, type AttachedWebIpc } from './web-ipc.js'
 import { registerCliRoutes } from '../server/cli.js'
-import { mountLocalToolGateway } from '../server/local-tool-gateway.js'
+import { mountLocalToolGateway, useToolToken } from '../server/local-tool-gateway.js'
 import type { Server as HttpServer } from 'node:http'
 import { proxyHarnessSurface, attachHarnessSurfaceWS, type AttachedHarnessSurfaceWS } from './harness-surface-proxy.js'
 
@@ -200,6 +200,7 @@ export class WebPlugin implements Plugin {
       // Electron/dev can reuse the loopback web listener for workspace CLI
       // shims, eliminating the old default MCP/CLI side port. Docker/public-web
       // keeps this off and uses a separate loopback-only local tool gateway.
+      useToolToken(app)
       mountLocalToolGateway(app, {
         toolCenter: ctx.toolCenter,
         workspaceToolCenter: ctx.workspaceToolCenter,

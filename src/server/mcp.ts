@@ -16,6 +16,7 @@ import type { WorkspaceService } from '../workspaces/service.js'
 import type { InboxOrigin } from '../core/inbox-store.js'
 import { extractMcpShape, wrapToolExecute } from '../core/mcp-export.js'
 import { registerCliRoutes } from './cli.js'
+import { useToolToken } from './local-tool-gateway.js'
 import { resolveInboxOrigin } from './inbox-origin.js'
 import { createWorkspaceConversationControl } from '../workspaces/conversation-control.js'
 import { sessionCoworkerLabel } from '../workspaces/session-registry.js'
@@ -204,6 +205,7 @@ export class McpPlugin implements Plugin {
       allowHeaders: ['Content-Type', 'mcp-session-id', 'Last-Event-ID', 'mcp-protocol-version', 'x-openalice-run', 'x-openalice-session'],
       exposeHeaders: ['mcp-session-id', 'mcp-protocol-version'],
     }))
+    useToolToken(app)
 
     app.all('/mcp', async (c) => {
       const transport = new WebStandardStreamableHTTPServerTransport()
