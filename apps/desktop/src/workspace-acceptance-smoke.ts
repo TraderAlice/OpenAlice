@@ -108,6 +108,22 @@ export async function runRendererWorkspaceAcceptanceSmoke(
     const runShellContract = async (workspaceId, sessionId) => {
       let connectionId = ''
       let output = ''
+      const waitForShellPrompt = async () => {
+        const deadline = Date.now() + 10000
+        let lastOutputLength = output.length
+        let observedOutput = lastOutputLength > 0
+        let quietSince = Date.now()
+        while (Date.now() < deadline) {
+          if (output.length > lastOutputLength) {
+            lastOutputLength = output.length
+            observedOutput = true
+            quietSince = Date.now()
+          }
+          if (observedOutput && Date.now() - quietSince >= 300) return
+          await new Promise((resolve) => setTimeout(resolve, 25))
+        }
+        throw new Error('Workspace shell prompt did not settle: ' + output.slice(-4000))
+      }
       let attachedResolve
       let attachedReject
       let shellReadyResolve
@@ -193,6 +209,10 @@ export async function runRendererWorkspaceAcceptanceSmoke(
       })
       try {
         await attached
+        // The bridge's attached event precedes the login shell's first prompt.
+        // Let its startup output settle before typing the initial probe; ConPTY
+        // can otherwise drop the first character when the shell is not ready.
+        await waitForShellPrompt()
         const shellQuote = (value) => "'" + String(value).replaceAll("'", "'\\\"'\\\"'") + "'"
         const stepHelper = 'oa_step() { oa_label="$1"; shift; oa_output=$("$@" 2>&1); oa_status=$?; if test "$oa_status" -ne 0; then printf "__OPENALICE_WORKSPACE_%s_FAILED__ %s %s\\\\n%s\\\\n" "CLI_STEP" "$oa_label" "$oa_status" "$oa_output"; return "$oa_status"; fi; }'
         const command = [
@@ -227,9 +247,18 @@ export async function runRendererWorkspaceAcceptanceSmoke(
           () => shellReadyReject(new Error('Workspace shell-ready timeout: ' + output.slice(-4000))),
           10000,
         )
-        bridge.send(connectionId, new TextEncoder().encode(
+        const shellProbe = new TextEncoder().encode(
           "printf '__OPENALICE_%s_READY__\\\\n' 'SHELL'\\r",
-        ))
+        )
+        // This probe has no side effects, so retry it until the shell prints
+        // its marker. ConPTY can lose the first typed byte during startup.
+        while (!output.includes('__OPENALICE_SHELL_READY__')) {
+          bridge.send(connectionId, shellProbe)
+          await Promise.race([
+            shellReady,
+            new Promise((resolve) => setTimeout(resolve, 500)),
+          ])
+        }
         await shellReady
         helperReadyTimer = setTimeout(
           () => helperReadyReject(new Error('Workspace CLI helper-ready timeout: ' + output.slice(-4000))),
