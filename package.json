@@ -13,6 +13,7 @@
   "scripts": {
     "cli": "node packages/cli/bin/openalice.ts",
     "dev": "tsx scripts/guardian/dev.ts",
+    "dev:no-relay": "tsx scripts/guardian/dev.ts --no-relay",
     "dev:onboarding": "tsx scripts/onboarding-test-dev.ts",
     "remote": "node packages/cli/bin/openalice.ts --remote",
     "prebuild": "tsx scripts/build-migration-index.ts",

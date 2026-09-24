@@ -321,6 +321,7 @@ export const en = {
     unread: '{{count}} unread',
     pendingPush: '{{count}} pending to push',
     connectorNeedsAttention: '{{count}} connector needs attention',
+    updatesAvailable: '{{count}} updates available',
     about: 'About {{label}}',
     primaryNavigation: 'Primary navigation',
     yourAlice: 'Alice’s Settings',
@@ -867,6 +868,15 @@ export const en = {
       marketData: 'Market Data',
       newsSources: 'News Sources',
       beta: 'Beta',
+    },
+    updateLifecycle: {
+      title: 'Updates', description: 'Checks run in the background. Source Workspaces update automatically when a safe merge is possible; active work and conflicts wait for review.',
+      checkNow: 'Check now', checking: 'Checking…', statusTitle: 'This installation',
+      appCheck: 'Check OpenAlice updates automatically', appCheckDescription: 'Show available client and backend updates in Alice’s Settings.',
+      autoQuant: 'Auto-update Auto Quant', autoQuantDescription: 'Follow its newest stable upstream release. A blocked merge waits for review.',
+      autoPrediction: 'Auto-update Auto Prediction', autoPredictionDescription: 'Follow its newest stable upstream release. A blocked merge waits for review.',
+      client: 'This app', backend: 'Connected backend', available: 'v{{version}} available', currentOrManaged: 'Current or managed externally',
+      blocked: 'Needs review', failed: 'Check failed', review: 'Review {{name}} update',
     },
     machines: {
       title: 'Machines', description: 'Inspect and manage the computers where Alice can work.', saved: 'Saved Machines',

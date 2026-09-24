@@ -52,6 +52,43 @@ async function withHost(origin: string, path: string, host: string): Promise<{ s
 }
 
 describe('WebRelay', () => {
+  it('serves Vite assets and HMR through the relay while APIs follow its selected Runtime', async () => {
+    const runtime = await backend('dev-id', 'development')
+    openedBackends.push(runtime.server)
+    const ui = createServer((req, res) => {
+      res.setHeader('content-type', 'text/plain')
+      res.end(`vite:${req.url}`)
+    })
+    const hmr = new WebSocketServer({ noServer: true })
+    ui.on('upgrade', (req, socket, head) => hmr.handleUpgrade(req, socket, head, (ws) => {
+      ws.send(JSON.stringify({ type: 'connected' }))
+    }))
+    await new Promise<void>((done) => ui.listen(0, '127.0.0.1', done))
+    openedBackends.push(ui)
+    const address = ui.address()
+    if (!address || typeof address === 'string') throw new Error('Missing Vite fixture port')
+    const relay = new WebRelay({
+      uiOrigin: `http://127.0.0.1:${address.port}`,
+      inspectLocal: async () => ({ machine: { key: 'local', displayName: 'This computer', projects: [{
+        key: 'dev', id: 'dev-id', displayName: 'Development', available: true,
+        runtime: { webEndpoint: `http://127.0.0.1:${runtime.port}` },
+      }] } }) as never,
+      waitReady: async () => undefined,
+    })
+    const origin = await relay.listen()
+    openedRelays.push(relay)
+    await relay.connect('local', 'dev')
+    expect(await (await fetch(`${origin}/settings`)).text()).toBe('vite:/settings')
+    expect(await (await fetch(`${origin}/@vite/client`)).text()).toBe('vite:/@vite/client')
+    expect(await (await fetch(`${origin}/api/who`)).json()).toMatchObject({ label: 'development' })
+    const message = await new Promise<string>((done, reject) => {
+      const ws = new WebSocket(origin.replace('http:', 'ws:') + '/?token=test', 'vite-hmr', { headers: { origin } })
+      ws.once('message', (data) => { done(String(data)); ws.close() })
+      ws.once('error', reject)
+    })
+    expect(JSON.parse(message)).toEqual({ type: 'connected' })
+  })
+
   it('rebuilds the selected SSH forward before a backend upgrade reports success', async () => {
     const before = await backend('cloud-id', 'before')
     const after = await backend('cloud-id', 'after')

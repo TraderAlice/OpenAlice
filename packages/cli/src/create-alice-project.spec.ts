@@ -46,7 +46,7 @@ describe('openalice create alice-project', () => {
         homeDir,
       },
     )).resolves.toBe(0)
-    expect(JSON.parse(await readFile(join(home, 'workspace-setup.json'), 'utf8')).pending).toEqual(['chat'])
+    expect(JSON.parse(await readFile(join(home, 'workspace-setup.json'), 'utf8')).pending).toEqual(['chat', 'auto-quant', 'auto-prediction'])
     expect(stdout.join('')).toContain('NanoAlice')
     expect(stdout.join('')).toContain('openalice up --project office')
     expect(JSON.parse(await readFile(aliceProjectProductStampPath(home), 'utf8'))).toEqual({
@@ -61,8 +61,7 @@ describe('openalice create alice-project', () => {
   })
 })
 
-it('parses explicit workspace selection and rejects typos', () => {
-  expect(parseCreateAliceProjectArgs(['--workspaces', 'chat,auto-quant,chat']).workspaces).toEqual(['chat', 'auto-quant'])
-  expect(parseCreateAliceProjectArgs(['--workspaces', 'none']).workspaces).toEqual([])
-  expect(() => parseCreateAliceProjectArgs(['--workspaces', 'quant'])).toThrow('Workspaces must')
+it('keeps creation selection fixed to the three default Workspaces', () => {
+  expect(parseCreateAliceProjectArgs([])).not.toHaveProperty('workspaces')
+  expect(() => parseCreateAliceProjectArgs(['--workspaces', 'none'])).toThrow('Unknown option')
 })

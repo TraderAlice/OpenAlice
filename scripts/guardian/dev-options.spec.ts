@@ -7,17 +7,21 @@ import { parseDevGuardianOptions } from './dev-options.js'
 describe('parseDevGuardianOptions', () => {
   it('resolves a separate development home from the checkout directory', () => {
     expect(parseDevGuardianOptions(['--', '--home', '../openalice-homes/feature-a'], '/repo/OpenAlice'))
-      .toEqual({ home: resolve('/repo/OpenAlice', '../openalice-homes/feature-a') })
+      .toEqual({ home: resolve('/repo/OpenAlice', '../openalice-homes/feature-a'), relay: true })
   })
 
   it('supports equals syntax and leaves other Guardian options alone', () => {
     expect(parseDevGuardianOptions(['--takeover', '--home=/tmp/openalice feature']))
-      .toEqual({ home: resolve('/tmp/openalice feature') })
+      .toEqual({ home: resolve('/tmp/openalice feature'), relay: true })
   })
 
   it('uses the final home when a wrapper supplied more than one', () => {
     expect(parseDevGuardianOptions(['--home', '/tmp/first', '--home=/tmp/second']))
-      .toEqual({ home: resolve('/tmp/second') })
+      .toEqual({ home: resolve('/tmp/second'), relay: true })
+  })
+
+  it('keeps the direct server as an explicit diagnostic mode', () => {
+    expect(parseDevGuardianOptions(['--no-relay'])).toEqual({ home: null, relay: false })
   })
 
   it('rejects a missing home path before any process starts', () => {

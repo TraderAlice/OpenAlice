@@ -311,6 +311,7 @@ export const ja: Resources = {
     unread: '未読 {{count}} 件',
     pendingPush: 'プッシュ待ち {{count}} 件',
     connectorNeedsAttention: '要確認のコネクター {{count}} 件',
+    updatesAvailable: '利用可能な更新 {{count}} 件',
     about: '{{label}}について',
     primaryNavigation: 'メインナビゲーション',
     yourAlice: 'Alice’s Settings',
@@ -857,6 +858,15 @@ export const ja: Resources = {
       marketData: 'マーケットデータ',
       newsSources: 'ニュースソース',
       beta: 'ベータ',
+    },
+    updateLifecycle: {
+      title: '更新', description: '更新確認はバックグラウンドで行います。安全にマージできる Workspace は自動更新し、実行中や競合時は確認を待ちます。',
+      checkNow: '今すぐ確認', checking: '確認中…', statusTitle: 'このインストール',
+      appCheck: 'OpenAlice の更新を自動確認', appCheckDescription: 'クライアントとバックエンドの更新を Alice’s Settings に表示します。',
+      autoQuant: 'Auto Quant を自動更新', autoQuantDescription: '上流の最新安定版に追従し、マージが妨げられた場合は確認を待ちます。',
+      autoPrediction: 'Auto Prediction を自動更新', autoPredictionDescription: '上流の最新安定版に追従し、マージが妨げられた場合は確認を待ちます。',
+      client: 'このアプリ', backend: '接続中のバックエンド', available: 'v{{version}} を利用可能', currentOrManaged: '最新または外部管理',
+      blocked: '確認が必要', failed: '確認に失敗', review: '{{name}} の更新を確認',
     },
     machines: {
       title: 'マシン', description: 'Alice が作業できるマシンを確認・管理します。', saved: '保存済みマシン',

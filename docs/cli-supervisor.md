@@ -925,12 +925,11 @@ switches the live Supervisor view and records it as the next bare-start
 default; it does not stop, move, copy, or delete another project. Creating an
 AliceProject collects a validated lowercase key and separate complete home
 inside the TUI, rejects equal or nested registered homes, and selects the new
-entry atomically. The final Workspaces step defaults to Chat, allows optional
-Auto Quant and Auto Prediction (or none), then starts the selected project.
-The backend prepares those durable instances before the first page opens;
-Agent Sessions remain stopped. Failed preparation can be retried from Quick
-Start. CLI `create alice-project --workspaces` records the same selection
-for the next start. See [[docs/alice-project.md]]. An existing target must be empty or recognizable as an
+entry atomically. The final Workspaces step reviews Chat, Auto Quant, and Auto
+Prediction, then starts the selected project. The app opens first and prepares
+those durable instances asynchronously; Agent Sessions remain stopped. Failed
+preparation can be retried from Quick Start. The CLI records the same three
+defaults for the next app activation. See [[docs/alice-project.md]]. An existing target must be empty or recognizable as an
 OpenAlice complete home; an unrelated non-empty directory is rejected. A new
 target is created and canonicalized when registered, so a later missing
 registered Home is never silently recreated. A bare TUI launch falls back to

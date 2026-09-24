@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const mocks = vi.hoisted(() => ({
-  getVersionInfo: vi.fn(async (options?: { force?: boolean }) => ({
+  getVersionInfo: vi.fn(async (options?: { force?: boolean; currentOnly?: boolean }) => ({
     current: '0.82.0-beta',
     channel: 'beta',
     updateAuthority: 'source',
@@ -31,6 +31,12 @@ describe('version routes', () => {
 
     expect(response.status).toBe(200)
     expect(mocks.getVersionInfo).toHaveBeenCalledWith()
+  })
+
+  it('reports running identity without checking the release feed when requested', async () => {
+    const response = await createVersionRoutes().request('/?currentOnly=1')
+    expect(response.status).toBe(200)
+    expect(mocks.getVersionInfo).toHaveBeenCalledWith({ currentOnly: true })
   })
 
   it('forces a fresh release lookup for a manual update check', async () => {

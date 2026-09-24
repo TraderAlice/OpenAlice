@@ -55,6 +55,12 @@ Source development remains ordinary:
 pnpm dev
 ```
 
+`pnpm dev` serves the browser through the local Web relay, with Vite behind it
+for hot reload. The printed UI URL can switch between registered Machines and
+running AliceProjects. The Guardian-owned development AliceProject is included
+in the relay's local inventory without changing the saved Supervisor registry.
+Use `pnpm dev:no-relay` only to debug the older direct Vite-to-backend path.
+
 An explicit `--app-dir`, AliceProject source setting, or
 `OPENALICE_APP_HOME` can select a checkout for development. Normal installed
 startup does not clone source, install dependencies, or reconstruct a

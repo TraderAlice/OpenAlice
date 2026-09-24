@@ -47,10 +47,11 @@ and the tunnel loop on a context with no Node, Bun, or Agent Runtime installed.
 Real long-latency Agent TUI measurements remain a separate release observation
 rather than a reason to invent a new terminal protocol preemptively.
 
-Browser terminals on a remote source-dev UI keep their WebSocket on the page's
-origin, including its forwarded port. Only loopback browser access bypasses the
-Vite proxy for the development backend port; a LAN client cannot assume that
-the backend's loopback-only listener is exposed alongside the UI.
+Normal `pnpm dev` puts the local relay in front of Vite. Browser API, terminal
+WebSocket, and Studio surface routes use that relay's selected Runtime; Vite
+provides only the source UI and hot reload. The explicit `pnpm dev:no-relay`
+diagnostic path retains the older direct Vite-to-backend proxy and its
+loopback-only terminal bypass.
 
 Settings → General → Where Alice is working presents the active Machine beside the
 AliceProject reported by its Runtime. In the normal `openalice` TUI, the Web GUI

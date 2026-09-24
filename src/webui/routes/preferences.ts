@@ -1,5 +1,6 @@
 import { Hono } from 'hono'
 import { z } from 'zod'
+import { readUpdatePreferences, saveUpdatePreferences } from '../../core/update-preferences.js'
 
 import {
   AGENT_RUNTIME_QUICK_ACCESS_LIMIT,
@@ -59,6 +60,11 @@ const harnessPreferenceUpdateSchema = z.object({
   showIssueAttachedSessions: z.boolean(),
   showUnverifiedHarnessReleases: z.boolean(),
 })
+const updatePreferenceSchema = z.object({
+  autoCheckApp: z.boolean(),
+  autoUpdateAutoQuant: z.boolean(),
+  autoUpdateAutoPrediction: z.boolean(),
+})
 
 const agentRuntimesPreferenceUpdateSchema = z.object({
   quickAccessIds: z.array(z.string().trim().min(1).max(128)).max(AGENT_RUNTIME_QUICK_ACCESS_LIMIT),
@@ -106,6 +112,14 @@ export function createPreferencesRoutes(
   adapterRegistry: AdapterRegistry = createBuiltinAdapterRegistry(),
 ) {
   const app = new Hono()
+
+  app.get('/updates', async (c) => c.json(await readUpdatePreferences()))
+  app.put('/updates', async (c) => {
+    const parsed = updatePreferenceSchema.safeParse(await c.req.json().catch(() => null))
+    if (!parsed.success) return c.json({ error: 'invalid_update_preferences' }, 400)
+    try { return c.json(await saveUpdatePreferences(parsed.data)) }
+    catch (error) { return c.json({ error: 'preferences_write_failed', message: String(error) }, 500) }
+  })
 
   app.get('/quick-chat', async (c) => {
     try {

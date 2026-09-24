@@ -3,32 +3,23 @@ import { CheckCircle2, Download, ExternalLink, LoaderCircle, RefreshCw, Server }
 import { useTranslation } from 'react-i18next'
 
 import { useMachineManagement } from '../../hooks/useMachineManagement'
-import { useVersionInfo } from '../../hooks/useVersionInfo'
+import { useUpdateLifecycle } from '../../hooks/useUpdateLifecycle'
 import { Button } from '../ui/button'
 import { ConfigSection } from '../form'
 import { MachineUpgradeDialog } from './MachineUpgradeDialog'
 import { claimUpgradeDialog, shouldRestoreUpgradeDialog } from './upgrade-dialog-owner'
 
 type RuntimeMode = 'browser' | 'electron-dev' | 'electron-packaged'
-type NativeUpdaterStatus =
-  | { phase: 'available'; version?: string; releaseUrl?: string }
-  | { phase: 'downloading'; version?: string; percent?: number }
-  | { phase: 'downloaded'; version: string; releaseUrl: string }
-  | { phase: 'installing'; version: string; stage: 'preparing' | 'stopping-services' | 'releasing-runtime' | 'handing-off' }
-  | { phase: 'error'; message: string }
-
 const RELEASES_URL = 'https://github.com/TraderAlice/OpenAlice/releases'
 const UI_VERSION = typeof __OPENALICE_UI_VERSION__ === 'string' ? __OPENALICE_UI_VERSION__ : 'development'
 
 export function AboutOpenAliceSection() {
   const { t } = useTranslation()
   const [runtimeMode, setRuntimeMode] = useState<RuntimeMode>('browser')
-  const [nativeStatus, setNativeStatus] = useState<NativeUpdaterStatus | null>(null)
-  const [checking, setChecking] = useState(false)
   const [installing, setInstalling] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [upgradeOpen, setUpgradeOpen] = useState(false)
-  const { info: versionInfo, error: versionError, check: checkVersion } = useVersionInfo()
+  const { versionInfo, nativeStatus, error: versionError, checking, refresh: refreshUpdates } = useUpdateLifecycle()
   const machines = useMachineManagement()
   useEffect(() => { if (machines.operation?.mode === 'upgrade' && machines.operation.phase === 'running' && shouldRestoreUpgradeDialog('about')) setUpgradeOpen(true) }, [machines.operation?.id, machines.operation?.phase, machines.operation?.mode])
   const target = machines.status?.target
@@ -43,26 +34,13 @@ export function AboutOpenAliceSection() {
         if (active) setRuntimeMode(info.mode)
       }).catch(() => {})
     }
-    const nativeUpdater = window.openAlice?.updater
-    if (!nativeUpdater) return () => { active = false }
-    void nativeUpdater.getStatus().then((status) => {
-      if (active && status) setNativeStatus(status)
-    }).catch(() => {})
-    const unsubscribe = nativeUpdater.onStatus((status) => {
-      if (active) setNativeStatus(status)
-    })
-    return () => { active = false; unsubscribe() }
+    return () => { active = false }
   }, [])
 
   const backendVersion = versionInfo?.current ?? t('settings.about.versionLoading')
   const updateVersion = nativeStatus && 'version' in nativeStatus && nativeStatus.version
     ? nativeStatus.version
     : versionInfo?.hasUpdate ? versionInfo.latest : null
-  const webUpdateCheckOwned = !remote && (versionInfo === null || (
-    versionInfo.updateAuthority === 'source'
-    || versionInfo.updateAuthority === 'desktop'
-    || (versionInfo.updateAuthority === 'cli' && versionInfo.channel !== 'dev')
-  ))
 
   const backendStatus = useMemo(() => {
     if (checking && !updater) return { kind: 'checking' as const, text: t('settings.about.status.checking') }
@@ -98,19 +76,6 @@ export function AboutOpenAliceSection() {
       : 'border-primary/25 bg-primary-muted/30 text-primary'
   const BackendIcon = backendStatus.kind === 'current' ? CheckCircle2 : backendStatus.kind === 'checking' ? LoaderCircle : RefreshCw
 
-  const checkForUpdates = async () => {
-    setChecking(true)
-    setError(null)
-    try {
-      const nativeCheck = updater?.checkForUpdates().catch(() => null)
-      const backendCheck = !updater || !remote ? checkVersion() : Promise.resolve(null)
-      const [, next] = await Promise.all([nativeCheck ?? Promise.resolve(null), backendCheck])
-      if (next?.error) setError(t('settings.about.checkError'))
-    } catch {
-      setError(t('settings.about.checkError'))
-    } finally { setChecking(false) }
-  }
-
   const openRelease = async () => {
     setError(null)
     try {
@@ -132,7 +97,7 @@ export function AboutOpenAliceSection() {
     void machines.probe({ mode: 'upgrade', machineKey: target.machine, projectKey: target.project }).then(() => { claimUpgradeDialog('about'); setUpgradeOpen(true) }).catch(() => undefined)
   }
   const applyBackend = () => {
-    void machines.apply().then(() => checkVersion()).catch(() => undefined)
+    void machines.apply().then(() => refreshUpdates()).catch(() => undefined)
   }
 
   return <ConfigSection title={t('settings.about.title')}>
@@ -160,9 +125,8 @@ export function AboutOpenAliceSection() {
         </div>}
         {nativeStatus?.phase === 'installing' && <p className="mt-2 text-[11px] text-muted-foreground">{t('settings.about.installHandoffNote')}</p>}
         <div className="mt-3 flex flex-wrap gap-2">
-          {nativeStatus?.phase === 'downloaded' || nativeStatus?.phase === 'installing'
-            ? <Button type="button" size="sm" className="min-h-10 sm:min-h-8" disabled={installing || nativeStatus.phase === 'installing'} onClick={() => void installAndRestart()}><RefreshCw className={`size-3.5 ${installing ? 'animate-spin motion-reduce:animate-none' : ''}`} aria-hidden />{installing || nativeStatus.phase === 'installing' ? t('settings.about.installing') : t('settings.about.installAndRestart')}</Button>
-            : <Button type="button" size="sm" className="min-h-10 sm:min-h-8" disabled={checking} onClick={() => void checkForUpdates()}><RefreshCw className={`size-3.5 ${checking ? 'animate-spin motion-reduce:animate-none' : ''}`} aria-hidden />{checking ? t('settings.about.checking') : t('settings.about.check')}</Button>}
+          {(nativeStatus?.phase === 'downloaded' || nativeStatus?.phase === 'installing') &&
+            <Button type="button" size="sm" className="min-h-10 sm:min-h-8" disabled={installing || nativeStatus.phase === 'installing'} onClick={() => void installAndRestart()}><RefreshCw className={`size-3.5 ${installing ? 'animate-spin motion-reduce:animate-none' : ''}`} aria-hidden />{installing || nativeStatus.phase === 'installing' ? t('settings.about.installing') : t('settings.about.installAndRestart')}</Button>}
         </div>
       </div>}
       <div className="mt-3 flex flex-wrap gap-2">
@@ -184,7 +148,6 @@ export function AboutOpenAliceSection() {
         </div>
         <div className="mt-3 flex flex-wrap gap-2">
           {remote && <Button type="button" size="sm" className="min-h-10 sm:min-h-8" disabled={machines.probing || machines.applying} onClick={probeBackend}><RefreshCw className={`size-3.5 ${machines.probing ? 'animate-spin motion-reduce:animate-none' : ''}`} aria-hidden />{machines.probing ? t('settings.machines.probing') : t('settings.about.reviewBackendUpdate')}</Button>}
-          {!remote && !updater && webUpdateCheckOwned && <Button type="button" size="sm" className="min-h-10 sm:min-h-8" disabled={checking} onClick={() => void checkForUpdates()}><RefreshCw className={`size-3.5 ${checking ? 'animate-spin motion-reduce:animate-none' : ''}`} aria-hidden />{checking ? t('settings.about.checking') : t('settings.about.check')}</Button>}
         </div>
         <MachineUpgradeDialog open={upgradeOpen} plan={machines.plan?.mode === 'upgrade' ? machines.plan : null} operation={machines.operation} busy={machines.applying} error={machines.operationError} onClose={() => { setUpgradeOpen(false); machines.clearPlan() }} onApply={applyBackend} onRetry={probeBackend} />
         {machines.operationError && <p role="alert" className="mt-2 text-[12px] text-destructive">{machines.operationError}</p>}

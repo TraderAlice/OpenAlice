@@ -34,6 +34,8 @@ export interface WebRelayOptions {
   port?: number
   open?: boolean
   uiRoot?: string
+  /** Loopback Vite server behind the relay in source development. */
+  uiOrigin?: string
   inspectFleet?: typeof inspectMachineFleet
   inspectLocal?: typeof inspectLocalMachine
   inspectRegistered?: typeof inspectRegisteredMachine
@@ -54,9 +56,14 @@ export class WebRelay {
   private readonly options: WebRelayOptions
   private readonly machines: MachineManagement
   private origin = ''
+  private readonly devUi: URL | null
 
   constructor(options: WebRelayOptions = {}) {
     this.options = options
+    this.devUi = options.uiOrigin ? new URL(options.uiOrigin) : null
+    if (this.devUi && (this.devUi.protocol !== 'http:' || !['127.0.0.1', 'localhost'].includes(this.devUi.hostname) || this.devUi.username || this.devUi.password || this.devUi.pathname !== '/')) {
+      throw new Error('Development UI must be a loopback HTTP origin.')
+    }
     this.machines = options.machineManagement ?? new MachineManagement()
     this.server.on('upgrade', (req, socket, head) => this.upgrade(req, socket, head))
   }
@@ -129,7 +136,14 @@ export class WebRelay {
     for (const socket of this.sockets) socket.destroy()
     for (const response of this.subscribers) response.end()
     await new Promise<void>((done) => {
-      this.server.close(() => done())
+      const timeout = setTimeout(() => {
+        // A proxied development request can leave a half-closed socket after
+        // Vite exits. The relay has stopped listening; do not keep Guardian's
+        // runtime lock alive waiting indefinitely for that socket.
+        this.server.closeAllConnections()
+        done()
+      }, 2_000)
+      this.server.close(() => { clearTimeout(timeout); done() })
       this.server.closeAllConnections()
     })
   }
@@ -307,6 +321,7 @@ export class WebRelay {
       if (url.pathname.startsWith('/api/') || url.pathname === '/mcp' || url.pathname.startsWith('/mcp/')) {
         return this.proxy(req, res)
       }
+      if (this.devUi) return this.proxyDevelopmentUi(req, res)
       return this.staticFile(url.pathname, res)
     } catch (error) {
       json(res, 502, { error: error instanceof Error ? error.message : String(error) })
@@ -334,13 +349,54 @@ export class WebRelay {
 
   private upgrade(req: IncomingMessage, socket: Duplex, head: Buffer): void {
     const surfaceOrigin = this.surfaceOrigin(req)
-    if (!this.validRequest(req, false, surfaceOrigin ?? this.origin) || (!surfaceOrigin && !req.url?.startsWith('/api/'))) { socket.destroy(); return }
+    if (!this.validRequest(req, false, surfaceOrigin ?? this.origin)) { socket.destroy(); return }
+    if (!surfaceOrigin && !req.url?.startsWith('/api/')) {
+      if (this.devUi) this.upgradeDevelopmentUi(req, socket, head)
+      else socket.destroy()
+      return
+    }
     const target = this.target
     if (!target) { socket.destroy(); return }
     const endpoint = new URL(target.endpoint)
     const headers = upstreamHeaders(req, endpoint, target, !!surfaceOrigin)
     headers['connection'] = 'Upgrade'
     const upstream = httpRequest({ hostname: LOOPBACK, port: endpoint.port, method: 'GET', path: req.url, headers })
+    upstream.on('upgrade', (response, peer, peerHead) => {
+      const lines = [`HTTP/1.1 ${response.statusCode ?? 101} Switching Protocols`, ...Object.entries(response.headers).map(([key, value]) => `${key}: ${value}`), '', '']
+      socket.write(lines.join('\r\n'))
+      if (peerHead.length) socket.write(peerHead)
+      if (head.length) peer.write(head)
+      this.sockets.add(socket)
+      socket.on('close', () => { this.sockets.delete(socket); peer.destroy() })
+      peer.on('close', () => socket.destroy())
+      socket.pipe(peer).pipe(socket)
+    })
+    upstream.on('error', () => socket.destroy())
+    upstream.end()
+  }
+
+  private proxyDevelopmentUi(req: IncomingMessage, res: ServerResponse): void {
+    const endpoint = this.devUi!
+    const headers = { ...req.headers, host: endpoint.host }
+    delete headers['cookie']
+    delete headers['authorization']
+    if (headers['origin']) headers['origin'] = endpoint.origin
+    const upstream = httpRequest({ hostname: endpoint.hostname, port: endpoint.port, method: req.method, path: req.url, headers }, (response) => {
+      const responseHeaders = { ...response.headers }
+      delete responseHeaders['set-cookie']
+      res.writeHead(response.statusCode ?? 502, responseHeaders)
+      response.pipe(res)
+    })
+    upstream.on('error', (error) => { if (!res.headersSent) json(res, 502, { error: error.message }); else res.destroy(error) })
+    req.pipe(upstream)
+  }
+
+  private upgradeDevelopmentUi(req: IncomingMessage, socket: Duplex, head: Buffer): void {
+    const endpoint = this.devUi!
+    const headers = { ...req.headers, host: endpoint.host, origin: endpoint.origin, connection: 'Upgrade' }
+    delete headers['cookie']
+    delete headers['authorization']
+    const upstream = httpRequest({ hostname: endpoint.hostname, port: endpoint.port, method: 'GET', path: req.url, headers })
     upstream.on('upgrade', (response, peer, peerHead) => {
       const lines = [`HTTP/1.1 ${response.statusCode ?? 101} Switching Protocols`, ...Object.entries(response.headers).map(([key, value]) => `${key}: ${value}`), '', '']
       socket.write(lines.join('\r\n'))

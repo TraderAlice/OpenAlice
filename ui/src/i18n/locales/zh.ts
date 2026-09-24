@@ -310,6 +310,7 @@ export const zh: Resources = {
     unread: '{{count}} 条未读',
     pendingPush: '{{count}} 笔待推送',
     connectorNeedsAttention: '{{count}} 个连接器需要处理',
+    updatesAvailable: '{{count}} 项更新可用',
     about: '关于{{label}}',
     primaryNavigation: '主导航',
     yourAlice: 'Alice’s Settings',
@@ -855,6 +856,15 @@ export const zh: Resources = {
       marketData: '市场数据',
       newsSources: '新闻源',
       beta: '测试版',
+    },
+    updateLifecycle: {
+      title: '更新', description: '更新检查在后台进行。源码 Workspace 能安全合并时自动升级；运行占用或冲突会等待你处理。',
+      checkNow: '立即检查', checking: '检查中…', statusTitle: '当前安装',
+      appCheck: '自动检查 OpenAlice 更新', appCheckDescription: '在 Alice’s Settings 提示前端和后端可用更新。',
+      autoQuant: '自动更新 Auto Quant', autoQuantDescription: '跟随上游最新稳定版本；合并受阻时等待审阅。',
+      autoPrediction: '自动更新 Auto Prediction', autoPredictionDescription: '跟随上游最新稳定版本；合并受阻时等待审阅。',
+      client: '当前前端', backend: '已连接的后端', available: 'v{{version}} 可更新', currentOrManaged: '已是最新或由外部管理',
+      blocked: '需要处理', failed: '检查失败', review: '查看 {{name}} 的更新',
     },
     machines: {
       title: '机器', description: '探测和管理 Alice 可以工作的机器。', saved: '已保存的机器',

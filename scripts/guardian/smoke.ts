@@ -1,7 +1,7 @@
 /**
  * Guardian dev smoke test.
  *
- * Boots the full `pnpm dev` stack (UTA → Alice → Vite) as a black box,
+ * Boots the full `pnpm dev` stack (UTA → Alice → relay → Vite) as a black box,
  * verifies all three children actually spawned and bound their ports, then
  * exercises the UTA restart path and checks for orphaned processes on
  * teardown.
@@ -211,11 +211,17 @@ async function main(): Promise<void> {
   // Alice tsx spawn worked → web plugin bound its port.
   await waitFor('Alice listening (alice child spawned)', () => portBound(webPort))
 
-  // Vite pnpm spawn worked → it announces the stable IPv4 loopback URL that
-  // Guardian exposes to other local surfaces through Runtime discovery.
+  // Vite stays behind the relay; the advertised UI port is the relay origin.
   await waitFor('Vite dev server up (vite child spawned)', () => /\[vite\][^\n]*127\.0\.0\.1:\d+/i.test(out))
-  const uiPort = Number(/\[vite\][^\n]*127\.0\.0\.1:(\d+)/i.exec(out)?.[1])
-  if (!uiPort) fail(`could not parse Vite port from output:\n${out.slice(-600)}`)
+  const uiPort = Number(/UI\s+→\s+http:\/\/127\.0\.0\.1:(\d+) \(relay\)/i.exec(out)?.[1])
+  if (!uiPort) fail(`could not parse relay port from output:\n${out.slice(-600)}`)
+  await waitFor('relay frontend and HMR client ready', async () => {
+    try {
+      return (await fetch(`http://127.0.0.1:${uiPort}/@vite/client`)).ok
+    } catch { return false }
+  })
+  const relayStatus = await (await fetch(`http://127.0.0.1:${uiPort}/relay/v1/status`)).json() as { target?: { machine?: string } }
+  if (relayStatus.target?.machine !== 'local') fail(`dev relay did not select its local Runtime: ${JSON.stringify(relayStatus)}`)
 
   // A second process may inspect and open this dev-owned Runtime, but may not
   // stop or replace it. This is the discovery contract that prevents CLI and
@@ -231,7 +237,7 @@ async function main(): Promise<void> {
     fail(`dev discovery did not identify its owner: ${JSON.stringify(discovered.owner)}`)
   }
   if (discovered.endpoints.web !== `http://127.0.0.1:${uiPort}`) {
-    fail(`dev discovery advertised ${String(discovered.endpoints.web)} instead of Vite ${uiPort}`)
+    fail(`dev discovery advertised ${String(discovered.endpoints.web)} instead of relay ${uiPort}`)
   }
   const discoveredWeb = await fetch(`${discovered.endpoints.web}/api/auth/status`)
   if (!discoveredWeb.ok) {
@@ -280,7 +286,7 @@ async function main(): Promise<void> {
   })
 
   console.log('\n✅ HARD checks passed — all three children spawned and bound.')
-  summary(`✅ **Guardian boot smoke passed (${process.platform})** — UTA/Alice/Vite spawned; dev discovery stayed read-only through a duplicate start.`)
+  summary(`✅ **Guardian boot smoke passed (${process.platform})** — UTA/Alice/relay/Vite spawned; dev discovery stayed read-only through a duplicate start.`)
 
   // ── SOFT: UTA restart (never fails the run) ───────────────
   // Triggers the same flag Alice touches after a broker-config change. On

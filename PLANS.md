@@ -29,6 +29,10 @@ the durable truth after it changes. Git history is the archive.
 
 ## Active
 
+- [[plans/update-lifecycle.md]] — Prepare default Workspaces asynchronously on
+  Runtime start, scan app and Workspace releases in one lifecycle, and surface
+  actionable updates in Settings while preserving reviewed upgrade guards.
+
 - [[plans/cli-relay-entry-unification.md]] — Consolidates CLI-launched browser
   sessions on the client-owned WebRelay while retaining explicit local and
   remote Runtime lifecycle commands.

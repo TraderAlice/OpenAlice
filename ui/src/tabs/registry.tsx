@@ -18,7 +18,7 @@ import { MarketRotationPage } from '../pages/MarketRotationPage'
 import { MarketBoardPage } from '../pages/MarketBoardPage'
 import { MARKET_BOARD_TITLES } from '../pages/market-board-titles'
 import { MarketDetailPage } from '../pages/MarketDetailPage'
-import { AppearanceSettingsPage, SettingsPage, ToolsSettingsPage } from '../pages/SettingsPage'
+import { AppearanceSettingsPage, LanguageSettingsPage, SettingsPage, ToolsSettingsPage } from '../pages/SettingsPage'
 import { ActivityBarSettingsPage } from '../pages/ActivityBarSettingsPage'
 import { PetSettingsPage } from '../pages/PetSettingsPage'
 import { WorkspaceInjectionPage } from '../pages/WorkspaceInjectionPage'
@@ -267,6 +267,7 @@ const settingsCategoryTitle: Record<
   string
 > = {
   general: 'Overview',
+  language: 'Language',
   appearance: 'Skin',
   pet: 'Pet',
   'activity-bar': 'Activity bar',
@@ -288,6 +289,7 @@ const settingsCategoryTitle: Record<
 function SettingsRouter({ spec }: ViewProps<'settings'>) {
   switch (spec.params.category) {
     case 'general': return <SettingsPage />
+    case 'language': return <LanguageSettingsPage />
     case 'appearance': return <AppearanceSettingsPage />
     case 'pet': return <PetSettingsPage />
     case 'activity-bar': return <ActivityBarSettingsPage />

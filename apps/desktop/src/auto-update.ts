@@ -185,10 +185,8 @@ export function configureAutoUpdate(win: BrowserWindow, hooks: AutoUpdateHooks):
     sendStatus({ phase: 'downloaded', version: info.version, releaseUrl: releaseUrlFor(info.version) })
   })
 
-  // electron-updater emits the same rejection through its `error` event
-  // before rethrowing it from this promise. The event handler above owns the
-  // diagnostic; consume the promise rejection so one failure is logged once.
-  void checkForUpdates()
+  // The painted renderer activates update discovery after reading the shared
+  // automatic-check preference. Explicit IPC checks remain available here.
 }
 
 export function channelForVersion(version: string, platform: NodeJS.Platform, arch: string): string {

@@ -77,6 +77,7 @@ describe('SettingsCategoryList', () => {
       'settings.category.trading',
     ])
     expect(within(general!).queryByRole('button', { name: 'settings.category.agentPermissions' })).toBeNull()
+    expect(within(general!).getByRole('button', { name: 'settings.language.title' })).toBeTruthy()
   })
 
   it('owns the vertical scroll region for long settings navigation', () => {

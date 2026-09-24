@@ -319,6 +319,7 @@ export const zhHant: Resources = {
     unread: '{{count}} 則未讀',
     pendingPush: '{{count}} 筆待推送',
     connectorNeedsAttention: '{{count}} 個連接器需要處理',
+    updatesAvailable: '{{count}} 項更新可用',
     about: '關於{{label}}',
     primaryNavigation: '主要導覽',
     yourAlice: 'Alice’s Settings',
@@ -864,6 +865,15 @@ export const zhHant: Resources = {
       marketData: '市場資料',
       newsSources: '新聞來源',
       beta: '測試版',
+    },
+    updateLifecycle: {
+      title: '更新', description: '更新檢查在背景進行。來源 Workspace 能安全合併時自動升級；執行占用或衝突會等待處理。',
+      checkNow: '立即檢查', checking: '檢查中…', statusTitle: '目前安裝',
+      appCheck: '自動檢查 OpenAlice 更新', appCheckDescription: '在 Alice’s Settings 提示前端與後端可用更新。',
+      autoQuant: '自動更新 Auto Quant', autoQuantDescription: '跟隨上游最新穩定版本；合併受阻時等待審閱。',
+      autoPrediction: '自動更新 Auto Prediction', autoPredictionDescription: '跟隨上游最新穩定版本；合併受阻時等待審閱。',
+      client: '目前前端', backend: '已連線的後端', available: 'v{{version}} 可更新', currentOrManaged: '已是最新或由外部管理',
+      blocked: '需要處理', failed: '檢查失敗', review: '查看 {{name}} 的更新',
     },
     machines: {
       title: '機器', description: '探測和管理 Alice 可以工作的機器。', saved: '已儲存的機器',

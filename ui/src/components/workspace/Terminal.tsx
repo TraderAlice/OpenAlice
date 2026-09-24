@@ -795,10 +795,9 @@ function defaultWsUrl(): string {
     import.meta.env.DEV &&
     // Remote dev exposes one forwarded UI port; the backend may be loopback-only.
     ['localhost', '127.0.0.1', '[::1]'].includes(window.location.hostname) &&
-    typeof __OPENALICE_DEV_BACKEND_PORT__ === 'number' &&
-    __OPENALICE_DEV_BACKEND_PORT__ > 0
+    Number(import.meta.env.VITE_OPENALICE_DEV_BACKEND_PORT ?? 0) > 0
   ) {
-    return `${proto}//${window.location.hostname}:${__OPENALICE_DEV_BACKEND_PORT__}/api/workspaces/pty`;
+    return `${proto}//${window.location.hostname}:${import.meta.env.VITE_OPENALICE_DEV_BACKEND_PORT}/api/workspaces/pty`;
   }
   return `${proto}//${window.location.host}/api/workspaces/pty`;
 }

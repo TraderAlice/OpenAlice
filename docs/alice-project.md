@@ -67,12 +67,12 @@ plus the matching Settings categories
 Ask Alice or Settings. AutoQuant and Tracked stay visible until that
 boundary is reviewed separately.
 
-Named AliceProject creation selects the workspaces to prepare. Chat is the
-default; Auto Quant and Auto Prediction are optional, and selecting none leaves
-setup for later. The TUI Foundry adds a third Workspaces step (arrows to move,
-Space/click to toggle) and finishes with Create & start. Scripted creation uses
-`--workspaces chat,auto-quant,auto-prediction` or `--workspaces none`; it records
-the selection without starting a Runtime. The next startup prepares it.
+Named AliceProject creation selects Chat, Auto Quant, and Auto Prediction by
+default. The TUI Foundry reviews all three before Create & start. Creation records the request
+without preparing any Workspace. After the app shell opens, it activates the
+default Workspace setup asynchronously; Workspace pages show the pending state
+while the rest of the app remains usable. Existing projects with a missing
+canonical default are prepared by the same post-open lifecycle.
 
 The CLI and TUI share the same registration and `workspace-setup.json` birth
 request. Under its writer lease, the backend resolves or creates each selected

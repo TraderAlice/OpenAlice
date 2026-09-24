@@ -280,6 +280,15 @@ describe('getVersionInfo', () => {
     globalThis.fetch = originalFetch
   })
 
+  it('returns the running version without release discovery when current-only is selected', async () => {
+    const fetchMock = vi.fn()
+    globalThis.fetch = fetchMock as unknown as typeof fetch
+    const info = await getVersionInfo({ channel: 'stable', currentOnly: true })
+    expect(info.current).toBe(getCurrentVersion())
+    expect(info.latest).toBeNull()
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
+
   it('reports hasUpdate=true when latest is newer than current', async () => {
     mockJsonResponse(releaseManifest('stable', '999.999.999'))
 

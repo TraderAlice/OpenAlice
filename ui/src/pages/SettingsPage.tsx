@@ -27,6 +27,7 @@ import {
 } from '../theme/styleProfiles'
 import { useEffectivePreferenceSlot } from '../theme/useEffectiveTheme'
 import { AboutOpenAliceSection } from '../components/settings/AboutOpenAliceSection'
+import { UpdateLifecycleSection } from '../components/settings/UpdateLifecycleSection'
 import { AliceLocationSection } from '../components/settings/AliceLocationSection'
 import { MachineManagementSection } from '../components/settings/MachineManagementSection'
 import { Button } from '../components/ui/button'
@@ -853,9 +854,7 @@ function SettingsSection() {
 
       {/* Installation and update ownership */}
       <AboutOpenAliceSection />
-
-      {/* Language */}
-      <LanguageSection />
+      <UpdateLifecycleSection />
 
       {/* Complete OpenAlice home + runtime lock boundary */}
       <DataHomeSection />
@@ -1112,6 +1111,20 @@ export function SettingsPage() {
       <PageHeader title={t('settings.category.general')} />
       <SettingsScrollArea className="px-4 py-5 md:px-8">
         <SettingsSection />
+      </SettingsScrollArea>
+    </div>
+  )
+}
+
+export function LanguageSettingsPage() {
+  const { t } = useTranslation()
+  return (
+    <div className="flex flex-col flex-1 min-h-0">
+      <PageHeader title={t('settings.language.title')} />
+      <SettingsScrollArea className="px-4 py-5 md:px-8">
+        <div className="mx-auto w-full max-w-[1100px]">
+          <LanguageSection />
+        </div>
       </SettingsScrollArea>
     </div>
   )

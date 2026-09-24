@@ -13,6 +13,7 @@ import { UpdateBanner } from './components/UpdateBanner'
 import { DemoBanner } from './demo/DemoBanner'
 import { DemoAnalytics } from './demo/DemoAnalytics'
 import { WorkspacesProvider } from './contexts/WorkspacesContext'
+import { UpdateLifecycleProvider } from './hooks/useUpdateLifecycle'
 import {
   MobilePageNavigationProvider,
   useMobilePageNavigation,
@@ -70,12 +71,14 @@ const FirstRunGuide = lazy(async () => {
 export function App() {
   return (
     <WorkspacesProvider>
-      <SessionTakeoverProvider>
-      <AppShell />
-      <SessionTakeoverDialogHost />
-      <SessionBusyDialogHost />
-      <SessionDetailsDialogHost />
-      </SessionTakeoverProvider>
+      <UpdateLifecycleProvider>
+        <SessionTakeoverProvider>
+          <AppShell />
+          <SessionTakeoverDialogHost />
+          <SessionBusyDialogHost />
+          <SessionDetailsDialogHost />
+        </SessionTakeoverProvider>
+      </UpdateLifecycleProvider>
     </WorkspacesProvider>
   )
 }

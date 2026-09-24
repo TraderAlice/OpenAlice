@@ -1036,7 +1036,7 @@ export async function runSupervisorTui(
     home,
     workspaces,
   ) => {
-    await createSupervisorAliceProject(currentContext, name, home, { workspaces: workspaces ?? ['chat'] })
+    await createSupervisorAliceProject(currentContext, name, home, { workspaces: workspaces ?? [...PROJECT_WORKSPACES] })
     return resolveStoredLaunchContext(launchFlags, {
       env: dependencies.env,
     })
@@ -3024,31 +3024,27 @@ export async function runSupervisorTui(
       if (start && !projectsActive) await requestAction('start-open')
     }
     const showCreateWorkspaces = (name: string, home: string) => {
-      const selected = new Set<ProjectWorkspace>(['chat'])
       let cursor = 0
       selectWorkspaceRow = index => { cursor = index; ui.requestRender() }
       ui.setShowHardwareCursor(false)
       creatorView = {
         step: 'workspaces', currentProjectName: projectContext.aliceProject.displayName,
-        projectKey: name, detail: '↑↓ Choose · Space Toggle · Chat recommended; others optional.',
-        message: 'Prepare selected workspaces on startup. Agent Sessions start only when you ask.',
+        projectKey: name, detail: 'All default Workspaces are prepared after the app opens.',
+        message: 'Chat, Auto Quant, and Auto Prediction will initialize in the background. Agent Sessions start only when you ask.',
       }
       setMessage(creatorView.message)
       component = {
         render: (width) => PROJECT_WORKSPACES.map((kind, index) =>
-          truncateDisplayWidth(`${index === cursor ? '›' : ' '} [${selected.has(kind) ? 'x' : ' '}] ${PROJECT_WORKSPACE_LABELS[kind]}`, width)),
+          truncateDisplayWidth(`${index === cursor ? '›' : ' '} [x] ${PROJECT_WORKSPACE_LABELS[kind]}`, width)),
         invalidate: () => {},
         handleInput: (data) => {
           if (piTui.matchesKey(data, 'escape')) { showCreateHomeInput(name, home); return }
           if (piTui.matchesKey(data, 'up')) cursor = (cursor + 2) % 3
           else if (piTui.matchesKey(data, 'down')) cursor = (cursor + 1) % 3
-          else if (data === ' ') {
-            const kind = PROJECT_WORKSPACES[cursor]!
-            if (selected.has(kind)) selected.delete(kind); else selected.add(kind)
-          } else if (piTui.matchesKey(data, 'enter')) {
+          else if (piTui.matchesKey(data, 'enter')) {
             void activateContext(
-              () => createProject(projectContext, name, home, PROJECT_WORKSPACES.filter(kind => selected.has(kind))),
-              (next) => `Created ${next.aliceProject.displayName}. Starting and preparing workspaces…`,
+              () => createProject(projectContext, name, home, PROJECT_WORKSPACES),
+              (next) => `Created ${next.aliceProject.displayName}. Starting; Workspaces will prepare after the app opens…`,
               true,
             )
           }

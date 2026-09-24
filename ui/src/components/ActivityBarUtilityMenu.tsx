@@ -5,6 +5,7 @@ import { useTranslation } from 'react-i18next'
 
 import { useThemeStore, type AppTheme } from '../theme/store'
 import { useDesktopCompanion } from '../hooks/useDesktopCompanion'
+import { useOptionalUpdateLifecycle } from '../hooks/useUpdateLifecycle'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -46,6 +47,7 @@ export function ActivityBarUtilityMenu({
   const setTheme = useThemeStore((state) => state.setTheme)
   const [menuOpen, setMenuOpen] = useState(false)
   const companion = useDesktopCompanion(menuOpen)
+  const updateCount = useOptionalUpdateLifecycle()?.availableCount ?? 0
   const CurrentThemeIcon = THEME_MODES.find((item) => item.mode === theme)?.Icon ?? Laptop
 
   return (
@@ -73,6 +75,8 @@ export function ActivityBarUtilityMenu({
         {!compactRail && (
           <span className="min-w-0 flex-1 truncate text-[14px] font-medium">{t('nav.yourAlice')}</span>
         )}
+        {updateCount > 0 && <span role="status" aria-label={t('nav.updatesAvailable', { count: updateCount })}
+          className={`size-2 shrink-0 rounded-full bg-primary shadow-[0_0_0_3px_var(--sidebar)] ${compactRail ? 'absolute -right-0.5 -top-0.5' : ''}`} />}
         {connectorWarnings > 0 && (
           <span
             role="status"
