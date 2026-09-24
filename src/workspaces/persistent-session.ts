@@ -65,9 +65,6 @@ export type SessionAttachResult =
 const MAX_DIM = 1000;
 const CURSOR_TICK_MS = 2000;
 const CURSOR_BYTES_INTERVAL = 64 * 1024;
-const RESPAWN_DEBOUNCE_MS = 1000;
-const RESPAWN_WINDOW_MS = 30_000;
-const RESPAWN_WINDOW_LIMIT = 3;
 
 /**
  * A PTY whose lifetime is decoupled from any single WebSocket.
@@ -88,6 +85,8 @@ const RESPAWN_WINDOW_LIMIT = 3;
  * reattach.
  */
 export class PersistentSession {
+  private finishExecution!: (result: { reason: string; failed?: boolean }) => void;
+  readonly completed = new Promise<{ reason: string; failed?: boolean }>(resolve => { this.finishExecution = resolve; });
   private term: PtyProcess;
   private readonly buffer: ReplayBuffer;
   private readonly headless: HeadlessTerminalSnapshot;
@@ -106,8 +105,6 @@ export class PersistentSession {
   private controller: SessionControllerOwner | null = null;
   private currentCols: number;
   private currentRows: number;
-  private respawnTimes: number[] = [];
-  private respawnTimer: NodeJS.Timeout | null = null;
   /**
    * The CLI's own session id (claude: UUID in JSONL filename; codex: rollout
    * UUID; etc.). Discovered post-spawn by the transcript watcher when the
@@ -197,10 +194,7 @@ export class PersistentSession {
   }
 
   /**
-   * Child process exited but the session itself is sticking around. We tell
-   * the client (lifecycle child-exit), then schedule a respawn after a short
-   * debounce — unless the child has been crashing too often, in which case
-   * we open the circuit breaker and dispose for real.
+   * Child exit ends this execution. A new process requires a new managed execution.
    */
   private onChildExit(
     exited: PtyProcess,
@@ -229,35 +223,8 @@ export class PersistentSession {
       signal,
     });
 
-    const now = Date.now();
-    this.respawnTimes = this.respawnTimes.filter((t) => now - t < RESPAWN_WINDOW_MS);
-    this.respawnTimes.push(now);
-    if (this.respawnTimes.length > RESPAWN_WINDOW_LIMIT) {
-      this.log.warn('session.respawn_circuit_open', {
-        recentCrashes: this.respawnTimes.length,
-      });
-      this.sendControl({ type: 'exit', code: exitCode, signal });
-      this.dispose('respawn circuit open');
-      return;
-    }
-
-    if (this.respawnTimer) clearTimeout(this.respawnTimer);
-    this.respawnTimer = setTimeout(() => this.respawnNow(), RESPAWN_DEBOUNCE_MS);
-    this.respawnTimer.unref();
-  }
-
-  private respawnNow(): void {
-    this.respawnTimer = null;
-    if (this.disposed) return;
-    try {
-      this.term = this.spawnChild();
-      this.log.info('session.respawned', { pid: this.term.pid });
-      this.sendControl({ type: 'lifecycle', kind: 'child-respawn', pid: this.term.pid });
-    } catch (err) {
-      this.log.error('session.respawn_failed', { err });
-      this.sendControl({ type: 'exit', code: -1, signal: null });
-      this.dispose('respawn failed');
-    }
+    this.finishExecution({ reason: `child-exit:${exitCode}:${signal ?? 'none'}`, failed: exitCode !== 0 });
+    this.dispose('child exited');
   }
 
   get pid(): number {
@@ -468,9 +435,10 @@ export class PersistentSession {
     this.log.event('session.detached');
   }
 
-  /** Disable respawn and await the current child before another writer starts. */
+  /** Await the current child before another execution may start. */
   async disposeAndWait(reason: string): Promise<void> {
-    if (this.disposed) return;
+    if (this.term.terminateTree) { await this.term.terminateTree(); this.dispose(reason); return; }
+    if (this.disposed && this.currentChildExited) return;
     if (this.currentChildExited) { this.dispose(reason); return; }
     const term = this.term;
     let exited = false;
@@ -483,7 +451,8 @@ export class PersistentSession {
       finally { if (timer) clearTimeout(timer); }
     };
     try {
-      this.dispose(reason);
+      if (this.disposed) term.kill('SIGKILL');
+      else this.dispose(reason);
       await wait(2_000);
       if (!exited) { term.kill('SIGKILL'); await wait(2_000); }
       if (!exited) throw new Error('Interactive process did not exit; background handoff was not started');
@@ -496,10 +465,6 @@ export class PersistentSession {
     if (this.cursorTimer) {
       clearInterval(this.cursorTimer);
       this.cursorTimer = null;
-    }
-    if (this.respawnTimer) {
-      clearTimeout(this.respawnTimer);
-      this.respawnTimer = null;
     }
     try {
       this.term.kill();
@@ -519,6 +484,7 @@ export class PersistentSession {
       }
     }
     this.log.info('session.disposed', { reason });
+    this.finishExecution({ reason });
     this.opts.onDisposed();
   }
 

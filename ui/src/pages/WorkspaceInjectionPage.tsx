@@ -10,6 +10,8 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from '../components/ui/tabs'
 import { useProjectInjection, injectionStatus, type InjectionWorkspace } from '../hooks/useProjectInjection'
 import { WorkspaceTemplateUpgradePanel } from '../components/workspace/WorkspaceTemplateUpgradePanel'
 import { RefreshCw } from 'lucide-react'
+import { ConfigSection } from '../components/form'
+import { UnverifiedHarnessReleaseSetting } from '../components/workspace/UnverifiedHarnessReleaseSetting'
 
 export function WorkspaceInjectionPage() {
   const { t } = useTranslation()
@@ -20,6 +22,9 @@ export function WorkspaceInjectionPage() {
     <PageHeader title={t('distribution.title')} />
     <SettingsScrollArea className="px-4 py-4 md:px-6">
       <div className="mx-auto max-w-[1100px] space-y-4">
+        <ConfigSection title={t('settings.harness.releasesSection')}>
+          <UnverifiedHarnessReleaseSetting />
+        </ConfigSection>
         <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
           <span className="flex flex-wrap items-center gap-2 text-muted-foreground">{t('skillManager.projectVersion')}{state.data && <InjectionVersion version={state.data.version} empty="—" />}</span>
           <Button size="icon" variant="ghost" aria-label={t('harnessSurface.refresh')} title={t('harnessSurface.refresh')} disabled={state.busy} onClick={state.refresh}><RefreshCw size={15} /></Button>

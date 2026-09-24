@@ -1,3 +1,5 @@
+import { SessionAdmissionError } from '../../workspaces/session-admission.js';
+import type { ExecutionOrigin } from '../../workspaces/session-execution-manager.js';
 import { createAIProvider } from '../../ai-providers/provider.js'
 import { createWorkspaceContentRoutes } from './workspace-content.js';
 import { createStickerRoutes } from './stickers.js';
@@ -39,6 +41,7 @@ import { logger as launcherLogger } from '../../workspaces/logger.js';
 import { readWorkspaceMetadata, workspaceMetadataSchema, writeWorkspaceMetadata } from '../../workspaces/workspace-metadata.js';
 import {
   normalizeSessionTitle,
+  sessionDisplayTitle,
   sessionPreferredTitle,
   type SessionRecord,
 } from '../../workspaces/session-registry.js';
@@ -272,6 +275,31 @@ export function createWorkspaceRoutes(
   quickChatPreferences: QuickChatWorkspacePreferenceDeps = defaultQuickChatWorkspacePreferenceDeps,
 ): Hono {
   const app = new Hono();
+
+  app.get('/session-takeovers', (c) => c.json({
+    requests: svc.executions.takeovers.list().map(row => ({ ...row,
+      sessionTitle: (() => { const record = svc.sessionRegistry.get(row.workspaceId, row.recordId); return record ? sessionDisplayTitle(record) : row.recordId })(),
+    })), idleSeconds: svc.executions.takeovers.idleSeconds, serverNow: Date.now(),
+  }));
+  app.put('/session-takeovers/settings', async (c) => {
+    const body = await safeJson(c).catch(() => null) as { idleSeconds?: unknown } | null;
+    if (typeof body?.idleSeconds !== 'number' || !Number.isInteger(body.idleSeconds) || body.idleSeconds < 10 || body.idleSeconds > 3600) return c.json({ error: 'invalid_timeout' }, 400);
+    await svc.executions.takeovers.configure(body.idleSeconds);
+    return c.json({ idleSeconds: svc.executions.takeovers.idleSeconds });
+  });
+  app.post('/session-takeovers/:requestId/decision', async (c) => {
+    const body = await safeJson(c).catch(() => null) as { decision?: unknown } | null;
+    if (body?.decision !== 'approve' && body?.decision !== 'reject') return c.json({ error: 'invalid_decision' }, 400);
+    try { await svc.executions.takeovers.decide(c.req.param('requestId'), body.decision); return c.json({ ok: true }); }
+    catch (error) { return c.json({ error: 'takeover_decision_failed', message: String(error) }, 409); }
+  });
+  app.post('/:id/sessions/:sid/activity', (c) => {
+    const record = svc.sessionRegistry.get(c.req.param('id'), c.req.param('sid'));
+    if (!record) return c.json({ error: 'not_found' }, 404);
+    svc.executions.takeovers.activity(record.resumeId);
+    return c.json({ ok: true });
+  });
+
   app.route('/stickers', createStickerRoutes(svc));
   const headlessSessionInFlight = new Map<string, Promise<OpenHeadlessSessionResult>>();
   const readAutoQuantPreference = () =>
@@ -340,6 +368,7 @@ export function createWorkspaceRoutes(
   async function spawnInteractiveSession(
     meta: WorkspaceMeta,
     opts: {
+      readonly origin: ExecutionOrigin;
       readonly agentId?: string;
       readonly resume?: SessionFactoryContext['resume'];
       /** Product-level conversation id. Resolved to a native id only here. */
@@ -513,7 +542,6 @@ export function createWorkspaceRoutes(
         ...(!opts.resumeId && opts.createdBy
           ? { metadata: sessionMetadata(opts.createdBy) }
           : {}),
-        state: 'running',
         surface: opts.surface ?? 'terminal',
         ...(fallbackTitle ? { fallbackTitle } : {}),
         ...(opts.sourceRunId ? { sourceRunId: opts.sourceRunId } : {}),
@@ -538,7 +566,7 @@ export function createWorkspaceRoutes(
       if (opts.surface === 'webpi') {
         operationLease?.release();
         releaseClaim();
-        const snapshot = await svc.startWebSession(meta, record);
+        const snapshot = await svc.executions.web(meta, record, opts.origin);
         if (initialPrompt) await svc.web.prompt(record.id, initialPrompt);
         releaseClaim();
         return { ok: true, session: { sessionId: record.id, wsId: id, name: record.name, agent: adapter.id, resumeId: record.resumeId, pid: snapshot.pid ?? 0, startedAt: snapshot.startedAt, title: sessionPreferredTitle(record) ?? null, surface: 'webpi' } };
@@ -551,7 +579,7 @@ export function createWorkspaceRoutes(
         recordName,
         ...(sessionRuntime ? { sessionRuntime } : {}),
       };
-      const session = svc.pool.spawn(id, ctx);
+      const session = await svc.executions.terminal(id, ctx, opts.origin);
       if (freshProductSession && sessionRuntime && existsSync(meta.dir)) {
         await rememberWorkspaceRuntimeBinding({
           wsDir: meta.dir,
@@ -598,13 +626,6 @@ export function createWorkspaceRoutes(
       };
     } catch (err) {
       releaseClaim();
-      if (opts.surface === 'webpi') await svc.web.stop(record.id, 'GUI launch failed').catch(() => undefined);
-      await svc.sessionCoordinator.transition({
-        wsId: id,
-        resumeId: record.resumeId,
-        state: 'paused',
-        surface: opts.surface ?? 'terminal',
-      }).catch(() => undefined);
       launcherLogger.error('workspace.session_spawn_failed', { id, err });
       await svc.recordAgentRuntime?.('runtime.spawn_failed', {
         workspaceId: id,
@@ -690,6 +711,7 @@ export function createWorkspaceRoutes(
     }
 
     const spawned = await spawnInteractiveSession(meta, {
+      origin: { kind: 'user', entry: task ? 'headless-session-open' : 'resume-session-open' },
       agentId: identity.agent,
       resumeId,
       title: title?.trim() || task?.prompt || `Conversation ${resumeId}`,
@@ -799,6 +821,7 @@ export function createWorkspaceRoutes(
       }, 400);
     }
     const spawned = await spawnInteractiveSession(meta, {
+      origin: { kind: 'user', entry: 'manager-quick-start' },
       agentId: resolvedAgentId,
       ...(credentialSource ? { credentialSource } : {}),
       ...(credentialSlug ? { credentialSlug } : {}),
@@ -825,8 +848,7 @@ export function createWorkspaceRoutes(
       // A fresh native Pi id is allocated by the ordinary interactive spawn
       // seam. Stop its unused TUI immediately, then reopen that exact native
       // conversation in RPC mode and submit the visible user prompt.
-      svc.pool.disposeToken(record.id, 'switch fresh manager Session to Web');
-      await svc.startWebSession(meta, record, managerWebOptions);
+      await svc.executions.web(meta, record, { kind: 'user', entry: 'manager-quick-start' }, managerWebOptions);
       const snapshot = await svc.web.prompt(record.id, prompt);
       return c.json({
         manager: await publicManager(),
@@ -834,12 +856,6 @@ export function createWorkspaceRoutes(
         snapshot,
       }, 201);
     } catch (error) {
-      await svc.sessionRegistry.update(meta.id, record.id, {
-        state: 'paused',
-        surface: 'webpi',
-        lastActiveAt: new Date().toISOString(),
-      }).catch(() => undefined);
-      launcherLogger.error('workspace_manager.quick_start_failed', { recordId: record.id, error });
       return c.json({ error: 'manager_start_failed', message: (error as Error).message }, 500);
     }
   });
@@ -1776,6 +1792,7 @@ export function createWorkspaceRoutes(
               : 'invalid_presence_transition';
         return c.json({ error, message: err.message }, err.code === 'not_found' ? 404 : 409);
       }
+      if (err instanceof SessionAdmissionError) return c.json({ error: err.code, message: err.message, blocks: err.blocks, retryAt: err.retryAt }, 409);
       if (err instanceof HeadlessResumeError) {
         return c.json(
           { error: `resume_${err.code}`, message: err.message },
@@ -2016,6 +2033,7 @@ export function createWorkspaceRoutes(
       return c.json({ error: 'bad_request', message: (err as Error).message }, 400);
     }
     const result = await spawnInteractiveSession(meta, {
+      origin: { kind: 'user', entry: 'session-spawn' },
       ...(agentId !== undefined ? { agentId } : {}),
       ...(resumeId !== undefined ? { resumeId } : {}),
       ...(initialPrompt !== undefined ? { initialPrompt } : {}),
@@ -2177,6 +2195,7 @@ export function createWorkspaceRoutes(
     }
 
     const spawn = await spawnInteractiveSession(meta, {
+      origin: { kind: 'user', entry: 'quick-chat' },
       surface,
       ...(agentId !== undefined ? { agentId } : {}),
       ...(credentialSource !== undefined ? { credentialSource } : {}),
@@ -2222,12 +2241,10 @@ export function createWorkspaceRoutes(
         }
       }
       const wasTerminalRunning = Boolean(live);
-      if (live) await live.disposeAndWait(action === 'pause' ? 'paused' : 'tab stop');
-      const wasWebRunning = await svc.web?.stop(token, action === 'pause' ? 'paused' : 'tab stop') ?? false;
-      const wasRunning = wasTerminalRunning || wasWebRunning;
+      const wasWebRunning = svc.web.has(token);
+      const wasRunning = record ? await svc.executions.stop(record.resumeId, `user-${action}`) : false;
       if (record) {
         const patch: Partial<SessionRecord> = {
-          state: 'paused',
           lastActiveAt: new Date().toISOString(),
         };
         if (scrollbackRel) patch.scrollbackFile = scrollbackRel;
@@ -2383,7 +2400,7 @@ export function createWorkspaceRoutes(
       }
       // Choosing the terminal surface is an explicit handoff. Never leave Pi's
       // RPC host and PTY alive against the same native session file.
-      if (svc.web?.has(token)) await svc.web.stop(token, 'switch to terminal');
+
       const meta = svc.resolveRuntimeWorkspace?.(id) ?? svc.registry.get(id);
       if (!meta) return c.json({ error: 'workspace_not_found' }, 404);
       const adapter = svc.adapters.get(record.agent);
@@ -2468,50 +2485,11 @@ export function createWorkspaceRoutes(
           ...(sessionRuntime ? { sessionRuntime } : {}),
           ...(initialReplayBytes ? { initialReplayBytes } : {}),
         };
-        const session = svc.pool.spawn(id, ctx);
-        // Give the child a brief window to prove it stays up. If it exits
-        // within ~800ms (claude --continue against a stale projectKey, broken
-        // .mcp.json, missing trust, etc.) we'd otherwise return 200 OK while
-        // the pool respawn-loops itself into a circuit breaker behind the
-        // user's back. Surface the failure so the caller knows resume failed.
-        const earlyExit = await session.waitForFirstExit(800);
-        if (earlyExit) {
-          svc.pool.disposeToken(token, 'resume_early_exit');
-          await svc.sessionRegistry
-            .update(id, token, { state: 'paused', lastActiveAt: new Date().toISOString() })
-            .catch(() => undefined);
-          launcherLogger.warn('workspace.session_resume_early_exit', {
-            id,
-            sessionId: token,
-            agent: adapter.id,
-            code: earlyExit.code,
-            signal: earlyExit.signal,
-          });
-          await svc.recordAgentRuntime?.('runtime.spawn_failed', {
-            workspaceId: record.wsId,
-            resumeId: record.resumeId,
-            agent: adapter.id,
-            sessionRecordId: record.id,
-            surface: 'terminal',
-            cause: { kind: 'ui' },
-            error: `agent exited within startup window (code=${earlyExit.code})`,
-          });
-          return c.json({
-            error: 'spawn_died',
-            message: `agent exited within startup window (code=${earlyExit.code})`,
-            exitCode: earlyExit.code,
-            signal: earlyExit.signal,
-          }, 500);
-        }
+        const session = await svc.executions.terminal(id, ctx, { kind: 'user', entry: 'session-resume' });
         if (record.scrollbackFile) {
           await svc.scrollbackStore.remove(record.scrollbackFile);
           delete (record as { scrollbackFile?: string }).scrollbackFile;
         }
-        await svc.sessionRegistry
-          .update(id, token, { state: 'running', surface: 'terminal', lastActiveAt: new Date().toISOString() })
-          .catch((err) =>
-            launcherLogger.warn('session_registry.resume_update_failed', { id, token, err }),
-          );
         launcherLogger.info('workspace.session_resumed', {
           id,
           sessionId: token,
@@ -2611,28 +2589,67 @@ export function createWorkspaceRoutes(
         cwd: meta.dir,
         launcherRepoRoot: svc.config.launcherRepoRoot,
       });
-      const snapshot = await svc.startWebSession(
+      const snapshot = await svc.executions.web(
         meta,
         record,
+        { kind: 'user', entry: runtimeSelection ? 'web-reconfigure' : 'web-open' },
         { ...(id === svc.managerWorkspace?.id ? managerWebOptions : {}), ...(runtimeSelection ? { runtimeSelection } : {}) },
       );
       return c.json({ ok: true, snapshot, session: publicSession(record) });
     } catch (err) {
+      if (err instanceof SessionAdmissionError) return c.json({ error: err.code, message: err.message, blocks: err.blocks, retryAt: err.retryAt }, 409);
       if (err instanceof HeadlessResumeError) {
         return c.json({ error: 'resume_busy', message: err.message }, 409);
       }
       if (svc.web.has(token)) {
         return c.json({ error: 'web_open_failed', message: (err as Error).message }, 400);
       }
-      await svc.sessionRegistry.update(id, token, {
-        state: 'paused',
-        surface: 'webpi',
-        lastActiveAt: new Date().toISOString(),
-      }).catch(() => undefined);
       if (err instanceof AgentCredentialError) return c.json(err.toBody(), 400);
       launcherLogger.error('web_session.open_failed', { id, token, err });
       return c.json({ error: 'web_open_failed', message: (err as Error).message }, 500);
     }
+  });
+
+  // Session controls use roster identity and server-owned user attribution.
+  app.get('/:id/sessions/:sid/control', (c) => {
+    const record = svc.sessionRegistry.get(c.req.param('id'), c.req.param('sid'));
+    if (!record) return c.json({ error: 'not_found' }, 404);
+    return c.json({
+      execution: svc.executions.current(record.resumeId),
+      blocks: svc.executions.admission.blocks(record.resumeId),
+      cooldownSeconds: svc.executions.admission.cooldownSeconds,
+      serverNow: Date.now(),
+    });
+  });
+  app.post('/:id/sessions/:sid/interrupt', async (c) => {
+    const record = svc.sessionRegistry.get(c.req.param('id'), c.req.param('sid'));
+    if (!record) return c.json({ error: 'not_found' }, 404);
+    const body = z.object({ executionId: z.string().min(1) }).strict().safeParse(await safeJson(c).catch(() => null));
+    if (!body.success) return c.json({ error: 'bad_request', message: 'executionId is required' }, 400);
+    try {
+      const stopped = await svc.executions.interrupt(record.resumeId, body.data.executionId, { kind: 'user', entry: 'session-interrupt', workspaceId: record.wsId });
+      return c.json({ stopped });
+    } catch (error) { return c.json({ error: 'interrupt_failed', message: (error as Error).message }, 409); }
+  });
+  app.post('/:id/sessions/:sid/blocks/:blockId/release', async (c) => {
+    const record = svc.sessionRegistry.get(c.req.param('id'), c.req.param('sid'));
+    if (!record) return c.json({ error: 'not_found' }, 404);
+    try {
+      await svc.executions.admission.release(record.resumeId, c.req.param('blockId'), { kind: 'user', entry: 'session-block-release', workspaceId: record.wsId });
+      return c.json({ ok: true });
+    } catch (error) { return c.json({ error: 'release_failed', message: (error as Error).message }, 409); }
+  });
+  app.put('/session-controls/settings', async (c) => {
+    const body = z.object({ cooldownSeconds: z.number().int().min(10).max(86400) }).strict().safeParse(await safeJson(c).catch(() => null));
+    if (!body.success) return c.json({ error: 'bad_request', message: 'cooldownSeconds must be 10–86400' }, 400);
+    await svc.executions.admission.configure(body.data.cooldownSeconds, { kind: 'user', entry: 'session-control-settings' });
+    return c.json({ ok: true });
+  });
+
+  app.get('/:id/sessions/:sid/executions', (c) => {
+    const record = svc.sessionRegistry.get(c.req.param('id'), c.req.param('sid'));
+    if (!record) return c.json({ error: 'not_found' }, 404);
+    return c.json({ executions: svc.executions.list(record.resumeId) });
   });
 
   app.get('/:id/sessions/:sid/web', (c) => {
@@ -2650,13 +2667,14 @@ export function createWorkspaceRoutes(
   app.post('/:id/sessions/:sid/web/prompt', async (c) => {
     const ctx = webSessionContext(c);
     if (!ctx) return c.json({ error: 'not_found' }, 404);
-    if (svc.isResumeActive(ctx.record.resumeId)) return c.json({ error: 'resume_busy', message: 'Session configuration is changing; try again shortly' }, 409);
+    if (svc.executions.takeovers.isHandingOff(ctx.record.resumeId) || svc.isResumeActive(ctx.record.resumeId)) return c.json({ error: 'resume_busy', message: 'Session configuration is changing; try again shortly' }, 409);
     const body = await safeJson(c).catch(() => null);
     const message = body && typeof body === 'object' ? (body as Record<string, unknown>)['message'] : null;
     if (typeof message !== 'string' || !message.trim()) {
       return c.json({ error: 'bad_request', message: 'message is required' }, 400);
     }
     try {
+      svc.executions.takeovers.activity(ctx.record.resumeId);
       const snapshot = await svc.web.prompt(ctx.token, message);
       await svc.sessionRegistry.update(ctx.id, ctx.token, { lastActiveAt: new Date().toISOString() });
       return c.json({ ok: true, snapshot });
@@ -2875,7 +2893,7 @@ export function createWorkspaceRoutes(
       resumeMode: resume === undefined ? 'fresh' : resume === 'last' ? 'last' : 'by-id',
     });
     try {
-      const result = await svc.runHeadlessProbe(meta, adapter, resume, prompt, timeoutMs);
+      const result = await svc.executions.probe(meta, adapter, resume, prompt, timeoutMs, { kind: 'user', entry: 'diagnostic-probe' });
       return c.json(result);
     } catch (err) {
       if (err instanceof AgentCredentialError) {
@@ -2976,7 +2994,7 @@ export function createWorkspaceRoutes(
     // `wait:true` → run synchronously and return the full result (curl/tests).
     if (wait) {
       try {
-        const result = await svc.runHeadlessTask(meta, adapter, prompt, timeoutMs);
+        const result = await svc.executions.wait(meta, adapter, prompt, { kind: 'user', entry: 'headless-api-wait' }, timeoutMs);
         return c.json(result);
       } catch (err) {
         if (err instanceof AgentCredentialError) {
@@ -2991,11 +3009,12 @@ export function createWorkspaceRoutes(
     // the agent can additionally publish durable user-facing work to Inbox.
     try {
       const dispatched = resumeId
-        ? await svc.dispatchHeadlessTask(meta, adapter, prompt, timeoutMs, undefined, resumeId)
-        : await svc.dispatchHeadlessTask(
+        ? await svc.executions.dispatch(meta, adapter, prompt, { kind: 'user', entry: 'headless-api' }, timeoutMs, undefined, resumeId)
+        : await svc.executions.dispatch(
             meta,
             adapter,
             prompt,
+            { kind: 'user', entry: 'headless-api' },
             timeoutMs,
             undefined,
             undefined,
@@ -3009,6 +3028,7 @@ export function createWorkspaceRoutes(
       if (err instanceof HeadlessCapacityError) {
         return c.json({ error: 'capacity', message: err.message }, 429);
       }
+      if (err instanceof SessionAdmissionError) return c.json({ error: err.code, message: err.message, blocks: err.blocks, retryAt: err.retryAt }, 409);
       if (err instanceof HeadlessResumeError) {
         return c.json(
           { error: `resume_${err.code}`, message: err.message },
@@ -3031,16 +3051,12 @@ export function createWorkspaceRoutes(
     }
     const record = svc.sessionRegistry.get(id, token);
     if (!record) return c.json({ error: 'not_found' }, 404);
-    const wasTerminalRunning = svc.pool.disposeToken(token, 'session deleted');
-    const wasWebRunning = await svc.web?.stop(token, 'session deleted') ?? false;
-    const wasRunning = wasTerminalRunning || wasWebRunning;
+    const wasTerminalRunning = Boolean(svc.pool.get(token));
+    const wasWebRunning = svc.web.has(token);
+    const wasRunning = await svc.executions.stop(record.resumeId, 'user-session-delete');
     if (record.scrollbackFile) {
       await svc.scrollbackStore.remove(record.scrollbackFile);
     }
-    await svc.sessionRegistry.update(id, token, {
-      state: 'paused',
-      lastActiveAt: new Date().toISOString(),
-    });
     await svc.deleteSessionPresence({ wsId: id, resumeId: record.resumeId });
     launcherLogger.info('workspace.session_deleted', { id, sessionId: token, wasRunning });
     if (wasRunning) {

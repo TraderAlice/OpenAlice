@@ -8,6 +8,7 @@ import {
 } from './model.js'
 
 export interface StartWebSessionInput {
+  readonly onActivity?: (phase: string) => void
   readonly recordId: string
   readonly wsId: string
   readonly resumeId: string

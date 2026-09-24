@@ -1,3 +1,4 @@
+import { installExecutionFixture } from './workspace-execution-fixture.js';
 /**
  * POST /quick-chat — native runtime authentication plus explicit or remembered
  * Workspace launch bindings. Managed launches never rewrite native CLI project
@@ -241,7 +242,7 @@ function build(opts: {
   const rememberAutoPredictionDefaultWorkspace = vi.fn(async (workspaceId: string | null) => ({
     defaultWorkspaceId: workspaceId,
   }));
-  const app = createWorkspaceRoutes(svc, {
+  const app = createWorkspaceRoutes(installExecutionFixture(svc), {
     readQuickChatPreferences: vi.fn(async () => ({
       lastCredentialByAgent: {},
       recentChatWorkspaceId: opts.recentChatWorkspaceId ?? null,
@@ -572,13 +573,13 @@ describe('POST /quick-chat — native auth and explicit credential overrides', (
     const { app, svc, opencode, spawn } = build();
     (opencode.capabilities as any).web = { wire: 'acp', freshSession: true };
     (opencode as any).composeWebCommand = vi.fn();
-    svc.startWebSession = vi.fn(async () => ({} as any));
+    svc.executions.web = vi.fn(async () => ({} as any));
     (svc as any).web = { prompt: vi.fn(async () => ({})) } as any;
     const r = await quickChat(app, { prompt: 'GUI hello', agent: 'opencode', surface: 'webpi' });
     expect(r.status).toBe(201);
     expect(r.body.session.surface).toBe('webpi');
     expect(spawn).not.toHaveBeenCalled();
-    expect(svc.startWebSession).toHaveBeenCalledOnce();
+    expect(svc.executions.web).toHaveBeenCalledOnce();
     expect(svc.web.prompt).toHaveBeenCalledWith(r.body.session.sessionId, 'GUI hello');
   });
 

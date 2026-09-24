@@ -91,7 +91,7 @@ describe('ResumeRegistry', () => {
       .rejects.toThrow(/belongs to ws-1\/pi/)
   })
 
-  it('persists one immutable secret-free Session runtime binding', async () => {
+  it('persists the secret-free Session runtime binding independently of the identity ledger', async () => {
     const registry = await ResumeRegistry.load(path, noopLogger, runtimeStore)
     const runtimeBinding = {
       version: 1 as const,

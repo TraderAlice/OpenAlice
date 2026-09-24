@@ -5,11 +5,13 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vite
 
 const mocks = vi.hoisted(() => ({
   getBackendConnection: vi.fn(),
+  useRelayConnection: vi.fn(),
 }))
 
 vi.mock('../auth/backendConnection', () => ({
   getBackendConnection: mocks.getBackendConnection,
 }))
+vi.mock('../hooks/useRelayConnection', () => ({ useRelayConnection: mocks.useRelayConnection }))
 
 import '../i18n'
 import { i18n } from '../i18n'
@@ -52,6 +54,7 @@ beforeAll(async () => {
 
 beforeEach(() => {
   mocks.getBackendConnection.mockReturnValue({ kind: 'local', endpoint: '127.0.0.1:47331' })
+  mocks.useRelayConnection.mockReturnValue({ status: null })
 })
 
 afterEach(() => {
@@ -61,27 +64,26 @@ afterEach(() => {
 })
 
 describe('DataHomeSection', () => {
+  it('describes remote Project ownership when the browser uses a local relay', () => {
+    mocks.useRelayConnection.mockReturnValue({ status: { target: { machine: 'studio', project: 'research' } } })
+    render(<DataHomeSection />)
+    expect(screen.getByText(i18n.t('settings.dataHome.remoteManaged'))).toBeTruthy()
+  })
   it('explains command-line selection on browser/dev surfaces', () => {
     render(<DataHomeSection />)
 
-    expect(screen.getByText('openalice start --home <path>')).toBeTruthy()
+    expect(screen.getByText('openalice run --home <path>')).toBeTruthy()
     expect(screen.getByText('pnpm dev -- --home <path>')).toBeTruthy()
     expect(screen.queryByRole('button', { name: 'Choose folder and restart' })).toBeNull()
   })
 
   it('does not suggest local launch commands for a remote service-owned data home', () => {
-    mocks.getBackendConnection.mockReturnValue({
-      kind: 'remote',
-      target: 'alice@example.com',
-      sshPort: 22,
-      runtimePort: 47331,
-      localEndpoint: '127.0.0.1:40123',
-    })
+    mocks.useRelayConnection.mockReturnValue({ status: { target: { machine: 'studio', project: 'research' } } })
 
     render(<DataHomeSection />)
 
     expect(screen.getByText(/belongs to the connected remote Runtime/)).toBeTruthy()
-    expect(screen.queryByText('openalice start --home <path>')).toBeNull()
+    expect(screen.queryByText('openalice run --home <path>')).toBeNull()
     expect(screen.queryByText('pnpm dev -- --home <path>')).toBeNull()
   })
 

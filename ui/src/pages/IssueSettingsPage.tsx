@@ -4,8 +4,11 @@ import { PageHeader } from '../components/PageHeader'
 import { SaveIndicator } from '../components/SaveIndicator'
 import { useWorkspaces } from '../contexts/workspaces-context'
 import { AgentRuntimeIcon } from '../lib/agentRuntimeIcon'
+import { SessionTakeoverSettings } from '../components/workspace/SessionTakeoverDialog'
+import { useTranslation } from 'react-i18next'
 
 export function IssueSettingsPage() {
+  const { t } = useTranslation()
   const { agents, defaultAgent, issueDefaultAgent, setIssueDefaultAgent } = useWorkspaces()
   const [status, setStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
   const runtimeSelectId = useId()
@@ -74,6 +77,9 @@ export function IssueSettingsPage() {
                 <SaveIndicator status={status} />
               </div>
             </Field>
+          </ConfigSection>
+          <ConfigSection title={t('takeover.timing')}>
+            <SessionTakeoverSettings />
           </ConfigSection>
         </div>
       </SettingsScrollArea>

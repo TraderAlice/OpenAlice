@@ -1,72 +1,30 @@
 # Remote Quickstart
 
-Use this path when OpenAlice should run on a private Linux or macOS machine
-that you can already reach with SSH, while the browser stays on your laptop.
-The remote host owns Workspaces, native Agent processes, credentials, and
-optional trading services; the laptop owns only the browser and SSH tunnel.
+Use this path when OpenAlice runs on a private Linux or macOS machine reached
+through SSH, while its GUI stays on your computer. The remote machine owns its
+AliceProjects, Workspaces, Agent processes, credentials, and optional trading
+services. The local CLI owns the GUI relay and its single selected target.
+The lifecycle and security details live in [[docs/remote-access.md]].
 
-The lifecycle and security contract lives in [[docs/remote-access.md]].
-OpenAlice supplies the CLI; operators own their execution environment.
-
-## Choose a Deployment
-
-| What you want | Use |
-|---|---|
-| Complete packaged desktop app | Electron |
-| OpenAlice from a local source checkout | `openalice start` |
-| Existing private machine reached through SSH | `openalice --remote` |
-| Saved remote Machine profile | `openalice --machine` |
-
-`openalice --remote` follows the Herdr-style ownership model: execution and
-durable state stay on the machine with the files, while a replaceable local
-client can disconnect and return. OpenAlice uses an ordinary loopback HTTP/WS
-tunnel rather than Herdr's TUI protocol, so the normal browser UI remains the
-client.
-
-## Before You Start
-
-On the laptop:
-
-- macOS, Linux, or WSL;
-- `curl` and OpenSSH;
-- SSH access to the target.
-
-On the remote host:
-
-- Linux or macOS;
-- `curl`, `tar`, and a SHA-256 utility;
-- enough disk and memory for the installed Runtime.
-
-The native release does not require Node.js, Bun, Git, an Agent Runtime, or
-source-build tools. If you explicitly select a source checkout, that separate
-development path requires its normal Node/build prerequisites. OpenAlice does
-not install Agent Runtimes or configure SSH keys for you.
-
-## 1. Install the CLI on Your Laptop
+## 1. Install the local CLI
 
 ```bash
 curl -fsSL https://openalice.ai/install | bash
 ```
 
-Run the shell-specific activation command printed after installation; it makes
-the commands available in this terminal immediately, with no restart. Then
-verify the installed commands:
+Run the shell activation command printed by the installer, then verify the CLI:
 
 ```bash
 openalice --version
-openalice version --json
 ```
 
-The installer records its channel/version, target, checksum, and immutable
-content identity. Managed remote reproduces that same native OpenAlice release
-on the target; it has no separate hidden release channel and does not install
-or change the target's Agent Runtime executables.
+The SSH target needs OpenSSH access and the platform prerequisites for the
+native OpenAlice release. OpenAlice uses your normal SSH keys, host verification,
+ports, and `ProxyJump` configuration. It does not install Agent Runtime CLIs.
 
-## 2. Give the Host a Useful SSH Name
+## 2. Register a Machine
 
-OpenAlice delegates keys, agents, host verification, ports, and `ProxyJump` to
-your normal OpenSSH configuration. A short alias keeps every later command
-simple:
+Give the target an SSH alias if useful, then verify that ordinary SSH works:
 
 ```sshconfig
 Host openalice-box
@@ -75,165 +33,53 @@ Host openalice-box
   IdentityFile ~/.ssh/id_ed25519
 ```
 
-Verify the transport once:
+Start `openalice`, open its Web GUI, then go to Settings → General → Machines.
+Choose **Add Machine**, enter `openalice-box` and `Cloud`, and probe the target.
+The preview lists the exact remote actions before you approve registration.
+You can also use the CLI:
 
 ```bash
 ssh openalice-box
-```
-
-Exit that shell after it connects. OpenAlice will use the same host-key and
-authentication policy.
-
-## 3. Review the Plan
-
-```bash
 openalice --remote openalice-box --plan
+openalice machine add openalice-box --label "Cloud"
 ```
 
-The read-only plan reports the remote platform, CLI, Runtime owner/provider,
-ports, and every proposed change. On a new supported host it normally includes:
+`--plan` is read-only. `machine add` probes the host, shows and confirms the
+required install/start actions, checks Runtime health, then saves the SSH
+profile. Use `--yes` only when you have already reviewed those actions. An
+arbitrary SSH address is not a GUI target until it has passed this registration.
+The matching native OpenAlice release is installed on the target when needed;
+Agent Runtime executables and SSH credentials remain user-owned. An existing
+Machine can be probed and upgraded from the same Settings section.
 
-1. install the matching native OpenAlice release;
-2. verify and start the detached OpenAlice Server from that immutable Runtime;
-3. open a local loopback tunnel.
+## 3. Select the remote AliceProject
 
-The installed Runtime lives in the installer's immutable `cli/releases/`
-release directory. You do not need to SSH in, clone the repository, install a
-compiler, find an absolute source path, or repeat `--app-dir` on later
-connections. Nothing changes until you approve the plan.
+Run `openalice`. Its TUI starts the local Web relay. Open the Web GUI from the
+TUI, then choose **Cloud** and one of its running AliceProjects in Settings →
+General → Where Alice is working. The same selection is shared by browser tabs
+using that relay. For a GUI without the TUI, run `openalice relay`.
 
-## 4. Connect
+The browser always stays on the local relay origin. The relay opens and owns the
+SSH loopback tunnel to the selected backend. Switching to another Machine or
+AliceProject does not stop the previous Runtime. Closing the browser does not
+stop the remote Runtime; closing the local relay ends its tunnel.
 
-```bash
-openalice --remote openalice-box
-```
-
-Approve the displayed plan. The native archive downloads and activates as one
-bounded transaction; failures include a bounded diagnostic tail. When ready,
-OpenAlice opens a URL such as
-`http://127.0.0.1:49891` in the local browser.
-
-The browser, page APIs, and Workspace PTY WebSocket all cross the same SSH
-tunnel. Alice itself remains bound to remote `127.0.0.1`.
-
-## Everyday Use
-
-Reconnect with the short command:
+## Everyday controls
 
 ```bash
-openalice --remote openalice-box
-```
-
-OpenAlice prefers the last successful local port, so an existing browser tab
-can recover on the same localhost origin. If that port is genuinely occupied,
-the command chooses another one and tells you.
-
-Inspect or stop the remote Server without writing raw SSH commands:
-
-```bash
+openalice machine list
+openalice machine inspect Cloud
+openalice --machine Cloud status --json
 openalice --remote openalice-box --status
 openalice --remote openalice-box --stop
 ```
 
-Status bundles the control lookup into one SSH round trip instead of repeating
-the full bootstrap prerequisite scan. Stop uses the same control-only probe
-before and after Guardian's structured shutdown.
+`--machine` routes a command through a saved, enabled profile. `--remote`
+remains available for read-only planning and explicit status/stop controls; its
+old one-off browser attach is retired. `machine disable` prevents new selection
+without stopping an already-running remote Runtime.
 
-Closing the browser or pressing `Ctrl+C` closes only the local tunnel. The
-detached Server, Workspaces, PTYs, and Agent processes continue on the remote
-host until you run `--stop`, the host stops, or Guardian shuts them down.
-
-Known transient SSH transport interruptions are retried with a short,
-platform-neutral message. Raw platform diagnostics are shown only when the
-connection finally fails, so a provider's temporary SSH control-plane noise
-does not become the normal OpenAlice experience.
-
-## Installed Runtime and User-Owned Source
-
-The default installed Runtime is maintained by the ordinary OpenAlice
-installer:
-
-- the CLI and every OpenAlice process role carry the same product/content
-  identity;
-- archives are selected for the remote platform and architecture;
-- the archive checksum and internal file manifest are verified before
-  activation;
-- Agent Runtime executables remain user-owned and are discovered from `PATH`;
-- reconnect reuses a compatible healthy Runtime without mutation.
-
-For development or a deliberately pinned checkout, pass your own absolute
-path:
-
-```bash
-openalice --remote openalice-box \
-  --app-dir /srv/OpenAlice
-```
-
-If that path does not exist, the plan can clone the selected source there. If
-it already contains OpenAlice, it remains user-owned: managed remote prepares
-and starts it but does not fetch, switch, reset, or overwrite it. A path that
-exists but is not an OpenAlice checkout is refused.
-
-Useful variations:
-
-```bash
-# Keep one explicit browser origin.
-openalice --remote openalice-box --local-port 49891
-
-# Print the URL without opening a browser.
-openalice --remote openalice-box --no-open
-
-# Use an identity without an SSH config alias.
-openalice --remote alice@server.example.com \
-  --identity ~/.ssh/id_ed25519
-
-# Put durable state on a mounted volume.
-openalice --remote openalice-box \
-  --home /data/openalice-home
-```
-
-## Security and Persistence
-
-- Never publish remote port `47331` directly for the SSH path.
-- Never set `OPENALICE_DISABLE_AUTH=1` for remote access.
-- Use a least-privilege remote account and normal SSH host-key discipline.
-- Provider credentials, Workspace history, files, and Agent state live under
-  the remote home; the browser is not a backup.
-- For an ephemeral VM or container, place `--home` on persistent storage. The
-  Runtime can be reinstalled; the home is the durable state that must survive.
-- A platform replacement can reattach a volume whose Guardian lock names the
-  removed machine. OpenAlice refuses cross-machine takeover automatically;
-  confirm the previous instance is gone before following the operator recovery
-  guidance in [[docs/remote-access.md]].
-
-## Saved Machine commands
-
-Save a prepared SSH host and use its label for commands:
-
-```bash
-openalice machine add openalice-box --label "Cloud" --yes
-openalice machine list --json
-openalice --machine "Cloud" status --json
-openalice --machine "Cloud" exec --project research alice --help
-openalice machine disable "Cloud" --yes
-openalice machine enable "Cloud" --yes
-```
-
-Adding may install/update and start the remote Server. Targeted commands run
-on that host, stream output, and preserve its exit code without automatic
-retry. Disabling prevents new operations through the saved profile; it does
-not stop the Server or an existing tunnel. Use `--remote openalice-box` to open
-the browser tunnel. Named Herdr server sessions are not supported; select a
-remote AliceProject on the command with `--project` or `--home` where supported.
-
-## User-managed containers
-
-OpenAlice does not provide a backend Dockerfile, Compose recipe, or container
-supervisor. Operators who package it themselves own process supervision,
-persistence, networking, authentication, and updates to that deployment.
-
-SSH reaches the execution context selected by its endpoint. OpenAlice uses the
-compatible Guardian control contract in that context; it does not discover or
-enter nested containers. The normal managed CLI update requires that the
-execution context remain available while the old Runtime stops and the new
-Runtime starts. A user deployment must provide that lifecycle.
+Never publish the remote Runtime port directly or disable authentication for
+remote access. Durable data belongs under the remote AliceProject home. If that
+machine is ephemeral, mount that home on persistent storage. For explicit
+source-checkout or custom-home setup, see [[docs/remote-access.md]].

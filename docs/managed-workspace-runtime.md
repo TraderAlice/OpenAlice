@@ -486,9 +486,11 @@ starts a local research branch at the approved commit, and writes
 the native Coding Agent owns environment setup, later research commits, and
 explicit fetch/merge upgrades inside the Workspace. When a pinned source
 declares a v1 Studio capability, Alice may launch it with allocator-owned
-loopback ports. Electron keeps its main UI on `app://` and uses the restricted
-streaming Surface Gateway described in [[docs/harness-web-surfaces.md]]; it does
-not re-enable the ordinary Alice web listener.
+loopback ports. Electron integrated mode keeps its main UI on `app://` and uses
+the restricted streaming Surface Gateway described in
+[[docs/harness-web-surfaces.md]]; it does not re-enable the ordinary Alice web
+listener. Separated mode instead loads the local relay's HTTP UI and connects
+to the selected backend through that relay.
 
 OpenAlice copies Workspace skills into two canonical project paths:
 

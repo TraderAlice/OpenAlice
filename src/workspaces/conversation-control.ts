@@ -351,10 +351,13 @@ export function createWorkspaceConversationControl(
             subject: input.subject,
           })
       const dispatched = inquiry
-        ? await svc.dispatchHeadlessTask(
+        ? await svc.executions.dispatch(
             meta,
             adapter,
             prompt,
+            conversation.source.kind === 'session'
+              ? { kind: 'session', entry: 'conversation-ask', workspaceId: conversation.source.workspaceId, resumeId: conversation.source.resumeId }
+              : { kind: conversation.source.kind === 'human' ? 'user' : 'system', entry: 'conversation-ask' },
             input.timeoutMs,
             undefined,
             continuingOrigin?.resumeId,
@@ -363,10 +366,13 @@ export function createWorkspaceConversationControl(
             conversation,
             createdBy,
           )
-        : await svc.dispatchHeadlessTask(
+        : await svc.executions.dispatch(
             meta,
             adapter,
             prompt,
+            conversation.source.kind === 'session'
+              ? { kind: 'session', entry: 'conversation-ask', workspaceId: conversation.source.workspaceId, resumeId: conversation.source.resumeId }
+              : { kind: conversation.source.kind === 'human' ? 'user' : 'system', entry: 'conversation-ask' },
             input.timeoutMs,
             undefined,
             continuingOrigin?.resumeId,

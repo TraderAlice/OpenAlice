@@ -26,7 +26,7 @@ export function UpdateBanner() {
   const [sessionSkippedVersion, setSessionSkippedVersion] = useState<string | null>(null)
 
   useEffect(() => {
-    window.openAlice?.runtime.info()
+    window.openAlice?.runtime?.info()
       .then((runtime) => setRuntimeMode(runtime.mode))
       .catch(() => setRuntimeMode('browser'))
   }, [])

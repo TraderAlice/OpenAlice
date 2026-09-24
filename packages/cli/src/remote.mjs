@@ -9,6 +9,7 @@ import {
   DEFAULT_INSTALL_SOURCE,
   formatInstallSelector,
   installedContentIdentity,
+  installSourceChannelVersionError,
   installSourceUpdateChannel,
   installSourcesMatch,
   parseInstallSource,
@@ -47,7 +48,7 @@ export function parseRemoteArgs(argv) {
     remotePortExplicit: false,
     sshPort: null,
     identityFile: null,
-    openBrowser: true,
+    openBrowser: false,
     waitMs: 120_000,
     assumeYes: false,
     planOnly: false,
@@ -160,6 +161,7 @@ export async function connectRemote(options, dependencies = {}) {
     installBaseUrl: dependencies.installBaseUrl ?? env['OPENALICE_REMOTE_TEST_INSTALL_BASE_URL'] ?? '',
     repositoryUrl,
   })
+  await dependencies.onPlan?.(plan)
   stdout.write(formatRemotePlan(plan))
 
   if (plan.blocker) throw new Error(plan.blocker)
@@ -177,6 +179,7 @@ export async function connectRemote(options, dependencies = {}) {
 
   const runRemote = dependencies.runRemote ?? runSshCommand
   if (plan.runInstaller) {
+    dependencies.onProgress?.('installing')
     const expectedRemainingMutations = remainingMutationsAfterInstall(plan)
     stdout.write(`Installing the native OpenAlice CLI Runtime on ${options.destination} with the normal installer...\n`)
     let installerError = null
@@ -192,6 +195,7 @@ export async function connectRemote(options, dependencies = {}) {
       stdout.write('The SSH action ended unexpectedly; checking whether the remote install completed...\n')
     }
     try {
+      dependencies.onProgress?.('verifying-install')
       remote = await probe(connectionOptions, dependencies)
     } catch (probeError) {
       throw installerError ?? probeError
@@ -211,6 +215,7 @@ export async function connectRemote(options, dependencies = {}) {
       throw new Error('The remote OpenAlice CLI install completed, but it does not match the invoking local CLI')
     }
     if (plan.restartServer) {
+      dependencies.onProgress?.('restarting')
       remote = await stopNativeRuntimeAfterUpdate(
         connectionOptions,
         plan.restartOwner,
@@ -244,6 +249,7 @@ export async function connectRemote(options, dependencies = {}) {
   }
 
   if (plan.cloneSource) {
+    dependencies.onProgress?.('preparing-source')
     const expectedRemainingMutations = remainingMutationsAfterClone(plan)
     stdout.write(`Preparing the managed OpenAlice source on ${options.destination}...\n`)
     let cloneError = null
@@ -297,6 +303,7 @@ export async function connectRemote(options, dependencies = {}) {
   }
 
   if (plan.startServer) {
+    dependencies.onProgress?.('restarting')
     stdout.write(`${options.takeover ? 'Replacing' : 'Starting'} OpenAlice Server on ${options.destination}...\n`)
     let startError = null
     try {
@@ -323,6 +330,7 @@ export async function connectRemote(options, dependencies = {}) {
   if (!isRemoteRuntimeAttachable(remote.status)) {
     throw new Error(`Remote OpenAlice Server is not ready after apply (${remote.status?.class ?? 'no status'})`)
   }
+  dependencies.onProgress?.('verifying')
   if ((plan.nativeRuntimeExpected || remoteRuntimeMustMatchPlan(connectionOptions, remote))
     && !runningRuntimeMatchesPlan(connectionOptions, remote)) {
     throw new Error(formatRunningRuntimeMismatch(connectionOptions, remote))
@@ -344,7 +352,7 @@ export async function connectRemote(options, dependencies = {}) {
     remotePort: runtimePort,
     sshPort: options.sshPort,
     identityFile: options.identityFile,
-    openBrowser: options.openBrowser,
+    openBrowser: false,
     waitMs: options.waitMs,
     onReady: async ({ localPort }) => {
       try {
@@ -468,7 +476,7 @@ export function createRemotePlan(options, remote, install = {}) {
   const installBaseUrl = install.installBaseUrl ?? ''
   const repositoryUrl = install.repositoryUrl ?? DEFAULT_REPOSITORY_URL
   const mutations = []
-  let blocker = devBlocker || expectedTargetBlocker
+  let blocker = devBlocker || expectedTargetBlocker || installSourceChannelVersionError(installSource) || ''
   let cloneSource = false
   let startServer = false
   let restartServer = false
@@ -936,6 +944,8 @@ export function buildRemoteServerStopCommand(options, cliPath) {
 
 export function buildRemoteInstallCommand(installSource, installBaseUrl = '', expectedTarget = null) {
   const source = requireInstallSource(installSource)
+  const sourceError = installSourceChannelVersionError(source)
+  if (sourceError) throw new Error(sourceError)
   const target = normalizeExpectedRemoteTarget(expectedTarget)
   const updateChannel = installSourceUpdateChannel(source)
   if (expectedTarget !== null && expectedTarget !== undefined && !target) {
@@ -1099,11 +1109,12 @@ export async function confirmRemotePlan(message, dependencies = {}) {
 
 export function formatRemoteHelp() {
   return `Usage:
-  openalice --remote <user@host> [options]
+  openalice --remote <user@host> --plan|--status|--stop [options]
 
-Plans and, after explicit consent, installs or reuses the matching OpenAlice
-Runtime on the SSH host. It then opens the normal loopback browser tunnel.
-Disconnecting closes only the tunnel; the remote Server keeps running.
+Read-only planning and explicit remote Runtime control. To connect the GUI,
+first run "openalice machine add <user@host> --label <name>" to probe and save
+the Machine, then run "openalice" and select a running AliceProject. The GUI
+is served from the local relay, never from a direct SSH tunnel.
 
 When --app-dir is omitted, a new Runtime uses the installed platform-native
 release. A healthy compatible Runtime already present in the SSH execution
@@ -1113,8 +1124,6 @@ to select a specific source-development Runtime.
 Options:
   --app-dir <path>        Advanced: explicit existing or new source checkout
   --home <path>           Absolute remote OPENALICE_HOME (default: ~/.openalice)
-  --local-port <port|auto> Local tunnel port (default: auto)
-  --remote-port <port>    Remote OpenAlice web port (default: 47331)
   --ssh-port <port>       SSH server port
   --identity <path>       Local SSH identity file
   --wait <seconds>        Server/tunnel readiness timeout, 1-600 (default: 120)
@@ -1123,7 +1132,6 @@ Options:
   --plan                  Print the read-only plan and exit
   -y, --yes               Approve install/update/start actions non-interactively
   --takeover              Explicitly replace the recorded remote Guardian owner
-  --no-open               Print the local URL without opening a browser
   -h, --help              Show this help
 
 --yes never implies --takeover. Stage 2 supports Linux and macOS SSH hosts.

@@ -339,6 +339,10 @@ jobs:
       - name: Exercise candidate installer in a clean HTTP fixture
         run: node scripts/install-docker-smoke.mjs
 
+      - name: Build trusted local UI for Web relay
+        if: needs.release.outputs.channel == 'stable'
+        run: pnpm install --frozen-lockfile && pnpm exec turbo run build --filter=open-alice-ui...
+
       - name: Exercise candidate installer through managed SSH remote
         if: needs.release.outputs.channel == 'stable'
         run: node scripts/remote-ssh-smoke.mjs --skip-tui

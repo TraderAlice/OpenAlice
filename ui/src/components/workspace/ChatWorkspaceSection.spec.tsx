@@ -13,6 +13,8 @@ import {
   type TemplateInfo,
   type Workspace,
 } from './api'
+import { SessionBusyDialogHost } from './SessionBusyPanel'
+import { useSessionBusyDialog } from './session-busy-store'
 import { ChatWorkspaceSection } from './ChatWorkspaceSection'
 
 const actions = vi.hoisted(() => ({
@@ -36,6 +38,7 @@ const focusedTabState = vi.hoisted(() => ({
 }))
 
 vi.mock('../../hooks/useWorkspaceSessionDirectory', () => ({
+  useWorkspaceSessionDirectory: (id: string) => ({ directory: directoryState.directories.get(id) ?? null, loading: false, error: null, refresh: vi.fn() }),
   useWorkspaceSessionDirectories: () => ({
     directories: directoryState.directories,
     loading: false,
@@ -160,11 +163,13 @@ function renderSection(
         displayMode={displayMode}
         placement={placement}
       />
+      <SessionBusyDialogHost />
     </WorkspacesContext.Provider>,
   )
 }
 
 beforeEach(async () => {
+  useSessionBusyDialog.getState().close()
   for (const mock of Object.values(actions)) mock.mockClear()
   directoryState.directories = new Map()
   focusedTabState.tab = null
@@ -824,6 +829,39 @@ describe('ChatWorkspaceSection actions', () => {
     )
   })
 
+  it('shows background occupancy independently of roster preferences and keeps completion in the dialog', async () => {
+    harnessPreference.showHeadlessBornSessions = false
+    harnessPreference.showIssueAttachedSessions = false
+    const session = { ...chatSession(1), surface: 'headless' as const, state: 'running' as const }
+    const entry = { resumeId: session.resumeId, agent: 'pi', active: true, issueAttached: true, rosterVisibility: 'hidden',
+      createdAt: 1, updatedAt: 1, resumable: true,
+      latestExecution: { taskId: 'run-1', status: 'running', startedAt: 1 } }
+    directoryState.directories = new Map([[chatWorkspace.id, { sessions: [entry] }]])
+    const workspaces = [{ ...chatWorkspace, sessions: [session] }]
+    const rendered = renderSection(workspaces, null, undefined, 'focused', 'navigation')
+    fireEvent.click(screen.getByRole('button', { name: '1 running' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Conversation 1' }))
+    expect(screen.getByRole('dialog')).toBeTruthy()
+    expect(openOrFocus).not.toHaveBeenCalled()
+    expect(actions.resumeSession).not.toHaveBeenCalled()
+    entry.active = false
+    entry.latestExecution.status = 'done'
+    rendered.rerender(<WorkspacesContext.Provider value={workspaceContext(workspaces)}>
+      <ChatWorkspaceSection placement="navigation" /><SessionBusyDialogHost />
+    </WorkspacesContext.Provider>)
+    expect(screen.getByRole('dialog', { name: 'Background task finished' })).toBeTruthy()
+    expect(screen.queryByRole('button', { name: '1 running' })).toBeNull()
+    entry.latestExecution.status = 'interrupted'
+    rendered.rerender(<WorkspacesContext.Provider value={workspaceContext(workspaces)}>
+      <ChatWorkspaceSection placement="navigation" /><SessionBusyDialogHost />
+    </WorkspacesContext.Provider>)
+    expect(screen.getByRole('dialog', { name: 'Background run interrupted' })).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: 'Open conversation' }))
+    expect(openOrFocus).toHaveBeenCalledWith({ kind: 'workspace', params: {
+      wsId: chatWorkspace.id, sessionId: session.id, source: 'chat',
+    } })
+  })
+
   it('groups running headless Sessions and explains why TUI is temporarily unavailable', async () => {
     const onNavigate = vi.fn()
     directoryState.directories = new Map([[chatWorkspace.id, {
@@ -897,14 +935,14 @@ describe('ChatWorkspaceSection actions', () => {
     expect(screen.getByRole('button', { name: 'Morning scan complete. Semis still lead.' })).toBeTruthy()
     const [runningTitle, runningPlay] = screen.getAllByRole('button', { name: 'Running · Scan Open' })
     fireEvent.click(runningTitle!)
-    expect(screen.getByRole('dialog', { name: 'This Session is running in the background' })).toBeTruthy()
-    expect(screen.getByText('Started by Issue scan-open')).toBeTruthy()
+    expect(screen.getByRole('dialog', { name: 'Working on Scan Open' })).toBeTruthy()
+    expect(screen.getAllByText('Issue scan-open')).toHaveLength(2)
     expect(openOrFocus).not.toHaveBeenCalled()
     expect(actions.resumeSession).not.toHaveBeenCalled()
     fireEvent.click(screen.getAllByRole('button', { name: 'Close' })[0]!)
 
     fireEvent.click(runningPlay!)
-    expect(screen.getByRole('dialog', { name: 'This Session is running in the background' })).toBeTruthy()
+    expect(screen.getByRole('dialog', { name: 'Working on Scan Open' })).toBeTruthy()
     fireEvent.click(screen.getAllByRole('button', { name: 'Close' })[0]!)
 
     fireEvent.click(within(runningSection).getByRole('button', { name: /Running in background/ }))

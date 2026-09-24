@@ -1,7 +1,7 @@
 # Shell CLI Supervisor
 
 This guide owns the computer-level `openalice` command surface above Guardian:
-background and foreground lifecycle, status presentation, browser opening,
+background and foreground lifecycle, status presentation, relay GUI opening,
 machine-readable envelopes, shell completion, compatibility aliases, and the
 boundary of the Supervisor TUI.
 
@@ -48,7 +48,7 @@ openalice down [options]
 openalice status [options]
 openalice logs [options]
 openalice doctor [options]
-openalice open [options]
+openalice relay [--port <port>] [--no-open]
 openalice create alice-project [options]
 openalice project [list|use|copy-ai-creds|transfer] [options]
 ```
@@ -56,15 +56,28 @@ openalice project [list|use|copy-ai-creds|transfer] [options]
 Remote targeting is a global selector rather than a second command tree:
 
 ```bash
-openalice --remote <user@host> [options]
+openalice --remote <user@host> --plan|--status|--stop [options]
 openalice machine add <user@host> --label <label> [options]
 openalice --machine <id-or-label> <command> [options]
 ```
 
-`--remote` owns the managed SSH attach and loopback tunnel. `machine` stores
-Herdr-style remote profiles, and `--machine` re-enters an ordinary CLI command
-on the selected enabled profile. There is no separate public `ssh` or `remote`
-command.
+`machine add` probes and prepares a remote Runtime before saving its profile.
+The default `openalice` TUI owns the local Web relay; it connects only to
+registered Machines and their running AliceProjects. `openalice relay` serves
+the same GUI without a TUI. `--remote` remains for plan/status/stop controls;
+its former direct browser attach is retired. `--machine` re-enters an ordinary
+CLI command on a selected enabled profile.
+
+The normal TUI starts a local relay in the same CLI process. TUI selection and
+Settings → General → Where Alice is working operate one current Machine/AliceProject target;
+opening Web from the TUI uses that relay's stable loopback origin, including
+when no Runtime is selected yet (`o` opens the connection screen). Web changes
+also update the TUI. `openalice relay` runs the same relay without the terminal
+presentation. It serves the local UI bundle and forwards backend HTTP/WS to
+one selected running Runtime. Detaching from the TUI closes its relay and SSH
+tunnel, not the selected Runtime. Direct `--remote` browser access was a
+separate entry path. Electron keeps its integrated IPC path and can switch its
+window to a main-process relay for a separated connection.
 
 | Command | Contract |
 |---|---|
@@ -83,7 +96,7 @@ command.
 | `status` | Read normalized status and activation state without mutation |
 | `logs` | Read a bounded, redacted tail from safe Runtime log rotations |
 | `doctor` | Run read-only provenance, ownership, readiness, component, provider, update-metadata, and log-layout checks |
-| `open` | Require an advertised Web endpoint and a successful `/api/auth/status` probe before invoking the platform browser opener |
+| `openalice` | Start the Supervisor TUI and its Web relay. GUI browser opening always uses the relay origin. |
 
 `up` is idempotent for an already healthy matching owner. `down` is idempotent
 when no owner exists. Ordinary start never signals another owner. `--takeover`
@@ -105,15 +118,15 @@ Guardian/Alice/UTA/Connector processes; its release gate lives in
 [[plans/bun-cli-distribution.md]]. `up` and `run` remain
 browserless lifecycle commands and accept home, port, wait, and takeover
 options; `--app-dir` is an advanced source override with the preparation and
-rebuild options documented in [[docs/local-runtime.md]]. `--open` performs a
-separate verified browser open after readiness.
+rebuild options documented in [[docs/local-runtime.md]]. The retired `--open`
+shortcut must not bypass the relay.
 
 ## Default and Compatibility Surface
 
-- bare `openalice` enters the local Supervisor TUI;
+- bare `openalice` enters the local Supervisor TUI and starts its Web relay;
 - `openalice tui` is the explicit equivalent for tests and scripts;
-- `openalice start` retains the existing foreground, browser-oriented
-  compatibility launcher and also selects the installed bundle by default;
+- `openalice relay` runs the same Web controller without TUI presentation;
+- the old `openalice start` and `openalice open` browser shortcuts are retired;
 - `openalice server run|start|status|stop` remains available for managed
   remote and existing scripts;
 - new code uses `run|up|status|down`;
@@ -1334,7 +1347,7 @@ Manually use an isolated home and unused port to walk:
 openalice up --home <temporary-home> --port <unused-port>
 openalice status --home <temporary-home>
 openalice status --home <temporary-home> --json
-openalice open --home <temporary-home>
+openalice relay
 openalice down --home <temporary-home>
 ```
 

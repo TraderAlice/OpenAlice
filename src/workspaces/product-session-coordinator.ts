@@ -24,7 +24,6 @@ export interface EnsureProductSessionInput {
   readonly runtimeBinding?: SessionRuntimeBinding
   readonly metadata?: SessionMetadata
   readonly recordId?: string
-  readonly state?: SessionRecord['state']
   readonly surface?: ProductSessionSurface
   readonly fallbackTitle?: string
   readonly sourceRunId?: string
@@ -87,14 +86,12 @@ export class ProductSessionCoordinator {
           )
         }
         const patch: {
-          state?: SessionRecord['state']
           surface?: SessionRecord['surface']
           fallbackTitle?: string
           sourceRunId?: string
           resumeHint?: SessionRecord['resumeHint']
           lastActiveAt?: string
         } = {}
-        if (input.state && existing.state !== input.state) patch.state = input.state
         if (input.surface && existing.surface !== input.surface) patch.surface = input.surface
         const fallbackTitle = normalizeSessionTitle(input.fallbackTitle)
         if (fallbackTitle && !existing.fallbackTitle) patch.fallbackTitle = fallbackTitle
@@ -127,7 +124,7 @@ export class ProductSessionCoordinator {
         name: this.sessions.nextName(identity.wsId, identity.agent, input.namePrefix),
         createdAt,
         lastActiveAt: createdAt,
-        state: input.state ?? 'paused',
+        state: 'paused',
         surface: input.surface ?? 'headless',
         ...(fallbackTitle ? { fallbackTitle } : {}),
         ...(input.sourceRunId ? { sourceRunId: input.sourceRunId } : {}),
@@ -144,31 +141,6 @@ export class ProductSessionCoordinator {
         surface: record.surface,
       })
       return { identity, session: record, created: true }
-    })
-  }
-
-  async transition(input: {
-    readonly wsId: string
-    readonly resumeId: string
-    readonly state: SessionRecord['state']
-    readonly surface: ProductSessionSurface
-    readonly sourceRunId?: string
-    readonly now?: number
-  }): Promise<SessionRecord> {
-    return this.serialize(input.resumeId, async () => {
-      await this.sessions.ensureLoaded(input.wsId)
-      const record = this.sessions.findByResumeId(input.wsId, input.resumeId)
-      if (!record) {
-        throw new Error(`missing SessionRecord for resume identity: ${input.resumeId}`)
-      }
-      const updated = await this.sessions.update(input.wsId, record.id, {
-        state: input.state,
-        surface: input.surface,
-        lastActiveAt: new Date(input.now ?? Date.now()).toISOString(),
-        ...(input.sourceRunId && !record.sourceRunId ? { sourceRunId: input.sourceRunId } : {}),
-      })
-      if (!updated) throw new Error(`SessionRecord disappeared during transition: ${record.id}`)
-      return updated
     })
   }
 
@@ -210,7 +182,6 @@ export class ProductSessionCoordinator {
         ...(identity.agentSessionId ? { agentSessionId: identity.agentSessionId } : {}),
         ...(identity.latestTaskId ? { latestTaskId: identity.latestTaskId } : {}),
         ...(identity.runtimeBinding ? { runtimeBinding: identity.runtimeBinding } : {}),
-        state: 'paused',
         surface: identity.latestTaskId ? 'headless' : 'terminal',
         ...(fallback?.title ? { fallbackTitle: fallback.title } : {}),
         ...(fallback?.sourceRunId ? { sourceRunId: fallback.sourceRunId } : {}),

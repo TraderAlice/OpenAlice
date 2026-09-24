@@ -87,6 +87,84 @@ is not schedulable or resumable. It may carry `successorResumeId` for explicit
 handoff. OpenAlice never silently pretends a successor authored the
 predecessor's work.
 
+## Session execution authority
+
+`WorkspaceService.executions` is the only application entry point for starting
+or stopping a Session process. It exposes terminal, Web, asynchronous dispatch,
+synchronous wait, and diagnostic probe operations backed by
+`SessionExecutionManager`. HTTP, Electron IPC, conversation tools, Issues,
+schedules, Connector-driven work, offboarding, and shutdown share this boundary.
+The old service launch methods and coordinator state-transition method are
+removed. The exposed PTY/Web containers provide observation and transport, not
+process control. An architecture test guards this boundary.
+
+Every launch requires a concrete `origin` (caller kind and entry point, with
+Issue/Session/Connector identifiers where applicable), intent, surface, and
+secret-free credential/model/effort selection. Birth provenance remains
+immutable on the Session; execution provenance records each subsequent launch.
+
+`workspaces/state/session-executions.json` records a unique execution ID,
+requested/start/end timestamps, PID, optional task ID, phase, runtime activity,
+and termination reason. The phases are `starting -> running -> stopping ->
+ended`, with `failed` for startup or runtime failure. A natural exit can go
+directly from running to ended/failed. Web protocol activity additionally
+reports idle, working, awaiting-input, and other runtime states; TUI does not
+invent model activity from terminal bytes.
+
+The manager persists admission before spawning, excludes concurrent writers of
+one `resumeId`, waits for actual exit on stop/handoff, and rejects callbacks from
+an older execution. A shutdown closes admission and waits for startup/stop work.
+PTY exit ends its execution; there is no hidden automatic respawn. A new process
+requires another managed launch and receives another execution ID.
+
+Session roster `running/paused` is only a projection. Ordinary metadata updates
+cannot change it, and allocating a Session does not mark it running. At startup,
+the manager closes executions whose owner restarted and reconciles orphaned
+roster rows. A reconciliation record identifies the system recovery operation;
+it does not claim to know the original caller of an older unrecorded process.
+Existing roster and Session AI storage formats remain unchanged.
+
+Read execution history with
+`GET /api/workspaces/:id/sessions/:sid/executions`. It returns `{ executions }`
+for that Session; no keys, environment variables, prompts, or command lines are
+stored in this journal. A failed journal blocks new execution admission. A stop
+still terminates the process if writing its journal fails and reports the
+persistence failure to the caller.
+
+## Interactive takeover
+
+Background dispatch to an existing Session enters the execution manager's FIFO
+takeover admission before acquiring the resume lock. Pending requests leave
+interactive input available. The manager records source, request and decision
+times, inactivity deadline and handoff state in
+`state/session-executions.json.takeovers.json`. This file also owns the global
+idle interval (60 seconds by default, configurable from 10 to 3600 seconds).
+Configuration changes apply to new requests. A restart cancels pending requests;
+it does not replay work from this diagnostic journal. The journal retains active
+requests plus the last 500 resolved requests; no prompt or credential is stored.
+
+User activity within the target Session resets its server-owned deadline.
+Approval and timeout both wait for an observed GUI `idle` phase. Working,
+compacting, retrying and awaiting-input phases cannot be interrupted by this
+mechanism. A terminal has no trustworthy activity signal: it requires explicit
+approval, which clearly states that its process will stop. Closing the request
+Dialog merely hides it; rejecting declines that caller without stopping the
+Session. A Session cannot request its own handoff.
+
+The head request reserves the identity before stopping the current process,
+waits for actual exit, and retains its reservation through background completion.
+Later requests queue; interactive starts and prompts cannot race the handoff.
+Different Sessions remain independent. Shutdown cancels waiting admissions before
+stopping managed processes. Failed persistence closes admission.
+
+`GET /api/workspaces/session-takeovers` projects requests and server time;
+`POST /api/workspaces/session-takeovers/:requestId/decision` accepts approve or
+reject; `PUT /api/workspaces/session-takeovers/settings` sets `idleSeconds`.
+Session-local `/activity` requests record interaction without starting a process.
+Pending dispatch callers wait for admission; they receive the ordinary task ID
+once work is admitted, or a concrete refusal/error. Scheduling cursors retain
+their existing dispatch success/failure semantics.
+
 ## Offboarding Transaction
 
 Before moving a Workspace, Alice gathers:
@@ -163,3 +241,48 @@ present when a desk was created or departed is not part of its durable identity.
 Do not reintroduce “delete the registry row and leave the folder in place.” It
 pollutes manager discovery, destroys restore metadata, and turns known retired
 coworkers into unexplained missing state.
+
+### Interruption and Session launch admission
+
+Scheduling offers work; `SessionExecutionManager` decides whether the Session can
+accept it. Its persistent admission sidecar (`session-executions.json.admission.json`)
+owns launch blocks. It never starts work, retries a task, or advances a schedule.
+Every managed start checks admission before spawning; takeover also checks before
+queuing and immediately before handoff. Approval cannot override a launch block.
+
+`interrupt(resumeId, executionId, actor)` is the emergency stop for any execution
+surface, including headless and stalled startup. The expected execution ID prevents
+a stale click from stopping a subsequent run. The manager records who interrupted,
+when, and why, cancels pending takeover offers, signals the process tree, escalates
+to forced termination, and records `interrupted` only after exit is confirmed.
+History and partial output survive. A failed stop retains `stopping`, occupancy,
+and `stopError`; another interrupt retries termination. Routine internal `stop`
+remains for orderly shutdown, surface replacement and handoff, without a user
+cooldown. GUI turn abort remains distinct from terminating the Session process.
+
+Admission blocks are independent of execution outcomes:
+
+- `user-cooldown`: an explicit user interruption blocks all new starts for
+  600 seconds by default. The global setting accepts 10–86400 seconds and applies
+  to future interruptions. Expiry merely restores eligibility.
+- `execution-fault`: three consecutive failed executions block starts until
+  explicit user release. Success resets the streak; interruption does not count
+  as a failure. Releasing the fault resets its streak.
+- Active execution and takeover ownership remain live manager constraints.
+  Releasing one persisted block cannot override other blocks or occupancy.
+
+Only user-attributed controls may release blocks or change cooldown policy. HTTP
+handlers supply that attribution themselves; client-provided actors are rejected
+for interruption. Release and interruption retain actor provenance. Admission
+refusals expose `session_blocked`, the current policy blocks, and `retryAt` only
+when all policy blocks have deadlines.
+
+The UI reads `GET /api/workspaces/:id/sessions/:sid/control` through
+`useSessionControl`. Busy and details dialogs share `SessionControlPanel`.
+`POST .../interrupt` requires `executionId`; `POST .../blocks/:blockId/release`
+releases only that block. `PUT /api/workspaces/session-controls/settings` changes
+`cooldownSeconds`. No release endpoint starts an execution.
+
+The sidecar is new optional state with an explicit version, created lazily; the
+execution journal adds optional interruption metadata and an `interrupted` phase.
+No existing Session identity/configuration file is rewritten or migrated.

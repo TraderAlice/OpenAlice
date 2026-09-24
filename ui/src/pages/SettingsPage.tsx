@@ -27,8 +27,11 @@ import {
 } from '../theme/styleProfiles'
 import { useEffectivePreferenceSlot } from '../theme/useEffectiveTheme'
 import { AboutOpenAliceSection } from '../components/settings/AboutOpenAliceSection'
+import { AliceLocationSection } from '../components/settings/AliceLocationSection'
+import { MachineManagementSection } from '../components/settings/MachineManagementSection'
 import { Button } from '../components/ui/button'
 import { getBackendConnection } from '../auth/backendConnection'
+import { useRelayConnection } from '../hooks/useRelayConnection'
 
 // ==================== Appearance ====================
 
@@ -564,6 +567,7 @@ export function DataHomeSection() {
   const { t } = useTranslation()
   const bridge = window.openAlice?.dataHome
   const backendConnection = getBackendConnection()
+  const relay = useRelayConnection()
   const [status, setStatus] = useState<OpenAliceDataHomeStatus | null>(null)
   const [busy, setBusy] = useState(false)
   const [restarting, setRestarting] = useState(false)
@@ -583,7 +587,7 @@ export function DataHomeSection() {
         description={t('settings.dataHome.description')}
       >
         <div className="rounded-lg border border-border/60 bg-secondary/50 px-3 py-3">
-          {backendConnection.kind === 'remote' ? (
+          {relay.status?.target?.machine && relay.status.target.machine !== 'local' ? (
             <p className="text-[13px] leading-relaxed text-foreground">
               {t('settings.dataHome.remoteManaged')}
             </p>
@@ -591,7 +595,7 @@ export function DataHomeSection() {
             <>
               <p className="text-[13px] text-foreground">{t('settings.dataHome.browserOnly')}</p>
               <p className="mt-2 break-all font-mono text-[12px] leading-[18px] text-muted-foreground">
-                openalice start --home &lt;path&gt;
+                openalice run --home &lt;path&gt;
               </p>
               <p className="mt-1 break-all font-mono text-[12px] leading-[18px] text-muted-foreground">
                 pnpm dev -- --home &lt;path&gt;
@@ -844,7 +848,10 @@ function WorkspaceShellSection() {
 function SettingsSection() {
   return (
     <div className="mx-auto w-full max-w-[1100px]">
-      {/* Installation + current AliceProject identity */}
+      <AliceLocationSection />
+      <MachineManagementSection />
+
+      {/* Installation and update ownership */}
       <AboutOpenAliceSection />
 
       {/* Language */}

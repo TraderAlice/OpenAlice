@@ -23,7 +23,7 @@ beforeEach(async () => {
 afterEach(async () => rm(dir, { recursive: true, force: true }))
 
 describe('WorkspaceSessionRuntimeStore displayName', () => {
-  it('stores displayName beside the frozen AI binding', async () => {
+  it('stores displayName beside the Session AI binding', async () => {
     await store.ensure({
       wsId: 'ws-1',
       resumeId: 'resume-kind-owl-abc123',

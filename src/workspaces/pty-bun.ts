@@ -1,3 +1,4 @@
+import { sessionProcessStop } from './session-process-stop.js';
 import type {
   PtyBackend,
   PtyDisposable,
@@ -99,6 +100,7 @@ export function createBunPtyBackend(runtime: BunPtyRuntime, platform = process.p
 
     return {
       pid: child.pid,
+      terminateTree: sessionProcessStop(child.pid, 2000),
       onData(listener) {
         const disposable = subscribe(dataListeners, listener);
         for (const chunk of pendingData.splice(0)) listener(chunk);

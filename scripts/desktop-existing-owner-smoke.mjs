@@ -5,6 +5,7 @@ import { readFile, rm } from 'node:fs/promises'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 import { fileURLToPath } from 'node:url'
+import { desktopDevExecutable, spawnDesktopSmoke, stopDesktopSmoke } from './desktop-smoke-process.mjs'
 
 const repoRoot = fileURLToPath(new URL('..', import.meta.url))
 const pnpmCommand = process.platform === 'win32' ? (process.env.ComSpec ?? 'cmd.exe') : 'pnpm'
@@ -14,6 +15,15 @@ const pnpmArgs = (commandArgs) => process.platform === 'win32'
 const args = new Set(process.argv.slice(2))
 const skipBuild = args.has('--skip-build')
 const timeoutMs = 90_000
+let activeCleanup = null
+
+for (const signal of ['SIGINT', 'SIGTERM']) {
+  process.once(signal, () => {
+    void (activeCleanup?.() ?? Promise.resolve())
+      .catch((error) => console.error(`[existing-owner-smoke] cleanup failed: ${error instanceof Error ? error.message : String(error)}`))
+      .finally(() => process.exit(signal === 'SIGINT' ? 130 : 143))
+  })
+}
 
 if (args.has('--help') || args.has('-h')) {
   console.log(`Usage: pnpm electron:smoke:existing-owner [--skip-build]
@@ -126,101 +136,122 @@ async function proveSurface(surface) {
   })
   fixture.once('exit', () => { fixtureExited = true })
 
-  const readyDeadline = Date.now() + 10_000
-  while (!fixtureOutput.includes('[handoff-fixture] ready') && Date.now() < readyDeadline) {
-    if (fixture.exitCode !== null || fixture.signalCode !== null) {
-      throw new Error(`${surface} fixture exited before ready:\n${fixtureOutput}`)
-    }
-    await new Promise((resolvePromise) => setTimeout(resolvePromise, 25))
+  let child = null
+  let cleanupPromise = null
+  const cleanup = () => {
+    cleanupPromise ??= (async () => {
+      terminate(fixture)
+      const results = await Promise.allSettled([
+        stopDesktopSmoke(child),
+        waitForExit(fixture, `${surface} owner fixture`),
+      ])
+      const failed = results.find((result) => result.status === 'rejected')
+      if (failed) throw failed.reason
+      await rm(smokeRoot, { recursive: true, force: true })
+    })()
+    return cleanupPromise
   }
-  if (!fixtureOutput.includes('[handoff-fixture] ready')) {
-    throw new Error(`${surface} fixture did not become ready`)
-  }
-  const ready = fixtureOutput.match(/pid=(\d+) surface=\S+ web=(\S+)/)
-  if (!ready) throw new Error(`${surface} fixture ready line was unparseable`)
-  const fixturePid = Number(ready[1])
-  const webUrl = ready[2]
-
-  const child = spawn(pnpmCommand, pnpmArgs(['-F', '@traderalice/desktop', 'dev']), {
-    cwd: join(repoRoot, 'apps', 'desktop'),
-    stdio: ['ignore', 'pipe', 'pipe'],
-    env: {
-      ...process.env,
-      OPENALICE_HOME: smokeHome,
-      AQ_LAUNCHER_ROOT: smokeWorkspaces,
-      OPENALICE_GLOBAL_DIR: join(smokeRoot, 'global'),
-      OPENALICE_ELECTRON_SMOKE_EXISTING_OWNER: 'open-browser',
-      OPENALICE_ELECTRON_SMOKE_USER_DATA: electronUserData,
-      OPENALICE_ELECTRON_SMOKE_EXISTING_OWNER_RECEIPT: receiptPath,
-      ELECTRON_ENABLE_LOGGING: '1',
-    },
-  })
-  let output = ''
-  const passed = await new Promise((resolvePromise) => {
-    const timer = setTimeout(() => {
-      console.error(output.split('\n').slice(-80).join('\n'))
-      resolvePromise(false)
-    }, timeoutMs)
-    const finish = (ok) => {
-      clearTimeout(timer)
-      resolvePromise(ok)
-    }
-    const ownerAlive = () => {
-      try {
-        process.kill(fixturePid, 0)
-        return true
-      } catch {
-        return false
-      }
-    }
-    const onData = (chunk) => {
-      output += chunk.toString()
-      process.stdout.write(chunk)
-    }
-    child.stdout.on('data', onData)
-    child.stderr.on('data', onData)
-    child.on('exit', async (code) => {
-      let receipt = null
-      try {
-        receipt = JSON.parse(await readFile(receiptPath, 'utf8'))
-      } catch {
-        // The failure below includes the Electron output and exit code.
-      }
-      finish(
-        code === 0
-        && !fixtureExited
-        && ownerAlive()
-        && receipt?.action === 'open-browser'
-        && receipt?.url === webUrl
-        && receipt?.pid === fixturePid,
-      )
-    })
-  })
-
-  terminate(child)
-  const ownerSurvived = !fixtureExited
+  activeCleanup = cleanup
   try {
-    process.kill(fixturePid, 0)
-  } catch {
-    throw new Error(`${surface} owner pid ${fixturePid} is gone`)
+    const readyDeadline = Date.now() + 10_000
+    while (!fixtureOutput.includes('[handoff-fixture] ready') && Date.now() < readyDeadline) {
+      if (fixture.exitCode !== null || fixture.signalCode !== null) {
+        throw new Error(`${surface} fixture exited before ready:\n${fixtureOutput}`)
+      }
+      await new Promise((resolvePromise) => setTimeout(resolvePromise, 25))
+    }
+    if (!fixtureOutput.includes('[handoff-fixture] ready')) {
+      throw new Error(`${surface} fixture did not become ready`)
+    }
+    const ready = fixtureOutput.match(/pid=(\d+) surface=\S+ web=(\S+)/)
+    if (!ready) throw new Error(`${surface} fixture ready line was unparseable`)
+    const fixturePid = Number(ready[1])
+    const webUrl = ready[2]
+
+    child = spawnDesktopSmoke(desktopDevExecutable(), [join(repoRoot, 'dist', 'electron', 'main.js')], {
+      cwd: join(repoRoot, 'apps', 'desktop'),
+      stdio: ['ignore', 'pipe', 'pipe'],
+      env: {
+        ...process.env,
+        OPENALICE_HOME: smokeHome,
+        AQ_LAUNCHER_ROOT: smokeWorkspaces,
+        OPENALICE_GLOBAL_DIR: join(smokeRoot, 'global'),
+        OPENALICE_ELECTRON_SMOKE_EXISTING_OWNER: 'open-browser',
+        OPENALICE_ELECTRON_SMOKE_USER_DATA: electronUserData,
+        OPENALICE_ELECTRON_SMOKE_EXISTING_OWNER_RECEIPT: receiptPath,
+        ELECTRON_ENABLE_LOGGING: '1',
+      },
+    })
+    let output = ''
+    const passed = await new Promise((resolvePromise) => {
+      const timer = setTimeout(() => {
+        console.error(output.split('\n').slice(-80).join('\n'))
+        resolvePromise(false)
+      }, timeoutMs)
+      const finish = (ok) => {
+        clearTimeout(timer)
+        resolvePromise(ok)
+      }
+      const ownerAlive = () => {
+        try {
+          process.kill(fixturePid, 0)
+          return true
+        } catch {
+          return false
+        }
+      }
+      const onData = (chunk) => {
+        output += chunk.toString()
+        process.stdout.write(chunk)
+      }
+      child.stdout.on('data', onData)
+      child.stderr.on('data', onData)
+      child.on('error', () => finish(false))
+      child.on('exit', async (code) => {
+        let receipt = null
+        try {
+          receipt = JSON.parse(await readFile(receiptPath, 'utf8'))
+        } catch {
+          // The failure below includes the Electron output and exit code.
+        }
+        finish(
+          code === 0
+          && !fixtureExited
+          && ownerAlive()
+          && receipt?.action === 'open-browser'
+          && receipt?.url === webUrl
+          && receipt?.pid === fixturePid,
+        )
+      })
+    })
+
+    await stopDesktopSmoke(child)
+    const ownerSurvived = !fixtureExited
+    try {
+      process.kill(fixturePid, 0)
+    } catch {
+      throw new Error(`${surface} owner pid ${fixturePid} is gone`)
+    }
+    terminate(fixture)
+    const fixtureExit = await waitForExit(fixture, `${surface} owner fixture`)
+    if (process.platform !== 'win32' && fixtureExit.code !== 0) {
+      throw new Error(
+        `${surface} owner fixture did not release cleanly ` +
+        `(code=${fixtureExit.code ?? 'null'}, signal=${fixtureExit.signal ?? 'none'}):\n${fixtureOutput}`,
+      )
+    }
+    // The fixture owns guardian.lock. POSIX SIGTERM lets it release cleanly;
+    // Windows taskkill force-stops the tree. In both cases the owner must exit
+    // before deleting the disposable AliceProject, otherwise cleanup races the
+    // release mutation and can turn a successful handoff into ENOTEMPTY.
+    if (!passed || !ownerSurvived) {
+      throw new Error(`${surface} handoff smoke failed:\n${output.split('\n').slice(-40).join('\n')}`)
+    }
+    console.log(`[existing-owner-smoke] ${surface} owner pid ${fixturePid} survived`)
+  } finally {
+    await cleanup()
+    if (activeCleanup === cleanup) activeCleanup = null
   }
-  terminate(fixture)
-  const fixtureExit = await waitForExit(fixture, `${surface} owner fixture`)
-  if (process.platform !== 'win32' && fixtureExit.code !== 0) {
-    throw new Error(
-      `${surface} owner fixture did not release cleanly ` +
-      `(code=${fixtureExit.code ?? 'null'}, signal=${fixtureExit.signal ?? 'none'}):\n${fixtureOutput}`,
-    )
-  }
-  // The fixture owns guardian.lock. POSIX SIGTERM lets it release cleanly;
-  // Windows taskkill force-stops the tree. In both cases the owner must exit
-  // before deleting the disposable AliceProject, otherwise cleanup races the
-  // release mutation and can turn a successful handoff into ENOTEMPTY.
-  await rm(smokeRoot, { recursive: true, force: true })
-  if (!passed || !ownerSurvived) {
-    throw new Error(`${surface} handoff smoke failed:\n${output.split('\n').slice(-40).join('\n')}`)
-  }
-  console.log(`[existing-owner-smoke] ${surface} owner pid ${fixturePid} survived`)
 }
 
 try {

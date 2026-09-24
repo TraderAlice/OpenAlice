@@ -4,6 +4,7 @@ import {
   Activity,
   Bot,
   Ghost,
+  Gauge,
   Camera,
   Cpu,
   CandlestickChart,
@@ -11,7 +12,7 @@ import {
   Code2,
   Compass,
   FlaskConical,
-  Layers3,
+  LayoutDashboard,
   LineChart,
   ListChecks,
   Newspaper,
@@ -20,8 +21,7 @@ import {
   PanelsTopLeft,
   Plug,
   ScrollText,
-  ShieldCheck,
-  SlidersHorizontal,
+  Eye,
   Wrench,
 } from 'lucide-react'
 import { useAliceProject } from '../hooks/useAliceProject'
@@ -65,12 +65,20 @@ function writeDeveloperDisclosure(expanded: boolean): void {
 
 const CATEGORY_GROUPS = [
   {
-    labelKey: 'settings.group.workspace',
+    labelKey: 'settings.group.general',
     items: [
-      { labelKey: 'settings.category.general', category: 'general', Icon: SlidersHorizontal },
-      { labelKey: 'settings.category.appearance', category: 'appearance', Icon: Palette },
+      { labelKey: 'settings.category.general', category: 'general', Icon: LayoutDashboard },
       { labelKey: 'pet.title', category: 'pet', Icon: Ghost },
+      { labelKey: 'settings.category.issues', category: 'issues', Icon: ListChecks },
+      { labelKey: 'settings.category.beta', category: 'beta', Icon: FlaskConical },
+    ],
+  },
+  {
+    labelKey: 'settings.group.appearance',
+    items: [
+      { labelKey: 'settings.category.appearance', category: 'appearance', Icon: Palette },
       { labelKey: 'settings.category.activityBar', category: 'activity-bar', Icon: PanelLeft },
+      { labelKey: 'settings.category.visibility', category: 'visibility', Icon: Eye },
     ],
   },
   {
@@ -78,18 +86,22 @@ const CATEGORY_GROUPS = [
     items: [
       { labelKey: 'settings.category.aiProvider', category: 'ai-provider', Icon: Bot },
       { labelKey: 'settings.category.agentRuntimes', category: 'agent-runtimes', Icon: Cpu },
-      { labelKey: 'settings.category.agentPermissions', category: 'agent-permissions', Icon: ShieldCheck },
       { labelKey: 'settings.category.tools', category: 'tools', Icon: Wrench },
+      { labelKey: 'distribution.title', category: 'workspace-injection', Icon: Code2 },
     ],
   },
   {
-    labelKey: 'settings.group.operations',
+    labelKey: 'settings.group.trading',
     items: [
+      { labelKey: 'settings.category.agentPermissions', category: 'agent-permissions', Icon: Gauge },
       { labelKey: 'settings.category.trading', category: 'trading', Icon: CandlestickChart },
-      { labelKey: 'settings.category.issues', category: 'issues', Icon: ListChecks },
-      { labelKey: 'distribution.title', category: 'workspace-injection', Icon: Code2 },
-      { labelKey: 'settings.category.harness', category: 'harness', Icon: Layers3 },
-      { labelKey: 'settings.category.beta', category: 'beta', Icon: FlaskConical },
+    ],
+  },
+  {
+    labelKey: 'settings.group.data',
+    items: [
+      { labelKey: 'settings.category.marketData', category: 'market-data', Icon: LineChart },
+      { labelKey: 'settings.category.newsSources', category: 'news-collector', Icon: Newspaper },
     ],
   },
   {
@@ -97,8 +109,6 @@ const CATEGORY_GROUPS = [
     items: [
       { labelKey: 'settings.category.connectors', category: 'connectors', Icon: Plug },
       { labelKey: 'settings.category.mcpServer', category: 'mcp', Icon: Plug },
-      { labelKey: 'settings.category.marketData', category: 'market-data', Icon: LineChart },
-      { labelKey: 'settings.category.newsSources', category: 'news-collector', Icon: Newspaper },
     ],
   },
 ] as const

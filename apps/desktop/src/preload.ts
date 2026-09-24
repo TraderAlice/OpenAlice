@@ -126,6 +126,17 @@ ipcRenderer.on('openalice:updater:status', (_event, raw: unknown) => {
 })
 
 const api = {
+  desktopConnection: {
+    status: () => ipcRenderer.invoke('openalice:desktop-connection:status'),
+    fleet: () => ipcRenderer.invoke('openalice:desktop-connection:fleet'),
+    connect: (machine: string, project: string) => ipcRenderer.invoke('openalice:desktop-connection:connect', machine, project),
+    returnIntegrated: () => ipcRenderer.invoke('openalice:desktop-connection:return-integrated'),
+  },
+  desktopMachine: {
+    plan: (input: unknown) => ipcRenderer.invoke('openalice:desktop-machine:plan', input),
+    apply: (id: string) => ipcRenderer.invoke('openalice:desktop-machine:apply', id),
+    operation: () => ipcRenderer.invoke('openalice:desktop-machine:operation'),
+  },
   companion: {
     getSound: () => ipcRenderer.invoke('openalice:companion:sound:get'),
     updateSound: (settings: unknown) => ipcRenderer.invoke('openalice:companion:sound:update', settings),
@@ -228,4 +239,16 @@ const api = {
   },
 }
 
-contextBridge.exposeInMainWorld('openAlice', api)
+// A separated window must use the relay's HTTP/WS transport. It retains only
+// desktop chrome, updates, and the explicit path back to local integration;
+// backend-specific file and PTY IPC never reach a remote-connected renderer.
+if (window.location.protocol === 'app:') {
+  contextBridge.exposeInMainWorld('openAlice', api)
+} else if (window.location.protocol === 'http:' && window.location.hostname === '127.0.0.1') {
+  contextBridge.exposeInMainWorld('openAlice', {
+    desktopConnection: api.desktopConnection,
+    desktopMachine: api.desktopMachine,
+    windowChrome: api.windowChrome,
+    updater: api.updater,
+  })
+}

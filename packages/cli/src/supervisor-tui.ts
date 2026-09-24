@@ -30,7 +30,6 @@ import {
 } from './machine-registry.ts'
 import {
   inspectRuntime,
-  openRuntime,
   startRuntime,
   stopRuntime,
 } from './lifecycle.mjs'
@@ -223,7 +222,8 @@ import {
   type SupervisorHomeHotspotTarget,
   type SupervisorHomeTarget,
 } from './supervisor-tui-view.ts'
-import { connectSsh, openBrowser } from './ssh-connect.mjs'
+import { openBrowser } from './ssh-connect.mjs'
+import { WebRelay } from './web-relay.ts'
 import { buildRemoteSshArgs } from './remote.mjs'
 import { planProjectTransfer, type ProjectTransferPlan } from './project-transfer.ts'
 import { transferProjectOverSsh } from './project-transfer-ssh.ts'
@@ -415,6 +415,7 @@ export interface SupervisorSnapshot {
   managedSource?: ManagedSourcePlan | null
   fleet?: SupervisorFleetState | null
   activeTarget?: SupervisorActiveTarget | null
+  webRelayUrl?: string
   connectionEvents?: SupervisorConnectionEvent[]
   launchFlight?: SupervisorLaunchFlight | null
   inbox?: SupervisorInboxSnapshot | null
@@ -428,7 +429,7 @@ export interface SupervisorTuiDependencies {
   inspect?: (options?: { homeRoot?: string; waitMs?: number }) => Promise<RuntimeSummary>
   start?: (options: Record<string, unknown>) => Promise<unknown>
   stop?: (options: Record<string, unknown>) => Promise<unknown>
-  open?: (options: Record<string, unknown>) => Promise<unknown>
+  openBrowser?: typeof openBrowser
   readLogs?: (options: Record<string, unknown>) => Promise<RuntimeLogs>
   diagnose?: (options: Record<string, unknown>) => Promise<DoctorReport>
   checkUpdate?: (channel: SupervisorUpdateChannel) => Promise<UpdateResult>
@@ -487,6 +488,7 @@ export interface SupervisorTuiDependencies {
     signal: AbortSignal
     onReady: (connection: { localPort: number; localUrl: string; clientUrl: string }) => void
   }) => Promise<number>
+  webRelay?: WebRelay | null
   planProjectTransfer?: typeof planProjectTransfer
   sendProjectTransfer?: (input: {
     machine: RegisteredMachine
@@ -503,7 +505,6 @@ interface SupervisorServices {
   inspect: NonNullable<SupervisorTuiDependencies['inspect']>
   start: NonNullable<SupervisorTuiDependencies['start']>
   stop: NonNullable<SupervisorTuiDependencies['stop']>
-  open: NonNullable<SupervisorTuiDependencies['open']>
   readLogs: NonNullable<SupervisorTuiDependencies['readLogs']>
   diagnose: NonNullable<SupervisorTuiDependencies['diagnose']>
   checkUpdate: NonNullable<SupervisorTuiDependencies['checkUpdate']>
@@ -523,6 +524,7 @@ export async function runSupervisorTui(
 ): Promise<number> {
   const stdin = dependencies.stdin ?? process.stdin
   const stdout = dependencies.stdout ?? process.stdout
+  const openWebBrowser = dependencies.openBrowser ?? openBrowser
   const readInbox = dependencies.readInbox ?? readSupervisorInbox
   const setInboxRead = dependencies.setInboxRead ?? setSupervisorInboxRead
   if (!stdin.isTTY || !stdout.isTTY) {
@@ -609,6 +611,18 @@ export async function runSupervisorTui(
   }
   const now = dependencies.now ?? (() => Date.now())
   let activeTarget = localSupervisorTarget(context, runtime)
+  const webRelay = dependencies.webRelay === undefined ? new WebRelay() : dependencies.webRelay
+  if (webRelay) {
+    await webRelay.listen()
+    if (activeTarget) {
+      try {
+        await webRelay.connect('local', activeTarget.projectKey)
+      } catch (error) {
+        diagnostic = safeError(error)
+        activeTarget = null
+      }
+    }
+  }
   let connectionEvents: SupervisorConnectionEvent[] = activeTarget
     ? [createSupervisorConnectionEvent('connected', activeTarget, now(), 'startup')]
     : []
@@ -900,6 +914,7 @@ export async function runSupervisorTui(
     notice: startupNotice,
     fleet,
     activeTarget: forceHomeStart ? undefined : activeTarget,
+    webRelayUrl: webRelay?.originUrl,
     connectionEvents,
     inbox,
   }, {
@@ -946,24 +961,24 @@ export async function runSupervisorTui(
       void toggleInboxRead(entry.id)
     },
     onOpenInboxEntry: (entry) => {
-      const base = activeTarget?.clientUrl ?? activeTarget?.endpoint
+      const base = webRelay?.originUrl
       if (!base) return
       const url = supervisorInboxWorkspaceUrl(base, entry.workspaceId)
-      void openBrowser(url).then(
+      void openWebBrowser(url).then(
         () => screen.update({ notice: `Opened Workspace ${entry.workspaceLabel ?? entry.workspaceId}.` }),
         (error: unknown) => screen.update({ diagnostic: safeError(error) }),
       )
     },
     onOpenActiveTarget: () => {
-      const url = activeTarget?.clientUrl ?? activeTarget?.endpoint
+      const url = webRelay?.originUrl
       if (!url) return
-      void openBrowser(url).then(
-        () => screen.update({ notice: 'Opened the active AliceProject Web UI.' }),
+      void openWebBrowser(url).then(
+        () => screen.update({ notice: 'Opened the OpenAlice Web GUI.' }),
         (error: unknown) => screen.update({ diagnostic: safeError(error) }),
       )
     },
     onDisconnectActiveTarget: () => {
-      disconnectActiveRemoteTarget()
+      void disconnectActiveRemoteTarget()
     },
     onRefreshActiveTarget: () => {
       if (activeTarget?.kind === 'local') void refreshRuntime({ manual: true })
@@ -1041,31 +1056,30 @@ export async function runSupervisorTui(
     inspectRuntime: (options) => services.inspect(options),
     loadMachineRegistry: loadMachines,
   }))
-  const connectRemoteProject = dependencies.connectRemoteProject ?? (async ({
-    machine,
-    project,
-    signal,
-    onReady,
-  }) => {
-    const registry = await loadMachines()
-    const target = registry.machines.find((entry) => entry.key === machine.key)
-    if (!target) throw new Error(`Machine "${machine.key}" is no longer registered.`)
-    requireMachineEnabled(target)
-    const remotePort = loopbackEndpointPort(project.runtime.webEndpoint)
-    if (remotePort === null) {
-      throw new Error(`AliceProject "${project.key}" does not advertise a loopback Web endpoint.`)
+  const connectRemoteProject = dependencies.connectRemoteProject ?? (async ({ machine, project, signal, onReady }) => {
+    if (!webRelay) throw new Error('The Web relay is unavailable.')
+    tuiConnectionRequest = true
+    try {
+      await webRelay.connect(machine.key, project.key)
+      const selection = webRelay.activeSelection
+      if (!selection) throw new Error('The selected relay target disappeared during connection.')
+      const localUrl = selection.endpoint
+      onReady({ localPort: Number(new URL(localUrl).port), localUrl, clientUrl: webRelay.originUrl })
+    } finally {
+      tuiConnectionRequest = false
     }
-    return connectSsh({
-      destination: target.sshTarget,
-      localPort: 0,
-      remotePort,
-      sshPort: target.sshPort ?? null,
-      identityFile: target.identityFile ?? null,
-      openBrowser: false,
-      waitMs: 60_000,
-      signal,
-      onReady,
-    }, { stdout: SILENT_OUTPUT })
+    return new Promise<number>((done) => {
+      const finish = () => { unsubscribe(); signal.removeEventListener('abort', onAbort); done(0) }
+      const onAbort = () => {
+        if (webRelay.status.target?.machine === machine.key && webRelay.status.target.project === project.key) webRelay.disconnect()
+        finish()
+      }
+      const unsubscribe = webRelay.subscribe(() => {
+        if (webRelay.status.target?.machine !== machine.key || webRelay.status.target.project !== project.key) finish()
+      })
+      signal.addEventListener('abort', onAbort, { once: true })
+      if (signal.aborted || webRelay.status.target?.machine !== machine.key || webRelay.status.target.project !== project.key) onAbort()
+    })
   })
   const planTransfer = dependencies.planProjectTransfer ?? planProjectTransfer
   const sendTransfer = dependencies.sendProjectTransfer ?? ((input) => transferProjectOverSsh(input))
@@ -1079,6 +1093,67 @@ export async function runSupervisorTui(
   }
   const probeTarget = dependencies.probeTarget
     ?? ((endpoint) => probeOpenAlice(endpoint, { timeoutMs: 1_500 }))
+
+  let observedRelayGeneration = webRelay?.status.generation ?? 0
+  let tuiConnectionRequest = false
+  let relayExplicitlyDisconnected = false
+  const removeRelayObserver = webRelay?.subscribe(() => {
+    if (!active || !webRelay || webRelay.status.generation === observedRelayGeneration) return
+    observedRelayGeneration = webRelay.status.generation
+    if (!tuiConnectionRequest) {
+      relayExplicitlyDisconnected = !webRelay.activeSelection
+      void syncFromRelay()
+    }
+  })
+
+  async function syncFromRelay(): Promise<void> {
+    if (!webRelay || !active) return
+    const generation = webRelay.status.generation
+    const selection = webRelay.activeSelection
+    const previous = activeTarget
+    try {
+      if (!selection) {
+        activeTarget = null
+      } else if (selection.machine.key === 'local') {
+        if (!context) throw new Error('The selected local AliceProject has no TUI launch context.')
+        const selectedContext = context.project === selection.project.key
+          ? context : await selectProject(context, selection.project.key)
+        const selectedServices = selectedContext === context
+          ? services : createServices(dependencies, selectedContext)
+        const selectedRuntime = await selectedServices.inspect({ homeRoot: selectedContext.home, waitMs: 2_000 })
+        if (webRelay.status.generation !== generation) return
+        context = selectedContext
+        services = selectedServices
+        runtime = selectedRuntime
+        activeTarget = localSupervisorTarget(context, runtime)
+      } else {
+        activeTarget = remoteSupervisorTarget(selection.machine, selection.project, selection.endpoint, webRelay.originUrl)
+      }
+      if (!active || webRelay.status.generation !== generation) return
+      if (previous && (previous.machineKey !== activeTarget?.machineKey || previous.projectKey !== activeTarget?.projectKey)) {
+        recordConnectionEvent('disconnected', previous, 'target-switch')
+      }
+      if (activeTarget && (previous?.machineKey !== activeTarget.machineKey || previous.projectKey !== activeTarget.projectKey)) {
+        recordConnectionEvent('connected', activeTarget, 'target-switch')
+      }
+      inbox = null
+      screen.update({
+        context,
+        runtime,
+        activeTarget,
+        connectionEvents,
+        inbox,
+        panel: activeTarget ? 'overview' : 'fleet',
+        notice: activeTarget
+          ? `Connected to ${activeTarget.machineName} / ${activeTarget.projectName} from Web Settings.`
+          : 'The Web connection was disconnected.',
+        diagnostic: undefined,
+      })
+      if (activeTarget) void refreshInbox({ quiet: true })
+    } catch (error) {
+      if (active) screen.update({ diagnostic: safeError(error) })
+    }
+  }
 
   function recordConnectionEvent(
     kind: SupervisorConnectionEventKind,
@@ -1138,7 +1213,7 @@ export async function runSupervisorTui(
     }
   }
 
-  function disconnectActiveRemoteTarget(): void {
+  async function disconnectActiveRemoteTarget(): Promise<void> {
     const target = activeTarget
     if (!target || target.kind !== 'ssh') return
     const key = fleetTunnelKey(target.machineKey, target.projectKey)
@@ -1148,13 +1223,25 @@ export async function runSupervisorTui(
       notice: undefined,
       diagnostic: undefined,
     })
+    if (webRelay) {
+      const local = localSupervisorTarget(context, runtime)
+      if (local) {
+        tuiConnectionRequest = true
+        try { await webRelay.connect('local', local.projectKey) }
+        catch (error) {
+          if (active) screen.update({ busy: undefined, diagnostic: safeError(error) })
+          return
+        } finally { tuiConnectionRequest = false }
+      } else webRelay.disconnect()
+    }
     if (controller) {
       tunnelCloseOrigins.set(key, 'user-disconnect')
       controller.abort()
       return
     }
     recordConnectionEvent('disconnected', target, 'user-disconnect')
-    activeTarget = localSupervisorTarget(context, runtime)
+    activeTarget = webRelay?.status.target?.machine === 'local' || !webRelay
+      ? localSupervisorTarget(context, runtime) : null
     if (activeTarget) recordConnectionEvent('connected', activeTarget, 'target-switch')
     inbox = null
     screen.update({
@@ -1294,7 +1381,23 @@ export async function runSupervisorTui(
       runtime = nextRuntime
       const previousTarget = activeTarget
       if (!activeTarget || activeTarget.kind === 'local') {
-        activeTarget = localSupervisorTarget(context, nextRuntime)
+        const local = localSupervisorTarget(context, nextRuntime)
+        if (webRelay) {
+          const selected = webRelay.status.target
+          if (local && !selected && !relayExplicitlyDisconnected) {
+            tuiConnectionRequest = true
+            try { await webRelay.connect('local', context.project) }
+            catch (error) { if (options.manual) diagnostic = safeError(error) }
+            finally { tuiConnectionRequest = false }
+          } else if (!local && selected?.machine === 'local' && selected.project === context.project) {
+            tuiConnectionRequest = true
+            try { webRelay.disconnect() } finally { tuiConnectionRequest = false }
+          }
+          activeTarget = webRelay.status.target?.machine === 'local'
+            && webRelay.status.target.project === context.project ? local : null
+        } else {
+          activeTarget = local
+        }
         if (activeTarget?.endpoint !== previousTarget?.endpoint) inbox = null
       }
       const localTargetLost = previousTarget?.kind === 'local' && !activeTarget
@@ -1430,6 +1533,13 @@ export async function runSupervisorTui(
           context = await selectProject(context, project.key)
           services = createServices(dependencies, context)
           runtime = await services.inspect({ homeRoot: context.home, waitMs: 2_000 })
+          if (webRelay) {
+            tuiConnectionRequest = true
+            try {
+              if (localSupervisorTarget(context, runtime)) await webRelay.connect('local', project.key)
+              else webRelay.disconnect()
+            } finally { tuiConnectionRequest = false }
+          }
           abortRemoteTunnels()
           const previousTarget = activeTarget
           const previousEndpoint = activeTarget?.endpoint
@@ -1484,6 +1594,12 @@ export async function runSupervisorTui(
       }
       const localTarget = localSupervisorTarget(context, runtime)
       if (localTarget) {
+        if (webRelay) {
+          tuiConnectionRequest = true
+          try { await webRelay.connect('local', project.key) }
+          catch (error) { screen.update({ diagnostic: safeError(error) }); return }
+          finally { tuiConnectionRequest = false }
+        }
         abortRemoteTunnels()
         const previousEndpoint = activeTarget?.endpoint
         activeTarget = localTarget
@@ -1608,11 +1724,14 @@ export async function runSupervisorTui(
       tunnelCloseOrigins.delete(key)
       if (active) {
         clearTunnelState(key)
+        const replacement = webRelay?.status.target
+        if (replacement && (replacement.machine !== machine.key || replacement.project !== project.key)) return
         if (activeTarget?.kind === 'ssh'
           && activeTarget.machineKey === machine.key
           && activeTarget.projectKey === project.key) {
           recordConnectionEvent('disconnected', activeTarget, closeOrigin)
-          activeTarget = localSupervisorTarget(context, runtime)
+          activeTarget = webRelay?.status.target?.machine === 'local' || !webRelay
+            ? localSupervisorTarget(context, runtime) : null
           if (activeTarget) recordConnectionEvent('connected', activeTarget, 'target-switch')
           inbox = null
           screen.update({
@@ -1944,7 +2063,11 @@ export async function runSupervisorTui(
         if (action === 'start-open') {
           screen.update({ notice: 'Runtime started.' })
           try {
-            await services.open({ homeRoot, waitMs: 2_000 })
+            if (!webRelay) throw new Error('The Web relay is unavailable.')
+            tuiConnectionRequest = true
+            try { await webRelay.connect('local', context.project) }
+            finally { tuiConnectionRequest = false }
+            await openWebBrowser(webRelay.originUrl)
             screen.update({
               notice: 'OpenAlice started and opened in your browser.',
             })
@@ -1955,7 +2078,8 @@ export async function runSupervisorTui(
           screen.update({ notice: 'Runtime started in the background.' })
         }
       } else if (action === 'open') {
-        await services.open({ homeRoot, waitMs: 2_000 })
+        if (!webRelay) throw new Error('The Web relay is unavailable.')
+        await openWebBrowser(webRelay.originUrl)
         screen.update({ notice: 'Opened the verified Web UI.' })
       } else if (action === 'stop') {
         await services.stop({ homeRoot, waitMs: 15_000 })
@@ -3550,8 +3674,10 @@ export async function runSupervisorTui(
       clearInterval(inboxPoll)
       clearInterval(connectionPoll)
       stopMotionTimer()
+      removeRelayObserver?.()
       for (const controller of tunnelControllers.values()) controller.abort()
       tunnelControllers.clear()
+      if (webRelay) void webRelay.close()
       closeSourcePrompt?.()
       closeSettings?.()
       closeProjects?.()
@@ -4471,6 +4597,10 @@ export class SupervisorScreen implements Component {
     }
     if (matchesKey(data, 'o') && this.snapshot.activeTarget) {
       this.onOpenActiveTarget?.()
+      return true
+    }
+    if (matchesKey(data, 'o') && !this.snapshot.activeTarget && this.snapshot.webRelayUrl && this.onOpenActiveTarget) {
+      this.onOpenActiveTarget()
       return true
     }
     const keyActions: Array<[KeyId, SupervisorAction]> = [
@@ -5619,9 +5749,6 @@ function createServices(
     stop: options.configRecovery
       ? refuseProjectAction
       : dependencies.stop ?? ((stopOptions) => stopRuntime(stopOptions, shared)),
-    open: options.configRecovery
-      ? refuseProjectAction
-      : dependencies.open ?? ((openOptions) => openRuntime(openOptions, shared)),
     readLogs: options.configRecovery
       ? refuseProjectAction
       : dependencies.readLogs ?? ((logOptions) => readRuntimeLogs(logOptions, shared)),
@@ -6274,18 +6401,6 @@ function storedHomeRecoveryNotice(
 
 function sanitize(value: string): string {
   return value.replaceAll(/[\u0000-\u001f\u007f-\u009f]/g, ' ')
-}
-
-function loopbackEndpointPort(value: string | null): number | null {
-  if (!value) return null
-  try {
-    const url = new URL(value)
-    if (url.protocol !== 'http:' || url.hostname !== '127.0.0.1') return null
-    const port = Number(url.port || '80')
-    return Number.isInteger(port) && port >= 1 && port <= 65_535 ? port : null
-  } catch {
-    return null
-  }
 }
 
 function remoteHomesOverlap(left: string, right: string): boolean {

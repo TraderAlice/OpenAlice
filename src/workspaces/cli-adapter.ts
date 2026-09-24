@@ -201,7 +201,8 @@ export type SessionCredentialBinding =
     }
 
 /**
- * Immutable launch selection owned by a product `resumeId`. Omitted model
+ * Durable launch selection owned by a product `resumeId`. An explicit idle edit
+ * may replace it without changing the Session's Agent runtime. Omitted model
  * delegates model selection to the credential/runtime. Omitted effort means
  * exactly "not specified": it remains absent from adapter argv/config even
  * when the selected model publishes a provider default. An adapter still must

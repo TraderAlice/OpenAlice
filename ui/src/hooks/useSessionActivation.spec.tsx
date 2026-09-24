@@ -23,6 +23,19 @@ describe('Session route activation', () => {
     await act(() => result.current.activate())
     expect(open).toHaveBeenCalledOnce()
   })
+  it('hands busy activation to the dialog without creating an inline error or launching', async () => {
+    vi.mocked(getWorkspaceSessionDirectory).mockResolvedValue({ sessions: [
+      { resumeId: 'resume', latestExecution: { status: 'running' } },
+    ] } as never)
+    const open = vi.fn()
+    const onBusy = vi.fn()
+    const { result } = renderHook(() => useSessionActivation({
+      record, workspaceId: 'ws', enabled: true, automatic: true, open, onBusy, busyMessage: 'Busy',
+    }))
+    await waitFor(() => expect(onBusy).toHaveBeenCalledOnce())
+    expect(open).not.toHaveBeenCalled()
+    expect(result.current.error).toBeNull()
+  })
   it('does not launch hidden tabs or reconnect an explicitly disconnected session', async () => {
     const open = vi.fn()
     const { rerender } = renderHook(({ enabled, automatic }) => useSessionActivation({

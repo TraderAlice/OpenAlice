@@ -29,6 +29,10 @@ the durable truth after it changes. Git history is the archive.
 
 ## Active
 
+- [[plans/cli-relay-entry-unification.md]] — Consolidates CLI-launched browser
+  sessions on the client-owned WebRelay while retaining explicit local and
+  remote Runtime lifecycle commands.
+
 - [[plans/desktop-companion.md]] — Native Alice companion using supplied art,
   upstream press/drag/bubble motion and macOS/Windows acceptance.
 

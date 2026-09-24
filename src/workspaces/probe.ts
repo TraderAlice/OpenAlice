@@ -1,3 +1,4 @@
+import { SessionTerminationError } from './session-process-stop.js';
 /**
  * Headless probe: run an adapter's CLI against a workspace with a positional
  * prompt appended, capture the transcript-dir delta + a tail of the PTY
@@ -39,7 +40,8 @@ export interface HeadlessProbeArgs {
   readonly timeoutMs: number;
   readonly logger: Logger;
   /** Closes directory-operation start races once the PTY actually exists. */
-  readonly onSpawned?: () => void;
+  readonly onSpawned?: (pid: number) => void;
+  readonly abortSignal?: AbortSignal;
   /** Test seam; production loads the platform module only when probing. */
   readonly pty?: PtyBackend;
 }
@@ -60,6 +62,7 @@ export interface HeadlessProbeResult {
   readonly exitCode: number | null;
   readonly signal: number | null;
   readonly killed: boolean;
+  readonly interruptionReason?: string;
   readonly durationMs: number;
   readonly transcriptDir: string | null;
   readonly jsonlDelta: readonly JsonlFileDelta[];
@@ -89,6 +92,7 @@ export async function runHeadlessProbe(args: HeadlessProbeArgs): Promise<Headles
   let signal: number | null = null;
   let killed = false;
 
+  args.abortSignal?.throwIfAborted();
   const child = (args.pty ?? loadPtyBackend()).spawn(argv0, argv1, {
     name: 'xterm-256color',
     cwd,
@@ -96,7 +100,7 @@ export async function runHeadlessProbe(args: HeadlessProbeArgs): Promise<Headles
     cols: 80,
     rows: 24,
   });
-  args.onSpawned?.();
+  args.onSpawned?.(child.pid);
 
   child.onData((data) => {
     const s = typeof data === 'string' ? data : (data as Buffer).toString('utf8');
@@ -114,19 +118,46 @@ export async function runHeadlessProbe(args: HeadlessProbeArgs): Promise<Headles
     });
   });
 
+  let termination: Promise<void> | undefined;
+  let interruptionReason: string | undefined;
+  let rejectStop!: (error: unknown) => void;
+  const stopFailed = new Promise<never>((_, reject) => { rejectStop = reject });
+  void stopFailed.catch(() => {});
+  const stopTree = () => {
+    if (!child.terminateTree) return false;
+    termination ??= child.terminateTree();
+    void termination.catch(error => rejectStop(new SessionTerminationError(String(error), child.terminateTree!)));
+    return true;
+  };
   const softKillTimer = setTimeout(() => {
     killed = true;
+    if (stopTree()) return;
     try { child.kill('SIGTERM'); } catch { /* already gone */ }
   }, timeoutMs);
   softKillTimer.unref();
   const hardKillTimer = setTimeout(() => {
+    if (child.terminateTree) return;
     try { child.kill('SIGKILL'); } catch { /* ignore */ }
   }, timeoutMs + KILL_GRACE_MS);
   hardKillTimer.unref();
 
-  await exitPromise;
-  clearTimeout(softKillTimer);
-  clearTimeout(hardKillTimer);
+  let abortKill: NodeJS.Timeout | undefined;
+  const abort = () => {
+    interruptionReason = typeof args.abortSignal?.reason === 'string' ? args.abortSignal.reason : 'interrupted';
+    if (stopTree()) return;
+    try { child.kill('SIGTERM'); } catch { /* already gone */ }
+    abortKill = setTimeout(() => { try { child.kill('SIGKILL'); } catch { /* already gone */ } }, KILL_GRACE_MS);
+    abortKill.unref();
+  };
+  args.abortSignal?.addEventListener('abort', abort, { once: true });
+  if (args.abortSignal?.aborted) abort();
+  try { await Promise.race([exitPromise, stopFailed]); await termination; }
+  finally {
+    args.abortSignal?.removeEventListener('abort', abort);
+    if (abortKill) clearTimeout(abortKill);
+    clearTimeout(softKillTimer);
+    clearTimeout(hardKillTimer);
+  }
 
   const durationMs = Date.now() - start;
   const jsonlDelta = await collectJsonlDelta(transcriptDir, transcriptFileRe, sizesBefore);
@@ -149,6 +180,7 @@ export async function runHeadlessProbe(args: HeadlessProbeArgs): Promise<Headles
     exitCode,
     signal,
     killed,
+    ...(interruptionReason ? { interruptionReason } : {}),
     durationMs,
     transcriptDir,
     jsonlDelta,

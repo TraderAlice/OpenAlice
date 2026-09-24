@@ -1,4 +1,5 @@
 import { authHandlers } from './auth'
+import { relayHandlers } from './relay'
 import { tradingHandlers } from './trading'
 import { workspacesHandlers } from './workspaces'
 import { inboxHandlers } from './inbox'
@@ -28,6 +29,7 @@ import { catchAllHandlers } from './catchAll'
 // placed earlier.
 export const handlers = [
   ...authHandlers,
+  ...relayHandlers,
   ...tradingHandlers,
   ...workspacesHandlers,
   ...inboxHandlers,

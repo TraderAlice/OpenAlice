@@ -13,6 +13,7 @@ function build(opts: { assignee?: string } = {}) {
     _meta: unknown,
     _adapter: unknown,
     _prompt: string,
+    _origin: unknown,
     _timeout?: number,
     _issueId?: string,
     _resumeId?: string,
@@ -38,7 +39,7 @@ function build(opts: { assignee?: string } = {}) {
     },
     config: { launcherRepoRoot: '/tmp/repo' },
     resolveHeadlessDefaultAgentId: vi.fn(async () => 'pi'),
-    dispatchHeadlessTask,
+    executions: { dispatch: dispatchHeadlessTask },
     headlessTasks: { list, get: vi.fn() },
     headlessLogsDir: '/tmp/missing-inquiry-logs',
     issueDetail: vi.fn(async () => ({
@@ -71,7 +72,7 @@ describe('business inquiry routes', () => {
     expect(response.status).toBe(202)
     expect((await json(response)).resolution.mode).toBe('exact')
     expect(dispatchHeadlessTask).toHaveBeenCalledWith(
-      expect.anything(), expect.anything(), 'Why?', undefined, undefined, 'resume-author',
+      expect.anything(), expect.anything(), 'Why?', expect.objectContaining({ entry: expect.any(String), kind: expect.any(String) }), undefined, undefined, 'resume-author',
       expect.objectContaining({
         subject: { kind: 'inbox', entryId: entry.id },
         question: 'Why?',
@@ -97,7 +98,7 @@ describe('business inquiry routes', () => {
     await app.request(`/inbox/${entry.id}`, {
       method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ prompt: 'Recover context' }),
     })
-    expect(dispatchHeadlessTask.mock.calls[0]?.[9]).toMatchObject({
+    expect(dispatchHeadlessTask.mock.calls[0]?.[10]).toMatchObject({
       kind: 'conversation',
       caller: { kind: 'human' },
       reason: 'missing-origin',
@@ -117,8 +118,8 @@ describe('business inquiry routes', () => {
     expect(response.status).toBe(202)
     expect((await json(response)).resolution.mode).toBe('reconstructed')
     expect(dispatchHeadlessTask.mock.calls[0]?.[2]).toBe('Recover context')
-    expect(dispatchHeadlessTask.mock.calls[0]?.[5]).toBeUndefined()
-    expect(dispatchHeadlessTask.mock.calls[0]?.[6]?.resolution).toMatchObject({ mode: 'reconstructed' })
+    expect(dispatchHeadlessTask.mock.calls[0]?.[6]).toBeUndefined()
+    expect(dispatchHeadlessTask.mock.calls[0]?.[7]?.resolution).toMatchObject({ mode: 'reconstructed' })
   })
 
   it('adds reconstruction guidance when the UI request explicitly opts in', async () => {
@@ -134,7 +135,7 @@ describe('business inquiry routes', () => {
     })
     expect(response.status).toBe(202)
     expect(dispatchHeadlessTask.mock.calls[0]?.[2]).toContain('fresh worker reconstructing')
-    expect(dispatchHeadlessTask.mock.calls[0]?.[8]).toMatchObject({
+    expect(dispatchHeadlessTask.mock.calls[0]?.[9]).toMatchObject({
       source: { kind: 'human' },
       originalPrompt: 'Recover context',
       promptMode: 'reconstruction',
@@ -163,10 +164,10 @@ describe('business inquiry routes', () => {
       body: JSON.stringify({ prompt: 'Run?', relation: 'run', runId: 'run-old' }),
     })
     expect(run.status).toBe(202)
-    expect(dispatchHeadlessTask.mock.calls[0]?.[5]).toBe('resume-owner')
-    expect(dispatchHeadlessTask.mock.calls[0]?.[6]?.subject).toMatchObject({ relation: 'owner' })
-    expect(dispatchHeadlessTask.mock.calls[1]?.[5]).toBe('resume-run')
-    expect(dispatchHeadlessTask.mock.calls[1]?.[6]?.subject).toMatchObject({ relation: 'run', runId: 'run-old' })
+    expect(dispatchHeadlessTask.mock.calls[0]?.[6]).toBe('resume-owner')
+    expect(dispatchHeadlessTask.mock.calls[0]?.[7]?.subject).toMatchObject({ relation: 'owner' })
+    expect(dispatchHeadlessTask.mock.calls[1]?.[6]).toBe('resume-run')
+    expect(dispatchHeadlessTask.mock.calls[1]?.[7]?.subject).toMatchObject({ relation: 'run', runId: 'run-old' })
   })
 
   it('projects compact turn progress on inquiry history', async () => {

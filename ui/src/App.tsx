@@ -1,5 +1,9 @@
+import { SessionTakeoverProvider } from './hooks/useSessionTakeovers'
+import { SessionTakeoverDialogHost } from './components/workspace/SessionTakeoverDialog'
 import { lazy, Suspense, useEffect, useRef, useState } from 'react'
 import { useLocation } from 'react-router-dom'
+import { SessionDetailsDialogHost } from './components/workspace/SessionDetailsDialog'
+import { SessionBusyDialogHost } from './components/workspace/SessionBusyPanel'
 import { ActivityBar } from './components/ActivityBar'
 import { ActivityToasts } from './components/ActivityToasts'
 import { MobileContextBar } from './components/MobileContextBar'
@@ -66,7 +70,12 @@ const FirstRunGuide = lazy(async () => {
 export function App() {
   return (
     <WorkspacesProvider>
+      <SessionTakeoverProvider>
       <AppShell />
+      <SessionTakeoverDialogHost />
+      <SessionBusyDialogHost />
+      <SessionDetailsDialogHost />
+      </SessionTakeoverProvider>
     </WorkspacesProvider>
   )
 }
@@ -90,7 +99,14 @@ function AppShellContent() {
   const hasRailText = useHasRailText() // ≥960 — text rail is allowed
   const hasFullRail = useHasFullRail() // ≥1280 — full rail width
   const railMode = !isDesktop ? 'full' : hasFullRail ? 'full' : hasRailText ? 'narrow' : 'compact'
-  const { collapsed: railCollapsed, toggle: toggleRail } = useActivityRailState(railMode === 'compact')
+  const location = useLocation()
+  const settingsOnTablet = isDesktop && !hasRailText && (
+    location.pathname === '/settings' || location.pathname.startsWith('/settings/')
+  )
+  // Settings keeps its page-owned navigator visible at tablet widths. Give it
+  // the available sidebar space without changing the user's rail preference
+  // on other pages; manual expansion here lasts until leaving this layout.
+  const { collapsed: railCollapsed, toggle: toggleRail } = useActivityRailState(railMode === 'compact', settingsOnTablet)
   const toggleFocus = useNavigationToggleFocus()
   const railToggle = isDesktop ? (
     <PrimaryNavigationToggle ref={toggleFocus.ref} collapsed={railCollapsed} onToggle={() => {
@@ -98,7 +114,6 @@ function AppShellContent() {
       toggleRail()
     }} />
   ) : null
-  const location = useLocation()
   const mobilePageNavigation = useMobilePageNavigation()
   const showFirstRunGuide = firstRunGuideEnabled && !location.pathname.startsWith('/design/')
 

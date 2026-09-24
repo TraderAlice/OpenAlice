@@ -11,6 +11,7 @@ const TEST_HEADLESS_BIN = 'openalice-test-headless'
 async function completeFakeHeadlessTask(args: HeadlessTaskArgs): Promise<HeadlessTaskResult> {
   const stdout = args.command[0] === TEST_HEADLESS_BIN ? args.command.slice(1).join('\n') : ''
   args.onChildSpawned?.({
+    pid: 12345,
     exitCode: null,
     signalCode: null,
     kill: () => true,
@@ -132,6 +133,14 @@ afterEach(async () => {
 
 describe('WorkspaceService Issue assignee activity', () => {
   it('reports running terminal and WebPi owners as active', async () => {
+    const { SessionPool } = await import('./session-pool.js')
+    const { WebSessionHost } = await import('./web-session-host.js')
+    vi.spyOn(SessionPool.prototype, 'spawn').mockReturnValue({
+      pid: 123, completed: new Promise(() => {}), waitForFirstExit: async () => null, disposeAndWait: async () => {},
+    } as never)
+    vi.spyOn(WebSessionHost.prototype, 'start').mockImplementation(async (_input, complete) => {
+      complete?.(new Promise(() => {})); return { phase: 'idle', pid: 456 } as never
+    })
     for (const fixture of [
       { resumeId: 'resume-kind-owl-abc123', issueId: 'terminal-owner', surface: 'terminal' as const },
       { resumeId: 'resume-calm-fox-def456', issueId: 'webpi-owner', surface: 'webpi' as const },
@@ -142,10 +151,12 @@ describe('WorkspaceService Issue assignee activity', () => {
         agent: 'codex',
         namePrefix: 'x',
         agentSessionId: `native-${fixture.surface}`,
-        state: 'running',
         surface: fixture.surface,
         now: 1_000,
       })
+      const record = service!.sessionRegistry.findByResumeId('ws-1', fixture.resumeId)!
+      if (fixture.surface === 'terminal') await service!.executions.terminal('ws-1', { recordId: record.id, recordName: record.name }, { kind: 'user', entry: 'test-terminal' })
+      else await service!.executions.web(service!.registry.get('ws-1')!, record, { kind: 'user', entry: 'test-web' })
       const created = await createIssue(wsDir, {
         id: fixture.issueId,
         title: `${fixture.surface} owner`,
@@ -209,7 +220,7 @@ it.each(['terminal', 'webpi'] as const)('hands %s ownership to an Issue turn and
   const resumeId = 'resume-handoff-owner'
   const { session } = await service!.sessionCoordinator.ensure({
     resumeId, wsId: 'ws-1', agent: 'codex', namePrefix: 'c',
-    agentSessionId: 'native-handoff-owner', state: 'running', surface,
+    agentSessionId: 'native-handoff-owner', surface,
   })
   const adapter = service!.adapters.get('codex')!
   const command = vi.spyOn(adapter, 'composeHeadlessCommand').mockReturnValue(fakeHeadlessCommand(
@@ -218,17 +229,34 @@ it.each(['terminal', 'webpi'] as const)('hands %s ownership to an Issue turn and
   let release!: () => void
   const stopped = new Promise<void>((resolve) => { release = resolve })
   const stop = vi.fn(async () => { await stopped; return true })
-  const terminal = vi.spyOn(service!.pool, 'get').mockReturnValue(surface === 'terminal'
-    ? { disposeAndWait: stop } as never : undefined)
-  const web = vi.spyOn(service!.web, 'stop').mockImplementation(surface === 'webpi' ? stop : async () => false)
+  const { SessionPool } = await import('./session-pool.js')
+  const { WebSessionHost } = await import('./web-session-host.js')
+  const terminal = vi.spyOn(SessionPool.prototype, 'spawn').mockReturnValue({
+    recordId: session.id, pid: 123, completed: new Promise(() => {}),
+    waitForFirstExit: async () => null, disposeAndWait: stop,
+  } as never)
+  const web = vi.spyOn(WebSessionHost.prototype, 'stop').mockImplementation(stop)
+  vi.spyOn(WebSessionHost.prototype, 'start').mockImplementation(async (_input, complete) => {
+    complete?.(new Promise(() => {})); return { phase: 'idle', pid: 456 } as never
+  })
+  if (surface === 'terminal') await service!.executions.terminal('ws-1', { recordId: session.id, recordName: session.name, agentId: 'codex' }, { kind: 'user', entry: 'test-terminal' })
+  else await service!.executions.web(service!.registry.get('ws-1')!, session, { kind: 'user', entry: 'test-web' })
   try {
     const ws = service!.registry.get('ws-1')!
     const trigger = { kind: 'issue' as const, workspaceId: ws.id, issueId: 'handoff' }
-    const pending = service!.dispatchHeadlessTask(ws, adapter, 'Reply', undefined, trigger, resumeId)
+    const pending = service!.executions.dispatch(ws, adapter, 'Reply', { kind: 'issue', entry: 'test-issue' }, undefined, trigger, resumeId)
+    await vi.waitFor(() => expect(service!.executions.takeovers.list()).toHaveLength(1))
+    expect(stop).not.toHaveBeenCalled()
+    expect(service!.isResumeActive(resumeId)).toBe(false)
+    const approval = service!.executions.takeovers.decide(service!.executions.takeovers.list()[0].id, 'approve')
     await vi.waitFor(() => expect(stop).toHaveBeenCalled())
     expect(command).not.toHaveBeenCalled()
-    await expect(service!.dispatchHeadlessTask(ws, adapter, 'Duplicate', undefined, trigger, resumeId))
-      .rejects.toMatchObject({ code: 'busy' })
+    const duplicate = service!.executions.dispatch(ws, adapter, 'Duplicate', { kind: 'issue', entry: 'test-issue' }, undefined, trigger, resumeId)
+    await vi.waitFor(() => expect(service!.executions.takeovers.list()).toHaveLength(2))
+    await service!.executions.takeovers.decide(service!.executions.takeovers.list()[1].id, 'reject')
+    await expect(duplicate).rejects.toThrow('declined')
+    release()
+    await approval
     release()
     const result = await pending
     await vi.waitFor(() => expect(service!.headlessTasks.get(result.taskId)?.status).toBe('done'), { timeout: 10000 })
@@ -243,7 +271,7 @@ it('persists explicit conversation edits while keeping busy and Issue dispatches
   const resumeId = 'resume-selection-test'
   await service!.sessionCoordinator.ensure({
     resumeId, wsId: 'ws-1', agent: 'codex', namePrefix: 'c',
-    agentSessionId: 'native-selection-test', state: 'paused', surface: 'headless',
+    agentSessionId: 'native-selection-test', surface: 'headless',
     runtimeBinding: { version: 1, credential: { source: 'native' }, model: 'test-model', reasoningEffort: 'medium' },
   })
   const adapter = service!.adapters.get('codex')!
@@ -262,7 +290,7 @@ it('persists explicit conversation edits while keeping busy and Issue dispatches
     await vi.waitFor(() => expect(service!.isResumeActive(resumeId)).toBe(false), { timeout: 10000 })
     expect(service!.headlessTasks.get(result.taskId)).toMatchObject({ model: 'test-model', effort: 'high', status: 'done' })
     expect(service!.resumeRegistry.get(resumeId)?.runtimeBinding).toMatchObject({ model: 'test-model', reasoningEffort: 'high' })
-    await expect(service!.dispatchHeadlessTask(service!.registry.get('ws-1')!, adapter, 'issue', undefined,
+    await expect(service!.executions.dispatch(service!.registry.get('ws-1')!, adapter, 'issue', { kind: 'issue', entry: 'test-issue' }, undefined,
       { kind: 'issue', workspaceId: 'ws-1', issueId: 'test' }, resumeId, undefined, { model: 'other-model' }))
       .rejects.toMatchObject({ code: 'not_ready' })
     expect(service!.resumeRegistry.get(resumeId)?.runtimeBinding?.model).toBe('test-model')

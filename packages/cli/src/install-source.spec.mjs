@@ -6,8 +6,10 @@ import { pathToFileURL } from 'node:url'
 import { afterEach, describe, expect, it } from 'vitest'
 
 import {
+  CLI_VERSION,
   DEFAULT_INSTALL_SOURCE,
   installedContentIdentity,
+  installSourceChannelVersionError,
   installSourceUpdateChannel,
   installSourcesMatch,
   parseInstallSource,
@@ -21,17 +23,24 @@ afterEach(async () => {
 })
 
 describe('OpenAlice install source', () => {
-  it('uses the public master installer when no installed metadata exists', async () => {
+  it('uses a channel and release selector matching the local CLI version when metadata is absent', async () => {
     const root = await mkdtemp(join(tmpdir(), 'openalice-install-source-'))
     temporaryPaths.push(root)
     await expect(readInstallSource({ metadataUrl: join(root, 'missing.json') }))
       .resolves.toEqual(DEFAULT_INSTALL_SOURCE)
+    const beta = /^[0-9]+\.[0-9]+\.[0-9]+-beta(?:\.[1-9][0-9]*)?$/.test(CLI_VERSION)
     expect(DEFAULT_INSTALL_SOURCE).toMatchObject({
       schemaVersion: 2,
-      selector: { kind: 'branch', value: 'master' },
+      selector: beta ? { kind: 'version', value: `v${CLI_VERSION}` } : { kind: 'branch', value: 'master' },
       installerUrl: 'https://openalice.ai/install',
-      updateChannel: 'stable',
+      updateChannel: beta ? 'beta' : 'stable',
     })
+    expect(installSourceChannelVersionError(DEFAULT_INSTALL_SOURCE)).toBeNull()
+  })
+
+  it('rejects a contradictory channel and version before a remote installer runs', () => {
+    expect(installSourceChannelVersionError({ ...DEFAULT_INSTALL_SOURCE, cliVersion: '0.94.1-beta', updateChannel: 'stable' }))
+      .toContain('marked stable')
   })
 
   it('rejects malformed installed metadata instead of silently changing channels', async () => {

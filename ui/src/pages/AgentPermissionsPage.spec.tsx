@@ -63,9 +63,9 @@ describe('AgentPermissionsPage', () => {
     render(<AgentPermissionsPage />)
 
     const alert = await screen.findByRole('alert')
-    expect(screen.getByRole('heading', { name: 'Agent Permissions' })).toBeTruthy()
-    expect(screen.getByRole('heading', { name: 'Couldn’t load Agent Permissions' })).toBeTruthy()
-    expect(alert.textContent).toContain('Your permissions have not been changed.')
+    expect(screen.getByRole('heading', { name: 'Mode' })).toBeTruthy()
+    expect(screen.getByRole('heading', { name: 'Couldn’t load mode settings' })).toBeTruthy()
+    expect(alert.textContent).toContain('No settings were changed.')
 
     fireEvent.click(screen.getByRole('button', { name: 'Retry' }))
 

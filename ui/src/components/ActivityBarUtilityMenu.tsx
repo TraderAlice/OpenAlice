@@ -131,7 +131,7 @@ export function ActivityBarUtilityMenu({
             className="min-h-9 cursor-pointer gap-2 px-2.5 text-[12px] [&>svg:last-child]:ml-1"
           >
             <CurrentThemeIcon size={15} strokeWidth={1.75} aria-hidden />
-            <span className="min-w-0 flex-1 truncate">{t('settings.category.appearance')}</span>
+            <span className="min-w-0 flex-1 truncate">{t('settings.group.appearance')}</span>
             <span className="shrink-0 text-muted-foreground">{t(`theme.mode.${theme}`)}</span>
           </DropdownMenuSubTrigger>
           <DropdownMenuSubContent className="w-[148px] border border-border/70 bg-popover p-1.5 shadow-lg ring-0">

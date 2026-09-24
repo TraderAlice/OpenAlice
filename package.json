@@ -30,7 +30,7 @@
     "broker-packs:upgrade-smoke": "tsx scripts/broker-pack-upgrade-smoke.ts",
     "broker-packs:verify": "tsx scripts/verify-broker-packs.ts",
     "start": "node dist/main.js",
-    "electron:tsc": "pnpm -F @traderalice/desktop build",
+    "electron:tsc": "pnpm -F @traderalice/desktop build && node scripts/build-desktop-relay.mjs",
     "electron:build": "pnpm build && pnpm electron:tsc",
     "electron:smoke:demo": "node scripts/electron-demo/run.mjs --smoke",
     "electron:demo": "node scripts/electron-demo/run.mjs",

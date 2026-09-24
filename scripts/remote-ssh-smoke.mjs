@@ -38,8 +38,8 @@ if (options.help) {
   [--image <name> [--skip-build]] [--skip-tui]
 
 Builds a clean local SSH host, serves the real OpenAlice installer inside that
-host, and exercises plan, install, detached Server start, browser tunnel,
-dynamic Agent discovery, disconnect persistence, reconnect, structured stop,
+host, and exercises plan, Machine registration, detached Server start,
+relay switching, Agent discovery, disconnect persistence, structured stop,
 AliceProject transfer, and missing Broker Pack readiness. This is the clean
 Linux acceptance gate used by the CLI installer workflow.
 
@@ -122,18 +122,16 @@ try {
   console.log('[remote-ssh-smoke] checking read-only missing-host plan')
   const initialPlan = run(process.execPath, [
     cliEntry, '--remote', remoteTarget,
-    '--plan', '--no-open',
+    '--plan',
   ], { cwd: repoRoot, env: smokeEnv })
   requireText(initialPlan, 'install remote OpenAlice CLI')
   requireText(initialPlan, 'start remote OpenAlice Server')
   requireText(initialPlan, 'installed-native')
   run('ssh', [remoteTarget, 'test ! -x "$HOME/.openalice/bin/openalice"'], { env: smokeEnv })
 
-  console.log('[remote-ssh-smoke] applying install/start and opening first tunnel')
-  const firstTunnelUrl = await attachAndProbe(remoteTarget, smokeEnv, [
-    '--yes', '--no-open', '--wait', '30',
-  ])
-  requireRemoteClientUrl(firstTunnelUrl, remoteTarget)
+  console.log('[remote-ssh-smoke] registering a health-checked Machine and starting its Runtime')
+  run(process.execPath, [cliEntry, 'machine', 'add', remoteTarget, '--label', 'Smoke Cloud', '--yes'], { cwd: repoRoot, env: smokeEnv })
+  await probeRelay(smokeEnv)
   const running = remoteJson(remoteTarget, smokeEnv, '"$HOME/.openalice/bin/openalice" server status --json')
   if (running.class !== 'running' || running.owner?.surface !== 'cli-server') {
     throw new Error(`Remote Server did not survive tunnel disconnect: ${JSON.stringify(running)}`)
@@ -154,10 +152,6 @@ try {
   run('ssh', [remoteTarget,
     '"$HOME/.openalice/bin/openalice" create alice-project --name research --home /home/smoke/.openalice-research --product nano --yes',
   ], { env: smokeEnv })
-  run(process.execPath, [
-    cliEntry, 'machine', 'add', remoteTarget,
-    '--label', 'Smoke Cloud', '--yes',
-  ], { cwd: repoRoot, env: smokeEnv })
   console.log('[remote-ssh-smoke] checking saved-target dispatch and disable/enable')
   const profiles = JSON.parse(run(process.execPath, [cliEntry, 'machine', 'list', '--json'], { cwd: repoRoot, env: smokeEnv }))
   const profileId = profiles.machines.find((row) => row.label === 'Smoke Cloud')?.id
@@ -185,15 +179,17 @@ try {
     throw new Error(`Aggregate Machine inventory did not include both AliceProjects: ${JSON.stringify(fleet)}`)
   }
 
+  console.log('[remote-ssh-smoke] switching the browser relay to the registered remote Project')
+  await verifyWebRelay(smokeEnv, inventoryProjects.find((project) => project.key === 'default').id)
+  const afterRelay = remoteJson(remoteTarget, smokeEnv, '"$HOME/.openalice/bin/openalice" server status --json')
+  if (afterRelay.class !== 'running') throw new Error('Closing the Web relay stopped the remote Runtime')
+
   console.log('[remote-ssh-smoke] checking reuse plan and reconnecting')
   const reusePlan = run(process.execPath, [
-    cliEntry, '--remote', remoteTarget, '--plan', '--no-open',
+    cliEntry, '--remote', remoteTarget, '--plan',
   ], { cwd: repoRoot, env: smokeEnv })
   requireText(reusePlan, 'reuse compatible remote Runtime')
-  const reconnectedTunnelUrl = await attachAndProbe(remoteTarget, smokeEnv, ['--no-open', '--wait', '30'])
-  if (reconnectedTunnelUrl !== firstTunnelUrl) {
-    throw new Error(`Reconnect changed the remembered browser origin (${firstTunnelUrl} -> ${reconnectedTunnelUrl})`)
-  }
+  await probeRelay(smokeEnv)
 
   console.log('[remote-ssh-smoke] stopping the remote Server through its control endpoint')
   const statusOutput = run(process.execPath, [cliEntry, '--remote', remoteTarget, '--status'], { cwd: repoRoot, env: smokeEnv })
@@ -360,6 +356,68 @@ try {
     console.log(`[remote-ssh-smoke] kept SSH fixture credentials ${scratch}`)
   } else if (scratch) {
     await rm(scratch, { recursive: true, force: true })
+  }
+}
+
+async function startConnectedRelay(env) {
+  const child = spawn(process.execPath, [cliEntry, 'relay', '--no-open'], {
+    cwd: repoRoot, env, stdio: ['ignore', 'pipe', 'pipe'],
+  })
+  let output = ''
+  let origin
+  try {
+    origin = await new Promise((resolve, reject) => {
+      const timeout = setTimeout(() => reject(new Error(`Web relay did not start: ${output}`)), 30_000)
+      const read = (chunk) => {
+        output += String(chunk)
+        const match = output.match(/OpenAlice relay: (http:\/\/127\.0\.0\.1:\d+)/)
+        if (match) { clearTimeout(timeout); resolve(match[1]) }
+      }
+      child.stdout.on('data', read)
+      child.stderr.on('data', read)
+      child.once('exit', (code) => { clearTimeout(timeout); reject(new Error(`Web relay exited early (${code}): ${output}`)) })
+    })
+    const inventory = await fetch(`${origin}/relay/v1/fleet`).then((response) => response.json())
+    if (!inventory.machines.some((machine) => machine.key === 'smoke-cloud' && machine.connection === 'online')) {
+      throw new Error('Web relay could not discover the registered SSH Machine')
+    }
+    const response = await fetch(`${origin}/relay/v1/connect`, {
+      method: 'POST',
+      headers: { origin, 'content-type': 'application/json' },
+      body: JSON.stringify({ machine: 'smoke-cloud', project: 'default' }),
+    })
+    if (!response.ok) throw new Error(`Web relay connection failed: ${response.status} ${await response.text()}`)
+    const status = await response.json()
+    if (status.target?.machine !== 'smoke-cloud' || status.target?.project !== 'default') {
+      throw new Error(`Web relay selected the wrong target: ${JSON.stringify(status)}`)
+    }
+    return {
+      origin,
+      async close() {
+        child.kill('SIGTERM')
+        await waitForExit(child, 10_000)
+      },
+    }
+  } catch (error) {
+    child.kill('SIGTERM')
+    await waitForExit(child, 10_000).catch(() => undefined)
+    throw error
+  }
+}
+
+async function verifyWebRelay(env, expectedProjectId) {
+  const relay = await startConnectedRelay(env)
+  try {
+    const shell = await fetch(relay.origin)
+    if (!shell.ok || !(await shell.text()).includes('id="root"')) {
+      throw new Error('Web relay did not serve its trusted local UI bundle')
+    }
+    const identity = await fetch(`${relay.origin}/api/alice-project`).then((reply) => reply.json())
+    if (identity.project?.id !== expectedProjectId) {
+      throw new Error(`Web relay forwarded the wrong AliceProject: ${JSON.stringify(identity)}`)
+    }
+  } finally {
+    await relay.close()
   }
 }
 
@@ -538,17 +596,16 @@ async function waitForSsh(target, env) {
   throw new Error('SSH fixture did not become ready')
 }
 
-async function attachAndProbe(target, env, remoteArgs) {
-  const tunnel = await startTunnel(target, env, remoteArgs)
+async function probeRelay(env) {
+  const relay = await startConnectedRelay(env)
   try {
-    const response = await fetch(`${tunnel.origin}/api/auth/status`, { signal: AbortSignal.timeout(5_000) })
+    const response = await fetch(`${relay.origin}/api/auth/status`, { signal: AbortSignal.timeout(5_000) })
     const body = await response.json()
     if (!response.ok || body.authed !== true || body.tokenConfigured !== true || body.passthrough !== 'localhost') {
-      throw new Error(`Tunnel returned the wrong Runtime response: ${JSON.stringify(body)}`)
+      throw new Error(`Relay returned the wrong Runtime response: ${JSON.stringify(body)}`)
     }
-    return tunnel.clientUrl
   } finally {
-    await tunnel.close()
+    await relay.close()
   }
 }
 
@@ -556,7 +613,7 @@ async function verifyDynamicAgentRuntimeDiscovery(containerId, target, env) {
   const agent = 'pi'
   const shimPath = '/usr/local/bin/pi'
   const executionMarker = '/tmp/openalice-remote-smoke-agent-shim-executed'
-  const tunnel = await startTunnel(target, env, ['--no-open', '--wait', '30'])
+  const tunnel = await startConnectedRelay(env)
   try {
     const missingReadiness = await fetchRemoteJson(tunnel.origin, '/api/workspaces/agent-runtime-readiness')
     const missingCatalog = await fetchRemoteJson(tunnel.origin, '/api/workspaces/agents')
@@ -595,75 +652,6 @@ async function fetchRemoteJson(origin, path) {
     throw new Error(`Remote Runtime ${path} returned ${response.status}: ${JSON.stringify(body)}`)
   }
   return body
-}
-
-async function startTunnel(target, env, remoteArgs) {
-  const child = spawn(process.execPath, [cliEntry, '--remote', target, ...remoteArgs], {
-    cwd: repoRoot,
-    env,
-    stdio: ['ignore', 'pipe', 'inherit'],
-  })
-  child.stdout.setEncoding('utf8')
-  let output = ''
-  let resolveUrl
-  let rejectUrl
-  const urlReady = new Promise((resolvePromise, rejectPromise) => {
-    resolveUrl = resolvePromise
-    rejectUrl = rejectPromise
-  })
-  child.stdout.on('data', (chunk) => {
-    process.stdout.write(chunk)
-    output += chunk
-    const match = /Local OpenAlice UI: (http:\/\/127\.0\.0\.1:\d+\/[^\r\n]*)\r?\n/.exec(output)
-    if (match) resolveUrl(match[1])
-  })
-  child.once('error', rejectUrl)
-  child.once('exit', (code, signal) => {
-    if (!/Local OpenAlice UI:/.test(output)) {
-      rejectUrl(new Error(`remote CLI exited before tunnel readiness (code=${String(code)}, signal=${String(signal)})`))
-    }
-  })
-
-  const timeout = setTimeout(() => rejectUrl(new Error('Timed out waiting for the local tunnel URL')), 60_000)
-  let url
-  try {
-    url = await urlReady
-  } catch (error) {
-    child.kill('SIGTERM')
-    await waitForExit(child, 10_000).catch(() => undefined)
-    throw error
-  } finally {
-    clearTimeout(timeout)
-  }
-  const parsed = new URL(url)
-  let closed = false
-  return {
-    child,
-    clientUrl: url,
-    origin: parsed.origin,
-    async close() {
-      if (closed) return
-      closed = true
-      child.kill('SIGTERM')
-      const exit = await waitForExit(child, 10_000)
-      if (exit.code !== 0) {
-        throw new Error(`remote CLI did not close cleanly after tunnel disconnect (${JSON.stringify(exit)})`)
-      }
-    },
-  }
-}
-
-function requireRemoteClientUrl(value, target) {
-  const parsed = new URL(value)
-  const fragment = new URLSearchParams(parsed.hash.slice(1))
-  if (
-    fragment.get('openalice-remote') !== '1'
-    || fragment.get('target') !== target
-    || !fragment.get('ssh-port')
-    || !fragment.get('runtime-port')
-  ) {
-    throw new Error(`Remote smoke client URL lost its connection identity: ${value}`)
-  }
 }
 
 function webEndpointFromStatus(status) {

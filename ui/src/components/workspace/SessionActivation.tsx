@@ -1,12 +1,15 @@
 import { useTranslation } from 'react-i18next'
 import type { SessionRecord } from './api'
 import { Button } from '../ui/button'
+import { inspectOccupiedSession } from './session-busy-store'
+import type { WorkspaceSource } from '../../tabs/types'
 import { useSessionActivation } from '../../hooks/useSessionActivation'
 
 /** A pending operation or actionable failure, never a separate paused-session page. */
 export function SessionActivation(props: {
   record: SessionRecord
   workspaceId?: string
+  source?: WorkspaceSource
   enabled?: boolean
   automatic?: boolean
   onResume(): Promise<void>
@@ -18,6 +21,7 @@ export function SessionActivation(props: {
     enabled: props.enabled !== false, automatic: props.automatic !== false,
     open: () => props.record.surface === 'webpi' && props.onOpenWeb ? props.onOpenWeb() : props.onResume(),
     busyMessage: t('chat.headlessBusyDescription'),
+    ...(props.workspaceId ? { onBusy: () => inspectOccupiedSession({ record: props.record, workspaceId: props.workspaceId!, source: props.source }) } : {}),
   })
   return <div className="flex min-h-0 flex-1 items-center justify-center p-6">
     <div className="max-w-lg space-y-3 text-sm">

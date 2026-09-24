@@ -65,7 +65,7 @@ describe('SettingsPage loading', () => {
     render(<SettingsPage />)
 
     expect(screen.getByRole('heading', { name: 'Language' })).toBeTruthy()
-    expect(screen.getByText('openalice start --home <path>')).toBeTruthy()
+    expect(screen.getByText('openalice run --home <path>')).toBeTruthy()
     expect(mocks.configLoad).not.toHaveBeenCalled()
   })
 })

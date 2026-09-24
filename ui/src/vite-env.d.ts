@@ -7,6 +7,7 @@
  * site so production builds (where it's undefined) don't ReferenceError.
  */
 declare const __OPENALICE_DEV_BACKEND_PORT__: number
+declare const __OPENALICE_UI_VERSION__: string
 
 interface ImportMetaEnv {
   readonly VITE_DEMO_MODE?: string
@@ -28,6 +29,28 @@ interface Window {
    * sync with apps/desktop/src/preload.ts; never expose raw ipcRenderer.
    */
   readonly openAlice?: {
+    readonly desktopConnection?: {
+      status(): Promise<{
+        schemaVersion: 1
+        generation: number
+        target: { machine: string; machineName?: string; project: string; projectName?: string } | null
+        switching: boolean
+      }>
+      fleet(): Promise<{ machines: Array<{
+        key: string
+        displayName: string
+        connection: string
+        projects: Array<{ key: string; id: string; displayName: string; available: boolean; runtime: { class: string; state: string; webEndpoint: string | null } }>
+        issue: { message: string } | null
+      }> }>
+      connect(machine: string, project: string): Promise<unknown>
+      returnIntegrated(): Promise<void>
+    }
+    readonly desktopMachine?: {
+      plan(input: { mode: 'add' | 'upgrade'; sshTarget?: string; label?: string; sshPort?: number; identityFile?: string; machineKey?: string; projectKey?: string }): Promise<unknown>
+      apply(id: string): Promise<unknown>
+      operation(): Promise<unknown>
+    }
     readonly companion?: {
       getSound(): Promise<PetSoundSettings>
       updateSound(settings: Partial<PetSoundSettings>): Promise<PetSoundSettings>
@@ -41,7 +64,7 @@ interface Window {
       readonly platform: string
       setTheme?(theme: { color: string; symbolColor: string }): Promise<void>
     }
-    readonly runtime: {
+    readonly runtime?: {
       info(): Promise<{
         mode: 'electron-dev' | 'electron-packaged'
         transport: 'electron-ipc'
@@ -57,10 +80,10 @@ interface Window {
         }
       }>
     }
-    readonly keyboard: {
+    readonly keyboard?: {
       getInputSourceId(): Promise<string | null>
     }
-    readonly dataHome: {
+    readonly dataHome?: {
       getStatus(): Promise<OpenAliceDataHomeStatus>
       chooseAndRestart(): Promise<OpenAliceDataHomeActionResult>
       useRecentAndRestart(path: string): Promise<OpenAliceDataHomeActionResult>
@@ -98,7 +121,7 @@ interface Window {
       installAndRestart(): Promise<unknown>
       openRelease(version?: string): Promise<unknown>
     }
-    readonly workspace: {
+    readonly workspace?: {
       listFiles(input: { id: string; path: string }): Promise<{
         path: string
         entries: ReadonlyArray<{
@@ -117,7 +140,7 @@ interface Window {
         | { kind: 'error'; message: string }
       >
     }
-    readonly pty: {
+    readonly pty?: {
       connect(input: {
         sessionId: string
         cols: number

@@ -31,7 +31,7 @@ GitHub navigation.
 | [[docs/alice-harness.md]] | [Alice Harness injection](alice-harness.md) | Project CLI runtime, Skill prototypes/distribution, Workspace preferences and scoped file operations |
 | [[docs/sticker-packs.md]] | [Sticker packs](sticker-packs.md) | Project-owned sticker prototypes, optional Chat Skill projection, imports and file ownership |
 | [[docs/workspace-agent-guidance.md]] | [Workspace agent guidance](workspace-agent-guidance.md) | Always-loaded prompt contract, skill ownership, Workspace capability browser, live CLI authority, guidance versioning |
-| [[docs/workspace-lifecycle.md]] | [Workspace and Session lifecycle](workspace-lifecycle.md) | Offboarding, departed directories, handoff, restore/purge, Session retirement |
+| [[docs/workspace-lifecycle.md]] | [Workspace and Session lifecycle](workspace-lifecycle.md) | Unified Session execution, attribution, recovery, offboarding, handoff, restore/purge, retirement |
 | [[docs/workspace-manager.md]] | [Workspace Manager](workspace-manager.md) | Launcher-owned control plane, Web quick start, active-desk inventory, and management boundaries |
 | [[docs/web-conversation-surface.md]] | [Web conversation surface](web-conversation-surface.md) | Structured-protocol browser conversation for any runtime: wires, transports, neutral snapshot, permission requests, routes |
 | [[docs/workspace-template-upgrade.md]] | [Workspace Template Upgrade](workspace-template-upgrade.md) | Managed-asset baselines, three-way review, apply transactions, recovery, and the future Merge/Absorb boundary |

@@ -50,6 +50,7 @@ export const ASAR_REQUIRED_FILES = [
   'dist/main.js',
   'dist/electron/main.js',
   'dist/electron/preload.js',
+  'dist/electron/web-relay.js',
   'dist/electron/companion.js',
   'dist/electron/companion-preload.js',
   'dist/electron/companion-sound.js',

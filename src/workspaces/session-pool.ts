@@ -90,6 +90,7 @@ export class SessionPool {
   /** Spawn a PTY for a pre-allocated record. */
   spawn(wsId: string, factoryCtx: SessionFactoryContext): PersistentSession {
     const recordId = factoryCtx.recordId;
+    if (this.sessions.has(recordId)) throw new Error('Session already owns a PTY');
     const { opts, adapter } = this.configFactory(wsId, factoryCtx);
     const session = new PersistentSession({
       ...opts,
@@ -100,7 +101,7 @@ export class SessionPool {
         ? { initialTerminalViewAttributes: this.terminalViewAttributes }
         : {}),
       onTerminalViewAttributes: (attributes) => this.setTerminalViewAttributes(attributes),
-      onDisposed: () => this.onSessionDisposed(wsId, recordId),
+      onDisposed: () => this.onSessionDisposed(wsId, recordId, session),
     });
 
     this.sessions.set(recordId, session);
@@ -188,39 +189,10 @@ export class SessionPool {
     return true;
   }
 
-  /** Dispose ONE session by id. Returns false if not found. */
-  disposeToken(recordId: string, reason: string): boolean {
-    const session = this.sessions.get(recordId);
-    if (!session) return false;
-    session.dispose(reason);
-    return true;
-  }
-
-  /** Dispose ALL sessions for a workspace (DELETE /workspaces/:id). */
-  dispose(wsId: string, reason: string): boolean {
-    const ids = this.byWs.get(wsId);
-    if (!ids || ids.size === 0) return false;
-    // Copy first — session.dispose() triggers onDisposed which mutates byWs.
-    const snapshot = Array.from(ids);
-    for (const id of snapshot) {
-      const s = this.sessions.get(id);
-      if (s) s.dispose(reason);
-    }
-    return true;
-  }
-
-  disposeAll(reason: string): void {
-    for (const session of Array.from(this.sessions.values())) {
-      session.dispose(reason);
-    }
-    this.sessions.clear();
-    this.byWs.clear();
-    this.adapterFor.clear();
-  }
-
   // ── internals ────────────────────────────────────────────────────────────
 
-  private onSessionDisposed(wsId: string, recordId: string): void {
+  private onSessionDisposed(wsId: string, recordId: string, exited: PersistentSession): void {
+    if (this.sessions.get(recordId) !== exited) return;
     const session = this.sessions.get(recordId);
     const adapter = this.adapterFor.get(recordId);
     this.sessions.delete(recordId);
@@ -240,3 +212,8 @@ export class SessionPool {
     });
   }
 }
+
+export type SessionView = Omit<PersistentSession, 'dispose' | 'disposeAndWait'>;
+export type SessionPoolView = Pick<SessionPool, 'attachById' | 'liveSessionsFor' | 'liveSessionCount' | 'size' | 'setTerminalViewAttributes'> & {
+  get(recordId: string): SessionView | undefined;
+};

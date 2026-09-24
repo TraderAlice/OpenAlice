@@ -80,6 +80,7 @@ export default defineConfig({
   // `0` sentinel means "no override" — the client falls back to location.host.
   define: {
     __OPENALICE_DEV_BACKEND_PORT__: JSON.stringify(backendPort),
+    __OPENALICE_UI_VERSION__: JSON.stringify((JSON.parse(readFileSync(resolve(__dirname, '..', 'package.json'), 'utf-8')) as { version: string }).version),
   },
   // Dev server with API proxy to the backend.
   // Backend port is read from `data/config/ports.json` (web.port) so

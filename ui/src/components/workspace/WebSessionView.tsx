@@ -16,6 +16,7 @@ import { summarizeToolInput } from './web-transcript'
 export { isConversationNearBottom as isWebSessionNearBottom } from '../conversation/ConversationView'
 
 interface Props {
+  readonly readOnly?: boolean
   readonly record?: SessionRecord
   readonly wsId: string
   readonly sessionId: string
@@ -36,9 +37,9 @@ export function WebSessionView(props: Props) {
   return <WebSession key={JSON.stringify([props.wsId, props.sessionId])} {...props} />
 }
 
-function WebSession({ record, wsId, sessionId, agent, agents, label, headerActions, onSessionLost }: Props) {
+function WebSession({ readOnly = false, record, wsId, sessionId, agent, agents, label, headerActions, onSessionLost }: Props) {
   const [configurationReady, setConfigurationReady] = useState(true)
-  const session = useWebConversation(wsId, sessionId)
+  const session = useWebConversation(wsId, sessionId, readOnly)
   const { snapshot, busy, requests } = session
   const openFile = useCallback((path: string) => {
     if (import.meta.env.VITE_DEMO_MODE && path === 'demo/autoquant-studio.html') {
@@ -75,12 +76,12 @@ function WebSession({ record, wsId, sessionId, agent, agents, label, headerActio
       onFileReference={files.onFileReference}
       items={session.items}
       revision={snapshot?.revision ?? 0}
-      busy={busy}
-      ready={!!snapshot && snapshot.phase !== 'failed' && snapshot.phase !== 'starting' && !stopped && !session.reconfiguring && configurationReady}
+      busy={!readOnly && busy}
+      ready={!readOnly && !!snapshot && snapshot.phase !== 'failed' && snapshot.phase !== 'starting' && !stopped && !session.reconfiguring && configurationReady}
       placeholder={`Message ${agentLabel}…`}
       empty={snapshot ? 'What should Alice work on next?' : 'Opening conversation…'}
       renderComposer={record && agents ? composer => <WebSessionComposer composer={composer} workspaceId={wsId} record={record} agents={agents}
-        busy={busy || session.reconfiguring || !snapshot || snapshot.phase === 'starting'} reconfigure={session.reconfigure} onReadyChange={setConfigurationReady} /> : undefined}
+        busy={readOnly || busy || session.reconfiguring || !snapshot || snapshot.phase === 'starting'} reconfigure={session.reconfigure} onReadyChange={setConfigurationReady} /> : undefined}
       status={<>
         {session.reconfiguring && <div role="status" className="px-3 py-1 text-xs text-muted-foreground">Applying AI configuration…</div>}
 
@@ -88,14 +89,14 @@ function WebSession({ record, wsId, sessionId, agent, agents, label, headerActio
           <LoaderCircle size={14} className="animate-spin" aria-hidden />
           <div><strong>Compacting conversation context</strong><span>{agentLabel} is summarizing older history. Sending will resume when the compact finishes.</span></div>
         </div>}
-        {activeRequest && <ConversationRequestCard
+        {!readOnly && activeRequest && <ConversationRequestCard
           key={activeRequest.id}
           request={activeRequest}
           queued={requests.length - 1}
           respond={session.respond}
         />}
       </>}
-      error={session.error ?? (stopped ? 'This session has stopped. Refresh the session to reconnect.' : null)}
+      error={readOnly ? null : session.error ?? (stopped ? 'This session has stopped. Refresh the session to reconnect.' : null)}
       send={session.send}
       stop={session.stop}
       stopLabel={`Stop ${agentLabel}`}

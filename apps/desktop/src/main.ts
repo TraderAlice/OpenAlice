@@ -21,7 +21,7 @@
  * Out of scope (future iterations): tray icon, multi-window, native menus.
  */
 
-import { app, BrowserWindow, dialog, Menu, Notification, protocol, session } from 'electron'
+import { app, BrowserWindow, dialog, ipcMain, Menu, Notification, protocol, session, shell } from 'electron'
 import { runRendererTradingModeSmoke } from './trading-mode-smoke.js'
 import { runRendererDataHomeSmoke } from './data-home-smoke.js'
 import { runRendererWorkspaceAcceptanceSmoke } from './workspace-acceptance-smoke.js'
@@ -32,6 +32,7 @@ import {
   resolveGuardianTradingMode,
   takeoverRequested,
   proxyEnvFromRules,
+  resolveAliceProjectIdentity,
   type GuardianTradingModePlan,
   type RuntimeProcessLock,
 } from '@traderalice/guardian-runtime'
@@ -45,7 +46,7 @@ import { probeFreePort } from './probe-port.js'
 import { relocateLegacyData } from './relocate-data.js'
 import { configureAutoUpdate } from './auto-update.js'
 import { BoundedTextTail, conciseDiagnosticTail, DesktopDiagnostics } from './desktop-diagnostics.js'
-import { fetchAliceWebRequest, handleOpenAliceIpcMessage, registerOpenAliceIpc } from './ipc.js'
+import { cancelOpenAliceWebRequests, fetchAliceWebRequest, handleOpenAliceIpcMessage, registerOpenAliceIpc } from './ipc.js'
 import { resolveManagedRuntimeEnv } from './managed-runtime.js'
 import { rememberDataHome, writeDataHomePreferences } from './data-home.js'
 import {
@@ -60,6 +61,7 @@ import { inspectPreviousUpdateAttempt, recordUpdateAttempt } from './update-atte
 import { childIsRunning, stopChild } from './child-shutdown.js'
 import { exitDesktopProcess } from './app-exit.js'
 import { createAppWindow } from './app-window.js'
+import { WebRelay } from './web-relay.js'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = dirname(__filename)
@@ -80,6 +82,8 @@ let desktopDiagnostics: DesktopDiagnostics | null = null
 let aliceStderrTail = new BoundedTextTail()
 let aliceBecameReady = false
 let fatalDesktopErrorShown = false
+let localRuntimeSuspended = false
+let desktopRelay: WebRelay | null = null
 
 const DEFAULT_WEB_PORT_START = 47331
 const READY_TIMEOUT_MS = 30_000
@@ -798,7 +802,7 @@ app.whenReady().then(async () => {
         OPENALICE_GUARDIAN_PID: String(process.pid),
         OPENALICE_GUARDIAN_STARTED_AT: String(guardianStartedAt),
         AQ_LAUNCHER_ROOT: launcherRoot,
-        ...(takeover ? { OPENALICE_TAKEOVER: '1' } : {}),
+        ...(takeover && !localRuntimeSuspended ? { OPENALICE_TAKEOVER: '1' } : {}),
         ...homeEnv,
         ...runtimeEnv,
         ...proxyEnv,
@@ -806,7 +810,7 @@ app.whenReady().then(async () => {
       stdio: 'inherit',
     })
     child.once('exit', (code, signal) => {
-      if (appQuitting || restartingUTA) return
+      if (appQuitting || localRuntimeSuspended || restartingUTA) return
       console.error(`[guardian] UTA exited unexpectedly code=${code} signal=${signal} — trading offline, app stays up`)
     })
     return child
@@ -823,7 +827,7 @@ app.whenReady().then(async () => {
         OPENALICE_GUARDIAN_PID: String(process.pid),
         OPENALICE_GUARDIAN_STARTED_AT: String(guardianStartedAt),
         AQ_LAUNCHER_ROOT: launcherRoot,
-        ...(takeover ? { OPENALICE_TAKEOVER: '1' } : {}),
+        ...(takeover && !localRuntimeSuspended ? { OPENALICE_TAKEOVER: '1' } : {}),
         ...homeEnv,
         ...runtimeEnv,
         ...proxyEnv,
@@ -831,7 +835,7 @@ app.whenReady().then(async () => {
       stdio: 'inherit',
     })
     child.once('exit', (code, signal) => {
-      if (appQuitting || restartingConnector) return
+      if (appQuitting || localRuntimeSuspended || restartingConnector) return
       console.error(`[guardian] Connector exited unexpectedly code=${code} signal=${signal} — external notifications offline, app stays up`)
     })
     return child
@@ -855,7 +859,7 @@ app.whenReady().then(async () => {
         OPENALICE_GUARDIAN_PID: String(process.pid),
         OPENALICE_GUARDIAN_STARTED_AT: String(guardianStartedAt),
         AQ_LAUNCHER_ROOT: launcherRoot,
-        ...(takeover ? { OPENALICE_TAKEOVER: '1' } : {}),
+        ...(takeover && !localRuntimeSuspended ? { OPENALICE_TAKEOVER: '1' } : {}),
         ...homeEnv,
         ...runtimeEnv,
         ...proxyEnv,
@@ -878,7 +882,8 @@ app.whenReady().then(async () => {
       }
     })
     child.once('exit', (code, signal) => {
-      if (appQuitting) return
+      cancelOpenAliceWebRequests('The local Alice process exited before its IPC request completed.')
+      if (appQuitting || localRuntimeSuspended) return
       const message = `Alice exited unexpectedly code=${code} signal=${signal}`
       console.error(`[guardian] ${message}`)
       desktopDiagnostics?.write('guardian', message)
@@ -979,7 +984,8 @@ app.whenReady().then(async () => {
 
   // ── Restart-flag watcher: broker config changes touch the flag; SIGTERM
   // + respawn UTA without restarting Alice (mirrors prod.mjs). ────────────
-  void startFlagWatcher(homeEnv.OPENALICE_HOME, {
+  let flagWatchAbort = new AbortController()
+  const watchLocalFlags = (): void => { void startFlagWatcher(homeEnv.OPENALICE_HOME, {
     uta: () => { void (async () => {
       tradingMode = await resolveGuardianTradingMode(process.env, homeEnv.OPENALICE_HOME)
       await reconcileUTA(tradingMode, utaUrl, spawnUTA)
@@ -991,7 +997,8 @@ app.whenReady().then(async () => {
         spawnConnector,
       )
     })().catch((err) => console.error('[guardian] Connector reconcile failed:', err)) },
-  })
+  }, flagWatchAbort.signal) }
+  watchLocalFlags()
 
   // No in-window menu bar on Windows/Linux — Electron's default
   // File/Edit/View/Window/Help renders *inside* the window there and is
@@ -1005,6 +1012,212 @@ app.whenReady().then(async () => {
   )
 
   const win = createAppWindow(resolve(__dirname, 'preload.js'))
+  const mayNavigate = (destination: string): boolean => {
+    try {
+      const url = new URL(destination)
+      return (url.protocol === 'app:' && url.host === 'openalice') || url.origin === desktopRelay?.originUrl
+    } catch { return false }
+  }
+  win.webContents.on('will-navigate', (event, destination) => {
+    if (mayNavigate(destination)) return
+    event.preventDefault()
+    if (/^https:\/\//i.test(destination)) void shell.openExternal(destination)
+  })
+  win.webContents.setWindowOpenHandler(({ url }) => {
+    if (/^https:\/\//i.test(url)) void shell.openExternal(url)
+    return { action: 'deny' }
+  })
+  const localProject = resolveAliceProjectIdentity({
+    home: userDataHome,
+    appRoot: homeEnv.OPENALICE_APP_HOME,
+    env: process.env,
+  })
+  let relayOpening: Promise<WebRelay> | null = null
+  let modeSwitching = false
+  const ensureRelay = (): Promise<WebRelay> => {
+    if (!relayOpening) {
+      relayOpening = (async () => {
+        const uiRoot = app.isPackaged
+          ? join(process.resourcesPath, 'runtime', 'ui', 'dist')
+          : join(repoRoot, 'ui', 'dist')
+        const relay = new WebRelay({ uiRoot })
+        await relay.listen()
+        desktopRelay = relay
+        return relay
+      })().catch((error) => {
+        relayOpening = null
+        throw error
+      })
+    }
+    return relayOpening
+  }
+  const assertSwitchResources = (): void => {
+    const uiRoot = app.isPackaged
+      ? join(process.resourcesPath, 'runtime', 'ui', 'dist')
+      : join(repoRoot, 'ui', 'dist')
+    if (!existsSync(resolve(__dirname, 'preload.js')) || !existsSync(join(uiRoot, 'index.html'))) {
+      throw new Error('Desktop app files are unavailable. Restart from a complete, persistent OpenAlice installation before changing connections.')
+    }
+  }
+  const fromMainWindow = (senderId: number): void => {
+    if (win.isDestroyed() || win.webContents.isDestroyed() || senderId !== win.webContents.id) {
+      throw new Error('Connection controls are only available in the main window.')
+    }
+  }
+  ipcMain.handle('openalice:desktop-connection:status', async (event) => {
+    fromMainWindow(event.sender.id)
+    if (localRuntimeSuspended) return (await ensureRelay()).status
+    return {
+      schemaVersion: 1 as const,
+      generation: 0,
+      target: {
+        machine: 'local', machineName: 'This computer',
+        project: '@electron-current', projectName: localProject.displayName,
+      },
+      switching: modeSwitching,
+    }
+  })
+  ipcMain.handle('openalice:desktop-connection:fleet', async (event) => {
+    fromMainWindow(event.sender.id)
+    const relay = await ensureRelay()
+    const response = await fetch(`${relay.originUrl}/relay/v1/fleet`)
+    if (!response.ok) throw new Error(`Machine discovery failed (HTTP ${response.status}).`)
+    const fleet = await response.json() as { machines?: Array<{ key: string; projects: unknown[] }> }
+    const local = fleet.machines?.find((machine) => machine.key === 'local')
+    if (!localRuntimeSuspended && local) {
+      local.projects = local.projects.filter((project) => (project as { id?: string }).id !== localProject.id)
+      local.projects.unshift({
+        key: '@electron-current',
+        id: localProject.id,
+        displayName: localProject.displayName,
+        available: true,
+        runtime: { class: 'electron-ipc', state: 'running', webEndpoint: null },
+      })
+    }
+    return fleet
+  })
+  ipcMain.handle('openalice:desktop-machine:plan', async (event, input: unknown) => {
+    fromMainWindow(event.sender.id)
+    if (!input || typeof input !== 'object') throw new Error('Machine plan input is required.')
+    return (await ensureRelay()).planMachine(input as Parameters<WebRelay['planMachine']>[0])
+  })
+  ipcMain.handle('openalice:desktop-machine:apply', async (event, id: unknown) => {
+    fromMainWindow(event.sender.id)
+    if (typeof id !== 'string') throw new Error('A reviewed Machine plan is required.')
+    return (await ensureRelay()).applyMachine(id)
+  })
+  ipcMain.handle('openalice:desktop-machine:operation', async (event) => {
+    fromMainWindow(event.sender.id)
+    return (await ensureRelay()).machineOperation
+  })
+  ipcMain.handle('openalice:desktop-connection:connect', async (event, machine: unknown, project: unknown) => {
+    fromMainWindow(event.sender.id)
+    if (localRuntimeSuspended) throw new Error('Use the relay connection chooser while in separated mode.')
+    if (modeSwitching) throw new Error('A connection switch is already in progress.')
+    if (typeof machine !== 'string' || typeof project !== 'string') {
+      throw new Error('Choose a running AliceProject.')
+    }
+    modeSwitching = true
+    try {
+      const relay = await ensureRelay()
+      // The old local Runtime remains fully owned until the remote candidate
+      // has passed the relay's SSH, endpoint, and Project identity checks.
+      await relay.connect(machine, project)
+      assertSwitchResources()
+      desktopDiagnostics?.write('guardian', 'remote target verified; loading relay window')
+      // Keep the local Runtime and its Guardian ownership intact until the
+      // replacement page has actually loaded. A failed navigation must not
+      // strand the user with neither a window nor a local backend.
+      await win.loadURL(`${relay.originUrl}/settings`)
+      desktopDiagnostics?.write('guardian', 'relay window loaded; retiring local runtime')
+      localRuntimeSuspended = true
+      flagWatchAbort.abort()
+      cancelOpenAliceWebRequests('The desktop window is changing its backend connection.')
+      const children = [uta, connector, alice].filter((child): child is ChildProcess => child !== null && childIsRunning(child))
+      await Promise.all(children.map((child) => stopChild(child, {
+        graceMs: SIGTERM_GRACE_MS,
+        sendSignal: (signal) => killTree(child, signal),
+      })))
+      uta = null
+      connector = null
+      alice = null
+      desktopDiagnostics?.write('guardian', 'local services stopped; releasing local ownership')
+      await releaseGuardianRuntimeLock()
+      desktopDiagnostics?.write('guardian', 'local ownership released')
+      console.log(`[guardian] desktop connection → separated ${machine}/${project}`)
+      return relay.status
+    } catch (error) {
+      // Candidate failure leaves integrated ownership untouched. Once the
+      // local Runtime has been retired, keep the verified relay target visible
+      // even if loading its first page failed.
+      if (!localRuntimeSuspended) {
+        desktopRelay?.disconnect()
+        if (!win.isDestroyed() && !win.webContents.getURL().startsWith('app://')) {
+          await win.loadURL('app://openalice/settings').catch((loadError) => {
+            console.error('[guardian] could not restore integrated connection:', loadError)
+          })
+        }
+      }
+      else if (desktopRelay && win.webContents.getURL().startsWith('app://')) {
+        await win.loadURL(`${desktopRelay.originUrl}/settings`).catch((loadError) => {
+          console.error('[guardian] could not show separated connection:', loadError)
+        })
+      }
+      throw error
+    } finally {
+      modeSwitching = false
+    }
+  })
+  ipcMain.handle('openalice:desktop-connection:return-integrated', async (event) => {
+    fromMainWindow(event.sender.id)
+    if (!localRuntimeSuspended) return
+    if (modeSwitching) throw new Error('A connection switch is already in progress.')
+    modeSwitching = true
+    try {
+      guardianRuntimeLock = await acquireGuardianRuntime({
+        userDataHome,
+        launcherRoot,
+        launcher: app.isPackaged ? 'guardian-electron-packaged' : 'guardian-electron-dev',
+        takeover: false,
+        processStartedAt: guardianStartedAt,
+        onOwnershipLost: (error) => {
+          console.error('[guardian] runtime ownership lost:', error)
+          shutdown()
+        },
+      })
+      tradingMode = await resolveGuardianTradingMode(process.env, homeEnv.OPENALICE_HOME)
+      if (tradingMode.mode !== 'lite') uta = spawnUTA()
+      if (await readConnectorServiceEnabled(homeEnv.OPENALICE_HOME)) connector = spawnConnector()
+      alice = spawnAlice()
+      await waitForAliceReady()
+      aliceBecameReady = true
+      await win.loadURL('app://openalice/settings')
+      localRuntimeSuspended = false
+      flagWatchAbort = new AbortController()
+      watchLocalFlags()
+      desktopRelay?.disconnect()
+      console.log('[guardian] desktop connection → integrated')
+    } catch (error) {
+      flagWatchAbort.abort()
+      const children = [uta, connector, alice].filter((child): child is ChildProcess => child !== null && childIsRunning(child))
+      await Promise.all(children.map((child) => stopChild(child, {
+        graceMs: SIGTERM_GRACE_MS,
+        sendSignal: (signal) => killTree(child, signal),
+      })))
+      uta = null
+      connector = null
+      alice = null
+      await releaseGuardianRuntimeLock()
+      if (desktopRelay && win.webContents.getURL().startsWith('app://')) {
+        await win.loadURL(`${desktopRelay.originUrl}/settings`).catch((loadError) => {
+          console.error('[guardian] could not restore separated connection:', loadError)
+        })
+      }
+      throw error
+    } finally {
+      modeSwitching = false
+    }
+  })
   win.webContents.on('preload-error', (_event, preloadPath, error) => {
     console.error(`[guardian] renderer preload failed path=${preloadPath}: ${error.message}`)
   })
@@ -1184,7 +1397,7 @@ async function reconcileUTA(
   utaUrl: string,
   spawnUTA: () => ChildProcess,
 ): Promise<void> {
-  if (appQuitting) return
+  if (appQuitting || localRuntimeSuspended) return
   pendingUTAMode = mode
   if (restartingUTA) return
 
@@ -1238,7 +1451,7 @@ async function reconcileConnector(
   connectorUrl: string,
   spawnConnector: () => ChildProcess,
 ): Promise<void> {
-  if (appQuitting || restartingConnector) return
+  if (appQuitting || localRuntimeSuspended || restartingConnector) return
   restartingConnector = true
   try {
     const running = connector !== null && connector.exitCode === null
@@ -1270,6 +1483,7 @@ async function reconcileConnector(
 async function startFlagWatcher(
   dataHome: string,
   onTrigger: { uta: () => void; connector: () => void },
+  signal?: AbortSignal,
 ): Promise<void> {
   const flagDir = resolve(dataHome, 'data', 'control')
   const handlers = new Map([
@@ -1287,14 +1501,16 @@ async function startFlagWatcher(
     }, 100))
   }
   try {
-    const watcher = watch(flagDir)
+    const watcher = watch(flagDir, { signal })
     for await (const evt of watcher) {
       if (!evt.filename) continue
       const handler = handlers.get(evt.filename)
       if (handler) fire(evt.filename, handler)
     }
   } catch (err) {
-    console.error('[guardian] flag watcher errored:', err)
+    if (!signal?.aborted) console.error('[guardian] flag watcher errored:', err)
+  } finally {
+    for (const timer of pending.values()) clearTimeout(timer)
   }
 }
 
@@ -1319,6 +1535,8 @@ async function stopChildren(): Promise<void> {
 function shutdown(): void {
   if (appQuitting) return
   void stopChildren().finally(async () => {
+    await desktopRelay?.close().catch((error) => console.error('[guardian] relay close failed:', error))
+    desktopRelay = null
     await releaseGuardianRuntimeLock()
     const exitCode = typeof process.exitCode === 'number' ? process.exitCode : 0
     console.log(`[guardian] shutdown complete → exit ${exitCode}`)

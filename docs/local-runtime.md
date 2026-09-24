@@ -118,10 +118,10 @@ artifact does not absorb live broker SDKs. See [[docs/broker-packs.md]].
 Common entry points:
 
 ```bash
-openalice                 # Supervisor TUI
+openalice                 # Supervisor TUI and local Web relay
+openalice relay           # same Web relay without the TUI
 openalice up              # persistent background Runtime
 openalice status
-openalice open
 openalice down
 openalice run             # foreground Runtime
 openalice doctor
@@ -185,7 +185,8 @@ Routine verification is non-trading and uses isolated homes. Live-paper broker
 acceptance remains a separate explicit lane under [[docs/uta-live-testing.md]].
 
 Every native `dev` and versioned beta/stable candidate runs the artifact
-acceptance itself: the compiled CLI opens a captured platform browser command,
+acceptance itself: the compiled CLI starts its WebRelay, opens that local GUI
+through a captured platform browser command,
 launches two external OpenCode-adapter PTYs with distinct PIDs, sends independent
 input and resize messages, stops one Session, and proves the other remains
 interactive.

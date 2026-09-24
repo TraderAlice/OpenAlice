@@ -1,3 +1,4 @@
+import { installExecutionFixture } from './workspace-execution-fixture.js';
 /**
  * POST /:id/headless — the automation dispatch route. Covers the validation /
  * agent-resolution / dispatch branches against a stubbed WorkspaceService
@@ -64,8 +65,8 @@ function build(
   };
   const meta = opts.meta ?? { id: 'ws-1', dir: '/w' };
   const adapters = opts.adapters ?? { claude };
-  const runHeadlessTask = vi.fn(async () => HEADLESS_RESULT);
-  const dispatchHeadlessTask = opts.dispatch ?? vi.fn(async () => ({ taskId: 'task-1', resumeId: 'resume-1' }));
+  const executeWait = vi.fn(async () => HEADLESS_RESULT);
+  const executeDispatch = opts.dispatch ?? vi.fn(async () => ({ taskId: 'task-1', resumeId: 'resume-1' }));
   const runtimeReadiness = opts.runtimeReadiness ?? {
     agents: {
       claude: {
@@ -164,8 +165,8 @@ function build(
       projectKey: '-w',
     })),
     config: { launcherRepoRoot: '/repo' },
-    runHeadlessTask,
-    dispatchHeadlessTask,
+    executeWait,
+    executeDispatch,
     resumeRegistry: {
       get: vi.fn(() => opts.resumeIdentity ?? (opts.sessionRecord ? {
         resumeId: opts.sessionRecord.resumeId,
@@ -239,7 +240,7 @@ function build(
     }),
   } as unknown as WorkspaceService;
   return {
-    app: createWorkspaceRoutes(svc, {
+    app: createWorkspaceRoutes(installExecutionFixture(svc), {
       readQuickChatPreferences: async () => ({ lastCredentialByAgent: {}, recentChatWorkspaceId: null }),
       rememberRecentChatWorkspace: async (workspaceId) => ({ lastCredentialByAgent: {}, recentChatWorkspaceId: workspaceId }),
       readHarnessPreferences: async () => ({
@@ -248,8 +249,8 @@ function build(
         showUnverifiedHarnessReleases: false,
       }),
     }),
-    runHeadlessTask,
-    dispatchHeadlessTask,
+    executeWait,
+    executeDispatch,
     getAgentRuntimeReadiness,
     probeAgentRuntimeReadiness,
     lifecycle,
@@ -990,12 +991,13 @@ describe('POST /:id/headless', () => {
   });
 
   it('enables the watchdog only for an explicit timeoutMs', async () => {
-    const { app, dispatchHeadlessTask } = build();
+    const { app, executeDispatch } = build();
     await post(app, '/ws-1/headless', { prompt: 'x', timeoutMs: 42_000 });
-    expect(dispatchHeadlessTask).toHaveBeenLastCalledWith(
+    expect(executeDispatch).toHaveBeenLastCalledWith(
       expect.anything(),
       expect.anything(),
       'x',
+      { kind: 'user', entry: 'headless-api' },
       42_000,
       undefined,
       undefined,
@@ -1005,10 +1007,11 @@ describe('POST /:id/headless', () => {
       { kind: 'headless', surface: 'api' },
     );
     await post(app, '/ws-1/headless', { prompt: 'x' });
-    expect(dispatchHeadlessTask).toHaveBeenLastCalledWith(
+    expect(executeDispatch).toHaveBeenLastCalledWith(
       expect.anything(),
       expect.anything(),
       'x',
+      { kind: 'user', entry: 'headless-api' },
       undefined,
       undefined,
       undefined,
@@ -1020,7 +1023,7 @@ describe('POST /:id/headless', () => {
   });
 
   it('continues a headless conversation by product resumeId only', async () => {
-    const { app, dispatchHeadlessTask } = build({
+    const { app, executeDispatch } = build({
       resumeIdentity: {
         resumeId: 'resume-1', wsId: 'ws-1', agent: 'claude', agentSessionId: 'native-hidden',
       },
@@ -1028,18 +1031,19 @@ describe('POST /:id/headless', () => {
     const response = await post(app, '/ws-1/headless', { prompt: 'follow up', resumeId: 'resume-1' });
     expect(response.status).toBe(202);
     expect(response.body).toMatchObject({ taskId: 'task-1', resumeId: 'resume-1' });
-    expect(dispatchHeadlessTask).toHaveBeenCalledWith(
-      expect.anything(), expect.anything(), 'follow up', undefined, undefined, 'resume-1',
+    expect(executeDispatch).toHaveBeenCalledWith(
+      expect.anything(), expect.anything(), 'follow up', { kind: 'user', entry: 'headless-api' }, undefined, undefined, 'resume-1',
     );
   });
 
   it('stamps headless birth when allocating a fresh product Session', async () => {
-    const { app, dispatchHeadlessTask } = build();
+    const { app, executeDispatch } = build();
     await post(app, '/ws-1/headless', { prompt: 'one-shot' });
-    expect(dispatchHeadlessTask).toHaveBeenCalledWith(
+    expect(executeDispatch).toHaveBeenCalledWith(
       expect.anything(),
       expect.anything(),
       'one-shot',
+      { kind: 'user', entry: 'headless-api' },
       undefined,
       undefined,
       undefined,
@@ -1051,7 +1055,7 @@ describe('POST /:id/headless', () => {
   });
 
   it('does not allow wait:true to bypass recorded resume lineage', async () => {
-    const { app, dispatchHeadlessTask } = build({
+    const { app, executeDispatch } = build({
       resumeIdentity: { resumeId: 'resume-1', wsId: 'ws-1', agent: 'claude' },
     });
     const response = await post(app, '/ws-1/headless', {
@@ -1059,26 +1063,26 @@ describe('POST /:id/headless', () => {
     });
     expect(response.status).toBe(400);
     expect(response.body.error).toBe('resume_requires_async');
-    expect(dispatchHeadlessTask).not.toHaveBeenCalled();
+    expect(executeDispatch).not.toHaveBeenCalled();
   });
 
   it('async by default → 202 + taskId, dispatches in the background', async () => {
-    const { app, dispatchHeadlessTask, runHeadlessTask } = build();
+    const { app, executeDispatch, executeWait } = build();
     const r = await post(app, '/ws-1/headless', { prompt: 'do the thing' });
     expect(r.status).toBe(202);
     expect(r.body.taskId).toBe('task-1');
     expect(r.body.status).toBe('running');
-    expect(dispatchHeadlessTask).toHaveBeenCalledOnce();
-    expect(runHeadlessTask).not.toHaveBeenCalled(); // async path doesn't await the run
+    expect(executeDispatch).toHaveBeenCalledOnce();
+    expect(executeWait).not.toHaveBeenCalled(); // async path doesn't await the run
   });
 
   it('wait:true → 200 + the full sync result', async () => {
-    const { app, runHeadlessTask, dispatchHeadlessTask } = build();
+    const { app, executeWait, executeDispatch } = build();
     const r = await post(app, '/ws-1/headless', { prompt: 'do the thing', wait: true });
     expect(r.status).toBe(200);
     expect(r.body.exitCode).toBe(0);
-    expect(runHeadlessTask).toHaveBeenCalledOnce();
-    expect(dispatchHeadlessTask).not.toHaveBeenCalled();
+    expect(executeWait).toHaveBeenCalledOnce();
+    expect(executeDispatch).not.toHaveBeenCalled();
   });
 
   it('429 when the concurrency cap is hit', async () => {
@@ -1214,7 +1218,7 @@ describe('POST /:id/headless/:taskId/session', () => {
       pool: { get: (id: string) => live.get(id), spawn },
       isResumeActive: vi.fn(() => false),
     } as unknown as WorkspaceService;
-    return { app: createWorkspaceRoutes(svc), records, spawn };
+    return { app: createWorkspaceRoutes(installExecutionFixture(svc)), records, spawn };
   }
 
   it('returns one persistent Session and reuses it on repeated opens', async () => {
@@ -1540,7 +1544,7 @@ describe('POST /:id/sessions/:sid/resume — concurrent coalescing (ANG-120)', (
       config: { launcherRepoRoot: '/repo' },
       recordAgentRuntime: vi.fn(async () => undefined),
     } as unknown as WorkspaceService;
-    return { app: createWorkspaceRoutes(svc), spawn, svc };
+    return { app: createWorkspaceRoutes(installExecutionFixture(svc)), spawn, svc };
   }
 
   it('two simultaneous resumes spawn the agent exactly once', async () => {
@@ -1623,7 +1627,7 @@ describe('POST /:id/sessions/:sid/resume — concurrent coalescing (ANG-120)', (
     const result = await post(app, `/ws-1/sessions/${TOKEN}/resume`);
 
     expect(result.status).toBe(500);
-    expect(result.body.error).toBe('spawn_died');
+    expect(result.body.error).toBe('resume_failed');
     expect(svc.recordAgentRuntime).toHaveBeenCalledWith('runtime.spawn_failed', expect.objectContaining({
       workspaceId: 'ws-1',
       resumeId: 'resume-aid',
@@ -1696,11 +1700,11 @@ describe('Web surface routes', () => {
         disposeToken: vi.fn(() => { order.push('terminal-stopped'); return true; }),
       },
       web,
-      startWebSession: vi.fn(async () => { order.push('web-started'); return snapshot; }),
+      executeWeb: vi.fn(async () => { order.push('web-started'); return snapshot; }),
       isResumeActive: vi.fn(() => false),
       config: { launcherRepoRoot: '/repo' },
     } as unknown as WorkspaceService;
-    return { app: createWorkspaceRoutes(svc), order, svc, web };
+    return { app: createWorkspaceRoutes(installExecutionFixture(svc)), order, svc, web };
   }
 
   it('hands an existing Session from its PTY to the Web surface', async () => {
@@ -1709,7 +1713,7 @@ describe('Web surface routes', () => {
     expect(result.status).toBe(200);
     expect(result.body.snapshot).toMatchObject({ resumeId: 'resume-web', phase: 'idle' });
     expect(order).toEqual(['prepare-workspace', 'web-started']);
-    expect(svc.startWebSession).toHaveBeenCalledOnce();
+    expect(svc.executions.web).toHaveBeenCalledOnce();
   });
 
   it('passes a complete model/effort binding to the same Web Session restart', async () => {
@@ -1718,7 +1722,7 @@ describe('Web surface routes', () => {
       credentialSource: 'native', model: 'test-model', reasoningEffort: 'high',
     });
     expect(result.status).toBe(200);
-    expect(svc.startWebSession).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ id: TOKEN }), {
+    expect(svc.executions.web).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ id: TOKEN }), { kind: 'user', entry: 'web-reconfigure' }, {
       runtimeSelection: { credentialSource: 'native', model: 'test-model', reasoningEffort: 'high' },
     });
   });
@@ -1727,14 +1731,14 @@ describe('Web surface routes', () => {
     const { app, svc } = buildWeb();
     const result = await post(app, `/ws-1/sessions/${TOKEN}/web/open`, { credentialSource: 'vault' });
     expect(result.status).toBe(400);
-    expect(svc.startWebSession).not.toHaveBeenCalled();
+    expect(svc.executions.web).not.toHaveBeenCalled();
     expect(svc.sessionRegistry.update).not.toHaveBeenCalled();
   });
 
   it('retains the running Session when replacement credentials fail validation', async () => {
     const { app, svc, web } = buildWeb();
     web.has.mockReturnValue(true);
-    vi.mocked(svc.startWebSession).mockRejectedValue(new Error('Credential is unavailable'));
+    vi.mocked(svc.executions.web).mockRejectedValue(new Error('Credential is unavailable'));
     const result = await post(app, `/ws-1/sessions/${TOKEN}/web/open`, { credentialSource: 'native' });
     expect(result.status).toBe(400);
     expect(svc.sessionRegistry.update).not.toHaveBeenCalled();
@@ -1746,14 +1750,14 @@ describe('Web surface routes', () => {
     vi.mocked(svc.pool.get).mockReturnValue({ disposeAndWait } as never);
     const result = await post(app, `/ws-1/sessions/${TOKEN}/pause`);
     expect(result.status).toBe(200);
-    expect(disposeAndWait).toHaveBeenCalledWith('paused');
+    expect(svc.executions.stop).toHaveBeenCalledWith('resume-web', 'user-pause');
     expect(svc.sessionRegistry.update).toHaveBeenCalledWith('ws-1', TOKEN,
       expect.objectContaining({ state: 'paused' }));
   });
 
   it('does not overwrite background occupancy when Web loses the launch race', async () => {
     const { app, svc } = buildWeb();
-    vi.mocked(svc.startWebSession).mockRejectedValue(new HeadlessResumeError('busy', 'running turn'));
+    vi.mocked(svc.executions.web).mockRejectedValue(new HeadlessResumeError('busy', 'running turn'));
     const result = await post(app, `/ws-1/sessions/${TOKEN}/web/open`);
     expect(result.status).toBe(409);
     expect(svc.sessionRegistry.update).not.toHaveBeenCalled();
@@ -1763,7 +1767,7 @@ describe('Web surface routes', () => {
     const { app, svc } = buildWeb('codex', { resumeById: true, web: { wire: 'codex-app-server', permissionPrompts: true, freshSession: true } });
     const result = await post(app, `/ws-1/sessions/${TOKEN}/web/open`);
     expect(result.status).toBe(200);
-    expect(svc.startWebSession).toHaveBeenCalledOnce();
+    expect(svc.executions.web).toHaveBeenCalledOnce();
   });
 
   it('refuses runtimes without a Web capability instead of checking the agent id', async () => {
@@ -1771,7 +1775,7 @@ describe('Web surface routes', () => {
     const result = await post(app, `/ws-1/sessions/${TOKEN}/web/open`);
     expect(result.status).toBe(409);
     expect(result.body.error).toBe('unsupported_surface');
-    expect(svc.startWebSession).not.toHaveBeenCalled();
+    expect(svc.executions.web).not.toHaveBeenCalled();
   });
 
   it('passes browser prompts straight to the live host', async () => {
@@ -1859,7 +1863,7 @@ describe('Workspace manager surface routes', () => {
     } as unknown as WorkspaceService;
 
     const result = await get(
-      createWorkspaceRoutes(svc),
+      createWorkspaceRoutes(installExecutionFixture(svc)),
       `/workspace-manager/sessions/${session.id}/diagnostics`,
     );
 
@@ -1909,7 +1913,7 @@ describe('Workspace manager surface routes', () => {
       stderrTail: '',
       revision: 1,
     };
-    const startWebSession = vi.fn(async () => snapshot);
+    const executeWeb = vi.fn(async () => snapshot);
     const prompt = vi.fn(async () => snapshot);
     const disposeToken = vi.fn(() => true);
     const ensureManagerSession = vi.fn(async (input: any) => {
@@ -1985,11 +1989,11 @@ describe('Workspace manager surface routes', () => {
         disposeToken,
       },
       isResumeActive: vi.fn(() => false),
-      startWebSession,
+      executeWeb,
       web: { get: vi.fn(() => snapshot), prompt },
       config: { launcherRepoRoot: '/repo' },
     } as unknown as WorkspaceService;
-    const app = createWorkspaceRoutes(svc);
+    const app = createWorkspaceRoutes(installExecutionFixture(svc));
 
     expect(await get(app, '/manager')).toMatchObject({
       status: 200,
@@ -2003,10 +2007,11 @@ describe('Workspace manager surface routes', () => {
       session: { wsId: 'workspace-manager', agent: 'pi', surface: 'webpi' },
       snapshot: { phase: 'working' },
     });
-    expect(disposeToken).toHaveBeenCalledWith(createdRecord.id, 'switch fresh manager Session to Web');
-    expect(startWebSession).toHaveBeenCalledWith(
+    expect(disposeToken).not.toHaveBeenCalled();
+    expect(executeWeb).toHaveBeenCalledWith(
       meta,
       createdRecord,
+      { kind: 'user', entry: 'manager-quick-start' },
       expect.objectContaining({
         approveProject: true,
         appendSystemPrompt: expect.stringContaining('Workspace Manager'),
@@ -2033,7 +2038,7 @@ describe('Workspace manager surface routes', () => {
     };
     let spawnedContext: any = null;
     let liveSession: any = null;
-    const startWebSession = vi.fn();
+    const executeWeb = vi.fn();
     const ensureManagerSession = vi.fn(async (input: any) => {
       const identity = {
         resumeId: 'resume-manager-codex',
@@ -2112,11 +2117,11 @@ describe('Workspace manager surface routes', () => {
         }),
       },
       isResumeActive: vi.fn(() => false),
-      startWebSession,
+      executeWeb,
       web: { get: vi.fn(() => null) },
       config: { launcherRepoRoot: '/repo' },
     } as unknown as WorkspaceService;
-    const app = createWorkspaceRoutes(svc);
+    const app = createWorkspaceRoutes(installExecutionFixture(svc));
 
     const result = await post(app, '/manager/quick-start', {
       prompt: 'Map ownership.',
@@ -2146,7 +2151,7 @@ describe('Workspace manager surface routes', () => {
     expect(result.body).toMatchObject({ session: { title: 'Map ownership.' } });
     expect(spawnedContext.initialPrompt).toContain('OpenAlice Workspace Manager');
     expect(spawnedContext.initialPrompt).toContain('User request:\nMap ownership.');
-    expect(startWebSession).not.toHaveBeenCalled();
+    expect(executeWeb).not.toHaveBeenCalled();
 
     const unsupported = await post(app, '/manager/quick-start', {
       prompt: 'Open a shell.',

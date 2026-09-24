@@ -817,8 +817,8 @@ export function renderSupervisorContextTip(
     : view.panel === 'fleet'
       ? view.launcher
         ? view.directLauncher
-          ? 'Enter starts OpenAlice; this TUI verifies readiness and brings you Home. / shows commands.'
-          : '↑↓ selects; Tab/←→ changes pane; click selection again to activate.'
+          ? 'Enter starts OpenAlice; o opens the Web connection chooser; / shows commands.'
+          : '↑↓ selects; Tab/←→ changes pane; o opens the Web connection chooser.'
         : view.directConnection
           ? view.switchSelection
             ? 'Enter switches the only candidate; the current target stays live until ready.'

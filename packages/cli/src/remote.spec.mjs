@@ -27,13 +27,14 @@ import {
 const CLI_VERSION = JSON.parse(
   readFileSync(new URL('../package.json', import.meta.url), 'utf8'),
 ).version
+const betaCliVersion = /^[0-9]+\.[0-9]+\.[0-9]+-beta(?:\.[1-9][0-9]*)?$/.test(CLI_VERSION)
 const masterInstallSource = {
   schemaVersion: 3,
   repository: 'TraderAlice/OpenAlice',
   cliVersion: CLI_VERSION,
-  selector: { kind: 'branch', value: 'master' },
+  selector: betaCliVersion ? { kind: 'version', value: `v${CLI_VERSION}` } : { kind: 'branch', value: 'master' },
   installerUrl: 'https://openalice.ai/install',
-  updateChannel: 'stable',
+  updateChannel: betaCliVersion ? 'beta' : 'stable',
   method: 'direct',
   artifact: { platform: 'linux', arch: 'x64', sha256: 'a'.repeat(64) },
   installedAt: '2026-08-31T00:00:00.000Z',
@@ -85,8 +86,15 @@ describe('OpenAlice managed remote connector', () => {
     const command = buildRemoteInstallCommand(masterInstallSource)
     expect(command).toContain('OPENALICE_INSTALL_URL=')
     expect(command).toContain(`OPENALICE_EXPECTED_CLI_VERSION='${CLI_VERSION}'`)
-    expect(command).toContain(`--channel stable --version '${CLI_VERSION}'`)
+    expect(command).toContain(`--channel ${betaCliVersion ? 'beta' : 'stable'} --version '${CLI_VERSION}'`)
     expect(command).not.toContain('managed Pi')
+  })
+
+  it('blocks mismatched install provenance during planning instead of failing after approval', () => {
+    const source = { ...masterInstallSource, cliVersion: '0.94.1-beta', updateChannel: 'stable' }
+    expect(buildRemoteInstallCommand.bind(null, source)).toThrow('marked stable')
+    const plan = createRemotePlan(parseRemoteArgs(['host']), compatibleRemote(), { installSource: source })
+    expect(plan.blocker).toContain('marked stable')
   })
 
   it('reproduces a stable release from its exact ref without pinning the remote channel', () => {
@@ -376,7 +384,7 @@ describe('OpenAlice managed remote connector', () => {
     expect(plan.cloneSource).toBe(true)
     expect(plan.mutations).toEqual([
       'install remote OpenAlice CLI',
-      'clone OpenAlice source (branch master)',
+      betaCliVersion ? `clone OpenAlice source (version v${CLI_VERSION})` : 'clone OpenAlice source (branch master)',
       'start remote OpenAlice Server',
     ])
   })
@@ -1145,7 +1153,7 @@ describe('OpenAlice managed remote connector', () => {
     expect(buildRemoteBuildToolsProbeCommand()).toContain("printf 'cxx\\n'")
     const clone = buildRemoteCloneCommand("/srv/Alice's source", masterInstallSource)
     expect(clone).toContain("root='/srv/Alice'\\''s source'")
-    expect(clone).toContain("--branch 'master' --single-branch")
+    expect(clone).toContain(betaCliVersion ? `checkout --detach 'v${CLI_VERSION}'` : "--branch 'master' --single-branch")
     expect(clone).toContain('mv "$tmp" "$root"')
   })
 })

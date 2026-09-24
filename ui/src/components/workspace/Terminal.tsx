@@ -66,7 +66,7 @@ class ElectronPtySocket implements SocketLike {
   readyState = 0;
 
   private readonly connectionId: string;
-  private readonly bridge: NonNullable<Window['openAlice']>['pty'];
+  private readonly bridge: NonNullable<NonNullable<Window['openAlice']>['pty']>;
   private readonly listeners = {
     open: new Set<() => void>(),
     message: new Set<(ev: SocketMessageEventLike) => void>(),

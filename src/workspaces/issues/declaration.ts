@@ -178,9 +178,9 @@ const issueFrontmatterObjectSchema = z.object({
    * omitted with `credential`, the Issue inherits the Workspace headless
    * preference instead. */
   credentialSource: z.literal('native').optional(),
-  /** One-run model selection for the selected credential/runtime source. */
+  /** Model selection for a fresh Session's credential/runtime source. */
   model: z.string().min(1).optional(),
-  /** One-run reasoning effort, projected through the selected native CLI. */
+  /** Reasoning effort for a fresh Session, projected through the selected native CLI. */
   effort: z.custom<ModelReasoningEffort>(isModelReasoningEffort, {
     message: 'effort must be none, minimal, low, medium, high, xhigh, or max',
   }).optional(),
@@ -255,7 +255,9 @@ export const issueFrontmatterSchema = issueFrontmatterObjectSchema
         ctx.addIssue({
           code: 'custom',
           path: [field],
-          message: `session assignee owns its runtime; remove the ${field} override`,
+          message: field === 'agent'
+            ? 'assigned Session has a fixed Agent runtime; remove the agent override from this Issue'
+            : `assigned Session reads ${field} from its own AI config; remove the ${field} override from this Issue and update the Session instead`,
         })
       }
     }

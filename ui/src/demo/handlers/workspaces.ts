@@ -1,3 +1,4 @@
+import type { SessionBlock } from '../../hooks/useSessionControl'
 import stickerWave from '../fixtures/sticker-wave.json'
 import { demoChatWorkflowReply, demoChatWorkflowTitle } from '../fixtures/chat-workflows'
 import { stickerHandlers } from './stickers'
@@ -39,6 +40,39 @@ import type {
   WorkspaceRuntimePreference,
 } from '../../components/workspace/api'
 
+import type { TakeoverRequest } from '../../hooks/useSessionTakeovers'
+const demoTakeoverPreview = typeof location !== 'undefined' && new URLSearchParams(location.search).has('takeover')
+let demoTakeover: TakeoverRequest | null = null
+let demoTakeoverSeconds = 60
+let demoTakeoverStarted = 0
+function projectDemoTakeover(record: SessionRecord, state: SessionRecord['state'], surface: SessionRecord['surface']) {
+  const index = demoWorkspaces.findIndex(ws => ws.id === record.wsId)
+  const workspace = demoWorkspaces[index]
+  if (workspace) demoWorkspaces[index] = { ...workspace, sessions: workspace.sessions.map(row => row.id === record.id ? { ...row, state, surface, lastActiveAt: new Date().toISOString() } : row) }
+}
+function updateDemoTakeover() {
+  if (!demoTakeover) return
+  if (demoTakeover.state === 'pending' && (demoTakeover.decision === 'approved' || Date.now() >= demoTakeover.deadline)) {
+    const snapshot = findDemoWebSession(demoTakeover.workspaceId, demoTakeover.recordId)
+    if (snapshot && snapshot.phase !== 'idle') { demoTakeover.blocker = 'working'; return }
+    demoTakeover.state = 'running'; demoTakeoverStarted = Date.now()
+    const record = demoWorkspaces.find(ws => ws.id === demoTakeover!.workspaceId)?.sessions.find(row => row.id === demoTakeover!.recordId)
+    if (record) { demoResumedSessions.set(webKey(record.wsId, record.id), { ...record }); projectDemoTakeover(record, 'running', 'headless') }
+    demoTakeover.decision ??= 'idle-timeout'
+  }
+  if (demoTakeover.state === 'running' && Date.now() - demoTakeoverStarted >= 12000) {
+    demoTakeover.state = 'completed'
+    const record = demoWorkspaces.find(ws => ws.id === demoTakeover!.workspaceId)?.sessions.find(row => row.id === demoTakeover!.recordId)
+    if (record) projectDemoTakeover(record, 'paused', 'webpi')
+  }
+}
+
+const demoInterruptedSessions = new Set<string>()
+const demoSessionBlocks = new Map<string, SessionBlock[]>()
+let demoCooldownSeconds = 600
+if (typeof location !== 'undefined' && new URLSearchParams(location.search).has('sessionFault')) {
+  demoSessionBlocks.set('demo-chat-headless-claude', [{ id: 'demo-fault', executionId: 'demo-failed-execution', kind: 'execution-fault', createdAt: Date.now(), actor: { kind: 'system', entry: 'session-failure-policy' }, reason: 'Three consecutive executions failed.' }])
+}
 const demoSessionPresence = new Map<string, 'active' | 'archived' | 'deleted'>()
 
 
@@ -92,6 +126,8 @@ let demoWebSessions = createSeededWebSessions()
 let demoWebRequestSequence = 0
 
 export function resetDemoWorkspaceWebState(): void {
+  demoInterruptedSessions.clear(); demoSessionBlocks.clear(); demoCooldownSeconds = 600
+  demoTakeover = null; demoTakeoverSeconds = 60; demoTakeoverStarted = 0;
   demoReplyStreams.clear()
   demoSessionPresence.clear()
   demoManagerMessages = []
@@ -452,6 +488,34 @@ const demoHarnessConfigs = new Map<string, AliceHarnessConfig>()
 const demoHarnessCommands = { alice: ['rss', 'market', 'analysis', 'peer', 'inbox', 'issue', 'harness'], traderhub: ['equity', 'economy'], 'alice-uta': ['account', 'order'] }
 
 export const workspacesHandlers = [
+  http.get('/api/workspaces/session-takeovers', () => {
+    if (!demoTakeover && demoTakeoverPreview) {
+      demoTakeover = { id: 'demo-takeover', workspaceId: DEMO_CHAT_WORKSPACE_ID, recordId: 'demo-power-session', resumeId: demoWorkspaces.find(ws => ws.id === DEMO_CHAT_WORKSPACE_ID)?.sessions.find(row => row.id === 'demo-power-session')?.resumeId ?? 'demo-resume-power', sessionTitle: 'AI power: from demand to delivery',
+        origin: { kind: 'issue', entry: 'scheduled-issue', workspaceId: DEMO_CHAT_WORKSPACE_ID, issueId: 'scan-open' },
+        requestedAt: Date.now(), deadline: Date.now() + demoTakeoverSeconds * 1000, idleSeconds: demoTakeoverSeconds, state: 'pending' }
+    }
+    updateDemoTakeover()
+    return HttpResponse.json({ requests: demoTakeover ? [demoTakeover] : [], idleSeconds: demoTakeoverSeconds, serverNow: Date.now() })
+  }),
+  http.put('/api/workspaces/session-takeovers/settings', async ({ request }) => {
+    const body = await request.json() as { idleSeconds: number }
+    if (!Number.isInteger(body.idleSeconds) || body.idleSeconds < 10 || body.idleSeconds > 3600) return HttpResponse.json({ error: 'invalid_timeout' }, { status: 400 })
+    demoTakeoverSeconds = body.idleSeconds
+    return HttpResponse.json({ idleSeconds: demoTakeoverSeconds })
+  }),
+  http.post('/api/workspaces/session-takeovers/:requestId/decision', async ({ params, request }) => {
+    const body = await request.json() as { decision: string }
+    if (!['approve', 'reject'].includes(body.decision)) return HttpResponse.json({ error: 'invalid_decision' }, { status: 400 })
+    if (!demoTakeover || demoTakeover.id !== params.requestId || demoTakeover.state !== 'pending') return HttpResponse.json({ error: 'stale_request' }, { status: 409 })
+    demoTakeover.decision = body.decision === 'approve' ? 'approved' : 'rejected'
+    if (body.decision === 'reject') demoTakeover.state = 'rejected'
+    updateDemoTakeover()
+    return HttpResponse.json({ ok: true })
+  }),
+  http.post('/api/workspaces/:id/sessions/:sid/activity', ({ params }) => {
+    if (demoTakeover?.state === 'pending' && demoTakeover.recordId === params.sid && demoTakeover.decision !== 'approved') demoTakeover.deadline = Date.now() + demoTakeover.idleSeconds * 1000
+    return HttpResponse.json({ ok: true })
+  }),
   http.all('/api/workspaces/agents/:agent/models', ({ params }) => HttpResponse.json({
     models: demoCredentialPresets[params.agent === 'claude' ? 0 : 1]!.models!.map((model) => ({ ...model, id: ['omp', 'pi', 'opencode'].includes(String(params.agent)) ? `openai/${model.id}` : model.id })),
     discoverySupported: true, source: 'snapshot', fetchedAt: Date.now(), refreshing: false, error: null,
@@ -1255,6 +1319,11 @@ export const workspacesHandlers = [
             },
           }),
     }))
+    if (demoTakeover && demoTakeover.workspaceId === wsId && ['running', 'completed'].includes(demoTakeover.state)) {
+      const row = sessions.find(session => session.resumeId === demoTakeover!.resumeId)
+      if (row) row.latestExecution = { taskId: 'demo-takeover-run', status: demoTakeover.state === 'running' ? 'running' : 'done', startedAt: demoTakeoverStarted, issueId: demoTakeover.origin.issueId,
+        ...(demoTakeover.state === 'completed' ? { finishedAt: demoTakeoverStarted + 12000 } : {}) }
+    }
     if (wsId === DEMO_CHAT_WORKSPACE_ID) {
       const completedHeadless = sessions.find(
         (session) => session.resumeId === 'resume-demo-headless-colleague',
@@ -1274,8 +1343,9 @@ export const workspacesHandlers = [
       if (runningHeadless) {
         runningHeadless.latestExecution = {
           taskId: 'demo-headless-running',
-          status: 'running',
-          startedAt: Date.now() - 30_000,
+          status: runningHeadless.active ? 'running' : 'interrupted',
+          ...(!runningHeadless.active ? { finishedAt: runningHeadless.updatedAt } : {}),
+          startedAt: runningHeadless.createdAt,
           issueId: 'scan-open',
         }
       }
@@ -1521,6 +1591,50 @@ export const workspacesHandlers = [
     }
     demoWebSessions.delete(webKey(wsId, sessionId))
     return HttpResponse.json(true)
+  }),
+  http.get('/api/workspaces/:id/sessions/:sid/control', ({ params }) => {
+    const record = demoWorkspaces.find(ws => ws.id === String(params.id))?.sessions.find(row => row.id === String(params.sid))
+    if (!record) return HttpResponse.json({ error: 'not_found' }, { status: 404 })
+    return HttpResponse.json({ execution: record.state === 'running' ? {
+      executionId: `demo-execution-${record.id}`, phase: 'running', surface: record.surface, requestedAt: Date.parse(record.createdAt),
+      origin: { kind: 'issue', entry: 'scheduled-issue' }, configuration: { credentialSource: 'native' },
+    } : null, blocks: (demoSessionBlocks.get(record.id) ?? []).filter(row => !row.expiresAt || row.expiresAt > Date.now()), cooldownSeconds: demoCooldownSeconds, serverNow: Date.now() })
+  }),
+  http.post('/api/workspaces/:id/sessions/:sid/interrupt', async ({ params, request }) => {
+    const record = demoWorkspaces.find(ws => ws.id === String(params.id))?.sessions.find(row => row.id === String(params.sid))
+    const body = await request.json() as { executionId: string }
+    if (!record || body.executionId !== `demo-execution-${record.id}`) return HttpResponse.json({ message: 'Execution changed' }, { status: 409 })
+    if (record.state !== 'running') return HttpResponse.json({ stopped: false })
+    demoSessionBlocks.set(record.id, [...(demoSessionBlocks.get(record.id) ?? []), { id: `cooldown-${record.id}`, executionId: body.executionId, kind: 'user-cooldown', reason: 'User interrupted this Session', actor: { kind: 'user', entry: 'session-interrupt' }, createdAt: Date.now(), expiresAt: Date.now() + demoCooldownSeconds * 1000 }])
+    if (!demoResumedSessions.has(webKey(record.wsId, record.id))) demoResumedSessions.set(webKey(record.wsId, record.id), { ...record })
+    demoInterruptedSessions.add(record.id)
+    projectDemoTakeover(record, 'paused', record.surface)
+    if (demoTakeover?.recordId === record.id) demoTakeover.state = 'canceled'
+    return HttpResponse.json({ stopped: true })
+  }),
+  http.post('/api/workspaces/:id/sessions/:sid/blocks/:blockId/release', ({ params }) => {
+    const id = String(params.sid)
+    demoSessionBlocks.set(id, (demoSessionBlocks.get(id) ?? []).filter(row => row.id !== String(params.blockId)))
+    return HttpResponse.json({ ok: true })
+  }),
+  http.put('/api/workspaces/session-controls/settings', async ({ request }) => {
+    const body = await request.json() as { cooldownSeconds: number }
+    if (!Number.isInteger(body.cooldownSeconds) || body.cooldownSeconds < 10 || body.cooldownSeconds > 86400) return HttpResponse.json({ message: 'Invalid cooldown' }, { status: 400 })
+    demoCooldownSeconds = body.cooldownSeconds
+    return HttpResponse.json({ ok: true })
+  }),
+  http.get('/api/workspaces/:id/sessions/:sid/executions', ({ params }) => {
+    const record = demoWorkspaces.find(workspace => workspace.id === String(params.id))?.sessions.find(session => session.id === String(params.sid))
+      ?? (demoManagerSession.wsId === String(params.id) && demoManagerSession.id === String(params.sid) ? demoManagerSession : undefined)
+    if (!record) return HttpResponse.json({ error: 'not_found' }, { status: 404 })
+    const startedAt = Date.parse(record.createdAt)
+    return HttpResponse.json({ executions: [{
+      executionId: `demo-execution-${record.id}`, phase: demoInterruptedSessions.has(record.id) ? 'interrupted' : record.state === 'running' ? 'running' : 'ended',
+      surface: record.surface ?? 'terminal', requestedAt: startedAt, startedAt,
+      ...(record.state === 'paused' ? { finishedAt: Date.parse(record.lastActiveAt), reason: demoInterruptedSessions.has(record.id) ? 'user-interrupted' : 'user-pause' } : {}),
+      origin: { kind: 'user', entry: 'quick-start' },
+      configuration: { credentialSource: record.runtime?.credentialSource ?? 'native', model: record.runtime?.model, effort: record.runtime?.reasoningEffort },
+    }] })
   }),
   http.get('/api/workspaces/:id/sessions/:sid/diagnostics', () =>
     HttpResponse.json({ status: 'demo' }),

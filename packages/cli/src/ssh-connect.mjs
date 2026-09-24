@@ -16,7 +16,7 @@ export function parseSshConnectArgs(argv) {
     remotePort: 47331,
     sshPort: null,
     identityFile: null,
-    openBrowser: true,
+    openBrowser: false,
     waitMs: 60_000,
   }
 
@@ -71,6 +71,7 @@ export function buildSshArgs(options, localPort) {
     '-o', 'ServerAliveInterval=30',
     '-o', 'ServerAliveCountMax=3',
   ]
+  if (options.batchMode) args.push('-o', 'BatchMode=yes')
   if (options.sshPort !== null) args.push('-p', String(options.sshPort))
   if (options.identityFile !== null) args.push('-i', options.identityFile)
   args.push(
@@ -80,29 +81,13 @@ export function buildSshArgs(options, localPort) {
   return args
 }
 
-/**
- * Carry client-owned tunnel identity into the browser without sending SSH
- * details to the remote HTTP server. The Web UI consumes this fragment into
- * tab-scoped storage and immediately removes it from the address bar.
- */
-export function buildRemoteClientUrl(localUrl, options) {
-  const url = new URL(localUrl)
-  const fragment = new URLSearchParams()
-  fragment.set('openalice-remote', '1')
-  fragment.set('target', options.destination)
-  fragment.set('ssh-port', String(options.sshPort ?? 22))
-  fragment.set('runtime-port', String(options.remotePort))
-  url.hash = fragment.toString()
-  return url.href
-}
-
 export async function connectSsh(options, dependencies = {}) {
   if (options.signal?.aborted) throw new Error('SSH tunnel was cancelled')
+  if (options.openBrowser) throw new Error('Direct SSH browser attach is retired; use the local Web relay.')
   const allocatePort = dependencies.allocatePort ?? allocateLoopbackPort
   const portAvailable = dependencies.portAvailable ?? isLoopbackPortAvailable
   const spawnProcess = dependencies.spawnProcess ?? spawn
   const waitForRuntime = dependencies.waitForRuntime ?? waitForOpenAlice
-  const launchBrowser = dependencies.launchBrowser ?? openBrowser
   const stdout = dependencies.stdout ?? process.stdout
   let localPort = options.localPort
   if (!localPort && options.preferredLocalPort) {
@@ -115,7 +100,6 @@ export async function connectSsh(options, dependencies = {}) {
   }
   if (!localPort) localPort = await allocatePort()
   const localUrl = `http://${LOOPBACK}:${localPort}`
-  const clientUrl = buildRemoteClientUrl(localUrl, options)
   const ssh = spawnProcess('ssh', buildSshArgs(options, localPort), {
     stdio: ['inherit', 'ignore', 'inherit'],
     windowsHide: true,
@@ -137,10 +121,9 @@ export async function connectSsh(options, dependencies = {}) {
     ])
     ready = true
     stdout.write(`OpenAlice remote runtime: ${options.destination}\n`)
-    stdout.write(`Local OpenAlice UI: ${clientUrl}\n`)
+    stdout.write(`SSH tunnel ready: ${localUrl}\n`)
     stdout.write('The SSH tunnel stays active until this command exits. Press Ctrl+C to close it.\n')
-    if (options.onReady) await options.onReady({ localPort, localUrl, clientUrl })
-    if (options.openBrowser) await launchBrowser(clientUrl)
+    if (options.onReady) await options.onReady({ localPort, localUrl, clientUrl: localUrl })
     return await tunnelLifetime
   } catch (error) {
     ssh.kill('SIGTERM')
@@ -170,7 +153,7 @@ export function formatSshHelp() {
   return `Usage:
   Internal SSH loopback tunnel transport
 
-This transport is owned by the Supervisor and the --remote connector. It is
+This transport is owned by the Supervisor and WebRelay. It is
 not a public top-level CLI command.
 
 Options:
@@ -179,7 +162,7 @@ Options:
   --ssh-port <port>         SSH server port
   --identity <path>         SSH identity file
   --wait <seconds>          Readiness timeout, 1-600 (default: 60)
-  --no-open                 Print the URL without opening a browser
+  --no-open                 Keep the transport browserless (default)
   -h, --help                Show this help
 `
 }

@@ -1,3 +1,4 @@
+import { sessionProcessStop, SessionTerminationError } from './session-process-stop.js'
 /**
  * Headless task runner — the automation-dispatch primitive.
  *
@@ -50,6 +51,7 @@ export interface HeadlessTaskArgs {
   readonly env: Readonly<Record<string, string>>;
   /** Optional watchdog: SIGTERM at `timeoutMs`, SIGKILL after a grace window. */
   readonly timeoutMs?: number;
+  readonly abortSignal?: AbortSignal;
   readonly logger: Logger;
   /**
    * Stream stdout/stderr to bounded operator logs (16MB per stream; the
@@ -99,6 +101,7 @@ export interface HeadlessTaskResult {
   readonly signal: NodeJS.Signals | null;
   /** True if the watchdog had to kill the process (timeout, not natural exit). */
   readonly killed: boolean;
+  readonly interruptionReason?: string;
   readonly durationMs: number;
   /** Last bytes of stdout/stderr — diagnostics only; never parsed for control flow. */
   readonly stdoutTail: string;
@@ -125,8 +128,9 @@ export type HeadlessLaunchErrorCode =
  * as terminal when no later assistant text recovered the turn.
  */
 export function headlessTaskStatus(
-  result: Pick<HeadlessTaskResult, 'exitCode' | 'killed' | 'structured'>,
-): 'done' | 'failed' {
+  result: Pick<HeadlessTaskResult, 'exitCode' | 'killed' | 'structured' | 'interruptionReason'>,
+): 'done' | 'failed' | 'interrupted' {
+  if (result.interruptionReason) return 'interrupted';
   if (result.killed || result.exitCode !== 0) return 'failed';
 
   let lastError = -1;
@@ -446,6 +450,7 @@ export async function runHeadlessTask(args: HeadlessTaskArgs): Promise<HeadlessT
       { launchMode: resolved.mode },
     );
   }
+  args.abortSignal?.throwIfAborted();
   let child: ChildProcess;
   try {
     child = spawn(spawnFile, spawnArgs, {
@@ -505,29 +510,35 @@ export async function runHeadlessTask(args: HeadlessTaskArgs): Promise<HeadlessT
     });
   });
 
-  // An explicit watchdog is armed BEFORE the await so it covers the whole
-  // process lifetime. Without one, a one-shot Agent runs to its natural exit.
-  const softKill = timeoutMs === undefined ? undefined : setTimeout(() => {
-    killed = true;
-    try {
-      child.kill('SIGTERM');
-    } catch {
-      /* already gone */
-    }
-  }, timeoutMs);
+  // Retain the whole tree until graceful/forced termination has been confirmed.
+  let termination: Promise<void> | undefined;
+  const stopTree = child.pid ? sessionProcessStop(child.pid, KILL_GRACE_MS) : async () => {};
+  let interruptionReason: string | undefined;
+  let rejectStop!: (error: unknown) => void;
+  const stopFailed = new Promise<never>((_, reject) => { rejectStop = reject });
+  void stopFailed.catch(() => {});
+  const terminate = () => {
+    termination ??= stopTree();
+    void termination.catch(error => rejectStop(new SessionTerminationError(String(error), stopTree)));
+  };
+  const softKill = timeoutMs === undefined ? undefined : setTimeout(() => { killed = true; terminate(); }, timeoutMs);
   softKill?.unref();
-  const hardKill = timeoutMs === undefined ? undefined : setTimeout(() => {
-    try {
-      child.kill('SIGKILL');
-    } catch {
-      /* ignore */
-    }
-  }, timeoutMs + KILL_GRACE_MS);
-  hardKill?.unref();
-
-  await closePromise;
-  if (softKill) clearTimeout(softKill);
-  if (hardKill) clearTimeout(hardKill);
+  const abort = () => {
+    interruptionReason = typeof args.abortSignal?.reason === 'string' ? args.abortSignal.reason : 'interrupted';
+    terminate();
+  };
+  args.abortSignal?.addEventListener('abort', abort, { once: true });
+  if (args.abortSignal?.aborted) abort();
+  try {
+    await Promise.race([closePromise, stopFailed]);
+    await termination;
+  } catch (error) {
+    await Promise.all([outFile?.end(), errFile?.end()]);
+    throw error instanceof SessionTerminationError ? error : new SessionTerminationError(String(error), stopTree);
+  } finally {
+    args.abortSignal?.removeEventListener('abort', abort);
+    if (softKill) clearTimeout(softKill);
+  }
   scanner?.finish();
   const structured = structuredOutput.snapshot(false);
   assistantText = structured.assistantText;
@@ -562,6 +573,7 @@ export async function runHeadlessTask(args: HeadlessTaskArgs): Promise<HeadlessT
     exitCode,
     signal,
     killed,
+    ...(interruptionReason ? { interruptionReason } : {}),
     durationMs,
     stdoutTail,
     stderrTail,

@@ -8,7 +8,7 @@ import { Toggle } from '../components/Toggle'
 import type { SaveStatus } from '../hooks/useAutoSave'
 import { useHarnessPreferences } from '../hooks/useHarnessPreferences'
 
-export function HarnessSettingsPage() {
+export function SessionVisibilitySettingsPage() {
   const { t } = useTranslation()
   const { preferences, save, error } = useHarnessPreferences()
   const [status, setStatus] = useState<SaveStatus>('idle')
@@ -16,8 +16,6 @@ export function HarnessSettingsPage() {
   const rosterDescriptionId = `${rosterToggleId}-description`
   const issueRosterToggleId = useId()
   const issueRosterDescriptionId = `${issueRosterToggleId}-description`
-  const releasesToggleId = useId()
-  const releasesDescriptionId = `${releasesToggleId}-description`
 
   const persist = async (next: typeof preferences) => {
     setStatus('saving')
@@ -33,13 +31,13 @@ export function HarnessSettingsPage() {
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       <PageHeader
-        title={t('settings.harness.title')}
-        description={t('settings.harness.description')}
+        title={t('settings.category.visibility')}
+        description={t('settings.visibility.description')}
       />
       <SettingsScrollArea className="px-4 py-5 md:px-8">
         <div className="mx-auto max-w-[880px]">
           <ConfigSection
-            title={t('settings.harness.shared')}
+            title={t('settings.visibility.sessions')}
           >
             <div className="flex min-h-12 items-start justify-between gap-4 py-3">
               <div className="min-w-0">
@@ -79,23 +77,6 @@ export function HarnessSettingsPage() {
                   onChange={(next) => void persist({ ...preferences, showIssueAttachedSessions: next })}
                 />
               </div>
-            </div>
-            <div className="flex min-h-12 items-start justify-between gap-4 border-t border-border py-3">
-              <div className="min-w-0">
-                <label htmlFor={releasesToggleId} className="block text-sm font-medium text-foreground">
-                  {t('settings.harness.showUnverifiedReleases')}
-                </label>
-                <p id={releasesDescriptionId} className="mt-1 text-[12px] leading-relaxed text-muted-foreground">
-                  {t('settings.harness.showUnverifiedReleasesDescription')}
-                </p>
-              </div>
-              <Toggle
-                id={releasesToggleId}
-                ariaLabel={t('settings.harness.showUnverifiedReleases')}
-                checked={preferences.showUnverifiedHarnessReleases}
-                disabled={status === 'saving'}
-                onChange={(next) => void persist({ ...preferences, showUnverifiedHarnessReleases: next })}
-              />
             </div>
           </ConfigSection>
         </div>

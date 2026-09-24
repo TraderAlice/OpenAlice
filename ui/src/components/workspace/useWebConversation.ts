@@ -20,7 +20,7 @@ import { presentWebTranscript } from './web-presentation'
  *
  * One mounted identity; WebSessionView keys this hook's owner by workspace/session.
  */
-export function useWebConversation(wsId: string, sessionId: string) {
+export function useWebConversation(wsId: string, sessionId: string, readOnly = false) {
   const [launchPrompt] = useState(() => getLaunchPreview(wsId, sessionId))
   const [snapshot, setSnapshot] = useState<WebSessionSnapshot | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -38,7 +38,7 @@ export function useWebConversation(wsId: string, sessionId: string) {
     setError(next.error)
   }, [])
   const refresh = useCallback(async () => {
-    if (restarting.current) return
+    if (readOnly || restarting.current) return
     const epoch = generation.current
     try {
       const next = await getWebSession(wsId, sessionId, current.current?.revision)
@@ -46,7 +46,7 @@ export function useWebConversation(wsId: string, sessionId: string) {
       if (next) accept(next)
       else if (alive.current) setError(current.current?.error ?? null)
     } catch (error) { if (alive.current && epoch === generation.current) setError(error instanceof Error ? error.message : String(error)) }
-  }, [accept, wsId, sessionId])
+  }, [accept, wsId, sessionId, readOnly])
   useEffect(() => {
     alive.current = true
     let cancelled = false

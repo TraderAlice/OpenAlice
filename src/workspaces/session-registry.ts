@@ -1,3 +1,4 @@
+import type { ExecutionRecord } from './session-execution-manager.js';
 import { mkdir, readFile, readdir, rename, writeFile } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import { dirname, join } from 'node:path';
@@ -13,7 +14,7 @@ import type { Logger } from './logger.js';
  *
  * `state` is the launcher's view: 'running' means this product Session owns a
  * live terminal, WebPi, or headless execution; 'paused' means it owns none. On
- * crash recovery we flip any 'running' to 'paused' (see `bootFixup`).
+ * crash recovery we flip any 'running' to 'paused' (see `SessionExecutionManager`).
  *
  * `resumeId` is the product-level conversation identity. `resumeHint` remains
  * an internal compatibility cache of the adapter-native id; ResumeRegistry is
@@ -32,7 +33,7 @@ export interface SessionRecord {
   readonly name: string;
   readonly createdAt: string;
   lastActiveAt: string;
-  state: 'running' | 'paused';
+  readonly state: 'running' | 'paused';
   /** Last/live execution surface. A headless turn is a first-class Session
    * execution, not a directory-only identity waiting for a UI wrapper. */
   surface?: 'terminal' | 'webpi' | 'headless';
@@ -99,10 +100,9 @@ export function normalizeSessionTitle(value: string | null | undefined): string 
  * its own file at `${stateRoot}/sessions/<wsId>.json` (atomic write via
  * temp-file + rename, same pattern as `WorkspaceRegistry`).
  *
- * Loaded lazily: a workspace's records are only read from disk when first
- * needed (most workspaces never get touched in a given server lifetime).
- * `bootFixup()` is called once at startup on every existing file so we can
- * flip orphaned 'running' records to 'paused' before any UI sees them.
+ * Existing files load at boot; new Workspace files load on demand.
+ * SessionExecutionManager reconciles execution ownership after loading and
+ * before the service becomes available.
  *
  * Writes flush the touched workspace's file only — never all of them.
  */
@@ -119,53 +119,33 @@ export class SessionRegistry {
   ) {}
 
   /**
-   * One-shot factory. Creates the sessions directory and runs `bootFixup`
-   * across every existing session file so orphaned 'running' records flip
-   * to 'paused' before the rest of the server comes online.
+   * Load identity data without inventing execution transitions. The composition
+   * root subsequently initializes SessionExecutionManager and its recovery.
    */
   static async load(stateRoot: string, logger: Logger): Promise<SessionRegistry> {
     const dir = join(stateRoot, 'sessions');
     await mkdir(dir, { recursive: true });
     const reg = new SessionRegistry(dir, logger);
-    await reg.bootFixup();
+    await reg.loadExisting();
     return reg;
   }
 
-  private async bootFixup(): Promise<void> {
-    let files: string[];
-    try {
-      files = await readdir(this.dir);
-    } catch {
-      return;
+  private async loadExisting(): Promise<void> {
+    for (const name of await readdir(this.dir)) {
+      if (SESSION_FILE_RE.test(name)) await this.ensureLoaded(name.slice(0, -'.json'.length));
     }
-    let orphaned = 0;
-    for (const name of files) {
-      if (!SESSION_FILE_RE.test(name)) continue;
-      const wsId = name.slice(0, -'.json'.length);
-      await this.ensureLoaded(wsId);
-      const records = this.byWs.get(wsId);
-      if (!records || records.size === 0) continue;
-      let touched = false;
-      const now = new Date().toISOString();
-      for (const rec of records.values()) {
-        if (rec.state === 'running') {
-          rec.state = 'paused';
-          rec.lastActiveAt = now;
-          orphaned += 1;
-          touched = true;
-          this.logger.warn('session.orphaned_on_boot', {
-            wsId,
-            id: rec.id,
-            agent: rec.agent,
-            name: rec.name,
-          });
-        }
-      }
-      if (touched) await this.flush(wsId);
-    }
-    if (orphaned > 0) {
-      this.logger.info('session_registry.boot_fixup', { orphaned });
-    }
+  }
+
+  /** Only SessionExecutionManager projects execution state; ordinary metadata updates cannot. */
+  async projectExecution(execution: ExecutionRecord): Promise<void> {
+    await this.ensureLoaded(execution.workspaceId);
+    const record = this.get(execution.workspaceId, execution.recordId);
+    if (!record) return;
+    if (record.resumeId !== execution.resumeId) throw new Error('Execution identity mismatch');
+    Object.assign(record, { state: execution.phase === 'running' || execution.phase === 'stopping' ? 'running' : 'paused' });
+    record.surface = execution.surface;
+    record.lastActiveAt = new Date(execution.finishedAt ?? execution.startedAt ?? execution.requestedAt).toISOString();
+    await this.flush(record.wsId);
   }
 
   /**
@@ -261,12 +241,13 @@ export class SessionRegistry {
   async update(
     wsId: string,
     id: string,
-    patch: Partial<Omit<SessionRecord, 'id' | 'wsId' | 'agent' | 'name' | 'createdAt'>>,
+    patch: Partial<Omit<SessionRecord, 'id' | 'wsId' | 'agent' | 'name' | 'createdAt' | 'state'>>,
   ): Promise<SessionRecord | undefined> {
     await this.ensureLoaded(wsId);
     const records = this.byWs.get(wsId);
     const rec = records?.get(id);
     if (!records || !rec) return undefined;
+    if ('state' in patch) throw new Error('Session state belongs to SessionExecutionManager');
     Object.assign(rec, patch);
     await this.flush(wsId);
     return rec;

@@ -321,8 +321,9 @@ async function smokeRelease(options: {
     helperServer.stop(true)
   }
 
-  const [webPort, mcpPort, utaPort, connectorPort] = await allocatePorts(4)
+  const [webPort, mcpPort, utaPort, connectorPort, relayPort] = await allocatePorts(5)
   const runtimeHome = join(options.smokeHome, 'runtime-home')
+  const supervisorHome = join(options.smokeHome, 'supervisor')
   const userHome = join(options.smokeHome, 'user-home')
   const externalAgentRoot = join(options.smokeHome, 'external-agent')
   const externalAgentBin = join(externalAgentRoot, 'bin')
@@ -334,8 +335,13 @@ async function smokeRelease(options: {
   const nativeOpenCodeTuiConfig = '{"theme":"system"}\n'
   await Promise.all([
     mkdir(externalAgentBin, { recursive: true }),
+    mkdir(supervisorHome, { recursive: true }),
     mkdir(join(userHome, '.config', 'opencode'), { recursive: true }),
   ])
+  await writeFile(join(supervisorHome, 'config.json'), JSON.stringify({
+    schemaVersion: 2,
+    defaults: { home: runtimeHome, port: webPort },
+  }))
   await writeFile(join(userHome, '.config', 'opencode', 'tui.json'), nativeOpenCodeTuiConfig)
   await writeFile(externalOpenCode, `#!/bin/sh
 if [ "${'$'}{1-}" = "session" ] && [ "${'$'}{2-}" = "list" ]; then
@@ -362,6 +368,7 @@ printf '%s\\n' "${'$'}1" > "${'$'}OPENALICE_SMOKE_OPEN_RECEIPT"
     PATH: [externalAgentBin, ...new Set(dependencies.map(check => dirname(check.executable!)))].join(':'),
     TMPDIR: process.env['TMPDIR'] ?? '/tmp',
     OPENALICE_HOME: runtimeHome,
+    OPENALICE_SUPERVISOR_HOME: supervisorHome,
     OPENALICE_TRADING_MODE: 'lite',
     OPENALICE_DISABLE_AUTH: '1',
     OPENALICE_BIND_HOST: '127.0.0.1',
@@ -394,6 +401,7 @@ printf '%s\\n' "${'$'}1" > "${'$'}OPENALICE_SMOKE_OPEN_RECEIPT"
   })
   const stdoutPromise = new Response(runtime.stdout).text()
   const stderrPromise = new Response(runtime.stderr).text()
+  let relay: ReturnType<typeof Bun.spawn> | null = null
   let runtimeError: unknown = null
   let realOpenCodeReport: { path: string; version: string; ptyBytes: number } | null = null
   let browserOpenUrl: string | null = null
@@ -445,13 +453,21 @@ printf '%s\\n' "${'$'}1" > "${'$'}OPENALICE_SMOKE_OPEN_RECEIPT"
       total: guardian + alice,
     }
     const baseUrl = `http://127.0.0.1:${webPort}`
-    const openOutput = run([
+    const relayUrl = `http://127.0.0.1:${relayPort}`
+    relay = Bun.spawn([
       options.executablePath,
-      'open', '--home', runtimeHome, '--wait', '3',
-    ], runtimeEnv)
+      'relay', '--port', String(relayPort),
+    ], {
+      cwd: options.smokeHome,
+      env: runtimeEnv,
+      stdout: 'pipe',
+      stderr: 'pipe',
+    })
+    await waitForHttp(`${relayUrl}/settings`, 15_000)
     browserOpenUrl = (await waitForFileText(openReceipt, 5_000)).trim()
-    if (browserOpenUrl !== baseUrl || !openOutput.includes(`Opened OpenAlice Web UI: ${baseUrl}`)) {
-      throw new Error(`compiled CLI did not open its verified Web endpoint: ${openOutput} / ${browserOpenUrl}`)
+    const relayStatus = await fetchJson(`${relayUrl}/relay/v1/status`) as { target?: { machine?: string; project?: string } }
+    if (browserOpenUrl !== `${relayUrl}/settings` || relayStatus.target?.machine !== 'local') {
+      throw new Error(`compiled CLI did not open its local WebRelay: ${JSON.stringify(relayStatus)} / ${browserOpenUrl}`)
     }
     const inventory = await fetchJson(`${baseUrl}/api/workspaces/agents`) as {
       agents?: Array<{ id?: string; installed?: boolean }>
@@ -589,6 +605,10 @@ printf '%s\\n' "${'$'}1" > "${'$'}OPENALICE_SMOKE_OPEN_RECEIPT"
   } catch (error) {
     runtimeError = error
   } finally {
+    if (relay) {
+      relay.kill('SIGTERM')
+      await relay.exited
+    }
     runtime.kill('SIGTERM')
   }
   const exitCode = await runtime.exited

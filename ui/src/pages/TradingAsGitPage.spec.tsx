@@ -42,7 +42,7 @@ describe('TradingAsGitPage localization', () => {
     expect(screen.queryByText('在将智能体暂存的券商写入推送到交易场所前进行审阅。')).toBeNull()
     expect(screen.getByText('精简模式')).toBeTruthy()
     expect(screen.getByRole('heading', { name: '精简模式下无法使用“交易即 Git”。' })).toBeTruthy()
-    expect(screen.getByRole('button', { name: '打开智能体权限' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: '打开模式设置' })).toBeTruthy()
     expect(screen.queryByText('Trading as Git is unavailable in Lite mode.')).toBeNull()
   })
 })

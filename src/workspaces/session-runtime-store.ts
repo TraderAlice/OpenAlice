@@ -119,8 +119,9 @@ function serializeDossier(file: SessionRuntimeFile): SessionRuntimeFile {
 }
 
 /**
- * Workspace-owned Session dossier: frozen AI launch binding plus a mutable
- * coworker displayName. Writes always target the first resolved directory.
+ * Workspace-owned Session dossier: explicit AI launch binding plus a mutable
+ * coworker displayName. Normal launches preserve the binding; idle edits may
+ * replace it. Writes always target the first resolved directory.
  * The launcher-owned Workspace Manager may resolve to its own state directory
  * because its cwd is the active-floor root, not a Workspace.
  */

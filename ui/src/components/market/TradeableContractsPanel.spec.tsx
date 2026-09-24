@@ -111,7 +111,7 @@ describe('TradeableContractsPanel', () => {
     expect(await screen.findByText('已配置券商中没有与 AAPL 匹配的可交易合约。')).toBeTruthy()
   })
 
-  it('keeps the localized Trading setup action navigable', async () => {
+  it('keeps the localized Broker setup action navigable', async () => {
     mocks.searchContracts.mockResolvedValue({ utasConfigured: 0, results: [] })
 
     render(
@@ -120,10 +120,10 @@ describe('TradeableContractsPanel', () => {
       </MemoryRouter>,
     )
 
-    const setupLink = await screen.findByRole('link', { name: '前往“交易”添加' })
+    const setupLink = await screen.findByRole('link', { name: '前往“券商”添加' })
     expect(setupLink.getAttribute('href')).toBe('/trading')
     expect(setupLink.parentElement?.textContent).toBe(
-      '尚未配置交易账户。前往“交易”添加，即可在此查看匹配合约。',
+      '尚未配置交易账户。前往“券商”添加，即可在此查看匹配合约。',
     )
   })
 })

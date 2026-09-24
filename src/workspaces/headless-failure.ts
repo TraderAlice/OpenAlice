@@ -3,6 +3,7 @@ import { stripVTControlCharacters } from 'node:util'
 import type { HeadlessStructuredOutput } from './headless-output.js'
 
 export interface HeadlessFailureInput {
+  readonly interruptionReason?: string
   readonly status: string
   readonly structured?: HeadlessStructuredOutput | null
   readonly error?: string
@@ -16,6 +17,7 @@ export interface HeadlessFailureInput {
 /** Successful/recovered turns may contain stderr warnings or earlier errors. */
 export function headlessFailureSummary(input: HeadlessFailureInput): string | undefined {
   if (input.status !== 'failed' && input.status !== 'interrupted') return undefined
+  if (input.interruptionReason) return `Agent run interrupted: ${input.interruptionReason}.`
   const blocks = input.structured?.blocks ?? []
   const lastError = blocks.findLastIndex((block) => block.type === 'error')
   const lastText = blocks.findLastIndex((block) => block.type === 'text')
