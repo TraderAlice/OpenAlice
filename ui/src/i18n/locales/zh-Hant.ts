@@ -2833,6 +2833,7 @@ export const zhHant: Resources = {
       rejected: '已拒絕',
       userRejected: '使用者已拒絕',
       cancelled: '已取消',
+      unconfirmed: '未確認 — 需核對',
     },
   },
   news: {

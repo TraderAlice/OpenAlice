@@ -217,6 +217,38 @@ describe('PushApprovalPanel localization', () => {
     expect(screen.getByText('已提交')).toBeTruthy()
   })
 
+  it('reports an unconfirmed write as indeterminate rather than rejected', async () => {
+    mocks.walletLog.mockResolvedValue({
+      commits: [{
+        hash: '8ecf74c612345678',
+        message: 'MU tactical swing long',
+        timestamp: '2026-08-17T08:00:00.000Z',
+        operations: [{
+          symbol: 'MU',
+          action: 'placeOrder',
+          change: 'BUY 10 LMT @971 GTC (unconfirmed)',
+          status: 'unconfirmed',
+          order: {
+            side: 'BUY',
+            orderType: 'LMT',
+            totalQuantity: '10',
+            limitPrice: '971',
+            timeInForce: 'GTC',
+          },
+        }],
+      }],
+    })
+
+    render(<PushApprovalPanel />)
+
+    fireEvent.click(await screen.findByText('买入 MU, 10, @ 971'))
+    const status = await screen.findByText('未确认 — 需对账')
+    expect(status.className).toContain('text-warning')
+    expect(status.className).not.toContain('text-destructive')
+    expect(screen.queryByText('已拒绝')).toBeNull()
+    expect(screen.queryByText('unconfirmed')).toBeNull()
+  })
+
   it('uses a queue-to-detail drill-in on narrow layouts while preserving the desktop split view', async () => {
     mocks.walletStatus.mockResolvedValue({
       staged: [{

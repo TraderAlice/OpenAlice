@@ -2826,6 +2826,7 @@ export const ja: Resources = {
       rejected: '却下',
       userRejected: 'ユーザーが却下',
       cancelled: '取消済み',
+      unconfirmed: '未確認 — 照合が必要',
     },
   },
   news: {

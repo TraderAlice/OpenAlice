@@ -317,3 +317,48 @@ describe('tradingPush — AI-trading gate (#95)', () => {
     expect(pushed()).toBe(0)
   })
 })
+
+describe(
+  'getVenueSpread tool',
+  () => {
+    type SchemaTool = { inputSchema: { safeParse: (value: unknown) => { success: boolean } } }
+    const spreadSchemaOf = (tools: Record<string, unknown>) =>
+      (tools.getVenueSpread as unknown as SchemaTool).inputSchema
+
+    // The AI SDK validates the model’s arguments against exactly this schema
+    // before `execute` runs, so this is the boundary an LLM actually hits.
+    it('refuses an aliceId set outside the wire contract\u2019s 2..8 legs', () => {
+      const schema = spreadSchemaOf(createTradingTools(fakeManager([])) as unknown as Record<string, unknown>)
+
+      expect(schema.safeParse({ aliceIds: ['only-one'] }).success).toBe(false)
+      expect(schema.safeParse({ aliceIds: [] }).success).toBe(false)
+      expect(schema.safeParse({}).success).toBe(false)
+      expect(schema.safeParse({ aliceIds: ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i'] }).success).toBe(false)
+      expect(schema.safeParse({ aliceIds: ['venue-a|BTC/USDT:USDT', 'venue-b|BTC/USDT:USDT'] }).success).toBe(true)
+    })
+
+    it(
+      'returns a pairing refusal as a structured error instead of throwing at the model',
+      async () => {
+        const manager = {
+          getVenueSpread: async () => {
+            throw new BrokerError(
+              'CONFIG',
+              'getVenueSpread legs do not name the same instrument: BTC|USDT|SPOT, BTC|USDT|PERP',
+            )
+          },
+        } as unknown as Parameters<typeof createTradingTools>[0]
+
+        const result = await run(createTradingTools(manager).getVenueSpread, { aliceIds: ['a', 'b'] }) as {
+          error: string
+          code: string
+          transient: boolean
+        }
+
+        expect(result.error).toMatch(/do not name the same instrument/)
+        // A mismatched instrument set is the caller’s to fix, not a blip to retry.
+        expect(result.transient).toBe(false)
+      },
+    )
+  },
+)

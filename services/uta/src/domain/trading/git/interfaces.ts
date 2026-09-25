@@ -75,7 +75,30 @@ export interface ITradingGit {
 }
 
 export interface TradingGitConfig {
-  executeOperation: (operation: Operation) => Promise<unknown>
+  /** Hand one staged operation to the broker.
+   *
+   *  `signal` is best-effort cooperative cancellation: it aborts when the
+   *  write bound (`writeTimeoutMs`) expires, so a broker call that CAN stop
+   *  waiting does. Today no `IBroker` method accepts a signal, so the real
+   *  enforcement is at this layer — an uncooperative call is abandoned (and
+   *  its result recorded as unconfirmed), never cancelled. */
+  executeOperation: (operation: Operation, signal?: AbortSignal) => Promise<unknown>
   getGitState: () => Promise<GitState>
   onCommit?: (state: GitExportState) => void | Promise<void>
+  /** Liveness bound for ONE broker call in the push path. A promise that
+   *  never settles must not hold the wallet write lock forever — the account
+   *  could no longer stage or push anything, including a stop-loss. Defaults
+   *  to `DEFAULT_WRITE_TIMEOUT_MS` (TradingGit.ts). */
+  writeTimeoutMs?: number
+  /** Verdict for a broker call that FAILED. `'unconfirmed'` means the request may
+   *  have reached the venue (timeout, reset, 5xx, unclassifiable) — the log must
+   *  not claim the order did not take effect; `'rejected'` means the failure
+   *  proves it did not (invalid order, insufficient funds, auth, local refusal).
+   *
+   *  Absent means every failure is recorded `'rejected'`, i.e. the behaviour that
+   *  predates this seam, so a caller that wires nothing keeps its old semantics.
+   *  The UTA service wires
+   *  `classifyOperationFailure` (domain/trading/brokers/operation-failure-classification.ts),
+   *  which fails closed to `'unconfirmed'`. */
+  classifyOperationError?: (error: unknown) => 'rejected' | 'unconfirmed'
 }

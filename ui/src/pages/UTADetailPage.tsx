@@ -1084,13 +1084,17 @@ const ORDER_STATUS_STYLES: Record<OrderHistoryStatus, string> = {
   rejected: 'bg-destructive/15 text-destructive',
   'user-rejected': 'bg-destructive/15 text-destructive',
   submitted: 'bg-primary/15 text-primary',
+  unconfirmed: 'bg-warning/15 text-warning',
 }
 
 const ORDER_HISTORY_COMPACT_WIDTH = 760
 
 function OrderStatusBadge({ status }: { status: OrderHistoryStatus }) {
   return (
-    <span className={`rounded-sm px-1.5 py-0.5 text-[10px] leading-[14px] font-medium ${ORDER_STATUS_STYLES[status] ?? 'bg-muted text-muted-foreground'}`}>
+    <span
+      className={`rounded-sm px-1.5 py-0.5 text-[10px] leading-[14px] font-medium ${ORDER_STATUS_STYLES[status] ?? 'bg-muted text-muted-foreground'}`}
+      title={status === 'unconfirmed' ? 'Outcome unknown — reconcile against broker state' : undefined}
+    >
       {status}
     </span>
   )

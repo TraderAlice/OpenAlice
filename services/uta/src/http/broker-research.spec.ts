@@ -40,3 +40,77 @@ describe('Broker research HTTP boundary', () => {
     expect(read).toHaveBeenCalledWith({ symbol: 'BTC/USD', secType: 'CRYPTO' }, 2)
   })
 })
+
+describe('Funding-rate HTTP boundary', () => {
+  const ALICE_ID = 'bybit-main|BTC_USDT.USDT'
+  // The venue's native symbol is NOT the aliceId tail: 'BTC_USDT.USDT' is the
+  // venue's own id form, and only the account knows what it resolves to. The
+  // 2026-05 regression was exactly this — a route stamping the raw aliceId onto
+  // a fresh Contract handed the broker a symbol it could not resolve.
+  const resolvedContract = { symbol: 'BTC', localSymbol: 'BTC/USDT:USDT', secType: 'CRYPTO_PERP' }
+
+  function setupFunding() {
+    const rate = vi.fn().mockResolvedValue({ contract: resolvedContract, fundingRate: 0.0001, timestamp: new Date(0) })
+    const history = vi.fn().mockResolvedValue({ contract: resolvedContract, rates: [], timestamp: new Date(0) })
+    const account = {
+      id: 'bybit-main', health: 'healthy', broker: { getFundingRate: rate, getFundingRateHistory: history },
+      contractFromAliceId: (aliceId: string) => {
+        if (aliceId !== ALICE_ID) throw new Error(`Unexpected aliceId ${aliceId}`)
+        return resolvedContract
+      },
+    }
+    const routes = createTradingRoutes({ utaManager: { get: () => account } } as unknown as UTAEngineContext)
+    const post = (route: string, body: unknown) => routes.request(`/uta/bybit-main/contract/${route}`, {
+      method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body),
+    })
+    return { rate, history, post }
+  }
+
+  it('resolves the contract through the account before reading the rate', async () => {
+    const { rate, post } = setupFunding()
+
+    const res = await post('funding-rate', { aliceId: ALICE_ID })
+
+    expect(res.status).toBe(200)
+    const [contractArg] = rate.mock.calls[0]
+    expect(contractArg).toBe(resolvedContract)
+    expect(contractArg.localSymbol).toBe('BTC/USDT:USDT')
+    expect(JSON.stringify(contractArg)).not.toContain('BTC_USDT.USDT')
+  })
+
+  it('forwards start/limit unchanged with the account-resolved contract', async () => {
+    const { history, post } = setupFunding()
+
+    const res = await post('funding-rate-history', { aliceId: ALICE_ID, start: '2026-09-01T00:00:00.000Z', limit: 7 })
+
+    expect(res.status).toBe(200)
+    expect(history).toHaveBeenCalledWith(resolvedContract, { start: '2026-09-01T00:00:00.000Z', limit: 7 })
+  })
+
+  it('rejects malformed bodies before touching the broker', async () => {
+    const { rate, history, post } = setupFunding()
+
+    expect((await post('funding-rate', {})).status).toBe(400)
+    expect((await post('funding-rate', { aliceId: '' })).status).toBe(400)
+    expect((await post('funding-rate', null)).status).toBe(400)
+    expect((await post('funding-rate-history', { aliceId: ALICE_ID, limit: 1001 })).status).toBe(400)
+    expect((await post('funding-rate-history', { aliceId: ALICE_ID, start: 'yesterday' })).status).toBe(400)
+
+    expect(rate).not.toHaveBeenCalled()
+    expect(history).not.toHaveBeenCalled()
+  })
+
+  it('surfaces a broker pack without the capability instead of answering with an empty rate', async () => {
+    const account = { id: 'alpaca', health: 'healthy', broker: {}, contractFromAliceId: () => resolvedContract }
+    const routes = createTradingRoutes({ utaManager: { get: () => account } } as unknown as UTAEngineContext)
+    const post = (route: string, body: unknown) => routes.request(`/uta/alpaca/contract/${route}`, {
+      method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body),
+    })
+
+    for (const route of ['funding-rate', 'funding-rate-history']) {
+      const res = await post(route, { aliceId: 'alpaca|BTC/USD' })
+      expect(res.status, route).not.toBe(200)
+      expect((await res.json()).error, route).toMatch(/not supported by this broker pack/)
+    }
+  })
+})

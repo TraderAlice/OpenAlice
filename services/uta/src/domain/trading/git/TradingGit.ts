@@ -58,8 +58,94 @@ export function isPendingHashConflict(error: unknown): boolean {
     || (error as { name?: unknown }).name === 'PendingHashConflictError'
 }
 
+/** Liveness bound for ONE wallet write in the push path (`writeTimeoutMs`) —
+ *  the deadline covers the whole `executePush()` broker loop, because the lock
+ *  is held for the whole loop, so per-call budgets shrink as it elapses.
+ *
+ *  Observed defect: nothing upstream bounded `executeOperation` (the HTTP route
+ *  awaits it unbounded, `IBroker` takes no cancellation signal), so a promise
+ *  that never settles held `inflightWrite` forever — the `finally` in push()/
+ *  reject() only runs on settlement — and every later add/commit/push/reject
+ *  threw PENDING_HASH_CONFLICT with no release path in `ITradingGit`: the
+ *  account could no longer stage or push anything, a stop-loss included.
+ *
+ *  A CLIENT request abort is NOT the mechanism and is deliberately not handled
+ *  here: neither Node nor Hono cancels an awaited server-side promise, and the
+ *  `finally` runs on every settlement (fulfilled or rejected). Only a promise
+ *  that never settles leaks the lock, so the bound IS the fix and the signal
+ *  handed to `executeOperation` is best-effort cooperation on top of it.
+ *
+ *  The deadline covers the WHOLE write attempt: every broker call in the
+ *  dispatch loop AND the post-execution state snapshot (same broker connection,
+ *  same lock). When the snapshot does not settle inside the bound the commit is
+ *  still appended with the last state the log holds plus a `stateAfterSource`
+ *  marker — never a snapshot that was not read.
+ *
+ *  90s: a healthy submit is seconds (CCXT's own per-request timeout is ~10s,
+ *  IBKR acks through request-bridge in seconds), so this keeps ~3x headroom for
+ *  a slow broker while confining a stuck account to ~1.5 minutes. */
+export const DEFAULT_WRITE_TIMEOUT_MS = 90_000
+
+/** The write stopped waiting on a broker call whose outcome is UNKNOWN — the
+ *  order MAY have landed. Kept distinct from PendingHashConflictError (retrying
+ *  is pointless) and from `'rejected'` (which claims the order definitely did
+ *  not take effect): the caller must reconcile against broker state instead of
+ *  retrying.
+ *
+ *  Thrown AFTER the commit is appended (the log records the unsettled
+ *  operations as `unconfirmed`, `success: false`) and after staging is cleared
+ *  (re-pushing the same commit could duplicate an order whose fate is
+ *  unknown), so the write lock is already released when callers see this.
+ *  Check `logPersisted` before treating the record as durable. */
+export class WriteOutcomeUnconfirmedError extends Error {
+  readonly code = 'WRITE_OUTCOME_UNCONFIRMED' as const
+  /** Commit appended for the abandoned write — inspect it with `show`. */
+  readonly hash: CommitHash
+  /** Operations whose outcome could not be determined. */
+  readonly unconfirmed: OperationResult[]
+  /** False when `onCommit` failed: the commit is in memory only. */
+  readonly logPersisted: boolean
+
+  constructor(
+    message: string,
+    params: { hash: CommitHash; unconfirmed: OperationResult[]; logPersisted: boolean },
+  ) {
+    super(message)
+    this.name = 'WriteOutcomeUnconfirmedError'
+    this.hash = params.hash
+    this.unconfirmed = params.unconfirmed
+    this.logPersisted = params.logPersisted
+  }
+}
+
+export function isWriteOutcomeUnconfirmed(error: unknown): error is WriteOutcomeUnconfirmedError {
+  if (error instanceof WriteOutcomeUnconfirmedError) return true
+  if (!error || typeof error !== 'object') return false
+  return (error as { code?: unknown }).code === 'WRITE_OUTCOME_UNCONFIRMED'
+    || (error as { name?: unknown }).name === 'WriteOutcomeUnconfirmedError'
+}
+
+/**
+ * A failure the dispatcher REPORTED as a resolved `{ success: false, error }`
+ * rather than throwing one — `CcxtBroker.placeOrder` resolves this shape for
+ * every venue error it catches, transport timeouts included, so the message is
+ * the only evidence the classification has to work from.
+ *
+ * The git layer constructs it and hands it to the same
+ * `classifyOperationError` seam it uses for thrown failures; the classifier
+ * matches it by name (see
+ * brokers/operation-failure-classification.ts).
+ */
+export class ReportedOperationFailureError extends Error {
+  constructor(message: string) {
+    super(message)
+    this.name = 'ReportedOperationFailureError'
+  }
+}
+
 export class TradingGit implements ITradingGit {
   private stagingArea: Operation[] = []
+
   private pendingMessage: string | null = null
   private pendingHash: CommitHash | null = null
   private inflightWrite = false
@@ -117,6 +203,13 @@ export class TradingGit implements ITradingGit {
   }
 
   async push(expectedPendingHash: string): Promise<PushResult> {
+    // Hash first, before the staging check: after an unconfirmed write the pending
+    // commit is deliberately gone, and a retry carrying its hash must be refused as
+    // PENDING_HASH_CONFLICT — the code clients read as "refresh, do not retry" —
+    // rather than as a generic "nothing to push".
+    if (expectedPendingHash && expectedPendingHash !== this.pendingHash) {
+      throw new PendingHashConflictError('Pending commit changed')
+    }
     this.assertPrepared('push')
     this.beginWrite(expectedPendingHash)
     try {
@@ -138,24 +231,88 @@ export class TradingGit implements ITradingGit {
     const message = this.pendingMessage
     const hash = this.pendingHash
 
-    // Execute all operations
+    // Execute all operations under ONE write deadline: the lock is held for the
+    // whole loop, so the bound must cover the write, not a single call. The loop
+    // stops at the first call that does not settle in the remaining budget — the
+    // operations after it were never handed to the broker, and carrying on could
+    // turn one unknown order into several.
+    const writeTimeoutMs = this.config.writeTimeoutMs ?? DEFAULT_WRITE_TIMEOUT_MS
+    const deadline = Date.now() + writeTimeoutMs
     const results: OperationResult[] = []
-    for (const op of operations) {
-      try {
-        const raw = await this.config.executeOperation(op)
-        results.push(this.parseOperationResult(op, raw))
-      } catch (error) {
+    let abandoned: { index: number } | null = null
+    for (const [index, op] of operations.entries()) {
+      const outcome = await this.runBounded((signal) => this.config.executeOperation(op, signal), deadline)
+      if (outcome.kind === 'settled') {
+        const parsed = this.parseOperationResult(op, outcome.value)
+        results.push(parsed)
+        // A reported transport failure (CcxtBroker resolves { success: false,
+        // error } for every venue error, timeouts included): same rule as the
+        // thrown/expired case — stop before dispatching more operations into an
+        // unknown venue state.
+        if (parsed.status === 'unconfirmed') {
+          abandoned = { index }
+          break
+        }
+        continue
+      }
+      if (outcome.kind === 'failed') {
+        const verdict = this.config.classifyOperationError?.(outcome.error) ?? 'rejected'
+        const message = outcome.error instanceof Error ? outcome.error.message : String(outcome.error)
+        if (verdict === 'unconfirmed') {
+          // The request may have reached the venue and no outcome came back
+          // (transport failure, venue 5xx, unclassifiable): recording 'rejected'
+          // would be a definite claim we cannot back up. The write stops here —
+          // the remaining operations were never dispatched, and continuing could
+          // turn one unknown order into several.
+          abandoned = { index }
+          results.push({
+            action: op.action,
+            success: false,
+            status: 'unconfirmed',
+            error: `${message} — outcome unknown, reconcile against broker state`,
+          })
+          break
+        }
         results.push({
           action: op.action,
           success: false,
           status: 'rejected',
-          error: error instanceof Error ? error.message : String(error),
+          error: message,
+        })
+        continue
+      }
+      // The call never settled inside the bound, or failed only after the bound
+      // aborted it → the outcome is unknown; recording 'rejected' would be a lie
+      // (the order may be live).
+      abandoned = { index }
+      results.push({
+        action: op.action,
+        success: false,
+        status: 'unconfirmed',
+        error: outcome.reason === 'aborted'
+          ? `Broker call failed after the ${writeTimeoutMs}ms write bound aborted it — outcome unknown, reconcile against broker state`
+          : `Broker call did not settle within the ${writeTimeoutMs}ms write bound — outcome unknown, reconcile against broker state`,
+      })
+      break
+    }
+
+    if (abandoned) {
+      // Sequential loop: these were never dispatched, so their outcome IS
+      // known — not executed.
+      for (const op of operations.slice(abandoned.index + 1)) {
+        results.push({
+          action: op.action,
+          success: false,
+          status: 'rejected',
+          error: `Not executed: the wallet write was abandoned ${writeTimeoutMs}ms after operation ${abandoned.index + 1} went unanswered`,
         })
       }
     }
 
-    // Snapshot state after execution
-    const stateAfter = await this.config.getGitState()
+    // Snapshot state after execution — bounded by the SAME deadline: this read
+    // goes to the same broker connection the write just used, so an unanswered
+    // call here would hold the wallet lock exactly like an unanswered order.
+    const snapshot = await this.readSnapshot(deadline)
 
     const commit: GitCommit = {
       hash,
@@ -163,7 +320,7 @@ export class TradingGit implements ITradingGit {
       message,
       operations,
       results,
-      stateAfter,
+      ...snapshot,
       timestamp: new Date().toISOString(),
       round: this.currentRound,
     }
@@ -171,15 +328,55 @@ export class TradingGit implements ITradingGit {
     this.commits.push(commit)
     this.head = hash
 
-    await this.config.onCommit?.(this.exportState())
-
-    // Clear staging
+    // Clear staging BEFORE persisting: an `onCommit` that rejects must never
+    // leave the pending commit alive, or the client could push it again and
+    // resubmit operations whose outcome is already decided — or, after a timeout,
+    // unknown. That door is what this ordering closes.
     this.stagingArea = []
     this.pendingMessage = null
     this.pendingHash = null
 
+    let persistError: unknown
+    try {
+      await this.config.onCommit?.(this.exportState())
+    } catch (error) {
+      // Loud, not fatal: the commit is already in the log and the next successful
+      // persist writes the whole export (so the record self-heals), but a
+      // durability failure must never be silent.
+      persistError = error
+      console.error(
+        `TradingGit[${hash}]: persisting the commit log failed — ${error instanceof Error ? error.message : String(error)}`,
+      )
+    }
+
     const rejected = results.filter((r) => !r.success)
     const submitted = results.filter((r) => r.success)
+
+    if (abandoned) {
+      // Log written, staging cleared, lock released by push()'s finally. The
+      // caller gets an indeterminate verdict rather than a definite outcome the
+      // broker never confirmed — and a re-push cannot resubmit, because the
+      // pending commit is gone and its operations are recorded here.
+      const unconfirmed = results.filter((r) => r.status === 'unconfirmed')
+      const snapshotNote = snapshot.stateAfterSource === 'last-known'
+        ? '; the post-execution snapshot did not settle, so the previous commit\'s state was carried forward'
+        : snapshot.stateAfterSource === 'unavailable'
+          ? '; the post-execution snapshot was unavailable'
+          : ''
+      const persistNote = persistError
+        ? `; persisting the commit log also failed (${persistError instanceof Error ? persistError.message : String(persistError)})`
+        : ''
+      throw new WriteOutcomeUnconfirmedError(
+        `Wallet write ${hash} did not confirm: ${unconfirmed.length} operation(s) did not settle within the ${writeTimeoutMs}ms write bound — outcome indeterminate, reconcile against broker state${snapshotNote}${persistNote}`,
+        { hash, unconfirmed, logPersisted: persistError === undefined },
+      )
+    }
+
+    // A confirmed write whose log could not be persisted still fails the caller:
+    // the operations reached the broker, but the record of them may be lost on
+    // restart. Re-thrown AFTER the staging cleanup above, so the pending commit
+    // cannot be pushed a second time.
+    if (persistError) throw persistError
 
     return { hash, message, operationCount: operations.length, submitted, rejected }
   }
@@ -213,15 +410,18 @@ export class TradingGit implements ITradingGit {
       error: reason || 'Rejected by user',
     }))
 
-    const stateAfter = await this.config.getGitState()
+    // Bounded like the push path: reject holds the SAME write lock, so an
+    // unanswered snapshot read here would wedge the account just as badly.
+    const rejectDeadline = Date.now() + (this.config.writeTimeoutMs ?? DEFAULT_WRITE_TIMEOUT_MS)
+    const snapshot = await this.readSnapshot(rejectDeadline)
 
     const commit: GitCommit = {
       hash,
       parentHash: this.head,
       message,
       operations,
+      ...snapshot,
       results,
-      stateAfter,
       timestamp: new Date().toISOString(),
       round: this.currentRound,
     }
@@ -255,6 +455,75 @@ export class TradingGit implements ITradingGit {
     if (this.pendingMessage === null || this.pendingHash === null) {
       throw new Error(`Nothing to ${action}: please commit first`)
     }
+  }
+
+  /** Await one write-path step until `deadline`; on expiry abort the
+   *  (best-effort) signal and report the step as abandoned instead of waiting
+   *  forever. The abandoned attempt keeps running: `Promise.race` keeps its
+   *  rejection handled, and a late settlement is deliberately ignored — the
+   *  commit already recorded the outcome as unknown, and a straggler must not
+   *  rewrite a verdict the caller was never told.
+   *
+   *  A step that fails only AFTER the bound aborted it is reported as
+   *  `'unconfirmed'` too: the error it surfaced is the abort, which says nothing
+   *  about whether the order was accepted. Only a failure that arrives before the
+   *  abort is a definite `'failed'`. */
+  private async runBounded<T>(
+    run: (signal: AbortSignal) => Promise<T>,
+    deadline: number,
+  ): Promise<
+    | { kind: 'settled'; value: T }
+    | { kind: 'failed'; error: unknown }
+    | { kind: 'unconfirmed'; reason: 'expired' | 'aborted' }
+  > {
+    const controller = new AbortController()
+    let timer: NodeJS.Timeout | undefined
+
+    try {
+      const expiry = new Promise<{ kind: 'unconfirmed'; reason: 'expired' }>((resolve) => {
+        // NOT unref'd: the bound must fire even if nothing else holds the event
+        // loop open, and the timer is cleared below on every settlement.
+        timer = setTimeout(() => {
+          controller.abort()
+          resolve({ kind: 'unconfirmed', reason: 'expired' })
+        }, Math.max(0, deadline - Date.now()))
+      })
+
+      const attempt = Promise.resolve()
+        .then(() => run(controller.signal))
+        .then(
+          (value): { kind: 'settled'; value: T } => ({ kind: 'settled', value }),
+          (error): { kind: 'failed'; error: unknown } | { kind: 'unconfirmed'; reason: 'aborted' } =>
+            controller.signal.aborted ? { kind: 'unconfirmed', reason: 'aborted' } : { kind: 'failed', error },
+        )
+
+      return await Promise.race([attempt, expiry])
+    } finally {
+      if (timer) clearTimeout(timer)
+    }
+  }
+
+  /** Post-execution account snapshot for a write that holds the wallet lock.
+   *
+   *  Bounded by the caller's deadline, because this read goes to the same broker
+   *  connection the write just used: an unanswered call here would hold the lock
+   *  exactly like an unanswered order (both push and reject take that lock).
+   *
+   *  When it does not settle, the last state the log already holds is carried
+   *  forward and MARKED (`stateAfterSource`) — inventing a snapshot would claim
+   *  an account picture that was never read, and dropping the commit would lose
+   *  the per-operation verdicts the caller needs. A read that FAILS (rejects) is
+   *  a definite answer rather than an unknown one, so it still propagates. */
+  private async readSnapshot(
+    deadline: number,
+  ): Promise<{ stateAfter?: GitState; stateAfterSource?: GitCommit['stateAfterSource'] }> {
+    const snapshot = await this.runBounded(() => this.config.getGitState(), deadline)
+    if (snapshot.kind === 'settled') return { stateAfter: snapshot.value }
+    if (snapshot.kind === 'failed') throw snapshot.error
+    const previous = this.commits[this.commits.length - 1]?.stateAfter
+    return previous
+      ? { stateAfter: previous, stateAfterSource: 'last-known' }
+      : { stateAfterSource: 'unavailable' }
   }
 
   /**
@@ -434,7 +703,10 @@ export class TradingGit implements ITradingGit {
         symbol,
         action: op.action,
         change: this.formatOperationChange(op, result),
-        status: result?.status || 'rejected',
+        // A log row with no recorded verdict (legacy or partial commit data) is
+        // indeterminate — the same 'unconfirmed' the write and read paths use —
+        // never an invented venue rejection.
+        status: result?.status || 'unconfirmed',
         ...(op.action === 'placeOrder' ? {
           order: {
             side: op.order?.action,
@@ -581,7 +853,7 @@ export class TradingGit implements ITradingGit {
     return {
       ...commit,
       operations: commit.operations.map(TradingGit.rehydrateOperation),
-      stateAfter: TradingGit.rehydrateGitState(commit.stateAfter),
+      ...(commit.stateAfter ? { stateAfter: TradingGit.rehydrateGitState(commit.stateAfter) } : {}),
     }
   }
 
@@ -933,8 +1205,12 @@ export class TradingGit implements ITradingGit {
       return {
         action: op.action,
         success: false,
-        status: 'rejected',
-        error: 'Invalid response from trading engine',
+        // Not a verdict at all: the engine answered with something we cannot
+        // read, so the request left us and no outcome came back — the
+        // indeterminate class. Deliberately NOT routed through the classifier:
+        // no policy may turn a protocol failure into a definite venue rejection.
+        status: 'unconfirmed',
+        error: 'Invalid response from trading engine — outcome unknown, reconcile against broker state',
         raw,
       }
     }
@@ -942,11 +1218,17 @@ export class TradingGit implements ITradingGit {
     const success = rawObj.success === true
 
     if (!success) {
+      const message = (rawObj.error as string) ?? 'Unknown error'
       return {
         action: op.action,
         success: false,
-        status: 'rejected',
-        error: (rawObj.error as string) ?? 'Unknown error',
+        // The dispatcher REPORTED a failure instead of throwing it (e.g.
+        // CcxtBroker.placeOrder resolves { success: false, error } for every
+        // venue error, transport timeouts included). Route it through the same
+        // decision as a thrown failure: a transport message means the outcome is
+        // unknown, anything else is a refusal.
+        status: this.config.classifyOperationError?.(new ReportedOperationFailureError(message)) ?? 'rejected',
+        error: message,
         raw,
       }
     }

@@ -9,7 +9,7 @@
 import { z } from 'zod'
 import ccxt from 'ccxt'
 import Decimal from 'decimal.js'
-import type { Exchange, Order as CcxtOrder, Position as CcxtRawPosition } from 'ccxt'
+import type { Exchange, FundingRateHistory as CcxtFundingRateHistoryRow, Order as CcxtOrder, Position as CcxtRawPosition } from 'ccxt'
 import { Contract, ContractDescription, ContractDetails, Order, OrderState, UNSET_DECIMAL } from '@traderalice/ibkr'
 import {
   BrokerError,
@@ -26,11 +26,12 @@ import {
   type TpSlParams,
   type Bar,
   type BarParams,
+  type FundingRateHistoryParams,
   type SubAccountRef,
 } from '../types.js'
 import '../../contract-ext.js'
 import { buildPosition } from '../contract-builder.js'
-import { CCXT_CREDENTIAL_FIELDS, type CcxtBrokerConfig, type CcxtMarket, type FundingRate, type OrderBook, type OrderBookLevel } from './ccxt-types.js'
+import { CCXT_CREDENTIAL_FIELDS, type CcxtBrokerConfig, type CcxtMarket, type FundingRate, type FundingRateHistory, type OrderBook, type OrderBookLevel } from './ccxt-types.js'
 import { MAX_INIT_RETRIES, INIT_RETRY_BASE_MS } from './ccxt-types.js'
 import {
   ccxtTypeToSecType,
@@ -44,7 +45,7 @@ import { fuzzyRankContracts } from '../fuzzy-rank.js'
 import {
   type CcxtExchangeOverrides,
   type CcxtSubAccountDef,
-  exchangeOverrides,
+  resolveExchangeOverrides,
   defaultFetchBalance,
   defaultFetchOrderById,
   defaultCancelOrderById,
@@ -160,6 +161,32 @@ function ibkrOrderTypeToCcxt(orderType: string): string {
   }
 }
 
+/** Reduce one ccxt funding-rate page to `settlement timestamp → rate`, dropping
+ *  rows the venue left un-stamped (or stamped past our read time) and
+ *  de-duplicating the inclusive page boundaries venues return twice. */
+function fundingRatePoints(rows: CcxtFundingRateHistoryRow[], upperBound: number): Map<number, number> {
+  const points = new Map<number, number>()
+  for (const row of rows) {
+    if (row?.timestamp == null || row.fundingRate == null) continue
+    const ts = Number(row.timestamp)
+    const rate = Number(row.fundingRate)
+    if (!Number.isFinite(ts) || ts > upperBound || !Number.isFinite(rate)) continue
+    points.set(ts, rate)
+  }
+  return points
+}
+
+/** The venue's current funding cadence, measured from its own two most recent
+ *  periods. Venue-set — 8h on binance/okx/bybit today — and it has changed over
+ *  the years, so unlike BAR_INTERVAL_MS it is measured rather than assumed. */
+function fundingCadenceMs(timestamps: number[]): number | undefined {
+  const latest = timestamps.at(-1)
+  const previous = timestamps.at(-2)
+  if (latest == null || previous == null) return undefined
+  const gap = latest - previous
+  return gap > 0 ? gap : undefined
+}
+
 export interface CcxtBrokerMeta {
   exchange: string  // "bybit", "binance", "okx", etc.
 }
@@ -243,7 +270,7 @@ export class CcxtBroker implements IBroker<CcxtBrokerMeta> {
     this.exchangeName = config.exchange
     this.keyless = config.keyless ?? false
     this.meta = { exchange: config.exchange }
-    this.overrides = exchangeOverrides[config.exchange] ?? {}
+    this.overrides = resolveExchangeOverrides(config.exchange)
     this.id = config.id ?? `${config.exchange}-main`
     this.label = config.label ?? `${config.exchange.charAt(0).toUpperCase() + config.exchange.slice(1)} ${config.sandbox ? 'Testnet' : 'Live'}`
 
@@ -1375,6 +1402,109 @@ export class CcxtBroker implements IBroker<CcxtBrokerMeta> {
         nextFundingTime: funding.fundingDatetime ? new Date(funding.fundingDatetime) : undefined,
         previousFundingRate: funding.previousFundingRate ?? undefined,
         timestamp: new Date(funding.timestamp ?? Date.now()),
+      }
+    } catch (err) {
+      throw BrokerError.from(err)
+    }
+  }
+
+  /**
+   * Settled funding-rate history via ccxt `fetchFundingRateHistory`.
+   *
+   * Two ccxt semantics have to be reconciled with this repo's contract, and
+   * both are handled the way `getHistorical` handles the same mismatch:
+   *
+   *  - ccxt reads `since` as "the FIRST `limit` rows at/after this time",
+   *    while Alice's convention is that `limit` truncates to the MOST RECENT
+   *    rows in the window. Handing `start` straight to ccxt would answer a
+   *    30-day request with the month-old end of the series, so the trailing
+   *    anchor is computed first and the truncation happens last, on the
+   *    accumulated rows.
+   *  - venues cap page sizes independently of the requested limit, so one
+   *    page is not always the answer.
+   *
+   * The anchor needs the venue's funding cadence, which — unlike
+   * BAR_INTERVAL_MS for bars — cannot be assumed, so it is measured from the
+   * newest rows this read starts from anyway.
+   *
+   * A venue that does not publish this history (`has.fetchFundingRateHistory`
+   * not a plain `true` — including ccxt's 'emulated', a synthesized series) is
+   * refused loudly instead of answered with a substitute.
+   */
+  async getFundingRateHistory(contract: Contract, params: FundingRateHistoryParams): Promise<FundingRateHistory> {
+    this.ensureInit()
+
+    const ccxtSymbol = contractToCcxt(contract, this.markets, this.exchangeName)
+    if (!ccxtSymbol) throw new BrokerError('EXCHANGE', 'Cannot resolve contract to CCXT symbol')
+    if (this.exchange.has.fetchFundingRateHistory !== true) {
+      throw new BrokerError('EXCHANGE', `${this.exchangeName} does not publish funding-rate history`)
+    }
+
+    const limit = Math.min(1000, params.limit == null ? 100 : Math.max(1, Math.floor(params.limit)))
+    const lowerBound = params.start == null ? undefined : Date.parse(params.start)
+    if (lowerBound != null && !Number.isFinite(lowerBound)) {
+      throw new BrokerError('EXCHANGE', `start is not a valid ISO 8601 timestamp: ${params.start}`)
+    }
+    const upperBound = Date.now()
+    // One extra period: venues differ on whether the period still being funded
+    // is already visible, and an exact N-period window can otherwise come back
+    // with only N-1 settled periods.
+    const queryLimit = limit + 1
+
+    try {
+      // The newest page first. With no `since` ccxt reads the most recent rows,
+      // so this page is both the cadence measurement the anchor needs and, when
+      // `limit` fits one page, the whole answer.
+      const newest = fundingRatePoints(await this.exchange.fetchFundingRateHistory(ccxtSymbol, undefined, queryLimit), upperBound)
+      const timestamps = [...newest.keys()].sort((a, b) => a - b)
+      const cadenceMs = fundingCadenceMs(timestamps)
+      const trailingSince = cadenceMs == null ? undefined : upperBound - cadenceMs * queryLimit + 1
+      const since = trailingSince == null
+        ? lowerBound
+        : Math.max(lowerBound ?? Number.NEGATIVE_INFINITY, trailingSince)
+
+      const byTime = new Map<number, number>()
+      for (const [ts, rate] of newest) {
+        if (lowerBound != null && ts < lowerBound) continue
+        byTime.set(ts, rate)
+      }
+      // Two reasons to stop here: the newest page already reaches back past
+      // `start` (the window holds the newest periods, so nothing older can be
+      // in it), or it already carries the requested number of them. Otherwise
+      // the venue's page cap is below the request and the periods under the
+      // newest page still have to be read.
+      const windowCovered = lowerBound != null && timestamps.length > 0 && timestamps[0] <= lowerBound
+      if (!windowCovered && byTime.size < limit) {
+        // Walk forward from the trailing anchor, exactly like the OHLCV walk
+        // above. The one-extra-period budget is what keeps the walk from
+        // stopping a period short of the newest page and leaving a hole in
+        // the tail that is sliced last.
+        let cursor = since
+        for (let page = 0; page < 100 && cursor != null && byTime.size < queryLimit; page++) {
+          const rows = fundingRatePoints(await this.exchange.fetchFundingRateHistory(ccxtSymbol, cursor, queryLimit), upperBound)
+          let latest = Number.NEGATIVE_INFINITY
+          for (const [ts, rate] of rows) {
+            latest = Math.max(latest, ts)
+            if (lowerBound != null && ts < lowerBound) continue
+            byTime.set(ts, rate)
+          }
+          if (!rows.size || latest < cursor || latest >= upperBound || byTime.size >= queryLimit) break
+          cursor = latest + 1
+        }
+      }
+
+      const market = this.markets[ccxtSymbol]
+      // Truncation happens HERE, on the accumulated rows: `limit` selects the
+      // most recent periods, never the ones that happen to come first.
+      const rates = [...byTime.entries()]
+        .sort((a, b) => a[0] - b[0])
+        .slice(-limit)
+        .map(([ts, fundingRate]) => ({ timestamp: new Date(ts), fundingRate }))
+
+      return {
+        contract: market ? marketToContract(market, this.exchangeName) : contract,
+        rates,
+        timestamp: new Date(upperBound),
       }
     } catch (err) {
       throw BrokerError.from(err)

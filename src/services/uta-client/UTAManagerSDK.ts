@@ -23,6 +23,7 @@ import type {
   UTASummary,
   AggregatedEquity,
   ContractSearchHit,
+  VenueSpreadResult,
 } from '@traderalice/uta-protocol'
 import type { ContractDescription, Contract, ContractDetails } from '@traderalice/ibkr'
 import type { ReconnectResult } from '../../core/types.js'
@@ -155,6 +156,15 @@ export class UTAManagerSDK {
    *  `await manager.size()`. */
   async size(): Promise<number> {
     return (await this.listUTAs()).length
+  }
+
+  /** Read the same instrument on 2–8 venues concurrently and report the
+   *  cross-venue spread between them. Read-only: no orders, no state. A leg
+   *  that fails is reported inside the result; a mismatched instrument set
+   *  (or fewer than two answering venues) rejects the whole call. */
+  async getVenueSpread(aliceIds: string[]): Promise<VenueSpreadResult> {
+    this.assertAvailable()
+    return this.client.post<VenueSpreadResult>(`/api/trading/venue-spread`, { aliceIds })
   }
 
   async getAggregatedEquity(): Promise<AggregatedEquity> {

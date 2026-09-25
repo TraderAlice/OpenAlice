@@ -6,11 +6,11 @@
  */
 
 import Decimal from 'decimal.js'
-import type { Contract, ContractDescription, ContractDetails } from '@traderalice/ibkr'
-import type { AccountCapabilities, BrokerHealth, BrokerHealthInfo } from './brokers/types.js'
+import { Contract, type ContractDescription, type ContractDetails } from '@traderalice/ibkr'
+import { BrokerError, type AccountCapabilities, type BrokerHealth, type BrokerHealthInfo } from './brokers/types.js'
 import { createCcxtProviderTools } from './brokers/ccxt/ccxt-tools.js'
 import { createBroker } from './brokers/factory.js'
-import { getBrokerPreset } from '@traderalice/uta-protocol'
+import { computeVenueSpread, getBrokerPreset, pairingKeyOf, usablePrice } from '@traderalice/uta-protocol'
 import { UnifiedTradingAccount } from './UnifiedTradingAccount.js'
 import { loadGitState, createGitPersister } from './git-persistence.js'
 import { readUTAsConfig, type UTAConfig } from '@/core/config.js'
@@ -23,8 +23,21 @@ import './contract-ext.js'
 // Manager-level shapes live in `@traderalice/uta-protocol` (the SDK
 // contract surface) — re-exported here for backwards compatibility with
 // callers that import via `@/domain/trading`.
-import type { UTASummary, AggregatedEquity, ContractSearchResult } from '@traderalice/uta-protocol'
-export type { UTASummary, AggregatedEquity, ContractSearchResult }
+import type { UTASummary, AggregatedEquity, ContractSearchResult, VenueQuoteLeg, VenueSpreadResult } from '@traderalice/uta-protocol'
+export type { UTASummary, AggregatedEquity, ContractSearchResult, VenueQuoteLeg, VenueSpreadResult }
+
+/** A leg that could not be read, in the same shape a successful leg returns.
+ *  `latencyMs` is the time we spent on the attempt that failed (0 when no read
+ *  was attempted, e.g. the account is not registered). */
+function failedVenueLeg(aliceId: string, source: string, error: string, latencyMs = 0): VenueQuoteLeg {
+  return {
+    source, aliceId, localSymbol: '',
+    bid: null, ask: null, last: null,
+    observedAt: new Date().toISOString(),
+    latencyMs,
+    error,
+  }
+}
 
 // ==================== UTAManager ====================
 
@@ -302,6 +315,101 @@ export class UTAManager {
     const uta = this.entries.get(accountId)
     if (!uta) return null
     return uta.getContractDetails(query)
+  }
+
+  // ==================== Cross-venue spread ====================
+
+  /**
+   * Read the same instrument on 2–8 venues concurrently and report the
+   * cross-venue spread between them. Read-only: quotes only — no order
+   * path, no trading state, no git state.
+   *
+   * Legs carry `observedAt` (our local read-back time) and no venue-side
+   * timestamp: the broker layer builds `Quote.timestamp` as
+   * `ticker.timestamp ?? Date.now()`, so a venue that stamps nothing is
+   * indistinguishable from one that does, and a field that can pass local
+   * time off as exchange time is worse than no field.
+   *
+   * Degradation follows `searchContracts`, one step further: a leg that fails
+   * (unknown account prefix, unhealthy account, broker error) is reported as
+   * an errored leg instead of failing the call, so one region-blocked venue
+   * cannot blank a spread the remaining venues can still answer.
+   *
+   * The call fails outright — never with a partial spread — when fewer than
+   * two legs answered, or when the legs that answered do not name the same
+   * instrument. A BTC-spot vs BTC-perp difference is not a spread, and
+   * reporting one would be worse than reporting nothing.
+   */
+  async getVenueSpread(aliceIds: string[]): Promise<VenueSpreadResult> {
+    if (aliceIds.length < 2 || aliceIds.length > 8) {
+      throw new BrokerError('CONFIG', `getVenueSpread reads 2–8 venues, got ${aliceIds.length}.`)
+    }
+    // Envelope time is taken BEFORE dispatch, so `skewMs` measures the fan-out
+    // itself rather than the clock of whichever venue answered last.
+    const asOf = new Date().toISOString()
+
+    const reads = await Promise.all(aliceIds.map(async (aliceId): Promise<{ leg: VenueQuoteLeg; pairingKey?: string }> => {
+      const separator = aliceId.indexOf('|')
+      const uta = separator > 0 ? this.entries.get(aliceId.slice(0, separator)) : undefined
+      if (!uta) {
+        return { leg: failedVenueLeg(aliceId, '', `No UTA matches the account prefix of aliceId "${aliceId}".`) }
+      }
+      if (uta.health !== 'healthy') {
+        uta.nudgeRecovery()
+        return { leg: failedVenueLeg(aliceId, uta.id, `Account is "${uta.health}" — its quote was not read.`) }
+      }
+      // Monotonic clock: a leg's cost must not move with an NTP step.
+      const readStartedAt = performance.now()
+      try {
+        // aliceId-only stub; UTA expands it through the broker native-key decoder.
+        const quote = await uta.getQuote(Object.assign(new Contract(), { aliceId }))
+        return {
+          pairingKey: pairingKeyOf(quote.contract),
+          leg: {
+            source: uta.id,
+            aliceId,
+            localSymbol: quote.contract.localSymbol || quote.contract.symbol || '',
+            // `usablePrice` maps a missing side (CCXT writes "0") to null so a
+            // silent venue can never be read as the cheapest place to buy.
+            bid: usablePrice(quote.bid),
+            ask: usablePrice(quote.ask),
+            last: usablePrice(quote.last),
+            // This leg's own clock reading — the input to `skewMs`.
+            observedAt: new Date().toISOString(),
+            latencyMs: Math.round(performance.now() - readStartedAt),
+          },
+        }
+      } catch (err) {
+        return {
+          leg: failedVenueLeg(aliceId, uta.id, err instanceof Error ? err.message : String(err),
+            Math.round(performance.now() - readStartedAt)),
+        }
+      }
+    }))
+
+    const legs = reads.map((read) => read.leg)
+    const answered = reads.filter((read): read is { leg: VenueQuoteLeg; pairingKey: string } => read.pairingKey !== undefined)
+    if (answered.length < 2) {
+      throw new BrokerError('CONFIG',
+        `getVenueSpread read ${answered.length} of ${aliceIds.length} venues — a spread needs two: ` +
+        legs.map((leg) => `${leg.aliceId} (${leg.error ?? 'ok'})`).join(', '))
+    }
+
+    const pairingKeys = Array.from(new Set(answered.map((read) => read.pairingKey)))
+    if (pairingKeys.length > 1) {
+      throw new BrokerError('CONFIG',
+        `getVenueSpread legs do not name the same instrument: ${answered.map((read) => `${read.leg.aliceId} => ${read.pairingKey}`).join(', ')}. ` +
+        'Legs must share symbol, quote currency and product type (spot vs perpetual vs future vs option).')
+    }
+
+    const observed = answered.map((read) => Date.parse(read.leg.observedAt))
+    return {
+      asOf,
+      skewMs: Math.max(...observed) - Math.min(...observed),
+      pairingKey: pairingKeys[0],
+      legs,
+      ...computeVenueSpread(legs),
+    }
   }
 
   // ==================== Cleanup ====================

@@ -213,27 +213,56 @@ export function compactPushResult(r: unknown): AnyRec {
 
 /** GitCommit (tradingShow) → ops + results compacted; stateAfter collapsed
  *  to the account-level numbers + counts (the full position/order arrays
- *  are reachable via getPortfolio/getOrders when actually needed). */
+ *  are reachable via getPortfolio/getOrders when actually needed).
+ *
+ *  Provenance rides on the commit's OWN field: an absent `stateAfterSource` is
+ *  the protocol's encoding for "this commit's live post-execution read", so the
+ *  common path keeps its exact former shape, while a snapshot that was NOT read
+ *  for this commit ('last-known' carried forward, or 'unavailable') is
+ *  summarized as nothing at all — `stateAfter: null` plus its source and one
+ *  plain sentence.
+ *
+ *  Why omission and not a marked-but-present summary: ANY number that reaches
+ *  the payload gets quoted back as fact (the defect this guards was
+ *  `positionCount: 0` for positions that were never read). A null summary
+ *  leaves nothing to quote, so the only thing a consumer can repeat is the
+ *  statement that no snapshot was read. The counts below are therefore the
+ *  length of an array that really was in the commit — never a 0 for absence. */
 export function compactCommit(commit: unknown): AnyRec {
   if (!commit || typeof commit !== 'object') return {}
   const k = commit as AnyRec
-  const state = (k['stateAfter'] ?? {}) as AnyRec
-  return {
+  const source = k['stateAfterSource']
+  const state = k['stateAfter'] as AnyRec | undefined
+  const out: AnyRec = {
     hash: k['hash'],
     parentHash: k['parentHash'],
     message: k['message'],
     timestamp: k['timestamp'],
     operations: Array.isArray(k['operations']) ? k['operations'].map(compactOperation) : [],
     results: Array.isArray(k['results']) ? k['results'].map(compactResult) : [],
-    stateAfter: {
-      netLiquidation: money(state['netLiquidation']),
-      totalCashValue: money(state['totalCashValue']),
-      unrealizedPnL: money(state['unrealizedPnL']),
-      realizedPnL: money(state['realizedPnL']),
-      positionCount: Array.isArray(state['positions']) ? state['positions'].length : 0,
-      pendingOrderCount: Array.isArray(state['pendingOrders']) ? state['pendingOrders'].length : 0,
-    },
   }
+  const positions = state?.['positions']
+  const pendingOrders = state?.['pendingOrders']
+  // Fails closed: a provenance marker of any kind, or a snapshot that is
+  // missing / not an object / missing its position+order arrays, means this
+  // commit holds no account picture of its own to show.
+  if (source !== undefined || !state || !Array.isArray(positions) || !Array.isArray(pendingOrders)) {
+    out['stateAfter'] = null
+    out['stateAfterSource'] = source ?? 'unavailable'
+    out['stateAfterNote'] = source === 'last-known'
+      ? "no account snapshot was read after this commit — the previous commit's state was carried forward and does not describe this commit"
+      : 'no account snapshot was read after this commit'
+    return out
+  }
+  out['stateAfter'] = {
+    netLiquidation: money(state['netLiquidation']),
+    totalCashValue: money(state['totalCashValue']),
+    unrealizedPnL: money(state['unrealizedPnL']),
+    realizedPnL: money(state['realizedPnL']),
+    positionCount: positions.length,
+    pendingOrderCount: pendingOrders.length,
+  }
+  return out
 }
 
 /** ContractDetails → contract compacted + primitive fields that carry

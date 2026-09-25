@@ -2824,6 +2824,7 @@ export const zh: Resources = {
       rejected: '已拒绝',
       userRejected: '用户已拒绝',
       cancelled: '已取消',
+      unconfirmed: '未确认 — 需对账',
     },
   },
   news: {

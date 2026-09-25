@@ -234,3 +234,74 @@ export const exchangeOverrides: Record<string, CcxtExchangeOverrides> = {
   bybit: bybitOverrides,
   hyperliquid: hyperliquidOverrides,
 }
+
+// ==================== Exchange-id aliases ====================
+
+/**
+ * Venue ids that ARE a registered id's own venue, named one by one.
+ *
+ * A broker is configured with a ccxt id, and ccxt ships several ids per venue —
+ * one per market subset of the SAME account. For those, the position-mode field,
+ * the wallet decomposition and the venue's error codes are identical; only
+ * `fetchMarkets.types` and the default type differ. A listed alias gets the
+ * canonical id's overrides, so a hedged account configured as `binanceusdm` or
+ * `binancecoinm` gets the same handling as one configured as `binance` instead of
+ * sending what the venue refuses (binance: -4061).
+ *
+ * Why an explicit list and not a rule (suffix strip, prefix match): an override is
+ * a set of ORDER RULES — which leg field a payload carries, how an account
+ * decomposes into wallets. Applying another venue's rules is silent at the call
+ * site and surfaces only as an order the venue rejects, or worse, as an accepted
+ * order composed under assumptions that venue never made. ccxt's metadata does
+ * not predict this safely: the ids rejected below are the same class hierarchy and
+ * the same API shape. So an id is either listed here, or it keeps today's
+ * behaviour — no overrides.
+ *
+ * Verified against the installed ccxt (4.5.78). Both entries extend `binance` and
+ * change only id/name/urls{logo,doc}/has/options (binanceusdm.js:11, binancecoinm.js:10),
+ * inheriting the whole endpoint table — the fapi/dapi groups and the spot host in
+ * binance.js's urls.api (binance.js:228) — so they are the same venue, the same
+ * account, and the same live endpoints answer for them:
+ *   - binanceusdm (USDⓈ-M; fetchMarkets.types ['linear'], binanceusdm.js:35-38)
+ *     reads GET /fapi/v1/positionSide/dual, the endpoint the override names.
+ *   - binancecoinm (COIN-M; fetchMarkets.types ['inverse'], binancecoinm.js:34-38)
+ *     still reaches that linear endpoint: the override pins `{ subType: 'linear' }`
+ *     (exchanges/binance.ts) and ccxt gives params precedence over the instance's
+ *     own defaultSubType (Exchange.js:6232-6239), which is the setting Binance
+ *     documents as shared between UM and CM. So COIN-M needs no separate policy
+ *     variant — which is why this id is a mapping, not a fifth override file.
+ *
+ * Deliberately NOT listed. Each one inherits the class and the API shape, not the
+ * venue; the rules an override encodes were observed on ONE venue's account, and
+ * nothing here shows a sibling entity's deployment follows them:
+ *   - `binanceus` (Binance US, binanceus.js:16): its own spot deployment
+ *     (api.binance.us, binanceus.js:24-26) with swap/future false and
+ *     fetchPositionMode false (binanceus.js:56-57,103), yet it inherits binance's
+ *     fapi/dapi group URLs — so the position-mode read (and the `future`/`delivery`
+ *     wallet reads) would leave for the GLOBAL Binance endpoints with US
+ *     credentials and read another entity's account state as the account's own.
+ *   - `okxus` / `myokx` (OKX US / OKX EEA; okxus.js:17,21 us.okx.com,
+ *     myokx.js:17,21 eea.okx.com): separate deployments of OKX's API. The OKX
+ *     overrides are the ones verified against www.okx.com.
+ *   - `bybiteu` (Bybit EU; bybiteu.js:18,31-35 api.bybit.eu) with swap/future false
+ *     (bybiteu.js:57-58). The Bybit overrides were verified against api.bybit.com.
+ * Unconfirmable therefore unmapped: the failure direction is always NO overrides.
+ */
+export const exchangeIdAliases: Record<string, string> = {
+  binanceusdm: 'binance',
+  binancecoinm: 'binance',
+}
+
+/**
+ * The overrides for a configured ccxt exchange id, aliases included — the lookup
+ * every override consumer must use instead of indexing `exchangeOverrides`
+ * directly. Returns the registry's own object (same reference: a copy could drift
+ * from the canonical entry).
+ *
+ * Unknown, unlisted and unconfirmed ids all resolve to an empty overrides object:
+ * a missing override costs a venue refusal, a wrong one composes orders under
+ * another venue's rules. Never widen this to a nearest-match.
+ */
+export function resolveExchangeOverrides(exchangeId: string): CcxtExchangeOverrides {
+  return exchangeOverrides[exchangeIdAliases[exchangeId] ?? exchangeId] ?? {}
+}

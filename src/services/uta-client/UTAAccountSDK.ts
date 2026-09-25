@@ -13,6 +13,8 @@
 import type {
   UTAClient,
   OptionResearchRequest,
+  FundingRateRequest,
+  FundingRateHistoryRequest,
   AccountInfo,
   SubAccountRef,
   OrderHistoryEntry,
@@ -173,6 +175,14 @@ export class UTAAccountSDK {
 
   getOrderBook(request: { aliceId: string; limit?: number }): Promise<Record<string, unknown>> {
     return this.client.post(`/api/trading/uta/${encodeURIComponent(this.id)}/contract/order-book`, request)
+  }
+
+  getFundingRate(request: FundingRateRequest): Promise<Record<string, unknown>> {
+    return this.client.post(`/api/trading/uta/${encodeURIComponent(this.id)}/contract/funding-rate`, request)
+  }
+
+  getFundingRateHistory(request: FundingRateHistoryRequest): Promise<Record<string, unknown>> {
+    return this.client.post(`/api/trading/uta/${encodeURIComponent(this.id)}/contract/funding-rate-history`, request)
   }
 
   getMarketClock(): Promise<MarketClock> {

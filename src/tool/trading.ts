@@ -1,4 +1,4 @@
-import { optionResearchSchema, orderBookSchema } from '@traderalice/uta-protocol'
+import { fundingRateHistorySchema, fundingRateSchema, optionResearchSchema, orderBookSchema, venueSpreadSchema } from '@traderalice/uta-protocol'
 /**
  * AI Trading Tool Factory — pure tool shell layer
  *
@@ -504,6 +504,60 @@ If the result is an object with a \`degraded\` array, one or more accounts could
           if (!parsed) return { error: 'Invalid aliceId. Use contract search first.' }
           const uta = await manager.resolveOne(parsed.utaId)
           return { source: uta.id, ...await uta.getOrderBook(request) }
+        } catch (err) { return handleBrokerError(err) }
+      },
+    }),
+
+    getFundingRate: tool({
+      description: `Read the CURRENT funding rate of a perpetual contract (CCXT/crypto accounts only).
+
+A funding rate is the rate charged PER FUNDING PERIOD. It is NOT annualized and NOT an amount: it is a rate. Convert it into a holding cost with the period length you observe in getFundingRateHistory (commonly 8h, venue-set, and venues have changed it) — never by assuming 8h and never with a fixed annualization factor. A POSITIVE rate means LONGS PAY SHORTS for that period, so one period of a long position costs notional × rate.
+
+The fields a venue reports differ: the previous-period rate is optional, and venues that publish none return no previousFundingRate (do not read that absence as "unchanged"). Some venues answer this read from the SDK's own synthesis of nearby market data rather than from a native funding endpoint, so it is the venue's best published figure, not a settlement record — the settled series is what getFundingRateHistory reads. The timestamp is not always a venue time either: when a venue's funding read reaches us without one (OKX is one — the SDK parses no timestamp for that endpoint), we stamp OUR read time in its place, not a venue or settlement time.
+
+Read-only public market data; no credentials or entitlement required.`,
+      inputSchema: fundingRateSchema,
+      execute: async request => {
+        try {
+          const parsed = parseAliceId(request.aliceId)
+          if (!parsed) return { error: 'Invalid aliceId. Use contract search first.' }
+          const uta = await manager.resolveOne(parsed.utaId)
+          return { source: uta.id, ...await uta.getFundingRate(request) }
+        } catch (err) { return handleBrokerError(err) }
+      },
+    }),
+
+    getFundingRateHistory: tool({
+      description: `Read a perpetual contract's SETTLED funding-rate history, one rate per funding period, oldest first (ascending by timestamp, newest last) (CCXT/crypto accounts only).
+
+Each rate is the rate charged PER FUNDING PERIOD. It is NOT annualized and NOT an amount: it is a rate. A POSITIVE rate means LONGS PAY SHORTS for that period, so sum or average these per-period rates for a realized holding cost and never multiply them by a fixed annualization factor — the period length is venue-set (commonly 8h, but venues have moved pairs off it), so read it from the gaps between the returned timestamps instead of assuming it.
+
+start is an optional ISO 8601 lower bound on the window; omitted reads the venue's most recent periods. limit truncates to the MOST RECENT periods in that window (default 100, max 1000) — never the oldest ones first. Venues cap their own page sizes, so a request larger than the venue's cap returns fewer periods than asked, always the most recent available. The envelope timestamp is OUR read time (the window's upper bound), not the last period's settlement time. Read-only public market data; no credentials required.`,
+      inputSchema: fundingRateHistorySchema,
+      execute: async request => {
+        try {
+          const parsed = parseAliceId(request.aliceId)
+          if (!parsed) return { error: 'Invalid aliceId. Use contract search first.' }
+          const uta = await manager.resolveOne(parsed.utaId)
+          return { source: uta.id, ...await uta.getFundingRateHistory(request) }
+        } catch (err) { return handleBrokerError(err) }
+      },
+    }),
+
+    getVenueSpread: tool({
+      description: `Read the SAME instrument on 2–8 venues CONCURRENTLY and report the price difference between them. Read-only: no orders, no trading state.
+
+Pass 2–8 aliceIds, one per venue. Every leg must name the same instrument — same symbol, same quote currency, and same product type (spot vs perpetual vs future vs option). Legs that disagree on any of the three are rejected outright instead of compared, because a BTC-spot vs BTC-perp difference is basis, not a spread. A single readable venue is an error too, not a spread against nothing.
+
+This is a PRICE RELATIONSHIP, NOT AN EXECUTABLE OPPORTUNITY — do not read it as a trading signal on its own. It excludes fees, funding and slippage, and it carries no size at all: Quote has no size field, so the number says nothing about how much could actually be traded at those prices. The legs are concurrent snapshots, not simultaneous ones — quote age can differ across venues by hundreds of milliseconds or more — so skewMs and each leg’s latencyMs are the evidence for whether the legs are comparable at all.
+
+bid/ask are each venue’s live quote levels. executableSpread buys at the lowest ask and sells at the highest bid ACROSS DIFFERENT VENUES (a venue cannot trade with itself), and is null when fewer than two venues quote both sides. A venue with no two-sided quote is EXCLUDED — its missing side is never counted as a 0 price and last is never substituted for one — so a keyless binance leg (which quotes no bid/ask) drops out, and if that leaves fewer than two two-sided venues the spread is null rather than patched together. Excluded venues appear with bid/ask null.
+
+skewMs = max − min of the legs’ observedAt: it measures the skew of OUR fan-out, not exchange-side staleness (a venue whose own quotes are stale still reads as fresh here). Individual venues can fail without failing the call; read each leg’s \`error\`. Amounts are decimal strings.`,
+      inputSchema: venueSpreadSchema,
+      execute: async ({ aliceIds }) => {
+        try {
+          return await manager.getVenueSpread(aliceIds)
         } catch (err) { return handleBrokerError(err) }
       },
     }),

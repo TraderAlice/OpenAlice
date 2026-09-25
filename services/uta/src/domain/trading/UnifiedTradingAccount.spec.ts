@@ -1575,3 +1575,76 @@ describe('UTA — connecting gate (non-blocking cold start)', () => {
     await expect(uta.getAccount()).resolves.toBeDefined()
   })
 })
+
+// ==================== Wallet write failure verdicts (wired classifier) ====================
+//
+// The git layer cannot classify broker errors itself, so UTA wires
+// `classifyOperationFailure` into the git config. These specs drive a real push
+// through the account, because a classifier that is merely implemented but not
+// wired leaves the production path exactly as mislabelling as before.
+
+describe('UTA — wallet write failure verdicts', () => {
+  it('records a transport-level failure as unconfirmed and frees the account', async () => {
+    const { uta, broker } = createUTA()
+    // The shape CcxtBroker rethrows from its venue client when the request times
+    // out: the order may have reached the matching engine. The venue client's own
+    // 10s timeout fires long before the 90s write bound, so this — not the write
+    // bound — is the path a hung venue actually takes.
+    const placeOrder = vi.spyOn(broker, 'placeOrder').mockRejectedValueOnce(
+      Object.assign(new Error('mock-paper POST /order request timed out (10000 ms)'), { name: 'RequestTimeout' }),
+    )
+
+    uta.stagePlaceOrder({ aliceId: 'mock-paper|AAPL', action: 'BUY', orderType: 'MKT', totalQuantity: '10' })
+    uta.commit('buy AAPL')
+    const hash = uta.status().pendingHash!
+
+    await expect(uta.push(hash)).rejects.toMatchObject({ code: 'WRITE_OUTCOME_UNCONFIRMED' })
+
+    // The log must not claim a definite non-effect for an order that may be live.
+    expect(uta.show(hash)?.results[0]).toMatchObject({ success: false, status: 'unconfirmed' })
+
+    // The write lock is gone: the stop-loss an operator would send next goes
+    // through, broker call included.
+    placeOrder.mockResolvedValue({ success: true, orderId: 'order-stop' })
+    uta.stagePlaceOrder({
+      aliceId: 'mock-paper|MSFT', symbol: 'MSFT', action: 'SELL', orderType: 'STOP',
+      totalQuantity: '1', auxPrice: '90',
+    })
+    const stopHash = uta.commit('stop-loss MSFT').hash
+    await expect(uta.push(stopHash)).resolves.toMatchObject({ operationCount: 1 })
+  })
+
+  it('still records a venue refusal as rejected', async () => {
+    const { uta, broker } = createUTA()
+    vi.spyOn(broker, 'placeOrder').mockRejectedValue(
+      Object.assign(new Error('insufficient funds'), { name: 'InsufficientFunds' }),
+    )
+
+    uta.stagePlaceOrder({ aliceId: 'mock-paper|AAPL', action: 'BUY', orderType: 'MKT', totalQuantity: '10' })
+    uta.commit('buy AAPL')
+    const hash = uta.status().pendingHash!
+
+    const result = await uta.push(hash)
+
+    expect(result.rejected).toHaveLength(1)
+    expect(uta.show(hash)?.results[0]).toMatchObject({ success: false, status: 'rejected' })
+  })
+
+  it('records a timeout the broker reports as a resolved failure as unconfirmed', async () => {
+    const { uta, broker } = createUTA()
+    // CcxtBroker.placeOrder catches every venue error and RESOLVES it — so on a
+    // hung venue the write never throws, and the verdict has to come from the
+    // reported message rather than from an exception.
+    vi.spyOn(broker, 'placeOrder').mockResolvedValue({
+      success: false,
+      error: 'okx POST /order request timed out (10000 ms)',
+    })
+
+    uta.stagePlaceOrder({ aliceId: 'mock-paper|AAPL', action: 'BUY', orderType: 'MKT', totalQuantity: '10' })
+    uta.commit('buy AAPL')
+    const hash = uta.status().pendingHash!
+
+    await expect(uta.push(hash)).rejects.toMatchObject({ code: 'WRITE_OUTCOME_UNCONFIRMED' })
+    expect(uta.show(hash)?.results[0]).toMatchObject({ success: false, status: 'unconfirmed' })
+  })
+})

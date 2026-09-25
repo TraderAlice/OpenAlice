@@ -3,7 +3,7 @@ import Decimal from 'decimal.js'
 import {
   val, money, price,
   compactContract, compactOrderFields, compactOperation,
-  compactResult, compactStatus, compactAccountInfo,
+  compactResult, compactStatus, compactAccountInfo, compactCommit,
 } from './trading-compact.js'
 
 describe('val — sentinel normalization', () => {
@@ -130,5 +130,73 @@ describe('compactAccountInfo', () => {
       unrealizedPnL: '150.49', realizedPnL: '-0.37', initMarginReq: '1.12',
     })
     expect('buyingPower' in a).toBe(false)
+  })
+})
+
+describe('compactCommit — a snapshot that was not read is never presented as fact', () => {
+  // A commit whose account snapshot WAS read — the common path, and the only
+  // shape a consumer may quote as current account state.
+  const state = {
+    netLiquidation: '90273.826752780986',
+    totalCashValue: '81351.50743564543',
+    unrealizedPnL: '150.48841053856901168',
+    realizedPnL: '-0.3654613868044494',
+    positions: [{ contract: { symbol: 'ETH' }, position: '0.5' }, { contract: { symbol: 'BTC' }, position: '0.01' }],
+    pendingOrders: [{ orderId: 'o1' }],
+  }
+  const fields = {
+    hash: 'abcd1234', parentHash: 'efgh5678', message: 'long ETH',
+    timestamp: '2026-09-23T00:00:00.000Z',
+    operations: [{ action: 'placeOrder', contract: { symbol: 'ETH' }, order: { action: 'BUY', totalQuantity: '0.5' } }],
+    results: [{ action: 'placeOrder', success: true, status: 'submitted', orderId: 'o1' }],
+  }
+  const compactedOps = [{ action: 'placeOrder', contract: { symbol: 'ETH' }, order: { action: 'BUY', totalQuantity: '0.5' } }]
+  const compactedResults = [{ action: 'placeOrder', success: true, status: 'submitted', orderId: 'o1' }]
+
+  it('leaves a freshly-read snapshot exactly as it was (common path unchanged)', () => {
+    const out = compactCommit({ ...fields, stateAfter: state })
+    expect(out).toEqual({
+      hash: 'abcd1234', parentHash: 'efgh5678', message: 'long ETH',
+      timestamp: '2026-09-23T00:00:00.000Z',
+      operations: compactedOps,
+      results: compactedResults,
+      stateAfter: {
+        netLiquidation: '90273.83', totalCashValue: '81351.51', unrealizedPnL: '150.49',
+        realizedPnL: '-0.37', positionCount: 2, pendingOrderCount: 1,
+      },
+    })
+    // An absent stateAfterSource IS the protocol's encoding for "live read" —
+    // the agent boundary must not invent its own provenance vocabulary.
+    expect('stateAfterSource' in out).toBe(false)
+    expect('stateAfterNote' in out).toBe(false)
+  })
+
+  it("carries 'last-known' and never renders the carried-forward positions as this commit's count", () => {
+    const out = compactCommit({ ...fields, stateAfter: state, stateAfterSource: 'last-known' })
+    expect(out['stateAfterSource']).toBe('last-known')
+    // The carried-forward array holds 2 positions; quoting either 2 (as if read)
+    // or 0 (as if flat) states an account picture this commit never saw.
+    expect(out['stateAfter']).toBeNull()
+    expect(JSON.stringify(out)).not.toContain('positionCount')
+    expect(JSON.stringify(out)).not.toContain('netLiquidation')
+    expect(String(out['stateAfterNote'])).toMatch(/no account snapshot was read/)
+    // The commit's own per-operation verdicts ARE real and must survive.
+    expect(out['results']).toEqual(compactedResults)
+  })
+
+  it("carries 'unavailable' and never renders a never-read snapshot as positionCount 0", () => {
+    const out = compactCommit({ ...fields, stateAfterSource: 'unavailable' })
+    expect(out['stateAfterSource']).toBe('unavailable')
+    expect(out['stateAfter']).toBeNull()
+    expect(JSON.stringify(out)).not.toContain('positionCount')
+    expect(String(out['stateAfterNote'])).toMatch(/no account snapshot was read/)
+    expect(out['results']).toEqual(compactedResults)
+  })
+
+  it('fails closed when the record holds no snapshot at all (legacy/partial commit)', () => {
+    const out = compactCommit({ ...fields })
+    expect(out['stateAfter']).toBeNull()
+    expect(out['stateAfterSource']).toBe('unavailable')
+    expect(JSON.stringify(out)).not.toContain('positionCount')
   })
 })

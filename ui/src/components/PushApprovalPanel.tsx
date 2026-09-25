@@ -236,6 +236,7 @@ function statusClass(status: string | undefined): string {
     case 'rejected': return 'text-destructive'
     case 'user-rejected': return 'text-warning'
     case 'cancelled': return 'text-muted-foreground'
+    case 'unconfirmed': return 'text-warning'
     default: return 'text-muted-foreground'
   }
 }
@@ -247,6 +248,7 @@ function statusLabel(status: string, t: TFunction): string {
     case 'rejected': return t('tradingReview.operationStatus.rejected')
     case 'user-rejected': return t('tradingReview.operationStatus.userRejected')
     case 'cancelled': return t('tradingReview.operationStatus.cancelled')
+    case 'unconfirmed': return t('tradingReview.operationStatus.unconfirmed')
     default: return status
   }
 }

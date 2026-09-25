@@ -1678,6 +1678,183 @@ describe('CcxtBroker — getHistorical', () => {
   })
 })
 
+// ==================== getFundingRateHistory ====================
+
+describe('CcxtBroker — getFundingRateHistory', () => {
+  const HOUR_MS = 3_600_000
+  const FUNDING_STEP_MS = 8 * HOUR_MS          // binance/okx/bybit cadence today
+  const FOUR_HOUR_MS = 4 * HOUR_MS             // not every venue settles on the 8h clock
+  const NOW = Date.parse('2026-09-23T00:00:00Z')
+
+  /** The settled periods a venue holds, oldest first, each with a distinct
+   *  rate so a wrong slice cannot pass by coincidence. `stepMs` is the venue's
+   *  funding cadence: 8h on binance/okx/bybit today, but venue-set, and the
+   *  broker measures it off the venue rather than assuming it. */
+  function series(count: number, stepMs = FUNDING_STEP_MS): Array<{ ts: number; rate: number }> {
+    return Array.from({ length: count }, (_, i) => ({
+      ts: NOW - stepMs * (count - i),
+      rate: 0.0001 * (count - i),
+    }))
+  }
+
+  /** ccxt semantics, faithfully: with no `since` a venue answers with its most
+   *  recent rows, with one it answers with the FIRST rows at/after it — capped
+   *  at its own page size. */
+  function serveVenue(rows: Array<{ ts: number; rate: number }>, pageCap = Number.POSITIVE_INFINITY) {
+    return vi.fn(async (_symbol: string, since?: number, limit?: number) => {
+      const cap = Math.min(limit ?? rows.length, pageCap)
+      const eligible = since == null ? rows : rows.filter(row => row.ts >= since)
+      const page = since == null ? eligible.slice(-cap) : eligible.slice(0, cap)
+      return page.map(row => ({
+        info: { raw: 'venue payload' }, symbol: 'BTC/USDT:USDT',
+        datetime: new Date(row.ts).toISOString(), timestamp: row.ts, fundingRate: row.rate,
+      }))
+    })
+  }
+
+  function makeFundingAccount() {
+    const acc = makeAccount()
+    setInitialized(acc, { 'BTC/USDT:USDT': makeSwapMarket('BTC', 'USDT', 'BTC/USDT:USDT') })
+    ;(acc as any).exchange.has = { fetchFundingRateHistory: true }
+    return acc
+  }
+
+  function contract() {
+    const c = new Contract()
+    c.localSymbol = 'BTC/USDT:USDT'
+    return c
+  }
+
+  /** The anchor and the truncation are both relative to "now". */
+  function atNow(fn: () => Promise<void>) {
+    return async () => {
+      vi.useFakeTimers()
+      vi.setSystemTime(new Date(NOW))
+      try {
+        await fn()
+      } finally {
+        vi.useRealTimers()
+      }
+    }
+  }
+
+  it('truncates to the most recent periods in the window, not the page ccxt returns first', atNow(async () => {
+    const acc = makeFundingAccount()
+    const venue = series(30)                    // 10 days of 8h periods
+    const fetch = serveVenue(venue)
+    ;(acc as any).exchange.fetchFundingRateHistory = fetch
+
+    const history = await acc.getFundingRateHistory(contract(), {
+      start: new Date(NOW - 10 * 24 * HOUR_MS).toISOString(), limit: 3,
+    })
+
+    expect(history.rates).toEqual(venue.slice(-3).map(row => ({ timestamp: new Date(row.ts), fundingRate: row.rate })))
+    expect(fetch).toHaveBeenCalledTimes(1)
+  }))
+
+  it('walks venue-capped pages until it holds the most recent periods', atNow(async () => {
+    const acc = makeFundingAccount()
+    const venue = series(30, FOUR_HOUR_MS)      // 5 days of 4h periods
+    const fetch = serveVenue(venue, 2)          // page cap below the request
+    ;(acc as any).exchange.fetchFundingRateHistory = fetch
+
+    const history = await acc.getFundingRateHistory(contract(), {
+      start: new Date(NOW - 10 * 24 * HOUR_MS).toISOString(), limit: 4,
+    })
+
+    expect(history.rates).toEqual(venue.slice(-4).map(row => ({ timestamp: new Date(row.ts), fundingRate: row.rate })))
+    expect(new Set(history.rates.map(rate => rate.timestamp.getTime())).size).toBe(4)
+    expect(fetch.mock.calls.length).toBeGreaterThanOrEqual(2)
+  }))
+
+  // 4h venues exist. The trailing anchor is derived from the venue's own two
+  // newest periods; with a page cap below `limit` a wrong anchor surfaces as a
+  // hole in the returned window rather than as a merely shorter one.
+  it('measures a non-8h venue cadence instead of assuming the 8h default', atNow(async () => {
+    const acc = makeFundingAccount()
+    const venue = series(60, FOUR_HOUR_MS)      // 10 days of 4h periods
+    const fetch = serveVenue(venue, 5)          // page cap below the request
+    ;(acc as any).exchange.fetchFundingRateHistory = fetch
+
+    const history = await acc.getFundingRateHistory(contract(), { limit: 10 })
+
+    expect(history.rates).toEqual(venue.slice(-10).map(row => ({ timestamp: new Date(row.ts), fundingRate: row.rate })))
+    const stamps = history.rates.map(rate => rate.timestamp.getTime())
+    expect(new Set(stamps).size).toBe(10)                                    // no period answered twice
+    expect(stamps.slice(1).map((ts, i) => ts - stamps[i])).toEqual(Array(9).fill(FOUR_HOUR_MS))
+    expect(fetch.mock.calls.length).toBeGreaterThanOrEqual(2)                // walked, not one page
+  }))
+
+  // Two venue cadences, deliberately: the cadence is set by the venue, not by
+  // this file, so with exactly one fixture pinned a constant that happens to
+  // equal it (4h) is indistinguishable from a measurement. Pinning a second,
+  // different cadence is what makes any single hardcoded period fail one of these
+  // two fixtures — 8h fails both, 4h fails the hourly one, 1h fails the 4h one.
+  it('measures an hourly venue cadence as well, so no single constant fits both', atNow(async () => {
+    const acc = makeFundingAccount()
+    const venue = series(60, HOUR_MS)           // 60h of 1h periods
+    const fetch = serveVenue(venue, 5)          // page cap below the request
+    ;(acc as any).exchange.fetchFundingRateHistory = fetch
+
+    const history = await acc.getFundingRateHistory(contract(), { limit: 10 })
+
+    expect(history.rates).toEqual(venue.slice(-10).map(row => ({ timestamp: new Date(row.ts), fundingRate: row.rate })))
+    const stamps = history.rates.map(rate => rate.timestamp.getTime())
+    expect(new Set(stamps).size).toBe(10)                                    // no period answered twice
+    expect(stamps.slice(1).map((ts, i) => ts - stamps[i])).toEqual(Array(9).fill(HOUR_MS))
+    expect(fetch.mock.calls.length).toBeGreaterThanOrEqual(2)                // walked, not one page
+  }))
+
+  it('returns only the periods at/after start', atNow(async () => {
+    const acc = makeFundingAccount()
+    ;(acc as any).exchange.fetchFundingRateHistory = serveVenue(series(30))
+
+    const history = await acc.getFundingRateHistory(contract(), { start: new Date(NOW - 20 * HOUR_MS).toISOString() })
+
+    expect(history.rates.map(rate => rate.timestamp.getTime()))
+      .toEqual([NOW - 2 * FUNDING_STEP_MS, NOW - FUNDING_STEP_MS])
+  }))
+
+  it('normalizes rows and the envelope instead of leaking the raw ccxt page', atNow(async () => {
+    const acc = makeFundingAccount()
+    ;(acc as any).exchange.fetchFundingRateHistory = serveVenue(series(3), 1)
+
+    const history = await acc.getFundingRateHistory(contract(), { limit: 1 })
+
+    expect(Object.keys(history.rates[0]).sort()).toEqual(['fundingRate', 'timestamp'])
+    expect(history.rates[0].fundingRate).toBe(0.0001)
+    expect(history.rates[0].timestamp).toEqual(new Date(NOW - FUNDING_STEP_MS))
+    expect(history.timestamp).toEqual(new Date(NOW))
+    expect(history.contract.localSymbol).toBe('BTC/USDT:USDT')
+  }))
+
+  it('loud-refuses a venue that does not publish this history', async () => {
+    const acc = makeFundingAccount()
+    const fetch = serveVenue(series(3))
+    ;(acc as any).exchange.fetchFundingRateHistory = fetch
+
+    for (const capability of [false, 'emulated', undefined]) {
+      ;(acc as any).exchange.has = { fetchFundingRateHistory: capability }
+      await expect(acc.getFundingRateHistory(contract(), {})).rejects.toThrow(/does not publish funding-rate history/)
+    }
+    expect(fetch).not.toHaveBeenCalled()
+  })
+
+  it('rejects a start that is not an ISO timestamp', async () => {
+    const acc = makeFundingAccount()
+    ;(acc as any).exchange.fetchFundingRateHistory = serveVenue(series(3))
+    await expect(acc.getFundingRateHistory(contract(), { start: 'last-tuesday' })).rejects.toThrow(/not a valid ISO 8601/)
+  })
+
+  it('throws when the contract cannot be resolved', async () => {
+    const acc = makeAccount()
+    setInitialized(acc, {})
+    const unknown = new Contract()
+    unknown.localSymbol = 'NONE/USDT'
+    await expect(acc.getFundingRateHistory(unknown, {})).rejects.toThrow('Cannot resolve contract')
+  })
+})
+
 // ==================== getMarketClock ====================
 
 describe('CcxtBroker — getMarketClock', () => {
