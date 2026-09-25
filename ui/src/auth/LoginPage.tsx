@@ -50,9 +50,11 @@ export function LoginPage() {
           {t('auth.instruction')}
           {' '}
           <span className="text-foreground-faint">
-            Find it in the backend logs after <code className="font-mono">pnpm dev</code> /
-            {' '}<code className="font-mono">docker run</code>, or rotate via
-            {' '}<code className="font-mono">rm data/config/auth.json</code> and restart.
+            {t('auth.tokenHintBefore')}
+            <code className="rounded bg-muted px-1 py-0.5 font-mono text-[11px] text-foreground/80">docker compose logs openalice</code>
+            {t('auth.tokenHintMid')}
+            <code className="rounded bg-muted px-1 py-0.5 font-mono text-[11px] text-foreground/80">auth.json</code>
+            {t('auth.tokenHintAfter')}
           </span>
         </p>
 
@@ -69,7 +71,7 @@ export function LoginPage() {
               onChange={(e) => setToken(e.target.value)}
               disabled={busy}
               className={`${inputClass} h-9 font-mono`}
-              placeholder="xKUT78dNUcRVDwoyDsUUROqffPJV8-..."
+              placeholder={t('auth.tokenPlaceholder')}
             />
           </div>
 
@@ -101,14 +103,16 @@ export function NoTokenPage() {
         <img src="/alice.ico" alt="" aria-hidden draggable={false} className="mb-4 size-8 object-contain" />
         <h1 className="text-[18px] font-semibold text-foreground mb-2">{t('auth.noTokenHeading')}</h1>
         <p className="text-[13px] text-foreground leading-relaxed mb-3">
-          The backend did not generate <code className="font-mono">data/config/auth.json</code>.
-          This usually means bootstrap was skipped via <code className="font-mono">OPENALICE_DISABLE_AUTH=1</code>,
-          or the file was created empty.
+          {t('auth.noTokenBodyBefore')}
+          <code className="rounded bg-muted px-1 py-0.5 font-mono text-[11px] text-foreground/80">auth.json</code>
+          {t('auth.noTokenBodyMid')}
+          <code className="rounded bg-muted px-1 py-0.5 font-mono text-[11px] text-foreground/80">OPENALICE_DISABLE_AUTH=1</code>
+          {t('auth.noTokenBodyAfter')}
         </p>
         <p className="text-[12px] text-muted-foreground leading-relaxed">
-          Stop the backend, delete <code className="font-mono">data/config/auth.json</code> if it exists,
-          unset <code className="font-mono">OPENALICE_DISABLE_AUTH</code>, and restart. The first-run
-          token will be printed to stdout.
+          {t('auth.noTokenRecoveryBefore')}
+          <code className="rounded bg-muted px-1 py-0.5 font-mono text-[11px] text-foreground/80">OPENALICE_DISABLE_AUTH</code>
+          {t('auth.noTokenRecoveryAfter')}
         </p>
       </div>
     </div>
