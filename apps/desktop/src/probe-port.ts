@@ -40,15 +40,13 @@ function bindable(port: number, host: string): Promise<boolean> {
   return new Promise((res) => {
     const srv = createServer()
     let settled = false
-    let listening = false
     const done = (free: boolean) => {
       if (settled) return
-      if (!listening) {
-        settled = true
+      settled = true
+      if (!srv.listening) {
         res(free)
         return
       }
-      settled = true
       try {
         srv.close(() => res(free))
       } catch { res(free) }
@@ -59,10 +57,7 @@ function bindable(port: number, host: string): Promise<boolean> {
       // errors make this particular probe neutral.
       done(err.code === 'EAFNOSUPPORT' || err.code === 'EADDRNOTAVAIL')
     })
-    srv.once('listening', () => {
-      listening = true
-      done(true)
-    })
+    srv.once('listening', () => done(true))
     srv.listen(port, host)
   })
 }

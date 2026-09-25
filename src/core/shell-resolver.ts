@@ -31,7 +31,9 @@ export function resolveBashPath(
     .split(delimiter)
     .map((entry) => entry.trim().replace(/^"|"$/g, ''))
     .filter(Boolean);
-  // Prefer Git Bash before generic PATH bash aliases (for example, WSL/system32).
+  // Prefer Git for Windows over a system32 bash.exe alias (usually WSL).
+  // The headless launcher passes Windows paths to Bash; WSL's bash cannot
+  // execute those paths, while Git Bash can.
   for (const dir of pathDirs) {
     if (!existsSync(join(dir, 'git.exe'))) continue;
     const root = /^(?:cmd|bin)$/i.test(dirnameLeaf(dir)) ? dirname(dir) : dir;

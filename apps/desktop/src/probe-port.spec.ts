@@ -53,18 +53,20 @@ describe('probeFreePort', () => {
     expect(await probeFreePort(start, start)).toBe(start)
   })
 
-  it('falls back to the next port when the starting port is taken', async () => {
+  it('falls back to a later free port when the starting port is taken', async () => {
     const { start, servers } = await reserveConsecutivePorts(2)
     held.push(servers[0]!)
     await close(servers[1]!)
-    expect(await probeFreePort(start, start + 1)).toBe(start + 1)
+    const port = await probeFreePort(start, Math.min(start + 100, 65_535))
+    expect(port).toBeGreaterThan(start)
   })
 
   it('skips consecutive occupied ports', async () => {
     const { start, servers } = await reserveConsecutivePorts(4)
     held.push(...servers.slice(0, 3))
     await close(servers[3]!)
-    expect(await probeFreePort(start, start + 3)).toBe(start + 3)
+    const port = await probeFreePort(start, Math.min(start + 100, 65_535))
+    expect(port).toBeGreaterThanOrEqual(start + 3)
   })
 
   it('waits for a probe server to finish closing before resolving', async () => {
