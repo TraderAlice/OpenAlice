@@ -25,6 +25,8 @@ vi.mock('ccxt', () => {
     this.fetchOpenOrders = vi.fn()
     this.fetchClosedOrders = vi.fn()
     this.createOrder = vi.fn()
+    // OKX implicit API: GET /api/v5/account/config — the venue-side position mode
+    this.privateGetAccountConfig = vi.fn()
     this.cancelOrder = vi.fn()
     this.editOrder = vi.fn()
     this.fetchOrder = vi.fn()
@@ -41,6 +43,7 @@ vi.mock('ccxt', () => {
       bybit: MockExchange,
       binance: MockExchange,
       bitget: MockExchange,
+      okx: MockExchange,
     },
   }
 })
@@ -758,6 +761,89 @@ describe('CcxtBroker — modifyOrder field forwarding', () => {
 
     const params = call[6] ?? {}
     expect(params).toEqual({})
+  })
+})
+
+// ==================== modifyOrder — OKX filled amount ====================
+
+describe('CcxtBroker — modifyOrder OKX filled amount', () => {
+  it('adds OKX original filled amount to requested remaining amount', async () => {
+    const acc = makeAccount({ exchange: 'okx' })
+    setInitialized(acc, { 'ETH/USDT:USDT': makeSwapMarket('ETH', 'USDT', 'ETH/USDT:USDT') })
+    ;(acc as any).orderSymbolCache.set('okx-partial', 'ETH/USDT:USDT')
+    ;(acc as any).exchange.fetchOrder = vi.fn().mockResolvedValue({
+      type: 'limit', side: 'buy', amount: 0.7, price: 1900, filled: 0.2,
+    })
+    ;(acc as any).exchange.editOrder = vi.fn().mockResolvedValue({ id: 'okx-partial-edited', status: 'open' })
+
+    await acc.modifyOrder('okx-partial', { totalQuantity: new Decimal(0.5) })
+    const call = (acc as any).exchange.editOrder.mock.calls[0]
+
+    expect(call[4]).toBe(0.7) // requested remaining 0.5 + already filled 0.2
+  })
+
+  it('keeps requested amount when OKX original filled amount is zero', async () => {
+    const acc = makeAccount({ exchange: 'okx' })
+    setInitialized(acc, { 'ETH/USDT:USDT': makeSwapMarket('ETH', 'USDT', 'ETH/USDT:USDT') })
+    ;(acc as any).orderSymbolCache.set('okx-zero-fill', 'ETH/USDT:USDT')
+    ;(acc as any).exchange.fetchOrder = vi.fn().mockResolvedValue({
+      type: 'limit', side: 'buy', amount: 0.7, price: 1900, filled: 0,
+    })
+    ;(acc as any).exchange.editOrder = vi.fn().mockResolvedValue({ id: 'okx-zero-fill-edited', status: 'open' })
+
+    await acc.modifyOrder('okx-zero-fill', { totalQuantity: new Decimal(0.5) })
+    const call = (acc as any).exchange.editOrder.mock.calls[0]
+
+    expect(call[4]).toBe(0.5)
+  })
+})
+
+// ==================== modifyOrder — hedge fields ====================
+
+describe('CcxtBroker — modifyOrder hedge fields', () => {
+  it('forwards Bitget tradeSide when the original order is hedge-mode open', async () => {
+    const acc = makeAccount({ exchange: 'bitget' })
+    setInitialized(acc, { 'ETH/USDT:USDT': makeSwapMarket('ETH', 'USDT', 'ETH/USDT:USDT') })
+    ;(acc as any).orderSymbolCache.set('bitget-open', 'ETH/USDT:USDT')
+    ;(acc as any).exchange.fetchOrder = vi.fn().mockResolvedValue({
+      type: 'limit', side: 'buy', amount: 0.1, price: 1900, info: { tradeSide: 'open' },
+    })
+    ;(acc as any).exchange.editOrder = vi.fn().mockResolvedValue({ id: 'bitget-open-edited', status: 'open' })
+
+    await acc.modifyOrder('bitget-open', { totalQuantity: new Decimal(0.2) })
+    const params = (acc as any).exchange.editOrder.mock.calls[0][6] ?? {}
+
+    expect(params.tradeSide).toBe('open')
+  })
+
+  it('does not forward a Bitget one-way tradeSide value', async () => {
+    const acc = makeAccount({ exchange: 'bitget' })
+    setInitialized(acc, { 'ETH/USDT:USDT': makeSwapMarket('ETH', 'USDT', 'ETH/USDT:USDT') })
+    ;(acc as any).orderSymbolCache.set('bitget-one-way', 'ETH/USDT:USDT')
+    ;(acc as any).exchange.fetchOrder = vi.fn().mockResolvedValue({
+      type: 'limit', side: 'buy', amount: 0.1, price: 1900, info: { tradeSide: 'one-way' },
+    })
+    ;(acc as any).exchange.editOrder = vi.fn().mockResolvedValue({ id: 'bitget-one-way-edited', status: 'open' })
+
+    await acc.modifyOrder('bitget-one-way', { totalQuantity: new Decimal(0.2) })
+    const params = (acc as any).exchange.editOrder.mock.calls[0][6] ?? {}
+
+    expect(params.tradeSide).toBeUndefined()
+  })
+
+  it('does not forward Binance positionSide because ccxt drops it from contract amend requests', async () => {
+    const acc = makeAccount({ exchange: 'binance' })
+    setInitialized(acc, { 'ETH/USDT:USDT': makeSwapMarket('ETH', 'USDT', 'ETH/USDT:USDT') })
+    ;(acc as any).orderSymbolCache.set('binance-one-way', 'ETH/USDT:USDT')
+    ;(acc as any).exchange.fetchOrder = vi.fn().mockResolvedValue({
+      type: 'limit', side: 'buy', amount: 0.1, price: 1900, info: { positionSide: 'BOTH' },
+    })
+    ;(acc as any).exchange.editOrder = vi.fn().mockResolvedValue({ id: 'binance-one-way-edited', status: 'open' })
+
+    await acc.modifyOrder('binance-one-way', { totalQuantity: new Decimal(0.2) })
+    const params = (acc as any).exchange.editOrder.mock.calls[0][6] ?? {}
+
+    expect(params.positionSide).toBeUndefined()
   })
 })
 
@@ -1712,5 +1798,256 @@ describe('CcxtBroker — close', () => {
   it('resolves without error (no-op)', async () => {
     const acc = makeAccount()
     await expect(acc.close()).resolves.toBeUndefined()
+  })
+})
+function makeOkxAccount(posMode: string) {
+  const acc = makeAccount({ exchange: 'okx' })
+  setInitialized(acc, {
+    'ETH/USDT:USDT': makeSwapMarket('ETH', 'USDT', 'ETH/USDT:USDT'),
+    'ETH/USDT': makeSpotMarket('ETH', 'USDT'),
+  })
+  ;(acc as any).exchange.privateGetAccountConfig = vi.fn().mockResolvedValue({
+    code: '0',
+    data: [{ posMode, uid: '44705892343619584' }],
+    msg: '',
+  })
+  ;(acc as any).exchange.createOrder = vi.fn().mockResolvedValue({ id: 'okx-1', status: 'open' })
+  return acc
+}
+
+function okxPerp(): Contract {
+  const contract = new Contract()
+  contract.localSymbol = 'ETH/USDT:USDT'
+  return contract
+}
+
+function okxMarketOrder(action: 'BUY' | 'SELL'): Order {
+  const order = new Order()
+  order.action = action
+  order.orderType = 'MKT'
+  order.totalQuantity = new Decimal('0.5')
+  return order
+}
+
+/** createOrder's 6th arg is params. */
+function okxPlacedParams(acc: CcxtBroker, call = 0): Record<string, unknown> {
+  return (acc as any).exchange.createOrder.mock.calls[call][5]
+}
+
+function okxOpenLongPosition() {
+  return {
+    symbol: 'ETH/USDT:USDT', contracts: 0.5, contractSize: 1,
+    markPrice: 1920, entryPrice: 1900, unrealizedPnl: 10,
+    side: 'long', leverage: 10, initialMargin: 100, liquidationPrice: 0,
+  }
+}
+
+describe('CcxtBroker — OKX long/short position mode', () => {
+  it('sends posSide long/short for opening swap orders', async () => {
+    const acc = makeOkxAccount('long_short_mode')
+
+    await acc.placeOrder(okxPerp(), okxMarketOrder('BUY'))
+    await acc.placeOrder(okxPerp(), okxMarketOrder('SELL'))
+
+    expect(okxPlacedParams(acc, 0).posSide).toBe('long')
+    expect(okxPlacedParams(acc, 1).posSide).toBe('short')
+  })
+
+  it('closes a long perp as side sell + posSide long, without reduceOnly', async () => {
+    const acc = makeOkxAccount('long_short_mode')
+    ;(acc as any).exchange.fetchPositions = vi.fn().mockResolvedValue([okxOpenLongPosition()])
+
+    const result = await acc.closePosition(okxPerp())
+
+    expect(result.success).toBe(true)
+    const call = (acc as any).exchange.createOrder.mock.calls[0]
+    expect(call[2]).toBe('sell') // reverses the long
+    const params = call[5]
+    expect(params.posSide).toBe('long')
+    // OKX documents reduceOnly as net-mode-only; posSide already limits the order
+    // to the long, and sending both is the combination the venue rejects.
+    expect('reduceOnly' in params).toBe(false)
+  })
+
+  it('closes a short perp as side buy + posSide short', async () => {
+    const acc = makeOkxAccount('long_short_mode')
+    ;(acc as any).exchange.fetchPositions = vi.fn().mockResolvedValue([
+      { ...okxOpenLongPosition(), side: 'short' },
+    ])
+
+    await acc.closePosition(okxPerp())
+
+    const call = (acc as any).exchange.createOrder.mock.calls[0]
+    expect(call[2]).toBe('buy')
+    expect(call[5].posSide).toBe('short')
+  })
+
+  it('never sends posSide for spot on a long/short account', async () => {
+    const acc = makeOkxAccount('long_short_mode')
+    const spotContract = new Contract()
+    spotContract.localSymbol = 'ETH/USDT'
+
+    await acc.placeOrder(spotContract, okxMarketOrder('BUY'))
+
+    // Anti-vacuity: without the read, an unregistered okx override passes too.
+    expect((acc as any).exchange.privateGetAccountConfig).toHaveBeenCalledTimes(1)
+    expect('posSide' in okxPlacedParams(acc)).toBe(false)
+  })
+
+  it('sends no posSide on a net-mode account, and still consults the venue', async () => {
+    const acc = makeOkxAccount('net_mode')
+
+    await acc.placeOrder(okxPerp(), okxMarketOrder('BUY'))
+
+    expect((acc as any).exchange.privateGetAccountConfig).toHaveBeenCalledTimes(1)
+    expect('posSide' in okxPlacedParams(acc)).toBe(false)
+  })
+
+  it('keeps reduceOnly for a net-mode close (net accounts are unchanged)', async () => {
+    const acc = makeOkxAccount('net_mode')
+    ;(acc as any).exchange.fetchPositions = vi.fn().mockResolvedValue([okxOpenLongPosition()])
+
+    await acc.closePosition(okxPerp())
+
+    const params = okxPlacedParams(acc)
+    expect(params.reduceOnly).toBe(true)
+    expect('posSide' in params).toBe(false)
+  })
+
+  it('preserves a caller-supplied posSide verbatim', async () => {
+    const acc = makeOkxAccount('long_short_mode')
+
+    await acc.placeOrder(okxPerp(), okxMarketOrder('BUY'), undefined, { posSide: 'short', reduceOnly: true })
+
+    const params = okxPlacedParams(acc)
+    expect(params.posSide).toBe('short') // not replaced by the opening-side mapping
+    expect(params.reduceOnly).toBe(true) // the caller owns the wire contract
+  })
+
+  it('a failed read degrades to the pre-fix payload, and the next order recovers', async () => {
+    const acc = makeOkxAccount('long_short_mode')
+    const configRead = vi.fn()
+      .mockRejectedValueOnce(new Error('okx 50011 request too frequent'))
+      .mockResolvedValue({ code: '0', data: [{ posMode: 'long_short_mode' }], msg: '' })
+    ;(acc as any).exchange.privateGetAccountConfig = configRead
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+
+    try {
+      // Order 1: an unreadable mode leaves the outbound payload exactly as it is
+      // with the okx override unregistered — { reduceOnly: true } and no posSide
+      // (the shape the injection-disabled RED run sends).
+      const first = await acc.placeOrder(okxPerp(), okxMarketOrder('SELL'), undefined, { reduceOnly: true })
+      expect(first.success).toBe(true)
+      expect(okxPlacedParams(acc, 0)).toEqual({ reduceOnly: true })
+      expect(String(warn.mock.calls[0]?.[0])).toContain('position mode')
+
+      // Order 2: the rejection was not remembered — the venue is asked again and
+      // the hedge mapping applies.
+      const second = await acc.placeOrder(okxPerp(), okxMarketOrder('SELL'), undefined, { reduceOnly: true })
+      expect(second.success).toBe(true)
+      expect(okxPlacedParams(acc, 1)).toEqual({ posSide: 'long' })
+      expect(configRead).toHaveBeenCalledTimes(2)
+    } finally {
+      warn.mockRestore()
+    }
+  })
+
+  it('names the mode-detection fallback on the failure the operator sees', async () => {
+    const acc = makeOkxAccount('long_short_mode')
+    ;(acc as any).exchange.privateGetAccountConfig = vi.fn().mockRejectedValue(new Error('okx 50011 request too frequent'))
+    ;(acc as any).exchange.createOrder = vi.fn().mockRejectedValue(new Error('okx 51000 Parameter posSide error'))
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+
+    try {
+      const result = await acc.placeOrder(okxPerp(), okxMarketOrder('SELL'), undefined, { reduceOnly: true })
+
+      expect(result.success).toBe(false)
+      // The venue's rejection reaches the operator with the fallback attached.
+      expect(result.error).toContain('51000')
+      expect(result.error).toContain('position mode')
+    } finally {
+      warn.mockRestore()
+    }
+  })
+
+  it('never decides from a stale mode: a switch to net_mode lands on the next close', async () => {
+    const acc = makeOkxAccount('long_short_mode')
+    const configRead = (acc as any).exchange.privateGetAccountConfig
+
+    await acc.placeOrder(okxPerp(), okxMarketOrder('SELL'), undefined, { reduceOnly: true })
+    expect(okxPlacedParams(acc, 0).posSide).toBe('long')
+    expect('reduceOnly' in okxPlacedParams(acc, 0)).toBe(false)
+
+    // The account was switched to net mode in the OKX UI between the two orders.
+    configRead.mockResolvedValue({ code: '0', data: [{ posMode: 'net_mode' }], msg: '' })
+    await acc.placeOrder(okxPerp(), okxMarketOrder('SELL'), undefined, { reduceOnly: true })
+
+    // A mode older than the order would keep posSide and drop reduceOnly here — on
+    // an account where reduceOnly is what stops a close from opening the other side.
+    expect('posSide' in okxPlacedParams(acc, 1)).toBe(false)
+    expect(okxPlacedParams(acc, 1).reduceOnly).toBe(true)
+    // Anti-vacuity: the second order really did ask the venue again.
+    expect(configRead).toHaveBeenCalledTimes(2)
+  })
+
+  it('shares one in-flight read between simultaneous orders', async () => {
+    const acc = makeOkxAccount('long_short_mode')
+
+    await Promise.all([
+      acc.placeOrder(okxPerp(), okxMarketOrder('BUY')),
+      acc.placeOrder(okxPerp(), okxMarketOrder('SELL')),
+    ])
+
+    expect((acc as any).exchange.privateGetAccountConfig).toHaveBeenCalledTimes(1)
+    expect(okxPlacedParams(acc, 0).posSide).toBe('long')
+    expect(okxPlacedParams(acc, 1).posSide).toBe('short')
+  })
+})
+
+function makeOkxAmendAccount(original: { side: 'buy' | 'sell'; info?: Record<string, unknown> }) {
+  const acc = makeOkxAccount('long_short_mode')
+  const exchange = (acc as any).exchange
+  ;(acc as any).orderSymbolCache.set('okx-amend', 'ETH/USDT:USDT')
+  exchange.fetchOrder = vi.fn().mockResolvedValue({
+    id: 'okx-amend',
+    type: 'limit',
+    amount: 0.5,
+    price: 1900,
+    ...original,
+  })
+  exchange.editOrder = vi.fn().mockResolvedValue({ id: 'okx-amend-edited', status: 'open' })
+  return acc
+}
+
+function okxEditParams(acc: CcxtBroker): Record<string, unknown> {
+  return (acc as any).exchange.editOrder.mock.calls[0][6]
+}
+
+describe('CcxtBroker — OKX amend keeps the official fields', () => {
+  it('does not send posSide when amending a hedged close', async () => {
+    const acc = makeOkxAmendAccount({ side: 'sell', info: { posSide: 'long' } })
+
+    await acc.modifyOrder('okx-amend', {})
+
+    expect('posSide' in okxEditParams(acc)).toBe(false)
+    expect((acc as any).exchange.privateGetAccountConfig).not.toHaveBeenCalled()
+  })
+
+  it('forwards amended quantity and price without a position side', async () => {
+    const acc = makeOkxAmendAccount({ side: 'sell', info: { posSide: 'long' } })
+    const changes: Partial<Order> = {
+      totalQuantity: new Decimal('0.75'),
+      lmtPrice: new Decimal('2050'),
+      auxPrice: new Decimal('2010'),
+      tif: 'GTC',
+    }
+
+    await acc.modifyOrder('okx-amend', changes)
+
+    const call = (acc as any).exchange.editOrder.mock.calls[0]
+    expect(call[4]).toBe(0.75)
+    expect(call[5]).toBe(2050)
+    expect(call[6]).toEqual({ stopPrice: 2010, timeInForce: 'gtc' })
+    expect('posSide' in call[6]).toBe(false)
   })
 })

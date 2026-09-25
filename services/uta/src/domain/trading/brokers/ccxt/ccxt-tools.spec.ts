@@ -7,6 +7,7 @@
  * passed it through, leaving `contractToCcxt` unable to resolve.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { asSchema } from 'ai'
 
 // Mock ccxt BEFORE importing CcxtBroker (mirrors CcxtBroker.spec.ts).
 vi.mock('ccxt', () => {
@@ -123,6 +124,32 @@ describe('createCcxtProviderTools — getOrderBook', () => {
       aliceId: 'mock-paper|BTC',
     })
     expect(result.error).toMatch(/No CCXT account available/)
+  })
+
+  it('accepts order-book limit 400 and forwards it to broker.getOrderBook', async () => {
+    const tools = createCcxtProviderTools(mgr)
+    const brokerSpy = vi.spyOn(broker, 'getOrderBook')
+
+    const result = await (tools.getOrderBook.execute as Function)({
+      aliceId: 'bybit-main|BTC/USDT:USDT',
+      limit: 400,
+    })
+
+    expect(brokerSpy).toHaveBeenCalledTimes(1)
+    expect(brokerSpy.mock.calls[0][1]).toBe(400)
+    expect(result.source).toBe('bybit-main')
+  })
+
+  it('rejects order-book limit 5001 before calling broker.getOrderBook', async () => {
+    const tools = createCcxtProviderTools(mgr)
+    const brokerSpy = vi.spyOn(broker, 'getOrderBook')
+
+    const validation = await asSchema(tools.getOrderBook.inputSchema).validate?.({
+      aliceId: 'bybit-main|BTC/USDT:USDT',
+      limit: 5001,
+    })
+    expect(validation?.success).toBe(false)
+    expect(brokerSpy).not.toHaveBeenCalled()
   })
 })
 

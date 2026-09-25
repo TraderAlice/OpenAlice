@@ -6,6 +6,7 @@
 
 import { tool } from 'ai'
 import { z } from 'zod'
+import { MAX_ORDER_BOOK_LIMIT } from '@traderalice/uta-protocol'
 import type { Contract } from '@traderalice/ibkr'
 import type { UnifiedTradingAccount } from '../../UnifiedTradingAccount.js'
 import type { UTAManager } from '../../uta-manager.js'
@@ -70,16 +71,17 @@ Use searchContracts first to get the aliceId.`,
 
 Returns bids and asks sorted by price. Each level is [price, amount].
 Use this to evaluate liquidity and potential slippage before placing large orders.
-Use searchContracts first to get the aliceId.`,
+Use searchContracts first to get the aliceId.
+Requests are capped at ${MAX_ORDER_BOOK_LIMIT} levels per side; a venue may return fewer levels when its own ordinary book is smaller.`,
       inputSchema: z.object({
         aliceId: z.string().describe('Contract identifier from searchContracts (format: accountId|nativeKey, e.g. "bybit-main|BTC/USDT:USDT")'),
         limit: z
           .number()
           .int()
           .min(1)
-          .max(100)
+          .max(MAX_ORDER_BOOK_LIMIT)
           .optional()
-          .describe('Number of price levels per side (default: 20)'),
+          .describe(`Number of price levels per side (default: 20; request cap: ${MAX_ORDER_BOOK_LIMIT})`),
         source: z.string().optional().describe(sourceDesc),
       }),
       execute: async ({ aliceId, limit, source }) => {

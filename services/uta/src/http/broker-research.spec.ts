@@ -39,4 +39,17 @@ describe('Broker research HTTP boundary', () => {
     expect((await post('order-book', { aliceId: 'alpaca|BTC/USD', limit: 2 })).status).toBe(200)
     expect(read).toHaveBeenCalledWith({ symbol: 'BTC/USD', secType: 'CRYPTO' }, 2)
   })
+
+  it('accepts order-book limit 400 and passes it to the broker', async () => {
+    const { read, post } = setup()
+    const res = await post('order-book', { aliceId: 'alpaca|BTC/USD', limit: 400 })
+    expect(res.status).toBe(200)
+    expect(read).toHaveBeenCalledWith({ symbol: 'BTC/USD', secType: 'CRYPTO' }, 400)
+  })
+
+  it('rejects order-book limit 5001 before calling the broker', async () => {
+    const { read, post } = setup()
+    expect((await post('order-book', { aliceId: 'alpaca|BTC/USD', limit: 5001 })).status).toBe(400)
+    expect(read).not.toHaveBeenCalled()
+  })
 })
