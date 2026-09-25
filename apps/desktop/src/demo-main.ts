@@ -73,7 +73,7 @@ void app.whenReady().then(async () => {
   protocol.handle('app', request => fetchAliceWebRequest(request, backend))
   Menu.setApplicationMenu(process.platform === 'darwin'
     ? Menu.buildFromTemplate([{ role: 'appMenu' }, { role: 'editMenu' }, { role: 'windowMenu' }]) : null)
-  const win = createAppWindow(join(root, 'dist/electron/preload.js'), 'OpenAlice — Demo')
+  const { window: win } = createAppWindow(join(root, 'dist/electron/preload.js'), 'OpenAlice — Demo')
   win.webContents.on('console-message', (_event, level, message) => {
     if (level >= 2) console.error(`[demo renderer] ${message}`)
   })

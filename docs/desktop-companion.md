@@ -3,8 +3,10 @@
 The normal desktop and isolated Electron demo start one Alice companion window
 from `apps/desktop/src/app-window.ts`. It shares the Electron main process and
 adds a renderer, with no additional Guardian, Alice, UTA or remote connection.
-Closing the main window destroys the companion; minimizing the main window
-leaves the companion available. The menu/tray can restore the main window.
+Closing the main window hides it while the app tray and companion stay available;
+the tray can restore the main window or quit the app. Minimizing the main window
+also leaves the companion available. Quitting destroys the companion and stops
+the managed processes.
 The bottom-left Alice’s Settings menu also provides Show pet / Hide pet in
 desktop mode. Its local preload bridge reads the saved preference, toggles the
 same native controller as the tray, and subscribes to visibility changes. The
@@ -57,9 +59,10 @@ context isolation, no renderer Node APIs, a local-only CSP, and blocked
 navigation/popups. Windows uses a transparent toolbar window; macOS makes the
 companion visible across Spaces without transforming the app's Dock identity.
 Geometry uses Electron DIPs and monitor work areas, including negative monitor
-coordinates. Removing a monitor or changing display metrics brings the window
-back into a remaining work area. `OPENALICE_DISABLE_COMPANION=1` is a launcher
-kill switch.
+coordinates. Drag and snap writes include the intended content size on Windows
+so fractional display scaling cannot enlarge the window during repeated moves.
+Removing a monitor or changing display metrics brings the window back into a
+remaining work area. `OPENALICE_DISABLE_COMPANION=1` is a launcher kill switch.
 
 Assets are copied by the existing UI public-assets build into the packaged
 `Resources/runtime/ui/dist/companion` directory. Package assertions require

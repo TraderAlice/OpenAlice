@@ -10,18 +10,19 @@
  * Lifecycle:
  *   relocate data → resolve ports → spawn UTA unless lite mode disables it
  *   → spawn Alice (UTA URL or lite env injected) → wait Alice ready
- *   → open window. Watch `data/control/restart-uta.flag` → respawn UTA.
- *   On quit or unexpected Alice exit: cascade tree-kill both children.
+ *   → open window and tray. Closing the window hides it; Quit or an
+ *   unexpected Alice exit cascades child shutdown. Watch
+ *   `data/control/restart-uta.flag` → respawn UTA.
  *
  * The port + supervision logic is an inline mirror of
  * scripts/guardian/{shared.ts,prod.mjs} — the desktop package is a separate
  * release surface with no TS-dev-tooling dependency, the same reason
  * probe-port.ts is duplicated rather than imported.
  *
- * Out of scope (future iterations): tray icon, multi-window, native menus.
+ * Out of scope (future iterations): multi-window, native menus.
  */
 
-import { app, BrowserWindow, dialog, ipcMain, Menu, Notification, protocol, session, shell } from 'electron'
+import { app, BrowserWindow, dialog, ipcMain, Menu, nativeImage, Notification, protocol, session, shell, Tray } from 'electron'
 import { runRendererTradingModeSmoke } from './trading-mode-smoke.js'
 import { runRendererDataHomeSmoke } from './data-home-smoke.js'
 import { runRendererWorkspaceAcceptanceSmoke } from './workspace-acceptance-smoke.js'
@@ -61,6 +62,7 @@ import { inspectPreviousUpdateAttempt, recordUpdateAttempt } from './update-atte
 import { childIsRunning, stopChild } from './child-shutdown.js'
 import { exitDesktopProcess } from './app-exit.js'
 import { createAppWindow } from './app-window.js'
+import type { CompanionHandle } from './companion.js'
 import { WebRelay } from './web-relay.js'
 
 const __filename = fileURLToPath(import.meta.url)
@@ -70,6 +72,7 @@ let uta: ChildProcess | null = null
 let connector: ChildProcess | null = null
 let alice: ChildProcess | null = null
 let appQuitting = false
+let tray: Tray | null = null
 let restartingUTA = false
 let restartingConnector = false
 let pendingUTAMode: GuardianTradingModePlan | null = null
@@ -1011,7 +1014,13 @@ app.whenReady().then(async () => {
       : null,
   )
 
-  const win = createAppWindow(resolve(__dirname, 'preload.js'))
+  const { window: win, companion } = createAppWindow(resolve(__dirname, 'preload.js'))
+  createTray(win, companion)
+  win.on('close', event => {
+    if (appQuitting) return
+    event.preventDefault()
+    win.hide()
+  })
   const mayNavigate = (destination: string): boolean => {
     try {
       const url = new URL(destination)
@@ -1547,6 +1556,36 @@ function shutdown(): void {
   })
 }
 
+function resolveTrayIconPath(): string {
+  return app.isPackaged
+    ? join(process.resourcesPath, 'runtime/ui/dist/companion/alice.png')
+    : resolve(__dirname, '../../ui/public/companion/alice.png')
+}
+
+function createTray(win: BrowserWindow, companion?: CompanionHandle): void {
+  const image = nativeImage.createFromPath(resolveTrayIconPath())
+  tray = new Tray(image.resize({ width: 22, height: 22 }))
+  tray.setToolTip('OpenAlice')
+
+  const show = () => {
+    if (win.isDestroyed()) return
+    if (win.isMinimized()) win.restore()
+    win.show()
+    win.focus()
+  }
+  const trayMenu = () => Menu.buildFromTemplate([
+    { label: 'Show OpenAlice', click: show },
+    ...(companion && !companion.window.isDestroyed()
+      ? [{ label: 'Pet', submenu: companion.trayMenuItems() }]
+      : []),
+    { type: 'separator' },
+    { label: 'Quit', click: () => app.quit() },
+  ])
+  tray.on('click', show)
+  tray.on('right-click', () => tray?.popUpContextMenu(trayMenu()))
+  if (process.platform === 'linux') tray.setContextMenu(trayMenu())
+}
+
 app.on('before-quit', (e) => {
   if (appQuitting) return
   e.preventDefault()
@@ -1554,8 +1593,5 @@ app.on('before-quit', (e) => {
 })
 
 app.on('window-all-closed', () => {
-  // MVP: quit on last-window-close everywhere (including macOS).
-  // Future: tray icon + macOS "stay alive in background" semantics so the
-  // user can close the window without killing in-flight cron jobs.
-  app.quit()
+  // The tray owns the explicit Quit action when no windows are visible.
 })
