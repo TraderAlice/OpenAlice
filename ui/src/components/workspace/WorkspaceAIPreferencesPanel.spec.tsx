@@ -140,11 +140,11 @@ describe('WorkspaceAIPreferencesPanel', () => {
 
     fireEvent.click(screen.getByRole('button', { name: '编辑交互式 Session中的 Codex 偏好' }))
     fireEvent.click(screen.getByRole('radio', { name: /固定默认值/ }))
-    const access = await screen.findByRole('button', { name: 'AI 访问' })
+    const access = await screen.findByRole('button', { name: 'AI Provider' })
     expect(screen.getByRole('button', { name: '模型与推理强度' })).toBeTruthy()
 
     fireEvent.click(access)
-    expect(await screen.findByText('由谁管理 Codex 的 AI 访问？')).toBeTruthy()
+    expect(await screen.findByText('选择 Codex 使用的 AI 账户')).toBeTruthy()
     expect(screen.getByRole('menuitem', { name: /Codex 账户/ })).toBeTruthy()
     fireEvent.click(screen.getByRole('menuitem', { name: /DeepSeek API/ }))
     await waitFor(() => expect(screen.queryByRole('menuitem', { name: /DeepSeek API/ })).toBeNull())

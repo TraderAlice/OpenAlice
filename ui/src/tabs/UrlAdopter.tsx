@@ -88,8 +88,10 @@ export function UrlAdopter() {
         {/* Settings — one entry per category */}
         <Route path="/settings/workspace-injection" element={<AdoptStatic spec={{ kind: 'settings', params: { category: 'workspace-injection' } }} />} />
         <Route path="/settings" element={<AdoptStatic spec={{ kind: 'settings', params: { category: 'general' } }} />} />
+        <Route path="/settings/language" element={<AdoptStatic spec={{ kind: 'settings', params: { category: 'language' } }} />} />
         <Route path="/settings/appearance" element={<AdoptStatic spec={{ kind: 'settings', params: { category: 'appearance' } }} />} />
         <Route path="/settings/activity-bar" element={<AdoptStatic spec={{ kind: 'settings', params: { category: 'activity-bar' } }} />} />
+        <Route path="/settings/visibility" element={<AdoptStatic spec={{ kind: 'settings', params: { category: 'visibility' } }} />} />
         <Route path="/settings/pet" element={<AdoptStatic spec={{ kind: 'settings', params: { category: 'pet' } }} />} />
         <Route path="/settings/ai-provider" element={<AdoptStatic spec={{ kind: 'settings', params: { category: 'ai-provider' } }} />} />
         <Route path="/settings/agent-runtimes" element={<AdoptStatic spec={{ kind: 'settings', params: { category: 'agent-runtimes' } }} />} />
@@ -97,7 +99,7 @@ export function UrlAdopter() {
         <Route path="/settings/tools" element={<AdoptStatic spec={{ kind: 'settings', params: { category: 'tools' } }} />} />
         <Route path="/settings/trading" element={<AdoptTraderSettings category="trading" />} />
         <Route path="/settings/issues" element={<AdoptStatic spec={{ kind: 'settings', params: { category: 'issues' } }} />} />
-        <Route path="/settings/harness" element={<AdoptStatic spec={{ kind: 'settings', params: { category: 'harness' } }} />} />
+        <Route path="/settings/harness" element={<Navigate to="/settings/visibility" replace />} />
         <Route path="/settings/mcp" element={<AdoptStatic spec={{ kind: 'settings', params: { category: 'mcp' } }} />} />
         <Route path="/settings/market-data" element={<AdoptTraderSettings category="market-data" />} />
         <Route path="/settings/news-collector" element={<AdoptTraderSettings category="news-collector" />} />

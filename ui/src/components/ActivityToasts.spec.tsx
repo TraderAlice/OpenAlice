@@ -9,6 +9,9 @@ import type { AgentActivitySignal, GlobalAgentActivityData } from '../hooks/useG
 import { ActivityToasts } from './ActivityToasts'
 
 const useActivity = vi.fn<() => GlobalAgentActivityData>()
+vi.mock('../contexts/workspaces-context', () => ({ useWorkspaces: () => ({ workspaces: [{
+  id: 'chat-1', sessions: [{ id: 'session-1', resumeId: 'resume-1', agent: 'pi', name: 'p1', title: 'Daily market review', displayName: 'Market analyst' }],
+}] }) }))
 
 vi.mock('../hooks/useGlobalAgentActivity', async (importOriginal) => {
   const original = await importOriginal<typeof import('../hooks/useGlobalAgentActivity')>()
@@ -145,12 +148,13 @@ describe('ActivityToasts', () => {
       id: 'inbox:entry-1',
       kind: 'inbox',
       inboxEntryId: 'entry-1',
+      detail: 'The market report is ready.',
     })]))
     view.rerender(<ActivityToasts />)
 
     await waitFor(() => expect(toast.success).toHaveBeenCalledWith(
-      'activityToast.inboxDelivered:pi',
-      expect.objectContaining({ id: 'openalice-activity:inbox:entry-1' }),
+      'activityToast.inboxDelivered:Market analyst',
+      expect.objectContaining({ id: 'openalice-activity:inbox:entry-1', description: 'The market report is ready.' }),
     ))
     view.rerender(<ActivityToasts />)
     expect(toast.success).toHaveBeenCalledTimes(1)

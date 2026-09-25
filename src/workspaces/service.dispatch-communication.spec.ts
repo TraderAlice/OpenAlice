@@ -105,3 +105,19 @@ it.each(['unchanged', 'rebound', 'deleted'] as const)('keeps an internal ask pri
   expect(events.find(event => event.type === 'conversation.dispatched' && event.taskId === publicRun.taskId)?.communication).toEqual(publicRun.communication)
   expect(publicRun.terminalDelivery?.state).toBe('accepted')
 }, 20000)
+
+it('interrupts a real background execution through the unified service and denies subsequent offers', async () => {
+  const adapter = service.adapters.get('codex')!
+  vi.mocked(adapter.composeHeadlessCommand!).mockReturnValue([process.execPath, '-e',
+    'console.log(JSON.stringify({type:"thread.started",thread_id:"interrupt-fixture"})); setInterval(()=>{},1000)'])
+  const ws = service.registry.get('ws')!
+  const offered = await service.executions.dispatch(ws, adapter, 'test', { kind: 'schedule', entry: 'test-schedule' })
+  await vi.waitFor(() => expect(service.executions.current(offered.resumeId)?.phase).toBe('running'))
+  const run = service.executions.current(offered.resumeId)!
+  expect(await service.executions.interrupt(offered.resumeId, run.executionId, { kind: 'user', entry: 'test-interrupt' })).toBe(true)
+  await vi.waitFor(() => expect(service.headlessTasks.get(offered.taskId)?.status).toBe('interrupted'))
+  expect(service.executions.list(offered.resumeId)[0]).toMatchObject({ phase: 'interrupted', reason: 'user-interrupted' })
+  expect(service.executions.admission.blocks(offered.resumeId)).toHaveLength(1)
+  await expect(service.executions.dispatch(ws, adapter, 'again', { kind: 'schedule', entry: 'test-schedule' }, undefined, undefined, offered.resumeId)).rejects.toMatchObject({ code: 'session_blocked' })
+  expect(service.headlessTasks.get(offered.taskId)?.interruptionReason).toBe('user-interrupted')
+}, 15000)

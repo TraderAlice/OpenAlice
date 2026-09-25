@@ -212,17 +212,20 @@ describe('CLI installer dev publication workflow', () => {
     expect(install.run).toContain('--expected-commit "$EXPECTED_COMMIT"')
   })
 
-  it('installs the remote smoke parser before running the checkout fixture', () => {
+  it('builds the trusted local UI before running the remote relay fixture', () => {
     const steps = workflow.jobs['checkout-remote'].steps ?? []
     const pnpm = steps.findIndex((candidate) => candidate.uses === 'pnpm/action-setup@v6')
     const node = steps.findIndex((candidate) => candidate.uses === 'actions/setup-node@v7')
-    const install = steps.findIndex((candidate) => candidate.run === 'pnpm install --frozen-lockfile --filter @traderalice/openalice-cli')
+    const install = steps.findIndex((candidate) => candidate.run === 'pnpm install --frozen-lockfile')
+    const build = steps.findIndex((candidate) => candidate.name === 'Build trusted local UI for Web relay'
+      && candidate.run === 'pnpm exec turbo run build --filter=open-alice-ui...')
     const smoke = steps.findIndex((candidate) => candidate.name === 'Exercise clean SSH host fixture')
 
     expect(pnpm).toBeGreaterThanOrEqual(0)
     expect(node).toBeGreaterThan(pnpm)
     expect(steps[node]?.with?.cache).toBe('pnpm')
     expect(install).toBeGreaterThan(node)
-    expect(smoke).toBeGreaterThan(install)
+    expect(build).toBeGreaterThan(install)
+    expect(smoke).toBeGreaterThan(build)
   })
 })

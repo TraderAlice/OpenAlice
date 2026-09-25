@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { SettingsCategoryList } from './SettingsCategoryList'
@@ -65,6 +65,21 @@ afterEach(() => {
 })
 
 describe('SettingsCategoryList', () => {
+  it('places Mode before Broker in Trading, outside General', () => {
+    render(<SettingsCategoryList />)
+
+    const general = screen.getByText('settings.group.general').parentElement?.parentElement
+    const trading = screen.getByText('settings.group.trading').parentElement?.parentElement
+    expect(general).not.toBeNull()
+    expect(trading).not.toBeNull()
+    expect(within(trading!).getAllByRole('button').map((button) => button.textContent)).toEqual([
+      'settings.category.agentPermissions',
+      'settings.category.trading',
+    ])
+    expect(within(general!).queryByRole('button', { name: 'settings.category.agentPermissions' })).toBeNull()
+    expect(within(general!).getByRole('button', { name: 'settings.language.title' })).toBeTruthy()
+  })
+
   it('owns the vertical scroll region for long settings navigation', () => {
     render(<SettingsCategoryList />)
 

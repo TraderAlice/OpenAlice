@@ -8,6 +8,11 @@ import { useConfigPage } from '../hooks/useConfigPage'
 import { PageHeader } from '../components/PageHeader'
 import { CenteredLoading } from '../components/StateViews'
 import { Button } from '@/components/ui/button'
+import { useTradingConfig } from '../hooks/useTradingConfig'
+import { useWorkspace } from '../tabs/store'
+import { UTADataSourceRow } from '../components/uta/UTADataSourceRow'
+import { displayNameForUTA } from '../lib/uta-account-filter'
+import type { UTAConfig } from '../api/types'
 
 type MarketDataConfig = Record<string, unknown>
 
@@ -103,10 +108,12 @@ function deriveSourceRows(
   ping: HubPing,
   keys: Record<string, string>,
   extraVendors: string[],
+  utas: UTAConfig[],
 ): SourceRow[] {
   const hubLive = hubOn && ping !== 'down' // optimistic while checking
   const hub = { source: 'Hub', state: 'ok' as const }
-  const chartVendors = ['yfinance', ...extraVendors].join(', ')
+  const utaCount = utas.filter((uta) => uta.enabled && uta.asVendor !== false).length
+  const chartVendors = ['yfinance', ...extraVendors, ...(utaCount ? [`${utaCount} UTA${utaCount === 1 ? '' : 's'}`] : [])].join(', ')
 
   return [
     {
@@ -159,6 +166,8 @@ function deriveSourceRows(
 // ==================== Page ====================
 
 export function MarketDataPage() {
+  const trading = useTradingConfig()
+  const openOrFocus = useWorkspace((state) => state.openOrFocus)
   const { config, status, loadError, updateConfig, updateConfigImmediate, retry } = useConfigPage<MarketDataConfig>({
     section: 'marketData',
     extract: (full: AppConfig) => (full as Record<string, unknown>).marketData as MarketDataConfig,
@@ -167,6 +176,9 @@ export function MarketDataPage() {
   const [advancedOpen, setAdvancedOpen] = useState(false)
   const [highlightFmp, setHighlightFmp] = useState(false)
   const [ping, setPing] = useState<HubPing>('checking')
+  const [savingSourceId, setSavingSourceId] = useState<string | null>(null)
+  const [savedSourceId, setSavedSourceId] = useState<string | null>(null)
+  const [sourceError, setSourceError] = useState<string | null>(null)
   const fmpRef = useRef<HTMLDivElement>(null)
   const highlightTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
 
@@ -209,7 +221,7 @@ export function MarketDataPage() {
 
   const providerKeys = (config.providerKeys ?? {}) as Record<string, string>
   const extraVendors = (config.extraVendors ?? []) as string[]
-  const sourceRows = deriveSourceRows(hub.enabled, ping, providerKeys, extraVendors)
+  const sourceRows = deriveSourceRows(hub.enabled, ping, providerKeys, extraVendors, trading.utas)
 
   const handleExtraVendorToggle = (id: string, on: boolean) => {
     const next = on ? [...new Set([...extraVendors, id])] : extraVendors.filter((v) => v !== id)
@@ -224,6 +236,21 @@ export function MarketDataPage() {
       if (v) cleaned[k] = v
     }
     updateConfig({ providerKeys: cleaned })
+  }
+
+  const updateUTASource = async (uta: UTAConfig, asVendor: boolean) => {
+    setSavingSourceId(uta.id)
+    setSavedSourceId(null)
+    setSourceError(null)
+    try {
+      await trading.saveUTA({ ...uta, asVendor })
+      setSavedSourceId(uta.id)
+      window.setTimeout(() => setSavedSourceId((current) => current === uta.id ? null : current), 1800)
+    } catch (error) {
+      setSourceError(error instanceof Error ? error.message : 'Could not update this UTA source.')
+    } finally {
+      setSavingSourceId(null)
+    }
   }
 
   const jumpToFmp = () => {
@@ -266,7 +293,17 @@ export function MarketDataPage() {
           <SourcesCard rows={sourceRows} onAddFmp={jumpToFmp} />
 
           <ChartVendorsSection extraVendors={extraVendors} onToggle={handleExtraVendorToggle} />
-
+        </div>
+        <BrokerKlineSourcesSection
+          utas={trading.utas}
+          loading={trading.loading}
+          error={trading.error ?? sourceError}
+          savingId={savingSourceId}
+          savedId={savedSourceId}
+          onToggle={(uta, checked) => { void updateUTASource(uta, checked) }}
+          onManage={() => openOrFocus({ kind: 'settings', params: { category: 'trading' } })}
+        />
+        <div className={`mx-auto max-w-[880px] ${!enabled ? 'pointer-events-none opacity-40' : ''}`}>
           <AdvancedSection
             open={advancedOpen}
             onToggle={() => setAdvancedOpen((o) => !o)}
@@ -282,6 +319,40 @@ export function MarketDataPage() {
       </SettingsScrollArea>
     </div>
   )
+}
+
+function BrokerKlineSourcesSection({ utas, loading, error, savingId, savedId, onToggle, onManage }: {
+  utas: UTAConfig[]
+  loading: boolean
+  error: string | null
+  savingId: string | null
+  savedId: string | null
+  onToggle: (uta: UTAConfig, checked: boolean) => void
+  onManage: () => void
+}) {
+  return <section className="mx-auto mb-6 max-w-[880px]">
+    <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+      <h2 className="text-[13px] font-semibold text-foreground">Broker K-line sources</h2>
+      <Button type="button" variant="ghost" size="sm" onClick={onManage}>Manage UTAs in Broker</Button>
+    </div>
+    <p className="mb-2.5 max-w-[640px] text-[12px] leading-5 text-muted-foreground">
+      Choose which configured UTAs join default K-line and contract discovery. This is the same setting as “Use as data source” in each UTA’s Broker settings; explicit source selection remains available.
+    </p>
+    {loading ? <p role="status" className="text-xs text-muted-foreground">Loading broker sources…</p> : utas.length === 0 && !error ? (
+      <p className="rounded-lg border border-dashed border-border px-4 py-3 text-xs text-muted-foreground">No UTAs configured. Add one in Broker to use its K-line data.</p>
+    ) : <div className="space-y-2.5">
+      {utas.map((uta) => <UTADataSourceRow
+        key={uta.id}
+        name={displayNameForUTA(uta)}
+        description={`${uta.presetId} · ${uta.enabled ? 'Available when connected' : 'UTA disabled; enable it in Broker to serve data'}`}
+        checked={uta.asVendor !== false}
+        disabled={savingId !== null}
+        onChange={(checked) => onToggle(uta, checked)}
+        status={savingId === uta.id ? <SaveIndicator status="saving" /> : savedId === uta.id ? <SaveIndicator status="saved" /> : null}
+      />)}
+    </div>}
+    {error && <p role="alert" className="mt-2 text-xs text-destructive">{error}</p>}
+  </section>
 }
 
 // ==================== Data Hub card ====================

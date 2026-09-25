@@ -852,6 +852,21 @@ body {
    not anxious. Color is the success/green token to keep the
    association with "alive + healthy". */
 
+/* Indeterminate activity only; its position never represents task progress. */
+@keyframes session-running-sweep {
+  from { transform: translateX(-100%); }
+  to { transform: translateX(460%); }
+}
+.oa-session-running-line::after {
+  content: '';
+  display: block;
+  width: 22%;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--primary);
+  animation: session-running-sweep 2.8s ease-in-out infinite;
+}
+
 @keyframes live-pulse {
   0%, 100% {
     opacity: 0.55;
@@ -1089,6 +1104,7 @@ html[lang="ja"] .oa-onboarding-title {
     background-image: none;
     opacity: 0.7;
   }
+  .oa-session-running-line::after,
   .live-pulse,
   .live-pulse::after,
   .thinking-dot,

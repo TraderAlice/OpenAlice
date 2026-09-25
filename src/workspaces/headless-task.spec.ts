@@ -364,3 +364,31 @@ describe('headlessTaskStatus', () => {
     expect(headlessTaskStatus({ exitCode: 1, killed: false, structured: output })).toBe('failed');
   });
 });
+
+it('interrupts an uncooperative process tree and preserves partial output', async () => {
+  const controller = new AbortController();
+  let descendant: number | undefined;
+  const command = [
+    'node', '-e',
+    'const {spawn}=require("node:child_process"); process.on("SIGTERM",()=>{}); const c=spawn(process.execPath,["-e",\'process.on("SIGTERM",()=>{}); console.log("ready"); setInterval(()=>{},1000)\']); c.stdout.once("data",()=>console.log("child="+c.pid)); setInterval(()=>{},1000)',
+  ];
+  try {
+    const result = await runHeadlessTask({
+      command, cwd: process.cwd(), env: baseEnv, logger: noopLogger,
+      abortSignal: controller.signal,
+      onChildSpawned(child) {
+        child.stdout?.on('data', buffer => {
+          const match = String(buffer).match(/child=(\d+)/);
+          if (match) { descendant = Number(match[1]); controller.abort('user-interrupted'); }
+        });
+      },
+    });
+    expect(result.interruptionReason).toBe('user-interrupted');
+    expect(headlessTaskStatus(result)).toBe('interrupted');
+    expect(result.stdoutTail).toContain('child=');
+    expect(descendant).toBeDefined();
+    expect(() => process.kill(descendant!, 0)).toThrow();
+  } finally {
+    if (descendant) { try { process.kill(descendant, 'SIGKILL'); } catch {} }
+  }
+}, 15000);

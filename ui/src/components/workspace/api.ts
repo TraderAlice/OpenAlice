@@ -1437,8 +1437,8 @@ async function webSessionMutation(url: string, action: string, payload?: unknown
   return body.snapshot;
 }
 
-export async function openWebSession(wsId: string, sessionId: string): Promise<WebSessionSnapshot> {
-  return webSessionMutation(webSessionUrl(wsId, sessionId, '/open'), 'open');
+export async function openWebSession(wsId: string, sessionId: string, runtime?: PausedSessionRuntimeUpdate): Promise<WebSessionSnapshot> {
+  return webSessionMutation(webSessionUrl(wsId, sessionId, '/open'), 'open', runtime);
 }
 
 export async function getWebSession(
@@ -1849,6 +1849,15 @@ export async function listAgentCredentials(agent: string): Promise<SavedCredenti
   if (!res.ok) throw new Error(`list agent credentials failed: ${res.status}`);
   const body = (await res.json()) as { credentials: SavedCredential[] };
   return body.credentials;
+}
+
+/** Runtime-owned models and capabilities, using the same catalog contract as Vault access. */
+export async function listNativeModels(agent: string, workspaceId?: string, signal?: AbortSignal, force = false): Promise<import('../../api/config').ProviderModelCatalog> {
+  const query = workspaceId ? `?workspaceId=${encodeURIComponent(workspaceId)}` : '';
+  const response = await fetch(`/api/workspaces/agents/${encodeURIComponent(agent)}/models${query}`, { signal, method: force ? 'POST' : 'GET' });
+  const body = await response.json();
+  if (!response.ok) throw new Error(body.error || 'Model discovery failed');
+  return body;
 }
 
 /** Which vault credential a workspace's agent is currently configured with (null = none/hand-edited). */

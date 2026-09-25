@@ -1,3 +1,4 @@
+import { sessionProcessStop } from './session-process-stop.js';
 import { createRequire } from 'node:module';
 
 import type { PtyBackend, PtyProcess } from './pty-types.js';
@@ -14,10 +15,12 @@ export const ptyBackend: PtyBackend = {
   name: 'node-pty',
   supportsFlowControl: true,
   spawn(file, args, options) {
-    return loadNodePty().spawn(file, [...args], {
+    const child = loadNodePty().spawn(file, [...args], {
       ...options,
       // Preserve raw byte boundaries for xterm's streaming decoder.
       encoding: null,
     }) as unknown as PtyProcess;
+    child.terminateTree = sessionProcessStop(child.pid, 2000);
+    return child;
   },
 };

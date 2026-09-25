@@ -1,3 +1,4 @@
+import { discoverNativeModels } from '../native-model-discovery.js';
 import { createHash } from 'node:crypto';
 import { realpathSync } from 'node:fs';
 import { readdir, stat } from 'node:fs/promises';
@@ -189,6 +190,7 @@ function cursorToolEvents(record: Record<string, unknown>): readonly HeadlessOut
  * does not validate the id.
  */
 export const cursorAdapter: CliAdapter = {
+  discoverModels: (cwd) => discoverNativeModels('cursor', 'cursor-agent', cwd),
   id: 'cursor',
   displayName: 'Cursor Agent',
   binary: 'cursor-agent',

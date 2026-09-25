@@ -91,7 +91,7 @@ describe('ResumeRegistry', () => {
       .rejects.toThrow(/belongs to ws-1\/pi/)
   })
 
-  it('persists one immutable secret-free Session runtime binding', async () => {
+  it('persists the secret-free Session runtime binding independently of the identity ledger', async () => {
     const registry = await ResumeRegistry.load(path, noopLogger, runtimeStore)
     const runtimeBinding = {
       version: 1 as const,
@@ -130,7 +130,7 @@ describe('ResumeRegistry', () => {
     expect(raw).not.toContain('sk-secret')
   })
 
-  it('replaces a paused Session binding only through the explicit registry boundary', async () => {
+  it('replaces a paused Session binding through the explicit registry boundary', async () => {
     const registry = await ResumeRegistry.load(path, noopLogger, runtimeStore)
     await registry.ensure({
       resumeId: 'resume-runtime-edit',
@@ -161,6 +161,43 @@ describe('ResumeRegistry', () => {
     expect(updated).toMatchObject({ runtimeBinding: replacement, updatedAt: 2 })
     expect((await ResumeRegistry.load(path, noopLogger, runtimeStore))
       .get('resume-runtime-edit')?.runtimeBinding).toEqual(replacement)
+  })
+
+  it('reconciles a Workspace-edited Session binding on a later scan', async () => {
+    const registry = await ResumeRegistry.load(path, noopLogger, runtimeStore)
+    await registry.ensure({
+      resumeId: 'resume-runtime-reconcile',
+      wsId: 'ws-1',
+      agent: 'codex',
+      runtimeBinding: {
+        version: 1,
+        credential: { source: 'vault', credentialSlug: 'openrouter-1', wireShape: 'openai-responses' },
+        model: 'google/gemini-3.7-flash',
+      },
+      now: 1,
+    })
+
+    await writeFile(
+      join(dir, 'ws-1', '.alice', 'sessions', 'resume-runtime-reconcile.json'),
+      JSON.stringify({
+        version: 1,
+        resumeId: 'resume-runtime-reconcile',
+        agent: 'codex',
+        ai: {
+          version: 1,
+          credential: { source: 'vault', credentialSlug: 'openrouter-1', wireShape: 'openai-responses' },
+          model: 'meta/muse-spark-1.3-contributor',
+        },
+      }),
+    )
+
+    expect(registry.get('resume-runtime-reconcile')?.runtimeBinding?.model)
+      .toBe('google/gemini-3.7-flash')
+    await expect(registry.reconcileRuntimeBindings(2)).resolves.toBe(1)
+    expect(registry.get('resume-runtime-reconcile')).toMatchObject({
+      updatedAt: 2,
+      runtimeBinding: { model: 'meta/muse-spark-1.3-contributor' },
+    })
   })
 
   it('hydrates displayName from the Session dossier and never flushes it to the identity ledger', async () => {

@@ -1,6 +1,6 @@
 {
   "name": "open-alice",
-  "version": "0.93.1",
+  "version": "0.94.1-beta.2",
   "description": "File-based trading agent engine",
   "type": "module",
   "imports": {
@@ -13,10 +13,9 @@
   "scripts": {
     "cli": "node packages/cli/bin/openalice.ts",
     "dev": "tsx scripts/guardian/dev.ts",
+    "dev:no-relay": "tsx scripts/guardian/dev.ts --no-relay",
     "dev:onboarding": "tsx scripts/onboarding-test-dev.ts",
-    "remote:ssh": "node packages/cli/bin/openalice.mjs ssh",
-    "docker:build": "docker build --tag openalice:local .",
-    "docker:smoke": "node scripts/docker-runtime-smoke.mjs",
+    "remote": "node packages/cli/bin/openalice.ts --remote",
     "prebuild": "tsx scripts/build-migration-index.ts",
     "build": "turbo run build && tsup src/main.ts --format esm --dts",
     "prebuild:server": "tsx scripts/build-migration-index.ts",
@@ -32,7 +31,7 @@
     "broker-packs:upgrade-smoke": "tsx scripts/broker-pack-upgrade-smoke.ts",
     "broker-packs:verify": "tsx scripts/verify-broker-packs.ts",
     "start": "node dist/main.js",
-    "electron:tsc": "pnpm -F @traderalice/desktop build",
+    "electron:tsc": "pnpm -F @traderalice/desktop build && node scripts/build-desktop-relay.mjs",
     "electron:build": "pnpm build && pnpm electron:tsc",
     "electron:smoke:demo": "node scripts/electron-demo/run.mjs --smoke",
     "electron:demo": "node scripts/electron-demo/run.mjs",

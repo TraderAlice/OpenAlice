@@ -80,6 +80,7 @@ export interface ResumeIdentityRecord {
 export class ResumeRegistry {
   private readonly records = new Map<string, ResumeIdentityRecord>()
   private flushChain: Promise<void> = Promise.resolve()
+  private runtimeBindingChain: Promise<void> = Promise.resolve()
 
   private constructor(
     private readonly path: string,
@@ -284,6 +285,41 @@ export class ResumeRegistry {
     await this.flush()
   }
 
+  /**
+   * Reconcile Workspace-owned Session dossiers that may have been edited by an
+   * Agent or another process. The dossier is the source of truth for the AI
+   * binding; the in-memory record is only a launch-time cache. Missing AI
+   * fields are left alone so a partial/display-name-only dossier cannot
+   * silently downgrade an existing managed Session to native auth.
+   */
+  async reconcileRuntimeBindings(now = Date.now()): Promise<number> {
+    return this.withRuntimeBindingLock(async () => {
+      let changed = 0
+      for (const record of this.records.values()) {
+        try {
+          const dossier = await this.runtimeBindings.readDossier({
+            wsId: record.wsId,
+            resumeId: record.resumeId,
+            agent: record.agent,
+          })
+          if (!dossier?.ai || JSON.stringify(dossier.ai) === JSON.stringify(record.runtimeBinding)) continue
+          record.runtimeBinding = dossier.ai
+          record.updatedAt = now
+          changed += 1
+        } catch (err) {
+          this.logger.warn('resume_registry.runtime_binding_reconcile_failed', {
+            wsId: record.wsId,
+            resumeId: record.resumeId,
+            agent: record.agent,
+            err,
+          })
+        }
+      }
+      if (changed > 0) await this.flush()
+      return changed
+    })
+  }
+
   async replaceRuntimeBinding(input: {
     resumeId: string
     wsId: string
@@ -291,24 +327,26 @@ export class ResumeRegistry {
     runtimeBinding: SessionRuntimeBinding
     now?: number
   }): Promise<ResumeIdentityRecord> {
-    const record = this.records.get(input.resumeId)
-    if (!record) throw new Error(`resume identity ${input.resumeId} was not found`)
-    if (record.wsId !== input.wsId || record.agent !== input.agent) {
-      throw new Error(`resume identity ${input.resumeId} belongs to ${record.wsId}/${record.agent}`)
-    }
-    if (record.lifecycle === 'retired') {
-      throw new Error(`resume identity ${input.resumeId} is retired`)
-    }
-    await this.runtimeBindings.replace({
-      wsId: input.wsId,
-      resumeId: input.resumeId,
-      agent: input.agent,
-      binding: input.runtimeBinding,
+    return this.withRuntimeBindingLock(async () => {
+      const record = this.records.get(input.resumeId)
+      if (!record) throw new Error(`resume identity ${input.resumeId} was not found`)
+      if (record.wsId !== input.wsId || record.agent !== input.agent) {
+        throw new Error(`resume identity ${input.resumeId} belongs to ${record.wsId}/${record.agent}`)
+      }
+      if (record.lifecycle === 'retired') {
+        throw new Error(`resume identity ${input.resumeId} is retired`)
+      }
+      await this.runtimeBindings.replace({
+        wsId: input.wsId,
+        resumeId: input.resumeId,
+        agent: input.agent,
+        binding: input.runtimeBinding,
+      })
+      record.runtimeBinding = input.runtimeBinding
+      record.updatedAt = input.now ?? Date.now()
+      await this.flush()
+      return record
     })
-    record.runtimeBinding = input.runtimeBinding
-    record.updatedAt = input.now ?? Date.now()
-    await this.flush()
-    return record
   }
 
   async setDisplayName(input: {
@@ -394,5 +432,11 @@ export class ResumeRegistry {
       // durable before the Catalog transition is committed.
       throw err
     }
+  }
+
+  private withRuntimeBindingLock<T>(operation: () => Promise<T>): Promise<T> {
+    const next = this.runtimeBindingChain.then(operation)
+    this.runtimeBindingChain = next.then(() => undefined, () => undefined)
+    return next
   }
 }

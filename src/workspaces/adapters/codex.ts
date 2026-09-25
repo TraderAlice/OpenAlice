@@ -1,3 +1,4 @@
+import { discoverNativeModels } from '../native-model-discovery.js';
 import { createReadStream, existsSync, readFileSync } from 'node:fs';
 import { mkdir, readdir, readFile, rm, stat, writeFile } from 'node:fs/promises';
 import { homedir } from 'node:os';
@@ -176,6 +177,7 @@ function readCodexSessionTitleIndex(cwd: string): Promise<ReadonlyMap<string, st
  */
 
 export const codexAdapter: CliAdapter = {
+  discoverModels: (cwd) => discoverNativeModels('codex', 'codex', cwd),
   id: 'codex',
   displayName: 'Codex',
   binary: 'codex',

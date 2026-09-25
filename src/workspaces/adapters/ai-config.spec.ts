@@ -856,7 +856,7 @@ describe('composeHeadlessCommand (one-shot headless argv, prompt placed per-CLI)
     ]);
   });
 
-  it('pi: Docker headless explicitly approves the image-pinned runtime', () => {
+  it('pi: Docker headless explicitly approves the image-provided runtime', () => {
     expect(piAdapter.composeHeadlessCommand!(['pi'], ctx({ OPENALICE_LAUNCHER: 'docker' }), 'do x')).toEqual([
       'pi', '--approve', '-p', '--mode', 'json', 'do x',
     ]);

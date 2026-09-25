@@ -6,11 +6,15 @@ import { afterEach, describe, expect, it } from 'vitest'
 
 import {
   machineRegistryPath,
+  findRegisteredMachine,
   parseMachineRegistry,
   readMachineRegistry,
   readMachineRegistrySummary,
   registerMachine,
+  registerMachineProfile,
+  renameMachine,
   removeMachine,
+  setMachineEnabled,
   writeMachineRegistry,
 } from './machine-registry.ts'
 
@@ -29,6 +33,13 @@ async function temporarySupervisorRoot(): Promise<string> {
 }
 
 describe('Supervisor machine registry', () => {
+  it('resolves public labels before internal keys and uses the same target for mutations', async () => {
+    const supervisorRoot = await temporarySupervisorRoot()
+    await registerMachineProfile({ label: 'Cloud Box', sshTarget: 'first-host' }, { supervisorRoot })
+    const second = await registerMachineProfile({ label: 'cloud-box', sshTarget: 'second-host' }, { supervisorRoot })
+    expect(findRegisteredMachine(await readMachineRegistrySummary({ supervisorRoot }), 'cloud-box')?.id).toBe(second.id)
+    expect((await setMachineEnabled('cloud-box', false, { supervisorRoot })).id).toBe(second.id)
+  })
   it('treats a missing document as a local-only registry', async () => {
     const supervisorRoot = await temporarySupervisorRoot()
 
@@ -181,5 +192,37 @@ describe('Supervisor machine registry', () => {
     await expect(removeMachine('local', { supervisorRoot })).rejects.toThrow(
       'cannot be removed',
     )
+  })
+
+  it('creates opaque profiles and resolves later mutations by id or label', async () => {
+    const supervisorRoot = await temporarySupervisorRoot()
+    const added = await registerMachineProfile({
+      label: 'Cloud Box',
+      sshTarget: 'alice@cloud',
+    }, { supervisorRoot })
+
+    expect(added).toMatchObject({
+      displayName: 'Cloud Box',
+      sshTarget: 'alice@cloud',
+      enabled: true,
+    })
+    expect(added.id).toMatch(/^[a-f0-9]{32}$/)
+
+    await expect(renameMachine(added.id!, 'Cloud Production', { supervisorRoot })).resolves.toMatchObject({
+      displayName: 'Cloud Production',
+    })
+    await expect(setMachineEnabled('Cloud Production', false, { supervisorRoot })).resolves.toMatchObject({
+      enabled: false,
+    })
+    await expect(readMachineRegistrySummary({ supervisorRoot })).resolves.toMatchObject({
+      machines: [{
+        id: added.id,
+        displayName: 'Cloud Production',
+        enabled: false,
+      }],
+    })
+    await expect(removeMachine(added.id!, { supervisorRoot })).resolves.toMatchObject({
+      id: added.id,
+    })
   })
 })

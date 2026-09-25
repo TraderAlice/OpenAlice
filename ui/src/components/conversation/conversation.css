@@ -1,34 +1,6 @@
-/* Conversation is deliberately a surface inside the existing terminal slot. */
-.conversation-shell {
-  position: relative;
-  width: 100%;
-  max-width: 100%;
-  height: 100%;
-  min-width: 0;
-  min-height: 0;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-  container: conversation / inline-size;
-  color: var(--foreground);
-  background: var(--background);
-}
-
 .conversation-phase { display: inline-flex; align-items: center; gap: 5px; padding: 4px 8px; border: 1px solid var(--border); border-radius: 999px; color: var(--muted-foreground); font-size: 10px; text-transform: capitalize; }
 .conversation-phase.is-working, .conversation-phase.is-retrying, .conversation-phase.is-compacting { color: var(--primary); }
 .conversation-phase.is-failed { color: var(--destructive); }
-
-.conversation-messages {
-  flex: 1;
-  width: 100%;
-  max-width: 100%;
-  min-width: 0;
-  min-height: 0;
-  overflow-y: auto;
-  overflow-x: hidden;
-  padding: 32px max(24px, calc((100% - 736px) / 2));
-  scrollbar-gutter: stable;
-}
 
 .conversation-empty { padding: 12vh 16px; text-align: center; color: var(--muted-foreground); font-size: 13px; }
 .conversation-message { max-width: 100%; min-width: 0; display: flex; flex-direction: column; align-items: stretch; margin: 0 0 32px; }
@@ -176,11 +148,10 @@
 .conversation-compaction-status > div { display: grid; gap: 2px; min-width: 0; }
 .conversation-compaction-status strong { color: var(--foreground); font-size: 11px; font-weight: 650; }
 .conversation-compaction-status span { color: var(--muted-foreground); font-size: 10px; line-height: 1.45; }
-.conversation-composer-wrap { position: relative; flex-shrink: 0; width: 100%; min-width: 0; padding: 12px max(24px, calc((100% - 736px) / 2)) 20px; }
 .conversation-input[data-slot="textarea"] { display: block; width: 100%; min-height: 68px; max-height: 168px; resize: none; border: 0; border-radius: 0; padding: 6px; color: var(--foreground); background: transparent; box-shadow: none; font-size: 14px; line-height: 21px; }
 /* The composer shell owns focus feedback. Outrank the shared field-control
  * focus rule so its inset textarea does not draw a second rectangular ring. */
-:root .conversation-shell .conversation-input[data-slot="textarea"]:focus-visible { outline: none; box-shadow: none; }
+:root .oa-harness-composer .conversation-input[data-slot="textarea"]:focus-visible { outline: none; box-shadow: none; }
 .conversation-send[data-slot="button"] { flex-shrink: 0; border-radius: 999px; color: var(--background); background: var(--foreground); }
 .conversation-send[data-slot="button"]:hover { opacity: .9; }
 .conversation-send[data-slot="button"]:disabled { color: var(--muted-foreground); background: var(--muted); opacity: .55; }
@@ -210,7 +181,6 @@
  * responsive state must therefore follow the surface's real inline size, not
  * the browser viewport. */
 @container conversation (max-width: 720px) {
-  .conversation-messages, .conversation-composer-wrap { padding-left: 12px; padding-right: 12px; }
   .conversation-compaction-status { margin-left: 12px; margin-right: 12px; }
   .conversation-jump-latest { right: 12px; }
   .conversation-message.is-user { margin-left: 0; }
@@ -220,8 +190,16 @@
 }
 
 @container conversation (max-width: 460px) {
-  .conversation-messages { padding-top: 18px; }
   .conversation-message { margin-bottom: 20px; }
   .conversation-activity > summary { gap: 6px; padding-inline: 8px; }
   .conversation-composer-hint { text-align: left; }
+}
+
+.oa-chat-launch-preview { animation: chat-launch-reveal 220ms var(--motion-ease-out) both; }
+@keyframes chat-launch-reveal {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .oa-chat-launch-preview { animation: none; }
 }

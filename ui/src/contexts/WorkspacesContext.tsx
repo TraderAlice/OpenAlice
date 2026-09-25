@@ -16,6 +16,7 @@
  * remove a session, use the sidebar's × button.
  */
 
+import { setLaunchPreview } from '../components/conversation/launch-preview'
 import {
   useCallback,
   useEffect,
@@ -453,6 +454,7 @@ export function WorkspacesProvider({ children }: { children: ReactNode }) {
         credentialSource,
         surface,
       )
+      if (session.surface === 'webpi') setLaunchPreview(workspace.id, session.sessionId, prompt)
       const nowIso = new Date().toISOString()
       const newRecord: SessionRecord = {
         id: session.sessionId,

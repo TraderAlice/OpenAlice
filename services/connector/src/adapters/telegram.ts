@@ -59,6 +59,18 @@ const TELEGRAM_RESUME_CHECK_INTERVAL_MS = 15_000
 const TELEGRAM_RESUME_GAP_MS = 45_000
 const MAX_FINISHED_DRAFTS = 128
 
+type TelegramStartupStage = 'bot_init' | 'webhook_cleanup' | 'polling'
+
+class TelegramStartupError extends Error {
+  readonly stage: TelegramStartupStage
+
+  constructor(stage: TelegramStartupStage, reason: string, cause?: unknown) {
+    super(`Telegram startup [${stage}] ${reason}`, cause === undefined ? undefined : { cause })
+    this.name = 'TelegramStartupError'
+    this.stage = stage
+  }
+}
+
 interface TelegramDraftSession {
   draftId: number
   markdown?: string
@@ -290,13 +302,27 @@ export class TelegramConnectorAdapter implements ConnectorAdapter {
     this.sessionReady = false
     this.attachBot(bot, context)
 
+    // Run getMe separately so a hung Bot API initialization is distinguishable
+    // from grammY's webhook cleanup and the actual getUpdates loop below.
+    await runTelegramStartupStep(
+      'bot_init',
+      () => bot.init(),
+      this.attemptTimeoutMs,
+      'calling getMe',
+    )
+
     let ready = false
+    let startupStage: TelegramStartupStage = 'webhook_cleanup'
     let resolveReady!: () => void
     const becameReady = new Promise<void>((resolve) => { resolveReady = resolve })
+    // Telegram does not allow getUpdates while a webhook is configured, so
+    // grammY clears any old webhook before entering long polling. Keep queued
+    // updates: dropping them would silently discard owner messages.
     const polling = bot.start({
-      drop_pending_updates: true,
+      drop_pending_updates: false,
       onStart: () => {
         ready = true
+        startupStage = 'polling'
         resolveReady()
         this.sessionReady = true
         if (this.ownerUserId && this.chatId) this.tracker.healthy(this.ownerUserId)
@@ -312,12 +338,17 @@ export class TelegramConnectorAdapter implements ConnectorAdapter {
         })
         bot.api.config.use(autoRetry())
       },
+    }).catch((error) => {
+      throw new TelegramStartupError(ready ? 'polling' : startupStage, 'failed', error)
     })
 
     let attemptTimer: ReturnType<typeof setTimeout> | undefined
     const attemptExpired = new Promise<never>((_resolve, reject) => {
       attemptTimer = setTimeout(() => {
-        reject(new Error(`Telegram polling session did not become ready within ${this.attemptTimeoutMs}ms`))
+        reject(new TelegramStartupError(
+          startupStage,
+          `did not become ready within ${this.attemptTimeoutMs}ms`,
+        ))
       }, this.attemptTimeoutMs)
       attemptTimer.unref?.()
     })
@@ -325,7 +356,7 @@ export class TelegramConnectorAdapter implements ConnectorAdapter {
       await Promise.race([
         becameReady,
         polling.then(() => {
-          if (!ready) throw new Error('Telegram polling ended before it became ready')
+          if (!ready) throw new TelegramStartupError(startupStage, 'ended before onStart')
         }),
         attemptExpired,
       ])
@@ -911,6 +942,23 @@ export async function withTimeout<T>(operation: () => Promise<T>, timeoutMs: num
     ])
   } finally {
     if (timer) clearTimeout(timer)
+  }
+}
+
+async function runTelegramStartupStep<T>(
+  stage: TelegramStartupStage,
+  operation: () => Promise<T>,
+  timeoutMs: number,
+  detail: string,
+): Promise<T> {
+  const timeoutMessage = `timed out after ${timeoutMs}ms while ${detail}`
+  try {
+    return await withTimeout(operation, timeoutMs, timeoutMessage)
+  } catch (error) {
+    if (error instanceof Error && error.message === timeoutMessage) {
+      throw new TelegramStartupError(stage, timeoutMessage)
+    }
+    throw new TelegramStartupError(stage, 'failed', error)
   }
 }
 

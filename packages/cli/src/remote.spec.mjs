@@ -27,13 +27,14 @@ import {
 const CLI_VERSION = JSON.parse(
   readFileSync(new URL('../package.json', import.meta.url), 'utf8'),
 ).version
+const betaCliVersion = /^[0-9]+\.[0-9]+\.[0-9]+-beta(?:\.[1-9][0-9]*)?$/.test(CLI_VERSION)
 const masterInstallSource = {
   schemaVersion: 3,
   repository: 'TraderAlice/OpenAlice',
   cliVersion: CLI_VERSION,
-  selector: { kind: 'branch', value: 'master' },
+  selector: betaCliVersion ? { kind: 'version', value: `v${CLI_VERSION}` } : { kind: 'branch', value: 'master' },
   installerUrl: 'https://openalice.ai/install',
-  updateChannel: 'stable',
+  updateChannel: betaCliVersion ? 'beta' : 'stable',
   method: 'direct',
   artifact: { platform: 'linux', arch: 'x64', sha256: 'a'.repeat(64) },
   installedAt: '2026-08-31T00:00:00.000Z',
@@ -85,8 +86,15 @@ describe('OpenAlice managed remote connector', () => {
     const command = buildRemoteInstallCommand(masterInstallSource)
     expect(command).toContain('OPENALICE_INSTALL_URL=')
     expect(command).toContain(`OPENALICE_EXPECTED_CLI_VERSION='${CLI_VERSION}'`)
-    expect(command).toContain(`--channel stable --version '${CLI_VERSION}'`)
+    expect(command).toContain(`--channel ${betaCliVersion ? 'beta' : 'stable'} --version '${CLI_VERSION}'`)
     expect(command).not.toContain('managed Pi')
+  })
+
+  it('blocks mismatched install provenance during planning instead of failing after approval', () => {
+    const source = { ...masterInstallSource, cliVersion: '0.94.1-beta', updateChannel: 'stable' }
+    expect(buildRemoteInstallCommand.bind(null, source)).toThrow('marked stable')
+    const plan = createRemotePlan(parseRemoteArgs(['host']), compatibleRemote(), { installSource: source })
+    expect(plan.blocker).toContain('marked stable')
   })
 
   it('reproduces a stable release from its exact ref without pinning the remote channel', () => {
@@ -167,12 +175,40 @@ describe('OpenAlice managed remote connector', () => {
     expect(conflict.blocker).toContain('Re-run with --takeover')
   })
 
-  it('reuses a healthy compatible CLI Server without mutation', () => {
+  it('reuses a healthy compatible Runtime without mutation', () => {
     const plan = createRemotePlan(parseRemoteArgs(['host']), compatibleRemote())
     expect(plan.mutations).toEqual([])
     expect(plan.installCli).toBe(false)
     expect(plan.startServer).toBe(false)
     expect(plan.blocker).toBe('')
+  })
+
+  it('reuses a healthy Docker-owned Runtime without treating its launcher as a conflict', async () => {
+    const remote = compatibleRemote({
+      owner: {
+        surface: 'docker',
+        pid: 99,
+        instanceId: 'runtime-99',
+        startedAt: '2026-08-31T00:00:00.000Z',
+        launchRoot: '/app',
+      },
+      provider: { kind: 'source', root: '/app' },
+    })
+    const plan = createRemotePlan(parseRemoteArgs(['host', '--no-open']), remote)
+    expect(plan.blocker).toBe('')
+    expect(plan.mutations).toEqual([])
+    expect(plan.sourceMode).toBe('existing-runtime')
+
+    const connectTunnel = vi.fn(async () => 0)
+    await expect(connectRemote(parseRemoteArgs(['host', '--no-open']), {
+      probeRemote: async () => remote,
+      connectTunnel,
+      stdout: { write: vi.fn() },
+    })).resolves.toBe(0)
+    expect(connectTunnel).toHaveBeenCalledWith(expect.objectContaining({
+      destination: 'host',
+      remotePort: 47331,
+    }), expect.any(Object))
   })
 
   it('accepts a published native fallback whose provider predates content identity status', () => {
@@ -185,14 +221,15 @@ describe('OpenAlice managed remote connector', () => {
     expect(plan.mutations).toEqual([])
   })
 
-  it('does not reuse a running source Runtime when native mode was requested', () => {
+  it('reuses a running source Runtime when no explicit source path was requested', () => {
     const remote = compatibleRemote({
-      owner: { surface: 'cli-server', pid: 99, launchRoot: '/srv/source-runtime' },
+      owner: { surface: 'docker', pid: 99, launchRoot: '/srv/source-runtime' },
       provider: { kind: 'source', root: '/srv/source-runtime' },
     })
     const plan = createRemotePlan(parseRemoteArgs(['host']), remote)
     expect(plan.startServer).toBe(false)
-    expect(plan.blocker).toContain('not the requested installed native Runtime')
+    expect(plan.blocker).toBe('')
+    expect(plan.mutations).toEqual([])
   })
 
   it('does not reuse a running source Runtime from another checkout', () => {
@@ -241,6 +278,28 @@ describe('OpenAlice managed remote connector', () => {
       'update remote OpenAlice CLI',
       'restart remote OpenAlice Server',
     ])
+  })
+
+  it('defers an external Runtime update that has no safe activation capability', () => {
+    const remote = outdatedNativeRemote({
+      owner: {
+        surface: 'docker',
+        pid: 99,
+        instanceId: 'runtime-99',
+        startedAt: '2026-08-31T00:00:00.000Z',
+        launchRoot: '/app',
+      },
+      provider: { kind: 'source', root: '/app' },
+      capabilities: ['runtime.stop'],
+    })
+
+    const plan = createRemotePlan(parseRemoteArgs(['host']), remote)
+
+    expect(plan.installCli).toBe(false)
+    expect(plan.deferredCliUpdate).toBe(true)
+    expect(plan.activationRoute).toBe('unavailable')
+    expect(plan.mutations).toEqual([])
+    expect(formatRemotePlan(plan)).toContain('update deferred')
   })
 
   it('does not restart an explicit source Runtime when only its CLI is updated', () => {
@@ -325,7 +384,7 @@ describe('OpenAlice managed remote connector', () => {
     expect(plan.cloneSource).toBe(true)
     expect(plan.mutations).toEqual([
       'install remote OpenAlice CLI',
-      'clone OpenAlice source (branch master)',
+      betaCliVersion ? `clone OpenAlice source (version v${CLI_VERSION})` : 'clone OpenAlice source (branch master)',
       'start remote OpenAlice Server',
     ])
   })
@@ -664,9 +723,19 @@ describe('OpenAlice managed remote connector', () => {
     expect(runRemote).toHaveBeenCalledTimes(4)
   })
 
-  it('stops a managed remote Server without requiring a raw SSH command', async () => {
+  it('stops a capability-bearing Docker Runtime without requiring a raw SSH command', async () => {
+    const dockerRuntime = compatibleRemote({
+      owner: {
+        surface: 'docker',
+        pid: 99,
+        instanceId: 'runtime-99',
+        startedAt: '2026-08-31T00:00:00.000Z',
+        launchRoot: '/app',
+      },
+      provider: { kind: 'source', root: '/app' },
+    })
     const probeRemote = vi.fn()
-      .mockResolvedValueOnce(compatibleRemote())
+      .mockResolvedValueOnce(dockerRuntime)
       .mockResolvedValueOnce(compatibleRemote({ class: 'absent', state: 'absent', owner: null, endpoints: {} }))
     const runRemote = vi.fn(async () => 'OpenAlice Server stopped\n')
     const connectTunnel = vi.fn()
@@ -1084,7 +1153,7 @@ describe('OpenAlice managed remote connector', () => {
     expect(buildRemoteBuildToolsProbeCommand()).toContain("printf 'cxx\\n'")
     const clone = buildRemoteCloneCommand("/srv/Alice's source", masterInstallSource)
     expect(clone).toContain("root='/srv/Alice'\\''s source'")
-    expect(clone).toContain("--branch 'master' --single-branch")
+    expect(clone).toContain(betaCliVersion ? `checkout --detach 'v${CLI_VERSION}'` : "--branch 'master' --single-branch")
     expect(clone).toContain('mv "$tmp" "$root"')
   })
 })

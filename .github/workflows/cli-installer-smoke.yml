@@ -220,7 +220,10 @@ jobs:
           node-version: 22.19.0
           cache: pnpm
 
-      - run: pnpm install --frozen-lockfile --filter @traderalice/openalice-cli
+      - run: pnpm install --frozen-lockfile
+
+      - name: Build trusted local UI for Web relay
+        run: pnpm exec turbo run build --filter=open-alice-ui...
 
       - name: Exercise clean SSH host fixture
         run: node scripts/remote-ssh-smoke.mjs --skip-tui

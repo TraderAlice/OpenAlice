@@ -5,6 +5,7 @@ const eventRows = Math.max(1, Number(process.env['OPENALICE_TUI_FIXTURE_EVENT_RO
 
 const exitCode = await runSupervisorTui({}, {
   env: process.env,
+  webRelay: null,
   resolveContext: () => resolveLaunchContext({
     cwd: process.cwd(),
     homeDir: '/fixture',

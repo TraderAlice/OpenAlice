@@ -622,7 +622,6 @@ pnpm test:system:guardian
 pnpm test:system:installer
 pnpm test:system:installer:dev
 pnpm test:system:remote
-pnpm docker:smoke
 cd ui && npx tsc -b
 pnpm electron:smoke:workspace
 pnpm electron:smoke:pty

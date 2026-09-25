@@ -1,38 +1,17 @@
 import { spawn } from 'node:child_process'
 import { access, readFile } from 'node:fs/promises'
-import { homedir } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
 
 import {
   aliceProjectEnvironment,
   resolveAliceProjectIdentity,
 } from './alice-project.ts'
-import {
-  reconcileActivation,
-  resolveActivationContext,
-  rollbackFailedActivation,
-} from './activation-runtime.mjs'
-
 import { buildManagedPiEnvForHome } from './launch-context.ts'
-import {
-  LOOPBACK,
-  createStartupSignalGuard,
-  openBrowser,
-  probeOpenAlice,
-  waitForOpenAlice,
-} from './runtime-client.mjs'
+import { LOOPBACK } from './runtime-client.mjs'
 import {
   inspectRuntimeBuildTools,
   runtimeBuildToolsError,
 } from './runtime-deps.mjs'
-import { readRuntimeStatus as readGuardianRuntimeStatus } from './server-control.mjs'
-import {
-  prepareBunRuntimeEnvironment,
-  buildExternalAgentRuntimeEnvironment,
-  bunGuardianProcessSpec,
-  isBunStandalone,
-  resolveBunResourceRoot,
-} from './bun-standalone.mjs'
 
 const RUNTIME_ARTIFACTS = [
   'dist/main.js',
@@ -106,184 +85,6 @@ export function parseLocalStartArgs(argv) {
   }
 
   return options
-}
-
-export async function startLocal(options, dependencies = {}) {
-  const stdout = dependencies.stdout ?? process.stdout
-  const env = dependencies.env ?? process.env
-  const homeDir = dependencies.homeDir ?? homedir()
-  const homeRoot = resolve(options.homeRoot ?? env['OPENALICE_HOME'] ?? join(homeDir, '.openalice'))
-  const localUrl = `http://${LOOPBACK}:${options.port}`
-  const probeRuntime = dependencies.probeRuntime ?? probeOpenAlice
-  const launchBrowser = dependencies.launchBrowser ?? openBrowser
-  const readRuntimeStatus = dependencies.readRuntimeStatus ?? readGuardianRuntimeStatus
-  const readConfiguredWebPort = dependencies.readConfiguredWebPort ?? readHomeWebPort
-  const activation = await resolveActivationContext(env, dependencies)
-
-  if (await probeRuntime(localUrl)) {
-    const status = await readRuntimeStatus({ homeRoot, timeoutMs: 500 }, { ...dependencies, env, homeDir })
-    await reconcileActivation(status, activation, dependencies)
-    stdout.write(`OpenAlice is already running at ${localUrl}\n`)
-    if (options.openBrowser) await launchBrowser(localUrl)
-    return 0
-  }
-
-  const status = await readRuntimeStatus({ homeRoot, timeoutMs: 500 }, { ...dependencies, env, homeDir })
-  const discoveredUrl = status.endpoints?.web
-    ?? (status.class === 'owned_elsewhere'
-      ? configuredLocalUrl(await readConfiguredWebPort(homeRoot))
-      : null)
-  if (discoveredUrl && discoveredUrl !== localUrl && await probeRuntime(discoveredUrl)) {
-    await reconcileActivation(status, activation, dependencies)
-    stdout.write(`OpenAlice is already running at ${discoveredUrl} for ${homeRoot}\n`)
-    if (options.openBrowser) await launchBrowser(discoveredUrl)
-    return 0
-  }
-
-  const standalone = isBunStandalone()
-  const launchEnv = standalone
-    ? buildExternalAgentRuntimeEnvironment(env)
-    : env
-  const requestedAppDir = options.appDir
-    ?? env['OPENALICE_APP_HOME']?.trim()
-    ?? env['OPENALICE_MANAGED_RUNTIME_PATH']?.trim()
-    ?? dependencies.cwd
-    ?? process.cwd()
-  const resolveRoot = dependencies.resolveRoot ?? findOpenAliceRoot
-  const appDir = standalone
-    ? resolveBunResourceRoot(env, dependencies.runtimeExecutable ?? process.execPath)
-    : await resolveRoot(requestedAppDir)
-  const runtimeProvider = resolveLocalRuntimeProvider(appDir, env, activation.contentIdentity)
-  const prepareSource = dependencies.prepareSource ?? prepareSourceCheckout
-  if (!standalone) await prepareSource(appDir, options, { stdout, env })
-
-  const spawnProcess = dependencies.spawnProcess ?? spawn
-  const waitForRuntime = dependencies.waitForRuntime ?? waitForOpenAlice
-  const nodeBinary = dependencies.nodeBinary ?? process.execPath
-  let runtimeEnv = buildLocalRuntimeEnv(launchEnv, {
-    appDir,
-    homeRoot,
-    nodeBinary,
-    port: options.port,
-    takeover: options.takeover,
-  })
-  runtimeEnv.OPENALICE_RUNTIME_PROVIDER = runtimeProvider.kind
-  if (standalone) {
-    runtimeEnv = await prepareBunRuntimeEnvironment(
-      runtimeEnv,
-      appDir,
-      dependencies.runtimeExecutable ?? process.execPath,
-      { inspectDependencies: dependencies.inspectDependencies },
-    )
-  }
-  delete runtimeEnv.OPENALICE_RUNTIME_CONTENT_IDENTITY
-  if (runtimeProvider.contentIdentity) {
-    runtimeEnv.OPENALICE_RUNTIME_CONTENT_IDENTITY = runtimeProvider.contentIdentity
-  }
-  const guardianSpec = standalone
-    ? bunGuardianProcessSpec(dependencies.runtimeExecutable ?? process.execPath)
-    : { cmd: nodeBinary, args: ['scripts/guardian/prod.mjs'] }
-  const runtime = spawnProcess(guardianSpec.cmd, guardianSpec.args, {
-    cwd: appDir,
-    env: runtimeEnv,
-    stdio: 'inherit',
-    windowsHide: true,
-  })
-
-  let ready = false
-  const readinessAbort = new AbortController()
-  const startupSignals = createStartupSignalGuard(runtime, 'Local OpenAlice start')
-  const earlyFailure = new Promise((_, reject) => {
-    runtime.once('error', reject)
-    runtime.once('exit', (code, signal) => {
-      if (!ready) {
-        const error = new Error(`Local OpenAlice exited before it was ready (code=${String(code)}, signal=${String(signal)})`)
-        error.code = 'EEARLYEXIT'
-        reject(error)
-      }
-    })
-  })
-
-  try {
-    await Promise.race([
-      waitForRuntime(localUrl, { timeoutMs: options.waitMs, signal: readinessAbort.signal }),
-      earlyFailure,
-      startupSignals.promise,
-    ])
-    ready = true
-    const readyStatus = await readRuntimeStatus(
-      { homeRoot, timeoutMs: 1_000 },
-      { ...dependencies, env: runtimeEnv, homeDir },
-    )
-    await reconcileActivation(readyStatus, activation, dependencies)
-    const runtimeExit = holdRuntime(runtime)
-    startupSignals.release()
-    stdout.write(`OpenAlice source: ${appDir}\n`)
-    stdout.write(`OpenAlice home: ${homeRoot}\n`)
-    stdout.write(`Local OpenAlice UI: ${localUrl}\n`)
-    stdout.write('The local Runtime stays active until this command exits. Press Ctrl+C to stop it.\n')
-    if (options.openBrowser) await launchBrowser(localUrl)
-    return await runtimeExit
-  } catch (error) {
-    readinessAbort.abort()
-    startupSignals.release()
-    runtime.kill('SIGTERM')
-    if (
-      !error?.code
-      && error instanceof Error
-      && error.message.startsWith('OpenAlice did not become ready')
-    ) error.code = 'ETIMEDOUT'
-    const rollback = await rollbackFailedActivation(activation, error, dependencies)
-    if (rollback) {
-      const wrapped = new Error(
-        `${error instanceof Error ? error.message : String(error)}. The failed direct-install activation was rolled back to ${rollback.restoredRelease}. Run openalice again to start the restored release. User data was not changed.`,
-      )
-      wrapped.code = error?.code ?? 'ESTART'
-      wrapped.cause = error
-      wrapped.rollback = rollback
-      throw wrapped
-    }
-    throw error
-  }
-}
-
-function resolveLocalRuntimeProvider(appDir, env, installedIdentity = null) {
-  if (isBunStandalone()) {
-    return {
-      kind: 'bun',
-      contentIdentity: env['OPENALICE_RUNTIME_CONTENT_IDENTITY']?.trim()
-        || installedIdentity
-        || null,
-    }
-  }
-  const managedPath = env['OPENALICE_MANAGED_RUNTIME_PATH']?.trim()
-  if (!managedPath || resolve(managedPath) !== resolve(appDir)) {
-    return { kind: 'source', contentIdentity: null }
-  }
-  const contentIdentity = env[
-    'OPENALICE_MANAGED_RUNTIME_CONTENT_IDENTITY'
-  ]?.trim()
-  if (!contentIdentity || !/^[a-f0-9]{16}$/.test(contentIdentity)) {
-    throw new Error(
-      'The installed OpenAlice Runtime is missing its valid 16-character content identity. Reinstall or update OpenAlice.',
-    )
-  }
-  return { kind: 'bundle', contentIdentity }
-}
-
-export async function readHomeWebPort(homeRoot, options = {}) {
-  const readFileImpl = options.readFileImpl ?? readFile
-  try {
-    const parsed = JSON.parse(await readFileImpl(join(homeRoot, 'data', 'config', 'ports.json'), 'utf8'))
-    const port = Number(parsed?.web)
-    return Number.isInteger(port) && port >= 1 && port <= 65_535 ? port : null
-  } catch {
-    return null
-  }
-}
-
-function configuredLocalUrl(port) {
-  return port ? `http://${LOOPBACK}:${port}` : null
 }
 
 export function buildLocalRuntimeEnv(env, options) {
@@ -397,48 +198,6 @@ export async function hasRuntimeArtifacts(appDir, options = {}) {
   } catch {
     return false
   }
-}
-
-export function formatLocalStartHelp() {
-  return `Usage:
-  openalice [options]
-  openalice start [path] [options]
-
-Prepares an OpenAlice source checkout without Electron, starts the built-runtime
-Guardian on local loopback, and opens the normal OpenAlice browser UI.
-
-Options:
-  --app-dir <path>   OpenAlice checkout (default: current directory or parent)
-  --home <path>      User-state root (default: OPENALICE_HOME or ~/.openalice)
-  --port <port>      Local web port (default: 47331)
-  --rebuild          Reinstall dependencies and rebuild server artifacts
-  --skip-prepare     Fail instead of installing/building missing artifacts
-  --takeover         Replace the recorded local Guardian owner tree
-  --no-update-check  Skip the bounded stable-release update check
-  --wait <seconds>   Readiness timeout, 1-600 (default: 120)
-  --no-open          Print the URL without opening a browser
-  -h, --help         Show this help
-`
-}
-
-function holdRuntime(runtime) {
-  if (runtime.exitCode !== undefined && (runtime.exitCode !== null || runtime.signalCode !== null)) {
-    return Promise.resolve(runtime.exitCode ?? 0)
-  }
-  return new Promise((resolvePromise) => {
-    let requestedStop = false
-    const stop = () => {
-      requestedStop = true
-      runtime.kill('SIGTERM')
-    }
-    process.once('SIGINT', stop)
-    process.once('SIGTERM', stop)
-    runtime.once('exit', (code) => {
-      process.off('SIGINT', stop)
-      process.off('SIGTERM', stop)
-      resolvePromise(requestedStop ? 0 : code ?? 0)
-    })
-  })
 }
 
 function runChecked(command, args, options) {

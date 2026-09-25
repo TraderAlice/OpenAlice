@@ -5,6 +5,7 @@ let diagnoses = 0
 
 const exitCode = await runSupervisorTui({}, {
   env: process.env,
+  webRelay: null,
   resolveContext: () => resolveLaunchContext({
     cwd: process.cwd(),
     homeDir: '/fixture',

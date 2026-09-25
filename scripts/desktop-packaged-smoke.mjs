@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import { writeProjectWorkspaceRequest } from '../packages/cli/src/project-workspaces.ts'
-import { spawn, spawnSync } from 'node:child_process'
+import { spawnSync } from 'node:child_process'
 import { existsSync, mkdirSync, mkdtempSync, rmSync } from 'node:fs'
 import { createServer as createNetServer } from 'node:net'
 import { homedir, tmpdir } from 'node:os'
@@ -14,6 +14,7 @@ import {
 import { buildDesktopPackagedSmokePlan } from './desktop-packaged-smoke-plan.mjs'
 import { runPnpmSync } from './pnpm-command.mjs'
 import { packagedElectronExecutable } from './smoke-packaged-toolchain.mjs'
+import { spawnDesktopSmoke, stopDesktopSmoke } from './desktop-smoke-process.mjs'
 import { startWorkspaceAcceptanceAiMock } from './workspace-acceptance-ai-mock.mjs'
 import {
   formatWorkspaceAcceptanceFailure,
@@ -99,9 +100,27 @@ function waitForPackagedApp(child, automated) {
   return new Promise((resolve, reject) => {
     let requestedSignal = null
     let timedOut = false
-    const forwardSignal = (signal) => {
+    let settled = false
+    let shutdown = null
+    const finish = async (code, signal) => {
+      if (settled) return
+      settled = true
+      cleanup()
+      try {
+        await (shutdown ?? stopDesktopSmoke(child))
+        resolve({ code, signal, requestedSignal, timedOut })
+      } catch (error) { reject(error) }
+    }
+    const requestStop = (signal) => {
       requestedSignal = signal
-      child.kill('SIGTERM')
+      shutdown ??= stopDesktopSmoke(child)
+      void shutdown.then(() => finish(child.exitCode, child.signalCode), (error) => {
+        cleanup()
+        reject(error)
+      })
+    }
+    const forwardSignal = (signal) => {
+      requestStop(signal)
     }
     const onSigint = () => forwardSignal('SIGINT')
     const onSigterm = () => forwardSignal('SIGTERM')
@@ -112,23 +131,22 @@ function waitForPackagedApp(child, automated) {
       ? setTimeout(() => {
           timedOut = true
           console.error('[desktop-smoke] automated packaged smoke timed out')
-          child.kill('SIGTERM')
+          requestStop(null)
         }, 180_000)
       : null
     timeout?.unref()
 
-    const finish = () => {
+    const cleanup = () => {
       if (timeout) clearTimeout(timeout)
       process.off('SIGINT', onSigint)
       process.off('SIGTERM', onSigterm)
     }
     child.once('error', (error) => {
-      finish()
+      cleanup()
       reject(error)
     })
     child.once('exit', (code, signal) => {
-      finish()
-      resolve({ code, signal, requestedSignal, timedOut })
+      void finish(code, signal)
     })
   })
 }
@@ -153,6 +171,8 @@ async function main() {
   let aiMock = null
   let packageArtifact = null
   let smokeRoot = null
+  let appChild = null
+  let appStopped = true
   let finalCode = 0
   let signalToRaise = null
 
@@ -272,12 +292,14 @@ async function main() {
       console.log('[desktop-smoke] close the app window or press Ctrl-C here to stop')
     }
 
-    const child = spawn(appPath, [], {
+    appChild = spawnDesktopSmoke(appPath, [], {
       cwd: repoRoot,
       stdio: 'inherit',
       env,
     })
-    const exit = await waitForPackagedApp(child, onboarding || tradingMode || workspaceAcceptance)
+    appStopped = false
+    const exit = await waitForPackagedApp(appChild, onboarding || tradingMode || workspaceAcceptance)
+    appStopped = true
     signalToRaise = exit.requestedSignal
     finalCode = exit.timedOut ? 1 : exit.code ?? (exit.signal ? 1 : 0)
 
@@ -303,18 +325,27 @@ async function main() {
     console.error(`[desktop-smoke] ${error instanceof Error ? error.message : String(error)}`)
   } finally {
     aiMock?.server.close()
-    if (smokeRoot && !keep) {
+    if (!appStopped) {
+      try {
+        await stopDesktopSmoke(appChild)
+        appStopped = true
+      } catch (error) {
+        finalCode = 1
+        console.error(`[desktop-smoke] app cleanup failed; keeping package and data: ${error instanceof Error ? error.message : String(error)}`)
+      }
+    }
+    if (smokeRoot && !keep && appStopped) {
       try {
         rmSync(smokeRoot, { recursive: true, force: true, maxRetries: 8, retryDelay: 250 })
       } catch (error) {
         finalCode = 1
         console.error(`[desktop-smoke] failed to clean temporary data ${smokeRoot}: ${error instanceof Error ? error.message : String(error)}`)
       }
-    } else if (smokeRoot && keep) {
+    } else if (smokeRoot && (keep || !appStopped)) {
       console.log(`[desktop-smoke] kept temporary data: ${smokeRoot}`)
     }
 
-    const packageCleanup = cleanupTemporaryDesktopPackageArtifact(packageArtifact, { keep: keepPackage })
+    const packageCleanup = cleanupTemporaryDesktopPackageArtifact(packageArtifact, { keep: keepPackage || !appStopped })
     if (packageCleanup.kept) {
       console.log(`[desktop-smoke] kept temporary package: ${packageArtifact.packageRoot}`)
     } else if (packageCleanup.cleaned) {

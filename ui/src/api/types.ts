@@ -100,7 +100,8 @@ export interface ModelSemantics {
   contextWindow?: number
   maxOutputTokens?: number
   reasoning?: {
-    mode: ModelReasoningMode
+    mode?: ModelReasoningMode
+    supported?: boolean
     efforts?: ModelReasoningEffort[]
     defaultEffort?: ModelReasoningEffort
     defaultEnabled?: boolean

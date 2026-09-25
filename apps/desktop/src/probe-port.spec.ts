@@ -1,5 +1,5 @@
-import { describe, it, expect, afterEach } from 'vitest'
-import { createServer, type AddressInfo, type Server } from 'node:net'
+import { describe, it, expect, afterEach, vi } from 'vitest'
+import { createServer, Server, type AddressInfo } from 'node:net'
 import { probeFreePort } from './probe-port.js'
 
 async function listen(port: number = 0): Promise<Server> {
@@ -65,6 +65,66 @@ describe('probeFreePort', () => {
     held.push(...servers.slice(0, 3))
     await close(servers[3]!)
     expect(await probeFreePort(start, start + 3)).toBe(start + 3)
+  })
+
+  it('waits for a probe server to finish closing before resolving', async () => {
+    const { start, servers } = await reserveConsecutivePorts(1)
+    await close(servers[0]!)
+
+    const originalClose = Server.prototype.close
+    let pendingServer: Server | undefined
+    let pendingCallback: ((error?: Error) => void) | undefined
+    let releaseObserved!: () => void
+    const closeObserved = new Promise<void>((resolve) => {
+      releaseObserved = resolve
+    })
+    const closeSpy = vi.spyOn(Server.prototype, 'close').mockImplementationOnce(function (
+      this: Server,
+      callback?: (error?: Error) => void,
+    ) {
+      pendingServer = this
+      pendingCallback = callback
+      releaseObserved()
+      return this
+    })
+
+    let resolved = false
+    let released = false
+    try {
+      const probe = probeFreePort(start, start).then((port) => {
+        resolved = true
+        return port
+      })
+      void probe.catch(() => {}) // Keep a failing regression from becoming an unhandled rejection.
+      await closeObserved
+      expect(pendingCallback).toBeTypeOf('function')
+      await new Promise<void>((resolve) => setImmediate(resolve))
+      expect(resolved).toBe(false)
+      expect(pendingServer).toBeDefined()
+
+      closeSpy.mockRestore()
+      await new Promise<void>((resolve, reject) => {
+        originalClose.call(pendingServer!, (error) => {
+          if (error) {
+            reject(error)
+            return
+          }
+          pendingCallback?.()
+          resolve()
+        })
+      })
+      released = true
+      expect(await probe).toBe(start)
+    } finally {
+      if (!released) {
+        closeSpy.mockRestore()
+        if (pendingServer) {
+          await new Promise<void>((resolve) => {
+            originalClose.call(pendingServer!, () => resolve())
+          })
+        }
+      }
+    }
   })
 
   it('throws when no port in range is available', async () => {

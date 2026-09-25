@@ -71,6 +71,26 @@ const pendingWebRequests = new Map<string, {
   readonly timer: ReturnType<typeof setTimeout>
 }>()
 
+function sendAliceMessage(child: ChildProcess, message: Serializable, onError: (error: Error) => void = () => {}): void {
+  try {
+    // Without a callback, a disconnect between `connected` and `send` emits
+    // an unhandled ChildProcess error and can terminate the Electron main process.
+    child.send(message, (error) => {
+      if (error) onError(error)
+    })
+  } catch (error) {
+    onError(error instanceof Error ? error : new Error(String(error)))
+  }
+}
+
+export function cancelOpenAliceWebRequests(reason = 'Alice IPC connection closed'): void {
+  for (const [id, pending] of pendingWebRequests) {
+    pendingWebRequests.delete(id)
+    clearTimeout(pending.timer)
+    pending.reject(new Error(reason))
+  }
+}
+
 class WorkspacePathTraversal extends Error {
   constructor(readonly attempted: string) {
     super(`refused to escape workspace: ${attempted}`)
@@ -272,13 +292,20 @@ export function registerOpenAliceIpc(opts: OpenAliceIpcOptions): void {
         ptyConnections.delete(connectionId)
         return
       }
-      child.send(msg)
+      sendAliceMessage(child, msg, () => {
+        ptyConnections.delete(connectionId)
+        if (!event.sender.isDestroyed()) {
+          event.sender.send('openalice:pty:server-event', {
+            connectionId, event: 'close', code: 1011, reason: 'Alice IPC unavailable',
+          })
+        }
+      })
     }
 
     event.sender.once('destroyed', () => {
       ptyConnections.delete(connectionId)
       const child = opts.getAliceProcess()
-      if (child?.connected) child.send({ type: MSG_PTY_CLIENT_CLOSE, connectionId })
+      if (child?.connected) sendAliceMessage(child, { type: MSG_PTY_CLIENT_CLOSE, connectionId })
     })
 
     sendToAlice({
@@ -305,21 +332,21 @@ export function registerOpenAliceIpc(opts: OpenAliceIpcOptions): void {
       return
     }
     if (body['type'] === 'data') {
-      child.send({
+      sendAliceMessage(child, {
         type: MSG_PTY_CLIENT,
         connectionId,
         binary: true,
         data: body['data'] as Serializable,
       })
     } else if (body['type'] === 'resize') {
-      child.send({
+      sendAliceMessage(child, {
         type: MSG_PTY_CLIENT,
         connectionId,
         binary: false,
         data: JSON.stringify({ type: 'resize', cols: body['cols'], rows: body['rows'] }),
       })
     } else if (body['type'] === 'control' && typeof body['data'] === 'string') {
-      child.send({
+      sendAliceMessage(child, {
         type: MSG_PTY_CLIENT,
         connectionId,
         binary: false,
@@ -336,7 +363,7 @@ export function registerOpenAliceIpc(opts: OpenAliceIpcOptions): void {
     if (conn && conn.sender !== event.sender) return
     ptyConnections.delete(connectionId)
     const child = opts.getAliceProcess()
-    if (child?.connected) child.send({ type: MSG_PTY_CLIENT_CLOSE, connectionId })
+    if (child?.connected) sendAliceMessage(child, { type: MSG_PTY_CLIENT_CLOSE, connectionId })
   })
 }
 
@@ -356,13 +383,19 @@ export async function fetchAliceWebRequest(request: Request, child: ChildProcess
       rejectPromise(new Error(`Alice IPC request timed out: ${method} ${request.url}`))
     }, timeoutMs)
     pendingWebRequests.set(id, { resolve: resolvePromise, reject: rejectPromise, timer })
-    child.send({
+    sendAliceMessage(child, {
       type: MSG_WEB_REQUEST,
       id,
       method,
       url: request.url,
       headers: [...request.headers.entries()],
       ...(body ? { body } : {}),
+    }, (error) => {
+      const pending = pendingWebRequests.get(id)
+      if (!pending) return
+      pendingWebRequests.delete(id)
+      clearTimeout(pending.timer)
+      pending.reject(error)
     })
   })
 }

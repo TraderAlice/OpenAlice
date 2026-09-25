@@ -31,17 +31,20 @@ export function resolveBashPath(
     .split(delimiter)
     .map((entry) => entry.trim().replace(/^"|"$/g, ''))
     .filter(Boolean);
+  // Prefer Git Bash before generic PATH bash aliases (for example, WSL/system32).
+  for (const dir of pathDirs) {
+    if (!existsSync(join(dir, 'git.exe'))) continue;
+    const root = /^(?:cmd|bin)$/i.test(dirnameLeaf(dir)) ? dirname(dir) : dir;
+    const fromGit = firstExisting([
+      join(root, 'bin', 'bash.exe'),
+      join(root, 'usr', 'bin', 'bash.exe'),
+    ]);
+    if (fromGit) return fromGit;
+  }
+
   for (const dir of pathDirs) {
     const direct = join(dir, 'bash.exe');
     if (existsSync(direct)) return direct;
-    if (existsSync(join(dir, 'git.exe'))) {
-      const root = /^(?:cmd|bin)$/i.test(dirnameLeaf(dir)) ? dirname(dir) : dir;
-      const fromGit = firstExisting([
-        join(root, 'bin', 'bash.exe'),
-        join(root, 'usr', 'bin', 'bash.exe'),
-      ]);
-      if (fromGit) return fromGit;
-    }
   }
 
   const roots = [

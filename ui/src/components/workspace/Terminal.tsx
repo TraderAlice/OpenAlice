@@ -66,7 +66,7 @@ class ElectronPtySocket implements SocketLike {
   readyState = 0;
 
   private readonly connectionId: string;
-  private readonly bridge: NonNullable<Window['openAlice']>['pty'];
+  private readonly bridge: NonNullable<NonNullable<Window['openAlice']>['pty']>;
   private readonly listeners = {
     open: new Set<() => void>(),
     message: new Set<(ev: SocketMessageEventLike) => void>(),
@@ -784,7 +784,7 @@ function randomId(): string {
 
 function defaultWsUrl(): string {
   const proto = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-  // Dev: connect straight to the backend port, bypassing the Vite proxy whose
+  // Local dev: connect straight to the backend port, bypassing the Vite proxy whose
   // WS forwarding chokes on the terminal byte stream (read ECONNRESET) and adds
   // a buffer+copy hop per frame. The backend's loopback auth passthrough admits
   // the direct 127.0.0.1 connection, and the page's :5173 Origin is already in
@@ -793,10 +793,11 @@ function defaultWsUrl(): string {
   // same-origin runs keep using location.host.
   if (
     import.meta.env.DEV &&
-    typeof __OPENALICE_DEV_BACKEND_PORT__ === 'number' &&
-    __OPENALICE_DEV_BACKEND_PORT__ > 0
+    // Remote dev exposes one forwarded UI port; the backend may be loopback-only.
+    ['localhost', '127.0.0.1', '[::1]'].includes(window.location.hostname) &&
+    Number(import.meta.env.VITE_OPENALICE_DEV_BACKEND_PORT ?? 0) > 0
   ) {
-    return `${proto}//${window.location.hostname}:${__OPENALICE_DEV_BACKEND_PORT__}/api/workspaces/pty`;
+    return `${proto}//${window.location.hostname}:${import.meta.env.VITE_OPENALICE_DEV_BACKEND_PORT}/api/workspaces/pty`;
   }
   return `${proto}//${window.location.host}/api/workspaces/pty`;
 }

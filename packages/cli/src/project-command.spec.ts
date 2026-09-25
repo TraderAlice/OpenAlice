@@ -26,6 +26,25 @@ afterEach(async () => {
 })
 
 describe('openalice project', () => {
+  it('refuses a transfer when the saved Machine is disabled during confirmation', async () => {
+    const env = await setupProjects()
+    const base = transferIo(env)
+    const sendTransfer = vi.fn()
+    let loads = 0
+    await expect(runProjectCommand([
+      'transfer', '--from', 'default', '--to-machine', 'Cloud',
+      '--to-project', 'remote-copy', '--to-home', '/srv/alice-copy', '--yes',
+    ], {
+      ...base,
+      stdout: { write: () => undefined },
+      loadMachines: async () => {
+        const registry = await base.loadMachines()
+        return { ...registry, machines: registry.machines.map((machine) => ({ ...machine, enabled: ++loads === 1 })) }
+      },
+      sendTransfer,
+    })).rejects.toThrow('disabled')
+    expect(sendTransfer).not.toHaveBeenCalled()
+  })
   it('lists registered AliceProjects and can select one', async () => {
     const env = await setupProjects()
     const listed: string[] = []

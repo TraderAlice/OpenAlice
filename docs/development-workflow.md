@@ -274,7 +274,7 @@ delivery lane:
   The stable `build-and-test` check name remains successful by requiring that
   build and intentionally accepting the skipped full-test lane. The PR must
   record the applicable owner-scoped tests, typecheck, browser, Electron,
-  Docker, installer, or native-runtime evidence from the ladder above; hosted
+  remote, installer, or native-runtime evidence from the ladder above; hosted
   CI is not a second purchase of the same confidence.
 - PRs to `master` automatically run the trusted source-contract/typecheck gate
   and the native Windows dev-stack smoke. The hermetic Ubuntu suite, complete
@@ -290,7 +290,7 @@ delivery lane:
   `packages/cli/package.json` takes the release-preparation fast lane. It keeps
   the trusted classifier, workflow contracts, root typecheck, and the stable
   aggregate check name, while skipping the source build/full-test lane and the
-  Docker, CLI installer, Broker Pack, and desktop/cross-platform PR matrices
+  CLI installer, Broker Pack, and desktop/cross-platform PR matrices
   because no runtime implementation changed. The beta Release workflow then
   rebuilds and accepts every final version-bearing candidate from the exact
   `master` SHA.

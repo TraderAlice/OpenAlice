@@ -34,16 +34,17 @@ describe('OPENROUTER preset', () => {
     expect(OPENROUTER.models?.map((model) => model.id)).toEqual([
       'openai/gpt-5.6-luna',
       'anthropic/claude-sonnet-5',
-      'deepseek/deepseek-v4-flash-0731',
+      'deepseek/deepseek-v4.1-flash',
       'tencent/hy3',
-      'z-ai/glm-5.2',
+      'z-ai/glm-5.3',
       'xiaomi/mimo-v2.5',
       'anthropic/claude-opus-5',
-      'anthropic/claude-fable-5',
+      'anthropic/claude-fable-5.1',
+      'openai/gpt-6-astra',
       'openai/gpt-5.6-sol',
       'openai/gpt-5.6-terra',
       'x-ai/grok-4.6',
-      'google/gemini-3.7-flash',
+      'google/gemini-3.8-flash',
       'minimax/minimax-m3',
       'moonshotai/kimi-k3',
       'deepseek/deepseek-v4-pro',
@@ -81,7 +82,7 @@ describe('credential form catalog', () => {
 
   it('offers current Anthropic API tiers while keeping the latest Opus as the complex-agent default', () => {
     expect(CLAUDE_API.models?.map((model) => model.id)).toEqual([
-      'claude-fable-5',
+      'claude-fable-5-1',
       'claude-opus-5',
       'claude-sonnet-5',
       'claude-haiku-4-5',
@@ -97,11 +98,11 @@ describe('credential form catalog', () => {
       });
   });
 
-  it('offers the GPT 5.6 family to Codex subscriptions and OpenAI API keys', () => {
-    const expected = ['gpt-5.6-sol', 'gpt-5.6-terra', 'gpt-5.6-luna', 'gpt-5.5', 'gpt-5.4'];
+  it('offers Astra and the GPT 5.6 family to Codex subscriptions and OpenAI API keys', () => {
+    const expected = ['gpt-6-astra', 'gpt-5.6-sol', 'gpt-5.6-terra', 'gpt-5.6-luna', 'gpt-5.5', 'gpt-5.4'];
     expect(CODEX_OAUTH.models?.map((model) => model.id)).toEqual(expected);
     expect(CODEX_API.models?.map((model) => model.id)).toEqual(expected);
-    expect(DEFAULT_MODEL_BY_VENDOR['openai']).toBe('gpt-5.6-sol');
+    expect(DEFAULT_MODEL_BY_VENDOR['openai']).toBe('gpt-6-astra');
     expect(CODEX_OAUTH.models?.find((model) => model.id === 'gpt-5.6-sol')?.semantics)
       .toMatchObject({
         contextWindow: 272_000,
@@ -117,6 +118,15 @@ describe('credential form catalog', () => {
           defaultEffort: 'medium',
         },
       });
+  });
+
+  it('keeps Astra API effort limits distinct from the native Codex subscription', () => {
+    const api = CODEX_API.models!.find((model) => model.id === 'gpt-6-astra')!.semantics!;
+    const subscription = CODEX_OAUTH.models!.find((model) => model.id === 'gpt-6-astra')!.semantics!;
+    expect(api.contextWindow).toBe(1_050_000);
+    expect(api.reasoning!.efforts).not.toContain('ultra');
+    expect(subscription.contextWindow).toBe(272_000);
+    expect(subscription.reasoning!.efforts).toContain('ultra');
   });
 
   it('offers current Grok API tiers on the official xAI endpoints', () => {
@@ -138,6 +148,8 @@ describe('credential form catalog', () => {
 
   it('offers current general-purpose Gemini tiers without mixing in media-only models', () => {
     expect(GEMINI.models?.map((model) => model.id)).toEqual([
+      'gemini-3.8-flash',
+      'gemini-3.7-flash',
       'gemini-3.6-flash',
       'gemini-3.5-flash-lite',
       'gemini-3.5-flash',
@@ -147,21 +159,21 @@ describe('credential form catalog', () => {
       'gemini-2.5-flash',
       'gemini-2.5-flash-lite',
     ]);
-    expect(DEFAULT_MODEL_BY_VENDOR['google']).toBe('gemini-3.6-flash');
-    expect(GEMINI.models?.find((model) => model.id === 'gemini-3.6-flash')?.semantics)
+    expect(DEFAULT_MODEL_BY_VENDOR['google']).toBe('gemini-3.8-flash');
+    expect(GEMINI.models?.find((model) => model.id === 'gemini-3.8-flash')?.semantics)
       .toMatchObject({
         contextWindow: 1_048_576,
         maxOutputTokens: 65_536,
-        reasoning: { efforts: ['medium', 'high'], defaultEffort: 'medium' },
+        reasoning: { efforts: ['low', 'medium', 'high'], defaultEffort: 'medium' },
       });
   });
 
   it('offers the stable DeepSeek V4 API ids with registered semantics', () => {
     expect(DEEPSEEK.models?.map((model) => model.id)).toEqual([
       'deepseek-v4-pro',
-      'deepseek-v4-flash',
+      'deepseek-flash',
     ]);
-    expect(DEEPSEEK.models?.find((model) => model.id === 'deepseek-v4-flash')?.semantics)
+    expect(DEEPSEEK.models?.find((model) => model.id === 'deepseek-flash')?.semantics)
       .toMatchObject({
         contextWindow: 1_000_000,
         maxOutputTokens: 384_000,
@@ -191,11 +203,11 @@ describe('credential form catalog', () => {
   it('pins the audited flagship default for every built-in API-key provider', () => {
     expect(DEFAULT_MODEL_BY_VENDOR).toEqual({
       anthropic: 'claude-opus-5',
-      openai: 'gpt-5.6-sol',
+      openai: 'gpt-6-astra',
       xai: 'grok-4.6',
-      google: 'gemini-3.6-flash',
+      google: 'gemini-3.8-flash',
       minimax: 'MiniMax-M3',
-      glm: 'glm-5.2',
+      glm: 'glm-5.3',
       kimi: 'kimi-k3',
       deepseek: 'deepseek-v4-pro',
       longcat: 'LongCat-2.0',

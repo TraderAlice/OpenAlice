@@ -223,6 +223,11 @@ keeps the OpenAlice wordmark without a second portrait. Its trailing ellipsis
 appears on hover, keyboard focus, or while open; touch keeps it visible. The
 trigger highlights for interaction, not because a Settings or Connectors page
 is active. Settings remains an item inside this application menu.
+Settings and Developer use the same page-owned secondary navigator as Inbox
+and Market from 768px upward. At 768–959px, entering Settings temporarily
+collapses the activity rail so the category navigator and content fit together;
+manual expansion is allowed and leaving Settings restores the user's saved rail
+preference. Below 768px, the category navigator remains a drawer.
 
 Connectors is accessed from the bottom Your Alice menu, alongside Settings and
 above Appearance, not from the primary activity list or its layout editor.
@@ -261,9 +266,17 @@ sidebar, and use the shared reading renderer rather than a new Markdown stack.
 ### Agent conversation presentation
 
 `components/conversation/` owns the adapter-neutral browser conversation view,
-content/activity rendering and composer shell. `ComposerShell` is shared with
-the Harness launch page; its context, controls and details are caller-owned
-slots, not embedded Pi selectors. Existing `oa-harness-composer-*` styling seams
+content/activity rendering and `ChatComposer` input/actions. `AgentChatComposer`
+composes that primitive with the shared provider/model/effort selector for both
+Start and GUI. Start retains runtime/surface selection in its composer context
+tray. In an existing GUI Session, the fixed runtime icon/name lives in the top
+bar beside the TUI action; narrow screens show the icon with its accessible
+name and tooltip. The GUI composer has no runtime tray. One compact
+button shows the provider icon, model and effort, with submenus for each choice.
+The AI Provider submenu and native account option use the matching provider or
+runtime icon; the full provider name remains available in the button tooltip.
+Narrow layouts truncate this summary without wrapping it onto multiple rows.
+The Start composer follows sidebar Workspace selection and has no Workspace picker. Existing `oa-harness-composer-*` styling seams
 remain the shared visual material. Messages and composer use a 46rem reading
 measure, with local scrolling for wide output and wrapping toolbar controls.
 User messages use a quiet, borderless bubble; assistant prose sits directly on
@@ -646,3 +659,92 @@ uses the shared 250ms ease-out curve for the resizable outer panels, with a
 subtle content fade/translation. Pointer and keyboard resizing remain immediate;
 reduced-motion mode disables the transitions. Content width is held during the
 short disclosure to avoid repeatedly wrapping file and Studio content.
+
+### Session header and tablet work panels
+
+Running TUI Sessions expose GUI switching in their shared top bar whenever the
+runtime supports the Web surface; GUI Sessions expose the reverse TUI action.
+The Harness shell must not hide this action behind the work-panel menu.
+At 768–1279px, opening the right work panel collapses the left activity rail
+and keeps the conversation visible beside the panel. Only phone viewports
+below 768px replace the conversation with the work panel.
+
+Start keeps Suggested workflows in the shared Collapsible panel. Typing closes
+its measured height and fades it; clearing the draft reverses the transition.
+Closed content becomes inert and aria-hidden immediately. The shared reduced
+motion rule removes the transition.
+
+First submission renders the submitted user message on the same conversation
+canvas with a live startup status while the request is pending. The composer
+stays mounted, clears visually and locks until launch settles; a failed launch
+restores the retained draft. GUI navigation carries one transient, identity-keyed
+prompt preview into useWebConversation until its first authoritative snapshot.
+It never persists or resends this preview. No artificial startup delay is added;
+the short message entrance honors reduced motion. TUI launches share the pending
+feedback, then hand over to the terminal normally.
+
+
+### Background Session inspection
+
+Each current-Workspace Harness navigation group has a collapsed `n running`
+disclosure for background occupancy, below Studio (Chat: directly below its heading, before conversations).
+The disclosure and its entries reuse the ordinary Session child-row primitives
+for matching height, inset, icon spacing, and text size.
+When a running headless execution reports a start time, its child row shows a
+compact live elapsed time beside the title; unknown start times stay unlabeled.
+On hover or keyboard focus, the timer fades to reveal the standard Session
+overflow action, whose Details entry opens the shared inspection dialog.
+This projection includes headless-born and Issue-attached Sessions independently
+of ordinary conversation roster preferences, including hidden background workers;
+retired identities are excluded. Idle interactive processes do not count. Occupied rows are excluded
+from the recent interactive workset to avoid duplicate entries.
+
+Selecting a background row opens the shared transient Session dialog without
+changing the right-hand view, URL, or tab inventory. It shows task provenance,
+timing, refresh errors and diagnostic identifiers. Completion removes the row
+from the disclosure but leaves an open dialog available with an explicit Open
+conversation action. Existing background deep links surrender their Session tab
+and open the same dialog over the previous view (or Harness landing when no tab
+remains). Inspection never starts or takes over a runtime.
+The dialog leads with Session identity and current state, then elapsed time and
+provenance; a moving line signals activity without claiming a completion
+percentage. Metadata stays compact, diagnostic IDs stay behind a disclosure,
+and refresh/interruption controls remain visible in the footer. The right-click
+Details dialog uses the same identity, status and control hierarchy while its
+history and configuration scroll within the body. On narrow screens, metadata
+stacks and the status badge shortens so it does not displace the Session name.
+Interrupting from either dialog first confirms the target Session, immediate
+stop, retained conversation history, and configured restart cooldown.
+The shared control footer enters an inline confirmation state rather than
+opening a second dialog. Cancel or Escape returns focus to the interrupt action;
+the execution stays untouched until the explicit confirmation.
+
+
+Session row menus expose Details independently of activation and distinguish
+Archive (file for later) from Delete (dismiss from normal conversation lists).
+Delete uses the existing presence transition, stops an interactive runtime,
+and removes saved terminal scrollback; it does not erase Workspace files,
+retained provenance, or native CLI history. Background-owned rows do not expose
+this destructive action. Details reads the exact Session identity, current
+Issue assignments and execution history through one domain hook. Creation,
+last start, last end and last activity remain separate fields; unknown values
+and partial-fetch failures are explicit. Inspection does not launch a runtime.
+
+### Session takeover requests
+
+A single domain provider polls takeover requests across Workspaces. New requests
+open the shared Dialog; the content topbar retains a small pending-count bubble
+when the Dialog is dismissed. The Dialog separates origin, entry point, time,
+server-derived idle countdown and the two explicit actions: keep using or hand
+over. Its timing disclosure and Harness Settings edit the same global interval.
+The countdown bar respects reduced motion; it is not a live-announced timer.
+Narrow screens use the same scrollable Dialog, with wrapping action buttons.
+Session-local keyboard, input, pointer and wheel interaction renew inactivity;
+interactions with takeover controls themselves do not renew it.
+
+Already-open GUI conversations retain their mounted transcript and draft while
+handed over. A lightweight status strip names the background source; input is
+read-only. Completion offers explicit return to conversation instead of an
+automatic process restart. A cold background deep link keeps the existing busy
+Dialog behavior. Demo `?takeover=preview` seeds an isolated, simulated request for
+the AI-power conversation, including approval, idle timeout and completion.

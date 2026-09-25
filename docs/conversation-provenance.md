@@ -116,7 +116,7 @@ Rules:
 
 A product Session may carry an optional, mutable `displayName` on the
 Workspace Session dossier at `.alice/sessions/<resumeId>.json`. It sits
-beside the frozen `ai` launch binding, not inside it and not on the
+beside the Session's `ai` launch binding, not inside it and not on the
 launcher roster.
 
 This is the coworker's nametag:
@@ -136,8 +136,11 @@ This is the coworker's nametag:
 - `workspaces/state/resume-identities.json` hydrates the name in memory and
   strips it on flush, the same way it treats `runtimeBinding`.
 
-Do not hand-edit the dossier JSON. One bad write can destroy the Session's
-credential, model, or effort binding.
+Session Settings validates and writes the AI binding immediately while idle.
+Agents may also edit a dossier's `ai.model` or `ai.reasoningEffort` for a later
+launch, preserving its credential and the rest of the JSON; the scheduler
+reconciles valid external edits. A malformed dossier cannot be loaded, so do
+not replace the whole file with a partial model/effort fragment.
 
 ## Layered Index
 
@@ -182,12 +185,14 @@ support activity feeds and auditing, but do not change the forward semantics.
 | PID/live PTY | Ephemeral process incarnation | No |
 
 `ResumeRegistry` must bind a `resumeId` immutably to one `workspaceId` and one
-runtime kind. It also owns that Session's immutable, secret-free runtime
-binding: credential source reference, model, and effort. It may learn or
+Agent runtime kind. The Session's secret-free AI binding (credential source
+reference, model, and effort) lives in its Workspace dossier. The registry
+hydrates and caches it for launches; explicit idle edits and valid dossier
+edits can replace it without changing the Session's identity. It may learn or
 refresh the native locator and re-resolve a referenced vault secret at launch,
 but it must never reassign the product Session to another Workspace/runtime or
-silently replace its launch selection. Native ids, API keys, and provider
-payloads remain backend-only.
+silently replace its AI choice with later Workspace defaults. Native ids, API
+keys, and provider payloads remain backend-only.
 
 ## Standard Provenance Envelope
 
@@ -435,7 +440,7 @@ assignee: "@new-then-resume"
 - OpenAlice immediately rewrites `@new-then-resume` to that Session's exact `@resumeId`.
 - Later fires and Issue comments continue the same accountable coworker.
 - The Issue may specify `agent` before the first claim; after the claim, the
-  concrete Session owns its runtime.
+  concrete Session keeps its Agent runtime and owns a separately editable AI binding.
 
 #### Mode C: a fresh worker per fire
 

@@ -176,6 +176,7 @@ export function WorkspaceManagerPage({ spec, visible = true }: { spec: ManagerSp
             />
           ) : session.surface === 'webpi' ? (
             <WebSessionView
+              record={session}
               wsId={MANAGER_WORKSPACE_ID}
               sessionId={sessionId}
               agent={session.agent}

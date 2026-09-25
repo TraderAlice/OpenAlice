@@ -67,6 +67,12 @@ preferences; existing Sessions retain their own binding for omitted fields.
 Changing credential drops inherited model/effort from the previous credential.
 Explicit changes to an existing Session persist for later turns and require it
 to be idle. Its Agent runtime cannot change. `--agent` selects only a new worker.
+For a Session already assigned to an Issue, do not put new `model` or `effort`
+fields on the Issue: those fields only seed fresh Sessions. Session Settings
+updates an idle Session directly. A valid edit to that Session's
+`.alice/sessions/<resumeId>.json` `ai.model` / `ai.reasoningEffort` is also
+reconciled for its next launch; preserve the rest of the dossier and never store
+keys there. Editing the file does not change the current running process.
 
 Prompts are ordinary coworker messages. Add `--reconstruct` only when the task
 explicitly requires a fresh worker to reconstruct missing historical intent.

@@ -149,7 +149,7 @@ Add the applicable surface gate:
 | Guardian lock, ownership, or takeover | `pnpm test:system:guardian` and the real launcher path |
 | Desktop, IPC, PTY, managed runtime, or packaging | Matching unsigned Electron/package smoke from [[docs/managed-workspace-runtime.md]] |
 | Root installer or distributed CLI | [[docs/cli-installer.md]], `pnpm test:system:installer`, and the interactive playground before release |
-| Docker/server/remote deployment | [[docs/docker-deployment.md]], `pnpm docker:smoke`, or `pnpm test:system:remote` as applicable |
+| Server/remote deployment | [[docs/remote-access.md]] and `pnpm test:system:remote` |
 | Persisted state | Apply the shipped-boundary rule above; shipped shapes need an idempotent migration, spec, and regenerated index |
 | Onboarding, first run, or auth | Isolated state plus dev and packaged paths where relevant |
 

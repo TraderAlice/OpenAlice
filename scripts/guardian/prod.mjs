@@ -1,9 +1,8 @@
 #!/usr/bin/env node
 /**
- * Guardian — built-runtime entry, used by Docker and the local CLI.
+ * Guardian — built-runtime entry, used by source and native CLI launches.
  *
- * tini runs as PID 1 (signal forwarding + zombie reaping); this script is
- * the orchestrator tini supervises. It spawns the long-lived Node services
+ * This script supervises the long-lived services
  * that make up a built OpenAlice Runtime:
  *
  *   1. UTA service  (services/uta/dist/uta.js, bind 127.0.0.1:47333)
@@ -18,12 +17,12 @@
  *   - watch `${OPENALICE_HOME}/data/control/restart-uta.flag`
  *     for UI-triggered broker config changes; SIGTERM + respawn UTA
  *     when it changes (debounced 100ms)
- *   - SIGTERM/SIGINT from tini cascades to both children, then exit
+ *   - SIGTERM/SIGINT cascades to children, then exit
  *   - Alice exiting unintentionally cascades shutdown; UTA exiting marks
  *     trading offline but does not take down the app
  *
  * Mirrors `scripts/guardian/dev.ts` minus the Vite child and watch-mode
- * spawns. Kept as `.mjs` so the runtime image needs no TS tooling.
+ * spawns. Kept as `.mjs` so built source launches need no TS tooling.
  */
 
 import { spawn } from 'node:child_process'
@@ -42,6 +41,7 @@ import {
   normalizeProcessExitCode,
   RestartBackoff,
   takeoverRequested,
+  proxyEnvFromRules,
 } from '@traderalice/guardian-runtime'
 import {
   planProdPorts,
@@ -54,7 +54,7 @@ const DATA_HOME = process.env.OPENALICE_HOME
   ?? process.env.OPENALICE_USER_DATA_HOME // deprecated alias, one-release courtesy
   ?? '/data'
 const LAUNCHER_ROOT = process.env.AQ_LAUNCHER_ROOT ?? resolve(DATA_HOME, 'workspaces')
-const LAUNCHER = process.env.OPENALICE_LAUNCHER?.trim() || 'docker'
+const LAUNCHER = process.env.OPENALICE_LAUNCHER?.trim() || 'source'
 const GUARDIAN_LAUNCHER = LAUNCHER.startsWith('guardian-') ? LAUNCHER : `guardian-${LAUNCHER}`
 const NODE_BINARY = process.env.OPENALICE_NODE_BINARY?.trim() || process.execPath
 const RUNTIME_EXECUTABLE = process.env.OPENALICE_RUNTIME_EXECUTABLE?.trim() || process.execPath
@@ -74,6 +74,10 @@ const ALICE_PROJECT = resolveAliceProjectIdentity({
   key: process.env.OPENALICE_PROJECT ?? 'default',
 })
 const ALICE_PROJECT_ENV = aliceProjectEnvironment(ALICE_PROJECT)
+const GUARDIAN_CHILD_ENV = {
+  ...process.env,
+  ...proxyEnvFromRules('', process.env),
+}
 
 function truthyEnv(raw) {
   if (raw === undefined || raw === '') return false
@@ -84,7 +88,7 @@ function truthyEnv(raw) {
 function resolveRuntimeProvider() {
   const explicit = process.env.OPENALICE_RUNTIME_PROVIDER?.trim()
   if (['source', 'bundle', 'bun', 'docker', 'remote'].includes(explicit)) return explicit
-  return LAUNCHER === 'docker' ? 'docker' : 'source'
+  return 'source'
 }
 
 function normalizeContentIdentity(value) {
@@ -167,7 +171,7 @@ async function resolveTradingMode(env, userDataHome) {
 // Port precedence and collision behavior mirror scripts/guardian/shared.ts:
 // explicit env/file values fail if occupied, while defaults probe upward.
 // The built Guardian keeps this logic in runnable ESM because source-backed
-// and Docker production paths do not ship a TypeScript loader.
+// production paths do not ship a TypeScript loader.
 let TRADING_MODE
 let PROJECT_PRODUCT
 let SKIP_UTA
@@ -210,7 +214,7 @@ async function readRuntimeVersion() {
 
 function runtimeStatus() {
   const owner = guardianRuntimeLock?.owner
-  const capabilities = LAUNCHER === 'cli-server' ? ['runtime.stop'] : []
+  const capabilities = ['runtime.stop']
   return buildGuardianRuntimeStatus({
     productVersion: RUNTIME_VERSION,
     runtimeVersion: RUNTIME_VERSION,
@@ -226,7 +230,10 @@ function runtimeStatus() {
       mode: SERVER_MODE,
     },
     endpoints: {
-      web: `http://${BIND_HOST}:${WEB_PORT}`,
+      // The public bind address may be 0.0.0.0 for an image/proxy, but this
+      // status endpoint describes how the selected execution context reaches
+      // Alice. SSH forwarding must always use the local loopback listener.
+      web: `http://127.0.0.1:${WEB_PORT}`,
     },
     provider: {
       kind: RUNTIME_PROVIDER,
@@ -288,7 +295,7 @@ function makeUTASpec() {
   return {
     ...processSpec,
     env: {
-      ...process.env,
+      ...GUARDIAN_CHILD_ENV,
       ...ALICE_PROJECT_ENV,
       OPENALICE_UTA_PORT: String(UTA_PORT),
       OPENALICE_HOME: DATA_HOME,
@@ -323,7 +330,7 @@ function spawnConnector() {
   })
   const child = spawn(spec.cmd, spec.args, {
     env: {
-      ...process.env,
+      ...GUARDIAN_CHILD_ENV,
       ...ALICE_PROJECT_ENV,
       OPENALICE_CONNECTOR_PORT: String(CONNECTOR_PORT),
       OPENALICE_MCP_PORT: String(MCP_PORT),
@@ -357,7 +364,7 @@ function spawnAlice() {
   })
   const child = spawn(spec.cmd, spec.args, {
     env: {
-      ...process.env,
+      ...GUARDIAN_CHILD_ENV,
       ...ALICE_PROJECT_ENV,
       OPENALICE_WEB_PORT: String(WEB_PORT),
       OPENALICE_MCP_PORT: String(MCP_PORT),
@@ -649,7 +656,7 @@ export async function startGuardianRuntime() {
 
   guardianControlServer = await startGuardianControlServer({
     homeRoot: DATA_HOME,
-    allowStop: LAUNCHER === 'cli-server',
+    allowStop: true,
     getStatus: runtimeStatus,
     onStop: () => shutdown(),
   })

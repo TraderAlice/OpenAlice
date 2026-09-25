@@ -1,3 +1,4 @@
+import { SessionExecutionManager } from './session-execution-manager.js'
 import { existsSync } from 'node:fs'
 import { mkdir, mkdtemp, readFile, rename, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
@@ -95,6 +96,8 @@ beforeEach(async () => {
   cleanupWorkspaceState = vi.fn(async (_record, cwd: string) => {
     expect(existsSync(cwd)).toBe(true)
   })
+  const executions = await SessionExecutionManager.open(join(root, 'executions.json'), execution => sessions.projectExecution(execution))
+  await executions.recoverOrphans(sessions.listAll())
   lifecycle = new WorkspaceLifecycleManager({
     launcherRoot: root,
     registry,
@@ -104,6 +107,7 @@ beforeEach(async () => {
     scrollbackStore: new ScrollbackStore(join(root, 'state'), noopLogger),
     headlessTasks: tasks,
     pool,
+    executions,
     operationGuard,
     cleanupWorkspaceState,
     logger: noopLogger,

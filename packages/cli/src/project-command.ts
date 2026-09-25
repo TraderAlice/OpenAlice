@@ -19,6 +19,8 @@ import {
 } from './machine-inventory.ts'
 import {
   readMachineRegistrySummary,
+  findRegisteredMachine,
+  requireMachineEnabled,
   type MachineRegistrySummary,
   type RegisteredMachine,
 } from './machine-registry.ts'
@@ -242,7 +244,7 @@ async function runProjectTransfer(argv: string[], io: ProjectCommandIo): Promise
     env: io.env,
     supervisorRoot: io.supervisorRoot,
   })))()
-  const machine = requireRegisteredMachine(machines, options.machine)
+  let machine = requireRegisteredMachine(machines, options.machine)
   const inspectMachine = io.inspectMachine ?? ((entry) => inspectRegisteredMachine(entry, {
     env: io.env,
     supervisorRoot: io.supervisorRoot,
@@ -327,6 +329,15 @@ async function runProjectTransfer(argv: string[], io: ProjectCommandIo): Promise
 
   sourceRuntime = await inspectSource(source.home)
   if (sourceRuntime.class !== 'absent') throw transferBlocked('Source Runtime changed after planning; transfer was not started.')
+  const latestMachines = await (io.loadMachines ?? (() => readMachineRegistrySummary({
+    env: io.env,
+    supervisorRoot: io.supervisorRoot,
+  })))()
+  const latestMachine = requireRegisteredMachine(latestMachines, machine.id ?? machine.key)
+  if (latestMachine.sshTarget !== machine.sshTarget || latestMachine.sshPort !== machine.sshPort || latestMachine.identityFile !== machine.identityFile) {
+    throw transferBlocked('Destination connection changed after planning; re-run the transfer plan.')
+  }
+  machine = latestMachine
   remote = await inspectMachine(machine)
   if (remote.connection !== 'online' || !remote.capabilities.transferReceive) {
     throw transferBlocked('Destination Machine changed after planning; transfer was not started.')
@@ -465,8 +476,9 @@ function formatProjectTransferReceipt(receipt: ProjectTransferReceipt): string {
 }
 
 function requireRegisteredMachine(summary: MachineRegistrySummary, key: string): RegisteredMachine {
-  const machine = summary.machines.find((entry) => entry.key === key)
+  const machine = findRegisteredMachine(summary, key)
   if (!machine) throw usageError(`Machine "${key}" is not registered.`)
+  requireMachineEnabled(machine)
   return machine
 }
 

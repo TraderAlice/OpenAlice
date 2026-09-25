@@ -18,14 +18,30 @@ export const CLI_VERSION = typeof compiledCliVersion === 'string' && compiledCli
   ? compiledCliVersion
   : JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8')).version
 
+const betaCliVersion = /^[0-9]+\.[0-9]+\.[0-9]+-beta(?:\.[1-9][0-9]*)?$/.test(CLI_VERSION)
+
 export const DEFAULT_INSTALL_SOURCE = Object.freeze({
   schemaVersion: 2,
   repository: 'TraderAlice/OpenAlice',
   cliVersion: CLI_VERSION,
-  selector: Object.freeze({ kind: 'branch', value: 'master' }),
+  selector: Object.freeze(betaCliVersion
+    ? { kind: 'version', value: `v${CLI_VERSION}` }
+    : { kind: 'branch', value: 'master' }),
   installerUrl: 'https://openalice.ai/install',
-  updateChannel: 'stable',
+  updateChannel: betaCliVersion ? 'beta' : 'stable',
 })
+
+export function installSourceChannelVersionError(source) {
+  const normalized = requireInstallSource(source)
+  const channel = installSourceUpdateChannel(normalized)
+  if (channel === 'stable' && !/^[0-9]+\.[0-9]+\.[0-9]+$/.test(normalized.cliVersion)) {
+    return `CLI ${normalized.cliVersion} is marked stable, but the installer requires a stable version. Refresh this client's install-source metadata before upgrading a remote Machine.`
+  }
+  if (channel === 'beta' && !/^[0-9]+\.[0-9]+\.[0-9]+-beta(?:\.[1-9][0-9]*)?$/.test(normalized.cliVersion)) {
+    return `CLI ${normalized.cliVersion} is marked beta, but the installer requires a beta version. Refresh this client's install-source metadata before upgrading a remote Machine.`
+  }
+  return null
+}
 
 export async function readInstallSource(options = {}) {
   const env = options.env ?? process.env

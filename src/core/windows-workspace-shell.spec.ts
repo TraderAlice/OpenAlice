@@ -1,5 +1,5 @@
-import { mkdtemp, readFile } from 'node:fs/promises'
-import { join } from 'node:path'
+import { mkdir, mkdtemp, readFile, writeFile } from 'node:fs/promises'
+import { delimiter, join } from 'node:path'
 import { tmpdir } from 'node:os'
 
 import { describe, expect, it } from 'vitest'
@@ -82,6 +82,25 @@ describe('Windows workspace shell preference', () => {
     }
     expect(resolveBashPath(env, 'win32')).toBe('D:\\Git\\bin\\bash.exe')
     expect(resolveBashPath(env, 'darwin')).toBe('/bin/bash')
+  })
+
+  it('prefers Git Bash over an earlier system32 bash alias', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'alice-shell-resolver-'))
+    const system32 = join(root, 'system32')
+    const gitRoot = join(root, 'Git')
+    const gitCmd = join(gitRoot, 'cmd')
+    const gitBin = join(gitRoot, 'bin')
+    await Promise.all([
+      mkdir(system32, { recursive: true }),
+      mkdir(gitCmd, { recursive: true }),
+      mkdir(gitBin, { recursive: true }),
+    ])
+    const systemBash = join(system32, 'bash.exe')
+    const gitExe = join(gitCmd, 'git.exe')
+    const gitBash = join(gitBin, 'bash.exe')
+    await Promise.all([writeFile(systemBash, ''), writeFile(gitExe, ''), writeFile(gitBash, '')])
+
+    expect(resolveBashPath({ PATH: [system32, gitCmd].join(delimiter) }, 'win32')).toBe(gitBash)
   })
 
   it('reports a deleted custom shell and does not silently fall back to Auto', () => {

@@ -7,7 +7,6 @@ import { resolveStoredLaunchContext } from './supervisor-config.ts'
 import {
   inspectRuntime,
   lifecycleError,
-  openRuntime,
   startRuntime,
   stopRuntime,
 } from './lifecycle.mjs'
@@ -17,10 +16,11 @@ export const LIFECYCLE_JSON_SCHEMA_VERSION = 1
 export const ROOT_COMMANDS = Object.freeze([
   { name: 'version', description: 'Print the OpenAlice product and install version' },
   { name: 'tui', description: 'Open the local Supervisor TUI' },
+  { name: 'relay', description: 'Serve the same local Web GUI without the TUI' },
   { name: 'create', description: 'Create a named AliceProject (Trader or Nano)' },
   { name: 'exec', description: 'Run a capability CLI in the selected AliceProject' },
   { name: 'project', description: 'List, select, or transfer AliceProjects' },
-  { name: 'machine', description: 'Register SSH hosts and inspect their AliceProjects' },
+  { name: 'machine', description: 'Save and manage remote Machine profiles' },
   { name: 'up', description: 'Start a persistent local Runtime in the background' },
   { name: 'run', description: 'Run a local Runtime in the foreground' },
   { name: 'down', description: 'Stop the persistent local Runtime' },
@@ -28,11 +28,7 @@ export const ROOT_COMMANDS = Object.freeze([
   { name: 'logs', description: 'Read a bounded redacted Runtime log tail' },
   { name: 'doctor', description: 'Run read-only Runtime diagnostics' },
   { name: 'setup', description: 'Check and coordinate system Git/Bash installation' },
-  { name: 'open', description: 'Open the verified local Web UI' },
-  { name: 'start', description: 'Compatibility foreground browser launcher' },
   { name: 'server', description: 'Compatibility Server lifecycle commands' },
-  { name: 'ssh', description: 'Open a tunnel to an existing remote Runtime' },
-  { name: 'remote', description: 'Plan, prepare, and connect to a remote Runtime' },
   { name: 'update', description: 'Check or switch the stable, beta, or dev channel' },
   { name: 'rollback', description: 'Switch a direct install to a retained release' },
   { name: 'uninstall', description: 'Remove installer-owned CLI files and preserve data' },
@@ -42,7 +38,7 @@ export const ROOT_COMMANDS = Object.freeze([
 const LIFECYCLE_OPTIONS = Object.freeze({
   up: [
     '--project', '--instance', '--app-dir', '--home', '--port', '--log', '--wait', '--rebuild',
-    '--skip-prepare', '--takeover', '--open', '--no-open', '--no-update-check', '--json',
+    '--skip-prepare', '--takeover', '--no-update-check', '--json',
   ],
   run: [
     '--project', '--instance', '--app-dir', '--home', '--port', '--wait', '--rebuild',
@@ -53,12 +49,11 @@ const LIFECYCLE_OPTIONS = Object.freeze({
   logs: ['--project', '--instance', '--home', '--lines', '--json'],
   doctor: ['--project', '--instance', '--home', '--wait', '--json'],
   setup: ['--check', '--json'],
-  open: ['--project', '--instance', '--home', '--wait'],
 })
 
 export function parseLifecycleArgs(action, argv) {
   if (action === 'up' || action === 'run') return parseStartArgs(action, argv)
-  if (!['down', 'status', 'open'].includes(action)) {
+  if (!['down', 'status'].includes(action)) {
     throw usageError(`Unknown lifecycle command: ${String(action)}`)
   }
 
@@ -72,7 +67,6 @@ export function parseLifecycleArgs(action, argv) {
     const arg = argv[index]
     if (arg === '--') continue
     if (arg === '--json') {
-      if (action === 'open') throw usageError('openalice open does not support --json')
       options.json = true
       continue
     }
@@ -164,22 +158,13 @@ export async function runLifecycleCommand(action, options, dependencies = {}) {
             }
           : undefined,
       })
-      let opened = null
-      if (action === 'up' && options.openBrowser) {
-        opened = await (dependencies.openRuntime ?? openRuntime)({
-          homeRoot: result.homeRoot,
-          waitMs: options.waitMs,
-        }, runtimeDependencies)
-      }
       if (options.json) {
         writeJson(stdout, successEnvelope(action, {
           runtime: result,
-          ...(opened ? { opened: { url: opened.url } } : {}),
         }))
       } else if (result.outcome === 'already-running') {
         stdout.write(formatExistingRuntime(result.status))
       }
-      if (!options.json && opened) stdout.write(`Opened OpenAlice Web UI: ${opened.url}\n`)
       return action === 'run' ? result.exitCode ?? 0 : 0
     }
 
@@ -204,14 +189,6 @@ export async function runLifecycleCommand(action, options, dependencies = {}) {
       return 0
     }
 
-    if (action === 'open') {
-      const result = await (dependencies.openRuntime ?? openRuntime)(
-        resolvedOptions,
-        runtimeDependencies,
-      )
-      stdout.write(`Opened OpenAlice Web UI: ${result.url}\n`)
-      return 0
-    }
 
     throw usageError(`Unknown lifecycle command: ${String(action)}`)
   } catch (error) {
@@ -242,7 +219,6 @@ Options:
   --skip-prepare     Fail instead of installing/building missing artifacts
   --takeover         Replace the recorded Guardian owner tree
   --wait <seconds>   Readiness timeout, 1-600 (default: 120)
-  --open             Open the verified Web UI after readiness
   --no-update-check  Skip the bounded stable-release update check
   --json             Print a versioned machine-readable result
   -h, --help         Show this help
@@ -274,9 +250,6 @@ Options:
   if (action === 'down') {
     return formatControlHelp('down', 'Asks the self-owned Guardian to stop and waits for release.', 15, true)
   }
-  if (action === 'open') {
-    return formatControlHelp('open', 'Opens an already-running, verified local OpenAlice Web UI.', 2, false)
-  }
   throw usageError(`Unknown lifecycle command: ${String(action)}`)
 }
 
@@ -293,8 +266,14 @@ Usage:
 Commands:
 ${commands}
 
-The default without a command opens the Supervisor TUI. Use "openalice run"
-for a foreground Runtime or "openalice up" for a persistent background Runtime.
+The default without a command opens the Supervisor TUI and its local Web relay.
+Use "openalice relay" for the same GUI without TUI, "openalice run" for a
+foreground Runtime, or "openalice up" for a persistent background Runtime.
+
+Remote selectors:
+  openalice machine add <user@host> --label <name> [options]
+  openalice --remote <user@host> --plan|--status|--stop [options]
+  openalice --machine <id-or-label> <command> [options]
 
 Run "openalice <command> --help" for command details.
 `
@@ -368,8 +347,6 @@ ${fishCompletionOptions()}
 function parseStartArgs(action, argv) {
   let project = null
   let json = false
-  let openRequested = false
-  let noOpenRequested = false
   let logFile = null
   let portSpecified = false
   let updateChecksSpecified = false
@@ -387,11 +364,11 @@ function parseStartArgs(action, argv) {
       continue
     }
     if (arg === '--open') {
-      if (action === 'run') throw usageError('openalice run does not support --open')
-      openRequested = true
-      continue
+      throw usageError('"--open" is retired. Run "openalice up", then "openalice" to use the relay GUI.')
     }
-    if (arg === '--no-open') noOpenRequested = true
+    if (arg === '--no-open') {
+      throw usageError('"--no-open" is unnecessary: "openalice up" does not open a browser.')
+    }
     if (arg === '--port') portSpecified = true
     if (arg === '--no-update-check') updateChecksSpecified = true
     if (arg === '--log') {
@@ -402,7 +379,6 @@ function parseStartArgs(action, argv) {
     }
     startArgv.push(arg)
   }
-  if (openRequested && noOpenRequested) throw usageError('Use only one of --open or --no-open')
   let parsed
   try {
     parsed = parseLocalStartArgs(startArgv)
@@ -415,7 +391,7 @@ function parseStartArgs(action, argv) {
     _portSpecified: portSpecified,
     _updateChecksSpecified: updateChecksSpecified,
     project,
-    openBrowser: action === 'up' && openRequested,
+    openBrowser: false,
     json,
     logFile,
   }
@@ -554,7 +530,7 @@ function bashCompletionCases() {
     .join('\n')
   return `${lifecycle}
     project) COMPREPLY=( $(compgen -W "list use copy-ai-creds transfer --json --from --to --to-machine --to-project --to-home --name --plan --yes --without-credentials --session-owner-policy --stop-source" -- "$current") ) ;;
-    machine) COMPREPLY=( $(compgen -W "list add remove inspect --target --name --ssh-port --identity --json --yes" -- "$current") ) ;;`
+    machine) COMPREPLY=( $(compgen -W "list add rename remove enable disable inspect --label --ssh-port --identity --json --yes" -- "$current") ) ;;`
 }
 
 function zshCompletionCases() {
@@ -563,7 +539,7 @@ function zshCompletionCases() {
     .join('\n')
   return `${lifecycle}
   project) _values 'option' 'list' 'use' 'copy-ai-creds' 'transfer' '--json' '--from' '--to' '--to-machine' '--to-project' '--to-home' '--name' '--plan' '--yes' '--without-credentials' '--session-owner-policy' '--stop-source' ;;
-  machine) _values 'option' 'list' 'add' 'remove' 'inspect' '--target' '--name' '--ssh-port' '--identity' '--json' '--yes' ;;`
+  machine) _values 'option' 'list' 'add' 'rename' 'remove' 'enable' 'disable' 'inspect' '--label' '--ssh-port' '--identity' '--json' '--yes' ;;`
 }
 
 function fishCompletionOptions() {
@@ -573,7 +549,7 @@ function fishCompletionOptions() {
       return `complete -c openalice -n '__fish_seen_subcommand_from ${command}' -l ${name}`
     }))
     .join('\n')
-  const machine = ['target', 'name', 'ssh-port', 'identity', 'json', 'yes']
+  const machine = ['label', 'ssh-port', 'identity', 'json', 'yes']
     .map((name) => `complete -c openalice -n '__fish_seen_subcommand_from machine' -l ${name}`)
     .join('\n')
   const project = ['json', 'from', 'to', 'to-machine', 'to-project', 'to-home', 'name', 'plan', 'yes', 'without-credentials', 'session-owner-policy', 'stop-source']

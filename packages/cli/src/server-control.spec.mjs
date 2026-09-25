@@ -92,21 +92,55 @@ describe('OpenAlice Guardian control protocol', () => {
     }
   })
 
-  it('recognizes another launcher but refuses to stop it', async () => {
+  it('recognizes a Docker-owned Runtime as healthy and lets its capability authorize stop', async () => {
+    const home = await makeTempDir()
+    let state = 'running'
+    let server
+    const onStop = vi.fn(() => {
+      state = 'stopping'
+      setTimeout(() => { void server.close() }, 5)
+    })
+    server = await startGuardianControlServer({
+      homeRoot: home,
+      allowStop: true,
+      getStatus: () => runtimeStatus(home, {
+        state,
+        surface: 'docker',
+        capabilities: ['runtime.stop'],
+      }),
+      onStop,
+    })
+    try {
+      const status = await readRuntimeStatus({ homeRoot: home })
+      expect(status).toMatchObject({
+        class: 'running',
+        owner: { surface: 'docker' },
+        capabilities: ['runtime.stop'],
+      })
+      await expect(stopRuntimeServer({ homeRoot: home, waitMs: 2_000 })).resolves.toMatchObject({
+        stopped: true,
+      })
+      expect(onStop).toHaveBeenCalledOnce()
+    } finally {
+      await server.close()
+    }
+  })
+
+  it('uses capability rather than launcher surface to reject an unsupported stop', async () => {
     const home = await makeTempDir()
     const server = await startGuardianControlServer({
       homeRoot: home,
       allowStop: false,
       getStatus: () => runtimeStatus(home, {
-        surface: 'cli',
+        surface: 'docker',
         capabilities: [],
       }),
       onStop: vi.fn(),
     })
     try {
       const status = await readRuntimeStatus({ homeRoot: home })
-      expect(status.class).toBe('owned_elsewhere')
-      await expect(stopRuntimeServer({ homeRoot: home, waitMs: 100 })).rejects.toThrow('refusing server stop')
+      expect(status.class).toBe('running')
+      await expect(stopRuntimeServer({ homeRoot: home, waitMs: 100 })).rejects.toThrow('does not advertise runtime.stop')
       await expect(requestRuntimeControl(home, 'runtime.stop')).rejects.toMatchObject({ code: 'stop_not_supported' })
     } finally {
       await server.close()

@@ -1,10 +1,11 @@
 /**
  * Guardian — dev entry.
  *
- * Spawns optional services + Alice + Vite. UTA is an optional carrier: OPENALICE_LITE_MODE=1
+ * Spawns optional services + Alice + the local Web relay + Vite. UTA is an optional carrier: OPENALICE_LITE_MODE=1
  * skips it entirely; if a normal UTA boot fails, Alice still starts and
  * `/api/trading/*` reports UTA unavailable. Vite comes last because it only
- * needs Alice's port for its dev proxy target.
+ * needs Alice's port for its fallback direct dev proxy target. `--no-relay`
+ * retains that direct path for diagnostics.
  *
  * Restart protocol: Guardian watches `data/control/restart-uta.flag`. When
  * Alice touches it (after broker config changes), Guardian SIGTERMs UTA,
@@ -53,6 +54,9 @@ import {
   isBackendHotReloadEnabled,
 } from './dev-hot-reload.js'
 import { parseDevGuardianOptions } from './dev-options.js'
+import { buildGuardianChildEnv } from './system-proxy.js'
+import { probeFreePort } from '../probe-port.js'
+import { createDevRelay } from './dev-relay.js'
 
 let guardianRuntimeLock: RuntimeProcessLock | null = null
 let guardianControlServer: { endpoint: string; close: () => Promise<void> } | null = null
@@ -141,6 +145,15 @@ async function main(): Promise<void> {
     skipUta,
     skipConnector: !connectorEnabled,
   })
+  const reservedPorts = new Set([ports.webPort, ports.mcpPort, ports.utaPort, ports.connectorPort, ports.uiPort])
+  let vitePort = ports.uiPort
+  if (options.relay) {
+    let candidate = ports.uiPort === 65_535 ? 5173 : ports.uiPort + 1
+    do {
+      vitePort = await probeFreePort(candidate)
+      candidate = vitePort === 65_535 ? 5173 : vitePort + 1
+    } while (reservedPorts.has(vitePort))
+  }
   const flagPath = resolve(dataHome, 'data/control/restart-uta.flag')
   const connectorFlagPath = resolve(dataHome, 'data/control/restart-connector.flag')
   const utaUrl = `http://127.0.0.1:${ports.utaPort}`
@@ -194,7 +207,8 @@ async function main(): Promise<void> {
   console.log(`[guardian] Alice    →  http://localhost:${ports.webPort}`)
   console.log(`[guardian] Tools    →  http://127.0.0.1:${ports.mcpPort}/cli`)
   console.log(`[guardian] MCP      →  optional on http://127.0.0.1:${ports.mcpPort}/mcp`)
-  console.log(`[guardian] UI       →  http://localhost:${ports.uiPort}`)
+  console.log(`[guardian] UI       →  http://127.0.0.1:${ports.uiPort}${options.relay ? ' (relay)' : ' (direct)'}`)
+  if (options.relay) console.log(`[guardian] Vite     →  http://127.0.0.1:${vitePort} (internal HMR)`)
   console.log(`[guardian] reload   →  ${backendHotReload ? 'backend watch enabled' : 'backend watch disabled'}`)
   console.log(`[guardian] flags    →  ${flagPath}, ${connectorFlagPath}`)
   console.log('')
@@ -245,8 +259,7 @@ async function main(): Promise<void> {
     onStop: () => undefined,
   })
   console.log(`[guardian] Control  →  ${guardianControlServer.endpoint} (read-only)`)
-
-  const baseEnv = {
+  const baseEnvResolution = await buildGuardianChildEnv({
     ...process.env,
     ...aliceProjectEnvironment(aliceProject),
     NODE_OPTIONS: `${process.env['NODE_OPTIONS'] ?? ''} --conditions=openalice-source`.trim(),
@@ -260,7 +273,11 @@ async function main(): Promise<void> {
     ...(managedToolchainPath ? { OPENALICE_MANAGED_TOOLCHAIN_PATH: managedToolchainPath } : {}),
     ...(takeover ? { OPENALICE_TAKEOVER: '1' } : {}),
     ...(projectProduct === 'nano' ? { OPENALICE_PROJECT_PRODUCT: 'nano', OPENALICE_UTA_DISABLED: '1' } : {}),
+  }, { platform: process.platform })
+  if (baseEnvResolution.diagnostic) {
+    console.warn(`[guardian] ${baseEnvResolution.diagnostic}`)
   }
+  const baseEnv = baseEnvResolution.env
 
   // ── UTA spec (re-used by Guardian for restart) ────────────
   const utaSpec: SpawnSpec = {
@@ -350,6 +367,17 @@ async function main(): Promise<void> {
   aliceStatus = 'ready'
   console.log(`[guardian] Alice ready`)
 
+  // The browser always enters through the relay in normal source development.
+  // Its local target is the backend, while its UI assets and HMR come from Vite.
+  const relay = options.relay ? await createDevRelay({
+    home: dataHome,
+    projectId: aliceProject.id,
+    projectName: aliceProject.displayName,
+    backendPort: ports.webPort,
+    uiPort: ports.uiPort,
+    vitePort,
+  }) : null
+
   // ── Vite ──────────────────────────────────────────────────
   const vite: ChildProcess = spawnChild({
     name: 'vite',
@@ -359,7 +387,9 @@ async function main(): Promise<void> {
       ...baseEnv,
       OPENALICE_BACKEND_PORT: String(ports.webPort),
       // Guardian is the port authority: Vite binds exactly this (strictPort).
-      OPENALICE_UI_PORT: String(ports.uiPort),
+      OPENALICE_UI_PORT: String(vitePort),
+      VITE_OPENALICE_DEV_RELAY: options.relay ? '1' : '0',
+      VITE_OPENALICE_DEV_BACKEND_PORT: options.relay ? '0' : String(ports.webPort),
     },
     prefixLogs: true,
   })
@@ -372,7 +402,10 @@ async function main(): Promise<void> {
         ...(connector ? [connector.process] : []),
       ]),
     } : {}),
-    onShutdown: releaseGuardianRuntimeLock,
+    onShutdown: async () => {
+      await relay?.close()
+      await releaseGuardianRuntimeLock()
+    },
   })
 
   // UTA restart cooperates with cascade — old SIGTERM is "expected", new

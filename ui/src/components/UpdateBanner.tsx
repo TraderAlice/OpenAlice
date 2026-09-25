@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { useVersionInfo } from '../hooks/useVersionInfo'
+import { useUpdateLifecycle } from '../hooks/useUpdateLifecycle'
 
 const SKIP_STORAGE_KEY = 'openalice.update.skipVersion'
 type RuntimeMode = 'browser' | 'electron-dev' | 'electron-packaged'
@@ -20,19 +20,20 @@ type RuntimeMode = 'browser' | 'electron-dev' | 'electron-packaged'
  * native updater. Service-managed and non-updating installs do not render.
  */
 export function UpdateBanner() {
-  const { info } = useVersionInfo()
+  const { versionInfo: info, preferences } = useUpdateLifecycle()
   const [runtimeMode, setRuntimeMode] = useState<RuntimeMode>('browser')
   const [sessionDismissed, setSessionDismissed] = useState(false)
   const [sessionSkippedVersion, setSessionSkippedVersion] = useState<string | null>(null)
 
   useEffect(() => {
-    window.openAlice?.runtime.info()
+    window.openAlice?.runtime?.info()
       .then((runtime) => setRuntimeMode(runtime.mode))
       .catch(() => setRuntimeMode('browser'))
   }, [])
 
   if (
-    !info
+    !preferences?.autoCheckApp
+    || !info
     || !['source', 'desktop', 'cli'].includes(info.updateAuthority)
     || !info.hasUpdate
     || !info.latest

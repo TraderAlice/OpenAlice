@@ -19,6 +19,12 @@ const remoteMachine: RegisteredMachine = {
 }
 
 describe('Machine inventory', () => {
+  it('keeps disabled profiles visible without contacting SSH', async () => {
+    const runRemote = vi.fn()
+    const result = await inspectRegisteredMachine({ ...remoteMachine, enabled: false }, { runRemote })
+    expect(result).toMatchObject({ connection: 'offline', projects: [], issue: { code: 'EMACHINEDISABLED' }, capabilities: { lifecycle: false, transferReceive: false, openTunnel: false } })
+    expect(runRemote).not.toHaveBeenCalled()
+  })
   it('builds a secret-free aggregate local inventory', async () => {
     const result = await inspectLocalMachine({
       supervisorRoot: '/supervisor',

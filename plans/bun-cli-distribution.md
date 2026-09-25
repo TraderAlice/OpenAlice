@@ -458,7 +458,6 @@ Owner guides:
 - [[docs/broker-packs.md]]
 - [[docs/development-workflow.md]]
 - [[docs/remote-access.md]]
-- [[docs/docker-deployment.md]]
 
 Research references:
 

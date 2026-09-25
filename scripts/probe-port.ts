@@ -43,11 +43,18 @@ function bindable(port: number, host: string): Promise<boolean> {
   return new Promise((res) => {
     const srv = createServer()
     let settled = false
+    let listening = false
     const done = (free: boolean) => {
       if (settled) return
+      if (!listening) {
+        settled = true
+        res(free)
+        return
+      }
       settled = true
-      try { srv.close() } catch { /* noop */ }
-      res(free)
+      try {
+        srv.close(() => res(free))
+      } catch { res(free) }
     }
     srv.once('error', (err: NodeJS.ErrnoException) => {
       // A host with IPv6 disabled should still be able to use IPv4 ports.
@@ -55,7 +62,10 @@ function bindable(port: number, host: string): Promise<boolean> {
       // errors make this particular probe neutral.
       done(err.code === 'EAFNOSUPPORT' || err.code === 'EADDRNOTAVAIL')
     })
-    srv.once('listening', () => done(true))
+    srv.once('listening', () => {
+      listening = true
+      done(true)
+    })
     srv.listen(port, host)
   })
 }

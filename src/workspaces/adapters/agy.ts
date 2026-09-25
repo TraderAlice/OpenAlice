@@ -1,3 +1,4 @@
+import { discoverNativeModels } from '../native-model-discovery.js';
 import { realpathSync } from 'node:fs';
 import { readFile, stat } from 'node:fs/promises';
 import { homedir } from 'node:os';
@@ -184,6 +185,7 @@ function agyToolEvents(step: Record<string, unknown>): readonly HeadlessOutputEv
  * this adapter does not validate the id.
  */
 export const agyAdapter: CliAdapter = {
+  discoverModels: (cwd) => discoverNativeModels('agy', 'agy', cwd),
   id: 'agy',
   displayName: 'Antigravity',
   binary: 'agy',

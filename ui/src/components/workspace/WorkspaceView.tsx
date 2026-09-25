@@ -1,5 +1,4 @@
 import { useMemo, useRef } from 'react';
-import { useTranslation } from 'react-i18next';
 import type { ReactElement, ReactNode } from 'react';
 
 import type { AgentInfo, PausedSessionRuntimeUpdate, SessionRecord } from './api';
@@ -14,6 +13,7 @@ import { useWorkspaceSidePanels } from '../../live/workspace-side-panels';
 import type { WorkspaceSource } from '../../tabs/types';
 
 export interface WorkspaceViewProps {
+  readonly readOnly?: boolean;
   readonly wsId: string;
   readonly visible?: boolean;
   /** Pinned record id, or null = no session pinned (empty pane). */
@@ -40,7 +40,6 @@ export interface WorkspaceViewProps {
 }
 
 export function WorkspaceView(props: WorkspaceViewProps): ReactElement {
-  const { t } = useTranslation();
   const connected = useRef(false);
   if (props.activeRecord?.state === 'running') connected.current = true;
   // Mount ONLY this tab's own pinned session. Each session is its own tab with
@@ -82,16 +81,12 @@ export function WorkspaceView(props: WorkspaceViewProps): ReactElement {
   return (
     <div className={viewClass}>
       <div className="workspace-terminal">
-        {props.activeRecord?.state === 'running' && props.activeRecord.surface === 'headless' && (
-          <div role="alert" className="flex h-full items-center justify-center p-6 text-sm text-muted-foreground">
-            {t('workspace.interactiveOwnership.background')}
-          </div>
-        )}
         {showPausedCta && props.activeRecord && (
           <SessionActivation
             key={props.activeRecord.id}
             record={props.activeRecord}
             workspaceId={props.wsId}
+            source={props.source}
             enabled={props.visible !== false}
             automatic={!connected.current}
             onResume={() => props.onResume(props.activeRecord!.id)}
@@ -108,6 +103,8 @@ export function WorkspaceView(props: WorkspaceViewProps): ReactElement {
               >
                 {(s.surface ?? 'terminal') === 'webpi' ? (
                   <WebSessionView
+                    record={s}
+                    readOnly={props.readOnly}
                     wsId={props.wsId}
                     sessionId={s.id}
                     agent={s.agent}

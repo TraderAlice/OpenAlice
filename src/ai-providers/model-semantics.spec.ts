@@ -178,3 +178,14 @@ describe('model semantics registry', () => {
     }
   })
 })
+
+
+it('registers September model constraints without retiring old saved model semantics', () => {
+  expect(resolveModelSemantics('glm', 'glm-5.3')?.reasoning).toEqual({ mode: 'required', efforts: ['low', 'high', 'max'], defaultEffort: 'max' });
+  expect(resolveModelSemantics('anthropic', 'claude-fable-5-1')).toMatchObject({ maxOutputTokens: 128_000, reasoning: { mode: 'required' } });
+  expect(resolveModelSemantics('deepseek', 'deepseek-flash')?.reasoning?.efforts).toEqual(['low', 'high', 'max']);
+  expect(resolveModelSemantics('deepseek', 'deepseek-v4-flash')).not.toBeNull();
+  expect(resolveModelSemantics('anthropic', 'claude-fable-5')).not.toBeNull();
+  expect(resolveModelSemantics('openrouter', 'z-ai/glm-5.3')?.contextWindow).toBe(1_310_720);
+  expect(resolveModelSemantics('openrouter', 'deepseek/deepseek-v4.1-flash')?.contextWindow).toBe(1_048_576);
+});

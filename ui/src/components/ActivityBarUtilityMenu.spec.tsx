@@ -30,7 +30,7 @@ vi.mock('react-i18next', () => ({
       'nav.showCompanion': 'Show pet',
       'nav.hideCompanion': 'Hide pet',
       'nav.connectorNeedsAttention': '1 connector needs attention',
-      'settings.category.appearance': 'Appearance',
+      'settings.group.appearance': 'Appearance',
       'theme.mode.auto': 'Auto',
       'theme.mode.day': 'Day',
       'theme.mode.night': 'Night',

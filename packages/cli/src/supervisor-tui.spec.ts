@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
+import { createServer } from 'node:http'
 
 import { resolveLaunchContext } from './launch-context.ts'
 import type { MachineFleetEnvelope, MachineInventory } from './machine-inventory.ts'
@@ -32,6 +33,7 @@ import {
   SupervisorScreen,
 } from './supervisor-tui.ts'
 import { renderSupervisorConfirmationActionBar } from './supervisor-confirmation.ts'
+import { WebRelay } from './web-relay.ts'
 import {
   advanceSupervisorLaunchFlight,
   createSupervisorLaunchFlight,
@@ -1819,7 +1821,7 @@ describe('Supervisor TUI screen', () => {
     expect(launcher).not.toContain('Enter runs Next')
     expect(launcher).toContain('Tab/←→ changes pane')
     expect(directLauncher).toContain('Enter starts OpenAlice')
-    expect(directLauncher).toContain('brings you Home')
+    expect(directLauncher).toContain('o opens the Web connection chooser')
     expect(directLauncher).not.toContain('changes pane')
     expect(directConnection).toContain('Enter returns Home; m transfers this AliceProject')
     expect(directConnection).toContain('←→ changes view')
@@ -3703,6 +3705,83 @@ describe('Supervisor TUI screen', () => {
     expect(screen.render(100).join('\n')).toContain('[ Enter ]  Open Workspace')
   })
 
+  it('opens the Web connection chooser from a TUI with no active backend', () => {
+    let opened = 0
+    const screen = new SupervisorScreen({
+      version: 'dev', channel: 'development', runtime: { class: 'absent', endpoints: {} },
+      activeTarget: null, webRelayUrl: 'http://127.0.0.1:5196',
+    }, { onOpenActiveTarget: () => { opened += 1 } })
+    expect(screen.handleKey('o', matchesKey)).toBe(true)
+    expect(opened).toBe(1)
+  })
+
+  it('reflects a Web GUI connection in the running TUI through the same relay', async () => {
+    const context = resolveLaunchContext({ cwd: '/tmp', homeDir: '/home/alice' })
+    const backend = createServer((req, res) => {
+      res.setHeader('content-type', 'application/json')
+      res.end(req.url === '/api/alice-project'
+        ? JSON.stringify({ project: { id: context.aliceProject.id } })
+        : JSON.stringify({ authed: true, tokenConfigured: false }))
+    })
+    await new Promise<void>((done) => backend.listen(0, '127.0.0.1', done))
+    const address = backend.address()
+    if (!address || typeof address === 'string') throw new Error('Missing test backend port')
+    const endpoint = `http://127.0.0.1:${address.port}`
+    const relay = new WebRelay({ inspectLocal: async () => ({ machine: {
+      key: 'local', displayName: 'This computer', projects: [{
+        key: context.project, id: context.aliceProject.id,
+        displayName: context.aliceProject.displayName, available: true,
+        runtime: { webEndpoint: endpoint },
+      }],
+    } }) as never })
+    let screen: SupervisorScreen | undefined
+    let inputListener: ((data: string) => unknown) | undefined
+    let connected = false
+    class FakeTui {
+      addChild(component: SupervisorScreen): void { screen = component }
+      addInputListener(listener: (data: string) => unknown): () => void {
+        inputListener = listener
+        return () => undefined
+      }
+      requestRender(): void {}
+      setShowHardwareCursor(): void {}
+      start(): void {}
+      stop(): void {}
+    }
+    try {
+      const running = runSupervisorTui({}, {
+        webRelay: relay,
+        stdin: { isTTY: true } as NodeJS.ReadStream,
+        stdout: { isTTY: true } as NodeJS.WriteStream,
+        resolveContext: () => context,
+        inspect: async () => connected
+          ? { class: 'running', owner: { surface: 'cli-server', pid: 42 }, endpoints: { web: endpoint } }
+          : { class: 'absent', owner: null, endpoints: {} },
+        seedFleet: isolatedLocalFleet,
+        inspectFleet: isolatedLocalFleet,
+        pollIntervalMs: 20,
+        discoverUpdate: async () => null,
+        loadTui: async () => ({ ProcessTerminal: class {}, TUI: FakeTui, matchesKey }) as never,
+      })
+      await vi.waitFor(() => expect(screen).toBeDefined())
+      connected = true
+      await relay.connect('local', context.project)
+      await vi.waitFor(() => expect(screen?.snapshot.activeTarget).toMatchObject({
+        kind: 'local', projectKey: context.project, endpoint,
+      }))
+      expect(screen?.snapshot.notice).toContain('from Web Settings')
+      relay.disconnect()
+      await vi.waitFor(() => expect(screen?.snapshot.activeTarget).toBeNull())
+      await new Promise((done) => setTimeout(done, 100))
+      expect(relay.status.target).toBeNull()
+      expect(screen?.snapshot.activeTarget).toBeNull()
+      inputListener?.('q')
+      await expect(running).resolves.toBe(0)
+    } finally {
+      await new Promise<void>((done) => backend.close(() => done()))
+    }
+  })
+
   it('starts the Runtime from the Launcher and stays in the TUI', async () => {
     const calls: string[] = []
     let screen: SupervisorScreen | undefined
@@ -3744,6 +3823,7 @@ describe('Supervisor TUI screen', () => {
     })
 
     await expect(runSupervisorTui({}, {
+      webRelay: null,
       stdin: { isTTY: true } as NodeJS.ReadStream,
       stdout: { isTTY: true } as NodeJS.WriteStream,
       resolveContext: () => context,
@@ -3761,7 +3841,7 @@ describe('Supervisor TUI screen', () => {
         }
         setTimeout(() => inputListener?.('q'), 0)
       },
-      open: async () => {
+      openBrowser: async () => {
         calls.push('open')
       },
       discoverUpdate: async () => null,
@@ -3800,6 +3880,7 @@ describe('Supervisor TUI screen', () => {
     const context = resolveLaunchContext({ cwd: '/tmp', homeDir: '/home/alice' })
 
     await expect(runSupervisorTui({}, {
+      webRelay: null,
       stdin: { isTTY: true } as NodeJS.ReadStream,
       stdout: { isTTY: true } as NodeJS.WriteStream,
       resolveContext: () => context,
@@ -3854,6 +3935,7 @@ describe('Supervisor TUI screen', () => {
     }
 
     await expect(runSupervisorTui({}, {
+      webRelay: null,
       stdin: { isTTY: true } as NodeJS.ReadStream,
       stdout: { isTTY: true } as NodeJS.WriteStream,
       resolveContext: () => resolveLaunchContext({
@@ -3923,6 +4005,7 @@ describe('Supervisor TUI screen', () => {
     }
 
     await expect(runSupervisorTui({}, {
+      webRelay: null,
       stdin: { isTTY: true } as NodeJS.ReadStream,
       stdout: { isTTY: true } as NodeJS.WriteStream,
       resolveContext: () => resolveLaunchContext({ cwd: '/tmp', homeDir: '/home/alice' }),
@@ -3990,6 +4073,7 @@ describe('Supervisor TUI screen', () => {
     }
 
     await expect(runSupervisorTui({}, {
+      webRelay: null,
       stdin: { isTTY: true } as NodeJS.ReadStream,
       stdout: { isTTY: true } as NodeJS.WriteStream,
       resolveContext: () => resolveLaunchContext({ cwd: '/tmp', homeDir: '/home/alice' }),
@@ -4065,6 +4149,7 @@ describe('Supervisor TUI screen', () => {
     const context = resolveLaunchContext({ cwd: '/tmp', homeDir: '/home/alice' })
 
     await expect(runSupervisorTui({}, {
+      webRelay: null,
       stdin: { isTTY: true } as NodeJS.ReadStream,
       stdout: { isTTY: true } as NodeJS.WriteStream,
       resolveContext: () => context,
@@ -4134,6 +4219,7 @@ describe('Supervisor TUI screen', () => {
     }
 
     await expect(runSupervisorTui({}, {
+      webRelay: null,
       stdin: { isTTY: true } as NodeJS.ReadStream,
       stdout: { isTTY: true } as NodeJS.WriteStream,
       resolveContext: () => resolveLaunchContext({ cwd: '/tmp', homeDir: '/home/alice' }),
@@ -4196,6 +4282,7 @@ describe('Supervisor TUI screen', () => {
     }
 
     await expect(runSupervisorTui({}, {
+      webRelay: null,
       stdin: { isTTY: true } as NodeJS.ReadStream,
       stdout: { isTTY: true } as NodeJS.WriteStream,
       resolveContext: () => resolveLaunchContext({ cwd: '/tmp', homeDir: '/home/alice' }),
@@ -4284,6 +4371,7 @@ describe('Supervisor TUI screen', () => {
     }
     const realTui = await (await import('./pi-tui-loader.ts')).loadPiTui()
     await expect(runSupervisorTui({}, {
+      webRelay: null,
       stdin: { isTTY: true } as NodeJS.ReadStream,
       stdout: { isTTY: true } as NodeJS.WriteStream,
       resolveContext: () => resolveLaunchContext({ cwd: '/tmp', homeDir: '/home/alice' }),
@@ -4373,6 +4461,7 @@ describe('Supervisor TUI screen', () => {
     const realTui = await (await import('./pi-tui-loader.ts')).loadPiTui()
 
     await expect(runSupervisorTui({}, {
+      webRelay: null,
       stdin: { isTTY: true } as NodeJS.ReadStream,
       stdout: { isTTY: true } as NodeJS.WriteStream,
       resolveContext: () => resolveLaunchContext({ cwd: '/tmp', homeDir: '/home/alice' }),
@@ -4460,6 +4549,7 @@ describe('Supervisor TUI screen', () => {
     const realTui = await (await import('./pi-tui-loader.ts')).loadPiTui()
 
     await expect(runSupervisorTui({}, {
+      webRelay: null,
       stdin: { isTTY: true } as NodeJS.ReadStream,
       stdout: { isTTY: true } as NodeJS.WriteStream,
       resolveContext: () => resolveLaunchContext({ cwd: '/tmp', homeDir: '/home/alice' }),
@@ -4528,6 +4618,7 @@ describe('Supervisor TUI screen', () => {
     })
 
     await expect(runSupervisorTui({}, {
+      webRelay: null,
       stdin: { isTTY: true } as NodeJS.ReadStream,
       stdout: { isTTY: true } as NodeJS.WriteStream,
       resolveContext: () => initialContext,
@@ -4570,7 +4661,7 @@ describe('Supervisor TUI screen', () => {
         }
         queueMicrotask(() => inputListener?.('q'))
       },
-      open: async () => {
+      openBrowser: async () => {
         calls.push('open')
       },
       discoverUpdate: async () => null,
@@ -4882,6 +4973,7 @@ describe('Supervisor TUI screen', () => {
     }
 
     await expect(runSupervisorTui({}, {
+      webRelay: null,
       stdin: { isTTY: true } as NodeJS.ReadStream,
       stdout: { isTTY: true } as NodeJS.WriteStream,
       env: {},
@@ -4926,6 +5018,7 @@ describe('Supervisor TUI screen', () => {
     }
 
     await expect(runSupervisorTui({}, {
+      webRelay: null,
       stdin: { isTTY: true } as NodeJS.ReadStream,
       stdout: { isTTY: true } as NodeJS.WriteStream,
       env: { OPENALICE_HOME: '/tmp/explicit-home' },
@@ -4952,6 +5045,7 @@ describe('Supervisor TUI screen', () => {
       throw new Error('TUI should not start')
     }
     await expect(runSupervisorTui({ home: '/tmp/research' }, {
+      webRelay: null,
       stdin: { isTTY: true } as NodeJS.ReadStream,
       stdout: { isTTY: true } as NodeJS.WriteStream,
       env: {},
@@ -4968,6 +5062,7 @@ describe('Supervisor TUI screen', () => {
     })
 
     await expect(runSupervisorTui({ project: 'research' }, {
+      webRelay: null,
       stdin: { isTTY: true } as NodeJS.ReadStream,
       stdout: { isTTY: true } as NodeJS.WriteStream,
       resolveContext: async () => {
@@ -5025,6 +5120,7 @@ describe('Supervisor TUI screen', () => {
     }
 
     await expect(runSupervisorTui({}, {
+      webRelay: null,
       stdin: { isTTY: true } as NodeJS.ReadStream,
       stdout: { isTTY: true } as NodeJS.WriteStream,
       resolveContext: () => resolveLaunchContext({
@@ -5102,6 +5198,7 @@ describe('Supervisor TUI screen', () => {
     const realTui = await (await import('./pi-tui-loader.ts')).loadPiTui()
 
     await expect(runSupervisorTui({}, {
+      webRelay: null,
       stdin: { isTTY: true } as NodeJS.ReadStream,
       stdout: { isTTY: true, columns: 100, rows: 30 } as NodeJS.WriteStream,
       resolveContext: () => resolveLaunchContext({ cwd: '/tmp', homeDir: '/home/alice' }),
@@ -5145,6 +5242,7 @@ describe('Supervisor TUI screen', () => {
     }
 
     await expect(runSupervisorTui({}, {
+      webRelay: null,
       stdin: { isTTY: true } as NodeJS.ReadStream,
       stdout: { isTTY: true } as NodeJS.WriteStream,
       resolveContext: () => resolveLaunchContext({ cwd: '/tmp', homeDir: '/home/alice' }),

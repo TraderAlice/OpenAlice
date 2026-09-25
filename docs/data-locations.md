@@ -28,7 +28,9 @@ collide.
 
 Workspace launcher state includes the private
 `workspaces/state/agent-conversations.jsonl` prompt/reply event stream and
-`workspaces/state/agent-runtime.jsonl` occupancy journal. Both move with the
+`workspaces/state/agent-runtime.jsonl` occupancy journal.
+`workspaces/state/session-executions.json` is the secret-free process lifecycle
+ledger (source, selection, PID, states, and exit reason). These move with the
 complete home and are not part of any Workspace repository. Treat the
 conversation stream as sensitive history when backing up or sharing a home;
 the occupancy journal has no prompt bodies.
@@ -158,7 +160,7 @@ that selects itself.
 The local CLI already exposes the same complete-root boundary:
 
 ```bash
-openalice start --home ~/.openalice-dev/feature-a
+openalice run --home ~/.openalice-dev/feature-a
 ```
 
 `pnpm dev` accepts an equivalent focused override. Keep these homes outside the
@@ -196,14 +198,41 @@ pins; delete the key or the file to restore probing. `openalice up --port`
 and `OPENALICE_WEB_PORT` remain one-run pins and do not rewrite the file.
 
 The machine-wide Supervisor root also owns `machines.json`. This second
-registry names SSH Machines for fleet inspection; it does not move with a
-complete home and does not belong to the Electron browser profile. The local
-Machine is implicit. Stored rows contain only connection metadata (target,
-port, display name, and optional local identity-file path), never key bytes or
-AliceProject data. `remote-targets.json` beside it remains a hashed,
-non-enumerable tunnel-port cache rather than durable fleet identity.
+registry stores Herdr-style remote Machine profiles; it does not move with a
+complete home and does not belong to the Electron browser profile. Stored rows
+contain an opaque id, display name, SSH target, optional port, enabled state,
+and local identity-file path, never key bytes or AliceProject data.
+`remote-targets.json` beside it remains a hashed, non-enumerable tunnel-port
+cache rather than durable fleet identity.
 
-A received AliceProject is registered in this machine-wide registry only after
+The persisted shape is distinct from the `machine list --json` presentation:
+
+```json
+{
+  "schemaVersion": 1,
+  "machines": {
+    "cloud": {
+      "id": "0123456789abcdef0123456789abcdef",
+      "displayName": "Cloud",
+      "sshTarget": "alice@cloud",
+      "enabled": true
+    }
+  }
+}
+```
+
+The map key is an internal Fleet/transfer handle. Optional `sshPort` is an
+integer from 1 to 65535; optional `identityFile` is an absolute local path.
+Omitting `sshPort` lets OpenSSH config choose it. Older rows may omit `id` and
+`enabled`; they use the map key as id and are enabled by default. Public JSON
+uses an array with `id`, `label`, `target`, `enabled`, and nullable `sshPort`.
+Do not write that output back as the registry. New CLI labels must be unique and cannot
+be `local` or a profile id. Selectors resolve id, then label, then internal key.
+Unknown fields survive writes; an old `remoteSession` field is inert metadata,
+not a session selector. OpenAlice does not consume Herdr's catalog format.
+
+A received AliceProject is registered in the Supervisor's `config.json`, not
+`machines.json`, only after
 its sibling staging Home has passed checksum and space validation and has been
 atomically published. Registration does not select it as the remote default.
 The new Home owns a new `sealing.key`; source machine locks, Runtime payloads,

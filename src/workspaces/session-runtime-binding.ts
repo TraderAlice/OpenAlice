@@ -31,7 +31,7 @@ export class SessionRuntimeBindingError extends Error {
   }
 }
 
-/** Optional choices captured exactly once when a product Session is created. */
+/** Optional AI choices for Session creation or an explicit existing-Session edit. */
 export interface SessionRuntimeSelection {
   /** Explicitly bypass Workspace/provider files and use the runtime's own auth. */
   readonly credentialSource?: 'native'
@@ -152,7 +152,7 @@ function resolveVault(
     ...(input.requestedWireShape ? { wireShape: input.requestedWireShape } : {}),
     ...(selectedModel ? { model: selectedModel } : {}),
     ...(input.reasoningEffort ? { reasoningEffort: input.reasoningEffort } : {}),
-  })
+  }, credentialSlug)
   if (!ai) {
     throw new SessionRuntimeBindingError(
       'credential_incompatible',

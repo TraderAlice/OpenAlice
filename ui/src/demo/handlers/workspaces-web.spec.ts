@@ -242,3 +242,24 @@ it('round-trips a Codex free-text question in demo mode', async () => {
   expect(result.body.snapshot.requests).toEqual([])
   expect(JSON.stringify(result.body.snapshot.messages)).toContain('Project name: Alice research')
 })
+
+it('exposes a representative execution history for a known demo Session and rejects unknown identities', async () => {
+  const path = `${baseUrl}/api/workspaces/${DEMO_CHAT_WORKSPACE_ID}/sessions`
+  expect(await (await fetch(`${path}/${DEMO_CHAT_SESSION_ID}/executions`)).json()).toMatchObject({ executions: [{ executionId: `demo-execution-${DEMO_CHAT_SESSION_ID}`, origin: { kind: 'user', entry: 'quick-start' } }] })
+  expect((await fetch(`${path}/missing/executions`)).status).toBe(404)
+})
+
+it('demo interruption enters cooldown; releasing it does not restart the Session', async () => {
+  const base = `${baseUrl}/api/workspaces/${DEMO_CHAT_WORKSPACE_ID}/sessions/demo-chat-headless-claude`
+  const before = await fetch(`${base}/control`).then(response => response.json())
+  expect(before.execution.phase).toBe('running')
+  const stop = await postJson(`${base}/interrupt`, { executionId: before.execution.executionId })
+  expect(stop.status).toBe(200)
+  const blocked = await fetch(`${base}/control`).then(response => response.json())
+  expect(blocked.execution).toBeNull()
+  const history = await fetch(`${base}/executions`).then(response => response.json())
+  expect(history.executions[0]).toMatchObject({ phase: 'interrupted', reason: 'user-interrupted' })
+  expect(blocked.blocks[0].kind).toBe('user-cooldown')
+  await postJson(`${base}/blocks/${blocked.blocks[0].id}/release`)
+  expect(await fetch(`${base}/control`).then(response => response.json())).toMatchObject({ execution: null, blocks: [] })
+})

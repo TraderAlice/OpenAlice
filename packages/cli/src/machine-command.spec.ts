@@ -5,7 +5,22 @@ import type { MachineInspectEnvelope } from './machine-inventory.ts'
 import type { MachineRegistrySummary } from './machine-registry.ts'
 
 describe('openalice machine', () => {
-  it('lists the implicit local Machine and registered SSH Machines as JSON', async () => {
+  it('rejects invalid or duplicate profiles and unsupported sessions before remote setup', async () => {
+    const setupRemote = vi.fn()
+    const addMachineProfile = vi.fn()
+    for (const extra of [
+      ['--label', 'Cloud box'],
+      ['--label', 'local'],
+      ['--label', 'Cloud', '--remote-session', 'default'],
+    ]) {
+      await expect(runMachineCommand(['add', 'host', ...extra, '--yes'], {
+        setupRemote, addMachineProfile, loadMachines: async () => summary(),
+      })).rejects.toThrow()
+    }
+    expect(setupRemote).not.toHaveBeenCalled()
+    expect(addMachineProfile).not.toHaveBeenCalled()
+  })
+  it('lists saved Herdr-style Machine profiles as JSON', async () => {
     let output = ''
     await runMachineCommand(['list', '--json'], {
       stdout: { write: (chunk) => { output += chunk } },
@@ -13,54 +28,62 @@ describe('openalice machine', () => {
     })
     expect(JSON.parse(output)).toEqual({
       schemaVersion: 1,
-      defaultMachine: 'local',
       machines: [
         {
-          key: 'local',
-          displayName: 'This computer',
-          sshTarget: null,
-          sshPort: null,
-          isDefault: true,
-        },
-        {
-          key: 'cloud',
-          displayName: 'Cloud box',
-          sshTarget: 'alice@example.com',
+          id: 'cloud',
+          label: 'Cloud box',
+          target: 'alice@example.com',
+          enabled: true,
           sshPort: 22,
-          isDefault: false,
         },
       ],
     })
   })
 
-  it('registers a Machine only after explicit non-interactive confirmation', async () => {
-    const addMachine = vi.fn(async (input) => ({ ...input, displayName: input.displayName ?? 'Cloud', isDefault: false }))
-    await expect(runMachineCommand([
-      'add', 'cloud', '--target', 'alice@example.com', '--yes',
-    ], { addMachine, interactive: false })).resolves.toBe(0)
-    expect(addMachine).toHaveBeenCalledWith(expect.objectContaining({
+  it('sets up and saves a Machine only after explicit non-interactive confirmation', async () => {
+    const setupRemote = vi.fn(async () => undefined)
+    const addMachineProfile = vi.fn(async (input) => ({
       key: 'cloud',
+      id: '0123456789abcdef0123456789abcdef',
+      displayName: input.label,
+      sshTarget: input.sshTarget,
+      isDefault: false,
+      enabled: true,
+    }))
+    await expect(runMachineCommand([
+      'add', 'alice@example.com', '--label', 'Cloud', '--yes',
+    ], { setupRemote, addMachineProfile, loadMachines: async () => summary(), interactive: false })).resolves.toBe(0)
+    expect(setupRemote).toHaveBeenCalledWith(expect.objectContaining({
+      label: 'Cloud',
       sshTarget: 'alice@example.com',
-      sshPort: undefined,
+      assumeYes: true,
+    }), expect.any(Object))
+    expect(addMachineProfile).toHaveBeenCalledWith(expect.objectContaining({
+      label: 'Cloud',
+      sshTarget: 'alice@example.com',
     }), expect.any(Object))
 
     await expect(runMachineCommand([
-      'add', 'cloud', '--target', 'alice@example.com',
-    ], { addMachine, interactive: false })).rejects.toMatchObject({ code: 'EUSAGE' })
+      'add', 'alice@example.com', '--label', 'Cloud',
+    ], { setupRemote, addMachineProfile, loadMachines: async () => summary(), interactive: false })).rejects.toMatchObject({ code: 'EUSAGE' })
   })
 
   it('cancels an interactive mutation without writing', async () => {
     let output = ''
-    const addMachine = vi.fn()
+    const setupRemote = vi.fn()
+    const addMachineProfile = vi.fn()
     await expect(runMachineCommand([
-      'add', 'cloud', '--target', 'alice@example.com',
+      'add', 'alice@example.com', '--label', 'Cloud',
     ], {
       stdout: { write: (chunk) => { output += chunk } },
-      addMachine,
+      setupRemote,
+      addMachineProfile,
+      loadMachines: async () => summary(),
       interactive: true,
       prompt: async () => 'n',
     })).resolves.toBe(0)
-    expect(addMachine).not.toHaveBeenCalled()
+    expect(setupRemote).not.toHaveBeenCalled()
+    expect(addMachineProfile).not.toHaveBeenCalled()
     expect(output).toBe('Cancelled.\n')
   })
 

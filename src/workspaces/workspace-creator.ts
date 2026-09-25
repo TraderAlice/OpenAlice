@@ -272,7 +272,7 @@ export class WorkspaceCreator {
             });
             continue;
           }
-          const projected = credentialToWorkspaceAiCred(credential, adapter, decl);
+          const projected = credentialToWorkspaceAiCred(credential, adapter, decl, decl.credentialSlug);
           if (!projected) {
             log.warn('workspace.runtime_settings_seed_skipped', {
               agentId,

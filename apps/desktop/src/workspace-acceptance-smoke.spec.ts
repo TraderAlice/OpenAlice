@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { runRendererWorkspaceAcceptanceSmoke } from './workspace-acceptance-smoke.js'
 
 describe('Workspace acceptance renderer source', () => {
-  it('preserves literal newline escapes until Git Bash receives the command', async () => {
+  it('preserves literal newline escapes and waits for the shell readiness marker', async () => {
     const executeJavaScript = vi.fn(async () => ({}))
     const win = { webContents: { executeJavaScript } }
 
@@ -26,18 +26,33 @@ describe('Workspace acceptance renderer source', () => {
     expect(source).toContain("diagnosticText.includes('\"type\":\"message_update\"')")
     const attached = source.indexOf('await attached')
     const shellProbe = source.indexOf("'SHELL'\\r")
+    const shellProbeLoop = source.indexOf("while (!output.includes('__OPENALICE_SHELL_READY__'))")
+    const shellProbeSend = source.indexOf('bridge.send(connectionId, shellProbe)', shellProbeLoop)
     const shellReady = source.indexOf('await shellReady')
     const helperProbe = source.indexOf("'STEP_HELPER'\\r")
     const helperReady = source.indexOf('await helperReady')
     const contract = source.indexOf("command + '\\r'")
-    expect([attached, shellProbe, shellReady, helperProbe, helperReady, contract]).not.toContain(-1)
+    expect([
+      attached,
+      shellProbe,
+      shellProbeLoop,
+      shellProbeSend,
+      shellReady,
+      helperProbe,
+      helperReady,
+      contract,
+    ]).not.toContain(-1)
     expect(attached).toBeLessThan(shellProbe)
-    expect(shellProbe).toBeLessThan(shellReady)
+    expect(shellProbe).toBeLessThan(shellProbeLoop)
+    expect(shellProbeLoop).toBeLessThan(shellProbeSend)
+    expect(shellProbeSend).toBeLessThan(shellReady)
     expect(shellReady).toBeLessThan(helperProbe)
     expect(helperProbe).toBeLessThan(helperReady)
     expect(helperReady).toBeLessThan(contract)
     expect(source).toContain('Workspace shell-ready timeout: ')
     expect(source).toContain('Workspace CLI helper-ready timeout: ')
+    expect(source).not.toContain('waitForShellPrompt')
+    expect(source).toContain('new Promise((resolve) => setTimeout(resolve, 500))')
     expect(() => new Function(`return ${source}`)).not.toThrow()
   })
 })

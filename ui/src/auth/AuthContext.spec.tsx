@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 
+import { useState } from 'react'
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
@@ -21,6 +22,7 @@ import {
 } from './AuthContext'
 import { AuthGate, BackendUnavailableScreen } from './AuthGate'
 import { BACKEND_PROBE_REQUESTED_EVENT } from './backendConnectivity'
+import { useHideBackendOutageOverlay } from './BackendOutageOverlayContext'
 
 function WorkspaceHarness() {
   const { backendRecoveryGeneration, refresh } = useAuth()
@@ -36,6 +38,12 @@ function WorkspaceHarness() {
 function OptionalBackendSignalHarness() {
   const { backendUnavailable, backendRecoveryGeneration } = useBackendRecoverySignal()
   return <span>{`${backendUnavailable}:${backendRecoveryGeneration}`}</span>
+}
+
+function PlannedRestartHarness() {
+  const [updating, setUpdating] = useState(true)
+  useHideBackendOutageOverlay(updating)
+  return <><WorkspaceHarness /><button type="button" onClick={() => setUpdating(false)}>Finish update</button></>
 }
 
 async function flushEffects() {
@@ -57,27 +65,17 @@ describe('AuthProvider backend recovery', () => {
     expect(screen.getByText('false:0')).toBeTruthy()
   })
 
-  it('shows the exact SSH route when a remote Runtime is unavailable', () => {
+  it('shows a recoverable backend outage without guessing Machine identity', () => {
     render(
       <BackendUnavailableScreen
         retry={vi.fn(async () => undefined)}
-        connection={{
-          kind: 'remote',
-          target: 'alice@example.com',
-          sshPort: 2222,
-          runtimePort: 47331,
-          localEndpoint: '127.0.0.1:40123',
-        }}
       />,
     )
 
     expect(screen.getByRole('alertdialog', {
-      name: 'OpenAlice lost its connection to alice@example.com:2222',
+      name: 'OpenAlice lost its backend connection',
     })).toBeTruthy()
-    expect(screen.getByText('SSH tunnel')).toBeTruthy()
-    expect(screen.getByText('127.0.0.1:40123')).toBeTruthy()
-    expect(screen.getByText('127.0.0.1:47331')).toBeTruthy()
-    expect(screen.getAllByText('alice@example.com:2222').length).toBeGreaterThan(0)
+    expect(screen.getByRole('button', { name: 'Retry now' })).toBeTruthy()
   })
 
   it('does not manufacture a login screen during a cold-start outage', async () => {
@@ -138,6 +136,29 @@ describe('AuthProvider backend recovery', () => {
     expect(screen.getByText('workspace-app')).toBeTruthy()
     expect(screen.queryByRole('status')).toBeNull()
     expect(screen.getByTestId('backend-recovery-generation').textContent).toBe('1')
+  })
+
+  it('keeps the active upgrade dialog visible during its planned backend restart', async () => {
+    mocks.getStatus
+      .mockResolvedValueOnce({ authed: true, tokenConfigured: true })
+      .mockRejectedValueOnce(new Error('backend restarting'))
+
+    render(
+      <AuthProvider>
+        <AuthGate><PlannedRestartHarness /></AuthGate>
+      </AuthProvider>,
+    )
+    await flushEffects()
+    fireEvent.click(screen.getByRole('button', { name: 'Refresh auth' }))
+    await flushEffects()
+
+    expect(screen.getByText('workspace-app')).toBeTruthy()
+    expect(screen.queryByRole('alertdialog')).toBeNull()
+    expect(screen.getByText('workspace-app').closest('[inert]')).toBeNull()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Finish update' }))
+    await flushEffects()
+    expect(screen.getByRole('alertdialog')).toBeTruthy()
   })
 
   it('increments the recovery generation once per unavailable-to-available transition', async () => {

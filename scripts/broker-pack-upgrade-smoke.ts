@@ -56,11 +56,17 @@ async function main(): Promise<void> {
   const candidateCatalog = await readCatalog(
     resolve(candidateRoot, brokerPackCatalogFileName(currentVersion)),
   )
-  const previousCatalog = await fetchJson<BrokerPackReleaseCatalog>(
-    releaseAssetUrl(previousTag, brokerPackCatalogFileName(previousVersion)),
-  )
-  assertCatalog(previousCatalog, previousVersion)
   assertCatalog(candidateCatalog, currentVersion)
+  const previousCatalogUrl = releaseAssetUrl(previousTag, brokerPackCatalogFileName(previousVersion))
+  const previousCatalog = await fetchOptionalJson<BrokerPackReleaseCatalog>(previousCatalogUrl)
+  if (!previousCatalog) {
+    console.warn(
+      `[broker-pack-upgrade-smoke] ${previousTag} has no ${brokerPackCatalogFileName(previousVersion)} `
+        + `for ${process.platform}-${process.arch}; skipping the N-1 upgrade proof for this newly published platform`,
+    )
+    return
+  }
+  assertCatalog(previousCatalog, previousVersion)
 
   const home = await mkdtemp(resolve(tmpdir(), 'openalice-broker-pack-upgrade-'))
   const oldHome = process.env['OPENALICE_HOME']
@@ -223,8 +229,11 @@ async function readCatalog(path: string): Promise<BrokerPackReleaseCatalog> {
   return JSON.parse(await readFile(path, 'utf8')) as BrokerPackReleaseCatalog
 }
 
-async function fetchJson<T>(url: string): Promise<T> {
-  return JSON.parse((await fetchBytes(url)).toString('utf8')) as T
+async function fetchOptionalJson<T>(url: string): Promise<T | undefined> {
+  const response = await fetch(url, { redirect: 'follow', signal: AbortSignal.timeout(120_000) })
+  if (response.status === 404) return undefined
+  if (!response.ok) throw new Error(`GET ${url} failed: HTTP ${response.status}`)
+  return JSON.parse(Buffer.from(await response.arrayBuffer()).toString('utf8')) as T
 }
 
 async function fetchBytes(url: string): Promise<Buffer> {

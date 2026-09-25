@@ -152,6 +152,8 @@ interface UpdateContext {
 }
 
 interface GetVersionInfoOptions extends FetchLatestReleaseOptions {
+  /** Report running identity without contacting the release feed. */
+  currentOnly?: boolean
   /** Test seam for the running process environment. */
   env?: EnvLike
   /** Test seam for installed provenance reads. */
@@ -290,7 +292,8 @@ export async function getVersionInfo(opts?: GetVersionInfoOptions): Promise<Vers
       )
 
   if (
-    context.error
+    opts?.currentOnly
+    || context.error
     || context.authority === 'service'
     || context.authority === 'none'
     || context.channel === 'dev'

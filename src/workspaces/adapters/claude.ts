@@ -1,3 +1,4 @@
+import { discoverNativeModels } from '../native-model-discovery.js';
 import { randomUUID } from 'node:crypto';
 import { createReadStream } from 'node:fs';
 import { readFile, realpath } from 'node:fs/promises';
@@ -156,6 +157,7 @@ function projectKey(workspaceDir: string): string {
  * still does the placeholder-substitution at spawn-env-build time).
  */
 export const claudeAdapter: CliAdapter = {
+  discoverModels: (cwd) => discoverNativeModels('claude', 'claude', cwd),
   id: 'claude',
   displayName: 'Claude Code',
   binary: 'claude',
@@ -200,7 +202,7 @@ export const claudeAdapter: CliAdapter = {
       // Vault binding must exclude user and local sources so an unrelated
       // global login or deprecated `.claude/settings.local.json` export cannot
       // replace ANTHROPIC_BASE_URL / auth / model after OpenAlice projects the
-      // immutable Session binding. Keep the project source enabled: Claude
+      // current Session binding. Keep the project source enabled: Claude
       // owns the native loading semantics for the Workspace's CLAUDE.md and
       // `.claude/skills`, and treating those files as a synthetic plugin loses
       // their normal project scope and persona behavior. Explicit `--settings`

@@ -1,3 +1,4 @@
+import { useActivityBarCollapse } from '../../live/activity-bar-collapse'
 // @vitest-environment jsdom
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { beforeEach, afterEach, expect, it, vi } from 'vitest'
@@ -59,4 +60,17 @@ it('opens the real Studio specimen beside a demo Chat without starting a process
   render(<HarnessWorkbench source="chat" spec={{ kind: 'workspace', params: { wsId: 'a', sessionId: 'one' } }}>Chat</HarnessWorkbench>)
   expect(screen.getByTitle('AutoQuant Studio · Demo').getAttribute('src')).toContain('/demo-studio/index.html')
   expect(screen.queryByTitle('Test Studio')).toBeNull()
+})
+
+it('collapses left navigation when opening the work panel at tablet width', () => {
+  const original = window.matchMedia
+  window.matchMedia = vi.fn().mockReturnValue({ matches: true, addEventListener: vi.fn(), removeEventListener: vi.fn() })
+  useActivityBarCollapse.setState({ railCollapsed: false })
+  try {
+    render(<HarnessWorkbench source="chat" spec={{ kind: 'workspace', params: { wsId: 'a' } }}>Conversation</HarnessWorkbench>)
+    expect(useActivityBarCollapse.getState().railCollapsed).toBe(false)
+    act(() => store.getState().openTab('a', { kind: 'files', id: 'files' }))
+    expect(useActivityBarCollapse.getState().railCollapsed).toBe(true)
+    expect(screen.getAllByText('Conversation').length).toBeGreaterThan(0)
+  } finally { window.matchMedia = original }
 })

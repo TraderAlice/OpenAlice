@@ -1,7 +1,7 @@
 # Shell CLI Supervisor
 
 This guide owns the computer-level `openalice` command surface above Guardian:
-background and foreground lifecycle, status presentation, browser opening,
+background and foreground lifecycle, status presentation, relay GUI opening,
 machine-readable envelopes, shell completion, compatibility aliases, and the
 boundary of the Supervisor TUI.
 
@@ -48,19 +48,46 @@ openalice down [options]
 openalice status [options]
 openalice logs [options]
 openalice doctor [options]
-openalice open [options]
+openalice relay [--port <port>] [--no-open]
 openalice create alice-project [options]
 openalice project [list|use|copy-ai-creds|transfer] [options]
 ```
+
+Remote targeting is a global selector rather than a second command tree:
+
+```bash
+openalice --remote <user@host> --plan|--status|--stop [options]
+openalice machine add <user@host> --label <label> [options]
+openalice --machine <id-or-label> <command> [options]
+```
+
+`machine add` probes and prepares a remote Runtime before saving its profile.
+The default `openalice` TUI owns the local Web relay; it connects only to
+registered Machines and their running AliceProjects. `openalice relay` serves
+the same GUI without a TUI. `--remote` remains for plan/status/stop controls;
+its former direct browser attach is retired. `--machine` re-enters an ordinary
+CLI command on a selected enabled profile.
+
+The normal TUI starts a local relay in the same CLI process. TUI selection and
+Settings → General → Where Alice is working operate one current Machine/AliceProject target;
+opening Web from the TUI uses that relay's stable loopback origin, including
+when no Runtime is selected yet (`o` opens the connection screen). Web changes
+also update the TUI. `openalice relay` runs the same relay without the terminal
+presentation. It serves the local UI bundle and forwards backend HTTP/WS to
+one selected running Runtime. Detaching from the TUI closes its relay and SSH
+tunnel, not the selected Runtime. Direct `--remote` browser access was a
+separate entry path. Electron keeps its integrated IPC path and can switch its
+window to a main-process relay for a separated connection.
 
 | Command | Contract |
 |---|---|
 | `create alice-project` | Register a named complete home. Interactive or `--yes` with `--name`, `--home`, and optional `--product trader\|nano`. Product is immutable birth (Trader default; Nano never starts UTA). TUI create remains Trader-equivalent. |
 | `project list` | Print registered AliceProjects and the remembered bare-start default. `--json` emits the registry summary. |
 | `project use <key>` | Record that AliceProject as the next bare-start default. Does not start, stop, or copy another project. |
-| `machine list` | Print the implicit local Machine and explicitly registered SSH Machines. `--json` emits a versioned secret-free summary. |
-| `machine add/remove` | Atomically remember or forget local SSH connection metadata. Non-interactive mutation requires `--yes`; remote state is never changed. |
-| `machine inspect [key]` | Build a typed Machine → AliceProject inventory; each remote Machine uses one bounded aggregate SSH command. |
+| `machine list` | Print saved Machine profiles by opaque id, label, target, and enabled state. `--json` emits a versioned secret-free summary. |
+| `machine add` | Prepare the selected remote Server, then atomically save its SSH profile. Non-interactive mutation requires `--yes`. |
+| `machine rename/enable/disable/remove` | Mutate local profile metadata after explicit confirmation; remove never deletes remote data. |
+| `machine inspect [id-or-label]` | Build a typed Machine → AliceProject inventory; each enabled remote Machine uses one bounded aggregate SSH command. Disabled rows stay visible without SSH. |
 | `project copy-ai-creds` | Copy AI credential rows from one complete home into another. Interactive unless `--from`, `--to`, and `--yes` are set. Matching vendor+key rows are skipped; colliding slugs are renamed. Workspace launch preferences, broker accounts, and `sealing.key` are never copied. Secrets are never printed. |
 | `project transfer` | Plan or copy a stopped local AliceProject to a new complete Home on a registered SSH Machine. Portable configuration and Workspace/Git state transfer; Session/runtime/auth state does not. Credentials use the SSH stream and are re-sealed with a new remote key. The source and remote default remain unchanged. |
 | `up` | Prepare the selected provider when needed, start `cli-server` detached, and return only after Guardian control plus Alice HTTP readiness |
@@ -69,7 +96,7 @@ openalice project [list|use|copy-ai-creds|transfer] [options]
 | `status` | Read normalized status and activation state without mutation |
 | `logs` | Read a bounded, redacted tail from safe Runtime log rotations |
 | `doctor` | Run read-only provenance, ownership, readiness, component, provider, update-metadata, and log-layout checks |
-| `open` | Require an advertised Web endpoint and a successful `/api/auth/status` probe before invoking the platform browser opener |
+| `openalice` | Start the Supervisor TUI and its Web relay. GUI browser opening always uses the relay origin. |
 
 `up` is idempotent for an already healthy matching owner. `down` is idempotent
 when no owner exists. Ordinary start never signals another owner. `--takeover`
@@ -91,17 +118,17 @@ Guardian/Alice/UTA/Connector processes; its release gate lives in
 [[plans/bun-cli-distribution.md]]. `up` and `run` remain
 browserless lifecycle commands and accept home, port, wait, and takeover
 options; `--app-dir` is an advanced source override with the preparation and
-rebuild options documented in [[docs/local-runtime.md]]. `--open` performs a
-separate verified browser open after readiness.
+rebuild options documented in [[docs/local-runtime.md]]. The retired `--open`
+shortcut must not bypass the relay.
 
 ## Default and Compatibility Surface
 
-- bare `openalice` enters the local Supervisor TUI;
+- bare `openalice` enters the local Supervisor TUI and starts its Web relay;
 - `openalice tui` is the explicit equivalent for tests and scripts;
-- `openalice start` retains the existing foreground, browser-oriented
-  compatibility launcher and also selects the installed bundle by default;
-- `openalice server run|start|status|stop` remains available for managed remote
-  and existing scripts;
+- `openalice relay` runs the same Web controller without TUI presentation;
+- the old `openalice start` and `openalice open` browser shortcuts are retired;
+- `openalice server run|start|status|stop` remains available for managed
+  remote and existing scripts;
 - new code uses `run|up|status|down`;
 - `server status --json` retains its legacy raw status payload.
 
@@ -840,10 +867,10 @@ the Supervisor reads a versioned machine-local document at
 AliceProject map outside every selectable complete home.
 
 The same Supervisor root may contain `machines.json`, a separate versioned
-registry for the implicit local computer plus named SSH hosts. It is not part
-of any AliceProject and is not selected by `OPENALICE_HOME`. Writes are atomic
-and owner-private; unknown additive fields survive rewrites, while an invalid
-or newer known schema fails visibly. This registry remains separate from the
+registry for saved Herdr-style remote Machine profiles. It is not part of any
+AliceProject and is not selected by `OPENALICE_HOME`. Writes are atomic and
+owner-private; unknown additive fields survive rewrites, while an invalid or
+newer known schema fails visibly. This registry remains separate from the
 hashed `remote-targets.json` tunnel-port cache.
 
 Bare `openalice` and flag-less `openalice tui` must still open a machine-level
@@ -898,12 +925,11 @@ switches the live Supervisor view and records it as the next bare-start
 default; it does not stop, move, copy, or delete another project. Creating an
 AliceProject collects a validated lowercase key and separate complete home
 inside the TUI, rejects equal or nested registered homes, and selects the new
-entry atomically. The final Workspaces step defaults to Chat, allows optional
-Auto Quant and Auto Prediction (or none), then starts the selected project.
-The backend prepares those durable instances before the first page opens;
-Agent Sessions remain stopped. Failed preparation can be retried from Quick
-Start. CLI `create alice-project --workspaces` records the same selection
-for the next start. See [[docs/alice-project.md]]. An existing target must be empty or recognizable as an
+entry atomically. The final Workspaces step reviews Chat, Auto Quant, and Auto
+Prediction, then starts the selected project. The app opens first and prepares
+those durable instances asynchronously; Agent Sessions remain stopped. Failed
+preparation can be retried from Quick Start. The CLI records the same three
+defaults for the next app activation. See [[docs/alice-project.md]]. An existing target must be empty or recognizable as an
 OpenAlice complete home; an unrelated non-empty directory is rejected. A new
 target is created and canonicalized when registered, so a later missing
 registered Home is never silently recreated. A bare TUI launch falls back to
@@ -1058,10 +1084,10 @@ Human `status` reports:
 
 Dev-owned Runtimes may be inspected and opened. A healthy local `dev` or
 `cli-server` owner also advertises a verified loopback Web endpoint that
-Electron can open in the default browser without takeover. `down` still
-refuses both. Only a matching `cli-server` that advertises `runtime.stop`
-accepts the stop transaction. The Electron browser handoff is documented in
-[[docs/data-locations.md]].
+Electron can open in the default browser without takeover. A compatible
+Runtime accepts the stop transaction only when it
+advertises `runtime.stop`; its owner surface remains diagnostic. The Electron
+browser handoff is documented in [[docs/data-locations.md]].
 
 Source dev and built Guardian entries publish the same private, local
 `runtime.status` contract. In particular, `pnpm dev` advertises its owner PID,
@@ -1320,7 +1346,7 @@ Manually use an isolated home and unused port to walk:
 openalice up --home <temporary-home> --port <unused-port>
 openalice status --home <temporary-home>
 openalice status --home <temporary-home> --json
-openalice open --home <temporary-home>
+openalice relay
 openalice down --home <temporary-home>
 ```
 

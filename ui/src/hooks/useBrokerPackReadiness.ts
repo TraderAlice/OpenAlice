@@ -91,7 +91,7 @@ export function deriveAccountInteractionPolicy({
       ...readable,
       canTrade: false,
       reason: tradingMode === 'readonly'
-        ? 'Agent Permissions are in read-only mode.'
+        ? 'Trading mode is Readonly.'
         : 'Trading is unavailable in Lite mode.',
     }
   }

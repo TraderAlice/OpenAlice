@@ -55,7 +55,6 @@ describe('ProductSessionCoordinator', () => {
       agent: 'codex',
       namePrefix: 'x',
       latestTaskId: 'task-1',
-      state: 'running',
       surface: 'headless',
       fallbackTitle: 'Run the market close scan',
       sourceRunId: 'task-1',
@@ -66,7 +65,6 @@ describe('ProductSessionCoordinator', () => {
       wsId: WS,
       agent: 'codex',
       namePrefix: 'x',
-      state: 'running',
       surface: 'headless',
       now: 1_723_337_001_000,
     })
@@ -84,44 +82,35 @@ describe('ProductSessionCoordinator', () => {
     })
     expect(first.session).toMatchObject({
       resumeId: RESUME,
-      state: 'running',
+      state: 'paused',
       surface: 'headless',
       fallbackTitle: 'Run the market close scan',
       sourceRunId: 'task-1',
     })
   })
 
-  it('moves the same record between headless and interactive execution states', async () => {
+  it('reuses the same paused identity without claiming a running execution', async () => {
     const born = await coordinator.ensure({
       resumeId: RESUME,
       wsId: WS,
       agent: 'claude',
       namePrefix: 'c',
-      state: 'running',
       surface: 'headless',
       now: 1_723_337_000_000,
     })
 
-    await coordinator.transition({
-      wsId: WS,
-      resumeId: RESUME,
-      state: 'paused',
-      surface: 'headless',
-      now: 1_723_337_010_000,
-    })
     const interactive = await coordinator.ensure({
       resumeId: RESUME,
       wsId: WS,
       agent: 'claude',
       namePrefix: 'c',
-      state: 'running',
       surface: 'terminal',
       now: 1_723_337_020_000,
     })
 
     expect(interactive.session.id).toBe(born.session.id)
     expect(interactive.session).toMatchObject({
-      state: 'running',
+      state: 'paused',
       surface: 'terminal',
       lastActiveAt: new Date(1_723_337_020_000).toISOString(),
     })

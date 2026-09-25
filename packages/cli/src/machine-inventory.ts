@@ -14,6 +14,7 @@ import { resolveSupervisorRootPath, type ResolveSupervisorRootOptions } from './
 import { inspectRuntime } from './lifecycle.mjs'
 import type { RegisteredMachine } from './machine-registry.ts'
 import {
+  machineIsEnabled,
   readMachineRegistrySummary,
   type MachineRegistrySummary,
 } from './machine-registry.ts'
@@ -162,6 +163,7 @@ export async function inspectRegisteredMachine(
   machine: RegisteredMachine,
   options: MachineInventoryOptions = {},
 ): Promise<MachineInventory> {
+  if (!machineIsEnabled(machine)) return disabledMachine(machine)
   const runRemote = options.runRemote ?? runSshCommand
   try {
     const output = await runRemote({
@@ -226,6 +228,7 @@ export async function inspectMachineFleet(
 }
 
 export function registeredMachinePlaceholder(machine: RegisteredMachine): MachineInventory {
+  if (!machineIsEnabled(machine)) return disabledMachine(machine)
   return {
     key: machine.key,
     displayName: machine.displayName,
@@ -416,6 +419,10 @@ function classifyRemoteInventoryError(error: unknown): {
     return { connection: 'incompatible', code: 'ECLIMISSING', message: 'A compatible OpenAlice CLI is not installed on the remote machine.' }
   }
   return { connection: 'offline', code: 'ESSHUNAVAILABLE', message: 'The machine could not be reached over SSH.' }
+}
+
+function disabledMachine(machine: RegisteredMachine): MachineInventory {
+  return unavailableMachine(machine, 'offline', 'EMACHINEDISABLED', 'Machine is disabled; enable it before connecting.')
 }
 
 function unavailableMachine(

@@ -49,14 +49,14 @@ describe('runtime discovery sanitizer', () => {
       detail: 'token=super-secret-value',
     })
 
-    expect(status.class).toBe('owned_elsewhere')
+    expect(status.class).toBe('running')
     expect(status.owner).toEqual(expect.objectContaining({ surface: 'dev', pid: 42 }))
     expect(status.endpoints).toEqual({ web: 'http://127.0.0.1:5173' })
     expect(JSON.stringify(status)).not.toContain('secret-lock-token')
     expect(status.detail).toContain('[REDACTED]')
   })
 
-  it('classifies a healthy CLI Server as running and a future API as incompatible', () => {
+  it('classifies a healthy Runtime by health rather than launcher surface', () => {
     const running = classifyGuardianRuntimeStatus('/tmp/openalice-home', {
       state: 'running',
       owner: { surface: 'cli-server', pid: 7 },
@@ -64,6 +64,15 @@ describe('runtime discovery sanitizer', () => {
       endpoints: { web: 'http://127.0.0.1:47331' },
     })
     expect(running.class).toBe('running')
+
+    const docker = classifyGuardianRuntimeStatus('/tmp/openalice-home', {
+      state: 'running',
+      owner: { surface: 'docker', pid: 8 },
+      components: { alice: 'ready' },
+      endpoints: { web: 'http://127.0.0.1:47331' },
+    })
+    expect(docker.class).toBe('running')
+    expect(docker.owner?.surface).toBe('docker')
 
     const incompatible = classifyGuardianRuntimeStatus('/tmp/openalice-home', {
       control: { apiVersion: 3, minClientApiVersion: 2, capabilities: ['runtime.status'] },
@@ -246,7 +255,7 @@ describe('discovered runtime.status client', () => {
     try {
       const status = await readDiscoveredRuntimeStatus({ homeRoot: home })
       expect(status).toMatchObject({
-        class: 'owned_elsewhere',
+        class: 'running',
         owner: { surface: 'dev' },
         endpoints: { web: 'http://127.0.0.1:5173' },
       })

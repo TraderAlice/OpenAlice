@@ -2,7 +2,6 @@ import { BrowserWindow } from 'electron'
 import { configureWindowChrome, windowChromeOptions } from './window-chrome.js'
 import { createCompanion, type CompanionHandle } from './companion.js'
 
-/** Companion plus the window it creates, or `undefined` when disabled. */
 export interface AppWindow {
   readonly window: BrowserWindow
   readonly companion?: CompanionHandle

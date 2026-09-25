@@ -97,6 +97,10 @@ UTA source unavailable with an actionable error; it must not remove the UTA
 provider kind, rewrite `asVendor`, or silently route the same `barId` through a
 different vendor.
 
+The same per-UTA `asVendor` preference appears in Settings → Data → Market Data
+and in that UTA's Settings → Trading → Broker editor. Both entrances save the
+UTA configuration; Market Data has no separate copy of the preference.
+
 New K-line sources should implement the bar/provider contract and appear in bar
 source discovery. They should not require a new OpenBB-style asset-class client
 or a copied OpenBB route hierarchy.

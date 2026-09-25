@@ -14,39 +14,45 @@ description: >
 # Tool audit
 
 You are auditing OpenAlice's AI tool surface from the **developer** side — not
-inside a workspace. The tools reach you over the `openalice` MCP server (wired
-by the repo-root `.mcp.json`). This is dogfooding: actually use each tool, then
-say what's wrong and how to fix it.
+inside a workspace. Read [[docs/workspace-agent-guidance.md]] and
+[[docs/testing.md]] first. Audit the real CLI shims (`alice`, `traderhub`,
+`alice-uta`) and their live manifests; MCP is an additional surface where
+configured, not a prerequisite for CLI verification.
 
 ## 0. Preconditions — check first, don't skip
 
-1. **The backend must be running.** The MCP server is the live dev backend on
-   `:47332`. If the `openalice` tools are NOT in your available toolset, stop
-   and tell the developer to start it:
-   ```
-   pnpm dev      # Guardian spawns UTA + Alice (MCP on 47332) + Vite
-   ```
-   then reconnect the MCP server (`/mcp` in Claude Code) or restart the session.
+1. **Resolve the actual target and endpoint.** Use an isolated test home and
+   inspect its startup output, CLI routing environment, and runtime status.
+   Port 47332 is a historical default, not evidence of the current endpoint.
+   From outside a Workspace, use `openalice exec --project <key> <cli> ...`;
+   consult `--help` and the live manifest before selecting flags. For an
+   explicitly requested saved remote target, use
+   `openalice --machine <id-or-label> exec --project <key> <cli> ...`.
+   Remote paths belong to that host. An unavailable MCP connector does not
+   block source review or real CLI checks. Record unavailable surfaces instead
+   of changing user configuration or starting their normal broker environment.
 2. **You have the source.** This is the repo — read `src/tool/*.ts` (and
    `src/core/workspace-tool-center.ts` for workspace-scoped tools) to get the
    authoritative, complete tool list and each tool's intent, instead of relying
-   only on what the MCP toolset surfaces. Cross-check: a tool in the source but
-   missing from your toolset is itself a finding.
+   only on what a toolset surfaces. Cross-check the live export registry and
+   enabled capabilities before calling an absent tool a defect.
 
 ## 1. Each tool's example IS your starting fixture
 
-Every tool declares a runnable sample input via `.meta({ examples: [...] })` on
-its `inputSchema` (see `[[feedback_tool_example_input]]`). It shows up as
-`examples` in the tool's JSON schema. **Use `examples[0]` as the call input** —
-don't invent parameters. If a tool has no example, that's a finding (note it),
-and fall back to the minimal valid input you can infer from the schema.
+When the current schema includes `examples`, use one as the starting fixture
+after checking its side effects. Replace sample ids and paths with isolated
+fixtures. When absent, derive the smallest valid input from live help/schema
+and note the documentation gap. Do not assume every tool uses the same schema
+library or that a sample is safe to run against user state.
 
 ## 2. Procedure — per tool
 
 Go through **every** tool. For each:
 
 1. Read its `description` and input schema (params + the declared `example`).
-2. **Call it** with the example input — EXCEPT the safety list below.
+2. Invoke it through the real CLI shim where exported, using isolated fixtures
+   and the side-effect rules below. MCP-only calls do not prove argv parsing,
+   routing, flag help, or CLI output. Record which surface was actually used.
 3. Record a verdict on five axes:
    - **Runs?** — did it return a result, or error / hang / throw? Capture the
      exact error.
@@ -68,9 +74,12 @@ and review the example without invoking:
 > `placeOrder`, `modifyOrder`, `closePosition`, `cancelOrder`,
 > `tradingCommit`, `tradingPush`, `tradingSync`
 
-Safe to actually run: all read-only tools, `simulatePriceChange` (dry-run,
-read-only), and `entity_upsert` / `entity_search` (local entity store, no money
-or broker involved — `entity_upsert` writes local state, which is fine).
+Inspect each tool's current implementation and test lane before invocation;
+the names above are examples, not a complete mutation denylist. Run local
+writes such as `entity_upsert` only against isolated fixtures. External
+read-only calls require the task's external-read scope; broker reads and live
+paper work follow [[docs/uta-live-testing.md]]. Do not send messages, dispatch
+Issues, or alter user files merely because a tool has no trading effect.
 
 When a read-only tool errors because no broker account is configured / market
 is closed / a vendor key is missing, that's an **environment** result, not a
@@ -79,8 +88,9 @@ tool itself misbehave given a reasonable input?
 
 ## 4. Output — a review file
 
-Write the review to `tool-audit-report.md` at the repo root (it's a throwaway
-artifact — don't commit it). Structure:
+Return the review in the task; write a temporary artifact only if useful.
+Concrete deferred defects follow the GitHub Issue contract in
+[[docs/development-workflow.md]], not a repository TODO file. Structure:
 
 - A one-line **summary**: N tools, X ran clean, Y errored, Z have description/
   param/output issues.

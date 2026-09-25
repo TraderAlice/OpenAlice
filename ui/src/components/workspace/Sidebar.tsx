@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { formatRelativeTime } from '../../lib/intl';
 import type { ReactElement } from 'react';
-import { Archive, ChevronDown, ChevronRight, LayoutGrid, Library, LoaderCircle, Pencil, Play, Plus, RotateCcw, Settings as SettingsIcon, Square, Terminal, Trash2, type LucideIcon } from 'lucide-react';
+import { Info, Archive, ChevronDown, ChevronRight, LayoutGrid, Library, LoaderCircle, Pencil, Play, Plus, RotateCcw, Settings as SettingsIcon, Square, Terminal, Trash2, type LucideIcon } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
 import { headlessApi, type HeadlessTaskRecord } from '../../api/headless';
@@ -23,6 +23,7 @@ import { SelectionIndicator } from '../SelectionIndicator';
 import { projectHeadlessTaskPresentation } from './headless-task-presentation';
 import { Button } from '../ui/button';
 import { SidebarRow } from '../SidebarRow';
+import { useSessionDetailsDialog } from './session-details-store';
 import { SidebarChildRow, SidebarChildRowButton } from '../SidebarChildRow';
 
 /**
@@ -678,6 +679,8 @@ export function SessionRow(props: SessionRowProps): ReactElement {
   const restoreLabel = t('workspace.restoreSession', { title: display });
   const settingsLabel = t('workspace.sessionSettings.openFor', { title: display });
   const menuItems = [
+    { label: t('workspace.sessionDetails.title'), icon: <Info size={13} />, onSelect: () => useSessionDetailsDialog.getState().show(s) },
+    ...(headlessOccupying ? [{ label: t('sessionControl.interrupt'), icon: <Square size={11} />, onSelect: () => useSessionDetailsDialog.getState().show(s) }] : []),
     ...(!headlessOccupying && !(props.enterOnSelect && isPaused) ? [isPaused ? {
       label: resumeLabel,
       ariaLabel: resumeLabel,
@@ -715,6 +718,7 @@ export function SessionRow(props: SessionRowProps): ReactElement {
       icon: <Trash2 size={13} strokeWidth={2} />,
       onSelect: props.onDelete,
       danger: true,
+      disabled: headlessOccupying,
     }] : []),
   ];
   const selectLabel = headlessOccupying ? t('workspace.sessionRunning', { title: display }) : display;

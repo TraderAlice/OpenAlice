@@ -1,3 +1,4 @@
+import { SessionExecutionManager } from './session-execution-manager.js'
 import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -130,6 +131,8 @@ describe('SessionRegistry persistence', () => {
 
     const reloaded = await SessionRegistry.load(root, noopLogger)
     await reloaded.ensureLoaded(WS)
+    const executions = await SessionExecutionManager.open(join(root, 'executions.json'), record => reloaded.projectExecution(record))
+    await executions.recoverOrphans(reloaded.listAll())
     const r = reloaded.listFor(WS)[0]
 
     expect(r?.state).toBe('paused') // orphaned running flipped on reload

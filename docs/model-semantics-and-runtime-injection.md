@@ -10,6 +10,17 @@ Related guides: [[docs/project-structure.md]] and
 
 ## The Three-Layer Contract
 
+Model pickers discover IDs from the selected access source. Saved credentials
+use `GET /api/config/credentials/:slug/models?agent=…` with runtime compatibility
+validation; draft credentials use `POST /api/config/credentials/models`.
+OpenAI-compatible, Anthropic, and Google model-list APIs are read-only (no
+generation probe). Native access uses the selected runtime adapter in the selected Workspace.
+Both access sources return model IDs, labels and normalized reasoning/effort
+semantics together; native selectors and aliases remain intact. UI requests follow account changes, discard stale
+responses, and expose loading, empty, and retry states. Static suggestions
+and manual IDs remain a fallback when discovery is unavailable. An empty
+successful catalog is not replaced with guessed models.
+
 OpenAlice does not run an in-process model loop. It prepares a native Agent CLI
 to reach a selected model. That preparation has three distinct inputs:
 
@@ -23,7 +34,7 @@ Model selection and semantic resolution
                          │
                          ▼
 Per-process runtime projection
-  Claude Code / Codex / Cursor Agent / opencode / Oh My Pi / Pi argv + env for one immutable Session binding
+  Claude Code / Codex / Cursor Agent / opencode / Oh My Pi / Pi argv + env for the Session's current binding
 ```
 
 ### Credential access
@@ -39,9 +50,9 @@ vendor. One key declares three wires: OpenAI Chat and Responses at
 `/v1/messages`). The Anthropic skin uses Bearer auth
 (`ANTHROPIC_AUTH_TOKEN`). Suggested model IDs are OpenRouter slugs
 (`provider/model`); any other catalog ID may be pasted. The current coding
-default is `openai/gpt-5.6-luna`. The suggestion list also includes
-OpenRouter's current top-weekly text models (`deepseek/deepseek-v4-flash-0731`,
-`tencent/hy3`, `openai/gpt-5.6-luna`, `z-ai/glm-5.2`, `xiaomi/mimo-v2.5`).
+default is `openai/gpt-5.6-luna`. The suggestion list also includes current coding and general-purpose models
+(`deepseek/deepseek-v4.1-flash`, `tencent/hy3`, `openai/gpt-6-astra`,
+`z-ai/glm-5.3`, `xiaomi/mimo-v2.5`).
 Existing Custom credentials that already point at `openrouter.ai` keep
 working as `custom`.
 
@@ -49,6 +60,116 @@ working as `custom`.
 retyping the last model used with an account, but it does not make the model an
 intrinsic property of the credential and must never store a copied capability
 snapshot.
+
+### Provider model catalogs
+
+`CredentialAIProvider`, the Vault branch of `AIProvider` in
+`src/ai-providers/provider.ts`, is an immutable in-memory
+projection of one existing Credential record: one slug, key and configured
+endpoint map. `createAIProvider` selects the vendor implementation, such as
+`DeepSeekProvider`. Presets provide default suggestions and form values;
+provider instances own model discovery, model descriptions, and catalog
+identity. Credential storage, IDs, Session bindings and runtime injection are
+unchanged; there is no second provider/account registry.
+
+Discovery is optional (`discoverModels` is absent when unsupported). GLM and
+Cursor currently use bundled suggestions and manual IDs; GLM directory support
+is not enabled without a confirmed API contract. Native subscriptions do not
+become API discovery accounts. Other implementations reuse protocol transports,
+selecting a directory from the account's configured wires independently of the
+runtime's inference preference. Custom endpoints retain best-effort protocol
+discovery. Failed supported discovery preserves cached data; it does not change
+the capability to unsupported. No balance API is introduced.
+
+The route constructs the same provider abstraction for saved and draft
+credentials. Drafts may include their vendor and full configured wire map;
+legacy protocol-only requests use CustomProvider. `discoverySupported` lets
+the shared UI hook hide refresh for unsupported providers while preserving
+bundled suggestions and manual entry. Native discovery remains runtime-owned through `NativeAIProvider`.
+
+Saved API credentials use the Project-owned `ProviderModelCatalogStore` in
+`src/ai-providers/model-catalog.ts`. Successful lists are stored under
+`OPENALICE_HOME/data/model-catalog/providers/`. Reads immediately return the
+snapshot (or bundled suggestions when absent) and trigger one shared background
+refresh when the timestamp is 24 hours old. Explicit POST refreshes use the
+same endpoint. Failed refreshes preserve the list and timestamp, with a
+one-minute retry delay; successful empty lists remain empty. Incomplete or
+failed discovery is never committed.
+
+Cache identity covers the credential, vendor, endpoint, wire and key. Cache
+files contain an internal identity digest, timestamp, model display fields and
+validated model semantics; no key or raw provider response. Corrupt files are rebuilt. A successful
+refresh replaces membership rather than unioning with bundled suggestions;
+each model carries its normalized upstream semantics. The provider merges missing
+fields from the bundled registry on read. Explicit false and empty effort lists
+are authoritative; incompatible fallback defaults are removed. Reasoning support
+can be known while its switching mode or effort levels remain unknown.
+
+`AIProvider.resolveModel(id)` is the shared credential-scoped local resolution
+boundary for runtime injection and metadata. It reads the same validated catalog
+snapshot without starting network I/O; absent caches use bundled facts. Stored
+credentials and Session selection formats are unchanged. Anthropic capability
+objects, Google thinking/token limits, and OpenRouter directory extensions are
+normalized by discovery before caching. Provider request parameters do not imply
+specific effort levels or whether reasoning can be disabled.
+
+The public `useProviderModels` hook returns the account-scoped models, selected
+model, semantics, reasoning and effort options as one result. Credential forms,
+launch controls and the native-config editor consume it rather than looking up
+efforts separately. Model-only changes do not refetch the directory; account
+changes discard the preceding account's capabilities immediately. Its internal
+`useModelCatalog` transport hook follows an in-flight refresh without hiding
+existing options. Controls preserve current selections missing from the latest
+list and warn about the mismatch. Absence is not proof that inference is
+unavailable: catalog membership is advisory, never a launch gate. Refresh does
+not change `lastModel` or Session bindings. Draft discovery remains transient;
+native discovery stays runtime-owned and does not write provider snapshots.
+
+### Native AI providers
+
+`NativeAIProvider` projects the existing `credential.source: native` selection
+through the same `AIProvider` catalog boundary. It does not create a Vault
+record, read tokens, perform OAuth, or inject credentials. The child runtime
+owns login, token refresh, global/project configuration and custom providers.
+Session model/effort injection and persisted formats remain unchanged.
+
+Adapters optionally implement `discoverModels(cwd)`. The generic
+`GET /api/workspaces/agents/:agent/models` and POST refresh return the same
+catalog shape as saved credentials, consumed by `useProviderModels`. Unsupported
+adapters retain bundled/manual choices. Failed queries preserve the previous
+catalog and report an error; successful structured empty lists stay empty.
+
+Native catalogs reuse the catalog store with memory-only, one-minute snapshots,
+scoped by runtime and Workspace directory, invalidated by binary/environment
+identity. Login/configuration changes become visible on the next stale read or
+manual refresh; Alice does not claim to detect every runtime account change.
+Native discovery does not borrow API-vendor semantics for native aliases.
+Exact runtime suggestions can fill missing metadata, with live fields winning.
+
+Installed-runtime audit (2026-09-20):
+
+| Runtime | Read-only discovery | Capability data |
+| --- | --- | --- |
+| Codex | app-server initialize + paginated model/list; no thread creation | Per-model effort menu and default |
+| Claude Code | stream-json control initialize; no user message or persisted session | Effort menu, adaptive thinking, original aliases |
+| Oh My Pi | models --json | Provider-qualified selector, thinking tiers, reasoning and token limits |
+| Pi | ephemeral RPC get_available_models | Reasoning, token limits, thinkingLevelMap; null tiers excluded, extended tiers require mapping |
+| opencode | models --verbose | Provider-qualified ID, reasoning, token limits and recognized effort variants |
+| Cursor | models | Account model IDs/labels; effort encoded in native selectors stays intact |
+| Grok Build | models | IDs; known exact-model capabilities come from the existing runtime suggestions |
+| Antigravity | models | IDs/labels; known exact-model capabilities come from existing suggestions |
+
+Directory queries follow native startup configuration, including installed
+extensions/custom provider registrations, and never send an inference prompt.
+They use canonical binary detection, managed Pi's Node head where applicable,
+and Windows shim resolution. Children have a bounded lifetime/output size and
+are terminated after the query. Only allowlisted normalized model metadata
+leaves the process; raw errors, account data, headers and endpoints never reach
+the UI or catalog. Text-parser failures are errors, not successful empty lists.
+The directory describes what the runtime advertises, not a per-model inference
+permission guarantee. Unknown capability fields remain unknown; arbitrary
+opencode variants outside the shared effort vocabulary are not presented as
+standard effort levels.
 
 ### Model selection and semantics
 
@@ -95,7 +216,11 @@ runtime's native launch interface:
   Alice launches PATH `agy` only — never `antigravity` or `gemini`;
 - Grok Build `XAI_API_KEY` / optional `GROK_MODELS_BASE_URL` plus `--model`
   and `--effort`;
-- Oh My Pi provider env plus `--model` and `--thinking`;
+- Oh My Pi process-local provider registration (reusing Pi's explicit extension
+  and secret-bearing child environment) plus provider-qualified `--model` and
+  `--thinking`; generic Anthropic/OpenAI environment keys do not authenticate
+  MiniMax or register a custom gateway's model in OMP. Native bindings retain
+  OMP's own provider selection and login;
 - Codex provider arguments/environment plus `--model` and
   `model_reasoning_effort` configuration arguments.
 
@@ -211,15 +336,16 @@ Cursor omit the inapplicable wire shape. Keys and resolved provider payloads
 never enter the Workspace file.
 
 A fresh Session resolves that surface/Agent preference together with any
-explicit credential, model, or effort choice into one immutable, secret-free
+explicit credential, model, or effort choice into one durable, secret-free
 `SessionRuntimeBinding` owned by its `resumeId`. It is written to
 `.alice/sessions/<resumeId>.json` in the owning Workspace, as the `ai`
 object. An optional sibling `displayName` is the mutable coworker nametag
 and is not part of this binding. The global resume registry stores identity,
 lifecycle, and native-session mapping only; it hydrates the binding and
-nametag from the Workspace file when Alice starts and never flushes either
-into `resume-identities.json`. The binding is
-then projected on every launch of that Session:
+nametag from the Workspace file when Alice starts, periodically reconciles
+valid external dossier edits, and never flushes either into
+`resume-identities.json`. The binding is then projected on every launch of
+that Session:
 interactive TUI, structured Web surface, headless Issue turn, and exact resume.
 It is not a headless-only override.
 
@@ -457,11 +583,16 @@ bind that vault reference without writing it into the Workspace or changing the
 runtime's global state. An absent choice means
 “use the runtime default”; it does not mean “pick any compatible credential.”
 Existing Session bindings remain authoritative until that Session is retired
-or the user explicitly replaces the binding while it is paused. A paused edit
+or the binding is explicitly replaced while the Session is idle. A paused edit
 updates the secret-free `.alice/sessions/<resumeId>.json` `ai` object without
 waking the Session or rewriting `displayName`; the replacement credential,
-model, and effort take effect on its next resume. OpenAlice never imports a runtime-global secret into its
-vault or a Workspace.
+model, and effort take effect on its next resume. A valid external edit to the
+same dossier is reconciled on the scheduler tick (60 seconds by default); it
+must preserve the `version`, `resumeId`, `agent`, and `ai.credential` fields.
+Neither path changes an already-running process. An Issue assigned to the
+Session's exact `@resumeId` cannot override its binding in Issue frontmatter;
+Issue `model`/`effort` fields only seed fresh Sessions. OpenAlice never imports
+a runtime-global secret into its vault or a Workspace.
 
 Native “global” state follows the runtime actually launched. A source or
 user-installed Pi uses its own normal global agent directory. Packaged managed
@@ -550,6 +681,30 @@ Tests for this subsystem must cover:
 - diagnostic readiness failures never block an ordinary native launch or resume;
 - missing OpenAlice credentials never block a runtime that can manage its own access;
 - failed interactive resumes return a visible error and remain retryable.
+
+### September 20, 2026 preset audit
+
+Bundled suggestions were checked against the configured providers' live model
+catalogs and primary documentation. New defaults apply to new forms and
+unspecified selections; this audit does not rewrite stored model choices.
+
+- OpenAI/Codex adds GPT-6 Astra; API limits follow [the model page](https://developers.openai.com/api/docs/models/gpt-6-astra).
+  Native Codex subscription metadata retains its separate 272K context and
+  `ultra` effort, verified against the local CLI model catalog.
+- Anthropic adds [Fable 5.1](https://platform.claude.com/docs/en/models/fable-5-1/overview);
+  the direct API ID is `claude-fable-5-1`, while OpenRouter uses `anthropic/claude-fable-5.1`.
+  Opus 5 remains the normal default.
+- Google defaults to [Gemini 3.8 Flash](https://ai.google.dev/gemini-api/docs/models/gemini-3.8-flash),
+  retaining earlier general-purpose tiers; media-only models are not preset suggestions.
+- GLM defaults to [5.3](https://docs.z.ai/guides/llm/glm-5.3), whose reasoning is mandatory.
+  Exact direct-API context remains unspecified; OpenRouter's separately reported limits are retained.
+- DeepSeek uses the live `deepseek-flash` ID for [V4.1 Flash](https://api-docs.deepseek.com/news/news260910/).
+  Old model semantic entries remain resolvable. Volatile price figures are removed from form hints.
+- MiniMax adds the current M2.7/M2.5 HighSpeed choices. Kimi, LongCat and Grok
+  suggestions were checked and remain current. Cursor/native subscription
+  catalogs are runtime-owned, so API listings do not redefine their identifiers.
+- OpenRouter's compact suggestions use IDs verified in its public directory;
+  rankings are not embedded in labels. Its full live catalog stays separate.
 
 ## Registry Maintenance
 

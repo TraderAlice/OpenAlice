@@ -12,6 +12,7 @@ export const SCHEDULED_ISSUE_WATCHDOG_LATE_GRACE_MS = 60_000
 
 export type IssueRunFailureKind =
   | 'system_paused'
+  | 'interrupted'
   | 'launcher_restarted'
   | 'timeout'
   | 'launch_error'
@@ -46,6 +47,7 @@ export function issueRunFailure(
     | 'processStarted'
     | 'exitCode'
     | 'signal'
+    | 'interruptionReason'
     | 'killed'
     | 'error'
     | 'timeoutMs'
@@ -58,9 +60,9 @@ export function issueRunFailure(
 
   if (task.status === 'interrupted') {
     return {
-      kind: 'launcher_restarted',
-      title: 'Launcher restarted',
-      message: 'OpenAlice stopped while this run was active. It was not automatically retried.',
+      kind: task.interruptionReason ? 'interrupted' : 'launcher_restarted',
+      title: task.interruptionReason ? 'Run interrupted' : 'Launcher restarted',
+      message: task.interruptionReason ? `This run was interrupted (${task.interruptionReason}). Session admission controls when another run is allowed.` : 'OpenAlice stopped while this run was active. It was not automatically retried.',
       retryable: true,
     }
   }

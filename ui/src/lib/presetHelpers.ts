@@ -207,12 +207,13 @@ export function describeModelSemantics(semantics: ModelSemantics | null | undefi
   if (!semantics) return null
   const parts: string[] = []
   if (semantics.reasoning) {
-    parts.push({
+    if (semantics.reasoning.mode) parts.push({
       none: 'No reasoning mode',
       optional: 'Reasoning optional',
       adaptive: 'Adaptive reasoning',
       required: 'Reasoning always on',
     }[semantics.reasoning.mode])
+    else if (semantics.reasoning.supported !== undefined) parts.push(semantics.reasoning.supported ? 'Reasoning supported' : 'No reasoning mode')
     if (semantics.reasoning.defaultEffort) parts.push(`default effort: ${semantics.reasoning.defaultEffort}`)
     else if (semantics.reasoning.defaultEnabled !== undefined) {
       parts.push(`thinking default: ${semantics.reasoning.defaultEnabled ? 'on' : 'off'}`)

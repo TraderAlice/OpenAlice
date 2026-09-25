@@ -4,6 +4,8 @@ import { act, renderHook, waitFor } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import type { AgentInfo } from '../components/workspace/api'
+import { useWebSessionModelConfig } from './useWebSessionModelConfig'
+import type { SessionRecord } from '../components/workspace/api'
 import { resetAgentRuntimesStore } from './useAgentRuntimes'
 import {
   formatPinnedCapability,
@@ -204,5 +206,32 @@ describe('usePinnedRuntimeDraft', () => {
     rerender({ active: true })
     await waitFor(() => expect(result.current.dirty).toBe(false))
     expect(result.current.toRuntimeUpdate().reasoningEffort).toBe('high')
+  })
+})
+
+
+describe('live Session model configuration', () => {
+  const record = { agent: 'codex', runtime: { credentialSource: 'native', model: 'gpt-5.6-sol', reasoningEffort: 'high' } } as SessionRecord
+  it('restarts with the bound model and effort, without writing launch preferences', async () => {
+    const reconfigure = vi.fn(async () => undefined)
+    const { result } = renderHook(() => useWebSessionModelConfig({ workspaceId: 'w', record, agents: [codex], busy: false, reconfigure }))
+    await waitFor(() => expect(result.current.config.credentialSelectionReady).toBe(true))
+    expect(reconfigure).not.toHaveBeenCalled()
+    act(() => result.current.config.selectReasoningEffort('low'))
+    await waitFor(() => expect(reconfigure).toHaveBeenCalledWith({ credentialSource: 'native', model: 'gpt-5.6-sol', reasoningEffort: 'low' }))
+    await waitFor(() => expect(result.current.dirty).toBe(false))
+    expect(mocks.rememberQuickChatLaunch).not.toHaveBeenCalled()
+  })
+  it('does not repeatedly restart a rejected configuration and allows explicit retry', async () => {
+    const reconfigure = vi.fn().mockRejectedValue(new Error('restart failed'))
+    const { result } = renderHook(() => useWebSessionModelConfig({ workspaceId: 'w', record, agents: [codex], busy: false, reconfigure }))
+    await waitFor(() => expect(result.current.config.credentialSelectionReady).toBe(true))
+    act(() => result.current.config.selectReasoningEffort('low'))
+    await waitFor(() => expect(result.current.error).toBe('restart failed'))
+    expect(reconfigure).toHaveBeenCalledTimes(1)
+    reconfigure.mockResolvedValue(undefined)
+    act(() => result.current.retry())
+    await waitFor(() => expect(result.current.dirty).toBe(false))
+    expect(reconfigure).toHaveBeenCalledTimes(2)
   })
 })

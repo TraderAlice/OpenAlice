@@ -16,16 +16,15 @@ import {
   parseLifecycleArgs,
   runLifecycleCommand,
 } from '../src/lifecycle-command.mjs'
-import { formatLocalStartHelp, parseLocalStartArgs, startLocal } from '../src/local-start.mjs'
 import {
   formatObservabilityHelp,
   parseObservabilityArgs,
   runObservabilityCommand,
 } from '../src/observability-command.mjs'
 import { connectRemote, formatRemoteHelp, parseRemoteArgs } from '../src/remote.mjs'
+import { formatMachineTargetHelp, runMachineTarget } from '../src/machine-target-command.mjs'
 import { formatRollbackHelp, runRollbackCommand } from '../src/rollback.mjs'
 import { formatServerHelp, parseServerArgs, runServerCommand } from '../src/server.mjs'
-import { connectSsh, formatSshHelp, parseSshConnectArgs } from '../src/ssh-connect.mjs'
 import { formatUninstallHelp, runUninstallCommand } from '../src/uninstall.mjs'
 import { formatUpdateHelp, maybeNotifyUpdate, runUpdateCommand } from '../src/update.mjs'
 import {
@@ -62,17 +61,37 @@ export async function main(argv = process.argv.slice(2)) {
     process.stdout.write(`${readVersion()}\n`)
     return 0
   }
-  if (!command || command === 'start' || command.startsWith('-')) {
-    const startArgs = command === 'start' ? args : argv
-    if (startArgs.includes('--help') || startArgs.includes('-h')) {
-      process.stdout.write(formatLocalStartHelp())
+  if (command === '--remote') {
+    if (args.includes('--help') || args.includes('-h')) {
+      process.stdout.write(formatRemoteHelp())
       return 0
     }
-    const options = parseLocalStartArgs(startArgs)
-    await maybeNotifyUpdate({ enabled: options.checkUpdates })
-    return startLocal(options)
+    const options = parseRemoteArgs(args)
+    if (options.mode === 'connect' && !options.planOnly) {
+      throw usageError('Direct SSH browser attach is retired. Run "openalice machine add <user@host> --label <name>" to probe and register the Machine, then run "openalice" and choose its AliceProject in the GUI.')
+    }
+    return connectRemote(options)
   }
-  if (['up', 'run', 'down', 'status', 'open'].includes(command)) {
+  if (command === '--machine') {
+    const [selector, ...commandArgs] = args
+    if (!selector || selector === '--help' || selector === '-h' || commandArgs.includes('--help') && commandArgs.length === 1) {
+      process.stdout.write(formatMachineTargetHelp())
+      return selector ? 0 : 2
+    }
+    return runMachineTarget(selector, commandArgs, {
+      runLocal: async (localArgs) => (await import('../src/main.ts')).main(localArgs),
+    })
+  }
+  if (command === 'start') {
+    throw usageError('"openalice start" is retired. Run "openalice" for the TUI and relay GUI, or "openalice run" for a foreground Runtime without a GUI.')
+  }
+  if (!command || command.startsWith('-')) {
+    return (await import('../src/main.ts')).main(argv)
+  }
+  if (command === 'open') {
+    throw usageError('"openalice open" is retired. Run "openalice" for the TUI and relay GUI, or "openalice relay" for a GUI without the TUI.')
+  }
+  if (['up', 'run', 'down', 'status'].includes(command)) {
     if (args.includes('--help') || args.includes('-h')) {
       process.stdout.write(formatLifecycleHelp(command))
       return 0
@@ -108,13 +127,6 @@ Prints a completion script to stdout without modifying shell configuration.
     process.stdout.write(formatShellCompletion(args[0]))
     return 0
   }
-  if (command === 'ssh') {
-    if (args.includes('--help') || args.includes('-h')) {
-      process.stdout.write(formatSshHelp())
-      return 0
-    }
-    return connectSsh(parseSshConnectArgs(args))
-  }
   if (command === 'server') {
     const [action, ...serverArgs] = args
     if (!action || action === 'help' || action === '--help' || action === '-h' || serverArgs.includes('--help') || serverArgs.includes('-h')) {
@@ -122,13 +134,6 @@ Prints a completion script to stdout without modifying shell configuration.
       return 0
     }
     return runServerCommand(action, parseServerArgs(action, serverArgs))
-  }
-  if (command === 'remote') {
-    if (args.includes('--help') || args.includes('-h')) {
-      process.stdout.write(formatRemoteHelp())
-      return 0
-    }
-    return connectRemote(parseRemoteArgs(args))
   }
   if (command === 'update') {
     if (args.includes('--help') || args.includes('-h')) {
@@ -183,6 +188,10 @@ Prints a completion script to stdout without modifying shell configuration.
   error.code = 'EUSAGE'
   error.exitCode = 2
   throw error
+}
+
+function usageError(message) {
+  return Object.assign(new Error(message), { code: 'EUSAGE', exitCode: 2 })
 }
 
 function installedRuntimeInfo(productVersion) {

@@ -121,6 +121,17 @@ beforeEach(async () => {
 afterEach(cleanup)
 
 describe('AgentLaunchSelectors keyboard menus', () => {
+  it('offers API account setup when the native runtime has no saved credentials', async () => {
+    const user = userEvent.setup()
+    const onConfigureProvider = vi.fn()
+    const config = launchConfig({ credentials: [], credential: null, effectiveCredential: null, accessMode: 'native', needsCredential: false })
+    render(<AgentLaunchSelectors config={config} onConfigureProvider={onConfigureProvider} />)
+    await user.click(screen.getByRole('button', { name: i18n.t('chatLanding.selectCredential') }))
+    await user.click(await screen.findByRole('menuitem', { name: new RegExp(i18n.t('chatLanding.addApiAccount')) }))
+    expect(onConfigureProvider).toHaveBeenCalledOnce()
+    expect(config.selectRuntimeDefault).not.toHaveBeenCalled()
+  })
+
   it('keeps model and effort together above the phone breakpoint', () => {
     render(<AgentLaunchSelectors config={launchConfig()} onConfigureProvider={vi.fn()} />)
 
@@ -195,7 +206,7 @@ describe('AgentLaunchSelectors keyboard menus', () => {
     trigger.focus()
     await user.keyboard('{ArrowUp}')
     expect(screen.getByText(i18n.t('chatLanding.credentialMenuTitle', { runtime: 'OpenCode' }))).toBeTruthy()
-    expect(document.activeElement).toBe(screen.getByRole('menuitem', { name: /Backup/ }))
+    expect(document.activeElement).toBe(screen.getByRole('menuitem', { name: /Add API account/ }))
 
     await user.keyboard('{Escape}')
     expect(screen.queryByRole('menu')).toBeNull()
@@ -204,6 +215,8 @@ describe('AgentLaunchSelectors keyboard menus', () => {
     await user.keyboard('{ArrowDown}')
     expect(document.activeElement).toBe(screen.getByRole('menuitem', { name: /OpenCode account/ }))
     await user.keyboard('{End}')
+    expect(document.activeElement).toBe(screen.getByRole('menuitem', { name: /Add API account/ }))
+    await user.keyboard('{ArrowUp}')
     expect(document.activeElement).toBe(screen.getByRole('menuitem', { name: /Backup/ }))
     await user.keyboard('{Enter}')
     expect(selectCredential).toHaveBeenCalledWith('backup')
@@ -363,7 +376,7 @@ describe('AgentLaunchSelectors keyboard menus', () => {
     await user.click(screen.getByRole('menuitem', { name: /Model/ }))
     fireEvent.click(await screen.findByRole('menuitem', { name: i18n.t('chatLanding.customModel') }))
 
-    const input = await screen.findByRole('textbox', { name: i18n.t('chatLanding.customModelId') })
+    const input = await screen.findByRole('combobox', { name: i18n.t('chatLanding.customModelId') })
     await user.clear(input)
     await user.type(input, 'private-model-1')
     await user.click(screen.getByRole('button', { name: i18n.t('common.save') }))

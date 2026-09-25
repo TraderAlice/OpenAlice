@@ -1,3 +1,4 @@
+import { discoverNativeModels } from '../native-model-discovery.js';
 import { execFile } from 'node:child_process';
 import { readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
@@ -280,6 +281,7 @@ export async function syncOpenCodeWorkspaceTheme(cwd: string): Promise<boolean> 
  *     it as resumeHint → `opencode --session <id>` resumes by id.
  */
 export const opencodeAdapter: CliAdapter = {
+  discoverModels: (cwd) => discoverNativeModels('opencode', 'opencode', cwd),
   id: 'opencode',
   displayName: 'opencode',
   binary: 'opencode',

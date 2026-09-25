@@ -45,6 +45,18 @@ Current references:
 
 ## Executive Summary
 
+### OpenAlice command adaptation (2026-09-19)
+
+The current command work follows Herdr's global `--remote` / `--machine`
+selectors and saved-machine lifecycle. It is not file-schema or wire-protocol
+compatibility. See upstream [machine commands](https://github.com/herdrdev/herdr/blob/master/src/cli/machine.rs)
+and [target dispatch](https://github.com/herdrdev/herdr/blob/master/src/cli/target.rs).
+Herdr passes its saved session name to server preparation. OpenAlice has no
+equivalent named server session and rejects `--remote-session`; Agent Sessions
+and AliceProjects must not be silently substituted for that concept. Our
+persisted registry and operational contract belong to [[docs/data-locations.md]]
+and [[docs/remote-access.md]].
+
 Herdr is not merely a TUI launched inside SSH. Its default architecture is a
 persistent terminal Runtime with one or more thin clients:
 
@@ -343,7 +355,7 @@ settings. The directory and bridge socket are user-only. See
 
 OpenAlice should reuse its own installer/update trust chain for remote hosts.
 It should not copy Herdr's binary transfer implementation or grow a second
-remote-only installer inside `openalice remote`.
+remote-only installer inside `openalice --remote`.
 
 Concretely, OpenAlice SSH carries the approved installer command, not the full
 Runtime artifact. The remote host pulls the small control CLI from the same

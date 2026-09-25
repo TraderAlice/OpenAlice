@@ -1,3 +1,4 @@
+import { discoverNativeModels } from '../native-model-discovery.js';
 import { createReadStream, existsSync, statSync } from 'node:fs';
 import { mkdir, readFile, readdir, realpath, rename, writeFile } from 'node:fs/promises';
 import { dirname, join, resolve } from 'node:path';
@@ -192,9 +193,10 @@ function sortPiTrust(trust: Readonly<Record<string, boolean | null>>): Record<st
 }
 
 function piHeadlessApproveArgs(env: Readonly<Record<string, string | undefined>>): readonly string[] {
-  // Packaged desktop and Docker both use an OpenAlice-pinned Pi. Contributor
-  // dev intentionally uses whatever `pi` is on PATH; its install/version/trust
-  // policy belongs to that developer, so do not attach version-specific flags.
+  // Packaged desktop uses an OpenAlice-managed Pi and Docker uses its
+  // image-provided Pi. Contributor dev intentionally uses whatever `pi` is on
+  // PATH; its install/version/trust policy belongs to that developer, so do not
+  // attach version-specific flags.
   const profile = runtimeProfileFromEnv(env);
   return usesManagedPiBinary(env) || profile.launcher === 'docker' ? ['--approve'] : [];
 }
@@ -232,6 +234,7 @@ function piHeadlessApproveArgs(env: Readonly<Record<string, string | undefined>>
  * transcriptDiscovery stays 'none'.
  */
 export const piAdapter: CliAdapter = {
+  discoverModels: (cwd) => discoverNativeModels('pi', 'pi', cwd),
   id: 'pi',
   displayName: 'Pi',
   binary: 'pi',

@@ -1,4 +1,5 @@
 import {
+  type ReactNode,
   forwardRef,
   useEffect,
   useId,
@@ -47,7 +48,10 @@ import {
 import { formatContextWindow, type AgentLaunchConfigState } from '../../hooks/useAgentLaunchConfig'
 import { useAgentRuntimes } from '../../hooks/useAgentRuntimes'
 import { projectAgentRuntimeQuickAccess } from '../../lib/agentRuntimeQuickAccess'
+import { AgentRuntimeIcon } from '../../lib/agentRuntimeIcon'
 import { AIProviderIcon } from '@/lib/aiProviderIcon'
+import { ModelCatalogStatus } from '../ModelCatalogStatus'
+import { ModelCombobox } from '../credentials/PresetFields'
 import {
   AgentRuntimePicker,
   type AgentRuntimePickerHandle,
@@ -93,6 +97,9 @@ export interface AgentLaunchSelectorsProps {
   readonly labeled?: boolean
   /** Visually recede selectors into a composer toolbar until hover/focus. */
   readonly toolbar?: boolean
+  readonly disabled?: boolean
+  /** One provider/model/effort trigger for shared chat composers. */
+  readonly combinedAi?: boolean
   /** Present AI controls as full-width setting rows instead of composer chips. */
   readonly layout?: 'inline' | 'settings'
   /** Raise menus above a parent settings dialog. */
@@ -202,18 +209,101 @@ function AgentLaunchEffortEditor({
   )
 }
 
+function AgentLaunchAccessItems({ config, onConfigureProvider }: {
+  config: AgentLaunchConfigState; onConfigureProvider(): void;
+}) {
+  const { t } = useTranslation()
+  const runtimeName = config.selectedAgent?.displayName ?? t('chatLanding.runtimeFallback')
+  return (
+    <DropdownMenuGroup>
+      <DropdownMenuLabel className="border-b border-border/60 px-2.5 py-2 text-[11px]">
+        {t('chatLanding.credentialMenuTitle', { runtime: runtimeName })}
+      </DropdownMenuLabel>
+      {config.detectedCredential?.configured === true && (
+        <DropdownMenuItem
+          onClick={() => {
+            config.selectWorkspaceDefault()
+          }}
+          className={`min-h-11 px-2.5 py-2 text-[12px] ${config.accessMode === 'auto' ? 'text-primary' : 'text-foreground'}`}
+        >
+          <span className="min-w-0 flex-1">
+            <span className="block truncate">{t('chatLanding.workspaceAiAccess')}</span>
+            {config.detectedCredential.model && (
+              <span className="block truncate text-[10px] text-muted-foreground">{config.detectedCredential.model}</span>
+            )}
+          </span>
+          {config.accessMode === 'auto' && <SelectionCheckIcon />}
+        </DropdownMenuItem>
+      )}
+      <DropdownMenuItem
+        onClick={() => {
+          config.selectRuntimeDefault()
+        }}
+        className={`min-h-11 px-2.5 py-2 text-[12px] ${config.accessMode === 'native' ? 'text-primary' : 'text-foreground'}`}
+      >
+        <AgentRuntimeIcon agentId={config.effectiveAgent} className="h-4 w-4 shrink-0" />
+        <span className="min-w-0 flex-1">
+          <span className="block truncate">{t('chatLanding.runtimeAccount', { runtime: runtimeName })}</span>
+          <span className="block truncate text-[10px] text-muted-foreground">{t('chatLanding.runtimeAccountDetail', { runtime: runtimeName })}</span>
+        </span>
+        {config.accessMode === 'native' && <SelectionCheckIcon />}
+      </DropdownMenuItem>
+      {(config.credentials ?? []).map((credential) => {
+        const active = config.accessMode === 'vault' && credential.slug === config.effectiveCredential
+        return (
+          <DropdownMenuItem
+            key={credential.slug}
+            onClick={() => {
+              config.selectCredential(credential.slug)
+            }}
+            className={`min-h-11 px-2.5 py-2 text-[12px] ${active ? 'text-primary' : 'text-foreground'}`}
+          >
+            <span className="flex h-4 w-4 shrink-0 items-center justify-center text-muted-foreground">
+              <AIProviderIcon vendor={credential.vendor} className="h-4 w-4" />
+            </span>
+            <span className="min-w-0 flex-1">
+              <span className="block truncate">{credentialAccessLabel(credential)}</span>
+              <span className="block truncate text-[10px] text-muted-foreground">
+                {t('chatLanding.savedAccessDetail', { credential: credentialAccessDetail(credential) })}
+              </span>
+            </span>
+            {credential.resolvedModel && (
+              <span className="max-w-[100px] shrink-0 truncate text-[10px] text-muted-foreground">{credential.resolvedModel}</span>
+            )}
+            {active && <SelectionCheckIcon />}
+          </DropdownMenuItem>
+        )
+      })}
+      <DropdownMenuSeparator />
+      <DropdownMenuItem onClick={onConfigureProvider} className="min-h-11 px-2.5 py-2 text-[12px]">
+        <KeyRound className="h-4 w-4 shrink-0" aria-hidden />
+        <span className="min-w-0 flex-1">
+          <span className="block">{t('chatLanding.addApiAccount')}</span>
+          <span className="block text-[10px] text-muted-foreground">{t('chatLanding.addApiAccountDetail')}</span>
+        </span>
+      </DropdownMenuItem>
+    </DropdownMenuGroup>
+  )
+}
+
 function AgentLaunchInferenceMenu({
   config,
   menuPlacement,
   settings = false,
+  disabled = false,
+  access,
   menuPositionerClassName,
 }: {
   config: AgentLaunchConfigState
   menuPlacement: 'up' | 'down'
   settings?: boolean
+  disabled?: boolean
+  access?: { label: string; icon: ReactNode; items: ReactNode } | undefined
   menuPositionerClassName?: string
 }) {
   const { t } = useTranslation()
+  const [open, setOpen] = useState(false)
+  useEffect(() => { if (disabled) setOpen(false) }, [disabled])
   const pendingCustomModelRef = useRef(false)
   const [customModelOpen, setCustomModelOpen] = useState(false)
   const [customModelDraft, setCustomModelDraft] = useState('')
@@ -258,7 +348,7 @@ function AgentLaunchInferenceMenu({
 
   return (
     <>
-      <DropdownMenu
+      <DropdownMenu open={open && !disabled} onOpenChange={setOpen}
         onOpenChangeComplete={(open) => {
           if (open || !pendingCustomModelRef.current) return
           pendingCustomModelRef.current = false
@@ -268,13 +358,15 @@ function AgentLaunchInferenceMenu({
         <DropdownMenuTrigger
           render={<button
             type="button"
-            aria-label={t('chatLanding.selectModelAndEffort')}
+            disabled={disabled}
+            title={access?.label}
+            aria-label={access ? `${t('chatLanding.selectCredential')}, ${t('chatLanding.selectModelAndEffort')}` : t('chatLanding.selectModelAndEffort')}
             className={settings
               ? 'oa-pressable flex min-h-14 w-full min-w-0 items-center gap-3 rounded-lg border border-border/70 bg-muted/25 px-3 py-2 text-left transition-colors hover:bg-muted/45'
-              : 'oa-pressable inline-flex min-h-7 min-w-0 max-w-[340px] items-center gap-1 rounded-lg bg-transparent px-1.5 py-1 text-[12px] leading-[18px] font-medium text-foreground transition-colors hover:bg-muted'}
+              : 'oa-pressable inline-flex min-h-7 min-w-0 max-w-full items-center gap-1 rounded-lg bg-transparent px-1.5 py-1 text-[12px] leading-[18px] font-medium text-foreground transition-colors hover:bg-muted'}
           />}
         >
-          <Cpu className={settings ? 'h-4 w-4 shrink-0 text-muted-foreground' : 'h-3 w-3 shrink-0 text-muted-foreground'} />
+          {access?.icon ?? <Cpu className={settings ? 'h-4 w-4 shrink-0 text-muted-foreground' : 'h-3 w-3 shrink-0 text-muted-foreground'} />}
           {settings ? (
             <span className="min-w-0 flex-1">
               <span className="block text-[10px] font-medium text-muted-foreground">
@@ -287,7 +379,7 @@ function AgentLaunchInferenceMenu({
             </span>
           ) : (
             <>
-              <span className="max-w-[180px] shrink-0 truncate">{resolvedModel}</span>
+              <span className="min-w-0 max-w-[180px] truncate">{resolvedModel}</span>
               <span className="min-w-0 truncate text-muted-foreground">{resolvedEffort}</span>
             </>
           )}
@@ -298,16 +390,28 @@ function AgentLaunchInferenceMenu({
           side={settings ? 'top' : menuPlacement === 'down' ? 'bottom' : 'top'}
           sideOffset={6}
           positionerClassName={menuPositionerClassName}
-          aria-label={t('chatLanding.selectModelAndEffort')}
+          aria-label={access ? `${t('chatLanding.selectCredential')}, ${t('chatLanding.selectModelAndEffort')}` : t('chatLanding.selectModelAndEffort')}
           className="w-[300px] max-w-[calc(100vw-2rem)] rounded-xl border border-border/70 bg-secondary p-1.5 shadow-lg ring-0"
         >
+          {access && <DropdownMenuSub>
+            <DropdownMenuSubTrigger className="min-h-10 px-2.5 py-2 text-[12px]">
+              {access.icon}
+              <span>{t('chatLanding.selectCredential')}</span>
+              <span className="ml-auto max-w-[170px] truncate text-muted-foreground">{access.label}</span>
+            </DropdownMenuSubTrigger>
+            <DropdownMenuSubContent className="w-[300px] max-w-[calc(100vw-2rem)] max-h-80 overflow-y-auto bg-secondary p-1.5">
+              {access.items}
+            </DropdownMenuSubContent>
+          </DropdownMenuSub>}
           <DropdownMenuSub>
             <DropdownMenuSubTrigger className="min-h-10 px-2.5 py-2 text-[12px]">
               <span className="font-medium">{t('chatLanding.modelField')}</span>
               <span className="ml-auto max-w-[170px] truncate text-muted-foreground">{resolvedModel}</span>
             </DropdownMenuSubTrigger>
             <DropdownMenuSubContent className="w-[300px] max-w-[calc(100vw-2rem)] border border-border/70 bg-secondary p-1.5 shadow-lg ring-0">
+              <ModelCatalogStatus catalog={config.modelCatalog} selectedModel={config.launchModel ?? config.defaultModel} />
               <DropdownMenuRadioGroup
+                className="max-h-64 overflow-y-auto"
                 value={modelValue}
                 onValueChange={(value) => config.selectModel(value ? String(value) : null)}
               >
@@ -382,22 +486,16 @@ function AgentLaunchInferenceMenu({
         <DialogContent overlayClassName="z-[80]" className="z-[80]">
           <DialogHeader>
             <DialogTitle>{t('chatLanding.customModelTitle')}</DialogTitle>
-            <DialogDescription>{t('chatLanding.customModelDescription')}</DialogDescription>
+            <DialogDescription>{t('modelCatalog.selectHelp')}</DialogDescription>
           </DialogHeader>
-          <input
+          <ModelCombobox
             value={customModelDraft}
-            onChange={(event) => setCustomModelDraft(event.target.value)}
-            onKeyDown={(event) => {
-              if (event.key === 'Enter') {
-                event.preventDefault()
-                saveCustomModel()
-              }
-            }}
-            aria-label={t('chatLanding.customModelId')}
-            placeholder={t('chatLanding.customModelId')}
-            autoFocus
-            className={`${inputClass} min-h-9 text-[12px] leading-[18px]`}
+            suggestions={config.modelOptions}
+            onChange={setCustomModelDraft}
+            ariaLabel={t('chatLanding.customModelId')}
+            placeholder={t('modelCatalog.selectPlaceholder')}
           />
+          <ModelCatalogStatus catalog={config.modelCatalog} selectedModel={customModelDraft} />
           <DialogFooter>
             <DialogClose render={<Button variant="outline" />}>
               {t('common.cancel')}
@@ -425,6 +523,8 @@ export const AgentLaunchSelectors = forwardRef<AgentLaunchSelectorsHandle, Agent
     labeled = false,
     toolbar = false,
     layout = 'inline',
+    combinedAi = false,
+    disabled = false,
     menuPositionerClassName,
   },
   ref,
@@ -462,7 +562,12 @@ export const AgentLaunchSelectors = forwardRef<AgentLaunchSelectorsHandle, Agent
         ? t('chatLanding.workspaceAccessDetail', { credential: credentialAccessDetail(config.credential) })
         : t('chatLanding.savedAccessDetail', { credential: credentialAccessDetail(config.credential) })
       : config.detectedCredential?.model ?? t('chatLanding.workspaceAccessDetailFallback')
-  const selectedVaultVendor = config.accessMode === 'vault' ? config.credential?.vendor : undefined
+  const selectedVaultVendor = !nativeAccess ? config.credential?.vendor : undefined
+  const providerIcon = selectedVaultVendor
+    ? <AIProviderIcon vendor={selectedVaultVendor} className="h-4 w-4 shrink-0" />
+    : nativeAccess
+      ? <AgentRuntimeIcon agentId={config.effectiveAgent} className="h-4 w-4 shrink-0" />
+      : <KeyRound className="h-4 w-4 shrink-0" />
 
   useImperativeHandle(ref, () => ({
     openAgentMenu() {
@@ -499,7 +604,7 @@ export const AgentLaunchSelectors = forwardRef<AgentLaunchSelectorsHandle, Agent
         </Button>
       )}
 
-      {showAi && showAccess && config.canSelectCredential && !config.noCredentials && config.credentials && (
+      {!combinedAi && showAi && showAccess && config.canSelectCredential && !config.noCredentials && config.credentials && (
         <DropdownMenu open={credentialMenuOpen} onOpenChange={setCredentialMenuOpen}>
           <DropdownMenuTrigger
             type="button"
@@ -513,9 +618,7 @@ export const AgentLaunchSelectors = forwardRef<AgentLaunchSelectorsHandle, Agent
             className={`oa-pressable inline-flex min-w-0 items-center rounded-lg text-left text-muted-foreground transition-colors hover:text-foreground ${settingsLayout ? 'min-h-14 w-full gap-2 border border-border/70 bg-muted/25 px-3 py-2 hover:bg-muted/45' : toolbar ? 'min-h-7 max-w-[190px] gap-1.5 bg-transparent px-1.5 py-1 hover:bg-muted' : labeled ? 'min-h-12 w-full max-w-none gap-2 bg-muted px-2.5 py-1.5 sm:w-auto sm:max-w-[240px]' : 'min-h-8 max-w-[240px] gap-2 bg-muted px-2.5 py-1'}`}
           >
             <span className={`flex shrink-0 items-center justify-center ${settingsLayout ? 'h-[18px] w-[18px]' : 'h-4 w-4'}`}>
-              {selectedVaultVendor
-                ? <AIProviderIcon vendor={selectedVaultVendor} className="h-full w-full" />
-                : <KeyRound className={settingsLayout ? 'h-[18px] w-[18px]' : 'h-4 w-4'} />}
+              {providerIcon}
             </span>
             <span className="min-w-0 flex-1">
               {(labeled || settingsLayout) && (
@@ -537,65 +640,7 @@ export const AgentLaunchSelectors = forwardRef<AgentLaunchSelectorsHandle, Agent
             positionerClassName={menuPositionerClassName}
             className="w-[min(22rem,calc(100vw-2rem))] max-w-[calc(100vw-2rem)] rounded-xl border border-border/70 bg-secondary p-1.5 shadow-lg ring-0"
           >
-            <DropdownMenuGroup>
-              <DropdownMenuLabel className="border-b border-border/60 px-2.5 py-2 text-[11px]">
-                {t('chatLanding.credentialMenuTitle', { runtime: runtimeName })}
-              </DropdownMenuLabel>
-              {config.detectedCredential?.configured === true && (
-                <DropdownMenuItem
-                  onClick={() => {
-                    config.selectWorkspaceDefault()
-                  }}
-                  className={`min-h-11 px-2.5 py-2 text-[12px] ${config.accessMode === 'auto' ? 'text-primary' : 'text-foreground'}`}
-                >
-                  <span className="min-w-0 flex-1">
-                    <span className="block truncate">{t('chatLanding.workspaceAiAccess')}</span>
-                    {config.detectedCredential.model && (
-                      <span className="block truncate text-[10px] text-muted-foreground">{config.detectedCredential.model}</span>
-                    )}
-                  </span>
-                  {config.accessMode === 'auto' && <SelectionCheckIcon />}
-                </DropdownMenuItem>
-              )}
-              <DropdownMenuItem
-                onClick={() => {
-                  config.selectRuntimeDefault()
-                }}
-                className={`min-h-11 px-2.5 py-2 text-[12px] ${config.accessMode === 'native' ? 'text-primary' : 'text-foreground'}`}
-              >
-                <span className="min-w-0 flex-1">
-                  <span className="block truncate">{t('chatLanding.runtimeAccount', { runtime: runtimeName })}</span>
-                  <span className="block truncate text-[10px] text-muted-foreground">{t('chatLanding.runtimeAccountDetail', { runtime: runtimeName })}</span>
-                </span>
-                {config.accessMode === 'native' && <SelectionCheckIcon />}
-              </DropdownMenuItem>
-              {config.credentials.map((credential) => {
-                const active = config.accessMode === 'vault' && credential.slug === config.effectiveCredential
-                return (
-                  <DropdownMenuItem
-                    key={credential.slug}
-                    onClick={() => {
-                      config.selectCredential(credential.slug)
-                    }}
-                    className={`min-h-11 px-2.5 py-2 text-[12px] ${active ? 'text-primary' : 'text-foreground'}`}
-                  >
-                    <span className="flex h-4 w-4 shrink-0 items-center justify-center text-muted-foreground">
-                      <AIProviderIcon vendor={credential.vendor} className="h-4 w-4" />
-                    </span>
-                    <span className="min-w-0 flex-1">
-                      <span className="block truncate">{credentialAccessLabel(credential)}</span>
-                      <span className="block truncate text-[10px] text-muted-foreground">
-                        {t('chatLanding.savedAccessDetail', { credential: credentialAccessDetail(credential) })}
-                      </span>
-                    </span>
-                    {credential.resolvedModel && (
-                      <span className="max-w-[100px] shrink-0 truncate text-[10px] text-muted-foreground">{credential.resolvedModel}</span>
-                    )}
-                    {active && <SelectionCheckIcon />}
-                  </DropdownMenuItem>
-                )
-              })}
-            </DropdownMenuGroup>
+            <AgentLaunchAccessItems config={config} onConfigureProvider={onConfigureProvider} />
           </DropdownMenuContent>
         </DropdownMenu>
       )}
@@ -610,6 +655,12 @@ export const AgentLaunchSelectors = forwardRef<AgentLaunchSelectorsHandle, Agent
               config={config}
               menuPlacement={menuPlacement}
               settings={settingsLayout}
+              disabled={disabled}
+              access={combinedAi && showAccess ? {
+                label: selectedAccessLabel,
+                icon: providerIcon,
+                items: <AgentLaunchAccessItems config={config} onConfigureProvider={onConfigureProvider} />,
+              } : undefined}
               menuPositionerClassName={menuPositionerClassName}
             />
           ) : (

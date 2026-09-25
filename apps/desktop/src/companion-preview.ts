@@ -4,7 +4,7 @@ import { mkdtempSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import assert from 'node:assert/strict'
-import { createCompanion } from './companion.js'
+import { createCompanion, resizeCompanionWindow, setCompanionBounds } from './companion.js'
 
 const home = mkdtempSync(join(tmpdir(), 'openalice-companion-'))
 app.setPath('userData', home)
@@ -36,6 +36,16 @@ void app.whenReady().then(async () => {
   assert.equal(bubbleAlpha[0], 0, 'Speech bubble exterior must be transparent')
   assert.ok(bubbleAlpha[1] >= 250, 'Speech bubble interior must be effectively opaque')
   assert.equal(pet.isAlwaysOnTop(), true)
+  // Repeated native writes must keep the renderer size stable on fractional DPI.
+  const contentBounds = () => process.platform === 'win32' ? pet.getContentBounds() : pet.getBounds()
+  const initialBounds = contentBounds()
+  for (let i = 0; i < 200; i++) {
+    setCompanionBounds(pet, { ...initialBounds, x: initialBounds.x + i % 3, y: initialBounds.y + i % 3 })
+    const actual = contentBounds()
+    assert.equal(actual.width, initialBounds.width, `Companion width drifted after move ${i + 1}`)
+    assert.equal(actual.height, initialBounds.height, `Companion height drifted after move ${i + 1}`)
+  }
+  setCompanionBounds(pet, initialBounds)
   pet.focus()
   await new Promise(done => setTimeout(done, 150))
   await pet.webContents.executeJavaScript(`window.smokeEvents=[]; for(const name of ['pointerdown','pointerup','pointercancel','lostpointercapture','blur']) window.addEventListener(name, e => window.smokeEvents.push([name,e.clientX,e.clientY]),true)`)
@@ -71,7 +81,7 @@ void app.whenReady().then(async () => {
   writeFileSync(join(home, 'flipped.png'), (await pet.webContents.capturePage()).toPNG())
   // Window gutters must preserve portrait size and contain the bubble on both sides.
   for (const size of [170, 220, 280]) {
-    pet.setSize(Math.round(size * 2.7), Math.round(size * 1.65))
+    resizeCompanionWindow(pet, Math.round(size * 2.7), Math.round(size * 1.65))
     for (const flipped of [false, true]) {
       pet.webContents.send('openalice:companion:flip', flipped)
       await new Promise(done => setTimeout(done, 350))

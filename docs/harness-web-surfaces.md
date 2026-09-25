@@ -31,14 +31,15 @@ Workspace records the tuple used to create or last upgrade it in tracked
 `.alice/harness-source.json`; verification is derived from an exact catalog
 match and is never a mutable flag in the receipt.
 
-By default, version notices and upgrades use verified catalog entries only. An
-installation-level Harness preference may additionally discover the newest
-stable SemVer tag directly from the canonical repository. Pre-releases are
-excluded. Such a tag remains **not verified by OpenAlice** even when its
-immutable commit contains a valid manifest. The UI keeps that distinction
-visible and requires an explicit unverified apply action. Discovery never
-checks out code, installs dependencies, launches a capability, or silently
-upgrades a Workspace.
+On app activation, Auto Quant and Auto Prediction check their canonical
+repositories for the newest stable SemVer tag and automatically apply it by
+default, including tags outside OpenAlice's verified catalog. Pre-releases are
+excluded. The update status retains `verified: false` for an upstream tag that
+OpenAlice has not catalogued. Settings can disable automatic updates for each
+Workspace. The manual source-upgrade UI can include these releases when auto
+updates are enabled or the advanced Harness preference is enabled. Discovery
+alone does not check out code or install dependencies; apply remains subject to
+the merge and activity guards below.
 
 AutoQuant and Auto Prediction share one upgrade workflow. Preview fetches the
 exact target commit, validates its `harness.json` without checking it out,
@@ -107,8 +108,9 @@ arbitrary user target exists. The route is published after readiness and
 removed before termination. Generation checks make stale exits harmless.
 
 - Browser/server reuses Alice's loopback HTTP listener.
-- `pnpm dev` connects Studio to the Guardian-injected Alice backend port; Vite
-  owns no route table.
+- `pnpm dev` routes Studio through the local Web relay to its selected Runtime;
+  Vite owns no route table. `pnpm dev:no-relay` uses the Guardian-injected Alice
+  backend port directly for the older diagnostic path.
 - SSH browser uses the same Alice tunnel. The opaque Host header crosses it, so
   no second `ssh -L` is needed.
 - Electron keeps `app://openalice` for the product UI. Alice opens an ephemeral
@@ -122,6 +124,13 @@ origin. Harness frontends use current-origin relative assets, APIs, SSE, and
 WebSocket URLs and must explicitly permit the restricted OpenAlice iframe.
 
 ## Product interaction
+
+Harness initialization feedback is template-scoped UI runtime state, shared by
+setup pages and Quick Start. Switching pages does not cancel the backend
+creation request or lose its pending/error state; returning shows the running
+progress indicator or retained failure, and repeated clicks cannot start a
+second request. The indicator is indeterminate because creation exposes no
+percentage. This feedback survives route changes, not a full browser reload.
 
 AutoQuant and Prediction expose Studio beside New research after a default
 Workspace exists. Opening Studio starts idempotently and presents an announced

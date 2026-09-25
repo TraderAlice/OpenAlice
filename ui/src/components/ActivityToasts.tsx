@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next'
 
 import type { AgentActivitySignal } from '../hooks/useGlobalAgentActivity'
 import { useGlobalAgentActivity } from '../hooks/useGlobalAgentActivity'
+import { useActivitySessionLabel } from '../hooks/useWorkspaceData'
 import { useWorkspace } from '../tabs/store'
 
 const MAX_ANNOUNCED_SIGNALS = 200
@@ -26,6 +27,7 @@ function toastId(signal: AgentActivitySignal): string {
 export function ActivityToasts() {
   const { t } = useTranslation()
   const openOrFocus = useWorkspace((state) => state.openOrFocus)
+  const sessionLabel = useActivitySessionLabel()
   const { signals, loading, error } = useGlobalAgentActivity()
   const initialRevision = useRef<number | null>(null)
   const announced = useRef(new Map<string, number>())
@@ -69,8 +71,9 @@ export function ActivityToasts() {
           duration: 8_000,
         })
       } else if (signal.kind === 'inbox') {
-        toast.success(t('activityToast.inboxDelivered', { agent }), {
+        toast.success(t('activityToast.inboxDelivered', { agent: sessionLabel(signal) ?? signal.sessionRecordId ?? t('activityToast.session') }), {
           id,
+          description: signal.detail,
           duration: 4_000,
           action: {
             label: t('activityToast.viewInbox'),
@@ -107,7 +110,7 @@ export function ActivityToasts() {
       if (!oldest) break
       announced.current.delete(oldest)
     }
-  }, [error, loading, openOrFocus, signals, t])
+  }, [error, loading, openOrFocus, sessionLabel, signals, t])
 
   return null
 }

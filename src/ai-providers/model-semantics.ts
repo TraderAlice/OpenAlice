@@ -46,7 +46,9 @@ export interface ModelReasoningSemantics {
    * adaptive: the model/runtime dynamically chooses how much to reason
    * required: requests cannot disable reasoning
    */
-  mode: ModelReasoningMode
+  mode?: ModelReasoningMode
+  /** Capability can be known even when switching behavior is not advertised. */
+  supported?: boolean
   /** Provider-native effort levels, when the official contract documents them. */
   efforts?: ModelReasoningEffort[]
   /** Provider default. Omitted when the provider does not publish one. */
@@ -85,6 +87,12 @@ const GEMINI_3_CONTEXT = 1_048_576
  * - MiniMax OpenAI `reasoning_split`: https://platform.minimax.io/docs/api-reference/text-chat-openai
  * - Kimi K3/reasoning effort: https://www.kimi.com/help/kimi-api/api-model-selection
  * - DeepSeek models/limits: https://api-docs.deepseek.com/quick_start/pricing
+ * - September 2026 refresh: https://developers.openai.com/api/docs/models/gpt-6-astra
+ * - Claude Fable 5.1: https://platform.claude.com/docs/en/models/fable-5-1/overview
+ * - Gemini 3.8: https://ai.google.dev/gemini-api/docs/models/gemini-3.8-flash
+ * - GLM 5.3: https://docs.z.ai/guides/llm/glm-5.3
+ * - DeepSeek V4.1: https://api-docs.deepseek.com/news/news260910/
+ * - Gateway token limits: https://openrouter.ai/api/v1/models
  * - DeepSeek thinking: https://api-docs.deepseek.com/guides/thinking_mode
  * - LongCat Chat API: https://longcat.chat/platform/docs/api/chat.html
  * - xAI Grok 4.6 reasoning: https://docs.x.ai/developers/model-capabilities/text/reasoning
@@ -98,6 +106,11 @@ const GEMINI_3_CONTEXT = 1_048_576
  */
 export const MODEL_SEMANTICS_BY_VENDOR: Registry = {
   anthropic: {
+    'claude-fable-5-1': {
+      contextWindow: 1_000_000,
+      maxOutputTokens: 128_000,
+      reasoning: { mode: 'required', efforts: ['low', 'medium', 'high', 'xhigh', 'max'], defaultEffort: 'high', interleaved: true },
+    },
     'claude-fable-5': {
       contextWindow: 1_000_000,
       reasoning: {
@@ -150,6 +163,11 @@ export const MODEL_SEMANTICS_BY_VENDOR: Registry = {
     },
   },
   openai: {
+    'gpt-6-astra': {
+      contextWindow: 1_050_000,
+      maxOutputTokens: 128_000,
+      reasoning: { mode: 'required', efforts: ['low', 'medium', 'high', 'xhigh', 'max'] },
+    },
     'gpt-5.6': { contextWindow: 1_050_000, maxOutputTokens: 128_000, reasoning: OPENAI_56_REASONING },
     'gpt-5.6-sol': { contextWindow: 1_050_000, maxOutputTokens: 128_000, reasoning: OPENAI_56_REASONING },
     'gpt-5.6-terra': { contextWindow: 1_050_000, maxOutputTokens: 128_000, reasoning: OPENAI_56_REASONING },
@@ -192,6 +210,16 @@ export const MODEL_SEMANTICS_BY_VENDOR: Registry = {
     },
   },
   google: {
+    'gemini-3.8-flash': {
+      contextWindow: GEMINI_3_CONTEXT,
+      maxOutputTokens: 65_536,
+      reasoning: { mode: 'adaptive', efforts: ['low', 'medium', 'high'], defaultEffort: 'medium' },
+    },
+    'gemini-3.7-flash': {
+      contextWindow: GEMINI_3_CONTEXT,
+      maxOutputTokens: 65_536,
+      reasoning: { mode: 'adaptive', efforts: ['low', 'medium', 'high'], defaultEffort: 'medium' },
+    },
     'gemini-3.6-flash': {
       contextWindow: GEMINI_3_CONTEXT,
       maxOutputTokens: 65_536,
@@ -273,6 +301,11 @@ export const MODEL_SEMANTICS_BY_VENDOR: Registry = {
     },
   },
   glm: {
+    'glm-5.3': {
+      // Official docs specify 1M context without an exact token count.
+      maxOutputTokens: 128_000,
+      reasoning: { mode: 'required', efforts: ['low', 'high', 'max'], defaultEffort: 'max' },
+    },
     'glm-5.2': { reasoning: { mode: 'adaptive', efforts: ['high', 'max'] } },
   },
   kimi: {
@@ -299,6 +332,11 @@ export const MODEL_SEMANTICS_BY_VENDOR: Registry = {
     },
   },
   deepseek: {
+    'deepseek-flash': {
+      contextWindow: 1_000_000,
+      maxOutputTokens: 384_000,
+      reasoning: { mode: 'optional', efforts: ['low', 'high', 'max'], defaultEffort: 'high', interleaved: true },
+    },
     'deepseek-v4-flash': {
       contextWindow: 1_000_000,
       maxOutputTokens: 384_000,
@@ -329,6 +367,31 @@ export const MODEL_SEMANTICS_BY_VENDOR: Registry = {
     },
   },
   openrouter: {
+    'openai/gpt-6-astra': {
+      contextWindow: 1_050_000,
+      maxOutputTokens: 128_000,
+      reasoning: { mode: 'required', efforts: ['low', 'medium', 'high', 'xhigh', 'max'] },
+    },
+    'anthropic/claude-fable-5.1': {
+      contextWindow: 1_000_000,
+      maxOutputTokens: 128_000,
+      reasoning: { mode: 'required', efforts: ['low', 'medium', 'high', 'xhigh', 'max'], defaultEffort: 'high', interleaved: true },
+    },
+    'google/gemini-3.8-flash': {
+      contextWindow: GEMINI_3_CONTEXT,
+      maxOutputTokens: 65_536,
+      reasoning: { mode: 'adaptive', efforts: ['low', 'medium', 'high'], defaultEffort: 'medium' },
+    },
+    'deepseek/deepseek-v4.1-flash': {
+      contextWindow: 1_048_576,
+      maxOutputTokens: 384_000,
+      reasoning: { mode: 'optional', efforts: ['low', 'high', 'max'], defaultEffort: 'high', interleaved: true },
+    },
+    'z-ai/glm-5.3': {
+      contextWindow: 1_310_720,
+      maxOutputTokens: 131_072,
+      reasoning: { mode: 'required', efforts: ['low', 'high', 'max'], defaultEffort: 'max' },
+    },
     // OpenRouter slugs are `origin/id`. Facts below match the origin vendor
     // entries for the same generation when those exist; unknown pasted IDs
     // stay unregistered.
@@ -460,7 +523,7 @@ export function resolveModelSemantics(
 /** Coarse capability required by Pi and opencode custom-model registrations. */
 export function modelSupportsReasoning(semantics: ModelSemantics | null | undefined): boolean | null {
   const mode = semantics?.reasoning?.mode
-  if (mode === undefined) return null
+  if (mode === undefined) return semantics?.reasoning?.supported ?? null
   return mode !== 'none'
 }
 
@@ -475,7 +538,8 @@ export function describeModelSemantics(semantics: ModelSemantics | null | undefi
       adaptive: 'Adaptive reasoning',
       required: 'Reasoning always on',
     }
-    parts.push(labels[semantics.reasoning.mode])
+    if (semantics.reasoning.mode) parts.push(labels[semantics.reasoning.mode])
+    else if (semantics.reasoning.supported !== undefined) parts.push(semantics.reasoning.supported ? 'Reasoning supported' : 'No reasoning mode')
     if (semantics.reasoning.defaultEffort) parts.push(`default effort ${semantics.reasoning.defaultEffort}`)
     else if (semantics.reasoning.defaultEnabled !== undefined) {
       parts.push(`thinking default ${semantics.reasoning.defaultEnabled ? 'on' : 'off'}`)
@@ -493,4 +557,23 @@ function formatTokenCount(value: number): string {
   }
   if (value >= 1_000) return `${Math.round(value / 1_000)}K`
   return String(value)
+}
+
+/** Upstream facts override individual fallback fields, including false/empty values. */
+export function mergeModelSemantics(fallback: ModelSemantics | null | undefined, discovered: ModelSemantics | undefined): ModelSemantics | undefined {
+  if (!fallback && !discovered) return undefined
+  const merged: ModelSemantics = { ...fallback, ...discovered }
+  if (fallback?.reasoning || discovered?.reasoning) {
+    const live = discovered?.reasoning
+    const base = live?.supported === true && fallback?.reasoning?.mode === 'none' ? undefined : fallback?.reasoning
+    const reasoning = { ...base, ...live }
+    if (live?.supported === false || live?.mode === 'none') {
+      merged.reasoning = { supported: false, mode: 'none', efforts: [] }
+    } else {
+      if (reasoning.mode === 'none') reasoning.supported = false
+      if (reasoning.defaultEffort && reasoning.efforts && !reasoning.efforts.includes(reasoning.defaultEffort)) delete reasoning.defaultEffort
+      merged.reasoning = reasoning
+    }
+  }
+  return merged
 }

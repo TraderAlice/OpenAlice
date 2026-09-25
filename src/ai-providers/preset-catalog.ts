@@ -30,7 +30,7 @@ function withModelSemantics(vendor: string, models: ModelOption[]): ModelOption[
   })
 }
 
-const CODEX_56_CONTEXT_WINDOW = 272_000
+const CODEX_SUBSCRIPTION_CONTEXT_WINDOW = 272_000
 
 function codexSubscriptionModel(
   id: string,
@@ -41,7 +41,7 @@ function codexSubscriptionModel(
     id,
     label,
     semantics: {
-      contextWindow: CODEX_56_CONTEXT_WINDOW,
+      contextWindow: CODEX_SUBSCRIPTION_CONTEXT_WINDOW,
       reasoning: {
         mode: 'required',
         efforts: input.efforts,
@@ -140,7 +140,7 @@ export const CLAUDE_API: PresetDef = {
   description: 'Pay per token via Anthropic API',
   category: 'official',
   defaultName: 'Claude (API Key)',
-  hint: 'Model is switchable here or from the profile list anytime. Opus 5 is the recommended complex-agent default; Sonnet balances capability and cost, while Fable is the highest-capability premium tier.',
+  hint: 'Model is switchable here or from the profile list anytime. Opus 5 is the recommended complex-agent default; Sonnet balances capability and cost, while Fable 5.1 is the highest-capability premium tier.',
   zodSchema: z.object({
     backend: z.literal('agent-sdk'),
     loginMethod: z.literal('api-key'),
@@ -148,7 +148,7 @@ export const CLAUDE_API: PresetDef = {
     apiKey: z.string().min(1).describe('Anthropic API key'),
   }),
   models: withModelSemantics('anthropic', [
-    { id: 'claude-fable-5', label: 'Claude Fable 5 (Highest capability)' },
+    { id: 'claude-fable-5-1', label: 'Claude Fable 5.1 (Highest capability)' },
     { id: 'claude-opus-5', label: 'Claude Opus 5 (Complex agents)' },
     { id: 'claude-sonnet-5', label: 'Claude Sonnet 5 (Balanced)' },
     { id: 'claude-haiku-4-5', label: 'Claude Haiku 4.5 (Fastest)' },
@@ -177,9 +177,13 @@ export const CODEX_OAUTH: PresetDef = {
   zodSchema: z.object({
     backend: z.literal('codex'),
     loginMethod: z.literal('codex-oauth'),
-    model: z.string().default('gpt-5.6-sol').describe('Model'),
+    model: z.string().default('gpt-6-astra').describe('Model'),
   }),
   models: [
+    codexSubscriptionModel('gpt-6-astra', 'GPT 6 Astra (Highest capability)', {
+      efforts: ['low', 'medium', 'high', 'xhigh', 'max', 'ultra'],
+      defaultEffort: 'medium',
+    }),
     codexSubscriptionModel('gpt-5.6-sol', 'GPT 5.6 Sol (Power)', {
       efforts: ['low', 'medium', 'high', 'xhigh', 'max', 'ultra'],
       defaultEffort: 'low',
@@ -206,10 +210,11 @@ export const CODEX_API: PresetDef = {
   zodSchema: z.object({
     backend: z.literal('codex'),
     loginMethod: z.literal('api-key'),
-    model: z.string().default('gpt-5.6-sol').describe('Model'),
+    model: z.string().default('gpt-6-astra').describe('Model'),
     apiKey: z.string().min(1).describe('OpenAI API key'),
   }),
   models: withModelSemantics('openai', [
+    { id: 'gpt-6-astra', label: 'GPT 6 Astra (Highest capability)' },
     { id: 'gpt-5.6-sol', label: 'GPT 5.6 Sol (Power)' },
     { id: 'gpt-5.6-terra', label: 'GPT 5.6 Terra (Balanced)' },
     { id: 'gpt-5.6-luna', label: 'GPT 5.6 Luna (Cost-efficient)' },
@@ -224,7 +229,7 @@ export const CODEX_API: PresetDef = {
     apiKeyLabel: 'OpenAI API key',
     apiKeyPlaceholder: 'sk-...',
     apiKeyHelp: 'Use an OpenAI Platform API key. A ChatGPT subscription is a separate Codex CLI login and does not belong in this field.',
-    modelHelp: 'Choose a model enabled for this API project, or paste another exact ID. Sol is the flagship tier, Terra balances capability and cost, and Luna favors efficient high-volume work.',
+    modelHelp: 'Choose a model enabled for this API project, or paste another exact ID. Astra is the highest-capability tier, Sol covers complex everyday work, Terra balances capability and cost, and Luna favors efficient high-volume work.',
   },
   writeOnlyFields: ['apiKey'],
 }
@@ -293,16 +298,17 @@ export const OPENROUTER: PresetDef = {
   models: withModelSemantics('openrouter', [
     { id: 'openai/gpt-5.6-luna', label: 'GPT 5.6 Luna (Suggested default)' },
     { id: 'anthropic/claude-sonnet-5', label: 'Claude Sonnet 5' },
-    { id: 'deepseek/deepseek-v4-flash-0731', label: 'DeepSeek V4 Flash 0731 (Top weekly)' },
-    { id: 'tencent/hy3', label: 'Tencent Hy3 (Top weekly)' },
-    { id: 'z-ai/glm-5.2', label: 'GLM 5.2 (Top weekly)' },
-    { id: 'xiaomi/mimo-v2.5', label: 'Xiaomi MiMo-V2.5 (Top weekly)' },
+    { id: 'deepseek/deepseek-v4.1-flash', label: 'DeepSeek V4.1 Flash' },
+    { id: 'tencent/hy3', label: 'Tencent Hy3 (General-purpose)' },
+    { id: 'z-ai/glm-5.3', label: 'GLM 5.3' },
+    { id: 'xiaomi/mimo-v2.5', label: 'Xiaomi MiMo-V2.5 (General-purpose)' },
     { id: 'anthropic/claude-opus-5', label: 'Claude Opus 5 (Complex agents)' },
-    { id: 'anthropic/claude-fable-5', label: 'Claude Fable 5 (Highest capability)' },
+    { id: 'anthropic/claude-fable-5.1', label: 'Claude Fable 5.1 (Highest capability)' },
+    { id: 'openai/gpt-6-astra', label: 'GPT 6 Astra (Highest capability)' },
     { id: 'openai/gpt-5.6-sol', label: 'GPT 5.6 Sol (Power)' },
     { id: 'openai/gpt-5.6-terra', label: 'GPT 5.6 Terra (Balanced)' },
     { id: 'x-ai/grok-4.6', label: 'Grok 4.6 (Flagship)' },
-    { id: 'google/gemini-3.7-flash', label: 'Gemini 3.7 Flash (Fast / current)' },
+    { id: 'google/gemini-3.8-flash', label: 'Gemini 3.8 Flash (Fast / current)' },
     { id: 'minimax/minimax-m3', label: 'MiniMax M3' },
     { id: 'moonshotai/kimi-k3', label: 'Kimi K3' },
     { id: 'deepseek/deepseek-v4-pro', label: 'DeepSeek V4 Pro' },
@@ -311,7 +317,7 @@ export const OPENROUTER: PresetDef = {
     apiKeyLabel: 'OpenRouter API key',
     apiKeyPlaceholder: 'sk-or-...',
     apiKeyHelp: 'Use a key from openrouter.ai. This is not a first-party Anthropic, OpenAI, or Google key.',
-    modelHelp: 'Use the exact OpenRouter model ID (`provider/model`), or paste another ID from the OpenRouter catalog. GPT 5.6 Luna is the suggested default. The next suggestions mix current Anthropic tiers with this week\'s highest-volume text models.',
+    modelHelp: 'Use the exact OpenRouter model ID (`provider/model`), or paste another ID from the OpenRouter catalog. GPT 5.6 Luna is the suggested default. The suggestions cover current coding and general-purpose models; live discovery supplies the full catalog.',
   },
   writeOnlyFields: ['apiKey'],
 }
@@ -328,11 +334,13 @@ export const GEMINI: PresetDef = {
   zodSchema: z.object({
     backend: z.literal('vercel-ai-sdk'),
     provider: z.literal('google'),
-    model: z.string().default('gemini-3.6-flash').describe('Model'),
+    model: z.string().default('gemini-3.8-flash').describe('Model'),
     apiKey: z.string().min(1).describe('Google AI API key'),
   }),
   models: withModelSemantics('google', [
-    { id: 'gemini-3.6-flash', label: 'Gemini 3.6 Flash (Agentic default)' },
+    { id: 'gemini-3.8-flash', label: 'Gemini 3.8 Flash (Agentic default)' },
+    { id: 'gemini-3.7-flash', label: 'Gemini 3.7 Flash (Previous generation)' },
+    { id: 'gemini-3.6-flash', label: 'Gemini 3.6 Flash (Previous generation)' },
     { id: 'gemini-3.5-flash-lite', label: 'Gemini 3.5 Flash-Lite (Fastest / economical)' },
     { id: 'gemini-3.5-flash', label: 'Gemini 3.5 Flash (Previous generation)' },
     { id: 'gemini-3.1-pro-preview', label: 'Gemini 3.1 Pro (Previous preview, paid)' },
@@ -349,7 +357,7 @@ export const GEMINI: PresetDef = {
     apiKeyLabel: 'Google AI API key',
     apiKeyPlaceholder: 'AQ... or AIza...',
     apiKeyHelp: 'Use a Gemini API key from Google AI Studio. Current AQ authorization keys and legacy AIza keys are both supported.',
-    modelHelp: 'Choose a general-purpose Gemini model available to this project, or paste another exact model ID. Gemini 3.6 Flash is the current balanced agentic default; Gemini 3.5 Flash-Lite favors throughput and cost.',
+    modelHelp: 'Choose a general-purpose Gemini model available to this project, or paste another exact model ID. Gemini 3.8 Flash is the current balanced agentic default; Gemini 3.5 Flash-Lite favors throughput and cost.',
   },
   writeOnlyFields: ['apiKey'],
 }
@@ -386,6 +394,9 @@ export const MINIMAX: PresetDef = {
   models: withModelSemantics('minimax', [
     { id: 'MiniMax-M3', label: 'MiniMax M3' },
     { id: 'MiniMax-M2.7', label: 'MiniMax M2.7' },
+    { id: 'MiniMax-M2.7-highspeed', label: 'MiniMax M2.7 HighSpeed' },
+    { id: 'MiniMax-M2.5', label: 'MiniMax M2.5' },
+    { id: 'MiniMax-M2.5-highspeed', label: 'MiniMax M2.5 HighSpeed' },
   ]),
   setup: {
     apiKeyLabel: 'MiniMax API key',
@@ -404,12 +415,12 @@ export const GLM: PresetDef = {
   description: 'Zhipu GLM models via Claude Agent SDK (Anthropic-compatible)',
   category: 'third-party',
   defaultName: 'GLM',
-  hint: 'China console: bigmodel.cn — International console: z.ai. API keys are region-locked. GLM 5.2 is the current flagship, served on both regions.',
+  hint: 'China console: bigmodel.cn — International console: z.ai. API keys are region-locked. GLM 5.3 is the current flagship, served on both regions.',
   zodSchema: z.object({
     backend: z.literal('agent-sdk'),
     loginMethod: z.literal('api-key'),
     baseUrl: z.string().default('https://open.bigmodel.cn/api/anthropic').describe('API endpoint'),
-    model: z.string().default('glm-5.2').describe('Model'),
+    model: z.string().default('glm-5.3').describe('Model'),
     apiKey: z.string().min(1).describe('GLM API key'),
   }),
   regions: [
@@ -421,7 +432,8 @@ export const GLM: PresetDef = {
     } },
   ],
   models: withModelSemantics('glm', [
-    { id: 'glm-5.2', label: 'GLM 5.2' },
+    { id: 'glm-5.3', label: 'GLM 5.3' },
+    { id: 'glm-5.2', label: 'GLM 5.2 (Previous generation)' },
   ]),
   setup: {
     apiKeyLabel: 'GLM API key',
@@ -484,7 +496,7 @@ export const DEEPSEEK: PresetDef = {
   description: 'DeepSeek models via Claude Agent SDK (Anthropic-compatible)',
   category: 'third-party',
   defaultName: 'DeepSeek',
-  hint: 'Get your API key at platform.deepseek.com. Single platform — no regional split. V4 Flash costs $0.0028/M cache-hit input, $0.14/M cache-miss input, and $0.28/M output.',
+  hint: 'Get your API key at platform.deepseek.com. Single platform — no regional split. The current Flash model is DeepSeek V4.1 Flash, exposed as `deepseek-flash`. Check the platform for current pricing.',
   zodSchema: z.object({
     backend: z.literal('agent-sdk'),
     loginMethod: z.literal('api-key'),
@@ -499,7 +511,7 @@ export const DEEPSEEK: PresetDef = {
   ],
   models: withModelSemantics('deepseek', [
     { id: 'deepseek-v4-pro', label: 'DeepSeek V4 Pro (flagship)' },
-    { id: 'deepseek-v4-flash', label: 'DeepSeek V4 Flash (fast / economical)' },
+    { id: 'deepseek-flash', label: 'DeepSeek V4.1 Flash (fast / economical)' },
   ]),
   setup: {
     apiKeyLabel: 'DeepSeek API key',
@@ -631,11 +643,11 @@ export const PRESET_CATALOG: PresetDef[] = [
  */
 export const DEFAULT_MODEL_BY_VENDOR: Record<string, string> = {
   anthropic: 'claude-opus-5',
-  openai: 'gpt-5.6-sol',
+  openai: 'gpt-6-astra',
   xai: 'grok-4.6',
-  google: 'gemini-3.6-flash',
+  google: 'gemini-3.8-flash',
   minimax: 'MiniMax-M3',
-  glm: 'glm-5.2',
+  glm: 'glm-5.3',
   kimi: 'kimi-k3',
   deepseek: 'deepseek-v4-pro',
   longcat: 'LongCat-2.0',

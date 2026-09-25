@@ -1,3 +1,4 @@
+import { discoverNativeModels } from '../native-model-discovery.js';
 import { existsSync, realpathSync } from 'node:fs';
 import { readdir, readFile, realpath, stat } from 'node:fs/promises';
 import { homedir } from 'node:os';
@@ -294,6 +295,7 @@ async function readSummary(path: string): Promise<Record<string, unknown> | null
  * Native `--model` suggestions live in `grok-models.ts` (live `grok models`).
  */
 export const grokAdapter: CliAdapter = {
+  discoverModels: (cwd) => discoverNativeModels('grok', 'grok', cwd),
   id: 'grok',
   displayName: 'Grok Build',
   binary: 'grok',

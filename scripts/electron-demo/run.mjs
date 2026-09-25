@@ -1,7 +1,8 @@
-import { spawnSync, spawn } from 'node:child_process'
+import { spawnSync } from 'node:child_process'
 import { createRequire } from 'node:module'
 import { fileURLToPath } from 'node:url'
 import { build } from 'tsup'
+import { spawnDesktopSmoke, stopDesktopSmoke } from '../desktop-smoke-process.mjs'
 const root = fileURLToPath(new URL('../../', import.meta.url))
 const require = createRequire(new URL('../../apps/desktop/package.json', import.meta.url))
 const flags = new Set(process.argv.slice(2))
@@ -33,8 +34,21 @@ if (!process.argv.includes('--skip-build')) {
     banner: { js: "import { createRequire } from 'node:module'; const require = createRequire(import.meta.url);" },
   })
 }
-const child = spawn(require('electron'), [fileURLToPath(new URL('../../dist/electron/demo-main.js', import.meta.url)), ...(process.argv.includes('--smoke') ? ['--demo-smoke'] : [])], {
+const child = spawnDesktopSmoke(require('electron'), [fileURLToPath(new URL('../../dist/electron/demo-main.js', import.meta.url)), ...(process.argv.includes('--smoke') ? ['--demo-smoke'] : [])], {
   cwd: root, stdio: 'inherit', env: { ...process.env, ELECTRON_RUN_AS_NODE: '' },
 })
-for (const signal of ['SIGINT', 'SIGTERM']) process.on(signal, () => child.kill(signal))
-child.on('exit', code => { process.exitCode = code ?? 1 })
+let stopping = null
+let requestedExitCode = null
+const stop = () => stopping ??= stopDesktopSmoke(child)
+for (const signal of ['SIGINT', 'SIGTERM']) {
+  process.once(signal, () => {
+    requestedExitCode = signal === 'SIGINT' ? 130 : 143
+    void stop().then(() => { process.exitCode = requestedExitCode })
+      .catch((error) => { console.error(error); process.exitCode = 1 })
+  })
+}
+child.on('error', (error) => { console.error(error); process.exitCode = 1 })
+child.on('exit', (code) => {
+  void stop().then(() => { process.exitCode = requestedExitCode ?? code ?? 1 })
+    .catch((error) => { console.error(error); process.exitCode = 1 })
+})

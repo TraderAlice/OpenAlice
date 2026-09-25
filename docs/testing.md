@@ -57,8 +57,7 @@ System commands intentionally expose their prerequisite and artifact boundary:
 
 Some acceptance commands primarily own an artifact lifecycle rather than a
 test selection. Keep their established owner namespace instead of adding a
-decorative `test:*` alias: examples include `pnpm docker:smoke`,
-`pnpm electron:smoke:*`, Electron packing, Broker Pack acceptance, and release
+decorative `test:*` alias: examples include `pnpm electron:smoke:*`, Electron packing, Broker Pack acceptance, and release
 candidate builders. Likewise, the package-manager artifact smoke requires
 explicit artifact arguments and is not a parameterless root test command.
 
@@ -88,6 +87,10 @@ pass.
 selection, side effects, prerequisites, and the planned invocation without
 loading a test module, probing credentials, or proving that those prerequisites
 exist. Arguments after `--` are forwarded to Vitest.
+
+Docker fixtures under `scripts/` are disposable installer and SSH test hosts;
+they are not supported deployment images. OpenAlice does not ship a backend
+Dockerfile, Compose recipe, or container supervisor.
 
 The generic selector does not execute the `system` inventory; use the matching
 `test:system:*` command. Run `pnpm test:select --help` for the live catalog.

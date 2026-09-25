@@ -1,3 +1,4 @@
+import { SessionExecutionManager } from './session-execution-manager.js'
 import { existsSync } from 'node:fs'
 import { chmod, mkdir, mkdtemp, readFile, rm, symlink, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
@@ -84,6 +85,8 @@ beforeEach(async () => {
   const tasks = await HeadlessTaskRegistry.load(join(root, 'state', 'headless-tasks.json'), noopLogger)
   const pool = { get: () => undefined, disposeToken: () => false } as unknown as SessionPool
   operationGuard = new WorkspaceOperationGuard()
+  const executions = await SessionExecutionManager.open(join(root, 'executions.json'), execution => sessions.projectExecution(execution))
+  await executions.recoverOrphans(sessions.listAll())
   lifecycle = new WorkspaceLifecycleManager({
     launcherRoot: root,
     registry,
@@ -93,6 +96,7 @@ beforeEach(async () => {
     scrollbackStore: new ScrollbackStore(join(root, 'state'), noopLogger),
     headlessTasks: tasks,
     pool,
+    executions,
     operationGuard,
     logger: noopLogger,
   })

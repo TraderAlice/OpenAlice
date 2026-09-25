@@ -6,6 +6,7 @@ import { createServer } from 'node:net'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 import { fileURLToPath } from 'node:url'
+import { desktopDevExecutable, spawnDesktopSmoke, stopDesktopSmoke } from './desktop-smoke-process.mjs'
 
 const repoRoot = fileURLToPath(new URL('..', import.meta.url))
 const pnpmCommand = process.platform === 'win32' ? (process.env.ComSpec ?? 'cmd.exe') : 'pnpm'
@@ -120,7 +121,7 @@ console.log(`[desktop-pty-smoke] data: ${smokeHome}`)
 console.log(`[desktop-pty-smoke] workspaces: ${smokeWorkspaces}`)
 console.log(`[desktop-pty-smoke] uta port: ${utaPort}`)
 
-const child = spawn(pnpmCommand, pnpmArgs(['-F', '@traderalice/desktop', 'dev']), {
+const child = spawnDesktopSmoke(desktopDevExecutable(), [join(repoRoot, 'dist', 'electron', 'main.js')], {
   cwd: join(repoRoot, 'apps', 'desktop'),
   stdio: ['ignore', 'pipe', 'pipe'],
   env: {
@@ -173,23 +174,32 @@ const finish = async (code, message) => {
   }
   settled = true
   clearTimeout(timer)
-  terminateTestProcess(child, 'SIGTERM')
   if (recoveryOwner) terminateTestProcess(recoveryOwner, 'SIGKILL')
   // On Windows, taskkill can return before Git Bash/node-pty releases its cwd
   // directory handle. Wait for the process events, then use Node's bounded
   // EBUSY/EPERM retry loop. A persistent cleanup failure still fails the smoke
   // so a real leaked process is never hidden as a successful takeover.
-  await Promise.all([
-    waitForProcessExit(child),
+  const cleanup = await Promise.allSettled([
+    stopDesktopSmoke(child),
     ...(recoveryOwner ? [waitForProcessExit(recoveryOwner)] : []),
   ])
-  if (!keep) {
+  let processCleanupFailed = false
+  for (const result of cleanup) {
+    if (result.status === 'rejected') {
+      processCleanupFailed = true
+      code = 1
+      message = `\n[desktop-pty-smoke] process cleanup failed: ${result.reason instanceof Error ? result.reason.message : String(result.reason)}`
+    }
+  }
+  if (!keep && !processCleanupFailed) {
     try {
       await rm(smokeRoot, { recursive: true, force: true, maxRetries: 20, retryDelay: 250 })
     } catch (err) {
       code = 1
       message = `\n[desktop-pty-smoke] cleanup failed after process exit: ${err instanceof Error ? err.message : String(err)}`
     }
+  } else if (processCleanupFailed) {
+    console.error(`[desktop-pty-smoke] kept temporary data for failed process cleanup: ${smokeRoot}`)
   }
   if (message) console.log(message)
   process.exit(code)
@@ -259,6 +269,10 @@ const onData = (chunk) => {
 
 child.stdout.on('data', onData)
 child.stderr.on('data', onData)
+child.on('error', (error) => { void finish(1, `\n[desktop-pty-smoke] Electron failed to start: ${error.message}`) })
+
+process.once('SIGINT', () => { void finish(130, '\n[desktop-pty-smoke] interrupted') })
+process.once('SIGTERM', () => { void finish(143, '\n[desktop-pty-smoke] terminated') })
 
 const timer = setTimeout(() => {
   console.error('\n[desktop-pty-smoke] timed out')

@@ -3,9 +3,8 @@
  * credential vault and the per-workspace AI config modal.
  *
  * - ModelCombobox: an editable input with an explicit suggestion popover. The
- *   suggestions curb typos (minimax-m3 vs MiniMax-M3) for known vendors while
- *   still allowing a free-typed model id (no version-lock) — and for custom /
- *   unrecognized providers it's just a plain input.
+ *   suggestions come from the selected provider's model API or preset fallback.
+ *   Free-typed IDs remain available for providers without a model-list API.
  */
 
 import { useId, useRef, useState } from 'react'
@@ -22,7 +21,7 @@ export function ModelCombobox({
   suggestionsLabel,
 }: {
   value: string
-  suggestions: LabeledOption[]
+  suggestions: readonly LabeledOption[]
   onChange: (v: string) => void
   placeholder?: string
   ariaLabel?: string

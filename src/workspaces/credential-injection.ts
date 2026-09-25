@@ -10,8 +10,9 @@
  * `authMode` / `wireApi` knobs) via `overrides`. The vault's `lastModel` is a
  * remembered default, not a lock; callers may still supply a per-use model.
  *
- * `credentialToWorkspaceAiCred` remains the shared, side-effect-free projection
- * helper. `injectWorkspaceCredentials` is retained only for explicit export to
+ * `credentialToWorkspaceAiCred` remains the shared projection helper. With a
+ * credential slug it reads provider-owned local model facts; it never performs
+ * network I/O or writes configuration. `injectWorkspaceCredentials` is retained only for explicit export to
  * a native CLI; managed Sessions must use Session runtime bindings instead.
  */
 
@@ -22,7 +23,8 @@ import {
   type CredentialWireShape,
 } from '@/core/config.js'
 import { DEFAULT_MODEL_BY_VENDOR } from '@/ai-providers/preset-catalog.js'
-import { modelSupportsReasoning, resolveModelSemantics } from '@/ai-providers/model-semantics.js'
+import { createAIProvider } from '@/ai-providers/provider.js'
+import { modelSupportsReasoning, resolveModelSemantics, type ModelSemantics } from '@/ai-providers/model-semantics.js'
 import type {
   AdapterRegistry,
   AgentProviderCapabilities,
@@ -183,6 +185,7 @@ export function credentialToWorkspaceAiCred(
   credential: Pick<Credential, 'vendor' | 'apiKey' | 'baseUrl' | 'wireShape' | 'wires'>,
   adapter: CliAdapter,
   overrides: CredentialInjectionOverrides = {},
+  credentialSlug?: string,
 ): WorkspaceAiCred | null {
   const capabilities = adapter.capabilities.aiProvider
   if (!capabilities) return null
@@ -225,7 +228,8 @@ export function credentialToWorkspaceAiCred(
   }
   if (overrides.wireApi) cred.wireApi = overrides.wireApi
 
-  return applyRegisteredModelSemantics(cred, capabilities, credential.vendor)
+  return applyRegisteredModelSemantics(cred, capabilities, credential.vendor,
+    credentialSlug && cred.model ? createAIProvider(credentialSlug, credential as Credential).resolveModel(cred.model).semantics : undefined)
 }
 
 /**
@@ -241,8 +245,9 @@ export function applyRegisteredModelSemantics(
   cred: WorkspaceAiCred,
   capabilities: AgentProviderCapabilities,
   vendor: string | null | undefined,
+  resolvedSemantics?: ModelSemantics,
 ): WorkspaceAiCred {
-  const semantics = resolveModelSemantics(vendor, cred.model)
+  const semantics = resolvedSemantics ?? resolveModelSemantics(vendor, cred.model)
   if (!semantics) return cred
 
   const next: WorkspaceAiCred = { ...cred }
@@ -320,7 +325,7 @@ export async function injectWorkspaceCredentials(opts: {
       ...(reasoningMatchesModel ? { reasoning: decl.reasoning } : {}),
       ...(decl.authMode !== undefined ? { authMode: decl.authMode } : {}),
       ...(decl.wireApi !== undefined ? { wireApi: decl.wireApi } : {}),
-    })
+    }, decl.credentialSlug)
     if (!wsCred) {
       // The credential has no wire shape this agent speaks (e.g. an OpenAI-Chat
       // key for codex, which is Responses-only). Loud skip — never inject a

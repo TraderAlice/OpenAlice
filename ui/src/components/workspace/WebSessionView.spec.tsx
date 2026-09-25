@@ -185,7 +185,8 @@ describe('WebSessionView runtime identity', () => {
     )
 
     expect(await screen.findByRole('button', { name: 'Stop Claude Code' })).toBeTruthy()
-    expect(screen.getByTitle('Claude Code stream-json over stdio')).toBeTruthy()
+    expect(screen.getByTitle('Claude Code').closest('[data-slot="page-topbar"]')).toBeTruthy()
+    expect(screen.queryByTestId('harness-landing-context')).toBeNull()
     expect(screen.queryByText(/Message Pi/)).toBeNull()
   })
 

@@ -1,3 +1,4 @@
+import { SessionTakeoverBubble } from './workspace/SessionTakeoverDialog'
 import { createContext, useCallback, useContext, useLayoutEffect, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { PrimaryNavigationContext } from '../contexts/PrimaryNavigationContext'
@@ -36,7 +37,7 @@ export function PageTopBar(props: Parameters<typeof TopBar>[0]) {
   const primaryNavigation = useContext(PrimaryNavigationContext)
   const claim = slot?.claim
   useLayoutEffect(() => claim?.(), [claim])
-  const bar = <TopBar {...props} leading={<>{slot ? slot.leading : primaryNavigation}{props.leading}</>} />
+  const bar = <TopBar {...props} actions={<>{props.actions}<SessionTakeoverBubble /></>} leading={<>{slot ? slot.leading : primaryNavigation}{props.leading}</>} />
   if (!slot) return bar
   return slot.target ? createPortal(bar, slot.target) : null
 }

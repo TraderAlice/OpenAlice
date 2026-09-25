@@ -302,7 +302,7 @@ export function PortfolioPage() {
             {!tradingModeLoading && tradingMode === 'lite' ? (
               <TradingModeGate
                 title="Portfolio is unavailable in Lite mode."
-                description="Lite mode keeps UTA disconnected, so there are no broker accounts, positions, or equity snapshots to show. Change the trading mode in Agent Permissions to connect UTA."
+                description="Lite mode keeps UTA disconnected, so there are no broker accounts, positions, or equity snapshots to show. Change the trading mode in Settings → Trading → Mode to connect UTA."
               />
             ) : <>
             {refreshError && (
@@ -471,7 +471,7 @@ function NoAccountsEmpty() {
         onClick={goToTradingSettings}
         size="sm"
       >
-        Add broker in Settings → Trading
+        Add broker in Settings → Trading → Broker
       </Button>
     </div>
   )

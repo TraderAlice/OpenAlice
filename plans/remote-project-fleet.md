@@ -2,6 +2,18 @@
 
 Status: Active
 
+2026-09-19 contract audit: the command/profile increment now restores full
+local target dispatch, streams remote command output with exact exit status
+and no automatic replay, enforces disabled profiles across inventory and new
+remote operations, and rechecks transfer targets after confirmation. Removed
+the nonfunctional `--remote-session` input; no named-server-session mapping is
+implied. Owner guides, quickstart, active command examples, comments, shell
+completion, and the developer tool-audit skill reflect that boundary. CLI
+owner tests, root/package types, and the expanded disposable SSH/Docker
+install/dispatch/disable/reconnect/transfer/TUI smoke have passed. Full hermetic
+verification passed 814 files / 7,138 tests, with four existing skips; two
+additional selector/transfer regression cases passed in the targeted run.
+
 Delivery mode: Serial / interactive. The maintainer selected the Machine →
 AliceProject Supervisor model and requested goal-driven implementation on
 2026-08-23. Each increment starts from current `dev`, receives proportional
@@ -161,18 +173,29 @@ Rules:
 - Removing a registry row forgets only local connection metadata. It never
   invokes SSH or mutates a remote CLI, Runtime, project registry, or home.
 
-Initial command surface:
+Current command surface:
 
 ```bash
 openalice machine list [--json]
-openalice machine add <key> --target <ssh-target> [--name <label>]
+openalice machine add <ssh-target> --label <label>
   [--ssh-port <port>] [--identity <local-path>] [--yes]
-openalice machine remove <key> [--yes]
-openalice machine inspect [<key>] [--json]
+openalice machine rename <id-or-label> --label <label> [--yes]
+openalice machine enable <id-or-label> [--yes]
+openalice machine disable <id-or-label> [--yes]
+openalice machine remove <id-or-label> [--yes]
+openalice machine inspect [<id-or-label>] [--json]
+openalice --machine <id-or-label> <command> [options]
 ```
 
 Interactive add/remove remains explicit; non-interactive mutation requires
 complete flags plus `--yes`.
+
+Profiles now expose opaque ids and labels; map keys remain internal handles.
+Adding prepares the remote Server before saving. Disabled profiles do not
+participate in new inventory probes, starts, connections, or transfers.
+Herdr session selection is not implemented: reject `--remote-session` rather
+than storing a setting that has no effect. AliceProject selection remains
+owned by the target command's `--project` / `--home` options.
 
 ## Fleet Inventory Contract
 
@@ -538,7 +561,7 @@ Rules:
   parser; never parse human output or scan arbitrary directories.
 - [x] Represent local and remote inventory through the same typed model and
   capability flags.
-- [x] Keep existing raw-target `openalice remote <target>` behavior compatible;
+- [x] Keep existing raw-target `openalice --remote <target>` behavior compatible;
   registered-selector connection is owned by Increment 2 after fleet selection
   exists.
 - [x] Add parser/store/inventory/compatibility/security unit tests and an
@@ -674,7 +697,7 @@ Rules:
 - [ ] Add focused managed-SSH, dev-manifest, stale-controller, cross-channel,
   consent/default-No, and post-install identity tests. Extend the disposable
   Docker SSH journey without exposing a public Web port.
-- [ ] Update `docs/remote-access.md`, `docs/docker-deployment.md`, CLI help, and
+- [ ] Update `docs/remote-access.md`, CLI help, and
   Supervisor wording with the shipped apply authority and downgrade rules.
 
 ### Increment 8 — remote readiness and browser truth
