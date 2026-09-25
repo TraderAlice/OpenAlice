@@ -55,7 +55,7 @@ export type Operation =
 
 // ==================== Operation Result ====================
 
-export type OperationStatus = 'submitted' | 'filled' | 'rejected' | 'cancelled' | 'user-rejected'
+export type OperationStatus = 'submitted' | 'filled' | 'rejected' | 'cancelled' | 'user-rejected' | 'unconfirmed'
 
 export interface OperationResult {
   action: OperationAction
