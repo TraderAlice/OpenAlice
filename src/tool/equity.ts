@@ -25,13 +25,15 @@ If unsure about the symbol, use marketSearchForResearch to find it.`,
       }).meta({ examples: [{ symbol: 'AAPL' }] }),
       execute: async ({ symbol }) => {
         // For Taiwan tickers (2330.TW / 6488.TWO), metrics route to the official
-        // twse vendor first (official P/E·殖利率·股價淨值比), then yfinance.
-        // Profile stays yfinance-first (richer description/sector), with twse as a
-        // backstop. Routes by symbol DOMAIN (the ticker is itself a TW security),
+        // twse vendor first (official P/E·殖利率·股價淨值比), then yfinance/FMP.
+        // Elsewhere: FMP first when keyed, yfinance as keyless fallback.
+        // Routes by symbol DOMAIN (the ticker is itself a TW security),
         // not by a hardcoded asset-class → vendor map.
         const isTW = /\d{3,6}[A-Z]?\.(TW|TWO)$/i.test(symbol)
-        const profileProviders = isTW ? ['yfinance', 'twse'] : ['yfinance']
-        const metricProviders = isTW ? ['twse', 'yfinance'] : ['yfinance']
+        // US/global: FMP first (keyed fundamentals), yfinance fallback (keyless).
+        // TW: keep official twse metrics preference; yfinance for richer profile text.
+        const profileProviders = isTW ? ['yfinance', 'twse', 'fmp'] : ['fmp', 'yfinance']
+        const metricProviders = isTW ? ['twse', 'yfinance', 'fmp'] : ['fmp', 'yfinance']
         const firstHit = async <T,>(providers: string[], call: (p: string) => Promise<T[]>): Promise<T | null> => {
           for (const p of providers) {
             const rows = await call(p).catch(() => [] as T[])
@@ -61,18 +63,27 @@ If unsure about the symbol, use marketSearchForResearch to find it.`,
         limit: z.number().int().positive().optional().describe('Number of periods to return (default: 5)'),
       }).meta({ examples: [{ symbol: 'AAPL', type: 'income', period: 'annual', limit: 5 }] }),
       execute: async ({ symbol, type, period, limit }) => {
-        const params: Record<string, unknown> = { symbol, provider: 'yfinance' }
-        if (period) params.period = period
-        if (limit) params.limit = limit
+        const base: Record<string, unknown> = { symbol }
+        if (period) base.period = period
+        if (limit) base.limit = limit
 
-        switch (type) {
-          case 'income':
-            return await equityClient.getIncomeStatement(params)
-          case 'balance':
-            return await equityClient.getBalanceSheet(params)
-          case 'cash':
-            return await equityClient.getCashFlow(params)
+        const fetch = (provider: string) => {
+          const params = { ...base, provider }
+          switch (type) {
+            case 'income':
+              return equityClient.getIncomeStatement(params)
+            case 'balance':
+              return equityClient.getBalanceSheet(params)
+            case 'cash':
+              return equityClient.getCashFlow(params)
+          }
         }
+        // FMP first when keyed; yfinance remains the keyless fallback (e.g. CN Yahoo blocks).
+        for (const provider of ['fmp', 'yfinance'] as const) {
+          const rows = await fetch(provider).catch(() => [] as Awaited<ReturnType<typeof fetch>>)
+          if (rows && rows.length > 0) return rows
+        }
+        return []
       },
     }),
 
