@@ -24,11 +24,11 @@ export function AliceLocationSection() {
   const [switchError, setSwitchError] = useState<string | null>(null)
   const desktopConnection = window.openAlice?.desktopConnection
   const canChoose = Boolean(relay.status || desktopConnection || connection.kind === 'electron')
-  const remote = connection.kind === 'remote' || (relay.status?.target?.machine !== undefined && relay.status.target.machine !== 'local')
+  const remote = relay.status?.target?.machine !== undefined && relay.status.target.machine !== 'local'
   const electron = connection.kind === 'electron'
   const relayMachine = relay.status?.target?.machine
   const machine = relay.status?.target?.machineName ?? (relayMachine && relayMachine !== 'local' ? relayMachine : undefined)
-    ?? (connection.kind === 'remote' ? connection.target : t('settings.backendConnection.thisMachine'))
+    ?? t('settings.backendConnection.thisMachine')
   const projectName = project?.displayName
     ?? (loading ? t('settings.backendConnection.checking') : t('settings.backendConnection.projectUnavailable'))
   const status = loading
@@ -41,10 +41,10 @@ export function AliceLocationSection() {
     : remote ? t('settings.backendConnection.remoteMode') : t('settings.backendConnection.separated')
   const transport = electron ? 'Electron IPC' : relay.status
     ? desktopConnection ? 'Electron relay' : 'Local CLI relay'
-    : connection.kind === 'remote' ? 'SSH tunnel' : 'Loopback HTTP'
+    : 'Loopback HTTP'
   const clientEndpoint = electron ? 'app://openalice' : relay.status
     ? window.location.host
-    : connection.kind === 'remote' ? connection.localEndpoint : connection.endpoint
+    : connection.endpoint
 
   return (
     <ConfigSection title={t('settings.backendConnection.title')}>
@@ -61,7 +61,7 @@ export function AliceLocationSection() {
             {status} · {mode}
           </p>
         </div>
-        {(canChoose || connection.kind === 'remote') && (
+        {canChoose && (
           <Button type="button" variant="outline" size="sm" className="min-h-10 self-start sm:min-h-8 sm:self-auto"
             onClick={() => canChoose ? setChooserOpen(true) : setShowInstructions((value) => !value)}
             aria-expanded={canChoose ? chooserOpen : showInstructions}
@@ -96,7 +96,6 @@ export function AliceLocationSection() {
             {project && <Detail label={t('settings.about.aliceProject.appRoot')} value={project.appRoot ?? t('settings.about.aliceProject.runtimeManaged')} mono />}
             <Detail label={t('settings.backendConnection.transport')} value={transport} />
             <Detail label={t('settings.backendConnection.clientEndpoint')} value={clientEndpoint} mono />
-            {connection.kind === 'remote' && !relay.status && <Detail label={t('settings.backendConnection.remoteEndpoint')} value={`127.0.0.1:${connection.runtimePort}`} mono />}
           </dl>
           <p className="mt-4 text-[12px] leading-relaxed text-muted-foreground">
             {remote ? t(desktopConnection ? 'settings.backendConnection.electronRemoteNote' : 'settings.backendConnection.remoteNote')

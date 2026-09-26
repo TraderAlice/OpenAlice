@@ -160,7 +160,7 @@ that selects itself.
 The local CLI already exposes the same complete-root boundary:
 
 ```bash
-openalice start --home ~/.openalice-dev/feature-a
+openalice run --home ~/.openalice-dev/feature-a
 ```
 
 `pnpm dev` accepts an equivalent focused override. Keep these homes outside the

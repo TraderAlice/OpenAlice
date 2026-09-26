@@ -10,8 +10,11 @@ export function desktopDevExecutable() {
 export function spawnDesktopSmoke(executable, args, options) {
   // A private process group lets the smoke clean up Electron's helper and
   // Alice child processes even when Electron exits before its wrapper does.
+  const env = { ...options.env }
+  delete env.ELECTRON_RUN_AS_NODE
   return spawn(executable, args, {
     ...options,
+    env,
     detached: process.platform !== 'win32',
   })
 }

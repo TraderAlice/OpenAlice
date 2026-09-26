@@ -227,9 +227,21 @@ export async function runRendererWorkspaceAcceptanceSmoke(
           () => shellReadyReject(new Error('Workspace shell-ready timeout: ' + output.slice(-4000))),
           10000,
         )
-        bridge.send(connectionId, new TextEncoder().encode(
+        const shellProbe = new TextEncoder().encode(
           "printf '__OPENALICE_%s_READY__\\\\n' 'SHELL'\\r",
-        ))
+        )
+        // A quiet terminal is not a reliable readiness signal: ConPTY may keep
+        // emitting prompt-control bytes after the login shell is usable. This
+        // probe has no side effects, so use its marker as the readiness signal
+        // and retry until the shell acknowledges it. ConPTY can lose the first
+        // typed byte during startup.
+        while (!output.includes('__OPENALICE_SHELL_READY__')) {
+          bridge.send(connectionId, shellProbe)
+          await Promise.race([
+            shellReady,
+            new Promise((resolve) => setTimeout(resolve, 500)),
+          ])
+        }
         await shellReady
         helperReadyTimer = setTimeout(
           () => helperReadyReject(new Error('Workspace CLI helper-ready timeout: ' + output.slice(-4000))),

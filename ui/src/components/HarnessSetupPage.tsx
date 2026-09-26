@@ -1,4 +1,4 @@
-import { useMemo, useState, type ComponentType } from 'react'
+import { useEffect, useMemo, useRef, useState, type ComponentType } from 'react'
 import { useTranslation } from 'react-i18next'
 import { ArrowRight, Check, Loader2, PanelsTopLeft } from 'lucide-react'
 
@@ -7,6 +7,7 @@ import { RecoverySurface, RefreshNotice } from './StateViews'
 import { workspaceDisplayTitle } from './workspace/display'
 import { idleInitialization, useHarnessInitialization } from '../live/harness-initialization'
 import { IndeterminateProgress } from './ui/indeterminate-progress'
+import { useProjectWorkspaceSetup } from '../hooks/useProjectWorkspaceSetup'
 
 export type HarnessSetupCopyPrefix = 'autoQuantSetup' | 'autoPredictionSetup' | 'chatSetup'
 
@@ -43,7 +44,25 @@ export function HarnessSetupPage({
   const [error, setError] = useState<string | null>(null)
   const initialization = useHarnessInitialization((state) => state.templates[templateName] ?? idleInitialization)
   const initialize = useHarnessInitialization((state) => state.initialize)
-  const initializing = initialization.pending
+  const projectSetup = useProjectWorkspaceSetup()
+  const setupKind = templateName === 'auto-quant-v2' ? 'auto-quant' : templateName
+  const setupFailure = projectSetup.error || projectSetup.setup?.errors?.[setupKind]
+  const autoInitializing = !setupFailure && (projectSetup.setup === null
+    || projectSetup.setup.phase !== 'complete'
+    || projectSetup.setup.pending.includes(setupKind))
+  const initializing = initialization.pending || autoInitializing
+  const refreshedSetupState = useRef<string | null>(null)
+  const sawSetupInProgress = useRef(projectSetup.setup?.phase !== 'complete')
+  useEffect(() => {
+    if (projectSetup.setup?.phase !== 'complete') { sawSetupInProgress.current = true; return }
+    if (!sawSetupInProgress.current) return
+    const state = projectSetup.setup.pending.join(',')
+    if (refreshedSetupState.current === state) return
+    refreshedSetupState.current = state
+    void ctx.refresh()
+    if (templateName === 'auto-quant-v2') void ctx.refreshAutoQuantPreference()
+    if (templateName === 'auto-prediction') void ctx.refreshAutoPredictionPreference?.()
+  }, [ctx, projectSetup.setup?.phase, projectSetup.setup?.pending])
   const workspaces = useMemo(
     () => ctx.workspaces
       .filter((workspace) => workspace.template === templateName)
@@ -194,11 +213,13 @@ export function HarnessSetupPage({
             <button
               type="button"
               disabled={initializing}
-              onClick={() => void initialize(templateName, initializeWorkspace)}
+              onClick={() => setupFailure
+                ? void projectSetup.retry()
+                : void initialize(templateName, initializeWorkspace)}
               className="oa-pressable flex w-full items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-60"
             >
               {initializing && <Loader2 aria-hidden className="h-4 w-4 animate-spin motion-reduce:animate-none" />}
-              {initializing ? t(`${copyPrefix}.initializing`) : t(`${copyPrefix}.initializeAction`)}
+              {initializing ? t(`${copyPrefix}.initializing`) : setupFailure ? t('common.retry') : t(`${copyPrefix}.initializeAction`)}
             </button>
             {initializing && (
               <div className="mt-3 space-y-2">
@@ -211,8 +232,8 @@ export function HarnessSetupPage({
           </div>
         )}
 
-        {(error || initialization.error) && (
-          <p role="alert" className="mt-4 text-center text-xs text-destructive">{error || initialization.error}</p>
+        {(error || initialization.error || setupFailure) && (
+          <p role="alert" className="mt-4 text-center text-xs text-destructive">{error || initialization.error || setupFailure}</p>
         )}
       </main>
     </div>

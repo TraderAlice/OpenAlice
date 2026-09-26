@@ -26,6 +26,12 @@ export async function main(
   const [command, ...args] = argv
   if (command === 'exec') return runProjectCli(args)
   if (command === 'relay') return (dependencies.runRelay ?? runWebRelay)(args)
+  if (command === 'start') {
+    throw usageError('"openalice start" is retired. Run "openalice" for the TUI and relay GUI, or "openalice run" for a foreground Runtime without a GUI.')
+  }
+  if (command === 'open') {
+    throw usageError('"openalice open" is retired. Run "openalice" for the TUI and relay GUI, or "openalice relay" for a GUI without the TUI.')
+  }
   const setup = async () => {
     if (!(dependencies.standalone ?? isBunStandalone())) return 0
     return (dependencies.runSetup ?? ((setupArgs: string[]) => runDependencySetup(setupArgs, { quietReady: true })))(args.includes('--json') ? ['--json'] : [])
@@ -66,7 +72,7 @@ Options:
     await setup()
     return (dependencies.runTui ?? runSupervisorTui)(flags)
   }
-  const startsLocalRuntime = ['up', 'run', 'start'].includes(command)
+  const startsLocalRuntime = ['up', 'run'].includes(command)
     || (command === 'server' && ['start', 'run'].includes(args[0] ?? ''))
   if (startsLocalRuntime && !args.includes('--help') && !args.includes('-h')) {
     const setupCode = await setup()

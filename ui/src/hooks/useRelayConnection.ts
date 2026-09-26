@@ -12,6 +12,10 @@ export interface RelayMachine {
   key: string
   displayName: string
   connection: string
+  sshTarget?: string | null
+  platform?: string | null
+  cliVersion?: string | null
+  defaultProject?: string | null
   projects: RelayProject[]
   issue: { message: string } | null
 }
@@ -21,6 +25,7 @@ export interface RelayStatus {
   generation: number
   target: { machine: string; machineName?: string; project: string; projectName?: string } | null
   switching: boolean
+  targetConnection?: 'healthy' | 'reconnecting' | 'unavailable' | null
 }
 
 async function relayJson<T>(path: string, init?: RequestInit): Promise<T> {
@@ -30,6 +35,14 @@ async function relayJson<T>(path: string, init?: RequestInit): Promise<T> {
     throw new Error(body?.error ?? `Relay returned HTTP ${response.status}`)
   }
   return response.json() as Promise<T>
+}
+
+export function fetchRelayStatus(): Promise<RelayStatus> {
+  return relayJson<RelayStatus>('status')
+}
+
+export function reconnectRelayTarget(): Promise<RelayStatus> {
+  return relayJson<RelayStatus>('reconnect', { method: 'POST', headers: { 'content-type': 'application/json' } })
 }
 
 export function useRelayConnection(initial: RelayStatus | null = null) {

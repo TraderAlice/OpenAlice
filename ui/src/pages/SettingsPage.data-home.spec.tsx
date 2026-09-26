@@ -72,24 +72,18 @@ describe('DataHomeSection', () => {
   it('explains command-line selection on browser/dev surfaces', () => {
     render(<DataHomeSection />)
 
-    expect(screen.getByText('openalice start --home <path>')).toBeTruthy()
+    expect(screen.getByText('openalice run --home <path>')).toBeTruthy()
     expect(screen.getByText('pnpm dev -- --home <path>')).toBeTruthy()
     expect(screen.queryByRole('button', { name: 'Choose folder and restart' })).toBeNull()
   })
 
   it('does not suggest local launch commands for a remote service-owned data home', () => {
-    mocks.getBackendConnection.mockReturnValue({
-      kind: 'remote',
-      target: 'alice@example.com',
-      sshPort: 22,
-      runtimePort: 47331,
-      localEndpoint: '127.0.0.1:40123',
-    })
+    mocks.useRelayConnection.mockReturnValue({ status: { target: { machine: 'studio', project: 'research' } } })
 
     render(<DataHomeSection />)
 
     expect(screen.getByText(/belongs to the connected remote Runtime/)).toBeTruthy()
-    expect(screen.queryByText('openalice start --home <path>')).toBeNull()
+    expect(screen.queryByText('openalice run --home <path>')).toBeNull()
     expect(screen.queryByText('pnpm dev -- --home <path>')).toBeNull()
   })
 

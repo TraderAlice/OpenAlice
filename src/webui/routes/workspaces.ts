@@ -4,6 +4,7 @@ import { createAIProvider } from '../../ai-providers/provider.js'
 import { createWorkspaceContentRoutes } from './workspace-content.js';
 import { createStickerRoutes } from './stickers.js';
 import { prepareProjectWorkspaces, readProjectWorkspaceSetup } from '../../workspaces/project-workspace-setup.js';
+import { readUpdatePreferences } from '../../core/update-preferences.js';
 /**
  * Hono routes for the Workspaces feature, mounted at /api/workspaces.
  *
@@ -1119,10 +1120,10 @@ export function createWorkspaceRoutes(
     }
   });
 
-  app.get('/project-setup', async (c) => c.json(await readProjectWorkspaceSetup()));
+  app.get('/project-setup', async (c) => c.json(await readProjectWorkspaceSetup(undefined, svc)));
   app.post('/project-setup/retry', async (c) => {
     await prepareProjectWorkspaces(svc);
-    return c.json(await readProjectWorkspaceSetup());
+    return c.json(await readProjectWorkspaceSetup(undefined, svc));
   });
 
   app.post('/chat/initialize', async (c) => {
@@ -1533,11 +1534,16 @@ export function createWorkspaceRoutes(
     if (!validId(id)) return c.json({ error: 'not_found' }, 404);
     try {
       const preferences = await readHarnessPreference();
+      const updatePreferences = await readUpdatePreferences();
+      const template = svc.registry.get(id)?.template;
+      const includeUnverified = preferences.showUnverifiedHarnessReleases
+        || (template === 'auto-quant-v2' && updatePreferences.autoUpdateAutoQuant)
+        || (template === 'auto-prediction' && updatePreferences.autoUpdateAutoPrediction);
       const targetVersion = c.req.query('targetVersion');
       return c.json({
         plan: await svc.sourceUpgrades.plan(
           id,
-          preferences.showUnverifiedHarnessReleases,
+          includeUnverified,
           targetVersion || undefined,
         ),
       });
@@ -1563,9 +1569,14 @@ export function createWorkspaceRoutes(
     }
     try {
       const preferences = await readHarnessPreference();
+      const updatePreferences = await readUpdatePreferences();
+      const template = svc.registry.get(id)?.template;
+      const includeUnverified = preferences.showUnverifiedHarnessReleases
+        || (template === 'auto-quant-v2' && updatePreferences.autoUpdateAutoQuant)
+        || (template === 'auto-prediction' && updatePreferences.autoUpdateAutoPrediction);
       const result = await svc.sourceUpgrades.apply(
         id,
-        preferences.showUnverifiedHarnessReleases,
+        includeUnverified,
         { planDigest: fields['planDigest'], targetVersion: fields['targetVersion'] },
       );
       return c.json({ result, workspace: await svc.publicMeta(svc.registry.get(id)!) });

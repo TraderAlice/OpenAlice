@@ -132,6 +132,11 @@ const api = {
     connect: (machine: string, project: string) => ipcRenderer.invoke('openalice:desktop-connection:connect', machine, project),
     returnIntegrated: () => ipcRenderer.invoke('openalice:desktop-connection:return-integrated'),
   },
+  desktopMachine: {
+    plan: (input: unknown) => ipcRenderer.invoke('openalice:desktop-machine:plan', input),
+    apply: (id: string) => ipcRenderer.invoke('openalice:desktop-machine:apply', id),
+    operation: () => ipcRenderer.invoke('openalice:desktop-machine:operation'),
+  },
   companion: {
     getSound: () => ipcRenderer.invoke('openalice:companion:sound:get'),
     updateSound: (settings: unknown) => ipcRenderer.invoke('openalice:companion:sound:update', settings),
@@ -242,6 +247,7 @@ if (window.location.protocol === 'app:') {
 } else if (window.location.protocol === 'http:' && window.location.hostname === '127.0.0.1') {
   contextBridge.exposeInMainWorld('openAlice', {
     desktopConnection: api.desktopConnection,
+    desktopMachine: api.desktopMachine,
     windowChrome: api.windowChrome,
     updater: api.updater,
   })

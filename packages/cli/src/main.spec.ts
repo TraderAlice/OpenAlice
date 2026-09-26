@@ -1,8 +1,14 @@
 import { describe, expect, it, vi } from 'vitest'
 
 import { main } from './main.ts'
+import { main as runLegacyCommand } from '../bin/openalice.mjs'
 
 describe('OpenAlice TypeScript application entry', () => {
+  it('rejects the retired direct browser entry points before network access', async () => {
+    await expect(main(['start'])).rejects.toMatchObject({ code: 'EUSAGE', exitCode: 2 })
+    await expect(main(['open'])).rejects.toMatchObject({ code: 'EUSAGE', exitCode: 2 })
+    await expect(runLegacyCommand(['--remote', 'alice@example.com'])).rejects.toMatchObject({ code: 'EUSAGE', exitCode: 2 })
+  })
   it('routes the browser relay without starting a Runtime or opening the TUI', async () => {
     const runRelay = vi.fn(async () => 0)
     const runTui = vi.fn(async () => 0)

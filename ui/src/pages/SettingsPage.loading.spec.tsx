@@ -29,6 +29,16 @@ vi.mock('../api/preferences', () => ({
   },
 }))
 
+vi.mock('../hooks/useUpdateLifecycle', () => ({
+  useUpdateLifecycle: () => ({ versionInfo: null, nativeStatus: null, workspaceStates: [],
+    preferences: null, checking: false, error: null, availableCount: 0,
+    refresh: vi.fn(async () => undefined), savePreferences: vi.fn(async () => undefined) }),
+}))
+
+vi.mock('../contexts/workspaces-context', () => ({
+  useWorkspaces: () => ({ workspaces: [], openAgentConfig: vi.fn() }),
+}))
+
 beforeEach(async () => {
   vi.clearAllMocks()
   vi.stubGlobal('matchMedia', vi.fn(() => ({
@@ -64,8 +74,9 @@ describe('SettingsPage loading', () => {
 
     render(<SettingsPage />)
 
-    expect(screen.getByRole('heading', { name: 'Language' })).toBeTruthy()
-    expect(screen.getByText('openalice start --home <path>')).toBeTruthy()
+    expect(screen.getByRole('heading', { name: 'About OpenAlice' })).toBeTruthy()
+    expect(screen.queryByRole('heading', { name: 'Language' })).toBeNull()
+    expect(screen.getByText('openalice run --home <path>')).toBeTruthy()
     expect(mocks.configLoad).not.toHaveBeenCalled()
   })
 })

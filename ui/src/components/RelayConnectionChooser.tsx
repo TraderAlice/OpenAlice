@@ -114,8 +114,8 @@ export function RelayConnectionChooser({ open, onOpenChange, initialStatus }: {
 
       <div className="flex shrink-0 flex-wrap items-center justify-end gap-2 border-t border-border/70 px-5 py-3 sm:px-6">
         <Button type="button" variant="outline" size="sm" onClick={() => onOpenChange(false)}>{t('common.cancel', 'Cancel')}</Button>
-        <Button type="button" size="sm" disabled={!canConnect || relay.loading || relay.busy} onClick={() => { if (machineKey && projectKey) void relay.connect(machineKey, projectKey).catch(() => undefined) }}>
-          {relay.busy ? t('settings.backendConnection.checking') : isCurrent ? t('settings.backendConnection.reconnect') : t('settings.backendConnection.change')}
+        <Button type="button" size="sm" disabled={!canConnect || relay.loading || relay.busy || relay.status?.switching} onClick={() => { if (machineKey && projectKey) void relay.connect(machineKey, projectKey).catch(() => undefined) }}>
+          {relay.busy || relay.status?.switching ? t('settings.backendConnection.checking') : isCurrent ? t('settings.backendConnection.reconnect') : t('settings.backendConnection.change')}
         </Button>
       </div>
     </DialogContent>

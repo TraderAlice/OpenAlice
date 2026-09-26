@@ -3841,7 +3841,7 @@ describe('Supervisor TUI screen', () => {
         }
         setTimeout(() => inputListener?.('q'), 0)
       },
-      open: async () => {
+      openBrowser: async () => {
         calls.push('open')
       },
       discoverUpdate: async () => null,
@@ -4661,7 +4661,7 @@ describe('Supervisor TUI screen', () => {
         }
         queueMicrotask(() => inputListener?.('q'))
       },
-      open: async () => {
+      openBrowser: async () => {
         calls.push('open')
       },
       discoverUpdate: async () => null,

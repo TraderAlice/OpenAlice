@@ -29,6 +29,9 @@ const mocks = vi.hoisted(() => ({
 vi.mock('../contexts/workspaces-context', () => ({
   useWorkspaces: () => mocks.useWorkspaces(),
 }))
+vi.mock('../hooks/useProjectWorkspaceSetup', () => ({
+  useProjectWorkspaceSetup: () => ({ setup: { pending: [], errors: {}, phase: 'complete' }, error: null, busy: false, retry: vi.fn() }),
+}))
 
 vi.mock('../tabs/store', () => ({
   useWorkspace: (selector: (state: { openOrFocus: typeof mocks.openOrFocus }) => unknown) =>

@@ -3028,7 +3028,7 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
           child.write('\r')
         } else if (!prepared && output.includes('Choose workspaces')) {
           prepared = true
-          child.write('\u001b[B \r')
+          child.write('\r')
         } else if (
           !reopenedProjects
           && output.includes('OpenAlice started and opened in your browser.')
@@ -3081,7 +3081,7 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
     expect(transcript).toContain('[ Enter ] Continue')
     expect(transcript).toContain('Create & start')
     expect(transcript).toContain('Choose workspaces')
-    expect(JSON.parse(await readFile(join(isolatedHome, '.openalice-research/workspace-setup.json'), 'utf8')).pending).toEqual(['chat', 'auto-quant'])
+    expect(JSON.parse(await readFile(join(isolatedHome, '.openalice-research/workspace-setup.json'), 'utf8')).pending).toEqual(['chat', 'auto-quant', 'auto-prediction'])
     expect(transcript).toContain('Selected AliceProject Default AliceProject')
     expect(transcript).toContain('\u001b[?25h')
     expect(transcript).toContain('\u001b[?2004l')

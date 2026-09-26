@@ -1,6 +1,7 @@
 import { resolveLaunchContext } from '../launch-context.ts'
 import type { MachineFleetEnvelope, MachineInventory } from '../machine-inventory.ts'
 import { runSupervisorTui } from '../supervisor-tui.ts'
+import { fakeWebRelay } from './fake-web-relay.ts'
 
 let starts = 0
 let opens = 0
@@ -17,10 +18,11 @@ const healthFlap = process.env['OPENALICE_TUI_FIXTURE_HEALTH'] === 'flap'
 const fleetRows = Number(process.env['OPENALICE_TUI_FIXTURE_FLEET_ROWS'] ?? 0)
 const inboxUnread = Number(process.env['OPENALICE_TUI_FIXTURE_INBOX_UNREAD'] ?? 0)
 const fleet = fleetRows > 0 ? fixtureFleet(fleetRows, remote) : undefined
+const relay = fakeWebRelay()
 
 const exitCode = await runSupervisorTui({}, {
   env: process.env,
-  webRelay: null,
+  webRelay: relay,
   resolveContext: () => resolveLaunchContext({
     cwd: process.cwd(),
     homeDir: '/fixture',
@@ -45,7 +47,7 @@ const exitCode = await runSupervisorTui({}, {
     if (startFailure) throw new Error('Fixture Runtime start failed')
     running = true
   },
-  open: async () => { opens += 1 },
+  openBrowser: async () => { opens += 1 },
   readLogs: async () => {
     loads += 1
     return { entries: [] }
@@ -83,7 +85,7 @@ const exitCode = await runSupervisorTui({}, {
           onReady({
             localPort: 45_454,
             localUrl: 'http://127.0.0.1:45454',
-            clientUrl: 'http://127.0.0.1:45454/#openalice-remote=1',
+            clientUrl: 'http://127.0.0.1:45454',
           })
           return new Promise<number>((resolve) => {
             signal.addEventListener('abort', () => {

@@ -180,11 +180,12 @@ afterEach(() => {
   cleanup()
   vi.useRealTimers()
   vi.unstubAllGlobals()
+  vi.unstubAllEnvs()
 })
 
 describe('TerminalView backend recovery', () => {
   it('keeps remote dev terminal traffic on the forwarded UI origin', async () => {
-    vi.stubGlobal('__OPENALICE_DEV_BACKEND_PORT__', 47332)
+    vi.stubEnv('VITE_OPENALICE_DEV_BACKEND_PORT', '47332')
     render(<TerminalView wsId="research" sessionId="session-1" />)
     await startTerminal()
     expect(mocks.sockets[0]!.url).toMatch(/^ws:\/\/192\.0\.2\.42:47361\/api\/workspaces\/pty\?/)

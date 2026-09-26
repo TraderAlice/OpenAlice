@@ -7,11 +7,17 @@ import { AutoQuantSetupPage } from '../pages/AutoQuantSetupPage'
 import { AutoPredictionSetupPage } from '../pages/AutoPredictionSetupPage'
 import { ChatSetupPage } from '../pages/ChatSetupPage'
 
-const mocks = vi.hoisted(() => ({ initialize: vi.fn() }))
+const mocks = vi.hoisted(() => ({ initialize: vi.fn(), refresh: vi.fn(), refreshAutoQuantPreference: vi.fn(), refreshAutoPredictionPreference: vi.fn(), setup: { pending: [] as string[], errors: {} as Record<string, string>, phase: 'complete' as 'idle' | 'preparing' | 'complete' } }))
+vi.mock('../hooks/useProjectWorkspaceSetup', () => ({
+  useProjectWorkspaceSetup: () => ({ setup: mocks.setup, error: null, busy: false, retry: vi.fn() }),
+}))
 vi.mock('../contexts/workspaces-context', () => ({
   useWorkspaces: () => ({
     workspaces: [], templates: [], hasLoaded: true, templatesLoaded: true,
     listError: null, templatesError: null,
+    refresh: mocks.refresh,
+    refreshAutoQuantPreference: mocks.refreshAutoQuantPreference,
+    refreshAutoPredictionPreference: mocks.refreshAutoPredictionPreference,
     autoQuantPreferenceLoaded: true, autoPredictionPreferenceLoaded: true,
     initializeAutoQuant: mocks.initialize,
     initializeAutoPrediction: mocks.initialize,
@@ -21,10 +27,20 @@ vi.mock('../contexts/workspaces-context', () => ({
 
 beforeEach(async () => {
   mocks.initialize.mockReset()
+  mocks.refresh.mockReset()
+  mocks.setup = { pending: [], errors: {}, phase: 'complete' }
   useHarnessInitialization.setState({ templates: {} })
   await i18n.changeLanguage('en')
 })
 afterEach(cleanup)
+
+it('shows background setup progress without requiring a manual click', () => {
+  mocks.setup = { pending: ['auto-quant'], errors: {}, phase: 'preparing' }
+  render(<AutoQuantSetupPage />)
+  expect(screen.getByRole('progressbar')).toBeTruthy()
+  expect((screen.getByRole('button', { name: 'Initializing AutoQuant…' }) as HTMLButtonElement).disabled).toBe(true)
+  expect(mocks.initialize).not.toHaveBeenCalled()
+})
 
 it.each([
   ['AutoQuant', AutoQuantSetupPage],

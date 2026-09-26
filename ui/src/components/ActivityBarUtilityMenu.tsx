@@ -5,6 +5,7 @@ import { useTranslation } from 'react-i18next'
 
 import { useThemeStore, type AppTheme } from '../theme/store'
 import { useDesktopCompanion } from '../hooks/useDesktopCompanion'
+import { useOptionalUpdateLifecycle } from '../hooks/useUpdateLifecycle'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -46,6 +47,7 @@ export function ActivityBarUtilityMenu({
   const setTheme = useThemeStore((state) => state.setTheme)
   const [menuOpen, setMenuOpen] = useState(false)
   const companion = useDesktopCompanion(menuOpen)
+  const updateCount = useOptionalUpdateLifecycle()?.availableCount ?? 0
   const CurrentThemeIcon = THEME_MODES.find((item) => item.mode === theme)?.Icon ?? Laptop
 
   return (
@@ -70,6 +72,8 @@ export function ActivityBarUtilityMenu({
         {!compactRail && (
           <span className="min-w-0 flex-1 truncate text-[14px] font-medium">{t('nav.yourAlice')}</span>
         )}
+        {updateCount > 0 && <span role="status" aria-label={t('nav.updatesAvailable', { count: updateCount })}
+          className={`size-2 shrink-0 rounded-full bg-primary shadow-[0_0_0_3px_var(--sidebar)] ${compactRail ? 'absolute -right-0.5 -top-0.5' : ''}`} />}
         {connectorWarnings > 0 && (
           <span
             role="status"
@@ -128,7 +132,7 @@ export function ActivityBarUtilityMenu({
             className="min-h-9 cursor-pointer gap-2 px-2.5 text-[12px] [&>svg:last-child]:ml-1"
           >
             <CurrentThemeIcon size={15} strokeWidth={1.75} aria-hidden />
-            <span className="min-w-0 flex-1 truncate">{t('settings.category.appearance')}</span>
+            <span className="min-w-0 flex-1 truncate">{t('settings.group.appearance')}</span>
             <span className="shrink-0 text-muted-foreground">{t(`theme.mode.${theme}`)}</span>
           </DropdownMenuSubTrigger>
           <DropdownMenuSubContent className="oa-application-menu-panel w-[148px] border bg-popover p-1.5 ring-0">

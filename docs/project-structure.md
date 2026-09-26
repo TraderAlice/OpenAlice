@@ -44,15 +44,16 @@ Guardian
 
 Launchers share the same ownership model:
 
-- `scripts/guardian/dev.ts` runs UTA, Alice, and Vite for `pnpm dev`.
+- `scripts/guardian/dev.ts` runs UTA, Alice, the local Web relay, and Vite for
+  `pnpm dev`; `pnpm dev:no-relay` leaves the relay out for direct-path debugging.
 - `apps/desktop/src/main.ts` is the packaged Electron Guardian and renderer
   host. It starts Alice/UTA through Electron's Node mode.
 - `scripts/guardian/prod.mjs` supervises built Runtime services for Docker and
   the source-backed local CLI. Docker defaults to the `docker` launcher;
-  `openalice start` supplies the compatibility `cli` launcher, while canonical
   `openalice up|run` and compatibility `openalice server` supply `cli-server`
-  plus a versioned local status/stop capability. All CLI browser and SSH paths
-  keep Alice on loopback.
+  plus a versioned local status/stop capability. The default CLI TUI and
+  headless `openalice relay` serve the client-owned Web GUI on loopback; their
+  selected backend remains on loopback too.
 - `packages/guardian-runtime/` owns cross-launcher single-writer locks,
   heartbeat metadata, process identity, and controlled takeover.
 

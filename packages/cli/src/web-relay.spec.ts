@@ -1,8 +1,9 @@
 import { createServer, request as httpRequest, type Server } from 'node:http'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { WebSocket, WebSocketServer } from 'ws'
 
 import { WebRelay } from './web-relay.ts'
+import type { MachineManagement } from './machine-management.ts'
 
 const openedRelays: WebRelay[] = []
 const openedBackends: Server[] = []
@@ -51,6 +52,155 @@ async function withHost(origin: string, path: string, host: string): Promise<{ s
 }
 
 describe('WebRelay', () => {
+  it('serves Vite assets and HMR through the relay while APIs follow its selected Runtime', async () => {
+    const runtime = await backend('dev-id', 'development')
+    openedBackends.push(runtime.server)
+    const ui = createServer((req, res) => {
+      res.setHeader('content-type', 'text/plain')
+      res.end(`vite:${req.url}`)
+    })
+    const hmr = new WebSocketServer({ noServer: true })
+    ui.on('upgrade', (req, socket, head) => hmr.handleUpgrade(req, socket, head, (ws) => {
+      ws.send(JSON.stringify({ type: 'connected' }))
+    }))
+    await new Promise<void>((done) => ui.listen(0, '127.0.0.1', done))
+    openedBackends.push(ui)
+    const address = ui.address()
+    if (!address || typeof address === 'string') throw new Error('Missing Vite fixture port')
+    const relay = new WebRelay({
+      uiOrigin: `http://127.0.0.1:${address.port}`,
+      inspectLocal: async () => ({ machine: { key: 'local', displayName: 'This computer', projects: [{
+        key: 'dev', id: 'dev-id', displayName: 'Development', available: true,
+        runtime: { webEndpoint: `http://127.0.0.1:${runtime.port}` },
+      }] } }) as never,
+      waitReady: async () => undefined,
+    })
+    const origin = await relay.listen()
+    openedRelays.push(relay)
+    await relay.connect('local', 'dev')
+    expect(await (await fetch(`${origin}/settings`)).text()).toBe('vite:/settings')
+    expect(await (await fetch(`${origin}/@vite/client`)).text()).toBe('vite:/@vite/client')
+    expect(await (await fetch(`${origin}/api/who`)).json()).toMatchObject({ label: 'development' })
+    const message = await new Promise<string>((done, reject) => {
+      const ws = new WebSocket(origin.replace('http:', 'ws:') + '/?token=test', 'vite-hmr', { headers: { origin } })
+      ws.once('message', (data) => { done(String(data)); ws.close() })
+      ws.once('error', reject)
+    })
+    expect(JSON.parse(message)).toEqual({ type: 'connected' })
+  })
+
+  it('rebuilds the selected SSH forward before a backend upgrade reports success', async () => {
+    const before = await backend('cloud-id', 'before')
+    const after = await backend('cloud-id', 'after')
+    openedBackends.push(before.server, after.server)
+    let forwardPort = before.port
+    let busy = false
+    let oldForwardClosed = false
+    const machineManagement = {
+      get busy() { return busy },
+      get currentOperation() { return null },
+      async apply(_id: string, afterApply: (result: { machineKey: string; inventory: unknown }) => Promise<void>) {
+        busy = true
+        forwardPort = after.port
+        try {
+          await afterApply({ machineKey: 'cloud', inventory: {} })
+          return { machineKey: 'cloud', inventory: {} }
+        } finally { busy = false }
+      },
+    } as unknown as MachineManagement
+    const relay = new WebRelay({
+      machineManagement,
+      readRegistry: async () => ({ defaultMachine: 'local', machines: [{ key: 'cloud', sshTarget: 'cloud-host', enabled: true }] }) as never,
+      inspectRegistered: async () => ({
+        key: 'cloud', displayName: 'Cloud', connection: 'online', capabilities: { openTunnel: true },
+        projects: [{ key: 'main', id: 'cloud-id', displayName: 'Main', available: true, runtime: { webEndpoint: 'http://127.0.0.1:47331' } }],
+      }) as never,
+      connect: (async (options: { signal: AbortSignal; onReady: (value: { localUrl: string }) => void }) => {
+        const port = forwardPort
+        options.onReady({ localUrl: `http://127.0.0.1:${port}` })
+        await new Promise<void>((resolve) => options.signal.addEventListener('abort', () => {
+          if (port === before.port) oldForwardClosed = true
+          resolve()
+        }, { once: true }))
+        return 0
+      }) as never,
+      waitReady: async () => undefined,
+    })
+    const origin = await relay.listen()
+    openedRelays.push(relay)
+    await relay.connect('cloud', 'main')
+    expect(await (await fetch(`${origin}/api/who`)).json()).toMatchObject({ label: 'before' })
+
+    await relay.applyMachine('reviewed-plan')
+
+    expect(relay.status.generation).toBe(2)
+    expect(oldForwardClosed).toBe(true)
+    expect(await (await fetch(`${origin}/api/who`)).json()).toMatchObject({ label: 'after' })
+  })
+
+  it('rebuilds a stale SSH forward after proxied requests fail while the remote Runtime is healthy', async () => {
+    const before = await backend('cloud-id', 'stale forward')
+    const after = await backend('cloud-id', 'healthy forward')
+    openedBackends.push(after.server)
+    let attempts = 0
+    const relay = new WebRelay({
+      readRegistry: async () => ({ defaultMachine: 'local', machines: [{ key: 'cloud', sshTarget: 'cloud-host', enabled: true }] }) as never,
+      inspectRegistered: async () => ({
+        key: 'cloud', displayName: 'Cloud', connection: 'online', capabilities: { openTunnel: true },
+        projects: [{ key: 'main', id: 'cloud-id', displayName: 'Main', available: true, runtime: { webEndpoint: 'http://127.0.0.1:47331' } }],
+      }) as never,
+      connect: (async (options: { signal: AbortSignal; onReady: (value: { localUrl: string }) => void }) => {
+        const port = ++attempts === 1 ? before.port : after.port
+        options.onReady({ localUrl: `http://127.0.0.1:${port}` })
+        await new Promise<void>((resolve) => options.signal.addEventListener('abort', () => resolve(), { once: true }))
+        return 0
+      }) as never,
+      waitReady: async () => undefined,
+    })
+    const origin = await relay.listen()
+    openedRelays.push(relay)
+    await relay.connect('cloud', 'main')
+    await new Promise<void>((done) => before.server.close(() => done()))
+
+    expect((await fetch(`${origin}/api/who`)).status).toBe(502)
+    await vi.waitFor(() => expect(relay.status.generation).toBe(2))
+    expect(relay.status.targetConnection).toBe('healthy')
+    expect(await (await fetch(`${origin}/api/who`)).json()).toMatchObject({ label: 'healthy forward' })
+  })
+
+  it('keeps the selected location and reconnects when its SSH process exits', async () => {
+    const runtime = await backend('cloud-id', 'healthy')
+    openedBackends.push(runtime.server)
+    let attempts = 0
+    let exitFirstTunnel: (() => void) | null = null
+    const relay = new WebRelay({
+      readRegistry: async () => ({ defaultMachine: 'local', machines: [{ key: 'cloud', sshTarget: 'cloud-host', enabled: true }] }) as never,
+      inspectRegistered: async () => ({
+        key: 'cloud', displayName: 'Cloud', connection: 'online', capabilities: { openTunnel: true },
+        projects: [{ key: 'main', id: 'cloud-id', displayName: 'Main', available: true, runtime: { webEndpoint: 'http://127.0.0.1:47331' } }],
+      }) as never,
+      connect: (async (options: { signal: AbortSignal; onReady: (value: { localUrl: string }) => void }) => {
+        const first = ++attempts === 1
+        options.onReady({ localUrl: `http://127.0.0.1:${runtime.port}` })
+        await new Promise<void>((resolve) => {
+          if (first) exitFirstTunnel = resolve
+          options.signal.addEventListener('abort', () => resolve(), { once: true })
+        })
+        return 0
+      }) as never,
+      waitReady: async () => undefined,
+    })
+    await relay.listen()
+    openedRelays.push(relay)
+    await relay.connect('cloud', 'main')
+    expect(exitFirstTunnel).toBeTypeOf('function')
+    exitFirstTunnel!()
+
+    await vi.waitFor(() => expect(relay.status.generation).toBe(2))
+    expect(relay.status.target).toMatchObject({ machine: 'cloud', project: 'main' })
+    expect(relay.status.targetConnection).toBe('healthy')
+  })
+
   it('shares the selected target and disconnection events with a local presenter', async () => {
     const a = await backend('a-id', 'A')
     const relay = new WebRelay({ inspectLocal: async () => ({ machine: {
@@ -97,6 +247,10 @@ describe('WebRelay', () => {
     expect(await (await fetch(`${origin}/api/who`)).json()).toEqual({ label: 'B', cookie: null })
     const attack = await fetch(`${origin}/relay/v1/connect`, { method: 'POST', headers: { origin: 'https://evil.example', 'content-type': 'application/json' }, body: JSON.stringify({ machine: 'local', project: 'a' }) })
     expect(attack.status).toBe(403)
+    const reconnectAttack = await fetch(`${origin}/relay/v1/reconnect`, { method: 'POST', headers: { origin: 'https://evil.example' } })
+    expect(reconnectAttack.status).toBe(403)
+    const machineAttack = await fetch(`${origin}/relay/v1/machines/apply`, { method: 'POST', headers: { origin: 'https://evil.example', 'content-type': 'application/json' }, body: JSON.stringify({ id: 'stolen-plan' }) })
+    expect(machineAttack.status).toBe(403)
     expect(relay.status.target).toMatchObject({ machine: 'local', project: 'b' })
   })
 

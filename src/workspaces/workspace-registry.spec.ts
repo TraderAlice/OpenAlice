@@ -34,6 +34,29 @@ describe('WorkspaceRegistry persistence failures', () => {
   })
 })
 
+describe('WorkspaceRegistry concurrent persistence', () => {
+  it('serializes concurrent writes without dropping workspace rows', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'openalice-registry-concurrent-'))
+    temporaryPaths.push(root)
+    const path = join(root, 'workspaces.json')
+    const registry = await WorkspaceRegistry.load(path, logger())
+    const workspaces = Array.from({ length: 6 }, (_, index) => ({
+      id: `chat-concurrent-${index}`,
+      tag: `concurrent-${index}`,
+      dir: join(root, `chat-concurrent-${index}`),
+      createdAt: `2026-09-24T00:00:0${index}.000Z`,
+    }))
+
+    const results = await Promise.allSettled(workspaces.map((workspace) => registry.add(workspace)))
+    const persisted = JSON.parse(await readFile(path, 'utf8')) as { workspaces: { id: string }[] }
+
+    expect(results.filter((result) => result.status === 'rejected')).toEqual([])
+    expect(registry.list()).toHaveLength(workspaces.length)
+    expect(persisted.workspaces.map((workspace) => workspace.id).sort())
+      .toEqual(workspaces.map((workspace) => workspace.id).sort())
+  })
+})
+
 describe('WorkspaceRegistry legacy adapter metadata', () => {
   it('ignores legacy agents and never persists them again', async () => {
     const root = await mkdtemp(join(tmpdir(), 'openalice-registry-agents-'))

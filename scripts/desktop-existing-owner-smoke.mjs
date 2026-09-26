@@ -173,7 +173,6 @@ async function proveSurface(surface) {
       stdio: ['ignore', 'pipe', 'pipe'],
       env: {
         ...process.env,
-        ELECTRON_RUN_AS_NODE: '',
         OPENALICE_HOME: smokeHome,
         AQ_LAUNCHER_ROOT: smokeWorkspaces,
         OPENALICE_GLOBAL_DIR: join(smokeRoot, 'global'),

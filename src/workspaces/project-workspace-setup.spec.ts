@@ -13,21 +13,24 @@ async function home(pending?: string[]) {
   return dir
 }
 function service() {
+  const registry = new Map<string, { template: string }>()
   return {
-    resolveOrCreateChatWorkspace: vi.fn(async () => ({ ok: true, workspace: { id: 'chat-id' } })),
-    resolveOrCreateAutoQuantWorkspace: vi.fn(async () => ({ ok: true, workspace: { id: 'quant-id' } })),
-    resolveOrCreateAutoPredictionWorkspace: vi.fn(async () => ({ ok: true, workspace: { id: 'prediction-id' } })),
+    registry: { get: (id: string) => registry.get(id) },
+    resolveOrCreateChatWorkspace: vi.fn(async () => { registry.set('chat-id', { template: 'chat' }); return { ok: true, workspace: { id: 'chat-id' } } }),
+    resolveOrCreateAutoQuantWorkspace: vi.fn(async () => { registry.set('quant-id', { template: 'auto-quant-v2' }); return { ok: true, workspace: { id: 'quant-id' } } }),
+    resolveOrCreateAutoPredictionWorkspace: vi.fn(async () => { registry.set('prediction-id', { template: 'auto-prediction' }); return { ok: true, workspace: { id: 'prediction-id' } } }),
   }
 }
-it('prepares only requested workspaces, saves defaults, and consumes once across concurrent retries', async () => {
+it('fills all missing default Workspaces after activation and consumes once across concurrent retries', async () => {
   const dir = await home(['chat', 'auto-quant']); const svc = service()
   await Promise.all([prepareProjectWorkspaces(svc as unknown as WorkspaceService, { home: dir }), prepareProjectWorkspaces(svc as unknown as WorkspaceService, { home: dir })])
   expect(svc.resolveOrCreateChatWorkspace).toHaveBeenCalledTimes(1)
-  expect(svc.resolveOrCreateAutoPredictionWorkspace).not.toHaveBeenCalled()
+  expect(svc.resolveOrCreateAutoPredictionWorkspace).toHaveBeenCalledTimes(1)
   expect((await readProjectWorkspaceSetup(dir)).pending).toEqual([])
   const prefs = JSON.parse(await readFile(join(dir, 'data/preferences.json'), 'utf8'))
   expect(prefs.quickChat.recentChatWorkspaceId).toBe('chat-id')
   expect(prefs.autoQuant.defaultWorkspaceId).toBe('quant-id')
+  expect(prefs.autoPrediction.defaultWorkspaceId).toBe('prediction-id')
 })
 it('keeps failures retryable while preparing other workspaces', async () => {
   const dir = await home(['chat', 'auto-quant', 'auto-prediction']); const svc = service()
@@ -38,10 +41,12 @@ it('keeps failures retryable while preparing other workspaces', async () => {
   expect(svc.resolveOrCreateChatWorkspace).toHaveBeenCalledTimes(1)
   expect(await readProjectWorkspaceSetup(dir)).toMatchObject({ pending: [], errors: {} })
 })
-it('leaves old and explicitly skipped homes alone', async () => {
+it('prepares old and previously skipped homes on activation', async () => {
   const svc = service()
   for (const dir of [await home(), await home([])]) await prepareProjectWorkspaces(svc as unknown as WorkspaceService, { home: dir })
-  expect(svc.resolveOrCreateChatWorkspace).not.toHaveBeenCalled()
+  expect(svc.resolveOrCreateChatWorkspace).toHaveBeenCalledTimes(2)
+  expect(svc.resolveOrCreateAutoQuantWorkspace).toHaveBeenCalledTimes(2)
+  expect(svc.resolveOrCreateAutoPredictionWorkspace).toHaveBeenCalledTimes(2)
 })
 it('rejects corrupt intent without creating workspaces', async () => {
   const dir = await home(['unknown']); const svc = service()

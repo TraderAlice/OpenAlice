@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, Menu, nativeImage, screen, Tray } from 'electron'
+import { app, BrowserWindow, ipcMain, Menu, screen } from 'electron'
 import { readFileSync } from 'node:fs'
 import { writeFile, rename } from 'node:fs/promises'
 import { dirname, join, resolve } from 'node:path'
@@ -12,13 +12,19 @@ export function resizeCompanionWindow(window: BrowserWindow, width: number, heig
   else window.setSize(width, height)
 }
 
-function setCompanionBounds(window: BrowserWindow, bounds: Rect): void {
-  if (process.platform === 'win32') {
-    window.setContentSize(bounds.width, bounds.height)
-    window.setPosition(bounds.x, bounds.y)
-  } else {
-    window.setBounds(bounds)
-  }
+/** Move and size in the same coordinate space used by the renderer. */
+export function setCompanionBounds(window: BrowserWindow, bounds: Rect): void {
+  if (process.platform === 'win32') window.setContentBounds(bounds)
+  else window.setBounds(bounds)
+}
+
+function companionBounds(window: BrowserWindow): Rect {
+  return process.platform === 'win32' ? window.getContentBounds() : window.getBounds()
+}
+
+export interface CompanionHandle {
+  readonly window: BrowserWindow
+  trayMenuItems(): Electron.MenuItemConstructorOptions[]
 }
 
 /**
@@ -28,7 +34,7 @@ function setCompanionBounds(window: BrowserWindow, bounds: Rect): void {
  * Press/release, mirroring, bubble timing and snapping follow that MIT project;
  * OpenAlice owns the native lifecycle/IPC adaptation. See companion/NOTICE.md.
  */
-export function createCompanion(owner: BrowserWindow): BrowserWindow | undefined {
+export function createCompanion(owner: BrowserWindow): CompanionHandle | undefined {
   if (process.env.OPENALICE_DISABLE_COMPANION === '1') return
   const here = dirname(fileURLToPath(import.meta.url))
   const assets = app.isPackaged
@@ -70,17 +76,31 @@ export function createCompanion(owner: BrowserWindow): BrowserWindow | undefined
   let snapTimer: ReturnType<typeof setInterval> | undefined
   const stopSnap = () => { clearInterval(snapTimer); snapTimer = undefined }
   let drag: { start: Electron.Point; bounds: Rect; moved: boolean } | undefined
+  const petSize = () => ({ width: Math.round(size * 2.7), height: Math.round(size * 1.65) })
+  const inPositionRange = (value: number) =>
+    Number.isFinite(value) && Math.round(value) >= -2_147_483_648 && Math.round(value) <= 2_147_483_647
+  const moveTo = (x: number, y: number): boolean => {
+    if (pet.isDestroyed() || !inPositionRange(x) || !inPositionRange(y)) { stopSnap(); return false }
+    try {
+      setCompanionBounds(pet, { x: Math.round(x), y: Math.round(y), ...petSize() })
+      return true
+    } catch (error) {
+      console.error('[companion] failed to move pet:', error)
+      stopSnap()
+      return false
+    }
+  }
   const updateDrag = () => {
     if (!drag) return
     const cursor = screen.getCursorScreenPoint()
     const dx = cursor.x - drag.start.x, dy = cursor.y - drag.start.y
     if (dx * dx + dy * dy >= 9) drag.moved = true
-    if (drag.moved) pet.setPosition(Math.round(drag.bounds.x + dx), Math.round(drag.bounds.y + dy))
+    if (drag.moved) moveTo(drag.bounds.x + dx, drag.bounds.y + dy)
   }
   let writeQueue = Promise.resolve()
   const save = () => {
     if (pet.isDestroyed()) return
-    const { x, y } = pet.getBounds()
+    const { x, y } = companionBounds(pet)
     const payload = JSON.stringify({ x, y, size, enabled })
     writeQueue = writeQueue.then(async () => {
       await writeFile(statePath + '.tmp', payload)
@@ -89,21 +109,23 @@ export function createCompanion(owner: BrowserWindow): BrowserWindow | undefined
   }
   const settle = (snap = true) => {
     stopSnap()
-    const current = pet.getBounds()
+    if (pet.isDestroyed()) return
+    const current = companionBounds(pet)
     const next = settleCompanion(current, screen.getDisplayMatching(current).workArea, snap)
     flipped = next.flipped
     pet.webContents.send('openalice:companion:flip', flipped)
-    if (!snap || reducedMotion) { pet.setPosition(next.x, next.y); save(); return }
+    if (!snap || reducedMotion) { if (moveTo(next.x, next.y)) save(); return }
     const start = performance.now()
     snapTimer = setInterval(() => {
       const progress = Math.min(1, (performance.now() - start) / 160)
       const ease = snapEase(progress)
-      pet.setPosition(Math.round(current.x + (next.x - current.x) * ease), Math.round(current.y + (next.y - current.y) * ease))
-      if (progress === 1) { stopSnap(); pet.setPosition(next.x, next.y); save() }
+      if (!moveTo(current.x + (next.x - current.x) * ease, current.y + (next.y - current.y) * ease)) return
+      if (progress === 1) { stopSnap(); if (moveTo(next.x, next.y)) save() }
     }, 16)
   }
   const open = () => { if (!owner.isDestroyed()) { if (owner.isMinimized()) owner.restore(); owner.show(); owner.focus() } }
   const toggle = () => {
+    if (pet.isDestroyed()) return
     enabled = !enabled
     if (enabled && ready) { settle(false); pet.showInactive() } else pet.hide()
     save()
@@ -162,28 +184,25 @@ export function createCompanion(owner: BrowserWindow): BrowserWindow | undefined
     ipcMain.removeHandler(soundUpdate)
     ipcMain.removeHandler(soundReset)
   })
-  const menu = () => Menu.buildFromTemplate([
-    { label: '打开 OpenAlice', click: open },
+  const trayMenuItems = (): Electron.MenuItemConstructorOptions[] => [
     { label: enabled ? 'Hide pet' : 'Show pet', click: toggle },
-    { label: '大小', submenu: [170, 220, 280].map(value => ({
-      label: value === 170 ? '小' : value === 220 ? '中' : '大', type: 'radio' as const, checked: size === value,
+    { label: 'Size', submenu: [170, 220, 280].map(value => ({
+      label: value === 170 ? 'Small' : value === 220 ? 'Medium' : 'Large', type: 'radio' as const, checked: size === value,
       click: () => {
-        const old = pet.getBounds(); size = value
-        const height = Math.round(size * 1.65)
-        const width = Math.round(size * 2.7)
+        if (pet.isDestroyed()) return
+        const old = companionBounds(pet); size = value
+        const { width, height } = petSize()
         setCompanionBounds(pet, { x: Math.round(old.x + (old.width - width) / 2), y: old.y + old.height - height, width, height })
         settle(false); save()
       },
     })) },
+  ]
+  const menu = () => Menu.buildFromTemplate([
+    { label: 'Show OpenAlice', click: open },
+    ...trayMenuItems(),
     { type: 'separator' },
-    { label: '退出 OpenAlice', click: () => app.quit() },
+    { label: 'Quit OpenAlice', click: () => app.quit() },
   ])
-  const icon = nativeImage.createFromPath(join(assets, 'alice.png')).resize({ width: 22, height: 22 })
-  const tray = new Tray(icon)
-  tray.setToolTip('OpenAlice · Alice')
-  const trayMenu = () => tray.popUpContextMenu(menu())
-  tray.on('click', trayMenu)
-  tray.on('right-click', trayMenu)
   const trusted = (event: Electron.IpcMainEvent | Electron.IpcMainInvokeEvent) => event.sender === pet.webContents && event.senderFrame === pet.webContents.mainFrame
   const listen = (action: string, callback: (input: unknown) => void) => {
     const channel = 'openalice:companion:' + action
@@ -194,7 +213,7 @@ export function createCompanion(owner: BrowserWindow): BrowserWindow | undefined
   listen('ready', () => { ready = true; pet.webContents.send('openalice:companion:flip', flipped); if (enabled) pet.showInactive() })
   listen('reduced-motion', value => { if (typeof value === 'boolean') reducedMotion = value })
   listen('interactive', value => { if (typeof value === 'boolean') pet.setIgnoreMouseEvents(drag ? false : !value, { forward: true }) })
-  listen('begin-drag', () => { stopSnap(); drag = { start: screen.getCursorScreenPoint(), bounds: pet.getBounds(), moved: false }; pet.setIgnoreMouseEvents(false) })
+  listen('begin-drag', () => { stopSnap(); drag = { start: screen.getCursorScreenPoint(), bounds: companionBounds(pet), moved: false }; pet.setIgnoreMouseEvents(false) })
   listen('move-drag', updateDrag)
   listen('menu', () => menu().popup({ window: pet }))
   listen('open', open)
@@ -203,7 +222,7 @@ export function createCompanion(owner: BrowserWindow): BrowserWindow | undefined
     if (!trusted(event)) return false
     updateDrag()
     const moved = drag?.moved ?? false
-    if (drag && cancelled === true) pet.setBounds(drag.bounds)
+    if (drag && cancelled === true && !pet.isDestroyed()) setCompanionBounds(pet, drag.bounds)
     drag = undefined
     if (moved && cancelled !== true) settle()
     return moved
@@ -214,7 +233,7 @@ export function createCompanion(owner: BrowserWindow): BrowserWindow | undefined
     if (pet.isDestroyed() || !ready || !pet.isVisible()) return
     const cursor = screen.getCursorScreenPoint()
     updateDrag()
-    const box = pet.getBounds()
+    const box = companionBounds(pet)
     const point = { x: cursor.x - box.x, y: cursor.y - box.y }
     const key = `${point.x},${point.y}`
     if (key !== lastCursor) { lastCursor = key; pet.webContents.send('openalice:companion:cursor', point) }
@@ -224,7 +243,7 @@ export function createCompanion(owner: BrowserWindow): BrowserWindow | undefined
   screen.on('display-metrics-changed', displayChanged)
   owner.once('closed', () => { if (!pet.isDestroyed()) pet.destroy() })
   pet.once('closed', () => {
-    clearInterval(tick); stopSnap(); tray.destroy(); ipcMain.removeHandler(endChannel)
+    clearInterval(tick); stopSnap(); ipcMain.removeHandler(endChannel)
     screen.removeListener('display-removed', displayChanged)
     screen.removeListener('display-metrics-changed', displayChanged)
   })
@@ -232,5 +251,5 @@ export function createCompanion(owner: BrowserWindow): BrowserWindow | undefined
     console.error('[companion] load failed:', error.message)
     if (!pet.isDestroyed()) pet.destroy()
   })
-  return pet
+  return { window: pet, trayMenuItems }
 }

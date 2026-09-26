@@ -4,7 +4,8 @@ import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/re
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { i18n } from '../i18n'
-import { HarnessSettingsPage } from './HarnessSettingsPage'
+import { SessionVisibilitySettingsPage } from './SessionVisibilitySettingsPage'
+import { UnverifiedHarnessReleaseSetting } from '../components/workspace/UnverifiedHarnessReleaseSetting'
 
 const mocks = vi.hoisted(() => ({
   save: vi.fn(),
@@ -37,13 +38,13 @@ beforeEach(async () => {
   mocks.save.mockResolvedValue(undefined)
 })
 
-describe('HarnessSettingsPage', () => {
-  it('opts into showing headless-born Sessions and names the shared roster', async () => {
-    render(<HarnessSettingsPage />)
+describe('Session visibility settings', () => {
+  it('opts into showing headless-born Sessions', async () => {
+    render(<SessionVisibilitySettingsPage />)
 
     const toggle = screen.getByRole('switch', { name: 'Show headless-born Sessions' })
     expect(toggle.getAttribute('aria-checked')).toBe('false')
-    expect(screen.getByText('Shared Harness behavior')).toBeTruthy()
+    expect(screen.getByText('Session visibility')).toBeTruthy()
     expect(screen.queryByText('Ask Alice')).toBeNull()
     expect(screen.queryByText('Auto Quant')).toBeNull()
     expect(screen.queryByText('Auto Prediction')).toBeNull()
@@ -57,7 +58,7 @@ describe('HarnessSettingsPage', () => {
   })
 
   it('opts into showing Sessions attached to Issues independently', async () => {
-    render(<HarnessSettingsPage />)
+    render(<SessionVisibilitySettingsPage />)
 
     const toggle = screen.getByRole('switch', { name: 'Show Issue-attached Sessions' })
     expect(toggle.getAttribute('aria-checked')).toBe('false')
@@ -71,8 +72,8 @@ describe('HarnessSettingsPage', () => {
   })
 
   it('keeps unverified release discovery off until explicitly enabled', async () => {
-    render(<HarnessSettingsPage />)
-    const toggle = screen.getByRole('switch', { name: 'Show unverified Harness releases' })
+    render(<UnverifiedHarnessReleaseSetting />)
+    const toggle = screen.getByRole('switch', { name: 'Include unverified template releases' })
     expect(toggle.getAttribute('aria-checked')).toBe('false')
     fireEvent.click(toggle)
     await waitFor(() => expect(mocks.save).toHaveBeenCalledWith({

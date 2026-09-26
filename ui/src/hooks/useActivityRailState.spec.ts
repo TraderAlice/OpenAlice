@@ -34,4 +34,26 @@ describe('primary activity rail', () => {
     expect(view.result.current.collapsed).toBe(true)
     expect(useActivityBarCollapse.getState().railCollapsed).toBe(true)
   })
+
+  it('temporarily collapses for a page navigator and restores the saved preference on exit', () => {
+    useActivityBarCollapse.setState({ railCollapsed: false })
+    const view = renderHook(
+      ({ pageNavigator }) => useActivityRailState(true, pageNavigator),
+      { initialProps: { pageNavigator: false } },
+    )
+    expect(view.result.current.collapsed).toBe(false)
+
+    view.rerender({ pageNavigator: true })
+    expect(view.result.current.collapsed).toBe(true)
+    expect(useActivityBarCollapse.getState().railCollapsed).toBe(false)
+
+    act(() => view.result.current.toggle())
+    expect(view.result.current.collapsed).toBe(false)
+    expect(useActivityBarCollapse.getState().railCollapsed).toBe(false)
+
+    view.rerender({ pageNavigator: false })
+    expect(view.result.current.collapsed).toBe(false)
+    view.rerender({ pageNavigator: true })
+    expect(view.result.current.collapsed).toBe(true)
+  })
 })
