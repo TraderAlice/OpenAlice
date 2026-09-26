@@ -62,7 +62,7 @@ import { attachWorkspacesWS, type AttachedWS } from './workspaces-ws.js'
 import { attachWorkspacesIpc, type AttachedWorkspaceIpc } from './workspaces-ipc.js'
 import { attachWebIpc, type AttachedWebIpc } from './web-ipc.js'
 import { registerCliRoutes } from '../server/cli.js'
-import { mountLocalToolGateway } from '../server/local-tool-gateway.js'
+import { mountLocalToolGateway, useToolToken } from '../server/local-tool-gateway.js'
 import type { Server as HttpServer } from 'node:http'
 import { proxyHarnessSurface, attachHarnessSurfaceWS, type AttachedHarnessSurfaceWS } from './harness-surface-proxy.js'
 
@@ -195,6 +195,7 @@ export class WebPlugin implements Plugin {
     })
 
     app.use('/api/*', cors())
+    useToolToken(app)
 
     if (this.config.localCliOnWeb) {
       if (bindIsPublic) {

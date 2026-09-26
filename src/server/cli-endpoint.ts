@@ -9,7 +9,8 @@ export async function publishCliEndpoint(url: string, socket?: string, home = us
   const project = resolveAliceProjectIdentity({ home, appRoot: appResourcesHome })
   const path = join(home, 'state', 'cli-endpoint.json')
   const nonce = randomUUID()
-  const payload = { schemaVersion: 1, projectId: project.id, home: project.home, appRoot: appResourcesHome, pid: process.pid, nonce, url, ...(socket ? { socket } : {}) }
+  const token = process.env['OPENALICE_TOOL_TOKEN']
+  const payload = { schemaVersion: 1, projectId: project.id, home: project.home, appRoot: appResourcesHome, pid: process.pid, nonce, url, ...(token ? { token } : {}), ...(socket ? { socket } : {}) }
   await mkdir(join(home, 'state'), { recursive: true })
   const temp = `${path}.${nonce}.tmp`
   await writeFile(temp, JSON.stringify(payload), { mode: 0o600 })

@@ -698,6 +698,12 @@ function codexMcpConfigArgs(ctx: SpawnContext): string[] {
   if (!workspaceId) {
     throw new Error('codex adapter: AQ_WS_ID missing from spawn env');
   }
+  const bearer = ctx.env['OPENALICE_TOOL_TOKEN']
+    ? [
+        '-c', 'mcp_servers.openalice.bearer_token_env_var="OPENALICE_TOOL_TOKEN"',
+        '-c', 'mcp_servers.openalice-workspace.bearer_token_env_var="OPENALICE_TOOL_TOKEN"',
+      ]
+    : [];
   return [
     '-c',
     `mcp_servers.openalice.url="${mcpUrl}"`,
@@ -708,6 +714,7 @@ function codexMcpConfigArgs(ctx: SpawnContext): string[] {
     // server name, which then failed codex's own `^[a-zA-Z0-9_-]+$` name check
     // ("Invalid MCP server name '\"openalice-workspace\"'").
     `mcp_servers.openalice-workspace.url="${mcpUrl}/${workspaceId}"`,
+    ...bearer,
   ];
 }
 

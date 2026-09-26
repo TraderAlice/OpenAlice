@@ -233,6 +233,11 @@ describe('codexAdapter AI-config', () => {
     ]);
   });
 
+  it('emits Codex bearer env names and not the secret', () => {
+    const argv = codexAdapter.composeCommand(['x'], { cwd: dir, env: { OPENALICE_MCP_URL: 'http://127.0.0.1:1/mcp', AQ_WS_ID: 'ws', OPENALICE_TOOL_TOKEN: 'spawn-secret' } })
+    expect(argv.filter(a => a.includes('bearer_token_env_var') || a.includes('spawn-secret'))).toEqual(['mcp_servers.openalice.bearer_token_env_var="OPENALICE_TOOL_TOKEN"', 'mcp_servers.openalice-workspace.bearer_token_env_var="OPENALICE_TOOL_TOKEN"'])
+  })
+
   it('preserves both MCP servers when resuming codex sessions', () => {
     const env = {
       OPENALICE_MCP_URL: 'http://127.0.0.1:47332/mcp',

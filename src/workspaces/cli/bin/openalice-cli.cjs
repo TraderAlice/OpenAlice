@@ -179,7 +179,7 @@ async function invoke(base, tool, args) {
 }
 
 async function fetchJson(url, opts) {
-  opts = { ...opts, headers: { ...opts.headers, ...(process.env.OPENALICE_PROJECT_ID ? { 'x-openalice-project': process.env.OPENALICE_PROJECT_ID } : {}) } }
+  opts = { ...opts, headers: { ...opts.headers, ...(process.env.OPENALICE_PROJECT_ID ? { 'x-openalice-project': process.env.OPENALICE_PROJECT_ID } : {}), ...(process.env.OPENALICE_TOOL_TOKEN ? { Authorization: `Bearer ${process.env.OPENALICE_TOOL_TOKEN}` } : {}) } }
   if (process.env.OPENALICE_TOOL_SOCKET && url.startsWith('/')) {
     return fetchSocketJson(process.env.OPENALICE_TOOL_SOCKET, url, opts)
   }
