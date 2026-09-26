@@ -14,7 +14,7 @@ import {
 import { CreateWorkspaceDialog } from './CreateWorkspaceDialog';
 import { WorkspaceOffboardingDialog } from './WorkspaceOffboardingDialog';
 import { Skeleton } from '../StateViews';
-import { sessionCoworkerLabel, workspaceDisplayName, workspaceDisplayTitle } from './display';
+import { sessionChromeLabel, workspaceDisplayName, workspaceDisplayTitle } from './display';
 import { orderSessionsForSidebar, orderWorkspacesForSidebar, workspaceActivityMs } from './sidebar-order';
 import { useReorderMotion } from './useReorderMotion';
 import { SidebarActionMenu } from './SidebarActionMenu';
@@ -25,6 +25,7 @@ import { Button } from '../ui/button';
 import { SidebarRow } from '../SidebarRow';
 import { useSessionDetailsDialog } from './session-details-store';
 import { SidebarChildRow, SidebarChildRowButton } from '../SidebarChildRow';
+import { SpacedTruncate } from '../SpacedTruncate';
 
 /**
  * Workspace launcher sidebar.
@@ -666,7 +667,9 @@ export function SessionRow(props: SessionRowProps): ReactElement {
   const resumable = props.resumable !== false;
   const canDelete = props.canDelete !== false;
   // Coworker nametag → native/fallback title → sticky launcher name.
-  const display = props.displayTitle?.trim() || sessionCoworkerLabel(s);
+  const display = sessionChromeLabel(s, props.displayTitle);
+  const fullTitle = (props.displayTitle?.trim() || s.title?.trim() || s.name || display).trim();
+  const chromeTitle = fullTitle !== display ? fullTitle : display;
   const resumeLocked = !resumable;
   const resumeLabel = headlessOccupying
     ? t('workspace.sessionRunning', { title: display })
@@ -754,16 +757,17 @@ export function SessionRow(props: SessionRowProps): ReactElement {
         {/* Runtime identity stays stable across Session state. The action at the
             right and the row treatment carry paused/running/selected state. */}
         <span className="min-w-0 flex-1">
-          <span
-            title={display}
-            className={`block truncate ${labelTone}`}
-          >
-            {display}
-          </span>
+          <SpacedTruncate
+            text={display}
+            title={chromeTitle}
+            abbreviated={fullTitle !== display}
+            className={labelTone}
+          />
           {props.subtitle && (
-            <span className="text-micro mt-0.5 block truncate text-muted-foreground/55">
-              {props.subtitle}
-            </span>
+            <SpacedTruncate
+              text={props.subtitle}
+              className="text-micro mt-0.5 text-muted-foreground/55"
+            />
           )}
           {openError && <span role="alert" className="block text-caption text-destructive break-words">{openError}</span>}
         </span>

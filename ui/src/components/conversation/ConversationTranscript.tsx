@@ -1,11 +1,11 @@
-import { useEffect, useState, type ReactElement } from 'react'
+import { memo, useEffect, useState, type ReactElement } from 'react'
 import { Check, ChevronRight, CircleAlert, CircleDashed, LoaderCircle } from 'lucide-react'
 import { MarkdownContent } from '../MarkdownContent'
 import type { ConversationActivity, ConversationContent, ConversationItem, ConversationToolStep } from './types'
 import { useTextReveal } from './useTextReveal'
 import { MessageActions } from './MessageActions'
 
-export function ConversationTranscriptItem({
+export const ConversationTranscriptItem = memo(function ConversationTranscriptItem({
   item,
   fileHrefs,
   onFileReference,
@@ -54,7 +54,7 @@ export function ConversationTranscriptItem({
       {!working && item.final && <MessageActions text={item.final} />}
     </article>
   )
-}
+})
 
 function ConversationActivityGroup({ activity, working }: { readonly activity: ConversationActivity; readonly working: boolean }): ReactElement {
   const failedCount = activity.steps.filter((step) => step.status === 'failed').length

@@ -15,13 +15,13 @@ vi.mock('../../components/market/TradeableContractsPanel', () => ({ TradeableCon
 afterEach(cleanup)
 
 describe('EquityDetail provider namespaces', () => {
-  it('keeps Eastmoney native secids on the supported K-line-only surface', () => {
+  it('shows Tencent L1 quote on Eastmoney K-line surfaces, without fundamentals', () => {
     render(<EquityDetail symbol="1.600519" source="eastmoney|1.600519" />)
 
     expect(screen.queryByText(/This Eastmoney view/)).toBeNull()
     expect(screen.getByText('kline-panel')).toBeTruthy()
     expect(screen.getByText('contracts-panel 600519')).toBeTruthy()
-    expect(screen.queryByText('quote-panel')).toBeNull()
+    expect(screen.getByText('quote-panel')).toBeTruthy()
     expect(screen.queryByText('profile-panel')).toBeNull()
     expect(screen.queryByText('metrics-panel')).toBeNull()
     expect(screen.queryByText('statements-panel')).toBeNull()
