@@ -10,6 +10,7 @@ import { resolve } from 'node:path'
 import type { z } from 'zod'
 import type { IBroker } from './types.js'
 import { MockBroker } from './mock/MockBroker.js'
+import { CnLocalPaperBroker } from './mock/CnLocalPaperBroker.js'
 import type { BrokerEngine } from '@traderalice/uta-protocol'
 import {
   BROKER_PACK_API_VERSION,
@@ -70,7 +71,13 @@ async function loadBrokerEngineUncached(engine: BrokerEngine): Promise<BrokerEng
   if (engine === 'mock') {
     return {
       configSchema: MockBroker.configSchema,
-      createBroker: (config) => Object.assign(MockBroker.fromConfig(config), { brokerEngine: 'mock' }),
+      createBroker: (config) => {
+        const variant = config.brokerConfig?.['variant']
+        if (variant === 'cn-local-paper') {
+          return Object.assign(CnLocalPaperBroker.fromConfig(config), { brokerEngine: 'mock' })
+        }
+        return Object.assign(MockBroker.fromConfig(config), { brokerEngine: 'mock' })
+      },
     }
   }
   if (!isInstallableBrokerEngine(engine)) throw new Error(`Unknown broker engine "${engine}"`)

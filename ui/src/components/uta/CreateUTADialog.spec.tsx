@@ -162,4 +162,43 @@ describe('CreateUTADialog', () => {
 
     expect(onEscape).toHaveBeenCalled()
   })
+
+  it('lists CN Local Paper under Local paper and skips Broker Pack install', async () => {
+    const cnPaper: BrokerPreset = {
+      id: 'cn-local-paper',
+      label: 'CN Local Paper',
+      description: 'Local A-share paper',
+      category: 'testing',
+      defaultName: 'cn-paper',
+      badge: 'CN',
+      badgeColor: 'text-muted-foreground',
+      engine: 'mock',
+      guardCategory: 'securities',
+      subtitleFields: [],
+      schema: {
+        type: 'object',
+        properties: {
+          cash: { type: 'number', title: 'Starting cash (CNY)', default: 1_000_000 },
+        },
+      },
+    }
+    const simulator: BrokerPreset = {
+      ...cnPaper,
+      id: 'mock-simulator',
+      label: 'Simulator (testing only)',
+      defaultName: 'simulator',
+      badge: 'SM',
+    }
+    setup({ presets: [brokerPreset, cnPaper, simulator] })
+
+    await waitFor(() => expect(getBrokerPacks).toHaveBeenCalled())
+    expect(screen.getByText('Local paper')).toBeTruthy()
+    expect(screen.getByText('CN Local Paper')).toBeTruthy()
+    expect(screen.queryByText('Simulator (testing only)')).toBeNull()
+
+    fireEvent.click(screen.getByText('CN Local Paper'))
+    expect(screen.getByText(/Starting cash/i)).toBeTruthy()
+    expect(screen.queryByRole('button', { name: /Install/i })).toBeNull()
+    expect(installBrokerPack).not.toHaveBeenCalled()
+  })
 })
