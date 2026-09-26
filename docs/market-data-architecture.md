@@ -222,7 +222,10 @@ leaves a usable code-based heading and does not block history. Provider-native
 secids remain on the bar request; broker discovery receives the security code
 as a heuristic query, not a claimed canonical trading identity. The chart
 displays its forward-adjustment policy beside the source and keeps full candle
-timestamps available on the condensed date-range label.
+timestamps available on the condensed date-range label. Realtime Level-1 quotes
+on that page (and for Yahoo `.SS`/`.SZ` / bare A-share codes) use the keyless
+`tencent` provider (`qt.gtimg.cn`) at a ~3s poll — ordinary watching latency,
+not exchange matching or HFT.
 
 ### Bar record freshness
 

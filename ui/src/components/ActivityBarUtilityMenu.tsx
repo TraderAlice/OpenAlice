@@ -49,21 +49,18 @@ export function ActivityBarUtilityMenu({
   const CurrentThemeIcon = THEME_MODES.find((item) => item.mode === theme)?.Icon ?? Laptop
 
   return (
-    <DropdownMenu open={menuOpen} onOpenChange={setMenuOpen}>
+    <DropdownMenu onOpenChange={setMenuOpen}>
       <DropdownMenuTrigger
         render={(
           <button
             type="button"
             aria-label={t('nav.applicationMenu')}
             title={compactRail ? t('nav.applicationMenu') : undefined}
-            onClick={() => {
-              if (!menuOpen) setMenuOpen(true)
-            }}
             className={`oa-application-menu oa-pressable relative flex min-w-0 cursor-pointer items-center rounded-md text-left text-[13px] text-sidebar-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring/45 ${
               compactRail
-                ? `${denseRail ? 'h-[26px] w-[26px]' : 'h-8 w-8'} justify-center p-0`
-                : 'min-h-10 w-full gap-2.5 px-2 py-1.5'
-            } ${menuOpen ? 'bg-sidebar-accent text-sidebar-accent-foreground' : 'hover:bg-sidebar-accent/60'}`}
+                ? `${denseRail ? 'h-[26px] w-[26px]' : 'h-8 w-8'} justify-center p-0 ${menuOpen ? 'bg-muted' : 'hover:bg-sidebar-accent/70'}`
+                : `oa-application-menu--rail min-h-10 w-full gap-2.5 px-2 py-1.5`
+            }`}
           />
         )}
       >
@@ -88,7 +85,7 @@ export function ActivityBarUtilityMenu({
         align="start"
         side="top"
         sideOffset={6}
-        className="w-[208px] max-w-[calc(100vw-1rem)] rounded-xl border border-border/70 bg-popover p-1.5 shadow-lg ring-0"
+        className="oa-application-menu-panel w-[208px] max-w-[calc(100vw-1rem)] rounded-xl border bg-popover p-1.5 ring-0"
       >
         {companion.visible !== null && (
           <DropdownMenuItem
@@ -134,7 +131,7 @@ export function ActivityBarUtilityMenu({
             <span className="min-w-0 flex-1 truncate">{t('settings.category.appearance')}</span>
             <span className="shrink-0 text-muted-foreground">{t(`theme.mode.${theme}`)}</span>
           </DropdownMenuSubTrigger>
-          <DropdownMenuSubContent className="w-[148px] border border-border/70 bg-popover p-1.5 shadow-lg ring-0">
+          <DropdownMenuSubContent className="oa-application-menu-panel w-[148px] border bg-popover p-1.5 ring-0">
             <DropdownMenuRadioGroup
               value={theme}
               onValueChange={(value) => {

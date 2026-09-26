@@ -46,6 +46,28 @@ afterEach(() => {
 })
 
 describe('ActivityBarUtilityMenu', () => {
+  it('toggles the application menu closed on a second trigger click', async () => {
+    const user = userEvent.setup()
+    render(
+      <ActivityBarUtilityMenu
+        compactRail={false}
+        denseRail={false}
+        onOpenSettings={vi.fn()}
+        onOpenConnectors={vi.fn()}
+      />,
+    )
+
+    const trigger = screen.getByRole('button', { name: 'Alice’s Settings: Open application menu' })
+    expect(trigger.className).toContain('oa-application-menu--rail')
+    expect(trigger.getAttribute('aria-expanded')).toBe('false')
+    trigger.focus()
+    await user.keyboard('{ArrowDown}')
+    expect(await screen.findByRole('menuitem', { name: 'Settings' })).toBeTruthy()
+    expect(trigger.getAttribute('aria-expanded')).toBe('true')
+    await user.click(trigger)
+    expect(screen.queryByRole('menuitem', { name: 'Settings' })).toBeNull()
+  })
+
   it('recovers a hidden companion from Alice Settings and then offers Hide pet', async () => {
     let visible = false
     const toggle = vi.fn(async () => { visible = !visible; return visible })
@@ -60,6 +82,8 @@ describe('ActivityBarUtilityMenu', () => {
     expect(toggle).toHaveBeenCalledOnce()
     await user.click(screen.getByRole('button', { name: 'Alice’s Settings: Open application menu' }))
     expect(await screen.findByRole('menuitem', { name: 'Hide pet' })).toBeTruthy()
+    await user.keyboard('{Escape}')
+    expect(screen.queryByRole('menuitem', { name: 'Hide pet' })).toBeNull()
   })
   it('keeps theme choices in an Appearance submenu', async () => {
     const user = userEvent.setup()
@@ -74,7 +98,7 @@ describe('ActivityBarUtilityMenu', () => {
     )
 
     await user.click(screen.getByRole('button', { name: 'Alice’s Settings: Open application menu' }))
-    expect(screen.getByRole('menuitem', { name: 'Settings' })).toBeTruthy()
+    expect(await screen.findByRole('menuitem', { name: 'Settings' })).toBeTruthy()
     expect(screen.getAllByRole('menuitem').map(item => item.textContent)).toEqual(['Settings', 'Connectors', 'AppearanceAuto'])
     expect(screen.getByRole('menuitem', { name: 'Appearance: Auto' })).toBeTruthy()
     expect(screen.queryByRole('menuitemradio', { name: 'Auto' })).toBeNull()
@@ -82,7 +106,8 @@ describe('ActivityBarUtilityMenu', () => {
     expect(onOpenSettings).toHaveBeenCalledOnce()
 
     await user.click(screen.getByRole('button', { name: 'Alice’s Settings: Open application menu' }))
-    screen.getByRole('menuitem', { name: 'Appearance: Auto' }).focus()
+    const appearance = await screen.findByRole('menuitem', { name: 'Appearance: Auto' })
+    appearance.focus()
     await user.keyboard('{ArrowRight}')
     expect(screen.getByRole('menuitemradio', { name: 'Auto' }).getAttribute('aria-checked')).toBe('true')
     expect(screen.getByRole('menuitemradio', { name: 'Day' })).toBeTruthy()
@@ -101,10 +126,13 @@ describe('ActivityBarUtilityMenu', () => {
     expect(trigger.querySelector('img')?.getAttribute('src')).toBe(aliceWave)
     expect(trigger.querySelector('img')?.parentElement?.classList.contains('rounded-full')).toBe(true)
     expect(trigger.textContent).toBe(compactRail ? '' : 'Alice’s Settings')
-    expect(trigger.className).not.toContain('bg-sidebar-accent text-sidebar-accent-foreground')
+    expect(trigger.className).not.toContain('bg-muted')
+    expect(trigger.getAttribute('aria-expanded')).toBe('false')
     trigger.focus()
     await user.keyboard('{ArrowDown}')
-    expect(trigger.className).toContain('bg-sidebar-accent text-sidebar-accent-foreground')
+    expect(trigger.getAttribute('aria-expanded')).toBe('true')
+    if (compactRail) expect(trigger.className).toContain('bg-muted')
+    else expect(trigger.className).toContain('oa-application-menu--rail')
     const connectors = screen.getByRole('menuitem', { name: /Connectors/ })
     expect(connectors.getAttribute('aria-current')).toBe('page')
     connectors.focus()

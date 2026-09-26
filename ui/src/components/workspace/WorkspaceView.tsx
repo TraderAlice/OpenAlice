@@ -109,6 +109,7 @@ export function WorkspaceView(props: WorkspaceViewProps): ReactElement {
                     sessionId={s.id}
                     agent={s.agent}
                     {...(props.agents ? { agents: props.agents } : {})}
+                    {...(props.source ? { source: props.source } : {})}
                     label={s.displayName?.trim() || s.title?.trim()
                       ? sessionCoworkerLabel(s)
                       : props.label ? `${props.label} · ${s.name}` : s.name}

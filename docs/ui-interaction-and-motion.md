@@ -221,8 +221,15 @@ The bottom Your Alice application menu uses the static Alice portrait and a
 text label when expanded, or only the portrait when compact. The brand header
 keeps the OpenAlice wordmark without a second portrait. Its trailing ellipsis
 appears on hover, keyboard focus, or while open; touch keeps it visible. The
-trigger highlights for interaction, not because a Settings or Connectors page
-is active. Settings remains an item inside this application menu.
+trigger toggles the menu on repeated activation and highlights for interaction,
+not because a Settings or Connectors page is active. Expanded-rail resting and
+open states use `.oa-application-menu--rail` with a color-mix lift off
+`bg-sidebar`; Night palettes (Graphite, Midnight, Moss, Iris) use a stronger
+mix and inset edge. The `.oa-application-menu-panel` popup keeps a
+foreground-weighted border and shadow, again stronger under Night, so it
+separates from both the rail and the open trigger. Default Night Graphite also
+raises `--popover` / `--muted` above the sidebar so floating chrome stays
+readable. Settings remains an item inside this application menu.
 
 Connectors is accessed from the bottom Your Alice menu, alongside Settings and
 above Appearance, not from the primary activity list or its layout editor.
@@ -677,6 +684,23 @@ prompt preview into useWebConversation until its first authoritative snapshot.
 It never persists or resends this preview. No artificial startup delay is added;
 the short message entrance honors reduced motion. TUI launches share the pending
 feedback, then hand over to the terminal normally.
+
+### AutoQuant long-context continue
+
+AutoQuant Web Sessions may offer a soft “summarize and continue” path when a
+thread grows long (many user turns or heavy tool activity). The offer appears
+inline at the end of the transcript like an ordinary conversation card — no
+modal overlay — so the user can keep chatting without being blocked. It asks
+them to write a consensus draft first (optional scaffold: assumptions,
+conclusions, open questions, next steps), then lets Alice add suggestion cards
+the user can accept into the same draft. Confirming archives the old Session,
+asks the live agent to write `reports/checkpoints/…` when possible, and opens
+AutoQuant landing with a continue prompt that treats the checkpoint as source of
+truth. Dismissals cool down per Session so the reminder stays infrequent.
+“Later” docks the inline card into the header “Summarize & continue” control
+with a ~1s shrink/fade (skipped under reduced motion), flying a fixed-position
+clone so the transcript scroller cannot clip the path, then briefly pulses that
+control so the deferred path stays discoverable.
 
 
 ### Background Session inspection
