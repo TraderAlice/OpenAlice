@@ -97,6 +97,10 @@ OpenAlice Inbox.
 5. Translate the evidence for the user, separating AutoQuant's findings from
    your judgment. Any live account or execution decision returns to
    `alice-uta` and its approval flow.
+6. When the handoff includes an equity CSV (`date`, `equity`, optional
+   `bench`), follow `equity-tearsheet` and produce
+   `equity-drawdown-tearsheet.html` in that Report directory. Give the user
+   the absolute path and `file:///` URL. Do not redraw the study.
 
 A normal attended Chat reply already reaches the user. Ask AutoQuant to commit
 and push an exact file to Inbox only when the user explicitly wants a durable

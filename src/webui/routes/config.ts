@@ -460,9 +460,9 @@ export function createConfigRoutes(opts?: ConfigRouteOpts) {
       if (section === 'trading' || section === 'snapshot') {
         triggerUTARestart().catch(() => { /* surfaced via health badges */ })
       }
-      // marketData edits are picked up lazily by the provider resolver
-      // (it reads ctx.config per request), so no explicit hot-reload hook
-      // is needed. Connector Service owns its own restart flag and API.
+      // marketData edits: HTTP compat + SDK clients resolve providerKeys
+      // per request (see SDKBaseClient credentials getter). Connector
+      // Service owns its own restart flag and API.
       return c.json(validated)
     } catch (err) {
       if (err instanceof Error && err.name === 'ZodError') {
@@ -482,7 +482,8 @@ export function createMarketDataRoutes(ctx: EngineContext) {
     bls:              { credField: 'bls_api_key',              provider: 'bls',              model: 'BlsSearch',               params: { query: 'unemployment' } },
     eia:              { credField: 'eia_api_key',              provider: 'eia',              model: 'ShortTermEnergyOutlook',  params: {} },
     econdb:           { credField: 'econdb_api_key',           provider: 'econdb',           model: 'AvailableIndicators',     params: {} },
-    fmp:              { credField: 'fmp_api_key',              provider: 'fmp',              model: 'EquityScreener',          params: { limit: 1 } },
+    // EquityInfo/profile is on free FMP plans; EquityScreener (company-screener) is often 402.
+    fmp:              { credField: 'fmp_api_key',              provider: 'fmp',              model: 'EquityInfo',              params: { symbol: 'AAPL' } },
     intrinio:         { credField: 'intrinio_api_key',         provider: 'intrinio',         model: 'EquitySearch',            params: { query: 'AAPL', limit: 1 } },
   }
 

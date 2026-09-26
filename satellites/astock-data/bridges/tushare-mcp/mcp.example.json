@@ -1,15 +1,11 @@
 {
   "mcpServers": {
-    "openalice": {
-      "type": "streamable-http",
-      "url": "${OPENALICE_MCP_URL:-http://127.0.0.1:47332/mcp}"
-    },
     "astock-tushare": {
       "command": "D:\\Developer\\openalice\\satellites\\astock-data\\bridges\\tushare-mcp\\.venv\\Scripts\\python.exe",
       "args": ["-m", "tushare_mcp"],
       "env": {
-        "TUSHARE_TOKEN": "${env:TUSHARE_TOKEN}",
-        "TUSHARE_HTTP_URL": "${env:TUSHARE_HTTP_URL}"
+        "TUSHARE_TOKEN": "REPLACE_WITH_YOUR_TOKEN_OR_USE_HOST_ENV",
+        "TUSHARE_HTTP_URL": "https://tuaremax.top"
       }
     }
   }
