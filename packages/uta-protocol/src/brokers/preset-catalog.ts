@@ -494,6 +494,40 @@ export const SIMULATOR_PRESET: BrokerPresetDef = {
   isPaper: () => true,
 }
 
+/**
+ * Local A-share paper — Tencent L1 marks + MockBroker matching.
+ * Built-in mock engine (no Broker Pack). For closed-loop dry runs only.
+ */
+export const CN_LOCAL_PAPER_PRESET: BrokerPresetDef = {
+  id: 'cn-local-paper',
+  label: 'CN Local Paper',
+  description: 'Free local A-share paper: Tencent quotes + in-process matching. Not a broker virtual account.',
+  category: 'testing',
+  hint: 'Use this to exercise the OpenAlice trading loop on A-shares without a broker API. Marks come from public Tencent L1 (delayed). Enforces lot size 100, T+1, ±10% limit band, and session hours. State is in-memory and cleared on UTA restart. Do not treat fills as market-quality evidence.',
+  defaultName: 'cn-paper',
+  badge: 'CN',
+  badgeColor: 'text-muted-foreground',
+  engine: 'mock',
+  guardCategory: 'securities',
+  zodSchema: z.object({
+    cash: z.coerce.number().default(1_000_000).describe('Starting cash (CNY)'),
+  }),
+  subtitleFields: [
+    { field: 'cash', prefix: '¥' },
+  ],
+  fingerprintFields: ['_instanceId'],
+  toEngineConfig: (d) => ({
+    variant: 'cn-local-paper',
+    cash: d.cash,
+    quoteProvider: 'tencent',
+    enforceSession: true,
+    enforceLotSize: true,
+    enforceTPlus1: true,
+    enforceLimitBand: true,
+  }),
+  isPaper: () => true,
+}
+
 // ==================== Catalog ====================
 
 // Order matters — the wizard renders presets top-down within each
@@ -519,6 +553,7 @@ export const BROKER_PRESET_CATALOG: BrokerPresetDef[] = [
   CCXT_CUSTOM_PRESET,
   // ---- Testing ----
   SIMULATOR_PRESET,
+  CN_LOCAL_PAPER_PRESET,
 ]
 
 /** Lookup by id. Throws if unknown. */

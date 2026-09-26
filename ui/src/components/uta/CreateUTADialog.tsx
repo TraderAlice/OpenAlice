@@ -92,14 +92,19 @@ export function CreateUTADialog({
     badgeColor: p.badgeColor,
   })
 
-  // 'testing' category presets (Simulator) are intentionally excluded; their
-  // creation entry lives in Dev -> Simulator so real broker setup stays clean.
+  // 'testing' category: keep mock-simulator on Dev → Simulator only.
+  // CN Local Paper stays available here so the trading closed-loop has an
+  // entry without a Broker Pack.
   const recommendedOptions: SDKOption[] = useMemo(
     () => presets.filter(p => p.category === 'recommended').map(toOption),
     [presets],
   )
   const cryptoOptions: SDKOption[] = useMemo(
     () => presets.filter(p => p.category === 'crypto').map(toOption),
+    [presets],
+  )
+  const localPaperOptions: SDKOption[] = useMemo(
+    () => presets.filter(p => p.category === 'testing' && p.id !== 'mock-simulator').map(toOption),
     [presets],
   )
 
@@ -123,7 +128,9 @@ export function CreateUTADialog({
     setAsVendor(initialAsVendor)
     setError('')
     const status = selected ? packStatuses?.find((row) => row.engine === selected.engine) : undefined
-    setStep(status?.installed ? 'config' : 'install')
+    // Builtin mock engine never needs a Broker Pack download.
+    const installed = selected?.engine === 'mock' || !!status?.installed
+    setStep(installed ? 'config' : 'install')
   }
 
   const handleInstallPack = async () => {
@@ -235,9 +242,14 @@ export function CreateUTADialog({
                 <SDKSelector options={cryptoOptions} selected={presetId ?? ''} onSelect={handlePick} />
               </section>
             )}
+            {localPaperOptions.length > 0 && (
+              <section className="space-y-3">
+                <PickerSectionHeader title="Local paper" />
+                <SDKSelector options={localPaperOptions} selected={presetId ?? ''} onSelect={handlePick} />
+              </section>
+            )}
           </div>
         )}
-
         {step === 'config' && preset && (
           <div className="space-y-5">
             {preset.hint && <HintBlock text={preset.hint} />}

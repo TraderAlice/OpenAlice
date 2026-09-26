@@ -166,6 +166,13 @@ export class MockBroker implements IBroker {
 
   static configSchema = z.object({
     cash: z.coerce.number().default(100_000),
+    /** When `cn-local-paper`, registry constructs CnLocalPaperBroker instead. */
+    variant: z.literal('cn-local-paper').optional(),
+    enforceSession: z.boolean().optional(),
+    enforceLotSize: z.boolean().optional(),
+    enforceTPlus1: z.boolean().optional(),
+    enforceLimitBand: z.boolean().optional(),
+    quoteProvider: z.enum(['tencent', 'manual']).optional(),
   })
   static configFields: import('../types.js').BrokerConfigField[] = [
     { name: 'cash', type: 'number', label: 'Starting cash (USD)', default: 100_000 },
@@ -575,6 +582,12 @@ export class MockBroker implements IBroker {
   /** Read the current markPrice for a native key (returns null if unset). */
   getMarkPrice(nativeKey: string): Decimal | null {
     return this._markPrices.get(nativeKey) ?? null
+  }
+
+  /** Simulator / paper wrapper: credit or debit cash without an order. */
+  adjustCash(delta: Decimal | string | number): void {
+    const d = delta instanceof Decimal ? delta : new Decimal(delta)
+    this._cash = this._cash.plus(d)
   }
 
   /** Manually fill a pending order. Optional price (defaults to markPrice or limit price); optional qty for partial. */
