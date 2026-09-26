@@ -159,7 +159,38 @@ export const marketHandlers = [
     return HttpResponse.json(demoMarketAAPL.historical)
   }),
   http.get('/api/market/equity/profile', aaplOnly(demoMarketAAPL.profile)),
-  http.get('/api/market-data-v1/equity/price/quote', aaplOnly(demoMarketAAPL.quote)),
+  http.get('/api/market-data-v1/equity/price/quote', ({ request }) => {
+    const symbol = symbolFromUrl(request.url)
+    if (symbol === AAPL) return HttpResponse.json(demoMarketAAPL.quote)
+    // CN A-share realtime path (Tencent) — static demo snapshot for Eastmoney / .SS symbols.
+    if (
+      symbol === '1.600519'
+      || symbol === '600519.SS'
+      || symbol === 'SH600519'
+      || symbol === '600519'
+    ) {
+      return HttpResponse.json({
+        results: [{
+          symbol,
+          name: '贵州茅台',
+          exchange: 'SSE',
+          last_price: 1251.24,
+          prev_close: 1253.8,
+          open: 1255.03,
+          high: 1271.5,
+          low: 1250.89,
+          volume: 3_098_100,
+          change: -2.56,
+          change_percent: -0.002,
+          year_high: 1379.18,
+          year_low: 1128.42,
+          market_cap: 15641.52e8,
+        }],
+        provider: 'tencent',
+      })
+    }
+    return HttpResponse.json(demoMarketEmpty)
+  }),
   http.get('/api/market/equity/metrics', aaplOnly(demoMarketAAPL.metrics)),
   http.get('/api/market/equity/ratios', aaplOnly(demoMarketAAPL.ratios)),
   http.get('/api/market/equity/balance', aaplOnly(demoMarketAAPL.balance)),

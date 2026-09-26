@@ -33,11 +33,12 @@ setMarketVendor; the change is live immediately, no restart.`,
       description: `Turn a market-data vendor on or off. Effective on the NEXT search — no restart.
 
 Use after listMarketVendors shows the vendor for the market you want is off — e.g. enable
-"twse" before searching Taiwan stocks by Chinese name, or "eastmoney" for CN A-shares. The
-always-on primary vendor (yfinance) cannot be toggled.`,
+"twse" before searching Taiwan stocks by Chinese name, or "eastmoney" for CN A-shares. For
+CN A-share Level-1 watching, use EquityQuote with provider "tencent" (symbols sh/sz, .SS/.SZ,
+or Eastmoney secid; poll ~3s). The always-on primary vendor (yfinance) cannot be toggled.`,
       inputSchema: z
         .object({
-          vendor: z.string().describe('Vendor id from listMarketVendors, e.g. "twse", "eastmoney"'),
+          vendor: z.string().describe('Vendor id from listMarketVendors, e.g. "twse", "eastmoney", "tencent"'),
           enabled: z.boolean().describe('true to turn on, false to turn off'),
         })
         .meta({ examples: [{ vendor: 'twse', enabled: true }] }),

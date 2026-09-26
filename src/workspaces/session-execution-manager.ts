@@ -141,6 +141,8 @@ export class SessionExecutionManager {
     if (this.fault) throw new Error('Session execution journal is unavailable', { cause: this.fault })
     if (request.surface !== 'headless' && this.takeovers.isHandingOff(request.resumeId)) throw new Error('Session handoff is in progress')
     this.admission.assertAllowed(request.resumeId)
+    // Drop terminal zombies left when finish mutated phase then lost journal I/O.
+    this.releaseTerminalOccupant(request.resumeId)
     if (this.locks.has(request.resumeId) || this.active.has(request.resumeId)) throw new Error('Session execution is busy')
     const release = this.lock(request.resumeId)
     const record: ExecutionRecord = { ...structuredClone(request), executionId: randomUUID(), phase: 'starting', requestedAt: Date.now(), events: [] }
@@ -186,7 +188,12 @@ export class SessionExecutionManager {
     } catch (error) {
       if (controller.signal.aborted) throw error
       try { await driver.stop('startup-failed') }
-      catch { await this.transition(record, 'stopping', 'startup-cleanup-failed'); throw error }
+      catch {
+        // Never leave a non-running startup occupying the Session forever.
+        try { await this.finish(record, 'failed', 'startup-cleanup-failed') }
+        catch { this.releaseOccupancy(record.resumeId, record) }
+        throw error
+      }
       await this.finish(record, 'failed', 'startup-failed')
       throw error
     } finally { release() }
@@ -235,7 +242,12 @@ export class SessionExecutionManager {
   async stop(resumeId: string, reason: string, outcome: 'ended' | 'interrupted' = 'ended'): Promise<boolean> {
     if (!reason.trim()) throw new Error('Stop reason is required')
     const entry = this.active.get(resumeId)
-    if (!entry || terminal(entry.record.phase)) return false
+    if (!entry) return false
+    // A terminal record must not keep the resumeId busy for later opens.
+    if (terminal(entry.record.phase)) {
+      this.releaseOccupancy(resumeId, entry.record)
+      return false
+    }
     if (entry.stopping) return entry.stopping
     // Do not wait on the startup lock: cancellation is the escape hatch for a hung handshake.
     entry.controller.abort(reason)
@@ -285,16 +297,38 @@ export class SessionExecutionManager {
     return () => { this.locks.delete(resumeId); resolve() }
   }
 
+  /** Drop occupancy for this resume/record pair. */
+  private releaseOccupancy(resumeId: string, record?: ExecutionRecord): void {
+    const entry = this.active.get(resumeId)
+    if (!entry) return
+    if (record && entry.record !== record) return
+    this.active.delete(resumeId)
+    this.completions.delete(resumeId)
+  }
+
+  /** Clear a journal-finished execution that still blocks start(). */
+  private releaseTerminalOccupant(resumeId: string): void {
+    const entry = this.active.get(resumeId)
+    if (entry && terminal(entry.record.phase)) this.releaseOccupancy(resumeId, entry.record)
+  }
+
   private async finish(record: ExecutionRecord, phase: 'ended' | 'failed' | 'interrupted', reason: string, explicit = false) {
-    if (this.active.get(record.resumeId)?.record !== record || terminal(record.phase)) return
+    if (this.active.get(record.resumeId)?.record !== record) return
+    // Already terminal in memory but still occupying active (e.g. persist failed after mutate).
+    if (terminal(record.phase)) {
+      this.releaseOccupancy(record.resumeId, record)
+      return
+    }
     // An explicit stop owns the completion reason; a natural callback cannot race it.
     if (record.phase === 'stopping' && !explicit) return
-    if (phase === 'failed' || (phase === 'ended' && !explicit)) await this.admission.outcome(record.resumeId, record.executionId, phase === 'failed', reason)
-    if (record.phase === 'stopping' && !explicit) return
-    await this.transition(record, phase, record.phase === 'stopping' ? record.reason ?? reason : reason)
-    if (this.active.get(record.resumeId)?.record === record) {
-      this.active.delete(record.resumeId)
-      this.completions.delete(record.resumeId)
+    try {
+      if (phase === 'failed' || (phase === 'ended' && !explicit)) await this.admission.outcome(record.resumeId, record.executionId, phase === 'failed', reason)
+      if (record.phase === 'stopping' && !explicit) return
+      await this.transition(record, phase, record.phase === 'stopping' ? record.reason ?? reason : reason)
+    } finally {
+      // Free the slot once phase is terminal even when journal I/O failed mid-transition;
+      // otherwise start() throws permanent "Session execution is busy".
+      if (terminal(record.phase)) this.releaseOccupancy(record.resumeId, record)
     }
   }
 

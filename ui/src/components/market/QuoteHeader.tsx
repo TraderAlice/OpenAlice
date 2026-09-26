@@ -5,30 +5,32 @@ import { fmtNumber, fmtMoneyShort, fmtPercent, fmtInt } from './format'
 
 interface Props {
   symbol: string
+  /** Override the server default equity provider (e.g. `tencent` for CN L1). */
+  provider?: string
+  /** Re-poll interval; default 60s for slow vendors, 3s for CN realtime. */
+  pollMs?: number
 }
 
-export function QuoteHeader({ symbol }: Props) {
+export function QuoteHeader({ symbol, provider, pollMs = 60_000 }: Props) {
   const [quote, setQuote] = useState<EquityQuote | null>(null)
-  const [provider, setProvider] = useState<string | null>(null)
+  const [resolvedProvider, setResolvedProvider] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     let cancelled = false
     const fetch = () => {
       setError(null)
-      marketApi.equity.quote(symbol).then((res) => {
+      marketApi.equity.quote(symbol, provider ? { provider } : undefined).then((res) => {
         if (cancelled) return
         if (res.error) setError(res.error)
         setQuote(res.results?.[0] ?? null)
-        setProvider(res.provider || null)
+        setResolvedProvider(res.provider || null)
       }).catch((e) => { if (!cancelled) setError(e instanceof Error ? e.message : String(e)) })
     }
     fetch()
-    // Quote is price-sensitive; re-poll every 60s so a tab left open overnight
-    // doesn't show yesterday's last print as if it were live.
-    const timer = setInterval(fetch, 60_000)
+    const timer = setInterval(fetch, pollMs)
     return () => { cancelled = true; clearInterval(timer) }
-  }, [symbol])
+  }, [symbol, provider, pollMs])
 
   const name = quote?.name as string | undefined
   const exchange = quote?.exchange as string | undefined
@@ -37,7 +39,7 @@ export function QuoteHeader({ symbol }: Props) {
   const changePct = quote?.change_percent as number | undefined
   const up = (change ?? 0) >= 0
   // First-load: no quote yet and no error → show skeletons in place of the
-  // (otherwise dash-filled) value slots. `quote` stays set across the 60s
+  // (otherwise dash-filled) value slots. `quote` stays set across the
   // re-poll, so this won't flash on a background refetch.
   const loading = !quote && !error
 
@@ -56,9 +58,9 @@ export function QuoteHeader({ symbol }: Props) {
                   {exchange}
                 </span>
               )}
-              {provider && (
+              {resolvedProvider && (
                 <span className="text-[11px] font-medium text-muted-foreground">
-                  {provider}
+                  {resolvedProvider}
                 </span>
               )}
             </>
@@ -92,10 +94,10 @@ export function QuoteHeader({ symbol }: Props) {
         <Field label="Prev"      value={fmtNumber(quote?.prev_close)}  loading={loading} />
         <Field label="High"      value={fmtNumber(quote?.high)}        loading={loading} />
         <Field label="Low"       value={fmtNumber(quote?.low)}         loading={loading} />
-        <Field label="Volume"    value={fmtInt(quote?.volume)}         loading={loading} />
+        <Field label="Volume"    value={fmtInt(quote?.volume)}        loading={loading} />
         <Field label="Mkt Cap"   value={fmtMoneyShort(quote?.market_cap)} loading={loading} />
-        <Field label="52W High"  value={fmtNumber(quote?.year_high)}   loading={loading} />
-        <Field label="52W Low"   value={fmtNumber(quote?.year_low)}    loading={loading} />
+        <Field label="52W High"  value={fmtNumber(quote?.year_high)}  loading={loading} />
+        <Field label="52W Low"   value={fmtNumber(quote?.year_low)}   loading={loading} />
         <Field label="MA50"      value={fmtNumber(quote?.ma50)}        loading={loading} />
         <Field label="MA200"     value={fmtNumber(quote?.ma200)}       loading={loading} />
       </dl>

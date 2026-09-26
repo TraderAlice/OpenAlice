@@ -259,6 +259,40 @@ body {
     color var(--motion-fast) var(--motion-ease-out);
 }
 
+/* Spaced truncation mark (Chromium ignores custom text-overflow strings). */
+.oa-spaced-truncate {
+  display: flex;
+  min-width: 0;
+  max-width: 100%;
+  width: 100%;
+  align-items: baseline;
+}
+
+.oa-spaced-truncate__text {
+  flex: 1 1 0%;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.oa-spaced-truncate__mark {
+  flex: none;
+  padding-inline-start: 1.15em;
+}
+
+/* Keep a breath between the last glyph and the truncation mark. */
+.oa-truncate-gap {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: " …";
+}
+
+@supports not (text-overflow: " …") {
+  .oa-truncate-gap {
+    text-overflow: ellipsis;
+  }
+}
+
 .oa-icon-action,
 .oa-icon-action > svg,
 .oa-nav-icon {
@@ -405,6 +439,58 @@ body {
 
 .oa-chat-new-action {
   box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--foreground) 3.5%, transparent);
+}
+
+/* Alice Settings footer control: readable against the rail in Day and Night. */
+.oa-application-menu--rail {
+  background: color-mix(in srgb, var(--sidebar-foreground) 7%, var(--sidebar));
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--sidebar-foreground) 12%, transparent);
+}
+
+.oa-application-menu--rail:hover {
+  background: color-mix(in srgb, var(--sidebar-foreground) 10%, var(--sidebar));
+}
+
+.oa-application-menu--rail[aria-expanded="true"] {
+  background: color-mix(in srgb, var(--sidebar-foreground) 12%, var(--sidebar));
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--sidebar-foreground) 18%, transparent);
+}
+
+.oa-application-menu-panel {
+  border-color: color-mix(in srgb, var(--foreground) 18%, transparent);
+  box-shadow:
+    0 10px 32px color-mix(in srgb, var(--shadow-color) 48%, transparent),
+    0 0 0 1px color-mix(in srgb, var(--foreground) 16%, transparent);
+}
+
+/* Night palettes: Graphite/Midnight/Moss/Iris need a larger lift off the rail. */
+:root:is(
+  [data-palette="graphite"],
+  [data-palette="midnight"],
+  [data-palette="moss"],
+  [data-palette="iris"]
+) {
+  .oa-application-menu--rail {
+    background: color-mix(in srgb, var(--sidebar-foreground) 14%, var(--sidebar));
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--sidebar-foreground) 24%, transparent);
+  }
+
+  .oa-application-menu--rail:hover {
+    background: color-mix(in srgb, var(--sidebar-foreground) 18%, var(--sidebar));
+  }
+
+  .oa-application-menu--rail[aria-expanded="true"] {
+    background: color-mix(in srgb, var(--sidebar-foreground) 20%, var(--sidebar));
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--sidebar-foreground) 32%, transparent);
+  }
+
+  .oa-application-menu-panel {
+    background: color-mix(in srgb, var(--foreground) 8%, var(--popover));
+    border-color: color-mix(in srgb, var(--foreground) 34%, transparent);
+    box-shadow:
+      0 14px 40px color-mix(in srgb, var(--shadow-color) 72%, transparent),
+      0 0 0 1px color-mix(in srgb, var(--foreground) 28%, transparent);
+  }
 }
 
 .oa-sidebar-child-row:has(.oa-sidebar-child-row-main:focus-visible) {

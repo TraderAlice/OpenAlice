@@ -8,6 +8,7 @@ import type { HeadlessTaskRecord } from '../../api/headless'
 import { i18n } from '../../i18n'
 import type { AgentInfo, SessionRecord, Workspace } from './api'
 import { SessionRow, WorkspaceRow } from './Sidebar'
+import { shortenSessionChromeTitle } from './display'
 
 describe('navigation entry', () => {
 const session: SessionRecord = { id: 's', resumeId: 'r', wsId: 'w', agent: 'pi', name: 'p',
@@ -421,6 +422,7 @@ describe('SessionRow actions', () => {
 
   it('ellipsizes long English and CJK titles without moving row actions', () => {
     const title = `${'市场扫描'.repeat(12)} and a very long English conversation title about overnight risk`
+    const chrome = shortenSessionChromeTitle(title)
     render(
       <SessionRow
         session={{ ...session, state: 'paused', pid: null, startedAt: null, title }}
@@ -435,12 +437,40 @@ describe('SessionRow actions', () => {
       />,
     )
 
-    const main = screen.getByRole('button', { name: title })
-    expect(main.querySelector('.truncate')?.textContent).toBe(title)
-    expect(screen.getByText('Issue').className).toContain('truncate')
-    const resume = screen.getByRole('button', { name: `Resume ${title}` })
+    const main = screen.getByRole('button', { name: chrome })
+    const label = main.querySelector('.oa-spaced-truncate')
+    expect(label?.textContent?.replace(/…$/u, '')).toBe(chrome)
+    expect(label?.getAttribute('title')).toBe(title)
+    expect(screen.getByText('Issue').className).toContain('oa-spaced-truncate')
+    const resume = screen.getByRole('button', { name: `Resume ${chrome}` })
     expect(resume.className).toContain('oa-icon-action')
     expect(main.compareDocumentPosition(resume) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+  })
+
+  it('keeps a spaced abbreviation mark on smart-shortened chrome titles', () => {
+    const title = `研究问题：
+在「A股单标的 600531.SH（豫光金铅）日频」框架下，设计并验证一套可复现的有界马丁格尔量化研究方案：
+优先回答——
+(A) 以下列固定规则运行时，相对沪深300，近3年样本上是否构成可检验的交易/风险信号`
+    const chrome = shortenSessionChromeTitle(title)
+    expect(chrome).toBe('豫光金铅 · 有界马丁格尔')
+    render(
+      <SessionRow
+        session={{ ...session, state: 'paused', pid: null, startedAt: null, title }}
+        displayTitle={title}
+        isActive={false}
+        canDelete={false}
+        onSelect={vi.fn()}
+        onPause={vi.fn()}
+        onResume={vi.fn()}
+        onDelete={vi.fn()}
+      />,
+    )
+
+    const label = screen.getByRole('button', { name: chrome }).querySelector('.oa-spaced-truncate')
+    expect(label?.textContent).toBe(`${chrome}…`)
+    expect(label?.querySelector('.oa-spaced-truncate__mark')).not.toBeNull()
+    expect(label?.getAttribute('title')).toBe(title)
   })
 
   it('offers Archive while an interactive Session is running', async () => {

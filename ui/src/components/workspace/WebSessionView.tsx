@@ -12,6 +12,8 @@ import { AgentRuntimeIcon } from '../../lib/agentRuntimeIcon'
 import type { AgentInfo, SessionRecord, WebPermissionRequest, WebSessionPhase } from './api'
 import { useWebConversation } from './useWebConversation'
 import { summarizeToolInput } from './web-transcript'
+import { AutoQuantContextContinueController } from './AutoQuantContextContinue'
+import type { WorkspaceSource } from '../../tabs/types'
 
 export { isConversationNearBottom as isWebSessionNearBottom } from '../conversation/ConversationView'
 
@@ -25,6 +27,7 @@ interface Props {
   readonly agents?: readonly AgentInfo[]
   readonly label?: string
   readonly headerActions?: ReactNode
+  readonly source?: WorkspaceSource
   readonly onSessionLost: () => void
 }
 
@@ -37,7 +40,7 @@ export function WebSessionView(props: Props) {
   return <WebSession key={JSON.stringify([props.wsId, props.sessionId])} {...props} />
 }
 
-function WebSession({ readOnly = false, record, wsId, sessionId, agent, agents, label, headerActions, onSessionLost }: Props) {
+function WebSession({ readOnly = false, record, wsId, sessionId, agent, agents, label, headerActions, source, onSessionLost }: Props) {
   const [configurationReady, setConfigurationReady] = useState(true)
   const session = useWebConversation(wsId, sessionId, readOnly)
   const { snapshot, busy, requests } = session
@@ -58,13 +61,14 @@ function WebSession({ readOnly = false, record, wsId, sessionId, agent, agents, 
   const phaseLabel = snapshot ? describePhase(snapshot.phase) : 'starting'
   const stopped = snapshot?.phase === 'stopped'
 
-  return <>
+  const body = (continueUi?: { headerAction: ReactNode; panel: ReactNode }) => <>
     <ConversationView
       header={<PageTopBar title={label ?? 'Conversation'} actions={<>
         <span className="inline-flex shrink-0 items-center gap-1.5 text-xs text-muted-foreground" title={agentLabel} aria-label={agentLabel}>
           <AgentRuntimeIcon agentId={agentId} className="h-3.5 w-3.5" />
           <span className="hidden sm:inline">{agentLabel}</span>
         </span>
+        {continueUi?.headerAction}
         {headerActions}
       </>}>
         {(busy || !snapshot || snapshot.phase === 'failed') && <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
@@ -80,6 +84,7 @@ function WebSession({ readOnly = false, record, wsId, sessionId, agent, agents, 
       ready={!readOnly && !!snapshot && snapshot.phase !== 'failed' && snapshot.phase !== 'starting' && !stopped && !session.reconfiguring && configurationReady}
       placeholder={`Message ${agentLabel}…`}
       empty={snapshot ? 'What should Alice work on next?' : 'Opening conversation…'}
+      afterItems={continueUi?.panel}
       renderComposer={record && agents ? composer => <WebSessionComposer composer={composer} workspaceId={wsId} record={record} agents={agents}
         busy={readOnly || busy || session.reconfiguring || !snapshot || snapshot.phase === 'starting'} reconfigure={session.reconfigure} onReadyChange={setConfigurationReady} /> : undefined}
       status={<>
@@ -105,6 +110,26 @@ function WebSession({ readOnly = false, record, wsId, sessionId, agent, agents, 
     />
     <ConversationImagePreview image={files.imagePreview} onClose={files.closeImage} />
   </>
+
+  if (!readOnly && source === 'auto-quant' && record) {
+    return (
+      <AutoQuantContextContinueController
+        wsId={wsId}
+        sessionId={sessionId}
+        source={source}
+        record={record}
+        {...(agents ? { agents } : {})}
+        items={session.items}
+        {...(snapshot?.phase ? { phase: snapshot.phase } : {})}
+        {...(label ? { label } : {})}
+        turnBusy={busy}
+      >
+        {(continueUi) => body(continueUi)}
+      </AutoQuantContextContinueController>
+    )
+  }
+
+  return body()
 }
 
 function presentRequest(request: WebPermissionRequest): ConversationRequest {
