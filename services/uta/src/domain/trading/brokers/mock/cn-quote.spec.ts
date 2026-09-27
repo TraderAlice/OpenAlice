@@ -1,39 +1,72 @@
 import { describe, it, expect } from 'vitest'
-import { toTencentCode, bareCodeOfTencentCode, marketOfTencentCode } from './cn-quote.js'
+import {
+  toTencentCode,
+  parseCnSymbol,
+  inferCnMarket,
+  bareCodeOfTencentCode,
+  marketOfTencentCode,
+} from './cn-quote.js'
 import {
   assertLotSize,
+  assertOrderQty,
   assertLimitBand,
   isCnAshareSessionOpen,
   stampTaxOnSell,
+  commissionOnNotional,
   LOT_SIZE,
   cnTradingDayKey,
 } from './cn-rules.js'
 import Decimal from 'decimal.js'
 import type { CnQuoteSnapshot } from './cn-quote.js'
 
-describe('toTencentCode', () => {
-  it('maps 6-digit SH/SZ heuristics', () => {
+describe('parseCnSymbol / toTencentCode', () => {
+  it('maps 6-digit SH/SZ/BJ heuristics', () => {
     expect(toTencentCode('600519')).toBe('sh600519')
     expect(toTencentCode('000001')).toBe('sz000001')
     expect(toTencentCode('300750')).toBe('sz300750')
+    expect(toTencentCode('513100')).toBe('sh513100')
+    expect(toTencentCode('510300')).toBe('sh510300')
+    expect(toTencentCode('159915')).toBe('sz159915')
+    expect(toTencentCode('920000')).toBe('bj920000')
+    expect(toTencentCode('430047')).toBe('bj430047')
+    expect(toTencentCode('870436')).toBe('bj870436')
+    expect(inferCnMarket('900901')).toBe('sh')
   })
 
-  it('accepts prefixed and dotted forms', () => {
+  it('accepts prefixed, dotted, hyphenated, and secid forms', () => {
     expect(toTencentCode('sh600519')).toBe('sh600519')
+    expect(toTencentCode('sh-600519')).toBe('sh600519')
     expect(toTencentCode('600519.SS')).toBe('sh600519')
     expect(toTencentCode('000001.SZ')).toBe('sz000001')
+    expect(toTencentCode('920000.BJ')).toBe('bj920000')
+    expect(toTencentCode('bj920000')).toBe('bj920000')
     expect(toTencentCode('1.600519')).toBe('sh600519')
     expect(toTencentCode('0.000001')).toBe('sz000001')
+    expect(toTencentCode('2.920000')).toBe('bj920000')
   })
 
-  it('rejects unknown shapes', () => {
+  it('exposes canonical dotted ids', () => {
+    const a = parseCnSymbol('513100')
+    expect(a.ok).toBe(true)
+    if (a.ok) expect(a.ref.canonical).toBe('513100.SH')
+    const b = parseCnSymbol('920000')
+    expect(b.ok).toBe(true)
+    if (b.ok) expect(b.ref.canonical).toBe('920000.BJ')
+  })
+
+  it('rejects unknown shapes with UNKNOWN_SYMBOL', () => {
     expect(toTencentCode('AAPL')).toBeNull()
     expect(toTencentCode('')).toBeNull()
+    const r = parseCnSymbol('AAPL')
+    expect(r.ok).toBe(false)
+    if (!r.ok) expect(r.code).toBe('UNKNOWN_SYMBOL')
   })
 
   it('bare/market helpers', () => {
     expect(bareCodeOfTencentCode('sh600519')).toBe('600519')
+    expect(bareCodeOfTencentCode('bj920000')).toBe('920000')
     expect(marketOfTencentCode('sz000001')).toBe('sz')
+    expect(marketOfTencentCode('bj920000')).toBe('bj')
   })
 })
 
@@ -68,6 +101,17 @@ describe('cn-rules', () => {
   it('stamp tax rounds up on sell notional', () => {
     const tax = stampTaxOnSell(new Decimal(100_000))
     expect(tax.toString()).toBe('50')
+  })
+
+  it('commission floors at ¥5', () => {
+    expect(commissionOnNotional(new Decimal(1000)).toString()).toBe('5')
+    expect(commissionOnNotional(new Decimal(100_000)).toString()).toBe('25')
+  })
+
+  it('buy requires lot; sell allows odd lots', () => {
+    expect(assertOrderQty('BUY', new Decimal(100))).toBeNull()
+    expect(assertOrderQty('BUY', new Decimal(50))).toMatch(/buy lot/)
+    expect(assertOrderQty('SELL', new Decimal(37))).toBeNull()
   })
 
   it('trading day key is YYYY-MM-DD', () => {
