@@ -38,6 +38,7 @@ import {
   cnTradingDayKey,
   commissionOnNotional,
   isCnAshareSessionOpen,
+  limitBandFromPrevClose,
   stampTaxOnSell,
 } from './cn-rules.js'
 
@@ -403,6 +404,7 @@ export class CnLocalPaperBroker implements IBroker {
     const n = price instanceof Decimal ? price.toNumber() : Number(price)
     const prev = quote?.prevClose ?? n
     const tencentCode = parsed.ok ? parsed.ref.tencentCode : (toTencentCode(nativeKey) ?? `sh${bare}`)
+    const band = limitBandFromPrevClose(prev, bare)
     const snap: CnQuoteSnapshot = {
       code: bare,
       market,
@@ -414,8 +416,8 @@ export class CnLocalPaperBroker implements IBroker {
       bid: quote?.bid ?? n,
       ask: quote?.ask ?? n,
       volume: quote?.volume ?? 0,
-      limitUp: quote?.limitUp ?? Math.round(prev * 1.1 * 100) / 100,
-      limitDown: quote?.limitDown ?? Math.round(prev * 0.9 * 100) / 100,
+      limitUp: quote?.limitUp ?? band.limitUp,
+      limitDown: quote?.limitDown ?? band.limitDown,
       timestamp: new Date(),
     }
     this.quoteCache.set(bare, snap)
