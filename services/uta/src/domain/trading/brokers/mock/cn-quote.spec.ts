@@ -11,13 +11,17 @@ import {
   assertOrderQty,
   assertLimitBand,
   isCnAshareSessionOpen,
+  isCnAshareTradingDay,
   stampTaxOnSell,
   commissionOnNotional,
+  limitPctForBareCode,
   LOT_SIZE,
   cnTradingDayKey,
 } from './cn-rules.js'
+import { cnEodSignalTableSchema, CN_EOD_SIGNAL_EXAMPLE } from './cn-eod-signal.js'
 import Decimal from 'decimal.js'
 import type { CnQuoteSnapshot } from './cn-quote.js'
+
 
 describe('parseCnSymbol / toTencentCode', () => {
   it('maps 6-digit SH/SZ/BJ heuristics', () => {
@@ -120,5 +124,45 @@ describe('cn-rules', () => {
 
   it('session helper returns boolean', () => {
     expect(typeof isCnAshareSessionOpen(new Date())).toBe('boolean')
+  })
+
+  it('uses holiday calendar — National Day closed, ordinary weekday open', () => {
+    // 2026-10-01 Thursday 10:00 Shanghai = UTC 02:00
+    expect(isCnAshareTradingDay(new Date('2026-10-01T02:00:00Z'))).toBe(false)
+    expect(isCnAshareSessionOpen(new Date('2026-10-01T02:00:00Z'))).toBe(false)
+    // 2026-09-29 Tuesday 10:00 Shanghai
+    expect(isCnAshareTradingDay(new Date('2026-09-29T02:00:00Z'))).toBe(true)
+    expect(isCnAshareSessionOpen(new Date('2026-09-29T02:00:00Z'))).toBe(true)
+  })
+
+  it('board-aware limit pct', () => {
+    expect(limitPctForBareCode('600036')).toBe(0.1)
+    expect(limitPctForBareCode('300750')).toBe(0.2)
+    expect(limitPctForBareCode('688981')).toBe(0.2)
+    expect(limitPctForBareCode('920000')).toBe(0.3)
+  })
+})
+
+describe('cn-eod-signal', () => {
+  it('accepts the example sleeve table', () => {
+    const parsed = cnEodSignalTableSchema.safeParse(CN_EOD_SIGNAL_EXAMPLE)
+    expect(parsed.success).toBe(true)
+  })
+
+  it('rejects BUY without qty', () => {
+    const parsed = cnEodSignalTableSchema.safeParse({
+      schemaVersion: 1,
+      generatedAt: '2026-09-29T00:00:00.000Z',
+      rows: [{
+        date: '2026-09-29',
+        account: 'cn-paper',
+        sleeveCny: 70_000,
+        symbol: '600036',
+        action: 'BUY',
+        reason: 'x',
+        signalId: 'x',
+      }],
+    })
+    expect(parsed.success).toBe(false)
   })
 })

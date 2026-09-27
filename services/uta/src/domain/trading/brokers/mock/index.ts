@@ -6,14 +6,24 @@ export { toTencentCode, parseCnSymbol, inferCnMarket, fetchCnQuote, fetchTencent
 export type { CnQuoteSnapshot, CnQuoteFetcher, CnMarket, CnSymbolRef, ParseCnSymbolResult } from './cn-quote.js'
 export {
   isCnAshareSessionOpen,
+  isCnAshareTradingDay,
   assertLotSize,
   assertOrderQty,
   assertLimitBand,
   stampTaxOnSell,
   commissionOnNotional,
+  limitPctForBareCode,
+  limitBandFromPrevClose,
   LOT_SIZE,
   CN_STAMP_TAX_RATE,
   CN_COMMISSION_RATE,
   CN_MIN_COMMISSION,
   cnTradingDayKey,
 } from './cn-rules.js'
+export {
+  cnEodSignalTableSchema,
+  cnEodSignalRowSchema,
+  CN_EOD_SIGNAL_SCHEMA_VERSION,
+  CN_EOD_SIGNAL_EXAMPLE,
+} from './cn-eod-signal.js'
+export type { CnEodSignalRow, CnEodSignalTable } from './cn-eod-signal.js'

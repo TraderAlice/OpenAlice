@@ -4,6 +4,8 @@
  * Local paper only — delayed/public L1, not broker-matching quotes.
  */
 
+import { limitBandFromPrevClose } from './cn-rules.js'
+
 export type CnMarket = 'sh' | 'sz' | 'bj'
 
 /** @deprecated Prefer CnMarket — kept as alias for existing imports. */
@@ -134,10 +136,6 @@ function num(v: string | undefined): number {
   return Number.isFinite(n) ? n : NaN
 }
 
-function round2(n: number): number {
-  return Math.round(n * 100) / 100
-}
-
 function parseRow(bodyPart: string): CnQuoteSnapshot | null {
   // v_sh600519="1~贵州茅台~600519~…"; also bj920000
   const m = bodyPart.match(/^v_((?:sh|sz|bj)\d{6})="([^"]*)"/)
@@ -153,9 +151,11 @@ function parseRow(bodyPart: string): CnQuoteSnapshot | null {
   const ask = num(fields[19])
   const volumeHands = num(fields[6])
   const name = fields[1] || bareCodeOfTencentCode(tencentCode)
+  const code = bareCodeOfTencentCode(tencentCode)
+  const band = limitBandFromPrevClose(prev, code)
 
   return {
-    code: bareCodeOfTencentCode(tencentCode),
+    code,
     market: marketOfTencentCode(tencentCode),
     tencentCode,
     name,
@@ -165,8 +165,8 @@ function parseRow(bodyPart: string): CnQuoteSnapshot | null {
     bid: Number.isFinite(bid) && bid > 0 ? bid : last,
     ask: Number.isFinite(ask) && ask > 0 ? ask : last,
     volume: Number.isFinite(volumeHands) ? volumeHands * 100 : 0,
-    limitUp: round2(prev * 1.1),
-    limitDown: round2(prev * 0.9),
+    limitUp: band.limitUp,
+    limitDown: band.limitDown,
     timestamp: new Date(),
   }
 }
