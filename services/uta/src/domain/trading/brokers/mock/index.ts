@@ -2,14 +2,18 @@ export { MockBroker, makeContract, makePosition, makeOpenOrder, makePlaceOrderRe
 export type { MockBrokerOptions, CallRecord } from './MockBroker.js'
 export { CnLocalPaperBroker, cnLocalPaperConfigSchema } from './CnLocalPaperBroker.js'
 export type { CnLocalPaperConfig } from './CnLocalPaperBroker.js'
-export { toTencentCode, fetchCnQuote, fetchTencentQuotes } from './cn-quote.js'
-export type { CnQuoteSnapshot, CnQuoteFetcher } from './cn-quote.js'
+export { toTencentCode, parseCnSymbol, inferCnMarket, fetchCnQuote, fetchTencentQuotes } from './cn-quote.js'
+export type { CnQuoteSnapshot, CnQuoteFetcher, CnMarket, CnSymbolRef, ParseCnSymbolResult } from './cn-quote.js'
 export {
   isCnAshareSessionOpen,
   assertLotSize,
+  assertOrderQty,
   assertLimitBand,
   stampTaxOnSell,
+  commissionOnNotional,
   LOT_SIZE,
   CN_STAMP_TAX_RATE,
+  CN_COMMISSION_RATE,
+  CN_MIN_COMMISSION,
   cnTradingDayKey,
 } from './cn-rules.js'

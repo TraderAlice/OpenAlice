@@ -9,8 +9,12 @@ import Decimal from 'decimal.js'
 import type { CnQuoteSnapshot } from './cn-quote.js'
 
 const LOT = 100
-/** Sell-side stamp tax (simplified flat rate; ignores minimums / board nuances). */
+/** Sell-side stamp tax (simplified flat rate; ignores board nuances). */
 export const CN_STAMP_TAX_RATE = new Decimal('0.0005')
+/** Simplified commission rate (~万2.5); floored by {@link CN_MIN_COMMISSION}. */
+export const CN_COMMISSION_RATE = new Decimal('0.00025')
+/** A-share retail minimum commission (CNY). */
+export const CN_MIN_COMMISSION = new Decimal(5)
 
 export function isMultipleOfLot(qty: Decimal): boolean {
   return qty.gt(0) && qty.mod(LOT).eq(0)
@@ -40,9 +44,21 @@ export function isCnAshareSessionOpen(now: Date = new Date()): boolean {
   return morning || afternoon
 }
 
+/** @deprecated Prefer {@link assertOrderQty} — buy lot / sell odd-lot aware. */
 export function assertLotSize(qty: Decimal): string | null {
   if (!isMultipleOfLot(qty)) {
     return `A-share lot size is ${LOT} shares; got ${qty.toString()}`
+  }
+  return null
+}
+
+/**
+ * Buy must be whole lots (100); sell may be odd lots (qty > 0).
+ */
+export function assertOrderQty(side: string, qty: Decimal): string | null {
+  if (!qty.gt(0)) return `Quantity must be positive; got ${qty.toString()}`
+  if (side.toUpperCase() === 'BUY' && !isMultipleOfLot(qty)) {
+    return `A-share buy lot size is ${LOT} shares; got ${qty.toString()}`
   }
   return null
 }
@@ -71,6 +87,13 @@ export function assertLimitBand(
 export function stampTaxOnSell(notional: Decimal): Decimal {
   if (notional.lte(0)) return new Decimal(0)
   return notional.mul(CN_STAMP_TAX_RATE).toDecimalPlaces(2, Decimal.ROUND_UP)
+}
+
+/** Commission on notional (buy or sell), with ¥5 minimum. */
+export function commissionOnNotional(notional: Decimal): Decimal {
+  if (notional.lte(0)) return new Decimal(0)
+  const raw = notional.mul(CN_COMMISSION_RATE).toDecimalPlaces(2, Decimal.ROUND_UP)
+  return Decimal.max(raw, CN_MIN_COMMISSION)
 }
 
 /** Trading-day key in Asia/Shanghai (YYYY-MM-DD). */

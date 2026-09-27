@@ -26,14 +26,17 @@ import { MockBroker } from './MockBroker.js'
 import {
   fetchCnQuote,
   fetchTencentQuotes,
+  parseCnSymbol,
   toTencentCode,
+  type CnMarket,
   type CnQuoteFetcher,
   type CnQuoteSnapshot,
 } from './cn-quote.js'
 import {
   assertLimitBand,
-  assertLotSize,
+  assertOrderQty,
   cnTradingDayKey,
+  commissionOnNotional,
   isCnAshareSessionOpen,
   stampTaxOnSell,
 } from './cn-rules.js'
@@ -81,6 +84,8 @@ export class CnLocalPaperBroker implements IBroker {
   private readonly quoteCache = new Map<string, CnQuoteSnapshot>()
   /** Shares bought on the current Shanghai trading day — blocks same-day sell. */
   private readonly boughtToday = new Map<string, BoughtToday>()
+  /** BUY LMT reservations: orderId → notional + estimated commission (CNY). */
+  private readonly frozenByOrder = new Map<string, Decimal>()
   private pollTimer: ReturnType<typeof setInterval> | null = null
 
   constructor(
@@ -135,17 +140,20 @@ export class CnLocalPaperBroker implements IBroker {
   // ---- Contracts ----
 
   async searchContracts(pattern: string): Promise<ContractDescription[]> {
-    const code = toTencentCode(pattern)
-    if (!code) return []
+    const parsed = parseCnSymbol(pattern)
+    if (!parsed.ok) return []
 
     let snap: CnQuoteSnapshot | null = null
     if (this.opts.quoteProvider === 'tencent') {
-      snap = await fetchCnQuote(pattern, this.quoteFetcher).catch(() => null)
+      snap = await fetchCnQuote(parsed.ref.canonical, this.quoteFetcher).catch(() => null)
+      // Tencent mode: no quote ⇒ not tradeable here (avoid inventing a dead contract).
+      if (!snap) return []
     } else {
-      snap = this.quoteCache.get(code.replace(/^(sh|sz)/, '')) ?? null
+      snap = this.quoteCache.get(parsed.ref.bare) ?? null
+      if (!snap) return []
     }
 
-    const c = this.buildCnContract(snap?.code ?? code.replace(/^(sh|sz)/, ''), snap)
+    const c = this.buildCnContract(snap.code, snap)
     const desc = new ContractDescription()
     desc.contract = c
     return [desc]
@@ -153,20 +161,28 @@ export class CnLocalPaperBroker implements IBroker {
 
   async getContractDetails(query: Contract): Promise<ContractDetails | null> {
     const symbol = query.symbol || query.localSymbol || ''
+    const parsed = parseCnSymbol(symbol)
+    if (!parsed.ok) return null
     const snap = this.opts.quoteProvider === 'manual'
-      ? this.quoteCache.get(this.nativeBare(query)) ?? null
+      ? this.quoteCache.get(parsed.ref.bare) ?? null
       : await this.ensureQuote(query)
-    if (!snap && !toTencentCode(symbol)) return null
-    const c = this.buildCnContract(snap?.code ?? (this.nativeBare(query) || symbol), snap)
+    if (!snap) return null
+    const c = this.buildCnContract(snap.code, snap)
     const details = new ContractDetails()
     details.contract = c
-    details.longName = snap?.name ?? c.symbol
+    details.longName = snap.name
     return details
   }
 
   // ---- Trading ----
 
   async placeOrder(contract: Contract, order: Order, tpsl?: TpSlParams): Promise<PlaceOrderResult> {
+    const symbol = contract.symbol || contract.localSymbol || ''
+    const parsed = parseCnSymbol(symbol)
+    if (!parsed.ok) {
+      return { success: false, error: `UNKNOWN_SYMBOL: ${parsed.message}` }
+    }
+
     const cnContract = this.normalizeContract(contract)
     const side = order.action.toUpperCase()
     const qty = !order.totalQuantity.equals(UNSET_DECIMAL) ? order.totalQuantity : new Decimal(0)
@@ -176,22 +192,29 @@ export class CnLocalPaperBroker implements IBroker {
     }
 
     if (this.opts.enforceLotSize) {
-      const lotErr = assertLotSize(qty)
+      const lotErr = assertOrderQty(side, qty)
       if (lotErr) return { success: false, error: lotErr }
     }
 
     const snap = await this.ensureQuote(cnContract)
     if (!snap && this.opts.quoteProvider === 'tencent') {
-      return { success: false, error: `No Tencent quote for ${cnContract.symbol}` }
+      return {
+        success: false,
+        error: `NO_QUOTE: No Tencent quote for ${parsed.ref.canonical}`,
+      }
     }
     if (snap) {
-      this.inner.setMarkPrice(this.inner.getNativeKey(cnContract), snap.last)
+      const filledIds = this.inner.setMarkPrice(this.inner.getNativeKey(cnContract), snap.last)
+      await this.settleFilledOrders(filledIds, new Decimal(snap.last))
     }
 
+    const px = order.orderType === 'MKT'
+      ? new Decimal(snap?.last ?? this.inner.getMarkPrice(this.inner.getNativeKey(cnContract))?.toNumber() ?? 0)
+      : (!order.lmtPrice.equals(UNSET_DECIMAL)
+        ? order.lmtPrice
+        : new Decimal(snap?.last ?? 0))
+
     if (this.opts.enforceLimitBand && snap) {
-      const px = order.orderType === 'MKT'
-        ? new Decimal(snap.last)
-        : (!order.lmtPrice.equals(UNSET_DECIMAL) ? order.lmtPrice : new Decimal(snap.last))
       const bandErr = assertLimitBand(side, px, snap)
       if (bandErr) return { success: false, error: bandErr }
     }
@@ -201,30 +224,74 @@ export class CnLocalPaperBroker implements IBroker {
       if (t1) return { success: false, error: t1 }
     }
 
+    const notional = qty.mul(px)
+    const estCommission = commissionOnNotional(notional)
+    if (side === 'BUY') {
+      const need = notional.plus(estCommission)
+      const available = await this.availableCash()
+      if (available.lt(need)) {
+        return {
+          success: false,
+          error: `INSUFFICIENT_CASH: need ${need.toFixed(2)} (notional ${notional.toFixed(2)} + commission ${estCommission.toFixed(2)}), available ${available.toFixed(2)}`,
+        }
+      }
+    }
+
     const result = await this.inner.placeOrder(cnContract, order, tpsl)
     if (!result.success) return result
 
     const filledNow = order.orderType === 'MKT' || result.orderState?.status === 'Filled'
+    if (!filledNow && side === 'BUY' && order.orderType === 'LMT' && result.orderId) {
+      this.frozenByOrder.set(result.orderId, notional.plus(estCommission))
+    }
+
     if (filledNow) {
+      this.applyFillFees(side, qty, px)
       if (side === 'BUY') this.recordBuy(cnContract, qty)
-      if (side === 'SELL') {
-        const fillPx = snap ? new Decimal(snap.last) : this.inner.getMarkPrice(this.inner.getNativeKey(cnContract))
-        if (fillPx) {
-          const tax = stampTaxOnSell(qty.mul(fillPx))
-          if (tax.gt(0)) this.inner.adjustCash(tax.neg())
-        }
-      }
     }
 
     return result
   }
 
   async modifyOrder(orderId: string, changes: Partial<Order>): Promise<PlaceOrderResult> {
-    return this.inner.modifyOrder(orderId, changes)
+    const open = await this.inner.getOrder(orderId)
+    if (!open || open.orderState.status !== 'Submitted') {
+      return this.inner.modifyOrder(orderId, changes)
+    }
+
+    const side = (changes.action ?? open.order.action).toUpperCase()
+    const orderType = changes.orderType ?? open.order.orderType
+    const prevFreeze = this.frozenByOrder.get(orderId) ?? new Decimal(0)
+
+    if (side === 'BUY' && orderType === 'LMT') {
+      const qty = changes.totalQuantity && !changes.totalQuantity.equals(UNSET_DECIMAL)
+        ? changes.totalQuantity
+        : open.order.totalQuantity
+      const px = changes.lmtPrice && !changes.lmtPrice.equals(UNSET_DECIMAL)
+        ? changes.lmtPrice
+        : (!open.order.lmtPrice.equals(UNSET_DECIMAL) ? open.order.lmtPrice : new Decimal(0))
+      const need = qty.mul(px).plus(commissionOnNotional(qty.mul(px)))
+      const available = (await this.availableCash()).plus(prevFreeze)
+      if (available.lt(need)) {
+        return {
+          success: false,
+          error: `INSUFFICIENT_CASH: modified LMT needs ${need.toFixed(2)}, available ${available.toFixed(2)}`,
+        }
+      }
+      const result = await this.inner.modifyOrder(orderId, changes)
+      if (result.success) this.frozenByOrder.set(orderId, need)
+      return result
+    }
+
+    const result = await this.inner.modifyOrder(orderId, changes)
+    if (result.success) this.frozenByOrder.delete(orderId)
+    return result
   }
 
   async cancelOrder(orderId: string): Promise<PlaceOrderResult> {
-    return this.inner.cancelOrder(orderId)
+    const result = await this.inner.cancelOrder(orderId)
+    if (result.success) this.frozenByOrder.delete(orderId)
+    return result
   }
 
   async closePosition(contract: Contract, quantity?: Decimal): Promise<PlaceOrderResult> {
@@ -248,7 +315,13 @@ export class CnLocalPaperBroker implements IBroker {
 
   async getAccount(_subAccountId?: string): Promise<AccountInfo> {
     const info = await this.inner.getAccount()
-    return { ...info, baseCurrency: 'CNY' }
+    const available = await this.availableCash()
+    return {
+      ...info,
+      baseCurrency: 'CNY',
+      // Ledger cash stays in totalCashValue; buyingPower is cash minus LMT BUY freezes.
+      buyingPower: available.toString(),
+    }
   }
 
   async getPositions(_subAccountId?: string): Promise<Position[]> {
@@ -320,13 +393,19 @@ export class CnLocalPaperBroker implements IBroker {
     price: Decimal | string | number,
     quote?: Partial<CnQuoteSnapshot>,
   ): string[] {
-    const bare = nativeKey.replace(/^(sh|sz)/i, '')
+    const parsed = parseCnSymbol(nativeKey)
+    const bare = parsed.ok
+      ? parsed.ref.bare
+      : nativeKey.replace(/^(sh|sz|bj)/i, '').replace(/\.(ss|sh|sz|bj)$/i, '')
+    const market: CnMarket = parsed.ok
+      ? parsed.ref.market
+      : (quote?.market ?? 'sh')
     const n = price instanceof Decimal ? price.toNumber() : Number(price)
     const prev = quote?.prevClose ?? n
-    const tencentCode = toTencentCode(nativeKey) ?? `sh${bare}`
+    const tencentCode = parsed.ok ? parsed.ref.tencentCode : (toTencentCode(nativeKey) ?? `sh${bare}`)
     const snap: CnQuoteSnapshot = {
       code: bare,
-      market: tencentCode.startsWith('sz') ? 'sz' : 'sh',
+      market,
       tencentCode,
       name: quote?.name ?? bare,
       last: n,
@@ -348,19 +427,22 @@ export class CnLocalPaperBroker implements IBroker {
 
   private nativeBare(contract: Contract): string {
     const symbol = contract.symbol || contract.localSymbol || ''
-    return symbol.replace(/^(sh|sz)/i, '').replace(/\.(ss|sh|sz)$/i, '')
+    const parsed = parseCnSymbol(symbol)
+    if (parsed.ok) return parsed.ref.bare
+    return symbol.replace(/^(sh|sz|bj)/i, '').replace(/\.(ss|sh|sz|bj)$/i, '')
   }
 
   private buildCnContract(code: string, snap: CnQuoteSnapshot | null): Contract {
-    const bare = code.replace(/^(sh|sz)/i, '')
-    const market = snap?.market
-      ?? (toTencentCode(bare)?.startsWith('sz') ? 'sz' : 'sh')
+    const parsed = parseCnSymbol(code)
+    const bare = parsed.ok ? parsed.ref.bare : code.replace(/^(sh|sz|bj)/i, '')
+    const market: CnMarket = snap?.market
+      ?? (parsed.ok ? parsed.ref.market : 'sh')
     const c = new Contract()
     c.symbol = bare
     c.localSymbol = bare
     c.secType = 'STK'
     c.exchange = 'CNLOCAL'
-    c.primaryExch = market.toUpperCase()
+    c.primaryExchange = market.toUpperCase()
     c.currency = 'CNY'
     c.aliceId = `${this.id}|${bare}`
     return c
@@ -408,19 +490,46 @@ export class CnLocalPaperBroker implements IBroker {
       this.quoteCache.set(row.code, row)
       this.quoteCache.set(row.tencentCode, row)
       const filledIds = this.inner.setMarkPrice(row.code, row.last)
-      for (const id of filledIds) {
-        const filled = await this.inner.getOrder(id)
-        if (!filled) continue
-        const side = filled.order.action.toUpperCase()
-        const qty = filled.order.filledQuantity && !filled.order.filledQuantity.equals(UNSET_DECIMAL)
-          ? filled.order.filledQuantity
-          : filled.order.totalQuantity
-        if (side === 'BUY') this.recordBuy(filled.contract, qty)
-        if (side === 'SELL') {
-          const tax = stampTaxOnSell(qty.mul(row.last))
-          if (tax.gt(0)) this.inner.adjustCash(tax.neg())
-        }
-      }
+      await this.settleFilledOrders(filledIds, new Decimal(row.last))
+    }
+  }
+
+  private async settleFilledOrders(filledIds: string[], fillPxHint: Decimal): Promise<void> {
+    for (const id of filledIds) {
+      this.frozenByOrder.delete(id)
+      const filled = await this.inner.getOrder(id)
+      if (!filled) continue
+      // Fully filled orders drop out of Submitted; partials may remain open.
+      const side = filled.order.action.toUpperCase()
+      const qty = filled.order.filledQuantity && !filled.order.filledQuantity.equals(UNSET_DECIMAL)
+        ? filled.order.filledQuantity
+        : filled.order.totalQuantity
+      const fillPx = filled.avgFillPrice
+        ? new Decimal(filled.avgFillPrice)
+        : fillPxHint
+      this.applyFillFees(side, qty, fillPx)
+      if (side === 'BUY') this.recordBuy(filled.contract, qty)
+    }
+  }
+
+  private frozenTotal(): Decimal {
+    let sum = new Decimal(0)
+    for (const v of this.frozenByOrder.values()) sum = sum.plus(v)
+    return sum
+  }
+
+  private async availableCash(): Promise<Decimal> {
+    const info = await this.inner.getAccount()
+    return new Decimal(info.totalCashValue).minus(this.frozenTotal())
+  }
+
+  private applyFillFees(side: string, qty: Decimal, fillPx: Decimal): void {
+    const notional = qty.mul(fillPx)
+    const commission = commissionOnNotional(notional)
+    if (commission.gt(0)) this.inner.adjustCash(commission.neg())
+    if (side === 'SELL') {
+      const tax = stampTaxOnSell(notional)
+      if (tax.gt(0)) this.inner.adjustCash(tax.neg())
     }
   }
 
