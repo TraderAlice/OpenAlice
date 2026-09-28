@@ -59,6 +59,45 @@ const cancelOrderSchema = z.object({
   message,
 })
 
+const paperReason = z.string().min(1, { message: 'reason is required' })
+
+const paperAdjustCashSchema = z.object({
+  delta: numericString,
+  reason: paperReason,
+})
+
+const paperAdjustPositionSchema = z.object({
+  nativeKey: z.string().min(1),
+  quantityDelta: numericString,
+  avgCost: numericString.optional(),
+  lockedQty: numericString.optional(),
+  reason: paperReason,
+})
+
+const paperSetSellableSchema = z.object({
+  nativeKey: z.string().min(1),
+  sellable: numericString,
+  reason: paperReason,
+})
+
+const paperSetSnapshotSchema = z.object({
+  cash: numericString,
+  positions: z.array(z.object({
+    nativeKey: z.string().min(1),
+    quantity: numericString,
+    avgCost: numericString.optional(),
+    sellable: numericString.optional(),
+  })),
+  reason: paperReason,
+})
+
+function paperAdjustError(c: Context, err: unknown): Response {
+  const message = err instanceof Error ? err.message : String(err)
+  const be = err instanceof BrokerError ? err : null
+  if (be?.code === 'CONFIG') return c.json({ error: message, code: be.code }, 400)
+  return c.json({ error: message }, 400)
+}
+
 /** HTTP status mapping for one-shot order pipeline failures. */
 const PHASE_STATUS: Record<OrderEntryPhase, 400 | 500> = {
   stage: 400,
@@ -272,6 +311,64 @@ export function createTradingRoutes(ctx: UTAEngineContext) {
     const account = resolveAccount(ctx, c)
     if (!account) return c.json({ error: 'Account not found' }, 404)
     return queryAccount(c, account, () => account.getAccount(c.req.query('subAccountId')))
+  })
+
+  // CN Local Paper bookkeeping — gated to cn-local-paper only.
+  app.get('/uta/:id/paper/book', async (c) => {
+    const account = resolveAccount(ctx, c)
+    if (!account) return c.json({ error: 'Account not found' }, 404)
+    if (!account.isCnLocalPaper()) {
+      return c.json({ error: 'Bookkeeping is only available on CN Local Paper accounts' }, 400)
+    }
+    return queryAccount(c, account, async () => ({ book: await account.getCnPaperBookView() }))
+  })
+
+  app.post('/uta/:id/paper/adjust-cash', async (c) => {
+    const account = resolveAccount(ctx, c)
+    if (!account) return c.json({ error: 'Account not found' }, 404)
+    const parsed = paperAdjustCashSchema.safeParse(await c.req.json().catch(() => null))
+    if (!parsed.success) return c.json({ error: parsed.error.message }, 400)
+    try {
+      return c.json(await account.paperAdjustCash(parsed.data))
+    } catch (err) {
+      return paperAdjustError(c, err)
+    }
+  })
+
+  app.post('/uta/:id/paper/adjust-position', async (c) => {
+    const account = resolveAccount(ctx, c)
+    if (!account) return c.json({ error: 'Account not found' }, 404)
+    const parsed = paperAdjustPositionSchema.safeParse(await c.req.json().catch(() => null))
+    if (!parsed.success) return c.json({ error: parsed.error.message }, 400)
+    try {
+      return c.json(await account.paperAdjustPosition(parsed.data))
+    } catch (err) {
+      return paperAdjustError(c, err)
+    }
+  })
+
+  app.post('/uta/:id/paper/set-sellable', async (c) => {
+    const account = resolveAccount(ctx, c)
+    if (!account) return c.json({ error: 'Account not found' }, 404)
+    const parsed = paperSetSellableSchema.safeParse(await c.req.json().catch(() => null))
+    if (!parsed.success) return c.json({ error: parsed.error.message }, 400)
+    try {
+      return c.json(await account.paperSetSellable(parsed.data))
+    } catch (err) {
+      return paperAdjustError(c, err)
+    }
+  })
+
+  app.post('/uta/:id/paper/set-snapshot', async (c) => {
+    const account = resolveAccount(ctx, c)
+    if (!account) return c.json({ error: 'Account not found' }, 404)
+    const parsed = paperSetSnapshotSchema.safeParse(await c.req.json().catch(() => null))
+    if (!parsed.success) return c.json({ error: parsed.error.message }, 400)
+    try {
+      return c.json(await account.paperSetSnapshot(parsed.data))
+    } catch (err) {
+      return paperAdjustError(c, err)
+    }
   })
 
   // Positions. `?subAccountId=` scopes to one wallet (omitted ⇒ all).

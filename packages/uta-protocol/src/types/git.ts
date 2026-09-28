@@ -52,6 +52,33 @@ export type Operation =
       quantityDelta: string
       markPrice: string
     }
+  | {
+      /** CN Local Paper bookkeeping: cash delta (deposit / withdraw / fee). */
+      action: 'paperAdjustCash'
+      delta: string
+      reason: string
+    }
+  | {
+      /** CN Local Paper bookkeeping: position qty ± and optional cost / T+1 lock. */
+      action: 'paperAdjustPosition'
+      nativeKey: string
+      quantityDelta: string
+      avgCost?: string
+      lockedQty?: string
+      reason: string
+    }
+  | {
+      /** CN Local Paper bookkeeping: replace cash + positions in one shot. */
+      action: 'paperSetSnapshot'
+      cash: string
+      positions: Array<{
+        nativeKey: string
+        quantity: string
+        avgCost?: string
+        sellable?: string
+      }>
+      reason: string
+    }
 
 // ==================== Operation Result ====================
 
@@ -318,5 +345,8 @@ export function getOperationSymbol(op: Operation | undefined): string {
     case 'syncOrders': return 'unknown'
     case 'observeExternalOrder': return op.contract?.symbol || op.contract?.aliceId || 'unknown'
     case 'reconcileBalance': return op.aliceId
+    case 'paperAdjustCash': return 'cash'
+    case 'paperAdjustPosition': return op.nativeKey
+    case 'paperSetSnapshot': return 'book'
   }
 }

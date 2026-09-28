@@ -34,6 +34,7 @@ import type {
   SyncResult,
 } from './git/types.js'
 import { createGuardPipeline, resolveGuards } from './guards/index.js'
+import { CnLocalPaperBroker } from './brokers/mock/CnLocalPaperBroker.js'
 import './contract-ext.js'
 
 // ==================== Options ====================
@@ -1236,6 +1237,142 @@ export class UnifiedTradingAccount {
 
   getCapabilities(): AccountCapabilities {
     return this.broker.getCapabilities()
+  }
+
+  // ==================== CN Local Paper bookkeeping ====================
+
+  isCnLocalPaper(): boolean {
+    return this.broker instanceof CnLocalPaperBroker
+  }
+
+  private requireCnPaper(): CnLocalPaperBroker {
+    if (!(this.broker instanceof CnLocalPaperBroker)) {
+      throw new BrokerError(
+        'CONFIG',
+        `Account "${this.label}" is not CN Local Paper — bookkeeping adjustments are only available on cn-local-paper.`,
+      )
+    }
+    return this.broker
+  }
+
+  async getCnPaperBookView() {
+    return this.requireCnPaper().getBookView()
+  }
+
+  async paperAdjustCash(params: { delta: string; reason: string }): Promise<{ hash: string }> {
+    this._assertCanMutateAccount('paperAdjustCash')
+    const reason = params.reason.trim()
+    if (!reason) throw new Error('paperAdjustCash: reason is required')
+    const broker = this.requireCnPaper()
+    broker.adjustBookCash(params.delta)
+    const stateAfter = await this._getState()
+    const hash = await this.git.recordPaperAdjust({
+      operation: {
+        action: 'paperAdjustCash',
+        delta: String(params.delta),
+        reason,
+      },
+      stateAfter,
+    })
+    return { hash }
+  }
+
+  async paperAdjustPosition(params: {
+    nativeKey: string
+    quantityDelta: string
+    avgCost?: string
+    lockedQty?: string
+    reason: string
+  }): Promise<{ hash: string }> {
+    this._assertCanMutateAccount('paperAdjustPosition')
+    const reason = params.reason.trim()
+    if (!reason) throw new Error('paperAdjustPosition: reason is required')
+    const broker = this.requireCnPaper()
+    broker.adjustBookPosition({
+      nativeKey: params.nativeKey,
+      quantityDelta: params.quantityDelta,
+      ...(params.avgCost != null && params.avgCost !== '' ? { avgCost: params.avgCost } : {}),
+      ...(params.lockedQty != null && params.lockedQty !== '' ? { lockedQty: params.lockedQty } : {}),
+    })
+    const stateAfter = await this._getState()
+    const hash = await this.git.recordPaperAdjust({
+      operation: {
+        action: 'paperAdjustPosition',
+        nativeKey: params.nativeKey,
+        quantityDelta: String(params.quantityDelta),
+        ...(params.avgCost != null && params.avgCost !== '' ? { avgCost: String(params.avgCost) } : {}),
+        ...(params.lockedQty != null && params.lockedQty !== '' ? { lockedQty: String(params.lockedQty) } : {}),
+        reason,
+      },
+      stateAfter,
+    })
+    return { hash }
+  }
+
+  async paperSetSellable(params: {
+    nativeKey: string
+    sellable: string
+    reason: string
+  }): Promise<{ hash: string }> {
+    this._assertCanMutateAccount('paperAdjustPosition')
+    const reason = params.reason.trim()
+    if (!reason) throw new Error('paperSetSellable: reason is required')
+    const broker = this.requireCnPaper()
+    const view = await broker.getBookView()
+    const row = view.positions.find((p) => p.nativeKey === params.nativeKey)
+    if (!row) throw new Error(`paperSetSellable: no position at ${params.nativeKey}`)
+    const total = new Decimal(row.quantity)
+    const sellable = new Decimal(params.sellable)
+    const lockedQty = total.minus(sellable).toString()
+    broker.setSellable({ nativeKey: params.nativeKey, sellable })
+    const stateAfter = await this._getState()
+    const hash = await this.git.recordPaperAdjust({
+      operation: {
+        action: 'paperAdjustPosition',
+        nativeKey: params.nativeKey,
+        quantityDelta: '0',
+        lockedQty,
+        reason,
+      },
+      stateAfter,
+    })
+    return { hash }
+  }
+
+  async paperSetSnapshot(params: {
+    cash: string
+    positions: Array<{
+      nativeKey: string
+      quantity: string
+      avgCost?: string
+      sellable?: string
+    }>
+    reason: string
+  }): Promise<{ hash: string }> {
+    this._assertCanMutateAccount('paperSetSnapshot')
+    const reason = params.reason.trim()
+    if (!reason) throw new Error('paperSetSnapshot: reason is required')
+    const broker = this.requireCnPaper()
+    broker.setBookSnapshot({
+      cash: params.cash,
+      positions: params.positions,
+    })
+    const stateAfter = await this._getState()
+    const hash = await this.git.recordPaperAdjust({
+      operation: {
+        action: 'paperSetSnapshot',
+        cash: String(params.cash),
+        positions: params.positions.map((p) => ({
+          nativeKey: p.nativeKey,
+          quantity: String(p.quantity),
+          ...(p.avgCost != null && p.avgCost !== '' ? { avgCost: String(p.avgCost) } : {}),
+          ...(p.sellable != null && p.sellable !== '' ? { sellable: String(p.sellable) } : {}),
+        })),
+        reason,
+      },
+      stateAfter,
+    })
+    return { hash }
   }
 
   // ==================== State ====================

@@ -13,6 +13,8 @@ import { createBroker } from './brokers/factory.js'
 import { getBrokerPreset } from '@traderalice/uta-protocol'
 import { UnifiedTradingAccount } from './UnifiedTradingAccount.js'
 import { loadGitState, createGitPersister } from './git-persistence.js'
+import { loadCnPaperBook, createCnPaperBookPersister } from './cn-paper-persistence.js'
+import { CnLocalPaperBroker } from './brokers/mock/CnLocalPaperBroker.js'
 import { readUTAsConfig, type UTAConfig } from '@/core/config.js'
 import type { EventLog } from '@/core/event-log.js'
 import type { ToolCenter } from '@/core/tool-center.js'
@@ -61,6 +63,11 @@ export class UTAManager {
   /** Create a UTA from config, register it, and start async broker connection. */
   async initUTA(cfg: UTAConfig): Promise<UnifiedTradingAccount> {
     const broker = await createBroker(cfg, { fxService: this.fxService })
+    if (broker instanceof CnLocalPaperBroker) {
+      const book = await loadCnPaperBook(cfg.id)
+      if (book) broker.importBookState(book)
+      broker.setBookPersister(createCnPaperBookPersister(cfg.id))
+    }
     const savedState = await loadGitState(cfg.id)
     const uta = new UnifiedTradingAccount(broker, {
       guards: cfg.guards,

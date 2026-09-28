@@ -328,6 +328,51 @@ export class TradingGit implements ITradingGit {
   }
 
   /**
+   * Append a CN Local Paper bookkeeping commit without staging/push.
+   * Broker state is already mutated by the caller; this is the audit trail.
+   */
+  async recordPaperAdjust(params: {
+    operation: Extract<Operation, { action: 'paperAdjustCash' | 'paperAdjustPosition' | 'paperSetSnapshot' }>
+    stateAfter: GitState
+    message?: string
+  }): Promise<CommitHash> {
+    const { operation, stateAfter } = params
+    const timestamp = new Date().toISOString()
+    const message = params.message ?? `paper: ${operation.action} — ${operation.reason}`
+
+    const result: OperationResult = {
+      action: operation.action,
+      success: true,
+      status: 'filled',
+    }
+
+    const hash = generateCommitHash({
+      message,
+      operations: [operation],
+      timestamp,
+      parentHash: this.head,
+    })
+
+    const commit: GitCommit = {
+      hash,
+      parentHash: this.head,
+      message,
+      operations: [operation],
+      results: [result],
+      stateAfter,
+      timestamp,
+      round: this.currentRound,
+    }
+
+    this.commits.push(commit)
+    this.head = hash
+
+    await this.config.onCommit?.(this.exportState())
+
+    return hash
+  }
+
+  /**
    * Record externally-observed open orders as ONE squashed commit — the
    * "commits without a message" the user made on the exchange directly.
    * The log is a faithful record, not the source of final state: once an
@@ -520,6 +565,21 @@ export class TradingGit implements ITradingGit {
         const direction = delta.gte(0) ? 'observed' : 'released'
         return `${direction} ${delta.abs().toFixed()} @${op.markPrice}`
       }
+
+      case 'paperAdjustCash': {
+        const delta = new Decimal(op.delta)
+        const sign = delta.gte(0) ? '+' : ''
+        return `paper cash ${sign}${delta.toFixed()} (${op.reason})`
+      }
+
+      case 'paperAdjustPosition': {
+        const delta = new Decimal(op.quantityDelta)
+        const sign = delta.gte(0) ? '+' : ''
+        return `paper ${op.nativeKey} ${sign}${delta.toFixed()} (${op.reason})`
+      }
+
+      case 'paperSetSnapshot':
+        return `paper snapshot ${op.positions.length} positions cash=${op.cash} (${op.reason})`
     }
   }
 

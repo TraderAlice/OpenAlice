@@ -16,6 +16,7 @@ import { Toggle } from '../components/Toggle'
 import { SegmentedControl } from '../components/SegmentedControl'
 import { AccountReadinessBadge, BrokerSupportGate } from '../components/uta/BrokerPackGate'
 import { EditUTADialog } from '../components/uta/EditUTADialog'
+import { PaperBookAdjustDialog } from '../components/uta/PaperBookAdjustDialog'
 import { OrderEntryDialog, type OrderEntryMode } from '../components/uta/OrderEntryDialog'
 import { EquityCurve } from '../components/EquityCurve'
 import { Metric, signFromDelta } from '../components/Metric'
@@ -51,6 +52,7 @@ export function UTADetailPage({ spec }: UTADetailPageProps) {
   const [selectedSub, setSelectedSub] = useState<string | undefined>(undefined)
   const [snapshots, setSnapshots] = useState<UTASnapshotSummary[]>([])
   const [editing, setEditing] = useState(false)
+  const [paperAdjustOpen, setPaperAdjustOpen] = useState(false)
   const [orderMode, setOrderMode] = useState<OrderEntryMode | null>(null)
   const [dataError, setDataError] = useState<string | null>(null)
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null)
@@ -271,6 +273,17 @@ export function UTADetailPage({ spec }: UTADetailPageProps) {
               <Button onClick={() => setEditing(true)} variant="outline" size="sm">
                 Edit
               </Button>
+              {uta.presetId === 'cn-local-paper' && (
+                <Button
+                  onClick={() => setPaperAdjustOpen(true)}
+                  variant="outline"
+                  size="sm"
+                  disabled={!policy.canTrade}
+                  title={!policy.canTrade ? policy.reason : '对齐真实账户净效果到纸面账'}
+                >
+                  调整账面
+                </Button>
+              )}
               <Button
                 onClick={() => setOrderMode({ kind: 'place' })}
                 disabled={!policy.canTrade}
@@ -396,6 +409,14 @@ export function UTADetailPage({ spec }: UTADetailPageProps) {
             navigate('/trading')
           }}
           onClose={() => setEditing(false)}
+        />
+      )}
+
+      {paperAdjustOpen && (
+        <PaperBookAdjustDialog
+          utaId={uta.id}
+          onClose={() => setPaperAdjustOpen(false)}
+          onDone={() => { void refreshLive() }}
         />
       )}
 

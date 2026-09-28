@@ -43,6 +43,12 @@ export interface ITradingGit {
     message?: string
   }): Promise<CommitHash>
 
+  recordPaperAdjust(params: {
+    operation: Extract<Operation, { action: 'paperAdjustCash' | 'paperAdjustPosition' | 'paperSetSnapshot' }>
+    stateAfter: GitState
+    message?: string
+  }): Promise<CommitHash>
+
   // ---- git log / show / status ----
 
   log(options?: { limit?: number; symbol?: string }): CommitLogEntry[]
