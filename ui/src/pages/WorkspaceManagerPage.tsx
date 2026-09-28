@@ -179,6 +179,7 @@ export function WorkspaceManagerPage({ spec, visible = true }: { spec: ManagerSp
               record={session}
               wsId={MANAGER_WORKSPACE_ID}
               sessionId={sessionId}
+              visible={visible}
               agent={session.agent}
               agents={agents}
               label={t('workspaceManager.title')}

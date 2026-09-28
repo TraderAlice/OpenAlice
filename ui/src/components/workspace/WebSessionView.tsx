@@ -84,6 +84,7 @@ function WebSession({ readOnly = false, record, wsId, sessionId, visible = true,
       revision={snapshot?.revision ?? 0}
       busy={!readOnly && busy}
       ready={!readOnly && !!snapshot && snapshot.phase !== 'failed' && snapshot.phase !== 'starting' && !stopped && !session.reconfiguring && configurationReady}
+      visible={visible}
       placeholder={`Message ${agentLabel}…`}
       empty={snapshot ? 'What should Alice work on next?' : 'Opening conversation…'}
       afterItems={continueUi?.panel}

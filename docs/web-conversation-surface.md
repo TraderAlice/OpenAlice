@@ -239,7 +239,9 @@ accepts the restarted process's new revision sequence. No persisted shape change
 `ConversationLayout` owns the single page canvas for Start and GUI: header,
 scrolling content, and bottom composer dock. Start supplies the welcome state
 (centered when space permits, scrollable from the top when short); an existing
-Session supplies transcript content and follow-tail handling. Both use Start's
+Session supplies transcript content and follow-tail handling. Warm TabHost
+returns restore that follow-tail position when the reader was still at the
+bottom. Both use Start's
 46rem composer width, 12px narrow gutters/bottom inset, and 24px gutters with
 a 20px bottom inset from 42rem container width. Workspace pages must not add
 another padding wrapper around the GUI canvas. Route/session lifetimes remain

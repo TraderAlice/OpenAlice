@@ -22,6 +22,12 @@ export interface ConversationViewProps {
   /** Soft system / product cards appended after the live transcript. */
   readonly afterItems?: ReactNode
   readonly error?: string | null
+  /**
+   * False while TabHost keeps this frame warm but hidden (e.g. Trading).
+   * Returning to visible restores follow-tail scroll after content-visibility
+   * may have collapsed the scroller metrics.
+   */
+  readonly visible?: boolean
   /** An absent action means the adapter does not support it. */
   readonly send?: (message: string) => Promise<void>
   readonly stop?: () => Promise<void>
@@ -123,6 +129,8 @@ export function ConversationView(props: ConversationViewProps) {
   const [following, setFollowing] = useState(true)
   const followingRef = useRef(true)
   const scroller = useRef<HTMLDivElement>(null)
+  const visible = props.visible !== false
+  const wasVisibleRef = useRef(visible)
 
   function jump(behavior: ScrollBehavior = 'smooth') {
     followingRef.current = true
@@ -133,6 +141,19 @@ export function ConversationView(props: ConversationViewProps) {
   useEffect(() => {
     if (followingRef.current) scroller.current?.scrollTo({ top: scroller.current.scrollHeight, behavior: 'auto' })
   }, [props.revision, props.items.length])
+
+  // Warm TabHost frames collapse transcript layout while hidden. When the
+  // reader returns and was still following the tail, restore bottom after paint
+  // so scrollHeight reflects the visible tree (revision may be unchanged).
+  useEffect(() => {
+    const becameVisible = visible && !wasVisibleRef.current
+    wasVisibleRef.current = visible
+    if (!becameVisible || !followingRef.current) return
+    const frame = window.requestAnimationFrame(() => {
+      scroller.current?.scrollTo({ top: scroller.current.scrollHeight, behavior: 'auto' })
+    })
+    return () => window.cancelAnimationFrame(frame)
+  }, [visible])
 
   useEffect(() => {
     if (!scroller.current || typeof ResizeObserver === 'undefined') return
