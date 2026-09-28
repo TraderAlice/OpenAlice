@@ -5,6 +5,12 @@
  * (`opencode acp`) implement the agent side natively. Alice is the client: it
  * advertises no filesystem or terminal capabilities, so agents keep using
  * their own tools, and only permission requests round-trip to the browser.
+ *
+ * Session compaction (ACP preview `clientCapabilities.session.compaction`) is
+ * advertised so Cursor Agent and peers can report `compaction_update` /
+ * `compaction_summary_chunk` instead of falling back to synthetic tool calls
+ * or silent truncation. Legacy "Compact conversation" tool titles are still
+ * recognized when an agent has not migrated yet.
  */
 import { JsonRpcPeer, type JsonRpcError } from './json-rpc.js'
 import {
@@ -34,6 +40,10 @@ export class AcpTransport implements WebSessionTransport {
   private sessionId: string | null
   private pendingUserText: string | null = null
   private turnActive = false
+  /** Active ACP compaction entities (`compactionId`) plus legacy `tool:<id>` keys. */
+  private readonly compactingIds = new Set<string>()
+  private readonly compactSummaries = new Map<string, string>()
+  private readonly legacyCompactTools = new Set<string>()
 
   constructor(private readonly ctx: WebTransportContext) {
     this.sessionId = ctx.input.nativeSessionId ?? null
@@ -47,7 +57,13 @@ export class AcpTransport implements WebSessionTransport {
   async start(): Promise<void> {
     const init = await this.peer.request('initialize', {
       protocolVersion: ACP_PROTOCOL_VERSION,
-      clientCapabilities: { fs: { readTextFile: false, writeTextFile: false }, terminal: false },
+      clientCapabilities: {
+        fs: { readTextFile: false, writeTextFile: false },
+        terminal: false,
+        // Preview ACP session-compaction capability — required before agents
+        // may emit compaction_update / compaction_summary_chunk (RFD).
+        session: { compaction: {} },
+      },
       clientInfo: { name: 'openalice', title: 'OpenAlice', version: '1' },
     })
     const capabilities = isJsonObject(init) && isJsonObject(init['agentCapabilities']) ? init['agentCapabilities'] : {}
@@ -130,7 +146,9 @@ export class AcpTransport implements WebSessionTransport {
     if (stopReason === 'refusal') this.builder.notice(`${this.ctx.input.agent} refused to continue this turn.`)
     if (stopReason === 'max_tokens') this.builder.notice('The turn stopped at the model output limit.')
     if (stopReason === 'max_turn_requests') this.builder.notice('The turn stopped at the request limit.')
-    this.ctx.state.setPhase('idle')
+    // A late compacting signal can outlive the prompt RPC; prefer that phase.
+    if (this.compactingIds.size > 0) this.ctx.state.setPhase('compacting')
+    else this.ctx.state.setPhase('idle')
   }
 
   private onNotification(method: string, params: unknown): void {
@@ -155,6 +173,7 @@ export class AcpTransport implements WebSessionTransport {
       case 'tool_call': {
         const id = stringOrNull(update['toolCallId'])
         if (!id) break
+        if (isLegacyCompactTool(update)) this.beginLegacyCompact(id)
         this.builder.toolCall(id, toolTitle(update), update['rawInput'] ?? {})
         this.applyToolStatus(id, update)
         break
@@ -162,6 +181,7 @@ export class AcpTransport implements WebSessionTransport {
       case 'tool_call_update': {
         const id = stringOrNull(update['toolCallId'])
         if (!id) break
+        if (isLegacyCompactTool(update)) this.beginLegacyCompact(id)
         const name = stringOrNull(update['title'])
         this.builder.toolCallUpdate(id, {
           ...(name ? { name } : {}),
@@ -170,14 +190,92 @@ export class AcpTransport implements WebSessionTransport {
         this.applyToolStatus(id, update)
         break
       }
+      case 'compaction_update':
+        this.applyCompactionUpdate(update)
+        break
+      case 'compaction_summary_chunk':
+        this.applyCompactionSummaryChunk(update)
+        break
       default:
         // plan, available_commands_update, current_mode_update, config_option_update
         break
     }
   }
 
+  private applyCompactionUpdate(update: JsonObject): void {
+    const id = stringOrNull(update['compactionId'])
+    const status = stringOrNull(update['status'])
+    if (!id || !status) return
+    if (status === 'in_progress') {
+      this.compactingIds.add(id)
+      this.ctx.state.setPhase('compacting')
+      if ('summary' in update) this.replaceCompactSummary(id, update['summary'])
+      return
+    }
+    if ('summary' in update) this.replaceCompactSummary(id, update['summary'])
+    const summary = this.compactSummaries.get(id)?.trim() ?? ''
+    this.compactingIds.delete(id)
+    this.compactSummaries.delete(id)
+    const agent = this.ctx.input.agent
+    if (status === 'completed') {
+      this.builder.notice(summary
+        ? `${agent} compacted the conversation context.\n\n${summary}`
+        : `${agent} compacted the conversation context.`)
+    } else if (status === 'failed') {
+      const error = stringOrNull(update['error'])
+      this.builder.notice(error
+        ? `${agent} failed to compact the conversation context: ${error}`
+        : `${agent} failed to compact the conversation context.`)
+    } else if (status === 'cancelled') {
+      this.builder.notice(`${agent} cancelled conversation context compaction.`)
+    }
+    this.restorePhaseAfterCompaction()
+  }
+
+  private applyCompactionSummaryChunk(update: JsonObject): void {
+    const id = stringOrNull(update['compactionId'])
+    if (!id) return
+    const chunk = contentBlockText(update['content'])
+    if (!chunk) return
+    this.compactSummaries.set(id, `${this.compactSummaries.get(id) ?? ''}${chunk}`)
+  }
+
+  private replaceCompactSummary(id: string, summary: unknown): void {
+    if (summary === null) {
+      this.compactSummaries.delete(id)
+      return
+    }
+    if (!Array.isArray(summary)) return
+    if (summary.length === 0) {
+      this.compactSummaries.delete(id)
+      return
+    }
+    const text = summary.map((block) => contentBlockText(block)).join('')
+    if (text) this.compactSummaries.set(id, text)
+    else this.compactSummaries.delete(id)
+  }
+
+  private beginLegacyCompact(toolCallId: string): void {
+    const key = `tool:${toolCallId}`
+    this.legacyCompactTools.add(toolCallId)
+    this.compactingIds.add(key)
+    this.ctx.state.setPhase('compacting')
+  }
+
+  private restorePhaseAfterCompaction(): void {
+    if (this.compactingIds.size > 0) {
+      this.ctx.state.setPhase('compacting')
+      return
+    }
+    this.ctx.state.setPhase(this.turnActive ? 'working' : 'idle')
+  }
+
   private applyToolStatus(id: string, update: JsonObject): void {
     const status = update['status']
+    if (status === 'in_progress' || status === 'pending') {
+      if (this.legacyCompactTools.has(id) || isLegacyCompactTool(update)) this.beginLegacyCompact(id)
+      return
+    }
     if (status !== 'completed' && status !== 'failed') return
     const content = toolCallContent(update['content'])
     const output = content.length > 0
@@ -186,6 +284,16 @@ export class AcpTransport implements WebSessionTransport {
         ? [{ type: 'data', value: update['rawOutput'] } satisfies WebContentPart]
         : ''
     this.builder.toolResult(id, output, status === 'failed')
+    if (this.legacyCompactTools.has(id) || isLegacyCompactTool(update)) {
+      this.legacyCompactTools.delete(id)
+      this.compactingIds.delete(`tool:${id}`)
+      if (status === 'completed') {
+        this.builder.notice(`${this.ctx.input.agent} compacted the conversation context.`)
+      } else {
+        this.builder.notice(`${this.ctx.input.agent} failed to compact the conversation context.`)
+      }
+      this.restorePhaseAfterCompaction()
+    }
   }
 
   private async onRequest(method: string, params: unknown, id: string | number): Promise<unknown> {
@@ -244,6 +352,13 @@ export class AcpTransport implements WebSessionTransport {
 
 function toolTitle(record: JsonObject): string {
   return stringOrNull(record['title']) ?? stringOrNull(record['kind']) ?? 'tool'
+}
+
+/** Synthetic compact tools used by ACP agents before session.compaction existed. */
+function isLegacyCompactTool(record: JsonObject): boolean {
+  const title = toolTitle(record)
+  return /compact(?:ing|ed)?(?:\s+conversation(?:\s+history)?)?/i.test(title)
+    || /^compact conversation$/i.test(title)
 }
 
 function toneFromKind(kind: unknown): WebRequestOptionTone {

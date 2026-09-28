@@ -279,6 +279,121 @@ function acpProcess(options: { loadSession?: boolean; failAuth?: boolean } = {})
 describe('WebSessionHost with the acp transport', () => {
   const acpInput = input({ agent: 'cursor', wire: 'acp', command: ['cursor-agent', 'acp'] })
 
+  it('advertises session.compaction and follows compaction_update through compacting', async () => {
+    let promptId: unknown
+    const process = new FakeProcess((command, self) => {
+      const id = command['id']
+      const method = command['method']
+      const params = (command['params'] ?? {}) as Json
+      if (method === 'initialize') {
+        self.line({ jsonrpc: '2.0', id, result: { protocolVersion: 1, agentCapabilities: { loadSession: true }, authMethods: [] } })
+        return
+      }
+      if (method === 'session/new') {
+        self.line({ jsonrpc: '2.0', id, result: { sessionId: 'ses_compact' } })
+        return
+      }
+      if (method === 'session/prompt') {
+        promptId = id
+        const sessionId = params['sessionId']
+        self.line({ jsonrpc: '2.0', method: 'session/update', params: {
+          sessionId,
+          update: { sessionUpdate: 'compaction_update', compactionId: 'cmp_1', status: 'in_progress' },
+        } })
+        self.line({ jsonrpc: '2.0', method: 'session/update', params: {
+          sessionId,
+          update: {
+            sessionUpdate: 'compaction_summary_chunk',
+            compactionId: 'cmp_1',
+            content: { type: 'text', text: 'Kept the martingale bounds.' },
+          },
+        } })
+      }
+    })
+    const host = new WebSessionHost(logger, {}, () => process as never)
+    await host.start(acpInput)
+    expect(process.received[0]).toMatchObject({
+      method: 'initialize',
+      params: {
+        clientCapabilities: {
+          session: { compaction: {} },
+        },
+      },
+    })
+
+    await host.prompt('record-1', 'continue')
+    await settle()
+    expect(host.get('record-1')?.phase).toBe('compacting')
+
+    process.line({ jsonrpc: '2.0', method: 'session/update', params: {
+      sessionId: 'ses_compact',
+      update: { sessionUpdate: 'compaction_update', compactionId: 'cmp_1', status: 'completed' },
+    } })
+    process.line({ jsonrpc: '2.0', method: 'session/update', params: {
+      sessionId: 'ses_compact',
+      update: { sessionUpdate: 'agent_message_chunk', content: { type: 'text', text: 'Ready.' } },
+    } })
+    process.line({ jsonrpc: '2.0', id: promptId, result: { stopReason: 'end_turn' } })
+    await settle()
+    const done = host.get('record-1')!
+    expect(done.phase).toBe('idle')
+    expect(texts(done).some((line) => line.includes('compacted the conversation context'))).toBe(true)
+    expect(texts(done).some((line) => line.includes('Kept the martingale bounds.'))).toBe(true)
+    expect(texts(done)).toContain('assistant:Ready.')
+  })
+
+  it('treats legacy Compact conversation tool calls as compacting', async () => {
+    let promptId: unknown
+    const process = new FakeProcess((command, self) => {
+      const id = command['id']
+      const method = command['method']
+      const params = (command['params'] ?? {}) as Json
+      if (method === 'initialize') {
+        self.line({ jsonrpc: '2.0', id, result: { protocolVersion: 1, agentCapabilities: { loadSession: true }, authMethods: [] } })
+        return
+      }
+      if (method === 'session/new') {
+        self.line({ jsonrpc: '2.0', id, result: { sessionId: 'ses_legacy' } })
+        return
+      }
+      if (method === 'session/prompt') {
+        promptId = id
+        const sessionId = params['sessionId']
+        self.line({ jsonrpc: '2.0', method: 'session/update', params: {
+          sessionId,
+          update: {
+            sessionUpdate: 'tool_call',
+            toolCallId: 'compact_1',
+            title: 'Compacting conversation history...',
+            kind: 'other',
+            status: 'in_progress',
+          },
+        } })
+      }
+    })
+    const host = new WebSessionHost(logger, {}, () => process as never)
+    await host.start(acpInput)
+    await host.prompt('record-1', 'go')
+    await settle()
+    expect(host.get('record-1')?.phase).toBe('compacting')
+
+    process.line({ jsonrpc: '2.0', method: 'session/update', params: {
+      sessionId: 'ses_legacy',
+      update: {
+        sessionUpdate: 'tool_call_update',
+        toolCallId: 'compact_1',
+        title: 'Compacted conversation history',
+        status: 'completed',
+        content: [{ type: 'content', content: { type: 'text', text: 'ok' } }],
+      },
+    } })
+    process.line({ jsonrpc: '2.0', id: promptId, result: { stopReason: 'end_turn' } })
+    await settle()
+    const done = host.get('record-1')!
+    expect(done.phase).toBe('idle')
+    expect(texts(done).some((line) => line.includes('compacted the conversation context'))).toBe(true)
+  })
+
   it('creates a session, streams a turn, and routes permission requests to the browser', async () => {
     const onNativeSessionId = vi.fn()
     const process = acpProcess()
