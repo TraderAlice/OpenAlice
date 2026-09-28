@@ -495,6 +495,10 @@ const workspaceListModule: ViewModule<'workspace-list'> = {
 
 const workspaceModule: ViewModule<'workspace'> = {
   kind: 'workspace',
+  // Desktop TabHost keeps the last focused Workspace frame warm while the
+  // user visits Trading / Market / etc., so huge Web transcripts do not
+  // remount from scratch on every return. Cap is enforced in selectPersistentTabs.
+  lifecycle: 'keep-mounted',
   shell: (spec) => spec.params.source === 'chat'
     ? 'chat'
     : spec.params.source === 'auto-quant'

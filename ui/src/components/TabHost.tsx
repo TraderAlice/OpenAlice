@@ -1,7 +1,8 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useWorkspace } from '../tabs/store'
 import { type Tab } from '../tabs/types'
 import { getView, getViewShell, MarketArea } from '../tabs/registry'
+import { selectPersistentTabs } from '../tabs/persistent-tabs'
 import { EmptyEditor } from './EmptyEditor'
 import { ChatPageShell } from '../pages/ChatPageShell'
 
@@ -15,6 +16,10 @@ import { ChatPageShell } from '../pages/ChatPageShell'
  * `lifecycle: 'keep-mounted'` in tabs/registry when it genuinely needs a live
  * background DOM. Those keep-mounted hidden frames use `visibility: hidden`
  * so size-sensitive children keep a real layout box.
+ *
+ * Workspace views are keep-mounted on desktop, but only the active Workspace
+ * tab (or the single last-focused Workspace while away) stays warm — see
+ * `selectPersistentTabs`.
  */
 export function TabHost() {
   const tabIds = useWorkspace((state) =>
@@ -28,11 +33,20 @@ export function TabHost() {
   const activeTab = activeTabId ? tabsMap[activeTabId] ?? null : null
   const activeView = activeTab ? getView(activeTab.spec.kind) : null
   const activeUsesPersistentFrame = activeView?.lifecycle === 'keep-mounted' && isDesktop
-  const persistentTabs = isDesktop
-    ? tabIds
-      .map((id) => tabsMap[id])
-      .filter((tab): tab is Tab => tab != null && getView(tab.spec.kind).lifecycle === 'keep-mounted')
-    : []
+
+  const lastWorkspaceTabIdRef = useRef<string | null>(null)
+  if (activeTab?.spec.kind === 'workspace') {
+    lastWorkspaceTabIdRef.current = activeTab.id
+  }
+
+  const persistentTabs = selectPersistentTabs({
+    isDesktop,
+    tabIds,
+    tabs: tabsMap,
+    activeTabId,
+    lastWorkspaceTabId: lastWorkspaceTabIdRef.current,
+    lifecycleOf: (kind) => getView(kind).lifecycle ?? 'active-only',
+  })
 
   return (
     <div className="flex min-h-0 min-w-0 flex-1 flex-col">

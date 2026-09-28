@@ -22,6 +22,8 @@ interface Props {
   readonly record?: SessionRecord
   readonly wsId: string
   readonly sessionId: string
+  /** False while TabHost keeps this frame warm but hidden (e.g. user is on Trading). */
+  readonly visible?: boolean
   /** Runtime id of the Session; the snapshot confirms it once loaded. */
   readonly agent?: string
   readonly agents?: readonly AgentInfo[]
@@ -40,9 +42,9 @@ export function WebSessionView(props: Props) {
   return <WebSession key={JSON.stringify([props.wsId, props.sessionId])} {...props} />
 }
 
-function WebSession({ readOnly = false, record, wsId, sessionId, agent, agents, label, headerActions, source, onSessionLost }: Props) {
+function WebSession({ readOnly = false, record, wsId, sessionId, visible = true, agent, agents, label, headerActions, source, onSessionLost }: Props) {
   const [configurationReady, setConfigurationReady] = useState(true)
-  const session = useWebConversation(wsId, sessionId, readOnly)
+  const session = useWebConversation(wsId, sessionId, readOnly, visible)
   const { snapshot, busy, requests } = session
   const openFile = useCallback((path: string) => {
     if (import.meta.env.VITE_DEMO_MODE && path === 'demo/autoquant-studio.html') {

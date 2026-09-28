@@ -43,13 +43,14 @@ export function WorkspaceView(props: WorkspaceViewProps): ReactElement {
   const connected = useRef(false);
   if (props.activeRecord?.state === 'running') connected.current = true;
   // Mount ONLY this tab's own pinned session. Each session is its own tab with
-  // its own WorkspaceView, and TabHost keeps every tab mounted (display:none
-  // when inactive) — so a session's terminal already persists across tab
-  // switches without a WS reconnect. Mounting *every* running session here (the
-  // old single-shared-view design) duplicates each session's <TerminalView>
-  // into every open tab: a session open in N tabs then gets N WebSockets
-  // fighting over its single-attach PTY → kick/reconnect war that wedges the
-  // session (ANG-120 — e.g. claude froze whenever an opencode tab was also open).
+  // its own WorkspaceView. Desktop TabHost keeps at most one Workspace frame
+  // warm while the user is away (Trading / Market / …), so terminals and Web
+  // transcripts can return without a full remount. Mounting *every* running
+  // session here (the old single-shared-view design) duplicates each
+  // session's <TerminalView> into every open tab: a session open in N tabs
+  // then gets N WebSockets fighting over its single-attach PTY →
+  // kick/reconnect war that wedges the session (ANG-120 — e.g. claude froze
+  // whenever an opencode tab was also open).
   //
   // WorkspacePage owns the no-session composer. A missing pinned record may
   // briefly occur before the post-spawn poll supplies it.
@@ -107,6 +108,7 @@ export function WorkspaceView(props: WorkspaceViewProps): ReactElement {
                     readOnly={props.readOnly}
                     wsId={props.wsId}
                     sessionId={s.id}
+                    visible={props.visible !== false}
                     agent={s.agent}
                     {...(props.agents ? { agents: props.agents } : {})}
                     {...(props.source ? { source: props.source } : {})}
