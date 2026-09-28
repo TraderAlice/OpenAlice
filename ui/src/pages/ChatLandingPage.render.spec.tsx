@@ -504,8 +504,7 @@ describe('ChatLandingPage workflow starters', () => {
 })
 
 describe('ChatLandingPage keyboard submission', () => {
-  it('defaults the demo to GUI and sends a selected starter through quick chat', async () => {
-    vi.stubEnv('VITE_DEMO_MODE', 'true')
+  it('defaults a capable runtime to GUI and sends a selected starter through quick chat', async () => {
     mocks.useWorkspaces.mockImplementation(() => ({
       ...context([chatWorkspace()]),
       agents: [{ ...piAgent, capabilities: { ...piAgent.capabilities, web: { wire: 'pi-rpc', freshSession: true } } }],
@@ -536,20 +535,20 @@ describe('ChatLandingPage keyboard submission', () => {
     expect(screen.queryByText('Starting session…')).toBeNull()
   })
 
-  it('offers GUI for a capable runtime and passes the selected surface', async () => {
+  it('lets a capable runtime switch from the GUI default to TUI', async () => {
     mocks.useWorkspaces.mockImplementation(() => ({
       ...context([chatWorkspace()]),
       agents: [{ ...piAgent, capabilities: { ...piAgent.capabilities, web: { wire: 'pi-rpc', freshSession: true } } }],
     }))
     render(<ChatLandingPage spec={{ params: { targetWsId: 'chat-1' } }} />)
     await screen.findByRole('button', { name: 'AI Provider, Model and reasoning' })
-    fireEvent.click(screen.getByRole('button', { name: 'UI mode: TUI' }))
-    fireEvent.click(await screen.findByRole('menuitemradio', { name: 'GUI' }))
+    fireEvent.click(screen.getByRole('button', { name: 'UI mode: GUI' }))
+    fireEvent.click(await screen.findByRole('menuitemradio', { name: 'TUI' }))
     const composer = screen.getByPlaceholderText('Describe the task, question, or decision…')
-    fireEvent.change(composer, { target: { value: 'GUI hello' } })
+    fireEvent.change(composer, { target: { value: 'TUI hello' } })
     fireEvent.keyDown(composer, { key: 'Enter', code: 'Enter' })
     await waitFor(() => expect(mocks.quickChat).toHaveBeenCalled())
-    expect(mocks.quickChat.mock.calls[0]?.[8]).toBe('webpi')
+    expect(mocks.quickChat.mock.calls[0]?.[8]).toBe('terminal')
   })
 
   it('does not submit when Enter confirms an IME composition candidate', async () => {
