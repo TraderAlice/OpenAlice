@@ -17,7 +17,9 @@ dry runs. Marks come from public Tencent L1 (delayed). Matching and account
 state live inside UTA's mock engine. It is **not** a broker virtual account and
 must not be treated as market-quality evidence.
 
-Enforced today (when the matching flags are on): lot size 100, T+1 sell lock,
+Enforced today (when the matching flags are on): lot size 100, settlement-aware
+sell lock (T+1 for A-share stocks / equity ETFs; T+0 for verified and
+heuristic same-day instruments — see [`cn-settlement.ts`](../services/uta/src/domain/trading/brokers/mock/cn-settlement.ts)),
 ±10% limit band, session hours, commission and stamp-tax cash debits on fill.
 
 ## Persistence and product surface

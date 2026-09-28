@@ -41,6 +41,7 @@ import {
   limitBandFromPrevClose,
   stampTaxOnSell,
 } from './cn-rules.js'
+import { getSettlement } from './cn-settlement.js'
 import {
   CN_PAPER_BOOK_VERSION,
   type CnPaperBookState,
@@ -553,7 +554,10 @@ export class CnLocalPaperBroker implements IBroker {
   }
 
   private recordBuy(contract: Contract, qty: Decimal): void {
+    if (!this.opts.enforceTPlus1) return
     const key = this.inner.getNativeKey(this.normalizeContract(contract))
+    const name = this.quoteCache.get(key)?.name ?? this.quoteCache.get(this.nativeBare(contract))?.name ?? ''
+    if (getSettlement(key, name).mode === 'T0') return
     const day = cnTradingDayKey()
     const prev = this.boughtToday.get(key)
     if (prev && prev.day === day) {
@@ -564,7 +568,10 @@ export class CnLocalPaperBroker implements IBroker {
   }
 
   private async tPlus1Error(contract: Contract, sellQty: Decimal): Promise<string | null> {
+    if (!this.opts.enforceTPlus1) return null
     const key = this.inner.getNativeKey(this.normalizeContract(contract))
+    const name = this.quoteCache.get(key)?.name ?? this.quoteCache.get(this.nativeBare(contract))?.name ?? ''
+    if (getSettlement(key, name).mode === 'T0') return null
     const day = cnTradingDayKey()
     const bought = this.boughtToday.get(key)
     const locked = bought && bought.day === day ? bought.qty : new Decimal(0)

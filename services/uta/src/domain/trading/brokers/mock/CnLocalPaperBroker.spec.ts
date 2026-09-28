@@ -86,6 +86,58 @@ describe('CnLocalPaperBroker', () => {
     expect(blocked.error).toMatch(/T\+1/)
   })
 
+  it('allows same-day sell for verified T+0 ETF 513100', async () => {
+    broker.setMarkPrice('513100', 2.3, snap({
+      code: '513100',
+      market: 'sh',
+      tencentCode: 'sh513100',
+      name: '国泰纳斯达克100',
+      last: 2.3,
+      prevClose: 2.3,
+      limitUp: 2.53,
+      limitDown: 2.07,
+    }))
+    const c = (await broker.searchContracts('513100'))[0]!.contract
+    const buy = new Order()
+    buy.action = 'BUY'
+    buy.orderType = 'MKT'
+    buy.totalQuantity = new Decimal(1000)
+    expect((await broker.placeOrder(c, buy)).success).toBe(true)
+
+    const sell = new Order()
+    sell.action = 'SELL'
+    sell.orderType = 'MKT'
+    sell.totalQuantity = new Decimal(1000)
+    const sold = await broker.placeOrder(c, sell)
+    expect(sold.success).toBe(true)
+    expect(await broker.getPositions()).toHaveLength(0)
+  })
+
+  it('allows same-day sell for heuristic T+0 commodity ETF by name', async () => {
+    broker.setMarkPrice('159985', 1.5, snap({
+      code: '159985',
+      market: 'sz',
+      tencentCode: 'sz159985',
+      name: '豆粕ETF',
+      last: 1.5,
+      prevClose: 1.5,
+      limitUp: 1.65,
+      limitDown: 1.35,
+    }))
+    const c = (await broker.searchContracts('159985'))[0]!.contract
+    const buy = new Order()
+    buy.action = 'BUY'
+    buy.orderType = 'MKT'
+    buy.totalQuantity = new Decimal(100)
+    expect((await broker.placeOrder(c, buy)).success).toBe(true)
+
+    const sell = new Order()
+    sell.action = 'SELL'
+    sell.orderType = 'MKT'
+    sell.totalQuantity = new Decimal(100)
+    expect((await broker.placeOrder(c, sell)).success).toBe(true)
+  })
+
   it('allows selling previously held shares not bought today', async () => {
     // Seed inventory without going through today's buy lock: buy then clear lock map via day roll simulation.
     const c = (await broker.searchContracts('600519'))[0]!.contract
