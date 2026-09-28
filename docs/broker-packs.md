@@ -13,6 +13,10 @@ Longbridge. Those implementations ship as versioned, platform-specific Broker
 Packs and are installed only after the user chooses a broker or public crypto
 data source in the Trading UI.
 
+Built-in `cn-local-paper` (CN Local Paper) is part of the Mock engine, not a
+Broker Pack. Its product contract and future bookkeeping adjustment surface
+live in [[docs/cn-local-paper.md]].
+
 This split has three independent concepts:
 
 1. **UTA Core** owns account orchestration, approvals, snapshots, FX, HTTP, and

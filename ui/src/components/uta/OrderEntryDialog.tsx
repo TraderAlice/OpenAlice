@@ -1,4 +1,4 @@
-import { useEffect, useId, useState } from 'react'
+import { useEffect, useId, useRef, useState } from 'react'
 import Decimal from 'decimal.js'
 import { ChevronRight, CircleAlert, Loader2, Search, X } from 'lucide-react'
 import { Field, inputClass } from '../form'
@@ -56,11 +56,17 @@ export function OrderEntryDialog({ utaId, mode, onClose, subAccounts, defaultSub
     onClose()
   }
 
+  const bodyRef = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    const el = bodyRef.current
+    if (el) el.scrollTop = 0
+  }, [mode, result])
+
   return (
     <Dialog ariaLabel={dialogTitle} onClose={handleClose} width="w-[560px]">
       <Header title={dialogTitle} onClose={handleClose} />
 
-      <div className="flex-1 overflow-y-auto px-6 py-6">
+      <div ref={bodyRef} className="flex-1 overflow-y-auto px-6 py-6">
         {result
           ? <PushResultPanel result={result} />
           : mode.kind === 'place'
@@ -199,6 +205,7 @@ function PlaceForm({ initialAliceId, ...p }: SharedFormProps & { initialAliceId?
         value={aliceId}
         initialAliceId={initialAliceId}
         onChange={setAliceId}
+        autoFocus
       />
 
       <WalletPicker subAccounts={p.subAccounts} value={subAccountId} onChange={setSubAccountId} />
@@ -296,7 +303,6 @@ function PlaceForm({ initialAliceId, ...p }: SharedFormProps & { initialAliceId?
             value={message}
             onChange={(e) => setMessage(e.target.value)}
             placeholder="Why are you placing this order?"
-            autoFocus
           />
           <p className="text-[11px] text-muted-foreground/60 mt-1">Goes into the trading-as-git commit log alongside the order. Required, even for manual entries.</p>
         </Field>
@@ -345,11 +351,13 @@ function ContractPicker({
   value,
   initialAliceId,
   onChange,
+  autoFocus = false,
 }: {
   utaId: string
   value: string
   initialAliceId?: string
   onChange: (aliceId: string) => void
+  autoFocus?: boolean
 }) {
   const resultsId = useId()
   const [query, setQuery] = useState(() => initialContractLabel(initialAliceId))
@@ -442,6 +450,7 @@ function ContractPicker({
           onChange={(event) => updateQuery(event.target.value)}
           placeholder="Search this account — AAPL, BTC, EUR…"
           autoComplete="off"
+          autoFocus={autoFocus}
           aria-controls={resultsId}
           aria-expanded={showResults || showNoMatches}
           aria-describedby={`${resultsId}-help`}
@@ -612,6 +621,7 @@ function CloseForm({ aliceId, initialQty, symbol, ...p }: SharedFormProps & { al
           onChange={(e) => setQty(e.target.value)}
           placeholder="(empty = full position)"
           inputMode="decimal"
+          autoFocus
           aria-label="Quantity to close"
           aria-invalid={quantityError ? 'true' : undefined}
           aria-describedby="close-position-quantity-help"
@@ -630,7 +640,6 @@ function CloseForm({ aliceId, initialQty, symbol, ...p }: SharedFormProps & { al
           value={message}
           onChange={(e) => setMessage(e.target.value)}
           placeholder="Why are you closing?"
-          autoFocus
           aria-label="Commit Message — required"
         />
       </Field>

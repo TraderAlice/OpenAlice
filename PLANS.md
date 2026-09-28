@@ -29,6 +29,10 @@ the durable truth after it changes. Git history is the archive.
 
 ## Active
 
+- [[plans/cn-paper-bookkeeping.md]] — CN Local Paper 账务调整: definition locked;
+  persist + broker APIs + paper journal ops + UTA `/paper/*` routes + 调整账面 UI
+  landed. Residual: browser acceptance of the dialog on a live CN paper UTA.
+
 - [[plans/update-lifecycle.md]] — Prepare default Workspaces asynchronously on
   Runtime start, scan app and Workspace releases in one lifecycle, and surface
   actionable updates in Settings while preserving reviewed upgrade guards.

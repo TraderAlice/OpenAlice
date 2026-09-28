@@ -751,6 +751,29 @@ describe('TradingGit', () => {
       expect(log[0].operations[0].change).toContain('observed')
       expect(log[0].operations[0].change).toContain('1.0093')
     })
+
+    it('paperAdjustCash commits survive JSON round-trip and are not fills', async () => {
+      await git.recordPaperAdjust({
+        operation: {
+          action: 'paperAdjustCash',
+          delta: '10000',
+          reason: '对齐券商入金',
+        },
+        stateAfter: makeGitState(),
+      })
+
+      const exported = JSON.parse(JSON.stringify(git.exportState()))
+      const restored = TradingGit.restore(exported, config)
+      const commit = restored.show(restored.status().head!)
+      const op = commit!.operations[0] as Extract<Operation, { action: 'paperAdjustCash' }>
+      expect(op.action).toBe('paperAdjustCash')
+      expect(op.delta).toBe('10000')
+      expect(op.reason).toBe('对齐券商入金')
+
+      const log = restored.log()
+      expect(log[0].operations[0].change).toContain('paper cash')
+      expect(log[0].operations[0].change).toContain('10000')
+    })
   })
 
   // ==================== setCurrentRound ====================

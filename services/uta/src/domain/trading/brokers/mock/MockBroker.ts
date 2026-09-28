@@ -590,6 +590,11 @@ export class MockBroker implements IBroker {
     this._cash = this._cash.plus(d)
   }
 
+  /** Absolute cash replace (CN paper book restore / snapshot). */
+  setCash(amount: Decimal | string | number): void {
+    this._cash = amount instanceof Decimal ? amount : new Decimal(amount)
+  }
+
   /** Manually fill a pending order. Optional price (defaults to markPrice or limit price); optional qty for partial. */
   fillOrder(orderId: string, opts: { price?: Decimal | string | number; qty?: Decimal | string | number } = {}): void {
     const internal = this._orders.get(orderId)
@@ -873,6 +878,7 @@ export class MockBroker implements IBroker {
     this._positions.clear()
     for (const p of positions) {
       const key = this.getNativeKey(p.contract) || p.contract.aliceId || 'unknown'
+      this._rememberContract(p.contract)
       this._positions.set(key, {
         contract: p.contract,
         side: p.side,

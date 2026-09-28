@@ -87,6 +87,85 @@ export const tradingApi = {
     return fetchJson(`/api/trading/uta/${utaId}/account${qs}`)
   },
 
+  async paperBook(utaId: string): Promise<{
+    book: {
+      cash: string
+      buyingPower: string
+      positions: Array<{
+        nativeKey: string
+        quantity: string
+        avgCost: string
+        locked: string
+        sellable: string
+      }>
+    }
+  }> {
+    return fetchJson(`/api/trading/uta/${utaId}/paper/book`)
+  },
+
+  async paperAdjustCash(utaId: string, body: { delta: string; reason: string }): Promise<{ hash: string }> {
+    const res = await fetch(`/api/trading/uta/${utaId}/paper/adjust-cash`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    })
+    const data = await res.json().catch(() => ({}))
+    if (!res.ok) throw new Error(data.error || `Adjust cash failed (${res.status})`)
+    return data
+  },
+
+  async paperAdjustPosition(utaId: string, body: {
+    nativeKey: string
+    quantityDelta: string
+    avgCost?: string
+    lockedQty?: string
+    reason: string
+  }): Promise<{ hash: string }> {
+    const res = await fetch(`/api/trading/uta/${utaId}/paper/adjust-position`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    })
+    const data = await res.json().catch(() => ({}))
+    if (!res.ok) throw new Error(data.error || `Adjust position failed (${res.status})`)
+    return data
+  },
+
+  async paperSetSellable(utaId: string, body: {
+    nativeKey: string
+    sellable: string
+    reason: string
+  }): Promise<{ hash: string }> {
+    const res = await fetch(`/api/trading/uta/${utaId}/paper/set-sellable`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    })
+    const data = await res.json().catch(() => ({}))
+    if (!res.ok) throw new Error(data.error || `Set sellable failed (${res.status})`)
+    return data
+  },
+
+  async paperSetSnapshot(utaId: string, body: {
+    cash: string
+    positions: Array<{
+      nativeKey: string
+      quantity: string
+      avgCost?: string
+      sellable?: string
+    }>
+    reason: string
+  }): Promise<{ hash: string }> {
+    const res = await fetch(`/api/trading/uta/${utaId}/paper/set-snapshot`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    })
+    const data = await res.json().catch(() => ({}))
+    if (!res.ok) throw new Error(data.error || `Set snapshot failed (${res.status})`)
+    return data
+  },
+
   async utaPositions(utaId: string, subAccountId?: string): Promise<{ positions: Position[] }> {
     const qs = subAccountId ? `?subAccountId=${encodeURIComponent(subAccountId)}` : ''
     return fetchJson(`/api/trading/uta/${utaId}/positions${qs}`)
