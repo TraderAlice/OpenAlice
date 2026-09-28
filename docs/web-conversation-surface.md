@@ -172,9 +172,11 @@ another writer may start. The UI renders background occupancy without attaching
 a terminal to a headless Session.
 
 Quick Start exposes a TUI / GUI selector beside the runtime. GUI is available
-only with `web.freshSession`; `quick-chat` accepts `surface: webpi` and starts
-the structured host directly with the same Session runtime binding. Omission
-keeps the terminal default. The initial prompt is sent once after Web startup.
+only with `web.freshSession`; when the runtime advertises that capability the
+selector defaults to GUI, otherwise it stays on TUI. `quick-chat` accepts
+`surface: webpi` and starts the structured host directly with the same Session
+runtime binding. Omission keeps the terminal default. The initial prompt is
+sent once after Web startup.
 
 ## File references in GUI prose
 
