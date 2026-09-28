@@ -5,7 +5,7 @@
  * Not the /dev/simulator god-mode surface.
  */
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { api } from '../../api'
 import { Button } from '../ui/button'
 import { SegmentedControl } from '../SegmentedControl'
@@ -16,7 +16,7 @@ const inputClassMono = `${sharedInputClass} min-h-8 py-1 font-mono text-xs`
 
 type TabId = 'cash' | 'position' | 'sellable' | 'snapshot'
 
-type BookView = {
+export type BookView = {
   cash: string
   buyingPower: string
   positions: Array<{
@@ -28,12 +28,100 @@ type BookView = {
   }>
 }
 
+export type SnapPositionDraft = {
+  nativeKey: string
+  quantity: string
+  avgCost?: string
+  sellable?: string
+}
+
 const TABS: Array<{ id: TabId; label: string }> = [
   { id: 'cash', label: '现金' },
   { id: 'position', label: '持仓' },
   { id: 'sellable', label: '可卖' },
   { id: 'snapshot', label: '整账' },
 ]
+
+/** Format current book positions for the whole-book textarea. */
+export function formatSnapRows(positions: BookView['positions']): string {
+  return positions
+    .map((p) => `${p.nativeKey},${p.quantity},${p.avgCost},${p.sellable}`)
+    .join('\n')
+}
+
+/** Parse whole-book textarea lines (`代码,股数,成本,可卖`). */
+export function parseSnapRows(text: string): SnapPositionDraft[] {
+  return text
+    .split('\n')
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .map((line) => {
+      const [nativeKey, quantity, avgCost, sell] = line.split(/[,，\s]+/)
+      if (!nativeKey || !quantity) throw new Error(`整账行无效: ${line}`)
+      return {
+        nativeKey,
+        quantity,
+        ...(avgCost ? { avgCost } : {}),
+        ...(sell ? { sellable: sell } : {}),
+      }
+    })
+}
+
+/** Human-readable diff between current book and the draft snapshot fields. */
+export function summarizeSnapshotDiff(
+  book: BookView,
+  cash: string,
+  rows: string,
+): string[] {
+  const lines: string[] = []
+  const nextCash = cash.trim()
+  if (nextCash !== '' && nextCash !== book.cash) {
+    lines.push(`现金 ${book.cash} → ${nextCash}`)
+  }
+
+  let next: SnapPositionDraft[]
+  try {
+    next = parseSnapRows(rows)
+  } catch (err) {
+    return [`解析失败: ${err instanceof Error ? err.message : String(err)}`]
+  }
+
+  const nextMap = new Map(next.map((p) => [p.nativeKey, p]))
+  const prevMap = new Map(book.positions.map((p) => [p.nativeKey, p]))
+
+  for (const [key, prev] of prevMap) {
+    if (!nextMap.has(key)) {
+      lines.push(`删除 ${key}（qty=${prev.quantity}）`)
+    }
+  }
+
+  for (const [key, n] of nextMap) {
+    const prev = prevMap.get(key)
+    if (!prev) {
+      lines.push(
+        `新增 ${key} qty=${n.quantity}`
+          + (n.avgCost != null ? ` cost=${n.avgCost}` : '')
+          + (n.sellable != null ? ` 可卖=${n.sellable}` : ''),
+      )
+      continue
+    }
+    const changes: string[] = []
+    if (n.quantity !== prev.quantity) changes.push(`qty ${prev.quantity}→${n.quantity}`)
+    if (n.avgCost != null && n.avgCost !== prev.avgCost) {
+      changes.push(`cost ${prev.avgCost}→${n.avgCost}`)
+    }
+    if (n.sellable != null && n.sellable !== prev.sellable) {
+      changes.push(`可卖 ${prev.sellable}→${n.sellable}`)
+    }
+    if (changes.length > 0) lines.push(`${key}: ${changes.join(' · ')}`)
+  }
+
+  if (next.length === 0 && book.positions.length > 0) {
+    // already covered by per-symbol 删除 lines
+  }
+
+  return lines
+}
 
 export function PaperBookAdjustDialog({
   utaId,
@@ -57,12 +145,21 @@ export function PaperBookAdjustDialog({
   const [sellKey, setSellKey] = useState('')
   const [sellable, setSellable] = useState('')
   const [snapCash, setSnapCash] = useState('')
-  const [snapRows, setSnapRows] = useState('600519,100,10,100')
+  const [snapRows, setSnapRows] = useState('')
+  /** When true, refresh must not overwrite the user's draft snapshot fields. */
+  const snapDirtyRef = useRef(false)
+
+  const markSnapDirty = () => {
+    snapDirtyRef.current = true
+  }
 
   const refresh = useCallback(async () => {
     const r = await api.trading.paperBook(utaId)
     setBook(r.book)
-    setSnapCash(r.book.cash)
+    if (!snapDirtyRef.current) {
+      setSnapCash(r.book.cash)
+      setSnapRows(formatSnapRows(r.book.positions))
+    }
     if (!posKey && r.book.positions[0]) setPosKey(r.book.positions[0].nativeKey)
     if (!sellKey && r.book.positions[0]) {
       setSellKey(r.book.positions[0].nativeKey)
@@ -74,7 +171,11 @@ export function PaperBookAdjustDialog({
     refresh().catch((err) => setError(err instanceof Error ? err.message : String(err)))
   }, [refresh])
 
-  const run = async (label: string, fn: () => Promise<unknown>) => {
+  const snapDiff = book && tab === 'snapshot'
+    ? summarizeSnapshotDiff(book, snapCash, snapRows)
+    : []
+
+  const run = async (fn: () => Promise<unknown>) => {
     if (!reason.trim()) {
       setError('请填写调整原因')
       return
@@ -83,6 +184,7 @@ export function PaperBookAdjustDialog({
     setError(null)
     try {
       await fn()
+      snapDirtyRef.current = false
       await refresh()
       onDone()
       setReason('')
@@ -96,11 +198,11 @@ export function PaperBookAdjustDialog({
     }
   }
 
-  const submitCash = () => run('cash', () =>
+  const submitCash = () => run(() =>
     api.trading.paperAdjustCash(utaId, { delta: cashDelta.trim(), reason: reason.trim() }),
   )
 
-  const submitPosition = () => run('position', () =>
+  const submitPosition = () => run(() =>
     api.trading.paperAdjustPosition(utaId, {
       nativeKey: posKey.trim(),
       quantityDelta: posDelta.trim(),
@@ -109,7 +211,7 @@ export function PaperBookAdjustDialog({
     }),
   )
 
-  const submitSellable = () => run('sellable', () =>
+  const submitSellable = () => run(() =>
     api.trading.paperSetSellable(utaId, {
       nativeKey: sellKey.trim(),
       sellable: sellable.trim(),
@@ -117,21 +219,8 @@ export function PaperBookAdjustDialog({
     }),
   )
 
-  const submitSnapshot = () => run('snapshot', async () => {
-    const positions = snapRows
-      .split('\n')
-      .map((line) => line.trim())
-      .filter(Boolean)
-      .map((line) => {
-        const [nativeKey, quantity, avgCost, sell] = line.split(/[,，\s]+/)
-        if (!nativeKey || !quantity) throw new Error(`整账行无效: ${line}`)
-        return {
-          nativeKey,
-          quantity,
-          ...(avgCost ? { avgCost } : {}),
-          ...(sell ? { sellable: sell } : {}),
-        }
-      })
+  const submitSnapshot = () => run(async () => {
+    const positions = parseSnapRows(snapRows)
     await api.trading.paperSetSnapshot(utaId, {
       cash: snapCash.trim(),
       positions,
@@ -209,15 +298,42 @@ export function PaperBookAdjustDialog({
 
           {tab === 'snapshot' && (
             <div className="space-y-2">
-              <input className={`${inputClassMono} w-full`} placeholder="现金" value={snapCash} onChange={(e) => setSnapCash(e.target.value)} />
+              <input
+                className={`${inputClassMono} w-full`}
+                placeholder="现金"
+                value={snapCash}
+                onChange={(e) => {
+                  markSnapDirty()
+                  setSnapCash(e.target.value)
+                }}
+                aria-label="整账现金"
+              />
               <textarea
                 className={`${inputClassMono} w-full min-h-24`}
                 placeholder={'每行: 代码,股数,成本,可卖\n600519,100,1680,100'}
                 value={snapRows}
-                onChange={(e) => setSnapRows(e.target.value)}
+                onChange={(e) => {
+                  markSnapDirty()
+                  setSnapRows(e.target.value)
+                }}
+                aria-label="整账持仓"
               />
+              {snapDiff.length > 0 && (
+                <div
+                  className="rounded-md border border-warning/40 bg-warning/5 px-3 py-2 text-[11px] space-y-0.5"
+                  role="status"
+                  aria-label="整账变更预览"
+                >
+                  <div className="font-medium text-warning">将变更：</div>
+                  {snapDiff.map((line) => (
+                    <div key={line} className="font-mono text-foreground/90">{line}</div>
+                  ))}
+                </div>
+              )}
               <Button size="sm" disabled={loading || !snapCash.trim()} onClick={submitSnapshot}>确认整账替换</Button>
-              <p className="text-[11px] text-warning">整账会替换当前账面；须先取消未完成委托。</p>
+              <p className="text-[11px] text-warning">
+                整账会整本替换当前账面；文本框未列出的持仓会被删除。须先取消未完成委托。仅改可卖请用「可卖」页签。
+              </p>
             </div>
           )}
 
