@@ -329,9 +329,12 @@ submission, and preserve the draft on failure. Enter respects IME composition;
 Shift+Enter inserts a newline. Session identity changes remount local composition
 state and ignore prior requests. New revisions follow the tail only while the
 reader is already there; Jump to latest is explicit and honors reduced motion.
-Idle needs no top-bar badge; busy and failure states remain visible. Runtime
-settings remain in the existing Session settings until an adapter actually
-supports a corresponding inline control.
+Warm TabHost returns (for example Trading → Session) restore follow-tail scroll
+after paint when the reader was still following — hidden frames use
+`content-visibility: hidden`, which can collapse scroller metrics without a
+revision change. Idle needs no top-bar badge; busy and failure states remain
+visible. Runtime settings remain in the existing Session settings until an
+adapter actually supports a corresponding inline control.
 
 ### Long-form Markdown
 

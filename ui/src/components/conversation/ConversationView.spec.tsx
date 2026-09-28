@@ -68,3 +68,54 @@ describe('adapter-neutral conversation', () => {
    rerender(<ConversationView {...base} busy items={[{ kind: 'assistant-turn', key: 'history', progress: [], final: 'Already in progress', activity: null }]} />)
    expect(screen.getByText('Already in progress')).toBeTruthy()
  })
+
+describe('warm-frame follow-tail restore', () => {
+  it('scrolls to the latest turn when a following reader returns from a hidden warm frame', async () => {
+    const items = [{
+      kind: 'assistant-turn' as const,
+      key: 'turn-1',
+      progress: [],
+      final: 'Latest answer',
+      activity: null,
+    }]
+    const { container, rerender } = render(<ConversationView {...base} items={items} visible={false} />)
+    const scroller = container.querySelector('.conversation-messages') as HTMLDivElement
+    Object.defineProperties(scroller, {
+      scrollTop: { configurable: true, writable: true, value: 0 },
+      clientHeight: { configurable: true, value: 300 },
+      scrollHeight: { configurable: true, value: 1_000 },
+    })
+    vi.mocked(scroller.scrollTo).mockClear()
+
+    rerender(<ConversationView {...base} items={items} visible />)
+    await waitFor(() => {
+      expect(scroller.scrollTo).toHaveBeenCalledWith({ top: 1_000, behavior: 'auto' })
+    })
+  })
+
+  it('does not force history readers to the bottom when the warm frame becomes visible', async () => {
+    const items = [{
+      kind: 'assistant-turn' as const,
+      key: 'turn-1',
+      progress: [],
+      final: 'Older context',
+      activity: null,
+    }]
+    const { container, rerender } = render(<ConversationView {...base} items={items} />)
+    const scroller = container.querySelector('.conversation-messages') as HTMLDivElement
+    Object.defineProperties(scroller, {
+      scrollTop: { configurable: true, writable: true, value: 120 },
+      clientHeight: { configurable: true, value: 300 },
+      scrollHeight: { configurable: true, value: 1_000 },
+    })
+    fireEvent.scroll(scroller)
+    expect(screen.getByRole('button', { name: 'Jump to latest' })).toBeTruthy()
+    vi.mocked(scroller.scrollTo).mockClear()
+
+    rerender(<ConversationView {...base} items={items} visible={false} />)
+    rerender(<ConversationView {...base} items={items} visible />)
+    await new Promise((resolve) => requestAnimationFrame(() => resolve(undefined)))
+    expect(scroller.scrollTo).not.toHaveBeenCalled()
+    expect(screen.getByRole('button', { name: 'Jump to latest' })).toBeTruthy()
+  })
+})
