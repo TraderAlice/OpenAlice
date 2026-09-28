@@ -3,10 +3,11 @@ import { setLaunchPreview, getLaunchPreview } from '../conversation/launch-previ
 import { act, cleanup, renderHook, waitFor } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { useWebConversation } from './useWebConversation'
+import { clearWebSessionCache, writeWebSessionCache } from './web-session-cache'
 import type { WebSessionSnapshot } from './api'
 const api = vi.hoisted(() => ({ getWebSession: vi.fn(), openWebSession: vi.fn() }))
 vi.mock('./api', () => ({ ...api, abortWebSession: vi.fn(), promptWebSession: vi.fn(), respondWebSession: vi.fn() }))
-afterEach(() => { cleanup(); vi.resetAllMocks() })
+afterEach(() => { cleanup(); clearWebSessionCache(); vi.resetAllMocks() })
 const snapshot = (revision: number, phase = 'idle') => ({ revision, phase, messages: [], requests: [], error: null }) as unknown as WebSessionSnapshot
 
 describe('Web Session restart', () => {
@@ -48,5 +49,12 @@ describe('Web Session restart', () => {
     await act(async () => { await result.current.refresh() })
     await expect(result.current.reconfigure({ credentialSource: 'native' })).rejects.toThrow('Wait for the current response')
     expect(api.openWebSession).toHaveBeenCalledTimes(1)
+  })
+  it('hydrates immediately from the in-memory snapshot cache on remount', async () => {
+    writeWebSessionCache('workspace', 'session', snapshot(12))
+    api.getWebSession.mockResolvedValue(null)
+    const { result } = renderHook(() => useWebConversation('workspace', 'session'))
+    expect(result.current.snapshot?.revision).toBe(12)
+    await waitFor(() => expect(api.getWebSession).toHaveBeenCalled())
   })
 })

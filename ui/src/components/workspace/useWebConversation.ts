@@ -12,6 +12,15 @@ import {
   type WebSessionSnapshot,
 } from './api'
 import { presentWebTranscript } from './web-presentation'
+import {
+  readWebSessionCache,
+  writeWebSessionCache,
+} from './web-session-cache'
+
+const ACTIVE_POLL_MS = 350
+const IDLE_POLL_MS = 1500
+/** Hidden warm frames still catch up, but far less often than a visible desk. */
+const HIDDEN_POLL_MS = 15_000
 
 /**
  * Live view of one Web conversation. Polls faster while the runtime works and
@@ -19,24 +28,37 @@ import { presentWebTranscript } from './web-presentation'
  * previous poll can never roll the transcript back.
  *
  * One mounted identity; WebSessionView keys this hook's owner by workspace/session.
+ * Remounts hydrate from a small in-memory snapshot cache so Trading → Session
+ * returns do not wait on a full multi‑MB GET before first paint.
  */
-export function useWebConversation(wsId: string, sessionId: string, readOnly = false) {
+export function useWebConversation(
+  wsId: string,
+  sessionId: string,
+  readOnly = false,
+  visible = true,
+) {
   const [launchPrompt] = useState(() => getLaunchPreview(wsId, sessionId))
-  const [snapshot, setSnapshot] = useState<WebSessionSnapshot | null>(null)
+  const [snapshot, setSnapshot] = useState<WebSessionSnapshot | null>(
+    () => readWebSessionCache(wsId, sessionId),
+  )
   const [error, setError] = useState<string | null>(null)
-  const current = useRef<WebSessionSnapshot | null>(null)
+  const current = useRef<WebSessionSnapshot | null>(snapshot)
   const alive = useRef(false)
   const generation = useRef(0)
   const restarting = useRef(false)
+  const visibleRef = useRef(visible)
+  const wasVisibleRef = useRef(visible)
+  visibleRef.current = visible
   const [reconfiguring, setReconfiguring] = useState(false)
   useEffect(() => { if (snapshot) clearLaunchPreview(wsId, sessionId) }, [snapshot, wsId, sessionId])
   useEffect(() => () => clearLaunchPreview(wsId, sessionId), [wsId, sessionId])
   const accept = useCallback((next: WebSessionSnapshot) => {
     if (!alive.current || (current.current && next.revision < current.current.revision)) return
     current.current = next
+    writeWebSessionCache(wsId, sessionId, next)
     setSnapshot(next)
     setError(next.error)
-  }, [])
+  }, [wsId, sessionId])
   const refresh = useCallback(async () => {
     if (readOnly || restarting.current) return
     const epoch = generation.current
@@ -54,11 +76,40 @@ export function useWebConversation(wsId: string, sessionId: string, readOnly = f
     async function poll() {
       await refresh()
       if (cancelled) return
-      timer = window.setTimeout(() => void poll(), isBusy(current.current?.phase) ? 350 : 1500)
+      const phase = current.current?.phase
+      const delay = !visibleRef.current
+        ? HIDDEN_POLL_MS
+        : isBusy(phase) ? ACTIVE_POLL_MS : IDLE_POLL_MS
+      timer = window.setTimeout(() => void poll(), delay)
     }
     void poll()
     return () => { alive.current = false; cancelled = true; window.clearTimeout(timer) }
   }, [refresh])
+  // When a warm frame becomes visible again, refresh after paint so the
+  // composer can take focus/keystrokes before a multi‑MB poll/reconcile.
+  // Skip the initial mount — `poll` already fetched once.
+  useEffect(() => {
+    const becameVisible = visible && !wasVisibleRef.current
+    wasVisibleRef.current = visible
+    if (!becameVisible || readOnly) return
+    let cancelled = false
+    let idleId: number | undefined
+    const raf = window.requestAnimationFrame(() => {
+      const run = () => { if (!cancelled) void refresh() }
+      if (typeof window.requestIdleCallback === 'function') {
+        idleId = window.requestIdleCallback(run, { timeout: 250 })
+      } else {
+        idleId = window.setTimeout(run, 0)
+      }
+    })
+    return () => {
+      cancelled = true
+      window.cancelAnimationFrame(raf)
+      if (idleId === undefined) return
+      if (typeof window.cancelIdleCallback === 'function') window.cancelIdleCallback(idleId)
+      else window.clearTimeout(idleId)
+    }
+  }, [visible, readOnly, refresh])
   const reconfigure = useCallback(async (runtime: PausedSessionRuntimeUpdate) => {
     if (restarting.current || isBusy(current.current?.phase)) throw new Error('Wait for the current response to finish')
     restarting.current = true
