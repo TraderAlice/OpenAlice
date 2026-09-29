@@ -76,7 +76,10 @@ flight is a transport bug, not a runtime condition.
   ends.
 
 The snapshot is ephemeral. Do not persist it, do not migrate it, and do not
-read it back as a transcript.
+read it back as a transcript. Long sessions keep a bounded live projection
+window in `messages` plus `historyHiddenCount` for older process-local history
+the browser can reveal through `POST .../web/history/earlier`. That window is
+presentation-only: native Agent transcripts and model context stay untouched.
 
 ## Persisted surface value
 
@@ -97,6 +100,8 @@ components, labels) use "Web". User-facing copy says "Web", never "WebPi".
   running headless turn, disposes a PTY on the same record, starts the host.
 - `GET /web?revision=` — snapshot or `{ unchanged: true }`.
 - `POST /web/prompt`, `POST /web/abort` — turn control.
+- `POST /web/history/earlier` — reveal older process-local projection history
+  that was held back from the bounded snapshot window.
 - `POST /web/respond { requestId, optionId, text? }` — answers one request; the
   transport validates the option id and fails with `web_respond_failed`. For a
   question with `allowText`, send `optionId: ""` and nonblank `text` to answer

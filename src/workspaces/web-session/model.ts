@@ -82,6 +82,11 @@ export interface WebSessionSnapshot {
   readonly startedAt: number
   readonly phase: WebSessionPhase
   readonly messages: readonly WebConversationMessage[]
+  /**
+   * Older transcript still held in the live process but omitted from
+   * `messages`. Zero means the snapshot carries the full projected history.
+   */
+  readonly historyHiddenCount: number
   /** Current cumulative in-flight assistant message; replaced, never accumulated. */
   readonly streamingMessage: WebConversationMessage | null
   readonly requests: readonly WebPermissionRequest[]

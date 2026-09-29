@@ -1664,6 +1664,7 @@ describe('Web surface routes', () => {
       startedAt: 1,
       phase: 'idle',
       messages: [],
+      historyHiddenCount: 0,
       streamingMessage: null,
       requests: [],
       error: null,
@@ -1686,6 +1687,7 @@ describe('Web surface routes', () => {
       prompt: vi.fn(async () => ({ ...snapshot, phase: 'working' })),
       abort: vi.fn(async () => snapshot),
       respond: vi.fn(async () => ({ ...snapshot, requests: [] })),
+      revealEarlier: vi.fn(() => snapshot),
     };
     const svc = {
       registry: { get: () => ({ id: 'ws-1', dir: '/w' }) },
@@ -1908,6 +1910,7 @@ describe('Workspace manager surface routes', () => {
       phase: 'working',
       state: {},
       messages: [],
+      historyHiddenCount: 0,
       streamingMessage: null,
       error: null,
       stderrTail: '',

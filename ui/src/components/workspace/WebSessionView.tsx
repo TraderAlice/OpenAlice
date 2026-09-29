@@ -14,6 +14,7 @@ import { useWebConversation } from './useWebConversation'
 import { summarizeToolInput } from './web-transcript'
 import { AutoQuantContextContinueController } from './AutoQuantContextContinue'
 import type { WorkspaceSource } from '../../tabs/types'
+import { i18n } from '../../i18n'
 
 export { isConversationNearBottom as isWebSessionNearBottom } from '../conversation/ConversationView'
 
@@ -62,15 +63,28 @@ function WebSession({ readOnly = false, record, wsId, sessionId, visible = true,
   const activeRequest = useMemo(() => requests[0] ? presentRequest(requests[0]) : null, [requests])
   const phaseLabel = snapshot ? describePhase(snapshot.phase) : 'starting'
   const stopped = snapshot?.phase === 'stopped'
+  const earlierBanner = session.historyHiddenCount > 0 ? (
+    <div className="flex justify-center px-3 py-2">
+      <button
+        type="button"
+        className="text-xs text-muted-foreground underline-offset-2 hover:text-foreground hover:underline disabled:opacity-60"
+        disabled={readOnly || session.historyBusy}
+        onClick={() => { void session.loadEarlier() }}
+      >
+        {session.historyBusy
+          ? i18n.t('webConversation.loadingEarlier')
+          : i18n.t('webConversation.loadEarlier', { count: session.historyHiddenCount })}
+      </button>
+    </div>
+  ) : null
 
-  const body = (continueUi?: { headerAction: ReactNode; panel: ReactNode }) => <>
+  const body = (continueUi?: { tip: ReactNode }) => <>
     <ConversationView
       header={<PageTopBar title={label ?? 'Conversation'} actions={<>
         <span className="inline-flex shrink-0 items-center gap-1.5 text-xs text-muted-foreground" title={agentLabel} aria-label={agentLabel}>
           <AgentRuntimeIcon agentId={agentId} className="h-3.5 w-3.5" />
           <span className="hidden sm:inline">{agentLabel}</span>
         </span>
-        {continueUi?.headerAction}
         {headerActions}
       </>}>
         {(busy || !snapshot || snapshot.phase === 'failed') && <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
@@ -87,7 +101,8 @@ function WebSession({ readOnly = false, record, wsId, sessionId, visible = true,
       visible={visible}
       placeholder={`Message ${agentLabel}…`}
       empty={snapshot ? 'What should Alice work on next?' : 'Opening conversation…'}
-      afterItems={continueUi?.panel}
+      beforeItems={earlierBanner}
+      afterItems={continueUi?.tip}
       renderComposer={record && agents ? composer => <WebSessionComposer composer={composer} workspaceId={wsId} record={record} agents={agents}
         busy={readOnly || busy || session.reconfiguring || !snapshot || snapshot.phase === 'starting'} reconfigure={session.reconfigure} onReadyChange={setConfigurationReady} /> : undefined}
       status={<>
@@ -114,18 +129,12 @@ function WebSession({ readOnly = false, record, wsId, sessionId, visible = true,
     <ConversationImagePreview image={files.imagePreview} onClose={files.closeImage} />
   </>
 
-  if (!readOnly && source === 'auto-quant' && record) {
+  if (!readOnly && source === 'auto-quant') {
     return (
       <AutoQuantContextContinueController
-        wsId={wsId}
-        sessionId={sessionId}
         source={source}
-        record={record}
-        {...(agents ? { agents } : {})}
         items={session.items}
         {...(snapshot?.phase ? { phase: snapshot.phase } : {})}
-        {...(label ? { label } : {})}
-        turnBusy={busy}
       >
         {(continueUi) => body(continueUi)}
       </AutoQuantContextContinueController>

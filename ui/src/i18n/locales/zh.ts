@@ -1785,6 +1785,10 @@ export const zh: Resources = {
     offerAction: '整理并续作',
     offerBanner: '这段研究讨论偏长了。要整理共识并开新对话吗？',
   },
+  webConversation: {
+    loadEarlier: '加载更早的记录（还有 {{count}} 条）',
+    loadingEarlier: '正在加载更早的记录…',
+  },
   autoPredictionLanding: {
     heading: '预测研究工作区应该调查什么？', subheading: '使用原生 Coding Agent 研究预测市场语义与证据。',
     targetHeading: '在此工作区中新建研究会话', clearTarget: '使用其他预测研究工作区',

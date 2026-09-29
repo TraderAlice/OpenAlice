@@ -8,6 +8,7 @@ import {
   getWebSession,
   promptWebSession,
   respondWebSession,
+  revealEarlierWebHistory,
   type WebSessionPhase,
   type WebSessionSnapshot,
 } from './api'
@@ -125,7 +126,17 @@ export function useWebConversation(
       if (alive.current) setReconfiguring(false)
     }
   }, [accept, wsId, sessionId])
+  const [historyBusy, setHistoryBusy] = useState(false)
   const items = useMemo(() => presentWebTranscript(snapshot ? [...snapshot.messages, ...(snapshot.streamingMessage ? [snapshot.streamingMessage] : [])] : []), [snapshot])
+  const loadEarlier = useCallback(async () => {
+    if (readOnly || historyBusy || !snapshot?.historyHiddenCount) return
+    setHistoryBusy(true)
+    try {
+      accept(await revealEarlierWebHistory(wsId, sessionId))
+    } finally {
+      if (alive.current) setHistoryBusy(false)
+    }
+  }, [accept, historyBusy, readOnly, sessionId, snapshot?.historyHiddenCount, wsId])
   return {
     snapshot,
     error,
@@ -133,6 +144,9 @@ export function useWebConversation(
     reconfigure,
     items: !snapshot && launchPrompt ? [{ kind: 'user', key: 'launch-preview', content: [{ kind: 'markdown', text: launchPrompt }] }] as ConversationItem[] : items,
     busy: isBusy(snapshot?.phase),
+    historyBusy,
+    historyHiddenCount: snapshot?.historyHiddenCount ?? 0,
+    loadEarlier,
     requests: snapshot?.requests ?? [],
     refresh,
     send: async (message: string) => { accept(await promptWebSession(wsId, sessionId, message)) },

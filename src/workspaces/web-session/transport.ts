@@ -6,6 +6,12 @@ import {
   type WebSessionPhase,
   type WebSessionWire,
 } from './model.js'
+import {
+  splitProjectionWindow,
+  takeEarlierChunk,
+  WEB_HISTORY_REVEAL_CHUNK,
+  WEB_HISTORY_WINDOW_MESSAGES,
+} from './projection-window.js'
 
 export interface StartWebSessionInput {
   readonly onActivity?: (phase: string) => void
@@ -35,6 +41,8 @@ export class WebSessionState {
   phase: WebSessionPhase = 'starting'
   nativeSessionId: string | null = null
   messages: readonly WebConversationMessage[] = []
+  /** Oldest→newest prefix omitted from `messages` but retained for reveal. */
+  hiddenMessages: readonly WebConversationMessage[] = []
   streamingMessage: WebConversationMessage | null = null
   requests: readonly WebPermissionRequest[] = []
   error: string | null = null
@@ -59,12 +67,15 @@ export class WebSessionState {
   }
 
   replaceMessages(messages: readonly WebConversationMessage[]): void {
+    this.hiddenMessages = []
     this.messages = messages
+    this.enforceWindow()
     this.bump()
   }
 
   append(message: WebConversationMessage): void {
     this.messages = [...this.messages, message]
+    this.enforceWindow()
     this.bump()
   }
 
@@ -83,7 +94,26 @@ export class WebSessionState {
       return
     }
     this.messages = [...this.messages, streaming]
+    this.enforceWindow()
     this.bump()
+  }
+
+  /** Prepend older hidden history into the live snapshot. Returns how many messages moved. */
+  revealEarlier(count = WEB_HISTORY_REVEAL_CHUNK): number {
+    const { remaining, chunk } = takeEarlierChunk(this.hiddenMessages, count)
+    if (chunk.length === 0) return 0
+    this.hiddenMessages = remaining
+    this.messages = [...chunk, ...this.messages]
+    this.bump()
+    return chunk.length
+  }
+
+  private enforceWindow(): void {
+    if (this.messages.length <= WEB_HISTORY_WINDOW_MESSAGES) return
+    const { hidden, visible } = splitProjectionWindow(this.messages, WEB_HISTORY_WINDOW_MESSAGES)
+    if (hidden.length === 0) return
+    this.hiddenMessages = [...this.hiddenMessages, ...hidden]
+    this.messages = visible
   }
 
   addRequest(request: WebPermissionRequest): void {

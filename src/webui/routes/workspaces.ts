@@ -2727,6 +2727,31 @@ export function createWorkspaceRoutes(
     }
   });
 
+  // Reveal older projected history that was held back from the live snapshot
+  // window. Native Agent transcript is unchanged; this only widens Alice's
+  // ephemeral A-side projection for the browser.
+  app.post('/:id/sessions/:sid/web/history/earlier', async (c) => {
+    const ctx = webSessionContext(c);
+    if (!ctx) return c.json({ error: 'not_found' }, 404);
+    if (svc.executions.takeovers.isHandingOff(ctx.record.resumeId) || svc.isResumeActive(ctx.record.resumeId)) {
+      return c.json({ error: 'resume_busy', message: 'Session configuration is changing; try again shortly' }, 409);
+    }
+    const body = await safeJson(c).catch(() => null);
+    const raw = body && typeof body === 'object' ? (body as Record<string, unknown>)['count'] : undefined;
+    const count = raw === undefined ? undefined : Number(raw);
+    if (count !== undefined && (!Number.isSafeInteger(count) || count <= 0 || count > 500)) {
+      return c.json({ error: 'bad_request', message: 'count must be an integer from 1 to 500' }, 400);
+    }
+    try {
+      svc.executions.takeovers.activity(ctx.record.resumeId);
+      const snapshot = svc.web.revealEarlier(ctx.token, count);
+      await svc.sessionRegistry.update(ctx.id, ctx.token, { lastActiveAt: new Date().toISOString() });
+      return c.json({ ok: true, snapshot });
+    } catch (err) {
+      return c.json({ error: 'web_history_earlier_failed', message: (err as Error).message }, 409);
+    }
+  });
+
   // Read-only introspection for a single session. Returns the full set of
   // path-related fields a spawn / resume would compute (via the same
   // `computeSpawnPlan` the pool uses), plus an on-disk snapshot of the

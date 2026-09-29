@@ -3522,6 +3522,14 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
         }
         return web.respond(recordId, requestId, optionId, text);
       },
+      revealEarlier: (recordId, count) => {
+        const snapshot = web.get(recordId);
+        if (snapshot) {
+          if (executionManager.takeovers.isHandingOff(snapshot.resumeId)) throw new HeadlessResumeError('busy', 'Session handoff is in progress');
+          executionManager.takeovers.activity(snapshot.resumeId);
+        }
+        return web.revealEarlier(recordId, count);
+      },
     },
     managerWorkspace,
     resolveRuntimeWorkspace,

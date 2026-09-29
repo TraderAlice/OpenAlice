@@ -902,6 +902,11 @@ export interface WebSessionSnapshot {
   readonly startedAt: number;
   readonly phase: WebSessionPhase;
   readonly messages: readonly WebConversationMessage[];
+  /**
+   * Older live-process history omitted from `messages`. Zero means this
+   * snapshot already carries the full projected window Alice is holding.
+   */
+  readonly historyHiddenCount: number;
   readonly streamingMessage: WebConversationMessage | null;
   readonly requests: readonly WebPermissionRequest[];
   readonly error: string | null;
@@ -1469,6 +1474,19 @@ export async function promptWebSession(
 
 export async function abortWebSession(wsId: string, sessionId: string): Promise<WebSessionSnapshot> {
   return webSessionMutation(webSessionUrl(wsId, sessionId, '/abort'), 'abort');
+}
+
+/** Widen the A-side projection window with older live-process history. */
+export async function revealEarlierWebHistory(
+  wsId: string,
+  sessionId: string,
+  count?: number,
+): Promise<WebSessionSnapshot> {
+  return webSessionMutation(
+    webSessionUrl(wsId, sessionId, '/history/earlier'),
+    'history earlier',
+    count === undefined ? undefined : { count },
+  );
 }
 
 /** Answer an offered option, or use an empty optionId and text for a question. */

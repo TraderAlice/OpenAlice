@@ -352,6 +352,7 @@ function demoManagerSnapshot(): WebSessionSnapshot {
     startedAt: demoManagerSession.startedAt,
     phase: 'idle' as const,
     messages: demoManagerMessages,
+    historyHiddenCount: 0,
     streamingMessage: null,
     requests: [],
     error: null,
@@ -1747,6 +1748,18 @@ export const workspacesHandlers = [
       return HttpResponse.json({ error: 'web_respond_failed', message: `unknown option ${body.optionId}` }, { status: 409 })
     }
     return HttpResponse.json({ snapshot: result })
+  }),
+
+  http.post('/api/workspaces/:id/sessions/:sid/web/history/earlier', ({ params }) => {
+    const snapshot = findDemoWebSession(String(params.id), String(params.sid))
+    if (!snapshot) return HttpResponse.json({ error: 'web_not_running' }, { status: 409 })
+    return HttpResponse.json({
+      snapshot: {
+        ...snapshot,
+        historyHiddenCount: 0,
+        revision: snapshot.revision + 1,
+      },
+    })
   }),
 
   http.get('/api/workspaces/:id/agent-config', ({ params }) =>
