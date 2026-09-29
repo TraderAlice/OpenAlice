@@ -41,6 +41,7 @@ import type {
   AlpacaBarRaw,
 } from './alpaca-types.js'
 import { makeContract, resolveSymbol, mapAlpacaOrderStatus, makeOrderState, ALPACA_TIMEFRAME } from './alpaca-contracts.js'
+import { applyAlpacaAxiosEnvProxy } from './alpaca-env-proxy.js'
 import { buildPosition } from '../contract-builder.js'
 import { fuzzyRankContracts, type FuzzyRankInput } from '../fuzzy-rank.js'
 
@@ -167,6 +168,19 @@ export class AlpacaBroker implements IBroker {
       throw new BrokerError(
         'CONFIG',
         `No API credentials configured. Set apiKey and apiSecret in accounts.json to enable this account.`,
+      )
+    }
+
+    // Bridge HTTP(S)_PROXY onto the SDK's axios before the first request.
+    // Axios 0.21's env auto-proxy 400s on common local mixed-port proxies;
+    // see alpaca-env-proxy.ts. No-op when no proxy env is set (direct).
+    const proxy = applyAlpacaAxiosEnvProxy()
+    if (proxy.mode === 'http-proxy') {
+      console.log(`AlpacaBroker[${this.id}]: routing REST via outbound proxy (${proxy.proxyUrl})`)
+    } else if (proxy.mode === 'socks-unbridged') {
+      console.warn(
+        `AlpacaBroker[${this.id}]: SOCKS/unsupported proxy env (${proxy.proxyUrl}) — ` +
+        `Alpaca axios bridging supports HTTP(S) proxies only; connecting directly`,
       )
     }
 

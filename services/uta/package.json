@@ -13,11 +13,12 @@
   },
   "dependencies": {
     "@hono/node-server": "^2.0.12",
-    "@traderalice/ibkr": "workspace:*",
     "@traderalice/guardian-runtime": "workspace:*",
+    "@traderalice/ibkr": "workspace:*",
     "@traderalice/uta-protocol": "workspace:*",
     "decimal.js": "^10.6.0",
     "hono": "^4.12.32",
+    "https-proxy-agent": "^7.0.6",
     "zod": "^4.3.6"
   },
   "devDependencies": {

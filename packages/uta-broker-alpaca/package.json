@@ -11,6 +11,7 @@
     "@traderalice/ibkr": "workspace:*",
     "@traderalice/uta-protocol": "workspace:*",
     "decimal.js": "^10.6.0",
+    "https-proxy-agent": "^7.0.6",
     "zod": "^4.3.6"
   },
   "devDependencies": { "@types/node": "^22.13.4", "tsup": "^8.5.1", "typescript": "^5.9.3" }
