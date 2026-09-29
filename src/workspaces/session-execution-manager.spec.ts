@@ -47,6 +47,54 @@ describe('Session execution authority', () => {
     await expect(manager.start(request, { start: async () => { throw new Error('handshake') }, stop })).rejects.toThrow('handshake')
     expect(stop).toHaveBeenCalledWith('startup-failed')
     expect(manager.list()[0].phase).toBe('failed')
+    expect(manager.current('resume')).toBeNull()
+    await manager.start({ ...request, intent: 'resume' }, { start: async () => ({ value: 7, completed: new Promise(() => {}) }), stop: async () => {} })
+    expect(manager.current('resume')?.phase).toBe('running')
+  })
+
+  it('frees occupancy when failed-startup journal projection fails so a later open is not permanently busy', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'execution-manager-'))
+    directories.push(dir)
+    const file = join(dir, 'executions.json')
+    let rejectFailed = false
+    const project = vi.fn(async (record: { phase: string }) => {
+      if (rejectFailed && record.phase === 'failed') throw Object.assign(new Error('EPERM'), { code: 'EPERM' })
+    })
+    const manager = await SessionExecutionManager.open(file, project)
+    rejectFailed = true
+    await expect(manager.start(request, {
+      start: async () => { throw new Error('handshake') },
+      stop: async () => {},
+    })).rejects.toThrow()
+    expect(manager.current('resume')).toBeNull()
+    rejectFailed = false
+    await manager.start({ ...request, intent: 'resume' }, {
+      start: async () => ({ value: 1, completed: new Promise(() => {}) }),
+      stop: async () => {},
+    })
+    expect(manager.current('resume')?.phase).toBe('running')
+  })
+
+  it('clears a terminal zombie from active on stop so web open can start again', async () => {
+    const { manager } = await setup()
+    await expect(manager.start(request, { start: async () => { throw new Error('handshake') }, stop: async () => {} })).rejects.toThrow('handshake')
+    expect(manager.current('resume')).toBeNull()
+    // Reproduce production: terminal phase still occupying active after a lost finish() delete.
+    const zombie = manager.list()[0]
+    expect(zombie.phase).toBe('failed')
+    ;(manager as unknown as { active: Map<string, unknown> }).active.set('resume', {
+      record: zombie,
+      stop: async () => {},
+      controller: new AbortController(),
+    })
+    expect(manager.current('resume')).toMatchObject({ phase: 'failed' })
+    await expect(manager.stop('resume', 'switch to Web')).resolves.toBe(false)
+    expect(manager.current('resume')).toBeNull()
+    await manager.start({ ...request, intent: 'resume' }, {
+      start: async () => ({ value: 3, completed: new Promise(() => {}) }),
+      stop: async () => {},
+    })
+    expect(manager.current('resume')?.phase).toBe('running')
   })
   it('records owner restart without inventing a new launch or changing its origin', async () => {
     const { manager, file } = await setup()
