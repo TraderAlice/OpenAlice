@@ -1787,6 +1787,10 @@ export const ja: Resources = {
     offerAction: '整理して続ける',
     offerBanner: '研究スレッドが長くなりました。合意を残して新しい会話に移りますか？',
   },
+  webConversation: {
+    loadEarlier: '以前の履歴を読み込む（非表示 {{count}} 件）',
+    loadingEarlier: '以前の履歴を読み込み中…',
+  },
   autoPredictionLanding: {
     heading: '予測研究デスクで何を調べますか？', subheading: 'ネイティブ Coding Agent で予測市場の意味論と証拠を調査します。',
     targetHeading: 'このワークスペースで研究セッションを開始', clearTarget: '別の予測ワークスペースを使う',

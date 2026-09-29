@@ -19,6 +19,8 @@ export interface ConversationViewProps {
   readonly context?: ReactNode
   readonly controls?: ReactNode
   readonly status?: ReactNode
+  /** Soft banner / controls rendered above the live transcript (e.g. load earlier). */
+  readonly beforeItems?: ReactNode
   /** Soft system / product cards appended after the live transcript. */
   readonly afterItems?: ReactNode
   readonly error?: string | null
@@ -203,6 +205,7 @@ export function ConversationView(props: ConversationViewProps) {
       )}
     </>}
   >
+      {props.beforeItems}
       {props.items.length === 0 && !error && <div className="conversation-empty">{props.empty}</div>}
       {props.items.map((item, index) => (
         <ConversationTranscriptItem

@@ -1812,6 +1812,10 @@ export const en = {
     offerAction: 'Summarize & continue',
     offerBanner: 'This research thread is getting long. Capture consensus and continue in a new chat?',
   },
+  webConversation: {
+    loadEarlier: 'Load earlier history ({{count}} hidden)',
+    loadingEarlier: 'Loading earlier history…',
+  },
   autoPredictionLanding: {
     heading: 'What should the prediction desk investigate?',
     subheading: 'Research prediction-market semantics and evidence with a native Coding Agent.',

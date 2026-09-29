@@ -237,6 +237,7 @@ export function createDemoWebSnapshot(seed: DemoWebSeed): WebSessionSnapshot {
     startedAt: seed.startedAt,
     phase: 'idle',
     messages: structuredClone(seed.messages),
+    historyHiddenCount: 0,
     streamingMessage: null,
     requests: [],
     error: null,

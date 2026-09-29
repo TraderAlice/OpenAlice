@@ -4,6 +4,7 @@ import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-libra
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import type { AgentInfo, WebSessionSnapshot } from './api'
+import { clearWebSessionCache } from './web-session-cache'
 import { isWebSessionNearBottom, WebSessionView } from './WebSessionView'
 
 const mocks = vi.hoisted(() => ({
@@ -11,6 +12,7 @@ const mocks = vi.hoisted(() => ({
   getWebSession: vi.fn(),
   promptWebSession: vi.fn(),
   respondWebSession: vi.fn(),
+  revealEarlierWebHistory: vi.fn(),
 }))
 
 vi.mock('./api', async (importOriginal) => {
@@ -21,6 +23,7 @@ vi.mock('./api', async (importOriginal) => {
     getWebSession: mocks.getWebSession,
     promptWebSession: mocks.promptWebSession,
     respondWebSession: mocks.respondWebSession,
+    revealEarlierWebHistory: mocks.revealEarlierWebHistory,
   }
 })
 
@@ -49,6 +52,7 @@ function snapshot(phase: WebSessionSnapshot['phase'], overrides: Partial<WebSess
     startedAt: 1,
     phase,
     messages: [],
+    historyHiddenCount: 0,
     streamingMessage: null,
     requests: [],
     error: null,
@@ -60,11 +64,13 @@ function snapshot(phase: WebSessionSnapshot['phase'], overrides: Partial<WebSess
 
 beforeEach(() => {
   vi.clearAllMocks()
+  clearWebSessionCache()
   Object.defineProperty(HTMLElement.prototype, 'scrollTo', { configurable: true, value: vi.fn() })
   mocks.getWebSession.mockResolvedValue(snapshot('compacting'))
   mocks.abortWebSession.mockResolvedValue(snapshot('idle'))
   mocks.promptWebSession.mockResolvedValue(snapshot('idle'))
   mocks.respondWebSession.mockResolvedValue(snapshot('working'))
+  mocks.revealEarlierWebHistory.mockResolvedValue(snapshot('idle'))
 })
 
 afterEach(() => {

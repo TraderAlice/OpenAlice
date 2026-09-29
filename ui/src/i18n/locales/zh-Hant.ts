@@ -1794,6 +1794,10 @@ export const zhHant: Resources = {
     offerAction: '整理並續作',
     offerBanner: '這段研究討論偏長了。要整理共識並開新對話嗎？',
   },
+  webConversation: {
+    loadEarlier: '載入更早的紀錄（還有 {{count}} 則）',
+    loadingEarlier: '正在載入更早的紀錄…',
+  },
   autoPredictionLanding: {
     heading: '預測研究工作區應調查什麼？', subheading: '使用原生 Coding Agent 研究預測市場語義與證據。',
     targetHeading: '在此工作區新增研究工作階段', clearTarget: '使用其他預測研究工作區',

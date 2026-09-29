@@ -138,6 +138,10 @@ export class WebSessionHost {
     return session.snapshot()
   }
 
+  revealEarlier(recordId: string, count?: number): WebSessionSnapshot {
+    return this.require(recordId).revealEarlier(count)
+  }
+
   async stop(recordId: string, reason = 'stopped'): Promise<boolean> {
     const session = this.sessions.get(recordId)
     if (!session) return false
@@ -229,12 +233,19 @@ class LiveWebSession {
       startedAt: this.startedAt,
       phase: this.state.phase,
       messages: this.state.messages,
+      historyHiddenCount: this.state.hiddenMessages.length,
       streamingMessage: this.state.streamingMessage,
       requests: this.state.requests,
       error: this.state.error,
       stderrTail: this.stderrTail,
       revision: this.state.revision,
     }
+  }
+
+  revealEarlier(count?: number): WebSessionSnapshot {
+    this.assertLive()
+    this.state.revealEarlier(count)
+    return this.snapshot()
   }
 
   prompt(message: string): Promise<void> {
