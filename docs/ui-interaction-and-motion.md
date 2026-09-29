@@ -693,22 +693,13 @@ It never persists or resends this preview. No artificial startup delay is added;
 the short message entrance honors reduced motion. TUI launches share the pending
 feedback, then hand over to the terminal normally.
 
-### AutoQuant long-context continue
+### AutoQuant long-context tip
 
-AutoQuant Web Sessions may offer a soft “summarize and continue” path when a
-thread grows long (many user turns or heavy tool activity). The offer appears
-inline at the end of the transcript like an ordinary conversation card — no
-modal overlay — so the user can keep chatting without being blocked. It asks
-them to write a consensus draft first (optional scaffold: assumptions,
-conclusions, open questions, next steps), then lets Alice add suggestion cards
-the user can accept into the same draft. Confirming archives the old Session,
-asks the live agent to write `reports/checkpoints/…` when possible, and opens
-AutoQuant landing with a continue prompt that treats the checkpoint as source of
-truth. Dismissals cool down per Session so the reminder stays infrequent.
-“Later” docks the inline card into the header “Summarize & continue” control
-with a ~1s shrink/fade (skipped under reduced motion), flying a fixed-position
-clone so the transcript scroller cannot clip the path, then briefly pulses that
-control so the deferred path stays discoverable.
+AutoQuant Web Sessions may show a soft tip when a thread grows long (many user
+turns or heavy tool activity). The tip appears inline at the end of the
+transcript while the Session is idle — informational only, no draft, archive,
+or header affordance. The composer stays free so the user can keep chatting or
+start a fresh conversation themselves.
 
 
 ### Background Session inspection
