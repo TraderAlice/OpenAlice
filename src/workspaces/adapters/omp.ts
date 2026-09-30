@@ -1,5 +1,5 @@
 import { discoverNativeModels } from '../native-model-discovery.js';
-import { realpathSync } from 'node:fs';
+import { realpathSync, statSync } from 'node:fs';
 import { readdir, readFile, stat } from 'node:fs/promises';
 import { homedir, tmpdir } from 'node:os';
 import { isAbsolute, join, relative, resolve } from 'node:path';
@@ -138,6 +138,28 @@ function ompRoleArgs(ctx: SpawnContext): readonly string[] {
   return ctx.appendSystemPrompt ? ['--append-system-prompt', ctx.appendSystemPrompt] : [];
 }
 
+/**
+ * Windows resolves a bare `omp` through PATH, where the npm `.cmd` shim can
+ * shadow the native executable and add a Bun re-exec before the real process.
+ * Pin the native binary when PATH has one; other platforms already resolve
+ * `omp` to the native binary.
+ */
+function ompCommand(env: Readonly<Record<string, string>>, cwd: string): string {
+  if (process.platform !== 'win32') return 'omp';
+  // Windows env var casing is unstable across hosts; check both.
+  for (const dir of (env['PATH'] ?? env['Path'] ?? '').split(';')) {
+    if (!dir) continue;
+    // A child resolves relative PATH entries from its launch cwd, not Alice's.
+    const native = resolve(cwd, dir, 'omp.exe');
+    try {
+      if (statSync(native).isFile()) return native;
+    } catch {
+      // The candidate disappeared between listing and probe; keep looking.
+    }
+  }
+  return 'omp';
+}
+
 function parseJsonRecord(line: string): Record<string, unknown> | null {
   try {
     const parsed: unknown = JSON.parse(line);
@@ -267,7 +289,7 @@ export const ompAdapter: CliAdapter = {
 
   composeCommand(_base: readonly string[], ctx: SpawnContext): readonly string[] {
     const cmd = [
-      'omp',
+      ompCommand(ctx.env, ctx.cwd),
       '--auto-approve',
       ...(ctx.sessionRuntime?.interactiveArgs ?? []),
       ...ompRoleArgs(ctx),
@@ -284,7 +306,7 @@ export const ompAdapter: CliAdapter = {
     prompt: string,
   ): readonly string[] {
     return [
-      'omp',
+      ompCommand(ctx.env, ctx.cwd),
       ...(ctx.sessionRuntime?.headlessArgs ?? []),
       ...ompRoleArgs(ctx),
       '-p',
@@ -304,7 +326,7 @@ export const ompAdapter: CliAdapter = {
   composeWebCommand(_base: readonly string[], ctx: SpawnContext): readonly string[] {
     if (ctx.resume === 'last') throw new Error('the Web surface requires a concrete omp session id or a fresh Session');
     return [
-      'omp',
+      ompCommand(ctx.env, ctx.cwd),
       ...(ctx.sessionRuntime?.webArgs ?? ctx.sessionRuntime?.interactiveArgs ?? []),
       ...ompRoleArgs(ctx),
       '--mode',

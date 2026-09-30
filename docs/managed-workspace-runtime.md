@@ -345,6 +345,10 @@ remain at the OpenAlice/UTA boundary.
   `[managedPiNodePath, managedPiPath, ...args]`; its lifecycle implementation
   reconciles trust, legacy config, the managed Windows shell, and the native Pi
   automatic theme pair.
+- On Windows, the OMP adapter chooses a native `omp.exe` from the final child
+  `PATH` for TUI, headless, and Web/RPC launches. Relative `PATH` entries
+  resolve against the Workspace launch cwd; if none contains the executable,
+  the adapter falls back to the normal `omp` lookup.
 
 The headless runner records `processStarted` only after Node emits `spawn`.
 Failures before that event retain a typed `launchErrorCode`, a human-readable

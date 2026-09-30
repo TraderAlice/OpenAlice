@@ -58,6 +58,7 @@ off the Alice host.
 
 ### 🐛 Bug Fixes
 
+- **workspaces/omp**: Resolve Windows native `omp.exe` candidates against the Workspace launch cwd, including relative PATH entries.
 - Inject persona + brain state into Claude Code provider
 - Extract assistant text when Claude Code result is empty
 - Align SettingsPanel with actual backend config structure
