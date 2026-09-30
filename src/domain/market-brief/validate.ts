@@ -1,5 +1,7 @@
 import {
+  CONNECT_FLOW_CLAIM,
   EVIDENCE_TRIGGER,
+  FORBIDDEN_CONNECT_FLOW_SERIES,
   FactsDocumentSchema,
   JudgmentsDocumentSchema,
   type Fact,
@@ -68,6 +70,7 @@ function validateFactsInternal(doc: FactsDocument): BriefIssue[] {
         path,
       })
     }
+    issues.push(...validateFactProvenance(fact, path))
   }
   for (const [i, fact] of doc.facts.entries()) {
     if (fact.kind !== 'derived') continue
@@ -100,6 +103,92 @@ function validateFactsInternal(doc: FactsDocument): BriefIssue[] {
       })
     }
   }
+  return issues
+}
+
+function validateFactProvenance(fact: Fact, path: string): BriefIssue[] {
+  const issues: BriefIssue[] = []
+  const blob = `${fact.series_id} ${fact.caliber} ${fact.source} ${fact.note ?? ''} ${fact.proxy_for ?? ''}`
+
+  if (fact.is_proxy) {
+    if (!fact.proxy_for) {
+      issues.push({
+        level: 'error',
+        code: 'proxy_missing_target',
+        message: `Proxy fact ${fact.id} needs proxy_for (canonical series)`,
+        path,
+      })
+    }
+    if (fact.data_type && fact.data_type !== 'proxy' && fact.data_type !== 'unknown') {
+      issues.push({
+        level: 'warning',
+        code: 'proxy_data_type',
+        message: `Proxy fact ${fact.id} should use data_type=proxy (got ${fact.data_type})`,
+        path,
+      })
+    }
+    if (!fact.data_type) {
+      issues.push({
+        level: 'warning',
+        code: 'proxy_untyped',
+        message: `Proxy fact ${fact.id} should set data_type=proxy`,
+        path,
+      })
+    }
+  } else if (fact.proxy_for) {
+    issues.push({
+      level: 'error',
+      code: 'proxy_flag_missing',
+      message: `Fact ${fact.id} has proxy_for but is_proxy is not true`,
+      path,
+    })
+  }
+
+  if (fact.data_type === 'proxy' && !fact.is_proxy) {
+    issues.push({
+      level: 'error',
+      code: 'proxy_data_type_without_flag',
+      message: `Fact ${fact.id} data_type=proxy requires is_proxy=true and proxy_for`,
+      path,
+    })
+  }
+
+  if (fact.data_type === 'intraday' && /收盘|official.?close|closing/i.test(fact.note ?? '')) {
+    issues.push({
+      level: 'warning',
+      code: 'intraday_labeled_close',
+      message: `Fact ${fact.id} is intraday but note mentions close — do not call it 收盘 in prose`,
+      path,
+    })
+  }
+
+  if (CONNECT_FLOW_CLAIM.test(blob) && FORBIDDEN_CONNECT_FLOW_SERIES.test(blob)) {
+    issues.push({
+      level: 'error',
+      code: 'forbidden_connect_flow_series',
+      message: `Fact ${fact.id} must not treat concept/sector money-flow as Stock Connect 北向/南向`,
+      path,
+    })
+  }
+
+  if (fact.domain === 'flow' && FORBIDDEN_CONNECT_FLOW_SERIES.test(blob) && !/hkex|sse|szse|exchange.?day.?end|historical.?daily/i.test(blob)) {
+    issues.push({
+      level: 'warning',
+      code: 'flow_non_exchange_caliber',
+      message: `Flow fact ${fact.id} should prefer HKEX/SSE/SZSE day-end caliber over board scrapes`,
+      path,
+    })
+  }
+
+  if ((fact.domain === 'event' || fact.domain === 'calendar') && fact.data_type === 'official_close') {
+    issues.push({
+      level: 'warning',
+      code: 'event_as_close',
+      message: `Fact ${fact.id} is ${fact.domain} but data_type=official_close — use event/calendar/release`,
+      path,
+    })
+  }
+
   return issues
 }
 
