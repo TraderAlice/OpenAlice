@@ -14,6 +14,7 @@ import { createMarketSearchTools } from '../tool/market.js'
 import { createVendorTools } from '../tool/market-vendors.js'
 import { createEquityTools } from '../tool/equity.js'
 import { createEconomyTools } from '../tool/economy.js'
+import { createMarketBriefTools } from '../tool/market-brief.js'
 import { createQuantTools } from '../tool/quant.js'
 import { createSnapshotTools } from '../tool/snapshot.js'
 import { createSimulateTools } from '../tool/simulate.js'
@@ -54,6 +55,7 @@ describe('CLI_EXPORTS — data export (global tools)', () => {
   tc.register(createSnapshotTools(any), 'snapshot')
   tc.register(createSimulateTools(any), 'simulate')
   tc.register(createEconomyTools(any, any), 'economy')
+  tc.register(createMarketBriefTools(), 'market-brief')
 
   it('every mapped verb resolves to a registered global tool', () => {
     for (const name of mappedToolNames('data')) {

@@ -476,13 +476,13 @@ describe('ChatLandingPage workflow starters', () => {
     expect(suggestions).toHaveLength(3)
     expect(suggestions[0]?.className).not.toContain('oa-suggestion-enter')
     expect(suggestions[0]?.className).toContain('border-b')
-    expect(suggestions[0]?.textContent).toContain("Read today's cross-asset signals")
+    expect(suggestions[0]?.textContent).toContain("Today's signals: A-shares and your markets")
 
     fireEvent.click(screen.getByRole('button', { name: 'Show more workflows' }))
     expect(strip.textContent).toContain('Find what actually needs follow-up')
     expect(strip.textContent).toContain('Turn research into a scheduled Issue')
     expect(strip.textContent).toContain('Delegate a reproducible study')
-    expect(strip.textContent).not.toContain("Read today's cross-asset signals")
+    expect(strip.textContent).not.toContain("Today's signals: A-shares and your markets")
 
     fireEvent.click(screen.getByRole('button', { name: 'Find what actually needs follow-up' }))
     expect((screen.getByPlaceholderText('Describe the task, question, or decision…') as HTMLTextAreaElement).value)
@@ -496,10 +496,10 @@ describe('ChatLandingPage workflow starters', () => {
 
     const firstSetButton = screen.getByRole('button', { name: 'Show more workflows' })
     fireEvent.click(firstSetButton)
-    const refreshedStarter = screen.getByRole('button', { name: "Read today's cross-asset signals" })
+    const refreshedStarter = screen.getByRole('button', { name: "Today's signals: A-shares and your markets" })
     fireEvent.click(refreshedStarter)
     expect((screen.getByPlaceholderText('Describe the task, question, or decision…') as HTMLTextAreaElement).value)
-      .toContain("Read today's macro backdrop")
+      .toContain("First read the client's focus markets")
   })
 })
 
@@ -511,11 +511,11 @@ describe('ChatLandingPage keyboard submission', () => {
     }))
     render(<ChatLandingPage spec={{ params: { targetWsId: 'chat-1' } }} />)
     await screen.findByRole('button', { name: 'UI mode: GUI' })
-    fireEvent.click(screen.getByRole('button', { name: "Read today's cross-asset signals" }))
+    fireEvent.click(screen.getByRole('button', { name: "Today's signals: A-shares and your markets" }))
     fireEvent.click(screen.getByRole('button', { name: 'Send' }))
     await waitFor(() => expect(mocks.quickChat).toHaveBeenCalled())
     expect(mocks.quickChat.mock.calls[0]?.[8]).toBe('webpi')
-    expect(mocks.quickChat.mock.calls[0]?.join(' ')).toContain("Read today's macro backdrop")
+    expect(mocks.quickChat.mock.calls[0]?.join(' ')).toContain("First read the client's focus markets")
   })
 
   it('shows the submitted message during startup and restores the draft after failure', async () => {

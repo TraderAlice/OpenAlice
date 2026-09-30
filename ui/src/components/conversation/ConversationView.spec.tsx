@@ -61,6 +61,41 @@ describe('adapter-neutral conversation', () => {
     expect(send).not.toHaveBeenCalled()
     expect(screen.queryByRole('button')).toBeNull()
   })
+
+  it('shows a spinning Working status after the user message before assistant activity arrives', () => {
+    const { container, rerender } = render(<ConversationView {...base} busy items={[{
+      kind: 'user',
+      key: 'user-1',
+      content: [{ kind: 'markdown', text: 'Read focus markets and brief me' }],
+    }]} />)
+    const pending = screen.getByRole('status')
+    expect(pending.textContent).toContain('Working')
+    expect(container.querySelector('.animate-spin')).toBeTruthy()
+
+    rerender(<ConversationView {...base} busy items={[
+      { kind: 'user', key: 'user-1', content: [{ kind: 'markdown', text: 'Read focus markets and brief me' }] },
+      {
+        kind: 'assistant-turn',
+        key: 'a1',
+        progress: [],
+        final: null,
+        activity: {
+          thinking: [],
+          unknownParts: [],
+          steps: [{
+            id: 'read-1',
+            name: 'Read',
+            summary: '.alice/settings.json',
+            input: '{}',
+            status: 'running',
+            thinking: [],
+          }],
+        },
+      },
+    ]} />)
+    expect(screen.getByText('Working').closest('details')).toBeTruthy()
+    expect(container.querySelector('.conversation-pending-working')).toBeNull()
+  })
 })
 
  it('does not animate the first asynchronously loaded active history', () => {

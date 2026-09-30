@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
+import { LoaderCircle } from 'lucide-react'
 import { ConversationLayout } from './ConversationLayout'
 import { ChatComposer, type ChatComposerProps } from './ChatComposer'
 import { ConversationTranscriptItem } from './ConversationTranscript'
@@ -40,6 +41,31 @@ export interface ConversationViewProps {
 
 export function isConversationNearBottom(metrics: Pick<HTMLElement, 'scrollTop' | 'scrollHeight' | 'clientHeight'>, threshold = 72): boolean {
   return metrics.scrollHeight - metrics.clientHeight - metrics.scrollTop <= threshold
+}
+
+/** True while busy before the transcript has its own Working/activity chrome. */
+export function shouldShowPendingWorking(
+  busy: boolean,
+  stopped: boolean,
+  lastItem: ConversationItem | undefined,
+): boolean {
+  if (!busy || stopped) return false
+  if (!lastItem || lastItem.kind === 'user' || lastItem.kind === 'notice' || lastItem.kind === 'unknown') return true
+  if (lastItem.kind !== 'assistant-turn') return false
+  return lastItem.progress.length === 0 && !lastItem.activity && !lastItem.final
+}
+
+function ConversationPendingWorking(): ReactNode {
+  return (
+    <div className="conversation-activity is-running" role="status" aria-live="polite">
+      <div className="conversation-pending-working">
+        <span className="conversation-activity-status" aria-hidden="true">
+          <LoaderCircle size={14} className="animate-spin motion-reduce:animate-none" />
+        </span>
+        <span className="conversation-activity-title">Working</span>
+      </div>
+    </div>
+  )
 }
 
 /**
@@ -175,6 +201,7 @@ export function ConversationView(props: ConversationViewProps) {
     && !stopped
     && JSON.stringify(initialItems.current?.get(lastItem.key)) !== JSON.stringify(lastItem),
   )
+  const pendingWorking = shouldShowPendingWorking(props.busy, stopped, lastItem)
 
   return <ConversationLayout
     header={props.header}
@@ -206,7 +233,7 @@ export function ConversationView(props: ConversationViewProps) {
     </>}
   >
       {props.beforeItems}
-      {props.items.length === 0 && !error && <div className="conversation-empty">{props.empty}</div>}
+      {props.items.length === 0 && !error && !pendingWorking && <div className="conversation-empty">{props.empty}</div>}
       {props.items.map((item, index) => (
         <ConversationTranscriptItem
           key={item.key}
@@ -218,6 +245,7 @@ export function ConversationView(props: ConversationViewProps) {
           working={props.busy && index === lastIndex}
         />
       ))}
+      {pendingWorking && <ConversationPendingWorking />}
       {props.afterItems}
       {error && <div className="conversation-error" role="alert">
         <strong>Could not continue</strong><span>{error}</span>

@@ -54,11 +54,24 @@ fit the task.
 | Need | Surface | Skill |
 |---|---|---|
 | Current market boards, fundamentals, macro, calendars | `traderhub` | `traderhub` |
-| Symbol discovery, collected RSS, K-lines and bounded analysis | `alice` | `alice`, `alice-analysis` |
+| Daily cross-asset / market brief (focus markets, A-shares + selected) | `traderhub` + `alice market` + `alice brief` | `traderhub`, `market-data` |
+| Symbol discovery, collected RSS, K-lines and bounded analysis | `alice` | `alice`, `alice-analysis`, `market-data` |
 | Peer addressing, Agent conversation, Inbox, Issues and provenance | `alice` | `alice` |
 | Issue files, schedules, headless delivery contracts | `.alice/issues/` + `alice issue` | `self-scheduling` |
 | Accounts, positions, orders, trading-as-git | `alice-uta` | `alice-uta` |
 | Optional website adapters, if installed separately | `opencli` | `opencli-reader` |
+
+**Focus markets:** If `.alice/focus-markets.json` exists, treat it as the
+client's selected markets for cross-asset briefs. If missing, default to China
+A-shares, US equities, Hong Kong equities, and major macro assets. Always cover
+A-shares on market briefs. The browser watchlist and `.alice/settings.json` are
+not this file. Format and pull order live in the `traderhub` skill.
+
+**Market brief structure:** For「今日宏观 · 跨资产」and equivalents, follow the
+`traderhub` skill's `alice brief` pipeline — assemble → derive →
+`build-analysis` → `render-analysis` → editorial polish → `editorial-check`,
+under `research/briefs/` (write-once `--output`). Do not hand-compute
+bp/%/spreads; do not upgrade certainty while rewriting.
 
 Use the bundled research skills (`build-thesis`, `sector-rotation`,
 `scan-value-chain`, `retrospective`, `equity-tearsheet`) when their workflow

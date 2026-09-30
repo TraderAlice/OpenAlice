@@ -41,7 +41,7 @@ One concept has one primary owner:
 | Connector reply file attachments (`[[relative/path.ext]]`) | `file-delivery` |
 | Delegating quantitative research from Chat to AutoQuant | `delegate-autoquant` |
 | Issue file shape, ownership, schedules, headless delivery | `self-scheduling` |
-| Low-frequency market/fundamental/macro data | `traderhub` |
+| Low-frequency market/fundamental/macro data; daily cross-asset market brief and `.alice/focus-markets.json` | `traderhub` |
 | K-line discovery, raw OHLCV, freshness and reply chart references | `market-data` |
 | Optional quantitative formulas and snapshots | `alice-analysis` |
 | Broker accounts/contracts/quotes and trading writes | `alice-uta` |

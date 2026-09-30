@@ -97,6 +97,15 @@
   color: var(--muted-foreground);
   font-size: 11px;
 }
+.conversation-pending-working {
+  min-height: 36px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 0;
+  color: var(--muted-foreground);
+  font-size: 11px;
+}
 .conversation-activity-status { width: 18px; height: 18px; flex: 0 0 18px; display: grid; place-items: center; color: inherit; }
 .conversation-activity-title { flex: 0 0 auto; font-weight: 500; }
 .conversation-activity-meta { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: 10px/1.4 var(--font-mono, monospace); }

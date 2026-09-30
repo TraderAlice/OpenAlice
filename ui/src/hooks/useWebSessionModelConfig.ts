@@ -17,6 +17,8 @@ export function useWebSessionModelConfig({ workspaceId, record, agents, busy, re
   const inFlight = useRef(false)
   useEffect(() => {
     const key = JSON.stringify(editor.draft)
+    // Never reopen the live process while a turn is in flight (busy includes
+    // composer pending). That race cleared the draft while dropping the bubble.
     if (!editor.dirty || busy || inFlight.current || attempted.current === key || !editor.config.credentialSelectionReady) return
     attempted.current = key
     inFlight.current = true
