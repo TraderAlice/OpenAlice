@@ -65,6 +65,13 @@ must remain alive with that account reported as `offline/down`. A failed broker
 must never escape as a process-level unhandled rejection or take other accounts
 offline with it.
 
+Recovery can start a new connect while an earlier attempt on the same
+`EClient` is still opening its socket, for example when IB Gateway restarts.
+Each attempt owns the `Connection` it opened. A superseded attempt closes only
+that socket, without reporting through the shared wrapper; it never greets,
+adopts, or tears down its successor's connection, and never clears the
+successor's `nextValidId` waiter.
+
 ## Verification ladder
 
 Work on this boundary must proceed from narrow to broad:

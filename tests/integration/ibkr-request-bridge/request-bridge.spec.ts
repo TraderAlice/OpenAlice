@@ -119,6 +119,70 @@ describe('RequestBridge — connection handshake', () => {
       await new Promise<void>((resolve) => server.close(() => resolve()))
     }
   })
+
+  it('lets a superseding connect finish while the superseded attempt only closes its own socket', async () => {
+    // Recovery can start a new connect on the shared EClient while the previous
+    // attempt is still opening its socket (seen when IB Gateway restarts). The
+    // stale attempt must neither tear down its successor nor leave a rejected
+    // handshake unobserved, which Node treats as fatal and kills the UTA process.
+    const unhandled: unknown[] = []
+    const onUnhandled = (reason: unknown): void => { unhandled.push(reason) }
+    process.on('unhandledRejection', onUnhandled)
+
+    const sockets = new Set<Socket>()
+    const server = createServer((socket) => {
+      sockets.add(socket)
+      socket.once('close', () => sockets.delete(socket))
+      let stage: 'greeting' | 'start-api' | 'done' = 'greeting'
+      socket.on('data', () => {
+        if (stage === 'greeting') {
+          stage = 'start-api'
+          const payload = Buffer.from(`222\0${new Date(0).toISOString()}\0`, 'utf8')
+          const header = Buffer.alloc(4)
+          header.writeUInt32BE(payload.length)
+          socket.write(Buffer.concat([header, payload]))
+          return
+        }
+        if (stage === 'start-api') {
+          stage = 'done'
+          socket.write(makeMsg(9, true, makeField(1) + makeField(700)))
+        }
+      })
+    })
+    await new Promise<void>((resolve, reject) => {
+      server.once('error', reject)
+      server.listen(0, '127.0.0.1', resolve)
+    })
+
+    const bridge = new RequestBridge()
+    const client = new EClient(bridge)
+    try {
+      const address = server.address()
+      if (address === null || typeof address === 'string') throw new Error('test server has no TCP port')
+
+      const superseded = bridge.waitForConnect(client, '127.0.0.1', address.port, 19, 1_000)
+      const current = bridge.waitForConnect(client, '127.0.0.1', address.port, 19, 1_000)
+
+      await expect(superseded).rejects.toThrow('Previous TWS/Gateway connection attempt was superseded')
+      // Node reports an unobserved rejection after the current turn.
+      await new Promise((resolve) => setTimeout(resolve, 20))
+      expect(unhandled).toEqual([])
+
+      await expect(current).resolves.toBeUndefined()
+      expect(client.isConnected()).toBe(true)
+      expect(bridge.getNextOrderId()).toBe(700)
+
+      // The superseded attempt closed its own socket; only the live one remains.
+      await vi.waitFor(() => expect(sockets.size).toBe(1), { timeout: 1_000 })
+      expect(client.isConnected()).toBe(true)
+      expect(unhandled).toEqual([])
+    } finally {
+      process.off('unhandledRejection', onUnhandled)
+      client.disconnect()
+      for (const socket of sockets) socket.destroy()
+      await new Promise<void>((resolve) => server.close(() => resolve()))
+    }
+  }, 5_000)
 })
 
 describe('RequestBridge — error routing', () => {
