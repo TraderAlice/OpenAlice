@@ -10,6 +10,14 @@ The catalog and selector live in `scripts/test-lanes.mjs` and
 public commands describe product ownership and risk instead of exposing that
 internal topology.
 
+The root and selector commands run through Vite+ (`vp test`), while test sources
+import Vitest APIs from `vitest`. The root, UI, and package-local runners
+declare Vitest directly for TypeScript resolution, all pinned to the version
+bundled by `vite-plus@1.0.0-rc.1` (5.0.1). Their Vite aliases and the workspace
+`vite@*` override resolve to the same Vite+ core package. Keep those pins
+aligned when upgrading Vite+; mixed runner copies can split mock and expect
+state.
+
 ## Command Model
 
 Start with the narrowest command that can falsify the change, then escalate

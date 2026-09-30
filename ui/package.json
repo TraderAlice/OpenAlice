@@ -3,11 +3,11 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "vite",
-    "dev:demo": "vite --mode demo",
-    "build": "tsc -b && vite build",
-    "build:demo": "tsc -b && vite build --mode demo",
-    "preview": "vite preview",
+    "dev": "vp dev",
+    "dev:demo": "vp dev --mode demo",
+    "build": "tsc -b && vp build",
+    "build:demo": "tsc -b && vp build --mode demo",
+    "preview": "vp preview",
     "msw:init": "msw init ./public --save"
   },
   "dependencies": {
@@ -48,14 +48,15 @@
     "zustand": "^5.0.13"
   },
   "devDependencies": {
-    "@tailwindcss/vite": "^4.1.8",
+    "@tailwindcss/vite": "^4.3.3",
     "@types/react": "^19.1.6",
     "@types/react-dom": "^19.1.6",
-    "@vitejs/plugin-react": "^4.5.2",
+    "@vitejs/plugin-react": "^6.1.1",
     "msw": "^2.14.6",
-    "tailwindcss": "^4.1.8",
+    "tailwindcss": "^4.3.3",
     "typescript": "^5.9.3",
-    "vite": "^7.3.5"
+    "vite": "npm:@voidzero-dev/vite-plus-core@1.0.0-rc.1",
+    "vitest": "5.0.1"
   },
   "msw": {
     "workerDirectory": [

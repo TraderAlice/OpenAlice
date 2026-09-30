@@ -49,8 +49,8 @@ overrides:
   express-rate-limit: ^8.2.2
   picomatch: ^4.0.4
   rollup: ^4.59.0
-  vitest>vite: ^7.3.5
-  '@vitest/mocker>vite': ^7.3.5
+  'vite@*': npm:@voidzero-dev/vite-plus-core@1.0.0-rc.1
+  'vitest@*': 5.0.1
 
 patchedDependencies:
   # Adapted from stablyai/orca@ab0f220. See THIRD_PARTY_NOTICES.md.

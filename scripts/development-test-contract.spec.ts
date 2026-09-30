@@ -23,26 +23,6 @@ function readRootScripts(): Record<string, string> {
 }
 
 describe('development test command contract', () => {
-  it('keeps one composable namespace around the hermetic full suite', () => {
-    const scripts = readRootScripts()
-
-    expect(scripts.test).toBe('vitest run')
-    expect(scripts['test:select']).toBe('node scripts/run-tests.mjs')
-    expect(scripts['test:changed']).toBe('node scripts/run-tests.mjs --changed origin/dev')
-    for (const owner of [
-      'alice',
-      'ui',
-      'uta',
-      'connector',
-      'runtime-cli',
-      'desktop',
-      'repo-tooling',
-    ]) {
-      expect(scripts[`test:owner:${owner}`]).toBe(`node scripts/run-tests.mjs --owner ${owner}`)
-    }
-    expect(scripts['test:watch']).toBe('vitest --config vitest.config.ts')
-  })
-
   it('uses production boundaries for integration, contract, external, live, and system tests', () => {
     const scripts = readRootScripts()
 

@@ -36,7 +36,8 @@
     "ts-proto": "^2.11.5",
     "tsup": "^8.4.0",
     "typescript": "^5.7.3",
-    "vitest": "^3.2.6"
+    "vite": "npm:@voidzero-dev/vite-plus-core@1.0.0-rc.1",
+    "vitest": "5.0.1"
   },
   "engines": {
     "node": ">=22.19.0"
