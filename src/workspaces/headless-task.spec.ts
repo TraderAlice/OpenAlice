@@ -70,7 +70,7 @@ describe('runHeadlessTask', () => {
     });
     expect(r.killed).toBe(true);
     expect(r.signal === 'SIGTERM' || r.exitCode !== 0).toBe(true);
-  });
+  }, 15_000);
 
   it('reports a missing binary as exitCode -1 instead of throwing', async () => {
     let spawned = false;

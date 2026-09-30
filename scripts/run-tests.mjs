@@ -276,7 +276,7 @@ function printExplanation(plan) {
   for (const candidate of plan.invocations) {
     const project = candidate.project ? ` project=${candidate.project}` : ''
     console.log(`\nwould run lane=${candidate.lane}${project}`)
-    console.log(`  vitest ${candidate.args.join(' ')}`)
+    console.log(`  vp test ${candidate.args.slice(1).join(' ')}`)
   }
 }
 
@@ -331,9 +331,9 @@ function main() {
     }
   }
 
-  const vitest = resolve(repoRoot, 'node_modules/vitest/vitest.mjs')
+  const vitePlus = resolve(repoRoot, 'node_modules/vite-plus/bin/vp')
   for (const candidate of plan.invocations) {
-    const result = spawnSync(process.execPath, [vitest, ...candidate.args], {
+    const result = spawnSync(process.execPath, [vitePlus, 'test', ...candidate.args.slice(1)], {
       cwd: repoRoot,
       env: process.env,
       stdio: 'inherit',

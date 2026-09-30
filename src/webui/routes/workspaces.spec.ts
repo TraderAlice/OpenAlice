@@ -7,7 +7,7 @@ import { installExecutionFixture } from './workspace-execution-fixture.js';
 import { describe, expect, it, vi } from 'vitest';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { join, resolve } from 'node:path';
 
 import { createWorkspaceRoutes } from './workspaces.js';
 import { HeadlessCapacityError, HeadlessResumeError, type WorkspaceService } from '../../workspaces/service.js';
@@ -2182,7 +2182,7 @@ describe('native provider model directory', () => {
     const response = await app.request('/agents/fixture/models?workspaceId=ws-1', { method: 'POST' });
     expect(response.status).toBe(200);
     expect(await response.json()).toMatchObject({ discoverySupported: true, refreshing: false, models: [{ id: 'runtime-alias', semantics: { reasoning: { efforts: ['high'] } } }] });
-    expect(discoverModels).toHaveBeenCalledWith('/w');
+    expect(discoverModels).toHaveBeenCalledWith(resolve('/w'));
     expect((await app.request('/agents/missing/models')).status).toBe(404);
     expect((await app.request('/agents/fixture/models?workspaceId=missing')).status).toBe(404);
   });

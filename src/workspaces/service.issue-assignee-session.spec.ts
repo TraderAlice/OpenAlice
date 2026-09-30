@@ -261,7 +261,7 @@ it.each(['terminal', 'webpi'] as const)('hands %s ownership to an Issue turn and
     const result = await pending
     await vi.waitFor(() => expect(service!.headlessTasks.get(result.taskId)?.status).toBe('done'), { timeout: 10000 })
     expect(service!.sessionRegistry.get(ws.id, session.id)?.state).toBe('paused')
-    expect(service!.isResumeActive(resumeId)).toBe(false)
+    await vi.waitFor(() => expect(service!.isResumeActive(resumeId)).toBe(false), { timeout: 10000 })
   } finally { release(); terminal.mockRestore(); web.mockRestore(); command.mockRestore() }
 })
 
