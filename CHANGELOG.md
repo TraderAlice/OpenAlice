@@ -58,6 +58,7 @@ off the Alice host.
 
 ### 🐛 Bug Fixes
 
+- **ui/auth**: Correct first-run token recovery guidance across four locales; identify the actual data-root path and warn that existing sessions are not revoked by rotating the token.
 - Inject persona + brain state into Claude Code provider
 - Extract assistant text when Claude Code result is empty
 - Align SettingsPanel with actual backend config structure

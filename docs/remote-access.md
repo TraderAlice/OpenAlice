@@ -586,6 +586,14 @@ is not sufficient authorization. The browser contract remains:
 - operators exposing a deployment beyond loopback own its HTTPS,
   authentication, and network-access policy.
 
+The admin token is printed once in Alice startup output.
+`OPENALICE_HOME/data/config/auth.json` stores only its hash, not the
+plaintext token. If the token is lost, stop Alice, remove that file from
+the configured data root, and restart to issue a new token. This does
+not revoke sessions already stored in
+`OPENALICE_HOME/data/config/sessions.json`; revoke those separately if
+session compromise is a concern.
+
 The local relay additionally rejects non-exact Host and cross-origin mutation
 requests, strips browser forwarding headers, and namespaces backend cookies
 per Machine/Project. Its control routes accept registered keys rather than raw
