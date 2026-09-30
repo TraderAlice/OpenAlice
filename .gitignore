@@ -50,6 +50,11 @@ packages/ibkr/ref/CMakeLists.txt
 /docs/reference/install-script/*
 !/docs/reference/install-script/README.md
 
+# Python satellites (venvs / caches; source stays tracked)
+satellites/**/.venv/
+satellites/**/__pycache__/
+satellites/**/*.egg-info/
+
 # Turborepo
 .turbo/
 
