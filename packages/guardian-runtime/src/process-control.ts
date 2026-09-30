@@ -204,7 +204,13 @@ async function signalProcessTree(
     try {
       await execFileAsync('taskkill', args, { windowsHide: true, timeout: 5_000 })
     } catch {
-      // The process may have exited between the liveness check and taskkill.
+      if (signal === 'SIGTERM') {
+        try {
+          await execFileAsync('taskkill', [...args, '/F'], { windowsHide: true, timeout: 5_000 })
+        } catch {
+          // The process may have exited between the liveness check and taskkill.
+        }
+      }
     }
     return [pid]
   }
