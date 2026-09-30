@@ -6,6 +6,8 @@ scrapes. One field → one primary origin. Cite as-of and series id every time.
 After fetch, persist observed facts and derive bp/%/spreads with
 `alice brief` (see `traderhub` skill § Structured brief pipeline). This file
 is the **source order** for pulls; `alice brief` is the **structure** layer.
+Field-level provenance (`data_type` / `quality` / `domain` / proxy labeling,
+connect-flow bans): `brief-data-sources.md`.
 
 Eastmoney / Yahoo / Tushare are **fallback or optional depth**, never a silent
 replacement for the primary. If two sources disagree, name both and keep the

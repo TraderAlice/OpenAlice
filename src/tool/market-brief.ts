@@ -108,6 +108,12 @@ Use before authoring \`research/briefs/<date>/<run>/facts.json\`. Numbers in the
           'fetched_at',
           'kind: observed|derived',
           'derived_from?',
+          'data_type?: official_close|exchange_day_end|intraday|settlement|session_close_utc|release|event|calendar|proxy|derived|unknown',
+          'quality?: A|B|C',
+          'domain?: market|flow|macro|event|calendar|derived',
+          'is_proxy?',
+          'proxy_for?',
+          'source_symbol?',
         ],
         judgment_fields: [
           'id',

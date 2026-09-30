@@ -9,8 +9,10 @@ description: >
   Deribit crypto curves. Also owns the daily cross-asset / market-brief
   workflow (今日宏观、跨资产、focus markets, A-shares + selected markets) with
   a compiler-first evidence stack (CSI/CNI, NBS, FRED/OECD; exchange day-end
-  connect disclosure — not scrape-first) and the `alice brief` structural
-  pipeline (facts → analysis signals/certainty → render-analysis → editorial-check).
+  connect disclosure — not scrape-first), fact provenance fields
+  (`data_type`/`quality`/`domain`/proxy — see brief-data-sources), and the
+  `alice brief` structural pipeline (facts → analysis signals/certainty →
+  render-analysis → editorial-check).
   Use whenever you need a macro number, a fundamental, a calendar, a
   ready-made board, or today's three cross-asset signals: "what's CPI",
   "AAPL ratios", "earnings this week", "which sectors are rotating in",
@@ -147,8 +149,10 @@ across markets (Chat starter「今日宏观 · 跨资产」and equivalents).
 ### 2. Pull evidence by market (cite each origin / as-of)
 
 Full source table and HTTP shapes: `references/brief-evidence-stack.md`.
-**Accuracy and provenance beat coverage.** Do not scrape Eastmoney/THS boards
-as primary when a compiler or agency series exists.
+Provenance fields (`data_type` / `quality` / `domain` / proxy):
+`references/brief-data-sources.md`. **Accuracy and provenance beat coverage.**
+Do not scrape Eastmoney/THS boards as primary when a compiler or agency series
+exists.
 
 **Tushare hard gate (every `cn-ashare` brief):**
 
@@ -201,10 +205,13 @@ Rules:
 2. CLI `--output` is write-once (`wx`); on collision bump `runId`.
 3. Prefer `assemble` / `derive` for numbers. Signal `certainty` grades:
    fact | derived_fact | interpretation | hypothesis | forecast | data_limitation.
-4. Editorial Layer **must not upgrade certainty** or drop `data_limitations`.
-5. Two-layer reading: exec「今天最重要的三个变化」+ 详细分析.
-6. Named origin on every number. CSI/CNI over Yahoo/Eastmoney/Tushare when they disagree.
-7. Style guide: `references/editorial-style.md` + `alice brief style`.
+4. On every observed fact set provenance when known: `data_type`, `quality`,
+   `domain`; proxies need `is_proxy` + `proxy_for` (+ `source_symbol`). See
+   `references/brief-data-sources.md`. Never cite concept-board flow as 北向.
+5. Editorial Layer **must not upgrade certainty** or drop `data_limitations`.
+6. Two-layer reading: exec「今天最重要的三个变化」+ 详细分析.
+7. Named origin on every number. CSI/CNI over Yahoo/Eastmoney/Tushare when they disagree.
+8. Style guide: `references/editorial-style.md` + `alice brief style`.
 
 K-lines and chart references: `market-data`. Trading: `alice-uta`.
 

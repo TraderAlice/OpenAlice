@@ -17,6 +17,40 @@ export const CertaintySchema = z.enum([
 
 export type Certainty = z.infer<typeof CertaintySchema>
 
+/** How the value was timed / what session it represents. */
+export const FactDataTypeSchema = z.enum([
+  'official_close',
+  'exchange_day_end',
+  'intraday',
+  'settlement',
+  'session_close_utc',
+  'release',
+  'event',
+  'calendar',
+  'proxy',
+  'derived',
+  'unknown',
+])
+
+export type FactDataType = z.infer<typeof FactDataTypeSchema>
+
+/** Source tier: A official, B free/low-cost vendor, C professional paid. */
+export const FactQualitySchema = z.enum(['A', 'B', 'C'])
+
+export type FactQuality = z.infer<typeof FactQualitySchema>
+
+/** Logical domain — keeps flow/event out of equity-bar semantics. */
+export const FactDomainSchema = z.enum([
+  'market',
+  'flow',
+  'macro',
+  'event',
+  'calendar',
+  'derived',
+])
+
+export type FactDomain = z.infer<typeof FactDomainSchema>
+
 export const FactSchema = z.object({
   id: z.string().min(1),
   series_id: z.string().min(1),
@@ -31,6 +65,17 @@ export const FactSchema = z.object({
   kind: z.enum(['observed', 'derived']).default('observed'),
   derived_from: z.array(z.string().min(1)).optional(),
   note: z.string().optional(),
+  /** Timing / session semantics for prose (intraday ≠ official_close). */
+  data_type: FactDataTypeSchema.optional(),
+  /** A = official agency/exchange; B = free/vendor; C = professional paid. */
+  quality: FactQualitySchema.optional(),
+  domain: FactDomainSchema.optional(),
+  /** True when value stands in for another series (e.g. UUP for DXY). */
+  is_proxy: z.boolean().optional(),
+  /** Canonical series this proxy approximates, e.g. ICE:DXY. */
+  proxy_for: z.string().min(1).optional(),
+  /** Vendor ticker actually fetched, e.g. UUP or DX-Y.NYB. */
+  source_symbol: z.string().min(1).optional(),
 })
 
 export const FactsDocumentSchema = z.object({
@@ -125,6 +170,16 @@ export type DeriveOp = z.infer<typeof DeriveOpSchema>
 
 /** Claim words that require evidence (narrow first version). */
 export const EVIDENCE_TRIGGER = /拥挤|减仓|资金转向|避险|crowded|deleverag|flow(?:s|ed)? into|defensive rotation/i
+
+/**
+ * Concept-board / thematic money-flow labels must never be cited as Stock Connect
+ * Northbound/Southbound (北向/南向) official flow.
+ */
+export const FORBIDDEN_CONNECT_FLOW_SERIES =
+  /概念|板块资金|主力净流入|deep.?stock.?connect.?board|msci.?china.*(flow|资金)|concept.?board.?flow|ths.?moneyflow|eastmoney.?sector.?flow/i
+
+export const CONNECT_FLOW_CLAIM =
+  /北向|南向|沪股通|深股通|港股通|northbound|southbound|stock.?connect/i
 
 export function certaintyFromJudgment(j: Judgment): Certainty {
   if (j.certainty) return j.certainty

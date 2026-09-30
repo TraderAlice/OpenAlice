@@ -63,6 +63,15 @@ function formatValue(fact: Fact): string {
   return `${fact.value}${unit}`
 }
 
+function provenanceSuffix(fact: Fact): string {
+  const bits: string[] = []
+  if (fact.data_type) bits.push(fact.data_type)
+  if (fact.quality) bits.push(`Q${fact.quality}`)
+  if (fact.is_proxy) bits.push(`proxy→${fact.proxy_for ?? '?'}`)
+  if (fact.source_symbol) bits.push(`via ${fact.source_symbol}`)
+  return bits.length ? ` · ${bits.join(' · ')}` : ''
+}
+
 function escapeCell(text: string): string {
   return text.replace(/\|/g, '\\|').replace(/\n/g, ' ')
 }
@@ -111,13 +120,14 @@ export function renderBriefMarkdown(
   lines.push('')
   lines.push(
     locale === 'zh'
-      ? '| series_id | asof | source | caliber | value | id |'
-      : '| series_id | asof | source | caliber | value | id |',
+      ? '| series_id | asof | source | caliber | value | type | id |'
+      : '| series_id | asof | source | caliber | value | type | id |',
   )
-  lines.push('|---|---|---|---|---|---|')
+  lines.push('|---|---|---|---|---|---|---|')
   for (const f of facts.facts) {
+    const type = f.is_proxy ? `proxy:${f.proxy_for ?? '?'}` : (f.data_type ?? '')
     lines.push(
-      `| ${escapeCell(f.series_id)} | ${escapeCell(f.asof)} | ${escapeCell(f.source)} | ${escapeCell(f.caliber)} | ${escapeCell(formatValue(f))} | \`${f.id}\` |`,
+      `| ${escapeCell(f.series_id)} | ${escapeCell(f.asof)} | ${escapeCell(f.source)} | ${escapeCell(f.caliber)} | ${escapeCell(formatValue(f))} | ${escapeCell(type)} | \`${f.id}\` |`,
     )
   }
   lines.push('')
@@ -128,7 +138,7 @@ export function renderBriefMarkdown(
   lines.push(locale === 'zh' ? '## 事实（observed）' : '## Facts (observed)')
   lines.push('')
   for (const f of observed) {
-    lines.push(`- \`${f.id}\` — **${formatValue(f)}** · ${f.series_id} · ${f.source} · asof ${f.asof}`)
+    lines.push(`- \`${f.id}\` — **${formatValue(f)}** · ${f.series_id} · ${f.source} · asof ${f.asof}${provenanceSuffix(f)}`)
     if (f.note) lines.push(`  - ${f.note}`)
   }
   if (!observed.length) lines.push(locale === 'zh' ? '- （无）' : '- (none)')
@@ -171,7 +181,7 @@ export function renderBriefMarkdown(
     for (const eid of j.evidence_ids) {
       const f = factsById.get(eid)
       if (f) {
-        lines.push(`  - \`${eid}\`: ${formatValue(f)} (${f.source}, asof ${f.asof})`)
+        lines.push(`  - \`${eid}\`: ${formatValue(f)} (${f.source}, asof ${f.asof})${provenanceSuffix(f)}`)
       }
     }
     lines.push(
@@ -280,11 +290,12 @@ export function renderAnalysisMarkdown(
 
   lines.push(locale === 'zh' ? '### 数据截至' : '### Data as-of')
   lines.push('')
-  lines.push('| series_id | asof | source | caliber | value | id |')
-  lines.push('|---|---|---|---|---|---|')
+  lines.push('| series_id | asof | source | caliber | value | type | id |')
+  lines.push('|---|---|---|---|---|---|---|')
   for (const f of analysis.facts) {
+    const type = f.is_proxy ? `proxy:${f.proxy_for ?? '?'}` : (f.data_type ?? '')
     lines.push(
-      `| ${escapeCell(f.series_id)} | ${escapeCell(f.asof)} | ${escapeCell(f.source)} | ${escapeCell(f.caliber)} | ${escapeCell(formatValue(f))} | \`${f.id}\` |`,
+      `| ${escapeCell(f.series_id)} | ${escapeCell(f.asof)} | ${escapeCell(f.source)} | ${escapeCell(f.caliber)} | ${escapeCell(formatValue(f))} | ${escapeCell(type)} | \`${f.id}\` |`,
     )
   }
   lines.push('')
@@ -302,7 +313,7 @@ export function renderAnalysisMarkdown(
     for (const eid of s.evidence_ids) {
       const f = factsById.get(eid)
       if (f) {
-        lines.push(`- \`${eid}\`: **${formatValue(f)}** · ${f.source} · asof ${f.asof} · ${f.series_id}`)
+        lines.push(`- \`${eid}\`: **${formatValue(f)}** · ${f.source} · asof ${f.asof} · ${f.series_id}${provenanceSuffix(f)}`)
       } else {
         lines.push(`- \`${eid}\`: _(missing)_`)
       }
