@@ -385,3 +385,66 @@ describe('placeOrder inputSchema', () => {
     expect(result.success).toBe(false)
   })
 })
+
+// ==================== funding rates (Alice tool -> UTA HTTP boundary) ====================
+
+describe('createTradingTools — funding rates', () => {
+  // The Alice account surface is the HTTP SDK; these stubs stand in for it so
+  // the tool layer's own contract (aliceId routing, request pass-through,
+  // source tagging) is what gets pinned.
+  function stubManager() {
+    const account = {
+      id: 'bybit-main',
+      getFundingRate: vi.fn().mockResolvedValue({ fundingRate: 0.0001 }),
+      getFundingRateHistory: vi.fn().mockResolvedValue({ rates: [{ timestamp: new Date(0), fundingRate: 0.0001 }] }),
+    }
+    const manager = { resolveOne: vi.fn().mockReturnValue(account) } as unknown as UTAManagerSDK
+    return { account, manager }
+  }
+
+  it('routes the request to the account encoded in the aliceId and tags the source', async () => {
+    const { account, manager } = stubManager()
+    const tools = createTradingTools(manager)
+    const request = { aliceId: 'bybit-main|BTC/USDT:USDT', start: '2026-09-01T00:00:00.000Z', limit: 5 }
+
+    const result = await (tools.getFundingRateHistory.execute as Function)(request)
+
+    expect(account.getFundingRateHistory).toHaveBeenCalledWith(request)
+    expect(result).toEqual({ source: 'bybit-main', rates: [{ timestamp: new Date(0), fundingRate: 0.0001 }] })
+  })
+
+  it('returns the current rate with its source and no invented fields', async () => {
+    const { account, manager } = stubManager()
+    const tools = createTradingTools(manager)
+
+    const result = await (tools.getFundingRate.execute as Function)({ aliceId: 'bybit-main|BTC/USDT:USDT' })
+
+    expect(account.getFundingRate).toHaveBeenCalledWith({ aliceId: 'bybit-main|BTC/USDT:USDT' })
+    expect(result).toEqual({ source: 'bybit-main', fundingRate: 0.0001 })
+  })
+
+  it('never calls an account for an aliceId without a source', async () => {
+    const { account, manager } = stubManager()
+    const tools = createTradingTools(manager)
+
+    const result = await (tools.getFundingRate.execute as Function)({ aliceId: 'no-separator' })
+
+    expect(result.error).toMatch(/Invalid aliceId/)
+    expect(account.getFundingRate).not.toHaveBeenCalled()
+  })
+
+  it('describes the rate conventions to the model instead of implying an annualized amount', () => {
+    const { manager } = stubManager()
+    const tools = createTradingTools(manager)
+
+    for (const definition of [tools.getFundingRate, tools.getFundingRateHistory]) {
+      expect(definition.description).toMatch(/PER FUNDING PERIOD/)
+      expect(definition.description).toMatch(/NOT annualized and NOT an amount/)
+      expect(definition.description).toMatch(/LONGS PAY SHORTS/)
+    }
+    // The current-rate read must not promise a field venues may omit, and the
+    // history read must state its ordering.
+    expect(tools.getFundingRate.description).toMatch(/previousFundingRate/)
+    expect(tools.getFundingRateHistory.description).toMatch(/ascending/)
+  })
+})

@@ -3,6 +3,7 @@ import Decimal from 'decimal.js'
 import { Contract, Order } from '@traderalice/ibkr'
 import { projectOrderHistory, projectTradeHistory } from './order-history.js'
 import type { GitCommit, Operation, OperationResult } from './git/types.js'
+import { TradingGit, WriteOutcomeUnconfirmedError } from './git/TradingGit.js'
 import './contract-ext.js'
 
 let n = 0
@@ -38,6 +39,12 @@ function limitBuy(qty: string, price: string): Order {
   o.totalQuantity = new Decimal(qty)
   o.lmtPrice = new Decimal(price)
   return o
+}
+
+/** A persisted verdict is data, not a type: the log rehydrates from disk without
+ *  validating results, so a record can carry a status the union never listed. */
+function persistedResult(value: unknown): OperationResult {
+  return value as OperationResult
 }
 
 describe('projectOrderHistory', () => {
@@ -116,6 +123,63 @@ describe('projectOrderHistory', () => {
     expect(rows).toHaveLength(1)
     expect(rows[0].status).toBe('rejected')
     expect(rows[0].error).toBe('price band')
+  })
+
+  it("carries the write path's unconfirmed verdict into the history row", async () => {
+    // End-to-end through the real write path: the broker call never settles, so
+    // TradingGit abandons the write at its liveness bound and records the honest
+    // verdict. The read path must hand that verdict back untouched — a row that
+    // reads 'rejected' would invite a blind re-submit of an order that may be live.
+    const git = new TradingGit({
+      executeOperation: () => new Promise<never>(() => {}),
+      getGitState: async () => ({
+        netLiquidation: '0', totalCashValue: '0', unrealizedPnL: '0', realizedPnL: '0',
+        positions: [], pendingOrders: [],
+      }),
+      writeTimeoutMs: 20,
+    })
+    git.add({ action: 'placeOrder', contract: contract(), order: limitBuy('0.01', '1650') })
+    const { hash } = git.commit('buy the dip')
+
+    await expect(git.push(hash)).rejects.toBeInstanceOf(WriteOutcomeUnconfirmedError)
+
+    const recorded = git.show(hash)
+    expect(recorded?.results[0]).toMatchObject({ success: false, status: 'unconfirmed' })
+    const rows = projectOrderHistory(recorded ? [recorded] : [])
+    expect(rows[0]?.status).toBe('unconfirmed')
+  })
+
+  it('reads an unresolvable verdict as unconfirmed and names the gap on the row', () => {
+    // No writer omits a verdict (one per operation), so these are records whose
+    // verdict was lost or written by something that knows a status the vocabulary
+    // does not. Neither is a venue rejection: 'rejected' would assert an answer
+    // this log does not have, and the order may be live.
+    const open = commit(
+      [{ action: 'placeOrder', contract: contract(), order: limitBuy('0.01', '1650') }],
+      [{ action: 'placeOrder', success: true, orderId: 'o1', status: 'submitted' }],
+    )
+    const lostVerdict = commit(
+      [{ action: 'placeOrder', contract: contract(), order: limitBuy('0.02', '1650') }],
+      [],
+    )
+    const unknownStatus = commit(
+      [{ action: 'placeOrder', contract: contract(), order: limitBuy('0.03', '1650') }],
+      [persistedResult({ action: 'placeOrder', success: false, status: 'ghosted' })],
+    )
+    const unknownSync = commit(
+      [{ action: 'syncOrders' }],
+      [persistedResult({ action: 'syncOrders', success: true, orderId: 'o1', status: 'ghosted' })],
+    )
+
+    const rows = projectOrderHistory([open, lostVerdict, unknownStatus, unknownSync])
+
+    const anonymous = rows.filter((row) => !row.orderId)
+    expect(anonymous.map((row) => row.status)).toEqual(['unconfirmed', 'unconfirmed'])
+    expect(anonymous.every((row) => row.error?.includes('no recorded verdict'))).toBe(true)
+
+    const resolved = rows.find((row) => row.orderId === 'o1')
+    expect(resolved?.status).toBe('unconfirmed')
+    expect(resolved?.resolvedAt).toBeDefined()
   })
 })
 

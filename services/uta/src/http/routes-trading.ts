@@ -1,4 +1,4 @@
-import { optionResearchSchema, orderBookSchema, type BrokerResearch } from '@traderalice/uta-protocol'
+import { fundingRateHistorySchema, fundingRateSchema, optionResearchSchema, orderBookSchema, venueSpreadSchema, type BrokerResearch } from '@traderalice/uta-protocol'
 import { Hono } from 'hono'
 import type { Context } from 'hono'
 import { z } from 'zod'
@@ -6,9 +6,10 @@ import type { UTAEngineContext } from '../types.js'
 import { BrokerError } from '../domain/trading/brokers/types.js'
 import type { UnifiedTradingAccount } from '../domain/trading/UnifiedTradingAccount.js'
 import { searchTradeableContracts } from '../domain/trading/contract-search.js'
-import type { AssetClassHint } from '@traderalice/uta-protocol'
+import type { AssetClassHint, OperationResult } from '@traderalice/uta-protocol'
 import { executeOneShotOrder, type OrderEntryPhase } from '../domain/trading/order-entry.js'
-import { isPendingHashConflict } from '../domain/trading/git/TradingGit.js'
+import { isPendingHashConflict, isWriteOutcomeUnconfirmed } from '../domain/trading/git/TradingGit.js'
+import { loadGitState } from '../domain/trading/git-persistence.js'
 import { projectOrderHistory, projectTradeHistory } from '../domain/trading/order-history.js'
 
 // ==================== Order entry schemas ====================
@@ -88,6 +89,58 @@ function readExpectedPendingHash(body: unknown): string | undefined {
   return typeof value === 'string' && value.trim() ? value.trim() : undefined
 }
 
+/** The answer a retry of an indeterminate wallet write gets: the same verdict
+ *  the original push reported, never a definite-sounding "nothing happened". */
+interface UnconfirmedWriteVerdict {
+  error: string
+  code: 'WRITE_OUTCOME_UNCONFIRMED'
+  hash: string
+  unconfirmed: OperationResult[]
+  logPersisted: boolean
+}
+
+/** Re-state the verdict of a wallet write whose commit is still in the log.
+ *
+ *  A write that ends without an answer records its commit with the unsettled
+ *  operations marked `unconfirmed` and clears the pending commit by design, so a
+ *  retry carrying that commit's hash can no longer be served by `push` — and
+ *  "Nothing to push" is the one answer it must never get: the order MAY be live.
+ *  The recorded commit is the source of truth, so the verdict is read back out of
+ *  the log (`show`) instead of being restated from state that no longer exists.
+ *
+ *  Anything else — an unknown hash, or a commit with no unsettled operation — returns
+ *  undefined and the caller keeps the ordinary conflict.
+ *
+ *  `logPersisted` is re-derived, not remembered: a commit carries no record of
+ *  whether its own persist step succeeded, so the durable log is read directly.
+ *  Its absence means the record must not be relied on past a restart.
+ */
+async function unconfirmedWriteVerdict(
+  accountId: string,
+  uta: UnifiedTradingAccount,
+  hash: string,
+): Promise<UnconfirmedWriteVerdict | undefined> {
+  const commit = uta.show(hash)
+  if (!commit) return undefined
+  const unconfirmed = commit.results.filter((result) => result.status === 'unconfirmed')
+  if (unconfirmed.length === 0) return undefined
+  // The probe decides one field, never the verdict: an unreadable durable log is
+  // no evidence that the record is durable, and must not replace the answer the
+  // caller came back for with a 500.
+  let logPersisted = false
+  try {
+    const durable = await loadGitState(accountId)
+    logPersisted = durable?.commits.some((entry) => entry.hash === hash) ?? false
+  } catch { /* unreadable durable log → not durable */ }
+  return {
+    error: `Wallet write ${hash} did not confirm: ${unconfirmed.length} operation(s) did not settle — outcome indeterminate, reconcile against broker state`,
+    code: 'WRITE_OUTCOME_UNCONFIRMED',
+    hash,
+    unconfirmed,
+    logPersisted,
+  }
+}
+
 /** Resolve account by :id param, return 404 if not found. */
 function resolveAccount(ctx: UTAEngineContext, c: Context): UnifiedTradingAccount | null {
   const id = c.req.param('id')
@@ -140,6 +193,23 @@ export function createTradingRoutes(ctx: UTAEngineContext) {
   app.get('/equity', async (c) => {
     const equity = await ctx.utaManager.getAggregatedEquity()
     return c.json(equity)
+  })
+
+  // ==================== Cross-venue spread ====================
+  // Read-only fan-out: one instrument, 2–8 venues, read concurrently.
+  // Per-leg failures degrade inside the manager, so anything that escapes is a
+  // refusal of THIS request (unusable aliceId set, fewer than two answering
+  // venues, mismatched pairing keys) — hence `permanent` errors are the
+  // caller's to fix (400), not a venue outage (503).
+  app.post('/venue-spread', async (c) => {
+    const parsed = venueSpreadSchema.safeParse(await c.req.json().catch(() => null))
+    if (!parsed.success) return c.json({ error: parsed.error.message }, 400)
+    try {
+      return c.json(await ctx.utaManager.getVenueSpread(parsed.data.aliceIds))
+    } catch (err) {
+      const be = err instanceof BrokerError ? err : BrokerError.from(err)
+      return c.json({ error: be.message, code: be.code, transient: !be.permanent }, be.permanent ? 400 : 503)
+    }
   })
 
   // ==================== Tradeable contract search ====================
@@ -357,6 +427,34 @@ export function createTradingRoutes(ctx: UTAEngineContext) {
       return broker.getOrderBook(contract, parsed.data.limit ?? 20)
     })
   })
+  // Funding rates are public market data (no credentials involved). Both routes
+  // resolve the contract through the ACCOUNT, never by stamping the raw aliceId
+  // onto a Contract: only the account's broker knows the venue's native symbol.
+  app.post('/uta/:id/contract/funding-rate', async c => {
+    const account = resolveAccount(ctx, c)
+    if (!account) return c.json({ error: 'Account not found' }, 404)
+    const parsed = fundingRateSchema.safeParse(await c.req.json().catch(() => null))
+    if (!parsed.success) return c.json({ error: parsed.error.message }, 400)
+    return queryAccount(c, account, async () => {
+      const contract = account.contractFromAliceId(parsed.data.aliceId)
+      const broker = account.broker as typeof account.broker & BrokerResearch
+      if (!broker.getFundingRate) throw new Error('Funding rates are not supported by this broker pack.')
+      return broker.getFundingRate(contract)
+    })
+  })
+  app.post('/uta/:id/contract/funding-rate-history', async c => {
+    const account = resolveAccount(ctx, c)
+    if (!account) return c.json({ error: 'Account not found' }, 404)
+    const parsed = fundingRateHistorySchema.safeParse(await c.req.json().catch(() => null))
+    if (!parsed.success) return c.json({ error: parsed.error.message }, 400)
+    return queryAccount(c, account, async () => {
+      const contract = account.contractFromAliceId(parsed.data.aliceId)
+      const broker = account.broker as typeof account.broker & BrokerResearch
+      if (!broker.getFundingRateHistory) throw new Error('Funding-rate history is not supported by this broker pack.')
+      const { start, limit } = parsed.data
+      return broker.getFundingRateHistory(contract, { start, limit })
+    })
+  })
 
   // Hub → leaves expansion (bond issuers, option chains, futures months).
   // Body: { aliceId, filters?: ExpandContractFilters }.
@@ -503,10 +601,22 @@ export function createTradingRoutes(ctx: UTAEngineContext) {
   app.post('/uta/:id/wallet/push', async (c) => {
     const uta = ctx.utaManager.get(c.req.param('id'))
     if (!uta) return c.json({ error: 'Account not found' }, 404)
-    if (!uta.status().pendingMessage) return c.json({ error: 'Nothing to push' }, 400)
+    const body = await c.req.json().catch(() => ({}))
+    const expectedPendingHash = readExpectedPendingHash(body)
+    if (!uta.status().pendingMessage) {
+      // The genuinely empty wallet: nothing waiting and no hash to account for.
+      if (!expectedPendingHash) return c.json({ error: 'Nothing to push' }, 400)
+      // A supplied hash names a commit, and when the log holds it as a write whose
+      // operations never settled this is a retry of an indeterminate write: it
+      // re-learns that verdict, BEFORE any push is attempted — "Nothing to push"
+      // would tell the owner the opposite of what the log says (the order MAY be
+      // live), and a push attempt has nothing to add. Any other hash with nothing
+      // pending — unknown, or a commit that settled — is not an unknown outcome,
+      // and falls through to the ordinary conflict.
+      const retry = await unconfirmedWriteVerdict(c.req.param('id'), uta, expectedPendingHash)
+      if (retry) return c.json(retry, 504)
+    }
     try {
-      const body = await c.req.json().catch(() => ({}))
-      const expectedPendingHash = readExpectedPendingHash(body)
       if (!expectedPendingHash) {
         return c.json({
           error: 'expectedPendingHash is required',
@@ -521,6 +631,22 @@ export function createTradingRoutes(ctx: UTAEngineContext) {
           error: err instanceof Error ? err.message : 'Pending commit changed',
           code: 'PENDING_HASH_CONFLICT',
         }, 409)
+      }
+      if (isWriteOutcomeUnconfirmed(err)) {
+        // The broker never answered. The commit IS in the log with the
+        // unsettled operations marked unconfirmed, so the caller is told to
+        // reconcile (`show <hash>`) instead of being handed the generic 500 —
+        // and never a 'rejected' verdict the exchange did not give.
+        return c.json({
+          error: err.message,
+          code: 'WRITE_OUTCOME_UNCONFIRMED',
+          hash: err.hash,
+          unconfirmed: err.unconfirmed,
+          // Whether the unconfirmed record reached disk. `false` means the caller
+          // must not treat it as recorded (and should escalate), even though the
+          // commit is in the in-memory log.
+          logPersisted: err.logPersisted,
+        }, 504)
       }
       return c.json({ error: String(err) }, 500)
     }

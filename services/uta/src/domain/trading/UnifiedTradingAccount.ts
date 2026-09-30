@@ -33,6 +33,8 @@ import type {
   OrderStatusUpdate,
   SyncResult,
 } from './git/types.js'
+import type { TradingGitConfig } from './git/interfaces.js'
+import { classifyOperationFailure, LocalOperationRefusalError } from './brokers/operation-failure-classification.js'
 import { createGuardPipeline, resolveGuards } from './guards/index.js'
 import './contract-ext.js'
 
@@ -198,7 +200,17 @@ export class UnifiedTradingAccount {
     const guards = resolveGuards(options.guards ?? [])
     const guardedDispatcher = createGuardPipeline(dispatcher, broker, guards)
 
-    const gitConfig = {
+    const gitConfig: TradingGitConfig = {
+      // The write bound (`writeTimeoutMs`) is enforced inside TradingGit: no
+      // IBroker method takes a cancellation signal, so the signal it hands to
+      // `executeOperation` cannot interrupt an in-flight broker call. A
+      // dispatch that outlives the bound is therefore abandoned at the git
+      // layer and recorded as unconfirmed — never assumed rejected.
+      // Transport-level failures (timeout, reset, venue 5xx) must not be logged
+      // as 'rejected': the order may be live, and a caller that trusts a definite
+      // 'rejected' retries and can double-submit. The classifier reads the
+      // BrokerError codes and raw CCXT error classes the brokers actually throw.
+      classifyOperationError: classifyOperationFailure,
       executeOperation: guardedDispatcher,
       getGitState: this._getState,
       onCommit: options.onCommit,
@@ -571,7 +583,7 @@ export class UnifiedTradingAccount {
    */
   private async _assertCloseQuantityWithinPosition(contract: Contract, quantity: Decimal): Promise<void> {
     if (!quantity.isFinite() || quantity.lte(0)) {
-      throw new Error('closePosition: qty must be a positive finite number.')
+      throw new LocalOperationRefusalError('closePosition: qty must be a positive finite number.')
     }
 
     const nativeKey = this.broker.getNativeKey(contract)
@@ -582,12 +594,12 @@ export class UnifiedTradingAccount {
     const label = contract.symbol || contract.localSymbol || nativeKey
 
     if (!position) {
-      throw new Error(`closePosition: no open position found for ${label}. Refresh positions before retrying.`)
+      throw new LocalOperationRefusalError(`closePosition: no open position found for ${label}. Refresh positions before retrying.`)
     }
 
     const available = position.quantity.abs()
     if (quantity.gt(available)) {
-      throw new Error(
+      throw new LocalOperationRefusalError(
         `closePosition: quantity ${quantity.toString()} exceeds the open ${label} position size ${available.toString()}. ` +
         `Use a quantity no greater than ${available.toString()}, or omit qty to close the full position.`,
       )

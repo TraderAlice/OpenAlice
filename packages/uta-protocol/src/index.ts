@@ -20,3 +20,4 @@ export * from './brokers/presets.js'
 export * from './brokers/search-rules.js'
 
 export * from './broker-research.js'
+export * from './contract-pairing.js'

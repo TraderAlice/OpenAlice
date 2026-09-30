@@ -55,7 +55,12 @@ export type Operation =
 
 // ==================== Operation Result ====================
 
-export type OperationStatus = 'submitted' | 'filled' | 'rejected' | 'cancelled' | 'user-rejected'
+/** The wallet write was abandoned while the broker call was still outstanding
+ *  (write bound expired) — the order MAY have reached the exchange. Kept
+ *  distinct from 'rejected' on purpose: a rejected order definitely did not
+ *  take effect, so only an unconfirmed one must be reconciled against broker
+ *  state before any retry. */
+export type OperationStatus = 'submitted' | 'filled' | 'rejected' | 'cancelled' | 'user-rejected' | 'unconfirmed'
 
 export interface OperationResult {
   action: OperationAction
@@ -96,7 +101,20 @@ export interface GitCommit {
   message: string
   operations: Operation[]
   results: OperationResult[]
-  stateAfter: GitState
+  /** Post-execution account snapshot.
+   *
+   *  ABSENT only when the snapshot could not be read inside the wallet write
+   *  bound AND the log held no earlier state to carry forward (first write on an
+   *  account) — see `stateAfterSource`. */
+  stateAfter?: GitState
+  /** How `stateAfter` was obtained. Absent = a live post-execution snapshot.
+   *
+   *  'last-known' — the post-execution read did not settle inside the write
+   *  bound, so the previous commit's state was carried forward; it is NOT what
+   *  the account looked like after this commit. 'unavailable' — the read did not
+   *  settle and there was no earlier state to carry forward. Either way the
+   *  commit's own per-operation verdicts are real. */
+  stateAfterSource?: 'last-known' | 'unavailable'
   timestamp: string
   round?: number
 }

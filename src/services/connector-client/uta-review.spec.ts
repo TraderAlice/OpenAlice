@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
-import type { ConnectorUtaPresentation, ConnectorUtaRequest } from '@traderalice/connector-protocol'
+import type { ConnectorUtaFailure, ConnectorUtaPresentation, ConnectorUtaRequest } from '@traderalice/connector-protocol'
+import { UTAHttpError } from '@traderalice/uta-protocol'
 import { compactUtaOperation, processConnectorUtaRequests } from './uta-review.js'
 import type { UTAManagerSDK } from '../uta-client/index.js'
 import type { TradingModePolicy } from '../trading-mode.js'
@@ -195,7 +196,7 @@ describe('processConnectorUtaRequests', () => {
   it('rejects in readonly mode and refuses push', async () => {
     const push = vi.fn(async () => ({ hash: 'x', submitted: [], rejected: [] }))
     const reject = vi.fn(async () => ({ hash: 'rejhash' }))
-    const failUta = vi.fn(async () => undefined)
+    const failUta = vi.fn(async (_failure: ConnectorUtaFailure) => undefined)
     const presentUta = vi.fn(async (_presentation: ConnectorUtaPresentation) => undefined)
     const uta = account({ push, reject })
     await processConnectorUtaRequests({
@@ -233,7 +234,7 @@ describe('processConnectorUtaRequests', () => {
 
   it('does not execute after the request has expired', async () => {
     const push = vi.fn()
-    const failUta = vi.fn(async () => undefined)
+    const failUta = vi.fn(async (_failure: ConnectorUtaFailure) => undefined)
     await processConnectorUtaRequests({
       isEnabled: async () => true,
       drainUtaActions: async () => [request({
@@ -254,7 +255,7 @@ describe('processConnectorUtaRequests', () => {
 
   it('does not push when the reviewed hash is missing', async () => {
     const push = vi.fn()
-    const failUta = vi.fn(async () => undefined)
+    const failUta = vi.fn(async (_failure: ConnectorUtaFailure) => undefined)
     await processConnectorUtaRequests({
       isEnabled: async () => true,
       drainUtaActions: async () => [request({
@@ -310,7 +311,7 @@ describe('processConnectorUtaRequests', () => {
     const conflict = Object.assign(new Error('Pending commit changed'), { code: 'PENDING_HASH_CONFLICT' })
     const push = vi.fn(async () => { throw conflict })
     const reject = vi.fn(async () => { throw conflict })
-    const failUta = vi.fn(async () => undefined)
+    const failUta = vi.fn(async (_failure: ConnectorUtaFailure) => undefined)
     const uta = account({ push, reject })
     await processConnectorUtaRequests({
       isEnabled: async () => true,
@@ -344,4 +345,152 @@ describe('processConnectorUtaRequests', () => {
     expect(reject).toHaveBeenCalled()
     expect(failUta).toHaveBeenLastCalledWith(expect.objectContaining({ reason: 'conflict' }))
   })
+
+  it('reports an indeterminate write as a reconcile notice, never as a retryable failure', async () => {
+    // The push route answers 504 + WRITE_OUTCOME_UNCONFIRMED when the wallet write
+    // was abandoned while the broker call was still outstanding: the order MAY be
+    // live. Nothing here may read as "push again", and nothing as "it went through".
+    const indeterminate = new UTAHttpError(504, {
+      error: 'Wallet write abc12345 did not confirm: 1 operation(s) did not settle within the 90000ms write bound — outcome indeterminate, reconcile against broker state',
+      code: 'WRITE_OUTCOME_UNCONFIRMED',
+      hash: 'abc12345',
+      unconfirmed: [{ action: 'placeOrder', success: false, status: 'unconfirmed' }],
+    }, 'Wallet write abc12345 did not confirm')
+    const push = vi.fn(async () => { throw indeterminate })
+    const failUta = vi.fn(async (_failure: ConnectorUtaFailure) => undefined)
+    const presentUta = vi.fn(async (_presentation: ConnectorUtaPresentation) => undefined)
+    const ackUtaActions = vi.fn(async () => undefined)
+    const releaseUtaActions = vi.fn(async () => undefined)
+    await processConnectorUtaRequests({
+      isEnabled: async () => true,
+      drainUtaActions: async () => [],
+      claimUtaActions: async () => ({
+        claimId: 'claim-uta',
+        items: [request({ action: 'push', utaId: 'alpaca-paper', pendingHash: 'abc12345' })],
+      }),
+      ackUtaActions,
+      releaseUtaActions,
+      presentUta,
+      failUta,
+      warn: vi.fn(),
+      utaManager: manager([account({ push })]),
+      tradingModePolicy: () => PRO,
+    })
+    expect(push).toHaveBeenCalledWith('abc12345')
+    const failure = failUta.mock.calls[0]?.[0]
+    expect(failure?.message).toContain('MAY be live')
+    expect(failure?.message).toContain('abc12345')
+    expect(failure?.message).toContain('Reconcile against broker state')
+    expect(failure?.message).not.toMatch(/Send \/uta again/)
+    // 'unavailable' (the venue never answered the write) because the connector's
+    // reason vocabulary has no 'unconfirmed' member and the retry-inviting texts
+    // ('conflict' → "Send /uta again", 'delivery_failed') are exactly what this
+    // outcome must not be reported as; the message above carries the meaning.
+    expect(failure?.reason).toBe('unavailable')
+    // Never a push: the venue acceptance was never seen.
+    expect(presentUta).not.toHaveBeenCalled()
+    // Terminal: the owner gets one honest notice, not a redelivery loop.
+    expect(ackUtaActions).toHaveBeenCalledWith('claim-uta', ['uta-1'])
+    expect(releaseUtaActions).not.toHaveBeenCalled()
+  })
+
+  it('keeps a bare 504 without the route code an ordinary failure', async () => {
+    // Only the push route's own code claims an indeterminate write. A plain
+    // gateway timeout says nothing about whether the order landed, so it must not
+    // be promoted to "may be live" — that would teach the owner to distrust
+    // every slow network.
+    const gateway = new UTAHttpError(504, { error: 'upstream timeout' }, 'upstream timeout')
+    const failUta = vi.fn(async (_failure: ConnectorUtaFailure) => undefined)
+    const push = vi.fn(async () => { throw gateway })
+    await processConnectorUtaRequests({
+      isEnabled: async () => true,
+      drainUtaActions: async () => [request({ action: 'push', utaId: 'alpaca-paper', pendingHash: 'abc12345' })],
+      presentUta: async () => undefined,
+      failUta,
+      warn: vi.fn(),
+      utaManager: manager([account({ push })]),
+      tradingModePolicy: () => PRO,
+    })
+    expect(failUta).toHaveBeenCalledWith(expect.objectContaining({ reason: 'delivery_failed' }))
+  })
+  it('renders a retried approval of an indeterminate write as the reconcile notice, never as "nothing is waiting"', async () => {
+    // The retry arrives after the write ended indeterminate, so the pending commit
+    // is gone BY DESIGN and `status()` shows nothing waiting — the approval's hash
+    // is all the connector has left of it. That hash has to reach the route, which
+    // re-states the verdict: the order MAY be live, and this notice is the only
+    // thing standing between the owner and a second submission.
+    const indeterminate = new UTAHttpError(504, {
+      error: 'Wallet write abc12345 did not confirm: 1 operation(s) did not settle — outcome indeterminate, reconcile against broker state',
+      code: 'WRITE_OUTCOME_UNCONFIRMED',
+      hash: 'abc12345',
+      unconfirmed: [{ action: 'placeOrder', success: false, status: 'unconfirmed' }],
+    }, 'Wallet write abc12345 did not confirm')
+    const push = vi.fn(async () => { throw indeterminate })
+    const failUta = vi.fn(async (_failure: ConnectorUtaFailure) => undefined)
+    const presentUta = vi.fn(async (_presentation: ConnectorUtaPresentation) => undefined)
+    const ackUtaActions = vi.fn(async () => undefined)
+    const releaseUtaActions = vi.fn(async () => undefined)
+    await processConnectorUtaRequests({
+      isEnabled: async () => true,
+      drainUtaActions: async () => [],
+      claimUtaActions: async () => ({
+        claimId: 'claim-uta',
+        items: [request({ action: 'push', utaId: 'alpaca-paper', pendingHash: 'abc12345' })],
+      }),
+      ackUtaActions,
+      releaseUtaActions,
+      presentUta,
+      failUta,
+      warn: vi.fn(),
+      utaManager: manager([account({
+        status: { staged: [], pendingMessage: null, pendingHash: null },
+        push,
+      })]),
+      tradingModePolicy: () => PRO,
+    })
+    // The approval's own hash is what tells the route which write this is.
+    expect(push).toHaveBeenCalledWith('abc12345')
+    const failure = failUta.mock.calls[0]?.[0]
+    expect(failure?.reason).toBe('unavailable')
+    expect(failure?.message).toContain('MAY be live')
+    expect(failure?.message).toContain('abc12345')
+    expect(failure?.message).toContain('Reconcile against broker state')
+    // The defect this pins: an indeterminate write rendered as "Nothing is waiting
+    // for approval on that account."
+    expect(presentUta).not.toHaveBeenCalled()
+    expect(failure?.message).not.toContain('Nothing is waiting')
+    // Terminal: one honest notice, not a redelivery loop.
+    expect(ackUtaActions).toHaveBeenCalledWith('claim-uta', ['uta-1'])
+    expect(releaseUtaActions).not.toHaveBeenCalled()
+  })
+
+  it('lets the indeterminate retry win over an unrelated newly staged batch', async () => {
+    // A fresh uncommitted batch can sit next to a write whose outcome is unknown.
+    // Its size is not what the owner is being asked to approve here, so it must not
+    // replace the reconcile notice with the "approve it in OpenAlice" refusal.
+    const indeterminate = new UTAHttpError(504, {
+      error: 'Wallet write abc12345 did not confirm',
+      code: 'WRITE_OUTCOME_UNCONFIRMED',
+      hash: 'abc12345',
+    }, 'Wallet write abc12345 did not confirm')
+    const push = vi.fn(async () => { throw indeterminate })
+    const failUta = vi.fn(async (_failure: ConnectorUtaFailure) => undefined)
+    const presentUta = vi.fn(async (_presentation: ConnectorUtaPresentation) => undefined)
+    await processConnectorUtaRequests({
+      isEnabled: async () => true,
+      drainUtaActions: async () => [request({ action: 'push', utaId: 'alpaca-paper', pendingHash: 'abc12345' })],
+      presentUta,
+      failUta,
+      warn: vi.fn(),
+      utaManager: manager([account({
+        status: { staged: Array.from({ length: 9 }, () => ({ action: 'placeOrder' })), pendingMessage: null, pendingHash: null },
+        push,
+      })]),
+      tradingModePolicy: () => PRO,
+    })
+    expect(push).toHaveBeenCalledWith('abc12345')
+    expect(presentUta).not.toHaveBeenCalled()
+    expect(failUta.mock.calls[0]?.[0]?.message).toContain('MAY be live')
+  })
+
 })

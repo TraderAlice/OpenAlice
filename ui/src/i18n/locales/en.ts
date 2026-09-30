@@ -2709,6 +2709,7 @@ export const en = {
       rejected: 'rejected',
       userRejected: 'user rejected',
       cancelled: 'cancelled',
+      unconfirmed: 'unconfirmed — reconcile',
     },
   },
   news: {
