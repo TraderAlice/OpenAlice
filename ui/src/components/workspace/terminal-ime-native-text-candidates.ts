@@ -79,6 +79,10 @@ function isSyntheticUnicodeTextKey(event: ImeNativeTextKeyEvent): boolean {
   return isSinglePrintableTextKey(event.key)
 }
 
+function isImeProcessedKeydown(event: ImeNativeTextKeyEvent): boolean {
+  return (event.keyCode ?? event.which) === 229
+}
+
 export function isImeNativeTextKeydownCandidate(
   event: ImeNativeTextKeyEvent,
   compositionActive: boolean,
@@ -88,6 +92,16 @@ export function isImeNativeTextKeydownCandidate(
   if (event.type !== 'keydown') return false
   if (event.ctrlKey || event.altKey || event.metaKey) return false
   if (event.isComposing === true || compositionActive) return false
+  // keyCode 229 marks a keydown the IME owns (macOS Chromium keeps the real
+  // character in `key` while an IME is active, even in its ASCII mode).
+  // xterm routes every 229 keydown through CompositionHelper's textarea-diff
+  // path, which batches pending inserts behind one 0ms timer over the shared
+  // helper textarea. Claiming such keys here makes the forwarder clear that
+  // textarea mid-window, so the pending diff loses fast-typed letters and can
+  // even emit a spurious DEL that swallows the just-forwarded character.
+  // The 229 path already forwards IME-produced text (including full-width
+  // punctuation) byte-faithfully, so the claim is only for non-IME keydowns.
+  if (isImeProcessedKeydown(event)) return false
   if (isSyntheticUnicodeTextKey(event)) return true
   if (isCjkDirectPunctuationKey(event.key)) return true
   if (inputSourceFeatures.forwardAsciiPunctuation && isAsciiPunctuationKey(event.key)) return true
