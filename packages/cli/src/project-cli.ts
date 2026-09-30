@@ -26,12 +26,12 @@ export async function runProjectCli(argv: string[]): Promise<number> {
   const explicit = project !== undefined || home !== undefined
   if (explicit) {
     for (const key of Object.keys(env)) {
-      if (key.startsWith('OPENALICE_PROJECT_') || ['OPENALICE_PROJECT', 'OPENALICE_INSTANCE', 'OPENALICE_HOME', 'AQ_WS_ID', 'AQ_RUN_ID', 'AQ_SESSION_ID', 'OPENALICE_TOOL_URL', 'OPENALICE_TOOL_SOCKET', 'OPENALICE_MCP_URL'].includes(key)) delete env[key]
+      if (key.startsWith('OPENALICE_PROJECT_') || ['OPENALICE_PROJECT', 'OPENALICE_INSTANCE', 'OPENALICE_HOME', 'AQ_WS_ID', 'AQ_RUN_ID', 'AQ_SESSION_ID', 'OPENALICE_TOOL_URL', 'OPENALICE_TOOL_SOCKET', 'OPENALICE_TOOL_TOKEN', 'OPENALICE_MCP_URL'].includes(key)) delete env[key]
     }
   }
   const context = await resolveStoredLaunchContext({ ...(project ? { project } : {}), ...(home ? { home } : {}) }, { env })
   const endpointPath = join(context.home, 'state', 'cli-endpoint.json')
-  let endpoint: { schemaVersion?: number; projectId?: string; home?: string; appRoot?: string; url?: string; socket?: string }
+  let endpoint: { schemaVersion?: number; projectId?: string; home?: string; appRoot?: string; url?: string; socket?: string; token?: string }
   try { endpoint = JSON.parse(await readFile(endpointPath, 'utf8')) }
   catch { throw new Error(`No CLI endpoint in ${context.home}. Start or restart this Project with the updated OpenAlice Runtime.`) }
   if (endpoint.schemaVersion !== 1 || endpoint.projectId !== context.aliceProject.id || !endpoint.home || resolve(endpoint.home) !== resolve(context.home)) throw new Error('Project CLI endpoint identity does not match the selected Project')
@@ -43,6 +43,7 @@ export async function runProjectCli(argv: string[]): Promise<number> {
   env.OPENALICE_PROJECT_ID = context.aliceProject.id
   env.OPENALICE_HOME = context.home
   env.OPENALICE_TOOL_URL = endpoint.socket ? '/cli' : endpoint.url
+  if (endpoint.token) env.OPENALICE_TOOL_TOKEN = endpoint.token
   delete env.OPENALICE_TOOL_SOCKET
   if (endpoint.socket) env.OPENALICE_TOOL_SOCKET = endpoint.socket
   env.OPENALICE_CLI_BIN = binary

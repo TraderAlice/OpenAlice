@@ -9,6 +9,7 @@
  * port.
  */
 
+import { randomBytes, timingSafeEqual } from 'node:crypto'
 import { Hono } from 'hono'
 import { cors } from 'hono/cors'
 import { serve } from '@hono/node-server'
@@ -26,6 +27,23 @@ export interface LocalToolGatewayDeps {
   readonly inboxStore: IInboxStore
   readonly entityStore: IEntityStore
   readonly getWorkspaceService: () => WorkspaceService | null
+}
+
+export function ensureToolToken(): void {
+  if (!process.env['OPENALICE_TOOL_TOKEN']) process.env['OPENALICE_TOOL_TOKEN'] = randomBytes(32).toString('base64url')
+}
+
+/** Spawn-injected bearer. Absent on /api; the web session stays on its own gate. */
+export function useToolToken(app: Hono): void {
+  app.use('*', async (c, next) => {
+    const path = c.req.path
+    if (path !== '/mcp' && !path.startsWith('/mcp/') && !path.startsWith('/cli/')) return next()
+    const token = process.env['OPENALICE_TOOL_TOKEN'] ?? ''
+    const got = Buffer.from(c.req.header('authorization') ?? '')
+    const expected = Buffer.from(`Bearer ${token}`)
+    if (token && got.length === expected.length && timingSafeEqual(got, expected)) return next()
+    return c.json({ error: 'unauthorized' }, 401)
+  })
 }
 
 export function mountLocalToolGateway(app: Hono, deps: LocalToolGatewayDeps): void {
@@ -48,6 +66,7 @@ export class LocalToolGatewayPlugin implements Plugin {
       allowMethods: ['GET', 'POST', 'OPTIONS'],
       allowHeaders: ['Content-Type', 'x-openalice-run', 'x-openalice-session'],
     }))
+    useToolToken(app)
     mountLocalToolGateway(app, this.deps)
     this.server = serve({ fetch: app.fetch, port: this.port, hostname: '127.0.0.1' }, (info) => {
       console.log(`local tool gateway listening on http://127.0.0.1:${info.port}/cli`)
