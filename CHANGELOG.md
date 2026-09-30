@@ -4,6 +4,10 @@ All notable changes to OpenAlice will be documented in this file.
 
 ## [Unreleased]
 
+- Add an opt-in Windows source-run script for Alice/Vite in forced lite mode;
+  status is the safe default, and scheduled-task takeover remains explicit.
+
+
 ### 🏗️ Architecture — UTA-split v1
 
 Split the trading domain into a dedicated UTA service co-located with

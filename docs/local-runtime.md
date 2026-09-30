@@ -66,6 +66,33 @@ An explicit `--app-dir`, AliceProject source setting, or
 startup does not clone source, install dependencies, or reconstruct a
 repository-shaped Runtime.
 
+### Windows source-run, lite mode
+
+`scripts/windows-source-dev.ps1` runs Alice and Vite from a checkout without
+Guardian or UTA. It forces both `OPENALICE_LITE_MODE=1` and
+`OPENALICE_TRADING_MODE=lite`, regardless of inherited Pro settings: trading
+carrier calls are unavailable, but Alice can still write ordinary local state.
+Its default `Status` mode makes no scheduled-task change. The default data
+home is `<checkout>/.openalice-source-dev/data`; pass `-DataHome` to use a
+different isolated state directory.
+
+```powershell
+./scripts/windows-source-dev.ps1 -Mode Prepare
+./scripts/windows-source-dev.ps1 -Mode Run
+./scripts/windows-source-dev.ps1 -Mode Status
+```
+
+`Prepare` installs locked dependencies and builds server outputs as needed.
+`Run` stays in the foreground and stops its Alice/Vite children on exit.
+The explicit `-Mode Switch` replaces the named Windows Scheduled Task after
+holding its prior definition in memory for this invocation, stops source
+processes in this checkout, probes Alice/Vite, and attempts to restore the old
+task on failure. Do not use `Switch` to replace a running
+installation unless that takeover and its task name are intended. This
+script does not prove UTA health or support trading writes. For the full
+Guardian-managed development stack, use `pnpm dev` instead.
+
+
 ## Agent Runtime boundary
 
 Pi, OpenCode, Codex, Claude Code, and other native Agent CLIs are external
