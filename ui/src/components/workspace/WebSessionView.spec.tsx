@@ -221,16 +221,16 @@ describe('WebSessionView compaction state', () => {
       />,
     )
 
-    const status = await screen.findByRole('status')
-    expect(status.textContent).toContain('Compacting conversation context')
-    expect(status.textContent).toContain('summarizing older history')
+    await screen.findByText('Compacting conversation context')
+    const status = screen.getByText('Compacting conversation context').closest('[role="status"]')
+    expect(status?.textContent).toContain('summarizing older history')
     expect(screen.getByText('compacting')).toBeTruthy()
     expect(screen.getByRole('button', { name: 'Stop Pi' })).toBeTruthy()
     expect(screen.queryByRole('button', { name: 'Send message' })).toBeNull()
 
     fireEvent.click(screen.getByRole('button', { name: 'Stop Pi' }))
     await waitFor(() => expect(mocks.abortWebSession).toHaveBeenCalledWith('workspace-manager', 'p1'))
-    expect(screen.queryByRole('status')).toBeNull()
+    expect(screen.queryByText('Compacting conversation context')).toBeNull()
     expect(screen.getByRole('button', { name: 'Send message' })).toBeTruthy()
   })
 })

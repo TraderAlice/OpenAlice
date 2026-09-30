@@ -1,9 +1,11 @@
 ---
 name: market-data
 description: >
-  Use for price history, OHLCV/K-lines, market-data source discovery, or showing
-  a candlestick chart in a conversation. Fetch data for local analysis or share
-  a chart using OpenAlice market references.
+  Use for price history, OHLCV/K-lines, market-data source discovery, China
+  A-share index/name bars, or showing a candlestick chart in a conversation.
+  Fetch data for local analysis or share a chart using OpenAlice market
+  references. Pair with the `traderhub` market-brief workflow when covering
+  A-share tape alongside macro boards.
 ---
 
 # Market data and charts
@@ -29,6 +31,32 @@ JavaScript or shell analysis; omit `--output` for stdout. Existing output files
 are not overwritten. `alice market bars --help` lists window options and an
 explicit `--asset-class` hint for vendor lookups that cannot resolve the class.
 The `alice-analysis` skill covers optional formula and snapshot shortcuts.
+
+### China A-shares (indexes and names)
+
+For **daily market briefs**, prefer compiler endpoints (CSI / CNI) documented in
+the `traderhub` skill `references/brief-evidence-stack.md` — they carry official
+change %. Use `alice market` bars as **fallback or ETF/name tape**, not as a
+silent override of CSI/CNI.
+
+When using bars, discover then copy the exact `barId` (do not hard-code a vendor
+if search returns another live source). Always request **enough history** to
+compute change % (`--count` ≥ 5, usually 20):
+
+```bash
+alice market search-bars --query "000001.SS"    # SSE Composite (Yahoo-style)
+alice market search-bars --query "000300.SS"    # CSI 300
+alice market search-bars --query 沪深300
+alice market search-bars --query 600519         # example single name
+alice market vendors                            # eastmoney / yfinance must be on
+alice market bars --bar-id '<from-search>' --interval 1d --count 20
+```
+
+Prefer an enabled Eastmoney or Yahoo equity source for CN bar history when
+CSI/CNI is unreachable. Realtime Level-1 on the Market page may use the keyless
+Tencent quote path — watching latency, not exchange matching. Sector money-flow
+and limit-up lists are **not** in this CLI; see `traderhub` market-brief +
+evidence stack for exchange day-end disclosure vs optional Tushare gaps.
 
 Check the returned coverage and freshness metadata, especially the earliest
 and latest records, fetch time and possible delay. The age of the last bar is

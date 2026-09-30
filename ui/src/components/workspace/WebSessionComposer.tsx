@@ -13,7 +13,9 @@ export function WebSessionComposer(props: {
 }) {
   const busy = props.busy || !!props.composer.pending
   const model = useWebSessionModelConfig({ ...props, busy })
-  useEffect(() => { props.onReadyChange(!model.dirty && !model.error) }, [model.dirty, model.error, props.onReadyChange])
+  // Dirty model config must not disable the textarea — only block send until
+  // auto-reconfigure finishes. Errors still mark the composer not-ready.
+  useEffect(() => { props.onReadyChange(!model.error) }, [model.error, props.onReadyChange])
   const openOrFocus = useWorkspace(state => state.openOrFocus)
   return <AgentChatComposer {...props.composer} config={model.config} configurationDisabled={busy}
     canSend={props.composer.canSend && !model.dirty && !model.error}

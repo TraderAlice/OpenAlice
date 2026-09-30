@@ -9,6 +9,7 @@ import {
   promptWebSession,
   respondWebSession,
   revealEarlierWebHistory,
+  type WebConversationMessage,
   type WebSessionPhase,
   type WebSessionSnapshot,
 } from './api'
@@ -23,10 +24,29 @@ const IDLE_POLL_MS = 1500
 /** Hidden warm frames still catch up, but far less often than a visible desk. */
 const HIDDEN_POLL_MS = 15_000
 
+/** True when the projected transcript already ends with this user text. */
+export function transcriptHasTrailingUser(messages: readonly WebConversationMessage[], text: string): boolean {
+  const needle = text.trim()
+  if (!needle) return false
+  for (let i = messages.length - 1; i >= 0; i--) {
+    const msg = messages[i]
+    if (!msg || msg.role !== 'user') continue
+    const body = typeof msg.content === 'string'
+      ? msg.content
+      : msg.content.filter((part) => part.type === 'text').map((part) => part.text).join('')
+    return body.trim() === needle
+  }
+  return false
+}
+
 /**
  * Live view of one Web conversation. Polls faster while the runtime works and
  * only accepts monotonically newer revisions so a late response from a
  * previous poll can never roll the transcript back.
+ *
+ * Prompt/stop/respond mutations are authoritative for the current generation:
+ * they must not be dropped by a poll that raced ahead on revision, or the
+ * composer clears the draft while the bubble never appears.
  *
  * One mounted identity; WebSessionView keys this hook's owner by workspace/session.
  * Remounts hydrate from a small in-memory snapshot cache so Trading → Session
@@ -43,33 +63,51 @@ export function useWebConversation(
     () => readWebSessionCache(wsId, sessionId),
   )
   const [error, setError] = useState<string | null>(null)
+  const [pendingUser, setPendingUser] = useState<string | null>(null)
   const current = useRef<WebSessionSnapshot | null>(snapshot)
   const alive = useRef(false)
   const generation = useRef(0)
   const restarting = useRef(false)
+  const prompting = useRef(false)
   const visibleRef = useRef(visible)
   const wasVisibleRef = useRef(visible)
   visibleRef.current = visible
   const [reconfiguring, setReconfiguring] = useState(false)
   useEffect(() => { if (snapshot) clearLaunchPreview(wsId, sessionId) }, [snapshot, wsId, sessionId])
   useEffect(() => () => clearLaunchPreview(wsId, sessionId), [wsId, sessionId])
-  const accept = useCallback((next: WebSessionSnapshot) => {
-    if (!alive.current || (current.current && next.revision < current.current.revision)) return
+
+  /** Poll / background refresh: never apply an older revision. */
+  const acceptPoll = useCallback((next: WebSessionSnapshot) => {
+    if (!alive.current || (current.current && next.revision < current.current.revision)) return false
     current.current = next
     writeWebSessionCache(wsId, sessionId, next)
     setSnapshot(next)
     setError(next.error)
+    return true
   }, [wsId, sessionId])
+
+  /** User/runtime mutations for this generation: always apply when the epoch matches. */
+  const acceptMutation = useCallback((next: WebSessionSnapshot, epoch: number) => {
+    if (!alive.current || epoch !== generation.current) return false
+    current.current = next
+    writeWebSessionCache(wsId, sessionId, next)
+    setSnapshot(next)
+    setError(next.error)
+    return true
+  }, [wsId, sessionId])
+
   const refresh = useCallback(async () => {
-    if (readOnly || restarting.current) return
+    if (readOnly || restarting.current || prompting.current) return
     const epoch = generation.current
     try {
       const next = await getWebSession(wsId, sessionId, current.current?.revision)
-      if (epoch !== generation.current) return
-      if (next) accept(next)
+      if (epoch !== generation.current || prompting.current) return
+      if (next) acceptPoll(next)
       else if (alive.current) setError(current.current?.error ?? null)
-    } catch (error) { if (alive.current && epoch === generation.current) setError(error instanceof Error ? error.message : String(error)) }
-  }, [accept, wsId, sessionId, readOnly])
+    } catch (error) {
+      if (alive.current && epoch === generation.current) setError(error instanceof Error ? error.message : String(error))
+    }
+  }, [acceptPoll, wsId, sessionId, readOnly])
   useEffect(() => {
     alive.current = true
     let cancelled = false
@@ -80,7 +118,7 @@ export function useWebConversation(
       const phase = current.current?.phase
       const delay = !visibleRef.current
         ? HIDDEN_POLL_MS
-        : isBusy(phase) ? ACTIVE_POLL_MS : IDLE_POLL_MS
+        : isBusy(phase) || prompting.current ? ACTIVE_POLL_MS : IDLE_POLL_MS
       timer = window.setTimeout(() => void poll(), delay)
     }
     void poll()
@@ -112,7 +150,9 @@ export function useWebConversation(
     }
   }, [visible, readOnly, refresh])
   const reconfigure = useCallback(async (runtime: PausedSessionRuntimeUpdate) => {
-    if (restarting.current || isBusy(current.current?.phase)) throw new Error('Wait for the current response to finish')
+    if (restarting.current || prompting.current || isBusy(current.current?.phase)) {
+      throw new Error('Wait for the current response to finish')
+    }
     restarting.current = true
     generation.current += 1
     setReconfiguring(true)
@@ -120,40 +160,94 @@ export function useWebConversation(
       const next = await openWebSession(wsId, sessionId, runtime)
       // A new process owns a new revision sequence. Keep rendered history until it is ready.
       current.current = null
-      accept(next)
+      acceptMutation(next, generation.current)
     } finally {
       restarting.current = false
       if (alive.current) setReconfiguring(false)
     }
-  }, [accept, wsId, sessionId])
+  }, [acceptMutation, wsId, sessionId])
   const [historyBusy, setHistoryBusy] = useState(false)
-  const items = useMemo(() => presentWebTranscript(snapshot ? [...snapshot.messages, ...(snapshot.streamingMessage ? [snapshot.streamingMessage] : [])] : []), [snapshot])
+  const items = useMemo(() => {
+    const messages = snapshot
+      ? [...snapshot.messages, ...(snapshot.streamingMessage ? [snapshot.streamingMessage] : [])]
+      : []
+    const projected = presentWebTranscript(messages)
+    if (!snapshot && launchPrompt) {
+      return [{ kind: 'user', key: 'launch-preview', content: [{ kind: 'markdown', text: launchPrompt }] }] as ConversationItem[]
+    }
+    if (pendingUser && snapshot && !transcriptHasTrailingUser(snapshot.messages, pendingUser)) {
+      return [
+        ...projected,
+        {
+          kind: 'user' as const,
+          key: 'optimistic-user',
+          content: [{ kind: 'markdown' as const, text: pendingUser }],
+        },
+      ]
+    }
+    return projected
+  }, [snapshot, launchPrompt, pendingUser])
   const loadEarlier = useCallback(async () => {
     if (readOnly || historyBusy || !snapshot?.historyHiddenCount) return
     setHistoryBusy(true)
     try {
-      accept(await revealEarlierWebHistory(wsId, sessionId))
+      const epoch = generation.current
+      acceptMutation(await revealEarlierWebHistory(wsId, sessionId), epoch)
     } finally {
       if (alive.current) setHistoryBusy(false)
     }
-  }, [accept, historyBusy, readOnly, sessionId, snapshot?.historyHiddenCount, wsId])
+  }, [acceptMutation, historyBusy, readOnly, sessionId, snapshot?.historyHiddenCount, wsId])
+
+  const send = useCallback(async (message: string) => {
+    const text = message.trim()
+    if (!text) return
+    if (restarting.current) throw new Error('Session configuration is changing; try again shortly')
+    if (prompting.current || isBusy(current.current?.phase)) {
+      throw new Error('Wait for the current response to finish')
+    }
+    const epoch = generation.current
+    prompting.current = true
+    setPendingUser(text)
+    setError(null)
+    try {
+      const next = await promptWebSession(wsId, sessionId, text)
+      if (epoch !== generation.current) {
+        throw new Error('Session configuration changed while sending; please resend')
+      }
+      if (!acceptMutation(next, epoch)) {
+        throw new Error('Could not apply the sent message; please resend')
+      }
+    } finally {
+      prompting.current = false
+      if (alive.current) setPendingUser(null)
+    }
+  }, [acceptMutation, wsId, sessionId])
+
+  const stop = useCallback(async () => {
+    const epoch = generation.current
+    acceptMutation(await abortWebSession(wsId, sessionId), epoch)
+  }, [acceptMutation, wsId, sessionId])
+
+  const respond = useCallback(async (requestId: string, optionId: string, text?: string) => {
+    const epoch = generation.current
+    acceptMutation(await respondWebSession(wsId, sessionId, requestId, optionId, text), epoch)
+  }, [acceptMutation, wsId, sessionId])
+
   return {
     snapshot,
     error,
     reconfiguring,
     reconfigure,
-    items: !snapshot && launchPrompt ? [{ kind: 'user', key: 'launch-preview', content: [{ kind: 'markdown', text: launchPrompt }] }] as ConversationItem[] : items,
-    busy: isBusy(snapshot?.phase),
+    items,
+    busy: isBusy(snapshot?.phase) || !!pendingUser,
     historyBusy,
     historyHiddenCount: snapshot?.historyHiddenCount ?? 0,
     loadEarlier,
     requests: snapshot?.requests ?? [],
     refresh,
-    send: async (message: string) => { accept(await promptWebSession(wsId, sessionId, message)) },
-    stop: async () => { accept(await abortWebSession(wsId, sessionId)) },
-    respond: async (requestId: string, optionId: string, text?: string) => {
-      accept(await respondWebSession(wsId, sessionId, requestId, optionId, text))
-    },
+    send,
+    stop,
+    respond,
   }
 }
 

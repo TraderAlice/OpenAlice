@@ -129,6 +129,7 @@ describe('chat workspace create: bootstrap → inject → commit', () => {
     // injected files all present
     for (const rel of [
       'CLAUDE.md', 'AGENTS.md', 'README.md',
+      '.alice/focus-markets.json',
       '.claude/skills/scan-value-chain/SKILL.md',
       '.agents/skills/scan-value-chain/SKILL.md',
       '.claude/skills/delegate-autoquant/SKILL.md',
@@ -143,6 +144,11 @@ describe('chat workspace create: bootstrap → inject → commit', () => {
     ]) {
       expect(existsSync(join(dir, rel)), rel).toBe(true);
     }
+
+    expect(JSON.parse(await readFile(join(dir, '.alice/focus-markets.json'), 'utf8'))).toEqual({
+      version: 1,
+      markets: ['cn-ashare', 'us-equity', 'hk-equity', 'macro'],
+    });
 
     // CLI-only injection: no MCP files are written at all
     expect(existsSync(join(dir, '.mcp.json'))).toBe(false);

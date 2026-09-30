@@ -52,7 +52,7 @@ describe('shortenSessionChromeTitle', () => {
 
   it('shortens macro / QMT / broker / US-fundamental prompts', () => {
     expect(shortenSessionChromeTitle(
-      '阅读今天的宏观背景、板块轮动和异常异动，给出最值得关注的三个跨资产信号，标明每项数据的截至时间，并把事实证据和你的判断分开。',
+      '先读取本 Workspace（或 Settings）里客户勾选的关注市场；若未配置，默认覆盖大A、美股、港股与主要宏观资产。阅读今天的宏观背景、板块轮动和异常异动——大A必看（指数、板块/资金流与异动），并覆盖上述自选市场。给出最值得关注的三个跨资产信号，标明每项数据的截至时间，并把事实证据和你的判断分开；缺数时说明缺口，不要编造。',
     )).toBe('今日宏观 · 跨资产')
     expect(shortenSessionChromeTitle(
       '我想做一个实时的据接口, 数据提供来自华安证券的QMT，你给我些实现的方法和建议吧',

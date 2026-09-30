@@ -6,12 +6,18 @@ description: >
   term structure, sector rotation), equity fundamentals (profile, financials,
   ratios, estimates, insiders, short interest), ETF drilldowns, FRED/BLS/EIA
   macro series, OECD cross-country indicators, IMF PortWatch shipping, and
-  Deribit crypto curves. Use whenever you need a macro number, a fundamental,
-  a calendar, or a ready-made board: "what's CPI", "AAPL ratios", "earnings
-  this week", "which sectors are rotating in", "Suez canal traffic", "Fed
-  balance sheet". Data is served hub-first (hosted TraderHub) with local
-  fallback — no API keys needed. Discover flags live with
-  `traderhub <group> <verb> --help`; do NOT guess flags.
+  Deribit crypto curves. Also owns the daily cross-asset / market-brief
+  workflow (今日宏观、跨资产、focus markets, A-shares + selected markets) with
+  a compiler-first evidence stack (CSI/CNI, NBS, FRED/OECD; exchange day-end
+  connect disclosure — not scrape-first) and the `alice brief` structural
+  pipeline (facts → analysis signals/certainty → render-analysis → editorial-check).
+  Use whenever you need a macro number, a fundamental, a calendar, a
+  ready-made board, or today's three cross-asset signals: "what's CPI",
+  "AAPL ratios", "earnings this week", "which sectors are rotating in",
+  "Suez canal traffic", "Fed balance sheet", "market brief", "今日宏观".
+  Data is served hub-first (hosted TraderHub) with local fallback — no API
+  keys needed. Discover flags live with `traderhub <group> <verb> --help`;
+  do NOT guess flags.
 ---
 
 # `traderhub` — low-frequency market data
@@ -121,6 +127,86 @@ traderhub crypto options --symbol BTC               # Deribit chains (BTC/ETH/PA
 traderhub crypto futures --symbol ETH
 traderhub index search --query "S&P"                # CBOE index directory
 ```
+
+## Daily market brief (cross-asset, incl. A-shares)
+
+Use this when the user wants today's macro / sector / unusual-move signals
+across markets (Chat starter「今日宏观 · 跨资产」and equivalents).
+
+### 1. Resolve focus markets
+
+1. Read `.alice/focus-markets.json` if it exists (Workspace-owned preference).
+2. If missing, default to `cn-ashare`, `us-equity`, `hk-equity`, and `macro`.
+3. Always cover `cn-ashare` for market briefs even when the file omits it.
+4. Do **not** treat the browser watchlist or `.alice/settings.json` as focus
+   markets.
+5. Format and ids: see `references/focus-markets.md`. Offer to create
+   `.alice/focus-markets.json` from that template when the user wants a
+   durable selection.
+
+### 2. Pull evidence by market (cite each origin / as-of)
+
+Full source table and HTTP shapes: `references/brief-evidence-stack.md`.
+**Accuracy and provenance beat coverage.** Do not scrape Eastmoney/THS boards
+as primary when a compiler or agency series exists.
+
+**Tushare hard gate (every `cn-ashare` brief):**
+
+1. Hit **CSI `index-perf` + CNI daily** first (see evidence stack URLs).
+2. Do **not** open with Tushare `index_daily` / all-stock breadth as the tape.
+3. Use any Tushare verb only after it returns real data (not `40203`). On
+   无权限/限频: abandon that verb for this run, keep CSI/CNI/ETF/FRED, list the gap.
+4. Cite Tushare as `via Tushare (<api>)`, never as 中证/国证/统计局/交易所官网.
+
+| Focus id | Minimum pulls | Do not pretend |
+|---|---|---|
+| `macro` | `board get --board macro` (FRED rates/oil/dollar), `board get --board global-macro` (OECD; China row ≠ A-share tape), optional `board get --board fed`. CN PMI: **NBS** first; Tushare `cn_pmi` only if permitted. Prefer FRED `DTWEXBGS` over broken Yahoo DXY. | Invented release dates; near-month futures roll as “oil crash” |
+| `us-equity` | `board get --board movers`, `board rotation`, optional `board get --board valuation` | — |
+| `cn-ashare` | **Required:** CSI (000300 / 000905 / 000688 / …) + CNI (399001 / 399006 / …) for close **and change %**. Fallback bars: `market-data` Eastmoney/Yahoo with `count` ≥ 5. Sector proxy: industry **ETF** bars — label ETF. Optional `alice rss` if configured. | US `movers` as A-share; Tushare-first; single-candle change %; unlabeled self-computed breadth as “官方” |
+| `cn-ashare` connect / flow | **SSE/SZSE day-end** and/or HKEX Historical Daily (成交额、前十大). | `moneyflow_hsgt` as exchange official; 北向净流入 without a net-buy field |
+| `cn-ashare` optional depth | Tushare only if gated probe passes: `sw_daily`, `limit_list_*`, `daily_info`, `moneyflow_*`, `cn_pmi`. | Filling flows/limit boards from memory or ±10% heuristics labeled as official |
+| `hk-equity` | **Required when selected.** Index/tape via `market-data` (`alice market search-bars` / `bars`, e.g. HSI / `.HK` names, `count` ≥ 5). If a Longbridge UTA is connected: optional live marks via `alice-uta contract search` → `contract quote` (cite as Longbridge quote + observation time). | Longbridge historical K-lines (not exposed as bars in OpenAlice today); inventing HSI change % from one candle |
+| `fx` / `crypto` / `commodity` | Matching bars + board cells that actually cover them | Thin coverage → name the gap |
+
+### 3. Structured brief pipeline (`alice brief`)
+
+Do **not** invent bp / % / spreads in prose. Persist Analysis Layer JSON, derive
+in code, render a two-layer draft, then Editorial polish **without changing
+semantics**. Gate with `editorial-check`.
+
+```text
+alice brief assemble … --output …/facts.json
+alice brief derive … --output …/facts.derived.json
+alice brief build-analysis --asof YYYY-MM-DD \
+  --facts-json-file …/facts.derived.json \
+  --judgments-json-file …/judgments.json \
+  --data-limitations-json '["南北向资金未获得"]' \
+  --output …/analysis.json
+alice brief render-analysis --analysis-json-file …/analysis.json \
+  --output …/report.draft.md
+# Editorial Pass: rewrite presentation only — see references/editorial-style.md
+#   alice brief style   # compact rules reminder
+alice brief editorial-check --analysis-json-file …/analysis.json \
+  --edited-file …/report.md
+# publish report.md only when editorial-check ok=true
+```
+
+Legacy `alice brief render` (facts+judgments) still works; prefer
+`build-analysis` + `render-analysis` for new briefs.
+
+Rules:
+
+1. Path under `research/briefs/<asofDate>/<runId>/` — include `analysis.json`,
+   `report.draft.md`, `report.md`.
+2. CLI `--output` is write-once (`wx`); on collision bump `runId`.
+3. Prefer `assemble` / `derive` for numbers. Signal `certainty` grades:
+   fact | derived_fact | interpretation | hypothesis | forecast | data_limitation.
+4. Editorial Layer **must not upgrade certainty** or drop `data_limitations`.
+5. Two-layer reading: exec「今天最重要的三个变化」+ 详细分析.
+6. Named origin on every number. CSI/CNI over Yahoo/Eastmoney/Tushare when they disagree.
+7. Style guide: `references/editorial-style.md` + `alice brief style`.
+
+K-lines and chart references: `market-data`. Trading: `alice-uta`.
 
 ## Units — read before comparing numbers
 

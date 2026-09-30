@@ -26,6 +26,7 @@ const BASE_EXPORTS: Record<string, CliExport> = {
       rss: 'Search and read the user\'s collected subscribed-feed archive',
       market: 'Discover symbols, bar sources, and optional market-data vendors',
       analysis: 'Read dated K-lines and calculate indicators',
+      brief: 'Structure cross-asset market briefs — facts schema, derive, validate, write-once paths',
     },
     commands: {
       // `rss`, not `news`: the backing store is the RSS collector's archive —
@@ -55,6 +56,19 @@ const BASE_EXPORTS: Record<string, CliExport> = {
         quant: 'calculateQuant',
         // Dated as-of read with a freshness contract for retrospective analysis.
         snapshot: 'marketSnapshot',
+      },
+      // Structural brief pipeline (not a fetch engine). Persist with --output (wx).
+      brief: {
+        schema: 'briefSchema',
+        path: 'briefPath',
+        assemble: 'briefAssemble',
+        derive: 'briefDerive',
+        validate: 'briefValidate',
+        render: 'briefRender',
+        'build-analysis': 'briefBuildAnalysis',
+        'render-analysis': 'briefRenderAnalysis',
+        'editorial-check': 'briefEditorialCheck',
+        style: 'briefStyle',
       },
     },
   },
