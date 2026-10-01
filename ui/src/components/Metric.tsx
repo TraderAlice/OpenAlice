@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react'
+import { cn } from '../lib/utils'
 import { ArrowDownRight, ArrowUpRight, Minus } from 'lucide-react'
 
 export type MetricSize = 'sm' | 'md' | 'lg'
@@ -28,28 +29,28 @@ interface MetricProps {
  *
  * Sizes:
  *   sm — secondary metrics row (Cash, Buying Power, etc.). 16px value.
- *   md — card-level metric (UTA card NLV). 22px value.
- *   lg — page hero (UTA detail page NLV). 28→36px responsive.
+ *   md — card-level metric (UTA card NLV). 20px value.
+ *   lg — page hero (UTA detail page NLV). 28px value.
  */
 export function Metric({ label, value, delta, valueSign, size = 'md', className }: MetricProps) {
   const valueClass = (() => {
     const color = signColor(valueSign)
     switch (size) {
       case 'sm': return `text-[16px] font-semibold tabular-nums ${color}`
-      case 'lg': return `text-[28px] md:text-[36px] font-bold tabular-nums leading-tight ${color}`
+      case 'lg': return `text-[28px] font-semibold tabular-nums leading-tight ${color}`
       case 'md':
-      default:   return `text-[22px] font-bold tabular-nums ${color}`
+      default:   return `text-[20px] font-semibold tabular-nums ${color}`
     }
   })()
 
   return (
-    <div className={className}>
-      <p className="text-[11px] font-medium leading-4 text-muted-foreground">{label}</p>
-      <p className={valueClass}>{value}</p>
+    <div className={cn('min-w-0 space-y-1', className)}>
+      <p className="text-sm font-medium leading-5 text-muted-foreground">{label}</p>
+      <p className={cn('[overflow-wrap:anywhere]', valueClass)}>{value}</p>
       {delta && (
-        <p className={`mt-0.5 inline-flex items-center gap-1 text-[12px] leading-4 tabular-nums ${signColor(delta.sign)}`}>
+        <p className={`flex items-start gap-1 text-sm leading-5 tabular-nums ${signColor(delta.sign)}`}>
           <DeltaIcon sign={delta.sign} />
-          {delta.value}
+          <span className="min-w-0 [overflow-wrap:anywhere]">{delta.value}</span>
         </p>
       )}
     </div>
@@ -64,7 +65,7 @@ function signColor(sign?: MetricSign): string {
 
 function DeltaIcon({ sign }: { sign: MetricSign }) {
   const Icon = sign === 'up' ? ArrowUpRight : sign === 'down' ? ArrowDownRight : Minus
-  return <Icon aria-hidden className="size-3 shrink-0" />
+  return <Icon aria-hidden className="mt-0.5 size-4 shrink-0" />
 }
 
 /** Pick a sign from a numeric delta. `flat` for `0` (or NaN). */

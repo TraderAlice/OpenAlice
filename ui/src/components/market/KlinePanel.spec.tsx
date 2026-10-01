@@ -1,11 +1,12 @@
 // @vitest-environment jsdom
 
-import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { MemoryRouter, useLocation } from 'react-router-dom'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import type { BarsResponse } from '../../api/market'
 import { KlinePanel } from './KlinePanel'
+import { useThemeStore } from '../../theme/store'
 
 const mocks = vi.hoisted(() => ({
   bars: vi.fn(),
@@ -13,6 +14,8 @@ const mocks = vi.hoisted(() => ({
   candleSetData: vi.fn(),
   volumeSetData: vi.fn(),
   fitContent: vi.fn(),
+  semanticColor: vi.fn(),
+  createChart: vi.fn(),
 }))
 
 vi.mock('../../api/market', async (importOriginal) => {
@@ -27,25 +30,23 @@ vi.mock('../../api/market', async (importOriginal) => {
   }
 })
 
-vi.mock('../../theme/useEffectiveTheme', () => ({
-  useEffectiveTheme: () => 'light',
-  useEffectivePalette: () => 'paper',
-}))
-
 vi.mock('../../theme/semanticColors', () => ({
-  readSemanticColor: () => '#000000',
+  readSemanticColor: mocks.semanticColor,
 }))
 
 vi.mock('lightweight-charts', () => ({
   CandlestickSeries: 'CandlestickSeries',
   HistogramSeries: 'HistogramSeries',
   createChart: () => {
+    mocks.createChart()
     const timeScale = {
       applyOptions: vi.fn(),
       fitContent: mocks.fitContent,
     }
     return {
+      applyOptions: vi.fn(),
       addSeries: (series: string) => ({
+        applyOptions: vi.fn(),
         priceScale: () => ({ applyOptions: vi.fn() }),
         setData: series === 'CandlestickSeries' ? mocks.candleSetData : mocks.volumeSetData,
       }),
@@ -74,6 +75,8 @@ function response(symbol: string, barId: string): BarsResponse {
 
 beforeEach(() => {
   vi.clearAllMocks()
+  useThemeStore.setState({ theme: 'day', dayPalette: 'paper', nightPalette: 'graphite', uiStyle: 'default', stylePaletteMode: 'saved' })
+  mocks.semanticColor.mockReturnValue('#000000')
   mocks.searchSources.mockResolvedValue({ candidates: [], count: 0 })
 })
 
@@ -169,7 +172,7 @@ describe('KlinePanel source routing', () => {
     expect(mocks.bars).not.toHaveBeenCalledWith(expect.objectContaining({ barId: 'yfinance|gold' }))
   })
 
-  it('publishes the displayed bars to a sibling analysis panel without another request', async () => {
+  it('shares bars and preserves the chart viewport through parent renders and recommended palette changes', async () => {
     const onSnapshot = vi.fn()
     mocks.bars.mockResolvedValue(response('EURUSD', 'yfinance|EURUSD'))
 
@@ -201,7 +204,21 @@ describe('KlinePanel source routing', () => {
         />
       </MemoryRouter>,
     )
-    expect(mocks.bars).toHaveBeenCalledTimes(1)
+    act(() => {
+      mocks.semanticColor.mockReturnValue('#006400')
+      useThemeStore.setState({ uiStyle: 'win98', stylePaletteMode: 'recommended' })
+    })
+    expect({
+      requests: mocks.bars.mock.calls.length,
+      charts: mocks.createChart.mock.calls.length,
+      viewportFits: mocks.fitContent.mock.calls.length,
+      volume: mocks.volumeSetData.mock.lastCall?.[0],
+    }).toEqual({
+      requests: 1,
+      charts: 1,
+      viewportFits: 1,
+      volume: [expect.objectContaining({ value: 100, color: '#006400' })],
+    })
   })
 })
 
