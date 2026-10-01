@@ -30,7 +30,7 @@ import { fmt, fmtPnl, fmtNum, fmtPctSigned } from '../lib/format'
 import { contractPrimary } from '../lib/contract-display'
 import { displayProviderForUTA } from '../lib/uta-account-filter'
 import { TradingModeGate } from '../components/TradingModeGate'
-import { AccountReadinessBadge, BrokerSupportGate } from '../components/uta/BrokerPackGate'
+import { BrokerSupportGate } from '../components/uta/BrokerPackGate'
 import { ensureTradingModePolling, useTradingMode } from '../live/trading-mode'
 import { computeTodayDelta, type CurvePointSummary } from './portfolio-metrics'
 
@@ -294,8 +294,8 @@ export function PortfolioPage() {
       />
 
       {/* Content */}
-      <div className="flex-1 overflow-y-auto px-[var(--page-inset)] py-5">
-        <div className="flex gap-6 items-start">
+      <div className="@container flex-1 overflow-y-auto px-[var(--page-inset)] py-5">
+        <div className="flex flex-col gap-6 items-stretch @5xl:flex-row @5xl:items-start">
           {/* Main column */}
           <div className="flex-1 min-w-0 space-y-5">
             {loading && data === EMPTY ? <PortfolioSkeleton /> : <>
@@ -311,24 +311,16 @@ export function PortfolioPage() {
               </div>
             )}
 
-            {blockedAccounts.map((uta) => {
-              const readiness = accountReadiness.get(uta.id)!
-              return (
-                <div key={uta.id} className="space-y-2">
-                  <div className="flex items-center justify-between gap-3 px-1">
-                    <span className="text-sm font-medium text-foreground">{uta.label ?? uta.id}</span>
-                    <AccountReadinessBadge readiness={readiness} health={healthMap[uta.id]} />
-                  </div>
-                  <BrokerSupportGate
-                    readiness={readiness}
-                    installingEngine={brokerReadiness.installingEngine}
-                    onInstall={brokerReadiness.install}
-                    onRetry={brokerReadiness.refresh}
-                    compact
-                  />
-                </div>
-              )
-            })}
+            {blockedAccounts.map((uta) => (
+              <BrokerSupportGate
+                key={uta.id}
+                readiness={accountReadiness.get(uta.id)!}
+                installingEngine={brokerReadiness.installingEngine}
+                onInstall={brokerReadiness.install}
+                onRetry={brokerReadiness.refresh}
+                compact
+              />
+            ))}
             {operationalAccounts.length > 0 && (
               <HeroMetrics equity={data.equity} curve={aggregateCurve?.total ?? null} />
             )}
@@ -394,7 +386,7 @@ export function PortfolioPage() {
 
           {/* Right sidebar — FX rates */}
           {data.fxRates.length > 0 && (
-            <div className="hidden lg:block w-[200px] shrink-0 sticky top-5">
+            <div className="w-full @5xl:w-[200px] @5xl:shrink-0 @5xl:sticky @5xl:top-5">
               <FxRatesPanel rates={data.fxRates} />
             </div>
           )}
@@ -508,14 +500,14 @@ function HeroMetrics({ equity, curve }: {
   }
 
   return (
-    <div className="space-y-4 rounded-lg border border-border bg-card px-5 py-5">
+    <div className="space-y-4 rounded-lg border border-border bg-card p-4 sm:p-6">
       <Metric
         size="lg"
         label="Total Equity (USD)"
         value={fmt(total, 'USD')}
         delta={todayDelta ?? { value: '— today', sign: 'flat' }}
       />
-      <div className="grid grid-cols-2 md:grid-cols-3 gap-4 pt-4 border-t border-border">
+      <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,10rem),1fr))] gap-4 pt-4 border-t border-border">
         <Metric size="sm" label="Cash" value={fmt(cash, 'USD')} />
         <Metric
           size="sm"
@@ -825,7 +817,7 @@ export function PositionsTable({ positions, fxRates }: { positions: PositionWith
         data-testid="portfolio-positions-desktop"
         className="hidden overflow-x-auto rounded-lg border border-border md:block"
       >
-        <table className="w-full text-sm">
+        <table className="w-full text-sm tabular-nums [&_th]:whitespace-nowrap [&_td:not(:first-child)]:whitespace-nowrap">
           <thead>
             <tr className="bg-secondary text-muted-foreground text-left">
               <th className="px-3 py-2 font-medium">Symbol</th>
@@ -888,7 +880,7 @@ function FxRatesPanel({ rates }: { rates: FxRateInfo[] }) {
         FX Rates
       </h3>
       <div className="border border-border rounded-lg overflow-hidden">
-        <table className="w-full text-sm">
+        <table className="w-full text-sm tabular-nums [&_th]:whitespace-nowrap [&_td:not(:first-child)]:whitespace-nowrap">
           <tbody>
             {rates.map(r => (
               <tr key={r.currency} className="border-t border-border first:border-t-0">

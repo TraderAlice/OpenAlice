@@ -17,9 +17,11 @@ import {
 } from 'lightweight-charts'
 import { barsApi, type AssetClass, type HistoricalBar, type BarSourceCandidate, type BarMeta } from '../../api/market'
 import { readSemanticColor } from '../../theme/semanticColors'
-import { useEffectivePalette, useEffectiveTheme } from '../../theme/useEffectiveTheme'
+import { useEffectivePalette } from '../../theme/useEffectiveTheme'
 import { Skeleton } from '../StateViews'
 import { SegmentedControl } from '../SegmentedControl'
+import { useLocale } from '../../i18n/useLocale'
+import { getIntlLocale } from '../../lib/intl'
 
 export type KlineInterval = MarketInterval
 export type KlineTimeframe = '1D' | '5D' | '1M' | '3M' | '1Y' | '5Y' | 'All'
@@ -88,8 +90,8 @@ interface Props {
 }
 
 export function KlinePanel({ selection, source, onSnapshot, displayTitle, embeddedInterval, onEmbeddedIntervalChange }: Props) {
-  const effectiveTheme = useEffectiveTheme()
   const effectivePalette = useEffectivePalette()
+  const locale = useLocale()
   const [searchParams] = useSearchParams()
   const navigate = useNavigate()
   const [localInterval, setLocalInterval] = useState(embeddedInterval ?? DEFAULT_INTERVAL)
@@ -158,38 +160,18 @@ export function KlinePanel({ selection, source, onSnapshot, displayTitle, embedd
   const candleRef = useRef<ISeriesApi<'Candlestick'> | null>(null)
   const volumeRef = useRef<ISeriesApi<'Histogram'> | null>(null)
 
-  // Canvas renderers cannot resolve CSS variables themselves. Rebuild on a
-  // concrete theme change and read the same semantic card used by DOM/SVG UI.
   useEffect(() => {
     if (!containerRef.current) return
-    const colors = readKlineChartColors()
     const chart = createChart(containerRef.current, {
       layout: {
         background: { color: 'transparent' },
-        textColor: colors.text,
-        panes: { separatorColor: colors.grid, separatorHoverColor: colors.primaryMuted },
+        fontFamily: getComputedStyle(containerRef.current).fontFamily,
+        fontSize: 14,
       },
-      grid: {
-        vertLines: { color: colors.grid },
-        horzLines: { color: colors.grid },
-      },
-      crosshair: {
-        vertLine: { color: colors.primaryMuted, labelBackgroundColor: colors.labelBackground },
-        horzLine: { color: colors.primaryMuted, labelBackgroundColor: colors.labelBackground },
-      },
-      rightPriceScale: { borderColor: colors.grid },
-      timeScale: { borderColor: colors.grid, timeVisible: false, secondsVisible: false },
+      timeScale: { timeVisible: false, secondsVisible: false },
       autoSize: true,
     })
-
-    const candle = chart.addSeries(CandlestickSeries, {
-      upColor: colors.positive,
-      downColor: colors.negative,
-      borderUpColor: colors.positive,
-      borderDownColor: colors.negative,
-      wickUpColor: colors.positive,
-      wickDownColor: colors.negative,
-    })
+    const candle = chart.addSeries(CandlestickSeries)
 
     const volume = chart.addSeries(HistogramSeries, {
       priceFormat: { type: 'volume' },
@@ -207,12 +189,44 @@ export function KlinePanel({ selection, source, onSnapshot, displayTitle, embedd
       candleRef.current = null
       volumeRef.current = null
     }
-  }, [effectiveTheme, effectivePalette])
+  }, [])
+
+  useEffect(() => {
+    const colors = readKlineChartColors()
+    chartRef.current?.applyOptions({
+      layout: {
+        textColor: colors.text,
+        panes: { separatorColor: colors.grid, separatorHoverColor: colors.primaryMuted },
+      },
+      grid: {
+        vertLines: { color: colors.grid },
+        horzLines: { color: colors.grid },
+      },
+      crosshair: {
+        vertLine: { color: colors.text, labelBackgroundColor: colors.labelBackground },
+        horzLine: { color: colors.text, labelBackgroundColor: colors.labelBackground },
+      },
+      rightPriceScale: { borderColor: colors.grid },
+      timeScale: { borderColor: colors.grid },
+    })
+    candleRef.current?.applyOptions({
+      upColor: colors.positive,
+      downColor: colors.negative,
+      borderUpColor: colors.positive,
+      borderDownColor: colors.negative,
+      wickUpColor: colors.positive,
+      wickDownColor: colors.negative,
+    })
+  }, [effectivePalette])
+
+  useEffect(() => {
+    chartRef.current?.applyOptions({ localization: { locale: getIntlLocale() } })
+  }, [locale])
 
   // Toggle time-axis detail when interval flips between intraday and daily.
   useEffect(() => {
     chartRef.current?.timeScale().applyOptions({ timeVisible: INTRADAY.has(interval) })
-  }, [interval, effectiveTheme, effectivePalette])
+  }, [interval])
 
   // Discover the available bar sources for this symbol (populates the picker).
   // Seed the picked source from the focused tab; otherwise null → vendor default.
@@ -238,12 +252,14 @@ export function KlinePanel({ selection, source, onSnapshot, displayTitle, embedd
     return () => { cancelled = true }
   }, [selectionSymbol, selectionAssetClass, requestedBarId])
 
-  // Push bars into chart and fit.
+  const hasFittedQuery = useRef(false)
+  const queryKey = JSON.stringify(query)
+  useEffect(() => { hasFittedQuery.current = false }, [queryKey])
+
   useEffect(() => {
-    if (!candleRef.current || !volumeRef.current || !chartRef.current) return
+    if (!candleRef.current || !chartRef.current) return
     if (!bars || bars.length === 0) {
       candleRef.current.setData([])
-      volumeRef.current.setData([])
       return
     }
 
@@ -254,17 +270,22 @@ export function KlinePanel({ selection, source, onSnapshot, displayTitle, embedd
       low: b.low,
       close: b.close,
     }))
-    const colors = readKlineChartColors()
-    const volumeData: HistogramData[] = bars.map((b) => ({
-      time: toUTCTimestamp(b.date),
-      value: b.volume ?? 0,
-      color: b.close >= b.open ? colors.positiveMuted : colors.negativeMuted,
-    }))
-
     candleRef.current.setData(candleData)
-    volumeRef.current.setData(volumeData)
-    chartRef.current.timeScale().fitContent()
-  }, [bars, effectiveTheme, effectivePalette])
+    if (!hasFittedQuery.current) {
+      chartRef.current.timeScale().fitContent()
+      hasFittedQuery.current = true
+    }
+  }, [bars])
+
+  useEffect(() => {
+    const colors = readKlineChartColors()
+    const volumeData: HistogramData[] = (bars ?? []).map((bar) => ({
+      time: toUTCTimestamp(bar.date),
+      value: bar.volume ?? 0,
+      color: bar.close >= bar.open ? colors.positiveMuted : colors.negativeMuted,
+    }))
+    volumeRef.current?.setData(volumeData)
+  }, [bars, effectivePalette])
 
   const title = useMemo(() => {
     if (!selectionSymbol || !selectionAssetClass) return 'Select a symbol'
@@ -311,12 +332,12 @@ export function KlinePanel({ selection, source, onSnapshot, displayTitle, embedd
         </p>}
         <div className="flex items-center gap-x-5 gap-y-2 flex-wrap">
           {!embedded && sourceOptions.length > 1 && (
-            <label className="flex items-center gap-2">
-              <span className="text-sm font-medium text-muted-foreground/70">Source</span>
+            <label className="flex min-w-0 max-w-full items-center gap-2">
+              <span className="shrink-0 text-sm font-medium text-muted-foreground/70">Source</span>
               <select
                 value={selectedBarId ?? meta?.barId ?? ''}
                 onChange={(e) => setSelectedBarId(e.target.value || null)}
-                className="oa-field-control max-w-[240px] cursor-pointer rounded-md border border-input bg-background px-2 py-1 text-sm leading-5 text-foreground outline-none transition-[border-color,box-shadow] duration-[var(--motion-fast)] [transition-timing-function:var(--motion-ease-out)] motion-reduce:transition-none"
+                className="oa-field-control min-w-0 max-w-[240px] cursor-pointer rounded-md border border-input bg-background px-2 py-1 text-sm leading-5 text-foreground outline-none transition-[border-color,box-shadow] duration-[var(--motion-fast)] [transition-timing-function:var(--motion-ease-out)] motion-reduce:transition-none"
                 title="Which provider's K-line to show — sources are never merged; you pick"
               >
                 {sourceOptions.map((c) => (
@@ -328,10 +349,10 @@ export function KlinePanel({ selection, source, onSnapshot, displayTitle, embedd
             </label>
           )}
           <div
-            className="flex items-center gap-2"
+            className="flex min-w-0 max-w-full items-center gap-2"
             title="Candle width (how much time each bar covers)"
           >
-            <span className="text-sm font-medium text-muted-foreground/70">Interval</span>
+            <span className="shrink-0 text-sm font-medium text-muted-foreground/70">Interval</span>
             <SegmentedControl
               value={interval}
               options={INTERVALS.map((value) => ({ value, label: value }))}
@@ -341,10 +362,10 @@ export function KlinePanel({ selection, source, onSnapshot, displayTitle, embedd
             />
           </div>
           {!embedded && <div
-            className="flex items-center gap-2"
+            className="flex min-w-0 max-w-full items-center gap-2"
             title="How far back to load history"
           >
-            <span className="text-sm font-medium text-muted-foreground/70">Range</span>
+            <span className="shrink-0 text-sm font-medium text-muted-foreground/70">Range</span>
             <SegmentedControl
               value={tf}
               options={TIMEFRAMES.map((value) => ({ value, label: value }))}

@@ -4,6 +4,7 @@ import type { BrokerEngine, BrokerHealthInfo } from '../../api/types'
 import type { AccountPackReadiness } from '../../hooks/useBrokerPackReadiness'
 import { HealthBadge } from './HealthBadge'
 import { Button } from '../ui/button'
+import { ContextHelp } from '../ContextHelp'
 
 export function AccountReadinessBadge({ readiness, health, size = 'sm' }: {
   readiness: AccountPackReadiness
@@ -61,28 +62,33 @@ export function BrokerSupportGate({ readiness, installingEngine, onInstall, onRe
           ? 'This broker preset is no longer supported'
           : 'Broker support status is unavailable'
 
+  const reason = readiness.reason ?? (readiness.state === 'checking'
+    ? 'Reading support installed on this Runtime.'
+    : 'This Runtime can load the configured account after its machine-local Broker Pack is available.')
+  const installScope = 'Installation changes this Runtime. Broker connections and trading remain unchanged.'
+
   return (
     <div
-      className={`rounded-lg border border-warning/30 bg-warning/5 ${compact ? 'px-3 py-2.5' : 'px-4 py-3'}`}
+      className={`rounded-lg border ${compact ? 'border-border bg-card px-4 py-3' : 'border-warning/30 bg-warning/5 px-4 py-3'}`}
       role="status"
       data-testid="broker-support-gate"
     >
-      <div className="flex items-start gap-2.5">
-        <AlertTriangle size={15} className="mt-0.5 shrink-0 text-warning" aria-hidden />
+      <div className={`flex gap-3 ${compact ? 'items-center' : 'items-start'}`}>
+        {!compact && <AlertTriangle size={15} className="mt-0.5 shrink-0 text-warning" aria-hidden />}
         <div className="min-w-0 flex-1">
-          {!compact && <div className="text-sm font-medium text-foreground">{title}</div>}
-          <p className={`${compact ? '' : 'mt-0.5'} text-sm leading-relaxed text-muted-foreground`}>
-            {readiness.reason ?? (
-              readiness.state === 'checking'
-                ? 'Reading support installed on this Runtime.'
-                : 'This Runtime can load the configured account after its machine-local Broker Pack is available.'
+          {compact ? (
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+              <span className="text-sm font-medium text-foreground [overflow-wrap:anywhere]">{readiness.label}</span>
+              <AccountReadinessBadge readiness={readiness} />
+              <ContextHelp label={readiness.label}>{`${reason} ${installScope}`}</ContextHelp>
+            </div>
+          ) : <>
+            <div className="text-sm font-medium text-foreground">{title}</div>
+            <p className="mt-0.5 text-sm leading-relaxed text-muted-foreground">{reason}</p>
+            {readiness.state !== 'checking' && (
+              <p className="mt-1 text-sm leading-relaxed text-muted-foreground/80">{installScope}</p>
             )}
-          </p>
-          {!compact && !readiness.operational && readiness.state !== 'checking' && (
-            <p className="mt-1 text-sm leading-relaxed text-muted-foreground/80">
-              Installation changes this Runtime. Broker connections and trading remain unchanged.
-            </p>
-          )}
+          </>}
           {actionError && <p className="mt-1 text-sm text-destructive" role="alert">{actionError}</p>}
         </div>
         {installable && (readiness.state === 'needs-install' || readiness.state === 'needs-repair') ? (

@@ -666,7 +666,7 @@ function TermCurveCard({ curve }: { curve: TermCurve }) {
             <LineChart accessibilityLayer width={width} height={height} data={chartData} margin={{ top: 8, right: compact ? 8 : 16, bottom: 0, left: 0 }}>
               <XAxis
                 dataKey="label"
-                tick={{ fontSize: 10, fill: 'var(--chart-axis)' }}
+                tick={{ fontSize: 14, fill: 'var(--chart-axis)' }}
                 stroke="var(--chart-axis)"
                 interval="preserveStartEnd"
                 minTickGap={compact ? 18 : 28}
@@ -674,9 +674,9 @@ function TermCurveCard({ curve }: { curve: TermCurve }) {
               />
               <YAxis
                 domain={['dataMin', 'dataMax']}
-                tick={{ fontSize: 10, fill: 'var(--chart-axis)' }}
+                tick={{ fontSize: 14, fill: 'var(--chart-axis)' }}
                 stroke="var(--chart-axis)"
-                width={compact ? 48 : 70}
+                width="auto"
                 tickFormatter={(value: number) => formatTermAxisPrice(value, width)}
               />
               <Tooltip
@@ -935,11 +935,11 @@ function ChokepointCard({ curve }: { curve: ShippingCurve }) {
           </span>
         )}
       </div>
-      <MeasuredChartFrame className="h-28">
+      <MeasuredChartFrame className="h-40">
         {({ width, height }) => (
           <LineChart accessibilityLayer width={width} height={height} data={chartData} margin={{ top: 4, right: 8, bottom: 0, left: 0 }}>
-            <XAxis dataKey="label" tick={{ fontSize: 9, fill: 'var(--chart-axis)' }} stroke="var(--chart-axis)" minTickGap={28} />
-            <YAxis tick={{ fontSize: 9, fill: 'var(--chart-axis)' }} stroke="var(--chart-axis)" width={36}
+            <XAxis dataKey="label" tick={{ fontSize: 14, fill: 'var(--chart-axis)' }} stroke="var(--chart-axis)" minTickGap={28} />
+            <YAxis tick={{ fontSize: 14, fill: 'var(--chart-axis)' }} stroke="var(--chart-axis)" width="auto"
               tickFormatter={(v: number) => v.toFixed(1)} domain={['auto', 'auto']} />
             <Tooltip
               contentStyle={chartTooltipStyle}

@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'
+import { useId, useState, useMemo } from 'react'
 import {
   AreaChart, Area, XAxis, YAxis, Tooltip, ReferenceLine,
 } from 'recharts'
@@ -38,6 +38,7 @@ export function EquityCurve({
   onPointClick, selectedTimestamp,
 }: EquityCurveProps) {
   const [range, setRange] = useState<RangeLabel>('24H')
+  const gradientId = useId()
 
   const filtered = useMemo(() => {
     const r = RANGES.find(r => r.label === range)
@@ -80,14 +81,12 @@ export function EquityCurve({
   // midnights) instead of recharts' arbitrary data-point positions.
   const xTicks = useMemo(() => computeTimeTicks(chartData), [chartData])
 
-  if (chartData.length === 0) return null
-
   const isAllView = selectedAccountId === 'all'
 
   return (
-    <div className="border border-border rounded-lg bg-secondary p-4">
+    <div className="min-w-0 rounded-lg border border-border bg-card p-4 sm:p-6">
       {/* Header */}
-      <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <h3 className="text-sm font-semibold leading-5 text-foreground">
           Equity Curve
         </h3>
@@ -102,7 +101,7 @@ export function EquityCurve({
 
       {/* Account switcher */}
       {accounts.length > 1 && (
-        <div className="mb-3 flex max-w-full items-center gap-2">
+        <div className="mb-4 flex max-w-full flex-wrap items-center gap-2">
           <span className="shrink-0 text-sm font-medium leading-5 text-muted-foreground">Account</span>
           <SegmentedControl
             value={selectedAccountId}
@@ -118,23 +117,27 @@ export function EquityCurve({
       )}
 
       {/* Chart */}
-      <MeasuredChartFrame className="h-[220px] w-full">
+      {chartData.length === 0 ? (
+        <div className="flex h-[240px] items-center justify-center text-sm text-muted-foreground" role="status">
+          No snapshots in this range.
+        </div>
+      ) : <MeasuredChartFrame className="h-[240px] w-full">
         {({ width, height }) => (
           <AreaChart
             accessibilityLayer
             width={width}
             height={height}
             data={chartData}
-            onClick={(e: any) => {
-              if (e?.activePayload?.[0]?.payload && onPointClick) {
-                onPointClick(e.activePayload[0].payload as EquityCurvePoint)
-              }
+            onClick={(event) => {
+              if (event.activeIndex == null) return
+              const point = filtered[Number(event.activeIndex)]
+              if (point) onPointClick?.(point)
             }}
           >
           <defs>
-            <linearGradient id="equityGradient" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="5%" stopColor="var(--primary)" stopOpacity={0.3} />
-              <stop offset="95%" stopColor="var(--primary)" stopOpacity={0} />
+            <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
+              <stop offset="5%" stopColor="var(--chart-1)" stopOpacity={0.3} />
+              <stop offset="95%" stopColor="var(--chart-1)" stopOpacity={0} />
             </linearGradient>
           </defs>
           <XAxis
@@ -143,19 +146,22 @@ export function EquityCurve({
             domain={['dataMin', 'dataMax']}
             ticks={xTicks}
             tickFormatter={formatTime}
-            tick={{ fontSize: 10, fill: 'var(--muted-foreground)' }}
+            tick={{ fontSize: 14, fill: 'var(--chart-axis)' }}
             axisLine={{ stroke: 'var(--border)' }}
             tickLine={false}
-            minTickGap={40}
+            minTickGap={32}
+            height={36}
+            tickMargin={8}
           />
           <YAxis
             tickFormatter={yAxis?.formatter ?? formatCurrency}
-            tick={{ fontSize: 10, fill: 'var(--muted-foreground)' }}
+            tick={{ fontSize: 14, fill: 'var(--chart-axis)' }}
             axisLine={false}
             tickLine={false}
-            width={70}
+            width="auto"
             domain={yAxis?.domain ?? ['auto', 'auto']}
             ticks={yAxis?.ticks}
+            tickMargin={8}
           />
           <Tooltip
             isAnimationActive={false}
@@ -164,23 +170,24 @@ export function EquityCurve({
           <Area
             type="monotone"
             dataKey="equityNum"
-            stroke="var(--primary)"
+            stroke="var(--chart-1)"
             strokeWidth={1.5}
-            fill="url(#equityGradient)"
+            fill={`url(#${gradientId})`}
             dot={false}
-            activeDot={{ r: 4, fill: 'var(--primary)', stroke: 'var(--secondary)', strokeWidth: 2 }}
+            isAnimationActive={false}
+            activeDot={{ r: 4, fill: 'var(--chart-1)', stroke: 'var(--secondary)', strokeWidth: 2 }}
           />
           {selectedTimestamp && (
             <ReferenceLine
               x={new Date(selectedTimestamp).getTime()}
-              stroke="var(--primary)"
+              stroke="var(--chart-1)"
               strokeDasharray="3 3"
               strokeOpacity={0.6}
             />
           )}
           </AreaChart>
         )}
-      </MeasuredChartFrame>
+      </MeasuredChartFrame>}
     </div>
   )
 }

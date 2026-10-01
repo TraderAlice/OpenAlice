@@ -930,3 +930,30 @@ stretch toward the target during a press and retain their existing checked
 travel. Keyboard focus, reduced motion, and pending switches use stationary
 feedback. These changes preserve selection handlers, persistence, routing, and
 execution authority.
+
+### Neutral trading surfaces
+
+The default Graphite card uses the upstream gray canvas, card, popup, and
+sidebar surfaces. Primary controls and focus rings use neutral ink. Blue,
+green, red, and amber retain information, gains, losses, and attention roles.
+`CountBadge` owns neutral count surfaces and semantic reminders in both
+navigation levels. Expanded Trading and Chat entries share the one-pixel
+navigation gap.
+
+Portfolio metrics use content-sized columns and tabular numerals. FX details
+follow the main column until the content container can accommodate a side
+panel. Financial table values stay together within their scroll region.
+Chart axes use 14px text; Recharts measures value-axis width automatically.
+
+`MeasuredChartFrame` retains its last positive size through transient hidden
+layouts and ignores unchanged integer dimensions. Market K-lines retain the
+chart instance and visible range when the palette changes. New symbol, source,
+interval, and timeframe queries fit their first loaded data; periodic updates
+preserve the chosen viewport. Price geometry and crosshair feedback update
+immediately. Equity range controls remain available with an empty plot, and
+point selection uses the current Recharts event index. Sparkline gradient
+identity comes from React throughout empty and populated states.
+
+Chart date labels follow the application locale through the shared locale store.
+Compact broker-support rows keep the account, status, and recovery action
+visible. Their help control owns installation scope and diagnostic detail.

@@ -45,7 +45,9 @@ vi.mock('lightweight-charts', () => ({
       fitContent: mocks.fitContent,
     }
     return {
+      applyOptions: vi.fn(),
       addSeries: (series: string) => ({
+        applyOptions: vi.fn(),
         priceScale: () => ({ applyOptions: vi.fn() }),
         setData: series === 'CandlestickSeries' ? mocks.candleSetData : mocks.volumeSetData,
       }),
