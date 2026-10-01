@@ -56,8 +56,8 @@ describe('InboxReplyThread', () => {
     })
     const reply = screen.getByRole('button', { name: 'Reply' })
     expect(reply.className).toContain('h-10')
-    expect(reply.className).toContain('w-10')
-    expect(reply.className).toContain('sm:h-8')
+    expect(reply.className).toContain('min-w-11')
+    expect(reply.className).toContain('min-h-11')
     fireEvent.click(reply)
 
     await waitFor(() => expect(ask).toHaveBeenCalledWith('Which data did you use?'))

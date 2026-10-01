@@ -16,6 +16,7 @@ import {
 } from '../office/inbox-duty-excursion'
 import { workspaceDisplayName } from './workspace/display'
 import { Skeleton } from './StateViews'
+import { CountBadge } from './CountBadge'
 import { Button } from './ui/button'
 import { inputClass } from './form'
 import {
@@ -142,7 +143,7 @@ export function InboxSidebar({ onNavigate }: { onNavigate?: () => void } = {}) {
 
   if (entries.length === 0) {
     return (
-      <div className="px-3 py-4 text-[12px] text-muted-foreground/70 leading-relaxed">
+      <div className="px-3 py-4 text-sm text-muted-foreground/70 leading-relaxed">
         {t('inbox.noMessages')}
       </div>
     )
@@ -156,7 +157,7 @@ export function InboxSidebar({ onNavigate }: { onNavigate?: () => void } = {}) {
             size={13}
             strokeWidth={1.8}
             aria-hidden
-            className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground/55"
+            className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground"
           />
           <input
             type="text"
@@ -165,7 +166,7 @@ export function InboxSidebar({ onNavigate }: { onNavigate?: () => void } = {}) {
             onChange={(event) => setQuery(event.target.value)}
             placeholder={t('inbox.searchPlaceholder')}
             aria-label={t('inbox.searchPlaceholder')}
-            className={`${inputClass} bg-background/65 pl-7.5 pr-7 text-[11px]`}
+            className={`${inputClass} pl-9 pr-9`}
           />
           {query && (
             <Button
@@ -174,7 +175,7 @@ export function InboxSidebar({ onNavigate }: { onNavigate?: () => void } = {}) {
               aria-label={t('inbox.clearSearch')}
               variant="ghost"
               size="icon-xs"
-              className="absolute right-1 top-1/2 -translate-y-1/2 text-muted-foreground/55"
+              className="absolute right-1 top-1/2 -translate-y-1/2 text-muted-foreground"
             >
               <X size={12} strokeWidth={1.8} aria-hidden />
             </Button>
@@ -183,7 +184,7 @@ export function InboxSidebar({ onNavigate }: { onNavigate?: () => void } = {}) {
         {normalizedQuery && (
           <div
             aria-live="polite"
-            className="px-1 pt-1 text-[10px] leading-[14px] tabular-nums text-muted-foreground/55"
+            className="px-1 pt-1 text-sm leading-5 tabular-nums text-muted-foreground"
           >
             {t('inbox.searchResults', { count: filteredEntries.length, total: entries.length })}
           </div>
@@ -192,7 +193,7 @@ export function InboxSidebar({ onNavigate }: { onNavigate?: () => void } = {}) {
 
       <div className="min-h-0 flex-1 overflow-y-auto">
         {normalizedQuery && filteredEntries.length === 0 ? (
-          <div className="px-3 py-5 text-center text-[11px] leading-relaxed text-muted-foreground/65">
+          <div className="px-3 py-5 text-center text-sm leading-relaxed text-muted-foreground">
             {t('inbox.noSearchResults', { query: query.trim() })}
           </div>
         ) : mode === 'workspace' ? (
@@ -287,7 +288,7 @@ function ToggleBtn({
             aria-pressed={active}
             variant="ghost"
             size="icon-sm"
-            className={active ? 'bg-muted text-foreground' : 'text-muted-foreground/60'}
+            className={active ? 'bg-muted text-foreground' : 'text-muted-foreground'}
           />
         )}
       >
@@ -309,6 +310,7 @@ function WorkspaceView({
   workspaceLabels: ReadonlyMap<string, string>
   onSelect: (id: string) => void
 }) {
+  const { t } = useTranslation()
   return (
     <>
       {threads.map((thread) => {
@@ -317,23 +319,16 @@ function WorkspaceView({
           workspaceLabels.get(thread.workspaceId) ?? thread.workspaceLabel ?? thread.workspaceId
         return (
           <div key={thread.workspaceId} className="mb-1.5">
-            {/* Cluster header: label · unread badge · latest time */}
             <div className="flex items-center gap-1.5 px-3 mt-1.5 mb-0.5">
-              <span className="flex-1 truncate text-[12px] font-medium text-foreground/90">
+              <span className="flex-1 truncate text-sm font-medium text-foreground/90">
                 {workspaceLabel}
               </span>
               {unread > 0 && (
-                <span className="shrink-0 min-w-[15px] text-center text-muted-foreground text-[11px] leading-[15px] font-medium tabular-nums">
-                  {unread}
-                </span>
+                <CountBadge count={unread} label={`${unread} ${t('inbox.unread')}`} />
               )}
-              <span className="shrink-0 text-[10px] text-muted-foreground/50 tabular-nums">
-                {formatRelativeTime(thread.latestTs)}
-              </span>
             </div>
 
-            {/* Message rows on a kinship rail */}
-            <div className="ml-[18px] border-l border-border/50">
+            <div className="mx-2 space-y-1">
               {thread.entries.map((entry) => (
                 <ClusterRow
                   key={entry.id}
@@ -365,7 +360,7 @@ function ClusterRow({
 }) {
   const { t } = useTranslation()
   const time = formatRelativeTime(entry.ts)
-  const { subject, excerpt, rowLabel } = presentInboxEntry(entry, {
+  const { subject, rowLabel } = presentInboxEntry(entry, {
     source,
     unread,
     time,
@@ -386,7 +381,7 @@ function ClusterRow({
           onClick()
         }
       }}
-      className={`group relative grid min-h-11 grid-cols-[auto_minmax(0,1fr)] gap-x-1.5 gap-y-0.5 pl-3 pr-3 py-1.5 cursor-pointer transition-colors outline-none focus-visible:bg-muted/70 ${
+      className={`group relative grid min-h-11 grid-cols-[auto_minmax(0,1fr)] gap-x-1.5 gap-y-1 rounded-xl pl-3 pr-3 py-3 cursor-pointer transition-colors outline-none focus-visible:bg-muted/70 ${
         active ? 'bg-muted' : 'hover:bg-muted/50'
       }`}
     >
@@ -396,19 +391,14 @@ function ClusterRow({
       />
       <span className="min-w-0">
         <span
-          className={`block truncate text-[12px] leading-5 ${
+          className={`line-clamp-2 text-sm leading-5 ${
             unread ? 'font-semibold text-foreground' : 'font-medium text-foreground/90'
           }`}
         >
           {subject}
         </span>
-        {excerpt && (
-          <span className="mt-0.5 hidden truncate text-[11px] leading-4 text-muted-foreground/65 sm:block">
-            {excerpt}
-          </span>
-        )}
       </span>
-      <span className="col-start-2 text-[10px] text-muted-foreground/50 tabular-nums">
+      <span className="col-start-2 text-sm text-muted-foreground tabular-nums">
         {time}
       </span>
     </div>
@@ -433,7 +423,7 @@ function TimeView({
     <>
       {groups.map(([bucket, items]) => (
         <div key={bucket} className="mb-1">
-          <div className="mb-1 mt-2 px-3 text-[11px] font-medium text-muted-foreground/65">
+          <div className="mb-1 mt-2 px-3 text-sm font-medium text-muted-foreground">
             {t(BUCKET_KEYS[bucket])}
           </div>
           <div className="flex flex-col">
@@ -468,7 +458,7 @@ function TimeRow({
   const { t } = useTranslation()
   const source = workspaceLabel ?? entry.workspaceLabel ?? entry.workspaceId
   const time = formatRelativeTime(entry.ts)
-  const { subject, excerpt, rowLabel } = presentInboxEntry(entry, {
+  const { subject, rowLabel } = presentInboxEntry(entry, {
     source,
     unread,
     time,
@@ -489,7 +479,7 @@ function TimeRow({
           onClick()
         }
       }}
-      className={`group relative flex min-h-14 flex-col justify-center gap-1 px-3 py-2 cursor-pointer transition-colors outline-none focus-visible:bg-muted/70 ${
+      className={`group relative flex min-h-14 flex-col justify-center gap-1 rounded-xl px-3 py-3 cursor-pointer transition-colors outline-none focus-visible:bg-muted/70 ${
         active ? 'bg-muted' : 'hover:bg-muted/50'
       }`}
     >
@@ -501,25 +491,20 @@ function TimeRow({
         />
         <span className="min-w-0 flex-1">
           <span
-            className={`block truncate text-[12px] leading-5 ${
+            className={`line-clamp-2 text-sm leading-5 ${
               unread ? 'font-semibold text-foreground' : 'font-medium text-foreground/90'
             }`}
           >
             {subject}
           </span>
-          {excerpt && (
-            <span className="mt-0.5 hidden truncate text-[11px] leading-4 text-muted-foreground/65 sm:block">
-              {excerpt}
-            </span>
-          )}
         </span>
       </div>
 
       <div className="flex min-w-0 items-center gap-2 pl-3">
-        <span className="min-w-0 flex-1 truncate text-[10px] text-muted-foreground/60">
+        <span className="min-w-0 flex-1 truncate text-sm text-muted-foreground">
           {source}
         </span>
-        <span className="shrink-0 text-[10px] text-muted-foreground/60 tabular-nums">
+        <span className="shrink-0 text-sm text-muted-foreground tabular-nums">
           {time}
         </span>
       </div>

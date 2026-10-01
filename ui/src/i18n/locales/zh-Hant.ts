@@ -337,8 +337,8 @@ export const zhHant: Resources = {
   },
   demoBanner: {
     badge: '示範',
-    compact: '錄製預覽',
-    description: '你正在查看包含錄製資料的 OpenAlice 快照。變更不會儲存；Web 回覆為模擬產生。',
+    description: '此頁面使用錄製資料和模擬 Web 回覆。安裝 OpenAlice 後即可連接即時服務。',
+    terminal: '安裝 OpenAlice 後即可執行終端工作階段。',
     install: '安裝 OpenAlice',
   },
   issues: {

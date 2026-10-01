@@ -12,11 +12,14 @@ export function ContextHelp({ children, label }: { children: string; label?: str
     <Popover>
       <PopoverTrigger
         aria-label={name}
+        openOnHover
+        delay={250}
+        closeDelay={100}
         render={<Button variant="ghost" size="icon-xs" className="shrink-0 text-muted-foreground" />}
       >
         <Info aria-hidden className="size-4" />
       </PopoverTrigger>
-      <PopoverContent align="start" className="max-w-[calc(100vw-2rem)] p-4">
+      <PopoverContent align="start" sideOffset={8} className="w-80 max-w-[calc(100vw-2rem)] rounded-xl p-4">
         <PopoverTitle className="sr-only">{name}</PopoverTitle>
         <PopoverDescription>
           <MeasuredText className="block text-sm leading-6">{children}</MeasuredText>

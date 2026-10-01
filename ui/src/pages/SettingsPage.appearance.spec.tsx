@@ -46,6 +46,7 @@ describe('AppearanceSection palette pair editor', () => {
   it('switches component style immediately without changing the palette pair', () => {
     render(<AppearanceSection />)
 
+    fireEvent.click(screen.getByRole('button', { name: 'Interface style Default' }))
     expect(screen.getByRole('radio', { name: 'Default' }).getAttribute('aria-checked')).toBe('true')
     fireEvent.click(screen.getByRole('radio', { name: 'Windows 98' }))
 
@@ -60,6 +61,7 @@ describe('AppearanceSection palette pair editor', () => {
   it('scopes the selected style recommendation without rewriting saved colors', () => {
     render(<AppearanceSection />)
 
+    fireEvent.click(screen.getByRole('button', { name: 'Interface style Default' }))
     fireEvent.click(screen.getByRole('radio', { name: 'Windows 98' }))
     expect(useThemeStore.getState().dayPalette).toBe('paper')
     expect(useThemeStore.getState().nightPalette).toBe('graphite')

@@ -28,8 +28,22 @@ financial semantics, and existing workflow contracts.
   capsules. Cards use a 26px radius and tonal separation. Touch targets use 44px.
 - Prices, percentages, counts, and timestamps use tabular numerals. Machine
   identifiers and commands retain monospace. Selection checks use neutral ink.
-- Copy names the object, state, or operation. ContextHelp owns extended guidance.
+- Copy names the object, state, or operation. ContextHelp owns extended guidance,
+  opening after 250ms of hover and through click or keyboard activation. Pointer
+  departure uses a 100ms grace period. Help stays selectable inside its popup.
   Errors, consent, and recovery actions remain at the action boundary.
+- The web demo notice retains its identity and installation action in a fixed
+  row. Its recorded-data explanation lives in ContextHelp. Color mode leads
+  appearance settings; palette editing and interface styles use disclosures.
+  Runtime checks belong to each runtime detail panel. Market-data guidance lives
+  beside its source or switch, with connection states visible in the page.
+- Collapsible owns input-aware disclosure timing. Pointer actions use the shared
+  160ms height and opacity transition; keyboard activation updates immediately.
+  Workspace Manager uses the shared inference menu and custom-model dialog.
+  Inbox lists show the subject, timestamp, and unread count. Reply guidance
+  lives beside the recipient; replies and notifications use shared buttons.
+  Tooltips use the 14px supporting-text role, a 250ms initial delay, immediate
+  transfer within the provider window, and a 110ms exit.
 - Financial movement and operational health retain their dedicated semantic
   colors. Shared surfaces consume tokens across all saved palettes.
 

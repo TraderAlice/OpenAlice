@@ -2,7 +2,6 @@ import {
   type ReactNode,
   forwardRef,
   useEffect,
-  useId,
   useImperativeHandle,
   useMemo,
   useRef,
@@ -11,7 +10,6 @@ import {
 import { useTranslation } from 'react-i18next'
 import {
   AlertTriangle,
-  BrainCircuit,
   ChevronDown,
   Cpu,
   Info,
@@ -20,7 +18,6 @@ import {
 } from 'lucide-react'
 
 import { Button } from '@/components/ui/button'
-import { inputClass } from '@/components/form'
 import { SelectionCheckIcon } from '@/components/ui/selection-check-icon'
 import {
   Dialog,
@@ -108,105 +105,6 @@ export interface AgentLaunchSelectorsProps {
 
 export interface AgentLaunchSelectorsHandle {
   openAgentMenu(): void
-}
-
-function AgentLaunchModelEditor({
-  config,
-  labeled = false,
-}: {
-  config: AgentLaunchConfigState
-  labeled?: boolean
-}) {
-  const { t } = useTranslation()
-  const listId = useId()
-  const [draft, setDraft] = useState(config.launchModel ?? '')
-
-  useEffect(() => setDraft(config.launchModel ?? ''), [config.launchModel])
-
-  const commit = () => {
-    const next = draft.trim()
-    if (next !== (config.launchModel ?? '')) config.selectModel(next || null)
-  }
-  const defaultLabel = config.defaultModel
-    ? t('chatLanding.defaultModelValue', { model: config.defaultModel })
-    : t('chatLanding.runtimeDefaultModel')
-  const contextLabel = config.aiDetails?.contextWindow
-    ? t('chatLanding.contextSummary', {
-        limit: formatContextWindow(config.aiDetails.contextWindow),
-      })
-    : undefined
-
-  return (
-    <label className={`relative inline-flex min-w-0 items-center rounded-md bg-muted text-[11px] leading-[15px] text-muted-foreground focus-within:ring-1 focus-within:ring-primary/50 ${labeled ? 'min-h-12 w-full max-w-none sm:w-auto sm:max-w-[220px]' : 'min-h-8 max-w-[220px]'}`}>
-      <Cpu className={`pointer-events-none absolute left-2.5 h-3 w-3 shrink-0 ${labeled ? 'top-6' : ''}`} />
-      {labeled && (
-        <span className="pointer-events-none absolute left-2.5 top-1.5 text-[9.5px] font-medium text-muted-foreground">
-          {t('chatLanding.modelField')}
-        </span>
-      )}
-      <input
-        list={listId}
-        value={draft}
-        onChange={(event) => setDraft(event.target.value)}
-        onBlur={commit}
-        onKeyDown={(event) => {
-          if (event.key === 'Enter') event.currentTarget.blur()
-          if (event.key === 'Escape') {
-            setDraft(config.launchModel ?? '')
-            event.currentTarget.blur()
-          }
-        }}
-        aria-label={t('chatLanding.selectModel')}
-        title={contextLabel}
-        placeholder={defaultLabel}
-        className={`min-w-0 bg-transparent pl-7 pr-2 text-[11px] text-foreground outline-none placeholder:text-muted-foreground ${labeled ? 'w-full pb-1 pt-5 sm:w-[190px]' : 'w-[190px] py-1'}`}
-      />
-      <datalist id={listId}>
-        {config.modelOptions.map((model) => (
-          <option key={model.id} value={model.id}>{model.label}</option>
-        ))}
-      </datalist>
-    </label>
-  )
-}
-
-function AgentLaunchEffortEditor({
-  config,
-  labeled = false,
-}: {
-  config: AgentLaunchConfigState
-  labeled?: boolean
-}) {
-  const { t } = useTranslation()
-  const current = config.selectedReasoningEffort
-  const options = current && !config.effortOptions.includes(current)
-    ? [current, ...config.effortOptions]
-    : config.effortOptions
-  const defaultLabel = t('chatLanding.effortNotSpecified')
-  return (
-    <label className={`relative inline-flex min-w-0 items-center rounded-md bg-muted text-[11px] leading-[15px] text-muted-foreground focus-within:ring-1 focus-within:ring-primary/50 ${labeled ? 'min-h-12 w-full max-w-none sm:w-auto sm:max-w-[190px]' : 'min-h-8 max-w-[190px]'}`}>
-      <BrainCircuit className={`pointer-events-none absolute left-2.5 h-3 w-3 shrink-0 ${labeled ? 'top-6' : ''}`} />
-      {labeled && (
-        <span className="pointer-events-none absolute left-2.5 top-1.5 text-[9.5px] font-medium text-muted-foreground">
-          {t('chatLanding.effortField')}
-        </span>
-      )}
-      <select
-        value={current ?? ''}
-        onChange={(event) => config.selectReasoningEffort(
-          event.target.value
-            ? event.target.value as NonNullable<AgentLaunchConfigState['launchReasoningEffort']>
-            : null,
-        )}
-        aria-label={t('chatLanding.selectEffort')}
-        className={`min-w-0 appearance-none bg-transparent pl-7 pr-7 text-[11px] text-foreground outline-none ${labeled ? 'w-full max-w-none pb-1 pt-5 sm:max-w-[190px]' : 'max-w-[190px] py-1'}`}
-      >
-        <option value="">{defaultLabel}</option>
-        {options.map((effort) => <option key={effort} value={effort}>{effort}</option>)}
-      </select>
-      <ChevronDown className="pointer-events-none absolute right-2 h-3 w-3 opacity-60" />
-    </label>
-  )
 }
 
 function AgentLaunchAccessItems({ config, onConfigureProvider }: {
@@ -363,7 +261,7 @@ function AgentLaunchInferenceMenu({
             aria-label={access ? `${t('chatLanding.selectCredential')}, ${t('chatLanding.selectModelAndEffort')}` : t('chatLanding.selectModelAndEffort')}
             className={settings
               ? 'oa-pressable flex min-h-14 w-full min-w-0 items-center gap-3 rounded-lg border border-border/70 bg-muted/25 px-3 py-2 text-left transition-colors hover:bg-muted/45'
-              : 'oa-pressable inline-flex min-h-7 min-w-0 max-w-full items-center gap-1 rounded-lg bg-transparent px-1.5 py-1 text-sm leading-5 font-medium text-foreground transition-colors hover:bg-muted'}
+              : 'oa-pressable inline-flex min-h-7 min-w-0 max-w-full items-center gap-2 rounded-lg bg-transparent px-1.5 py-1 text-sm leading-5 font-medium text-foreground transition-colors hover:bg-muted'}
           />}
         >
           {access?.icon ?? <Cpu className={settings ? 'h-4 w-4 shrink-0 text-muted-foreground' : 'h-3 w-3 shrink-0 text-muted-foreground'} />}
@@ -415,6 +313,9 @@ function AgentLaunchInferenceMenu({
                 value={modelValue}
                 onValueChange={(value) => config.selectModel(value ? String(value) : null)}
               >
+                {details?.contextWindow && (
+                  <DropdownMenuLabel>{t('chatLanding.contextSummary', { limit: formatContextWindow(details.contextWindow) })}</DropdownMenuLabel>
+                )}
                 <DropdownMenuRadioItem value="" closeOnClick={false} className="min-h-9 px-2.5 pr-8 text-sm">
                   {config.defaultModel ? (
                     <span className="flex min-w-0 flex-1 items-baseline gap-2">
@@ -650,25 +551,18 @@ export const AgentLaunchSelectors = forwardRef<AgentLaunchSelectorsHandle, Agent
           data-testid="agent-launch-inference-group"
           className={settingsLayout ? 'w-full min-w-0' : `contents sm:flex sm:shrink-0 sm:items-center ${toolbar ? 'sm:gap-1' : 'sm:gap-2'}`}
         >
-          {toolbar ? (
-            <AgentLaunchInferenceMenu
-              config={config}
-              menuPlacement={menuPlacement}
-              settings={settingsLayout}
-              disabled={disabled}
-              access={combinedAi && showAccess ? {
-                label: selectedAccessLabel,
-                icon: providerIcon,
-                items: <AgentLaunchAccessItems config={config} onConfigureProvider={onConfigureProvider} />,
-              } : undefined}
-              menuPositionerClassName={menuPositionerClassName}
-            />
-          ) : (
-            <>
-              <AgentLaunchModelEditor config={config} labeled={labeled} />
-              <AgentLaunchEffortEditor config={config} labeled={labeled} />
-            </>
-          )}
+          <AgentLaunchInferenceMenu
+            config={config}
+            menuPlacement={menuPlacement}
+            settings={settingsLayout}
+            disabled={disabled}
+            access={combinedAi && showAccess ? {
+              label: selectedAccessLabel,
+              icon: providerIcon,
+              items: <AgentLaunchAccessItems config={config} onConfigureProvider={onConfigureProvider} />,
+            } : undefined}
+            menuPositionerClassName={menuPositionerClassName}
+          />
         </div>
       )}
     </>

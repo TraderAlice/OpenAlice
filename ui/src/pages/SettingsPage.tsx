@@ -60,6 +60,7 @@ export function AppearanceSection({ standalone = false }: { standalone?: boolean
   const setStylePaletteMode = useThemeStore((s) => s.setStylePaletteMode)
   const effectiveSlot = useEffectivePreferenceSlot()
   const [editingSlot, setEditingSlot] = useState<ThemePreferenceSlot>(effectiveSlot)
+  const [choosingStyle, setChoosingStyle] = useState(false)
   const [paletteFilter, setPaletteFilter] = useState<PaletteLibraryFilter>('recommended')
   const [customizingPalettes, setCustomizingPalettes] = useState(false)
   const paletteEditorId = useId()
@@ -115,73 +116,9 @@ export function AppearanceSection({ standalone = false }: { standalone?: boolean
 
   const content = (
     <>
-      <div className="border-b border-border/60 pb-5">
-        <div className="flex items-center gap-2">
-          <span className="text-sm font-medium text-foreground">{t('settings.appearance.interfaceStyle')}</span>
-          <ContextHelp label={t('settings.appearance.interfaceStyle')}>{t('settings.appearance.interfaceStyleDescription')}</ContextHelp>
-        </div>
-        <div
-          className="mt-3 grid gap-2.5 sm:grid-cols-3"
-          role="radiogroup"
-          aria-label={t('settings.appearance.interfaceStyle')}
-        >
-          {UI_STYLE_PROFILES.map((profile) => (
-            <StyleProfileCard
-              key={profile.id}
-              profile={profile.id}
-              label={t(profile.labelKey)}
-              description={t(profile.descriptionKey)}
-              selected={uiStyle === profile.id}
-              onSelect={setUiStyle}
-            />
-          ))}
-        </div>
-        {recommendedPalettePair && (
-          <div
-            data-palette-preview={recommendedPalettePair.day}
-            className="oa-palette-preview mt-3 flex min-w-0 flex-col gap-3 rounded-lg border border-border bg-background p-3 sm:flex-row sm:items-center"
-          >
-            <span className="oa-palette-preview-shell flex h-11 w-full shrink-0 overflow-hidden rounded border sm:w-24" aria-hidden>
-              <span className="oa-palette-preview-sidebar flex w-6 shrink-0 items-center justify-center border-r">
-                <span className="oa-palette-preview-sidebar-dot h-2 w-2 rounded-full" />
-              </span>
-              <span className="oa-palette-preview-canvas flex min-w-0 flex-1 flex-col justify-center gap-1.5 px-2">
-                <span className="oa-palette-preview-primary-line h-1.5 w-3/5 rounded-full" />
-                <span className="oa-palette-preview-muted-line h-1 w-full rounded-full" />
-                <span className="oa-palette-preview-muted-line h-1 w-3/4 rounded-full" />
-              </span>
-            </span>
-            <div className="min-w-0 flex-1">
-              <span className="block text-sm font-semibold text-foreground">
-                {t('settings.appearance.recommendedPalette', {
-                  style: t(activeStyleDefinition.labelKey),
-                })}
-              </span>
-              <p className="mt-0.5 text-sm leading-snug text-muted-foreground">
-                {t('settings.appearance.recommendedPaletteDescription', {
-                  palette: t(paletteDefinition(recommendedPalettePair.day).labelKey),
-                })}
-              </p>
-            </div>
-            <Button
-              type="button"
-              onClick={applyRecommendedPalette}
-              aria-pressed={recommendedPaletteApplied}
-              variant={recommendedPaletteApplied ? 'default' : 'outline'}
-              size="sm"
-              className="min-h-10 shrink-0 sm:min-h-8"
-            >
-              {t(recommendedPaletteApplied
-                ? 'settings.appearance.useSavedPalettes'
-                : 'settings.appearance.applyRecommendedPalette')}
-            </Button>
-          </div>
-        )}
-      </div>
-
       <div className="border-b border-border/60 py-5">
         <div className="flex items-center gap-2">
-          <span className="text-sm font-medium text-foreground">{t('settings.appearance.colorMode')}</span>
+          <span className="text-base font-semibold text-foreground">{t('settings.appearance.colorMode')}</span>
           <ContextHelp label={t('settings.appearance.colorMode')}>{t('settings.appearance.colorModeDescription')}</ContextHelp>
         </div>
         <SegmentedControl
@@ -196,7 +133,7 @@ export function AppearanceSection({ standalone = false }: { standalone?: boolean
         />
         <div
           data-palette-preview={activePalette}
-          className="mt-3 inline-flex max-w-full items-center gap-2 rounded-md border px-2.5 py-1.5 text-sm leading-5"
+          className="sr-only"
           aria-live="polite"
         >
           <span className="h-2 w-2 shrink-0 rounded-full bg-primary" aria-hidden />
@@ -214,21 +151,13 @@ export function AppearanceSection({ standalone = false }: { standalone?: boolean
         </div>
       </div>
 
-      <div className="border-b border-border/60 py-5">
+      <Collapsible open={customizingPalettes} onOpenChange={setCustomizingPalettes} className="border-b border-border/60 py-5">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="flex items-center gap-2">
-            <span className="text-sm font-medium text-foreground">{t('settings.appearance.themePair')}</span>
+            <span className="text-base font-semibold text-foreground">{t('settings.appearance.themePair')}</span>
             <ContextHelp label={t('settings.appearance.themePair')}>{t('settings.appearance.themePairDescription')}</ContextHelp>
           </div>
-          <Button
-            type="button"
-            onClick={() => setCustomizingPalettes((current) => !current)}
-            aria-expanded={customizingPalettes}
-            aria-controls={paletteEditorId}
-            variant="outline"
-            size="sm"
-            className="min-h-10 sm:min-h-8"
-          >
+          <CollapsibleTrigger aria-controls={paletteEditorId} render={<Button variant="outline" size="sm" className="min-h-10" />}>
             {t(customizingPalettes
               ? 'settings.appearance.hidePaletteEditor'
               : 'settings.appearance.customizePalettes')}
@@ -236,7 +165,7 @@ export function AppearanceSection({ standalone = false }: { standalone?: boolean
               className={`h-3.5 w-3.5 transition-transform duration-[var(--motion-fast)] ${customizingPalettes ? 'rotate-180' : ''}`}
               aria-hidden
             />
-          </Button>
+          </CollapsibleTrigger>
         </div>
 
         <div className="mt-3 grid grid-cols-2 gap-2.5 sm:gap-3">
@@ -256,54 +185,119 @@ export function AppearanceSection({ standalone = false }: { standalone?: boolean
           />
         </div>
 
-        <div
-          id={paletteEditorId}
-          hidden={!customizingPalettes}
-          inert={!customizingPalettes ? true : undefined}
-          className="mt-4 border-t border-border/60 pt-4"
-        >
-          <div className="flex flex-wrap items-start justify-between gap-3">
-            <div>
-              <span className="text-sm font-medium text-foreground">
-                {t('settings.appearance.choosePalette', { slot: t(`theme.mode.${editingSlot}`) })}
-              </span>
-              <p className="mt-0.5 max-w-2xl text-sm leading-relaxed text-muted-foreground">
-                {t('settings.appearance.paletteLibraryDescription')}
-              </p>
+        <CollapsibleContent keepMounted id={paletteEditorId}>
+          <div className="mt-4 border-t border-border/60 pt-4">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div className="flex items-center gap-2">
+                <span className="text-sm font-medium text-foreground">
+                  {t('settings.appearance.choosePalette', { slot: t(`theme.mode.${editingSlot}`) })}
+                </span>
+                <ContextHelp label={t('settings.appearance.choosePalette', { slot: t(`theme.mode.${editingSlot}`) })}>{t('settings.appearance.paletteLibraryDescription')}</ContextHelp>
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                <Button
+                  type="button"
+                  onClick={resetPair}
+                  disabled={isDefaultPair}
+                  variant="outline"
+                  size="sm"
+                  className="min-h-10 text-muted-foreground sm:min-h-8"
+                >
+                  <RotateCcw className="h-3.5 w-3.5" aria-hidden />
+                  {t('settings.appearance.resetPair')}
+                </Button>
+                <SegmentedControl
+                  value={paletteFilter}
+                  options={(['recommended', 'all'] as const).map((filter) => ({
+                    value: filter,
+                    label: t(`settings.appearance.paletteFilterOption.${filter}`),
+                  }))}
+                  onChange={setPaletteFilter}
+                  ariaLabel={t('settings.appearance.paletteFilter')}
+                />
+              </div>
             </div>
-            <div className="flex flex-wrap items-center gap-2">
+
+            <PalettePicker
+              palettes={visiblePalettes}
+              selected={editingPalette}
+              dayPalette={dayPalette}
+              nightPalette={nightPalette}
+              onSelect={choosePalette}
+            />
+          </div>
+        </CollapsibleContent>
+      </Collapsible>
+
+      <Collapsible open={choosingStyle} onOpenChange={setChoosingStyle} className="py-5">
+        <div className="flex items-center gap-2">
+          <CollapsibleTrigger className="group/style flex min-h-11 min-w-0 flex-1 items-center gap-3 rounded-lg text-left outline-none focus-visible:[box-shadow:var(--oa-focus-shadow)]">
+            <span className="flex-1 text-base font-semibold">{t('settings.appearance.interfaceStyle')}</span>{' '}
+            <span className="text-sm text-muted-foreground">{t(activeStyleDefinition.labelKey)}</span>
+            <ChevronDown aria-hidden className="size-4 transition-transform duration-[var(--motion-fast)] group-data-panel-open/style:rotate-180 motion-reduce:transition-none" />
+          </CollapsibleTrigger>
+          <ContextHelp label={t('settings.appearance.interfaceStyle')}>{t('settings.appearance.interfaceStyleDescription')}</ContextHelp>
+        </div>
+        <CollapsibleContent keepMounted>
+          <div
+            className="mt-3 grid gap-2.5 sm:grid-cols-3"
+            role="radiogroup"
+            aria-label={t('settings.appearance.interfaceStyle')}
+          >
+            {UI_STYLE_PROFILES.map((profile) => (
+              <StyleProfileCard
+                key={profile.id}
+                profile={profile.id}
+                label={t(profile.labelKey)}
+                description={t(profile.descriptionKey)}
+                selected={uiStyle === profile.id}
+                onSelect={setUiStyle}
+              />
+            ))}
+          </div>
+          {recommendedPalettePair && (
+            <div
+              data-palette-preview={recommendedPalettePair.day}
+              className="oa-palette-preview mt-3 flex min-w-0 flex-col gap-3 rounded-lg border border-border bg-background p-3 sm:flex-row sm:items-center"
+            >
+              <span className="oa-palette-preview-shell flex h-11 w-full shrink-0 overflow-hidden rounded border sm:w-24" aria-hidden>
+                <span className="oa-palette-preview-sidebar flex w-6 shrink-0 items-center justify-center border-r">
+                  <span className="oa-palette-preview-sidebar-dot h-2 w-2 rounded-full" />
+                </span>
+                <span className="oa-palette-preview-canvas flex min-w-0 flex-1 flex-col justify-center gap-1.5 px-2">
+                  <span className="oa-palette-preview-primary-line h-1.5 w-3/5 rounded-full" />
+                  <span className="oa-palette-preview-muted-line h-1 w-full rounded-full" />
+                  <span className="oa-palette-preview-muted-line h-1 w-3/4 rounded-full" />
+                </span>
+              </span>
+              <div className="min-w-0 flex-1">
+                <span className="block text-sm font-semibold text-foreground">
+                  {t('settings.appearance.recommendedPalette', {
+                    style: t(activeStyleDefinition.labelKey),
+                  })}
+                </span>
+                <p className="mt-0.5 text-sm leading-snug text-muted-foreground">
+                  {t('settings.appearance.recommendedPaletteDescription', {
+                    palette: t(paletteDefinition(recommendedPalettePair.day).labelKey),
+                  })}
+                </p>
+              </div>
               <Button
                 type="button"
-                onClick={resetPair}
-                disabled={isDefaultPair}
-                variant="outline"
+                onClick={applyRecommendedPalette}
+                aria-pressed={recommendedPaletteApplied}
+                variant={recommendedPaletteApplied ? 'default' : 'outline'}
                 size="sm"
-                className="min-h-10 text-muted-foreground sm:min-h-8"
+                className="min-h-10 shrink-0 sm:min-h-8"
               >
-                <RotateCcw className="h-3.5 w-3.5" aria-hidden />
-                {t('settings.appearance.resetPair')}
+                {t(recommendedPaletteApplied
+                  ? 'settings.appearance.useSavedPalettes'
+                  : 'settings.appearance.applyRecommendedPalette')}
               </Button>
-              <SegmentedControl
-                value={paletteFilter}
-                options={(['recommended', 'all'] as const).map((filter) => ({
-                  value: filter,
-                  label: t(`settings.appearance.paletteFilterOption.${filter}`),
-                }))}
-                onChange={setPaletteFilter}
-                ariaLabel={t('settings.appearance.paletteFilter')}
-              />
             </div>
-          </div>
-
-          <PalettePicker
-            palettes={visiblePalettes}
-            selected={editingPalette}
-            dayPalette={dayPalette}
-            nightPalette={nightPalette}
-            onSelect={choosePalette}
-          />
-        </div>
-      </div>
+          )}
+        </CollapsibleContent>
+      </Collapsible>
 
     </>
   )
@@ -401,11 +395,6 @@ function PaletteSlotCard({
               {t('settings.appearance.activeSlot')}
             </span>
           )}
-          {editing && (
-            <span className="rounded-full border border-primary/35 bg-primary/10 px-2 py-0.5 text-sm leading-5 font-semibold text-primary">
-              {t('settings.appearance.editingSlot')}
-            </span>
-          )}
         </span>
       </span>
       <span className="mt-2.5 flex items-center gap-1 sm:mt-3 sm:gap-1.5" aria-hidden>
@@ -487,7 +476,7 @@ function PalettePicker({
             <span className="oa-palette-preview-terminal-line ml-1 h-px flex-1" />
           </span>
           {(palette.id === dayPalette || palette.id === nightPalette) && (
-            <span className="oa-palette-preview-muted mt-2 block text-[9.5px] font-medium">
+            <span className="oa-palette-preview-muted mt-2 block text-sm font-medium">
               {palette.id === dayPalette && palette.id === nightPalette
                 ? t('settings.appearance.usedForBoth')
                 : palette.id === dayPalette

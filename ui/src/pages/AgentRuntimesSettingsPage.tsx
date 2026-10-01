@@ -157,11 +157,10 @@ export function AgentRuntimesSettingsPage() {
 
           <ConfigSection
             title={t('settings.agentRuntimes.quickAccess')}
+            help={t(pinned.length ? 'settings.agentRuntimes.quickAccessDescription' : 'settings.agentRuntimes.quickAccessEmpty')}
             accessory={<CountBadge count={pinned.length} label={t('settings.agentRuntimes.quickAccessCount', { count: pinned.length, limit: AGENT_RUNTIME_QUICK_ACCESS_LIMIT })} />}
           >
-            {pinned.length === 0 ? (
-              <p className="py-2 text-xs text-muted-foreground">{t('settings.agentRuntimes.quickAccessEmpty')}</p>
-            ) : (
+            {pinned.length > 0 && (
               <ol className="overflow-hidden rounded-xl bg-background">
                 {pinned.map((agent, index) => {
                   return (
@@ -294,17 +293,6 @@ function RuntimeSettingsCard({
           <ChevronDown aria-hidden className="size-3.5 shrink-0 text-muted-foreground transition-transform duration-[var(--motion-fast)] group-data-panel-open/runtime:rotate-180 motion-reduce:transition-none" />
         </CollapsibleTrigger>
         <div className="flex min-h-[72px] shrink-0 items-center gap-3">
-          <Button
-            variant="ghost"
-            size="icon-sm"
-            disabled={probing}
-            focusableWhenDisabled
-            onClick={onProbe}
-            aria-label={`${agent.displayName}: ${t('settings.agentRuntimes.probe')}`}
-            title={t('settings.agentRuntimes.probe')}
-          >
-            <RefreshCw aria-hidden className={row?.status === 'checking' ? 'animate-spin motion-reduce:animate-none' : undefined} />
-          </Button>
           <Toggle
             size="sm"
             checked={pinned}
@@ -337,6 +325,17 @@ function RuntimeSettingsCard({
                 </div>
               </dl>
             )}
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={probing}
+              focusableWhenDisabled
+              onClick={onProbe}
+              aria-label={`${agent.displayName}: ${t('settings.agentRuntimes.probe')}`}
+            >
+              <RefreshCw aria-hidden className={row?.status === 'checking' ? 'animate-spin motion-reduce:animate-none' : undefined} />
+              {t('settings.agentRuntimes.probe')}
+            </Button>
             {!installed && hint && (
               <p>
                 {hint.cmd && <span className="mr-2 break-all font-mono">{hint.cmd}</span>}

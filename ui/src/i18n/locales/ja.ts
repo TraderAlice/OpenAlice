@@ -329,9 +329,8 @@ export const ja: Resources = {
   },
   demoBanner: {
     badge: 'デモ',
-    compact: '記録済みプレビュー',
-    description:
-      '記録済みデータを使った OpenAlice のスナップショットを表示しています。変更は保存されず、Web の応答はシミュレーションです。',
+    description: '録画データとシミュレーションによる Web の返信を表示します。OpenAlice をインストールするとライブサービスに接続できます。',
+    terminal: 'OpenAlice をインストールしてターミナルセッションを実行できます。',
     install: 'OpenAlice をインストール',
   },
   issues: {

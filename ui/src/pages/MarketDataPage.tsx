@@ -4,6 +4,8 @@ import { api, type AppConfig } from '../api'
 import { SaveIndicator } from '../components/SaveIndicator'
 import { ConfigSection, SettingsScrollArea, inputClass } from '../components/form'
 import { Toggle } from '../components/Toggle'
+import { ContextHelp } from '../components/ContextHelp'
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '../components/ui/collapsible'
 import { useConfigPage } from '../hooks/useConfigPage'
 import { PageHeader } from '../components/PageHeader'
 import { CenteredLoading } from '../components/StateViews'
@@ -332,12 +334,12 @@ function BrokerKlineSourcesSection({ utas, loading, error, savingId, savedId, on
 }) {
   return <section className="mx-auto mb-6 max-w-[880px]">
     <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-      <h2 className="text-sm font-semibold text-foreground">Broker K-line sources</h2>
+      <div className="flex items-center gap-2">
+        <h2 className="text-lg font-semibold text-foreground">Broker K-line sources</h2>
+        <ContextHelp label="Broker K-line sources">Configured UTAs supply K-line data and contract discovery. These switches share the Broker setting “Use as data source”. Each chart also supports explicit source selection.</ContextHelp>
+      </div>
       <Button type="button" variant="ghost" size="sm" onClick={onManage}>Manage UTAs in Broker</Button>
     </div>
-    <p className="mb-2.5 max-w-[640px] text-sm leading-5 text-muted-foreground">
-      Choose which configured UTAs join default K-line and contract discovery. This is the same setting as “Use as data source” in each UTA’s Broker settings; explicit source selection remains available.
-    </p>
     {loading ? <p role="status" className="text-xs text-muted-foreground">Loading broker sources…</p> : utas.length === 0 && !error ? (
       <p className="rounded-lg border border-dashed border-border px-4 py-3 text-xs text-muted-foreground">No UTAs configured. Add one in Broker to use its K-line data.</p>
     ) : <div className="space-y-2.5">
@@ -369,9 +371,12 @@ function HubCard({
   const host = hub.baseUrl.replace(/^https?:\/\//, '').replace(/\/+$/, '')
 
   return (
-    <section className="mb-6 rounded-lg border border-border/70 bg-card p-4">
+    <section className="mb-6 rounded-2xl bg-secondary p-5 sm:p-6">
       <div className="flex items-center justify-between mb-1.5">
-        <h2 className="text-[14px] leading-5 font-semibold">Data Hub</h2>
+        <div className="flex items-center gap-2">
+          <h2 className="text-lg font-semibold">Data Hub</h2>
+          <ContextHelp label="Data Hub">The hosted hub serves public market data anonymously. Configured provider keys take precedence.</ContextHelp>
+        </div>
         <Toggle ariaLabel="Data Hub" size="sm" checked={hub.enabled} onChange={onToggle} />
       </div>
       {hub.enabled ? (
@@ -391,10 +396,6 @@ function HubCard({
           <span className="text-sm text-muted-foreground">Off — boards and series use your own keys and vendors.</span>
         </div>
       )}
-      <p className="text-sm text-muted-foreground">
-        Low-frequency data is served from the hosted hub — no API keys needed.
-        Anonymous reads of public data; your own keys always take precedence.
-      </p>
     </section>
   )
 }
@@ -404,31 +405,25 @@ function HubCard({
 function SourcesCard({ rows, onAddFmp }: { rows: SourceRow[]; onAddFmp: () => void }) {
   return (
     <section className="mb-6">
-      <h2 className="mb-2 text-sm leading-5 font-semibold text-foreground">Data sources</h2>
-      <div className="divide-y divide-border/40 overflow-hidden rounded-lg border border-border/70 bg-card">
+      <h2 className="mb-3 text-lg font-semibold text-foreground">Data sources</h2>
+      <div className="divide-y divide-border/60 overflow-hidden rounded-2xl bg-secondary">
         {rows.map((row) => (
-          <div key={row.name} className="flex items-center gap-3 px-4 py-3">
+          <div key={row.name} className="grid min-h-14 grid-cols-[auto_minmax(0,1fr)] items-center gap-x-3 gap-y-1 px-4 py-2 sm:grid-cols-[auto_minmax(0,1fr)_auto] sm:px-5">
             {row.state === 'ok'
               ? <CheckCircle2 aria-hidden className="size-3.5 shrink-0 text-success" />
               : <MinusCircle aria-hidden className="size-3.5 shrink-0 text-muted-foreground" />}
-            <div className="flex-1 min-w-0">
-              <span className="text-sm text-foreground font-medium">{row.name}</span>
-              {row.detail && <span className="text-sm text-muted-foreground/60 ml-2">{row.detail}</span>}
+            <div className="flex min-w-0 flex-1 items-center gap-1">
+              <span className="text-sm font-medium text-foreground">{row.name}</span>
+              {row.detail && <ContextHelp label={row.name}>{row.detail}</ContextHelp>}
             </div>
-            <span className={`text-sm ${row.state === 'ok' ? 'text-muted-foreground' : 'text-muted-foreground/60'}`}>
-              {row.source}
-            </span>
-            {row.cta && (
-              <Button
-                type="button"
-                onClick={onAddFmp}
-                className="shrink-0 text-sm"
-                size="sm"
-                variant="outline"
-              >
-                Add key
-              </Button>
-            )}
+            <div className="col-start-2 flex min-w-0 items-center justify-between gap-3 pb-1 sm:col-start-3 sm:pb-0">
+              <span className="text-sm text-muted-foreground">{row.source}</span>
+              {row.cta && (
+                <Button type="button" onClick={onAddFmp} size="sm" variant="outline">
+                  Add key
+                </Button>
+              )}
+            </div>
           </div>
         ))}
       </div>
@@ -446,24 +441,19 @@ function ChartVendorsSection({
   onToggle: (id: string, on: boolean) => void
 }) {
   return (
-    <section className="mb-6">
-      <h2 className="mb-2 text-sm leading-5 font-semibold text-foreground">Chart vendors</h2>
-      <p className="text-sm text-muted-foreground/70 mb-2.5 max-w-[640px]">
-        Live K-line &amp; quote sources — queried per symbol, never via the hub. Switch one on and it
-        joins the search pool; what it covers is found by searching, not configured here. yfinance is
-        the always-on global default.
-      </p>
+    <ConfigSection title="Chart vendors" help="Vendors supply live charts and quotes. Enabled vendors join symbol search. yfinance is the default global source." className="mb-6">
       <div className="space-y-2.5">
         {CHART_VENDORS.map((v) => {
           const on = v.alwaysOn || extraVendors.includes(v.id)
           return (
-            <div key={v.id} className="rounded-lg border border-border/70 bg-card px-4 py-3.5">
+            <div key={v.id} className="rounded-xl bg-background px-4 py-3">
               <div className="flex items-center justify-between gap-3">
                 <div className="flex items-center gap-2 min-w-0">
                   {on
                     ? <CheckCircle2 aria-hidden className="size-3.5 shrink-0 text-success" />
                     : <MinusCircle aria-hidden className="size-3.5 shrink-0 text-muted-foreground" />}
-                  <span className="text-sm leading-5 font-semibold text-foreground truncate">{v.name}</span>
+                  <span className="text-base font-medium text-foreground">{v.name}</span>
+                  <ContextHelp label={v.name}>{v.desc}</ContextHelp>
                 </div>
                 {v.alwaysOn ? (
                   <span className="shrink-0 text-sm font-medium text-muted-foreground">Always on</span>
@@ -471,12 +461,11 @@ function ChartVendorsSection({
                   <Toggle ariaLabel={v.name} size="sm" checked={on} onChange={(val) => onToggle(v.id, val)} />
                 )}
               </div>
-              <p className="mt-1.5 max-w-2xl text-sm leading-5 text-muted-foreground/70">{v.desc}</p>
             </div>
           )
         })}
       </div>
-    </section>
+    </ConfigSection>
   )
 }
 
@@ -502,20 +491,13 @@ function AdvancedSection({
   highlightFmp: boolean
 }) {
   return (
-    <section className="mb-8">
-      <Button
-        type="button"
-        onClick={onToggle}
-        className="px-1 text-sm"
-        variant="ghost"
-        size="sm"
-        aria-expanded={open}
-      >
+    <Collapsible open={open} onOpenChange={onToggle} className="mb-8">
+      <CollapsibleTrigger render={<Button variant="ghost" size="sm" className="px-1" />}>
         <ChevronRight aria-hidden className={`size-3.5 ${open ? 'rotate-90' : ''}`} />
         Advanced
-      </Button>
+      </CollapsibleTrigger>
 
-      {open && (
+      <CollapsibleContent>
         <div className="mt-2 rounded-lg border border-border/70 bg-card px-5">
           <KeyProvidersSection
             providerKeys={providerKeys}
@@ -526,7 +508,7 @@ function AdvancedSection({
 
           <ConfigSection
             title="Data Hub Endpoint"
-            description="Self-hosters point this at their own TraderHub instance."
+            help="Self-hosted installations can connect to a custom TraderHub instance."
           >
             <input
               type="text"
@@ -537,8 +519,8 @@ function AdvancedSection({
             />
           </ConfigSection>
         </div>
-      )}
-    </section>
+      </CollapsibleContent>
+    </Collapsible>
   )
 }
 
@@ -635,7 +617,7 @@ function KeyProvidersSection({
   return (
     <ConfigSection
       title="Data Provider Keys"
-      description="Low-frequency data — boards, economy, fundamentals — is served by the Data Hub. Add a key only to go direct, or to unlock the slice the hub doesn't serve (FMP fundamentals)."
+      help="Provider keys enable direct access. An FMP key also enables equity fundamentals and discovery."
     >
       <div className="space-y-4">
         {KEY_GROUPS.map((group, gi) => (

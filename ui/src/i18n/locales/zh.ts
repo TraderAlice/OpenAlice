@@ -333,8 +333,8 @@ export const zh: Resources = {
   },
   demoBanner: {
     badge: '演示',
-    compact: '录制预览',
-    description: '你正在查看包含录制数据的 OpenAlice 快照。更改不会保存；Web 回复为模拟生成。',
+    description: '此页面使用录制数据和模拟 Web 回复。安装 OpenAlice 后即可连接实时服务。',
+    terminal: '安装 OpenAlice 后即可运行终端会话。',
     install: '安装 OpenAlice',
   },
   issues: {

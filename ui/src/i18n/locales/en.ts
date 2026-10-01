@@ -347,9 +347,8 @@ export const en = {
   },
   demoBanner: {
     badge: 'Demo',
-    compact: 'Recorded preview',
-    description:
-      'You’re looking at a snapshot of OpenAlice with recorded data. Changes aren’t saved; Web replies are simulated.',
+    description: 'Recorded data and simulated Web replies. Install OpenAlice to connect live services.',
+    terminal: 'Install OpenAlice to run terminal sessions.',
     install: 'Install OpenAlice',
   },
   issues: {
