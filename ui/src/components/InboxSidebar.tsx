@@ -328,7 +328,7 @@ function WorkspaceView({
               )}
             </div>
 
-            <div className="mx-2 space-y-1">
+            <div className="mx-2 space-y-(--oa-row-gap)">
               {thread.entries.map((entry) => (
                 <ClusterRow
                   key={entry.id}
@@ -426,7 +426,7 @@ function TimeView({
           <div className="mb-1 mt-2 px-3 text-sm font-medium text-muted-foreground">
             {t(BUCKET_KEYS[bucket])}
           </div>
-          <div className="flex flex-col">
+          <div className="flex flex-col gap-(--oa-row-gap)">
             {items.map((entry) => (
               <TimeRow
                 key={entry.id}

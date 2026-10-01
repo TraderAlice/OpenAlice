@@ -217,7 +217,7 @@ function TrackedEntityRow({
           onClick()
         }
       }}
-      className={`group relative mb-0.5 grid min-h-[38px] grid-cols-[20px_minmax(0,1fr)_auto] items-center gap-2 rounded-md px-2.5 py-1.5 outline-none transition-colors ${
+      className={`group relative mb-(--oa-row-gap) grid min-h-[38px] grid-cols-[20px_minmax(0,1fr)_auto] items-center gap-2 rounded-md px-2.5 py-1.5 outline-none transition-colors ${
         active
           ? 'bg-sidebar-accent text-sidebar-accent-foreground'
           : 'text-muted-foreground hover:bg-accent hover:text-foreground focus-visible:bg-accent'
@@ -277,7 +277,7 @@ function TrackedIssueRow({
       data-tracked-entity={`issue:${anchor.workspaceId}:${anchor.issue.id}`}
       onClick={onClick}
       title={`${anchor.issue.title} — ${anchor.workspaceTag}`}
-      className={`group relative mb-0.5 grid min-h-[38px] w-full grid-cols-[20px_minmax(0,1fr)_auto] items-center gap-2 rounded-md px-2.5 py-1.5 text-left outline-none transition-colors ${
+      className={`group relative mb-(--oa-row-gap) grid min-h-[38px] w-full grid-cols-[20px_minmax(0,1fr)_auto] items-center gap-2 rounded-md px-2.5 py-1.5 text-left outline-none transition-colors ${
         active
           ? 'bg-sidebar-accent text-sidebar-accent-foreground'
           : 'text-muted-foreground hover:bg-accent hover:text-foreground focus-visible:bg-accent'

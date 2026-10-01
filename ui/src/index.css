@@ -101,6 +101,7 @@
 /* Base resolution (no attribute / explicit light). */
 :root {
   --page-inset: 32px;
+  --oa-row-gap: 4px;
   --oa-control-hover-border: color-mix(in srgb, var(--foreground) 18%, transparent);
   --oa-control-focus-border: color-mix(in srgb, var(--foreground) 28%, transparent);
   --oa-focus-ring: var(--foreground);
@@ -257,7 +258,18 @@ body {
     box-shadow var(--motion-fast) var(--motion-ease-out);
 }
 
-:where(.oa-pressable, .oa-nav-item, .oa-nav-row):focus-visible {
+.oa-nav-row,
+.oa-sidebar-child-row,
+.oa-harness-nav-header {
+  margin-block-end: var(--oa-row-gap);
+}
+
+:where(.oa-nav-item, .oa-nav-row):focus-visible {
+  outline: none;
+  box-shadow: inset 0 0 0 2px var(--oa-focus-ring);
+}
+
+:where(.oa-pressable):focus-visible {
   outline: none;
   box-shadow: var(--oa-focus-shadow);
 }

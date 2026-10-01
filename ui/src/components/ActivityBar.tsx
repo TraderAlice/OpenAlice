@@ -191,7 +191,7 @@ export function ActivityBar({
                   />
                 )}
                 {showItems && (
-                  <div className={`flex flex-col ${compactRail ? 'gap-1' : denseRail ? 'gap-1 md:gap-px' : 'gap-px'}`} id={`activity-section-${section.id}`}>
+                  <div className="flex flex-col gap-(--oa-row-gap)" id={`activity-section-${section.id}`}>
                     {section.items.map((item) => {
                       const sec = activitySectionFor(item.page)
                       const isActive = item.page === 'chat' ? focusedKind === 'quick-start' : selectedSidebar === sec
@@ -265,7 +265,7 @@ export function ActivityBar({
               </div>
             )
           })}
-          <div className={compactRail ? 'mt-3 flex w-11 flex-col gap-1 border-t border-sidebar-border/70 pt-3' : 'mt-px space-y-1'}>
+          <div className={compactRail ? 'mt-3 flex w-11 flex-col gap-(--oa-row-gap) border-t border-sidebar-border/70 pt-3' : 'mt-(--oa-row-gap) space-y-(--oa-row-gap)'}>
             {harnesses.map(mode => (
               <ChatWorkspaceSection key={mode} mode={mode} placement="navigation" compact={compactRail} onNavigate={onClose} />
             ))}

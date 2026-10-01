@@ -1033,3 +1033,12 @@ Opening and closing use the shared origin-aware opacity and scale transition.
 Reduced motion removes the transition. The popup occupies the overlay layer, and
 selection leaves the surrounding document geometry unchanged. The neutral
 `SelectionCheckIcon` remains the single selection glyph owner.
+
+### Repeated-row separation
+
+`--oa-row-gap` owns the 4px separation between adjacent navigation and choice
+surfaces. Primary navigation, secondary sidebar rows, Harness child rows, Tracked
+entries, Inbox entries, select options, and action-menu items consume this token.
+Section captions and hierarchy boundaries retain their larger spacing. Navigation
+focus rings draw inside the row, preserving the visible gutter during keyboard use.
+Row heights, label insets, hit targets, and selection geometry remain unchanged.
