@@ -128,12 +128,18 @@ Never put a dollar-denominated thesis in a double-quoted `--commit-message`;
 `"$971"` can reach OpenAlice as `"71"`. File-backed string flags accept `-` to
 read stdin when the exact value is already available as a stream.
 
-## Market clock & simulator
+## Market clock, calendar & simulator
 
 ```bash
-alice-uta market clock                 # is the venue open?
-alice-uta sim price-change --help      # MockBroker only — move a mock price for testing; no-op against real brokers
+alice-uta market clock                      # live session open/closed (not holiday calendar)
+alice-uta market calendar --market HK       # Longbridge tradingDays: open/prev/next/half-day
+alice-uta sim price-change --help           # MockBroker only — move a mock price for testing; no-op against real brokers
 ```
+
+`market clock` answers “is any LB session open right now?”. It does **not** tell
+you whether today is an exchange holiday. For HK/US/CN/SG holiday calendars use
+`market calendar` on a Longbridge account (or the traderhub `hk_calendar.py`
+script with `LONGPORT_*` env for headless daily-brief collection).
 
 ## Not here
 

@@ -25,6 +25,8 @@ export type {
   AccountInfo,
   Quote,
   MarketClock,
+  TradingCalendar,
+  TradingCalendarDay,
   AccountCapabilities,
   TpSlParams,
 } from './brokers/index.js'

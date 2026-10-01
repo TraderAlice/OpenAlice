@@ -275,6 +275,7 @@ const BASE_EXPORTS: Record<string, CliExport> = {
       },
       market: {
         clock: 'getMarketClock',
+        calendar: 'getTradingCalendar',
       },
       // MockBroker simulator only — no-op against real brokers.
       sim: {

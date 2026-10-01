@@ -23,6 +23,7 @@ import type {
   Bar,
   BarParams,
   MarketClock,
+  TradingCalendar,
   BrokerHealth,
   BrokerHealthInfo,
   AccountCapabilities,
@@ -177,6 +178,15 @@ export class UTAAccountSDK {
 
   getMarketClock(): Promise<MarketClock> {
     return this.client.get<MarketClock>(`/api/trading/uta/${encodeURIComponent(this.id)}/market-clock`)
+  }
+
+  getTradingCalendar(market: string, asOf?: Date): Promise<TradingCalendar> {
+    const params: Record<string, string> = { market }
+    if (asOf) params.asOf = asOf.toISOString()
+    return this.client.get<TradingCalendar>(
+      `/api/trading/uta/${encodeURIComponent(this.id)}/trading-calendar`,
+      params,
+    )
   }
 
   /** Hub → leaves expansion (bond issuers, option chains, futures months). */

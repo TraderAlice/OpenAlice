@@ -320,6 +320,32 @@ export interface MarketClock {
 }
 
 /**
+ * Exchange trading calendar (holiday / half-day), distinct from live session
+ * open/closed (`MarketClock`). Optional on brokers that expose a calendar API
+ * (Longbridge `tradingDays`); others leave the method undefined.
+ */
+export interface TradingCalendarDay {
+  /** Calendar date `YYYY-MM-DD` in the venue's local calendar. */
+  date: string
+  isHalfDay: boolean
+}
+
+export interface TradingCalendar {
+  /** Venue code, e.g. `HK` | `US` | `CN` | `SG`. */
+  market: string
+  /** Reference date used for open/prev/next derivation (`YYYY-MM-DD`). */
+  asOf: string
+  isTradingDay: boolean
+  isHalfDay: boolean
+  prevTradingDay: string | null
+  nextTradingDay: string | null
+  nextIsHalfDay: boolean
+  /** Trading / half days returned in the queried windows (sorted). */
+  days: TradingCalendarDay[]
+  queriedAt: string
+}
+
+/**
  * Normalized bar interval — Alice-facing enum. Each broker maps this to its
  * native bar-size / period / timeframe string. Keep this list small and
  * additive; brokers declare which subset they support via
@@ -586,6 +612,13 @@ export interface IBroker<TMeta = unknown> {
   getOpenOrders?(): Promise<OpenOrder[]>
   getQuote(contract: Contract): Promise<Quote>
   getMarketClock(): Promise<MarketClock>
+
+  /**
+   * Exchange holiday / half-day calendar for a market code (`HK`, `US`, …).
+   * Optional — distinct from {@link getMarketClock} (live session). Brokers
+   * without a calendar API leave it undefined; UTA loud-refuses.
+   */
+  getTradingCalendar?(market: string, asOf?: Date): Promise<TradingCalendar>
 
   /**
    * Historical OHLCV bars. Optional — brokers without time-series data

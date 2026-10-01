@@ -25,6 +25,7 @@ import {
   OrderSide,
   OrderType as LbOrderType,
   TimeInForceType,
+  NaiveDate,
   type SubmitOrderOptions,
   type ReplaceOrderOptions,
 } from 'longbridge'
@@ -38,6 +39,8 @@ import {
   type OpenOrder,
   type Quote,
   type MarketClock,
+  type TradingCalendar,
+  type TradingCalendarDay,
   type TpSlParams,
 } from '../types.js'
 import '../../contract-ext.js'
@@ -665,7 +668,33 @@ export class LongbridgeBroker implements IBroker {
       const isOpen = sessions.some((m) =>
         m.tradeSessions.some((s) => isWithinSession(now, s.beginTime, s.endTime)),
       )
+      // Live session only — does not answer "is today a holiday?". Prefer
+      // getTradingCalendar(market) for exchange open/prev/next trading days.
       return { isOpen, timestamp: now }
+    } catch (err) {
+      throw BrokerError.from(err)
+    }
+  }
+
+  async getTradingCalendar(market: string, asOf?: Date): Promise<TradingCalendar> {
+    const code = market.trim().toUpperCase()
+    const lbMarket = marketCodeToLb(code)
+    if (lbMarket === null) {
+      throw new BrokerError('CONFIG', `Unsupported calendar market "${market}" (use HK, US, CN, or SG)`)
+    }
+    try {
+      const quote = this.quoteCtx as unknown as {
+        tradingDays: (
+          m: number,
+          begin: NaiveDate,
+          end: NaiveDate,
+        ) => Promise<{ tradingDays: NaiveDate[]; halfTradingDays: NaiveDate[] }>
+      }
+      const ref = asOf ?? new Date()
+      // Use Asia/Shanghai calendar date for HK/CN; UTC date is fine for US/SG briefs.
+      const today = venueLocalDate(code, ref)
+      const { full, half } = await fetchTradingDaySets(quote, lbMarket, today)
+      return buildTradingCalendar(code, today, full, half, new Date().toISOString())
     } catch (err) {
       throw BrokerError.from(err)
     }
@@ -743,6 +772,113 @@ function lbTifToIbkr(t: number): string {
 }
 
 // ==================== Helpers ====================
+
+/** Longbridge trading_days window must stay under one month. */
+const CALENDAR_WINDOW_DAYS = 27
+
+/** Mirror longbridge `const enum Market` numeric values (avoid const-enum import). */
+const LB_MARKET = { US: 1, HK: 2, CN: 3, SG: 4 } as const
+
+function marketCodeToLb(code: string): number | null {
+  switch (code) {
+    case 'US': return LB_MARKET.US
+    case 'HK': return LB_MARKET.HK
+    case 'CN': return LB_MARKET.CN
+    case 'SG': return LB_MARKET.SG
+    default: return null
+  }
+}
+
+function venueLocalDate(market: string, when: Date): { y: number; m: number; d: number } {
+  const tz = market === 'US' ? 'America/New_York' : 'Asia/Shanghai'
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: tz,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).formatToParts(when)
+  const y = Number(parts.find((p) => p.type === 'year')?.value)
+  const m = Number(parts.find((p) => p.type === 'month')?.value)
+  const d = Number(parts.find((p) => p.type === 'day')?.value)
+  return { y, m, d }
+}
+
+function addDays(ymd: { y: number; m: number; d: number }, delta: number): { y: number; m: number; d: number } {
+  const dt = new Date(Date.UTC(ymd.y, ymd.m - 1, ymd.d + delta))
+  return { y: dt.getUTCFullYear(), m: dt.getUTCMonth() + 1, d: dt.getUTCDate() }
+}
+
+function ymdKey(ymd: { y: number; m: number; d: number }): string {
+  return `${ymd.y}-${String(ymd.m).padStart(2, '0')}-${String(ymd.d).padStart(2, '0')}`
+}
+
+function naiveToKey(n: NaiveDate): string {
+  return ymdKey({ y: n.year, m: n.month, d: n.day })
+}
+
+async function fetchTradingDaySets(
+  quote: {
+    tradingDays: (
+      m: number,
+      begin: NaiveDate,
+      end: NaiveDate,
+    ) => Promise<{ tradingDays: NaiveDate[]; halfTradingDays: NaiveDate[] }>
+  },
+  lbMarket: number,
+  today: { y: number; m: number; d: number },
+): Promise<{ full: Set<string>; half: Set<string> }> {
+  const full = new Set<string>()
+  const half = new Set<string>()
+
+  const pull = async (begin: { y: number; m: number; d: number }, end: { y: number; m: number; d: number }) => {
+    const resp = await quote.tradingDays(
+      lbMarket,
+      new NaiveDate(begin.y, begin.m, begin.d),
+      new NaiveDate(end.y, end.m, end.d),
+    )
+    for (const n of resp.tradingDays ?? []) full.add(naiveToKey(n))
+    for (const n of resp.halfTradingDays ?? []) half.add(naiveToKey(n))
+  }
+
+  await pull(addDays(today, -CALENDAR_WINDOW_DAYS), addDays(today, -1))
+  await pull(today, addDays(today, CALENDAR_WINDOW_DAYS))
+  const upcoming = [...full, ...half].filter((k) => k > ymdKey(today)).sort()
+  if (upcoming.length === 0) {
+    const start = addDays(today, CALENDAR_WINDOW_DAYS + 1)
+    await pull(start, addDays(start, CALENDAR_WINDOW_DAYS))
+  }
+  return { full, half }
+}
+
+/** Exported for unit tests — pure derivation from date-key sets. */
+export function buildTradingCalendar(
+  market: string,
+  today: { y: number; m: number; d: number },
+  full: Set<string>,
+  half: Set<string>,
+  queriedAt: string,
+): TradingCalendar {
+  const asOf = ymdKey(today)
+  const all = [...new Set([...full, ...half])].sort()
+  const past = all.filter((k) => k < asOf)
+  const upcoming = all.filter((k) => k > asOf)
+  const next = upcoming[0] ?? null
+  const days: TradingCalendarDay[] = all.map((date) => ({
+    date,
+    isHalfDay: half.has(date),
+  }))
+  return {
+    market,
+    asOf,
+    isTradingDay: full.has(asOf) || half.has(asOf),
+    isHalfDay: half.has(asOf),
+    prevTradingDay: past.length ? past[past.length - 1]! : null,
+    nextTradingDay: next,
+    nextIsHalfDay: Boolean(next && half.has(next)),
+    days,
+    queriedAt,
+  }
+}
 
 function isWithinSession(
   now: Date,

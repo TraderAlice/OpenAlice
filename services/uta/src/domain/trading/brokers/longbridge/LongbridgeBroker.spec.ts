@@ -16,6 +16,9 @@ vi.mock('longbridge', () => {
   } as const
   const TimeInForceType = { Unknown: 0, Day: 1, GoodTilCanceled: 2, GoodTilDate: 3 } as const
   const Market = { Unknown: 0, US: 1, HK: 2, CN: 3, SG: 4, Crypto: 5 } as const
+  class NaiveDate {
+    constructor(public year: number, public month: number, public day: number) {}
+  }
 
   return {
     Config: { fromApikey: vi.fn(() => ({ __config: true })) },
@@ -35,12 +38,14 @@ vi.mock('longbridge', () => {
         depth: vi.fn(),
         staticInfo: vi.fn(),
         tradingSession: vi.fn(),
+        tradingDays: vi.fn(),
       })),
     },
     OrderSide,
     OrderType,
     TimeInForceType,
     Market,
+    NaiveDate,
   }
 })
 
@@ -63,6 +68,7 @@ function attachMockContexts(broker: LongbridgeBroker): {
     depth: vi.fn(),
     staticInfo: vi.fn(),
     tradingSession: vi.fn(),
+    tradingDays: vi.fn(),
     optionQuote: vi.fn(),
     warrantQuote: vi.fn(),
   }
@@ -795,6 +801,76 @@ describe('LongbridgeBroker — getMarketClock()', () => {
       Date.prototype.getHours = originalGetHours
       Date.prototype.getMinutes = originalGetMinutes
     }
+  })
+})
+
+// ==================== getTradingCalendar() ====================
+
+describe('LongbridgeBroker — getTradingCalendar()', () => {
+  it('derives prev/next around an HK holiday using tradingDays windows', async () => {
+    const b = makeBroker()
+    const { quote } = attachMockContexts(b)
+    quote.tradingDays.mockImplementation(async (_m: number, begin: { year: number; month: number; day: number }, end: { year: number; month: number; day: number }) => {
+      const all = [
+        { year: 2026, month: 9, day: 28 },
+        { year: 2026, month: 9, day: 29 },
+        { year: 2026, month: 9, day: 30 },
+        { year: 2026, month: 10, day: 2 },
+        { year: 2026, month: 10, day: 5 },
+      ]
+      const inRange = (n: { year: number; month: number; day: number }) => {
+        const k = `${n.year}-${String(n.month).padStart(2, '0')}-${String(n.day).padStart(2, '0')}`
+        const a = `${begin.year}-${String(begin.month).padStart(2, '0')}-${String(begin.day).padStart(2, '0')}`
+        const bkey = `${end.year}-${String(end.month).padStart(2, '0')}-${String(end.day).padStart(2, '0')}`
+        return k >= a && k <= bkey
+      }
+      return {
+        tradingDays: all.filter(inRange),
+        halfTradingDays: [],
+      }
+    })
+    const cal = await b.getTradingCalendar('HK', new Date('2026-10-01T04:00:00Z'))
+    expect(cal.market).toBe('HK')
+    expect(cal.asOf).toBe('2026-10-01')
+    expect(cal.isTradingDay).toBe(false)
+    expect(cal.prevTradingDay).toBe('2026-09-30')
+    expect(cal.nextTradingDay).toBe('2026-10-02')
+    expect(cal.nextIsHalfDay).toBe(false)
+  })
+
+  it('marks half-day sessions', async () => {
+    const b = makeBroker()
+    const { quote } = attachMockContexts(b)
+    quote.tradingDays.mockResolvedValue({
+      tradingDays: [{ year: 2026, month: 12, day: 23 }, { year: 2026, month: 12, day: 28 }],
+      halfTradingDays: [{ year: 2026, month: 12, day: 24 }],
+    })
+    const cal = await b.getTradingCalendar('HK', new Date('2026-12-24T04:00:00Z'))
+    expect(cal.isTradingDay).toBe(true)
+    expect(cal.isHalfDay).toBe(true)
+    expect(cal.prevTradingDay).toBe('2026-12-23')
+    expect(cal.nextTradingDay).toBe('2026-12-28')
+  })
+
+  it('rejects unknown market codes', async () => {
+    const b = makeBroker()
+    attachMockContexts(b)
+    await expect(b.getTradingCalendar('JP')).rejects.toThrow(/Unsupported calendar market/)
+  })
+})
+
+describe('buildTradingCalendar helper', () => {
+  it('exports stable ISO date keys', async () => {
+    const { buildTradingCalendar } = await import('./LongbridgeBroker.js')
+    const cal = buildTradingCalendar(
+      'HK',
+      { y: 2026, m: 10, d: 1 },
+      new Set(['2026-09-30', '2026-10-02']),
+      new Set(),
+      '2026-10-01T01:00:00.000Z',
+    )
+    expect(cal.prevTradingDay).toBe('2026-09-30')
+    expect(cal.nextTradingDay).toBe('2026-10-02')
   })
 })
 
