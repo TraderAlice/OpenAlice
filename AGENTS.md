@@ -38,35 +38,19 @@ See [[docs/project-structure.md]] for current ownership and entry points.
 
 ## Delivery Authority
 
-- `dev` is the routine integration lane and active preview channel. Routine PRs
-  target `dev`.
-- `master` is the release-source/user-facing lane. Promotion, beta/stable tags,
-  version synchronization, feeds, and publication follow the manual contract in
-  [[docs/development-workflow.md]]; merging to `master` does not itself publish.
-- Do not commit directly to `master`. Avoid direct commits to `dev` unless the
-  maintainer explicitly requests integration work. Never force-push or delete
-  either branch.
-- Prefer merge commits for ordinary PRs. Preserve a feature branch while its
-  work is unmerged and delete it only after GitHub records a successful merge.
+- Work from current `dev` on a focused feature branch; routine PRs target `dev`.
+- After local verification, open and merge routine PRs unless a review pause or
+  feature-branch iteration hold applies. Pending CI alone does not block;
+  known product or contract failures must be resolved first.
+- A review pause blocks merging. A feature-branch iteration hold keeps work on
+  one branch without opening or merging its PR until the maintainer accepts it.
+- `master` is the release source; merging there does not publish. Never
+  force-push or delete `dev` or `master`, or commit directly to `master`.
+  Direct `dev` commits require an explicit integration request.
+- Prefer merge commits; delete feature branches only after a confirmed merge.
 
-Choose delivery authority before implementation:
-
-| Mode | Trigger | Delivery |
-|---|---|---|
-| Serial / interactive | Default when the user is actively steering concrete work | After proportional local verification, open and merge a PR to `dev` without treating pending remote CI as a synchronous lock |
-| Autonomous / topic | Explicit `/goal` or autonomous contribution request | Keep one coherent Draft PR open for later acceptance; CI never grants merge authority |
-
-An explicit feature-branch iteration request overrides PR timing in either
-mode: keep all related increments on one owned branch and do not open or merge
-its PR until the maintainer accepts it. One integrator owns that branch;
-parallel workers hand off commits rather than racing to push or creating one PR
-per finding.
-
-Pending CI alone does not block serial progress, but a known product or contract
-failure must be understood and repaired before adding scope. Beta promotion may
-use recorded local acceptance plus the lightweight master PR gates. Stable
-release, explicit review pauses, and untrusted contributions retain their full
-synchronous gates.
+Detailed delivery modes, autonomous-contribution acceptance, CI feedback, and
+release procedures live in [[docs/development-workflow.md]].
 
 ## Verification Ladder
 
