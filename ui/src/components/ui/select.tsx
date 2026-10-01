@@ -55,7 +55,7 @@ function Select({
       <SelectPrimitive.Trigger
         {...props}
         data-slot="select-trigger"
-        className={cn(inputClass, 'group/select inline-flex items-center gap-3 text-start [@media(pointer:coarse)]:min-h-11', size === 'sm' ? 'h-9 py-1.5 text-sm leading-5' : 'h-11 py-2 text-base leading-6', className)}
+        className={cn(inputClass, 'group/select inline-flex items-center gap-3 text-start [@media(pointer:coarse)]:min-h-11', size === 'sm' ? 'h-9 py-1.5 text-sm leading-5' : 'h-(--oa-control-height) py-1.5 text-sm leading-5 [@media(pointer:coarse)]:text-base', className)}
       >
         {hasIcons && <span aria-hidden className="flex size-4 shrink-0 items-center justify-center">{selected?.icon}</span>}
         <SelectPrimitive.Value className="min-w-0 flex-1 truncate" title={selected?.label} placeholder={placeholder}>{selected?.label ?? placeholder}</SelectPrimitive.Value>

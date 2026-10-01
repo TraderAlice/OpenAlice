@@ -112,7 +112,7 @@ describe('AppearanceSection palette pair editor', () => {
     expect(screen.queryByRole('button', { name: 'Recommended' })).toBeNull()
     expect(screen.queryByRole('button', { name: 'Reset pair' })).toBeNull()
     expect(screen.queryByRole('button', { name: 'Choose Paper' })).toBeNull()
-    expect(screen.getByRole('button', { name: 'Auto' }).className).toContain('min-h-10')
+    expect(screen.getByRole('button', { name: 'Auto' }).className).toContain('min-h-8')
 
     fireEvent.click(disclosure)
 
@@ -120,7 +120,7 @@ describe('AppearanceSection palette pair editor', () => {
     expect(editor?.hidden).toBe(false)
     expect(screen.getByRole('button', { name: 'Recommended' }).getAttribute('aria-pressed'))
       .toBe('true')
-    expect(screen.getByRole('button', { name: 'Recommended' }).className).toContain('min-h-10')
+    expect(screen.getByRole('button', { name: 'Recommended' }).className).toContain('min-h-8')
     expect(screen.getByRole('button', { name: 'Reset pair' }).className).toContain('min-h-10')
     expect(screen.getByRole('button', { name: 'Choose Paper' })).toBeTruthy()
     expect(screen.getByRole('button', { name: 'Choose Linen' })).toBeTruthy()

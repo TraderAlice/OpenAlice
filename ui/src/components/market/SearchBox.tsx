@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { type BarSourceCandidate, type AssetClass } from '../../api/market'
 import { useAssetSearch } from './useAssetSearch'
+import { inputClass } from '../form'
 
 const ASSET_CLASS_COLORS: Record<string, string> = {
   equity: 'bg-primary/15 text-primary',
@@ -79,7 +80,7 @@ export function SearchBox() {
         aria-expanded={Boolean(open && query.trim())}
         aria-controls={open && query.trim() ? listId : undefined}
         aria-activedescendant={open && query.trim() && results[highlight] ? `${listId}-${highlight}` : undefined}
-        className="oa-field-control w-full rounded-full border border-input bg-background px-5 py-3 text-base leading-6 outline-none transition-[border-color,box-shadow] duration-[var(--motion-fast)] [transition-timing-function:var(--motion-ease-out)] placeholder:text-muted-foreground motion-reduce:transition-none"
+        className={inputClass}
         placeholder={t('market.searchInputPlaceholder')}
         value={query}
         onChange={(e) => { setQuery(e.target.value); setOpen(true) }}

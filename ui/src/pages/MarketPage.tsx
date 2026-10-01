@@ -28,14 +28,14 @@ export function MarketPage() {
   return (
     <div className="@container/market-overview flex flex-col flex-1 min-h-0">
       <PageHeader title={t('market.pageTitle')} help={t('market.pageDescription')} />
-      <div className="flex min-h-0 flex-1 flex-col gap-8 overflow-y-auto px-[var(--page-inset)] pb-8 pt-2">
+      <div className="flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto px-[var(--page-inset)] pb-8 pt-2">
         <SearchBox />
 
         <section className="py-2">
           <div className="flex flex-col gap-3.5">
             <div className="flex flex-col gap-2 @min-[40rem]/market-overview:flex-row @min-[40rem]/market-overview:items-end @min-[40rem]/market-overview:justify-between @min-[40rem]/market-overview:gap-8">
               <div className="flex items-center gap-2">
-                <h2 className="text-lg font-semibold text-foreground">{t('market.fxTitle')}</h2>
+                <h2 className="text-base font-semibold text-foreground">{t('market.fxTitle')}</h2>
                 <ContextHelp label={t('market.fxTitle')}>{t('market.fxDescription')}</ContextHelp>
               </div>
               <div className="flex flex-wrap gap-1.5" aria-label={t('market.fxTitle')}>
@@ -75,7 +75,7 @@ export function MarketPage() {
 
         {/* S&P 500 valuation strip — the market-level regime read. */}
         <div className="flex flex-col gap-2">
-          <h3 className="text-lg font-semibold text-foreground">
+          <h3 className="text-base font-semibold text-foreground">
             {t('market.valuationTitle')}
             {strip && <span className="ml-2 normal-case font-normal tracking-normal"><BoardMeta meta={strip.meta} /></span>}
           </h3>
@@ -107,7 +107,7 @@ export function MarketPage() {
         <section className="py-2">
           <div>
             <div className="flex items-end justify-between gap-6">
-              <h2 className="text-lg leading-6 font-semibold text-foreground">{t('market.overviewTitle')}</h2>
+              <h2 className="text-base leading-6 font-semibold text-foreground">{t('market.overviewTitle')}</h2>
             </div>
 
             <div className="mt-3 grid grid-cols-1 gap-3 @min-[28rem]/market-overview:grid-cols-2 @min-[64rem]/market-overview:grid-cols-4">
@@ -154,12 +154,12 @@ function MarketLaunchCard({
     <button
       type="button"
       onClick={onClick}
-      className="oa-data-surface oa-pressable group flex min-h-20 items-center gap-4 rounded-2xl px-5 py-4 text-left hover:border-foreground/20 hover:bg-muted/50"
+      className="oa-data-surface oa-pressable group flex min-h-12 items-center gap-3 rounded-xl px-3 py-2 text-left hover:border-foreground/20 hover:bg-muted/50"
     >
-      <span className="flex h-10 w-10 shrink-0 rounded-full bg-background items-center justify-center text-muted-foreground">
+      <span className="flex size-7 shrink-0 rounded-md bg-background items-center justify-center text-muted-foreground">
         {icon}
       </span>
-      <span className="min-w-0 text-base font-medium text-foreground">{title}</span>
+      <span className="min-w-0 text-sm font-medium text-foreground">{title}</span>
     </button>
   )
 }

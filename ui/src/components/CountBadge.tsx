@@ -24,7 +24,7 @@ export function CountBadge({ count, label, limit, tone = 'info', className, id, 
       title={label}
       data-slot="count-badge"
       data-tone={tone}
-      className={cn('inline-flex h-6 min-w-6 shrink-0 items-center justify-center rounded-full px-1.5 text-sm font-semibold leading-5 tabular-nums', countTone[tone], className)}
+      className={cn('inline-flex h-5 min-w-5 shrink-0 items-center justify-center rounded-full px-1.5 text-sm font-medium leading-5 tabular-nums', countTone[tone], className)}
     >
       {limit !== undefined && count > limit ? `${limit}+` : count}
     </span>

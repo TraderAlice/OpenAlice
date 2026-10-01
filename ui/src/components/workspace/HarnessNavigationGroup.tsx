@@ -20,7 +20,7 @@ export function HarnessNavigationGroup({ title, compact, compactIcon, active, ne
     return (
       <Tooltip>
         <TooltipTrigger render={<button type="button" aria-label={label} aria-current={active ? 'page' : undefined} onClick={onOpen}
-          className={`oa-nav-item flex size-11 items-center justify-center [&_svg]:size-5 rounded-full ${active ? 'bg-sidebar-accent text-sidebar-accent-foreground' : 'text-sidebar-foreground hover:bg-sidebar-accent/60'}`} />}>
+          className={`oa-nav-item flex size-11 items-center justify-center [&_svg]:size-4 rounded-md ${active ? 'bg-sidebar-accent text-sidebar-accent-foreground' : 'text-sidebar-foreground hover:bg-sidebar-accent/60'}`} />}>
           {compactIcon}
         </TooltipTrigger>
         <TooltipContent side="right">{label}</TooltipContent>
@@ -29,10 +29,10 @@ export function HarnessNavigationGroup({ title, compact, compactIcon, active, ne
   }
   return (
     <section aria-label={label} className="min-w-0">
-      <div className={`oa-harness-nav-header flex min-h-10 items-center rounded-full md:min-h-8 ${active ? 'bg-sidebar-accent' : 'hover:bg-sidebar-accent/60'}`}>
+      <div className={`oa-harness-nav-header flex min-h-(--oa-nav-height) items-center rounded-md ${active ? 'bg-sidebar-accent' : 'hover:bg-sidebar-accent/60'}`}>
         <button type="button" aria-label={label} aria-current={active ? 'page' : undefined} onClick={onOpen}
-          className={`oa-nav-item flex min-h-10 min-w-0 flex-1 items-center gap-2.5 rounded-full px-2.5 text-left text-sm leading-6 font-normal aria-[current=page]:font-semibold md:min-h-8 ${active ? 'text-foreground' : 'text-sidebar-foreground hover:text-foreground'}`}>
-          <span className="flex h-5 w-5 shrink-0 items-center justify-center">{compactIcon}</span>
+          className={`oa-nav-item oa-primary-nav-row flex min-w-0 flex-1 items-center rounded-md text-left font-normal aria-[current=page]:font-medium ${active ? 'text-foreground' : 'text-sidebar-foreground hover:text-foreground'}`}>
+          <span className="oa-navigation-icon">{compactIcon}</span>
           <span className="truncate">{title}</span>
         </button>
         <div className="oa-harness-nav-actions flex shrink-0 items-center pr-1">

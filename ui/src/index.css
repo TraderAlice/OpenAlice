@@ -5,14 +5,6 @@
 @import "./theme/style-profiles.css";
 @import "./theme/motion.css";
 
-@font-face {
-  font-family: "Inter";
-  font-style: normal;
-  font-display: swap;
-  font-weight: 100 900;
-  src: url("./assets/fonts/InterVariable.woff2") format("woff2-variations");
-}
-
 /* Tailwind aliases for the semantic color card. The core names intentionally
    mirror Orca/shadcn; this does not import or require the shadcn component
    library. `inline` keeps utilities connected to the active runtime palette. */
@@ -79,7 +71,7 @@
   --color-office-label: var(--office-label);
   --color-office-label-foreground: var(--office-label-foreground);
 
-  --font-sans: "Inter", "PingFang SC",
+  --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
     "Microsoft YaHei", "Hiragino Sans GB", "Noto Sans CJK SC", sans-serif;
   --font-mono: "SF Mono", "Fira Code", "Cascadia Code", Menlo, Consolas,
     monospace;
@@ -90,17 +82,20 @@
   --text-sm--line-height: 20px;
   --text-base: 16px;
   --text-base--line-height: 24px;
-  --radius-sm: 8px;
-  --radius-md: 12px;
-  --radius-lg: 16px;
-  --radius-xl: 20px;
-  --radius-2xl: 26px;
-  --radius-3xl: 32px;
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 10px;
+  --radius-xl: 12px;
+  --radius-2xl: 16px;
+  --radius-3xl: 20px;
 }
 
 /* Base resolution (no attribute / explicit light). */
 :root {
-  --page-inset: 32px;
+  --page-inset: 24px;
+  --oa-control-height: 36px;
+  --oa-nav-height: 32px;
+  --oa-panel-inset: 16px;
   --oa-row-gap: 4px;
   --oa-control-hover-border: color-mix(in srgb, var(--foreground) 18%, transparent);
   --oa-control-focus-border: color-mix(in srgb, var(--foreground) 28%, transparent);
@@ -117,7 +112,7 @@
    would pick (Han unification). Scoped via <html lang="ja">, which the locale
    store keeps in sync. */
 :root:lang(ja) {
-  --font-sans: "Inter",
+  --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI",
     "Hiragino Kaku Gothic ProN", "Hiragino Sans", "Yu Gothic", "YuGothic",
     "Meiryo", "Noto Sans JP", sans-serif;
 }
@@ -127,7 +122,7 @@
    the default stack would pick. Scoped via <html lang="zh-Hant"> — region-
    neutral (serves both Taiwan and Hong Kong Traditional readers). */
 :root:lang(zh-Hant) {
-  --font-sans: "Inter",
+  --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI",
     "PingFang TC", "Microsoft JhengHei", "Noto Sans TC",
     "Noto Sans CJK TC", sans-serif;
 }
@@ -172,23 +167,31 @@ body {
   background: color-mix(in srgb, var(--info) 70%, var(--muted-foreground));
 }
 
-/* Expanded desktop navigation has one inset per hierarchy level. Keep these
-   density rules out of the compact rail and touch navigation. */
-@media (pointer: coarse) {
-  .oa-sidebar-child-row { min-height: 44px; }
+@media (max-width: 767px), (pointer: coarse) {
+  :root { --oa-control-height: 44px; --oa-nav-height: 44px; }
 }
+.oa-primary-nav-row {
+  min-height: var(--oa-nav-height);
+  gap: 8px;
+  padding: 6px 10px;
+  font-size: 14px;
+  line-height: 20px;
+}
+.oa-navigation-icon {
+  display: flex;
+  flex: 0 0 16px;
+  width: 16px;
+  height: 16px;
+  align-items: center;
+  justify-content: center;
+}
+.oa-navigation-icon > svg { width: 16px; height: 16px; }
 @media (min-width: 768px) and (hover: hover) and (pointer: fine) {
-  #activity-bar:not([data-rail-layout="compact"]) .oa-nav-item {
-    min-height: 48px;
-    padding-inline: 16px;
-    gap: 16px;
-  }
-  #activity-bar .oa-harness-nav-header { min-height: 48px; }
   #activity-bar .oa-harness-nav-actions > button { height: 28px; }
-  #activity-bar .oa-harness-nav-children { margin-left: 28px; padding-bottom: 8px; }
+  #activity-bar .oa-harness-nav-children { margin-left: 24px; padding-bottom: 4px; }
   #activity-bar .oa-harness-nav-children .oa-sidebar-child-row {
     margin-inline: 0;
-    min-height: 40px;
+    min-height: var(--oa-nav-height);
     padding-block: 4px;
   }
 }
@@ -774,8 +777,8 @@ body {
   flex-wrap: wrap;
   align-items: center;
   gap: 4px 8px;
-  min-height: 56px;
-  padding: 8px 20px;
+  min-height: 44px;
+  padding: 4px 16px;
   border-bottom: 1px solid transparent;
   color: var(--foreground);
 }
@@ -784,16 +787,16 @@ body {
 .oa-topbar-identity { display: flex; flex: 1 1 6rem; min-width: 0; align-items: center; gap: 8px; }
 .oa-topbar-actions { display: flex; flex: 0 1 auto; max-width: 100%; min-width: 0; flex-wrap: wrap; align-items: center; gap: 4px; }
 .oa-topbar-actions > div { max-width: 100%; flex-wrap: wrap; }
-.oa-topbar[data-heading="page"] { min-height: 80px; padding: 16px var(--page-inset); }
-.oa-topbar[data-heading="page"] h2 { font-size: 22px; line-height: 27.5px; letter-spacing: -0.018em; }
+.oa-topbar[data-heading="page"] { min-height: 44px; padding: 4px var(--page-inset); }
+.oa-topbar[data-heading="page"] h2 { font-size: 18px; line-height: 24px; letter-spacing: -0.01em; }
 .oa-desktop-mac .oa-topbar[data-heading="page"],
 :root[data-window-chrome="windows"] .oa-topbar[data-heading="page"] { min-height: 44px; padding-block: 4px; }
 .oa-desktop-mac .oa-topbar[data-heading="page"] h2,
 :root[data-window-chrome="windows"] .oa-topbar[data-heading="page"] h2 { font-size: 18px; line-height: 24px; }
 @media (max-width: 767px), (pointer: coarse) {
   .oa-topbar { min-height: 48px; }
-  .oa-topbar[data-heading="page"] { min-height: 72px; padding: 12px var(--page-inset); }
-  .oa-topbar[data-heading="page"] h2 { font-size: 22px; line-height: 27.5px; }
+  .oa-topbar[data-heading="page"] { min-height: 56px; padding: 6px var(--page-inset); }
+  .oa-topbar[data-heading="page"] h2 { font-size: 18px; line-height: 24px; }
 }
 
 /* ==================== Live-data pulse ====================
@@ -1072,22 +1075,6 @@ html[lang="ja"] .oa-onboarding-title {
   .oa-nav-item:hover .oa-nav-icon {
     transform: none;
   }
-}
-
-/* ==================== Button utility classes ==================== */
-
-:is(.btn-primary, .btn-secondary, .btn-danger, .btn-primary-sm, .btn-secondary-sm) {
-  @apply inline-flex min-h-11 items-center justify-center gap-2 rounded-full border border-transparent px-5 py-2 text-sm font-semibold outline-none transition-[color,background-color,border-color,box-shadow,scale] duration-[var(--motion-fast)] active:scale-[0.98] disabled:opacity-40 disabled:cursor-default focus-visible:transition-none motion-reduce:transition-none;
-}
-:is(.btn-primary-sm, .btn-secondary-sm) { @apply min-h-9 px-4 py-1.5; }
-:is(.btn-primary, .btn-primary-sm) { @apply bg-action text-action-foreground hover:bg-action-hover; }
-:is(.btn-secondary, .btn-secondary-sm) { @apply bg-secondary text-secondary-foreground hover:bg-muted; }
-.btn-danger { @apply border-destructive/30 text-destructive hover:bg-destructive/10; }
-:is(.btn-primary, .btn-secondary, .btn-danger, .btn-primary-sm, .btn-secondary-sm):focus-visible {
-  box-shadow: var(--oa-focus-shadow);
-}
-@media (pointer: coarse) {
-  :is(.btn-primary-sm, .btn-secondary-sm) { min-height: 44px; }
 }
 
 /* Native scrollbars stay subtle and gain contrast under the pointer. */
@@ -1901,14 +1888,14 @@ body:has([data-desktop-banner]):not(:has(.oa-office-main)) [data-sonner-toaster]
   transition: none;
 }
 
-.oa-config-section + .oa-config-section { margin-top: 24px; }
+.oa-config-section + .oa-config-section { margin-top: 16px; }
 
 .oa-inference-setting {
   display: grid;
   grid-template-columns: 20px minmax(0, 0.8fr) minmax(0, 1.4fr) 16px;
-  min-height: 48px;
-  gap: 12px;
-  padding: 10px 12px;
+  min-height: var(--oa-control-height);
+  gap: 8px;
+  padding: 8px 10px;
   font-size: 14px;
   line-height: 20px;
   overflow-wrap: anywhere;

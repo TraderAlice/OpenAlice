@@ -9,14 +9,14 @@ import type { MacroSeriesCard } from '../../api/reference'
 export function SeriesCard({ card, label, emptyText }: { card: MacroSeriesCard; label: string; emptyText: string }) {
   const empty = card.points.length === 0
   return (
-    <div className="oa-data-surface flex min-w-0 flex-col gap-4 rounded-2xl p-4 text-start sm:p-6">
+    <div className="oa-data-surface flex min-w-0 flex-col gap-3 rounded-2xl p-(--oa-panel-inset) text-start">
       <div className="flex flex-1 flex-col items-start justify-between gap-1">
         <span className="text-sm text-muted-foreground break-words" title={card.id}>{label}</span>
         <span className="shrink-0 text-sm text-muted-foreground">{card.latestDate ?? ''}</span>
       </div>
       <div className="mt-auto flex min-w-0 flex-wrap items-end justify-between gap-2">
         <div className="flex min-w-0 items-baseline gap-2">
-          <span className="shrink-0 text-[28px] leading-9 font-semibold tracking-[-0.02em] text-foreground tabular-nums">{fmtSeriesValue(card, card.latest)}</span>
+          <span className="shrink-0 text-[24px] leading-8 font-semibold tracking-[-0.02em] text-foreground tabular-nums">{fmtSeriesValue(card, card.latest)}</span>
           {card.change != null && card.change !== 0 && (
             <span className={`text-sm leading-5 tabular-nums ${card.change > 0 ? 'text-success' : 'text-destructive'}`}>
               {card.change > 0 ? '+' : ''}{card.unit === 'count' ? fmtCompactNum(card.change) : card.change.toFixed(2)}

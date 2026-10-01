@@ -31,7 +31,7 @@ export function SegmentedControl<T extends string>({
       value={[value]}
       onValueChange={([next]) => { if (next !== undefined) onChange(next) }}
       aria-label={ariaLabel}
-      className={`scrollbar-hide flex w-fit max-w-full items-center gap-0.5 overflow-x-auto rounded-full bg-secondary p-1 ${className}`}
+      className={`scrollbar-hide flex w-fit max-w-full items-center gap-0.5 overflow-x-auto rounded-lg bg-secondary p-0.5 ${className}`}
     >
       {options.map((option) => {
         const active = option.value === value
@@ -42,8 +42,8 @@ export function SegmentedControl<T extends string>({
             type="button"
             aria-label={option.ariaLabel}
             aria-controls={option.ariaControls}
-            className={`oa-segmented-option shrink-0 whitespace-nowrap rounded-full font-semibold outline-none focus-visible:[box-shadow:var(--oa-focus-shadow)] [@media(pointer:coarse)]:min-h-11 ${
-              compact ? 'min-h-8 px-3 text-sm' : 'min-h-10 px-4 text-sm'
+            className={`oa-segmented-option shrink-0 whitespace-nowrap rounded-md font-medium outline-none focus-visible:[box-shadow:var(--oa-focus-shadow)] [@media(pointer:coarse)]:min-h-11 ${
+              compact ? 'min-h-7 px-2.5 text-sm' : 'min-h-8 px-3 text-sm'
             } ${
               active
                 ? 'text-background'

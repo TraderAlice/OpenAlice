@@ -319,7 +319,7 @@ export function UTADetailPage({ spec }: UTADetailPageProps) {
             <EmptyState title="Live account data is unavailable." description="Retry after checking the broker connection and account health." />
           ) : (
             <div className="space-y-5">
-              <div className="grid items-stretch gap-4 @4xl:grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)]">
+              <div className="grid items-stretch gap-4 @3xl:grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)]">
                 <AccountPanel
                   account={account}
                   positions={positions}
@@ -496,13 +496,13 @@ function AccountPanel({ account, positions, delta24h, clock, connecting, selecto
   useLayoutEffect(() => {
     if (account && panelRef.current) setLoadedHeight(panelRef.current.offsetHeight)
   }, [account])
-  const header = <div className="mb-4 flex min-h-11 flex-wrap items-center justify-between gap-2">
+  const header = <div className="mb-3 flex min-h-(--oa-control-height) flex-wrap items-center justify-between gap-2">
     {selector ?? <h3 className="text-sm font-semibold">Account</h3>}
     {clock != null && <span className="shrink-0 text-sm"><MarketClockChip clock={clock} /></span>}
   </div>
   if (!account) {
     return (
-      <div ref={panelRef} className="min-w-0 rounded-lg border border-border bg-card p-4 sm:p-6" style={{ minHeight: loadedHeight }} aria-busy={!error}>
+      <div ref={panelRef} className="min-w-0 rounded-lg border border-border bg-card p-(--oa-panel-inset)" style={{ minHeight: loadedHeight }} aria-busy={!error}>
         {header}
         <p className="mb-3.5 text-sm text-muted-foreground" role="status">
           {error ? 'Account data is unavailable.' : connecting ? 'Connecting to broker…' : 'Loading account info…'}
@@ -553,7 +553,7 @@ function AccountPanel({ account, positions, delta24h, clock, connecting, selecto
     : null
 
   return (
-    <div ref={panelRef} className="min-w-0 rounded-lg border border-border bg-card p-4 sm:p-6">
+    <div ref={panelRef} className="min-w-0 rounded-lg border border-border bg-card p-(--oa-panel-inset)">
       {header}
 
       <Metric
@@ -566,7 +566,7 @@ function AccountPanel({ account, positions, delta24h, clock, connecting, selecto
         } : { value: '— 24h', sign: 'flat' }}
       />
 
-      <dl className="mt-5 border-t border-border divide-y divide-border">
+      <dl className="mt-4 border-t border-border divide-y divide-border">
         <AccountRow label="Cash" value={fmt(account.totalCashValue, ccy)} />
 
         <AccountRow label="Positions Value" value={fmt(positionsValue, ccy)} />
@@ -621,7 +621,7 @@ function AccountRow({ label, value, sign }: {
 }) {
   const valueColor = sign === 'up' ? 'text-success' : sign === 'down' ? 'text-destructive' : 'text-foreground'
   return (
-    <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1.35fr)] items-baseline gap-4 py-3">
+    <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1.35fr)] items-baseline gap-3 py-2">
       <dt className="min-w-0 text-sm font-medium text-muted-foreground">{label}</dt>
       <dd className={`min-w-0 text-sm leading-5 font-medium tabular-nums text-right [overflow-wrap:anywhere] ${valueColor}`}>{value}</dd>
     </div>

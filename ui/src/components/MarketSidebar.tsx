@@ -109,7 +109,7 @@ export function MarketSidebar({ onNavigate }: { onNavigate?: () => void }) {
           onKeyDown={handleSearchKeyDown}
           placeholder={t('market.searchPlaceholder')}
           aria-label={t('market.searchPlaceholder')}
-          className={`${inputClass} px-2.5 text-base`}
+          className={`${inputClass} px-2.5`}
         />
       </div>
 

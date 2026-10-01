@@ -1,4 +1,5 @@
 import { useRef, useState, type ReactNode, type RefObject } from 'react'
+import { Button } from './ui/button'
 
 import {
   AlertDialog,
@@ -66,8 +67,6 @@ export function ConfirmDialog({
     }
   }
 
-  const confirmClass = variant === 'danger' ? 'btn-danger' : 'btn-primary'
-
   return (
     <AlertDialog
       open
@@ -86,7 +85,7 @@ export function ConfirmDialog({
           : restoreFocusRef.current?.isConnected ? restoreFocusRef.current : fallbackFocusRef?.current ?? false}
       >
         <div className="px-6 pt-6 pb-3">
-          <AlertDialogTitle className="text-[22px] leading-7 font-semibold">
+          <AlertDialogTitle>
             {title}
           </AlertDialogTitle>
         </div>
@@ -95,18 +94,18 @@ export function ConfirmDialog({
         >
           {message}
         </AlertDialogDescription>
-        <div className="flex justify-end gap-3 bg-secondary px-6 py-5">
-          <AlertDialogCancel ref={cancelRef} className="btn-secondary" disabled={busy}>
+        <div className="flex justify-end gap-2 bg-secondary px-6 py-4">
+          <AlertDialogCancel ref={cancelRef} variant="secondary" disabled={busy}>
             {cancelLabel}
           </AlertDialogCancel>
-          <button
+          <Button
             type="button"
             onClick={handleConfirm}
             disabled={busy}
-            className={confirmClass}
+            variant={variant === 'danger' ? 'destructive' : 'default'}
           >
             {busy ? workingLabel : confirmLabel}
-          </button>
+          </Button>
         </div>
       </AlertDialogContent>
     </AlertDialog>

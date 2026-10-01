@@ -381,7 +381,7 @@ function ClusterRow({
           onClick()
         }
       }}
-      className={`group relative grid min-h-11 grid-cols-[auto_minmax(0,1fr)] gap-x-1.5 gap-y-1 rounded-xl pl-3 pr-3 py-3 cursor-pointer transition-colors outline-none focus-visible:bg-muted/70 ${
+      className={`group relative grid min-h-11 grid-cols-[auto_minmax(0,1fr)] gap-x-1.5 gap-y-1 rounded-md px-2.5 py-2 cursor-pointer transition-colors outline-none focus-visible:bg-muted/70 ${
         active ? 'bg-muted' : 'hover:bg-muted/50'
       }`}
     >
@@ -479,7 +479,7 @@ function TimeRow({
           onClick()
         }
       }}
-      className={`group relative flex min-h-14 flex-col justify-center gap-1 rounded-xl px-3 py-3 cursor-pointer transition-colors outline-none focus-visible:bg-muted/70 ${
+      className={`group relative flex min-h-12 flex-col justify-center gap-1 rounded-md px-2.5 py-2 cursor-pointer transition-colors outline-none focus-visible:bg-muted/70 ${
         active ? 'bg-muted' : 'hover:bg-muted/50'
       }`}
     >

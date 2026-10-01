@@ -3,7 +3,7 @@ import type { ComponentProps, ReactNode } from 'react'
 /** Shared geometry for Harness child destinations; actions are sibling controls. */
 export function SidebarChildRow({ active, className = '', children, ...props }: ComponentProps<'div'> & { active: boolean }) {
   return <div {...props} data-active={active}
-    className={`oa-sidebar-child-row text-sm group relative mx-1.5 flex min-h-9 items-center gap-1 rounded-full px-3 py-1.5 transition-colors ${active ? 'bg-sidebar-accent text-sidebar-accent-foreground' : 'hover:bg-sidebar-accent/65'} ${className}`}>
+    className={`oa-sidebar-child-row text-sm group relative mx-1.5 flex min-h-(--oa-nav-height) items-center gap-1 rounded-md px-2.5 py-1 transition-colors ${active ? 'bg-sidebar-accent text-sidebar-accent-foreground' : 'hover:bg-sidebar-accent/65'} ${className}`}>
     {children}
   </div>
 }

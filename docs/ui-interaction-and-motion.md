@@ -12,20 +12,30 @@ Shared components own visual geometry, interaction states, and motion.
 
 ## Visual Language
 
-The default light surface follows measurements from the public
-[Wise Business demo](https://wise.com/business-demo) and the clarity principles in
-[Wise Design](https://wise.design/brand). OpenAlice retains its product identity,
-financial semantics, and existing workflow contracts.
+The workbench follows the compact layout of the current Codex desktop app.
+Navigation, toolbars, menus, fields, and cards share the density tokens in
+`ui/src/index.css`. Product semantics and existing workflow contracts remain
+owned by OpenAlice. Palette selection remains independent of layout density.
 
 - `theme/palette.css` owns white surfaces, forest ink (`#163300`), primary action
   lime (`#9FE870`), and secondary forest tint. `--action` owns filled controls;
   `--primary` owns links and text. Secondary tint is composited over the canvas;
   floating surfaces remain opaque. Saved palette identifiers remain stable.
-- Inter is served locally under the SIL Open Font License. Supporting copy uses
-  14px, fields use 16px, and page titles use 22px with a 1.25 line height.
-  Locale-specific fallback fonts retain the correct CJK glyph forms.
-- Main navigation uses a 48px target and 24px radius. Primary actions use 40px
-  capsules. Cards use a 26px radius and tonal separation. Touch targets use 44px.
+- Typography uses the platform UI font stack: Apple system fonts on macOS,
+  Segoe UI on Windows, and locale-aware CJK fallbacks. Navigation, labels, menu
+  choices, and desktop fields use 14px with a 20px line height. Reading content
+  and touch fields retain 16px. Page titles use 18px with a 24px line height.
+  Dialog titles share the 18px heading role. The font resolves locally during first paint.
+- `--oa-nav-height` owns 32px desktop navigation rows. Icons use a fixed 16px
+  slot and an 8px text gap. Selected rows use an 8px radius. The expanded
+  primary rail is 240px wide, its intermediate layout is 220px, and the compact
+  rail is 64px. Native macOS chrome retains its 88px compact rail.
+- `--oa-control-height` owns 36px desktop fields and standard buttons; small
+  buttons and menu choices use 32px. Page headers share a 44px band. Cards use
+  10–16px radii and `--oa-panel-inset` at 16px. Page insets are 24px on desktop
+  and 16px on narrow screens. Touch navigation and controls retain 44px targets.
+- Hero metrics use 28px, card metrics use 20px, and secondary metrics use 16px.
+  Launch headings use 24–28px with a 64px illustration and stable suggestion space.
 - Prices, percentages, counts, and timestamps use tabular numerals. Machine
   identifiers and commands retain monospace. Selection checks use neutral ink.
 - Copy names the object, state, or operation. ContextHelp owns extended guidance,
@@ -46,18 +56,18 @@ financial semantics, and existing workflow contracts.
   transfer within the provider window, and a 110ms exit.
 - Inference rows use one four-column layout: a 20px icon, label, wrapping value,
   and a fixed 16px chevron. Label and value columns align to their start edges.
-  The trigger shows the model and an explicit effort override. Default effort remains in its menu. Utility menus use 40px rows,
+  The trigger shows the model and an explicit effort override. Default effort remains in its menu. Utility menus use 32px rows,
   44px touch targets, and immediate keyboard highlighting.
   Menus size to their content with a 224px minimum and a 448px maximum,
   constrained to the viewport with 16px side clearance. Popup padding is 6px;
-  rows and labels share a 12px inner inset. Icon rows reserve 16px plus a 12px
+  rows and labels share a 10px inner inset. Icon rows reserve 16px plus an 8px
   text gap. Group labels and icon-free sibling choices use the same text inset.
   Checks and submenu arrows share the trailing rail. Workspace switching has a
   full labeled row. Action names and model identifiers wrap at the viewport
   boundary; model lists own scrolling inside a fixed header and footer.
 - Supporting text uses the shared 14px role across product components and pages.
-  Form entry uses 16px. Shared menu callers inherit row geometry; their classes
-  describe product layout and state. Tabs share capsule spacing and neutral
+  Touch form entry uses 16px. Shared menu callers inherit row geometry; their classes
+  describe product layout and state. Tabs share compact spacing and neutral
   selection. Popovers and dialogs stay within the viewport and scroll internally.
   Account cards respond to their container width, and names wrap within each card.
   Refresh timestamps use a clock icon. Active session badges use an activity icon.
@@ -68,8 +78,8 @@ financial semantics, and existing workflow contracts.
   details reuse Collapsible. Palette and style choices use neutral borders and selection checks.
   Preview colors remain inside their palette surfaces. Active palette labels
   wrap on narrow screens.
-- Main navigation uses regular Inter labels with semibold selection. Harness
-  children use a consistent 28px inset. Background work carries a numeric count.
+- Main navigation uses regular UI labels with medium selection. Harness
+  children use a consistent 24px desktop inset. Background work carries a numeric count.
   Manager quick starts use short operation names; full prompts remain available
   through hover and keyboard guidance and populate the editable draft.
 - Financial movement and operational health retain their dedicated semantic
@@ -184,7 +194,7 @@ visible on touch devices; Quant and Prediction share its presentation.
 `SidebarChildRow` and `SidebarChildRowButton` own Harness child geometry for
 both Studio and Sessions: a 16px icon slot, 8px label gap, shared selection and
 keyboard focus, and sibling action controls. Expanded fine-pointer desktop rows
-are 40px tall with no additional per-destination vertical padding; other surfaces
+are 32px tall with no additional per-destination vertical padding; other surfaces
 retain the existing Session row density. Keep runtime behavior in the caller.
 Harness working views use one content top bar, not a second conversation sidebar.
 TerminalView has no card/canvas mode: its header always uses PageTopBar and its
@@ -472,7 +482,7 @@ share a 16px horizontal inset and a trailing switch rail; tool names align with
 the group label after the 16px chevron and 12px gap. Inset separators stay inside
 the rounded boundary. Long group labels and tool identifiers wrap within their
 text column; identifiers prefer camel-case and delimiter boundaries. Header
-targets start at 48px tall, tool rows start at 56px, and sibling
+targets start at the shared control height, tool rows start at 44px, and sibling
 groups retain an 8px gap. Keyboard disclosure and reduced motion update the
 chevron and panel immediately. The narrow search toolbar reserves a separate
 save-status row, preserving the input width and the first group's position.
@@ -532,7 +542,7 @@ keyboard navigation, outside dismissal, scroll locking, and focus return.
   Responsive compact mode is a default, never a lock. Entering Chat, Quant, or
   Prediction no longer auto-collapses the rail: it owns their session lists.
   Explicit expanded/collapsed preferences apply across all product areas.
-- `TopBar` owns compact header geometry (40px desktop, at least 48px on phone).
+- `TopBar` owns compact header geometry (44px desktop, at least 48px on phone).
   `PageContentLayout` owns a fixed header slot; `PageTopBar` portals a page's
   title and actions into it without copying business state or callbacks.
   `PageHeader` adds description/live metadata below this bar. Keep large
@@ -835,7 +845,7 @@ the AI-power conversation, including approval, idle timeout and completion.
 
 ## Compact activity notifications
 
-The shared Sonner layer uses readable 352px pop-out cards, Inter,
+The shared Sonner layer uses readable 352px pop-out cards, the shared UI font,
 semantic popover colors, internal close controls, bounded previews and actions
 below copy. News may include a 64×48 feed image, validated at the producer and
 renderer; missing/failed media collapses without a placeholder. Article identity,
@@ -881,8 +891,8 @@ provides an explicit retry. Continuous motion pauses offscreen and in hidden
 pages; reduced-motion preference removes looping and transition effects.
 
 `MeasuredText` uses the pinned Pretext 0.0.8 package. Prepared layouts are cached
-by text and typography. DOM content remains selectable. Local Inter is the
-measured font; width changes recompute line wrapping through the shared owner.
+by text and typography. DOM content remains selectable. The element’s resolved font supplies measured
+glyph metrics; width changes recompute line wrapping through the shared owner.
 
 `SettingsArea` preserves navigation DOM, width, scroll position, and focus across
 category changes. Appearance, Overview language selection, and market filters share `SegmentedControl`.
@@ -917,15 +927,14 @@ the running controls, disclosures, menus, and dialogs.
 
 ### Shared alignment and state feedback
 
-`SettingsScrollArea` owns page insets through `--page-inset`: 32px on desktop
+`SettingsScrollArea` owns page insets through `--page-inset`: 24px on desktop
 and 16px below 768px. Page headings and supporting copy use the same token.
 Settings content keeps a leading-edge reading rail at every width; individual
 sections retain their content-width limits. Market boards, Portfolio, account
 detail, and connector status reuse the same inset token. Embedded configuration retains its
 explicit dialog insets.
 
-Configuration and market cards use 16px inner spacing on small screens and
-24px from 640px. Header controls wrap inside the card. Runtime disclosure copy
+Configuration and financial cards use the shared 16px panel inset. Header controls wrap inside the card. Runtime disclosure copy
 shares the runtime-name inset. Series cards place the date on its own line
 and anchor value groups to the row’s shared lower edge. Dialog and confirmation headings use start
 alignment, and long configuration titles wrap inside the available space.
@@ -988,12 +997,12 @@ wallets retain their margin row across wallet selections. Summary values
 use tabular numerals and aligned definition-list columns. Native account
 currency follows the snapshot through axes, tooltips, and detail metrics.
 
-The compact navigation rail is 68px wide with 44px controls and 4px item gaps.
+The compact navigation rail is 64px wide with 44px controls and 4px item gaps.
 The page-sidebar title keeps the body text inset; its expansion control occupies
 the trailing action slot. Count badges use blue for information, green for
 running activity, and amber for attention. Selection glyphs retain neutral ink.
 
-Settings overview sections share the ConfigSection surface and a 24px section
+Settings overview sections share the ConfigSection surface and a 16px section
 gap. Version rows reserve explicit identity, status, and action columns on wide
 containers. Disclosure controls use fixed-size chevrons and the shared
 Collapsible timing, keyboard, and reduced-motion behavior.
@@ -1029,14 +1038,15 @@ keyboard navigation, dismissal, focus, and portal positioning. Suggestion select
 leaves the enclosing form pending explicit submission.
 
 `ui/choice-styles.ts` owns the popup surface and option geometry shared by selection
-fields and suggestions. Action-menu popups reuse that surface. A 1px neutral border,
+fields and suggestions. Action menus reuse that surface and option geometry. A 1px neutral border,
 6px inner padding, 10px option inset, and fixed 16px trailing selection slot align
 field labels with option labels. Runtime identities use a fixed 16px leading slot.
 Options wrap long text through `MeasuredText`; triggers retain one line and expose
 the complete selected label. Form popups follow the anchor width. Compact toolbar
 and suggestion popups use content width with a 32rem limit. Popups retain 16px
-viewport clearance and scroll within the available height. Form controls are 44px tall;
-compact toolbar controls are 36px tall with 44px coarse-pointer targets.
+viewport clearance and scroll within the available height. Desktop form controls are 36px tall;
+compact toolbar buttons are 32px tall and selection fields are 36px tall.
+Coarse-pointer targets retain a 44px minimum.
 
 Opening and closing use the shared origin-aware opacity and scale transition.
 Reduced motion removes the transition. The popup occupies the overlay layer, and

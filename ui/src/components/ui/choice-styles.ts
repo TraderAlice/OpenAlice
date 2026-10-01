@@ -2,4 +2,4 @@ export const choicePopupClass = 'origin-(--transform-origin) overflow-hidden rou
 
 export const choiceListClass = 'max-h-[min(28rem,calc(var(--available-height)_-_2px))] overflow-y-auto overscroll-contain space-y-(--oa-row-gap) p-1.5 [scrollbar-width:thin]'
 
-export const choiceItemClass = 'flex min-h-10 min-w-0 cursor-default items-center gap-3 rounded-[calc(var(--radius-xl)-0.375rem)] px-2.5 py-2 text-start text-sm leading-5 outline-none select-none data-highlighted:bg-accent data-selected:not-data-highlighted:bg-muted/60 data-disabled:opacity-50 data-disabled:pointer-events-none [@media(pointer:coarse)]:min-h-11'
+export const choiceItemClass = 'flex min-h-8 min-w-0 cursor-default items-center gap-2 rounded-md px-2.5 py-1.5 text-start text-sm leading-5 outline-none select-none data-highlighted:bg-accent data-selected:not-data-highlighted:bg-muted/60 data-disabled:opacity-50 data-disabled:pointer-events-none [@media(pointer:coarse)]:min-h-11'

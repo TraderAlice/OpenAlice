@@ -436,7 +436,7 @@ export function ChatWorkspaceSection({
           ))}
           {navigationSessions.length > visibleNavigationSessions.length && (
             <button type="button" onClick={event => openConversationBrowser(currentWorkspace?.id ?? null, event.currentTarget)}
-              className="oa-nav-row flex min-h-10 w-full items-center rounded-full px-3 text-left text-sm text-muted-foreground hover:bg-sidebar-accent">
+              className="oa-nav-row flex min-h-(--oa-nav-height) w-full items-center rounded-md px-2.5 text-left text-sm text-muted-foreground hover:bg-sidebar-accent">
               {t('chat.viewAllConversations', { count: navigationSessions.length })}
             </button>
           )}

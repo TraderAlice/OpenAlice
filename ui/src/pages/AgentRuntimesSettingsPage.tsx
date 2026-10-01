@@ -178,7 +178,7 @@ export function AgentRuntimesSettingsPage() {
                   return (
                     <li
                       key={agent.id}
-                      className="flex min-h-12 min-w-0 items-center gap-2 border-b border-border/60 px-3 py-2 last:border-b-0"
+                      className="flex min-h-11 min-w-0 items-center gap-2 border-b border-border/60 px-3 py-2 last:border-b-0"
                     >
                       <span className="w-5 shrink-0 text-sm leading-5 tabular-nums text-muted-foreground">{index + 1}</span>
                       <AgentRuntimeIcon agentId={agent.id} className="size-4 shrink-0" />
@@ -293,20 +293,20 @@ function RuntimeSettingsCard({
   const { Icon: StatusIcon, color: statusColor } = RUNTIME_STATUS_APPEARANCE[row?.status ?? 'unknown']
 
   return (
-    <article className="min-w-0 border-b border-border/60 px-3 last:border-b-0 sm:px-4">
+    <article className="@container/runtime min-w-0 border-b border-border/60 px-3 last:border-b-0">
       <Collapsible className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-start gap-x-3">
-        <CollapsibleTrigger className="group/runtime flex min-h-[72px] w-full cursor-pointer items-center gap-3 rounded-md py-3 text-left outline-none focus-visible:[box-shadow:var(--oa-focus-shadow)]">
-          <AgentRuntimeIcon agentId={agent.id} className="size-7 shrink-0" />
-          <span className="min-w-0 flex-1">
-            <span className="block text-base font-semibold [overflow-wrap:anywhere]">{agent.displayName}</span>
-            <span className={`mt-1 flex items-start gap-1.5 text-sm leading-5 ${statusColor}`}>
+        <CollapsibleTrigger className="group/runtime flex min-h-11 w-full cursor-pointer items-center gap-2 rounded-md py-2 text-left outline-none focus-visible:[box-shadow:var(--oa-focus-shadow)]">
+          <AgentRuntimeIcon agentId={agent.id} className="size-5 shrink-0" />
+          <span className="flex min-w-0 flex-1 flex-col gap-1 @min-[24rem]/runtime:flex-row @min-[24rem]/runtime:items-center @min-[24rem]/runtime:gap-3">
+            <span className="min-w-0 flex-1 text-sm font-medium [overflow-wrap:anywhere]">{agent.displayName}</span>
+            <span className={`flex items-start gap-1.5 text-sm leading-5 ${statusColor}`}>
               <StatusIcon aria-hidden className={`mt-0.5 size-4 shrink-0 ${row?.status === 'checking' ? 'animate-spin motion-reduce:animate-none' : ''}`} />
               <span>{t(agentRuntimeSettingsStatusKey(row))}</span>
             </span>
           </span>
           <ChevronDown aria-hidden className="size-3.5 shrink-0 text-muted-foreground transition-transform duration-[var(--motion-fast)] group-data-panel-open/runtime:rotate-180 motion-reduce:transition-none" />
         </CollapsibleTrigger>
-        <div className="flex min-h-[72px] shrink-0 self-stretch items-center gap-3">
+        <div className="flex min-h-11 shrink-0 self-stretch items-center gap-3">
           <Toggle
             size="sm"
             checked={pinned}
@@ -323,7 +323,7 @@ function RuntimeSettingsCard({
           />
         </div>
         <CollapsibleContent keepMounted className="col-span-2">
-          <div className="space-y-3 pb-5 pt-1 pl-10 text-sm leading-5 text-muted-foreground">
+          <div className="space-y-3 pb-4 pt-1 pl-7 text-sm leading-5 text-muted-foreground">
             <p>{installed ? t('settings.agentRuntimes.installed') : t('settings.agentRuntimes.notInstalled')}</p>
             <p className="break-all font-mono text-sm">{binPath ?? t('settings.agentRuntimes.unknownPath')}</p>
             {row?.message && <p>{row.message}</p>}
@@ -362,7 +362,7 @@ function RuntimeSettingsCard({
         </CollapsibleContent>
       </Collapsible>
       {needsAttention && row.repairTarget && (
-        <p className="pb-3 pl-10 text-sm leading-5 text-warning">{t(REPAIR_KEYS[row.repairTarget])}</p>
+        <p className="pb-3 pl-7 text-sm leading-5 text-warning">{t(REPAIR_KEYS[row.repairTarget])}</p>
       )}
     </article>
   )

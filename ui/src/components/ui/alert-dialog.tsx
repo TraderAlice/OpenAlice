@@ -117,7 +117,7 @@ function AlertDialogTitle({
     <AlertDialogPrimitive.Title
       data-slot="alert-dialog-title"
       className={cn(
-        "text-[22px] leading-7 font-semibold tracking-[-0.018em] group-has-data-[slot=alert-dialog-media]/alert-dialog-content:col-start-2",
+        "text-lg leading-6 font-semibold tracking-[-0.01em] group-has-data-[slot=alert-dialog-media]/alert-dialog-content:col-start-2",
         className
       )}
       {...props}

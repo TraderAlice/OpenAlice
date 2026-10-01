@@ -54,13 +54,13 @@ export function SidebarRow({
           onClick()
         }
       }}
-      className={`oa-nav-row group relative mx-2 flex min-h-10 cursor-pointer items-center gap-3 rounded-full px-3 py-2 text-sm leading-6 outline-none md:min-h-10 ${
+      className={`oa-nav-row group relative mx-2 flex min-h-(--oa-nav-height) cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-sm leading-5 outline-none ${
         active
           ? 'bg-sidebar-accent text-sidebar-accent-foreground'
           : 'text-sidebar-foreground hover:bg-sidebar-accent/60'
       } ${dim ? 'opacity-60' : ''}`}
     >
-      {icon && <span className="flex h-5 w-5 shrink-0 items-center justify-center">{icon}</span>}
+      {icon && <span className="oa-navigation-icon">{icon}</span>}
       <span className="truncate flex-1">{label}</span>
       {trail && <div className="shrink-0 flex items-center gap-0.5">{trail}</div>}
     </div>

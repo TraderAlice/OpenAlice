@@ -81,27 +81,27 @@ export function VersionOverviewSection() {
       : backend?.updateAuthority === 'none' ? t('settings.about.status.noUpdater')
         : backend?.updateAuthority === 'source' ? text('sourceManaged') : backend?.latest ? text('current') : text('unknown')
   const row = (kind: 'app' | 'backend' | 'project', icon: ReactNode, subtitle: ReactNode, identity: string, status: string, available: boolean, action: () => void, children?: ReactNode) => <section id={`settings-version-${kind}`} tabIndex={-1} className="min-w-0 scroll-mt-5 outline-none focus-visible:[box-shadow:var(--oa-focus-shadow)]">
-    <div className="grid grid-cols-[1.5rem_minmax(0,1fr)] items-center gap-x-3 gap-y-3 px-4 py-5 sm:px-5 @3xl:grid-cols-[1.5rem_minmax(0,1fr)_10rem_14rem_7rem]">
+    <div className="grid grid-cols-[1.25rem_minmax(0,1fr)] items-center gap-x-3 gap-y-2 px-4 py-3 @2xl:grid-cols-[1.25rem_minmax(0,1fr)_8rem_10rem_6rem]">
       <div className={`self-start pt-0.5 ${available ? 'text-info' : 'text-muted-foreground'}`} aria-hidden>{icon}</div>
       <div className="min-w-0"><h3 className="text-sm font-semibold">{text(kind)}</h3><div className="mt-1 flex flex-wrap items-center gap-2 break-words text-sm text-muted-foreground">{subtitle}</div></div>
-      {identity && <span className="col-start-2 min-w-0 break-words text-sm tabular-nums @3xl:col-start-3 @3xl:row-start-1">{identity}</span>}
-      <span className={`col-start-2 flex items-start gap-1.5 text-sm @3xl:col-start-4 @3xl:row-start-1 ${available ? 'text-info' : status === text('needsAttention') || status === text('checkFailed') ? 'text-warning' : 'text-muted-foreground'}`}>
+      {identity && <span className="col-start-2 min-w-0 break-words text-sm tabular-nums @2xl:col-start-3 @2xl:row-start-1">{identity}</span>}
+      <span className={`col-start-2 flex items-start gap-1.5 text-sm @2xl:col-start-4 @2xl:row-start-1 ${available ? 'text-info' : status === text('needsAttention') || status === text('checkFailed') ? 'text-warning' : 'text-muted-foreground'}`}>
         {available ? <ArrowUpCircle className="mt-0.5 size-4 shrink-0" aria-hidden /> : status === text('current') ? <CircleCheck className="mt-0.5 size-4 shrink-0 text-success" aria-hidden /> : status === text('needsAttention') || status === text('checkFailed') ? <CircleAlert className="mt-0.5 size-4 shrink-0" aria-hidden /> : <CircleHelp className="mt-0.5 size-4 shrink-0" aria-hidden />}
         <span className="min-w-0">{status}</span>
       </span>
-      <div className="col-start-2 flex items-center @3xl:col-start-5 @3xl:row-start-1 @3xl:justify-end">
+      <div className="col-start-2 flex items-center @2xl:col-start-5 @2xl:row-start-1 @2xl:justify-end">
         {(available || (kind === 'project' && activeOperation)) && <Button size="sm" onClick={action}>{activeOperation && kind === 'project' ? text('viewProgress') : text('viewUpdate')}</Button>}
         {!available && kind !== 'project' && <Button variant="outline" size="sm" aria-label={`${text(kind)}: ${text('details')}`} onClick={action}>{text('details')}</Button>}
       </div>
     </div>{children}
   </section>
-  const projectDetails = <Collapsible open={expanded} onOpenChange={setExpanded} className="mx-4 mb-4 ml-[52px] sm:mx-5 sm:ml-14">
+  const projectDetails = <Collapsible open={expanded} onOpenChange={setExpanded} className="mx-4 mb-3 ml-12">
     <CollapsibleDetailsTrigger>{text('projectDetails')}</CollapsibleDetailsTrigger>
     <CollapsibleContent><div className="space-y-4 border-l border-border pl-4 pt-4">
-      {rows.map(item => <div key={item.kind} className="grid min-w-0 grid-cols-[1rem_minmax(0,1fr)] items-start gap-x-3 gap-y-2 @3xl:grid-cols-[1rem_minmax(0,1fr)_10rem_14rem_7rem]">
+      {rows.map(item => <div key={item.kind} className="grid min-w-0 grid-cols-[1rem_minmax(0,1fr)] items-start gap-x-3 gap-y-2 @2xl:grid-cols-[1rem_minmax(0,1fr)_8rem_10rem_6rem]">
         <span className="pt-0.5 text-muted-foreground" aria-hidden>{item.kind === 'chat' ? <MessageCircle className="size-4" /> : item.kind === 'auto-quant' ? <BarChart3 className="size-4" /> : <FlaskConical className="size-4" />}</span>
         <div className="min-w-0"><p className="text-sm font-medium">{item.label}</p>{item.workspace && <div className="mt-1 flex flex-wrap items-center gap-2 text-sm text-muted-foreground"><span>{item.workspace.displayName || item.workspace.tag}</span><span className="rounded-full bg-secondary px-2 py-0.5">{text('defaultWorkspace')}</span></div>}</div>
-        <div className="col-start-2 grid gap-x-3 gap-y-2 text-sm @3xl:col-start-3 @3xl:col-span-2 @3xl:row-start-1 @3xl:grid-cols-subgrid">{item.workspace && <span className="flex items-center gap-2 tabular-nums">{version(item.current)}{item.candidate && <><ArrowRight className="size-3 text-muted-foreground" /><span className="text-info">{version(item.candidate)}</span></>}</span>}<span className={`flex items-start gap-1.5 ${item.status === text('waiting') || item.attention ? 'text-warning' : item.candidate ? 'text-info' : 'text-muted-foreground'}`}>{item.status === text('current') ? <CircleCheck className="mt-0.5 size-4 shrink-0 text-success" aria-hidden /> : item.status === text('waiting') || item.attention ? <CircleAlert className="mt-0.5 size-4 shrink-0" aria-hidden /> : item.candidate ? <ArrowUpCircle className="mt-0.5 size-4 shrink-0" aria-hidden /> : <CircleHelp className="mt-0.5 size-4 shrink-0" aria-hidden />}<span className="min-w-0">{item.status}</span></span></div>
+        <div className="col-start-2 grid gap-x-3 gap-y-2 text-sm @2xl:col-start-3 @2xl:col-span-2 @2xl:row-start-1 @2xl:grid-cols-subgrid">{item.workspace && <span className="flex min-w-0 flex-wrap items-center gap-2 tabular-nums [overflow-wrap:anywhere]"><span className="min-w-0">{version(item.current)}</span>{item.candidate && <><ArrowRight className="size-3 text-muted-foreground" /><span className="min-w-0 text-info">{version(item.candidate)}</span></>}</span>}<span className={`flex items-start gap-1.5 ${item.status === text('waiting') || item.attention ? 'text-warning' : item.candidate ? 'text-info' : 'text-muted-foreground'}`}>{item.status === text('current') ? <CircleCheck className="mt-0.5 size-4 shrink-0 text-success" aria-hidden /> : item.status === text('waiting') || item.attention ? <CircleAlert className="mt-0.5 size-4 shrink-0" aria-hidden /> : item.candidate ? <ArrowUpCircle className="mt-0.5 size-4 shrink-0" aria-hidden /> : <CircleHelp className="mt-0.5 size-4 shrink-0" aria-hidden />}<span className="min-w-0">{item.status}</span></span></div>
         {item.error && <p role="alert" className="col-span-full break-words text-xs text-warning">{item.error}</p>}
       </div>)}
       {setupFailures.length > 0 && <Button variant="outline" size="sm" disabled={setup?.busy} onClick={() => { void setup?.retry() }}>{setup?.busy ? t('projectSetup.preparing') : t('common.retry')}</Button>}

@@ -29,17 +29,17 @@ interface MetricProps {
  *
  * Sizes:
  *   sm — secondary metrics row (Cash, Buying Power, etc.). 16px value.
- *   md — card-level metric (UTA card NLV). 22px value.
- *   lg — page hero (UTA detail page NLV). 28→36px responsive.
+ *   md — card-level metric (UTA card NLV). 20px value.
+ *   lg — page hero (UTA detail page NLV). 28px value.
  */
 export function Metric({ label, value, delta, valueSign, size = 'md', className }: MetricProps) {
   const valueClass = (() => {
     const color = signColor(valueSign)
     switch (size) {
       case 'sm': return `text-[16px] font-semibold tabular-nums ${color}`
-      case 'lg': return `text-[28px] md:text-[36px] font-semibold tabular-nums leading-tight ${color}`
+      case 'lg': return `text-[28px] font-semibold tabular-nums leading-tight ${color}`
       case 'md':
-      default:   return `text-[22px] font-semibold tabular-nums ${color}`
+      default:   return `text-[20px] font-semibold tabular-nums ${color}`
     }
   })()
 

@@ -208,7 +208,7 @@ export function MarketArea({ children }: { children: ReactNode }) {
     <PageSidebarShell
       storageKey="market"
       titleKey="nav.item.market"
-      defaultWidth={300}
+      defaultWidth={240}
       sidebar={({ closeMobileDrawer }) => <MarketSidebar onNavigate={closeMobileDrawer} />}
     >
       {children}

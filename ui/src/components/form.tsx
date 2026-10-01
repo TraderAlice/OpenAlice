@@ -5,7 +5,7 @@ import { cn } from '@/lib/utils'
 // ==================== Shared class constants ====================
 
 export const inputClass =
-  'oa-field-control h-11 w-full min-w-0 rounded-lg border border-input bg-background px-4 py-2 font-sans text-base leading-6 text-foreground outline-none transition-[border-color,background-color,box-shadow] duration-[var(--motion-fast)] [transition-timing-function:var(--motion-ease-out)] placeholder:text-muted-foreground motion-reduce:transition-none disabled:cursor-not-allowed disabled:bg-input/50 disabled:opacity-50'
+  'oa-field-control h-(--oa-control-height) w-full min-w-0 rounded-lg border border-input bg-background px-3 py-1.5 font-sans text-sm leading-5 [@media(pointer:coarse)]:text-base text-foreground outline-none transition-[border-color,background-color,box-shadow] duration-[var(--motion-fast)] [transition-timing-function:var(--motion-ease-out)] placeholder:text-muted-foreground motion-reduce:transition-none disabled:cursor-not-allowed disabled:bg-input/50 disabled:opacity-50'
 
 // ==================== Settings scroll area ====================
 
@@ -25,7 +25,7 @@ export function SettingsScrollArea({ children, className = '', scroll = true }: 
   return (
     <div
       data-settings-scroll-area
-      className={cn('min-h-0 min-w-0 flex-1', scroll && 'overflow-y-auto overscroll-contain [scrollbar-gutter:stable] px-[var(--page-inset)] py-5', className)}
+      className={cn('min-h-0 min-w-0 flex-1', scroll && 'overflow-y-auto overscroll-contain [scrollbar-gutter:stable] px-[var(--page-inset)] py-4', className)}
     >
       {children}
     </div>
@@ -43,8 +43,8 @@ interface SectionProps {
 
 export function Section({ id, title, description, children }: SectionProps) {
   return (
-    <section id={id} className="oa-config-section min-w-0 rounded-2xl bg-secondary p-4 sm:p-6 text-start">
-      <h3 className="text-lg leading-6 font-semibold text-foreground">{title}</h3>
+    <section id={id} className="oa-config-section min-w-0 rounded-2xl bg-secondary p-(--oa-panel-inset) text-start">
+      <h3 className="text-base leading-6 font-semibold text-foreground">{title}</h3>
       {description && (
         <p className="mt-1 max-w-2xl text-sm leading-5 text-muted-foreground">{description}</p>
       )}
@@ -85,14 +85,14 @@ export function ConfigSection({
     <section
       id={id}
       aria-labelledby={titleId}
-      className={`oa-config-section min-w-0 rounded-2xl bg-secondary p-4 sm:p-6 text-start ${className}`}
+      className={`oa-config-section min-w-0 rounded-2xl bg-secondary p-(--oa-panel-inset) text-start ${className}`}
     >
       <div className={`min-w-0 ${children ? 'mb-4' : ''}`}>
         <div className="flex min-h-6 min-w-0 flex-wrap items-center gap-2">
           <Heading
             id={titleId}
             tabIndex={focusableTitle ? -1 : undefined}
-            className={`min-w-0 break-words text-lg font-semibold text-foreground ${focusableTitle
+            className={`min-w-0 break-words text-base font-semibold text-foreground ${focusableTitle
               ? 'w-fit rounded-sm outline-none focus-visible:[box-shadow:var(--oa-focus-shadow)]'
               : ''
             }`}

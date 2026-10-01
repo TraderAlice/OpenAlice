@@ -3,6 +3,7 @@ import { useUpdateLifecycle, type NativeStatus } from '../hooks/useUpdateLifecyc
 import { Download, ExternalLink, RefreshCcw, X } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { Dialog } from './uta/Dialog'
+import { Button } from './ui/button'
 
 function previewStatus(): NativeStatus | null {
   if (!import.meta.env.DEV || typeof window === 'undefined') return null
@@ -63,15 +64,17 @@ export function DesktopUpdatePrompt() {
           </h2>
           <p className="text-sm text-muted-foreground truncate">OpenAlice v{status.version}</p>
         </div>
-        <button
+        <Button
           type="button"
           onClick={dismiss}
           disabled={installing}
-          className="h-8 w-8 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted disabled:opacity-40 flex items-center justify-center transition-colors"
+          variant="ghost"
+          size="icon-sm"
+          className="text-muted-foreground"
           aria-label={t('settings.about.prompt.close')}
         >
           <X size={16} />
-        </button>
+        </Button>
       </div>
 
       <div className="px-5 py-4 space-y-3">
@@ -98,32 +101,31 @@ export function DesktopUpdatePrompt() {
       </div>
 
       <div className="px-5 py-3 border-t border-border flex flex-col-reverse sm:flex-row sm:items-center sm:justify-end gap-2">
-        <button
+        <Button
           type="button"
           onClick={dismiss}
           disabled={installing}
-          className="btn-secondary"
+          variant="secondary"
         >
           {t('settings.about.prompt.later')}
-        </button>
-        <button
+        </Button>
+        <Button
           type="button"
           onClick={handleRelease}
           disabled={installing}
-          className="btn-secondary inline-flex items-center justify-center gap-2"
+          variant="secondary"
         >
           <ExternalLink size={14} />
           {t('settings.about.viewReleases')}
-        </button>
-        <button
+        </Button>
+        <Button
           type="button"
           onClick={handleInstall}
           disabled={installing}
-          className="btn-primary inline-flex items-center justify-center gap-2"
         >
           <RefreshCcw size={14} />
           {installing ? installText : t('settings.about.prompt.restartNow')}
-        </button>
+        </Button>
       </div>
     </Dialog>
   )

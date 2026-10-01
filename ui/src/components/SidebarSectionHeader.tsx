@@ -16,7 +16,7 @@ export function SidebarSectionHeader({
   hierarchy?: boolean
 }) {
   return (
-    <div className="mb-2 mt-5 flex min-h-5 select-none items-center gap-1.5 px-5">
+    <div className="mb-1 mt-3 flex min-h-5 select-none items-center gap-1.5 px-4">
       <h3 className={`flex-1 truncate font-medium ${hierarchy ? 'text-sm leading-5 text-sidebar-foreground' : 'text-sm leading-5 text-muted-foreground'}`}>
         {children}
       </h3>

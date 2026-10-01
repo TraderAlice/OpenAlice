@@ -862,15 +862,15 @@ export function ToolsSection() {
         <EmptyState title={t('settings.tools.emptyTitle')} description={t('settings.tools.emptyDescription')} />
       ) : (
         <div>
-          <div className="mb-2 grid grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-x-2 gap-y-1 sm:mb-6 sm:grid-cols-[minmax(0,1fr)_auto_auto_auto]">
-            <label className="flex h-11 min-w-0 items-center gap-3 rounded-lg border border-input bg-background px-4 focus-within:[box-shadow:var(--oa-focus-shadow)]">
+          <div className="mb-2 grid grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-x-2 gap-y-1 sm:mb-4 sm:grid-cols-[minmax(0,1fr)_auto_auto_auto]">
+            <label className="flex h-(--oa-control-height) min-w-0 items-center gap-2 rounded-lg border border-input bg-background px-3 focus-within:[box-shadow:var(--oa-focus-shadow)]">
               <Search aria-hidden className="size-4 shrink-0 text-muted-foreground" />
               <input type="search" value={query} onChange={(event) => {
                 setQuery(event.target.value)
                 if (event.target.value.trim()) setExpanded(new Set(groups.map((group) => group.key)))
               }}
                 aria-label={t('settings.tools.search')} placeholder={t('settings.tools.search')}
-                className="min-w-0 flex-1 bg-transparent text-base outline-none" />
+                className="min-w-0 flex-1 bg-transparent text-sm [@media(pointer:coarse)]:text-base outline-none" />
             </label>
             <CountBadge count={matchingCount} label={t('settings.tools.count', { count: matchingCount })} />
             <ContextHelp label={t('settings.category.tools')}>{t('settings.tools.summary', { tools: inventory.length, groups: groups.length })}</ContextHelp>
@@ -930,12 +930,12 @@ function ToolGroupCard({
       <div className="flex items-center gap-3 px-4 py-1">
         <CollapsibleTrigger
           type="button"
-          className="group/tool-trigger flex min-h-12 min-w-0 flex-1 items-center gap-3 rounded-md py-2 text-left focus-visible:outline-none focus-visible:[box-shadow:var(--oa-focus-shadow)]"
+          className="group/tool-trigger flex min-h-(--oa-control-height) min-w-0 flex-1 items-center gap-3 rounded-md py-2 text-left focus-visible:outline-none focus-visible:[box-shadow:var(--oa-focus-shadow)]"
           aria-expanded={expanded}
           aria-controls={toolListId}
         >
           <ChevronRight aria-hidden className={`size-4 shrink-0 text-muted-foreground group-hover/tool-trigger:text-foreground transition-transform duration-[var(--motion-standard)] group-data-[instant]/tool-group:transition-none motion-reduce:transition-none ${expanded ? 'rotate-90' : ''}`} />
-          <span className="min-w-0 text-base font-semibold text-foreground [overflow-wrap:anywhere]">{label}</span>
+          <span className="min-w-0 text-sm font-medium text-foreground [overflow-wrap:anywhere]">{label}</span>
           <CountBadge count={enabledCount} label={t('settings.tools.enabledCount', { count: enabledCount, total: group.tools.length })} />
         </CollapsibleTrigger>
         <Toggle
@@ -957,7 +957,7 @@ function ToolGroupCard({
             return (
               <div
                 key={t.name}
-                className="flex min-h-14 items-center gap-3 py-2"
+                className="flex min-h-11 items-center gap-3 py-1.5"
               >
                 <div className="flex min-w-0 flex-1 items-center gap-2 pl-7">
                   <span className="min-w-0 font-mono text-sm leading-5 text-foreground [overflow-wrap:anywhere]">

@@ -133,8 +133,8 @@ export function ActivityBar({
     .filter(mode => mode === 'chat' || !layout.hidden.includes(mode))
   const railContent = (
     <>
-        <div className={`oa-activity-brand h-[72px] flex shrink-0 items-center ${compactRail ? 'md:h-14 justify-center px-0' : narrowRail ? 'gap-1.5 px-2.5' : 'gap-2.5 px-3.5'}`}>
-              <h1 className={`min-w-0 flex-1 truncate text-[22px] font-bold leading-7 tracking-[-0.025em] text-foreground ${compactRail ? 'md:hidden' : ''}`}>OpenAlice</h1>
+        <div className={`oa-activity-brand h-11 flex shrink-0 items-center ${compactRail ? 'justify-center px-0' : narrowRail ? 'gap-1.5 px-2.5' : 'gap-2.5 px-3.5'}`}>
+              <h1 className={`min-w-0 flex-1 truncate text-lg font-semibold leading-6 tracking-[-0.015em] text-foreground ${compactRail ? 'md:hidden' : ''}`}>OpenAlice</h1>
               {!desktopStatic ? (
                 <Button
                   type="button"
@@ -224,20 +224,18 @@ export function ActivityBar({
                           aria-label={label}
                           aria-describedby={badge ? `activity-count-${item.page}` : undefined}
                           aria-current={isActive ? 'page' : undefined}
-                          className={`oa-nav-item relative flex items-center rounded-full text-left font-normal aria-[current=page]:font-semibold ${
+                          className={`oa-nav-item relative flex items-center rounded-md text-left font-normal aria-[current=page]:font-medium ${
                             compactRail
-                              ? 'md:size-11 md:min-h-11 md:justify-center md:gap-0 md:px-0 md:py-0'
-                              : denseRail
-                                ? `min-h-10 ${narrowRail ? 'gap-2 px-2' : 'gap-2.5 px-2.5'} py-2 text-sm`
-                                : 'min-h-12 gap-3 px-4 py-3 text-sm leading-6'
+                              ? 'size-11 justify-center gap-0 p-0'
+                              : 'oa-primary-nav-row'
                           } ${
                             isActive
                               ? 'bg-sidebar-accent text-sidebar-accent-foreground'
                               : 'text-sidebar-foreground hover:bg-sidebar-accent/60 hover:text-sidebar-foreground'
                           }`}
                         >
-                          <span className={`oa-nav-icon relative flex h-5 w-5 shrink-0 items-center justify-center ${denseRail ? 'md:h-5 md:w-5' : ''}`}>
-                            <Icon size={20} strokeWidth={1.75} />
+                          <span className="oa-nav-icon oa-navigation-icon relative">
+                            <Icon size={16} strokeWidth={1.75} />
                           </span>
                           <span className={`flex-1 truncate ${compactRail ? 'md:hidden' : ''}`}>{label}</span>
                           {badge !== null && (
@@ -273,7 +271,7 @@ export function ActivityBar({
         </nav>
 
         {/* Application controls pinned to the bottom of the rail. */}
-        <div className={`shrink-0 border-t border-border/55 ${compactRail ? 'flex justify-center py-3' : 'p-1.5'}`}>
+        <div className={`shrink-0 border-t border-border/55 ${compactRail ? 'flex justify-center py-2' : 'p-1.5'}`}>
           <ActivityBarUtilityMenu
             compactRail={compactRail}
             denseRail={denseRail}
@@ -296,7 +294,7 @@ export function ActivityBar({
   )
 
   const railClassName = `
-    w-[280px] ${compactRail ? 'md:w-[68px]' : narrowRail ? 'md:w-[232px]' : 'md:w-[260px]'} h-full flex flex-col shrink-0
+    w-[280px] ${compactRail ? 'md:w-[64px]' : narrowRail ? 'md:w-[220px]' : 'md:w-[240px]'} h-full flex flex-col shrink-0
     bg-sidebar border-r border-sidebar-border/70
   `
 

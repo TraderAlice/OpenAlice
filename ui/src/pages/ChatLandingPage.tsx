@@ -404,9 +404,9 @@ export function HarnessLandingPage({
           alt=""
           aria-hidden="true"
           draggable={false}
-          className="oa-harness-hero-mark h-20 w-20 object-contain select-none sm:h-24 sm:w-24"
+          className="oa-harness-hero-mark size-16 object-contain select-none"
         />
-        <h1 className="oa-harness-title mt-3 max-w-[38rem] text-balance text-[32px] font-semibold leading-[40px] tracking-[-0.025em] text-foreground @min-[42rem]/harness:text-[40px] @min-[42rem]/harness:leading-[48px]">
+        <h1 className="oa-harness-title mt-3 max-w-[38rem] text-balance text-[24px] font-semibold leading-8 tracking-[-0.02em] text-foreground @min-[42rem]/harness:text-[28px] @min-[42rem]/harness:leading-9">
           {t(`${copyKey}.heading`)}
         </h1>
       </header>
@@ -418,7 +418,7 @@ export function HarnessLandingPage({
         aria-hidden={!showStarterIntents}
         inert={!showStarterIntents}
       >
-        <div className="pt-7">
+        <div className="pt-5">
         <div className="flex h-7 items-center justify-between px-1">
           <span className="text-sm font-medium text-muted-foreground">
             {t(`${copyKey}.examplesLabel`)}
