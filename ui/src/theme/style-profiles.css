@@ -1,307 +1,234 @@
-/* Runtime component appearance profiles. Colors stay entirely owned by the
-   active semantic palette; these profiles only alter typography, geometry,
-   elevation, density, and motion. */
-
 .oa-style-profile-card {
-  border-radius: 0.75rem;
-  transition:
-    border-color var(--motion-standard) var(--motion-ease-standard),
-    background-color var(--motion-standard) var(--motion-ease-standard),
-    box-shadow var(--motion-standard) var(--motion-ease-standard),
-    transform var(--motion-fast) var(--motion-ease-standard);
+  position: relative;
+  display: block;
+  min-width: 0;
+  cursor: pointer;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 10px;
+  background: var(--background);
+  transition: border-color var(--motion-fast), background-color var(--motion-fast);
 }
 
 .oa-style-profile-card[data-selected="true"] {
-  border-color: var(--primary);
-  background: color-mix(in srgb, var(--primary-muted) 58%, var(--background));
-  box-shadow: 0 0 0 1px color-mix(in srgb, var(--primary) 38%, transparent);
+  border-color: var(--foreground);
+  background: var(--secondary);
+}
+
+.oa-style-profile-card:has(:focus-visible) {
+  outline: 2px solid var(--foreground);
+  outline-offset: 3px;
 }
 
 .oa-style-profile-preview {
-  border-radius: 0.4rem;
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 10px;
+  --radius-xl: 12px;
+  --radius-2xl: 16px;
+  --radius-3xl: 20px;
+  --oa-surface-background: var(--secondary);
+  --oa-surface-border: transparent;
+  --oa-surface-shadow: none;
+  display: flex;
+  height: 88px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--background);
+  color: var(--foreground);
 }
 
-.oa-style-profile-card[data-ui-style-preview="win98"],
-.oa-style-profile-card[data-ui-style-preview="win98"] .oa-style-profile-preview,
-.oa-style-profile-card[data-ui-style-preview="win98"] .oa-style-profile-row {
-  border-radius: 0;
+.oa-style-profile-rail {
+  display: flex;
+  width: 26px;
+  flex: 0 0 26px;
+  flex-direction: column;
+  gap: 5px;
+  padding: 10px 6px;
+  border-right: 1px solid var(--border);
+  background: var(--sidebar);
 }
 
-.oa-style-profile-card[data-ui-style-preview="win98"] .oa-style-profile-preview {
-  box-shadow:
-    inset 1px 1px color-mix(in srgb, var(--background) 92%, var(--foreground)),
-    inset -1px -1px color-mix(in srgb, var(--foreground) 48%, var(--background));
+.oa-style-profile-rail > i {
+  height: 4px;
+  border-radius: var(--radius-sm);
+  background: var(--muted-foreground);
+  opacity: 0.35;
 }
 
-.oa-style-profile-card[data-ui-style-preview="broker-classic"],
-.oa-style-profile-card[data-ui-style-preview="broker-classic"] .oa-style-profile-preview,
-.oa-style-profile-card[data-ui-style-preview="broker-classic"] .oa-style-profile-row {
-  border-radius: 0.125rem;
+.oa-style-profile-rail > i:first-child {
+  background: var(--foreground);
+  opacity: 0.8;
 }
 
-.oa-style-profile-card[data-ui-style-preview="broker-classic"] .oa-style-profile-toolbar {
-  height: 0.2rem;
+.oa-style-profile-canvas {
+  display: grid;
+  min-width: 0;
+  flex: 1;
+  grid-template-rows: 7px 1fr 12px;
+  gap: 7px;
+  padding: 10px;
 }
 
-.oa-style-profile-card[data-ui-style-preview="broker-classic"] .oa-style-profile-row {
-  height: 0.32rem;
+.oa-style-profile-toolbar {
+  width: 52%;
+  border-radius: var(--radius-sm);
+  background: var(--foreground);
+  opacity: 0.6;
 }
 
-/* Windows 98 ------------------------------------------------------------- */
+.oa-style-profile-chart {
+  min-width: 0;
+  width: 100%;
+  height: 100%;
+  border: 1px solid var(--oa-surface-border, transparent);
+  border-radius: var(--radius-md);
+  background: var(--oa-surface-background, var(--secondary));
+  box-shadow: var(--oa-surface-shadow, none);
+}
 
-:root[data-ui-style="win98"] {
-  --font-sans: Tahoma, "MS Sans Serif", "Microsoft Sans Serif", "PingFang SC",
-    "Microsoft YaHei", sans-serif;
+.oa-style-profile-row {
+  border: 1px solid var(--oa-surface-border, transparent);
+  border-radius: var(--radius-sm);
+  background: var(--oa-surface-background, var(--secondary));
+}
+
+:root[data-ui-style="broker-classic"],
+[data-ui-style-preview="broker-classic"] {
+  --radius-sm: 2px;
+  --radius-md: 3px;
+  --radius-lg: 4px;
+  --radius-xl: 4px;
+  --radius-2xl: 4px;
+  --radius-3xl: 6px;
+  --oa-surface-background: var(--background);
+  --oa-surface-border: color-mix(in srgb, var(--foreground) 22%, var(--background));
+  --oa-surface-shadow: none;
+  --oa-header-background: var(--secondary);
+  --motion-fast: 80ms;
+  --motion-standard: 120ms;
+  --motion-slow: 180ms;
+}
+
+:root[data-ui-style="studio"],
+[data-ui-style-preview="studio"] {
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 12px;
+  --radius-xl: 14px;
+  --radius-2xl: 18px;
+  --radius-3xl: 20px;
+  --oa-surface-background: var(--card);
+  --oa-surface-border: color-mix(in srgb, var(--foreground) 9%, var(--background));
+  --oa-surface-shadow: 0 2px 3px color-mix(in srgb, var(--shadow-color) 4%, transparent),
+    0 8px 20px color-mix(in srgb, var(--shadow-color) 5%, transparent);
+}
+
+:root[data-ui-style="outline"],
+[data-ui-style-preview="outline"] {
+  --radius-sm: 3px;
+  --radius-md: 6px;
+  --radius-lg: 8px;
+  --radius-xl: 8px;
+  --radius-2xl: 8px;
+  --radius-3xl: 10px;
+  --oa-surface-background: var(--background);
+  --oa-surface-border: color-mix(in srgb, var(--foreground) 30%, var(--background));
+  --oa-surface-shadow: none;
+}
+
+:root[data-ui-style="win98"],
+[data-ui-style-preview="win98"] {
+  --font-sans: Tahoma, "MS Sans Serif", "Microsoft Sans Serif", "PingFang SC", "Microsoft YaHei", sans-serif;
+  --radius-sm: 0px;
+  --radius-md: 0px;
+  --radius-lg: 0px;
+  --radius-xl: 0px;
+  --radius-2xl: 0px;
+  --radius-3xl: 0px;
   --motion-fast: 0ms;
   --motion-standard: 0ms;
   --motion-slow: 0ms;
   --oa-win-highlight: color-mix(in srgb, var(--background) 94%, var(--foreground));
-  --oa-win-light: color-mix(in srgb, var(--background) 76%, var(--foreground));
   --oa-win-shadow: color-mix(in srgb, var(--foreground) 42%, var(--background));
-  --oa-win-dark: color-mix(in srgb, var(--foreground) 72%, var(--background));
+  --oa-surface-background: var(--secondary);
+  --oa-surface-border: var(--oa-win-shadow);
+  --oa-surface-shadow: inset 1px 1px var(--oa-win-highlight), inset -1px -1px var(--oa-win-shadow);
 }
 
-:root[data-ui-style="win98"] body {
-  background: var(--background);
-  transition: none;
+:root[data-ui-style]:not([data-ui-style="default"]) .oa-data-surface,
+:root[data-ui-style]:not([data-ui-style="default"]) .oa-config-section {
+  border: 1px solid var(--oa-surface-border, transparent);
+  background: var(--oa-surface-background, var(--secondary));
+  box-shadow: var(--oa-surface-shadow, none);
 }
 
-:root[data-ui-style="win98"] :where(
-  button,
-  input:not([type="checkbox"]):not([type="radio"]),
-  select,
-  textarea,
-  [data-slot="dialog-content"],
-  [data-slot="alert-dialog-content"],
-  [data-slot="sheet-content"],
-  [data-slot="dropdown-menu-content"],
-  [data-slot="dropdown-menu-sub-content"],
-  [data-slot="popover-content"],
-  [data-slot="tooltip-content"],
-  .rounded,
-  .rounded-sm,
-  .rounded-md,
-  .rounded-lg,
-  .rounded-xl,
-  .rounded-2xl,
-  .rounded-3xl
-) {
-  border-radius: 0 !important;
+:root[data-ui-style]:not([data-ui-style="default"]) .oa-config-section {
+  border-radius: var(--radius-2xl);
+  padding: var(--oa-panel-inset, 16px);
 }
 
-:root[data-ui-style="win98"] :where(
-  button:not([data-slot="dialog-close"]),
-  [role="button"].oa-pressable,
-  input:not([type="checkbox"]):not([type="radio"]),
-  select,
-  textarea
-) {
-  border-color: var(--oa-win-shadow);
-  box-shadow:
-    inset 1px 1px var(--oa-win-highlight),
-    inset -1px -1px var(--oa-win-dark),
-    inset 2px 2px var(--oa-win-light),
-    inset -2px -2px var(--oa-win-shadow);
+:root[data-ui-style]:not([data-ui-style="default"]) .oa-config-section + .oa-config-section {
+  margin-top: var(--oa-panel-inset, 16px);
 }
 
-:root[data-ui-style="win98"] :where(
-  input:not([type="checkbox"]):not([type="radio"]),
-  textarea,
-  select
-) {
-  background: var(--background);
-  box-shadow:
-    inset 1px 1px var(--oa-win-dark),
-    inset -1px -1px var(--oa-win-highlight),
-    inset 2px 2px var(--oa-win-shadow);
+:root[data-ui-style="broker-classic"] .oa-config-section > .oa-section-heading:not(:last-child) {
+  margin: calc(-1 * var(--oa-panel-inset, 16px));
+  margin-bottom: var(--oa-panel-inset, 16px);
+  padding: 8px var(--oa-panel-inset, 16px);
+  border-bottom: 1px solid var(--oa-surface-border);
+  border-radius: var(--radius-2xl) var(--radius-2xl) 0 0;
+  background: var(--oa-header-background);
 }
 
-/* Session entries are list rows, not three adjacent command buttons. Keep the
-   title surface flat and reserve the classic raised chrome for its compact
-   lifecycle/menu actions. The row itself owns hover and selected state. */
-:root[data-ui-style="win98"] .oa-session-row {
-  gap: 2px;
-  min-height: 28px;
-  padding-block: 2px;
+:root[data-ui-style="broker-classic"] .oa-data-surface-header {
+  padding-block: 8px;
+  margin-bottom: var(--oa-panel-inset, 16px);
+  border-bottom: 1px solid var(--oa-surface-border);
+  background: var(--oa-header-background);
 }
 
-:root[data-ui-style="win98"] .oa-session-row-main {
-  align-self: stretch;
-  min-height: 24px;
-  padding-inline: 4px;
-  border-color: transparent;
-  background: transparent;
-  box-shadow: none;
-}
-
-:root[data-ui-style="win98"] .oa-session-row-main:active {
-  transform: none;
-  box-shadow: none;
-}
-
-:root[data-ui-style="win98"] .oa-session-row > .oa-workspace-row-action {
-  height: 24px;
-  width: 24px;
-}
-
-:root[data-ui-style="win98"] :where(
-  [data-slot="dialog-content"],
-  [data-slot="alert-dialog-content"],
-  [data-slot="sheet-content"],
-  [data-slot="dropdown-menu-content"],
-  [data-slot="dropdown-menu-sub-content"],
-  [data-slot="popover-content"]
-) {
-  border: 1px solid var(--oa-win-dark);
-  box-shadow:
-    inset 1px 1px var(--oa-win-highlight),
-    inset -1px -1px var(--oa-win-shadow),
-    3px 3px 0 color-mix(in srgb, var(--foreground) 34%, transparent);
-}
-
-:root[data-ui-style="win98"] :where(
-  [data-slot="dropdown-menu-item"],
-  [data-slot="dropdown-menu-checkbox-item"],
-  [data-slot="dropdown-menu-radio-item"],
-  [data-slot="dropdown-menu-sub-trigger"]
-) {
-  border-radius: 0 !important;
-}
-
-:root[data-ui-style="win98"] :where(
-  button,
-  [role="button"],
-  input:not([type="checkbox"]):not([type="radio"]),
-  select,
-  textarea
-):focus-visible {
-  outline: 1px dotted currentColor;
-  outline-offset: -4px;
-}
-
-@media (hover: hover) and (pointer: fine) {
-  :root[data-ui-style="win98"] .oa-pressable:hover:not(:disabled):not([aria-disabled="true"]),
-  :root[data-ui-style="win98"] .oa-icon-action:hover:not(:disabled):not([aria-disabled="true"]),
-  :root[data-ui-style="win98"] .oa-nav-row:hover {
-    transform: none;
-  }
-
-  :root[data-ui-style="win98"] :where(button, [role="button"]):active:not(:disabled):not([aria-disabled="true"]) {
-    transform: translate(1px, 1px);
-    box-shadow:
-      inset 1px 1px var(--oa-win-dark),
-      inset -1px -1px var(--oa-win-highlight),
-      inset 2px 2px var(--oa-win-shadow);
-  }
-}
-
-/* Broker Classic --------------------------------------------------------- */
-
-:root[data-ui-style="broker-classic"] {
-  --font-sans: Arial, Tahoma, "Microsoft YaHei", "PingFang SC", sans-serif;
-  --motion-fast: 60ms;
-  --motion-standard: 90ms;
-  --motion-slow: 120ms;
-}
-
-:root[data-ui-style="broker-classic"] body {
-  background: var(--background);
-}
-
-:root[data-ui-style="broker-classic"] :where(
-  button,
-  input:not([type="checkbox"]):not([type="radio"]),
-  select,
-  textarea,
-  [data-slot="dialog-content"],
-  [data-slot="alert-dialog-content"],
-  [data-slot="sheet-content"],
-  [data-slot="dropdown-menu-content"],
-  [data-slot="dropdown-menu-sub-content"],
-  [data-slot="popover-content"],
-  .rounded,
-  .rounded-sm,
-  .rounded-md,
-  .rounded-lg,
-  .rounded-xl,
-  .rounded-2xl,
-  .rounded-3xl
-) {
-  border-radius: 0.125rem !important;
-}
-
-:root[data-ui-style="broker-classic"] :where(
-  [data-slot="dialog-content"],
-  [data-slot="alert-dialog-content"],
-  [data-slot="sheet-content"],
-  [data-slot="dropdown-menu-content"],
-  [data-slot="dropdown-menu-sub-content"],
-  [data-slot="popover-content"]
-) {
-  border: 1px solid var(--border);
-  box-shadow: 2px 2px 0 color-mix(in srgb, var(--foreground) 20%, transparent);
-}
-
-:root[data-ui-style="broker-classic"] :where(table) {
+:root[data-ui-style="broker-classic"] table {
   border-collapse: collapse;
   font-variant-numeric: tabular-nums;
 }
 
 :root[data-ui-style="broker-classic"] :where(th, td) {
-  border-color: var(--border);
+  border-right: 1px solid var(--border);
 }
 
-:root[data-ui-style="broker-classic"] :where(.text-display, [class*="tabular-nums"]) {
-  font-variant-numeric: tabular-nums;
+:root[data-ui-style="broker-classic"] :where(th, td):last-child {
+  border-right: 0;
 }
 
-@media (min-width: 48rem) and (hover: hover) and (pointer: fine) {
-  :root[data-ui-style="broker-classic"] {
-    font-size: 15px;
-  }
-
-  :root[data-ui-style="broker-classic"] :where(
-    [data-slot="button"],
-    [data-slot="dropdown-menu-item"],
-    [data-slot="dropdown-menu-checkbox-item"],
-    [data-slot="dropdown-menu-radio-item"],
-    [data-slot="dropdown-menu-sub-trigger"]
-  ) {
-    min-height: 1.5rem;
-  }
-
-  :root[data-ui-style="broker-classic"] :where(
-    input:not([type="checkbox"]):not([type="radio"]),
-    select,
-    textarea
-  ) {
-    padding-top: 0.3rem;
-    padding-bottom: 0.3rem;
-  }
-
-  :root[data-ui-style="broker-classic"] [data-settings-scroll-area] {
-    scrollbar-width: thin;
-  }
+:root[data-ui-style="broker-classic"] tbody > tr:nth-child(even) {
+  background: color-mix(in srgb, var(--foreground) 3%, transparent);
 }
 
-/* Profile choices are specimens, not ordinary controls: keep each card's own
-   geometry visible even while another profile is active on the document. */
-:root[data-ui-style] .oa-style-profile-card {
-  box-shadow: none;
+:root[data-ui-style="broker-classic"] :where(td.tabular-nums, .oa-metric-value) {
+  font-family: var(--font-mono);
+  letter-spacing: -0.025em;
 }
 
-:root[data-ui-style] .oa-style-profile-card[data-ui-style-preview="default"] {
-  border-radius: 0.75rem !important;
+:root[data-ui-style="outline"] :where(.oa-nav-row, .oa-nav-item)[aria-current="page"]:not(:focus-visible) {
+  background: var(--background);
+  box-shadow: inset 0 0 0 1px var(--foreground);
 }
 
-:root[data-ui-style] .oa-style-profile-card[data-ui-style-preview="win98"] {
-  border-radius: 0 !important;
+:root[data-ui-style="studio"] [data-slot="button"]:is([data-variant="default"], [data-variant="outline"]):not(:disabled):not(:focus-visible) {
+  box-shadow: 0 1px 2px color-mix(in srgb, var(--shadow-color) 8%, transparent);
 }
 
-:root[data-ui-style] .oa-style-profile-card[data-ui-style-preview="broker-classic"] {
-  border-radius: 0.125rem !important;
+:root[data-ui-style="win98"] :where([data-slot="button"], .oa-field-control):not(:focus-visible) {
+  box-shadow: inset 1px 1px var(--oa-win-highlight), inset -1px -1px var(--oa-win-shadow);
 }
 
-:root[data-ui-style] .oa-style-profile-card[data-selected="true"] {
-  box-shadow: 0 0 0 1px color-mix(in srgb, var(--primary) 38%, transparent);
+:root[data-ui-style="win98"] .oa-field-control {
+  box-shadow: inset 1px 1px var(--oa-win-shadow);
+}
+
+:root[data-ui-style="win98"] :where(button, input, textarea):focus-visible {
+  outline: 1px dotted currentColor;
+  outline-offset: -4px;
 }
