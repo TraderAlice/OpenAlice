@@ -1,7 +1,9 @@
 import { useState, useEffect, useCallback, useId, useMemo } from 'react'
-import { ChevronDown, Moon, RotateCcw, Sun } from 'lucide-react'
+import { ChevronDown, Moon, RotateCcw, Search, Sun } from 'lucide-react'
 import { api } from '../api'
 import type { ToolInfo } from '../api/tools'
+import { CountBadge } from '../components/CountBadge'
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '../components/ui/collapsible'
 import { ContextHelp } from '../components/ContextHelp'
 import { Toggle } from '../components/Toggle'
 import { SaveIndicator } from '../components/SaveIndicator'
@@ -793,6 +795,7 @@ export function ToolsSection() {
       default: return key
     }
   }
+  const [query, setQuery] = useState('')
   const [inventory, setInventory] = useState<ToolInfo[]>([])
   const [disabled, setDisabled] = useState<Set<string>>(new Set())
   const [loaded, setLoaded] = useState(false)
@@ -868,6 +871,13 @@ export function ToolsSection() {
     })
   }, [])
 
+  const search = query.trim().toLocaleLowerCase()
+  const matchingGroups = groups.map((group) => ({
+    ...group,
+    tools: search ? group.tools.filter((tool) => `${groupLabel(group.key)} ${tool.name} ${tool.description ?? ''}`.toLocaleLowerCase().includes(search)) : group.tools,
+  })).filter((group) => group.tools.length > 0)
+  const matchingCount = matchingGroups.reduce((count, group) => count + group.tools.length, 0)
+
   return (
     <div className="mx-auto w-full max-w-[1100px]">
       {!loaded ? (
@@ -886,13 +896,24 @@ export function ToolsSection() {
       ) : (
         <div>
           <div className="flex items-center justify-between mb-4">
-            <p className="text-[13px] text-muted-foreground">
-              {t('settings.tools.summary', { tools: inventory.length, groups: groups.length })}
-            </p>
+            <div className="flex items-center gap-2">
+              <CountBadge count={matchingCount} label={t('settings.tools.count', { count: matchingCount })} />
+              <ContextHelp label={t('settings.category.tools')}>{t('settings.tools.summary', { tools: inventory.length, groups: groups.length })}</ContextHelp>
+            </div>
             <SaveIndicator status={status} onRetry={retry} />
           </div>
+          <label className="mb-4 flex h-9 items-center gap-2 rounded-md border border-input bg-background px-3 focus-within:[box-shadow:var(--oa-focus-shadow)]">
+            <Search aria-hidden className="size-4 shrink-0 text-muted-foreground" />
+            <input type="search" value={query} onChange={(event) => {
+              setQuery(event.target.value)
+              if (event.target.value.trim()) setExpanded(new Set(groups.map((group) => group.key)))
+            }}
+              aria-label={t('settings.tools.search')} placeholder={t('settings.tools.search')}
+              className="min-w-0 flex-1 bg-transparent text-sm outline-none" />
+          </label>
           <div className="space-y-2">
-            {groups.map((g) => (
+            {matchingGroups.length === 0 && <EmptyState title={t('settings.tools.noMatches')} />}
+            {matchingGroups.map((g) => (
               <ToolGroupCard
                 key={g.key}
                 group={g}
@@ -932,17 +953,16 @@ function ToolGroupCard({
   onToggleTool,
   onToggleGroup,
 }: ToolGroupCardProps) {
+  const { t } = useTranslation()
   const enabledCount = group.tools.filter((t) => !disabled.has(t.name)).length
   const noneEnabled = enabledCount === 0
   const toolListId = useId()
 
   return (
-    <div className="border border-border rounded-lg overflow-hidden">
-      {/* Group header */}
+    <Collapsible open={expanded} onOpenChange={onToggleExpanded} className="border border-border rounded-lg overflow-hidden">
       <div className="flex items-center gap-3 px-4 py-2.5 bg-secondary">
-        <button
+        <CollapsibleTrigger
           type="button"
-          onClick={onToggleExpanded}
           className="-my-2.5 flex min-h-10 min-w-0 flex-1 items-center gap-2 rounded-md py-2.5 text-left focus-visible:outline-none focus-visible:[box-shadow:var(--oa-focus-shadow)]"
           aria-expanded={expanded}
           aria-controls={toolListId}
@@ -955,10 +975,8 @@ function ToolGroupCard({
             <polyline points="9 18 15 12 9 6" />
           </svg>
           <span className="text-sm font-medium text-foreground truncate">{label}</span>
-          <span className="text-[11px] text-muted-foreground shrink-0">
-            {enabledCount}/{group.tools.length}
-          </span>
-        </button>
+          <CountBadge count={enabledCount} label={t('settings.tools.enabledCount', { count: enabledCount, total: group.tools.length })} />
+        </CollapsibleTrigger>
         <Toggle
           ariaLabel={`${label} tools`}
           size="sm"
@@ -967,12 +985,10 @@ function ToolGroupCard({
         />
       </div>
 
-      {/* Tool list */}
-      <div
+      <CollapsibleContent keepMounted
         id={toolListId}
         aria-hidden={!expanded}
         inert={!expanded ? true : undefined}
-        hidden={!expanded}
       >
         <div className="divide-y divide-border">
           {group.tools.map((t) => {
@@ -981,15 +997,13 @@ function ToolGroupCard({
               <div
                 key={t.name}
                 className={`flex min-h-12 items-center gap-3 px-4 py-2 ${
-                  enabled ? '' : 'opacity-50'
+                  enabled ? '' : 'bg-muted/30'
                 }`}
               >
-                <div className="flex-1 min-w-0">
-                  <span className="text-[13px] leading-[18px] text-foreground font-mono">{t.name}</span>
+                <div className="flex flex-1 min-w-0 items-center gap-2">
+                  <span className="truncate text-[13px] leading-[18px] text-foreground font-mono" title={t.name}>{t.name}</span>
                   {t.description && (
-                    <p className="text-[11px] text-muted-foreground mt-0.5 line-clamp-1">
-                      {t.description}
-                    </p>
+                    <ContextHelp label={t.name}>{t.description}</ContextHelp>
                   )}
                 </div>
                 <Toggle
@@ -1002,8 +1016,8 @@ function ToolGroupCard({
             )
           })}
         </div>
-      </div>
-    </div>
+      </CollapsibleContent>
+    </Collapsible>
   )
 }
 

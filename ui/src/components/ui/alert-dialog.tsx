@@ -52,7 +52,7 @@ function AlertDialogContent({
         data-slot="alert-dialog-content"
         data-size={size}
         className={cn(
-          "group/alert-dialog-content fixed top-1/2 left-1/2 z-50 grid w-full -translate-x-1/2 -translate-y-1/2 gap-4 rounded-2xl bg-popover p-4 text-popover-foreground shadow-lg ring-1 ring-foreground/10 outline-none transition-[opacity,transform] duration-[var(--motion-standard)] [transition-timing-function:var(--motion-ease-out)] data-starting-style:scale-[.98] data-starting-style:opacity-0 data-ending-style:scale-[.99] data-ending-style:opacity-0 data-ending-style:duration-[var(--motion-fast)] motion-reduce:transition-none data-[size=default]:max-w-xs data-[size=sm]:max-w-xs data-[size=default]:sm:max-w-sm",
+          "group/alert-dialog-content fixed top-1/2 left-1/2 z-50 grid w-full -translate-x-1/2 -translate-y-1/2 gap-4 rounded-2xl bg-popover p-4 text-popover-foreground shadow-lg ring-1 ring-foreground/10 outline-none transition-[opacity,scale] duration-[var(--motion-standard)] [transition-timing-function:var(--motion-ease-out)] data-starting-style:scale-[.98] data-starting-style:opacity-0 data-ending-style:scale-[.99] data-ending-style:opacity-0 data-ending-style:duration-[var(--motion-fast)] motion-reduce:transition-none data-[size=default]:max-w-xs data-[size=sm]:max-w-xs data-[size=default]:sm:max-w-sm",
           className
         )}
         {...props}

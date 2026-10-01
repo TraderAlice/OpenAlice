@@ -1,3 +1,4 @@
+import { CountBadge } from '../components/CountBadge'
 import { useInboxContent } from '../hooks/useInboxContent'
 import { Dialog, DialogContent, DialogTitle } from '../components/ui/dialog'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
@@ -158,14 +159,14 @@ export function InboxPage({ visible }: InboxPageProps) {
             fallback={(
               <PageHeader
                 title={t('nav.item.inbox')}
-                description={t('inbox.pageDescription', { count: entries.length })}
+                accessory={<CountBadge count={entries.length} label={t('inbox.pageDescription', { count: entries.length })} />}
               />
             )}
           />
         ) : (
           <PageHeader
             title={t('nav.item.inbox')}
-            description={t('inbox.pageDescription', { count: entries.length })}
+            accessory={<CountBadge count={entries.length} label={t('inbox.pageDescription', { count: entries.length })} />}
           />
         )}
         <div className="flex-1 overflow-y-auto min-h-0">

@@ -1,4 +1,3 @@
-import { Collapsible, CollapsibleContent } from '../components/ui/collapsible'
 import { ConversationTranscriptItem } from '../components/conversation/ConversationTranscript'
 import aliceWave from '../../../default/stickers/alice-color/wave.png'
 import { MeasuredText } from '../components/MeasuredText'
@@ -412,8 +411,7 @@ export function HarnessLandingPage({
         </h1>
       </header>
 
-      <Collapsible open={showStarterIntents}>
-      <CollapsibleContent keepMounted
+      <div
         data-testid="harness-landing-suggestions"
         data-state={showStarterIntents ? 'visible' : 'hidden'}
         className="oa-harness-starters"
@@ -467,8 +465,7 @@ export function HarnessLandingPage({
           })}
         </div>
         </div>
-      </CollapsibleContent>
-      </Collapsible>
+      </div>
       </>}
     </ConversationLayout>
   )

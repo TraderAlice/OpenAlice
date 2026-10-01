@@ -7,6 +7,7 @@ interface PageHeaderProps {
   title: string
   description?: ReactNode
   help?: string
+  accessory?: ReactNode
   right?: ReactNode
   /** Show a pulsing "data is live" indicator and relative-time microcopy
    *  ("updated 14s ago") in the description row below the toolbar.
@@ -19,12 +20,14 @@ export function PageHeader({
   title,
   description,
   help,
+  accessory,
   right,
   live,
 }: PageHeaderProps) {
   return (
     <>
       <PageTopBar title={title} actions={right}>
+        {accessory}
         {help && <ContextHelp label={title}>{help}</ContextHelp>}
       </PageTopBar>
       {(description || live) && (

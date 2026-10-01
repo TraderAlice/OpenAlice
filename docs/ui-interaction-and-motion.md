@@ -409,6 +409,26 @@ away from the pointer.
 
 ### Component primitive ownership
 
+Popup and button transitions target the individual CSS `scale` property emitted
+by Tailwind. Drawer motion targets `translate`. Keyboard-focused buttons skip
+interpolation; coarse-pointer buttons keep a 44px minimum target.
+
+`SegmentedControl` delegates single selection and roving keyboard focus to
+Base UI ToggleGroup. News, Movers, Issues, portfolio views, charts and simulator
+controls share its sizes, focus treatment and coarse-pointer target. Arrow keys
+move focus; Enter and Space select. A selected option remains selected when
+pressed again.
+
+Issue groups and tool groups use the shared Collapsible measurement and lifetime.
+Tool search opens matching groups, retains individual disclosure control and
+reports the matching count. Tool descriptions live in the contextual help owner.
+The landing suggestions retain their layout space as the draft changes, keeping
+the welcome heading and composer anchored. Keyboard input updates this state
+immediately. Market shortcuts share one component and a neutral visual treatment.
+Trading mode descriptions remain visible; pending settings writes retain their
+focus target and rejected writes expose a recoverable error at the control.
+
+
 Behavioral UI primitives live as source under `ui/src/components/ui/`. They are
 initialized from shadcn's Base UI recipes through `ui/components.json`, then
 owned and reviewed as OpenAlice code. Product components such as

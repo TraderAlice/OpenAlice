@@ -1,3 +1,4 @@
+import { SegmentedControl } from '../components/SegmentedControl'
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
 import { LineChart, Line, YAxis, XAxis, Tooltip } from 'recharts'
@@ -62,34 +63,14 @@ function MoversBoardView() {
     <div className="flex flex-col flex-1 min-h-0">
       <PageHeader
         title={t('market.boardMovers')}
-        description={
-          <span className="inline-flex flex-wrap items-center gap-x-2 gap-y-0.5">
-            <span>{t('market.moversSubtitle')}</span>
-            {data && <BoardMeta meta={data.meta} />}
-          </span>
-        }
+        help={t('market.moversSubtitle')}
+        description={data && <BoardMeta meta={data.meta} />}
         live={{ lastUpdated: updatedAt, label: 'Fetched', hideDot: true }}
       />
       <div className="flex-1 overflow-y-auto px-4 md:px-8 py-4 flex flex-col gap-4 min-h-0">
-        <div
-          className="flex flex-wrap items-center gap-1"
-          role="group"
-          aria-label={t('market.boardMovers')}
-        >
-          {(['gainers', 'losers', 'active', 'undervaluedGrowth', 'growthTech', 'smallCaps', 'undervaluedLarge'] as const).map((k) => (
-            <Button
-              key={k}
-              type="button"
-              onClick={() => setList(k)}
-              aria-pressed={list === k}
-              className="shrink-0 whitespace-nowrap text-[12px]"
-              variant={list === k ? 'secondary' : 'ghost'}
-              size="sm"
-            >
-              {t(listLabelKey(k))}
-            </Button>
-          ))}
-        </div>
+        <SegmentedControl value={list} onChange={setList} className="flex-wrap" ariaLabel={t('market.boardMovers')}
+          options={(['gainers', 'losers', 'active', 'undervaluedGrowth', 'growthTech', 'smallCaps', 'undervaluedLarge'] as const)
+            .map((value) => ({ value, label: t(listLabelKey(value)) }))} />
 
         {loading && !data && <CenteredLoading label={t('common.loading')} />}
         {error && (

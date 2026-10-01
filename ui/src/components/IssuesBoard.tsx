@@ -1,3 +1,5 @@
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from './ui/collapsible'
+import { CountBadge } from './CountBadge'
 import { useEffect, useState } from 'react'
 import type { TFunction } from 'i18next'
 import { useTranslation } from 'react-i18next'
@@ -440,29 +442,25 @@ function StatusGroup({
   const statusLabel = label ?? t(`issues.status.${status}`)
   const listId = `issues-status-${groupKey}`
   return (
-    <section
+    <Collapsible open={!collapsed || hideHeading} onOpenChange={onToggle}
+      render={<section />}
       data-testid={`issue-status-group-${groupKey}`}
       className="min-w-0"
     >
-      {!hideHeading && <button
+      {!hideHeading && <CollapsibleTrigger
         type="button"
-        onClick={onToggle}
         aria-expanded={!collapsed}
         aria-controls={listId}
         aria-label={t(collapsed ? 'issues.expandStatus' : 'issues.collapseStatus', { status: statusLabel })}
         className="flex h-9 w-full items-center gap-2 rounded-lg bg-muted/45 px-3 text-left transition-colors hover:bg-muted/60 sm:px-4"
       >
-        {collapsed ? (
-          <ChevronRight size={14} className="shrink-0 text-muted-foreground/70" />
-        ) : (
-          <ChevronDown size={14} className="shrink-0 text-muted-foreground/70" />
-        )}
+        <ChevronRight size={14} aria-hidden className={`shrink-0 text-muted-foreground transition-transform duration-[var(--motion-fast)] motion-reduce:transition-none ${collapsed ? '' : 'rotate-90'}`} />
         {!label && <meta.Icon size={14} className={`shrink-0 ${meta.className}`} />}
         <span className="text-[13px] font-medium text-foreground">{statusLabel}</span>
-        <span className="text-xs text-muted-foreground">{rows.length}</span>
-      </button>}
-      {(!collapsed || hideHeading) && (
-        <ul id={listId} className="py-1">
+        <CountBadge count={rows.length} label={`${statusLabel}: ${rows.length}`} />
+      </CollapsibleTrigger>}
+      <CollapsibleContent id={listId} aria-hidden={collapsed && !hideHeading} inert={collapsed && !hideHeading}>
+        <ul className="py-1">
           {rows.map((row) => (
             <IssueRow
               key={`${row.wsId}:${row.issue.id}`}
@@ -473,8 +471,8 @@ function StatusGroup({
             />
           ))}
         </ul>
-      )}
-    </section>
+      </CollapsibleContent>
+    </Collapsible>
   )
 }
 

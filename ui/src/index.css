@@ -1719,7 +1719,7 @@ html[lang="ja"] .oa-onboarding-title {
   }
 }
 .message-enter {
-  animation: fadeSlideIn 0.3s ease-out;
+  animation: fadeSlideIn var(--motion-standard) var(--motion-ease-out);
 }
 
 /* Page transition animation */
@@ -1732,7 +1732,7 @@ html[lang="ja"] .oa-onboarding-title {
   }
 }
 .page-fade-in {
-  animation: pageFadeIn 150ms ease-out;
+  animation: pageFadeIn var(--motion-fast) var(--motion-ease-out);
 }
 
 /* Code block wrapper for copy button */
@@ -1939,4 +1939,18 @@ html[lang="ja"] .oa-onboarding-title {
 body:has([data-desktop-banner]):not(:has(.oa-office-main)) [data-sonner-toaster] { --offset-top: 88px !important; }
 @media (max-width: 767px) {
   [data-sonner-toaster] { --mobile-offset-top: 96px !important; }
+}
+
+.oa-harness-starters {
+  opacity: 1;
+  visibility: visible;
+  transition: opacity var(--motion-fast) var(--motion-ease-out), visibility var(--motion-fast);
+}
+.oa-harness-starters[data-state="hidden"] {
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+}
+.conversation-shell:has(textarea:focus-visible) .oa-harness-starters {
+  transition: none;
 }

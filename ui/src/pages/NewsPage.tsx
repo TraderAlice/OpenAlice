@@ -1,3 +1,4 @@
+import { SegmentedControl } from '../components/SegmentedControl'
 import { safeNotificationImage } from '../lib/notifications/image'
 import { memo, useCallback, useEffect, useId, useMemo, useRef, useState, type FormEvent } from 'react'
 import { ChevronDown, CircleAlert, RefreshCw, Search } from 'lucide-react'
@@ -144,9 +145,9 @@ export function NewsPage({ spec }: { spec: Extract<ViewSpec, { kind: 'news' }> }
         <PageHeader title={category ? t(category.labelKey) : t('nav.item.news')} />
         <div className="flex min-h-0 flex-1 flex-col">
           <div className="shrink-0 border-b border-border px-3 py-2 md:px-4">
-            <nav aria-label={t('news.viewsLabel')} className="mb-2 flex flex-wrap items-center gap-1">
-              {NEWS_VIEWS.map((view) => <Button key={view.id} size="sm" variant={selection === view.id ? 'secondary' : 'ghost'}
-                aria-pressed={selection === view.id} onClick={() => setSelection(view.id)}>{t(view.labelKey)}</Button>)}
+            <nav aria-label={t('news.viewsLabel')} className="mb-2 min-w-0">
+              <SegmentedControl value={selection} onChange={setSelection} ariaLabel={t('news.viewsLabel')}
+                options={NEWS_VIEWS.map((view) => ({ value: view.id, label: t(view.labelKey) }))} />
             </nav>
             <form aria-label={t('news.filtersLabel')} onSubmit={submit} className="flex flex-wrap items-center gap-2">
               <div className="flex min-w-0 basis-full items-center gap-1 sm:basis-auto">
