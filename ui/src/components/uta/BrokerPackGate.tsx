@@ -11,7 +11,7 @@ export function AccountReadinessBadge({ readiness, health, size = 'sm' }: {
   size?: 'sm' | 'md'
 }) {
   if (!readiness.configuredEnabled) {
-    return <span className="text-[11px] text-muted-foreground">Disabled in config</span>
+    return <span className="text-sm text-muted-foreground">Disabled in config</span>
   }
   if (readiness.operational) return <HealthBadge health={health} size={size} />
 
@@ -26,7 +26,7 @@ export function AccountReadinessBadge({ readiness, health, size = 'sm' }: {
           : 'Support status unavailable'
   return (
     <span
-      className="inline-flex items-center gap-1.5 text-[11px] leading-[15px] text-warning"
+      className="inline-flex items-center gap-1.5 text-sm leading-5 text-warning"
       title={readiness.reason}
       data-testid="account-readiness-badge"
     >
@@ -70,8 +70,8 @@ export function BrokerSupportGate({ readiness, installingEngine, onInstall, onRe
       <div className="flex items-start gap-2.5">
         <AlertTriangle size={15} className="mt-0.5 shrink-0 text-warning" aria-hidden />
         <div className="min-w-0 flex-1">
-          {!compact && <div className="text-[12px] font-medium text-foreground">{title}</div>}
-          <p className={`${compact ? '' : 'mt-0.5'} text-[11px] leading-relaxed text-muted-foreground`}>
+          {!compact && <div className="text-sm font-medium text-foreground">{title}</div>}
+          <p className={`${compact ? '' : 'mt-0.5'} text-sm leading-relaxed text-muted-foreground`}>
             {readiness.reason ?? (
               readiness.state === 'checking'
                 ? 'Reading support installed on this Runtime.'
@@ -79,11 +79,11 @@ export function BrokerSupportGate({ readiness, installingEngine, onInstall, onRe
             )}
           </p>
           {!compact && !readiness.operational && readiness.state !== 'checking' && (
-            <p className="mt-1 text-[10px] leading-relaxed text-muted-foreground/80">
+            <p className="mt-1 text-sm leading-relaxed text-muted-foreground/80">
               Installation changes this Runtime. Broker connections and trading remain unchanged.
             </p>
           )}
-          {actionError && <p className="mt-1 text-[11px] text-destructive" role="alert">{actionError}</p>}
+          {actionError && <p className="mt-1 text-sm text-destructive" role="alert">{actionError}</p>}
         </div>
         {installable && (readiness.state === 'needs-install' || readiness.state === 'needs-repair') ? (
           <Button

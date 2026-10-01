@@ -36,18 +36,18 @@ export function Metric({ label, value, delta, valueSign, size = 'md', className 
     const color = signColor(valueSign)
     switch (size) {
       case 'sm': return `text-[16px] font-semibold tabular-nums ${color}`
-      case 'lg': return `text-[28px] md:text-[36px] font-bold tabular-nums leading-tight ${color}`
+      case 'lg': return `text-[28px] md:text-[36px] font-semibold tabular-nums leading-tight ${color}`
       case 'md':
-      default:   return `text-[22px] font-bold tabular-nums ${color}`
+      default:   return `text-[22px] font-semibold tabular-nums ${color}`
     }
   })()
 
   return (
     <div className={className}>
-      <p className="text-[11px] font-medium leading-4 text-muted-foreground">{label}</p>
+      <p className="text-sm font-medium leading-5 text-muted-foreground">{label}</p>
       <p className={valueClass}>{value}</p>
       {delta && (
-        <p className={`mt-0.5 inline-flex items-center gap-1 text-[12px] leading-4 tabular-nums ${signColor(delta.sign)}`}>
+        <p className={`mt-0.5 inline-flex items-center gap-1 text-sm leading-5 tabular-nums ${signColor(delta.sign)}`}>
           <DeltaIcon sign={delta.sign} />
           {delta.value}
         </p>
@@ -64,7 +64,7 @@ function signColor(sign?: MetricSign): string {
 
 function DeltaIcon({ sign }: { sign: MetricSign }) {
   const Icon = sign === 'up' ? ArrowUpRight : sign === 'down' ? ArrowDownRight : Minus
-  return <Icon aria-hidden className="size-3 shrink-0" />
+  return <Icon aria-hidden className="size-4 shrink-0" />
 }
 
 /** Pick a sign from a numeric delta. `flat` for `0` (or NaN). */

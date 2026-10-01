@@ -249,7 +249,7 @@ export function ActivityBar({
                               label={badge.label}
                               limit={99}
                               tone={badge.tone}
-                              className={compactRail ? 'md:absolute md:-right-1 md:-top-1 md:h-4 md:min-w-4 md:px-1 md:text-[9px]' : undefined}
+                              className={compactRail ? 'md:absolute md:-right-1 md:-top-1 md:h-5 md:min-w-5 md:px-1' : undefined}
                             />
                           )}
                         </button>
@@ -367,7 +367,7 @@ function SectionHeader({
     <button
       type="button"
       onClick={onToggleCollapse}
-      className="mb-0.5 flex min-h-10 w-full items-center gap-1.5 px-2.5 py-1 text-left text-[12px] font-medium leading-4 text-muted-foreground/75 transition-colors hover:text-foreground md:min-h-6"
+      className="mb-0.5 flex min-h-10 w-full items-center gap-1.5 px-2.5 py-1 text-left text-sm font-medium leading-5 text-muted-foreground/75 transition-colors hover:text-foreground md:min-h-6"
       aria-expanded={!isCollapsed}
       aria-controls={controlsId}
       aria-label={label}

@@ -63,7 +63,7 @@ function DialogContent({
       <DialogPrimitive.Popup
         data-slot="dialog-content"
         className={cn(
-          "fixed top-1/2 left-1/2 z-50 grid w-full max-w-[calc(100%-2rem)] -translate-x-1/2 -translate-y-1/2 gap-5 rounded-2xl bg-popover p-6 text-sm text-popover-foreground shadow-md outline-none transition-[opacity,scale] duration-[var(--motion-standard)] [transition-timing-function:var(--motion-ease-out)] data-starting-style:scale-[.98] data-starting-style:opacity-0 data-ending-style:scale-[.99] data-ending-style:opacity-0 data-ending-style:duration-[var(--motion-fast)] data-instant:transition-none motion-reduce:transition-none sm:max-w-sm",
+          "fixed top-1/2 left-1/2 z-50 grid w-full max-h-[calc(100dvh-2rem)] max-w-[calc(100%-2rem)] overflow-y-auto -translate-x-1/2 -translate-y-1/2 gap-5 rounded-2xl bg-popover p-6 text-sm text-popover-foreground shadow-md outline-none transition-[opacity,scale] duration-[var(--motion-standard)] [transition-timing-function:var(--motion-ease-out)] data-starting-style:scale-[.98] data-starting-style:opacity-0 data-ending-style:scale-[.99] data-ending-style:opacity-0 data-ending-style:duration-[var(--motion-fast)] data-instant:transition-none motion-reduce:transition-none sm:max-w-sm",
           showCloseButton && "[&_[data-slot=dialog-header]]:pr-16",
           className
         )}

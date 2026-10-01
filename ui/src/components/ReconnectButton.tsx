@@ -45,8 +45,8 @@ export function ReconnectButton({ accountId, disabled = false, disabledReason }:
       >
         {status === 'loading' ? 'Connecting...' : 'Reconnect'}
       </button>
-      {status === 'success' && <span className="text-[12px] text-success">{message}</span>}
-      {status === 'error' && <span className="text-[12px] text-destructive">{message}</span>}
+      {status === 'success' && <span className="text-sm text-success">{message}</span>}
+      {status === 'error' && <span className="text-sm text-destructive">{message}</span>}
     </div>
   )
 }

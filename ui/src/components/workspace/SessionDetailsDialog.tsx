@@ -1,6 +1,6 @@
 import { useRef } from 'react'
 import { useTranslation } from 'react-i18next'
-import { ArrowUpRight, RefreshCw } from 'lucide-react'
+import { ArrowUpRight, Activity, RefreshCw } from 'lucide-react'
 import { useSessionControl } from '../../hooks/useSessionControl'
 import { useSessionDetails } from '../../hooks/useSessionDetails'
 import { AgentRuntimeIcon } from '../../lib/agentRuntimeIcon'
@@ -62,7 +62,7 @@ export function SessionDetailsDialog({ record, onClose }: { record: SessionRecor
           <DialogDescription className="mt-0.5 text-xs">{text('title')}</DialogDescription>
         </div>
         <span className="ml-auto inline-flex shrink-0 items-center gap-2 rounded-full bg-muted px-2.5 py-1 text-xs font-medium text-muted-foreground">
-          {live && <span className="relative size-2 rounded-full bg-primary live-pulse motion-reduce:animate-none" aria-hidden />}
+          {live && <Activity className="size-4 shrink-0" aria-hidden />}
           {status}
         </span>
       </header>

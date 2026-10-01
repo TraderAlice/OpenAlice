@@ -103,7 +103,7 @@ export function MarketRotationPage() {
         {error && (
           <div
             role="alert"
-            className="flex items-center justify-between gap-3 rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2 text-[13px] leading-5 text-destructive"
+            className="flex items-center justify-between gap-3 rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm leading-5 text-destructive"
           >
             <span className="min-w-0 break-words">{error}</span>
             <Button
@@ -122,7 +122,7 @@ export function MarketRotationPage() {
           <>
             <QuadrantChart points={points} t={t} />
             <RotationTable rows={data.sectors} benchmarkSymbol={data.benchmark.symbol} t={t} />
-            <p className="max-w-3xl break-words text-[11px] leading-relaxed text-muted-foreground/70">
+            <p className="max-w-3xl break-words text-sm leading-relaxed text-muted-foreground/70">
               <span className="font-semibold text-muted-foreground">{t('market.rotationMethodology')}: </span>
               {data.methodology}
             </p>
@@ -173,7 +173,7 @@ function QuadrantChart({ points, t }: { points: Point[]; t: TFunction }) {
           </ScatterChart>
         )}
       </MeasuredChartFrame>
-      <div className="flex justify-between px-8 -mt-1 text-[10px] text-muted-foreground/50">
+      <div className="flex justify-between px-8 -mt-1 text-sm text-muted-foreground/50">
         <span>{t('market.axisRelStrength')} →</span>
         <span>↑ {t('market.axisVolumeShare')}</span>
       </div>
@@ -182,14 +182,14 @@ function QuadrantChart({ points, t }: { points: Point[]; t: TFunction }) {
 }
 
 function CornerLabel({ className, text }: { className: string; text: string }) {
-  return <span className={`absolute text-[11px] font-medium ${className}`}>{text}</span>
+  return <span className={`absolute text-sm font-medium ${className}`}>{text}</span>
 }
 
 function PointTooltip({ active, payload, t }: { active?: boolean; payload?: Array<{ payload: Point }>; t: TFunction }) {
   if (!active || !payload?.length) return null
   const p = payload[0].payload
   return (
-    <div className="oa-chart-tooltip px-2.5 py-1.5 text-[11px] leading-[15px]">
+    <div className="oa-chart-tooltip px-2.5 py-1.5 text-sm leading-5">
       <div className="font-mono font-semibold text-foreground">{p.symbol} <span className="text-muted-foreground font-sans font-normal">{p.sector}</span></div>
       <div className="mt-0.5 grid grid-cols-[auto_auto] gap-x-3 gap-y-0.5">
         <span className="text-muted-foreground">{t('market.colScore')}</span><span className={signColor(p.score)}>{p.score ?? '—'}</span>

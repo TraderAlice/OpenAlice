@@ -62,7 +62,7 @@ export function SidebarActionMenu({
               aria-label={item.ariaLabel}
               disabled={item.disabled}
               variant={item.danger ? 'destructive' : 'default'}
-              className="flex min-h-8 w-full cursor-default items-center gap-2 rounded-md px-2 py-1.5 text-left text-[12px] leading-4 transition-colors focus:bg-accent"
+              className="w-full text-left"
               onClick={() => {
                 if (item.disabled) return
                 // Base UI restores focus to the trigger as the menu finishes

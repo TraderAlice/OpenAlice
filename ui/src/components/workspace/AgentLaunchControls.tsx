@@ -123,8 +123,9 @@ function AgentLaunchAccessItems({ config, onConfigureProvider }: {
           onClick={() => {
             config.selectWorkspaceDefault()
           }}
-          className={`min-h-11 px-2.5 py-2 text-sm ${config.accessMode === 'auto' ? 'text-primary' : 'text-foreground'}`}
+          className={`min-h-11 ${config.accessMode === 'auto' ? 'text-primary' : 'text-foreground'}`}
         >
+          <Settings2 className="size-4 shrink-0" aria-hidden />
           <span className="min-w-0 flex-1">
             <span className="block break-words">{t('chatLanding.workspaceAiAccess')}</span>
             {config.detectedCredential.model && (
@@ -138,7 +139,7 @@ function AgentLaunchAccessItems({ config, onConfigureProvider }: {
         onClick={() => {
           config.selectRuntimeDefault()
         }}
-        className={`min-h-11 px-2.5 py-2 text-sm ${config.accessMode === 'native' ? 'text-primary' : 'text-foreground'}`}
+        className={`min-h-11 ${config.accessMode === 'native' ? 'text-primary' : 'text-foreground'}`}
       >
         <AgentRuntimeIcon agentId={config.effectiveAgent} className="h-4 w-4 shrink-0" />
         <span className="min-w-0 flex-1">
@@ -155,7 +156,7 @@ function AgentLaunchAccessItems({ config, onConfigureProvider }: {
             onClick={() => {
               config.selectCredential(credential.slug)
             }}
-            className={`min-h-11 px-2.5 py-2 text-sm ${active ? 'text-primary' : 'text-foreground'}`}
+            className={`min-h-11 ${active ? 'text-primary' : 'text-foreground'}`}
           >
             <span className="flex h-4 w-4 shrink-0 items-center justify-center text-muted-foreground">
               <AIProviderIcon vendor={credential.vendor} className="h-4 w-4" />
@@ -174,7 +175,7 @@ function AgentLaunchAccessItems({ config, onConfigureProvider }: {
         )
       })}
       <DropdownMenuSeparator />
-      <DropdownMenuItem onClick={onConfigureProvider} className="min-h-11 px-2.5 py-2 text-sm">
+      <DropdownMenuItem onClick={onConfigureProvider} className="min-h-11">
         <KeyRound className="h-4 w-4 shrink-0" aria-hidden />
         <span className="min-w-0 flex-1">
           <span className="block">{t('chatLanding.addApiAccount')}</span>
@@ -318,23 +319,23 @@ function AgentLaunchInferenceMenu({
                 {details?.contextWindow && (
                   <DropdownMenuLabel>{t('chatLanding.contextSummary', { limit: formatContextWindow(details.contextWindow) })}</DropdownMenuLabel>
                 )}
-                <DropdownMenuRadioItem value="" closeOnClick={false} className="min-h-9 px-2.5 pr-8 text-sm">
+                <DropdownMenuRadioItem value="" closeOnClick={false}>
                   {config.defaultModel ? (
-                    <span className="flex min-w-0 flex-1 items-baseline gap-2">
+                    <span className="flex min-w-0 flex-1 flex-wrap items-baseline gap-2">
                       <span className="shrink-0">{t('chatLanding.defaultLabel')}</span>
-                      <span className="min-w-0 truncate text-muted-foreground">{config.defaultModel}</span>
+                      <span className="min-w-0 break-words text-muted-foreground">{config.defaultModel}</span>
                     </span>
                   ) : (
                     <span className="min-w-0 flex-1 break-words">{t('chatLanding.runtimeDefaultModel')}</span>
                   )}
                 </DropdownMenuRadioItem>
                 {customCurrentModel && (
-                  <DropdownMenuRadioItem value={customCurrentModel} closeOnClick={false} className="min-h-9 px-2.5 pr-8 text-sm">
+                  <DropdownMenuRadioItem value={customCurrentModel} closeOnClick={false}>
                     <span className="min-w-0 flex-1 break-words">{customCurrentModel}</span>
                   </DropdownMenuRadioItem>
                 )}
                 {knownModels.map((model) => (
-                  <DropdownMenuRadioItem key={model.id} value={model.id} closeOnClick={false} className="min-h-9 px-2.5 pr-8 text-sm">
+                  <DropdownMenuRadioItem key={model.id} value={model.id} closeOnClick={false}>
                     <span className="min-w-0 flex-1">
                       <span className="block break-words">{model.label}</span>
                       {model.label !== model.id && (
@@ -346,7 +347,6 @@ function AgentLaunchInferenceMenu({
               </DropdownMenuRadioGroup>
               <DropdownMenuSeparator />
               <DropdownMenuItem
-                className="min-h-9 px-2.5 text-sm"
                 onClick={() => {
                   setCustomModelDraft(config.launchModel ?? config.defaultModel ?? '')
                   pendingCustomModelRef.current = true
@@ -370,13 +370,13 @@ function AgentLaunchInferenceMenu({
                   value ? String(value) as NonNullable<AgentLaunchConfigState['launchReasoningEffort']> : null,
                 )}
               >
-                <DropdownMenuRadioItem value="" closeOnClick={false} className="min-h-9 px-2.5 pr-8 text-sm">
+                <DropdownMenuRadioItem value="" closeOnClick={false}>
                   <span className="min-w-0 flex-1 break-words">
                     {t('chatLanding.effortNotSpecified')}
                   </span>
                 </DropdownMenuRadioItem>
                 {effortOptions.map((effort) => (
-                  <DropdownMenuRadioItem key={effort} value={effort} closeOnClick={false} className="min-h-9 px-2.5 pr-8 text-sm">
+                  <DropdownMenuRadioItem key={effort} value={effort} closeOnClick={false}>
                     {t('chatLanding.reasoningEffortSummary', { effort })}
                   </DropdownMenuRadioItem>
                 ))}

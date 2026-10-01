@@ -515,7 +515,7 @@ function AdvancedSection({
               value={hub.baseUrl}
               onChange={(e) => onHubChange({ ...hub, baseUrl: e.target.value })}
               placeholder="https://traderhub.openalice.ai"
-              className={`${inputClass} max-w-[420px] font-mono text-sm`}
+              className={`${inputClass} max-w-[420px] font-mono text-base`}
             />
           </ConfigSection>
         </div>

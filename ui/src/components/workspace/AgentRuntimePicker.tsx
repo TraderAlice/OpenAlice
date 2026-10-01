@@ -5,7 +5,7 @@ import {
   useState,
 } from 'react'
 import { useTranslation } from 'react-i18next'
-import { ChevronDown, Copy, ExternalLink, Search } from 'lucide-react'
+import { ChevronDown, Copy, ExternalLink, LayoutGrid, Search } from 'lucide-react'
 
 import { Button } from '@/components/ui/button'
 import {
@@ -217,10 +217,10 @@ export const AgentRuntimePicker = forwardRef<AgentRuntimePickerHandle, AgentRunt
               onClick={() => {
                 if (!menuOpen) setMenuOpen(true)
               }}
-              className={`oa-pressable inline-flex min-h-7 min-w-0 max-w-[190px] items-center gap-1.5 rounded-md py-1 text-sm leading-5 font-medium text-muted-foreground hover:bg-muted hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50 ${toolbar ? 'bg-transparent px-2' : 'bg-muted px-2.5'}`}
+              className={`oa-pressable inline-flex min-h-9 min-w-0 max-w-[190px] items-center gap-2 rounded-full py-1.5 text-sm leading-5 font-medium text-muted-foreground hover:bg-muted hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50 ${toolbar ? 'bg-transparent px-3' : 'bg-secondary px-3'}`}
             />}
           >
-            <AgentRuntimeIcon agentId={selected?.id} className="h-3.5 w-3.5 shrink-0" />
+            <AgentRuntimeIcon agentId={selected?.id} className="size-4 shrink-0" />
             <span className="truncate">{selected?.displayName ?? t('chatLanding.selectAgent')}</span>
             <ChevronDown className="h-3 w-3 shrink-0 opacity-60" />
           </DropdownMenuTrigger>
@@ -241,9 +241,9 @@ export const AgentRuntimePicker = forwardRef<AgentRuntimePickerHandle, AgentRunt
                     if (missing) return
                     choose(agent.id)
                   }}
-                  className={`min-h-9 gap-2 px-2.5 text-sm ${active ? 'bg-muted text-foreground' : missing ? 'text-muted-foreground' : 'text-foreground'}`}
+                  className={`${active ? 'bg-muted text-foreground' : missing ? 'text-muted-foreground' : 'text-foreground'}`}
                 >
-                  <AgentRuntimeIcon agentId={agent.id} className="h-3.5 w-3.5 shrink-0" />
+                  <AgentRuntimeIcon agentId={agent.id} className="size-4 shrink-0" />
                   <span className="min-w-0 flex-1 truncate">{agent.displayName}</span>
                   {missing && (
                     <span className="shrink-0 text-sm text-muted-foreground">
@@ -267,11 +267,11 @@ export const AgentRuntimePicker = forwardRef<AgentRuntimePickerHandle, AgentRunt
                       if (selected.installed === false) return
                       choose(selected.id)
                     }}
-                    className={`min-h-9 gap-2 px-2.5 text-sm ${
+                    className={`${
                       selected.installed === false ? 'text-muted-foreground' : 'bg-muted text-foreground'
                     }`}
                   >
-                    <AgentRuntimeIcon agentId={selectedOutsidePrimary ? selected?.id : null} className="h-3.5 w-3.5 shrink-0" />
+                    <AgentRuntimeIcon agentId={selectedOutsidePrimary ? selected?.id : null} className="size-4 shrink-0" />
                     <span className="min-w-0 flex-1 truncate">{selected.displayName}</span>
                     {selected.installed === false && (
                       <span className="shrink-0 text-sm text-muted-foreground">
@@ -286,8 +286,8 @@ export const AgentRuntimePicker = forwardRef<AgentRuntimePickerHandle, AgentRunt
             <DropdownMenuSeparator />
             <DropdownMenuItem
               onClick={() => setOthersOpen(true)}
-              className="min-h-9 px-2.5 text-sm"
             >
+              <LayoutGrid className="size-4" aria-hidden />
               {t('chatLanding.otherRuntimes')}
             </DropdownMenuItem>
           </DropdownMenuContent>

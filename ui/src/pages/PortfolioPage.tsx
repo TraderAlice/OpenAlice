@@ -559,9 +559,9 @@ function PortfolioSkeleton() {
       {/* Equity curve */}
       <Skeleton className="h-[220px] w-full rounded-lg" />
       {/* Account strip */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+      <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,20rem),1fr))] gap-3">
         {Array.from({ length: 2 }).map((_, i) => (
-          <div key={i} className="flex items-center gap-3 rounded-lg border border-border bg-card px-3.5 py-3">
+          <div key={i} className="flex min-w-0 items-center gap-3 rounded-lg border border-border bg-card p-4">
             <Skeleton className="size-3 rounded-sm" />
             <div className="flex-1 space-y-2">
               <Skeleton className="h-3 w-24" />
@@ -598,7 +598,7 @@ function AccountStrip({ sources, perAccountCurve }: {
   perAccountCurve: Record<string, CurvePointSummary>
 }) {
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+    <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,20rem),1fr))] gap-3">
       {sources.map(s => {
         const isDisabled = s.disabled
         // Initial connect in flight — distinct from offline. `health` is
@@ -639,19 +639,19 @@ function AccountStrip({ sources, perAccountCurve }: {
         const showSpark = !isDisabled && !isOffline && !isConnecting && curve && curve.values.length >= 2
 
         return (
-          <div key={s.id} className={`flex items-center gap-3 rounded-lg border border-border bg-card px-3.5 py-3 ${isOffline || isDisabled ? 'opacity-60' : ''}`}>
+          <div key={s.id} className={`flex min-w-0 items-center gap-3 rounded-lg border border-border bg-card p-4 ${isOffline || isDisabled ? 'opacity-60' : ''}`}>
             <StatusIcon
               aria-hidden
               className={`size-3.5 shrink-0 ${statusColor} ${isConnecting ? 'animate-spin motion-reduce:animate-none' : ''}`}
             />
             <div className="flex-1 min-w-0">
-              <div className="flex items-baseline justify-between gap-2">
-                <span className="text-foreground font-medium text-sm truncate">{s.label}</span>
+              <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
+                <span className="min-w-0 break-words text-foreground font-medium text-sm">{s.label}</span>
                 {!isDisabled && !isOffline && !isConnecting && (
                   <span className="text-muted-foreground tabular-nums text-sm leading-5">{fmt(Number(s.equity))}</span>
                 )}
               </div>
-              <div className="flex items-baseline justify-between gap-2 mt-0.5">
+              <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1 mt-0.5">
                 {isDisabled
                   ? <span className="text-muted-foreground text-sm">Disabled</span>
                   : isConnecting
@@ -1044,7 +1044,7 @@ export function SnapshotSettings({ enabled, every, onEnabledChange, onEveryChang
               aria-label="Custom portfolio snapshot interval"
               aria-invalid={!customEveryValid}
               aria-describedby={!customEveryValid ? 'snapshot-interval-error' : undefined}
-              className="oa-field-control w-20 rounded-md border border-input bg-background px-1.5 py-1 text-center text-sm leading-5 text-foreground outline-none"
+              className="oa-field-control w-20 rounded-md border border-input bg-background px-1.5 py-1 text-center text-base leading-5 text-foreground outline-none"
               value={customEvery}
               onChange={(e) => {
                 const next = e.target.value

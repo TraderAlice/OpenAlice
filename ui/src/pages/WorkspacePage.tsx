@@ -156,7 +156,7 @@ export function WorkspacePage({ spec, visible }: Props) {
           }}
           variant="ghost"
           size="sm"
-          className="text-[11px]"
+          className="text-sm"
           title={webCanvas ? `Open this ${runtimeLabel} Session in the terminal` : `Open this ${runtimeLabel} Session in Web`}
         >
           {webCanvas
@@ -171,7 +171,7 @@ export function WorkspacePage({ spec, visible }: Props) {
         onClick={() => ctx.openAgentConfig(wsId)}
         variant="ghost"
         size="sm"
-        className="text-[11px]"
+        className="text-sm"
         title={t('workspace.configure')}
       >
         <Settings size={13} aria-hidden />
@@ -183,7 +183,7 @@ export function WorkspacePage({ spec, visible }: Props) {
   if (!sessionId) return (
     <div className="workspaces-root workspace-page-shell flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
       <PageTopBar title={workspaceName} titleHint={workspaceDisplayTitle(workspace)} actions={workspaceActions}>
-        {hasCustomName && <span className="hidden font-mono text-[10px] text-muted-foreground/70 sm:inline">{workspace.tag}</span>}
+        {hasCustomName && <span className="hidden font-mono text-sm text-muted-foreground/70 sm:inline">{workspace.tag}</span>}
       </PageTopBar>
       <HarnessLandingPage key={wsId} mode={source ?? 'chat'} spec={{ params: { targetWsId: wsId } }} showHeader={false} />
     </div>
@@ -196,7 +196,7 @@ export function WorkspacePage({ spec, visible }: Props) {
       {!terminalCanvas && !webCanvas && (
         <PageTopBar title={workspaceName} titleHint={workspaceDisplayTitle(workspace)} actions={workspaceActions}>
             {hasCustomName && (
-              <span className="hidden shrink-0 font-mono text-[10px] text-muted-foreground/70 sm:inline">
+              <span className="hidden shrink-0 font-mono text-sm text-muted-foreground/70 sm:inline">
                 {workspace.tag}
               </span>
             )}

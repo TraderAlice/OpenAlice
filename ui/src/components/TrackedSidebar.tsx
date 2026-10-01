@@ -97,7 +97,7 @@ export function TrackedSidebar({
 
   if (!hasRows && (listError || issueError)) {
     return (
-      <div className="flex items-start gap-2 px-3 py-4 text-[12px] leading-relaxed text-muted-foreground">
+      <div className="flex items-start gap-2 px-3 py-4 text-sm leading-relaxed text-muted-foreground">
         <CircleAlert size={14} className="mt-0.5 shrink-0 text-destructive" aria-hidden />
         <span>{t('tracked.listLoadErrorTitle')}</span>
       </div>
@@ -106,7 +106,7 @@ export function TrackedSidebar({
 
   if (!hasRows) {
     return (
-      <div className="px-3 py-4 text-[12px] text-muted-foreground/70 leading-relaxed">
+      <div className="px-3 py-4 text-sm text-muted-foreground/70 leading-relaxed">
         {t('tracked.nothingTrackedYet')}
       </div>
     )
@@ -186,7 +186,7 @@ export function TrackedSidebar({
 
 function SectionCount({ count }: { count: number }) {
   return (
-    <span className="rounded-full bg-muted px-1.5 py-0.5 text-[10px] leading-[14px] font-medium tabular-nums text-muted-foreground/65">
+    <span className="rounded-full bg-muted px-1.5 py-0.5 text-sm leading-5 font-medium tabular-nums text-muted-foreground/65">
       {count}
     </span>
   )
@@ -233,7 +233,7 @@ function TrackedEntityRow({
       <span className="min-w-0">
         {display.prefix ? (
           <span className="flex min-w-0 items-baseline gap-1.5">
-            <span className="shrink-0 font-mono text-[10px] leading-[14px] font-semibold text-muted-foreground/60">
+            <span className="shrink-0 font-mono text-sm leading-5 font-semibold text-muted-foreground/60">
               {display.prefix}
             </span>
             <span className={`truncate text-[12.5px] ${active ? 'font-semibold text-foreground' : 'font-medium'}`}>
@@ -249,7 +249,7 @@ function TrackedEntityRow({
 
       {entity.backlinkCount > 0 && (
         <span
-          className={`min-w-[20px] rounded-full px-1.5 py-0.5 text-center text-[10px] leading-[14px] font-medium tabular-nums ${
+          className={`min-w-[20px] rounded-full px-1.5 py-0.5 text-center text-sm leading-5 font-medium tabular-nums ${
             active ? 'bg-background/75 text-muted-foreground' : 'bg-muted/70 text-muted-foreground/65'
           }`}
           title={t('tracked.backlinksTooltip', { count: entity.backlinkCount })}
@@ -290,7 +290,7 @@ function TrackedIssueRow({
         <ListChecks size={13} strokeWidth={1.8} />
       </span>
       <span className="flex min-w-0 items-baseline gap-1.5">
-        <span className="shrink-0 font-mono text-[10px] leading-[14px] font-semibold text-muted-foreground/60">
+        <span className="shrink-0 font-mono text-sm leading-5 font-semibold text-muted-foreground/60">
           {anchor.workspaceTag}
         </span>
         <span className={`truncate text-[12.5px] ${active ? 'font-semibold text-foreground' : 'font-medium'}`}>

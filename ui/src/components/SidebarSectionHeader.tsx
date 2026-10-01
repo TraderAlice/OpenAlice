@@ -20,7 +20,7 @@ export function SidebarSectionHeader({
       <h3 className={`flex-1 truncate font-medium ${hierarchy ? 'text-sm leading-5 text-sidebar-foreground' : 'text-sm leading-5 text-muted-foreground'}`}>
         {children}
       </h3>
-      {trailing && <span className="flex shrink-0 items-center leading-4">{trailing}</span>}
+      {trailing && <span className="flex shrink-0 items-center leading-5">{trailing}</span>}
     </div>
   )
 }

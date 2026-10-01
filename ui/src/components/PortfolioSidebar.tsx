@@ -47,7 +47,7 @@ export function PortfolioSidebar() {
             pendingPush > 0 ? (
               <span
                 aria-label={t('nav.pendingPush', { count: pendingPush })}
-                className="min-w-[18px] h-[18px] px-1.5 rounded-full bg-destructive text-[10px] leading-[14px] font-semibold text-destructive-foreground tabular-nums flex items-center justify-center"
+                className="min-w-[18px] h-[18px] px-1.5 rounded-full bg-destructive text-sm leading-5 font-semibold text-destructive-foreground tabular-nums flex items-center justify-center"
               >
                 {pendingPush > 99 ? '99+' : pendingPush}
               </span>
@@ -67,13 +67,13 @@ export function PortfolioSidebar() {
         </SidebarSectionHeader>
 
         {lite ? (
-          <p className="px-3 py-2 text-[12px] leading-relaxed text-muted-foreground">
+          <p className="px-3 py-2 text-sm leading-relaxed text-muted-foreground">
             Account drill-down is unavailable in Lite mode.
           </p>
         ) : loading ? (
           <SidebarRowsSkeleton rows={3} />
         ) : utas.length === 0 ? (
-          <p className="px-3 py-2 text-[12px] leading-relaxed text-muted-foreground">
+          <p className="px-3 py-2 text-sm leading-relaxed text-muted-foreground">
             {t('portfolio.noAccountsYet')}
           </p>
         ) : (
@@ -91,7 +91,7 @@ export function PortfolioSidebar() {
                 }
                 trail={
                   !uta.enabled ? (
-                    <span className="text-[10px] font-medium text-muted-foreground">{t('common.off')}</span>
+                    <span className="text-sm font-medium text-muted-foreground">{t('common.off')}</span>
                   ) : undefined
                 }
               />

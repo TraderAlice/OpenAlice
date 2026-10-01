@@ -286,37 +286,37 @@ export function KlinePanel({ selection, source, onSnapshot, displayTitle, embedd
       <div className="flex flex-col py-2 px-1 gap-2">
         <div className="flex items-center gap-x-3 gap-y-1 min-w-0 flex-wrap">
           <div className="flex min-w-0 items-center gap-1">
-            <span className="text-[13px] font-medium text-foreground truncate">{displayTitle ?? title}</span>
+            <span className="text-sm font-medium text-foreground truncate">{displayTitle ?? title}</span>
             {selection && <WatchlistButton assetClass={selection.assetClass} symbol={selection.symbol} />}
           </div>
           {meta && (
             <span
-              className="inline-flex items-center gap-1.5 text-[11px] leading-[15px] font-medium text-muted-foreground"
+              className="inline-flex items-center gap-1.5 text-sm leading-5 font-medium text-muted-foreground"
               title={`Provider: ${meta.barId}${meta.barCapability ? ` (${meta.barCapability})` : ''}`}
             >
               <span>{meta.sourceId === 'eastmoney' ? '东方财富 · 前复权' : meta.sourceId}</span>{meta.barCapability && <span>{meta.barCapability}</span>}
             </span>
           )}
           {bars && bars.length > 0 && (
-            <span className="text-[11px] text-muted-foreground sm:ml-auto"
+            <span className="text-sm text-muted-foreground sm:ml-auto"
               title={`${bars[0].date} → ${bars[bars.length - 1].date}`}>
               {bars.length} bars · {bars[0].date.slice(0, 10)} — {bars[bars.length - 1].date.slice(0, 10)}
             </span>
           )}
         </div>
         {meta && <BarFreshness meta={meta} />}
-        {meta?.quality && meta.quality.excludedRows > 0 && <p className="text-[11px] leading-5 text-warning" role="status">
+        {meta?.quality && meta.quality.excludedRows > 0 && <p className="text-sm leading-5 text-warning" role="status">
           {meta.quality.excludedRows} incomplete {meta.quality.excludedRows === 1 ? 'record' : 'records'} excluded from fetched window.
           {meta.quality.latestExcludedRecordAt && ` Latest: ${meta.quality.latestExcludedRecordAt} (${meta.quality.latestExcludedFields.join(', ')} missing or invalid).`}
         </p>}
         <div className="flex items-center gap-x-5 gap-y-2 flex-wrap">
           {!embedded && sourceOptions.length > 1 && (
             <label className="flex items-center gap-2">
-              <span className="text-[11px] font-medium text-muted-foreground/70">Source</span>
+              <span className="text-sm font-medium text-muted-foreground/70">Source</span>
               <select
                 value={selectedBarId ?? meta?.barId ?? ''}
                 onChange={(e) => setSelectedBarId(e.target.value || null)}
-                className="oa-field-control max-w-[240px] cursor-pointer rounded-md border border-input bg-background px-2 py-1 text-[12px] leading-[18px] text-foreground outline-none transition-[border-color,box-shadow] duration-[var(--motion-fast)] [transition-timing-function:var(--motion-ease-out)] motion-reduce:transition-none"
+                className="oa-field-control max-w-[240px] cursor-pointer rounded-md border border-input bg-background px-2 py-1 text-sm leading-5 text-foreground outline-none transition-[border-color,box-shadow] duration-[var(--motion-fast)] [transition-timing-function:var(--motion-ease-out)] motion-reduce:transition-none"
                 title="Which provider's K-line to show — sources are never merged; you pick"
               >
                 {sourceOptions.map((c) => (
@@ -331,7 +331,7 @@ export function KlinePanel({ selection, source, onSnapshot, displayTitle, embedd
             className="flex items-center gap-2"
             title="Candle width (how much time each bar covers)"
           >
-            <span className="text-[11px] font-medium text-muted-foreground/70">Interval</span>
+            <span className="text-sm font-medium text-muted-foreground/70">Interval</span>
             <SegmentedControl
               value={interval}
               options={INTERVALS.map((value) => ({ value, label: value }))}
@@ -344,7 +344,7 @@ export function KlinePanel({ selection, source, onSnapshot, displayTitle, embedd
             className="flex items-center gap-2"
             title="How far back to load history"
           >
-            <span className="text-[11px] font-medium text-muted-foreground/70">Range</span>
+            <span className="text-sm font-medium text-muted-foreground/70">Range</span>
             <SegmentedControl
               value={tf}
               options={TIMEFRAMES.map((value) => ({ value, label: value }))}
@@ -360,7 +360,7 @@ export function KlinePanel({ selection, source, onSnapshot, displayTitle, embedd
       <div className="oa-data-surface relative min-h-0 flex-1 overflow-hidden rounded-lg border">
         <div ref={containerRef} className="absolute inset-0" />
         {!selection && !requestedBarId && (
-          <div className="absolute inset-0 flex items-center justify-center text-[13px] leading-5 text-muted-foreground">
+          <div className="absolute inset-0 flex items-center justify-center text-sm leading-5 text-muted-foreground">
             Pick an asset to see the K-line.
           </div>
         )}
@@ -370,10 +370,10 @@ export function KlinePanel({ selection, source, onSnapshot, displayTitle, embedd
           </div>
         )}
         {(selection || requestedBarId) && loading && (
-          <div className="absolute top-2 right-2 text-[11px] text-muted-foreground">Loading…</div>
+          <div className="absolute top-2 right-2 text-sm text-muted-foreground">Loading…</div>
         )}
         {(selection || requestedBarId) && error && !loading && (
-          <div className="absolute inset-0 flex items-center justify-center flex-col gap-3 text-[13px] leading-5 text-muted-foreground px-8 text-center">
+          <div className="absolute inset-0 flex items-center justify-center flex-col gap-3 text-sm leading-5 text-muted-foreground px-8 text-center">
             {error}
             <Button variant="outline" size="sm" onClick={retry}>Retry</Button>
           </div>

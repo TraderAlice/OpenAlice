@@ -1,5 +1,5 @@
 import { SegmentedControl } from '../components/SegmentedControl'
-import { useEffect, useMemo, useState, type ReactNode } from 'react'
+import { useEffect, useMemo, useState, type CSSProperties, type ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
 import { LineChart, Line, YAxis, XAxis, Tooltip } from 'recharts'
 import { Search } from 'lucide-react'
@@ -21,6 +21,16 @@ import {
 } from '../api/reference'
 import { useWorkspace } from '../tabs/store'
 import type { ViewSpec } from '../tabs/types'
+
+const chartTooltipStyle: CSSProperties = {
+  border: '1px solid var(--border)',
+  borderRadius: 'var(--radius-lg)',
+  backgroundColor: 'var(--popover)',
+  color: 'var(--popover-foreground)',
+  padding: '8px 12px',
+  fontSize: 'var(--text-sm)',
+  lineHeight: '20px',
+}
 
 const REFRESH_MS = 5 * 60 * 1000
 
@@ -65,7 +75,7 @@ function MoversBoardView() {
         title={t('market.boardMovers')}
         help={t('market.moversSubtitle')}
         description={data && <BoardMeta meta={data.meta} />}
-        live={{ lastUpdated: updatedAt, label: 'Fetched', hideDot: true }}
+        live={{ lastUpdated: updatedAt, label: 'Fetched', hideIcon: true }}
       />
       <div className="flex-1 overflow-y-auto px-4 md:px-8 py-4 flex flex-col gap-4 min-h-0">
         <SegmentedControl value={list} onChange={setList} ariaLabel={t('market.boardMovers')}
@@ -183,7 +193,7 @@ function CalendarBoardView() {
             {data && <BoardMeta meta={data.meta} extra={`${data.window.start} → ${data.window.end}`} />}
           </span>
         }
-        live={{ lastUpdated: updatedAt, label: 'Fetched', hideDot: true }}
+        live={{ lastUpdated: updatedAt, label: 'Fetched', hideIcon: true }}
       />
       <div className="flex-1 overflow-y-auto px-4 md:px-8 py-4 flex flex-col gap-4 min-h-0">
         <div
@@ -557,7 +567,7 @@ function MacroBoardView() {
             {data && <BoardMeta meta={data.meta} />}
           </span>
         }
-        live={{ lastUpdated: updatedAt, label: 'Fetched', hideDot: true }}
+        live={{ lastUpdated: updatedAt, label: 'Fetched', hideIcon: true }}
       />
       <div className="flex-1 overflow-y-auto px-4 md:px-8 py-4 min-h-0">
         {loading && !data && <CenteredLoading label={t('common.loading')} />}
@@ -614,7 +624,7 @@ function TermStructureBoardView() {
             {data && <BoardMeta meta={data.meta} />}
           </span>
         }
-        live={{ lastUpdated: updatedAt, label: 'Fetched', hideDot: true }}
+        live={{ lastUpdated: updatedAt, label: 'Fetched', hideIcon: true }}
       />
       <div className="flex-1 overflow-y-auto px-4 md:px-8 py-4 flex flex-col gap-6 min-h-0">
         {loading && !data && <CenteredLoading label={t('common.loading')} />}
@@ -670,6 +680,7 @@ function TermCurveCard({ curve }: { curve: TermCurve }) {
                 tickFormatter={(value: number) => formatTermAxisPrice(value, width)}
               />
               <Tooltip
+                contentStyle={chartTooltipStyle}
                 isAnimationActive={false}
                 formatter={(v) => [Number(v).toLocaleString('en-US'), '']}
                 labelFormatter={(l) => `20${l}`}
@@ -734,7 +745,7 @@ function GlobalMacroBoardView() {
             {data && <BoardMeta meta={data.meta} />}
           </span>
         }
-        live={{ lastUpdated: updatedAt, label: 'Fetched', hideDot: true }}
+        live={{ lastUpdated: updatedAt, label: 'Fetched', hideIcon: true }}
       />
       <div className="flex-1 overflow-y-auto px-4 md:px-8 py-4 min-h-0">
         {loading && !data && <CenteredLoading label={t('common.loading')} />}
@@ -887,7 +898,7 @@ function ShippingBoardView() {
             {data && <BoardMeta meta={data.meta} />}
           </span>
         }
-        live={{ lastUpdated: updatedAt, label: 'Fetched', hideDot: true }}
+        live={{ lastUpdated: updatedAt, label: 'Fetched', hideIcon: true }}
       />
       <div className="flex-1 overflow-y-auto px-4 md:px-8 py-4 min-h-0">
         {loading && !data && <CenteredLoading label={t('common.loading')} />}
@@ -931,6 +942,7 @@ function ChokepointCard({ curve }: { curve: ShippingCurve }) {
             <YAxis tick={{ fontSize: 9, fill: 'var(--chart-axis)' }} stroke="var(--chart-axis)" width={36}
               tickFormatter={(v: number) => v.toFixed(1)} domain={['auto', 'auto']} />
             <Tooltip
+              contentStyle={chartTooltipStyle}
               isAnimationActive={false}
               formatter={(v) => [`${Number(v).toFixed(2)}M t`, '']}
               separator=""
@@ -968,7 +980,7 @@ function FedBoardView() {
             {data && <BoardMeta meta={data.meta} />}
           </span>
         }
-        live={{ lastUpdated: updatedAt, label: 'Fetched', hideDot: true }}
+        live={{ lastUpdated: updatedAt, label: 'Fetched', hideIcon: true }}
       />
       <div className="flex-1 overflow-y-auto px-4 md:px-8 py-4 flex flex-col gap-5 min-h-0">
         {loading && !data && <CenteredLoading label={t('common.loading')} />}

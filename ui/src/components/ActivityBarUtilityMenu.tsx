@@ -6,6 +6,7 @@ import { useTranslation } from 'react-i18next'
 import { useThemeStore, type AppTheme } from '../theme/store'
 import { useDesktopCompanion } from '../hooks/useDesktopCompanion'
 import { useUpdateLifecycle } from '../hooks/useUpdateLifecycle'
+import { CountBadge } from './CountBadge'
 import { UpdateGuidanceBadge } from './settings/UpdateGuidanceBadge'
 import {
   DropdownMenu,
@@ -69,7 +70,7 @@ export function ActivityBarUtilityMenu({
             onClick={() => {
               if (!menuOpen) setMenuOpen(true)
             }}
-            className={`oa-application-menu oa-pressable relative flex min-w-0 cursor-pointer items-center rounded-md text-left text-[13px] text-sidebar-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring/45 ${
+            className={`oa-application-menu oa-pressable relative flex min-w-0 cursor-pointer items-center rounded-md text-left text-sm text-sidebar-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring/45 ${
               compactRail
                 ? `${denseRail ? 'h-[26px] w-[26px]' : 'h-8 w-8'} justify-center p-0`
                 : 'min-h-10 w-full gap-2.5 px-2 py-1.5'
@@ -100,13 +101,12 @@ export function ActivityBarUtilityMenu({
         align="start"
         side="top"
         sideOffset={6}
-        className="w-[208px] max-w-[calc(100vw-1rem)] rounded-xl border border-border/70 bg-popover p-1.5 shadow-lg ring-0"
+        className="w-[240px] max-w-[calc(100vw-1rem)] rounded-xl border border-border/70 bg-popover p-1.5 shadow-lg ring-0"
       >
         {companion.visible !== null && (
           <DropdownMenuItem
             onClick={() => { void companion.toggle() }}
             disabled={companion.pending}
-            className="min-h-9 cursor-pointer gap-2 px-2.5 text-[12px]"
           >
             <Ghost size={15} strokeWidth={1.75} aria-hidden />
             <span>{t(companion.visible ? 'nav.hideCompanion' : 'nav.showCompanion')}</span>
@@ -115,7 +115,6 @@ export function ActivityBarUtilityMenu({
         {companion.failed && <div role="alert" className="px-2.5 py-1 text-xs text-destructive">{t('nav.companionError')}</div>}
         <DropdownMenuItem
           onClick={onOpenSettings}
-          className="min-h-9 cursor-pointer gap-2 px-2.5 text-[12px]"
         >
           <Settings size={15} strokeWidth={1.75} aria-hidden />
           <span className="flex-1">{t('nav.item.settings')}</span>
@@ -125,30 +124,24 @@ export function ActivityBarUtilityMenu({
         <DropdownMenuItem
           onClick={onOpenConnectors}
           aria-current={connectorsActive ? 'page' : undefined}
-          className="min-h-9 cursor-pointer gap-2 px-2.5 text-[12px]"
         >
           <Plug size={15} strokeWidth={1.75} aria-hidden />
           <span className="flex-1">{t('nav.item.connectors')}</span>
           {connectorWarnings > 0 && (
-            <span
-              aria-label={t('nav.connectorNeedsAttention', { count: connectorWarnings })}
-              className="rounded-full bg-warning px-1.5 text-[10px] tabular-nums text-warning-foreground"
-            >
-              {connectorWarnings > 99 ? '99+' : connectorWarnings}
-            </span>
+            <CountBadge count={connectorWarnings} limit={99} tone="attention"
+              label={t('nav.connectorNeedsAttention', { count: connectorWarnings })} />
           )}
         </DropdownMenuItem>
         <DropdownMenuSeparator />
         <DropdownMenuSub>
           <DropdownMenuSubTrigger
             aria-label={t('nav.appearanceMenu', { mode: t(`theme.mode.${theme}`) })}
-            className="min-h-9 cursor-pointer gap-2 px-2.5 text-[12px] [&>svg:last-child]:ml-1"
           >
             <CurrentThemeIcon size={15} strokeWidth={1.75} aria-hidden />
             <span className="min-w-0 flex-1 truncate">{t('settings.group.appearance')}</span>
             <span className="shrink-0 text-muted-foreground">{t(`theme.mode.${theme}`)}</span>
           </DropdownMenuSubTrigger>
-          <DropdownMenuSubContent className="w-[148px] border border-border/70 bg-popover p-1.5 shadow-lg ring-0">
+          <DropdownMenuSubContent className="w-[180px] border border-border/70 bg-popover p-1.5 shadow-lg ring-0">
             <DropdownMenuRadioGroup
               value={theme}
               onValueChange={(value) => {
@@ -161,7 +154,6 @@ export function ActivityBarUtilityMenu({
                 <DropdownMenuRadioItem
                   key={mode}
                   value={mode}
-                  className="min-h-9 cursor-pointer gap-2 px-2.5 pr-8 text-[12px]"
                 >
                   <Icon size={15} strokeWidth={1.75} aria-hidden />
                   <span>{t(`theme.mode.${mode}`)}</span>

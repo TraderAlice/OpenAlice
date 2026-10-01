@@ -61,7 +61,7 @@ export function DesktopUpdatePrompt() {
           <h2 className="text-[15px] font-semibold text-foreground leading-snug">
             {installing ? t('settings.about.prompt.installingTitle') : t('settings.about.prompt.readyTitle')}
           </h2>
-          <p className="text-[12px] text-muted-foreground truncate">OpenAlice v{status.version}</p>
+          <p className="text-sm text-muted-foreground truncate">OpenAlice v{status.version}</p>
         </div>
         <button
           type="button"
@@ -75,10 +75,10 @@ export function DesktopUpdatePrompt() {
       </div>
 
       <div className="px-5 py-4 space-y-3">
-        <p className="text-[13px] leading-relaxed text-foreground">
+        <p className="text-sm leading-relaxed text-foreground">
           {installing ? installText : t('settings.about.prompt.readyBody')}
         </p>
-        <p className="text-[12px] leading-relaxed text-muted-foreground">
+        <p className="text-sm leading-relaxed text-muted-foreground">
           {t('settings.about.installHandoffNote')}
         </p>
         {installing && (
@@ -91,7 +91,7 @@ export function DesktopUpdatePrompt() {
           </div>
         )}
         {error && (
-          <div className="rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-[12px] leading-relaxed text-destructive">
+          <div className="rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm leading-relaxed text-destructive">
             {error}
           </div>
         )}

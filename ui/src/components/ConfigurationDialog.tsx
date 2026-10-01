@@ -57,7 +57,7 @@ export function ConfigurationDialog({
                 {title}
               </DialogTitle>
               {description && (
-                <DialogDescription className="mt-0.5 text-[12px] leading-5">
+                <DialogDescription className="mt-0.5 text-sm leading-5">
                   {description}
                 </DialogDescription>
               )}

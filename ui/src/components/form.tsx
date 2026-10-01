@@ -84,11 +84,11 @@ export function ConfigSection({
       className={`oa-config-section min-w-0 rounded-2xl bg-secondary p-5 sm:p-6 ${className}`}
     >
       <div className={`min-w-0 ${children ? 'mb-5' : ''}`}>
-        <div className="flex min-h-6 min-w-0 items-center gap-2">
+        <div className="flex min-h-6 min-w-0 flex-wrap items-center gap-2">
           <h3
             id={titleId}
             tabIndex={focusableTitle ? -1 : undefined}
-            className={`text-lg font-semibold text-foreground ${focusableTitle
+            className={`min-w-0 break-words text-lg font-semibold text-foreground ${focusableTitle
               ? 'w-fit rounded-sm outline-none focus-visible:[box-shadow:var(--oa-focus-shadow)]'
               : ''
             }`}
@@ -125,10 +125,10 @@ export function Field({
   children,
 }: FieldProps) {
   return (
-    <div className="mb-3.5 last:mb-0">
+    <div className="mb-4 last:mb-0">
       <label
         htmlFor={controlId}
-        className="block text-sm text-foreground mb-1.5 font-medium"
+        className="block text-sm text-foreground mb-2 font-medium"
       >
         {label}
       </label>

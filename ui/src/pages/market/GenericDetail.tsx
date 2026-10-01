@@ -18,7 +18,7 @@ export function GenericDetail({ symbol, assetClass, source }: Props) {
     <div className="flex flex-col gap-3 min-h-0 flex-1">
       <div className="flex items-baseline gap-2 px-1">
         <span className="text-[20px] font-semibold tracking-tight text-foreground">{symbol}</span>
-        <span className="text-[11px] font-medium text-muted-foreground">
+        <span className="text-sm font-medium text-muted-foreground">
           {assetClass}
         </span>
       </div>

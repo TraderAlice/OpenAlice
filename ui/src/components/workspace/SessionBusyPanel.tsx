@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type RefObject } from 'react'
 import { useTranslation } from 'react-i18next'
-import { ArrowUpRight, CalendarDays, Clock3, RefreshCw } from 'lucide-react'
+import { ArrowUpRight, Activity, CalendarDays, Clock3, RefreshCw } from 'lucide-react'
 import { useSessionControl } from '../../hooks/useSessionControl'
 import { useWorkspaceSessionDirectory } from '../../hooks/useWorkspaceSessionDirectory'
 import { AgentRuntimeIcon } from '../../lib/agentRuntimeIcon'
@@ -63,7 +63,7 @@ function SessionBusyPanel({ record, workspaceId, onClose, onOpen, titleRef }: {
         <p className="mt-0.5 text-xs text-muted-foreground">{record.agent}</p>
       </div>
       <span className="inline-flex shrink-0 items-center gap-2 rounded-full bg-muted px-2.5 py-1 text-xs font-medium text-muted-foreground">
-        {!ended && <span className="relative size-2 rounded-full bg-primary live-pulse motion-reduce:animate-none" aria-hidden />}
+        {!ended && <Activity className="size-4 shrink-0" aria-hidden />}
         <span className="sm:hidden">{t(outcome === 'ended' ? 'workspace.sessionBusy.finishedShort' : outcome === 'running' ? 'workspace.sessionDetails.running' : `workspace.sessionBusy.${outcome}Short`)}</span>
         <span className="hidden sm:inline">{t(outcome === 'ended' ? 'workspace.sessionBusy.finishedShort' : `workspace.sessionBusy.${outcome}`)}</span>
       </span>
@@ -77,7 +77,7 @@ function SessionBusyPanel({ record, workspaceId, onClose, onOpen, titleRef }: {
         {!ended && <div className="oa-session-running-line mx-auto my-5 h-0.5 max-w-sm overflow-hidden rounded-full bg-border" aria-hidden />}
         <p className="mt-3 flex flex-wrap items-baseline justify-center gap-x-2 gap-y-1 text-sm text-muted-foreground">
           <span>{run?.issueId ? `Issue ${run.issueId}` : unknown}</span>
-          <span aria-hidden>·</span>
+          <Clock3 className="size-4 shrink-0" aria-hidden />
           <span className="tabular-nums">{run?.startedAt ? elapsedClock(run.startedAt, run.finishedAt ?? now) : unknown}</span>
           <span>{t(ended ? 'workspace.sessionBusy.total' : 'workspace.sessionBusy.elapsed')}</span>
         </p>

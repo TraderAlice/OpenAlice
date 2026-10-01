@@ -50,14 +50,14 @@ export function QuoteHeader({ symbol }: Props) {
             <Skeleton className="h-3.5 w-28 rounded" />
           ) : (
             <>
-              {name && <span className="text-[13px] text-muted-foreground truncate">{name}</span>}
+              {name && <span className="text-sm text-muted-foreground truncate">{name}</span>}
               {exchange && (
-                <span className="text-[11px] font-medium text-muted-foreground">
+                <span className="text-sm font-medium text-muted-foreground">
                   {exchange}
                 </span>
               )}
               {provider && (
-                <span className="text-[11px] font-medium text-muted-foreground">
+                <span className="text-sm font-medium text-muted-foreground">
                   {provider}
                 </span>
               )}
@@ -77,7 +77,7 @@ export function QuoteHeader({ symbol }: Props) {
           ) : (
             change != null &&
             changePct != null && (
-              <span className={`text-[13px] font-medium ${up ? 'text-success' : 'text-destructive'}`}>
+              <span className={`text-sm font-medium ${up ? 'text-success' : 'text-destructive'}`}>
                 {up ? '+' : ''}{fmtNumber(change)} ({up ? '+' : ''}{fmtPercent(changePct)})
               </span>
             )
@@ -87,7 +87,7 @@ export function QuoteHeader({ symbol }: Props) {
 
       {/* Bid / ask intentionally omitted — they're real-time L1 quote data
           that belongs at the execution layer (UTA), not in analysis. */}
-      <dl className="grid min-w-0 flex-1 grid-cols-2 content-center gap-x-4 gap-y-1 border-border/60 text-[11px] sm:grid-cols-3 sm:border-l sm:pl-5 md:grid-cols-5">
+      <dl className="grid min-w-0 flex-1 grid-cols-2 content-center gap-x-4 gap-y-1 border-border/60 text-sm sm:grid-cols-3 sm:border-l sm:pl-5 md:grid-cols-5">
         <Field label="Open"      value={fmtNumber(quote?.open)}        loading={loading} />
         <Field label="Prev"      value={fmtNumber(quote?.prev_close)}  loading={loading} />
         <Field label="High"      value={fmtNumber(quote?.high)}        loading={loading} />
@@ -100,7 +100,7 @@ export function QuoteHeader({ symbol }: Props) {
         <Field label="MA200"     value={fmtNumber(quote?.ma200)}       loading={loading} />
       </dl>
 
-      {error && <div className="w-full text-[11px] text-destructive">{error}</div>}
+      {error && <div className="w-full text-sm text-destructive">{error}</div>}
     </section>
   )
 }
@@ -108,7 +108,7 @@ export function QuoteHeader({ symbol }: Props) {
 function Field({ label, value, loading }: { label: string; value: string; loading?: boolean }) {
   return (
     <div className="flex min-w-0 flex-col justify-center py-0.5">
-      <dt className="text-[11px] font-medium leading-4 text-muted-foreground/70">{label}</dt>
+      <dt className="text-sm font-medium leading-5 text-muted-foreground/70">{label}</dt>
       <dd className="mt-px truncate font-mono leading-[16px] tabular-nums text-foreground">
         {loading ? <Skeleton className="h-3 w-12 rounded mt-0.5" /> : value}
       </dd>

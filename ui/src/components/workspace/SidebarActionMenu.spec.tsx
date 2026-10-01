@@ -42,7 +42,6 @@ describe('SidebarActionMenu', () => {
     const menu = screen.getByRole('menu', { name: triggerLabel })
     expect(offboard.textContent).toBe('Offboard workspace')
     expect(menu.className).toContain('min-w-[184px]')
-    expect(rename.className).toContain('rounded-md')
     expect(menu.querySelector('[data-slot="dropdown-menu-separator"]')).toBeTruthy()
     expect(document.activeElement).toBe(offboard)
 

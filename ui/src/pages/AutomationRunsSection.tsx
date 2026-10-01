@@ -66,23 +66,23 @@ function ToolBlock({ block }: { block: Extract<HeadlessMessageBlock, { type: 'to
       <summary className={`flex min-h-10 cursor-pointer list-none items-center gap-2 px-3 py-2 text-xs sm:min-h-0 ${statusClass}`}>
         <Wrench size={13} className="shrink-0" />
         <span className="min-w-0 flex-1 truncate font-medium text-foreground">{block.name}</span>
-        <span className="shrink-0 text-[11px] font-medium">{block.status}</span>
+        <span className="shrink-0 text-sm font-medium">{block.status}</span>
         {hasDetails && <ChevronRight size={12} className="shrink-0 transition-transform duration-[var(--motion-fast)] group-open/tool:rotate-90 motion-reduce:transition-none" />}
       </summary>
       {hasDetails && (
         <div className="space-y-2 border-t border-border/50 px-3 py-2">
           {block.input !== undefined && (
             <div>
-              <div className="mb-1 text-[11px] font-medium text-muted-foreground/70">Input</div>
-              <pre className="max-h-40 overflow-auto whitespace-pre-wrap break-words text-[11px] leading-relaxed text-muted-foreground">
+              <div className="mb-1 text-sm font-medium text-muted-foreground/70">Input</div>
+              <pre className="max-h-40 overflow-auto whitespace-pre-wrap break-words text-sm leading-relaxed text-muted-foreground">
                 {formatValue(block.input)}
               </pre>
             </div>
           )}
           {block.output !== undefined && (
             <div>
-              <div className="mb-1 text-[11px] font-medium text-muted-foreground/70">Output</div>
-              <pre className="max-h-48 overflow-auto whitespace-pre-wrap break-words text-[11px] leading-relaxed text-muted-foreground">
+              <div className="mb-1 text-sm font-medium text-muted-foreground/70">Output</div>
+              <pre className="max-h-48 overflow-auto whitespace-pre-wrap break-words text-sm leading-relaxed text-muted-foreground">
                 {formatValue(block.output)}
               </pre>
             </div>
@@ -170,12 +170,12 @@ function RunOutput({ task }: { task: HeadlessTaskRecord }) {
         </div>
       )}
       <section className="border-l-2 border-primary/30 pl-3">
-        <div className="mb-2 flex items-center gap-2 text-[12px] leading-[18px] font-medium text-muted-foreground">
+        <div className="mb-2 flex items-center gap-2 text-sm leading-5 font-medium text-muted-foreground">
           <MessageSquareText size={14} />
           Reply
         </div>
         {output.structured.assistantText ? (
-          <MarkdownContent text={output.structured.assistantText} className="text-[13px] leading-relaxed" />
+          <MarkdownContent text={output.structured.assistantText} className="text-sm leading-relaxed" />
         ) : (
           <p className="text-xs text-muted-foreground">
             {running ? 'Waiting for an assistant reply…' : 'This run produced no assistant reply.'}
@@ -185,7 +185,7 @@ function RunOutput({ task }: { task: HeadlessTaskRecord }) {
 
       {(tools.length > 0 || errors.length > 0) && (
         <section>
-          <div className="mb-2 flex items-center gap-2 text-[12px] leading-[18px] font-medium text-muted-foreground">
+          <div className="mb-2 flex items-center gap-2 text-sm leading-5 font-medium text-muted-foreground">
             <Wrench size={13} />
             <span>Activity</span>
             <span className="font-normal text-muted-foreground/70">{tools.length} tool{tools.length === 1 ? '' : 's'}</span>
@@ -200,7 +200,7 @@ function RunOutput({ task }: { task: HeadlessTaskRecord }) {
             ))}
           </div>
           {output.structured.truncated && (
-            <p className="mt-2 text-[11px] text-warning">Earlier activity was truncated; runtime diagnostics remain available below.</p>
+            <p className="mt-2 text-sm text-warning">Earlier activity was truncated; runtime diagnostics remain available below.</p>
           )}
         </section>
       )}
@@ -212,13 +212,13 @@ function RunOutput({ task }: { task: HeadlessTaskRecord }) {
         </summary>
         <div className="space-y-2 border-t border-border/50 p-2">
           {output.stdout && (
-            <pre className="max-h-64 overflow-auto rounded bg-code-background p-2 text-[11px] leading-snug text-muted-foreground whitespace-pre-wrap break-all">
+            <pre className="max-h-64 overflow-auto rounded bg-code-background p-2 text-sm leading-snug text-muted-foreground whitespace-pre-wrap break-all">
               {output.stdout.truncated ? '… (tail)\n' : ''}
               {output.stdout.text || '(empty)'}
             </pre>
           )}
           {output.stderr && output.stderr.text.length > 0 && (
-            <pre className="max-h-32 overflow-auto rounded bg-destructive/20 p-2 text-[11px] leading-snug text-destructive/80 whitespace-pre-wrap break-all">
+            <pre className="max-h-32 overflow-auto rounded bg-destructive/20 p-2 text-sm leading-snug text-destructive/80 whitespace-pre-wrap break-all">
               {output.stderr.truncated ? '… (tail)\n' : ''}
               {output.stderr.text}
             </pre>
@@ -245,12 +245,12 @@ function SummaryMetric({
 }) {
   return (
     <div className="min-w-0 flex-1 px-2.5 py-2.5 first:pl-0 last:pr-0 sm:px-4">
-      <div className="truncate text-[11px] font-medium text-muted-foreground/70">
+      <div className="truncate text-sm font-medium text-muted-foreground/70">
         <span className="sm:hidden">{mobileLabel}</span>
         <span className="hidden sm:inline">{label}</span>
       </div>
       <div className="mt-0.5 text-base font-semibold tabular-nums text-foreground sm:text-lg">{value}</div>
-      <div className="truncate text-[10px] text-muted-foreground sm:overflow-visible sm:text-clip sm:whitespace-normal sm:text-[11px]">
+      <div className="truncate text-sm text-muted-foreground sm:overflow-visible sm:text-clip sm:whitespace-normal sm:text-sm">
         <span className="sm:hidden">{mobileDetail}</span>
         <span className="hidden sm:inline">{detail}</span>
       </div>
@@ -299,7 +299,7 @@ function AutomationRunTitle({
   const presentation = projectHeadlessTaskPresentation(task)
   if (!source) {
     return (
-      <span className="block max-h-10 overflow-hidden text-[13px] leading-5 text-foreground">
+      <span className="block max-h-10 overflow-hidden text-sm leading-5 text-foreground">
         {presentation.title}
       </span>
     )
@@ -312,23 +312,23 @@ function AutomationRunTitle({
   return (
     <>
       <span className="flex min-w-0 items-center gap-2">
-        <span className="shrink-0 rounded-sm border border-primary/25 bg-primary/10 px-1.5 py-0.5 text-[10px] leading-[14px] font-medium text-primary">
+        <span className="shrink-0 rounded-sm border border-primary/25 bg-primary/10 px-1.5 py-0.5 text-sm leading-5 font-medium text-primary">
           {source.label}
         </span>
         <span
-          className="truncate text-[13px] font-medium text-foreground"
+          className="truncate text-sm font-medium text-foreground"
           title={`Issue: ${source.issueId}, ${issueWorkspace}`}
         >
           {issueTitle}
         </span>
         {crossWorkspace && (
-          <span className="shrink-0 truncate text-[10px] text-muted-foreground" title={issueWorkspace}>
+          <span className="shrink-0 truncate text-sm text-muted-foreground" title={issueWorkspace}>
             {issueWorkspace}
           </span>
         )}
       </span>
       {presentation.summary && (
-        <span className="mt-0.5 block truncate text-[12px] leading-5 text-muted-foreground">
+        <span className="mt-0.5 block truncate text-sm leading-5 text-muted-foreground">
           {presentation.summary}
         </span>
       )}
@@ -563,13 +563,13 @@ export function AutomationRunsSection() {
                     aria-expanded={isExpanded}
                     aria-label={runLabel}
                   >
-                    <span className={`mt-1 inline-flex rounded-full px-2 py-0.5 text-[10px] leading-[14px] font-medium ${STATUS_STYLE[task.status]}`}>
+                    <span className={`mt-1 inline-flex rounded-full px-2 py-0.5 text-sm leading-5 font-medium ${STATUS_STYLE[task.status]}`}>
                       {task.status}
                     </span>
                     <Bot size={14} className="mt-1 shrink-0 text-muted-foreground/70" />
                     <span className="min-w-0 flex-1">
                       <AutomationRunTitle task={task} source={issueSource} issue={issueIdentity} />
-                      <span className="mt-1 flex flex-wrap gap-x-3 gap-y-0.5 text-[11px] text-muted-foreground">
+                      <span className="mt-1 flex flex-wrap gap-x-3 gap-y-0.5 text-sm text-muted-foreground">
                         <span>{task.agent}</span>
                         <span
                           className={workspaceLabel ? undefined : 'font-mono'}
@@ -591,7 +591,7 @@ export function AutomationRunsSection() {
                         <summary className="flex min-h-10 cursor-pointer items-center px-3 py-2 text-xs font-medium text-muted-foreground hover:text-foreground sm:min-h-0">
                           Task instructions
                         </summary>
-                        <pre className="max-h-64 overflow-auto border-t border-border/50 px-3 py-2 whitespace-pre-wrap break-words text-[11px] leading-relaxed text-muted-foreground">
+                        <pre className="max-h-64 overflow-auto border-t border-border/50 px-3 py-2 whitespace-pre-wrap break-words text-sm leading-relaxed text-muted-foreground">
                           {task.prompt}
                         </pre>
                       </details>
@@ -663,11 +663,11 @@ export function AutomationRunsSection() {
               >
                 {loadingMore ? 'Loading older runs…' : `Load ${Math.min(RUNS_PAGE_SIZE, snapshot.page.total - snapshot.tasks.length)} older runs`}
               </Button>
-              <span className="text-[11px] text-muted-foreground">
+              <span className="text-sm text-muted-foreground">
                 {snapshot.tasks.length} of {snapshot.page.total} loaded
               </span>
               {loadMoreError && (
-                <span role="alert" className="text-[11px] text-destructive">
+                <span role="alert" className="text-sm text-destructive">
                   Could not load older runs: {loadMoreError}
                 </span>
               )}

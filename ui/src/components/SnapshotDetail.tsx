@@ -20,11 +20,11 @@ export function SnapshotDetail({ snapshot, onClose }: SnapshotDetailProps) {
       <div className="flex items-center justify-between px-4 py-2.5 bg-primary/5 border-b border-border">
         <div className="flex items-center gap-2">
           <HealthDot health={snapshot.health} />
-          <span className="text-[13px] text-foreground font-medium">
+          <span className="text-sm text-foreground font-medium">
             {new Date(snapshot.timestamp).toLocaleString()}
           </span>
           <TriggerBadge trigger={snapshot.trigger} />
-          <span className="text-[11px] text-muted-foreground">{snapshot.accountId}</span>
+          <span className="text-sm text-muted-foreground">{snapshot.accountId}</span>
         </div>
         <button
           type="button"
@@ -47,11 +47,11 @@ export function SnapshotDetail({ snapshot, onClose }: SnapshotDetailProps) {
       {/* Positions */}
       {snapshot.positions.length > 0 && (
         <div className="px-4 pb-3">
-          <p className="mb-1.5 text-[11px] font-medium leading-4 text-muted-foreground">
+          <p className="mb-1.5 text-sm font-medium leading-5 text-muted-foreground">
             Positions ({snapshot.positions.length})
           </p>
           <div className="border border-border rounded overflow-x-auto">
-            <table className="w-full text-[12px]">
+            <table className="w-full text-sm">
               <thead>
                 <tr className="bg-background text-muted-foreground text-left">
                   <th className="px-2.5 py-1.5 font-medium">Symbol</th>
@@ -70,11 +70,11 @@ export function SnapshotDetail({ snapshot, onClose }: SnapshotDetailProps) {
                     <tr key={i} className="border-t border-border">
                       <td className="px-2.5 py-1.5">
                         <span className="font-medium text-foreground">{symbolFromAliceId(p.aliceId)}</span>
-                        <span className={`ml-1.5 text-[10px] px-1 py-0.5 rounded font-medium ${p.side === 'long' ? 'bg-success/15 text-success' : 'bg-destructive/15 text-destructive'}`}>
+                        <span className={`ml-1.5 text-sm px-1 py-0.5 rounded font-medium ${p.side === 'long' ? 'bg-success/15 text-success' : 'bg-destructive/15 text-destructive'}`}>
                           {p.side}
                         </span>
                       </td>
-                      <td className="px-2.5 py-1.5 text-center text-[10px] leading-[14px] text-muted-foreground tabular-nums">{p.currency}</td>
+                      <td className="px-2.5 py-1.5 text-center text-sm leading-5 text-muted-foreground tabular-nums">{p.currency}</td>
                       <td className="px-2.5 py-1.5 text-right text-foreground tabular-nums">{p.quantity}</td>
                       <td className="px-2.5 py-1.5 text-right text-muted-foreground tabular-nums">{fmtStr(p.avgCost, p.currency)}</td>
                       <td className="px-2.5 py-1.5 text-right text-foreground tabular-nums">{fmtStr(p.marketPrice, p.currency)}</td>
@@ -94,16 +94,16 @@ export function SnapshotDetail({ snapshot, onClose }: SnapshotDetailProps) {
       {/* Open Orders */}
       {snapshot.openOrders.length > 0 && (
         <div className="px-4 pb-3">
-          <p className="mb-1.5 text-[11px] font-medium leading-4 text-muted-foreground">
+          <p className="mb-1.5 text-sm font-medium leading-5 text-muted-foreground">
             Open Orders ({snapshot.openOrders.length})
           </p>
           <div className="space-y-1">
             {snapshot.openOrders.map((o, i) => (
-              <div key={i} className="flex items-center gap-2 text-[12px] leading-[18px] px-2.5 py-1.5 border border-border rounded bg-background">
+              <div key={i} className="flex items-center gap-2 text-sm leading-5 px-2.5 py-1.5 border border-border rounded bg-background">
                 <span className={`font-medium ${o.action === 'BUY' ? 'text-success' : 'text-destructive'}`}>{o.action}</span>
                 <span className="text-foreground">{symbolFromAliceId(o.aliceId)}</span>
                 <span className="text-muted-foreground">{o.totalQuantity} @ {o.orderType}</span>
-                <span className="text-primary text-[10px]">{o.status}</span>
+                <span className="text-primary text-sm">{o.status}</span>
               </div>
             ))}
           </div>
@@ -113,7 +113,7 @@ export function SnapshotDetail({ snapshot, onClose }: SnapshotDetailProps) {
       {/* Empty state */}
       {snapshot.positions.length === 0 && snapshot.openOrders.length === 0 && (
         <div className="px-4 pb-3">
-          <p className="text-[12px] text-muted-foreground">No positions or orders at this time.</p>
+          <p className="text-sm text-muted-foreground">No positions or orders at this time.</p>
         </div>
       )}
     </div>
@@ -135,7 +135,7 @@ function TriggerBadge({ trigger }: { trigger: string }) {
     : trigger === 'post-reject' ? 'reject'
     : trigger
   return (
-    <span className="text-[10px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground">
+    <span className="text-sm px-1.5 py-0.5 rounded bg-muted text-muted-foreground">
       {label}
     </span>
   )
@@ -145,7 +145,7 @@ function MetricItem({ label, value, pnl }: { label: string; value: string; pnl?:
   const color = pnl == null ? 'text-foreground' : pnl >= 0 ? 'text-success' : 'text-destructive'
   return (
     <div>
-      <p className="text-[10px] font-medium leading-4 text-muted-foreground">{label}</p>
+      <p className="text-sm font-medium leading-5 text-muted-foreground">{label}</p>
       <p className={`text-[16px] font-bold tabular-nums ${color}`}>{value}</p>
     </div>
   )

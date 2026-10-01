@@ -92,40 +92,42 @@ export function AliceLocationSection() {
           {showDetails ? <ChevronDown className="size-4 shrink-0" aria-hidden /> : <ChevronRight className="size-4 shrink-0" aria-hidden />}
           {t('settings.backendConnection.details')}
         </CollapsibleTrigger>
-        <CollapsibleContent id={detailsId} className="min-w-0 border-t border-border/60 py-3">
-          <dl className="grid min-w-0 gap-x-6 gap-y-3 text-sm sm:grid-cols-2">
-            <Detail label={t('settings.backendConnection.machine')} value={machine} />
-            <Detail label="AliceProject" value={projectName} />
-            {project && <Detail label={t('settings.backendConnection.projectKey')} value={project.key} mono />}
-            {project && <Detail label={t('settings.backendConnection.projectId')} value={project.id} mono />}
-            {project && <Detail label={t('settings.about.aliceProject.dataHome')} value={project.home} mono />}
-            {project && <Detail label={t('settings.about.aliceProject.appRoot')} value={project.appRoot ?? t('settings.about.aliceProject.runtimeManaged')} mono />}
-            <Detail label={t('settings.backendConnection.transport')} value={transport} />
-            <Detail label={t('settings.backendConnection.clientEndpoint')} value={clientEndpoint} mono />
-          </dl>
-          <p className="mt-4 text-sm leading-relaxed text-muted-foreground">
-            {remote ? t(desktopConnection ? 'settings.backendConnection.electronRemoteNote' : 'settings.backendConnection.remoteNote')
-              : electron ? t('settings.backendConnection.electronNote') : t('settings.backendConnection.localNote')}
-          </p>
-          <div className="mt-3 flex flex-wrap gap-2">
-            {desktopConnection && !electron && (
-              <Button type="button" variant="outline" size="sm" disabled={returningIntegrated} onClick={() => {
-                setReturningIntegrated(true)
-                setSwitchError(null)
-                void desktopConnection.returnIntegrated().catch((cause: unknown) => {
-                  setSwitchError(cause instanceof Error ? cause.message : String(cause))
-                  setReturningIntegrated(false)
-                })
-              }}>
-                <Monitor className="size-3.5" aria-hidden />
-                {returningIntegrated ? t('settings.backendConnection.checking') : t('settings.backendConnection.returnIntegrated')}
-              </Button>
-            )}
-            {!loading && !project && (
-              <Button type="button" variant="outline" size="sm" onClick={() => void refresh()}>
-                <RefreshCw className="size-3.5" aria-hidden />{t('settings.backendConnection.retry')}
-              </Button>
-            )}
+        <CollapsibleContent id={detailsId}>
+          <div className="min-w-0 border-t border-border/60 py-3">
+            <dl className="grid min-w-0 gap-x-6 gap-y-3 text-sm sm:grid-cols-2">
+              <Detail label={t('settings.backendConnection.machine')} value={machine} />
+              <Detail label="AliceProject" value={projectName} />
+              {project && <Detail label={t('settings.backendConnection.projectKey')} value={project.key} mono />}
+              {project && <Detail label={t('settings.backendConnection.projectId')} value={project.id} mono />}
+              {project && <Detail label={t('settings.about.aliceProject.dataHome')} value={project.home} mono />}
+              {project && <Detail label={t('settings.about.aliceProject.appRoot')} value={project.appRoot ?? t('settings.about.aliceProject.runtimeManaged')} mono />}
+              <Detail label={t('settings.backendConnection.transport')} value={transport} />
+              <Detail label={t('settings.backendConnection.clientEndpoint')} value={clientEndpoint} mono />
+            </dl>
+            <p className="mt-4 text-sm leading-relaxed text-muted-foreground">
+              {remote ? t(desktopConnection ? 'settings.backendConnection.electronRemoteNote' : 'settings.backendConnection.remoteNote')
+                : electron ? t('settings.backendConnection.electronNote') : t('settings.backendConnection.localNote')}
+            </p>
+            <div className="mt-3 flex flex-wrap gap-2">
+              {desktopConnection && !electron && (
+                <Button type="button" variant="outline" size="sm" disabled={returningIntegrated} onClick={() => {
+                  setReturningIntegrated(true)
+                  setSwitchError(null)
+                  void desktopConnection.returnIntegrated().catch((cause: unknown) => {
+                    setSwitchError(cause instanceof Error ? cause.message : String(cause))
+                    setReturningIntegrated(false)
+                  })
+                }}>
+                  <Monitor className="size-3.5" aria-hidden />
+                  {returningIntegrated ? t('settings.backendConnection.checking') : t('settings.backendConnection.returnIntegrated')}
+                </Button>
+              )}
+              {!loading && !project && (
+                <Button type="button" variant="outline" size="sm" onClick={() => void refresh()}>
+                  <RefreshCw className="size-3.5" aria-hidden />{t('settings.backendConnection.retry')}
+                </Button>
+              )}
+            </div>
           </div>
         </CollapsibleContent>
       </Collapsible>

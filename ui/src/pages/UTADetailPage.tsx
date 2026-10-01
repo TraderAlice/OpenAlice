@@ -259,7 +259,7 @@ export function UTADetailPage({ spec }: UTADetailPageProps) {
                 title={isDisabled && !readiness.operational ? policy.reason : undefined}
                 onChange={async (v) => { await tc.saveUTA({ ...uta, enabled: v }) }}
               />
-              <span className="text-[11px] text-muted-foreground">
+              <span className="text-sm text-muted-foreground">
                 {isDisabled ? 'Configured off' : 'Configured on'}
               </span>
             </span>
@@ -286,13 +286,13 @@ export function UTADetailPage({ spec }: UTADetailPageProps) {
       <div className="flex-1 overflow-y-auto px-4 md:px-6 py-5">
         <div className="max-w-[1240px] mx-auto">
           {dataError && (
-            <div className="mb-4 rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2 text-[12px] leading-[18px] text-destructive">
+            <div className="mb-4 rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm leading-5 text-destructive">
               Failed to load live data: {dataError}
             </div>
           )}
 
           {interactionNotice && (
-            <div className="mb-4 rounded-lg border border-warning/30 bg-warning/5 px-3 py-2 text-[12px] leading-[18px] text-warning" role="status">
+            <div className="mb-4 rounded-lg border border-warning/30 bg-warning/5 px-3 py-2 text-sm leading-5 text-warning" role="status">
               {interactionNotice}
             </div>
           )}
@@ -307,7 +307,7 @@ export function UTADetailPage({ spec }: UTADetailPageProps) {
               />
               {curvePoints.length >= 2 && (
                 <div className="space-y-2">
-                  <p className="text-[11px] text-warning" role="status">
+                  <p className="text-sm text-warning" role="status">
                     Historical snapshot. Broker support is unavailable on this Runtime, so these values are stale.
                   </p>
                   <EquityCurve
@@ -501,13 +501,13 @@ function AccountPanel({ account, positions, delta24h, clock, connecting }: {
     return (
       <div className="rounded-lg border border-border bg-card p-4">
         {clock != null && (
-          <div className="text-[12px] mb-3"><MarketClockChip clock={clock} /></div>
+          <div className="text-sm mb-3"><MarketClockChip clock={clock} /></div>
         )}
         {/* During the initial broker connect, say so explicitly — "connecting"
             reads as progress, where a bare "Loading…" that lingers 30s reads
             as a stall. Skeleton rows below stand in for the metric list so the
             panel has shape instead of a single line of text. */}
-        <p className={`text-[12px] mb-3.5 ${connecting ? 'text-primary' : 'text-muted-foreground'}`}>
+        <p className={`text-sm mb-3.5 ${connecting ? 'text-primary' : 'text-muted-foreground'}`}>
           {connecting ? 'Connecting to broker…' : 'Loading account info…'}
         </p>
         <div className="space-y-3.5" aria-hidden="true">
@@ -558,7 +558,7 @@ function AccountPanel({ account, positions, delta24h, clock, connecting }: {
   return (
     <div className="rounded-lg border border-border bg-card p-4">
       {clock != null && (
-        <div className="text-[12px] mb-3"><MarketClockChip clock={clock} /></div>
+        <div className="text-sm mb-3"><MarketClockChip clock={clock} /></div>
       )}
 
       <Metric
@@ -579,8 +579,8 @@ function AccountPanel({ account, positions, delta24h, clock, connecting }: {
         {utilizationPct != null && (
           <div className="py-2">
             <div className="flex items-baseline justify-between gap-3">
-              <span className="text-[11px] font-medium text-muted-foreground">Utilization</span>
-              <span className="text-[13px] leading-[18px] font-medium tabular-nums text-foreground">{utilizationPct.toFixed(1)}%</span>
+              <span className="text-sm font-medium text-muted-foreground">Utilization</span>
+              <span className="text-sm leading-5 font-medium tabular-nums text-foreground">{utilizationPct.toFixed(1)}%</span>
             </div>
             <div className="mt-1.5 h-[2px] rounded-full bg-muted overflow-hidden">
               <div
@@ -631,8 +631,8 @@ function AccountRow({ label, value, sign }: {
   const valueColor = sign === 'up' ? 'text-success' : sign === 'down' ? 'text-destructive' : 'text-foreground'
   return (
     <div className="flex items-baseline justify-between gap-3 py-2">
-      <span className="text-[11px] font-medium text-muted-foreground">{label}</span>
-      <span className={`text-[13px] leading-[18px] font-medium tabular-nums text-right ${valueColor}`}>{value}</span>
+      <span className="text-sm font-medium text-muted-foreground">{label}</span>
+      <span className={`text-sm leading-5 font-medium tabular-nums text-right ${valueColor}`}>{value}</span>
     </div>
   )
 }
@@ -643,7 +643,7 @@ function Section({ title, action, children }: { title: string; action?: React.Re
   return (
     <section>
       <div className="flex items-center justify-between mb-2.5">
-        <h3 className="text-[13px] leading-[18px] font-semibold text-foreground">{title}</h3>
+        <h3 className="text-sm leading-5 font-semibold text-foreground">{title}</h3>
         {action}
       </div>
       {children}
@@ -696,7 +696,7 @@ export function PositionsSection({ positions, onCloseClick, canClose = true, clo
           const groupCcy = currencies.size === 1 ? [...currencies][0] : undefined
           return (
             <div key={g.class} className="border-t border-border first:border-t-0">
-              <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 bg-muted/40 px-3 py-2 text-[11px] leading-[15px]">
+              <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 bg-muted/40 px-3 py-2 text-sm leading-5">
                 <div className="flex items-center gap-1.5">
                   <span className="font-semibold text-foreground">{assetClassLabel(g.class)}</span>
                   <span className="text-muted-foreground">
@@ -730,7 +730,7 @@ export function PositionsSection({ positions, onCloseClick, canClose = true, clo
         data-testid="uta-positions-desktop"
         className="hidden overflow-x-auto rounded-lg border border-border md:block"
       >
-        <table className="w-full text-[13px]">
+        <table className="w-full text-sm">
           <thead>
             <tr className="bg-secondary text-muted-foreground text-left">
               <th className="px-3 py-2 font-medium">Contract</th>
@@ -755,12 +755,12 @@ export function PositionsSection({ positions, onCloseClick, canClose = true, clo
                 <Fragment key={g.class}>
                   <tr className="bg-muted/40 border-t border-border">
                     <td colSpan={cols} className="px-3 py-1.5">
-                      <div className="flex items-center justify-between text-[12px] leading-[18px]">
+                      <div className="flex items-center justify-between text-sm leading-5">
                         <div className="flex items-center gap-2">
                           <span className="font-semibold text-foreground">{assetClassLabel(g.class)}</span>
                           <span className="text-muted-foreground">{g.positions.length} position{g.positions.length > 1 ? 's' : ''}</span>
                           {!groupCcy && (
-                            <span className="text-muted-foreground/60 text-[11px]">mixed ccy</span>
+                            <span className="text-muted-foreground/60 text-sm">mixed ccy</span>
                           )}
                         </div>
                         <div className="flex items-center gap-3 tabular-nums">
@@ -796,7 +796,7 @@ function PositionMetric({
 }) {
   return (
     <div className="min-w-0">
-      <dt className="text-[11px] font-medium text-muted-foreground">{label}</dt>
+      <dt className="text-sm font-medium text-muted-foreground">{label}</dt>
       <dd className={`mt-0.5 truncate text-caption tabular-nums ${valueClassName}`} title={value}>{value}</dd>
     </div>
   )
@@ -819,13 +819,13 @@ function PositionMobileRow({ position: p, onClose, canClose, closeDisabledReason
         <div className="grid grid-cols-[minmax(0,1fr)_auto_16px] items-start gap-2">
           <div className="min-w-0">
             <ContractCell contract={p.contract} />
-            <span className={`mt-1 inline-flex rounded-sm px-1.5 py-0.5 text-[10px] leading-[14px] font-medium ${p.side === 'long' ? 'bg-success/15 text-success' : 'bg-destructive/15 text-destructive'}`}>
+            <span className={`mt-1 inline-flex rounded-sm px-1.5 py-0.5 text-sm leading-5 font-medium ${p.side === 'long' ? 'bg-success/15 text-success' : 'bg-destructive/15 text-destructive'}`}>
               {p.side}
             </span>
           </div>
           <div className="shrink-0 text-right">
-            <div className="text-[13px] leading-[18px] font-semibold tabular-nums text-foreground">{fmt(p.marketValue, ccy)}</div>
-            <div className={`mt-1 flex justify-end gap-2 text-[11px] leading-[15px] tabular-nums ${pnlTone}`}>
+            <div className="text-sm leading-5 font-semibold tabular-nums text-foreground">{fmt(p.marketValue, ccy)}</div>
+            <div className={`mt-1 flex justify-end gap-2 text-sm leading-5 tabular-nums ${pnlTone}`}>
               <span>{fmtPnl(pnl, ccy)}</span>
               <span>{fmtPctSigned(pct)}</span>
             </div>
@@ -848,7 +848,7 @@ function PositionMobileRow({ position: p, onClose, canClose, closeDisabledReason
         />
       </dl>
       <div className="flex items-center justify-between gap-3 border-t border-border bg-secondary/20 px-3 py-2">
-        <span className="text-[11px] text-muted-foreground">Position action</span>
+        <span className="text-sm text-muted-foreground">Position action</span>
         <Button
           type="button"
           onClick={onClose}
@@ -878,7 +878,7 @@ function PositionRow({ position: p, onClose, canClose, closeDisabledReason }: { 
         <ContractCell contract={p.contract} />
       </td>
       <td className="px-3 py-2">
-        <span className={`rounded-sm px-1.5 py-0.5 text-[10px] leading-[14px] font-medium ${p.side === 'long' ? 'bg-success/15 text-success' : 'bg-destructive/15 text-destructive'}`}>
+        <span className={`rounded-sm px-1.5 py-0.5 text-sm leading-5 font-medium ${p.side === 'long' ? 'bg-success/15 text-success' : 'bg-destructive/15 text-destructive'}`}>
           {p.side}
         </span>
       </td>
@@ -889,7 +889,7 @@ function PositionRow({ position: p, onClose, canClose, closeDisabledReason }: { 
       <td className="px-3 py-2 text-right text-foreground tabular-nums">{fmt(p.marketValue, ccy)}</td>
       <td className={`px-3 py-2 text-right font-medium tabular-nums ${pnl >= 0 ? 'text-success' : 'text-destructive'}`}>
         <div>{fmtPnl(pnl, ccy)}</div>
-        <div className="text-[11px] font-normal opacity-80">{fmtPctSigned(pct)}</div>
+        <div className="text-sm font-normal opacity-80">{fmtPctSigned(pct)}</div>
       </td>
       <td className="px-3 py-2 text-right">
         <Button
@@ -1042,7 +1042,7 @@ function OpenOrdersTable({ orders }: { orders: unknown[] }) {
   }
   return (
     <div className="border border-border rounded-lg overflow-x-auto">
-      <table className="w-full text-[13px]">
+      <table className="w-full text-sm">
         <thead>
           <tr className="bg-secondary text-muted-foreground text-left">
             <th className="px-3 py-2 font-medium">Order ID</th>
@@ -1057,7 +1057,7 @@ function OpenOrdersTable({ orders }: { orders: unknown[] }) {
         <tbody>
           {rows.map((o, i) => (
             <tr key={i} className="border-t border-border">
-              <td className="px-3 py-2 font-mono text-muted-foreground text-[11px] leading-[15px]">{String(o.orderId ?? '—')}</td>
+              <td className="px-3 py-2 font-mono text-muted-foreground text-sm leading-5">{String(o.orderId ?? '—')}</td>
               <td className="px-3 py-2 font-mono text-foreground" title={o.contract?.aliceId}>
                 {o.contract?.symbol ?? o.contract?.localSymbol ?? o.contract?.aliceId ?? '?'}
               </td>
@@ -1066,7 +1066,7 @@ function OpenOrdersTable({ orders }: { orders: unknown[] }) {
               <td className="px-3 py-2 text-right text-foreground tabular-nums">{String(o.order?.totalQuantity ?? '')}</td>
               <td className="px-3 py-2 text-right text-muted-foreground tabular-nums">{o.order?.lmtPrice != null && !isUnsetDecimal(o.order.lmtPrice) ? String(o.order.lmtPrice) : '—'}</td>
               <td className="px-3 py-2">
-                <span className="text-[11px] text-muted-foreground">{o.orderState?.status ?? 'Unknown'}</span>
+                <span className="text-sm text-muted-foreground">{o.orderState?.status ?? 'Unknown'}</span>
               </td>
             </tr>
           ))}
@@ -1090,7 +1090,7 @@ const ORDER_HISTORY_COMPACT_WIDTH = 760
 
 function OrderStatusBadge({ status }: { status: OrderHistoryStatus }) {
   return (
-    <span className={`rounded-sm px-1.5 py-0.5 text-[10px] leading-[14px] font-medium ${ORDER_STATUS_STYLES[status] ?? 'bg-muted text-muted-foreground'}`}>
+    <span className={`rounded-sm px-1.5 py-0.5 text-sm leading-5 font-medium ${ORDER_STATUS_STYLES[status] ?? 'bg-muted text-muted-foreground'}`}>
       {status}
     </span>
   )
@@ -1098,7 +1098,7 @@ function OrderStatusBadge({ status }: { status: OrderHistoryStatus }) {
 
 function SideBadge({ side }: { side: 'BUY' | 'SELL' }) {
   return (
-    <span className={`rounded-sm px-1.5 py-0.5 text-[10px] leading-[14px] font-medium ${side === 'BUY' ? 'bg-success/15 text-success' : 'bg-destructive/15 text-destructive'}`}>
+    <span className={`rounded-sm px-1.5 py-0.5 text-sm leading-5 font-medium ${side === 'BUY' ? 'bg-success/15 text-success' : 'bg-destructive/15 text-destructive'}`}>
       {side}
     </span>
   )
@@ -1106,7 +1106,7 @@ function SideBadge({ side }: { side: 'BUY' | 'SELL' }) {
 
 function SourceChip({ label }: { label: string }) {
   return (
-    <span className="rounded-sm bg-muted px-1.5 text-[10px] leading-[14px] text-muted-foreground">
+    <span className="rounded-sm bg-muted px-1.5 text-sm leading-5 text-muted-foreground">
       {label}
     </span>
   )
@@ -1155,7 +1155,7 @@ export function OrderHistoryTable({ orders }: { orders: OrderHistoryEntry[] | nu
                     </span>
                   </div>
 
-                  <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] leading-[15px] text-muted-foreground">
+                  <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm leading-5 text-muted-foreground">
                     <span className="tabular-nums">{formatHistoryTime(o.timestamp)}</span>
                     <SideBadge side={o.side} />
                     <span>{o.orderType ?? '—'}</span>
@@ -1163,18 +1163,18 @@ export function OrderHistoryTable({ orders }: { orders: OrderHistoryEntry[] | nu
 
                   <dl className="mt-3 grid grid-cols-3 gap-2">
                     <div className="min-w-0 border-l border-border pl-2.5">
-                      <dt className="text-[11px] font-medium text-muted-foreground">Qty</dt>
-                      <dd className="mt-0.5 truncate text-[12px] leading-[18px] text-foreground tabular-nums">
+                      <dt className="text-sm font-medium text-muted-foreground">Qty</dt>
+                      <dd className="mt-0.5 truncate text-sm leading-5 text-foreground tabular-nums">
                         {o.quantity != null ? fmtNum(o.quantity) : '—'}
                       </dd>
                     </div>
                     <div className="min-w-0 border-l border-border pl-2.5">
-                      <dt className="text-[11px] font-medium text-muted-foreground">Limit</dt>
-                      <dd className="mt-0.5 truncate text-[12px] leading-[18px] text-foreground tabular-nums">{o.limitPrice ?? '—'}</dd>
+                      <dt className="text-sm font-medium text-muted-foreground">Limit</dt>
+                      <dd className="mt-0.5 truncate text-sm leading-5 text-foreground tabular-nums">{o.limitPrice ?? '—'}</dd>
                     </div>
                     <div className="min-w-0 border-l border-border pl-2.5">
-                      <dt className="text-[11px] font-medium text-muted-foreground">Fill</dt>
-                      <dd className="mt-0.5 truncate text-[12px] leading-[18px] text-foreground tabular-nums">
+                      <dt className="text-sm font-medium text-muted-foreground">Fill</dt>
+                      <dd className="mt-0.5 truncate text-sm leading-5 text-foreground tabular-nums">
                         {o.avgFillPrice ? `${o.avgFillPrice}${o.filledQty ? ` × ${o.filledQty}` : ''}` : '—'}
                       </dd>
                     </div>
@@ -1186,7 +1186,7 @@ export function OrderHistoryTable({ orders }: { orders: OrderHistoryEntry[] | nu
                     aria-controls={detailsId}
                     aria-label={`${isExpanded ? 'Hide' : 'Show'} details for ${contractPrimary(o.contract)} order`}
                     onClick={() => setExpanded(prev => prev === i ? null : i)}
-                    className="mt-3 w-full justify-between text-[11px]"
+                    className="mt-3 w-full justify-between text-sm"
                     variant="outline"
                     size="sm"
                   >
@@ -1196,7 +1196,7 @@ export function OrderHistoryTable({ orders }: { orders: OrderHistoryEntry[] | nu
                 </div>
 
                 {isExpanded && (
-                  <div id={detailsId} className="border-t border-border bg-muted/20 px-3 py-2.5 text-[11px] text-muted-foreground">
+                  <div id={detailsId} className="border-t border-border bg-muted/20 px-3 py-2.5 text-sm text-muted-foreground">
                     <div className="font-mono text-foreground">{o.commitHash}</div>
                     <p className="mt-1 break-words leading-5">{o.message}</p>
                     {o.error && <p className="mt-1 break-words text-destructive">{o.error}</p>}
@@ -1213,7 +1213,7 @@ export function OrderHistoryTable({ orders }: { orders: OrderHistoryEntry[] | nu
 
   return (
     <div ref={setContainer} className="border border-border rounded-lg overflow-x-auto">
-      <table className="w-full min-w-[760px] text-[13px]">
+      <table className="w-full min-w-[760px] text-sm">
         <thead>
           <tr className="bg-secondary text-muted-foreground text-left">
             <th className="px-3 py-2 font-medium">Time</th>
@@ -1269,7 +1269,7 @@ export function OrderHistoryTable({ orders }: { orders: OrderHistoryEntry[] | nu
               </tr>
               {expanded === i && (
                 <tr id={`order-history-details-${i}`} className="border-t border-border bg-muted/20">
-                  <td colSpan={9} className="px-3 py-2 text-[11px] text-muted-foreground">
+                  <td colSpan={9} className="px-3 py-2 text-sm text-muted-foreground">
                     <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5">
                       <span className="font-mono">{o.commitHash}</span>
                       <span>{o.message}</span>
@@ -1302,7 +1302,7 @@ function TradeHistoryTable({ trades }: { trades: TradeHistoryEntry[] | null }) {
   }
   return (
     <div className="border border-border rounded-lg overflow-x-auto">
-      <table className="w-full text-[13px]">
+      <table className="w-full text-sm">
         <thead>
           <tr className="bg-secondary text-muted-foreground text-left">
             <th className="px-3 py-2 font-medium">Time</th>

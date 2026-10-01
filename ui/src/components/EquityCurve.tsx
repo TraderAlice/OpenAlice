@@ -88,7 +88,7 @@ export function EquityCurve({
     <div className="border border-border rounded-lg bg-secondary p-4">
       {/* Header */}
       <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-        <h3 className="text-[13px] font-semibold leading-5 text-foreground">
+        <h3 className="text-sm font-semibold leading-5 text-foreground">
           Equity Curve
         </h3>
         <SegmentedControl
@@ -103,7 +103,7 @@ export function EquityCurve({
       {/* Account switcher */}
       {accounts.length > 1 && (
         <div className="mb-3 flex max-w-full items-center gap-2">
-          <span className="shrink-0 text-[11px] font-medium leading-4 text-muted-foreground">Account</span>
+          <span className="shrink-0 text-sm font-medium leading-5 text-muted-foreground">Account</span>
           <SegmentedControl
             value={selectedAccountId}
             options={[
@@ -193,7 +193,7 @@ function CustomTooltip({ active, payload, isAllView, accounts }: any) {
   const accountMap = new Map((accounts as Array<{ id: string; label: string }>).map(a => [a.id, a.label]))
 
   return (
-    <div className="oa-chart-tooltip px-3 py-2 text-[12px] leading-[18px]">
+    <div className="oa-chart-tooltip px-3 py-2 text-sm leading-5">
       <p className="text-muted-foreground mb-1">
         {new Date(data.time).toLocaleString()}
       </p>

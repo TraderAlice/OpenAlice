@@ -1,3 +1,4 @@
+import { Checkbox } from '@/components/ui/checkbox'
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useAliceHarness, type AliceHarnessConfig } from '../../hooks/useAliceHarness'
@@ -32,12 +33,12 @@ export function AliceHarnessPanel({ wsId, onChange, inProject = false }: { wsId:
           {Object.entries(state.data.commands).map(([binary, groups]) => <fieldset key={binary} className="border-t border-border py-3">
             <legend className="px-1 font-mono text-sm">{binary}</legend>
             <label className="flex items-center gap-2 text-sm">
-              <input type="checkbox" checked={draft.cli[binary]?.enabled !== false} onChange={(event) => setDraft({ ...draft, cli: { ...draft.cli, [binary]: { ...draft.cli[binary], enabled: event.target.checked } } })} />
+              <Checkbox checked={draft.cli[binary]?.enabled !== false} onChange={(event) => setDraft({ ...draft, cli: { ...draft.cli, [binary]: { ...draft.cli[binary], enabled: event.target.checked } } })} />
               {t('aliceHarness.enabled')}
             </label>
             <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3">
               {groups.map((group) => <label key={group} className="flex items-center gap-2 font-mono text-xs">
-                <input type="checkbox" disabled={draft.cli[binary]?.enabled === false} checked={draft.cli[binary]?.groups?.[group] !== false} onChange={(event) => setDraft({ ...draft, cli: { ...draft.cli, [binary]: { ...draft.cli[binary], groups: { ...draft.cli[binary]?.groups, [group]: event.target.checked } } } })} />
+                <Checkbox disabled={draft.cli[binary]?.enabled === false} checked={draft.cli[binary]?.groups?.[group] !== false} onChange={(event) => setDraft({ ...draft, cli: { ...draft.cli, [binary]: { ...draft.cli[binary], groups: { ...draft.cli[binary]?.groups, [group]: event.target.checked } } } })} />
                 {group}
               </label>)}
             </div>
@@ -47,7 +48,7 @@ export function AliceHarnessPanel({ wsId, onChange, inProject = false }: { wsId:
             <p className="mb-3 text-xs text-muted-foreground">{t('distribution.keepHint')}</p>
             <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
               {Object.entries(state.data.skillDefaults).map(([skill, fallback]) => <label key={skill} className="flex items-center gap-2 font-mono text-xs">
-                <input type="checkbox" checked={draft.skills?.[skill] ?? fallback} onChange={(event) => setDraft({ ...draft, skills: { ...draft.skills, [skill]: event.target.checked } })} />
+                <Checkbox checked={draft.skills?.[skill] ?? fallback} onChange={(event) => setDraft({ ...draft, skills: { ...draft.skills, [skill]: event.target.checked } })} />
                 {skill}
               </label>)}
             </div>

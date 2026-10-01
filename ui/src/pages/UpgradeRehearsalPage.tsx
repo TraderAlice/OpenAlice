@@ -1,3 +1,4 @@
+import { Checkbox } from '@/components/ui/checkbox'
 import { displayVersion } from '../components/dev/upgrade-rehearsal/releases'
 import { ReleasePublisher } from '../components/dev/upgrade-rehearsal/ReleasePublisher'
 import { identityLabel, type ReleaseChannel } from '@traderalice/update-lifecycle'
@@ -291,8 +292,7 @@ export function UpgradeRehearsalPage() {
           <div className="p-5 space-y-3 text-sm">
             {s.scenario !== 'integrated' && (
               <label className="flex items-center gap-2">
-                <input
-                  type="checkbox"
+                <Checkbox
                   checked={s.backend}
                   disabled={!editing}
                   onChange={(e) =>
@@ -303,8 +303,7 @@ export function UpgradeRehearsalPage() {
               </label>
             )}
             <label className="flex items-center gap-2">
-              <input
-                type="checkbox"
+              <Checkbox
                 checked={s.content}
                 disabled={!editing}
                 onChange={(e) =>

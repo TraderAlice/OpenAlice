@@ -45,9 +45,17 @@ financial semantics, and existing workflow contracts.
   Tooltips use the 14px supporting-text role, a 250ms initial delay, immediate
   transfer within the provider window, and a 110ms exit.
 - Inference rows use one four-column layout: a 20px icon, label, wrapping value,
-  and a fixed 16px chevron. The trigger shows the model and an explicit effort
-  override. Default effort remains in its menu. Utility menus use 40px rows,
+  and a fixed 16px chevron. Label and value columns align to their start edges.
+  The trigger shows the model and an explicit effort override. Default effort remains in its menu. Utility menus use 40px rows,
   44px touch targets, and immediate keyboard highlighting.
+- Supporting text uses the shared 14px role across product components and pages.
+  Form entry uses 16px. Shared menu callers inherit row geometry; their classes
+  describe product layout and state. Tabs share capsule spacing and neutral
+  selection. Popovers and dialogs stay within the viewport and scroll internally.
+  Account cards respond to their container width, and names wrap within each card.
+  Refresh timestamps use a clock icon. Active session badges use an activity icon.
+  Checkbox owns native form semantics, a 44px input target, and the neutral
+  SelectionCheckIcon across configuration, connectors, filters, and capabilities.
 - Overview owns language selection. Existing language URLs and saved tabs open
   Overview. Connection state uses an icon and a separate mode chip. Location
   details reuse Collapsible. Palette and style choices use neutral borders and selection checks.

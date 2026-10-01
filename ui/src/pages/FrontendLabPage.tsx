@@ -73,7 +73,7 @@ export function FrontendLabPage() {
       <div className="max-w-[960px] space-y-5">
         <div>
           <h2 className="text-[18px] font-semibold text-foreground">Frontend lab</h2>
-          <p className="mt-1 max-w-[620px] text-[13px] leading-relaxed text-muted-foreground">
+          <p className="mt-1 max-w-[620px] text-sm leading-relaxed text-muted-foreground">
             Exercise shared UI feedback through the real application event pipeline.
           </p>
         </div>
@@ -81,7 +81,7 @@ export function FrontendLabPage() {
         <section className="overflow-hidden rounded-lg border border-border bg-secondary/35">
           <div className="border-b border-border px-4 py-3">
             <h3 className="text-[14px] leading-[19px] font-semibold text-foreground">Activity Sonner</h3>
-            <p className="mt-1 text-[12px] leading-relaxed text-muted-foreground">
+            <p className="mt-1 text-sm leading-relaxed text-muted-foreground">
               Each button appends a dedicated test activity to the runtime journal. The global
               activity filter then projects it into the same Sonner bridge used by real work.
             </p>
@@ -90,8 +90,8 @@ export function FrontendLabPage() {
             {TESTS.map((test) => (
               <div key={test.state} className="flex min-h-12 flex-col gap-3 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
                 <div className="min-w-0">
-                  <div className="text-[13px] font-medium text-foreground">{test.label}</div>
-                  <div className="mt-0.5 text-[12px] text-muted-foreground">{test.description}</div>
+                  <div className="text-sm font-medium text-foreground">{test.label}</div>
+                  <div className="mt-0.5 text-sm text-muted-foreground">{test.description}</div>
                 </div>
                 <Button
                   type="button"
@@ -120,7 +120,7 @@ export function FrontendLabPage() {
         <section className="overflow-hidden rounded-xl border border-border bg-secondary/35">
           <div className="border-b border-border px-4 py-3">
             <h3 className="text-[14px] font-semibold text-foreground">Product activity journal</h3>
-            <p className="mt-1 text-[12px] leading-relaxed text-muted-foreground">
+            <p className="mt-1 text-sm leading-relaxed text-muted-foreground">
               Append real typed product facts. Each test should appear in both Office and the
               shared Sonner bridge; it never writes an Inbox message or News article.
             </p>
@@ -128,8 +128,8 @@ export function FrontendLabPage() {
           <div className="divide-y divide-border">
             <div className="flex flex-col gap-3 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
               <div className="min-w-0">
-                <div className="text-[13px] font-medium text-foreground">Inbox received</div>
-                <div className="mt-0.5 text-[12px] text-muted-foreground">Tests the registered Inbox activity producer and consumer.</div>
+                <div className="text-sm font-medium text-foreground">Inbox received</div>
+                <div className="mt-0.5 text-sm text-muted-foreground">Tests the registered Inbox activity producer and consumer.</div>
               </div>
               <Button type="button" variant="outline" disabled={pending !== null} onClick={() => void triggerProductActivity('inbox')}>
                 <Inbox />
@@ -138,8 +138,8 @@ export function FrontendLabPage() {
             </div>
             <div className="flex flex-col gap-3 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
               <div className="min-w-0">
-                <div className="text-[13px] font-medium text-foreground">News ingested</div>
-                <div className="mt-0.5 text-[12px] text-muted-foreground">Tests one per-item News fact without running an RSS fetch.</div>
+                <div className="text-sm font-medium text-foreground">News ingested</div>
+                <div className="mt-0.5 text-sm text-muted-foreground">Tests one per-item News fact without running an RSS fetch.</div>
               </div>
               <Button type="button" variant="outline" disabled={pending !== null} onClick={() => void triggerProductActivity('news')}>
                 <Newspaper />
@@ -150,7 +150,7 @@ export function FrontendLabPage() {
         </section>
 
         {error ? (
-          <div className="rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-[12px] leading-[18px] text-destructive">
+          <div className="rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm leading-5 text-destructive">
             {error}
           </div>
         ) : null}

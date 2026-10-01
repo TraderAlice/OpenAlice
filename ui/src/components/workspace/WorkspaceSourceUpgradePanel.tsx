@@ -81,9 +81,9 @@ export function WorkspaceSourceUpgradePanel({ wsId, onWorkspaceChanged }: Props)
           <section className="rounded-lg border border-border bg-secondary/35 p-4">
             <div className="flex items-start justify-between gap-4">
               <div>
-                <div className="flex items-center gap-2 text-[12px] leading-[18px] font-semibold text-muted-foreground"><GitMerge size={14} />{t('workspace.sourceUpgradeTitle')}</div>
+                <div className="flex items-center gap-2 text-sm leading-5 font-semibold text-muted-foreground"><GitMerge size={14} />{t('workspace.sourceUpgradeTitle')}</div>
                 <div className="mt-2 flex items-center gap-2 text-[18px] font-semibold"><span>{plan.fromVersion}</span><ArrowRight size={17} className="text-muted-foreground" /><span className="text-primary">{plan.toVersion}</span></div>
-                <div className="mt-2 flex flex-wrap items-center gap-2 text-[11px] leading-[15px]">
+                <div className="mt-2 flex flex-wrap items-center gap-2 text-sm leading-5">
                   <span className={`rounded-full px-2 py-0.5 ${plan.verified ? 'bg-success/10 text-success' : 'bg-warning/12 text-warning'}`}>
                     {t(plan.verified ? 'workspace.sourceUpgradeVerified' : 'workspace.sourceUpgradeUnverified')}
                   </span>
@@ -95,14 +95,14 @@ export function WorkspaceSourceUpgradePanel({ wsId, onWorkspaceChanged }: Props)
           </section>
 
           {!plan.verified && (
-            <div className="rounded-lg border border-warning/40 bg-warning/8 px-3 py-3 text-[12px] leading-relaxed text-foreground">
+            <div className="rounded-lg border border-warning/40 bg-warning/8 px-3 py-3 text-sm leading-relaxed text-foreground">
               <div className="flex items-center gap-2 font-semibold text-warning"><AlertTriangle size={15} />{t('workspace.sourceUpgradeUnverifiedTitle')}</div>
               <p className="mt-1 text-muted-foreground">{t('workspace.sourceUpgradeUnverifiedDescription')}</p>
             </div>
           )}
 
           {plan.blockers.length > 0 && (
-            <div className="rounded-lg border border-warning/35 bg-warning/8 px-3 py-3 text-[12px] leading-[18px]">
+            <div className="rounded-lg border border-warning/35 bg-warning/8 px-3 py-3 text-sm leading-5">
               <div className="flex items-center gap-2 font-semibold text-warning"><AlertTriangle size={15} />{t('workspace.upgradeBlockedTitle')}</div>
               <ul className="mt-2 list-disc space-y-1 pl-5 text-muted-foreground">
                 {plan.blockers.map((blocker) => <li key={blocker}>{blockerLabels[blocker] ?? blocker}</li>)}
@@ -111,8 +111,8 @@ export function WorkspaceSourceUpgradePanel({ wsId, onWorkspaceChanged }: Props)
           )}
 
           <section className="rounded-lg border border-border bg-secondary/20 p-4">
-            <h4 className="text-[13px] leading-[18px] font-semibold">{t('workspace.sourceUpgradeChanges', { count: plan.changedPaths.length })}</h4>
-            <div className="mt-3 max-h-48 overflow-y-auto rounded-lg border border-border bg-background/55 p-3 font-mono text-[11px] leading-[15px] text-muted-foreground">
+            <h4 className="text-sm leading-5 font-semibold">{t('workspace.sourceUpgradeChanges', { count: plan.changedPaths.length })}</h4>
+            <div className="mt-3 max-h-48 overflow-y-auto rounded-lg border border-border bg-background/55 p-3 font-mono text-sm leading-5 text-muted-foreground">
               {plan.changedPaths.map((path) => <div key={path} className="truncate">{path}</div>)}
             </div>
           </section>
@@ -124,7 +124,7 @@ export function WorkspaceSourceUpgradePanel({ wsId, onWorkspaceChanged }: Props)
         </div>
       )}
       {!plan && error && <Button variant="outline" disabled={loading} onClick={() => void load()}><RefreshCw size={13}/>{t('workspace.upgradeRefresh')}</Button>}
-      {error && <p className="mt-3 rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2 text-[12px] leading-[18px] text-destructive">{error}</p>}
+      {error && <p className="mt-3 rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm leading-5 text-destructive">{error}</p>}
     </div>
   )
 }

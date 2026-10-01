@@ -163,7 +163,7 @@ function RuntimePreferenceDialog({
               {t('workspaceSettings.preferences.followRecent')}
               {!useFixed && <span className="ml-auto"><SelectionCheckIcon /></span>}
             </div>
-            <p className="mt-1 text-[11px] leading-relaxed text-muted-foreground">
+            <p className="mt-1 text-sm leading-relaxed text-muted-foreground">
               {t('workspaceSettings.preferences.followRecentHelp')}
             </p>
           </button>
@@ -179,7 +179,7 @@ function RuntimePreferenceDialog({
               {t('workspaceSettings.preferences.fixedDefault')}
               {useFixed && <span className="ml-auto"><SelectionCheckIcon /></span>}
             </div>
-            <p className="mt-1 text-[11px] leading-relaxed text-muted-foreground">
+            <p className="mt-1 text-sm leading-relaxed text-muted-foreground">
               {t('workspaceSettings.preferences.fixedDefaultHelp')}
             </p>
           </button>
@@ -318,7 +318,7 @@ export function WorkspaceAIPreferencesPanel({ workspace, agents, onSaved, onConf
         <div className="mx-auto max-w-3xl space-y-5">
           <div>
             <h3 className="text-sm font-semibold text-foreground">{t('workspaceSettings.preferences.title')}</h3>
-            <p className="mt-1 text-[11px] leading-relaxed text-muted-foreground">
+            <p className="mt-1 text-sm leading-relaxed text-muted-foreground">
               {t('workspaceSettings.preferences.description')}
             </p>
           </div>
@@ -342,8 +342,8 @@ export function WorkspaceAIPreferencesPanel({ workspace, agents, onSaved, onConf
             return (
               <section key={mode} className="overflow-hidden rounded-lg border border-border bg-card">
                 <div className="border-b border-border bg-muted/25 px-4 py-3">
-                  <h4 className="text-[13px] leading-[18px] font-semibold text-foreground">{title}</h4>
-                  <p className="mt-1 text-[11px] leading-relaxed text-muted-foreground">
+                  <h4 className="text-sm leading-5 font-semibold text-foreground">{title}</h4>
+                  <p className="mt-1 text-sm leading-relaxed text-muted-foreground">
                     {t(`workspaceSettings.preferences.${mode}Help`)}
                   </p>
                 </div>
@@ -378,7 +378,7 @@ export function WorkspaceAIPreferencesPanel({ workspace, agents, onSaved, onConf
                   </label>
 
                   {recentAgentName && recentSummary && (
-                    <div className="flex flex-wrap items-center gap-x-1 gap-y-1 text-[11px] leading-[15px] text-muted-foreground">
+                    <div className="flex flex-wrap items-center gap-x-1 gap-y-1 text-sm leading-5 text-muted-foreground">
                       <span>
                         {drafts[mode].defaultAgent
                           ? t('workspaceSettings.preferences.recentRuntime')
@@ -393,7 +393,7 @@ export function WorkspaceAIPreferencesPanel({ workspace, agents, onSaved, onConf
                   {saveState?.mode === mode && (
                     <div
                       role={saveState.status === 'error' ? 'alert' : 'status'}
-                      className={`flex min-h-5 flex-wrap items-center gap-2 text-[11px] leading-[15px] ${saveState.status === 'error' ? 'text-destructive' : 'text-muted-foreground'}`}
+                      className={`flex min-h-5 flex-wrap items-center gap-2 text-sm leading-5 ${saveState.status === 'error' ? 'text-destructive' : 'text-muted-foreground'}`}
                     >
                       {saveState.status === 'saving' && t('common.saving')}
                       {saveState.status === 'saved' && t('common.saved')}
@@ -414,7 +414,7 @@ export function WorkspaceAIPreferencesPanel({ workspace, agents, onSaved, onConf
                   )}
 
                   <div className="overflow-hidden rounded-lg border border-border">
-                    <div className="grid grid-cols-[minmax(7rem,1fr)_minmax(0,2fr)_auto] gap-3 border-b border-border bg-muted/40 px-3 py-2 text-[11px] font-medium text-muted-foreground">
+                    <div className="grid grid-cols-[minmax(7rem,1fr)_minmax(0,2fr)_auto] gap-3 border-b border-border bg-muted/40 px-3 py-2 text-sm font-medium text-muted-foreground">
                       <span>{t('workspaceSettings.preferences.runtime')}</span>
                       <span>{t('workspaceSettings.preferences.resolvedPreference')}</span>
                       <span className="sr-only">{t('common.edit')}</span>
@@ -428,8 +428,8 @@ export function WorkspaceAIPreferencesPanel({ workspace, agents, onSaved, onConf
                           <div className="flex min-w-0 items-start gap-2">
                             <AgentRuntimeIcon agentId={agent.id} className="mt-px size-[18px] shrink-0" />
                             <div className="min-w-0">
-                              <div className="truncate text-[12px] font-medium text-foreground">{agent.displayName}</div>
-                              <div className="mt-0.5 text-[10px] text-muted-foreground">
+                              <div className="truncate text-sm font-medium text-foreground">{agent.displayName}</div>
+                              <div className="mt-0.5 text-sm text-muted-foreground">
                                 {fixed
                                   ? agent.id === recentAgentId
                                     ? t('workspaceSettings.preferences.fixedCurrentRecentRuntime')
@@ -440,7 +440,7 @@ export function WorkspaceAIPreferencesPanel({ workspace, agents, onSaved, onConf
                               </div>
                             </div>
                           </div>
-                          <div className="min-w-0 space-y-1 text-[11px]">
+                          <div className="min-w-0 space-y-1 text-sm">
                             <div className="flex min-w-0 items-center gap-1.5 text-foreground">
                               {summary.vendor
                                 ? <AIProviderIcon vendor={summary.vendor} className="size-4 shrink-0" />

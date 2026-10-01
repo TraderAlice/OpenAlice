@@ -44,9 +44,9 @@ export interface CreateWorkspaceFormProps {
   readonly submitLabel?: string
 }
 
-const FIELD = `${inputClass} text-[13px]`
-const LABEL = 'block text-[12px] font-medium text-muted-foreground'
-const HINT = 'text-[11px] text-muted-foreground/70'
+const FIELD = `${inputClass} text-sm`
+const LABEL = 'block text-sm font-medium text-muted-foreground'
+const HINT = 'text-sm text-muted-foreground/70'
 
 export function CreateWorkspaceForm(props: CreateWorkspaceFormProps): ReactElement {
   const { t } = useTranslation()
@@ -192,7 +192,7 @@ export function CreateWorkspaceForm(props: CreateWorkspaceFormProps): ReactEleme
         </div>
       )}
 
-      {create.error && <div role="alert" className="text-[12px] text-destructive">{create.error}</div>}
+      {create.error && <div role="alert" className="text-sm text-destructive">{create.error}</div>}
 
       <div className="flex items-center justify-end gap-2 pt-1">
         {onCancel && (

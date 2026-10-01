@@ -1,3 +1,4 @@
+import { Checkbox } from '@/components/ui/checkbox'
 import { useCallback, useEffect, useMemo, useRef, useState, type MutableRefObject, type ReactNode } from 'react'
 import type { TFunction } from 'i18next'
 import { Bot, CheckCircle2, ChevronDown, CircleAlert, ExternalLink, Eye, EyeOff, KeyRound, Link2, ListChecks, Power, RefreshCw, Send, ShieldCheck } from 'lucide-react'
@@ -1200,10 +1201,9 @@ function ConnectorCredentialsEditor({
               controlId={inputId}
             >
               {field.kind === 'boolean' ? (
-                <input
+                <Checkbox
                   id={inputId}
                   aria-label={`${definition.label} ${fieldLabel}`}
-                  type="checkbox"
                   required={fieldMissing}
                   checked={value === true}
                   onChange={(event) => onSettingChange(field.key, event.target.checked)}

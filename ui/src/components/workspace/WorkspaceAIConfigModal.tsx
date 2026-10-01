@@ -682,7 +682,7 @@ export function WorkspaceAIConfigModal({
         <div className="flex shrink-0 items-center justify-between border-b border-border px-4 py-3 sm:p-4">
           <div className="min-w-0">
             <h2 id={dialogTitleId} className="text-[15px] font-semibold text-foreground">{t('workspaceSettings.title')}</h2>
-            <p id={dialogDescriptionId} className="mt-0.5 truncate text-[11px] text-muted-foreground">{workspaceLabel}</p>
+            <p id={dialogDescriptionId} className="mt-0.5 truncate text-sm text-muted-foreground">{workspaceLabel}</p>
           </div>
           <Button
             type="button"
@@ -704,7 +704,7 @@ export function WorkspaceAIConfigModal({
               type="button"
               onClick={() => setSection('general')}
               aria-current={section === 'general' ? 'page' : undefined}
-              className={`flex min-h-11 min-w-max flex-none items-center gap-2 rounded-md px-2.5 py-2 text-left text-[12px] leading-[18px] font-medium transition-colors sm:mt-0 sm:h-8 sm:min-h-8 sm:w-full ${
+              className={`flex min-h-11 min-w-max flex-none items-center gap-2 rounded-md px-2.5 py-2 text-left text-sm leading-5 font-medium transition-colors sm:mt-0 sm:h-8 sm:min-h-8 sm:w-full ${
                 section === 'general'
                   ? 'bg-muted text-foreground'
                   : 'text-muted-foreground hover:bg-muted hover:text-foreground'
@@ -717,7 +717,7 @@ export function WorkspaceAIConfigModal({
               type="button"
               onClick={() => setSection('launch')}
               aria-current={section === 'launch' ? 'page' : undefined}
-              className={`flex min-h-11 min-w-max flex-none items-center gap-2 rounded-md px-2.5 py-2 text-left text-[12px] leading-[18px] font-medium transition-colors sm:mt-1 sm:h-8 sm:min-h-8 sm:w-full ${
+              className={`flex min-h-11 min-w-max flex-none items-center gap-2 rounded-md px-2.5 py-2 text-left text-sm leading-5 font-medium transition-colors sm:mt-1 sm:h-8 sm:min-h-8 sm:w-full ${
                 section === 'launch'
                   ? 'bg-muted text-foreground'
                   : 'text-muted-foreground hover:bg-muted hover:text-foreground'
@@ -730,7 +730,7 @@ export function WorkspaceAIConfigModal({
               type="button"
               onClick={() => setSection('preferences')}
               aria-current={section === 'preferences' ? 'page' : undefined}
-              className={`flex min-h-11 min-w-max flex-none items-center gap-2 rounded-md px-2.5 py-2 text-left text-[12px] leading-[18px] font-medium transition-colors sm:mt-1 sm:h-8 sm:min-h-8 sm:w-full ${
+              className={`flex min-h-11 min-w-max flex-none items-center gap-2 rounded-md px-2.5 py-2 text-left text-sm leading-5 font-medium transition-colors sm:mt-1 sm:h-8 sm:min-h-8 sm:w-full ${
                 section === 'preferences'
                   ? 'bg-muted text-foreground'
                   : 'text-muted-foreground hover:bg-muted hover:text-foreground'
@@ -743,7 +743,7 @@ export function WorkspaceAIConfigModal({
               type="button"
               onClick={() => setSection('template')}
               aria-current={section === 'template' ? 'page' : undefined}
-              className={`flex min-h-11 min-w-max flex-none items-center gap-2 rounded-md px-2.5 py-2 text-left text-[12px] leading-[18px] font-medium transition-colors sm:mt-1 sm:h-8 sm:min-h-8 sm:w-full ${
+              className={`flex min-h-11 min-w-max flex-none items-center gap-2 rounded-md px-2.5 py-2 text-left text-sm leading-5 font-medium transition-colors sm:mt-1 sm:h-8 sm:min-h-8 sm:w-full ${
                 section === 'template'
                   ? 'bg-muted text-foreground'
                   : 'text-muted-foreground hover:bg-muted hover:text-foreground'
@@ -759,7 +759,7 @@ export function WorkspaceAIConfigModal({
               type="button"
               onClick={() => setSection('absorb')}
               aria-current={section === 'absorb' ? 'page' : undefined}
-              className={`flex min-h-11 min-w-max flex-none items-center gap-2 rounded-md px-2.5 py-2 text-left text-[12px] leading-[18px] font-medium transition-colors sm:mt-1 sm:h-8 sm:min-h-8 sm:w-full ${
+              className={`flex min-h-11 min-w-max flex-none items-center gap-2 rounded-md px-2.5 py-2 text-left text-sm leading-5 font-medium transition-colors sm:mt-1 sm:h-8 sm:min-h-8 sm:w-full ${
                 section === 'absorb'
                   ? 'bg-muted text-foreground'
                   : 'text-muted-foreground hover:bg-muted hover:text-foreground'
@@ -784,7 +784,7 @@ export function WorkspaceAIConfigModal({
                       placeholder={stableTag}
                       className={inputClass}
                     />
-                    <div className="mt-1 flex items-center justify-between gap-3 text-[11px] leading-[15px] text-muted-foreground/70">
+                    <div className="mt-1 flex items-center justify-between gap-3 text-sm leading-5 text-muted-foreground/70">
                       <span>{t('workspaceSettings.general.displayNameHelp')}</span>
                       <span>{displayName.length}/80</span>
                     </div>
@@ -800,7 +800,7 @@ export function WorkspaceAIConfigModal({
                       placeholder={t('workspaceSettings.general.descriptionPlaceholder')}
                       className={`${inputClass} min-h-28 resize-y leading-relaxed`}
                     />
-                    <div className="mt-1 flex items-center justify-between gap-3 text-[11px] leading-[15px] text-muted-foreground/70">
+                    <div className="mt-1 flex items-center justify-between gap-3 text-sm leading-5 text-muted-foreground/70">
                       <span>{t('workspaceSettings.general.descriptionHelp')}</span>
                       <span>{description.length}/240</span>
                     </div>
@@ -810,9 +810,9 @@ export function WorkspaceAIConfigModal({
                     <div className="flex items-start gap-2">
                       <Info size={14} className="mt-0.5 shrink-0 text-muted-foreground" />
                       <div className="min-w-0">
-                        <div className="text-[11px] font-medium text-muted-foreground">{t('workspaceSettings.general.stableTag')}</div>
-                        <div className="mt-1 truncate font-mono text-[12px] leading-[18px] text-foreground">{stableTag}</div>
-                        <p className="mt-1 text-[11px] leading-snug text-muted-foreground/75">
+                        <div className="text-sm font-medium text-muted-foreground">{t('workspaceSettings.general.stableTag')}</div>
+                        <div className="mt-1 truncate font-mono text-sm leading-5 text-foreground">{stableTag}</div>
+                        <p className="mt-1 text-sm leading-snug text-muted-foreground/75">
                           {t('workspaceSettings.general.stableTagHelp')}
                         </p>
                       </div>
@@ -820,19 +820,19 @@ export function WorkspaceAIConfigModal({
                   </div>
 
                   {error && (
-                    <div className="rounded-md border border-destructive/40 bg-destructive/10 text-destructive text-[12px] leading-[18px] px-3 py-2">
+                    <div className="rounded-md border border-destructive/40 bg-destructive/10 text-destructive text-sm leading-5 px-3 py-2">
                       {error}
                     </div>
                   )}
                   {metadataSavedFlash && (
-                    <div className="rounded-md border border-success/40 bg-success/10 text-success text-[12px] leading-[18px] px-3 py-2">
+                    <div className="rounded-md border border-success/40 bg-success/10 text-success text-sm leading-5 px-3 py-2">
                       {t('workspaceSettings.general.saved')}
                     </div>
                   )}
                   </div>
                 </div>
                 <div className="flex shrink-0 items-center justify-end gap-2 border-t border-border bg-secondary/30 px-3 py-2.5 sm:grid sm:grid-cols-[minmax(0,1fr)_auto]">
-                  <p className="hidden min-w-0 text-[11px] leading-snug text-muted-foreground/75 sm:block">
+                  <p className="hidden min-w-0 text-sm leading-snug text-muted-foreground/75 sm:block">
                     {t('workspaceSettings.general.storedIn')}
                   </p>
                   <div className="flex justify-end gap-2">
@@ -859,7 +859,7 @@ export function WorkspaceAIConfigModal({
             {section === 'ai' && (
               <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
         <div className="shrink-0 border-b border-warning/30 bg-warning/5 px-4 py-3">
-          <div className="flex items-start gap-2 text-[11px] leading-relaxed text-muted-foreground">
+          <div className="flex items-start gap-2 text-sm leading-relaxed text-muted-foreground">
             <AlertTriangle size={15} className="mt-0.5 shrink-0 text-warning" />
             <div>
               <div className="font-semibold text-foreground">{t('workspaceSettings.ai.deprecatedTitle')}</div>
@@ -878,7 +878,7 @@ export function WorkspaceAIConfigModal({
                 setPickedCredential('')
                 setPickedWireShape('')
               }}
-              className={`flex min-h-11 flex-none items-center justify-center gap-2 whitespace-nowrap px-3 py-2 text-[13px] leading-[18px] font-medium transition-colors sm:h-9 sm:min-h-9 sm:flex-1 sm:px-4 ${
+              className={`flex min-h-11 flex-none items-center justify-center gap-2 whitespace-nowrap px-3 py-2 text-sm leading-5 font-medium transition-colors sm:h-9 sm:min-h-9 sm:flex-1 sm:px-4 ${
                 tab === id
                   ? 'text-primary border-b-2 border-primary -mb-px'
                   : 'text-muted-foreground hover:text-foreground'
@@ -898,7 +898,7 @@ export function WorkspaceAIConfigModal({
         >
           {/* Quick pick — load a saved credential into the form */}
           {credentials.length === 0 ? (
-            <p className="text-[11px] leading-snug text-muted-foreground/75">
+            <p className="text-sm leading-snug text-muted-foreground/75">
               {t('workspaceSettings.ai.noCompatibleCredential', { agent: TAB_LABEL[tab] })}
             </p>
           ) : (
@@ -967,7 +967,7 @@ export function WorkspaceAIConfigModal({
                       {t('workspaceSettings.ai.load')}
                     </Button>
                   </div>
-                  <p className="text-[11px] text-muted-foreground/80 leading-snug mt-1.5">
+                  <p className="text-sm text-muted-foreground/80 leading-snug mt-1.5">
                     {compatible.length === 0 && credentials.length > 0
                       ? t('workspaceSettings.ai.incompatibleHelp', { agent: TAB_LABEL[tab] })
                       : t('workspaceSettings.ai.loadHelp')}
@@ -1005,7 +1005,7 @@ export function WorkspaceAIConfigModal({
                   <option key={shape} value={shape}>{WIRE_SHAPE_GUIDANCE[shape]}</option>
                 ))}
               </select>
-              <p className="text-[11px] text-muted-foreground/80 leading-snug mt-1">
+              <p className="text-sm text-muted-foreground/80 leading-snug mt-1">
                 {t('workspaceSettings.ai.apiProtocolHelp')}
               </p>
             </div>
@@ -1072,7 +1072,7 @@ export function WorkspaceAIConfigModal({
                 <option value="x-api-key">x-api-key — Anthropic default</option>
                 <option value="bearer">Authorization: Bearer — gateways (MiniMax, LongCat, proxies)</option>
               </select>
-              <p className="text-[11px] text-muted-foreground/80 leading-snug mt-1">
+              <p className="text-sm text-muted-foreground/80 leading-snug mt-1">
                 {t('workspaceSettings.ai.authHeaderHelp')}
               </p>
             </div>
@@ -1095,11 +1095,11 @@ export function WorkspaceAIConfigModal({
               suggestionsLabel={t('workspaceSettings.ai.modelSuggestions')}
             />
             {modelSuggestions.length > 0 && (
-              <p className="text-[11px] text-muted-foreground/70 mt-1">{t('workspaceSettings.ai.modelSuggestions')}</p>
+              <p className="text-sm text-muted-foreground/70 mt-1">{t('workspaceSettings.ai.modelSuggestions')}</p>
             )}
 
             {semanticsSummary && (
-              <div className="mt-2 rounded-md border border-primary/20 bg-primary/5 px-3 py-2 text-[11px] leading-relaxed text-muted-foreground">
+              <div className="mt-2 rounded-md border border-primary/20 bg-primary/5 px-3 py-2 text-sm leading-relaxed text-muted-foreground">
                 <strong className="text-foreground">{t('workspaceSettings.ai.registeredAutomatically')}</strong>{' '}
                 {semanticsSummary}.
               </div>
@@ -1165,7 +1165,7 @@ export function WorkspaceAIConfigModal({
 
             {modelRegistration?.reasoning === true && !selectedModelSemantics?.reasoning && (
               <details className="mt-2 rounded-md border border-border bg-secondary/40 px-3 py-2">
-                <summary className="cursor-pointer text-[11px] font-medium text-muted-foreground">
+                <summary className="cursor-pointer text-sm font-medium text-muted-foreground">
                   {t('aiProvider.advancedReasoning')}
                 </summary>
                 <div className="mt-2 space-y-1.5">
@@ -1219,10 +1219,10 @@ export function WorkspaceAIConfigModal({
 
           {(tab === 'codex' || tab === 'opencode' || tab === 'pi') && (
             <details className="rounded-md border border-border bg-secondary/40 px-3 py-2.5">
-              <summary className="cursor-pointer text-[11px] font-medium text-muted-foreground">
+              <summary className="cursor-pointer text-sm font-medium text-muted-foreground">
                 {t('workspaceSettings.ai.protocolDetails')}
               </summary>
-              <div className="mt-2 space-y-2 border-t border-border/60 pt-2 text-[11px] leading-relaxed text-muted-foreground">
+              <div className="mt-2 space-y-2 border-t border-border/60 pt-2 text-sm leading-relaxed text-muted-foreground">
                 {tab === 'codex' ? (
                   <p>{t('workspaceSettings.ai.codexResponsesOnly')}</p>
                 ) : (
@@ -1243,17 +1243,17 @@ export function WorkspaceAIConfigModal({
           )}
 
           {error && (
-            <div className="rounded-md border border-destructive/40 bg-destructive/10 text-destructive text-[12px] leading-[18px] px-3 py-2">
+            <div className="rounded-md border border-destructive/40 bg-destructive/10 text-destructive text-sm leading-5 px-3 py-2">
               {error}
             </div>
           )}
           {savedFlash && (
-            <div className="rounded-md border border-success/40 bg-success/10 text-success text-[12px] leading-[18px] px-3 py-2">
+            <div className="rounded-md border border-success/40 bg-success/10 text-success text-sm leading-5 px-3 py-2">
               {t('workspaceSettings.ai.saved')}
             </div>
           )}
           {offerSaveCred && (
-            <div className="rounded-md border border-primary/40 bg-primary/10 text-foreground text-[12px] leading-[18px] px-3 py-2.5 flex items-center justify-between gap-3">
+            <div className="rounded-md border border-primary/40 bg-primary/10 text-foreground text-sm leading-5 px-3 py-2.5 flex items-center justify-between gap-3">
               <span className="leading-snug">
                 {t('workspaceSettings.ai.saveCredentialPrompt')}
               </span>
@@ -1279,17 +1279,17 @@ export function WorkspaceAIConfigModal({
             </div>
           )}
           {credFlash && (
-            <div className="rounded-md border border-success/40 bg-success/10 text-success text-[12px] leading-[18px] px-3 py-2">
+            <div className="rounded-md border border-success/40 bg-success/10 text-success text-sm leading-5 px-3 py-2">
               {credFlash}
             </div>
           )}
           {testing && (
-            <div className="rounded-md border border-border bg-secondary text-muted-foreground text-[12px] leading-[18px] px-3 py-2">
+            <div className="rounded-md border border-border bg-secondary text-muted-foreground text-sm leading-5 px-3 py-2">
               {t('workspaceSettings.ai.testingConnection')}
             </div>
           )}
           {!testing && result?.ok && resultMatchesCurrent && (
-            <div className="rounded-md border border-success/40 bg-success/10 text-success text-[12px] leading-[18px] px-3 py-2">
+            <div className="rounded-md border border-success/40 bg-success/10 text-success text-sm leading-5 px-3 py-2">
               {result.response?.trim() ? (
                 <>
                   <div className="font-medium mb-0.5">
@@ -1311,7 +1311,7 @@ export function WorkspaceAIConfigModal({
             </div>
           )}
           {!testing && result && !result.ok && resultMatchesCurrent && (
-            <div className="rounded-md border border-destructive/40 bg-destructive/10 text-destructive text-[12px] leading-[18px] px-3 py-2">
+            <div className="rounded-md border border-destructive/40 bg-destructive/10 text-destructive text-sm leading-5 px-3 py-2">
               <div className="font-medium mb-0.5">{t('workspaceSettings.ai.testFailed')}</div>
               <div className="whitespace-pre-wrap break-words font-mono text-[11.5px]">
                 {result.error}
@@ -1319,12 +1319,12 @@ export function WorkspaceAIConfigModal({
             </div>
           )}
           {!testing && result && !resultMatchesCurrent && (
-            <div className="rounded-md border border-warning/30 bg-warning/5 text-warning/90 text-[12px] leading-[18px] px-3 py-2">
+            <div className="rounded-md border border-warning/30 bg-warning/5 text-warning/90 text-sm leading-5 px-3 py-2">
               {t('workspaceSettings.ai.formChanged')}
             </div>
           )}
 
-          <p className="text-[11px] text-muted-foreground/80 leading-snug pt-1">
+          <p className="text-sm text-muted-foreground/80 leading-snug pt-1">
             {t('workspaceSettings.ai.changesHelp')}
           </p>
         </div>

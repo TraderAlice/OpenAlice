@@ -758,7 +758,7 @@ function ChatWorkspaceContextFooter(props: ChatWorkspaceContextFooterProps): Rea
     pendingActionRef.current = action
   }
 
-  const menuItemClass = 'oa-workspace-context-item min-h-7 gap-2 rounded-md px-2 py-1 text-muted-foreground focus:bg-muted focus:text-foreground'
+  const menuItemClass = 'oa-workspace-context-item text-muted-foreground focus:bg-muted focus:text-foreground'
 
   return (
     <div className={props.iconOnly ? 'shrink-0' : 'shrink-0 border-t border-border/60 bg-secondary p-1.5'}>
@@ -848,7 +848,7 @@ function ChatWorkspaceContextFooter(props: ChatWorkspaceContextFooterProps): Rea
                         aria-label={workspaceDisplayTitle(workspace)}
                         title={workspaceDisplayTitle(workspace)}
                         onClick={() => queueAction(() => props.onSelectWorkspace(workspace.id))}
-                        className="oa-workspace-context-item min-h-8 gap-2 rounded-md py-1 pl-2 pr-8"
+                        className="oa-workspace-context-item"
                       >
                         <span className="min-w-0 flex-1 truncate">{workspaceDisplayName(workspace)}</span>
                       </DropdownMenuRadioItem>

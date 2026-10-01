@@ -139,7 +139,7 @@ export function ModelCombobox({
               }`}
             >
               <span className="min-w-0 flex-1">
-                <span className="block truncate font-mono text-[12px] text-foreground">{model.id}</span>
+                <span className="block truncate font-mono text-sm text-foreground">{model.id}</span>
                 {model.label !== model.id && (
                   <span className="mt-0.5 block truncate text-[10.5px]">{model.label}</span>
                 )}

@@ -125,7 +125,7 @@ function WalletPicker({ subAccounts, value, onChange }: {
       <select className={inputClass} value={value} onChange={(e) => onChange(e.target.value)}>
         {subAccounts.map(s => <option key={s.id} value={s.id}>{s.label}</option>)}
       </select>
-      <p className="text-[11px] text-muted-foreground/60 mt-1">This venue has separate wallets; the order routes to the one you pick.</p>
+      <p className="text-sm text-muted-foreground/60 mt-1">This venue has separate wallets; the order routes to the one you pick.</p>
     </Field>
   )
 }
@@ -232,7 +232,7 @@ function PlaceForm({ initialAliceId, ...p }: SharedFormProps & { initialAliceId?
           placeholder="0.001"
           inputMode="decimal"
         />
-        <p className="text-[11px] text-muted-foreground/60 mt-1">Numeric string — preserved at full precision through to the broker (no float roundtrip).</p>
+        <p className="text-sm text-muted-foreground/60 mt-1">Numeric string — preserved at full precision through to the broker (no float roundtrip).</p>
       </Field>
 
       {orderType === 'LMT' && (
@@ -275,7 +275,7 @@ function PlaceForm({ initialAliceId, ...p }: SharedFormProps & { initialAliceId?
                 placeholder="50"
                 inputMode="decimal"
               />
-              <p className="text-[11px] text-muted-foreground/60 mt-1">
+              <p className="text-sm text-muted-foreground/60 mt-1">
                 Market orders only. Entering a cash quantity clears Quantity.
               </p>
             </Field>
@@ -298,7 +298,7 @@ function PlaceForm({ initialAliceId, ...p }: SharedFormProps & { initialAliceId?
             placeholder="Why are you placing this order?"
             autoFocus
           />
-          <p className="text-[11px] text-muted-foreground/60 mt-1">Goes into the trading-as-git commit log alongside the order. Required, even for manual entries.</p>
+          <p className="text-sm text-muted-foreground/60 mt-1">Goes into the trading-as-git commit log alongside the order. Required, even for manual entries.</p>
         </Field>
       </div>
 
@@ -454,7 +454,7 @@ function ContractPicker({
         )}
       </div>
 
-      <p id={`${resultsId}-help`} className="mt-1 text-[11px] text-muted-foreground/70">
+      <p id={`${resultsId}-help`} className="mt-1 text-sm text-muted-foreground/70">
         Search tradeable contracts on this account, or paste an exact aliceId.
       </p>
 
@@ -462,15 +462,15 @@ function ContractPicker({
         <div className="mt-2 flex min-w-0 items-start gap-2 rounded-lg border border-border bg-muted/35 px-3 py-2">
           <span className="mt-0.5"><SelectionCheckIcon /></span>
           <div className="min-w-0">
-            <div className="flex flex-wrap items-center gap-1.5 text-[12px] leading-[18px] font-medium text-foreground">
+            <div className="flex flex-wrap items-center gap-1.5 text-sm leading-5 font-medium text-foreground">
               <span>{contractLabel(selected)}</span>
               {selected.contract.secType && (
-                <span className="rounded bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground">
+                <span className="rounded bg-muted px-1.5 py-0.5 text-sm text-muted-foreground">
                   {selected.contract.secType}
                 </span>
               )}
             </div>
-            <div className="mt-0.5 truncate font-mono text-[10px] leading-[14px] text-muted-foreground" title={value}>
+            <div className="mt-0.5 truncate font-mono text-sm leading-5 text-muted-foreground" title={value}>
               {value}
             </div>
           </div>
@@ -485,7 +485,7 @@ function ContractPicker({
           className="mt-2 max-h-52 overflow-y-auto rounded-lg border border-border bg-background p-1 shadow-sm"
         >
           {searchError !== null ? (
-            <div className="px-2 py-2 text-[12px] text-destructive">
+            <div className="px-2 py-2 text-sm text-destructive">
               Could not search this account: {searchError}
             </div>
           ) : results.map((hit) => {
@@ -504,17 +504,17 @@ function ContractPicker({
               >
                 <span className="min-w-0 flex-1">
                   <span className="flex flex-wrap items-center gap-1.5">
-                    <span className="font-mono text-[13px] leading-[18px] font-semibold text-foreground">
+                    <span className="font-mono text-sm leading-5 font-semibold text-foreground">
                       {contractLabel(hit)}
                     </span>
                     {hit.contract.secType && (
-                      <span className="rounded bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground">
+                      <span className="rounded bg-muted px-1.5 py-0.5 text-sm text-muted-foreground">
                         {hit.contract.secType}
                       </span>
                     )}
                   </span>
                   {details && (
-                    <span className="mt-0.5 block truncate text-[11px] text-muted-foreground">
+                    <span className="mt-0.5 block truncate text-sm text-muted-foreground">
                       {details}
                     </span>
                   )}
@@ -526,13 +526,13 @@ function ContractPicker({
       )}
 
       {showNoMatches && (
-        <div id={resultsId} role="status" className="mt-2 rounded-lg border border-border bg-secondary/40 px-3 py-2 text-[12px] leading-[18px] text-muted-foreground">
+        <div id={resultsId} role="status" className="mt-2 rounded-lg border border-border bg-secondary/40 px-3 py-2 text-sm leading-5 text-muted-foreground">
           No matching tradeable contract on this account.
         </div>
       )}
 
       {hasExactAliceId && selected === null && value && (
-        <div id={resultsId} role="status" className="mt-2 rounded-lg border border-border bg-secondary/40 px-3 py-2 text-[11px] leading-[15px] text-muted-foreground">
+        <div id={resultsId} role="status" className="mt-2 rounded-lg border border-border bg-secondary/40 px-3 py-2 text-sm leading-5 text-muted-foreground">
           Exact aliceId entered. It will still be validated by the account before the order is staged.
         </div>
       )}
@@ -599,8 +599,8 @@ function CloseForm({ aliceId, initialQty, symbol, ...p }: SharedFormProps & { al
   return (
     <div className="space-y-4">
       <div className="rounded-md border border-border bg-secondary/50 px-3 py-2.5 space-y-1">
-        <div className="text-[11px] font-medium text-muted-foreground">Closing</div>
-        <div className="font-mono text-[13px] leading-[18px] text-foreground">{aliceId}</div>
+        <div className="text-sm font-medium text-muted-foreground">Closing</div>
+        <div className="font-mono text-sm leading-5 text-foreground">{aliceId}</div>
       </div>
 
       <WalletPicker subAccounts={p.subAccounts} value={subAccountId} onChange={setSubAccountId} />
@@ -618,7 +618,7 @@ function CloseForm({ aliceId, initialQty, symbol, ...p }: SharedFormProps & { al
         />
         <p
           id="close-position-quantity-help"
-          className={`text-[11px] mt-1 ${quantityError ? 'text-destructive' : 'text-muted-foreground/60'}`}
+          className={`text-sm mt-1 ${quantityError ? 'text-destructive' : 'text-muted-foreground/60'}`}
         >
           {quantityError ?? `Current position size: ${new Decimal(initialQty).abs().toString()}. Enter less for a partial close, or clear to close all.`}
         </p>
@@ -663,7 +663,7 @@ function PushResultPanel({ result }: { result: WalletPushResult }) {
     <div className="space-y-4">
       <div className="flex items-center gap-2">
         <span className={`w-2 h-2 rounded-full shrink-0 ${fullySubmitted ? 'bg-success' : 'bg-warning'}`} />
-        <span className={`text-[13px] font-medium ${fullySubmitted ? 'text-success' : 'text-warning'}`}>
+        <span className={`text-sm font-medium ${fullySubmitted ? 'text-success' : 'text-warning'}`}>
           {simulated
             ? `${totalSubmitted} operation${totalSubmitted > 1 ? 's' : ''} simulated`
             : fullySubmitted
@@ -673,11 +673,11 @@ function PushResultPanel({ result }: { result: WalletPushResult }) {
       </div>
 
       <div className="rounded-md border border-border bg-secondary/50 px-3 py-2.5 space-y-1.5">
-        <div className="flex justify-between text-[12px]">
+        <div className="flex justify-between text-sm">
           <span className="text-muted-foreground">Commit hash</span>
           <span className="font-mono text-foreground">{result.hash}</span>
         </div>
-        <div className="text-[12px]">
+        <div className="text-sm">
           <span className="text-muted-foreground">Message:</span>
           <span className="ml-2 text-foreground">{result.message}</span>
         </div>
@@ -692,12 +692,12 @@ function PushResultPanel({ result }: { result: WalletPushResult }) {
 
       {simulated
         ? (
-          <p className="text-[11px] text-muted-foreground leading-relaxed">
+          <p className="text-sm text-muted-foreground leading-relaxed">
             Demo simulation only — no order was sent to a broker and portfolio data was not changed.
           </p>
         )
         : (
-          <p className="text-[11px] text-muted-foreground leading-relaxed">
+          <p className="text-sm text-muted-foreground leading-relaxed">
             Status <strong className="text-foreground">Submitted</strong> means the broker accepted the order — fills happen async.
             Refresh the positions / orders panels in a moment to see the order transition to <strong className="text-foreground">Filled</strong>.
           </p>
@@ -717,9 +717,9 @@ interface OpRow {
 function OpTable({ title, rows, kind }: { title: string; rows: OpRow[]; kind: 'submitted' | 'rejected' }) {
   return (
     <div>
-      <p className="mb-1.5 text-[11px] font-medium text-muted-foreground">{title} ({rows.length})</p>
+      <p className="mb-1.5 text-sm font-medium text-muted-foreground">{title} ({rows.length})</p>
       <div className="rounded-md border border-border overflow-hidden">
-        <table className="w-full text-[12px]">
+        <table className="w-full text-sm">
           <thead>
             <tr className="bg-muted/30 text-muted-foreground">
               <th className="text-left px-2.5 py-1.5 font-medium">Action</th>
@@ -731,7 +731,7 @@ function OpTable({ title, rows, kind }: { title: string; rows: OpRow[]; kind: 's
             {rows.map((r, i) => (
               <tr key={i} className="border-t border-border">
                 <td className="px-2.5 py-1.5 text-foreground">{r.action}</td>
-                <td className="px-2.5 py-1.5 font-mono text-muted-foreground text-[11px] leading-[15px]">{r.orderId ?? '—'}</td>
+                <td className="px-2.5 py-1.5 font-mono text-muted-foreground text-sm leading-5">{r.orderId ?? '—'}</td>
                 <td className={`px-2.5 py-1.5 ${kind === 'rejected' ? 'text-destructive' : 'text-foreground'}`}>
                   {kind === 'rejected' ? (r.error ?? r.status) : r.status}
                 </td>
@@ -751,11 +751,11 @@ function ErrorPanel({ message, phase }: { message: string; phase?: string }) {
     <div className="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2.5">
       <div className="flex items-center gap-2 mb-1">
         <CircleAlert className="size-4 shrink-0 text-destructive" aria-hidden />
-        <span className="text-[12px] font-medium text-destructive">
+        <span className="text-sm font-medium text-destructive">
           {phase ? `Failed at ${phase} step` : 'Failed'}
         </span>
       </div>
-      <p className="text-[12px] text-foreground whitespace-pre-wrap">{message}</p>
+      <p className="text-sm text-foreground whitespace-pre-wrap">{message}</p>
     </div>
   )
 }
