@@ -16,7 +16,7 @@ export function PetSettingsPage() {
   useEffect(() => { if (savedVolume !== undefined) setVolume(Math.round(savedVolume * 100)) }, [savedVolume])
   return <div className="flex h-full min-h-0 flex-col">
     <PageHeader title={t('pet.title')} />
-    <SettingsScrollArea className="px-6">
+    <SettingsScrollArea>
       <div className="max-w-2xl">
         <ActivityPreferencesSection />
         <ConfigSection title={t('pet.sound')} help={t('pet.description')}>

@@ -42,11 +42,11 @@ export function SegmentedControl<T extends string>({
             type="button"
             aria-label={option.ariaLabel}
             aria-controls={option.ariaControls}
-            className={`shrink-0 whitespace-nowrap rounded-full font-semibold outline-none transition-[background-color,color,box-shadow,scale] duration-[var(--motion-fast)] [transition-timing-function:var(--motion-ease-out)] focus-visible:[box-shadow:var(--oa-focus-shadow)] active:scale-[0.98] focus-visible:transition-none [@media(pointer:coarse)]:min-h-11 motion-reduce:transition-none ${
+            className={`oa-segmented-option shrink-0 whitespace-nowrap rounded-full font-semibold outline-none focus-visible:[box-shadow:var(--oa-focus-shadow)] [@media(pointer:coarse)]:min-h-11 ${
               compact ? 'min-h-8 px-3 text-sm' : 'min-h-10 px-4 text-sm'
             } ${
               active
-                ? 'bg-foreground text-background'
+                ? 'text-background'
                 : 'text-foreground hover:bg-muted'
             }`}
           >

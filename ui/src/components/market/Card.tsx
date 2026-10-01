@@ -24,9 +24,9 @@ interface Props {
 export function Card({ title, info, right, className, headerClassName, contentClassName, children }: Props) {
   return (
     <section className={`oa-data-surface flex flex-col overflow-hidden rounded-2xl ${className ?? ''}`}>
-      <header className={`oa-data-surface-header flex min-h-14 gap-3 px-5 pt-5 pb-3 ${headerClassName ?? 'items-center justify-between'}`}>
+      <header className={`oa-data-surface-header flex min-h-14 flex-wrap gap-3 px-4 pt-4 pb-3 sm:px-6 sm:pt-6 ${headerClassName ?? 'items-center justify-between'}`}>
         <div className="flex items-center gap-1.5 min-w-0">
-          <h3 className="text-lg leading-6 font-semibold text-foreground truncate">{title}</h3>
+          <h3 className="text-lg leading-6 font-semibold text-foreground break-words">{title}</h3>
           {info && (
             <Tooltip>
               <TooltipTrigger
@@ -48,9 +48,9 @@ export function Card({ title, info, right, className, headerClassName, contentCl
             </Tooltip>
           )}
         </div>
-        {right && <div className="shrink-0">{right}</div>}
+        {right && <div className="min-w-0 max-w-full">{right}</div>}
       </header>
-      <div className={contentClassName ?? 'px-5 pb-5'}>{children}</div>
+      <div className={contentClassName ?? 'min-w-0 px-4 pb-4 sm:px-6 sm:pb-6'}>{children}</div>
     </section>
   )
 }

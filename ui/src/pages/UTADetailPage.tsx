@@ -283,8 +283,8 @@ export function UTADetailPage({ spec }: UTADetailPageProps) {
         }
       />
 
-      <div className="flex-1 overflow-y-auto px-4 md:px-6 py-5">
-        <div className="max-w-[1240px] mx-auto">
+      <div className="flex-1 overflow-y-auto px-[var(--page-inset)] py-5">
+        <div className="max-w-[1240px]">
           {dataError && (
             <div className="mb-4 rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm leading-5 text-destructive">
               Failed to load live data: {dataError}
@@ -419,8 +419,8 @@ function Shell({ title, children }: { title: string; children?: React.ReactNode 
   return (
     <div className="flex flex-col flex-1 min-h-0">
       <PageHeader title={title} description={<Link to="/trading" className="text-muted-foreground hover:text-foreground">← Trading</Link>} />
-      <div className="flex-1 overflow-y-auto px-4 md:px-6 py-5">
-        <div className="max-w-[720px] mx-auto">{children}</div>
+      <div className="flex-1 overflow-y-auto px-[var(--page-inset)] py-5">
+        <div className="max-w-[720px]">{children}</div>
       </div>
     </div>
   )

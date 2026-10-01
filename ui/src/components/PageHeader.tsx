@@ -27,7 +27,7 @@ export function PageHeader({
         {help && <ContextHelp label={title}>{help}</ContextHelp>}
       </PageTopBar>
       {(description || live) && (
-        <div data-slot="page-description" className="flex shrink-0 flex-wrap items-center gap-x-2 gap-y-1 px-4 pb-1 pt-3 text-sm leading-5 text-muted-foreground md:px-6">
+        <div data-slot="page-description" className="flex shrink-0 flex-wrap items-center gap-x-2 gap-y-1 px-[var(--page-inset)] pb-1 pt-3 text-sm leading-5 text-muted-foreground">
           {description && <span className="min-w-0">{description}</span>}
           {live && <LiveIndicator lastUpdated={live.lastUpdated} label={live.label} hideIcon={live.hideIcon} />}
         </div>

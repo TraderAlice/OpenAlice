@@ -713,7 +713,7 @@ function WorkspaceShellSection() {
 function SettingsSection() {
   const { t } = useTranslation()
   return (
-    <div className="mx-auto w-full max-w-[1100px]">
+    <div className="w-full max-w-[1100px]">
       <section className="mb-6 flex flex-wrap items-center justify-between gap-4 border-b border-border/60 pb-6">
         <div className="flex items-center gap-2">
           <h3 className="text-base font-semibold">{t('settings.language.title')}</h3>
@@ -844,7 +844,7 @@ export function ToolsSection() {
   const matchingCount = matchingGroups.reduce((count, group) => count + group.tools.length, 0)
 
   return (
-    <div className="mx-auto w-full max-w-[1100px]">
+    <div className="w-full max-w-[1100px]">
       {!loaded ? (
         loadError ? (
           <div role="alert" className="flex flex-col items-center justify-center py-16 text-center">
@@ -990,7 +990,7 @@ export function SettingsPage() {
   return (
     <div className="flex flex-col flex-1 min-h-0">
       <PageHeader title={t('settings.category.general')} />
-      <SettingsScrollArea className="px-4 py-5 md:px-8">
+      <SettingsScrollArea>
         <SettingsSection />
       </SettingsScrollArea>
     </div>
@@ -1003,8 +1003,8 @@ export function AppearanceSettingsPage() {
   return (
     <div className="flex flex-col flex-1 min-h-0">
       <PageHeader title={t('settings.appearance.title')} />
-      <SettingsScrollArea className="px-4 py-5 md:px-8">
-        <div className="mx-auto w-full max-w-[1100px]">
+      <SettingsScrollArea>
+        <div className="w-full max-w-[1100px]">
           <AppearanceSection standalone />
         </div>
       </SettingsScrollArea>
@@ -1018,7 +1018,7 @@ export function ToolsSettingsPage() {
   return (
     <div className="flex flex-col flex-1 min-h-0">
       <PageHeader title={t('settings.category.tools')} />
-      <SettingsScrollArea className="px-4 py-5 md:px-8">
+      <SettingsScrollArea>
         <ToolsSection />
       </SettingsScrollArea>
     </div>

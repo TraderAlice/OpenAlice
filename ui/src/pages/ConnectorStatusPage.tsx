@@ -134,8 +134,8 @@ export function ConnectorStatusPage() {
         )}
       />
 
-      <div className="flex-1 overflow-y-auto px-4 py-5 md:px-8 md:py-6">
-        <div className="mx-auto max-w-[1040px] space-y-6">
+      <div className="flex-1 overflow-y-auto px-[var(--page-inset)] py-5 md:py-6">
+        <div className="max-w-[1040px] space-y-6">
           {loading && !snapshot ? (
             <ConnectorOverviewSkeleton label={t('connectorStatus.loading')} />
           ) : snapshot ? (

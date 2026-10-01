@@ -38,8 +38,8 @@ export function SessionVisibilitySettingsPage() {
         help={t('settings.visibility.description')}
         right={<SaveIndicator status={status === 'idle' && error ? 'error' : status} />}
       />
-      <SettingsScrollArea className="px-4 py-5 md:px-8">
-        <div className="mx-auto max-w-[880px]">
+      <SettingsScrollArea>
+        <div className="max-w-[880px]">
           <ConfigSection
             title={t('settings.visibility.sessions')}
           >

@@ -20,8 +20,8 @@ export function WorkspaceInjectionPage() {
   const ready = state.data?.workspaces.filter((row) => ['update', 'record'].includes(injectionStatus(row))).length ?? 0
   return <div className="flex min-h-0 flex-1 flex-col">
     <PageHeader title={t('distribution.title')} />
-    <SettingsScrollArea className="px-4 py-4 md:px-6">
-      <div className="mx-auto max-w-[1100px] space-y-4">
+    <SettingsScrollArea>
+      <div className="max-w-[1100px] space-y-4">
         <ConfigSection title={t('settings.harness.releasesSection')}>
           <UnverifiedHarnessReleaseSetting />
         </ConfigSection>

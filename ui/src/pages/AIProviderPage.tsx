@@ -125,14 +125,14 @@ export function AIProviderPage() {
   return (
     <div className="flex flex-col flex-1 min-h-0">
       <PageHeader title={t('aiProvider.title')} />
-      <SettingsScrollArea className="px-4 py-5 md:px-8">
+      <SettingsScrollArea>
         {credentialsLoadError && (
-          <div role="alert" className="mx-auto mb-4 flex max-w-[1100px] items-center justify-between gap-3 rounded-lg border border-destructive/30 px-3 py-2 text-xs text-destructive">
+          <div role="alert" className="mb-4 flex max-w-[1100px] items-center justify-between gap-3 rounded-lg border border-destructive/30 px-3 py-2 text-xs text-destructive">
             <span>{t('aiProvider.loadErrorTitle')}</span>
             <Button variant="outline" size="sm" onClick={() => void reload()}>{t('common.retry')}</Button>
           </div>
         )}
-        <div className="mx-auto grid min-w-0 max-w-[1100px] gap-6 2xl:grid-cols-2">
+        <div className="grid min-w-0 max-w-[1100px] gap-6 2xl:grid-cols-2">
           {/* ============== Credentials ============== */}
           <section className="min-w-0">
             <div className="flex items-center justify-between mb-3">
@@ -265,7 +265,7 @@ export function AIProviderPage() {
           <WorkspaceDefaultsSection credentials={credentials} presets={presets} agents={agents} />
         </div>
 
-        <div className="mx-auto mt-6 flex min-h-12 max-w-[1100px] items-center justify-between gap-4 border-t border-border/60 py-3">
+        <div className="mt-6 flex min-h-12 max-w-[1100px] items-center justify-between gap-4 border-t border-border/60 py-3">
           <ContextHelp label={t('aiProvider.openAgentRuntimes')}>{t('aiProvider.openAgentRuntimesDescription')}</ContextHelp>
           <Button
             type="button"

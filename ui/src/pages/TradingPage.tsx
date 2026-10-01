@@ -412,7 +412,7 @@ export function TradingPage() {
 
   if (tc.loading) return (
     <PageShell>
-      <div className="max-w-[820px] mx-auto space-y-2.5" aria-hidden="true">
+      <div className="max-w-[820px] space-y-2.5" aria-hidden="true">
         {Array.from({ length: 3 }).map((_, i) => (
           <div key={i} className="flex items-center gap-3 px-4 py-3.5 rounded-lg border border-border bg-secondary">
             <Skeleton className="h-9 w-9 rounded-lg" />
@@ -448,8 +448,8 @@ export function TradingPage() {
         )) ? { lastUpdated } : undefined}
       />
 
-      <SettingsScrollArea className="px-4 py-5 md:px-6">
-        <div className="max-w-[820px] mx-auto space-y-4">
+      <SettingsScrollArea>
+        <div className="max-w-[820px] space-y-4">
           {serviceStatus?.available === false && <TradingServiceOfflineBanner status={serviceStatus} />}
           <MissingBrokerPacksNotice packs={brokerPacks} onInstall={brokerReadiness.install} />
           {tc.utas.length === 0 ? (
@@ -556,7 +556,7 @@ function PageShell({ children, scroll = true }: { children?: React.ReactNode; sc
   return (
     <div className="flex flex-col flex-1 min-h-0">
       <PageHeader title="Broker" />
-      <SettingsScrollArea scroll={scroll} className={scroll ? 'px-4 py-5 md:px-6' : ''}>{children}</SettingsScrollArea>
+      <SettingsScrollArea scroll={scroll}>{children}</SettingsScrollArea>
     </div>
   )
 }

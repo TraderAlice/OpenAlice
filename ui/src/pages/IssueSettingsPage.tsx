@@ -36,8 +36,8 @@ export function IssueSettingsPage() {
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       <PageHeader title="Issue Settings" />
-      <SettingsScrollArea className="px-4 py-5 md:px-8">
-        <div className="mx-auto max-w-[880px]">
+      <SettingsScrollArea>
+        <div className="max-w-[880px]">
           <ConfigSection
             title="Default agent runtime"
             help="Applied to scheduled and headless issue runs whose frontmatter omits an agent runtime."

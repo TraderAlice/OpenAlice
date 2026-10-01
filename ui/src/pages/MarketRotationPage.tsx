@@ -98,7 +98,7 @@ export function MarketRotationPage() {
         }
         live={{ lastUpdated: updatedAt }}
       />
-      <div className="flex-1 overflow-y-auto px-4 md:px-8 py-4 flex flex-col gap-6 min-h-0">
+      <div className="flex-1 overflow-y-auto px-[var(--page-inset)] py-4 flex flex-col gap-6 min-h-0">
         {loading && !data && <CenteredLoading label={t('common.loading')} />}
         {error && (
           <div

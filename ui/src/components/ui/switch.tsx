@@ -41,14 +41,14 @@ function Switch({ className, size = 'md', ...props }: SwitchProps) {
         aria-hidden="true"
         data-slot="switch-track"
         className={cn(
-          'inline-flex shrink-0 items-center rounded-full bg-muted p-[3px] transition-[background-color,box-shadow] duration-[var(--motion-fast)] [transition-timing-function:var(--motion-ease-out)] group-data-checked/switch:bg-action motion-reduce:transition-none',
+          'inline-flex shrink-0 items-center rounded-full bg-muted p-[3px] transition-[background-color,box-shadow] duration-[var(--motion-standard)] [transition-timing-function:var(--motion-ease-out)] group-data-checked/switch:bg-action group-focus-visible/switch:transition-none motion-reduce:transition-none',
           geometry.track,
         )}
       >
         <SwitchPrimitive.Thumb
           data-slot="switch-thumb"
           className={cn(
-            'block shrink-0 translate-x-0 rounded-full bg-muted-foreground transition-[translate,scale,background-color] duration-[var(--motion-standard)] [transition-timing-function:var(--motion-ease-out)] data-checked:bg-action-foreground group-active/switch:scale-x-110 group-focus-visible/switch:transition-none motion-reduce:transition-none',
+            'block shrink-0 translate-x-0 rounded-full bg-muted-foreground transition-[translate,scale,background-color] duration-[var(--motion-standard)] [transition-timing-function:var(--motion-ease-out)] data-checked:bg-action-foreground origin-left data-checked:origin-right motion-safe:group-[:active:not(:focus-visible):not([data-readonly])]/switch:scale-x-125 group-focus-visible/switch:transition-none motion-reduce:transition-none',
             geometry.thumb,
           )}
         />

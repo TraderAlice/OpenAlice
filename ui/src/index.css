@@ -100,10 +100,15 @@
 
 /* Base resolution (no attribute / explicit light). */
 :root {
+  --page-inset: 32px;
   --oa-control-hover-border: color-mix(in srgb, var(--foreground) 18%, transparent);
   --oa-control-focus-border: color-mix(in srgb, var(--foreground) 28%, transparent);
   --oa-focus-ring: var(--foreground);
   --oa-focus-shadow: 0 0 0 2px var(--background), 0 0 0 4px var(--oa-focus-ring);
+}
+
+@media (max-width: 767px) {
+  :root { --page-inset: 16px; }
 }
 
 /* Japanese gets a JP-first sans stack so shared Han characters render in
@@ -453,7 +458,7 @@ body {
 }
 
 @media (hover: hover) and (pointer: fine) {
-  .oa-pressable:active:not(:disabled):not([aria-disabled="true"]) {
+  .oa-pressable:active:not(:focus-visible):not(:disabled):not([aria-disabled="true"]):not([aria-haspopup]) {
     transform: scale(0.98);
   }
 
@@ -791,7 +796,7 @@ body {
 .oa-topbar-identity { display: flex; flex: 1 1 6rem; min-width: 0; align-items: center; gap: 8px; }
 .oa-topbar-actions { display: flex; flex: 0 1 auto; max-width: 100%; min-width: 0; flex-wrap: wrap; align-items: center; gap: 4px; }
 .oa-topbar-actions > div { max-width: 100%; flex-wrap: wrap; }
-.oa-topbar[data-heading="page"] { min-height: 80px; padding: 16px 32px; }
+.oa-topbar[data-heading="page"] { min-height: 80px; padding: 16px var(--page-inset); }
 .oa-topbar[data-heading="page"] h2 { font-size: 22px; line-height: 27.5px; letter-spacing: -0.018em; }
 .oa-desktop-mac .oa-topbar[data-heading="page"],
 :root[data-window-chrome="windows"] .oa-topbar[data-heading="page"] { min-height: 44px; padding-block: 4px; }
@@ -799,7 +804,7 @@ body {
 :root[data-window-chrome="windows"] .oa-topbar[data-heading="page"] h2 { font-size: 18px; line-height: 24px; }
 @media (max-width: 767px), (pointer: coarse) {
   .oa-topbar { min-height: 48px; }
-  .oa-topbar[data-heading="page"] { min-height: 72px; padding: 12px 20px; }
+  .oa-topbar[data-heading="page"] { min-height: 72px; padding: 12px var(--page-inset); }
   .oa-topbar[data-heading="page"] h2 { font-size: 22px; line-height: 27.5px; }
 }
 
@@ -1888,4 +1893,29 @@ body:has([data-desktop-banner]):not(:has(.oa-office-main)) [data-sonner-toaster]
   min-width: 0;
   text-align: start;
   color: var(--muted-foreground);
+}
+
+
+.oa-segmented-option {
+  position: relative;
+  isolation: isolate;
+  transition: scale var(--motion-standard) var(--motion-ease-out), background-color var(--motion-fast) var(--motion-ease-out);
+}
+.oa-segmented-option::before {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  inset: 0;
+  border-radius: inherit;
+  background: var(--foreground);
+  visibility: hidden;
+  scale: 0.94;
+  transition: scale var(--motion-standard) var(--motion-ease-out);
+}
+.oa-segmented-option[data-pressed]::before { visibility: visible; scale: 1; }
+.oa-segmented-option:active { scale: 0.97; transition-duration: var(--motion-fast); }
+.oa-segmented-option:focus-visible,
+.oa-segmented-option:focus-visible::before { transition: none; scale: 1; }
+@media (prefers-reduced-motion: reduce) {
+  .oa-segmented-option, .oa-segmented-option::before { transition: none; scale: 1; }
 }

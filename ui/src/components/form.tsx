@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react'
 import { ContextHelp } from './ContextHelp'
+import { cn } from '@/lib/utils'
 
 // ==================== Shared class constants ====================
 
@@ -24,7 +25,7 @@ export function SettingsScrollArea({ children, className = '', scroll = true }: 
   return (
     <div
       data-settings-scroll-area
-      className={`min-h-0 flex-1 ${scroll ? 'overflow-y-auto overscroll-contain [scrollbar-gutter:stable]' : ''} ${className}`}
+      className={cn('min-h-0 min-w-0 flex-1', scroll && 'overflow-y-auto overscroll-contain [scrollbar-gutter:stable] px-[var(--page-inset)] py-5', className)}
     >
       {children}
     </div>
@@ -42,7 +43,7 @@ interface SectionProps {
 
 export function Section({ id, title, description, children }: SectionProps) {
   return (
-    <section id={id} className="oa-config-section rounded-2xl bg-secondary p-5 sm:p-6">
+    <section id={id} className="oa-config-section min-w-0 rounded-2xl bg-secondary p-4 sm:p-6 text-start">
       <h3 className="text-lg leading-6 font-semibold text-foreground">{title}</h3>
       {description && (
         <p className="mt-1 max-w-2xl text-sm leading-5 text-muted-foreground">{description}</p>
@@ -81,9 +82,9 @@ export function ConfigSection({
     <section
       id={id}
       aria-labelledby={titleId}
-      className={`oa-config-section min-w-0 rounded-2xl bg-secondary p-5 sm:p-6 ${className}`}
+      className={`oa-config-section min-w-0 rounded-2xl bg-secondary p-4 sm:p-6 text-start ${className}`}
     >
-      <div className={`min-w-0 ${children ? 'mb-5' : ''}`}>
+      <div className={`min-w-0 ${children ? 'mb-4' : ''}`}>
         <div className="flex min-h-6 min-w-0 flex-wrap items-center gap-2">
           <h3
             id={titleId}

@@ -25,9 +25,9 @@ export function MCPPage() {
     <div className="flex flex-col flex-1 min-h-0">
       <PageHeader title="MCP Server" right={<SaveIndicator status={status} onRetry={retry} />} />
 
-      <SettingsScrollArea className="px-4 py-5 md:px-8">
+      <SettingsScrollArea>
         {config && (
-          <div className="max-w-[880px] mx-auto">
+          <div className="max-w-[880px]">
             <ConfigSection
               title="HTTP Server"
               help="Expose a local Streamable HTTP endpoint to external MCP clients. OpenAlice must be running."
@@ -57,7 +57,7 @@ export function MCPPage() {
           </div>
         )}
         {loadError && (
-          <div role="alert" className="mx-auto max-w-[880px] text-center">
+          <div role="alert" className="max-w-[880px] text-center">
             <p className="text-sm text-destructive">Failed to load configuration.</p>
             <Button type="button" variant="outline" size="sm" className="mt-3" onClick={() => void reload()}>
               Retry

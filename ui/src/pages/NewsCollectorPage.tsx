@@ -32,7 +32,7 @@ function CollectorSettings() {
   const enabled = cfg.enabled !== false
 
   return (
-    <div className="mx-auto w-full max-w-[880px]">
+    <div className="w-full max-w-[880px]">
       <div className="flex min-h-12 items-center justify-between gap-4 border-b border-border/60 py-2">
         <div className="min-w-0">
           <p className="text-sm font-medium text-foreground">Collect articles</p>
@@ -362,7 +362,7 @@ export function NewsCollectorPage() {
     <div className="flex flex-col flex-1 min-h-0">
       <PageHeader title="News Collector" />
 
-      <SettingsScrollArea className="px-4 py-5 md:px-8">
+      <SettingsScrollArea>
         <CollectorSettings />
       </SettingsScrollArea>
     </div>

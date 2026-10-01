@@ -417,9 +417,9 @@ function ConnectorSettingsSurface({
 
       <SettingsScrollArea
         scroll={!adapterOnly}
-        className={adapterOnly ? 'px-4 py-3 sm:px-6 sm:py-4' : 'px-4 pb-5 md:px-8'}
+        className={adapterOnly ? 'px-4 py-3 sm:px-6 sm:py-4' : 'py-0 pb-5'}
       >
-        <div className="max-w-[920px] mx-auto">
+        <div className="w-full max-w-[920px]">
           {!adapterOnly && <div data-connector-settings-top-spacer aria-hidden className="h-5" />}
           {!config && !loadError && (
             <ConnectorSettingsSkeleton compact={adapterOnly} label={t('connectorSettings.loading')} />

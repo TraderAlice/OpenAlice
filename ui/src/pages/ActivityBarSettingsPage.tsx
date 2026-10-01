@@ -346,8 +346,8 @@ export function ActivityBarSettingsPage() {
         title={t('settings.activityBar.title')}
         right={<SaveIndicator status={status} onRetry={retry} />}
       />
-      <SettingsScrollArea className="px-4 py-5 md:px-8">
-        <div ref={rootRef} className="mx-auto flex w-full max-w-[880px] flex-col gap-4">
+      <SettingsScrollArea>
+        <div ref={rootRef} className="flex w-full max-w-[880px] flex-col gap-4">
           {error && (
             <p className="text-sm text-destructive">{t('settings.activityBar.loadError')}</p>
           )}

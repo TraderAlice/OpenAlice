@@ -147,8 +147,8 @@ export function AgentRuntimesSettingsPage() {
           </Button>
         )}
       />
-      <SettingsScrollArea className="px-4 py-5 md:px-8">
-        <div className="mx-auto max-w-[880px]">
+      <SettingsScrollArea>
+        <div className="max-w-[880px]">
           {error && (
             <p role="alert" className="mb-4 rounded-lg border border-destructive/40 bg-destructive/5 px-3 py-2 text-sm text-destructive">
               {error}
@@ -161,7 +161,7 @@ export function AgentRuntimesSettingsPage() {
             accessory={<CountBadge count={pinned.length} label={t('settings.agentRuntimes.quickAccessCount', { count: pinned.length, limit: AGENT_RUNTIME_QUICK_ACCESS_LIMIT })} />}
           >
             {pinned.length > 0 && (
-              <ol className="overflow-hidden rounded-xl bg-background">
+              <ol className="overflow-hidden rounded-lg bg-background">
                 {pinned.map((agent, index) => {
                   return (
                     <li
@@ -230,7 +230,7 @@ export function AgentRuntimesSettingsPage() {
                 />
               </div>
             ) : (
-              <div className="overflow-hidden rounded-xl bg-background">
+              <div className="overflow-hidden rounded-lg bg-background">
                 {visible.map((agent) => (
                   <RuntimeSettingsCard
                     key={agent.id}
@@ -309,7 +309,7 @@ function RuntimeSettingsCard({
           />
         </div>
         <CollapsibleContent keepMounted className="col-span-2">
-          <div className="space-y-2 pb-5 pt-1 sm:pl-10 text-sm leading-5 text-muted-foreground">
+          <div className="space-y-3 pb-5 pt-1 pl-10 text-sm leading-5 text-muted-foreground">
             <p>{installed ? t('settings.agentRuntimes.installed') : t('settings.agentRuntimes.notInstalled')}</p>
             <p className="break-all font-mono text-sm">{binPath ?? t('settings.agentRuntimes.unknownPath')}</p>
             {row?.message && <p>{row.message}</p>}
@@ -348,7 +348,7 @@ function RuntimeSettingsCard({
         </CollapsibleContent>
       </Collapsible>
       {needsAttention && row.repairTarget && (
-        <p className="pb-3 pl-8 text-xs leading-5 text-warning">{t(REPAIR_KEYS[row.repairTarget])}</p>
+        <p className="pb-3 pl-10 text-sm leading-5 text-warning">{t(REPAIR_KEYS[row.repairTarget])}</p>
       )}
     </article>
   )

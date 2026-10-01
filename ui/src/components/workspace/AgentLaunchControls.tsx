@@ -115,7 +115,7 @@ function AgentLaunchAccessItems({ config, onConfigureProvider }: {
   const runtimeName = config.selectedAgent?.displayName ?? t('chatLanding.runtimeFallback')
   return (
     <DropdownMenuGroup>
-      <DropdownMenuLabel className="border-b border-border/60 px-2.5 py-2 text-sm">
+      <DropdownMenuLabel className="border-b border-border/60">
         {t('chatLanding.credentialMenuTitle', { runtime: runtimeName })}
       </DropdownMenuLabel>
       {config.detectedCredential?.configured === true && (
@@ -262,8 +262,8 @@ function AgentLaunchInferenceMenu({
             title={access?.label}
             aria-label={access ? `${t('chatLanding.selectCredential')}, ${t('chatLanding.selectModelAndEffort')}` : t('chatLanding.selectModelAndEffort')}
             className={settings
-              ? 'oa-pressable flex min-h-14 w-full min-w-0 items-center gap-3 rounded-lg border border-border/70 bg-muted/25 px-3 py-2 text-left transition-colors hover:bg-muted/45'
-              : 'oa-pressable inline-flex min-h-9 min-w-0 max-w-full items-center gap-2 rounded-full bg-secondary px-3 py-1.5 text-sm leading-5 text-foreground transition-colors hover:bg-muted'}
+              ? 'group/inference oa-pressable flex min-h-14 w-full min-w-0 items-center gap-3 rounded-lg border border-border/70 bg-muted/25 px-3 py-2 text-left transition-colors hover:bg-muted/45'
+              : 'group/inference oa-pressable inline-flex min-h-9 min-w-0 max-w-full items-center gap-2 rounded-full bg-secondary px-3 py-1.5 text-sm leading-5 text-foreground transition-colors hover:bg-muted'}
           />}
         >
           {access?.icon ?? <Cpu className={settings ? 'h-4 w-4 shrink-0 text-muted-foreground' : 'h-3 w-3 shrink-0 text-muted-foreground'} />}
@@ -283,7 +283,7 @@ function AgentLaunchInferenceMenu({
               {config.launchReasoningEffort && <span className="min-w-0 truncate rounded-full bg-background px-2 py-0.5 text-sm text-muted-foreground">{resolvedEffort}</span>}
             </>
           )}
-          <ChevronDown className={settings ? 'h-4 w-4 shrink-0 opacity-60' : 'h-3 w-3 shrink-0 opacity-60'} />
+          <ChevronDown className="size-4 shrink-0 opacity-60 transition-transform duration-[var(--motion-standard)] [transition-timing-function:var(--motion-ease-out)] group-aria-expanded/inference:rotate-180 group-focus-visible/inference:transition-none motion-reduce:transition-none" />
         </DropdownMenuTrigger>
         <DropdownMenuContent
           align="start"
@@ -291,7 +291,7 @@ function AgentLaunchInferenceMenu({
           sideOffset={6}
           positionerClassName={menuPositionerClassName}
           aria-label={access ? `${t('chatLanding.selectCredential')}, ${t('chatLanding.selectModelAndEffort')}` : t('chatLanding.selectModelAndEffort')}
-          className="w-[336px] max-w-[calc(100vw-2rem)] rounded-2xl border border-border/70 p-1.5 shadow-lg ring-0"
+          className="w-[336px] max-w-[calc(100vw-2rem)]"
         >
           {access && <DropdownMenuSub>
             <DropdownMenuSubTrigger className="oa-inference-setting">
@@ -299,7 +299,7 @@ function AgentLaunchInferenceMenu({
               <span>{t('chatLanding.selectCredential')}</span>
               <span className="oa-inference-value">{access.label}</span>
             </DropdownMenuSubTrigger>
-            <DropdownMenuSubContent className="w-[300px] max-w-[calc(100vw-2rem)] max-h-80 overflow-y-auto p-1.5">
+            <DropdownMenuSubContent className="w-[300px] max-w-[calc(100vw-2rem)]">
               {access.items}
             </DropdownMenuSubContent>
           </DropdownMenuSub>}
@@ -309,7 +309,7 @@ function AgentLaunchInferenceMenu({
               <span>{t('chatLanding.modelField')}</span>
               <span className="oa-inference-value">{resolvedModel}</span>
             </DropdownMenuSubTrigger>
-            <DropdownMenuSubContent className="w-[300px] max-w-[calc(100vw-2rem)] border border-border/70 p-1.5 shadow-lg ring-0">
+            <DropdownMenuSubContent className="w-[300px] max-w-[calc(100vw-2rem)]">
               <ModelCatalogStatus catalog={config.modelCatalog} selectedModel={config.launchModel ?? config.defaultModel} />
               <DropdownMenuRadioGroup
                 className="max-h-64 overflow-y-auto"
@@ -363,7 +363,7 @@ function AgentLaunchInferenceMenu({
               <span>{t('chatLanding.effortField')}</span>
               <span className="oa-inference-value">{resolvedEffort}</span>
             </DropdownMenuSubTrigger>
-            <DropdownMenuSubContent className="w-[220px] max-w-[calc(100vw-2rem)] border border-border/70 p-1.5 shadow-lg ring-0">
+            <DropdownMenuSubContent className="w-[220px] max-w-[calc(100vw-2rem)]">
               <DropdownMenuRadioGroup
                 value={effortValue}
                 onValueChange={(value) => config.selectReasoningEffort(

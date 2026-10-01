@@ -294,7 +294,7 @@ export function PortfolioPage() {
       />
 
       {/* Content */}
-      <div className="flex-1 overflow-y-auto px-4 md:px-6 py-5">
+      <div className="flex-1 overflow-y-auto px-[var(--page-inset)] py-5">
         <div className="flex gap-6 items-start">
           {/* Main column */}
           <div className="flex-1 min-w-0 space-y-5">

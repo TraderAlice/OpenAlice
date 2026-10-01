@@ -890,3 +890,33 @@ Browser checks cover persistence, repeated input, keyboard navigation, focus
 return, loading, failure recovery, reduced motion, and narrow-screen layouts.
 Static screenshots record layout and visible states. Motion requires exercising
 the running controls, disclosures, menus, and dialogs.
+
+### Shared alignment and state feedback
+
+`SettingsScrollArea` owns page insets through `--page-inset`: 32px on desktop
+and 16px below 768px. Page headings and supporting copy use the same token.
+Settings content keeps a leading-edge reading rail at every width; individual
+sections retain their content-width limits. Market boards, Portfolio, account
+detail, and connector status reuse the same inset token. Embedded configuration retains its
+explicit dialog insets.
+
+Configuration and market cards use 16px inner spacing on small screens and
+24px from 640px. Header controls wrap inside the card. Runtime disclosure copy
+shares the runtime-name inset. Series cards place the date on its own line
+and anchor value groups to the row’s shared lower edge. Dialog and confirmation headings use start
+alignment, and long configuration titles wrap inside the available space.
+
+Dropdown surfaces own a 6px inner inset, 20px outer radius, and concentric 14px
+item radius. Group labels and item content share 12px horizontal padding.
+Submenus include the parent’s 6px inset in their 10px anchor offset, leaving
+a 4px surface separation. Their leading content edge follows the trigger row.
+Base UI adjusts placement when a viewport edge constrains the available space.
+
+Shared button and segmented-control presses settle at 97% scale over 110ms
+and return over 160ms. Popup
+anchors retain their position. Segmented selection uses a 160ms surface-scale
+transition with immediate selected text and semantic state. Switch thumbs
+stretch toward the target during a press and retain their existing checked
+travel. Keyboard focus, reduced motion, and pending switches use stationary
+feedback. These changes preserve selection handlers, persistence, routing, and
+execution authority.

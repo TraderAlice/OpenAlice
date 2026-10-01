@@ -284,8 +284,8 @@ export function MarketDataPage() {
         }
       />
 
-      <SettingsScrollArea className="px-4 py-5 md:px-8">
-        <div className={`max-w-[880px] mx-auto ${!enabled ? 'opacity-40 pointer-events-none' : ''}`}>
+      <SettingsScrollArea>
+        <div className={`max-w-[880px] ${!enabled ? 'opacity-40 pointer-events-none' : ''}`}>
           <HubCard
             hub={hub}
             ping={ping}
@@ -305,7 +305,7 @@ export function MarketDataPage() {
           onToggle={(uta, checked) => { void updateUTASource(uta, checked) }}
           onManage={() => openOrFocus({ kind: 'settings', params: { category: 'trading' } })}
         />
-        <div className={`mx-auto max-w-[880px] ${!enabled ? 'pointer-events-none opacity-40' : ''}`}>
+        <div className={`max-w-[880px] ${!enabled ? 'pointer-events-none opacity-40' : ''}`}>
           <AdvancedSection
             open={advancedOpen}
             onToggle={() => setAdvancedOpen((o) => !o)}
@@ -317,7 +317,7 @@ export function MarketDataPage() {
             highlightFmp={highlightFmp}
           />
         </div>
-        {loadError && <p className="text-sm text-destructive mt-4 max-w-[880px] mx-auto">Failed to load configuration.</p>}
+        {loadError && <p className="text-sm text-destructive mt-4 max-w-[880px]">Failed to load configuration.</p>}
       </SettingsScrollArea>
     </div>
   )
@@ -332,7 +332,7 @@ function BrokerKlineSourcesSection({ utas, loading, error, savingId, savedId, on
   onToggle: (uta: UTAConfig, checked: boolean) => void
   onManage: () => void
 }) {
-  return <section className="mx-auto mb-6 max-w-[880px]">
+  return <section className="mb-6 max-w-[880px]">
     <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
       <div className="flex items-center gap-2">
         <h2 className="text-lg font-semibold text-foreground">Broker K-line sources</h2>

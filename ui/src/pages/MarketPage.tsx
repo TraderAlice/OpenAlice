@@ -28,7 +28,7 @@ export function MarketPage() {
   return (
     <div className="@container/market-overview flex flex-col flex-1 min-h-0">
       <PageHeader title={t('market.pageTitle')} help={t('market.pageDescription')} />
-      <div className="flex min-h-0 flex-1 flex-col gap-8 overflow-y-auto px-5 pb-8 pt-2 md:px-8">
+      <div className="flex min-h-0 flex-1 flex-col gap-8 overflow-y-auto px-[var(--page-inset)] pb-8 pt-2">
         <SearchBox />
 
         <section className="py-2">
