@@ -660,6 +660,44 @@ Smoke matrix preserves these receipts as CI artifacts. Release candidates run
 the same acceptance on all three platform/architecture builds before any tag or
 GitHub Release is created; only accepted installers are then published.
 
+### Local package diagnostics
+
+Use the packaged Workspace acceptance above before treating a source Electron
+launch as release evidence. A native CLI archive, a browser session, and a
+packaged desktop app exercise different resource layouts; acceptance of one
+cannot certify another.
+
+For interactive diagnosis, `pnpm electron:smoke:packaged` defaults to isolated
+stores. `--real-data` explicitly opts into the user's existing state; use it
+only when the requested investigation needs that state. Onboarding, trading-mode
+and Workspace acceptance profiles always require isolation. The current option
+contract lives in `scripts/desktop-packaged-smoke.mjs` and
+`scripts/desktop-packaged-smoke-plan.mjs`; do not infer defaults from an old
+command transcript.
+
+For a resource-layout failure, inspect an unsigned persistent package:
+
+```bash
+pnpm electron:build
+pnpm vendor:runtime
+CSC_IDENTITY_AUTO_DISCOVERY=false pnpm -F @traderalice/desktop exec electron-builder --dir --projectDir ../.. --publish never
+pnpm electron:assert-package
+```
+
+This diagnostic flow does not publish or prove signing/notarization. Normal
+smokes disable local macOS signing; `--signed` is for an explicitly scoped
+signing investigation. Release signing authority is defined in
+[[docs/development-workflow.md]].
+
+When a package job fails, classify the failure before rebuilding: resource
+layout, native dependency/Windows command resolution, or signing/publication.
+Read the failed job's log and check the actual packaged resource root, child
+`OPENALICE_APP_HOME`, executable resolution and owned process cleanup. Inspect
+provider configuration only when relevant, without copying credentials or
+request bodies into logs or reports. Prefer the existing verifier/retry path
+when accepted candidate bytes already exist; candidate reuse and its evidence
+requirements belong to [[docs/development-workflow.md]].
+
 ### N-1 desktop upgrade acceptance
 
 Fresh-package startup is not upgrade evidence. Every native Desktop Package

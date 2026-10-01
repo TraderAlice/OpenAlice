@@ -612,6 +612,33 @@ artifact as a substitute for an accepted native archive.
 Do not delete `dev` after promotion. After a master hotfix, propagate the fix
 back to `dev` immediately so a later promotion cannot revert it.
 
+### Release completion evidence
+
+Release completion requires evidence of:
+
+- the requested channel/tag, dispatch SHA, matching root/CLI product versions,
+  and accepted native candidate receipts;
+- the GitHub tag target and prerelease flag, expected assets/checksums, and the
+  selected channel's public CDN manifest, updater feeds and referenced bytes;
+- for beta, evidence that stable manifests, updater feeds and desktop aliases
+  stayed unchanged; the shared installer may change but must still default to
+  stable;
+- the result for each applicable package-manager channel from
+  [[docs/cli-package-managers.md]], including public registry/formula evidence,
+  and an explicit explanation for any pending, disabled or unavailable channel.
+
+The workflow's conditional jobs are not proof of public channel activation. In
+particular, distinguish a successful GitHub/CDN publication from pending npm or
+Homebrew activation. Package-manager publication is stable-only under the
+current contract; do not invent a beta publication path or imply that a skipped
+job verified one. Resolve the requested channel scope against the current
+workflow and package-manager guide before dispatching a release.
+
+A tag or a green build alone is not completion. A successful retry cannot erase
+an unfixed product defect found by required acceptance: repair the defect in
+`dev` and follow the promotion path above. Pure infrastructure failures may use
+the supported retry path without rebuilding unrelated accepted candidates.
+
 ## Emergency Hotfixes
 
 Use a `master`-targeted hotfix only when stable users are currently broken or
