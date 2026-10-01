@@ -4,7 +4,7 @@ import {
   type Workspace, type TemplateUpgradePlan, type HarnessSourceUpgradePlan, type SkillProjectionRequest,
 } from '../../components/workspace/api'
 
-export type WorkspacePlanRequest = { workspaceId: string } & (
+export type WorkspacePlanRequest = { workspaceId: string; targetVersion?: string } & (
   | { kind: 'source' }
   | { kind: 'template'; layer?: 'template' | 'alice-harness'; projection?: SkillProjectionRequest }
 )
@@ -13,8 +13,8 @@ interface PlanValue { plan: WorkspacePlan | null; error?: string; unsupported?: 
 
 export function workspacePlanKey(request: WorkspacePlanRequest): string {
   return JSON.stringify(request.kind === 'source'
-    ? [request.workspaceId, 'source']
-    : [request.workspaceId, request.layer ?? 'template', request.projection?.skill ?? null, request.projection?.action ?? null])
+    ? [request.workspaceId, 'source', request.targetVersion ?? null]
+    : [request.workspaceId, request.layer ?? 'template', request.projection?.skill ?? null, request.projection?.action ?? null, request.targetVersion ?? null])
 }
 export function workspacePlanRequest(workspace: Pick<Workspace, 'id' | 'template' | 'upgradeAvailable'>): WorkspacePlanRequest {
   return workspace.upgradeAvailable?.kind === 'source' || ['auto-quant-v2', 'auto-prediction'].includes(workspace.template ?? '')
@@ -53,7 +53,7 @@ export class WorkspacePlanStore {
   peek(request: WorkspacePlanRequest) { return this.entries.get(workspacePlanKey(request))?.resource.getSnapshot().value?.plan ?? null }
   private read = async (request: WorkspacePlanRequest): Promise<PlanValue> => {
     try {
-      const plan = await (request.kind === 'source' ? getHarnessSourceUpgradePlan(request.workspaceId)
+      const plan = await (request.kind === 'source' ? getHarnessSourceUpgradePlan(request.workspaceId, request.targetVersion)
         : getTemplateUpgradePlan(request.workspaceId, request.layer ?? 'template', request.projection))
       this.validate(request, plan)
       return { plan }
@@ -66,6 +66,7 @@ export class WorkspacePlanStore {
     }
   }
   private validate(request: WorkspacePlanRequest, plan: WorkspacePlan): void {
+    if (request.targetVersion && plan.toVersion !== request.targetVersion) throw new Error('The checked update target changed; check for updates again')
     if (plan.workspaceId !== request.workspaceId || plan.strategy !== (request.kind === 'source' ? 'source-merge' : 'managed-context')) {
       throw new Error('Update preview does not match the requested Workspace and layer')
     }
@@ -93,15 +94,19 @@ export class WorkspacePlanStore {
       this.inventory.set(workspace.id, signature)
     }
   }
-  refreshObserved(workspaces: readonly Workspace[], candidates: readonly string[], force = true): void {
-    if (!this.active) return
-    const check = force ? this.refresh : this.ensure
-    const refreshed = new Set<string>()
-    for (const workspace of workspaces) if (candidates.includes(workspace.id)) {
-      const request = workspacePlanRequest(workspace); refreshed.add(workspacePlanKey(request)); void check(request)
+  private observations = new Map<string, string>()
+  observe(states: readonly { workspaceId: string; fromVersion?: string; toVersion?: string; phase: string }[]): void {
+    const present = new Set(states.map(state => state.workspaceId))
+    for (const [id] of this.observations) if (!present.has(id)) {
+      this.invalidateWorkspace(id); this.observations.delete(id)
     }
-    // Also refresh open/previously opened layer and skill reviews, without
-    // treating their scoped changes as whole-template update evidence.
-    for (const [key, entry] of this.entries) if (!refreshed.has(key) && workspaces.some(workspace => workspace.id === entry.request.workspaceId)) void check(entry.request)
+    for (const state of states) {
+      const signature = JSON.stringify([state.fromVersion, state.toVersion, state.phase])
+      if (this.observations.get(state.workspaceId) !== signature) this.invalidateWorkspace(state.workspaceId)
+      this.observations.set(state.workspaceId, signature)
+    }
+  }
+  invalidateReviews(): void {
+    for (const entry of this.entries.values()) entry.resource.clear()
   }
 }

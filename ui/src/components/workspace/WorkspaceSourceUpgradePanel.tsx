@@ -58,7 +58,9 @@ export function WorkspaceSourceUpgradePanel({ wsId, onWorkspaceChanged }: Props)
     }
   }
 
-  if (!plan && !error) {
+  if (shared.current && !result) return <EmptyState icon={<ShieldCheck className="text-success" />} title={t('settings.versions.current')} />
+
+  if (!plan && !error && !result) {
     return <CenteredLoading label={t('workspace.sourceUpgradeLoading')} />
   }
 

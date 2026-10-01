@@ -44,3 +44,6 @@ jobs:
 
       - name: Build complete workspace
         run: pnpm build
+
+      - name: Typecheck registered suites
+        run: pnpm exec tsc -p tests/tsconfig.json --noEmit

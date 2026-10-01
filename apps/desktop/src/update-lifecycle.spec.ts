@@ -6,7 +6,7 @@ import { DesktopUpdateLifecycle } from './update-lifecycle.js'
 const roots: string[] = []
 afterEach(async () => { await Promise.all(roots.splice(0).map(root => rm(root, { recursive: true, force: true }))) })
 async function root() { const value = await mkdtemp(join(tmpdir(), 'desktop-lifecycle-')); roots.push(value); return value }
-it('retains native handoff through process restart until exact binary AND required services are ready', async () => {
+it('retains native handoff through controller recreation until exact binary AND required services are ready', async () => {
   const dir = await root(); let version = '0.94.1-beta.2'
   const service = new DesktopUpdateLifecycle(dir, () => version)
   const prepare = vi.fn(async () => { expect((await service.snapshot())?.inFlight).toBe('desktop:prepare') })

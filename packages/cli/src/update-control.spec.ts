@@ -25,7 +25,7 @@ async function fixture() {
   const options: UpdateControlOptions = { root, scope: () => scope, project, backend: { plan: async () => machinePlan(), apply: backendApply }, client: { current: () => version, downloaded: () => '1.1.0', install, ready: async () => true } }
   return { options, backendApply, install, project, setVersion: (value: string) => { version = value }, setScope: (value: string) => { scope = value }, projectDone: () => projectDone }
 }
-it('persists backend and project completion across native restart and browser reload', async () => {
+it('persists backend and project completion across controller recreation', async () => {
   const f = await fixture(), service = new UpdateControlService(f.options)
   const plan = await service.review({ client: true, backend: true, projectUnits: ['template:chat'] })
   await service.approve(plan, plan.fingerprint)

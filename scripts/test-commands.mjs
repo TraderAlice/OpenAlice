@@ -28,7 +28,7 @@ export function collectTestCommands(root, packages, ownerForRoot) {
       return {
         id, name, manifest: `${workspace.root === '.' ? '' : `${workspace.root}/`}package.json`,
         command, invocation: workspace.root === '.' ? `pnpm ${name}` : `pnpm -F ${workspace.name} ${name}`,
-        owner, lane, kind: selector ? (/--(?:groups|inventory)(?:\s|$)/.test(command) ? 'inventory' : 'spec-selection') : 'unclassified',
+        owner, lane, kind: selector ? (/--(?:suites|inventory)(?:\s|$)/.test(command) ? 'inventory' : 'spec-selection') : 'unclassified',
         sideEffects: selector ? 'selected lane; hermetic by default, explicit external/live options retain their guards' : 'unclassified; inspect the dedicated runner before execution',
         prerequisites: selector ? ['workspace dependencies installed; see selected lane prerequisites'] : [],
         ...profile,

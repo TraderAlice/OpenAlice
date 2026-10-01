@@ -13,7 +13,7 @@ GitHub navigation.
 | [[docs/project-structure.md]] | [Project structure](project-structure.md) | Process boundaries, source ownership, state roots, architectural entry points |
 | [[docs/development-workflow.md]] | [Development workflow](development-workflow.md) | Branches, delivery modes, PRs, promotions, external review, risk gates |
 | [[docs/update-lifecycle.md]] | [Update lifecycle](update-lifecycle.md) | Shared inventory, exact-target planning, durable owner coordination and rehearsal |
-| [[docs/testing.md]] | [Testing](testing.md) | Product scenario/protocol evidence groups, required assertion gates/run receipts, test ownership, risk lanes, command namespace, selector composition, side effects, and package-local semantics |
+| [[docs/testing.md]] | [Testing](testing.md) | Unit/integration/E2E scope and suite registration, required gates/run receipts, ownership, execution conditions, selectors, and package-local semantics |
 | [[docs/managed-workspace-runtime.md]] | [Managed Workspace runtime](managed-workspace-runtime.md) | Electron packaging, managed Pi, PortableGit/Bash, runtime profile, Workspace PATH |
 | [[docs/harness-web-surfaces.md]] | [Harness web surfaces](harness-web-surfaces.md) | Harness manifests, managed Studio ports, readiness, routing, transport, lifecycle, and embedding |
 | [[docs/model-semantics-and-runtime-injection.md]] | [Model semantics and runtime injection](model-semantics-and-runtime-injection.md) | AI credential access, model semantics, Workspace selection, and native Agent projection |
@@ -22,12 +22,12 @@ GitHub navigation.
 | [[docs/cli-package-managers.md]] | [CLI package-manager channels](cli-package-managers.md) | npm/Bun platform packages, Homebrew formula, AUR package, provenance, update ownership, and publication order |
 | [[docs/cli-supervisor.md]] | [Shell CLI Supervisor](cli-supervisor.md) | Top-level Runtime lifecycle, status/JSON presentation, browser opening, completion, compatibility aliases, and TUI boundary |
 | [[docs/local-runtime.md]] | [Local Runtime and CLI bootstrap](local-runtime.md) | Source-backed localhost startup, dependency bootstrap, Runtime ownership, and headless bundle boundary |
-| [[docs/data-locations.md]] | [Data locations](data-locations.md) | Complete-home selection, desktop launcher preferences, concurrent instances, and directory safety |
+| [[docs/data-locations.md]] | [Data locations](data-locations.md) | Complete-home ownership, shared Default selection, concurrent AliceProjects, and directory safety |
 | [[docs/remote-access.md]] | [Remote Runtime and access](remote-access.md) | Server lifecycle, SSH transport, managed remote bootstrap, client authority, and staged Studio protocol |
 | [[docs/demo-mode.md]] | [Demo mode](demo-mode.md) | Shared mock data, isolated native Electron preview and demo smoke |
 | [[docs/desktop-companion.md]] | [Desktop companion](desktop-companion.md) | Alice floating window, native lifecycle, interaction, assets and platform acceptance |
 | [[docs/inbox-content.md]] | [Inbox content](inbox-content.md) | Markdown publication, shared file references, migration and UI hook |
-| [[docs/connector-service.md]] | [Connector Service](connector-service.md) | Optional Discord/Telegram Inbox projection, adapters, secrets, health, Guardian lifecycle |
+| [[docs/connector-service.md]] | [Connector Service](connector-service.md) | Optional external Inbox projection, adapters, secrets, health, Guardian lifecycle |
 | [[docs/ui-interaction-and-motion.md]] | [UI interaction and motion](ui-interaction-and-motion.md) | Clickable affordances, shared motion tokens, entrances/disclosures, reduced-motion policy |
 | [[docs/alice-harness.md]] | [Alice Harness injection](alice-harness.md) | Project CLI runtime, Skill prototypes/distribution, Workspace preferences and scoped file operations |
 | [[docs/sticker-packs.md]] | [Sticker packs](sticker-packs.md) | Project-owned sticker prototypes, optional Chat Skill projection, imports and file ownership |
@@ -35,11 +35,11 @@ GitHub navigation.
 | [[docs/workspace-lifecycle.md]] | [Workspace and Session lifecycle](workspace-lifecycle.md) | Unified Session execution, attribution, recovery, offboarding, handoff, restore/purge, retirement |
 | [[docs/workspace-manager.md]] | [Workspace Manager](workspace-manager.md) | Launcher-owned control plane, Web quick start, active-desk inventory, and management boundaries |
 | [[docs/web-conversation-surface.md]] | [Web conversation surface](web-conversation-surface.md) | Structured-protocol browser conversation for any runtime: wires, transports, neutral snapshot, permission requests, routes |
-| [[docs/workspace-template-upgrade.md]] | [Workspace Template Upgrade](workspace-template-upgrade.md) | Managed-asset baselines, three-way review, apply transactions, recovery, and the future Merge/Absorb boundary |
+| [[docs/workspace-template-upgrade.md]] | [Workspace Template Upgrade](workspace-template-upgrade.md) | Managed-asset baselines, three-way review, apply transactions, recovery, and the separate Absorb boundary |
 | [[docs/workspace-absorb.md]] | [Workspace Absorb](workspace-absorb.md) | Directional Workspace consolidation, collision review, archived source identity, and recovery |
 | [[docs/workspace-issues-and-scheduling.md]] | [Workspace issues and scheduling](workspace-issues-and-scheduling.md) | Markdown issue contract, global board, schedule scanner, headless execution, Inbox delivery |
 | [[docs/conversation-provenance.md]] | [Workspace Session and artifact provenance](conversation-provenance.md) | `resumeId` identity, artifact trails, Issue execution responsibility, and provenance-before-collaboration sequencing |
-| [[docs/event-system.md]] | [Event-system retirement note](event-system.md) | Removed Alice event-bus scheduler and the remaining UTA journal boundary |
+| [[docs/product-activity-journal.md]] | [Product Activity Journal](product-activity-journal.md) | Append-only Agent, Inbox, and News facts, family-aware reads, and UI projections; never dispatch |
 | [[docs/uta-live-testing.md]] | [UTA live testing](uta-live-testing.md) | Real broker/demo acceptance scenarios and trading invariants |
 | [[docs/ibkr-wire-protocol.md]] | [IBKR wire protocol](ibkr-wire-protocol.md) | TWS/Gateway inbound framing, payload-only decoder contract, failure isolation, and verification |
 | [[docs/market-data-architecture.md]] | [Market data architecture](market-data-architecture.md) | TraderHub/reference data, BarService K-lines, and the private provider compatibility layer |
@@ -70,10 +70,20 @@ guide, also without vendoring third-party code.
 
 ## Incident Records
 
+- [[docs/incidents/2026-07-17-ibkr-contract-resolution.md]] —
+  [IBKR conId contract-resolution repair](incidents/2026-07-17-ibkr-contract-resolution.md):
+  recorded paper diagnosis, canonical routing invariants, and safe cleanup
+  evidence from the completed repair; current acceptance lives in the UTA guide.
 - [[docs/incidents/2026-07-28-broker-pack-upgrade-gap.md]] —
   [v0.85 Broker Pack upgrade gap](incidents/2026-07-28-broker-pack-upgrade-gap.md):
   previous-release Pack activation failed after a desktop upgrade and
   established the N-1→N release gate.
+
+## Retired Architecture
+
+- [[docs/event-system.md]] — [Event-system retirement note](event-system.md):
+  a short pointer for the removed Alice event-bus scheduler and webhook API.
+  The active journal is owned by the Product Activity Journal guide above.
 
 ## Maintenance Rule
 

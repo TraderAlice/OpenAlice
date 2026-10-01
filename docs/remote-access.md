@@ -383,30 +383,30 @@ refreshes Fleet state. Stop, restart, takeover, Setup, source, logs, Doctor,
 and configuration mutations remain unavailable for remote Fleet selections;
 offline or incompatible rows never receive guessed lifecycle actions.
 
-The browser relay is an alternate client presentation: `openalice relay`
-opens a stable loopback origin and selects a running local Project when one is
-available. If none is running, its connection screen can still discover
-Machines and Projects. Settings lists only registered SSH Machines and lets the
-user select a running Project. A stopped Project must first be started through
-CLI lifecycle controls. Selecting or switching Projects does not start, stop,
-update, or take over a Runtime; the separate, explicitly approved Machine
-update plan can restart one. One relay has one active target shared by all its tabs. A
-switch probes the candidate and verifies its AliceProject identity before
-promotion; failure retains the old target. Success closes old WebSockets,
-increments a target generation, and reloads all tabs. Switching never stops
-the old Runtime.
+The browser relay is an alternate presentation: `openalice relay` serves a
+stable loopback origin and restores only the shared Supervisor Default.
+Missing or unavailable Default leaves the startup chooser detached rather than
+selecting an arbitrary running project. The chooser can explicitly create,
+start, and connect local or registered remote AliceProjects; these are visible
+user actions, not implicit lifecycle effects of selection.
 
-Electron can host the same relay in its main process. Its default integrated
-mode keeps `app://openalice`, the local Guardian-owned AliceProject, and native
-IPC. Settings can select a running local or SSH Project for separated mode:
-the relay verifies the candidate first, then Electron stops only its own local
-children, releases its local Project lock, and loads the relay's loopback UI.
-The separated renderer uses backend HTTP/WS and receives no backend-specific
-native bridge. Returning to integrated mode reacquires local ownership without
-takeover, starts local children, waits for Alice readiness, and only then loads
-`app://openalice`. The selection is scoped to this Electron process; a fresh
-launch starts in integrated mode. Neither switch stops a selected remote
-Runtime.
+Settings connection switching remains a running-target operation. One relay
+target is shared by its tabs; a switch verifies the endpoint and AliceProject
+identity before presentation and Default persistence. Failure retains the old
+target. Successful promotion closes old WebSockets, advances the target
+generation, and reloads tabs without stopping the old Runtime. Explicit
+Machine update plans remain a separate mutation boundary.
+
+Electron uses the same persistent Default, choosing integrated local ownership
+or the startup chooser/relay as appropriate rather than always resetting to
+integrated mode on a fresh launch. Integrated mode retains `app://openalice`
+and native IPC. For a separated switch, it verifies the replacement target and
+loads its loopback renderer before stopping only its own local children and
+releasing their Guardian lock. The separated renderer uses backend HTTP/WS,
+not a backend-specific native bridge. Returning to integrated mode acquires
+local ownership without takeover, waits for readiness, and presents
+`app://openalice`. Neither switch stops a selected remote Runtime. Selection
+and migration details belong to [[docs/alice-project.md]].
 
 When `--app-dir` is absent, managed remote requires the verified native Runtime
 installed with the matching CLI. No Git checkout, Node, Bun, Python, compiler,

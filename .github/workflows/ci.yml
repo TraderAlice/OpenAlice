@@ -66,6 +66,10 @@ jobs:
         run: npx tsc --noEmit
         timeout-minutes: 5
 
+      - name: Typecheck registered suites
+        run: pnpm exec tsc -p tests/tsconfig.json --noEmit
+        timeout-minutes: 5
+
   workspace-build:
     needs: source-contracts
     if: >-

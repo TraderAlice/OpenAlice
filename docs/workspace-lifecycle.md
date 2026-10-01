@@ -239,7 +239,9 @@ present when a desk was created or departed is not part of its durable identity.
 - `src/webui/routes/workspaces.ts` — lifecycle API surface.
 - `ui/src/components/workspace/WorkspaceOffboardingDialog.tsx` — blockers,
   handoff inventory, reason, and notes before departure.
-- `ui/src/pages/WorkspaceListPage.tsx` — departed inventory, restore, purge.
+- Restore and purge remain lifecycle API operations. The retired global
+  `/workspaces` inventory redirects to `/chat`; `WorkspaceListPage.tsx` is
+  not mounted and must not be treated as the current restore/purge UI.
 
 Do not reintroduce “delete the registry row and leave the folder in place.” It
 pollutes manager discovery, destroys restore metadata, and turns known retired

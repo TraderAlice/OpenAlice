@@ -48,7 +48,7 @@ jobs:
           bun-version-file: .bun-version
       - run: pnpm install --frozen-lockfile --filter='!@traderalice/desktop'
       - run: pnpm build:server
-      - run: pnpm exec vitest run scripts/cli-signature.spec.mjs scripts/verify-cli-release.spec.mjs
+      - run: pnpm exec vitest run tests/integration/cli-release-artifacts/cli-signature.spec.mjs tests/integration/cli-release-artifacts/verify-cli-release.spec.mjs
       - run: pnpm build:bun-runtime:feasibility
       - run: pnpm build:bun:release
       - name: Verify the packaged bytes again

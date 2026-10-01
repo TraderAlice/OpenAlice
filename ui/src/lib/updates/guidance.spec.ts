@@ -9,6 +9,7 @@ it('guides to manual updates while leaving automatic active-work waits in place'
     { id: 'other', template: 'unmanaged', upgradeAvailable: { to: '9.0.0' } },
   ]
   const result = selectWorkspaceUpdateGuidance(workspaces, [
+    { workspaceId: 'chat', phase: 'available', toVersion: '1.8.9' },
     { workspaceId: 'aq', phase: 'blocked', toVersion: '0.8.32', reason: 'active_runtime' },
     { workspaceId: 'ap', phase: 'available', toVersion: '0.4.1' },
   ], { autoUpdateAutoQuant: true, autoUpdateAutoPrediction: true })

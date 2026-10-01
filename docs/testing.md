@@ -23,54 +23,71 @@ children use package exports and do not inherit those aliases. Build the
 package's dependencies too: its Node entry imports Guardian runtime. This local
 build prerequisite does not grant any external or broker acceptance authority.
 
-## Product Evidence Groups
+## Test scope and registration
 
-Product journeys live under `tests/scenarios/<scenario>/`; protocol and
-cross-folder workflow requirements live under `tests/contracts/<boundary>/`.
-Each directory's `coverage.json` feeds the existing catalog with required
-behaviors, assertion/command evidence, priorities, fidelity, environment
-limits, and explicit gaps. Leaf unit/component specs remain with their code.
-See [[tests/README.md]] ([group catalog](../tests/README.md)) for the complete
-map and maintenance contract.
+The maintainer's convention separates scope from execution conditions:
+
+| Scope | Location | Registration |
+|---|---|---|
+| Unit/component | Same-name spec beside its implementation | Not required |
+| Integration | `tests/integration/<topic>/` | Required per suite |
+| E2E | `tests/e2e/<topic>/`, or an existing native/artifact runner | Required per suite/runner |
+
+Unit tests verify a module's own responsibility. Integration tests exercise
+collaborating production modules; E2E exercises a user workflow through the
+actual application entry and relevant runtime. A mocked browser, local child
+fixture or in-process HTTP request does not itself establish E2E coverage.
+`hermetic`, external-readonly and live-paper describe execution conditions and
+side effects, not these scope levels.
+
+Register higher-tier suites in `tests/suites.json`, with purpose, tier, owner,
+execution lane, files or dedicated commands, and honest scope limits. Unit
+specs require no registration. The former scenario/contract assertion matrices
+and their per-test title references have been removed. A module with several
+focused unit files may use `<module>.<topic>.spec.ts` beside its implementation.
+Higher-tier files containing some unit cases remain registered as a whole;
+scope descriptions state which collaborators are real and which are fixtures.
+
+## Suite discovery and selection
 
 ```bash
-pnpm test:groups
-pnpm test:groups --scenario desktop-lifecycle --explain
-pnpm test:groups --contract alice-uta --json
+pnpm test:suites
+pnpm test:suites --tier e2e --explain
 pnpm test:inventory --json
-pnpm test:select --scenario workspace-creation --lane integration
-pnpm test:select --scenario first-run --contract alice-uta --owner alice --explain
-pnpm test:select --scenario startup-project-selection --explain
+pnpm test:unit
+pnpm test:integration
+pnpm test:e2e
+pnpm test:select --suite conversation-recovery --lane integration
+pnpm test:select --tier integration --owner uta --lane external-readonly --explain
 ```
 
-`--scenario` and `--contract` select referenced spec evidence and compose with
-existing dimensions: OR within a dimension, AND between dimensions. The lane
-still defaults to hermetic. Dedicated system/Electron/installer/paper commands
-are shown as additional evidence with their own prerequisites; the generic
-selector never executes them on behalf of a group. A group with no executable
-specs in the selected lane fails closed. Use `--groups` to inspect such a
-group's missing behaviors or argument-bearing dedicated commands.
+`--suite` and `--tier` compose with owner, lane, package, area and path: OR within
+a dimension, AND between dimensions. The default execution lane is hermetic.
+`test:integration` covers hermetic module integration plus the existing serialized
+local-process profile (still called the `integration` lane). `test:e2e` runs
+hermetic E2E only. External reads, live-paper writes and native/artifact runners
+remain explicit opt-ins, independent of test tier. A suite with no executable
+specs in the selected lane fails closed; use `test:suites` to inspect separate
+command entries and their prerequisites instead of running them implicitly.
 
-`test:groups` is a data-only view of requirements, including missing/partial
-evidence; `test:inventory` is the complete unfiltered spec and command inventory.
-An owner-only leaf spec is accounted for without inventing a product coverage
-claim. Mapped evidence is not a run result; a green component check is not a
-native user journey. Catalog guards validate assertion/task references and
-central ownership. Metadata changes force collection-wide changed-test reruns.
+`suites.json` registers files/commands, not individual `it()` titles. The catalog
+rejects dangling entries, duplicate file/runner ownership, registered unit suites
+and unregistered higher-tier files. Inventory reports tier and suite separately;
+a unit's null suite is normal. Scope review must still inspect real collaborators:
+renaming a file is not evidence of its integration or E2E fidelity.
 
-The startup/lifecycle pilot maps shared Default migration and verified Project
-attachment separately from Desktop startup/retirement helpers and Guardian
-stop/descendant contracts. Existing leaf specs can support several groups
-without acquiring another owner or lane. Native chooser, Dock/tray/menu Quit,
-SSH and complete process/port cleanup remain explicit gaps. Inspect the
-scenario and affected protocol separately when their intersection would omit
-evidence; the required `critical-local` gate remains unchanged and whole.
+Central suites keep their owner's Node/jsdom Vitest project. Their direct
+harness imports are root development dependencies at the same installed
+versions used by the owning packages; production dependency ownership does
+not change. `pnpm exec tsc -p tests/tsconfig.json --noEmit` checks moved specs,
+including JSX. Both source-contract and dev clean-build CI run this check so
+relocation does not silently remove test code from TypeScript verification.
 
 ## Required local evidence and run receipts
 
 `pnpm test:critical --receipt artifacts/tests/critical-local.json` runs the
-`critical-local` gate declared in `tests/gates.json`. It resolves existing
-coverage rows rather than maintaining another list of test files. Its five
+`critical-local` gate declared in `tests/gates.json`. It pins the existing 15 required assertions directly, independently of ordinary
+suite registration. Its five
 bounded requirements cover broker-free Chat/restart, real local child failure
 and shutdown recovery, loopback approval HTTP, run-result integrity and
 complete packaged-Workspace receipt validation. These are source/local checks;
@@ -78,14 +95,14 @@ they do not certify browser onboarding, a real agent login, native Dock/tray
 interaction, or a venue account.
 
 The gate runs its entire declared hermetic and integration evidence. It rejects
-owner/lane/group/path/changed filters and forwarded Vitest arguments. Each
+owner/lane/suite/tier/path/changed filters and forwarded Vitest arguments. Each
 required assertion must appear exactly once and actually pass: missing,
 ambiguous, skipped and failed assertions all fail acceptance. Merely passing
 some other assertions in the same file is insufficient.
 
 Every actual `test:select` execution writes a JSON receipt. Use `--receipt` to
 choose a durable output location; otherwise the runner prints its temporary
-receipt path. JSON/list/explain/group/inventory modes remain data-only and do
+receipt path. JSON/list/explain/suite/inventory modes remain data-only and do
 not write a run receipt. Receipts record source commit and index tree, dirty
 state, host/Node identity, selectors, per-invocation executed/passed/failed/
 skipped assertion counts, required evidence and unexecuted invocations. The
@@ -131,7 +148,9 @@ when the dependency or ownership boundary is uncertain.
 | `pnpm test:external:*` | Explicit read-only access to public services, configured providers, or local TWS. |
 | `pnpm test:live:*` | Explicit demo/paper account acceptance that can submit, cancel, close, or otherwise mutate broker state. |
 | `pnpm test:select` | Composable catalog query and advanced Vitest entry point. |
-| `pnpm test:groups` | Data-only product scenario/protocol requirement and gap inspection. |
+| `pnpm test:suites` | Data-only registered integration/E2E suite inspection. |
+| `pnpm test:unit` | Colocated unit/component tests; no registration required. |
+| `pnpm test:e2e` | Hermetic E2E specs; dedicated/native commands remain explicit. |
 | `pnpm test:inventory` | Complete data-only spec, manifest-check, and registered standalone acceptance inventory. |
 
 The owner suites are:
@@ -185,7 +204,7 @@ Selectors in one dimension are ORed; different dimensions are ANDed. For
 example, two `--owner` values select either owner, while `--owner uta
 --package @traderalice/uta-service` selects only the package portion of that
 owner. Supported dimensions are `--lane`, `--owner`, `--area`, `--package`,
-repo-relative `--path`, `--scenario`, and `--contract`. `--changed [base]` intersects the candidates at
+repo-relative `--path`, `--suite`, and `--tier`. `--changed [base]` intersects the candidates at
 execution using Vitest's static import graph. The default lane is `hermetic`,
 and a zero-file result fails closed rather than pretending that nothing was a
 pass.
@@ -201,10 +220,8 @@ required gates reject all forwarded arguments.
 Use the [[docs/development-workflow.md]]
 ([feedback ladder](development-workflow.md#local-feedback-ladder)) for the
 development-loop versus cumulative-delivery decision. A combined
-`--scenario`, `--contract`, and `--owner` query is an intersection, not the
-union of those groups. Run affected protocol regressions separately when a
-scenario/owner filter would omit their evidence, with the appropriate lane or
-dedicated command. Unmapped owner-only tests may still cover affected behavior.
+`--suite`, `--tier`, and `--owner` query is an intersection, not a union.
+Inspect affected unit/owner/package tests beyond suite registration as well.
 Static changed imports cannot establish dynamic/registry/process impact;
 inspect those edges and expand explicitly. The required critical gate remains
 whole and its CI requirement is unchanged.
@@ -286,15 +303,15 @@ can establish whether a supposedly covered regression actually fails the test;
 restore the mutation before accepting the change. Test counts and line coverage
 are inventory signals, not product acceptance.
 
-1. Decide its side-effect lane before choosing a filename. Ordinary isolated
-   specs are hermetic; deterministic product journeys are integration; public
-   reads are external; account writes are live; host/artifact journeys are
-   system tests.
-2. Keep leaf specs under exactly one owner root. A central scenario/contract
-   spec instead declares exactly one owner/lane/area/package association in its
-   group's `centralTests` and an evidence row. Add a focused catalog include or
-   exclusion in `scripts/test-lanes.mjs` when filename and location do not
-   express the lane or named area unambiguously.
+1. Decide scope and execution conditions independently. Unit/component specs
+   stay beside their module; integration/E2E suites live under `tests/`.
+   Hermetic module integration can run in the default lane; the serialized
+   local-process profile uses the integration lane. Public reads, paper writes
+   and dedicated host/artifact runners retain their explicit lanes.
+2. Keep same-name unit specs beside their implementation without registration.
+   Register integration/E2E files or dedicated acceptance commands once in
+   `tests/suites.json`. Keep owner/lane/package/area routing intact when moving
+   an existing test, and do not import side-effectful fixtures during inventory.
 3. Keep the default environment isolated. Never hide a public request,
    configured-home read, Docker dependency, or broker write behind a skip in
    the hermetic catalog.
@@ -319,31 +336,11 @@ lanes. A metadata-only `--changed` edit invalidates collection across the
 selected lane; it does not change that lane's side-effect authorization or make
 static import analysis complete for dynamic runtime dependencies.
 
-Post-merge Stage 1/2 grouping acceptance and its remaining product gaps are
-tracked in [[plans/test-system-grouping.md]]. Shutdown completion-drain tests
-also do not certify that every storage layer propagates disk write failures.
+## Dynamic lifecycle consumers
 
-## Bounded lifecycle selections
-
-`pnpm test:select --scenario startup-project-selection` includes real Supervisor
-PTY input, rendering, project switching and detached recovery alongside component
-and loopback protocol evidence. `--scenario update-recovery --path
-packages/cli/src/install.spec.mjs` selects immutable installer integrity fixtures.
-`--contract persisted-state --path tests/scenarios/startup-project-selection/supervisor-project-selection.pty.spec.ts`
-selects real terminal settings persistence. Append `--list --explain` for a dry run.
-
-Coverage manifests name exact claims, but generic selection executes entire spec
-files. The three central PTY journey files execute startup, selection and recovery;
-the CLI terminal-presentation file is selected separately by native-platform or
-the Runtime/CLI owner. All 60 cases remain collected exactly once. Synthetic Runtime relay success does not establish real backend
-identity verification; the separately mapped loopback WebRelay tests do. Fixture
-HOME is caller-owned and real-CLI cases clear inherited Home/Project overrides.
-Native installed launchers, Windows/macOS terminals, real SSH, native Electron
-and signed installer artifacts retain explicit acceptance gaps.
-
-For a real impact probe, `pnpm exec vitest related
-packages/cli/src/supervisor-tui.ts --run --project node` selects the statically
-importing component/input/CLI tests; it does not include spawned PTY consumers.
-Run the startup scenario and affected native-platform presentation separately,
-or the Runtime/CLI owner/package suite. The shared PTY support module is imported
-by all four files, but fixture and product child entry paths remain dynamic.
+The registered `startup-project-selection` suite includes real Supervisor PTY
+startup, selection and recovery with controlled Runtime fixtures. It does not
+establish native Electron, real SSH or signed-artifact behavior. Static changed
+imports do not follow child-process entry paths; select affected suites and
+owner/package tests explicitly. Shutdown completion-drain tests also do not
+certify that every storage layer propagates disk write failures.

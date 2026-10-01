@@ -1,0 +1,1450 @@
+[
+  {
+    "id": "alice-uta",
+    "title": "Alice to UTA carrier and trading permission",
+    "tier": "integration",
+    "owner": "uta",
+    "lane": "integration",
+    "areas": [
+      "uta",
+      "uta-paper"
+    ],
+    "package": "@traderalice/uta-service",
+    "files": [
+      "tests/integration/alice-uta/approval-http.spec.ts"
+    ],
+    "scope": "Existing local production-module integration with isolated state and controlled external dependencies; not a browser/native-agent or real venue journey."
+  },
+  {
+    "id": "conversation-recovery",
+    "title": "Conversation, interruption, and Session recovery",
+    "tier": "integration",
+    "owner": "runtime-cli",
+    "lane": "integration",
+    "areas": [
+      "workspace"
+    ],
+    "files": [
+      "tests/integration/conversation-recovery/session-recovery.spec.ts"
+    ],
+    "scope": "Existing local production-module integration with isolated state and controlled external dependencies; not a browser/native-agent or real venue journey."
+  },
+  {
+    "id": "first-run",
+    "title": "First run, authentication, and broker-free use",
+    "tier": "integration",
+    "owner": "alice",
+    "lane": "integration",
+    "areas": [
+      "workspace"
+    ],
+    "files": [
+      "tests/integration/first-run/broker-free-chat.spec.ts"
+    ],
+    "scope": "Existing local production-module integration with isolated state and controlled external dependencies; not a browser/native-agent or real venue journey."
+  },
+  {
+    "id": "startup-project-selection",
+    "title": "Shared Default migration and verified AliceProject selection",
+    "tier": "e2e",
+    "owner": "runtime-cli",
+    "lane": "hermetic",
+    "areas": [
+      "platform"
+    ],
+    "package": "@traderalice/openalice-cli",
+    "files": [
+      "tests/e2e/startup-project-selection/supervisor-startup.pty.spec.ts",
+      "tests/e2e/startup-project-selection/supervisor-project-selection.pty.spec.ts",
+      "tests/e2e/startup-project-selection/supervisor-recovery.pty.spec.ts",
+      "tests/e2e/startup-project-selection/supervisor-terminal-presentation.pty.spec.ts"
+    ],
+    "scope": "Existing real Supervisor PTY journeys with controlled Runtime fixtures; not native desktop or remote-host acceptance."
+  },
+  {
+    "id": "trading-approval",
+    "title": "Trading staging, approval, execution, and cleanup",
+    "tier": "integration",
+    "owner": "uta",
+    "lane": "integration",
+    "areas": [
+      "uta",
+      "uta-paper"
+    ],
+    "package": "@traderalice/uta-service",
+    "files": [
+      "tests/integration/trading-approval/uta-lifecycle.spec.ts"
+    ],
+    "scope": "Existing local production-module integration with isolated state and controlled external dependencies; not a browser/native-agent or real venue journey."
+  },
+  {
+    "id": "workspace-creation",
+    "title": "Create a durable Workspace",
+    "tier": "integration",
+    "owner": "runtime-cli",
+    "lane": "integration",
+    "areas": [
+      "workspace"
+    ],
+    "files": [
+      "tests/integration/workspace-creation/workspace-creation.spec.ts"
+    ],
+    "scope": "Existing local production-module integration with isolated state and controlled external dependencies; not a browser/native-agent or real venue journey."
+  },
+  {
+    "id": "connector-acceptance",
+    "title": "connector host and artifact acceptance",
+    "tier": "e2e",
+    "owner": "connector",
+    "lane": "system",
+    "areas": [],
+    "commands": [
+      "open-alice#test:system:connector"
+    ],
+    "scope": "Dedicated existing acceptance runners; prerequisites, supported platforms and explicit arguments remain owned by each command. Never automatically executed by suite selection; listing is not acceptance."
+  },
+  {
+    "id": "desktop-acceptance",
+    "title": "desktop host and artifact acceptance",
+    "tier": "e2e",
+    "owner": "desktop",
+    "lane": "system",
+    "areas": [],
+    "commands": [
+      "open-alice#electron:smoke:demo",
+      "open-alice#electron:smoke:packaged",
+      "open-alice#electron:smoke:startup",
+      "open-alice#electron:smoke:onboarding",
+      "open-alice#electron:smoke:trading-mode",
+      "open-alice#electron:smoke:workspace",
+      "open-alice#electron:smoke:guardian-recovery",
+      "open-alice#electron:smoke:existing-owner",
+      "open-alice#electron:smoke:upgrade",
+      "desktop-companion"
+    ],
+    "scope": "Dedicated existing acceptance runners; prerequisites, supported platforms and explicit arguments remain owned by each command. Never automatically executed by suite selection; listing is not acceptance."
+  },
+  {
+    "id": "runtime-cli-acceptance",
+    "title": "runtime-cli host and artifact acceptance",
+    "tier": "e2e",
+    "owner": "runtime-cli",
+    "lane": "system",
+    "areas": [],
+    "commands": [
+      "open-alice#test:system:dev-stack",
+      "open-alice#test:system:guardian",
+      "open-alice#test:system:installer",
+      "open-alice#test:system:installer:dev",
+      "open-alice#test:system:remote",
+      "cli-package-manager",
+      "cli-system-package-manager",
+      "cli-linuxbrew",
+      "cli-aur",
+      "cli-legacy-cutover",
+      "windows-cli-preview"
+    ],
+    "scope": "Dedicated existing acceptance runners; prerequisites, supported platforms and explicit arguments remain owned by each command. Never automatically executed by suite selection; listing is not acceptance."
+  },
+  {
+    "id": "broker-pack-runtime",
+    "title": "Broker Pack runtime compatibility",
+    "tier": "integration",
+    "owner": "uta",
+    "lane": "system",
+    "areas": [],
+    "commands": [
+      "open-alice#broker-packs:upgrade-smoke",
+      "@traderalice/uta-broker-alpaca#test:packaged"
+    ],
+    "scope": "Current/previous compiled Broker Packs loaded against controlled local dependencies; no venue account. Explicit artifact/network prerequisites remain required."
+  },
+  {
+    "id": "ibkr-wire-readonly",
+    "title": "ibkr wire readonly",
+    "tier": "integration",
+    "owner": "uta",
+    "lane": "external-readonly",
+    "areas": [
+      "ibkr",
+      "uta",
+      "uta-paper"
+    ],
+    "package": "@traderalice/ibkr",
+    "files": [
+      "tests/integration/ibkr-wire-readonly/connect.spec.ts",
+      "tests/integration/ibkr-wire-readonly/contract-details.spec.ts"
+    ],
+    "scope": "Existing provider/broker integration against external services; configured credentials and demo/paper acknowledgement remain explicit prerequisites. Does not prove browser or native CLI workflows."
+  },
+  {
+    "id": "ibkr-wire-paper",
+    "title": "ibkr wire paper",
+    "tier": "integration",
+    "owner": "uta",
+    "lane": "live-paper",
+    "areas": [
+      "ibkr",
+      "uta",
+      "uta-paper"
+    ],
+    "package": "@traderalice/ibkr",
+    "files": [
+      "tests/integration/ibkr-wire-paper/order-precision.spec.ts"
+    ],
+    "scope": "Existing provider/broker integration against external services; configured credentials and demo/paper acknowledgement remain explicit prerequisites. Does not prove browser or native CLI workflows."
+  },
+  {
+    "id": "twse-provider",
+    "title": "twse provider",
+    "tier": "integration",
+    "owner": "alice",
+    "lane": "external-readonly",
+    "areas": [
+      "market-data"
+    ],
+    "package": "@traderalice/opentypebb",
+    "files": [
+      "tests/integration/twse-provider/twse.spec.ts"
+    ],
+    "scope": "Existing provider/broker integration against external services; configured credentials and demo/paper acknowledgement remain explicit prerequisites. Does not prove browser or native CLI workflows."
+  },
+  {
+    "id": "broker-alpaca-paper",
+    "title": "broker alpaca paper",
+    "tier": "integration",
+    "owner": "uta",
+    "lane": "live-paper",
+    "areas": [
+      "alpaca",
+      "uta",
+      "uta-paper"
+    ],
+    "package": "@traderalice/uta-service",
+    "files": [
+      "tests/integration/broker-alpaca-paper/alpaca-paper.spec.ts",
+      "tests/integration/broker-alpaca-paper/uta-alpaca.spec.ts"
+    ],
+    "scope": "Existing provider/broker integration against external services; configured credentials and demo/paper acknowledgement remain explicit prerequisites. Does not prove browser or native CLI workflows."
+  },
+  {
+    "id": "broker-bybit-paper",
+    "title": "broker bybit paper",
+    "tier": "integration",
+    "owner": "uta",
+    "lane": "live-paper",
+    "areas": [
+      "bybit",
+      "uta",
+      "uta-paper"
+    ],
+    "package": "@traderalice/uta-service",
+    "files": [
+      "tests/integration/broker-bybit-paper/ccxt-bybit.spec.ts",
+      "tests/integration/broker-bybit-paper/uta-bybit.spec.ts",
+      "tests/integration/broker-bybit-paper/uta-ccxt-bybit.spec.ts"
+    ],
+    "scope": "Existing provider/broker integration against external services; configured credentials and demo/paper acknowledgement remain explicit prerequisites. Does not prove browser or native CLI workflows."
+  },
+  {
+    "id": "broker-market-data",
+    "title": "broker market data",
+    "tier": "integration",
+    "owner": "uta",
+    "lane": "external-readonly",
+    "areas": [
+      "market-data",
+      "uta",
+      "uta-paper"
+    ],
+    "package": "@traderalice/uta-service",
+    "files": [
+      "tests/integration/broker-market-data/CcxtBroker.spec.ts"
+    ],
+    "scope": "Existing provider/broker integration against external services; configured credentials and demo/paper acknowledgement remain explicit prerequisites. Does not prove browser or native CLI workflows."
+  },
+  {
+    "id": "broker-hyperliquid-paper",
+    "title": "broker hyperliquid paper",
+    "tier": "integration",
+    "owner": "uta",
+    "lane": "live-paper",
+    "areas": [
+      "hyperliquid",
+      "uta",
+      "uta-paper"
+    ],
+    "package": "@traderalice/uta-service",
+    "files": [
+      "tests/integration/broker-hyperliquid-paper/ccxt-hyperliquid.spec.ts"
+    ],
+    "scope": "Existing provider/broker integration against external services; configured credentials and demo/paper acknowledgement remain explicit prerequisites. Does not prove browser or native CLI workflows."
+  },
+  {
+    "id": "broker-okx-paper",
+    "title": "broker okx paper",
+    "tier": "integration",
+    "owner": "uta",
+    "lane": "live-paper",
+    "areas": [
+      "okx",
+      "uta",
+      "uta-paper"
+    ],
+    "package": "@traderalice/uta-service",
+    "files": [
+      "tests/integration/broker-okx-paper/ccxt-okx.spec.ts"
+    ],
+    "scope": "Existing provider/broker integration against external services; configured credentials and demo/paper acknowledgement remain explicit prerequisites. Does not prove browser or native CLI workflows."
+  },
+  {
+    "id": "bybit-diagnostic",
+    "title": "bybit diagnostic",
+    "tier": "integration",
+    "owner": "uta",
+    "lane": "live-paper",
+    "areas": [
+      "bybit-diagnostic",
+      "uta"
+    ],
+    "package": "@traderalice/uta-service",
+    "files": [
+      "tests/integration/bybit-diagnostic/ccxt-raw-diagnostic.spec.ts"
+    ],
+    "scope": "Existing provider/broker integration against external services; configured credentials and demo/paper acknowledgement remain explicit prerequisites. Does not prove browser or native CLI workflows."
+  },
+  {
+    "id": "broker-ibkr-paper",
+    "title": "broker ibkr paper",
+    "tier": "integration",
+    "owner": "uta",
+    "lane": "live-paper",
+    "areas": [
+      "ibkr",
+      "uta",
+      "uta-paper"
+    ],
+    "package": "@traderalice/uta-service",
+    "files": [
+      "tests/integration/broker-ibkr-paper/ibkr-paper.spec.ts",
+      "tests/integration/broker-ibkr-paper/uta-ibkr.spec.ts"
+    ],
+    "scope": "Existing provider/broker integration against external services; configured credentials and demo/paper acknowledgement remain explicit prerequisites. Does not prove browser or native CLI workflows."
+  },
+  {
+    "id": "market-data-routes",
+    "title": "market data routes",
+    "tier": "integration",
+    "owner": "alice",
+    "lane": "external-readonly",
+    "areas": [
+      "market-data"
+    ],
+    "files": [
+      "tests/integration/market-data-routes/market-data.spec.ts"
+    ],
+    "scope": "Existing provider/broker integration against external services; configured credentials and demo/paper acknowledgement remain explicit prerequisites. Does not prove browser or native CLI workflows."
+  },
+  {
+    "id": "market-data-providers",
+    "title": "market data providers",
+    "tier": "integration",
+    "owner": "alice",
+    "lane": "external-readonly",
+    "areas": [
+      "market-data"
+    ],
+    "files": [
+      "tests/integration/market-data-providers/analysis.spec.ts",
+      "tests/integration/market-data-providers/bars.spec.ts",
+      "tests/integration/market-data-providers/calc-v2.spec.ts",
+      "tests/integration/market-data-providers/fmp.spec.ts",
+      "tests/integration/market-data-providers/yfinance.spec.ts"
+    ],
+    "scope": "Existing provider/broker integration against external services; configured credentials and demo/paper acknowledgement remain explicit prerequisites. Does not prove browser or native CLI workflows."
+  },
+  {
+    "id": "hyperliquid-market-data",
+    "title": "Hyperliquid markets loading",
+    "tier": "integration",
+    "owner": "uta",
+    "lane": "external-readonly",
+    "areas": [
+      "market-data",
+      "uta",
+      "uta-paper",
+      "hyperliquid"
+    ],
+    "package": "@traderalice/uta-service",
+    "files": [
+      "tests/integration/hyperliquid-market-data/ccxt-hyperliquid-markets.spec.ts"
+    ],
+    "scope": "Existing provider/broker integration against external services; configured credentials and demo/paper acknowledgement remain explicit prerequisites. Does not prove browser or native CLI workflows."
+  },
+  {
+    "id": "desktop-data-home",
+    "title": "desktop data home",
+    "tier": "integration",
+    "owner": "desktop",
+    "lane": "hermetic",
+    "areas": [],
+    "package": "@traderalice/desktop",
+    "files": [
+      "tests/integration/desktop-data-home/data-home-desktop.spec.ts"
+    ],
+    "scope": "Desktop controller and real preference persistence; Electron dialog/shell are mocked, so no native chooser acceptance."
+  },
+  {
+    "id": "guardian-control",
+    "title": "guardian control",
+    "tier": "integration",
+    "owner": "runtime-cli",
+    "lane": "hermetic",
+    "areas": [
+      "platform"
+    ],
+    "package": "@traderalice/openalice-cli",
+    "files": [
+      "tests/integration/guardian-control/server-control.spec.mjs"
+    ],
+    "scope": "CLI client and Guardian control server across a real local socket; stop callbacks controlled, no full Guardian tree."
+  },
+  {
+    "id": "guardian-discovery",
+    "title": "guardian discovery",
+    "tier": "integration",
+    "owner": "runtime-cli",
+    "lane": "hermetic",
+    "areas": [
+      "platform"
+    ],
+    "package": "@traderalice/guardian-runtime",
+    "files": [
+      "tests/integration/guardian-discovery/existing-owner-startup.spec.ts"
+    ],
+    "scope": "Real local control server, discovery and owner-startup decision; no native desktop handoff."
+  },
+  {
+    "id": "project-transfer",
+    "title": "project transfer",
+    "tier": "integration",
+    "owner": "runtime-cli",
+    "lane": "hermetic",
+    "areas": [
+      "platform"
+    ],
+    "package": "@traderalice/openalice-cli",
+    "files": [
+      "tests/integration/project-transfer/project-transfer-stream.spec.ts",
+      "tests/integration/project-transfer/project-transfer.spec.ts"
+    ],
+    "scope": "Transfer planning, archive streaming, credential sealing and atomic filesystem publication; isolated local directories, no SSH."
+  },
+  {
+    "id": "project-management",
+    "title": "project management",
+    "tier": "integration",
+    "owner": "runtime-cli",
+    "lane": "hermetic",
+    "areas": [
+      "platform"
+    ],
+    "package": "@traderalice/openalice-cli",
+    "files": [
+      "tests/integration/project-management/create-alice-project.spec.ts",
+      "tests/integration/project-management/project-command.spec.ts"
+    ],
+    "scope": "Command handlers collaborate with Project and Supervisor registries; direct calls and isolated files, not an installed CLI journey."
+  },
+  {
+    "id": "client-updates",
+    "title": "client updates",
+    "tier": "integration",
+    "owner": "runtime-cli",
+    "lane": "hermetic",
+    "areas": [
+      "platform"
+    ],
+    "package": "@traderalice/openalice-cli",
+    "files": [
+      "tests/integration/client-updates/client-updates.spec.ts"
+    ],
+    "scope": "Client update policy and real WebRelay HTTP round trips; controlled release discovery, no actual installation."
+  },
+  {
+    "id": "remote-updates",
+    "title": "remote updates",
+    "tier": "integration",
+    "owner": "runtime-cli",
+    "lane": "hermetic",
+    "areas": [
+      "platform"
+    ],
+    "package": "@traderalice/openalice-cli",
+    "files": [
+      "tests/integration/remote-updates/remote-update.spec.ts"
+    ],
+    "scope": "Production remote controller, durable journal and rehearsal planner agreement; SSH and native upgrade commands are mocked."
+  },
+  {
+    "id": "cli-installer",
+    "title": "cli installer",
+    "tier": "e2e",
+    "owner": "runtime-cli",
+    "lane": "hermetic",
+    "areas": [
+      "platform"
+    ],
+    "package": "@traderalice/openalice-cli",
+    "files": [
+      "tests/e2e/cli-installer/install.spec.mjs"
+    ],
+    "scope": "Actual installer entry and CLI launchers against locally generated archives and loopback download fixtures; no public release or signed-artifact acceptance."
+  },
+  {
+    "id": "supervisor-default",
+    "title": "supervisor default",
+    "tier": "integration",
+    "owner": "runtime-cli",
+    "lane": "hermetic",
+    "areas": [
+      "platform"
+    ],
+    "package": "@traderalice/openalice-cli",
+    "files": [
+      "tests/integration/supervisor-default/supervisor-default-migration.spec.ts"
+    ],
+    "scope": "Default selection migration, persisted configuration and concurrent local CLI writers; isolated homes."
+  },
+  {
+    "id": "supervisor-input",
+    "title": "supervisor input",
+    "tier": "integration",
+    "owner": "runtime-cli",
+    "lane": "hermetic",
+    "areas": [
+      "platform"
+    ],
+    "package": "@traderalice/openalice-cli",
+    "files": [
+      "tests/integration/supervisor-input/supervisor-tui-input.spec.ts",
+      "tests/integration/supervisor-input/supervisor-tui.spec.ts"
+    ],
+    "scope": "Real pi-tui input framing and Supervisor interaction with buffered terminal and injected lifecycle operations; no real terminal acceptance."
+  },
+  {
+    "id": "connector-files",
+    "title": "connector files",
+    "tier": "integration",
+    "owner": "connector",
+    "lane": "hermetic",
+    "areas": [],
+    "package": "@traderalice/connector-service",
+    "files": [
+      "tests/integration/connector-files/workspace-files.spec.ts"
+    ],
+    "scope": "Connector client and Alice Workspace-file routes over loopback HTTP/socket; no external messenger."
+  },
+  {
+    "id": "simulator-routes",
+    "title": "simulator routes",
+    "tier": "integration",
+    "owner": "uta",
+    "lane": "hermetic",
+    "areas": [
+      "uta",
+      "uta-paper"
+    ],
+    "package": "@traderalice/uta-service",
+    "files": [
+      "tests/integration/simulator-routes/simulator.spec.ts"
+    ],
+    "scope": "UTA simulator routes and real MockBroker state transitions; isolated in-process HTTP, no venue."
+  },
+  {
+    "id": "project-market-cli",
+    "title": "project market cli",
+    "tier": "e2e",
+    "owner": "alice",
+    "lane": "hermetic",
+    "areas": [],
+    "files": [
+      "tests/e2e/project-market-cli/project-market-cli.spec.ts"
+    ],
+    "scope": "Public CLI subprocess through local HTTP tool and chart routes with fixture market data; no published binary or public provider."
+  },
+  {
+    "id": "cli-gateway",
+    "title": "cli gateway",
+    "tier": "integration",
+    "owner": "alice",
+    "lane": "hermetic",
+    "areas": [],
+    "files": [
+      "tests/integration/cli-gateway/cli.spec.ts",
+      "tests/integration/cli-gateway/project-cli.spec.ts",
+      "tests/integration/cli-gateway/cli-commands.spec.ts"
+    ],
+    "scope": "CLI gateway, real tool centers and local HTTP/CLI fixtures; Workspace services and external providers remain controlled."
+  },
+  {
+    "id": "connector-session-model",
+    "title": "connector session model",
+    "tier": "integration",
+    "owner": "alice",
+    "lane": "hermetic",
+    "areas": [],
+    "files": [
+      "tests/integration/connector-session-model/connector-model-persistence.spec.ts"
+    ],
+    "scope": "Connector model route, resume registry and Session runtime dossier persistence; no messenger or agent process."
+  },
+  {
+    "id": "connector-inbox",
+    "title": "connector inbox",
+    "tier": "integration",
+    "owner": "alice",
+    "lane": "hermetic",
+    "areas": [],
+    "files": [
+      "tests/integration/connector-inbox/action-bridge.spec.ts",
+      "tests/integration/connector-inbox/index.spec.ts"
+    ],
+    "scope": "Inbox store, attachment materialization and Connector bridge; transport injected, no external delivery."
+  },
+  {
+    "id": "carrier-health",
+    "title": "carrier health",
+    "tier": "integration",
+    "owner": "alice",
+    "lane": "hermetic",
+    "areas": [],
+    "files": [
+      "tests/integration/carrier-health/integrations.spec.ts"
+    ],
+    "scope": "Shared health probe composed with production Connector/UTA decoders; fixture responses, no live carrier."
+  },
+  {
+    "id": "workspace-lifecycle",
+    "title": "workspace lifecycle",
+    "tier": "integration",
+    "owner": "runtime-cli",
+    "lane": "hermetic",
+    "areas": [
+      "workspace"
+    ],
+    "files": [
+      "tests/integration/workspace-lifecycle/workspace-lifecycle.spec.ts",
+      "tests/integration/workspace-lifecycle/workspace-absorb.spec.ts"
+    ],
+    "scope": "Workspace offboarding/restore/absorb across production registries and isolated Git/filesystem state; Session process adapters controlled."
+  },
+  {
+    "id": "workspace-upgrades",
+    "title": "workspace upgrades",
+    "tier": "integration",
+    "owner": "runtime-cli",
+    "lane": "hermetic",
+    "areas": [
+      "workspace"
+    ],
+    "files": [
+      "tests/integration/workspace-upgrades/template-upgrade.spec.ts",
+      "tests/integration/workspace-upgrades/harness-source-upgrade.spec.ts"
+    ],
+    "scope": "Workspace template/source upgrade managers, registries and Git transactions on local fixtures; no remote fetching."
+  },
+  {
+    "id": "session-coordination",
+    "title": "session coordination",
+    "tier": "integration",
+    "owner": "runtime-cli",
+    "lane": "hermetic",
+    "areas": [
+      "workspace"
+    ],
+    "files": [
+      "tests/integration/session-coordination/product-session-coordinator.spec.ts",
+      "tests/integration/session-coordination/resume-registry.spec.ts",
+      "tests/integration/session-coordination/session-registry.spec.ts",
+      "tests/integration/session-coordination/session-title-resolver.spec.ts"
+    ],
+    "scope": "Production Session coordinator and durable resume/session stores; no native agent launch."
+  },
+  {
+    "id": "session-takeover",
+    "title": "session takeover",
+    "tier": "integration",
+    "owner": "runtime-cli",
+    "lane": "hermetic",
+    "areas": [
+      "workspace"
+    ],
+    "files": [
+      "tests/integration/session-takeover/session-takeover.spec.ts"
+    ],
+    "scope": "Session takeover and execution manager interaction with controlled process callbacks and isolated durable state."
+  },
+  {
+    "id": "dispatch-delivery",
+    "title": "dispatch delivery",
+    "tier": "integration",
+    "owner": "runtime-cli",
+    "lane": "hermetic",
+    "areas": [
+      "workspace"
+    ],
+    "files": [
+      "tests/integration/dispatch-delivery/dispatch-delivery.spec.ts"
+    ],
+    "scope": "Dispatch communication and durable task delivery state with injected transport; no external messenger."
+  },
+  {
+    "id": "workspace-dispatch",
+    "title": "workspace dispatch",
+    "tier": "integration",
+    "owner": "runtime-cli",
+    "lane": "hermetic",
+    "areas": [
+      "workspace"
+    ],
+    "files": [
+      "tests/integration/workspace-dispatch/service.dispatch-communication.spec.ts"
+    ],
+    "scope": "Real Workspace service, child fixture, Issue persistence and loopback Connector delivery; no paid model or external messenger."
+  },
+  {
+    "id": "workspace-web-reconfigure",
+    "title": "workspace web reconfigure",
+    "tier": "integration",
+    "owner": "runtime-cli",
+    "lane": "hermetic",
+    "areas": [
+      "workspace"
+    ],
+    "files": [
+      "tests/integration/workspace-web-reconfigure/service.web-reconfigure.spec.ts"
+    ],
+    "scope": "Workspace service, execution coordination and persisted runtime binding; WebSessionHost process operations mocked."
+  },
+  {
+    "id": "issue-lifecycle",
+    "title": "issue lifecycle",
+    "tier": "integration",
+    "owner": "runtime-cli",
+    "lane": "hermetic",
+    "areas": [
+      "workspace"
+    ],
+    "files": [
+      "tests/integration/issue-lifecycle/auto-complete.spec.ts",
+      "tests/integration/issue-lifecycle/comment-delivery.spec.ts",
+      "tests/integration/issue-lifecycle/comments-progress.spec.ts",
+      "tests/integration/issue-lifecycle/mutate.spec.ts"
+    ],
+    "scope": "Issue mutation/reader/comment/delivery collaboration on isolated files; scheduler and agent dispatch controlled."
+  },
+  {
+    "id": "issue-provenance",
+    "title": "issue provenance",
+    "tier": "integration",
+    "owner": "runtime-cli",
+    "lane": "hermetic",
+    "areas": [
+      "workspace"
+    ],
+    "files": [
+      "tests/integration/issue-provenance/change-tracker.spec.ts"
+    ],
+    "scope": "Issue change tracking and production artifact provenance persistence on temporary state."
+  },
+  {
+    "id": "connector-desk",
+    "title": "connector desk",
+    "tier": "integration",
+    "owner": "runtime-cli",
+    "lane": "hermetic",
+    "areas": [
+      "workspace"
+    ],
+    "files": [
+      "tests/integration/connector-desk/telegram-connector.spec.ts",
+      "tests/integration/connector-desk/telegram-desk-chat.spec.ts"
+    ],
+    "scope": "Connector desk creation, inbound projection and Issue comments on isolated files; messenger calls injected."
+  },
+  {
+    "id": "issue-routes",
+    "title": "issue routes",
+    "tier": "integration",
+    "owner": "alice",
+    "lane": "hermetic",
+    "areas": [],
+    "files": [
+      "tests/integration/issue-routes/issues.spec.ts"
+    ],
+    "scope": "HTTP Issue mutations and comments through production file readers/writers; Workspace dispatch controlled."
+  },
+  {
+    "id": "test-selection",
+    "title": "test selection",
+    "tier": "integration",
+    "owner": "repo-tooling",
+    "lane": "hermetic",
+    "areas": [
+      "workflow"
+    ],
+    "files": [
+      "tests/integration/test-selection/test-suites.spec.ts",
+      "tests/integration/test-selection/test-lanes.spec.ts",
+      "tests/integration/test-selection/test-collection-inputs.spec.ts",
+      "tests/integration/test-selection/test-results.spec.ts"
+    ],
+    "scope": "Repository catalog, selector and actual Vitest collection/result integration; child fixtures are local only."
+  },
+  {
+    "id": "cli-release-artifacts",
+    "title": "cli release artifacts",
+    "tier": "integration",
+    "owner": "repo-tooling",
+    "lane": "hermetic",
+    "areas": [],
+    "files": [
+      "tests/integration/cli-release-artifacts/build-cli-package-channels.spec.mjs",
+      "tests/integration/cli-release-artifacts/cli-release-fixture.spec.mjs",
+      "tests/integration/cli-release-artifacts/prepare-cli-dev-assets.spec.mjs",
+      "tests/integration/cli-release-artifacts/verify-cli-release.spec.mjs",
+      "tests/integration/cli-release-artifacts/cli-signature.spec.mjs"
+    ],
+    "scope": "Production release preparation/verification modules over synthetic local archives and signatures; no signing credentials or publication."
+  },
+  {
+    "id": "uta-simulation",
+    "title": "uta simulation",
+    "tier": "integration",
+    "owner": "uta",
+    "lane": "hermetic",
+    "areas": [
+      "uta",
+      "uta-paper"
+    ],
+    "package": "@traderalice/uta-service",
+    "files": [
+      "tests/integration/uta-simulation/trading-tools.spec.ts",
+      "tests/integration/uta-simulation/UnifiedTradingAccount.spec.ts",
+      "tests/integration/uta-simulation/uta-health.spec.ts",
+      "tests/integration/uta-simulation/uta-manager.spec.ts",
+      "tests/integration/uta-simulation/order-sync-poller.spec.ts",
+      "tests/integration/uta-simulation/snapshot.spec.ts",
+      "tests/integration/uta-simulation/contract-search.spec.ts",
+      "tests/integration/uta-simulation/guards.spec.ts",
+      "tests/integration/uta-simulation/ccxt-tools.spec.ts"
+    ],
+    "scope": "UTA account, manager, guards, order synchronization and snapshots composed with production MockBroker; no configured accounts, public providers or venue writes."
+  },
+  {
+    "id": "uta-startup",
+    "title": "uta startup",
+    "tier": "e2e",
+    "owner": "uta",
+    "lane": "hermetic",
+    "areas": [
+      "uta",
+      "platform",
+      "uta-paper"
+    ],
+    "package": "@traderalice/uta-service",
+    "files": [
+      "tests/e2e/uta-startup/uta-startup-resilience.spec.ts"
+    ],
+    "scope": "Real UTA service entry process, loopback failing TWS fixture and healthy local simulator; no real account."
+  },
+  {
+    "id": "ibkr-request-bridge",
+    "title": "ibkr request bridge",
+    "tier": "integration",
+    "owner": "uta",
+    "lane": "hermetic",
+    "areas": [
+      "uta",
+      "ibkr",
+      "uta-paper"
+    ],
+    "package": "@traderalice/uta-service",
+    "files": [
+      "tests/integration/ibkr-request-bridge/request-bridge.spec.ts"
+    ],
+    "scope": "IBKR client wire handshake and UTA request bridge against local socket fixtures; no TWS account."
+  },
+  {
+    "id": "ibkr-reader-recovery",
+    "title": "ibkr reader recovery",
+    "tier": "integration",
+    "owner": "uta",
+    "lane": "hermetic",
+    "areas": [
+      "uta",
+      "ibkr",
+      "uta-paper"
+    ],
+    "package": "@traderalice/ibkr",
+    "files": [
+      "tests/integration/ibkr-reader-recovery/reader-recovery.spec.ts"
+    ],
+    "scope": "IBKR reader, decoder and client failure containment through synthetic wire frames; fake connection, no broker."
+  },
+  {
+    "id": "provider-catalog",
+    "title": "provider catalog",
+    "tier": "integration",
+    "owner": "alice",
+    "lane": "hermetic",
+    "areas": [],
+    "files": [
+      "tests/integration/provider-catalog/model-catalog.spec.ts",
+      "tests/integration/provider-catalog/native-provider.spec.ts"
+    ],
+    "scope": "Native/API provider adapters composed with model catalog persistence; discovery injected, no native login or external API."
+  },
+  {
+    "id": "broker-pack-installation",
+    "title": "broker pack installation",
+    "tier": "integration",
+    "owner": "alice",
+    "lane": "hermetic",
+    "areas": [],
+    "files": [
+      "tests/integration/broker-pack-installation/installer.spec.ts"
+    ],
+    "scope": "Pack installer, active-pack resolver and updater against local archives/HTTP; no public downloads or broker access."
+  },
+  {
+    "id": "issue-tools",
+    "title": "issue tools",
+    "tier": "integration",
+    "owner": "alice",
+    "lane": "hermetic",
+    "areas": [],
+    "files": [
+      "tests/integration/issue-tools/issue-tools.spec.ts"
+    ],
+    "scope": "Issue tool factories and production Issue reader/writer/comment collaboration on temporary files; agent dispatch injected."
+  },
+  {
+    "id": "inbox-tools",
+    "title": "inbox tools",
+    "tier": "integration",
+    "owner": "alice",
+    "lane": "hermetic",
+    "areas": [],
+    "files": [
+      "tests/integration/inbox-tools/inbox-read.spec.ts",
+      "tests/integration/inbox-tools/conversation.spec.ts",
+      "tests/integration/inbox-tools/conversation-artifacts.spec.ts"
+    ],
+    "scope": "Inbox tools and production in-memory Inbox store; conversation dispatch injected."
+  },
+  {
+    "id": "session-rename",
+    "title": "session rename",
+    "tier": "integration",
+    "owner": "alice",
+    "lane": "hermetic",
+    "areas": [],
+    "files": [
+      "tests/integration/session-rename/session-rename.spec.ts"
+    ],
+    "scope": "Session rename tool and durable resume/runtime stores; no native agent."
+  },
+  {
+    "id": "entity-routes",
+    "title": "entity routes",
+    "tier": "integration",
+    "owner": "alice",
+    "lane": "hermetic",
+    "areas": [],
+    "files": [
+      "tests/integration/entity-routes/entities.spec.ts",
+      "tests/integration/entity-routes/wikilink.spec.ts"
+    ],
+    "scope": "Entity graph/wikilink HTTP routes and in-memory entity store; isolated artifact files and controlled Issue lookup."
+  },
+  {
+    "id": "inbox-routes",
+    "title": "inbox routes",
+    "tier": "integration",
+    "owner": "alice",
+    "lane": "hermetic",
+    "areas": [],
+    "files": [
+      "tests/integration/inbox-routes/inbox.spec.ts",
+      "tests/integration/inbox-routes/inquiries.spec.ts"
+    ],
+    "scope": "Inbox HTTP reads, writes, inquiry attribution and attachment resolution with production Inbox store; dispatch controlled."
+  },
+  {
+    "id": "office-routes",
+    "title": "office routes",
+    "tier": "integration",
+    "owner": "alice",
+    "lane": "hermetic",
+    "areas": [],
+    "files": [
+      "tests/integration/office-routes/office.spec.ts"
+    ],
+    "scope": "Office HTTP mutations and durable day/follow-up stores; test-controlled Workspace/Inbox evidence, no browser."
+  },
+  {
+    "id": "runtime-log-routes",
+    "title": "runtime log routes",
+    "tier": "integration",
+    "owner": "alice",
+    "lane": "hermetic",
+    "areas": [],
+    "files": [
+      "tests/integration/runtime-log-routes/agent-runtime.spec.ts"
+    ],
+    "scope": "Activity HTTP pagination and production runtime journal with temporary log files."
+  },
+  {
+    "id": "sticker-routes",
+    "title": "sticker routes",
+    "tier": "integration",
+    "owner": "alice",
+    "lane": "hermetic",
+    "areas": [],
+    "files": [
+      "tests/integration/sticker-routes/stickers.spec.ts"
+    ],
+    "scope": "Sticker HTTP preview/import/apply, pack storage and Workspace checkout guards with temporary files."
+  },
+  {
+    "id": "workspace-routes",
+    "title": "workspace routes",
+    "tier": "integration",
+    "owner": "alice",
+    "lane": "hermetic",
+    "areas": [],
+    "files": [
+      "tests/integration/workspace-routes/workspaces.spec.ts",
+      "tests/integration/workspace-routes/workspaces-quickchat.spec.ts"
+    ],
+    "scope": "Workspace HTTP routes and real metadata/runtime-setting persistence and launch selection; Session launch callbacks controlled."
+  },
+  {
+    "id": "provider-config-routes",
+    "title": "provider config routes",
+    "tier": "integration",
+    "owner": "alice",
+    "lane": "hermetic",
+    "areas": [],
+    "files": [
+      "tests/integration/provider-config-routes/config-workspace-defaults.spec.ts"
+    ],
+    "scope": "Config routes, credential compatibility and model catalog; vault I/O and model probes injected."
+  },
+  {
+    "id": "workspace-assignee",
+    "title": "workspace assignee",
+    "tier": "integration",
+    "owner": "runtime-cli",
+    "lane": "hermetic",
+    "areas": [
+      "workspace"
+    ],
+    "files": [
+      "tests/integration/workspace-assignee/service.issue-assignee-session.spec.ts"
+    ],
+    "scope": "Real Workspace service, Issue persistence and Session ownership; native execution/host operations controlled."
+  },
+  {
+    "id": "agent-configuration",
+    "title": "agent configuration",
+    "tier": "integration",
+    "owner": "runtime-cli",
+    "lane": "hermetic",
+    "areas": [
+      "workspace",
+      "platform"
+    ],
+    "files": [
+      "tests/integration/agent-configuration/ai-config.spec.ts"
+    ],
+    "scope": "Runtime adapter credential projection and workspace preparation with temporary files; no native login or paid model."
+  },
+  {
+    "id": "cli-shims",
+    "title": "cli shims",
+    "tier": "e2e",
+    "owner": "runtime-cli",
+    "lane": "hermetic",
+    "areas": [
+      "workspace",
+      "platform"
+    ],
+    "files": [
+      "tests/e2e/cli-shims/shim.spec.ts"
+    ],
+    "scope": "Public Workspace CLI launchers against local HTTP and Inbox tool fixtures; no installed artifact or external services."
+  },
+  {
+    "id": "sse-transport",
+    "title": "sse transport",
+    "tier": "integration",
+    "owner": "alice",
+    "lane": "hermetic",
+    "areas": [],
+    "files": [
+      "tests/integration/sse-transport/sse-transport.spec.ts"
+    ],
+    "scope": "Hono/node HTTP SSE transport behavior using test-owned local server; dependency transport contract, not a browser journey."
+  },
+  {
+    "id": "test-isolation",
+    "title": "test isolation",
+    "tier": "integration",
+    "owner": "repo-tooling",
+    "lane": "hermetic",
+    "areas": [],
+    "files": [
+      "tests/integration/test-isolation/vitest-git-isolation.spec.ts"
+    ],
+    "scope": "Production Vitest environment setup and actual Git ignore discovery in a child process on isolated repositories."
+  },
+  {
+    "id": "ui-navigation",
+    "title": "ui navigation",
+    "tier": "integration",
+    "owner": "ui",
+    "lane": "hermetic",
+    "areas": [],
+    "package": "open-alice-ui",
+    "files": [
+      "tests/integration/ui-navigation/SettingsCategoryList.navigation.spec.tsx",
+      "tests/integration/ui-navigation/NewsPage.navigation.spec.tsx"
+    ],
+    "scope": "Real Router, URL adopter, tab state and page/category interactions under jsdom; API and unrelated view registry controlled."
+  },
+  {
+    "id": "ui-backend-recovery",
+    "title": "ui backend recovery",
+    "tier": "integration",
+    "owner": "ui",
+    "lane": "hermetic",
+    "areas": [],
+    "package": "open-alice-ui",
+    "files": [
+      "tests/integration/ui-backend-recovery/AuthContext.spec.tsx"
+    ],
+    "scope": "Auth provider, gate and outage overlay coordination in jsdom; backend status mocked, no live authentication."
+  },
+  {
+    "id": "ui-workspace-setup",
+    "title": "ui workspace setup",
+    "tier": "integration",
+    "owner": "ui",
+    "lane": "hermetic",
+    "areas": [],
+    "package": "open-alice-ui",
+    "files": [
+      "tests/integration/ui-workspace-setup/HarnessSetupPage.spec.tsx"
+    ],
+    "scope": "Three setup pages and shared initialization store across navigation; initialization API controlled, no installed runtime."
+  },
+  {
+    "id": "ui-update-coordination",
+    "title": "ui update coordination",
+    "tier": "integration",
+    "owner": "ui",
+    "lane": "hermetic",
+    "areas": [],
+    "package": "open-alice-ui",
+    "files": [
+      "tests/integration/ui-update-coordination/useUpdateLifecycle.spec.tsx"
+    ],
+    "scope": "Update provider and shared Workspace plan consumers in jsdom; backend/version APIs controlled."
+  },
+  {
+    "id": "demo-state",
+    "title": "demo state",
+    "tier": "integration",
+    "owner": "ui",
+    "lane": "hermetic",
+    "areas": [],
+    "package": "open-alice-ui",
+    "files": [
+      "tests/integration/demo-state/office.spec.ts",
+      "tests/integration/demo-state/workspaces-updates.spec.ts"
+    ],
+    "scope": "Demo HTTP handlers and API clients sharing Office/Workspace state; MSW/jsdom, no product backend or native Electron."
+  },
+  {
+    "id": "desktop-runtime-integration",
+    "title": "desktop runtime integration",
+    "tier": "integration",
+    "owner": "desktop",
+    "lane": "system",
+    "areas": [],
+    "commands": [
+      "open-alice#electron:smoke-toolchain",
+      "open-alice#electron:smoke:pty"
+    ],
+    "scope": "Packaged native toolchain and Electron PTY bridge integration on a supported host; not a complete UI journey. Explicit artifact prerequisites apply."
+  },
+  {
+    "id": "native-pty",
+    "title": "native pty",
+    "tier": "integration",
+    "owner": "runtime-cli",
+    "lane": "system",
+    "areas": [],
+    "commands": [
+      "bun-native-pty"
+    ],
+    "scope": "Bun/native PTY interoperability with a local child fixture; not a full CLI workflow. Requires a compatible native build."
+  },
+  {
+    "id": "windows-release-integration",
+    "title": "windows release integration",
+    "tier": "integration",
+    "owner": "runtime-cli",
+    "lane": "hermetic",
+    "areas": [
+      "platform"
+    ],
+    "package": "@traderalice/openalice-cli",
+    "files": [
+      "tests/integration/windows-release-integration/windows-release.spec.mjs"
+    ],
+    "scope": "Windows release selection, installer command and atomic layout/rollback integration; platform/spawn injected, not native Windows acceptance."
+  },
+  {
+    "id": "windows-headless-command",
+    "title": "windows headless command",
+    "tier": "integration",
+    "owner": "runtime-cli",
+    "lane": "hermetic",
+    "areas": [
+      "workspace",
+      "platform"
+    ],
+    "files": [
+      "tests/integration/windows-headless-command/win-command.spec.ts"
+    ],
+    "scope": "Windows executable resolution and headless shim interoperability on local fixtures; platform-specific cases remain skipped off Windows."
+  },
+  {
+    "id": "desktop-port-probe",
+    "title": "desktop port probe",
+    "tier": "integration",
+    "owner": "desktop",
+    "lane": "hermetic",
+    "areas": [],
+    "package": "@traderalice/desktop",
+    "files": [
+      "tests/integration/desktop-port-probe/probe-port.spec.ts"
+    ],
+    "scope": "Port selection against test-owned local TCP listeners; no desktop launch."
+  },
+  {
+    "id": "web-relay",
+    "title": "web relay",
+    "tier": "integration",
+    "owner": "runtime-cli",
+    "lane": "hermetic",
+    "areas": [
+      "platform"
+    ],
+    "package": "@traderalice/openalice-cli",
+    "files": [
+      "tests/integration/web-relay/web-relay.spec.ts"
+    ],
+    "scope": "CLI WebRelay HTTP/WebSocket forwarding against test-owned local backends; no SSH or public host."
+  },
+  {
+    "id": "guardian-process-control",
+    "title": "guardian process control",
+    "tier": "integration",
+    "owner": "runtime-cli",
+    "lane": "hermetic",
+    "areas": [
+      "platform"
+    ],
+    "package": "@traderalice/guardian-runtime",
+    "files": [
+      "tests/integration/guardian-process-control/process-control.spec.ts"
+    ],
+    "scope": "Process identity and shutdown against test-owned native children; no existing runtime ownership."
+  },
+  {
+    "id": "desktop-receipts",
+    "title": "desktop receipts",
+    "tier": "integration",
+    "owner": "repo-tooling",
+    "lane": "hermetic",
+    "areas": [],
+    "files": [
+      "tests/integration/desktop-receipts/desktop-candidate-receipt.spec.mjs"
+    ],
+    "scope": "Release receipt CLI and filesystem verification with synthetic local artifacts; no publication."
+  },
+  {
+    "id": "desktop-smoke-process",
+    "title": "desktop smoke process",
+    "tier": "integration",
+    "owner": "repo-tooling",
+    "lane": "hermetic",
+    "areas": [],
+    "files": [
+      "tests/integration/desktop-smoke-process/desktop-smoke-process.spec.mjs"
+    ],
+    "scope": "Smoke process supervisor and native test-owned process trees; no packaged desktop or real user process."
+  },
+  {
+    "id": "installer-powershell",
+    "title": "installer powershell",
+    "tier": "integration",
+    "owner": "repo-tooling",
+    "lane": "hermetic",
+    "areas": [],
+    "files": [
+      "tests/integration/installer-powershell/install-ps-download-text.spec.ts"
+    ],
+    "scope": "Existing PowerShell installer invoked with an injected download transport; skipped when PowerShell is absent."
+  },
+  {
+    "id": "runtime-port-probe",
+    "title": "runtime port probe",
+    "tier": "integration",
+    "owner": "repo-tooling",
+    "lane": "hermetic",
+    "areas": [],
+    "files": [
+      "tests/integration/runtime-port-probe/probe-port.spec.ts"
+    ],
+    "scope": "Port selection against test-owned local TCP listeners."
+  },
+  {
+    "id": "release-verifier",
+    "title": "release verifier",
+    "tier": "integration",
+    "owner": "repo-tooling",
+    "lane": "hermetic",
+    "areas": [],
+    "files": [
+      "tests/integration/release-verifier/select-release-verifier.spec.mjs"
+    ],
+    "scope": "Release verifier selection against an isolated Git repository; no remote fetch or release publication."
+  },
+  {
+    "id": "harness-transport",
+    "title": "harness transport",
+    "tier": "integration",
+    "owner": "alice",
+    "lane": "hermetic",
+    "areas": [],
+    "files": [
+      "tests/integration/harness-transport/harness-surface-proxy.spec.ts"
+    ],
+    "scope": "Harness HTTP/WebSocket proxy or child readiness lifecycle against test-owned loopback services; no real Studio checkout."
+  },
+  {
+    "id": "harness-transport-runtime-cli",
+    "title": "harness transport runtime cli",
+    "tier": "integration",
+    "owner": "runtime-cli",
+    "lane": "hermetic",
+    "areas": [
+      "workspace"
+    ],
+    "files": [
+      "tests/integration/harness-transport-runtime-cli/harness-surface-manager.spec.ts"
+    ],
+    "scope": "Harness HTTP/WebSocket proxy or child readiness lifecycle against test-owned loopback services; no real Studio checkout."
+  },
+  {
+    "id": "agent-probe-http",
+    "title": "agent probe http",
+    "tier": "integration",
+    "owner": "runtime-cli",
+    "lane": "hermetic",
+    "areas": [
+      "workspace"
+    ],
+    "files": [
+      "tests/integration/agent-probe-http/agent-probe.spec.ts"
+    ],
+    "scope": "Provider probe clients over loopback HTTP with fixture responses; no public AI provider or paid request."
+  },
+  {
+    "id": "headless-process",
+    "title": "headless process",
+    "tier": "integration",
+    "owner": "runtime-cli",
+    "lane": "hermetic",
+    "areas": [
+      "workspace"
+    ],
+    "files": [
+      "tests/integration/headless-process/headless-task.spec.ts"
+    ],
+    "scope": "Headless runner and real local child fixtures, output and cancellation; no native agent login or paid model."
+  },
+  {
+    "id": "native-model-protocol",
+    "title": "native model protocol",
+    "tier": "integration",
+    "owner": "runtime-cli",
+    "lane": "hermetic",
+    "areas": [
+      "workspace"
+    ],
+    "files": [
+      "tests/integration/native-model-protocol/native-model-discovery.spec.ts"
+    ],
+    "scope": "Native model discovery and child protocol fixtures; no native agent login or paid model."
+  },
+  {
+    "id": "git-process",
+    "title": "git process",
+    "tier": "integration",
+    "owner": "runtime-cli",
+    "lane": "hermetic",
+    "areas": [
+      "workspace"
+    ],
+    "files": [
+      "tests/integration/git-process/git-execution.spec.ts"
+    ],
+    "scope": "Git execution adapter and test-owned Node subprocesses; bundled Git path mocked."
+  },
+  {
+    "id": "cursor-shell",
+    "title": "cursor shell",
+    "tier": "integration",
+    "owner": "runtime-cli",
+    "lane": "hermetic",
+    "areas": [
+      "workspace"
+    ],
+    "files": [
+      "tests/integration/cursor-shell/cursor.spec.ts"
+    ],
+    "scope": "Cursor adapter metadata and sandbox environment restoration through a local shell; no native agent invocation."
+  },
+  {
+    "id": "yahoo-history-contract",
+    "title": "yahoo history contract",
+    "tier": "integration",
+    "owner": "alice",
+    "lane": "hermetic",
+    "areas": [
+      "market-data"
+    ],
+    "package": "@traderalice/opentypebb",
+    "files": [
+      "tests/integration/yahoo-history-contract/historical-contract.spec.ts"
+    ],
+    "scope": "Provider fetchers and historical query/normalization helpers; Yahoo SDK fully mocked, no external reads."
+  }
+]

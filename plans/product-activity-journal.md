@@ -2,7 +2,7 @@
 
 **Status:** active
 
-**Owner guides:** [[docs/event-system.md]], [[docs/conversation-provenance.md]], [[docs/ui-interaction-and-motion.md]], [[docs/project-structure.md]]
+**Owner guides:** [[docs/product-activity-journal.md]], [[docs/conversation-provenance.md]], [[docs/ui-interaction-and-motion.md]], [[docs/project-structure.md]]
 
 **Delivery:** existing `codex/office-workstation-crew` Draft PR to `dev`; do not merge until the Office topic is accepted.
 

@@ -6,7 +6,7 @@ export function collectionWideTestInputs(root) {
   return [
     '**/package.json',
     '**/{vitest,vite}*.config.*',
-    'scripts/{test-lanes,test-groups,test-commands,test-results,test-collection-inputs}.mjs',
+    'scripts/{test-lanes,test-suites,test-commands,test-results,test-collection-inputs}.mjs',
     'tests/**/*.json',
   ].map(pattern => resolve(root, pattern).replaceAll('\\', '/'))
 }

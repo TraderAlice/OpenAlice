@@ -176,9 +176,10 @@ https://download.openalice.ai/cli/dev/releases/<commit>/openalice-cli-<version>-
 https://download.openalice.ai/cli/dev/releases/<commit>/openalice-cli-<version>-<platform>-<arch>.tar.gz.sha256
 ```
 
-Every `dev` push builds all four native targets. Publication verifies each
-sidecar and the archive's target/version metadata, uploads an immutable copy
-under `cli/dev/releases/<commit>/`, and preserves a small candidate receipt.
+Every `dev` push builds the complete native target matrix defined in
+`.github/workflows/cli-installer-smoke.yml`. Publication verifies sidecars and
+archive target/version metadata, uploads immutable copies under
+`cli/dev/releases/<commit>/`, and preserves a small candidate receipt.
 A separate activation stage rechecks that remote `refs/heads/dev` is exactly
 the workflow commit before replacing the live manifest. A stale rerun is a
 successful no-op. Candidate upload and channel activation can therefore be
@@ -191,30 +192,29 @@ makes a clean native consumer fail to resolve the module even when local builds
 work from an existing workspace build. The commit-bound receipt verifies and
 restores this directory alongside the protocol/runtime packages.
 
-The rolling-dev matrix does not rebuild the platform-neutral server inputs on
-four hosts. One clean Ubuntu job runs `pnpm build:server` and publishes a
-commit-bound, SHA-256-verified artifact containing exactly `ui/dist` and the
-`dist` outputs of connector-protocol, guardian-runtime, ibkr, opentypebb, and
-uta-protocol. Each native host still checks out the same commit, installs its
-own dependencies and pinned Bun, verifies every received file and the exact
-commit before installing those six roots, then performs the host-native Bun
-compile and smoke. The receipt rejects missing, extra, changed, or pre-existing
-outputs rather than merging trees. It never carries `node_modules`, dugite Git,
-a Bun executable, service/root build output, or a host-native release. Adding a
-shared root requires a reviewed import/build need and a matching contract test;
-a missing input must fail closed instead of widening the artifact to the repo.
+The rolling-dev matrix does not rebuild platform-neutral server inputs on each
+native host. One clean Ubuntu job runs `pnpm build:server` and publishes a
+commit-bound, SHA-256-verified artifact. Its exact permitted roots are
+`CLI_NEUTRAL_INPUT_ROOTS` in `scripts/prepare-cli-neutral-inputs.mjs`, including
+the UI and built shared packages such as `update-lifecycle` above.
 
-The currently published channel-neutral installer predates this resolver and
-still downloads `openalice-cli-dev-<platform>-<arch>.tar.gz`. Activation
-temporarily refreshes those aliases after the exact-head check solely to keep
-that released bootstrap working. New installer snapshots and native dev
-updates do not consume them. Remove the compatibility writes after a beta or
-stable release has placed the manifest-driven installer on the shared public
-endpoint; do not make aliases part of the next manifest schema.
+Each target verifies every received file and the exact commit before installing
+those roots and compiling the native candidate. The receipt rejects missing,
+extra, changed, or pre-existing outputs rather than merging trees. It never
+carries `node_modules`, dugite Git, a Bun executable, service/root build output,
+or a host-native release. Adding a root requires a reviewed import/build need
+and matching contract coverage, not widening the artifact to the repository.
 
-Versioned beta and stable releases publish the same four target archives and
-sidecars as GitHub Release assets and mirror them unchanged to the download
-CDN. Stable and beta manifests remain separate; immutable
+Older released channel-neutral bootstraps download fixed
+`openalice-cli-dev-<platform>-<arch>.tar.gz` aliases. Activation retains
+compatibility writes after the exact-head check for those bootstraps. New
+installer snapshots and native dev updates resolve immutable manifest paths
+and do not consume the aliases. The writes remain a shipped-bootstrap
+compatibility boundary, not part of the native manifest schema.
+
+Versioned beta and stable releases publish the accepted native archive matrix
+and sidecars described in [[docs/cli-package-managers.md]] as GitHub Release
+assets and mirror them unchanged to the CDN. Stable and beta manifests remain separate;
 `OpenAlice-<version>-install` and
 `cli/dev/releases/<commit>/install` files are verified snapshots of the same
 root `install` source, not separate channel scripts.
@@ -495,13 +495,13 @@ is no permanent dual-runtime resolver. Before changing the active pointer, the
 cutover also backs up every legacy launcher; a validation failure restores the
 old launchers and removes the unconfirmed native pointer.
 
-Both rolling `dev` publication and every versioned beta/stable release replay this
-cutover from the published v0.90.1 installer on Linux x64. The acceptance
-fixture pins the historical Pi manifests by SHA-256 because the upstream Pi
-release assets are not part of OpenAlice's durable release surface. It then
-proves native `version`, detached `up`, `status`, `down`, and uninstall with Node
-and Agent Runtimes absent from the new Runtime path, while preserving a data
-marker and a user-owned external Pi executable.
+Stable release publication replays this cutover from the published v0.90.1
+installer on Linux x64. The current beta and rolling-dev workflows do not run
+that stable-only acceptance job; their successful candidate checks are not
+cutover evidence. The fixture pins the historical Pi manifests by SHA-256,
+then proves native version/lifecycle/uninstall behavior with Node and Agent
+Runtimes absent from the new Runtime path, while preserving a data marker and
+user-owned external Pi. See [[docs/development-workflow.md]] for release gates.
 
 The shipped v0.90.1 updater invoked the accepted versioned installer without a
 selector and bound the candidate with `OPENALICE_EXPECTED_CLI_VERSION`. The
@@ -585,7 +585,7 @@ For installer changes run:
 
 ```bash
 bash -n install
-pnpm exec vitest run packages/cli/src/install.spec.mjs
+pnpm exec vitest run tests/e2e/cli-installer/install.spec.mjs
 pnpm test:system:installer
 npx tsc --noEmit
 pnpm test
@@ -597,9 +597,9 @@ For a managed SSH or AliceProject cross-target change, also run:
 pnpm test:system:remote
 pnpm exec vitest run \\
   packages/cli/src/remote.spec.mjs \\
-  packages/cli/src/project-transfer.spec.ts \\
+  tests/integration/project-transfer/project-transfer.spec.ts \\
   packages/cli/src/project-transfer-ssh.spec.ts \\
-  packages/cli/src/project-transfer-stream.spec.ts
+  tests/integration/project-transfer/project-transfer-stream.spec.ts
 ```
 
 OpenAlice assumes the target is already reachable through ordinary SSH. These

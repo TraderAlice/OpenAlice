@@ -372,9 +372,12 @@ submission, and preserve the draft on failure. Enter respects IME composition;
 Shift+Enter inserts a newline. Session identity changes remount local composition
 state and ignore prior requests. New revisions follow the tail only while the
 reader is already there; Jump to latest is explicit and honors reduced motion.
-Idle needs no top-bar badge; busy and failure states remain visible. Runtime
-settings remain in the existing Session settings until an adapter actually
-supports a corresponding inline control.
+Idle needs no top-bar badge; busy and failure states remain visible. GUI Sessions
+use the shared composer for capability-supported AI access, model, and effort
+controls. Changes persist through idle Session reconfiguration; busy/pending
+sends lock configuration, and an unsaved or failed change blocks sending until
+saved or retried. Unsupported controls stay hidden rather than implying an
+adapter can apply them.
 
 ### Long-form Markdown
 
@@ -717,10 +720,12 @@ address history tracks submitted URLs, not cross-origin in-page navigation.
 Workspace-keyed runtime view state retains open tabs, selected tab, width and
 last Session. Mounted file/Studio tabs survive disclosure and Session changes;
 closing a tab releases its view without stopping the managed Studio process.
-Reload resets this transient view state. At content widths below 720px the
-panel replaces the conversation region while the shared header and explicit
-collapse/return action remain available. Base UI Tabs and the shared resizable
-primitive own keyboard selection and splitter behavior.
+Reload resets this transient view state. At phone viewport widths below 768px,
+the panel replaces the conversation region while the shared header and explicit
+collapse/return action remain available. At 768–1279px it stays beside the
+conversation and opening it collapses the activity rail. These are viewport
+media-query boundaries, not a 720px content-width container query. Base UI Tabs
+and the shared resizable primitive own keyboard selection and splitter behavior.
 
 Harness headers expose a single icon-only work-panel disclosure with a tooltip
 and accessible expanded state. Workspace configuration stays in the existing

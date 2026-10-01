@@ -827,7 +827,8 @@ export const workspacesHandlers = [
     if (!workspace) return HttpResponse.json({ error: 'not_found' }, { status: 404 })
     if (!workspace.harnessSource) return HttpResponse.json({ error: 'unsupported', message: 'This Workspace does not have a source receipt.' }, { status: 400 })
     const candidate = workspace.id === DEMO_AUTO_QUANT_WORKSPACE_ID && !demoProjectUpdatesReady ? demoHarnessSourceCandidate : null
-    const blockers = candidate ? ['active_runtime'] : []
+    if (!candidate) return HttpResponse.json({ error: 'no_update', message: 'This Harness Workspace is already on the newest available release.' }, { status: 400 })
+    const blockers = ['active_runtime']
     return HttpResponse.json({ plan: {
       workspaceId: workspace.id, template: workspace.template, strategy: 'source-merge',
       fromVersion: workspace.harnessSource.version, fromCommit: workspace.harnessSource.commit,

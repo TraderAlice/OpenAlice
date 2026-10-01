@@ -1092,17 +1092,17 @@ pnpm test:system:remote
 pnpm electron:smoke:pty
 pnpm electron:smoke:workspace
 pnpm exec vitest run \
-  packages/cli/src/install.spec.mjs \
+  tests/e2e/cli-installer/install.spec.mjs \
   packages/cli/src/lifecycle.spec.mjs \
-  packages/cli/src/project-command.spec.ts \
+  tests/integration/project-management/project-command.spec.ts \
   packages/cli/src/remote.spec.mjs \
-  packages/cli/src/server-control.spec.mjs \
+  tests/integration/guardian-control/server-control.spec.mjs \
   packages/cli/src/update.spec.mjs \
   packages/cli/src/rollback.spec.mjs \
   packages/cli/src/uninstall.spec.mjs \
-  packages/cli/src/project-transfer.spec.ts \
+  tests/integration/project-transfer/project-transfer.spec.ts \
   packages/cli/src/project-transfer-ssh.spec.ts \
-  packages/cli/src/project-transfer-stream.spec.ts
+  tests/integration/project-transfer/project-transfer-stream.spec.ts
 ```
 
 Use the local OrbStack Docker engine as the default clean Linux harness for

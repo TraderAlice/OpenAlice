@@ -12,10 +12,9 @@ takeover, and process-tree truth belong to [[docs/project-structure.md]] and
 `packages/guardian-runtime/`.
 
 Remaining Supervisor product work is tracked in
-[[plans/shell-first-cli-supervisor.md]]. Native Bun distribution and explicit
-release-channel work are tracked in [[plans/bun-cli-distribution.md]] and
-[[plans/release-channels-0.90.2.md]]. This guide describes only behavior already
-shipped in the current tree.
+[[plans/shell-first-cli-supervisor.md]]. Native distribution belongs to
+[[docs/cli-installer.md]]; channel publication and release decisions belong to
+[[docs/development-workflow.md]]. This guide describes implemented behavior.
 
 ## Product Boundary
 
@@ -62,11 +61,12 @@ openalice --machine <id-or-label> <command> [options]
 ```
 
 `machine add` probes and prepares a remote Runtime before saving its profile.
-The default `openalice` TUI owns the local Web relay; it connects only to
-registered Machines and their running AliceProjects. `openalice relay` serves
-the same GUI without a TUI. `--remote` remains for plan/status/stop controls;
-its former direct browser attach is retired. `--machine` re-enters an ordinary
-CLI command on a selected enabled profile.
+The default `openalice` TUI owns the local Web relay. Its launcher supports
+explicit create/start/connect actions for local and registered remote
+AliceProjects; connected Settings switching attaches running targets.
+`openalice relay` serves the same GUI without a TUI. `--remote` remains for
+plan/status/stop controls; direct browser attach is retired. `--machine`
+re-enters an ordinary CLI command on a selected enabled profile.
 
 Startup selection uses the current machine's **Default** pair in
 `Supervisor/config.json.defaultTarget`. Only successful user attachment changes
@@ -995,20 +995,19 @@ home. Installer launchers supply the lower-priority internal pair
 `OPENALICE_MANAGED_RUNTIME_CONTENT_IDENTITY`; ordinary users do not need to set
 them.
 
-Only an installer-owned Runtime carrying `OPENALICE_MANAGED_PI_PATH` receives
-project-private `PI_CODING_AGENT_DIR` and `PI_CODING_AGENT_SESSION_DIR`
-values. Source development and an external Pi retain their native user
-configuration and session roots.
+Source development and native standalone CLI launches use external Agent
+Runtimes and retain their native configuration/session roots. An explicitly
+supplied managed-Pi environment may use project-private directories through
+the common launch-context builder; that conditional projection is not an
+installer promise to bundle Pi. See [[docs/managed-workspace-runtime.md]] for
+the packaged Electron boundary.
 
-The same stored resolver selects homes for `up`, `run`, `down`, `status`,
-`open`, `logs`, and `doctor`; those commands also accept
-`--project <key>` and load a Home registered through the TUI.
-Consequently a Runtime started through the TUI and one started by
-`openalice up` receive the same managed-Pi environment, source, Web-port
-policy, and update-check setting unless an explicit command option overrides
-them. The transitional `start` and `server` compatibility presenters still
-own their legacy option parsing and output until the root parser conversion is
-complete.
+The same stored target resolver serves `up`, `run`, `down`, `status`, `logs`,
+and `doctor`; explicit `--project <key>` selects a registered local home.
+TUI and lifecycle starts use the same target, source, Web-port, and update-check
+policy unless an invocation override applies. `open` and `start` are retired
+and fail with replacement guidance; `server` remains the documented
+compatibility command, not a second startup-default authority.
 
 An inherited default Web port remains automatic for the source-backed built
 Guardian: it probes upward from 47331 together with unconfigured

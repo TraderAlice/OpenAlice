@@ -1,7 +1,7 @@
 # Compact activity notifications
 
 **Status:** implementation; approved visual, Draft PR to dev; no merge authority.
-**Owner guides:** [[docs/ui-interaction-and-motion.md]], [[docs/event-system.md]], [[docs/testing.md]].
+**Owner guides:** [[docs/ui-interaction-and-motion.md]], [[docs/product-activity-journal.md]], [[docs/testing.md]].
 
 ## PRD and design decision
 

@@ -162,16 +162,18 @@ OpenAlice-Broker-Packs-<version>-<platform>-<arch>.json
 OpenAlice-Broker-<engine>-<version>-<platform>-<arch>.tgz
 ```
 
-The release workflow runs this on macOS arm64, macOS x64, Windows x64, and
-Linux x64; publishes the files with the desktop release; mirrors them to the
-download CDN; and verifies every catalog and referenced archive.
+The versioned release matrix in `.github/workflows/release.yml` builds Packs
+for macOS arm64/x64, Windows x64, and Linux arm64/x64, publishes them with the
+release, mirrors them to the CDN, and verifies catalog/archive agreement.
+Rolling dev uses its own matrix, including Windows ARM64 with the engine
+exception noted above.
 
-Before a candidate can publish, each platform runner downloads the real Broker
-Packs from the previous GitHub Release, activates them in an isolated
-`OPENALICE_HOME`, serves the current candidate catalog locally, and runs the
-production reconciliation path. The gate requires every active pointer to move
-to the candidate while every previous immutable release remains intact. A
-fresh-install-only Pack check is not sufficient for release acceptance.
+Stable publication additionally downloads real Packs from the previous release,
+activates them in an isolated `OPENALICE_HOME`, and exercises reconciliation
+against the candidate catalog. Every active pointer must move to the candidate
+while previous immutable releases remain intact. Beta does not run that
+stable-only N-1 step; fresh-install checks must not be described as upgrade
+acceptance. The channel-specific authority is [[docs/development-workflow.md]].
 
 The build command also extracts every generated archive, verifies its catalog
 membership, size, SHA-256, package identity, entry containment, and absence of
@@ -260,7 +262,7 @@ Run the focused checks before the repository-wide gates:
 ```bash
 pnpm broker-packs:build
 pnpm broker-packs:upgrade-smoke
-pnpm vitest run src/services/broker-packs/installer.spec.ts \
+pnpm vitest run tests/integration/broker-pack-installation/installer.spec.ts \
   services/uta/src/domain/trading/brokers/registry.spec.ts \
   ui/src/components/uta/CreateUTADialog.spec.tsx
 npx tsc --noEmit

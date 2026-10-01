@@ -13,7 +13,6 @@ import { Dialog, DialogContent, DialogDescription, DialogTitle } from '../ui/dia
 import { MachineUpgradeDialog } from './MachineUpgradeDialog'
 import { ProjectUpdateReview } from './ProjectUpdateReview'
 import { claimUpgradeDialog, shouldRestoreUpgradeDialog } from './upgrade-dialog-owner'
-import { workspacePlanIsCurrent, workspacePlanRequest } from '../../lib/updates/workspacePlans'
 import { VERSION_OVERVIEW_ID } from '../../lib/updates/focusVersionOverview'
 
 const version = (value?: string | null) => value ? `v${value.replace(/^v/, '')}` : '—'
@@ -46,16 +45,15 @@ export function VersionOverviewSection() {
   const rows = updates.projectWorkspaces.map(item => {
     const workspace = item.workspace
     const state = updates.workspaceStates.find(value => value.workspaceId === workspace?.id)
-    const snapshot = workspace ? updates.workspacePlans.resource(workspacePlanRequest(workspace)).getSnapshot() : null
-    const plan = snapshot?.value?.plan
-    const current = plan?.fromVersion ?? (state?.phase === 'updated' ? state.toVersion : state?.fromVersion ?? workspace?.currentVersion ?? workspace?.upgradeAvailable?.from)
-    const candidate = plan ? (workspacePlanIsCurrent(plan) ? undefined : plan.toVersion) : state?.phase === 'updated' || state?.phase === 'current' ? undefined : state?.toVersion ?? workspace?.upgradeAvailable?.to
+    const current = state?.phase === 'updated' ? state.toVersion : state?.fromVersion ?? workspace?.currentVersion
+    const candidate = state && ['available', 'blocked'].includes(state.phase) ? state.toVersion : undefined
     const failure = setupFailures.find(failure => failure.kind === item.kind)
-    const error = item.error || snapshot?.error || snapshot?.value?.error || failure?.reason
-    const attention = Boolean(error || state?.phase === 'failed' || (plan?.blocked && !plan.blockers.every(reason => reason === 'active_runtime')))
-    const status = error ? text('checkFailed') : failure ? t('projectSetup.setupFailed') : !item.loaded ? text('loading') : !workspace ? text('notConfigured')
-      : state?.phase === 'applying' ? text('updating') : plan?.blocked || state?.phase === 'blocked' ? text('waiting')
-        : candidate ? text('available') : plan || state?.phase === 'current' || state?.phase === 'updated' ? text('current') : text('unknown')
+    const error = item.error || (state?.phase === 'failed' ? state.reason : null) || failure?.reason
+    const attention = Boolean(error || state?.phase === 'failed' || (state?.phase === 'blocked' && state.reason?.split(/\s*,\s*/).some(reason => reason !== 'active_runtime')))
+    const status = item.error || (state?.phase === 'failed' && state.failureStage === 'check') ? text('checkFailed')
+      : state?.phase === 'failed' ? text('needsAttention') : failure ? t('projectSetup.setupFailed') : !item.loaded || state?.phase === 'checking' ? text('loading') : !workspace ? text('notConfigured')
+      : state?.phase === 'applying' ? text('updating') : state?.phase === 'blocked' ? text('waiting')
+        : candidate ? text('available') : state?.phase === 'current' || state?.phase === 'updated' ? text('current') : text('unknown')
     return { ...item, current, candidate, attention, error, status }
   })
   const projectAvailable = rows.some(row => row.candidate)

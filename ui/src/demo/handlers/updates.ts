@@ -1,6 +1,6 @@
 import { createUpdatePlan, approveUpdate, UpdateCoordinator, projectUpdateUnit, type UpdateOperation, type UpdatePlan } from '@traderalice/update-lifecycle'
 import { http, HttpResponse } from 'msw'
-import { DEMO_AUTO_QUANT_WORKSPACE_ID, DEMO_CHAT_WORKSPACE_ID, demoChatWorkspace, demoWorkspaces } from '../fixtures/workspaces'
+import { DEMO_AUTO_QUANT_WORKSPACE_ID, DEMO_AUTO_PREDICTION_WORKSPACE_ID, DEMO_CHAT_WORKSPACE_ID, demoChatWorkspace, demoWorkspaces } from '../fixtures/workspaces'
 
 export const demoProjectUpdatesReady = typeof location !== 'undefined' && new URLSearchParams(location.search).get('updates') === 'ready'
 if (demoProjectUpdatesReady) Object.assign(demoChatWorkspace, { upgradeAvailable: { from: '0.1.0', to: '0.2.0' } })
@@ -15,13 +15,20 @@ export const demoHarnessSourceCandidate = {
   fromVersion: 'v0.8.31', toVersion: 'v0.8.32', verified: false,
   toCommit: 'b'.repeat(40),
 }
-const snapshot = () => ({ preferences, workspaces: demoProjectUpdatesReady ? [] : [{
-  workspaceId: DEMO_AUTO_QUANT_WORKSPACE_ID, template: 'auto-quant-v2',
-  phase: preferences.autoUpdateAutoQuant ? 'blocked' : 'available',
-  fromVersion: demoHarnessSourceCandidate.fromVersion, toVersion: demoHarnessSourceCandidate.toVersion, verified: demoHarnessSourceCandidate.verified,
-  checkedAt: new Date().toISOString(),
-  ...(preferences.autoUpdateAutoQuant ? { reason: 'active_runtime' } : {}),
-}] })
+const snapshot = () => ({ preferences, workspaces: [
+  { workspaceId: DEMO_CHAT_WORKSPACE_ID, template: 'chat', checkedAt: new Date().toISOString(),
+    fromVersion: demoChatWorkspace.currentVersion ?? '0.1.0',
+    ...(demoChatWorkspace.upgradeAvailable ? { phase: 'available', toVersion: demoChatWorkspace.upgradeAvailable.to } : { phase: 'current' }) },
+  { workspaceId: DEMO_AUTO_QUANT_WORKSPACE_ID, template: 'auto-quant-v2', checkedAt: new Date().toISOString(),
+    fromVersion: demoHarnessSourceCandidate.fromVersion,
+    ...(demoProjectUpdatesReady ? { phase: 'current' } : {
+      phase: preferences.autoUpdateAutoQuant ? 'blocked' : 'available',
+      toVersion: demoHarnessSourceCandidate.toVersion, verified: demoHarnessSourceCandidate.verified,
+      ...(preferences.autoUpdateAutoQuant ? { reason: 'active_runtime' } : {}),
+    }) },
+  { workspaceId: DEMO_AUTO_PREDICTION_WORKSPACE_ID, template: 'auto-prediction', phase: 'current', checkedAt: new Date().toISOString(),
+    fromVersion: demoWorkspaces.find(workspace => workspace.id === DEMO_AUTO_PREDICTION_WORKSPACE_ID)?.harnessSource?.version },
+] })
 
 let clientPreferences = { autoCheck: true }
 const clientSnapshot = () => ({

@@ -28,9 +28,18 @@ export function ProjectUpdateReview({ onClose }: { onClose(): void }) {
   const [retry, setRetry] = useState(0)
   const mounted = useRef(true)
   useEffect(() => { mounted.current = true; return () => { mounted.current = false } }, [])
-  const rows = updates.projectWorkspaces.flatMap(({ workspace, label }) => {
+  const candidates = updates.projectWorkspaces.flatMap(item => {
+    if (!item.workspace) return []
+    const state = updates.workspaceStates.find(state => state.workspaceId === item.workspace!.id)
+    if (!state?.toVersion || !['available', 'blocked'].includes(state.phase)) return []
+    return [{ ...item, workspace: item.workspace, request: { ...workspacePlanRequest(item.workspace), targetVersion: state.toVersion } }]
+  })
+  const candidateKey = JSON.stringify(candidates.map(item => item.request))
+  useEffect(() => {
+    for (const item of candidates) void updates.workspacePlans.ensure(item.request)
+  }, [updates.workspacePlans, candidateKey, retry, updates.workspacePlans.getSnapshot()]) // eslint-disable-line react-hooks/exhaustive-deps
+  const rows = candidates.flatMap(({ workspace, label, request }) => {
     if (!workspace) return []
-    const request = workspacePlanRequest(workspace)
     const snapshot = updates.workspacePlans.resource(request).getSnapshot()
     const preview = snapshot.value?.plan
     if (!preview || workspacePlanIsCurrent(preview)) return []
@@ -40,11 +49,11 @@ export function ProjectUpdateReview({ onClose }: { onClose(): void }) {
       conflicts: preview.strategy === 'managed-context' ? preview.summary.conflicts > 0 : preview.conflictedPaths.length > 0,
     }]
   })
-  const previews = updates.projectWorkspaces.flatMap(({ workspace }) => workspace ? [updates.workspacePlans.resource(workspacePlanRequest(workspace)).getSnapshot()] : [])
-  const previewError = updates.projectWorkspaces.find(item => item.error)?.error
+  const previews = candidates.map(({ request }) => updates.workspacePlans.resource(request).getSnapshot())
+  const previewError = updates.error || updates.workspaceStates.find(state => state.phase === 'failed' && updates.projectWorkspaces.some(item => item.workspace?.id === state.workspaceId))?.reason || updates.projectWorkspaces.find(item => item.error)?.error
     || previews.map(snapshot => snapshot.error ?? snapshot.value?.error).find(Boolean)
-  const pendingPreview = updates.projectWorkspaces.some(item => !item.loaded) || previews.some(snapshot => snapshot.checking || (!snapshot.value && !snapshot.error))
-  const key = JSON.stringify(rows.map(row => [row.id, row.preview.planDigest, row.error, row.checking]))
+  const pendingPreview = updates.checking || updates.projectWorkspaces.some(item => !item.loaded || updates.workspaceStates.some(state => state.workspaceId === item.workspace?.id && ['checking', 'applying'].includes(state.phase))) || previews.some(snapshot => snapshot.checking || (!snapshot.value && !snapshot.error))
+  const key = JSON.stringify([candidateKey, rows.map(row => [row.id, row.preview.planDigest, row.error, row.checking])])
   const plan = reviewed?.key === key ? reviewed.plan : null
   const operation = updates.operation
   const active = operation && operation.phase !== 'succeeded'
