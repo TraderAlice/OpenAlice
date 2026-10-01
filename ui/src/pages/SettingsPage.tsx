@@ -1,6 +1,6 @@
 import { Select } from '@/components/ui/select'
-import { useState, useEffect, useCallback, useId, useMemo } from 'react'
-import { ChevronDown, Moon, RotateCcw, Search, Sun } from 'lucide-react'
+import { Fragment, useState, useEffect, useCallback, useId, useMemo } from 'react'
+import { ChevronDown, ChevronRight, Moon, RotateCcw, Search, Sun } from 'lucide-react'
 import { api } from '../api'
 import type { ToolInfo } from '../api/tools'
 import { SegmentedControl } from '../components/SegmentedControl'
@@ -862,8 +862,8 @@ export function ToolsSection() {
         <EmptyState title={t('settings.tools.emptyTitle')} description={t('settings.tools.emptyDescription')} />
       ) : (
         <div>
-          <div className="mb-6 flex items-center gap-2">
-            <label className="flex h-11 min-w-0 flex-1 items-center gap-3 rounded-lg border border-input bg-background px-4 focus-within:[box-shadow:var(--oa-focus-shadow)]">
+          <div className="mb-2 grid grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-x-2 gap-y-1 sm:mb-6 sm:grid-cols-[minmax(0,1fr)_auto_auto_auto]">
+            <label className="flex h-11 min-w-0 items-center gap-3 rounded-lg border border-input bg-background px-4 focus-within:[box-shadow:var(--oa-focus-shadow)]">
               <Search aria-hidden className="size-4 shrink-0 text-muted-foreground" />
               <input type="search" value={query} onChange={(event) => {
                 setQuery(event.target.value)
@@ -874,7 +874,9 @@ export function ToolsSection() {
             </label>
             <CountBadge count={matchingCount} label={t('settings.tools.count', { count: matchingCount })} />
             <ContextHelp label={t('settings.category.tools')}>{t('settings.tools.summary', { tools: inventory.length, groups: groups.length })}</ContextHelp>
-            <SaveIndicator status={status} onRetry={retry} />
+            <div className="col-span-3 flex min-h-5 justify-end sm:col-span-1">
+              <SaveIndicator status={status} onRetry={retry} />
+            </div>
           </div>
           <div className="space-y-2">
             {matchingGroups.length === 0 && <EmptyState title={t('settings.tools.noMatches')} />}
@@ -924,22 +926,16 @@ function ToolGroupCard({
   const toolListId = useId()
 
   return (
-    <Collapsible open={expanded} onOpenChange={onToggleExpanded} className="rounded-2xl bg-background overflow-hidden">
-      <div className="flex items-center gap-3 px-5 py-3 bg-secondary">
+    <Collapsible open={expanded} onOpenChange={onToggleExpanded} className="group/tool-group overflow-hidden rounded-2xl border border-border/60 bg-secondary">
+      <div className="flex items-center gap-3 px-4 py-1">
         <CollapsibleTrigger
           type="button"
-          className="flex min-h-12 min-w-0 flex-1 items-center gap-3 rounded-md py-2 text-left focus-visible:outline-none focus-visible:[box-shadow:var(--oa-focus-shadow)]"
+          className="group/tool-trigger flex min-h-12 min-w-0 flex-1 items-center gap-3 rounded-md py-2 text-left focus-visible:outline-none focus-visible:[box-shadow:var(--oa-focus-shadow)]"
           aria-expanded={expanded}
           aria-controls={toolListId}
         >
-          <svg
-            width="14" height="14" viewBox="0 0 24 24"
-            fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
-            className={`shrink-0 transition-transform duration-[var(--motion-fast)] ${expanded ? 'rotate-90' : ''}`}
-          >
-            <polyline points="9 18 15 12 9 6" />
-          </svg>
-          <span className="text-base font-semibold text-foreground truncate">{label}</span>
+          <ChevronRight aria-hidden className={`size-4 shrink-0 text-muted-foreground group-hover/tool-trigger:text-foreground transition-transform duration-[var(--motion-standard)] group-data-[instant]/tool-group:transition-none motion-reduce:transition-none ${expanded ? 'rotate-90' : ''}`} />
+          <span className="min-w-0 text-base font-semibold text-foreground [overflow-wrap:anywhere]">{label}</span>
           <CountBadge count={enabledCount} label={t('settings.tools.enabledCount', { count: enabledCount, total: group.tools.length })} />
         </CollapsibleTrigger>
         <Toggle
@@ -955,18 +951,20 @@ function ToolGroupCard({
         aria-hidden={!expanded}
         inert={!expanded ? true : undefined}
       >
-        <div className="divide-y divide-border">
+        <div className="mx-4 divide-y divide-border/60 border-t border-border/60 pb-1">
           {group.tools.map((t) => {
             const enabled = !disabled.has(t.name)
             return (
               <div
                 key={t.name}
-                className={`flex min-h-12 items-center gap-3 px-4 py-2 ${
-                  enabled ? '' : 'bg-muted/30'
-                }`}
+                className="flex min-h-14 items-center gap-3 py-2"
               >
-                <div className="flex flex-1 min-w-0 items-center gap-2">
-                  <span className="truncate text-sm leading-5 text-foreground font-mono" title={t.name}>{t.name}</span>
+                <div className="flex min-w-0 flex-1 items-center gap-2 pl-7">
+                  <span className="min-w-0 font-mono text-sm leading-5 text-foreground [overflow-wrap:anywhere]">
+                    {t.name.split(/(?<=[a-z0-9])(?=[A-Z])|(?<=[_.:/-])/u).map((part, index) => (
+                      <Fragment key={index}>{index > 0 && <wbr />}{part}</Fragment>
+                    ))}
+                  </span>
                   {t.description && (
                     <ContextHelp label={t.name}>{t.description}</ContextHelp>
                   )}

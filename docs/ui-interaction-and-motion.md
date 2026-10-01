@@ -467,6 +467,15 @@ pressed again.
 Issue groups and tool groups use the shared Collapsible measurement and lifetime.
 Tool search opens matching groups, retains individual disclosure control and
 reports the matching count. Tool descriptions live in the contextual help owner.
+Each tool group owns one continuous rounded surface. Its header and tool rows
+share a 16px horizontal inset and a trailing switch rail; tool names align with
+the group label after the 16px chevron and 12px gap. Inset separators stay inside
+the rounded boundary. Long group labels and tool identifiers wrap within their
+text column; identifiers prefer camel-case and delimiter boundaries. Header
+targets start at 48px tall, tool rows start at 56px, and sibling
+groups retain an 8px gap. Keyboard disclosure and reduced motion update the
+chevron and panel immediately. The narrow search toolbar reserves a separate
+save-status row, preserving the input width and the first group's position.
 The landing suggestions retain their layout space as the draft changes, keeping
 the welcome heading and composer anchored. Keyboard input updates this state
 immediately. Market shortcuts share one component and a neutral visual treatment.
