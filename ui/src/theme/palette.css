@@ -20,7 +20,7 @@
   --popover-foreground: #0e0f0c;
   --primary: #163300;
   --primary-foreground: #ffffff;
-  --secondary: rgba(22, 51, 0, 0.04);
+  --secondary: color-mix(in srgb, #163300 4%, #ffffff);
   --secondary-foreground: #0e0f0c;
   --muted: #e7e9e4;
   --muted-foreground: #454745;

@@ -381,13 +381,6 @@ body {
   box-shadow: 0 0 0 2px var(--foreground), 0 6px 24px color-mix(in srgb, var(--shadow-color) 6%, transparent);
 }
 
-@supports (corner-shape: superellipse(1.5)) {
-  .oa-harness-context-tray,
-  .oa-harness-composer-shell {
-    corner-shape: superellipse(1.5);
-  }
-}
-
 .oa-chat-new-action {
   box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--foreground) 3.5%, transparent);
 }

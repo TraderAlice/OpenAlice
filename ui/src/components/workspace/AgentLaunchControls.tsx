@@ -216,7 +216,7 @@ function AgentLaunchAccessItems({ config, onConfigureProvider }: {
   const runtimeName = config.selectedAgent?.displayName ?? t('chatLanding.runtimeFallback')
   return (
     <DropdownMenuGroup>
-      <DropdownMenuLabel className="border-b border-border/60 px-2.5 py-2 text-[11px]">
+      <DropdownMenuLabel className="border-b border-border/60 px-2.5 py-2 text-sm">
         {t('chatLanding.credentialMenuTitle', { runtime: runtimeName })}
       </DropdownMenuLabel>
       {config.detectedCredential?.configured === true && (
@@ -224,12 +224,12 @@ function AgentLaunchAccessItems({ config, onConfigureProvider }: {
           onClick={() => {
             config.selectWorkspaceDefault()
           }}
-          className={`min-h-11 px-2.5 py-2 text-[12px] ${config.accessMode === 'auto' ? 'text-primary' : 'text-foreground'}`}
+          className={`min-h-11 px-2.5 py-2 text-sm ${config.accessMode === 'auto' ? 'text-primary' : 'text-foreground'}`}
         >
           <span className="min-w-0 flex-1">
             <span className="block truncate">{t('chatLanding.workspaceAiAccess')}</span>
             {config.detectedCredential.model && (
-              <span className="block truncate text-[10px] text-muted-foreground">{config.detectedCredential.model}</span>
+              <span className="block truncate text-sm text-muted-foreground">{config.detectedCredential.model}</span>
             )}
           </span>
           {config.accessMode === 'auto' && <SelectionCheckIcon />}
@@ -239,12 +239,12 @@ function AgentLaunchAccessItems({ config, onConfigureProvider }: {
         onClick={() => {
           config.selectRuntimeDefault()
         }}
-        className={`min-h-11 px-2.5 py-2 text-[12px] ${config.accessMode === 'native' ? 'text-primary' : 'text-foreground'}`}
+        className={`min-h-11 px-2.5 py-2 text-sm ${config.accessMode === 'native' ? 'text-primary' : 'text-foreground'}`}
       >
         <AgentRuntimeIcon agentId={config.effectiveAgent} className="h-4 w-4 shrink-0" />
         <span className="min-w-0 flex-1">
           <span className="block truncate">{t('chatLanding.runtimeAccount', { runtime: runtimeName })}</span>
-          <span className="block truncate text-[10px] text-muted-foreground">{t('chatLanding.runtimeAccountDetail', { runtime: runtimeName })}</span>
+          <span className="block truncate text-sm text-muted-foreground">{t('chatLanding.runtimeAccountDetail', { runtime: runtimeName })}</span>
         </span>
         {config.accessMode === 'native' && <SelectionCheckIcon />}
       </DropdownMenuItem>
@@ -256,30 +256,30 @@ function AgentLaunchAccessItems({ config, onConfigureProvider }: {
             onClick={() => {
               config.selectCredential(credential.slug)
             }}
-            className={`min-h-11 px-2.5 py-2 text-[12px] ${active ? 'text-primary' : 'text-foreground'}`}
+            className={`min-h-11 px-2.5 py-2 text-sm ${active ? 'text-primary' : 'text-foreground'}`}
           >
             <span className="flex h-4 w-4 shrink-0 items-center justify-center text-muted-foreground">
               <AIProviderIcon vendor={credential.vendor} className="h-4 w-4" />
             </span>
             <span className="min-w-0 flex-1">
               <span className="block truncate">{credentialAccessLabel(credential)}</span>
-              <span className="block truncate text-[10px] text-muted-foreground">
+              <span className="block truncate text-sm text-muted-foreground">
                 {t('chatLanding.savedAccessDetail', { credential: credentialAccessDetail(credential) })}
               </span>
             </span>
             {credential.resolvedModel && (
-              <span className="max-w-[100px] shrink-0 truncate text-[10px] text-muted-foreground">{credential.resolvedModel}</span>
+              <span className="max-w-[100px] shrink-0 truncate text-sm text-muted-foreground">{credential.resolvedModel}</span>
             )}
             {active && <SelectionCheckIcon />}
           </DropdownMenuItem>
         )
       })}
       <DropdownMenuSeparator />
-      <DropdownMenuItem onClick={onConfigureProvider} className="min-h-11 px-2.5 py-2 text-[12px]">
+      <DropdownMenuItem onClick={onConfigureProvider} className="min-h-11 px-2.5 py-2 text-sm">
         <KeyRound className="h-4 w-4 shrink-0" aria-hidden />
         <span className="min-w-0 flex-1">
           <span className="block">{t('chatLanding.addApiAccount')}</span>
-          <span className="block text-[10px] text-muted-foreground">{t('chatLanding.addApiAccountDetail')}</span>
+          <span className="block text-sm text-muted-foreground">{t('chatLanding.addApiAccountDetail')}</span>
         </span>
       </DropdownMenuItem>
     </DropdownMenuGroup>
@@ -363,13 +363,13 @@ function AgentLaunchInferenceMenu({
             aria-label={access ? `${t('chatLanding.selectCredential')}, ${t('chatLanding.selectModelAndEffort')}` : t('chatLanding.selectModelAndEffort')}
             className={settings
               ? 'oa-pressable flex min-h-14 w-full min-w-0 items-center gap-3 rounded-lg border border-border/70 bg-muted/25 px-3 py-2 text-left transition-colors hover:bg-muted/45'
-              : 'oa-pressable inline-flex min-h-7 min-w-0 max-w-full items-center gap-1 rounded-lg bg-transparent px-1.5 py-1 text-[12px] leading-[18px] font-medium text-foreground transition-colors hover:bg-muted'}
+              : 'oa-pressable inline-flex min-h-7 min-w-0 max-w-full items-center gap-1 rounded-lg bg-transparent px-1.5 py-1 text-sm leading-5 font-medium text-foreground transition-colors hover:bg-muted'}
           />}
         >
           {access?.icon ?? <Cpu className={settings ? 'h-4 w-4 shrink-0 text-muted-foreground' : 'h-3 w-3 shrink-0 text-muted-foreground'} />}
           {settings ? (
             <span className="min-w-0 flex-1">
-              <span className="block text-[10px] font-medium text-muted-foreground">
+              <span className="block text-sm font-medium text-muted-foreground">
                 {t('chatLanding.selectModelAndEffort')}
               </span>
               <span className="flex min-w-0 items-baseline gap-2 text-sm text-foreground">
@@ -391,31 +391,31 @@ function AgentLaunchInferenceMenu({
           sideOffset={6}
           positionerClassName={menuPositionerClassName}
           aria-label={access ? `${t('chatLanding.selectCredential')}, ${t('chatLanding.selectModelAndEffort')}` : t('chatLanding.selectModelAndEffort')}
-          className="w-[300px] max-w-[calc(100vw-2rem)] rounded-xl border border-border/70 bg-secondary p-1.5 shadow-lg ring-0"
+          className="w-[300px] max-w-[calc(100vw-2rem)] rounded-xl border border-border/70 p-1.5 shadow-lg ring-0"
         >
           {access && <DropdownMenuSub>
-            <DropdownMenuSubTrigger className="min-h-10 px-2.5 py-2 text-[12px]">
+            <DropdownMenuSubTrigger className="min-h-10 px-2.5 py-2 text-sm">
               {access.icon}
               <span>{t('chatLanding.selectCredential')}</span>
               <span className="ml-auto max-w-[170px] truncate text-muted-foreground">{access.label}</span>
             </DropdownMenuSubTrigger>
-            <DropdownMenuSubContent className="w-[300px] max-w-[calc(100vw-2rem)] max-h-80 overflow-y-auto bg-secondary p-1.5">
+            <DropdownMenuSubContent className="w-[300px] max-w-[calc(100vw-2rem)] max-h-80 overflow-y-auto p-1.5">
               {access.items}
             </DropdownMenuSubContent>
           </DropdownMenuSub>}
           <DropdownMenuSub>
-            <DropdownMenuSubTrigger className="min-h-10 px-2.5 py-2 text-[12px]">
+            <DropdownMenuSubTrigger className="min-h-10 px-2.5 py-2 text-sm">
               <span className="font-medium">{t('chatLanding.modelField')}</span>
               <span className="ml-auto max-w-[170px] truncate text-muted-foreground">{resolvedModel}</span>
             </DropdownMenuSubTrigger>
-            <DropdownMenuSubContent className="w-[300px] max-w-[calc(100vw-2rem)] border border-border/70 bg-secondary p-1.5 shadow-lg ring-0">
+            <DropdownMenuSubContent className="w-[300px] max-w-[calc(100vw-2rem)] border border-border/70 p-1.5 shadow-lg ring-0">
               <ModelCatalogStatus catalog={config.modelCatalog} selectedModel={config.launchModel ?? config.defaultModel} />
               <DropdownMenuRadioGroup
                 className="max-h-64 overflow-y-auto"
                 value={modelValue}
                 onValueChange={(value) => config.selectModel(value ? String(value) : null)}
               >
-                <DropdownMenuRadioItem value="" closeOnClick={false} className="min-h-9 px-2.5 pr-8 text-[12px]">
+                <DropdownMenuRadioItem value="" closeOnClick={false} className="min-h-9 px-2.5 pr-8 text-sm">
                   {config.defaultModel ? (
                     <span className="flex min-w-0 flex-1 items-baseline gap-2">
                       <span className="shrink-0">{t('chatLanding.defaultLabel')}</span>
@@ -426,16 +426,16 @@ function AgentLaunchInferenceMenu({
                   )}
                 </DropdownMenuRadioItem>
                 {customCurrentModel && (
-                  <DropdownMenuRadioItem value={customCurrentModel} closeOnClick={false} className="min-h-9 px-2.5 pr-8 text-[12px]">
+                  <DropdownMenuRadioItem value={customCurrentModel} closeOnClick={false} className="min-h-9 px-2.5 pr-8 text-sm">
                     <span className="min-w-0 flex-1 truncate">{customCurrentModel}</span>
                   </DropdownMenuRadioItem>
                 )}
                 {knownModels.map((model) => (
-                  <DropdownMenuRadioItem key={model.id} value={model.id} closeOnClick={false} className="min-h-9 px-2.5 pr-8 text-[12px]">
+                  <DropdownMenuRadioItem key={model.id} value={model.id} closeOnClick={false} className="min-h-9 px-2.5 pr-8 text-sm">
                     <span className="min-w-0 flex-1">
                       <span className="block truncate">{model.label}</span>
                       {model.label !== model.id && (
-                        <span className="block truncate text-[10px] text-muted-foreground">{model.id}</span>
+                        <span className="block truncate text-sm text-muted-foreground">{model.id}</span>
                       )}
                     </span>
                   </DropdownMenuRadioItem>
@@ -443,7 +443,7 @@ function AgentLaunchInferenceMenu({
               </DropdownMenuRadioGroup>
               <DropdownMenuSeparator />
               <DropdownMenuItem
-                className="min-h-9 px-2.5 text-[12px]"
+                className="min-h-9 px-2.5 text-sm"
                 onClick={() => {
                   setCustomModelDraft(config.launchModel ?? config.defaultModel ?? '')
                   pendingCustomModelRef.current = true
@@ -455,24 +455,24 @@ function AgentLaunchInferenceMenu({
           </DropdownMenuSub>
 
           <DropdownMenuSub>
-            <DropdownMenuSubTrigger className="min-h-10 px-2.5 py-2 text-[12px]">
+            <DropdownMenuSubTrigger className="min-h-10 px-2.5 py-2 text-sm">
               <span className="font-medium">{t('chatLanding.effortField')}</span>
               <span className="ml-auto max-w-[140px] truncate text-muted-foreground">{resolvedEffort}</span>
             </DropdownMenuSubTrigger>
-            <DropdownMenuSubContent className="w-[220px] max-w-[calc(100vw-2rem)] border border-border/70 bg-secondary p-1.5 shadow-lg ring-0">
+            <DropdownMenuSubContent className="w-[220px] max-w-[calc(100vw-2rem)] border border-border/70 p-1.5 shadow-lg ring-0">
               <DropdownMenuRadioGroup
                 value={effortValue}
                 onValueChange={(value) => config.selectReasoningEffort(
                   value ? String(value) as NonNullable<AgentLaunchConfigState['launchReasoningEffort']> : null,
                 )}
               >
-                <DropdownMenuRadioItem value="" closeOnClick={false} className="min-h-9 px-2.5 pr-8 text-[12px]">
+                <DropdownMenuRadioItem value="" closeOnClick={false} className="min-h-9 px-2.5 pr-8 text-sm">
                   <span className="min-w-0 flex-1 truncate">
                     {t('chatLanding.effortNotSpecified')}
                   </span>
                 </DropdownMenuRadioItem>
                 {effortOptions.map((effort) => (
-                  <DropdownMenuRadioItem key={effort} value={effort} closeOnClick={false} className="min-h-9 px-2.5 pr-8 text-[12px]">
+                  <DropdownMenuRadioItem key={effort} value={effort} closeOnClick={false} className="min-h-9 px-2.5 pr-8 text-sm">
                     {t('chatLanding.reasoningEffortSummary', { effort })}
                   </DropdownMenuRadioItem>
                 ))}
@@ -597,7 +597,7 @@ export const AgentLaunchSelectors = forwardRef<AgentLaunchSelectorsHandle, Agent
           onClick={onConfigureProvider}
           variant="ghost"
           size="sm"
-          className="bg-warning/10 text-[11px] text-warning hover:bg-warning/20 hover:text-warning"
+          className="bg-warning/10 text-sm text-warning hover:bg-warning/20 hover:text-warning"
         >
           <KeyRound className="h-3 w-3" />
           {t('chatLanding.configureProvider')}
@@ -622,13 +622,13 @@ export const AgentLaunchSelectors = forwardRef<AgentLaunchSelectorsHandle, Agent
             </span>
             <span className="min-w-0 flex-1">
               {(labeled || settingsLayout) && (
-                <span className={`block truncate font-medium text-muted-foreground ${settingsLayout ? 'text-[10px]' : 'text-[9.5px]'}`}>
+                <span className="block truncate text-sm font-medium text-muted-foreground">
                   {t('chatLanding.aiAccess')}
                 </span>
               )}
-              <span className={`block truncate text-foreground ${settingsLayout ? 'text-sm font-medium' : 'text-[12px]'}`}>{selectedAccessLabel}</span>
+              <span className={`block truncate text-sm text-foreground ${settingsLayout ? 'font-medium' : ''}`}>{selectedAccessLabel}</span>
               {(labeled || settingsLayout) && (
-                <span className={`block truncate text-muted-foreground ${settingsLayout ? 'text-xs' : 'text-[9.5px]'}`}>{selectedAccessDetail}</span>
+                <span className="block truncate text-sm text-muted-foreground">{selectedAccessDetail}</span>
               )}
             </span>
             <ChevronDown className={settingsLayout ? 'h-4 w-4 shrink-0 opacity-60' : 'h-3 w-3 shrink-0 opacity-60'} />
@@ -638,7 +638,7 @@ export const AgentLaunchSelectors = forwardRef<AgentLaunchSelectorsHandle, Agent
             side={menuPlacement === 'down' ? 'bottom' : 'top'}
             sideOffset={6}
             positionerClassName={menuPositionerClassName}
-            className="w-[min(22rem,calc(100vw-2rem))] max-w-[calc(100vw-2rem)] rounded-xl border border-border/70 bg-secondary p-1.5 shadow-lg ring-0"
+            className="w-[min(22rem,calc(100vw-2rem))] max-w-[calc(100vw-2rem)] rounded-xl border border-border/70 p-1.5 shadow-lg ring-0"
           >
             <AgentLaunchAccessItems config={config} onConfigureProvider={onConfigureProvider} />
           </DropdownMenuContent>

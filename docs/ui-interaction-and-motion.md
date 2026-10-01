@@ -19,7 +19,8 @@ financial semantics, and existing workflow contracts.
 
 - `theme/palette.css` owns white surfaces, forest ink (`#163300`), primary action
   lime (`#9FE870`), and secondary forest tint. `--action` owns filled controls;
-  `--primary` owns links and text. Saved palette identifiers remain stable.
+  `--primary` owns links and text. Secondary tint is composited over the canvas;
+  floating surfaces remain opaque. Saved palette identifiers remain stable.
 - Inter is served locally under the SIL Open Font License. Supporting copy uses
   14px, fields use 16px, and page titles use 22px with a 1.25 line height.
   Locale-specific fallback fonts retain the correct CJK glyph forms.

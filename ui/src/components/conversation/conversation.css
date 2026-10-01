@@ -141,8 +141,6 @@
 
 .conversation-error { display: grid; gap: 7px; margin: 20px 0; padding: 13px; border: 1px solid color-mix(in srgb, var(--destructive) 50%, var(--border)); border-radius: 10px; color: var(--destructive); font-size: var(--text-sm); }
 .conversation-error button { width: fit-content; color: var(--foreground); text-decoration: underline; }
-.conversation-jump-latest { position: absolute; right: max(18px, calc((100% - 736px) / 2)); bottom: 82px; z-index: 2; padding: 6px 10px; border: 1px solid color-mix(in srgb, var(--primary) 42%, var(--border)); border-radius: 999px; color: var(--foreground); background: color-mix(in srgb, var(--secondary) 92%, transparent); box-shadow: 0 5px 18px color-mix(in srgb, var(--shadow-color) 16%, transparent); font-size: var(--text-sm); font-weight: 650; }
-.conversation-jump-latest:hover { border-color: var(--primary); color: var(--primary); }
 .conversation-compaction-status { display: flex; align-items: flex-start; gap: 9px; margin: 0 max(18px, calc((100% - 736px) / 2)) 10px; padding: 10px 12px; border: 1px solid color-mix(in srgb, var(--primary) 34%, var(--border)); border-radius: 10px; color: var(--primary); background: color-mix(in srgb, var(--primary) 7%, var(--secondary)); }
 .conversation-compaction-status > svg { flex: 0 0 auto; margin-top: 2px; }
 .conversation-compaction-status > div { display: grid; gap: 2px; min-width: 0; }
@@ -153,7 +151,6 @@
  * focus rule so its inset textarea does not draw a second rectangular ring. */
 :root .oa-harness-composer .conversation-input[data-slot="textarea"]:focus-visible { outline: none; box-shadow: none; }
 .conversation-jump-row { position: absolute; bottom: 100%; left: 0; right: 0; display: flex; justify-content: center; padding: 8px; pointer-events: none; }
-.conversation-jump-row .conversation-jump-latest { position: static; pointer-events: auto; font-size: var(--text-sm); }
 .conversation-composer-wrap .conversation-compaction-status { margin: 0 0 10px; }
 .conversation-activity summary:focus-visible, .conversation-detail summary:focus-visible, .conversation-reasoning summary:focus-visible { outline: 2px solid var(--oa-focus-ring); outline-offset: -2px; }
 .conversation-unknown { overflow-wrap: anywhere; }
@@ -175,7 +172,6 @@
  * the browser viewport. */
 @container conversation (max-width: 720px) {
   .conversation-compaction-status { margin-left: 12px; margin-right: 12px; }
-  .conversation-jump-latest { right: 12px; }
   .conversation-message.is-user { margin-left: 0; }
   .conversation-tool-step > summary { grid-template-columns: 18px minmax(52px, auto) minmax(0, 1fr) 14px; }
   .conversation-step-size { display: none; }
