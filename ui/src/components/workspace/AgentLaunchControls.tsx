@@ -115,7 +115,7 @@ function AgentLaunchAccessItems({ config, onConfigureProvider }: {
   const runtimeName = config.selectedAgent?.displayName ?? t('chatLanding.runtimeFallback')
   return (
     <DropdownMenuGroup>
-      <DropdownMenuLabel className="border-b border-border/60">
+      <DropdownMenuLabel inset>
         {t('chatLanding.credentialMenuTitle', { runtime: runtimeName })}
       </DropdownMenuLabel>
       {config.detectedCredential?.configured === true && (
@@ -123,7 +123,7 @@ function AgentLaunchAccessItems({ config, onConfigureProvider }: {
           onClick={() => {
             config.selectWorkspaceDefault()
           }}
-          className={`min-h-11 ${config.accessMode === 'auto' ? 'text-primary' : 'text-foreground'}`}
+          className="min-h-11"
         >
           <Settings2 className="size-4 shrink-0" aria-hidden />
           <span className="min-w-0 flex-1">
@@ -132,21 +132,21 @@ function AgentLaunchAccessItems({ config, onConfigureProvider }: {
               <span className="block break-words text-sm text-muted-foreground">{config.detectedCredential.model}</span>
             )}
           </span>
-          {config.accessMode === 'auto' && <SelectionCheckIcon />}
+          <span className="size-4 shrink-0">{config.accessMode === 'auto' && <SelectionCheckIcon />}</span>
         </DropdownMenuItem>
       )}
       <DropdownMenuItem
         onClick={() => {
           config.selectRuntimeDefault()
         }}
-        className={`min-h-11 ${config.accessMode === 'native' ? 'text-primary' : 'text-foreground'}`}
+        className="min-h-11"
       >
         <AgentRuntimeIcon agentId={config.effectiveAgent} className="h-4 w-4 shrink-0" />
         <span className="min-w-0 flex-1">
           <span className="block break-words">{t('chatLanding.runtimeAccount', { runtime: runtimeName })}</span>
           <span className="block break-words text-sm text-muted-foreground">{t('chatLanding.runtimeAccountDetail', { runtime: runtimeName })}</span>
         </span>
-        {config.accessMode === 'native' && <SelectionCheckIcon />}
+        <span className="size-4 shrink-0">{config.accessMode === 'native' && <SelectionCheckIcon />}</span>
       </DropdownMenuItem>
       {(config.credentials ?? []).map((credential) => {
         const active = config.accessMode === 'vault' && credential.slug === config.effectiveCredential
@@ -156,7 +156,7 @@ function AgentLaunchAccessItems({ config, onConfigureProvider }: {
             onClick={() => {
               config.selectCredential(credential.slug)
             }}
-            className={`min-h-11 ${active ? 'text-primary' : 'text-foreground'}`}
+            className="min-h-11"
           >
             <span className="flex h-4 w-4 shrink-0 items-center justify-center text-muted-foreground">
               <AIProviderIcon vendor={credential.vendor} className="h-4 w-4" />
@@ -166,11 +166,11 @@ function AgentLaunchAccessItems({ config, onConfigureProvider }: {
               <span className="block break-words text-sm text-muted-foreground">
                 {t('chatLanding.savedAccessDetail', { credential: credentialAccessDetail(credential) })}
               </span>
+              {credential.resolvedModel && (
+                <span className="block text-sm text-muted-foreground [overflow-wrap:anywhere]">{credential.resolvedModel}</span>
+              )}
             </span>
-            {credential.resolvedModel && (
-              <span className="max-w-[100px] shrink-0 truncate text-sm text-muted-foreground">{credential.resolvedModel}</span>
-            )}
-            {active && <SelectionCheckIcon />}
+            <span className="size-4 shrink-0">{active && <SelectionCheckIcon />}</span>
           </DropdownMenuItem>
         )
       })}
@@ -299,7 +299,7 @@ function AgentLaunchInferenceMenu({
               <span>{t('chatLanding.selectCredential')}</span>
               <span className="oa-inference-value">{access.label}</span>
             </DropdownMenuSubTrigger>
-            <DropdownMenuSubContent className="w-[300px] max-w-[calc(100vw-2rem)]">
+            <DropdownMenuSubContent className="min-w-[min(20rem,calc(100vw-2rem))]">
               {access.items}
             </DropdownMenuSubContent>
           </DropdownMenuSub>}
@@ -309,10 +309,10 @@ function AgentLaunchInferenceMenu({
               <span>{t('chatLanding.modelField')}</span>
               <span className="oa-inference-value">{resolvedModel}</span>
             </DropdownMenuSubTrigger>
-            <DropdownMenuSubContent className="w-[300px] max-w-[calc(100vw-2rem)]">
+            <DropdownMenuSubContent className="flex min-w-[min(20rem,calc(100vw-2rem))] flex-col overflow-hidden">
               <ModelCatalogStatus catalog={config.modelCatalog} selectedModel={config.launchModel ?? config.defaultModel} />
               <DropdownMenuRadioGroup
-                className="max-h-64 overflow-y-auto"
+                className="min-h-0 overflow-y-auto overscroll-contain"
                 value={modelValue}
                 onValueChange={(value) => config.selectModel(value ? String(value) : null)}
               >
@@ -345,8 +345,9 @@ function AgentLaunchInferenceMenu({
                   </DropdownMenuRadioItem>
                 ))}
               </DropdownMenuRadioGroup>
-              <DropdownMenuSeparator />
+              <DropdownMenuSeparator className="shrink-0" />
               <DropdownMenuItem
+                className="shrink-0"
                 onClick={() => {
                   setCustomModelDraft(config.launchModel ?? config.defaultModel ?? '')
                   pendingCustomModelRef.current = true
@@ -363,7 +364,7 @@ function AgentLaunchInferenceMenu({
               <span>{t('chatLanding.effortField')}</span>
               <span className="oa-inference-value">{resolvedEffort}</span>
             </DropdownMenuSubTrigger>
-            <DropdownMenuSubContent className="w-[220px] max-w-[calc(100vw-2rem)]">
+            <DropdownMenuSubContent>
               <DropdownMenuRadioGroup
                 value={effortValue}
                 onValueChange={(value) => config.selectReasoningEffort(
@@ -542,7 +543,7 @@ export const AgentLaunchSelectors = forwardRef<AgentLaunchSelectorsHandle, Agent
             side={menuPlacement === 'down' ? 'bottom' : 'top'}
             sideOffset={6}
             positionerClassName={menuPositionerClassName}
-            className="w-[min(22rem,calc(100vw-2rem))] max-w-[calc(100vw-2rem)] rounded-xl border border-border/70 p-1.5 shadow-lg ring-0"
+            className="min-w-[min(22rem,calc(100vw-2rem))]"
           >
             <AgentLaunchAccessItems config={config} onConfigureProvider={onConfigureProvider} />
           </DropdownMenuContent>

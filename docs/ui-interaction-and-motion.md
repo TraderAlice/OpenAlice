@@ -48,6 +48,13 @@ financial semantics, and existing workflow contracts.
   and a fixed 16px chevron. Label and value columns align to their start edges.
   The trigger shows the model and an explicit effort override. Default effort remains in its menu. Utility menus use 40px rows,
   44px touch targets, and immediate keyboard highlighting.
+  Menus size to their content with a 224px minimum and a 448px maximum,
+  constrained to the viewport with 16px side clearance. Popup padding is 6px;
+  rows and labels share a 12px inner inset. Icon rows reserve 16px plus a 12px
+  text gap. Group labels and icon-free sibling choices use the same text inset.
+  Checks and submenu arrows share the trailing rail. Workspace switching has a
+  full labeled row. Action names and model identifiers wrap at the viewport
+  boundary; model lists own scrolling inside a fixed header and footer.
 - Supporting text uses the shared 14px role across product components and pages.
   Form entry uses 16px. Shared menu callers inherit row geometry; their classes
   describe product layout and state. Tabs share capsule spacing and neutral
@@ -66,7 +73,10 @@ financial semantics, and existing workflow contracts.
   Manager quick starts use short operation names; full prompts remain available
   through hover and keyboard guidance and populate the editable draft.
 - Financial movement and operational health retain their dedicated semantic
-  colors. Shared surfaces consume tokens across all saved palettes.
+  colors. Shared surfaces consume tokens across all saved palettes. Default day
+  and night palettes use blue for information, green for success, red for errors,
+  and yellow for attention. Runtime readiness pairs these colors with an icon
+  and a localized state name. Selection marks retain neutral ink.
 
 News rows in `ui/src/pages/NewsPage.tsx` form a local-calendar-day timeline.
 Time stays in the left gutter. The headline is a separate, prominent block above

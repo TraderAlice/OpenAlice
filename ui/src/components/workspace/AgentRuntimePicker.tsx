@@ -228,7 +228,7 @@ export const AgentRuntimePicker = forwardRef<AgentRuntimePickerHandle, AgentRunt
             align="start"
             side={menuPlacement === 'down' ? 'bottom' : 'top'}
             sideOffset={6}
-            className="w-[min(16rem,calc(100vw-2rem))] rounded-xl border border-border/70 p-1 shadow-lg ring-0"
+            className="min-w-[min(16rem,calc(100vw-2rem))]"
           >
             {primary.map((agent) => {
               const active = agent.id === selectedId
@@ -244,13 +244,13 @@ export const AgentRuntimePicker = forwardRef<AgentRuntimePickerHandle, AgentRunt
                   className={`${active ? 'bg-muted text-foreground' : missing ? 'text-muted-foreground' : 'text-foreground'}`}
                 >
                   <AgentRuntimeIcon agentId={agent.id} className="size-4 shrink-0" />
-                  <span className="min-w-0 flex-1 truncate">{agent.displayName}</span>
+                  <span className="min-w-0 flex-1">{agent.displayName}</span>
                   {missing && (
                     <span className="shrink-0 text-sm text-muted-foreground">
                       {t('chatLanding.agentNotInstalled')}
                     </span>
                   )}
-                  {active && <SelectionCheckIcon />}
+                  <span className="size-4 shrink-0">{active && <SelectionCheckIcon />}</span>
                 </DropdownMenuItem>
               )
             })}
@@ -258,7 +258,7 @@ export const AgentRuntimePicker = forwardRef<AgentRuntimePickerHandle, AgentRunt
               <>
                 <DropdownMenuSeparator />
                 <DropdownMenuGroup>
-                  <DropdownMenuLabel className="px-2.5 py-1 text-sm font-medium text-muted-foreground">
+                  <DropdownMenuLabel inset>
                     {t('chatLanding.currentRuntime')}
                   </DropdownMenuLabel>
                   <DropdownMenuItem
@@ -272,7 +272,7 @@ export const AgentRuntimePicker = forwardRef<AgentRuntimePickerHandle, AgentRunt
                     }`}
                   >
                     <AgentRuntimeIcon agentId={selectedOutsidePrimary ? selected?.id : null} className="size-4 shrink-0" />
-                    <span className="min-w-0 flex-1 truncate">{selected.displayName}</span>
+                    <span className="min-w-0 flex-1">{selected.displayName}</span>
                     {selected.installed === false && (
                       <span className="shrink-0 text-sm text-muted-foreground">
                         {t('chatLanding.agentNotInstalled')}

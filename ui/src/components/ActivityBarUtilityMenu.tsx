@@ -82,7 +82,7 @@ export function ActivityBarUtilityMenu({
           <img src={aliceWave} alt="" draggable={false} className="size-full origin-[50%_38%] scale-[1.8] object-contain" />
         </span>
         {!compactRail && (
-          <span className="min-w-0 flex-1 truncate text-[14px] font-medium">{t('nav.yourAlice')}</span>
+          <span className="min-w-0 flex-1 text-[14px] font-medium">{t('nav.yourAlice')}</span>
         )}
         {(updateCount > 0 || setupCount > 0) && <span role="status" aria-label={[updateCount > 0 ? t('nav.updatesAvailable', { count: updateCount }) : '', setupCount > 0 ? t('projectSetup.title') : ''].filter(Boolean).join('; ')}
           className={`size-2 shrink-0 rounded-full bg-primary shadow-[0_0_0_3px_var(--sidebar)] ${compactRail ? 'absolute -right-0.5 -top-0.5' : ''}`} />}
@@ -101,7 +101,7 @@ export function ActivityBarUtilityMenu({
         align="start"
         side="top"
         sideOffset={6}
-        className="w-[240px] max-w-[calc(100vw-1rem)] rounded-xl border border-border/70 bg-popover p-1.5 shadow-lg ring-0"
+        className="min-w-[min(15rem,calc(100vw-2rem))]"
       >
         {companion.visible !== null && (
           <DropdownMenuItem
@@ -138,10 +138,10 @@ export function ActivityBarUtilityMenu({
             aria-label={t('nav.appearanceMenu', { mode: t(`theme.mode.${theme}`) })}
           >
             <CurrentThemeIcon size={15} strokeWidth={1.75} aria-hidden />
-            <span className="min-w-0 flex-1 truncate">{t('settings.group.appearance')}</span>
+            <span className="min-w-0 flex-1">{t('settings.group.appearance')}</span>
             <span className="shrink-0 text-muted-foreground">{t(`theme.mode.${theme}`)}</span>
           </DropdownMenuSubTrigger>
-          <DropdownMenuSubContent className="w-[180px] border border-border/70 bg-popover p-1.5 shadow-lg ring-0">
+          <DropdownMenuSubContent>
             <DropdownMenuRadioGroup
               value={theme}
               onValueChange={(value) => {

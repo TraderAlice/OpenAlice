@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { ArrowDown, ArrowUp, ChevronDown, RefreshCw, Search } from 'lucide-react'
+import { ArrowDown, ArrowUp, ChevronDown, CircleCheck, CircleDashed, CircleX, LoaderCircle, TriangleAlert, RefreshCw, Search } from 'lucide-react'
 
 import { ConfigSection, SettingsScrollArea, inputClass } from '../components/form'
 import { CountBadge } from '../components/CountBadge'
@@ -10,7 +10,7 @@ import { Button } from '../components/ui/button'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '../components/ui/collapsible'
 import { Toggle } from '../components/Toggle'
 import { installHintFor } from '../components/workspace/agentInstall'
-import type { AgentInfo, AgentRuntimeReadinessRow } from '../components/workspace/api'
+import type { AgentInfo, AgentRuntimeReadinessRow, AgentRuntimeReadinessStatus } from '../components/workspace/api'
 import { useAgentRuntimes } from '../hooks/useAgentRuntimes'
 import { AGENT_RUNTIME_QUICK_ACCESS_LIMIT, canAddAgentRuntimeQuickAccess } from '../lib/agentRuntimeQuickAccess'
 import { AgentRuntimeIcon } from '../lib/agentRuntimeIcon'
@@ -50,6 +50,18 @@ const RUNTIME_COPY = {
     auth: 'aiProvider.runtime.pi.auth',
   },
 } as const
+
+const RUNTIME_STATUS_APPEARANCE = {
+  unknown: { Icon: CircleDashed, color: 'text-muted-foreground' },
+  ready: { Icon: CircleCheck, color: 'text-success' },
+  checking: { Icon: LoaderCircle, color: 'text-info' },
+  not_installed: { Icon: TriangleAlert, color: 'text-warning' },
+  auth_required: { Icon: TriangleAlert, color: 'text-warning' },
+  provider_required: { Icon: TriangleAlert, color: 'text-warning' },
+  output_unrecognized: { Icon: TriangleAlert, color: 'text-warning' },
+  timeout: { Icon: TriangleAlert, color: 'text-warning' },
+  failed: { Icon: CircleX, color: 'text-destructive' },
+} satisfies Record<AgentRuntimeReadinessStatus, { Icon: typeof CircleCheck; color: string }>
 
 const REPAIR_KEYS = {
   'runtime-install': 'settings.agentRuntimes.repair.runtimeInstall',
@@ -278,21 +290,23 @@ function RuntimeSettingsCard({
   const binPath = row?.binPath ?? agent.binPath ?? null
 
   const needsAttention = row?.repairTarget && row.status !== 'ready' && row.status !== 'checking'
+  const { Icon: StatusIcon, color: statusColor } = RUNTIME_STATUS_APPEARANCE[row?.status ?? 'unknown']
 
   return (
     <article className="min-w-0 border-b border-border/60 px-3 last:border-b-0 sm:px-4">
       <Collapsible className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-start gap-x-3">
-        <CollapsibleTrigger className="group/runtime flex min-h-[72px] w-full cursor-pointer items-center gap-3 rounded-md text-left outline-none focus-visible:[box-shadow:var(--oa-focus-shadow)]">
+        <CollapsibleTrigger className="group/runtime flex min-h-[72px] w-full cursor-pointer items-center gap-3 rounded-md py-3 text-left outline-none focus-visible:[box-shadow:var(--oa-focus-shadow)]">
           <AgentRuntimeIcon agentId={agent.id} className="size-7 shrink-0" />
           <span className="min-w-0 flex-1">
-            <span className="block truncate text-base font-semibold">{agent.displayName}</span>
-            <span className={`block text-sm leading-5 ${needsAttention ? 'text-warning' : 'text-muted-foreground'}`}>
-              {t(agentRuntimeSettingsStatusKey(row))}
+            <span className="block text-base font-semibold [overflow-wrap:anywhere]">{agent.displayName}</span>
+            <span className={`mt-1 flex items-start gap-1.5 text-sm leading-5 ${statusColor}`}>
+              <StatusIcon aria-hidden className={`mt-0.5 size-4 shrink-0 ${row?.status === 'checking' ? 'animate-spin motion-reduce:animate-none' : ''}`} />
+              <span>{t(agentRuntimeSettingsStatusKey(row))}</span>
             </span>
           </span>
           <ChevronDown aria-hidden className="size-3.5 shrink-0 text-muted-foreground transition-transform duration-[var(--motion-fast)] group-data-panel-open/runtime:rotate-180 motion-reduce:transition-none" />
         </CollapsibleTrigger>
-        <div className="flex min-h-[72px] shrink-0 items-center gap-3">
+        <div className="flex min-h-[72px] shrink-0 self-stretch items-center gap-3">
           <Toggle
             size="sm"
             checked={pinned}

@@ -633,10 +633,6 @@ body {
     min-height: 2.75rem;
   }
 
-  .oa-workspace-context-item {
-    min-height: 2.75rem;
-  }
-
   .oa-harness-context-tray :is(button, [role="button"]),
   .oa-harness-composer :is(button, [role="button"]),
   .oa-harness-starters .oa-icon-action {
