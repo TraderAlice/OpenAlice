@@ -64,6 +64,21 @@ export interface FundingRate {
   timestamp: Date
 }
 
+/** One funding period: the venue's own settlement time for the period, and the
+ *  rate it charged for it. */
+export interface FundingRatePoint {
+  timestamp: Date
+  fundingRate: number
+}
+
+/** A contract's funding-rate history, oldest period first. */
+export interface FundingRateHistory {
+  contract: Contract
+  rates: FundingRatePoint[]
+  /** OUR local read time for this read — the window's upper bound. */
+  timestamp: Date
+}
+
 /** [price, amount] */
 export type OrderBookLevel = [price: number, amount: number]
 

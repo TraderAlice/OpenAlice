@@ -45,6 +45,24 @@ K-lines and quantitative work
 boards, fundamentals, macro series, calendars, ETFs, and related slow-moving
 research data. `alice market` owns bar discovery and raw history; `alice analysis` supplies optional price-path calculations.
 
+## Perpetual funding reads
+
+The trading tools `getFundingRate` and `getFundingRateHistory` resolve the contract through
+its UTA account and call read-only broker methods. The same reads are available
+through `POST /uta/:id/contract/funding-rate` and
+`POST /uta/:id/contract/funding-rate-history`; Alice's UTA client exposes
+them under `/api/trading/uta/:id/contract/…`. In Lite mode the UTA carrier
+is disconnected, so these reads are unavailable. No broker write is involved.
+
+Rates are per funding period, not annualized. A positive rate means longs pay
+shorts. History is oldest-first with venue settlement timestamps and a local
+read-time envelope; `start` is an ISO timestamp lower bound and `limit`
+selects the most recent periods (up to 1000). Native CCXT history support is
+required; synthesized or absent history capabilities are refused. Venue page
+limits are paginated; a shorter result means the window or venue history has
+fewer settled periods. Failed or stalled pagination is reported as an error,
+not silently treated as complete.
+
 ## TraderHub and Reference Data
 
 `src/domain/market-data/reference/` defines OpenAlice-owned board contracts.

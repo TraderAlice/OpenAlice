@@ -1,4 +1,4 @@
-import { optionResearchSchema, orderBookSchema, type BrokerResearch } from '@traderalice/uta-protocol'
+import { fundingRateHistorySchema, fundingRateSchema, optionResearchSchema, orderBookSchema, type BrokerResearch } from '@traderalice/uta-protocol'
 import { Hono } from 'hono'
 import type { Context } from 'hono'
 import { z } from 'zod'
@@ -355,6 +355,35 @@ export function createTradingRoutes(ctx: UTAEngineContext) {
       const broker = account.broker as typeof account.broker & BrokerResearch
       if (!broker.getOrderBook) throw new Error('Order books are not supported by this broker pack.')
       return broker.getOrderBook(contract, parsed.data.limit ?? 20)
+    })
+  })
+
+  // Funding rates are public market data (no credentials involved). Both routes
+  // resolve the contract through the ACCOUNT, never by stamping the raw aliceId
+  // onto a Contract: only the account's broker knows the venue's native symbol.
+  app.post('/uta/:id/contract/funding-rate', async c => {
+    const account = resolveAccount(ctx, c)
+    if (!account) return c.json({ error: 'Account not found' }, 404)
+    const parsed = fundingRateSchema.safeParse(await c.req.json().catch(() => null))
+    if (!parsed.success) return c.json({ error: parsed.error.message }, 400)
+    return queryAccount(c, account, async () => {
+      const contract = account.contractFromAliceId(parsed.data.aliceId)
+      const broker = account.broker as typeof account.broker & BrokerResearch
+      if (!broker.getFundingRate) throw new Error('Funding rates are not supported by this broker pack.')
+      return broker.getFundingRate(contract)
+    })
+  })
+  app.post('/uta/:id/contract/funding-rate-history', async c => {
+    const account = resolveAccount(ctx, c)
+    if (!account) return c.json({ error: 'Account not found' }, 404)
+    const parsed = fundingRateHistorySchema.safeParse(await c.req.json().catch(() => null))
+    if (!parsed.success) return c.json({ error: parsed.error.message }, 400)
+    return queryAccount(c, account, async () => {
+      const contract = account.contractFromAliceId(parsed.data.aliceId)
+      const broker = account.broker as typeof account.broker & BrokerResearch
+      if (!broker.getFundingRateHistory) throw new Error('Funding-rate history is not supported by this broker pack.')
+      const { start, limit } = parsed.data
+      return broker.getFundingRateHistory(contract, { start, limit })
     })
   })
 

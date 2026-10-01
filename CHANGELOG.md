@@ -4,6 +4,10 @@ All notable changes to OpenAlice will be documented in this file.
 
 ## [Unreleased]
 
+- Add read-only current and historical perpetual funding rates through UTA,
+  the Alice client, and agent trading tools; keep CCXT aliases, wallet writes,
+  and cross-venue spreads outside this change.
+
 ### 🏗️ Architecture — UTA-split v1
 
 Split the trading domain into a dedicated UTA service co-located with

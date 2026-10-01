@@ -385,3 +385,38 @@ describe('placeOrder inputSchema', () => {
     expect(result.success).toBe(false)
   })
 })
+
+// ==================== funding rates (Alice tool -> UTA HTTP boundary) ====================
+
+describe('createTradingTools — funding rates', () => {
+  it('selects the account encoded in aliceId rather than another connected account', async () => {
+    const selected = {
+      id: 'bybit-main',
+      getFundingRateHistory: vi.fn().mockResolvedValue({ rates: [{ timestamp: new Date(0), fundingRate: 0.0001 }] }),
+    }
+    const other = {
+      id: 'other',
+      getFundingRateHistory: vi.fn().mockResolvedValue({ rates: [{ timestamp: new Date(0), fundingRate: 0.002 }] }),
+    }
+    const manager = {
+      resolveOne: vi.fn((id: string) => id === 'bybit-main' ? selected : other),
+    } as unknown as UTAManagerSDK
+    const tools = createTradingTools(manager)
+
+    const result = await (tools.getFundingRateHistory.execute as Function)({ aliceId: 'bybit-main|BTC/USDT:USDT', limit: 5 })
+
+    expect(result).toEqual({ source: 'bybit-main', rates: [{ timestamp: new Date(0), fundingRate: 0.0001 }] })
+    expect(other.getFundingRateHistory).not.toHaveBeenCalled()
+  })
+
+  it('never calls an account for an aliceId without a source', async () => {
+    const account = { getFundingRate: vi.fn() }
+    const manager = { resolveOne: vi.fn().mockReturnValue(account) } as unknown as UTAManagerSDK
+    const tools = createTradingTools(manager)
+
+    const result = await (tools.getFundingRate.execute as Function)({ aliceId: 'no-separator' })
+
+    expect(result.error).toMatch(/Invalid aliceId/)
+    expect(manager.resolveOne).not.toHaveBeenCalled()
+  })
+})

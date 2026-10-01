@@ -17,9 +17,22 @@ export const orderBookSchema = z.object({
 export type OptionResearchRequest = z.infer<typeof optionResearchSchema>
 export type OptionResearchFilters = Omit<OptionResearchRequest, 'aliceId'>
 
-/** Optional structural capabilities: old broker packs continue to load. */
+/** Funding is a rate per venue settlement period, not an annualized yield. */
+export const fundingRateSchema = z.object({ aliceId: z.string().min(1) })
+export const fundingRateHistorySchema = z.object({
+  aliceId: z.string().min(1),
+  start: z.string().datetime({ offset: true }).optional(),
+  limit: z.number().int().min(1).max(1000).optional(),
+})
+export type FundingRateRequest = z.infer<typeof fundingRateSchema>
+export type FundingRateHistoryRequest = z.infer<typeof fundingRateHistorySchema>
+export type FundingRateHistoryParams = Omit<FundingRateHistoryRequest, 'aliceId'>
+
+/** Optional capabilities preserve existing broker packs. */
 export interface BrokerResearch {
   getOptionContracts?(underlying: string, filters: OptionResearchFilters): Promise<Record<string, unknown>>
   getOptionChain?(underlying: string, filters: OptionResearchFilters): Promise<Record<string, unknown>>
   getOrderBook?(contract: Contract, limit?: number): Promise<unknown>
+  getFundingRate?(contract: Contract): Promise<unknown>
+  getFundingRateHistory?(contract: Contract, params: FundingRateHistoryParams): Promise<unknown>
 }
