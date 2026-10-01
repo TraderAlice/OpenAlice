@@ -165,7 +165,7 @@ exists.
 | Focus id | Minimum pulls | Do not pretend |
 |---|---|---|
 | `macro` | `board get --board macro` (FRED rates/oil/dollar), `board get --board global-macro` (OECD; China row ≠ A-share tape), optional `board get --board fed`. CN PMI: **NBS** first; Tushare `cn_pmi` only if permitted. Prefer FRED `DTWEXBGS` over broken Yahoo DXY. | Invented release dates; near-month futures roll as “oil crash” |
-| `us-equity` | `board get --board movers`, `board rotation`, optional `board get --board valuation` | — |
+| `us-equity` | `board get --board movers`, `board rotation`, optional `board get --board valuation`. US retail headlines: prefer Alice news feeds already enabled (MarketWatch/CNBC/…); if Yahoo RSS is needed from mainland China, use offshore `satellites/market-data-gateway` → `Gateway US Markets` feed / `GET /api/v1/news/headlines` (cite `yahoo-finance` or `via gateway`, quality `B`). | Direct Yahoo RSS on CN hosts (often 403) |
 | `cn-ashare` | **Required:** CSI (000300 / 000905 / 000688 / …) + CNI (399001 / 399006 / …) for close **and change %**. Fallback bars: `market-data` Eastmoney/Yahoo with `count` ≥ 5. Sector proxy: industry **ETF** bars — label ETF. Optional `alice rss` if configured. | US `movers` as A-share; Tushare-first; single-candle change %; unlabeled self-computed breadth as “官方” |
 | `cn-ashare` connect / flow | **SSE/SZSE day-end** and/or HKEX Historical Daily (成交额、前十大). | `moneyflow_hsgt` as exchange official; 北向净流入 without a net-buy field |
 | `cn-ashare` optional depth | Tushare only if gated probe passes: `sw_daily`, `limit_list_*`, `daily_info`, `moneyflow_*`, `cn_pmi`. | Filling flows/limit boards from memory or ±10% heuristics labeled as official |

@@ -107,7 +107,9 @@ default/                       shipped skills and factory defaults
 docs/                          owner guides and contributor documentation
 satellites/                    optional side-car data bridges (not in pnpm/Turbo);
                                e.g. astock-data Tushare MCP — see
-                               satellites/astock-data/README.md
+                               satellites/astock-data/README.md;
+                               market-data-gateway (offshore Yahoo news/quotes) —
+                               see satellites/market-data-gateway/README.md
 ```
 
 The model execution loop is not in `src/ai-providers/`. Native coding-agent
@@ -117,9 +119,25 @@ combines credential access, model selection, and those semantics before each
 adapter projects the result into one target CLI process. Follow
 [[docs/model-semantics-and-runtime-injection.md]] for that boundary.
 
-`satellites/` trees are independently installed runtimes (today Python MCP).
-They must not be imported from `src/` or added to `pnpm-workspace.yaml`. Wire
-them through MCP or a future thin ToolCenter client only.
+`satellites/` trees are independently installed runtimes (Python MCP or HTTP
+sidecars). They must not be imported from `src/` or added to
+`pnpm-workspace.yaml`. Wire them through MCP, HTTP/RSS, or a future thin
+ToolCenter client only.
+
+### Market Data Gateway (offshore news / thin quotes)
+
+When mainland hosts cannot reach Yahoo Finance RSS (regional 403), run
+[`satellites/market-data-gateway`](../satellites/market-data-gateway/README.md)
+on a Japan or North America VPS. It pulls Yahoo RSS there, stores normalized
+headlines in SQLite, and exposes:
+
+- `GET /api/v1/news/headlines` (Bearer token)
+- `GET /feeds/us-markets.xml?token=…` (RSS re-export for Alice)
+
+Point the shipped **Gateway US Markets** news feed
+([`src/domain/news/config.ts`](../src/domain/news/config.ts)) at that URL.
+Keep the direct Yahoo Finance feed disabled on China hosts. This is a
+normalize-and-cache gateway, not an open Yahoo URL proxy.
 
 Alice owns RSS collection and the JSONL archive in `src/domain/news/`.
 Settings → News Sources (`/settings/news-collector`) offers opt-in presets

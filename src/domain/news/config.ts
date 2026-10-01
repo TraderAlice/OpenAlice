@@ -88,7 +88,19 @@ export const newsCollectorSchema = z.object({
       url: 'https://finance.yahoo.com/news/rssindex',
       source: 'yahoo-finance',
       categories: ['markets', 'us'],
-      description: 'Retail-oriented US stock movers and earnings.',
+      description:
+        'Retail-oriented US stock movers and earnings. Often blocked from mainland China (403). Prefer Gateway US Markets on an offshore VPS — see satellites/market-data-gateway/README.md. Keep disabled on CN hosts.',
+      enabled: false,
+    },
+    {
+      name: 'Gateway US Markets',
+      // Point at your offshore Market Data Gateway RSS re-export.
+      // Append ?token=… when GATEWAY_TOKEN is set (Alice RSS has no auth headers).
+      url: 'http://127.0.0.1:8787/feeds/us-markets.xml',
+      source: 'gateway-us',
+      categories: ['markets', 'us'],
+      description:
+        'Normalized US headlines from satellites/market-data-gateway (Yahoo collected offshore). Replace host/token for your VPS; do not use a raw Yahoo proxy URL.',
       enabled: false,
     },
     {
