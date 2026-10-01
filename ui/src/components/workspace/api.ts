@@ -280,8 +280,8 @@ export class HarnessSourceUpgradeApiError extends Error {
   }
 }
 
-export async function getHarnessSourceUpgradePlan(wsId: string): Promise<HarnessSourceUpgradePlan> {
-  const res = await fetch(`/api/workspaces/${encodeURIComponent(wsId)}/source-upgrade`)
+export async function getHarnessSourceUpgradePlan(wsId: string, targetVersion?: string): Promise<HarnessSourceUpgradePlan> {
+  const res = await fetch(`/api/workspaces/${encodeURIComponent(wsId)}/source-upgrade${targetVersion ? `?targetVersion=${encodeURIComponent(targetVersion)}` : ''}`)
   const body = await res.json().catch(() => ({})) as {
     plan?: HarnessSourceUpgradePlan
     error?: string

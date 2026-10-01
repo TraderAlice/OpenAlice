@@ -16,12 +16,12 @@ beforeAll(async () => { await i18n.changeLanguage('en') })
 beforeEach(async () => {
   mocks.generation = 0; mocks.setup = null
   const workspacePlans = new WorkspacePlanStore()
-  await workspacePlans.replace({ kind: 'template', workspaceId: 'chat' }, { workspaceId: 'chat', template: 'chat', strategy: 'managed-context', fromVersion: '1', toVersion: '2', planDigest: 'exact', blocked: false, blockers: [], files: [], summary: { ready: 1, conflicts: 0, unchanged: 0, preserved: 0 } } as any)
+  await workspacePlans.replace({ kind: 'template', workspaceId: 'chat', targetVersion: '2' }, { workspaceId: 'chat', template: 'chat', strategy: 'managed-context', fromVersion: '1', toVersion: '2', planDigest: 'exact', blocked: false, blockers: [], files: [], summary: { ready: 1, conflicts: 0, unchanged: 0, preserved: 0 } } as any)
   mocks.updates = {
     machines: { status: { target: { machine: 'cloud', machineName: 'Railway Linux', project: 'main-cloud' } }, plan: null, operation: null, probe: mocks.probe, applying: false },
     client: { kind: 'cli', currentVersion: '0.94.1', discovery: { value: { status: 'current', channel: 'stable' } } },
     versionInfo: { current: '0.93.1', latest: '0.94.1', hasUpdate: true, channel: 'stable', updateAuthority: 'cli' },
-    workspacePlans, workspaceStates: [],
+    workspacePlans, workspaceStates: [{ workspaceId: 'chat', template: 'chat', phase: 'available', fromVersion: '1', toVersion: '2' }],
     projectWorkspaces: [{ kind: 'chat', label: 'Chat', loaded: true, workspace: { id: 'chat', tag: 'my-chat', template: 'chat', currentVersion: '1' } }, { kind: 'auto-quant', label: 'Quant', loaded: true, workspace: null }, { kind: 'auto-prediction', label: 'Prediction', loaded: true, workspace: null }],
     installClient: mocks.install, refresh: vi.fn(async () => {}), openClientRelease: vi.fn(async () => {}),
     review: vi.fn(async () => ({ id: 'project-review', proposals: [{ unit: { id: 'template:chat', desired: { version: '2' } }, fingerprint: 'exact' }], steps: [], blockers: [], fingerprint: 'exact' })),
@@ -92,4 +92,22 @@ it('keeps recovery reachable even when no new update is available', () => {
   fireEvent.click(screen.getByRole('button', { name: 'View progress' }))
   expect(screen.getByRole('dialog').textContent).toContain('Reconnect the approved target')
   expect(mocks.updates.resume).not.toHaveBeenCalled()
+})
+
+it('renders successful current discovery even if an old plan cache contains a failure', async () => {
+  mocks.updates.workspaceStates = [{ workspaceId: 'chat', template: 'chat', phase: 'current', fromVersion: '2' }]
+  await mocks.updates.workspacePlans.resource({ kind: 'template', workspaceId: 'chat' }).check(async () => { throw new Error('old preview failure') })
+  render(<VersionOverviewSection />)
+  const project = within(document.getElementById('settings-version-project')!)
+  expect(project.getByText('Up to date')).toBeTruthy()
+  expect(project.queryByText('Needs attention')).toBeNull()
+  expect(project.queryByRole('button', { name: 'View update' })).toBeNull()
+})
+it.each(['check', 'review', 'apply'])('shows %s failures without misclassifying their stage', stage => {
+  mocks.updates.workspaceStates = [{ workspaceId: 'chat', template: 'chat', phase: 'failed', failureStage: stage, reason: 'operation failed' }]
+  render(<VersionOverviewSection />)
+  fireEvent.click(screen.getByRole('button', { name: 'Project details' }))
+  const project = within(document.getElementById('settings-version-project')!)
+  expect(Boolean(project.queryByText('Update check failed'))).toBe(stage === 'check')
+  expect(project.getByText('operation failed')).toBeTruthy()
 })

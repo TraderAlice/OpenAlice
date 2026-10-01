@@ -92,15 +92,20 @@ with the product package, without mocking Electron's version API.
 
 ## Project commands and UI entry
 
-`WorkspaceUpdateService.check()` observes AQ/AP stable upstream releases even
-when automatic merging is disabled. It never creates a source plan or applies
+`WorkspaceUpdateService.check()` is the status owner for the persisted default
+Chat, Quant and Prediction Workspaces. It reads the three existing default
+preferences and ignores non-default instances. Chat compares its applied template
+baseline with the available template using shared version ordering; AQ/AP observe
+stable upstream releases even when automatic merging is disabled. It never creates a source plan or applies
 content. `applyPolicy()` is a separate serialized command: it re-reads policy,
 plans the exact observed target, checks policy again after planning, and invokes
 the authoritative source manager with its digest. Activation, the background
 timer and a saved policy change explicitly call `refreshAndApplyPolicy()`.
 `POST /api/updates/check` only checks; saving preferences no longer depends on a
 browser follow-up request to start approved automatic work. Failed discovery
-retains the previous observation but cannot trigger an automatic apply. AQ/AP
+retains the previous observation but cannot trigger an automatic apply. Failures
+identify check, review or apply stage. Automatic execution rechecks both policy
+and default selection before applying; Chat remains explicitly reviewed. AQ/AP
 manual source review exposes the same stable upstream candidates regardless of
 auto-apply policy; candidate visibility is not permission to merge.
 
@@ -114,12 +119,22 @@ shared cache primitive rather than an independent promise/expiry implementation.
 
 ### Shared review plans
 
-The same provider owns the Workspace preview inventory used by the overview and
-the existing template/source review panels. Read-only candidate discovery
-prefetches the primary plan. Opening or reopening a review reuses that exact
-observation; it does not request another preview. The first status response
-joins an inventory prefetch. Subsequent automatic checks and explicit refreshes
-update the same resource and coalesce concurrent requests.
+The provider consumes `/api/updates` observations for overview status and global
+guidance. It never generates plans to discover whether updates exist, and neither
+cached previews nor the Workspace list's legacy hints override those observations.
+A missing observation is unknown, not proof of being current. Older remote
+Runtimes that omit Chat discovery show unknown until their backend is updated.
+
+The provider also owns the separate review-plan cache. Opening a project review
+requests plans only for observed candidates, keyed by the exact target version.
+Source previews request that exact version; template previews must match it.
+Reopening a review reuses its plan. A changed observation or explicit check
+invalidates affected reviews without prefetching them; mounted review consumers
+reload when needed. Discovery returning current removes the candidate and cannot
+become an error merely because there is no upgrade plan. The source plan command
+retains `no_update` for explicit requests without a candidate; the overview never
+uses that command as discovery. Demo preserves this real API behavior instead of
+manufacturing a current source plan.
 
 Each backend recovery generation owns a fresh inventory. Workspace identity,
 template versus source versus Alice Harness layer, and skill/action projection

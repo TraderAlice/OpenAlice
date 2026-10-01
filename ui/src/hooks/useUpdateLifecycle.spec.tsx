@@ -55,29 +55,34 @@ beforeEach(() => {
 })
 afterEach(() => { cleanup(); vi.clearAllMocks(); vi.unstubAllGlobals() })
 
-it('prefetches the candidate once and projects the same plan into guidance and manual review', async () => {
-  mocks.workspaces = [{ id: 'chat', template: 'chat', upgradeAvailable: { to: '2' } }, { id: 'old-chat', template: 'chat', upgradeAvailable: { to: '9' } }]
+it('uses checks for status and only generates a plan when explicitly reviewed', async () => {
+  mocks.workspaces = [{ id: 'chat', template: 'chat', upgradeAvailable: { to: '9' } }, { id: 'old-chat', template: 'chat', upgradeAvailable: { to: '9' } }, { id: 'aq', template: 'auto-quant-v2' }]
   let reads = 0
   let current = false
   vi.stubGlobal('fetch', vi.fn(async (path: string) => {
     if (path === '/api/workspaces/chat/template-upgrade') {
       reads++
-      return { ok: true, json: async () => ({ plan: current ? { ...workspacePreview, fromVersion: '3' } : workspacePreview }) }
+      return { ok: true, json: async () => ({ plan: workspacePreview }) }
     }
-    return { ok: true, json: async () => ({ preferences, workspaces: [] }) }
+    if (path.includes('/source-upgrade')) throw new Error('Current source must not request a plan')
+    return { ok: true, json: async () => ({ preferences, workspaces: [
+      { workspaceId: 'chat', template: 'chat', phase: current ? 'current' : 'available', fromVersion: current ? '3' : '1', ...(current ? {} : { toVersion: '3' }) },
+      { workspaceId: 'aq', template: 'auto-quant-v2', phase: 'current', fromVersion: '1.0.0' },
+    ] }) }
   }))
   const { result } = renderHook(useUpdateLifecycle, { wrapper })
-  const request = { workspaceId: 'chat', kind: 'template' as const }
-  await waitFor(() => expect(result.current.workspacePlans.peek(request)?.toVersion).toBe('3'))
+  await waitFor(() => expect(result.current.guidance.workspaceIds).toEqual(['chat']))
+  expect(reads).toBe(0)
+  const request = { workspaceId: 'chat', kind: 'template' as const, targetVersion: '3' }
   await act(async () => { await result.current.workspacePlans.ensure(request) })
   expect(reads).toBe(1)
-  expect(vi.mocked(fetch).mock.calls.some(([path]) => String(path).includes('old-chat') || String(path).includes('/updates/inventory'))).toBe(false)
-  expect(result.current.guidance.workspaceIds).toEqual(['chat'])
+  expect(result.current.workspacePlans.peek(request)?.toVersion).toBe('3')
   current = true
   await act(async () => { await result.current.refresh() })
   await waitFor(() => expect(result.current.guidance.workspaceIds).toEqual([]))
-  expect(result.current.workspacePlans.peek(request)?.fromVersion).toBe('3')
-  expect(reads).toBe(2)
+  expect(result.current.workspacePlans.peek(request)).toBeNull()
+  expect(reads).toBe(1)
+  expect(vi.mocked(fetch).mock.calls.some(([path]) => String(path).includes('old-chat') || String(path).includes('/source-upgrade'))).toBe(false)
 })
 
 it('does not revive a plan across backend A → B → A or disconnected reads', async () => {

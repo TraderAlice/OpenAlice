@@ -42,8 +42,8 @@ export function selectWorkspaceUpdateGuidance(
     // global breadcrumb must never point to a row the destination omits.
     if (!['chat', 'auto-quant-v2', 'auto-prediction'].includes(workspace.template ?? '')) continue
     const state = byId.get(workspace.id)
-    const candidate = state?.toVersion ?? workspace.upgradeAvailable?.to
-    if (!candidate) continue
+    if (!state) continue
+    const candidate = state.toVersion
     if (state?.phase === 'failed') {
       needsAttention.push(workspace.id)
       continue
@@ -55,6 +55,7 @@ export function selectWorkspaceUpdateGuidance(
     }
     if (state?.phase === 'checking' || state?.phase === 'applying' || state?.phase === 'current') continue
     if (state?.phase === 'updated' && state.toVersion === candidate) continue
+    if (!candidate) continue
     if ((workspace.template === 'auto-quant-v2' || workspace.template === 'auto-prediction') && !policy) continue
     const autoUpdate = workspace.template === 'auto-quant-v2'
       ? policy?.autoUpdateAutoQuant

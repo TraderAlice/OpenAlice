@@ -3,7 +3,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { WorkspacePlanStore } from '../../lib/updates/workspacePlans'
 let planStore: WorkspacePlanStore
-vi.mock('../../hooks/useUpdateLifecycle', () => ({ useUpdateLifecycle: () => ({ workspacePlans: planStore }) }))
+let observations: import('../../hooks/useUpdateLifecycle').WorkspaceUpdateState[] = []
+vi.mock('../../hooks/useUpdateLifecycle', () => ({ useUpdateLifecycle: () => ({
+  workspacePlans: planStore, workspaceStates: observations, projectWorkspaces: [],
+  checking: false, preferences: {}, error: null, refresh: vi.fn(),
+}) }))
 
 import { i18n } from '../../i18n'
 import {
@@ -70,6 +74,7 @@ const plan: TemplateUpgradePlan = {
 }
 
 beforeEach(async () => {
+  observations = []
   planStore = new WorkspacePlanStore()
   await i18n.changeLanguage('en')
   vi.mocked(getTemplateUpgradePlan).mockResolvedValue(plan)

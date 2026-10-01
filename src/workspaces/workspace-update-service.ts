@@ -1,3 +1,5 @@
+import { compareVersions } from '@traderalice/update-lifecycle'
+import { readPreferences } from '../core/preferences.js'
 import { ProjectUpdateCoordinator } from './project-update-coordinator.js'
 import { readUpdatePreferences, type UpdatePreferences } from '../core/update-preferences.js'
 import { readHarnessSource } from './harness-source.js'
@@ -12,13 +14,14 @@ const SOURCE_TEMPLATES = {
 type Phase = 'checking' | 'available' | 'applying' | 'current' | 'updated' | 'blocked' | 'failed'
 export interface WorkspaceUpdateState {
   readonly workspaceId: string
-  readonly template: keyof typeof SOURCE_TEMPLATES
+  readonly template: 'chat' | keyof typeof SOURCE_TEMPLATES
   readonly phase: Phase
   readonly checkedAt: string | null
   readonly fromVersion?: string
   readonly toVersion?: string
   readonly verified?: boolean
   readonly reason?: string
+  readonly failureStage?: 'check' | 'review' | 'apply'
 }
 
 /** Project-local command boundary. Checking only observes source metadata;
@@ -87,31 +90,50 @@ export class WorkspaceUpdateService {
     if (!this.stopped) await this.applyPolicy()
   }
 
+  private async defaults() {
+    const preferences = await readPreferences()
+    return [
+      ['chat', preferences.quickChat.recentChatWorkspaceId],
+      ['auto-quant-v2', preferences.autoQuant.defaultWorkspaceId],
+      ['auto-prediction', preferences.autoPrediction.defaultWorkspaceId],
+    ].flatMap(([template, id]) => {
+      const workspace = id ? this.service.registry.get(id) : undefined
+      return workspace?.template === template ? [workspace] : []
+    })
+  }
+
   private async scan(): Promise<void> {
-    const workspaces = this.service.registry.list()
+    const workspaces = await this.defaults()
     const ids = new Set(workspaces.map(workspace => workspace.id))
     for (const id of this.states.keys()) if (!ids.has(id)) this.states.delete(id)
     for (const workspace of workspaces) {
       if (this.stopped) return
-      if (!(workspace.template && workspace.template in SOURCE_TEMPLATES)) continue
-      const template = workspace.template as keyof typeof SOURCE_TEMPLATES
+      const template = workspace.template as WorkspaceUpdateState['template']
       const prior = this.states.get(workspace.id)
       const base = { workspaceId: workspace.id, template }
       this.states.set(workspace.id, { ...prior, ...base, phase: 'checking', checkedAt: prior?.checkedAt ?? null })
       try {
-        const receipt = await readHarnessSource(workspace.dir)
-        if (!receipt) throw new Error('Workspace has no Harness source receipt')
-        // Discovery is independent of apply policy. Stable upstream tags remain
-        // visible (with verified=false outside the bundled catalog) when the
-        // user disables automatic merges.
-        const latest = await this.service.sourceUpgrades.latest(template, receipt.version, true)
+        let fromVersion: string
+        let latest: { version: string; verified?: boolean } | null
+        if (template === 'chat') {
+          const definition = this.service.templates?.get(template)
+          const installed = await this.service.templateUpgrades?.currentVersion(workspace)
+          if (definition?.upgradeStrategy !== 'managed-context' || !installed) throw new Error('Workspace template update baseline is unavailable')
+          fromVersion = installed
+          latest = compareVersions(definition.version, installed) > 0 ? { version: definition.version } : null
+        } else {
+          const receipt = await readHarnessSource(workspace.dir)
+          if (!receipt) throw new Error('Workspace has no Harness source receipt')
+          fromVersion = receipt.version
+          latest = await this.service.sourceUpgrades.latest(template, receipt.version, true)
+        }
         this.states.set(workspace.id, {
-          ...base, checkedAt: new Date().toISOString(), fromVersion: receipt.version,
+          ...base, checkedAt: new Date().toISOString(), fromVersion,
           ...(latest ? { phase: 'available', toVersion: latest.version, verified: latest.verified } : { phase: 'current' }),
         })
       } catch (error) {
         this.states.set(workspace.id, {
-          ...prior, ...base, phase: 'failed', checkedAt: new Date().toISOString(),
+          ...base, fromVersion: prior?.fromVersion, phase: 'failed', failureStage: 'check', checkedAt: new Date().toISOString(),
           reason: error instanceof Error ? error.message : String(error),
         })
       }
@@ -121,11 +143,13 @@ export class WorkspaceUpdateService {
   private async applyAvailable(): Promise<void> {
     for (const state of this.states.values()) {
       if (this.stopped) return
-      if (state.phase !== 'available' || !state.toVersion) continue
+      if (state.template === 'chat' || state.phase !== 'available' || !state.toVersion) continue
+      if (!(await this.defaults()).some(workspace => workspace.id === state.workspaceId)) continue
       // Read immediately before each mutation so a preference change during
       // another Workspace's merge cannot authorize the next one accidentally.
       const preferences = await readUpdatePreferences()
       if (!preferences[SOURCE_TEMPLATES[state.template]]) continue
+      let failureStage: 'review' | 'apply' = 'review'
       try {
         const plan = await this.service.sourceUpgrades.plan(state.workspaceId, true, state.toVersion)
         if (plan.blocked) {
@@ -134,14 +158,15 @@ export class WorkspaceUpdateService {
         }
         if (this.stopped) return
         const currentPolicy = await readUpdatePreferences()
-        if (!currentPolicy[SOURCE_TEMPLATES[state.template]]) continue
+        if (!currentPolicy[SOURCE_TEMPLATES[state.template]] || !(await this.defaults()).some(workspace => workspace.id === state.workspaceId)) continue
         this.states.set(state.workspaceId, { ...state, phase: 'applying' })
+        failureStage = 'apply'
         await this.service.sourceUpgrades.apply(state.workspaceId, true, {
           planDigest: plan.planDigest, targetVersion: state.toVersion,
         })
         this.states.set(state.workspaceId, { ...state, phase: 'updated' })
       } catch (error) {
-        this.states.set(state.workspaceId, { ...state, phase: 'failed',
+        this.states.set(state.workspaceId, { ...state, phase: 'failed', failureStage,
           reason: error instanceof Error ? error.message : String(error) })
       }
     }

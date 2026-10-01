@@ -8,7 +8,7 @@ import { useProjectUpdateWorkspaces, type ProjectUpdateWorkspace } from './usePr
 import { useMachineControls } from './useMachineControls'
 import { useBackendRecoverySignal } from '../auth/AuthContext'
 import { useWorkspaces } from '../contexts/workspaces-context'
-import { WorkspacePlanStore, workspacePlanIsCurrent, workspacePlanRequest } from '../lib/updates/workspacePlans'
+import { WorkspacePlanStore } from '../lib/updates/workspacePlans'
 import { selectWorkspaceUpdateGuidance, type UpdateGuidance } from '../lib/updates/guidance'
 
 export interface UpdatePreferences {
@@ -18,13 +18,14 @@ export interface UpdatePreferences {
 }
 export interface WorkspaceUpdateState {
   workspaceId: string
-  template: 'auto-quant-v2' | 'auto-prediction'
+  template: 'chat' | 'auto-quant-v2' | 'auto-prediction'
   phase: 'checking' | 'available' | 'applying' | 'current' | 'updated' | 'blocked' | 'failed'
   checkedAt: string | null
   fromVersion?: string
   toVersion?: string
   verified?: boolean
   reason?: string
+  failureStage?: 'check' | 'review' | 'apply'
 }
 export type NativeStatus =
   | { phase: 'checking' }
@@ -139,8 +140,6 @@ export function UpdateLifecycleProvider({ children }: { children: ReactNode }) {
   const planRevision = useSyncExternalStore(workspacePlans.subscribe, workspacePlans.getSnapshot, workspacePlans.getSnapshot)
   useEffect(() => { if (!backendUnavailable) workspacePlans.activate(); return workspacePlans.retire }, [workspacePlans, backendUnavailable])
   useEffect(() => { workspacePlans.reconcile(workspaces, hasLoaded) }, [workspacePlans, workspaces, hasLoaded])
-  const workspaceInventory = useRef(workspaces)
-  workspaceInventory.current = workspaces
   const [preferences, setPreferences] = useState<UpdatePreferences | null>(null)
   const discovery = useDiscoverySnapshot<VersionInfo>(`${backendRecoveryGeneration}:${backendUnavailable}`)
   const { value: versionInfo, error: versionError, check: checkVersion, clear: clearVersion } = discovery
@@ -165,7 +164,6 @@ export function UpdateLifecycleProvider({ children }: { children: ReactNode }) {
   }, [scope])
   const updatesSupported = useRef<boolean | null>(null)
   const observedWorkspaceUpdates = useRef(new Set<string>())
-  const observedPlansLoaded = useRef(false)
 
   const load = useCallback(async (force = false) => {
     if (backendUnavailable || !isCurrent()) return
@@ -187,11 +185,8 @@ export function UpdateLifecycleProvider({ children }: { children: ReactNode }) {
       setUpdatesUnsupported(false)
       setPreferences(snapshot.preferences)
       setWorkspaceStates(snapshot.workspaces)
-      const inventory = workspaceInventory.current
-      // Inventory may have already prefetched a candidate before the first
-      // status response. Initial discovery joins it; later polls refresh it.
-      workspacePlans.refreshObserved(inventory, inventory.map(workspace => workspace.id), force || observedPlansLoaded.current)
-      observedPlansLoaded.current = true
+      workspacePlans.observe(snapshot.workspaces)
+      if (force) workspacePlans.invalidateReviews()
       let refreshedWorkspace = false
       for (const state of snapshot.workspaces) {
         if (state.phase !== 'updated') continue
@@ -223,6 +218,16 @@ export function UpdateLifecycleProvider({ children }: { children: ReactNode }) {
     finally { if (force && isCurrent()) setChecking(false) }
   }, [backendUnavailable, refreshWorkspaces, checkVersion, isCurrent, workspacePlans])
 
+  const defaultSelection = JSON.stringify(workspaces.map(workspace => workspace.id))
+  const previousDefaults = useRef(defaultSelection)
+  useEffect(() => {
+    if (!hasLoaded) return
+    if (previousDefaults.current !== defaultSelection) {
+      previousDefaults.current = defaultSelection
+      void load(true)
+    }
+  }, [defaultSelection, hasLoaded, load])
+
   useEffect(() => {
     if (operation?.phase === 'succeeded') void load(true)
   }, [operation?.id, operation?.phase, load])
@@ -232,7 +237,6 @@ export function UpdateLifecycleProvider({ children }: { children: ReactNode }) {
     setError(null)
     updatesSupported.current = null
     observedWorkspaceUpdates.current.clear()
-    observedPlansLoaded.current = false
     setPreferences(null)
     setWorkspaceStates([])
     setUpdatesUnsupported(false)
@@ -324,10 +328,6 @@ export function UpdateLifecycleProvider({ children }: { children: ReactNode }) {
 
   }, [load, isCurrent, backendUnavailable])
 
-  useEffect(() => {
-    for (const workspace of workspaces) void workspacePlans.ensure(workspacePlanRequest(workspace))
-  }, [workspacePlans, workspaces, workspaceStates, preferences])
-
   useEffect(() => { machines.clearPlan() }, [backendRecoveryGeneration, backendUnavailable, machines.clearPlan])
   useEffect(() => {
     const target = machines.status?.target
@@ -340,21 +340,7 @@ export function UpdateLifecycleProvider({ children }: { children: ReactNode }) {
     const app = client?.discovery.value?.status === 'available'
       || ['available', 'downloaded'].includes(nativeStatus?.phase ?? '')
     const backend = Boolean(versionInfo?.hasUpdate)
-    const projected = workspaces.map(workspace => {
-      const plan = workspacePlans.peek(workspacePlanRequest(workspace))
-      return plan ? { ...workspace, upgradeAvailable: workspacePlanIsCurrent(plan) ? null : { ...workspace.upgradeAvailable, to: plan.toVersion } } : workspace
-    })
-    const observations = workspaces.flatMap<Parameters<typeof selectWorkspaceUpdateGuidance>[1][number]>(workspace => {
-      const state = workspaceStates.find(item => item.workspaceId === workspace.id)
-      const plan = workspacePlans.peek(workspacePlanRequest(workspace))
-      // A running/failed policy command remains an owner observation. Otherwise
-      // the current shared preview supplies the same candidate as its review.
-      if (!plan || state?.phase === 'checking' || state?.phase === 'applying' || state?.phase === 'failed') return state ? [state] : []
-      return [{ workspaceId: workspace.id, toVersion: plan.toVersion,
-        phase: workspacePlanIsCurrent(plan) ? 'current' as const : plan.blocked ? 'blocked' as const : 'available' as const,
-        reason: plan.blockers.join(',') }]
-    })
-    const project = selectWorkspaceUpdateGuidance(projected, observations, preferences)
+    const project = selectWorkspaceUpdateGuidance(workspaces, workspaceStates, preferences)
     return {
       app, backend, ...project,
       availableCount: Number(app) + Number(backend) + Number(project.workspaceIds.length > 0),

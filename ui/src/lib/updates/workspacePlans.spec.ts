@@ -115,20 +115,20 @@ it('invalidates content changes and removal without changing another Workspace',
   await store.ensure(request)
   store.reconcile([{ ...workspace, id: 'other' }], true)
   expect(store.peek(request)).toBeNull()
-  store.refreshObserved([{ ...workspace, id: 'other' }], [])
+  store.invalidateReviews()
   await Promise.resolve()
-  expect(getTemplateUpgradePlan).toHaveBeenCalledTimes(3) // other only; removed chat is not refreshed
+  expect(getTemplateUpgradePlan).toHaveBeenCalledTimes(2) // invalidation does not discover or plan
 })
 
-it('refreshes primary candidates and already observed scoped reviews once each', async () => {
+it('invalidates a changed discovery target without generating a plan', async () => {
   const store = new WorkspacePlanStore()
-  const skill = { ...request, layer: 'alice-harness' as const, projection: { skill: 'alice', action: 'update' as const } }
-  await store.ensure(request)
-  await store.ensure(skill)
-  store.refreshObserved([workspace], ['chat', 'chat'])
-  await store.ensure(request)
-  await store.ensure(skill)
-  expect(getTemplateUpgradePlan).toHaveBeenCalledTimes(4)
+  store.observe([{ workspaceId: 'chat', phase: 'available', fromVersion: '1', toVersion: '2' }])
+  await store.ensure({ ...request, targetVersion: '2' })
+  store.observe([{ workspaceId: 'chat', phase: 'current', fromVersion: '2' }])
+  expect(store.peek({ ...request, targetVersion: '2' })).toBeNull()
+  expect(getTemplateUpgradePlan).toHaveBeenCalledOnce()
+  await store.ensure({ ...request, targetVersion: '3' })
+  expect(store.resource({ ...request, targetVersion: '3' }).getSnapshot().error).toContain('target changed')
 })
 
 it('rejects a mismatched Workspace response and retains unsupported API evidence', async () => {

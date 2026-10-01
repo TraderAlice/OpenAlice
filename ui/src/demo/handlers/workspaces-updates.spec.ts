@@ -14,15 +14,16 @@ it('keeps source overview and review on the same candidate with an explicit runt
   const status = await fetch(`${base}/api/updates`).then(response => response.json())
   const { plan } = await fetch(`${base}/api/workspaces/${DEMO_AUTO_QUANT_WORKSPACE_ID}/source-upgrade`).then(response => response.json())
   expect(plan).toMatchObject({ workspaceId: DEMO_AUTO_QUANT_WORKSPACE_ID, strategy: 'source-merge',
-    toVersion: status.workspaces[0].toVersion, verified: status.workspaces[0].verified,
+    toVersion: status.workspaces.find((item: { workspaceId: string }) => item.workspaceId === DEMO_AUTO_QUANT_WORKSPACE_ID).toVersion, verified: false,
     blocked: true, blockers: ['active_runtime'] })
   expect(plan.fromCommit).not.toBe(plan.toCommit)
   expect((await fetch(`${base}/api/workspaces/${DEMO_AUTO_QUANT_WORKSPACE_ID}/source-upgrade`, { method: 'POST' })).status).toBe(409)
 })
 
-it('returns a current exact source receipt when there is no newer candidate', async () => {
-  const { plan } = await fetch(`${base}/api/workspaces/${DEMO_AUTO_PREDICTION_WORKSPACE_ID}/source-upgrade`).then(response => response.json())
-  expect(plan.fromVersion).toBe(plan.toVersion)
-  expect(plan.fromCommit).toBe(plan.toCommit)
-  expect(plan.changedPaths).toEqual([])
+it('reports current through discovery and does not invent a plan when no candidate exists', async () => {
+  const status = await fetch(`${base}/api/updates`).then(response => response.json())
+  expect(status.workspaces.find((item: { workspaceId: string }) => item.workspaceId === DEMO_AUTO_PREDICTION_WORKSPACE_ID)).toMatchObject({ phase: 'current' })
+  const response = await fetch(`${base}/api/workspaces/${DEMO_AUTO_PREDICTION_WORKSPACE_ID}/source-upgrade`)
+  expect(response.status).toBe(400)
+  expect(await response.json()).toMatchObject({ error: 'no_update' })
 })
