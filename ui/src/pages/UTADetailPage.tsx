@@ -333,6 +333,7 @@ export function UTADetailPage({ spec }: UTADetailPageProps) {
                       subAccounts={subAccounts}
                       selected={selectedSub}
                       onSelect={(sub) => {
+                        reqSeq.current++
                         setAccount(null)
                         setSelectedSub(sub)
                       }}
