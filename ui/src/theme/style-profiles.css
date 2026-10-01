@@ -12,9 +12,8 @@
 }
 
 .oa-style-profile-card[data-selected="true"] {
-  border-color: var(--primary);
-  background: color-mix(in srgb, var(--primary-muted) 58%, var(--background));
-  box-shadow: 0 0 0 1px color-mix(in srgb, var(--primary) 38%, transparent);
+  border-color: var(--foreground);
+  background: var(--secondary);
 }
 
 .oa-style-profile-preview {
@@ -287,8 +286,4 @@
 /* Preview cards retain their own geometry across active profiles. */
 :root[data-ui-style] .oa-style-profile-card {
   box-shadow: none;
-}
-
-:root[data-ui-style] .oa-style-profile-card[data-selected="true"] {
-  box-shadow: 0 0 0 1px color-mix(in srgb, var(--primary) 38%, transparent);
 }

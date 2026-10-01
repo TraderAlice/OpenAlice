@@ -44,6 +44,19 @@ financial semantics, and existing workflow contracts.
   lives beside the recipient; replies and notifications use shared buttons.
   Tooltips use the 14px supporting-text role, a 250ms initial delay, immediate
   transfer within the provider window, and a 110ms exit.
+- Inference rows use one four-column layout: a 20px icon, label, wrapping value,
+  and a fixed 16px chevron. The trigger shows the model and an explicit effort
+  override. Default effort remains in its menu. Utility menus use 40px rows,
+  44px touch targets, and immediate keyboard highlighting.
+- Overview owns language selection. Existing language URLs and saved tabs open
+  Overview. Connection state uses an icon and a separate mode chip. Location
+  details reuse Collapsible. Palette and style choices use neutral borders and selection checks.
+  Preview colors remain inside their palette surfaces. Active palette labels
+  wrap on narrow screens.
+- Main navigation uses regular Inter labels with semibold selection. Harness
+  children use a consistent 28px inset. Background work carries a numeric count.
+  Manager quick starts use short operation names; full prompts remain available
+  through hover and keyboard guidance and populate the editable draft.
 - Financial movement and operational health retain their dedicated semantic
   colors. Shared surfaces consume tokens across all saved palettes.
 
@@ -840,7 +853,7 @@ by text and typography. DOM content remains selectable. Local Inter is the
 measured font; width changes recompute line wrapping through the shared owner.
 
 `SettingsArea` preserves navigation DOM, width, scroll position, and focus across
-category changes. Appearance, language, and market filters share `SegmentedControl`.
+category changes. Appearance, Overview language selection, and market filters share `SegmentedControl`.
 `SaveIndicator` retains an empty idle slot to stabilize adjacent controls.
 `ContextHelp`, `ConfigSection.help`, and `PageHeader.help`
 provide on-demand guidance through the shared Popover. Runtime details and news

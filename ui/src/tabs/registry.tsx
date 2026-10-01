@@ -18,7 +18,7 @@ import { MarketRotationPage } from '../pages/MarketRotationPage'
 import { MarketBoardPage } from '../pages/MarketBoardPage'
 import { MARKET_BOARD_TITLES } from '../pages/market-board-titles'
 import { MarketDetailPage } from '../pages/MarketDetailPage'
-import { AppearanceSettingsPage, LanguageSettingsPage, SettingsPage, ToolsSettingsPage } from '../pages/SettingsPage'
+import { AppearanceSettingsPage, SettingsPage, ToolsSettingsPage } from '../pages/SettingsPage'
 import { ActivityBarSettingsPage } from '../pages/ActivityBarSettingsPage'
 import { PetSettingsPage } from '../pages/PetSettingsPage'
 import { WorkspaceInjectionPage } from '../pages/WorkspaceInjectionPage'
@@ -269,7 +269,7 @@ const settingsCategoryTitle: Record<
 > = {
   general: 'Overview',
   machines: 'Machines',
-  language: 'Language',
+  language: 'Overview',
   appearance: 'Skin',
   pet: 'Pet',
   'activity-bar': 'Activity bar',
@@ -292,7 +292,7 @@ function SettingsRouter({ spec }: ViewProps<'settings'>) {
   switch (spec.params.category) {
     case 'general': return <SettingsPage />
     case 'machines': return <MachinesSettingsPage />
-    case 'language': return <LanguageSettingsPage />
+    case 'language': return <SettingsPage />
     case 'appearance': return <AppearanceSettingsPage />
     case 'pet': return <PetSettingsPage />
     case 'activity-bar': return <ActivityBarSettingsPage />
@@ -317,7 +317,7 @@ const settingsModule: ViewModule<'settings'> = {
   shell: 'settings',
   title: (spec) => settingsCategoryTitle[spec.params.category],
   toUrl: (spec) =>
-    spec.params.category === 'general'
+    (spec.params.category === 'general' || spec.params.category === 'language')
       ? '/settings'
       : `/settings/${spec.params.category}`,
   Component: SettingsRouter,

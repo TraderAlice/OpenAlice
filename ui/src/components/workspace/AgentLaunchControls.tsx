@@ -12,6 +12,7 @@ import {
   AlertTriangle,
   ChevronDown,
   Cpu,
+  Gauge,
   Info,
   KeyRound,
   Settings2,
@@ -125,9 +126,9 @@ function AgentLaunchAccessItems({ config, onConfigureProvider }: {
           className={`min-h-11 px-2.5 py-2 text-sm ${config.accessMode === 'auto' ? 'text-primary' : 'text-foreground'}`}
         >
           <span className="min-w-0 flex-1">
-            <span className="block truncate">{t('chatLanding.workspaceAiAccess')}</span>
+            <span className="block break-words">{t('chatLanding.workspaceAiAccess')}</span>
             {config.detectedCredential.model && (
-              <span className="block truncate text-sm text-muted-foreground">{config.detectedCredential.model}</span>
+              <span className="block break-words text-sm text-muted-foreground">{config.detectedCredential.model}</span>
             )}
           </span>
           {config.accessMode === 'auto' && <SelectionCheckIcon />}
@@ -141,8 +142,8 @@ function AgentLaunchAccessItems({ config, onConfigureProvider }: {
       >
         <AgentRuntimeIcon agentId={config.effectiveAgent} className="h-4 w-4 shrink-0" />
         <span className="min-w-0 flex-1">
-          <span className="block truncate">{t('chatLanding.runtimeAccount', { runtime: runtimeName })}</span>
-          <span className="block truncate text-sm text-muted-foreground">{t('chatLanding.runtimeAccountDetail', { runtime: runtimeName })}</span>
+          <span className="block break-words">{t('chatLanding.runtimeAccount', { runtime: runtimeName })}</span>
+          <span className="block break-words text-sm text-muted-foreground">{t('chatLanding.runtimeAccountDetail', { runtime: runtimeName })}</span>
         </span>
         {config.accessMode === 'native' && <SelectionCheckIcon />}
       </DropdownMenuItem>
@@ -160,8 +161,8 @@ function AgentLaunchAccessItems({ config, onConfigureProvider }: {
               <AIProviderIcon vendor={credential.vendor} className="h-4 w-4" />
             </span>
             <span className="min-w-0 flex-1">
-              <span className="block truncate">{credentialAccessLabel(credential)}</span>
-              <span className="block truncate text-sm text-muted-foreground">
+              <span className="block break-words">{credentialAccessLabel(credential)}</span>
+              <span className="block break-words text-sm text-muted-foreground">
                 {t('chatLanding.savedAccessDetail', { credential: credentialAccessDetail(credential) })}
               </span>
             </span>
@@ -261,7 +262,7 @@ function AgentLaunchInferenceMenu({
             aria-label={access ? `${t('chatLanding.selectCredential')}, ${t('chatLanding.selectModelAndEffort')}` : t('chatLanding.selectModelAndEffort')}
             className={settings
               ? 'oa-pressable flex min-h-14 w-full min-w-0 items-center gap-3 rounded-lg border border-border/70 bg-muted/25 px-3 py-2 text-left transition-colors hover:bg-muted/45'
-              : 'oa-pressable inline-flex min-h-7 min-w-0 max-w-full items-center gap-2 rounded-lg bg-transparent px-1.5 py-1 text-sm leading-5 font-medium text-foreground transition-colors hover:bg-muted'}
+              : 'oa-pressable inline-flex min-h-9 min-w-0 max-w-full items-center gap-2 rounded-full bg-secondary px-3 py-1.5 text-sm leading-5 text-foreground transition-colors hover:bg-muted'}
           />}
         >
           {access?.icon ?? <Cpu className={settings ? 'h-4 w-4 shrink-0 text-muted-foreground' : 'h-3 w-3 shrink-0 text-muted-foreground'} />}
@@ -270,15 +271,15 @@ function AgentLaunchInferenceMenu({
               <span className="block text-sm font-medium text-muted-foreground">
                 {t('chatLanding.selectModelAndEffort')}
               </span>
-              <span className="flex min-w-0 items-baseline gap-2 text-sm text-foreground">
+              <span className="flex min-w-0 flex-wrap items-baseline gap-x-3 gap-y-1 text-sm text-foreground">
                 <span className="min-w-0 truncate font-medium">{resolvedModel}</span>
                 <span className="shrink-0 text-xs text-muted-foreground">{resolvedEffort}</span>
               </span>
             </span>
           ) : (
             <>
-              <span className="min-w-0 max-w-[180px] truncate">{resolvedModel}</span>
-              <span className="min-w-0 truncate text-muted-foreground">{resolvedEffort}</span>
+              <span className="min-w-0 max-w-[240px] truncate">{resolvedModel}</span>
+              {config.launchReasoningEffort && <span className="min-w-0 truncate rounded-full bg-background px-2 py-0.5 text-sm text-muted-foreground">{resolvedEffort}</span>}
             </>
           )}
           <ChevronDown className={settings ? 'h-4 w-4 shrink-0 opacity-60' : 'h-3 w-3 shrink-0 opacity-60'} />
@@ -289,22 +290,23 @@ function AgentLaunchInferenceMenu({
           sideOffset={6}
           positionerClassName={menuPositionerClassName}
           aria-label={access ? `${t('chatLanding.selectCredential')}, ${t('chatLanding.selectModelAndEffort')}` : t('chatLanding.selectModelAndEffort')}
-          className="w-[300px] max-w-[calc(100vw-2rem)] rounded-xl border border-border/70 p-1.5 shadow-lg ring-0"
+          className="w-[336px] max-w-[calc(100vw-2rem)] rounded-2xl border border-border/70 p-1.5 shadow-lg ring-0"
         >
           {access && <DropdownMenuSub>
-            <DropdownMenuSubTrigger className="min-h-10 px-2.5 py-2 text-sm">
-              {access.icon}
+            <DropdownMenuSubTrigger className="oa-inference-setting">
+              <span className="flex size-5 items-center justify-center" aria-hidden>{access.icon}</span>
               <span>{t('chatLanding.selectCredential')}</span>
-              <span className="ml-auto max-w-[170px] truncate text-muted-foreground">{access.label}</span>
+              <span className="oa-inference-value">{access.label}</span>
             </DropdownMenuSubTrigger>
             <DropdownMenuSubContent className="w-[300px] max-w-[calc(100vw-2rem)] max-h-80 overflow-y-auto p-1.5">
               {access.items}
             </DropdownMenuSubContent>
           </DropdownMenuSub>}
           <DropdownMenuSub>
-            <DropdownMenuSubTrigger className="min-h-10 px-2.5 py-2 text-sm">
-              <span className="font-medium">{t('chatLanding.modelField')}</span>
-              <span className="ml-auto max-w-[170px] truncate text-muted-foreground">{resolvedModel}</span>
+            <DropdownMenuSubTrigger className="oa-inference-setting">
+              <Cpu className="size-5 text-muted-foreground" aria-hidden />
+              <span>{t('chatLanding.modelField')}</span>
+              <span className="oa-inference-value">{resolvedModel}</span>
             </DropdownMenuSubTrigger>
             <DropdownMenuSubContent className="w-[300px] max-w-[calc(100vw-2rem)] border border-border/70 p-1.5 shadow-lg ring-0">
               <ModelCatalogStatus catalog={config.modelCatalog} selectedModel={config.launchModel ?? config.defaultModel} />
@@ -323,20 +325,20 @@ function AgentLaunchInferenceMenu({
                       <span className="min-w-0 truncate text-muted-foreground">{config.defaultModel}</span>
                     </span>
                   ) : (
-                    <span className="min-w-0 flex-1 truncate">{t('chatLanding.runtimeDefaultModel')}</span>
+                    <span className="min-w-0 flex-1 break-words">{t('chatLanding.runtimeDefaultModel')}</span>
                   )}
                 </DropdownMenuRadioItem>
                 {customCurrentModel && (
                   <DropdownMenuRadioItem value={customCurrentModel} closeOnClick={false} className="min-h-9 px-2.5 pr-8 text-sm">
-                    <span className="min-w-0 flex-1 truncate">{customCurrentModel}</span>
+                    <span className="min-w-0 flex-1 break-words">{customCurrentModel}</span>
                   </DropdownMenuRadioItem>
                 )}
                 {knownModels.map((model) => (
                   <DropdownMenuRadioItem key={model.id} value={model.id} closeOnClick={false} className="min-h-9 px-2.5 pr-8 text-sm">
                     <span className="min-w-0 flex-1">
-                      <span className="block truncate">{model.label}</span>
+                      <span className="block break-words">{model.label}</span>
                       {model.label !== model.id && (
-                        <span className="block truncate text-sm text-muted-foreground">{model.id}</span>
+                        <span className="block break-words text-sm text-muted-foreground">{model.id}</span>
                       )}
                     </span>
                   </DropdownMenuRadioItem>
@@ -356,9 +358,10 @@ function AgentLaunchInferenceMenu({
           </DropdownMenuSub>
 
           <DropdownMenuSub>
-            <DropdownMenuSubTrigger className="min-h-10 px-2.5 py-2 text-sm">
-              <span className="font-medium">{t('chatLanding.effortField')}</span>
-              <span className="ml-auto max-w-[140px] truncate text-muted-foreground">{resolvedEffort}</span>
+            <DropdownMenuSubTrigger className="oa-inference-setting">
+              <Gauge className="size-5 text-muted-foreground" aria-hidden />
+              <span>{t('chatLanding.effortField')}</span>
+              <span className="oa-inference-value">{resolvedEffort}</span>
             </DropdownMenuSubTrigger>
             <DropdownMenuSubContent className="w-[220px] max-w-[calc(100vw-2rem)] border border-border/70 p-1.5 shadow-lg ring-0">
               <DropdownMenuRadioGroup
@@ -368,7 +371,7 @@ function AgentLaunchInferenceMenu({
                 )}
               >
                 <DropdownMenuRadioItem value="" closeOnClick={false} className="min-h-9 px-2.5 pr-8 text-sm">
-                  <span className="min-w-0 flex-1 truncate">
+                  <span className="min-w-0 flex-1 break-words">
                     {t('chatLanding.effortNotSpecified')}
                   </span>
                 </DropdownMenuRadioItem>
@@ -523,13 +526,13 @@ export const AgentLaunchSelectors = forwardRef<AgentLaunchSelectorsHandle, Agent
             </span>
             <span className="min-w-0 flex-1">
               {(labeled || settingsLayout) && (
-                <span className="block truncate text-sm font-medium text-muted-foreground">
+                <span className="block break-words text-sm font-medium text-muted-foreground">
                   {t('chatLanding.aiAccess')}
                 </span>
               )}
-              <span className={`block truncate text-sm text-foreground ${settingsLayout ? 'font-medium' : ''}`}>{selectedAccessLabel}</span>
+              <span className={`block break-words text-sm text-foreground ${settingsLayout ? 'font-medium' : ''}`}>{selectedAccessLabel}</span>
               {(labeled || settingsLayout) && (
-                <span className="block truncate text-sm text-muted-foreground">{selectedAccessDetail}</span>
+                <span className="block break-words text-sm text-muted-foreground">{selectedAccessDetail}</span>
               )}
             </span>
             <ChevronDown className={settingsLayout ? 'h-4 w-4 shrink-0 opacity-60' : 'h-3 w-3 shrink-0 opacity-60'} />
@@ -645,7 +648,7 @@ export function AgentLaunchDetails({
             {scope.label}
           </span>
           {scope.detail && (
-            <span className="hidden min-w-0 flex-1 truncate sm:block" title={scope.detail}>
+            <span className="hidden min-w-0 flex-1 break-words sm:block" title={scope.detail}>
               {scope.detail}
             </span>
           )}

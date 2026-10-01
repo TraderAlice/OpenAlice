@@ -14,7 +14,6 @@ import {
   FlaskConical,
   LayoutDashboard,
   Monitor,
-  Languages,
   LineChart,
   ListChecks,
   Newspaper,
@@ -74,7 +73,6 @@ const CATEGORY_GROUPS = [
     items: [
       { labelKey: 'settings.category.general', category: 'general', Icon: LayoutDashboard },
       { labelKey: 'settings.machines.title', category: 'machines', Icon: Monitor },
-      { labelKey: 'settings.language.title', category: 'language', Icon: Languages },
       { labelKey: 'pet.title', category: 'pet', Icon: Ghost },
       { labelKey: 'settings.category.issues', category: 'issues', Icon: ListChecks },
       { labelKey: 'settings.category.beta', category: 'beta', Icon: FlaskConical },
@@ -162,7 +160,7 @@ export function SettingsCategoryList({ onSelect }: { onSelect?: () => void }) {
           <SidebarSectionHeader>{t(group.labelKey)}</SidebarSectionHeader>
           {group.items.map((item) => {
             const active =
-              focused?.kind === 'settings' && focused.params.category === item.category
+              focused?.kind === 'settings' && (focused.params.category === 'language' ? 'general' : focused.params.category) === item.category
             return (
               <SidebarRow
                 key={item.category}

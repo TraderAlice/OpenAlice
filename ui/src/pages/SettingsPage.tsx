@@ -173,14 +173,14 @@ export function AppearanceSection({ standalone = false }: { standalone?: boolean
             slot="day"
             palette={paletteDefinition(dayPalette)}
             active={effectiveSlot === 'day'}
-            editing={editingSlot === 'day'}
+            editing={customizingPalettes && editingSlot === 'day'}
             onSelect={() => editSlot('day')}
           />
           <PaletteSlotCard
             slot="night"
             palette={paletteDefinition(nightPalette)}
             active={effectiveSlot === 'night'}
-            editing={editingSlot === 'night'}
+            editing={customizingPalettes && editingSlot === 'night'}
             onSelect={() => editSlot('night')}
           />
         </div>
@@ -379,19 +379,20 @@ function PaletteSlotCard({
         palette: t(palette.labelKey),
       })}
       onClick={onSelect}
-      className="oa-palette-preview oa-pressable min-w-0 rounded-lg border p-2.5 text-left shadow-sm transition-[border-color,box-shadow,transform] sm:p-3"
+      className="oa-palette-preview oa-pressable min-w-0 rounded-2xl border p-4 text-left transition-[border-color,transform]"
     >
-      <span className="flex min-w-0 items-start justify-between gap-2 sm:gap-3">
+      <span className="flex min-w-0 flex-wrap items-start justify-between gap-2">
         <span className="min-w-0">
           <span className="flex items-center gap-1.5 text-sm leading-5 font-medium">
             <Icon className="h-3.5 w-3.5" />
             {t(`theme.mode.${slot}`)}
           </span>
-          <span className="mt-1 block truncate text-[14px] font-semibold">{t(palette.labelKey)}</span>
+          <span className="mt-1 block break-words text-sm font-semibold">{t(palette.labelKey)}</span>
         </span>
         <span className="flex shrink-0 flex-col items-end gap-1">
           {active && (
-            <span className="rounded-full bg-primary px-2 py-0.5 text-sm leading-5 font-semibold text-primary-foreground">
+            <span className="inline-flex items-center gap-1 rounded-full bg-foreground/8 px-2 py-0.5 text-sm leading-5 font-medium">
+              <SelectionCheckIcon />
               {t('settings.appearance.activeSlot')}
             </span>
           )}
@@ -434,7 +435,7 @@ function PalettePicker({
           onClick={() => onSelect(palette.id)}
           aria-pressed={selected === palette.id}
           aria-label={t('settings.appearance.choosePaletteOption', { palette: t(palette.labelKey) })}
-          className="oa-palette-preview oa-pressable min-w-0 rounded-lg border p-3 text-left shadow-sm transition-[border-color,box-shadow,transform]"
+          className="oa-palette-preview oa-pressable min-w-0 rounded-2xl border p-4 text-left transition-[border-color,transform]"
         >
           <span className="flex items-start justify-between gap-2">
             <span className="min-w-0">
@@ -710,8 +711,16 @@ function WorkspaceShellSection() {
 // ==================== Settings Section ====================
 
 function SettingsSection() {
+  const { t } = useTranslation()
   return (
     <div className="mx-auto w-full max-w-[1100px]">
+      <section className="mb-6 flex flex-wrap items-center justify-between gap-4 border-b border-border/60 pb-6">
+        <div className="flex items-center gap-2">
+          <h3 className="text-base font-semibold">{t('settings.language.title')}</h3>
+          <ContextHelp label={t('settings.language.title')}>{t('settings.language.description')}</ContextHelp>
+        </div>
+        <LanguageSection />
+      </section>
       <AliceLocationSection />
 
       {/* Installation and update ownership */}
@@ -983,20 +992,6 @@ export function SettingsPage() {
       <PageHeader title={t('settings.category.general')} />
       <SettingsScrollArea className="px-4 py-5 md:px-8">
         <SettingsSection />
-      </SettingsScrollArea>
-    </div>
-  )
-}
-
-export function LanguageSettingsPage() {
-  const { t } = useTranslation()
-  return (
-    <div className="flex flex-col flex-1 min-h-0">
-      <PageHeader title={t('settings.language.title')} help={t('settings.language.description')} />
-      <SettingsScrollArea className="px-4 py-5 md:px-8">
-        <div className="mx-auto w-full max-w-[1100px]">
-          <LanguageSection />
-        </div>
       </SettingsScrollArea>
     </div>
   )

@@ -175,11 +175,11 @@ body {
   #activity-bar:not([data-rail-layout="compact"]) .oa-nav-item {
     min-height: 48px;
     padding-inline: 16px;
-    gap: 12px;
+    gap: 16px;
   }
-  #activity-bar .oa-harness-nav-header { min-height: 40px; }
+  #activity-bar .oa-harness-nav-header { min-height: 48px; }
   #activity-bar .oa-harness-nav-actions > button { height: 28px; }
-  #activity-bar .oa-harness-nav-children { margin-left: 8px; padding-bottom: 4px; }
+  #activity-bar .oa-harness-nav-children { margin-left: 28px; padding-bottom: 8px; }
   #activity-bar .oa-harness-nav-children .oa-sidebar-child-row {
     margin-inline: 0;
     min-height: 40px;
@@ -1901,3 +1901,20 @@ body:has([data-desktop-banner]):not(:has(.oa-office-main)) [data-sonner-toaster]
 }
 
 .oa-config-section + .oa-config-section { margin-top: 24px; }
+
+.oa-inference-setting {
+  display: grid;
+  grid-template-columns: 20px minmax(0, 0.8fr) minmax(0, 1.4fr) 16px;
+  min-height: 48px;
+  gap: 12px;
+  padding: 10px 12px;
+  font-size: 14px;
+  line-height: 20px;
+  overflow-wrap: anywhere;
+}
+
+.oa-inference-value {
+  min-width: 0;
+  text-align: end;
+  color: var(--muted-foreground);
+}

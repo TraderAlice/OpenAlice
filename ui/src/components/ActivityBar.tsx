@@ -224,7 +224,7 @@ export function ActivityBar({
                           aria-label={label}
                           aria-describedby={badge ? `activity-count-${item.page}` : undefined}
                           aria-current={isActive ? 'page' : undefined}
-                          className={`oa-nav-item relative flex items-center rounded-full text-left font-semibold ${
+                          className={`oa-nav-item relative flex items-center rounded-full text-left font-normal aria-[current=page]:font-semibold ${
                             compactRail
                               ? denseRail
                                 ? 'md:h-[26px] md:w-8 md:min-h-[26px] md:justify-center md:gap-0 md:px-0 md:py-0'

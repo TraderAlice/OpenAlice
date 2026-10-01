@@ -32,9 +32,9 @@ afterEach(() => { cleanup(); vi.clearAllMocks(); Reflect.deleteProperty(window, 
 it('shows three parent objects with optional read-only default content, without selection or a chooser', () => {
   render(<VersionOverviewSection />)
   expect(screen.getAllByRole('heading', { level: 3 }).map(node => node.textContent)).toEqual(['App', 'Backend', 'Alice Project'])
-  expect(screen.queryByText('my-chat · Default')).toBeNull()
+  expect(screen.queryByText('my-chat')).toBeNull()
   fireEvent.click(screen.getByRole('button', { name: 'Project details' }))
-  expect(screen.getByText('my-chat · Default')).toBeTruthy()
+  expect(screen.getByText('my-chat')).toBeTruthy()
   expect(screen.getByText('Quant')).toBeTruthy()
   expect(screen.getByText('Prediction')).toBeTruthy()
   expect(screen.queryByRole('checkbox')).toBeNull()
