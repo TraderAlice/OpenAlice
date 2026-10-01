@@ -1,3 +1,6 @@
+import { ModelIdentity } from '../ModelIdentity'
+import { AIProviderIcon } from '../../lib/aiProviderIcon'
+import { modelManufacturer } from '../../lib/modelIdentity'
 /**
  * Reusable preset-enumeration form controls, shared by the AI Provider
  * credential vault and the per-workspace AI config modal.
@@ -14,6 +17,7 @@ import type { LabeledOption } from '../../lib/presetHelpers'
 
 export function ModelCombobox({
   value,
+  vendor,
   suggestions,
   onChange,
   placeholder,
@@ -21,6 +25,7 @@ export function ModelCombobox({
   suggestionsLabel,
 }: {
   value: string
+  vendor?: string | null
   suggestions: readonly LabeledOption[]
   onChange: (v: string) => void
   placeholder?: string
@@ -55,9 +60,12 @@ export function ModelCombobox({
         }
       }}
     >
+      <span className="pointer-events-none absolute inset-y-0 left-3 flex items-center">
+        <AIProviderIcon vendor={modelManufacturer(value, vendor)} className="size-4 shrink-0" />
+      </span>
       <input
         ref={inputRef}
-        className={`${inputClass}${suggestions.length > 0 ? ' pr-9' : ''}`}
+        className={`${inputClass} pl-9${suggestions.length > 0 ? ' pr-9' : ''}`}
         role="combobox"
         aria-label={ariaLabel ?? placeholder ?? 'Model'}
         aria-autocomplete="list"
@@ -138,12 +146,7 @@ export function ModelCombobox({
                 index === activeIndex ? 'bg-muted text-foreground' : 'text-muted-foreground hover:bg-muted/70 hover:text-foreground'
               }`}
             >
-              <span className="min-w-0 flex-1">
-                <span className="block truncate font-mono text-[12px] text-foreground">{model.id}</span>
-                {model.label !== model.id && (
-                  <span className="mt-0.5 block truncate text-[10.5px]">{model.label}</span>
-                )}
-              </span>
+              <ModelIdentity model={model.id} label={model.label} vendor={vendor} className="flex-1" />
               {model.id === value && <span aria-hidden className="mt-0.5 text-xs text-primary">✓</span>}
             </button>
           ))}

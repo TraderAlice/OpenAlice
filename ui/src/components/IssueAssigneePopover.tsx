@@ -1,3 +1,4 @@
+import { ModelIdentity } from './ModelIdentity'
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { MessageSquare } from 'lucide-react'
@@ -85,7 +86,7 @@ function AssigneeContent({ wsId, id, onAssigned }: { wsId: string; id: string; o
           {ready ? <>
             <dl className="grid grid-cols-[auto_minmax(0,1fr)] gap-x-4 gap-y-1.5 text-xs">
               <dt className="text-muted-foreground">{t('issues.detail.runtime')}</dt><dd className="truncate">{owner.agent || '—'}</dd>
-              <dt className="text-muted-foreground">{t('issues.detail.model')}</dt><dd className="truncate" title={owner.runtime?.model}>{owner.runtime?.model || '—'}</dd>
+              <dt className="text-muted-foreground">{t('issues.detail.model')}</dt><dd>{owner.runtime?.model ? <ModelIdentity model={owner.runtime.model} /> : '—'}</dd>
               <dt className="text-muted-foreground">{t('issues.detail.effort')}</dt><dd>{owner.runtime?.reasoningEffort || '—'}</dd>
               <dt className="text-muted-foreground">{t('issues.detail.credential')}</dt><dd className="truncate">{owner.runtime?.credentialSlug || owner.runtime?.credentialSource || '—'}</dd>
             </dl>
