@@ -3,10 +3,12 @@ import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'nod
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { expect, it } from 'vitest'
+import vitestConfig from '../vitest.config.js'
 import { collectionWideTestInputs } from './test-collection-inputs.mjs'
 
 const root = resolve(import.meta.dirname, '..')
 it('shares collection metadata triggers across every runnable config', () => {
+  expect(vitestConfig.test?.forceRerunTriggers).toEqual(collectionWideTestInputs(root))
   for (const config of ['vitest.config.ts', 'vitest.e2e.config.ts', 'vitest.external.config.ts', 'vitest.uta-live.config.ts', 'packages/ibkr/vitest.config.ts', 'packages/guardian-runtime/vitest.config.ts']) {
     expect(readFileSync(resolve(root, config), 'utf8')).toContain('forceRerunTriggers: collectionWideTestInputs(')
   }

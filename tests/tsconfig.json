@@ -6,6 +6,6 @@
     "noEmit": true,
     "rootDir": ".."
   },
-  "include": ["./**/*.spec.ts", "../scripts/test-groups.spec.ts", "../scripts/test-collection-inputs.spec.ts", "../scripts/test-results.spec.ts", "../scripts/workspace-acceptance-receipt.spec.ts"],
+  "include": ["./**/*.spec.ts", "../scripts/test-groups.spec.ts", "../scripts/test-lanes.spec.ts", "../scripts/test-collection-inputs.spec.ts", "../scripts/test-results.spec.ts", "../scripts/workspace-acceptance-receipt.spec.ts"],
   "exclude": ["../node_modules", "../dist"]
 }

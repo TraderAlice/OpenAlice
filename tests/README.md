@@ -1,10 +1,17 @@
-# Product scenarios and protocol boundaries
+# Integration and E2E topics
 
-This directory is the product evidence map. Each group owns a `coverage.json`
-with required initial state, action, expected behavior, priority, specific
-assertion/command references, fidelity, environment limits, and remaining gaps.
-The manifests feed the existing catalog and selector; this is not another test
-runner. Leaf unit/component specs stay beside their owning implementation.
+Same-name unit/component specs belong beside their implementation and need no
+registration. Integration suites belong in `tests/integration/<topic>/`; E2E
+suites belong in `tests/e2e/<topic>/` or an existing registered native/artifact
+runner. Both higher tiers require suite registration. Scope is independent of
+external access, trading writes and other execution conditions.
+
+Migration is in progress: the five deterministic integration suites have moved,
+while `scenarios/` and `contracts/` still hold legacy `coverage.json` manifests
+and some PTY specs. The legacy fields below describe what the current selector
+consumes, not the final registration contract. Ordinary unit assertion mappings
+will be removed as suite/gate consumers migrate together. No new cases or
+coverage expansion are part of this work. See [[plans/test-system-grouping.md]].
 
 ## Browse and run
 

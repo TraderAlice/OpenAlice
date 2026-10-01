@@ -121,8 +121,13 @@ export function validateCoverageGroups(root, groups, specs, commands, catalog) {
       }
     }
     for (const test of group.centralTests ?? []) {
-      const prefix = `tests/${kinds[group.kind]}/${group.name}/`
-      require(safePath(test.path) && test.path.startsWith(prefix) && specSet.has(test.path), `${id}: central test must exist inside its group`)
+      const prefixes = [
+        `tests/integration/${group.name}/`,
+        `tests/e2e/${group.name}/`,
+        // Existing PTY groups move after their actual test scope is reviewed.
+        `tests/${kinds[group.kind]}/${group.name}/`,
+      ]
+      require(safePath(test.path) && prefixes.some((prefix) => test.path.startsWith(prefix)) && specSet.has(test.path), `${id}: central test must exist inside its topic`)
       require(!centralPaths.has(test.path), `${id}: duplicate central ownership ${test.path}`)
       centralPaths.add(test.path)
       require(owners.includes(test.owner) && lanes.includes(test.lane), `${id}: invalid central owner/lane`)

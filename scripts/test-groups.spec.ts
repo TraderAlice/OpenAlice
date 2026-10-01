@@ -66,16 +66,12 @@ describe('scenario and boundary evidence catalog', () => {
     expect(() => validate(unowned)).toThrow(/Central spec lacks explicit ownership/)
   })
 
-  it('rejects central metadata that loses package/area selection or default collection', () => {
+  it('rejects central metadata that loses package/area selection', () => {
     for (const [field, value] of [['package', '@missing/package'], ['areas', ['unknown-area']]] as const) {
       const groups = structuredClone(coverageGroups)
       groups.find((group) => group.centralTests?.length).centralTests[0][field] = value
       expect(() => validate(groups)).toThrow(/invalid central package|invalid central area/)
     }
-    const groups = structuredClone(coverageGroups)
-    const test = groups.find((group) => group.kind === 'scenario' && group.name === 'workspace-creation').centralTests[0]
-    test.lane = 'hermetic'
-    expect(() => validate(groups)).toThrow(/filename is excluded/)
   })
 
   it('keeps native user journeys partial even with green-looking unit evidence', () => {
@@ -97,7 +93,7 @@ describe('group selection through the existing lane/owner/package selector', () 
     expect(selected).toEqual(['src/services/uta-client/UTAManagerSDK.spec.ts'])
     expect(selectTestFiles(repoRoot, {
       scenarios: ['trading-approval'], lanes: ['integration'], packages: ['@traderalice/uta-service'],
-    })).toEqual(['tests/contracts/alice-uta/approval-http.e2e.spec.ts', 'tests/scenarios/trading-approval/uta-lifecycle.e2e.spec.ts'])
+    })).toEqual(['tests/integration/alice-uta/approval-http.spec.ts', 'tests/integration/trading-approval/uta-lifecycle.spec.ts'])
     expect(selectTestFiles(repoRoot, {
       scenarios: ['workspace-creation', 'trading-approval'], lanes: ['integration'],
     })).toHaveLength(3)

@@ -12,16 +12,16 @@
       "expected": "Stable command scopes and hermetic default collection remain authoritative.",
       "evidence": [
         {
-          "spec": "tests/contracts/development-workflow/development-test-contract.spec.ts",
-          "assertion": "keeps one composable namespace around the hermetic full suite",
+          "spec": "scripts/test-lanes.spec.ts",
+          "assertion": "keeps root owner commands synchronized with the ownership map",
           "level": "contract",
           "scope": "Manifest/config contract; does not execute all selected tests."
         },
         {
-          "spec": "tests/contracts/development-workflow/development-test-contract.spec.ts",
-          "assertion": "reruns every project when collection-wide inputs change",
+          "spec": "scripts/test-collection-inputs.spec.ts",
+          "assertion": "collects otherwise unrelated tests for metadata-only --changed edits",
           "level": "contract",
-          "scope": "Config input contract, not a remote CI run."
+          "scope": "Runs isolated Git/Vitest fixtures to verify actual changed-file collection after metadata edits; not a remote CI run."
         },
         {
           "spec": "scripts/test-lanes.spec.ts",
@@ -79,15 +79,5 @@
       "gap": ""
     }
   ],
-  "centralTests": [
-    {
-      "path": "tests/contracts/development-workflow/development-test-contract.spec.ts",
-      "owner": "repo-tooling",
-      "lane": "hermetic",
-      "areas": [
-        "workflow"
-      ],
-      "package": null
-    }
-  ]
+  "centralTests": []
 }

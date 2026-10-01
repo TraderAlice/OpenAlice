@@ -70,7 +70,7 @@
       "expected": "One durable Chat and native Session identity survive; local replies decode without a broker carrier.",
       "evidence": [
         {
-          "spec": "tests/scenarios/first-run/broker-free-chat.e2e.spec.ts",
+          "spec": "tests/integration/first-run/broker-free-chat.spec.ts",
           "assertion": "creates one broker-free Chat, decodes a local reply, and reuses its Session after restart",
           "level": "integration",
           "scope": "Real service/bootstrap/Git/stores/child; executable command substituted at external model boundary. No browser, credential onboarding, Guardian or packaged startup."
@@ -81,7 +81,7 @@
   ],
   "centralTests": [
     {
-      "path": "tests/scenarios/first-run/broker-free-chat.e2e.spec.ts",
+      "path": "tests/integration/first-run/broker-free-chat.spec.ts",
       "owner": "alice",
       "lane": "integration",
       "areas": [

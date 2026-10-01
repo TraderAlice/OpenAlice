@@ -23,10 +23,41 @@ children use package exports and do not inherit those aliases. Build the
 package's dependencies too: its Node entry imports Guardian runtime. This local
 build prerequisite does not grant any external or broker acceptance authority.
 
+## Test scope and registration
+
+The maintainer's convention separates scope from execution conditions:
+
+| Scope | Location | Registration |
+|---|---|---|
+| Unit/component | Same-name spec beside its implementation | Not required |
+| Integration | `tests/integration/<topic>/` | Required per suite |
+| E2E | `tests/e2e/<topic>/`, or an existing native/artifact runner | Required per suite/runner |
+
+Unit tests verify a module's own responsibility. Integration tests exercise
+collaborating production modules; E2E exercises a user workflow through the
+actual application entry and relevant runtime. A mocked browser, local child
+fixture or in-process HTTP request does not itself establish E2E coverage.
+`hermetic`, external-readonly and live-paper describe execution conditions and
+side effects, not these scope levels.
+
+The existing system is being migrated, not already compliant. The five isolated
+local integration specs now live under `tests/integration/`; they keep their
+existing `test:integration` command and execution configuration. Legacy topic
+manifests still live under `tests/scenarios/` and `tests/contracts/`, still
+reference some leaf assertions, and still supply critical-gate evidence. These
+references will be replaced as suite registration and gate consumers migrate
+together. Do not expand the legacy unit registry. `owner-only` is not a missing
+registration for a unit test, and a topic's list of units is not an executed
+integration journey. See [[plans/test-system-grouping.md]] for remaining work.
+
+This cleanup processes existing tests only: relocation, consolidation, pruning
+and metadata repair. Do not add cases or expand product coverage during it.
+
 ## Product Evidence Groups
 
-Product journeys live under `tests/scenarios/<scenario>/`; protocol and
-cross-folder workflow requirements live under `tests/contracts/<boundary>/`.
+During migration, scenario metadata lives under `tests/scenarios/<scenario>/`;
+protocol/workflow metadata lives under `tests/contracts/<boundary>/`.
+The registered deterministic integration specs live under `tests/integration/`.
 Each directory's `coverage.json` feeds the existing catalog with required
 behaviors, assertion/command evidence, priorities, fidelity, environment
 limits, and explicit gaps. Leaf unit/component specs remain with their code.
@@ -290,9 +321,11 @@ are inventory signals, not product acceptance.
    specs are hermetic; deterministic product journeys are integration; public
    reads are external; account writes are live; host/artifact journeys are
    system tests.
-2. Keep leaf specs under exactly one owner root. A central scenario/contract
-   spec instead declares exactly one owner/lane/area/package association in its
-   group's `centralTests` and an evidence row. Add a focused catalog include or
+2. Keep same-name unit specs beside their implementation without registration.
+   Register integration/E2E suites under their topic. During the current
+   migration, central specs still declare one owner/lane/area/package association
+   in the legacy group's `centralTests` and retain existing required evidence.
+   Add a focused catalog include or
    exclusion in `scripts/test-lanes.mjs` when filename and location do not
    express the lane or named area unambiguously.
 3. Keep the default environment isolated. Never hide a public request,

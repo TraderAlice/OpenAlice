@@ -130,7 +130,7 @@ export const laneSuites = {
 export const laneSuiteNames = Object.freeze(Object.keys(laneSuites))
 
 const workflowContractIncludes = [
-  'tests/contracts/development-workflow/development-test-contract.spec.ts',
+  'scripts/test-collection-inputs.spec.ts',
   'scripts/test-lanes.spec.ts',
   'scripts/test-groups.spec.ts',
   'scripts/test-results.spec.ts',

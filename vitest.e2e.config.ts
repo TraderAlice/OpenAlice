@@ -7,7 +7,7 @@ import { integrationIncludes } from './scripts/test-lanes.mjs'
 const __dirname = dirname(fileURLToPath(import.meta.url))
 
 // Match vitest.config.ts — workspace packages alias directly to src/*.ts so
-// e2e tests don't need packages/*/dist pre-built.
+// integration tests don't need packages/*/dist pre-built.
 const workspaceAliases = {
   '@': resolve(__dirname, './src'),
   '@traderalice/guardian-runtime': resolve(__dirname, './packages/guardian-runtime/src/index.ts'),
@@ -19,7 +19,7 @@ const workspaceAliases = {
   '@traderalice/opentypebb': resolve(__dirname, './packages/opentypebb/src/index.ts'),
 }
 
-// Deterministic local product/integration E2E only. Public providers and local
+// Deterministic local integration only; these are not end-to-end app journeys. Public providers and local
 // credentials belong to vitest.external.config.ts; tests that submit orders
 // belong to vitest.uta-live.config.ts.
 export default {

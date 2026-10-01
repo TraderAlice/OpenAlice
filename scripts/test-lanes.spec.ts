@@ -13,7 +13,6 @@ import {
   externalReadonlyIncludes,
   integrationIncludes,
   laneSuites,
-  laneSuiteNames,
   lanesForTestFile,
   livePaperIncludes,
   ownerSuiteCommand,
@@ -50,13 +49,18 @@ describe('test catalog ownership contract', () => {
     for (const owner of ownerSuiteNames) {
       expect(assignments.filter(({ owners }) => owners.includes(owner)).length).toBeGreaterThan(0)
     }
-    for (const lane of laneSuiteNames.filter((name) => laneSuites[name].runnable)) {
+    for (const [lane, suite] of Object.entries(laneSuites)) {
+      if (!suite.runnable) continue
       expect(assignments.filter(({ lanes }) => lanes.includes(lane)).length).toBeGreaterThan(0)
     }
   })
 
   it('keeps root owner commands synchronized with the ownership map', () => {
     const scripts = readJson('package.json').scripts as Record<string, string>
+    expect(scripts.test).toBe('vitest run')
+    expect(scripts['test:select']).toBe('node scripts/run-tests.mjs')
+    expect(scripts['test:changed']).toBe('node scripts/run-tests.mjs --changed origin/dev')
+    expect(scripts['test:watch']).toBe('vitest --config vitest.config.ts')
     for (const owner of ownerSuiteNames) {
       expect(scripts[`test:owner:${owner}`]).toBe(ownerSuiteCommand(owner))
     }

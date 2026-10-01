@@ -12,13 +12,13 @@
       "expected": "Positions, cash, order states, history, and decimal precision agree.",
       "evidence": [
         {
-          "spec": "tests/scenarios/trading-approval/uta-lifecycle.e2e.spec.ts",
+          "spec": "tests/integration/trading-approval/uta-lifecycle.spec.ts",
           "assertion": "limit order \u2192 submitted \u2192 fill \u2192 sync detects filled",
           "level": "integration",
           "scope": "Real UTA internals with MockBroker; no HTTP/UI/CLI or venue."
         },
         {
-          "spec": "tests/scenarios/trading-approval/uta-lifecycle.e2e.spec.ts",
+          "spec": "tests/integration/trading-approval/uta-lifecycle.spec.ts",
           "assertion": "partial close precision: 1.0 - 0.3 = 0.7 exactly",
           "level": "integration",
           "scope": "Decimal invariants through the internal lifecycle."
@@ -41,19 +41,19 @@
           "scope": "Alice SDK with a fake UTA client."
         },
         {
-          "spec": "tests/contracts/alice-uta/approval-http.e2e.spec.ts",
+          "spec": "tests/integration/alice-uta/approval-http.spec.ts",
           "assertion": "refuses missing and stale approval hashes over real HTTP without a venue write",
           "level": "integration",
           "scope": "Real loopback HTTP/SDK/Hono/UTA/TradingGit with an in-memory venue; no GUI/CLI authentication, separate UTA process or real paper venue."
         },
         {
-          "spec": "tests/contracts/alice-uta/approval-http.e2e.spec.ts",
+          "spec": "tests/integration/alice-uta/approval-http.spec.ts",
           "assertion": "honors a readonly mode change after staging and server readonly policy without a venue write",
           "level": "integration",
           "scope": "Real loopback HTTP/SDK/Hono/UTA/TradingGit with an in-memory venue; no GUI/CLI authentication, separate UTA process or real paper venue."
         },
         {
-          "spec": "tests/contracts/alice-uta/approval-http.e2e.spec.ts",
+          "spec": "tests/integration/alice-uta/approval-http.spec.ts",
           "assertion": "serializes duplicate HTTP approvals and refuses replay after ledger restart",
           "level": "integration",
           "scope": "Real loopback HTTP/SDK/Hono/UTA/TradingGit with an in-memory venue; no GUI/CLI authentication, separate UTA process or real paper venue."
@@ -81,7 +81,7 @@
   ],
   "centralTests": [
     {
-      "path": "tests/scenarios/trading-approval/uta-lifecycle.e2e.spec.ts",
+      "path": "tests/integration/trading-approval/uta-lifecycle.spec.ts",
       "owner": "uta",
       "lane": "integration",
       "areas": [

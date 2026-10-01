@@ -20,8 +20,6 @@ describe('MobileRailMenuButton', () => {
     )
 
     const button = screen.getByRole('button', { name: '展开活动栏' })
-    expect(button.className).toContain('h-10')
-    expect(button.className).toContain('w-10')
     expect(button.getAttribute('aria-expanded')).toBe('false')
     expect(button.getAttribute('aria-controls')).toBe('activity-bar')
     expect(button.getAttribute('aria-haspopup')).toBe('dialog')

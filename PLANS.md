@@ -39,9 +39,9 @@ the durable truth after it changes. Git history is the archive.
   signatures and shared final-archive acceptance for #1670. Draft PR acceptance
   remains pending.
 
-- [[plans/test-system-grouping.md]] — Grouping/critical local gates merged as
-  #1667/#1672; bounded startup-to-exit lifecycle evidence mappings are in a
-  separate Draft increment. Native/browser/venue gaps remain explicit.
+- [[plans/test-system-grouping.md]] — Reorganize existing tests by unit,
+  integration and E2E scope; register only higher-tier suites, consolidate and
+  prune existing tests. No new test cases or coverage expansion.
 
 - [[plans/compact-notifications.md]] — Approved compact type-specific pop-out
   notifications, bounded news/Inbox grouping and optional news thumbnails;

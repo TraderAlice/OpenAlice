@@ -46,37 +46,37 @@
       "expected": "Wire errors remain observable, invalid approvals do not write, one accepted proposal submits once, and failures do not become submissions.",
       "evidence": [
         {
-          "spec": "tests/contracts/alice-uta/approval-http.e2e.spec.ts",
+          "spec": "tests/integration/alice-uta/approval-http.spec.ts",
           "assertion": "refuses missing and stale approval hashes over real HTTP without a venue write",
           "level": "integration",
           "scope": "Real loopback HTTP/SDK/Hono/UTA/TradingGit with an in-memory venue; no GUI/CLI authentication, separate UTA process or real paper venue."
         },
         {
-          "spec": "tests/contracts/alice-uta/approval-http.e2e.spec.ts",
+          "spec": "tests/integration/alice-uta/approval-http.spec.ts",
           "assertion": "honors a readonly mode change after staging and server readonly policy without a venue write",
           "level": "integration",
           "scope": "Real loopback HTTP/SDK/Hono/UTA/TradingGit with an in-memory venue; no GUI/CLI authentication, separate UTA process or real paper venue."
         },
         {
-          "spec": "tests/contracts/alice-uta/approval-http.e2e.spec.ts",
+          "spec": "tests/integration/alice-uta/approval-http.spec.ts",
           "assertion": "serializes duplicate HTTP approvals and refuses replay after ledger restart",
           "level": "integration",
           "scope": "Real loopback HTTP/SDK/Hono/UTA/TradingGit with an in-memory venue; no GUI/CLI authentication, separate UTA process or real paper venue."
         },
         {
-          "spec": "tests/contracts/alice-uta/approval-http.e2e.spec.ts",
+          "spec": "tests/integration/alice-uta/approval-http.spec.ts",
           "assertion": "reports transport loss and recovers the same prepared approval after HTTP reconnect",
           "level": "integration",
           "scope": "Real loopback HTTP/SDK/Hono/UTA/TradingGit with an in-memory venue; no GUI/CLI authentication, separate UTA process or real paper venue."
         },
         {
-          "spec": "tests/contracts/alice-uta/approval-http.e2e.spec.ts",
+          "spec": "tests/integration/alice-uta/approval-http.spec.ts",
           "assertion": "preserves a venue rejection as a failed operation rather than successful submission",
           "level": "integration",
           "scope": "Real loopback HTTP/SDK/Hono/UTA/TradingGit with an in-memory venue; no GUI/CLI authentication, separate UTA process or real paper venue."
         },
         {
-          "spec": "tests/contracts/alice-uta/approval-http.e2e.spec.ts",
+          "spec": "tests/integration/alice-uta/approval-http.spec.ts",
           "assertion": "cancels a loopback read without losing the prepared approval or writing to the venue",
           "level": "integration",
           "scope": "Real loopback HTTP cancellation and subsequent read; venue is MockBroker. Server-side read is released in finally."
@@ -87,7 +87,7 @@
   ],
   "centralTests": [
     {
-      "path": "tests/contracts/alice-uta/approval-http.e2e.spec.ts",
+      "path": "tests/integration/alice-uta/approval-http.spec.ts",
       "owner": "uta",
       "lane": "integration",
       "areas": [

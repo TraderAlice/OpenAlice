@@ -69,25 +69,25 @@
       "expected": "Recovery retains identity, interruption terminates the child, explicit release permits another launch and old requests cannot kill it.",
       "evidence": [
         {
-          "spec": "tests/scenarios/conversation-recovery/session-recovery.e2e.spec.ts",
+          "spec": "tests/integration/conversation-recovery/session-recovery.spec.ts",
           "assertion": "records real child failure and resumes the persisted native identity after restart",
           "level": "integration",
           "scope": "Real service/child/translator/persistence; controlled external executable. No browser/PTY/Guardian kill."
         },
         {
-          "spec": "tests/scenarios/conversation-recovery/session-recovery.e2e.spec.ts",
+          "spec": "tests/integration/conversation-recovery/session-recovery.spec.ts",
           "assertion": "interrupts through HTTP, requires explicit release, and rejects an old execution interrupt after resume",
           "level": "integration",
           "scope": "Real Hono routes/service/stores/child; in-process Hono requests, no browser network or native paid runtime."
         },
         {
-          "spec": "tests/scenarios/conversation-recovery/session-recovery.e2e.spec.ts",
+          "spec": "tests/integration/conversation-recovery/session-recovery.spec.ts",
           "assertion": "waits for terminal dispatch persistence before dispose resolves",
           "level": "integration",
           "scope": "Real service and child; deliberately delayed task persistence proves concurrent dispose callers wait for completion and shutdown rejects new dispatch."
         },
         {
-          "spec": "tests/scenarios/conversation-recovery/session-recovery.e2e.spec.ts",
+          "spec": "tests/integration/conversation-recovery/session-recovery.spec.ts",
           "assertion": "cleans transcript watchers after rejected completion and shares the failed disposal",
           "level": "integration",
           "scope": "Real service/child and filesystem watchers; injected completion rejection and one watcher close failure. Verifies cleanup and shared AggregateError, not propagation of every disk write failure."
@@ -98,7 +98,7 @@
   ],
   "centralTests": [
     {
-      "path": "tests/scenarios/conversation-recovery/session-recovery.e2e.spec.ts",
+      "path": "tests/integration/conversation-recovery/session-recovery.spec.ts",
       "owner": "runtime-cli",
       "lane": "integration",
       "areas": [
