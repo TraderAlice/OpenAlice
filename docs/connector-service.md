@@ -738,7 +738,7 @@ Changes to this subsystem require:
 - Settings browser verification without exposing token values;
 - dev Guardian enable/restart/disable recovery under an isolated
   `OPENALICE_HOME`;
-- Docker build/runtime smoke and packaged Electron resource assertion.
+- packaged Electron resource assertion.
 
 Real Telegram/Discord delivery needs user-owned platform credentials and is a
 manual acceptance lane; credential-free CI must not pretend that a live

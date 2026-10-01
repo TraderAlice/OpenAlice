@@ -134,37 +134,17 @@ artifact does not absorb live broker SDKs. See [[docs/broker-packs.md]].
 
 ## Commands and lifecycle
 
-Common entry points:
-
-```bash
-openalice                 # Supervisor TUI and local Web relay
-openalice relay           # same Web relay without the TUI
-openalice up              # persistent background Runtime
-openalice status
-openalice down
-openalice run             # foreground Runtime
-openalice doctor
-openalice logs
-openalice version --json
-openalice update --check
-openalice rollback --plan
-```
-
-`openalice up` waits for Guardian control and Alice readiness, then returns;
-the Runtime survives the launching shell. `openalice run` owns the foreground
-Guardian tree and Ctrl+C stops it. The Supervisor TUI detaches without stopping
-an already-running Runtime. A healthy matching owner is reused; takeover always
-requires the existing explicit Guardian recovery path.
+Runtime lifecycle commands and their readiness/ownership semantics are owned by
+[Shell CLI Supervisor](cli-supervisor.md#canonical-lifecycle-commands).
+Installed version, update and rollback commands belong to the
+[CLI installer](cli-installer.md#update-and-rollback).
 
 Installation never starts a Runtime. Update or rollback changes the next CLI
 invocation and does not hot-reload an already-running process tree. Restart is
 an explicit lifecycle decision.
 
-Stable, beta, and dev direct installs perform bounded, channel-keyed update
-checks on their own manifests at interactive startup. Network failure is silent
-and never blocks use. Pinned and custom installs do not silently cross into a
-release channel. Package-manager-owned installs report their manager's stable
-update command and are never overwritten by the direct installer.
+Channel discovery and package-manager update ownership follow the
+[CLI installer update contract](cli-installer.md#update-and-rollback).
 
 ## Data and concurrent development
 

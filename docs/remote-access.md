@@ -14,30 +14,10 @@ this guide is the OpenAlice contract.
 
 ## Status
 
-The repository now contains the Bun-native Stage 0 through Stage 2 path, with
-source checkout support retained only as an explicit development override:
-
-- `openalice up|run` re-executes the installed native command into the existing
-  Guardian/Alice/UTA/Connector process roles without requiring Node, Bun, a
-  checkout, or a current working directory;
-- `openalice up|run|status|down` provides browserless local lifecycle over the
-  same `cli-server` Guardian owner;
-- bare `openalice` starts the TUI and local Web relay; its GUI can select a
-  registered Machine and a running AliceProject;
-- `openalice relay` serves the trusted local Web UI and lets that browser
-  inspect registered Machines and switch one active Machine/AliceProject;
-- `openalice server run|start|status|stop` provides a browserless
-  foreground or detached Runtime lifecycle backed by Guardian's local control
-  endpoint;
-- `openalice machine list|add|rename|remove|enable|disable` owns Herdr-style
-  saved Machine profiles; `--machine <id-or-label> <command>` targets one
-  saved profile, while `machine inspect` remains the product-specific bounded
-  fleet inventory probe;
-- `openalice project transfer` plans and copies one quiescent local
-  AliceProject into a new complete home on a registered SSH Machine, preserving
-  portable configuration and Workspace repositories while deliberately
-  starting with zero resumable Sessions;
-- Electron remains a complete local desktop distribution.
+The Bun-native Runtime, registered SSH Machines, managed remote bootstrap and
+AliceProject transfer are implemented. Source checkout remains an explicit
+[development override](local-runtime.md#installed-runtime-provider).
+Current entry points are defined in [Command Contract](#command-contract).
 
 The release-owned installer advances one checksum-bound native OpenAlice
 release. Agent Runtime executables remain user-owned and are only discovered
@@ -298,22 +278,10 @@ active connection. These are local relay controls, never AliceProject API calls.
 read-only planning and explicit status/stop controls; its former one-off
 browser attach is retired.
 
-Local Runtime lifecycle commands are browserless:
-
-```bash
-openalice run [app-dir]
-openalice up [app-dir]
-openalice status
-openalice down
-openalice server run|start|status|stop
-```
-
-`run` owns a foreground Guardian and stops its process tree on normal shell
-termination. `up` starts a detached owner and returns after control and HTTP
-readiness. The `server` presenter remains for managed remote and existing
-scripts. Neither these commands nor their status URLs transfer GUI ownership
-from the local relay to the Runtime. The old `start`, `open`, and `up --open`
-shortcuts are retired.
+Local lifecycle and compatibility commands are owned by
+[Shell CLI Supervisor](cli-supervisor.md#canonical-lifecycle-commands).
+Neither those commands nor their status URLs transfer GUI ownership from the
+local relay to the Runtime.
 
 ### Registered Machines and aggregate inventory
 
@@ -822,32 +790,20 @@ Runtime model.
 
 ### Stage 0 — SSH transport (implemented inside the relay)
 
-- the local relay owns the SSH loopback tunnel for its registered remote target;
-- browser UI and PTY WebSocket traverse the relay's stable loopback origin;
-- Machine registration owns remote preparation and Server readiness.
+Registered-Machine relay selection follows [Command Contract](#command-contract).
 
 ### Stage 1 — native Server lifecycle (implemented)
 
-- `server run/start/status/stop`;
-- Guardian-owned local status/stop endpoint;
-- detached start waits for real readiness;
-- status distinguishes absent, compatible, unhealthy, and other owner;
-- stop is structured and capability-gated;
-- Electron behavior remains unchanged.
+Readiness, status and shutdown follow [Server Lifecycle](#server-lifecycle)
+and [Guardian Control Contract](#guardian-control-contract).
 
 ### Stage 2 — managed Bun-native remote (implemented)
 
-- `machine add` plan/apply orchestration;
-- probe and bootstrap the matching native CLI release with explicit consent;
-- run the installed release without Node, Bun, source checkout, build tools, or
-  bundled Agent Runtime executables;
-- retain explicit `--app-dir` source preparation for development only;
-- report unsupported release targets instead of silently cloning source;
-- start/reuse the remote Server;
-- establish the relay's SSH loopback tunnel on target selection;
-- leave the Server alive after disconnect;
-- remaining release observation: validate ordinary Agent TUI interaction under
-  representative network shaping before deciding whether Stage 3 is useful.
+Preparation follows [Registered Machines](#registered-machines-and-aggregate-inventory)
+and [SSH Transport Contract](#ssh-transport-contract). Source overrides belong
+to [Local Runtime](local-runtime.md#installed-runtime-provider).
+Measure ordinary Agent TUI interaction under representative network shaping
+before deciding whether Stage 3 is useful.
 
 ### Stage 3 — terminal transport optimization
 

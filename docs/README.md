@@ -94,5 +94,6 @@ guide, also without vendoring third-party code.
 - Do not copy an owner guide back into `AGENTS.md`; add or update its wikilink.
 - Do not leave executable instructions in a retired guide. Keep a short
   tombstone when old external links need a destination.
-- Prefer self-describing code/catalogs over copied provider, event, or route
+- Keep each contract in one owner guide and link to it rather than copying it.
+  Prefer self-describing code/catalogs over copied provider, event, or route
   inventories that immediately drift.

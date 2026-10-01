@@ -52,21 +52,9 @@ openalice create alice-project [options]
 openalice project [list|use|copy-ai-creds|transfer] [options]
 ```
 
-Remote targeting is a global selector rather than a second command tree:
-
-```bash
-openalice --remote <user@host> --plan|--status|--stop [options]
-openalice machine add <user@host> --label <label> [options]
-openalice --machine <id-or-label> <command> [options]
-```
-
-`machine add` probes and prepares a remote Runtime before saving its profile.
-The default `openalice` TUI owns the local Web relay. Its launcher supports
-explicit create/start/connect actions for local and registered remote
-AliceProjects; connected Settings switching attaches running targets.
-`openalice relay` serves the same GUI without a TUI. `--remote` remains for
-plan/status/stop controls; direct browser attach is retired. `--machine`
-re-enters an ordinary CLI command on a selected enabled profile.
+Remote selectors and Machine preparation are defined in
+[Remote Command Contract](remote-access.md#command-contract). The default TUI
+and `relay` entry points are defined under [Default and Compatibility Surface](#default-and-compatibility-surface).
 
 Startup selection uses the current machine's **Default** pair in
 `Supervisor/config.json.defaultTarget`. Only successful user attachment changes
@@ -83,16 +71,9 @@ project over SSH. The remote machine's own Default is never consulted. Unsupport
 remote commands fail visibly; compatibility `server` commands require a local
 Default or explicit home. Creation does not change a local or remote Default.
 
-The normal TUI starts a local relay in the same CLI process. TUI selection and
-Settings → General → Where Alice is working operate one current Machine/AliceProject target;
-opening Web from the TUI uses that relay's stable loopback origin, including
-when no Runtime is selected yet (`o` opens the connection screen). Web changes
-also update the TUI. `openalice relay` runs the same relay without the terminal
-presentation. It serves the local UI bundle and forwards backend HTTP/WS to
-one selected running Runtime. Detaching from the TUI closes its relay and SSH
-tunnel, not the selected Runtime. Direct `--remote` browser access was a
-separate entry path. Electron keeps its integrated IPC path and can switch its
-window to a main-process relay for a separated connection.
+TUI selection and Settings operate one relay target. Detaching closes the relay
+and its SSH tunnel, not the selected Runtime. Transport, trusted local UI and
+client authority belong to [Remote Runtime and Access](remote-access.md#ssh-transport-contract).
 
 | Command | Contract |
 |---|---|
@@ -111,7 +92,6 @@ window to a main-process relay for a separated connection.
 | `status` | Read normalized status and activation state without mutation |
 | `logs` | Read a bounded, redacted tail from safe Runtime log rotations |
 | `doctor` | Run read-only provenance, ownership, readiness, component, provider, update-metadata, and log-layout checks |
-| `openalice` | Start the Supervisor TUI and its Web relay. GUI browser opening always uses the relay origin. |
 
 `up` is idempotent for an already healthy matching owner. `down` is idempotent
 when no owner exists. Ordinary start never signals another owner. `--takeover`
@@ -127,14 +107,9 @@ restores the exact retained pointer without touching user data. A
 package-manager install is only reported as pending because its manager remains
 the sole owner of package files.
 
-Native CLI installs use the Bun standalone provider, which skips source
-preparation and re-enters one executable as distinct
-Guardian/Alice/UTA/Connector processes; its release gate lives in
-[[plans/bun-cli-distribution.md]]. `up` and `run` remain
-browserless lifecycle commands and accept home, port, wait, and takeover
-options; `--app-dir` is an advanced source override with the preparation and
-rebuild options documented in [[docs/local-runtime.md]]. The retired `--open`
-shortcut must not bypass the relay.
+`up` and `run` accept home, port, wait and takeover options. Native provider
+boundaries and the explicit `--app-dir` source override belong to
+[Local Runtime](local-runtime.md#installed-runtime-provider).
 
 ## Default and Compatibility Surface
 
@@ -1334,19 +1309,9 @@ This source entry does not install or copy a CLI payload. When `pnpm dev`
 already owns the selected home, the TUI and read-only commands discover that
 live Runtime rather than starting or replacing another owner.
 
-For command-only changes, select focused or package/owner feedback using the
-[[docs/development-workflow.md]]
-([shared ladder](development-workflow.md#local-feedback-ladder)). The package
-suite is useful when impact spans CLI commands:
-
-```bash
-pnpm -F @traderalice/openalice-cli test
-```
-
-Typecheck the changed owner and exercise the affected real CLI command. Shared
-protocol, process lifecycle, launcher, dependency/configuration or uncertain
-impact escalates to full-suite and applicable surface acceptance under that
-ladder; command-only wording does not exempt those boundaries.
+Use the [Local Feedback Ladder](development-workflow.md#local-feedback-ladder)
+to select focused, owner/package or full-suite evidence; typecheck the changed
+owner and exercise the actual CLI command.
 
 Config-recovery and in-TUI update work must keep the focused Supervisor config
 and TUI specs green: parser preservation, distinct newer-schema errors, recovery

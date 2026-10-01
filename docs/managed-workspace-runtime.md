@@ -656,9 +656,8 @@ The second assertion deliberately uses an observable Workspace side effect,
 not a model claiming that a command succeeded. The run emits a versioned JSON
 receipt whose individual checks make PATH, injection, CLI transport, runtime
 output, tool use, and cleanup failures distinguishable. The Desktop Package
-Smoke matrix preserves these receipts as CI artifacts. Release candidates run
-the same acceptance on all three platform/architecture builds before any tag or
-GitHub Release is created; only accepted installers are then published.
+Smoke matrix receipts are preserved as CI artifacts. Release acceptance gates
+are defined in [Development Workflow](development-workflow.md#promotion-dev-to-master).
 
 ### Local package diagnostics
 
@@ -684,19 +683,17 @@ CSC_IDENTITY_AUTO_DISCOVERY=false pnpm -F @traderalice/desktop exec electron-bui
 pnpm electron:assert-package
 ```
 
-This diagnostic flow does not publish or prove signing/notarization. Normal
-smokes disable local macOS signing; `--signed` is for an explicitly scoped
-signing investigation. Release signing authority is defined in
-[[docs/development-workflow.md]].
+This diagnostic flow does not publish or prove signing/notarization. `--signed`
+is for an explicitly scoped signing investigation under the
+[Package signing boundary](development-workflow.md#package-signing-boundary).
 
 When a package job fails, classify the failure before rebuilding: resource
 layout, native dependency/Windows command resolution, or signing/publication.
 Read the failed job's log and check the actual packaged resource root, child
 `OPENALICE_APP_HOME`, executable resolution and owned process cleanup. Inspect
 provider configuration only when relevant, without copying credentials or
-request bodies into logs or reports. Prefer the existing verifier/retry path
-when accepted candidate bytes already exist; candidate reuse and its evidence
-requirements belong to [[docs/development-workflow.md]].
+request bodies into logs or reports. For preserved candidate replay, follow
+[Development Workflow](development-workflow.md#promotion-dev-to-master).
 
 ### N-1 desktop upgrade acceptance
 
@@ -718,14 +715,11 @@ desktop data, credentials, or preferences. The previous renderer is driven
 through a short-lived loopback DevTools endpoint so the test uses its real API
 and bootstrap code without adding a production smoke route.
 
-Stable release candidates repeat the journey against publication bytes. macOS
-expands the final signed architecture-specific ZIP; Windows silently installs
-N-1 and then runs the final NSIS installer over the same isolated directory.
-The release job validates platform update YAML, referenced size and SHA-512,
-blockmaps, candidate version, and the upgrade receipt before publication.
-Beta does not run this stable-only N-1 gate; its candidate build and current
-Workspace acceptance are not proof of previous-release upgrade compatibility.
-See [[docs/development-workflow.md]] for the channel-specific release gates.
+Stable release candidates repeat the journey against publication bytes: macOS
+expands the final signed architecture-specific ZIP; Windows installs N-1 then
+runs the final NSIS installer over the same isolated directory. Channel gates,
+receipts and updater-metadata requirements are owned by
+[Development Workflow](development-workflow.md#promotion-dev-to-master).
 
 This gate proves N-1 state compatibility and the shipped ZIP/NSIS bytes. macOS
 ShipIt replacement and signing/notarization remain native release mechanics.
@@ -749,11 +743,7 @@ pnpm vitest run \
   scripts/smoke-packaged-toolchain.spec.ts
 ```
 
-Then exercise the packaged path:
-
-```bash
-pnpm electron:smoke:workspace
-```
+Then exercise the [packaged Workspace acceptance](#workspace-acceptance-contract).
 
 That command is the standard local acceptance path. It builds and vendors the
 runtime, packages into a unique owner directory under the OS temp directory,
@@ -860,10 +850,8 @@ and ignored TERM after wrapper exit; a local pthread diagnostic additionally
 checks a Z leader with a live worker. Native Electron/platform acceptance remains
 separate from these Node and injected-procfs assertions.
 
-Routine fixes do not require adding a permanent native smoke entry point.
-The one-off Default-selection navigation script was removed after acceptance;
-its product fix and hermetic Relay/UI regressions remain. Packaged smoke defaults
-to temporary OpenAlice data. `--real-data` is an explicit manual opt-in and is
-rejected by automated acceptance modes. These temporary stores do not promise
+Routine fixes do not require a permanent native smoke entry point. The isolated
+store and `--real-data` contract is defined under [Local package diagnostics](#local-package-diagnostics).
+Temporary stores do not promise
 OS-home or native-agent credential isolation; do not run live native Agents
 against a maintainer account as part of ordinary test verification.

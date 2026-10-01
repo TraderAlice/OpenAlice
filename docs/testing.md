@@ -41,12 +41,10 @@ fixture or in-process HTTP request does not itself establish E2E coverage.
 side effects, not these scope levels.
 
 Register higher-tier suites in `tests/suites.json`, with purpose, tier, owner,
-execution lane, files or dedicated commands, and honest scope limits. Unit
-specs require no registration. The former scenario/contract assertion matrices
-and their per-test title references have been removed. A module with several
-focused unit files may use `<module>.<topic>.spec.ts` beside its implementation.
-Higher-tier files containing some unit cases remain registered as a whole;
-scope descriptions state which collaborators are real and which are fixtures.
+execution lane, files or dedicated commands, and honest scope limits. A module
+with several focused unit files may use `<module>.<topic>.spec.ts` beside its
+implementation. Higher-tier files containing some unit cases remain registered
+as a whole; state which collaborators are real and which are fixtures.
 
 ## Suite discovery and selection
 
@@ -61,8 +59,7 @@ pnpm test:select --suite conversation-recovery --lane integration
 pnpm test:select --tier integration --owner uta --lane external-readonly --explain
 ```
 
-`--suite` and `--tier` compose with owner, lane, package, area and path: OR within
-a dimension, AND between dimensions. The default execution lane is hermetic.
+Selector composition is defined in [Composable Selection](#composable-selection).
 `test:integration` covers hermetic module integration plus the existing serialized
 local-process profile (still called the `integration` lane). `test:e2e` runs
 hermetic E2E only. External reads, live-paper writes and native/artifact runners
@@ -124,17 +121,12 @@ cleanup. Packaged Workspace receipt validation separately requires every
 producer check, including `cleanupComplete`; an empty/truncated check object
 cannot pass.
 
-The dev PR clean-build job and the master/manual source-contract job invoke
-this gate and upload its receipt even on failure. The existing full-suite,
-native/platform and final artifact release gates remain separate. The gate
-always runs this bounded critical set; it does not pretend the static changed
-import graph establishes cross-process impact. Continue using owner/full-suite
-fallback for broader changes.
+CI invocation belongs to [CI Feedback Lanes](development-workflow.md#ci-feedback-lanes);
+native/platform and final artifact gates remain separate from this local gate.
 
 ## Command Model
 
-Start with the narrowest command that can falsify the change, then escalate
-when the dependency or ownership boundary is uncertain.
+Choose the delivery gate with the [Local Feedback Ladder](development-workflow.md#local-feedback-ladder).
 
 | Namespace | Meaning |
 |---|---|
@@ -204,10 +196,10 @@ Selectors in one dimension are ORed; different dimensions are ANDed. For
 example, two `--owner` values select either owner, while `--owner uta
 --package @traderalice/uta-service` selects only the package portion of that
 owner. Supported dimensions are `--lane`, `--owner`, `--area`, `--package`,
-repo-relative `--path`, `--suite`, and `--tier`. `--changed [base]` intersects the candidates at
-execution using Vitest's static import graph. The default lane is `hermetic`,
-and a zero-file result fails closed rather than pretending that nothing was a
-pass.
+repo-relative `--path`, `--suite`, and `--tier`. `--changed [base]` intersects the
+candidates using Vitest's static import graph; `test:changed` compares committed
+and working-tree changes against freshly fetched `origin/dev`. The default lane
+is `hermetic`; a zero-file result fails closed rather than counting as a pass.
 
 `--list`, `--explain`, and `--json` are dry-run modes. They enumerate catalog
 selection, side effects, prerequisites, and the planned invocation without
@@ -217,14 +209,10 @@ reporter/output and one-shot execution options, which are rejected. Focused
 name filters are development feedback, not acceptance for excluded assertions;
 required gates reject all forwarded arguments.
 
-Use the [[docs/development-workflow.md]]
-([feedback ladder](development-workflow.md#local-feedback-ladder)) for the
-development-loop versus cumulative-delivery decision. A combined
-`--suite`, `--tier`, and `--owner` query is an intersection, not a union.
-Inspect affected unit/owner/package tests beyond suite registration as well.
-Static changed imports cannot establish dynamic/registry/process impact;
-inspect those edges and expand explicitly. The required critical gate remains
-whole and its CI requirement is unchanged.
+Use the [Local Feedback Ladder](development-workflow.md#local-feedback-ladder)
+for cumulative-delivery acceptance. Inspect affected unit/owner/package tests
+beyond suite registration: static imports do not establish dynamic-import,
+generated-contract, registry or child-process impact.
 
 Docker fixtures under `scripts/` are disposable installer and SSH test hosts;
 they are not supported deployment images. OpenAlice does not ship a backend
@@ -303,15 +291,10 @@ can establish whether a supposedly covered regression actually fails the test;
 restore the mutation before accepting the change. Test counts and line coverage
 are inventory signals, not product acceptance.
 
-1. Decide scope and execution conditions independently. Unit/component specs
-   stay beside their module; integration/E2E suites live under `tests/`.
-   Hermetic module integration can run in the default lane; the serialized
-   local-process profile uses the integration lane. Public reads, paper writes
-   and dedicated host/artifact runners retain their explicit lanes.
-2. Keep same-name unit specs beside their implementation without registration.
-   Register integration/E2E files or dedicated acceptance commands once in
-   `tests/suites.json`. Keep owner/lane/package/area routing intact when moving
-   an existing test, and do not import side-effectful fixtures during inventory.
+1. Choose [scope and registration](#test-scope-and-registration) independently
+   of [execution conditions](#side-effects-and-acceptance).
+2. Keep owner/lane/package/area routing intact when moving tests, and do not
+   import side-effectful fixtures during inventory.
 3. Keep the default environment isolated. Never hide a public request,
    configured-home read, Docker dependency, or broker write behind a skip in
    the hermetic catalog.
@@ -322,9 +305,7 @@ are inventory signals, not product acceptance.
    `pnpm test:contract:workflow`. Its catalog contract requires every collected
    spec to have exactly one owner and one lane and protects the root command
    namespace.
-6. Run the selected lane plus the owning typecheck and real surface. Escalate to
-   `pnpm test` when the change crosses owners, changes shared test/build
-   infrastructure, or cannot be bounded confidently.
+6. Verify under the [Local Feedback Ladder](development-workflow.md#local-feedback-ladder).
 
 Do not create a new Vitest project merely to obtain a product label. Add or
 change execution environments only when isolation or runtime behavior actually
