@@ -1004,3 +1004,32 @@ and developer release panels use this owner. Native disclosures retain their
 HTML state and keyboard behavior. Controlled disclosures retain Base UI panel
 measurement and focus behavior. Chevron rotation follows the shared motion
 timing and settles immediately for keyboard focus and reduced motion.
+
+
+### Selection fields and suggestions
+
+`ui/select.tsx` owns predefined-value fields. Runtime preferences, issue controls,
+provider protocols, credentials, workspace setup, account forms, news filters,
+and developer tools use its Base UI selection contract. Values remain strings at
+this boundary; context-window fields convert numeric values at their owning form.
+Empty-string options retain their visible label and their existing default behavior.
+
+`ui/autocomplete.tsx` owns free-entry symbol suggestions in the simulator. Typing
+and choosing a suggestion preserve the same input callback. Base UI owns filtering,
+keyboard navigation, dismissal, focus, and portal positioning. Suggestion selection
+leaves the enclosing form pending explicit submission.
+
+`ui/choice-styles.ts` owns the popup surface and option geometry shared by selection
+fields and suggestions. Action-menu popups reuse that surface. A 1px neutral border,
+6px inner padding, 10px option inset, and fixed 16px trailing selection slot align
+field labels with option labels. Runtime identities use a fixed 16px leading slot.
+Options wrap long text through `MeasuredText`; triggers retain one line and expose
+the complete selected label. Form popups follow the anchor width. Compact toolbar
+and suggestion popups use content width with a 32rem limit. Popups retain 16px
+viewport clearance and scroll within the available height. Form controls are 44px tall;
+compact toolbar controls are 36px tall with 44px coarse-pointer targets.
+
+Opening and closing use the shared origin-aware opacity and scale transition.
+Reduced motion removes the transition. The popup occupies the overlay layer, and
+selection leaves the surrounding document geometry unchanged. The neutral
+`SelectionCheckIcon` remains the single selection glyph owner.

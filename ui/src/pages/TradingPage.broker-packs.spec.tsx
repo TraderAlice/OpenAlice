@@ -1,3 +1,4 @@
+import userEvent from '@testing-library/user-event'
 // @vitest-environment jsdom
 
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
@@ -236,7 +237,8 @@ describe('ExternalOrderMonitoringRow', () => {
       document.getElementById(id)?.textContent?.includes('orders placed outside Alice'),
     )).toBe(true)
 
-    fireEvent.change(select, { target: { value: '5m' } })
+    fireEvent.click(select)
+    await userEvent.click(await screen.findByRole('option', { name: 'Every 5m' }))
 
     await waitFor(() => expect(screen.getByRole('status').textContent).toBe(
       'Saved — restarting UTA to apply',

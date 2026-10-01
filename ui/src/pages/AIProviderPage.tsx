@@ -1,3 +1,4 @@
+import { Select } from '@/components/ui/select'
 import { DetailsSummary } from '../components/ui/collapsible'
 /**
  * AI Provider — Alice's credential vault.
@@ -461,28 +462,24 @@ function WorkspaceDefaultsSection({
           </div>
         </div>
         <div className="flex w-full flex-col gap-2 sm:w-auto sm:min-w-[260px]">
-          <select
+          <Select
             aria-label={t('aiProvider.defaultCredentialLabel', { agent: agent.name })}
-            className={inputClass}
             value={current}
             disabled={saving || options.length === 0}
-            onChange={(e) => void setAgentDefault(agent.id, e.target.value)}
-          >
-            <option value="">{t('aiProvider.dontSeed')}</option>
-            {options.map((slug) => <option key={slug} value={slug}>{credLabel(slug)}</option>)}
-          </select>
+            onValueChange={(selectedValue) => void setAgentDefault(agent.id, selectedValue)}
+            options={[
+              { value: '', label: t('aiProvider.dontSeed') },
+              ...options.map((slug) => ({ value: slug, label: credLabel(slug) })),
+            ]}
+          />
           {current && wireShapes.length > 1 && (
-            <select
+            <Select
               aria-label={t('aiProvider.apiProtocolLabel', { agent: agent.name })}
-              className={inputClass}
               value={selectedWire}
               disabled={saving}
-              onChange={(e) => void setAgentWire(agent.id, e.target.value as WireShape)}
-            >
-              {wireShapes.map((shape) => (
-                <option key={shape} value={shape}>{WIRE_SHAPE_GUIDANCE[shape]}</option>
-              ))}
-            </select>
+              onValueChange={(selectedValue) => void setAgentWire(agent.id, selectedValue as WireShape)}
+              options={wireShapes.map((shape) => ({ value: shape, label: WIRE_SHAPE_GUIDANCE[shape] }))}
+            />
           )}
           {current && wireShapes.length === 1 && (
             <p className="px-1 text-sm text-muted-foreground">
@@ -498,24 +495,25 @@ function WorkspaceDefaultsSection({
           {(agent.id === 'pi' || agent.id === 'opencode') && current && !selectedSemantics?.reasoning && (
             <details className="px-1 text-sm text-muted-foreground">
               <DetailsSummary>{t('aiProvider.advancedReasoning')}</DetailsSummary>
-              <select
+              <Select
                 aria-label={t('aiProvider.reasoningOverrideLabel', { agent: agent.name })}
-                className={`${inputClass} mt-1.5`}
+                className="mt-1.5"
                 value={typeof data?.defaults[agent.id]?.reasoning !== 'boolean' ||
                   data.defaults[agent.id]?.reasoningModel !== selectedModelId
                   ? 'auto'
                   : data.defaults[agent.id]!.reasoning ? 'enabled' : 'disabled'}
                 disabled={saving}
-                onChange={(event) => void setReasoningOverride(
+                onValueChange={(selectedValue) => void setReasoningOverride(
                   agent.id as 'pi' | 'opencode',
                   selectedModelId,
-                  event.target.value === 'auto' ? null : event.target.value === 'enabled',
+                  selectedValue === 'auto' ? null : selectedValue === 'enabled',
                 )}
-              >
-                <option value="auto">{t('aiProvider.useRuntimeDefault')}</option>
-                <option value="enabled">{t('aiProvider.supportsReasoning')}</option>
-                <option value="disabled">{t('aiProvider.noReasoning')}</option>
-              </select>
+                options={[
+                  { value: 'auto', label: t('aiProvider.useRuntimeDefault') },
+                  { value: 'enabled', label: t('aiProvider.supportsReasoning') },
+                  { value: 'disabled', label: t('aiProvider.noReasoning') },
+                ]}
+              />
             </details>
           )}
         </div>

@@ -1,3 +1,4 @@
+import userEvent from '@testing-library/user-event'
 // @vitest-environment jsdom
 
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
@@ -353,10 +354,11 @@ describe('WorkspaceAIConfigModal local model metadata', () => {
       <WorkspaceAIConfigModal wsId="chat-1" initialSection="ai" initialAgent="pi" onClose={vi.fn()} />,
     )
 
-    const protocol = await screen.findByRole('combobox', { name: 'Pi API 协议' }) as HTMLSelectElement
+    const protocol = await screen.findByRole('combobox', { name: 'Pi API 协议' })
     await screen.findByRole('button', { name: '测试' })
-    expect(protocol.value).toBe('anthropic')
-    expect(Array.from(protocol.options).map((option) => option.value)).toEqual(['anthropic'])
+    expect(protocol.textContent).toBe('Anthropic Messages')
+    fireEvent.click(protocol)
+    expect((await screen.findAllByRole('option')).map((option) => option.textContent)).toEqual(['Anthropic Messages'])
   })
 
   it('shows LongCat\'s real thinking default without inventing an effort selector', async () => {
@@ -442,9 +444,9 @@ describe('WorkspaceAIConfigModal local model metadata', () => {
     )
 
     const effort = await screen.findByRole('combobox', { name: 'Pi 思考强度' })
-    expect((effort as HTMLSelectElement).value).toBe('')
-    expect((effort as HTMLSelectElement).selectedOptions[0]?.textContent).toBe('未指定')
-    fireEvent.change(effort, { target: { value: 'high' } })
+    expect(effort.textContent).toBe('未指定')
+    fireEvent.click(effort)
+    await userEvent.click(await screen.findByRole('option', { name: /^high/ }))
     fireEvent.click(screen.getByRole('button', { name: '保存' }))
 
     await waitFor(() => expect(mocks.saveAgentConfig).toHaveBeenCalledWith(
@@ -495,9 +497,8 @@ describe('WorkspaceAIConfigModal local model metadata', () => {
     )
 
     const effort = await screen.findByRole('combobox', { name: 'Pi 思考强度' })
-    expect((effort as HTMLSelectElement).value).toBe('')
-    expect((effort as HTMLSelectElement).selectedOptions[0]?.textContent).toBe('未指定')
-  })
+    expect(effort.textContent).toBe('未指定')
+      })
 
   it('saves a context-only change directly without probing the provider again', async () => {
     const onClose = vi.fn()
@@ -513,7 +514,8 @@ describe('WorkspaceAIConfigModal local model metadata', () => {
     )
 
     const contextWindow = await screen.findByRole('combobox', { name: 'Pi 上下文窗口' })
-    fireEvent.change(contextWindow, { target: { value: '512000' } })
+    fireEvent.click(contextWindow)
+    await userEvent.click(await screen.findByRole('option', { name: '512K' }))
 
     const save = screen.getByRole('button', { name: '保存' })
     expect(screen.queryByRole('button', { name: '测试' })).toBeNull()

@@ -1,3 +1,4 @@
+import { Select } from '@/components/ui/select'
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { ChevronFirst, ChevronLast, ChevronLeft, ChevronRight } from 'lucide-react'
 import { api, type AgentConversationRecord, type ToolCallRecord } from '../api'
@@ -129,16 +130,15 @@ function ToolCallLogSection() {
     <div className="flex flex-col gap-3 h-full">
       {/* Controls */}
       <div className="flex items-center gap-3 shrink-0">
-        <select
+        <Select
           value={nameFilter}
-          onChange={(e) => handleNameChange(e.target.value)}
-          className="oa-field-control h-8 rounded-md border border-input bg-muted px-2 text-sm text-foreground outline-none"
-        >
-          <option value="">All tools</option>
-          {toolNames.map((n) => (
-            <option key={n} value={n}>{n}</option>
-          ))}
-        </select>
+          onValueChange={(selectedValue) => handleNameChange(selectedValue)}
+          size="sm" className="w-auto max-w-full" aria-label="Tool"
+          options={[
+            { value: '', label: 'All tools' },
+            ...toolNames.map((n) => ({ value: n, label: n })),
+          ]}
+        />
 
         <Button
           type="button"

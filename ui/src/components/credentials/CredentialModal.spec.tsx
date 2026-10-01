@@ -1,3 +1,4 @@
+import userEvent from '@testing-library/user-event'
 // @vitest-environment jsdom
 
 import { useState } from 'react'
@@ -360,7 +361,7 @@ describe('CredentialModal', () => {
     expect(screen.getByDisplayValue('gemini-default')).toBeTruthy()
   })
 
-  it('requires a concrete URL for custom providers and explains mode compatibility', () => {
+  it('requires a concrete URL for custom providers and explains mode compatibility', async () => {
     render(
       <CredentialModal
         mode="add"
@@ -376,7 +377,10 @@ describe('CredentialModal', () => {
     fireEvent.change(screen.getByPlaceholderText('Enter API key'), { target: { value: 'sk-gateway' } })
     fireEvent.change(screen.getByPlaceholderText(i18n.t('modelCatalog.selectPlaceholder')), { target: { value: 'gateway-model' } })
 
-    expect(screen.getByRole('option', { name: /OpenAI Chat Completions — opencode, Pi/ })).toBeTruthy()
+    fireEvent.click(screen.getByRole('combobox', { name: 'API compatibility mode' }))
+    const compatibility = await screen.findByRole('option', { name: /OpenAI Chat Completions — opencode, Pi/ })
+    expect(compatibility).toBeTruthy()
+    await userEvent.click(compatibility)
     const testButton = screen.getByRole('button', { name: 'Test connection' }) as HTMLButtonElement
     expect(testButton.disabled).toBe(true)
     expect(testButton.title).toBe('Enter the custom API base URL.')
@@ -548,7 +552,7 @@ describe('CredentialModal', () => {
     )
 
     expect(screen.getByDisplayValue('gpt-account-specific')).toBeTruthy()
-    expect(screen.getByDisplayValue('Saved custom endpoint (keep unchanged)')).toBeTruthy()
+    expect(screen.getByRole('combobox', { name: 'Account region' }).textContent).toBe('Saved custom endpoint (keep unchanged)')
     fireEvent.click(screen.getByRole('button', { name: 'Test connection' }))
     await waitFor(() => expect(screen.getByRole('button', { name: 'Save' })).toBeTruthy())
     fireEvent.click(screen.getByRole('button', { name: 'Save' }))

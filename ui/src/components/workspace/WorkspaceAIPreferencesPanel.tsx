@@ -1,9 +1,9 @@
+import { Select } from '@/components/ui/select'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Cpu, KeyRound, Pencil, RotateCcw } from 'lucide-react'
 
 import type { QuickChatLaunchPreference } from '@/api/preferences'
-import { inputClass } from '@/components/form'
 import { Button } from '@/components/ui/button'
 import { SelectionCheckIcon } from '@/components/ui/selection-check-icon'
 import {
@@ -338,7 +338,6 @@ export function WorkspaceAIPreferencesPanel({ workspace, agents, onSaved, onConf
                 t('workspaceSettings.preferences.agentLogin'),
               )
               : null
-            const selectedAgentId = drafts[mode].defaultAgent ?? recentAgentId
             return (
               <section key={mode} className="overflow-hidden rounded-lg border border-border bg-card">
                 <div className="border-b border-border bg-muted/25 px-4 py-3">
@@ -350,30 +349,25 @@ export function WorkspaceAIPreferencesPanel({ workspace, agents, onSaved, onConf
                 <div className="space-y-4 p-4">
                   <label className="block text-xs font-medium text-foreground">
                     {t('workspaceSettings.preferences.defaultRuntime')}
-                    <span className="mt-2 flex items-center gap-2">
-                      {selectedAgentId && (
-                        <AgentRuntimeIcon agentId={selectedAgentId} className="size-4 shrink-0" />
-                      )}
-                      <select
+                    <span className="mt-2 block">
+                      <Select
                         aria-label={t('workspaceSettings.preferences.defaultRuntimeFor', { mode: title })}
                         value={drafts[mode].defaultAgent ?? ''}
                         disabled={saving}
-                        onChange={(event) => {
+                        onValueChange={(selectedValue) => {
                           const next = {
                             ...drafts,
-                            [mode]: { ...drafts[mode], defaultAgent: event.target.value || null },
+                            [mode]: { ...drafts[mode], defaultAgent: selectedValue || null },
                           }
                           void persist(mode, next, drafts)
                         }}
-                        className={`${inputClass} flex-1 px-2.5`}
-                      >
-                        <option value="">
-                          {recentAgentName
-                            ? t('workspaceSettings.preferences.followRecentRuntimeResolved', { runtime: recentAgentName })
-                            : t('workspaceSettings.preferences.followRecentRuntime')}
-                        </option>
-                        {compatibleAgents.map((agent) => <option key={agent.id} value={agent.id}>{agent.displayName}</option>)}
-                      </select>
+                        options={[
+                          { value: '', icon: <AgentRuntimeIcon agentId={recentAgentId} className="size-4" />, label: recentAgentName
+                              ? t('workspaceSettings.preferences.followRecentRuntimeResolved', { runtime: recentAgentName })
+                              : t('workspaceSettings.preferences.followRecentRuntime') },
+                          ...compatibleAgents.map((agent) => ({ value: agent.id, label: agent.displayName, icon: <AgentRuntimeIcon agentId={agent.id} className="size-4" /> })),
+                        ]}
+                      />
                     </span>
                   </label>
 

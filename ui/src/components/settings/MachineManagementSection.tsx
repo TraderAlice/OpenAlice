@@ -1,3 +1,4 @@
+import { Select } from '@/components/ui/select'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { AlertCircle, CircleCheck, CircleMinus, ChevronDown, LoaderCircle, Monitor, Plus, RefreshCw, Server } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
@@ -5,7 +6,6 @@ import { useTranslation } from 'react-i18next'
 import { useUpdateLifecycle } from '../../hooks/useUpdateLifecycle'
 import { Button } from '../ui/button'
 import { ContextHelp } from '../ContextHelp'
-import { inputClass } from '../form'
 import { AddMachineDialog } from './AddMachineDialog'
 import { MachineUpgradeDialog } from './MachineUpgradeDialog'
 import { claimUpgradeDialog, shouldRestoreUpgradeDialog } from './upgrade-dialog-owner'
@@ -69,7 +69,9 @@ export function MachineManagementSection() {
             {open && !local && <div className="border-t border-border/70 bg-secondary/20 px-3 py-4 sm:px-4">
               <div className="grid gap-4 sm:grid-cols-2">
                 <div className="space-y-2 text-sm"><p className="font-medium">{t('settings.machines.health', 'Health & installation')}</p><p className="flex justify-between gap-2"><span className="text-muted-foreground">SSH</span><span>{machine.connection}</span></p><p className="flex justify-between gap-2"><span className="text-muted-foreground">OpenAlice CLI</span><span>{machine.cliVersion ?? '—'}</span></p><p className="flex justify-between gap-2"><span className="text-muted-foreground">AliceProjects</span><span>{machine.projects.length}</span></p></div>
-                <div className="flex min-w-0 flex-col justify-between gap-3"><div><p className="text-sm font-medium">{t('settings.machines.update', 'Check for update')}</p><p className="mt-1 text-sm text-muted-foreground">{t('settings.machines.updateDescription', 'Check this Machine’s update channel and review the installation and activation plan.')}</p>{selectableProjects.length > 0 && <label className="mt-2 block text-sm text-muted-foreground">AliceProject<select className={`${inputClass} mt-1`} value={selectedProject?.key ?? ''} onChange={(event) => { setUpgradeProjects((value) => ({ ...value, [machine.key]: event.target.value })); manager.clearPlan() }}>{selectableProjects.map((project) => <option key={project.key} value={project.key}>{project.displayName}</option>)}</select></label>}</div><Button type="button" variant="outline" size="sm" disabled={busy} className="min-h-9 self-start" onClick={() => void manager.probe({ mode: 'upgrade', machineKey: machine.key, ...(selectedProject ? { projectKey: selectedProject.key } : {}) }).then(() => { claimUpgradeDialog('machines'); setUpgradeOpen(true) }).catch(() => undefined)}>{manager.probing ? <LoaderCircle className="mr-2 size-4 animate-spin motion-reduce:animate-none" aria-hidden /> : <RefreshCw className="mr-2 size-4" aria-hidden />}{t('settings.machines.checkUpdate', 'Probe and review')}</Button></div>
+                <div className="flex min-w-0 flex-col justify-between gap-3"><div><p className="text-sm font-medium">{t('settings.machines.update', 'Check for update')}</p><p className="mt-1 text-sm text-muted-foreground">{t('settings.machines.updateDescription', 'Check this Machine’s update channel and review the installation and activation plan.')}</p>{selectableProjects.length > 0 && <label className="mt-2 block text-sm text-muted-foreground">AliceProject<Select className="mt-1" value={selectedProject?.key ?? ''} onValueChange={(selectedValue) => { setUpgradeProjects((value) => ({ ...value, [machine.key]: selectedValue })); manager.clearPlan() }}
+                  options={selectableProjects.map((project) => ({ value: project.key, label: project.displayName }))}
+                /></label>}</div><Button type="button" variant="outline" size="sm" disabled={busy} className="min-h-9 self-start" onClick={() => void manager.probe({ mode: 'upgrade', machineKey: machine.key, ...(selectedProject ? { projectKey: selectedProject.key } : {}) }).then(() => { claimUpgradeDialog('machines'); setUpgradeOpen(true) }).catch(() => undefined)}>{manager.probing ? <LoaderCircle className="mr-2 size-4 animate-spin motion-reduce:animate-none" aria-hidden /> : <RefreshCw className="mr-2 size-4" aria-hidden />}{t('settings.machines.checkUpdate', 'Probe and review')}</Button></div>
               </div>
               {machine.issue && <p role="status" className="mt-3 text-sm text-muted-foreground">{machine.issue.message}</p>}
             </div>}

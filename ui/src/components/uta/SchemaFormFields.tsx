@@ -1,3 +1,4 @@
+import { Select } from '@/components/ui/select'
 import { Field, inputClass } from '../form'
 import { Toggle } from '../Toggle'
 import type { SchemaField } from '../../hooks/useSchemaForm'
@@ -35,9 +36,9 @@ export function SchemaFormFields({ fields, formData, setField, showSecrets }: {
           case 'select':
             return (
               <Field key={f.key} label={f.title}>
-                <select className={inputClass} value={value} onChange={(e) => setField(f.key, e.target.value)}>
-                  {f.options?.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
-                </select>
+                <Select aria-label={f.title} value={value} onValueChange={(selectedValue) => setField(f.key, selectedValue)}
+                  options={f.options?.map(o => ({ value: o.value, label: o.label })) ?? []}
+                />
                 {f.description && <p className="text-sm text-muted-foreground/60 mt-1">{f.description}</p>}
               </Field>
             )

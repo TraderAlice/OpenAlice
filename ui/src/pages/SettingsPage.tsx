@@ -1,3 +1,4 @@
+import { Select } from '@/components/ui/select'
 import { useState, useEffect, useCallback, useId, useMemo } from 'react'
 import { ChevronDown, Moon, RotateCcw, Search, Sun } from 'lucide-react'
 import { api } from '../api'
@@ -656,14 +657,15 @@ function WorkspaceShellSection() {
       help={t('settings.workspaceShell.description')}
     >
       <Field label={t('settings.workspaceShell.mode')}>
-        <select
-          className={inputClass}
+        <Select
+          aria-label={t('settings.workspaceShell.mode')}
           value={mode}
-          onChange={(event) => setMode(event.target.value as 'auto' | 'custom')}
-        >
-          <option value="auto">{t('settings.workspaceShell.auto')}</option>
-          <option value="custom">{t('settings.workspaceShell.custom')}</option>
-        </select>
+          onValueChange={(selectedValue) => setMode(selectedValue as 'auto' | 'custom')}
+          options={[
+            { value: 'auto', label: t('settings.workspaceShell.auto') },
+            { value: 'custom', label: t('settings.workspaceShell.custom') },
+          ]}
+        />
       </Field>
       {mode === 'custom' && (
         <Field

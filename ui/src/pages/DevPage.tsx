@@ -1,3 +1,4 @@
+import { Select } from '@/components/ui/select'
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
 import { ChevronRight } from 'lucide-react'
@@ -121,15 +122,12 @@ function SnapshotsTab() {
         {/* Account selector */}
         <div className="flex items-center gap-3">
           <label className="text-sm text-muted-foreground">Account:</label>
-          <select
+          <Select
             value={selectedAccount}
-            onChange={e => setSelectedAccount(e.target.value)}
-            className="h-8 rounded-md border border-border bg-background px-2 py-1.5 text-sm leading-5 text-foreground"
-          >
-            {accounts.map(a => (
-              <option key={a.id} value={a.id}>{a.label} ({a.id})</option>
-            ))}
-          </select>
+            onValueChange={(selectedValue) => setSelectedAccount(selectedValue)}
+            size="sm" className="w-auto max-w-full" aria-label="Account"
+            options={accounts.map(a => ({ value: a.id, label: [a.label, " (", a.id, ")"].join('') }))}
+          />
           <Button
             type="button"
             variant="outline"
@@ -519,15 +517,16 @@ function ToolExecutePanel({ detail, result, onResult }: ToolExecutePanelProps) {
                 {prop.required && <span className="text-sm text-primary/70">required</span>}
               </label>
               {prop.type === 'boolean' ? (
-                <select
+                <Select
                   value={inputs[prop.key] ?? ''}
-                  onChange={(e) => setInputs((prev) => ({ ...prev, [prop.key]: e.target.value }))}
-                  className="oa-field-control h-8 rounded-md border border-input bg-background px-2.5 py-1.5 text-xs text-foreground outline-none"
-                >
-                  <option value="">-</option>
-                  <option value="true">true</option>
-                  <option value="false">false</option>
-                </select>
+                  onValueChange={(selectedValue) => setInputs((prev) => ({ ...prev, [prop.key]: selectedValue }))}
+                  size="sm" aria-label={prop.key}
+                  options={[
+                    { value: '', label: '-' },
+                    { value: 'true', label: 'true' },
+                    { value: 'false', label: 'false' },
+                  ]}
+                />
               ) : (
                 <input
                   type={prop.type === 'number' || prop.type === 'integer' ? 'number' : 'text'}

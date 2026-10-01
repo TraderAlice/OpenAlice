@@ -1,3 +1,4 @@
+import { Select } from '@/components/ui/select'
 import { useEffect, useId, useState } from 'react'
 import Decimal from 'decimal.js'
 import { ChevronRight, CircleAlert, Loader2, Search, X } from 'lucide-react'
@@ -122,9 +123,9 @@ function WalletPicker({ subAccounts, value, onChange }: {
   if (!subAccounts || subAccounts.length <= 1) return null
   return (
     <Field label="Wallet — required">
-      <select className={inputClass} value={value} onChange={(e) => onChange(e.target.value)}>
-        {subAccounts.map(s => <option key={s.id} value={s.id}>{s.label}</option>)}
-      </select>
+      <Select aria-label="Wallet" value={value} onValueChange={(selectedValue) => onChange(selectedValue)}
+        options={subAccounts.map(s => ({ value: s.id, label: s.label }))}
+      />
       <p className="text-sm text-muted-foreground/60 mt-1">This venue has separate wallets; the order routes to the one you pick.</p>
     </Field>
   )
@@ -281,10 +282,12 @@ function PlaceForm({ initialAliceId, ...p }: SharedFormProps & { initialAliceId?
             </Field>
           )}
           <Field label="Time in Force">
-            <select className={inputClass} value={tif} onChange={(e) => setTif(e.target.value)}>
-              <option value="DAY">DAY</option>
-              <option value="GTC">GTC (Good Till Cancelled)</option>
-            </select>
+            <Select aria-label="Time in force" value={tif} onValueChange={(selectedValue) => setTif(selectedValue)}
+              options={[
+                { value: 'DAY', label: 'DAY' },
+                { value: 'GTC', label: 'GTC (Good Till Cancelled)' },
+              ]}
+            />
           </Field>
         </div>
       )}

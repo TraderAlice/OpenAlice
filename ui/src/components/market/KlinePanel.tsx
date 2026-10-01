@@ -1,3 +1,4 @@
+import { Select } from '@/components/ui/select'
 import { useMarketBars } from '../../hooks/useMarketBars'
 import { Button } from '../ui/button'
 import { MARKET_INTERVALS, MARKET_REFERENCE_COUNT, type MarketInterval } from '@traderalice/connector-protocol'
@@ -334,18 +335,13 @@ export function KlinePanel({ selection, source, onSnapshot, displayTitle, embedd
           {!embedded && sourceOptions.length > 1 && (
             <label className="flex min-w-0 max-w-full items-center gap-2">
               <span className="shrink-0 text-sm font-medium text-muted-foreground/70">Source</span>
-              <select
+              <Select
                 value={selectedBarId ?? meta?.barId ?? ''}
-                onChange={(e) => setSelectedBarId(e.target.value || null)}
-                className="oa-field-control min-w-0 max-w-[240px] cursor-pointer rounded-md border border-input bg-background px-2 py-1 text-sm leading-5 text-foreground outline-none transition-[border-color,box-shadow] duration-[var(--motion-fast)] [transition-timing-function:var(--motion-ease-out)] motion-reduce:transition-none"
+                onValueChange={(selectedValue) => setSelectedBarId(selectedValue || null)}
+                size="sm" className="w-auto max-w-60" aria-label="Source"
                 title="Which provider's K-line to show — sources are never merged; you pick"
-              >
-                {sourceOptions.map((c) => (
-                  <option key={c.barId} value={c.barId}>
-                    {c.sourceId}, {c.symbol}{c.barCapability ? ` (${c.barCapability})` : ''}
-                  </option>
-                ))}
-              </select>
+                options={sourceOptions.map((c) => ({ value: c.barId, label: [c.sourceId, ", ", c.symbol, c.barCapability ? ` (${c.barCapability})` : ''].join('') }))}
+              />
             </label>
           )}
           <div

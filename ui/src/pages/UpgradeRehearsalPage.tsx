@@ -1,3 +1,4 @@
+import { Select } from '@/components/ui/select'
 import { Checkbox } from '@/components/ui/checkbox'
 import { displayVersion } from '../components/dev/upgrade-rehearsal/releases'
 import { ReleasePublisher } from '../components/dev/upgrade-rehearsal/ReleasePublisher'
@@ -159,40 +160,36 @@ export function UpgradeRehearsalPage() {
       <div className="flex flex-wrap items-end gap-4">
         <label className="min-w-0 flex-1 text-xs text-muted-foreground">
           Scenario
-          <select
+          <Select
             aria-label="Scenario"
             disabled={!editing}
             value={s.scenario}
-            onChange={(e) =>
-              dispatch({ type: 'scenario', value: e.target.value as Scenario })
+            onValueChange={(selectedValue) =>
+              dispatch({ type: 'scenario', value: selectedValue as Scenario })
             }
-            className="mt-2 block h-10 w-full rounded-lg border border-border bg-background px-3 text-sm text-foreground disabled:opacity-60"
-          >
-            {Object.entries(scenarios).map(([k, v]) => (
-              <option key={k} value={k}>
-                {v}
-              </option>
-            ))}
-          </select>
+            className="mt-2"
+            options={Object.entries(scenarios).map(([k, v]) => ({ value: k, label: v }))}
+          />
         </label>
         <label className="text-xs text-muted-foreground">
           Follow channel
-          <select
+          <Select
             aria-label="Follow channel"
             disabled={!editing}
             value={s.channel}
-            onChange={(e) =>
+            onValueChange={(selectedValue) =>
               dispatch({
                 type: 'channel',
-                value: e.target.value as ReleaseChannel,
+                value: selectedValue as ReleaseChannel,
               })
             }
-            className="mt-2 block h-10 rounded-lg border border-border bg-background px-3 text-sm text-foreground"
-          >
-            <option value="stable">Stable</option>
-            <option value="beta">Beta</option>
-            <option value="dev">Dev commit</option>
-          </select>
+            className="mt-2 w-auto"
+            options={[
+              { value: 'stable', label: 'Stable' },
+              { value: 'beta', label: 'Beta' },
+              { value: 'dev', label: 'Dev commit' },
+            ]}
+          />
         </label>
         <Button
           variant="outline"

@@ -14,6 +14,8 @@
  * is a one-place edit here — it appears everywhere at once.
  */
 
+import { Select } from '@/components/ui/select'
+
 import { useEffect, useRef, useState } from 'react'
 import type { FormEvent, ReactElement } from 'react'
 import { useTranslation } from 'react-i18next'
@@ -123,20 +125,13 @@ export function CreateWorkspaceForm(props: CreateWorkspaceFormProps): ReactEleme
           <label htmlFor="cw-template" className={LABEL}>
             {t('createWorkspace.templateLabel')}
           </label>
-          <select
+          <Select
             id="cw-template"
             value={effectiveTemplate}
-            onChange={(e) => setSelected(e.target.value)}
+            onValueChange={(selectedValue) => setSelected(selectedValue)}
             disabled={create.creating}
-            className={FIELD}
-          >
-            {templates.map((tpl) => (
-              <option key={tpl.name} value={tpl.name}>
-                {tpl.displayName ?? tpl.name}
-                {tpl.community ? t('createWorkspace.communitySuffix') : ''}
-              </option>
-            ))}
-          </select>
+            options={templates.map((tpl) => ({ value: tpl.name, label: [tpl.displayName ?? tpl.name, tpl.community ? t('createWorkspace.communitySuffix') : ''].join('') }))}
+          />
           {selectedMeta?.description && <p className={HINT}>{selectedMeta.description}</p>}
         </div>
       )}
@@ -169,19 +164,13 @@ export function CreateWorkspaceForm(props: CreateWorkspaceFormProps): ReactEleme
           <label htmlFor="cw-source-version" className={LABEL}>
             {t('createWorkspace.sourceVersionLabel')}
           </label>
-          <select
+          <Select
             id="cw-source-version"
-            value={effectiveSourceVersion}
-            onChange={(e) => setSourceVersion(e.target.value)}
+            value={effectiveSourceVersion ?? ''}
+            onValueChange={(selectedValue) => setSourceVersion(selectedValue)}
             disabled={create.creating}
-            className={FIELD}
-          >
-            {selectedMeta.source.versions.map((entry) => (
-              <option key={entry.version} value={entry.version}>
-                {entry.version}
-              </option>
-            ))}
-          </select>
+            options={selectedMeta.source.versions.map((entry) => ({ value: entry.version, label: entry.version }))}
+          />
           <p className={HINT}>
             {t('createWorkspace.sourceVersionHint', {
               commit: selectedMeta.source.versions

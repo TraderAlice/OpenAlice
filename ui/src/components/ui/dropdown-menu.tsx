@@ -3,6 +3,7 @@ import { Menu as MenuPrimitive } from "@base-ui/react/menu"
 
 import { cn } from "@/lib/utils"
 import { ChevronRightIcon } from "lucide-react"
+import { choicePopupClass } from "./choice-styles"
 import { SelectionCheckIcon } from "./selection-check-icon"
 
 function DropdownMenu({ ...props }: MenuPrimitive.Root.Props) {
@@ -44,7 +45,7 @@ function DropdownMenuContent({
       >
         <MenuPrimitive.Popup
           data-slot="dropdown-menu-content"
-          className={cn("z-50 max-h-(--available-height) w-max min-w-[min(14rem,calc(100vw-2rem))] max-w-[min(28rem,calc(100vw-2rem))] origin-(--transform-origin) overflow-x-hidden overflow-y-auto rounded-xl bg-popover p-1.5 text-popover-foreground shadow-md ring-1 ring-foreground/10 outline-none transition-[opacity,scale] duration-[var(--motion-standard)] [transition-timing-function:var(--motion-ease-out)] data-starting-style:scale-[.98] data-starting-style:opacity-0 data-ending-style:scale-[.99] data-ending-style:opacity-0 data-ending-style:duration-[var(--motion-fast)] data-instant:transition-none motion-reduce:transition-none", className )}
+          className={cn(choicePopupClass, "z-50 max-h-(--available-height) w-max min-w-[min(14rem,calc(100vw-2rem))] max-w-[min(28rem,calc(100vw-2rem))] overflow-x-hidden overflow-y-auto p-1.5", className )}
           {...props}
         />
       </MenuPrimitive.Positioner>

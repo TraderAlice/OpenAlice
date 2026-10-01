@@ -1,6 +1,7 @@
+import { Select } from '@/components/ui/select'
 import { useState, useEffect, useId, useMemo } from 'react'
 import { AlertTriangle } from 'lucide-react'
-import { SettingsScrollArea, inputClass } from '../components/form'
+import { SettingsScrollArea } from '../components/form'
 import { EmptyState as SharedEmptyState, RecoverySurface, Skeleton } from '../components/StateViews'
 import { Toggle } from '../components/Toggle'
 import { useTradingConfig } from '../hooks/useTradingConfig'
@@ -130,17 +131,14 @@ export function ExternalOrderMonitoringRow() {
         >
           {msg}
         </span>
-        <select
+        <Select
           id={selectId}
           aria-describedby={`${descriptionId} ${statusId}`}
           value={value}
-          onChange={(e) => { void save(e.target.value) }}
-          className={`${inputClass} w-full sm:w-auto`}
-        >
-          {OBSERVE_CADENCE_OPTIONS.map((v) => (
-            <option key={v} value={v}>{v === 'off' ? 'Off' : `Every ${v}`}</option>
-          ))}
-        </select>
+          onValueChange={(selectedValue) => { void save(selectedValue) }}
+          className="w-full sm:w-auto"
+          options={OBSERVE_CADENCE_OPTIONS.map((v) => ({ value: v, label: v === 'off' ? 'Off' : `Every ${v}` }))}
+        />
       </div>
     </div>
   )

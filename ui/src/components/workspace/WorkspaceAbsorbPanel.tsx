@@ -1,3 +1,4 @@
+import { Select } from '@/components/ui/select'
 import { useCallback, useEffect, useMemo, useState, type ReactElement } from 'react'
 import {
   AlertTriangle,
@@ -13,7 +14,6 @@ import {
   Users,
 } from 'lucide-react'
 
-import { inputClass } from '../form'
 import { Button } from '../ui/button'
 import { SelectionCheckIcon } from '../ui/selection-check-icon'
 import {
@@ -158,24 +158,21 @@ export function WorkspaceAbsorbPanel({
               <ArrowRight size={16} className="mx-auto rotate-90 text-muted-foreground sm:rotate-0" />
               <label className="flex min-w-0 flex-col justify-center rounded-lg border border-dashed border-border bg-background px-3 py-2.5">
                 <span className="text-sm font-medium text-muted-foreground">Archive after absorb</span>
-                <select
+                <Select
                   value={sourceId}
-                  onChange={(event) => {
-                    setSourceId(event.target.value)
+                  onValueChange={(selectedValue) => {
+                    setSourceId(selectedValue)
                     setPlan(null)
                     setResult(null)
                     setError(null)
                   }}
-                  className={`${inputClass} mt-1 font-semibold`}
+                  className="mt-1"
                   aria-label="Workspace to absorb"
-                >
-                  <option value="">Choose a Workspace…</option>
-                  {candidates.map((workspace) => (
-                    <option key={workspace.id} value={workspace.id}>
-                      {workspace.displayName?.trim() || workspace.tag}
-                    </option>
-                  ))}
-                </select>
+                  options={[
+                    { value: '', label: 'Choose a Workspace…' },
+                    ...candidates.map((workspace) => ({ value: workspace.id, label: workspace.displayName?.trim() || workspace.tag })),
+                  ]}
+                />
               </label>
             </div>
           </div>

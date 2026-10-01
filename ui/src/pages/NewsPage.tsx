@@ -1,3 +1,4 @@
+import { Select } from '@/components/ui/select'
 import { SegmentedControl } from '../components/SegmentedControl'
 import { safeNotificationImage } from '../lib/notifications/image'
 import { memo, useCallback, useEffect, useId, useMemo, useRef, useState, type FormEvent } from 'react'
@@ -174,16 +175,18 @@ export function NewsPage({ spec }: { spec: Extract<ViewSpec, { kind: 'news' }> }
             </form>
             {dateError && <p role="alert" className="mt-2 text-xs text-destructive">{t('news.dateRangeError')}</p>}
             <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-              <select aria-label={t('news.lookbackLabel')} value={query.lookback ?? '24h'} disabled={Boolean(query.startTime)}
-                onChange={(event) => setQuery({ ...query, lookback: event.target.value })}
-                className={cn(inputClass, 'h-7 w-auto py-1 text-xs')}>
-                {LOOKBACK_OPTIONS.map((option) => <option key={option.value} value={option.value}>{t(option.labelKey)}</option>)}
-              </select>
-              <select aria-label={t('news.sourceLabel')} value={query.source ?? ''} onChange={(event) => setQuery({ ...query, source: event.target.value || undefined })}
-                className={cn(inputClass, 'h-7 w-auto max-w-36 py-1 text-xs')}>
-                <option value="">{t('news.allSources')}</option>
-                {sources.map((source) => <option key={source} value={source}>{source}</option>)}
-              </select>
+              <Select aria-label={t('news.lookbackLabel')} value={query.lookback ?? '24h'} disabled={Boolean(query.startTime)}
+                onValueChange={(selectedValue) => setQuery({ ...query, lookback: selectedValue })}
+                size="sm" className="w-auto max-w-full"
+                options={LOOKBACK_OPTIONS.map((option) => ({ value: option.value, label: t(option.labelKey) }))}
+              />
+              <Select aria-label={t('news.sourceLabel')} value={query.source ?? ''} onValueChange={(selectedValue) => setQuery({ ...query, source: selectedValue || undefined })}
+                size="sm" className="w-auto max-w-48"
+                options={[
+                  { value: '', label: t('news.allSources') },
+                  ...sources.map((source) => ({ value: source, label: source })),
+                ]}
+              />
               <span aria-live="polite">{t('news.articleCount', { count: visibleArticles.length })}</span>
               {articles.length === 200 && <span>{t('news.resultLimit', { count: 200 })}</span>}
               <Button type="button" variant="ghost" size="icon-sm" className="ml-auto" aria-label={t('news.refresh')} onClick={retry} disabled={loading || refreshing}>

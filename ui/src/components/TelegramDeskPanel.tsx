@@ -1,9 +1,10 @@
+import { Select } from '@/components/ui/select'
 import { useId, useMemo, useState } from 'react'
 import { ChevronDown, MessageSquare } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { TELEGRAM_DESK_CADENCES } from '../api/connectors'
 import { ConfirmDialog } from './ConfirmDialog'
-import { Field, inputClass } from './form'
+import { Field } from './form'
 import { MarkdownWhatEditor } from './MarkdownWhatEditor'
 import { useAgentLaunchPreferences } from '../hooks/useAgentLaunchConfig'
 import { useTelegramConnectorDesk } from '../hooks/useTelegramConnectorDesk'
@@ -135,24 +136,20 @@ export function TelegramDeskPanel({
                 controlId={cadenceSelectId}
                 description={t('connectorSettings.desk.cadenceDescription')}
               >
-                <select
+                <Select
                   id={cadenceSelectId}
-                  className={inputClass}
                   value={currentEvery ?? ''}
                   disabled={working}
-                  onChange={(event) => {
-                    const next = event.target.value
+                  onValueChange={(selectedValue) => {
+                    const next = selectedValue
                     if (!next) return
                     void saveCadence(next)
                   }}
-                >
-                  {!currentEvery && <option value="">{t('connectorSettings.desk.cadenceCustom')}</option>}
-                  {cadenceOptions.map((every) => (
-                    <option key={every} value={every}>
-                      {t('connectorSettings.desk.cadenceEvery', { every })}
-                    </option>
-                  ))}
-                </select>
+                  options={[
+                    ...(!currentEvery ? [{ value: '', label: t('connectorSettings.desk.cadenceCustom') }] : []),
+                    ...cadenceOptions.map((every) => ({ value: every, label: t('connectorSettings.desk.cadenceEvery', { every }) })),
+                  ]}
+                />
               </Field>
               <div>
                 <h4 className="text-sm font-medium text-foreground">{t('connectorSettings.desk.what')}</h4>
@@ -192,19 +189,13 @@ export function TelegramDeskPanel({
               controlId={workspaceSelectId}
               description={t('connectorSettings.desk.workspaceDescription')}
             >
-              <select
+              <Select
                 id={workspaceSelectId}
-                className={inputClass}
                 value={selectedWsId}
                   disabled={working || !launchPreferencesLoaded}
-                onChange={(event) => setWsId(event.target.value)}
-              >
-                {choices.map((workspace) => (
-                  <option key={workspace.id} value={workspace.id}>
-                    {workspaceDisplayName(workspace)}
-                  </option>
-                ))}
-              </select>
+                onValueChange={(selectedValue) => setWsId(selectedValue)}
+                options={choices.map((workspace) => ({ value: workspace.id, label: workspaceDisplayName(workspace) }))}
+              />
             </Field>
           )}
           <p className="text-[11.5px] leading-5 text-muted-foreground">

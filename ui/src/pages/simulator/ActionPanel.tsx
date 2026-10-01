@@ -12,6 +12,9 @@
  * own form state across tab switches so partial inputs aren't lost.
  */
 
+import { Autocomplete } from '@/components/ui/autocomplete'
+import { Select } from '@/components/ui/select'
+
 import { useMemo, useState } from 'react'
 import { api } from '../../api'
 import { simulatorApi, type SimulatorState } from '../../api/simulator'
@@ -327,10 +330,12 @@ function OrderTab({ utaId, knownKeys, run, loading }: {
         ariaLabel="Order side"
         compact
       />
-      <select value={orderType} onChange={(e) => setOrderType(e.target.value as 'MKT' | 'LMT')} className={`${inputClass} w-20`}>
-        <option value="MKT">MKT</option>
-        <option value="LMT">LMT</option>
-      </select>
+      <Select value={orderType} onValueChange={(selectedValue) => setOrderType(selectedValue as 'MKT' | 'LMT')} className="w-24" aria-label="Order type"
+        options={[
+          { value: 'MKT', label: 'MKT' },
+          { value: 'LMT', label: 'LMT' },
+        ]}
+      />
       <KeySelect value={key} onChange={setKey} options={knownKeys} placeholder="symbol" />
       <input className={`${inputClassMono} w-28`} placeholder="qty" value={qty} onChange={(e) => setQty(e.target.value)} />
       {orderType === 'LMT' && (
@@ -350,17 +355,13 @@ function KeySelect({ value, onChange, options, placeholder }: {
   placeholder: string
 }) {
   return (
-    <>
-      <input
-        className={`${inputClassMono} w-36`}
-        placeholder={placeholder}
-        value={value}
-        onChange={(e) => onChange(e.target.value.trim())}
-        list="sim-action-known-keys"
-      />
-      <datalist id="sim-action-known-keys">
-        {options.map(k => <option key={k} value={k} />)}
-      </datalist>
-    </>
+    <Autocomplete
+      className="w-36 font-mono"
+      aria-label={placeholder}
+      placeholder={placeholder}
+      value={value}
+      onValueChange={(symbol) => onChange(symbol.trim())}
+      options={options}
+    />
   )
 }

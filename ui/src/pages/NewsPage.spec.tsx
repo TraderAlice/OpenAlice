@@ -1,3 +1,4 @@
+import userEvent from '@testing-library/user-event'
 // @vitest-environment jsdom
 
 import type { ReactNode } from 'react'
@@ -199,7 +200,8 @@ describe('NewsPage request recovery', () => {
     render(<RoutedNewsPage />)
     await screen.findByRole('heading', { name: 'Newest update' })
     mocks.list.mockRejectedValueOnce(new Error('filter unavailable'))
-    fireEvent.change(screen.getByRole('combobox', { name: 'News source' }), { target: { value: 'Reuters' } })
+    fireEvent.click(screen.getByRole('combobox', { name: 'News source' }))
+    await userEvent.click(await screen.findByRole('option', { name: 'Reuters' }))
     await screen.findByRole('alert')
     expect(screen.queryByRole('heading', { name: 'Newest update' })).toBeNull()
     expect(screen.queryByText('No articles')).toBeNull()
@@ -231,9 +233,11 @@ describe('NewsPage request recovery', () => {
     const fast = deferred<NewsListResponse>()
     mocks.list.mockImplementationOnce(() => slow.promise).mockImplementationOnce(() => fast.promise)
     const lookback = screen.getByRole('combobox', { name: 'News time range' })
-    fireEvent.change(lookback, { target: { value: '1h' } })
+    fireEvent.click(lookback)
+    await userEvent.click(await screen.findByRole('option', { name: '1 hour' }))
     await waitFor(() => expect(mocks.list).toHaveBeenCalledTimes(2))
-    fireEvent.change(lookback, { target: { value: '7d' } })
+    fireEvent.click(lookback)
+    await userEvent.click(await screen.findByRole('option', { name: '7 days' }))
     await waitFor(() => expect(mocks.list).toHaveBeenCalledTimes(3))
     await act(async () => { fast.resolve(newsResponse('Latest response', '7d')); await fast.promise })
     expect(await screen.findByRole('heading', { name: 'Latest response' })).toBeTruthy()

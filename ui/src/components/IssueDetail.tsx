@@ -1,3 +1,4 @@
+import { Select } from '@/components/ui/select'
 import { Checkbox } from '@/components/ui/checkbox'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { ReactNode } from 'react'
@@ -87,10 +88,6 @@ const RUN_STATUS_STYLE: Record<HeadlessTaskStatus, string> = {
 const STATUS_OPTIONS: IssueStatus[] = ['in_progress', 'todo', 'backlog', 'done', 'canceled']
 const PRIORITY_OPTIONS: IssuePriority[] = ['urgent', 'high', 'medium', 'low', 'none']
 
-// Shared control styling for the Inspector and its configuration dialog.
-const railControl =
-  'oa-field-control h-10 min-w-0 flex-1 rounded-md border border-input bg-background px-3 py-1 text-sm text-foreground outline-none transition-[border-color,box-shadow] disabled:cursor-not-allowed disabled:opacity-50 sm:h-9'
-
 const CONFIGURABLE_AGENTS: readonly AgentId[] = ['claude', 'codex', 'cursor', 'agy', 'grok', 'omp', 'opencode', 'pi']
 
 function isConfigurableAgent(agent: string | null | undefined): agent is AgentId {
@@ -163,33 +160,27 @@ function AgentEditor({
   return (
     <>
       <Cpu size={14} className="ml-2 shrink-0 text-muted-foreground" aria-hidden />
-      <select
-        className="h-9 min-w-0 flex-1 cursor-pointer rounded border-0 bg-transparent pl-0 text-sm outline-none hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring"
+      <Select
+        size="sm" className="flex-1 border-transparent bg-transparent"
         value={selected}
         disabled={disabled}
         aria-label={t('issues.detail.runtime')}
-        onChange={(e) => {
-          const next = e.target.value
+        onValueChange={(selectedValue) => {
+          const next = selectedValue
           onChange(next ? next : null)
         }}
-      >
-        <option value="">{defaultLabel}</option>
-        {options.map((agent) => {
-          const row = readiness[agent.id]
-          const suffix =
-            agent.installed === false ? t('issues.detail.runtimeMissingSuffix')
-            : row?.requiresCredential && !row.ready ? t('issues.detail.runtimeCredentialSuffix')
-            : ''
-          return (
-            <option key={agent.id} value={agent.id}>
-              {agent.displayName}{suffix}
-            </option>
-          )
-        })}
-        {value && !options.some((agent) => agent.id === value) && (
-          <option value={value}>{value}</option>
-        )}
-      </select>
+        options={[
+          { value: '', label: defaultLabel },
+          ...options.map((agent) => {
+            const row = readiness[agent.id]
+            const suffix = agent.installed === false ? t('issues.detail.runtimeMissingSuffix')
+              : row?.requiresCredential && !row.ready ? t('issues.detail.runtimeCredentialSuffix')
+                : ''
+            return { value: agent.id, label: `${agent.displayName}${suffix}` }
+          }),
+          ...(value && !options.some((agent) => agent.id === value) ? [{ value, label: value }] : []),
+        ]}
+      />
       <Button
         type="button"
         disabled={!canConfigure}
@@ -532,21 +523,20 @@ function SchedulePolicyEditor({
               <Timer size={14} aria-hidden />
               {t('issues.detail.timeout')}
             </span>
-            <select
-              className={`${railControl} w-full`}
+            <Select
+              size="sm"
               aria-label={t('issues.detail.timeout')}
               value={issue.timeout ?? ''}
               disabled={saving}
-              onChange={(event) => {
-                const value = event.target.value
+              onValueChange={(selectedValue) => {
+                const value = selectedValue
                 onPatch({ timeout: value === '' ? null : value as IssueTimeout })
               }}
-            >
-              <option value="">{t('issues.detail.timeoutNone')}</option>
-              {ISSUE_TIMEOUTS.map((timeout) => (
-                <option key={timeout} value={timeout}>{timeout}</option>
-              ))}
-            </select>
+              options={[
+                { value: '', label: t('issues.detail.timeoutNone') },
+                ...ISSUE_TIMEOUTS.map((timeout) => ({ value: timeout, label: timeout })),
+              ]}
+            />
             <span className="block text-sm leading-relaxed text-muted-foreground">{t('issues.detail.timeoutHint')}</span>
           </label>
         </div>

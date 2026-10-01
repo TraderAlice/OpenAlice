@@ -1,3 +1,4 @@
+import { Select } from '@/components/ui/select'
 import { DetailsSummary } from '../ui/collapsible'
 import { useProviderModels } from '../../hooks/useProviderModels'
 /**
@@ -920,45 +921,37 @@ export function WorkspaceAIConfigModal({
               return (
                 <>
                   <div className="flex flex-col gap-2 sm:flex-row">
-                    <select
+                    <Select
                       aria-label={t('workspaceSettings.ai.savedCredentialLabel', { agent: TAB_LABEL[tab] })}
                       value={pickedCredential}
-                      onChange={(e) => {
-                        const slug = e.target.value
+                      onValueChange={(selectedValue) => {
+                        const slug = selectedValue
                         const cred = compatible.find((candidate) => candidate.slug === slug)
                         setPickedCredential(slug)
                         setPickedWireShape(
                           cred ? (agentWireShapes(cred.wires, agents, tab, cred.vendor)[0] ?? '') : '',
                         )
                       }}
-                      className={inputClass + ' flex-1'}
+                      className="flex-1"
                       disabled={compatible.length === 0}
-                    >
-                      <option value="">
-                        {compatible.length === 0
-                          ? t('workspaceSettings.ai.noCompatibleCredential', { agent: TAB_LABEL[tab] })
-                          : t('workspaceSettings.ai.selectCredential')}
-                      </option>
-                      {compatible.map((cred) => {
-                        const shapes = agentWireShapes(cred.wires, agents, tab, cred.vendor)
-                        return (
-                          <option key={cred.slug} value={cred.slug}>
-                            {(cred.label?.trim() || cred.slug)}{shapes.length > 1 ? `, ${t('workspaceSettings.ai.protocolCount', { count: shapes.length })}` : ''}
-                          </option>
-                        )
-                      })}
-                    </select>
+                      options={[
+                        { value: '', label: compatible.length === 0
+                            ? t('workspaceSettings.ai.noCompatibleCredential', { agent: TAB_LABEL[tab] })
+                            : t('workspaceSettings.ai.selectCredential') },
+                        ...compatible.map((cred) => {
+                          const shapes = agentWireShapes(cred.wires, agents, tab, cred.vendor)
+                          return { value: cred.slug, label: [cred.label?.trim() || cred.slug, shapes.length > 1 ? `, ${t('workspaceSettings.ai.protocolCount', { count: shapes.length })}` : ''].join('') }
+                        }),
+                      ]}
+                    />
                     {selectedWireOptions.length > 1 && (
-                      <select
+                      <Select
                         aria-label={t('workspaceSettings.ai.savedCredentialProtocolLabel')}
                         value={pickedWireShape}
-                        onChange={(e) => setPickedWireShape(e.target.value as WireShape)}
-                        className={inputClass + ' sm:max-w-[210px]'}
-                      >
-                        {selectedWireOptions.map((shape) => (
-                          <option key={shape} value={shape}>{WIRE_SHAPE_GUIDANCE[shape]}</option>
-                        ))}
-                      </select>
+                        onValueChange={(selectedValue) => setPickedWireShape(selectedValue as WireShape)}
+                        className="sm:max-w-[210px]"
+                        options={selectedWireOptions.map((shape) => ({ value: shape, label: WIRE_SHAPE_GUIDANCE[shape] }))}
+                      />
                     )}
                     <Button
                       onClick={applyCredential}
@@ -983,11 +976,11 @@ export function WorkspaceAIConfigModal({
           {(tabProviderCapabilities?.wirePreference.length ?? 0) > 1 && (
             <div>
               <label className="block text-xs font-medium text-muted-foreground mb-1">{t('workspaceSettings.ai.apiProtocol')}</label>
-              <select
+              <Select
                 aria-label={t('workspaceSettings.ai.apiProtocolLabel', { agent: TAB_LABEL[tab] })}
                 value={form.wireShape}
-                onChange={(e) => {
-                  const wireShape = e.target.value as WireShape
+                onValueChange={(selectedValue) => {
+                  const wireShape = selectedValue as WireShape
                   const selected = credentials.find((candidate) => candidate.slug === pickedCredential)
                   const selectedBaseUrl = selected?.wires[wireShape]
                   setForm({
@@ -1000,12 +993,8 @@ export function WorkspaceAIConfigModal({
                   })
                   gate.reset()
                 }}
-                className={inputClass}
-              >
-                {formWireOptions.map((shape) => (
-                  <option key={shape} value={shape}>{WIRE_SHAPE_GUIDANCE[shape]}</option>
-                ))}
-              </select>
+                options={formWireOptions.map((shape) => ({ value: shape, label: WIRE_SHAPE_GUIDANCE[shape] }))}
+              />
               <p className="text-sm text-muted-foreground/80 leading-snug mt-1">
                 {t('workspaceSettings.ai.apiProtocolHelp')}
               </p>
@@ -1064,15 +1053,15 @@ export function WorkspaceAIConfigModal({
           {form.wireShape === 'anthropic' && (
             <div>
               <label className="block text-xs font-medium text-muted-foreground mb-1">{t('workspaceSettings.ai.authHeader')}</label>
-              <select
+              <Select
                 aria-label={t('workspaceSettings.ai.authHeaderLabel', { agent: TAB_LABEL[tab] })}
                 value={form.authMode}
-                onChange={(e) => setForm({ ...form, authMode: e.target.value as FormState['authMode'] })}
-                className={inputClass}
-              >
-                <option value="x-api-key">x-api-key — Anthropic default</option>
-                <option value="bearer">Authorization: Bearer — gateways (MiniMax, LongCat, proxies)</option>
-              </select>
+                onValueChange={(selectedValue) => setForm({ ...form, authMode: selectedValue as FormState['authMode'] })}
+                options={[
+                  { value: 'x-api-key', label: 'x-api-key — Anthropic default' },
+                  { value: 'bearer', label: 'Authorization: Bearer — gateways (MiniMax, LongCat, proxies)' },
+                ]}
+              />
               <p className="text-sm text-muted-foreground/80 leading-snug mt-1">
                 {t('workspaceSettings.ai.authHeaderHelp')}
               </p>
@@ -1111,26 +1100,22 @@ export function WorkspaceAIConfigModal({
                 <label className="block text-xs font-medium text-muted-foreground mb-1">
                   {t('workspaceSettings.ai.reasoningEffort')}
                 </label>
-                <select
+                <Select
                   aria-label={t('workspaceSettings.ai.reasoningEffortLabel', { agent: TAB_LABEL[tab] })}
                   value={form.reasoningEffort ?? ''}
-                  onChange={(event) => setForm({
+                  onValueChange={(selectedValue) => setForm({
                     ...form,
-                    reasoningEffort: event.target.value
-                      ? event.target.value as ModelReasoningEffort
+                    reasoningEffort: selectedValue
+                      ? selectedValue as ModelReasoningEffort
                       : null,
                   })}
-                  className={inputClass}
-                >
-                  <option value="">{t('workspaceSettings.ai.effortNotSpecified')}</option>
-                  {supportedReasoningEfforts.map((effort) => (
-                    <option key={effort} value={effort}>
-                      {effort}{effort === selectedModelSemantics?.reasoning?.defaultEffort
-                        ? ` — ${t('workspaceSettings.ai.registeredDefault')}`
-                        : ''}
-                    </option>
-                  ))}
-                </select>
+                  options={[
+                    { value: '', label: t('workspaceSettings.ai.effortNotSpecified') },
+                    ...supportedReasoningEfforts.map((effort) => ({ value: effort, label: [effort, effort === selectedModelSemantics?.reasoning?.defaultEffort
+                          ? ` — ${t('workspaceSettings.ai.registeredDefault')}`
+                          : ''].join('') })),
+                  ]}
+                />
                 <p className="text-[10.5px] leading-snug text-muted-foreground/80 mt-1">
                   {selectedModelSemantics?.reasoning?.defaultEffort
                     ? t('workspaceSettings.ai.reasoningEffortHelp', {
@@ -1170,19 +1155,19 @@ export function WorkspaceAIConfigModal({
                   {t('aiProvider.advancedReasoning')}
                 </DetailsSummary>
                 <div className="mt-2 space-y-1.5">
-                  <select
+                  <Select
                     aria-label={t('workspaceSettings.ai.reasoningOverrideLabel', { agent: TAB_LABEL[tab] })}
-                    className={inputClass}
                     value={form.reasoning === null ? 'auto' : form.reasoning ? 'enabled' : 'disabled'}
-                    onChange={(event) => setForm({
+                    onValueChange={(selectedValue) => setForm({
                       ...form,
-                      reasoning: event.target.value === 'auto' ? null : event.target.value === 'enabled',
+                      reasoning: selectedValue === 'auto' ? null : selectedValue === 'enabled',
                     })}
-                  >
-                    <option value="auto">{t('aiProvider.useRuntimeDefault')}</option>
-                    <option value="enabled">{t('aiProvider.supportsReasoning')}</option>
-                    <option value="disabled">{t('aiProvider.noReasoning')}</option>
-                  </select>
+                    options={[
+                      { value: 'auto', label: t('aiProvider.useRuntimeDefault') },
+                      { value: 'enabled', label: t('aiProvider.supportsReasoning') },
+                      { value: 'disabled', label: t('aiProvider.noReasoning') },
+                    ]}
+                  />
                   <p className="text-[10.5px] leading-snug text-muted-foreground/80">
                     {t('workspaceSettings.ai.unknownReasoningHelp')}
                   </p>
@@ -1195,26 +1180,22 @@ export function WorkspaceAIConfigModal({
           {modelRegistration?.contextWindow === true && (
             <div>
               <label className="block text-xs font-medium text-muted-foreground mb-1">{t('workspaceSettings.ai.contextWindow')}</label>
-              <select
+              <Select
                 aria-label={t('workspaceSettings.ai.contextWindowLabel', { agent: TAB_LABEL[tab] })}
-                value={form.contextWindow ?? ''}
-                onChange={(e) => setForm({
+                value={form.contextWindow === null ? '' : String(form.contextWindow)}
+                onValueChange={(selectedValue) => setForm({
                   ...form,
-                  contextWindow: e.target.value ? Number(e.target.value) : null,
+                  contextWindow: selectedValue ? Number(selectedValue) : null,
                 })}
-                className={inputClass}
-              >
-                <option value="">
-                  {selectedModelSemantics?.contextWindow
-                    ? t('workspaceSettings.ai.contextAutomatic', {
-                      limit: formatContextWindow(selectedModelSemantics.contextWindow),
-                    })
-                    : t('workspaceSettings.ai.runtimeDefaultOption')}
-                </option>
-                {CONTEXT_WINDOW_OPTIONS.map((option) => (
-                  <option key={option.value} value={option.value}>{option.label}</option>
-                ))}
-              </select>
+                options={[
+                  { value: '', label: selectedModelSemantics?.contextWindow
+                      ? t('workspaceSettings.ai.contextAutomatic', {
+                        limit: formatContextWindow(selectedModelSemantics.contextWindow),
+                      })
+                      : t('workspaceSettings.ai.runtimeDefaultOption') },
+                  ...CONTEXT_WINDOW_OPTIONS.map((option) => ({ value: String(option.value), label: option.label })),
+                ]}
+              />
             </div>
           )}
 

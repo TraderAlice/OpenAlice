@@ -1,3 +1,4 @@
+import { Select } from '@/components/ui/select'
 import { DetailsSummary } from '../ui/collapsible'
 import { useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
@@ -323,19 +324,19 @@ export function CredentialModal({ mode, cred, presets, agents, initialPresetId, 
           </div>
         ) : (
           <>
-              <div className="flex items-center justify-between">
-                <div className="flex min-w-0 items-center gap-2">
+              <div className="flex min-w-0 items-center justify-between gap-3">
+                <div className="flex min-w-0 flex-1 items-center gap-2">
                   <AIProviderIcon vendor={VENDOR_BY_PRESET[preset.id] ?? 'custom'} className="size-5 shrink-0" />
-                  <span className="text-sm font-semibold text-foreground">{preset.label}</span>
-                  <span className="min-w-0 truncate text-sm text-muted-foreground">{preset.description}</span>
+                  <span className="shrink-0 text-sm font-semibold text-foreground">{preset.label}</span>
+                  <span title={preset.description} className="min-w-0 truncate text-sm text-muted-foreground">{preset.description}</span>
                 </div>
                 {mode === 'add' && (
-                  <button onClick={() => {
+                  <Button type="button" variant="ghost" size="sm" onClick={() => {
                     setPreset(null)
                     // Automatic discovery must not carry a key to a different provider.
                     setApiKey('')
                     gate.reset()
-                  }} className="text-sm text-primary hover:underline">{t('common.change')}</button>
+                  }} className="shrink-0">{t('common.change')}</Button>
                 )}
               </div>
 
@@ -382,15 +383,9 @@ export function CredentialModal({ mode, cred, presets, agents, initialPresetId, 
                     />
                   </Field>
                   <Field label={t('aiProvider.credentialModal.compatibilityMode')} description={t('aiProvider.credentialModal.compatibilityModeHelp')}>
-                    <select className={inputClass} value={customShape} onChange={(event) => { setCustomShape(event.target.value as WireShape); gate.reset() }}>
-                      {SHAPE_ORDER.map((shape) => (
-                        <option key={shape} value={shape}>
-                          {WIRE_SHAPE_GUIDANCE[shape]} — {
-                            agentNames(compatibleAgentIds({ [shape]: '' }, agents))
-                          }
-                        </option>
-                      ))}
-                    </select>
+                    <Select aria-label={t('aiProvider.credentialModal.compatibilityMode')} value={customShape} onValueChange={(selectedValue) => { setCustomShape(selectedValue as WireShape); gate.reset() }}
+                      options={SHAPE_ORDER.map((shape) => ({ value: shape, label: [WIRE_SHAPE_GUIDANCE[shape], " — ", agentNames(compatibleAgentIds({ [shape]: '' }, agents))].join('') }))}
+                    />
                   </Field>
                   <Field label={t('aiProvider.credentialModal.baseUrl')} description={t('aiProvider.credentialModal.baseUrlHelp')}>
                     <input
@@ -411,10 +406,12 @@ export function CredentialModal({ mode, cred, presets, agents, initialPresetId, 
                       label={t('aiProvider.credentialModal.accountRegion')}
                       description={preset.setup?.regionHelp ?? t('aiProvider.credentialModal.accountRegionHelp')}
                     >
-                      <select className={inputClass} value={regionId} onChange={(event) => { setRegionId(event.target.value); gate.reset() }}>
-                        {usingStoredRegion && <option value={STORED_REGION_ID}>{t('aiProvider.credentialModal.storedEndpoint')}</option>}
-                        {regions.map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}
-                      </select>
+                      <Select aria-label={t('aiProvider.credentialModal.accountRegion')} value={regionId} onValueChange={(selectedValue) => { setRegionId(selectedValue); gate.reset() }}
+                        options={[
+                          ...(usingStoredRegion ? [{ value: STORED_REGION_ID, label: t('aiProvider.credentialModal.storedEndpoint') }] : []),
+                          ...regions.map((item) => ({ value: item.id, label: item.label })),
+                        ]}
+                      />
                     </Field>
                   )}
                 </>
