@@ -44,6 +44,11 @@ GitHub navigation.
 | [[docs/ibkr-wire-protocol.md]] | [IBKR wire protocol](ibkr-wire-protocol.md) | TWS/Gateway inbound framing, payload-only decoder contract, failure isolation, and verification |
 | [[docs/market-data-architecture.md]] | [Market data architecture](market-data-architecture.md) | TraderHub/reference data, BarService K-lines, and the private provider compatibility layer |
 
+Satellite sidecars (not owner guides; install separately):
+
+- [astock-data Tushare MCP](../satellites/astock-data/README.md) — A-share fundamentals bridge
+- [market-data-gateway](../satellites/market-data-gateway/README.md) — offshore Yahoo news RSS normalize + thin quotes for CN hosts
+
 Other files under `docs/images/` are README/product assets rather than owner
 guides.
 

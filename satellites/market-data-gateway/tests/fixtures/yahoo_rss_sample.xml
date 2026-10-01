@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0">
+  <channel>
+    <title>Yahoo Finance</title>
+    <link>https://finance.yahoo.com/news/</link>
+    <description>Yahoo Finance sample</description>
+    <item>
+      <title>Sample NVDA climbs on AI demand</title>
+      <link>https://finance.yahoo.com/news/sample-nvda-1.html</link>
+      <guid isPermaLink="true">https://finance.yahoo.com/news/sample-nvda-1.html</guid>
+      <pubDate>Tue, 30 Sep 2026 20:00:00 GMT</pubDate>
+      <description>Chipmaker gains as cloud customers expand GPU fleets.</description>
+    </item>
+    <item>
+      <title>Fed officials signal patience</title>
+      <link>https://finance.yahoo.com/news/sample-fed-2.html</link>
+      <guid>yahoo-fed-2</guid>
+      <pubDate>Tue, 30 Sep 2026 18:30:00 GMT</pubDate>
+      <description>Policy makers prefer more data before cutting rates.</description>
+    </item>
+  </channel>
+</rss>

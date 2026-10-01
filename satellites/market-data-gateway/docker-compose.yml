@@ -1,0 +1,17 @@
+services:
+  gateway:
+    build: .
+    ports:
+      - "8787:8787"
+    env_file:
+      - .env
+    environment:
+      GATEWAY_DB_PATH: /data/gateway.db
+      GATEWAY_HOST: 0.0.0.0
+      GATEWAY_PORT: "8787"
+    volumes:
+      - gateway-data:/data
+    restart: unless-stopped
+
+volumes:
+  gateway-data:

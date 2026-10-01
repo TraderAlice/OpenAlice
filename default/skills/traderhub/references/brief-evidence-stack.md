@@ -82,3 +82,14 @@ Use only after a non-40203 response. Typical verbs:
 
 Prefer NBS / State Council release schedules or stated FRED observation dates.
 Do not invent holiday / data-release dates without a dated source.
+
+## Offshore Yahoo news (optional)
+
+Mainland hosts often cannot fetch `finance.yahoo.com` RSS (HTTP 403). Prefer
+already-enabled Alice feeds (Fed, MarketWatch, CNBC, …). When Yahoo headlines
+are required, run
+[`satellites/market-data-gateway`](../../../../satellites/market-data-gateway/README.md)
+on a JP/US VPS and point the **Gateway US Markets** news feed at
+`/feeds/us-markets.xml?token=…`, or call `GET /api/v1/news/headlines`. Cite as
+`yahoo-finance` / `via gateway` with `quality=B`. Do not configure an open
+Yahoo URL proxy.

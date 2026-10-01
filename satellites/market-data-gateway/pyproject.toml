@@ -1,0 +1,34 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "market-data-gateway"
+version = "0.1.0"
+description = "OpenAlice satellite: offshore news/quote gateway (Yahoo RSS normalize + cache)"
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "AGPL-3.0-only" }
+dependencies = [
+  "fastapi>=0.115.0,<1",
+  "uvicorn[standard]>=0.30.0,<1",
+  "httpx>=0.27.0,<1",
+  "pydantic>=2.7.0,<3",
+  "pydantic-settings>=2.3.0,<3",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8.0.0", "pytest-asyncio>=0.24.0"]
+
+[project.scripts]
+market-data-gateway = "market_data_gateway.app:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+market_data_gateway = ["py.typed"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
