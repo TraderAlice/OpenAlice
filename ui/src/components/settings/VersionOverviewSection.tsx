@@ -16,7 +16,6 @@ import { claimUpgradeDialog, shouldRestoreUpgradeDialog } from './upgrade-dialog
 import { workspacePlanIsCurrent, workspacePlanRequest } from '../../lib/updates/workspacePlans'
 import { VERSION_OVERVIEW_ID } from '../../lib/updates/focusVersionOverview'
 
-const UI_VERSION = typeof __OPENALICE_UI_VERSION__ === 'string' ? __OPENALICE_UI_VERSION__ : 'development'
 const version = (value?: string | null) => value ? `v${value.replace(/^v/, '')}` : '—'
 type View = 'app' | 'backend' | 'project' | 'native-review' | 'native-progress' | 'backend-review' | null
 
@@ -35,7 +34,7 @@ export function VersionOverviewSection() {
   const integrated = getBackendConnection().kind === 'electron'
   const target = machines.status?.target
   const remote = Boolean(target && target.machine !== 'local')
-  const appVersion = updates.client?.currentVersion ?? UI_VERSION
+  const appVersion = updates.client?.currentVersion
   const appCandidate = updates.nativeReady?.version ?? updates.client?.discovery.value?.latestVersion
   const appAvailable = Boolean(updates.nativeReady || updates.client?.discovery.value?.status === 'available')
   const backend = updates.versionInfo
@@ -127,7 +126,7 @@ export function VersionOverviewSection() {
             {integrated && <p className="mt-4 rounded-lg bg-primary/5 p-3 text-sm">{text('integrated')}</p>}
             {view === 'app' && updates.client?.kind === 'cli' && <p className="mt-4 text-sm text-muted-foreground">{text('cliManaged')}</p>}
             {view === 'backend' && !remote && !integrated && <p className="mt-4 text-sm text-muted-foreground">{text('localManaged')}</p>}
-            <details className="mt-5 text-xs text-muted-foreground"><summary className="cursor-pointer py-2">{text('buildDetails')}</summary><p className="py-2">{text('uiBuild')} {version(UI_VERSION)}</p>{(view === 'app' ? updates.clientError : updates.versionError || backend?.error) && <p role="alert">{view === 'app' ? updates.clientError : updates.versionError || backend?.error}</p>}</details>
+            {(view === 'app' ? updates.clientError : updates.versionError || backend?.error) && <p role="alert" className="mt-5 text-sm text-warning">{view === 'app' ? updates.clientError : updates.versionError || backend?.error}</p>}
           </>}
           {view === 'native-review' && <><ReviewRow title={text('app')} detail={`${version(appVersion)} → ${version(updates.nativeReady?.version)}`}/><p className="mt-4 rounded-lg bg-primary/5 p-4 text-sm">{text('restartNote')}</p>{remote && <p className="mt-3 text-xs text-muted-foreground">{text('backendOptional')}</p>}</>}
           {view === 'native-progress' && <div role="status" className="space-y-5"><div className="flex items-center gap-3"><LoaderCircle className="size-6 animate-spin motion-reduce:animate-none text-primary"/><p>{nativeStatus?.phase === 'installing' ? t(`settings.about.status.installing.${nativeStatus.stage}`) : updates.nativeError || text('handoffNote')}</p></div><p className="text-sm text-muted-foreground">{text('handoffNote')}</p></div>}

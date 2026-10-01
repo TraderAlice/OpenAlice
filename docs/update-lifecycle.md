@@ -75,6 +75,21 @@ its own discovery request state machine; `useVersionDiscovery` is removed.
 Project status and preference responses are also fenced by connection generation.
 Native client status is independent of the selected backend.
 
+The client version enters through the existing compiled `CLI_VERSION` product
+version. `ClientUpdateService` owns that value; discovery adapters report release
+observations, not replacement current identities. Electron uses the same value
+for native discovery, journals, restart verification and integrated readiness.
+Electron's engine version is never a product version. Source desktop discovery
+reports the dev channel and has no native installation authority.
+
+Each desktop window owns one client update service. Both relay creation paths
+receive that instance, so HTTP and preload IPC share policy, observation, timer
+and version. Demo also uses the service with an unsupported discovery adapter.
+The overview does not substitute the renderer bundle version when client status
+is unavailable. Existing startup acceptance compares the actual IPC/HTTP
+identity and policy; integrated PTY acceptance also compares the backend version
+with the product package, without mocking Electron's version API.
+
 ## Project commands and UI entry
 
 `WorkspaceUpdateService.check()` observes AQ/AP stable upstream releases even

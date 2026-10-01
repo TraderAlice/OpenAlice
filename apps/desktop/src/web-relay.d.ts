@@ -1,6 +1,6 @@
 /** Types for the CLI relay bundled into dist/electron/web-relay.js. */
 export declare class WebRelay {
-  constructor(options?: { port?: number; uiRoot?: string })
+  constructor(options?: { port?: number; uiRoot?: string; clientUpdates?: ClientUpdateService })
   readonly originUrl: string
   readonly status: {
     schemaVersion: 1
@@ -28,13 +28,16 @@ export declare function readStartupTarget(options?: { legacyDesktopPreferencePat
 export declare function writeStartupTarget(target: { machine: string; project: string } | null, options?: { current?: () => boolean }): Promise<void>
 
 export declare class ClientUpdateService {
-  constructor(options?: { path?: string; kind?: 'cli' | 'desktop'; currentVersion?: string; discover?: () => Promise<import('@traderalice/update-lifecycle').ClientReleaseObservation> })
+  readonly currentVersion: string
+  constructor(options?: { path?: string; kind?: 'cli' | 'desktop'; discover?: (currentVersion: string) => Promise<Omit<import('@traderalice/update-lifecycle').ClientReleaseObservation, 'currentVersion'>> })
   snapshot(): Promise<import('@traderalice/update-lifecycle').ClientUpdateSnapshot>
   check(): Promise<import('@traderalice/update-lifecycle').ClientUpdateSnapshot>
   activate(): void
   stop(): void
   savePreferences(input: unknown): Promise<import('@traderalice/update-lifecycle').ClientUpdateSnapshot>
 }
+
+export declare const CLI_VERSION: string
 
 export declare class UpdateControlService {
   constructor(options: {

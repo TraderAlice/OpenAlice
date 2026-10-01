@@ -34,7 +34,7 @@ export interface AutoUpdateHooks {
   onInstallFailure?: (error: Error) => Promise<void> | void
 }
 
-export function configureAutoUpdate(win: BrowserWindow, hooks: AutoUpdateHooks): { discover(): Promise<ClientReleaseObservation>; install(expectedVersion?: string): Promise<{ ok: boolean }>; downloaded(): string | null } {
+export function configureAutoUpdate(win: BrowserWindow, hooks: AutoUpdateHooks, currentVersion: string): { discover(): Promise<ClientReleaseObservation>; install(expectedVersion?: string): Promise<{ ok: boolean }>; downloaded(): string | null } {
   let downloadedVersion: string | null = null
   let availableVersion: string | null = null
   let checkedRelease: { version: string; available: boolean } | null = null
@@ -101,7 +101,7 @@ export function configureAutoUpdate(win: BrowserWindow, hooks: AutoUpdateHooks):
 
   const controls = { install: (expectedVersion?: string) => install(expectedVersion), downloaded: () => downloadedVersion, discover: async (): Promise<ClientReleaseObservation> => {
     const result = await checkForUpdates()
-    const base = { currentVersion: app.getVersion(), channel: app.getVersion().includes('-') ? 'beta' : 'stable' }
+    const base = { currentVersion, channel: !app.isPackaged ? 'dev' : currentVersion.includes('-') ? 'beta' : 'stable' }
     if (!result.supported) return { ...base, status: 'unsupported', message: result.reason }
     if (latestStatus?.phase === 'error') throw new Error(latestStatus.message)
     if (!checkedRelease) throw new Error('Native updater returned no release identity')
@@ -168,8 +168,8 @@ export function configureAutoUpdate(win: BrowserWindow, hooks: AutoUpdateHooks):
 
   autoUpdater.autoDownload = true
   autoUpdater.autoInstallOnAppQuit = false
-  autoUpdater.allowPrerelease = app.getVersion().includes('-')
-  autoUpdater.channel = channelForVersion(app.getVersion(), process.platform, process.arch)
+  autoUpdater.allowPrerelease = currentVersion.includes('-')
+  autoUpdater.channel = channelForVersion(currentVersion, process.platform, process.arch)
   autoUpdater.allowDowngrade = false
 
   autoUpdater.on('error', (err) => {
@@ -192,7 +192,7 @@ export function configureAutoUpdate(win: BrowserWindow, hooks: AutoUpdateHooks):
   autoUpdater.on('update-not-available', (info) => {
     console.log(`[updater] no update available (latest=${info.version})`)
     checkedRelease = { version: info.version, available: false }
-    sendStatus({ phase: 'current', version: app.getVersion() })
+    sendStatus({ phase: 'current', version: currentVersion })
   })
 
   autoUpdater.on('download-progress', (progress) => {

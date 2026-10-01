@@ -64,7 +64,7 @@ import { exitDesktopProcess } from './app-exit.js'
 import { createAppWindow } from './app-window.js'
 import { configureWindowLifecycle, showAppWindow } from './window-lifecycle.js'
 import type { CompanionHandle } from './companion.js'
-import { UpdateControlService, ClientUpdateService, WebRelay, readStartupTarget, writeStartupTarget, resolveLocalStartupHome, inspectLocalMachine } from './web-relay.js'
+import { CLI_VERSION, UpdateControlService, ClientUpdateService, WebRelay, readStartupTarget, writeStartupTarget, resolveLocalStartupHome, inspectLocalMachine } from './web-relay.js'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = dirname(__filename)
@@ -331,11 +331,16 @@ async function waitForUTA(utaUrl: string, timeoutMs = UTA_READY_TIMEOUT_MS): Pro
 
 async function runRendererPtySmoke(win: BrowserWindow): Promise<void> {
   const keepWorkspace = process.env['OPENALICE_ELECTRON_SMOKE_KEEP_WORKSPACE'] === '1'
+  const expectedVersion = JSON.parse(await readFile(resolve(__dirname, '../../package.json'), 'utf8')).version
   const result = await win.webContents.executeJavaScript(`(async () => {
     const stage = (value) => console.warn('[desktop-pty-smoke] renderer stage=' + value)
     stage('bridge')
     const bridge = window.openAlice?.pty
     if (!bridge) throw new Error('window.openAlice.pty missing')
+    const client = await window.openAlice.clientUpdates.status()
+    const backend = await fetch('/api/version?currentOnly=1').then(response => response.json())
+    if (client.currentVersion !== ${JSON.stringify(expectedVersion)} || backend.current !== client.currentVersion) throw new Error('Integrated product versions disagree')
+    stage('product-version=' + client.currentVersion)
     const keyboard = window.openAlice?.keyboard
     if (!keyboard?.getInputSourceId) throw new Error('window.openAlice.keyboard missing')
     const keyboardInputSourceId = await keyboard.getInputSourceId()
@@ -512,18 +517,18 @@ async function runRendererOnboardingSmoke(win: BrowserWindow): Promise<void> {
   )
 }
 
-function configureDesktopUpdates(win: BrowserWindow, updateAttemptPath: string): void {
-  const lifecycle = new DesktopUpdateLifecycle(app.getPath('userData'), () => app.getVersion())
+function configureDesktopUpdates(win: BrowserWindow, updateAttemptPath: string): ClientUpdateService {
+  const lifecycle = new DesktopUpdateLifecycle(app.getPath('userData'), () => CLI_VERSION)
   const ready = async () => {
     if (win.isDestroyed()) return false
     if (!await win.webContents.executeJavaScript(`Boolean(window.openAlice?.updater && document.querySelector('[data-testid="activity-bar"]'))`, true)) return false
     if (win.webContents.getURL().startsWith('app://')) {
       const response = await fetchAliceWebRequest(new Request('app://openalice/api/version?currentOnly=1'), alice)
-      return response.ok && (await response.json()).current === app.getVersion()
+      return response.ok && (await response.json()).current === CLI_VERSION
     }
     return true
   }
-  const resume = () => { void lifecycle.resume(ready).then(async result => { if (result?.phase === 'succeeded') await inspectPreviousUpdateAttempt(updateAttemptPath, app.getVersion()) }).catch(error => console.warn('[updater] recovery:', error)) }
+  const resume = () => { void lifecycle.resume(ready).then(async result => { if (result?.phase === 'succeeded') await inspectPreviousUpdateAttempt(updateAttemptPath, CLI_VERSION) }).catch(error => console.warn('[updater] recovery:', error)) }
   win.webContents.on('did-finish-load', resume)
   resume()
   ipcMain.removeHandler('openalice:updates:operation')
@@ -536,10 +541,10 @@ function configureDesktopUpdates(win: BrowserWindow, updateAttemptPath: string):
     },
     beforeInstall: async (version, report) => {
       await recordUpdateAttempt(updateAttemptPath, {
-        fromVersion: app.getVersion(),
+        fromVersion: CLI_VERSION,
         toVersion: version,
       })
-      desktopDiagnostics?.write('updater', `starting ${app.getVersion()} -> ${version}`)
+      desktopDiagnostics?.write('updater', `starting ${CLI_VERSION} -> ${version}`)
       report('stopping-services')
       await stopChildren()
       updateStoppedServices = true
@@ -569,7 +574,7 @@ function configureDesktopUpdates(win: BrowserWindow, updateAttemptPath: string):
         app.exit(1)
       }
     },
-  })
+  }, CLI_VERSION)
   const control = new UpdateControlService({
     root: app.getPath('userData'),
     scope: () => win.webContents.getURL().startsWith('app://') ? `integrated:${process.env['OPENALICE_HOME'] ?? 'local'}` : `${desktopRelay?.status.target?.machine ?? 'none'}:${desktopRelay?.status.target?.project ?? 'none'}`,
@@ -582,7 +587,7 @@ function configureDesktopUpdates(win: BrowserWindow, updateAttemptPath: string):
       return response.json()
     },
     backend: { plan: () => { const target = desktopRelay?.status.target; if (!target || target.machine === 'local') throw new Error('This backend updates with its installation owner'); return desktopRelay!.planMachine({ mode: 'upgrade', machineKey: target.machine, projectKey: target.project }) }, apply: id => desktopRelay!.applyMachine(id) },
-    client: { current: () => app.getVersion(), downloaded: nativeUpdates.downloaded, install: nativeUpdates.install, ready },
+    client: { current: () => CLI_VERSION, downloaded: nativeUpdates.downloaded, install: nativeUpdates.install, ready },
   })
   ipcMain.handle('openalice:updates:abandon', async () => {
     if (await control.status()) await control.abandon()
@@ -593,7 +598,7 @@ function configureDesktopUpdates(win: BrowserWindow, updateAttemptPath: string):
   ipcMain.handle('openalice:updates:approve', (_event, plan, fingerprint) => control.approve(plan, fingerprint))
   ipcMain.handle('openalice:updates:resume', () => { void control.status().then(current => current ? control.resume() : lifecycle.resume(ready)).catch(error => console.warn('[updates] continuation failed:', error)); return { accepted: true } })
   const clientUpdates = new ClientUpdateService({
-    kind: 'desktop', currentVersion: app.getVersion(),
+    kind: 'desktop',
     path: join(app.getPath('userData'), 'client-updates.json'),
     discover: nativeUpdates.discover,
   })
@@ -602,6 +607,7 @@ function configureDesktopUpdates(win: BrowserWindow, updateAttemptPath: string):
   ipcMain.handle('openalice:client-updates:activate', () => { clientUpdates.activate(); resume() })
   ipcMain.handle('openalice:client-updates:preferences', (_event, input: unknown) => clientUpdates.savePreferences(input))
   win.once('closed', () => clientUpdates.stop())
+  return clientUpdates
 }
 
 /** Before any local home is selected or locked, the desktop can be a client
@@ -609,10 +615,11 @@ function configureDesktopUpdates(win: BrowserWindow, updateAttemptPath: string):
  * and update IPC. Project-owned file/PT Y capabilities are never registered. */
 async function startDesktopLauncher(repoRoot: string, updateAttemptPath: string, startupError?: unknown): Promise<void> {
   localRuntimeSuspended = true
-  const relay = new WebRelay({ uiRoot: app.isPackaged ? join(process.resourcesPath, 'runtime', 'ui', 'dist') : join(repoRoot, 'ui', 'dist') })
+  const { window: win, companion } = createAppWindow(resolve(__dirname, 'preload.js'))
+  const clientUpdates = configureDesktopUpdates(win, updateAttemptPath)
+  const relay = new WebRelay({ clientUpdates, uiRoot: app.isPackaged ? join(process.resourcesPath, 'runtime', 'ui', 'dist') : join(repoRoot, 'ui', 'dist') })
   desktopRelay = relay
   await relay.listen()
-  const { window: win, companion } = createAppWindow(resolve(__dirname, 'preload.js'))
   createTray(win, companion)
   companion?.configureActivity({
     identity: () => !relay.status.switching && relay.status.target ? JSON.stringify([relay.originUrl, relay.status.generation, relay.status.target.machine, relay.status.target.project]) : null,
@@ -671,7 +678,6 @@ async function startDesktopLauncher(repoRoot: string, updateAttemptPath: string,
     relay.disconnect()
     await win.loadURL(relay.originUrl)
   }))
-  configureDesktopUpdates(win, updateAttemptPath)
   if (startupError) relay.setStartupError(startupError)
   else {
     const recent = await relay.startupPreference()
@@ -682,12 +688,17 @@ async function startDesktopLauncher(repoRoot: string, updateAttemptPath: string,
   console.log(`[guardian] desktop client shell ready → ${relay.originUrl}`)
   if (process.env['OPENALICE_ELECTRON_SMOKE_STARTUP'] === '1') {
     try {
+      const expectedVersion = JSON.parse(await readFile(join(repoRoot, 'package.json'), 'utf8')).version
       const result = await win.webContents.executeJavaScript(`(async () => {
         const deadline = Date.now() + 15000
         while (!document.querySelector('h1') && Date.now() < deadline) await new Promise(resolve => setTimeout(resolve, 50))
         const bridge = window.openAlice
         if (!document.querySelector('h1') || !bridge?.desktopConnection || !bridge?.desktopMachine) throw new Error('Startup chooser or client controls missing')
         if (bridge.runtime || bridge.pty || bridge.dataHome) throw new Error('Project-owned IPC leaked into startup shell')
+        const client = await bridge.clientUpdates.savePreferences({ autoCheck: false })
+        const httpClient = await fetch('/relay/v1/updates').then(response => response.json())
+        if (client.kind !== 'desktop' || client.currentVersion !== ${JSON.stringify(expectedVersion)}) throw new Error('Desktop product identity differs from its package')
+        if (httpClient.kind !== client.kind || httpClient.currentVersion !== client.currentVersion || httpClient.preferences.autoCheck !== false) throw new Error('HTTP and IPC client owners diverged')
         const connected = ${JSON.stringify(process.env['OPENALICE_ACCEPTANCE_CONNECTED'] === '1')}
         const status = await bridge.desktopConnection.status()
         const recent = await bridge.desktopConnection.startupTarget()
@@ -700,7 +711,7 @@ async function startDesktopLauncher(repoRoot: string, updateAttemptPath: string,
           if (native && native.phase !== 'succeeded') throw new Error('Separated native readiness not verified')
         }
         if (document.querySelector('[data-testid="first-run-guide"]')) throw new Error('Legacy wizard mounted')
-        return { heading: document.querySelector('h1').textContent, recent }
+        return { heading: document.querySelector('h1').textContent, recent, version: client.currentVersion }
       })()`)
       if (alice || uta || connector || guardianRuntimeLock) throw new Error('Startup shell acquired local project ownership')
       console.log('[guardian] renderer startup smoke passed ' + JSON.stringify(result))
@@ -713,10 +724,10 @@ async function startDesktopLauncher(repoRoot: string, updateAttemptPath: string,
 
 app.whenReady().then(async () => {
   desktopDiagnostics = new DesktopDiagnostics(join(app.getPath('logs'), 'desktop.log'))
-  desktopDiagnostics.write('desktop', `starting OpenAlice ${app.getVersion()} pid=${process.pid}`)
+  desktopDiagnostics.write('desktop', `starting OpenAlice ${CLI_VERSION} pid=${process.pid}`)
   const updateAttemptPath = join(app.getPath('userData'), UPDATE_ATTEMPT_FILE)
   try {
-    const previousUpdate = await inspectPreviousUpdateAttempt(updateAttemptPath, app.getVersion(), { ready: false })
+    const previousUpdate = await inspectPreviousUpdateAttempt(updateAttemptPath, CLI_VERSION, { ready: false })
     if (previousUpdate.kind === 'succeeded') {
       desktopDiagnostics.write(
         'updater',
@@ -730,7 +741,7 @@ app.whenReady().then(async () => {
       dialog.showErrorBox(
         'OpenAlice update did not finish',
         `The previous update to OpenAlice ${previousUpdate.attempt.toVersion} did not complete. ` +
-          `OpenAlice is still running ${app.getVersion()}.\n\n` +
+          `OpenAlice is still running ${CLI_VERSION}.\n\n` +
           `You can retry from Settings, or install the release manually.\n\nDiagnostic log:\n${desktopDiagnostics.path}`,
       )
     }
@@ -1227,6 +1238,7 @@ app.whenReady().then(async () => {
       desktopDiagnostics?.write('startup', startupMemoryError)
     }
   }
+  const clientUpdates = configureDesktopUpdates(win, updateAttemptPath)
   let relayOpening: Promise<WebRelay> | null = null
   const ensureRelay = (): Promise<WebRelay> => {
     if (!relayOpening) {
@@ -1234,7 +1246,7 @@ app.whenReady().then(async () => {
         const uiRoot = app.isPackaged
           ? join(process.resourcesPath, 'runtime', 'ui', 'dist')
           : join(repoRoot, 'ui', 'dist')
-        const relay = new WebRelay({ uiRoot })
+        const relay = new WebRelay({ uiRoot, clientUpdates })
         await relay.listen()
         desktopRelay = relay
         return relay
@@ -1553,8 +1565,6 @@ app.whenReady().then(async () => {
   })
   await win.loadURL('app://openalice/')
   if (integratedProject) await rememberLocalSelection()
-
-  configureDesktopUpdates(win, updateAttemptPath)
 
 }).catch((error) => {
   const message = error instanceof Error ? error.stack ?? error.message : String(error)

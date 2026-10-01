@@ -24,14 +24,13 @@ export async function readClientUpdatePreferences(path = clientUpdatePreferences
 export interface ClientUpdateServiceOptions {
   path?: string
   kind?: 'cli' | 'desktop'
-  currentVersion?: string
-  discover?: () => Promise<ClientReleaseObservation>
+  discover?: (currentVersion: string) => Promise<Omit<ClientReleaseObservation, 'currentVersion'>>
 }
 export class ClientUpdateService {
   private readonly discovery = new DiscoveryStore<ClientReleaseObservation>({ successTtlMs: INTERVAL, errorTtlMs: 60_000 })
   private readonly path: string
   private readonly kind: 'cli' | 'desktop'
-  private readonly currentVersion: string
+  readonly currentVersion = CLI_VERSION
   private readonly discover: () => Promise<ClientReleaseObservation>
   private writes: Promise<unknown> = Promise.resolve()
   private timer: ReturnType<typeof setInterval> | null = null
@@ -39,15 +38,15 @@ export class ClientUpdateService {
   constructor(options: ClientUpdateServiceOptions = {}) {
     this.path = options.path ?? clientUpdatePreferencesPath()
     this.kind = options.kind ?? 'cli'
-    this.currentVersion = options.currentVersion ?? CLI_VERSION
-    this.discover = options.discover ?? (async () => {
+    const discover = options.discover ?? (async () => {
       const result = await checkForUpdate({ currentVersion: this.currentVersion })
       // Project/UI consumers receive observations, never installer commands.
       return { status: result.status === 'available' || result.status === 'current' ? result.status : 'unsupported',
-        currentVersion: this.currentVersion, channel: result.channel ?? 'unknown',
+        channel: result.channel ?? 'unknown',
         latestVersion: result.latestVersion, latestCommit: 'latestCommit' in result ? result.latestCommit : undefined,
         releaseNotesUrl: result.releaseNotesUrl, message: result.message }
     })
+    this.discover = async () => ({ ...await discover(this.currentVersion), currentVersion: this.currentVersion })
   }
   async snapshot(): Promise<ClientUpdateSnapshot> {
     return { kind: this.kind, currentVersion: this.currentVersion,

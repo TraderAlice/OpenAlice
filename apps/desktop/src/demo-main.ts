@@ -5,6 +5,7 @@ import { mkdtempSync, mkdirSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { ClientUpdateService } from './web-relay.js'
 import { runDemoSmoke } from './demo-smoke.js'
 import { createAppWindow } from './app-window.js'
 import { fetchAliceWebRequest, handleOpenAliceIpcMessage, registerOpenAliceIpc } from './ipc.js'
@@ -70,18 +71,15 @@ void app.whenReady().then(async () => {
     schemaVersion: 1, generation: 0, target: { machine: 'demo', project: 'isolated-demo' }, switching: false,
   }))
   ipcMain.handle('openalice:updater:get-status', () => null)
-  let clientPreferences = { autoCheck: true }
-  const clientSnapshot = () => ({ kind: 'desktop', currentVersion: app.getVersion(), preferences: clientPreferences,
-    discovery: { value: { status: 'unsupported', currentVersion: app.getVersion(), channel: 'demo', message: 'Demo mode' },
-      checking: false, error: null, checkedAt: null, succeededAt: null } })
-  ipcMain.handle('openalice:client-updates:status', clientSnapshot)
-  ipcMain.handle('openalice:client-updates:check', clientSnapshot)
-  ipcMain.handle('openalice:client-updates:activate', () => undefined)
-  ipcMain.handle('openalice:client-updates:preferences', (_event, input: unknown) => {
-    if (!input || typeof input !== 'object' || !('autoCheck' in input) || typeof input.autoCheck !== 'boolean') throw new Error('Invalid client update preferences')
-    clientPreferences = { autoCheck: input.autoCheck }
-    return clientSnapshot()
+  const clientUpdates = new ClientUpdateService({
+    kind: 'desktop', path: join(app.getPath('userData'), 'client-updates.json'),
+    discover: async () => ({ status: 'unsupported', channel: 'demo', message: 'Demo mode' }),
   })
+  ipcMain.handle('openalice:client-updates:status', () => clientUpdates.snapshot())
+  ipcMain.handle('openalice:client-updates:check', () => clientUpdates.check())
+  ipcMain.handle('openalice:client-updates:activate', () => clientUpdates.activate())
+  ipcMain.handle('openalice:client-updates:preferences', (_event, input: unknown) => clientUpdates.savePreferences(input))
+  app.once('before-quit', () => clientUpdates.stop())
   for (const action of ['install-and-restart', 'open-release']) {
     ipcMain.handle(`openalice:updater:${action}`, () => { throw new Error('Unavailable in demo mode') })
   }

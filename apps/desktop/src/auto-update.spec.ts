@@ -12,7 +12,7 @@ const mocks = vi.hoisted(() => {
       | { enabled: false; reason: 'missing-config'; configPath: string },
     app: {
       isPackaged: false,
-      getVersion: vi.fn(() => '0.0.0'),
+      getVersion: vi.fn(() => '39.8.10'),
     },
     ipcMain: {
       removeHandler: vi.fn((channel: string) => handlers.delete(channel)),
@@ -77,7 +77,7 @@ describe('configureAutoUpdate', () => {
   })
 
   it('keeps updater IPC stable when the updater engine is disabled', async () => {
-    const controls = configureAutoUpdate({} as never, { beforeInstall: vi.fn(async () => {}) })
+    const controls = configureAutoUpdate({} as never, { beforeInstall: vi.fn(async () => {}) }, '0.94.1-beta.2')
 
     expect([...mocks.handlers.keys()]).toEqual([
       'openalice:updater:get-status',
@@ -90,7 +90,7 @@ describe('configureAutoUpdate', () => {
     const install = mocks.handlers.get('openalice:updater:install-and-restart')
     const openRelease = mocks.handlers.get('openalice:updater:open-release')
     expect(await getStatus?.()).toBeNull()
-    await expect(controls.discover()).resolves.toMatchObject({ status: 'unsupported', message: 'not-packaged' })
+    await expect(controls.discover()).resolves.toMatchObject({ status: 'unsupported', message: 'not-packaged', currentVersion: '0.94.1-beta.2', channel: 'dev' })
     await expect(install?.()).rejects.toThrow('No downloaded update is ready to install.')
     await openRelease?.({}, undefined)
     expect(mocks.shell.openExternal)
@@ -108,7 +108,7 @@ describe('configureAutoUpdate', () => {
 
     const controls = configureAutoUpdate({ isDestroyed: () => false, webContents: { send: vi.fn() } } as never, {
       beforeInstall: vi.fn(async () => {}),
-    })
+    }, '0.94.1')
 
     expect(mocks.handlers.has('openalice:updater:check-for-updates')).toBe(false)
     const manual = controls.discover()
@@ -124,7 +124,6 @@ describe('configureAutoUpdate', () => {
 
   it('reports visible install stages before handing off to the native updater', async () => {
     mocks.app.isPackaged = true
-    mocks.app.getVersion.mockReturnValue('0.87.0-beta')
     mocks.capability = { enabled: true, configPath: '/Applications/OpenAlice.app/app-update.yml' }
     const send = vi.fn()
     const setProgressBar = vi.fn()
@@ -137,7 +136,7 @@ describe('configureAutoUpdate', () => {
       isDestroyed: () => false,
       setProgressBar,
       webContents: { send },
-    } as never, { beforeInstall, onInstallHandoff })
+    } as never, { beforeInstall, onInstallHandoff }, '0.87.0-beta')
 
     mocks.listeners.get('update-available')?.({ version: '0.88.0-beta' })
     mocks.listeners.get('download-progress')?.({ percent: 42.4 })
@@ -168,7 +167,7 @@ describe('configureAutoUpdate', () => {
     } as never, {
       beforeInstall: vi.fn(async () => {}),
       onInstallFailure,
-    })
+    }, '0.87.0-beta')
     mocks.listeners.get('update-downloaded')?.({ version: '0.88.0-beta' })
     mocks.autoUpdater.quitAndInstall.mockImplementationOnce(() => {
       throw new Error('ShipIt refused the update')
