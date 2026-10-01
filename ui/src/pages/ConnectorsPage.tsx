@@ -1,3 +1,4 @@
+import { DetailsSummary } from '../components/ui/collapsible'
 import { Checkbox } from '@/components/ui/checkbox'
 import { useCallback, useEffect, useMemo, useRef, useState, type MutableRefObject, type ReactNode } from 'react'
 import type { TFunction } from 'i18next'
@@ -1555,11 +1556,10 @@ function SetupStatePanel({
             <span>{t('connectorSettings.testSent', { name: definition.label })}</span>
           </div>
           <details data-connector-test-details className="group/details mt-1 pl-5 text-[11.5px] text-muted-foreground">
-            <summary className="oa-pressable flex h-8 w-fit cursor-pointer list-none items-center gap-2 font-medium hover:text-foreground">
-              <ListChecks size={13} aria-hidden />
+            <DetailsSummary>
               {t('connectorSettings.testDetails')}
-            </summary>
-            <div className="mb-1 break-words pl-5 leading-5">
+            </DetailsSummary>
+            <div className="mb-1 break-words leading-5">
               {t('connectorSettings.deliveryReference')}{' '}
               <code className="break-all font-mono text-foreground/80">{actionFeedback.probeId}</code>
             </div>

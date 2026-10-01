@@ -9,7 +9,7 @@ import { RelayConnectionChooser } from '../RelayConnectionChooser'
 import { Button } from '../ui/button'
 import { ConfigSection } from '../form'
 import { StatusIndicator } from '../motion/StatusIndicator'
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '../ui/collapsible'
+import { Collapsible, CollapsibleContent, CollapsibleDetailsTrigger } from '../ui/collapsible'
 
 /** The relay owns Machine identity; the backend owns AliceProject identity. */
 export function AliceLocationSection() {
@@ -89,11 +89,9 @@ export function AliceLocationSection() {
       {switchError && <p role="alert" className="py-2 text-sm text-destructive">{switchError}</p>}
 
       <Collapsible open={showDetails} onOpenChange={setShowDetails}>
-        <CollapsibleTrigger type="button" className="group flex min-h-11 w-full items-center gap-2 py-2 text-left text-sm text-muted-foreground hover:text-foreground focus-visible:rounded-sm focus-visible:outline-none focus-visible:[box-shadow:var(--oa-focus-shadow)]"
-          aria-expanded={showDetails} aria-controls={detailsId}>
-          <ChevronRight className="size-4 shrink-0 transition-transform duration-[var(--motion-fast)] group-aria-expanded:rotate-90 motion-reduce:transition-none" aria-hidden />
+        <CollapsibleDetailsTrigger aria-controls={detailsId}>
           {t('settings.backendConnection.details')}
-        </CollapsibleTrigger>
+        </CollapsibleDetailsTrigger>
         <CollapsibleContent id={detailsId}>
           <div className="min-w-0 border-t border-border/60 py-3">
             <dl className="grid min-w-0 gap-x-6 gap-y-3 text-sm sm:grid-cols-2">

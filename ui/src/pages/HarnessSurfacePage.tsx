@@ -1,3 +1,4 @@
+import { DetailsSummary } from '../components/ui/collapsible'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Bot, MoreHorizontal, ExternalLink, Loader2, RefreshCw, RotateCcw, ScrollText } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
@@ -101,9 +102,9 @@ export function HarnessSurfacePage({
             <div className="mt-3 rounded-lg border border-border bg-muted/30 p-3">
               <p className="break-words font-mono text-xs text-foreground">{error}</p>
               <details className="mt-2" open>
-                <summary className="cursor-pointer text-xs font-medium text-muted-foreground">
+                <DetailsSummary>
                   {t('harnessSurface.studioOutput')}
-                </summary>
+                </DetailsSummary>
                 <pre className="mt-2 max-h-48 overflow-auto whitespace-pre-wrap break-words rounded-md bg-background p-3 text-xs text-muted-foreground">
                   {logs || t('harnessSurface.noLogs')}
                 </pre>

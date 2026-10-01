@@ -1,3 +1,4 @@
+import { DetailsSummary } from '../ui/collapsible'
 import { useProviderModels } from '../../hooks/useProviderModels'
 /**
  * Per-workspace settings modal.
@@ -1165,9 +1166,9 @@ export function WorkspaceAIConfigModal({
 
             {modelRegistration?.reasoning === true && !selectedModelSemantics?.reasoning && (
               <details className="mt-2 rounded-md border border-border bg-secondary/40 px-3 py-2">
-                <summary className="cursor-pointer text-sm font-medium text-muted-foreground">
+                <DetailsSummary>
                   {t('aiProvider.advancedReasoning')}
-                </summary>
+                </DetailsSummary>
                 <div className="mt-2 space-y-1.5">
                   <select
                     aria-label={t('workspaceSettings.ai.reasoningOverrideLabel', { agent: TAB_LABEL[tab] })}
@@ -1219,9 +1220,9 @@ export function WorkspaceAIConfigModal({
 
           {(tab === 'codex' || tab === 'opencode' || tab === 'pi') && (
             <details className="rounded-md border border-border bg-secondary/40 px-3 py-2.5">
-              <summary className="cursor-pointer text-sm font-medium text-muted-foreground">
+              <DetailsSummary>
                 {t('workspaceSettings.ai.protocolDetails')}
-              </summary>
+              </DetailsSummary>
               <div className="mt-2 space-y-2 border-t border-border/60 pt-2 text-sm leading-relaxed text-muted-foreground">
                 {tab === 'codex' ? (
                   <p>{t('workspaceSettings.ai.codexResponsesOnly')}</p>

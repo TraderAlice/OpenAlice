@@ -988,3 +988,19 @@ Settings overview sections share the ConfigSection surface and a 24px section
 gap. Version rows reserve explicit identity, status, and action columns on wide
 containers. Disclosure controls use fixed-size chevrons and the shared
 Collapsible timing, keyboard, and reduced-motion behavior.
+
+
+### Text-aligned detail controls
+
+`CollapsibleDetailsTrigger` and `DetailsSummary` share the disclosure-row
+geometry in `index.css`. Labels align with their owning content edge in default,
+hover, focus, and expanded states. The 8px surface inset extends outside that
+edge, and a fixed 16px trailing chevron remains vertically centered. Rows retain
+a 44px minimum hit area, wrap long labels, and use a quiet neutral surface.
+
+Project details, location details, update preferences, market configuration,
+connector diagnostics, session diagnostics, credential details, startup forms,
+and developer release panels use this owner. Native disclosures retain their
+HTML state and keyboard behavior. Controlled disclosures retain Base UI panel
+measurement and focus behavior. Chevron rotation follows the shared motion
+timing and settles immediately for keyboard focus and reduced motion.

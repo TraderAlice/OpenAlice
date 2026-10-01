@@ -143,7 +143,6 @@ describe('Connector demo routes', () => {
     const diagnostics = (await screen.findByText('Technical details')).closest('details') as HTMLDetailsElement
     expect(diagnostics.open).toBe(false)
     const diagnosticSummary = within(diagnostics).getByText('Technical details').closest('summary') as HTMLElement
-    expect(diagnosticSummary.className).toContain('min-h-10')
     fireEvent.click(diagnosticSummary)
     expect(diagnostics.open).toBe(true)
     fireEvent.click(await screen.findByRole('button', { name: 'Reconnect' }))
@@ -179,7 +178,6 @@ describe('Connector demo routes', () => {
     const diagnostics = within(lifecycle).getByText('Technical details').closest('details') as HTMLDetailsElement
     expect(diagnostics.open).toBe(false)
     expect(within(diagnostics).getByText('offline')).toBeTruthy()
-    expect(within(diagnostics).getByText('Technical details').closest('summary')?.className).toContain('min-h-10')
     expect(reconnect.className).toContain('h-8')
     fireEvent.click(reconnect)
 

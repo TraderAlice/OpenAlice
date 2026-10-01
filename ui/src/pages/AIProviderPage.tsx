@@ -1,3 +1,4 @@
+import { DetailsSummary } from '../components/ui/collapsible'
 /**
  * AI Provider — Alice's credential vault.
  *
@@ -496,7 +497,7 @@ function WorkspaceDefaultsSection({
           )}
           {(agent.id === 'pi' || agent.id === 'opencode') && current && !selectedSemantics?.reasoning && (
             <details className="px-1 text-sm text-muted-foreground">
-              <summary className="inline-flex min-h-8 cursor-pointer items-center">{t('aiProvider.advancedReasoning')}</summary>
+              <DetailsSummary>{t('aiProvider.advancedReasoning')}</DetailsSummary>
               <select
                 aria-label={t('aiProvider.reasoningOverrideLabel', { agent: agent.name })}
                 className={`${inputClass} mt-1.5`}

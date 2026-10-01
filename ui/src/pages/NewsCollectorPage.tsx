@@ -1,11 +1,11 @@
 import { useMemo, useRef, useState } from 'react'
-import { ChevronDown, Plus, X } from 'lucide-react'
+import { Plus, X } from 'lucide-react'
 import { type AppConfig, type NewsCollectorConfig, type NewsCollectorFeed } from '../api'
 import { SaveIndicator } from '../components/SaveIndicator'
 import { ConfigSection, Field, SettingsScrollArea, inputClass } from '../components/form'
 import { CountBadge } from '../components/CountBadge'
 import { ContextHelp } from '../components/ContextHelp'
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '../components/ui/collapsible'
+import { Collapsible, CollapsibleContent, CollapsibleDetailsTrigger, CollapsibleTrigger } from '../components/ui/collapsible'
 import { Toggle } from '../components/Toggle'
 import { useConfigPage } from '../hooks/useConfigPage'
 import { PageHeader } from '../components/PageHeader'
@@ -134,10 +134,7 @@ function RssHubPresets({ feeds, onChange }: {
 
   return (
     <Collapsible className="mb-4 border-b border-border/60 pb-3">
-      <CollapsibleTrigger render={<Button variant="ghost" className="group/rss -ml-2" />}>
-        RSSHub
-        <ChevronDown aria-hidden className="size-3.5 transition-transform duration-[var(--motion-fast)] group-data-panel-open/rss:rotate-180 motion-reduce:transition-none" />
-      </CollapsibleTrigger>
+      <CollapsibleDetailsTrigger>RSSHub</CollapsibleDetailsTrigger>
       <CollapsibleContent keepMounted>
         <div className="space-y-3 pt-3">
           <p id="rsshub-help" className="text-sm leading-5 text-muted-foreground">

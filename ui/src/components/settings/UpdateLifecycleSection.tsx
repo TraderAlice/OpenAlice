@@ -1,10 +1,10 @@
 import { useState } from 'react'
-import { ChevronDown, RefreshCw } from 'lucide-react'
+import { RefreshCw } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { useUpdateLifecycle, type UpdatePreferences } from '../../hooks/useUpdateLifecycle'
 import { Button } from '../ui/button'
 import { ConfigSection } from '../form'
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '../ui/collapsible'
+import { Collapsible, CollapsibleContent, CollapsibleDetailsTrigger } from '../ui/collapsible'
 import { Toggle } from '../Toggle'
 
 export function UpdateLifecycleSection() {
@@ -25,12 +25,9 @@ export function UpdateLifecycleSection() {
 
   return <ConfigSection title={t('settings.versions.preferences')}>
     <Collapsible>
-    <CollapsibleTrigger className="group flex min-h-11 w-full items-center gap-2 text-left text-sm text-muted-foreground outline-none hover:text-foreground focus-visible:[box-shadow:var(--oa-focus-shadow)]">
-      <ChevronDown className="size-4 shrink-0 -rotate-90 transition-transform duration-[var(--motion-fast)] group-aria-expanded:rotate-0 motion-reduce:transition-none" aria-hidden />
-      <span className="min-w-0">{t('settings.versions.managePreferences')}</span>
-    </CollapsibleTrigger>
+    <CollapsibleDetailsTrigger>{t('settings.versions.managePreferences')}</CollapsibleDetailsTrigger>
     <CollapsibleContent>
-    <div className="rounded-lg border border-border/70 bg-secondary/35 p-4">
+    <div className="mt-3 rounded-lg border border-border/70 bg-secondary/35 p-4">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <p className="max-w-2xl text-xs leading-5 text-muted-foreground">{t('settings.updateLifecycle.description')}</p>
         <Button type="button" size="sm" variant="outline" disabled={updates.checking} onClick={() => void updates.refresh()}>

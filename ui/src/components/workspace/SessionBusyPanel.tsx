@@ -1,3 +1,4 @@
+import { DetailsSummary } from '../ui/collapsible'
 import { useEffect, useRef, useState, type RefObject } from 'react'
 import { useTranslation } from 'react-i18next'
 import { ArrowUpRight, Activity, CalendarDays, Clock3, RefreshCw } from 'lucide-react'
@@ -94,7 +95,7 @@ function SessionBusyPanel({ record, workspaceId, onClose, onOpen, titleRef }: {
       {loading && <p role="status" className="mt-4 text-xs text-muted-foreground">{t('workspace.sessionBusy.loading')}</p>}
       {error && <p role="alert" className="mt-4 text-xs text-destructive">{t('workspace.sessionBusy.unavailable')}</p>}
       <details className="mt-5 text-xs text-muted-foreground">
-        <summary className="cursor-pointer py-1">{t('workspace.sessionBusy.details')}</summary>
+        <DetailsSummary>{t('workspace.sessionBusy.details')}</DetailsSummary>
         <p className="break-all py-1">{t('workspace.sessionBusy.identity')}: {record.resumeId}</p>
         <p className="break-all py-1">{t('workspace.sessionBusy.task')}: {run?.taskId ?? unknown}</p>
       </details>

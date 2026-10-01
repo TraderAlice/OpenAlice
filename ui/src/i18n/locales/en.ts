@@ -2036,7 +2036,7 @@ export const en = {
       porcelain: 'Cool, crisp workspace',
       linen: 'Oat, ink, and terracotta',
       'windows-classic': 'System silver with navy selection',
-      graphite: 'Deep forest with lime actions',
+      graphite: 'Low-glare neutral dark tones',
       midnight: 'Deep blue night palette',
       moss: 'Forest ink with soft amber',
       iris: 'Violet dusk with cool cyan',

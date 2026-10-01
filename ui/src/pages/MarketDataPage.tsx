@@ -1,11 +1,11 @@
 import { useEffect, useRef, useState } from 'react'
-import { CheckCircle2, ChevronRight, CircleAlert, LoaderCircle, MinusCircle } from 'lucide-react'
+import { CheckCircle2, CircleAlert, LoaderCircle, MinusCircle } from 'lucide-react'
 import { api, type AppConfig } from '../api'
 import { SaveIndicator } from '../components/SaveIndicator'
 import { ConfigSection, SettingsScrollArea, inputClass } from '../components/form'
 import { Toggle } from '../components/Toggle'
 import { ContextHelp } from '../components/ContextHelp'
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '../components/ui/collapsible'
+import { Collapsible, CollapsibleContent, CollapsibleDetailsTrigger } from '../components/ui/collapsible'
 import { useConfigPage } from '../hooks/useConfigPage'
 import { PageHeader } from '../components/PageHeader'
 import { CenteredLoading } from '../components/StateViews'
@@ -492,10 +492,7 @@ function AdvancedSection({
 }) {
   return (
     <Collapsible open={open} onOpenChange={onToggle} className="mb-8">
-      <CollapsibleTrigger render={<Button variant="ghost" size="sm" className="px-1" />}>
-        <ChevronRight aria-hidden className={`size-3.5 ${open ? 'rotate-90' : ''}`} />
-        Advanced
-      </CollapsibleTrigger>
+      <CollapsibleDetailsTrigger>Advanced</CollapsibleDetailsTrigger>
 
       <CollapsibleContent>
         <div className="mt-2 rounded-lg border border-border/70 bg-card px-5">

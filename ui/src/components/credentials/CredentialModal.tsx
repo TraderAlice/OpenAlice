@@ -1,3 +1,4 @@
+import { DetailsSummary } from '../ui/collapsible'
 import { useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { X } from 'lucide-react'
@@ -479,9 +480,9 @@ export function CredentialModal({ mode, cred, presets, agents, initialPresetId, 
               </Field>
 
               {!isDirect && <details className="rounded-lg border border-border bg-secondary/20 px-3 py-2">
-                <summary className="cursor-pointer select-none text-sm text-muted-foreground hover:text-foreground">
+                <DetailsSummary>
                   {t('aiProvider.credentialModal.endpointDetails')}
-                </summary>
+                </DetailsSummary>
                 <div className="mt-2 space-y-1.5 border-t border-border/60 pt-2">
                   {shapes.length === 0 && <p className="text-sm text-muted-foreground">{t('aiProvider.credentialModal.noEndpoint')}</p>}
                   {shapes.map((shape) => (

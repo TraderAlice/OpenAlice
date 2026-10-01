@@ -1,5 +1,5 @@
 import { useEffect, useState, type ReactNode } from 'react'
-import { ArrowRight, ArrowUpCircle, CircleCheck, CircleAlert, CircleHelp, BarChart3, ChevronDown, ExternalLink, FlaskConical, Folder, Info, LoaderCircle, MessageCircle, Monitor, RefreshCw, Server } from 'lucide-react'
+import { ArrowRight, ArrowUpCircle, CircleCheck, CircleAlert, CircleHelp, BarChart3, ExternalLink, FlaskConical, Folder, Info, LoaderCircle, MessageCircle, Monitor, RefreshCw, Server } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import type { Resources } from '../../i18n/locales/en'
 import { useUpdateLifecycle } from '../../hooks/useUpdateLifecycle'
@@ -9,7 +9,7 @@ import { getBackendConnection } from '../../auth/backendConnection'
 import { useBackendRecoverySignal } from '../../auth/AuthContext'
 import { ConfigSection } from '../form'
 import { Button } from '../ui/button'
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '../ui/collapsible'
+import { Collapsible, CollapsibleContent, CollapsibleDetailsTrigger } from '../ui/collapsible'
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '../ui/dialog'
 import { MachineUpgradeDialog } from './MachineUpgradeDialog'
 import { ProjectUpdateReview } from './ProjectUpdateReview'
@@ -84,20 +84,20 @@ export function VersionOverviewSection() {
     <div className="grid grid-cols-[1.5rem_minmax(0,1fr)] items-center gap-x-3 gap-y-3 px-4 py-5 sm:px-5 @3xl:grid-cols-[1.5rem_minmax(0,1fr)_10rem_14rem_7rem]">
       <div className={`self-start pt-0.5 ${available ? 'text-info' : 'text-muted-foreground'}`} aria-hidden>{icon}</div>
       <div className="min-w-0"><h3 className="text-sm font-semibold">{text(kind)}</h3><div className="mt-1 flex flex-wrap items-center gap-2 break-words text-sm text-muted-foreground">{subtitle}</div></div>
-      <span className="col-start-2 min-w-0 break-words text-sm tabular-nums @3xl:col-start-3 @3xl:row-start-1">{identity}</span>
+      {identity && <span className="col-start-2 min-w-0 break-words text-sm tabular-nums @3xl:col-start-3 @3xl:row-start-1">{identity}</span>}
       <span className={`col-start-2 flex items-start gap-1.5 text-sm @3xl:col-start-4 @3xl:row-start-1 ${available ? 'text-info' : status === text('needsAttention') || status === text('checkFailed') ? 'text-warning' : 'text-muted-foreground'}`}>
         {available ? <ArrowUpCircle className="mt-0.5 size-4 shrink-0" aria-hidden /> : status === text('current') ? <CircleCheck className="mt-0.5 size-4 shrink-0 text-success" aria-hidden /> : status === text('needsAttention') || status === text('checkFailed') ? <CircleAlert className="mt-0.5 size-4 shrink-0" aria-hidden /> : <CircleHelp className="mt-0.5 size-4 shrink-0" aria-hidden />}
         <span className="min-w-0">{status}</span>
       </span>
       <div className="col-start-2 flex items-center @3xl:col-start-5 @3xl:row-start-1 @3xl:justify-end">
         {(available || (kind === 'project' && activeOperation)) && <Button size="sm" onClick={action}>{activeOperation && kind === 'project' ? text('viewProgress') : text('viewUpdate')}</Button>}
-        {!available && kind !== 'project' && <Button variant="ghost" size="sm" aria-label={`${text(kind)}: ${text('details')}`} onClick={action}>{text('details')}</Button>}
+        {!available && kind !== 'project' && <Button variant="outline" size="sm" aria-label={`${text(kind)}: ${text('details')}`} onClick={action}>{text('details')}</Button>}
       </div>
     </div>{children}
   </section>
-  const projectDetails = <Collapsible open={expanded} onOpenChange={setExpanded}>
-    <CollapsibleTrigger render={<Button variant="ghost" size="sm" className="mb-3 ml-[52px] sm:ml-14" />}><ChevronDown className={`size-3.5 transition-transform motion-reduce:transition-none ${expanded ? '' : '-rotate-90'}`} />{text('projectDetails')}</CollapsibleTrigger>
-    <CollapsibleContent><div className="mx-4 mb-5 ml-[52px] space-y-4 border-l border-border pl-4 sm:mx-5 sm:ml-14">
+  const projectDetails = <Collapsible open={expanded} onOpenChange={setExpanded} className="mx-4 mb-4 ml-[52px] sm:mx-5 sm:ml-14">
+    <CollapsibleDetailsTrigger>{text('projectDetails')}</CollapsibleDetailsTrigger>
+    <CollapsibleContent><div className="space-y-4 border-l border-border pl-4 pt-4">
       {rows.map(item => <div key={item.kind} className="grid min-w-0 grid-cols-[1rem_minmax(0,1fr)] items-start gap-x-3 gap-y-2 @3xl:grid-cols-[1rem_minmax(0,1fr)_10rem_14rem_7rem]">
         <span className="pt-0.5 text-muted-foreground" aria-hidden>{item.kind === 'chat' ? <MessageCircle className="size-4" /> : item.kind === 'auto-quant' ? <BarChart3 className="size-4" /> : <FlaskConical className="size-4" />}</span>
         <div className="min-w-0"><p className="text-sm font-medium">{item.label}</p>{item.workspace && <div className="mt-1 flex flex-wrap items-center gap-2 text-sm text-muted-foreground"><span>{item.workspace.displayName || item.workspace.tag}</span><span className="rounded-full bg-secondary px-2 py-0.5">{text('defaultWorkspace')}</span></div>}</div>

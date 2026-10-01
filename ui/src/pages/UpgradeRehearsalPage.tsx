@@ -5,7 +5,6 @@ import { identityLabel, type ReleaseChannel } from '@traderalice/update-lifecycl
 import {
   ArrowRight,
   Check,
-  ChevronDown,
   FlaskConical,
   Monitor,
   Package,
@@ -17,7 +16,7 @@ import { Button } from '../components/ui/button'
 import {
   Collapsible,
   CollapsibleContent,
-  CollapsibleTrigger,
+  CollapsibleDetailsTrigger,
 } from '../components/ui/collapsible'
 import { useUpgradeRehearsal } from '../hooks/useUpgradeRehearsal'
 import {
@@ -58,13 +57,10 @@ function Disclosure({
   children: React.ReactNode
 }) {
   return (
-    <Collapsible className="border-t border-border">
-      <CollapsibleTrigger className="flex w-full items-center justify-between gap-3 px-5 py-4 text-left text-sm font-medium">
-        {title}
-        <ChevronDown size={16} />
-      </CollapsibleTrigger>
+    <Collapsible className="border-t border-border px-5 py-2">
+      <CollapsibleDetailsTrigger>{title}</CollapsibleDetailsTrigger>
       <CollapsibleContent>
-        <div className="px-5 pb-5 text-sm text-muted-foreground">
+        <div className="pt-3 pb-3 text-sm text-muted-foreground">
           {children}
         </div>
       </CollapsibleContent>

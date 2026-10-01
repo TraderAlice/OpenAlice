@@ -1750,7 +1750,44 @@ html[lang="ja"] .oa-onboarding-title {
   }
 }
 
-/* Base UI owns measurement and mount lifetime; hidden panels leave the tab order. */
+.oa-disclosure-trigger {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: calc(100% + 16px);
+  min-height: 44px;
+  margin-inline: -8px;
+  padding: 10px 8px;
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--muted) 35%, transparent);
+  color: var(--foreground);
+  font-size: var(--text-sm);
+  font-weight: 500;
+  line-height: 1.5;
+  text-align: start;
+  list-style: none;
+  outline: none;
+  transition: background-color var(--motion-fast) var(--motion-ease-out);
+}
+.oa-disclosure-trigger::-webkit-details-marker { display: none; }
+.oa-disclosure-trigger:focus-visible { box-shadow: var(--oa-focus-shadow); }
+.oa-disclosure-trigger:disabled { opacity: 0.5; }
+.oa-disclosure-trigger:active { background: var(--muted); }
+@media (hover: hover) {
+  .oa-disclosure-trigger:hover { background: var(--muted); }
+}
+.oa-disclosure-chevron {
+  flex: 0 0 16px;
+  width: 16px;
+  height: 16px;
+  color: var(--muted-foreground);
+  transition: transform var(--motion-standard) var(--motion-ease-out);
+}
+.oa-disclosure-trigger[aria-expanded="true"] > .oa-disclosure-chevron,
+details[open] > .oa-disclosure-trigger > .oa-disclosure-chevron { transform: rotate(90deg); }
+.oa-disclosure-trigger:focus-visible > .oa-disclosure-chevron,
+[data-slot="collapsible"][data-instant] > .oa-disclosure-trigger > .oa-disclosure-chevron { transition: none; }
+
 .oa-collapsible-panel {
   height: var(--collapsible-panel-height);
   overflow: hidden;

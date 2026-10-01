@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { Button } from '../../ui/button'
 import {
   Collapsible,
-  CollapsibleTrigger,
+  CollapsibleDetailsTrigger,
   CollapsibleContent,
 } from '../../ui/collapsible'
 import {
@@ -88,9 +88,9 @@ export function ReleasePublisher({
         ))}
       </ol>
       <Collapsible>
-        <CollapsibleTrigger className="text-sm text-muted-foreground">
+        <CollapsibleDetailsTrigger>
           Release history · {publication.records.length}
-        </CollapsibleTrigger>
+        </CollapsibleDetailsTrigger>
         <CollapsibleContent>
           <ul className="mt-3 space-y-3">
             {[...publication.records].reverse().map((r) => (
@@ -105,9 +105,9 @@ export function ReleasePublisher({
                   </span>
                 </div>
                 <Collapsible>
-                  <CollapsibleTrigger className="mt-2 text-muted-foreground">
+                  <CollapsibleDetailsTrigger className="mt-2">
                     {releaseAssets(r).length} artifacts
-                  </CollapsibleTrigger>
+                  </CollapsibleDetailsTrigger>
                   <CollapsibleContent>
                     <div className="mt-2 max-h-48 overflow-auto">
                       {releaseAssets(r).map((name) => (
