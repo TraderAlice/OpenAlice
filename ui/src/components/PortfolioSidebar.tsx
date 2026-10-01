@@ -2,6 +2,7 @@ import { useTranslation } from 'react-i18next'
 import { useTradingConfig } from '../hooks/useTradingConfig'
 import { useWorkspace } from '../tabs/store'
 import { getFocusedTab } from '../tabs/types'
+import { CountBadge } from './CountBadge'
 import { SidebarRow } from './SidebarRow'
 import { SidebarSectionHeader } from './SidebarSectionHeader'
 import { SidebarRowsSkeleton } from './StateViews'
@@ -45,12 +46,8 @@ export function PortfolioSidebar() {
           onClick={() => openOrFocus({ kind: 'trading-as-git', params: {} })}
           trail={
             pendingPush > 0 ? (
-              <span
-                aria-label={t('nav.pendingPush', { count: pendingPush })}
-                className="min-w-[18px] h-[18px] px-1.5 rounded-full bg-destructive text-[10px] leading-[14px] font-semibold text-destructive-foreground tabular-nums flex items-center justify-center"
-              >
-                {pendingPush > 99 ? '99+' : pendingPush}
-              </span>
+              <CountBadge count={pendingPush} limit={99} tone="info"
+                label={t('nav.pendingPush', { count: pendingPush })} />
             ) : undefined
           }
         />
@@ -62,18 +59,20 @@ export function PortfolioSidebar() {
           onClick={() => openOrFocus({ kind: 'portfolio', params: {} })}
         />
 
-        <SidebarSectionHeader>
-          {t('portfolio.accounts')}{!lite && !loading && utas.length > 0 ? ` (${utas.length})` : ''}
+        <SidebarSectionHeader trailing={!lite && !loading && utas.length > 0
+          ? <CountBadge count={utas.length} tone="info" label={`${t('portfolio.accounts')}: ${utas.length}`} />
+          : undefined}>
+          {t('portfolio.accounts')}
         </SidebarSectionHeader>
 
         {lite ? (
-          <p className="px-3 py-2 text-[12px] leading-relaxed text-muted-foreground">
+          <p className="px-3 py-2 text-sm leading-relaxed text-muted-foreground">
             Account drill-down is unavailable in Lite mode.
           </p>
         ) : loading ? (
           <SidebarRowsSkeleton rows={3} />
         ) : utas.length === 0 ? (
-          <p className="px-3 py-2 text-[12px] leading-relaxed text-muted-foreground">
+          <p className="px-3 py-2 text-sm leading-relaxed text-muted-foreground">
             {t('portfolio.noAccountsYet')}
           </p>
         ) : (
@@ -91,7 +90,7 @@ export function PortfolioSidebar() {
                 }
                 trail={
                   !uta.enabled ? (
-                    <span className="text-[10px] font-medium text-muted-foreground">{t('common.off')}</span>
+                    <span className="text-sm font-medium text-muted-foreground">{t('common.off')}</span>
                   ) : undefined
                 }
               />

@@ -1,3 +1,4 @@
+import userEvent from '@testing-library/user-event'
 // @vitest-environment jsdom
 
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
@@ -97,10 +98,12 @@ describe('WorkspaceAIPreferencesPanel', () => {
     expect(screen.queryByRole('tab')).toBeNull()
     expect(screen.getByText('交互式 Session')).toBeTruthy()
     expect(screen.getByText('无头运行')).toBeTruthy()
-    expect((screen.getByRole('combobox', { name: '交互式 Session的默认 Agent Runtime' }) as HTMLSelectElement).value).toBe('pi')
+    expect(screen.getByRole('combobox', { name: '交互式 Session的默认 Agent Runtime' }).textContent).toBe('Pi')
     expect((await screen.findAllByText('DeepSeek API')).length).toBeGreaterThan(0)
     expect(screen.getAllByText('deepseek-v4-flash, high').length).toBeGreaterThan(0)
-    expect(screen.getByRole('option', { name: '跟随最近使用 — Pi' })).toBeTruthy()
+    fireEvent.click(screen.getByRole('combobox', { name: '交互式 Session的默认 Agent Runtime' }))
+    expect(await screen.findByRole('option', { name: '跟随最近使用 — Pi' })).toBeTruthy()
+    fireEvent.keyDown(screen.getByRole('option', { name: '跟随最近使用 — Pi' }), { key: 'Escape' })
     expect(screen.getByText('最近成功使用的 Runtime')).toBeTruthy()
     expect(screen.getByText('当前解析为')).toBeTruthy()
     expect(screen.getByText('固定默认值 · 当前最近使用')).toBeTruthy()
@@ -108,8 +111,9 @@ describe('WorkspaceAIPreferencesPanel', () => {
     expect(screen.getAllByText('使用最近设置').length).toBeGreaterThan(0)
 
     const runtime = screen.getByRole('combobox', { name: '无头运行的默认 Agent Runtime' })
-    expect((runtime as HTMLSelectElement).value).toBe('')
-    fireEvent.change(runtime, { target: { value: 'codex' } })
+    expect(runtime.textContent).toBe('跟随最近使用 — Codex')
+    fireEvent.click(runtime)
+    await userEvent.click(await screen.findByRole('option', { name: 'Codex' }))
 
     await waitFor(() => expect(mocks.updateWorkspaceRuntimeDefaults).toHaveBeenCalledWith(
       'chat-1',
@@ -165,14 +169,15 @@ describe('WorkspaceAIPreferencesPanel', () => {
       />,
     )
 
-    const runtime = screen.getByRole('combobox', { name: '无头运行的默认 Agent Runtime' }) as HTMLSelectElement
-    fireEvent.change(runtime, { target: { value: 'codex' } })
+    const runtime = screen.getByRole('combobox', { name: '无头运行的默认 Agent Runtime' })
+    fireEvent.click(runtime)
+    await userEvent.click(await screen.findByRole('option', { name: 'Codex' }))
 
     expect((await screen.findByRole('alert')).textContent).toContain('保存失败')
-    expect(runtime.value).toBe('')
+    expect(runtime.textContent).toBe('跟随最近使用 — Codex')
 
     fireEvent.click(screen.getByRole('button', { name: '重试' }))
     await waitFor(() => expect(mocks.updateWorkspaceRuntimeDefaults).toHaveBeenCalledTimes(2))
-    await waitFor(() => expect(runtime.value).toBe('codex'))
+    await waitFor(() => expect(runtime.textContent).toBe('Codex'))
   })
 })

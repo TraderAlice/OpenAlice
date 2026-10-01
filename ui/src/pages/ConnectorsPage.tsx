@@ -1,3 +1,5 @@
+import { DetailsSummary } from '../components/ui/collapsible'
+import { Checkbox } from '@/components/ui/checkbox'
 import { useCallback, useEffect, useMemo, useRef, useState, type MutableRefObject, type ReactNode } from 'react'
 import type { TFunction } from 'i18next'
 import { Bot, CheckCircle2, ChevronDown, CircleAlert, ExternalLink, Eye, EyeOff, KeyRound, Link2, ListChecks, Power, RefreshCw, Send, ShieldCheck } from 'lucide-react'
@@ -409,16 +411,16 @@ function ConnectorSettingsSurface({
       {!adapterOnly && (
         <PageHeader
           title={t('connectorSettings.title')}
-          description={t('connectorSettings.description')}
+          help={t('connectorSettings.description')}
           right={<SaveIndicator status={status} onRetry={retry} />}
         />
       )}
 
       <SettingsScrollArea
         scroll={!adapterOnly}
-        className={adapterOnly ? 'px-4 py-3 sm:px-6 sm:py-4' : 'px-4 pb-5 md:px-8'}
+        className={adapterOnly ? 'px-4 py-3 sm:px-6 sm:py-4' : 'py-0 pb-5'}
       >
-        <div className="max-w-[920px] mx-auto">
+        <div className="w-full max-w-[920px]">
           {!adapterOnly && <div data-connector-settings-top-spacer aria-hidden className="h-5" />}
           {!config && !loadError && (
             <ConnectorSettingsSkeleton compact={adapterOnly} label={t('connectorSettings.loading')} />
@@ -466,8 +468,8 @@ function ConnectorSettingsSurface({
                         <Power className="size-4" aria-hidden="true" />
                       </span>
                       <div className="min-w-0">
-                      <h4 className="text-[13px] leading-[18px] font-medium text-foreground">{t('connectorSettings.runService')}</h4>
-                        <p className="mt-0.5 max-w-2xl text-[12px] leading-5 text-muted-foreground">
+                      <h4 className="text-sm leading-5 font-medium text-foreground">{t('connectorSettings.runService')}</h4>
+                        <p className="mt-0.5 max-w-2xl text-sm leading-5 text-muted-foreground">
                           {t('connectorSettings.runServiceDescription')}
                         </p>
                       </div>
@@ -783,7 +785,7 @@ function ConnectorSectionNav({
     >
       <div className="mb-1.5 flex items-center gap-2 px-1">
         <ListChecks size={13} className="shrink-0 text-muted-foreground" aria-hidden />
-        <p className="text-[12px] font-medium text-foreground">{t('connectorSettings.channelNavigation')}</p>
+        <p className="text-sm font-medium text-foreground">{t('connectorSettings.channelNavigation')}</p>
       </div>
       <div
         data-connector-channel-grid
@@ -829,11 +831,11 @@ function ConnectorSectionNav({
             >
               <span className="flex min-w-0 items-center gap-2">
                 <ConnectorBrandMark id={definition.id} className="size-5" />
-                <span className="truncate text-[12px] font-medium text-foreground">
+                <span className="truncate text-sm font-medium text-foreground">
                   {definition.label}
                 </span>
               </span>
-              <span className={`shrink-0 rounded-md px-2 py-0.5 text-[10px] leading-[14px] font-medium ${connectorNavBadgeClass(setup.stage)}`}>
+              <span className={`shrink-0 rounded-md px-2 py-0.5 text-sm leading-5 font-medium ${connectorNavBadgeClass(setup.stage)}`}>
                 {badge}
               </span>
             </Button>
@@ -900,7 +902,7 @@ function ConnectorAdapterSection({
       )}
       titleId={titleId}
       focusableTitle
-      description={t('connectorSettings.adapterDescription', { name: definition.label })}
+      help={t('connectorSettings.adapterDescription', { name: definition.label })}
     >
       {children}
     </ConfigSection>
@@ -978,7 +980,7 @@ function ConnectorChoiceField({
   const descriptionId = description ? `${id}-description` : undefined
   return (
     <fieldset className="mb-3.5 last:mb-0" aria-describedby={descriptionId}>
-      <legend className="mb-1.5 text-[13px] font-medium text-foreground">{label}</legend>
+      <legend className="mb-1.5 text-sm font-medium text-foreground">{label}</legend>
       <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
         {options.map((option) => {
           const optionId = `${id}-${option.value}`
@@ -1020,9 +1022,9 @@ function ConnectorChoiceField({
                     : <span className="size-3.5 rounded-sm border border-muted-foreground/45" />}
                 </span>
                 <span className="min-w-0">
-                  <span className="block text-[12px] font-semibold">{optionLabel}</span>
+                  <span className="block text-sm font-semibold">{optionLabel}</span>
                   {optionDescription && (
-                    <span className="mt-0.5 block break-words text-[10.5px] leading-4 text-muted-foreground">
+                    <span className="mt-0.5 block break-words text-sm leading-4 text-muted-foreground">
                       {optionDescription}
                     </span>
                   )}
@@ -1033,7 +1035,7 @@ function ConnectorChoiceField({
         })}
       </div>
       {description && (
-        <p id={descriptionId} className="mt-1 text-[12px] text-muted-foreground/60">
+        <p id={descriptionId} className="mt-1 text-sm text-muted-foreground/60">
           {description}
         </p>
       )}
@@ -1126,10 +1128,10 @@ function ConnectorCredentialsEditor({
           <span className="flex size-6 shrink-0 items-center justify-center text-muted-foreground">
             <KeyRound size={14} aria-hidden />
           </span>
-          <span className="truncate text-[13px] font-medium leading-[18px] text-foreground">{t('connectorSettings.connectionDetails')}</span>
+          <span className="truncate text-sm font-medium leading-5 text-foreground">{t('connectorSettings.connectionDetails')}</span>
         </span>
         <span className="flex shrink-0 items-center gap-2">
-          <span id={credentialsStatusId} className={`rounded-full px-2 py-0.5 text-[10px] font-medium leading-4 ${
+          <span id={credentialsStatusId} className={`rounded-full px-2 py-0.5 text-sm font-medium leading-4 ${
             ready ? 'bg-success/10 text-success' : 'bg-warning/10 text-warning'
           }`}>
             {ready ? t('connectorSettings.saved') : t('connectorSettings.required')}
@@ -1171,7 +1173,7 @@ function ConnectorCredentialsEditor({
           const fieldLabelContent = fieldMissing ? (
             <span className="flex items-center gap-1.5">
               <span>{fieldLabel}</span>
-              <span className="rounded-md bg-warning/10 px-1.5 py-0.5 text-[9.5px] leading-[14px] font-medium text-warning">
+              <span className="rounded-md bg-warning/10 px-1.5 py-0.5 text-[9.5px] leading-5 font-medium text-warning">
                 {t('connectorSettings.required')}
               </span>
             </span>
@@ -1200,10 +1202,9 @@ function ConnectorCredentialsEditor({
               controlId={inputId}
             >
               {field.kind === 'boolean' ? (
-                <input
+                <Checkbox
                   id={inputId}
                   aria-label={`${definition.label} ${fieldLabel}`}
-                  type="checkbox"
                   required={fieldMissing}
                   checked={value === true}
                   onChange={(event) => onSettingChange(field.key, event.target.checked)}
@@ -1253,7 +1254,7 @@ function ConnectorCredentialsEditor({
                       <>
                         <Button
                           type="button"
-                          className="h-8 shrink-0 text-[12px]"
+                          className="h-8 shrink-0 text-sm"
                           variant="outline"
                           disabled={!secretDraft || savingSecret !== null}
                           onClick={() => onReplaceSecret(field.key, fieldLabel)}
@@ -1262,7 +1263,7 @@ function ConnectorCredentialsEditor({
                         </Button>
                         <Button
                           type="button"
-                          className="h-8 shrink-0 text-[12px]"
+                          className="h-8 shrink-0 text-sm"
                           variant="destructive"
                           disabled={savingSecret !== null}
                           onClick={() => onRemoveSecret(field.key, fieldLabel)}
@@ -1273,7 +1274,7 @@ function ConnectorCredentialsEditor({
                     )}
                   </div>
                   {secretError && (
-                    <p id={inputErrorId} className="mt-1 text-[12px] leading-5 text-destructive" role="alert">
+                    <p id={inputErrorId} className="mt-1 text-sm leading-5 text-destructive" role="alert">
                       {t('connectorSettings.tokenSaveError', { error: secretError })}
                     </p>
                   )}
@@ -1310,7 +1311,7 @@ function ConnectorCredentialsEditor({
               </p>
               <Button
                 type="button"
-                className="h-8 w-full shrink-0 px-4 text-[12px] sm:w-auto"
+                className="h-8 w-full shrink-0 px-4 text-sm sm:w-auto"
                 disabled={!requiredConnectionComplete || enteredMissingSecretKeys.length === 0 || savingSecret !== null}
                 aria-describedby={connectionHintId}
                 onClick={() => onSaveConnection(enteredMissingSecretKeys)}
@@ -1321,7 +1322,7 @@ function ConnectorCredentialsEditor({
               </Button>
             </div>
             {connectionError && (
-              <p className="mt-2 text-[12px] text-destructive" role="alert">
+              <p className="mt-2 text-sm text-destructive" role="alert">
                 {t('connectorSettings.connectionSaveError', { error: connectionError })}
               </p>
             )}
@@ -1331,7 +1332,7 @@ function ConnectorCredentialsEditor({
           <div className="mt-4 border-t border-border/60 pt-3">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div>
-                <p className="text-[12px] font-medium text-foreground">
+                <p className="text-sm font-medium text-foreground">
                   {t('connectorSettings.linkedAccount')}
                 </p>
                 <p className="mt-0.5 text-[11.5px] leading-5 text-muted-foreground">
@@ -1340,7 +1341,7 @@ function ConnectorCredentialsEditor({
               </div>
               <Button
                 type="button"
-                className="h-8 w-full shrink-0 text-[12px] sm:w-auto"
+                className="h-8 w-full shrink-0 text-sm sm:w-auto"
                 variant="destructive"
                 disabled={savingSecret !== null}
                 onClick={onUnlink}
@@ -1367,7 +1368,7 @@ function ConnectorSetupGuide({ definition, t }: { definition: ConnectorDefinitio
           <ListChecks size={15} aria-hidden />
         </span>
         <div className="min-w-0 flex-1">
-          <h4 className="text-[12.5px] font-semibold leading-[18px] text-foreground">
+          <h4 className="text-[12.5px] font-semibold leading-5 text-foreground">
             {t('connectorSettings.setupGuide.title', { name: definition.label })}
           </h4>
           <p className="mt-0.5 text-[11.5px] leading-5 text-muted-foreground">
@@ -1390,7 +1391,7 @@ function ConnectorSetupGuide({ definition, t }: { definition: ConnectorDefinitio
                 target="_blank"
                 rel="noreferrer"
                 aria-label={t('connectorSettings.setupGuide.openSetupAria', { label })}
-                className="oa-pressable inline-flex h-8 items-center gap-1.5 rounded-md border border-border/80 bg-background px-2.5 text-[11px] font-medium leading-[15px] text-primary hover:border-foreground/20 hover:bg-secondary/40 focus-visible:outline-none focus-visible:[box-shadow:var(--oa-focus-shadow)]"
+                className="oa-pressable inline-flex h-8 items-center gap-1.5 rounded-md border border-border/80 bg-background px-2.5 text-sm font-medium leading-5 text-primary hover:border-foreground/20 hover:bg-secondary/40 focus-visible:outline-none focus-visible:[box-shadow:var(--oa-focus-shadow)]"
               >
                 {label}
                 <ExternalLink size={12} aria-hidden />
@@ -1403,7 +1404,7 @@ function ConnectorSetupGuide({ definition, t }: { definition: ConnectorDefinitio
         <ol className="mt-2.5 space-y-1.5 pl-7.5 text-[11.5px] leading-5 text-foreground/90">
           {steps.map((step, index) => (
             <li key={step} className="flex gap-2">
-              <span className="w-4 shrink-0 text-right text-[10px] leading-[14px] font-medium tabular-nums text-muted-foreground">
+              <span className="w-4 shrink-0 text-right text-sm leading-5 font-medium tabular-nums text-muted-foreground">
                 {index + 1}.
               </span>
               <span>{step}</span>
@@ -1456,14 +1457,14 @@ function SetupStatePanel({
           <Icon size={17} className={`mt-0.5 shrink-0 ${presentation.iconClass}`} />
           <div aria-live="polite" aria-atomic="true">
             <div className="flex flex-wrap items-center gap-2">
-              <p className="text-[13px] font-semibold text-foreground">{presentation.title}</p>
-              <span className="rounded-md border border-current/15 px-2 py-0.5 text-[10px] leading-[14px] font-medium">
+              <p className="text-sm font-semibold text-foreground">{presentation.title}</p>
+              <span className="rounded-md border border-current/15 px-2 py-0.5 text-sm leading-5 font-medium">
                 {presentation.badge}
               </span>
             </div>
-            <p className="mt-1 max-w-[620px] text-[12px] leading-5 text-muted-foreground">{presentation.description}</p>
+            <p className="mt-1 max-w-[620px] text-sm leading-5 text-muted-foreground">{presentation.description}</p>
             {setup.stage === 'awaiting_link' && (
-              <ol className="mt-3 space-y-1 text-[12px] text-foreground">
+              <ol className="mt-3 space-y-1 text-sm text-foreground">
                 <li>1. {t('connectorSettings.linkStepOpen', { name: definition.label })}</li>
                 <li>2. {t('connectorSettings.linkStepSendBefore')} <code className="rounded bg-background px-1.5 py-0.5 font-mono text-primary">{command}</code>.</li>
                 <li>3. {t('connectorSettings.linkStepWait')}</li>
@@ -1474,7 +1475,7 @@ function SetupStatePanel({
         {canRun && (
           <div className="ml-auto flex w-full flex-wrap items-center gap-2 sm:w-auto sm:shrink-0">
             <div className="mr-1 flex h-8 items-center gap-2">
-              <span className="text-[12px] font-medium text-foreground">
+              <span className="text-sm font-medium text-foreground">
                 {t('connectorSettings.useConnector', { name: definition.label })}
               </span>
               <Toggle
@@ -1489,7 +1490,7 @@ function SetupStatePanel({
             {setup.stage === 'error' && (
               <Button
                 type="button"
-                className="h-8 text-[12px]"
+                className="h-8 text-sm"
                 variant="outline"
                 disabled={reconnecting === definition.id || saving}
                 onClick={onReconnect}
@@ -1503,7 +1504,7 @@ function SetupStatePanel({
             {setup.stage === 'linked' && runtime?.status === 'healthy' && (
             <Button
               type="button"
-              className="h-8 text-[12px]"
+              className="h-8 text-sm"
               variant="outline"
               disabled={testing !== null}
               onClick={onTest}
@@ -1537,14 +1538,14 @@ function SetupStatePanel({
           role="status"
           aria-live="polite"
           aria-atomic="true"
-          className="mt-3 flex items-start gap-2 border-t border-current/10 pt-3 text-[12px] text-muted-foreground"
+          className="mt-3 flex items-start gap-2 border-t border-current/10 pt-3 text-sm text-muted-foreground"
         >
           <RefreshCw size={14} className="mt-0.5 shrink-0 animate-spin motion-reduce:animate-none" aria-hidden />
           <span>{t('connectorSettings.testSendingFeedback', { name: definition.label })}</span>
         </div>
       )}
       {testing !== definition.id && actionFeedback?.status === 'success' && (
-        <div className="mt-3 border-t border-current/10 pt-3 text-[12px]">
+        <div className="mt-3 border-t border-current/10 pt-3 text-sm">
           <div
             role="status"
             aria-live="polite"
@@ -1555,11 +1556,10 @@ function SetupStatePanel({
             <span>{t('connectorSettings.testSent', { name: definition.label })}</span>
           </div>
           <details data-connector-test-details className="group/details mt-1 pl-5 text-[11.5px] text-muted-foreground">
-            <summary className="oa-pressable flex h-8 w-fit cursor-pointer list-none items-center gap-2 font-medium hover:text-foreground">
-              <ListChecks size={13} aria-hidden />
+            <DetailsSummary>
               {t('connectorSettings.testDetails')}
-            </summary>
-            <div className="mb-1 break-words pl-5 leading-5">
+            </DetailsSummary>
+            <div className="mb-1 break-words leading-5">
               {t('connectorSettings.deliveryReference')}{' '}
               <code className="break-all font-mono text-foreground/80">{actionFeedback.probeId}</code>
             </div>
@@ -1569,7 +1569,7 @@ function SetupStatePanel({
       {testing !== definition.id && actionFeedback?.status === 'error' && (
         <div
           role="alert"
-          className="mt-3 flex items-start gap-2 border-t border-current/10 pt-3 text-[12px] text-destructive"
+          className="mt-3 flex items-start gap-2 border-t border-current/10 pt-3 text-sm text-destructive"
         >
           <CircleAlert size={14} className="mt-0.5 shrink-0" aria-hidden />
           <span>
@@ -1685,7 +1685,7 @@ function HealthBadge({ health, t }: { health: ConnectorHealth | null; t: TFuncti
   const state = getConnectorServiceState(health)
   if (state === 'stopped') {
     return (
-      <span className="inline-flex items-center gap-1.5 rounded-md bg-muted px-2.5 py-1 text-[10px] leading-[14px] font-medium text-muted-foreground">
+      <span className="inline-flex items-center gap-1.5 rounded-md bg-muted px-2.5 py-1 text-sm leading-5 font-medium text-muted-foreground">
         <ShieldCheck size={12} aria-hidden />
         {t('connectorSettings.serviceStopped')}
       </span>
@@ -1693,7 +1693,7 @@ function HealthBadge({ health, t }: { health: ConnectorHealth | null; t: TFuncti
   }
   if (state === 'healthy') {
     return (
-      <span className="inline-flex items-center gap-1.5 rounded-md bg-success/10 px-2.5 py-1 text-[10px] leading-[14px] font-medium text-success">
+      <span className="inline-flex items-center gap-1.5 rounded-md bg-success/10 px-2.5 py-1 text-sm leading-5 font-medium text-success">
         <ShieldCheck size={12} aria-hidden />
         {t('connectorSettings.serviceOnline')}
       </span>
@@ -1702,7 +1702,7 @@ function HealthBadge({ health, t }: { health: ConnectorHealth | null; t: TFuncti
   if (state === 'running') {
     return (
       <span
-        className="inline-flex items-center gap-1.5 rounded-md bg-warning/12 px-2.5 py-1 text-[10px] leading-[14px] font-medium text-warning"
+        className="inline-flex items-center gap-1.5 rounded-md bg-warning/12 px-2.5 py-1 text-sm leading-5 font-medium text-warning"
         title={t('connectorStatus.service.runningDescription')}
       >
         <CircleAlert size={12} aria-hidden />
@@ -1712,7 +1712,7 @@ function HealthBadge({ health, t }: { health: ConnectorHealth | null; t: TFuncti
   }
   return (
     <span
-      className="inline-flex items-center gap-1.5 rounded-md bg-destructive/10 px-2.5 py-1 text-[10px] leading-[14px] font-medium text-destructive"
+      className="inline-flex items-center gap-1.5 rounded-md bg-destructive/10 px-2.5 py-1 text-sm leading-5 font-medium text-destructive"
       title={t('connectorSettings.serviceUnavailableDescription')}
     >
       <CircleAlert size={12} aria-hidden />

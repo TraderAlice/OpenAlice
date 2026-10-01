@@ -91,7 +91,7 @@ export function EditUTADialog({ uta, preset, health, readiness, policy, installi
           <div className="min-w-0 flex-1">
             <h3 className="text-[14px] leading-[19px] font-semibold text-foreground truncate">{displayName}</h3>
             {displayName !== uta.id && (
-              <div className="mt-0.5 truncate font-mono text-[10px] leading-[14px] text-muted-foreground">{uta.id}</div>
+              <div className="mt-0.5 truncate font-mono text-sm leading-5 text-muted-foreground">{uta.id}</div>
             )}
           </div>
           <AccountReadinessBadge readiness={readiness} health={health} size="md" />
@@ -136,13 +136,13 @@ export function EditUTADialog({ uta, preset, health, readiness, policy, installi
         )}
         <Section title="Configuration">
           <div className="mb-3">
-            <span className="text-[12px] text-muted-foreground">Type</span>
-            <span className="ml-2 text-[12px] font-medium text-foreground">{preset?.label ?? uta.presetId}</span>
+            <span className="text-sm text-muted-foreground">Type</span>
+            <span className="ml-2 text-sm font-medium text-foreground">{preset?.label ?? uta.presetId}</span>
           </div>
           <div className="mb-3 flex items-center justify-between gap-4 rounded-lg border border-border px-3 py-2.5">
             <div className="min-w-0">
-              <div className="text-[12px] font-medium text-foreground">Read-only account</div>
-              <div className="text-[11px] text-muted-foreground leading-relaxed">
+              <div className="text-sm font-medium text-foreground">Read-only account</div>
+              <div className="text-sm text-muted-foreground leading-relaxed">
                 Allow analysis reads; block broker-side order changes.
               </div>
             </div>
@@ -186,7 +186,7 @@ export function EditUTADialog({ uta, preset, health, readiness, policy, installi
             variant="ghost"
             size="sm"
             onClick={() => setGuardsOpen(!guardsOpen)}
-            className="px-0 text-[13px] text-muted-foreground hover:bg-transparent"
+            className="px-0 text-sm text-muted-foreground hover:bg-transparent"
             aria-expanded={guardsOpen}
           >
             <ChevronRight
@@ -235,9 +235,9 @@ export function EditUTADialog({ uta, preset, health, readiness, policy, installi
                 await onSave(updated)
               }}
             />
-            <span className="text-[12px] text-muted-foreground">{draft.enabled !== false ? 'Configured on' : 'Configured off'}</span>
+            <span className="text-sm text-muted-foreground">{draft.enabled !== false ? 'Configured on' : 'Configured off'}</span>
           </label>
-          {msg && <span className="text-[12px] text-muted-foreground">{msg}</span>}
+          {msg && <span className="text-sm text-muted-foreground">{msg}</span>}
         </div>
         <DeleteButton label="Delete UTA" onConfirm={onDelete} />
       </div>

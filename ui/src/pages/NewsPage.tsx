@@ -1,3 +1,5 @@
+import { Select } from '@/components/ui/select'
+import { SegmentedControl } from '../components/SegmentedControl'
 import { safeNotificationImage } from '../lib/notifications/image'
 import { memo, useCallback, useEffect, useId, useMemo, useRef, useState, type FormEvent } from 'react'
 import { ChevronDown, CircleAlert, RefreshCw, Search } from 'lucide-react'
@@ -144,45 +146,47 @@ export function NewsPage({ spec }: { spec: Extract<ViewSpec, { kind: 'news' }> }
         <PageHeader title={category ? t(category.labelKey) : t('nav.item.news')} />
         <div className="flex min-h-0 flex-1 flex-col">
           <div className="shrink-0 border-b border-border px-3 py-2 md:px-4">
-            <nav aria-label={t('news.viewsLabel')} className="mb-2 flex flex-wrap items-center gap-1">
-              {NEWS_VIEWS.map((view) => <Button key={view.id} size="sm" variant={selection === view.id ? 'secondary' : 'ghost'}
-                aria-pressed={selection === view.id} onClick={() => setSelection(view.id)}>{t(view.labelKey)}</Button>)}
+            <nav aria-label={t('news.viewsLabel')} className="mb-2 min-w-0">
+              <SegmentedControl value={selection} onChange={setSelection} ariaLabel={t('news.viewsLabel')}
+                options={NEWS_VIEWS.map((view) => ({ value: view.id, label: t(view.labelKey) }))} />
             </nav>
             <form aria-label={t('news.filtersLabel')} onSubmit={submit} className="flex flex-wrap items-center gap-2">
               <div className="flex min-w-0 basis-full items-center gap-1 sm:basis-auto">
                 <label className="min-w-0 flex-1 sm:flex-none">
                   <span className="sr-only">{t('news.startDate')}</span>
                   <input type="date" value={draft.startDate} onChange={(event) => setDraft({ ...draft, startDate: event.target.value })}
-                    className={`${inputClass} h-8 min-w-0 px-2 py-1 text-xs sm:w-[140px]`} />
+                    className={`${inputClass} h-8 min-w-0 px-2 py-1 text-base sm:w-[140px]`} />
                 </label>
                 <span aria-hidden="true" className="text-muted-foreground">–</span>
                 <label className="min-w-0 flex-1 sm:flex-none">
                   <span className="sr-only">{t('news.endDate')}</span>
                   <input type="date" value={draft.endDate} onChange={(event) => setDraft({ ...draft, endDate: event.target.value })}
-                    className={`${inputClass} h-8 min-w-0 px-2 py-1 text-xs sm:w-[140px]`} />
+                    className={`${inputClass} h-8 min-w-0 px-2 py-1 text-base sm:w-[140px]`} />
                 </label>
               </div>
               <input aria-label={t('news.symbolFilter')} placeholder={t('news.symbolFilter')} value={draft.symbol}
                 onChange={(event) => setDraft({ ...draft, symbol: event.target.value })}
-                className={`${inputClass} h-8 min-w-0 flex-1 basis-[130px] px-2 py-1 text-xs sm:max-w-[170px]`} />
+                className={`${inputClass} h-8 min-w-0 flex-1 basis-[130px] px-2 py-1 text-base sm:max-w-[170px]`} />
               <input aria-label={t('news.keywordFilter')} placeholder={t('news.keywordFilter')} value={draft.keyword}
                 onChange={(event) => setDraft({ ...draft, keyword: event.target.value })}
-                className={`${inputClass} h-8 min-w-0 flex-1 basis-[140px] px-2 py-1 text-xs`} />
+                className={`${inputClass} h-8 min-w-0 flex-1 basis-[140px] px-2 py-1 text-base`} />
               <Button type="submit" variant="secondary" size="sm"><Search className="size-3.5" aria-hidden />{t('news.search')}</Button>
               <Button type="button" variant="outline" className="h-8" onClick={clear}>{t('news.clear')}</Button>
             </form>
             {dateError && <p role="alert" className="mt-2 text-xs text-destructive">{t('news.dateRangeError')}</p>}
             <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-              <select aria-label={t('news.lookbackLabel')} value={query.lookback ?? '24h'} disabled={Boolean(query.startTime)}
-                onChange={(event) => setQuery({ ...query, lookback: event.target.value })}
-                className={cn(inputClass, 'h-7 w-auto py-1 text-xs')}>
-                {LOOKBACK_OPTIONS.map((option) => <option key={option.value} value={option.value}>{t(option.labelKey)}</option>)}
-              </select>
-              <select aria-label={t('news.sourceLabel')} value={query.source ?? ''} onChange={(event) => setQuery({ ...query, source: event.target.value || undefined })}
-                className={cn(inputClass, 'h-7 w-auto max-w-36 py-1 text-xs')}>
-                <option value="">{t('news.allSources')}</option>
-                {sources.map((source) => <option key={source} value={source}>{source}</option>)}
-              </select>
+              <Select aria-label={t('news.lookbackLabel')} value={query.lookback ?? '24h'} disabled={Boolean(query.startTime)}
+                onValueChange={(selectedValue) => setQuery({ ...query, lookback: selectedValue })}
+                size="sm" className="w-auto max-w-full"
+                options={LOOKBACK_OPTIONS.map((option) => ({ value: option.value, label: t(option.labelKey) }))}
+              />
+              <Select aria-label={t('news.sourceLabel')} value={query.source ?? ''} onValueChange={(selectedValue) => setQuery({ ...query, source: selectedValue || undefined })}
+                size="sm" className="w-auto max-w-48"
+                options={[
+                  { value: '', label: t('news.allSources') },
+                  ...sources.map((source) => ({ value: source, label: source })),
+                ]}
+              />
               <span aria-live="polite">{t('news.articleCount', { count: visibleArticles.length })}</span>
               {articles.length === 200 && <span>{t('news.resultLimit', { count: 200 })}</span>}
               <Button type="button" variant="ghost" size="icon-sm" className="ml-auto" aria-label={t('news.refresh')} onClick={retry} disabled={loading || refreshing}>
@@ -236,10 +240,10 @@ const NewsStreamRow = memo(function NewsStreamRow({ article, locale, onTag }: { 
   const hasImage = Boolean(image && failedImage !== image)
   const source = link ? (
     <a href={link} target="_blank" rel="noopener noreferrer" aria-label={t('news.openOriginal')} title={article.source ?? t('news.openOriginal')}
-      className="inline-flex min-h-7 max-w-full items-center rounded-sm text-[11px] text-muted-foreground underline-offset-2 hover:text-foreground hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring [overflow-wrap:anywhere]">
+      className="inline-flex min-h-7 max-w-full items-center rounded-sm text-sm text-muted-foreground underline-offset-2 hover:text-foreground hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring [overflow-wrap:anywhere]">
       {article.source ?? t('news.openOriginal')}
     </a>
-  ) : article.source ? <span className="text-[11px] text-muted-foreground [overflow-wrap:anywhere]">{article.source}</span> : null
+  ) : article.source ? <span className="text-sm text-muted-foreground [overflow-wrap:anywhere]">{article.source}</span> : null
   return (
     <article role="listitem" className="grid min-w-0 grid-cols-[46px_minmax(0,1fr)] sm:grid-cols-[54px_minmax(0,1fr)]">
       <div className="relative border-r border-border/60 pr-2 text-right">
@@ -253,7 +257,7 @@ const NewsStreamRow = memo(function NewsStreamRow({ article, locale, onTag }: { 
           <h4 className="text-sm font-semibold leading-[22px] text-foreground [overflow-wrap:anywhere]">
             {link ? <a href={link} target="_blank" rel="noopener noreferrer" className="rounded-sm underline-offset-2 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring">{article.title}</a> : article.title}
           </h4>
-          {content && <p id={summaryId} className={cn('mt-1 whitespace-pre-wrap text-[13px] leading-[21px] text-muted-foreground [overflow-wrap:anywhere]', !expanded && 'line-clamp-3')}>
+          {content && <p id={summaryId} className={cn('mt-1 whitespace-pre-wrap text-sm leading-[21px] text-muted-foreground [overflow-wrap:anywhere]', !expanded && 'line-clamp-3')}>
             {content}
           </p>}
           <div className="mt-2 flex min-w-0 flex-wrap items-center gap-1.5">
@@ -295,7 +299,7 @@ function NewsLoadError({ refreshing, onRetry }: { refreshing: boolean; onRetry: 
   return <div role="alert" className="mx-auto flex max-w-[520px] flex-col items-center px-6 py-16 text-center">
     <CircleAlert size={24} strokeWidth={1.75} className="text-destructive" aria-hidden />
     <h2 className="mt-3 text-[15px] font-medium">{t('news.loadErrorTitle')}</h2>
-    <p className="mt-1.5 text-[13px] leading-relaxed text-muted-foreground">{t('news.loadErrorDescription')}</p>
+    <p className="mt-1.5 text-sm leading-relaxed text-muted-foreground">{t('news.loadErrorDescription')}</p>
     <Button type="button" onClick={onRetry} disabled={refreshing} className="mt-4" variant="outline" size="sm">{refreshing ? t('common.loading') : t('common.retry')}</Button>
   </div>
 }

@@ -73,28 +73,28 @@ export function WorkspaceOffboardingDialog({
     >
       <div className="border-b border-border px-5 py-4">
         <h2 className="text-[15px] font-semibold text-foreground">{t('workspace.offboardTitle')}</h2>
-        <p className="mt-1 text-[12px] text-muted-foreground">
+        <p className="mt-1 text-sm text-muted-foreground">
           {t('workspace.offboardDescription', { workspace: workspaceDisplayTitle(workspace) })}
         </p>
       </div>
 
       <div className="max-h-[65vh] space-y-4 overflow-y-auto px-5 py-4">
-        {!assessment && !error && <p className="text-[13px] text-muted-foreground">{t('workspace.offboardLoading')}</p>}
+        {!assessment && !error && <p className="text-sm text-muted-foreground">{t('workspace.offboardLoading')}</p>}
 
         {assessment && (
           <>
             {assessment.blockers.length > 0 && (
-              <div className="rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2.5 text-[12px] leading-[18px] text-destructive">
+              <div className="rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2.5 text-sm leading-5 text-destructive">
                 <div className="font-semibold">{t('workspace.offboardBlocked')}</div>
                 {assessment.blockers.map((blocker) => <div key={blocker} className="mt-1">{blocker}</div>)}
               </div>
             )}
 
             <div>
-              <div className="mb-2 text-[11px] font-medium text-muted-foreground/70">
+              <div className="mb-2 text-sm font-medium text-muted-foreground/70">
                 {t('workspace.offboardHandoffSnapshot')}
               </div>
-              <div className="grid grid-cols-2 gap-2 text-[12px] sm:grid-cols-3">
+              <div className="grid grid-cols-2 gap-2 text-sm sm:grid-cols-3">
                 <Snapshot label={t('workspace.offboardSessions')} value={assessment.sessionRecords} />
                 <Snapshot label={t('workspace.offboardSignatures')} value={assessment.resumeIds.length} />
                 <Snapshot label={t('workspace.offboardOpenIssues')} value={assessment.openIssueIds.length} />
@@ -107,7 +107,7 @@ export function WorkspaceOffboardingDialog({
         )}
 
         <label className="block">
-          <span className="mb-1.5 block text-[12px] font-medium text-foreground">{t('workspace.offboardReason')}</span>
+          <span className="mb-1.5 block text-sm font-medium text-foreground">{t('workspace.offboardReason')}</span>
           <input
             value={reason}
             onChange={(event) => setReason(event.target.value)}
@@ -118,7 +118,7 @@ export function WorkspaceOffboardingDialog({
         </label>
 
         <label className="block">
-          <span className="mb-1.5 block text-[12px] font-medium text-foreground">{t('workspace.offboardNotes')}</span>
+          <span className="mb-1.5 block text-sm font-medium text-foreground">{t('workspace.offboardNotes')}</span>
           <Textarea
             value={notes}
             onChange={(event) => setNotes(event.target.value)}
@@ -129,7 +129,7 @@ export function WorkspaceOffboardingDialog({
           />
         </label>
 
-        {error && <p className="text-[12px] text-destructive">{error}</p>}
+        {error && <p className="text-sm text-destructive">{error}</p>}
       </div>
 
       <div className="flex justify-end gap-2 border-t border-border px-5 py-3">
@@ -152,7 +152,7 @@ function Snapshot({ label, value }: { label: string; value: number }): ReactElem
   return (
     <div className="rounded-lg border border-border/70 bg-secondary/45 px-3 py-2">
       <div className="text-[16px] font-semibold text-foreground">{value}</div>
-      <div className="mt-0.5 truncate text-[10px] text-muted-foreground">{label}</div>
+      <div className="mt-0.5 truncate text-sm text-muted-foreground">{label}</div>
     </div>
   )
 }

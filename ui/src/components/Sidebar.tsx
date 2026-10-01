@@ -19,7 +19,7 @@ interface SidebarProps {
 export function Sidebar({ title, actions, children, leading }: SidebarProps) {
   return (
     <aside className="flex h-full w-full flex-col bg-sidebar text-sidebar-foreground">
-      <TopBar title={title} leading={leading} actions={actions} />
+      <TopBar title={title} actions={<>{leading}{actions}</>} />
       <div className="flex min-h-0 flex-1 flex-col">{children}</div>
     </aside>
   )

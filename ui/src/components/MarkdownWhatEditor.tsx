@@ -184,7 +184,7 @@ export function MarkdownWhatEditor({ value, onSave, ariaLabel, placeholder }: Ma
         className="pointer-events-none sticky top-[6.75rem] z-10 flex min-h-5 justify-end lg:top-2"
       >
         <span
-          className={`rounded-full border bg-background/95 px-2 py-0.5 text-[11px] shadow-sm backdrop-blur transition-opacity ${
+          className={`rounded-full border bg-background/95 px-2 py-0.5 text-sm shadow-sm backdrop-blur transition-opacity ${
             saveState === 'error'
               ? 'border-destructive/30 text-destructive'
               : 'border-border/70 text-muted-foreground'

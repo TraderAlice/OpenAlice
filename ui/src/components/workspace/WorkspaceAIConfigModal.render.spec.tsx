@@ -1,3 +1,4 @@
+import userEvent from '@testing-library/user-event'
 // @vitest-environment jsdom
 
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
@@ -179,7 +180,7 @@ beforeEach(async () => {
 afterEach(cleanup)
 
 describe('WorkspaceAIConfigModal local model metadata', () => {
-  it('exposes a named modal dialog and moves focus into the selected section', () => {
+  it('exposes a named modal dialog and moves focus into the selected section', async () => {
     render(
       <WorkspaceAIConfigModal
         wsId="chat-1"
@@ -191,7 +192,7 @@ describe('WorkspaceAIConfigModal local model metadata', () => {
     const dialog = screen.getByRole('dialog', { name: '工作区设置' })
     expect(dialog.getAttribute('aria-modal')).toBe('true')
     expect(screen.getByRole('button', { name: '通用' }).getAttribute('aria-current')).toBe('page')
-    expect(document.activeElement).toBe(screen.getByRole('button', { name: '通用' }))
+    await waitFor(() => expect(document.activeElement).toBe(screen.getByRole('button', { name: '通用' })))
   })
 
   it('separates Agent runtime diagnostics from AI preferences', async () => {
@@ -242,7 +243,7 @@ describe('WorkspaceAIConfigModal local model metadata', () => {
     expect(screen.queryByText('从已保存凭证载入')).toBeNull()
   })
 
-  it('keeps forward and reverse Tab navigation inside the dialog', () => {
+  it('keeps forward and reverse Tab navigation inside the dialog', async () => {
     render(
       <WorkspaceAIConfigModal
         wsId="chat-1"
@@ -252,22 +253,23 @@ describe('WorkspaceAIConfigModal local model metadata', () => {
     )
 
     const dialog = screen.getByRole('dialog', { name: '工作区设置' })
+    await userEvent.click(screen.getByRole('button', { name: '通用' }))
     const focusable = Array.from(dialog.querySelectorAll<HTMLElement>(
-      'button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
+      'button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"]):not([disabled])',
     ))
     const first = focusable[0]!
     const last = focusable[focusable.length - 1]!
 
     last.focus()
-    fireEvent.keyDown(document, { key: 'Tab' })
-    expect(document.activeElement).toBe(first)
+    await userEvent.tab()
+    await waitFor(() => expect(document.activeElement).toBe(first))
 
     first.focus()
-    fireEvent.keyDown(document, { key: 'Tab', shiftKey: true })
-    expect(document.activeElement).toBe(last)
+    await userEvent.tab({ shift: true })
+    await waitFor(() => expect(document.activeElement).toBe(last))
   })
 
-  it('closes on Escape, restores focus, and removes its keyboard listener', () => {
+  it('closes on Escape, restores focus, and removes its keyboard listener', async () => {
     const trigger = document.createElement('button')
     trigger.textContent = 'Open workspace settings'
     document.body.append(trigger)
@@ -282,15 +284,15 @@ describe('WorkspaceAIConfigModal local model metadata', () => {
       />,
     )
 
-    expect(document.activeElement).toBe(screen.getByRole('button', { name: '通用' }))
-    expect(trigger.hasAttribute('inert')).toBe(true)
+    await waitFor(() => expect(document.activeElement).toBe(screen.getByRole('button', { name: '通用' })))
+    expect(screen.queryByRole('button', { name: 'Open workspace settings' })).toBeNull()
     expect(trigger.getAttribute('aria-hidden')).toBe('true')
     fireEvent.keyDown(document, { key: 'Escape' })
     expect(onClose).toHaveBeenCalledTimes(1)
 
     unmount()
-    expect(document.activeElement).toBe(trigger)
-    expect(trigger.hasAttribute('inert')).toBe(false)
+    await waitFor(() => expect(document.activeElement).toBe(trigger))
+    expect(screen.getByRole('button', { name: 'Open workspace settings' })).toBe(trigger)
     expect(trigger.getAttribute('aria-hidden')).toBeNull()
     fireEvent.keyDown(document, { key: 'Escape' })
     expect(onClose).toHaveBeenCalledTimes(1)
@@ -309,7 +311,7 @@ describe('WorkspaceAIConfigModal local model metadata', () => {
       <WorkspaceAIConfigModal wsId="chat-1" initialSection="ai" initialAgent="codex" onClose={vi.fn()} />,
     )
 
-    fireEvent.change(await screen.findByPlaceholderText('gpt-5.5'), {
+    fireEvent.change(await screen.findByRole('combobox', { name: '模型' }), {
       target: { value: 'gpt-5.6-sol' },
     })
     fireEvent.click(screen.getByRole('button', { name: '保存' }))
@@ -353,10 +355,11 @@ describe('WorkspaceAIConfigModal local model metadata', () => {
       <WorkspaceAIConfigModal wsId="chat-1" initialSection="ai" initialAgent="pi" onClose={vi.fn()} />,
     )
 
-    const protocol = await screen.findByRole('combobox', { name: 'Pi API 协议' }) as HTMLSelectElement
+    const protocol = await screen.findByRole('combobox', { name: 'Pi API 协议' })
     await screen.findByRole('button', { name: '测试' })
-    expect(protocol.value).toBe('anthropic')
-    expect(Array.from(protocol.options).map((option) => option.value)).toEqual(['anthropic'])
+    expect(protocol.textContent).toBe('Anthropic Messages')
+    fireEvent.click(protocol)
+    expect((await screen.findAllByRole('option')).map((option) => option.textContent)).toEqual(['Anthropic Messages'])
   })
 
   it('shows LongCat\'s real thinking default without inventing an effort selector', async () => {
@@ -442,9 +445,9 @@ describe('WorkspaceAIConfigModal local model metadata', () => {
     )
 
     const effort = await screen.findByRole('combobox', { name: 'Pi 思考强度' })
-    expect((effort as HTMLSelectElement).value).toBe('')
-    expect((effort as HTMLSelectElement).selectedOptions[0]?.textContent).toBe('未指定')
-    fireEvent.change(effort, { target: { value: 'high' } })
+    expect(effort.textContent).toBe('未指定')
+    fireEvent.click(effort)
+    await userEvent.click(await screen.findByRole('option', { name: /^high/ }))
     fireEvent.click(screen.getByRole('button', { name: '保存' }))
 
     await waitFor(() => expect(mocks.saveAgentConfig).toHaveBeenCalledWith(
@@ -495,9 +498,8 @@ describe('WorkspaceAIConfigModal local model metadata', () => {
     )
 
     const effort = await screen.findByRole('combobox', { name: 'Pi 思考强度' })
-    expect((effort as HTMLSelectElement).value).toBe('')
-    expect((effort as HTMLSelectElement).selectedOptions[0]?.textContent).toBe('未指定')
-  })
+    expect(effort.textContent).toBe('未指定')
+      })
 
   it('saves a context-only change directly without probing the provider again', async () => {
     const onClose = vi.fn()
@@ -513,7 +515,8 @@ describe('WorkspaceAIConfigModal local model metadata', () => {
     )
 
     const contextWindow = await screen.findByRole('combobox', { name: 'Pi 上下文窗口' })
-    fireEvent.change(contextWindow, { target: { value: '512000' } })
+    fireEvent.click(contextWindow)
+    await userEvent.click(await screen.findByRole('option', { name: '512K' }))
 
     const save = screen.getByRole('button', { name: '保存' })
     expect(screen.queryByRole('button', { name: '测试' })).toBeNull()

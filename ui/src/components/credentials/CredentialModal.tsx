@@ -1,3 +1,5 @@
+import { Select } from '@/components/ui/select'
+import { DetailsSummary } from '../ui/collapsible'
 import { useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { X } from 'lucide-react'
@@ -259,7 +261,7 @@ export function CredentialModal({ mode, cred, presets, agents, initialPresetId, 
       <div className="flex shrink-0 items-center justify-between border-b border-border px-4 py-3 sm:px-5 sm:py-4">
         <div className="min-w-0">
           <h2 className="text-[15px] font-semibold text-foreground">{title}</h2>
-          <p className="mt-0.5 text-[11px] leading-snug text-muted-foreground">{t('aiProvider.credentialModal.subtitle')}</p>
+          <p className="mt-0.5 text-sm leading-snug text-muted-foreground">{t('aiProvider.credentialModal.subtitle')}</p>
         </div>
         <Button
           type="button"
@@ -298,7 +300,7 @@ export function CredentialModal({ mode, cred, presets, agents, initialPresetId, 
                     <span className="min-w-0 flex-1">
                       <span className="block truncate text-[12.5px] font-medium text-foreground">{item.label}</span>
                       <span className="block truncate text-[10.5px] text-muted-foreground">{item.description}</span>
-                      <span className="mt-0.5 block truncate text-[10px] text-muted-foreground/75">
+                      <span className="mt-0.5 block truncate text-sm text-muted-foreground/75">
                         {item.category === 'custom'
                           ? t('aiProvider.credentialModal.chooseMode')
                           : t('aiProvider.credentialModal.worksWith', {
@@ -307,14 +309,14 @@ export function CredentialModal({ mode, cred, presets, agents, initialPresetId, 
                       </span>
                     </span>
                     {item.category === 'custom' && (
-                      <span className="shrink-0 text-[10px] text-muted-foreground">
+                      <span className="shrink-0 text-sm text-muted-foreground">
                         {t('aiProvider.credentialModal.freeForm')}
                       </span>
                     )}
                   </button>
                 ))}
                 {visiblePresets.length === 0 && (
-                  <p className="px-4 py-6 text-center text-[12px] text-muted-foreground">
+                  <p className="px-4 py-6 text-center text-sm text-muted-foreground">
                     {t('aiProvider.credentialModal.noMatches', { query: presetQuery })}
                   </p>
                 )}
@@ -322,24 +324,24 @@ export function CredentialModal({ mode, cred, presets, agents, initialPresetId, 
           </div>
         ) : (
           <>
-              <div className="flex items-center justify-between">
-                <div className="flex min-w-0 items-center gap-2">
+              <div className="flex min-w-0 items-center justify-between gap-3">
+                <div className="flex min-w-0 flex-1 items-center gap-2">
                   <AIProviderIcon vendor={VENDOR_BY_PRESET[preset.id] ?? 'custom'} className="size-5 shrink-0" />
-                  <span className="text-[13px] font-semibold text-foreground">{preset.label}</span>
-                  <span className="min-w-0 truncate text-[11px] text-muted-foreground">{preset.description}</span>
+                  <span className="shrink-0 text-sm font-semibold text-foreground">{preset.label}</span>
+                  <span title={preset.description} className="min-w-0 truncate text-sm text-muted-foreground">{preset.description}</span>
                 </div>
                 {mode === 'add' && (
-                  <button onClick={() => {
+                  <Button type="button" variant="ghost" size="sm" onClick={() => {
                     setPreset(null)
                     // Automatic discovery must not carry a key to a different provider.
                     setApiKey('')
                     gate.reset()
-                  }} className="text-[11px] text-primary hover:underline">{t('common.change')}</button>
+                  }} className="shrink-0">{t('common.change')}</Button>
                 )}
               </div>
 
               {preset.hint && (
-                <p className="text-[11px] text-muted-foreground bg-muted rounded-lg px-3 py-2.5 leading-relaxed">{preset.hint}</p>
+                <p className="text-sm text-muted-foreground bg-muted rounded-lg px-3 py-2.5 leading-relaxed">{preset.hint}</p>
               )}
 
               {!isCustom && (
@@ -360,7 +362,7 @@ export function CredentialModal({ mode, cred, presets, agents, initialPresetId, 
               {isDirect ? (
                 <Field label={t('aiProvider.credentialModal.baseUrl')} description={t('aiProvider.credentialModal.directBaseUrlHelp')}>
                   <input
-                    className={inputClass + ' font-mono text-[12px]'}
+                    className={inputClass + ' font-mono text-base'}
                     value={directUrl}
                     onChange={(event) => setDirectUrl(event.target.value)}
                     placeholder="Cursor default endpoint"
@@ -381,19 +383,13 @@ export function CredentialModal({ mode, cred, presets, agents, initialPresetId, 
                     />
                   </Field>
                   <Field label={t('aiProvider.credentialModal.compatibilityMode')} description={t('aiProvider.credentialModal.compatibilityModeHelp')}>
-                    <select className={inputClass} value={customShape} onChange={(event) => { setCustomShape(event.target.value as WireShape); gate.reset() }}>
-                      {SHAPE_ORDER.map((shape) => (
-                        <option key={shape} value={shape}>
-                          {WIRE_SHAPE_GUIDANCE[shape]} — {
-                            agentNames(compatibleAgentIds({ [shape]: '' }, agents))
-                          }
-                        </option>
-                      ))}
-                    </select>
+                    <Select aria-label={t('aiProvider.credentialModal.compatibilityMode')} value={customShape} onValueChange={(selectedValue) => { setCustomShape(selectedValue as WireShape); gate.reset() }}
+                      options={SHAPE_ORDER.map((shape) => ({ value: shape, label: [WIRE_SHAPE_GUIDANCE[shape], " — ", agentNames(compatibleAgentIds({ [shape]: '' }, agents))].join('') }))}
+                    />
                   </Field>
                   <Field label={t('aiProvider.credentialModal.baseUrl')} description={t('aiProvider.credentialModal.baseUrlHelp')}>
                     <input
-                      className={inputClass + ' font-mono text-[12px]'}
+                      className={inputClass + ' font-mono text-base'}
                       value={customUrl}
                       onChange={(event) => { setCustomUrl(event.target.value); gate.reset() }}
                       placeholder="https://provider.example/v1"
@@ -410,10 +406,12 @@ export function CredentialModal({ mode, cred, presets, agents, initialPresetId, 
                       label={t('aiProvider.credentialModal.accountRegion')}
                       description={preset.setup?.regionHelp ?? t('aiProvider.credentialModal.accountRegionHelp')}
                     >
-                      <select className={inputClass} value={regionId} onChange={(event) => { setRegionId(event.target.value); gate.reset() }}>
-                        {usingStoredRegion && <option value={STORED_REGION_ID}>{t('aiProvider.credentialModal.storedEndpoint')}</option>}
-                        {regions.map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}
-                      </select>
+                      <Select aria-label={t('aiProvider.credentialModal.accountRegion')} value={regionId} onValueChange={(selectedValue) => { setRegionId(selectedValue); gate.reset() }}
+                        options={[
+                          ...(usingStoredRegion ? [{ value: STORED_REGION_ID, label: t('aiProvider.credentialModal.storedEndpoint') }] : []),
+                          ...regions.map((item) => ({ value: item.id, label: item.label })),
+                        ]}
+                      />
                     </Field>
                   )}
                 </>
@@ -421,7 +419,7 @@ export function CredentialModal({ mode, cred, presets, agents, initialPresetId, 
 
               <div className="border-y border-border/60 py-2.5">
                 <div className="flex flex-wrap items-center gap-1.5">
-                  <span className="mr-1 text-[11px] leading-[15px] font-medium text-foreground">{t('aiProvider.credentialModal.compatibleRuntimes')}</span>
+                  <span className="mr-1 text-sm leading-5 font-medium text-foreground">{t('aiProvider.credentialModal.compatibleRuntimes')}</span>
                   {compatibleAgents.map((agentId) => (
                     <span key={agentId} className="inline-flex min-h-6 items-center gap-1.5 text-[10.5px] leading-[15px] text-muted-foreground">
                       <AgentRuntimeIcon agentId={agentId} className="size-4 shrink-0" />
@@ -469,6 +467,7 @@ export function CredentialModal({ mode, cred, presets, agents, initialPresetId, 
               >
                 <ModelCombobox
                   value={model}
+                  vendor={VENDOR_BY_PRESET[preset.id]}
                   suggestions={models}
                   onChange={setModel}
                   placeholder={t('modelCatalog.selectPlaceholder')}
@@ -479,11 +478,11 @@ export function CredentialModal({ mode, cred, presets, agents, initialPresetId, 
               </Field>
 
               {!isDirect && <details className="rounded-lg border border-border bg-secondary/20 px-3 py-2">
-                <summary className="cursor-pointer select-none text-[11px] text-muted-foreground hover:text-foreground">
+                <DetailsSummary>
                   {t('aiProvider.credentialModal.endpointDetails')}
-                </summary>
+                </DetailsSummary>
                 <div className="mt-2 space-y-1.5 border-t border-border/60 pt-2">
-                  {shapes.length === 0 && <p className="text-[11px] text-muted-foreground">{t('aiProvider.credentialModal.noEndpoint')}</p>}
+                  {shapes.length === 0 && <p className="text-sm text-muted-foreground">{t('aiProvider.credentialModal.noEndpoint')}</p>}
                   {shapes.map((shape) => (
                     <div key={shape} className="grid grid-cols-[125px_minmax(0,1fr)] gap-2 text-[10.5px]">
                       <span className="text-muted-foreground">{WIRE_SHAPE_GUIDANCE[shape]}</span>
@@ -500,11 +499,11 @@ export function CredentialModal({ mode, cred, presets, agents, initialPresetId, 
               )}
 
               {error && (
-                <p className="min-w-0 max-w-full whitespace-pre-wrap break-words text-[12px] text-destructive">{error}</p>
+                <p className="min-w-0 max-w-full whitespace-pre-wrap break-words text-sm text-destructive">{error}</p>
               )}
-              {gate.testing && <p className="text-[12px] text-muted-foreground">{t('aiProvider.credentialModal.testingConnection')}</p>}
+              {gate.testing && <p className="text-sm text-muted-foreground">{t('aiProvider.credentialModal.testingConnection')}</p>}
               {gate.result && !staleResult && (
-                <div className={`min-w-0 max-w-full overflow-hidden rounded-lg px-3 py-2.5 text-[12px] ${gate.result.ok ? 'bg-success/10 text-success' : 'bg-destructive/10 text-destructive'}`}>
+                <div className={`min-w-0 max-w-full overflow-hidden rounded-lg px-3 py-2.5 text-sm ${gate.result.ok ? 'bg-success/10 text-success' : 'bg-destructive/10 text-destructive'}`}>
                   {gate.result.ok ? (
                     gate.result.response?.trim() ? (
                       <>
@@ -527,7 +526,7 @@ export function CredentialModal({ mode, cred, presets, agents, initialPresetId, 
                 </div>
               )}
               {staleResult && (
-                <p className="text-[11px] text-warning/90">{t('aiProvider.credentialModal.formChanged')}</p>
+                <p className="text-sm text-warning/90">{t('aiProvider.credentialModal.formChanged')}</p>
               )}
           </>
         )}
@@ -535,7 +534,7 @@ export function CredentialModal({ mode, cred, presets, agents, initialPresetId, 
 
       {preset && (
         <div className="grid shrink-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-3 border-t border-border bg-secondary/30 px-4 py-2.5 sm:px-5 sm:py-3">
-          <div className="min-w-0 text-[11px] leading-snug text-muted-foreground sm:text-[12px]">
+          <div className="min-w-0 text-sm leading-snug text-muted-foreground sm:text-sm">
             {tested ? (
               <span className="inline-flex items-center gap-2 text-success">
                 <span className="h-2 w-2 shrink-0 rounded-full bg-success" />

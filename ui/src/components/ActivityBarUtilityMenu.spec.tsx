@@ -119,7 +119,7 @@ describe('ActivityBarUtilityMenu', () => {
     const trigger = screen.getByRole('button', { name: 'Alice’s Settings: Open application menu' })
     expect(trigger.querySelector('img')?.getAttribute('src')).toBe(aliceWave)
     expect(trigger.querySelector('img')?.parentElement?.classList.contains('rounded-full')).toBe(true)
-    expect(trigger.textContent).toBe(compactRail ? '' : 'Alice’s Settings')
+    expect(trigger.textContent).toBe(compactRail ? '1' : 'Alice’s Settings1')
     expect(trigger.className).not.toContain('bg-sidebar-accent text-sidebar-accent-foreground')
     trigger.focus()
     await user.keyboard('{ArrowDown}')
@@ -136,7 +136,7 @@ describe('ActivityBarUtilityMenu', () => {
 it('uses the blue avatar breadcrumb for setup failures without claiming an available update', async () => {
   mocks.guidance = { availableCount: 0, needsAttentionCount: 0, setupCount: 1 }
   const { rerender } = render(<ActivityBarUtilityMenu compactRail denseRail={false} onOpenSettings={vi.fn()} onOpenConnectors={vi.fn()} />)
-  expect(screen.getByRole('status', { name: 'projectSetup.title' }).className).toContain('bg-primary')
+  expect(screen.getByRole('status', { name: 'projectSetup.title' }).className).toContain('bg-info/12')
   await userEvent.setup().click(screen.getByRole('button', { name: 'Alice’s Settings: Open application menu' }))
   expect(screen.getByRole('menuitem', { name: /Settings.*projectSetup.title/ })).toBeTruthy()
   expect(screen.queryByLabelText('1 updates available')).toBeNull()

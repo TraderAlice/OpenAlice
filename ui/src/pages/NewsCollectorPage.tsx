@@ -1,8 +1,11 @@
-import { useMemo, useState } from 'react'
-import { X } from 'lucide-react'
+import { useMemo, useRef, useState } from 'react'
+import { Plus, X } from 'lucide-react'
 import { type AppConfig, type NewsCollectorConfig, type NewsCollectorFeed } from '../api'
 import { SaveIndicator } from '../components/SaveIndicator'
 import { ConfigSection, Field, SettingsScrollArea, inputClass } from '../components/form'
+import { CountBadge } from '../components/CountBadge'
+import { ContextHelp } from '../components/ContextHelp'
+import { Collapsible, CollapsibleContent, CollapsibleDetailsTrigger, CollapsibleTrigger } from '../components/ui/collapsible'
 import { Toggle } from '../components/Toggle'
 import { useConfigPage } from '../hooks/useConfigPage'
 import { PageHeader } from '../components/PageHeader'
@@ -20,7 +23,7 @@ const DEFAULT_NEWS_CONFIG: NewsCollectorConfig = {
 }
 
 function CollectorSettings() {
-  const { config, status, loadError, updateConfig, updateConfigImmediate, retry } = useConfigPage<NewsCollectorConfig>({
+  const { config, status, loadError, updateConfig, updateConfigImmediate, reload, retry } = useConfigPage<NewsCollectorConfig>({
     section: 'news',
     extract: (full: AppConfig) => (full as Record<string, unknown>).news as NewsCollectorConfig,
   })
@@ -29,13 +32,10 @@ function CollectorSettings() {
   const enabled = cfg.enabled !== false
 
   return (
-    <div className="mx-auto w-full max-w-[880px]">
+    <div className="w-full max-w-[880px]">
       <div className="flex min-h-12 items-center justify-between gap-4 border-b border-border/60 py-2">
         <div className="min-w-0">
-          <p className="text-[13px] font-medium text-foreground">Collect articles</p>
-          <p className="mt-0.5 text-[12px] leading-5 text-muted-foreground">
-            Fetch enabled feeds on the configured schedule.
-          </p>
+          <p className="text-sm font-medium text-foreground">Collect articles</p>
         </div>
         <div className="flex shrink-0 items-center gap-3">
           <SaveIndicator status={status} onRetry={retry} />
@@ -43,32 +43,35 @@ function CollectorSettings() {
             ariaLabel="News collection"
             size="sm"
             checked={enabled}
+            disabled={!config}
             onChange={(v) => updateConfigImmediate({ enabled: v })}
           />
         </div>
       </div>
 
-      <div className={`${!enabled ? 'opacity-40 pointer-events-none' : ''}`}>
+      <fieldset disabled={!config || !enabled} className="min-w-0 disabled:opacity-50">
         {/* Collection Settings */}
         <ConfigSection
           title="Collection Settings"
-          description="Control how often articles are fetched and how long they are retained in the archive."
+          help="Control how often articles are fetched and how long they are retained in the archive."
         >
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <Field label="Fetch interval (min)">
+            <Field label="Fetch interval (min)" controlId="news-interval">
               <input
                 className={inputClass}
                 type="number"
                 min={1}
+                id="news-interval"
                 value={cfg.intervalMinutes}
                 onChange={(e) => updateConfig({ intervalMinutes: Number(e.target.value) || 10 })}
               />
             </Field>
-            <Field label="Retention (days)">
+            <Field label="Retention (days)" controlId="news-retention">
               <input
                 className={inputClass}
                 type="number"
                 min={1}
+                id="news-retention"
                 value={cfg.retentionDays}
                 onChange={(e) => updateConfig({ retentionDays: Number(e.target.value) || 7 })}
               />
@@ -77,15 +80,15 @@ function CollectorSettings() {
         </ConfigSection>
 
         {/* RSS Feeds */}
-        <FeedsSection
-          feeds={cfg.feeds}
+        {config && <FeedsSection
+          feeds={config.feeds}
           onChange={(feeds) => updateConfigImmediate({ feeds })}
-        />
-      </div>
+        />}
+      </fieldset>
       {loadError && (
         <div role="alert" className="mt-4 flex min-h-12 items-center justify-between gap-3 rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2">
-          <p className="text-[13px] text-destructive">Failed to load configuration.</p>
-          <Button type="button" variant="outline" size="sm" onClick={() => void retry()}>
+          <p className="text-sm text-destructive">Failed to load configuration.</p>
+          <Button type="button" variant="outline" size="sm" onClick={() => void reload()}>
             Retry
           </Button>
         </div>
@@ -130,60 +133,59 @@ function RssHubPresets({ feeds, onChange }: {
   const invalid = instance.trim().length > 0 && !baseUrl
 
   return (
-    <div className="mb-4 space-y-3 border-b border-border/60 pb-4">
-      <h4 className="text-[13px] font-medium">Chinese news via RSSHub</h4>
-      <p id="rsshub-help" className="text-[12px] leading-5 text-muted-foreground">
-        Use an RSSHub instance reachable from the OpenAlice backend, not just this browser.
-        OpenAlice does not install RSSHub. Public instances may block requests.
-        Restart Alice after saving to start collecting the new feeds.
-      </p>
-      <Field label="RSSHub instance URL" controlId="rsshub-instance">
-        <input
-          id="rsshub-instance"
-          type="url"
-          className={inputClass}
-          value={instance}
-          onChange={(event) => setInstance(event.target.value)}
-          placeholder="http://localhost:1200"
-          aria-invalid={invalid}
-          aria-describedby={invalid ? 'rsshub-help rsshub-error' : 'rsshub-help'}
-        />
-        {invalid && (
-          <p id="rsshub-error" role="alert" className="mt-1 text-[12px] text-destructive">
-            Enter an HTTP(S) instance URL without credentials, a query, or a fragment.
+    <Collapsible className="mb-4 border-b border-border/60 pb-3">
+      <CollapsibleDetailsTrigger>RSSHub</CollapsibleDetailsTrigger>
+      <CollapsibleContent keepMounted>
+        <div className="space-y-3 pt-3">
+          <p id="rsshub-help" className="text-sm leading-5 text-muted-foreground">
+            Connect an RSSHub instance reachable from the OpenAlice backend.
+            Restart Alice after saving to collect the new feeds.
           </p>
-        )}
-      </Field>
-      <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
-        {RSSHUB_PRESETS.map((preset) => {
-          const added = feeds.some((feed) => feed.source.trim().toLowerCase() === preset.source)
-          return (
-            <Button
-              key={preset.source}
-              type="button"
-              variant="outline"
-              disabled={!baseUrl || added}
-              onClick={() => {
-                if (!baseUrl || added) return
-                onChange([...feeds, {
-                  name: preset.name,
-                  source: preset.source,
-                  url: new URL(preset.route, baseUrl).href,
-                  description: preset.description,
-                  enabled: true,
-                }])
-              }}
-            >
-              {added ? 'Added' : 'Add'} {preset.name}
-            </Button>
-          )
-        })}
-      </div>
-      <p className="text-[12px] leading-5 text-muted-foreground">
-        Each preset saves a normal feed URL. Changing this address does not modify existing feeds;
-        remove and re-add a preset to move it to another instance.
-      </p>
-    </div>
+          <Field label="RSSHub instance URL" controlId="rsshub-instance">
+            <input
+              id="rsshub-instance"
+              type="url"
+              className={inputClass}
+              value={instance}
+              onChange={(event) => setInstance(event.target.value)}
+              placeholder="http://localhost:1200"
+              aria-invalid={invalid}
+              aria-describedby={invalid ? 'rsshub-help rsshub-error' : 'rsshub-help'}
+            />
+            {invalid && (
+              <p id="rsshub-error" role="alert" className="mt-1 text-sm text-destructive">
+                Enter an HTTP(S) instance URL without credentials, a query, or a fragment.
+              </p>
+            )}
+          </Field>
+          <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
+            {RSSHUB_PRESETS.map((preset) => {
+              const added = feeds.some((feed) => feed.source.trim().toLowerCase() === preset.source)
+              return (
+                <Button
+                  key={preset.source}
+                  type="button"
+                  variant="outline"
+                  disabled={!baseUrl || added}
+                  onClick={() => {
+                    if (!baseUrl || added) return
+                    onChange([...feeds, {
+                      name: preset.name,
+                      source: preset.source,
+                      url: new URL(preset.route, baseUrl).href,
+                      description: preset.description,
+                      enabled: true,
+                    }])
+                  }}
+                >
+                  {added ? 'Added' : 'Add'} {preset.name}
+                </Button>
+              )
+            })}
+          </div>
+        </div>
+      </CollapsibleContent>
+    </Collapsible>
   )
 }
 
@@ -198,6 +200,8 @@ export function FeedsSection({
   const [newUrl, setNewUrl] = useState('')
   const [newSource, setNewSource] = useState('')
   const [newDescription, setNewDescription] = useState('')
+  const addFeedRef = useRef<HTMLButtonElement>(null)
+  const feedNameRef = useRef<HTMLInputElement>(null)
   const [pendingRemoval, setPendingRemoval] = useState<{
     feed: NewsCollectorFeed
     index: number
@@ -227,16 +231,13 @@ export function FeedsSection({
     setNewUrl('')
     setNewSource('')
     setNewDescription('')
+    feedNameRef.current?.focus()
   }
 
   return (
     <ConfigSection
       title="RSS Feeds"
-      description={
-        feeds.length > 0
-          ? `${activeCount} of ${feeds.length} feed${feeds.length > 1 ? 's' : ''} active.`
-          : 'Add a feed to start collecting articles.'
-      }
+      accessory={<CountBadge count={activeCount} label={`${activeCount} of ${feeds.length} feeds active`} />}
     >
       <RssHubPresets feeds={feeds} onChange={onChange} />
       {/* Existing feeds */}
@@ -247,7 +248,7 @@ export function FeedsSection({
             return (
               <div
                 key={`${feed.source}-${i}`}
-                className={`flex min-h-12 items-center gap-3 rounded-lg border border-border/60 px-3 py-2.5 ${isEnabled ? '' : 'opacity-50'}`}
+                className={`flex min-h-12 items-center gap-3 rounded-lg border border-border/60 px-3 py-2.5 ${isEnabled ? 'bg-background' : 'bg-muted/30'}`}
               >
                 <Toggle
                   ariaLabel={feed.name}
@@ -256,17 +257,15 @@ export function FeedsSection({
                   onChange={(v) => setEnabled(i, v)}
                 />
                 <div className="flex-1 min-w-0">
-                  <p className="text-[13px] font-medium text-foreground truncate">{feed.name}</p>
-                  {feed.description && (
-                    <p className="text-[12px] text-muted-foreground/80 truncate">{feed.description}</p>
-                  )}
-                  <p className="text-[11px] text-muted-foreground/60 truncate mt-0.5">{feed.url}</p>
-                  <div className="flex items-center gap-2 mt-0.5">
-                    <span className="text-[11px] text-muted-foreground/50">source: {feed.source}</span>
-                    {feed.categories && feed.categories.length > 0 && (
-                      <span className="text-[11px] text-muted-foreground/50">categories: {feed.categories.join(', ')}</span>
-                    )}
+                  <div className="flex min-w-0 items-center gap-1">
+                    <p className="truncate text-sm font-medium text-foreground">{feed.name}</p>
+                    <ContextHelp label={feed.name}>{[
+                      feed.description,
+                      `Source: ${feed.source}`,
+                      feed.categories?.length ? `Categories: ${feed.categories.join(', ')}` : '',
+                    ].filter(Boolean).join('. ')}</ContextHelp>
                   </div>
+                  <p className="mt-0.5 truncate text-sm text-muted-foreground" title={feed.url}>{feed.url}</p>
                 </div>
                 <Button
                   type="button"
@@ -286,47 +285,52 @@ export function FeedsSection({
       )}
 
       {/* Add feed form */}
-      <div className="space-y-3 rounded-lg border border-border/60 p-4">
-        <p className="text-[13px] font-medium text-foreground">Add Feed</p>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          <Field label="Name">
-            <input className={inputClass} value={newName} onChange={(e) => setNewName(e.target.value)} placeholder="e.g. CoinDesk" />
-          </Field>
-          <Field label="Source Tag">
-            <input className={inputClass} value={newSource} onChange={(e) => setNewSource(e.target.value)} placeholder="e.g. coindesk" />
-          </Field>
-        </div>
-        <Field label="Feed URL">
-          <input
-            className={inputClass}
-            type="url"
-            value={newUrl}
-            onChange={(e) => setNewUrl(e.target.value)}
-            placeholder="https://example.com/rss.xml"
-            aria-invalid={showFeedUrlError}
-            aria-describedby={showFeedUrlError ? 'news-feed-url-error' : undefined}
-          />
-          {showFeedUrlError && (
-            <p id="news-feed-url-error" role="alert" className="mt-1 text-[12px] text-destructive">
-              Enter a valid URL, for example https://example.com/rss.xml.
-            </p>
-          )}
-        </Field>
-        <Field label="Description (optional)">
-          <input className={inputClass} value={newDescription} onChange={(e) => setNewDescription(e.target.value)} placeholder="Short description shown in the feed list" />
-        </Field>
-        <Button
-          type="button"
-          onClick={addFeed}
-          disabled={!newName.trim() || !feedUrlValid || !newSource.trim()}
-          variant="outline"
-        >
-          Add Feed
-        </Button>
-      </div>
+      <Collapsible defaultOpen={feeds.length === 0}>
+        <CollapsibleTrigger ref={addFeedRef} render={<Button variant="outline" className="mb-3" />}><Plus aria-hidden />New feed</CollapsibleTrigger>
+        <CollapsibleContent keepMounted>
+          <form className="space-y-3 rounded-lg border border-border/60 p-4" onSubmit={(event) => { event.preventDefault(); addFeed() }}>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <Field label="Name" controlId="news-feed-name">
+                <input ref={feedNameRef} id="news-feed-name" className={inputClass} value={newName} onChange={(e) => setNewName(e.target.value)} placeholder="e.g. CoinDesk" />
+              </Field>
+              <Field label="Source Tag" controlId="news-feed-source">
+                <input id="news-feed-source" className={inputClass} value={newSource} onChange={(e) => setNewSource(e.target.value)} placeholder="e.g. coindesk" />
+              </Field>
+            </div>
+            <Field label="Feed URL" controlId="news-feed-url">
+              <input
+                className={inputClass}
+                type="url"
+                id="news-feed-url"
+                value={newUrl}
+                onChange={(e) => setNewUrl(e.target.value)}
+                placeholder="https://example.com/rss.xml"
+                aria-invalid={showFeedUrlError}
+                aria-describedby={showFeedUrlError ? 'news-feed-url-error' : undefined}
+              />
+              {showFeedUrlError && (
+                <p id="news-feed-url-error" role="alert" className="mt-1 text-sm text-destructive">
+                  Enter a valid URL, for example https://example.com/rss.xml.
+                </p>
+              )}
+            </Field>
+            <Field label="Description (optional)" controlId="news-feed-description">
+              <input id="news-feed-description" className={inputClass} value={newDescription} onChange={(e) => setNewDescription(e.target.value)} placeholder="Short description shown in the feed list" />
+            </Field>
+            <Button
+              type="submit"
+              disabled={!newName.trim() || !feedUrlValid || !newSource.trim()}
+              variant="outline"
+            >
+              Add Feed
+            </Button>
+          </form>
+        </CollapsibleContent>
+      </Collapsible>
 
       {pendingRemoval && (
         <ConfirmDialog
+          fallbackFocusRef={addFeedRef}
           title={`Remove ${pendingRemoval.feed.name}?`}
           message={(
             <>
@@ -355,7 +359,7 @@ export function NewsCollectorPage() {
     <div className="flex flex-col flex-1 min-h-0">
       <PageHeader title="News Collector" />
 
-      <SettingsScrollArea className="px-4 py-5 md:px-8">
+      <SettingsScrollArea>
         <CollectorSettings />
       </SettingsScrollArea>
     </div>

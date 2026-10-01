@@ -1,0 +1,17 @@
+:root {
+  --motion-fast: 110ms;
+  --motion-standard: 160ms;
+  --motion-slow: 250ms;
+  --motion-ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --motion-ease-standard: cubic-bezier(0.2, 0, 0, 1);
+  --motion-ease-drawer: cubic-bezier(0.32, 0.72, 0, 1);
+  --status-indicator-spin-dur:    900ms;
+  --status-indicator-pop-dur: var(--motion-slow);
+  --status-indicator-pop-ease:    var(--motion-ease-out);
+  --status-indicator-fill-dur: var(--motion-standard);
+  --status-indicator-draw-dur: var(--motion-standard);
+  --status-indicator-draw-delay: 0ms;
+  --status-indicator-draw-ease:   var(--motion-ease-out);
+  --status-indicator-ring-w: 1.5px;
+  --status-indicator-mark-w:      2;
+}

@@ -1,5 +1,7 @@
 import { Filter, SlidersHorizontal, List, ChevronDown, Search, X } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
+import { SegmentedControl } from './SegmentedControl'
+import { CountBadge } from './CountBadge'
 import { Switch } from './ui/switch'
 import { Button } from './ui/button'
 import { Popover, PopoverTrigger, PopoverContent } from './ui/popover'
@@ -32,14 +34,16 @@ export function IssueListToolbar({ view, onChange, workspaces, visible, total }:
   const clear = () => onChange({ query: '', statuses: [], priorities: [], workspace: '', assignee: 'all', schedule: 'all' })
   return <div className="sticky top-0 z-20 bg-background pb-2 pt-1">
     <div className="flex min-h-11 flex-wrap items-center justify-between gap-2 px-2">
-      <div role="group" aria-label={label('views')} className="flex gap-1.5">
-        {(['active', 'backlog', 'all'] as const).map((tab) => <Button key={tab} variant="outline" size="sm" aria-pressed={view.tab === tab} onClick={() => onChange({ tab })} className={`rounded-full px-3 font-medium ${view.tab === tab ? 'bg-muted border-transparent' : 'bg-background'}`}>{label(tab)}</Button>)}
+      <div className="flex min-w-0 items-center gap-2">
+        <SegmentedControl value={view.tab} onChange={(tab) => onChange({ tab })} ariaLabel={label('views')}
+          options={(['active', 'backlog', 'all'] as const).map((value) => ({ value, label: label(value) }))} />
+        <CountBadge count={visible} label={t('issues.view.results', { count: visible, total })} />
       </div>
       <div className="flex items-center gap-1.5">
-        <Popover><PopoverTrigger aria-label={label('filter')} title={label('filter')} className={`flex size-8 items-center justify-center rounded-full border border-border hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${count ? 'bg-muted' : ''}`}><Filter size={15} /></PopoverTrigger>
+        <Popover><PopoverTrigger aria-label={label('filter')} title={label('filter')} className={`flex min-h-8 items-center justify-center gap-1.5 rounded-md border border-border px-2 hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${count ? 'bg-muted' : ''}`}><Filter size={15} /><span className="hidden text-xs sm:inline">{label('filter')}</span>{count > 0 && <CountBadge count={count} label={`${label('filter')}: ${count}`} />}</PopoverTrigger>
           <PopoverContent align="end" className="w-80 max-w-[calc(100vw-2rem)] max-h-[calc(100dvh-6rem)] overflow-y-auto space-y-4 p-4">
             <div className="flex items-center justify-between"><h3 className="text-sm font-medium">{label('filter')}</h3>{count > 0 && <Button variant="ghost" size="sm" onClick={clear}>{label('clear')}</Button>}</div>
-            <label className="flex h-9 items-center gap-2 rounded-md border border-input px-2"><Search size={14} className="text-muted-foreground" /><input aria-label={label('search')} placeholder={label('search')} value={view.query} onChange={(event) => onChange({ query: event.target.value })} className="min-w-0 flex-1 bg-transparent text-sm outline-none" /></label>
+            <label className="flex h-9 items-center gap-2 rounded-md border border-input px-2"><Search size={14} className="text-muted-foreground" /><input aria-label={label('search')} placeholder={label('search')} value={view.query} onChange={(event) => onChange({ query: event.target.value })} className="min-w-0 flex-1 bg-transparent text-base outline-none" /></label>
             {(['statuses', 'priorities'] as const).map((field) => <fieldset key={field}><legend className="mb-2 text-xs text-muted-foreground">{label(field)}</legend><div className="flex flex-wrap gap-1.5">
               {(field === 'statuses' ? ['backlog', 'todo', 'in_progress', 'done', 'canceled'] : ['none', 'urgent', 'high', 'medium', 'low']).map((value) => <Button key={value} variant="outline" size="sm" aria-pressed={view[field].includes(value)} className={`rounded-full text-xs ${view[field].includes(value) ? 'bg-muted border-foreground/30' : ''}`} onClick={() => onChange({ [field]: view[field].includes(value) ? view[field].filter((item) => item !== value) : [...view[field], value] })}>{field === 'priorities' && value === 'none' ? t('issues.priority.label', { priority: t('issues.priority.none') }) : t(`issues.${field === 'statuses' ? 'status' : 'priority'}.${value}` as 'issues.status.todo')}</Button>)}
             </div></fieldset>)}

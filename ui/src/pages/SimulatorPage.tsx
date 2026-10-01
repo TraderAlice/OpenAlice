@@ -112,7 +112,7 @@ function TopBar({ utas, selectedId, onSelect, cash, onRefresh }: {
       </Button>
 
       {cash !== undefined && (
-        <span className="ml-auto text-[12px] font-medium text-muted-foreground">
+        <span className="ml-auto text-sm font-medium text-muted-foreground">
           Cash <span className="ml-1.5 font-mono text-sm text-foreground">
             ${Number(cash).toLocaleString(getIntlLocale(), { minimumFractionDigits: 2 })}
           </span>

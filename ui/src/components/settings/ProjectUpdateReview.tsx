@@ -6,7 +6,7 @@ import { useUpdateLifecycle } from '../../hooks/useUpdateLifecycle'
 import { useWorkspaces } from '../../contexts/workspaces-context'
 import { workspacePlanIsCurrent, workspacePlanRequest } from '../../lib/updates/workspacePlans'
 import { Button } from '../ui/button'
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '../ui/collapsible'
+import { Collapsible, CollapsibleContent, CollapsibleDetailsTrigger } from '../ui/collapsible'
 
 /** One project decision, executed by the existing durable update owner. */
 export function ProjectUpdateReview({ onClose }: { onClose(): void }) {
@@ -117,7 +117,7 @@ export function ProjectUpdateReview({ onClose }: { onClose(): void }) {
         {!rows.length && !loading && !pendingPreview && !previewError && <p className="text-sm text-muted-foreground">{t('settings.versions.current')}</p>}
         {rows.length > 0 && <>
           <div><h4 className="text-sm font-medium">{t('settings.versions.impact')}</h4><p className="mt-2 text-sm leading-6 text-muted-foreground">{t('settings.versions.projectImpact')}</p></div>
-          <Collapsible><CollapsibleTrigger className="flex w-full items-center justify-between border-y border-border py-3 text-sm">{t('settings.versions.changedFiles')}<span aria-hidden>⌄</span></CollapsibleTrigger><CollapsibleContent><div className="space-y-4 py-3">{rows.map(row => <div key={row.id}><p className="mb-1 text-xs font-medium">{row.label}</p>{row.paths.map(path => <p key={path} className="break-all py-0.5 font-mono text-xs text-muted-foreground">{path}</p>)}</div>)}</div></CollapsibleContent></Collapsible>
+          <Collapsible><CollapsibleDetailsTrigger>{t('settings.versions.changedFiles')}</CollapsibleDetailsTrigger><CollapsibleContent><div className="space-y-4 py-3">{rows.map(row => <div key={row.id}><p className="mb-1 text-xs font-medium">{row.label}</p>{row.paths.map(path => <p key={path} className="break-all py-0.5 font-mono text-xs text-muted-foreground">{path}</p>)}</div>)}</div></CollapsibleContent></Collapsible>
         </>}
         {plan?.blockers.filter(reason => !rows.some(row => row.preview.blockers.includes(reason))).map(reason => <p key={reason} role="alert" className="break-words text-sm text-warning">{blockerLabels[reason] ?? reason}</p>)}
       </>}
