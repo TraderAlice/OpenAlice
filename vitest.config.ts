@@ -63,6 +63,7 @@ export default defineConfig({
         },
       },
       {
+        esbuild: { jsx: 'automatic', jsxImportSource: 'react' },
         resolve: {
           alias: uiAliases,
         },

@@ -277,12 +277,10 @@ for changed runner/configuration, executable tests, or product code. Typechecks
 and real surfaces apply when their code or behavior changes; explain why a
 check is applicable or not rather than inventing runtime acceptance.
 
-Scenario, protocol and owner are separate selection dimensions: values within
-one dimension are ORed, dimensions are ANDed. An owner/scenario intersection
-can exclude part of an affected protocol; run that protocol regression
-independently as well. Inspect owner/package/path evidence beyond group
-metadata: an owner-only spec without a scenario mapping is not proof of
-irrelevance. `pnpm test:critical` always runs its complete declared evidence;
+Suite, tier and owner are separate selection dimensions: values within one
+are ORed, dimensions are ANDed. A focused intersection can exclude affected
+behavior; inspect unit/owner/package tests beyond registered high-level suites.
+Unit tests intentionally require no suite registration. `pnpm test:critical` always runs its complete declared evidence;
 neither focused development feedback nor this ladder may trim it or weaken its
 existing CI requirement.
 
@@ -353,17 +351,16 @@ delivery lane:
   block related commits, but only the latest head is evidence and a completed
   failure blocks further scope until repaired. CI never grants merge authority.
 - A push to `dev` is a CLI-only rolling publication lane. It does not run the
-  generic CI workflow, build Electron, or build Docker. Six native CLI candidates
-  are assembled from one shared server input. macOS/Linux candidates run packaged
-  Guardian/Alice, Web, Workspace, PTY, and release-owned Git acceptance before
-  one atomic dev manifest is activated. Windows x64/ARM64 cross-build on Linux;
-  their native runner acceptance is manual or stable-only, so a Windows queue
-  is not a dev/beta publication dependency. Native rehearsal preserves artifacts
-  first and may replay acceptance after installer/fixture fixes. The heavier UTA/Connector recovery and
-  external Broker Pack fixture run once on Linux x64; manual Full Source
-  Validation and final Release lanes keep broader native-host coverage. Full
-  Source Validation is an explicit maintainer action when that broader
-  Ubuntu/macOS backstop is useful.
+  generic CI workflow or build Electron/a product Docker image. Native CLI
+  candidates share one verified server input. macOS/Linux candidates exercise
+  packaged Guardian/Alice, Web, Workspace, PTY, and release-owned Git before
+  atomic manifest activation. Windows CLI candidates cross-build without the
+  native executable acceptance used by the explicit Windows lanes.
+  However, CLI builds depend on the complete native Broker Pack matrix,
+  including Windows x64/ARM64 runners: those queues can block dev publication.
+  Native rehearsal preserves artifacts for later replay after fixture fixes.
+  The heavier UTA/Connector recovery fixture runs once on Linux x64; manual
+  Full Source Validation and final Release lanes retain their broader coverage.
 - Installer or distributed-CLI work proves the checked-out tree locally with
   the deterministic clean-container HTTP install. A routine `dev` PR does not
   purchase a second hosted copy of that fixture. After merge, the `dev` push

@@ -4,7 +4,6 @@ import { resolve, dirname } from 'node:path'
 
 import {
   assertLivePaperAcknowledgement,
-  livePaperExcludes,
   livePaperIncludes,
 } from './scripts/test-lanes.mjs'
 
@@ -31,7 +30,6 @@ export default {
   test: {
     forceRerunTriggers: collectionWideTestInputs(__dirname),
     include: livePaperIncludes,
-    exclude: livePaperExcludes,
     testTimeout: 60_000,
     fileParallelism: false,
     pool: 'forks',

@@ -158,19 +158,18 @@ development/CLI operation that may stop an owner of the same home. Separate
 homes are the normal choice for concurrent worktrees; takeover is recovery,
 not concurrency.
 
-Bare `openalice` exposes those separate homes through `i AliceProjects`. The
-machine-local Supervisor registry lives outside every complete home. It always
-retains the implicit `default`, may register named homes, and remembers the
-selected name for the next bare start. Creating or selecting an entry does not
-move, copy, stop, or delete another home. Named entries require an explicit
-separate Home; equal and nested registered paths are rejected. An inherited
-existing target must be empty or recognizable as an OpenAlice home. An
-accepted target is created/canonicalized during registration; if that
-registered path later disappears, a bare Supervisor launch keeps the entry,
-falls back to an available project, and directs the user to `i AliceProjects` to
-repair the remembered selection. An explicit environment/flag selection fails
-instead of falling back, so automation cannot accidentally target another
-Home. The missing path is never silently recreated. An inherited Web port
+Bare `openalice` exposes registered homes through AliceProjects. The
+machine-local Supervisor registry lives outside every complete home and stores
+the shared Machine/AliceProject Default. Creating an entry does not select it
+or move, copy, stop, or delete another home. Named projects require a separate
+home; equal and nested registered paths are rejected.
+
+If the remembered home disappears, retain the registry entry and show the
+startup chooser or a visible target error. Do not attach to another available
+project or silently recreate the missing path. Explicit environment/flag
+selection also remains authoritative rather than falling back.
+
+An inherited Web port
 remains automatic from 47331 so concurrent AliceProjects probe upward, while a
 configured port is intentionally pinned. First Alice boot must not write
 `data/config/ports.json` merely to materialize that default: a file `web`
@@ -230,10 +229,16 @@ for released automation only.
 
 ## Switching and Failure Safety
 
-Switching never moves, copies, merges, or deletes current data. The desktop
-validates the target, saves the selection, then performs a full Guardian
-restart. The newly selected home may be empty or an existing OpenAlice home.
-A non-empty unrelated directory requires confirmation.
+Selection never moves, copies, merges, or deletes project data. Startup chooses
+a registered Machine/AliceProject; explicit create may prepare a new or empty
+home and rejects an unrelated non-empty directory. Verify the target and
+successful client presentation before remembering the shared Default. A failed
+switch preserves the old connection and Default.
+
+The retired Electron directory picker, recent-home list, and ask-on-startup
+setting are not alternative selection authorities. Integrated/separated mode
+transitions and owned-child retirement follow [[docs/remote-access.md]];
+complete-home ownership remains with the selected AliceProject.
 
 `openalice project copy-ai-creds` is the explicit exception for AI credential
 rows in `<home>/data/config/ai-provider-manager.json`. It merges only the

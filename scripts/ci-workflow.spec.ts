@@ -96,6 +96,7 @@ describe('CI workflow authority lanes', () => {
       'pnpm test:contract:workflow',
       'pnpm test:critical --receipt artifacts/tests/critical-local.json',
       'pnpm build',
+      'pnpm exec tsc -p tests/tsconfig.json --noEmit',
     ])
     expect(commands(cleanBuild)).not.toContain('npx tsc --noEmit')
     expect(commands(cleanBuild)).not.toContain('pnpm test')

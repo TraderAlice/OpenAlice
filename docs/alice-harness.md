@@ -24,14 +24,16 @@ accepted and available revisions separately.
 
 ## Ownership
 
-Alice Harness owns complete trees for `alice`, `alice-analysis`, `alice-uta`,
-`traderhub`, `self-scheduling`, and `file-delivery`, plus removal/reconciliation of legacy
-`alice-workspace` copies. `.agents/skills` is primary and `.claude/skills` is its
-runtime mirror; old `.pi/skills` duplicates are included only for reconciliation.
-Template-declared instructions, README and other bundled Skills remain template
-owned. Existing template baselines may contain these trees, but template plans
-exclude Alice-owned paths. Source upgrades remain ordinary upstream Git merges
-and do not advance Alice injection metadata.
+`ALICE_HARNESS_SKILLS` in `src/workspaces/alice-harness-policy.ts` is the
+authoritative catalog of complete Alice-owned Skill trees, including the
+`market-data` raw-history capability. The legacy catalog additionally covers
+removal/reconciliation of `alice-workspace` copies. `.agents/skills` is primary
+and `.claude/skills` is its runtime mirror; old `.pi/skills` duplicates are
+included only for reconciliation. Template-declared instructions, README and
+other bundled Skills remain template owned. Existing template baselines may
+contain these trees, but template plans exclude Alice-owned paths. Source
+upgrades remain ordinary upstream Git merges and do not advance Alice injection
+metadata.
 
 ## Workspace configuration
 

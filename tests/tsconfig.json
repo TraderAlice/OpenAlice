@@ -4,8 +4,26 @@
     "allowJs": true,
     "checkJs": false,
     "noEmit": true,
-    "rootDir": ".."
+    "rootDir": "..",
+    "allowImportingTsExtensions": true,
+    "jsx": "react-jsx",
+    "paths": {
+      "@/*": [
+        "../src/*",
+        "../ui/src/*"
+      ]
+    },
+    "declaration": false
   },
-  "include": ["./**/*.spec.ts", "../scripts/test-groups.spec.ts", "../scripts/test-lanes.spec.ts", "../scripts/test-collection-inputs.spec.ts", "../scripts/test-results.spec.ts", "../scripts/workspace-acceptance-receipt.spec.ts"],
-  "exclude": ["../node_modules", "../dist"]
+  "include": [
+    "./**/*.spec.ts",
+    "./**/*.spec.tsx",
+    "../ui/src/vite-env.d.ts",
+    "../ui/src/i18n/i18n.d.ts",
+    "../scripts/workspace-acceptance-receipt.spec.ts"
+  ],
+  "exclude": [
+    "../node_modules",
+    "../dist"
+  ]
 }

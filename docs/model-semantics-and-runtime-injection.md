@@ -537,8 +537,9 @@ The visible effective choices are sufficient disclosure there: selecting a
 vault credential must not rewrite the Workspace, and changing a creation
 default never rewrites an existing Workspace. Successful explicit Workspace
 saves use transient confirmation instead of a permanent success state.
-This disclosure applies to all four supported Agent runtimes. Claude Code and
-Codex use their native global login and global runtime configuration by default.
+This disclosure applies to registered Agent runtimes according to their
+declared capabilities, not a fixed four-runtime set. Claude Code and Codex use
+their native global login and global runtime configuration by default.
 Merely storing a compatible credential in Alice never selects or injects it;
 only an explicit Session selection, Workspace fixed/recent preference, or
 new-Workspace creation seed overrides the native fallback. The visible values
@@ -673,7 +674,9 @@ Tests for this subsystem must cover:
 - exact ids and declared aliases resolve, while unknown ids remain unknown;
 - omitted semantic fields do not become false during serialization;
 - registered reasoning models reach Pi and opencode without a manual toggle;
-- explicit effort choices round-trip through all four native runtimes;
+- explicit effort choices round-trip through adapters that declare effort
+  support, preserving runtime-specific representation such as Cursor's
+  model-encoded effort rather than inventing a universal wire field;
 - omitted effort remains absent even when the selected model publishes a default;
 - provider-only thinking switches never become fabricated effort values;
 - non-reasoning and unknown models do not receive fabricated capabilities;

@@ -24,8 +24,9 @@ emits them. Completion stays on `runtime.stopped` with clipped assistant
 text and block metrics. Tool input/output and the user prompt stay out —
 they already live in the structured run snapshot and conversation log.
 TUI has no equivalent extractor yet, so headed Sessions still only write
-occupancy. The journal is not a dispatch authority. Office reads this file;
-Automation → Runs remains the current headless-task table.
+occupancy. This is the Agent family of [[docs/product-activity-journal.md]],
+not a dispatch authority. Office reads the journal; Developer → Runs at
+`/settings/developer/runs` is the current headless-task table.
 
 ## One Object, Two Roles
 
@@ -552,15 +553,15 @@ evidence beyond changed-file imports.
 npx tsc --noEmit
 pnpm vitest run \
   src/workspaces/headless-output.spec.ts \
-  src/workspaces/headless-task.spec.ts \
+  tests/integration/headless-process/headless-task.spec.ts \
   src/workspaces/headless-task-registry.spec.ts \
   src/webui/routes/headless.spec.ts \
   src/workspaces/issues/declaration.spec.ts \
-  src/workspaces/issues/mutate.spec.ts \
-  src/workspaces/issues/comment-delivery.spec.ts \
+  tests/integration/issue-lifecycle/mutate.spec.ts \
+  tests/integration/issue-lifecycle/comment-delivery.spec.ts \
   src/workspaces/issues/board.spec.ts \
-  src/webui/routes/issues.spec.ts \
-  src/workspaces/issues/auto-complete.spec.ts \
+  tests/integration/issue-routes/issues.spec.ts \
+  tests/integration/issue-lifecycle/auto-complete.spec.ts \
   src/workspaces/schedule/scanner.spec.ts
 ```
 

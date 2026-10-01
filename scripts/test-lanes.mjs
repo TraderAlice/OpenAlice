@@ -1,7 +1,7 @@
 import { existsSync, readdirSync, readFileSync } from 'node:fs'
 import { isAbsolute, relative, resolve } from 'node:path'
 
-import { centralTestDefinitions, coverageGroups, groupSpecFiles, selectCoverageGroups } from './test-groups.mjs'
+import { registeredTestDefinitions, selectTestSuites, tierForTestFile } from './test-suites.mjs'
 import { collectTestCommands as collectCommands } from './test-commands.mjs'
 export { systemCommandSuites } from './test-commands.mjs'
 
@@ -60,26 +60,10 @@ export const ownerSuites = {
 
 export const ownerSuiteNames = Object.freeze(Object.keys(ownerSuites))
 
-export const integrationIncludes = centralTestDefinitions.filter((test) => test.lane === 'integration').map((test) => test.path)
+export const integrationIncludes = registeredTestDefinitions.filter((test) => test.lane === 'integration').map((test) => test.path)
 
-export const externalReadonlyIncludes = [
-  'src/domain/market-data/__test__/e2e/market-data.e2e.spec.ts',
-  'src/domain/market-data/__tests__/bbProviders/*.bbProvider.spec.ts',
-  'services/uta/src/domain/trading/__test__/e2e/ccxt-hyperliquid-markets.e2e.spec.ts',
-  'services/uta/src/domain/trading/brokers/ccxt/CcxtBroker.e2e.spec.ts',
-  'packages/opentypebb/src/providers/twse/__tests__/twse.live.spec.ts',
-  'packages/ibkr/tests/e2e/connect.e2e.spec.ts',
-  'packages/ibkr/tests/e2e/contract-details.e2e.spec.ts',
-]
-
-export const livePaperIncludes = [
-  'services/uta/src/domain/trading/__test__/e2e/*.e2e.spec.ts',
-  'packages/ibkr/tests/e2e/order-precision.e2e.spec.ts',
-]
-
-export const livePaperExcludes = [
-  'services/uta/src/domain/trading/__test__/e2e/ccxt-hyperliquid-markets.e2e.spec.ts',
-]
+export const externalReadonlyIncludes = registeredTestDefinitions.filter(test => test.lane === 'external-readonly').map(test => test.path)
+export const livePaperIncludes = registeredTestDefinitions.filter(test => test.lane === 'live-paper').map(test => test.path)
 
 export const laneSuites = {
   hermetic: {
@@ -90,7 +74,7 @@ export const laneSuites = {
     runnable: true,
   },
   integration: {
-    config: 'vitest.e2e.config.ts',
+    config: 'vitest.integration.config.ts',
     description: 'Deterministic local product integration with hermetic state.',
     sideEffects: 'temporary local files and test-owned local processes only',
     prerequisites: ['workspace dependencies installed'],
@@ -130,10 +114,6 @@ export const laneSuites = {
 export const laneSuiteNames = Object.freeze(Object.keys(laneSuites))
 
 const workflowContractIncludes = [
-  'scripts/test-collection-inputs.spec.ts',
-  'scripts/test-lanes.spec.ts',
-  'scripts/test-groups.spec.ts',
-  'scripts/test-results.spec.ts',
   'scripts/classify-beta-release-prep.spec.mjs',
   'scripts/prepare-cli-neutral-inputs.spec.mjs',
   'scripts/ci-workflow.spec.ts',
@@ -148,18 +128,14 @@ const platformContractIncludes = [
   'scripts/guardian/shared.spec.ts',
   'scripts/pnpm-command.spec.ts',
   'services/connector/src/core/io-journal.spec.ts',
-  'services/uta/src/uta-startup-resilience.spec.ts',
   'src/core/windows-workspace-shell.spec.ts',
   'src/services/auth/session-store.spec.ts',
   'src/services/auth/token-store.spec.ts',
-  'src/workspaces/adapters/ai-config.spec.ts',
   'src/workspaces/adapters/shell.spec.ts',
   'src/workspaces/agent-conversation-log.spec.ts',
   'src/workspaces/agent-detect.spec.ts',
-  'src/workspaces/cli/shim.spec.ts',
   'src/workspaces/headless-task-win-shim.spec.ts',
   'src/workspaces/spawn-env.spec.ts',
-  'src/workspaces/win-command.spec.ts',
   'src/workspaces/workspace-creator.spec.ts',
 ]
 
@@ -192,60 +168,35 @@ export const areaSuites = {
   'market-data': {
     description: 'Alice/UTA public market-data and provider reads.',
     roots: ['src/domain/market-data', 'packages/opentypebb'],
-    includes: [
-      'services/uta/src/domain/trading/__test__/e2e/ccxt-hyperliquid-markets.e2e.spec.ts',
-      'services/uta/src/domain/trading/brokers/ccxt/CcxtBroker.e2e.spec.ts',
-    ],
   },
   ibkr: {
     description: 'IBKR package, adapter, and paper-account acceptance.',
     roots: ['packages/ibkr', 'packages/uta-broker-ibkr', 'services/uta/src/domain/trading/brokers/ibkr'],
-    includes: [
-      'services/uta/src/domain/trading/__test__/e2e/ibkr-paper.e2e.spec.ts',
-      'services/uta/src/domain/trading/__test__/e2e/uta-ibkr.e2e.spec.ts',
-    ],
   },
   bybit: {
     description: 'Bybit demo-account acceptance.',
-    includes: [
-      'services/uta/src/domain/trading/__test__/e2e/ccxt-bybit.e2e.spec.ts',
-      'services/uta/src/domain/trading/__test__/e2e/uta-bybit.e2e.spec.ts',
-      'services/uta/src/domain/trading/__test__/e2e/uta-ccxt-bybit.e2e.spec.ts',
-    ],
   },
   okx: {
     description: 'OKX demo-account acceptance.',
-    includes: ['services/uta/src/domain/trading/__test__/e2e/ccxt-okx.e2e.spec.ts'],
   },
   alpaca: {
     description: 'Alpaca paper-account acceptance.',
-    includes: [
-      'services/uta/src/domain/trading/__test__/e2e/alpaca-paper.e2e.spec.ts',
-      'services/uta/src/domain/trading/__test__/e2e/uta-alpaca.e2e.spec.ts',
-    ],
   },
   hyperliquid: {
     description: 'Hyperliquid read-only or demo-account acceptance.',
-    includes: [
-      'services/uta/src/domain/trading/__test__/e2e/ccxt-hyperliquid-markets.e2e.spec.ts',
-      'services/uta/src/domain/trading/__test__/e2e/ccxt-hyperliquid.e2e.spec.ts',
-    ],
   },
   'bybit-diagnostic': {
     description: 'Manual raw broker diagnostic that market-buys and best-effort closes.',
-    includes: ['services/uta/src/domain/trading/__test__/e2e/ccxt-raw-diagnostic.e2e.spec.ts'],
   },
   'uta-paper': {
     description: 'Configured UTA paper sweep, excluding the raw market-buy diagnostic.',
     roots: ownerSuites.uta.roots,
-    excludes: ['services/uta/src/domain/trading/__test__/e2e/ccxt-raw-diagnostic.e2e.spec.ts'],
   },
 }
 
 export const areaSuiteNames = Object.freeze(Object.keys(areaSuites))
 
 const collectionRoots = ['src', 'packages', 'services', 'apps', 'scripts', 'ui', 'tests']
-const systemTestFiles = new Set()
 
 function isWithin(file, root) {
   return file === root || file.startsWith(`${root}/`)
@@ -287,12 +238,11 @@ function matchesSuiteDefinition(file, suite) {
 
 export function isRiskLaneTest(file) {
   const normalized = slash(file)
-  const central = centralTestDefinitions.find((test) => test.path === normalized)
+  const central = registeredTestDefinitions.find((test) => test.path === normalized)
   if (central) return central.lane !== 'hermetic'
   return normalized.includes('.e2e.spec.')
     || normalized.includes('.bbProvider.spec.')
     || normalized.includes('.live.spec.')
-    || systemTestFiles.has(normalized)
 }
 
 export function isHermeticDefaultTest(file) {
@@ -302,22 +252,14 @@ export function isHermeticDefaultTest(file) {
 
 export function lanesForTestFile(file) {
   const normalized = slash(file)
-  const central = centralTestDefinitions.find((test) => test.path === normalized)
+  const central = registeredTestDefinitions.find((test) => test.path === normalized)
   if (central) return [central.lane]
-  return [
-    isHermeticDefaultTest(normalized) && 'hermetic',
-    matchesAny(normalized, integrationIncludes) && 'integration',
-    matchesAny(normalized, externalReadonlyIncludes) && 'external-readonly',
-    matchesAny(normalized, livePaperIncludes)
-      && !matchesAny(normalized, livePaperExcludes)
-      && 'live-paper',
-    systemTestFiles.has(normalized) && 'system',
-  ].filter(Boolean)
+  return isHermeticDefaultTest(normalized) ? ['hermetic'] : []
 }
 
 export function ownersForTestFile(file) {
   const normalized = slash(file)
-  const central = centralTestDefinitions.find((test) => test.path === normalized)
+  const central = registeredTestDefinitions.find((test) => test.path === normalized)
   if (central) return [central.owner]
   return ownerSuiteNames.filter((owner) => (
     ownerSuites[owner].roots.some((root) => isWithin(normalized, root))
@@ -325,7 +267,7 @@ export function ownersForTestFile(file) {
 }
 
 export function areasForTestFile(file) {
-  const central = centralTestDefinitions.find((test) => test.path === slash(file))
+  const central = registeredTestDefinitions.find((test) => test.path === slash(file))
   return [...new Set([
     ...areaSuiteNames.filter((area) => matchesSuiteDefinition(file, areaSuites[area])),
     ...(central?.areas ?? []),
@@ -333,7 +275,7 @@ export function areasForTestFile(file) {
 }
 
 export function centralHermeticIncludes(project) {
-  return centralTestDefinitions.filter((test) => (
+  return registeredTestDefinitions.filter((test) => (
     test.lane === 'hermetic' && ownerSuites[test.owner]?.project === project
   )).map((test) => test.path)
 }
@@ -400,13 +342,8 @@ export function selectTestFiles(repoRoot, selectors = {}) {
   const areas = selectors.areas ?? []
   const packages = selectors.packages ?? []
   const paths = (selectors.paths ?? []).map(normalizePathSelector)
-  selectCoverageGroups(selectors) // Validate both group dimensions even if the file intersection is empty.
-  const groupPaths = (kind, names) => new Set(coverageGroups
-    .filter((group) => group.kind === kind && names.includes(group.name)).flatMap(groupSpecFiles))
-  const scenarios = selectors.scenarios ?? []
-  const contracts = selectors.contracts ?? []
-  const scenarioPaths = groupPaths('scenario', scenarios)
-  const contractPaths = groupPaths('contract', contracts)
+  const suites = selectTestSuites(selectors)
+  const suitePaths = new Set(suites.flatMap(suite => suite.files ?? []))
 
   for (const lane of lanes) {
     if (!laneSuites[lane]) throw new Error(`Unknown test lane: ${lane}`)
@@ -430,10 +367,10 @@ export function selectTestFiles(repoRoot, selectors = {}) {
     && (owners.length === 0 || ownersForTestFile(file).some((owner) => owners.includes(owner)))
     && (areas.length === 0 || areasForTestFile(file).some((area) => areas.includes(area)))
     && (packageRoots.length === 0 || packageRoots.some((root) => isWithin(file, root))
-      || packages.includes(centralTestDefinitions.find((test) => test.path === file)?.package))
+      || packages.includes(registeredTestDefinitions.find((test) => test.path === file)?.package))
     && (paths.length === 0 || paths.some((path) => matchesPathSelector(file, path)))
-    && (scenarios.length === 0 || scenarioPaths.has(file))
-    && (contracts.length === 0 || contractPaths.has(file))
+    && (!selectors.suites?.length || suitePaths.has(file))
+    && (!selectors.tiers?.length || selectors.tiers.includes(tierForTestFile(file)))
   ))
 }
 

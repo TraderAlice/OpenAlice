@@ -1,22 +1,17 @@
-import { readFileSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
 import { resolve, relative } from 'node:path'
-import { coverageGroups } from './test-groups.mjs'
 import { lanesForTestFile } from './test-lanes.mjs'
 
-export function requiredGate(root, name, groups = coverageGroups) {
-  const gates = JSON.parse(readFileSync(resolve(root, 'tests/gates.json'), 'utf8'))
+export function requiredGate(root, name, gates = JSON.parse(readFileSync(resolve(root, 'tests/gates.json'), 'utf8'))) {
   const gate = gates[name]
-  if (!gate || !Array.isArray(gate.requirements) || !gate.requirements.length) throw new Error(`Unknown or empty required gate: ${name}`)
-  const evidence = gate.requirements.flatMap(ref => {
-    const group = groups.find(group => `${group.kind}:${group.name}` === ref.group)
-    const row = group?.requirements.find(row => row.id === ref.requirement)
-    if (!row || row.review !== 'reviewed' || row.gap || !row.evidence.length) throw new Error(`Required gate ${name} needs bounded reviewed evidence: ${ref.group}/${ref.requirement}`)
-    return row.evidence.map(entry => {
-      if (!entry.spec || entry.command || !['hermetic', 'integration'].includes(lanesForTestFile(entry.spec)[0])) throw new Error(`Required gate ${name} cannot automatically run dedicated/external evidence`)
-      return { group: ref.group, requirement: ref.requirement, spec: entry.spec, assertion: entry.assertion }
-    })
+  if (!gate || !Array.isArray(gate.evidence) || !gate.evidence.length) throw new Error(`Unknown or empty required gate: ${name}`)
+  const evidence = gate.evidence.map(entry => {
+    if (!entry.spec || entry.command || !['hermetic', 'integration'].includes(lanesForTestFile(entry.spec)[0])) throw new Error(`Required gate ${name} cannot automatically run dedicated/external evidence`)
+    const safe = !entry.spec.startsWith('/') && !entry.spec.includes('\\') && !entry.spec.includes(':') && !entry.spec.split('/').includes('..')
+    if (!safe || !existsSync(resolve(root, entry.spec)) || !entry.requirement || !entry.assertion || !readFileSync(resolve(root, entry.spec), 'utf8').includes(entry.assertion)) throw new Error(`Required gate ${name} has a missing/stale assertion: ${entry.spec}`)
+    return entry
   })
-  const ids = evidence.map(entry => JSON.stringify(entry))
+  const ids = evidence.map(entry => JSON.stringify([entry.spec, entry.assertion]))
   if (new Set(ids).size !== ids.length) throw new Error(`Duplicate required gate evidence: ${name}`)
   return { name, description: gate.description, evidence, files: [...new Set(evidence.map(entry => entry.spec))].sort() }
 }

@@ -913,7 +913,7 @@ TUI increments:
 
 ```bash
 pnpm vitest run \
-  packages/cli/src/supervisor-tui.spec.ts \
+  tests/integration/supervisor-input/supervisor-tui.spec.ts \
   packages/cli/src/supervisor-tui.pty.spec.ts \
   packages/cli/src/<fleet-tui-specs>
 ```

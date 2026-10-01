@@ -47,14 +47,14 @@ touched contract requires it.
 | UTA health/restart/supervision without trading changes | Health and restart smoke with a broker disabled or read-only | Only if recovery of pending/open orders is part of the change |
 
 For CCXT public K-line changes, run the gated keyless freshness acceptance. It
-uses no credentials or trading endpoints, reproduces the same old start windows
-as `alice analysis bars(..., count=50)`, and asserts that Binance, OKX, and
-Bybit still return a latest bar across 1m, 15m, 1h, 4h, and 1d:
+uses no credentials or trading endpoints, exercises old start windows through
+the raw-history path exported as `alice market bars`, and asserts that Binance,
+OKX, and Bybit still return a latest bar across 1m, 15m, 1h, 4h, and 1d:
 
 ```bash
 pnpm exec vitest run \
   --config vitest.external.config.ts \
-  services/uta/src/domain/trading/brokers/ccxt/CcxtBroker.e2e.spec.ts
+  tests/integration/broker-market-data/CcxtBroker.spec.ts
 ```
 
 Keep this outside ordinary CI: it is real venue evidence, but DNS, venue
@@ -122,7 +122,7 @@ When selecting a test by name, keep the shared lane and file selection explicit:
 ```bash
 OPENALICE_UTA_LIVE_PAPER=1 pnpm test:select \
   --lane live-paper \
-  --path services/uta/src/domain/trading/__test__/e2e/ibkr-paper.e2e.spec.ts \
+  --path tests/integration/broker-ibkr-paper/ibkr-paper.spec.ts \
   -- -t 'canonical conId routing'
 ```
 
@@ -169,27 +169,56 @@ OPENALICE_UTA_LIVE_PAPER=1 pnpm test:select \
 
 ## Setup
 
+Inside a real OpenAlice Workspace, the launcher injects the selected project's
+`OPENALICE_TOOL_URL` or `OPENALICE_TOOL_SOCKET` plus `AQ_WS_ID`:
+
 ```bash
-export OPENALICE_TOOL_URL=http://127.0.0.1:47331/cli
-export AQ_WS_ID=<any live workspace id>     # from ~/.openalice/workspaces/workspaces.json
-BIN=src/workspaces/cli/bin/alice-uta
-node $BIN                                    # discover groups/verbs
-node $BIN order place --help                 # flags come from the manifest
-# "user approves": curl -s -X POST http://127.0.0.1:47333/api/trading/uta/<id>/wallet/push \
-#   -H 'content-type: application/json' \
-#   -d '{"expectedPendingHash":"<pendingHash from wallet/status>"}'
+alice-uta                         # discover groups/verbs
+alice-uta order place --help      # flags come from the live manifest
 ```
 
-Running inside a real OpenAlice Workspace is preferred: the launcher injects
-`OPENALICE_TOOL_URL` or `OPENALICE_TOOL_SOCKET` plus `AQ_WS_ID` automatically.
-For a manual repo-root run, use Guardian's printed Alice web port rather than
-assuming 47331 if `data/config/ports.json` overrides it.
+Outside a Workspace, use the installed Supervisor's explicit project routing:
+
+```bash
+openalice exec --project <project-key> alice-uta
+openalice exec --project <project-key> alice-uta order place --help
+```
+
+For an explicitly selected saved remote target, add `--machine <id-or-label>`
+before `exec`. A manual source-shim invocation must supply the discovered
+routing environment and a Workspace id from that AliceProject, then execute
+`src/workspaces/cli/bin/alice-uta` directly, not through `node`: it is a shell
+launcher for the shared payload. Do not infer an endpoint from historical ports
+or read a different project's default home.
+
+Approval remains a human action. Use the UI, or the explicit wallet/push HTTP
+acceptance path against the verified selected endpoint with the exact pending
+hash; never bypass the tool's approval refusal or assume a fixed UTA port.
 
 Probe scripts (external orders, raw venue checks) live as throwaway `.mts`
 files under `data/` (gitignored), run with
 `NODE_OPTIONS='--conditions=openalice-source' npx tsx data/<file>.mts`,
 importing `readUTAsConfig` + `createBroker` by absolute/relative path.
 Delete after use.
+
+## IBKR canonical contract acceptance
+
+`conId` identifies an instrument but is not a complete routing contract. Quote
+and order paths resolve it through a clean `{ conId }` details request;
+caller-supplied display symbols, exchanges, and currencies must not poison that
+lookup. `STK / SMART / USD` defaults apply only to symbol-form stocks without a
+conId. Close-position routing preserves the venue contract.
+
+Offline coverage in `services/uta/src/domain/trading/brokers/ibkr/IbkrBroker.spec.ts`
+uses the reviewed `contract-resolution.v1.json` fixture to exercise canonical
+routing, cache sharing, mutation isolation, and failed-lookup retry. Explicit
+paper acceptance uses `ibkr-paper.e2e.spec.ts` for canonical what-if validation
+and `uta-ibkr.e2e.spec.ts` for FX identity/stage/commit/reject without push.
+The live-paper acknowledgement and exact pre-run account baseline above still
+apply. These scenarios are not part of a documentation smoke run.
+
+Historical diagnosis and recorded repair evidence:
+[[docs/incidents/2026-07-17-ibkr-contract-resolution.md]].
 
 ## IBKR half-open and option-mark acceptance
 

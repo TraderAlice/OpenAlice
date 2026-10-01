@@ -2,8 +2,8 @@
 
 This guide owns the in-place reconciliation of launcher-managed template
 assets into an existing durable Workspace. It defines the three-way merge,
-review contract, transaction and recovery rules, and the boundary shared with
-a future Workspace Merge/Absorb workflow.
+review contract, transaction and recovery rules, and the checkout boundary
+shared with [[docs/workspace-absorb.md]].
 
 Related guides: [[docs/workspace-agent-guidance.md]],
 [[docs/workspace-lifecycle.md]], and [[docs/project-structure.md]].
@@ -95,9 +95,9 @@ upgrade signal.
 ## Apply Transaction
 
 Apply takes the shared checkout-operation lease and is serialized per Workspace.
-Offboarding uses the same lease; a future Merge/Absorb operation must do so as
-well, so directory reconciliation and directory moves cannot race. Apply also
-refuses to start while an interactive
+Offboarding and Workspace Absorb use the same guard; Absorb holds both source
+and target leases, so reconciliation, copying, and directory moves cannot race.
+Apply also refuses to start while an interactive
 Session, Web Session, or headless run is active. It also refuses an already
 staged Git index so the template change cannot absorb an unrelated staged
 change.
@@ -151,26 +151,25 @@ preview another desk but the tool rejects applying that peer's upgrade.
 
 ## Shared Foundation, Different Workflows
 
-Template Upgrade and a future Workspace Merge/Absorb are not the same product
-operation:
+Template Upgrade and Workspace Absorb are separate implemented operations:
 
 - Upgrade has an unoccupied template as Incoming and a recorded template
   snapshot as Base. It changes only launcher-managed assets.
-- Merge has another worked-in Workspace as a source. It must define ownership,
-  Session/resumeId retirement or transfer, Issue and artifact provenance, Git
-  history policy, and source-Workspace offboarding.
+- Absorb copies reviewed user assets from a source Workspace into a retained
+  target. The target keeps its history and Sessions; source Sessions retire
+  with the lossless departed checkout, and the Catalog records the absorption.
+  See [[docs/workspace-absorb.md]] for provenance and the two-desk transaction.
 
-They should share the source-neutral mechanics—asset inventory, fingerprinted
-snapshots, change planning, conflict choices, reviewed digest, serialized
-transaction, recovery, and audit commit—but not share a single business API or
-pretend that merging coworkers is merely a template update.
+Both use fingerprinted plans, reviewed digests, conflict choices, checkout
+serialization, recovery journals, and audit commits. Their business APIs and
+recovery rules remain separate: absorbing a coworker is not a template update.
 
 ## Load-Bearing Code
 
 - `src/workspaces/template-upgrade.ts` — snapshot, planning, transaction, and
   recovery.
 - `src/workspaces/workspace-operation-guard.ts` — process-local serialization
-  shared with offboarding and future checkout-wide operations.
+  shared with offboarding and Workspace Absorb.
 - `src/workspaces/template-registry.ts` — explicit template opt-in.
 - `src/workspaces/workspace-creator.ts` — exact creation baseline.
 - `src/workspaces/service.ts` — composition, busy-state gate, and recovery
@@ -178,7 +177,7 @@ pretend that merging coworkers is merely a template update.
 - `src/webui/routes/workspaces.ts` — preview and apply API.
 - `ui/src/components/workspace/WorkspaceTemplateUpgradePanel.tsx` — review and
   conflict decisions.
-- `src/workspaces/template-upgrade.spec.ts` — classification, stale preview,
+- `tests/integration/workspace-upgrades/template-upgrade.spec.ts` — classification, stale preview,
   concurrency, rollback, baseline, and real-template materialization coverage.
 
 ## Line-level merging and conflict handoff

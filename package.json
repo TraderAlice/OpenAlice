@@ -52,7 +52,7 @@
     "vendor:runtime": "node scripts/vendor-managed-runtime.mjs",
     "test": "vitest run",
     "test:select": "node scripts/run-tests.mjs",
-    "test:groups": "node scripts/run-tests.mjs --groups",
+    "test:suites": "node scripts/run-tests.mjs --suites",
     "test:inventory": "node scripts/run-tests.mjs --inventory",
     "test:changed": "node scripts/run-tests.mjs --changed origin/dev",
     "test:owner:alice": "node scripts/run-tests.mjs --owner alice",
@@ -62,9 +62,9 @@
     "test:owner:runtime-cli": "node scripts/run-tests.mjs --owner runtime-cli",
     "test:owner:desktop": "node scripts/run-tests.mjs --owner desktop",
     "test:owner:repo-tooling": "node scripts/run-tests.mjs --owner repo-tooling",
-    "test:integration": "node scripts/run-tests.mjs --lane integration",
-    "test:integration:workspace": "node scripts/run-tests.mjs --lane integration --area workspace",
-    "test:integration:uta": "node scripts/run-tests.mjs --lane integration --area uta",
+    "test:integration": "node scripts/run-tests.mjs --tier integration --lane hermetic --lane integration",
+    "test:integration:workspace": "node scripts/run-tests.mjs --tier integration --lane hermetic --lane integration --area workspace",
+    "test:integration:uta": "node scripts/run-tests.mjs --tier integration --lane hermetic --lane integration --area uta",
     "test:contract:workflow": "node scripts/run-tests.mjs --lane hermetic --area workflow",
     "test:contract:platform": "node scripts/run-tests.mjs --lane hermetic --area platform",
     "test:contract:connector-replay": "node scripts/run-tests.mjs --lane hermetic --area connector-replay",
@@ -87,7 +87,9 @@
     "test:watch": "vitest --config vitest.config.ts",
     "star-history:generate": "node scripts/generate-star-history.mjs",
     "postinstall": "node scripts/fix-pty-perms.mjs",
-    "test:critical": "node scripts/run-tests.mjs --gate critical-local"
+    "test:critical": "node scripts/run-tests.mjs --gate critical-local",
+    "test:unit": "node scripts/run-tests.mjs --tier unit",
+    "test:e2e": "node scripts/run-tests.mjs --tier e2e"
   },
   "keywords": [
     "trading",
@@ -236,6 +238,13 @@
     "tsx": "^4.21.0",
     "turbo": "^2.9.14",
     "typescript": "^5.9.3",
-    "vitest": "^4.1.5"
+    "vitest": "^4.1.5",
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0",
+    "react-router-dom": "^7.18.2",
+    "react-i18next": "^17.0.8",
+    "msw": "^2.14.6",
+    "ccxt": "^4.5.78",
+    "yahoo-finance2": "^3.13.1"
   }
 }
