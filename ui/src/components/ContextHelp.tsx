@@ -1,10 +1,11 @@
 import { Info } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { MeasuredText } from './MeasuredText'
+import { cn } from '../lib/utils'
 import { Button } from './ui/button'
 import { Popover, PopoverContent, PopoverDescription, PopoverTitle, PopoverTrigger } from './ui/popover'
 
-export function ContextHelp({ children, label }: { children: string; label?: string }) {
+export function ContextHelp({ children, label, className }: { children: string; label?: string; className?: string }) {
   const { t } = useTranslation()
   const name = label ? t('common.helpFor', { name: label }) : t('common.help')
 
@@ -15,7 +16,7 @@ export function ContextHelp({ children, label }: { children: string; label?: str
         openOnHover
         delay={250}
         closeDelay={100}
-        render={<Button variant="ghost" size="icon-xs" className="shrink-0 text-muted-foreground" />}
+        render={<Button variant="ghost" size="icon-xs" className={cn('shrink-0 text-muted-foreground', className)} />}
       >
         <Info aria-hidden className="size-4" />
       </PopoverTrigger>

@@ -1,5 +1,5 @@
 import { useEffect, useId, useState } from 'react'
-import { ChevronDown, ChevronRight, Monitor, RefreshCw, Server } from 'lucide-react'
+import { ChevronRight, Monitor, RefreshCw, Server } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 
 import { getBackendConnection } from '../../auth/backendConnection'
@@ -50,7 +50,9 @@ export function AliceLocationSection() {
     : connection.endpoint
 
   return (
-    <ConfigSection title={t('settings.backendConnection.title')}>
+    <ConfigSection title={t('settings.backendConnection.title')} help={remote
+      ? t(desktopConnection ? 'settings.backendConnection.electronRemoteNote' : 'settings.backendConnection.remoteNote')
+      : electron ? t('settings.backendConnection.electronNote') : t('settings.backendConnection.localNote')}>
       <div className="flex min-w-0 flex-col gap-3 border-y border-border/60 py-3 sm:flex-row sm:items-center">
         <Server className="size-5 shrink-0 text-muted-foreground" aria-hidden />
         <div className="min-w-0 flex-1">
@@ -87,9 +89,9 @@ export function AliceLocationSection() {
       {switchError && <p role="alert" className="py-2 text-sm text-destructive">{switchError}</p>}
 
       <Collapsible open={showDetails} onOpenChange={setShowDetails}>
-        <CollapsibleTrigger type="button" className="flex min-h-10 w-full items-center gap-2 py-2 text-left text-sm text-muted-foreground hover:text-foreground focus-visible:rounded-sm focus-visible:outline-none focus-visible:[box-shadow:var(--oa-focus-shadow)]"
+        <CollapsibleTrigger type="button" className="group flex min-h-11 w-full items-center gap-2 py-2 text-left text-sm text-muted-foreground hover:text-foreground focus-visible:rounded-sm focus-visible:outline-none focus-visible:[box-shadow:var(--oa-focus-shadow)]"
           aria-expanded={showDetails} aria-controls={detailsId}>
-          {showDetails ? <ChevronDown className="size-4 shrink-0" aria-hidden /> : <ChevronRight className="size-4 shrink-0" aria-hidden />}
+          <ChevronRight className="size-4 shrink-0 transition-transform duration-[var(--motion-fast)] group-aria-expanded:rotate-90 motion-reduce:transition-none" aria-hidden />
           {t('settings.backendConnection.details')}
         </CollapsibleTrigger>
         <CollapsibleContent id={detailsId}>
@@ -104,11 +106,7 @@ export function AliceLocationSection() {
               <Detail label={t('settings.backendConnection.transport')} value={transport} />
               <Detail label={t('settings.backendConnection.clientEndpoint')} value={clientEndpoint} mono />
             </dl>
-            <p className="mt-4 text-sm leading-relaxed text-muted-foreground">
-              {remote ? t(desktopConnection ? 'settings.backendConnection.electronRemoteNote' : 'settings.backendConnection.remoteNote')
-                : electron ? t('settings.backendConnection.electronNote') : t('settings.backendConnection.localNote')}
-            </p>
-            <div className="mt-3 flex flex-wrap gap-2">
+            {((desktopConnection && !electron) || (!loading && !project)) && <div className="mt-3 flex flex-wrap gap-2">
               {desktopConnection && !electron && (
                 <Button type="button" variant="outline" size="sm" disabled={returningIntegrated} onClick={() => {
                   setReturningIntegrated(true)
@@ -127,7 +125,7 @@ export function AliceLocationSection() {
                   <RefreshCw className="size-3.5" aria-hidden />{t('settings.backendConnection.retry')}
                 </Button>
               )}
-            </div>
+            </div>}
           </div>
         </CollapsibleContent>
       </Collapsible>

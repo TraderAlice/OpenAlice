@@ -20,7 +20,7 @@ export function HarnessNavigationGroup({ title, compact, compactIcon, active, ne
     return (
       <Tooltip>
         <TooltipTrigger render={<button type="button" aria-label={label} aria-current={active ? 'page' : undefined} onClick={onOpen}
-          className={`oa-nav-item flex h-8 w-8 items-center justify-center rounded-full ${active ? 'bg-sidebar-accent text-sidebar-accent-foreground' : 'text-sidebar-foreground hover:bg-sidebar-accent/60'}`} />}>
+          className={`oa-nav-item flex size-11 items-center justify-center [&_svg]:size-5 rounded-full ${active ? 'bg-sidebar-accent text-sidebar-accent-foreground' : 'text-sidebar-foreground hover:bg-sidebar-accent/60'}`} />}>
           {compactIcon}
         </TooltipTrigger>
         <TooltipContent side="right">{label}</TooltipContent>

@@ -60,7 +60,7 @@ export function PortfolioSidebar() {
         />
 
         <SidebarSectionHeader trailing={!lite && !loading && utas.length > 0
-          ? <CountBadge count={utas.length} label={`${t('portfolio.accounts')}: ${utas.length}`} />
+          ? <CountBadge count={utas.length} tone="info" label={`${t('portfolio.accounts')}: ${utas.length}`} />
           : undefined}>
           {t('portfolio.accounts')}
         </SidebarSectionHeader>

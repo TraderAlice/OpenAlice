@@ -957,3 +957,29 @@ identity comes from React throughout empty and populated states.
 Chart date labels follow the application locale through the shared locale store.
 Compact broker-support rows keep the account, status, and recovery action
 visible. Their help control owns installation scope and diagnostic detail.
+
+### Stable account inspection
+
+Equity chart guidance occupies a permanent title-row help slot. Account and
+range controls remain mounted through loading, empty, and historical states.
+Account selection owns its request sequence and its chart loading state; the
+portfolio summary keeps its independent refresh lifecycle. Snapshot inspection
+uses the shared dialog, selects the latest stored snapshot at the selected
+point's time, and restores the underlying chart position on dismissal.
+
+Account summaries and curves share card padding and stretch to their grid row.
+Wallet selection stays inside the summary card. A pending wallet read retains
+the previous card height and disables position-close controls. Derivatives
+wallets retain their margin row across wallet selections. Summary values
+use tabular numerals and aligned definition-list columns. Native account
+currency follows the snapshot through axes, tooltips, and detail metrics.
+
+The compact navigation rail is 68px wide with 44px controls and 4px item gaps.
+The page-sidebar title keeps the body text inset; its expansion control occupies
+the trailing action slot. Count badges use blue for information, green for
+running activity, and amber for attention. Selection glyphs retain neutral ink.
+
+Settings overview sections share the ConfigSection surface and a 24px section
+gap. Version rows reserve explicit identity, status, and action columns on wide
+containers. Disclosure controls use fixed-size chevrons and the shared
+Collapsible timing, keyboard, and reduced-motion behavior.

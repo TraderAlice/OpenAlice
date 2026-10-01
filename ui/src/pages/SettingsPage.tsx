@@ -713,8 +713,8 @@ function WorkspaceShellSection() {
 function SettingsSection() {
   const { t } = useTranslation()
   return (
-    <div className="w-full max-w-[1100px]">
-      <section className="mb-6 flex flex-wrap items-center justify-between gap-4 border-b border-border/60 pb-6">
+    <div className="w-full max-w-[1100px] [&>*+*]:mt-6">
+      <section className="flex flex-wrap items-center justify-between gap-4 px-4 sm:px-6">
         <div className="flex items-center gap-2">
           <h3 className="text-base font-semibold">{t('settings.language.title')}</h3>
           <ContextHelp label={t('settings.language.title')}>{t('settings.language.description')}</ContextHelp>

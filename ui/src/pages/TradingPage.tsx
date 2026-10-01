@@ -443,9 +443,9 @@ export function TradingPage() {
     <div className="flex flex-col flex-1 min-h-0">
       <PageHeader
         title="Broker"
-        live={lastUpdated && equity?.accounts.some((row) => brokerReadiness.data?.accounts.some(
+        live={{ lastUpdated: equity?.accounts.some((row) => brokerReadiness.data?.accounts.some(
           (account) => account.accountId === row.id && account.operational,
-        )) ? { lastUpdated } : undefined}
+        )) ? lastUpdated : null }}
       />
 
       <SettingsScrollArea>

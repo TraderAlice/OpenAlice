@@ -133,7 +133,7 @@ export function ActivityBar({
     .filter(mode => mode === 'chat' || !layout.hidden.includes(mode))
   const railContent = (
     <>
-        <div className={`oa-activity-brand h-[72px] flex shrink-0 items-center ${compactRail ? 'justify-center px-0' : narrowRail ? 'gap-1.5 px-2.5' : 'gap-2.5 px-3.5'}`}>
+        <div className={`oa-activity-brand h-[72px] flex shrink-0 items-center ${compactRail ? 'md:h-14 justify-center px-0' : narrowRail ? 'gap-1.5 px-2.5' : 'gap-2.5 px-3.5'}`}>
               <h1 className={`min-w-0 flex-1 truncate text-[22px] font-bold leading-7 tracking-[-0.025em] text-foreground ${compactRail ? 'md:hidden' : ''}`}>OpenAlice</h1>
               {!desktopStatic ? (
                 <Button
@@ -169,11 +169,11 @@ export function ActivityBar({
                 key={section.id}
                 className={
                   compactRail && si > 0
-                    ? `${denseRail ? 'mt-3 pt-3 md:mt-0.5 md:pt-0.5 md:w-8' : 'mt-3 pt-3 md:w-8'} border-t border-sidebar-border/70`
+                    ? 'mt-3 pt-3 md:w-11 border-t border-sidebar-border/70'
                     : si > 0
                       ? denseRail ? 'mt-2' : 'mt-3'
                       : compactRail
-                        ? 'md:w-8'
+                        ? 'md:w-11'
                         : ''
                 }
               >
@@ -191,7 +191,7 @@ export function ActivityBar({
                   />
                 )}
                 {showItems && (
-                  <div className={`flex flex-col ${denseRail ? 'gap-1 md:gap-px' : 'gap-px'}`} id={`activity-section-${section.id}`}>
+                  <div className={`flex flex-col ${compactRail ? 'gap-1' : denseRail ? 'gap-1 md:gap-px' : 'gap-px'}`} id={`activity-section-${section.id}`}>
                     {section.items.map((item) => {
                       const sec = activitySectionFor(item.page)
                       const isActive = item.page === 'chat' ? focusedKind === 'quick-start' : selectedSidebar === sec
@@ -201,7 +201,7 @@ export function ActivityBar({
                         badge = {
                           count: unreadInbox,
                           label: t('nav.unread', { count: unreadInbox }),
-                          tone: 'neutral',
+                          tone: 'info',
                         }
                       } else if (item.page === 'portfolio' && pendingPush > 0) {
                         badge = {
@@ -226,9 +226,7 @@ export function ActivityBar({
                           aria-current={isActive ? 'page' : undefined}
                           className={`oa-nav-item relative flex items-center rounded-full text-left font-normal aria-[current=page]:font-semibold ${
                             compactRail
-                              ? denseRail
-                                ? 'md:h-[26px] md:w-8 md:min-h-[26px] md:justify-center md:gap-0 md:px-0 md:py-0'
-                                : 'md:h-8 md:w-8 md:min-h-8 md:justify-center md:gap-0 md:px-0 md:py-0'
+                              ? 'md:size-11 md:min-h-11 md:justify-center md:gap-0 md:px-0 md:py-0'
                               : denseRail
                                 ? `min-h-10 ${narrowRail ? 'gap-2 px-2' : 'gap-2.5 px-2.5'} py-2 text-sm`
                                 : 'min-h-12 gap-3 px-4 py-3 text-sm leading-6'
@@ -249,7 +247,7 @@ export function ActivityBar({
                               label={badge.label}
                               limit={99}
                               tone={badge.tone}
-                              className={compactRail ? 'md:absolute md:-right-1 md:-top-1 md:h-5 md:min-w-5 md:px-1' : undefined}
+                              className={compactRail ? 'md:absolute md:-right-1 md:-top-0.5 md:h-5 md:min-w-5 md:px-1 ring-2 ring-sidebar' : undefined}
                             />
                           )}
                         </button>
@@ -267,7 +265,7 @@ export function ActivityBar({
               </div>
             )
           })}
-          <div className={compactRail ? 'mt-4 flex flex-col gap-1 border-t border-sidebar-border/70 pt-3' : 'mt-px space-y-1'}>
+          <div className={compactRail ? 'mt-3 flex w-11 flex-col gap-1 border-t border-sidebar-border/70 pt-3' : 'mt-px space-y-1'}>
             {harnesses.map(mode => (
               <ChatWorkspaceSection key={mode} mode={mode} placement="navigation" compact={compactRail} onNavigate={onClose} />
             ))}
@@ -275,7 +273,7 @@ export function ActivityBar({
         </nav>
 
         {/* Application controls pinned to the bottom of the rail. */}
-        <div className={`shrink-0 border-t border-border/55 ${compactRail ? `flex justify-center ${denseRail ? 'py-0.5' : 'py-2'}` : 'p-1.5'}`}>
+        <div className={`shrink-0 border-t border-border/55 ${compactRail ? 'flex justify-center py-3' : 'p-1.5'}`}>
           <ActivityBarUtilityMenu
             compactRail={compactRail}
             denseRail={denseRail}
@@ -298,7 +296,7 @@ export function ActivityBar({
   )
 
   const railClassName = `
-    w-[280px] ${compactRail ? 'md:w-[50px]' : narrowRail ? 'md:w-[232px]' : 'md:w-[260px]'} h-full flex flex-col shrink-0
+    w-[280px] ${compactRail ? 'md:w-[68px]' : narrowRail ? 'md:w-[232px]' : 'md:w-[260px]'} h-full flex flex-col shrink-0
     bg-sidebar border-r border-sidebar-border/70
   `
 

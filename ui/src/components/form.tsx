@@ -64,6 +64,7 @@ interface ConfigSectionProps {
   children?: ReactNode
   titleId?: string
   focusableTitle?: boolean
+  headingLevel?: 2 | 3
   className?: string
 }
 
@@ -76,8 +77,10 @@ export function ConfigSection({
   children,
   titleId,
   focusableTitle = false,
+  headingLevel = 3,
   className = '',
 }: ConfigSectionProps) {
+  const Heading = headingLevel === 2 ? 'h2' : 'h3'
   return (
     <section
       id={id}
@@ -86,7 +89,7 @@ export function ConfigSection({
     >
       <div className={`min-w-0 ${children ? 'mb-4' : ''}`}>
         <div className="flex min-h-6 min-w-0 flex-wrap items-center gap-2">
-          <h3
+          <Heading
             id={titleId}
             tabIndex={focusableTitle ? -1 : undefined}
             className={`min-w-0 break-words text-lg font-semibold text-foreground ${focusableTitle
@@ -95,7 +98,7 @@ export function ConfigSection({
             }`}
           >
             {title}
-          </h3>
+          </Heading>
           {help && <ContextHelp label={typeof title === 'string' ? title : undefined}>{help}</ContextHelp>}
           {accessory && <div className="ml-auto flex shrink-0 items-center gap-2">{accessory}</div>}
         </div>

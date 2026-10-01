@@ -1,4 +1,4 @@
-import { useId, useState, useMemo } from 'react'
+import { useId, useState, useMemo, type Ref } from 'react'
 import {
   AreaChart, Area, XAxis, YAxis, Tooltip, ReferenceLine,
 } from 'recharts'
@@ -6,6 +6,9 @@ import type { EquityCurvePoint } from '../api'
 import { getIntlLocale } from '../lib/intl'
 import { MeasuredChartFrame } from './MeasuredChartFrame'
 import { SegmentedControl } from './SegmentedControl'
+import { ContextHelp } from './ContextHelp'
+import { currencySymbol, fmt } from '../lib/format'
+import { cn } from '../lib/utils'
 
 // ==================== Time ranges ====================
 
@@ -23,19 +26,25 @@ type RangeLabel = (typeof RANGES)[number]['label']
 // ==================== Props ====================
 
 interface EquityCurveProps {
+  ref?: Ref<HTMLDivElement>
   points: EquityCurvePoint[]
   accounts: Array<{ id: string; label: string }>
   selectedAccountId: string | 'all'
   onAccountChange: (id: string | 'all') => void
   onPointClick?: (point: EquityCurvePoint) => void
   selectedTimestamp?: string | null
+  historical?: boolean
+  loading?: boolean
+  currency?: string
+  className?: string
 }
 
 // ==================== Component ====================
 
 export function EquityCurve({
-  points, accounts, selectedAccountId, onAccountChange,
+  ref, points, accounts, selectedAccountId, onAccountChange,
   onPointClick, selectedTimestamp,
+  historical = false, loading = false, currency = 'USD', className,
 }: EquityCurveProps) {
   const [range, setRange] = useState<RangeLabel>('24H')
   const gradientId = useId()
@@ -73,9 +82,9 @@ export function EquityCurve({
     return {
       domain: [lo, hi] as [number, number],
       ticks,
-      formatter: makeCurrencyTickFormatter(max - min, (hi - lo) / 3),
+      formatter: makeCurrencyTickFormatter(max - min, (hi - lo) / 3, currency),
     }
-  }, [chartData])
+  }, [chartData, currency])
 
   // Explicit X ticks aligned to round time boundaries (whole hours, local
   // midnights) instead of recharts' arbitrary data-point positions.
@@ -84,12 +93,18 @@ export function EquityCurve({
   const isAllView = selectedAccountId === 'all'
 
   return (
-    <div className="min-w-0 rounded-lg border border-border bg-card p-4 sm:p-6">
+    <div ref={ref} tabIndex={onPointClick ? -1 : undefined} aria-label="Equity curve" className={cn('flex min-w-0 flex-col rounded-lg border border-border bg-card p-4 outline-none sm:p-6', className)} aria-busy={loading}>
       {/* Header */}
-      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-        <h3 className="text-sm font-semibold leading-5 text-foreground">
-          Equity Curve
-        </h3>
+      <div className="mb-4 flex min-h-11 flex-wrap items-center justify-between gap-3">
+        <div className="flex items-center gap-1">
+          <h3 className="text-sm font-semibold leading-5 text-foreground">
+            Equity Curve
+          </h3>
+          <ContextHelp label={historical ? 'Historical snapshot' : 'Equity Curve'} className={historical ? 'text-warning' : undefined}>
+            {historical ? 'Historical snapshot. Broker support is unavailable on this Runtime. This chart shows recorded values.' : onPointClick ? 'Recorded account equity. Select a point to inspect its snapshot.' : 'Recorded account equity across all wallets.'}
+          </ContextHelp>
+          <span className="sr-only" role="status">{historical ? 'Historical snapshot. Live broker data is unavailable.' : ''}</span>
+        </div>
         <SegmentedControl
           value={range}
           options={RANGES.map((r) => ({ value: r.label, label: r.label }))}
@@ -117,11 +132,11 @@ export function EquityCurve({
       )}
 
       {/* Chart */}
-      {chartData.length === 0 ? (
-        <div className="flex h-[240px] items-center justify-center text-sm text-muted-foreground" role="status">
-          No snapshots in this range.
+      {loading || chartData.length === 0 ? (
+        <div className="flex min-h-[240px] flex-1 items-center justify-center text-sm text-muted-foreground" role="status">
+          {loading ? 'Loading snapshots…' : 'No snapshots in this range.'}
         </div>
-      ) : <MeasuredChartFrame className="h-[240px] w-full">
+      ) : <MeasuredChartFrame className="min-h-[240px] w-full flex-1">
         {({ width, height }) => (
           <AreaChart
             accessibilityLayer
@@ -165,7 +180,7 @@ export function EquityCurve({
           />
           <Tooltip
             isAnimationActive={false}
-            content={<CustomTooltip isAllView={isAllView} accounts={accounts} />}
+            content={<CustomTooltip isAllView={isAllView} accounts={accounts} currency={currency} />}
           />
           <Area
             type="monotone"
@@ -173,7 +188,7 @@ export function EquityCurve({
             stroke="var(--chart-1)"
             strokeWidth={1.5}
             fill={`url(#${gradientId})`}
-            dot={false}
+            dot={chartData.length === 1 ? { r: 3, fill: 'var(--chart-1)' } : false}
             isAnimationActive={false}
             activeDot={{ r: 4, fill: 'var(--chart-1)', stroke: 'var(--secondary)', strokeWidth: 2 }}
           />
@@ -194,7 +209,7 @@ export function EquityCurve({
 
 // ==================== Custom Tooltip ====================
 
-function CustomTooltip({ active, payload, isAllView, accounts }: any) {
+function CustomTooltip({ active, payload, isAllView, accounts, currency }: any) {
   if (!active || !payload?.[0]) return null
   const data = payload[0].payload as EquityCurvePoint & { time: number }
   const accountMap = new Map((accounts as Array<{ id: string; label: string }>).map(a => [a.id, a.label]))
@@ -205,7 +220,7 @@ function CustomTooltip({ active, payload, isAllView, accounts }: any) {
         {new Date(data.time).toLocaleString()}
       </p>
       <p className="text-foreground font-semibold tabular-nums">
-        ${Number(data.equity).toLocaleString(getIntlLocale(), { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+        {fmt(data.equity, currency)}
       </p>
       {isAllView && data.accounts && Object.keys(data.accounts).length > 1 && (
         <div className="mt-1.5 pt-1.5 border-t border-border space-y-0.5">
@@ -247,18 +262,19 @@ function formatCurrency(val: number): string {
  * ("$100,680"); wider ranges keep the compact K/M form but with enough
  * decimals that adjacent ticks stay distinct ("$100.68K").
  */
-function makeCurrencyTickFormatter(range: number, tickSpacing: number): (val: number) => string {
+function makeCurrencyTickFormatter(range: number, tickSpacing: number, currency: string): (val: number) => string {
+  const prefix = currencySymbol(currency)
   return (val: number) => {
     if (range < 2000) {
       const decimals = range < 10 ? 2 : 0
-      return `$${val.toLocaleString(getIntlLocale(), { minimumFractionDigits: decimals, maximumFractionDigits: decimals })}`
+      return `${prefix}${val.toLocaleString(getIntlLocale(), { minimumFractionDigits: decimals, maximumFractionDigits: decimals })}`
     }
-    if (Math.abs(val) < 1_000) return `$${val.toFixed(0)}`
+    if (Math.abs(val) < 1_000) return `${prefix}${val.toFixed(0)}`
     const unit = Math.abs(val) >= 1_000_000 ? 1_000_000 : 1_000
     const suffix = unit === 1_000_000 ? 'M' : 'K'
     // Enough fractional digits that one tick step is resolvable at this unit.
     const decimals = Math.min(4, Math.max(1, Math.ceil(-Math.log10(tickSpacing / unit))))
-    return `$${(val / unit).toFixed(decimals)}${suffix}`
+    return `${prefix}${(val / unit).toFixed(decimals)}${suffix}`
   }
 }
 

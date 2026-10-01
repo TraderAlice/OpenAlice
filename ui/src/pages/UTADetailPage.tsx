@@ -8,6 +8,7 @@ import type { UTAConfig, BrokerPreset, AccountInfo, SubAccountRef, Position, Bro
 import { useTradingConfig } from '../hooks/useTradingConfig'
 import { useAccountHealth } from '../hooks/useAccountHealth'
 import { deriveAccountInteractionPolicy, useBrokerPackReadiness } from '../hooks/useBrokerPackReadiness'
+import { ContextHelp } from '../components/ContextHelp'
 import { PageHeader } from '../components/PageHeader'
 import { EmptyState, Skeleton } from '../components/StateViews'
 import { Button, buttonVariants } from '../components/ui/button'
@@ -50,6 +51,7 @@ export function UTADetailPage({ spec }: UTADetailPageProps) {
   const [subAccounts, setSubAccounts] = useState<SubAccountRef[]>([])
   const [selectedSub, setSelectedSub] = useState<string | undefined>(undefined)
   const [snapshots, setSnapshots] = useState<UTASnapshotSummary[]>([])
+  const [snapshotsLoading, setSnapshotsLoading] = useState(true)
   const [editing, setEditing] = useState(false)
   const [orderMode, setOrderMode] = useState<OrderEntryMode | null>(null)
   const [dataError, setDataError] = useState<string | null>(null)
@@ -106,7 +108,6 @@ export function UTADetailPage({ spec }: UTADetailPageProps) {
       return
     }
     const seq = ++reqSeq.current
-    setDataError(null)
     try {
       const [acct, pos, ord] = await Promise.allSettled([
         api.trading.utaAccount(id, selectedSub),
@@ -115,10 +116,6 @@ export function UTADetailPage({ spec }: UTADetailPageProps) {
       ])
       if (seq !== reqSeq.current) return  // superseded by a newer refresh — discard
       if (acct.status === 'rejected') {
-        setAccount(null)
-        setPositions([])
-        setOrders([])
-        setLastUpdated(null)
         setDataError(acct.reason instanceof Error ? acct.reason.message : String(acct.reason))
         return
       }
@@ -137,23 +134,32 @@ export function UTADetailPage({ spec }: UTADetailPageProps) {
 
   // Snapshots refresh more slowly (60s); same data feeds the NAV chart and
   // the 24h-delta anchor — no extra fetches needed.
+  const snapshotRequest = useRef(0)
   const refreshSnapshots = useCallback(async () => {
     if (!id) return
+    const request = ++snapshotRequest.current
     try {
       const r = await api.trading.snapshots(id, { limit: 50 })
-      setSnapshots(r.snapshots)
+      if (request === snapshotRequest.current) setSnapshots(r.snapshots)
     } catch {
       // non-fatal
+    } finally {
+      if (request === snapshotRequest.current) setSnapshotsLoading(false)
     }
   }, [id])
 
   useEffect(() => {
-    refreshLive()
-    refreshSnapshots()
-    const liveInterval = setInterval(refreshLive, 15_000)
-    const snapshotInterval = setInterval(refreshSnapshots, 60_000)
-    return () => { clearInterval(liveInterval); clearInterval(snapshotInterval) }
-  }, [refreshLive, refreshSnapshots])
+    void refreshLive()
+    const interval = setInterval(refreshLive, 15_000)
+    return () => { clearInterval(interval); reqSeq.current++ }
+  }, [refreshLive])
+
+  useEffect(() => {
+    setSnapshotsLoading(true)
+    void refreshSnapshots()
+    const interval = setInterval(refreshSnapshots, 60_000)
+    return () => { clearInterval(interval); snapshotRequest.current++ }
+  }, [refreshSnapshots])
 
   // Market clock — mount + every 60s. The poll itself re-renders the
   // "opens in Xh Ym" countdown, so no separate ticker is needed.
@@ -244,7 +250,13 @@ export function UTADetailPage({ spec }: UTADetailPageProps) {
     <div className="flex flex-col flex-1 min-h-0">
       <PageHeader
         title={displayName}
-        live={lastUpdated && policy.canRead ? { lastUpdated } : undefined}
+        accessory={<span className="flex size-8 shrink-0 items-center justify-center">
+          {(dataError || interactionNotice) && <ContextHelp label="Account status" className={dataError ? 'text-destructive' : 'text-warning'}>
+            {dataError ? `Live account data is unavailable: ${dataError}` : interactionNotice!}
+          </ContextHelp>}
+          <span className="sr-only" role="alert">{dataError ?? interactionNotice ?? ''}</span>
+        </span>}
+        live={{ lastUpdated: policy.canRead ? lastUpdated : null }}
         description={
           <span className="inline-flex flex-wrap items-center gap-x-3 gap-y-2">
             <Link to="/trading" className="text-muted-foreground hover:text-foreground">← Trading</Link>
@@ -283,20 +295,8 @@ export function UTADetailPage({ spec }: UTADetailPageProps) {
         }
       />
 
-      <div className="flex-1 overflow-y-auto px-[var(--page-inset)] py-5">
+      <div className="@container flex-1 overflow-y-auto px-[var(--page-inset)] py-5">
         <div className="max-w-[1240px]">
-          {dataError && (
-            <div className="mb-4 rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm leading-5 text-destructive">
-              Failed to load live data: {dataError}
-            </div>
-          )}
-
-          {interactionNotice && (
-            <div className="mb-4 rounded-lg border border-warning/30 bg-warning/5 px-3 py-2 text-sm leading-5 text-warning" role="status">
-              {interactionNotice}
-            </div>
-          )}
-
           {!policy.canRead ? (
             <div className="space-y-4">
               <BrokerSupportGate
@@ -305,65 +305,54 @@ export function UTADetailPage({ spec }: UTADetailPageProps) {
                 onInstall={brokerReadiness.install}
                 onRetry={brokerReadiness.refresh}
               />
-              {curvePoints.length >= 2 && (
-                <div className="space-y-2">
-                  <p className="text-sm text-warning" role="status">
-                    Historical snapshot. Broker support is unavailable on this Runtime, so these values are stale.
-                  </p>
-                  <EquityCurve
-                    points={curvePoints}
-                    accounts={[{ id, label: displayName }]}
-                    selectedAccountId={id}
-                    onAccountChange={() => {}}
-                  />
-                </div>
-              )}
+              <EquityCurve
+                points={curvePoints}
+                loading={snapshotsLoading}
+                accounts={[{ id, label: displayName }]}
+                selectedAccountId={id}
+                onAccountChange={() => {}}
+                currency={snapshots[0]?.account.baseCurrency || 'USD'}
+                historical
+              />
             </div>
           ) : !lastUpdated && !dataError ? <UTADetailMainSkeleton /> : !lastUpdated ? (
             <EmptyState title="Live account data is unavailable." description="Retry after checking the broker connection and account health." />
           ) : (
             <div className="space-y-5">
-              {/* Keep the visual overview together, then give the operational
-                  tables the full content width. The auto-fit grid responds to
-                  this pane's real width after both app sidebars, rather than
-                  guessing from the browser viewport. */}
-              <div
-                className="grid items-stretch gap-4"
-                style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 26rem), 1fr))' }}
-              >
-                {curvePoints.length >= 2 && (
-                  <div className="min-w-0">
-                    <EquityCurve
-                      points={curvePoints}
-                      accounts={[{ id, label: displayName }]}
-                      selectedAccountId={id}
-                      onAccountChange={() => { /* single-account mode: switcher hidden */ }}
-                    />
-                  </div>
-                )}
-
-                <div className="min-w-0 space-y-3">
-                  {subAccounts.length > 1 && (
+              <div className="grid items-stretch gap-4 @4xl:grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)]">
+                <AccountPanel
+                  account={account}
+                  positions={positions}
+                  delta24h={selectedSub === undefined ? delta24h : null}
+                  clock={clock}
+                  connecting={health?.connecting ?? false}
+                  error={dataError}
+                  hasMarginWallet={subAccounts.some((wallet) => wallet.kind === 'derivatives')}
+                  selector={subAccounts.length > 1 ? (
                     <SubAccountSelector
                       subAccounts={subAccounts}
                       selected={selectedSub}
                       onSelect={(sub) => {
-                        // Drop the previous wallet's numbers immediately so the
-                        // panel shows "Loading account info…" during the (slow,
-                        // multi-round-trip) scoped read instead of briefly painting
-                        // the old scope's net-liquidation under the new pill.
                         setAccount(null)
                         setSelectedSub(sub)
                       }}
                     />
-                  )}
-                  <AccountPanel account={account} positions={positions} delta24h={delta24h} clock={clock} connecting={health?.connecting ?? false} />
-                </div>
+                  ) : undefined}
+                />
+                <EquityCurve
+                  points={curvePoints}
+                  loading={snapshotsLoading}
+                  accounts={[{ id, label: displayName }]}
+                  selectedAccountId={id}
+                  onAccountChange={() => {}}
+                  currency={snapshots[0]?.account.baseCurrency || 'USD'}
+                  className="h-full"
+                />
               </div>
 
               <PositionsSection
                 positions={positions}
-                canClose={policy.canTrade}
+                canClose={policy.canTrade && account !== null}
                 closeDisabledReason={policy.reason}
                 onCloseClick={(p) => setOrderMode({
                   kind: 'close',
@@ -444,6 +433,7 @@ function SubAccountSelector({ subAccounts, selected, onSelect }: {
         ...subAccounts.map(account => ({ value: account.id, label: account.label, ariaLabel: `${account.label}, ${account.kind} wallet` })),
       ]}
       onChange={(value) => onSelect(value === 'all' ? undefined : value)}
+      compact
       ariaLabel="Trading wallet"
     />
   )
@@ -490,25 +480,31 @@ function UTADetailMainSkeleton() {
   )
 }
 
-function AccountPanel({ account, positions, delta24h, clock, connecting }: {
+function AccountPanel({ account, positions, delta24h, clock, connecting, selector, hasMarginWallet, error }: {
   account: AccountInfo | null
   positions: Position[]
   delta24h: Delta24h | null
   clock: MarketClockState
   connecting?: boolean
+  selector?: React.ReactNode
+  hasMarginWallet: boolean
+  error: string | null
 }) {
+  const panelRef = useRef<HTMLDivElement>(null)
+  const [loadedHeight, setLoadedHeight] = useState<number>()
+  useLayoutEffect(() => {
+    if (account && panelRef.current) setLoadedHeight(panelRef.current.offsetHeight)
+  }, [account])
+  const header = <div className="mb-4 flex min-h-11 flex-wrap items-center justify-between gap-2">
+    {selector ?? <h3 className="text-sm font-semibold">Account</h3>}
+    {clock != null && <span className="shrink-0 text-sm"><MarketClockChip clock={clock} /></span>}
+  </div>
   if (!account) {
     return (
-      <div className="rounded-lg border border-border bg-card p-4">
-        {clock != null && (
-          <div className="text-sm mb-3"><MarketClockChip clock={clock} /></div>
-        )}
-        {/* During the initial broker connect, say so explicitly — "connecting"
-            reads as progress, where a bare "Loading…" that lingers 30s reads
-            as a stall. Skeleton rows below stand in for the metric list so the
-            panel has shape instead of a single line of text. */}
-        <p className={`text-sm mb-3.5 ${connecting ? 'text-primary' : 'text-muted-foreground'}`}>
-          {connecting ? 'Connecting to broker…' : 'Loading account info…'}
+      <div ref={panelRef} className="min-w-0 rounded-lg border border-border bg-card p-4 sm:p-6" style={{ minHeight: loadedHeight }} aria-busy={!error}>
+        {header}
+        <p className="mb-3.5 text-sm text-muted-foreground" role="status">
+          {error ? 'Account data is unavailable.' : connecting ? 'Connecting to broker…' : 'Loading account info…'}
         </p>
         <div className="space-y-3.5" aria-hidden="true">
           {Array.from({ length: 6 }).map((_, i) => (
@@ -556,10 +552,8 @@ function AccountPanel({ account, positions, delta24h, clock, connecting }: {
     : null
 
   return (
-    <div className="rounded-lg border border-border bg-card p-4">
-      {clock != null && (
-        <div className="text-sm mb-3"><MarketClockChip clock={clock} /></div>
-      )}
+    <div ref={panelRef} className="min-w-0 rounded-lg border border-border bg-card p-4 sm:p-6">
+      {header}
 
       <Metric
         size="lg"
@@ -571,25 +565,23 @@ function AccountPanel({ account, positions, delta24h, clock, connecting }: {
         } : { value: '— 24h', sign: 'flat' }}
       />
 
-      <div className="mt-4 border-t border-border divide-y divide-border">
+      <dl className="mt-5 border-t border-border divide-y divide-border">
         <AccountRow label="Cash" value={fmt(account.totalCashValue, ccy)} />
 
         <AccountRow label="Positions Value" value={fmt(positionsValue, ccy)} />
 
-        {utilizationPct != null && (
-          <div className="py-2">
+        <div className="py-2">
             <div className="flex items-baseline justify-between gap-3">
-              <span className="text-sm font-medium text-muted-foreground">Utilization</span>
-              <span className="text-sm leading-5 font-medium tabular-nums text-foreground">{utilizationPct.toFixed(1)}%</span>
+              <dt className="text-sm font-medium text-muted-foreground">Utilization</dt>
+              <dd className="text-sm leading-5 font-medium tabular-nums text-foreground">{utilizationPct == null ? '—' : `${utilizationPct.toFixed(1)}%`}</dd>
             </div>
             <div className="mt-1.5 h-[2px] rounded-full bg-muted overflow-hidden">
               <div
-                className="h-full rounded-full bg-primary"
-                style={{ width: `${Math.min(100, Math.max(0, utilizationPct))}%` }}
+                className="h-full rounded-full bg-info"
+                style={{ width: `${Math.min(100, Math.max(0, utilizationPct ?? 0))}%` }}
               />
             </div>
-          </div>
-        )}
+        </div>
 
         <AccountRow
           label="Unrealized P&L"
@@ -599,26 +591,24 @@ function AccountPanel({ account, positions, delta24h, clock, connecting }: {
           sign={signFromDelta(unrealized)}
         />
 
-        {realized != null && (
-          <AccountRow
-            label="Realized P&L"
-            value={fmtPnl(account.realizedPnL, ccy)}
-            sign={signFromDelta(realized)}
-          />
-        )}
+        <AccountRow
+          label="Realized P&L"
+          value={realized == null ? '—' : fmtPnl(account.realizedPnL, ccy)}
+          sign={signFromDelta(realized)}
+        />
 
         {account.buyingPower != null && !isUnsetDecimal(account.buyingPower) && (
           <AccountRow label="Buying Power" value={fmt(account.buyingPower, ccy)} />
         )}
 
-        {marginUsed != null && marginUsed > 0 && (
-          <AccountRow label="Margin Used" value={fmt(account.initMarginReq, ccy)} />
+        {(hasMarginWallet || marginUsed != null && marginUsed > 0) && (
+          <AccountRow label="Margin Used" value={marginUsed == null ? '—' : fmt(marginUsed, ccy)} />
         )}
 
         {account.dayTradesRemaining != null && (
           <AccountRow label="Day Trades Left" value={fmtNum(account.dayTradesRemaining)} />
         )}
-      </div>
+      </dl>
     </div>
   )
 }
@@ -630,9 +620,9 @@ function AccountRow({ label, value, sign }: {
 }) {
   const valueColor = sign === 'up' ? 'text-success' : sign === 'down' ? 'text-destructive' : 'text-foreground'
   return (
-    <div className="flex items-baseline justify-between gap-3 py-2">
-      <span className="text-sm font-medium text-muted-foreground">{label}</span>
-      <span className={`text-sm leading-5 font-medium tabular-nums text-right ${valueColor}`}>{value}</span>
+    <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1.35fr)] items-baseline gap-4 py-3">
+      <dt className="min-w-0 text-sm font-medium text-muted-foreground">{label}</dt>
+      <dd className={`min-w-0 text-sm leading-5 font-medium tabular-nums text-right [overflow-wrap:anywhere] ${valueColor}`}>{value}</dd>
     </div>
   )
 }
@@ -730,7 +720,7 @@ export function PositionsSection({ positions, onCloseClick, canClose = true, clo
         data-testid="uta-positions-desktop"
         className="hidden overflow-x-auto rounded-lg border border-border md:block"
       >
-        <table className="w-full text-sm">
+        <table className="w-full text-sm tabular-nums [&_th]:whitespace-nowrap [&_td]:whitespace-nowrap">
           <thead>
             <tr className="bg-secondary text-muted-foreground text-left">
               <th className="px-3 py-2 font-medium">Contract</th>
@@ -1042,7 +1032,7 @@ function OpenOrdersTable({ orders }: { orders: unknown[] }) {
   }
   return (
     <div className="border border-border rounded-lg overflow-x-auto">
-      <table className="w-full text-sm">
+      <table className="w-full text-sm tabular-nums [&_th]:whitespace-nowrap [&_td]:whitespace-nowrap">
         <thead>
           <tr className="bg-secondary text-muted-foreground text-left">
             <th className="px-3 py-2 font-medium">Order ID</th>
@@ -1302,7 +1292,7 @@ function TradeHistoryTable({ trades }: { trades: TradeHistoryEntry[] | null }) {
   }
   return (
     <div className="border border-border rounded-lg overflow-x-auto">
-      <table className="w-full text-sm">
+      <table className="w-full text-sm tabular-nums [&_th]:whitespace-nowrap [&_td]:whitespace-nowrap">
         <thead>
           <tr className="bg-secondary text-muted-foreground text-left">
             <th className="px-3 py-2 font-medium">Time</th>

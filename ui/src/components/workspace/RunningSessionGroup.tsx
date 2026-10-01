@@ -41,7 +41,7 @@ export function RunningSessionGroup({ sessions, onSelect }: {
         icon={<LoaderCircle size={14} aria-hidden className="animate-spin [animation-duration:2s] motion-reduce:animate-none" />}
       />}>
         <span className="min-w-0 flex-1 truncate">{t('workspace.sessionDetails.running')}</span>
-        <CountBadge count={sessions.length} label={label} />
+        <CountBadge count={sessions.length} tone="success" label={label} />
         <ChevronRight size={14} aria-hidden className="shrink-0 transition-transform group-data-[panel-open]/running:rotate-90 motion-reduce:transition-none" />
       </CollapsibleTrigger>
     </SidebarChildRow>

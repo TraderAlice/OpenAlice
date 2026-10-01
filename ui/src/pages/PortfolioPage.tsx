@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from 'react'
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import {
   ArrowDownRight,
   ArrowUpRight,
@@ -21,6 +21,7 @@ import { PageHeader } from '../components/PageHeader'
 import { EmptyState, Skeleton } from '../components/StateViews'
 import { Button } from '../components/ui/button'
 import { EquityCurve } from '../components/EquityCurve'
+import { Dialog, DialogContent, DialogTitle } from '../components/ui/dialog'
 import { SnapshotDetail } from '../components/SnapshotDetail'
 import { Toggle } from '../components/Toggle'
 import { SegmentedControl } from '../components/SegmentedControl'
@@ -135,6 +136,11 @@ export function PortfolioPage() {
   const [loading, setLoading] = useState(true)
   const [lastRefresh, setLastRefresh] = useState<Date | null>(null)
   const [refreshError, setRefreshError] = useState<string | null>(null)
+  const curveRef = useRef<HTMLDivElement>(null)
+  const curveRequest = useRef(0)
+  const snapshotRequest = useRef(0)
+  const [curveLoading, setCurveLoading] = useState(false)
+  const [curveCurrency, setCurveCurrency] = useState('USD')
   const [curvePoints, setCurvePoints] = useState<EquityCurvePoint[]>([])
   const [curveAccountId, setCurveAccountId] = useState<string | 'all'>('') // '' = not yet initialized
   const [selectedTimestamp, setSelectedTimestamp] = useState<string | null>(null)
@@ -175,17 +181,18 @@ export function PortfolioPage() {
   const fetchCurveData = useCallback(async (accountId: string | 'all') => {
     if (accountId === 'all') {
       const result = await api.trading.equityCurve({ limit: 200 }).catch(() => ({ points: [] }))
-      return result.points
+      return { points: result.points, currency: 'USD' }
     }
     // Single account — fetch its snapshots and convert to EquityCurvePoint format
     const { snapshots } = await api.trading.snapshots(accountId, { limit: 200 }).catch(() => ({ snapshots: [] as UTASnapshotSummary[] }))
-    return snapshots
+    const points = snapshots
       .sort((a, b) => a.timestamp.localeCompare(b.timestamp))
       .map(s => ({
         timestamp: s.timestamp,
         equity: s.account.netLiquidation,
         accounts: { [accountId]: s.account.netLiquidation },
       }))
+    return { points, currency: snapshots[0]?.account.baseCurrency || 'USD' }
   }, [])
 
   const refresh = useCallback(async () => {
@@ -217,16 +224,10 @@ export function PortfolioPage() {
     }
     setSnapshotConfigLoaded(true)
 
-    // Default to first account on initial load
-    const effectiveId = curveAccountId || portfolioConfigs[0]?.id || 'all'
-    if (!curveAccountId && effectiveId) setCurveAccountId(effectiveId)
-    const points = await fetchCurveData(effectiveId)
-    setCurvePoints(points)
-
     setLastRefresh(portfolioResult.liveSucceeded ? new Date() : null)
     setRefreshError(portfolioResult.error)
     setLoading(false)
-  }, [brokerReadiness.loading, curveAccountId, fetchCurveData, operationalAccounts, portfolioConfigs, tradingConfig.loading, tradingMode, tradingModeLoading])
+  }, [brokerReadiness.loading, operationalAccounts, portfolioConfigs, tradingConfig.loading, tradingMode, tradingModeLoading])
 
   useEffect(() => { ensureTradingModePolling() }, [])
   useEffect(() => { refresh() }, [refresh])
@@ -247,25 +248,64 @@ export function PortfolioPage() {
   // Account list for the chart switcher
   const chartAccounts = portfolioConfigs.map(a => ({ id: a.id, label: a.label ?? a.id }))
 
-  const handleAccountChange = useCallback(async (id: string | 'all') => {
+  useEffect(() => {
+    if (!curveAccountId && portfolioConfigs.length > 0) setCurveAccountId(portfolioConfigs[0].id)
+  }, [curveAccountId, portfolioConfigs])
+
+  const refreshCurve = useCallback(async () => {
+    if (!curveAccountId || tradingModeLoading || tradingMode === 'lite') return
+    const request = ++curveRequest.current
+    const result = await fetchCurveData(curveAccountId)
+    if (request !== curveRequest.current) return
+    setCurvePoints(result.points)
+    setCurveCurrency(result.currency)
+    setCurveLoading(false)
+  }, [curveAccountId, fetchCurveData, tradingMode, tradingModeLoading])
+
+  useEffect(() => {
+    setCurveLoading(true)
+    void refreshCurve()
+    const interval = setInterval(refreshCurve, 30_000)
+    return () => { clearInterval(interval); curveRequest.current++ }
+  }, [refreshCurve])
+
+  const handleAccountChange = (id: string | 'all') => {
+    curveRequest.current++
+    snapshotRequest.current++
+    setCurveLoading(true)
     setCurveAccountId(id)
     setSelectedSnapshot(null)
     setSelectedTimestamp(null)
-    const points = await fetchCurveData(id)
-    setCurvePoints(points)
-  }, [fetchCurveData])
+  }
 
-  const handlePointClick = useCallback(async (point: EquityCurvePoint) => {
-    setSelectedTimestamp(point.timestamp)
+  const closeSnapshot = () => {
+    snapshotRequest.current++
+    setSelectedTimestamp(null)
+  }
+
+  const handlePointClick = async (point: EquityCurvePoint) => {
+    if (curveLoading) return
     const accountId = curveAccountId !== 'all' ? curveAccountId : Object.keys(point.accounts)[0]
     if (!accountId) return
+    const request = ++snapshotRequest.current
     try {
-      const { snapshots } = await api.trading.snapshots(accountId, { limit: 1 })
-      if (snapshots.length > 0) setSelectedSnapshot(snapshots[0])
+      const { snapshots } = await api.trading.snapshots(accountId, { limit: 200 })
+      if (request !== snapshotRequest.current) return
+      const selectedTime = new Date(point.timestamp).getTime() + (curveAccountId === 'all' ? 59_999 : 0)
+      const snapshot = snapshots.reduce<UTASnapshotSummary | null>((latest, snapshot) => {
+        const time = new Date(snapshot.timestamp).getTime()
+        return time <= selectedTime && (!latest || time > new Date(latest.timestamp).getTime()) ? snapshot : latest
+      }, null)
+      if (snapshot) {
+        setSelectedTimestamp(point.timestamp)
+        setSelectedSnapshot(snapshot)
+      }
     } catch {
-      // Ignore — snapshot fetch failed
+      if (request === snapshotRequest.current) setSelectedTimestamp(null)
     }
-  }, [curveAccountId])
+  }
+
+  useEffect(() => () => { snapshotRequest.current++ }, [])
 
   // Merge equity per-account data with provider info + per-account unrealizedPnL from positions
   const accountSources = (data.equity?.accounts ?? []).map(eq => {
@@ -279,11 +319,12 @@ export function PortfolioPage() {
     <div className="flex flex-col flex-1 min-h-0">
       <PageHeader
         title="Portfolio"
-        help="Live portfolio overview across all trading accounts."
-        live={lastRefresh ? { lastUpdated: lastRefresh } : undefined}
+        help={refreshError ? `Live portfolio data is unavailable: ${refreshError}` : "Live portfolio overview across all trading accounts."}
+        accessory={refreshError ? <span className="sr-only" role="alert">{refreshError}</span> : undefined}
+        live={{ lastUpdated: lastRefresh }}
         right={
           <Button
-            onClick={refresh}
+            onClick={() => { void refresh(); void refreshCurve() }}
             disabled={loading}
             variant="outline"
             size="sm"
@@ -298,19 +339,13 @@ export function PortfolioPage() {
         <div className="flex flex-col gap-6 items-stretch @5xl:flex-row @5xl:items-start">
           {/* Main column */}
           <div className="flex-1 min-w-0 space-y-5">
-            {loading && data === EMPTY ? <PortfolioSkeleton /> : <>
+            {loading && !snapshotConfigLoaded ? <PortfolioSkeleton /> : <>
             {!tradingModeLoading && tradingMode === 'lite' ? (
               <TradingModeGate
                 title="Portfolio is unavailable in Lite mode."
                 description="Lite mode keeps UTA disconnected, so there are no broker accounts, positions, or equity snapshots to show. Change the trading mode in Settings → Trading → Mode to connect UTA."
               />
             ) : <>
-            {refreshError && (
-              <div className="rounded-lg border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm leading-5 text-destructive" role="alert">
-                Live portfolio data is unavailable: {refreshError}
-              </div>
-            )}
-
             {blockedAccounts.map((uta) => (
               <BrokerSupportGate
                 key={uta.id}
@@ -325,22 +360,19 @@ export function PortfolioPage() {
               <HeroMetrics equity={data.equity} curve={aggregateCurve?.total ?? null} />
             )}
 
-            {curvePoints.length > 0 && (
-              <div className="space-y-2">
-                {curveAccountId !== 'all' && !accountReadiness.get(curveAccountId)?.operational && (
-                  <p className="text-sm text-warning" role="status">
-                    Historical snapshot. Broker support is unavailable on this Runtime, so this chart is not live.
-                  </p>
-                )}
-                <EquityCurve
-                  points={curvePoints}
-                  accounts={chartAccounts}
-                  selectedAccountId={curveAccountId}
-                  onAccountChange={handleAccountChange}
-                  onPointClick={handlePointClick}
-                  selectedTimestamp={selectedTimestamp}
-                />
-              </div>
+            {(chartAccounts.length > 0 || curvePoints.length > 0) && (
+              <EquityCurve
+                ref={curveRef}
+                points={curvePoints}
+                accounts={chartAccounts}
+                selectedAccountId={curveAccountId}
+                onAccountChange={handleAccountChange}
+                onPointClick={handlePointClick}
+                selectedTimestamp={selectedTimestamp}
+                loading={curveLoading}
+                currency={curveCurrency}
+                historical={curveAccountId !== 'all' && !accountReadiness.get(curveAccountId)?.operational}
+              />
             )}
 
             <SnapshotSettings
@@ -352,10 +384,12 @@ export function PortfolioPage() {
             />
 
             {selectedSnapshot && (
-              <SnapshotDetail
-                snapshot={selectedSnapshot}
-                onClose={() => { setSelectedSnapshot(null); setSelectedTimestamp(null) }}
-              />
+              <Dialog open={selectedTimestamp !== null} onOpenChange={(open) => { if (!open) closeSnapshot() }}>
+                <DialogContent finalFocus={curveRef} showCloseButton={false} aria-describedby={undefined} className="max-h-[85dvh] overflow-y-auto p-0 sm:max-w-4xl">
+                  <DialogTitle className="sr-only">Snapshot details</DialogTitle>
+                  <SnapshotDetail snapshot={selectedSnapshot} onClose={closeSnapshot} />
+                </DialogContent>
+              </Dialog>
             )}
 
             {accountSources.length > 0 && (

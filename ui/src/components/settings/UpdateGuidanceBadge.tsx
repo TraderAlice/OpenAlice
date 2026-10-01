@@ -8,7 +8,7 @@ export function UpdateGuidanceBadge({ count, setupCount = 0, tone = 'available' 
   return <CountBadge
     count={total}
     limit={99}
-    tone={tone === 'attention' ? 'attention' : 'neutral'}
+    tone={tone === 'attention' ? 'attention' : 'info'}
     label={[count > 0 ? t(tone === 'available' ? 'nav.updatesAvailable' : 'nav.updatesNeedAttention', { count }) : '', setupCount > 0 ? t('projectSetup.title') : ''].filter(Boolean).join('; ')}
   />
 }
