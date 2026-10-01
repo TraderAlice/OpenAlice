@@ -80,9 +80,7 @@ void app.whenReady().then(async () => {
   ipcMain.handle('openalice:client-updates:activate', () => clientUpdates.activate())
   ipcMain.handle('openalice:client-updates:preferences', (_event, input: unknown) => clientUpdates.savePreferences(input))
   app.once('before-quit', () => clientUpdates.stop())
-  for (const action of ['install-and-restart', 'open-release']) {
-    ipcMain.handle(`openalice:updater:${action}`, () => { throw new Error('Unavailable in demo mode') })
-  }
+  ipcMain.handle('openalice:updater:open-release', () => { throw new Error('Unavailable in demo mode') })
   protocol.handle('app', request => fetchAliceWebRequest(request, backend))
   Menu.setApplicationMenu(process.platform === 'darwin'
     ? Menu.buildFromTemplate([{ role: 'appMenu' }, { role: 'editMenu' }, { role: 'windowMenu' }]) : null)

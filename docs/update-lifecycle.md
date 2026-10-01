@@ -6,6 +6,34 @@ installation and project execution remain with their owners: [[docs/remote-acces
 [[docs/workspace-template-upgrade.md]] and [[docs/harness-web-surfaces.md]].
 The pure planner and host adapters share one operation contract described below.
 
+## Product identity
+
+Root `package.json#version` is the authored product version. Backend, CLI and
+Guardian use the shared Node identity reader: an injected build value takes
+precedence, otherwise the known product manifest supplies source identity.
+The reader never searches cwd or substitutes a private package's version.
+The CLI workspace is private and has no authored product version. Existing
+native/npm assembly generates distribution metadata from the root identity.
+
+The desktop relay bundles this reader with the existing build-version injection;
+leaving it external would make an installed package search for a source manifest.
+The launcher declares its actual desktop mode before initializing readers. Desktop
+provenance belongs to those app bytes, even if its parent shell carries a CLI receipt.
+Native CLI launch clears inherited desktop mode and declares `cli-server` after
+composing the child environment. Its existing installed receipt supplies the channel;
+a raw binary without that receipt has no installed-update authority. Missing explicit
+receipts and invalid receipts never fall back to source or stable provenance.
+
+TUI, remote planning and backend adapters consume the shared provenance parser.
+Source execution stays development; pinned/custom/unknown ownership is preserved
+instead of being normalized to stable. Remote planning requires its caller's resolved
+identity; no exported default provenance object can bypass that read.
+
+Release preparation and candidate receipts import the same dependency-free
+release policy source before installation; runtime consumers use the package's
+built entry. Trusted-base workflow classification copies both the classifier and
+that policy from the base revision. No generated policy copy is checked in.
+
 ## Shared release selection
 
 `packages/update-lifecycle` exposes a pure TypeScript root with no React, filesystem,
@@ -16,8 +44,8 @@ There is no UI-local discovery comparator or server/CLI comparator re-export.
 Workspace source-tag ordering also uses the shared SemVer comparator. Qualified
 `snapshot-*` catalog entries are opaque exact selections: they remain selectable
 but cannot be ordered as release zero or auto-upgraded without a comparable
-baseline. Template managed-file versions retain their existing owner-specific
-convention for now.
+baseline. Managed-template release precedence uses the same shared ordering inside its
+existing transaction owner; Skill content projection uses file fingerprints.
 
 - A release identifies a channel and version, with a commit for development builds.
   An owner with same-platform payload evidence can additionally supply its artifact
@@ -34,10 +62,27 @@ convention for now.
 - Selection says whether a candidate is available, current, blocked or unknown,
   with a reason. It does not prove client/backend protocol compatibility.
 
+Backend HTTP, CLI, relay and native desktop adapters retain the selection status
+and reason. The backend's shipped `hasUpdate` field is only a compatibility
+projection of a fresh `available` decision. Missing decisions are unknown;
+blocked and failed observations cannot be presented as current. Native transport
+notifications do not authorize downloads: the shared policy accepts the candidate
+before electron-updater downloads it. Installation rechecks the exact approved
+version before handoff. Electron still owns payload validation and activation.
+Native IPC and renderer consumers share one status type.
+
 The Node CLI consumes the package's built ESM, while repository tests resolve its
 source. Workspace dependencies and the build graph must build it before CLI/UI
 consumers. Shared identity and selection tests live beside the package; network,
 installer and native-update tests stay with their effect owners.
+
+Release publication uses the same policy in the existing asset preparation
+script. Stable/beta release intent must move forward; mirror repair targets the
+exact active version. The publication workflow is serialized and records the
+observed channel-head digest. After immutable uploads, it re-reads the object
+store and validates both that digest and eligibility before writing any mutable
+native feed, installer alias or manifest. A changed observation requires a fresh
+run. Dev publication remains commit/payload-based in its existing owner.
 
 ## Exact activation evidence
 
@@ -111,7 +156,10 @@ auto-apply policy; candidate visibility is not permission to merge.
 
 The sole public React hook is `useUpdateLifecycle`. Its provider owns the
 native status subscription, client install command and Machine plan/progress
-state. Settings, desktop prompt and Machine controls subscribe to it; there is
+state. App-only and coordinated installation both enter the existing control
+service through review, approve and resume. There is no direct native-install
+IPC or preload method. Settings, desktop prompt and Machine controls subscribe
+to it; there is
 no `useMachineManagement` or nullable companion lifecycle hook. Shared chrome
 can request the same hook's optional preview mode. Connection/fleet CRUD still
 belongs to the connection owner. Source repository discovery also uses the
@@ -213,8 +261,9 @@ traces. It saves the in-flight stage before each effect. Lost outcomes are
 reconciled with owner receipts; unknown outcomes cannot be blindly replayed.
 `FileUpdateJournal` serializes each host scope using the existing Guardian lock,
 validates its saved graph, and writes private atomic receipts. Explicitly ending
-a plan archives the coordination record; it does not roll back files or erase
-child-owner receipts. These journals are new state, not a migration of a shipped
+a plan archives its coordination record; it does not roll back files. Native
+child receipts linked to that parent are archived with it; unrelated and remote
+owner receipts remain intact. These journals are new state, not a migration of a shipped
 persisted format.
 
 The local `UpdateControlService` composes backend, project and native owners.
@@ -226,6 +275,15 @@ target session in memory only; after a host restart, the browser must supply
 its authenticated session again. Cookie namespaces prevent cross-target reuse.
 A newer publication cannot replace an approved
 artifact. The native updater retains signature/download/handoff ownership.
+
+The same local control service selects recovery for status, resume and abandon.
+An unfinished native receipt takes precedence over completed coordinated history.
+A native child records the exact parent operation ID in its existing proposal
+reference; matching versions alone do not establish parentage. Linked native
+recovery runs before parent reconciliation. Unrelated unfinished receipts remain
+independent and prevent a new approval or native activation from replacing them.
+Startup uses this same selector. Recovery observes exact activation and readiness;
+it does not repeat an uncertain installer handoff.
 
 `WorkspaceUpdateService.coordinator` owns project inventory and child operations.
 Inventory includes managed templates, independent source tags, injected Alice

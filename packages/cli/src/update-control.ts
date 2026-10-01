@@ -16,8 +16,13 @@ export interface UpdateControlOptions {
   client?: {
     current(): string
     downloaded(): string | null
-    install(version: string): Promise<unknown>
+    install(version: string, parentOperationId: string): Promise<unknown>
     ready(): Promise<boolean>
+    recovery?: {
+      status(): Promise<UpdateOperation | null>
+      resume(): Promise<UpdateOperation | null>
+      abandon(): Promise<void>
+    }
   }
 }
 /** Durable local composition of owner commands. Browser reload drops no receipt;
@@ -34,11 +39,28 @@ export class UpdateControlService {
     if (this.options.scope() !== scope) throw new Error('The selected project changed during the update')
     return this.options.project(path, body)
   }
+  /** A pending native activation takes precedence over unrelated history.
+   * A linked child remains part of its coordinated parent, including recovery. */
+  private async recovery() {
+    const [control, native] = await Promise.all([this.journal.read(), this.options.client?.recovery?.status()])
+    const child = control && native && native.plan.proposals[0]?.reference?.parentOperationId === control.id
+      && control.plan.proposals.some(p => p.unit.id === 'client' && p.fingerprint === native.plan.proposals[0]?.unit.desired?.version)
+      ? native : null
+    if (native && (!control || (native.phase !== 'succeeded' && !(child && control.phase !== 'succeeded')))) {
+      return { owner: 'native' as const, operation: native, child: null }
+    }
+    return { owner: 'control' as const, operation: control ?? native ?? null, child }
+  }
   async abandon(): Promise<void> {
     if (this.flight) throw new Error('Wait for the owner command to return before ending this plan')
-    await this.journal.abandon()
+    const selected = await this.recovery()
+    if (selected.owner === 'native') await this.options.client!.recovery!.abandon()
+    else {
+      if (selected.child && selected.child.phase !== 'succeeded') await this.options.client!.recovery!.abandon()
+      await this.journal.abandon()
+    }
   }
-  status(): Promise<UpdateOperation | null> { return this.journal.read() }
+  async status(): Promise<UpdateOperation | null> { return (await this.recovery()).operation }
   async review(selection: UpdateSelection): Promise<UpdatePlan> {
     if (!selection || !Array.isArray(selection.projectUnits) || selection.projectUnits.length > 100) throw new Error('Invalid update selection')
     const proposals: UpdateProposal[] = []
@@ -69,6 +91,8 @@ export class UpdateControlService {
     return createUpdatePlan('local-control', proposals)
   }
   async approve(plan: UpdatePlan, fingerprint: string): Promise<UpdateOperation> {
+    const native = await this.options.client?.recovery?.status()
+    if (native && native.phase !== 'succeeded') throw new Error('Resume or abandon the unfinished native update before approving another plan')
     // Owner fingerprints are refreshed at approval; generated review ids are
     // references, not evidence. A new publication invalidates this review.
     const refreshed = await this.review({ client: plan.proposals.some(p => p.unit.id === 'client'), backend: plan.proposals.some(p => p.unit.id === 'backend'),
@@ -80,7 +104,16 @@ export class UpdateControlService {
   }
   resume(): Promise<UpdateOperation> {
     if (this.flight) return this.flight
-    const run = this.journal.run(this.owner()).finally(() => { if (this.flight === run) this.flight = null })
+    const run = (async () => {
+      const selected = await this.recovery()
+      if (selected.owner === 'native') {
+        const result = await this.options.client!.recovery!.resume()
+        if (!result) throw new Error('Native update receipt disappeared during recovery')
+        return result
+      }
+      if (selected.child && selected.child.phase !== 'succeeded') await this.options.client!.recovery!.resume()
+      return this.journal.run(this.owner())
+    })().finally(() => { if (this.flight === run) this.flight = null })
     this.flight = run
     return run
   }
@@ -89,6 +122,14 @@ export class UpdateControlService {
       reconcile: async (step, p, op) => {
         if (p.unit.id !== 'client' && p.reference!.scope !== this.options.scope()) return { status: 'blocked', reason: 'Reconnect to the approved Machine and AliceProject before continuing this update' }
         if (p.unit.id === 'client') {
+          const native = await this.options.client?.recovery?.status()
+          if (native && native.phase !== 'succeeded') {
+            if (native.plan.proposals[0]?.reference?.parentOperationId !== op.id
+              || native.plan.proposals[0]?.unit.desired?.version !== p.fingerprint) {
+              return { status: 'blocked', reason: 'Another native operation owns desktop activation' }
+            }
+            return { status: native.phase === 'waiting' ? 'waiting' : 'unknown', reason: native.error ?? 'Native activation requires recovery' }
+          }
           if (this.options.client?.current() === p.fingerprint) {
             if (step.stage !== 'reconnect' || await this.options.client.ready()) return { status: 'complete', receipt: `native:${p.fingerprint}:${step.stage}` }
             return { status: 'waiting', reason: 'Waiting for desktop readiness' }
@@ -116,7 +157,7 @@ export class UpdateControlService {
       execute: async (_step, p, op) => {
         if (p.unit.id !== 'client' && this.options.scope() !== p.reference!.scope) return { status: 'blocked', reason: 'The selected project changed during the update' }
         if (p.unit.id === 'client') {
-          await this.options.client!.install(p.fingerprint)
+          await this.options.client!.install(p.fingerprint, op.id)
           return { status: 'waiting', reason: 'Resume after native desktop activation' }
         }
         if (p.unit.id === 'backend') {

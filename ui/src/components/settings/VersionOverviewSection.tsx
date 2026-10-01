@@ -36,7 +36,7 @@ export function VersionOverviewSection() {
   const remote = Boolean(target && target.machine !== 'local')
   const appVersion = updates.client?.currentVersion
   const appCandidate = updates.nativeReady?.version ?? updates.client?.discovery.value?.latestVersion
-  const appAvailable = Boolean(updates.nativeReady || updates.client?.discovery.value?.status === 'available')
+  const appAvailable = !updates.clientError && !updates.nativeError && Boolean(updates.nativeReady || updates.client?.discovery.value?.status === 'available')
   const backend = updates.versionInfo
   const projectName = project?.displayName ?? target?.projectName ?? text('projectUnknown')
   const machineName = target?.machineName ?? t('settings.backendConnection.thisMachine')
@@ -49,11 +49,11 @@ export function VersionOverviewSection() {
     const current = state?.phase === 'updated' ? state.toVersion : state?.fromVersion ?? workspace?.currentVersion
     const candidate = state && ['available', 'blocked'].includes(state.phase) ? state.toVersion : undefined
     const failure = setupFailures.find(failure => failure.kind === item.kind)
-    const error = item.error || (state?.phase === 'failed' ? state.reason : null) || failure?.reason
+    const error = item.error || (state?.phase === 'failed' ? state.reason : state?.phase === 'blocked' && state.reason === 'older-release' ? t('workspace.upgradeBlockedReason.older-release') : null) || failure?.reason
     const attention = Boolean(error || state?.phase === 'failed' || (state?.phase === 'blocked' && state.reason?.split(/\s*,\s*/).some(reason => reason !== 'active_runtime')))
     const status = item.error || (state?.phase === 'failed' && state.failureStage === 'check') ? text('checkFailed')
       : state?.phase === 'failed' ? text('needsAttention') : failure ? t('projectSetup.setupFailed') : !item.loaded || state?.phase === 'checking' ? text('loading') : !workspace ? text('notConfigured')
-      : state?.phase === 'applying' ? text('updating') : state?.phase === 'blocked' ? text('waiting')
+      : state?.phase === 'applying' ? text('updating') : state?.phase === 'blocked' ? (attention ? text('needsAttention') : text('waiting'))
         : candidate ? text('available') : state?.phase === 'current' || state?.phase === 'updated' ? text('current') : text('unknown')
     return { ...item, current, candidate, attention, error, status }
   })
@@ -75,11 +75,11 @@ export function VersionOverviewSection() {
   }
   const appStatus = updates.clientError || updates.nativeError ? text('checkFailed')
     : nativeStatus?.phase === 'downloading' ? text('downloading')
-      : appAvailable ? text('available') : updates.client?.discovery.value?.status === 'current' ? text('current') : text('unknown')
+      : appAvailable ? text('available') : updates.client?.discovery.value?.status === 'blocked' ? text('needsAttention') : updates.client?.discovery.value?.status === 'current' ? text('current') : text('unknown')
   const backendStatus = updates.versionError || backend?.error ? text('checkFailed')
-    : backend?.hasUpdate ? text('available') : backend?.updateAuthority === 'service' ? t('settings.about.status.serviceManaged')
+    : backend?.decision?.status === 'blocked' ? text('needsAttention') : backend?.hasUpdate ? text('available') : backend?.updateAuthority === 'service' ? t('settings.about.status.serviceManaged')
       : backend?.updateAuthority === 'none' ? t('settings.about.status.noUpdater')
-        : backend?.updateAuthority === 'source' ? text('sourceManaged') : backend?.latest ? text('current') : text('unknown')
+        : backend?.updateAuthority === 'source' ? text('sourceManaged') : backend?.decision?.status === 'current' ? text('current') : text('unknown')
   const row = (kind: 'app' | 'backend' | 'project', icon: ReactNode, subtitle: ReactNode, identity: string, status: string, available: boolean, action: () => void, children?: ReactNode) => <section id={`settings-version-${kind}`} tabIndex={-1} className="min-w-0 scroll-mt-5 outline-none focus-visible:[box-shadow:var(--oa-focus-shadow)]">
     <div className="grid grid-cols-[1.25rem_minmax(0,1fr)] items-center gap-x-3 gap-y-2 px-4 py-3 @2xl:grid-cols-[1.25rem_minmax(0,1fr)_8rem_10rem_6rem]">
       <div className={`self-start pt-0.5 ${available ? 'text-info' : 'text-muted-foreground'}`} aria-hidden>{icon}</div>
@@ -128,6 +128,8 @@ export function VersionOverviewSection() {
           {(view === 'app' || view === 'backend') && <>
             <div className="mb-6 flex flex-wrap items-center gap-3"><span className="text-3xl font-semibold tabular-nums">{version(view === 'app' ? appVersion : backend?.current)}</span><span className="rounded-full border border-border px-3 py-1 text-xs">{view === 'app' ? updates.client?.discovery.value?.channel ?? '—' : backend?.channel ?? '—'}</span></div>
             <dl className="grid gap-5 border-y border-border py-5 sm:grid-cols-2"><Fact label={text('runningVersion')} value={version(view === 'app' ? appVersion : backend?.current)}/><Fact label={text('installedVersion')} value={text('notReported')}/><Fact label={text('location')} value={view === 'app' ? t('settings.backendConnection.thisMachine') : machineName}/><Fact label={text('updateStatus')} value={view === 'app' ? appStatus : backendStatus}/></dl>
+            {(view === 'app' ? updates.client?.discovery.value?.reason : backend?.decision?.reason) === 'older-release' && <p role="status" className="mt-4 text-sm text-warning">{text('olderRelease')}</p>}
+            {view === 'app' && updates.client?.discovery.value?.message && <p className="mt-4 text-sm text-muted-foreground">{updates.client.discovery.value.message}</p>}
             {integrated && <p className="mt-4 rounded-lg bg-primary/5 p-3 text-sm">{text('integrated')}</p>}
             {view === 'app' && updates.client?.kind === 'cli' && <p className="mt-4 text-sm text-muted-foreground">{text('cliManaged')}</p>}
             {view === 'backend' && !remote && !integrated && <p className="mt-4 text-sm text-muted-foreground">{text('localManaged')}</p>}

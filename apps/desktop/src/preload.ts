@@ -21,18 +21,7 @@ interface PtyListeners {
   readonly close: Set<(msg: { code: number; reason: string }) => void>
 }
 
-type UpdaterStatus =
-  | { phase: 'checking' }
-  | { phase: 'current'; version: string }
-  | { phase: 'available'; version?: string; releaseUrl?: string }
-  | { phase: 'downloading'; version?: string; percent?: number }
-  | { phase: 'downloaded'; version: string; releaseUrl: string }
-  | {
-      phase: 'installing'
-      version: string
-      stage: 'preparing' | 'stopping-services' | 'releasing-runtime' | 'handing-off'
-    }
-  | { phase: 'error'; message: string }
+type UpdaterStatus = import('@traderalice/update-lifecycle').NativeUpdaterStatus
 
 const ptyListeners = new Map<string, PtyListeners>()
 const updaterListeners = new Set<(status: UpdaterStatus) => void>()
@@ -228,7 +217,6 @@ const api = {
       updaterListeners.add(cb)
       return () => updaterListeners.delete(cb)
     },
-    installAndRestart: (version?: string) => ipcRenderer.invoke('openalice:updater:install-and-restart', version),
     openRelease: (version?: string) => ipcRenderer.invoke('openalice:updater:open-release', version),
   },
   workspace: {

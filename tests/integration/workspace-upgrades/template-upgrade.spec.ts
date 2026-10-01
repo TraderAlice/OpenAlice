@@ -7,6 +7,7 @@ import { join } from 'node:path';
 import { exec as gitExec } from 'dugite';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
+import { workspaceTemplateUpgradeFactory } from '../../../src/tool/workspace-template-upgrade.js';
 import type { Logger } from '../../../src/workspaces/logger.js';
 import { TemplateRegistry, type TemplateMeta } from '../../../src/workspaces/template-registry.js';
 import {
@@ -79,6 +80,70 @@ afterEach(async () => rm(root, {
 }));
 
 describe('TemplateUpgradeManager', () => {
+  it.each([
+    ['0.94.1', '0.94.1-beta.2'],
+    ['2.0.0', '1.9.9'],
+    ['0.94.1-beta.10', '0.94.1-beta.2'],
+  ])('rejects %s -> %s without changing files, Git or the applied baseline', async (installed, candidate) => {
+    await initializeWorkspaceTemplateState(workspace, { ...template, version: installed });
+    template = { ...template, version: candidate };
+    const upgrade = manager();
+    const statePath = join(workspace.dir, '.alice/template-upgrade/state.json');
+    const baselinePath = join(workspace.dir, '.alice/template-upgrade/baseline.json.gz');
+    const before = await Promise.all([git(workspace.dir, ['rev-parse', 'HEAD']), readFile(statePath), readFile(baselinePath), readFile(join(workspace.dir, 'AGENTS.md'))]);
+    expect((await upgrade.check(workspace)).decision).toEqual({ status: 'blocked', reason: 'older-release' });
+    const plan = await upgrade.plan(workspace.id);
+    expect(plan.update).toEqual({ status: 'blocked', reason: 'older-release' });
+    await expect(upgrade.apply(workspace.id, { planDigest: plan.planDigest })).rejects.toMatchObject({ code: 'blocked' });
+    const tool = workspaceTemplateUpgradeFactory.build({ workspaceId: workspace.id, workspaceLabel: workspace.tag, inboxStore: {} as never, entityStore: {} as never, templateUpgrades: upgrade });
+    expect(await tool.execute!({ apply: true, mode: 'summary' }, { toolCallId: 'regression', messages: [] })).toMatchObject({ ok: false, error: { code: 'blocked' }, preview: { update: { reason: 'older-release' } } });
+    expect(await Promise.all([git(workspace.dir, ['rev-parse', 'HEAD']), readFile(statePath), readFile(baselinePath), readFile(join(workspace.dir, 'AGENTS.md'))])).toEqual(before);
+    expect(await git(workspace.dir, ['status', '--porcelain'])).toBe('');
+  });
+
+  it('accepts beta to stable through the tool and records the exact stable baseline', async () => {
+    await initializeWorkspaceTemplateState(workspace, { ...template, version: '0.94.1-beta.2' });
+    template = { ...template, version: '0.94.1' };
+    const upgrade = manager();
+    const tool = workspaceTemplateUpgradeFactory.build({ workspaceId: 'manager-desk', workspaceLabel: 'Manager', inboxStore: {} as never, entityStore: {} as never, templateUpgrades: upgrade });
+    expect(await tool.execute!({ id: workspace.id, apply: true, mode: 'summary' }, { toolCallId: 'forward', messages: [] })).toMatchObject({ ok: true, action: 'applied', result: { toVersion: '0.94.1' } });
+    expect(await upgrade.currentVersion(workspace)).toBe('0.94.1');
+    expect(await readFile(join(workspace.dir, 'AGENTS.md'), 'utf8')).toBe('template agents v2\n');
+    expect((await upgrade.check(workspace)).decision).toEqual({ status: 'current', reason: 'same-release' });
+    expect((await upgrade.plan(workspace.id)).blocked).toBe(false);
+  });
+
+  it('rechecks eligibility when an incoming target changes after preview', async () => {
+    await initializeWorkspaceTemplateState(workspace, { ...template, version: '1.0.0' });
+    const upgrade = manager();
+    const preview = await upgrade.plan(workspace.id);
+    const head = await git(workspace.dir, ['rev-parse', 'HEAD']);
+    template = { ...template, version: '1.0.0-beta.2' };
+    await expect(upgrade.apply(workspace.id, { planDigest: preview.planDigest })).rejects.toMatchObject({ code: 'blocked', plan: { update: { reason: 'older-release' } } });
+    expect(await upgrade.currentVersion(workspace)).toBe('1.0.0');
+    expect(await git(workspace.dir, ['rev-parse', 'HEAD'])).toBe(head);
+    expect(await readFile(join(workspace.dir, 'AGENTS.md'), 'utf8')).toBe('template agents v1\n');
+  });
+
+  it.each([undefined, 'invalid'])('does not invent a baseline for unreported/invalid incoming version %s', async version => {
+    template = { ...template, version };
+    const upgrade = manager();
+    expect((await upgrade.check(workspace)).decision.status).toBe('unknown');
+    const plan = await upgrade.plan(workspace.id);
+    expect(plan.update.status).toBe('unknown');
+    await expect(upgrade.apply(workspace.id, { planDigest: plan.planDigest })).rejects.toMatchObject({ code: 'blocked' });
+    expect(await git(workspace.dir, ['status', '--porcelain'])).toBe('');
+  });
+
+  it('reports equal-version content changes from the owner and refuses to apply', async () => {
+    template = { ...template, version: '1.0.0' };
+    const upgrade = manager();
+    const plan = await upgrade.plan(workspace.id);
+    expect(plan.blockers).toContain('template_version_not_bumped');
+    await expect(upgrade.apply(workspace.id, { planDigest: plan.planDigest })).rejects.toMatchObject({ code: 'blocked' });
+    expect(await git(workspace.dir, ['status', '--porcelain'])).toBe('');
+  });
+
   it('merges separate lines and keeps the upstream baseline independent from local edits', async () => {
     const base = 'heading\n\nold command\n\nclosing\n';
     await writeFile(join(workspace.dir, 'AGENTS.md'), base);

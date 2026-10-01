@@ -23,7 +23,9 @@ export function workspacePlanRequest(workspace: Pick<Workspace, 'id' | 'template
 }
 
 export function workspacePlanIsCurrent(plan: WorkspacePlan): boolean {
-  return plan.fromVersion === plan.toVersion && (plan.strategy !== 'source-merge' || plan.fromCommit === plan.toCommit)
+  return plan.strategy === 'source-merge'
+    ? plan.fromVersion === plan.toVersion && plan.fromCommit === plan.toCommit
+    : plan.update.status === 'current' && !plan.blocked
 }
 
 /** One backend generation owns this read-only inventory. Core DiscoveryStore
@@ -66,6 +68,9 @@ export class WorkspacePlanStore {
     }
   }
   private validate(request: WorkspacePlanRequest, plan: WorkspacePlan): void {
+    if (plan.strategy === 'managed-context' && !plan.update) {
+      throw new Error('This backend does not report Workspace update eligibility. Update the backend before reviewing this update.')
+    }
     if (request.targetVersion && plan.toVersion !== request.targetVersion) throw new Error('The checked update target changed; check for updates again')
     if (plan.workspaceId !== request.workspaceId || plan.strategy !== (request.kind === 'source' ? 'source-merge' : 'managed-context')) {
       throw new Error('Update preview does not match the requested Workspace and layer')

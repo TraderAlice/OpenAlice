@@ -259,9 +259,8 @@ delivery lane:
   [Full Source Validation](../.github/workflows/ci.yml). The complete Ubuntu
   suite/build and macOS backstop run on manual dispatch or stable Release.
   Desktop and Broker Pack packaging use their separate workflows.
-- An exact synchronized forward beta version-only diff in `package.json` and
-  `packages/cli/package.json` retains the trusted classifier, workflow
-  contracts, complete critical evidence and typechecks, but skips the Windows
+- An exact forward beta version-only diff in root `package.json` retains
+  the trusted classifier, workflow contracts, complete critical evidence and typechecks, but skips the Windows
   smoke and installer/desktop/Broker Pack PR matrices.
   The classifier comes from the trusted base and fails closed: stable versions,
   extra changes, mismatches, invalid versions and errors use normal master gates.
@@ -367,8 +366,8 @@ After promotion, a maintainer may prepare a focused version-only branch from
 `master` and target its PR back to `master` when the source is ready to release.
 This maintainer-directed release-prep PR is the narrow exception to the normal
 `dev` base. Keep this publication-only commit on `master` until the release and
-its public surface are accepted. Then copy only the synchronized root and CLI
-`version` values back to `dev` through a focused dev-targeted PR; do not merge
+its public surface are accepted. Then copy only the root product
+`version` value back to `dev` through a focused dev-targeted PR; do not merge
 unrelated `master` changes or turn that bookkeeping into a second implementation
 lane. Source runtime identity remains independent of that value:
 `OPENALICE_LAUNCHER=dev` and `electron-dev` select the `dev` channel, while
@@ -377,7 +376,7 @@ manually from `master`, choose the `release` operation, and supply both the
 channel and tag:
 `beta` accepts `vX.Y.Z-beta` or `vX.Y.Z-beta.N`; `stable` accepts only
 `vX.Y.Z`. The workflow rejects an existing tag, a channel/tag mismatch, or a
-version that disagrees with either the root or `packages/cli` package. It binds
+version that disagrees with the root product manifest. It binds
 the accepted candidates and eventual tag to the dispatch commit SHA.
 
 Version-prep gates are defined in [CI Feedback Lanes](#ci-feedback-lanes).

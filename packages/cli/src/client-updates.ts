@@ -41,7 +41,8 @@ export class ClientUpdateService {
     const discover = options.discover ?? (async () => {
       const result = await checkForUpdate({ currentVersion: this.currentVersion })
       // Project/UI consumers receive observations, never installer commands.
-      return { status: result.status === 'available' || result.status === 'current' ? result.status : 'unsupported',
+      return { status: result.status,
+        reason: 'reason' in result ? result.reason : undefined,
         channel: result.channel ?? 'unknown',
         latestVersion: result.latestVersion, latestCommit: 'latestCommit' in result ? result.latestCommit : undefined,
         releaseNotesUrl: result.releaseNotesUrl, message: result.message }

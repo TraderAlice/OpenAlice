@@ -92,6 +92,16 @@ upgrade, the recorded baseline becomes authoritative. Editing README
 frontmatter is not equivalent to completing an upgrade and cannot dismiss the
 upgrade signal.
 
+The managed-template owner uses shared SemVer precedence for both discovery and
+apply. A lower candidate is blocked, absent or malformed versions are unknown,
+and changed incoming content at equal precedence requires a template version
+bump. Plans carry that decision to the tool and review UI; neither derives
+eligibility by comparing display strings. Apply recomputes the decision inside
+the checkout lease before writing files, commits, baselines, or receipts.
+Alice Harness Skill projection remains content reconciliation and can apply
+same-version file changes. Missing template metadata is not version zero and
+cannot create an invented managed-template baseline.
+
 ## Apply Transaction
 
 Apply takes the shared checkout-operation lease and is serialized per Workspace.

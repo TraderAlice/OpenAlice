@@ -1,24 +1,10 @@
-import type { ClientReleaseObservation } from '@traderalice/update-lifecycle'
+import { selectRelease, releaseChannelForVersion, type ReleaseDecision, type ClientReleaseObservation, type NativeUpdaterStatus as UpdaterStatus, type UpdaterInstallStage } from '@traderalice/update-lifecycle'
+export type { UpdaterInstallStage } from '@traderalice/update-lifecycle'
 import { app, ipcMain, shell, type BrowserWindow } from 'electron'
 import electronUpdater from 'electron-updater'
 import { resolveAutoUpdateCapability } from './auto-update-policy.js'
 
 const { autoUpdater } = electronUpdater
-
-export type UpdaterInstallStage =
-  | 'preparing'
-  | 'stopping-services'
-  | 'releasing-runtime'
-  | 'handing-off'
-
-type UpdaterStatus =
-  | { phase: 'checking' }
-  | { phase: 'current'; version: string }
-  | { phase: 'available'; version?: string; releaseUrl?: string }
-  | { phase: 'downloading'; version?: string; percent?: number }
-  | { phase: 'downloaded'; version: string; releaseUrl: string }
-  | { phase: 'installing'; version: string; stage: UpdaterInstallStage }
-  | { phase: 'error'; message: string }
 
 type UpdateCheckResult =
   | { supported: true }
@@ -29,15 +15,15 @@ export interface AutoUpdateHooks {
     version: string,
     report: (stage: Exclude<UpdaterInstallStage, 'preparing' | 'handing-off'>) => void,
   ) => Promise<void>
-  executeInstall?: (version: string, prepare: () => Promise<void>, handoff: () => Promise<void>) => Promise<void>
+  executeInstall?: (version: string, prepare: () => Promise<void>, handoff: () => Promise<void>, parentOperationId?: string) => Promise<void>
   onInstallHandoff?: (version: string) => Promise<void> | void
   onInstallFailure?: (error: Error) => Promise<void> | void
 }
 
-export function configureAutoUpdate(win: BrowserWindow, hooks: AutoUpdateHooks, currentVersion: string): { discover(): Promise<ClientReleaseObservation>; install(expectedVersion?: string): Promise<{ ok: boolean }>; downloaded(): string | null } {
+export function configureAutoUpdate(win: BrowserWindow, hooks: AutoUpdateHooks, currentVersion: string): { discover(): Promise<ClientReleaseObservation>; install(expectedVersion?: string, parentOperationId?: string): Promise<{ ok: boolean }>; downloaded(): string | null } {
   let downloadedVersion: string | null = null
   let availableVersion: string | null = null
-  let checkedRelease: { version: string; available: boolean } | null = null
+  let checkedRelease: { version: string; decision: ReleaseDecision } | null = null
   let latestStatus: UpdaterStatus | null = null
   let activeCheck: Promise<UpdateCheckResult> | null = null
   let installInProgress = false
@@ -46,6 +32,11 @@ export function configureAutoUpdate(win: BrowserWindow, hooks: AutoUpdateHooks, 
     isPackaged: app.isPackaged,
     resourcesPath: process.resourcesPath,
   })
+
+  const channel = releaseChannelForVersion(currentVersion)
+  const select = (version: string): ReleaseDecision => channel
+    ? selectRelease({ channel, version: currentVersion }, { channel, version }, channel)
+    : { status: 'unknown', reason: 'invalid-identity' }
 
   const releaseUrlFor = (version: string): string =>
     `https://github.com/TraderAlice/OpenAlice/releases/tag/v${version}`
@@ -78,8 +69,10 @@ export function configureAutoUpdate(win: BrowserWindow, hooks: AutoUpdateHooks, 
     if (!capability.enabled) {
       return Promise.resolve({ supported: false, reason: capability.reason })
     }
+    if (installInProgress) return Promise.resolve({ supported: true })
     if (activeCheck) return activeCheck
     checkedRelease = null
+    installFailureHandled = false
     sendStatus({ phase: 'checking' })
     activeCheck = autoUpdater.checkForUpdates()
       .then(() => ({ supported: true as const }))
@@ -99,20 +92,20 @@ export function configureAutoUpdate(win: BrowserWindow, hooks: AutoUpdateHooks, 
   ipcMain.removeHandler('openalice:updater:get-status')
   ipcMain.handle('openalice:updater:get-status', () => latestStatus)
 
-  const controls = { install: (expectedVersion?: string) => install(expectedVersion), downloaded: () => downloadedVersion, discover: async (): Promise<ClientReleaseObservation> => {
+  const controls = { install: (expectedVersion?: string, parentOperationId?: string) => install(expectedVersion, parentOperationId), downloaded: () => downloadedVersion, discover: async (): Promise<ClientReleaseObservation> => {
     const result = await checkForUpdates()
-    const base = { currentVersion, channel: !app.isPackaged ? 'dev' : currentVersion.includes('-') ? 'beta' : 'stable' }
+    const base = { currentVersion, channel: !app.isPackaged ? 'dev' : channel ?? 'custom' }
     if (!result.supported) return { ...base, status: 'unsupported', message: result.reason }
     if (latestStatus?.phase === 'error') throw new Error(latestStatus.message)
     if (!checkedRelease) throw new Error('Native updater returned no release identity')
-    return { ...base, status: checkedRelease.available ? 'available' : 'current',
+    return { ...base, ...checkedRelease.decision,
       latestVersion: checkedRelease.version, releaseNotesUrl: releaseUrlFor(checkedRelease.version) }
   } }
 
-  ipcMain.removeHandler('openalice:updater:install-and-restart')
-  const install = async (expectedVersion?: string) => {
+  const install = async (expectedVersion?: string, parentOperationId?: string) => {
     if (expectedVersion !== undefined && expectedVersion !== downloadedVersion) throw new Error('The downloaded update changed; review the current release before installing')
     if (!downloadedVersion) throw new Error('No downloaded update is ready to install.')
+    if ((latestStatus?.phase === 'error' && !installFailureHandled) || select(downloadedVersion).status !== 'available') throw new Error('The downloaded release is not eligible for installation. Check updates again.')
     if (installInProgress) return { ok: true }
     installInProgress = true
     installFailureHandled = false
@@ -128,13 +121,15 @@ export function configureAutoUpdate(win: BrowserWindow, hooks: AutoUpdateHooks, 
       })
       }
       const handoff = async () => {
+      if (downloadedVersion !== version || select(version).status !== 'available') throw new Error('The downloaded update changed before handoff; review the current release before installing')
       sendStatus({ phase: 'installing', version, stage: 'handing-off' })
       await hooks.onInstallHandoff?.(version)
       // Assisted NSIS updates must be silent or they stop on the installer UI
       // after Electron exits. Force-run restarts the updated app on success.
+      if (downloadedVersion !== version) throw new Error('The approved native payload changed during handoff')
       autoUpdater.quitAndInstall(true, true)
       }
-      if (hooks.executeInstall) await hooks.executeInstall(version, prepare, handoff)
+      if (hooks.executeInstall) await hooks.executeInstall(version, prepare, handoff, parentOperationId)
       else { await prepare(); await handoff() }
       return { ok: true }
     } catch (error) {
@@ -144,7 +139,6 @@ export function configureAutoUpdate(win: BrowserWindow, hooks: AutoUpdateHooks, 
       throw normalized
     }
   }
-  ipcMain.handle('openalice:updater:install-and-restart', (_event, expectedVersion?: string) => install(expectedVersion))
 
   ipcMain.removeHandler('openalice:updater:open-release')
   ipcMain.handle('openalice:updater:open-release', async (_event, version: unknown) => {
@@ -166,9 +160,10 @@ export function configureAutoUpdate(win: BrowserWindow, hooks: AutoUpdateHooks, 
     return controls
   }
 
-  autoUpdater.autoDownload = true
+  if (!channel) throw new Error('Native updater requires a supported OpenAlice product release identity')
+  autoUpdater.autoDownload = false
   autoUpdater.autoInstallOnAppQuit = false
-  autoUpdater.allowPrerelease = currentVersion.includes('-')
+  autoUpdater.allowPrerelease = channel === 'beta'
   autoUpdater.channel = channelForVersion(currentVersion, process.platform, process.arch)
   autoUpdater.allowDowngrade = false
 
@@ -182,20 +177,31 @@ export function configureAutoUpdate(win: BrowserWindow, hooks: AutoUpdateHooks, 
     sendStatus({ phase: 'error', message: normalized.message })
   })
 
-  autoUpdater.on('update-available', (info) => {
-    console.log(`[updater] update available: ${info.version}`)
-    checkedRelease = { version: info.version, available: true }
-    availableVersion = info.version
-    sendStatus({ phase: 'available', version: info.version, releaseUrl: releaseUrlFor(info.version) })
-  })
-
-  autoUpdater.on('update-not-available', (info) => {
-    console.log(`[updater] no update available (latest=${info.version})`)
-    checkedRelease = { version: info.version, available: false }
-    sendStatus({ phase: 'current', version: currentVersion })
-  })
+  const acceptRelease = (version: string, nativeAvailable: boolean) => {
+    const decision = select(version)
+    checkedRelease = { version, decision }
+    if (decision.status !== 'available') {
+      availableVersion = null
+      downloadedVersion = null
+      if (decision.status === 'current') sendStatus({ phase: 'current', version: currentVersion })
+      else sendStatus({ phase: decision.status, version, reason: decision.reason })
+      return
+    }
+    if (!nativeAvailable) {
+      sendStatus({ phase: 'error', message: 'The native updater did not accept the eligible release payload. Check updates again.' })
+      return
+    }
+    availableVersion = version
+    sendStatus({ phase: 'available', version, releaseUrl: releaseUrlFor(version) })
+    void autoUpdater.downloadUpdate().catch((error: unknown) => {
+      sendStatus({ phase: 'error', message: error instanceof Error ? error.message : String(error) })
+    })
+  }
+  autoUpdater.on('update-available', info => acceptRelease(info.version, true))
+  autoUpdater.on('update-not-available', info => acceptRelease(info.version, false))
 
   autoUpdater.on('download-progress', (progress) => {
+    if (!availableVersion || select(availableVersion).status !== 'available') return
     console.log(`[updater] downloading ${progress.percent.toFixed(1)}%`)
     sendStatus({
       phase: 'downloading',
@@ -205,6 +211,13 @@ export function configureAutoUpdate(win: BrowserWindow, hooks: AutoUpdateHooks, 
   })
 
   autoUpdater.on('update-downloaded', (info) => {
+    const decision = select(info.version)
+    if (decision.status !== 'available') { acceptRelease(info.version, false); return }
+    if (checkedRelease && checkedRelease.version !== info.version) {
+      downloadedVersion = null
+      sendStatus({ phase: 'error', message: 'The downloaded update does not match the checked release. Check updates again.' })
+      return
+    }
     downloadedVersion = info.version
     availableVersion = info.version
     sendStatus({ phase: 'downloaded', version: info.version, releaseUrl: releaseUrlFor(info.version) })
@@ -216,8 +229,9 @@ export function configureAutoUpdate(win: BrowserWindow, hooks: AutoUpdateHooks, 
 }
 
 export function channelForVersion(version: string, platform: NodeJS.Platform, arch: string): string {
-  const prerelease = version.match(/^\d+\.\d+\.\d+-([0-9A-Za-z-]+)/)
-  const channel = prerelease?.[1] ?? 'latest'
+  const releaseChannel = releaseChannelForVersion(version)
+  if (!releaseChannel) throw new Error('Unsupported OpenAlice release channel')
+  const channel = releaseChannel === 'stable' ? 'latest' : releaseChannel
   // GenericProvider appends "-mac" to this channel. Intel therefore requests
   // latest-intel-mac.yml / beta-intel-mac.yml, which are compatibility aliases
   // of the public latest-mac-intel.yml / beta-mac-intel.yml feeds.

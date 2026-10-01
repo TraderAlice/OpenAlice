@@ -10,15 +10,17 @@ export class DesktopUpdateLifecycle {
     this.journal = new FileUpdateJournal(join(root, 'update-operations'), 'desktop')
   }
   snapshot(): Promise<UpdateOperation | null> { return this.journal.read() }
-  async install(version: string, prepare: () => Promise<void>, handoff: () => Promise<void>): Promise<UpdateOperation> {
+  async install(version: string, prepare: () => Promise<void>, handoff: () => Promise<void>, parentOperationId?: string): Promise<UpdateOperation> {
     const plan = createUpdatePlan('desktop', [{
       unit: { id: 'desktop', installationId: 'desktop', roles: ['renderer', 'relay', 'bundled-runtime'], owner: 'electron-updater', location: 'local',
         installed: { version: this.currentVersion() }, active: { version: this.currentVersion() }, desired: { version }, source: 'native-feed', policyScope: 'client', capabilities: null, operations: ['update'] },
+      reference: parentOperationId ? { parentOperationId } : undefined,
       fingerprint: `native:${version}`, stages: ['prepare', 'activate', 'verify', 'reconnect'],
     }])
     const existing = await this.journal.read()
     if (!existing || existing.phase === 'succeeded') await this.journal.approve(plan, plan.fingerprint)
-    else if (existing.plan.proposals[0]?.unit.desired?.version !== version) throw new Error('Resume the approved desktop release before selecting another target')
+    else if (existing.plan.proposals[0]?.unit.desired?.version !== version
+      || existing.plan.proposals[0]?.reference?.parentOperationId !== parentOperationId) throw new Error('Resume the approved desktop release before selecting another target')
     return this.journal.run(this.owner({ prepare, handoff }))
   }
   async resume(ready: () => Promise<boolean>): Promise<UpdateOperation | null> {

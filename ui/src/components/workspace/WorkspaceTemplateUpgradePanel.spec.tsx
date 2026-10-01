@@ -31,7 +31,7 @@ const plan: TemplateUpgradePlan = {
   template: 'chat',
   fromVersion: '1.2.0',
   toVersion: '1.6.1',
-  strategy: 'managed-context',
+  strategy: 'managed-context', update: { status: 'available', reason: 'newer-release' },
   planDigest: 'preview-1',
   source: 'legacy-root-commit',
   blocked: false,
@@ -125,6 +125,7 @@ describe('WorkspaceTemplateUpgradePanel', () => {
       .mockResolvedValueOnce({
         ...plan,
         fromVersion: plan.toVersion,
+        update: { status: 'current', reason: 'same-release' },
         source: 'recorded-baseline',
         files: [],
         summary: { ready: 0, preserved: 0, conflicts: 0, unchanged: 0 },
@@ -202,4 +203,19 @@ it('refreshes an already open review after Workspace content invalidation', asyn
   await waitFor(() => expect(planStore.peek({ workspaceId: 'chat-old', kind: 'template' })?.planDigest).toBe('content-changed'))
   expect(getTemplateUpgradePlan).toHaveBeenCalledTimes(2)
   expect((screen.getByRole('button', { name: 'Apply and commit' }) as HTMLButtonElement).disabled).toBe(true)
+})
+
+it('shows the owner downgrade blocker and never enables apply', async () => {
+  vi.mocked(getTemplateUpgradePlan).mockResolvedValue({ ...plan, fromVersion: '0.94.1', toVersion: '0.94.1-beta.2', update: { status: 'blocked', reason: 'older-release' }, blocked: true, blockers: ['older-release'] })
+  render(<WorkspaceTemplateUpgradePanel wsId="chat-old" onWorkspaceChanged={vi.fn()} onClose={vi.fn()} />)
+  expect(await screen.findByText('The available template is older than this Workspace. An update cannot downgrade it.')).toBeTruthy()
+  expect(screen.getByRole('button', { name: 'Apply and commit' }).hasAttribute('disabled')).toBe(true)
+  expect(applyTemplateUpgrade).not.toHaveBeenCalled()
+})
+
+it('does not reconstruct eligibility when an older backend omits it', async () => {
+  vi.mocked(getTemplateUpgradePlan).mockResolvedValue({ ...plan, update: undefined } as unknown as TemplateUpgradePlan)
+  render(<WorkspaceTemplateUpgradePanel wsId="chat-old" onWorkspaceChanged={vi.fn()} onClose={vi.fn()} />)
+  expect(await screen.findByText(/This backend does not report Workspace update eligibility/)).toBeTruthy()
+  expect(screen.queryByRole('button', { name: 'Apply and commit' })?.hasAttribute('disabled') ?? true).toBe(true)
 })

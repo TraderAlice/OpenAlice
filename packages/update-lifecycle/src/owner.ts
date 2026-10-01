@@ -27,7 +27,7 @@ export async function recordOwnerUpdate<T>(input: {
     throw error
   }
 }
-export function projectUpdateUnit(id: string, owner: string, location: string, installed: UpdateIdentity | null, desired: UpdateIdentity): UpdateUnit {
+export function projectUpdateUnit(id: string, owner: string, location: string, installed: UpdateIdentity | null, desired: UpdateIdentity | null): UpdateUnit {
   return { id, installationId: location, projectId: location, roles: [owner], owner, location, installed, active: installed, desired,
     source: owner, policyScope: owner === 'broker-pack' ? 'pack' : 'project', capabilities: null, operations: ['update'] }
 }

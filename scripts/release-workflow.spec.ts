@@ -106,7 +106,7 @@ describe('Release workflow critical path', () => {
     expect(guard).toContain('releases/latest')
     expect(guard).toContain('.draft == false and .prerelease == false')
     expect(guard).toContain('merge-base --is-ancestor')
-    expect(guard).toContain('packages/cli/package.json')
+    expect(guard).not.toContain('packages/cli/package.json')
     const download = step(job, 'Download and verify existing public release bytes').run ?? ''
     expect(download).toContain('verifyCliNpmPackages')
     expect(download).toContain('verify-public-cli-channels.mjs')
@@ -143,11 +143,12 @@ describe('Release workflow critical path', () => {
     const plan = step(workflow.jobs.release, 'Validate release intent and version authority').run ?? ''
     expect(plan).toContain('refs/heads/master')
     expect(plan).toContain("require('./package.json').version")
-    expect(plan).toContain("require('./packages/cli/package.json').version")
+    expect(plan).not.toContain("require('./packages/cli/package.json').version")
     expect(plan).toContain('Release tag already exists')
     expect(plan).toContain("RELEASE_CHANNEL\" = \"stable")
     expect(plan).toContain("RELEASE_CHANNEL\" = \"beta")
-    expect(plan).toContain('does not match channel')
+    expect(plan).toContain('check-publication')
+    expect(plan).toContain('channel_head_sha256=')
 
     for (const name of [
       'Create beta tag and GitHub prerelease from accepted candidates',
@@ -627,8 +628,9 @@ describe('Release workflow critical path', () => {
     expect(installer).toContain('Mirror repair requires a channel-aware Release')
     expect(mirror.steps?.some((candidate) => candidate.name === 'Publish generated release metadata and installer'))
       .toBe(false)
-    expect(step(mirror, 'Keep mirror repair on the active channel release').if)
-      .toContain("needs.release.outputs.operation == 'mirror'")
+    expect(upload).toContain('check-publication')
+    expect(upload).toContain('--expected-sha256 "$EXPECTED_HEAD_SHA256"')
+    expect(upload.indexOf('check-publication')).toBeLessThan(upload.indexOf('--include "${FEED_PREFIX}*.yml"'))
     expect(step(mirror, 'Snapshot stable aliases before a beta mirror').if)
       .toContain("needs.release.outputs.channel == 'beta'")
     expect(upload).toContain('s3://${R2_BUCKET}/beta/manifest.json')

@@ -37,7 +37,7 @@ export class ProjectUpdateCoordinator {
       const template = workspace.template ? this.service.templates.get(workspace.template) : undefined
       if (template?.upgradeStrategy === 'managed-context' && (!selected || selected.has(`template:${workspace.id}`))) {
         const installed = await this.service.templateUpgrades.currentVersion(workspace)
-        units.push(projectUpdateUnit(`template:${workspace.id}`, 'template', workspace.dir, installed ? { version: installed } : null, { version: template.version }))
+        units.push(projectUpdateUnit(`template:${workspace.id}`, 'template', workspace.dir, installed ? { version: installed } : null, template.version ? { version: template.version } : null))
       }
       if (template?.source && (!selected || selected.has(`source:${workspace.id}`))) {
         const receipt = await readHarnessSource(workspace.dir)
@@ -81,7 +81,7 @@ export class ProjectUpdateCoordinator {
       const conflicts = 'summary' in plan && plan.summary.conflicts > 0
       proposals.push({ unit: { ...unit, desired: { ...unit.desired!, revision: plan.planDigest } }, fingerprint: plan.planDigest,
         stages: ['apply', 'verify'], reference: { workspaceId, targetVersion: plan.toVersion },
-        blockers: [...plan.blockers, ...(conflicts ? ['Resolve managed-file conflicts in the Workspace review first'] : [])] })
+        blockers: [...plan.blockers, ...('update' in plan && plan.update.status !== 'available' ? [plan.update.reason] : []), ...(conflicts ? ['Resolve managed-file conflicts in the Workspace review first'] : [])] })
     }
     return createUpdatePlan('project', proposals)
   }

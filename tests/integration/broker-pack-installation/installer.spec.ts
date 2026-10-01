@@ -157,6 +157,7 @@ describe('broker-pack installer', () => {
     catalog.sourceCommit = commit
     const resources = resolve(fixture, 'resources')
     await mkdir(resources)
+    await writeFile(resolve(resources, 'package.json'), JSON.stringify({ name: 'open-alice', version }))
     await writeFile(resolve(resources, 'broker-pack-source.json'), JSON.stringify({schemaVersion: 1, commit, catalog}))
     delete process.env['OPENALICE_BROKER_PACK_CATALOG_URL']
     process.env['OPENALICE_APP_HOME'] = resources

@@ -29,10 +29,6 @@ the durable truth after it changes. Git history is the archive.
 
 ## Active
 
-- [[plans/version-lifecycle-convergence.md]] — Remove competing product identity,
-  upgrade eligibility, status translation, recovery routing, and release policy
-  entry points; acceptance follows the reproduced defects in #1721.
-
 - [[plans/settings-machines-dialog.md]] — Move machine management into General / Machines and replace inline SSH setup with a reviewed dialog; Draft PR only.
 
 - [[plans/review-updates-shared-plan.md]] — Share automatic/manual update review

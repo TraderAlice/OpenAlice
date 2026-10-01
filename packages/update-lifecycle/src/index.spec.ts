@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { compareVersions, isVersion, newerRelease, selectRelease, type ReleaseIdentity } from './index.js'
+import { compareVersions, isVersion, releaseChannelForVersion, newerRelease, selectRelease, type ReleaseIdentity } from './index.js'
 
 describe('release precedence', () => {
   it.each([
@@ -48,4 +48,12 @@ describe('channel selection shared by product and rehearsal', () => {
     expect(selectRelease(current, { ...current, artifactSha256: 'b'.repeat(64) }, 'dev').status).toBe('available')
     expect(selectRelease({ ...current, commit: undefined }, current, 'dev').status).toBe('current')
   })
+})
+
+it.each([
+  ['0.94.1', 'stable'], ['0.94.1+local.7', 'stable'], ['v0.94.1-beta.2', 'beta'],
+  ['0.94.1-beta.10+build.2', 'beta'], ['0.94.1-beta.0', null], ['0.94.1-beta.01', null],
+  ['invalid', null], ['39', null], ['0.94.1-alpha.1', null],
+])('classifies the running product %s using the shared channel grammar', (version, expected) => {
+  expect(releaseChannelForVersion(version)).toBe(expected)
 })

@@ -68,8 +68,8 @@ export function WorkspaceTemplateUpgradePanel({
     [plan],
   )
   const unresolved = conflicts.filter((file) => !resolutions[file.path]).length
-  const current = projection ? !plan?.files.some((file) => file.status === 'ready' || file.status === 'conflict') : plan?.fromVersion === plan?.toVersion && (layer === 'template' || !plan?.files.some((file) => file.status === 'ready' || file.status === 'conflict'))
-  const canApply = !!plan && !current && !plan.blocked && unresolved === 0 && !applying && !loading && !shared.error
+  const current = plan?.update.status === 'current' && !plan.blocked
+  const canApply = !!plan && plan.update.status === 'available' && !plan.blocked && unresolved === 0 && !applying && !loading && !shared.error
 
   const apply = async (): Promise<void> => {
     if (!plan || !canApply) return
@@ -183,6 +183,9 @@ export function WorkspaceTemplateUpgradePanel({
                         run: run.taskId ?? t('workspace.upgradeSynchronousRun'),
                       })}
                     </li>
+                  ))}
+                  {plan.blockers.filter(reason => reason !== 'active_sessions' && reason !== 'staged_changes').map(reason => (
+                    <li key={reason}>{t(`workspace.upgradeBlockedReason.${reason}`, { defaultValue: reason })}</li>
                   ))}
                   {plan.blockers.includes('staged_changes') && <li>{t('workspace.upgradeBlockedStaged')}</li>}
                 </ul>

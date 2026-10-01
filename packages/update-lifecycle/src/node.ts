@@ -5,6 +5,8 @@ import { dirname, join } from 'node:path'
 import { acquireRuntimeLock } from '@traderalice/guardian-runtime'
 import { approveUpdate, createUpdatePlan, updateFingerprint, UpdateCoordinator, type UpdateJournal, type UpdateOperation, type UpdateOwner, type UpdatePlan } from './coordinator.js'
 
+export { getProductVersion } from './product-version.js'
+
 export class FileUpdateJournal implements UpdateJournal {
   readonly path: string
   readonly lockPath: string

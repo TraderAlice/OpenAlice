@@ -1,8 +1,8 @@
 /**
  * App version awareness — current version + latest channel release.
  *
- * The current version comes from package.json#version (read once at module
- * load). The latest stable or beta version comes from the matching OpenAlice
+ * The current version comes from the shared product build identity.
+ * The latest stable or beta version comes from the matching OpenAlice
  * CDN manifest and is cached in memory with separate success/error TTLs.
  * Explicit runtime identity and installed provenance, rather than package
  * semver alone, select the channel and update authority. Source development
@@ -14,46 +14,10 @@
  * discovery does not depend on GitHub's anonymous API.
  */
 
-import { DiscoveryStore, selectRelease, releaseChannelMatchesVersion } from '@traderalice/update-lifecycle'
+import { DiscoveryStore, selectRelease, releaseChannelMatchesVersion, installSourceUpdateChannel, releaseChannelForVersion, type ReleaseDecision } from '@traderalice/update-lifecycle'
 import { readFileSync } from 'node:fs'
-import { resolve, dirname } from 'node:path'
-import { fileURLToPath } from 'node:url'
-
-// ==================== Current version (from package.json) ====================
-
-interface PackageJson {
-  version?: string
-}
-
-let _packageJson: PackageJson | null = null
-
-function readPackageJson(): PackageJson {
-  if (_packageJson !== null) return _packageJson
-  const here = fileURLToPath(import.meta.url)
-  const candidates = [
-    process.env['OPENALICE_APP_HOME'] && resolve(process.env['OPENALICE_APP_HOME'], 'package.json'),
-    resolve(process.cwd(), 'package.json'),
-    resolve(dirname(here), '..', '..', 'package.json'),
-  ].filter((value): value is string => Boolean(value))
-  for (const candidate of [...new Set(candidates)]) {
-    try {
-      const parsed = JSON.parse(readFileSync(candidate, 'utf-8')) as PackageJson
-      if (typeof parsed.version === 'string') {
-        _packageJson = parsed
-        return _packageJson
-      }
-    } catch {
-      // Packaged Alice/UTA and source execution have different import.meta.url
-      // roots; continue through the explicit app home, cwd, and source fallbacks.
-    }
-  }
-  _packageJson = {}
-  return _packageJson
-}
-
-export function getCurrentVersion(): string {
-  return readPackageJson().version ?? '0.0.0'
-}
+import { getProductVersion as getCurrentVersion } from '@traderalice/update-lifecycle/node'
+export { getCurrentVersion }
 
 // ==================== Latest release (cached manifest fetch) ====================
 
@@ -104,12 +68,6 @@ const ERROR_TTL_MS = 5 * 60 * 1000 // 5min
 
 // Fixed feed inventory: each channel owns one bounded single-flight resource.
 const cache = new Map<ReleaseChannel, DiscoveryStore<LatestRelease>>()
-
-function releaseChannelForVersion(version: string): ReleaseChannel {
-  return /^v?\d+\.\d+\.\d+-beta(?:\.|$)/.test(version)
-    ? 'beta'
-    : 'stable'
-}
 
 function isHttpUrl(value: string): boolean {
   try {
@@ -167,6 +125,7 @@ export async function fetchLatestRelease(
   opts?: FetchLatestReleaseOptions,
 ): Promise<{ result: LatestRelease | null; error: string | null }> {
   const channel = opts?.channel ?? releaseChannelForVersion(getCurrentVersion())
+  if (!channel) return { result: null, error: 'Running product identity has no supported release channel' }
   let store = cache.get(channel)
   if (!store) {
     store = new DiscoveryStore<LatestRelease>({ successTtlMs: SUCCESS_TTL_MS, errorTtlMs: ERROR_TTL_MS })
@@ -197,7 +156,9 @@ export interface VersionInfo {
   channel: VersionChannel
   updateAuthority: UpdateAuthority
   latest: string | null
+  /** Compatibility projection for released clients; decision is authoritative. */
   hasUpdate: boolean
+  decision: ReleaseDecision | null
   releaseUrl: string | null
   releaseNotes: string | null
   publishedAt: string | null
@@ -229,6 +190,7 @@ export async function getVersionInfo(opts?: GetVersionInfoOptions): Promise<Vers
       updateAuthority: context.authority,
       latest: null,
       hasUpdate: false,
+      decision: null,
       releaseUrl: null,
       releaseNotes: null,
       publishedAt: null,
@@ -245,7 +207,7 @@ export async function getVersionInfo(opts?: GetVersionInfoOptions): Promise<Vers
       current,
       channel: context.channel,
       updateAuthority: context.authority,
-      latest: null, hasUpdate: false,
+      latest: null, hasUpdate: false, decision: null,
       releaseUrl: null, releaseNotes: null, publishedAt: null,
       error,
     }
@@ -255,13 +217,14 @@ export async function getVersionInfo(opts?: GetVersionInfoOptions): Promise<Vers
     { channel: context.channel, version: result.version },
     context.channel,
   )
-  const hasUpdate = decision.status === 'available'
+  const hasUpdate = !error && decision.status === 'available'
   return {
     current,
     channel: context.channel,
     updateAuthority: context.authority,
     latest: result.version,
     hasUpdate,
+    decision,
     releaseUrl: result.url,
     releaseNotes: result.body,
     publishedAt: result.publishedAt,
@@ -283,6 +246,10 @@ function resolveUpdateContext(
     return { channel: 'dev', authority: 'source', error: null }
   }
 
+  if (runtimeProfile === 'electron-packaged') {
+    return { channel: releaseChannelForVersion(currentVersion) ?? 'custom', authority: 'desktop', error: null }
+  }
+
   const installedSourcePath = env['OPENALICE_INSTALL_SOURCE']?.trim()
   const installedChannel = installedSourcePath
     ? readInstalledChannel(installedSourcePath, readTextFile)
@@ -293,12 +260,9 @@ function resolveUpdateContext(
   const channel = installedChannel ?? (
     installedSourcePath
       ? 'custom'
-      : releaseChannelForVersion(currentVersion)
+      : releaseChannelForVersion(currentVersion) ?? 'custom'
   )
 
-  if (runtimeProfile === 'electron-packaged') {
-    return { channel, authority: 'desktop', error: provenanceError }
-  }
   if (runtimeProfile === 'docker') {
     return { channel, authority: 'service', error: provenanceError }
   }
@@ -308,7 +272,7 @@ function resolveUpdateContext(
     return { channel, authority, error: provenanceError }
   }
 
-  return { channel, authority: 'source', error: null }
+  return { channel: 'dev', authority: 'source', error: null }
 }
 
 function isSourceRuntimeProfile(runtimeProfile: string | undefined): boolean {
@@ -319,76 +283,7 @@ function isSourceRuntimeProfile(runtimeProfile: string | undefined): boolean {
 
 function readInstalledChannel(path: string, readTextFile: ReadTextFile): VersionChannel | null {
   try {
-    const parsed = JSON.parse(readTextFile(path)) as unknown
-    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return null
-    const source = parsed as Record<string, unknown>
-    if (!isValidInstalledSource(source)) return null
-
-    const schemaVersion = source['schemaVersion']
-    if (schemaVersion === 2 || schemaVersion === 3) {
-      return normalizeInstalledChannel(source['updateChannel'])
-    }
-    if (schemaVersion !== 1) return null
-
-    const selector = source['selector']
-    if (!selector || typeof selector !== 'object' || Array.isArray(selector)) return null
-    const kind = (selector as Record<string, unknown>)['kind']
-    const value = (selector as Record<string, unknown>)['value']
-    if (kind === 'version') return 'pinned'
-    if (kind !== 'branch' || typeof value !== 'string') return null
-    if (value === 'master') {
-      return source['installerUrl'] === 'https://openalice.ai/install' ? 'stable' : 'custom'
-    }
-    return 'dev'
-  } catch {
-    return null
-  }
-}
-
-function isValidInstalledSource(source: Record<string, unknown>): boolean {
-  const schemaVersion = source['schemaVersion']
-  const selector = source['selector']
-  if (!selector || typeof selector !== 'object' || Array.isArray(selector)) return false
-  const kind = (selector as Record<string, unknown>)['kind']
-  const value = (selector as Record<string, unknown>)['value']
-  if (
-    ![1, 2, 3].includes(schemaVersion as number)
-    || source['repository'] !== 'TraderAlice/OpenAlice'
-    || typeof source['cliVersion'] !== 'string'
-    || source['cliVersion'].length < 1
-    || (kind !== 'branch' && kind !== 'version')
-    || typeof value !== 'string'
-    || value.length < 1
-    || value.length > 128
-    || value.includes('..')
-    || !/^[A-Za-z0-9._/-]+$/.test(value)
-    || typeof source['installerUrl'] !== 'string'
-    || !isHttpUrl(source['installerUrl'])
-  ) {
-    return false
-  }
-  if (schemaVersion !== 3) return true
-
-  const artifact = source['artifact']
-  return (
-    typeof source['method'] === 'string'
-    && ['direct', 'npm', 'bun', 'brew', 'aur'].includes(source['method'])
-    && Boolean(artifact)
-    && typeof artifact === 'object'
-    && !Array.isArray(artifact)
-    && ['darwin', 'linux', 'win32'].includes((artifact as Record<string, unknown>)['platform'] as string)
-    && ['arm64', 'x64'].includes((artifact as Record<string, unknown>)['arch'] as string)
-    && typeof (artifact as Record<string, unknown>)['sha256'] === 'string'
-    && /^[a-f0-9]{64}$/.test((artifact as Record<string, unknown>)['sha256'] as string)
-    && typeof source['installedAt'] === 'string'
-    && Number.isFinite(Date.parse(source['installedAt']))
-  )
-}
-
-function normalizeInstalledChannel(value: unknown): VersionChannel | null {
-  if (value === 'development') return 'dev'
-  if (value === 'stable' || value === 'beta' || value === 'pinned' || value === 'custom') {
-    return value
-  }
-  return null
+    const channel = installSourceUpdateChannel(JSON.parse(readTextFile(path)))
+    return channel === 'development' ? 'dev' : channel
+  } catch { return null }
 }

@@ -78,7 +78,7 @@ async function discoverUpdate(options = {}, dependencies = {}) {
     : normalizeUpdateChannel(options.channel)
   if (!channel) {
     return {
-      status: 'unsupported',
+      status: /** @type {const} */ ('unsupported'),
       currentVersion,
       channel: installSourceUpdateChannel(installSource),
       sourceChannel: installSourceUpdateChannel(installSource),
@@ -110,7 +110,9 @@ async function discoverUpdate(options = {}, dependencies = {}) {
       'dev',
     )
     return {
-      status: decision.status === 'unknown' ? 'unsupported' : decision.status,
+      status: decision.status,
+      reason: decision.reason,
+      ...(decision.status === 'blocked' ? { message: `Update blocked: ${decision.reason} (${currentVersion} → ${manifest.version})` } : {}),
       ...(decision.status === 'unknown' ? { message: 'Cannot determine the running release identity' } : {}),
       currentVersion,
       latestVersion: manifest.version,
@@ -141,7 +143,7 @@ async function discoverUpdate(options = {}, dependencies = {}) {
     && isNativeDirectInstallSource(installSource)
   ) {
     return {
-      status: 'unsupported',
+      status: /** @type {const} */ ('unsupported'),
       currentVersion,
       latestVersion: manifest.version,
       releaseNotesUrl: manifest.releaseNotesUrl,
@@ -157,7 +159,9 @@ async function discoverUpdate(options = {}, dependencies = {}) {
     options.channel !== undefined ? 'switch-channel' : 'update',
   )
   return {
-    status: decision.status === 'unknown' ? 'unsupported' : decision.status === 'available' ? 'available' : 'current',
+    status: decision.status,
+    reason: decision.reason,
+    ...(decision.status === 'blocked' ? { message: `Update blocked: ${decision.reason} (${currentVersion} → ${manifest.version})` } : {}),
     ...(decision.status === 'unknown' ? { message: 'Cannot determine the running release identity' } : {}),
     currentVersion,
     latestVersion: manifest.version,
@@ -210,7 +214,7 @@ export async function runUpdateCommand(argv, dependencies = {}) {
     stdout.write(`${JSON.stringify(result)}\n`)
     return 0
   }
-  if (result.status === 'unsupported') {
+  if (result.status === 'unsupported' || result.status === 'blocked' || result.status === 'unknown') {
     stdout.write(`${result.message}\n`)
     return 0
   }

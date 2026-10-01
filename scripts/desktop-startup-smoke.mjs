@@ -32,7 +32,9 @@ for (const hasRecent of connectedHome ? [false] : [false, true]) {
       child.once('error', error => { clearTimeout(timeout); reject(error) })
       child.once('exit', code => { clearTimeout(timeout); code === 0 ? resolve() : reject(new Error(output)) })
     })
-    if (!output.includes('renderer startup smoke passed')) throw new Error(output)
+    const receipt = output.split('\n').find(line => line.includes('renderer startup smoke passed'))
+    if (!receipt) throw new Error(output)
+    console.log(receipt)
     if (hasRecent && !output.includes('missing-machine')) throw new Error('Unavailable Recent was erased')
     console.log(`[startup-smoke] ${connectedHome ? 'connected separated mode' : hasRecent ? 'unavailable Recent' : 'no Recent'} passed; no local project ownership`)
   } finally {

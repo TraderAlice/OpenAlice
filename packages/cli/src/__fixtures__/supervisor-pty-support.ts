@@ -30,7 +30,7 @@ export const eventLensFixtureEntry = join(
 )
 export const cliPackageRoot = dirname(dirname(cliEntry))
 export const cliVersion = JSON.parse(
-  await readFile(join(cliPackageRoot, 'package.json'), 'utf8'),
+  await readFile(new URL('../../../../package.json', import.meta.url), 'utf8'),
 ).version
 export const temporaryPaths: string[] = []
 const originalStartView = process.env.OPENALICE_TUI_START_VIEW

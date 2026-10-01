@@ -1,3 +1,4 @@
+import { releaseChannelForVersion } from '@traderalice/update-lifecycle'
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import {
   getCurrentVersion,
@@ -59,14 +60,6 @@ function mockJsonResponse(value: unknown, response?: { status?: number; statusTe
   return fetchMock
 }
 
-describe('getCurrentVersion', () => {
-  it('returns a non-empty version string from package.json', () => {
-    const version = getCurrentVersion()
-    expect(typeof version).toBe('string')
-    expect(version.length).toBeGreaterThan(0)
-  })
-})
-
 describe('fetchLatestRelease (mocked manifest fetch)', () => {
   const originalFetch = globalThis.fetch
 
@@ -110,7 +103,8 @@ describe('fetchLatestRelease (mocked manifest fetch)', () => {
     const info = await getVersionInfo({ channel: 'stable', force: true })
     expect(info.latest).toBe('99.0.0')
     expect(info.error).toBe('feed unavailable')
-    expect(info.hasUpdate).toBe(true)
+    expect(info.hasUpdate).toBe(false)
+    expect(info.decision).toEqual({ status: 'available', reason: 'newer-release' })
   })
 
   it('reads the beta channel from its separate manifest URL', async () => {
@@ -274,6 +268,18 @@ describe('getVersionInfo', () => {
     expect(fetchMock).not.toHaveBeenCalled()
   })
 
+  it('preserves an older release decision instead of claiming current', async () => {
+    mockJsonResponse(releaseManifest('stable', '0.1.0'))
+    expect(await getVersionInfo({ channel: 'stable' })).toMatchObject({ hasUpdate: false, decision: { status: 'blocked', reason: 'older-release' } })
+  })
+
+  it('treats absent installation metadata as source ownership without feed discovery', async () => {
+    const fetchMock = vi.fn()
+    globalThis.fetch = fetchMock as typeof fetch
+    expect(await getVersionInfo({ env: {} })).toMatchObject({ channel: 'dev', updateAuthority: 'source', latest: null, decision: null })
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
+
   it('reports hasUpdate=true when latest is newer than current', async () => {
     mockJsonResponse(releaseManifest('stable', '999.999.999'))
 
@@ -292,7 +298,7 @@ describe('getVersionInfo', () => {
     const channel = /-beta(?:\.|$)/i.test(current) ? 'beta' : 'stable'
     mockJsonResponse(releaseManifest(channel, current))
 
-    const info = await getVersionInfo()
+    const info = await getVersionInfo({ channel })
 
     expect(info.latest).toBe(current)
     expect(info.hasUpdate).toBe(false)
@@ -356,6 +362,17 @@ describe('getVersionInfo', () => {
     })
     expect(readTextFile).not.toHaveBeenCalled()
     expect(fetchMock).not.toHaveBeenCalled()
+  })
+
+  it('keeps packaged desktop ownership independent of inherited CLI provenance', async () => {
+    const readTextFile = vi.fn(() => { throw new Error('Unrelated CLI receipt') })
+    const info = await getVersionInfo({
+      currentOnly: true,
+      env: { OPENALICE_RUNTIME_PROFILE: 'electron-packaged', OPENALICE_INSTALL_SOURCE: '/cli/install-source.json' },
+      readTextFile,
+    })
+    expect(info).toMatchObject({ current: getCurrentVersion(), channel: releaseChannelForVersion(getCurrentVersion()), updateAuthority: 'desktop', error: null })
+    expect(readTextFile).not.toHaveBeenCalled()
   })
 
   it('normalizes legacy non-master branch provenance to the development channel', async () => {

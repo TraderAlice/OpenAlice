@@ -22,7 +22,9 @@ to the selected Runtime. No Workspace Agent or Studio is started for this check.
 unsigned packaged process and checks real readiness through preload. It also
 checks the shared Skills inventory. `scripts/desktop-startup-smoke.mjs` accepts
 `--app-path <executable> --connected-home <disposable-running-project>` to prove
-packaged separated inventory without taking local project ownership. Native
+packaged separated client/backend identity without taking local project ownership.
+It uses the shipped version endpoint so a previous release need not implement the
+current update-inventory API; integrated Workspace acceptance checks that inventory. Native
 signature/notarization and Windows installer replacement remain release gates.
 
 ## Product Contract

@@ -115,7 +115,6 @@ export async function startRuntime(options, dependencies = {}) {
     port: options.port,
     takeover: options.takeover,
   })
-  runtimeEnv.OPENALICE_LAUNCHER = 'cli-server'
   runtimeEnv.OPENALICE_SERVER_MODE = detached ? 'detached' : 'foreground'
   runtimeEnv.OPENALICE_RUNTIME_PROVIDER = runtimeProvider.kind
   if (standalone) {
@@ -126,6 +125,7 @@ export async function startRuntime(options, dependencies = {}) {
       { inspectDependencies: dependencies.inspectDependencies },
     )
   }
+  runtimeEnv.OPENALICE_LAUNCHER = 'cli-server'
   delete runtimeEnv.OPENALICE_RUNTIME_CONTENT_IDENTITY
   if (runtimeProvider.contentIdentity) {
     runtimeEnv.OPENALICE_RUNTIME_CONTENT_IDENTITY = runtimeProvider.contentIdentity

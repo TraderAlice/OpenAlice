@@ -1,3 +1,4 @@
+import packageJson from '../../../../package.json'
 import { createUpdatePlan, approveUpdate, UpdateCoordinator, projectUpdateUnit, type UpdateOperation, type UpdatePlan } from '@traderalice/update-lifecycle'
 import { http, HttpResponse } from 'msw'
 import { DEMO_AUTO_QUANT_WORKSPACE_ID, DEMO_AUTO_PREDICTION_WORKSPACE_ID, DEMO_CHAT_WORKSPACE_ID, demoChatWorkspace, demoWorkspaces } from '../fixtures/workspaces'
@@ -32,8 +33,8 @@ const snapshot = () => ({ preferences, workspaces: [
 
 let clientPreferences = { autoCheck: true }
 const clientSnapshot = () => ({
-  kind: 'cli', currentVersion: '0.94.1-beta.2', preferences: clientPreferences,
-  discovery: { value: { status: 'current', currentVersion: '0.94.1-beta.2', channel: 'beta' },
+  kind: 'cli', currentVersion: packageJson.version, preferences: clientPreferences,
+  discovery: { value: { status: 'unsupported', currentVersion: packageJson.version, channel: 'dev', message: 'Demo does not install client updates.' },
     checking: false, error: null, checkedAt: Date.now(), succeededAt: Date.now() },
 })
 let operation: UpdateOperation | null = null

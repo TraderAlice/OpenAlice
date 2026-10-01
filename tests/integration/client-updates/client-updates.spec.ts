@@ -1,4 +1,4 @@
-import { mkdtemp, rm } from 'node:fs/promises'
+import { mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
@@ -67,4 +67,24 @@ it('serves the injected desktop owner through HTTP with the same identity, polic
     expect(expected).toMatchObject({ kind: 'desktop', currentVersion: CLI_VERSION, preferences: { autoCheck: false },
       discovery: { value: { currentVersion: CLI_VERSION } } })
   } finally { await relay.close() }
+})
+
+it('preserves the production CLI blocked decision through client service and relay HTTP', async () => {
+  const source = join(root, 'install-source.json')
+  await writeFile(source, JSON.stringify({ schemaVersion: 2, repository: 'TraderAlice/OpenAlice', cliVersion: CLI_VERSION, selector: { kind: 'branch', value: 'master' }, installerUrl: 'https://openalice.ai/install', updateChannel: 'stable' }))
+  vi.stubEnv('OPENALICE_INSTALL_SOURCE', source)
+  const realFetch = globalThis.fetch
+  vi.stubGlobal('fetch', vi.fn(async (url, init) => String(url).startsWith('http://127.0.0.1:') ? realFetch(url, init) : new Response(JSON.stringify({ channel: 'stable', version: '0.1.0', releaseNotesUrl: 'https://example.test/release', installer: { url: 'https://example.test/install', versionedUrl: 'https://example.test/v0.1.0/install', sha256: 'a'.repeat(64) } }), { headers: { 'content-type': 'application/json' } })))
+  const owner = new ClientUpdateService({ path: join(root, 'policy.json') })
+  services.push(owner)
+  const relay = new WebRelay({ clientUpdates: owner })
+  try {
+    await owner.check()
+    const origin = await relay.listen()
+    const snapshot = await fetch(`${origin}/relay/v1/updates`).then(response => response.json())
+    expect(snapshot.discovery.value).toMatchObject({ currentVersion: CLI_VERSION, status: 'blocked', reason: 'older-release' })
+  } finally {
+    await relay.close()
+    vi.unstubAllGlobals(); vi.unstubAllEnvs()
+  }
 })

@@ -30,7 +30,10 @@ export async function verifyRemoteUpgradeRecovery({ from, to, remoteTarget, env,
   const options = parseRemoteArgs([remoteTarget, '--home', project, '--yes'])
   const dependencies = { env: clientEnv, spawnProcess: (command, args, spawnOptions) => spawn(command, args, { ...spawnOptions, env: clientEnv }) }
   const observed = await probeRemoteHost(options, dependencies)
-  const plan = createRemotePlan(options, observed)
+  // This scenario explicitly reviews the installed published release. Source
+  // execution must not manufacture a stable controller installation receipt.
+  dependencies.installSource = observed.installSource
+  const plan = createRemotePlan(options, observed, { installSource: observed.installSource })
   if (plan.blocker || plan.installCli || !plan.restartServer || plan.installSource.cliVersion !== to)
     throw new Error(`Expected activation-only plan: ${JSON.stringify(plan)}`)
   console.log(`[remote-upgrade-recovery] confirmed ${from} active / ${to} installed; activating without reinstall`)

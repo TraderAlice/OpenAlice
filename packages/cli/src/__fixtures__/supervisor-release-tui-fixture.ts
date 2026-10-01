@@ -2,7 +2,7 @@ import { fixtureHome } from './fixture-home.ts'
 import { resolveLaunchContext } from '../launch-context.ts'
 import { runSupervisorTui } from '../supervisor-tui.ts'
 
-const checked: string[] = []
+const checked: Array<string | undefined> = []
 
 const exitCode = await runSupervisorTui({}, {
   env: process.env,

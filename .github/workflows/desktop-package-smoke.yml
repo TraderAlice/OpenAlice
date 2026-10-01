@@ -70,6 +70,10 @@ jobs:
         with:
           fetch-depth: 0
 
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+
       - name: Detect exact beta release preparation
         id: beta-release-prep
         if: github.event_name == 'pull_request'
@@ -77,8 +81,10 @@ jobs:
         env:
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
         run: |
-          git show "${BASE_SHA}:scripts/classify-beta-release-prep.mjs" > "$RUNNER_TEMP/classify-beta-release-prep.mjs"
-          node "$RUNNER_TEMP/classify-beta-release-prep.mjs" --github-output "$GITHUB_OUTPUT"
+          trusted_root="$RUNNER_TEMP/openalice-release-policy"
+          mkdir -p "$trusted_root"
+          git archive "$BASE_SHA" scripts/classify-beta-release-prep.mjs packages/update-lifecycle/src/release-policy.ts | tar -x -C "$trusted_root"
+          node "$trusted_root/scripts/classify-beta-release-prep.mjs" --github-output "$GITHUB_OUTPUT"
 
       - uses: pnpm/action-setup@v6
         if: steps.beta-release-prep.outcome != 'success' || steps.beta-release-prep.outputs.beta_release_prep != 'true'

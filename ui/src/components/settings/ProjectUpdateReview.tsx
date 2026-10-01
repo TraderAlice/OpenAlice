@@ -14,6 +14,10 @@ export function ProjectUpdateReview({ onClose }: { onClose(): void }) {
   const { openAgentConfig, refresh: refreshWorkspaces } = useWorkspaces()
   const { t } = useTranslation()
   const blockerLabels: Record<string, string> = {
+    'older-release': t('workspace.upgradeBlockedReason.older-release'),
+    'invalid-identity': t('workspace.upgradeBlockedReason.invalid-identity'),
+    'missing-candidate': t('workspace.upgradeBlockedReason.missing-candidate'),
+    template_version_not_bumped: t('workspace.upgradeBlockedReason.template_version_not_bumped'),
     active_runtime: t('workspace.sourceUpgradeBlocker.active_runtime'),
     active_sessions: t('workspace.upgradeBlockedSessions'),
     staged_changes: t('workspace.upgradeBlockedStaged'),

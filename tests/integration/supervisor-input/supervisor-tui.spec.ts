@@ -1138,29 +1138,16 @@ describe('Supervisor TUI screen', () => {
     expect(runtimeFrame).not.toContain('[ l ] Reload snapshot')
   })
 
-  it('labels source-run, stable, beta, and dev channels from install provenance', async () => {
-    await expect(resolveSupervisorChannel({
-      resolveLayout: () => null,
-    })).resolves.toBe('dev')
-    await expect(resolveSupervisorChannel({
-      resolveLayout: () => ({}),
-      readSource: async () => ({
-        selector: { kind: 'branch', value: 'dev' },
-      }),
-    })).resolves.toBe('dev')
-    await expect(resolveSupervisorChannel({
-      resolveLayout: () => ({}),
-      readSource: async () => ({
-        updateChannel: 'beta',
-        selector: { kind: 'version', value: 'v0.90.2-beta.1' },
-      }),
-    })).resolves.toBe('beta')
-    await expect(resolveSupervisorChannel({
-      resolveLayout: () => ({}),
-      readSource: async () => ({
-        selector: { kind: 'version', value: 'v0.87.0' },
-      }),
-    })).resolves.toBe('stable')
+  it('uses shared provenance for source, packaged, pinned and unknown channels', async () => {
+    await expect(resolveSupervisorChannel()).resolves.toBe('dev')
+    const source = { schemaVersion: 2, repository: 'TraderAlice/OpenAlice', cliVersion: '0.94.1',
+      selector: { kind: 'version', value: 'v0.94.1' }, installerUrl: 'https://openalice.ai/install' } as const
+    for (const channel of ['stable', 'beta', 'development', 'pinned', 'custom'] as const) {
+      await expect(resolveSupervisorChannel({ readSource: async () => ({ ...source, updateChannel: channel }) }))
+        .resolves.toBe(channel === 'development' ? 'dev' : channel)
+    }
+    await expect(resolveSupervisorChannel({ readSource: async () => null })).resolves.toBe('unknown')
+    await expect(resolveSupervisorChannel({ readSource: async () => ({ ...source, schemaVersion: 1 }) })).resolves.toBe('pinned')
   })
 
   it('renders stable stopped-state application chrome', () => {
@@ -5282,7 +5269,7 @@ describe('Supervisor TUI screen', () => {
 
   it('routes pointer selection through the focused update-channel stage', async () => {
     let inputListener: ((data: string) => unknown) | undefined
-    const checked: string[] = []
+    const checked: Array<string | undefined> = []
     class FakeTui {
       addChild(): void {}
       addInputListener(listener: (data: string) => unknown): () => void {

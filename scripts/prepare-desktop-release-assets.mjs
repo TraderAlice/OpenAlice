@@ -1,12 +1,42 @@
 #!/usr/bin/env node
 
+import { releaseChannelMatchesVersion, compareVersions, selectRelease } from '../packages/update-lifecycle/src/release-policy.ts'
 import { createHash } from 'node:crypto'
 import { copyFileSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
 import { basename, join, resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
 
 function prereleaseChannel(version) {
-  return version.match(/^\d+\.\d+\.\d+-([0-9A-Za-z-]+)/)?.[1] ?? 'latest'
+  if (releaseChannelMatchesVersion('stable', version)) return 'latest'
+  if (releaseChannelMatchesVersion('beta', version)) return 'beta'
+  throw new Error(`[release-assets] unsupported release version: ${version}`)
+}
+
+/** Existing publication transport supplies the observed bytes. The same policy
+ * gates intent and the last read before mutable feeds move under the workflow's
+ * publication lock. An observation changed during the build requires a new run. */
+export function checkPublicationHead({ headBytes, version, channel, operation, expectedSha256 }) {
+  if (!['stable', 'beta'].includes(channel) || !releaseChannelMatchesVersion(channel, version)) {
+    throw new Error('Release version does not match channel')
+  }
+  if (!['release', 'mirror'].includes(operation)) throw new Error('Invalid publication operation')
+  const sha256 = createHash('sha256').update(headBytes).digest('hex')
+  if (expectedSha256 !== undefined && sha256 !== expectedSha256) throw new Error('Channel head changed after release intent; review the current head before publishing')
+  const head = JSON.parse(headBytes.toString())
+  if (head?.channel !== channel || typeof head.version !== 'string' || !releaseChannelMatchesVersion(channel, head.version)) {
+    throw new Error('Current channel head has invalid release identity')
+  }
+  const decision = selectRelease(head, { channel, version }, channel)
+  if (operation === 'mirror' ? decision.status !== 'current' || head.version !== version : decision.status !== 'available') {
+    throw new Error(operation === 'mirror' ? 'Mirror repair must target the active channel release' : `Publication must move the channel forward: ${decision.reason}`)
+  }
+  return sha256
+}
+
+export function previousReleaseTag(tags, channel) {
+  if (!['stable', 'beta'].includes(channel)) throw new Error('Invalid release channel')
+  return tags.filter(tag => tag.startsWith('v') && releaseChannelMatchesVersion(channel, tag.slice(1)))
+    .sort((a, b) => compareVersions(b, a))[0] ?? ''
 }
 
 function copyIfPresent(outDir, source, targets) {
@@ -192,6 +222,17 @@ function requireValues(values, keys) {
 
 function main() {
   const { command, values } = parseArgs(process.argv.slice(2))
+  if (command === 'check-publication') {
+    requireValues(values, ['head-path', 'version', 'channel', 'operation'])
+    console.log(checkPublicationHead({ headBytes: readFileSync(values['head-path']), version: values.version,
+      channel: values.channel, operation: values.operation, expectedSha256: values['expected-sha256'] }))
+    return
+  }
+  if (command === 'previous-tag') {
+    requireValues(values, ['tags-path', 'channel'])
+    console.log(previousReleaseTag(readFileSync(values['tags-path'], 'utf8').split(/\r?\n/), values.channel))
+    return
+  }
   if (command === 'build') {
     requireValues(values, ['out-dir', 'platform', 'arch', 'version'])
     prepareBuildMetadata({

@@ -1,4 +1,3 @@
-import { compareVersions } from '@traderalice/update-lifecycle'
 import { readPreferences } from '../core/preferences.js'
 import { ProjectUpdateCoordinator } from './project-update-coordinator.js'
 import { readUpdatePreferences, type UpdatePreferences } from '../core/update-preferences.js'
@@ -116,11 +115,14 @@ export class WorkspaceUpdateService {
         let fromVersion: string
         let latest: { version: string; verified?: boolean } | null
         if (template === 'chat') {
-          const definition = this.service.templates?.get(template)
-          const installed = await this.service.templateUpgrades?.currentVersion(workspace)
-          if (definition?.upgradeStrategy !== 'managed-context' || !installed) throw new Error('Workspace template update baseline is unavailable')
-          fromVersion = installed
-          latest = compareVersions(definition.version, installed) > 0 ? { version: definition.version } : null
+          const check = await this.service.templateUpgrades?.check(workspace)
+          if (!check?.fromVersion || check.decision.status === 'unknown') throw new Error('Workspace template update baseline is unavailable')
+          fromVersion = check.fromVersion
+          if (check.decision.status === 'blocked') {
+            this.states.set(workspace.id, { ...base, checkedAt: new Date().toISOString(), fromVersion, phase: 'blocked', reason: check.decision.reason })
+            continue
+          }
+          latest = check.decision.status === 'available' && check.toVersion ? { version: check.toVersion } : null
         } else {
           const receipt = await readHarnessSource(workspace.dir)
           if (!receipt) throw new Error('Workspace has no Harness source receipt')

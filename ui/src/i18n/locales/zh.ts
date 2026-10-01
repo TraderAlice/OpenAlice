@@ -889,6 +889,7 @@ export const zh: Resources = {
       beta: '测试版',
     },
     versions: {
+      olderRelease: '可用发行版比正在运行的版本更旧，常规升级不会将其降级。',
       "previewChanged": "更新内容已变化，请重新检查后再更新。",
       "managedChanges": "将更新 {{changed}} 个托管文件，保留 {{preserved}} 个本地自定义文件。",
       "sourceChanges": "将变更 {{count}} 个源文件。",
@@ -3512,6 +3513,12 @@ export const zh: Resources = {
     upgradeBlockedSessionItem: '{{name}} · {{agent}} · {{surface}} 仍在打开。',
     upgradeBlockedHeadlessItem: '{{agent}} 的 Headless 运行 {{run}} 仍在工作。',
     upgradeSynchronousRun: '同步运行',
+    upgradeBlockedReason: {
+      'older-release': '可用模板比当前工作区更旧，升级不能将其降级。',
+      'invalid-identity': '无法确认工作区的版本，暂不能判断是否可升级。',
+      'missing-candidate': '模板未提供版本号。',
+      'template_version_not_bumped': '模板内容已更改，但版本号未递增。',
+    },
     upgradeBlockedStaged: '请先提交或取消暂存文件，让模板升级拥有一条干净、独立的 Git 提交。',
     upgradeReadyTitle: '可以直接更新',
     upgradeReadyDescription: '模板修改了这些文件，而工作区没有修改；它们会自动应用。',

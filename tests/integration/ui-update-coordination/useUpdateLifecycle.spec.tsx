@@ -2,6 +2,7 @@
 
 import { act, cleanup, renderHook, waitFor } from '@testing-library/react'
 import type { ReactNode } from 'react'
+import { createUpdatePlan, projectUpdateUnit } from '@traderalice/update-lifecycle'
 import { StrictMode } from 'react'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import type { VersionInfo } from '../../../ui/src/api/types'
@@ -38,6 +39,7 @@ const preferences = { autoCheckApp: true, autoUpdateAutoQuant: true, autoUpdateA
 const wrapper = ({ children }: { children: ReactNode }) => <UpdateLifecycleProvider>{children}</UpdateLifecycleProvider>
 const workspacePreview = {
   workspaceId: 'chat', template: 'chat', strategy: 'managed-context' as const,
+  update: { status: 'available' as const, reason: 'newer-release' },
   fromVersion: '1', toVersion: '3', planDigest: 'shared-plan', source: 'recorded-baseline' as const,
   blocked: false, blockers: [], activity: { busy: false, sessions: [], headless: [] },
   files: [], summary: { ready: 0, preserved: 0, conflicts: 0, unchanged: 0 },
@@ -265,10 +267,18 @@ it('two consumers share the native subscription and a single install handoff', a
   const updater = {
     getStatus: vi.fn(async () => ({ phase: 'downloaded', version: '1.0.0', releaseUrl: 'https://example.test/release' })),
     onStatus: vi.fn(() => () => undefined),
-    installAndRestart: vi.fn(() => new Promise<void>(resolve => { finish = resolve })),
+  }
+  const plan = createUpdatePlan('local-control', [{
+    unit: projectUpdateUnit('client', 'electron-updater', 'local', { version: '0.99.0' }, { version: '1.0.0' }),
+    fingerprint: '1.0.0', stages: ['activate', 'verify', 'reconnect'],
+  }])
+  const clientUpdates = {
+    operation: vi.fn(async () => null), review: vi.fn(async () => plan),
+    approve: vi.fn(() => new Promise<void>(resolve => { finish = resolve })),
+    resume: vi.fn(async () => undefined), status: vi.fn(async () => null), activate: vi.fn(async () => undefined),
   }
   const original = Object.getOwnPropertyDescriptor(window, 'openAlice')
-  Object.defineProperty(window, 'openAlice', { configurable: true, value: { updater } })
+  Object.defineProperty(window, 'openAlice', { configurable: true, value: { updater, clientUpdates } })
   vi.stubGlobal('fetch', vi.fn(async () => ({ ok: true, json: async () => ({ preferences, workspaces: [] }) })))
   try {
     const { result } = renderHook(() => ({ first: useUpdateLifecycle(), second: useUpdateLifecycle() }), { wrapper })
@@ -279,11 +289,13 @@ it('two consumers share the native subscription and a single install handoff', a
       expect(result.current.second.installClient()).toBe(pending)
     })
     await act(async () => { await Promise.resolve() })
-    expect(updater.installAndRestart).toHaveBeenCalledOnce()
+    expect(clientUpdates.review).toHaveBeenCalledWith({ client: true, backend: false, projectUnits: [] })
+    expect(clientUpdates.approve).toHaveBeenCalledWith(plan, plan.fingerprint)
     expect(updater.onStatus).toHaveBeenCalledOnce()
     await act(async () => { finish(); await pending })
     await act(async () => { await result.current.second.installClient() })
-    expect(updater.installAndRestart).toHaveBeenCalledOnce()
+    expect(clientUpdates.approve).toHaveBeenCalledOnce()
+    expect(clientUpdates.resume).toHaveBeenCalledOnce()
     expect(result.current.first.nativeInstalling).toBe(true)
   } finally {
     if (original) Object.defineProperty(window, 'openAlice', original)

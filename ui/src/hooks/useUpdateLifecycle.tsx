@@ -27,14 +27,8 @@ export interface WorkspaceUpdateState {
   reason?: string
   failureStage?: 'check' | 'review' | 'apply'
 }
-export type NativeStatus =
-  | { phase: 'checking' }
-  | { phase: 'current'; version: string }
-  | { phase: 'available'; version?: string; releaseUrl?: string }
-  | { phase: 'downloading'; version?: string; percent?: number }
-  | { phase: 'downloaded'; version: string; releaseUrl: string }
-  | { phase: 'installing'; version: string; stage: 'preparing' | 'stopping-services' | 'releasing-runtime' | 'handing-off' }
-  | { phase: 'error'; message: string }
+export type NativeStatus = import('@traderalice/update-lifecycle').NativeUpdaterStatus
+
 interface UpdateResponse { preferences: UpdatePreferences; workspaces: WorkspaceUpdateState[] }
 
 export interface UpdateLifecycle {
@@ -274,6 +268,7 @@ export function UpdateLifecycleProvider({ children }: { children: ReactNode }) {
     const accept = (status: NativeStatus | null) => {
       setNativeStatus(status)
       if (status?.phase === 'downloaded') setNativeReady(status)
+      else if (status?.phase !== 'installing') setNativeReady(null)
       if (status?.phase === 'installing') setNativeInstalling(true)
       if (status?.phase === 'error') {
         setNativeError(status.message)
@@ -297,7 +292,13 @@ export function UpdateLifecycleProvider({ children }: { children: ReactNode }) {
     if (!updater || !nativeReady) return Promise.reject(new Error('No downloaded client update is ready'))
     setNativeInstalling(true)
     setNativeError(null)
-    const flight = Promise.resolve().then(async () => { await updater.installAndRestart(nativeReady.version) }).catch((cause: unknown) => {
+    const flight = Promise.resolve().then(async () => {
+      const plan = await review({ client: true, backend: false, projectUnits: [] })
+      if (plan.proposals.find(proposal => proposal.unit.id === 'client')?.unit.desired?.version !== nativeReady.version) {
+        throw new Error('The downloaded update changed; review the current release before installing')
+      }
+      await approve(plan)
+    }).catch((cause: unknown) => {
       nativeInstallFlight.current = null
       setNativeInstalling(false)
       setNativeError(cause instanceof Error ? cause.message : String(cause))
@@ -305,7 +306,7 @@ export function UpdateLifecycleProvider({ children }: { children: ReactNode }) {
     })
     nativeInstallFlight.current = flight
     return flight
-  }, [nativeReady])
+  }, [nativeReady, review, approve])
 
   const openClientRelease = useCallback(async (version?: string) => {
     const updater = window.openAlice?.updater
@@ -331,23 +332,23 @@ export function UpdateLifecycleProvider({ children }: { children: ReactNode }) {
   useEffect(() => { machines.clearPlan() }, [backendRecoveryGeneration, backendUnavailable, machines.clearPlan])
   useEffect(() => {
     const target = machines.status?.target
-    if (!backendUnavailable && versionInfo?.hasUpdate && target && target.machine !== 'local' && !machines.applying && machines.operation?.phase !== 'running') {
+    if (!backendUnavailable && !versionError && !versionInfo?.error && versionInfo?.hasUpdate && target && target.machine !== 'local' && !machines.applying && machines.operation?.phase !== 'running') {
       void machines.probe({ mode: 'upgrade', machineKey: target.machine, projectKey: target.project }, { force: true }).catch(() => undefined)
     }
-  }, [versionInfo, backendUnavailable, machines.status?.target?.machine, machines.status?.target?.project, machines.probe])
+  }, [versionInfo, versionError, backendUnavailable, machines.status?.target?.machine, machines.status?.target?.project, machines.probe])
 
   const guidance = useMemo<UpdateGuidance>(() => {
-    const app = client?.discovery.value?.status === 'available'
-      || ['available', 'downloaded'].includes(nativeStatus?.phase ?? '')
-    const backend = Boolean(versionInfo?.hasUpdate)
+    const app = !clientTransportError && !client?.discovery.error && !nativeError && (client?.discovery.value?.status === 'available'
+      || ['available', 'downloaded'].includes(nativeStatus?.phase ?? ''))
+    const backend = !versionError && !versionInfo?.error && Boolean(versionInfo?.hasUpdate)
     const project = selectWorkspaceUpdateGuidance(workspaces, workspaceStates, preferences)
     return {
       app, backend, ...project,
       availableCount: Number(app) + Number(backend) + Number(project.workspaceIds.length > 0),
-      needsAttentionCount: Number(project.needsAttentionWorkspaceIds.length > 0),
+      needsAttentionCount: Number(project.needsAttentionWorkspaceIds.length > 0) + Number(client?.discovery.value?.status === 'blocked') + Number(versionInfo?.decision?.status === 'blocked'),
       setupCount: projectSetupFailures(projectSetup?.setup ?? null, projectSetup?.error ?? null).length,
     }
-  }, [client, nativeStatus, versionInfo, workspaceStates, workspaces, preferences, projectSetup, workspacePlans, planRevision])
+  }, [client, clientTransportError, nativeError, nativeStatus, versionInfo, versionError, workspaceStates, workspaces, preferences, projectSetup, workspacePlans, planRevision])
   const availableCount = guidance.availableCount
 
   const value = useMemo<UpdateLifecycle>(() => ({

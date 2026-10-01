@@ -16,6 +16,12 @@ INSTALL_DIR="${OPENALICE_INSTALL_DIR:-$HOME/.openalice}"
 INSTALLER_URL="${OPENALICE_INSTALL_URL:-}"
 KEEP_RELEASES="${OPENALICE_INSTALL_KEEP_RELEASES:-3}"
 
+# Bootstrap has no JavaScript runtime. Channel grammar is checked against the
+# shared release policy by installer acceptance.
+VERSION_PATTERN='^v?(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-(0|[1-9][0-9]*|[0-9]*[A-Za-z-][0-9A-Za-z-]*)(\.(0|[1-9][0-9]*|[0-9]*[A-Za-z-][0-9A-Za-z-]*))*)?(\+[0-9A-Za-z-]+(\.[0-9A-Za-z-]+)*)?$'
+STABLE_VERSION_PATTERN='^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$'
+BETA_VERSION_PATTERN='^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)-beta(\.[1-9][0-9]*)?$'
+
 channel="stable"
 channel_set=false
 exact_version=""
@@ -105,7 +111,7 @@ while [[ $# -gt 0 ]]; do
       [[ -z "$archive_path" ]] || fail "--version cannot be combined with --archive"
       [[ -z "$exact_version" ]] || fail "Specify --version only once"
       exact_version="${2#v}"
-      [[ "$exact_version" =~ ^[0-9]+\.[0-9]+\.[0-9]+([+-][0-9A-Za-z.-]+)?$ ]] \
+      [[ "$exact_version" =~ $VERSION_PATTERN ]] \
         || fail "--version must be an OpenAlice release version such as 0.91.0"
       shift 2
       ;;
@@ -142,10 +148,10 @@ elif [[ -n "$exact_version" ]]; then
     || fail "--branch cannot be combined with --version; use --channel to retain an update channel"
   if [[ "$channel_set" == true ]]; then
     if [[ "$channel" == stable ]]; then
-      [[ "$exact_version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] \
+      [[ "$exact_version" =~ $STABLE_VERSION_PATTERN ]] \
         || fail "--channel stable requires a stable --version"
     elif [[ "$channel" == beta ]]; then
-      [[ "$exact_version" =~ ^[0-9]+\.[0-9]+\.[0-9]+-beta(\.[1-9][0-9]*)?$ ]] \
+      [[ "$exact_version" =~ $BETA_VERSION_PATTERN ]] \
         || fail "--channel beta requires a beta --version"
     else
       fail "--channel dev cannot be combined with --version"
@@ -264,7 +270,7 @@ else
     release_version="$(printf '%s' "$stable_json" | sed -n 's/.*"version"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' | head -n 1)"
     [[ "$stable_channel" == stable ]] \
       || fail "Stable manifest did not identify the stable channel"
-    [[ "$release_version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] \
+    [[ "$release_version" =~ $STABLE_VERSION_PATTERN ]] \
       || fail "Stable manifest did not contain a valid stable version"
     if [[ "$release_version" == "$LEGACY_STABLE_VERSION" ]]; then
       delegate_legacy_stable_install stable
@@ -277,7 +283,7 @@ else
     release_version="$(printf '%s' "$beta_json" | sed -n 's/.*"version"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' | head -n 1)"
     [[ "$beta_channel" == beta ]] \
       || fail "Beta manifest did not identify the beta channel"
-    [[ "$release_version" =~ ^[0-9]+\.[0-9]+\.[0-9]+-beta(\.[1-9][0-9]*)?$ ]] \
+    [[ "$release_version" =~ $BETA_VERSION_PATTERN ]] \
       || fail "Beta manifest did not contain a valid beta version"
     artifact_url="${RELEASE_ASSET_BASE_URL}/v${release_version}/openalice-cli-${release_version}-${platform}-${architecture}.tar.gz"
   elif [[ "$selector_kind" == pinned || "$selector_kind" == release ]]; then
@@ -301,7 +307,7 @@ else
       || fail "Dev manifest did not identify the dev channel"
     [[ "$dev_repository" == "$REPOSITORY" ]] \
       || fail "Dev manifest did not identify the OpenAlice repository"
-    [[ "$release_version" =~ ^[0-9]+\.[0-9]+\.[0-9]+([+-][0-9A-Za-z.-]+)?$ ]] \
+    [[ "$release_version" =~ $VERSION_PATTERN ]] \
       || fail "Dev manifest did not contain a valid OpenAlice version"
     [[ "$dev_commit" =~ ^[a-f0-9]{7,64}$ ]] \
       || fail "Dev manifest did not contain a valid commit identity"
@@ -586,7 +592,7 @@ artifact_version="$(json_field "$release_json" version)"
 artifact_platform="$(json_field "$release_json" platform)"
 artifact_arch="$(json_field "$release_json" arch)"
 content_identity="$(json_field "$release_json" contentIdentity)"
-[[ "$artifact_version" =~ ^[0-9]+\.[0-9]+\.[0-9]+([+-][0-9A-Za-z.-]+)?$ ]] || fail "release.json has an invalid version"
+[[ "$artifact_version" =~ $VERSION_PATTERN ]] || fail "release.json has an invalid version"
 [[ "$artifact_platform" == "$platform" && "$artifact_arch" == "$architecture" ]] \
   || fail "Archive target $artifact_platform-$artifact_arch does not match $platform-$architecture"
 [[ "$content_identity" =~ ^[a-f0-9]{16}$ ]] || fail "release.json has an invalid content identity"

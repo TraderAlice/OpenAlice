@@ -1,3 +1,4 @@
+import { releaseChannelMatchesVersion } from '@traderalice/update-lifecycle'
 import { spawnSync } from 'node:child_process'
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
@@ -47,6 +48,41 @@ const directory = mkdtempSync(join(tmpdir(), 'openalice-installer-download-'))
 afterAll(() => rmSync(directory, { recursive: true, force: true }))
 
 describe.skipIf(powershell === undefined)('Windows installer text downloads', () => {
+  it('accepts the shared channel grammar in actual manifest and exact-version plans', () => {
+    const cases = ['stable', 'beta'].flatMap(channel => [
+      '0.94.1', '0.94.1-beta', '0.94.1-beta.2', '0.94.1-beta.10', '0.94.1-beta.0',
+      '0.94.1-beta.01', '00.94.1', '0.094.1', '0.94.01', '0.94.1-BETA.2', '0.94.1+build.1',
+    ].flatMap(version => [false, true].map(exact => ({ channel, version, exact,
+      accepted: releaseChannelMatchesVersion(channel as 'stable' | 'beta', version) }))))
+    const script = join(directory, 'channel-grammar.ps1')
+    writeFileSync(script, `
+$ErrorActionPreference = 'Stop'
+$cases = '${JSON.stringify(cases)}' | ConvertFrom-Json
+function Invoke-WebRequest {
+  param([string]$Uri, [switch]$UseBasicParsing, [int]$TimeoutSec, [string]$OutFile)
+  if ($Uri.EndsWith('.sha256')) { return [pscustomobject]@{ Content = '${sidecarHash}  openalice-cli-' + $global:OpenAliceGrammarCase.version + '-win32-x64.tar.gz' } }
+  return [pscustomobject]@{ Content = (@{ channel = $global:OpenAliceGrammarCase.channel; version = $global:OpenAliceGrammarCase.version } | ConvertTo-Json -Compress) }
+}
+$env:OPENALICE_DOWNLOAD_BASE_URL = 'https://mock.invalid'
+$env:OPENALICE_RELEASE_ASSET_BASE_URL = 'https://mock.invalid'
+foreach ($case in $cases) {
+  $global:OpenAliceGrammarCase = $case
+  $params = @{ Channel = $case.channel; Plan = $true; InstallDir = '${directory}/grammar-root' }
+  if ($case.exact) { $params.Version = $case.version }
+  $accepted = $true; $failure = ''
+  try { & '${installScript}' @params } catch { $accepted = $false; $failure = $_.Exception.Message }
+  if ($accepted -ne $case.accepted) { throw "Grammar mismatch: $($case.channel) $($case.version) exact=$($case.exact): $failure" }
+}
+if (Test-Path '${directory}/grammar-root') { throw 'Plan wrote installation state' }
+Write-Host 'GRAMMAR_PARITY_PASSED'
+`)
+    const result = spawnSync(powershell!, ['-NoProfile', '-File', script], {
+      env: { ...process.env, OS: 'Windows_NT', PROCESSOR_ARCHITECTURE: 'AMD64' }, encoding: 'utf8', windowsHide: true,
+    })
+    expect(result.status, result.stderr).toBe(0)
+    expect(result.stdout).toContain('GRAMMAR_PARITY_PASSED')
+  })
+
   it('decodes a byte[] .sha256 sidecar response while planning an update', () => {
     const script = join(directory, 'plan-with-octet-stream-sidecar.ps1')
     writeFileSync(script, harness)

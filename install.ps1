@@ -12,6 +12,10 @@ param(
   [switch]$Uninstall,
   [int]$WaitForPid
 )
+# Dependency-free bootstrap grammar; accepted cases are shared-policy acceptance.
+$VersionPattern = '^v?(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-(0|[1-9][0-9]*|[0-9]*[A-Za-z-][0-9A-Za-z-]*)(\.(0|[1-9][0-9]*|[0-9]*[A-Za-z-][0-9A-Za-z-]*))*)?(\+[0-9A-Za-z-]+(\.[0-9A-Za-z-]+)*)?$'
+$StableVersionPattern = '^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$'
+$BetaVersionPattern = '^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)-beta(\.[1-9][0-9]*)?$'
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version 2
 if ($env:OS -ne 'Windows_NT') { throw 'This installer requires Windows.' }
@@ -110,7 +114,7 @@ if (-not $Archive) {
       if ($identity -notmatch '^[a-f0-9]{16}$') { throw 'Invalid dev content identity.' }
     }
   }
-  if ($Version -notmatch '^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$') { throw 'Invalid release version.' }
+  if ($Version -cnotmatch $VersionPattern) { throw 'Invalid release version.' }
   $name = "openalice-cli-$Version-win32-$arch.tar.gz"
   if ($Channel -eq 'dev') { $Archive = "$base/cli/dev/releases/$commit/$name" }
   else {
@@ -123,8 +127,8 @@ if (-not $Archive) {
 }
 if ($Sha256 -notmatch '^[a-f0-9]{64}$') { throw 'An archive requires its SHA-256 digest.' }
 $Sha256 = $Sha256.ToLowerInvariant()
-if ($Version -and -not $pinned -and $Channel -eq 'stable' -and $Version -notmatch '^\d+\.\d+\.\d+$') { throw 'Stable requires a stable version.' }
-if ($Version -and -not $pinned -and $Channel -eq 'beta' -and $Version -notmatch '^\d+\.\d+\.\d+-beta(?:\.[1-9][0-9]*)?$') { throw 'Beta requires a beta version.' }
+if ($Version -and -not $pinned -and $Channel -eq 'stable' -and $Version -cnotmatch $StableVersionPattern) { throw 'Stable requires a stable version.' }
+if ($Version -and -not $pinned -and $Channel -eq 'beta' -and $Version -cnotmatch $BetaVersionPattern) { throw 'Beta requires a beta version.' }
 if ($env:OPENALICE_EXPECTED_CLI_ARTIFACT_SHA256 -and $Sha256 -ne $env:OPENALICE_EXPECTED_CLI_ARTIFACT_SHA256) { throw 'Candidate changed since update discovery; check again.' }
 if ($env:OPENALICE_EXPECTED_DEV_COMMIT -and $commit -ne $env:OPENALICE_EXPECTED_DEV_COMMIT) { throw 'Dev commit changed since update discovery; check again.' }
 Write-Host "OpenAlice CLI installation plan`nChannel         $Channel`nTarget          win32-$arch`nArtifact        $Archive`nSHA-256         $Sha256`nInstall root    $root`nActivation      cli/current.txt (next invocation only)"
@@ -218,12 +222,12 @@ try {
   $expanded = Join-Path $stage $top
   $metadata = Get-Content -Raw -LiteralPath (Join-Path $expanded 'release.json') | ConvertFrom-Json
   if ($metadata.schemaVersion -ne 1 -or $metadata.product -ne 'OpenAlice CLI' -or $metadata.platform -ne 'win32' -or $metadata.arch -ne $arch -or $metadata.contentIdentity -notmatch '^[a-f0-9]{16}$') { throw 'Release metadata does not match this host.' }
-  if ($metadata.version -notmatch '^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$' -or $top -ne "openalice-cli-$($metadata.version)-win32-$arch") { throw 'Release version does not match archive.' }
+  if ($metadata.version -cnotmatch $VersionPattern -or $top -ne "openalice-cli-$($metadata.version)-win32-$arch") { throw 'Release version does not match archive.' }
   if (($Version -and $metadata.version -ne $Version) -or ($env:OPENALICE_EXPECTED_CLI_VERSION -and $metadata.version -ne $env:OPENALICE_EXPECTED_CLI_VERSION)) { throw 'Unexpected product version.' }
   if (($identity -and $metadata.contentIdentity -ne $identity) -or ($env:OPENALICE_EXPECTED_CLI_CONTENT_IDENTITY -and $metadata.contentIdentity -ne $env:OPENALICE_EXPECTED_CLI_CONTENT_IDENTITY)) { throw 'Unexpected content identity.' }
   $Version = $metadata.version
-  if (-not $pinned -and $Channel -eq 'stable' -and $Version -notmatch '^\d+\.\d+\.\d+$') { throw 'Stable requires a stable version.' }
-  if (-not $pinned -and $Channel -eq 'beta' -and $Version -notmatch '^\d+\.\d+\.\d+-beta(?:\.[1-9][0-9]*)?$') { throw 'Beta requires a beta version.' }
+  if (-not $pinned -and $Channel -eq 'stable' -and $Version -cnotmatch $StableVersionPattern) { throw 'Stable requires a stable version.' }
+  if (-not $pinned -and $Channel -eq 'beta' -and $Version -cnotmatch $BetaVersionPattern) { throw 'Beta requires a beta version.' }
   $exe = Join-Path $expanded 'bin\openalice.exe'
   $reported = & $exe --version
   if ($LASTEXITCODE -ne 0 -or "$reported".Trim() -ne $Version) { throw 'Staged executable verification failed.' }

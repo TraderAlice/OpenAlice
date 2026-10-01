@@ -47,7 +47,7 @@ import {
   type TuiLaunchFlags,
 } from './launch-context.ts'
 import { resolveInstalledLayout } from './install-layout.mjs'
-import { CLI_VERSION, readInstallSource } from './install-source.mjs'
+import { CLI_VERSION, readInstallSource, installSourceUpdateChannel } from './install-source.mjs'
 import { findOpenAliceRoot } from './local-start.mjs'
 import { readRuntimeLogs } from './logs.mjs'
 import { probeOpenAlice } from './runtime-client.mjs'
@@ -434,7 +434,7 @@ export interface SupervisorTuiDependencies {
   openBrowser?: typeof openBrowser
   readLogs?: (options: Record<string, unknown>) => Promise<RuntimeLogs>
   diagnose?: (options: Record<string, unknown>) => Promise<DoctorReport>
-  checkUpdate?: (channel: SupervisorUpdateChannel) => Promise<UpdateResult>
+  checkUpdate?: (channel?: SupervisorUpdateChannel) => Promise<UpdateResult>
   discoverUpdate?: () => Promise<UpdateResult | null>
   applyUpdate?: (result: UpdateResult) => Promise<number>
   resolveContext?: (
@@ -678,7 +678,7 @@ export async function runSupervisorTui(
   const piTui = await (dependencies.loadTui ?? loadPiTui)(dependencies.env)
   const resolvedChannel = dependencies.channel
     ?? await (dependencies.resolveChannel ?? resolveSupervisorChannel)()
-  const channel = normalizeSupervisorUpdateChannel(resolvedChannel) ?? 'stable'
+  const channel = resolvedChannel
   const terminal = new piTui.ProcessTerminal()
   const ui = new piTui.TUI(
     terminal,
@@ -1938,7 +1938,7 @@ export async function runSupervisorTui(
         const selectedIndex = Math.max(0, items.findIndex((item) => item.value === selectedItem?.value))
         const observatory = renderSupervisorReleaseObservatory({
           installedVersion: screen.snapshot.version,
-          currentLane: normalizeSupervisorUpdateChannel(screen.snapshot.channel) ?? 'stable',
+          currentLane: screen.snapshot.channel,
           selected: selectedIndex,
         }, width)
         const baseList = selectListPointerTarget(
@@ -2047,7 +2047,7 @@ export async function runSupervisorTui(
     try {
       if (action === 'update') {
         const update = await services.checkUpdate(
-          normalizeSupervisorUpdateChannel(screen.snapshot.channel) ?? 'stable',
+          normalizeSupervisorUpdateChannel(screen.snapshot.channel) ?? undefined,
         )
         screen.update({
           update,
@@ -3804,26 +3804,12 @@ export async function runSupervisorTui(
 }
 
 export async function resolveSupervisorChannel(
-  options: {
-    moduleUrl?: string
-    resolveLayout?: (moduleUrl?: string) => unknown
-    readSource?: () => Promise<{
-      updateChannel?: string
-      selector?: { kind?: string; value?: string }
-    }>
-  } = {},
-): Promise<SupervisorUpdateChannel> {
-  const moduleUrl = options.moduleUrl ?? import.meta.url
-  const layout = (
-    options.resolveLayout ?? resolveInstalledLayout
-  )(moduleUrl)
-  if (!layout) return 'dev'
+  options: { readSource?: typeof readInstallSource } = {},
+): Promise<string> {
   const source = await (options.readSource ?? readInstallSource)()
-  const explicit = normalizeSupervisorUpdateChannel(source.updateChannel)
-  if (explicit) return explicit
-  if (source.selector?.kind === 'branch' && source.selector.value === 'dev') return 'dev'
-  if (source.selector?.kind === 'version' && source.selector.value?.includes('-beta')) return 'beta'
-  return 'stable'
+  if (!source) return 'unknown'
+  const channel = installSourceUpdateChannel(source)
+  return channel === 'development' ? 'dev' : channel
 }
 
 function normalizeSupervisorUpdateChannel(value: unknown): SupervisorUpdateChannel | null {

@@ -1,9 +1,11 @@
+import { getProductVersion } from '@traderalice/update-lifecycle/node'
 import { createHash } from 'node:crypto'
 import { readFileSync } from 'node:fs'
 import { readFile } from 'node:fs/promises'
 import { basename, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { isCliTarget } from './release-targets.mjs'
+import { parseInstallSource, requireInstallSource, installSourceUpdateChannel, releaseChannelMatchesVersion, releaseChannelForVersion } from '@traderalice/update-lifecycle'
+export { parseInstallSource, requireInstallSource, installSourceUpdateChannel } from '@traderalice/update-lifecycle'
 
 import {
   bunInstallSourceLocations,
@@ -12,32 +14,24 @@ import {
   resolveBunResourceRoot,
 } from './bun-standalone.mjs'
 
-const compiledCliVersion = globalThis.__OPENALICE_BUILD_VERSION__
+export const CLI_VERSION = getProductVersion()
 
-export const CLI_VERSION = typeof compiledCliVersion === 'string' && compiledCliVersion.length > 0
-  ? compiledCliVersion
-  : JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8')).version
-
-const betaCliVersion = /^[0-9]+\.[0-9]+\.[0-9]+-beta(?:\.[1-9][0-9]*)?$/.test(CLI_VERSION)
-
-export const DEFAULT_INSTALL_SOURCE = Object.freeze({
+const SOURCE_INSTALL_SOURCE = Object.freeze({
   schemaVersion: 2,
   repository: 'TraderAlice/OpenAlice',
   cliVersion: CLI_VERSION,
-  selector: Object.freeze(betaCliVersion
-    ? { kind: 'version', value: `v${CLI_VERSION}` }
-    : { kind: 'branch', value: 'master' }),
+  selector: Object.freeze({ kind: 'branch', value: 'dev' }),
   installerUrl: 'https://openalice.ai/install',
-  updateChannel: betaCliVersion ? 'beta' : 'stable',
+  updateChannel: 'development',
 })
 
 export function installSourceChannelVersionError(source) {
   const normalized = requireInstallSource(source)
   const channel = installSourceUpdateChannel(normalized)
-  if (channel === 'stable' && !/^[0-9]+\.[0-9]+\.[0-9]+$/.test(normalized.cliVersion)) {
+  if (channel === 'stable' && !releaseChannelMatchesVersion('stable', normalized.cliVersion)) {
     return `CLI ${normalized.cliVersion} is marked stable, but the installer requires a stable version. Refresh this client's install-source metadata before upgrading a remote Machine.`
   }
-  if (channel === 'beta' && !/^[0-9]+\.[0-9]+\.[0-9]+-beta(?:\.[1-9][0-9]*)?$/.test(normalized.cliVersion)) {
+  if (channel === 'beta' && !releaseChannelMatchesVersion('beta', normalized.cliVersion)) {
     return `CLI ${normalized.cliVersion} is marked beta, but the installer requires a beta version. Refresh this client's install-source metadata before upgrading a remote Machine.`
   }
   return null
@@ -45,6 +39,15 @@ export function installSourceChannelVersionError(source) {
 
 export async function readInstallSource(options = {}) {
   const env = options.env ?? process.env
+  const standalone = options.bunStandalone ?? isBunStandalone()
+  const profile = standalone ? undefined : env.OPENALICE_RUNTIME_PROFILE || env.OPENALICE_LAUNCHER
+  if (profile === 'electron-packaged') {
+    return { ...SOURCE_INSTALL_SOURCE, selector: { kind: 'version', value: `v${CLI_VERSION}` },
+      updateChannel: releaseChannelForVersion(CLI_VERSION) ?? 'custom' }
+  }
+  if (['dev', 'electron-dev', 'electron'].includes(profile)) {
+    return { ...SOURCE_INSTALL_SOURCE, selector: { ...SOURCE_INSTALL_SOURCE.selector } }
+  }
   const metadataLocations = options.metadataUrl
     ? [options.metadataUrl]
     : env['OPENALICE_INSTALL_SOURCE']
@@ -54,11 +57,12 @@ export async function readInstallSource(options = {}) {
     try {
       return requireInstallSource(JSON.parse(await readFile(metadataUrl, 'utf8')))
     } catch (error) {
-      if (error?.code === 'ENOENT') continue
+      if (error?.code === 'ENOENT' && !options.metadataUrl && !env['OPENALICE_INSTALL_SOURCE']) continue
       throw error
     }
   }
-  return cloneInstallSource(DEFAULT_INSTALL_SOURCE)
+  if (standalone) return null
+  return { ...SOURCE_INSTALL_SOURCE, selector: { ...SOURCE_INSTALL_SOURCE.selector } }
 }
 
 export function installedContentIdentity(moduleUrl = import.meta.url, options = {}) {
@@ -88,76 +92,6 @@ function nativeInstallSourceLocations(options, env) {
   )
 }
 
-export function normalizeInstallSource(value, fallback = DEFAULT_INSTALL_SOURCE) {
-  return parseInstallSource(value) ?? cloneInstallSource(fallback)
-}
-
-export function parseInstallSource(value) {
-  if (!value || typeof value !== 'object') return null
-  const repository = typeof value.repository === 'string' ? value.repository : ''
-  const cliVersion = typeof value.cliVersion === 'string' ? value.cliVersion : ''
-  const selector = value.selector
-  const kind = selector?.kind
-  const ref = selector?.value
-  const installerUrl = typeof value.installerUrl === 'string' ? value.installerUrl : ''
-  const schemaVersion = value.schemaVersion
-  const updateChannel = schemaVersion === 2 || schemaVersion === 3
-    ? value.updateChannel
-    : inferLegacyUpdateChannel({ selector, installerUrl })
-  const method = value.method
-  const artifact = value.artifact
-  const installedAt = value.installedAt
-  const validV3 = schemaVersion !== 3 || (
-    ['direct', 'npm', 'bun', 'brew', 'aur'].includes(method)
-    && artifact
-    && typeof artifact === 'object'
-    && isCliTarget(artifact.platform, artifact.arch)
-    && typeof artifact.sha256 === 'string'
-    && /^[a-f0-9]{64}$/.test(artifact.sha256)
-    && typeof installedAt === 'string'
-    && Number.isFinite(Date.parse(installedAt))
-  )
-  if (
-    ![1, 2, 3].includes(schemaVersion)
-    || repository !== 'TraderAlice/OpenAlice'
-    || cliVersion.length < 1
-    || !['branch', 'version'].includes(kind)
-    || typeof ref !== 'string'
-    || ref.length < 1
-    || ref.length > 128
-    || ref.includes('..')
-    || !/^[A-Za-z0-9._/-]+$/.test(ref)
-    || !isHttpUrl(installerUrl)
-    || !['stable', 'beta', 'pinned', 'development', 'custom'].includes(updateChannel)
-    || !validV3
-  ) {
-    return null
-  }
-  return {
-    schemaVersion,
-    repository,
-    cliVersion,
-    selector: { kind, value: ref },
-    installerUrl,
-    ...(schemaVersion >= 2 ? { updateChannel } : {}),
-    ...(schemaVersion === 3 ? {
-      method,
-      artifact: {
-        platform: artifact.platform,
-        arch: artifact.arch,
-        sha256: artifact.sha256,
-      },
-      installedAt,
-    } : {}),
-  }
-}
-
-export function requireInstallSource(value) {
-  const parsed = parseInstallSource(value)
-  if (!parsed) throw new Error('OpenAlice install-source metadata is invalid')
-  return parsed
-}
-
 export function installSourcesMatch(left, right) {
   const normalizedLeft = parseInstallSource(left)
   const normalizedRight = parseInstallSource(right)
@@ -170,15 +104,8 @@ export function installSourcesMatch(left, right) {
     && installSourceUpdateChannel(normalizedLeft) === installSourceUpdateChannel(normalizedRight)
 }
 
-export function installSourceUpdateChannel(source) {
-  const normalized = requireInstallSource(source)
-  return normalized.schemaVersion >= 2
-    ? normalized.updateChannel
-    : inferLegacyUpdateChannel(normalized)
-}
-
 export function formatInstallSelector(source) {
-  const normalized = normalizeInstallSource(source)
+  const normalized = requireInstallSource(source)
   return `${normalized.selector.kind} ${normalized.selector.value}`
 }
 
@@ -193,40 +120,4 @@ export function managedSourceKey(source) {
     .digest('hex')
     .slice(0, 8)
   return `${readable}-${digest}`
-}
-
-function cloneInstallSource(source) {
-  return {
-    schemaVersion: source.schemaVersion,
-    repository: source.repository,
-    cliVersion: source.cliVersion,
-    selector: { ...source.selector },
-    installerUrl: source.installerUrl,
-    ...(source.schemaVersion >= 2 ? { updateChannel: source.updateChannel } : {}),
-    ...(source.schemaVersion === 3 && source.method ? { method: source.method } : {}),
-    ...(source.schemaVersion === 3 && source.artifact ? { artifact: { ...source.artifact } } : {}),
-    ...(source.schemaVersion === 3 && source.installedAt ? { installedAt: source.installedAt } : {}),
-  }
-}
-
-function inferLegacyUpdateChannel(source) {
-  if (source?.selector?.kind === 'version') return 'pinned'
-  if (
-    source?.selector?.kind === 'branch'
-    && source.selector.value === 'master'
-    && source.installerUrl === 'https://openalice.ai/install'
-  ) {
-    return 'stable'
-  }
-  if (source?.selector?.kind === 'branch' && source.selector.value === 'master') return 'custom'
-  return 'development'
-}
-
-function isHttpUrl(value) {
-  try {
-    const url = new URL(value)
-    return url.protocol === 'https:' || url.protocol === 'http:'
-  } catch {
-    return false
-  }
 }

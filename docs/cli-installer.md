@@ -5,6 +5,11 @@ activation, provenance, update, rollback, uninstall, and release acceptance.
 Runtime behavior after activation belongs to [[docs/local-runtime.md]]. Electron
 packaging remains independent under [[docs/managed-workspace-runtime.md]].
 
+Bootstrap Bash/PowerShell stay dependency-free. Each keeps one channel grammar,
+with actual manifest and exact-version planning checked against the shared release
+policy. They reject zero-padded core versions, beta.0/beta.01 and uppercase BETA;
+JavaScript build/release tools import the shared policy directly.
+
 The current CLI payload is one target-native Bun executable plus immutable
 OpenAlice resources. The installer does not install Node.js, Bun, npm, source
 dependencies, build tools, or an Agent Runtime.

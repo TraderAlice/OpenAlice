@@ -34,7 +34,7 @@ export function resolveBunInstallSourcePath(
 ) {
   const locations = bunInstallSourceLocations(env, executable, resourceRoot)
   if (env.OPENALICE_INSTALL_SOURCE?.trim()) return locations[0]
-  return locations.find((path) => exists(path)) ?? null
+  return locations.find((path) => exists(path)) ?? locations[0]
 }
 
 export function bunGuardianProcessSpec(executable = process.execPath) {
@@ -60,6 +60,8 @@ export function buildBunRuntimeEnvironment(
   const windows = (options.platform ?? process.platform) === 'win32'
   const path = windows ? win32 : posix
   const runtimeEnv = buildExternalAgentRuntimeEnvironment(env)
+  delete runtimeEnv.OPENALICE_RUNTIME_PROFILE
+  delete runtimeEnv.OPENALICE_LAUNCHER
   // Windows environment names are case-insensitive; do not pass both Path and PATH.
   const inheritedPath = runtimeEnv.PATH ?? runtimeEnv.Path ?? ''
   if (windows) delete runtimeEnv.Path

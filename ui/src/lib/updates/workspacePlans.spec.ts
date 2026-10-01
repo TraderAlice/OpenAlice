@@ -12,7 +12,7 @@ vi.mock('../../components/workspace/api', async importOriginal => ({
 const request = { workspaceId: 'chat', kind: 'template' as const }
 const plan: TemplateUpgradePlan = {
   workspaceId: 'chat', template: 'chat', fromVersion: '1', toVersion: '2',
-  strategy: 'managed-context', planDigest: 'one', source: 'recorded-baseline',
+  strategy: 'managed-context', update: { status: 'available', reason: 'newer-release' }, planDigest: 'one', source: 'recorded-baseline',
   blocked: false, blockers: [], activity: { busy: false, sessions: [], headless: [] },
   files: [], summary: { ready: 0, conflicts: 0, unchanged: 0, preserved: 0 },
 }

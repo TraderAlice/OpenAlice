@@ -1,3 +1,4 @@
+import { releaseChannelMatchesVersion } from '@traderalice/update-lifecycle'
 import { execFile } from 'node:child_process'
 import { createHash } from 'node:crypto'
 import { createServer } from 'node:http'
@@ -35,6 +36,32 @@ afterEach(async () => {
 })
 
 describe.skipIf(process.platform === 'win32')('OpenAlice native CLI installer', { timeout: 30_000 }, () => {
+  it('accepts the shared stable/beta grammar through manifest and exact-version planning', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'openalice-channel-grammar-'))
+    temporaryPaths.push(root)
+    let channel = 'stable', version = '0.94.1'
+    const server = createServer((request, response) => {
+      response.end(request.url.endsWith('.sha256') ? `${'a'.repeat(64)}  archive.tar.gz\n` : JSON.stringify({ channel, version }))
+    })
+    await new Promise(resolve => server.listen(0, '127.0.0.1', resolve))
+    const base = `http://127.0.0.1:${server.address().port}`
+    const env = { ...process.env, HOME: root, OPENALICE_DOWNLOAD_BASE_URL: base,
+      OPENALICE_STABLE_MANIFEST_URL: `${base}/manifest.json`, OPENALICE_BETA_MANIFEST_URL: `${base}/beta/manifest.json`, OPENALICE_RELEASE_ASSET_BASE_URL: base }
+    try {
+      for (channel of ['stable', 'beta']) for (version of [
+        '0.94.1', '0.94.1-beta', '0.94.1-beta.2', '0.94.1-beta.10', '0.94.1-beta.0',
+        '0.94.1-beta.01', '00.94.1', '0.094.1', '0.94.01', '0.94.1-BETA.2', '0.94.1+build.1',
+      ]) for (const exact of [false, true]) {
+        const expected = releaseChannelMatchesVersion(channel, version)
+        const args = [installer, '--channel', channel, '--install-dir', join(root, 'install'), '--no-modify-path', '--plan', ...(exact ? ['--version', version] : [])]
+        const result = await execFileAsync('bash', args, { env }).then(value => ({ ...value, accepted: true }), error => ({ ...error, accepted: false }))
+        expect(result.accepted, `${channel} ${version} ${exact ? 'exact' : 'manifest'}: ${result.stderr}`).toBe(expected)
+        if (expected) expect(result.stdout).toContain('Plan complete. No files were changed.')
+      }
+      await expect(access(join(root, 'install'))).rejects.toMatchObject({ code: 'ENOENT' })
+    } finally { await new Promise(resolve => server.close(resolve)) }
+  })
+
   it('shows a complete non-mutating plan and an explicit ownership boundary', async () => {
     const fixture = await makeReleaseArchive('0.91.0', '1'.repeat(16))
     const installRoot = join(fixture.root, 'install root')
@@ -978,8 +1005,7 @@ async function resolveExecutable(command) {
     if (!directory) continue
     const candidate = join(directory, command)
     try {
-      await access(candidate)
-      return candidate
+      if ((await stat(candidate)).isFile()) return candidate
     } catch {}
   }
   return null

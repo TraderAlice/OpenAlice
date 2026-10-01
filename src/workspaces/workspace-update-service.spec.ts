@@ -1,3 +1,4 @@
+import { selectVersion } from '@traderalice/update-lifecycle'
 import { beforeEach, expect, it, vi } from 'vitest'
 import { readPreferences } from '../core/preferences.js'
 import { readUpdatePreferences } from '../core/update-preferences.js'
@@ -11,10 +12,11 @@ vi.mock('./harness-source.js', () => ({ readHarnessSource: vi.fn() }))
 
 const preferences = { autoCheckApp: true, autoUpdateAutoQuant: true, autoUpdateAutoPrediction: true }
 function service() {
+  const currentVersion = vi.fn(async () => '1.2.0')
   return {
     registry: { list: vi.fn(() => []), get: vi.fn(id => id === 'aq' ? { id, dir: '/workspace/aq', template: 'auto-quant-v2' } : undefined) },
     templates: { get: vi.fn(() => ({ version: '1.3.0', upgradeStrategy: 'managed-context' })) },
-    templateUpgrades: { currentVersion: vi.fn(async () => '1.2.0'), plan: vi.fn() },
+    templateUpgrades: { currentVersion, check: vi.fn(async () => { const fromVersion = await currentVersion(); return { fromVersion, toVersion: '1.3.0', decision: selectVersion(fromVersion, '1.3.0') } }), plan: vi.fn() },
     sourceUpgrades: {
       latest: vi.fn().mockResolvedValue({ version: '1.3.0', verified: false }),
       plan: vi.fn().mockResolvedValue({ blocked: false, blockers: [], planDigest: 'reviewed-digest' }),

@@ -1,4 +1,4 @@
-import { recordOwnerUpdate, projectUpdateUnit } from '@traderalice/update-lifecycle';
+import { recordOwnerUpdate, projectUpdateUnit, selectVersion, isVersion, type ReleaseDecision } from '@traderalice/update-lifecycle';
 import { FileUpdateJournal } from '@traderalice/update-lifecycle/node';
 import { createHash } from 'node:crypto';
 import { existsSync } from 'node:fs';
@@ -110,6 +110,7 @@ export interface TemplateUpgradeFilePlan {
 }
 
 export interface TemplateUpgradePlan {
+  readonly update: { status: ReleaseDecision['status']; reason: string };
   readonly workspaceId: string;
   readonly template: string;
   readonly fromVersion: string;
@@ -160,7 +161,8 @@ export class TemplateUpgradeError extends Error {
       | 'staged_changes'
       | 'stale_plan'
       | 'unresolved_conflict'
-      | 'invalid_resolution',
+      | 'invalid_resolution'
+      | 'blocked',
     message: string,
     public readonly plan?: TemplateUpgradePlan,
   ) {
@@ -323,6 +325,12 @@ export class TemplateUpgradeManager {
     return this.opts.aliceHarness ? undefined : workspace.spawnedFromVersion;
   }
 
+  async check(workspace: WorkspaceMeta) {
+    const template = await this.resolveTemplate(workspace);
+    const fromVersion = await this.currentVersion(workspace);
+    return { fromVersion, toVersion: template.version, decision: selectVersion(fromVersion, template.version) };
+  }
+
   async plan(workspaceId: string, projection?: SkillProjectionRequest): Promise<TemplateUpgradePlan> {
     const lease = await this.operationGuard.acquireWhenAvailable(workspaceId, 'template-upgrade-preview');
     try {
@@ -372,7 +380,7 @@ export class TemplateUpgradeManager {
     const merged: Record<string, SnapshotFile> = {};
     const plan = await this.buildPlan(workspace, template, incoming, input.projection, merged);
     if (plan.blocked) {
-      const code = plan.blockers.includes('active_sessions') ? 'busy' : 'staged_changes';
+      const code = plan.blockers.includes('active_sessions') ? 'busy' : plan.blockers.includes('staged_changes') ? 'staged_changes' : 'blocked';
       throw new TemplateUpgradeError(code, blockerMessage(plan.blockers), plan);
     }
     if (plan.planDigest !== input.planDigest) {
@@ -382,8 +390,8 @@ export class TemplateUpgradeManager {
         plan,
       );
     }
-    if ((input.projection && !plan.files.some((file) => file.status === 'ready' || file.status === 'conflict')) || plan.fromVersion === plan.toVersion && (!this.opts.aliceHarness || !plan.files.some((file) => file.status === 'ready' || file.status === 'conflict'))) {
-      throw new TemplateUpgradeError('already_current', 'Workspace is already on this template version', plan);
+    if (plan.update.status !== 'available') {
+      throw new TemplateUpgradeError(plan.update.status === 'current' ? 'already_current' : 'blocked', blockerMessage([plan.update.reason]), plan);
     }
 
     const resolutions = input.resolutions ?? {};
@@ -572,11 +580,18 @@ export class TemplateUpgradeManager {
     const fromVersion = state?.template === template.name
       ? state.appliedVersion
       : this.opts.aliceHarness ? 'unversioned' : workspace.spawnedFromVersion ?? 'unknown';
+    const changed = files.some(file => file.status === 'ready' || file.status === 'conflict');
+    const update = this.opts.aliceHarness
+      ? { status: changed || (!projection && fromVersion !== template.version) ? 'available' as const : 'current' as const,
+          reason: changed || (!projection && fromVersion !== template.version) ? 'content-changed' : 'same-content' }
+      : selectVersion(fromVersion, template.version);
+    if (update.status === 'blocked' || update.status === 'unknown') blockers.push(update.reason);
+    if (!this.opts.aliceHarness && update.status === 'current' && changed) blockers.push('template_version_not_bumped');
     const planDigest = digestPlan({
       workspaceId: workspace.id,
       template: template.name,
       fromVersion,
-      toVersion: template.version,
+      toVersion: template.version ?? 'unknown',
       baseline,
       ...(projection ? { projection } : {}),
       ...(this.opts.aliceHarness ? { config: await readAliceHarnessConfig(workspace.dir) } : {}),
@@ -587,8 +602,9 @@ export class TemplateUpgradeManager {
       workspaceId: workspace.id,
       template: template.name,
       fromVersion,
-      toVersion: template.version,
+      toVersion: template.version ?? 'unknown',
       strategy: 'managed-context',
+      update,
       planDigest,
       source,
       blocked: blockers.length > 0,
@@ -689,7 +705,7 @@ export async function initializeWorkspaceTemplateState(
   const snapshot = await readManagedWorkspaceSnapshot(workspace.dir);
   const injected = Object.fromEntries(Object.entries(snapshot).filter(([path]) => isAliceHarnessSkillPath(path)));
   await persistAppliedState(workspace.dir, { ...template, name: 'alice-harness', version: await aliceHarnessSourceVersion() }, injected, 'creation', undefined, upgradePaths(true));
-  if (template.upgradeStrategy !== 'managed-context') return;
+  if (template.upgradeStrategy !== 'managed-context' || !template.version || !isVersion(template.version)) return;
   await ensureStateExcluded(workspace.dir);
   await persistAppliedState(workspace.dir, template, Object.fromEntries(Object.entries(snapshot).filter(([path]) => !isAliceHarnessSkillPath(path))), 'creation');
 }
@@ -1040,6 +1056,7 @@ async function persistAppliedState(
   paths = TEMPLATE_PATHS,
   projection?: SkillProjectionRequest & { version: string },
 ): Promise<void> {
+  if (!template.version) throw new TemplateUpgradeError('blocked', 'Cannot record a template baseline without version evidence');
   const appliedAt = new Date().toISOString();
   const previous = projection ? await readState(workspaceDir, paths) : null;
   const skillVersions = { ...(projection ? previous?.skillVersions : {}) };
@@ -1173,6 +1190,10 @@ async function runGit(workspaceDir: string, args: readonly string[]): Promise<st
 }
 
 function blockerMessage(blockers: readonly string[]): string {
+  if (blockers.includes('older-release')) return 'The available template is older than the applied Workspace version. An ordinary update cannot downgrade it.';
+  if (blockers.includes('invalid-identity') || blockers.includes('missing-candidate')) return 'Workspace template version evidence is unavailable. Upgrade eligibility cannot be determined.';
+  if (blockers.includes('template_version_not_bumped')) return 'The template contents changed without a version bump. Update the template version before applying.';
+  if (blockers.includes('same-release') || blockers.includes('same-content')) return 'Workspace is already on this template version';
   if (blockers.includes('active_sessions')) {
     return 'Pause the Workspace sessions and headless work before upgrading its shared instructions.';
   }

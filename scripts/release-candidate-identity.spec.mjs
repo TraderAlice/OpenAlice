@@ -17,6 +17,22 @@ function fixture() {
 }
 
 describe('release candidate identity', () => {
+  it.each([
+    ['beta', '0.94.1-beta.0'], ['beta', '0.94.1-beta.01'],
+    ['stable', '00.94.1'], ['beta', '0.094.1-beta.2'],
+    ['stable', '0.94.1-beta.2'], ['beta', '0.94.1'],
+    ['custom', '0.94.1'], ['stable', '0.94.1+build'],
+  ])('rejects %s candidate identity %s at the artifact boundary', (channel, version) => {
+    const { directory } = fixture()
+    expect(() => createCandidateIdentity({ directory, filenames: ['app.zip'], ...header, channel, version }))
+      .toThrow('version/channel')
+  })
+  it.each([['stable', '0.94.1'], ['beta', '0.94.1-beta'], ['beta', '0.94.1-beta.2'], ['beta', '0.94.1-beta.10']])(
+    'accepts %s candidate identity %s', (channel, version) => {
+      const { directory } = fixture()
+      expect(createCandidateIdentity({ directory, filenames: ['app.zip'], ...header, channel, version })).toMatchObject({ channel, version })
+    },
+  )
   it('binds exact bytes and is independent of filename order', () => {
     const input = fixture()
     expect(verifyCandidateIdentity(input)).toBe(input.manifest.candidateId)

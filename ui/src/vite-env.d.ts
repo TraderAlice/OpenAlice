@@ -1,6 +1,5 @@
 /// <reference types="vite/client" />
 
-declare const __OPENALICE_UI_VERSION__: string
 
 interface ImportMetaEnv {
   readonly VITE_DEMO_MODE?: string
@@ -110,34 +109,8 @@ interface Window {
       savePreferences(input: import('@traderalice/update-lifecycle').ClientUpdatePreferences): Promise<import('@traderalice/update-lifecycle').ClientUpdateSnapshot>
     }
     readonly updater?: {
-      getStatus(): Promise<
-        | { phase: 'checking' }
-        | { phase: 'current'; version: string }
-        | { phase: 'available'; version?: string; releaseUrl?: string }
-        | { phase: 'downloading'; version?: string; percent?: number }
-        | { phase: 'downloaded'; version: string; releaseUrl: string }
-        | {
-            phase: 'installing'
-            version: string
-            stage: 'preparing' | 'stopping-services' | 'releasing-runtime' | 'handing-off'
-          }
-        | { phase: 'error'; message: string }
-        | null
-      >
-      onStatus(cb: (status:
-        | { phase: 'checking' }
-        | { phase: 'current'; version: string }
-        | { phase: 'available'; version?: string; releaseUrl?: string }
-        | { phase: 'downloading'; version?: string; percent?: number }
-        | { phase: 'downloaded'; version: string; releaseUrl: string }
-        | {
-            phase: 'installing'
-            version: string
-            stage: 'preparing' | 'stopping-services' | 'releasing-runtime' | 'handing-off'
-          }
-        | { phase: 'error'; message: string }
-      ) => void): () => void
-      installAndRestart(version?: string): Promise<unknown>
+      getStatus(): Promise<import('@traderalice/update-lifecycle').NativeUpdaterStatus | null>
+      onStatus(cb: (status: import('@traderalice/update-lifecycle').NativeUpdaterStatus) => void): () => void
       openRelease(version?: string): Promise<unknown>
     }
     readonly workspace?: {

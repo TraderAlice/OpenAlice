@@ -1,3 +1,4 @@
+import { isVersion } from '../packages/update-lifecycle/src/release-policy.js'
 import { verifyCliReleaseArchive } from './verify-cli-release.mjs'
 import { requireBunVersion } from './bun-toolchain.mjs'
 import { writeDevBrokerBinding } from './dev-broker-binding.mjs'
@@ -15,10 +16,8 @@ const arch = process.argv[2] ?? process.arch
 if (!['x64', 'arm64'].includes(arch)) throw new Error(`Unsupported Windows architecture: ${arch}`)
 requireBunVersion(Bun.version)
 const product = JSON.parse(await readFile(join(root, 'package.json'), 'utf8'))
-const cli = JSON.parse(await readFile(join(root, 'packages/cli/package.json'), 'utf8'))
-if (product.version !== cli.version) throw new Error('Product and CLI versions must match')
 const version: string = product.version
-if (!/^\d+\.\d+\.\d+(?:-[\w.-]+)?$/.test(version)) throw new Error('Invalid product version')
+if (!isVersion(version)) throw new Error('Invalid product version')
 const sourceCommit = run(['git', 'rev-parse', 'HEAD']).trim()
 const sourceDirty = run(['git', 'status', '--porcelain']).trim().length > 0
 const output = resolve(process.env.OPENALICE_BUN_OUTPUT_DIR ?? join(root, 'dist/windows-cli-preview', arch))

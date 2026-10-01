@@ -43,13 +43,13 @@ export async function diagnoseRuntime(options = {}, dependencies = {}) {
   const installed = Boolean(layout || manager)
   add(
     'cli.provenance',
-    installed ? 'pass' : 'warn',
-    layout
+    !installSource ? 'fail' : installed ? 'pass' : 'warn',
+    !installSource ? `OpenAlice ${CLI_VERSION} installation provenance is unavailable` : layout
       ? `Installed OpenAlice ${CLI_VERSION} metadata is readable`
       : manager
         ? `${manager.label}-managed OpenAlice ${CLI_VERSION} metadata is readable`
       : `OpenAlice ${CLI_VERSION} is running from a source checkout`,
-    installed
+    !installSource ? 'Restore the installation metadata with the owning installer or package manager' : installed
       ? `${installSource.selector.kind} ${installSource.selector.value}; content ${contentIdentity ?? 'unknown'}`
       : 'Self-update is intentionally unavailable from a source checkout',
   )

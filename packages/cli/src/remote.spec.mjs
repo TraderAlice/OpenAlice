@@ -1,3 +1,4 @@
+import { readInstallSource } from './install-source.mjs'
 import { EventEmitter } from 'node:events'
 import { readFileSync } from 'node:fs'
 import { rm, mkdtemp } from 'node:fs/promises'
@@ -18,7 +19,7 @@ import {
   buildRemoteServerStopCommand,
   buildRemoteSshArgs,
   connectRemote,
-  createRemotePlan,
+  createRemotePlan as createSourceRemotePlan,
   formatRemotePlan,
   parseRemoteArgs,
   probeRemoteHost,
@@ -36,7 +37,7 @@ afterEach(async () => { vi.unstubAllEnvs(); await rm(updateScratch, { recursive:
 vi.mock('./ssh-connect.mjs', () => ({ connectSsh: () => { throw new Error('Hermetic remote specs must inject connectTunnel') } }))
 
 const CLI_VERSION = JSON.parse(
-  readFileSync(new URL('../package.json', import.meta.url), 'utf8'),
+  readFileSync(new URL('../../../package.json', import.meta.url), 'utf8'),
 ).version
 const betaCliVersion = /^[0-9]+\.[0-9]+\.[0-9]+-beta(?:\.[1-9][0-9]*)?$/.test(CLI_VERSION)
 const masterInstallSource = {
@@ -49,6 +50,12 @@ const masterInstallSource = {
   method: 'direct',
   artifact: { platform: 'linux', arch: 'x64', sha256: 'a'.repeat(64) },
   installedAt: '2026-08-31T00:00:00.000Z',
+}
+
+// Installed-release scenarios supply actual provenance; source execution has no
+// native release receipt and must not inherit the stable installation channel.
+function createRemotePlan(options, remote, install = {}) {
+  return createSourceRemotePlan(options, remote, { installSource: masterInstallSource, ...install })
 }
 
 describe('OpenAlice managed remote connector', () => {
@@ -156,6 +163,18 @@ describe('OpenAlice managed remote connector', () => {
     })
     expect(verifiedDev).toContain(`OPENALICE_EXPECTED_CLI_ARTIFACT_SHA256='${'b'.repeat(64)}'`)
     expect(verifiedDev).toContain(`OPENALICE_EXPECTED_CLI_CONTENT_IDENTITY='${'c'.repeat(16)}'`)
+  })
+
+  it('does not turn source execution into an installed stable release', async () => {
+    const options = parseRemoteArgs(['host', '--yes'])
+    const plan = createSourceRemotePlan(options, missingRemote(), { installSource: await readInstallSource({ env: {} }) })
+    expect(plan.installSource.updateChannel).toBe('development')
+    expect(plan.blocker).toContain('dev target')
+    const runRemote = vi.fn()
+    await expect(connectRemote(options, {
+      probeRemote: async () => missingRemote(), runRemote, stdout: { write: vi.fn() },
+    })).rejects.toThrow('does not have target identity')
+    expect(runRemote).not.toHaveBeenCalled()
   })
 
   it('plans install and start separately, with no implicit takeover', () => {
@@ -780,6 +799,7 @@ describe('OpenAlice managed remote connector', () => {
     const connectTunnel = vi.fn()
     const stdout = { write: vi.fn() }
     await expect(connectRemote(parseRemoteArgs(['host', '--app-dir', '/srv/OpenAlice']), {
+      installSource: masterInstallSource,
       probeRemote: async () => missingRemote(),
       confirmPlan: async () => false,
       runRemote,
@@ -1036,6 +1056,7 @@ describe('OpenAlice managed remote connector', () => {
     const stdout = { write: vi.fn() }
 
     await expect(connectRemote(options, {
+      installSource: masterInstallSource,
       probeRemote,
       runRemote,
       connectTunnel: async () => 0,
@@ -1155,6 +1176,7 @@ describe('OpenAlice managed remote connector', () => {
     const stdout = { write: vi.fn() }
 
     await expect(connectRemote(options, {
+      installSource: masterInstallSource,
       probeRemote,
       runRemote,
       connectTunnel,

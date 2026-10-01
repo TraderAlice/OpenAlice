@@ -8,7 +8,7 @@ import { dirname, join, posix } from 'node:path'
 import { createInterface } from 'node:readline/promises'
 
 import {
-  DEFAULT_INSTALL_SOURCE,
+  CLI_VERSION,
   formatInstallSelector,
   installedContentIdentity,
   installSourceChannelVersionError,
@@ -659,8 +659,8 @@ function formatManagedRemoteStatus(destination, remote) {
   return `${lines.join('\n')}\n\n`
 }
 
-export function createRemotePlan(options, remote, install = {}) {
-  let installSource = requireInstallSource(install.installSource ?? DEFAULT_INSTALL_SOURCE)
+export function createRemotePlan(options, remote, install) {
+  let installSource = requireInstallSource(install.installSource)
   let contentIdentity = normalizeContentIdentity(install.contentIdentity)
   let expectedRemoteTarget = normalizeExpectedRemoteTarget(install.expectedRemoteTarget)
   const recordedSource = parseInstallSource(remote.installSource)
@@ -952,7 +952,7 @@ async function resolveLocalInstallIdentity(dependencies, env) {
     const testSource = parseInstallSource({
       schemaVersion: 1,
       repository: 'TraderAlice/OpenAlice',
-      cliVersion: DEFAULT_INSTALL_SOURCE.cliVersion,
+      cliVersion: CLI_VERSION,
       selector: { kind: testKind, value: testValue },
       installerUrl: testUrl,
     })

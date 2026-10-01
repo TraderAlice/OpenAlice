@@ -1516,7 +1516,7 @@ export function createWorkspaceRoutes(
       if (err instanceof z.ZodError) return c.json({ error: 'bad_request', message: 'Invalid Skill operation' }, 400);
       if (err instanceof TemplateUpgradeError) {
         const status = err.code === 'not_found' ? 404
-          : err.code === 'busy' || err.code === 'staged_changes' || err.code === 'stale_plan'
+          : err.code === 'busy' || err.code === 'staged_changes' || err.code === 'stale_plan' || err.code === 'blocked'
             ? 409
             : 400;
         return c.json({ error: err.code, message: err.message, plan: err.plan }, status);

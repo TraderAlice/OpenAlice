@@ -885,6 +885,7 @@ export const ja: Resources = {
       beta: 'ベータ',
     },
     versions: {
+      olderRelease: '利用可能なリリースは実行中のバージョンより古いため、通常の更新ではダウングレードできません。',
       "previewChanged": "更新内容が変わりました。再確認してください。",
       "managedChanges": "管理対象の {{changed}} ファイルを更新し、ローカルで変更した {{preserved}} ファイルを保持します。",
       "sourceChanges": "{{count}} 個のソースファイルが変更されます。",
@@ -3508,6 +3509,12 @@ export const ja: Resources = {
     upgradeBlockedSessionItem: '{{name}} · {{agent}} · {{surface}} が開いています。',
     upgradeBlockedHeadlessItem: '{{agent}} の Headless 実行 {{run}} はまだ処理中です。',
     upgradeSynchronousRun: '同期実行',
+    upgradeBlockedReason: {
+      'older-release': '利用可能なテンプレートはこのワークスペースより古いため、更新できません。',
+      'invalid-identity': 'ワークスペースのバージョンを確認できません。',
+      'missing-candidate': 'テンプレートのバージョンがありません。',
+      'template_version_not_bumped': 'テンプレートの内容が変更されましたが、バージョンは更新されていません。',
+    },
     upgradeBlockedStaged: 'テンプレート更新を独立した Git コミットにするため、ステージ済みファイルをコミットまたはステージ解除してください。',
     upgradeReadyTitle: 'そのまま更新可能',
     upgradeReadyDescription: 'テンプレートだけが変更したファイルです。自動的に適用されます。',

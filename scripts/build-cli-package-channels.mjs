@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 
+import { isVersion } from '../packages/update-lifecycle/src/release-policy.ts'
 import { execFileSync } from 'node:child_process'
 import {
   chmodSync,
@@ -36,7 +37,7 @@ export function buildCliPackageChannels({
   if (systemOnly && (npmOnly || requireAll)) {
     throw new Error('system-only cannot be combined with npm-only or require-all')
   }
-  if (!/^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/.test(version)) {
+  if (!isVersion(version)) {
     throw new Error(`invalid OpenAlice version: ${version}`)
   }
   const releasedAtDate = new Date(releasedAt)

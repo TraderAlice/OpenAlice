@@ -117,7 +117,7 @@ describe('CI workflow authority lanes', () => {
     expect(classifier['continue-on-error']).toBe(true)
     expect(classifier.if).toBe("github.event_name == 'pull_request'")
     expect(classifier.env?.BASE_SHA).toBe('${{ github.event.pull_request.base.sha }}')
-    expect(classifier.run).toContain('git show "${BASE_SHA}:scripts/classify-beta-release-prep.mjs"')
+    expect(classifier.run).toContain('git archive "$BASE_SHA" scripts/classify-beta-release-prep.mjs packages/update-lifecycle/src/release-policy.ts')
     expect(classifier.run).toContain('--github-output "$GITHUB_OUTPUT"')
     expect(sourceContracts.outputs?.beta_release_prep)
       .toContain("steps.beta-release-prep.outcome == 'success'")
@@ -166,7 +166,9 @@ describe('CI workflow authority lanes', () => {
     }
   })
 
-  it('keeps the runtime-visible root and CLI version baselines synchronized', () => {
-    expect(packageJson.version).toBe(cliPackageJson.version)
+  it('authors product identity only at the root; CLI distribution metadata is generated', () => {
+    expect(packageJson.version).toEqual(expect.any(String))
+    expect(cliPackageJson.version).toBeUndefined()
+    expect(cliPackageJson.private).toBe(true)
   })
 })

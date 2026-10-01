@@ -340,6 +340,8 @@ describe('OpenAlice Runtime lifecycle core', () => {
         detached: true,
         env: {
           OPENALICE_APP_HOME: resources,
+          OPENALICE_RUNTIME_PROFILE: 'electron-packaged',
+          OPENALICE_LAUNCHER: 'electron',
           OPENALICE_MANAGED_PI_PATH: '/desktop/pi/cli.js',
           OPENALICE_MANAGED_PI_NODE_PATH: '/desktop/node',
           PI_CODING_AGENT_DIR: '/native/pi',
@@ -367,6 +369,7 @@ describe('OpenAlice Runtime lifecycle core', () => {
           cwd: resources,
           env: expect.objectContaining({
             OPENALICE_RUNTIME_PROVIDER: 'bun',
+            OPENALICE_LAUNCHER: 'cli-server',
             OPENALICE_RUNTIME_CONTENT_IDENTITY: 'bbbbbbbbbbbbbbbb',
             OPENALICE_RUNTIME_EXECUTABLE: '/opt/openalice/releases/v1/bin/openalice',
             PI_CODING_AGENT_DIR: '/native/pi',
@@ -374,6 +377,7 @@ describe('OpenAlice Runtime lifecycle core', () => {
         }),
       )
       const spawnedEnv = spawnProcess.mock.calls[0][2].env
+      expect(spawnedEnv).not.toHaveProperty('OPENALICE_RUNTIME_PROFILE')
       expect(spawnedEnv).not.toHaveProperty('OPENALICE_MANAGED_PI_PATH')
       expect(spawnedEnv).not.toHaveProperty('OPENALICE_MANAGED_PI_NODE_PATH')
     } finally {

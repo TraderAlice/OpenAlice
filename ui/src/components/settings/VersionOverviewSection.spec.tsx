@@ -16,7 +16,7 @@ beforeAll(async () => { await i18n.changeLanguage('en') })
 beforeEach(async () => {
   mocks.generation = 0; mocks.setup = null
   const workspacePlans = new WorkspacePlanStore()
-  await workspacePlans.replace({ kind: 'template', workspaceId: 'chat', targetVersion: '2' }, { workspaceId: 'chat', template: 'chat', strategy: 'managed-context', fromVersion: '1', toVersion: '2', planDigest: 'exact', blocked: false, blockers: [], files: [], summary: { ready: 1, conflicts: 0, unchanged: 0, preserved: 0 } } as any)
+  await workspacePlans.replace({ kind: 'template', workspaceId: 'chat', targetVersion: '2' }, { workspaceId: 'chat', template: 'chat', strategy: 'managed-context', update: { status: 'available', reason: 'newer-release' }, fromVersion: '1', toVersion: '2', planDigest: 'exact', blocked: false, blockers: [], files: [], summary: { ready: 1, conflicts: 0, unchanged: 0, preserved: 0 } } as any)
   mocks.updates = {
     machines: { status: { target: { machine: 'cloud', machineName: 'Railway Linux', project: 'main-cloud' } }, plan: null, operation: null, probe: mocks.probe, applying: false },
     client: { kind: 'cli', currentVersion: '0.94.1', discovery: { value: { status: 'current', channel: 'stable' } } },
@@ -110,4 +110,23 @@ it.each(['check', 'review', 'apply'])('shows %s failures without misclassifying 
   const project = within(document.getElementById('settings-version-project')!)
   expect(Boolean(project.queryByText('Update check failed'))).toBe(stage === 'check')
   expect(project.getByText('operation failed')).toBeTruthy()
+})
+
+it('retains a blocked release decision and explains it without an update action', () => {
+  mocks.updates.client.discovery.value = { status: 'blocked', reason: 'older-release', latestVersion: '0.94.0', channel: 'stable' }
+  render(<VersionOverviewSection />)
+  const app = within(document.getElementById('settings-version-app')!)
+  expect(app.getByText('Needs attention')).toBeTruthy()
+  expect(app.queryByRole('button', { name: 'View update' })).toBeNull()
+  fireEvent.click(app.getByRole('button', { name: 'App: Details' }))
+  expect(screen.getByText('The available release is older than the running version. An ordinary update cannot downgrade it.')).toBeTruthy()
+})
+
+it('does not offer installation from a retained candidate after discovery fails', () => {
+  mocks.updates.client.discovery.value = { status: 'available', latestVersion: '0.95.0', channel: 'stable' }
+  mocks.updates.clientError = 'feed offline'
+  render(<VersionOverviewSection />)
+  const app = within(document.getElementById('settings-version-app')!)
+  expect(app.getByText('Update check failed')).toBeTruthy()
+  expect(app.queryByRole('button', { name: 'View update' })).toBeNull()
 })
