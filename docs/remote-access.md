@@ -283,7 +283,8 @@ openalice --remote <target> --plan|--status|--stop [options]
 required native CLI/Runtime install or start, checks readiness, and only then
 registers the Machine. The relay can select a registered, enabled Machine and
 one of its running AliceProjects. It cannot select an arbitrary SSH address.
-Settings → General now offers the same Machine preparation from the local GUI:
+Settings → General → Machines offers Machine preparation in an Add Machine
+dialog from the local GUI:
 enter an SSH target and label, run a read-only probe, review the exact planned
 actions, then approve apply. Saved Machines can be re-probed for updates against
 the local CLI release. Select a running AliceProject when reviewing an update so

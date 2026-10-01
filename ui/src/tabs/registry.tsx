@@ -22,6 +22,7 @@ import { AppearanceSettingsPage, LanguageSettingsPage, SettingsPage, ToolsSettin
 import { ActivityBarSettingsPage } from '../pages/ActivityBarSettingsPage'
 import { PetSettingsPage } from '../pages/PetSettingsPage'
 import { WorkspaceInjectionPage } from '../pages/WorkspaceInjectionPage'
+import { MachinesSettingsPage } from '../pages/MachinesSettingsPage'
 import { BetaSettingsPage } from '../pages/BetaSettingsPage'
 import { AgentPermissionsPage } from '../pages/AgentPermissionsPage'
 import { AgentRuntimesSettingsPage } from '../pages/AgentRuntimesSettingsPage'
@@ -266,6 +267,7 @@ const settingsCategoryTitle: Record<
   string
 > = {
   general: 'Overview',
+  machines: 'Machines',
   language: 'Language',
   appearance: 'Skin',
   pet: 'Pet',
@@ -288,6 +290,7 @@ const settingsCategoryTitle: Record<
 function SettingsRouter({ spec }: ViewProps<'settings'>) {
   switch (spec.params.category) {
     case 'general': return <SettingsPage />
+    case 'machines': return <MachinesSettingsPage />
     case 'language': return <LanguageSettingsPage />
     case 'appearance': return <AppearanceSettingsPage />
     case 'pet': return <PetSettingsPage />

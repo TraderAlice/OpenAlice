@@ -98,6 +98,19 @@ Auto Quant preparation; Retry simulates recovery without creating real files.
 The preparing scenario stays quiet. These fixtures exercise UI guidance and
 recovery only, not a live Workspace clone or native packaging.
 
+## Machine settings review
+
+`/settings/machines` opens the dedicated fleet page. Add Machine uses a read-only
+probe followed by explicit approval; the demo saves a temporary in-memory row
+without switching the current target. Reload clears these added rows.
+
+Append `?machineScenario=probe-error`, `blocked`, or `apply-error` for failure
+acceptance. Probe/apply errors fail once, then allow a fresh review to simulate
+recovery. Blocked plans never allow approval. The normal add plan has no remote
+changes and still requires approval to save the profile. All SSH, remote state,
+installation and persistence in these scenarios are simulated through MSW; no
+SSH connection is attempted.
+
 ## Update overview walkthrough
 
 Open `/settings?updates=ready` in the browser demo to exercise the three-object

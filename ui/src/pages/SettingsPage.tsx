@@ -29,7 +29,6 @@ import { useEffectivePreferenceSlot } from '../theme/useEffectiveTheme'
 import { VersionOverviewSection } from '../components/settings/VersionOverviewSection'
 import { UpdateLifecycleSection } from '../components/settings/UpdateLifecycleSection'
 import { AliceLocationSection } from '../components/settings/AliceLocationSection'
-import { MachineManagementSection } from '../components/settings/MachineManagementSection'
 import { Button } from '../components/ui/button'
 import { getBackendConnection } from '../auth/backendConnection'
 import { useRelayConnection } from '../hooks/useRelayConnection'
@@ -773,7 +772,6 @@ function SettingsSection() {
       {/* Installation and update ownership */}
       <VersionOverviewSection />
       <UpdateLifecycleSection />
-      <MachineManagementSection />
 
       {/* Complete OpenAlice home + runtime lock boundary */}
       <DataHomeSection />

@@ -11,8 +11,11 @@ const mocks = vi.hoisted(() => ({
   focused: null as null | { kind: 'dev'; params: { tab: 'logs' | 'runs' | 'api' } }
     | { kind: 'automation'; params: { section: 'runs' | 'api' } },
   openOrFocus: vi.fn(),
+  navigate: vi.fn(),
   guidance: { availableCount: 0, needsAttentionCount: 0 },
 }))
+
+vi.mock('react-router-dom', () => ({ useNavigate: () => mocks.navigate }))
 
 vi.mock('../hooks/useUpdateLifecycle', () => ({ useUpdateLifecycle: () => ({ guidance: mocks.guidance }) }))
 
@@ -63,6 +66,7 @@ beforeEach(() => {
   window.sessionStorage.clear()
   mocks.focused = null
   mocks.openOrFocus.mockClear()
+  mocks.navigate.mockClear()
   mocks.guidance = { availableCount: 0, needsAttentionCount: 0 }
 })
 
@@ -120,7 +124,7 @@ describe('SettingsCategoryList', () => {
     fireEvent.click(developer)
     expect(developer.getAttribute('aria-expanded')).toBe('true')
     fireEvent.click(screen.getByRole('button', { name: 'common.logs' }))
-    expect(mocks.openOrFocus).toHaveBeenCalledWith({ kind: 'dev', params: { tab: 'logs' } })
+    expect(mocks.navigate).toHaveBeenCalledWith('/settings/developer/logs')
   })
 
   it('automatically expands for a Developer deep link', () => {
@@ -137,7 +141,7 @@ describe('SettingsCategoryList', () => {
     expect(screen.queryByRole('button', { name: `automation.${tab}` })).toBeNull()
     fireEvent.click(screen.getByRole('button', { name: 'settings.group.developer' }))
     fireEvent.click(screen.getByRole('button', { name: `automation.${tab}` }))
-    expect(mocks.openOrFocus).toHaveBeenCalledWith({ kind: 'dev', params: { tab } })
+    expect(mocks.navigate).toHaveBeenCalledWith(`/settings/developer/${tab}`)
     expect(onSelect).toHaveBeenCalledOnce()
   })
 
@@ -147,4 +151,12 @@ describe('SettingsCategoryList', () => {
     expect(screen.getByRole('button', { name: 'settings.group.developer' }).getAttribute('aria-expanded')).toBe('true')
     expect(screen.getByRole('button', { name: 'automation.runs' })).toBeTruthy()
   })
+})
+
+it('places Machines directly after Overview and opens its dedicated tab', () => {
+  render(<SettingsCategoryList />)
+  const names = screen.getAllByRole('button').map(button => button.textContent)
+  expect(names.indexOf('settings.machines.title')).toBe(names.indexOf('settings.category.general') + 1)
+  fireEvent.click(screen.getByRole('button', { name: 'settings.machines.title' }))
+  expect(mocks.navigate).toHaveBeenCalledWith('/settings/machines')
 })

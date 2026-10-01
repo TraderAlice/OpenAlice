@@ -29,6 +29,8 @@ the durable truth after it changes. Git history is the archive.
 
 ## Active
 
+- [[plans/settings-machines-dialog.md]] — Move machine management into General / Machines and replace inline SSH setup with a reviewed dialog; Draft PR only.
+
 - [[plans/review-updates-shared-plan.md]] — Share automatic/manual update review
   plans and open exact single targets. Independent Draft #1693; preserve the
   coordinated owner review from #1692 and keep attention #1691 separate.
