@@ -593,6 +593,8 @@ Returned leaves carry aliceId. Broker capabilities still govern trading; Alpaca 
 
     getMarketClock: tool({
       description: `Get current market clock status (isOpen, nextOpen, nextClose).
+This is live session open/closed — NOT an exchange holiday calendar.
+For HK/US/CN/SG trading days (prev/next/half-day), use getTradingCalendar on a Longbridge account.
 If this tool returns an error with transient=true, wait a few seconds and retry once before reporting to the user.`,
       inputSchema: z.object({ source: z.string().optional().describe(sourceDesc(false)) }).meta({ examples: [{ source: 'alpaca-paper' }] }),
       execute: async ({ source }) => {
@@ -600,6 +602,35 @@ If this tool returns an error with transient=true, wait a few seconds and retry 
         if (targets.length === 0) return await noAccountsError(manager, source)
         try {
           const results = await Promise.all(targets.map(async (uta) => ({ source: uta.id, ...await uta.getMarketClock() })))
+          return results.length === 1 ? results[0] : results
+        } catch (err) {
+          return handleBrokerError(err)
+        }
+      },
+    }),
+
+    getTradingCalendar: tool({
+      description: `Exchange trading calendar (holiday / half-day) via Longbridge tradingDays.
+Returns isTradingDay, isHalfDay, prevTradingDay, nextTradingDay for market=HK|US|CN|SG.
+Distinct from market clock (live session). Non-Longbridge accounts refuse with CONFIG.
+Cite as Longbridge calendar; quality B.`,
+      inputSchema: z.object({
+        source: z.string().optional().describe(sourceDesc(false)),
+        market: z.enum(['HK', 'US', 'CN', 'SG']).default('HK').describe('Venue calendar to query'),
+        asOf: z.string().optional().describe('Optional ISO date/time anchor (default: now)'),
+      }).meta({ examples: [{ source: 'longbridge-paper', market: 'HK' }] }),
+      execute: async ({ source, market, asOf }) => {
+        const targets = await manager.resolve(source)
+        if (targets.length === 0) return await noAccountsError(manager, source)
+        const anchor = asOf ? new Date(asOf) : undefined
+        if (anchor && Number.isNaN(anchor.getTime())) {
+          return { error: `Invalid asOf timestamp: ${asOf}` }
+        }
+        try {
+          const results = await Promise.all(targets.map(async (uta) => ({
+            source: uta.id,
+            ...(await uta.getTradingCalendar(market, anchor)),
+          })))
           return results.length === 1 ? results[0] : results
         } catch (err) {
           return handleBrokerError(err)

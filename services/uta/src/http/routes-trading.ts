@@ -397,6 +397,19 @@ export function createTradingRoutes(ctx: UTAEngineContext) {
     return queryAccount(c, account, () => account.getMarketClock())
   })
 
+  // Exchange trading calendar (Longbridge tradingDays; other brokers refuse)
+  app.get('/uta/:id/trading-calendar', async (c) => {
+    const account = resolveAccount(ctx, c)
+    if (!account) return c.json({ error: 'Account not found' }, 404)
+    const market = c.req.query('market') ?? 'HK'
+    const asOfRaw = c.req.query('asOf')
+    const asOf = asOfRaw ? new Date(asOfRaw) : undefined
+    if (asOf && Number.isNaN(asOf.getTime())) {
+      return c.json({ error: `Invalid asOf timestamp: ${asOfRaw}` }, 400)
+    }
+    return queryAccount(c, account, () => account.getTradingCalendar(market, asOf))
+  })
+
   // Quote — `GET /quote/:symbol` keeps the path-param form for legacy
   // UI callers; the AI tool layer uses the POST form below because it
   // typically only has an `aliceId` (which the broker's native-key

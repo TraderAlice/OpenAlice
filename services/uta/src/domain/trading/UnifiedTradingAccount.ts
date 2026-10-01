@@ -9,7 +9,7 @@
 
 import Decimal from 'decimal.js'
 import { Contract, Order, ContractDescription, ContractDetails, UNSET_DECIMAL, UNSET_INTEGER, UNSET_DOUBLE } from '@traderalice/ibkr'
-import { BrokerError, type IBroker, type AccountInfo, type Position, type OpenOrder, type PlaceOrderResult, type Quote, type MarketClock, type AccountCapabilities, type BrokerHealth, type BrokerHealthInfo, type BrokerConnectionStateEvent, type UTAReach, type UTATier, type TpSlParams, type Bar, type BarParams, type ExpandContractFilters, type ContractExpansion, type SubAccountRef } from './brokers/types.js'
+import { BrokerError, type IBroker, type AccountInfo, type Position, type OpenOrder, type PlaceOrderResult, type Quote, type MarketClock, type TradingCalendar, type AccountCapabilities, type BrokerHealth, type BrokerHealthInfo, type BrokerConnectionStateEvent, type UTAReach, type UTATier, type TpSlParams, type Bar, type BarParams, type ExpandContractFilters, type ContractExpansion, type SubAccountRef } from './brokers/types.js'
 
 const REACH_RANK: Record<UTAReach, number> = { down: 0, connected: 1, readable: 2 }
 import { TradingGit } from './git/TradingGit.js'
@@ -1153,6 +1153,20 @@ export class UnifiedTradingAccount {
 
   getMarketClock(): Promise<MarketClock> {
     return this._callBroker(() => this.broker.getMarketClock())
+  }
+
+  /**
+   * Exchange holiday calendar. Loud-refuses when the broker has no calendar API
+   * (most venues); Longbridge implements `tradingDays`.
+   */
+  async getTradingCalendar(market: string, asOf?: Date): Promise<TradingCalendar> {
+    if (typeof this.broker.getTradingCalendar !== 'function') {
+      throw new BrokerError(
+        'CONFIG',
+        `Account "${this.label}" does not support trading calendars. Use a Longbridge account, or the traderhub hk_calendar.py script with LONGPORT_* env.`,
+      )
+    }
+    return this._callBroker(() => this.broker.getTradingCalendar!(market, asOf))
   }
 
   /**

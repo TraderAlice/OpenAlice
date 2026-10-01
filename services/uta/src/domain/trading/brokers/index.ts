@@ -7,6 +7,8 @@ export type {
   AccountInfo,
   Quote,
   MarketClock,
+  TradingCalendar,
+  TradingCalendarDay,
   AccountCapabilities,
   BrokerConfigField,
   TpSlParams,
