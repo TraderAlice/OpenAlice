@@ -3,6 +3,7 @@
 @import "shadcn/tailwind.css";
 @import "./theme/palette.css";
 @import "./theme/style-profiles.css";
+@import "./theme/motion.css";
 
 @font-face {
   font-family: "Instrument Sans Variable";
@@ -99,12 +100,6 @@
 
 /* Base resolution (no attribute / explicit light). */
 :root {
-  --motion-fast: 110ms;
-  --motion-standard: 160ms;
-  --motion-slow: 250ms;
-  --motion-ease-out: cubic-bezier(0.22, 1, 0.36, 1);
-  --motion-ease-standard: cubic-bezier(0.2, 0, 0, 1);
-  --motion-ease-drawer: var(--motion-ease-out);
   --oa-control-hover-border: color-mix(in srgb, var(--foreground) 18%, transparent);
   --oa-control-focus-border: color-mix(in srgb, var(--foreground) 28%, transparent);
   --oa-focus-ring: color-mix(in srgb, var(--foreground) 46%, transparent);
@@ -1070,26 +1065,25 @@ html[lang="ja"] .oa-onboarding-title {
   }
 }
 
-/* Skeleton placeholder — theme-aware shimmer for first-load states. The block
-   is the tertiary surface (reads on both the page bg and bg-secondary cards); a
-   soft overlay band sweeps across at an ambient cadence (sibling to live-pulse's
-   2.4s, a touch quicker so it reads as "loading" without feeling anxious). Size
-   + radius come from the element's own utility classes. Honors reduced motion. */
 @keyframes skeleton-sweep {
-  0% { background-position: 200% 0; }
-  100% { background-position: -200% 0; }
+  from { transform: translateX(-100%); }
+  to { transform: translateX(100%); }
 }
 .skeleton {
-  background-color: var(--muted);
-  background-image: linear-gradient(
-    90deg,
-    transparent 0%,
-    var(--accent-strong) 50%,
-    transparent 100%
-  );
-  background-size: 200% 100%;
-  background-repeat: no-repeat;
-  animation: skeleton-sweep 1.6s ease-in-out infinite;
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+  background: var(--muted);
+}
+.skeleton::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--foreground) 5%, transparent), transparent);
+  animation: skeleton-sweep var(--shimmer-dur) var(--motion-ease-standard) infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .skeleton::after { animation: none; display: none; }
 }
 @media (prefers-reduced-motion: reduce) {
   .oa-onboarding-slide-forward,

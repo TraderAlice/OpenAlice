@@ -1,0 +1,46 @@
+.oa-gradient-text {
+  background-image: var(--motion-spectrum-wash), linear-gradient(var(--foreground), var(--foreground));
+
+  background-size: 180% 180%, 180% 180%, 180% 180%, 180% 180%,
+                   180% 180%, 180% 180%, 180% 180%, 100% 100%;
+  background-repeat: no-repeat;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation:
+    oa-gradient-hue var(--gradient-text-hue-dur) linear infinite,
+    oa-gradient-drift var(--gradient-text-drift-dur) ease-in-out infinite;
+}
+
+@keyframes oa-gradient-hue {
+  from { filter: hue-rotate(0deg) saturate(1.3); }
+  to   { filter: hue-rotate(-360deg) saturate(1.3); }
+}
+
+@keyframes oa-gradient-drift {
+  0%, 100% {
+    background-position:
+      100% 0%, 0% 50%, 100% 50%, 0% 100%,
+      0% 0%, 50% 0%, 50% 100%, 0 0;
+  }
+  25% {
+    background-position:
+      100% 100%, 50% 0%, 50% 100%, 0% 0%,
+      100% 0%, 100% 50%, 0% 50%, 0 0;
+  }
+  50% {
+    background-position:
+      0% 100%, 100% 50%, 0% 50%, 100% 0%,
+      100% 100%, 50% 100%, 50% 0%, 0 0;
+  }
+  75% {
+    background-position:
+      0% 0%, 50% 100%, 50% 0%, 100% 100%,
+      0% 100%, 0% 50%, 100% 50%, 0 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .oa-gradient-text { animation: none; }
+}
+
+.oa-gradient-text[data-playing="false"] { animation-play-state: paused; }

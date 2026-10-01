@@ -922,3 +922,24 @@
 [data-palette-preview] .oa-palette-preview-terminal-line {
   background: color-mix(in srgb, var(--terminal-foreground) 35%, transparent);
 }
+
+:root {
+  --motion-spectrum-blue: #288cff;
+  --motion-spectrum-coral: #ff3264;
+  --motion-spectrum-green: #32c850;
+  --motion-spectrum-violet: #b428f0;
+  --motion-spectrum-amber: #ff7828;
+  --motion-spectrum-teal: #1eb9aa;
+  --motion-spectrum-ink: #5a5a64;
+  --motion-spectrum-light: #ffffff;
+  --motion-spectrum-indigo: #6446ff;
+  --motion-spectrum-pink: #f032b4;
+  --motion-spectrum-wash:
+    radial-gradient(ellipse 12% 34% at 50% 50%, color-mix(in srgb, var(--motion-spectrum-blue) 88%, transparent), transparent),
+    radial-gradient(ellipse 45% 75% at 52% 48%, color-mix(in srgb, var(--motion-spectrum-blue) 50%, transparent), transparent),
+    radial-gradient(ellipse 40% 90% at 48% 52%, color-mix(in srgb, var(--motion-spectrum-pink) 40%, transparent), transparent),
+    radial-gradient(ellipse 18% 40% at 50% 50%, var(--motion-spectrum-violet), transparent),
+    radial-gradient(ellipse 45% 35% at 50% 50%, var(--motion-spectrum-amber), transparent),
+    radial-gradient(ellipse 50% 75% at 50% 50%, var(--motion-spectrum-green), color-mix(in srgb, var(--motion-spectrum-teal) 50%, transparent) 50%, transparent),
+    radial-gradient(ellipse 90% 65% at 50% 50%, var(--motion-spectrum-teal), transparent);
+}

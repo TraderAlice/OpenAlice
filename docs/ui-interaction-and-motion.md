@@ -788,3 +788,28 @@ Running progress cannot reopen its dismissed bubble, but a new terminal result
 may appear once. News/Inbox actions retain their whole-page destinations; Agent
 inspection opens the existing read-only Session details when available, Office
 otherwise. No notification action automatically retries or takes over a runtime.
+
+
+## 共享动效组件
+
+`ui/src/components/motion/` 拥有 11 个交互组件及其样式。现有 Settings → Developer → Frontend 提供组件练习、暂停、重置与源码查看。`MotionGallery` 维护组件身份和实现路径，TypeScript 与 CSS 源码按当前组件延迟加载，复制操作使用当前已加载文件。
+
+颜色由 `ui/src/theme/palette.css` 管理，装饰光谱使用同一颜色入口。时长、缓动、粒子数量和物理参数由 `ui/src/theme/motion.css` 管理。常规操作反馈使用 110ms，状态切换使用 160ms，重点过渡使用 250ms。共享弹层使用 Base UI 的定位、键盘操作、焦点返回和挂载生命周期。
+
+选择标记由 `SelectionCheckIcon` 管理，采用固定 16px 画布与中性笔画。操作完成标记由 `StatusIndicator` 管理，使用状态颜色。`StateViews` 与 `SaveIndicator` 使用同一状态组件。骨架光带采用 transform 位移。`ConversationImagePreview` 使用 `LoadingImage`，以图片解码完成驱动显示，并提供错误状态与重试操作。
+
+`MeasuredText` 复用已固定的 Pretext 0.0.8。准备结果随文字、字体和排版参数缓存，宽度变化执行布局计算。DOM 保持可选择的正文，测量使用本地 Instrument Sans Variable。
+
+持续动效跟随组件可见性、页面可见性与 `prefers-reduced-motion`。Canvas 控制器在取消、离开页面和卸载时清理帧、计时器与事件监听器。纸屑每帧处理有界粒子集合，图片占位最多生成 400 个点。消散采用滑动窗口模糊，单帧成本随像素数线性增长。图片倾斜使用有界软件形变；跨域像素读取失败时继续使用 CSS 倾斜。拖放取消回到起点，Enter 和空格执行同一落点行为。
+
+本机验证命令：
+
+```bash
+pnpm -F @traderalice/connector-protocol build
+pnpm --filter @traderalice/update-lifecycle... build
+pnpm -F open-alice-ui exec tsc -b
+CI=1 NODE_ENV=test pnpm test:owner:ui
+pnpm -F open-alice-ui build:demo
+```
+
+测试命令显式设置 `NODE_ENV=test`，支持继承生产环境变量的本机命令入口。浏览器检查覆盖组件操作、源码文件、键盘导航、焦点返回、减少动态效果与窄屏布局。

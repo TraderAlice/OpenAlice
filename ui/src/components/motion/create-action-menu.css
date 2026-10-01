@@ -1,0 +1,111 @@
+.oa-create-menu-anchor {
+  position: relative;
+  width: 200px;
+  height: 140px;
+}
+
+.oa-create-menu-layer {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  pointer-events: none;
+
+}
+
+.oa-create-menu-blob {
+  fill: var(--create-menu-surface);
+  stroke: var(--border);
+  stroke-width: 1px;
+  transform: translate(0, 0);
+  transform-box: fill-box;
+  transition: transform var(--create-menu-close-dur) var(--create-menu-close-ease);
+  will-change: transform;
+}
+.oa-create-menu-anchor[data-open="true"] .oa-create-menu-blob {
+  transform: translate(calc(var(--fx, 0px) * var(--create-menu-spread)),
+                       calc(var(--fy, 0px) * var(--create-menu-spread)));
+  transition: transform var(--create-menu-open-dur) var(--create-menu-open-ease);
+  transition-delay: calc(var(--i, 0) * var(--create-menu-stagger));
+}
+
+.oa-create-menu-item,
+.oa-create-menu-main {
+  position: absolute;
+  left: 80px;
+  top: 80px;
+  width: 40px;
+  height: 40px;
+  border: 0;
+  padding: 0;
+  border-radius: 50%;
+  background: transparent;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  color: var(--create-menu-icon-color, var(--foreground));
+  -webkit-tap-highlight-color: transparent;
+  transform: translate(0, 0);
+  transition: transform var(--create-menu-close-dur) var(--create-menu-close-ease),
+              background-color var(--motion-fast) var(--motion-ease-standard);
+  will-change: transform;
+}
+
+.oa-create-menu-item { pointer-events: none; }
+.oa-create-menu-anchor[data-open="true"] .oa-create-menu-item {
+  pointer-events: auto;
+  transform: translate(calc(var(--fx, 0px) * var(--create-menu-spread)),
+                       calc(var(--fy, 0px) * var(--create-menu-spread)));
+  transition: transform var(--create-menu-open-dur) var(--create-menu-open-ease),
+              background-color var(--motion-fast) var(--motion-ease-standard);
+  transition-delay: calc(var(--i, 0) * var(--create-menu-stagger)), 0ms;
+}
+@media (hover: hover) and (pointer: fine) {
+  .oa-create-menu-anchor[data-open="true"] .oa-create-menu-item:hover { background: var(--accent); }
+}
+.oa-create-menu-main:focus-visible,
+.oa-create-menu-item:focus-visible {
+  outline: 2px solid var(--foreground);
+  outline-offset: 2px;
+}
+
+.oa-create-menu-item svg {
+  display: block;
+  opacity: 0;
+  filter: blur(2px);
+  transition: opacity var(--motion-fast) var(--motion-ease-standard), filter var(--motion-fast) var(--motion-ease-standard);
+}
+
+.oa-create-menu-anchor[data-open="true"] .oa-create-menu-item svg {
+  opacity: 1;
+  filter: blur(0);
+  transition: opacity var(--motion-standard) var(--motion-ease-standard), filter var(--motion-standard) var(--motion-ease-standard);
+  transition-delay: calc(var(--i, 0) * var(--create-menu-stagger) + var(--motion-fast)),
+                    calc(var(--i, 0) * var(--create-menu-stagger) + var(--motion-fast));
+}
+
+
+.oa-create-menu-swap {
+  position: relative;
+  display: inline-grid;
+  place-items: center;
+  transform: rotate(0deg);
+  transition: transform var(--create-menu-icon-dur) var(--create-menu-icon-ease);
+}
+.oa-create-menu-anchor[data-open="true"] .oa-create-menu-swap { transform: rotate(var(--create-menu-icon-rotate)); }
+
+@media (prefers-reduced-motion: reduce) {
+  .oa-create-menu-blob,
+  .oa-create-menu-item,
+  .oa-create-menu-item svg,
+  .oa-create-menu-swap { transition: none; }
+}
+
+.oa-create-menu-positioner { z-index: 10; }
+.oa-create-menu-popup { position: relative; width: 200px; height: 140px; outline: none; pointer-events: none; }
+.oa-create-menu-item:focus-visible { background: var(--accent); }
+.oa-create-menu-anchor[data-instant="true"] .oa-create-menu-blob,
+.oa-create-menu-anchor[data-instant="true"] .oa-create-menu-item,
+.oa-create-menu-anchor[data-instant="true"] .oa-create-menu-item svg,
+.oa-create-menu-anchor[data-instant="true"] .oa-create-menu-swap { transition: none; }

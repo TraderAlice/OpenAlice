@@ -1,0 +1,69 @@
+.oa-loading-image {
+  position: relative;
+  width: 142px;
+  height: 142px;
+  border-radius: 12px;
+  background: var(--muted);
+  overflow: hidden;
+  isolation: isolate;
+}
+.oa-loading-image-field {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  transition: opacity var(--loading-image-reveal-dur) var(--loading-image-reveal-ease);
+}
+.oa-loading-image-img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity var(--loading-image-reveal-dur) var(--loading-image-reveal-ease);
+}
+.oa-loading-image.is-revealed .oa-loading-image-field {
+  opacity: 0;
+}
+.oa-loading-image.is-revealed .oa-loading-image-img {
+  opacity: 1;
+}
+
+.oa-loading-image-field i {
+  position: absolute;
+  width: var(--loading-image-dot);
+  height: var(--loading-image-dot);
+  border-radius: 50%;
+  background: var(--loading-image-dot-color);
+  opacity: calc(var(--loading-image-peak) * var(--v, 1));
+  transform: scale(
+    calc(var(--loading-image-scale-min) + (1 - var(--loading-image-scale-min)) * var(--v, 1))
+  );
+}
+
+.oa-loading-image.is-loading .oa-loading-image-field i {
+  animation: oa-loading-image-twinkle calc(var(--loading-image-cycle) * var(--k, 1))
+    var(--loading-image-ease) var(--delay, 0ms) infinite;
+}
+@keyframes oa-loading-image-twinkle {
+  0%, 100% {
+    opacity: 0;
+    transform: scale(var(--loading-image-scale-min));
+  }
+  50% {
+    opacity: var(--loading-image-peak);
+    transform: scale(1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .oa-loading-image.is-loading .oa-loading-image-field i { animation: none; }
+  .oa-loading-image-field,
+  .oa-loading-image-img {
+      transition: none;
+  }
+}
+
+.oa-loading-image[data-playing="false"] .oa-loading-image-field i { animation-play-state: paused; }

@@ -11,6 +11,97 @@ import type { Resources } from './en'
  * Content is UI chrome only — no geographic or other non-technical terms.
  */
 export const zhHant: Resources = {
+  motionLab: {
+    "title": "動效元件庫",
+    "description": "共用元件、真實互動與專案原始碼。",
+    "pause": "暫停動效",
+    "play": "啟用動效",
+    "viewSource": "檢視原始碼：{{name}}",
+    "sourceDescription": "OpenAlice 使用的元件實作與樣式。",
+    "copy": "複製原始碼",
+    "copied": "已複製",
+    "copyError": "複製失敗。可選取原始碼文字進行複製。",
+    "sourceError": "原始碼載入失敗，請重試。",
+    "celebrate": "慶祝",
+    "tryAction": "執行操作",
+    "complete": "完成",
+    "loading": "載入",
+    "error": "失敗",
+    "reset": "重設",
+    "reveal": "顯示圖片",
+    "openImage": "展開圖片",
+    "closeImage": "收合圖片",
+    "imageAlt": "山間的落葉松",
+    "drop": "放入圖片",
+    "dropTarget": "圖片目標區域",
+    "create": "建立",
+    "file": "檔案",
+    "image": "圖片",
+    "folder": "資料夾",
+    "preview": "預覽",
+    "clear": "消散圖片",
+    "completeCount": "已完成 {{count}} 次",
+    "selected": "已選取：{{name}}",
+    "idle": "就緒",
+    "fast": "操作回饋",
+    "standard": "狀態切換",
+    "slow": "重點過渡",
+    "gradientLabel": "OpenAlice",
+    "exampleCount": "{{count}} 組元件",
+    "tokens": "統一時長",
+    "sourceVariants": "原始碼檔案",
+    "imageState": "圖片狀態",
+    "statusState": "操作狀態",
+    "nameInput": "漸層文字",
+    "galleryLabel": "動效元件練習",
+    "examples": {
+      "card-stack": {
+        "name": "卡片堆疊",
+        "description": "懸停與鍵盤焦點展開卡片集合。"
+      },
+      "confetti": {
+        "name": "紙屑慶祝",
+        "description": "有界粒子回應主動慶祝操作。"
+      },
+      "drop-interaction": {
+        "name": "物理拖放",
+        "description": "指標與鍵盤將圖片放入目標區域。"
+      },
+      "highlight-button": {
+        "name": "高亮按鈕",
+        "description": "柔和光環突出單一操作。"
+      },
+      "create-menu": {
+        "name": "流體選單",
+        "description": "三個操作共享同一展開原點。"
+      },
+      "loading-image": {
+        "name": "圖片佔位",
+        "description": "點陣過渡到已解碼圖片。"
+      },
+      "tilting-image": {
+        "name": "圖片傾斜",
+        "description": "圖片從原位置展開。"
+      },
+      "shimmer-tile": {
+        "name": "流動光帶",
+        "description": "光帶沿元件表面移動。"
+      },
+      "gradient-text": {
+        "name": "漸層文字",
+        "description": "色彩流經可選取的文字。"
+      },
+      "dissolve-effect": {
+        "name": "煙霧消散",
+        "description": "圖片消散後恢復，支援重複練習。"
+      },
+      "status-indicator": {
+        "name": "狀態形變",
+        "description": "載入、完成與失敗共享固定尺寸。"
+      }
+    }
+  },
+
   activityPreferences: en.activityPreferences,
 
   sessionControl: {
@@ -1571,6 +1662,7 @@ export const zhHant: Resources = {
     }
   },
   common: {
+    imageLoadFailed: "圖片載入失敗。",
     back: '返回',
     loading: '載入中…',
     searching: '搜尋中…',

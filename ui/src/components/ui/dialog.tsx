@@ -29,7 +29,7 @@ function DialogOverlay({
     <DialogPrimitive.Backdrop
       data-slot="dialog-overlay"
       className={cn(
-        "fixed inset-0 isolate z-50 bg-backdrop supports-backdrop-filter:backdrop-blur-xs transition-opacity duration-[var(--motion-standard)] [transition-timing-function:var(--motion-ease-standard)] data-starting-style:opacity-0 data-ending-style:opacity-0 data-ending-style:duration-[var(--motion-fast)] motion-reduce:transition-none",
+        "fixed inset-0 isolate z-50 bg-backdrop supports-backdrop-filter:backdrop-blur-xs transition-opacity duration-[var(--motion-standard)] [transition-timing-function:var(--motion-ease-standard)] data-starting-style:opacity-0 data-ending-style:opacity-0 data-ending-style:duration-[var(--motion-fast)] data-instant:transition-none motion-reduce:transition-none",
         className
       )}
       {...props}
@@ -63,7 +63,7 @@ function DialogContent({
       <DialogPrimitive.Popup
         data-slot="dialog-content"
         className={cn(
-          "fixed top-1/2 left-1/2 z-50 grid w-full max-w-[calc(100%-2rem)] -translate-x-1/2 -translate-y-1/2 gap-4 rounded-2xl bg-popover p-4 text-sm text-popover-foreground shadow-lg ring-1 ring-foreground/10 outline-none transition-[opacity,transform] duration-[var(--motion-standard)] [transition-timing-function:var(--motion-ease-out)] data-starting-style:scale-[.98] data-starting-style:opacity-0 data-ending-style:scale-[.99] data-ending-style:opacity-0 data-ending-style:duration-[var(--motion-fast)] motion-reduce:transition-none sm:max-w-sm",
+          "fixed top-1/2 left-1/2 z-50 grid w-full max-w-[calc(100%-2rem)] -translate-x-1/2 -translate-y-1/2 gap-4 rounded-2xl bg-popover p-4 text-sm text-popover-foreground shadow-lg ring-1 ring-foreground/10 outline-none transition-[opacity,transform] duration-[var(--motion-standard)] [transition-timing-function:var(--motion-ease-out)] data-starting-style:scale-[.98] data-starting-style:opacity-0 data-ending-style:scale-[.99] data-ending-style:opacity-0 data-ending-style:duration-[var(--motion-fast)] data-instant:transition-none motion-reduce:transition-none sm:max-w-sm",
           className
         )}
         {...props}
