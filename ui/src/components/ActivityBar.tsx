@@ -20,7 +20,6 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from '@/components/ui/tooltip'
-import { SelectionIndicator } from './SelectionIndicator'
 import { CountBadge } from './CountBadge'
 import { Button } from '@/components/ui/button'
 import { ChatWorkspaceSection } from './workspace/ChatWorkspaceSection'
@@ -134,8 +133,8 @@ export function ActivityBar({
     .filter(mode => mode === 'chat' || !layout.hidden.includes(mode))
   const railContent = (
     <>
-        <div className={`oa-activity-brand ${denseRail ? 'h-10 md:h-8' : 'h-10'} flex shrink-0 items-center ${compactRail ? 'justify-center px-0' : narrowRail ? 'gap-1.5 px-2.5' : 'gap-2.5 px-3.5'}`}>
-              <h1 className={`min-w-0 flex-1 truncate text-[13px] font-semibold leading-[18px] tracking-[-0.01em] text-foreground ${compactRail ? 'md:hidden' : ''}`}>OpenAlice</h1>
+        <div className={`oa-activity-brand h-[72px] flex shrink-0 items-center ${compactRail ? 'justify-center px-0' : narrowRail ? 'gap-1.5 px-2.5' : 'gap-2.5 px-3.5'}`}>
+              <h1 className={`min-w-0 flex-1 truncate text-[22px] font-bold leading-7 tracking-[-0.025em] text-foreground ${compactRail ? 'md:hidden' : ''}`}>OpenAlice</h1>
               {!desktopStatic ? (
                 <Button
                   type="button"
@@ -225,23 +224,22 @@ export function ActivityBar({
                           aria-label={label}
                           aria-describedby={badge ? `activity-count-${item.page}` : undefined}
                           aria-current={isActive ? 'page' : undefined}
-                          className={`oa-nav-item relative flex items-center rounded-md text-left ${
+                          className={`oa-nav-item relative flex items-center rounded-full text-left font-semibold ${
                             compactRail
                               ? denseRail
                                 ? 'md:h-[26px] md:w-8 md:min-h-[26px] md:justify-center md:gap-0 md:px-0 md:py-0'
                                 : 'md:h-8 md:w-8 md:min-h-8 md:justify-center md:gap-0 md:px-0 md:py-0'
                               : denseRail
-                                ? `min-h-[28px] ${narrowRail ? 'gap-2 px-2' : 'gap-2.5 px-2.5'} py-1 text-[12px]`
-                                : 'min-h-10 gap-2.5 px-2.5 py-1 text-[13px] leading-[18px] md:min-h-8'
+                                ? `min-h-10 ${narrowRail ? 'gap-2 px-2' : 'gap-2.5 px-2.5'} py-2 text-sm`
+                                : 'min-h-12 gap-3 px-4 py-3 text-sm leading-6'
                           } ${
                             isActive
                               ? 'bg-sidebar-accent text-sidebar-accent-foreground'
-                              : 'text-sidebar-foreground/75 hover:bg-sidebar-accent/60 hover:text-sidebar-foreground'
+                              : 'text-sidebar-foreground hover:bg-sidebar-accent/60 hover:text-sidebar-foreground'
                           }`}
                         >
-                          {isActive && <SelectionIndicator />}
-                          <span className={`oa-nav-icon relative flex h-[18px] w-[18px] shrink-0 items-center justify-center ${denseRail ? 'md:h-3.5 md:w-3.5' : ''}`}>
-                            <Icon size={denseRail ? 14 : 15} strokeWidth={1.75} />
+                          <span className={`oa-nav-icon relative flex h-5 w-5 shrink-0 items-center justify-center ${denseRail ? 'md:h-5 md:w-5' : ''}`}>
+                            <Icon size={20} strokeWidth={1.75} />
                           </span>
                           <span className={`flex-1 truncate ${compactRail ? 'md:hidden' : ''}`}>{label}</span>
                           {badge !== null && (

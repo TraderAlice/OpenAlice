@@ -35,7 +35,7 @@ function CollectorSettings() {
     <div className="mx-auto w-full max-w-[880px]">
       <div className="flex min-h-12 items-center justify-between gap-4 border-b border-border/60 py-2">
         <div className="min-w-0">
-          <p className="text-[13px] font-medium text-foreground">Collect articles</p>
+          <p className="text-sm font-medium text-foreground">Collect articles</p>
         </div>
         <div className="flex shrink-0 items-center gap-3">
           <SaveIndicator status={status} onRetry={retry} />
@@ -87,7 +87,7 @@ function CollectorSettings() {
       </fieldset>
       {loadError && (
         <div role="alert" className="mt-4 flex min-h-12 items-center justify-between gap-3 rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2">
-          <p className="text-[13px] text-destructive">Failed to load configuration.</p>
+          <p className="text-sm text-destructive">Failed to load configuration.</p>
           <Button type="button" variant="outline" size="sm" onClick={() => void reload()}>
             Retry
           </Button>
@@ -140,7 +140,7 @@ function RssHubPresets({ feeds, onChange }: {
       </CollapsibleTrigger>
       <CollapsibleContent keepMounted>
         <div className="space-y-3 pt-3">
-          <p id="rsshub-help" className="text-[12px] leading-5 text-muted-foreground">
+          <p id="rsshub-help" className="text-sm leading-5 text-muted-foreground">
             Connect an RSSHub instance reachable from the OpenAlice backend.
             Restart Alice after saving to collect the new feeds.
           </p>
@@ -156,7 +156,7 @@ function RssHubPresets({ feeds, onChange }: {
               aria-describedby={invalid ? 'rsshub-help rsshub-error' : 'rsshub-help'}
             />
             {invalid && (
-              <p id="rsshub-error" role="alert" className="mt-1 text-[12px] text-destructive">
+              <p id="rsshub-error" role="alert" className="mt-1 text-sm text-destructive">
                 Enter an HTTP(S) instance URL without credentials, a query, or a fragment.
               </p>
             )}
@@ -261,14 +261,14 @@ export function FeedsSection({
                 />
                 <div className="flex-1 min-w-0">
                   <div className="flex min-w-0 items-center gap-1">
-                    <p className="truncate text-[13px] font-medium text-foreground">{feed.name}</p>
+                    <p className="truncate text-sm font-medium text-foreground">{feed.name}</p>
                     <ContextHelp label={feed.name}>{[
                       feed.description,
                       `Source: ${feed.source}`,
                       feed.categories?.length ? `Categories: ${feed.categories.join(', ')}` : '',
                     ].filter(Boolean).join('. ')}</ContextHelp>
                   </div>
-                  <p className="mt-0.5 truncate text-[11px] text-muted-foreground" title={feed.url}>{feed.url}</p>
+                  <p className="mt-0.5 truncate text-sm text-muted-foreground" title={feed.url}>{feed.url}</p>
                 </div>
                 <Button
                   type="button"
@@ -312,7 +312,7 @@ export function FeedsSection({
                 aria-describedby={showFeedUrlError ? 'news-feed-url-error' : undefined}
               />
               {showFeedUrlError && (
-                <p id="news-feed-url-error" role="alert" className="mt-1 text-[12px] text-destructive">
+                <p id="news-feed-url-error" role="alert" className="mt-1 text-sm text-destructive">
                   Enter a valid URL, for example https://example.com/rss.xml.
                 </p>
               )}

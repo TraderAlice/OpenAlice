@@ -137,7 +137,7 @@ export function AIProviderPage() {
           <section className="min-w-0">
             <div className="flex items-center justify-between mb-3">
               <div className="flex min-w-0 items-baseline gap-1.5">
-                <h2 className="text-[14px] leading-[19px] font-semibold text-foreground">{t('aiProvider.credentials')}</h2>
+                <h2 className="text-[14px] leading-5 font-semibold text-foreground">{t('aiProvider.credentials')}</h2>
                 <CountBadge
                   count={visibleCredentials.length}
                   label={`${t('aiProvider.credentials')}: ${vaultQuery.trim()
@@ -178,21 +178,21 @@ export function AIProviderPage() {
                       <AIProviderIcon vendor={cred.vendor} className="mt-0.5 size-5 shrink-0" />
                       <div className="min-w-0 flex-1">
                         <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
-                          <span className="text-[13px] font-medium text-foreground">{displayLabel}</span>
+                          <span className="text-sm font-medium text-foreground">{displayLabel}</span>
                           {showVendor && (
-                            <span className="text-[11px] text-muted-foreground">{displayVendor}</span>
+                            <span className="text-sm text-muted-foreground">{displayVendor}</span>
                           )}
                           {cred.label && (
-                            <span className="font-mono text-[11px] leading-[15px] text-muted-foreground">{cred.slug}</span>
+                            <span className="font-mono text-sm leading-5 text-muted-foreground">{cred.slug}</span>
                           )}
                           {cred.hasApiKey && (
-                            <span className="inline-flex items-center gap-1 text-[10px] leading-[14px] font-medium text-success">
+                            <span className="inline-flex items-center gap-1 text-sm leading-5 font-medium text-success">
                               <Check aria-hidden className="size-3" />
                               {t('aiProvider.keySet')}
                             </span>
                           )}
                         </div>
-                        <div className="mt-0.5 flex min-w-0 flex-col gap-0.5 text-[11px] text-muted-foreground">
+                        <div className="mt-0.5 flex min-w-0 flex-col gap-0.5 text-sm text-muted-foreground">
                           <span className="truncate">
                             {t('aiProvider.defaultModel')}: <span className="font-mono">{cred.lastModel || t('aiProvider.notSet')}</span>
                           </span>
@@ -450,12 +450,12 @@ function WorkspaceDefaultsSection({
           <AgentRuntimeIcon agentId={agent.id} className="mt-0.5 size-5 shrink-0" />
           <div className="min-w-0 flex-1">
             <div className="flex items-baseline gap-2">
-              <span className="text-[13px] font-medium text-foreground">{agent.name}</span>
-              <span className="font-mono text-[11px] leading-[15px] text-muted-foreground">{agent.id}</span>
+              <span className="text-sm font-medium text-foreground">{agent.name}</span>
+              <span className="font-mono text-sm leading-5 text-muted-foreground">{agent.id}</span>
             </div>
-            {note && <p className="mt-0.5 text-[11px] leading-snug text-muted-foreground">{note}</p>}
+            {note && <p className="mt-0.5 text-sm leading-snug text-muted-foreground">{note}</p>}
             {options.length === 0 && (
-              <p className="mt-0.5 text-[11px] leading-snug text-muted-foreground/70">{t('aiProvider.noCompatible')}</p>
+              <p className="mt-0.5 text-sm leading-snug text-muted-foreground/70">{t('aiProvider.noCompatible')}</p>
             )}
           </div>
         </div>
@@ -484,18 +484,18 @@ function WorkspaceDefaultsSection({
             </select>
           )}
           {current && wireShapes.length === 1 && (
-            <p className="px-1 text-[10.5px] text-muted-foreground">
+            <p className="px-1 text-sm text-muted-foreground">
               {t('aiProvider.protocol', { protocol: WIRE_SHAPE_GUIDANCE[wireShapes[0]!] })}
             </p>
           )}
           {(agent.id === 'pi' || agent.id === 'opencode') && current && semanticsSummary && (
-            <p className="px-1 text-[10.5px] leading-snug text-muted-foreground">
+            <p className="px-1 text-sm leading-snug text-muted-foreground">
               {t('aiProvider.model', { model: selectedModelId })}<br />
               {t('aiProvider.automatic', { summary: semanticsSummary })}
             </p>
           )}
           {(agent.id === 'pi' || agent.id === 'opencode') && current && !selectedSemantics?.reasoning && (
-            <details className="px-1 text-[10.5px] text-muted-foreground">
+            <details className="px-1 text-sm text-muted-foreground">
               <summary className="inline-flex min-h-8 cursor-pointer items-center">{t('aiProvider.advancedReasoning')}</summary>
               <select
                 aria-label={t('aiProvider.reasoningOverrideLabel', { agent: agent.name })}
@@ -525,8 +525,8 @@ function WorkspaceDefaultsSection({
   return (
     <section className="min-w-0">
       <div className="mb-3 flex min-h-5 items-center justify-between gap-3">
-        <h2 className="text-[14px] leading-[19px] font-semibold text-foreground">{t('aiProvider.defaultsTitle')}</h2>
-        <span aria-live="polite" className={`text-[11px] ${saveStatus === 'saved' ? 'text-success' : 'text-muted-foreground'}`}>
+        <h2 className="text-[14px] leading-5 font-semibold text-foreground">{t('aiProvider.defaultsTitle')}</h2>
+        <span aria-live="polite" className={`text-sm ${saveStatus === 'saved' ? 'text-success' : 'text-muted-foreground'}`}>
           {saveStatus === 'saving' ? t('common.saving') : saveStatus === 'saved' ? t('common.saved') : ''}
         </span>
       </div>
@@ -569,7 +569,7 @@ function WorkspaceDefaultsSection({
             </>
           )}
 
-          {error && <p className="text-[12px] text-destructive">{error}</p>}
+          {error && <p className="text-sm text-destructive">{error}</p>}
         </div>
       )}
     </section>

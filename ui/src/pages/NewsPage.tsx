@@ -237,10 +237,10 @@ const NewsStreamRow = memo(function NewsStreamRow({ article, locale, onTag }: { 
   const hasImage = Boolean(image && failedImage !== image)
   const source = link ? (
     <a href={link} target="_blank" rel="noopener noreferrer" aria-label={t('news.openOriginal')} title={article.source ?? t('news.openOriginal')}
-      className="inline-flex min-h-7 max-w-full items-center rounded-sm text-[11px] text-muted-foreground underline-offset-2 hover:text-foreground hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring [overflow-wrap:anywhere]">
+      className="inline-flex min-h-7 max-w-full items-center rounded-sm text-sm text-muted-foreground underline-offset-2 hover:text-foreground hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring [overflow-wrap:anywhere]">
       {article.source ?? t('news.openOriginal')}
     </a>
-  ) : article.source ? <span className="text-[11px] text-muted-foreground [overflow-wrap:anywhere]">{article.source}</span> : null
+  ) : article.source ? <span className="text-sm text-muted-foreground [overflow-wrap:anywhere]">{article.source}</span> : null
   return (
     <article role="listitem" className="grid min-w-0 grid-cols-[46px_minmax(0,1fr)] sm:grid-cols-[54px_minmax(0,1fr)]">
       <div className="relative border-r border-border/60 pr-2 text-right">
@@ -254,7 +254,7 @@ const NewsStreamRow = memo(function NewsStreamRow({ article, locale, onTag }: { 
           <h4 className="text-sm font-semibold leading-[22px] text-foreground [overflow-wrap:anywhere]">
             {link ? <a href={link} target="_blank" rel="noopener noreferrer" className="rounded-sm underline-offset-2 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring">{article.title}</a> : article.title}
           </h4>
-          {content && <p id={summaryId} className={cn('mt-1 whitespace-pre-wrap text-[13px] leading-[21px] text-muted-foreground [overflow-wrap:anywhere]', !expanded && 'line-clamp-3')}>
+          {content && <p id={summaryId} className={cn('mt-1 whitespace-pre-wrap text-sm leading-[21px] text-muted-foreground [overflow-wrap:anywhere]', !expanded && 'line-clamp-3')}>
             {content}
           </p>}
           <div className="mt-2 flex min-w-0 flex-wrap items-center gap-1.5">
@@ -296,7 +296,7 @@ function NewsLoadError({ refreshing, onRetry }: { refreshing: boolean; onRetry: 
   return <div role="alert" className="mx-auto flex max-w-[520px] flex-col items-center px-6 py-16 text-center">
     <CircleAlert size={24} strokeWidth={1.75} className="text-destructive" aria-hidden />
     <h2 className="mt-3 text-[15px] font-medium">{t('news.loadErrorTitle')}</h2>
-    <p className="mt-1.5 text-[13px] leading-relaxed text-muted-foreground">{t('news.loadErrorDescription')}</p>
+    <p className="mt-1.5 text-sm leading-relaxed text-muted-foreground">{t('news.loadErrorDescription')}</p>
     <Button type="button" onClick={onRetry} disabled={refreshing} className="mt-4" variant="outline" size="sm">{refreshing ? t('common.loading') : t('common.retry')}</Button>
   </div>
 }

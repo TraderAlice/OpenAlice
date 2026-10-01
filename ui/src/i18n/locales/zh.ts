@@ -2,96 +2,6 @@ import type { Resources } from './en'
 
 /** 简体中文. Typed as `Resources` → must match en's key structure exactly. */
 export const zh: Resources = {
-  motionLab: {
-    "title": "动效组件库",
-    "description": "共享组件、真实交互与项目源码。",
-    "pause": "暂停动效",
-    "play": "启用动效",
-    "viewSource": "查看源码：{{name}}",
-    "sourceDescription": "OpenAlice 使用的组件实现与样式。",
-    "copy": "复制源码",
-    "copied": "已复制",
-    "copyError": "复制失败。可选择源码文本进行复制。",
-    "sourceError": "源码加载失败，请重试。",
-    "celebrate": "庆祝",
-    "tryAction": "执行操作",
-    "complete": "完成",
-    "loading": "加载",
-    "error": "失败",
-    "reset": "重置",
-    "reveal": "显示图片",
-    "openImage": "展开图片",
-    "closeImage": "收起图片",
-    "imageAlt": "山间的落叶松",
-    "drop": "放入图片",
-    "dropTarget": "图片目标区域",
-    "create": "创建",
-    "file": "文件",
-    "image": "图片",
-    "folder": "文件夹",
-    "preview": "预览",
-    "clear": "消散图片",
-    "completeCount": "已完成 {{count}} 次",
-    "selected": "已选择：{{name}}",
-    "idle": "就绪",
-    "fast": "操作反馈",
-    "standard": "状态切换",
-    "slow": "重点过渡",
-    "gradientLabel": "OpenAlice",
-    "exampleCount": "{{count}} 套组件",
-    "tokens": "统一时长",
-    "sourceVariants": "源码文件",
-    "imageState": "图片状态",
-    "statusState": "操作状态",
-    "nameInput": "渐变文字",
-    "galleryLabel": "动效组件练习",
-    "examples": {
-      "card-stack": {
-        "name": "卡片堆叠",
-        "description": "悬停与键盘焦点展开卡片集合。"
-      },
-      "confetti": {
-        "name": "纸屑庆祝",
-        "description": "有界粒子响应主动庆祝操作。"
-      },
-      "drop-interaction": {
-        "name": "物理拖放",
-        "description": "指针与键盘将图片放入目标区域。"
-      },
-      "highlight-button": {
-        "name": "高亮按钮",
-        "description": "柔和光环突出单个操作。"
-      },
-      "create-menu": {
-        "name": "流体菜单",
-        "description": "三个操作共享同一展开原点。"
-      },
-      "loading-image": {
-        "name": "图片占位",
-        "description": "点阵过渡到已解码图片。"
-      },
-      "tilting-image": {
-        "name": "图片倾斜",
-        "description": "图片从原位置展开。"
-      },
-      "shimmer-tile": {
-        "name": "流动光带",
-        "description": "光带沿组件表面移动。"
-      },
-      "gradient-text": {
-        "name": "渐变文字",
-        "description": "色彩流经可选择的文字。"
-      },
-      "dissolve-effect": {
-        "name": "烟雾消散",
-        "description": "图片消散后恢复，支持重复练习。"
-      },
-      "status-indicator": {
-        "name": "状态形变",
-        "description": "加载、完成与失败共享固定尺寸。"
-      }
-    }
-  },
 
   activityPreferences: {
     title: '活动通知', description: '按偏好过滤提醒，完整活动记录不受影响。', desktopOnly: '通知偏好仅在桌面应用中可用。',
@@ -1191,6 +1101,8 @@ export const zh: Resources = {
       quickAccessDescription: '成功创建 Session 后，对应运行时会自动移到最前面。这里的顺序作为最近使用记录之后的候补基线；未安装的运行时不会自动填入。',
       quickAccessCount: '已置顶 {{count}} 个，最多 {{limit}} 个',
       catalogCount: '{{count}} 个运行时',
+      catalogCount_one: '{{count}} 个运行时',
+      catalogCount_other: '{{count}} 个运行时',
       quickAccessEmpty: '还没有置顶运行时。可从下方目录最多添加四个。',
       catalog: '已发现的运行时',
       catalogDescription: '安装状态由本机探测，不会作为偏好保存。',
@@ -2075,12 +1987,12 @@ export const zh: Resources = {
       'broker-classic': '受 TWS 启发的高密度交易工作台',
     },
     palette: {
-      codex: 'Codex',
+      codex: 'Alice',
       paper: '纸张', porcelain: '白瓷', linen: '亚麻', 'windows-classic': 'Windows 经典',
       graphite: '石墨', midnight: '午夜', moss: '苔色', iris: '鸢尾',
     },
     paletteDescription: {
-      codex: '纯白内容与中性冷灰',
+      codex: '纯白、深绿与青柠色操作',
       paper: '温暖的编辑风中性色',
       porcelain: '清爽的冷调工作区',
       linen: '燕麦纸、墨棕与陶土色',

@@ -38,8 +38,8 @@ describe('SaveIndicator', () => {
     expect(retry).toHaveBeenCalledTimes(1)
   })
 
-  it('renders nothing while idle', () => {
+  it('reserves an empty status slot during idle', () => {
     const { container } = render(<SaveIndicator status="idle" />)
-    expect(container.firstChild).toBeNull()
+    expect(container.firstChild?.textContent).toBe('')
   })
 })

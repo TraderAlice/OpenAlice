@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useId, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { type BarSourceCandidate, type AssetClass } from '../../api/market'
@@ -25,6 +25,7 @@ export function SearchBox() {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
   const [query, setQuery] = useState('')
+  const listId = useId()
   // Shared with the market sidebar — one federated search logic, no drift.
   const { results, loading } = useAssetSearch(query)
   const [open, setOpen] = useState(false)
@@ -34,14 +35,8 @@ export function SearchBox() {
   useEffect(() => { setHighlight(0) }, [results])
 
   useEffect(() => {
-    const onClickAway = (e: MouseEvent) => {
-      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
-        setOpen(false)
-      }
-    }
-    document.addEventListener('mousedown', onClickAway)
-    return () => document.removeEventListener('mousedown', onClickAway)
-  }, [])
+    if (open) containerRef.current?.querySelector('[aria-selected="true"]')?.scrollIntoView({ block: 'nearest' })
+  }, [highlight, open])
 
   const handleSelect = (r: BarSourceCandidate) => {
     if (!r.symbol) return
@@ -59,6 +54,7 @@ export function SearchBox() {
   }
 
   const onKey = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Escape') { setOpen(false); return }
     if (!open || results.length === 0) return
     if (e.key === 'ArrowDown') {
       e.preventDefault()
@@ -69,15 +65,21 @@ export function SearchBox() {
     } else if (e.key === 'Enter') {
       e.preventDefault()
       handleSelect(results[highlight])
-    } else if (e.key === 'Escape') {
-      setOpen(false)
     }
   }
 
   return (
-    <div ref={containerRef} className="relative">
+    <div ref={containerRef} className="relative" onBlur={(event) => {
+      if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setOpen(false)
+    }}>
       <input
-        className="oa-field-control w-full rounded-md border border-input bg-background px-3 py-2 text-[14px] leading-5 outline-none transition-[border-color,box-shadow] duration-[var(--motion-fast)] [transition-timing-function:var(--motion-ease-out)] placeholder:text-muted-foreground/50 motion-reduce:transition-none"
+        role="combobox"
+        aria-label={t('market.searchInputPlaceholder')}
+        aria-autocomplete="list"
+        aria-expanded={Boolean(open && query.trim())}
+        aria-controls={open && query.trim() ? listId : undefined}
+        aria-activedescendant={open && query.trim() && results[highlight] ? `${listId}-${highlight}` : undefined}
+        className="oa-field-control w-full rounded-full border border-input bg-background px-5 py-3 text-base leading-6 outline-none transition-[border-color,box-shadow] duration-[var(--motion-fast)] [transition-timing-function:var(--motion-ease-out)] placeholder:text-muted-foreground motion-reduce:transition-none"
         placeholder={t('market.searchInputPlaceholder')}
         value={query}
         onChange={(e) => { setQuery(e.target.value); setOpen(true) }}
@@ -85,19 +87,25 @@ export function SearchBox() {
         onKeyDown={onKey}
       />
       {open && query.trim() && (
-        <div className="absolute z-20 mt-1 max-h-[360px] w-full overflow-y-auto rounded-xl border border-border bg-popover py-1 shadow-md">
+        <div id={listId} role="listbox" aria-label={t('market.searchInputPlaceholder')} className="oa-popover-enter absolute z-20 mt-1 max-h-[360px] w-full overflow-y-auto rounded-xl border border-border bg-popover py-1 shadow-md">
           {loading && results.length === 0 && (
-            <div className="px-3 py-2 text-[13px] text-muted-foreground">{t('market.searching')}</div>
+            <div className="px-3 py-2 text-sm text-muted-foreground">{t('market.searching')}</div>
           )}
           {!loading && results.length === 0 && (
-            <div className="px-3 py-2 text-[13px] text-muted-foreground">{t('market.noMatches')}</div>
+            <div className="px-3 py-2 text-sm text-muted-foreground">{t('market.noMatches')}</div>
           )}
           {results.map((r, i) => (
             <button
               key={r.barId}
+              id={`${listId}-${i}`}
+              type="button"
+              role="option"
+              aria-selected={i === highlight}
+              tabIndex={-1}
+              onMouseDown={(event) => event.preventDefault()}
               onClick={() => handleSelect(r)}
               onMouseEnter={() => setHighlight(i)}
-              className={`flex w-full cursor-pointer items-center gap-2 px-3 py-2 text-left text-[13px] leading-[18px] ${
+              className={`flex w-full cursor-pointer items-center gap-2 px-3 py-2 text-left text-sm leading-5 ${
                 i === highlight ? 'bg-muted' : ''
               }`}
             >
@@ -106,13 +114,13 @@ export function SearchBox() {
                 <span className="text-muted-foreground truncate flex-1 min-w-0">— {r.name}</span>
               )}
               {/* Explicit provider — this is how same-symbol sources are disambiguated. */}
-              <span className="ml-auto flex shrink-0 items-center gap-1.5 text-[11px] leading-[15px] text-muted-foreground">
+              <span className="ml-auto flex shrink-0 items-center gap-1.5 text-sm leading-5 text-muted-foreground">
                 <span className="font-medium text-foreground/80">{r.sourceId}</span>
                 {r.barCapability && (
                   <span className={CAPABILITY_COLOR[r.barCapability] ?? 'text-muted-foreground'}>{r.barCapability}</span>
                 )}
               </span>
-              <span className={`shrink-0 rounded-sm px-1.5 py-0.5 text-[10px] leading-[14px] font-medium ${ASSET_CLASS_COLORS[r.assetClass] ?? ASSET_CLASS_COLORS.unknown}`}>
+              <span className={`shrink-0 rounded-sm px-1.5 py-0.5 text-sm leading-5 font-medium ${ASSET_CLASS_COLORS[r.assetClass] ?? ASSET_CLASS_COLORS.unknown}`}>
                 {r.assetClass}
               </span>
             </button>

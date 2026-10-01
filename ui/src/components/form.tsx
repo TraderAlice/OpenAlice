@@ -4,7 +4,7 @@ import { ContextHelp } from './ContextHelp'
 // ==================== Shared class constants ====================
 
 export const inputClass =
-  'oa-field-control h-8 w-full min-w-0 rounded-md border border-input bg-background px-3 py-1.5 font-sans text-[13px] leading-[18px] text-foreground outline-none transition-[border-color,background-color,box-shadow] duration-[var(--motion-fast)] [transition-timing-function:var(--motion-ease-out)] placeholder:text-muted-foreground motion-reduce:transition-none disabled:cursor-not-allowed disabled:bg-input/50 disabled:opacity-50'
+  'oa-field-control h-11 w-full min-w-0 rounded-lg border border-input bg-background px-4 py-2 font-sans text-base leading-6 text-foreground outline-none transition-[border-color,background-color,box-shadow] duration-[var(--motion-fast)] [transition-timing-function:var(--motion-ease-out)] placeholder:text-muted-foreground motion-reduce:transition-none disabled:cursor-not-allowed disabled:bg-input/50 disabled:opacity-50'
 
 // ==================== Settings scroll area ====================
 
@@ -42,10 +42,10 @@ interface SectionProps {
 
 export function Section({ id, title, description, children }: SectionProps) {
   return (
-    <section id={id} className="border-b border-border/60 py-5 last:border-b-0">
-      <h3 className="text-[14px] leading-[19px] font-semibold text-foreground">{title}</h3>
+    <section id={id} className="oa-config-section rounded-2xl bg-secondary p-5 sm:p-6">
+      <h3 className="text-lg leading-6 font-semibold text-foreground">{title}</h3>
       {description && (
-        <p className="mt-1 max-w-2xl text-[12px] leading-5 text-muted-foreground">{description}</p>
+        <p className="mt-1 max-w-2xl text-sm leading-5 text-muted-foreground">{description}</p>
       )}
       <div className="mt-4">{children}</div>
     </section>
@@ -81,14 +81,14 @@ export function ConfigSection({
     <section
       id={id}
       aria-labelledby={titleId}
-      className={`min-w-0 border-b border-border/60 py-5 last:border-b-0 ${className}`}
+      className={`oa-config-section min-w-0 rounded-2xl bg-secondary p-5 sm:p-6 ${className}`}
     >
-      <div className={`min-w-0 ${children ? 'mb-3' : ''}`}>
+      <div className={`min-w-0 ${children ? 'mb-5' : ''}`}>
         <div className="flex min-h-6 min-w-0 items-center gap-2">
           <h3
             id={titleId}
             tabIndex={focusableTitle ? -1 : undefined}
-            className={`text-[14px] font-semibold text-foreground ${focusableTitle
+            className={`text-lg font-semibold text-foreground ${focusableTitle
               ? 'w-fit rounded-sm outline-none focus-visible:[box-shadow:var(--oa-focus-shadow)]'
               : ''
             }`}
@@ -99,7 +99,7 @@ export function ConfigSection({
           {accessory && <div className="ml-auto flex shrink-0 items-center gap-2">{accessory}</div>}
         </div>
         {description && (
-          <p className="mt-1 max-w-2xl text-[12px] leading-5 text-muted-foreground">{description}</p>
+          <p className="mt-1 max-w-2xl text-sm leading-5 text-muted-foreground">{description}</p>
         )}
       </div>
       {children && <div className="min-w-0">{children}</div>}
@@ -128,13 +128,13 @@ export function Field({
     <div className="mb-3.5 last:mb-0">
       <label
         htmlFor={controlId}
-        className="block text-[13px] text-foreground mb-1.5 font-medium"
+        className="block text-sm text-foreground mb-1.5 font-medium"
       >
         {label}
       </label>
       {children}
       {description && (
-        <p id={descriptionId} className="mt-1 text-[12px] leading-5 text-muted-foreground">
+        <p id={descriptionId} className="mt-1 text-sm leading-5 text-muted-foreground">
           {description}
         </p>
       )}

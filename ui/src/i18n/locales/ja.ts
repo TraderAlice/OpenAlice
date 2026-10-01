@@ -3,96 +3,6 @@ import type { Resources } from './en'
 
 /** 日本語. Typed as `Resources` → must match en's key structure exactly. */
 export const ja: Resources = {
-  motionLab: {
-    "title": "モーションライブラリ",
-    "description": "共通コンポーネント、実際の操作とプロジェクトのソース。",
-    "pause": "動きを停止",
-    "play": "動きを有効化",
-    "viewSource": "ソースを表示：{{name}}",
-    "sourceDescription": "OpenAlice で使用するコンポーネントの実装とスタイル。",
-    "copy": "ソースをコピー",
-    "copied": "コピー済み",
-    "copyError": "コピーできませんでした。ソースを選択してコピーしてください。",
-    "sourceError": "ソースを読み込めませんでした。再試行してください。",
-    "celebrate": "お祝い",
-    "tryAction": "操作を実行",
-    "complete": "完了",
-    "loading": "読み込み",
-    "error": "失敗",
-    "reset": "リセット",
-    "reveal": "画像を表示",
-    "openImage": "画像を拡大",
-    "closeImage": "画像を縮小",
-    "imageAlt": "山のカラマツ",
-    "drop": "画像を配置",
-    "dropTarget": "画像の配置先",
-    "create": "作成",
-    "file": "ファイル",
-    "image": "画像",
-    "folder": "フォルダー",
-    "preview": "プレビュー",
-    "clear": "画像を消散",
-    "completeCount": "{{count}} 回完了",
-    "selected": "選択：{{name}}",
-    "idle": "準備完了",
-    "fast": "操作応答",
-    "standard": "状態切り替え",
-    "slow": "強調",
-    "gradientLabel": "OpenAlice",
-    "exampleCount": "{{count}} 個のコンポーネント",
-    "tokens": "共通時間",
-    "sourceVariants": "ソースファイル",
-    "imageState": "画像の状態",
-    "statusState": "操作の状態",
-    "nameInput": "グラデーション文字",
-    "galleryLabel": "トランジションの演習",
-    "examples": {
-      "card-stack": {
-        "name": "カードスタック",
-        "description": "ホバーとキーボードフォーカスでカードを展開。"
-      },
-      "confetti": {
-        "name": "紙吹雪",
-        "description": "粒子数を制限して操作を祝福。"
-      },
-      "drop-interaction": {
-        "name": "ドラッグと配置",
-        "description": "ポインターとキーボードで画像を配置。"
-      },
-      "highlight-button": {
-        "name": "強調ボタン",
-        "description": "柔らかな光で操作を強調。"
-      },
-      "create-menu": {
-        "name": "流体メニュー",
-        "description": "三つの操作を同じ起点から展開。"
-      },
-      "loading-image": {
-        "name": "画像プレースホルダー",
-        "description": "点の模様から読み込み済みの画像へ。"
-      },
-      "tilting-image": {
-        "name": "画像の傾き",
-        "description": "元の位置から画像を拡大。"
-      },
-      "shimmer-tile": {
-        "name": "光の流れ",
-        "description": "光の帯が表面を移動。"
-      },
-      "gradient-text": {
-        "name": "グラデーション文字",
-        "description": "選択可能な文字に色が流れる。"
-      },
-      "dissolve-effect": {
-        "name": "煙の消散",
-        "description": "画像が消散して戻り、繰り返し操作。"
-      },
-      "status-indicator": {
-        "name": "状態の変形",
-        "description": "読み込み、完了、失敗を同じ寸法で表示。"
-      }
-    }
-  },
 
   activityPreferences: en.activityPreferences,
 
@@ -1188,6 +1098,8 @@ export const ja: Resources = {
       quickAccessDescription: 'Session の作成に成功すると、そのランタイムが自動で先頭に移動します。この一覧は最近の履歴に続くフォールバック順です。未インストールのランタイムは自動では入りません。',
       quickAccessCount: '{{limit}} 件中 {{count}} 件をピン留め',
       catalogCount: 'ランタイム {{count}} 件',
+      catalogCount_one: 'ランタイム {{count}} 件',
+      catalogCount_other: 'ランタイム {{count}} 件',
       quickAccessEmpty: 'まだピン留めがありません。下のカタログから最大 4 件追加できます。',
       catalog: '検出されたランタイム',
       catalogDescription: 'インストール状態はこのマシンで調べます。設定としては保存しません。',
@@ -2072,12 +1984,12 @@ export const ja: Resources = {
       'broker-classic': 'TWS に着想を得た高密度な取引画面',
     },
     palette: {
-      codex: 'Codex',
+      codex: 'Alice',
       paper: 'ペーパー', porcelain: 'ポーセリン', linen: 'リネン', 'windows-classic': 'Windows クラシック',
       graphite: 'グラファイト', midnight: 'ミッドナイト', moss: 'モス', iris: 'アイリス',
     },
     paletteDescription: {
-      codex: '白とニュートラルなクールグレー',
+      codex: '白、フォレスト、ライムの操作色',
       paper: '温かみのある編集向け中間色',
       porcelain: '涼しく鮮明なワークスペース',
       linen: 'オート麦色、墨色、テラコッタ',

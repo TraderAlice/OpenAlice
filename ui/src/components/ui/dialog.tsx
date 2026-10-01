@@ -29,7 +29,7 @@ function DialogOverlay({
     <DialogPrimitive.Backdrop
       data-slot="dialog-overlay"
       className={cn(
-        "fixed inset-0 isolate z-50 bg-backdrop supports-backdrop-filter:backdrop-blur-xs transition-opacity duration-[var(--motion-standard)] [transition-timing-function:var(--motion-ease-standard)] data-starting-style:opacity-0 data-ending-style:opacity-0 data-ending-style:duration-[var(--motion-fast)] data-instant:transition-none motion-reduce:transition-none",
+        "fixed inset-0 isolate z-50 bg-backdrop transition-opacity duration-[var(--motion-standard)] [transition-timing-function:var(--motion-ease-standard)] data-starting-style:opacity-0 data-ending-style:opacity-0 data-ending-style:duration-[var(--motion-fast)] data-instant:transition-none motion-reduce:transition-none",
         className
       )}
       {...props}
@@ -63,7 +63,8 @@ function DialogContent({
       <DialogPrimitive.Popup
         data-slot="dialog-content"
         className={cn(
-          "fixed top-1/2 left-1/2 z-50 grid w-full max-w-[calc(100%-2rem)] -translate-x-1/2 -translate-y-1/2 gap-4 rounded-2xl bg-popover p-4 text-sm text-popover-foreground shadow-lg ring-1 ring-foreground/10 outline-none transition-[opacity,scale] duration-[var(--motion-standard)] [transition-timing-function:var(--motion-ease-out)] data-starting-style:scale-[.98] data-starting-style:opacity-0 data-ending-style:scale-[.99] data-ending-style:opacity-0 data-ending-style:duration-[var(--motion-fast)] data-instant:transition-none motion-reduce:transition-none sm:max-w-sm",
+          "fixed top-1/2 left-1/2 z-50 grid w-full max-w-[calc(100%-2rem)] -translate-x-1/2 -translate-y-1/2 gap-5 rounded-2xl bg-popover p-6 text-sm text-popover-foreground shadow-md outline-none transition-[opacity,scale] duration-[var(--motion-standard)] [transition-timing-function:var(--motion-ease-out)] data-starting-style:scale-[.98] data-starting-style:opacity-0 data-ending-style:scale-[.99] data-ending-style:opacity-0 data-ending-style:duration-[var(--motion-fast)] data-instant:transition-none motion-reduce:transition-none sm:max-w-sm",
+          showCloseButton && "[&_[data-slot=dialog-header]]:pr-10",
           className
         )}
         {...props}
@@ -75,7 +76,7 @@ function DialogContent({
             render={
               <Button
                 variant="ghost"
-                className={cn("absolute top-2 right-2", closeButtonClassName)}
+                className={cn("absolute top-4 right-4", closeButtonClassName)}
                 size="icon-sm"
               />
             }
@@ -112,7 +113,7 @@ function DialogFooter({
     <div
       data-slot="dialog-footer"
       className={cn(
-        "-mx-4 -mb-4 flex flex-col-reverse gap-2 rounded-b-2xl border-t bg-muted/50 p-4 sm:flex-row sm:justify-end",
+        "-mx-6 -mb-6 flex flex-col-reverse gap-3 rounded-b-2xl bg-secondary p-6 sm:flex-row sm:justify-end",
         className
       )}
       {...props}
@@ -132,7 +133,7 @@ function DialogTitle({ className, ...props }: DialogPrimitive.Title.Props) {
     <DialogPrimitive.Title
       data-slot="dialog-title"
       className={cn(
-        "text-base leading-none font-medium",
+        "text-[22px] leading-[28px] font-semibold tracking-[-0.018em]",
         className
       )}
       {...props}

@@ -1,12 +1,9 @@
-import { lazy, Suspense, useState } from 'react'
-import { Skeleton } from '../components/StateViews'
+import { useState } from 'react'
 import { CheckCircle2, CircleAlert, Inbox, LoaderCircle, Newspaper } from 'lucide-react'
 
 import { agentRuntimeLogApi } from '../api/agentRuntimeLog'
 import { Button } from '../components/ui/button'
 import { GLOBAL_ACTIVITY_REFRESH_EVENT } from '../hooks/useGlobalAgentActivity'
-
-const MotionGallery = lazy(() => import('../components/motion/MotionGallery'))
 
 type TestState = 'running' | 'success' | 'error'
 type ProductTestFamily = 'inbox' | 'news'
@@ -80,8 +77,6 @@ export function FrontendLabPage() {
             Exercise shared UI feedback through the real application event pipeline.
           </p>
         </div>
-
-        <Suspense fallback={<Skeleton className="h-72 w-full" />}><MotionGallery /></Suspense>
 
         <section className="overflow-hidden rounded-lg border border-border bg-secondary/35">
           <div className="border-b border-border px-4 py-3">

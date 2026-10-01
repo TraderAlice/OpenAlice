@@ -19,7 +19,6 @@ import { orderSessionsForSidebar, orderWorkspacesForSidebar, workspaceActivityMs
 import { useReorderMotion } from './useReorderMotion';
 import { SidebarActionMenu } from './SidebarActionMenu';
 import { AgentRuntimeIcon } from '../../lib/agentRuntimeIcon';
-import { SelectionIndicator } from '../SelectionIndicator';
 import { projectHeadlessTaskPresentation } from './headless-task-presentation';
 import { Button } from '../ui/button';
 import { SidebarRow } from '../SidebarRow';
@@ -386,7 +385,6 @@ export function WorkspaceRow(props: WorkspaceRowProps): ReactElement {
           isSelected ? 'bg-sidebar-accent text-sidebar-accent-foreground' : 'text-foreground hover:bg-sidebar-accent/65'
         }`}
       >
-        {isSelected && <SelectionIndicator />}
         <button
           type="button"
           onClick={() => props.onSelectWorkspace(w.id)}

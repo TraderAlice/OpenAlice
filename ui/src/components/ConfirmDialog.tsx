@@ -85,17 +85,17 @@ export function ConfirmDialog({
           ? fallbackFocusRef.current
           : restoreFocusRef.current?.isConnected ? restoreFocusRef.current : fallbackFocusRef?.current ?? false}
       >
-        <div className="border-b border-border px-5 py-4">
-          <AlertDialogTitle className="text-[15px] font-semibold">
+        <div className="px-6 pt-6 pb-3">
+          <AlertDialogTitle className="text-[22px] leading-7 font-semibold">
             {title}
           </AlertDialogTitle>
         </div>
         <AlertDialogDescription
-          render={<div className="px-5 py-4 text-[13px] leading-relaxed text-foreground" />}
+          render={<div className="px-6 pb-6 text-sm leading-relaxed text-foreground" />}
         >
           {message}
         </AlertDialogDescription>
-        <div className="flex justify-end gap-2 border-t border-border px-5 py-3">
+        <div className="flex justify-end gap-3 bg-secondary px-6 py-5">
           <AlertDialogCancel ref={cancelRef} className="btn-secondary" disabled={busy}>
             {cancelLabel}
           </AlertDialogCancel>

@@ -10,7 +10,6 @@ import { SidebarSectionHeader } from './SidebarSectionHeader'
 import { SidebarRowsSkeleton } from './StateViews'
 import type { EntityListItem } from '../api/entities'
 import type { ViewSpec } from '../tabs/types'
-import { SelectionIndicator } from './SelectionIndicator'
 
 /**
  * Tracked sidebar — the watchlist. Global assets/topics and Workspace-owned
@@ -224,7 +223,6 @@ function TrackedEntityRow({
           : 'text-muted-foreground hover:bg-accent hover:text-foreground focus-visible:bg-accent'
       }`}
     >
-      {active && <SelectionIndicator />}
       <span
         className="flex h-5 w-5 items-center justify-center text-muted-foreground/70 transition-colors group-hover:text-foreground"
         aria-hidden
@@ -285,7 +283,6 @@ function TrackedIssueRow({
           : 'text-muted-foreground hover:bg-accent hover:text-foreground focus-visible:bg-accent'
       }`}
     >
-      {active && <SelectionIndicator />}
       <span
         className="flex h-5 w-5 items-center justify-center text-muted-foreground/70 transition-colors group-hover:text-foreground"
         aria-hidden

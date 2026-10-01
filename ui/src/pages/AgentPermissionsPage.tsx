@@ -145,13 +145,13 @@ function TradingModeSection() {
           )
         })}
       </div>
-      <div className="mt-3 text-[11px] leading-relaxed text-muted-foreground/70">
+      <div className="mt-3 text-sm leading-relaxed text-muted-foreground/70">
         {status.envLocked
           ? t('settings.agentPermissions.mode.envLocked')
           : t('settings.agentPermissions.mode.source', { source: status.modeSource })}
       </div>
       {error && (
-        <div role="alert" className="mt-2 rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-[12px] text-destructive leading-relaxed">
+        <div role="alert" className="mt-2 rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive leading-relaxed">
           {error}
         </div>
       )}
@@ -210,7 +210,7 @@ function AiTradingToggle({
       <div className="flex min-h-12 items-center justify-between gap-4 py-1">
         <div className="min-w-0 flex-1">
           <span className="text-sm font-medium text-foreground">{t('settings.agent.allowAiTrading')}</span>
-          <p className="text-[12px] text-muted-foreground mt-0.5 leading-relaxed">
+          <p className="text-sm text-muted-foreground mt-0.5 leading-relaxed">
             {enabled ? t('settings.agent.allowAiTradingOn') : t('settings.agent.allowAiTradingOff')}
           </p>
         </div>
@@ -223,12 +223,12 @@ function AiTradingToggle({
       </div>
       {saveError && !confirming && <p role="alert" className="mt-2 text-sm text-destructive">{t('common.saveFailed')}</p>}
       {enabled && (
-        <div className="mt-2 rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-[12px] text-destructive leading-relaxed">
+        <div className="mt-2 rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive leading-relaxed">
           {t('settings.agent.allowAiTradingWarning')}
         </div>
       )}
       {enabled && mode !== 'pro' && (
-        <div className="mt-2 rounded-md border border-warning/30 bg-warning/5 px-3 py-2 text-[12px] text-muted-foreground leading-relaxed">
+        <div className="mt-2 rounded-md border border-warning/30 bg-warning/5 px-3 py-2 text-sm text-muted-foreground leading-relaxed">
           {t('settings.agentPermissions.aiPush.proOnly')}
         </div>
       )}

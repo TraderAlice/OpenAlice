@@ -13,96 +13,6 @@
  */
 
 export const en = {
-  motionLab: {
-    "title": "Motion library",
-    "description": "Shared components with live interactions and project source.",
-    "pause": "Pause motion",
-    "play": "Enable motion",
-    "viewSource": "View source: {{name}}",
-    "sourceDescription": "Component implementation and styles used by OpenAlice.",
-    "copy": "Copy source",
-    "copied": "Copied",
-    "copyError": "Copy failed. Select the source text to copy it.",
-    "sourceError": "Source could not be loaded. Try again.",
-    "celebrate": "Celebrate",
-    "tryAction": "Try action",
-    "complete": "Complete",
-    "loading": "Loading",
-    "error": "Failure",
-    "reset": "Reset",
-    "reveal": "Reveal image",
-    "openImage": "Expand image",
-    "closeImage": "Collapse image",
-    "imageAlt": "Larch trees in a mountain landscape",
-    "drop": "Place image",
-    "dropTarget": "Image target",
-    "create": "Create",
-    "file": "File",
-    "image": "Image",
-    "folder": "Folder",
-    "preview": "Preview",
-    "clear": "Dissolve image",
-    "completeCount": "Completed: {{count}}",
-    "selected": "Selected: {{name}}",
-    "idle": "Ready",
-    "fast": "Feedback",
-    "standard": "Transition",
-    "slow": "Emphasis",
-    "gradientLabel": "OpenAlice",
-    "exampleCount": "{{count}} components",
-    "tokens": "Shared timing",
-    "sourceVariants": "Source files",
-    "imageState": "Image state",
-    "statusState": "Status state",
-    "nameInput": "Gradient text",
-    "galleryLabel": "Transition exercises",
-    "examples": {
-      "card-stack": {
-        "name": "Card stack",
-        "description": "Hover and focus reveal a collection."
-      },
-      "confetti": {
-        "name": "Confetti",
-        "description": "Bounded particles celebrate an explicit action."
-      },
-      "drop-interaction": {
-        "name": "Drag and drop",
-        "description": "Pointer and keyboard place an image in a target."
-      },
-      "highlight-button": {
-        "name": "Highlight button",
-        "description": "A subtle rim gives one action emphasis."
-      },
-      "create-menu": {
-        "name": "Gooey menu",
-        "description": "Three actions share one fluid origin."
-      },
-      "loading-image": {
-        "name": "Image placeholder",
-        "description": "A dot field hands over to a decoded image."
-      },
-      "tilting-image": {
-        "name": "Image tilt",
-        "description": "The image expands from its original position."
-      },
-      "shimmer-tile": {
-        "name": "Organic shimmer",
-        "description": "A controlled light band moves across a surface."
-      },
-      "gradient-text": {
-        "name": "Gradient text",
-        "description": "Colour travels through selectable text."
-      },
-      "dissolve-effect": {
-        "name": "Smoky dissolve",
-        "description": "An image disperses, then returns for another exercise."
-      },
-      "status-indicator": {
-        "name": "Status morph",
-        "description": "Loading, completion and failure share one footprint."
-      }
-    }
-  },
 
   activityPreferences: {
     title: 'Activity notifications', description: 'Filter activity announcements. Your activity history stays complete.',
@@ -1206,6 +1116,8 @@ export const en = {
       quickAccessDescription: 'Successful Session launches move their runtime to the front automatically. Use this list as the fallback order behind that recent history. Uninstalled runtimes never auto-fill.',
       quickAccessCount: '{{count}} of {{limit}} pinned',
       catalogCount: '{{count}} runtimes',
+      catalogCount_one: '{{count}} runtime',
+      catalogCount_other: '{{count}} runtimes',
       quickAccessEmpty: 'No pinned runtimes yet. Add up to four from the catalog below.',
       catalog: 'Discovered runtimes',
       catalogDescription: 'Installation state is probed on this machine. It is never stored as a preference.',
@@ -2111,17 +2023,17 @@ export const en = {
       'broker-classic': 'Dense TWS-inspired trading workstation',
     },
     palette: {
-      codex: 'Codex',
+      codex: 'Alice',
       paper: 'Paper', porcelain: 'Porcelain', linen: 'Linen', 'windows-classic': 'Windows Classic',
       graphite: 'Graphite', midnight: 'Midnight', moss: 'Moss', iris: 'Iris',
     },
     paletteDescription: {
-      codex: 'Clean white with cool neutral grays',
+      codex: 'White, forest ink, and lime actions',
       paper: 'Warm, editorial neutrals',
       porcelain: 'Cool, crisp workspace',
       linen: 'Oat, ink, and terracotta',
       'windows-classic': 'System silver with navy selection',
-      graphite: 'Neutral low-glare dark',
+      graphite: 'Deep forest with lime actions',
       midnight: 'Deep blue night palette',
       moss: 'Forest ink with soft amber',
       iris: 'Violet dusk with cool cyan',

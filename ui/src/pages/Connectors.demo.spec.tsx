@@ -323,7 +323,7 @@ describe('Connector demo routes', () => {
     expect(within(card).getByText('Start Discord')).toBeTruthy()
     const details = within(card).getByRole('button', { name: 'Discord setup details' })
     expect(details.className).toContain('bg-background/50')
-    expect(details.className).not.toContain('bg-primary text-primary-foreground')
+    expect(details.className).not.toContain('bg-action text-action-foreground')
   })
 
   it('shows linked startup progress without offering a premature reconnect', async () => {
@@ -470,8 +470,8 @@ describe('Connector demo routes', () => {
     expect(appToken.required).toBe(true)
     const initialHint = within(dialog).getByText('Still needed: Bot token, App-level token.')
     expect(saveConnection.getAttribute('aria-describedby')).toBe(initialHint.id)
-    expect(botToken.className).toContain('h-8')
-    expect(appToken.className).toContain('h-8')
+    expect(botToken.className).toContain('h-11')
+    expect(appToken.className).toContain('h-11')
     draftToggles.forEach((button) => expect(button.className).toContain('min-w-10'))
     setupLinks.forEach((link) => expect(link.className).toContain('h-8'))
     expect(setupLinks[0].closest('[data-connector-setup-links]')).toBeTruthy()

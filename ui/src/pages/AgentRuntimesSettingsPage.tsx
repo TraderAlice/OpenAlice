@@ -150,7 +150,7 @@ export function AgentRuntimesSettingsPage() {
       <SettingsScrollArea className="px-4 py-5 md:px-8">
         <div className="mx-auto max-w-[880px]">
           {error && (
-            <p role="alert" className="mb-4 rounded-lg border border-destructive/40 bg-destructive/5 px-3 py-2 text-[12px] text-destructive">
+            <p role="alert" className="mb-4 rounded-lg border border-destructive/40 bg-destructive/5 px-3 py-2 text-sm text-destructive">
               {error}
             </p>
           )}
@@ -162,16 +162,16 @@ export function AgentRuntimesSettingsPage() {
             {pinned.length === 0 ? (
               <p className="py-2 text-xs text-muted-foreground">{t('settings.agentRuntimes.quickAccessEmpty')}</p>
             ) : (
-              <ol className="overflow-hidden rounded-lg border border-border/70 bg-background">
+              <ol className="overflow-hidden rounded-xl bg-background">
                 {pinned.map((agent, index) => {
                   return (
                     <li
                       key={agent.id}
                       className="flex min-h-12 min-w-0 items-center gap-2 border-b border-border/60 px-3 py-2 last:border-b-0"
                     >
-                      <span className="w-5 shrink-0 text-[11px] leading-[15px] tabular-nums text-muted-foreground">{index + 1}</span>
+                      <span className="w-5 shrink-0 text-sm leading-5 tabular-nums text-muted-foreground">{index + 1}</span>
                       <AgentRuntimeIcon agentId={agent.id} className="size-4 shrink-0" />
-                      <span className="min-w-0 flex-1 truncate text-[13px] leading-[18px] font-medium">{agent.displayName}</span>
+                      <span className="min-w-0 flex-1 truncate text-sm leading-5 font-medium">{agent.displayName}</span>
                       <div className="flex shrink-0 items-center gap-1">
                         <Button
                           variant="ghost"
@@ -213,14 +213,14 @@ export function AgentRuntimesSettingsPage() {
             accessory={<CountBadge count={visible.length} label={t('settings.agentRuntimes.catalogCount', { count: visible.length })} />}
           >
             <label className="relative mb-3 block">
-              <Search aria-hidden className="pointer-events-none absolute left-3 top-2 size-4 text-muted-foreground" />
+              <Search aria-hidden className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
               <input
                 type="search"
                 value={query}
                 onChange={(event) => setQuery(event.target.value)}
                 placeholder={t('settings.agentRuntimes.search')}
                 aria-label={t('settings.agentRuntimes.search')}
-                className={`${inputClass} pl-9`}
+                className={`${inputClass} pl-11`}
               />
             </label>
             {visible.length === 0 ? (
@@ -231,7 +231,7 @@ export function AgentRuntimesSettingsPage() {
                 />
               </div>
             ) : (
-              <div className="overflow-hidden rounded-lg border border-border/70 bg-background">
+              <div className="overflow-hidden rounded-xl bg-background">
                 {visible.map((agent) => (
                   <RuntimeSettingsCard
                     key={agent.id}
@@ -282,47 +282,18 @@ function RuntimeSettingsCard({
 
   return (
     <article className="min-w-0 border-b border-border/60 px-3 last:border-b-0 sm:px-4">
-      <div className="flex min-w-0 items-start gap-3">
-        <Collapsible className="min-w-0 flex-1">
-          <CollapsibleTrigger className="group/runtime flex min-h-14 w-full cursor-pointer items-center gap-3 rounded-md text-left outline-none focus-visible:[box-shadow:var(--oa-focus-shadow)]">
-            <AgentRuntimeIcon agentId={agent.id} className="size-5 shrink-0" />
-            <span className="min-w-0 flex-1">
-              <span className="block truncate text-[13px] font-semibold">{agent.displayName}</span>
-              <span className={`block text-[11px] leading-4 ${needsAttention ? 'text-warning' : 'text-muted-foreground'}`}>
-                {t(agentRuntimeSettingsStatusKey(row))}
-              </span>
+      <Collapsible className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-start gap-x-3">
+        <CollapsibleTrigger className="group/runtime flex min-h-[72px] w-full cursor-pointer items-center gap-3 rounded-md text-left outline-none focus-visible:[box-shadow:var(--oa-focus-shadow)]">
+          <AgentRuntimeIcon agentId={agent.id} className="size-7 shrink-0" />
+          <span className="min-w-0 flex-1">
+            <span className="block truncate text-base font-semibold">{agent.displayName}</span>
+            <span className={`block text-sm leading-5 ${needsAttention ? 'text-warning' : 'text-muted-foreground'}`}>
+              {t(agentRuntimeSettingsStatusKey(row))}
             </span>
-            <ChevronDown aria-hidden className="size-3.5 shrink-0 text-muted-foreground transition-transform duration-[var(--motion-fast)] group-data-panel-open/runtime:rotate-180 motion-reduce:transition-none" />
-          </CollapsibleTrigger>
-          <CollapsibleContent keepMounted>
-            <div className="space-y-2 pb-4 pl-8 text-xs leading-5 text-muted-foreground">
-              <p>{installed ? t('settings.agentRuntimes.installed') : t('settings.agentRuntimes.notInstalled')}</p>
-              <p className="break-all font-mono text-[11px]">{binPath ?? t('settings.agentRuntimes.unknownPath')}</p>
-              {row?.message && <p>{row.message}</p>}
-              {agent.id in RUNTIME_COPY && (
-                <dl className="grid gap-3 md:grid-cols-2">
-                  <div>
-                    <dt className="mb-1 font-medium text-foreground">{t('settings.agentRuntimes.models')}</dt>
-                    <dd>{t(RUNTIME_COPY[agent.id as keyof typeof RUNTIME_COPY].models)}</dd>
-                  </div>
-                  <div>
-                    <dt className="mb-1 font-medium text-foreground">{t('settings.agentRuntimes.auth')}</dt>
-                    <dd>{t(RUNTIME_COPY[agent.id as keyof typeof RUNTIME_COPY].auth)}</dd>
-                  </div>
-                </dl>
-              )}
-              {!installed && hint && (
-                <p>
-                  {hint.cmd && <span className="mr-2 break-all font-mono">{hint.cmd}</span>}
-                  <a href={hint.url} target="_blank" rel="noreferrer" className="text-primary underline underline-offset-4">
-                    {t('settings.agentRuntimes.installDocs')}
-                  </a>
-                </p>
-              )}
-            </div>
-          </CollapsibleContent>
-        </Collapsible>
-        <div className="flex min-h-14 shrink-0 items-center gap-3">
+          </span>
+          <ChevronDown aria-hidden className="size-3.5 shrink-0 text-muted-foreground transition-transform duration-[var(--motion-fast)] group-data-panel-open/runtime:rotate-180 motion-reduce:transition-none" />
+        </CollapsibleTrigger>
+        <div className="flex min-h-[72px] shrink-0 items-center gap-3">
           <Button
             variant="ghost"
             size="icon-sm"
@@ -349,7 +320,34 @@ function RuntimeSettingsCard({
             onChange={() => onTogglePin()}
           />
         </div>
-      </div>
+        <CollapsibleContent keepMounted className="col-span-2">
+          <div className="space-y-2 pb-5 pt-1 sm:pl-10 text-sm leading-5 text-muted-foreground">
+            <p>{installed ? t('settings.agentRuntimes.installed') : t('settings.agentRuntimes.notInstalled')}</p>
+            <p className="break-all font-mono text-sm">{binPath ?? t('settings.agentRuntimes.unknownPath')}</p>
+            {row?.message && <p>{row.message}</p>}
+            {agent.id in RUNTIME_COPY && (
+              <dl className="grid gap-3 md:grid-cols-2">
+                <div>
+                  <dt className="mb-1 font-medium text-foreground">{t('settings.agentRuntimes.models')}</dt>
+                  <dd>{t(RUNTIME_COPY[agent.id as keyof typeof RUNTIME_COPY].models)}</dd>
+                </div>
+                <div>
+                  <dt className="mb-1 font-medium text-foreground">{t('settings.agentRuntimes.auth')}</dt>
+                  <dd>{t(RUNTIME_COPY[agent.id as keyof typeof RUNTIME_COPY].auth)}</dd>
+                </div>
+              </dl>
+            )}
+            {!installed && hint && (
+              <p>
+                {hint.cmd && <span className="mr-2 break-all font-mono">{hint.cmd}</span>}
+                <a href={hint.url} target="_blank" rel="noreferrer" className="text-primary underline underline-offset-4">
+                  {t('settings.agentRuntimes.installDocs')}
+                </a>
+              </p>
+            )}
+          </div>
+        </CollapsibleContent>
+      </Collapsible>
       {needsAttention && row.repairTarget && (
         <p className="pb-3 pl-8 text-xs leading-5 text-warning">{t(REPAIR_KEYS[row.repairTarget])}</p>
       )}

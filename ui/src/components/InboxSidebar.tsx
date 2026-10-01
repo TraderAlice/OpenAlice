@@ -23,7 +23,6 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from './ui/tooltip'
-import { SelectionIndicator } from './SelectionIndicator'
 import type { InboxEntry } from '../api/inbox'
 
 /**
@@ -391,7 +390,6 @@ function ClusterRow({
         active ? 'bg-muted' : 'hover:bg-muted/50'
       }`}
     >
-      {active && <SelectionIndicator />}
       <span
         aria-hidden
         className={`mt-[7px] shrink-0 w-1.5 h-1.5 rounded-full ${unread ? 'oa-inbox-unread-dot' : 'bg-transparent'}`}
@@ -495,7 +493,6 @@ function TimeRow({
         active ? 'bg-muted' : 'hover:bg-muted/50'
       }`}
     >
-      {active && <SelectionIndicator />}
 
       <div className="flex min-w-0 items-start gap-1.5">
         <span

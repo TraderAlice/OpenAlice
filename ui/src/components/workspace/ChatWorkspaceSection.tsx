@@ -78,7 +78,6 @@ import { RunningSessionGroup } from './RunningSessionGroup'
 import { useSessionBusyDialog } from './session-busy-store'
 import { Button } from '@/components/ui/button'
 import type { ChatDisplayMode } from './chat-display-mode'
-import { SelectionIndicator } from '../SelectionIndicator'
 import { HarnessNavigationGroup } from './HarnessNavigationGroup'
 import { HarnessWorkspaceEntry } from './HarnessWorkspaceEntry'
 
@@ -1219,7 +1218,6 @@ function ManagerWorkspaceRow(props: ManagerWorkspaceRowProps): ReactElement {
             : 'text-foreground hover:bg-sidebar-accent/65'
         }`}
       >
-        {props.isFocused && <SelectionIndicator />}
         <button
           type="button"
           onClick={() => setExpanded((current) => !current)}
@@ -1357,7 +1355,6 @@ function ChatWorkspaceRow(props: ChatWorkspaceRowProps): ReactElement {
           isSelected ? 'bg-sidebar-accent text-sidebar-accent-foreground' : 'text-foreground hover:bg-sidebar-accent/65'
         }`}
       >
-        {isSelected && <SelectionIndicator />}
         <button
           type="button"
           onClick={(e) => {

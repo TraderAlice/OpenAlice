@@ -7,34 +7,30 @@ under `ui/src/components/`.
 
 ## Product Intent
 
-OpenAlice is a working console, not a static report. Motion should make the
-interface feel responsive and help the eye retain context without turning live
-trading surfaces into ambient animation.
+OpenAlice presents working state, the next available action, and precise feedback.
+Shared components own visual geometry, interaction states, and motion.
 
-## Visual Language: Neutral Working Surface
+## Visual Language
 
-OpenAlice should feel like a calm professional desk: neutral,
-information-dense, precise, and operational. It is neither a generic admin
-dashboard nor a decorative consumer-finance app.
+The default light surface follows measurements from the public
+[Wise Business demo](https://wise.com/business-demo) and the clarity principles in
+[Wise Design](https://wise.design/brand). OpenAlice retains its product identity,
+financial semantics, and existing workflow contracts.
 
-Build hierarchy with typography, spacing, alignment, and thin separators before
-adding another container. One dominant surface should own a task; supporting
-information should recede without becoming illegible.
-
-- Use neutral surfaces and the existing theme tokens. Codex is the default Day
-  card (white content and cool-gray sidebar); Graphite remains the default Night
-  card. Paper remains available, and saved palette choices are preserved. Do not introduce
-  isolated hard-coded palettes.
-- Reserve blue for interaction and selection. Reserve green and red for
-  financial or safety meaning, and amber for warnings. Do not use semantic
-  colors as decoration.
-- Prefer restrained radii, borders, and tonal changes over nested cards,
-  floating glass panels, gradients, neon effects, or large ambient shadows.
-- Use tabular numerals for quantities, prices, percentages, and timestamps.
-  Use monospace selectively for identifiers, symbols, commands, and machine
-  output rather than for ordinary prose.
-- Keep copy direct and operational. Lead with the state or object, then the
-  explanation and next action.
+- `theme/palette.css` owns white surfaces, forest ink (`#163300`), primary action
+  lime (`#9FE870`), and secondary forest tint. `--action` owns filled controls;
+  `--primary` owns links and text. Saved palette identifiers remain stable.
+- Inter is served locally under the SIL Open Font License. Supporting copy uses
+  14px, fields use 16px, and page titles use 22px with a 1.25 line height.
+  Locale-specific fallback fonts retain the correct CJK glyph forms.
+- Main navigation uses a 48px target and 24px radius. Primary actions use 40px
+  capsules. Cards use a 26px radius and tonal separation. Touch targets use 44px.
+- Prices, percentages, counts, and timestamps use tabular numerals. Machine
+  identifiers and commands retain monospace. Selection checks use neutral ink.
+- Copy names the object, state, or operation. ContextHelp owns extended guidance.
+  Errors, consent, and recovery actions remain at the action boundary.
+- Financial movement and operational health retain their dedicated semantic
+  colors. Shared surfaces consume tokens across all saved palettes.
 
 News rows in `ui/src/pages/NewsPage.tsx` form a local-calendar-day timeline.
 Time stays in the left gutter. The headline is a separate, prominent block above
@@ -142,7 +138,7 @@ visible on touch devices; Quant and Prediction share its presentation.
 `SidebarChildRow` and `SidebarChildRowButton` own Harness child geometry for
 both Studio and Sessions: a 16px icon slot, 8px label gap, shared selection and
 keyboard focus, and sibling action controls. Expanded fine-pointer desktop rows
-are 30px tall with no additional per-destination vertical padding; other surfaces
+are 40px tall with no additional per-destination vertical padding; other surfaces
 retain the existing Session row density. Keep runtime behavior in the caller.
 Harness working views use one content top bar, not a second conversation sidebar.
 TerminalView has no card/canvas mode: its header always uses PageTopBar and its
@@ -779,7 +775,7 @@ the AI-power conversation, including approval, idle timeout and completion.
 
 ## Compact activity notifications
 
-The shared Sonner layer uses readable 352px pop-out cards, Instrument Sans,
+The shared Sonner layer uses readable 352px pop-out cards, Inter,
 semantic popover colors, internal close controls, bounded previews and actions
 below copy. News may include a 64×48 feed image, validated at the producer and
 renderer; missing/failed media collapses without a placeholder. Article identity,
@@ -810,25 +806,41 @@ inspection opens the existing read-only Session details when available, Office
 otherwise. No notification action automatically retries or takes over a runtime.
 
 
-## 共享动效组件
+## Shared Feedback and Motion
 
-`ui/src/components/motion/` 拥有 11 个交互组件及其样式。现有 Settings → Developer → Frontend 提供组件练习、暂停、重置与源码查看。`MotionGallery` 维护组件身份和实现路径，TypeScript 与 CSS 源码按当前组件延迟加载，复制操作使用当前已加载文件。
+`ui/src/theme/motion.css` owns the timing scale: 110ms for direct feedback,
+160ms for state changes, and 250ms for larger transitions. Base UI owns popup
+positioning, focus return, keyboard behavior, and mounted exit transitions.
+Frequent page navigation preserves the shell and updates content immediately.
 
-颜色由 `ui/src/theme/palette.css` 管理，装饰光谱使用同一颜色入口。时长、缓动、粒子数量和物理参数由 `ui/src/theme/motion.css` 管理。常规操作反馈使用 110ms，状态切换使用 160ms，重点过渡使用 250ms。共享弹层使用 Base UI 的定位、键盘操作、焦点返回和挂载生命周期。
+`SelectionCheckIcon` owns the fixed 16px neutral selection glyph.
+`StatusIndicator` owns loading, completion, and failure feedback for `StateViews`
+and `SaveIndicator`. `ConversationImagePreview` uses `LoadingImage` for a single
+pulsing placeholder, image decoding, and a stable-size fade. Failed loading
+provides an explicit retry. Continuous motion pauses offscreen and in hidden
+pages; reduced-motion preference removes looping and transition effects.
 
-选择标记由 `SelectionCheckIcon` 管理，采用固定 16px 画布与中性笔画。操作完成标记由 `StatusIndicator` 管理，使用状态颜色。`StateViews` 与 `SaveIndicator` 使用同一状态组件。骨架光带采用 transform 位移。`ConversationImagePreview` 使用 `LoadingImage`，以图片解码完成驱动显示，并提供错误状态与重试操作。
+`MeasuredText` uses the pinned Pretext 0.0.8 package. Prepared layouts are cached
+by text and typography. DOM content remains selectable. Local Inter is the
+measured font; width changes recompute line wrapping through the shared owner.
 
-`MeasuredText` 复用已固定的 Pretext 0.0.8。准备结果随文字、字体和排版参数缓存，宽度变化执行布局计算。DOM 保持可选择的正文，测量使用本地 Instrument Sans Variable。
+`SettingsArea` preserves navigation DOM, width, scroll position, and focus across
+category changes. Appearance, language, and market filters share `SegmentedControl`.
+`SaveIndicator` retains an empty idle slot to stabilize adjacent controls.
+`ContextHelp`, `ConfigSection.help`, and `PageHeader.help`
+provide on-demand guidance through the shared Popover. Runtime details and news
+source editing reuse Base UI Collapsible and the shared timing tokens.
 
-持续动效跟随组件可见性、页面可见性与 `prefers-reduced-motion`。Canvas 控制器在取消、离开页面和卸载时清理帧、计时器与事件监听器。纸屑每帧处理有界粒子集合，图片占位最多生成 400 个点。消散采用滑动窗口模糊，单帧成本随像素数线性增长。图片倾斜使用有界软件形变；跨域像素读取失败时继续使用 CSS 倾斜。拖放取消回到起点，Enter 和空格执行同一落点行为。
+`CountBadge` owns navigation reminders, update guidance, runtime counts,
+credentials, and news source counts. Values come from existing state owners;
+accessible names include the full count and meaning. `Toggle.pending` uses
+Base UI read-only state to retain focus during persistence.
 
-设置分类与开发者页面由 `SettingsArea` 持续持有导航壳层。分类切换更新内容，侧栏 DOM、宽度、滚动位置与键盘焦点保持连续。高频导航直接响应输入。
+The implementation keeps animation on real product paths. Component galleries,
+source viewers, particle controllers, and unused demonstration assets are
+removed. Frontend Lab retains its existing product activity event exercises.
 
-`ContextHelp` 通过共享 Popover 提供按需说明，复用定位、Escape 关闭、焦点返回与 `MeasuredText` 测量。`ConfigSection.help` 和 `PageHeader.help` 承载解释性文字；错误、风险和修复操作保留在对应内容区域。运行时详情与新闻源编辑复用 Base UI Collapsible，展开时长引用共享 token。
-
-`CountBadge` 统一导航提醒、更新提示、运行时、凭证与新闻源数量，显示值来自现有状态所有者。辅助名称保留完整计数与含义。`Toggle.pending` 使用 Base UI 的只读状态，在保存期间保留焦点。选择卡片复用 `SelectionCheckIcon`。
-
-本机验证命令：
+Validation commands:
 
 ```bash
 pnpm -F @traderalice/connector-protocol build
@@ -838,4 +850,7 @@ CI=1 NODE_ENV=test pnpm test:owner:ui
 pnpm -F open-alice-ui build:demo
 ```
 
-测试命令显式设置 `NODE_ENV=test`，支持继承生产环境变量的本机命令入口。浏览器检查覆盖组件操作、源码文件、键盘导航、焦点返回、减少动态效果与窄屏布局。
+Browser checks cover persistence, repeated input, keyboard navigation, focus
+return, loading, failure recovery, reduced motion, and narrow-screen layouts.
+Static screenshots record layout and visible states. Motion requires exercising
+the running controls, disclosures, menus, and dialogs.

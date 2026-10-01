@@ -22,23 +22,23 @@ describe('Toggle', () => {
     const toggle = screen.getByRole('switch', { name: 'Allow AI to push trades' })
     expect(toggle.getAttribute('aria-checked')).toBe('false')
     expect(toggle.getAttribute('type')).toBe('button')
-    expect(toggle.className).toContain('size-10')
+    expect(toggle.className).toContain('h-11 w-12')
     expect(toggle.className).toContain('-my-[9px]')
 
     const track = toggle.querySelector<HTMLElement>('[data-slot="switch-track"]')
     const thumb = toggle.querySelector<HTMLElement>('[data-slot="switch-thumb"]')
     expect(track?.getAttribute('aria-hidden')).toBe('true')
-    expect(track?.className).toContain('w-10')
-    expect(track?.className).toContain('h-[22px]')
+    expect(track?.className).toContain('w-11')
+    expect(track?.className).toContain('h-[26px]')
     expect(track?.className).toContain('p-[3px]')
-    expect(thumb?.className).toContain('size-4')
+    expect(thumb?.className).toContain('size-5')
     expect(thumb?.className).toContain('data-checked:translate-x-[18px]')
 
     fireEvent.click(toggle)
     expect(onChange).toHaveBeenCalledWith(true)
   })
 
-  it('keeps the small visual track inside the same 40px hit target', () => {
+  it('keeps the small visual track inside the same 44px hit target', () => {
     render(
       <Toggle
         ariaLabel="Enable compact tool"
@@ -52,12 +52,12 @@ describe('Toggle', () => {
     const track = toggle.querySelector<HTMLElement>('[data-slot="switch-track"]')
     const thumb = toggle.querySelector<HTMLElement>('[data-slot="switch-thumb"]')
 
-    expect(toggle.className).toContain('size-10')
+    expect(toggle.className).toContain('h-11 w-12')
     expect(toggle.className).toContain('-mx-1')
     expect(toggle.className).toContain('-my-[11px]')
-    expect(track?.className).toContain('w-8')
-    expect(track?.className).toContain('h-[18px]')
-    expect(thumb?.className).toContain('size-3')
+    expect(track?.className).toContain('w-9')
+    expect(track?.className).toContain('h-[22px]')
+    expect(thumb?.className).toContain('size-4')
     expect(thumb?.className).toContain('data-checked:translate-x-[14px]')
   })
 

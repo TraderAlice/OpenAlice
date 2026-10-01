@@ -28,14 +28,14 @@ export function MarketPage() {
   return (
     <div className="@container/market-overview flex flex-col flex-1 min-h-0">
       <PageHeader title={t('market.pageTitle')} help={t('market.pageDescription')} />
-      <div className="flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto px-4 py-4 md:px-8">
+      <div className="flex min-h-0 flex-1 flex-col gap-8 overflow-y-auto px-5 pb-8 pt-2 md:px-8">
         <SearchBox />
 
-        <section className="border-y border-border/60 py-4">
+        <section className="py-2">
           <div className="flex flex-col gap-3.5">
-            <div className="flex flex-col gap-2 lg:flex-row lg:items-end lg:justify-between lg:gap-8">
+            <div className="flex flex-col gap-2 @min-[40rem]/market-overview:flex-row @min-[40rem]/market-overview:items-end @min-[40rem]/market-overview:justify-between @min-[40rem]/market-overview:gap-8">
               <div className="flex items-center gap-2">
-                <h2 className="text-sm font-semibold text-foreground">{t('market.fxTitle')}</h2>
+                <h2 className="text-lg font-semibold text-foreground">{t('market.fxTitle')}</h2>
                 <ContextHelp label={t('market.fxTitle')}>{t('market.fxDescription')}</ContextHelp>
               </div>
               <div className="flex flex-wrap gap-1.5" aria-label={t('market.fxTitle')}>
@@ -46,14 +46,14 @@ export function MarketPage() {
                     variant="outline"
                     size="sm"
                     onClick={() => openOrFocus({ kind: 'market-detail', params: { assetClass: 'currency', symbol: pair } })}
-                    className="font-mono text-[11px] leading-[15px]"
+                    className="tabular-nums text-sm leading-5"
                   >
                     {pair.slice(0, 3)}/{pair.slice(3)}
                   </Button>
                 ))}
               </div>
             </div>
-            <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+            <div className="grid grid-cols-1 gap-3 @min-[32rem]/market-overview:grid-cols-2 @min-[48rem]/market-overview:grid-cols-3">
               <MarketLaunchCard
                 icon={<Globe2 size={15} />}
                 title={t('market.fxGlobalTitle')}
@@ -75,12 +75,12 @@ export function MarketPage() {
 
         {/* S&P 500 valuation strip — the market-level regime read. */}
         <div className="flex flex-col gap-2">
-          <h3 className="text-caption font-semibold text-foreground">
+          <h3 className="text-lg font-semibold text-foreground">
             {t('market.valuationTitle')}
             {strip && <span className="ml-2 normal-case font-normal tracking-normal"><BoardMeta meta={strip.meta} /></span>}
           </h3>
           {stripError && (
-            <div className="rounded-lg border border-border bg-card px-3 py-2 text-[12px] text-muted-foreground">{stripError}</div>
+            <div className="rounded-lg border border-border bg-card px-3 py-2 text-sm text-muted-foreground">{stripError}</div>
           )}
           {!strip && !stripError && (
             <div className="grid grid-cols-1 gap-3 @min-[28rem]/market-overview:grid-cols-2 @min-[60rem]/market-overview:grid-cols-4" aria-hidden="true">
@@ -104,13 +104,13 @@ export function MarketPage() {
           )}
         </div>
 
-        <section className="border-y border-border/60 py-4">
+        <section className="py-2">
           <div>
             <div className="flex items-end justify-between gap-6">
-              <h2 className="text-[14px] leading-[19px] font-semibold text-foreground">{t('market.overviewTitle')}</h2>
+              <h2 className="text-lg leading-6 font-semibold text-foreground">{t('market.overviewTitle')}</h2>
             </div>
 
-            <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-4">
+            <div className="mt-3 grid grid-cols-1 gap-3 @min-[28rem]/market-overview:grid-cols-2 @min-[64rem]/market-overview:grid-cols-4">
               <MarketLaunchCard
                 icon={<TrendingUp size={17} strokeWidth={1.75} />}
                 title={t('market.boardMovers')}
@@ -154,12 +154,12 @@ function MarketLaunchCard({
     <button
       type="button"
       onClick={onClick}
-      className="oa-data-surface oa-pressable group flex min-h-11 items-center gap-2.5 rounded-lg border px-3 py-2 text-left hover:border-foreground/20 hover:bg-muted/50"
+      className="oa-data-surface oa-pressable group flex min-h-20 items-center gap-4 rounded-2xl px-5 py-4 text-left hover:border-foreground/20 hover:bg-muted/50"
     >
-      <span className="flex h-6 w-6 shrink-0 items-center justify-center text-muted-foreground">
+      <span className="flex h-10 w-10 shrink-0 rounded-full bg-background items-center justify-center text-muted-foreground">
         {icon}
       </span>
-      <span className="min-w-0 truncate text-[13px] font-medium text-foreground">{title}</span>
+      <span className="min-w-0 text-base font-medium text-foreground">{title}</span>
     </button>
   )
 }

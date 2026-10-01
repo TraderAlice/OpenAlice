@@ -113,7 +113,7 @@ export function ConnectorStatusPage() {
         right={(
           <div className="flex items-center gap-2">
             {lastUpdatedAt && (
-              <span className="hidden text-[11px] text-muted-foreground/60 sm:inline">
+              <span className="hidden text-sm text-muted-foreground/60 sm:inline">
                 {t('connectorStatus.updated', {
                   time: new Date(lastUpdatedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
                 })}
@@ -123,7 +123,7 @@ export function ConnectorStatusPage() {
               type="button"
               variant="outline"
               size="lg"
-              className="text-[13px] text-muted-foreground"
+              className="text-sm text-muted-foreground"
               disabled={refreshing}
               onClick={() => void refreshConnectorHealth()}
             >
@@ -327,15 +327,15 @@ function ConnectorOverview({
               </div>
               <div className="min-w-0">
                 <div className="flex flex-wrap items-center gap-2">
-                  <h3 className="text-[13px] leading-[18px] font-semibold text-foreground">{t('connectorStatus.serviceTitle')}</h3>
+                  <h3 className="text-sm leading-5 font-semibold text-foreground">{t('connectorStatus.serviceTitle')}</h3>
                   <StatusBadge tone={service.tone}>{service.label}</StatusBadge>
                 </div>
-                <p className="mt-0.5 max-w-[660px] text-[12px] leading-5 text-muted-foreground">
+                <p className="mt-0.5 max-w-[660px] text-sm leading-5 text-muted-foreground">
                   {service.description}
                 </p>
               </div>
             </div>
-            <div className="flex flex-wrap items-center gap-2 text-[11px] leading-[15px] text-muted-foreground">
+            <div className="flex flex-wrap items-center gap-2 text-sm leading-5 text-muted-foreground">
               <SummaryPill>{t('connectorStatus.configuredCount', { count: configuredCount })}</SummaryPill>
               <SummaryPill>{t('connectorStatus.activeCount', { count: activeCount })}</SummaryPill>
               {attentionCount > 0 && (
@@ -428,8 +428,8 @@ function ConnectorGroup({
   return (
     <section>
       <div className="mb-3.5 px-0.5">
-        <h3 className="text-[14px] leading-[19px] font-semibold text-foreground">{title}</h3>
-        <p className="mt-0.5 text-[12px] text-muted-foreground">{description}</p>
+        <h3 className="text-[14px] leading-5 font-semibold text-foreground">{title}</h3>
+        <p className="mt-0.5 text-sm text-muted-foreground">{description}</p>
       </div>
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         {adapters.map((adapter) => (
@@ -467,8 +467,8 @@ function AvailableConnectorGroup({
   return (
     <section>
       <div className="mb-3.5 px-0.5">
-        <h3 className="text-[14px] leading-[19px] font-semibold text-foreground">{title}</h3>
-        <p className="mt-0.5 text-[12px] text-muted-foreground">{description}</p>
+        <h3 className="text-[14px] leading-5 font-semibold text-foreground">{title}</h3>
+        <p className="mt-0.5 text-sm text-muted-foreground">{description}</p>
       </div>
       <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
         {adapters.map(({ definition }) => (
@@ -479,7 +479,7 @@ function AvailableConnectorGroup({
             <div className="flex min-w-0 flex-1 items-center gap-3">
               <ConnectorBrandMark id={definition.id} className="size-7" />
               <div className="min-w-0">
-            <h4 className="text-[14px] leading-[19px] font-semibold text-foreground">{definition.label}</h4>
+            <h4 className="text-[14px] leading-5 font-semibold text-foreground">{definition.label}</h4>
                 <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-[11.5px] text-muted-foreground">
                   <span className="inline-flex items-center gap-1.5">
                     <Send size={12} aria-hidden />
@@ -498,7 +498,7 @@ function AvailableConnectorGroup({
               type="button"
               variant="ghost"
               size="lg"
-              className="h-8 w-full bg-transparent text-[12px] text-muted-foreground sm:h-8 sm:w-auto"
+              className="h-8 w-full bg-transparent text-sm text-muted-foreground sm:h-8 sm:w-auto"
               onClick={(event) => onConfigure(definition.id, event.currentTarget)}
             >
               {t('connectorStatus.configureAdapter', { name: definition.label })}
@@ -616,7 +616,7 @@ function ConnectorOverviewCard({
           {setup.stage === 'error' && (
             <Button
               type="button"
-              className="h-8 px-3 text-[12px]"
+              className="h-8 px-3 text-sm"
               disabled={actionsBusy}
               onClick={() => void onReconnect(definition.id)}
             >
@@ -627,7 +627,7 @@ function ConnectorOverviewCard({
           <Button
             type="button"
             variant={prioritizeConfiguration ? 'default' : 'outline'}
-            className={`h-8 px-3 text-[12px] ${prioritizeConfiguration ? '' : 'bg-background/50'}`}
+            className={`h-8 px-3 text-sm ${prioritizeConfiguration ? '' : 'bg-background/50'}`}
             onClick={(event) => onConfigure(definition.id, event.currentTarget)}
           >
             <ActionIcon size={13} aria-hidden />
@@ -760,7 +760,7 @@ function StatusBadge({ tone, children }: { tone: StatusTone; children: string })
     neutral: 'border-border bg-muted text-muted-foreground',
   }
   return (
-    <span className={`inline-flex shrink-0 items-center rounded-md border px-2 py-0.5 text-[10.5px] leading-[15px] font-medium ${styles[tone]}`}>
+    <span className={`inline-flex shrink-0 items-center rounded-md border px-2 py-0.5 text-sm leading-5 font-medium ${styles[tone]}`}>
       {children}
     </span>
   )

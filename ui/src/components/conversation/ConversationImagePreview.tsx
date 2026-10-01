@@ -21,7 +21,7 @@ export function ConversationImagePreview({ image, onClose }: {
           <p>{t('common.imageLoadFailed')}</p>
           <Button type="button" variant="outline" onClick={() => { setFailedSource(null); setRetry(value => value + 1) }}>{t('common.retry')}</Button>
         </div>
-      ) : <LoadingImage key={`${image.href}:${retry}`} state="revealed" src={image.href} alt={image.path}
+      ) : <LoadingImage key={`${image.href}:${retry}`} src={image.href} alt={image.path}
         loadingLabel={t('common.loading')} className="oa-image-preview" imageClassName="oa-image-preview-content" onError={() => setFailedSource(image.href)} />)}
     </DialogContent>
   </Dialog>

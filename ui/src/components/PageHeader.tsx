@@ -26,7 +26,7 @@ export function PageHeader({
 }: PageHeaderProps) {
   return (
     <>
-      <PageTopBar title={title} actions={right}>
+      <PageTopBar heading="page" title={title} actions={right}>
         {accessory}
         {help && <ContextHelp label={title}>{help}</ContextHelp>}
       </PageTopBar>

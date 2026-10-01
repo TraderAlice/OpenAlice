@@ -1,5 +1,4 @@
 import type { ReactNode } from 'react'
-import { SelectionIndicator } from './SelectionIndicator'
 import { Tooltip, TooltipContent, TooltipTrigger } from './ui/tooltip'
 
 interface SidebarRowProps {
@@ -30,19 +29,6 @@ interface SidebarRowProps {
   ariaControls?: string
 }
 
-/**
- * Standardised row used inside every secondary sidebar (Chat channels,
- * Settings categories, Dev tabs, Portfolio accounts, etc.).
- *
- * Visual contract:
- * - Inactive rows render in full text colour for fast navigation scanning.
- * - Active rows use a muted fill and the project-owned neutral selection mark.
- * - Hover state is a half-opacity tint of the active background.
- *
- * The `div role="button"` owns row activation and lets `trail` contain action
- * buttons within valid HTML.
- * Enter / Space activate the row for keyboard users.
- */
 export function SidebarRow({
   label,
   active = false,
@@ -68,14 +54,13 @@ export function SidebarRow({
           onClick()
         }
       }}
-      className={`oa-nav-row group relative mx-2 flex min-h-10 cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-[13px] leading-[18px] outline-none md:min-h-8 ${
+      className={`oa-nav-row group relative mx-2 flex min-h-10 cursor-pointer items-center gap-3 rounded-full px-3 py-2 text-sm leading-6 outline-none md:min-h-10 ${
         active
           ? 'bg-sidebar-accent text-sidebar-accent-foreground'
           : 'text-sidebar-foreground hover:bg-sidebar-accent/60'
       } ${dim ? 'opacity-60' : ''}`}
     >
-      {active && <SelectionIndicator />}
-      {icon && <span className="flex h-[18px] w-[18px] shrink-0 items-center justify-center">{icon}</span>}
+      {icon && <span className="flex h-5 w-5 shrink-0 items-center justify-center">{icon}</span>}
       <span className="truncate flex-1">{label}</span>
       {trail && <div className="shrink-0 flex items-center gap-0.5">{trail}</div>}
     </div>

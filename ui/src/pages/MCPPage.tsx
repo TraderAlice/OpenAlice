@@ -34,7 +34,7 @@ export function MCPPage() {
             >
               <div className="flex min-h-12 items-center justify-between gap-4 mb-4 border-b border-border/60 py-2">
                 <div className="min-w-0">
-                  <p className="text-[13px] font-medium text-foreground">Run endpoint</p>
+                  <p className="text-sm font-medium text-foreground">Run endpoint</p>
                 </div>
                 <Toggle
                   ariaLabel="Run the MCP endpoint"
@@ -58,7 +58,7 @@ export function MCPPage() {
         )}
         {loadError && (
           <div role="alert" className="mx-auto max-w-[880px] text-center">
-            <p className="text-[13px] text-destructive">Failed to load configuration.</p>
+            <p className="text-sm text-destructive">Failed to load configuration.</p>
             <Button type="button" variant="outline" size="sm" className="mt-3" onClick={() => void reload()}>
               Retry
             </Button>
