@@ -29,6 +29,7 @@ import type { Exchange, Order as CcxtOrder, Position as CcxtPosition } from 'ccx
 import { bitgetOverrides } from './exchanges/bitget.js'
 import { bybitOverrides } from './exchanges/bybit.js'
 import { hyperliquidOverrides } from './exchanges/hyperliquid.js'
+import { okxOverrides } from './exchanges/okx.js'
 
 // ==================== Override interface ====================
 
@@ -233,4 +234,5 @@ export const exchangeOverrides: Record<string, CcxtExchangeOverrides> = {
   bitget: bitgetOverrides,
   bybit: bybitOverrides,
   hyperliquid: hyperliquidOverrides,
+  okx: okxOverrides,
 }

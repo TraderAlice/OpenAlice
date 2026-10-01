@@ -1,6 +1,7 @@
 import { z } from 'zod'
 import type { Contract } from '@traderalice/ibkr'
 
+export const MAX_ORDER_BOOK_LIMIT = 5_000
 const date = z.string().regex(/^\d{4}-\d{2}-\d{2}$/)
 export const optionResearchSchema = z.object({
   aliceId: z.string().min(1).describe('Underlying stock aliceId from contract search'),
@@ -12,7 +13,7 @@ export const optionResearchSchema = z.object({
   feed: z.enum(['indicative', 'opra']).optional().describe('Snapshots only; defaults to indicative (modified quotes, delayed trades). OPRA needs entitlement.'),
 })
 export const orderBookSchema = z.object({
-  aliceId: z.string().min(1), limit: z.number().int().min(1).max(100).optional(),
+  aliceId: z.string().min(1), limit: z.number().int().min(1).max(MAX_ORDER_BOOK_LIMIT).optional(),
 })
 export type OptionResearchRequest = z.infer<typeof optionResearchSchema>
 export type OptionResearchFilters = Omit<OptionResearchRequest, 'aliceId'>

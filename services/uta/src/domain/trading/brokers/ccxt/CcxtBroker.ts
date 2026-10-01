@@ -52,6 +52,7 @@ import {
   defaultFetchPositions,
   defaultFetchAllOpenOrders,
 } from './overrides.js'
+import { OkxPublicMarketStream, type OkxPublicMarketStreamOptions } from './exchanges/okx-stream.js'
 
 /** The implicit single wallet a unified-account venue (okx / bybit UTA) exposes
  *  — one plain fetchBalance() covers everything, so no selector is ever needed. */
@@ -592,8 +593,7 @@ export class CcxtBroker implements IBroker<CcxtBrokerMeta> {
       // params.triggerPrice — ccxt routes each venue to its algo endpoint.
       // The old lowercase passthrough sent okx a literal ordType "stp"
       // (51000 Parameter error, observed live), which meant the documented
-      // "place a separate stop" path didn't work either. TRAIL* stays
-      // refused until venue-verified — same rule as attached TP/SL.
+      // "place a separate stop" path didn't work either.
       let ccxtOrderType = ibkrOrderTypeToCcxt(order.orderType)
       if (order.orderType === 'STP' || order.orderType === 'STP LMT') {
         if (order.auxPrice.equals(UNSET_DECIMAL)) {
@@ -602,12 +602,30 @@ export class CcxtBroker implements IBroker<CcxtBrokerMeta> {
         params.triggerPrice = order.auxPrice.toNumber()
         ccxtOrderType = order.orderType === 'STP' ? 'market' : 'limit'
       } else if (order.orderType === 'TRAIL' || order.orderType === 'TRAIL LIMIT') {
-        return {
-          success: false,
-          error:
-            `${order.orderType} is not verified to reach ${this.exchangeName} through ccxt — refusing rather ` +
-            `than risking a silently mis-typed order. Use STP / STP LMT, or manage the trail manually.`,
+        if (this.exchangeName !== 'okx') {
+          return {
+            success: false,
+            error:
+              `${order.orderType} is not verified to reach ${this.exchangeName} through ccxt — refusing rather ` +
+              `than risking a silently mis-typed order. Use STP / STP LMT, or manage the trail manually.`,
+          }
         }
+
+        // ccxt 4.5.78's okx.createOrderRequest (okx.js:3315-3322) emits the
+        // official move_order_stop request when given one of these unified
+        // trailing fields. Prefer callback ratio when both IBKR fields exist,
+        // matching ccxt's own precedence; never invent a venue payload.
+        if (!order.trailingPercent.equals(UNSET_DECIMAL)) {
+          params.trailingPercent = order.trailingPercent.toNumber()
+        } else if (!order.trailStopPrice.equals(UNSET_DECIMAL)) {
+          params.trailingPrice = order.trailStopPrice.toNumber()
+        } else {
+          return {
+            success: false,
+            error: `${order.orderType} requires trailingPercent or trailStopPrice.`,
+          }
+        }
+        ccxtOrderType = order.orderType === 'TRAIL' ? 'market' : 'limit'
       }
       const side = order.action.toLowerCase() as 'buy' | 'sell'
       // CCXT SDK expects number for price — convert at the wire boundary.
@@ -673,7 +691,17 @@ export class CcxtBroker implements IBroker<CcxtBrokerMeta> {
       const original = fetchOverride
         ? await fetchOverride(this.exchange, orderId, ccxtSymbol, defaultFetchOrderById)
         : await defaultFetchOrderById(this.exchange, orderId, ccxtSymbol)
-      const qty = changes.totalQuantity != null && !changes.totalQuantity.equals(UNSET_DECIMAL) ? changes.totalQuantity.toNumber() : original.amount
+      // OKX amend newSz includes the amount already filled; other venues keep
+      // the existing requested-amount behavior.
+      const requestedQty = changes.totalQuantity != null && !changes.totalQuantity.equals(UNSET_DECIMAL)
+        ? changes.totalQuantity.toNumber()
+        : original.amount
+      if (typeof requestedQty !== 'number') {
+        return { success: false, error: `Cannot amend order ${orderId}: missing quantity` }
+      }
+      const qty = this.exchangeName === 'okx' && original.filled != null && original.filled > 0
+        ? requestedQty + original.filled
+        : requestedQty
       const price = changes.lmtPrice != null && !changes.lmtPrice.equals(UNSET_DECIMAL) ? changes.lmtPrice.toNumber() : original.price
 
       // Extra params for fields that don't fit editOrder's positional arguments
@@ -682,6 +710,19 @@ export class CcxtBroker implements IBroker<CcxtBrokerMeta> {
       if (changes.trailStopPrice != null && !changes.trailStopPrice.equals(UNSET_DECIMAL)) params.trailStopPrice = changes.trailStopPrice.toNumber()
       if (changes.trailingPercent != null && !changes.trailingPercent.equals(UNSET_DECIMAL)) params.trailingPercent = changes.trailingPercent.toNumber()
       if (changes.tif) params.timeInForce = changes.tif.toLowerCase()
+      // OKX amend-order takes newSz/newPx. posSide belongs to the original
+      // order, not this request; sending it is an unknown field (51000).
+
+      // Bitget's contract edit path merges params into the wire request. Its
+      // hedge-mode tradeSide is meaningful only for the original open/close
+      // values; one-way metadata must not be forwarded.
+      if (this.exchangeName === 'bitget') {
+        const info = original.info
+        if (info && typeof info === 'object') {
+          const tradeSide = (info as Record<string, unknown>).tradeSide
+          if (tradeSide === 'open' || tradeSide === 'close') params.tradeSide = tradeSide
+        }
+      }
 
       const result = await this.exchange.editOrder(
         orderId,
@@ -1402,5 +1443,33 @@ export class CcxtBroker implements IBroker<CcxtBrokerMeta> {
     } catch (err) {
       throw BrokerError.from(err)
     }
+  }
+
+  /**
+   * Open OKX public trades + incremental books. The stream always obtains
+   * its initial and gap-recovery snapshot through getOrderBook; it never
+   * turns this read path into a poll loop.
+   */
+  async streamOkxPublicMarketData(
+    contract: Contract,
+    options: Omit<OkxPublicMarketStreamOptions, 'instId' | 'loadSnapshot'> = {},
+  ): Promise<OkxPublicMarketStream> {
+    this.ensureInit()
+    if (this.exchangeName !== 'okx') {
+      throw new BrokerError('EXCHANGE', 'OKX public streaming is only available for the okx broker')
+    }
+
+    const ccxtSymbol = contractToCcxt(contract, this.markets, this.exchangeName)
+    if (!ccxtSymbol) throw new BrokerError('EXCHANGE', 'Cannot resolve contract to CCXT symbol')
+    const market = this.markets[ccxtSymbol]
+    if (!market?.id) throw new BrokerError('EXCHANGE', `Cannot resolve OKX instrument for ${ccxtSymbol}`)
+
+    const stream = new OkxPublicMarketStream({
+      ...options,
+      instId: market.id,
+      loadSnapshot: () => this.getOrderBook(contract),
+    })
+    await stream.start()
+    return stream
   }
 }
