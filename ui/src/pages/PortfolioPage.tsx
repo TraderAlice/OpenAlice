@@ -279,7 +279,7 @@ export function PortfolioPage() {
     <div className="flex flex-col flex-1 min-h-0">
       <PageHeader
         title="Portfolio"
-        description="Live portfolio overview across all trading accounts."
+        help="Live portfolio overview across all trading accounts."
         live={lastRefresh ? { lastUpdated: lastRefresh } : undefined}
         right={
           <Button

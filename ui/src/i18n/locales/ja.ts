@@ -1186,6 +1186,8 @@ export const ja: Resources = {
       description: 'この AliceProject が起動できるネイティブ CLI を確認し、未インストールを直し、最大 4 件のクイックアクセスを選びます。',
       quickAccess: 'クイックアクセス',
       quickAccessDescription: 'Session の作成に成功すると、そのランタイムが自動で先頭に移動します。この一覧は最近の履歴に続くフォールバック順です。未インストールのランタイムは自動では入りません。',
+      quickAccessCount: '{{limit}} 件中 {{count}} 件をピン留め',
+      catalogCount: 'ランタイム {{count}} 件',
       quickAccessEmpty: 'まだピン留めがありません。下のカタログから最大 4 件追加できます。',
       catalog: '検出されたランタイム',
       catalogDescription: 'インストール状態はこのマシンで調べます。設定としては保存しません。',
@@ -1675,6 +1677,8 @@ export const ja: Resources = {
     }
   },
   common: {
+    helpFor: 'ヘルプ: {{name}}',
+    help: 'ヘルプ',
     imageLoadFailed: "画像を読み込めませんでした。",
     back: '戻る',
     loading: '読み込み中…',

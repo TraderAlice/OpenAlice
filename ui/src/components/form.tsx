@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react'
+import { ContextHelp } from './ContextHelp'
 
 // ==================== Shared class constants ====================
 
@@ -57,7 +58,9 @@ interface ConfigSectionProps {
   id?: string
   title: ReactNode
   description?: string
-  children: ReactNode
+  help?: string
+  accessory?: ReactNode
+  children?: ReactNode
   titleId?: string
   focusableTitle?: boolean
   className?: string
@@ -67,6 +70,8 @@ export function ConfigSection({
   id,
   title,
   description,
+  help,
+  accessory,
   children,
   titleId,
   focusableTitle = false,
@@ -78,22 +83,26 @@ export function ConfigSection({
       aria-labelledby={titleId}
       className={`min-w-0 border-b border-border/60 py-5 last:border-b-0 ${className}`}
     >
-      <div className="mb-3 min-w-0">
-        <h3
-          id={titleId}
-          tabIndex={focusableTitle ? -1 : undefined}
-          className={`text-[14px] font-semibold text-foreground ${focusableTitle
-            ? 'w-fit rounded-sm outline-none focus-visible:[box-shadow:var(--oa-focus-shadow)]'
-            : ''
-          }`}
-        >
-          {title}
-        </h3>
+      <div className={`min-w-0 ${children ? 'mb-3' : ''}`}>
+        <div className="flex min-h-6 min-w-0 items-center gap-2">
+          <h3
+            id={titleId}
+            tabIndex={focusableTitle ? -1 : undefined}
+            className={`text-[14px] font-semibold text-foreground ${focusableTitle
+              ? 'w-fit rounded-sm outline-none focus-visible:[box-shadow:var(--oa-focus-shadow)]'
+              : ''
+            }`}
+          >
+            {title}
+          </h3>
+          {help && <ContextHelp label={typeof title === 'string' ? title : undefined}>{help}</ContextHelp>}
+          {accessory && <div className="ml-auto flex shrink-0 items-center gap-2">{accessory}</div>}
+        </div>
         {description && (
           <p className="mt-1 max-w-2xl text-[12px] leading-5 text-muted-foreground">{description}</p>
         )}
       </div>
-      <div className="min-w-0">{children}</div>
+      {children && <div className="min-w-0">{children}</div>}
     </section>
   )
 }

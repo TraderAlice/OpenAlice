@@ -1193,6 +1193,8 @@ export const zhHant: Resources = {
       description: '查看這個 AliceProject 可以啟動的原生 CLI，修復缺失安裝，並選擇最多四個快捷執行環境。',
       quickAccess: '快捷入口',
       quickAccessDescription: '成功建立 Session 後，對應執行環境會自動移到最前面。這裡的順序作為最近使用記錄之後的候補基線；未安裝的執行環境不會自動填入。',
+      quickAccessCount: '已釘選 {{count}} 個，最多 {{limit}} 個',
+      catalogCount: '{{count}} 個執行環境',
       quickAccessEmpty: '還沒有釘選執行環境。可從下方目錄最多新增四個。',
       catalog: '已發現的執行環境',
       catalogDescription: '安裝狀態由本機探測，不會作為偏好儲存。',
@@ -1682,6 +1684,8 @@ export const zhHant: Resources = {
     }
   },
   common: {
+    helpFor: '說明：{{name}}',
+    help: '說明',
     imageLoadFailed: "圖片載入失敗。",
     back: '返回',
     loading: '載入中…',

@@ -1,4 +1,4 @@
-import { useRef, useState, type ReactNode } from 'react'
+import { useRef, useState, type ReactNode, type RefObject } from 'react'
 
 import {
   AlertDialog,
@@ -25,6 +25,7 @@ interface ConfirmDialogProps {
   onConfirm: () => void | Promise<void>
   /** Called on cancel / Escape / backdrop click. */
   onClose: () => void
+  fallbackFocusRef?: RefObject<HTMLElement | null>
 }
 
 /**
@@ -41,9 +42,11 @@ export function ConfirmDialog({
   variant = 'danger',
   onConfirm,
   onClose,
+  fallbackFocusRef,
 }: ConfirmDialogProps) {
   const [busy, setBusy] = useState(false)
   const cancelRef = useRef<HTMLButtonElement | null>(null)
+  const confirmationStarted = useRef(false)
   const restoreFocusRef = useRef<HTMLElement | null>(
     typeof document !== 'undefined' && document.activeElement instanceof HTMLElement
       ? document.activeElement
@@ -52,8 +55,12 @@ export function ConfirmDialog({
 
   const handleConfirm = async () => {
     setBusy(true)
+    confirmationStarted.current = true
     try {
       await onConfirm()
+    } catch (error) {
+      confirmationStarted.current = false
+      throw error
     } finally {
       setBusy(false)
     }
@@ -65,13 +72,18 @@ export function ConfirmDialog({
     <AlertDialog
       open
       onOpenChange={(open) => {
-        if (!open && !busy) onClose()
+        if (!open && !busy) {
+          confirmationStarted.current = false
+          onClose()
+        }
       }}
     >
       <AlertDialogContent
         className="w-[calc(100%-2rem)] max-w-[440px] gap-0 overflow-hidden p-0"
         initialFocus={cancelRef}
-        finalFocus={restoreFocusRef}
+        finalFocus={() => confirmationStarted.current && fallbackFocusRef?.current
+          ? fallbackFocusRef.current
+          : restoreFocusRef.current?.isConnected ? restoreFocusRef.current : fallbackFocusRef?.current ?? false}
       >
         <div className="border-b border-border px-5 py-4">
           <AlertDialogTitle className="text-[15px] font-semibold">

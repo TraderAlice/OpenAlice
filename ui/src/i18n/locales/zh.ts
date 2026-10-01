@@ -1189,6 +1189,8 @@ export const zh: Resources = {
       description: '查看这个 AliceProject 可以启动的原生 CLI，修复缺失安装，并选择最多四个快捷运行时。',
       quickAccess: '快捷入口',
       quickAccessDescription: '成功创建 Session 后，对应运行时会自动移到最前面。这里的顺序作为最近使用记录之后的候补基线；未安装的运行时不会自动填入。',
+      quickAccessCount: '已置顶 {{count}} 个，最多 {{limit}} 个',
+      catalogCount: '{{count}} 个运行时',
       quickAccessEmpty: '还没有置顶运行时。可从下方目录最多添加四个。',
       catalog: '已发现的运行时',
       catalogDescription: '安装状态由本机探测，不会作为偏好保存。',
@@ -1678,6 +1680,8 @@ export const zh: Resources = {
     }
   },
   common: {
+    helpFor: '帮助：{{name}}',
+    help: '帮助',
     imageLoadFailed: "图片加载失败。",
     back: '返回',
     loading: '加载中…',

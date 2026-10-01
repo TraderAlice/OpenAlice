@@ -802,6 +802,12 @@ otherwise. No notification action automatically retries or takes over a runtime.
 
 持续动效跟随组件可见性、页面可见性与 `prefers-reduced-motion`。Canvas 控制器在取消、离开页面和卸载时清理帧、计时器与事件监听器。纸屑每帧处理有界粒子集合，图片占位最多生成 400 个点。消散采用滑动窗口模糊，单帧成本随像素数线性增长。图片倾斜使用有界软件形变；跨域像素读取失败时继续使用 CSS 倾斜。拖放取消回到起点，Enter 和空格执行同一落点行为。
 
+设置分类与开发者页面由 `SettingsArea` 持续持有导航壳层。分类切换更新内容，侧栏 DOM、宽度、滚动位置与键盘焦点保持连续。高频导航直接响应输入。
+
+`ContextHelp` 通过共享 Popover 提供按需说明，复用定位、Escape 关闭、焦点返回与 `MeasuredText` 测量。`ConfigSection.help` 和 `PageHeader.help` 承载解释性文字；错误、风险和修复操作保留在对应内容区域。运行时详情与新闻源编辑复用 Base UI Collapsible，展开时长引用共享 token。
+
+`CountBadge` 统一导航提醒、更新提示、运行时、凭证与新闻源数量，显示值来自现有状态所有者。辅助名称保留完整计数与含义。`Toggle.pending` 使用 Base UI 的只读状态，在保存期间保留焦点。选择卡片复用 `SelectionCheckIcon`。
+
 本机验证命令：
 
 ```bash

@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useId, useMemo } from 'react'
 import { ChevronDown, Moon, RotateCcw, Sun } from 'lucide-react'
 import { api } from '../api'
 import type { ToolInfo } from '../api/tools'
+import { ContextHelp } from '../components/ContextHelp'
 import { Toggle } from '../components/Toggle'
 import { SaveIndicator } from '../components/SaveIndicator'
 import { ConfigSection, Field, SettingsScrollArea, inputClass } from '../components/form'
@@ -29,6 +30,7 @@ import { useEffectivePreferenceSlot } from '../theme/useEffectiveTheme'
 import { VersionOverviewSection } from '../components/settings/VersionOverviewSection'
 import { UpdateLifecycleSection } from '../components/settings/UpdateLifecycleSection'
 import { AliceLocationSection } from '../components/settings/AliceLocationSection'
+import { SelectionCheckIcon } from '../components/ui/selection-check-icon'
 import { Button } from '../components/ui/button'
 import { getBackendConnection } from '../auth/backendConnection'
 import { useRelayConnection } from '../hooks/useRelayConnection'
@@ -111,13 +113,9 @@ export function AppearanceSection({ standalone = false }: { standalone?: boolean
   const content = (
     <>
       <div className="border-b border-border/60 pb-5">
-        <div>
-          <span className="text-sm font-medium text-foreground">
-            {t('settings.appearance.interfaceStyle')}
-          </span>
-          <p className="mt-0.5 text-[12px] leading-relaxed text-muted-foreground">
-            {t('settings.appearance.interfaceStyleDescription')}
-          </p>
+        <div className="flex items-center gap-2">
+          <span className="text-sm font-medium text-foreground">{t('settings.appearance.interfaceStyle')}</span>
+          <ContextHelp label={t('settings.appearance.interfaceStyle')}>{t('settings.appearance.interfaceStyleDescription')}</ContextHelp>
         </div>
         <div
           className="mt-3 grid gap-2.5 sm:grid-cols-3"
@@ -179,13 +177,9 @@ export function AppearanceSection({ standalone = false }: { standalone?: boolean
       </div>
 
       <div className="border-b border-border/60 py-5">
-        <div>
-          <span className="text-sm font-medium text-foreground">
-            {t('settings.appearance.colorMode')}
-          </span>
-          <p className="mt-0.5 text-[12px] leading-relaxed text-muted-foreground">
-            {t('settings.appearance.colorModeDescription')}
-          </p>
+        <div className="flex items-center gap-2">
+          <span className="text-sm font-medium text-foreground">{t('settings.appearance.colorMode')}</span>
+          <ContextHelp label={t('settings.appearance.colorMode')}>{t('settings.appearance.colorModeDescription')}</ContextHelp>
         </div>
         <div className="mt-3 flex flex-wrap gap-2" role="group" aria-label={t('settings.appearance.colorMode')}>
           {modes.map((mode) => (
@@ -229,13 +223,9 @@ export function AppearanceSection({ standalone = false }: { standalone?: boolean
 
       <div className="border-b border-border/60 py-5">
         <div className="flex flex-wrap items-start justify-between gap-3">
-          <div>
-            <span className="text-sm font-medium text-foreground">
-              {t('settings.appearance.themePair')}
-            </span>
-            <p className="mt-0.5 text-[12px] leading-relaxed text-muted-foreground">
-              {t('settings.appearance.themePairDescription')}
-            </p>
+          <div className="flex items-center gap-2">
+            <span className="text-sm font-medium text-foreground">{t('settings.appearance.themePair')}</span>
+            <ContextHelp label={t('settings.appearance.themePair')}>{t('settings.appearance.themePairDescription')}</ContextHelp>
           </div>
           <Button
             type="button"
@@ -340,7 +330,7 @@ export function AppearanceSection({ standalone = false }: { standalone?: boolean
   if (standalone) return content
 
   return (
-    <ConfigSection title={t('settings.appearance.title')} description={t('settings.appearance.description')}>
+    <ConfigSection title={t('settings.appearance.title')} help={t('settings.appearance.description')}>
       {content}
     </ConfigSection>
   )
@@ -365,10 +355,11 @@ function StyleProfileCard({
       role="radio"
       aria-checked={selected}
       aria-label={label}
+      title={description}
       data-ui-style-preview={profile}
       data-selected={selected}
       onClick={() => onSelect(profile)}
-      className="oa-style-profile-card oa-pressable min-h-24 min-w-0 border border-border bg-background p-2.5 text-left"
+      className="oa-style-profile-card oa-pressable min-h-20 min-w-0 border border-border bg-background p-2.5 text-left"
     >
       <span className="oa-style-profile-preview flex h-10 overflow-hidden border border-border bg-card" aria-hidden>
         <span className="oa-style-profile-rail w-3.5 shrink-0 border-r border-border bg-sidebar" />
@@ -378,8 +369,10 @@ function StyleProfileCard({
           <span className="oa-style-profile-row h-2 w-3/5 border border-border bg-background" />
         </span>
       </span>
-      <span className="mt-2 block text-[12px] font-semibold text-foreground">{label}</span>
-      <span className="mt-0.5 block text-[10.5px] leading-snug text-muted-foreground">{description}</span>
+      <span className="mt-2 flex items-center justify-between gap-2 text-[12px] font-semibold text-foreground">
+        {label}
+        <span className="size-4 shrink-0">{selected && <SelectionCheckIcon />}</span>
+      </span>
     </button>
   )
 }
@@ -402,6 +395,7 @@ function PaletteSlotCard({
   return (
     <button
       type="button"
+      title={t(palette.descriptionKey)}
       data-palette-preview={palette.id}
       data-selected={editing}
       aria-pressed={editing}
@@ -419,9 +413,6 @@ function PaletteSlotCard({
             {t(`theme.mode.${slot}`)}
           </span>
           <span className="mt-1 block truncate text-[14px] font-semibold">{t(palette.labelKey)}</span>
-          <span className="oa-palette-preview-muted mt-0.5 hidden text-[10.5px] leading-snug sm:block">
-            {t(palette.descriptionKey)}
-          </span>
         </span>
         <span className="flex shrink-0 flex-col items-end gap-1">
           {active && (
@@ -467,6 +458,7 @@ function PalettePicker({
         <button
           key={palette.id}
           type="button"
+          title={t(palette.descriptionKey)}
           data-palette-preview={palette.id}
           data-selected={selected === palette.id}
           onClick={() => onSelect(palette.id)}
@@ -477,11 +469,8 @@ function PalettePicker({
           <span className="flex items-start justify-between gap-2">
             <span className="min-w-0">
               <span className="block break-words text-[12px] font-semibold">{t(palette.labelKey)}</span>
-              <span className="oa-palette-preview-muted mt-0.5 block text-[10px] leading-snug">
-                {t(palette.descriptionKey)}
-              </span>
             </span>
-            <span className="oa-palette-preview-indicator mt-0.5 h-2.5 w-2.5 shrink-0 rounded-full border" aria-hidden />
+            <span className="size-4 shrink-0">{selected === palette.id && <SelectionCheckIcon />}</span>
           </span>
 
           <span className="oa-palette-preview-shell mt-3 flex h-9 overflow-hidden rounded border" aria-hidden>
@@ -538,7 +527,6 @@ export function LanguageSection() {
   const locale = useLocale()
   const setLocale = useSetLocale()
   return (
-    <ConfigSection title={t('settings.language.title')} description={t('settings.language.description')}>
       <div
         className="flex flex-wrap gap-2 py-1"
         role="group"
@@ -557,7 +545,6 @@ export function LanguageSection() {
           </Button>
         ))}
       </div>
-    </ConfigSection>
   )
 }
 
@@ -582,7 +569,7 @@ export function DataHomeSection() {
     return (
       <ConfigSection
         title={t('settings.dataHome.title')}
-        description={t('settings.dataHome.description')}
+        help={t('settings.dataHome.description')}
       >
         <div className="rounded-lg border border-border/60 bg-secondary/50 px-3 py-3">
           {relay.status?.target?.machine && relay.status.target.machine !== 'local' ? (
@@ -614,7 +601,7 @@ export function DataHomeSection() {
   return (
     <ConfigSection
       title={t('settings.dataHome.title')}
-      description={t('settings.dataHome.description')}
+      help={t('settings.dataHome.description')}
     >
       <div className="rounded-lg border border-border/60 bg-secondary/50 px-3 py-3">
         <div className="flex items-center justify-between gap-3">
@@ -707,7 +694,7 @@ function WorkspaceShellSection() {
   return (
     <ConfigSection
       title={t('settings.workspaceShell.title')}
-      description={t('settings.workspaceShell.description')}
+      help={t('settings.workspaceShell.description')}
     >
       <Field label={t('settings.workspaceShell.mode')}>
         <select
@@ -1037,7 +1024,7 @@ export function LanguageSettingsPage() {
   const { t } = useTranslation()
   return (
     <div className="flex flex-col flex-1 min-h-0">
-      <PageHeader title={t('settings.language.title')} />
+      <PageHeader title={t('settings.language.title')} help={t('settings.language.description')} />
       <SettingsScrollArea className="px-4 py-5 md:px-8">
         <div className="mx-auto w-full max-w-[1100px]">
           <LanguageSection />

@@ -17,18 +17,16 @@ export function BetaSettingsPage() {
         <div className="mx-auto w-full max-w-[880px]">
           <ConfigSection
             title={t('settings.beta.office')}
-            description={t('settings.beta.officeDescription')}
-          >
-            <div className="flex min-h-12 items-center justify-between gap-4">
-              <span className="text-[13px] font-medium text-foreground">{t('settings.beta.office')}</span>
+            help={t('settings.beta.officeDescription')}
+            accessory={
               <Toggle
                 size="sm"
                 checked={office}
                 ariaLabel={t('settings.beta.office')}
                 onChange={setOffice}
               />
-            </div>
-          </ConfigSection>
+            }
+          />
         </div>
       </SettingsScrollArea>
     </div>

@@ -1841,7 +1841,7 @@ html[lang="ja"] .oa-onboarding-title {
   height: var(--collapsible-panel-height);
   overflow: hidden;
   opacity: 1;
-  transition: height 180ms var(--motion-ease-out), opacity 180ms var(--motion-ease-out);
+  transition: height var(--motion-standard) var(--motion-ease-out), opacity var(--motion-standard) var(--motion-ease-out);
 }
 .oa-collapsible-panel[data-starting-style],
 .oa-collapsible-panel[data-ending-style] {

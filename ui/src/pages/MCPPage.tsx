@@ -30,14 +30,11 @@ export function MCPPage() {
           <div className="max-w-[880px] mx-auto">
             <ConfigSection
               title="HTTP Server"
-              description="Expose a local Streamable HTTP endpoint to external MCP clients."
+              help="Expose a local Streamable HTTP endpoint to external MCP clients. OpenAlice must be running."
             >
-              <div className="flex min-h-12 items-center justify-between gap-4 border-b border-border/60 py-2">
+              <div className="flex min-h-12 items-center justify-between gap-4 mb-4 border-b border-border/60 py-2">
                 <div className="min-w-0">
                   <p className="text-[13px] font-medium text-foreground">Run endpoint</p>
-                  <p className="mt-0.5 text-[12px] leading-5 text-muted-foreground">
-                    Available to local clients while OpenAlice is running.
-                  </p>
                 </div>
                 <Toggle
                   ariaLabel="Run the MCP endpoint"

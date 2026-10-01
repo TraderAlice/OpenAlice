@@ -30,7 +30,7 @@ function Switch({ className, size = 'md', ...props }: SwitchProps) {
       nativeButton
       render={<button type="button" />}
       className={cn(
-        'group/switch inline-flex size-10 shrink-0 cursor-pointer items-center justify-center rounded-full outline-none disabled:cursor-not-allowed disabled:opacity-40',
+        'group/switch inline-flex size-10 shrink-0 touch-manipulation cursor-pointer items-center justify-center rounded-full outline-none disabled:cursor-not-allowed disabled:opacity-40',
         'focus-visible:[&_[data-slot=switch-track]]:[box-shadow:var(--oa-focus-shadow)]',
         geometry.footprint,
         className,
@@ -48,7 +48,7 @@ function Switch({ className, size = 'md', ...props }: SwitchProps) {
         <SwitchPrimitive.Thumb
           data-slot="switch-thumb"
           className={cn(
-            'block shrink-0 translate-x-0 rounded-full bg-muted-foreground transition-[translate,background-color] duration-[var(--motion-fast)] [transition-timing-function:var(--motion-ease-out)] data-checked:bg-primary-foreground motion-reduce:transition-none',
+            'block shrink-0 translate-x-0 rounded-full bg-muted-foreground transition-[translate,scale,background-color] duration-[var(--motion-standard)] [transition-timing-function:var(--motion-ease-out)] data-checked:bg-primary-foreground group-active/switch:scale-x-110 group-focus-visible/switch:transition-none motion-reduce:transition-none',
             geometry.thumb,
           )}
         />

@@ -211,7 +211,7 @@ export function MarketDataPage() {
   if (!config) {
     return (
       <div className="flex flex-col flex-1 min-h-0">
-        <PageHeader title="Market Data" description="Structured financial data — prices, fundamentals, macro indicators." />
+        <PageHeader title="Market Data" help="Structured financial data — prices, fundamentals, macro indicators." />
         <div className="flex-1 flex items-center justify-center">
           <CenteredLoading />
         </div>
@@ -268,7 +268,7 @@ export function MarketDataPage() {
     <div className="flex flex-col flex-1 min-h-0">
       <PageHeader
         title="Market Data"
-        description="Structured financial data — prices, fundamentals, macro indicators."
+        help="Structured financial data — prices, fundamentals, macro indicators."
         right={
           <div className="flex items-center gap-3">
             <SaveIndicator status={status} onRetry={retry} />

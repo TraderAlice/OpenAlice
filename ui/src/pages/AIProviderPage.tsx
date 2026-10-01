@@ -24,6 +24,8 @@ import type {
   WorkspaceCredentialDefault,
   WorkspaceCredentialDefaultsResponse,
 } from '../api/config'
+import { CountBadge } from '../components/CountBadge'
+import { ContextHelp } from '../components/ContextHelp'
 import { PageHeader } from '../components/PageHeader'
 import { EmptyState, PageLoading, RecoverySurface, Skeleton } from '../components/StateViews'
 import { SettingsScrollArea, inputClass } from '../components/form'
@@ -66,21 +68,23 @@ export function AIProviderPage() {
   const [modal, setModal] = useState<{ mode: 'add' } | { mode: 'edit'; cred: CredentialSummary } | null>(null)
   const [pendingDelete, setPendingDelete] = useState<CredentialSummary | null>(null)
   const [vaultQuery, setVaultQuery] = useState('')
+  const credentialsRequest = useRef(0)
 
   const reload = useCallback(async () => {
-    setCredentials(null)
+    const request = ++credentialsRequest.current
     setCredentialsLoadError(false)
     try {
       const { credentials: next } = await api.config.getCredentials()
-      setCredentials(next)
+      if (request === credentialsRequest.current) setCredentials(next)
     } catch {
-      setCredentialsLoadError(true)
+      if (request === credentialsRequest.current) setCredentialsLoadError(true)
     }
   }, [])
 
   useEffect(() => {
     void reload()
     api.config.getPresets().then(({ presets: p }) => setPresets(p)).catch(() => {})
+    return () => { credentialsRequest.current += 1 }
   }, [reload])
 
   const apiKeyPresets = useMemo(() => presets.filter(isApiKeyPreset), [presets])
@@ -122,22 +126,24 @@ export function AIProviderPage() {
     <div className="flex flex-col flex-1 min-h-0">
       <PageHeader title={t('aiProvider.title')} />
       <SettingsScrollArea className="px-4 py-5 md:px-8">
+        {credentialsLoadError && (
+          <div role="alert" className="mx-auto mb-4 flex max-w-[1100px] items-center justify-between gap-3 rounded-lg border border-destructive/30 px-3 py-2 text-xs text-destructive">
+            <span>{t('aiProvider.loadErrorTitle')}</span>
+            <Button variant="outline" size="sm" onClick={() => void reload()}>{t('common.retry')}</Button>
+          </div>
+        )}
         <div className="mx-auto grid min-w-0 max-w-[1100px] gap-6 2xl:grid-cols-2">
           {/* ============== Credentials ============== */}
           <section className="min-w-0">
             <div className="flex items-center justify-between mb-3">
               <div className="flex min-w-0 items-baseline gap-1.5">
                 <h2 className="text-[14px] leading-[19px] font-semibold text-foreground">{t('aiProvider.credentials')}</h2>
-                {credentials.length > 0 && (
-                  <span className="text-[11px] text-muted-foreground">
-                    {vaultQuery.trim()
-                      ? t('aiProvider.credentialsFiltered', {
-                          shown: visibleCredentials.length,
-                          total: credentials.length,
-                        })
-                      : t('aiProvider.credentialsCount', { count: credentials.length })}
-                  </span>
-                )}
+                <CountBadge
+                  count={visibleCredentials.length}
+                  label={`${t('aiProvider.credentials')}: ${vaultQuery.trim()
+                    ? t('aiProvider.credentialsFiltered', { shown: visibleCredentials.length, total: credentials.length })
+                    : t('aiProvider.credentialsCount', { count: credentials.length })}`}
+                />
               </div>
               <Button
                 type="button"
@@ -260,7 +266,7 @@ export function AIProviderPage() {
         </div>
 
         <div className="mx-auto mt-6 flex min-h-12 max-w-[1100px] items-center justify-between gap-4 border-t border-border/60 py-3">
-          <p className="min-w-0 text-[12px] leading-5 text-muted-foreground">{t('aiProvider.openAgentRuntimesDescription')}</p>
+          <ContextHelp label={t('aiProvider.openAgentRuntimes')}>{t('aiProvider.openAgentRuntimesDescription')}</ContextHelp>
           <Button
             type="button"
             onClick={() => openOrFocus({ kind: 'settings', params: { category: 'agent-runtimes' } })}

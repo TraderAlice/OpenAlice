@@ -1204,6 +1204,8 @@ export const en = {
       description: 'See which native CLIs this AliceProject can launch, repair missing installs, and choose up to four quick-access runtimes.',
       quickAccess: 'Quick access',
       quickAccessDescription: 'Successful Session launches move their runtime to the front automatically. Use this list as the fallback order behind that recent history. Uninstalled runtimes never auto-fill.',
+      quickAccessCount: '{{count}} of {{limit}} pinned',
+      catalogCount: '{{count}} runtimes',
       quickAccessEmpty: 'No pinned runtimes yet. Add up to four from the catalog below.',
       catalog: 'Discovered runtimes',
       catalogDescription: 'Installation state is probed on this machine. It is never stored as a preference.',
@@ -1693,6 +1695,8 @@ export const en = {
     }
   },
   common: {
+    helpFor: 'Help: {{name}}',
+    help: 'Help',
     imageLoadFailed: "The image could not be loaded.",
     back: 'Back',
     loading: 'Loading…',

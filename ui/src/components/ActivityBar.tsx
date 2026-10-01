@@ -21,6 +21,7 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip'
 import { SelectionIndicator } from './SelectionIndicator'
+import { CountBadge } from './CountBadge'
 import { Button } from '@/components/ui/button'
 import { ChatWorkspaceSection } from './workspace/ChatWorkspaceSection'
 import { useUpdateLifecycle } from '../hooks/useUpdateLifecycle'
@@ -196,18 +197,18 @@ export function ActivityBar({
                       const sec = activitySectionFor(item.page)
                       const isActive = item.page === 'chat' ? focusedKind === 'quick-start' : selectedSidebar === sec
                       const Icon = item.icon
-                      let badge: { count: number; label: string; tone: string } | null = null
+                      let badge: { count: number; label: string; tone: 'neutral' | 'info' } | null = null
                       if (item.page === 'inbox' && unreadInbox > 0) {
                         badge = {
                           count: unreadInbox,
                           label: t('nav.unread', { count: unreadInbox }),
-                          tone: 'oa-inbox-unread-count',
+                          tone: 'neutral',
                         }
                       } else if (item.page === 'portfolio' && pendingPush > 0) {
                         badge = {
                           count: pendingPush,
                           label: t('nav.pendingPush', { count: pendingPush }),
-                          tone: 'bg-info text-info-foreground',
+                          tone: 'info',
                         }
                       }
                       const handleClick = () => {
@@ -222,6 +223,7 @@ export function ActivityBar({
                           type="button"
                           onClick={handleClick}
                           aria-label={label}
+                          aria-describedby={badge ? `activity-count-${item.page}` : undefined}
                           aria-current={isActive ? 'page' : undefined}
                           className={`oa-nav-item relative flex items-center rounded-md text-left ${
                             compactRail
@@ -243,14 +245,14 @@ export function ActivityBar({
                           </span>
                           <span className={`flex-1 truncate ${compactRail ? 'md:hidden' : ''}`}>{label}</span>
                           {badge !== null && (
-                            <span
-                              aria-label={badge.label}
-                              className={`flex h-[18px] min-w-[18px] shrink-0 items-center justify-center rounded-full px-1.5 text-[10px] leading-[14px] font-semibold tabular-nums ${badge.tone} ${
-                                compactRail ? 'md:absolute md:-right-1 md:-top-1 md:h-4 md:min-w-4 md:px-1 md:text-[9px]' : ''
-                              }`}
-                            >
-                              {badge.count > 99 ? '99+' : badge.count}
-                            </span>
+                            <CountBadge
+                              id={`activity-count-${item.page}`}
+                              count={badge.count}
+                              label={badge.label}
+                              limit={99}
+                              tone={badge.tone}
+                              className={compactRail ? 'md:absolute md:-right-1 md:-top-1 md:h-4 md:min-w-4 md:px-1 md:text-[9px]' : undefined}
+                            />
                           )}
                         </button>
                       )

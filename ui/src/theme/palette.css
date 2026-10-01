@@ -877,16 +877,6 @@
   color: var(--muted-foreground);
 }
 
-[data-palette-preview] .oa-palette-preview-indicator {
-  background: var(--muted);
-  border-color: var(--border);
-}
-
-[data-palette-preview][data-selected="true"] .oa-palette-preview-indicator {
-  background: var(--primary);
-  border-color: var(--primary);
-}
-
 [data-palette-preview] .oa-palette-preview-shell,
 [data-palette-preview] .oa-palette-preview-terminal {
   border-color: var(--border);

@@ -409,7 +409,7 @@ function ConnectorSettingsSurface({
       {!adapterOnly && (
         <PageHeader
           title={t('connectorSettings.title')}
-          description={t('connectorSettings.description')}
+          help={t('connectorSettings.description')}
           right={<SaveIndicator status={status} onRetry={retry} />}
         />
       )}
@@ -900,7 +900,7 @@ function ConnectorAdapterSection({
       )}
       titleId={titleId}
       focusableTitle
-      description={t('connectorSettings.adapterDescription', { name: definition.label })}
+      help={t('connectorSettings.adapterDescription', { name: definition.label })}
     >
       {children}
     </ConfigSection>

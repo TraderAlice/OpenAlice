@@ -33,7 +33,6 @@ describe('Toggle', () => {
     expect(track?.className).toContain('p-[3px]')
     expect(thumb?.className).toContain('size-4')
     expect(thumb?.className).toContain('data-checked:translate-x-[18px]')
-    expect(thumb?.className).toContain('transition-[translate,background-color]')
 
     fireEvent.click(toggle)
     expect(onChange).toHaveBeenCalledWith(true)

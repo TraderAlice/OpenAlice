@@ -74,7 +74,7 @@ interface ViewProps<K extends ViewKind> {
 }
 
 export type ViewLifecycle = 'active-only' | 'keep-mounted'
-export type ViewShell = 'chat' | 'auto-quant' | 'prediction' | 'market'
+export type ViewShell = 'chat' | 'auto-quant' | 'prediction' | 'market' | 'settings'
 
 export interface ViewModule<K extends ViewKind> {
   kind: K
@@ -188,6 +188,7 @@ const automationSectionTitle: Record<
 
 const automationModule: ViewModule<'automation'> = {
   kind: 'automation',
+  shell: 'settings',
   title: (spec) => automationSectionTitle[spec.params.section],
   toUrl: (spec) => `/settings/developer/${spec.params.section}`,
   Component: (props) => (
@@ -313,21 +314,26 @@ function SettingsRouter({ spec }: ViewProps<'settings'>) {
 
 const settingsModule: ViewModule<'settings'> = {
   kind: 'settings',
+  shell: 'settings',
   title: (spec) => settingsCategoryTitle[spec.params.category],
   toUrl: (spec) =>
     spec.params.category === 'general'
       ? '/settings'
       : `/settings/${spec.params.category}`,
-  Component: (props) => (
+  Component: SettingsRouter,
+}
+
+export function SettingsArea({ children }: { children: ReactNode }) {
+  return (
     <PageSidebarShell
       storageKey="settings"
       titleKey="nav.item.settings"
       defaultWidth={220}
       sidebar={({ closeMobileDrawer }) => <SettingsCategoryList onSelect={closeMobileDrawer} />}
     >
-      <SettingsRouter {...props} />
+      {children}
     </PageSidebarShell>
-  ),
+  )
 }
 
 const utaDetailModule: ViewModule<'uta-detail'> = {
@@ -361,18 +367,10 @@ const devTabTitle: Record<Extract<ViewSpec, { kind: 'dev' }>['params']['tab'], s
 
 const devModule: ViewModule<'dev'> = {
   kind: 'dev',
+  shell: 'settings',
   title: (spec) => devTabTitle[spec.params.tab],
   toUrl: (spec) => `/settings/developer/${spec.params.tab}`,
-  Component: (props) => (
-    <PageSidebarShell
-      storageKey="settings"
-      titleKey="nav.item.settings"
-      defaultWidth={220}
-      sidebar={({ closeMobileDrawer }) => <SettingsCategoryList onSelect={closeMobileDrawer} />}
-    >
-      <DevPage {...props} />
-    </PageSidebarShell>
-  ),
+  Component: DevPage,
 }
 
 const inboxModule: ViewModule<'inbox'> = {

@@ -19,13 +19,13 @@ export function PetSettingsPage() {
     <SettingsScrollArea className="px-6">
       <div className="max-w-2xl">
         <ActivityPreferencesSection />
-        <ConfigSection title={t('pet.sound')} description={t('pet.description')}>
+        <ConfigSection title={t('pet.sound')} help={t('pet.description')}>
           {sound.loading ? <p role="status">{t('pet.loading')}</p> : !sound.settings ?
             <p className="text-sm text-muted-foreground">{t('pet.desktopOnly')}</p> :
             <div className="space-y-6">
               <div className="flex items-center justify-between gap-4">
                 <label htmlFor="pet-sound-enabled" className="text-sm">{t('pet.enabled')}</label>
-                <Toggle id="pet-sound-enabled" checked={sound.settings.enabled} disabled={sound.pending}
+                <Toggle id="pet-sound-enabled" checked={sound.settings.enabled} pending={sound.pending}
                   ariaLabel={t('pet.enabled')} onChange={enabled => { void sound.update({ enabled }) }} />
               </div>
               <div>

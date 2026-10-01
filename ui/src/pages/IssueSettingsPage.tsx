@@ -40,7 +40,7 @@ export function IssueSettingsPage() {
         <div className="mx-auto max-w-[880px]">
           <ConfigSection
             title="Default agent runtime"
-            description="Applied to scheduled and headless issue runs whose frontmatter omits an agent runtime."
+            help="Applied to scheduled and headless issue runs whose frontmatter omits an agent runtime."
           >
             <Field
               label="Agent runtime"

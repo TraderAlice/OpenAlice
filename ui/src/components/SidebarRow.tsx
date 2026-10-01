@@ -63,7 +63,7 @@ export function SidebarRow({
       aria-controls={ariaControls}
       onClick={onClick}
       onKeyDown={(e) => {
-        if (e.key === 'Enter' || e.key === ' ') {
+        if (e.target === e.currentTarget && (e.key === 'Enter' || e.key === ' ')) {
           e.preventDefault()
           onClick()
         }

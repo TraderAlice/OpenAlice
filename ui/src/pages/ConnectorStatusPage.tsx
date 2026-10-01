@@ -109,7 +109,7 @@ export function ConnectorStatusPage() {
     <div className="flex flex-col flex-1 min-h-0">
       <PageHeader
         title={t('connectorStatus.title')}
-        description={t('connectorStatus.description')}
+        help={t('connectorStatus.description')}
         right={(
           <div className="flex items-center gap-2">
             {lastUpdatedAt && (
