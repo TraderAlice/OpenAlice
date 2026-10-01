@@ -360,7 +360,7 @@ export function ActivityBarSettingsPage() {
                 active?.kind === 'group' && active.id === group.id ? 'oa-sortable-placeholder' : ''
               }`}
             >
-              <div data-nav-group-header className="flex min-h-12 items-center gap-2 border-b border-border/50 px-3 py-2">
+              <div data-nav-group-header className="flex min-h-12 items-center gap-2 px-3 py-2">
                 <Button
                   type="button"
                   variant="ghost"
@@ -414,7 +414,7 @@ export function ActivityBarSettingsPage() {
                   </Button>
                 )}
               </div>
-              <div data-nav-item-list className="flex flex-col py-1">
+              <div data-nav-item-list className="flex flex-col border-t border-border/50 py-1 empty:hidden">
                 {group.items.map((item) => {
                   const label = t(item.leaf.labelKey)
                   const Icon = item.leaf.icon

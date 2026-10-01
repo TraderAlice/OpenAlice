@@ -407,8 +407,8 @@ export function WorkspaceAIPreferencesPanel({ workspace, agents, onSaved, onConf
                     </div>
                   )}
 
-                  <div className="overflow-hidden rounded-lg border border-border">
-                    <div className="grid grid-cols-[minmax(7rem,1fr)_minmax(0,2fr)_auto] gap-3 border-b border-border bg-muted/40 px-3 py-2 text-sm font-medium text-muted-foreground">
+                  <div className="divide-y divide-border overflow-hidden rounded-lg border border-border">
+                    <div className="grid grid-cols-[minmax(7rem,1fr)_minmax(0,2fr)_auto] gap-3 bg-muted/40 px-3 py-2 text-sm font-medium text-muted-foreground">
                       <span>{t('workspaceSettings.preferences.runtime')}</span>
                       <span>{t('workspaceSettings.preferences.resolvedPreference')}</span>
                       <span className="sr-only">{t('common.edit')}</span>
@@ -418,7 +418,7 @@ export function WorkspaceAIPreferencesPanel({ workspace, agents, onSaved, onConf
                       const recent = persistedRuntime[mode].recent.agents[agent.id]
                       const summary = preferenceSummary(fixed ?? recent, credentials, t('workspaceSettings.preferences.agentLogin'))
                       return (
-                        <div key={agent.id} className="grid min-h-12 grid-cols-[minmax(7rem,1fr)_minmax(0,2fr)_2rem] items-center gap-3 border-b border-border/70 px-3 py-2 last:border-b-0">
+                        <div key={agent.id} className="grid min-h-12 grid-cols-[minmax(7rem,1fr)_minmax(0,2fr)_2rem] items-center gap-3 px-3 py-2">
                           <div className="flex min-w-0 items-start gap-2">
                             <AgentRuntimeIcon agentId={agent.id} className="mt-px size-[18px] shrink-0" />
                             <div className="min-w-0">
