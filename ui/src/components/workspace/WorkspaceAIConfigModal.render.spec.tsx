@@ -310,7 +310,7 @@ describe('WorkspaceAIConfigModal local model metadata', () => {
       <WorkspaceAIConfigModal wsId="chat-1" initialSection="ai" initialAgent="codex" onClose={vi.fn()} />,
     )
 
-    fireEvent.change(await screen.findByPlaceholderText('gpt-5.5'), {
+    fireEvent.change(await screen.findByRole('combobox', { name: '模型' }), {
       target: { value: 'gpt-5.6-sol' },
     })
     fireEvent.click(screen.getByRole('button', { name: '保存' }))

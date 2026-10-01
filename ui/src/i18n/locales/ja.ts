@@ -63,7 +63,7 @@ export const ja: Resources = {
 
   modelCatalog: {
     bundled: "組み込みのモデル候補を表示しています。",
-    missing: "最新のモデル一覧に {{model}} がありません。選択は保持されていますが、利用可否が変わった可能性があります。",
+    missing: "一覧にないモデル",
     loading: "この AI アクセスのモデルを読み込み中…",
     failed: "モデルを取得できませんでした。再試行するか、一覧 API がない場合は ID を入力してください。",
     empty: "モデルがありません。このアカウントのプロバイダーを設定して更新してください。",
@@ -1255,8 +1255,6 @@ export const ja: Resources = {
     noCompatible: '保管庫に互換性のある認証情報がまだありません。',
     dontSeed: 'Runtime のネイティブ既定値を使用',
     protocol: 'プロトコル: {{protocol}}',
-    model: 'モデル: {{model}}',
-    automatic: '自動登録: {{summary}}',
     advancedReasoning: '詳細設定 — 未知モデルの推論機能',
     useRuntimeDefault: 'ランタイム既定値を使用',
     supportsReasoning: 'モデルは推論モードをサポート',
@@ -1499,7 +1497,6 @@ export const ja: Resources = {
       authHeaderHelp: 'Anthropic 公式は x-api-key を使用します。MiniMax や LongCat などの互換ゲートウェイでは Authorization: Bearer がよく使われます。',
       model: 'モデル',
       modelSuggestions: '一致したプロバイダーからの候補です。任意のモデル ID も入力できます。',
-      registeredAutomatically: '自動登録:',
       reasoningEffort: '推論強度',
       reasoningEffortLabel: '{{agent}} の推論強度',
       registeredDefault: '登録済みの既定値',

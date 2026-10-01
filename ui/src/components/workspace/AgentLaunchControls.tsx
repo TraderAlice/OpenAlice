@@ -11,7 +11,6 @@ import { useTranslation } from 'react-i18next'
 import {
   AlertTriangle,
   ChevronDown,
-  Cpu,
   Gauge,
   Info,
   KeyRound,
@@ -43,11 +42,13 @@ import {
   DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
-import { formatContextWindow, type AgentLaunchConfigState } from '../../hooks/useAgentLaunchConfig'
+import { type AgentLaunchConfigState } from '../../hooks/useAgentLaunchConfig'
 import { useAgentRuntimes } from '../../hooks/useAgentRuntimes'
 import { projectAgentRuntimeQuickAccess } from '../../lib/agentRuntimeQuickAccess'
 import { AgentRuntimeIcon } from '../../lib/agentRuntimeIcon'
 import { AIProviderIcon } from '@/lib/aiProviderIcon'
+import { ModelIdentity } from '../ModelIdentity'
+import { modelDisplayName, modelManufacturer } from '../../lib/modelIdentity'
 import { ModelCatalogStatus } from '../ModelCatalogStatus'
 import { ModelCombobox } from '../credentials/PresetFields'
 import {
@@ -128,9 +129,7 @@ function AgentLaunchAccessItems({ config, onConfigureProvider }: {
           <Settings2 className="size-4 shrink-0" aria-hidden />
           <span className="min-w-0 flex-1">
             <span className="block break-words">{t('chatLanding.workspaceAiAccess')}</span>
-            {config.detectedCredential.model && (
-              <span className="block break-words text-sm text-muted-foreground">{config.detectedCredential.model}</span>
-            )}
+
           </span>
           <span className="size-4 shrink-0">{config.accessMode === 'auto' && <SelectionCheckIcon />}</span>
         </DropdownMenuItem>
@@ -166,9 +165,7 @@ function AgentLaunchAccessItems({ config, onConfigureProvider }: {
               <span className="block break-words text-sm text-muted-foreground">
                 {t('chatLanding.savedAccessDetail', { credential: credentialAccessDetail(credential) })}
               </span>
-              {credential.resolvedModel && (
-                <span className="block text-sm text-muted-foreground [overflow-wrap:anywhere]">{credential.resolvedModel}</span>
-              )}
+
             </span>
             <span className="size-4 shrink-0">{active && <SelectionCheckIcon />}</span>
           </DropdownMenuItem>
@@ -231,6 +228,8 @@ function AgentLaunchInferenceMenu({
   const resolvedModel = config.launchModel
     ?? config.defaultModel
     ?? t('chatLanding.runtimeDefaultModel')
+  const resolvedModelLabel = config.modelOptions.find((model) => model.id === resolvedModel)?.label
+  const modelVendor = modelManufacturer(resolvedModel, config.credential?.vendor)
   const modelValue = config.launchModel ?? ''
   const effortValue = config.selectedReasoningEffort ?? ''
   const knownModels = config.modelOptions.filter((model) => model.id !== config.defaultModel)
@@ -266,23 +265,7 @@ function AgentLaunchInferenceMenu({
               : 'group/inference oa-pressable inline-flex min-h-9 min-w-0 max-w-full items-center gap-2 rounded-full bg-secondary px-3 py-1.5 text-sm leading-5 text-foreground transition-colors hover:bg-muted'}
           />}
         >
-          {access?.icon ?? <Cpu className={settings ? 'h-4 w-4 shrink-0 text-muted-foreground' : 'h-3 w-3 shrink-0 text-muted-foreground'} />}
-          {settings ? (
-            <span className="min-w-0 flex-1">
-              <span className="block text-sm font-medium text-muted-foreground">
-                {t('chatLanding.selectModelAndEffort')}
-              </span>
-              <span className="flex min-w-0 flex-wrap items-baseline gap-x-3 gap-y-1 text-sm text-foreground">
-                <span className="min-w-0 truncate font-medium">{resolvedModel}</span>
-                <span className="shrink-0 text-xs text-muted-foreground">{resolvedEffort}</span>
-              </span>
-            </span>
-          ) : (
-            <>
-              <span className="min-w-0 max-w-[240px] truncate">{resolvedModel}</span>
-              {config.launchReasoningEffort && <span className="min-w-0 truncate rounded-full bg-background px-2 py-0.5 text-sm text-muted-foreground">{resolvedEffort}</span>}
-            </>
-          )}
+          <ModelIdentity model={resolvedModel} label={resolvedModelLabel} vendor={config.credential?.vendor} className="flex-1 text-left" />
           <ChevronDown className="size-4 shrink-0 opacity-60 transition-transform duration-[var(--motion-standard)] [transition-timing-function:var(--motion-ease-out)] group-aria-expanded/inference:rotate-180 group-focus-visible/inference:transition-none motion-reduce:transition-none" />
         </DropdownMenuTrigger>
         <DropdownMenuContent
@@ -305,9 +288,9 @@ function AgentLaunchInferenceMenu({
           </DropdownMenuSub>}
           <DropdownMenuSub>
             <DropdownMenuSubTrigger className="oa-inference-setting">
-              <Cpu className="size-5 text-muted-foreground" aria-hidden />
+              <AIProviderIcon vendor={modelVendor} className="size-5" />
               <span>{t('chatLanding.modelField')}</span>
-              <span className="oa-inference-value">{resolvedModel}</span>
+              <span className="oa-inference-value">{modelDisplayName(resolvedModel, resolvedModelLabel)}</span>
             </DropdownMenuSubTrigger>
             <DropdownMenuSubContent className="flex min-w-[min(20rem,calc(100vw-2rem))] flex-col overflow-hidden">
               <ModelCatalogStatus catalog={config.modelCatalog} selectedModel={config.launchModel ?? config.defaultModel} />
@@ -316,14 +299,11 @@ function AgentLaunchInferenceMenu({
                 value={modelValue}
                 onValueChange={(value) => config.selectModel(value ? String(value) : null)}
               >
-                {details?.contextWindow && (
-                  <DropdownMenuLabel>{t('chatLanding.contextSummary', { limit: formatContextWindow(details.contextWindow) })}</DropdownMenuLabel>
-                )}
                 <DropdownMenuRadioItem value="" closeOnClick={false}>
                   {config.defaultModel ? (
-                    <span className="flex min-w-0 flex-1 flex-wrap items-baseline gap-2">
+                    <span className="flex min-w-0 flex-1 items-center gap-2">
                       <span className="shrink-0">{t('chatLanding.defaultLabel')}</span>
-                      <span className="min-w-0 break-words text-muted-foreground">{config.defaultModel}</span>
+                      <ModelIdentity model={config.defaultModel} label={config.modelOptions.find((model) => model.id === config.defaultModel)?.label} vendor={config.credential?.vendor} className="flex-1" />
                     </span>
                   ) : (
                     <span className="min-w-0 flex-1 break-words">{t('chatLanding.runtimeDefaultModel')}</span>
@@ -331,17 +311,12 @@ function AgentLaunchInferenceMenu({
                 </DropdownMenuRadioItem>
                 {customCurrentModel && (
                   <DropdownMenuRadioItem value={customCurrentModel} closeOnClick={false}>
-                    <span className="min-w-0 flex-1 break-words">{customCurrentModel}</span>
+                    <ModelIdentity model={customCurrentModel} vendor={config.credential?.vendor} className="flex-1" />
                   </DropdownMenuRadioItem>
                 )}
                 {knownModels.map((model) => (
                   <DropdownMenuRadioItem key={model.id} value={model.id} closeOnClick={false}>
-                    <span className="min-w-0 flex-1">
-                      <span className="block break-words">{model.label}</span>
-                      {model.label !== model.id && (
-                        <span className="block break-words text-sm text-muted-foreground">{model.id}</span>
-                      )}
-                    </span>
+                    <ModelIdentity model={model.id} label={model.label} vendor={config.credential?.vendor} className="flex-1" />
                   </DropdownMenuRadioItem>
                 ))}
               </DropdownMenuRadioGroup>
@@ -395,6 +370,7 @@ function AgentLaunchInferenceMenu({
           </DialogHeader>
           <ModelCombobox
             value={customModelDraft}
+            vendor={config.credential?.vendor}
             suggestions={config.modelOptions}
             onChange={setCustomModelDraft}
             ariaLabel={t('chatLanding.customModelId')}

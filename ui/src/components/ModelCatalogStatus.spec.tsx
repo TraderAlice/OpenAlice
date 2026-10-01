@@ -7,13 +7,13 @@ afterEach(cleanup)
 const catalog = { enabled: true, loading: false, error: null, source: 'snapshot' as const, models: [{ id: 'new' }], refresh: vi.fn() }
 it('warns for a selected model absent from a successful snapshot, including an empty list', () => {
   const { rerender } = render(<ModelCatalogStatus catalog={catalog} selectedModel="old" />)
-  expect(screen.getByText('modelCatalog.missing: old')).toBeTruthy()
+  expect(screen.getByText('modelCatalog.missing')).toBeTruthy()
   rerender(<ModelCatalogStatus catalog={{ ...catalog, models: [] }} selectedModel="old" />)
-  expect(screen.getByText('modelCatalog.missing: old')).toBeTruthy()
+  expect(screen.getByText('modelCatalog.missing')).toBeTruthy()
 })
 it('does not treat an incomplete seed list or no selection as a mismatch', () => {
   const { rerender } = render(<ModelCatalogStatus catalog={{ ...catalog, source: 'bundled' }} selectedModel="old" />)
-  expect(screen.queryByText('modelCatalog.missing: old')).toBeNull()
+  expect(screen.queryByText('modelCatalog.missing')).toBeNull()
   rerender(<ModelCatalogStatus catalog={catalog} />)
   expect(screen.queryByText(/modelCatalog.missing/)).toBeNull()
   rerender(<ModelCatalogStatus catalog={catalog} selectedModel="new" />)

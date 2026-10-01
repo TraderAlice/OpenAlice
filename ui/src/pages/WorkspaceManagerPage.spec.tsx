@@ -406,7 +406,7 @@ describe('WorkspaceManagerPage runtime selection', () => {
 
     render(<WorkspaceManagerPage spec={{ kind: 'workspace-manager', params: {} }} />)
 
-    expect(await findInferenceTrigger('MiniMax-M2.5')).toBeTruthy()
+    expect(await findInferenceTrigger('MiniMax M2.5')).toBeTruthy()
     expect(screen.queryByText('Saved in this workspace')).toBeNull()
     expect(screen.queryByText(/context$/)).toBeNull()
     expect(screen.getByRole('status').textContent).toContain('Claude still needs its own first-run setup')
@@ -462,14 +462,14 @@ describe('WorkspaceManagerPage runtime selection', () => {
 
     render(<WorkspaceManagerPage spec={{ kind: 'workspace-manager', params: {} }} />)
 
-    expect(await findInferenceTrigger('anthropic/claude-sonnet-4.6')).toBeTruthy()
+    expect(await findInferenceTrigger('Claude Sonnet 4.6')).toBeTruthy()
     const user = userEvent.setup()
     screen.getByRole('button', { name: 'AI Provider, Model and reasoning' }).focus()
     await user.keyboard('{ArrowDown}')
     await user.click(screen.getByRole('menuitem', { name: /^Model/ }))
     await waitFor(() => {
       const options = screen.getAllByRole('menuitemradio').map((option) => option.textContent)
-      expect(options).toEqual([expect.stringContaining('anthropic/claude-sonnet-4.6'), expect.stringContaining('openai/gpt-5.6')])
+      expect(options).toEqual([expect.stringContaining('Claude Sonnet 4.6'), expect.stringContaining('GPT 5.6')])
       expect(options.join(' ')).not.toContain('grok-4.6')
     })
   })
@@ -524,12 +524,11 @@ describe('WorkspaceManagerPage runtime selection', () => {
     render(<WorkspaceManagerPage spec={{ kind: 'workspace-manager', params: {} }} />)
 
     expect((await screen.findByRole('button', { name: 'AI Provider, Model and reasoning' })).title).toContain('Gemini')
-    const geminiModel = await findInferenceTrigger('gemini-3.1-flash-lite')
+    const geminiModel = await findInferenceTrigger('Gemini 3.1 Flash Lite')
     const user = userEvent.setup()
     geminiModel.focus()
     await user.keyboard('{ArrowDown}')
     await user.click(screen.getByRole('menuitem', { name: /^Model/ }))
-    expect(await screen.findByText('256K context')).toBeTruthy()
     await user.keyboard('{Escape}{Escape}')
     expect(screen.queryByText('Agent runtime')).toBeNull()
     fireEvent.click(screen.getByRole('button', { name: 'Adjust workspace AI' }))
@@ -540,7 +539,7 @@ describe('WorkspaceManagerPage runtime selection', () => {
     screen.getByRole('menuitem', { name: /^AI Provider/ }).focus()
     await user.keyboard('{ArrowRight}')
     await user.click(await screen.findByRole('menuitem', { name: /DeepSeek/ }))
-    expect(await findInferenceTrigger('deepseek-chat')).toBeTruthy()
+    expect(await findInferenceTrigger('DeepSeek Chat')).toBeTruthy()
     expect(mocks.rememberQuickChatLaunch).toHaveBeenCalledWith({
       agent: 'pi',
       accessMode: 'vault',
@@ -585,7 +584,7 @@ describe('WorkspaceManagerPage runtime selection', () => {
     expect(screen.getByRole('button', { name: 'AI Provider, Model and reasoning' }).title).toContain('Pi account')
     expect(screen.queryByText('Gemini')).toBeNull()
     expect(screen.getByRole('button', { name: 'AI Provider, Model and reasoning' }).textContent)
-      .not.toContain('gemini-3.1-flash-lite')
+      .not.toContain('Gemini 3.1 Flash Lite')
 
     await act(async () => {
       resolvePreferences({ lastCredentialByAgent: { pi: 'google-1' }, recentChatWorkspaceId: null })
@@ -625,7 +624,6 @@ describe('WorkspaceManagerPage runtime selection', () => {
     localModel.focus()
     await user.keyboard('{ArrowDown}')
     await user.click(screen.getByRole('menuitem', { name: /^Model/ }))
-    expect(await screen.findByText('128K context')).toBeTruthy()
     await user.keyboard('{Escape}{Escape}')
     expect(screen.getByRole('button', { name: 'AI Provider, Model and reasoning' }).title).toContain('Workspace AI setup')
   })

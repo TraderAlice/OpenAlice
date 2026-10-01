@@ -71,7 +71,7 @@ export const zhHant: Resources = {
 
   modelCatalog: {
     bundled: "正在使用內建模型建議。",
-    missing: "最新模型列表中沒有 {{model}}。已保留你的選擇，該模型的可用性可能已變更。",
+    missing: "模型未列入目錄",
     loading: "正在讀取此 AI 存取的模型清單…",
     failed: "讀取模型失敗，請重試；若服務商未提供模型清單 API，可手動輸入 ID。",
     empty: "未發現模型。請先為此帳戶設定模型提供商，再重新整理。",
@@ -1263,8 +1263,6 @@ export const zhHant: Resources = {
     noCompatible: '憑證庫裡還沒有相容憑證。',
     dontSeed: '使用 Runtime 原生預設值',
     protocol: '協定：{{protocol}}',
-    model: '模型：{{model}}',
-    automatic: '自動登記：{{summary}}',
     advancedReasoning: '進階——未知模型的思考能力',
     useRuntimeDefault: '使用執行環境預設值',
     supportsReasoning: '模型支援思考模式',
@@ -1507,7 +1505,6 @@ export const zhHant: Resources = {
       authHeaderHelp: 'Anthropic 官方介面使用 x-api-key；MiniMax、LongCat 等相容閘道通常要求 Authorization: Bearer。',
       model: '模型',
       modelSuggestions: '來自相符供應方的建議；也可以輸入任意模型 ID。',
-      registeredAutomatically: '自動登記：',
       reasoningEffort: '思考強度',
       reasoningEffortLabel: '{{agent}} 思考強度',
       registeredDefault: '登記預設值',

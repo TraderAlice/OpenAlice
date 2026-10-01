@@ -82,7 +82,7 @@ export const en = {
 
   modelCatalog: {
     bundled: "Using built-in model suggestions.",
-    missing: "{{model}} is not in the latest model list. Your selection is kept; availability may have changed.",
+    missing: "Model not listed",
     loading: "Loading models from this AI access…",
     failed: "Could not load models. Retry, or enter an ID manually if this provider has no model list API.",
     empty: "No models found. Configure a provider in this account, then refresh.",
@@ -1273,8 +1273,6 @@ export const en = {
     noCompatible: 'No compatible credential in the vault yet.',
     dontSeed: 'Let Agent runtime manage access',
     protocol: 'Protocol: {{protocol}}',
-    model: 'Model: {{model}}',
-    automatic: 'Automatic: {{summary}}',
     advancedReasoning: 'Advanced — unknown model reasoning',
     useRuntimeDefault: 'Let Agent runtime manage access',
     supportsReasoning: 'Model supports reasoning',
@@ -1517,7 +1515,6 @@ export const en = {
       authHeaderHelp: 'Anthropic first-party uses x-api-key. Compatible gateways such as MiniMax and LongCat often require Authorization: Bearer.',
       model: 'Model',
       modelSuggestions: 'Suggestions from the matched provider — or type any model ID.',
-      registeredAutomatically: 'Registered automatically:',
       reasoningEffort: 'Reasoning effort',
       reasoningEffortLabel: '{{agent}} reasoning effort',
       registeredDefault: 'registered default',

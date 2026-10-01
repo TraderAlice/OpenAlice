@@ -1,3 +1,4 @@
+import { modelDisplayName } from '../../lib/modelIdentity'
 import { Select } from '@/components/ui/select'
 import { DetailsSummary } from '../ui/collapsible'
 import { useMemo, useRef, useState } from 'react'
@@ -463,15 +464,15 @@ export function CredentialModal({ mode, cred, presets, agents, initialPresetId, 
 
               <Field
                 label={t('aiProvider.credentialModal.defaultModel')}
-                description={t('modelCatalog.selectHelp')}
               >
                 <ModelCombobox
                   value={model}
+                  vendor={VENDOR_BY_PRESET[preset.id]}
                   suggestions={models}
                   onChange={setModel}
                   placeholder={t('modelCatalog.selectPlaceholder')}
                   ariaLabel={t('aiProvider.credentialModal.defaultModel')}
-                  suggestionsLabel={t('aiProvider.credentialModal.defaultModelHelp')}
+                  suggestionsLabel={t('workspaceSettings.ai.modelSuggestions')}
                 />
                 <ModelCatalogStatus catalog={modelCatalog} selectedModel={model} />
               </Field>
@@ -493,7 +494,7 @@ export function CredentialModal({ mode, cred, presets, agents, initialPresetId, 
 
               {!isDirect && (
                 <p className="rounded-lg bg-muted px-3 py-2 text-[10.5px] leading-relaxed text-muted-foreground">
-                  {t('aiProvider.credentialModal.testExplanation', { model: model.trim() || t('aiProvider.credentialModal.selectedModel') })}
+                  {t('aiProvider.credentialModal.testExplanation', { model: model.trim() ? modelDisplayName(model, models.find((candidate) => candidate.id === model)?.label) : t('aiProvider.credentialModal.selectedModel') })}
                 </p>
               )}
 

@@ -1,3 +1,8 @@
+import mistralIcon from '@lobehub/icons-static-svg/icons/mistral-color.svg'
+import metaIcon from '@lobehub/icons-static-svg/icons/meta-color.svg'
+import qwenIcon from '@lobehub/icons-static-svg/icons/qwen-color.svg'
+import mimoIcon from '@lobehub/icons-static-svg/icons/xiaomimimo.svg'
+import hunyuanIcon from '@lobehub/icons-static-svg/icons/hunyuan-color.svg'
 import anthropicIcon from '@lobehub/icons-static-svg/icons/anthropic.svg'
 import cursorIcon from '@lobehub/icons-static-svg/icons/cursor.svg'
 import deepseekIcon from '@lobehub/icons-static-svg/icons/deepseek-color.svg'
@@ -22,6 +27,11 @@ interface BrandAsset {
 }
 
 const AI_PROVIDER_BRANDS: Record<string, BrandAsset> = {
+  mistral: { src: mistralIcon },
+  meta: { src: metaIcon },
+  qwen: { src: qwenIcon },
+  mimo: { src: mimoIcon, monochrome: true },
+  hunyuan: { src: hunyuanIcon },
   anthropic: { src: anthropicIcon, monochrome: true },
   openai: { src: openaiIcon, monochrome: true },
   google: { src: geminiIcon },
