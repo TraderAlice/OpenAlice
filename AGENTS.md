@@ -14,27 +14,21 @@ Detailed delivery and release procedure lives in
 
 ## Product and Architecture Boundaries
 
-- `src/` is Alice: Workspace lifecycle, tools, data domains, HTTP/IPC surfaces,
-  file-backed state, and the UTA client boundary.
-- `services/uta/` owns brokers, accounts, approvals, snapshots, FX, and trading
-  writes. Do not move broker state back into Alice.
-- The model loop runs in native CLIs (`claude`, `codex`, `cursor-agent`, `agy`,
-  `grok`, `omp`, `opencode`, `pi`). Alice owns credentials and injection, not an
-  in-process agent loop.
-- New agent-facing capabilities normally ship as Workspace templates, skills,
-  or satellite repositories. Do not grow a parallel workflow engine in `src/`.
-- UTA is optional for non-trading use. Startup, onboarding, and Chat must work
-  in lite/read-only mode without a broker carrier.
-- Chat and AutoQuant V2 Workspaces are durable and reusable. AutoQuant's
-  internal projects and experiments remain owned by its coding agent.
-- `OPENALICE_HOME` is the user-state root. Shipped persisted-state changes use
-  the migration framework and generated [[src/migrations/INDEX.md]]; never hide
-  one-off cleanup in startup code.
-- Secrets never belong in tracked files, logs, fixtures, PR bodies, or agent
-  instructions. Treat account, auth, provider, sealing, signing, and
-  notarization paths as sensitive.
+- AliceProject is the runtime and state-isolation boundary. Each owns a complete
+  `OPENALICE_HOME` and Guardian tree; Workspaces and Sessions live within it.
+  The Supervisor registry lives outside project homes. Selecting a project
+  must not implicitly move, copy, merge, or delete state.
+- Native CLIs own the model loop; Alice owns launch and context injection.
+  Do not add an in-process model loop or a parallel workflow engine.
+- UTA is optional: non-trading startup, onboarding, and Chat must work without it.
+- Workspaces are durable and reusable; new agent-facing capabilities belong in
+  templates, skills, or satellite repositories.
+- Released persisted-state changes require the appropriate migration mechanism,
+  not one-off startup cleanup.
+- Never put secrets in tracked files, logs, fixtures, PR bodies, or agent instructions.
 
-See [[docs/project-structure.md]] for current ownership and entry points.
+Details: [[docs/project-structure.md]], [[docs/alice-project.md]], and
+[[docs/data-locations.md]].
 
 ## Delivery Authority
 
