@@ -174,6 +174,16 @@ change. It returns stored feed content, which may be only a summary, and does
 not fetch the publisher webpage. Empty search results establish only that no
 match exists in the available subscribed-feed index.
 
+The News list interprets persisted `metadata.categories` as feed coverage only
+when `metadata.ingestSource` is `rss`, the collector that wrote those categories.
+Other archived records retain unknown ownership; publisher names and headline
+text are not provenance. This read-time interpretation does not rewrite JSONL or
+infer article associations. HTTP and demo responses carry `categoryScope`;
+exact tag requests use `scope:dimension:value`, with shared conservative alias
+normalization. Region tags such as `us` and `cn` are distinct from article market
+tags such as `us-stocks` and `a-shares`. Feed tags never drive article market or
+sentiment views. Keyword retains literal substring search.
+
 ## Raw history consumption
 
 `alice market bars --bar-id 'yfinance|AAPL' --asset-class equity --interval 1d

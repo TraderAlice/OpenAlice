@@ -125,6 +125,7 @@ export class NewsCollector {
           guid: item.guid,
           ingestSource: 'rss',
           dedupKey,
+          // Categories belong to this feed; ingestSource preserves their provenance.
           ...(feed.categories ? { categories: feed.categories.join(',') } : {}),
           ...(item.image ? { image: item.image } : {}),
         },

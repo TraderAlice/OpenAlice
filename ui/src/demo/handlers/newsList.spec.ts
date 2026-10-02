@@ -32,6 +32,42 @@ describe('demo News handlers', () => {
     }
   })
 
+  it.each(['F', 'BRK.B'])('combines complete-token matching with category provenance before limiting (%s)', async (symbol) => {
+    const original = [...demoNewsArticles]
+    const fixture = { content: '', source: 'test', link: null, categories: null }
+    const time = (index: number) => new Date(Date.now() - (10 - index) * 60_000).toISOString()
+    demoNewsArticles.splice(0, demoNewsArticles.length,
+      { ...fixture, time: time(1), title: `${symbol} results`, categoryScope: 'source', categories: 'us' },
+      { ...fixture, time: time(2), title: 'Issuer update', content: `($${symbol.toLowerCase()}) announces earnings`, categoryScope: 'unknown' },
+      { ...fixture, time: time(3), title: 'Explicit article tag', categoryScope: 'article', categories: symbol },
+      { ...fixture, time: time(4), title: `X${symbol}X outlook` },
+      { ...fixture, time: time(5), title: 'Source category only', categoryScope: 'source', categories: symbol },
+      { ...fixture, time: time(6), title: 'Unknown category only', categoryScope: 'unknown', categories: symbol },
+      { ...fixture, time: time(7), title: 'Missing category origin', categories: symbol },
+    )
+    try {
+      const titles = async (query: string) => (await (await fetch(`${baseUrl}/api/news${query}`)).json()).items.map((row: { title: string }) => row.title)
+      expect(await titles(`?symbol=${encodeURIComponent(symbol)}`)).toEqual([`${symbol} results`, 'Issuer update', 'Explicit article tag'])
+      expect(await titles(`?symbol=${encodeURIComponent(symbol)}&limit=1`)).toEqual(['Explicit article tag'])
+      expect(await titles(`?symbol=${encodeURIComponent(symbol)}&tag=source:region:us`)).toEqual([`${symbol} results`])
+      expect(await titles(`?keyword=${encodeURIComponent(symbol)}`)).toEqual(demoNewsArticles.map((row) => row.title))
+    } finally {
+      demoNewsArticles.splice(0, demoNewsArticles.length, ...original)
+    }
+  })
+
+  it('uses exact tag ownership, dimension and aliases rather than keyword text', async () => {
+    const source = await fetch(`${baseUrl}/api/news?tag=source:region:USA`)
+    const sourceBody = await source.json()
+    expect(sourceBody.items.map((row: { title: string }) => row.title)).toEqual(['Household budgeting tips from a US feed'])
+    expect(sourceBody.items[0].categoryScope).toBe('source')
+    const article = await fetch(`${baseUrl}/api/news?tag=article:region:us`)
+    expect((await article.json()).items.every((row: { categoryScope: string }) => row.categoryScope === 'article')).toBe(true)
+    const unknown = await fetch(`${baseUrl}/api/news?tag=unknown:unknown:cn`)
+    expect((await unknown.json()).items[0].title).toBe('Archived article with unknown category origin')
+    expect((await fetch(`${baseUrl}/api/news?tag=source:market:us`)).status).toBe(400)
+  })
+
   it('uses an explicit range as an exclusive-start, inclusive-end interval', async () => {
     const start = demoNewsArticles.find((article) => article.title.startsWith('Hang Seng TECH'))!
     const end = demoNewsArticles.find((article) => article.title.startsWith('NVDA'))!

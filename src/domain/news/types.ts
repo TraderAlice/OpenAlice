@@ -28,7 +28,7 @@ export interface RSSFeedConfig {
   url: string
   /** Source tag stored in metadata.source */
   source: string
-  /** Optional category tags */
+  /** Optional feed coverage tags; never article associations. */
   categories?: string[]
   /** Short human-readable description — shown in the UI to help users pick. */
   description?: string

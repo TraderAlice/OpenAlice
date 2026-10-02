@@ -1,4 +1,5 @@
 import { http, HttpResponse } from 'msw'
+import { newsTags, newsTagKey, normalizeNewsTagFilter } from '../../../../src/domain/news/tags.js'
 
 import type { NewsListResponse } from '../../api/types'
 import { demoNewsArticles } from '../fixtures/news'
@@ -71,18 +72,24 @@ export const newsListHandlers = [
     const symbol = params.get('symbol')?.trim().toLowerCase() ?? ''
     const limit = parseLimit(params.get('limit'))
 
+    const tagRaw = params.get('tag')
+    const tag = tagRaw === null ? undefined : normalizeNewsTagFilter(tagRaw)
+    if (tag === null) return badRequest('Invalid tag; expected scope:dimension:value')
     const filtered = demoNewsArticles.filter((article) => {
       const articleTime = Date.parse(article.time)
       if (!(articleTime > startTime && articleTime <= endTime)) return false
       if (sourceFilters?.length && !sourceFilters.includes((article.source ?? '').toLowerCase())) return false
+      if (tag && !newsTags(article.categories, article.categoryScope).some((value) => newsTagKey(value) === tag)) return false
       if (keyword && !includesText(article, keyword)) return false
-      if (symbol && !matchesSymbol([article.title, article.content, article.categories ?? ''].join('\n').toLowerCase(), symbol)) return false
+      // Only explicitly article-owned fixture categories can supply ticker tokens.
+      const symbolText = [article.title, article.content, article.categoryScope === 'article' ? article.categories ?? '' : ''].join('\n').toLowerCase()
+      if (symbol && !matchesSymbol(symbolText, symbol)) return false
       return true
     })
     const items = filtered
       .sort(compareNewsArticles)
       .slice(-limit)
-      .map((article) => ({ ...article, image: article.image ?? null }))
+      .map((article) => ({ ...article, categoryScope: article.categoryScope ?? 'unknown', image: article.image ?? null }))
     const body: NewsListResponse = {
       items,
       count: items.length,
