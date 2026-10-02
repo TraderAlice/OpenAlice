@@ -107,6 +107,16 @@ export function FrontendLabPage() {
           </div>
         </section>
 
+        {import.meta.env.VITE_DEMO_MODE && <section className="rounded-lg border border-border p-4">
+          <h3 className="text-sm font-semibold">Demo news notification states</h3>
+          <p className="mt-1 text-xs text-muted-foreground">Fictional articles; thumbnails exercise the real activity projection and shared bubble.</p>
+          <div className="mt-3 flex flex-wrap gap-2">
+            {(['image', 'plain', 'grouped', 'broken'] as const).map(preview => <Button key={preview}
+              variant="outline" onClick={() => void agentRuntimeLogApi.triggerProductActivityTest('news', preview)
+                .then(() => window.dispatchEvent(new Event(GLOBAL_ACTIVITY_REFRESH_EVENT)))}>{preview}</Button>)}
+          </div>
+        </section>}
+
         <section className="overflow-hidden rounded-xl border border-border bg-secondary/35">
           <div className="border-b border-border px-4 py-3">
             <h3 className="text-[14px] font-semibold text-foreground">Product activity journal</h3>

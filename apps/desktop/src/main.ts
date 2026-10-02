@@ -1,3 +1,4 @@
+import { runRendererCredentialPiSmoke } from './credential-pi-smoke.js'
 /**
  * Electron main process — OpenAlice's desktop guardian.
  *
@@ -10,18 +11,19 @@
  * Lifecycle:
  *   relocate data → resolve ports → spawn UTA unless lite mode disables it
  *   → spawn Alice (UTA URL or lite env injected) → wait Alice ready
- *   → open window. Watch `data/control/restart-uta.flag` → respawn UTA.
- *   On quit or unexpected Alice exit: cascade tree-kill both children.
+ *   → open window and tray. Closing the window hides it; Quit or an
+ *   unexpected Alice exit cascades child shutdown. Watch
+ *   `data/control/restart-uta.flag` → respawn UTA.
  *
  * The port + supervision logic is an inline mirror of
  * scripts/guardian/{shared.ts,prod.mjs} — the desktop package is a separate
  * release surface with no TS-dev-tooling dependency, the same reason
  * probe-port.ts is duplicated rather than imported.
  *
- * Out of scope (future iterations): tray icon, multi-window, native menus.
+ * Out of scope (future iterations): multi-window, native menus.
  */
 
-import { app, BrowserWindow, dialog, ipcMain, Menu, Notification, protocol, session, shell } from 'electron'
+import { app, BrowserWindow, dialog, ipcMain, Menu, nativeImage, Notification, protocol, session, shell, Tray } from 'electron'
 import { runRendererTradingModeSmoke } from './trading-mode-smoke.js'
 import { runRendererDataHomeSmoke } from './data-home-smoke.js'
 import { runRendererWorkspaceAcceptanceSmoke } from './workspace-acceptance-smoke.js'
@@ -48,20 +50,25 @@ import { configureAutoUpdate } from './auto-update.js'
 import { BoundedTextTail, conciseDiagnosticTail, DesktopDiagnostics } from './desktop-diagnostics.js'
 import { cancelOpenAliceWebRequests, fetchAliceWebRequest, handleOpenAliceIpcMessage, registerOpenAliceIpc } from './ipc.js'
 import { resolveManagedRuntimeEnv } from './managed-runtime.js'
-import { rememberDataHome, writeDataHomePreferences } from './data-home.js'
+import { defaultDataHomePreferences } from './data-home.js'
 import {
-  chooseDataHomeDirectory,
   createDesktopDataHomeController,
   dataHomeErrorDetail,
   resolveDesktopDataHome,
   type ResolvedDesktopDataHome,
 } from './data-home-desktop.js'
 import { existingOwnerSmokeMode, resolveExistingOwnerStartup } from './existing-owner-startup.js'
+import { DesktopUpdateLifecycle } from './update-lifecycle.js'
 import { inspectPreviousUpdateAttempt, recordUpdateAttempt } from './update-attempt.js'
 import { childIsRunning, stopChild } from './child-shutdown.js'
 import { exitDesktopProcess } from './app-exit.js'
 import { createAppWindow } from './app-window.js'
-import { WebRelay } from './web-relay.js'
+import { configureWindowLifecycle, showAppWindow } from './window-lifecycle.js'
+import type { CompanionHandle } from './companion.js'
+import { CLI_VERSION, UpdateControlService, ClientUpdateService, WebRelay, readStartupTarget, writeStartupTarget, resolveLocalStartupHome, inspectLocalMachine } from './web-relay.js'
+
+// The desktop launcher owns its mode for both relay and child Runtime readers.
+process.env.OPENALICE_RUNTIME_PROFILE = app.isPackaged ? 'electron-packaged' : 'electron-dev'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = dirname(__filename)
@@ -70,10 +77,11 @@ let uta: ChildProcess | null = null
 let connector: ChildProcess | null = null
 let alice: ChildProcess | null = null
 let appQuitting = false
+let tray: Tray | null = null
 let restartingUTA = false
 let restartingConnector = false
 let pendingUTAMode: GuardianTradingModePlan | null = null
-let rendererOnboardingSmokeStarted = false
+let rendererCredentialPiSmokeStarted = false
 let rendererDataHomeSmokeStarted = false
 let rendererTradingModeSmokeStarted = false
 let rendererWorkspaceAcceptanceSmokeStarted = false
@@ -129,9 +137,9 @@ protocol.registerSchemesAsPrivileged([
   },
 ])
 
-if (existingOwnerSmokeMode()) {
-  const smokeUserData = process.env['OPENALICE_ELECTRON_SMOKE_USER_DATA']?.trim()
-  if (smokeUserData) app.setPath('userData', smokeUserData)
+const smokeUserData = process.env['OPENALICE_ELECTRON_SMOKE_USER_DATA']?.trim()
+if (smokeUserData) app.setPath('userData', smokeUserData)
+if (existingOwnerSmokeMode() || process.env['OPENALICE_ELECTRON_SMOKE_STARTUP'] === '1') {
   app.commandLine.appendSwitch('no-sandbox')
   app.commandLine.appendSwitch('disable-gpu')
   app.disableHardwareAcceleration()
@@ -327,11 +335,16 @@ async function waitForUTA(utaUrl: string, timeoutMs = UTA_READY_TIMEOUT_MS): Pro
 
 async function runRendererPtySmoke(win: BrowserWindow): Promise<void> {
   const keepWorkspace = process.env['OPENALICE_ELECTRON_SMOKE_KEEP_WORKSPACE'] === '1'
+  const expectedVersion = JSON.parse(await readFile(resolve(__dirname, '../../package.json'), 'utf8')).version
   const result = await win.webContents.executeJavaScript(`(async () => {
     const stage = (value) => console.warn('[desktop-pty-smoke] renderer stage=' + value)
     stage('bridge')
     const bridge = window.openAlice?.pty
     if (!bridge) throw new Error('window.openAlice.pty missing')
+    const client = await window.openAlice.clientUpdates.status()
+    const backend = await fetch('/api/version?currentOnly=1').then(response => response.json())
+    if (client.currentVersion !== ${JSON.stringify(expectedVersion)} || backend.current !== client.currentVersion) throw new Error('Integrated product versions disagree')
+    stage('product-version=' + client.currentVersion)
     const keyboard = window.openAlice?.keyboard
     if (!keyboard?.getInputSourceId) throw new Error('window.openAlice.keyboard missing')
     const keyboardInputSourceId = await keyboard.getInputSourceId()
@@ -419,151 +432,222 @@ async function runRendererPtySmoke(win: BrowserWindow): Promise<void> {
   )
 }
 
-async function runRendererOnboardingSmoke(win: BrowserWindow): Promise<void> {
-  const result = await win.webContents.executeJavaScript(`(async () => {
-    const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
-    const json = async (res) => {
-      const text = await res.text()
-      let body = null
-      try { body = text ? JSON.parse(text) : null } catch { body = text }
-      if (!res.ok) throw new Error(res.status + ' ' + text)
-      return body
+
+function configureDesktopUpdates(win: BrowserWindow, updateAttemptPath: string): ClientUpdateService {
+  const lifecycle = new DesktopUpdateLifecycle(app.getPath('userData'), () => CLI_VERSION)
+  const ready = async () => {
+    if (win.isDestroyed()) return false
+    if (!await win.webContents.executeJavaScript(`Boolean(window.openAlice?.updater && document.querySelector('[data-testid="activity-bar"]'))`, true)) return false
+    if (win.webContents.getURL().startsWith('app://')) {
+      const response = await fetchAliceWebRequest(new Request('app://openalice/api/version?currentOnly=1'), alice)
+      return response.ok && (await response.json()).current === CLI_VERSION
     }
-    const waitFor = async (label, predicate, timeoutMs = 12000) => {
-      const deadline = Date.now() + timeoutMs
-      let last = null
-      while (Date.now() < deadline) {
-        try {
-          const value = await predicate()
-          if (value) return value
-        } catch (err) {
-          last = err
-        }
-        await sleep(100)
-      }
-      throw new Error('Timed out waiting for ' + label + (last ? ': ' + (last.message || String(last)) : ''))
-    }
-    const activeStep = () => document
-      .querySelector('[data-testid="first-run-guide-step"]')
-      ?.getAttribute('data-onboarding-step') || null
-    const clickPrimary = () => {
-      const button = document.querySelector('[data-testid="first-run-guide-primary"]')
-      if (!button) throw new Error('first-run primary button missing')
-      button.click()
-    }
-    const credentialPrimary = () => document.querySelector('[data-testid="credential-modal-primary"]')
-
-    await waitFor('Electron preload bridge', () => Boolean(
-      window.openAlice?.runtime && window.openAlice?.pty && window.openAlice?.dataHome && window.openAlice?.updater
-    ))
-
-    const runtimeInfo = await window.openAlice.runtime.info()
-    const dataHomeStatus = await window.openAlice.dataHome.getStatus()
-    if (dataHomeStatus.currentHome !== runtimeInfo.userDataHome) {
-      throw new Error('data-home bridge disagrees with runtime info')
-    }
-    if (dataHomeStatus.source !== 'environment' || dataHomeStatus.selectionLock !== 'openalice-home-env') {
-      throw new Error('isolated packaged smoke should be locked by OPENALICE_HOME')
-    }
-
-    const setup = await json(await fetch('/api/workspaces/project-setup'))
-    const workspaceList = await json(await fetch('/api/workspaces'))
-    if (setup.pending?.length || !workspaceList.workspaces?.some(ws => ws.template === 'chat')) {
-      throw new Error('new project did not prepare Chat before opening the renderer')
-    }
-
-    const agents = await json(await fetch('/api/workspaces/agents'))
-    const pi = agents.agents?.find((agent) => agent.id === 'pi')
-    if (!pi?.installed) throw new Error('managed Pi was not detected by packaged /agents')
-
-    const tradingStatus = await json(await fetch('/api/trading/status'))
-    if (tradingStatus.mode !== 'lite') {
-      throw new Error('expected fresh onboarding trading mode to be lite, got ' + tradingStatus.mode)
-    }
-
-    await waitFor('first-run guide', () => document.querySelector('[data-testid="first-run-guide"]'))
-    await waitFor('language step', () => activeStep() === 'language' ? true : false)
-    clickPrimary()
-    await waitFor('welcome step', () => activeStep() === 'lite' ? true : false)
-    clickPrimary()
-    await waitFor('AI access step', () => activeStep() === 'ai' ? true : false)
-
-    const initialReadiness = await waitFor('initial Pi runtime readiness', async () => {
-      const snapshot = await json(await fetch('/api/agent-runtimes/readiness'))
-      const row = snapshot.agents?.pi
-      return row && row.status !== 'unknown' && row.status !== 'checking' ? snapshot : null
-    }, 60000)
-
-    if (!initialReadiness.agents.pi?.ready) {
-      const addCredential = await waitFor('AI credential action', () => {
-        const button = document.querySelector('[data-testid="first-run-guide-primary"]')
-        return button &&
-          !button.disabled &&
-          button.getAttribute('data-onboarding-action') === 'add-credential'
-          ? button
-          : document.querySelector('[data-testid="first-run-guide-add-provider"]')
-      })
-      addCredential.click()
-      await waitFor('credential modal', () => credentialPrimary())
-      credentialPrimary().click()
-      await waitFor('verified credential', () => {
-        const button = credentialPrimary()
-        return button && !button.disabled && button.textContent?.trim() === 'Save' ? true : false
-      })
-      credentialPrimary().click()
-      await waitFor('credential modal close', () => credentialPrimary() ? false : true)
-    }
-
-    const readiness = await waitFor('Pi runtime readiness', async () => {
-      const snapshot = await json(await fetch('/api/agent-runtimes/readiness'))
-      const row = snapshot.agents?.pi
-      if (row?.ready && row.status === 'ready') return snapshot
-      if (row && row.status !== 'unknown' && row.status !== 'checking') {
-        throw new Error('Pi readiness was ' + row.status + ': ' + (row.message || 'no detail'))
-      }
-      return null
-    }, 60000)
-    const piReady = readiness.agents.pi
-
-    await waitFor('AI ready primary button', async () => {
-      const snapshot = await json(await fetch('/api/agent-runtimes/readiness'))
-      const row = snapshot.agents?.pi
-      const button = document.querySelector('[data-testid="first-run-guide-primary"]')
-      return row?.ready === true && (activeStep() === 'broker' || (activeStep() === 'ai' &&
-        button && !button.disabled && button.getAttribute('data-onboarding-action') === 'continue'))
-    }, 60000)
-    if (activeStep() === 'ai') clickPrimary()
-    await waitFor('broker step', () => activeStep() === 'broker' ? true : false)
-
-    return {
-      ok: true,
-      step: activeStep(),
-      piPath: pi.binPath || null,
-      runtimeStatus: piReady.status,
-      runtimeSource: piReady.source,
-      tradingMode: tradingStatus.mode,
-      dataHome: dataHomeStatus.currentHome,
-    }
-  })()`, true) as {
-    ok?: boolean
-    step?: string
-    piPath?: string | null
-    runtimeStatus?: string
-    runtimeSource?: string
-    tradingMode?: string
-    dataHome?: string
+    return true
   }
-  console.log(
-    `[guardian] electron smoke onboarding → ok step=${result.step ?? ''} mode=${result.tradingMode ?? ''} pi=${result.piPath ?? 'managed'} runtime=${result.runtimeStatus ?? ''}/${result.runtimeSource ?? ''} data=${result.dataHome ?? ''}`,
-  )
+  let updateStoppedServices = false
+  const nativeUpdates = configureAutoUpdate(win, {
+    executeInstall: async (version, prepare, handoff, parentOperationId) => {
+      const result = await lifecycle.install(version, prepare, handoff, parentOperationId)
+      if (['failed', 'blocked', 'recovery'].includes(result.phase)) throw new Error(result.error ?? 'Desktop update requires recovery')
+    },
+    beforeInstall: async (version, report) => {
+      await recordUpdateAttempt(updateAttemptPath, {
+        fromVersion: CLI_VERSION,
+        toVersion: version,
+      })
+      desktopDiagnostics?.write('updater', `starting ${CLI_VERSION} -> ${version}`)
+      report('stopping-services')
+      await stopChildren()
+      updateStoppedServices = true
+      report('releasing-runtime')
+      await releaseGuardianRuntimeLock()
+    },
+    onInstallHandoff: (version) => {
+      desktopDiagnostics?.write('updater', `handing ${version} to the native installer`)
+      if (Notification.isSupported()) {
+        new Notification({
+          title: 'OpenAlice is updating',
+          body: `Installing ${version}. OpenAlice will reopen automatically; this can take up to a minute.`,
+        }).show()
+      }
+    },
+    onInstallFailure: (error) => {
+      desktopDiagnostics?.write('updater', `installer handoff failed: ${error.stack ?? error.message}`)
+      const recoveryMessage = appQuitting || updateStoppedServices
+        ? 'OpenAlice will restart on the current version.'
+        : 'OpenAlice is still running on the current version.'
+      dialog.showErrorBox(
+        'OpenAlice update failed',
+        `${error.message}\n\n${recoveryMessage}\n\nDiagnostic log:\n${desktopDiagnostics?.path ?? app.getPath('logs')}`,
+      )
+      if (appQuitting || updateStoppedServices) {
+        app.relaunch()
+        app.exit(1)
+      }
+    },
+  }, CLI_VERSION)
+  const control = new UpdateControlService({
+    root: app.getPath('userData'),
+    scope: () => win.webContents.getURL().startsWith('app://') ? `integrated:${process.env['OPENALICE_HOME'] ?? 'local'}` : `${desktopRelay?.status.target?.machine ?? 'none'}:${desktopRelay?.status.target?.project ?? 'none'}`,
+    project: async (path, body) => {
+      const request = { method: body === undefined ? 'GET' : 'POST', headers: { 'content-type': 'application/json' }, ...(body === undefined ? {} : { body: JSON.stringify(body) }) }
+      const response = win.webContents.getURL().startsWith('app://')
+        ? await fetchAliceWebRequest(new Request(`app://openalice${path}`, request), alice)
+        : await win.webContents.session.fetch(`${desktopRelay!.originUrl}${path}`, { ...request, credentials: 'include' })
+      if (!response.ok) throw new Error(await response.text())
+      return response.json()
+    },
+    backend: { plan: () => { const target = desktopRelay?.status.target; if (!target || target.machine === 'local') throw new Error('This backend updates with its installation owner'); return desktopRelay!.planMachine({ mode: 'upgrade', machineKey: target.machine, projectKey: target.project }) }, apply: id => desktopRelay!.applyMachine(id) },
+    client: { current: () => CLI_VERSION, downloaded: nativeUpdates.downloaded, install: nativeUpdates.install, ready,
+      recovery: { status: () => lifecycle.snapshot(), resume: () => lifecycle.resume(ready), abandon: () => lifecycle.journal.abandon() } },
+  })
+  const resume = () => {
+    void control.status().then(current => current ? control.resume() : null).then(async result => {
+      if (result?.phase === 'succeeded') await inspectPreviousUpdateAttempt(updateAttemptPath, CLI_VERSION)
+    }).catch(error => console.warn('[updates] recovery:', error))
+  }
+  win.webContents.on('did-finish-load', resume)
+  resume()
+  ipcMain.removeHandler('openalice:updates:operation')
+  ipcMain.handle('openalice:updates:operation', () => control.status())
+  ipcMain.handle('openalice:updates:abandon', () => control.abandon())
+  ipcMain.handle('openalice:updates:status', () => control.status())
+  ipcMain.handle('openalice:updates:review', (_event, selection) => control.review(selection))
+  ipcMain.handle('openalice:updates:approve', (_event, plan, fingerprint) => control.approve(plan, fingerprint))
+  ipcMain.handle('openalice:updates:resume', () => { resume(); return { accepted: true } })
+  const clientUpdates = new ClientUpdateService({
+    kind: 'desktop',
+    path: join(app.getPath('userData'), 'client-updates.json'),
+    discover: nativeUpdates.discover,
+  })
+  ipcMain.handle('openalice:client-updates:status', () => clientUpdates.snapshot())
+  ipcMain.handle('openalice:client-updates:check', () => clientUpdates.check())
+  ipcMain.handle('openalice:client-updates:activate', () => { clientUpdates.activate(); resume() })
+  ipcMain.handle('openalice:client-updates:preferences', (_event, input: unknown) => clientUpdates.savePreferences(input))
+  win.once('closed', () => clientUpdates.stop())
+  return clientUpdates
+}
+
+/** Before any local home is selected or locked, the desktop can be a client
+ * shell. Its launcher uses the same relay as web/TUI, with only native chrome
+ * and update IPC. Project-owned file/PT Y capabilities are never registered. */
+async function startDesktopLauncher(repoRoot: string, updateAttemptPath: string, startupError?: unknown): Promise<void> {
+  localRuntimeSuspended = true
+  const { window: win, companion } = createAppWindow(resolve(__dirname, 'preload.js'))
+  const clientUpdates = configureDesktopUpdates(win, updateAttemptPath)
+  const relay = new WebRelay({ clientUpdates, uiRoot: app.isPackaged ? join(process.resourcesPath, 'runtime', 'ui', 'dist') : join(repoRoot, 'ui', 'dist') })
+  desktopRelay = relay
+  await relay.listen()
+  createTray(win, companion)
+  companion?.configureActivity({
+    identity: () => !relay.status.switching && relay.status.target ? JSON.stringify([relay.originUrl, relay.status.generation, relay.status.target.machine, relay.status.target.project]) : null,
+    read: async (query, signal) => { const response = await win.webContents.session.fetch(`${relay.originUrl}/api/agent-runtime${query}`, { signal: signal ? AbortSignal.any([signal, AbortSignal.timeout(15_000)]) : AbortSignal.timeout(15_000) }); if (!response.ok) throw new Error('Activity unavailable'); return response.json() },
+  })
+  Menu.setApplicationMenu(process.platform === 'darwin' ? Menu.buildFromTemplate([{ role: 'appMenu' }, { role: 'editMenu' }, { role: 'windowMenu' }]) : null)
+  configureWindowLifecycle(app, win, () => appQuitting)
+  win.webContents.on('will-navigate', (event, destination) => {
+    if (new URL(destination).origin === relay.originUrl) return
+    event.preventDefault()
+    if (/^https:\/\//i.test(destination)) void shell.openExternal(destination)
+  })
+  win.webContents.setWindowOpenHandler(({ url }) => { if (/^https:\/\//i.test(url)) void shell.openExternal(url); return { action: 'deny' } })
+  const assertSender = (senderId: number) => {
+    if (win.isDestroyed() || senderId !== win.webContents.id) throw new Error('Startup controls are only available in the main window.')
+  }
+  // Keep navigation and saving Default in the same serialized operation.
+  // Relay attachment alone finishes before loadURL; a second IPC request in
+  // that gap must not replace the target that this window is about to remember.
+  let launcherSwitching = false
+  let launcherGeneration = 0
+  const switchLauncher = async (action: (current: () => boolean) => Promise<unknown>) => {
+    if (launcherSwitching) throw new Error('A startup operation is already in progress.')
+    const generation = ++launcherGeneration
+    launcherSwitching = true
+    try { return await action(() => generation === launcherGeneration && !appQuitting && !win.isDestroyed()) } finally { launcherSwitching = false }
+  }
+  const integrate = async (project: string) => {
+    await resolveLocalStartupHome(project) // revalidate key/home before relaunch
+    const args = process.argv.slice(1).filter(arg => !arg.startsWith('--openalice-integrated-project='))
+    app.relaunch({ args: [...args, `--openalice-integrated-project=${project}`] })
+    shutdown()
+  }
+  ipcMain.handle('openalice:desktop-connection:status', event => { assertSender(event.sender.id); return relay.status })
+  ipcMain.handle('openalice:desktop-connection:startup-target', event => { assertSender(event.sender.id); return relay.startupPreference() })
+  ipcMain.handle('openalice:desktop-connection:fleet', async event => { assertSender(event.sender.id); const response = await fetch(`${relay.originUrl}/relay/v1/fleet`); if (!response.ok) throw new Error('Could not discover Machines.'); return response.json() })
+  ipcMain.handle('openalice:desktop-machine:plan', (event, input: unknown) => { assertSender(event.sender.id); return relay.planMachine(input as Parameters<WebRelay['planMachine']>[0]) })
+  ipcMain.handle('openalice:desktop-machine:apply', (event, id: string) => { assertSender(event.sender.id); return relay.applyMachine(id) })
+  ipcMain.handle('openalice:desktop-machine:operation', event => { assertSender(event.sender.id); return relay.machineOperation })
+  ipcMain.handle('openalice:desktop-connection:connect', async (event, machine: string, project: string) => switchLauncher(async (current) => {
+    assertSender(event.sender.id)
+    if (machine === 'local') {
+      const inventory = await inspectLocalMachine()
+      const selected = inventory.machine.projects.find(entry => entry.key === project)
+      if (!selected?.runtime.webEndpoint) return integrate(project)
+    }
+    await relay.connect(machine, project, { current, present: () => win.loadURL(`${relay.originUrl}/settings`) })
+  }))
+  ipcMain.handle('openalice:desktop-connection:project-control', async (event, input: { machine: string; project: string; action: string }) => switchLauncher(async (current) => {
+    assertSender(event.sender.id)
+    if (input?.machine === 'local' && input.action === 'start') return integrate(input.project)
+    await relay.controlProject(input)
+  }))
+  ipcMain.handle('openalice:desktop-connection:return-integrated', async event => switchLauncher(async (current) => {
+    assertSender(event.sender.id)
+    relay.disconnect()
+    await win.loadURL(relay.originUrl)
+  }))
+  if (startupError) relay.setStartupError(startupError)
+  else {
+    const recent = await relay.startupPreference()
+    if (recent.target) await relay.connect(recent.target.machine, recent.target.project, { remember: false }).catch(error => relay.setStartupError(error))
+  }
+  if (process.env['OPENALICE_ACCEPTANCE_CONNECTED'] === '1') await relay.connect('local', 'default', { remember: false })
+  await win.loadURL(relay.originUrl)
+  console.log(`[guardian] desktop client shell ready → ${relay.originUrl}`)
+  if (process.env['OPENALICE_ELECTRON_SMOKE_STARTUP'] === '1') {
+    try {
+      const expectedVersion = JSON.parse(await readFile(join(repoRoot, 'package.json'), 'utf8')).version
+      const result = await win.webContents.executeJavaScript(`(async () => {
+        const deadline = Date.now() + 15000
+        while (!document.querySelector('h1') && Date.now() < deadline) await new Promise(resolve => setTimeout(resolve, 50))
+        const bridge = window.openAlice
+        if (!document.querySelector('h1') || !bridge?.desktopConnection || !bridge?.desktopMachine) throw new Error('Startup chooser or client controls missing')
+        if (bridge.runtime || bridge.pty || bridge.dataHome) throw new Error('Project-owned IPC leaked into startup shell')
+        const client = await bridge.clientUpdates.savePreferences({ autoCheck: false })
+        const httpClient = await fetch('/relay/v1/updates').then(response => response.json())
+        if (client.kind !== 'desktop' || client.currentVersion !== ${JSON.stringify(expectedVersion)}) throw new Error('Desktop product identity differs from its package')
+        if (httpClient.kind !== client.kind || httpClient.currentVersion !== client.currentVersion || httpClient.preferences.autoCheck !== false) throw new Error('HTTP and IPC client owners diverged')
+        const connected = ${JSON.stringify(process.env['OPENALICE_ACCEPTANCE_CONNECTED'] === '1')}
+        const status = await bridge.desktopConnection.status()
+        const recent = await bridge.desktopConnection.startupTarget()
+        if (!connected && status.target) throw new Error('Unexpected project attachment')
+        let backendVersion = null
+        if (connected) {
+          if (status.target?.machine !== 'local' || status.target?.project !== 'default') throw new Error('Separated connection missing')
+          const backend = await fetch('/api/version').then(r => r.json())
+          if (typeof backend.current !== 'string' || !backend.current) throw new Error('Separated backend identity missing')
+          backendVersion = backend.current
+          const native = await bridge.clientUpdates.operation()
+          if (native && native.phase !== 'succeeded') throw new Error('Separated native readiness not verified')
+        }
+        if (document.querySelector('[data-testid="first-run-guide"]')) throw new Error('Legacy wizard mounted')
+        return { heading: document.querySelector('h1').textContent, recent, version: client.currentVersion, backendVersion }
+      })()`)
+      if (alice || uta || connector || guardianRuntimeLock) throw new Error('Startup shell acquired local project ownership')
+      console.log('[guardian] renderer startup smoke passed ' + JSON.stringify(result))
+    } catch (error) {
+      console.error('[guardian] renderer startup smoke failed:', error)
+      process.exitCode = 1
+    } finally { shutdown() }
+  }
 }
 
 app.whenReady().then(async () => {
   desktopDiagnostics = new DesktopDiagnostics(join(app.getPath('logs'), 'desktop.log'))
-  desktopDiagnostics.write('desktop', `starting OpenAlice ${app.getVersion()} pid=${process.pid}`)
+  desktopDiagnostics.write('desktop', `starting OpenAlice ${CLI_VERSION} pid=${process.pid}`)
   const updateAttemptPath = join(app.getPath('userData'), UPDATE_ATTEMPT_FILE)
   try {
-    const previousUpdate = await inspectPreviousUpdateAttempt(updateAttemptPath, app.getVersion())
+    const previousUpdate = await inspectPreviousUpdateAttempt(updateAttemptPath, CLI_VERSION, { ready: false })
     if (previousUpdate.kind === 'succeeded') {
       desktopDiagnostics.write(
         'updater',
@@ -577,7 +661,7 @@ app.whenReady().then(async () => {
       dialog.showErrorBox(
         'OpenAlice update did not finish',
         `The previous update to OpenAlice ${previousUpdate.attempt.toVersion} did not complete. ` +
-          `OpenAlice is still running ${app.getVersion()}.\n\n` +
+          `OpenAlice is still running ${CLI_VERSION}.\n\n` +
           `You can retry from Settings, or install the release manually.\n\nDiagnostic log:\n${desktopDiagnostics.path}`,
       )
     }
@@ -599,11 +683,34 @@ app.whenReady().then(async () => {
   const connectorEntry = resolve(repoRoot, 'services', 'connector', 'dist', 'connector.cjs')
 
   // User state and app resources have independent lifecycles. The desktop
-  // remembers its selected OpenAlice home under Electron's machine-local
-  // userData directory, because the selected home cannot safely own the
-  // pointer to itself. OPENALICE_HOME remains authoritative for automation and
+  // resolves Default from the shared client Supervisor registry. The legacy
+  // data-home preference is read only by the one-time migration.
+  // OPENALICE_HOME remains authoritative for automation and
   // packaged smokes. App resources stay in the package (or repo in dev).
-  const explicitUserDataHome = process.env['OPENALICE_HOME']?.trim()
+  let explicitUserDataHome = process.env['OPENALICE_HOME']?.trim()
+  let localStartupProject: string | null = null
+  const integratedSwitch = '--openalice-integrated-project='
+  const integratedProject = process.argv.find(arg => arg.startsWith(integratedSwitch))?.slice(integratedSwitch.length)
+  // Consume the successful-switch handoff; subsequent relaunches resolve the
+  // shared Default instead of retaining an invocation override indefinitely.
+  for (let index = process.argv.length - 1; index >= 0; index--) {
+    if (process.argv[index]?.startsWith(integratedSwitch)) process.argv.splice(index, 1)
+  }
+  app.commandLine.removeSwitch('openalice-integrated-project')
+  const smokeStartup = Object.keys(process.env).some(key => key.startsWith('OPENALICE_ELECTRON_SMOKE_') && key !== 'OPENALICE_ELECTRON_SMOKE_STARTUP' && process.env[key] === '1')
+  if (!explicitUserDataHome && !smokeStartup) {
+    try {
+      const recent = integratedProject ? { machine: 'local', project: integratedProject } : await readStartupTarget({ legacyDesktopPreferencePath: join(app.getPath('userData'), DATA_HOME_PREFERENCES_FILE) })
+      if (recent?.machine === 'local') {
+        const inventory = await inspectLocalMachine()
+        const selected = inventory.machine.projects.find(project => project.key === recent.project)
+        if (!integratedProject && (!selected?.available || selected.runtime.webEndpoint)) { await startDesktopLauncher(repoRoot, updateAttemptPath, !selected?.available ? new Error('The default local AliceProject data folder is unavailable.') : undefined); return }
+        explicitUserDataHome = await resolveLocalStartupHome(recent.project)
+        localStartupProject = recent.project
+      }
+      else { await startDesktopLauncher(repoRoot, updateAttemptPath); return }
+    } catch (error) { await startDesktopLauncher(repoRoot, updateAttemptPath, error); return }
+  }
   const defaultUserDataHome = join(homedir(), '.openalice')
   const preferencePath = join(app.getPath('userData'), DATA_HOME_PREFERENCES_FILE)
   let resolvedDataHome: ResolvedDesktopDataHome | null
@@ -677,29 +784,13 @@ app.whenReady().then(async () => {
       break
     }
 
-    const chosen = await chooseDataHomeDirectory(userDataHome)
-    if (!chosen) continue
-    if (chosen.path === userDataHome) {
-      dialog.showErrorBox(
-        'OpenAlice — choose another location',
-        'That folder is the complete home already owned by the running AliceProject.',
-      )
-      continue
-    }
-    try {
-      dataHomePreferences = rememberDataHome(dataHomePreferences, chosen.path, { startupPromptCompleted: true })
-      await writeDataHomePreferences(preferencePath, dataHomePreferences)
-    } catch (error) {
-      dialog.showErrorBox('OpenAlice — could not remember data location', dataHomeErrorDetail(error))
-      continue
-    }
-    userDataHome = chosen.path
-    launcherRoot = join(userDataHome, 'workspaces')
-    dataHomeSource = 'desktop-preference'
-    selectedDefaultHome = false
+    await startDesktopLauncher(repoRoot, updateAttemptPath)
+    return
   }
 
-  const homeEnv = app.isPackaged
+  const homeEnv = {
+    ...(localStartupProject ? { OPENALICE_PROJECT_KEY: localStartupProject } : {}),
+    ...(app.isPackaged
     ? {
         OPENALICE_HOME: userDataHome,
         // External tools need real paths. Code and dependencies stay in
@@ -709,7 +800,8 @@ app.whenReady().then(async () => {
     : {
         OPENALICE_HOME: userDataHome,
         OPENALICE_APP_HOME: repoRoot,
-      }
+      }),
+  }
   try {
     guardianRuntimeLock = await acquireGuardianRuntime({
       userDataHome,
@@ -737,7 +829,7 @@ app.whenReady().then(async () => {
   // backend boots (it would run migrations against an empty store). On
   // failure: surface and quit — booting beside the user's real data would
   // fork their trading history.
-  if (app.isPackaged && !explicitUserDataHome && selectedDefaultHome) {
+  if (app.isPackaged && ((!explicitUserDataHome && selectedDefaultHome) || localStartupProject === 'default' && userDataHome === defaultUserDataHome)) {
     try {
       await relocateLegacyData(app.getPath('userData'), userDataHome)
     } catch (err) {
@@ -938,7 +1030,7 @@ app.whenReady().then(async () => {
       source: dataHomeSource,
       selectionLock,
       preferencePath,
-      initialPreferences: dataHomePreferences,
+      initialPreferences: defaultDataHomePreferences(),
       requestRelaunch: scheduleDataHomeRelaunch,
     }),
   })
@@ -1011,7 +1103,26 @@ app.whenReady().then(async () => {
       : null,
   )
 
-  const win = createAppWindow(resolve(__dirname, 'preload.js'))
+  let modeSwitching = false
+  const { window: win, companion } = createAppWindow(resolve(__dirname, 'preload.js'))
+  createTray(win, companion)
+  companion?.configureActivity({
+    identity: () => {
+      if (modeSwitching) return null
+      if (!localRuntimeSuspended && win.webContents.getURL().startsWith('app://openalice/')) return `integrated:${userDataHome}`
+      const relay = desktopRelay
+      return relay && !relay.status.switching && relay.status.target && win.webContents.getURL().startsWith(relay.originUrl)
+        ? JSON.stringify([relay.originUrl, relay.status.generation, relay.status.target.machine, relay.status.target.project]) : null
+    },
+    read: async (query, signal) => {
+      const response = !localRuntimeSuspended && win.webContents.getURL().startsWith('app://openalice/')
+        ? await fetchAliceWebRequest(new Request(`app://openalice/api/agent-runtime${query}`), alice)
+        : await win.webContents.session.fetch(`${desktopRelay!.originUrl}/api/agent-runtime${query}`, { signal: signal ? AbortSignal.any([signal, AbortSignal.timeout(15_000)]) : AbortSignal.timeout(15_000) })
+      if (!response.ok) throw new Error('Activity unavailable')
+      return response.json()
+    },
+  })
+  configureWindowLifecycle(app, win, () => appQuitting)
   const mayNavigate = (destination: string): boolean => {
     try {
       const url = new URL(destination)
@@ -1030,17 +1141,32 @@ app.whenReady().then(async () => {
   const localProject = resolveAliceProjectIdentity({
     home: userDataHome,
     appRoot: homeEnv.OPENALICE_APP_HOME,
-    env: process.env,
+    env: { ...process.env, ...homeEnv },
   })
+  let startupMemoryError: string | null = null
+  let modeSwitchGeneration = 0
+  const rememberLocalSelection = async (current: () => boolean = () => true) => {
+    if (smokeStartup || process.env['OPENALICE_HOME']?.trim() || win.isDestroyed() || appQuitting) return
+    // An explicit automation home is not necessarily a registered project.
+    // Never replace the user's real Default with a disposable smoke identity.
+    try {
+      if (await resolveLocalStartupHome(localProject.key) !== userDataHome) return
+      await writeStartupTarget({ machine: 'local', project: localProject.key }, { current: () => current() && !win.isDestroyed() && !appQuitting })
+      startupMemoryError = null
+    } catch (error) {
+      startupMemoryError = `Connected, but Default was not saved: ${error instanceof Error ? error.message : String(error)}`
+      desktopDiagnostics?.write('startup', startupMemoryError)
+    }
+  }
+  const clientUpdates = configureDesktopUpdates(win, updateAttemptPath)
   let relayOpening: Promise<WebRelay> | null = null
-  let modeSwitching = false
   const ensureRelay = (): Promise<WebRelay> => {
     if (!relayOpening) {
       relayOpening = (async () => {
         const uiRoot = app.isPackaged
           ? join(process.resourcesPath, 'runtime', 'ui', 'dist')
           : join(repoRoot, 'ui', 'dist')
-        const relay = new WebRelay({ uiRoot })
+        const relay = new WebRelay({ uiRoot, clientUpdates })
         await relay.listen()
         desktopRelay = relay
         return relay
@@ -1096,6 +1222,16 @@ app.whenReady().then(async () => {
     }
     return fleet
   })
+  ipcMain.handle('openalice:desktop-connection:startup-target', async (event) => {
+    fromMainWindow(event.sender.id)
+    if (localRuntimeSuspended) return (await ensureRelay()).startupPreference()
+    try { return { target: await readStartupTarget(), error: startupMemoryError } }
+    catch (error) { return { target: null, error: error instanceof Error ? error.message : String(error) } }
+  })
+  ipcMain.handle('openalice:desktop-connection:project-control', async (event, input: unknown) => {
+    fromMainWindow(event.sender.id)
+    await (await ensureRelay()).controlProject(input)
+  })
   ipcMain.handle('openalice:desktop-machine:plan', async (event, input: unknown) => {
     fromMainWindow(event.sender.id)
     if (!input || typeof input !== 'object') throw new Error('Machine plan input is required.')
@@ -1112,23 +1248,34 @@ app.whenReady().then(async () => {
   })
   ipcMain.handle('openalice:desktop-connection:connect', async (event, machine: unknown, project: unknown) => {
     fromMainWindow(event.sender.id)
-    if (localRuntimeSuspended) throw new Error('Use the relay connection chooser while in separated mode.')
     if (modeSwitching) throw new Error('A connection switch is already in progress.')
+    const generation = ++modeSwitchGeneration
     if (typeof machine !== 'string' || typeof project !== 'string') {
       throw new Error('Choose a running AliceProject.')
     }
     modeSwitching = true
     try {
+      if (localRuntimeSuspended) {
+        const relay = await ensureRelay()
+        if (typeof machine !== 'string' || typeof project !== 'string') throw new Error('Choose a running AliceProject.')
+        await relay.connect(machine, project, {
+          current: () => generation === modeSwitchGeneration && !appQuitting && !win.isDestroyed(),
+          present: () => win.loadURL(`${relay.originUrl}/settings`),
+        })
+        return relay.status
+      }
       const relay = await ensureRelay()
       // The old local Runtime remains fully owned until the remote candidate
       // has passed the relay's SSH, endpoint, and Project identity checks.
-      await relay.connect(machine, project)
-      assertSwitchResources()
-      desktopDiagnostics?.write('guardian', 'remote target verified; loading relay window')
-      // Keep the local Runtime and its Guardian ownership intact until the
-      // replacement page has actually loaded. A failed navigation must not
-      // strand the user with neither a window nor a local backend.
-      await win.loadURL(`${relay.originUrl}/settings`)
+      await relay.connect(machine, project, {
+        current: () => generation === modeSwitchGeneration && !appQuitting && !win.isDestroyed(),
+        present: async () => {
+          assertSwitchResources()
+          desktopDiagnostics?.write('guardian', 'remote target verified; loading relay window')
+          // Keep the local Runtime until its replacement page is usable.
+          await win.loadURL(`${relay.originUrl}/settings`)
+        },
+      })
       desktopDiagnostics?.write('guardian', 'relay window loaded; retiring local runtime')
       localRuntimeSuspended = true
       flagWatchAbort.abort()
@@ -1170,6 +1317,7 @@ app.whenReady().then(async () => {
   })
   ipcMain.handle('openalice:desktop-connection:return-integrated', async (event) => {
     fromMainWindow(event.sender.id)
+    const generation = ++modeSwitchGeneration
     if (!localRuntimeSuspended) return
     if (modeSwitching) throw new Error('A connection switch is already in progress.')
     modeSwitching = true
@@ -1196,6 +1344,7 @@ app.whenReady().then(async () => {
       flagWatchAbort = new AbortController()
       watchLocalFlags()
       desktopRelay?.disconnect()
+      await rememberLocalSelection(() => generation === modeSwitchGeneration)
       console.log('[guardian] desktop connection → integrated')
     } catch (error) {
       flagWatchAbort.abort()
@@ -1262,14 +1411,14 @@ app.whenReady().then(async () => {
               }
             })
         }
-        if (process.env['OPENALICE_ELECTRON_SMOKE_ONBOARDING'] === '1' && !rendererOnboardingSmokeStarted) {
-          rendererOnboardingSmokeStarted = true
-          void runRendererOnboardingSmoke(win)
+        if (process.env['OPENALICE_ELECTRON_SMOKE_CREDENTIAL_PI'] === '1' && !rendererCredentialPiSmokeStarted) {
+          rendererCredentialPiSmokeStarted = true
+          void runRendererCredentialPiSmoke(win)
             .then(() => {
               if (process.env['OPENALICE_ELECTRON_SMOKE_EXIT'] === '1') shutdown()
             })
             .catch((err) => {
-              console.error(`[guardian] electron smoke onboarding → failed: ${err instanceof Error ? err.message : String(err)}`)
+              console.error(`[guardian] electron smoke credential-pi → failed: ${err instanceof Error ? err.message : String(err)}`)
               if (process.env['OPENALICE_ELECTRON_SMOKE_EXIT'] === '1') {
                 process.exitCode = 1
                 shutdown()
@@ -1334,44 +1483,9 @@ app.whenReady().then(async () => {
         console.error(`[guardian] renderer bridge probe failed: ${err instanceof Error ? err.message : String(err)}`)
       })
   })
-  win.loadURL('app://openalice/')
+  await win.loadURL('app://openalice/')
+  if (integratedProject) await rememberLocalSelection()
 
-  configureAutoUpdate(win, {
-    beforeInstall: async (version, report) => {
-      await recordUpdateAttempt(updateAttemptPath, {
-        fromVersion: app.getVersion(),
-        toVersion: version,
-      })
-      desktopDiagnostics?.write('updater', `starting ${app.getVersion()} -> ${version}`)
-      report('stopping-services')
-      await stopChildren()
-      report('releasing-runtime')
-      await releaseGuardianRuntimeLock()
-    },
-    onInstallHandoff: (version) => {
-      desktopDiagnostics?.write('updater', `handing ${version} to the native installer`)
-      if (Notification.isSupported()) {
-        new Notification({
-          title: 'OpenAlice is updating',
-          body: `Installing ${version}. OpenAlice will reopen automatically; this can take up to a minute.`,
-        }).show()
-      }
-    },
-    onInstallFailure: (error) => {
-      desktopDiagnostics?.write('updater', `installer handoff failed: ${error.stack ?? error.message}`)
-      const recoveryMessage = appQuitting
-        ? 'OpenAlice will restart on the current version.'
-        : 'OpenAlice is still running on the current version.'
-      dialog.showErrorBox(
-        'OpenAlice update failed',
-        `${error.message}\n\n${recoveryMessage}\n\nDiagnostic log:\n${desktopDiagnostics?.path ?? app.getPath('logs')}`,
-      )
-      if (appQuitting) {
-        app.relaunch()
-        app.exit(1)
-      }
-    },
-  })
 }).catch((error) => {
   const message = error instanceof Error ? error.stack ?? error.message : String(error)
   console.error('[guardian] desktop startup failed:', error)
@@ -1547,6 +1661,33 @@ function shutdown(): void {
   })
 }
 
+function resolveTrayIconPath(): string {
+  return app.isPackaged
+    ? join(process.resourcesPath, 'runtime/ui/dist/companion/alice.png')
+    : resolve(__dirname, '../../ui/public/companion/alice.png')
+}
+
+function createTray(win: BrowserWindow, companion?: CompanionHandle): void {
+  const image = nativeImage.createFromPath(resolveTrayIconPath())
+  tray = new Tray(image.resize({ width: 22, height: 22 }))
+  tray.setToolTip('OpenAlice')
+
+  const show = () => {
+    if (!appQuitting) showAppWindow(win)
+  }
+  const trayMenu = () => Menu.buildFromTemplate([
+    { label: 'Show OpenAlice', click: show },
+    ...(companion && !companion.window.isDestroyed()
+      ? [{ label: 'Pet', submenu: companion.trayMenuItems() }]
+      : []),
+    { type: 'separator' },
+    { label: 'Quit', click: () => app.quit() },
+  ])
+  tray.on('click', show)
+  tray.on('right-click', () => tray?.popUpContextMenu(trayMenu()))
+  if (process.platform === 'linux') tray.setContextMenu(trayMenu())
+}
+
 app.on('before-quit', (e) => {
   if (appQuitting) return
   e.preventDefault()
@@ -1554,8 +1695,6 @@ app.on('before-quit', (e) => {
 })
 
 app.on('window-all-closed', () => {
-  // MVP: quit on last-window-close everywhere (including macOS).
-  // Future: tray icon + macOS "stay alive in background" semantics so the
-  // user can close the window without killing in-flight cron jobs.
-  app.quit()
+  // Closing a window never shuts down the runtime. The tray Quit action or
+  // macOS Cmd+Q/app menu owns explicit shutdown through before-quit.
 })

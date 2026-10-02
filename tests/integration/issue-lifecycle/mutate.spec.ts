@@ -1,0 +1,421 @@
+import { mkdtemp, rm } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+
+import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+
+import { readWorkspaceIssues } from '../../../src/workspaces/issues/declaration.js'
+import { readIssueComments, updateIssueCommentDelivery } from '../../../src/workspaces/issues/comments.js'
+import { appendIssueComment, createIssue, updateIssueFields } from '../../../src/workspaces/issues/mutate.js'
+
+let dir: string
+beforeEach(async () => {
+  dir = await mkdtemp(join(tmpdir(), 'issues-mutate-'))
+})
+afterEach(async () => {
+  await rm(dir, { recursive: true, force: true })
+})
+
+/** Read one issue back through the real reader (the round-trip oracle). */
+async function readBack(id: string) {
+  const r = await readWorkspaceIssues(dir)
+  if (!r.ok) throw new Error(`readWorkspaceIssues not ok: ${JSON.stringify(r)}`)
+  const issue = r.issues.find((i) => i.id === id)
+  return { issue, invalid: r.invalid }
+}
+
+describe('createIssue', () => {
+  it('derives a kebab slug from the title and writes a readable issue', async () => {
+    const res = await createIssue(dir, { title: 'Fix the Login Bug!' })
+    expect(res.ok).toBe(true)
+    if (res.ok) {
+      expect(res.issue.id).toBe('fix-the-login-bug')
+      expect(res.issue.title).toBe('Fix the Login Bug!')
+      // Defaults applied on read-back.
+      expect(res.issue.status).toBe('todo')
+      expect(res.issue.priority).toBe('none')
+      expect(res.issue.assignee).toBe('@unassigned')
+    }
+    const { issue } = await readBack('fix-the-login-bug')
+    expect(issue?.title).toBe('Fix the Login Bug!')
+  })
+
+  it('honors an explicit id, frontmatter fields, and canonical What', async () => {
+    const res = await createIssue(dir, {
+      id: 'morning-sweep',
+      title: 'Morning research sweep',
+      status: 'in_progress',
+      priority: 'high',
+      assignee: '@resume-kind-owl-abc123',
+      when: { kind: 'every', every: '30m' },
+      what: 'run the research routine',
+    })
+    expect(res.ok).toBe(true)
+    const { issue } = await readBack('morning-sweep')
+    expect(issue).toMatchObject({
+      id: 'morning-sweep',
+      title: 'Morning research sweep',
+      status: 'in_progress',
+      priority: 'high',
+      assignee: '@resume-kind-owl-abc123',
+      what: 'run the research routine',
+    })
+    expect(issue?.when).toEqual({ kind: 'every', every: '30m' })
+    expect(issue?.what).toBe('run the research routine')
+  })
+
+  it('accepts @new-then-resume only for scheduled work that will choose its first owner', async () => {
+    const scheduled = await createIssue(dir, {
+      id: 'choose-owner',
+      title: 'Choose one owner',
+      assignee: '@new-then-resume',
+      when: { kind: 'every', every: '30m' },
+      agent: 'pi',
+    })
+    expect(scheduled.ok && scheduled.issue.assignee).toBe('@new-then-resume')
+
+    const unscheduled = await createIssue(dir, {
+      id: 'no-trigger',
+      title: 'No trigger',
+      assignee: '@new-then-resume',
+    })
+    expect(unscheduled.ok).toBe(false)
+    if (!unscheduled.ok) {
+      expect(unscheduled.reason).toBe('invalid')
+      if (unscheduled.reason === 'invalid') expect(unscheduled.error).toContain('@new-then-resume needs a schedule')
+    }
+  })
+
+  it('defaults scheduled work to one durable new owner', async () => {
+    const scheduled = await createIssue(dir, {
+      id: 'default-owner',
+      title: 'Default scheduled owner',
+      when: { kind: 'every', every: '30m' },
+    })
+    expect(scheduled.ok && scheduled.issue.assignee).toBe('@new-then-resume')
+  })
+
+  it('rejects deprecated assignee aliases with their canonical replacements', async () => {
+    const oldWorkspace = await createIssue(dir, {
+      id: 'old-workspace',
+      title: 'Old workspace spelling',
+      when: { kind: 'every', every: '30m' },
+      assignee: '@workspace',
+    })
+    expect(oldWorkspace.ok).toBe(false)
+    if (!oldWorkspace.ok && oldWorkspace.reason === 'invalid') {
+      expect(oldWorkspace.error).toBe('@workspace is deprecated; use @new-each-run')
+    }
+
+    await createIssue(dir, { id: 'canonical', title: 'Canonical' })
+    const oldNew = await updateIssueFields(dir, 'canonical', { assignee: '@new' })
+    expect(oldNew.ok).toBe(false)
+    if (!oldNew.ok && oldNew.reason === 'invalid') {
+      expect(oldNew.error).toBe('@new is deprecated; use @new-then-resume')
+    }
+  })
+
+  it('refuses to overwrite an existing issue (conflict)', async () => {
+    await createIssue(dir, { id: 'dup', title: 'first' })
+    const res = await createIssue(dir, { id: 'dup', title: 'second' })
+    expect(res).toEqual({ ok: false, reason: 'conflict', id: 'dup' })
+    // The original survives untouched.
+    const { issue } = await readBack('dup')
+    expect(issue?.title).toBe('first')
+  })
+
+  it('returns invalid on an empty title / underivable id', async () => {
+    expect((await createIssue(dir, { title: '   ' })).ok).toBe(false)
+    const r = await createIssue(dir, { title: '!!!' }) // slug → '' → invalid
+    expect(r.ok).toBe(false)
+    if (!r.ok) expect(r.reason).toBe('invalid')
+  })
+
+  it('returns invalid for a bad enum field', async () => {
+    const r = await createIssue(dir, { title: 'x', status: 'nope' as never })
+    expect(r.ok).toBe(false)
+    if (!r.ok) expect(r.reason).toBe('invalid')
+  })
+})
+
+describe('updateIssueFields', () => {
+  it('patches properties and preserves canonical What + scheduling frontmatter', async () => {
+    await createIssue(dir, {
+      id: 'task-1',
+      title: 'Do the thing',
+      when: { kind: 'every', every: '15m' },
+      what: 'keep the fire prompt',
+      agent: 'claude',
+      model: 'claude-opus-4-8',
+      effort: 'high',
+    })
+    const res = await updateIssueFields(dir, 'task-1', {
+      status: 'in_progress',
+      priority: 'urgent',
+      assignee: '@new-each-run',
+      agent: 'pi',
+      credential: 'gemini-primary',
+      model: 'gemini-3.5-pro',
+      effort: 'medium',
+    })
+    expect(res.ok).toBe(true)
+    if (res.ok) {
+      expect(res.issue.status).toBe('in_progress')
+      expect(res.issue.priority).toBe('urgent')
+      expect(res.issue.assignee).toBe('@new-each-run')
+      expect(res.issue.agent).toBe('pi')
+      expect(res.issue.credential).toBe('gemini-primary')
+    }
+    const { issue } = await readBack('task-1')
+    expect(issue).toMatchObject({
+      status: 'in_progress',
+      priority: 'urgent',
+      assignee: '@new-each-run',
+      what: 'keep the fire prompt',
+      agent: 'pi',
+      credential: 'gemini-primary',
+      model: 'gemini-3.5-pro',
+      effort: 'medium',
+    })
+    expect(issue?.when).toEqual({ kind: 'every', every: '15m' })
+    expect(issue?.what).toBe('keep the fire prompt')
+  })
+
+  it('stores a commentPrompt override and can clear it', async () => {
+    await createIssue(dir, { id: 'talk', title: 'Talk', what: 'desc', commentPrompt: '{comment}' })
+    const stored = await readBack('talk')
+    expect(stored.issue?.commentPrompt).toBe('{comment}')
+
+    const cleared = await updateIssueFields(dir, 'talk', { commentPrompt: null })
+    expect(cleared.ok).toBe(true)
+    if (!cleared.ok) return
+    expect(cleared.issue.commentPrompt).toBeUndefined()
+    expect((await readBack('talk')).issue?.commentPrompt).toBeUndefined()
+  })
+
+  it('clears an issue agent override with null', async () => {
+    await createIssue(dir, { id: 'agent-clear', title: 'T', agent: 'claude' })
+    const res = await updateIssueFields(dir, 'agent-clear', { agent: null })
+    expect(res.ok).toBe(true)
+    const { issue } = await readBack('agent-clear')
+    expect(issue?.agent).toBeUndefined()
+  })
+
+  it('sets and clears an optional scheduled-run timeout', async () => {
+    await createIssue(dir, {
+      id: 'budget',
+      title: 'Budget',
+      when: { kind: 'every', every: '15m' },
+      timeout: '45m',
+    })
+    let { issue } = await readBack('budget')
+    expect(issue?.timeout).toBe('45m')
+
+    const cleared = await updateIssueFields(dir, 'budget', { timeout: null })
+    expect(cleared.ok).toBe(true)
+    ;({ issue } = await readBack('budget'))
+    expect(issue?.timeout).toBeUndefined()
+
+    const set = await updateIssueFields(dir, 'budget', { timeout: '15m' })
+    expect(set.ok).toBe(true)
+    ;({ issue } = await readBack('budget'))
+    expect(issue?.timeout).toBe('15m')
+  })
+
+  it('toggles cron catchUp without rewriting the rest of when', async () => {
+    await createIssue(dir, {
+      id: 'morning',
+      title: 'Morning',
+      when: { kind: 'cron', cron: '0 9 * * *', timezone: 'America/New_York' },
+    })
+    const off = await updateIssueFields(dir, 'morning', { catchUp: false })
+    expect(off.ok).toBe(true)
+    let { issue } = await readBack('morning')
+    expect(issue?.when).toEqual({
+      kind: 'cron',
+      cron: '0 9 * * *',
+      timezone: 'America/New_York',
+      catchUp: false,
+    })
+
+    const on = await updateIssueFields(dir, 'morning', { catchUp: true })
+    expect(on.ok).toBe(true)
+    ;({ issue } = await readBack('morning'))
+    expect(issue?.when).toEqual({
+      kind: 'cron',
+      cron: '0 9 * * *',
+      timezone: 'America/New_York',
+    })
+
+    const every = await createIssue(dir, {
+      id: 'heartbeat',
+      title: 'Heartbeat',
+      when: { kind: 'every', every: '4h' },
+    })
+    expect(every.ok).toBe(true)
+    const refused = await updateIssueFields(dir, 'heartbeat', { catchUp: false })
+    expect(refused).toMatchObject({ ok: false, reason: 'invalid' })
+  })
+
+  it('switches atomically between vault access, native login, and inheritance', async () => {
+    await createIssue(dir, { id: 'access', title: 'Access', credential: 'openai-primary' })
+    const native = await updateIssueFields(dir, 'access', { credentialSource: 'native' })
+    expect(native.ok).toBe(true)
+    let { issue } = await readBack('access')
+    expect(issue?.credential).toBeUndefined()
+    expect(issue?.credentialSource).toBe('native')
+
+    const vault = await updateIssueFields(dir, 'access', { credential: 'deepseek-1' })
+    expect(vault.ok).toBe(true)
+    ;({ issue } = await readBack('access'))
+    expect(issue?.credential).toBe('deepseek-1')
+    expect(issue?.credentialSource).toBeUndefined()
+
+    const inherited = await updateIssueFields(dir, 'access', { credential: null, credentialSource: null })
+    expect(inherited.ok).toBe(true)
+    ;({ issue } = await readBack('access'))
+    expect(issue?.credential).toBeUndefined()
+    expect(issue?.credentialSource).toBeUndefined()
+  })
+
+  it('changes scheduled ownership without disturbing the schedule', async () => {
+    await createIssue(dir, {
+      id: 'owned',
+      title: 'Owned',
+      when: { kind: 'every', every: '15m' },
+      assignee: '@new-each-run',
+      agent: 'codex',
+      credential: 'openai-primary',
+      model: 'gpt-5.6',
+      effort: 'high',
+      timeout: '30m',
+    })
+    const res = await updateIssueFields(dir, 'owned', {
+      assignee: '@resume-kind-owl-abc123',
+    })
+    expect(res.ok).toBe(true)
+    const { issue } = await readBack('owned')
+    expect(issue?.assignee).toBe('@resume-kind-owl-abc123')
+    expect(issue?.agent).toBeUndefined()
+    expect(issue?.credential).toBeUndefined()
+    expect(issue?.credentialSource).toBeUndefined()
+    expect(issue?.model).toBeUndefined()
+    expect(issue?.effort).toBeUndefined()
+    expect(issue?.timeout).toBe('30m')
+    expect(issue?.when).toEqual({ kind: 'every', every: '15m' })
+  })
+
+  it('supports a partial patch (only status)', async () => {
+    await createIssue(dir, { id: 'p', title: 'T', priority: 'low' })
+    const res = await updateIssueFields(dir, 'p', { status: 'done' })
+    expect(res.ok).toBe(true)
+    const { issue } = await readBack('p')
+    expect(issue?.status).toBe('done')
+    expect(issue?.priority).toBe('low') // untouched
+  })
+
+  it('returns not_found for a missing issue', async () => {
+    expect(await updateIssueFields(dir, 'ghost', { status: 'done' })).toEqual({
+      ok: false,
+      reason: 'not_found',
+    })
+  })
+
+  it('returns invalid for a bad enum value', async () => {
+    await createIssue(dir, { id: 'q', title: 'T' })
+    const r = await updateIssueFields(dir, 'q', { status: 'bogus' as never })
+    expect(r.ok).toBe(false)
+    if (!r.ok) expect(r.reason).toBe('invalid')
+  })
+
+  it('returns invalid for an empty assignee', async () => {
+    await createIssue(dir, { id: 'r', title: 'T' })
+    const r = await updateIssueFields(dir, 'r', { assignee: '   ' })
+    expect(r.ok).toBe(false)
+    if (!r.ok) expect(r.reason).toBe('invalid')
+  })
+
+  it('records reply edges and updates durable delivery state idempotently', async () => {
+    await createIssue(dir, { id: 'threaded', title: 'Threaded' })
+    const source = await appendIssueComment(dir, 'threaded', 'human', 'why?', {
+      id: 'comment-source',
+      delivery: { state: 'pending', targetResumeId: 'resume-owner', taskId: 'run-1' },
+    })
+    expect(source.ok).toBe(true)
+    const reply = await appendIssueComment(dir, 'threaded', '@resume-owner', 'because', {
+      id: 'comment-reply-run-1',
+      replyTo: 'comment-source',
+    })
+    expect(reply.ok).toBe(true)
+    const duplicate = await appendIssueComment(dir, 'threaded', '@resume-owner', 'because', {
+      id: 'comment-reply-run-1',
+      replyTo: 'comment-source',
+    })
+    expect(duplicate.ok && duplicate.comment.id).toBe('comment-reply-run-1')
+    await updateIssueCommentDelivery(dir, 'threaded', 'comment-source', {
+      state: 'replied',
+      targetResumeId: 'resume-owner',
+      taskId: 'run-1',
+      replyCommentId: 'comment-reply-run-1',
+    })
+    const comments = await readIssueComments(dir, 'threaded')
+    expect(comments.ok && comments.comments).toEqual([
+      expect.objectContaining({
+        id: 'comment-source',
+        delivery: expect.objectContaining({ state: 'replied', replyCommentId: 'comment-reply-run-1' }),
+      }),
+      expect.objectContaining({ id: 'comment-reply-run-1', replyTo: 'comment-source' }),
+    ])
+  })
+})
+
+describe('appendIssueComment', () => {
+  it('writes a structured sidecar without changing What', async () => {
+    await createIssue(dir, { id: 'c1', title: 'Talk', what: 'Original description.' })
+    const res = await appendIssueComment(dir, 'c1', 'human', 'first comment')
+    expect(res.ok).toBe(true)
+    const { issue } = await readBack('c1')
+    expect(issue?.what).toBe('Original description.')
+    const comments = await readIssueComments(dir, 'c1')
+    expect(comments.ok && comments.comments).toEqual([
+      expect.objectContaining({ author: 'human', markdown: 'first comment' }),
+    ])
+  })
+
+  it('appends comments in order to one per-Issue sidecar', async () => {
+    await createIssue(dir, { id: 'c2', title: 'Talk' })
+    await appendIssueComment(dir, 'c2', 'human', 'one')
+    await appendIssueComment(dir, 'c2', 'ws:auto-quant', 'two')
+    const comments = await readIssueComments(dir, 'c2')
+    expect(comments.ok && comments.comments.map((comment) => [comment.author, comment.markdown])).toEqual([
+      ['human', 'one'],
+      ['ws:auto-quant', 'two'],
+    ])
+  })
+
+  it('returns not_found for a missing issue', async () => {
+    expect(await appendIssueComment(dir, 'ghost', 'human', 'hi')).toEqual({
+      ok: false,
+      reason: 'not_found',
+    })
+  })
+})
+
+describe('round-trip: create → update → comment → read back', () => {
+  it('keeps work definition and comments independently readable', async () => {
+    await createIssue(dir, { id: 'rt', title: 'Round trip', what: 'desc' })
+    await updateIssueFields(dir, 'rt', { status: 'in_progress', assignee: '@human' })
+    await appendIssueComment(dir, 'rt', 'human', 'looks good')
+    const { issue, invalid } = await readBack('rt')
+    expect(invalid).toHaveLength(0)
+    expect(issue).toMatchObject({
+      id: 'rt',
+      title: 'Round trip',
+      status: 'in_progress',
+      assignee: '@human',
+    })
+    expect(issue?.what).toBe('desc')
+    const comments = await readIssueComments(dir, 'rt')
+    expect(comments.ok && comments.comments[0]).toMatchObject({ author: 'human', markdown: 'looks good' })
+  })
+})

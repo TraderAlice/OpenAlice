@@ -18,3 +18,10 @@ html, body { margin: 0; width: 100%; height: 100%; overflow: hidden; background:
 #bubble.open #message { opacity: 1; transition: opacity .16s ease .12s, transform .3s ease; }
 #mirror.flipped #message { transform: scaleX(-1); }
 @media (prefers-reduced-motion: reduce) { #mirror, #body, #message, #bubble img, #bubble.open #message { transition: none; transition-delay: 0s !important; } }
+
+#bubble.activity #message { top: 25%; height: 29%; font-size: clamp(11px, calc(5vw / 2.7), 15px); overflow: hidden; }
+#activity-actions { position: absolute; left: 18%; right: 18%; top: 55%; display: flex; justify-content: center; gap: 6px; pointer-events: auto; }
+#activity-actions[hidden] { display: none; }
+#activity-actions button { font: 11px/1.5 system-ui; padding: 2px 4px; color: #292527; background: transparent; border: 0; border-radius: 3px; text-decoration: underline; cursor: pointer; }
+#activity-actions button:focus-visible { outline: 2px solid #648bc8; }
+#mirror.flipped #activity-actions { transform: scaleX(-1); }

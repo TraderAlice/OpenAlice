@@ -146,7 +146,7 @@ function hasImageExtension(url: string): boolean {
   }
 }
 
-function safeHttpImageUrl(raw: string | null): string | null {
+export function safeHttpImageUrl(raw: string | null): string | null {
   if (!raw) return null
   const url = decodeXmlEntities(raw.trim())
   try {

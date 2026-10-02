@@ -21,7 +21,7 @@ export interface SupervisorReleaseObservatoryRender {
 
 export interface SupervisorReleaseObservatoryView {
   installedVersion: string
-  currentLane: SupervisorReleaseLane
+  currentLane: string
   selected: number
 }
 

@@ -7,6 +7,7 @@
  * INDEX.md is committed to the repo — a PR that adds a migration
  * without an INDEX.md update is a visible red flag for reviewers.
  */
+import { SUPERVISOR_MIGRATIONS } from '../packages/cli/src/supervisor-default-migration.ts'
 import { writeFileSync } from 'node:fs'
 import { resolve, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -40,6 +41,16 @@ Each row below corresponds to an active migration in \`src/migrations/\`. The ru
 | ID | App Version | Date | Affects | Summary |
 |----|-------------|------|---------|---------|
 ${rows.length > 0 ? rows.join('\n') : '| _No post-baseline migrations yet_ | — | — | — | — |'}
+
+## Client Supervisor migrations
+
+These run under the Supervisor configuration lock. Their schema version is the
+durable idempotency marker; project backends must not apply them through a
+project's data/config journal. Existing files remain as backups.
+
+| ID | Schema | Date | Affects | Summary |
+|----|--------|------|---------|---------|
+${SUPERVISOR_MIGRATIONS.map(m => `| \`${m.id}\` | ${m.schemaVersion} | ${m.introducedAt} | ${m.affects} | ${escape(m.summary)} |`).join('\n')}
 `
 
 writeFileSync(out, md)

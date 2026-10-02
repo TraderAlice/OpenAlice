@@ -137,6 +137,7 @@ export interface TemplateUpgradeFilePlan {
 }
 
 export interface TemplateUpgradePlan {
+  readonly update: { status: 'available' | 'current' | 'blocked' | 'unknown'; reason: string }
   readonly workspaceId: string
   readonly template: string
   readonly fromVersion: string
@@ -280,8 +281,8 @@ export class HarnessSourceUpgradeApiError extends Error {
   }
 }
 
-export async function getHarnessSourceUpgradePlan(wsId: string): Promise<HarnessSourceUpgradePlan> {
-  const res = await fetch(`/api/workspaces/${encodeURIComponent(wsId)}/source-upgrade`)
+export async function getHarnessSourceUpgradePlan(wsId: string, targetVersion?: string): Promise<HarnessSourceUpgradePlan> {
+  const res = await fetch(`/api/workspaces/${encodeURIComponent(wsId)}/source-upgrade${targetVersion ? `?targetVersion=${encodeURIComponent(targetVersion)}` : ''}`)
   const body = await res.json().catch(() => ({})) as {
     plan?: HarnessSourceUpgradePlan
     error?: string
@@ -490,8 +491,8 @@ export interface TemplateInfo {
    *  OpenAlice. Rendered under a separate "Community" section. */
   readonly community?: boolean;
   readonly defaultAgents: readonly string[];
-  /** Template version, declared in README frontmatter. "0.0.0" when missing. */
-  readonly version: string;
+  /** Template version, declared in README frontmatter; absent when unreported. */
+  readonly version?: string;
   /** True if the template ships a README.md (showcase detail page can load it). */
   readonly hasReadme: boolean;
   readonly source?: {

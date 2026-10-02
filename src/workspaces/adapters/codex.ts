@@ -1,8 +1,8 @@
 import { discoverNativeModels } from '../native-model-discovery.js';
-import { createReadStream, existsSync, readFileSync } from 'node:fs';
-import { mkdir, readdir, readFile, rm, stat, writeFile } from 'node:fs/promises';
+import { createReadStream, existsSync, readFileSync, realpathSync } from 'node:fs';
+import { readdir, readFile, rm, stat } from 'node:fs/promises';
 import { homedir } from 'node:os';
-import { dirname, join, resolve } from 'node:path';
+import { join, resolve } from 'node:path';
 import { createInterface } from 'node:readline';
 
 import type {
@@ -145,10 +145,9 @@ function readCodexSessionTitleIndex(cwd: string): Promise<ReadonlyMap<string, st
  *   we'd see new files from every codex session on the machine, not just
  *   this workspace. v1 punts on this (`transcriptDiscovery: 'none'`); the
  *   `codex resume` picker is cwd-aware and handles the user-facing case.
- * - Trust model: codex prompts on first run for any cwd not in
- *   `~/.codex/config.toml` `[projects."<abs>"] trust_level`. The shared
- *   runtime lifecycle pre-writes that entry so the launcher's spawn doesn't
- *   stall on the prompt.
+ * - Trust model: OpenAlice trusts only the current Workspace for each child
+ *   invocation through a `-c projects={...}` override. Workspace preparation
+ *   never writes the user's global Codex configuration or persisted trust.
  * - Terminal appearance: Codex has no project UI-theme default to replace.
  *   Its TUI probes OSC 10/11 at startup and derives contrast-sensitive colors
  *   from the terminal defaults supplied by OpenAlice's shared PTY layer.
@@ -282,6 +281,7 @@ export const codexAdapter: CliAdapter = {
       '-c',
       'sandbox_mode="danger-full-access"',
       ...CODEX_SHELL_ARGS,
+      ...codexWorkspaceTrustArgs(ctx.cwd),
       'exec',
     ];
     if (ctx.resume === 'last') return [...head, 'resume', '--json', '--last', prompt];
@@ -305,6 +305,7 @@ export const codexAdapter: CliAdapter = {
       ...(ctx.sessionRuntime?.webArgs ?? ctx.sessionRuntime?.interactiveArgs ?? []),
       ...codexMcpConfigArgs(ctx),
       ...CODEX_SHELL_ARGS,
+      ...codexWorkspaceTrustArgs(ctx.cwd),
       'app-server',
       '--listen',
       'stdio://',
@@ -614,12 +615,6 @@ export const codexAdapter: CliAdapter = {
     return result;
   },
 
-  lifecycle: {
-    async prepareWorkspace(ctx): Promise<void> {
-      await ensureTrustedProject(ctx.cwd);
-    },
-  },
-
   /**
    * List codex sessions belonging to THIS workspace cwd, for the transcript
    * watcher's post-spawn id capture (codex can't be assigned an id at spawn).
@@ -687,7 +682,20 @@ function codexMcpHead(ctx: SpawnContext): string[] {
         `model_provider=${tomlString(CODEX_PROVIDER_NAME)}`,
       ]
     : [];
-  return ['codex', ...selection, ...CODEX_INTERACTIVE_PERMISSION_ARGS, ...CODEX_SHELL_ARGS, ...codexMcpConfigArgs(ctx)];
+  return ['codex', ...selection, ...CODEX_INTERACTIVE_PERMISSION_ARGS, ...CODEX_SHELL_ARGS, ...codexWorkspaceTrustArgs(ctx.cwd), ...codexMcpConfigArgs(ctx)];
+}
+
+/** Trust this launch without racing other processes over global config.toml. */
+function codexWorkspaceTrustArgs(cwd: string): string[] {
+  let canonical = resolve(cwd);
+  try {
+    canonical = realpathSync(canonical);
+  } catch {
+    // Follow the other adapters' path convention for a not-yet-created cwd.
+  }
+  // Codex splits dotted override keys on '.', including quoted path segments.
+  // A TOML inline table keeps paths with dots/quotes/backslashes as one key.
+  return ['-c', `projects={ ${JSON.stringify(canonical)} = { trust_level = "trusted" } }`];
 }
 
 /** `-c mcp_servers.*` overrides that register the launcher's MCP gateway. */
@@ -751,40 +759,6 @@ async function firstLine(fp: string): Promise<string> {
     rl.close();
     input.destroy();
   }
-}
-
-/**
- * Add (or no-op if present) a `[projects."<abs>"] trust_level = "trusted"`
- * entry to `~/.codex/config.toml`. Uses a minimal append-or-rewrite strategy
- * — we don't bring in a TOML library because the section grammar is simple
- * and we only ever touch one section per workspace.
- *
- * If the project is already present we leave the file alone, regardless of
- * what value it has (the user may have set `read_only` deliberately).
- */
-async function ensureTrustedProject(cwd: string): Promise<void> {
-  const abs = resolve(cwd);
-  const configPath = join(homedir(), '.codex', 'config.toml');
-
-  let existing = '';
-  try {
-    existing = await readFile(configPath, 'utf8');
-  } catch (err) {
-    if (!isENOENT(err)) throw err;
-    await mkdir(dirname(configPath), { recursive: true });
-  }
-
-  // Match either single- or triple-bracket [projects."<path>"] headers.
-  const headerEsc = abs.replace(/[\\"]/g, (c) => `\\${c}`);
-  const headerRe = new RegExp(
-    `^\\[projects\\."${headerEsc.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}"\\]\\s*$`,
-    'm',
-  );
-  if (headerRe.test(existing)) return; // already configured — don't clobber
-
-  const block = `\n[projects."${headerEsc}"]\ntrust_level = "trusted"\n`;
-  const next = existing.endsWith('\n') || existing.length === 0 ? existing + block : existing + '\n' + block;
-  await writeFile(configPath, next, 'utf8');
 }
 
 function isLegacyIsolatedHome(cwd: string): boolean {
@@ -876,10 +850,6 @@ async function resetLegacyIsolatedHome(cwd: string): Promise<void> {
     }
   }
   await rm(join(cwd, CODEX_LEGACY_ENV_PATH), { force: true });
-}
-
-function isENOENT(err: unknown): boolean {
-  return typeof err === 'object' && err !== null && (err as { code?: string }).code === 'ENOENT';
 }
 
 function tomlString(s: string): string {

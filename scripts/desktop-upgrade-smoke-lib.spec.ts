@@ -1,6 +1,7 @@
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, unlinkSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
+import { runInNewContext } from 'node:vm'
 
 import { describe, expect, it } from 'vitest'
 import { createPackage, uncacheAll } from '@electron/asar'
@@ -18,6 +19,7 @@ import {
   readInstalledDesktopVersion,
   selectPreviousDesktopTag,
   waitForChromiumProfileRelease,
+  waitForDesktopUpgradeDocument,
   windowsInstallerArgs,
 } from './desktop-upgrade-smoke-lib.mjs'
 
@@ -50,6 +52,45 @@ describe('installed desktop version during NSIS replacement', () => {
 })
 
 describe('desktop upgrade smoke planning', () => {
+  it('waits for completed product navigation even when the backend and React are already available', async () => {
+    let nowMs = 0
+    const document = { readyState: 'loading', getElementById: () => ({ childElementCount: 1 }) }
+    await waitForDesktopUpgradeDocument(
+      (expression: string) => runInNewContext(expression, {
+        document, location: { href: 'app://openalice/' }, fetch: async () => ({ ok: true }),
+      }),
+      {
+        now: () => nowMs,
+        sleep: async (ms: number) => { nowMs += ms; document.readyState = 'complete' },
+      },
+    )
+    expect(nowMs).toBe(250)
+  })
+
+  it('rejects a completed blank document or an unmounted product page', async () => {
+    for (const [href, childElementCount] of [['about:blank', 1], ['app://openalice/', 0]] as const) {
+      let nowMs = 0
+      await expect(waitForDesktopUpgradeDocument(
+        (expression: string) => runInNewContext(expression, {
+          document: { readyState: 'complete', getElementById: () => ({ childElementCount }) },
+          location: { href },
+        }),
+        { timeoutMs: 500, now: () => nowMs, sleep: async (ms: number) => { nowMs += ms } },
+      )).rejects.toThrow('timed out waiting for loaded OpenAlice upgrade document')
+    }
+  })
+
+  it('retries a destroyed context during navigation but preserves real evaluation failures', async () => {
+    let attempts = 0
+    await waitForDesktopUpgradeDocument(() => {
+      if (++attempts === 1) throw new Error('Execution context was destroyed')
+      return true
+    }, { sleep: async () => {} })
+    expect(attempts).toBe(2)
+    await expect(waitForDesktopUpgradeDocument(() => { throw new Error('renderer crashed') }))
+      .rejects.toThrow('renderer crashed')
+  })
+
   it('keeps the Windows builder and legacy takeover aligned with the upgrade contract', () => {
     const packageJson = JSON.parse(
       readFileSync(new URL('../package.json', import.meta.url), 'utf8'),

@@ -1,6 +1,11 @@
 import { contextBridge, ipcRenderer } from 'electron'
 
 contextBridge.exposeInMainWorld('companion', {
+  onActivity: (callback: (input: unknown) => void) => {
+    ipcRenderer.on('openalice:activity:display', (_event, input) => callback(input))
+  },
+  openActivity: (displayId: string) => ipcRenderer.invoke('openalice:activity:open', displayId),
+  dismissActivity: (displayId: string) => ipcRenderer.invoke('openalice:activity:dismiss', displayId),
   getSound: () => ipcRenderer.invoke('openalice:companion:sound:get'),
   onSound: (callback: (settings: unknown) => void) => {
     ipcRenderer.on('openalice:companion:sound:changed', (_event, settings) => callback(settings))

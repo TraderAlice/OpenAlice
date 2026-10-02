@@ -832,6 +832,10 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
     launcherLogger.child({ scope: 'issue-change-tracker' }),
   );
   const activeResumeIds = new Set<string>();
+  let shuttingDown = false;
+  const headlessDispatchAdmissions = new Set<Promise<unknown>>();
+  const headlessDispatchCompletions = new Set<Promise<void>>();
+  const headlessDispatchCompletionErrors: unknown[] = [];
   // Settings owns the one-per-AliceProject phone desk. Serialize its
   // read-check-write lifecycle so two browser tabs cannot both pass the
   // uniqueness check before either Issue file reaches disk.
@@ -2122,7 +2126,7 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
     // failures and terminal in-band runtime errors fail the task; retryable
     // errors followed by a later assistant reply remain visible in Activity
     // without turning a recovered run into a false failure.
-    void runHeadlessTaskMethod(ws, adapter, prompt, timeoutMs, {
+    const completion = runHeadlessTaskMethod(ws, adapter, prompt, timeoutMs, {
       origin,
       taskId: rec.taskId,
       resumeId: rec.resumeId,
@@ -2304,10 +2308,16 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
         activeResumeIds.delete(rec.resumeId);
         releaseTakeover();
       });
+    headlessDispatchCompletions.add(completion);
+    void completion.then(
+      () => headlessDispatchCompletions.delete(completion),
+      (error) => { headlessDispatchCompletions.delete(completion); headlessDispatchCompletionErrors.push(error); },
+    );
     return { taskId: rec.taskId, resumeId: rec.resumeId };
   };
 
-  const dispatchHeadlessTaskMethod: WorkspaceService['executions']['dispatch'] = async (...args) => {
+  const dispatchHeadlessTaskAdmission: WorkspaceService['executions']['dispatch'] = async (...args) => {
+    if (shuttingDown) throw new Error('Workspace service is shutting down');
     const [ws, , , origin, , trigger, resumeId, inquiry] = args;
     let release = () => {};
     if (resumeId) {
@@ -2332,6 +2342,16 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
     }
     try { if (resumeId) executionManager.admission.assertAllowed(resumeId); return await dispatchHeadlessTaskImpl(args[0], args[1], args[2], args[3], args[4], args[5], args[6], args[7], args[8], args[9], args[10], release); }
     catch (error) { release(); throw error; }
+  };
+
+  const dispatchHeadlessTaskMethod: WorkspaceService['executions']['dispatch'] = (...args) => {
+    const admission = dispatchHeadlessTaskAdmission(...args);
+    headlessDispatchAdmissions.add(admission);
+    void admission.then(
+      () => headlessDispatchAdmissions.delete(admission),
+      () => headlessDispatchAdmissions.delete(admission),
+    );
+    return admission;
   };
 
   // ── Workspace self-scheduling. Scan each workspace's own `.alice/issues/*.md`
@@ -3294,7 +3314,6 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
     return out;
   };
 
-  let shuttingDown = false;
 
   const publicMeta = async (w: WorkspaceMeta): Promise<unknown> => {
     const metadata = await readWorkspaceMetadata(w.dir);
@@ -3339,14 +3358,11 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
     if (w.template) {
       const tpl = templates.get(w.template);
       if (tpl) {
-        currentVersion = await templateUpgrades.currentVersion(w);
-        if (
-          tpl.upgradeStrategy === 'managed-context'
-          && currentVersion
-          && compareVersions(tpl.version, currentVersion) > 0
-        ) {
-          upgradeAvailable = { from: currentVersion, to: tpl.version };
-        }
+        if (tpl.upgradeStrategy === 'managed-context') {
+          const { decision, fromVersion, toVersion } = await templateUpgrades.check(w);
+          currentVersion = fromVersion;
+          if (decision.status === 'available' && fromVersion && toVersion) upgradeAvailable = { from: fromVersion, to: toVersion };
+        } else currentVersion = await templateUpgrades.currentVersion(w);
         if (harnessSource && tpl.source) {
           const harnessPreferences = await readHarnessPreferences();
           const latest = await sourceUpgrades.latest(
@@ -3391,17 +3407,29 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
     };
   };
 
-  const dispose = async (reason: string): Promise<void> => {
+  let disposal: Promise<void> | undefined;
+  const dispose = (reason: string): Promise<void> => {
+    if (disposal) return disposal;
     clearInterval(deliveryTimer);
-    if (shuttingDown) return;
     shuttingDown = true;
     launcherLogger.info('workspaces.dispose', { reason, activeSessions: pool.size() });
     scheduleScanner.stop();
     stopInboxActivity?.();
-    await harnessSurfaces.dispose();
-    await executionManager.stopAll('plugin-shutdown');
-    await scheduleScanner.waitForDispatches();
-    transcriptWatcher.disposeAll();
+    disposal = (async () => {
+      try {
+        await harnessSurfaces.dispose();
+        await executionManager.stopAll('plugin-shutdown');
+        await scheduleScanner.waitForDispatches();
+        await Promise.allSettled(headlessDispatchAdmissions);
+        // A stopped child is not a settled dispatch: task/Issue/conversation and
+        // delivery journals finish in the continuation after process exit.
+        await Promise.allSettled(headlessDispatchCompletions);
+        if (headlessDispatchCompletionErrors.length) throw new AggregateError(headlessDispatchCompletionErrors, 'Headless dispatch persistence failed during shutdown');
+      } finally {
+        transcriptWatcher.disposeAll();
+      }
+    })();
+    return disposal;
   };
 
   const connectorDeskOp = async (connectorId: string): Promise<ConnectorDesk | null> => {
@@ -3585,28 +3613,3 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
 }
 
 export type { SessionFactoryContext };
-
-/**
- * Compare two dotted-version strings (e.g. "1.0.0" vs "1.2.3"). Returns
- * 1 if a > b, -1 if a < b, 0 if equal. Non-numeric segments fall back to
- * lexical comparison so a template author who writes `version: 1.0.0-rc1`
- * still gets sensible ordering. Deliberately not pulling in semver — the
- * field is convention, not contract; this is enough to drive a badge.
- */
-function compareVersions(a: string, b: string): number {
-  const pa = a.split('.');
-  const pb = b.split('.');
-  const len = Math.max(pa.length, pb.length);
-  for (let i = 0; i < len; i++) {
-    const sa = pa[i] ?? '0';
-    const sb = pb[i] ?? '0';
-    const na = Number(sa);
-    const nb = Number(sb);
-    if (Number.isFinite(na) && Number.isFinite(nb)) {
-      if (na !== nb) return na > nb ? 1 : -1;
-    } else {
-      if (sa !== sb) return sa > sb ? 1 : -1;
-    }
-  }
-  return 0;
-}

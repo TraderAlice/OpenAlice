@@ -1,4 +1,5 @@
-/** Update behavior is installation-owned, independent of Workspace content. */
+/** AliceProject policy. The shipped autoCheckApp field controls backend release
+ * checks; local client policy belongs to the relay/Electron control plane. */
 import { mkdir, readFile, rename, writeFile } from 'node:fs/promises'
 import { dirname } from 'node:path'
 import { z } from 'zod'

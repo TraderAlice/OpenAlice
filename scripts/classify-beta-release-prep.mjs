@@ -1,12 +1,10 @@
+import { releaseChannelMatchesVersion, selectVersion } from '../packages/update-lifecycle/src/release-policy.ts'
 import { appendFile, readFile } from 'node:fs/promises'
 import { spawnSync } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
 
-const REQUIRED_MANIFESTS = ['package.json', 'packages/cli/package.json']
+const REQUIRED_MANIFESTS = ['package.json']
 const VERSION_LINE = /^  "version": "([^"]+)",\r?$/gm
-const RELEASE_VERSION = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-beta(?:\.([1-9]\d*))?)?$/
-const BETA_VERSION = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)-beta(?:\.([1-9]\d*))?$/
-
 function result(betaReleasePrep, reason) {
   return { betaReleasePrep, reason }
 }
@@ -53,34 +51,6 @@ function replaceVersion(source, token, value) {
   return `${source.slice(0, token.start)}${value}${source.slice(token.end)}`
 }
 
-function parseReleaseVersion(value) {
-  const match = RELEASE_VERSION.exec(value)
-  if (!match) return undefined
-  return {
-    core: [BigInt(match[1]), BigInt(match[2]), BigInt(match[3])],
-    beta: value.includes('-beta'),
-    betaNumber: match[4] === undefined ? undefined : BigInt(match[4]),
-  }
-}
-
-function isNewerBeta(baseValue, nextValue) {
-  if (!BETA_VERSION.test(nextValue)) return false
-  const base = parseReleaseVersion(baseValue)
-  const next = parseReleaseVersion(nextValue)
-  if (!base || !next?.beta) return false
-
-  for (let index = 0; index < base.core.length; index += 1) {
-    if (next.core[index] !== base.core[index]) {
-      return next.core[index] > base.core[index]
-    }
-  }
-
-  if (!base.beta) return false
-  if (base.betaNumber === undefined) return next.betaNumber !== undefined
-  if (next.betaNumber === undefined) return false
-  return next.betaNumber > base.betaNumber
-}
-
 export function classifyBetaReleasePrep({
   eventName,
   ref,
@@ -99,7 +69,7 @@ export function classifyBetaReleasePrep({
     changes.some((change) => change.status !== 'M') ||
     !REQUIRED_MANIFESTS.every((path) => changes.some((change) => change.path === path))
   ) {
-    return result(false, 'the complete diff is not exactly the two modified product manifests')
+    return result(false, 'the complete diff is not exactly the modified root product manifest')
   }
 
   const baseTokens = {}
@@ -125,13 +95,9 @@ export function classifyBetaReleasePrep({
 
   const baseVersion = baseTokens[REQUIRED_MANIFESTS[0]].value
   const nextVersion = headTokens[REQUIRED_MANIFESTS[0]].value
-  if (baseTokens[REQUIRED_MANIFESTS[1]].value !== baseVersion) {
-    return result(false, 'the base product manifest versions disagree')
-  }
-  if (headTokens[REQUIRED_MANIFESTS[1]].value !== nextVersion) {
-    return result(false, 'the candidate product manifest versions disagree')
-  }
-  if (!isNewerBeta(baseVersion, nextVersion)) {
+  if (!releaseChannelMatchesVersion('beta', nextVersion)
+    || !(releaseChannelMatchesVersion('stable', baseVersion) || releaseChannelMatchesVersion('beta', baseVersion))
+    || selectVersion(baseVersion, nextVersion).status !== 'available') {
     return result(false, `${nextVersion} is not a forward beta version from ${baseVersion}`)
   }
 

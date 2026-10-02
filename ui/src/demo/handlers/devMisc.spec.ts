@@ -29,7 +29,7 @@ describe('demo version handlers', () => {
 
     expect(response.status).toBe(200)
     expect(body.current).toBe(packageJson.version)
-    expect(body.channel).toBe('stable')
+    expect(body.channel).toBe('dev')
     expect(body.updateAuthority).toBe('source')
   })
 })

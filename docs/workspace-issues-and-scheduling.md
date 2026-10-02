@@ -24,8 +24,9 @@ emits them. Completion stays on `runtime.stopped` with clipped assistant
 text and block metrics. Tool input/output and the user prompt stay out —
 they already live in the structured run snapshot and conversation log.
 TUI has no equivalent extractor yet, so headed Sessions still only write
-occupancy. The journal is not a dispatch authority. Office reads this file;
-Automation → Runs remains the current headless-task table.
+occupancy. This is the Agent family of [[docs/product-activity-journal.md]],
+not a dispatch authority. Office reads the journal; Developer → Runs at
+`/settings/developer/runs` is the current headless-task table.
 
 ## One Object, Two Roles
 
@@ -390,6 +391,30 @@ An active peer Issue assigned to a retired `@resumeId` remains visibly owned by
 that signature but cannot fire until a human assigns an active Session or
 restores the departed Workspace. See [[docs/workspace-lifecycle.md]].
 
+## Editing an existing schedule in the GUI
+
+For ordinary Issues with `when`, the detail inspector's **Schedule** summary
+opens one draft editor for Interval (`every`), Cron and Once (`at`). Cadence,
+cron timezone/catch-up and the independent run timeout apply together only on
+**Save changes**; Cancel discards the draft, and a failed save retains it.
+Polling does not overwrite a draft; a changed saved schedule or timeout requires
+explicit reload before another save. This is a UI stale-value guard, not a
+file-level compare-and-swap guarantee.
+
+The existing Issue PATCH accepts `when` and delegates to `updateIssueFields`.
+Write-time validation reuses the browser-safe `schedule-expr`/`duration` owner;
+the file reader still exposes historical malformed schedules for inspection.
+Cron stays five-field with `local`/IANA timezone semantics. Once requires an
+absolute ISO timestamp with Z or an explicit UTC offset. Interval accepts the
+existing positive h/m/s duration grammar. Omitted timezone remains host-local.
+The phone desk keeps its dedicated Connector Settings cadence writer; the
+ordinary GUI does not add/remove schedules or change Issue ownership.
+
+Saving does not reset the scanner's markers or alter an admitted run's frozen
+settings. The returned detail is authoritative for cadence, next-due and health;
+an edited schedule may already be due. Done/canceled Issues remain inactive.
+No second schedule store, scheduler or execution path is introduced.
+
 ## Structured Runtime Output
 
 Claude Code, Codex, opencode, and Pi all emit different JSON event streams.
@@ -540,21 +565,28 @@ central schedule store or revive the legacy cron/AgentWork path.
 
 ## Verification
 
+Use [[docs/development-workflow.md]]
+([shared ladder](development-workflow.md#local-feedback-ladder)) to select the
+applicable subset for a leaf edit or expand to owner/full-suite acceptance.
+The following focused checklist covers issues, schedules and headless execution;
+shared lifecycle/protocol or cross-owner changes still require the broader
+gates. Dynamic dispatch, registry and child-process effects need explicit
+evidence beyond changed-file imports.
+
 ```bash
 npx tsc --noEmit
 pnpm vitest run \
   src/workspaces/headless-output.spec.ts \
-  src/workspaces/headless-task.spec.ts \
+  tests/integration/headless-process/headless-task.spec.ts \
   src/workspaces/headless-task-registry.spec.ts \
   src/webui/routes/headless.spec.ts \
   src/workspaces/issues/declaration.spec.ts \
-  src/workspaces/issues/mutate.spec.ts \
-  src/workspaces/issues/comment-delivery.spec.ts \
+  tests/integration/issue-lifecycle/mutate.spec.ts \
+  tests/integration/issue-lifecycle/comment-delivery.spec.ts \
   src/workspaces/issues/board.spec.ts \
-  src/webui/routes/issues.spec.ts \
-  src/workspaces/issues/auto-complete.spec.ts \
+  tests/integration/issue-routes/issues.spec.ts \
+  tests/integration/issue-lifecycle/auto-complete.spec.ts \
   src/workspaces/schedule/scanner.spec.ts
-pnpm test
 ```
 
 For UI changes, run strict UI types and verify Issue board, issue detail,

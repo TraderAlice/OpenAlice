@@ -1907,3 +1907,42 @@ html[lang="ja"] .oa-onboarding-title {
   border-radius: 0;
   background: transparent;
 }
+
+/* Compact notification content. Sonner remains the positioning/motion owner. */
+[data-sonner-toaster] { font-family: var(--font-sans); }
+[data-sonner-toast] { width: var(--width); }
+.oa-notification {
+  position: relative;
+  width: 100%;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--popover);
+  color: var(--popover-foreground);
+  font-family: var(--font-sans);
+  box-shadow: 0 4px 14px color-mix(in srgb, var(--foreground) 9%, transparent);
+}
+.oa-notification-header { display: flex; align-items: center; gap: 7px; padding-right: 24px; font-size: 12px; line-height: 20px; }
+.oa-notification-title { min-width: 0; font-weight: 600; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+.oa-notification-icon { width: 16px; height: 16px; flex-shrink: 0; color: var(--info); }
+.oa-notification[data-status="success"] .oa-notification-icon { color: var(--success); }
+.oa-notification[data-status="warning"] .oa-notification-icon { color: var(--warning); }
+.oa-notification[data-status="error"] .oa-notification-icon { color: var(--destructive); }
+.oa-notification[data-status="neutral"] .oa-notification-icon { color: var(--muted-foreground); }
+.oa-notification-count { color: var(--muted-foreground); font-size: 11px; flex-shrink: 0; font-variant-numeric: tabular-nums; }
+.oa-notification-close { position: absolute; right: 6px; top: 6px; display: grid; place-items: center; width: 28px; height: 28px; border: 0; border-radius: var(--radius-sm); background: transparent; color: var(--muted-foreground); cursor: pointer; }
+.oa-notification-close:hover { background: var(--accent); color: var(--foreground); }
+.oa-notification-body { display: flex; align-items: flex-start; gap: 10px; }
+.oa-notification:has(.oa-notification-description, .oa-notification-action, .oa-notification-image) .oa-notification-body { margin-top: 8px; }
+.oa-notification-copy { min-width: 0; flex: 1; }
+.oa-notification-description { margin: 0; font-size: 13px; font-weight: 500; line-height: 20px; overflow-wrap: anywhere; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.oa-notification-image { flex-shrink: 0; width: 64px; height: 48px; border-radius: 6px; object-fit: cover; border: 1px solid var(--border); }
+.oa-notification-action { display: inline-flex; align-items: center; gap: 4px; border: 0; background: transparent; color: var(--primary); font-family: inherit; font-size: 12px; font-weight: 500; line-height: 20px; margin-top: 8px; padding: 0; min-height: 24px; cursor: pointer; }
+.oa-notification-action:hover { text-decoration: underline; }
+.oa-notification-close:focus-visible, .oa-notification-action:focus-visible { outline: 2px solid var(--ring); outline-offset: 3px; }
+/* Demo/update chrome sits above the normal workbench header. Office has its
+   own explicit offsets in office.css and remains authoritative there. */
+body:has([data-desktop-banner]):not(:has(.oa-office-main)) [data-sonner-toaster] { --offset-top: 88px !important; }
+@media (max-width: 767px) {
+  [data-sonner-toaster] { --mobile-offset-top: 96px !important; }
+}

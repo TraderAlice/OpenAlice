@@ -1,7 +1,9 @@
 #!/usr/bin/env node
 
 import { spawnSync } from 'node:child_process'
-import { dirname, resolve } from 'node:path'
+import { dirname, resolve, join } from 'node:path'
+import { mkdtempSync, readFileSync, rmSync, mkdirSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
 import { fileURLToPath } from 'node:url'
 
 import {
@@ -10,6 +12,8 @@ import {
   areasForTestFile,
   assertLivePaperAcknowledgement,
   collectWorkspacePackages,
+  collectRepositorySpecFiles,
+  collectTestCommands,
   laneSuiteNames,
   laneSuites,
   lanesForTestFile,
@@ -19,6 +23,9 @@ import {
   selectTestFiles,
   systemCommandSuites,
 } from './test-lanes.mjs'
+import { testSuites, testTiers, suiteForTestFile, tierForTestFile, selectTestSuites, validateTestSuites } from './test-suites.mjs'
+import { validateTestCommands } from './test-commands.mjs'
+import { requiredGate, inspectVitestResult, evaluateRequiredEvidence } from './test-results.mjs'
 
 const scriptDir = dirname(fileURLToPath(import.meta.url))
 const repoRoot = resolve(scriptDir, '..')
@@ -48,11 +55,17 @@ function parseArgs(argv) {
     areas: [],
     packages: [],
     paths: [],
+    suites: [],
+    tiers: [],
     changed: null,
     list: false,
     explain: false,
     json: false,
     help: false,
+    showSuites: false,
+    inventory: false,
+    gate: null,
+    receipt: null,
     forward: [],
   }
 
@@ -66,6 +79,12 @@ function parseArgs(argv) {
     else if (arg === '--list') options.list = true
     else if (arg === '--explain') options.explain = true
     else if (arg === '--json') options.json = true
+    else if (arg === '--suites') options.showSuites = true
+    else if (arg === '--inventory') options.inventory = true
+    else if (arg === '--gate' || arg === '--receipt') {
+      options[arg.slice(2)] = takeValue(argv, index, arg)
+      index += 1
+    }
     else if (arg === '--changed') {
       const next = argv[index + 1]
       if (next && !next.startsWith('--')) {
@@ -76,6 +95,14 @@ function parseArgs(argv) {
       }
     } else if (arg.startsWith('--changed=')) {
       options.changed = arg.slice('--changed='.length) || 'origin/dev'
+    } else if (arg.startsWith('--suite=')) addValues(options.suites, arg.slice('--suite='.length), '--suite')
+    else if (arg === '--suite') {
+      addValues(options.suites, takeValue(argv, index, arg), arg)
+      index += 1
+    } else if (arg.startsWith('--tier=')) addValues(options.tiers, arg.slice('--tier='.length), '--tier')
+    else if (arg === '--tier') {
+      addValues(options.tiers, takeValue(argv, index, arg), arg)
+      index += 1
     } else if (arg.startsWith('--lane=')) addValues(options.lanes, arg.slice('--lane='.length), '--lane')
     else if (arg === '--lane') {
       addValues(options.lanes, takeValue(argv, index, arg), arg)
@@ -101,8 +128,9 @@ function parseArgs(argv) {
     }
   }
 
+  options.laneExplicit = options.lanes.length > 0
   if (options.lanes.length === 0) options.lanes.push('hermetic')
-  for (const key of ['lanes', 'owners', 'areas', 'packages', 'paths']) {
+  for (const key of ['lanes', 'owners', 'areas', 'packages', 'paths', 'suites', 'tiers']) {
     options[key] = [...new Set(options[key])]
   }
   return options
@@ -118,9 +146,13 @@ Selectors (repeatable; comma-separated values also work):
   --lane <name>       ${laneSuiteNames.join(', ')}
   --owner <name>      ${ownerSuiteNames.join(', ')}
   --area <name>       ${areaSuiteNames.join(', ')}
+  --suite <name>      registered integration/E2E topic (see --suites)
+  --tier <name>       unit, integration, e2e
   --package <name>    workspace package name
   --path <path|glob>  repo-relative test path, directory, or glob
   --changed [base]    intersect through Vitest's changed import graph (default: origin/dev)
+  --gate <name>      run all required assertion evidence (critical-local)
+  --receipt <path>   write an actual run receipt (default: temporary file)
 
 Values in one dimension are ORed; different dimensions are ANDed. The default
 lane is hermetic. Empty selections fail closed.
@@ -129,6 +161,18 @@ Modes (selection only; test modules, credentials, and prerequisites are not prob
   --list              print candidate files
   --explain           print selection, side effects, prerequisites, and invocation plan
   --json              print the same dry-run plan as JSON
+  --suites            inspect registered integration/E2E suites and separate runners
+  --inventory         inspect every spec/manifest check and registered standalone acceptance
+
+Suite inspection supports --suite/--tier filters and --json/--explain.
+Inventory is complete and unfiltered. Both modes are read-only; they never
+execute the commands they describe. Registration is not a recorded run.
+Required gates reject selectors/forwarded arguments that could narrow evidence.
+Actual runs reject empty/all-skipped results and write source/platform/outcome
+receipts. Test hook results do not prove native/venue cleanup.
+
+Suites: ${testSuites.map(suite => suite.id).join(', ')}
+Tiers: ${testTiers.join(', ')}
 
 Lane boundaries:`)
   for (const [name, lane] of Object.entries(laneSuites)) {
@@ -154,6 +198,10 @@ Examples:
   pnpm test:select --owner ui
   pnpm test:select --owner uta --package @traderalice/uta-service
   pnpm test:select --lane integration --area workspace
+  pnpm test:select --suite workspace-creation --lane integration
+  pnpm test:select --tier unit --owner ui --explain
+  pnpm test:suites --tier e2e --explain
+  pnpm test:inventory --json
   pnpm test:select --lane external-readonly --area market-data --explain
   pnpm test:select --owner alice --owner ui --changed origin/dev
 
@@ -220,13 +268,17 @@ function createInvocations(options, files) {
   return invocations
 }
 
-function createPlan(options, files) {
+function describeSuite(suite, commands) {
+  return { ...suite, dedicatedCommands: commands.filter(command => suite.commands?.includes(command.id)) }
+}
+
+function createPlan(options, files, commands) {
   const selectedLanes = options.lanes.map((name) => ({ name, ...laneSuites[name] }))
   const executionBlockers = []
   if (options.lanes.includes('system')) {
     executionBlockers.push('the system lane is inventory-only; use a dedicated test:system:* command')
   }
-  const bybitDiagnostic = 'services/uta/src/domain/trading/__test__/e2e/ccxt-raw-diagnostic.e2e.spec.ts'
+  const bybitDiagnostic = 'tests/integration/bybit-diagnostic/ccxt-raw-diagnostic.spec.ts'
   if (files.includes(bybitDiagnostic) && !options.areas.includes('bybit-diagnostic')) {
     executionBlockers.push(
       'the market-buy diagnostic must be selected explicitly with --area bybit-diagnostic',
@@ -240,6 +292,8 @@ function createPlan(options, files) {
       areas: options.areas,
       packages: options.packages,
       paths: options.paths,
+      suites: options.suites,
+      tiers: options.tiers,
       changed: options.changed,
       changedSemantics: options.changed
         ? 'candidate files are intersected at execution by Vitest static import analysis'
@@ -252,9 +306,14 @@ function createPlan(options, files) {
       lane: lanesForTestFile(path),
       owner: ownersForTestFile(path),
       areas: areasForTestFile(path),
+      tier: tierForTestFile(path),
+      suite: suiteForTestFile(path)?.id ?? null,
     })),
+    suites: (options.suites.length || options.tiers.length)
+      ? selectTestSuites(options).map(suite => describeSuite(suite, commands)) : [],
     invocations: createInvocations(options, files),
     executionBlockers,
+    requiredGate: options.requiredGate ?? null,
     note: 'Dry-run only: no tests ran and no credentials or prerequisites were probed.',
   }
 }
@@ -273,11 +332,53 @@ function printExplanation(plan) {
   for (const blocker of plan.executionBlockers) {
     console.log(`\nexecution blocker: ${blocker}`)
   }
+  if (plan.suites.length) printSuites(plan.suites, true)
   for (const candidate of plan.invocations) {
     const project = candidate.project ? ` project=${candidate.project}` : ''
     console.log(`\nwould run lane=${candidate.lane}${project}`)
     console.log(`  vitest ${candidate.args.join(' ')}`)
   }
+}
+
+function printSuites(suites, detailed) {
+  console.log('[test-select] suite inventory only; registration does not mean tests ran or passed')
+  for (const suite of suites) {
+    console.log(`\n${suite.id} — ${suite.title} [${suite.tier}; ${suite.lane}; ${suite.owner}]`)
+    console.log(`  scope: ${suite.scope}`)
+    if (detailed) for (const path of suite.files ?? []) console.log(`  spec: ${path}`)
+    for (const command of suite.dedicatedCommands) {
+      console.log(`  separate runner (never auto-run): ${command.invocation}`)
+      console.log(`    ${command.lane}; effects: ${command.sideEffects}`)
+      for (const prerequisite of command.prerequisites) console.log(`    prerequisite: ${prerequisite}`)
+    }
+  }
+}
+
+function inspectCatalog(options, specs, commands) {
+  if (options.showSuites && options.inventory) fail('choose --suites or --inventory')
+  if (options.gate || options.receipt || options.laneExplicit || options.owners.length || options.areas.length || options.packages.length || options.paths.length || options.changed || options.forward.length) {
+    fail('inspection does not apply file/lane filters or Vitest arguments; use only --suite/--tier with --suites')
+  }
+  if (options.inventory) {
+    if (options.suites.length || options.tiers.length) fail('--inventory is complete and unfiltered; use --suites for a suite view')
+    const files = specs.map((path) => {
+      return { path, owner: ownersForTestFile(path), lane: lanesForTestFile(path), areas: areasForTestFile(path), tier: tierForTestFile(path), suite: suiteForTestFile(path)?.id ?? null }
+    })
+    const result = { executed: false, files, commands, specCount: files.length, commandCount: commands.length, unitCount: files.filter(file => file.tier === 'unit').length, note: 'Complete data-only inventory. Unit tests need no registration; suite registration does not imply execution.' }
+    if (options.json) console.log(JSON.stringify(result, null, 2))
+    else {
+      console.log(`[test-select] inventory only: ${result.specCount} specs, ${result.commandCount} commands, ${result.unitCount} unit specs`)
+      for (const file of files) console.log(`${file.path}\t${file.lane[0]}\t${file.owner[0]}\t${file.tier}\t${file.suite ?? 'no registration required'}`)
+      for (const command of commands) {
+        console.log(`\n${command.id}\t${command.kind}\t${command.lane}\t${command.owner}\n  ${command.invocation}\n  effects: ${command.sideEffects}`)
+        for (const prerequisite of command.prerequisites) console.log(`  prerequisite: ${prerequisite}`)
+      }
+    }
+    return
+  }
+  const suites = selectTestSuites(options).map(suite => describeSuite(suite, commands))
+  if (options.json) console.log(JSON.stringify({ executed: false, suites, note: 'Suite inventory only. No tests ran; no prerequisites were probed.' }, null, 2))
+  else printSuites(suites, options.explain)
 }
 
 function main() {
@@ -287,9 +388,30 @@ function main() {
     return
   }
 
-  let files
+  let files, specs, commands
   try {
-    files = selectTestFiles(repoRoot, options)
+    specs = collectRepositorySpecFiles(repoRoot)
+    commands = collectTestCommands(repoRoot)
+    validateTestCommands(repoRoot, commands, ownerSuiteNames, laneSuiteNames)
+    validateTestSuites(repoRoot, testSuites, specs, commands, {
+      owners: ownerSuiteNames, lanes: laneSuiteNames, areas: areaSuiteNames,
+      packages: collectWorkspacePackages(repoRoot).map((entry) => entry.name),
+    })
+    if (options.showSuites || options.inventory) {
+      inspectCatalog(options, specs, commands)
+      return
+    }
+    if (options.gate) {
+      if (options.laneExplicit || options.owners.length || options.areas.length || options.packages.length || options.paths.length || options.suites.length || options.tiers.length || options.changed || options.forward.length) {
+        fail('--gate requires its entire declared evidence; selectors and Vitest arguments cannot narrow it')
+      }
+      options.requiredGate = requiredGate(repoRoot, options.gate)
+      files = options.requiredGate.files
+      options.lanes = [...new Set(files.flatMap(lanesForTestFile))]
+    } else files = selectTestFiles(repoRoot, options)
+    if (options.forward.some(arg => /^--(?:reporter|outputFile|watch|ui|api|passWithNoTests)(?:[.=]|$)/.test(arg) || arg === '-w')) {
+      fail('runner-owned reporters/output and one-shot execution cannot be overridden')
+    }
   } catch (error) {
     fail(error instanceof Error ? error.message : String(error))
   }
@@ -302,7 +424,7 @@ function main() {
     fail(`catalog ownership/lane invariant failed for: ${ambiguous.join(', ')}`)
   }
 
-  const plan = createPlan(options, files)
+  const plan = createPlan(options, files, commands)
   if (options.json) {
     console.log(JSON.stringify(plan, null, 2))
     return
@@ -331,16 +453,54 @@ function main() {
     }
   }
 
-  const vitest = resolve(repoRoot, 'node_modules/vitest/vitest.mjs')
-  for (const candidate of plan.invocations) {
-    const result = spawnSync(process.execPath, [vitest, ...candidate.args], {
-      cwd: repoRoot,
-      env: process.env,
-      stdio: 'inherit',
-    })
-    if (result.error) throw result.error
-    if (result.status !== 0) process.exit(result.status ?? 1)
+  if (plan.suites.length) printSuites(plan.suites, true)
+
+  executePlan(plan, options.receipt)
+}
+
+function executePlan(plan, destination) {
+  const startedAt = new Date().toISOString()
+  const git = args => spawnSync('git', args, { cwd: repoRoot, encoding: 'utf8' })
+  const source = git(['rev-parse', 'HEAD'])
+  const tree = git(['write-tree'])
+  const status = git(['status', '--porcelain', '--untracked-files=normal'])
+  const temporary = mkdtempSync(join(tmpdir(), 'oa-test-run-'))
+  const receiptPath = destination ? resolve(repoRoot, destination) : join(tmpdir(), `oa-test-receipt-${Date.now()}-${process.pid}.json`)
+  const runs = []
+  let cleanup = 'passed'
+  try {
+    for (const [index, candidate] of plan.invocations.entries()) {
+      const output = join(temporary, `${index}.json`)
+      const result = spawnSync(process.execPath, [resolve(repoRoot, 'node_modules/vitest/vitest.mjs'), ...candidate.args,
+        '--reporter=default', '--reporter=json', `--outputFile=${output}`], { cwd: repoRoot, env: process.env, stdio: 'inherit' })
+      let report
+      try { report = JSON.parse(readFileSync(output, 'utf8')) } catch { /* fail closed below */ }
+      const inspected = inspectVitestResult(repoRoot, report, result.status, plan.selectors.changed ? [] : plan.files.filter(file => file.lane.includes(candidate.lane) && (!candidate.project || ownerSuites[file.owner[0]].project === candidate.project)).map(file => file.path))
+      if (result.error) { inspected.errors.push(`runner spawn failed: ${result.error.code ?? 'unknown'}`); inspected.accepted = false }
+      runs.push({ lane: candidate.lane, project: candidate.project, ...inspected })
+      if (!inspected.accepted) break
+    }
+  } finally {
+    try { rmSync(temporary, { recursive: true, force: true }) } catch { cleanup = 'failed' }
   }
+  const required = evaluateRequiredEvidence(plan.requiredGate?.evidence ?? [], runs.flatMap(run => run.tests))
+  const accepted = runs.length === plan.invocations.length && runs.every(run => run.accepted) && required.every(row => row.accepted) && cleanup === 'passed'
+  const receipt = {
+    schemaVersion: 1, kind: 'source-tests', startedAt, finishedAt: new Date().toISOString(),
+    source: { commit: source.status === 0 ? source.stdout.trim() : null, indexTree: tree.status === 0 ? tree.stdout.trim() : null, dirty: status.status === 0 ? Boolean(status.stdout.trim()) : null },
+    artifact: null, environment: { platform: process.platform, arch: process.arch, node: process.version },
+    selectors: plan.selectors, gate: plan.requiredGate?.name ?? null,
+    accepted, runs, required,
+    warnings: { status: 'not-collected', scope: 'Console warnings are diagnostic; required assertions, hook/file failures and unhandled errors determine acceptance.' },
+    cleanup: { runnerTemporaryFiles: cleanup, productResources: 'test-hooks-only; native/venue cleanup not observed by this receipt' },
+    unexecutedInvocations: plan.invocations.slice(runs.length).map(({ lane, project }) => ({ lane, project })),
+  }
+  mkdirSync(dirname(receiptPath), { recursive: true })
+  writeFileSync(receiptPath, JSON.stringify(receipt, null, 2) + '\n')
+  console.log(`[test-select] acceptance=${accepted} receipt=${receiptPath}`)
+  for (const run of runs) for (const error of run.errors) console.error(`[test-select] ${error}`)
+  for (const row of required.filter(row => !row.accepted)) console.error(`[test-select] required ${row.requirement}: ${row.spec} — ${row.assertion}: ${row.status}`)
+  if (!accepted) process.exitCode = 1
 }
 
 main()

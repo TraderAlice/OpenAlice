@@ -40,13 +40,17 @@ on:
       - "scripts/bun-broker-pack-fixture.ts"
       - "scripts/build-bun-runtime-feasibility.ts"
       - "scripts/build-bun-release.ts"
+      - "scripts/bun-toolchain.mjs"
+      - "scripts/macho-signature.mjs"
+      - "scripts/sign-cli-macos.mjs"
+      - "scripts/verify-cli-release.mjs"
       - "scripts/build-cli-package-channels.mjs"
-      - "scripts/build-cli-package-channels.spec.mjs"
+      - "tests/integration/cli-release-artifacts/build-cli-package-channels.spec.mjs"
       - "scripts/pack-cli-npm-packages.mjs"
       - "scripts/pack-cli-npm-packages.spec.mjs"
       - "scripts/cli-package-manager-smoke.mjs"
       - "scripts/cli-release-fixture.mjs"
-      - "scripts/cli-release-fixture.spec.mjs"
+      - "tests/integration/cli-release-artifacts/cli-release-fixture.spec.mjs"
       - "scripts/cli-system-package-manager-smoke.mjs"
       - "scripts/cli-aur-container-smoke.mjs"
       - "scripts/cli-aur-container-smoke.spec.mjs"
@@ -56,7 +60,7 @@ on:
       - "scripts/cli-legacy-cutover-smoke.spec.mjs"
       - "scripts/prepare-cli-previous-release.mjs"
       - "scripts/prepare-cli-dev-assets.mjs"
-      - "scripts/prepare-cli-dev-assets.spec.mjs"
+      - "tests/integration/cli-release-artifacts/prepare-cli-dev-assets.spec.mjs"
       - "scripts/prepare-cli-neutral-inputs.mjs"
       - "scripts/prepare-cli-neutral-inputs.spec.mjs"
       - "THIRD_PARTY_NOTICES.md"
@@ -94,6 +98,10 @@ jobs:
         with:
           fetch-depth: 0
 
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+
       - name: Detect exact beta release preparation
         id: beta-release-prep
         if: github.event_name == 'pull_request'
@@ -101,8 +109,10 @@ jobs:
         env:
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
         run: |
-          git show "${BASE_SHA}:scripts/classify-beta-release-prep.mjs" > "$RUNNER_TEMP/classify-beta-release-prep.mjs"
-          node "$RUNNER_TEMP/classify-beta-release-prep.mjs" --github-output "$GITHUB_OUTPUT"
+          trusted_root="$RUNNER_TEMP/openalice-release-policy"
+          mkdir -p "$trusted_root"
+          git archive "$BASE_SHA" scripts/classify-beta-release-prep.mjs packages/update-lifecycle/src/release-policy.ts | tar -x -C "$trusted_root"
+          node "$trusted_root/scripts/classify-beta-release-prep.mjs" --github-output "$GITHUB_OUTPUT"
 
   bun-cli-feasibility:
     needs: release-prep-scope

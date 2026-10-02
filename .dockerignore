@@ -16,8 +16,15 @@ node_modules
 **/node_modules
 ui/.vite
 electron/dist
-# Test hosts exercise the server CLI without building Electron.
-apps/desktop
+# Test hosts omit Electron packaging but the UI imports these pure activity modules.
+apps/desktop/**
+!apps/desktop/src/
+!apps/desktop/src/activity-journal-types.ts
+!apps/desktop/src/activity-projection.ts
+!apps/desktop/src/activity-policy.ts
+!apps/desktop/src/activity-announcements.ts
+!apps/desktop/src/activity-controller.ts
+!apps/desktop/src/notification-queue.ts
 
 # Editor / IDE
 .vscode

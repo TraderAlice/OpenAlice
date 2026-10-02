@@ -1,0 +1,29 @@
+{
+  "extends": "../tsconfig.json",
+  "compilerOptions": {
+    "allowJs": true,
+    "checkJs": false,
+    "noEmit": true,
+    "rootDir": "..",
+    "allowImportingTsExtensions": true,
+    "jsx": "react-jsx",
+    "paths": {
+      "@/*": [
+        "../src/*",
+        "../ui/src/*"
+      ]
+    },
+    "declaration": false
+  },
+  "include": [
+    "./**/*.spec.ts",
+    "./**/*.spec.tsx",
+    "../ui/src/vite-env.d.ts",
+    "../ui/src/i18n/i18n.d.ts",
+    "../scripts/workspace-acceptance-receipt.spec.ts"
+  ],
+  "exclude": [
+    "../node_modules",
+    "../dist"
+  ]
+}

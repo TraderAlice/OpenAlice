@@ -113,7 +113,10 @@ invent model activity from terminal bytes.
 
 The manager persists admission before spawning, excludes concurrent writers of
 one `resumeId`, waits for actual exit on stop/handoff, and rejects callbacks from
-an older execution. A shutdown closes admission and waits for startup/stop work.
+an older execution. A shutdown closes admission and waits for startup/stop work. The Workspace
+service also drains dispatch admissions and terminal task/conversation/Issue/
+delivery persistence after child exit. Concurrent dispose callers await the
+same shutdown promise; a closed service rejects new headless dispatches.
 PTY exit ends its execution; there is no hidden automatic respawn. A new process
 requires another managed launch and receives another execution ID.
 
@@ -236,7 +239,9 @@ present when a desk was created or departed is not part of its durable identity.
 - `src/webui/routes/workspaces.ts` — lifecycle API surface.
 - `ui/src/components/workspace/WorkspaceOffboardingDialog.tsx` — blockers,
   handoff inventory, reason, and notes before departure.
-- `ui/src/pages/WorkspaceListPage.tsx` — departed inventory, restore, purge.
+- Restore and purge remain lifecycle API operations. The retired global
+  `/workspaces` inventory redirects to `/chat`; `WorkspaceListPage.tsx` is
+  not mounted and must not be treated as the current restore/purge UI.
 
 Do not reintroduce “delete the registry row and leave the folder in place.” It
 pollutes manager discovery, destroys restore metadata, and turns known retired

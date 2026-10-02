@@ -1,7 +1,7 @@
 import { AlertCircle, LoaderCircle } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 
-import type { MachinePlan } from '../../hooks/useMachineManagement'
+import type { MachinePlan } from '../../lib/updates/machine-types'
 import { Button } from '../ui/button'
 
 export function MachinePlanReview({ plan, busy, onApply }: { plan: MachinePlan; busy: boolean; onApply: () => void }) {
@@ -15,9 +15,10 @@ export function MachinePlanReview({ plan, busy, onApply }: { plan: MachinePlan; 
         {plan.project && <p className="mt-1 text-[12px] text-muted-foreground">AliceProject · {plan.project.displayName}</p>}
       </div>
       <span className="rounded-full border border-border px-2 py-0.5 text-[11px] text-muted-foreground">
-        {plan.installedVersion} → {plan.targetVersion}
+        {plan.activeVersion ?? 'Stopped / unreported'} → {plan.targetVersion}
       </span>
     </div>
+    <p className="mt-2 text-xs text-muted-foreground">Installed: {plan.installedVersion}</p>
     <dl className="mt-3 grid gap-2 text-[12px] sm:grid-cols-2">
       <div><dt className="text-muted-foreground">{t('settings.machines.runtime', 'Runtime')}</dt><dd className="mt-0.5">{plan.runtime}</dd></div>
       <div><dt className="text-muted-foreground">{t('settings.machines.plannedActions', 'Planned actions')}</dt><dd className="mt-0.5">{plan.actions.length ? plan.actions.join(' · ') : t('settings.machines.noChanges', 'No remote changes')}</dd></div>

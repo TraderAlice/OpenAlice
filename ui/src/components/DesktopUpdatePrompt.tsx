@@ -1,20 +1,10 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
+import { useUpdateLifecycle, type NativeStatus } from '../hooks/useUpdateLifecycle'
 import { Download, ExternalLink, RefreshCcw, X } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { Dialog } from './uta/Dialog'
 
-type UpdateStatus =
-  | { phase: 'available'; version?: string; releaseUrl?: string }
-  | { phase: 'downloading'; version?: string; percent?: number }
-  | { phase: 'downloaded'; version: string; releaseUrl: string }
-  | {
-      phase: 'installing'
-      version: string
-      stage: 'preparing' | 'stopping-services' | 'releasing-runtime' | 'handing-off'
-    }
-  | { phase: 'error'; message: string }
-
-function previewStatus(): UpdateStatus | null {
+function previewStatus(): NativeStatus | null {
   if (!import.meta.env.DEV || typeof window === 'undefined') return null
   const params = new URLSearchParams(window.location.search)
   if (params.get('updatePrompt') !== '1') return null
@@ -37,74 +27,30 @@ function previewStatus(): UpdateStatus | null {
 
 export function DesktopUpdatePrompt() {
   const { t } = useTranslation()
-  const [status, setStatus] = useState<UpdateStatus | null>(() => previewStatus())
-  const [busy, setBusy] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-
-  useEffect(() => {
-    const updater = window.openAlice?.updater
-    if (!updater) return
-
-    void updater.getStatus()
-      .then((next) => {
-        if (next?.phase === 'downloaded' || next?.phase === 'installing') setStatus(next)
-      })
-      .catch(() => {})
-
-    return updater.onStatus((next) => {
-      if (next.phase === 'error') {
-        setError(next.message)
-        setBusy(false)
-        return
-      }
-      if (next.phase !== 'downloaded' && next.phase !== 'installing') return
-      setError(null)
-      setBusy(next.phase === 'installing')
-      setStatus(next)
-    })
-  }, [])
-
+  const updates = useUpdateLifecycle()
+  const [preview, setPreview] = useState(() => previewStatus())
+  const [dismissed, setDismissed] = useState<string | null>(null)
+  const status = updates.nativeStatus?.phase === 'installing' ? updates.nativeStatus : updates.nativeReady ?? preview
   if (status?.phase !== 'downloaded' && status?.phase !== 'installing') return null
-
-  const installing = busy || status.phase === 'installing'
+  const installing = updates.nativeInstalling || status.phase === 'installing'
+  if (!installing && dismissed === status.version) return null
+  const error = updates.nativeError
   const installText = status.phase === 'installing'
     ? t(`settings.about.status.installing.${status.stage}`)
     : t('settings.about.installing')
-
-  const handleInstall = async () => {
-    const updater = window.openAlice?.updater
-    if (!updater) {
-      setStatus(null)
-      return
-    }
-    setBusy(true)
-    setError(null)
-    try {
-      await updater.installAndRestart()
-    } catch (err) {
-      setError(err instanceof Error ? err.message : String(err))
-      setBusy(false)
-    }
+  const dismiss = () => { setDismissed(status.version); setPreview(null) }
+  const handleInstall = () => {
+    if (preview && !updates.nativeReady) { dismiss(); return }
+    void updates.installClient().catch(() => undefined)
   }
-
-  const handleRelease = async () => {
-    const updater = window.openAlice?.updater
-    if (updater) {
-      await updater.openRelease(status.version)
-      return
-    }
-    const releaseUrl = status.phase === 'downloaded'
-      ? status.releaseUrl
-      : `https://github.com/TraderAlice/OpenAlice/releases/tag/v${status.version}`
-    window.open(releaseUrl, '_blank', 'noopener,noreferrer')
-  }
+  const handleRelease = () => { void updates.openClientRelease(status.version).catch(() => undefined) }
 
   return (
     <Dialog
       ariaLabel={installing
         ? t('settings.about.prompt.installingTitle')
         : t('settings.about.prompt.readyTitle')}
-      onClose={installing ? () => {} : () => setStatus(null)}
+      onClose={installing ? () => {} : dismiss}
       width="w-[480px]"
     >
       <div className="px-5 py-4 border-b border-border flex items-center gap-3">
@@ -119,7 +65,7 @@ export function DesktopUpdatePrompt() {
         </div>
         <button
           type="button"
-          onClick={() => setStatus(null)}
+          onClick={dismiss}
           disabled={installing}
           className="h-8 w-8 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted disabled:opacity-40 flex items-center justify-center transition-colors"
           aria-label={t('settings.about.prompt.close')}
@@ -154,7 +100,7 @@ export function DesktopUpdatePrompt() {
       <div className="px-5 py-3 border-t border-border flex flex-col-reverse sm:flex-row sm:items-center sm:justify-end gap-2">
         <button
           type="button"
-          onClick={() => setStatus(null)}
+          onClick={dismiss}
           disabled={installing}
           className="btn-secondary"
         >

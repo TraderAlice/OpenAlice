@@ -546,7 +546,7 @@ function parseCopyArgs(argv: string[]): { from?: string; to?: string; yes: boole
 }
 
 async function loadRegistry(io: ProjectCommandIo) {
-  const context = await (io.resolveContext ?? (() => resolveStoredLaunchContext({})))()
+  const context = await (io.resolveContext ?? (() => resolveStoredLaunchContext({ project: 'default' })))()
   const registry = await (io.loadRegistry ?? readSupervisorAliceProjectRegistry)(context)
   return { context, registry }
 }

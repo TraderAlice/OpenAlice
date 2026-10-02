@@ -29,9 +29,19 @@ the durable truth after it changes. Git history is the archive.
 
 ## Active
 
-- [[plans/update-lifecycle.md]] — Prepare default Workspaces asynchronously on
-  Runtime start, scan app and Workspace releases in one lifecycle, and surface
-  actionable updates in Settings while preserving reviewed upgrade guards.
+- [[plans/settings-machines-dialog.md]] — Move machine management into General / Machines and replace inline SSH setup with a reviewed dialog; Draft PR only.
+
+- [[plans/review-updates-shared-plan.md]] — Share automatic/manual update review
+  plans and open exact single targets. Independent Draft #1693; preserve the
+  coordinated owner review from #1692 and keep attention #1691 separate.
+
+- [[plans/cli-artifact-signature.md]] — Bun compiler pin, final macOS ad-hoc
+  signatures and shared final-archive acceptance for #1670. Draft PR acceptance
+  remains pending.
+
+- [[plans/compact-notifications.md]] — Approved compact type-specific pop-out
+  notifications, bounded news/Inbox grouping and optional news thumbnails;
+  implementation and Draft PR review only, no merge authority.
 
 - [[plans/cli-relay-entry-unification.md]] — Consolidates CLI-launched browser
   sessions on the client-owned WebRelay while retaining explicit local and
@@ -128,3 +138,4 @@ the durable truth after it changes. Git history is the archive.
   in `dev`; remaining work is the TypeScript CLI conversion, logs/Doctor/update
   UX, config check, registry deletion, authenticity-hardened updates, and
   release-gate N-1.
+- [[plans/companion-activity-notifications.md]] — Shared Journal notification preferences and background companion bubbles; Draft PR only, no release authority.

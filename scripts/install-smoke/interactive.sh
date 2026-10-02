@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-/fixture/run.sh --prepare-only >/dev/null
+bash /fixture/run.sh --prepare-only >/dev/null
 architecture=x64
 case "$(uname -m)" in arm64|aarch64) architecture=arm64 ;; esac
 archive="/tmp/openalice-native-fixture/openalice-cli-0.91.0-linux-${architecture}.tar.gz"

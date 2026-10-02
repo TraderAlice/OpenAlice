@@ -1,3 +1,4 @@
+import { readStartupTarget, writeStartupTarget } from './startup-target.ts'
 import { readMachineRegistrySummary, findRegisteredMachine, machineIsEnabled } from './machine-registry.ts'
 import { spawn } from 'node:child_process'
 import { buildRemoteSshArgs } from './remote.mjs'
@@ -19,7 +20,13 @@ export async function runMachineTarget(selector, commandArgs, dependencies = {})
   if (selector === 'local') {
     const runLocal = dependencies.runLocal
     if (!runLocal) throw usageError('The local Machine target is unavailable in this invocation')
-    return runLocal(commandArgs)
+    let localArgs = commandArgs
+    if (['up', 'run', 'down', 'status', 'logs', 'doctor'].includes(commandArgs[0]) && !commandArgs.some(arg => ['--project', '--instance', '--home'].includes(arg))) {
+      const target = await (dependencies.readStartup ?? readStartupTarget)()
+      if (!target || target.machine !== 'local') throw usageError('Pass --project: the current Default does not identify a local AliceProject.')
+      localArgs = [...commandArgs, '--project', target.project]
+    }
+    return runLocal(localArgs)
   }
 
   const summary = await (dependencies.loadMachines
@@ -30,7 +37,22 @@ export async function runMachineTarget(selector, commandArgs, dependencies = {})
     throw usageError(`Machine "${selector}" is disabled. Enable it before using --machine.`)
   }
 
-  const remoteCommand = buildRemoteCommand(commandArgs)
+  let explicitArgs = commandArgs
+  if (['up', 'run', 'down', 'status', 'logs', 'doctor', 'exec'].includes(commandArgs[0]) && !commandArgs.some(arg => ['--project', '--instance', '--home'].includes(arg))) {
+    const target = await (dependencies.readStartup ?? readStartupTarget)()
+    if (!target || target.machine !== machine.key) throw usageError('Pass --project: the current Default does not identify a project on this Machine.')
+    explicitArgs = [...commandArgs, '--project', target.project]
+  }
+  if (!['up', 'run', 'down', 'status', 'logs', 'doctor', 'version', '--version', 'project', 'create'].includes(commandArgs[0])) throw usageError('This command is not supported for a remote target.')
+  if (commandArgs[0] === 'project' && commandArgs[1] === 'use') {
+    if (commandArgs.length !== 3) throw usageError('Usage: --machine <key> project use <project>')
+    const { inspectRegisteredMachine } = await import('./machine-inventory.ts')
+    const inventory = await (dependencies.inspectMachine ?? inspectRegisteredMachine)(machine)
+    if (!inventory.projects.some(project => project.key === commandArgs[2])) throw usageError('This AliceProject is not registered on the selected Machine.')
+    await (dependencies.writeStartup ?? writeStartupTarget)({ machine: machine.key, project: commandArgs[2] })
+    return 0
+  }
+  const remoteCommand = buildRemoteCommand(explicitArgs)
   const runRemote = dependencies.runRemote ?? runTargetCommand
   return runRemote({
     destination: machine.sshTarget,

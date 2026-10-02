@@ -31,6 +31,7 @@ import {
   selectPreviousDesktopTag,
   versionFromTag,
   waitForChromiumProfileRelease,
+  waitForDesktopUpgradeDocument,
   windowsInstallerArgs,
 } from './desktop-upgrade-smoke-lib.mjs'
 import { packagedElectronExecutable } from './smoke-packaged-toolchain.mjs'
@@ -308,7 +309,19 @@ async function waitForRenderer(debugPort, child, timeoutMs = 90_000) {
           typeof target.url === 'string' &&
           target.url.startsWith('app://openalice') &&
           target.webSocketDebuggerUrl)
-        if (page) return CdpClient.connect(page.webSocketDebuggerUrl)
+        if (page) {
+          const client = await CdpClient.connect(page.webSocketDebuggerUrl)
+          try {
+            await waitForDesktopUpgradeDocument(expression => client.evaluate(expression), {
+              timeoutMs: Math.max(1, deadline - Date.now()),
+            })
+            console.log('[desktop-upgrade] product document loaded')
+            return client
+          } catch (error) {
+            client.close()
+            throw error
+          }
+        }
       }
     } catch (error) {
       lastError = error
@@ -359,7 +372,7 @@ function waitForExit(child, timeoutMs = 30_000) {
   return new Promise((resolveExit, rejectExit) => {
     const timeout = setTimeout(() => {
       terminateTree(child)
-      rejectExit(new Error('OpenAlice did not exit after renderer close'))
+      rejectExit(new Error('OpenAlice did not exit after explicit Electron quit'))
     }, timeoutMs)
     child.once('exit', (code) => {
       clearTimeout(timeout)
@@ -407,10 +420,25 @@ async function runRendererJourney({
     if (waitForWorkspaceSetup && typeof env.OPENALICE_HOME === 'string' && env.OPENALICE_HOME.length > 0) {
       await waitForProjectWorkspaceSetup(env.OPENALICE_HOME)
     }
-    await client.evaluate('window.close(); true').catch(() => undefined)
     client.close()
     client = null
-    const exitCode = await waitForExit(child)
+    // Main-window close now hides the desktop while its tray/runtime stay alive.
+    // Electron's browser-target Browser.close command invokes the normal Quit
+    // lifecycle; unlike a renderer close or forced kill, it drains managed children.
+    const browser = await fetch(`http://127.0.0.1:${debugPort}/json/version`).then(response => response.json())
+    if (!browser.webSocketDebuggerUrl) throw new Error('Electron browser DevTools target is unavailable')
+    client = await CdpClient.connect(browser.webSocketDebuggerUrl)
+    const exited = waitForExit(child)
+    await Promise.race([
+      client.command('Browser.close').catch(error => {
+        // Electron intentionally does not reply to Browser.close before exiting.
+        if (error.message !== 'DevTools connection closed') throw error
+      }),
+      exited,
+    ])
+    const exitCode = await exited
+    client.close()
+    client = null
     if (exitCode !== 0) throw new Error(`${label} exited ${exitCode}`)
     if (process.platform === 'darwin') {
       await waitForChromiumProfileRelease(electronUserData, {

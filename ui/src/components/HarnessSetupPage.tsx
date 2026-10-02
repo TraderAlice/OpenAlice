@@ -50,7 +50,7 @@ export function HarnessSetupPage({
   const autoInitializing = !setupFailure && (projectSetup.setup === null
     || projectSetup.setup.phase !== 'complete'
     || projectSetup.setup.pending.includes(setupKind))
-  const initializing = initialization.pending || autoInitializing
+  const initializing = initialization.pending || projectSetup.busy || autoInitializing
   const refreshedSetupState = useRef<string | null>(null)
   const sawSetupInProgress = useRef(projectSetup.setup?.phase !== 'complete')
   useEffect(() => {

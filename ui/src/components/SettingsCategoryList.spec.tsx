@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/react'
+import type { ReactNode } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { SettingsCategoryList } from './SettingsCategoryList'
@@ -10,7 +11,13 @@ const mocks = vi.hoisted(() => ({
   focused: null as null | { kind: 'dev'; params: { tab: 'logs' | 'runs' | 'api' } }
     | { kind: 'automation'; params: { section: 'runs' | 'api' } },
   openOrFocus: vi.fn(),
+  navigate: vi.fn(),
+  guidance: { availableCount: 0, needsAttentionCount: 0 },
 }))
+
+vi.mock('react-router-dom', () => ({ useNavigate: () => mocks.navigate }))
+
+vi.mock('../hooks/useUpdateLifecycle', () => ({ useUpdateLifecycle: () => ({ guidance: mocks.guidance }) }))
 
 vi.mock('../hooks/useAliceProject', () => ({
   useAliceProject: () => ({
@@ -42,13 +49,15 @@ vi.mock('./SidebarRow', () => ({
     label,
     onClick,
     ariaExpanded,
+    trail,
   }: {
     label: string
     onClick: () => void
     ariaExpanded?: boolean
+    trail?: ReactNode
   }) => (
     <button type="button" onClick={onClick} aria-expanded={ariaExpanded}>
-      {label}
+      {label}{trail}
     </button>
   ),
 }))
@@ -57,6 +66,8 @@ beforeEach(() => {
   window.sessionStorage.clear()
   mocks.focused = null
   mocks.openOrFocus.mockClear()
+  mocks.navigate.mockClear()
+  mocks.guidance = { availableCount: 0, needsAttentionCount: 0 }
 })
 
 afterEach(() => {
@@ -65,6 +76,11 @@ afterEach(() => {
 })
 
 describe('SettingsCategoryList', () => {
+  it('shows the update count on Overview, one level below Settings', () => {
+    mocks.guidance = { availableCount: 1, needsAttentionCount: 0 }
+    render(<SettingsCategoryList />)
+    expect(screen.getByRole('button', { name: /settings.category.general/ }).textContent).toContain('1')
+  })
   it('places Mode before Broker in Trading, outside General', () => {
     render(<SettingsCategoryList />)
 
@@ -78,15 +94,6 @@ describe('SettingsCategoryList', () => {
     ])
     expect(within(general!).queryByRole('button', { name: 'settings.category.agentPermissions' })).toBeNull()
     expect(within(general!).getByRole('button', { name: 'settings.language.title' })).toBeTruthy()
-  })
-
-  it('owns the vertical scroll region for long settings navigation', () => {
-    render(<SettingsCategoryList />)
-
-    const list = screen.getByTestId('settings-category-list')
-    expect(list.className).toContain('overflow-y-auto')
-    expect(list.className).toContain('overscroll-contain')
-    expect(list.className).toContain('[scrollbar-gutter:stable]')
   })
 
   it('hides trading and market-data categories on NanoAlice', () => {
@@ -108,7 +115,7 @@ describe('SettingsCategoryList', () => {
     fireEvent.click(developer)
     expect(developer.getAttribute('aria-expanded')).toBe('true')
     fireEvent.click(screen.getByRole('button', { name: 'common.logs' }))
-    expect(mocks.openOrFocus).toHaveBeenCalledWith({ kind: 'dev', params: { tab: 'logs' } })
+    expect(mocks.navigate).toHaveBeenCalledWith('/settings/developer/logs')
   })
 
   it('automatically expands for a Developer deep link', () => {
@@ -125,7 +132,7 @@ describe('SettingsCategoryList', () => {
     expect(screen.queryByRole('button', { name: `automation.${tab}` })).toBeNull()
     fireEvent.click(screen.getByRole('button', { name: 'settings.group.developer' }))
     fireEvent.click(screen.getByRole('button', { name: `automation.${tab}` }))
-    expect(mocks.openOrFocus).toHaveBeenCalledWith({ kind: 'dev', params: { tab } })
+    expect(mocks.navigate).toHaveBeenCalledWith(`/settings/developer/${tab}`)
     expect(onSelect).toHaveBeenCalledOnce()
   })
 
@@ -135,4 +142,12 @@ describe('SettingsCategoryList', () => {
     expect(screen.getByRole('button', { name: 'settings.group.developer' }).getAttribute('aria-expanded')).toBe('true')
     expect(screen.getByRole('button', { name: 'automation.runs' })).toBeTruthy()
   })
+})
+
+it('places Machines directly after Overview and opens its dedicated tab', () => {
+  render(<SettingsCategoryList />)
+  const names = screen.getAllByRole('button').map(button => button.textContent)
+  expect(names.indexOf('settings.machines.title')).toBe(names.indexOf('settings.category.general') + 1)
+  fireEvent.click(screen.getByRole('button', { name: 'settings.machines.title' }))
+  expect(mocks.navigate).toHaveBeenCalledWith('/settings/machines')
 })

@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto'
 import { resolve } from 'node:path'
 
-import { WebRelay } from '../../packages/cli/src/web-relay.js'
+import { WebRelay, writeStartupTarget } from '../../packages/cli/src/web-relay.js'
 import { inspectLocalMachine, inspectMachineFleet, type MachineInventory } from '../../packages/cli/src/machine-inventory.js'
 import { readSupervisorAliceProjectRegistry } from '../../packages/cli/src/supervisor-config.js'
 import { resolveSupervisorRootPath } from '../../packages/cli/src/launch-context.js'
@@ -47,6 +47,8 @@ export async function createDevRelay(config: DevRelayConfig): Promise<WebRelay> 
   const options = { loadRegistry }
   const relay = new WebRelay({
     port: config.uiPort,
+    // An ephemeral source-dev target cannot be reopened by an installed client.
+    writeStartup: async target => { if (target?.machine !== 'local' || existing) await writeStartupTarget(target) },
     uiOrigin: `http://127.0.0.1:${config.vitePort}`,
     inspectLocal: async () => {
       const inventory = await inspectLocalMachine(options)

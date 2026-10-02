@@ -22,6 +22,7 @@ import { AppearanceSettingsPage, LanguageSettingsPage, SettingsPage, ToolsSettin
 import { ActivityBarSettingsPage } from '../pages/ActivityBarSettingsPage'
 import { PetSettingsPage } from '../pages/PetSettingsPage'
 import { WorkspaceInjectionPage } from '../pages/WorkspaceInjectionPage'
+import { MachinesSettingsPage } from '../pages/MachinesSettingsPage'
 import { BetaSettingsPage } from '../pages/BetaSettingsPage'
 import { AgentPermissionsPage } from '../pages/AgentPermissionsPage'
 import { AgentRuntimesSettingsPage } from '../pages/AgentRuntimesSettingsPage'
@@ -33,7 +34,6 @@ import { ConnectorStatusPage } from '../pages/ConnectorStatusPage'
 import { MarketDataPage } from '../pages/MarketDataPage'
 import { NewsCollectorPage } from '../pages/NewsCollectorPage'
 import { UTADetailPage } from '../pages/UTADetailPage'
-import { OnboardingDesignPage } from '../pages/OnboardingDesignPage'
 import { DesignProjectPage } from '../pages/DesignProjectPage'
 import { DevPage } from '../pages/DevPage'
 import { InboxPage } from '../pages/InboxPage'
@@ -267,6 +267,7 @@ const settingsCategoryTitle: Record<
   string
 > = {
   general: 'Overview',
+  machines: 'Machines',
   language: 'Language',
   appearance: 'Skin',
   pet: 'Pet',
@@ -289,6 +290,7 @@ const settingsCategoryTitle: Record<
 function SettingsRouter({ spec }: ViewProps<'settings'>) {
   switch (spec.params.category) {
     case 'general': return <SettingsPage />
+    case 'machines': return <MachinesSettingsPage />
     case 'language': return <LanguageSettingsPage />
     case 'appearance': return <AppearanceSettingsPage />
     case 'pet': return <PetSettingsPage />
@@ -339,13 +341,6 @@ const utaDetailModule: ViewModule<'uta-detail'> = {
   ),
 }
 
-const onboardingModule: ViewModule<'onboarding'> = {
-  kind: 'onboarding',
-  title: () => 'Onboarding',
-  toUrl: () => '/onboarding',
-  Component: () => <OnboardingDesignPage />,
-}
-
 const designProjectModule: ViewModule<'design-project'> = {
   kind: 'design-project',
   title: (spec) => getDesignProject(spec.params.project)?.title ?? `Design: ${spec.params.project}`,
@@ -354,9 +349,9 @@ const designProjectModule: ViewModule<'design-project'> = {
 }
 
 const devTabTitle: Record<Extract<ViewSpec, { kind: 'dev' }>['params']['tab'], string> = {
+  'upgrade-rehearsal': 'Upgrade rehearsal',
   frontend: 'Frontend',
   tools: 'Tools',
-  onboarding: 'Onboarding',
   snapshots: 'Snapshots',
   logs: 'Logs',
   runs: 'Runs',
@@ -610,7 +605,6 @@ const VIEWS = {
   'market-detail': marketDetailModule,
   settings: settingsModule,
   'uta-detail': utaDetailModule,
-  onboarding: onboardingModule,
   'design-project': designProjectModule,
   dev: devModule,
   inbox: inboxModule,

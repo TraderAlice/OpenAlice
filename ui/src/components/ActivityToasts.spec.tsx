@@ -1,207 +1,82 @@
 // @vitest-environment jsdom
-
 import { StrictMode } from 'react'
-import { render, waitFor } from '@testing-library/react'
+import { render } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { toast } from 'sonner'
-
 import type { AgentActivitySignal, GlobalAgentActivityData } from '../hooks/useGlobalAgentActivity'
+import { NotificationQueue } from '../lib/notifications/queue'
 import { ActivityToasts } from './ActivityToasts'
 
 const useActivity = vi.fn<() => GlobalAgentActivityData>()
+const show = vi.fn()
+const hide = vi.fn()
+let queue: NotificationQueue
+vi.mock('./Toast', () => ({ useNotifications: () => queue }))
 vi.mock('../contexts/workspaces-context', () => ({ useWorkspaces: () => ({ workspaces: [{
   id: 'chat-1', sessions: [{ id: 'session-1', resumeId: 'resume-1', agent: 'pi', name: 'p1', title: 'Daily market review', displayName: 'Market analyst' }],
 }] }) }))
-
-vi.mock('../hooks/useGlobalAgentActivity', async (importOriginal) => {
-  const original = await importOriginal<typeof import('../hooks/useGlobalAgentActivity')>()
-  return { ...original, useGlobalAgentActivity: () => useActivity() }
-})
-
-vi.mock('react-i18next', () => ({
-  useTranslation: () => ({
-    t: (key: string, values?: { agent?: string }) => `${key}:${values?.agent ?? ''}`,
-  }),
+vi.mock('../hooks/useGlobalAgentActivity', async importOriginal => ({
+  ...await importOriginal<typeof import('../hooks/useGlobalAgentActivity')>(), useGlobalAgentActivity: () => useActivity(),
 }))
-
-vi.mock('sonner', () => ({
-  toast: {
-    loading: vi.fn(),
-    success: vi.fn(),
-    info: vi.fn(),
-    error: vi.fn(),
-    dismiss: vi.fn(),
-  },
-}))
+vi.mock('react-i18next', () => ({ useTranslation: () => ({ t: (key: string, values?: { agent?: string }) => `${key}:${values?.agent ?? ''}` }) }))
 
 function signal(overrides: Partial<AgentActivitySignal> = {}): AgentActivitySignal {
-  return {
-    id: 'conversation:task:task-1',
-    kind: 'conversation',
-    workspaceId: 'chat-1',
-    agent: 'pi',
-    resumeId: 'resume-1',
-    taskId: 'task-1',
-    occurredAt: 1_000,
-    revision: 1,
-    ...overrides,
-  }
+  return { id: 'conversation:task:task-1', kind: 'conversation', workspaceId: 'chat-1', agent: 'pi', resumeId: 'resume-1', taskId: 'task-1', occurredAt: 1_000, revision: 1, ...overrides }
 }
-
 function data(signals: AgentActivitySignal[]): GlobalAgentActivityData {
-  return {
-    signals,
-    summary: {
-      primary: signals[0] ?? null,
-      count: signals.length,
-      hasFailure: signals.some(({ kind }) => kind === 'conversation-failed'),
-    },
-    loading: false,
-    error: null,
-    refresh: vi.fn(),
-  }
+  return { signals, summary: { primary: signals[0] ?? null, count: signals.length, hasFailure: signals.some(s => s.kind === 'conversation-failed') }, loading: false, error: null, refresh: vi.fn() }
 }
+beforeEach(() => { show.mockReset(); hide.mockReset(); queue = new NotificationQueue({ show, hide }); useActivity.mockReturnValue(data([])) })
 
-beforeEach(() => {
-  vi.clearAllMocks()
-  useActivity.mockReturnValue(data([]))
-})
-
-describe('ActivityToasts', () => {
-  it('silences the initial snapshot across effect replay, then announces a new revision', () => {
-    const initial = Array.from({ length: 250 }, (_, index) => signal({
-      id: `news:${index + 1}`, kind: 'news', revision: index + 1,
-    }))
-    useActivity.mockReturnValue(data([...initial, signal({ revision: 251 })]))
-    const view = render(<StrictMode><ActivityToasts /></StrictMode>)
-    view.rerender(<StrictMode><ActivityToasts /></StrictMode>)
-    expect(toast.info).not.toHaveBeenCalled()
-    expect(toast.loading).not.toHaveBeenCalled()
-
-    useActivity.mockReturnValue(data([...initial, signal({
-      kind: 'conversation-failed', revision: 252,
-    })]))
-    view.rerender(<StrictMode><ActivityToasts /></StrictMode>)
-    expect(toast.error).toHaveBeenCalledTimes(1)
-    expect(toast.info).not.toHaveBeenCalled()
-  })
-
-  it('waits through loading and an initial failure before establishing the baseline', () => {
+describe('activity bubble projection', () => {
+  it('silences the initial snapshot across StrictMode replay and initial read errors', () => {
     useActivity.mockReturnValue({ ...data([]), loading: true })
-    const view = render(<ActivityToasts />)
-    useActivity.mockReturnValue({ ...data([]), error: 'Unavailable' })
-    view.rerender(<ActivityToasts />)
-    useActivity.mockReturnValue(data([signal()]))
-    view.rerender(<ActivityToasts />)
-    expect(toast.loading).not.toHaveBeenCalled()
-
-    useActivity.mockReturnValue(data([signal(), signal({ taskId: 'task-2', revision: 2 })]))
-    view.rerender(<ActivityToasts />)
-    expect(toast.loading).toHaveBeenCalledTimes(1)
-    expect(toast.loading).toHaveBeenCalledWith(
-      expect.any(String), expect.objectContaining({ id: 'openalice-activity:task:task-2' }),
-    )
+    const view = render(<StrictMode><ActivityToasts /></StrictMode>)
+    useActivity.mockReturnValue({ ...data([]), error: 'Offline' }); view.rerender(<StrictMode><ActivityToasts /></StrictMode>)
+    useActivity.mockReturnValue(data([signal()])); view.rerender(<StrictMode><ActivityToasts /></StrictMode>)
+    expect(show).not.toHaveBeenCalled()
+    useActivity.mockReturnValue(data([signal({ kind: 'conversation-failed', revision: 2, detail: 'No auth' })])); view.rerender(<StrictMode><ActivityToasts /></StrictMode>)
+    expect(show.mock.lastCall?.[1]).toMatchObject({ status: 'error', description: 'No auth' })
   })
-
-  it('keeps one loading toast per Agent request and dismisses it on completion', async () => {
+  it('updates one running bubble to completion in place and does not replay', () => {
     const view = render(<ActivityToasts />)
-    useActivity.mockReturnValue(data([signal()]))
+    useActivity.mockReturnValue(data([signal()])); view.rerender(<ActivityToasts />)
+    const id = show.mock.lastCall?.[0]
+    useActivity.mockReturnValue(data([signal({ kind: 'conversation-completed', revision: 2 })])); view.rerender(<ActivityToasts />)
+    expect(show.mock.lastCall?.[0]).toBe(id)
+    expect(show.mock.lastCall?.[1]).toMatchObject({ status: 'success', duration: 4_000 })
     view.rerender(<ActivityToasts />)
-
-    await waitFor(() => expect(toast.loading).toHaveBeenCalledWith(
-      'activityToast.conversationRunning:pi',
-      expect.objectContaining({ id: 'openalice-activity:task:task-1' }),
-    ))
-
-    view.rerender(<ActivityToasts />)
-    expect(toast.loading).toHaveBeenCalledTimes(1)
-
-    useActivity.mockReturnValue(data([]))
-    view.rerender(<ActivityToasts />)
-    await waitFor(() => expect(toast.dismiss).toHaveBeenCalledWith(
-      'openalice-activity:task:task-1',
-    ))
+    expect(show).toHaveBeenCalledTimes(2)
+    expect(hide).not.toHaveBeenCalled()
   })
-
-  it('updates a running Agent request in place when it fails', async () => {
+  it('keeps interruption/pause neutral and rejection amber', () => {
     const view = render(<ActivityToasts />)
-    useActivity.mockReturnValue(data([signal()]))
-    view.rerender(<ActivityToasts />)
-    await waitFor(() => expect(toast.loading).toHaveBeenCalledTimes(1))
-
-    useActivity.mockReturnValue(data([signal({
-      id: 'conversation-failed:task:task-1',
-      kind: 'conversation-failed',
-      revision: 2,
-    })]))
-    view.rerender(<ActivityToasts />)
-    await waitFor(() => expect(toast.error).toHaveBeenCalledWith(
-      'activityToast.conversationFailed:pi',
-      expect.objectContaining({ id: 'openalice-activity:task:task-1' }),
-    ))
-    expect(toast.dismiss).not.toHaveBeenCalled()
+    useActivity.mockReturnValue(data([signal({ kind: 'conversation-paused' })])); view.rerender(<ActivityToasts />)
+    expect(show.mock.lastCall?.[1].status).toBe('neutral')
+    useActivity.mockReturnValue(data([signal({ kind: 'conversation-failed', failureKind: 'rejected', revision: 2 })])); view.rerender(<ActivityToasts />)
+    expect(show.mock.lastCall?.[1]).toMatchObject({ status: 'warning', duration: 8_000 })
   })
-
-  it('announces an Agent-originated Inbox delivery once', async () => {
+  it('correlates Inbox with running/completed requests without a second completion bubble', () => {
     const view = render(<ActivityToasts />)
-    useActivity.mockReturnValue(data([signal({
-      id: 'inbox:entry-1',
-      kind: 'inbox',
-      inboxEntryId: 'entry-1',
-      detail: 'The market report is ready.',
-    })]))
-    view.rerender(<ActivityToasts />)
-
-    await waitFor(() => expect(toast.success).toHaveBeenCalledWith(
-      'activityToast.inboxDelivered:Market analyst',
-      expect.objectContaining({ id: 'openalice-activity:inbox:entry-1', description: 'The market report is ready.' }),
-    ))
-    view.rerender(<ActivityToasts />)
-    expect(toast.success).toHaveBeenCalledTimes(1)
+    useActivity.mockReturnValue(data([signal()])); view.rerender(<ActivityToasts />)
+    const id = show.mock.lastCall?.[0]
+    useActivity.mockReturnValue(data([signal({ kind: 'inbox', id: 'inbox:1', revision: 2, detail: 'Report ready' }), signal({ kind: 'conversation-completed', revision: 3 })])); view.rerender(<ActivityToasts />)
+    expect(show).toHaveBeenCalledTimes(2)
+    expect(show.mock.lastCall?.[0]).toBe(id)
+    expect(show.mock.lastCall?.[1]).toMatchObject({ title: 'activityToast.inboxDelivered:Market analyst', description: 'Report ready' })
   })
-
-  it('renders a dedicated Sonner test signal through the production bridge', async () => {
+  it('does not turn a failure into success because its error report reaches Inbox', () => {
     const view = render(<ActivityToasts />)
-    useActivity.mockReturnValue(data([signal({
-      id: 'sonner-test:42',
-      kind: 'sonner-test-success',
-      workspaceId: '__dev__',
-      agent: 'Dev Panel',
-      taskId: undefined,
-      resumeId: undefined,
-      detail: 'Sonner success test',
-      revision: 42,
-    })]))
-    view.rerender(<ActivityToasts />)
-
-    await waitFor(() => expect(toast.success).toHaveBeenCalledWith(
-      'Sonner success test',
-      expect.objectContaining({ id: 'openalice-activity:sonner-test:42' }),
-    ))
+    useActivity.mockReturnValue(data([signal({ kind: 'conversation-failed', detail: 'Failed', revision: 1 }), signal({ id: 'inbox:1', kind: 'inbox', revision: 2 })])); view.rerender(<ActivityToasts />)
+    expect(show.mock.calls.map(call => call[1].status)).toEqual(['error', 'success'])
+    expect(show.mock.calls[0][0]).not.toBe(show.mock.calls[1][0])
   })
-
-  it('announces each News activity with its source and headline', async () => {
+  it('groups new articles and atomically replaces the latest image/headline/id; large replay stays silent', () => {
     const view = render(<ActivityToasts />)
-    useActivity.mockReturnValue(data([signal({
-      id: 'news:42',
-      kind: 'news',
-      workspaceId: undefined,
-      agent: undefined,
-      resumeId: undefined,
-      taskId: undefined,
-      newsItemId: 42,
-      source: 'Reuters',
-      detail: 'Markets reopen after holiday',
-      revision: 42,
-    })]))
-    view.rerender(<ActivityToasts />)
-
-    await waitFor(() => expect(toast.info).toHaveBeenCalledWith(
-      'activityToast.newsIngested:',
-      expect.objectContaining({
-        id: 'openalice-activity:news:42',
-        description: 'Markets reopen after holiday',
-      }),
-    ))
+    const articles = Array.from({ length: 250 }, (_, index) => signal({ id: `news:${index}`, kind: 'news', taskId: undefined, source: 'Reuters', newsItemId: index, revision: index + 1, detail: `Headline ${index}`, image: index === 249 ? '/latest.jpg' : undefined }))
+    useActivity.mockReturnValue(data(articles)); view.rerender(<ActivityToasts />)
+    expect(show.mock.lastCall?.[1]).toMatchObject({ count: 250, articleId: 249, description: 'Headline 249', image: '/latest.jpg' })
+    const calls = show.mock.calls.length
+    useActivity.mockReturnValue(data([...articles])); view.rerender(<ActivityToasts />)
+    expect(show).toHaveBeenCalledTimes(calls)
   })
 })

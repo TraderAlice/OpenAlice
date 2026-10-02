@@ -14,6 +14,7 @@ const pnpmArgs = (commandArgs) => process.platform === 'win32'
   : commandArgs
 const args = new Set(process.argv.slice(2))
 const skipBuild = args.has('--skip-build')
+const packagedExecutable = process.env.OPENALICE_PACKAGED_SMOKE_EXECUTABLE
 const timeoutMs = 90_000
 let activeCleanup = null
 
@@ -168,7 +169,7 @@ async function proveSurface(surface) {
     const fixturePid = Number(ready[1])
     const webUrl = ready[2]
 
-    child = spawnDesktopSmoke(desktopDevExecutable(), [join(repoRoot, 'dist', 'electron', 'main.js')], {
+    child = spawnDesktopSmoke(packagedExecutable || desktopDevExecutable(), packagedExecutable ? [] : [join(repoRoot, 'dist', 'electron', 'main.js')], {
       cwd: join(repoRoot, 'apps', 'desktop'),
       stdio: ['ignore', 'pipe', 'pipe'],
       env: {

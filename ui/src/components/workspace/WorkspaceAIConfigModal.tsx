@@ -45,6 +45,7 @@ import { notifyWorkspaceAgentConfigChanged } from '../../lib/workspaceAiEvents'
 import { AgentRuntimeIcon } from '../../lib/agentRuntimeIcon'
 import { WorkspaceTemplateUpgradePanel } from './WorkspaceTemplateUpgradePanel'
 import { WorkspaceSourceUpgradePanel } from './WorkspaceSourceUpgradePanel'
+import { workspacePlanRequest } from '../../lib/updates/workspacePlans'
 import { WorkspaceAbsorbPanel } from './WorkspaceAbsorbPanel'
 import { WorkspaceLaunchConfigurationPanel } from './WorkspaceLaunchConfigurationPanel'
 import { WorkspaceAIPreferencesPanel } from './WorkspaceAIPreferencesPanel'
@@ -1402,7 +1403,7 @@ export function WorkspaceAIConfigModal({
             )}
 
             {section === 'template' && (
-              workspace?.upgradeAvailable?.kind === 'source'
+              workspace && workspacePlanRequest(workspace).kind === 'source'
                 ? <WorkspaceSourceUpgradePanel wsId={wsId} onWorkspaceChanged={refresh} />
                 : <WorkspaceTemplateUpgradePanel
                     wsId={wsId}

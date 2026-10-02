@@ -1,0 +1,35 @@
+{
+  "name": "@traderalice/update-lifecycle",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "openalice-source": "./src/index.ts",
+      "import": "./dist/index.js"
+    },
+    "./node": {
+      "types": "./dist/node.d.ts",
+      "openalice-source": "./src/node.ts",
+      "import": "./dist/node.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@types/node": "^24.10.0",
+    "typescript": "^5.9.3"
+  },
+  "description": "Shared release identity and update lifecycle policy for OpenAlice",
+  "license": "AGPL-3.0-only",
+  "dependencies": {
+    "@noble/hashes": "2.2.0",
+    "@traderalice/guardian-runtime": "workspace:*"
+  }
+}

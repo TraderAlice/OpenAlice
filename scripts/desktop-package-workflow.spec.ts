@@ -92,6 +92,9 @@ describe('Desktop Package Smoke workflow critical path', () => {
       'runs-on': 'windows-latest',
     })
     expect(brokerPacks.needs).toBe('preflight')
+    const upgrade = brokerPacks.steps?.find(step => step.name === 'Prove previous-release Broker Pack upgrade on Windows')?.run ?? ''
+    expect(upgrade).toContain('pnpm --filter @traderalice/update-lifecycle... build')
+    expect(upgrade.indexOf('update-lifecycle... build')).toBeLessThan(upgrade.indexOf('pnpm broker-packs:upgrade-smoke'))
     expect(brokerPacks.steps?.map((step) => step.name)).toEqual(
       expect.arrayContaining(brokerPackSteps),
     )

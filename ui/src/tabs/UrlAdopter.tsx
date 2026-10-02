@@ -1,5 +1,5 @@
 import { useEffect, type ReactNode } from 'react'
-import { Navigate, Route, Routes, useParams, useSearchParams } from 'react-router-dom'
+import { Navigate, Route, Routes, useLocation, useParams, useSearchParams } from 'react-router-dom'
 import { useAliceProject } from '../hooks/useAliceProject'
 import { isNanoProduct } from '../lib/product-surfaces'
 import { useWorkspace } from './store'
@@ -32,7 +32,6 @@ export function UrlAdopter() {
             race a redirect and replace the default entry during startup. */}
         <Route path="/" element={<AdoptStatic spec={{ kind: 'quick-start', params: {} }} />} />
         <Route path="/quick-start" element={<AdoptStatic spec={{ kind: 'quick-start', params: {} }} />} />
-        <Route path="/onboarding" element={<AdoptStatic spec={{ kind: 'onboarding', params: {} }} />} />
         <Route path="/design/:project" element={<AdoptDesignProject />} />
 
         {/* Activities */}
@@ -88,6 +87,7 @@ export function UrlAdopter() {
         {/* Settings — one entry per category */}
         <Route path="/settings/workspace-injection" element={<AdoptStatic spec={{ kind: 'settings', params: { category: 'workspace-injection' } }} />} />
         <Route path="/settings" element={<AdoptStatic spec={{ kind: 'settings', params: { category: 'general' } }} />} />
+        <Route path="/settings/machines" element={<AdoptStatic spec={{ kind: 'settings', params: { category: 'machines' } }} />} />
         <Route path="/settings/language" element={<AdoptStatic spec={{ kind: 'settings', params: { category: 'language' } }} />} />
         <Route path="/settings/appearance" element={<AdoptStatic spec={{ kind: 'settings', params: { category: 'appearance' } }} />} />
         <Route path="/settings/activity-bar" element={<AdoptStatic spec={{ kind: 'settings', params: { category: 'activity-bar' } }} />} />
@@ -520,7 +520,6 @@ function specToSection(spec: ViewSpec): ActivitySection {
     case 'market-board':
     case 'market-detail':      return 'market'
     case 'settings':
-    case 'onboarding':         return 'settings'
     case 'design-project':
     case 'dev':                return 'settings'
   }
@@ -533,6 +532,9 @@ function specToSection(spec: ViewSpec): ActivitySection {
  * deep link, back-forward) lands with the expected navigation context.
  */
 function useAdopt(spec: ViewSpec) {
+  // A store-only tab switch can leave Router on this same path. A fresh
+  // navigation still needs adoption even when the spec key did not change.
+  const locationKey = useLocation().key
   const openOrFocus = useWorkspace((state) => state.openOrFocus)
   const setSidebar = useWorkspace((state) => state.setSidebar)
   // Stable string key for dep tracking; spec is freshly built each render.
@@ -547,7 +549,7 @@ function useAdopt(spec: ViewSpec) {
     openOrFocus(spec)
     // The spec object captured here is the one keyed by `key`; safe to use.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [key])
+  }, [key, locationKey])
 }
 
 /**

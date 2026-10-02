@@ -402,12 +402,15 @@ live timeline. The Telegram phone desk already ships sealed mid-turn `text`
 blocks from that progress; tool and error blocks stay local to the workstation
 surfaces.
 
-For a human comment without a fixed owner, OpenAlice follows the Issue creation
-provenance and uses the universal follow-up rule: continue the attributable
-creator, or recruit a reconstructed Agent in the Issue Workspace when creation
-has no Session origin. This answering Session is a collaborator, not an
-execution owner; `assignee` stays unchanged. Agent-authored comments without a
-fixed owner remain durable notes so progress logging does not fan out workers.
+For a human comment without a fixed owner, the Issue's assignee policy wins.
+`@new-then-resume` recruits and claims its first Session using the Issue's Agent,
+credential, model, and effort; `@new-each-run` recruits a fresh worker without
+claiming ownership. Both share dispatch exclusion with scheduled fires and
+never fall back to an earlier creator. Ordinary human-owned or unassigned
+Issues use creation provenance: continue the attributable creator, or recruit
+a reconstruction Agent in the Issue Workspace. That fallback answerer is a
+collaborator and does not change `assignee`. Agent-authored comments without a
+fixed owner remain durable notes rather than recruiting workers.
 
 #### Mode A: one responsible Session
 
@@ -522,8 +525,8 @@ can explain the original trigger and falsifiers from its conversational context.
 
 ### One recurring Issue, multiple workers
 
-A financial/industrial scan has historical Codex runs and later Pi runs. If its
-assignee is `workspace`, each report has a different `resumeId`. “Who created
+A financial/industrial scan has historical Codex runs and later Pi runs. With
+`assignee: "@new-each-run"`, each report has a different `resumeId`. “Who created
 the scan?”, “who wrote the 10 July report?”, and “who ran it most recently?” are
 three different provenance queries.
 
@@ -714,13 +717,13 @@ blocks — are a separate append-only journal at
 `<launcherRoot>/state/agent-runtime.jsonl`. Completion keeps assistant
 text and metrics on `runtime.stopped`. It is a replay projection for
 Office, not a dispatch authority and not a prompt or tool-I/O log. TUI
-internals are not extracted yet. See
-[[docs/workspace-issues-and-scheduling.md]].
+internals are not extracted yet. This is the Agent family of
+[[docs/product-activity-journal.md]], separate from conversation history.
 
-The file is private launcher state (`0600` where supported), not Workspace Git
-content. It can contain complete prompts and replies and must be treated as
-sensitive local conversation history. Native runtime session ids and raw tool
-blocks never enter it.
+`agent-conversations.jsonl` is private launcher state (`0600` where supported),
+not Workspace Git content. It can contain complete prompts and replies and must
+be treated as sensitive local conversation history. Native runtime session ids
+and raw tool blocks never enter that conversation stream.
 
 `HeadlessTaskRegistry` remains execution truth and structured headless logs
 remain diagnostic truth. The independent event stream is an analysis/audit

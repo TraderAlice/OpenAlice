@@ -20,7 +20,7 @@
   },
   "scripts": {
     "build": "node -e \"require('node:fs').rmSync('dist',{recursive:true,force:true})\" && tsc",
-    "test": "vitest run --config vitest.config.ts",
+    "test": "node ../../scripts/run-tests.mjs --package @traderalice/ibkr",
     "test:external:readonly": "node ../../scripts/run-tests.mjs --lane external-readonly --package @traderalice/ibkr",
     "test:live-paper": "node ../../scripts/run-tests.mjs --lane live-paper --package @traderalice/ibkr",
     "typecheck": "tsc --noEmit",

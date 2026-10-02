@@ -26,10 +26,9 @@ import {
   type UiStyleProfileId,
 } from '../theme/styleProfiles'
 import { useEffectivePreferenceSlot } from '../theme/useEffectiveTheme'
-import { AboutOpenAliceSection } from '../components/settings/AboutOpenAliceSection'
+import { VersionOverviewSection } from '../components/settings/VersionOverviewSection'
 import { UpdateLifecycleSection } from '../components/settings/UpdateLifecycleSection'
 import { AliceLocationSection } from '../components/settings/AliceLocationSection'
-import { MachineManagementSection } from '../components/settings/MachineManagementSection'
 import { Button } from '../components/ui/button'
 import { getBackendConnection } from '../auth/backendConnection'
 import { useRelayConnection } from '../hooks/useRelayConnection'
@@ -570,8 +569,6 @@ export function DataHomeSection() {
   const backendConnection = getBackendConnection()
   const relay = useRelayConnection()
   const [status, setStatus] = useState<OpenAliceDataHomeStatus | null>(null)
-  const [busy, setBusy] = useState(false)
-  const [restarting, setRestarting] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
@@ -608,38 +605,11 @@ export function DataHomeSection() {
     )
   }
 
-  const runAction = async (action: () => Promise<OpenAliceDataHomeActionResult>) => {
-    setBusy(true)
-    setError(null)
-    try {
-      const result = await action()
-      setStatus(result.status)
-      if (result.outcome === 'restarting') setRestarting(true)
-    } catch {
-      setError(t('settings.dataHome.actionError'))
-    } finally {
-      setBusy(false)
-    }
-  }
-
-  const updateAskOnStartup = async (enabled: boolean) => {
-    setBusy(true)
-    setError(null)
-    try {
-      setStatus(await bridge.setAskOnStartup(enabled))
-    } catch {
-      setError(t('settings.dataHome.actionError'))
-    } finally {
-      setBusy(false)
-    }
-  }
-
   const lockDescription = status?.selectionLock === 'openalice-home-env'
     ? t('settings.dataHome.lockedByHome')
     : status?.selectionLock === 'workspace-root-env'
       ? t('settings.dataHome.lockedByWorkspace')
       : null
-  const recentHomes = status?.recentHomes.filter((path) => path !== status.currentHome) ?? []
 
   return (
     <ConfigSection
@@ -671,66 +641,14 @@ export function DataHomeSection() {
           variant="outline"
           size="sm"
           className="min-h-10 sm:min-h-8"
-          disabled={!status || busy}
+          disabled={!status}
           onClick={() => void bridge.openCurrent()
             .then((message) => { if (message) setError(t('settings.dataHome.openError')) })
             .catch(() => setError(t('settings.dataHome.openError')))}
         >
           {t('settings.dataHome.open')}
         </Button>
-        <Button
-          data-testid="data-home-choose"
-          type="button"
-          size="sm"
-          className="min-h-10 sm:min-h-8"
-          disabled={!status || busy || restarting || status.selectionLocked}
-          onClick={() => void runAction(() => bridge.chooseAndRestart())}
-        >
-          {restarting ? t('settings.dataHome.restarting') : t('settings.dataHome.chooseAndRestart')}
-        </Button>
       </div>
-
-      <div className="mt-4 flex min-h-12 items-center justify-between gap-4 rounded-lg border border-border/60 px-3 py-2.5">
-        <div className="flex-1">
-          <p className="text-[13px] font-medium text-foreground">{t('settings.dataHome.askOnStartup')}</p>
-          <p className="mt-0.5 text-[11px] leading-relaxed text-muted-foreground">
-            {t('settings.dataHome.askOnStartupDescription')}
-          </p>
-        </div>
-        <Toggle
-          checked={status?.askOnStartup ?? false}
-          disabled={!status || busy || status.selectionLocked}
-          ariaLabel={t('settings.dataHome.askOnStartup')}
-          onChange={(enabled) => void updateAskOnStartup(enabled)}
-        />
-      </div>
-
-      {recentHomes.length > 0 && (
-        <div className="mt-4">
-          <p className="mb-2 text-[12px] font-medium text-muted-foreground">
-            {t('settings.dataHome.recent')}
-          </p>
-          <div className="space-y-2">
-            {recentHomes.map((path) => (
-              <div key={path} className="flex min-h-12 items-center gap-2 rounded-lg border border-border/60 px-3 py-2">
-                <span className="min-w-0 flex-1 truncate font-mono text-[12px] leading-[18px] text-foreground" title={path}>
-                  {path}
-                </span>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  className="min-h-10 shrink-0 sm:min-h-8"
-                  disabled={busy || restarting || status?.selectionLocked}
-                  onClick={() => void runAction(() => bridge.useRecentAndRestart(path))}
-                >
-                  {t('settings.dataHome.useAndRestart')}
-                </Button>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
 
       {lockDescription && (
         <p className="mt-3 rounded-lg border border-warning/30 bg-warning/5 px-3 py-2 text-[11px] leading-relaxed text-warning">
@@ -850,10 +768,9 @@ function SettingsSection() {
   return (
     <div className="mx-auto w-full max-w-[1100px]">
       <AliceLocationSection />
-      <MachineManagementSection />
 
       {/* Installation and update ownership */}
-      <AboutOpenAliceSection />
+      <VersionOverviewSection />
       <UpdateLifecycleSection />
 
       {/* Complete OpenAlice home + runtime lock boundary */}

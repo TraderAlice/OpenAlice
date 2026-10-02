@@ -1,0 +1,86 @@
+name: CLI artifact acceptance
+
+on:
+  pull_request:
+    branches: [dev]
+    paths:
+      - '.bun-version'
+      - '.github/workflows/cli-artifact-acceptance.yml'
+      - 'scripts/bun-toolchain.mjs'
+      - 'scripts/macho-signature.mjs'
+      - 'scripts/sign-cli-macos.mjs'
+      - 'scripts/verify-cli-release*'
+      - 'scripts/build-bun-*'
+      - 'scripts/bun-compile-options.ts'
+      - 'packages/cli/bin/openalice-bun.ts'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: cli-artifact-acceptance-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  native-candidate:
+    name: Native CLI (${{ matrix.platform }}-${{ matrix.arch }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { os: ubuntu-24.04, platform: linux, arch: x64 }
+          - { os: macos-14, platform: darwin, arch: arm64 }
+          - { os: macos-15-intel, platform: darwin, arch: x64 }
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22.19.0
+          cache: pnpm
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version-file: .bun-version
+      - run: pnpm install --frozen-lockfile --filter='!@traderalice/desktop'
+      - run: pnpm build:server
+      - run: pnpm exec vitest run tests/integration/cli-release-artifacts/cli-signature.spec.mjs tests/integration/cli-release-artifacts/verify-cli-release.spec.mjs
+      - run: pnpm build:bun-runtime:feasibility
+      - run: pnpm build:bun:release
+      - name: Verify the packaged bytes again
+        run: node scripts/verify-cli-release.mjs dist/bun-release
+      - uses: actions/upload-artifact@v4
+        with:
+          name: cli-candidate-${{ matrix.platform }}-${{ matrix.arch }}-${{ github.event.pull_request.head.sha || github.sha }}
+          path: |
+            dist/bun-release/*.tar.gz
+            dist/bun-release/*.tar.gz.sha256
+            dist/bun-release/report.json
+          if-no-files-found: error
+          retention-days: 7
+          compression-level: 0
+
+  final-archive:
+    name: Final archive verification on Linux
+    needs: native-candidate
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22.19.0
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: cli-candidate-*
+          path: candidates
+      - name: Verify each preserved candidate without executing macOS bytes
+        run: |
+          for directory in candidates/*; do
+            node scripts/verify-cli-release.mjs "$directory"
+          done

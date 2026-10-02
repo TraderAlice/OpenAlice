@@ -363,3 +363,9 @@ describe('UrlAdopter Market News', () => {
     expect(mocks.setSidebar).toHaveBeenCalledWith('market')
   })
 })
+
+it('adopts the Machines deep link as a settings tab', async () => {
+  render(<MemoryRouter initialEntries={['/settings/machines']}><UrlAdopter /></MemoryRouter>)
+  await waitFor(() => expect(mocks.openOrFocus).toHaveBeenCalledWith({ kind: 'settings', params: { category: 'machines' } }))
+  expect(mocks.setSidebar).toHaveBeenCalledWith('settings')
+})

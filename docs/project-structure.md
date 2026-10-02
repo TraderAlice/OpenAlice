@@ -48,12 +48,12 @@ Launchers share the same ownership model:
   `pnpm dev`; `pnpm dev:no-relay` leaves the relay out for direct-path debugging.
 - `apps/desktop/src/main.ts` is the packaged Electron Guardian and renderer
   host. It starts Alice/UTA through Electron's Node mode.
-- `scripts/guardian/prod.mjs` supervises built Runtime services for Docker and
-  the source-backed local CLI. Docker defaults to the `docker` launcher;
-  `openalice up|run` and compatibility `openalice server` supply `cli-server`
-  plus a versioned local status/stop capability. The default CLI TUI and
-  headless `openalice relay` serve the client-owned Web GUI on loopback; their
-  selected backend remains on loopback too.
+- `scripts/guardian/prod.mjs` supervises built Runtime services and defaults to
+  the `source` launcher. CLI lifecycle commands supply `cli-server` plus a
+  versioned local status/stop capability. There is no shipped product Dockerfile
+  or Compose deployment; custom container/runtime-profile compatibility is not
+  a supported installer recipe. The CLI TUI and `openalice relay` serve their
+  client-owned Web GUI on loopback.
 - `packages/guardian-runtime/` owns cross-launcher single-writer locks,
   heartbeat metadata, process identity, and controlled takeover.
 
@@ -103,6 +103,10 @@ packages/
 ui/                            React/Vite renderer
 apps/desktop/                  Electron main/preload/IPC shell
 scripts/guardian/              dev/prod supervisors, local control + recovery tests
+tests/integration/             registered collaboration tests grouped by topic
+tests/e2e/                     application-entry workflows
+tests/suites.json              integration/E2E suite registry
+tests/commands.json            dedicated acceptance prerequisites (manifest commands stay in place)
 default/                       shipped skills and factory defaults
 docs/                          owner guides and contributor documentation
 ```
@@ -271,7 +275,7 @@ Load-bearing paths:
 - `src/workspaces/template-upgrade.ts` — reviewed managed-asset reconciliation
   and interrupted-upgrade recovery.
 - `src/workspaces/workspace-operation-guard.ts` — shared checkout-mutation
-  lease for upgrade, offboarding, and future merge operations.
+  lease for template upgrade, offboarding, and Workspace Absorb.
 - `src/workspaces/workspace-creator.ts` — bootstrap and initial git state.
 - `src/workspaces/context-injector.ts` — persona and shared skill injection.
 - `src/workspaces/adapters/` — CLI-specific command/config behavior.
@@ -380,15 +384,17 @@ durable Session record.
 
 ## Persistent State
 
-`OPENALICE_HOME` selects the OpenAlice user root. The default is
-`~/.openalice`. Guardian injects the resolved value into child processes so the
-launcher and services agree.
+Each AliceProject owns one complete `OPENALICE_HOME`. Guardian injects the
+resolved home into its child processes so services agree on that boundary.
+`~/.openalice` is the conventional implicit local home, not a fallback that may
+replace an unavailable or unresolved Supervisor Default.
 
-The desktop may select another complete root before Guardian ownership is
-acquired. Its machine-local path preference lives under Electron `userData`,
-outside every selectable root; see [[docs/data-locations.md]]. Never implement
-selection by moving only `data/`, because Workspaces, locks, credentials,
-sealing, and Broker Packs must remain coherent.
+The machine-local Supervisor registry and shared Machine/AliceProject Default
+live outside every project home. Desktop startup uses that authority before
+acquiring Guardian ownership; its former Electron `userData` path preference
+is migration input only. See [[docs/alice-project.md]] and
+[[docs/data-locations.md]]. Never select a project by moving only `data/`:
+Workspaces, locks, credentials, sealing, and Broker Packs must remain coherent.
 
 ```text
 <OPENALICE_HOME>/
@@ -445,11 +451,17 @@ directly and do not become permanent compatibility code.
 | External Inbox notifications and IM adapters | [Connector Service](connector-service.md) |
 | Renderer/API surface | `ui/`, `src/webui/`, and matching demo handlers |
 | Issues, schedules, headless runs, Inbox delivery | [Workspace issues and scheduling](workspace-issues-and-scheduling.md) |
-| Retired event-bus scheduler and UTA journal boundary | [Event-system retirement note](event-system.md) |
+| Product activity facts, family pagination, Office/Sonner projections | [Product Activity Journal](product-activity-journal.md) |
+| Historical event-bus retirement | [Event-system retirement note](event-system.md) |
 | User-state schema | `src/migrations/` + generated migration index |
 | Process lock/recovery and optional-service supervision | `packages/guardian-runtime/` and all three launchers |
-| Desktop home selection and concurrent local instances | [Data locations](data-locations.md) + `apps/desktop/src/data-home.ts` |
+| AliceProject selection and concurrent complete homes | [Data locations](data-locations.md), `packages/cli/src/startup-target.ts`, and `apps/desktop/src/main.ts` |
 
 When current code disagrees with this guide, verify the runtime behavior and
 update the guide in the same change rather than leaving a second source of
 truth in `AGENTS.md`.
+
+Required local test policy lives in `tests/gates.json`; `scripts/test-results.mjs`
+resolves it through the coverage manifests and inspects actual runner outcomes.
+`tests/helpers/` contains isolated local journey fixtures, never product runtime
+or an independent test runner. See [[docs/testing.md]].

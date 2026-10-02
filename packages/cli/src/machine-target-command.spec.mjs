@@ -33,6 +33,7 @@ describe('OpenAlice --machine target dispatch', () => {
           isDefault: false,
         }],
       }),
+      readStartup: async () => ({ machine: 'cloud', project: 'research' }),
       runRemote,
     })).resolves.toBe(7)
     expect(runRemote).toHaveBeenCalledWith({
@@ -59,8 +60,28 @@ describe('OpenAlice --machine target dispatch', () => {
 
   it('re-enters the local dispatcher for the implicit local Machine', async () => {
     const runLocal = vi.fn(async () => 7)
-    await expect(runMachineTarget('local', ['status'], { runLocal })).resolves.toBe(7)
-    expect(runLocal).toHaveBeenCalledWith(['status'])
+    await expect(runMachineTarget('local', ['status'], { runLocal, readStartup: async () => ({ machine: 'local', project: 'research' }) })).resolves.toBe(7)
+    expect(runLocal).toHaveBeenCalledWith(['status', '--project', 'research'])
+  })
+
+  it('rejects a remote Default for an explicit local lifecycle command', async () => {
+    const runLocal = vi.fn()
+    await expect(runMachineTarget('local', ['status'], {
+      runLocal, readStartup: async () => ({ machine: 'cloud', project: 'research' }),
+    })).rejects.toMatchObject({ code: 'EUSAGE' })
+    expect(runLocal).not.toHaveBeenCalled()
+  })
+
+  it('sets a remote Default on the origin without invoking the remote project-use command', async () => {
+    const runRemote = vi.fn()
+    const writeStartup = vi.fn(async () => {})
+    await expect(runMachineTarget('cloud', ['project', 'use', 'research'], {
+      loadMachines: async () => ({ machines: [{ key: 'cloud', sshTarget: 'alice@host', enabled: true }] }),
+      inspectMachine: async () => ({ projects: [{ key: 'research' }] }),
+      writeStartup, runRemote,
+    })).resolves.toBe(0)
+    expect(writeStartup).toHaveBeenCalledWith({ machine: 'cloud', project: 'research' })
+    expect(runRemote).not.toHaveBeenCalled()
   })
 
   it('shell-quotes every forwarded argument', () => {

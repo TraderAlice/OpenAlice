@@ -8,6 +8,25 @@ Related guides: [[docs/project-structure.md]],
 [[docs/model-semantics-and-runtime-injection.md]], and
 [[docs/development-workflow.md]].
 
+## Update readiness and acceptance
+
+[[docs/update-lifecycle.md]] owns coordinated update semantics. Electron keeps
+its native installer and local `userData/update-operations/` receipt; the relay
+or desktop control plane persists a composed plan under `update-control/`.
+A native handoff is complete only when the exact approved app version starts,
+the renderer is ready, and the required integrated Alice service reports that
+version. A separated client verifies its local shell; backend readiness belongs
+to the selected Runtime. No Workspace Agent or Studio is started for this check.
+
+`electron:smoke:workspace` seeds a durable native handoff, then starts a new
+unsigned packaged process and checks real readiness through preload. It also
+checks the shared Skills inventory. `scripts/desktop-startup-smoke.mjs` accepts
+`--app-path <executable> --connected-home <disposable-running-project>` to prove
+packaged separated client/backend identity without taking local project ownership.
+It uses the shipped version endpoint so a previous release need not implement the
+current update-inventory API; integrated Workspace acceptance checks that inventory. Native
+signature/notarization and Windows installer replacement remain release gates.
+
 ## Product Contract
 
 A packaged OpenAlice install must be able to open a Workspace on a fresh
@@ -28,13 +47,13 @@ removes the CLI/toolchain prerequisite; it does not bundle a model account or
 API key. User-installed Claude Code, Codex, opencode, or Pi remain supported as
 additional runtimes and may use their own subscription login or local config.
 
-Plain `pnpm dev` and Docker installs are different deployment shapes. They do
-not inherit the packaged desktop's managed-agent promise and may require an
-agent CLI in the host environment or image. The curl-installed CLI is a third
-shape: it installs the same pinned Pi version under the OpenAlice install root
-and injects `OPENALICE_MANAGED_PI_*` when it starts a source-backed Runtime. It
-still relies on host Node/npm and does not inherit Electron's managed
-Git/Bash/search-tool payload.
+Source development and the native CLI do not inherit the packaged desktop's
+managed-agent promise. They use separately installed Agent CLIs. The direct
+installer supplies a native OpenAlice Runtime, not a host Node/npm dependency
+or an installer-owned Pi launcher; it clears desktop-managed Pi variables.
+Electron's managed Pi/Git/Bash/search-tool payload remains a separate boundary.
+See [[docs/cli-installer.md]] for native installation and
+[[docs/local-runtime.md]] for source-backed launch.
 
 ### AI credential setup contract
 
@@ -132,17 +151,45 @@ force Add, Edit, Delete, or selection controls outside the viewport.
 
 ### Desktop data-location selection
 
-The desktop resolves the complete `OPENALICE_HOME` before acquiring runtime
-ownership or starting Alice/UTA. Fresh installs can choose a folder at startup;
-**Settings → General → Data location** can switch with a full restart, reopen a
-recent location, or ask on every launch. A duplicate-owner dialog can choose a
-different home instead of stopping the live instance.
+The desktop uses the Supervisor's shared Machine/AliceProject Default.
+An unavailable or unresolved Default opens the startup chooser without
+silently selecting another home or acquiring its Guardian lock. The chooser
+can explicitly create or start a registered project. Successful attachment is
+verified and presented before the shared Default is saved; it is not an
+independent Electron Recent setting.
 
-This launcher preference is stored under Electron `userData`, not inside the
-selected OpenAlice home and not inside portable `data/`. `OPENALICE_HOME` and
-`AQ_LAUNCHER_ROOT` environment overrides lock the desktop selector. Switching
-never copies or moves data. Follow [[docs/data-locations.md]] for precedence,
-concurrent-instance semantics, missing-drive behavior, and verification.
+The old Electron data-location preference is migration input only.
+`OPENALICE_HOME` remains an explicit invocation override. Follow
+[[docs/alice-project.md]] and [[docs/data-locations.md]] for Default selection,
+environment precedence, and concurrent-project isolation.
+
+`pnpm electron:smoke:startup` validates unresolved and unavailable Default
+startup against the built desktop bundle. Pass `--app-path <packaged executable>`
+to exercise the unsigned package. The cases isolate Supervisor, project state,
+and Electron profile, verify the client-only boundary without adopting an
+unrelated Runtime, then stop the private process group and remove test state.
+`pnpm electron:smoke:credential-pi` is **credential + native Pi execution
+acceptance** inside an already selected project. It waits for Chat Workspace
+preparation, checks an empty vault and missing native login, then drives the real
+Settings → AI Provider UI through Add, a rejected key, a successful HTTP Test
+against a local deterministic provider, and Save. It reads back the credential,
+sets the Workspace's interactive/headless executor binding through
+`PUT /api/workspaces/:id/runtime-settings`, requires `ready/launcher-vault`, and
+calls `POST /api/workspaces/:id/headless` for a separate native Pi reply. Terminal
+readiness failure or exit zero without the expected reply fails acceptance.
+The mock also requires observed credential-test and native reply requests.
+
+This is not the retired onboarding wizard or complete cold-start acceptance.
+Explicit `OPENALICE_HOME` bypasses the Machine/AliceProject launcher; the startup
+smoke above owns that boundary. Executor selection uses a test API, not its UI,
+and the native reply does not exercise the browser Chat composer.
+
+`electron:smoke:onboarding` / `--onboarding` remain deprecated aliases that warn
+and run the same gate. Use `--credential-pi` for direct runner invocation.
+Shared `OPENALICE_ONBOARDING_*` / `VITE_OPENALICE_ONBOARDING_*` fixture variables
+and the deterministic model ID retain their existing names for dev compatibility;
+they do not expand this gate's scope. The unsigned Linux path does not certify
+macOS/Windows packaging, signing or notarization.
 
 ## Current Platform Payloads
 
@@ -344,11 +391,10 @@ Workspace, run, Agent, launch mode, failure code, and OS error code without
 including the prompt, complete argv, credentials, or environment values.
 
 The packaged Electron managed npm runtime is not added to `PATH` as a fake
-`pi` binary; the Pi adapter owns its explicit launch command. The curl
-installer additionally creates `<install-root>/bin/pi` as a direct launcher to
-the same immutable managed runtime while the `openalice` launcher still uses
-the explicit env contract. User-installed standalone Pi in plain source/dev
-continues to use the normal `pi` command path.
+`pi` binary; the Pi adapter owns its explicit launch command. Source development
+and the native CLI use the user's standalone Pi on its normal command path.
+The current direct installer does not create `<install-root>/bin/pi` and removes
+validated legacy managed-Pi launchers during cutover.
 
 ### Workspace launch-plan disclosure
 
@@ -390,10 +436,10 @@ Pi project trust follows the runtime boundary:
   its normal `trust.json` state;
 - packaged headless sessions pass `--approve` because no user is present and
   OpenAlice controls the pinned managed Pi and Workspace contents;
-- plain `pnpm dev` headless sessions do not receive version-specific approval
-  flags. The Pi executable on `PATH`, its version, and its upgrade policy
-  belong to the contributor. A curl-installed CLI Runtime has an explicit
-  managed Pi path and therefore follows the pinned managed approval contract.
+- source-development and native-CLI headless sessions do not receive
+  version-specific approval flags for an external Pi. Its version and upgrade
+  policy belong to the user; the packaged desktop's pinned managed runtime
+  remains the managed approval boundary.
 
 Pi terminal appearance follows the same boundary used by Orca:
 
@@ -432,16 +478,12 @@ under the Workspace's `.pi/extensions/` registers the local provider, and the
 native Workspace `.pi/settings.json` layer selects it. This keeps the user's
 global models, settings, packages, auth, resources, trust, and sessions visible.
 
-An installer-owned OpenAlice Runtime is a separate managed boundary. A launcher
-carrying `OPENALICE_MANAGED_PI_PATH` causes the selected complete home to set
-`PI_CODING_AGENT_DIR` and `PI_CODING_AGENT_SESSION_DIR` beneath that instance's
-complete home before Guardian starts. Managed settings, trust, resources, and
-sessions are therefore shared within one OpenAlice instance but isolated from
-another instance and from a Pi launched directly in the user's shell. The
-standalone installer-provided `pi` launcher intentionally does not set those
-overrides. The environment projection lives in the common local-Runtime
-environment builder, so TUI, lifecycle, and transitional `start`/`server`
-launch paths cannot diverge on this boundary.
+An explicitly supplied managed-Pi launch environment is a separate boundary.
+The common local-Runtime environment builder can project its Pi settings,
+trust, resources, and sessions beneath the selected complete home before
+Guardian starts. This conditional support does not mean the native installer
+bundles Pi: native standalone startup clears desktop-managed Pi variables.
+Do not revive the retired `start` command to select a launch environment.
 
 An old Workspace `.pi-agent/` tree is migrated into the applicable native
 agent-directory layout before launch and removed only after its configuration
@@ -560,7 +602,9 @@ platform installer does not expose one to the old Electron process.
 
 Before the handoff, Electron atomically records
 `openalice-update-attempt.json` in its machine-local `userData` directory. The
-new version clears that marker on first launch. If the initiating version is
+approved target version clears that marker on first launch, using the shared
+release-evidence verifier. A different unapproved version archives the marker
+as failed rather than claiming a successful update. If the initiating version is
 still running after the bounded installer window, the marker is archived as
 `.failed` and a native error names the target version and desktop diagnostic
 log. This marker is updater evidence, not user-owned OpenAlice state, and does
@@ -634,9 +678,55 @@ The second assertion deliberately uses an observable Workspace side effect,
 not a model claiming that a command succeeded. The run emits a versioned JSON
 receipt whose individual checks make PATH, injection, CLI transport, runtime
 output, tool use, and cleanup failures distinguishable. The Desktop Package
-Smoke matrix preserves these receipts as CI artifacts. Release candidates run
-the same acceptance on all three platform/architecture builds before any tag or
-GitHub Release is created; only accepted installers are then published.
+Smoke matrix receipts are preserved as CI artifacts. Release acceptance gates
+are defined in [Development Workflow](development-workflow.md#promotion-dev-to-master).
+
+### Local package diagnostics
+
+Use the packaged Workspace acceptance above before treating a source Electron
+launch as release evidence. A native CLI archive, a browser session, and a
+packaged desktop app exercise different resource layouts; acceptance of one
+cannot certify another.
+
+For interactive diagnosis, `pnpm electron:smoke:packaged` defaults to isolated
+stores. `--real-data` explicitly opts into the user's existing state; use it
+only when the requested investigation needs that state. Onboarding, trading-mode
+and Workspace acceptance profiles always require isolation. The current option
+contract lives in `scripts/desktop-packaged-smoke.mjs` and
+`scripts/desktop-packaged-smoke-plan.mjs`; do not infer defaults from an old
+command transcript.
+
+Temporary packaged app launches inherit only host plumbing and explicit runner
+flags. OS-home/XDG, Pi, OpenAlice, Supervisor, global, and Electron state stays
+beneath the smoke root; ambient provider credentials, endpoints and native config
+overrides are excluded. Build/install subprocesses retain their normal environment.
+Known Codex, Claude, Cursor and Grok directory overrides also point under that root.
+`PI_CODING_AGENT_SESSION_DIR` and OMP profile selectors are cleared so Pi writes
+and adapter reads use the same isolated default layout. The sentinel integration
+checks the spawned environment, Pi trust writes and session-title lookup against
+disposable inherited directories. This does not certify every third-party CLI's
+optional external configuration or plugins.
+
+For a resource-layout failure, inspect an unsigned persistent package:
+
+```bash
+pnpm electron:build
+pnpm vendor:runtime
+CSC_IDENTITY_AUTO_DISCOVERY=false pnpm -F @traderalice/desktop exec electron-builder --dir --projectDir ../.. --publish never
+pnpm electron:assert-package
+```
+
+This diagnostic flow does not publish or prove signing/notarization. `--signed`
+is for an explicitly scoped signing investigation under the
+[Package signing boundary](development-workflow.md#package-signing-boundary).
+
+When a package job fails, classify the failure before rebuilding: resource
+layout, native dependency/Windows command resolution, or signing/publication.
+Read the failed job's log and check the actual packaged resource root, child
+`OPENALICE_APP_HOME`, executable resolution and owned process cleanup. Inspect
+provider configuration only when relevant, without copying credentials or
+request bodies into logs or reports. For preserved candidate replay, follow
+[Development Workflow](development-workflow.md#promotion-dev-to-master).
 
 ### N-1 desktop upgrade acceptance
 
@@ -657,20 +747,20 @@ The runner uses explicit temporary `OPENALICE_HOME`, `AQ_LAUNCHER_ROOT`,
 desktop data, credentials, or preferences. The previous renderer is driven
 through a short-lived loopback DevTools endpoint so the test uses its real API
 and bootstrap code without adding a production smoke route.
+Between launches the runner requests explicit Electron Quit through the browser
+DevTools target. Closing the main renderer only hides the normal desktop and
+does not establish shutdown; the runner still requires clean process exit.
 
-Release candidates repeat the journey against publication bytes. macOS expands
-the final signed architecture-specific ZIP; Windows silently installs N-1 and
-then runs the final NSIS installer over the same isolated install directory.
-Before either artifact is accepted, the release job parses the platform update
-YAML and recomputes the referenced file size and SHA-512, requires its blockmap,
-and verifies the candidate version. A failed upgrade receipt or byte mismatch
-blocks `publish-release`, so no tag, GitHub Release, or CDN mirror is created.
+Stable release candidates repeat the journey against publication bytes: macOS
+expands the final signed architecture-specific ZIP; Windows installs N-1 then
+runs the final NSIS installer over the same isolated directory. Channel gates,
+receipts and updater-metadata requirements are owned by
+[Development Workflow](development-workflow.md#promotion-dev-to-master).
 
 This gate proves N-1 state compatibility and the shipped ZIP/NSIS bytes. macOS
-ShipIt replacement and signing/notarization remain native release mechanics;
-the updater status/handoff contract stays covered by desktop unit/UI tests and
-signed release rehearsal. Do not describe an unpacked-package PR smoke as proof
-that ShipIt itself replaced the application.
+ShipIt replacement and signing/notarization remain native release mechanics.
+Do not describe an unpacked-package PR smoke as proof that ShipIt replaced the
+application.
 
 Do not replace the actual shims with direct tool-function calls in this smoke:
 that would stop covering argv parsing, manifest discovery, managed Node,
@@ -683,17 +773,13 @@ pnpm vitest run \
   src/core/runtime-profile.spec.ts \
   src/workspaces/agent-detect.spec.ts \
   src/workspaces/spawn-env.spec.ts \
-  src/workspaces/adapters/ai-config.spec.ts \
+  tests/integration/agent-configuration/ai-config.spec.ts \
   scripts/vendor-managed-runtime.spec.ts \
   scripts/assert-desktop-package.spec.ts \
   scripts/smoke-packaged-toolchain.spec.ts
 ```
 
-Then exercise the packaged path:
-
-```bash
-pnpm electron:smoke:workspace
-```
+Then exercise the [packaged Workspace acceptance](#workspace-acceptance-contract).
 
 That command is the standard local acceptance path. It builds and vendors the
 runtime, packages into a unique owner directory under the OS temp directory,
@@ -755,6 +841,13 @@ otherwise successful 88-second run, including a roughly 62-second main-to-render
 response delay. Preserve that timing as a separate performance finding rather
 than interpreting a larger smoke budget as a runtime performance fix.
 
+The N-1 state journey waits for the actual `app://openalice/` document to finish
+loading and mount before exercising APIs or requesting Quit. A DevTools page
+target or reachable backend alone does not mean Electron's initial navigation
+has completed. Standalone Broker Pack upgrade jobs must also build
+`@traderalice/update-lifecycle` and its dependencies before loading the source
+verifier; they cannot rely on another job's server build.
+
 A release-facing change should also verify a clean-machine flow:
 
 1. launch the packaged app with no system Node, Git, Bash, or Pi assumption;
@@ -784,3 +877,24 @@ For an isolated native frontend preview with shared mock data, use
 `pnpm electron:demo`. It preserves app protocol, preload and child IPC without
 starting managed agents or trading services. See [[docs/demo-mode.md]] for
 commands, data ownership and acceptance limits.
+
+### Smoke-owned process-group completion
+
+On Linux a positive group signal probe includes exited zombies. The smoke helper
+uses two complete procfs snapshots with matching nonempty PID/start-time
+identities before treating a group as exited: every member must be Z with exactly
+one thread. A Z thread-group leader with workers remains live. State is parsed
+after comm's final parenthesis, since legal process names can contain `)`.
+Restricted, hidden, unreadable, malformed, empty or changing snapshots remain
+conservative; live members in the private session also prevent completion.
+TERM/KILL order and shutdown budgets are unchanged. This proves execution stopped,
+not that the host init reaped PID entries. Real Node helper tests cover graceful
+and ignored TERM after wrapper exit; a local pthread diagnostic additionally
+checks a Z leader with a live worker. Native Electron/platform acceptance remains
+separate from these Node and injected-procfs assertions.
+
+Routine fixes do not require a permanent native smoke entry point. The isolated
+store and `--real-data` contract is defined under [Local package diagnostics](#local-package-diagnostics).
+Temporary stores do not promise
+OS-home or native-agent credential isolation; do not run live native Agents
+against a maintainer account as part of ordinary test verification.

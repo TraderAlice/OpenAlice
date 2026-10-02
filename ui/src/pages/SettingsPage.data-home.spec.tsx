@@ -87,31 +87,14 @@ describe('DataHomeSection', () => {
     expect(screen.queryByText('pnpm dev -- --home <path>')).toBeNull()
   })
 
-  it('shows the complete desktop home and can switch to a recent location', async () => {
+  it('shows the current home without independent Recent or startup-policy controls', async () => {
     const bridge = installBridge()
     render(<DataHomeSection />)
-
     expect(await screen.findByText(currentStatus.currentHome)).toBeTruthy()
-    expect(screen.getByText('Desktop selection')).toBeTruthy()
-    fireEvent.click(screen.getByRole('button', { name: 'Use and restart' }))
-
-    await waitFor(() => {
-      expect(bridge.useRecentAndRestart)
-        .toHaveBeenCalledWith('/Users/alice/.openalice-dev/project-b')
-    })
-    expect(await screen.findByText('Restarting...')).toBeTruthy()
-  })
-
-  it('persists the ask-on-startup preference through the desktop bridge', async () => {
-    const bridge = installBridge()
-    render(<DataHomeSection />)
-
-    const toggle = await screen.findByRole('switch', { name: 'Ask which location to use at startup' })
-    await waitFor(() => expect(toggle).toHaveProperty('disabled', false))
-    fireEvent.click(toggle)
-
-    await waitFor(() => expect(bridge.setAskOnStartup).toHaveBeenCalledWith(true))
-    expect(toggle.getAttribute('aria-checked')).toBe('true')
+    expect(screen.queryByRole('button', { name: 'Use and restart' })).toBeNull()
+    expect(screen.queryByRole('switch')).toBeNull()
+    expect(bridge.useRecentAndRestart).not.toHaveBeenCalled()
+    expect(bridge.setAskOnStartup).not.toHaveBeenCalled()
   })
 
   it('surfaces a native open-folder failure returned by Electron', async () => {
@@ -133,9 +116,7 @@ describe('DataHomeSection', () => {
     render(<DataHomeSection />)
 
     expect(await screen.findByText(/AQ_LAUNCHER_ROOT/)).toBeTruthy()
-    expect(screen.getByRole('button', { name: 'Choose folder and restart' }))
-      .toHaveProperty('disabled', true)
-    expect(screen.getByRole('switch', { name: 'Ask which location to use at startup' }))
-      .toHaveProperty('disabled', true)
+    expect(screen.queryByRole('button', { name: 'Choose folder and restart' })).toBeNull()
+    expect(screen.queryByRole('switch')).toBeNull()
   })
 })

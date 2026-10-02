@@ -223,6 +223,14 @@ keeps the OpenAlice wordmark without a second portrait. Its trailing ellipsis
 appears on hover, keyboard focus, or while open; touch keeps it visible. The
 trigger highlights for interaction, not because a Settings or Connectors page
 is active. Settings remains an item inside this application menu.
+Project Workspace preparation failures reuse its blue indicator and the Settings
+Overview breadcrumb. Loading and normal preparation never raise a banner or an
+error badge. Overview names the failing Harness preparation, shows its concrete
+cause, and offers the existing project-setup retry, including before a Workspace
+ID exists. Preparation has its own count rather than claiming an available
+update. One project-scoped setup provider shares polling and retries across
+Settings and Harness entry points; successful reads clear transport errors and
+successful preparation refreshes Workspace inventory and default selections.
 Settings and Developer use the same page-owned secondary navigator as Inbox
 and Market from 768px upward. At 768–959px, entering Settings temporarily
 collapses the activity rail so the category navigator and content fit together;
@@ -322,9 +330,12 @@ submission, and preserve the draft on failure. Enter respects IME composition;
 Shift+Enter inserts a newline. Session identity changes remount local composition
 state and ignore prior requests. New revisions follow the tail only while the
 reader is already there; Jump to latest is explicit and honors reduced motion.
-Idle needs no top-bar badge; busy and failure states remain visible. Runtime
-settings remain in the existing Session settings until an adapter actually
-supports a corresponding inline control.
+Idle needs no top-bar badge; busy and failure states remain visible. GUI Sessions
+use the shared composer for capability-supported AI access, model, and effort
+controls. Changes persist through idle Session reconfiguration; busy/pending
+sends lock configuration, and an unsaved or failed change blocks sending until
+saved or retried. Unsupported controls stay hidden rather than implying an
+adapter can apply them.
 
 ### Long-form Markdown
 
@@ -647,10 +658,12 @@ address history tracks submitted URLs, not cross-origin in-page navigation.
 Workspace-keyed runtime view state retains open tabs, selected tab, width and
 last Session. Mounted file/Studio tabs survive disclosure and Session changes;
 closing a tab releases its view without stopping the managed Studio process.
-Reload resets this transient view state. At content widths below 720px the
-panel replaces the conversation region while the shared header and explicit
-collapse/return action remain available. Base UI Tabs and the shared resizable
-primitive own keyboard selection and splitter behavior.
+Reload resets this transient view state. At phone viewport widths below 768px,
+the panel replaces the conversation region while the shared header and explicit
+collapse/return action remain available. At 768–1279px it stays beside the
+conversation and opening it collapses the activity rail. These are viewport
+media-query boundaries, not a 720px content-width container query. Base UI Tabs
+and the shared resizable primitive own keyboard selection and splitter behavior.
 
 Harness headers expose a single icon-only work-panel disclosure with a tooltip
 and accessible expanded state. Workspace configuration stays in the existing
@@ -748,3 +761,35 @@ read-only. Completion offers explicit return to conversation instead of an
 automatic process restart. A cold background deep link keeps the existing busy
 Dialog behavior. Demo `?takeover=preview` seeds an isolated, simulated request for
 the AI-power conversation, including approval, idle timeout and completion.
+
+## Compact activity notifications
+
+The shared Sonner layer uses readable 352px pop-out cards, Instrument Sans,
+semantic popover colors, internal close controls, bounded previews and actions
+below copy. News may include a 64×48 feed image, validated at the producer and
+renderer; missing/failed media collapses without a placeholder. Article identity,
+headline and image always update as one tuple. Old events remain text-only.
+
+The display queue keeps three expanded cards; pending cards start their lifetime
+only when admitted. An error preempts the lowest-priority non-error card, which
+returns to the queue and receives its full lifetime when redisplayed. FIFO holds
+within severity. News groups by source and Inbox by publishing Session/Workspace
+for a fixed four-second arrival window; queued groups continue collecting until
+admission. Repeated identical local errors (with optional caller scope) share a
+fixed 30-second window. Group updates do not restart the timer. Sonner owns
+hover/focus pause, swipe, positioning and reduced-motion behavior.
+
+Current global eligibility stays narrow: non-human Agent conversation requests,
+agent-originated non-manual Inbox delivery, News and explicit developer probes.
+The initial successful snapshot is silent. Request lifecycle uses one operation
+card; completion is green, interruption/pause neutral, rejection amber and
+launch/terminal failure red. A correlated Inbox result updates that request's
+card without a redundant completion popup. An error-report delivery must never
+replace a known failed execution with success. Raw tool/text/recoverable errors
+remain detail in their existing surfaces, not independent global notifications.
+
+Dismissal hides only UI feedback; it neither cancels work nor deletes content.
+Running progress cannot reopen its dismissed bubble, but a new terminal result
+may appear once. News/Inbox actions retain their whole-page destinations; Agent
+inspection opens the existing read-only Session details when available, Office
+otherwise. No notification action automatically retries or takes over a runtime.

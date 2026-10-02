@@ -110,6 +110,7 @@ const defaultDeps: PreferenceRouteDeps = {
 export function createPreferencesRoutes(
   deps: PreferenceRouteDeps = defaultDeps,
   adapterRegistry: AdapterRegistry = createBuiltinAdapterRegistry(),
+  onUpdatePolicyChanged?: () => void,
 ) {
   const app = new Hono()
 
@@ -117,7 +118,11 @@ export function createPreferencesRoutes(
   app.put('/updates', async (c) => {
     const parsed = updatePreferenceSchema.safeParse(await c.req.json().catch(() => null))
     if (!parsed.success) return c.json({ error: 'invalid_update_preferences' }, 400)
-    try { return c.json(await saveUpdatePreferences(parsed.data)) }
+    try {
+      const saved = await saveUpdatePreferences(parsed.data)
+      onUpdatePolicyChanged?.()
+      return c.json(saved)
+    }
     catch (error) { return c.json({ error: 'preferences_write_failed', message: String(error) }, 500) }
   })
 

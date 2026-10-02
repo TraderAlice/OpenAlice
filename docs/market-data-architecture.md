@@ -139,15 +139,20 @@ copied provider inventory in prose.
 
 ## Verification
 
-The compatibility package is tested from the monorepo root so it shares the
-same aliases, setup, and runtime assumptions as Alice:
+Select focused, package/owner, or full-suite evidence with the
+[[docs/development-workflow.md]]
+([shared ladder](development-workflow.md#local-feedback-ladder)). For a change
+inside the compatibility package, its focused tests run from the monorepo root
+so they share Alice aliases, setup, and runtime assumptions:
 
 ```bash
 pnpm -F @traderalice/opentypebb typecheck
 pnpm vitest run packages/opentypebb/src
-npx tsc --noEmit
-pnpm test
 ```
+
+Typecheck Alice when its client or routes change. Cross-owner/shared protocol,
+provider registry, dependency/configuration or uncertain impact requires the
+ladder's broader gates rather than relying on a static changed import selection.
 
 When changing bars or reference contracts, also run their focused suites and
 exercise the corresponding `traderhub` or `alice analysis` CLI path. Keyed or

@@ -1,0 +1,581 @@
+import { serve } from '@hono/node-server'
+import { execFile } from 'node:child_process'
+import { promisify } from 'node:util'
+import { issueRunNowFactory, issueRetryFactory } from '../../../src/tool/issue-tools.js'
+import { describe, it, expect, vi } from 'vitest'
+import { Hono } from 'hono'
+import { tool } from 'ai'
+import { z } from 'zod'
+import { resolve, join } from 'node:path'
+import { mkdtemp, mkdir, writeFile, rm } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { ToolCenter } from '../../../src/core/tool-center.js'
+import { WorkspaceToolCenter } from '../../../src/core/workspace-tool-center.js'
+import { createThinkingTools } from '../../../src/tool/thinking.js'
+import { inboxReadFactory } from '../../../src/tool/inbox-read.js'
+import { workspacePathFactory } from '../../../src/tool/workspace-path.js'
+import { createMemoryInboxStore } from '../../../src/core/inbox-store.js'
+import { extractMcpShape } from '../../../src/core/mcp-export.js'
+import { inboxPushFactory } from '../../../src/tool/inbox-push.js'
+import { registerCliRoutes, type CliGatewayDeps } from '../../../src/server/cli.js'
+
+/**
+ * Exercise gateway validation, dispatch and response unwrapping with a local
+ * search fixture; no market provider is contacted.
+ */
+function makeApp(manifestOnly = false): Hono {
+  const toolCenter = new ToolCenter()
+  toolCenter.register(createThinkingTools(), 'thinking') // must remain unreachable from CLI
+  toolCenter.register({ marketSearchForResearch: tool({
+    description: 'Local search fixture',
+    inputSchema: z.object({ query: z.string() }),
+    execute: ({ query }) => ({ symbol: query }),
+  }) }, 'market-search')
+
+  toolCenter.register({ simulate: tool({
+    description: 'Unexported simulation fixture',
+    inputSchema: z.object({}),
+    execute: (): { executed: boolean } => { throw new Error('Removed simulation must not execute') },
+  }) }, 'simulation')
+
+  const fakeSvc = {
+    registry: {
+      get: (id: string) => (id === 'ws1' ? { id: 'ws1', tag: 'demo' } : undefined),
+    },
+  }
+
+  const deps: CliGatewayDeps = {
+    toolCenter,
+    workspaceToolCenter: new WorkspaceToolCenter(),
+    inboxStore: {} as never,
+    entityStore: {} as never,
+    getWorkspaceService: () => fakeSvc as never,
+  }
+
+  const app = new Hono()
+  registerCliRoutes(app, deps, manifestOnly)
+  return app
+}
+
+const app = makeApp()
+const post = (path: string, body: unknown) =>
+  app.request(path, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  })
+
+describe('CLI gateway — data export', () => {
+  it('manifest lists grouped verbs with resolved tool names', async () => {
+    const res = await app.request('/cli/ws1/data/manifest')
+    expect(res.status).toBe(200)
+    const body = (await res.json()) as {
+      export: string
+      groups: Record<string, Record<string, { tool: string }>>
+      unmapped: string[]
+    }
+    expect(body.export).toBe('data')
+    expect(body.groups['market']?.['search']?.tool).toBe('marketSearchForResearch')
+    expect(body.groups).not.toHaveProperty('think')
+    expect(body.groups['analysis'] ?? {}).not.toHaveProperty('simulate')
+  })
+
+  it('rejects the removed calculator even when the tool remains registered', async () => {
+    const response = await post('/cli/ws1/data/invoke', { tool: 'calculate', args: { expression: '2 + 2' } })
+    expect(response.status).toBe(404)
+  })
+
+  it('rejects direct invocation of the removed simulator', async () => {
+    const response = await post('/cli/ws1/data/invoke', { tool: 'simulate', args: {} })
+    expect(response.status).toBe(404)
+  })
+
+  it('manifest 404s on unknown workspace', async () => {
+    const res = await app.request('/cli/nope/data/manifest')
+    expect(res.status).toBe(404)
+  })
+
+  it('manifest 404s on unknown export', async () => {
+    const res = await app.request('/cli/ws1/nope/manifest')
+    expect(res.status).toBe(404)
+  })
+
+  it('invoke runs a mapped tool and returns its payload', async () => {
+    const res = await post('/cli/ws1/data/invoke', { tool: 'marketSearchForResearch', args: { query: 'AAPL' } })
+    expect(res.status).toBe(200)
+    const body = (await res.json()) as { content: Array<{ type: string; text?: string }> }
+    const text = body.content.map((b) => b.text ?? '').join('')
+    expect(text).toContain('AAPL')
+  })
+
+  it('invoke rejects a tool name not on the CLI map (e.g. trading)', async () => {
+    const res = await post('/cli/ws1/data/invoke', { tool: 'placeOrder', args: {} })
+    expect(res.status).toBe(404)
+  })
+
+  it('invoke 400s on invalid args', async () => {
+    const res = await post('/cli/ws1/data/invoke', { tool: 'marketSearchForResearch', args: {} })
+    expect(res.status).toBe(400)
+  })
+
+  it('invoke 400s LOUDLY on an unknown flag, naming the key', async () => {
+    // Guards the silent-drop bug: a typo'd flag (--quantity for
+    // --totalQuantity) was stripped by non-strict parsing, staging a
+    // quantity-less order that validated clean.
+    const res = await post('/cli/ws1/data/invoke', {
+      tool: 'marketSearchForResearch',
+      args: { query: 'AAPL', qurey: 'typo' },
+    })
+    expect(res.status).toBe(400)
+    const body = (await res.json()) as { error: string; details?: string }
+    expect(body.details).toMatch(/qurey/)
+  })
+
+  it('invoke 404s on unknown workspace', async () => {
+    const res = await post('/cli/nope/data/invoke', { tool: 'marketSearchForResearch', args: { query: 'AAPL' } })
+    expect(res.status).toBe(404)
+  })
+})
+
+describe('CLI gateway — export scope isolation', () => {
+  it('unified alice reports an unavailable scoped tool instead of using a global fallback', async () => {
+    const res = await post('/cli/ws1/data/invoke', { tool: 'inbox_push', args: {} })
+    expect(res.status).toBe(404) // mapped, but not registered in this fixture
+  })
+
+  it('the workspace export cannot reach a data tool (marketSearchForResearch)', async () => {
+    const res = await post('/cli/ws1/workspace/invoke', { tool: 'marketSearchForResearch', args: { query: 'AAPL' } })
+    expect(res.status).toBe(404) // not in the workspace map → gated out
+  })
+
+  it('the workspace export manifest resolves (its own scope)', async () => {
+    const res = await app.request('/cli/ws1/workspace/manifest')
+    expect(res.status).toBe(200)
+    const body = (await res.json()) as {
+      export: string
+      groupDescriptions: Record<string, string>
+      groups: Record<string, unknown>
+    }
+    expect(body.export).toBe('workspace')
+    expect(typeof body.groups).toBe('object')
+    expect(body.groupDescriptions['peer']).toContain('absolute filesystem locations')
+    expect(body.groupDescriptions['conversation']).toContain('Agent-to-Agent')
+    expect(body.groupDescriptions['inbox']).toContain('human Inbox')
+  })
+})
+
+describe('CLI gateway — UTA decision provenance', () => {
+  function makeTradeApp() {
+    const append = vi.fn(async (input) => ({ id: 'p-1', ...input }))
+    const toolCenter = new ToolCenter()
+    toolCenter.register({
+      tradingCommit: tool({
+        description: 'fake UTA commit',
+        inputSchema: z.object({ message: z.string() }),
+        execute: async () => ({ source: 'alpaca-paper', hash: 'commit-abc', message: 'thesis' }),
+      }),
+    }, 'trading')
+    const fakeSvc = {
+      registry: {
+        get: (id: string) => id === 'ws1' ? { id: 'ws1', tag: 'demo' } : undefined,
+      },
+      headlessTasks: {
+        get: (id: string) => id === 'run-1'
+          ? { taskId: 'run-1', resumeId: 'resume-1', agent: 'codex' }
+          : null,
+      },
+      sessionRegistry: { get: () => undefined },
+      provenanceStore: { append },
+    }
+    const app = new Hono()
+    registerCliRoutes(app, {
+      toolCenter,
+      workspaceToolCenter: new WorkspaceToolCenter(),
+      inboxStore: {} as never,
+      entityStore: {} as never,
+      getWorkspaceService: () => fakeSvc as never,
+    })
+    return { app, append }
+  }
+
+  const commit = (app: Hono, headers: Record<string, string> = {}) => app.request('/cli/ws1/uta/invoke', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...headers },
+    body: JSON.stringify({ tool: 'tradingCommit', args: { message: 'thesis' } }),
+  })
+
+  it('attributes a successful UTA commit to the authoritative product Session', async () => {
+    const { app, append } = makeTradeApp()
+    expect((await commit(app, { 'x-openalice-run': 'run-1' })).status).toBe(200)
+    expect(append).toHaveBeenCalledWith(expect.objectContaining({
+      artifact: { kind: 'trade-decision', accountId: 'alpaca-paper', decisionId: 'commit-abc' },
+      action: 'decided',
+      origin: expect.objectContaining({
+        kind: 'session', workspaceId: 'ws1', resumeId: 'resume-1', agent: 'codex',
+      }),
+    }))
+  })
+
+  it('does not invent attribution for a commit without a valid Session header', async () => {
+    const { app, append } = makeTradeApp()
+    expect((await commit(app)).status).toBe(200)
+    expect(append).not.toHaveBeenCalled()
+  })
+})
+
+describe('CLI gateway — inbox read (scoped, string-arg coercion)', () => {
+  // A real workspace export wired with a memory inbox store, so the CLI shim's
+  // all-strings args (`--self` -> 'true', `--limit 1` -> '1') exercise the
+  // stringbool + number coercion through extractMcpShape + strictObject.
+  async function makeWsApp(): Promise<Hono> {
+    const inboxStore = createMemoryInboxStore()
+    await inboxStore.append({
+      workspaceId: 'ws1',
+      workspaceLabel: 'demo',
+      body: "mine\n\n[[reports/mine.md]]"
+    })
+    await inboxStore.append({
+      workspaceId: 'other',
+      workspaceLabel: 'them',
+      body: 'theirs'
+    })
+
+    const wtc = new WorkspaceToolCenter()
+    wtc.register(inboxReadFactory)
+
+    const fakeSvc = {
+      registry: {
+        get: (id: string) => (
+          id === 'ws1'
+            ? { id: 'ws1', tag: 'demo', dir: resolve('/workspaces/ws1') }
+            : id === 'other'
+              ? { id: 'other', tag: 'them', dir: resolve('/workspaces/other') }
+              : undefined
+        ),
+      },
+    }
+    const app = new Hono()
+    registerCliRoutes(app, {
+      toolCenter: new ToolCenter(),
+      workspaceToolCenter: wtc,
+      inboxStore,
+      entityStore: {} as never,
+      getWorkspaceService: () => fakeSvc as never,
+    })
+    return app
+  }
+
+  const invoke = async (app: Hono, args: Record<string, string>) => {
+    const res = await app.request('/cli/ws1/data/invoke', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ tool: 'inbox_read', args }),
+    })
+    const body = (await res.json()) as { content?: Array<{ text?: string }>; error?: string }
+    const payload = body.content ? JSON.parse(body.content.map((b) => b.text ?? '').join('')) : undefined
+    return { status: res.status, body, payload }
+  }
+
+  it('`--self` (string "true") coerces and filters to this workspace', async () => {
+    const app = await makeWsApp()
+    const { status, payload } = await invoke(app, { self: 'true' })
+    expect(status).toBe(200)
+    expect(payload.count).toBe(1)
+    expect(payload.entries[0].mine).toBe(true)
+    expect(payload.entries[0].files).toEqual([{
+      relativePath: 'reports/mine.md',
+      absolutePath: null,
+    }])
+  })
+
+  it('no flags returns the full cross-workspace stream', async () => {
+    const app = await makeWsApp()
+    const { status, payload } = await invoke(app, {})
+    expect(status).toBe(200)
+    expect(payload.count).toBe(2)
+  })
+
+  it('`--limit 1` (string "1") coerces to a number cap', async () => {
+    const app = await makeWsApp()
+    const { status, payload } = await invoke(app, { limit: '1' })
+    expect(status).toBe(200)
+    expect(payload.count).toBe(1)
+    expect(payload.hasMore).toBe(true)
+  })
+})
+
+describe('CLI gateway — agent-invisible origin (x-openalice-run → registry)', () => {
+  // The `alice` shim forwards the spawn-injected AQ_RUN_ID as an `x-openalice-run`
+  // header on /invoke. The gateway resolves it through the headless registry
+  // (authoritative — issueId/agent come from the RECORD, not the request) and
+  // stamps the resulting origin onto inbox_push, with NO origin param in the
+  // tool's input schema.
+  function makeOriginApp(inboxStore = createMemoryInboxStore()) {
+    const fakeSvc = {
+      registry: { get: (id: string) => (id === 'ws1' ? { id: 'ws1', tag: 'demo', dir: '/wsroot/ws1' } : undefined) },
+      headlessTasks: {
+        get: (taskId: string) =>
+          taskId === 'run-7'
+            ? {
+                taskId: 'run-7', resumeId: 'resume-7', agent: 'opencode',
+                trigger: { kind: 'issue', workspaceId: 'ws1', issueId: 'macro-scan' },
+              }
+            : null,
+      },
+      sessionRegistry: {
+        get: (wsId: string, id: string) =>
+          wsId === 'ws1' && id === 'sess-1'
+            ? { id: 'sess-1', resumeId: 'resume-1', wsId: 'ws1', agent: 'claude' }
+            : undefined,
+      },
+    }
+    const wtc = new WorkspaceToolCenter()
+    wtc.register(inboxPushFactory)
+    const globals = new ToolCenter()
+    globals.register({ inbox_push: tool({ inputSchema: z.object({ comments: z.string() }), execute: (): string => { throw new Error('Global shadow must never run') } }) }, 'shadow')
+    const app = new Hono()
+    registerCliRoutes(app, {
+      toolCenter: globals,
+      workspaceToolCenter: wtc,
+      inboxStore,
+      entityStore: {} as never,
+      getWorkspaceService: () => fakeSvc as never,
+    })
+    return { app, inboxStore }
+  }
+
+  const pushWith = (app: Hono, headers: Record<string, string>, exportKey = 'data') =>
+    app.request(`/cli/ws1/${exportKey}/invoke`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...headers },
+      body: JSON.stringify({ tool: 'inbox_push', args: { body: 'report' } }),
+    })
+
+  it.each(['data', 'workspace'])('stamps registry origin through the %s export', async (exportKey) => {
+    const { app, inboxStore } = makeOriginApp()
+    const res = await pushWith(app, { 'x-openalice-run': 'run-7' }, exportKey)
+    expect(res.status).toBe(200)
+    const { entries } = await inboxStore.read({ workspaceId: 'ws1' })
+    expect(entries[0].origin).toEqual({
+      kind: 'headless',
+      runId: 'run-7',
+      resumeId: 'resume-7',
+      issueId: 'macro-scan',
+      issueWorkspaceId: 'ws1',
+      agent: 'opencode',
+    })
+  })
+
+  it('no header → no origin (the interactive case)', async () => {
+    const { app, inboxStore } = makeOriginApp()
+    await pushWith(app, {})
+    const { entries } = await inboxStore.read({ workspaceId: 'ws1' })
+    expect(entries[0].origin).toBeUndefined()
+  })
+
+  it('an unknown run id resolves to no origin (forged/stale value can not fabricate a link)', async () => {
+    const { app, inboxStore } = makeOriginApp()
+    await pushWith(app, { 'x-openalice-run': 'ghost' })
+    const { entries } = await inboxStore.read({ workspaceId: 'ws1' })
+    expect(entries[0].origin).toBeUndefined()
+  })
+
+  it('stamps an interactive origin from a valid session header (validated against the registry)', async () => {
+    const { app, inboxStore } = makeOriginApp()
+    const res = await pushWith(app, { 'x-openalice-session': 'sess-1' })
+    expect(res.status).toBe(200)
+    const { entries } = await inboxStore.read({ workspaceId: 'ws1' })
+    expect(entries[0].origin).toEqual({
+      kind: 'interactive',
+      sessionId: 'sess-1',
+      resumeId: 'resume-1',
+      agent: 'claude',
+    })
+  })
+
+  it('a forged session id resolves to no origin (registry is the authority)', async () => {
+    const { app, inboxStore } = makeOriginApp()
+    await pushWith(app, { 'x-openalice-session': 'forged' })
+    const { entries } = await inboxStore.read({ workspaceId: 'ws1' })
+    expect(entries[0].origin).toBeUndefined()
+  })
+
+  it('the run header wins when both run and session headers are present', async () => {
+    const { app, inboxStore } = makeOriginApp()
+    await pushWith(app, { 'x-openalice-run': 'run-7', 'x-openalice-session': 'sess-1' })
+    const { entries } = await inboxStore.read({ workspaceId: 'ws1' })
+    expect(entries[0].origin).toEqual({
+      kind: 'headless',
+      runId: 'run-7',
+      resumeId: 'resume-7',
+      issueId: 'macro-scan',
+      issueWorkspaceId: 'ws1',
+      agent: 'opencode',
+    })
+  })
+
+  it('inbox_push input schema has NO origin / runId / issueId param (agent never self-identifies)', () => {
+    const built = inboxPushFactory.build({
+      workspaceId: 'ws1',
+      workspaceLabel: 'demo',
+      inboxStore: createMemoryInboxStore(),
+      entityStore: {} as never,
+    })
+    // The tool's input schema keys must be exactly the two content fields —
+    // never a self-identity parameter.
+    const keys = Object.keys(extractMcpShape(built))
+    expect(keys.sort()).toEqual(['body'])
+    expect(keys).not.toContain('origin')
+    expect(keys).not.toContain('runId')
+    expect(keys).not.toContain('issueId')
+  })
+})
+
+describe('CLI gateway — peer path (cross-workspace resolution)', () => {
+  // The /cli gateway threads a resolveWorkspace closure (over getWorkspaceService)
+  // into the workspace ctx, so workspace_path can resolve a PEER's dir — not just
+  // the caller's. Registry here knows two workspaces: the caller ws1 and a peer.
+  function makePeerApp(): Hono {
+    const REG: Record<string, { id: string; tag: string; dir: string }> = {
+      ws1: { id: 'ws1', tag: 'caller', dir: '/wsroot/ws1' },
+      ws2: { id: 'ws2', tag: 'Quant Lab', dir: '/wsroot/ws2' },
+    }
+    const fakeSvc = { registry: { get: (id: string) => REG[id] } }
+
+    const wtc = new WorkspaceToolCenter()
+    wtc.register(workspacePathFactory)
+
+    const app = new Hono()
+    registerCliRoutes(app, {
+      toolCenter: new ToolCenter(),
+      workspaceToolCenter: wtc,
+      inboxStore: {} as never,
+      entityStore: {} as never,
+      getWorkspaceService: () => fakeSvc as never,
+    })
+    return app
+  }
+
+  const invoke = async (app: Hono, args: Record<string, string>) => {
+    const res = await app.request('/cli/ws1/data/invoke', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ tool: 'workspace_path', args }),
+    })
+    const body = (await res.json()) as { content?: Array<{ text?: string }>; error?: string }
+    const payload = body.content ? JSON.parse(body.content.map((b) => b.text ?? '').join('')) : undefined
+    return { status: res.status, payload }
+  }
+
+  it('manifest renders the peer/path verb mapped to workspace_path (--help discovery)', async () => {
+    const res = await makePeerApp().request('/cli/ws1/workspace/manifest')
+    expect(res.status).toBe(200)
+    const body = (await res.json()) as {
+      groups: Record<string, Record<string, { tool: string }>>
+      unmapped: string[]
+    }
+    expect(body.groups['peer']?.['path']?.tool).toBe('workspace_path')
+    // it's mapped, so it must NOT appear in the no-silent-caps unmapped list
+    expect(body.unmapped).not.toContain('workspace_path')
+  })
+
+  it('resolves a PEER workspace dir from inside another workspace (ws1 -> ws2)', async () => {
+    const { status, payload } = await invoke(makePeerApp(), { id: 'ws2' })
+    expect(status).toBe(200)
+    expect(payload.ok).toBe(true)
+    expect(payload.path).toBe('/wsroot/ws2')
+    expect(payload.tag).toBe('Quant Lab')
+  })
+
+  it('returns ok:false (not a throw) for an unknown peer id', async () => {
+    // The tool returns a structured {ok:false} value rather than throwing, so
+    // the gateway responds 200 with that payload — not a 500.
+    const { status, payload } = await invoke(makePeerApp(), { id: 'ghost' })
+    expect(status).toBe(200)
+    expect(payload.ok).toBe(false)
+    expect(payload.error).toMatch(/unknown workspace/)
+  })
+})
+
+
+describe('Workspace CLI documentation', () => {
+  it('shares the live manifest but exposes no invocation routes', async () => {
+    const docs = makeApp(true)
+    const expected = await app.request('/cli/ws1/data/manifest')
+    const actual = await docs.request('/api/workspaces/ws1/cli/data/manifest')
+    expect(await actual.json()).toEqual(await expected.json())
+    expect((await docs.request('/api/workspaces/missing/cli/data/manifest')).status).toBe(404)
+    expect((await docs.request('/api/workspaces/ws1/cli/data/invoke', { method: 'POST' })).status).toBe(404)
+    expect((await docs.request('/cli/ws1/data/invoke', { method: 'POST' })).status).toBe(404)
+  })
+})
+
+
+describe('Workspace CLI configuration', () => {
+  it('filters discovery and rejects direct invocation through both canonical and legacy exports', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'alice-cli-policy-'))
+    try {
+      await mkdir(join(dir, '.alice'))
+      const wtc = new WorkspaceToolCenter()
+      const execute = vi.fn(async () => ({ ok: true }))
+      wtc.register({ name: 'workspace_list', build: () => tool({ inputSchema: z.object({}), execute }) })
+      const server = new Hono()
+      registerCliRoutes(server, {
+        toolCenter: new ToolCenter(), workspaceToolCenter: wtc, inboxStore: {} as never, entityStore: {} as never,
+        getWorkspaceService: () => ({ registry: { get: () => ({ id: 'one', tag: 'one', dir }) } }) as never,
+      })
+      await writeFile(join(dir, '.alice/alice-harness-config.json'), JSON.stringify({ schemaVersion: 1, cli: { alice: { groups: { peer: false } } } }))
+      for (const exp of ['data', 'workspace']) {
+        const manifest = await (await server.request(`/cli/one/${exp}/manifest`)).json() as { groups: object }
+        expect(manifest.groups).not.toHaveProperty('peer')
+        const response = await server.request(`/cli/one/${exp}/invoke`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ tool: 'workspace_list', args: {} }) })
+        expect(response.status).toBe(403)
+      }
+      expect(execute).not.toHaveBeenCalled()
+      await writeFile(join(dir, '.alice/alice-harness-config.json'), '{broken')
+      expect((await server.request('/cli/one/data/manifest')).status).toBe(503)
+      expect((await server.request('/cli/one/workspace/invoke', { method: 'POST', body: JSON.stringify({ tool: 'workspace_list' }) })).status).toBe(503)
+    } finally { await rm(dir, { recursive: true, force: true }) }
+  })
+})
+
+
+describe('Issue run CLI end to end', () => {
+  it('uses the actual launcher, manifest, schema and execution tool for run/retry', async () => {
+    const startIssueRun = vi.fn(async () => ({ taskId: 'run-new' }))
+    const workspaceToolCenter = new WorkspaceToolCenter()
+    workspaceToolCenter.register(issueRunNowFactory)
+    workspaceToolCenter.register(issueRetryFactory)
+    const app = new Hono()
+    registerCliRoutes(app, {
+      toolCenter: new ToolCenter(), workspaceToolCenter,
+      inboxStore: {} as never, entityStore: {} as never,
+      getWorkspaceService: () => ({
+        registry: { get: () => ({ id: 'ws1', tag: 'desk' }) },
+        resolveIssuesByName: async () => [{ wsId: 'ws1', wsTag: 'desk', id: 'daily', title: 'Daily' }],
+        startIssueRun,
+      }) as never,
+    })
+    const server = serve({ fetch: app.fetch, port: 0, hostname: '127.0.0.1' })
+    if (!server.listening) await new Promise<void>((resolve) => server.once('listening', resolve))
+    const address = server.address() as { port: number }
+    const execute = (args: string[]) => promisify(execFile)(process.execPath,
+      [resolve('src/workspaces/cli/bin/openalice-cli.cjs'), ...args], {
+        env: { ...process.env, OPENALICE_CLI_BIN: 'alice', AQ_WS_ID: 'ws1',
+          OPENALICE_TOOL_SOCKET: '', OPENALICE_TOOL_URL: `http://127.0.0.1:${address.port}/cli` },
+        timeout: 10000,
+      })
+    try {
+      expect((await execute(['issue', 'run', '--id', 'daily'])).stdout).toContain('run-new')
+      expect(startIssueRun).toHaveBeenLastCalledWith('ws1', 'daily', undefined)
+      expect((await execute(['issue', 'retry', '--id', 'daily', '--run-id', 'run-old'])).stdout).toContain('run-new')
+      expect(startIssueRun).toHaveBeenLastCalledWith('ws1', 'daily', 'run-old')
+      const before = startIssueRun.mock.calls.length
+      await expect(execute(['issue', 'retry', '--id', 'daily'])).rejects.toThrow()
+      expect(startIssueRun).toHaveBeenCalledTimes(before)
+    } finally {
+      if ('closeAllConnections' in server) server.closeAllConnections()
+      await new Promise<void>((resolve) => server.close(() => resolve()))
+    }
+  })
+})

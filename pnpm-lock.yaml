@@ -68,6 +68,9 @@ importers:
       '@traderalice/opentypebb':
         specifier: workspace:*
         version: link:packages/opentypebb
+      '@traderalice/update-lifecycle':
+        specifier: workspace:*
+        version: link:packages/update-lifecycle
       '@traderalice/uta-protocol':
         specifier: workspace:*
         version: link:packages/uta-protocol
@@ -153,9 +156,27 @@ importers:
       '@vitest/coverage-v8':
         specifier: ^4.1.5
         version: 4.1.5(vitest@4.1.5)
+      ccxt:
+        specifier: ^4.5.78
+        version: 4.5.78(protobufjs@7.6.5)
       jsdom:
         specifier: ^29.0.0
         version: 29.0.0(@noble/hashes@2.2.0)
+      msw:
+        specifier: ^2.14.6
+        version: 2.14.6(@types/node@25.2.3)(typescript@5.9.3)
+      react:
+        specifier: ^19.1.0
+        version: 19.2.4
+      react-dom:
+        specifier: ^19.1.0
+        version: 19.2.4(react@19.2.4)
+      react-i18next:
+        specifier: ^17.0.8
+        version: 17.0.8(i18next@26.3.1(typescript@5.9.3))(react-dom@19.2.4(react@19.2.4))(react@19.2.4)(typescript@5.9.3)
+      react-router-dom:
+        specifier: ^7.18.2
+        version: 7.18.2(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
       tsup:
         specifier: ^8.5.1
         version: 8.5.1(jiti@2.6.1)(postcss@8.5.25)(tsx@4.21.0)(typescript@5.9.3)(yaml@2.9.0)
@@ -171,12 +192,18 @@ importers:
       vitest:
         specifier: ^4.1.5
         version: 4.1.5(@opentelemetry/api@1.9.0)(@types/node@25.2.3)(@vitest/coverage-v8@4.1.5)(jsdom@29.0.0(@noble/hashes@2.2.0))(msw@2.14.6(@types/node@25.2.3)(typescript@5.9.3))(vite@7.3.6(@types/node@25.2.3)(jiti@2.6.1)(lightningcss@1.32.0)(tsx@4.21.0)(yaml@2.9.0))
+      yahoo-finance2:
+        specifier: ^3.13.1
+        version: 3.13.2
 
   apps/desktop:
     dependencies:
       '@traderalice/guardian-runtime':
         specifier: workspace:*
         version: link:../../packages/guardian-runtime
+      '@traderalice/update-lifecycle':
+        specifier: workspace:*
+        version: link:../../packages/update-lifecycle
       electron:
         specifier: ^39.8.5
         version: 39.8.10
@@ -195,9 +222,18 @@ importers:
       '@earendil-works/pi-tui':
         specifier: 0.83.0
         version: 0.83.0
+      '@traderalice/guardian-runtime':
+        specifier: workspace:*
+        version: link:../guardian-runtime
+      '@traderalice/update-lifecycle':
+        specifier: workspace:*
+        version: link:../update-lifecycle
       yaml:
         specifier: ^2.9.0
         version: 2.9.0
+      zod:
+        specifier: ^4.3.6
+        version: 4.3.6
 
   packages/connector-protocol:
     dependencies:
@@ -278,6 +314,22 @@ importers:
         version: 8.5.1(jiti@2.6.1)(postcss@8.5.25)(tsx@4.21.0)(typescript@5.9.3)(yaml@2.9.0)
       typescript:
         specifier: ^5.7.3
+        version: 5.9.3
+
+  packages/update-lifecycle:
+    dependencies:
+      '@noble/hashes':
+        specifier: 2.2.0
+        version: 2.2.0
+      '@traderalice/guardian-runtime':
+        specifier: workspace:*
+        version: link:../guardian-runtime
+    devDependencies:
+      '@types/node':
+        specifier: ^24.10.0
+        version: 24.19.0
+      typescript:
+        specifier: ^5.9.3
         version: 5.9.3
 
   packages/uta-broker-alpaca:
@@ -578,6 +630,9 @@ importers:
       '@traderalice/connector-protocol':
         specifier: workspace:*
         version: link:../packages/connector-protocol
+      '@traderalice/update-lifecycle':
+        specifier: workspace:*
+        version: link:../packages/update-lifecycle
       '@vercel/analytics':
         specifier: ^2.0.1
         version: 2.0.1(react@19.2.4)
@@ -2047,6 +2102,9 @@ packages:
 
   '@types/node@22.19.15':
     resolution: {integrity: sha512-F0R/h2+dsy5wJAUe3tAU6oqa2qbWY5TpNfL/RGmo1y38hiyO1w3x2jPtt76wmuaJI4DQnOBu21cNXQ2STIUUWg==}
+
+  '@types/node@24.19.0':
+    resolution: {integrity: sha512-zY+5tKxXdhGh1PYI0ac+7juvEu4OI6vWtVVoj5i2m42jxAY1U+zHGt6QCyOFwykdP62sM3MJ9stoYYUw5aCWew==}
 
   '@types/node@25.2.3':
     resolution: {integrity: sha512-m0jEgYlYz+mDJZ2+F4v8D1AyQb+QzsNqRuI7xg1VQX/KlKS0qT9r1Mo16yo5F/MtifXFgaofIFsdFMox2SxIbQ==}
@@ -5284,6 +5342,9 @@ packages:
   undici-types@7.16.0:
     resolution: {integrity: sha512-Zz+aZWSj8LE6zoxD+xrjh4VfkIG8Ya6LvYkZqtUQGJPZjYl53ypCaUwWqo7eI0x66KBGeRo+mlBEkMSeSZ38Nw==}
 
+  undici-types@7.24.6:
+    resolution: {integrity: sha512-WRNW+sJgj5OBN4/0JpHFqtqzhpbnV0GuB+OozA9gCL7a993SmU+1JBZCzLNxYsbMfIeDL+lTsphD5jN5N+n0zg==}
+
   undici@6.27.0:
     resolution: {integrity: sha512-YmfV3YnEDzXRC5lZ2jWtWWHKGUm1zIt8AhesR1tens+HTNv+YZlN/dp6G727LOvMJ8xjP9Be7Y2Sdr96LDm+pg==}
     engines: {node: '>=18.17'}
@@ -7073,6 +7134,10 @@ snapshots:
   '@types/node@22.19.15':
     dependencies:
       undici-types: 6.21.0
+
+  '@types/node@24.19.0':
+    dependencies:
+      undici-types: 7.24.6
 
   '@types/node@25.2.3':
     dependencies:
@@ -10406,6 +10471,8 @@ snapshots:
   undici-types@6.21.0: {}
 
   undici-types@7.16.0: {}
+
+  undici-types@7.24.6: {}
 
   undici@6.27.0: {}
 

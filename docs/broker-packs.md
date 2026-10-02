@@ -100,7 +100,19 @@ which performs this transaction:
 4. verify the published SHA-256 checksum before extraction;
 5. validate package name, version, API entry, and manifest;
 6. move the immutable release into place and atomically replace `active.json`;
-7. request a UTA restart so the new active pointer is observed.
+7. request a UTA restart so the new active pointer is observed;
+8. verify UTA's loaded module identity against the approved version and content ID.
+
+The shared [[docs/update-lifecycle.md]] records installation and UTA activation
+separately in each engine's `lifecycle/` journal. The installer also emits its
+own apply receipt under `update-operations/`. A lost restart response is
+reconciled using `GET /__uta/broker-packs/:engine`; changing the pointer alone
+cannot prove that an already cached SDK was replaced. This probe validates the
+module without creating a broker account or contacting a venue. Pack owners
+share one serialized UTA restart queue, with bounded health probes, so
+concurrent upgrades cannot race the restart flag or claim an earlier boot. Disabled UTA
+leaves activation pending and does not block Chat. Explicit artifact-only smoke
+can request `restart: false`; production intents use the complete lifecycle.
 
 Failure before pointer replacement leaves the previous active release intact.
 An installation lock rejects concurrent mutation of the same engine. Pack
@@ -150,16 +162,18 @@ OpenAlice-Broker-Packs-<version>-<platform>-<arch>.json
 OpenAlice-Broker-<engine>-<version>-<platform>-<arch>.tgz
 ```
 
-The release workflow runs this on macOS arm64, macOS x64, Windows x64, and
-Linux x64; publishes the files with the desktop release; mirrors them to the
-download CDN; and verifies every catalog and referenced archive.
+The versioned release matrix in `.github/workflows/release.yml` builds Packs
+for macOS arm64/x64, Windows x64, and Linux arm64/x64, publishes them with the
+release, mirrors them to the CDN, and verifies catalog/archive agreement.
+Rolling dev uses its own matrix, including Windows ARM64 with the engine
+exception noted above.
 
-Before a candidate can publish, each platform runner downloads the real Broker
-Packs from the previous GitHub Release, activates them in an isolated
-`OPENALICE_HOME`, serves the current candidate catalog locally, and runs the
-production reconciliation path. The gate requires every active pointer to move
-to the candidate while every previous immutable release remains intact. A
-fresh-install-only Pack check is not sufficient for release acceptance.
+Stable publication additionally downloads real Packs from the previous release,
+activates them in an isolated `OPENALICE_HOME`, and exercises reconciliation
+against the candidate catalog. Every active pointer must move to the candidate
+while previous immutable releases remain intact. Beta does not run that
+stable-only N-1 step; fresh-install checks must not be described as upgrade
+acceptance. The channel-specific authority is [[docs/development-workflow.md]].
 
 The build command also extracts every generated archive, verifies its catalog
 membership, size, SHA-256, package identity, entry containment, and absence of
@@ -248,7 +262,7 @@ Run the focused checks before the repository-wide gates:
 ```bash
 pnpm broker-packs:build
 pnpm broker-packs:upgrade-smoke
-pnpm vitest run src/services/broker-packs/installer.spec.ts \
+pnpm vitest run tests/integration/broker-pack-installation/installer.spec.ts \
   services/uta/src/domain/trading/brokers/registry.spec.ts \
   ui/src/components/uta/CreateUTADialog.spec.tsx
 npx tsc --noEmit

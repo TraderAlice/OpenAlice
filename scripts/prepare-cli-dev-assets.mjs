@@ -4,18 +4,15 @@ import { createHash } from 'node:crypto'
 import { execFileSync } from 'node:child_process'
 import { copyFileSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
 import { homedir } from 'node:os'
-import { basename, join, parse, resolve } from 'node:path'
+import { join, parse, resolve } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 
-import { bunReleaseContentIdentity } from './bun-release-content-identity.mjs'
+import { verifyCliReleaseArchive as validateCliReleaseArchive } from './verify-cli-release.mjs'
 import { CLI_RELEASE_TARGETS, cliExecutableName } from '../packages/cli/src/release-targets.mjs'
 
 import { readDevBrokerCatalog } from './dev-broker-binding.mjs'
 
 export { CLI_RELEASE_TARGETS }
-const PINNED_BUN_VERSION = readFileSync(new URL('../.bun-version', import.meta.url), 'utf8').trim()
-// PortableGit's complete file inventory exceeds child_process's 1 MiB default.
-const TAR_TEXT_OPTIONS = { encoding: 'utf8', maxBuffer: 16 * 1024 * 1024 }
 
 export function prepareCliDevAssets({ inputDir, outputDir, commit, version, installerPath, windowsInstallerPath }) {
   if (!/^[a-f0-9]{7,64}$/.test(commit)) {
@@ -113,63 +110,7 @@ export function prepareCliDevAssets({ inputDir, outputDir, commit, version, inst
   return manifest
 }
 
-export function validateCliReleaseArchive({ archivePath, version, platform, arch }) {
-  const archiveName = basename(archivePath)
-  const expectedName = `openalice-cli-${version}-${platform}-${arch}.tar.gz`
-  if (archiveName !== expectedName) {
-    throw new Error(`unexpected native CLI archive name: ${archiveName}`)
-  }
-  const checksumPath = `${archivePath}.sha256`
-  const checksum = parseChecksum(readFileSync(checksumPath, 'utf8'), archiveName)
-  const bytes = readFileSync(archivePath)
-  const actualChecksum = createHash('sha256').update(bytes).digest('hex')
-  if (checksum !== actualChecksum) {
-    throw new Error(`${archiveName} does not match its SHA-256 sidecar`)
-  }
-
-  const releaseName = archiveName.slice(0, -'.tar.gz'.length)
-  const metadata = JSON.parse(execFileSync('tar', [
-    '-xOzf', archivePath, `${releaseName}/release.json`,
-  ], TAR_TEXT_OPTIONS))
-  if (
-    metadata?.schemaVersion !== 1
-    || metadata?.product !== 'OpenAlice CLI'
-    || metadata?.version !== version
-    || metadata?.platform !== platform
-    || metadata?.arch !== arch
-    || metadata?.bunVersion !== PINNED_BUN_VERSION
-    || !/^[a-f0-9]{16}$/.test(metadata?.contentIdentity ?? '')
-  ) {
-    throw new Error(`${archiveName} contains invalid release metadata`)
-  }
-  let contentIdentity
-  try {
-    contentIdentity = bunReleaseContentIdentity(metadata)
-  } catch {
-    throw new Error(`${archiveName} contains invalid release metadata`)
-  }
-  if (contentIdentity !== metadata.contentIdentity) {
-    throw new Error(`${archiveName} content identity does not match its release manifest`)
-  }
-  const entries = execFileSync('tar', ['-tzf', archivePath], TAR_TEXT_OPTIONS)
-    .split(/\r?\n/)
-    .filter(Boolean)
-  if (entries.some((entry) => !entry.startsWith(`${releaseName}/`) || entry.includes('/../'))) {
-    throw new Error(`${archiveName} contains entries outside its release root`)
-  }
-  if (!entries.includes(`${releaseName}/bin/${cliExecutableName(platform)}`)) {
-    throw new Error(`${archiveName} does not contain bin/${cliExecutableName(platform)}`)
-  }
-  return { archiveName, releaseName, checksumPath, checksum, metadata, entries }
-}
-
-function parseChecksum(content, archiveName) {
-  const match = content.trim().match(/^([a-f0-9]{64})  ([^/]+)$/)
-  if (!match || match[2] !== archiveName) {
-    throw new Error(`${archiveName}.sha256 is malformed or names a different archive`)
-  }
-  return match[1]
-}
+export { verifyCliReleaseArchive as validateCliReleaseArchive } from './verify-cli-release.mjs'
 
 function parseArgs(argv) {
   if (argv.length !== 8 && argv.length !== 10) {

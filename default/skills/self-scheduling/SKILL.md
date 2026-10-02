@@ -47,6 +47,18 @@ You have two equivalent paths, and both write the **same**
    comments, but the document and schedule shape read most clearly as text. The
    file is always the single source of truth either way.
 
+### Change a scheduled Issue's model or effort
+
+For `@new-then-resume` / `@new-each-run`, update the Issue's `model` / `effort`.
+For an exact `@resumeId`, edit `ai.model` / `ai.reasoningEffort` in the owning
+Session's Workspace at `.alice/sessions/<resumeId>.json`; preserve all other
+fields, especially `agent` and `ai.credential`, and keep valid JSON. Only the
+Agent runtime is fixed; model and effort remain editable. Alice reconciles the
+file on the scheduler tick for the next launch, without changing the current
+process or losing context. Session Settings while idle is the validated UI
+alternative. Use `alice conversation ask --resume-id <resumeId> --model <id>
+--effort <level> --prompt <message>` only when you also intend to send a turn.
+
 ### CLI verbs
 
 ```bash
@@ -208,19 +220,10 @@ plain tracked item; add a `when` and it starts firing.
 
 `agent`, `credential`/`credentialSource`, `model`, and `effort` on an Issue seed a
 new Session. They are valid only for `@new-then-resume` / `@new-each-run`;
-do not write them into an Issue assigned to an exact `@resumeId`. That rule does
-not freeze the existing Session's AI choice: its Agent runtime stays fixed, but
-its credential, model, and effort can change for later launches. Use the Issue
-page's assigned-Session settings or Session Settings while idle for an immediate,
-validated update. `alice conversation ask --resume-id <resumeId>` with
-`--model <id>` / `--effort <level>` and `--prompt <message>` can update an idle
-Session and send its next turn. If editing the Session's own configuration file,
-change `ai.model` / `ai.reasoningEffort` in `.alice/sessions/<resumeId>.json`,
-preserve its other fields (especially `ai.credential`), and keep valid JSON.
-Alice reconciles valid file edits on the scheduler tick; the change applies to
-the next launch, not the current process. Never put a key in this file. The
-scheduler freezes Issue values into a fresh Session binding and does not rewrite
-persistent Workspace configuration.
+do not write them into an Issue assigned to an exact `@resumeId` (see above).
+The scheduler freezes Issue values into a fresh Session binding without
+rewriting Workspace configuration. Session credentials may also change through
+Session Settings while idle; never put a key in either file.
 
 > **Deprecated assignee aliases:** never write `@workspace` or `@new` in a new
 > or edited Issue. They exist only so older Workspace files can be migrated:

@@ -1,6 +1,8 @@
+import { mkdtemp, writeFile, rm } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import {
   formatLifecycleHelp,
@@ -9,6 +11,14 @@ import {
   parseLifecycleArgs,
   runLifecycleCommand,
 } from './lifecycle-command.mjs'
+
+let supervisorRoot
+beforeEach(async () => {
+  supervisorRoot = await mkdtemp(join(tmpdir(), 'cli-default-presenter-'))
+  await writeFile(join(supervisorRoot, 'config.json'), JSON.stringify({ schemaVersion: 3, defaultTarget: { machine: 'local', project: 'default' } }))
+  vi.stubEnv('OPENALICE_SUPERVISOR_HOME', supervisorRoot)
+})
+afterEach(async () => { vi.unstubAllEnvs(); await rm(supervisorRoot, { force: true, recursive: true }) })
 
 describe('OpenAlice top-level lifecycle commands', () => {
   it('keeps background startup browserless', () => {

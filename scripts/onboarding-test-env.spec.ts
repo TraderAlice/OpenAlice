@@ -15,23 +15,13 @@ describe('buildOnboardingTestEnv', () => {
     expect(env['PI_CODING_AGENT_DIR']).toBe(join(root, 'pi-agent'))
     expect(env['OPENALICE_AGENT_RUNTIME_INSTALLS']).toBe('only:pi')
     expect(env['OPENALICE_CREDENTIAL_TEST_MODE']).toBe('mock')
-    expect(env['VITE_OPENALICE_FIRST_RUN_GUIDE']).toBe('1')
     expect(env['VITE_OPENALICE_ONBOARDING_TEST']).toBe('1')
     expect(env['VITE_OPENALICE_CREDENTIAL_TEST_MODE']).toBe('mock')
-    expect(env['VITE_OPENALICE_ONBOARDING_STORAGE_SUFFIX']).toMatch(/^[0-9a-f-]{36}$/)
     expect(env['OPENALICE_UI_PORT']).toBe('15173')
     expect(env['OPENALICE_ONBOARDING_AI_MOCK_PORT']).toBe('0')
     expect(env['OPENALICE_ONBOARDING_AI_BASE_URL']).toBe('http://127.0.0.1:0/v1')
     expect(env['VITE_OPENALICE_ONBOARDING_AI_BASE_URL']).toBe('http://127.0.0.1:0/v1')
     expect(env['OPENALICE_TRADING_MODE']).toBeUndefined()
-  })
-
-  it('allows a fixed onboarding storage suffix for reproducing browser state', () => {
-    const { env } = buildOnboardingTestEnv({
-      VITE_OPENALICE_ONBOARDING_STORAGE_SUFFIX: 'fixed-ui-state',
-    }, { root: '/tmp/oa-onboarding' })
-
-    expect(env['VITE_OPENALICE_ONBOARDING_STORAGE_SUFFIX']).toBe('fixed-ui-state')
   })
 
   it('threads the dynamically bound mock port through backend and Vite config', () => {
@@ -49,14 +39,6 @@ describe('buildOnboardingTestEnv', () => {
     expect(() => buildOnboardingTestEnv({
       OPENALICE_ONBOARDING_AI_MOCK_PORT: 'not-a-port',
     }, { root: '/tmp/oa-onboarding' })).toThrow(/must be an integer/)
-  })
-
-  it('allows disabling the first-run guide in onboarding test mode', () => {
-    const { env } = buildOnboardingTestEnv({
-      VITE_OPENALICE_FIRST_RUN_GUIDE: '0',
-    }, { root: '/tmp/oa-onboarding' })
-
-    expect(env['VITE_OPENALICE_FIRST_RUN_GUIDE']).toBe('0')
   })
 
   it('scrubs inherited trading env unless the onboarding-specific mode is set', () => {

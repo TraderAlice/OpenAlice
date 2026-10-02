@@ -13,6 +13,33 @@ let held = null;
 let interactive = false;
 let hideTimer;
 let line = 0;
+let activityId = null;
+const activityActions = document.querySelector('#activity-actions');
+const activityOpen = document.querySelector('#activity-open');
+function activityHit(point) {
+  if (!activityId || !bubble.classList.contains('open')) return false;
+  // Only the visible text/button block receives native input, not transparent gutters or bubble tail.
+  const rect = activityActions.getBoundingClientRect();
+  const text = message.getBoundingClientRect();
+  return [rect, text].some(r => point.x >= r.left && point.x < r.right && point.y >= r.top && point.y < r.bottom);
+}
+bridge?.onActivity(event => {
+  if (event.type === 'hide') { if (event.displayId === activityId) hideBubble(); return; }
+  if (event.type !== 'show' || typeof event.displayId !== 'string') return;
+  clearTimeout(hideTimer);
+  activityId = event.displayId;
+  const title = [event.input.title, event.input.description].filter(Boolean).join(' · ').slice(0, 90);
+  message.textContent = title + (event.input.count > 1 ? ` (${event.input.count})` : '');
+  activityActions.hidden = false;
+  bubble.classList.add('open', 'activity');
+  bubble.setAttribute('aria-hidden', 'false');
+  update(lastPoint);
+});
+document.querySelector('#activity-open').addEventListener('click', () => { if (activityId) void bridge?.openActivity(activityId); });
+document.querySelector('#activity-dismiss').addEventListener('click', () => { if (activityId) void bridge?.dismissActivity(activityId); hideBubble(); });
+document.addEventListener('keydown', event => {
+  if (event.key === 'Escape' && activityId) { void bridge?.dismissActivity(activityId); hideBubble(); }
+});
 let sound = { enabled: true, volume: .5, source: null };
 let clickAudio;
 function configureSound(settings) {
@@ -55,18 +82,19 @@ function hit(point) {
 }
 function update(point) {
   lastPoint = point;
-  const next = held !== null || hit(point);
+  const next = held !== null || hit(point) || activityHit(point);
   if (next !== interactive) { interactive = next; bridge?.interactive(next); }
 }
 function speak() {
   playClickSound();
+  if (activityId) { activityOpen.focus(); return; }
   clearTimeout(hideTimer);
   message.textContent = lines[line++ % lines.length];
   bubble.classList.add('open');
   bubble.setAttribute('aria-hidden', 'false');
   hideTimer = setTimeout(hideBubble, 5000);
 }
-function hideBubble() { bubble.classList.remove('open'); bubble.setAttribute('aria-hidden', 'true'); }
+function hideBubble() { activityId = null; if (activityActions.contains(document.activeElement)) pet.focus(); activityActions.hidden = true; bubble.classList.remove('open', 'activity'); bubble.setAttribute('aria-hidden', 'true'); update(lastPoint); }
 pet.addEventListener('pointerdown', event => {
   if (event.button !== 0 || !hit({ x: event.clientX, y: event.clientY })) return;
   event.preventDefault();
@@ -94,7 +122,7 @@ document.addEventListener('contextmenu', event => { event.preventDefault(); brid
 pet.addEventListener('dblclick', () => bridge?.open());
 pet.addEventListener('keydown', event => {
   if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); speak(); }
-  if (event.key === 'Escape') hideBubble();
+  if (event.key === 'Escape') { if (activityId) void bridge?.dismissActivity(activityId); hideBubble(); }
   if (event.key === 'ContextMenu' || (event.shiftKey && event.key === 'F10')) { event.preventDefault(); bridge?.menu(); }
 });
 document.addEventListener('mousemove', event => update({ x: event.clientX, y: event.clientY }));

@@ -1,4 +1,4 @@
-import { useId, useState } from 'react'
+import { useEffect, useId, useState } from 'react'
 import { ChevronDown, ChevronRight, Monitor, RefreshCw, Server } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 
@@ -23,6 +23,9 @@ export function AliceLocationSection() {
   const [returningIntegrated, setReturningIntegrated] = useState(false)
   const [switchError, setSwitchError] = useState<string | null>(null)
   const desktopConnection = window.openAlice?.desktopConnection
+  useEffect(() => {
+    if (desktopConnection || relay.status) void relay.refresh()
+  }, [desktopConnection, relay.status?.target?.machine, relay.status?.target?.project, relay.refresh])
   const canChoose = Boolean(relay.status || desktopConnection || connection.kind === 'electron')
   const remote = relay.status?.target?.machine !== undefined && relay.status.target.machine !== 'local'
   const electron = connection.kind === 'electron'
@@ -70,6 +73,17 @@ export function AliceLocationSection() {
           </Button>
         )}
       </div>
+
+      {canChoose && <div className="flex min-w-0 flex-col gap-2 border-b border-border/60 py-3 sm:flex-row sm:items-center">
+        <div className="min-w-0 flex-1">
+          <p className="text-[12px] font-medium text-foreground">{t('settings.backendConnection.startupDefault')}</p>
+          <p className="truncate text-[12px] text-muted-foreground">{relay.startup?.target
+            ? `${relay.fleet.find((item) => item.key === relay.startup?.target?.machine)?.displayName ?? relay.startup.target.machine} / ${relay.fleet.find((item) => item.key === relay.startup?.target?.machine)?.projects.find((item) => item.key === relay.startup?.target?.project)?.displayName ?? relay.startup.target.project}`
+            : t('settings.backendConnection.noStartupDefault', 'Choose a location on the next launch')}</p>
+          {relay.startup?.error && <p role="alert" className="mt-1 text-[12px] text-destructive">{relay.startup.error}</p>}
+        </div>
+
+      </div>}
 
       {showInstructions && !electron && !relay.status && (
         <div id={instructionsId} className="border-b border-border/60 py-3 text-[12px] leading-relaxed">

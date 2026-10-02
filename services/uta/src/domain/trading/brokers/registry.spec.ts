@@ -104,6 +104,16 @@ describe('broker engine registry', () => {
     expect(broker).toMatchObject({ id: 'okx-main', label: 'Main OKX', brokerEngine: 'ccxt' })
   })
 
+  it('reports the loaded module identity until the owner actually reloads after a pointer change', async () => {
+    await activateCcxtModule('release-before', validModuleSource())
+    const { loadBrokerEngine, clearBrokerEngineCache } = await import('./registry.js')
+    expect((await loadBrokerEngine('ccxt')).packIdentity?.contentId).toBe('release-before')
+    await activateCcxtModule('release-after', validModuleSource())
+    expect((await loadBrokerEngine('ccxt')).packIdentity?.contentId).toBe('release-before')
+    clearBrokerEngineCache()
+    expect((await loadBrokerEngine('ccxt')).packIdentity?.contentId).toBe('release-after')
+  })
+
   it.each([
     ['API version', validModuleSource({ apiVersion: 2 }), /API version mismatch/i],
     ['engine identity', validModuleSource({ engine: 'alpaca' }), /engine mismatch/i],

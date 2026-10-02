@@ -1,9 +1,9 @@
+import { collectionWideTestInputs } from './scripts/test-collection-inputs.mjs'
 import { fileURLToPath } from 'node:url'
 import { resolve, dirname } from 'node:path'
 
 import {
   assertLivePaperAcknowledgement,
-  livePaperExcludes,
   livePaperIncludes,
 } from './scripts/test-lanes.mjs'
 
@@ -28,8 +28,8 @@ export default {
     alias: workspaceAliases,
   },
   test: {
+    forceRerunTriggers: collectionWideTestInputs(__dirname),
     include: livePaperIncludes,
-    exclude: livePaperExcludes,
     testTimeout: 60_000,
     fileParallelism: false,
     pool: 'forks',

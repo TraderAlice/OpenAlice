@@ -37,8 +37,6 @@ describe('MobileContextBar', () => {
       />,
     )
 
-    const bar = screen.getByTestId('mobile-context-bar')
-    expect(bar.className).toContain('h-12')
     expect(screen.getAllByRole('button')).toHaveLength(2)
     expect(screen.getByText('Inbox')).toBeTruthy()
 

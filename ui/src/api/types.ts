@@ -14,6 +14,8 @@ export interface VersionInfo {
   latest: string | null
   /** True when the update owner reports a newer release. */
   hasUpdate: boolean
+  /** Absent on older backends; absence cannot prove a current release. */
+  decision?: import('@traderalice/update-lifecycle').ReleaseDecision | null
   /** Release notes URL supplied by the channel manifest. */
   releaseUrl: string | null
   /** Reserved release notes body; channel manifests currently omit it. */

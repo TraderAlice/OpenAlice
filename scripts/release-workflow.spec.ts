@@ -106,7 +106,7 @@ describe('Release workflow critical path', () => {
     expect(guard).toContain('releases/latest')
     expect(guard).toContain('.draft == false and .prerelease == false')
     expect(guard).toContain('merge-base --is-ancestor')
-    expect(guard).toContain('packages/cli/package.json')
+    expect(guard).not.toContain('packages/cli/package.json')
     const download = step(job, 'Download and verify existing public release bytes').run ?? ''
     expect(download).toContain('verifyCliNpmPackages')
     expect(download).toContain('verify-public-cli-channels.mjs')
@@ -143,11 +143,12 @@ describe('Release workflow critical path', () => {
     const plan = step(workflow.jobs.release, 'Validate release intent and version authority').run ?? ''
     expect(plan).toContain('refs/heads/master')
     expect(plan).toContain("require('./package.json').version")
-    expect(plan).toContain("require('./packages/cli/package.json').version")
+    expect(plan).not.toContain("require('./packages/cli/package.json').version")
     expect(plan).toContain('Release tag already exists')
     expect(plan).toContain("RELEASE_CHANNEL\" = \"stable")
     expect(plan).toContain("RELEASE_CHANNEL\" = \"beta")
-    expect(plan).toContain('does not match channel')
+    expect(plan).toContain('check-publication')
+    expect(plan).toContain('channel_head_sha256=')
 
     for (const name of [
       'Create beta tag and GitHub prerelease from accepted candidates',
@@ -185,15 +186,6 @@ describe('Release workflow critical path', () => {
     }
     expect(workflow.jobs['preflight-public-cli-authority'].permissions?.['id-token']).toBe('write')
     expect(JSON.stringify(workflow)).not.toMatch(/NPM_TOKEN|NODE_AUTH_TOKEN/)
-  })
-
-  it('selects the previous release from the same channel', () => {
-    const plan = step(workflow.jobs.release, 'Validate release intent and version authority').run ?? ''
-    expect(plan).toContain('git for-each-ref --merged="$SOURCE_SHA" --sort=-version:refname')
-    expect(plan).toContain('PREVIOUS_TAG_PATTERN')
-    expect(plan).not.toContain('git describe --tags')
-    expect(step(workflow.jobs.release, 'Generate release notes').run)
-      .toContain('${{ steps.plan.outputs.previous_tag }}')
   })
 
   it('keeps existing-tag mirror repair distinct from new release creation', () => {
@@ -534,6 +526,9 @@ describe('Release workflow critical path', () => {
     expect(step(brokerPacks, 'Build optional Broker Packs').if).toBeUndefined()
     expect(step(brokerPacks, 'Prove previous-release Broker Pack upgrade').if)
       .toContain("needs.release.outputs.channel == 'stable'")
+    const upgrade = step(brokerPacks, 'Prove previous-release Broker Pack upgrade').run ?? ''
+    expect(upgrade).toContain('pnpm --filter @traderalice/update-lifecycle... build')
+    expect(upgrade.indexOf('update-lifecycle... build')).toBeLessThan(upgrade.indexOf('pnpm broker-packs:upgrade-smoke'))
     expect(step(brokerPacks, 'Preserve Broker Packs').if).toBeUndefined()
   })
 
@@ -636,8 +631,9 @@ describe('Release workflow critical path', () => {
     expect(installer).toContain('Mirror repair requires a channel-aware Release')
     expect(mirror.steps?.some((candidate) => candidate.name === 'Publish generated release metadata and installer'))
       .toBe(false)
-    expect(step(mirror, 'Keep mirror repair on the active channel release').if)
-      .toContain("needs.release.outputs.operation == 'mirror'")
+    expect(upload).toContain('check-publication')
+    expect(upload).toContain('--expected-sha256 "$EXPECTED_HEAD_SHA256"')
+    expect(upload.indexOf('check-publication')).toBeLessThan(upload.indexOf('--include "${FEED_PREFIX}*.yml"'))
     expect(step(mirror, 'Snapshot stable aliases before a beta mirror').if)
       .toContain("needs.release.outputs.channel == 'beta'")
     expect(upload).toContain('s3://${R2_BUCKET}/beta/manifest.json')

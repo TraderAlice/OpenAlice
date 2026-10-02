@@ -1,17 +1,10 @@
 import { defineConfig } from 'vitest/config'
 import { fileURLToPath } from 'node:url'
 import { resolve, dirname } from 'node:path'
+import { collectionWideTestInputs } from './scripts/test-collection-inputs.mjs'
+import { centralHermeticIncludes } from './scripts/test-lanes.mjs'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
-
-const workspaceGlob = (pattern: string): string => (
-  resolve(__dirname, pattern).replaceAll('\\', '/')
-)
-
-export const collectionWideTestInputs = [
-  workspaceGlob('**/package.json'),
-  workspaceGlob('**/{vitest,vite}.config.*'),
-]
 
 // Workspace packages are aliased directly to their `src/*.ts` entry points so
 // vitest doesn't need them pre-built into `dist/`. Vite's import-analysis
@@ -20,6 +13,8 @@ export const collectionWideTestInputs = [
 // gets the same effect via NODE_OPTIONS=--conditions=source (see scripts/guardian/dev.ts).
 const workspaceAliases = {
   '@': resolve(__dirname, './src'),
+  '@traderalice/update-lifecycle/node': resolve(__dirname, './packages/update-lifecycle/src/node.ts'),
+  '@traderalice/update-lifecycle': resolve(__dirname, './packages/update-lifecycle/src/index.ts'),
   '@traderalice/guardian-runtime': resolve(__dirname, './packages/guardian-runtime/src/index.ts'),
   '@traderalice/connector-protocol': resolve(__dirname, './packages/connector-protocol/src/index.ts'),
   '@traderalice/ibkr': resolve(__dirname, './packages/ibkr/src/index.ts'),
@@ -41,7 +36,7 @@ export default defineConfig({
     // inputs must invalidate every project. Vitest compares changed files as
     // absolute paths, so relative defaults do not match this workspace; keep
     // absolute, slash-normalized globs explicit for every platform.
-    forceRerunTriggers: collectionWideTestInputs,
+    forceRerunTriggers: collectionWideTestInputs(__dirname),
     // The Node suite includes installer, PTY, and Guardian specs that spawn
     // their own process trees. CPU-relative worker counts scale contention
     // back up on larger development hosts, while two workers still saturate a
@@ -58,7 +53,7 @@ export default defineConfig({
           name: 'node',
           environment: 'node',
           setupFiles: ['./vitest.setup.ts'],
-          include: ['src/**/*.spec.*', 'packages/**/*.spec.*', 'services/**/*.spec.*', 'apps/**/*.spec.*', 'scripts/**/*.spec.*'],
+          include: ['src/**/*.spec.*', 'packages/**/*.spec.*', 'services/**/*.spec.*', 'apps/**/*.spec.*', 'scripts/**/*.spec.*', ...centralHermeticIncludes('node')],
           exclude: [
             '**/*.e2e.spec.*',
             '**/*.bbProvider.spec.*',
@@ -68,6 +63,7 @@ export default defineConfig({
         },
       },
       {
+        esbuild: { jsx: 'automatic', jsxImportSource: 'react' },
         resolve: {
           alias: uiAliases,
         },
@@ -76,7 +72,7 @@ export default defineConfig({
           environment: 'jsdom',
           execArgv: ['--no-experimental-webstorage'],
           setupFiles: ['./vitest.setup.ts'],
-          include: ['ui/**/*.spec.*'],
+          include: ['ui/**/*.spec.*', ...centralHermeticIncludes('ui')],
         },
       },
     ],

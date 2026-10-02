@@ -52,6 +52,7 @@ export interface AliceProjectLaunchConfig extends LaunchConfigValues {
 }
 
 export interface TuiLaunchFlags extends LaunchConfigValues {
+  machine?: string
   project?: string
   /** @deprecated Accepted for released CLI compatibility. */
   instance?: string
@@ -287,7 +288,9 @@ export function parseTuiLaunchArgs(argv: string[]): TuiLaunchFlags {
   const flags: TuiLaunchFlags = {}
   for (let index = 0; index < argv.length; index += 1) {
     const arg = argv[index]
-    if (arg === '--project') {
+    if (arg === '--machine') {
+      flags.machine = requireValue(argv, ++index, arg)
+    } else if (arg === '--project') {
       flags.project = requireValue(argv, ++index, arg)
     } else if (arg === '--instance') {
       flags.instance = requireValue(argv, ++index, arg)

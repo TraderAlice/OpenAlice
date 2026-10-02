@@ -31,5 +31,19 @@ jobs:
       - name: Verify CI workflow contracts
         run: pnpm test:contract:workflow
 
+      - name: Verify required local product and protocol evidence
+        run: pnpm test:critical --receipt artifacts/tests/critical-local.json
+
+      - name: Upload required evidence receipt
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: critical-local-receipt
+          path: artifacts/tests/critical-local.json
+          if-no-files-found: error
+
       - name: Build complete workspace
         run: pnpm build
+
+      - name: Typecheck registered suites
+        run: pnpm exec tsc -p tests/tsconfig.json --noEmit

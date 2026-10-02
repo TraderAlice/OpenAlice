@@ -1,4 +1,3 @@
-import { randomUUID } from 'node:crypto'
 import { mkdtempSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -46,11 +45,9 @@ export function buildOnboardingTestEnv(
     OPENALICE_AGENT_RUNTIME_INSTALLS: input['OPENALICE_AGENT_RUNTIME_INSTALLS'] ?? 'only:pi',
     OPENALICE_ONBOARDING_AI_MOCK_PORT: aiMockPort,
     OPENALICE_ONBOARDING_AI_BASE_URL: aiBaseUrl,
-    VITE_OPENALICE_FIRST_RUN_GUIDE: input['VITE_OPENALICE_FIRST_RUN_GUIDE'] ?? '1',
     VITE_OPENALICE_ONBOARDING_TEST: '1',
     VITE_OPENALICE_CREDENTIAL_TEST_MODE: input['VITE_OPENALICE_CREDENTIAL_TEST_MODE'] ?? credentialTestMode,
     VITE_OPENALICE_ONBOARDING_AI_BASE_URL: input['VITE_OPENALICE_ONBOARDING_AI_BASE_URL'] ?? aiBaseUrl,
-    VITE_OPENALICE_ONBOARDING_STORAGE_SUFFIX: input['VITE_OPENALICE_ONBOARDING_STORAGE_SUFFIX'] ?? randomUUID(),
   }
 
   for (const [key, value] of Object.entries(DEFAULT_PORTS)) {

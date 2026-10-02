@@ -4,14 +4,14 @@ import { mkdtempSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import assert from 'node:assert/strict'
-import { createCompanion, resizeCompanionWindow } from './companion.js'
+import { createCompanion, resizeCompanionWindow, setCompanionBounds } from './companion.js'
 
 const home = mkdtempSync(join(tmpdir(), 'openalice-companion-'))
 app.setPath('userData', home)
 app.on('window-all-closed', () => app.quit())
 void app.whenReady().then(async () => {
   const owner = new BrowserWindow({ show: false, width: 900, height: 700 })
-  const pet = createCompanion(owner)!
+  const pet = createCompanion(owner)!.window
   pet.webContents.on('preload-error', (_event, path, error) => console.error(path, error))
   pet.webContents.on('console-message', (_event, level, message) => { if (level >= 2) console.error(message) })
   await new Promise<void>((done, reject) => {
@@ -36,6 +36,16 @@ void app.whenReady().then(async () => {
   assert.equal(bubbleAlpha[0], 0, 'Speech bubble exterior must be transparent')
   assert.ok(bubbleAlpha[1] >= 250, 'Speech bubble interior must be effectively opaque')
   assert.equal(pet.isAlwaysOnTop(), true)
+  // Repeated native writes must keep the renderer size stable on fractional DPI.
+  const contentBounds = () => process.platform === 'win32' ? pet.getContentBounds() : pet.getBounds()
+  const initialBounds = contentBounds()
+  for (let i = 0; i < 200; i++) {
+    setCompanionBounds(pet, { ...initialBounds, x: initialBounds.x + i % 3, y: initialBounds.y + i % 3 })
+    const actual = contentBounds()
+    assert.equal(actual.width, initialBounds.width, `Companion width drifted after move ${i + 1}`)
+    assert.equal(actual.height, initialBounds.height, `Companion height drifted after move ${i + 1}`)
+  }
+  setCompanionBounds(pet, initialBounds)
   pet.focus()
   await new Promise(done => setTimeout(done, 150))
   await pet.webContents.executeJavaScript(`window.smokeEvents=[]; for(const name of ['pointerdown','pointerup','pointercancel','lostpointercapture','blur']) window.addEventListener(name, e => window.smokeEvents.push([name,e.clientX,e.clientY]),true)`)

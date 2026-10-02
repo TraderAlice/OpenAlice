@@ -5,6 +5,7 @@ import { mkdtempSync, mkdirSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { ClientUpdateService } from './web-relay.js'
 import { runDemoSmoke } from './demo-smoke.js'
 import { createAppWindow } from './app-window.js'
 import { fetchAliceWebRequest, handleOpenAliceIpcMessage, registerOpenAliceIpc } from './ipc.js'
@@ -65,15 +66,30 @@ void app.whenReady().then(async () => {
       openCurrent: async () => '',
     },
   })
+  // Demo is an attached isolated Project; the shared preload now asks for this status before mounting React.
+  ipcMain.handle('openalice:desktop-connection:status', () => ({
+    schemaVersion: 1, generation: 0, target: { machine: 'demo', project: 'isolated-demo' }, switching: false,
+  }))
   ipcMain.handle('openalice:updater:get-status', () => null)
-  ipcMain.handle('openalice:updater:check-for-updates', () => ({ supported: false, reason: 'not-packaged' }))
-  for (const action of ['install-and-restart', 'open-release']) {
-    ipcMain.handle(`openalice:updater:${action}`, () => { throw new Error('Unavailable in demo mode') })
-  }
+  const clientUpdates = new ClientUpdateService({
+    kind: 'desktop', path: join(app.getPath('userData'), 'client-updates.json'),
+    discover: async () => ({ status: 'unsupported', channel: 'demo', message: 'Demo mode' }),
+  })
+  ipcMain.handle('openalice:client-updates:status', () => clientUpdates.snapshot())
+  ipcMain.handle('openalice:client-updates:check', () => clientUpdates.check())
+  ipcMain.handle('openalice:client-updates:activate', () => clientUpdates.activate())
+  ipcMain.handle('openalice:client-updates:preferences', (_event, input: unknown) => clientUpdates.savePreferences(input))
+  app.once('before-quit', () => clientUpdates.stop())
+  ipcMain.handle('openalice:updater:open-release', () => { throw new Error('Unavailable in demo mode') })
   protocol.handle('app', request => fetchAliceWebRequest(request, backend))
   Menu.setApplicationMenu(process.platform === 'darwin'
     ? Menu.buildFromTemplate([{ role: 'appMenu' }, { role: 'editMenu' }, { role: 'windowMenu' }]) : null)
-  const win = createAppWindow(join(root, 'dist/electron/preload.js'), 'OpenAlice — Demo')
+  const { window: win, companion } = createAppWindow(join(root, 'dist/electron/preload.js'), 'OpenAlice — Demo')
+  companion?.configureActivity({ identity: () => 'isolated-demo', read: async query => {
+    const response = await fetchAliceWebRequest(new Request(`app://openalice/api/agent-runtime${query}`), backend)
+    if (!response.ok) throw new Error('Demo activity unavailable')
+    return response.json()
+  } })
   win.webContents.on('console-message', (_event, level, message) => {
     if (level >= 2) console.error(`[demo renderer] ${message}`)
   })

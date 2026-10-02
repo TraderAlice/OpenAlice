@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
+import { useNavigate } from 'react-router-dom'
 import {
   Activity,
   Bot,
@@ -10,9 +11,9 @@ import {
   CandlestickChart,
   ChevronRight,
   Code2,
-  Compass,
   FlaskConical,
   LayoutDashboard,
+  Monitor,
   Languages,
   LineChart,
   ListChecks,
@@ -31,14 +32,17 @@ import { useWorkspace } from '../tabs/store'
 import { getFocusedTab } from '../tabs/types'
 import { SidebarRow } from './SidebarRow'
 import { SidebarSectionHeader } from './SidebarSectionHeader'
+import { useUpdateLifecycle } from '../hooks/useUpdateLifecycle'
+import { UpdateGuidanceBadge } from './settings/UpdateGuidanceBadge'
+import { focusVersionOverviewAfterNavigation } from '../lib/updates/focusVersionOverview'
 
 const DEVELOPER_DISCLOSURE_SESSION_KEY = 'openalice.settings.developer-expanded'
 const DEVELOPER_GROUP_ID = 'settings-developer-pages'
 
 const DEVELOPER_ITEMS = [
+  { labelKey: 'dev.upgradeRehearsal', tab: 'upgrade-rehearsal', Icon: FlaskConical },
   { labelKey: 'dev.frontend', tab: 'frontend', Icon: PanelsTopLeft },
   { labelKey: 'common.tools', tab: 'tools', Icon: Wrench },
-  { labelKey: 'dev.onboarding', tab: 'onboarding', Icon: Compass },
   { labelKey: 'dev.snapshots', tab: 'snapshots', Icon: Camera },
   { labelKey: 'common.logs', tab: 'logs', Icon: ScrollText },
   { labelKey: 'automation.runs', tab: 'runs', Icon: Activity },
@@ -69,6 +73,7 @@ const CATEGORY_GROUPS = [
     labelKey: 'settings.group.general',
     items: [
       { labelKey: 'settings.category.general', category: 'general', Icon: LayoutDashboard },
+      { labelKey: 'settings.machines.title', category: 'machines', Icon: Monitor },
       { labelKey: 'settings.language.title', category: 'language', Icon: Languages },
       { labelKey: 'pet.title', category: 'pet', Icon: Ghost },
       { labelKey: 'settings.category.issues', category: 'issues', Icon: ListChecks },
@@ -122,9 +127,10 @@ const CATEGORY_GROUPS = [
  */
 export function SettingsCategoryList({ onSelect }: { onSelect?: () => void }) {
   const { t } = useTranslation()
+  const navigate = useNavigate()
   const { project } = useAliceProject()
+  const guidance = useUpdateLifecycle({ optional: true })?.guidance
   const focused = useWorkspace((state) => getFocusedTab(state)?.spec)
-  const openOrFocus = useWorkspace((state) => state.openOrFocus)
   const developerTab = focused?.kind === 'dev' ? focused.params.tab
     : focused?.kind === 'automation' ? focused.params.section : null
   const developerActive = developerTab !== null
@@ -163,9 +169,11 @@ export function SettingsCategoryList({ onSelect }: { onSelect?: () => void }) {
                 label={t(item.labelKey)}
                 active={active}
                 icon={<item.Icon size={14} strokeWidth={1.75} className="text-muted-foreground/70" aria-hidden />}
+                trail={item.category === 'general' ? <><UpdateGuidanceBadge count={guidance?.availableCount ?? 0} setupCount={guidance?.setupCount ?? 0} /><UpdateGuidanceBadge count={guidance?.needsAttentionCount ?? 0} tone="attention" /></> : undefined}
                 onClick={() => {
-                  openOrFocus({ kind: 'settings', params: { category: item.category } })
+                  navigate(item.category === 'general' ? '/settings' : `/settings/${item.category}`)
                   onSelect?.()
+                  if (item.category === 'general' && (guidance?.availableCount || guidance?.needsAttentionCount || guidance?.setupCount)) focusVersionOverviewAfterNavigation()
                 }}
               />
             )
@@ -211,7 +219,7 @@ export function SettingsCategoryList({ onSelect }: { onSelect?: () => void }) {
                   active={active}
                   icon={<item.Icon size={14} strokeWidth={1.75} className="text-muted-foreground/70" aria-hidden />}
                   onClick={() => {
-                    openOrFocus({ kind: 'dev', params: { tab: item.tab } })
+                    navigate(`/settings/developer/${item.tab}`)
                     onSelect?.()
                   }}
                 />

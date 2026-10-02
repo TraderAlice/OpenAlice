@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { pinnedBunVersion } from './bun-toolchain.mjs'
 import { spawn, spawnSync } from 'node:child_process'
 import { Writable } from 'node:stream'
 import { chmod, mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
@@ -11,6 +12,7 @@ import { planProjectTransfer } from '../packages/cli/src/project-transfer.ts'
 import { sealProjectTransferJson } from '../packages/cli/src/project-transfer-secrets.ts'
 import { writeProjectTransferStream } from '../packages/cli/src/project-transfer-stream.ts'
 import { parseRemoteSshSmokeOptions } from './remote-ssh-smoke-options.mjs'
+import { verifyRemoteUpgradeRecovery } from './remote-upgrade-recovery-smoke.mjs'
 import {
   requireBrokerAccountNeedsInstall,
   requireDiscoveredAgentRuntime,
@@ -49,6 +51,8 @@ Options:
   --image <name>    Build with this image name, or select it with --skip-build
   --skip-build      Reuse --image instead of rebuilding the fixture
   --skip-tui        Skip the dependency-backed interactive TUI journey
+  --upgrade-from <version> --upgrade-to <version>
+                    Also install two published releases and verify pending activation/reconnect recovery
   -h, --help        Show this help
 `)
   process.exit(0)
@@ -67,6 +71,7 @@ try {
     run('docker', [
       'build',
       '--file', 'scripts/remote-smoke/Dockerfile',
+      '--build-arg', `BUN_VERSION=${pinnedBunVersion()}`,
       '--tag', image,
       '.',
     ], { cwd: repoRoot, inherit: true })
@@ -132,7 +137,7 @@ try {
   console.log('[remote-ssh-smoke] registering a health-checked Machine and starting its Runtime')
   run(process.execPath, [cliEntry, 'machine', 'add', remoteTarget, '--label', 'Smoke Cloud', '--yes'], { cwd: repoRoot, env: smokeEnv })
   await probeRelay(smokeEnv)
-  const running = remoteJson(remoteTarget, smokeEnv, '"$HOME/.openalice/bin/openalice" server status --json')
+  const running = remoteJson(remoteTarget, smokeEnv, '"$HOME/.openalice/bin/openalice" server status --home "$HOME/.openalice" --json')
   if (running.class !== 'running' || running.owner?.surface !== 'cli-server') {
     throw new Error(`Remote Server did not survive tunnel disconnect: ${JSON.stringify(running)}`)
   }
@@ -181,7 +186,7 @@ try {
 
   console.log('[remote-ssh-smoke] switching the browser relay to the registered remote Project')
   await verifyWebRelay(smokeEnv, inventoryProjects.find((project) => project.key === 'default').id)
-  const afterRelay = remoteJson(remoteTarget, smokeEnv, '"$HOME/.openalice/bin/openalice" server status --json')
+  const afterRelay = remoteJson(remoteTarget, smokeEnv, '"$HOME/.openalice/bin/openalice" server status --home "$HOME/.openalice" --json')
   if (afterRelay.class !== 'running') throw new Error('Closing the Web relay stopped the remote Runtime')
 
   console.log('[remote-ssh-smoke] checking reuse plan and reconnecting')
@@ -196,10 +201,11 @@ try {
   requireText(statusOutput, 'Runtime: running (cli-server)')
   const stopOutput = run(process.execPath, [cliEntry, '--remote', remoteTarget, '--stop', '--wait', '15'], { cwd: repoRoot, env: smokeEnv })
   requireText(stopOutput, 'OpenAlice Server is stopped')
-  const absent = remoteJson(remoteTarget, smokeEnv, '"$HOME/.openalice/bin/openalice" server status --json')
+  const absent = remoteJson(remoteTarget, smokeEnv, '"$HOME/.openalice/bin/openalice" server status --home "$HOME/.openalice" --json')
   if (absent.class !== 'absent') throw new Error(`Remote Server did not stop cleanly: ${JSON.stringify(absent)}`)
 
   console.log('[remote-ssh-smoke] planning and applying an AliceProject transfer')
+  const originalRegistry = remoteJson(remoteTarget, smokeEnv, '"$HOME/.openalice/bin/openalice" project list --json')
   const transferSource = join(localHome, '.openalice')
   const transferWorkspace = await prepareTransferSource(transferSource)
   const interruptedPlan = await planProjectTransfer({
@@ -302,7 +308,7 @@ try {
   const localSealingKey = (await import('node:fs/promises')).readFile(join(transferSource, 'sealing.key'), 'utf8')
   if (remoteSealingKey === (await localSealingKey).trim()) throw new Error('Transfer copied the source sealing key')
   const migratedRegistry = remoteJson(remoteTarget, smokeEnv, '"$HOME/.openalice/bin/openalice" project list --json')
-  if (migratedRegistry.defaultProject !== 'research'
+  if (migratedRegistry.defaultProject !== originalRegistry.defaultProject
     || !migratedRegistry.projects?.some((project) => project.key === 'migrated')) {
     throw new Error(`Transferred AliceProject was not registered without changing the remote default: ${JSON.stringify(migratedRegistry)}`)
   }
@@ -336,6 +342,10 @@ try {
   run('ssh', [remoteTarget,
     '"$HOME/.openalice/bin/openalice" down --project migrated --wait 15 >/tmp/migrated-down.log',
   ], { env: smokeEnv })
+  if (options.upgradeFrom) await verifyRemoteUpgradeRecovery({
+    from: options.upgradeFrom, to: options.upgradeTo, remoteTarget, env: smokeEnv, scratch,
+    run, remoteJson,
+  })
 
   console.log('[remote-ssh-smoke] passed')
 } catch (error) {
@@ -379,7 +389,7 @@ async function startConnectedRelay(env) {
     })
     const inventory = await fetch(`${origin}/relay/v1/fleet`).then((response) => response.json())
     if (!inventory.machines.some((machine) => machine.key === 'smoke-cloud' && machine.connection === 'online')) {
-      throw new Error('Web relay could not discover the registered SSH Machine')
+      throw new Error(`Web relay could not discover the registered SSH Machine: ${JSON.stringify(inventory)}`)
     }
     const response = await fetch(`${origin}/relay/v1/connect`, {
       method: 'POST',
