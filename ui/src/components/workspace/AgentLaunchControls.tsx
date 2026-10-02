@@ -368,7 +368,7 @@ function AgentLaunchInferenceMenu({
               : 'oa-pressable inline-flex min-h-7 min-w-0 max-w-full items-center gap-1 rounded-lg bg-transparent px-1.5 py-1 text-[12px] leading-[18px] font-medium text-foreground transition-colors hover:bg-muted'}
           />}
         >
-          <ModelIdentity model={resolvedModel} label={resolvedModelLabel} vendor={config.credential?.vendor} className={settings ? 'flex-1' : 'max-w-[180px]'} />
+          <ModelIdentity model={resolvedModel} label={resolvedModelLabel} vendor={config.credential?.vendor} className={settings ? 'flex-1' : 'max-w-[180px]'} truncate />
           <ChevronDown className={settings ? 'h-4 w-4 shrink-0 opacity-60' : 'h-3 w-3 shrink-0 opacity-60'} />
         </DropdownMenuTrigger>
         <DropdownMenuContent
@@ -402,14 +402,13 @@ function AgentLaunchInferenceMenu({
                 onValueChange={(value) => config.selectModel(value ? String(value) : null)}
               >
                 <DropdownMenuRadioItem value="" closeOnClick={false} className="min-h-9 px-2.5 pr-8 text-[12px]">
-                  {config.defaultModel ? (
-                    <span className="flex min-w-0 flex-1 items-baseline gap-2">
-                      <span className="shrink-0">{t('chatLanding.defaultLabel')}</span>
-                      <ModelIdentity model={config.defaultModel} label={config.modelOptions.find((model) => model.id === config.defaultModel)?.label} vendor={config.credential?.vendor} className="text-muted-foreground" />
-                    </span>
-                  ) : (
-                    <span className="min-w-0 flex-1 truncate">{t('chatLanding.runtimeDefaultModel')}</span>
-                  )}
+                  <ModelIdentity
+                    model={config.defaultModel ?? t('chatLanding.runtimeDefaultModel')}
+                    label={config.modelOptions.find((model) => model.id === config.defaultModel)?.label}
+                    vendor={config.credential?.vendor}
+                    className="flex-1"
+                  />
+                  {config.defaultModel && <span className="shrink-0 text-muted-foreground">{t('chatLanding.defaultLabel')}</span>}
                 </DropdownMenuRadioItem>
                 {customCurrentModel && (
                   <DropdownMenuRadioItem value={customCurrentModel} closeOnClick={false} className="min-h-9 px-2.5 pr-8 text-[12px]">
