@@ -6,7 +6,7 @@
  */
 
 import { makeMsg, makeMsgProto, makeField, makeInitialMsg, readMsg, readFields } from '../comm.js'
-import { Connection } from '../connection.js'
+import { Connection, type ConnectionWrapper } from '../connection.js'
 import { EReader } from '../reader.js'
 import { Decoder, applyAllHandlers } from '../decoder/index.js'
 import type { EWrapper } from '../wrapper.js'
@@ -82,6 +82,8 @@ export class EClient {
   optCapab: string | null = null
   reader: EReader | null = null
   connectOptions: string | null = null
+  // Bumped each time connect() opens a Connection; see connectionWrapperFor().
+  private connectionGeneration = 0
 
   constructor(wrapper: EWrapper) {
     this.wrapper = wrapper
@@ -182,7 +184,7 @@ export class EClient {
       this.clientId = clientId
 
       conn = new Connection(this.host, this.port)
-      conn.wrapper = this.wrapper as any
+      conn.wrapper = this.connectionWrapperFor(++this.connectionGeneration)
       this.conn = conn
 
       await conn.connect()
@@ -358,6 +360,25 @@ export class EClient {
     const conn = this.conn
     this.reset()
     conn?.disconnect()
+  }
+
+  /**
+   * The wrapper a Connection reports through. It forwards until a newer
+   * connect() opens a replacement: a superseded socket can still fail or close
+   * after its successor connected, and that must not reach the wrapper now
+   * serving the successor. Teardown of the current Connection still reports,
+   * including handleReaderError(), which resets the client before closing it.
+   */
+  private connectionWrapperFor(generation: number): ConnectionWrapper {
+    const current = (): boolean => generation === this.connectionGeneration
+    return {
+      error: (reqId, errorTime, errorCode, errorString, advancedOrderRejectJson) => {
+        if (current()) this.wrapper.error(reqId, errorTime, errorCode, errorString, advancedOrderRejectJson)
+      },
+      connectionClosed: () => {
+        if (current()) this.wrapper.connectionClosed()
+      },
+    }
   }
 
   private waitForHandshake(conn: Connection): Promise<{ serverVersion: number; connTime: string }> {

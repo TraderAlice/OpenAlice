@@ -1,6 +1,6 @@
 import { createServer, type Socket } from 'node:net'
 
-import { describe, it, expect, vi } from 'vitest'
+import { afterEach, beforeEach, describe, it, expect, vi } from 'vitest'
 import Decimal from 'decimal.js'
 import { Connection, Contract, EClient, makeField, makeMsg, NO_VALID_ID, TickTypeEnum } from '@traderalice/ibkr'
 import { RequestBridge } from '../../../services/uta/src/domain/trading/brokers/ibkr/request-bridge.js'
@@ -182,6 +182,143 @@ describe('RequestBridge — connection handshake', () => {
       for (const socket of sockets) socket.destroy()
       await new Promise<void>((resolve) => server.close(() => resolve()))
     }
+  }, 5_000)
+})
+
+describe('RequestBridge — superseded connect that settles late', () => {
+  // Gateway recovery can start a new connect while the previous attempt is
+  // still waiting in the protocol handshake. Whatever that stale attempt's
+  // socket does afterwards (answer, close, or time out) must not reach the
+  // connection that replaced it.
+
+  interface HeldSocket {
+    socket: Socket
+    greeted: Promise<void>
+    closed: Promise<void>
+    answer(): void
+  }
+
+  const cleanups: Array<() => Promise<void> | void> = []
+  const unhandled: unknown[] = []
+  const onUnhandled = (reason: unknown): void => { unhandled.push(reason) }
+
+  beforeEach(() => {
+    unhandled.length = 0
+    process.on('unhandledRejection', onUnhandled)
+  })
+
+  afterEach(async () => {
+    vi.useRealTimers()
+    for (const cleanup of cleanups.splice(0).reverse()) await cleanup()
+    process.off('unhandledRejection', onUnhandled)
+  })
+
+  /** A gateway that holds every handshake until the test answers it. */
+  async function startGateway(): Promise<{ port: number; socket(index: number): Promise<HeldSocket> }> {
+    const held: HeldSocket[] = []
+    const server = createServer((socket) => {
+      let markGreeted!: () => void
+      const greeted = new Promise<void>((resolve) => { markGreeted = resolve })
+      const closed = new Promise<void>((resolve) => { socket.once('close', () => resolve()) })
+      let stage: 'greeting' | 'held' | 'start-api' | 'done' = 'greeting'
+      socket.on('data', () => {
+        if (stage === 'greeting') {
+          stage = 'held'
+          markGreeted()
+          return
+        }
+        if (stage === 'start-api') {
+          stage = 'done'
+          socket.write(makeMsg(9, true, makeField(1) + makeField(700)))
+        }
+      })
+      held.push({
+        socket,
+        greeted,
+        closed,
+        answer: () => {
+          stage = 'start-api'
+          const payload = Buffer.from(`222\0${new Date(0).toISOString()}\0`, 'utf8')
+          const header = Buffer.alloc(4)
+          header.writeUInt32BE(payload.length)
+          socket.write(Buffer.concat([header, payload]))
+        },
+      })
+    })
+    await new Promise<void>((resolve, reject) => {
+      server.once('error', reject)
+      server.listen(0, '127.0.0.1', resolve)
+    })
+    cleanups.push(async () => {
+      for (const { socket } of held) socket.destroy()
+      await new Promise<void>((resolve) => server.close(() => resolve()))
+    })
+    const address = server.address()
+    if (address === null || typeof address === 'string') throw new Error('test server has no TCP port')
+    return {
+      port: address.port,
+      socket: (index) => vi.waitFor(() => {
+        const entry = held[index]
+        if (!entry) throw new Error(`socket ${index} not accepted yet`)
+        return entry
+      }, { timeout: 1_000 }),
+    }
+  }
+
+  /** Leaves the stale attempt waiting in its handshake behind a connected successor. */
+  async function supersedeDuringHandshake() {
+    const gateway = await startGateway()
+    const bridge = new RequestBridge()
+    const client = new EClient(bridge)
+    cleanups.push(() => client.disconnect())
+
+    const stale = bridge.waitForConnect(client, '127.0.0.1', gateway.port, 19, 60_000)
+    const staleOutcome = stale.then(() => 'resolved', (error: unknown) => error)
+    const staleSocket = await gateway.socket(0)
+    await staleSocket.greeted
+
+    const current = bridge.waitForConnect(client, '127.0.0.1', gateway.port, 19, 60_000)
+    const currentSocket = await gateway.socket(1)
+    await currentSocket.greeted
+    currentSocket.answer()
+    await expect(current).resolves.toBeUndefined()
+
+    const connectionClosed = vi.spyOn(bridge, 'connectionClosed')
+    const error = vi.spyOn(bridge, 'error')
+    return { bridge, client, staleSocket, staleOutcome, connectionClosed, error }
+  }
+
+  async function expectSuccessorUntouched(s: Awaited<ReturnType<typeof supersedeDuringHandshake>>): Promise<void> {
+    await expect(s.staleOutcome).resolves.toMatchObject({
+      message: 'Previous TWS/Gateway connection attempt was superseded',
+    })
+    await s.staleSocket.closed
+    expect(s.client.isConnected()).toBe(true)
+    expect(s.bridge.connectionDead).toBe(false)
+    expect(s.bridge.getNextOrderId()).toBe(700)
+    expect(s.connectionClosed).not.toHaveBeenCalled()
+    expect(s.error).not.toHaveBeenCalled()
+    expect(unhandled).toEqual([])
+  }
+
+  it('closes the stale socket quietly when its handshake succeeds late', async () => {
+    const s = await supersedeDuringHandshake()
+    s.staleSocket.answer()
+    await expectSuccessorUntouched(s)
+  }, 5_000)
+
+  it('ignores the stale socket closing late from the gateway side', async () => {
+    const s = await supersedeDuringHandshake()
+    s.staleSocket.socket.destroy()
+    await expectSuccessorUntouched(s)
+  }, 5_000)
+
+  it('closes the stale socket quietly when its handshake times out late', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
+    const s = await supersedeDuringHandshake()
+    // EClient's own protocol handshake timer (10s) fires for the stale attempt.
+    vi.advanceTimersByTime(10_000)
+    await expectSuccessorUntouched(s)
   }, 5_000)
 })
 

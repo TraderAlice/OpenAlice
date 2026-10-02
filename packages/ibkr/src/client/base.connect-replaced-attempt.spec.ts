@@ -1,7 +1,9 @@
 import { createServer, type Socket } from 'node:net'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { EClient } from '../src/client/base.js'
-import { DefaultEWrapper } from '../src/wrapper.js'
+import { EClient } from './base.js'
+import { makeField, makeMsg } from '../comm.js'
+import { IN } from '../message.js'
+import { DefaultEWrapper } from '../wrapper.js'
 
 describe('EClient.connect — replaced attempt', () => {
   const cleanups: Array<() => Promise<void> | void> = []
@@ -61,5 +63,55 @@ describe('EClient.connect — replaced attempt', () => {
     // The server did see the socket, and the replaced attempt closed it.
     await vi.waitFor(() => expect(accepted()).toBe(1), { timeout: 1_000 })
     await vi.waitFor(() => expect(sockets.size).toBe(0), { timeout: 1_000 })
+  }, 3_000)
+})
+
+describe('EClient — current connection teardown', () => {
+  it('still reports connectionClosed when a reader failure tears down the current connection', async () => {
+    const sockets = new Set<Socket>()
+    const server = createServer((socket) => {
+      sockets.add(socket)
+      socket.once('close', () => sockets.delete(socket))
+      let stage: 'greeting' | 'start-api' | 'done' = 'greeting'
+      socket.on('data', () => {
+        if (stage === 'greeting') {
+          stage = 'start-api'
+          const payload = Buffer.from(`222\0${new Date(0).toISOString()}\0`, 'utf8')
+          const header = Buffer.alloc(4)
+          header.writeUInt32BE(payload.length)
+          socket.write(Buffer.concat([header, payload]))
+          return
+        }
+        if (stage === 'start-api') {
+          stage = 'done'
+          // An account value with too few fields fails in the decoder.
+          socket.write(makeMsg(IN.ACCT_VALUE, true, makeField(2) + makeField('CashBalance') + makeField('DU_TEST')))
+        }
+      })
+    })
+    await new Promise<void>((resolve, reject) => {
+      server.once('error', reject)
+      server.listen(0, '127.0.0.1', resolve)
+    })
+
+    const wrapper = new DefaultEWrapper()
+    vi.spyOn(wrapper, 'error').mockImplementation(() => undefined)
+    const connectionClosed = vi.spyOn(wrapper, 'connectionClosed')
+    const client = new EClient(wrapper)
+    try {
+      const address = server.address()
+      if (address === null || typeof address === 'string') throw new Error('test server has no TCP port')
+      await client.connect('127.0.0.1', address.port, 7)
+
+      // handleReaderError() resets the client before closing the socket; that
+      // close still belongs to the current connection and must be reported.
+      await vi.waitFor(() => expect(connectionClosed).toHaveBeenCalledOnce(), { timeout: 1_000 })
+      expect(client.conn).toBeNull()
+      await vi.waitFor(() => expect(sockets.size).toBe(0), { timeout: 1_000 })
+    } finally {
+      client.disconnect()
+      for (const socket of sockets) socket.destroy()
+      await new Promise<void>((resolve) => server.close(() => resolve()))
+    }
   }, 3_000)
 })

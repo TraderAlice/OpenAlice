@@ -70,7 +70,11 @@ Recovery can start a new connect while an earlier attempt on the same
 Each attempt owns the `Connection` it opened. A superseded attempt closes only
 that socket, without reporting through the shared wrapper; it never greets,
 adopts, or tears down its successor's connection, and never clears the
-successor's `nextValidId` waiter.
+successor's `nextValidId` waiter. Its socket can still answer, close, or time
+out after the successor connects; a `Connection` stops reporting through the
+wrapper once a newer `connect()` replaces it, so none of that marks the
+successor's connection dead. Teardown of the current connection still
+reports `connectionClosed()`.
 
 ## Verification ladder
 
