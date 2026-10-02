@@ -42,6 +42,7 @@
     "electron:smoke-toolchain": "node scripts/smoke-packaged-toolchain.mjs",
     "electron:smoke:packaged": "node scripts/desktop-packaged-smoke.mjs",
     "electron:smoke:startup": "node scripts/desktop-startup-smoke.mjs",
+    "electron:smoke:credential-pi": "node scripts/desktop-packaged-smoke.mjs --credential-pi",
     "electron:smoke:onboarding": "node scripts/desktop-packaged-smoke.mjs --onboarding",
     "electron:smoke:trading-mode": "node scripts/desktop-packaged-smoke.mjs --trading-mode",
     "electron:smoke:workspace": "node scripts/desktop-packaged-smoke.mjs --workspace-acceptance",

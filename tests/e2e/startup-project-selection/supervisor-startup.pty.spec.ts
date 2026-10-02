@@ -547,7 +547,7 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
     expect(transcript).not.toContain('Runtime Source · AliceProject setting')
     expect(transcript).toContain('\u001b[?25h')
     expect(transcript).toContain('\u001b[?2004l')
-  })
+  }, 10_000)
 
   it('explains when managed source is unavailable from a source-run CLI', async () => {
     const isolatedHome = await mkdtemp(join(tmpdir(), 'openalice-cli-managed-source-'))

@@ -883,7 +883,9 @@ jobs:
 
       - name: Prove previous-release Broker Pack upgrade
         if: needs.release.outputs.channel == 'stable'
-        run: pnpm broker-packs:upgrade-smoke -- --from "${{ needs.release.outputs.previous_tag }}"
+        run: |
+          pnpm --filter @traderalice/update-lifecycle... build
+          pnpm broker-packs:upgrade-smoke -- --from "${{ needs.release.outputs.previous_tag }}"
 
       - name: Preserve Broker Packs
         uses: actions/upload-artifact@v4

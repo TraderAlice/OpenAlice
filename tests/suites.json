@@ -114,6 +114,7 @@
       "open-alice#electron:smoke:demo",
       "open-alice#electron:smoke:packaged",
       "open-alice#electron:smoke:startup",
+      "open-alice#electron:smoke:credential-pi",
       "open-alice#electron:smoke:onboarding",
       "open-alice#electron:smoke:trading-mode",
       "open-alice#electron:smoke:workspace",
@@ -1290,15 +1291,16 @@
   },
   {
     "id": "desktop-smoke-process",
-    "title": "desktop smoke process",
+    "title": "Desktop smoke process and state isolation",
     "tier": "integration",
     "owner": "repo-tooling",
     "lane": "hermetic",
     "areas": [],
     "files": [
-      "tests/integration/desktop-smoke-process/desktop-smoke-process.spec.mjs"
+      "tests/integration/desktop-smoke-process/desktop-smoke-process.spec.mjs",
+      "tests/integration/desktop-smoke-process/desktop-smoke-isolation.spec.ts"
     ],
-    "scope": "Smoke process supervisor and native test-owned process trees; no packaged desktop or real user process."
+    "scope": "Smoke process supervisor and native test-owned process trees, plus smoke allowlist/state selection through the real spawn environment, a test-owned child, and Pi trust/session lookup under disposable sentinel directories; no packaged desktop or real user state."
   },
   {
     "id": "installer-powershell",

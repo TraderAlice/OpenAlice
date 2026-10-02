@@ -526,6 +526,9 @@ describe('Release workflow critical path', () => {
     expect(step(brokerPacks, 'Build optional Broker Packs').if).toBeUndefined()
     expect(step(brokerPacks, 'Prove previous-release Broker Pack upgrade').if)
       .toContain("needs.release.outputs.channel == 'stable'")
+    const upgrade = step(brokerPacks, 'Prove previous-release Broker Pack upgrade').run ?? ''
+    expect(upgrade).toContain('pnpm --filter @traderalice/update-lifecycle... build')
+    expect(upgrade.indexOf('update-lifecycle... build')).toBeLessThan(upgrade.indexOf('pnpm broker-packs:upgrade-smoke'))
     expect(step(brokerPacks, 'Preserve Broker Packs').if).toBeUndefined()
   })
 

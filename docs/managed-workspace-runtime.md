@@ -168,8 +168,28 @@ startup against the built desktop bundle. Pass `--app-path <packaged executable>
 to exercise the unsigned package. The cases isolate Supervisor, project state,
 and Electron profile, verify the client-only boundary without adopting an
 unrelated Runtime, then stop the private process group and remove test state.
-The fresh-user `electron:smoke:onboarding` gate retains real asynchronous Workspace
-and credential readiness checks; it no longer expects the retired wizard.
+`pnpm electron:smoke:credential-pi` is **credential + native Pi execution
+acceptance** inside an already selected project. It waits for Chat Workspace
+preparation, checks an empty vault and missing native login, then drives the real
+Settings → AI Provider UI through Add, a rejected key, a successful HTTP Test
+against a local deterministic provider, and Save. It reads back the credential,
+sets the Workspace's interactive/headless executor binding through
+`PUT /api/workspaces/:id/runtime-settings`, requires `ready/launcher-vault`, and
+calls `POST /api/workspaces/:id/headless` for a separate native Pi reply. Terminal
+readiness failure or exit zero without the expected reply fails acceptance.
+The mock also requires observed credential-test and native reply requests.
+
+This is not the retired onboarding wizard or complete cold-start acceptance.
+Explicit `OPENALICE_HOME` bypasses the Machine/AliceProject launcher; the startup
+smoke above owns that boundary. Executor selection uses a test API, not its UI,
+and the native reply does not exercise the browser Chat composer.
+
+`electron:smoke:onboarding` / `--onboarding` remain deprecated aliases that warn
+and run the same gate. Use `--credential-pi` for direct runner invocation.
+Shared `OPENALICE_ONBOARDING_*` / `VITE_OPENALICE_ONBOARDING_*` fixture variables
+and the deterministic model ID retain their existing names for dev compatibility;
+they do not expand this gate's scope. The unsigned Linux path does not certify
+macOS/Windows packaging, signing or notarization.
 
 ## Current Platform Payloads
 
@@ -676,6 +696,17 @@ contract lives in `scripts/desktop-packaged-smoke.mjs` and
 `scripts/desktop-packaged-smoke-plan.mjs`; do not infer defaults from an old
 command transcript.
 
+Temporary packaged app launches inherit only host plumbing and explicit runner
+flags. OS-home/XDG, Pi, OpenAlice, Supervisor, global, and Electron state stays
+beneath the smoke root; ambient provider credentials, endpoints and native config
+overrides are excluded. Build/install subprocesses retain their normal environment.
+Known Codex, Claude, Cursor and Grok directory overrides also point under that root.
+`PI_CODING_AGENT_SESSION_DIR` and OMP profile selectors are cleared so Pi writes
+and adapter reads use the same isolated default layout. The sentinel integration
+checks the spawned environment, Pi trust writes and session-title lookup against
+disposable inherited directories. This does not certify every third-party CLI's
+optional external configuration or plugins.
+
 For a resource-layout failure, inspect an unsigned persistent package:
 
 ```bash
@@ -716,6 +747,9 @@ The runner uses explicit temporary `OPENALICE_HOME`, `AQ_LAUNCHER_ROOT`,
 desktop data, credentials, or preferences. The previous renderer is driven
 through a short-lived loopback DevTools endpoint so the test uses its real API
 and bootstrap code without adding a production smoke route.
+Between launches the runner requests explicit Electron Quit through the browser
+DevTools target. Closing the main renderer only hides the normal desktop and
+does not establish shutdown; the runner still requires clean process exit.
 
 Stable release candidates repeat the journey against publication bytes: macOS
 expands the final signed architecture-specific ZIP; Windows installs N-1 then
@@ -806,6 +840,13 @@ immediately after acceptance and cleanup. Native Intel evidence showed an
 otherwise successful 88-second run, including a roughly 62-second main-to-renderer
 response delay. Preserve that timing as a separate performance finding rather
 than interpreting a larger smoke budget as a runtime performance fix.
+
+The N-1 state journey waits for the actual `app://openalice/` document to finish
+loading and mount before exercising APIs or requesting Quit. A DevTools page
+target or reachable backend alone does not mean Electron's initial navigation
+has completed. Standalone Broker Pack upgrade jobs must also build
+`@traderalice/update-lifecycle` and its dependencies before loading the source
+verifier; they cannot rely on another job's server build.
 
 A release-facing change should also verify a clean-machine flow:
 

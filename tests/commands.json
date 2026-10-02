@@ -112,6 +112,23 @@
       ],
       "artifact": "unsigned Electron package; demo uses the isolated demo runner"
     },
+    "open-alice#electron:smoke:credential-pi": {
+      "owner": "desktop",
+      "lane": "system",
+      "kind": "artifact-acceptance",
+      "sideEffects": "builds/uses unsigned artifacts, starts real test-owned Electron/processes, and writes isolated temporary state; setup may download runtime/prior-version bytes",
+      "prerequisites": [
+        "native graphical Electron host",
+        "workspace dependencies and build/vendor prerequisites"
+      ],
+      "platforms": [
+        "macOS-arm64",
+        "macOS-x64",
+        "Windows-x64",
+        "Linux-x64"
+      ],
+      "artifact": "unsigned Electron package; credential Add/Test/Save UI, API-bound native Pi execution; excludes launcher and Chat composer"
+    },
     "open-alice#electron:smoke:onboarding": {
       "owner": "desktop",
       "lane": "system",
@@ -123,9 +140,11 @@
       ],
       "platforms": [
         "macOS-arm64",
-        "macOS-x64"
+        "macOS-x64",
+        "Windows-x64",
+        "Linux-x64"
       ],
-      "artifact": "unsigned Electron package; demo uses the isolated demo runner"
+      "artifact": "deprecated alias for electron:smoke:credential-pi; same credential UI and API-bound native Pi execution scope"
     },
     "open-alice#electron:smoke:trading-mode": {
       "owner": "desktop",
