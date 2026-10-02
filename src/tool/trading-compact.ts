@@ -181,7 +181,8 @@ export function compactStatus(status: unknown): AnyRec {
   const msg = k['pendingMessage']
   return {
     staged: Array.isArray(k['staged']) ? k['staged'].map(compactOperation) : [],
-    awaitingApproval: msg ? { message: msg, hash: k['pendingHash'] ?? null } : null,
+    awaitingApproval: msg && !k['execution'] ? { message: msg, hash: k['pendingHash'] ?? null } : null,
+    ...(k['execution'] ? { executionRecovery: { hash: k['pendingHash'], message: msg, ...k['execution'] as AnyRec } } : {}),
     head: k['head'] ?? null,
     commitCount: k['commitCount'],
   }

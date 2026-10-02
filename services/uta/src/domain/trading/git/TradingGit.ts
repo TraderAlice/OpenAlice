@@ -23,6 +23,7 @@ import type {
   GitState,
   CommitLogEntry,
   GitExportState,
+  GitPendingState,
   OperationSummary,
   PriceChangeInput,
   SimulatePriceChangeResult,
@@ -62,6 +63,7 @@ export class TradingGit implements ITradingGit {
   private stagingArea: Operation[] = []
   private pendingMessage: string | null = null
   private pendingHash: CommitHash | null = null
+  private execution: GitPendingState['execution']
   private inflightWrite = false
   private commits: GitCommit[] = []
   private head: CommitHash | null = null
@@ -70,6 +72,7 @@ export class TradingGit implements ITradingGit {
 
   constructor(config: TradingGitConfig) {
     this.config = config
+    if (config.savedPending) this.restorePending(config.savedPending)
   }
 
   // ==================== git add / commit / push ====================
@@ -92,6 +95,7 @@ export class TradingGit implements ITradingGit {
   }
 
   commit(message: string): CommitPrepareResult {
+    if (this.execution) throw new PendingHashConflictError('Execution has started; reconcile it before preparing another commit')
     if (this.inflightWrite) {
       throw new PendingHashConflictError('A wallet write is already in progress')
     }
@@ -99,6 +103,7 @@ export class TradingGit implements ITradingGit {
       throw new Error('Nothing to commit: staging area is empty')
     }
 
+    const previous = { hash: this.pendingHash, message: this.pendingMessage }
     const timestamp = new Date().toISOString()
     this.pendingHash = generateCommitHash({
       message,
@@ -107,6 +112,11 @@ export class TradingGit implements ITradingGit {
       parentHash: this.head,
     })
     this.pendingMessage = message
+    try { this.persistPending() } catch (error) {
+      this.pendingHash = previous.hash
+      this.pendingMessage = previous.message
+      throw error
+    }
 
     return {
       prepared: true,
@@ -126,7 +136,7 @@ export class TradingGit implements ITradingGit {
     }
   }
 
-  private async executePush(): Promise<PushResult> {
+  private async executePush(recoveredState?: GitState): Promise<PushResult> {
     if (this.stagingArea.length === 0) {
       throw new Error('Nothing to push: staging area is empty')
     }
@@ -138,24 +148,61 @@ export class TradingGit implements ITradingGit {
     const message = this.pendingMessage
     const hash = this.pendingHash
 
-    // Execute all operations
-    const results: OperationResult[] = []
-    for (const op of operations) {
-      try {
-        const raw = await this.config.executeOperation(op)
-        results.push(this.parseOperationResult(op, raw))
-      } catch (error) {
-        results.push({
-          action: op.action,
-          success: false,
-          status: 'rejected',
-          error: error instanceof Error ? error.message : String(error),
-        })
+    const recorded = this.commits.find((entry) => entry.hash === hash)
+    if (recorded) {
+      // Includes a rejected approval whose final save/cleanup failed. It must
+      // never become a fresh trade simply because the client retries push.
+      await this.config.onCommit?.(this.exportState())
+      this.clearPending()
+      return { hash, message: recorded.message, operationCount: operations.length,
+        submitted: recorded.results.filter((result) => result.success),
+        rejected: recorded.results.filter((result) => !result.success) }
+    }
+
+    // A retry/restart never dispatches an operation from an execution checkpoint.
+    // It may only finish recording known results, once the broker can be read.
+    const recovering = this.execution !== undefined
+    if (this.execution?.activeIndex != null) {
+      throw new Error(`Operation ${this.execution.activeIndex + 1} has no recorded outcome. Reconcile against broker orders; this wallet will not replay it.`)
+    }
+    this.execution ??= { parentHash: this.head, results: [], activeIndex: null }
+    const results = this.execution.results
+    if (!recovering) {
+      for (const [index, op] of operations.entries()) {
+        this.execution.activeIndex = index
+        try { this.persistPending() } catch (error) {
+          // The broker was not called. Keep this distinction in memory; the
+          // persisted marker may conservatively require review after a crash.
+          this.execution.activeIndex = null
+          throw error
+        }
+        let result: OperationResult
+        try {
+          const raw = await this.config.executeOperation(op)
+          result = this.parseOperationResult(op, raw)
+        } catch (error) {
+          // Preserve the current dispatch classification; #1644 owns the
+          // separate distinction between rejection and transport uncertainty.
+          result = {
+            action: op.action, success: false, status: 'rejected',
+            error: error instanceof Error ? error.message : String(error),
+          }
+        }
+        results.push(result)
+        this.execution.activeIndex = null
+        // Do not dispatch another write or read a snapshot until this outcome,
+        // including order and bracket-leg IDs, has reached the pending store.
+        this.persistPending()
       }
+    } else {
+      for (const op of operations.slice(results.length)) {
+        results.push({ action: op.action, success: false, status: 'rejected', error: 'Not executed: wallet execution was interrupted' })
+      }
+      this.persistPending()
     }
 
     // Snapshot state after execution
-    const stateAfter = await this.config.getGitState()
+    const stateAfter = recoveredState ?? await this.config.getGitState()
 
     const commit: GitCommit = {
       hash,
@@ -168,15 +215,14 @@ export class TradingGit implements ITradingGit {
       round: this.currentRound,
     }
 
-    this.commits.push(commit)
-    this.head = hash
-
+    // A prior final persistence attempt may have failed after appending in
+    // memory. Re-persist that same commit rather than append or execute again.
+    if (!this.commits.some((entry) => entry.hash === hash)) {
+      this.commits.push(commit)
+      this.head = hash
+    }
     await this.config.onCommit?.(this.exportState())
-
-    // Clear staging
-    this.stagingArea = []
-    this.pendingMessage = null
-    this.pendingHash = null
+    this.clearPending()
 
     const rejected = results.filter((r) => !r.success)
     const submitted = results.filter((r) => r.success)
@@ -185,6 +231,7 @@ export class TradingGit implements ITradingGit {
   }
 
   async reject(reason: string | undefined, expectedPendingHash: string): Promise<RejectResult> {
+    if (this.execution) throw new Error('Execution has started; rejection cannot erase broker outcomes. Reconcile the pending execution first.')
     this.assertPrepared('reject')
     this.beginWrite(expectedPendingHash)
     try {
@@ -226,14 +273,12 @@ export class TradingGit implements ITradingGit {
       round: this.currentRound,
     }
 
-    this.commits.push(commit)
-    this.head = hash
+    if (!this.commits.some((entry) => entry.hash === hash)) {
+      this.commits.push(commit)
+      this.head = hash
+    }
     await this.config.onCommit?.(this.exportState())
-
-    // Clear staging
-    this.stagingArea = []
-    this.pendingMessage = null
-    this.pendingHash = null
+    this.clearPending()
 
     return { hash, message, operationCount: operations.length }
   }
@@ -379,7 +424,7 @@ export class TradingGit implements ITradingGit {
   /** Every broker orderId the log has ever seen — observation diffs against this. */
   getKnownOrderIds(): Set<string> {
     const known = new Set<string>()
-    for (const commit of this.commits) {
+    for (const commit of this.orderRecords()) {
       for (const result of commit.results) {
         if (result.orderId) known.add(result.orderId)
         for (const leg of result.legs ?? []) known.add(leg.orderId)
@@ -538,6 +583,7 @@ export class TradingGit implements ITradingGit {
       staged: this.stagingArea.map((op) => this.projectOperation(op)),
       pendingMessage: this.pendingMessage,
       pendingHash: this.pendingHash,
+      ...(this.execution && { execution: JSON.parse(JSON.stringify(this.execution)) as NonNullable<GitPendingState['execution']> }),
       head: this.head,
       commitCount: this.commits.length,
     }
@@ -560,6 +606,55 @@ export class TradingGit implements ITradingGit {
     return { ...commit, operations: commit.operations.map((op) => this.projectOperation(op)) }
   }
 
+  private persistPending(): void {
+    this.config.onPendingChange?.({
+      staged: this.stagingArea.map((op) => this.projectOperation(op)),
+      pendingMessage: this.pendingMessage,
+      pendingHash: this.pendingHash,
+      ...(this.execution && { execution: this.execution }),
+    })
+  }
+
+  private clearPending(): void {
+    this.config.onPendingChange?.(null)
+    this.stagingArea = []
+    this.pendingMessage = null
+    this.pendingHash = null
+    this.execution = undefined
+  }
+
+  private restorePending(state: GitPendingState): void {
+    if (!Array.isArray(state.staged)
+      || (state.pendingHash !== null && typeof state.pendingHash !== 'string')
+      || (state.pendingMessage !== null && typeof state.pendingMessage !== 'string')
+      || ((state.pendingHash === null) !== (state.pendingMessage === null))) {
+      throw new Error('Invalid saved wallet staging state')
+    }
+    if (state.execution && (!state.pendingHash || !Array.isArray(state.execution.results)
+      || (state.execution.parentHash !== null && typeof state.execution.parentHash !== 'string')
+      || !state.execution.results.every((result) => result && typeof result.success === 'boolean' && typeof result.action === 'string' && typeof result.status === 'string')
+      || state.execution.results.length > state.staged.length
+      || (state.execution.activeIndex !== null && (state.execution.activeIndex !== state.execution.results.length
+        || state.execution.activeIndex >= state.staged.length)))) {
+      throw new Error('Invalid saved wallet execution state')
+    }
+    this.stagingArea = state.staged.map(TradingGit.rehydrateOperation)
+    this.pendingHash = state.pendingHash
+    this.pendingMessage = state.pendingMessage
+    this.execution = state.execution
+  }
+
+  /** Order sync must see accepted writes even while the final snapshot is down.
+   * Insert their results before any later sync records, so terminal sync wins. */
+  private orderRecords(): Array<Pick<GitCommit, 'operations' | 'results'>> {
+    const records: Array<Pick<GitCommit, 'operations' | 'results'>> = [...this.commits]
+    if (this.execution && !this.commits.some((commit) => commit.hash === this.pendingHash)) {
+      const index = this.commits.findIndex((commit) => commit.hash === this.execution!.parentHash)
+      records.splice(index + 1, 0, { operations: this.stagingArea, results: this.execution.results })
+    }
+    return records
+  }
+
   // ==================== Serialization ====================
 
   exportState(): GitExportState {
@@ -573,6 +668,11 @@ export class TradingGit implements ITradingGit {
     const git = new TradingGit(config)
     git.commits = state.commits.map(TradingGit.rehydrateCommit)
     git.head = state.head
+    // Crash after commit.json replacement but before pending.json cleanup.
+    // The ledger hash wins: an already-recorded approval must not reappear.
+    if (git.pendingHash && git.commits.some((commit) => commit.hash === git.pendingHash)) {
+      git.clearPending()
+    }
     return git
   }
 
@@ -652,6 +752,13 @@ export class TradingGit implements ITradingGit {
   // ==================== Sync ====================
 
   async sync(updates: OrderStatusUpdate[], currentState: GitState): Promise<SyncResult> {
+    // A running push must record its initial outcomes before later sync rows.
+    // The poller will read these orders again on its next pass.
+    if (this.inflightWrite) return { hash: this.head ?? '', updatedCount: 0, updates: [] }
+    if (this.execution && this.execution.activeIndex === null) {
+      this.inflightWrite = true
+      try { await this.executePush(currentState) } finally { this.inflightWrite = false }
+    }
     if (updates.length === 0) {
       return { hash: this.head ?? '', updatedCount: 0, updates: [] }
     }
@@ -694,10 +801,11 @@ export class TradingGit implements ITradingGit {
     // Bracket TP/SL legs ride in result.legs — born 'submitted'; any later
     // sync row for a leg lives in a newer commit and wins (first-seen-wins
     // over a newest-first scan).
+    const records = this.orderRecords()
     const orderStatus = new Map<string, string>()
 
-    for (let i = this.commits.length - 1; i >= 0; i--) {
-      for (const result of this.commits[i].results) {
+    for (let i = records.length - 1; i >= 0; i--) {
+      for (const result of records[i].results) {
         if (result.orderId && !orderStatus.has(result.orderId)) {
           orderStatus.set(result.orderId, result.status)
         }
@@ -711,7 +819,7 @@ export class TradingGit implements ITradingGit {
     const pending: Array<{ orderId: string; symbol: string; localSymbol?: string; aliceId?: string }> = []
     const seen = new Set<string>()
 
-    for (const commit of this.commits) {
+    for (const commit of records) {
       for (let j = 0; j < commit.results.length; j++) {
         const result = commit.results[j]
         // Sync commits store ONE syncOrders op with N per-order results —

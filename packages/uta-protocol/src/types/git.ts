@@ -130,10 +130,20 @@ export interface RejectResult {
   operationCount: number
 }
 
-export interface GitStatus {
+/** Durable progress belongs to the existing wallet staging owner. An active
+ * index without a result is uncertain after restart and must never be replayed. */
+export interface GitPendingState {
   staged: Operation[]
   pendingMessage: string | null
   pendingHash: CommitHash | null
+  execution?: {
+    parentHash: CommitHash | null
+    results: OperationResult[]
+    activeIndex: number | null
+  }
+}
+
+export interface GitStatus extends GitPendingState {
   head: CommitHash | null
   commitCount: number
 }
