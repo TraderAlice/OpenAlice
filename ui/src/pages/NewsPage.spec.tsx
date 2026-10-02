@@ -150,8 +150,8 @@ describe('NewsPage inline stream', () => {
       { ...newsResponse('Unknown').items[0], categoryScope: 'unknown', categories: 'cn' },
     ], count: 2, lookback: '24h' })
     render(<RoutedNewsPage />)
-    const tag = await screen.findByRole('button', { name: 'Source coverage · Region · United States', exact: true })
-    expect(screen.getAllByRole('button', { name: 'Source coverage · Region · United States', exact: true })).toHaveLength(1)
+    const tag = await screen.findByRole('button', { name: 'Source coverage · Region · United States' })
+    expect(screen.getAllByRole('button', { name: 'Source coverage · Region · United States' })).toHaveLength(1)
     expect(screen.getByRole('button', { name: 'Source coverage · Industry · Technology' })).toBeTruthy()
     expect(screen.getByRole('button', { name: 'Unknown origin · Raw tag · cn' })).toBeTruthy()
     fireEvent.click(tag)
