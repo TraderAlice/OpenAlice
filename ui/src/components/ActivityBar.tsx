@@ -3,7 +3,7 @@ import { useEffect, useMemo, useRef, useState, type ReactNode, type RefObject } 
 import { type Page } from '../App'
 import { useWorkspace } from '../tabs/store'
 import type { ActivitySection } from '../tabs/types'
-import { getFocusedTab } from '../tabs/types'
+import { getFocusedTab, specToSection } from '../tabs/types'
 import { useUnreadInboxCount } from '../live/inbox-read'
 import { usePendingPushCount } from '../live/trading-push'
 import { useConnectorWarningCount } from '../live/connector-health'
@@ -112,8 +112,10 @@ export function ActivityBar({
       .filter(section => section.items.length > 0),
     [layout, officeNav, project?.product],
   )
-  const selectedSidebar = useWorkspace((state) => state.selectedSidebar)
-  const focusedKind = useWorkspace((state) => getFocusedTab(state)?.spec.kind)
+  const currentSection = useWorkspace((state) => {
+    const spec = getFocusedTab(state)?.spec
+    return spec ? specToSection(spec) : null
+  })
   const setSidebar = useWorkspace((state) => state.setSidebar)
   const openOrFocus = useWorkspace((state) => state.openOrFocus)
   const unreadInbox = useUnreadInboxCount()
@@ -194,7 +196,7 @@ export function ActivityBar({
                   <div className={`flex flex-col ${denseRail ? 'gap-1 md:gap-px' : 'gap-px'}`} id={`activity-section-${section.id}`}>
                     {section.items.map((item) => {
                       const sec = activitySectionFor(item.page)
-                      const isActive = item.page === 'chat' ? focusedKind === 'quick-start' : selectedSidebar === sec
+                      const isActive = currentSection === (item.page === 'chat' ? 'quick-start' : sec)
                       const Icon = item.icon
                       let badge: { count: number; label: string; tone: string } | null = null
                       if (item.page === 'inbox' && unreadInbox > 0) {
@@ -280,7 +282,7 @@ export function ActivityBar({
             compactRail={compactRail}
             denseRail={denseRail}
             connectorWarnings={connectorWarnings}
-            connectorsActive={selectedSidebar === 'connectors'}
+            connectorsActive={currentSection === 'connectors'}
             onOpenConnectors={() => {
               setSidebar('connectors')
               openOrFocus({ kind: 'connectors', params: {} })
