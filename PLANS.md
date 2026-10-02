@@ -29,6 +29,8 @@ the durable truth after it changes. Git history is the archive.
 
 ## Active
 
+- [[plans/release-0.95.0-beta.md]] — Publish the authorized beta and record phase/job/step timing for a release-speed retrospective.
+
 - [[plans/settings-machines-dialog.md]] — Move machine management into General / Machines and replace inline SSH setup with a reviewed dialog; Draft PR only.
 
 - [[plans/review-updates-shared-plan.md]] — Share automatic/manual update review
