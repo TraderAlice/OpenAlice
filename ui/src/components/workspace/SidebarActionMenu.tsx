@@ -53,7 +53,7 @@ export function SidebarActionMenu({
         align="end"
         sideOffset={4}
         aria-label={label}
-        className="z-30 w-auto min-w-[184px] max-w-[calc(100vw-2rem)] rounded-[10px] border border-border/70 bg-popover p-1 shadow-md ring-0"
+        className="z-30"
       >
         {items.map((item, index) => (
           <Fragment key={item.label}>
@@ -62,7 +62,7 @@ export function SidebarActionMenu({
               aria-label={item.ariaLabel}
               disabled={item.disabled}
               variant={item.danger ? 'destructive' : 'default'}
-              className="flex min-h-8 w-full cursor-default items-center gap-2 rounded-md px-2 py-1.5 text-left text-[12px] leading-4 transition-colors focus:bg-accent"
+              className="w-full text-left"
               onClick={() => {
                 if (item.disabled) return
                 // Base UI restores focus to the trigger as the menu finishes
@@ -74,7 +74,7 @@ export function SidebarActionMenu({
               <span className="flex h-4 w-4 shrink-0 items-center justify-center" aria-hidden>
                 {item.icon}
               </span>
-              <span className="min-w-0 flex-1 truncate">{item.label}</span>
+              <span className="min-w-0 flex-1">{item.label}</span>
             </DropdownMenuItem>
           </Fragment>
         ))}

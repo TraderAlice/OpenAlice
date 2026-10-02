@@ -27,7 +27,7 @@ export function WorkspaceFilesToggle(): ReactElement {
       aria-pressed={filesVisible}
       aria-label={label}
       aria-expanded={filesVisible}
-      className={`workspace-files-toggle text-[11px] ${
+      className={`workspace-files-toggle text-sm ${
         filesVisible
           ? 'text-foreground bg-muted'
           : 'text-muted-foreground'

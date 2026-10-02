@@ -1,3 +1,4 @@
+import userEvent from '@testing-library/user-event'
 // @vitest-environment jsdom
 
 import { useState } from 'react'
@@ -228,9 +229,11 @@ describe('CredentialModal', () => {
       onClose={vi.fn()} onSaved={vi.fn()} />)
     await screen.findByText(i18n.t('modelCatalog.loaded', { count: 1 }))
     expect(configApi.getCredentialModels).toHaveBeenCalledWith('openai-1', undefined, expect.any(AbortSignal), 'openai-responses', false)
-    fireEvent.focus(screen.getByRole('combobox', { name: /model/i }))
-    fireEvent.click(screen.getByRole('option', { name: /saved\/model/ }))
-    expect(screen.getByDisplayValue('saved/model')).toBeTruthy()
+    await userEvent.clear(screen.getByRole('combobox', { name: /model/i }))
+    await userEvent.click(screen.getByRole('combobox', { name: /model/i }))
+    await userEvent.click(screen.getByRole('option', { name: /Saved model/ }))
+    await userEvent.tab()
+    expect(screen.getByRole('combobox', { name: /model/i })).toHaveProperty('value', 'saved/model')
   })
 
   it('clears a draft key when changing providers so discovery cannot send it to the next provider', () => {
@@ -245,8 +248,9 @@ describe('CredentialModal', () => {
     vi.mocked(api.config.testCredential).mockResolvedValue({ ok: true, response: 'ok' })
     setup()
     await screen.findByText(i18n.t('modelCatalog.loaded', { count: 1 }))
-    fireEvent.focus(screen.getByRole('combobox', { name: /model/i }))
-    fireEvent.click(screen.getByRole('option', { name: /account-only\/model-9/ }))
+    await userEvent.clear(screen.getByRole('combobox', { name: /model/i }))
+    await userEvent.click(screen.getByRole('combobox', { name: /model/i }))
+    fireEvent.click(screen.getByRole('option', { name: /Account model/ }))
     fireEvent.click(screen.getByRole('button', { name: 'Test connection' }))
     await waitFor(() => expect(api.config.testCredential).toHaveBeenCalledWith(expect.objectContaining({ model: 'account-only/model-9' })))
   })
@@ -357,10 +361,10 @@ describe('CredentialModal', () => {
     expect(screen.queryByText('Claude Code')).toBeNull()
     expect(screen.queryByText('Codex')).toBeNull()
     expect(screen.getByPlaceholderText('AQ... or AIza...')).toBeTruthy()
-    expect(screen.getByDisplayValue('gemini-default')).toBeTruthy()
+    expect(screen.getByRole('combobox', { name: /model/i })).toHaveProperty('value', 'gemini-default')
   })
 
-  it('requires a concrete URL for custom providers and explains mode compatibility', () => {
+  it('requires a concrete URL for custom providers and explains mode compatibility', async () => {
     render(
       <CredentialModal
         mode="add"
@@ -376,7 +380,10 @@ describe('CredentialModal', () => {
     fireEvent.change(screen.getByPlaceholderText('Enter API key'), { target: { value: 'sk-gateway' } })
     fireEvent.change(screen.getByPlaceholderText(i18n.t('modelCatalog.selectPlaceholder')), { target: { value: 'gateway-model' } })
 
-    expect(screen.getByRole('option', { name: /OpenAI Chat Completions — opencode, Pi/ })).toBeTruthy()
+    fireEvent.click(screen.getByRole('combobox', { name: 'API compatibility mode' }))
+    const compatibility = await screen.findByRole('option', { name: /OpenAI Chat Completions — opencode, Pi/ })
+    expect(compatibility).toBeTruthy()
+    await userEvent.click(compatibility)
     const testButton = screen.getByRole('button', { name: 'Test connection' }) as HTMLButtonElement
     expect(testButton.disabled).toBe(true)
     expect(testButton.title).toBe('Enter the custom API base URL.')
@@ -460,7 +467,7 @@ describe('CredentialModal', () => {
 
     expect(screen.getByText('OpenAI')).toBeTruthy()
     expect(screen.getByPlaceholderText('Enter API key')).toHaveProperty('value', 'sk-prefilled')
-    await waitFor(() => expect(screen.getByDisplayValue('gpt-test')).toBeTruthy())
+    await waitFor(() => expect(screen.getByRole('combobox', { name: /model/i })).toHaveProperty('value', 'gpt-test'))
   })
 
   it('keeps the failed test message inside the dialog instead of overflowing', async () => {
@@ -547,8 +554,8 @@ describe('CredentialModal', () => {
       />,
     )
 
-    expect(screen.getByDisplayValue('gpt-account-specific')).toBeTruthy()
-    expect(screen.getByDisplayValue('Saved custom endpoint (keep unchanged)')).toBeTruthy()
+    expect(screen.getByRole('combobox', { name: /model/i })).toHaveProperty('value', 'gpt-account-specific')
+    expect(screen.getByRole('combobox', { name: 'Account region' }).textContent).toBe('Saved custom endpoint (keep unchanged)')
     fireEvent.click(screen.getByRole('button', { name: 'Test connection' }))
     await waitFor(() => expect(screen.getByRole('button', { name: 'Save' })).toBeTruthy())
     fireEvent.click(screen.getByRole('button', { name: 'Save' }))

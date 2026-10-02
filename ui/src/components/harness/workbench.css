@@ -5,7 +5,7 @@
 .harness-work-tabs { display:flex; flex-direction:column; height:100%; min-height:0; }
 .harness-work-toolbar { display:flex; align-items:center; gap:2px; padding:4px 6px; border-bottom:1px solid var(--border); min-height:42px; }
 .harness-work-tablist { flex:0 1 auto; min-width:0; overflow-x:auto; justify-content:flex-start; border-radius:0; padding:0; background:transparent; }
-.harness-work-tab { flex:none; max-width:200px; overflow:hidden; text-overflow:ellipsis; min-height:32px; font-size:12px; padding:4px 10px; }
+.harness-work-tab { flex:none; max-width:200px; overflow:hidden; text-overflow:ellipsis; min-height:36px; font-size: var(--text-sm); padding:4px 10px; }
 .harness-work-content { flex:1; min-height:0; overflow:hidden; }
 .harness-work-content[hidden] { display:none; }
 .harness-work-content .files-panel { height:100%; }
@@ -33,27 +33,28 @@
 }
 .harness-workbench.is-disclosing .harness-work-inner { width:var(--work-motion-width); }
 /* One continuous header row: the split owns header and body together. */
-.harness-workbench { --harness-header-height:40px; }
+.harness-workbench { --harness-header-height:48px; }
 .harness-conversation .oa-topbar,
 .harness-work-toolbar { height:var(--harness-header-height); min-height:var(--harness-header-height); flex-shrink:0; flex-wrap:nowrap; box-sizing:border-box; background:var(--background); }
 .harness-work-toolbar { padding:4px 8px; }
 .harness-work { background:var(--background); }
-.harness-tab-item { display:flex; align-items:center; flex:none; max-width:220px; min-width:0; padding-right:4px; border-radius:6px; }
+.harness-tab-item { display:flex; align-items:center; flex:none; max-width:220px; min-width:0; padding-right:4px; border-radius:var(--radius-md); }
 .harness-tab-item.is-active { background:var(--accent-strong); }
-.harness-work-tab { min-width:0; max-width:185px; background:transparent!important; box-shadow:none!important; border-radius:0; padding:4px 8px; }
+.harness-work-tab { min-width:0; max-width:185px; background:transparent; box-shadow:none; border-radius:0; padding:4px 8px; }
 .harness-tab-close { width:20px; height:20px; min-height:20px; padding:0; flex:none; color:var(--muted-foreground); }
+.harness-work-tab[data-active] { color:var(--foreground); }
 .harness-tab-close:hover { color:var(--foreground); }
 .harness-work .files-panel.is-embedded { border:0; border-radius:0; box-shadow:none; background:transparent; }
 .harness-work .files-panel.is-embedded .panel-header { background:transparent; border:0; }
 @media (max-width:767px), (pointer:coarse) {
-  .harness-workbench { --harness-header-height:48px; }
-  .harness-tab-close { width:28px; height:32px; }
+  .harness-workbench { --harness-header-height:56px; }
+  .harness-tab-close { width:44px; height:44px; }
 }
 .harness-browser { display:flex; flex-direction:column; height:100%; min-height:0; background:var(--background); }
 .harness-browser-toolbar { display:flex; align-items:center; gap:2px; min-height:40px; padding:4px 8px; border-bottom:1px solid var(--border); }
 .harness-browser-toolbar > button { width:28px; height:28px; padding:0; flex:none; }
 .harness-address { flex:1; min-width:0; }
-.harness-address input { width:100%; min-width:0; border:1px solid transparent; border-radius:6px; padding:5px 8px; background:transparent; font-size:12px; color:var(--foreground); outline:none; }
+.harness-address input { width:100%; min-width:0; border:1px solid transparent; border-radius:6px; padding:5px 8px; background:transparent; font-size: var(--text-base); color:var(--foreground); outline:none; }
 .harness-address input:hover { background:var(--accent); }
 .harness-address input:focus-visible { background:var(--card); border-color:var(--input); box-shadow:var(--oa-focus-shadow); }
 

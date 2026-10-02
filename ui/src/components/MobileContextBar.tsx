@@ -54,7 +54,7 @@ export function MobileContextBar({
           >
             <PanelLeftOpen size={17} strokeWidth={1.75} aria-hidden />
           </button>
-          <span className="min-w-0 truncate px-1 text-[13px] font-semibold text-foreground">
+          <span className="min-w-0 truncate px-1 text-sm font-semibold text-foreground">
             {pageNavigation.title}
           </span>
         </>

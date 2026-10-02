@@ -37,6 +37,11 @@ export const UI_STYLE_PROFILES = [
   },
 ] as const satisfies readonly UiStyleProfileDefinition[]
 
+export function resolveStylePalettePair(profile: UiStyleProfileId, mode: UiStylePaletteMode) {
+  const definition: UiStyleProfileDefinition | undefined = UI_STYLE_PROFILES.find(({ id }) => id === profile)
+  return mode === 'recommended' ? definition?.recommendedPalettePair : undefined
+}
+
 export function isUiStyleProfileId(value: unknown): value is UiStyleProfileId {
   return UI_STYLE_PROFILES.some(({ id }) => id === value)
 }

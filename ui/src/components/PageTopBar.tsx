@@ -5,15 +5,16 @@ import { PrimaryNavigationContext } from '../contexts/PrimaryNavigationContext'
 
 /** Shared geometry, not business navigation. Nested tool panels may reuse it
  * locally; page headers use PageTopBar to occupy the layout's fixed slot. */
-export function TopBar({ title, titleHint, leading, actions, children }: {
+export function TopBar({ title, titleHint, leading, actions, children, heading = 'compact' }: {
   title?: ReactNode
+  heading?: 'compact' | 'page'
   titleHint?: string
   leading?: ReactNode
   actions?: ReactNode
   children?: ReactNode
 }) {
   return (
-    <div data-slot="page-topbar" className="oa-topbar">
+    <div data-slot="page-topbar" data-heading={heading} className="oa-topbar">
       {leading && <div className="oa-topbar-leading">{leading}</div>}
       <div className="oa-topbar-identity" title={titleHint ?? (typeof title === 'string' ? title : undefined)}>
         {title != null && <h2 className="truncate text-sm font-semibold tracking-[-0.01em]">{title}</h2>}

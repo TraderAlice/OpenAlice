@@ -7,12 +7,13 @@
  * at submit time to derive nativeKey + contract.
  */
 
+import { Autocomplete } from '@/components/ui/autocomplete'
+import { Select } from '@/components/ui/select'
+
 import type { InstrumentDraft, SecType } from './instruments'
 import { SEC_TYPES } from './instruments'
 import { inputClass as sharedInputClass } from '../../components/form'
 
-const inputClass =
-  `${sharedInputClass} min-h-8 py-1 text-sm`
 const inputClassMono =
   `${sharedInputClass} min-h-8 py-1 font-mono text-xs`
 
@@ -29,27 +30,22 @@ export function InstrumentInput({ draft, onChange, knownSymbols }: {
 
   return (
     <>
-      <select
+      <Select
         value={draft.secType}
-        onChange={(e) => set('secType', e.target.value as SecType)}
-        className={`${inputClass} w-32`}
+        onValueChange={(selectedValue) => set('secType', selectedValue as SecType)}
+        className="w-32" aria-label="Security type"
         title="Security type"
-      >
-        {SEC_TYPES.map((s) => <option key={s} value={s}>{s}</option>)}
-      </select>
+        options={SEC_TYPES.map((s) => ({ value: s, label: s }))}
+      />
 
-      <input
-        className={`${inputClassMono} w-28`}
+      <Autocomplete
+        className="w-28 font-mono"
+        aria-label="Symbol"
         placeholder="symbol"
         value={draft.symbol}
-        onChange={(e) => set('symbol', e.target.value.trim())}
-        list={knownSymbols ? 'sim-instrument-known' : undefined}
+        onValueChange={(symbol) => set('symbol', symbol.trim())}
+        options={knownSymbols ?? []}
       />
-      {knownSymbols && (
-        <datalist id="sim-instrument-known">
-          {knownSymbols.map((k) => <option key={k} value={k} />)}
-        </datalist>
-      )}
 
       {(isOption || isFuture) && (
         <input
@@ -68,16 +64,17 @@ export function InstrumentInput({ draft, onChange, knownSymbols }: {
             value={draft.strike ?? ''}
             onChange={(e) => set('strike', e.target.value)}
           />
-          <select
+          <Select
             value={draft.right ?? ''}
-            onChange={(e) => set('right', (e.target.value || undefined) as 'C' | 'P' | undefined)}
-            className={`${inputClass} w-16`}
+            onValueChange={(selectedValue) => set('right', (selectedValue || undefined) as 'C' | 'P' | undefined)}
+            className="w-24" aria-label="Option right"
             title="Right"
-          >
-            <option value="">right</option>
-            <option value="C">Call</option>
-            <option value="P">Put</option>
-          </select>
+            options={[
+              { value: '', label: 'right' },
+              { value: 'C', label: 'Call' },
+              { value: 'P', label: 'Put' },
+            ]}
+          />
         </>
       )}
 

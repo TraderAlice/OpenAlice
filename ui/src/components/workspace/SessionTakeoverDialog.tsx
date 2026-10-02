@@ -1,3 +1,4 @@
+import { DetailsSummary } from '../ui/collapsible'
 import { useEffect, useId, useState } from 'react'
 import { ArrowRightLeft, Clock3, ExternalLink, LoaderCircle } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
@@ -63,7 +64,7 @@ export function SessionTakeoverDialogHost() {
       {pending ? <Countdown row={row} offset={data.offset} /> : <p role="status" className="text-sm text-muted-foreground">{t(row.state === 'running' || row.state === 'handoff' ? 'takeover.runningHelp' : 'takeover.doneHelp')}</p>}
       {data.error && <p role="alert" className="text-sm text-destructive">{data.error}</p>}
       {pending && <div className="flex flex-wrap justify-end gap-2"><Button variant="outline" disabled={data.busy} onClick={() => void data.decide(row.id, 'reject')}>{t('takeover.keepUsing')}</Button><Button disabled={data.busy || row.decision === 'approved'} onClick={() => void data.decide(row.id, 'approve')}>{data.busy && <LoaderCircle size={14} className="animate-spin motion-reduce:animate-none" />}{t(row.decision === 'approved' ? 'takeover.approved' : 'takeover.approve')}</Button></div>}
-      <details className="border-t border-border pt-3"><summary className="cursor-pointer text-xs text-muted-foreground">{t('takeover.timing')}</summary><div className="pt-3"><SessionTakeoverSettings /></div></details>
+      <details className="border-t border-border pt-3"><DetailsSummary>{t('takeover.timing')}</DetailsSummary><div className="pt-3"><SessionTakeoverSettings /></div></details>
     </DialogContent>
   </Dialog>
 }

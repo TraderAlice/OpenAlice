@@ -25,6 +25,7 @@ import { TerminalView } from '../components/workspace/Terminal'
 import { WebSessionView } from '../components/workspace/WebSessionView'
 import { SessionActivation } from '../components/workspace/SessionActivation'
 import { Button } from '../components/ui/button'
+import { Tooltip, TooltipContent, TooltipTrigger } from '../components/ui/tooltip'
 import { useWorkspaces } from '../contexts/workspaces-context'
 import { useAgentLaunchConfig, useAgentLaunchPreferences } from '../hooks/useAgentLaunchConfig'
 import { useAgentRuntimes } from '../hooks/useAgentRuntimes'
@@ -75,10 +76,10 @@ export function WorkspaceManagerPage({ spec, visible = true }: { spec: ManagerSp
     : null
 
   const suggestions = useMemo(() => [
-    t('workspaceManager.suggestionAudit'),
-    t('workspaceManager.suggestionOwnership'),
-    t('workspaceManager.suggestionIssues'),
-    t('workspaceManager.suggestionUpgrade'),
+    { prompt: t('workspaceManager.suggestionAudit'), label: t('workspaceManager.actionAudit') },
+    { prompt: t('workspaceManager.suggestionOwnership'), label: t('workspaceManager.actionOwnership') },
+    { prompt: t('workspaceManager.suggestionIssues'), label: t('workspaceManager.actionIssues') },
+    { prompt: t('workspaceManager.suggestionUpgrade'), label: t('workspaceManager.actionUpgrade') },
   ], [t])
 
   const submit = async (): Promise<void> => {
@@ -153,8 +154,8 @@ export function WorkspaceManagerPage({ spec, visible = true }: { spec: ManagerSp
       </Button>
     )
     const runtimeBadge = (
-      <span className="inline-flex items-center gap-1.5 rounded-full border border-border/70 bg-background px-2 py-1 text-[10px] leading-[14px] font-medium text-muted-foreground">
-        <AgentRuntimeIcon agentId={session.agent} className="h-[11px] w-[11px]" />
+      <span className="inline-flex items-center gap-1.5 rounded-full border border-border/70 bg-background px-2 py-1 text-sm leading-5 font-medium text-muted-foreground">
+        <AgentRuntimeIcon agentId={session.agent} className="size-4" />
         {runtimeLabel(session.agent, agents)} {session.surface === 'webpi' ? 'Web' : 'TUI'}
       </span>
     )
@@ -215,14 +216,14 @@ export function WorkspaceManagerPage({ spec, visible = true }: { spec: ManagerSp
           </div>
         </div>
 
-        <section className="rounded-lg border border-border/80 bg-secondary/55 p-3 md:p-4">
+        <section className="rounded-2xl border border-border/80 bg-secondary/55 p-4">
           <textarea
             value={draft}
             onChange={(event) => setDraft(event.target.value)}
             onKeyDown={onKeyDown}
             placeholder={t('workspaceManager.placeholder')}
             rows={4}
-            className="min-h-28 w-full resize-none bg-transparent px-1 py-1 text-[14px] leading-relaxed text-foreground outline-none placeholder:text-muted-foreground/55 md:text-[15px]"
+            className="min-h-28 w-full resize-none bg-transparent px-1 py-1 text-base leading-6 text-foreground outline-none placeholder:text-muted-foreground"
           />
           <div className="workspace-manager-composer-footer mt-3 flex flex-col gap-2 border-t border-border/60 pt-3">
             <div className="workspace-manager-composer-actions flex min-w-0 flex-col gap-2">
@@ -230,6 +231,8 @@ export function WorkspaceManagerPage({ spec, visible = true }: { spec: ManagerSp
                 <AgentLaunchSelectors
                   ref={launchSelectorsRef}
                   config={launchConfig}
+                  toolbar
+                  combinedAi
                   onConfigureProvider={goConfigureProvider}
                 />
               </div>
@@ -238,7 +241,7 @@ export function WorkspaceManagerPage({ spec, visible = true }: { spec: ManagerSp
                 size="lg"
                 onClick={() => void submit()}
                 disabled={!draft.trim() || launching || !launchConfig.credentialSelectionReady}
-                className="self-start px-4 text-[12px]"
+                className="self-start px-4"
               >
                 {launching ? <Loader2 size={14} className="animate-spin" /> : <ArrowUp size={14} />}
                 {launching ? t('workspaceManager.launching') : t('workspaceManager.send')}
@@ -256,7 +259,7 @@ export function WorkspaceManagerPage({ spec, visible = true }: { spec: ManagerSp
         {(error ?? workspaceManagerError) && (
           <div
             role="alert"
-            className="mt-3 flex items-center justify-between gap-3 rounded-lg border border-destructive/25 bg-destructive/10 px-3 py-2 text-[12px] leading-[18px] text-destructive"
+            className="mt-3 flex items-center justify-between gap-3 rounded-lg border border-destructive/25 bg-destructive/10 px-3 py-2 text-sm leading-5 text-destructive"
           >
             <span>{error ?? workspaceManagerError}</span>
             {!error && workspaceManagerError && (
@@ -274,23 +277,25 @@ export function WorkspaceManagerPage({ spec, visible = true }: { spec: ManagerSp
         )}
 
         <section className="workspace-manager-suggestions-section mt-7 min-w-0">
-          <h2 className="mb-2 text-[12px] leading-[18px] font-medium text-muted-foreground">
+          <h2 className="mb-2 text-sm leading-5 font-medium text-muted-foreground">
             {t('workspaceManager.suggestions')}
           </h2>
           <div className="workspace-manager-suggestions grid min-w-0 gap-2">
             {suggestions.map((suggestion, index) => {
               const Icon = SUGGESTION_ICONS[index] ?? Network
               return (
-                <Button
-                  key={suggestion}
-                  type="button"
-                  variant="outline"
-                  onClick={() => setDraft(suggestion)}
-                  className="group h-auto min-h-10 w-full justify-start gap-2.5 rounded-lg px-3 py-2 text-left whitespace-normal"
-                >
-                  <Icon size={14} className="shrink-0 text-muted-foreground group-hover:text-foreground" />
-                  <span className="text-[12px] leading-5 text-muted-foreground group-hover:text-foreground">{suggestion}</span>
-                </Button>
+                <Tooltip key={suggestion.label}>
+                  <TooltipTrigger render={<Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => setDraft(suggestion.prompt)}
+                    className="group h-auto min-h-12 w-full justify-start gap-3 rounded-xl px-4 py-3 text-left whitespace-normal"
+                  />}>
+                    <Icon size={14} className="shrink-0 text-muted-foreground group-hover:text-foreground" />
+                    <span className="text-sm leading-5 text-muted-foreground group-hover:text-foreground">{suggestion.label}</span>
+                  </TooltipTrigger>
+                  <TooltipContent className="max-w-80">{suggestion.prompt}</TooltipContent>
+                </Tooltip>
               )
             })}
           </div>

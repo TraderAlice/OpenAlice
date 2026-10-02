@@ -1,6 +1,7 @@
+import { DetailsSummary } from '../ui/collapsible'
 import { useRef } from 'react'
 import { useTranslation } from 'react-i18next'
-import { ArrowUpRight, RefreshCw } from 'lucide-react'
+import { ArrowUpRight, Activity, RefreshCw } from 'lucide-react'
 import { useSessionControl } from '../../hooks/useSessionControl'
 import { useSessionDetails } from '../../hooks/useSessionDetails'
 import { AgentRuntimeIcon } from '../../lib/agentRuntimeIcon'
@@ -62,7 +63,7 @@ export function SessionDetailsDialog({ record, onClose }: { record: SessionRecor
           <DialogDescription className="mt-0.5 text-xs">{text('title')}</DialogDescription>
         </div>
         <span className="ml-auto inline-flex shrink-0 items-center gap-2 rounded-full bg-muted px-2.5 py-1 text-xs font-medium text-muted-foreground">
-          {live && <span className="relative size-2 rounded-full bg-primary live-pulse motion-reduce:animate-none" aria-hidden />}
+          {live && <Activity className="size-4 shrink-0" aria-hidden />}
           {status}
         </span>
       </header>
@@ -95,7 +96,7 @@ export function SessionDetailsDialog({ record, onClose }: { record: SessionRecor
           <h3 className="mb-3 text-sm font-semibold">{text('history')}</h3>
           {!data.loading && data.executions.length === 0 && <p className="text-sm text-muted-foreground">{text('noHistory')}</p>}
           <div className="space-y-2">{data.executions.map(run => <details key={run.executionId} className="rounded-lg border border-border px-3 py-2 text-sm">
-            <summary className="cursor-pointer break-words py-1">{date(run.startedAt ?? run.requestedAt)} · {run.phase} · {run.origin.kind}</summary>
+            <DetailsSummary>{date(run.startedAt ?? run.requestedAt)} · {run.phase} · {run.origin.kind}</DetailsSummary>
             <div className="mt-2 space-y-2 border-t border-border pt-3 text-muted-foreground">
               <p>{text('source')}: {run.origin.entry}</p>
               <p>{text('started')}: {date(run.startedAt)}</p><p>{text('ended')}: {date(run.finishedAt)}</p>
@@ -106,7 +107,7 @@ export function SessionDetailsDialog({ record, onClose }: { record: SessionRecor
           </details>)}</div>
         </section>
         <details className="border-t border-border pt-4 text-xs text-muted-foreground">
-          <summary className="cursor-pointer">{text('identifiers')}</summary>
+          <DetailsSummary>{text('identifiers')}</DetailsSummary>
           <dl className="mt-3 grid gap-2 sm:grid-cols-[9rem_minmax(0,1fr)]">
             {diagnostics.map(([label, value]) => <div key={label} className="contents"><dt>{label}</dt><dd className="break-all">{value}</dd></div>)}
             <dt>Session ID</dt><dd className="break-all">{record.id}</dd><dt>Resume ID</dt><dd className="break-all">{record.resumeId}</dd>

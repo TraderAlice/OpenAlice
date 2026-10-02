@@ -8,6 +8,7 @@ import type { UTAConfig, BrokerPreset, AccountInfo, SubAccountRef, Position, Bro
 import { useTradingConfig } from '../hooks/useTradingConfig'
 import { useAccountHealth } from '../hooks/useAccountHealth'
 import { deriveAccountInteractionPolicy, useBrokerPackReadiness } from '../hooks/useBrokerPackReadiness'
+import { ContextHelp } from '../components/ContextHelp'
 import { PageHeader } from '../components/PageHeader'
 import { EmptyState, Skeleton } from '../components/StateViews'
 import { Button, buttonVariants } from '../components/ui/button'
@@ -50,6 +51,8 @@ export function UTADetailPage({ spec }: UTADetailPageProps) {
   const [subAccounts, setSubAccounts] = useState<SubAccountRef[]>([])
   const [selectedSub, setSelectedSub] = useState<string | undefined>(undefined)
   const [snapshots, setSnapshots] = useState<UTASnapshotSummary[]>([])
+  const [snapshotsLoading, setSnapshotsLoading] = useState(true)
+  const [snapshotsError, setSnapshotsError] = useState<string | null>(null)
   const [editing, setEditing] = useState(false)
   const [orderMode, setOrderMode] = useState<OrderEntryMode | null>(null)
   const [dataError, setDataError] = useState<string | null>(null)
@@ -106,7 +109,6 @@ export function UTADetailPage({ spec }: UTADetailPageProps) {
       return
     }
     const seq = ++reqSeq.current
-    setDataError(null)
     try {
       const [acct, pos, ord] = await Promise.allSettled([
         api.trading.utaAccount(id, selectedSub),
@@ -115,10 +117,6 @@ export function UTADetailPage({ spec }: UTADetailPageProps) {
       ])
       if (seq !== reqSeq.current) return  // superseded by a newer refresh — discard
       if (acct.status === 'rejected') {
-        setAccount(null)
-        setPositions([])
-        setOrders([])
-        setLastUpdated(null)
         setDataError(acct.reason instanceof Error ? acct.reason.message : String(acct.reason))
         return
       }
@@ -137,23 +135,35 @@ export function UTADetailPage({ spec }: UTADetailPageProps) {
 
   // Snapshots refresh more slowly (60s); same data feeds the NAV chart and
   // the 24h-delta anchor — no extra fetches needed.
+  const snapshotRequest = useRef(0)
   const refreshSnapshots = useCallback(async () => {
     if (!id) return
+    const request = ++snapshotRequest.current
     try {
       const r = await api.trading.snapshots(id, { limit: 50 })
-      setSnapshots(r.snapshots)
-    } catch {
-      // non-fatal
+      if (request === snapshotRequest.current) {
+        setSnapshots(r.snapshots)
+        setSnapshotsError(null)
+      }
+    } catch (error) {
+      if (request === snapshotRequest.current) setSnapshotsError(error instanceof Error ? error.message : String(error))
+    } finally {
+      if (request === snapshotRequest.current) setSnapshotsLoading(false)
     }
   }, [id])
 
   useEffect(() => {
-    refreshLive()
-    refreshSnapshots()
-    const liveInterval = setInterval(refreshLive, 15_000)
-    const snapshotInterval = setInterval(refreshSnapshots, 60_000)
-    return () => { clearInterval(liveInterval); clearInterval(snapshotInterval) }
-  }, [refreshLive, refreshSnapshots])
+    void refreshLive()
+    const interval = setInterval(refreshLive, 15_000)
+    return () => { clearInterval(interval); reqSeq.current++ }
+  }, [refreshLive])
+
+  useEffect(() => {
+    setSnapshotsLoading(true)
+    void refreshSnapshots()
+    const interval = setInterval(refreshSnapshots, 60_000)
+    return () => { clearInterval(interval); snapshotRequest.current++ }
+  }, [refreshSnapshots])
 
   // Market clock — mount + every 60s. The poll itself re-renders the
   // "opens in Xh Ym" countdown, so no separate ticker is needed.
@@ -244,7 +254,13 @@ export function UTADetailPage({ spec }: UTADetailPageProps) {
     <div className="flex flex-col flex-1 min-h-0">
       <PageHeader
         title={displayName}
-        live={lastUpdated && policy.canRead ? { lastUpdated } : undefined}
+        accessory={<span className="flex size-8 shrink-0 items-center justify-center">
+          {(dataError || interactionNotice) && <ContextHelp label="Account status" className={dataError ? 'text-destructive' : 'text-warning'}>
+            {dataError ? `Live account data is unavailable: ${dataError}` : interactionNotice!}
+          </ContextHelp>}
+          <span className="sr-only" role="alert">{dataError ?? interactionNotice ?? ''}</span>
+        </span>}
+        live={{ lastUpdated: policy.canRead ? lastUpdated : null }}
         description={
           <span className="inline-flex flex-wrap items-center gap-x-3 gap-y-2">
             <Link to="/trading" className="text-muted-foreground hover:text-foreground">← Trading</Link>
@@ -259,7 +275,7 @@ export function UTADetailPage({ spec }: UTADetailPageProps) {
                 title={isDisabled && !readiness.operational ? policy.reason : undefined}
                 onChange={async (v) => { await tc.saveUTA({ ...uta, enabled: v }) }}
               />
-              <span className="text-[11px] text-muted-foreground">
+              <span className="text-sm text-muted-foreground">
                 {isDisabled ? 'Configured off' : 'Configured on'}
               </span>
             </span>
@@ -283,20 +299,8 @@ export function UTADetailPage({ spec }: UTADetailPageProps) {
         }
       />
 
-      <div className="flex-1 overflow-y-auto px-4 md:px-6 py-5">
-        <div className="max-w-[1240px] mx-auto">
-          {dataError && (
-            <div className="mb-4 rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2 text-[12px] leading-[18px] text-destructive">
-              Failed to load live data: {dataError}
-            </div>
-          )}
-
-          {interactionNotice && (
-            <div className="mb-4 rounded-lg border border-warning/30 bg-warning/5 px-3 py-2 text-[12px] leading-[18px] text-warning" role="status">
-              {interactionNotice}
-            </div>
-          )}
-
+      <div className="@container flex-1 overflow-y-auto px-[var(--page-inset)] py-5">
+        <div className="max-w-[1240px]">
           {!policy.canRead ? (
             <div className="space-y-4">
               <BrokerSupportGate
@@ -305,66 +309,60 @@ export function UTADetailPage({ spec }: UTADetailPageProps) {
                 onInstall={brokerReadiness.install}
                 onRetry={brokerReadiness.refresh}
               />
-              {curvePoints.length >= 2 && (
-                <div className="space-y-2">
-                  <p className="text-[11px] text-warning" role="status">
-                    Historical snapshot. Broker support is unavailable on this Runtime, so these values are stale.
-                  </p>
-                  <EquityCurve
-                    points={curvePoints}
-                    accounts={[{ id, label: displayName }]}
-                    selectedAccountId={id}
-                    onAccountChange={() => {}}
-                  />
-                </div>
-              )}
+              <EquityCurve
+                points={curvePoints}
+                loading={snapshotsLoading}
+                error={snapshotsError}
+                onRetry={() => { setSnapshotsLoading(true); void refreshSnapshots() }}
+                accounts={[{ id, label: displayName }]}
+                selectedAccountId={id}
+                onAccountChange={() => {}}
+                currency={snapshots[0]?.account.baseCurrency || 'USD'}
+                historical
+              />
             </div>
           ) : !lastUpdated && !dataError ? <UTADetailMainSkeleton /> : !lastUpdated ? (
             <EmptyState title="Live account data is unavailable." description="Retry after checking the broker connection and account health." />
           ) : (
             <div className="space-y-5">
-              {/* Keep the visual overview together, then give the operational
-                  tables the full content width. The auto-fit grid responds to
-                  this pane's real width after both app sidebars, rather than
-                  guessing from the browser viewport. */}
-              <div
-                className="grid items-stretch gap-4"
-                style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 26rem), 1fr))' }}
-              >
-                {curvePoints.length >= 2 && (
-                  <div className="min-w-0">
-                    <EquityCurve
-                      points={curvePoints}
-                      accounts={[{ id, label: displayName }]}
-                      selectedAccountId={id}
-                      onAccountChange={() => { /* single-account mode: switcher hidden */ }}
-                    />
-                  </div>
-                )}
-
-                <div className="min-w-0 space-y-3">
-                  {subAccounts.length > 1 && (
+              <div className="grid items-stretch gap-4 @3xl:grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)]">
+                <AccountPanel
+                  account={account}
+                  positions={positions}
+                  delta24h={selectedSub === undefined ? delta24h : null}
+                  clock={clock}
+                  connecting={health?.connecting ?? false}
+                  error={dataError}
+                  hasMarginWallet={subAccounts.some((wallet) => wallet.kind === 'derivatives')}
+                  selector={subAccounts.length > 1 ? (
                     <SubAccountSelector
                       subAccounts={subAccounts}
                       selected={selectedSub}
                       onSelect={(sub) => {
-                        // Drop the previous wallet's numbers immediately so the
-                        // panel shows "Loading account info…" during the (slow,
-                        // multi-round-trip) scoped read instead of briefly painting
-                        // the old scope's net-liquidation under the new pill.
+                        reqSeq.current++
                         setAccount(null)
                         setSelectedSub(sub)
                       }}
                     />
-                  )}
-                  <AccountPanel account={account} positions={positions} delta24h={delta24h} clock={clock} connecting={health?.connecting ?? false} />
-                </div>
+                  ) : undefined}
+                />
+                <EquityCurve
+                  points={curvePoints}
+                  loading={snapshotsLoading}
+                  error={snapshotsError}
+                  onRetry={() => { setSnapshotsLoading(true); void refreshSnapshots() }}
+                  accounts={[{ id, label: displayName }]}
+                  selectedAccountId={id}
+                  onAccountChange={() => {}}
+                  currency={snapshots[0]?.account.baseCurrency || 'USD'}
+                  className="h-full"
+                />
               </div>
 
               <PositionsSection
                 positions={positions}
-                canClose={policy.canTrade}
-                closeDisabledReason={policy.reason}
+                canClose={policy.canTrade && account !== null && dataError === null}
+                closeDisabledReason={dataError ?? policy.reason}
                 onCloseClick={(p) => setOrderMode({
                   kind: 'close',
                   aliceId: p.contract.aliceId ?? p.contract.localSymbol ?? p.contract.symbol ?? '',
@@ -419,8 +417,8 @@ function Shell({ title, children }: { title: string; children?: React.ReactNode 
   return (
     <div className="flex flex-col flex-1 min-h-0">
       <PageHeader title={title} description={<Link to="/trading" className="text-muted-foreground hover:text-foreground">← Trading</Link>} />
-      <div className="flex-1 overflow-y-auto px-4 md:px-6 py-5">
-        <div className="max-w-[720px] mx-auto">{children}</div>
+      <div className="flex-1 overflow-y-auto px-[var(--page-inset)] py-5">
+        <div className="max-w-[720px]">{children}</div>
       </div>
     </div>
   )
@@ -444,6 +442,7 @@ function SubAccountSelector({ subAccounts, selected, onSelect }: {
         ...subAccounts.map(account => ({ value: account.id, label: account.label, ariaLabel: `${account.label}, ${account.kind} wallet` })),
       ]}
       onChange={(value) => onSelect(value === 'all' ? undefined : value)}
+      compact
       ariaLabel="Trading wallet"
     />
   )
@@ -490,25 +489,31 @@ function UTADetailMainSkeleton() {
   )
 }
 
-function AccountPanel({ account, positions, delta24h, clock, connecting }: {
+function AccountPanel({ account, positions, delta24h, clock, connecting, selector, hasMarginWallet, error }: {
   account: AccountInfo | null
   positions: Position[]
   delta24h: Delta24h | null
   clock: MarketClockState
   connecting?: boolean
+  selector?: React.ReactNode
+  hasMarginWallet: boolean
+  error: string | null
 }) {
+  const panelRef = useRef<HTMLDivElement>(null)
+  const [loadedHeight, setLoadedHeight] = useState<number>()
+  useLayoutEffect(() => {
+    if (account && panelRef.current) setLoadedHeight(panelRef.current.offsetHeight)
+  }, [account])
+  const header = <div className="mb-3 flex min-h-(--oa-control-height) flex-wrap items-center justify-between gap-2">
+    {selector ?? <h3 className="text-sm font-semibold">Account</h3>}
+    {clock != null && <span className="shrink-0 text-sm"><MarketClockChip clock={clock} /></span>}
+  </div>
   if (!account) {
     return (
-      <div className="rounded-lg border border-border bg-card p-4">
-        {clock != null && (
-          <div className="text-[12px] mb-3"><MarketClockChip clock={clock} /></div>
-        )}
-        {/* During the initial broker connect, say so explicitly — "connecting"
-            reads as progress, where a bare "Loading…" that lingers 30s reads
-            as a stall. Skeleton rows below stand in for the metric list so the
-            panel has shape instead of a single line of text. */}
-        <p className={`text-[12px] mb-3.5 ${connecting ? 'text-primary' : 'text-muted-foreground'}`}>
-          {connecting ? 'Connecting to broker…' : 'Loading account info…'}
+      <div ref={panelRef} className="min-w-0 rounded-lg border border-border bg-card p-(--oa-panel-inset)" style={{ minHeight: loadedHeight }} aria-busy={!error}>
+        {header}
+        <p className="mb-3.5 text-sm text-muted-foreground" role="status">
+          {error ? 'Account data is unavailable.' : connecting ? 'Connecting to broker…' : 'Loading account info…'}
         </p>
         <div className="space-y-3.5" aria-hidden="true">
           {Array.from({ length: 6 }).map((_, i) => (
@@ -556,10 +561,8 @@ function AccountPanel({ account, positions, delta24h, clock, connecting }: {
     : null
 
   return (
-    <div className="rounded-lg border border-border bg-card p-4">
-      {clock != null && (
-        <div className="text-[12px] mb-3"><MarketClockChip clock={clock} /></div>
-      )}
+    <div ref={panelRef} className="min-w-0 rounded-lg border border-border bg-card p-(--oa-panel-inset)">
+      {header}
 
       <Metric
         size="lg"
@@ -571,25 +574,23 @@ function AccountPanel({ account, positions, delta24h, clock, connecting }: {
         } : { value: '— 24h', sign: 'flat' }}
       />
 
-      <div className="mt-4 border-t border-border divide-y divide-border">
+      <dl className="mt-4 border-t border-border divide-y divide-border">
         <AccountRow label="Cash" value={fmt(account.totalCashValue, ccy)} />
 
         <AccountRow label="Positions Value" value={fmt(positionsValue, ccy)} />
 
-        {utilizationPct != null && (
-          <div className="py-2">
+        <div className="py-2">
             <div className="flex items-baseline justify-between gap-3">
-              <span className="text-[11px] font-medium text-muted-foreground">Utilization</span>
-              <span className="text-[13px] leading-[18px] font-medium tabular-nums text-foreground">{utilizationPct.toFixed(1)}%</span>
+              <dt className="text-sm font-medium text-muted-foreground">Utilization</dt>
+              <dd className="text-sm leading-5 font-medium tabular-nums text-foreground">{utilizationPct == null ? '—' : `${utilizationPct.toFixed(1)}%`}</dd>
             </div>
             <div className="mt-1.5 h-[2px] rounded-full bg-muted overflow-hidden">
               <div
-                className="h-full rounded-full bg-primary"
-                style={{ width: `${Math.min(100, Math.max(0, utilizationPct))}%` }}
+                className="h-full rounded-full bg-info"
+                style={{ width: `${Math.min(100, Math.max(0, utilizationPct ?? 0))}%` }}
               />
             </div>
-          </div>
-        )}
+        </div>
 
         <AccountRow
           label="Unrealized P&L"
@@ -599,26 +600,24 @@ function AccountPanel({ account, positions, delta24h, clock, connecting }: {
           sign={signFromDelta(unrealized)}
         />
 
-        {realized != null && (
-          <AccountRow
-            label="Realized P&L"
-            value={fmtPnl(account.realizedPnL, ccy)}
-            sign={signFromDelta(realized)}
-          />
-        )}
+        <AccountRow
+          label="Realized P&L"
+          value={realized == null ? '—' : fmtPnl(account.realizedPnL, ccy)}
+          sign={signFromDelta(realized)}
+        />
 
         {account.buyingPower != null && !isUnsetDecimal(account.buyingPower) && (
           <AccountRow label="Buying Power" value={fmt(account.buyingPower, ccy)} />
         )}
 
-        {marginUsed != null && marginUsed > 0 && (
-          <AccountRow label="Margin Used" value={fmt(account.initMarginReq, ccy)} />
+        {(hasMarginWallet || marginUsed != null && marginUsed > 0) && (
+          <AccountRow label="Margin Used" value={marginUsed == null ? '—' : fmt(marginUsed, ccy)} />
         )}
 
         {account.dayTradesRemaining != null && (
           <AccountRow label="Day Trades Left" value={fmtNum(account.dayTradesRemaining)} />
         )}
-      </div>
+      </dl>
     </div>
   )
 }
@@ -630,9 +629,9 @@ function AccountRow({ label, value, sign }: {
 }) {
   const valueColor = sign === 'up' ? 'text-success' : sign === 'down' ? 'text-destructive' : 'text-foreground'
   return (
-    <div className="flex items-baseline justify-between gap-3 py-2">
-      <span className="text-[11px] font-medium text-muted-foreground">{label}</span>
-      <span className={`text-[13px] leading-[18px] font-medium tabular-nums text-right ${valueColor}`}>{value}</span>
+    <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1.35fr)] items-baseline gap-3 py-2">
+      <dt className="min-w-0 text-sm font-medium text-muted-foreground">{label}</dt>
+      <dd className={`min-w-0 text-sm leading-5 font-medium tabular-nums text-right [overflow-wrap:anywhere] ${valueColor}`}>{value}</dd>
     </div>
   )
 }
@@ -643,7 +642,7 @@ function Section({ title, action, children }: { title: string; action?: React.Re
   return (
     <section>
       <div className="flex items-center justify-between mb-2.5">
-        <h3 className="text-[13px] leading-[18px] font-semibold text-foreground">{title}</h3>
+        <h3 className="text-sm leading-5 font-semibold text-foreground">{title}</h3>
         {action}
       </div>
       {children}
@@ -696,7 +695,7 @@ export function PositionsSection({ positions, onCloseClick, canClose = true, clo
           const groupCcy = currencies.size === 1 ? [...currencies][0] : undefined
           return (
             <div key={g.class} className="border-t border-border first:border-t-0">
-              <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 bg-muted/40 px-3 py-2 text-[11px] leading-[15px]">
+              <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 bg-muted/40 px-3 py-2 text-sm leading-5">
                 <div className="flex items-center gap-1.5">
                   <span className="font-semibold text-foreground">{assetClassLabel(g.class)}</span>
                   <span className="text-muted-foreground">
@@ -730,7 +729,7 @@ export function PositionsSection({ positions, onCloseClick, canClose = true, clo
         data-testid="uta-positions-desktop"
         className="hidden overflow-x-auto rounded-lg border border-border md:block"
       >
-        <table className="w-full text-[13px]">
+        <table className="w-full text-sm tabular-nums [&_th]:whitespace-nowrap [&_td]:whitespace-nowrap">
           <thead>
             <tr className="bg-secondary text-muted-foreground text-left">
               <th className="px-3 py-2 font-medium">Contract</th>
@@ -739,9 +738,7 @@ export function PositionsSection({ positions, onCloseClick, canClose = true, clo
               <th className="px-3 py-2 font-medium text-right">Avg → Mark</th>
               <th className="px-3 py-2 font-medium text-right">Mkt Value</th>
               <th className="px-3 py-2 font-medium text-right">PnL</th>
-              <th className="px-3 py-2 font-medium text-right">
-                <span className="sr-only">Actions</span>
-              </th>
+              <th aria-label="Actions" className="px-3 py-2 font-medium text-right" />
             </tr>
           </thead>
           <tbody>
@@ -755,12 +752,12 @@ export function PositionsSection({ positions, onCloseClick, canClose = true, clo
                 <Fragment key={g.class}>
                   <tr className="bg-muted/40 border-t border-border">
                     <td colSpan={cols} className="px-3 py-1.5">
-                      <div className="flex items-center justify-between text-[12px] leading-[18px]">
+                      <div className="flex items-center justify-between text-sm leading-5">
                         <div className="flex items-center gap-2">
                           <span className="font-semibold text-foreground">{assetClassLabel(g.class)}</span>
                           <span className="text-muted-foreground">{g.positions.length} position{g.positions.length > 1 ? 's' : ''}</span>
                           {!groupCcy && (
-                            <span className="text-muted-foreground/60 text-[11px]">mixed ccy</span>
+                            <span className="text-muted-foreground/60 text-sm">mixed ccy</span>
                           )}
                         </div>
                         <div className="flex items-center gap-3 tabular-nums">
@@ -796,7 +793,7 @@ function PositionMetric({
 }) {
   return (
     <div className="min-w-0">
-      <dt className="text-[11px] font-medium text-muted-foreground">{label}</dt>
+      <dt className="text-sm font-medium text-muted-foreground">{label}</dt>
       <dd className={`mt-0.5 truncate text-caption tabular-nums ${valueClassName}`} title={value}>{value}</dd>
     </div>
   )
@@ -819,13 +816,13 @@ function PositionMobileRow({ position: p, onClose, canClose, closeDisabledReason
         <div className="grid grid-cols-[minmax(0,1fr)_auto_16px] items-start gap-2">
           <div className="min-w-0">
             <ContractCell contract={p.contract} />
-            <span className={`mt-1 inline-flex rounded-sm px-1.5 py-0.5 text-[10px] leading-[14px] font-medium ${p.side === 'long' ? 'bg-success/15 text-success' : 'bg-destructive/15 text-destructive'}`}>
+            <span className={`mt-1 inline-flex rounded-sm px-1.5 py-0.5 text-sm leading-5 font-medium ${p.side === 'long' ? 'bg-success/15 text-success' : 'bg-destructive/15 text-destructive'}`}>
               {p.side}
             </span>
           </div>
           <div className="shrink-0 text-right">
-            <div className="text-[13px] leading-[18px] font-semibold tabular-nums text-foreground">{fmt(p.marketValue, ccy)}</div>
-            <div className={`mt-1 flex justify-end gap-2 text-[11px] leading-[15px] tabular-nums ${pnlTone}`}>
+            <div className="text-sm leading-5 font-semibold tabular-nums text-foreground">{fmt(p.marketValue, ccy)}</div>
+            <div className={`mt-1 flex justify-end gap-2 text-sm leading-5 tabular-nums ${pnlTone}`}>
               <span>{fmtPnl(pnl, ccy)}</span>
               <span>{fmtPctSigned(pct)}</span>
             </div>
@@ -848,7 +845,7 @@ function PositionMobileRow({ position: p, onClose, canClose, closeDisabledReason
         />
       </dl>
       <div className="flex items-center justify-between gap-3 border-t border-border bg-secondary/20 px-3 py-2">
-        <span className="text-[11px] text-muted-foreground">Position action</span>
+        <span className="text-sm text-muted-foreground">Position action</span>
         <Button
           type="button"
           onClick={onClose}
@@ -878,7 +875,7 @@ function PositionRow({ position: p, onClose, canClose, closeDisabledReason }: { 
         <ContractCell contract={p.contract} />
       </td>
       <td className="px-3 py-2">
-        <span className={`rounded-sm px-1.5 py-0.5 text-[10px] leading-[14px] font-medium ${p.side === 'long' ? 'bg-success/15 text-success' : 'bg-destructive/15 text-destructive'}`}>
+        <span className={`rounded-sm px-1.5 py-0.5 text-sm leading-5 font-medium ${p.side === 'long' ? 'bg-success/15 text-success' : 'bg-destructive/15 text-destructive'}`}>
           {p.side}
         </span>
       </td>
@@ -889,7 +886,7 @@ function PositionRow({ position: p, onClose, canClose, closeDisabledReason }: { 
       <td className="px-3 py-2 text-right text-foreground tabular-nums">{fmt(p.marketValue, ccy)}</td>
       <td className={`px-3 py-2 text-right font-medium tabular-nums ${pnl >= 0 ? 'text-success' : 'text-destructive'}`}>
         <div>{fmtPnl(pnl, ccy)}</div>
-        <div className="text-[11px] font-normal opacity-80">{fmtPctSigned(pct)}</div>
+        <div className="text-sm font-normal opacity-80">{fmtPctSigned(pct)}</div>
       </td>
       <td className="px-3 py-2 text-right">
         <Button
@@ -1042,7 +1039,7 @@ function OpenOrdersTable({ orders }: { orders: unknown[] }) {
   }
   return (
     <div className="border border-border rounded-lg overflow-x-auto">
-      <table className="w-full text-[13px]">
+      <table className="w-full text-sm tabular-nums [&_th]:whitespace-nowrap [&_td]:whitespace-nowrap">
         <thead>
           <tr className="bg-secondary text-muted-foreground text-left">
             <th className="px-3 py-2 font-medium">Order ID</th>
@@ -1057,7 +1054,7 @@ function OpenOrdersTable({ orders }: { orders: unknown[] }) {
         <tbody>
           {rows.map((o, i) => (
             <tr key={i} className="border-t border-border">
-              <td className="px-3 py-2 font-mono text-muted-foreground text-[11px] leading-[15px]">{String(o.orderId ?? '—')}</td>
+              <td className="px-3 py-2 font-mono text-muted-foreground text-sm leading-5">{String(o.orderId ?? '—')}</td>
               <td className="px-3 py-2 font-mono text-foreground" title={o.contract?.aliceId}>
                 {o.contract?.symbol ?? o.contract?.localSymbol ?? o.contract?.aliceId ?? '?'}
               </td>
@@ -1066,7 +1063,7 @@ function OpenOrdersTable({ orders }: { orders: unknown[] }) {
               <td className="px-3 py-2 text-right text-foreground tabular-nums">{String(o.order?.totalQuantity ?? '')}</td>
               <td className="px-3 py-2 text-right text-muted-foreground tabular-nums">{o.order?.lmtPrice != null && !isUnsetDecimal(o.order.lmtPrice) ? String(o.order.lmtPrice) : '—'}</td>
               <td className="px-3 py-2">
-                <span className="text-[11px] text-muted-foreground">{o.orderState?.status ?? 'Unknown'}</span>
+                <span className="text-sm text-muted-foreground">{o.orderState?.status ?? 'Unknown'}</span>
               </td>
             </tr>
           ))}
@@ -1090,7 +1087,7 @@ const ORDER_HISTORY_COMPACT_WIDTH = 760
 
 function OrderStatusBadge({ status }: { status: OrderHistoryStatus }) {
   return (
-    <span className={`rounded-sm px-1.5 py-0.5 text-[10px] leading-[14px] font-medium ${ORDER_STATUS_STYLES[status] ?? 'bg-muted text-muted-foreground'}`}>
+    <span className={`rounded-sm px-1.5 py-0.5 text-sm leading-5 font-medium ${ORDER_STATUS_STYLES[status] ?? 'bg-muted text-muted-foreground'}`}>
       {status}
     </span>
   )
@@ -1098,7 +1095,7 @@ function OrderStatusBadge({ status }: { status: OrderHistoryStatus }) {
 
 function SideBadge({ side }: { side: 'BUY' | 'SELL' }) {
   return (
-    <span className={`rounded-sm px-1.5 py-0.5 text-[10px] leading-[14px] font-medium ${side === 'BUY' ? 'bg-success/15 text-success' : 'bg-destructive/15 text-destructive'}`}>
+    <span className={`rounded-sm px-1.5 py-0.5 text-sm leading-5 font-medium ${side === 'BUY' ? 'bg-success/15 text-success' : 'bg-destructive/15 text-destructive'}`}>
       {side}
     </span>
   )
@@ -1106,7 +1103,7 @@ function SideBadge({ side }: { side: 'BUY' | 'SELL' }) {
 
 function SourceChip({ label }: { label: string }) {
   return (
-    <span className="rounded-sm bg-muted px-1.5 text-[10px] leading-[14px] text-muted-foreground">
+    <span className="rounded-sm bg-muted px-1.5 text-sm leading-5 text-muted-foreground">
       {label}
     </span>
   )
@@ -1155,7 +1152,7 @@ export function OrderHistoryTable({ orders }: { orders: OrderHistoryEntry[] | nu
                     </span>
                   </div>
 
-                  <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] leading-[15px] text-muted-foreground">
+                  <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm leading-5 text-muted-foreground">
                     <span className="tabular-nums">{formatHistoryTime(o.timestamp)}</span>
                     <SideBadge side={o.side} />
                     <span>{o.orderType ?? '—'}</span>
@@ -1163,18 +1160,18 @@ export function OrderHistoryTable({ orders }: { orders: OrderHistoryEntry[] | nu
 
                   <dl className="mt-3 grid grid-cols-3 gap-2">
                     <div className="min-w-0 border-l border-border pl-2.5">
-                      <dt className="text-[11px] font-medium text-muted-foreground">Qty</dt>
-                      <dd className="mt-0.5 truncate text-[12px] leading-[18px] text-foreground tabular-nums">
+                      <dt className="text-sm font-medium text-muted-foreground">Qty</dt>
+                      <dd className="mt-0.5 truncate text-sm leading-5 text-foreground tabular-nums">
                         {o.quantity != null ? fmtNum(o.quantity) : '—'}
                       </dd>
                     </div>
                     <div className="min-w-0 border-l border-border pl-2.5">
-                      <dt className="text-[11px] font-medium text-muted-foreground">Limit</dt>
-                      <dd className="mt-0.5 truncate text-[12px] leading-[18px] text-foreground tabular-nums">{o.limitPrice ?? '—'}</dd>
+                      <dt className="text-sm font-medium text-muted-foreground">Limit</dt>
+                      <dd className="mt-0.5 truncate text-sm leading-5 text-foreground tabular-nums">{o.limitPrice ?? '—'}</dd>
                     </div>
                     <div className="min-w-0 border-l border-border pl-2.5">
-                      <dt className="text-[11px] font-medium text-muted-foreground">Fill</dt>
-                      <dd className="mt-0.5 truncate text-[12px] leading-[18px] text-foreground tabular-nums">
+                      <dt className="text-sm font-medium text-muted-foreground">Fill</dt>
+                      <dd className="mt-0.5 truncate text-sm leading-5 text-foreground tabular-nums">
                         {o.avgFillPrice ? `${o.avgFillPrice}${o.filledQty ? ` × ${o.filledQty}` : ''}` : '—'}
                       </dd>
                     </div>
@@ -1186,7 +1183,7 @@ export function OrderHistoryTable({ orders }: { orders: OrderHistoryEntry[] | nu
                     aria-controls={detailsId}
                     aria-label={`${isExpanded ? 'Hide' : 'Show'} details for ${contractPrimary(o.contract)} order`}
                     onClick={() => setExpanded(prev => prev === i ? null : i)}
-                    className="mt-3 w-full justify-between text-[11px]"
+                    className="mt-3 w-full justify-between text-sm"
                     variant="outline"
                     size="sm"
                   >
@@ -1196,7 +1193,7 @@ export function OrderHistoryTable({ orders }: { orders: OrderHistoryEntry[] | nu
                 </div>
 
                 {isExpanded && (
-                  <div id={detailsId} className="border-t border-border bg-muted/20 px-3 py-2.5 text-[11px] text-muted-foreground">
+                  <div id={detailsId} className="border-t border-border bg-muted/20 px-3 py-2.5 text-sm text-muted-foreground">
                     <div className="font-mono text-foreground">{o.commitHash}</div>
                     <p className="mt-1 break-words leading-5">{o.message}</p>
                     {o.error && <p className="mt-1 break-words text-destructive">{o.error}</p>}
@@ -1213,7 +1210,7 @@ export function OrderHistoryTable({ orders }: { orders: OrderHistoryEntry[] | nu
 
   return (
     <div ref={setContainer} className="border border-border rounded-lg overflow-x-auto">
-      <table className="w-full min-w-[760px] text-[13px]">
+      <table className="w-full min-w-[760px] text-sm">
         <thead>
           <tr className="bg-secondary text-muted-foreground text-left">
             <th className="px-3 py-2 font-medium">Time</th>
@@ -1269,7 +1266,7 @@ export function OrderHistoryTable({ orders }: { orders: OrderHistoryEntry[] | nu
               </tr>
               {expanded === i && (
                 <tr id={`order-history-details-${i}`} className="border-t border-border bg-muted/20">
-                  <td colSpan={9} className="px-3 py-2 text-[11px] text-muted-foreground">
+                  <td colSpan={9} className="px-3 py-2 text-sm text-muted-foreground">
                     <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5">
                       <span className="font-mono">{o.commitHash}</span>
                       <span>{o.message}</span>
@@ -1302,7 +1299,7 @@ function TradeHistoryTable({ trades }: { trades: TradeHistoryEntry[] | null }) {
   }
   return (
     <div className="border border-border rounded-lg overflow-x-auto">
-      <table className="w-full text-[13px]">
+      <table className="w-full text-sm tabular-nums [&_th]:whitespace-nowrap [&_td]:whitespace-nowrap">
         <thead>
           <tr className="bg-secondary text-muted-foreground text-left">
             <th className="px-3 py-2 font-medium">Time</th>

@@ -1,7 +1,12 @@
-import { useState, useEffect, useCallback, useId, useMemo } from 'react'
-import { ChevronDown, Moon, RotateCcw, Sun } from 'lucide-react'
+import { Select } from '@/components/ui/select'
+import { Fragment, useState, useEffect, useCallback, useId, useMemo } from 'react'
+import { ChevronDown, ChevronRight, Moon, RotateCcw, Search, Sun } from 'lucide-react'
 import { api } from '../api'
 import type { ToolInfo } from '../api/tools'
+import { SegmentedControl } from '../components/SegmentedControl'
+import { CountBadge } from '../components/CountBadge'
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '../components/ui/collapsible'
+import { ContextHelp } from '../components/ContextHelp'
 import { Toggle } from '../components/Toggle'
 import { SaveIndicator } from '../components/SaveIndicator'
 import { ConfigSection, Field, SettingsScrollArea, inputClass } from '../components/form'
@@ -29,6 +34,7 @@ import { useEffectivePreferenceSlot } from '../theme/useEffectiveTheme'
 import { VersionOverviewSection } from '../components/settings/VersionOverviewSection'
 import { UpdateLifecycleSection } from '../components/settings/UpdateLifecycleSection'
 import { AliceLocationSection } from '../components/settings/AliceLocationSection'
+import { SelectionCheckIcon } from '../components/ui/selection-check-icon'
 import { Button } from '../components/ui/button'
 import { getBackendConnection } from '../auth/backendConnection'
 import { useRelayConnection } from '../hooks/useRelayConnection'
@@ -55,6 +61,7 @@ export function AppearanceSection({ standalone = false }: { standalone?: boolean
   const setStylePaletteMode = useThemeStore((s) => s.setStylePaletteMode)
   const effectiveSlot = useEffectivePreferenceSlot()
   const [editingSlot, setEditingSlot] = useState<ThemePreferenceSlot>(effectiveSlot)
+  const [choosingStyle, setChoosingStyle] = useState(false)
   const [paletteFilter, setPaletteFilter] = useState<PaletteLibraryFilter>('recommended')
   const [customizingPalettes, setCustomizingPalettes] = useState(false)
   const paletteEditorId = useId()
@@ -110,106 +117,24 @@ export function AppearanceSection({ standalone = false }: { standalone?: boolean
 
   const content = (
     <>
-      <div className="border-b border-border/60 pb-5">
-        <div>
-          <span className="text-sm font-medium text-foreground">
-            {t('settings.appearance.interfaceStyle')}
-          </span>
-          <p className="mt-0.5 text-[12px] leading-relaxed text-muted-foreground">
-            {t('settings.appearance.interfaceStyleDescription')}
-          </p>
-        </div>
-        <div
-          className="mt-3 grid gap-2.5 sm:grid-cols-3"
-          role="radiogroup"
-          aria-label={t('settings.appearance.interfaceStyle')}
-        >
-          {UI_STYLE_PROFILES.map((profile) => (
-            <StyleProfileCard
-              key={profile.id}
-              profile={profile.id}
-              label={t(profile.labelKey)}
-              description={t(profile.descriptionKey)}
-              selected={uiStyle === profile.id}
-              onSelect={setUiStyle}
-            />
-          ))}
-        </div>
-        {recommendedPalettePair && (
-          <div
-            data-palette-preview={recommendedPalettePair.day}
-            className="oa-palette-preview mt-3 flex min-w-0 flex-col gap-3 rounded-lg border border-border bg-background p-3 sm:flex-row sm:items-center"
-          >
-            <span className="oa-palette-preview-shell flex h-11 w-full shrink-0 overflow-hidden rounded border sm:w-24" aria-hidden>
-              <span className="oa-palette-preview-sidebar flex w-6 shrink-0 items-center justify-center border-r">
-                <span className="oa-palette-preview-sidebar-dot h-2 w-2 rounded-full" />
-              </span>
-              <span className="oa-palette-preview-canvas flex min-w-0 flex-1 flex-col justify-center gap-1.5 px-2">
-                <span className="oa-palette-preview-primary-line h-1.5 w-3/5 rounded-full" />
-                <span className="oa-palette-preview-muted-line h-1 w-full rounded-full" />
-                <span className="oa-palette-preview-muted-line h-1 w-3/4 rounded-full" />
-              </span>
-            </span>
-            <div className="min-w-0 flex-1">
-              <span className="block text-[12px] font-semibold text-foreground">
-                {t('settings.appearance.recommendedPalette', {
-                  style: t(activeStyleDefinition.labelKey),
-                })}
-              </span>
-              <p className="mt-0.5 text-[10.5px] leading-snug text-muted-foreground">
-                {t('settings.appearance.recommendedPaletteDescription', {
-                  palette: t(paletteDefinition(recommendedPalettePair.day).labelKey),
-                })}
-              </p>
-            </div>
-            <Button
-              type="button"
-              onClick={applyRecommendedPalette}
-              aria-pressed={recommendedPaletteApplied}
-              variant={recommendedPaletteApplied ? 'default' : 'outline'}
-              size="sm"
-              className="min-h-10 shrink-0 sm:min-h-8"
-            >
-              {t(recommendedPaletteApplied
-                ? 'settings.appearance.useSavedPalettes'
-                : 'settings.appearance.applyRecommendedPalette')}
-            </Button>
-          </div>
-        )}
-      </div>
-
       <div className="border-b border-border/60 py-5">
-        <div>
-          <span className="text-sm font-medium text-foreground">
-            {t('settings.appearance.colorMode')}
-          </span>
-          <p className="mt-0.5 text-[12px] leading-relaxed text-muted-foreground">
-            {t('settings.appearance.colorModeDescription')}
-          </p>
+        <div className="flex items-center gap-2">
+          <span className="text-base font-semibold text-foreground">{t('settings.appearance.colorMode')}</span>
+          <ContextHelp label={t('settings.appearance.colorMode')}>{t('settings.appearance.colorModeDescription')}</ContextHelp>
         </div>
-        <div className="mt-3 flex flex-wrap gap-2" role="group" aria-label={t('settings.appearance.colorMode')}>
-          {modes.map((mode) => (
-            <button
-              key={mode}
-              type="button"
-              onClick={() => {
-                setTheme(mode)
-                if (mode !== 'auto') chooseSlot(mode)
-              }}
-              aria-pressed={theme === mode}
-              className={`oa-pressable min-h-10 rounded-md border px-3 py-1.5 text-[12px] leading-[18px] font-medium transition-colors sm:min-h-0 ${
-                theme === mode
-                  ? 'border-primary bg-primary-muted text-primary'
-                  : 'border-border bg-background text-muted-foreground hover:text-foreground'
-              }`}
-            >
-              {t(`theme.mode.${mode}`)}
-            </button>
-          ))}
-        </div>
+        <SegmentedControl
+          value={theme}
+          options={modes.map((mode) => ({ value: mode, label: t(`theme.mode.${mode}`) }))}
+          onChange={(mode) => {
+            setTheme(mode)
+            if (mode !== 'auto') chooseSlot(mode)
+          }}
+          ariaLabel={t('settings.appearance.colorMode')}
+          className="mt-3"
+        />
         <div
           data-palette-preview={activePalette}
-          className="mt-3 inline-flex max-w-full items-center gap-2 rounded-md border px-2.5 py-1.5 text-[11px] leading-[15px]"
+          className="sr-only"
           aria-live="polite"
         >
           <span className="h-2 w-2 shrink-0 rounded-full bg-primary" aria-hidden />
@@ -227,25 +152,13 @@ export function AppearanceSection({ standalone = false }: { standalone?: boolean
         </div>
       </div>
 
-      <div className="border-b border-border/60 py-5">
+      <Collapsible open={customizingPalettes} onOpenChange={setCustomizingPalettes} className="border-b border-border/60 py-5">
         <div className="flex flex-wrap items-start justify-between gap-3">
-          <div>
-            <span className="text-sm font-medium text-foreground">
-              {t('settings.appearance.themePair')}
-            </span>
-            <p className="mt-0.5 text-[12px] leading-relaxed text-muted-foreground">
-              {t('settings.appearance.themePairDescription')}
-            </p>
+          <div className="flex items-center gap-2">
+            <span className="text-base font-semibold text-foreground">{t('settings.appearance.themePair')}</span>
+            <ContextHelp label={t('settings.appearance.themePair')}>{t('settings.appearance.themePairDescription')}</ContextHelp>
           </div>
-          <Button
-            type="button"
-            onClick={() => setCustomizingPalettes((current) => !current)}
-            aria-expanded={customizingPalettes}
-            aria-controls={paletteEditorId}
-            variant="outline"
-            size="sm"
-            className="min-h-10 sm:min-h-8"
-          >
+          <CollapsibleTrigger aria-controls={paletteEditorId} render={<Button variant="outline" size="sm" className="min-h-10" />}>
             {t(customizingPalettes
               ? 'settings.appearance.hidePaletteEditor'
               : 'settings.appearance.customizePalettes')}
@@ -253,7 +166,7 @@ export function AppearanceSection({ standalone = false }: { standalone?: boolean
               className={`h-3.5 w-3.5 transition-transform duration-[var(--motion-fast)] ${customizingPalettes ? 'rotate-180' : ''}`}
               aria-hidden
             />
-          </Button>
+          </CollapsibleTrigger>
         </div>
 
         <div className="mt-3 grid grid-cols-2 gap-2.5 sm:gap-3">
@@ -261,78 +174,131 @@ export function AppearanceSection({ standalone = false }: { standalone?: boolean
             slot="day"
             palette={paletteDefinition(dayPalette)}
             active={effectiveSlot === 'day'}
-            editing={editingSlot === 'day'}
+            editing={customizingPalettes && editingSlot === 'day'}
             onSelect={() => editSlot('day')}
           />
           <PaletteSlotCard
             slot="night"
             palette={paletteDefinition(nightPalette)}
             active={effectiveSlot === 'night'}
-            editing={editingSlot === 'night'}
+            editing={customizingPalettes && editingSlot === 'night'}
             onSelect={() => editSlot('night')}
           />
         </div>
 
-        <div
-          id={paletteEditorId}
-          hidden={!customizingPalettes}
-          inert={!customizingPalettes ? true : undefined}
-          className="mt-4 border-t border-border/60 pt-4"
-        >
-          <div className="flex flex-wrap items-start justify-between gap-3">
-            <div>
-              <span className="text-sm font-medium text-foreground">
-                {t('settings.appearance.choosePalette', { slot: t(`theme.mode.${editingSlot}`) })}
-              </span>
-              <p className="mt-0.5 max-w-2xl text-[11px] leading-relaxed text-muted-foreground">
-                {t('settings.appearance.paletteLibraryDescription')}
-              </p>
-            </div>
-            <div className="flex flex-wrap items-center gap-2">
-              <Button
-                type="button"
-                onClick={resetPair}
-                disabled={isDefaultPair}
-                variant="outline"
-                size="sm"
-                className="min-h-10 text-muted-foreground sm:min-h-8"
-              >
-                <RotateCcw className="h-3.5 w-3.5" aria-hidden />
-                {t('settings.appearance.resetPair')}
-              </Button>
-              <div
-                className="inline-flex rounded-md border border-border bg-background p-0.5"
-                role="group"
-                aria-label={t('settings.appearance.paletteFilter')}
-              >
-                {(['recommended', 'all'] as const).map((filter) => (
-                  <button
-                    key={filter}
-                    type="button"
-                    onClick={() => setPaletteFilter(filter)}
-                    aria-pressed={paletteFilter === filter}
-                    className={`min-h-10 rounded px-2.5 py-1 text-[11px] font-medium transition-colors sm:min-h-0 ${
-                      paletteFilter === filter
-                        ? 'bg-primary-muted text-primary'
-                        : 'text-muted-foreground hover:text-foreground'
-                    }`}
-                  >
-                    {t(`settings.appearance.paletteFilterOption.${filter}`)}
-                  </button>
-                ))}
+        <CollapsibleContent keepMounted id={paletteEditorId}>
+          <div className="mt-4 border-t border-border/60 pt-4">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div className="flex items-center gap-2">
+                <span className="text-sm font-medium text-foreground">
+                  {t('settings.appearance.choosePalette', { slot: t(`theme.mode.${editingSlot}`) })}
+                </span>
+                <ContextHelp label={t('settings.appearance.choosePalette', { slot: t(`theme.mode.${editingSlot}`) })}>{t('settings.appearance.paletteLibraryDescription')}</ContextHelp>
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                <Button
+                  type="button"
+                  onClick={resetPair}
+                  disabled={isDefaultPair}
+                  variant="outline"
+                  size="sm"
+                  className="min-h-10 text-muted-foreground sm:min-h-8"
+                >
+                  <RotateCcw className="h-3.5 w-3.5" aria-hidden />
+                  {t('settings.appearance.resetPair')}
+                </Button>
+                <SegmentedControl
+                  value={paletteFilter}
+                  options={(['recommended', 'all'] as const).map((filter) => ({
+                    value: filter,
+                    label: t(`settings.appearance.paletteFilterOption.${filter}`),
+                  }))}
+                  onChange={setPaletteFilter}
+                  ariaLabel={t('settings.appearance.paletteFilter')}
+                />
               </div>
             </div>
-          </div>
 
-          <PalettePicker
-            palettes={visiblePalettes}
-            selected={editingPalette}
-            dayPalette={dayPalette}
-            nightPalette={nightPalette}
-            onSelect={choosePalette}
-          />
+            <PalettePicker
+              palettes={visiblePalettes}
+              selected={editingPalette}
+              dayPalette={dayPalette}
+              nightPalette={nightPalette}
+              onSelect={choosePalette}
+            />
+          </div>
+        </CollapsibleContent>
+      </Collapsible>
+
+      <Collapsible open={choosingStyle} onOpenChange={setChoosingStyle} className="py-5">
+        <div className="flex items-center gap-2">
+          <CollapsibleTrigger className="group/style flex min-h-11 min-w-0 flex-1 items-center gap-3 rounded-lg text-left outline-none focus-visible:[box-shadow:var(--oa-focus-shadow)]">
+            <span className="flex-1 text-base font-semibold">{t('settings.appearance.interfaceStyle')}</span>{' '}
+            <span className="text-sm text-muted-foreground">{t(activeStyleDefinition.labelKey)}</span>
+            <ChevronDown aria-hidden className="size-4 transition-transform duration-[var(--motion-fast)] group-data-panel-open/style:rotate-180 motion-reduce:transition-none" />
+          </CollapsibleTrigger>
+          <ContextHelp label={t('settings.appearance.interfaceStyle')}>{t('settings.appearance.interfaceStyleDescription')}</ContextHelp>
         </div>
-      </div>
+        <CollapsibleContent keepMounted>
+          <div
+            className="mt-3 grid gap-2.5 sm:grid-cols-3"
+            role="radiogroup"
+            aria-label={t('settings.appearance.interfaceStyle')}
+          >
+            {UI_STYLE_PROFILES.map((profile) => (
+              <StyleProfileCard
+                key={profile.id}
+                profile={profile.id}
+                label={t(profile.labelKey)}
+                description={t(profile.descriptionKey)}
+                selected={uiStyle === profile.id}
+                onSelect={setUiStyle}
+              />
+            ))}
+          </div>
+          {recommendedPalettePair && (
+            <div
+              data-palette-preview={recommendedPalettePair.day}
+              className="oa-palette-preview mt-3 flex min-w-0 flex-col gap-3 rounded-lg border border-border bg-background p-3 sm:flex-row sm:items-center"
+            >
+              <span className="oa-palette-preview-shell flex h-11 w-full shrink-0 overflow-hidden rounded border sm:w-24" aria-hidden>
+                <span className="oa-palette-preview-sidebar flex w-6 shrink-0 items-center justify-center border-r">
+                  <span className="oa-palette-preview-sidebar-dot h-2 w-2 rounded-full" />
+                </span>
+                <span className="oa-palette-preview-canvas flex min-w-0 flex-1 flex-col justify-center gap-1.5 px-2">
+                  <span className="oa-palette-preview-primary-line h-1.5 w-3/5 rounded-full" />
+                  <span className="oa-palette-preview-muted-line h-1 w-full rounded-full" />
+                  <span className="oa-palette-preview-muted-line h-1 w-3/4 rounded-full" />
+                </span>
+              </span>
+              <div className="min-w-0 flex-1">
+                <span className="block text-sm font-semibold text-foreground">
+                  {t('settings.appearance.recommendedPalette', {
+                    style: t(activeStyleDefinition.labelKey),
+                  })}
+                </span>
+                <p className="mt-0.5 text-sm leading-snug text-muted-foreground">
+                  {t('settings.appearance.recommendedPaletteDescription', {
+                    palette: t(paletteDefinition(recommendedPalettePair.day).labelKey),
+                  })}
+                </p>
+              </div>
+              <Button
+                type="button"
+                onClick={applyRecommendedPalette}
+                aria-pressed={recommendedPaletteApplied}
+                variant={recommendedPaletteApplied ? 'default' : 'outline'}
+                size="sm"
+                className="min-h-10 shrink-0 sm:min-h-8"
+              >
+                {t(recommendedPaletteApplied
+                  ? 'settings.appearance.useSavedPalettes'
+                  : 'settings.appearance.applyRecommendedPalette')}
+              </Button>
+            </div>
+          )}
+        </CollapsibleContent>
+      </Collapsible>
 
     </>
   )
@@ -340,7 +306,7 @@ export function AppearanceSection({ standalone = false }: { standalone?: boolean
   if (standalone) return content
 
   return (
-    <ConfigSection title={t('settings.appearance.title')} description={t('settings.appearance.description')}>
+    <ConfigSection title={t('settings.appearance.title')} help={t('settings.appearance.description')}>
       {content}
     </ConfigSection>
   )
@@ -365,10 +331,11 @@ function StyleProfileCard({
       role="radio"
       aria-checked={selected}
       aria-label={label}
+      title={description}
       data-ui-style-preview={profile}
       data-selected={selected}
       onClick={() => onSelect(profile)}
-      className="oa-style-profile-card oa-pressable min-h-24 min-w-0 border border-border bg-background p-2.5 text-left"
+      className="oa-style-profile-card oa-pressable min-h-20 min-w-0 border border-border bg-background p-2.5 text-left"
     >
       <span className="oa-style-profile-preview flex h-10 overflow-hidden border border-border bg-card" aria-hidden>
         <span className="oa-style-profile-rail w-3.5 shrink-0 border-r border-border bg-sidebar" />
@@ -378,8 +345,10 @@ function StyleProfileCard({
           <span className="oa-style-profile-row h-2 w-3/5 border border-border bg-background" />
         </span>
       </span>
-      <span className="mt-2 block text-[12px] font-semibold text-foreground">{label}</span>
-      <span className="mt-0.5 block text-[10.5px] leading-snug text-muted-foreground">{description}</span>
+      <span className="mt-2 flex items-center justify-between gap-2 text-sm font-semibold text-foreground">
+        {label}
+        <span className="size-4 shrink-0">{selected && <SelectionCheckIcon />}</span>
+      </span>
     </button>
   )
 }
@@ -402,6 +371,7 @@ function PaletteSlotCard({
   return (
     <button
       type="button"
+      title={t(palette.descriptionKey)}
       data-palette-preview={palette.id}
       data-selected={editing}
       aria-pressed={editing}
@@ -410,28 +380,21 @@ function PaletteSlotCard({
         palette: t(palette.labelKey),
       })}
       onClick={onSelect}
-      className="oa-palette-preview oa-pressable min-w-0 rounded-lg border p-2.5 text-left shadow-sm transition-[border-color,box-shadow,transform] sm:p-3"
+      className="oa-palette-preview oa-pressable min-w-0 rounded-2xl border p-4 text-left transition-[border-color,transform]"
     >
-      <span className="flex min-w-0 items-start justify-between gap-2 sm:gap-3">
+      <span className="flex min-w-0 flex-wrap items-start justify-between gap-2">
         <span className="min-w-0">
-          <span className="flex items-center gap-1.5 text-[11px] leading-[15px] font-medium">
+          <span className="flex items-center gap-1.5 text-sm leading-5 font-medium">
             <Icon className="h-3.5 w-3.5" />
             {t(`theme.mode.${slot}`)}
           </span>
-          <span className="mt-1 block truncate text-[14px] font-semibold">{t(palette.labelKey)}</span>
-          <span className="oa-palette-preview-muted mt-0.5 hidden text-[10.5px] leading-snug sm:block">
-            {t(palette.descriptionKey)}
-          </span>
+          <span className="mt-1 block break-words text-sm font-semibold">{t(palette.labelKey)}</span>
         </span>
         <span className="flex shrink-0 flex-col items-end gap-1">
           {active && (
-            <span className="rounded-full bg-primary px-2 py-0.5 text-[10px] leading-[14px] font-semibold text-primary-foreground">
+            <span className="inline-flex items-center gap-1 rounded-full bg-foreground/8 px-2 py-0.5 text-sm leading-5 font-medium">
+              <SelectionCheckIcon />
               {t('settings.appearance.activeSlot')}
-            </span>
-          )}
-          {editing && (
-            <span className="rounded-full border border-primary/35 bg-primary/10 px-2 py-0.5 text-[10px] leading-[14px] font-semibold text-primary">
-              {t('settings.appearance.editingSlot')}
             </span>
           )}
         </span>
@@ -467,21 +430,19 @@ function PalettePicker({
         <button
           key={palette.id}
           type="button"
+          title={t(palette.descriptionKey)}
           data-palette-preview={palette.id}
           data-selected={selected === palette.id}
           onClick={() => onSelect(palette.id)}
           aria-pressed={selected === palette.id}
           aria-label={t('settings.appearance.choosePaletteOption', { palette: t(palette.labelKey) })}
-          className="oa-palette-preview oa-pressable min-w-0 rounded-lg border p-3 text-left shadow-sm transition-[border-color,box-shadow,transform]"
+          className="oa-palette-preview oa-pressable min-w-0 rounded-2xl border p-4 text-left transition-[border-color,transform]"
         >
           <span className="flex items-start justify-between gap-2">
             <span className="min-w-0">
-              <span className="block break-words text-[12px] font-semibold">{t(palette.labelKey)}</span>
-              <span className="oa-palette-preview-muted mt-0.5 block text-[10px] leading-snug">
-                {t(palette.descriptionKey)}
-              </span>
+              <span className="block break-words text-sm font-semibold">{t(palette.labelKey)}</span>
             </span>
-            <span className="oa-palette-preview-indicator mt-0.5 h-2.5 w-2.5 shrink-0 rounded-full border" aria-hidden />
+            <span className="size-4 shrink-0">{selected === palette.id && <SelectionCheckIcon />}</span>
           </span>
 
           <span className="oa-palette-preview-shell mt-3 flex h-9 overflow-hidden rounded border" aria-hidden>
@@ -517,7 +478,7 @@ function PalettePicker({
             <span className="oa-palette-preview-terminal-line ml-1 h-px flex-1" />
           </span>
           {(palette.id === dayPalette || palette.id === nightPalette) && (
-            <span className="oa-palette-preview-muted mt-2 block text-[9.5px] font-medium">
+            <span className="oa-palette-preview-muted mt-2 block text-sm font-medium">
               {palette.id === dayPalette && palette.id === nightPalette
                 ? t('settings.appearance.usedForBoth')
                 : palette.id === dayPalette
@@ -538,26 +499,12 @@ export function LanguageSection() {
   const locale = useLocale()
   const setLocale = useSetLocale()
   return (
-    <ConfigSection title={t('settings.language.title')} description={t('settings.language.description')}>
-      <div
-        className="flex flex-wrap gap-2 py-1"
-        role="group"
-        aria-label={t('settings.language.title')}
-      >
-        {(['en', 'zh', 'ja', 'zh-Hant'] as const).map((l) => (
-          <Button
-            key={l}
-            type="button"
-            onClick={() => setLocale(l)}
-            aria-pressed={locale === l}
-            variant={locale === l ? 'secondary' : 'outline'}
-            className={`min-h-10 sm:min-h-8 ${locale === l ? 'text-primary' : 'text-muted-foreground'}`}
-          >
-            {LOCALE_LABELS[l]}
-          </Button>
-        ))}
-      </div>
-    </ConfigSection>
+    <SegmentedControl
+      value={locale}
+      options={(['en', 'zh', 'ja', 'zh-Hant'] as const).map((value) => ({ value, label: LOCALE_LABELS[value] }))}
+      onChange={setLocale}
+      ariaLabel={t('settings.language.title')}
+    />
   )
 }
 
@@ -582,20 +529,20 @@ export function DataHomeSection() {
     return (
       <ConfigSection
         title={t('settings.dataHome.title')}
-        description={t('settings.dataHome.description')}
+        help={t('settings.dataHome.description')}
       >
         <div className="rounded-lg border border-border/60 bg-secondary/50 px-3 py-3">
           {relay.status?.target?.machine && relay.status.target.machine !== 'local' ? (
-            <p className="text-[13px] leading-relaxed text-foreground">
+            <p className="text-sm leading-relaxed text-foreground">
               {t('settings.dataHome.remoteManaged')}
             </p>
           ) : (
             <>
-              <p className="text-[13px] text-foreground">{t('settings.dataHome.browserOnly')}</p>
-              <p className="mt-2 break-all font-mono text-[12px] leading-[18px] text-muted-foreground">
+              <p className="text-sm text-foreground">{t('settings.dataHome.browserOnly')}</p>
+              <p className="mt-2 break-all font-mono text-sm leading-5 text-muted-foreground">
                 openalice run --home &lt;path&gt;
               </p>
-              <p className="mt-1 break-all font-mono text-[12px] leading-[18px] text-muted-foreground">
+              <p className="mt-1 break-all font-mono text-sm leading-5 text-muted-foreground">
                 pnpm dev -- --home &lt;path&gt;
               </p>
             </>
@@ -614,23 +561,23 @@ export function DataHomeSection() {
   return (
     <ConfigSection
       title={t('settings.dataHome.title')}
-      description={t('settings.dataHome.description')}
+      help={t('settings.dataHome.description')}
     >
       <div className="rounded-lg border border-border/60 bg-secondary/50 px-3 py-3">
         <div className="flex items-center justify-between gap-3">
-          <p className="text-[12px] font-medium text-muted-foreground">
+          <p className="text-sm font-medium text-muted-foreground">
             {t('settings.dataHome.current')}
           </p>
           {status && (
-            <span className="rounded-full border border-border px-2 py-0.5 text-[10px] leading-[14px] text-muted-foreground">
+            <span className="rounded-full border border-border px-2 py-0.5 text-sm leading-5 text-muted-foreground">
               {t(`settings.dataHome.source.${status.source}`)}
             </span>
           )}
         </div>
-        <p data-testid="data-home-current" className="mt-1 break-all font-mono text-[12px] leading-[18px] text-foreground">
+        <p data-testid="data-home-current" className="mt-1 break-all font-mono text-sm leading-5 text-foreground">
           {status?.currentHome ?? t('settings.dataHome.loading')}
         </p>
-        <p className="mt-2 text-[11px] leading-relaxed text-muted-foreground">
+        <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
           {t('settings.dataHome.switchNote')}
         </p>
       </div>
@@ -651,11 +598,11 @@ export function DataHomeSection() {
       </div>
 
       {lockDescription && (
-        <p className="mt-3 rounded-lg border border-warning/30 bg-warning/5 px-3 py-2 text-[11px] leading-relaxed text-warning">
+        <p className="mt-3 rounded-lg border border-warning/30 bg-warning/5 px-3 py-2 text-sm leading-relaxed text-warning">
           {lockDescription}
         </p>
       )}
-      {error && <p className="mt-3 text-[11px] text-destructive">{error}</p>}
+      {error && <p className="mt-3 text-sm text-destructive">{error}</p>}
     </ConfigSection>
   )
 }
@@ -707,17 +654,18 @@ function WorkspaceShellSection() {
   return (
     <ConfigSection
       title={t('settings.workspaceShell.title')}
-      description={t('settings.workspaceShell.description')}
+      help={t('settings.workspaceShell.description')}
     >
       <Field label={t('settings.workspaceShell.mode')}>
-        <select
-          className={inputClass}
+        <Select
+          aria-label={t('settings.workspaceShell.mode')}
           value={mode}
-          onChange={(event) => setMode(event.target.value as 'auto' | 'custom')}
-        >
-          <option value="auto">{t('settings.workspaceShell.auto')}</option>
-          <option value="custom">{t('settings.workspaceShell.custom')}</option>
-        </select>
+          onValueChange={(selectedValue) => setMode(selectedValue as 'auto' | 'custom')}
+          options={[
+            { value: 'auto', label: t('settings.workspaceShell.auto') },
+            { value: 'custom', label: t('settings.workspaceShell.custom') },
+          ]}
+        />
       </Field>
       {mode === 'custom' && (
         <Field
@@ -734,13 +682,13 @@ function WorkspaceShellSection() {
         </Field>
       )}
       <div className="rounded-lg border border-border/60 bg-secondary/50 px-3 py-2.5 mb-3">
-        <p className="text-[12px] font-medium text-muted-foreground">
+        <p className="text-sm font-medium text-muted-foreground">
           {t('settings.workspaceShell.resolved')}
         </p>
-        <p className="mt-1 break-all font-mono text-[12px] leading-[18px] text-foreground">
+        <p className="mt-1 break-all font-mono text-sm leading-5 text-foreground">
           {status.resolvedPath ?? t('settings.workspaceShell.notFound')}
         </p>
-        <p className={`mt-1 text-[11px] ${status.valid ? 'text-success' : 'text-destructive'}`}>
+        <p className={`mt-1 text-sm ${status.valid ? 'text-success' : 'text-destructive'}`}>
           {status.valid
             ? t('settings.workspaceShell.source', { source: status.source })
             : status.message ?? t('settings.workspaceShell.notFound')}
@@ -756,7 +704,7 @@ function WorkspaceShellSection() {
         >
           {saving ? t('settings.workspaceShell.saving') : t('settings.workspaceShell.save')}
         </Button>
-        {error && <span className="text-[11px] text-destructive">{error}</span>}
+        {error && <span className="text-sm text-destructive">{error}</span>}
       </div>
     </ConfigSection>
   )
@@ -765,8 +713,16 @@ function WorkspaceShellSection() {
 // ==================== Settings Section ====================
 
 function SettingsSection() {
+  const { t } = useTranslation()
   return (
-    <div className="mx-auto w-full max-w-[1100px]">
+    <div className="w-full max-w-[1100px] [&>*+*]:mt-6">
+      <section className="flex flex-wrap items-center justify-between gap-4 px-4 sm:px-6">
+        <div className="flex items-center gap-2">
+          <h3 className="text-base font-semibold">{t('settings.language.title')}</h3>
+          <ContextHelp label={t('settings.language.title')}>{t('settings.language.description')}</ContextHelp>
+        </div>
+        <LanguageSection />
+      </section>
       <AliceLocationSection />
 
       {/* Installation and update ownership */}
@@ -806,6 +762,7 @@ export function ToolsSection() {
       default: return key
     }
   }
+  const [query, setQuery] = useState('')
   const [inventory, setInventory] = useState<ToolInfo[]>([])
   const [disabled, setDisabled] = useState<Set<string>>(new Set())
   const [loaded, setLoaded] = useState(false)
@@ -881,8 +838,15 @@ export function ToolsSection() {
     })
   }, [])
 
+  const search = query.trim().toLocaleLowerCase()
+  const matchingGroups = groups.map((group) => ({
+    ...group,
+    tools: search ? group.tools.filter((tool) => `${groupLabel(group.key)} ${tool.name} ${tool.description ?? ''}`.toLocaleLowerCase().includes(search)) : group.tools,
+  })).filter((group) => group.tools.length > 0)
+  const matchingCount = matchingGroups.reduce((count, group) => count + group.tools.length, 0)
+
   return (
-    <div className="mx-auto w-full max-w-[1100px]">
+    <div className="w-full max-w-[1100px]">
       {!loaded ? (
         loadError ? (
           <div role="alert" className="flex flex-col items-center justify-center py-16 text-center">
@@ -898,14 +862,25 @@ export function ToolsSection() {
         <EmptyState title={t('settings.tools.emptyTitle')} description={t('settings.tools.emptyDescription')} />
       ) : (
         <div>
-          <div className="flex items-center justify-between mb-4">
-            <p className="text-[13px] text-muted-foreground">
-              {t('settings.tools.summary', { tools: inventory.length, groups: groups.length })}
-            </p>
-            <SaveIndicator status={status} onRetry={retry} />
+          <div className="mb-2 grid grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-x-2 gap-y-1 sm:mb-4 sm:grid-cols-[minmax(0,1fr)_auto_auto_auto]">
+            <label className="flex h-(--oa-control-height) min-w-0 items-center gap-2 rounded-lg border border-input bg-background px-3 focus-within:[box-shadow:var(--oa-focus-shadow)]">
+              <Search aria-hidden className="size-4 shrink-0 text-muted-foreground" />
+              <input type="search" value={query} onChange={(event) => {
+                setQuery(event.target.value)
+                if (event.target.value.trim()) setExpanded(new Set(groups.map((group) => group.key)))
+              }}
+                aria-label={t('settings.tools.search')} placeholder={t('settings.tools.search')}
+                className="min-w-0 flex-1 bg-transparent text-sm [@media(pointer:coarse)]:text-base outline-none" />
+            </label>
+            <CountBadge count={matchingCount} label={t('settings.tools.count', { count: matchingCount })} />
+            <ContextHelp label={t('settings.category.tools')}>{t('settings.tools.summary', { tools: inventory.length, groups: groups.length })}</ContextHelp>
+            <div className="col-span-3 flex min-h-5 justify-end sm:col-span-1">
+              <SaveIndicator status={status} onRetry={retry} />
+            </div>
           </div>
           <div className="space-y-2">
-            {groups.map((g) => (
+            {matchingGroups.length === 0 && <EmptyState title={t('settings.tools.noMatches')} />}
+            {matchingGroups.map((g) => (
               <ToolGroupCard
                 key={g.key}
                 group={g}
@@ -945,33 +920,24 @@ function ToolGroupCard({
   onToggleTool,
   onToggleGroup,
 }: ToolGroupCardProps) {
+  const { t } = useTranslation()
   const enabledCount = group.tools.filter((t) => !disabled.has(t.name)).length
   const noneEnabled = enabledCount === 0
   const toolListId = useId()
 
   return (
-    <div className="border border-border rounded-lg overflow-hidden">
-      {/* Group header */}
-      <div className="flex items-center gap-3 px-4 py-2.5 bg-secondary">
-        <button
+    <Collapsible open={expanded} onOpenChange={onToggleExpanded} className="group/tool-group overflow-hidden rounded-2xl border border-border/60 bg-secondary">
+      <div className="flex items-center gap-3 px-4 py-1">
+        <CollapsibleTrigger
           type="button"
-          onClick={onToggleExpanded}
-          className="-my-2.5 flex min-h-10 min-w-0 flex-1 items-center gap-2 rounded-md py-2.5 text-left focus-visible:outline-none focus-visible:[box-shadow:var(--oa-focus-shadow)]"
+          className="group/tool-trigger flex min-h-(--oa-control-height) min-w-0 flex-1 items-center gap-3 rounded-md py-2 text-left focus-visible:outline-none focus-visible:[box-shadow:var(--oa-focus-shadow)]"
           aria-expanded={expanded}
           aria-controls={toolListId}
         >
-          <svg
-            width="14" height="14" viewBox="0 0 24 24"
-            fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
-            className={`shrink-0 transition-transform duration-[var(--motion-fast)] ${expanded ? 'rotate-90' : ''}`}
-          >
-            <polyline points="9 18 15 12 9 6" />
-          </svg>
-          <span className="text-sm font-medium text-foreground truncate">{label}</span>
-          <span className="text-[11px] text-muted-foreground shrink-0">
-            {enabledCount}/{group.tools.length}
-          </span>
-        </button>
+          <ChevronRight aria-hidden className={`size-4 shrink-0 text-muted-foreground group-hover/tool-trigger:text-foreground transition-transform duration-[var(--motion-standard)] group-data-[instant]/tool-group:transition-none motion-reduce:transition-none ${expanded ? 'rotate-90' : ''}`} />
+          <span className="min-w-0 text-sm font-medium text-foreground [overflow-wrap:anywhere]">{label}</span>
+          <CountBadge count={enabledCount} label={t('settings.tools.enabledCount', { count: enabledCount, total: group.tools.length })} />
+        </CollapsibleTrigger>
         <Toggle
           ariaLabel={`${label} tools`}
           size="sm"
@@ -980,29 +946,27 @@ function ToolGroupCard({
         />
       </div>
 
-      {/* Tool list */}
-      <div
+      <CollapsibleContent keepMounted
         id={toolListId}
         aria-hidden={!expanded}
         inert={!expanded ? true : undefined}
-        hidden={!expanded}
       >
-        <div className="divide-y divide-border">
+        <div className="mx-4 divide-y divide-border/60 border-t border-border/60 pb-1">
           {group.tools.map((t) => {
             const enabled = !disabled.has(t.name)
             return (
               <div
                 key={t.name}
-                className={`flex min-h-12 items-center gap-3 px-4 py-2 ${
-                  enabled ? '' : 'opacity-50'
-                }`}
+                className="flex min-h-11 items-center gap-3 py-1.5"
               >
-                <div className="flex-1 min-w-0">
-                  <span className="text-[13px] leading-[18px] text-foreground font-mono">{t.name}</span>
+                <div className="flex min-w-0 flex-1 items-center gap-2 pl-7">
+                  <span className="min-w-0 font-mono text-sm leading-5 text-foreground [overflow-wrap:anywhere]">
+                    {t.name.split(/(?<=[a-z0-9])(?=[A-Z])|(?<=[_.:/-])/u).map((part, index) => (
+                      <Fragment key={index}>{index > 0 && <wbr />}{part}</Fragment>
+                    ))}
+                  </span>
                   {t.description && (
-                    <p className="text-[11px] text-muted-foreground mt-0.5 line-clamp-1">
-                      {t.description}
-                    </p>
+                    <ContextHelp label={t.name}>{t.description}</ContextHelp>
                   )}
                 </div>
                 <Toggle
@@ -1015,8 +979,8 @@ function ToolGroupCard({
             )
           })}
         </div>
-      </div>
-    </div>
+      </CollapsibleContent>
+    </Collapsible>
   )
 }
 
@@ -1026,22 +990,8 @@ export function SettingsPage() {
   return (
     <div className="flex flex-col flex-1 min-h-0">
       <PageHeader title={t('settings.category.general')} />
-      <SettingsScrollArea className="px-4 py-5 md:px-8">
+      <SettingsScrollArea>
         <SettingsSection />
-      </SettingsScrollArea>
-    </div>
-  )
-}
-
-export function LanguageSettingsPage() {
-  const { t } = useTranslation()
-  return (
-    <div className="flex flex-col flex-1 min-h-0">
-      <PageHeader title={t('settings.language.title')} />
-      <SettingsScrollArea className="px-4 py-5 md:px-8">
-        <div className="mx-auto w-full max-w-[1100px]">
-          <LanguageSection />
-        </div>
       </SettingsScrollArea>
     </div>
   )
@@ -1053,8 +1003,8 @@ export function AppearanceSettingsPage() {
   return (
     <div className="flex flex-col flex-1 min-h-0">
       <PageHeader title={t('settings.appearance.title')} />
-      <SettingsScrollArea className="px-4 py-5 md:px-8">
-        <div className="mx-auto w-full max-w-[1100px]">
+      <SettingsScrollArea>
+        <div className="w-full max-w-[1100px]">
           <AppearanceSection standalone />
         </div>
       </SettingsScrollArea>
@@ -1068,7 +1018,7 @@ export function ToolsSettingsPage() {
   return (
     <div className="flex flex-col flex-1 min-h-0">
       <PageHeader title={t('settings.category.tools')} />
-      <SettingsScrollArea className="px-4 py-5 md:px-8">
+      <SettingsScrollArea>
         <ToolsSection />
       </SettingsScrollArea>
     </div>

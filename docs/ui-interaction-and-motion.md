@@ -7,34 +7,53 @@ under `ui/src/components/`.
 
 ## Product Intent
 
-OpenAlice is a working console, not a static report. Motion should make the
-interface feel responsive and help the eye retain context without turning live
-trading surfaces into ambient animation.
+OpenAlice presents working state, the next available action, and precise feedback.
+Shared components own visual geometry, interaction states, and motion.
 
-## Visual Language: Neutral Working Surface
+## Visual Language
 
-OpenAlice should feel like a calm professional desk: neutral,
-information-dense, precise, and operational. It is neither a generic admin
-dashboard nor a decorative consumer-finance app.
+The workbench follows the compact layout of the current Codex desktop app.
+`ui/src/index.css` owns shared density and typography. `theme/palette.css` owns
+colors, and `theme/style-profiles.css` owns selectable component appearance.
+Product state and workflow contracts remain owned by their feature modules.
 
-Build hierarchy with typography, spacing, alignment, and thin separators before
-adding another container. One dominant surface should own a task; supporting
-information should recede without becoming illegible.
+- The platform font stack uses Apple system fonts on macOS, Segoe UI on Windows,
+  and locale-aware CJK fallbacks. Navigation, labels, menu choices, and desktop
+  fields use 14px type with 20px leading. Reading content and touch fields retain
+  16px. Page and dialog titles share the 18px heading role with 24px leading.
+- `--oa-nav-height` owns 32px desktop navigation rows with 16px icons, an 8px
+  label gap, and an 8px selected radius. Primary rails use 240px expanded,
+  220px intermediate, and 64px compact widths. Native macOS chrome reserves
+  an 88px compact rail. Harness children use a 24px desktop inset.
+- `--oa-control-height` owns 36px desktop fields and standard buttons. Small
+  buttons and menu choices use 32px. Page headers share a 44px band.
+  `--oa-panel-inset` owns 16px card padding; `--page-inset` owns 24px desktop
+  and 16px narrow-screen page padding. Touch targets retain a 44px minimum.
+- `--oa-row-gap` owns the 4px separation between adjacent navigation and choice
+  surfaces. Hierarchy boundaries keep their larger spacing. Focus rings remain
+  inside navigation rows. Palette previews retain their own visual geometry.
+- Hero metrics use 28px, card metrics use 20px, and secondary metrics use 16px.
+  Launch headings use 24–28px. Prices, percentages, counts, and timestamps use
+  tabular numerals; identifiers and commands retain monospace.
+- `--action` owns filled controls and `--primary` owns links and text. Floating
+  surfaces remain opaque. Information, success, errors, and attention retain
+  dedicated semantic colors. Selection glyphs use neutral foreground ink.
+  The Graphite palette keeps neutral gray canvas, sidebar, and card surfaces.
+- Copy names the object, state, or operation. Extended guidance belongs in
+  contextual help. Errors, consent, and recovery actions remain visible at their
+  action boundary. Manager shortcuts show concise operation names and expose
+  full editable prompts through pointer and keyboard guidance.
 
-- Use neutral surfaces and the existing theme tokens. Codex is the default Day
-  card (white content and cool-gray sidebar); Graphite remains the default Night
-  card. Paper remains available, and saved palette choices are preserved. Do not introduce
-  isolated hard-coded palettes.
-- Reserve blue for interaction and selection. Reserve green and red for
-  financial or safety meaning, and amber for warnings. Do not use semantic
-  colors as decoration.
-- Prefer restrained radii, borders, and tonal changes over nested cards,
-  floating glass panels, gradients, neon effects, or large ambient shadows.
-- Use tabular numerals for quantities, prices, percentages, and timestamps.
-  Use monospace selectively for identifiers, symbols, commands, and machine
-  output rather than for ordinary prose.
-- Keep copy direct and operational. Lead with the state or object, then the
-  explanation and next action.
+Overview owns language selection; existing language URLs and saved tabs open
+Overview. `SettingsArea` keeps its navigator mounted across category changes,
+preserving width, scroll position, and focus. Color mode leads appearance
+settings; palette editing and interface styles use disclosures. Saved palette
+identifiers remain stable. Runtime checks live in runtime detail panels.
+
+The web demo notice keeps its identity and installation action in a fixed row.
+Its recorded-data explanation lives in contextual help. Inbox rows show the
+subject, timestamp, and unread count. Connection and runtime states pair an
+icon with a localized label; mode chips remain separate.
 
 News rows in `ui/src/pages/NewsPage.tsx` form a local-calendar-day timeline.
 Time stays in the left gutter. The headline is a separate, prominent block above
@@ -102,11 +121,11 @@ The saved primary `chat` layout slot now labels this shortcut; it remains pinned
 Chat (`/chat`) and all existing Harness deep links retain their own route identity.
 Quick Start selection never marks a Harness current until navigation enters it.
 Below the utility list, Chat,
-Quant, and Prediction each show up to four sessions from their current Workspace
+Quant, and Prediction each show up to three sessions from their current Workspace
 (retaining an active older row), a new-session landing shortcut, and the shared
 Workspace options menu. More conversations remain available in the browser
 dialog. These are feature rows with their own icons, not collapsible folders or
-a labeled Harness tree. Recent sessions stay visible with a shallow indent.
+a labeled Harness tree. Recent sessions stay visible with a shallow indent. Session, Studio, and all-conversation entries share the same icon, label, and trailing-count columns. The all-conversation entry keeps the complete count visible and opens the existing browser.
 Trailing actions place options first and new-session last. The header owns the
 single new-session action; empty lists do not repeat a New chat/research row.
 These actions appear on header hover, keyboard focus,
@@ -142,7 +161,7 @@ visible on touch devices; Quant and Prediction share its presentation.
 `SidebarChildRow` and `SidebarChildRowButton` own Harness child geometry for
 both Studio and Sessions: a 16px icon slot, 8px label gap, shared selection and
 keyboard focus, and sibling action controls. Expanded fine-pointer desktop rows
-are 30px tall with no additional per-destination vertical padding; other surfaces
+are 32px tall with no additional per-destination vertical padding; other surfaces
 retain the existing Session row density. Keep runtime behavior in the caller.
 Harness working views use one content top bar, not a second conversation sidebar.
 TerminalView has no card/canvas mode: its header always uses PageTopBar and its
@@ -280,7 +299,7 @@ Start and GUI. Start retains runtime/surface selection in its composer context
 tray. In an existing GUI Session, the fixed runtime icon/name lives in the top
 bar beside the TUI action; narrow screens show the icon with its accessible
 name and tooltip. The GUI composer has no runtime tray. One compact
-button shows the provider icon, model and effort, with submenus for each choice.
+button shows the model identity, with submenus for provider, model and effort.
 The AI Provider submenu and native account option use the matching provider or
 runtime icon; the full provider name remains available in the button tooltip.
 Narrow layouts truncate this summary without wrapping it onto multiple rows.
@@ -412,6 +431,58 @@ away from the pointer.
 
 ### Component primitive ownership
 
+`ui/src/theme/motion.css` owns 110ms direct feedback, 160ms state changes, and
+250ms larger transitions. Popup and button transitions target CSS `scale`;
+drawers target `translate`. Keyboard-focused controls update immediately.
+Frequent page navigation preserves the shell and updates content immediately.
+
+| Owner | Contract |
+|---|---|
+| `SelectionCheckIcon` | Fixed 16px neutral selection glyph; selected state stays on the owning control. |
+| `CountBadge` | Reminder and item counts from existing state owners, with full count and meaning in the accessible name. |
+| `ContextHelp` | Shared Popover with selectable guidance, 250ms hover delay, 100ms departure grace, and click and keyboard activation. `ConfigSection.help` and `PageHeader.help` reuse it. |
+| `SegmentedControl` | Base UI ToggleGroup single selection and roving focus. Arrow keys move focus; Enter and Space select. Repeated activation retains selection. |
+| `Collapsible` | Base UI measurement and mounted exit lifetime, shared height and opacity timing, immediate keyboard and reduced-motion updates. |
+| `CollapsibleDetailsTrigger`, `DetailsSummary` | Shared disclosure row with a trailing 16px chevron and 44px target. The 8px surface inset extends beyond the content edge, keeping labels aligned in every state. Native details keep HTML disclosure behavior. |
+| `ui/select.tsx` | Predefined string-valued fields with native form participation. Empty-string options retain their labels; numeric conversion belongs to the form. |
+| `ui/autocomplete.tsx` | Free-entry suggestions with shared input callbacks, keyboard navigation, dismissal, focus, and portal positioning. Selection retains explicit form submission. |
+| `ui/choice-styles.ts` | Popup and option geometry shared by fields, suggestions, and action menus. |
+| `Checkbox` | Native form semantics, a 44px target, and the shared selection glyph. |
+| `Toggle` | Shared switch feedback; pending persistence retains focus and exposes a read-only control. |
+| `StatusIndicator` | Loading, completion, and failure feedback used by `StateViews` and `SaveIndicator`. |
+| `LoadingImage` | Decoding and stable-size reveal for `ConversationImagePreview`, with an explicit retry after failure. |
+
+Choice popups use a neutral border, 6px inner padding, 10px option insets, and a
+fixed 16px trailing check or submenu rail. Form popups follow the anchor width;
+compact suggestions use content width with a 32rem limit. Action menus use a
+224px minimum and 448px maximum. Every popup keeps 16px viewport clearance and
+owns its scrolling. Submenus account for the parent's inset in their anchor
+offset; Base UI resolves viewport collisions. Long option labels wrap, and
+single-line triggers expose their complete selected label.
+
+Inference menus share a four-column row: a 20px icon, label, wrapping value,
+and 16px chevron. The trigger shows manufacturer identity and model name.
+Effort remains in its dedicated menu. Model lists scroll inside their fixed
+header and footer. Workspace switching has a full labeled row.
+
+Buttons and segmented options use a short 97% press scale with stationary
+keyboard feedback. Switch thumbs stretch toward their destination on a pointer
+press. Reduced motion retains focus and semantic state with immediate updates.
+Tooltips use 14px text, a 250ms initial delay, immediate transfer within the
+provider window, and a 110ms exit.
+
+Tool search opens matching groups, retains disclosure control, and reports the
+matching count. Each group owns one continuous rounded surface; its header and
+rows share the label inset and trailing switch rail. Separators remain inside
+the surface. Long identifiers wrap at camel-case and delimiter boundaries.
+Sibling groups retain an 8px gap. Narrow search toolbars reserve a save-status
+row, and `SaveIndicator` retains its idle slot. Failed settings writes expose a
+recoverable error beside the control. Trading mode descriptions remain visible.
+
+Landing suggestions retain layout space as the draft changes, keeping the
+heading and composer anchored. Keyboard input updates immediately. Market
+shortcuts reuse one shared component.
+
 Behavioral UI primitives live as source under `ui/src/components/ui/`. They are
 initialized from shadcn's Base UI recipes through `ui/components.json`, then
 owned and reviewed as OpenAlice code. Product components such as
@@ -461,7 +532,7 @@ keyboard navigation, outside dismissal, scroll locking, and focus return.
   Responsive compact mode is a default, never a lock. Entering Chat, Quant, or
   Prediction no longer auto-collapses the rail: it owns their session lists.
   Explicit expanded/collapsed preferences apply across all product areas.
-- `TopBar` owns compact header geometry (40px desktop, at least 48px on phone).
+- `TopBar` owns compact header geometry (44px desktop, at least 48px on phone).
   `PageContentLayout` owns a fixed header slot; `PageTopBar` portals a page's
   title and actions into it without copying business state or callbacks.
   `PageHeader` adds description/live metadata below this bar. Keep large
@@ -500,7 +571,8 @@ keyboard navigation, outside dismissal, scroll locking, and focus return.
 The `@/` alias resolves to `ui/src` in Vite, TypeScript, and the UI Vitest
 project. Backend tests keep their existing root `@` alias.
 
-Motion tokens and primitives live in `ui/src/index.css`:
+Motion tokens live in `ui/src/theme/motion.css`; shared class rules live in
+`ui/src/index.css`:
 
 | Primitive | Intended use |
 |---|---|
@@ -526,9 +598,9 @@ transition. The same shadow token covers buttons, navigation rows, tabs,
 segmented controls, switches, and resizable handles. Product accent color keeps
 its selection and action meaning.
 
-The application body establishes a 14px type size with 20px leading. Explicit
-display, heading, control, caption, and data roles build from that stable
-reading baseline.
+The application body establishes a 16px type size with 24px leading. Compact
+controls use 14px type with 20px leading. Display, heading, caption, and data
+roles use their shared tokens.
 
 The compact activity rail keeps its static Alice mark in the bottom application
 menu. Its expansion action
@@ -541,6 +613,38 @@ Dense market panels use `oa-data-surface` for the shared border and canvas and
 domain-owned layout and use the shared surfaces to align cards, charts, quote
 summaries, and launch actions. Recharts tooltips set `isAnimationActive={false}`
 at the component boundary, and the shared chart class owns their visual material.
+
+### Chart and account lifecycle
+
+`MeasuredChartFrame` retains its last positive size through hidden layouts and
+ignores unchanged integer dimensions. K-line charts retain their instance and
+visible range across palette changes. New symbol, source, interval, and
+timeframe queries fit their first loaded data; periodic updates preserve the
+chosen viewport. Price geometry and crosshair feedback update immediately.
+Axes use 14px text, locale-aware dates, and the snapshot's native currency.
+Recharts measures value-axis width. Sparkline gradient IDs remain stable across
+empty and populated states.
+
+Equity chart help occupies a permanent title-row slot. Account and range
+controls remain mounted through loading, empty, and historical states. Account
+selection owns its request sequence and chart loading state; portfolio summary
+refresh has an independent lifecycle. Point inspection uses the current event
+index and opens the latest stored snapshot at that time in a shared dialog.
+Closing inspection preserves chart position and returns focus.
+
+Account summaries and curves share card padding and stretch to their grid row.
+Wallet selection remains inside the summary card. Pending reads retain the
+card height and disable position-close actions. Derivatives wallets keep their
+margin row across selections. Summary definition lists align labels and values;
+financial tables keep values together within their own scroll region. FX detail
+panels follow the main column until their container supports a side panel.
+Broker support rows keep account, status, and recovery actions visible, with
+installation scope and diagnostics in contextual help.
+
+Settings version rows reserve identity, version, status, and action columns in
+wide containers. Their disclosure controls reuse the shared geometry. Page
+headings, configuration sections, and financial cards consume their owning
+inset tokens, including bounded-width settings sections and embedded dialogs.
 
 Clickable native and ARIA controls receive a pointer cursor globally. Disabled
 controls keep the default cursor and must remain visually disabled. Hover-only
@@ -581,16 +685,16 @@ waits for an outstanding request instead of repeatedly replacing a slow load,
 while explicit refresh, query changes and unmount cancel superseded requests.
 
 Market directory headings (News, Markets, Macro, Watchlist) are static captions.
-Parent headings use the shared hierarchy variant (13px, medium weight), and
+Parent headings use the shared hierarchy variant with medium weight, and
 each child navigation level adds a 12px inset. Clickable categories and leaf
-rows share 13px regular text and foreground color; gray is reserved for
+rows share the 14px navigation role and foreground color; gray is reserved for
 secondary summaries and chevrons. Only News category groups disclose children,
 with trailing chevrons. Only destination rows receive page selection
 styling; a collapsed category group shows the selected category as a plain
 summary. Restoring a News selection reveals its group, while users can still
 collapse it manually. Search results appear immediately below the search field.
 The shared Base UI Collapsible owns keyboard/ARIA and measured panel lifetime;
-its 180ms height/opacity transition is disabled with reduced motion. Closing
+its shared state transition updates immediately with reduced motion. Closing
 panels become inert and aria-hidden immediately, including during animation.
 The same directory and touch-sized controls serve the narrow-screen drawer.
 No new persisted preference is added.
@@ -627,6 +731,25 @@ For motion changes:
 
 Motion should be judged in the running UI. A class name or screenshot alone
 cannot prove timing, continuity, or pointer feedback.
+
+Text wrapping and block height are owned by the semantic DOM. Development
+checks run after `document.fonts.ready` and cover long Latin labels, CJK text,
+mixed scripts, unbroken identifiers, narrow widths, and text-spacing overrides.
+Measurements stay at the verification boundary. Platform-font product text
+uses browser layout throughout.
+
+```bash
+pnpm -F @traderalice/connector-protocol build
+pnpm --filter @traderalice/update-lifecycle... build
+pnpm -F open-alice-ui exec tsc -b
+CI=1 NODE_ENV=test pnpm test:owner:ui
+pnpm -F open-alice-ui build:demo
+```
+
+Browser checks include persistence, repeated input, focus return, loading,
+empty states, and failure recovery. Continuous feedback pauses offscreen and
+in hidden pages. Static screenshots record layout and visible state; running
+controls provide the timing and continuity evidence.
 
 Web question cards keep the existing composer status placement. Text-capable
 questions show a labeled shared Textarea and an explicit Send answer button;
@@ -764,7 +887,7 @@ the AI-power conversation, including approval, idle timeout and completion.
 
 ## Compact activity notifications
 
-The shared Sonner layer uses readable 352px pop-out cards, Instrument Sans,
+The shared Sonner layer uses readable 352px pop-out cards, the shared UI font,
 semantic popover colors, internal close controls, bounded previews and actions
 below copy. News may include a 64×48 feed image, validated at the producer and
 renderer; missing/failed media collapses without a placeholder. Article identity,
