@@ -78,7 +78,7 @@ export function ConfirmDialog({
       }}
     >
       <AlertDialogContent
-        className="w-[calc(100%-2rem)] max-w-[440px] gap-0 overflow-hidden p-0"
+        className="w-[calc(100%-2rem)] max-w-[440px] gap-0 p-0"
         initialFocus={cancelRef}
         finalFocus={() => confirmationStarted.current && fallbackFocusRef?.current
           ? fallbackFocusRef.current

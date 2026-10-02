@@ -286,6 +286,13 @@ body {
   box-shadow: var(--oa-focus-shadow);
 }
 
+@media (forced-colors: active) {
+  :root :focus-visible {
+    outline: 2px solid CanvasText;
+    outline-offset: 2px;
+  }
+}
+
 .oa-data-surface {
   border: 1px solid var(--oa-surface-border, transparent);
   background: var(--oa-surface-background, var(--secondary));
