@@ -614,7 +614,7 @@ provision a cloud service or manage an infrastructure provider.
 The Docker smoke uses a clean non-root Debian host with Node, npm, pnpm, Bun,
 and Agent Runtimes absent. It verifies plan, consent, native installation,
 dynamic launchers, update activation, retention, PATH, and lock cleanup. Use
-`pnpm test:system:installer -- --interactive` for the manual prompt playground.
+`pnpm test:system:installer --interactive` for the manual prompt playground.
 
 Use `pnpm test:system:installer:dev` only for the published dev-channel path.
 It downloads the current network installer and requires both network access and
