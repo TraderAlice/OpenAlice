@@ -207,8 +207,17 @@ async function fulfillUtaRequest(
     })
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error)
-    if (isHashConflict(error)) {
+    const pushFailure = classifyPushFailure(error)
+    if (pushFailure === 'hash-conflict') {
       return fail('conflict')
+    }
+    if (pushFailure === 'unconfirmed') {
+      // The write was abandoned while the broker call was still outstanding: the
+      // commit is in the log with its unsettled operations marked, the pending
+      // commit is gone and the order MAY be live. Terminal, and deliberately not
+      // the plain failure text ("Send /uta again"), which would walk the owner
+      // back into a possible second submission instead of a reconcile.
+      return fail('unavailable', unconfirmedPushMessage(request.utaId, error))
     }
     if (/readonly/i.test(message)) {
       return fail('readonly', message)
@@ -259,10 +268,53 @@ async function accountReview(uta: UTAAccountSDK, summary: UTASummary): Promise<C
   }
 }
 
-function isHashConflict(error: unknown): boolean {
-  if (error instanceof UTAHttpError && error.status === 409) return true
-  const code = error && typeof error === 'object' ? (error as { code?: unknown }).code : undefined
-  return code === 'PENDING_HASH_CONFLICT' || code === 'PENDING_HASH_REQUIRED'
+/** A push failure whose meaning is not the ordinary one: the owner must not read
+ *  it as a plain error to retry. */
+type PushFailure = 'hash-conflict' | 'unconfirmed'
+
+/**
+ * Why a push did not go through, when that changes what the owner is told.
+ *
+ *  'unconfirmed' — the write was abandoned at its liveness bound while the broker
+ *  call was still outstanding (`WRITE_OUTCOME_UNCONFIRMED`, HTTP 504): the order
+ *  MAY be live, so it must never read as success and never as the retry-inviting
+ *  delivery failure. Claimed from the route's own code, never from the status
+ *  alone — a bare gateway 504 is not a write we lost track of.
+ */
+function classifyPushFailure(error: unknown): PushFailure | undefined {
+  const code = errorCode(error)
+  if (code === 'WRITE_OUTCOME_UNCONFIRMED') return 'unconfirmed'
+  if (code === 'PENDING_HASH_CONFLICT' || code === 'PENDING_HASH_REQUIRED') return 'hash-conflict'
+  if (error instanceof UTAHttpError && error.status === 409) return 'hash-conflict'
+  return undefined
+}
+
+/** Failure code where the UTA client puts it: on a code-carrying error, or on the
+ *  response body of the `UTAHttpError` it throws for a non-2xx reply. */
+function errorCode(error: unknown): unknown {
+  const record = asRecord(error)
+  const direct = record?.code
+  if (direct !== undefined) return direct
+  return asRecord(record?.body)?.code
+}
+
+/** Commit the abandoned write produced, for the reconcile pointer. */
+function unconfirmedHash(error: unknown): string | undefined {
+  const hash = asRecord(asRecord(error)?.body)?.hash
+  return typeof hash === 'string' && hash ? hash : undefined
+}
+
+/** Owner-facing text for a write the broker never confirmed. The commit is in the
+ *  log with its unsettled operations marked and the pending commit is consumed, so
+ *  this is terminal: reconcile, do not push again. */
+function unconfirmedPushMessage(account: string | undefined, error: unknown): string {
+  const hash = unconfirmedHash(error)
+  const write = hash ? `wallet write ${hash}` : 'the pending commit'
+  return truncate(
+    `The push${account ? ` (${account})` : ''} did not confirm: ${write} was abandoned while the broker call was `
+    + 'outstanding, so the order MAY be live. Reconcile against broker state in OpenAlice → Trading as Git before pushing anything else.',
+    500,
+  )
 }
 
 function formatPushResult(label: string, result: PushResult): string {
