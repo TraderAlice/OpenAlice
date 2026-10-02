@@ -11,9 +11,9 @@ import { i18n } from '../../../ui/src/i18n'
 
 vi.mock('../../../ui/src/api', () => ({ api: { news: { list: vi.fn(async () => ({
   items: [
-    { time: '2026-09-06T00:00:00Z', title: 'US positive', content: 'x', source: 'test', link: null, categories: 'us,positive' },
-    { time: '2026-09-06T00:00:00Z', title: 'US negative', content: 'x', source: 'test', link: null, categories: 'us,negative' },
-    { time: '2026-09-06T00:00:00Z', title: 'Macro negative', content: 'x', source: 'test', link: null, categories: 'macro,negative' },
+    { time: '2026-09-06T00:00:00Z', title: 'US positive', content: 'x', source: 'test', link: null, categoryScope: 'article', categories: 'us,us-stocks,positive' },
+    { time: '2026-09-06T00:00:00Z', title: 'US negative', content: 'x', source: 'test', link: null, categoryScope: 'article', categories: 'us,us-stocks,negative' },
+    { time: '2026-09-06T00:00:00Z', title: 'Macro negative', content: 'x', source: 'test', link: null, categoryScope: 'article', categories: 'macro,negative' },
   ], count: 3, lookback: '24h',
 })) } } }))
 vi.mock('../../../ui/src/hooks/useAliceProject', () => ({
