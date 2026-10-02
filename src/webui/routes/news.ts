@@ -106,7 +106,7 @@ function matchesNewsFilters(
     item.content,
     item.metadata.categories ?? '',
   ].join('\n').toLowerCase()
-  return (!keyword || searchable.includes(keyword)) && (!symbol || searchable.includes(symbol))
+  return (!keyword || searchable.includes(keyword)) && (!symbol || matchesSymbol(searchable, symbol))
 }
 
 function compareNewsItems(a: NewsItem, b: NewsItem): number {
@@ -125,4 +125,10 @@ function safeHttpImageUrl(raw: string | null | undefined): string | null {
   } catch {
     return null
   }
+}
+
+/** Ticker punctuation belongs to the token; Keyword keeps substring semantics. */
+function matchesSymbol(text: string, symbol: string): boolean {
+  const tokens: string[] = text.match(/[\p{L}\p{N}_^]+(?:[.\/:=-][\p{L}\p{N}_^]+)*/gu) ?? []
+  return tokens.includes(symbol)
 }
