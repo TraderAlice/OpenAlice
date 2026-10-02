@@ -145,7 +145,11 @@ jobs:
         timeout-minutes: 10
 
       - name: Prove previous-release Broker Pack upgrade on Windows
-        run: pnpm broker-packs:upgrade-smoke
+        # The source verifier imports version authority through package exports.
+        # Build it explicitly in this standalone job, which has no server build.
+        run: |
+          pnpm --filter @traderalice/update-lifecycle... build
+          pnpm broker-packs:upgrade-smoke
         timeout-minutes: 10
 
   package:

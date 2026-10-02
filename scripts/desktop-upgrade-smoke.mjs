@@ -31,6 +31,7 @@ import {
   selectPreviousDesktopTag,
   versionFromTag,
   waitForChromiumProfileRelease,
+  waitForDesktopUpgradeDocument,
   windowsInstallerArgs,
 } from './desktop-upgrade-smoke-lib.mjs'
 import { packagedElectronExecutable } from './smoke-packaged-toolchain.mjs'
@@ -308,7 +309,19 @@ async function waitForRenderer(debugPort, child, timeoutMs = 90_000) {
           typeof target.url === 'string' &&
           target.url.startsWith('app://openalice') &&
           target.webSocketDebuggerUrl)
-        if (page) return CdpClient.connect(page.webSocketDebuggerUrl)
+        if (page) {
+          const client = await CdpClient.connect(page.webSocketDebuggerUrl)
+          try {
+            await waitForDesktopUpgradeDocument(expression => client.evaluate(expression), {
+              timeoutMs: Math.max(1, deadline - Date.now()),
+            })
+            console.log('[desktop-upgrade] product document loaded')
+            return client
+          } catch (error) {
+            client.close()
+            throw error
+          }
+        }
       }
     } catch (error) {
       lastError = error

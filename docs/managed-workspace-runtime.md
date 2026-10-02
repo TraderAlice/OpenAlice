@@ -841,6 +841,13 @@ otherwise successful 88-second run, including a roughly 62-second main-to-render
 response delay. Preserve that timing as a separate performance finding rather
 than interpreting a larger smoke budget as a runtime performance fix.
 
+The N-1 state journey waits for the actual `app://openalice/` document to finish
+loading and mount before exercising APIs or requesting Quit. A DevTools page
+target or reachable backend alone does not mean Electron's initial navigation
+has completed. Standalone Broker Pack upgrade jobs must also build
+`@traderalice/update-lifecycle` and its dependencies before loading the source
+verifier; they cannot rely on another job's server build.
+
 A release-facing change should also verify a clean-machine flow:
 
 1. launch the packaged app with no system Node, Git, Bash, or Pi assumption;
