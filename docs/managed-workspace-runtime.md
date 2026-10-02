@@ -512,7 +512,7 @@ configuration. Operations through `alice-uta` still follow UTA's trading mode
 and approval rules. That service-level trading boundary is distinct from host
 filesystem containment and should not be described as a sandbox for native
 tools. The load-bearing launch policies live in `src/workspaces/adapters/`
-and the Web transports under `src/workspaces/web/`.
+and the Web transports under `src/workspaces/web-session/`.
 
 ## Workspace Bootstrap and Skills
 
