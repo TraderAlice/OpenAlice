@@ -187,14 +187,22 @@ body {
   justify-content: center;
 }
 .oa-navigation-icon > svg { width: 16px; height: 16px; }
+.oa-harness-nav-children {
+  margin-inline-start: 24px;
+}
+.oa-harness-nav-children:empty { display: none; }
+.oa-harness-nav-children > .oa-sidebar-child-row,
+.oa-harness-nav-children > [data-slot="collapsible"] > .oa-sidebar-child-row {
+  margin-inline: 0;
+}
+.oa-harness-nav-children > .oa-sidebar-child-row:last-child {
+  margin-block-end: 0;
+}
+.oa-harness-nav-header:has(+ .oa-harness-nav-children:empty) {
+  margin-block-end: 0;
+}
 @media (min-width: 768px) and (hover: hover) and (pointer: fine) {
   #activity-bar .oa-harness-nav-actions > button { height: 28px; }
-  #activity-bar .oa-harness-nav-children { margin-left: 24px; padding-bottom: 4px; }
-  #activity-bar .oa-harness-nav-children .oa-sidebar-child-row {
-    margin-inline: 0;
-    min-height: var(--oa-nav-height);
-    padding-block: 4px;
-  }
 }
 
 @media (hover: hover) and (pointer: fine) {
@@ -1896,24 +1904,6 @@ body:has([data-desktop-banner]):not(:has(.oa-office-main)) [data-sonner-toaster]
   box-shadow: var(--oa-surface-shadow, none);
 }
 .oa-config-section + .oa-config-section { margin-top: 16px; }
-
-.oa-inference-setting {
-  display: grid;
-  grid-template-columns: 20px minmax(0, 0.8fr) minmax(0, 1.4fr) 16px;
-  min-height: var(--oa-control-height);
-  gap: 8px;
-  padding: 8px 10px;
-  font-size: 14px;
-  line-height: 20px;
-  overflow-wrap: anywhere;
-}
-
-.oa-inference-value {
-  min-width: 0;
-  text-align: start;
-  color: var(--muted-foreground);
-}
-
 
 .oa-segmented-option {
   position: relative;

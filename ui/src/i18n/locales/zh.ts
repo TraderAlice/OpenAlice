@@ -1724,6 +1724,7 @@ export const zh: Resources = {
       offboard: '办理 {{workspace}} 离职',
     },
     viewAllSessions: '查看全部 {{count}} 个会话',
+    allConversations: '全部对话',
     viewAllConversations: '查看全部 {{count}} 个对话',
     deleteWorkspace: '办理工作区离职',
     deleteWorkspaceTitle: '办理对话工作区离职',

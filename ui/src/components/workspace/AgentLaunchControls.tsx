@@ -271,20 +271,16 @@ function AgentLaunchInferenceMenu({
           className="w-[336px] max-w-[calc(100vw-2rem)]"
         >
           {access && <DropdownMenuSub>
-            <DropdownMenuSubTrigger className="oa-inference-setting">
-              <span className="flex size-5 items-center justify-center" aria-hidden>{access.icon}</span>
-              <span>{t('chatLanding.selectCredential')}</span>
-              <span className="oa-inference-value">{access.label}</span>
+            <DropdownMenuSubTrigger icon={access.icon} detail={access.label}>
+              {t('chatLanding.selectCredential')}
             </DropdownMenuSubTrigger>
             <DropdownMenuSubContent className="min-w-[min(20rem,calc(100vw-2rem))]">
               {access.items}
             </DropdownMenuSubContent>
           </DropdownMenuSub>}
           <DropdownMenuSub>
-            <DropdownMenuSubTrigger className="oa-inference-setting">
-              <Cpu className="size-5 text-muted-foreground" aria-hidden />
-              <span>{t('chatLanding.modelField')}</span>
-              <span className="oa-inference-value">{resolvedModel}</span>
+            <DropdownMenuSubTrigger icon={<Cpu className="size-4 text-muted-foreground" />} detail={resolvedModel}>
+              {t('chatLanding.modelField')}
             </DropdownMenuSubTrigger>
             <DropdownMenuSubContent className="flex min-w-[min(20rem,calc(100vw-2rem))] flex-col overflow-hidden">
               <ModelCatalogStatus catalog={config.modelCatalog} selectedModel={config.launchModel ?? config.defaultModel} />
@@ -331,10 +327,8 @@ function AgentLaunchInferenceMenu({
           </DropdownMenuSub>
 
           <DropdownMenuSub>
-            <DropdownMenuSubTrigger className="oa-inference-setting">
-              <Gauge className="size-5 text-muted-foreground" aria-hidden />
-              <span>{t('chatLanding.effortField')}</span>
-              <span className="oa-inference-value">{resolvedEffort}</span>
+            <DropdownMenuSubTrigger icon={<Gauge className="size-4 text-muted-foreground" />} detail={resolvedEffort}>
+              {t('chatLanding.effortField')}
             </DropdownMenuSubTrigger>
             <DropdownMenuSubContent>
               <DropdownMenuRadioGroup

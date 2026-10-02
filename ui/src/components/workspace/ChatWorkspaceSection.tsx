@@ -20,6 +20,7 @@ import {
   LoaderCircle,
   MessageSquare,
   MessageSquarePlus,
+  MessagesSquare,
   MoreHorizontal,
   Network,
   PanelsTopLeft,
@@ -81,6 +82,8 @@ import { Button } from '@/components/ui/button'
 import type { ChatDisplayMode } from './chat-display-mode'
 import { HarnessNavigationGroup } from './HarnessNavigationGroup'
 import { HarnessWorkspaceEntry } from './HarnessWorkspaceEntry'
+import { SidebarChildRow, SidebarChildRowButton } from '../SidebarChildRow'
+import { CountBadge } from '../CountBadge'
 
 const CHAT_TEMPLATE = 'chat'
 const AUTO_QUANT_TEMPLATE = 'auto-quant-v2'
@@ -400,7 +403,7 @@ export function ChatWorkspaceSection({
   const runningSessions = currentWorkspace ? runningWorkspaceSessions(currentWorkspace,
     sessionDirectories.directories.get(currentWorkspace.id) ?? null) : []
   const runningGroup = <RunningSessionGroup sessions={runningSessions} onSelect={showBusy} />
-  const visibleNavigationSessions = selectRecentSidebarWorkset(navigationSessions, isRosterRowActive, 4)
+  const visibleNavigationSessions = selectRecentSidebarWorkset(navigationSessions, isRosterRowActive, 3)
 
   return (
     <div className={navigation ? 'min-w-0' : 'flex h-full min-h-0 flex-col'}>
@@ -435,10 +438,17 @@ export function ChatWorkspaceSection({
               onArchive={() => archiveRosterSession(row)} onSettings={() => openSessionSettings(row)} />
           ))}
           {navigationSessions.length > visibleNavigationSessions.length && (
-            <button type="button" onClick={event => openConversationBrowser(currentWorkspace?.id ?? null, event.currentTarget)}
-              className="oa-nav-row flex min-h-(--oa-nav-height) w-full items-center rounded-md px-2.5 text-left text-sm text-muted-foreground hover:bg-sidebar-accent">
-              {t('chat.viewAllConversations', { count: navigationSessions.length })}
-            </button>
+            <SidebarChildRow active={false}>
+              <SidebarChildRowButton
+                icon={<MessagesSquare size={16} aria-hidden />}
+                onClick={event => openConversationBrowser(currentWorkspace?.id ?? null, event.currentTarget)}
+                aria-label={t('chat.viewAllConversations', { count: navigationSessions.length })}
+                className="text-muted-foreground"
+              >
+                <span className="min-w-0 flex-1 truncate">{t('chat.allConversations')}</span>
+                <CountBadge count={navigationSessions.length} label={t('chat.workspaceSessionCount', { count: navigationSessions.length })} />
+              </SidebarChildRowButton>
+            </SidebarChildRow>
           )}
         </HarnessNavigationGroup>
       ) : <>

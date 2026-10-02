@@ -1738,6 +1738,7 @@ export const en = {
       offboard: 'Offboard {{workspace}}',
     },
     viewAllSessions: 'View all {{count}} sessions',
+    allConversations: 'All conversations',
     viewAllConversations: 'View all {{count}} conversations',
     deleteWorkspace: 'Offboard workspace',
     deleteWorkspaceTitle: 'Offboard chat workspace',

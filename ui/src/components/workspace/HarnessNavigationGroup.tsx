@@ -28,7 +28,7 @@ export function HarnessNavigationGroup({ title, compact, compactIcon, active, ne
     )
   }
   return (
-    <section aria-label={label} className="min-w-0">
+    <section aria-label={label} className="oa-harness-nav-group min-w-0">
       <div className={`oa-harness-nav-header flex min-h-(--oa-nav-height) items-center rounded-md ${active ? 'bg-sidebar-accent' : 'hover:bg-sidebar-accent/60'}`}>
         <button type="button" aria-label={label} aria-current={active ? 'page' : undefined} onClick={onOpen}
           className={`oa-nav-item oa-primary-nav-row flex min-w-0 flex-1 items-center rounded-md text-left font-normal aria-[current=page]:font-medium ${active ? 'text-foreground' : 'text-sidebar-foreground hover:text-foreground'}`}>
@@ -43,7 +43,7 @@ export function HarnessNavigationGroup({ title, compact, compactIcon, active, ne
           </button>}
         </div>
       </div>
-      <div className="oa-harness-nav-children ml-7 min-w-0 pb-2">{children}</div>
+      <div className="oa-harness-nav-children min-w-0">{children}</div>
     </section>
   )
 }

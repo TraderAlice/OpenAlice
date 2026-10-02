@@ -1720,6 +1720,7 @@ export const ja: Resources = {
       offboard: '{{workspace}} を退役',
     },
     viewAllSessions: '{{count}} 件のセッションをすべて表示',
+    allConversations: 'すべての会話',
     viewAllConversations: '{{count}} 件の会話をすべて表示',
     deleteWorkspace: 'ワークスペースを退役',
     deleteWorkspaceTitle: 'チャットワークスペースを退役',

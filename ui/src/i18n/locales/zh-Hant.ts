@@ -1728,6 +1728,7 @@ export const zhHant: Resources = {
       offboard: '辦理 {{workspace}} 離職',
     },
     viewAllSessions: '查看全部 {{count}} 個工作階段',
+    allConversations: '全部對話',
     viewAllConversations: '查看全部 {{count}} 個對話',
     deleteWorkspace: '辦理工作區離職',
     deleteWorkspaceTitle: '辦理對話工作區離職',

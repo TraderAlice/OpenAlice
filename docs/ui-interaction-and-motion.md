@@ -121,11 +121,11 @@ The saved primary `chat` layout slot now labels this shortcut; it remains pinned
 Chat (`/chat`) and all existing Harness deep links retain their own route identity.
 Quick Start selection never marks a Harness current until navigation enters it.
 Below the utility list, Chat,
-Quant, and Prediction each show up to four sessions from their current Workspace
+Quant, and Prediction each show up to three sessions from their current Workspace
 (retaining an active older row), a new-session landing shortcut, and the shared
 Workspace options menu. More conversations remain available in the browser
 dialog. These are feature rows with their own icons, not collapsible folders or
-a labeled Harness tree. Recent sessions stay visible with a shallow indent.
+a labeled Harness tree. Recent sessions stay visible with a shallow indent. Session, Studio, and all-conversation entries share the same icon, label, and trailing-count columns. The all-conversation entry keeps the complete count visible and opens the existing browser.
 Trailing actions place options first and new-session last. The header owns the
 single new-session action; empty lists do not repeat a New chat/research row.
 These actions appear on header hover, keyboard focus,
