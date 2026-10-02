@@ -747,6 +747,9 @@ The runner uses explicit temporary `OPENALICE_HOME`, `AQ_LAUNCHER_ROOT`,
 desktop data, credentials, or preferences. The previous renderer is driven
 through a short-lived loopback DevTools endpoint so the test uses its real API
 and bootstrap code without adding a production smoke route.
+Between launches the runner requests explicit Electron Quit through the browser
+DevTools target. Closing the main renderer only hides the normal desktop and
+does not establish shutdown; the runner still requires clean process exit.
 
 Stable release candidates repeat the journey against publication bytes: macOS
 expands the final signed architecture-specific ZIP; Windows installs N-1 then
