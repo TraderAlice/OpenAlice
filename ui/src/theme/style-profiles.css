@@ -278,6 +278,7 @@
   .oa-sidebar-child-row[data-active="true"],
   .oa-harness-nav-header:has(> [aria-current="page"])
 ):not(:focus-visible):not(:focus-within) {
+  color: var(--foreground);
   background: var(--oa-selection-background);
   box-shadow: var(--oa-selection-shadow);
 }
@@ -321,8 +322,10 @@
   background: var(--oa-header-background);
 }
 
-:root[data-ui-style="broker-classic"] tbody > tr:nth-child(even) {
-  background: color-mix(in srgb, var(--foreground) 3%, transparent);
+@layer components {
+  :root[data-ui-style="broker-classic"] tbody > tr:nth-child(even) {
+    background: color-mix(in srgb, var(--foreground) 3%, transparent);
+  }
 }
 
 :root[data-ui-style="broker-classic"] :where(td.tabular-nums, .oa-metric-value) {
