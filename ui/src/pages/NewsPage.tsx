@@ -1,3 +1,5 @@
+import type { TFunction } from 'i18next'
+import { newsTags, newsTagKey, newsTagDefinition, type NewsTag } from '../../../src/domain/news/tags.js'
 import { safeNotificationImage } from '../lib/notifications/image'
 import { memo, useCallback, useEffect, useId, useMemo, useRef, useState, type FormEvent } from 'react'
 import { ChevronDown, CircleAlert, RefreshCw, Search } from 'lucide-react'
@@ -33,13 +35,6 @@ const NEWS_VIEWS = [
 type NewsViewId = typeof NEWS_VIEWS[number]['id']
 const INITIAL_FILTERS = { startDate: '', endDate: '', symbol: '', keyword: '' }
 const NEWS_PAGE_SIZE = 40
-const NEWS_TAG_DEFINITIONS = new Map<string, typeof NEWS_VIEWS[number] | typeof NEWS_CATEGORIES[number]>(
-  [...NEWS_VIEWS, ...NEWS_CATEGORIES].flatMap((definition) => definition.tags.map((tag) => [tag, definition] as const)),
-)
-const MARKET_FLAGS: Partial<Record<string, string>> = {
-  'a-shares': 'cn', hk: 'hk', us: 'us',
-}
-
 export function NewsPage({ spec }: { spec: Extract<ViewSpec, { kind: 'news' }> }) {
   const { t, i18n } = useTranslation()
   const navigate = useNavigate()
@@ -65,7 +60,7 @@ export function NewsPage({ spec }: { spec: Extract<ViewSpec, { kind: 'news' }> }
     if (selection === 'watchlist') {
       const symbols = watchlist.map((entry) => entry.symbol.trim().toLowerCase()).filter(Boolean)
       return sorted.filter((article) => {
-        const words = [article.title, article.content, article.categories ?? ''].join(' ').toLowerCase().split(/[^\p{L}\p{N}.^-]+/u)
+        const words = [article.title, article.content, articleTags(article).join(' ')].join(' ').toLowerCase().split(/[^\p{L}\p{N}.^-]+/u)
         return symbols.some((symbol) => words.includes(symbol))
       })
     }
@@ -134,9 +129,9 @@ export function NewsPage({ spec }: { spec: Extract<ViewSpec, { kind: 'news' }> }
     setQuery({ lookback: '24h', limit: 200 })
     setDateError(false)
   }
-  const selectTag = useCallback((tag: string) => {
-    setDraft((current) => ({ ...current, keyword: tag }))
-    setQuery((current) => ({ ...current, keyword: tag }))
+  const activeTag = query.tag ? newsTags(query.tag.split(':').slice(2).join(':'), query.tag.split(':')[0] as NewsTag['scope'])[0] : undefined
+  const selectTag = useCallback((tag: NewsTag) => {
+    setQuery((current) => ({ ...current, tag: newsTagKey(tag) }))
   }, [])
 
   return (
@@ -171,6 +166,7 @@ export function NewsPage({ spec }: { spec: Extract<ViewSpec, { kind: 'news' }> }
               <Button type="submit" variant="secondary" size="sm"><Search className="size-3.5" aria-hidden />{t('news.search')}</Button>
               <Button type="button" variant="outline" className="h-8" onClick={clear}>{t('news.clear')}</Button>
             </form>
+            {query.tag && <Button variant="outline" size="sm" className="mt-2" onClick={() => setQuery(({ tag: _, ...rest }) => rest)}>{t('news.exactTagFilter', { tag: activeTag ? tagLabel(activeTag, t) : '' })} ×</Button>}
             {dateError && <p role="alert" className="mt-2 text-xs text-destructive">{t('news.dateRangeError')}</p>}
             <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
               <select aria-label={t('news.lookbackLabel')} value={query.lookback ?? '24h'} disabled={Boolean(query.startTime)}
@@ -219,19 +215,14 @@ export function NewsPage({ spec }: { spec: Extract<ViewSpec, { kind: 'news' }> }
 }
 
 
-const NewsStreamRow = memo(function NewsStreamRow({ article, locale, onTag }: { article: NewsArticle; locale: string; onTag: (tag: string) => void }) {
+const NewsStreamRow = memo(function NewsStreamRow({ article, locale, onTag }: { article: NewsArticle; locale: string; onTag: (tag: NewsTag) => void }) {
   const { t } = useTranslation()
   const [expanded, setExpanded] = useState(false)
   const [failedImage, setFailedImage] = useState<string | null>(null)
   const summaryId = useId()
   const link = safeNewsUrl(article.link)
   const image = safeNotificationImage(article.image)
-  const labels = new Map<string, { tag: string; flag?: string }>()
-  for (const tag of (article.categories ?? '').split(/[;,]/).map((value) => value.trim()).filter(Boolean)) {
-    const definition = NEWS_TAG_DEFINITIONS.get(tag.toLowerCase())
-    const label = definition ? t(definition.labelKey) : tag
-    if (!labels.has(label)) labels.set(label, { tag, flag: definition ? MARKET_FLAGS[definition.id] : undefined })
-  }
+  const tags = newsTags(article.categories, article.categoryScope)
   const content = article.content.trim()
   const hasImage = Boolean(image && failedImage !== image)
   const source = link ? (
@@ -257,13 +248,12 @@ const NewsStreamRow = memo(function NewsStreamRow({ article, locale, onTag }: { 
             {content}
           </p>}
           <div className="mt-2 flex min-w-0 flex-wrap items-center gap-1.5">
-            {[...labels].map(([label, { tag, flag }]) => (
-              <Button key={label} type="button" variant="outline" size="xs" onClick={() => onTag(tag)}
-                className="h-auto min-h-7 max-w-full gap-1.5 whitespace-normal rounded-sm bg-muted/20 px-2 text-left font-normal text-muted-foreground [overflow-wrap:anywhere]">
-                {flag && <img src={`/market/flags/${flag}.svg`} alt="" width={16} height={16} className="size-4 shrink-0" />}
-                {label}
+            {tags.map((tag) => {
+              return <Button key={newsTagKey(tag)} type="button" variant="outline" size="xs" onClick={() => onTag(tag)}
+                className="h-auto min-h-7 max-w-full whitespace-normal rounded-sm bg-muted/20 px-2 text-left font-normal text-muted-foreground [overflow-wrap:anywhere]">
+                {tagLabel(tag, t)}
               </Button>
-            ))}
+            })}
             {(content || !hasImage && source) && <div className="ml-auto flex min-w-0 items-center gap-2">
               {content && <Button type="button" variant="ghost" size="icon-xs" aria-expanded={expanded} aria-controls={summaryId}
                 aria-label={t(expanded ? 'news.showLess' : 'news.showMore')} title={t(expanded ? 'news.showLess' : 'news.showMore')}
@@ -309,8 +299,15 @@ function NewsStaleNotice({ refreshing, onRetry }: { refreshing: boolean; onRetry
   </div>
 }
 
+function tagLabel(tag: NewsTag, t: TFunction): string {
+  const definition = tag.scope === 'unknown' ? undefined : newsTagDefinition(tag.value)
+  const scopeKey = { source: 'news.tagSource', article: 'news.tagArticle', unknown: 'news.tagUnknown' } as const
+  const dimensionKey = { region: 'news.tagRegion', market: 'news.tagMarket', industry: 'news.tagIndustry', topic: 'news.tagTopic', unknown: 'news.tagRaw' } as const
+  return [t(scopeKey[tag.scope]), t(dimensionKey[tag.dimension]), definition ? t(definition.labelKey) : tag.value].join(' · ')
+}
+
 function articleKey(article: NewsArticle): string { return `${article.time}-${article.link ?? article.title}` }
-function articleTags(article: NewsArticle): string[] { return (article.categories ?? '').split(/[;,]/).map((tag) => tag.trim().toLowerCase()).filter(Boolean) }
+function articleTags(article: NewsArticle): string[] { return newsTags(article.categories, article.categoryScope).filter((tag) => tag.scope === 'article').map((tag) => tag.value) }
 
 function safeNewsUrl(value: string | null | undefined, allowLocal = false): string | undefined {
   if (!value) return undefined

@@ -28,6 +28,16 @@ beforeEach(() => { mocks.list.mockReset() })
 afterEach(() => { cleanup(); vi.useRealTimers(); vi.clearAllMocks() })
 
 describe('useNewsFeed request lifecycle', () => {
+  it('reloads when an exact scoped tag changes and forwards it separately from Keyword', async () => {
+    mocks.list.mockResolvedValue(response('fixture'))
+    const hook = renderHook(({ tag }) => useNewsFeed({ tag, keyword: 'earnings' }), { initialProps: { tag: 'source:region:us' } })
+    await waitFor(() => expect(mocks.list).toHaveBeenCalledTimes(1))
+    expect(mocks.list.mock.calls[0][0]).toEqual({ tag: 'source:region:us', keyword: 'earnings' })
+    hook.rerender({ tag: 'article:region:us' })
+    await waitFor(() => expect(mocks.list).toHaveBeenCalledTimes(2))
+    expect(mocks.list.mock.calls[1][0].tag).toBe('article:region:us')
+  })
+
   it('aborts the previous request when a refresh supersedes it', async () => {
     const first = deferred<NewsListResponse>()
     mocks.list.mockReturnValueOnce(first.promise).mockResolvedValueOnce(response('fresh'))

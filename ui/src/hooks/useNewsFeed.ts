@@ -50,6 +50,7 @@ export function useNewsFeed(params: NewsQuery): UseNewsFeed {
     endTime,
     keyword,
     symbol,
+    tag,
   } = params
 
   useEffect(() => {
@@ -64,6 +65,7 @@ export function useNewsFeed(params: NewsQuery): UseNewsFeed {
       ...(startTime === undefined ? {} : { startTime }),
       ...(endTime === undefined ? {} : { endTime }),
       ...(keyword === undefined ? {} : { keyword }),
+      ...(tag === undefined ? {} : { tag }),
       ...(symbol === undefined ? {} : { symbol }),
     }
 
@@ -115,7 +117,7 @@ export function useNewsFeed(params: NewsQuery): UseNewsFeed {
       clearInterval(interval)
       loadRef.current = () => undefined
     }
-  }, [lookback, limit, source, startTime, endTime, keyword, symbol])
+  }, [lookback, limit, source, startTime, endTime, keyword, symbol, tag])
 
   const refresh = useCallback(() => {
     loadRef.current(hasLoaded.current)

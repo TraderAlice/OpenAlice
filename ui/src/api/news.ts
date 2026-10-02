@@ -8,6 +8,7 @@ export interface NewsQuery {
   startTime?: string
   endTime?: string
   keyword?: string
+  tag?: string
   symbol?: string
 }
 
@@ -20,6 +21,7 @@ export const newsApi = {
     if (params?.startTime) qs.set('startTime', params.startTime)
     if (params?.endTime) qs.set('endTime', params.endTime)
     if (params?.keyword) qs.set('keyword', params.keyword)
+    if (params?.tag) qs.set('tag', params.tag)
     if (params?.symbol) qs.set('symbol', params.symbol)
     const query = qs.toString()
     return fetchJson(`/api/news${query ? `?${query}` : ''}`, signal ? { signal } : undefined)

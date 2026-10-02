@@ -25,7 +25,7 @@ function render(node: ReactNode, entry = '/market/news') {
 }
 
 function newsResponse(title: string, lookback = '24h'): NewsListResponse {
-  return { items: [{ time: '2026-07-29T10:00:00.000Z', title, content: `${title} content`, source: 'Reuters', link: null, categories: 'markets,us' }], count: 1, lookback }
+  return { items: [{ time: '2026-07-29T10:00:00.000Z', title, content: `${title} content`, source: 'Reuters', link: null, categoryScope: 'article' as const, categories: 'markets,us,us-stocks' }], count: 1, lookback }
 }
 function deferred<T>() {
   let resolve!: (value: T) => void
@@ -39,9 +39,9 @@ beforeEach(async () => {
   await i18n.changeLanguage('en')
   mocks.list.mockResolvedValue({
     items: [
-      { time: '2026-07-29T08:00:00.000Z', title: 'Middle update', content: 'Middle content', source: 'Reuters', link: null, categories: 'markets,us' },
-      { time: '2026-07-29T10:00:00.000Z', title: 'Newest update', content: 'Newest content', source: 'Bloomberg', link: 'https://example.com/newest', categories: 'markets,us' },
-      { time: '2026-07-29T06:00:00.000Z', title: 'Oldest update', content: 'Oldest content', source: 'CNBC', link: null, categories: 'macro,rates' },
+      { time: '2026-07-29T08:00:00.000Z', title: 'Middle update', content: 'Middle content', source: 'Reuters', link: null, categoryScope: 'article' as const, categories: 'markets,us,us-stocks' },
+      { time: '2026-07-29T10:00:00.000Z', title: 'Newest update', content: 'Newest content', source: 'Bloomberg', link: 'https://example.com/newest', categoryScope: 'article' as const, categories: 'markets,us,us-stocks' },
+      { time: '2026-07-29T06:00:00.000Z', title: 'Oldest update', content: 'Oldest content', source: 'CNBC', link: null, categoryScope: 'article' as const, categories: 'macro,rates' },
     ], count: 3, lookback: '24h',
   })
 })
@@ -90,7 +90,7 @@ describe('NewsPage inline stream', () => {
     })
     const items = Array.from({ length: 81 }, (_, index) => ({
       ...newsResponse(`Story ${index}`).items[0],
-      categories: 'us,positive',
+      categoryScope: 'article' as const, categories: 'us,positive',
       time: new Date(2026, 6, 29, 10, index).toISOString(),
     }))
     mocks.list.mockResolvedValueOnce({ items, count: items.length, lookback: '24h' })
@@ -125,9 +125,9 @@ describe('NewsPage inline stream', () => {
   it('filters explicit importance, sentiment, and watchlist symbols without substring matches', async () => {
     mocks.watchlist = [{ assetClass: 'equity', symbol: 'AAPL', addedAt: 1 }]
     mocks.list.mockResolvedValue({ items: [
-      { ...newsResponse('AAPL supplier setback').items[0], categories: 'markets,us,important,negative' },
-      { ...newsResponse('NVDA advances after results').items[0], categories: 'markets,us,positive' },
-      { ...newsResponse('XAAPL unrelated ticker').items[0], categories: 'markets,us' },
+      { ...newsResponse('AAPL supplier setback').items[0], categoryScope: 'article' as const, categories: 'markets,us,us-stocks,important,negative' },
+      { ...newsResponse('NVDA advances after results').items[0], categoryScope: 'article' as const, categories: 'markets,us,us-stocks,positive' },
+      { ...newsResponse('XAAPL unrelated ticker').items[0], categoryScope: 'article' as const, categories: 'markets,us,us-stocks' },
     ], count: 3, lookback: '24h' })
     render(<RoutedNewsPage />)
     await screen.findByRole('heading', { name: /AAPL supplier setback/ })
@@ -142,6 +142,35 @@ describe('NewsPage inline stream', () => {
     fireEvent.click(within(views).getByRole('button', { name: 'Watchlist' }))
     expect(screen.getAllByRole('listitem')).toHaveLength(1)
     expect(screen.getByRole('heading', { name: /AAPL supplier setback/ })).toBeTruthy()
+  })
+
+  it('shows scoped dimensions and sends an exact tag query without replacing Keyword', async () => {
+    mocks.list.mockResolvedValue({ items: [
+      { ...newsResponse('Budgeting').items[0], categoryScope: 'source', categories: 'US,USA,tech,earnings,Mystery' },
+      { ...newsResponse('Unknown').items[0], categoryScope: 'unknown', categories: 'cn' },
+    ], count: 2, lookback: '24h' })
+    render(<RoutedNewsPage />)
+    const tag = await screen.findByRole('button', { name: 'Source coverage · Region · United States', exact: true })
+    expect(screen.getAllByRole('button', { name: 'Source coverage · Region · United States', exact: true })).toHaveLength(1)
+    expect(screen.getByRole('button', { name: 'Source coverage · Industry · Technology' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Unknown origin · Raw tag · cn' })).toBeTruthy()
+    fireEvent.click(tag)
+    await waitFor(() => expect(mocks.list.mock.lastCall?.[0]).toMatchObject({ tag: 'source:region:us' }))
+    expect(mocks.list.mock.lastCall?.[0].keyword).toBeUndefined()
+    fireEvent.click(screen.getByRole('button', { name: /Exact tag:/ }))
+    await waitFor(() => expect(mocks.list.mock.lastCall?.[0].tag).toBeUndefined())
+  })
+
+  it('does not treat feed regions or unknown labels as article markets', async () => {
+    mocks.list.mockResolvedValue({ items: [
+      { ...newsResponse('Budgeting').items[0], categoryScope: 'source', categories: 'us,us-stocks' },
+      { ...newsResponse('Unproven').items[0], categoryScope: 'unknown', categories: 'us-stocks' },
+      { ...newsResponse('US exchange story').items[0], categoryScope: 'article', categories: 'us-stocks' },
+    ], count: 3, lookback: '24h' })
+    render(<RoutedNewsPage />, '/market/news?category=us')
+    await screen.findByRole('heading', { name: 'US exchange story' })
+    expect(screen.queryByRole('heading', { name: 'Budgeting' })).toBeNull()
+    expect(screen.queryByRole('heading', { name: 'Unproven' })).toBeNull()
   })
 
   it('submits text filters deliberately and clears them without losing the stream', async () => {

@@ -1,3 +1,8 @@
+import { mkdtemp, rm, readFile } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+import { NewsCollectorStore, NewsCollector } from '../../domain/news/index.js'
+import * as rssParser from '../../domain/news/collector/rss-parser.js'
 import { describe, expect, it, vi } from 'vitest'
 import { createNewsRoutes } from './news.js'
 import type { EngineContext } from '../../core/types.js'
@@ -31,6 +36,60 @@ describe('news routes', () => {
     expect((await response.json()).items.map((entry: { title: string }) => entry.title)).toEqual([`($${symbol.toLowerCase()}) announces earnings.`])
     const keywords = await app.request('/?keyword=fed')
     expect((await keywords.json()).items[0].title).toBe('Fed cuts rates')
+  })
+
+  it('carries collector provenance through archive recovery and the HTTP response', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'news-provenance-'))
+    const logPath = join(dir, 'news.jsonl')
+    const store = new NewsCollectorStore({ logPath, maxInMemory: 100, retentionDays: 7 })
+    const parser = vi.spyOn(rssParser, 'fetchAndParseFeed').mockResolvedValue([
+      { title: 'Household budget', content: 'Ordinary household finance', link: null, guid: 'budget', pubDate: new Date() },
+    ])
+    try {
+      await store.init()
+      const collector = new NewsCollector({ store, feeds: [{ name: 'US coverage', source: 'fixture', url: 'https://example.test/feed', categories: ['us', 'cn'] }], intervalMs: 60_000 })
+      await collector.fetchAll()
+      await store.close()
+      const before = await readFile(logPath, 'utf8')
+      await store.init()
+      const response = await routes(store.getNewsV2.bind(store)).request('/?tag=source:region:USA')
+      const body = await response.json()
+      expect(body.items).toHaveLength(1)
+      expect(body.items[0]).toMatchObject({ title: 'Household budget', categories: 'us,cn', categoryScope: 'source' })
+      expect(await readFile(logPath, 'utf8')).toBe(before)
+    } finally {
+      parser.mockRestore()
+      await store.close()
+      await rm(dir, { recursive: true, force: true })
+    }
+  })
+
+  it('returns known feed coverage and unknown provenance without rewriting archived records', async () => {
+    const known = item(1, { title: 'Budgeting advice', metadata: { ingestSource: 'rss', source: 'US feed', categories: 'us,cn' } })
+    const unknown = item(2, { metadata: { source: 'US feed', categories: 'us,cn' } })
+    const response = await routes(vi.fn(async () => [known, unknown])).request('/')
+    expect((await response.json()).items.map((row: { categoryScope: string }) => row.categoryScope)).toEqual(['source', 'unknown'])
+    expect(known.metadata).toEqual({ ingestSource: 'rss', source: 'US feed', categories: 'us,cn' })
+  })
+
+  it('filters exact scoped tags before limiting and never matches incidental text', async () => {
+    const getNewsV2 = vi.fn(async (options: GetNewsV2Options) => {
+      expect(options.limit).toBeUndefined()
+      return [
+        item(1, { metadata: { ingestSource: 'rss', categories: 'USA,tech,earnings' } }),
+        item(2, { title: 'us tech earnings', metadata: { ingestSource: 'rss', categories: 'cn' } }),
+        item(3, { metadata: { categories: 'us,tech,earnings' } }),
+      ]
+    })
+    const app = routes(getNewsV2)
+    for (const tag of ['source:region:US', 'source:industry:technology', 'source:topic:earnings']) {
+      const res = await app.request(`/?tag=${tag}&limit=1`)
+      expect((await res.json()).items.map((row: { title: string }) => row.title)).toEqual(['Headline 1'])
+    }
+    const wrongMarket = await app.request('/?tag=source:market:us')
+    expect(wrongMarket.status).toBe(400)
+    const article = await app.request('/?tag=article:region:us')
+    expect((await article.json()).count).toBe(0)
   })
 
   it('uses explicit timestamps instead of lookback and returns a nullable lookback', async () => {

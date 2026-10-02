@@ -32,6 +32,18 @@ describe('demo News handlers', () => {
     }
   })
 
+  it('uses exact tag ownership, dimension and aliases rather than keyword text', async () => {
+    const source = await fetch(`${baseUrl}/api/news?tag=source:region:USA`)
+    const sourceBody = await source.json()
+    expect(sourceBody.items.map((row: { title: string }) => row.title)).toEqual(['Household budgeting tips from a US feed'])
+    expect(sourceBody.items[0].categoryScope).toBe('source')
+    const article = await fetch(`${baseUrl}/api/news?tag=article:region:us`)
+    expect((await article.json()).items.every((row: { categoryScope: string }) => row.categoryScope === 'article')).toBe(true)
+    const unknown = await fetch(`${baseUrl}/api/news?tag=unknown:unknown:cn`)
+    expect((await unknown.json()).items[0].title).toBe('Archived article with unknown category origin')
+    expect((await fetch(`${baseUrl}/api/news?tag=source:market:us`)).status).toBe(400)
+  })
+
   it('uses an explicit range as an exclusive-start, inclusive-end interval', async () => {
     const start = demoNewsArticles.find((article) => article.title.startsWith('Hang Seng TECH'))!
     const end = demoNewsArticles.find((article) => article.title.startsWith('NVDA'))!

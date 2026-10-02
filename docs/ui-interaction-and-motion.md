@@ -41,10 +41,13 @@ Time stays in the left gutter. The headline is a separate, prominent block above
 the summary, which previews up to three lines. Editorial images align with the
 headline on the right, with the source below; narrow screens place this image
 and source beneath the text. Bordered market/topic labels and a compact
-disclosure arrow follow the summary; expanding never hides the image. Flags
-identify the supplied market classification, not a company's domicile or the
-country mentioned in a headline. The local flag assets retain their license
-under `ui/public/market/flags/`; unknown tags remain text. The current news
+disclosure arrow follow the summary; expanding never hides the image. Labels name their ownership (source coverage, article association, or unknown)
+and their region, market, industry, topic/event, or raw dimension. No flags are
+inferred from feed coverage. Tag clicks select the exact scoped tag through the
+existing list endpoint, independently of Keyword; the removable filter chip uses
+the same wording. Unknown tags stay raw, and source labels never select article
+market/sentiment views. The local flag assets retain their license under
+`ui/public/market/flags/` for other consumers. The current news
 contract has no structured related-company identity or company-logo field.
 
 The news scroller reveals already-fetched results in batches of 40 when its

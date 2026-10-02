@@ -1,4 +1,5 @@
 import { Hono } from 'hono'
+import { newsCategoryScope, newsTags, newsTagKey, normalizeNewsTagFilter } from '../../domain/news/tags.js'
 
 import type { EngineContext } from '../../core/types.js'
 import type { GetNewsV2Options, NewsItem } from '../../domain/news/types.js'
@@ -44,7 +45,10 @@ export function createNewsRoutes(ctx: EngineContext) {
     const sources = sourceValues.length > 0 ? new Set(sourceValues) : undefined
     const keyword = normalizedTerm(c.req.query('keyword'))
     const symbol = normalizedTerm(c.req.query('symbol'))
-    const hasFilters = Boolean(sources || keyword || symbol)
+    const tagRaw = c.req.query('tag')
+    const tag = tagRaw === undefined ? undefined : normalizeNewsTagFilter(tagRaw)
+    if (tag === null) return c.json({ error: 'Invalid tag; expected scope:dimension:value' }, 400)
+    const hasFilters = Boolean(sources || keyword || symbol || tag)
     const options: GetNewsV2Options = {
       endTime,
       ...(startTime ? { startTime } : { lookback }),
@@ -52,7 +56,8 @@ export function createNewsRoutes(ctx: EngineContext) {
     }
 
     let items = await ctx.newsProvider.getNewsV2(options)
-    items = items.filter((item) => matchesNewsFilters(item, sources, keyword, symbol))
+    items = items.filter((item) => matchesNewsFilters(item, sources, keyword, symbol) &&
+      (!tag || newsTags(item.metadata.categories, newsCategoryScope(item.metadata)).some((value) => newsTagKey(value) === tag)))
     items.sort(compareNewsItems)
     if (items.length > limit) items = items.slice(-limit)
 
@@ -63,6 +68,7 @@ export function createNewsRoutes(ctx: EngineContext) {
       source: item.metadata.source ?? null,
       link: item.metadata.link ?? null,
       categories: item.metadata.categories ?? null,
+      categoryScope: newsCategoryScope(item.metadata),
       image: safeHttpImageUrl(item.metadata.image),
     }))
 
@@ -106,7 +112,8 @@ function matchesNewsFilters(
     item.content,
     item.metadata.categories ?? '',
   ].join('\n').toLowerCase()
-  return (!keyword || searchable.includes(keyword)) && (!symbol || matchesSymbol(searchable, symbol))
+  const symbolText = [item.title, item.content].join('\n').toLowerCase()
+  return (!keyword || searchable.includes(keyword)) && (!symbol || matchesSymbol(symbolText, symbol))
 }
 
 function compareNewsItems(a: NewsItem, b: NewsItem): number {

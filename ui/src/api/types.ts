@@ -261,6 +261,7 @@ export interface NewsArticle {
   source: string | null
   link: string | null
   categories: string | null
+  categoryScope?: 'source' | 'article' | 'unknown'
   image?: string | null
 }
 
