@@ -184,6 +184,10 @@ jobs:
       # The native smoke needs UTA, Alice, and UI, not the Electron download.
       - run: pnpm install --frozen-lockfile --filter='!@traderalice/desktop'
 
+      # Real pnpm dev children load package exports rather than Vitest aliases.
+      - name: Build Guardian entry package dependencies
+        run: pnpm --filter @traderalice/update-lifecycle... build
+
       - name: Exercise Guardian recovery with real child processes
         run: pnpm test:system:guardian
         timeout-minutes: 3

@@ -157,6 +157,11 @@ describe('CI workflow authority lanes', () => {
     expect(devSmoke.if).toContain("beta_release_prep != 'true'")
     expect(commands(devSmoke)).toContain('pnpm test:system:guardian')
     expect(commands(devSmoke)).toContain('pnpm test:system:dev-stack')
+    const nativeCommands = commands(devSmoke)
+    const packageBuild = nativeCommands.indexOf('pnpm --filter @traderalice/update-lifecycle... build')
+    expect(packageBuild).toBeGreaterThanOrEqual(0)
+    expect(packageBuild).toBeLessThan(nativeCommands.indexOf('pnpm test:system:guardian'))
+    expect(packageBuild).toBeLessThan(nativeCommands.indexOf('pnpm test:system:dev-stack'))
   })
 
   it('validates the selected ref without a hidden scheduled checkout override', () => {

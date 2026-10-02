@@ -1,3 +1,4 @@
+import { runRendererCredentialPiSmoke } from './credential-pi-smoke.js'
 /**
  * Electron main process — OpenAlice's desktop guardian.
  *
@@ -80,7 +81,7 @@ let tray: Tray | null = null
 let restartingUTA = false
 let restartingConnector = false
 let pendingUTAMode: GuardianTradingModePlan | null = null
-let rendererOnboardingSmokeStarted = false
+let rendererCredentialPiSmokeStarted = false
 let rendererDataHomeSmokeStarted = false
 let rendererTradingModeSmokeStarted = false
 let rendererWorkspaceAcceptanceSmokeStarted = false
@@ -431,94 +432,6 @@ async function runRendererPtySmoke(win: BrowserWindow): Promise<void> {
   )
 }
 
-async function runRendererOnboardingSmoke(win: BrowserWindow): Promise<void> {
-  const result = await win.webContents.executeJavaScript(`(async () => {
-    const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
-    const json = async (res) => {
-      const text = await res.text()
-      let body = null
-      try { body = text ? JSON.parse(text) : null } catch { body = text }
-      if (!res.ok) throw new Error(res.status + ' ' + text)
-      return body
-    }
-    const waitFor = async (label, predicate, timeoutMs = 12000) => {
-      const deadline = Date.now() + timeoutMs
-      let last = null
-      while (Date.now() < deadline) {
-        try {
-          const value = await predicate()
-          if (value) return value
-        } catch (err) {
-          last = err
-        }
-        await sleep(100)
-      }
-      throw new Error('Timed out waiting for ' + label + (last ? ': ' + (last.message || String(last)) : ''))
-    }
-
-    await waitFor('Electron preload bridge', () => Boolean(
-      window.openAlice?.runtime && window.openAlice?.pty && window.openAlice?.dataHome && window.openAlice?.updater
-    ))
-
-    const runtimeInfo = await window.openAlice.runtime.info()
-    const dataHomeStatus = await window.openAlice.dataHome.getStatus()
-    if (dataHomeStatus.currentHome !== runtimeInfo.userDataHome) {
-      throw new Error('data-home bridge disagrees with runtime info')
-    }
-    if (dataHomeStatus.source !== 'environment' || dataHomeStatus.selectionLock !== 'openalice-home-env') {
-      throw new Error('isolated packaged smoke should be locked by OPENALICE_HOME')
-    }
-
-    // Fresh-user verification follows the real product shell. Workspace setup
-    // happens after the renderer opens; no retired wizard controls are involved.
-    await waitFor('product navigation', () => document.querySelector('[data-testid="activity-bar"]'))
-    await waitFor('asynchronous Chat preparation', async () => {
-      const setup = await json(await fetch('/api/workspaces/project-setup'))
-      if (setup.errors?.chat) throw new Error(setup.errors.chat)
-      const workspaceList = await json(await fetch('/api/workspaces'))
-      return !setup.pending?.includes('chat') && workspaceList.workspaces?.some(ws => ws.template === 'chat')
-    }, 60000)
-
-    const agents = await json(await fetch('/api/workspaces/agents'))
-    const pi = agents.agents?.find((agent) => agent.id === 'pi')
-    if (!pi?.installed) throw new Error('managed Pi was not detected by packaged /agents')
-
-    const tradingStatus = await json(await fetch('/api/trading/status'))
-    if (tradingStatus.mode !== 'lite') {
-      throw new Error('expected fresh onboarding trading mode to be lite, got ' + tradingStatus.mode)
-    }
-
-    // Readiness is intentionally lazy now that the wizard is gone. This
-    // acceptance explicitly probes Pi; app startup must not trigger it.
-    await json(await fetch('/api/agent-runtimes/readiness/probe', {
-      method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ agent: 'pi' })
-    }))
-    const readiness = await waitFor('Pi runtime readiness result', async () => {
-      const snapshot = await json(await fetch('/api/agent-runtimes/readiness'))
-      const row = snapshot.agents?.pi
-      return row && row.status !== 'unknown' && row.status !== 'checking' ? row : null
-    }, 60000)
-
-    return {
-      ok: true,
-      piPath: pi.binPath || null,
-      runtimeStatus: readiness.status,
-      runtimeSource: readiness.source,
-      tradingMode: tradingStatus.mode,
-      dataHome: dataHomeStatus.currentHome,
-    }
-  })()`, true) as {
-    ok?: boolean
-    piPath?: string | null
-    runtimeStatus?: string
-    runtimeSource?: string
-    tradingMode?: string
-    dataHome?: string
-  }
-  console.log(
-    `[guardian] electron smoke onboarding → ok mode=${result.tradingMode ?? ''} pi=${result.piPath ?? 'managed'} runtime=${result.runtimeStatus ?? ''}/${result.runtimeSource ?? ''} data=${result.dataHome ?? ''}`,
-  )
-}
 
 function configureDesktopUpdates(win: BrowserWindow, updateAttemptPath: string): ClientUpdateService {
   const lifecycle = new DesktopUpdateLifecycle(app.getPath('userData'), () => CLI_VERSION)
@@ -1498,14 +1411,14 @@ app.whenReady().then(async () => {
               }
             })
         }
-        if (process.env['OPENALICE_ELECTRON_SMOKE_ONBOARDING'] === '1' && !rendererOnboardingSmokeStarted) {
-          rendererOnboardingSmokeStarted = true
-          void runRendererOnboardingSmoke(win)
+        if (process.env['OPENALICE_ELECTRON_SMOKE_CREDENTIAL_PI'] === '1' && !rendererCredentialPiSmokeStarted) {
+          rendererCredentialPiSmokeStarted = true
+          void runRendererCredentialPiSmoke(win)
             .then(() => {
               if (process.env['OPENALICE_ELECTRON_SMOKE_EXIT'] === '1') shutdown()
             })
             .catch((err) => {
-              console.error(`[guardian] electron smoke onboarding → failed: ${err instanceof Error ? err.message : String(err)}`)
+              console.error(`[guardian] electron smoke credential-pi → failed: ${err instanceof Error ? err.message : String(err)}`)
               if (process.env['OPENALICE_ELECTRON_SMOKE_EXIT'] === '1') {
                 process.exitCode = 1
                 shutdown()

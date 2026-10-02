@@ -293,6 +293,7 @@ export function CredentialModal({ mode, cred, presets, agents, initialPresetId, 
                 {visiblePresets.map((item) => (
                   <button
                     key={item.id}
+                    data-credential-preset={item.id}
                     onClick={() => pickPreset(item)}
                     className="flex min-h-12 w-full items-center gap-3 border-b border-border/60 px-3 py-2 text-left transition-colors last:border-b-0 hover:bg-muted/60"
                   >
@@ -503,7 +504,7 @@ export function CredentialModal({ mode, cred, presets, agents, initialPresetId, 
               )}
               {gate.testing && <p className="text-sm text-muted-foreground">{t('aiProvider.credentialModal.testingConnection')}</p>}
               {gate.result && !staleResult && (
-                <div className={`min-w-0 max-w-full overflow-hidden rounded-lg px-3 py-2.5 text-sm ${gate.result.ok ? 'bg-success/10 text-success' : 'bg-destructive/10 text-destructive'}`}>
+                <div data-testid="credential-test-result" data-ok={gate.result.ok} className={`min-w-0 max-w-full overflow-hidden rounded-lg px-3 py-2.5 text-sm ${gate.result.ok ? 'bg-success/10 text-success' : 'bg-destructive/10 text-destructive'}`}>
                   {gate.result.ok ? (
                     gate.result.response?.trim() ? (
                       <>
