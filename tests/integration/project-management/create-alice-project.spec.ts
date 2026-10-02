@@ -9,7 +9,7 @@ import {
   parseCreateAliceProjectArgs,
   runCreateAliceProjectCommand,
 } from '../../../packages/cli/src/create-alice-project.ts'
-import { supervisorConfigPath } from '../../../packages/cli/src/supervisor-config.ts'
+import { readSupervisorConfig, supervisorConfigPath, writeSupervisorConfig } from '../../../packages/cli/src/supervisor-config.ts'
 
 const temporary: string[] = []
 
@@ -25,7 +25,11 @@ describe('openalice create alice-project', () => {
     )
   })
 
-  it('creates a NanoAlice project stamp and registry entry', async () => {
+  it.each([
+    null,
+    { machine: 'local', project: 'default' },
+    { machine: 'cloud', project: 'research' },
+  ])('creates a NanoAlice project without changing Default %j', async (defaultTarget) => {
     const root = await mkdtemp(join(tmpdir(), 'create-nano-'))
     temporary.push(root)
     const homeDir = join(root, 'user')
@@ -36,6 +40,11 @@ describe('openalice create alice-project', () => {
       cwd: root,
       platform: 'linux',
       env: { XDG_CONFIG_HOME: join(root, 'config') },
+    })
+    await writeSupervisorConfig(context.supervisorRoot, {
+      ...await readSupervisorConfig(context.supervisorRoot),
+      schemaVersion: 3,
+      defaultTarget,
     })
     const stdout: string[] = []
     await expect(runCreateAliceProjectCommand(
@@ -48,6 +57,8 @@ describe('openalice create alice-project', () => {
     )).resolves.toBe(0)
     expect(JSON.parse(await readFile(join(home, 'workspace-setup.json'), 'utf8')).pending).toEqual(['chat', 'auto-quant', 'auto-prediction'])
     expect(stdout.join('')).toContain('NanoAlice')
+    expect(stdout.join('')).toContain('Lifecycle default unchanged.')
+    expect(stdout.join('')).not.toContain('Selected as')
     expect(stdout.join('')).toContain('openalice up --project office')
     expect(JSON.parse(await readFile(aliceProjectProductStampPath(home), 'utf8'))).toEqual({
       version: 1,
@@ -56,8 +67,9 @@ describe('openalice create alice-project', () => {
     const saved = JSON.parse(await readFile(
       supervisorConfigPath(context.supervisorRoot),
       'utf8',
-    )) as { projects?: { office?: { product?: string } } }
+    )) as { defaultTarget: unknown; projects?: { office?: { product?: string } } }
     expect(saved.projects?.office?.product).toBe('nano')
+    expect(saved.defaultTarget).toEqual(defaultTarget)
   })
 })
 

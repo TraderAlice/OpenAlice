@@ -422,10 +422,11 @@ describe('IssueDetail property controls', () => {
     render(<IssueDetail wsId="demo-ws-auto-quant" id="morning-scan" />)
 
     fireEvent.click(screen.getByRole('button', { name: 'Schedule settings' }))
-    const timeout = await screen.findByRole('combobox', { name: 'Run timeout' })
-    expect(timeout.textContent).toBe('No limit')
-    fireEvent.click(timeout)
-    await userEvent.click(await screen.findByRole('option', { name: '30m' }))
+    const timeout = await screen.findByRole('combobox', { name: 'Run timeout' }) as HTMLSelectElement
+    expect(timeout.value).toBe('')
+    fireEvent.change(timeout, { target: { value: '30m' } })
+    expect(mocks.updateIssue).not.toHaveBeenCalled()
+    fireEvent.click(screen.getByRole('button', { name: 'Save changes' }))
     await waitFor(() => {
       expect(mocks.updateIssue).toHaveBeenCalledWith(
         'demo-ws-auto-quant',
@@ -449,11 +450,13 @@ describe('IssueDetail property controls', () => {
     const toggle = await screen.findByRole('checkbox', { name: /Retry a missed fire/ }) as HTMLInputElement
     expect(toggle.checked).toBe(true)
     fireEvent.click(toggle)
+    expect(mocks.updateIssue).not.toHaveBeenCalled()
+    fireEvent.click(screen.getByRole('button', { name: 'Save changes' }))
     await waitFor(() => {
       expect(mocks.updateIssue).toHaveBeenCalledWith(
         'demo-ws-auto-quant',
         'morning-scan',
-        { catchUp: false },
+        { when: { ...scheduledIssue.issue.when!, catchUp: false } },
       )
     })
   })

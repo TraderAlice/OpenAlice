@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { ReactNode } from 'react'
 import type { TFunction } from 'i18next'
 import { useTranslation } from 'react-i18next'
-import { ArrowLeft, Check, ChevronRight, Clock, Cpu, Hash, History, Inbox, KeyRound, ListChecks, LoaderCircle, MessageSquare, Play, RotateCcw, Settings, SlidersHorizontal, Timer, TrendingUp, UserRound, X } from 'lucide-react'
+import { ArrowLeft, Check, ChevronRight, Clock, Cpu, Hash, History, Inbox, KeyRound, ListChecks, LoaderCircle, MessageSquare, Play, RotateCcw, Settings, SlidersHorizontal, TrendingUp, UserRound, X } from 'lucide-react'
 
 import type { HeadlessTaskStatus, HeadlessTurnProgress } from '../api/headless'
 import type { InboxEntry } from '../api/inbox'
@@ -18,11 +18,10 @@ import type {
   IssueProvenanceRecord,
   IssueRunRecord,
   IssueStatus,
-  IssueTimeout,
   WikilinkIssueRef,
   WikilinkResolution,
 } from '../api/issues'
-import { DEFAULT_ISSUE_COMMENT_PROMPT, ISSUE_TIMEOUTS, issuesApi } from '../api/issues'
+import { DEFAULT_ISSUE_COMMENT_PROMPT, issuesApi } from '../api/issues'
 
 import {
   getAgentReadiness,
@@ -53,6 +52,7 @@ import { useWikilinkHandler } from '../live/wikilink'
 import { useWorkspace } from '../tabs/store'
 import { ConfirmDialog } from './ConfirmDialog'
 import { ContextHelp } from './ContextHelp'
+import { IssueScheduleEditor } from './IssueScheduleEditor'
 import { CadenceSummary, PropertyMenu } from './IssuesBoard'
 import { IssueSectionNavigation } from './IssueSectionNavigation'
 import { STATUS_META } from './issue-status-meta'
@@ -467,86 +467,6 @@ function IssueAiEditor({
   )
 }
 
-function SchedulePolicyEditor({
-  issue,
-  saving,
-  onPatch,
-}: {
-  issue: IssueDetailIssue
-  saving: boolean
-  onPatch: (patch: IssuePatch) => Promise<boolean>
-}) {
-  const { t } = useTranslation()
-  const [open, setOpen] = useState(false)
-
-  if (!issue.when) return null
-
-  return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <Button
-        type="button"
-        variant="ghost"
-        size="sm"
-        disabled={saving}
-        onClick={() => setOpen(true)}
-        aria-label={t('issues.detail.editSchedule')}
-        className="h-auto w-full justify-start px-2 py-2 text-left"
-      >
-        <CadenceSummary when={issue.when} compact />
-        <ChevronRight size={13} className="ml-auto shrink-0 text-muted-foreground" aria-hidden />
-      </Button>
-      <DialogContent className="sm:max-w-md">
-        <DialogHeader>
-          <DialogTitle>{t('issues.detail.scheduleSettings')}</DialogTitle>
-          <DialogDescription>{t('issues.detail.scheduleSettingsDescription')}</DialogDescription>
-        </DialogHeader>
-        <div className="space-y-4">
-          {issue.when.kind === 'cron' && (
-            <label className="flex min-h-12 items-center gap-3 rounded-lg border border-border bg-muted/20 px-3 py-1">
-              <Checkbox
-                checked={issue.when.catchUp !== false}
-                disabled={saving}
-                aria-label={t('issues.detail.catchUp')}
-                onChange={(event) => onPatch({ catchUp: event.target.checked })}
-              />
-              <span>
-                <span className="block text-sm font-medium text-foreground">{t('issues.detail.catchUp')}</span>
-                <span className="mt-0.5 block text-xs leading-relaxed text-muted-foreground">
-                  {t('issues.detail.catchUpDescription')}
-                </span>
-              </span>
-            </label>
-          )}
-          <label className="block space-y-1.5">
-            <span className="flex items-center gap-2 text-xs font-medium text-foreground">
-              <Timer size={14} aria-hidden />
-              {t('issues.detail.timeout')}
-            </span>
-            <Select
-              size="sm"
-              aria-label={t('issues.detail.timeout')}
-              value={issue.timeout ?? ''}
-              disabled={saving}
-              onValueChange={(selectedValue) => {
-                const value = selectedValue
-                onPatch({ timeout: value === '' ? null : value as IssueTimeout })
-              }}
-              options={[
-                { value: '', label: t('issues.detail.timeoutNone') },
-                ...ISSUE_TIMEOUTS.map((timeout) => ({ value: timeout, label: timeout })),
-              ]}
-            />
-            <span className="block text-sm leading-relaxed text-muted-foreground">{t('issues.detail.timeoutHint')}</span>
-          </label>
-        </div>
-        <DialogFooter>
-          <Button onClick={() => setOpen(false)}>{t('common.close')}</Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-  )
-}
-
 function CommentBehaviorEditor({
   value,
   disabled,
@@ -947,7 +867,7 @@ function PropertiesRail({
 
         {issue.when && (
           <InspectorSection title={t('issues.detail.schedule')}>
-            <div className="-mx-2"><SchedulePolicyEditor issue={issue} saving={saving} onPatch={onPatch} /></div>
+            <div className="-mx-2"><IssueScheduleEditor key={issue.id} issue={issue} saving={saving} onPatch={onPatch}><CadenceSummary when={issue.when} compact /></IssueScheduleEditor></div>
             <div className="mt-3 flex items-center justify-between gap-3 border-t border-border/50 pt-3 text-xs">
               <span className="flex items-center gap-1.5 text-muted-foreground">
                 <Clock size={13} aria-hidden />
@@ -1705,8 +1625,8 @@ function WikilinkPicker({
  * priority editable inline; Agent owns assignment and runtime configuration.
  * Each write PATCHes and applies the
  * server-returned detail — authoritative, refetch-free). The scheduled agent
- * runtime is editable because it is operational routing; schedule cadence and
- * fire prompt remain file-owned frontmatter.
+ * runtime and schedule are edited through the same file mutation owner.
+ * Schedule drafts apply explicitly; the canonical What remains file-backed.
  */
 interface IssueDetailProps {
   wsId: string

@@ -1,4 +1,6 @@
 import { http, HttpResponse } from 'msw'
+import { scheduleValidationError } from '../../../../src/core/schedule-expr'
+import type { ScheduleWhen } from '../../api/schedule'
 import type { ModelReasoningEffort } from '../../api'
 import { ISSUE_TIMEOUTS, type IssuePriority, type IssueStatus, type IssueTimeout } from '../../api/issues'
 import {
@@ -77,6 +79,8 @@ export const issuesHandlers = [
       credentialSource?: unknown
       model?: unknown
       effort?: unknown
+      when?: unknown
+      catchUp?: unknown
       timeout?: unknown
       what?: unknown
       commentPrompt?: unknown
@@ -94,6 +98,8 @@ export const issuesHandlers = [
       credentialSource?: 'native' | null
       model?: string | null
       effort?: ModelReasoningEffort | null
+      when?: ScheduleWhen
+      catchUp?: boolean
       timeout?: IssueTimeout | null
       what?: string
       commentPrompt?: string | null
@@ -174,6 +180,19 @@ export const issuesHandlers = [
         patch.timeout = body.timeout as IssueTimeout
       }
     }
+    if ('when' in body) {
+      const current = demoIssueDetail(String(params.wsId), String(params.id))
+      if (!current) return HttpResponse.json({ error: 'not_found' }, { status: 404 })
+      if (!current.issue.when || current.issue.connectorDesk) return HttpResponse.json({ error: 'schedule_not_editable' }, { status: 422 })
+      const error = scheduleValidationError(body.when)
+      if (error) return HttpResponse.json({ error: 'invalid_issue', message: error }, { status: 422 })
+      patch.when = body.when as ScheduleWhen
+    }
+    if (body.catchUp !== undefined) {
+      const when = patch.when ?? demoIssueDetail(String(params.wsId), String(params.id))?.issue.when
+      if (typeof body.catchUp !== 'boolean' || when?.kind !== 'cron') return HttpResponse.json({ error: 'invalid_catch_up' }, { status: 400 })
+      patch.catchUp = body.catchUp
+    }
     if (body.what !== undefined) {
       if (typeof body.what !== 'string' || !body.what.trim()) {
         return HttpResponse.json({ error: 'invalid_what' }, { status: 400 })
@@ -201,6 +220,8 @@ export const issuesHandlers = [
       && patch.timeout === undefined
       && patch.what === undefined
       && patch.commentPrompt === undefined
+      && patch.when === undefined
+      && patch.catchUp === undefined
     ) {
       return HttpResponse.json({ error: 'no_fields' }, { status: 400 })
     }
