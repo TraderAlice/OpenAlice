@@ -10,6 +10,7 @@ Decisions: preserve exact-source identity; reuse recorded clean local acceptance
 
 - [x] Dev `61f3943d`: full suite 7,698 passed / 9 skipped, typechecks, critical-local, unsigned macOS arm64 credential/Pi, Workspace and startup acceptance.
 - [x] Exact-head live dev installer CI passed: run 36982439405.
+- [x] Repair promotion-only gate prerequisites and Quit/navigation semantics through #1737 and #1738; full suite now 7,701 passed / 9 skipped, native arm64 Workspace/N-1 and targeted Intel N-1 passed.
 - [ ] Promotion PR and required source/Windows/installer/remote gates.
 - [ ] Focused beta version-prep PR to master.
 - [ ] Exact-master Release dispatch and final native candidate acceptance.
