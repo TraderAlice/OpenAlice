@@ -97,6 +97,8 @@ describe('NewsPage inline stream', () => {
     render(<RoutedNewsPage />)
     await screen.findByRole('heading', { name: 'Story 80' })
     expect(screen.getAllByRole('listitem')).toHaveLength(40)
+    // Rendering the first batch does not guarantee the observer effect has registered.
+    await waitFor(() => expect(notify).toBeTypeOf('function'))
     act(() => notify(false))
     expect(screen.queryByRole('heading', { name: 'Story 40' })).toBeNull()
     act(() => { notify(true); notify(true) })
