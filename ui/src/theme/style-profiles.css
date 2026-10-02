@@ -30,6 +30,12 @@
   --oa-surface-background: var(--secondary);
   --oa-surface-border: transparent;
   --oa-surface-shadow: none;
+  --oa-header-background: var(--background);
+  --oa-navigation-background: var(--sidebar);
+  --oa-selection-background: var(--sidebar-accent);
+  --oa-selection-shadow: none;
+  --oa-popup-shadow: 0 3px 8px color-mix(in srgb, var(--shadow-color) 14%, transparent);
+  position: relative;
   display: flex;
   height: 88px;
   overflow: hidden;
@@ -47,35 +53,51 @@
   gap: 5px;
   padding: 10px 6px;
   border-right: 1px solid var(--border);
-  background: var(--sidebar);
+  background: var(--oa-navigation-background);
 }
 
 .oa-style-profile-rail > i {
-  height: 4px;
+  height: 8px;
   border-radius: var(--radius-sm);
   background: var(--muted-foreground);
   opacity: 0.35;
 }
 
 .oa-style-profile-rail > i:first-child {
-  background: var(--foreground);
-  opacity: 0.8;
+  background: var(--oa-selection-background);
+  box-shadow: var(--oa-selection-shadow);
+  opacity: 1;
 }
 
 .oa-style-profile-canvas {
   display: grid;
   min-width: 0;
   flex: 1;
-  grid-template-rows: 7px 1fr 12px;
-  gap: 7px;
-  padding: 10px;
+  grid-template-rows: 17px 1fr 12px;
+  gap: 5px;
+  padding: 0 6px 6px;
 }
 
 .oa-style-profile-toolbar {
-  width: 52%;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-inline: -6px;
+  padding-inline: 6px;
+  border-bottom: 1px solid var(--oa-surface-border, var(--border));
+  background: var(--oa-header-background);
+}
+
+.oa-style-profile-toolbar > i {
+  width: 36%;
+  height: 3px;
   border-radius: var(--radius-sm);
-  background: var(--foreground);
-  opacity: 0.6;
+  background: var(--muted-foreground);
+}
+
+.oa-style-profile-toolbar > i + i {
+  width: 12%;
+  margin-left: auto;
 }
 
 .oa-style-profile-chart {
@@ -94,6 +116,31 @@
   background: var(--oa-surface-background, var(--secondary));
 }
 
+.oa-style-profile-popup {
+  position: absolute;
+  top: 23px;
+  right: 8px;
+  display: grid;
+  width: 34%;
+  gap: 4px;
+  padding: 5px;
+  border: 1px solid var(--oa-surface-border, var(--border));
+  border-radius: var(--radius-xl);
+  background: var(--popover);
+  box-shadow: var(--oa-popup-shadow);
+}
+
+.oa-style-profile-popup > i {
+  height: 5px;
+  border-radius: var(--radius-sm);
+  background: var(--muted);
+}
+
+.oa-style-profile-popup > i:first-child {
+  background: var(--oa-selection-background);
+  box-shadow: var(--oa-selection-shadow);
+}
+
 :root[data-ui-style="broker-classic"],
 [data-ui-style-preview="broker-classic"] {
   --radius-sm: 2px;
@@ -103,9 +150,13 @@
   --radius-2xl: 4px;
   --radius-3xl: 6px;
   --oa-surface-background: var(--background);
-  --oa-surface-border: color-mix(in srgb, var(--foreground) 22%, var(--background));
+  --oa-surface-border: color-mix(in srgb, var(--foreground) 24%, var(--background));
   --oa-surface-shadow: none;
-  --oa-header-background: var(--secondary);
+  --oa-header-background: color-mix(in srgb, var(--foreground) 10%, var(--background));
+  --oa-navigation-background: color-mix(in srgb, var(--foreground) 5%, var(--background));
+  --oa-selection-background: color-mix(in srgb, var(--foreground) 14%, var(--background));
+  --oa-selection-shadow: inset 0 0 0 1px color-mix(in srgb, var(--foreground) 24%, transparent);
+  --oa-popup-shadow: 0 3px 0 color-mix(in srgb, var(--shadow-color) 10%, transparent);
   --motion-fast: 80ms;
   --motion-standard: 120ms;
   --motion-slow: 180ms;
@@ -115,27 +166,39 @@
 [data-ui-style-preview="studio"] {
   --radius-sm: 6px;
   --radius-md: 10px;
-  --radius-lg: 12px;
-  --radius-xl: 14px;
-  --radius-2xl: 18px;
-  --radius-3xl: 20px;
+  --radius-lg: 14px;
+  --radius-xl: 16px;
+  --radius-2xl: 20px;
+  --radius-3xl: 24px;
   --oa-surface-background: var(--card);
   --oa-surface-border: color-mix(in srgb, var(--foreground) 9%, var(--background));
-  --oa-surface-shadow: 0 2px 3px color-mix(in srgb, var(--shadow-color) 4%, transparent),
-    0 8px 20px color-mix(in srgb, var(--shadow-color) 5%, transparent);
+  --oa-surface-shadow: 0 1px 2px color-mix(in srgb, var(--shadow-color) 6%, transparent),
+    0 6px 16px color-mix(in srgb, var(--shadow-color) 7%, transparent);
+  --oa-header-background: var(--card);
+  --oa-navigation-background: color-mix(in srgb, var(--foreground) 6%, var(--background));
+  --oa-selection-background: var(--background);
+  --oa-selection-shadow: 0 1px 3px color-mix(in srgb, var(--shadow-color) 12%, transparent),
+    0 0 0 1px color-mix(in srgb, var(--foreground) 6%, transparent);
+  --oa-popup-shadow: 0 4px 8px color-mix(in srgb, var(--shadow-color) 10%, transparent),
+    0 16px 40px color-mix(in srgb, var(--shadow-color) 16%, transparent);
 }
 
 :root[data-ui-style="outline"],
 [data-ui-style-preview="outline"] {
-  --radius-sm: 3px;
+  --radius-sm: 4px;
   --radius-md: 6px;
-  --radius-lg: 8px;
-  --radius-xl: 8px;
-  --radius-2xl: 8px;
-  --radius-3xl: 10px;
+  --radius-lg: 6px;
+  --radius-xl: 6px;
+  --radius-2xl: 6px;
+  --radius-3xl: 8px;
   --oa-surface-background: var(--background);
-  --oa-surface-border: color-mix(in srgb, var(--foreground) 30%, var(--background));
+  --oa-surface-border: color-mix(in srgb, var(--foreground) 52%, var(--background));
   --oa-surface-shadow: none;
+  --oa-header-background: var(--background);
+  --oa-navigation-background: var(--background);
+  --oa-selection-background: var(--background);
+  --oa-selection-shadow: inset 0 0 0 1.5px var(--foreground);
+  --oa-popup-shadow: none;
 }
 
 :root[data-ui-style="win98"],
@@ -155,6 +218,11 @@
   --oa-surface-background: var(--secondary);
   --oa-surface-border: var(--oa-win-shadow);
   --oa-surface-shadow: inset 1px 1px var(--oa-win-highlight), inset -1px -1px var(--oa-win-shadow);
+  --oa-header-background: var(--secondary);
+  --oa-navigation-background: var(--secondary);
+  --oa-selection-background: var(--muted);
+  --oa-selection-shadow: inset 1px 1px var(--oa-win-shadow), inset -1px -1px var(--oa-win-highlight);
+  --oa-popup-shadow: inset 1px 1px var(--oa-win-highlight), inset -1px -1px var(--oa-win-shadow);
 }
 
 :root[data-ui-style]:not([data-ui-style="default"]) .oa-data-surface,
@@ -173,20 +241,62 @@
   margin-top: var(--oa-panel-inset, 16px);
 }
 
-:root[data-ui-style="broker-classic"] .oa-config-section > .oa-section-heading:not(:last-child) {
-  margin: calc(-1 * var(--oa-panel-inset, 16px));
-  margin-bottom: var(--oa-panel-inset, 16px);
-  padding: 8px var(--oa-panel-inset, 16px);
-  border-bottom: 1px solid var(--oa-surface-border);
-  border-radius: var(--radius-2xl) var(--radius-2xl) 0 0;
-  background: var(--oa-header-background);
+:root:is([data-ui-style="broker-classic"], [data-ui-style="studio"], [data-ui-style="outline"]) :where(
+  #activity-bar,
+  [data-page-sidebar-panel="navigator"] aside,
+  .oa-page-sidebar-dialog aside
+) {
+  background: var(--oa-navigation-background);
+  border-color: var(--oa-surface-border);
 }
 
-:root[data-ui-style="broker-classic"] .oa-data-surface-header {
-  padding-block: 8px;
-  margin-bottom: var(--oa-panel-inset, 16px);
-  border-bottom: 1px solid var(--oa-surface-border);
+:root:is([data-ui-style="broker-classic"], [data-ui-style="studio"], [data-ui-style="outline"]) :where(
+  .oa-topbar,
+  .oa-data-surface-header
+) {
   background: var(--oa-header-background);
+  box-shadow: inset 0 -1px var(--oa-surface-border);
+}
+
+:root:is([data-ui-style="broker-classic"], [data-ui-style="studio"], [data-ui-style="outline"]) :where(
+  [data-slot="popover-content"],
+  [data-slot="dropdown-menu-content"],
+  [data-slot="dropdown-menu-sub-content"],
+  [data-slot="select-content"],
+  [data-slot="autocomplete-content"],
+  [data-slot="dialog-content"]
+) {
+  background: var(--popover);
+  border: 1px solid var(--oa-surface-border);
+  box-shadow: var(--oa-popup-shadow);
+}
+
+:root:is([data-ui-style="broker-classic"], [data-ui-style="studio"], [data-ui-style="outline"]) :where(
+  .oa-nav-row[aria-current="page"],
+  .oa-nav-item[aria-current="page"]:not(.oa-harness-nav-header > .oa-nav-item),
+  .oa-sidebar-child-row[data-active="true"],
+  .oa-harness-nav-header:has(> [aria-current="page"])
+):not(:focus-visible):not(:focus-within) {
+  background: var(--oa-selection-background);
+  box-shadow: var(--oa-selection-shadow);
+}
+
+:root:is([data-ui-style="broker-classic"], [data-ui-style="outline"]) :where(
+  .oa-field-control,
+  [data-slot="tabs-list"]
+) {
+  border-color: var(--oa-surface-border);
+  background: var(--background);
+}
+
+:root:is([data-ui-style="broker-classic"], [data-ui-style="outline"]) [data-slot="tabs-trigger"][data-active]:not(:focus-visible) {
+  color: var(--foreground);
+  background: var(--oa-selection-background);
+  box-shadow: var(--oa-selection-shadow);
+}
+
+:root[data-ui-style="studio"] [data-slot="tabs-list"] {
+  background: var(--oa-navigation-background);
 }
 
 :root[data-ui-style="broker-classic"] table {
@@ -195,11 +305,19 @@
 }
 
 :root[data-ui-style="broker-classic"] :where(th, td) {
-  border-right: 1px solid var(--border);
+  box-shadow: inset -1px 0 var(--oa-surface-border);
 }
 
 :root[data-ui-style="broker-classic"] :where(th, td):last-child {
-  border-right: 0;
+  box-shadow: none;
+}
+
+:root[data-ui-style="broker-classic"] tr {
+  border-color: var(--oa-surface-border);
+}
+
+:root[data-ui-style="broker-classic"] :where(thead, thead > tr) {
+  background: var(--oa-header-background);
 }
 
 :root[data-ui-style="broker-classic"] tbody > tr:nth-child(even) {
@@ -209,11 +327,6 @@
 :root[data-ui-style="broker-classic"] :where(td.tabular-nums, .oa-metric-value) {
   font-family: var(--font-mono);
   letter-spacing: -0.025em;
-}
-
-:root[data-ui-style="outline"] :where(.oa-nav-row, .oa-nav-item)[aria-current="page"]:not(:focus-visible) {
-  background: var(--background);
-  box-shadow: inset 0 0 0 1px var(--foreground);
 }
 
 :root[data-ui-style="studio"] [data-slot="button"]:is([data-variant="default"], [data-variant="outline"]):not(:disabled):not(:focus-visible) {

@@ -43,13 +43,26 @@ afterEach(() => {
 })
 
 describe('AppearanceSection palette pair editor', () => {
-  it('switches component style immediately without changing the palette pair', () => {
+  it('switches every component style immediately and preserves the saved palette pair', () => {
     render(<AppearanceSection />)
 
     expect(screen.getByRole('radio', { name: 'Default' }).getAttribute('aria-checked')).toBe('true')
-    fireEvent.click(screen.getByRole('radio', { name: 'Windows 98' }))
+    const profiles = [
+      ['Broker Classic', 'broker-classic'],
+      ['Studio', 'studio'],
+      ['Outline', 'outline'],
+      ['Default', 'default'],
+      ['Windows 98', 'win98'],
+    ] as const
+    const selections = profiles.map(([label]) => {
+      fireEvent.click(screen.getByRole('radio', { name: label }))
+      const { uiStyle, dayPalette, nightPalette, stylePaletteMode } = useThemeStore.getState()
+      return { uiStyle, dayPalette, nightPalette, stylePaletteMode }
+    })
 
-    expect(useThemeStore.getState().uiStyle).toBe('win98')
+    expect(selections).toEqual(profiles.map(([, uiStyle]) => ({
+      uiStyle, dayPalette: 'paper', nightPalette: 'graphite', stylePaletteMode: 'saved',
+    })))
     expect(useThemeStore.getState().dayPalette).toBe('paper')
     expect(useThemeStore.getState().nightPalette).toBe('graphite')
     expect(useThemeStore.getState().stylePaletteMode).toBe('saved')

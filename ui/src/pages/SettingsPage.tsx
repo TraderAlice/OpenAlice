@@ -384,13 +384,14 @@ function StyleProfileCard({
       <span className="oa-style-profile-preview" data-ui-style-preview={profile} aria-hidden>
         <span className="oa-style-profile-rail"><i /><i /><i /><i /></span>
         <span className="oa-style-profile-canvas">
-          <span className="oa-style-profile-toolbar" />
+          <span className="oa-style-profile-toolbar"><i /><i /></span>
           <svg className="oa-style-profile-chart" viewBox="0 0 150 32" preserveAspectRatio="none">
             <path d="M8 25H142M8 16H142" fill="none" stroke="var(--border)" strokeWidth="0.6" />
             <path d="M8 24L30 20L46 23L65 13L88 16L105 9L125 12L142 6" fill="none" stroke="var(--foreground)" strokeWidth="1.5" />
           </svg>
           <span className="grid grid-cols-3 gap-1"><i className="oa-style-profile-row" /><i className="oa-style-profile-row" /><i className="oa-style-profile-row" /></span>
         </span>
+        <span className="oa-style-profile-popup"><i /><i /><i /></span>
       </span>
       <span className="mt-2 flex items-center justify-between gap-2 text-sm font-semibold text-foreground">
         {label}
