@@ -35,18 +35,20 @@ export function ModelCombobox({
   const listId = useId()
   const inputRef = useRef<HTMLInputElement>(null)
   const [open, setOpen] = useState(false)
-  const [activeIndex, setActiveIndex] = useState(-1)
+  const [activeModelId, setActiveModelId] = useState<string | null>(null)
+  const activeIndex = suggestions.findIndex((model) => model.id === activeModelId)
+  const activeModel = suggestions[activeIndex]
 
   const openSuggestions = () => {
     if (suggestions.length === 0) return
     setOpen(true)
-    setActiveIndex(0)
+    setActiveModelId(suggestions[0]?.id ?? null)
   }
 
   const chooseSuggestion = (model: LabeledOption) => {
     onChange(model.id)
     setOpen(false)
-    setActiveIndex(-1)
+    setActiveModelId(null)
   }
 
   return (
@@ -56,7 +58,7 @@ export function ModelCombobox({
         const next = event.relatedTarget as Node | null
         if (!next || !event.currentTarget.contains(next)) {
           setOpen(false)
-          setActiveIndex(-1)
+          setActiveModelId(null)
         }
       }}
     >
@@ -79,23 +81,20 @@ export function ModelCombobox({
         }}
         onFocus={openSuggestions}
         onKeyDown={(event) => {
-          if (suggestions.length === 0) return
-          if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
-            event.preventDefault()
-            setOpen(true)
-            setActiveIndex((current) => {
-              if (current < 0) return event.key === 'ArrowUp' ? suggestions.length - 1 : 0
-              return event.key === 'ArrowUp'
-                ? (current - 1 + suggestions.length) % suggestions.length
-                : (current + 1) % suggestions.length
-            })
-          } else if (event.key === 'Enter' && open && activeIndex >= 0) {
-            event.preventDefault()
-            chooseSuggestion(suggestions[activeIndex]!)
-          } else if (event.key === 'Escape' && open) {
+          if (event.key === 'Escape' && open) {
             event.preventDefault()
             setOpen(false)
-            setActiveIndex(-1)
+            setActiveModelId(null)
+          } else if (suggestions.length > 0 && (event.key === 'ArrowDown' || event.key === 'ArrowUp')) {
+            event.preventDefault()
+            setOpen(true)
+            const nextIndex = activeIndex < 0
+              ? event.key === 'ArrowUp' ? suggestions.length - 1 : 0
+              : (activeIndex + (event.key === 'ArrowUp' ? -1 : 1) + suggestions.length) % suggestions.length
+            setActiveModelId(suggestions[nextIndex]?.id ?? null)
+          } else if (event.key === 'Enter' && open && activeModel) {
+            event.preventDefault()
+            chooseSuggestion(activeModel)
           }
         }}
         placeholder={placeholder ?? 'model id'}
@@ -112,7 +111,7 @@ export function ModelCombobox({
           onClick={() => {
             if (open) {
               setOpen(false)
-              setActiveIndex(-1)
+              setActiveModelId(null)
             } else {
               openSuggestions()
               inputRef.current?.focus()
@@ -140,7 +139,7 @@ export function ModelCombobox({
               aria-selected={model.id === value}
               tabIndex={-1}
               onMouseDown={(event) => event.preventDefault()}
-              onMouseEnter={() => setActiveIndex(index)}
+              onMouseEnter={() => setActiveModelId(model.id)}
               onClick={() => chooseSuggestion(model)}
               className={`flex w-full items-start gap-3 rounded-md px-2.5 py-2 text-left transition-colors ${
                 index === activeIndex ? 'bg-muted text-foreground' : 'text-muted-foreground hover:bg-muted/70 hover:text-foreground'
