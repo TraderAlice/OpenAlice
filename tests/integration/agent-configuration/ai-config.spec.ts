@@ -1072,6 +1072,30 @@ describe('piAdapter AI-config', () => {
     expect(existsSync(join(dir, '.pi-agent'))).toBe(false);
   });
 
+  it('keeps sibling models across write, read, reconciliation and Session projection', async () => {
+    await piAdapter.writeAiConfig!(dir, {
+      baseUrl: 'https://fixture.test/v1', apiKey: 'fixture-key', model: 'research',
+      contextWindow: 64000, reasoning: true,
+      models: [
+        { id: 'research', contextWindow: 128000, reasoning: true },
+        { id: 'fast', contextWindow: 32000, reasoning: false },
+      ],
+    });
+    const expected = [
+      { id: 'research', contextWindow: 64000, reasoning: true },
+      { id: 'fast', contextWindow: 32000, reasoning: false },
+    ];
+    expect((await readWorkspaceProvider())['models']).toEqual(expected);
+    await localizePiWorkspaceProvider(dir);
+    const ai = await piAdapter.readAiConfig!(dir);
+    expect(ai?.models).toEqual(expected);
+    const projected = piAdapter.sessionRuntime!.project({ cwd: dir, env: {} }, {
+      binding: { version: 1, credential: { source: 'vault', credentialSlug: 'fixture' }, model: 'research' }, ai,
+    });
+    expect(JSON.parse(projected.env.OPENALICE_PI_SESSION_PROVIDER).provider.models).toEqual(expected);
+    expect(projected.interactiveArgs).toContain('research');
+  });
+
   it('keeps concurrent Workspace providers isolated in their own project state', async () => {
     const other = join(dir, 'second-workspace');
     await mkdir(other, { recursive: true });
@@ -1321,7 +1345,7 @@ describe('piAdapter AI-config', () => {
     }));
 
     await expect(localizePiWorkspaceProvider(dir)).resolves.toBe(true);
-    expect((await readWorkspaceProvider())['models']).toEqual([{ id: 'intended-model' }]);
+    expect((await readWorkspaceProvider())['models']).toEqual([{ id: 'stale-model', reasoning: true }, { id: 'intended-model' }]);
     expect((await readGlobalModels())['providers']).toEqual({
       user: { name: 'User provider', api: 'openai-completions' },
     });

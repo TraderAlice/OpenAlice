@@ -24,6 +24,7 @@ import {
 } from '@/core/config.js'
 import { DEFAULT_MODEL_BY_VENDOR } from '@/ai-providers/preset-catalog.js'
 import { createAIProvider } from '@/ai-providers/provider.js'
+import { cachedProviderModels } from '@/ai-providers/model-catalog.js'
 import { modelSupportsReasoning, resolveModelSemantics, type ModelSemantics } from '@/ai-providers/model-semantics.js'
 import type {
   AdapterRegistry,
@@ -228,8 +229,19 @@ export function credentialToWorkspaceAiCred(
   }
   if (overrides.wireApi) cred.wireApi = overrides.wireApi
 
+  const provider = credentialSlug ? createAIProvider(credentialSlug, credential as Credential) : undefined
+  if (adapter.id === 'pi' && provider) {
+    cred.models = cachedProviderModels(provider).map(entry => {
+      const projected = applyRegisteredModelSemantics({ model: entry.id }, capabilities, credential.vendor, entry.semantics)
+      return {
+        id: entry.id,
+        ...(projected.contextWindow != null ? { contextWindow: projected.contextWindow } : {}),
+        ...(projected.reasoning != null ? { reasoning: projected.reasoning } : {}),
+      }
+    })
+  }
   return applyRegisteredModelSemantics(cred, capabilities, credential.vendor,
-    credentialSlug && cred.model ? createAIProvider(credentialSlug, credential as Credential).resolveModel(cred.model).semantics : undefined)
+    provider && cred.model ? provider.resolveModel(cred.model).semantics : undefined)
 }
 
 /**
