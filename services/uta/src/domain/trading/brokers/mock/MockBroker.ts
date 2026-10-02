@@ -249,36 +249,66 @@ export class MockBroker implements IBroker {
       if ((error as NodeJS.ErrnoException).code === 'ENOENT') return
       throw error
     }
-    const state = JSON.parse(raw)
-    if (state.version !== 1) throw new Error('Unsupported mock state version')
+    const saved = JSON.parse(raw)
+    if (saved?.version !== 1) throw new Error('Unsupported mock state version')
+    // Validate only the snapshot boundary; broker classes still own their fields.
+    const finiteDecimal = z.string().refine(value => {
+      try { return new Decimal(value).isFinite() } catch { return false }
+    }, 'Expected a finite decimal')
+    const contract = z.looseObject({
+      symbol: z.string(), localSymbol: z.string().optional(), secType: z.string(),
+      exchange: z.string(), currency: z.string(),
+      multiplier: z.union([z.literal(''), finiteDecimal]).optional(),
+      strike: z.number().optional(),
+    })
+    const entries = <T extends z.ZodType>(value: T) => z.array(z.tuple([z.string().min(1), value]))
+      .refine(rows => new Set(rows.map(([key]) => key)).size === rows.length, 'Duplicate mock state key')
+    const state = z.object({
+      version: z.literal(1), cash: finiteDecimal, realizedPnL: finiteDecimal,
+      nextOrderId: z.number().int().positive().max(Number.MAX_SAFE_INTEGER),
+      positions: entries(z.looseObject({
+        contract, side: z.enum(['long', 'short']), quantity: finiteDecimal,
+        avgCost: finiteDecimal, marketPriceOverride: finiteDecimal.optional(),
+        avgCostSource: z.enum(['broker', 'wallet']).optional(),
+      })),
+      orders: entries(z.looseObject({
+        id: z.string().min(1), contract, status: z.enum(['Submitted', 'Filled', 'Cancelled']),
+        order: z.looseObject({ action: z.string().min(1), orderType: z.string().min(1), totalQuantity: finiteDecimal }),
+        fillPrice: z.number().optional(), filledQuantity: finiteDecimal.optional(), avgFillPrice: finiteDecimal.optional(),
+      })),
+      markPrices: entries(finiteDecimal), contracts: entries(contract),
+    }).parse(saved)
+    for (const [key, order] of state.orders) {
+      const sequence = /^mock-ord-(\d+)$/.exec(key)
+      if (key !== order.id || (sequence && Number(sequence[1]) >= state.nextOrderId)) {
+        throw new Error('Invalid mock order sequence or identity')
+      }
+    }
     // Construct everything before replacing live state. Corrupt files must fail
     // connection rather than silently reset the account to its starting cash.
     const cash = new Decimal(state.cash)
     const realizedPnL = new Decimal(state.realizedPnL)
-    if (!Number.isSafeInteger(state.nextOrderId) || state.nextOrderId < 1) {
-      throw new Error('Invalid mock order sequence')
-    }
-    const positions = new Map<string, InternalPosition>(state.positions.map(([key, p]: [string, InternalPosition]) => [key, {
+    const positions = new Map<string, InternalPosition>(state.positions.map(([key, p]) => [key, {
       ...p, contract: Object.assign(new Contract(), p.contract),
       quantity: new Decimal(p.quantity), avgCost: new Decimal(p.avgCost),
-      ...(p.marketPriceOverride != null && { marketPriceOverride: new Decimal(p.marketPriceOverride) }),
+      marketPriceOverride: p.marketPriceOverride == null ? undefined : new Decimal(p.marketPriceOverride),
     }]))
-    const orders = new Map<string, InternalOrder>(state.orders.map(([key, o]: [string, InternalOrder]) => {
+    const orders = new Map<string, InternalOrder>(state.orders.map(([key, o]) => {
       const order = Object.assign(new Order(), o.order)
       // Order owns the Decimal field inventory, including unset sentinels.
       for (const [field, value] of Object.entries(new Order())) {
         if (Decimal.isDecimal(value) && field in o.order) {
-          Object.assign(order, { [field]: new Decimal(String(o.order[field as keyof Order])) })
+          Object.assign(order, { [field]: new Decimal(finiteDecimal.parse(o.order[field])) })
         }
       }
-      if (o.order.filledQuantity != null) order.filledQuantity = new Decimal(o.order.filledQuantity)
+      if (o.order.filledQuantity != null) order.filledQuantity = new Decimal(finiteDecimal.parse(o.order.filledQuantity))
       return [key, { ...o, contract: Object.assign(new Contract(), o.contract), order,
-        ...(o.filledQuantity != null && { filledQuantity: new Decimal(o.filledQuantity) }),
-        ...(o.avgFillPrice != null && { avgFillPrice: new Decimal(o.avgFillPrice) }),
+        filledQuantity: o.filledQuantity == null ? undefined : new Decimal(o.filledQuantity),
+        avgFillPrice: o.avgFillPrice == null ? undefined : new Decimal(o.avgFillPrice),
       }]
     }))
-    const markPrices = new Map<string, Decimal>(state.markPrices.map(([key, price]: [string, string]) => [key, new Decimal(price)]))
-    const contracts = new Map<string, Contract>(state.contracts.map(([key, contract]: [string, Contract]) => [key, Object.assign(new Contract(), contract)]))
+    const markPrices = new Map<string, Decimal>(state.markPrices.map(([key, price]) => [key, new Decimal(price)]))
+    const contracts = new Map<string, Contract>(state.contracts.map(([key, contract]) => [key, Object.assign(new Contract(), contract)]))
     this._cash = cash
     this._realizedPnL = realizedPnL
     this._nextOrderId = state.nextOrderId

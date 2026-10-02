@@ -1,4 +1,4 @@
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
@@ -90,4 +90,36 @@ describe('configured mock restart', () => {
     writeFileSync(stateFile, JSON.stringify({ version: 99 }))
     await expect(create().init()).rejects.toThrow('Unsupported mock state version')
   })
+
+  it.each([
+    ['NaN cash', (s: any) => { s.cash = 'NaN' }],
+    ['infinite PnL', (s: any) => { s.realizedPnL = 'Infinity' }],
+    ['infinite mark', (s: any) => { s.markPrices[0][1] = '-Infinity' }],
+    ['invalid position quantity', (s: any) => { s.positions[0][1].quantity = 'NaN' }],
+    ['invalid order price', (s: any) => { s.orders[0][1].order.lmtPrice = 'Infinity' }],
+    ['missing order quantity', (s: any) => { delete s.orders[0][1].order.totalQuantity }],
+    ['invalid side', (s: any) => { s.positions[0][1].side = 'invalid' }],
+    ['invalid status', (s: any) => { s.orders[0][1].status = 'invalid' }],
+    ['missing contract', (s: any) => { s.positions[0][1].contract = null }],
+    ['duplicate orders', (s: any) => { s.orders.push(s.orders[0]) }],
+    ['mismatched order ID', (s: any) => { s.orders[0][1].id = 'different' }],
+    ['reused order sequence', (s: any) => { s.nextOrderId = 1 }],
+    ['invalid map entry', (s: any) => { s.contracts = [['AAPL']] }],
+  ])('refuses valid JSON with %s before replacing live state', async (_label, corrupt) => {
+    const { create, stateFile } = fixture()
+    const broker = create()
+    await broker.init()
+    broker.setMarkPrice('AAPL', '150')
+    await broker.placeOrder(makeContract(), order('MKT', '1'))
+    await broker.placeOrder(makeContract(), order('LMT', '2', '100'))
+    const account = await broker.getAccount()
+    const state = JSON.parse(readFileSync(stateFile, 'utf8'))
+    corrupt(state)
+    const raw = JSON.stringify(state)
+    writeFileSync(stateFile, raw)
+    await expect(broker.init()).rejects.toThrow()
+    expect(await broker.getAccount()).toEqual(account)
+    expect(readFileSync(stateFile, 'utf8')).toBe(raw)
+  })
+
 })
