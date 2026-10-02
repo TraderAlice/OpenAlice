@@ -1,6 +1,6 @@
 # Wallet execution recovery
 
-Status: implementation and isolated acceptance; Draft PR only. Issues #1680
+Status: Draft PR #1759 published; awaiting maintainer acceptance. Issues #1680
 and the pending-approval portion of #1313. Owner guides:
 [[docs/project-structure.md]], [[docs/uta-live-testing.md]], [[docs/testing.md]].
 
@@ -18,8 +18,9 @@ stamps the existing sub-account audit message before persistence.
 - [x] Present execution recovery in the existing review panel and agent status.
 - [x] Add isolated regression coverage for persistence and restart windows.
 - [x] Owner types, 1,062 UTA tests, 291 integration tests, and desktop/mobile browser recovery checks passed.
-- [ ] Full monorepo run still in progress; Electron install and npm-cache environment failures independently reproduced.
-- [ ] Verify published Draft head and its CI; no merge authority.
+- [x] Full monorepo: 891 files / 7,605 tests passed. Nine files failed because Electron, PTY and Dugite binaries were not installed, or npm cache was unwritable; the npm suite passed with a temporary cache.
+- [x] Published implementation head d5afff3d50c711cced0d82d0841c60f56eed6484 verified; clean-build and Vercel checks passed.
+- [ ] Maintainer acceptance of the Draft and the explicit unknown-outcome boundary; no merge authority.
 
 Recovery UI choice: reuse the existing review detail, warning color, status
 semantics and shared Button. A known outcome can be recorded without sending
