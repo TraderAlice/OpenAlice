@@ -433,7 +433,20 @@ Overrides:
 
 `data/` is the portable backup/migration unit. `sealing.key` deliberately
 lives beside it so a copied data directory does not carry its decryption key.
-The active migration chain starts after the 0.89.2-beta baseline. A
+The active migration chain starts after the 0.89.2-beta baseline. Before any
+migration or config snapshot, the runner rejects a journal older than that
+baseline or one containing an incomplete retired chain (0001–0038). This also
+catches an old home whose app version was advanced by a partially completed
+active chain. A journal that completed `0038_workspace_runtime_modes` at the
+baseline remains eligible, as do fresh homes. This check does not infer an old
+home's age if its journal was removed, and is not a general schema validator.
+
+For a rejected home, preserve a complete backup and start with a separate empty
+`OPENALICE_HOME`. Workspace repositories can be moved manually after backup;
+old Session identities require explicit recovery. Do not edit/remove the
+migration journal or copy old launcher state into the new home to bypass the
+check. This does not implement a legacy Session migration or undo a previous
+partial attempt. A
 transformation for a persisted shape that has shipped belongs in
 `src/migrations/`, must be idempotent, and must declare affected paths for the
 generated `src/migrations/INDEX.md`. Unreleased development shapes are replaced
