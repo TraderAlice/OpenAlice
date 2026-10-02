@@ -26,6 +26,7 @@ import { workspaceListFactory } from '../../../src/tool/workspace-list.js'
 import { workspaceTemplateUpgradeFactory, aliceHarnessUpgradeFactory } from '../../../src/tool/workspace-template-upgrade.js'
 import { entityUpsertFactory } from '../../../src/tool/entity-upsert.js'
 import { entitySearchFactory } from '../../../src/tool/entity-search.js'
+import { entityRemoveFactory } from '../../../src/tool/entity-remove.js'
 import { issueToolFactories } from '../../../src/tool/issue-tools.js'
 import { sessionSignatureFactory } from '../../../src/tool/session-signature.js'
 import { sessionRenameFactory } from '../../../src/tool/session-rename.js'
@@ -115,6 +116,7 @@ describe('CLI_EXPORTS — workspace export (scoped collaboration tools)', () => 
   wtc.register(aliceHarnessUpgradeFactory)
   wtc.register(entityUpsertFactory)
   wtc.register(entitySearchFactory)
+  wtc.register(entityRemoveFactory)
   for (const f of issueToolFactories) wtc.register(f)
   wtc.register(sessionSignatureFactory)
   wtc.register(sessionRenameFactory)
