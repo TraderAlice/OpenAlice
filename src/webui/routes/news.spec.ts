@@ -38,6 +38,26 @@ describe('news routes', () => {
     expect((await keywords.json()).items[0].title).toBe('Fed cuts rates')
   })
 
+  it.each(['F', 'BRK.B'])('combines complete-token matching with category provenance before limiting (%s)', async (symbol) => {
+    const records = [
+      item(1, { title: `${symbol} results`, content: '', metadata: { ingestSource: 'rss', categories: 'us' } }),
+      item(2, { title: 'Issuer update', content: `($${symbol.toLowerCase()}) announces earnings`, metadata: { ingestSource: 'rss', categories: 'us' } }),
+      item(3, { title: `X${symbol}X outlook`, content: '', metadata: {} }),
+      item(4, { title: 'Source category only', content: '', metadata: { ingestSource: 'rss', categories: symbol } }),
+      item(5, { title: 'Unknown category only', content: '', metadata: { categories: symbol } }),
+    ]
+    const getNewsV2 = vi.fn(async (options: GetNewsV2Options) => {
+      expect(options.limit).toBeUndefined()
+      return records
+    })
+    const app = routes(getNewsV2)
+    const titles = async (query: string) => (await (await app.request(query)).json()).items.map((row: { title: string }) => row.title)
+    expect(await titles(`/?symbol=${encodeURIComponent(symbol)}`)).toEqual([`${symbol} results`, 'Issuer update'])
+    expect(await titles(`/?symbol=${encodeURIComponent(symbol)}&limit=1`)).toEqual(['Issuer update'])
+    expect(await titles(`/?symbol=${encodeURIComponent(symbol)}&tag=source:region:us`)).toEqual([`${symbol} results`, 'Issuer update'])
+    expect(await titles(`/?keyword=${encodeURIComponent(symbol)}`)).toEqual(records.map((row) => row.title))
+  })
+
   it('carries collector provenance through archive recovery and the HTTP response', async () => {
     const dir = await mkdtemp(join(tmpdir(), 'news-provenance-'))
     const logPath = join(dir, 'news.jsonl')

@@ -112,6 +112,7 @@ function matchesNewsFilters(
     item.content,
     item.metadata.categories ?? '',
   ].join('\n').toLowerCase()
+  // Collected categories are feed coverage or unproven, not ticker evidence.
   const symbolText = [item.title, item.content].join('\n').toLowerCase()
   return (!keyword || searchable.includes(keyword)) && (!symbol || matchesSymbol(symbolText, symbol))
 }

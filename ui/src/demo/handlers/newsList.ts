@@ -81,6 +81,7 @@ export const newsListHandlers = [
       if (sourceFilters?.length && !sourceFilters.includes((article.source ?? '').toLowerCase())) return false
       if (tag && !newsTags(article.categories, article.categoryScope).some((value) => newsTagKey(value) === tag)) return false
       if (keyword && !includesText(article, keyword)) return false
+      // Only explicitly article-owned fixture categories can supply ticker tokens.
       const symbolText = [article.title, article.content, article.categoryScope === 'article' ? article.categories ?? '' : ''].join('\n').toLowerCase()
       if (symbol && !matchesSymbol(symbolText, symbol)) return false
       return true
