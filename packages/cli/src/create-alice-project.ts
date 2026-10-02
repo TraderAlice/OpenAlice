@@ -148,7 +148,7 @@ export async function runCreateAliceProjectCommand(
     `Created AliceProject ${name} (${product === 'nano' ? 'NanoAlice' : 'TraderAlice'}).\n`
     + `Home: ${home}\n`
     + `Workspaces: ${workspaces.join(', ')}. Prepared after the app opens; no Agent is launched.\n`
-    + `Selected as the local lifecycle default. Start with: openalice up --project ${name}\n`,
+    + `Lifecycle default unchanged. Start with: openalice up --project ${name}\n`,
   )
   return 0
 }

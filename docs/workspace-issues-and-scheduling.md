@@ -391,6 +391,30 @@ An active peer Issue assigned to a retired `@resumeId` remains visibly owned by
 that signature but cannot fire until a human assigns an active Session or
 restores the departed Workspace. See [[docs/workspace-lifecycle.md]].
 
+## Editing an existing schedule in the GUI
+
+For ordinary Issues with `when`, the detail inspector's **Schedule** summary
+opens one draft editor for Interval (`every`), Cron and Once (`at`). Cadence,
+cron timezone/catch-up and the independent run timeout apply together only on
+**Save changes**; Cancel discards the draft, and a failed save retains it.
+Polling does not overwrite a draft; a changed saved schedule or timeout requires
+explicit reload before another save. This is a UI stale-value guard, not a
+file-level compare-and-swap guarantee.
+
+The existing Issue PATCH accepts `when` and delegates to `updateIssueFields`.
+Write-time validation reuses the browser-safe `schedule-expr`/`duration` owner;
+the file reader still exposes historical malformed schedules for inspection.
+Cron stays five-field with `local`/IANA timezone semantics. Once requires an
+absolute ISO timestamp with Z or an explicit UTC offset. Interval accepts the
+existing positive h/m/s duration grammar. Omitted timezone remains host-local.
+The phone desk keeps its dedicated Connector Settings cadence writer; the
+ordinary GUI does not add/remove schedules or change Issue ownership.
+
+Saving does not reset the scanner's markers or alter an admitted run's frozen
+settings. The returned detail is authoritative for cadence, next-due and health;
+an edited schedule may already be due. Done/canceled Issues remain inactive.
+No second schedule store, scheduler or execution path is introduced.
+
 ## Structured Runtime Output
 
 Claude Code, Codex, opencode, and Pi all emit different JSON event streams.

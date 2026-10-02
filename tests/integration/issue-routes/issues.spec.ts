@@ -113,6 +113,65 @@ async function req(app: any, method: string, path: string, body?: unknown) {
 }
 
 describe('PATCH /api/issues/:wsId/:id', () => {
+  it('updates the file-owned cadence while retaining zone, owner, What and independent timeout', async () => {
+    const initial = { kind: 'cron', cron: '*/15 * * * *', timezone: 'America/Los_Angeles', catchUp: false }
+    await createIssue(wsDir, { id: 'cadence', title: 'Scan', when: initial, timeout: '30m', what: 'Keep this exact work.' })
+    const { app, appendProvenance } = build()
+    const when = { ...initial, cron: '0 * * * *' }
+    const updated = await req(app, 'PATCH', '/ws-1/cadence', { when })
+    expect(updated.status).toBe(200)
+    expect(updated.body.issue).toMatchObject({ when, timeout: '30m', what: 'Keep this exact work.', assignee: '@new-then-resume' })
+    expect(appendProvenance).toHaveBeenCalledWith(expect.objectContaining({ mutation: expect.objectContaining({ fields: expect.arrayContaining([expect.objectContaining({ field: 'schedule' })]) }) }), expect.anything())
+    expect((await req(app, 'GET', '/ws-1/cadence')).body.issue.when).toEqual(when)
+    const budget = await req(app, 'PATCH', '/ws-1/cadence', { timeout: null })
+    expect(budget.body.issue.when).toEqual(when)
+    expect(budget.body.issue.timeout).toBeUndefined()
+  })
+
+  it.each([
+    null, { kind: 'every', every: '0m' }, { kind: 'cron', cron: '0 0 * *' },
+    { kind: 'cron', cron: '0 * * * *', timezone: 'Mars/Base' },
+    { kind: 'at', at: 'tomorrow' },
+  ])('rejects invalid when %j without partially applying timeout', async (when) => {
+    const original = { kind: 'every', every: '15m' }
+    await createIssue(wsDir, { id: 'cadence', title: 'Scan', when: original, timeout: '30m' })
+    const { app } = build()
+    expect((await req(app, 'PATCH', '/ws-1/cadence', { when, timeout: '60m' })).status).toBe(422)
+    expect((await req(app, 'GET', '/ws-1/cadence')).body.issue).toMatchObject({ when: original, timeout: '30m' })
+  })
+
+  it('does not add schedules or edit connector desk cadence through the ordinary route', async () => {
+    await createIssue(wsDir, { id: 'plain', title: 'Tracked' })
+    await createIssue(wsDir, { id: 'desk', title: 'Desk', when: { kind: 'every', every: '15m' }, connectorDesk: 'telegram' }, { allowConnectorDesk: true })
+    const { app } = build()
+    for (const id of ['plain', 'desk']) {
+      expect((await req(app, 'PATCH', `/ws-1/${id}`, { when: { kind: 'every', every: '1h' } })).status).toBe(422)
+    }
+  })
+
+  it('retains the legacy catchUp patch and its precedence without partial writes', async () => {
+    await createIssue(wsDir, { id: 'legacy', title: 'Scan', when: { kind: 'cron', cron: '*/15 * * * *' } })
+    const { app } = build()
+    expect((await req(app, 'PATCH', '/ws-1/legacy', { catchUp: false })).body.issue.when.catchUp).toBe(false)
+    const result = await req(app, 'PATCH', '/ws-1/legacy', {
+      when: { kind: 'cron', cron: '0 * * * *', catchUp: true }, catchUp: false,
+    })
+    expect(result.status).toBe(200)
+    expect(result.body.issue.when).toEqual({ kind: 'cron', cron: '0 * * * *', catchUp: false })
+    expect((await req(app, 'PATCH', '/ws-1/legacy', { when: { kind: 'every', every: '1h' }, catchUp: false })).status).toBe(422)
+    expect((await req(app, 'GET', '/ws-1/legacy')).body.issue.when).toEqual(result.body.issue.when)
+  })
+
+  it('switches schedule kinds without reopening a terminal Issue', async () => {
+    await createIssue(wsDir, { id: 'closed', title: 'Closed', status: 'done', when: { kind: 'every', every: '15m' } })
+    const { app } = build()
+    for (const when of [{ kind: 'cron', cron: '0 * * * *' }, { kind: 'at', at: '2026-10-03T09:00:00-07:00' }, { kind: 'every', every: '1h' }]) {
+      const result = await req(app, 'PATCH', '/ws-1/closed', { when })
+      expect(result.status).toBe(200)
+      expect(result.body.issue).toMatchObject({ when, status: 'done' })
+    }
+  })
+
   it('404 on a malformed id', async () => {
     const { app } = build()
     expect((await req(app, 'PATCH', '/ws-1/bad.id', { status: 'done' })).status).toBe(404)
