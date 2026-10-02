@@ -141,6 +141,7 @@ export function AIProviderPage() {
               </div>
               <Button
                 type="button"
+                data-testid="credential-add"
                 onClick={() => setModal({ mode: 'add' })}
                 variant="outline"
                 size="sm"

@@ -3,28 +3,35 @@ import { describe, expect, it } from 'vitest'
 import { buildDesktopPackagedSmokePlan } from './desktop-packaged-smoke-plan.mjs'
 
 describe('buildDesktopPackagedSmokePlan', () => {
-  it('makes onboarding smoke isolated and deterministic', () => {
-    const plan = buildDesktopPackagedSmokePlan(['--onboarding'], {
+  it('keeps --onboarding as an explicitly deprecated alias with identical execution', () => {
+    const canonical = buildDesktopPackagedSmokePlan(['--credential-pi'])
+    const legacy = buildDesktopPackagedSmokePlan(['--onboarding'])
+    expect({ ...legacy, warnings: [] }).toEqual(canonical)
+    expect(legacy.warnings).toEqual([expect.stringContaining('--onboarding is deprecated; use --credential-pi')])
+  })
+
+  it('makes credential-pi acceptance isolated and deterministic', () => {
+    const plan = buildDesktopPackagedSmokePlan(['--credential-pi'], {
       OPENALICE_TRADING_MODE: 'pro',
       OPENALICE_LITE_MODE: '1',
-    }, { randomUUID: () => 'fixed-onboarding' })
+    }, { randomUUID: () => 'fixed-credential-pi' })
 
     expect(plan.errors).toEqual([])
     expect(plan.options).toMatchObject({
-      onboarding: true,
+      credentialPi: true,
       realData: false,
       tempData: true,
     })
     expect(plan.buildEnv).toMatchObject({
       VITE_OPENALICE_ONBOARDING_TEST: '1',
-      VITE_OPENALICE_CREDENTIAL_TEST_MODE: 'mock',
+      VITE_OPENALICE_CREDENTIAL_TEST_MODE: 'http',
     })
     expect(plan.launchEnv).toMatchObject({
       OPENALICE_ONBOARDING_TEST: '1',
-      OPENALICE_CREDENTIAL_TEST_MODE: 'mock',
+      OPENALICE_CREDENTIAL_TEST_MODE: 'http',
       OPENALICE_AGENT_RUNTIME_INSTALLS: 'only:pi',
       OPENALICE_MCP_ENABLED: '0',
-      OPENALICE_ELECTRON_SMOKE_ONBOARDING: '1',
+      OPENALICE_ELECTRON_SMOKE_CREDENTIAL_PI: '1',
       OPENALICE_ELECTRON_SMOKE_EXIT: '1',
     })
     expect(plan.unsetLaunchEnv).toEqual([
@@ -34,10 +41,10 @@ describe('buildDesktopPackagedSmokePlan', () => {
     ])
   })
 
-  it('rejects onboarding against real user data', () => {
-    const plan = buildDesktopPackagedSmokePlan(['--onboarding', '--real-data'])
+  it('rejects credential-pi acceptance against real user data', () => {
+    const plan = buildDesktopPackagedSmokePlan(['--credential-pi', '--real-data'])
 
-    expect(plan.errors).toContain('[desktop-smoke] --onboarding always uses isolated temp data; drop --real-data')
+    expect(plan.errors).toContain('[desktop-smoke] --credential-pi always uses isolated temp data; drop --real-data')
   })
 
   it('makes the trading-mode lifecycle smoke isolated and self-terminating', () => {
@@ -48,7 +55,7 @@ describe('buildDesktopPackagedSmokePlan', () => {
 
     expect(plan.errors).toEqual([])
     expect(plan.options).toMatchObject({
-      onboarding: false,
+      credentialPi: false,
       realData: false,
       tempData: true,
       tradingMode: true,
@@ -68,8 +75,8 @@ describe('buildDesktopPackagedSmokePlan', () => {
   it('rejects unsafe or contradictory trading-mode smoke flags', () => {
     expect(buildDesktopPackagedSmokePlan(['--trading-mode', '--real-data']).errors)
       .toContain('[desktop-smoke] --trading-mode always uses isolated temp data; drop --real-data')
-    expect(buildDesktopPackagedSmokePlan(['--trading-mode', '--onboarding']).errors)
-      .toContain('[desktop-smoke] choose only one automated smoke mode: --onboarding, --trading-mode, or --workspace-acceptance')
+    expect(buildDesktopPackagedSmokePlan(['--trading-mode', '--credential-pi']).errors)
+      .toContain('[desktop-smoke] choose only one automated smoke mode: --credential-pi, --trading-mode, or --workspace-acceptance')
   })
 
   it('makes Workspace acceptance isolated, self-terminating, and provider-independent', () => {
@@ -79,7 +86,7 @@ describe('buildDesktopPackagedSmokePlan', () => {
 
     expect(plan.errors).toEqual([])
     expect(plan.options).toMatchObject({
-      onboarding: false,
+      credentialPi: false,
       realData: false,
       tempData: true,
       tradingMode: false,
@@ -101,8 +108,8 @@ describe('buildDesktopPackagedSmokePlan', () => {
   it('rejects unsafe or contradictory Workspace acceptance flags', () => {
     expect(buildDesktopPackagedSmokePlan(['--workspace-acceptance', '--real-data']).errors)
       .toContain('[desktop-smoke] --workspace-acceptance always uses isolated temp data; drop --real-data')
-    expect(buildDesktopPackagedSmokePlan(['--workspace-acceptance', '--onboarding']).errors)
-      .toContain('[desktop-smoke] choose only one automated smoke mode: --onboarding, --trading-mode, or --workspace-acceptance')
+    expect(buildDesktopPackagedSmokePlan(['--workspace-acceptance', '--credential-pi']).errors)
+      .toContain('[desktop-smoke] choose only one automated smoke mode: --credential-pi, --trading-mode, or --workspace-acceptance')
   })
 
   it('rejects contradictory data flags', () => {

@@ -78,6 +78,7 @@ async function readJson(req) {
  */
 export async function startWorkspaceAcceptanceAiMock() {
   const stats = {
+    credentialTests: 0,
     readinessTurns: 0,
     acceptanceToolTurns: 0,
     acceptanceFinalTurns: 0,
@@ -101,6 +102,13 @@ export async function startWorkspaceAcceptanceAiMock() {
 
     try {
       const body = await readJson(req)
+      if (body.stream !== true) {
+        stats.credentialTests += 1
+        res.writeHead(200, { 'content-type': 'application/json' })
+        res.end(JSON.stringify({ id: 'chatcmpl-credential-pi-test', object: 'chat.completion',
+          model: body.model, choices: [{ index: 0, message: { role: 'assistant', content: 'OpenAlice credential is ready.' }, finish_reason: 'stop' }] }))
+        return
+      }
       const isAcceptance = JSON.stringify(body).includes(WORKSPACE_ACCEPTANCE_MARKER)
       let payload
       if (!isAcceptance) {
