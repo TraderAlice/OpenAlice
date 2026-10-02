@@ -2769,6 +2769,11 @@ export const ja: Resources = {
     },
   },
   news: {
+    topicCrypto: '暗号資産',
+    topicMarkets: 'マーケット',
+    topicNews: 'ニュース',
+    topicRates: '金利',
+
     tagSource: '配信元の対象',
     tagArticle: '記事の関連',
     tagUnknown: '帰属不明',

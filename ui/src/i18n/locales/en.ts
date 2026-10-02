@@ -2808,6 +2808,11 @@ export const en = {
     },
   },
   news: {
+    topicCrypto: 'Crypto',
+    topicMarkets: 'Markets',
+    topicNews: 'News',
+    topicRates: 'Interest rates',
+
     tagSource: 'Source coverage',
     tagArticle: 'Article',
     tagUnknown: 'Unknown origin',

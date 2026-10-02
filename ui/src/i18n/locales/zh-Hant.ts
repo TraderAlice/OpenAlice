@@ -2776,6 +2776,11 @@ export const zhHant: Resources = {
     },
   },
   news: {
+    topicCrypto: '加密資產',
+    topicMarkets: '市場',
+    topicNews: '新聞',
+    topicRates: '利率',
+
     tagSource: '來源涵蓋',
     tagArticle: '文章關聯',
     tagUnknown: '歸屬未知',

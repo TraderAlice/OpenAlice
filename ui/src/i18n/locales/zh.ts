@@ -2772,6 +2772,11 @@ export const zh: Resources = {
     },
   },
   news: {
+    topicCrypto: '加密资产',
+    topicMarkets: '市场',
+    topicNews: '新闻',
+    topicRates: '利率',
+
     tagSource: '来源覆盖',
     tagArticle: '文章关联',
     tagUnknown: '归属未知',

@@ -13,6 +13,11 @@ describe('news category provenance and dimensions', () => {
       'source:industry:technology', 'source:topic:earnings', 'source:unknown:unmapped',
     ])
   })
+  it('labels existing feed topics without equating rates with bonds or crypto with equities', () => {
+    expect(newsTags('markets,news,crypto,rates,bonds', 'source').map(newsTagKey)).toEqual([
+      'source:topic:markets', 'source:topic:news', 'source:topic:crypto', 'source:topic:rates', 'source:topic:bonds',
+    ])
+  })
   it('retains unproven tags as raw information without guessing or folding aliases', () => {
     expect(newsTags('US,USA,Legacy', 'unknown')).toEqual([
       { scope: 'unknown', dimension: 'unknown', value: 'US' },
