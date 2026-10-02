@@ -409,11 +409,9 @@ body {
     opacity: 0;
     pointer-events: none;
     transform: scale(0.96);
-    visibility: hidden;
     transition:
       opacity var(--motion-fast) var(--motion-ease-out),
-      transform var(--motion-fast) var(--motion-ease-out),
-      visibility 0s linear var(--motion-fast);
+      transform var(--motion-fast) var(--motion-ease-out);
   }
 
   .oa-session-row:hover .oa-session-overflow-action,
@@ -421,8 +419,6 @@ body {
     opacity: 1;
     pointer-events: auto;
     transform: none;
-    visibility: visible;
-    transition-delay: 0s;
   }
 
   .oa-session-state-action {

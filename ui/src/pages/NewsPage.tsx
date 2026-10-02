@@ -155,23 +155,23 @@ export function NewsPage({ spec }: { spec: Extract<ViewSpec, { kind: 'news' }> }
                 <label className="min-w-0 flex-1 sm:flex-none">
                   <span className="sr-only">{t('news.startDate')}</span>
                   <input type="date" value={draft.startDate} onChange={(event) => setDraft({ ...draft, startDate: event.target.value })}
-                    className={`${inputClass} h-8 min-w-0 px-2 py-1 text-base sm:w-[140px]`} />
+                    className={`${inputClass} sm:w-[140px]`} />
                 </label>
                 <span aria-hidden="true" className="text-muted-foreground">–</span>
                 <label className="min-w-0 flex-1 sm:flex-none">
                   <span className="sr-only">{t('news.endDate')}</span>
                   <input type="date" value={draft.endDate} onChange={(event) => setDraft({ ...draft, endDate: event.target.value })}
-                    className={`${inputClass} h-8 min-w-0 px-2 py-1 text-base sm:w-[140px]`} />
+                    className={`${inputClass} sm:w-[140px]`} />
                 </label>
               </div>
               <input aria-label={t('news.symbolFilter')} placeholder={t('news.symbolFilter')} value={draft.symbol}
                 onChange={(event) => setDraft({ ...draft, symbol: event.target.value })}
-                className={`${inputClass} h-8 min-w-0 flex-1 basis-[130px] px-2 py-1 text-base sm:max-w-[170px]`} />
+                className={`${inputClass} flex-1 basis-[130px] sm:max-w-[170px]`} />
               <input aria-label={t('news.keywordFilter')} placeholder={t('news.keywordFilter')} value={draft.keyword}
                 onChange={(event) => setDraft({ ...draft, keyword: event.target.value })}
-                className={`${inputClass} h-8 min-w-0 flex-1 basis-[140px] px-2 py-1 text-base`} />
-              <Button type="submit" variant="secondary" size="sm"><Search className="size-3.5" aria-hidden />{t('news.search')}</Button>
-              <Button type="button" variant="outline" className="h-8" onClick={clear}>{t('news.clear')}</Button>
+                className={`${inputClass} flex-1 basis-[140px]`} />
+              <Button type="submit" variant="secondary"><Search className="size-3.5" aria-hidden />{t('news.search')}</Button>
+              <Button type="button" variant="outline" onClick={clear}>{t('news.clear')}</Button>
             </form>
             {dateError && <p role="alert" className="mt-2 text-xs text-destructive">{t('news.dateRangeError')}</p>}
             <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">

@@ -13,7 +13,7 @@ function Choice({ label, value, choices, onChange }: { label: string; value: str
   return <div className="flex items-center justify-between gap-4">
     <span className="text-sm text-muted-foreground">{label}</span>
     <DropdownMenu>
-      <DropdownMenuTrigger aria-label={label} className="flex h-8 max-w-48 items-center gap-2 rounded-md border border-border px-2.5 text-sm hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+      <DropdownMenuTrigger aria-label={label} render={<Button variant="outline" size="sm" className="max-w-48" />}>
         <span className="truncate">{choices.find((item) => item.value === value)?.label || value}</span><ChevronDown size={13} />
       </DropdownMenuTrigger>
       <DropdownMenuContent>{choices.map((item) => <DropdownMenuItem key={item.value} onClick={() => onChange(item.value)}>
@@ -39,11 +39,11 @@ export function IssueListToolbar({ view, onChange, workspaces, visible, total }:
           options={(['active', 'backlog', 'all'] as const).map((value) => ({ value, label: label(value) }))} />
         <CountBadge count={visible} label={t('issues.view.results', { count: visible, total })} />
       </div>
-      <div className="flex items-center gap-1.5">
-        <Popover><PopoverTrigger aria-label={label('filter')} title={label('filter')} className={`flex min-h-8 items-center justify-center gap-1.5 rounded-md border border-border px-2 hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${count ? 'bg-muted' : ''}`}><Filter size={15} /><span className="hidden text-xs sm:inline">{label('filter')}</span>{count > 0 && <CountBadge count={count} label={`${label('filter')}: ${count}`} />}</PopoverTrigger>
+      <div className="ml-auto flex items-center gap-1.5">
+        <Popover><PopoverTrigger aria-label={label('filter')} title={label('filter')} render={<Button variant="outline" size="sm" className={`px-2 ${count ? 'bg-muted' : ''}`} />}><Filter size={15} /><span className="hidden text-xs sm:inline">{label('filter')}</span>{count > 0 && <CountBadge count={count} label={`${label('filter')}: ${count}`} />}</PopoverTrigger>
           <PopoverContent align="end" className="w-80 max-w-[calc(100vw-2rem)] max-h-[calc(100dvh-6rem)] overflow-y-auto space-y-4 p-4">
             <div className="flex items-center justify-between"><h3 className="text-sm font-medium">{label('filter')}</h3>{count > 0 && <Button variant="ghost" size="sm" onClick={clear}>{label('clear')}</Button>}</div>
-            <label className="flex h-9 items-center gap-2 rounded-md border border-input px-2"><Search size={14} className="text-muted-foreground" /><input aria-label={label('search')} placeholder={label('search')} value={view.query} onChange={(event) => onChange({ query: event.target.value })} className="min-w-0 flex-1 bg-transparent text-base outline-none" /></label>
+            <label className="flex h-(--oa-control-height) items-center gap-2 rounded-md border border-input px-2"><Search size={14} className="text-muted-foreground" /><input aria-label={label('search')} placeholder={label('search')} value={view.query} onChange={(event) => onChange({ query: event.target.value })} className="min-w-0 flex-1 bg-transparent text-base outline-none" /></label>
             {(['statuses', 'priorities'] as const).map((field) => <fieldset key={field}><legend className="mb-2 text-xs text-muted-foreground">{label(field)}</legend><div className="flex flex-wrap gap-1.5">
               {(field === 'statuses' ? ['backlog', 'todo', 'in_progress', 'done', 'canceled'] : ['none', 'urgent', 'high', 'medium', 'low']).map((value) => <Button key={value} variant="outline" size="sm" aria-pressed={view[field].includes(value)} className={`rounded-full text-xs ${view[field].includes(value) ? 'bg-muted border-foreground/30' : ''}`} onClick={() => onChange({ [field]: view[field].includes(value) ? view[field].filter((item) => item !== value) : [...view[field], value] })}>{field === 'priorities' && value === 'none' ? t('issues.priority.label', { priority: t('issues.priority.none') }) : t(`issues.${field === 'statuses' ? 'status' : 'priority'}.${value}` as 'issues.status.todo')}</Button>)}
             </div></fieldset>)}
@@ -52,7 +52,7 @@ export function IssueListToolbar({ view, onChange, workspaces, visible, total }:
             <Choice label={label('schedule')} value={view.schedule} choices={choices(['all', 'scheduled', 'unscheduled'])} onChange={(schedule) => onChange({ schedule: schedule as IssueListView['schedule'] })} />
           </PopoverContent>
         </Popover>
-        <Popover><PopoverTrigger aria-label={label('display')} title={label('display')} className="flex size-8 items-center justify-center rounded-full border border-border hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"><SlidersHorizontal size={15} /></PopoverTrigger>
+        <Popover><PopoverTrigger aria-label={label('display')} title={label('display')} render={<Button variant="outline" size="icon-sm" />}><SlidersHorizontal size={15} /></PopoverTrigger>
           <PopoverContent align="end" className="w-80 max-w-[calc(100vw-2rem)] max-h-[calc(100dvh-6rem)] overflow-y-auto p-0">
             <div className="space-y-4 p-4">
               <h3 className="flex items-center gap-2 text-sm font-medium"><List size={16} />{label('list')}</h3>
@@ -67,6 +67,6 @@ export function IssueListToolbar({ view, onChange, workspaces, visible, total }:
         </Popover>
       </div>
     </div>
-    {(count > 0 || visible !== total) && <div className="flex items-center gap-2 px-3 py-2 text-xs text-muted-foreground"><span>{t('issues.view.results', { count: visible, total })}</span>{count > 0 && <Button variant="ghost" size="sm" onClick={clear} className="h-6 text-xs"><X size={12} />{label('clear')}</Button>}</div>}
+    {(count > 0 || visible !== total) && <div className="flex items-center gap-2 px-3 py-2 text-xs text-muted-foreground"><span>{t('issues.view.results', { count: visible, total })}</span>{count > 0 && <Button variant="ghost" size="sm" onClick={clear} className="text-xs"><X size={12} />{label('clear')}</Button>}</div>}
   </div>
 }

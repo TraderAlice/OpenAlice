@@ -38,7 +38,7 @@ export function HarnessNavigationGroup({ title, compact, compactIcon, active, ne
         <div className="oa-harness-nav-actions flex shrink-0 items-center pr-1">
           {menu}
           {showNewAction && <button type="button" aria-label={`${title}: ${newLabel}`} title={newLabel} onClick={onOpen}
-            className="oa-icon-action flex h-8 w-7 shrink-0 items-center justify-center rounded-full text-muted-foreground hover:bg-sidebar-accent hover:text-foreground">
+            className="oa-icon-action oa-workspace-row-action flex h-8 w-7 shrink-0 items-center justify-center rounded-full text-muted-foreground hover:bg-sidebar-accent hover:text-foreground">
             <Plus size={14} aria-hidden />
           </button>}
         </div>

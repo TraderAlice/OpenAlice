@@ -299,7 +299,7 @@ Start and GUI. Start retains runtime/surface selection in its composer context
 tray. In an existing GUI Session, the fixed runtime icon/name lives in the top
 bar beside the TUI action; narrow screens show the icon with its accessible
 name and tooltip. The GUI composer has no runtime tray. One compact
-button shows the provider icon, model and effort, with submenus for each choice.
+button shows the model identity, with submenus for provider, model and effort.
 The AI Provider submenu and native account option use the matching provider or
 runtime icon; the full provider name remains available in the button tooltip.
 Narrow layouts truncate this summary without wrapping it onto multiple rows.
