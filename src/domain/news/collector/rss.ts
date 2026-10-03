@@ -1,14 +1,19 @@
 /**
- * News Collector — RSS fetch service
+ * News Collector — RSS and provider fetch service
  *
  * A code-level setInterval service (not AI-driven cron) that periodically
- * fetches configured RSS feeds and ingests new items into the store.
+ * fetches configured news sources and ingests new items into the store.
  */
 
 import { fetchAndParseFeed } from './rss-parser.js'
+import { fetchGelonghuiLives, GELONGHUI_API_URL, GELONGHUI_SOURCE_PAGE_URL } from './gelonghui.js'
 import { computeDedupKey, type NewsCollectorStore } from '../store.js'
 import type { RSSFeedConfig } from '../types.js'
 import type { NewsRecord } from '../types.js'
+
+function isGelonghuiDirectFeed(feed: RSSFeedConfig): boolean {
+  return feed.source.trim().toLowerCase() === 'gelonghui' && feed.url.trim() === GELONGHUI_SOURCE_PAGE_URL
+}
 
 export interface CollectorOpts {
   store: NewsCollectorStore
@@ -86,8 +91,9 @@ export class NewsCollector {
         totalItems += fetched
         totalNew += ingested
       } catch (err) {
+        const sourceUrl = isGelonghuiDirectFeed(feed) ? GELONGHUI_API_URL : feed.url
         console.warn(
-          `news-collector: failed to fetch ${feed.name} (${feed.url}): ${err instanceof Error ? err.message : err}`,
+          `news-collector: failed to fetch ${feed.name} (${sourceUrl}): ${err instanceof Error ? err.message : err}`,
         )
       }
     }
@@ -103,7 +109,8 @@ export class NewsCollector {
 
   /** Fetch a single feed and ingest its items. */
   private async fetchFeed(feed: RSSFeedConfig): Promise<{ fetched: number; ingested: number }> {
-    const items = await fetchAndParseFeed(feed.url)
+    const isGelonghui = isGelonghuiDirectFeed(feed)
+    const items = isGelonghui ? await fetchGelonghuiLives() : await fetchAndParseFeed(feed.url)
     let ingested = 0
 
     for (const item of items) {
@@ -123,7 +130,7 @@ export class NewsCollector {
           source: feed.source,
           link: item.link,
           guid: item.guid,
-          ingestSource: 'rss',
+          ingestSource: isGelonghui ? 'provider' : 'rss',
           dedupKey,
           ...(feed.categories ? { categories: feed.categories.join(',') } : {}),
           ...(item.image ? { image: item.image } : {}),
