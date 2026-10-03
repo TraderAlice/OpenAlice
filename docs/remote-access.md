@@ -183,6 +183,11 @@ The sender uses a versioned, bounded stream over SSH stdin. The receiver checks
 normalized paths, entry types, symlink containment, sizes, checksums, available
 space, and transaction identity; writes an owner-private sibling staging Home;
 then atomically publishes and registers it without changing the remote default.
+The text CLI reports streamed file/byte counts, average throughput and a
+stream-only ETA on stderr, at most once per second plus the final file update.
+It then waits for the verified receipt; sent bytes do not mean publication
+succeeded. JSON mode preserves its single machine-readable result. The TUI
+continues to use the same transport progress callback.
 A matching published receipt makes registration retry idempotent. Cancellation
 terminates the SSH receiver and leaves only that transaction's marked staging
 path eligible for a safe retry.
