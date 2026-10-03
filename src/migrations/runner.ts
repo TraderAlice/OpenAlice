@@ -18,7 +18,8 @@ import { readFileSync } from 'node:fs'
 import { resolve, dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import type { Migration, MigrationContext, ConfigMeta } from './types.js'
-import { REGISTRY } from './registry.js'
+import { MIGRATION_BASELINE, REGISTRY } from './registry.js'
+import { compareVersions, isVersion } from '@traderalice/update-lifecycle'
 import { dataPath, userDataHome } from '@/core/paths.js'
 
 const CONFIG_DIR = dataPath('config')
@@ -130,6 +131,21 @@ export async function runMigrations(opts: RunnerOpts = {}): Promise<void> {
   const snapshot = opts.snapshot ?? defaultSnapshot
 
   const meta = await readMeta(ctx)
+  // A newer appVersion alone is not proof of an upgrade: a previous failed
+  // boot may already have recorded some active migrations on an older home.
+  const retired = meta.appliedMigrations.filter(m => /^00(?:0[1-9]|[12][0-9]|3[0-8])_/.test(m.id))
+  const incompleteRetiredChain = retired.length > 0
+    && !retired.some(m => m.id === '0038_workspace_runtime_modes')
+  if (incompleteRetiredChain
+    || (isVersion(meta.appVersion) && compareVersions(meta.appVersion, MIGRATION_BASELINE) < 0)) {
+    throw new Error(
+      `This OpenAlice home predates the supported ${MIGRATION_BASELINE} migration baseline. ` +
+      'No migrations or config snapshots were written by this attempt. ' +
+      'Keep a complete backup of the old home and use a separate, empty OPENALICE_HOME. ' +
+      'Workspace repositories can be moved manually after backup; historical Session identities ' +
+      'need explicit recovery. Do not delete or edit data/config/_meta.json to bypass this check.',
+    )
+  }
   const applied = new Set(meta.appliedMigrations.map(m => m.id))
   const pending = registry.filter(m => !applied.has(m.id))
 
