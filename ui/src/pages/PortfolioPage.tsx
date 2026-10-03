@@ -485,7 +485,7 @@ function HeroMetrics({ equity, curve }: {
 }) {
   if (!equity) {
     return (
-      <div className="rounded-lg border border-border bg-card p-5 text-center">
+      <div className="oa-data-surface rounded-lg border border-border bg-card p-5 text-center">
         <p className="text-[13px] text-muted-foreground">Unable to load portfolio data.</p>
       </div>
     )
@@ -508,7 +508,7 @@ function HeroMetrics({ equity, curve }: {
   }
 
   return (
-    <div className="space-y-4 rounded-lg border border-border bg-card px-5 py-5">
+    <div className="oa-data-surface space-y-4 rounded-lg border border-border bg-card px-5 py-5">
       <Metric
         size="lg"
         label="Total Equity (USD)"
@@ -544,7 +544,7 @@ function PortfolioSkeleton() {
   return (
     <div className="space-y-5" aria-hidden="true">
       {/* Hero metrics */}
-      <div className="rounded-lg border border-border bg-card p-5">
+      <div className="oa-data-surface rounded-lg border border-border bg-card p-5">
         <Skeleton className="h-3 w-24" />
         <Skeleton className="h-9 w-48 mt-3" />
         <div className="flex flex-wrap gap-5 sm:gap-8 mt-5">
@@ -561,7 +561,7 @@ function PortfolioSkeleton() {
       {/* Account strip */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
         {Array.from({ length: 2 }).map((_, i) => (
-          <div key={i} className="flex items-center gap-3 rounded-lg border border-border bg-card px-3.5 py-3">
+          <div key={i} className="oa-data-surface flex items-center gap-3 rounded-lg border border-border bg-card px-3.5 py-3">
             <Skeleton className="size-3 rounded-sm" />
             <div className="flex-1 space-y-2">
               <Skeleton className="h-3 w-24" />
@@ -639,7 +639,7 @@ function AccountStrip({ sources, perAccountCurve }: {
         const showSpark = !isDisabled && !isOffline && !isConnecting && curve && curve.values.length >= 2
 
         return (
-          <div key={s.id} className={`flex items-center gap-3 rounded-lg border border-border bg-card px-3.5 py-3 ${isOffline || isDisabled ? 'opacity-60' : ''}`}>
+          <div key={s.id} className={`oa-data-surface flex items-center gap-3 rounded-lg border border-border bg-card px-3.5 py-3 ${isOffline || isDisabled ? 'opacity-60' : ''}`}>
             <StatusIcon
               aria-hidden
               className={`size-3.5 shrink-0 ${statusColor} ${isConnecting ? 'animate-spin motion-reduce:animate-none' : ''}`}
