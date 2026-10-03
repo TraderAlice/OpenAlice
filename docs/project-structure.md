@@ -357,6 +357,15 @@ crosses `@traderalice/uta-protocol` over local HTTP:
 - Configuration changes that require UTA restart use
   `data/control/restart-uta.flag`, watched by Guardian.
 
+Configured mock brokers save their own simulated cash, positions, orders,
+prices, and order sequence in `data/trading/<accountId>/mock.json`. Each
+simulator mutation writes a flushed temporary file and renames it into place;
+connection restores that state without replaying `commit.json`. Missing state
+starts a new simulator; unreadable or invalid state fails connection rather
+than resetting holdings. Directly constructed test brokers stay in memory
+unless given an explicit state file. The approval staging area remains owned
+by TradingGit and is not made durable by the broker snapshot.
+
 Do not use Alice process availability as evidence that UTA or a broker is
 healthy. Do not let an optional UTA failure block read-only Workspace use.
 An absent Broker Pack disables only accounts and K-line sources that require

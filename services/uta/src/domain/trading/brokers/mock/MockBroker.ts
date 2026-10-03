@@ -16,6 +16,9 @@
  * call these to drive scenarios without going through `placeOrder`.
  */
 
+import { mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs'
+import { dirname } from 'node:path'
+import { dataPath } from '@/core/paths.js'
 import { z } from 'zod'
 import Decimal from 'decimal.js'
 import { Contract, ContractDescription, ContractDetails, Order, OrderState, UNSET_DECIMAL, UNSET_DOUBLE } from '@traderalice/ibkr'
@@ -88,6 +91,8 @@ export interface MockBrokerOptions {
   label?: string
   cash?: number
   accountInfo?: Partial<AccountInfo>
+  /** Omit for isolated in-memory test brokers. */
+  stateFile?: string
 }
 
 // ==================== Defaults ====================
@@ -173,7 +178,7 @@ export class MockBroker implements IBroker {
 
   static fromConfig(config: { id: string; label?: string; brokerConfig: Record<string, unknown> }): MockBroker {
     const bc = MockBroker.configSchema.parse(config.brokerConfig)
-    return new MockBroker({ id: config.id, label: config.label, cash: bc.cash })
+    return new MockBroker({ id: config.id, label: config.label, cash: bc.cash, stateFile: dataPath('trading', config.id, 'mock.json') })
   }
 
   // ---- Instance ----
@@ -181,6 +186,8 @@ export class MockBroker implements IBroker {
   readonly brokerEngine = 'mock'
   readonly id: string
   readonly label: string
+
+  private readonly stateFile?: string
 
   private _positions = new Map<string, InternalPosition>()
   private _orders = new Map<string, InternalOrder>()
@@ -203,6 +210,7 @@ export class MockBroker implements IBroker {
   private _failMethods = new Set<string>()
 
   constructor(options: MockBrokerOptions = {}) {
+    this.stateFile = options.stateFile
     this.id = options.id ?? 'mock-paper'
     this.label = options.label ?? 'Mock Paper Account'
     this._cash = new Decimal(options.cash ?? 100_000)
@@ -212,6 +220,102 @@ export class MockBroker implements IBroker {
         ...options.accountInfo,
       }
     }
+  }
+
+  /** Broker state is authoritative; never replay the observation/approval ledger. */
+  private persist(): void {
+    if (!this.stateFile) return
+    mkdirSync(dirname(this.stateFile), { recursive: true })
+    const temporary = `${this.stateFile}.tmp`
+    writeFileSync(temporary, JSON.stringify({
+      version: 1,
+      cash: this._cash,
+      realizedPnL: this._realizedPnL,
+      nextOrderId: this._nextOrderId,
+      positions: [...this._positions],
+      orders: [...this._orders],
+      markPrices: [...this._markPrices],
+      contracts: [...this._contractRegistry],
+    }), { flush: true })
+    renameSync(temporary, this.stateFile)
+  }
+
+  private restore(): void {
+    if (!this.stateFile) return
+    let raw: string
+    try {
+      raw = readFileSync(this.stateFile, 'utf8')
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === 'ENOENT') return
+      throw error
+    }
+    const saved = JSON.parse(raw)
+    if (saved?.version !== 1) throw new Error('Unsupported mock state version')
+    // Validate only the snapshot boundary; broker classes still own their fields.
+    const finiteDecimal = z.string().refine(value => {
+      try { return new Decimal(value).isFinite() } catch { return false }
+    }, 'Expected a finite decimal')
+    const contract = z.looseObject({
+      symbol: z.string(), localSymbol: z.string().optional(), secType: z.string(),
+      exchange: z.string(), currency: z.string(),
+      multiplier: z.union([z.literal(''), finiteDecimal]).optional(),
+      strike: z.number().optional(),
+    })
+    const entries = <T extends z.ZodType>(value: T) => z.array(z.tuple([z.string().min(1), value]))
+      .refine(rows => new Set(rows.map(([key]) => key)).size === rows.length, 'Duplicate mock state key')
+    const state = z.object({
+      version: z.literal(1), cash: finiteDecimal, realizedPnL: finiteDecimal,
+      nextOrderId: z.number().int().positive().max(Number.MAX_SAFE_INTEGER),
+      positions: entries(z.looseObject({
+        contract, side: z.enum(['long', 'short']), quantity: finiteDecimal,
+        avgCost: finiteDecimal, marketPriceOverride: finiteDecimal.optional(),
+        avgCostSource: z.enum(['broker', 'wallet']).optional(),
+      })),
+      orders: entries(z.looseObject({
+        id: z.string().min(1), contract, status: z.enum(['Submitted', 'Filled', 'Cancelled']),
+        order: z.looseObject({ action: z.string().min(1), orderType: z.string().min(1), totalQuantity: finiteDecimal }),
+        fillPrice: z.number().optional(), filledQuantity: finiteDecimal.optional(), avgFillPrice: finiteDecimal.optional(),
+      })),
+      markPrices: entries(finiteDecimal), contracts: entries(contract),
+    }).parse(saved)
+    for (const [key, order] of state.orders) {
+      const sequence = /^mock-ord-(\d+)$/.exec(key)
+      if (key !== order.id || (sequence && Number(sequence[1]) >= state.nextOrderId)) {
+        throw new Error('Invalid mock order sequence or identity')
+      }
+    }
+    // Construct everything before replacing live state. Corrupt files must fail
+    // connection rather than silently reset the account to its starting cash.
+    const cash = new Decimal(state.cash)
+    const realizedPnL = new Decimal(state.realizedPnL)
+    const positions = new Map<string, InternalPosition>(state.positions.map(([key, p]) => [key, {
+      ...p, contract: Object.assign(new Contract(), p.contract),
+      quantity: new Decimal(p.quantity), avgCost: new Decimal(p.avgCost),
+      marketPriceOverride: p.marketPriceOverride == null ? undefined : new Decimal(p.marketPriceOverride),
+    }]))
+    const orders = new Map<string, InternalOrder>(state.orders.map(([key, o]) => {
+      const order = Object.assign(new Order(), o.order)
+      // Order owns the Decimal field inventory, including unset sentinels.
+      for (const [field, value] of Object.entries(new Order())) {
+        if (Decimal.isDecimal(value) && field in o.order) {
+          Object.assign(order, { [field]: new Decimal(finiteDecimal.parse(o.order[field])) })
+        }
+      }
+      if (o.order.filledQuantity != null) order.filledQuantity = new Decimal(finiteDecimal.parse(o.order.filledQuantity))
+      return [key, { ...o, contract: Object.assign(new Contract(), o.contract), order,
+        filledQuantity: o.filledQuantity == null ? undefined : new Decimal(o.filledQuantity),
+        avgFillPrice: o.avgFillPrice == null ? undefined : new Decimal(o.avgFillPrice),
+      }]
+    }))
+    const markPrices = new Map<string, Decimal>(state.markPrices.map(([key, price]) => [key, new Decimal(price)]))
+    const contracts = new Map<string, Contract>(state.contracts.map(([key, contract]) => [key, Object.assign(new Contract(), contract)]))
+    this._cash = cash
+    this._realizedPnL = realizedPnL
+    this._nextOrderId = state.nextOrderId
+    this._positions = positions
+    this._orders = orders
+    this._markPrices = markPrices
+    this._contractRegistry = contracts
   }
 
   // ==================== Call tracking ====================
@@ -253,7 +357,7 @@ export class MockBroker implements IBroker {
 
   // ---- Lifecycle ----
 
-  async init(): Promise<void> { this._record('init', []); this._checkFail('init') }
+  async init(): Promise<void> { this._record('init', []); this._checkFail('init'); this.restore() }
   async close(): Promise<void> { this._record('close', []) }
 
   // ---- Contract search (stub) ----
@@ -310,6 +414,7 @@ export class MockBroker implements IBroker {
 
       const orderState = new OrderState()
       orderState.status = 'Filled'
+      this.persist()
       return { success: true, orderId, orderState }
     }
 
@@ -321,6 +426,7 @@ export class MockBroker implements IBroker {
 
     const orderState = new OrderState()
     orderState.status = 'Submitted'
+    this.persist()
     return { success: true, orderId, orderState }
   }
 
@@ -351,6 +457,7 @@ export class MockBroker implements IBroker {
 
     const orderState = new OrderState()
     orderState.status = 'Submitted'
+    this.persist()
     return { success: true, orderId, orderState }
   }
 
@@ -363,6 +470,7 @@ export class MockBroker implements IBroker {
     internal.status = 'Cancelled'
     const orderState = new OrderState()
     orderState.status = 'Cancelled'
+    this.persist()
     return { success: true, orderId, orderState }
   }
 
@@ -559,7 +667,9 @@ export class MockBroker implements IBroker {
   setMarkPrice(nativeKey: string, price: Decimal | string | number): string[] {
     const decimalPrice = price instanceof Decimal ? price : new Decimal(price)
     this._markPrices.set(nativeKey, decimalPrice)
-    return this._matchPendingOrders(nativeKey, decimalPrice)
+    const filled = this._matchPendingOrders(nativeKey, decimalPrice)
+    this.persist()
+    return filled
   }
 
   /** Move a markPrice by a relative percent (e.g. +5 = up 5%). */
@@ -618,6 +728,7 @@ export class MockBroker implements IBroker {
       internal.status = 'Filled'
       internal.fillPrice = price.toNumber()
     }
+    this.persist()
   }
 
   /** Force-cancel a pending order (simulator surface; bypasses IBroker idempotency). */
@@ -625,6 +736,7 @@ export class MockBroker implements IBroker {
     const internal = this._orders.get(orderId)
     if (!internal) throw new Error(`MockBroker[${this.id}]: order ${orderId} not found`)
     internal.status = 'Cancelled'
+    this.persist()
   }
 
   /**
@@ -684,6 +796,7 @@ export class MockBroker implements IBroker {
     if (existing) {
       existing.quantity = existing.quantity.plus(qty)
       existing.avgCostSource = 'wallet'
+      this.persist()
       return
     }
 
@@ -695,6 +808,7 @@ export class MockBroker implements IBroker {
       avgCost: markPrice,
       avgCostSource: 'wallet',
     })
+    this.persist()
   }
 
   /** Simulate an external withdrawal (transfer-out, burn). Cash unchanged. */
@@ -708,6 +822,7 @@ export class MockBroker implements IBroker {
     } else {
       existing.avgCostSource = 'wallet'
     }
+    this.persist()
   }
 
   /**
@@ -752,6 +867,7 @@ export class MockBroker implements IBroker {
     const mult = positionForMult ? multiplierOf(positionForMult.contract) : new Decimal(1)
     const cashDelta = qty.mul(price).mul(mult)
     this._cash = params.side === 'BUY' ? this._cash.minus(cashDelta) : this._cash.plus(cashDelta)
+    this.persist()
   }
 
   /**
