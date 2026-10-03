@@ -1,3 +1,4 @@
+import { ModelIdentity } from './ModelIdentity'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { ReactNode } from 'react'
 import type { TFunction } from 'i18next'
@@ -392,7 +393,7 @@ function IssueAiEditor({
       >
         <KeyRound size={15} className="text-muted-foreground" aria-hidden />
         <span className="min-w-0">
-          <span className="block truncate text-[13px] font-normal text-foreground">{summaryModel}</span>
+          <ModelIdentity model={summaryModel} className="text-[13px] font-normal text-foreground" />
           <span className="block truncate text-[11px] text-muted-foreground">{[summaryAccess, summaryEffort].filter((value, index, values) => value !== summaryModel && values.indexOf(value) === index).join(' · ')}</span>
           <span className="sr-only">{provenance}</span>
         </span>
@@ -1100,7 +1101,7 @@ function RunRow({ run, onOpen }: { run: IssueRunRecord; onOpen: (run: IssueRunRe
           {t(`issues.detail.runStatus.${displayStatus}`)}
         </span>
         <span className="text-xs text-muted-foreground">{run.agent}</span>
-        {run.model && <span className="text-xs text-muted-foreground">{run.model}</span>}
+        {run.model && <ModelIdentity model={run.model} className="text-xs text-muted-foreground" />}
         {run.effort && <span className="text-xs text-muted-foreground">{run.effort}</span>}
         <span className="ml-auto text-xs text-muted-foreground" title={new Date(run.startedAt).toLocaleString()}>
           {formatRelativeTime(run.startedAt)}
