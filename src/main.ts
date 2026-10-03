@@ -70,6 +70,7 @@ import { workspaceTemplateUpgradeFactory, aliceHarnessUpgradeFactory } from './t
 import { createEntityStore } from './core/entity-store.js'
 import { entityUpsertFactory } from './tool/entity-upsert.js'
 import { entitySearchFactory } from './tool/entity-search.js'
+import { entityRemoveFactory } from './tool/entity-remove.js'
 import { issueToolFactories } from './tool/issue-tools.js'
 import { sessionSignatureFactory } from './tool/session-signature.js'
 import { sessionRenameFactory } from './tool/session-rename.js'
@@ -115,6 +116,7 @@ async function main() {
   workspaceToolCenter.register(aliceHarnessUpgradeFactory)
   workspaceToolCenter.register(entityUpsertFactory)
   workspaceToolCenter.register(entitySearchFactory)
+  workspaceToolCenter.register(entityRemoveFactory)
   for (const f of issueToolFactories) workspaceToolCenter.register(f)
   workspaceToolCenter.register(sessionSignatureFactory)
   workspaceToolCenter.register(sessionRenameFactory)
