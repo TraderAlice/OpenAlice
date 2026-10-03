@@ -1,3 +1,4 @@
+import { registerNativeMenuLocale } from './native-menu-locale.js'
 /** Development-only entry. Deliberately does not import the production Guardian. */
 import { app, ipcMain, Menu, protocol } from 'electron'
 import { spawn, type ChildProcess } from 'node:child_process'
@@ -85,6 +86,7 @@ void app.whenReady().then(async () => {
   Menu.setApplicationMenu(process.platform === 'darwin'
     ? Menu.buildFromTemplate([{ role: 'appMenu' }, { role: 'editMenu' }, { role: 'windowMenu' }]) : null)
   const { window: win, companion } = createAppWindow(join(root, 'dist/electron/preload.js'), 'OpenAlice — Demo')
+  registerNativeMenuLocale(win)
   companion?.configureActivity({ identity: () => 'isolated-demo', read: async query => {
     const response = await fetchAliceWebRequest(new Request(`app://openalice/api/agent-runtime${query}`), backend)
     if (!response.ok) throw new Error('Demo activity unavailable')

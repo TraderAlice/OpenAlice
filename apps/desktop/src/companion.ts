@@ -1,3 +1,4 @@
+import { nativeMenuLabels } from './native-menu-locale.js'
 import { installCompanionActivity } from './companion-activity.js'
 import type { ActivitySource } from './activity-controller.js'
 import { app, BrowserWindow, ipcMain, Menu, screen } from 'electron'
@@ -189,9 +190,9 @@ export function createCompanion(owner: BrowserWindow): CompanionHandle | undefin
   })
   const activity = installCompanionActivity(owner, pet)
   const trayMenuItems = (): Electron.MenuItemConstructorOptions[] => [
-    { label: enabled ? 'Hide pet' : 'Show pet', click: toggle },
-    { label: 'Size', submenu: [170, 220, 280].map(value => ({
-      label: value === 170 ? 'Small' : value === 220 ? 'Medium' : 'Large', type: 'radio' as const, checked: size === value,
+    { label: enabled ? nativeMenuLabels().hidePet : nativeMenuLabels().showPet, click: toggle },
+    { label: nativeMenuLabels().size, submenu: [170, 220, 280].map(value => ({
+      label: value === 170 ? nativeMenuLabels().small : value === 220 ? nativeMenuLabels().medium : nativeMenuLabels().large, type: 'radio' as const, checked: size === value,
       click: () => {
         if (pet.isDestroyed()) return
         const old = companionBounds(pet); size = value
@@ -202,10 +203,10 @@ export function createCompanion(owner: BrowserWindow): CompanionHandle | undefin
     })) },
   ]
   const menu = () => Menu.buildFromTemplate([
-    { label: 'Show OpenAlice', click: open },
+    { label: nativeMenuLabels().show, click: open },
     ...trayMenuItems(),
     { type: 'separator' },
-    { label: 'Quit OpenAlice', click: () => app.quit() },
+    { label: nativeMenuLabels().quitApp, click: () => app.quit() },
   ])
   const trusted = (event: Electron.IpcMainEvent | Electron.IpcMainInvokeEvent) => event.sender === pet.webContents && event.senderFrame === pet.webContents.mainFrame
   const listen = (action: string, callback: (input: unknown) => void) => {
