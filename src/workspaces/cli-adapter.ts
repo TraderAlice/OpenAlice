@@ -160,6 +160,8 @@ export interface WorkspaceAiCred {
   baseUrl?: string | null;
   apiKey?: string | null;
   model?: string | null;
+  /** Pi's available models from the same credential catalog; selection stays scalar. */
+  models?: Array<{ id: string; contextWindow?: number; reasoning?: boolean }>;
   /**
    * The wire protocol the endpoint speaks — Anthropic Messages / Google
    * Generative AI / OpenAI Chat Completions / OpenAI Responses. The cross-CLI generalization of the

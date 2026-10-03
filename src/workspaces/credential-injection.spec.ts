@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from 'vitest'
+import { afterEach, describe, it, expect, vi } from 'vitest'
 import {
   credentialToWorkspaceAiCred as projectCredentialToWorkspace,
   injectWorkspaceCredentials,
@@ -10,6 +10,9 @@ import { AdapterRegistry, emptyAgentSessionRuntime, type CliAdapter, type Worksp
 import { createBuiltinAdapterRegistry } from './adapters/index.js'
 import type { Credential } from '@/core/config.js'
 import type { Logger } from './logger.js'
+import * as modelCatalog from '../ai-providers/model-catalog.js'
+
+afterEach(() => vi.restoreAllMocks())
 
 // Multi-wire credentials: one key, the shapes (→ endpoints) it can speak.
 const anthropicKey: Credential = { vendor: 'anthropic', authType: 'api-key', apiKey: 'sk-ant', wires: { anthropic: '' } }
@@ -60,6 +63,24 @@ function compatibleCredentials(
 }
 
 describe('credentialToWorkspaceAiCred', () => {
+  it('projects credential catalog siblings only to Pi without copying selected-model overrides', () => {
+    vi.spyOn(modelCatalog, 'cachedProviderModels').mockReturnValue([
+      { id: 'research', label: 'Research', semantics: { contextWindow: 256000, reasoning: { supported: true } } },
+      { id: 'fast', label: 'Fast', semantics: { contextWindow: 32000, reasoning: { supported: false } } },
+    ])
+    const pi = projectCredentialToWorkspace(chatOnlyGateway, builtinAdapter('pi'), {
+      model: 'research', contextWindow: 64000,
+    }, 'fixture')!
+    expect(pi.model).toBe('research')
+    expect(pi.contextWindow).toBe(64000)
+    expect(pi.models).toEqual([
+      { id: 'research', contextWindow: 256000, reasoning: true },
+      { id: 'fast', contextWindow: 32000, reasoning: false },
+    ])
+    expect(projectCredentialToWorkspace(chatOnlyGateway, builtinAdapter('opencode'), { model: 'research' }, 'fixture'))
+      .not.toHaveProperty('models')
+  })
+
   it('supports a newly registered adapter entirely from its capability declaration', () => {
     const futureAdapter: CliAdapter = {
       id: 'future',
