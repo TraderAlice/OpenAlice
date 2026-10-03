@@ -417,6 +417,10 @@ export interface WalletOperation {
 }
 
 export interface WalletStatus {
+  execution?: {
+    activeIndex: number | null
+    results: Array<{ orderId?: string; status: string; error?: string; legs?: Array<{ orderId: string }> }>
+  }
   staged: WalletOperation[]
   pendingMessage: string | null
   pendingHash?: string | null

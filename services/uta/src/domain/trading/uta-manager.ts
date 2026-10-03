@@ -12,7 +12,7 @@ import { createCcxtProviderTools } from './brokers/ccxt/ccxt-tools.js'
 import { createBroker } from './brokers/factory.js'
 import { getBrokerPreset } from '@traderalice/uta-protocol'
 import { UnifiedTradingAccount } from './UnifiedTradingAccount.js'
-import { loadGitState, createGitPersister } from './git-persistence.js'
+import { loadGitState, createGitPersister, loadPendingState, createPendingPersister } from './git-persistence.js'
 import { readUTAsConfig, type UTAConfig } from '@/core/config.js'
 import type { EventLog } from '@/core/event-log.js'
 import type { ToolCenter } from '@/core/tool-center.js'
@@ -68,6 +68,8 @@ export class UTAManager {
       readOnly: cfg.readOnly,
       asVendor: cfg.asVendor,
       savedState,
+      savedPending: await loadPendingState(cfg.id),
+      onPendingChange: createPendingPersister(cfg.id),
       onCommit: createGitPersister(cfg.id),
       onHealthChange: (utaId, health) => {
         this.eventLog?.append('account.health', { accountId: utaId, ...health })

@@ -2686,6 +2686,12 @@ export const zhHant: Resources = {
     openPermissions: '開啟模式設定',
   },
   tradingReview: {
+    recovery: {
+      title: '執行復原',
+      uncertain: '一次券商呼叫沒有儲存結果。請勿重試。須先與券商訂單核對，此錢包才能再次提交。已儲存的結果列在下方。',
+      recorded: '這些結果已儲存。可完成記錄，不會再次提交訂單。尚未開始的操作將記錄為未執行。',
+      recordResults: '記錄已儲存的結果',
+    },
     description: '在將 Agent 暫存的券商寫入推送至交易場所前進行審閱。',
     liteTitle: '精簡模式下無法使用「交易即 Git」。',
     liteDescription: '精簡模式會讓 UTA 保持中斷，因此 Alice 無法審閱券商寫入提案。請在「設定 → 交易 → 模式」中切換交易模式以連接 UTA。',

@@ -357,6 +357,23 @@ crosses `@traderalice/uta-protocol` over local HTTP:
 - Configuration changes that require UTA restart use
   `data/control/restart-uta.flag`, watched by Guardian.
 
+TradingGit stores prepared approvals and execution progress in
+`data/trading/<accountId>/pending.json`, beside the unchanged commit ledger.
+Preparation saves the approval hash and operations; dispatch saves a marker
+before each broker call and its returned outcome before the next call or
+snapshot. Accepted IDs remain visible to existing order sync while a snapshot
+is unavailable. A completed ledger hash supersedes a stale pending file after
+a crash during cleanup. Uncommitted staging remains transient.
+
+Recovered execution never resends orders. Known outcomes can finish recording
+through the existing wallet push or order-sync path. A call with no saved
+outcome remains blocked and visible in Trading as Git and agent status until
+broker evidence can resolve it; there is no force-retry or discard action.
+Broker rejection versus transport uncertainty remains a separate dispatch
+classification boundary. Pending files are new; existing commit records are
+not replayed or migrated. Corrupt or unreadable files fail loading rather than
+silently starting a new wallet.
+
 Do not use Alice process availability as evidence that UTA or a broker is
 healthy. Do not let an optional UTA failure block read-only Workspace use.
 An absent Broker Pack disables only accounts and K-line sources that require

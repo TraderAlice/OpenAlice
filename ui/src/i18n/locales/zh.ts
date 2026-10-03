@@ -2682,6 +2682,12 @@ export const zh: Resources = {
     openPermissions: '打开模式设置',
   },
   tradingReview: {
+    recovery: {
+      title: '执行恢复',
+      uncertain: '一次券商调用没有保存结果。请勿重试。须先与券商订单核对，此钱包才能再次提交。已保存的结果列在下方。',
+      recorded: '这些结果已保存。可完成记录，不会再次提交订单。尚未开始的操作将记录为未执行。',
+      recordResults: '记录已保存的结果',
+    },
     description: '在将智能体暂存的券商写入推送到交易场所前进行审阅。',
     liteTitle: '精简模式下无法使用“交易即 Git”。',
     liteDescription: '精简模式会保持 UTA 断开，因此 Alice 无法审阅券商写入提案。请在“设置 → 交易 → 模式”中切换交易模式以连接 UTA。',

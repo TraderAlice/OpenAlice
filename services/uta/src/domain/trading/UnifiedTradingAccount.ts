@@ -27,6 +27,7 @@ import type {
   GitCommit,
   GitState,
   GitExportState,
+  GitPendingState,
   CommitLogEntry,
   PriceChangeInput,
   SimulatePriceChangeResult,
@@ -41,6 +42,8 @@ import './contract-ext.js'
 export interface UnifiedTradingAccountOptions {
   guards?: Array<{ type: string; options?: Record<string, unknown> }>
   savedState?: GitExportState
+  savedPending?: GitPendingState
+  onPendingChange?: (state: GitPendingState | null) => void
   onCommit?: (state: GitExportState) => void | Promise<void>
   onHealthChange?: (accountId: string, health: BrokerHealthInfo) => void
   onPostPush?: (accountId: string) => void | Promise<void>
@@ -202,6 +205,8 @@ export class UnifiedTradingAccount {
       executeOperation: guardedDispatcher,
       getGitState: this._getState,
       onCommit: options.onCommit,
+      savedPending: options.savedPending,
+      onPendingChange: options.onPendingChange,
     }
 
     this.git = options.savedState
@@ -1038,6 +1043,9 @@ export class UnifiedTradingAccount {
    * the placeholder avgCost and recomputes unrealizedPnL.
    */
   private async _reconcileWalletPositions(positions: Position[]): Promise<void> {
+    // Saved execution outcomes have not reached the cost-basis ledger yet.
+    // Do not book those fills a second time as unexplained balance changes.
+    if (this.git.status().execution) return
     const walletPositions = positions.filter(p => p.avgCostSource === 'wallet')
     if (walletPositions.length === 0) return
 

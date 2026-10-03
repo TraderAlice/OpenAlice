@@ -18,6 +18,7 @@ import type {
   GitCommit,
   CommitLogEntry,
   GitExportState,
+  GitPendingState,
   GitState,
   PriceChangeInput,
   SimulatePriceChangeResult,
@@ -75,6 +76,9 @@ export interface ITradingGit {
 }
 
 export interface TradingGitConfig {
+  savedPending?: GitPendingState
+  /** Synchronous because add/commit are synchronous public operations. */
+  onPendingChange?: (state: GitPendingState | null) => void
   executeOperation: (operation: Operation) => Promise<unknown>
   getGitState: () => Promise<GitState>
   onCommit?: (state: GitExportState) => void | Promise<void>

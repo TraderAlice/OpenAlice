@@ -118,6 +118,15 @@ describe('compactOperation / compactStatus / compactResult', () => {
   })
 })
 
+describe('execution recovery status', () => {
+  it('does not tell an agent an uncertain execution is awaiting approval', () => {
+    const execution = { parentHash: null, activeIndex: 1, results: [{ orderId: 'accepted', success: true, status: 'submitted' }] }
+    const result = compactStatus({ staged: [], pendingMessage: 'protective pair', pendingHash: 'hash', head: null, commitCount: 0, execution })
+    expect(result.awaitingApproval).toBeNull()
+    expect(result.executionRecovery).toMatchObject({ hash: 'hash', activeIndex: 1, results: execution.results })
+  })
+})
+
 describe('compactAccountInfo', () => {
   it('rounds money to 2dp and omits unreported fields (never fabricates zeros)', () => {
     const a = compactAccountInfo({

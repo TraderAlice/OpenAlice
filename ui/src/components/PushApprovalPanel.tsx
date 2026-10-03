@@ -876,6 +876,7 @@ function ReviewDetail({
   }
 
   const ops = itemOperations(item, t)
+  const execution = item.kind !== 'history' ? item.status.execution : undefined
   const isPending = item.kind === 'pending'
   const isStaged = item.kind === 'staged'
   const accountId = item.kind === 'history' ? item.accountId : item.account.id
@@ -923,7 +924,25 @@ function ReviewDetail({
                     })}
                 </div>
               </div>
-              {isPending && (
+              {isPending && execution && (
+                <div className="max-w-xl space-y-2 text-[12px] text-warning" role="status">
+                  <p>{t(execution.activeIndex != null ? 'tradingReview.recovery.uncertain' : 'tradingReview.recovery.recorded')}</p>
+                  <ul>
+                    {execution.results.map((result, index) => (
+                      <li key={index} className="break-all">
+                        {index + 1}: {result.status}{result.orderId ? ` — ${result.orderId}` : ''}
+                        {(result.legs ?? []).map((leg) => ` / ${leg.orderId}`).join('')}
+                      </li>
+                    ))}
+                  </ul>
+                  {execution.activeIndex == null && (
+                    <Button size="sm" onClick={() => onPush(accountId)} disabled={pushing !== null}>
+                      {t('tradingReview.recovery.recordResults')}
+                    </Button>
+                  )}
+                </div>
+              )}
+              {isPending && !execution && (
                 <div className="flex shrink-0 items-center gap-2">
                   {confirmingPush === accountId ? (
                     <>
@@ -1006,7 +1025,7 @@ function StatusPill({ item }: { item: ReviewItem }) {
     return (
       <span className="inline-flex items-center gap-1 rounded-full border border-warning/30 bg-warning/10 px-2 py-0.5 text-[11px] leading-[15px] font-medium text-warning">
         <AlertTriangle size={12} aria-hidden />
-        {t('tradingReview.status.needsApproval')}
+        {t(item.status.execution ? 'tradingReview.recovery.title' : 'tradingReview.status.needsApproval')}
       </span>
     )
   }

@@ -260,3 +260,27 @@ describe('PushApprovalPanel localization', () => {
     await waitFor(() => expect(document.activeElement).toBe(queueRow))
   })
 })
+
+
+describe('execution recovery review', () => {
+  it('shows accepted IDs and removes approval/rejection controls for an uncertain call', async () => {
+    await i18n.changeLanguage('en')
+    mocks.walletStatus.mockResolvedValue({ staged: [{ action: 'cancelOrder', orderId: 'old' }], pendingMessage: 'Interrupted batch', pendingHash: 'hash', head: null, commitCount: 0,
+      execution: { activeIndex: 1, results: [{ orderId: 'accepted-parent', status: 'submitted', legs: [{ orderId: 'accepted-child' }] }] } })
+    render(<PushApprovalPanel />)
+    expect(await screen.findByText(/A broker call has no saved outcome/)).toBeTruthy()
+    expect(screen.getByText(/accepted-parent.*accepted-child/)).toBeTruthy()
+    expect(screen.queryByRole('button', { name: /Approve|Reject|Record saved results/ })).toBeNull()
+    expect(mocks.walletPush).not.toHaveBeenCalled()
+    expect(mocks.walletReject).not.toHaveBeenCalled()
+  })
+
+  it('offers recording saved results without asking for another trade approval', async () => {
+    await i18n.changeLanguage('en')
+    mocks.walletStatus.mockResolvedValue({ staged: [{ action: 'cancelOrder', orderId: 'old' }], pendingMessage: 'Snapshot failed', pendingHash: 'hash', head: null, commitCount: 0,
+      execution: { activeIndex: null, results: [{ orderId: 'accepted', status: 'submitted' }] } })
+    render(<PushApprovalPanel />)
+    expect(await screen.findByRole('button', { name: 'Record saved results' })).toBeTruthy()
+    expect(screen.queryByRole('button', { name: /Approve|Reject/ })).toBeNull()
+  })
+})
