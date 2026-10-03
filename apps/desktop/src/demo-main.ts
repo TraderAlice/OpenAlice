@@ -8,7 +8,7 @@ import { fileURLToPath } from 'node:url'
 import { ClientUpdateService } from './web-relay.js'
 import { runDemoSmoke } from './demo-smoke.js'
 import { createAppWindow } from './app-window.js'
-import { fetchAliceWebRequest, handleOpenAliceIpcMessage, registerOpenAliceIpc } from './ipc.js'
+import { closeOpenAliceWebSource, fetchAliceWebRequest, handleOpenAliceIpcMessage, registerOpenAliceIpc } from './ipc.js'
 
 if (app.isPackaged) throw new Error('Electron demo is a source-development entry only')
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '../..')
@@ -25,9 +25,19 @@ protocol.registerSchemesAsPrivileged([{
 }])
 let backend: ChildProcess | null = null
 app.on('window-all-closed', () => app.quit())
-app.on('before-quit', () => { backend?.kill() })
+let quitting = false
+function stopBackend(): void {
+  if (quitting) return
+  quitting = true
+  if (!backend) return
+  // Close the request source before killing IPC, including dispatches after quit.
+  closeOpenAliceWebSource(backend)
+  backend.kill()
+}
+app.on('before-quit', stopBackend)
 
 void app.whenReady().then(async () => {
+  if (quitting) return
   // Only paths and basic process locale are handed to the fixture process.
   // It has no broker, agent, remote-project, or credential configuration.
   backend = spawn(process.execPath, [join(root, 'dist/demo/backend.mjs')], {
@@ -49,7 +59,12 @@ void app.whenReady().then(async () => {
     backend!.once('error', reject)
     backend!.once('exit', code => { clearTimeout(timeout); reject(new Error(`Demo backend exited: ${code}`)) })
   })
-  backend.on('exit', () => app.quit())
+  backend.on('exit', (code, signal) => {
+    if (quitting) return
+    console.error(`Demo backend exited unexpectedly: code=${code} signal=${signal}`)
+    stopBackend()
+    app.exit(1)
+  })
   const status = {
     currentHome: home, defaultHome: home, source: 'environment' as const,
     recentHomes: [home], askOnStartup: false, selectionLocked: true,
@@ -99,4 +114,4 @@ void app.whenReady().then(async () => {
     await runDemoSmoke(win)
     app.quit()
   }
-}).catch(error => { console.error(error); app.exit(1) })
+}).catch(error => { console.error(error); stopBackend(); app.exit(1) })

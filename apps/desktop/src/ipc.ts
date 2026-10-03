@@ -68,7 +68,7 @@ const ptyConnections = new Map<string, PtyConnection>()
 const pendingWebRequests = new Map<string, {
   readonly resolve: (res: Response) => void
   readonly reject: (err: Error) => void
-  readonly timer: ReturnType<typeof setTimeout>
+  readonly child: ChildProcess
 }>()
 
 function sendAliceMessage(child: ChildProcess, message: Serializable, onError: (error: Error) => void = () => {}): void {
@@ -84,10 +84,19 @@ function sendAliceMessage(child: ChildProcess, message: Serializable, onError: (
 }
 
 export function cancelOpenAliceWebRequests(reason = 'Alice IPC connection closed'): void {
-  for (const [id, pending] of pendingWebRequests) {
-    pendingWebRequests.delete(id)
-    clearTimeout(pending.timer)
+  for (const pending of pendingWebRequests.values()) {
     pending.reject(new Error(reason))
+  }
+}
+
+// Retirement is terminal for this source, including requests still reading a body.
+const closedWebSources = new WeakSet<ChildProcess>()
+
+export function closeOpenAliceWebSource(child: ChildProcess): void {
+  closedWebSources.add(child)
+  for (const pending of pendingWebRequests.values()) {
+    if (pending.child !== child) continue
+    pending.resolve(new Response('Alice IPC source closed', { status: 503 }))
   }
 }
 
@@ -368,35 +377,51 @@ export function registerOpenAliceIpc(opts: OpenAliceIpcOptions): void {
 }
 
 export async function fetchAliceWebRequest(request: Request, child: ChildProcess | null, timeoutMs = 30_000): Promise<Response> {
-  if (!child || !child.connected) {
+  if (!child || closedWebSources.has(child) || !child.connected || request.signal.aborted) {
     return new Response('Alice IPC unavailable', { status: 503 })
   }
   const id = randomId()
   const method = request.method.toUpperCase()
-  const body = method === 'GET' || method === 'HEAD'
-    ? undefined
-    : Buffer.from(await request.arrayBuffer())
 
   return new Promise<Response>((resolvePromise, rejectPromise) => {
-    const timer = setTimeout(() => {
+    const cleanup = () => {
       pendingWebRequests.delete(id)
-      rejectPromise(new Error(`Alice IPC request timed out: ${method} ${request.url}`))
-    }, timeoutMs)
-    pendingWebRequests.set(id, { resolve: resolvePromise, reject: rejectPromise, timer })
-    sendAliceMessage(child, {
-      type: MSG_WEB_REQUEST,
-      id,
-      method,
-      url: request.url,
-      headers: [...request.headers.entries()],
-      ...(body ? { body } : {}),
-    }, (error) => {
+      clearTimeout(timer)
+      request.signal.removeEventListener('abort', cancel)
+    }
+    const fail = (error: Error) => {
       const pending = pendingWebRequests.get(id)
       if (!pending) return
-      pendingWebRequests.delete(id)
-      clearTimeout(pending.timer)
       pending.reject(error)
+    }
+    const cancel = () => {
+      const pending = pendingWebRequests.get(id)
+      if (!pending) return
+      pending.resolve(new Response('Alice IPC request cancelled', { status: 503 }))
+    }
+    const timer = setTimeout(() => {
+      fail(new Error(`Alice IPC request timed out: ${method} ${request.url}`))
+    }, timeoutMs)
+    pendingWebRequests.set(id, {
+      child,
+      resolve: response => { cleanup(); resolvePromise(response) },
+      reject: error => { cleanup(); rejectPromise(error) },
     })
+    request.signal.addEventListener('abort', cancel, { once: true })
+    const dispatch = (body?: Buffer) => {
+      // Cancellation/retirement may have completed while reading the request body.
+      if (!pendingWebRequests.has(id)) return
+      sendAliceMessage(child, {
+        type: MSG_WEB_REQUEST,
+        id,
+        method,
+        url: request.url,
+        headers: [...request.headers.entries()],
+        ...(body ? { body } : {}),
+      }, fail)
+    }
+    if (method === 'GET' || method === 'HEAD') dispatch()
+    else void request.arrayBuffer().then(body => dispatch(Buffer.from(body))).catch(fail)
   })
 }
 
@@ -407,8 +432,6 @@ export function handleOpenAliceIpcMessage(raw: unknown): boolean {
     const id = typeof msg['id'] === 'string' ? msg['id'] : ''
     const pending = pendingWebRequests.get(id)
     if (!pending) return true
-    pendingWebRequests.delete(id)
-    clearTimeout(pending.timer)
     const headers = Array.isArray(msg['headers']) ? msg['headers'] as [string, string][] : []
     const status = typeof msg['status'] === 'number' ? msg['status'] : 500
     pending.resolve(new Response(coerceResponseBody(msg['body']), {
