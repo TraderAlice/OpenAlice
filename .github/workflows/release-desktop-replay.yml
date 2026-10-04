@@ -59,13 +59,12 @@ jobs:
           CANDIDATE_TARGET: ${{ runner.os }}-${{ inputs.arch }}
           CANDIDATE_REHEARSAL_BRANCH: ${{ inputs.rehearsal && github.ref_name || '' }}
         run: node scripts/select-release-candidate.mjs "$CANDIDATE_RUN" "$CANDIDATE_SOURCE_SHA" "$CANDIDATE_TARGET"
-      - uses: actions/download-artifact@v5
-        with:
-          github-token: ${{ github.token }}
-          run-id: ${{ inputs.candidate-run }}
-          artifact-ids: ${{ steps.candidate.outputs.artifact-id }}
-          path: dist/electron-app
-          merge-multiple: true
+      - name: Download exact selected candidate ID
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SELECTED_ARTIFACT_ID: ${{ steps.candidate.outputs.artifact-id }}
+        shell: bash
+        run: node scripts/release-artifacts.mjs "$SELECTED_ARTIFACT_ID" dist/electron-app
       - name: Verify selected candidate bytes
         run: node scripts/desktop-candidate-receipt.mjs verify-selected dist/electron-app
       - uses: pnpm/action-setup@v6
@@ -87,4 +86,4 @@ jobs:
           name: release-upgrade-acceptance-${{ runner.os }}-${{ inputs.arch }}
           path: ${{ runner.temp }}/openalice-desktop-upgrade.json
           if-no-files-found: error
-          retention-days: 7
+          retention-days: 30
