@@ -86,7 +86,7 @@ describe('Release workflow critical path', () => {
   it('does not make POSIX system-package acceptance wait for Windows or generate npm packages', () => {
     for (const name of ['accept-cli-homebrew', 'accept-cli-linuxbrew', 'accept-cli-aur']) {
       const job = workflow.jobs[name]
-      expect(needs(job)).toEqual(['release', 'build-cli-release'])
+      expect(needs(job)).toEqual(['release', 'build-cli-release', 'build-cli-windows'])
       const commands = job.steps?.map((entry) => entry.run ?? '').join('\n') ?? ''
       expect(commands.match(/--system-only/g)).toHaveLength(2)
       expect(commands).not.toContain('--require-all')
@@ -224,7 +224,7 @@ describe('Release workflow critical path', () => {
     const upgrade = desktopWorkflow.jobs.upgrade
 
     expect(step(desktop, 'Preserve desktop release candidate').uses).toBe('actions/upload-artifact@v4')
-    expect(step(desktop, 'Preserve desktop release candidate').with?.['retention-days']).toBe(3)
+    expect(step(desktop, 'Preserve desktop release candidate').with?.['retention-days']).toBe(30)
     expect(desktop.steps?.map((candidate) => candidate.name)).not.toContain(
       'Prove final desktop artifact upgrades previous release state',
     )
@@ -401,6 +401,26 @@ describe('Release workflow critical path', () => {
       .toContain('desktop-candidate-receipt.mjs stage')
   })
 
+  it('isolates and validates all six CLI targets for every full-set consumer', () => {
+    for (const name of ['publish-release', 'build-cli-package-channels', 'accept-cli-homebrew', 'accept-cli-linuxbrew', 'accept-cli-aur']) {
+      const job = workflow.jobs[name]
+      expect(needs(job)).toContain('build-cli-release')
+      expect(needs(job)).toContain('build-cli-windows')
+      expect(job.permissions?.actions).toBe('read')
+      expect(step(job, 'Select, verify and stage six CLI targets').run).toContain('scripts/stage-cli-release.mjs')
+      expect(job.steps?.some(entry => entry.with?.pattern === 'cli-release-*')).toBe(false)
+    }
+    expect(workflow.jobs['build-cli-windows'].with?.fixed_artifact_names).toBe(true)
+    for (const job of Object.values(workflow.jobs)) {
+      for (const entry of job.steps ?? []) {
+        if (entry.uses?.startsWith('actions/upload-artifact@')) {
+          expect(entry.with?.['retention-days']).toBe(30)
+          expect(entry.with?.overwrite).toBeUndefined()
+        }
+      }
+    }
+  })
+
   it('benchmarks actual CLI consumers without public or signing authority', () => {
     const job = workflow.jobs['benchmark-cli']
     expect(job.if).toBe("inputs.operation == 'benchmark-cli'")
@@ -427,8 +447,7 @@ describe('Release workflow critical path', () => {
     const acceptance = step(called, 'Accept preserved final artifact without rebuilding')
     expect(called.steps!.indexOf(selection)).toBeLessThan(called.steps!.indexOf(verification))
     expect(called.steps!.indexOf(verification)).toBeLessThan(called.steps!.indexOf(acceptance))
-    expect(called.steps?.find((entry) => entry.uses === 'actions/download-artifact@v5')?.with?.['artifact-ids'])
-      .toBe('${{ steps.candidate.outputs.artifact-id }}')
+    expect(step(called, 'Download exact selected candidate ID').run).toContain('release-artifacts.mjs')
     expect(source).not.toMatch(/secrets:|contents: write|electron-builder|pnpm electron:build|gh release/)
     expect(step(called, 'Bind acceptance to unchanged bytes and current verifier').run).toContain('bind-upgrade')
   })
