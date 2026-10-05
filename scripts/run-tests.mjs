@@ -336,7 +336,7 @@ function printExplanation(plan) {
   for (const candidate of plan.invocations) {
     const project = candidate.project ? ` project=${candidate.project}` : ''
     console.log(`\nwould run lane=${candidate.lane}${project}`)
-    console.log(`  vitest ${candidate.args.join(' ')}`)
+    console.log(`  vp test ${candidate.args.slice(1).join(' ')}`)
   }
 }
 
@@ -471,7 +471,7 @@ function executePlan(plan, destination) {
   try {
     for (const [index, candidate] of plan.invocations.entries()) {
       const output = join(temporary, `${index}.json`)
-      const result = spawnSync(process.execPath, [resolve(repoRoot, 'node_modules/vitest/vitest.mjs'), ...candidate.args,
+      const result = spawnSync(process.execPath, [resolve(repoRoot, 'node_modules/vite-plus/bin/vp'), 'test', ...candidate.args.slice(1),
         '--reporter=default', '--reporter=json', `--outputFile=${output}`], { cwd: repoRoot, env: process.env, stdio: 'inherit' })
       let report
       try { report = JSON.parse(readFileSync(output, 'utf8')) } catch { /* fail closed below */ }
