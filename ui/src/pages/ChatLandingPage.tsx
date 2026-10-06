@@ -32,6 +32,7 @@ import {
   type LucideIcon,
 } from 'lucide-react'
 
+import { cn } from '../lib/utils'
 import { useWorkspaces } from '../contexts/workspaces-context'
 import { installHintFor } from '../components/workspace/agentInstall'
 import { QuickChatError } from '../components/workspace/api'
@@ -494,13 +495,31 @@ export function HarnessLandingPage({
                 type="button"
                 onClick={() => useExample(example.prompt)}
                 disabled={launching}
-                className="group flex min-h-11 w-full items-center gap-3 border-b border-border/70 px-1 text-left outline-none transition-[border-color,color,box-shadow] duration-[var(--motion-fast)] hover:border-border hover:text-foreground focus-visible:[box-shadow:var(--oa-focus-shadow)] disabled:opacity-40"
+                aria-label={example.title}
+                aria-describedby={example.hint ? `chat-landing-hint-${example.id}` : undefined}
+                className={cn(
+                  'group flex w-full gap-3 border-b border-border/70 px-1 text-left outline-none transition-[border-color,color,box-shadow] duration-[var(--motion-fast)] hover:border-border hover:text-foreground focus-visible:[box-shadow:var(--oa-focus-shadow)] disabled:opacity-40',
+                  example.hint ? 'items-start py-2.5' : 'min-h-11 items-center',
+                )}
               >
                 <IntentIcon
                   aria-hidden
-                  className="h-[17px] w-[17px] shrink-0 text-muted-foreground transition-colors duration-[var(--motion-fast)] group-hover:text-foreground group-focus-visible:text-foreground"
+                  className={cn(
+                    'h-[17px] w-[17px] shrink-0 text-muted-foreground transition-colors duration-[var(--motion-fast)] group-hover:text-foreground group-focus-visible:text-foreground',
+                    example.hint && 'mt-0.5',
+                  )}
                 />
-                <StableIntentLabel>{example.title}</StableIntentLabel>
+                <span className="min-w-0 flex-1">
+                  <StableIntentLabel>{example.title}</StableIntentLabel>
+                  {example.hint ? (
+                    <span
+                      id={`chat-landing-hint-${example.id}`}
+                      className="mt-0.5 block text-[12px] font-normal leading-4 text-muted-foreground/80"
+                    >
+                      {example.hint}
+                    </span>
+                  ) : null}
+                </span>
               </button>
             )
           })}

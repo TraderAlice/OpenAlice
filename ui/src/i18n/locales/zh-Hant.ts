@@ -1951,6 +1951,7 @@ export const zhHant: Resources = {
     moreExamples: '換一組工作流程',
     marketBriefLabel: '市場脈搏',
     marketBriefTitle: '讀懂今天的跨市場訊號',
+    marketBriefHint: '先拉指數與總體看板，通常幾十秒；外盤不通會更久，缺數會標明。',
     marketBriefPrompt: '閱讀今天的總體背景、板塊輪動與異常走勢，給出最值得關注的三個跨資產訊號，標明每項資料的截至時間，並把事實證據與你的判斷分開。',
     portfolioReviewLabel: '持倉體檢',
     portfolioReviewTitle: '壓力測試我的目前持倉',

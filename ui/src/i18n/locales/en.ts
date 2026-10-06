@@ -1977,6 +1977,7 @@ export const en = {
     moreExamples: 'Show more workflows',
     marketBriefLabel: 'Market brief',
     marketBriefTitle: "Read today's cross-asset signals",
+    marketBriefHint: 'Pulls index compilers and macro boards first — usually tens of seconds. Offshore gaps take longer and will be named.',
     marketBriefPrompt: "Read today's macro backdrop, sector rotation, and unusual movers. Give me the three cross-asset signals that matter most, cite each source's as-of time, and separate evidence from your judgment.",
     portfolioReviewLabel: 'Portfolio',
     portfolioReviewTitle: 'Stress-test my current positions',
