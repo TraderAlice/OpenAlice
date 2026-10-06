@@ -89,8 +89,13 @@ export function ActivityBarUtilityMenu({
           label={[updateCount > 0 ? t('nav.updatesAvailable', { count: updateCount }) : '', setupCount > 0 ? t('projectSetup.title') : ''].filter(Boolean).join('; ')}
           className={compactRail ? 'absolute -right-1 -top-0.5 h-5 min-w-5 px-1 ring-2 ring-sidebar' : undefined}
         />}
-        {warningLabel && <CountBadge role="status" count={connectorWarnings + needsAttentionCount} limit={9} tone="attention" label={warningLabel}
-          className={compactRail ? 'absolute -bottom-0.5 -right-1 h-5 min-w-5 px-1 ring-2 ring-sidebar' : undefined} />}
+        {warningLabel && (
+          <span
+            role="status"
+            aria-label={warningLabel}
+            className={`h-1.5 w-1.5 shrink-0 rounded-full bg-warning ${compactRail ? 'absolute -bottom-0.5 -right-0.5' : ''}`}
+          />
+        )}
         {!compactRail && <Ellipsis size={16} strokeWidth={1.75} aria-hidden
           className="oa-application-menu-more shrink-0 text-muted-foreground" />}
       </DropdownMenuTrigger>

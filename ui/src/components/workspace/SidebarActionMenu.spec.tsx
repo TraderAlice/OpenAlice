@@ -132,6 +132,7 @@ describe('SidebarActionMenu', () => {
     const trigger = screen.getByRole('button', { name: 'More actions for Session' })
     trigger.focus()
     await user.keyboard('{ArrowDown}')
+    await vi.waitUntil(() => document.activeElement === screen.getByRole('menuitem', { name: 'Delete Session' }))
     await user.keyboard('{Enter}')
 
     await waitFor(() => expect(screen.getByRole('alertdialog', { name: 'Delete Session?' })).toBeTruthy())

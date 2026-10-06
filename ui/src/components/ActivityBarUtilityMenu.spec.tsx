@@ -119,7 +119,7 @@ describe('ActivityBarUtilityMenu', () => {
     const trigger = screen.getByRole('button', { name: 'Alice’s Settings: Open application menu' })
     expect(trigger.querySelector('img')?.getAttribute('src')).toBe(aliceWave)
     expect(trigger.querySelector('img')?.parentElement?.classList.contains('rounded-full')).toBe(true)
-    expect(trigger.textContent).toBe(compactRail ? '1' : 'Alice’s Settings1')
+    expect(trigger.textContent).toBe(compactRail ? '' : 'Alice’s Settings')
     expect(trigger.className).not.toContain('bg-sidebar-accent text-sidebar-accent-foreground')
     trigger.focus()
     await user.keyboard('{ArrowDown}')

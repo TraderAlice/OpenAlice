@@ -254,6 +254,10 @@ describe('WorkspaceAIConfigModal local model metadata', () => {
 
     const dialog = screen.getByRole('dialog', { name: '工作区设置' })
     await userEvent.click(screen.getByRole('button', { name: '通用' }))
+    const disabledTabStop = document.createElement('button')
+    disabledTabStop.disabled = true
+    disabledTabStop.tabIndex = 0
+    dialog.append(disabledTabStop)
     const focusable = Array.from(dialog.querySelectorAll<HTMLElement>(
       'button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"]):not([disabled])',
     ))
