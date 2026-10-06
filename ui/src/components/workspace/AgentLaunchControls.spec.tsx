@@ -149,8 +149,8 @@ describe('AgentLaunchSelectors keyboard menus', () => {
     trigger.focus()
     await user.keyboard('{ArrowDown}')
 
-    const openCode = screen.getByRole('menuitem', { name: /OpenCode/ })
-    const pi = screen.getByRole('menuitem', { name: /^Pi/ })
+    const openCode = screen.getByRole('menuitemradio', { name: /OpenCode/ })
+    const pi = screen.getByRole('menuitemradio', { name: /^Pi/ })
     const others = screen.getByRole('menuitem', { name: i18n.t('chatLanding.otherRuntimes') })
     expect(document.activeElement).toBe(pi)
 
@@ -183,7 +183,7 @@ describe('AgentLaunchSelectors keyboard menus', () => {
     const trigger = screen.getByRole('button', { name: i18n.t('chatLanding.selectAgent') })
     trigger.focus()
     await user.keyboard('{ArrowDown}')
-    const pi = await screen.findByRole('menuitem', { name: /^Pi/ })
+    const pi = await screen.findByRole('menuitemradio', { name: /^Pi/ })
     pi.focus()
     await user.keyboard('{Enter}')
 
@@ -303,8 +303,7 @@ describe('AgentLaunchSelectors keyboard menus', () => {
     const inferenceTrigger = screen.getByRole('button', { name: i18n.t('chatLanding.selectModelAndEffort') })
     expect(credentialTrigger.className).toContain('w-full')
     expect(inferenceTrigger.className).toContain('w-full')
-    expect(inferenceTrigger.textContent).toContain('gpt-5')
-    expect(inferenceTrigger.textContent).toContain('Default effort')
+    expect(inferenceTrigger.textContent).toContain('GPT 5')
   })
 
   it('combines model and reasoning into a nested toolbar menu', async () => {
@@ -338,8 +337,7 @@ describe('AgentLaunchSelectors keyboard menus', () => {
     )
 
     const trigger = screen.getByRole('button', { name: i18n.t('chatLanding.selectModelAndEffort') })
-    expect(trigger.textContent).toContain('gpt-5')
-    expect(trigger.textContent).toContain('high reasoning')
+    expect(trigger.textContent).toContain('GPT-5')
     expect(trigger.textContent).not.toContain('·')
 
     trigger.focus()

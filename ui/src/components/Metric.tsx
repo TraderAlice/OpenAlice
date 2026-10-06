@@ -46,7 +46,7 @@ export function Metric({ label, value, delta, valueSign, size = 'md', className 
   return (
     <div className={cn('min-w-0 space-y-1', className)}>
       <p className="text-sm font-medium leading-5 text-muted-foreground">{label}</p>
-      <p className={cn('[overflow-wrap:anywhere]', valueClass)}>{value}</p>
+      <p className={cn('oa-metric-value [overflow-wrap:anywhere]', valueClass)}>{value}</p>
       {delta && (
         <p className={`flex items-start gap-1 text-sm leading-5 tabular-nums ${signColor(delta.sign)}`}>
           <DeltaIcon sign={delta.sign} />

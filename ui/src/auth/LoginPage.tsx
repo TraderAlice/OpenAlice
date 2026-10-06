@@ -46,7 +46,7 @@ export function LoginPage() {
       <div className="w-full max-w-[400px] rounded-lg border border-border bg-card px-6 py-7 shadow-sm">
         <img src="/alice.ico" alt="" aria-hidden draggable={false} className="mb-4 size-8 object-contain" />
         <h1 className="text-[18px] font-semibold text-foreground mb-1">{t('auth.heading')}</h1>
-        <p className="text-sm text-muted-foreground leading-relaxed mb-5">
+        <p className="text-[12px] text-muted-foreground leading-relaxed mb-5">
           {t('auth.instruction')}
           {' '}
           <span className="text-foreground-faint">
@@ -58,7 +58,7 @@ export function LoginPage() {
 
         <form onSubmit={onSubmit} className="space-y-3">
           <div>
-            <label className="mb-1 block text-sm font-medium text-muted-foreground">
+            <label className="mb-1 block text-[12px] font-medium text-muted-foreground">
               {t('auth.adminTokenLabel')}
             </label>
             <input
@@ -74,7 +74,7 @@ export function LoginPage() {
           </div>
 
           {error && (
-            <div className="rounded-md border border-destructive/35 bg-destructive/10 px-2.5 py-2 text-sm leading-5 text-destructive" role="alert">
+            <div className="rounded-md border border-destructive/35 bg-destructive/10 px-2.5 py-2 text-[12px] leading-[18px] text-destructive" role="alert">
               {error}
             </div>
           )}
@@ -100,12 +100,12 @@ export function NoTokenPage() {
       <div className="w-full max-w-[460px] rounded-lg border border-border bg-card px-6 py-7">
         <img src="/alice.ico" alt="" aria-hidden draggable={false} className="mb-4 size-8 object-contain" />
         <h1 className="text-[18px] font-semibold text-foreground mb-2">{t('auth.noTokenHeading')}</h1>
-        <p className="text-sm text-foreground leading-relaxed mb-3">
+        <p className="text-[13px] text-foreground leading-relaxed mb-3">
           The backend did not generate <code className="font-mono">data/config/auth.json</code>.
           This usually means bootstrap was skipped via <code className="font-mono">OPENALICE_DISABLE_AUTH=1</code>,
           or the file was created empty.
         </p>
-        <p className="text-sm text-muted-foreground leading-relaxed">
+        <p className="text-[12px] text-muted-foreground leading-relaxed">
           Stop the backend, delete <code className="font-mono">data/config/auth.json</code> if it exists,
           unset <code className="font-mono">OPENALICE_DISABLE_AUTH</code>, and restart. The first-run
           token will be printed to stdout.

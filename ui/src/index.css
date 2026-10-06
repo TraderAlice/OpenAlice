@@ -5,6 +5,14 @@
 @import "./theme/style-profiles.css";
 @import "./theme/motion.css";
 
+@font-face {
+  font-family: "Instrument Sans Variable";
+  font-style: normal;
+  font-display: swap;
+  font-weight: 400 700;
+  src: url("./assets/fonts/instrument-sans-latin-wght-normal.woff2") format("woff2-variations");
+}
+
 /* Tailwind aliases for the semantic color card. The core names intentionally
    mirror Orca/shadcn; this does not import or require the shadcn component
    library. `inline` keeps utilities connected to the active runtime palette. */
@@ -77,8 +85,10 @@
   --text-sm--line-height: 20px;
   --text-base: 16px;
   --text-base--line-height: 24px;
+}
 
-  --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
+@theme {
+  --font-sans: "Instrument Sans Variable", "PingFang SC",
     "Microsoft YaHei", "Hiragino Sans GB", "Noto Sans CJK SC", sans-serif;
   --font-mono: "SF Mono", "Fira Code", "Cascadia Code", Menlo, Consolas,
     monospace;
@@ -293,7 +303,7 @@ body {
   }
 }
 
-.oa-data-surface {
+:root[data-ui-style="default"] .oa-data-surface {
   border: 1px solid var(--oa-surface-border, transparent);
   background: var(--oa-surface-background, var(--secondary));
   box-shadow: var(--oa-surface-shadow, none);
@@ -1901,12 +1911,12 @@ body:has([data-desktop-banner]):not(:has(.oa-office-main)) [data-sonner-toaster]
   transition: none;
 }
 
-.oa-config-section {
+:root[data-ui-style="default"] .oa-config-section {
   border: 1px solid var(--oa-surface-border, transparent);
   background: var(--oa-surface-background, var(--secondary));
   box-shadow: var(--oa-surface-shadow, none);
 }
-.oa-config-section + .oa-config-section { margin-top: 16px; }
+:root[data-ui-style="default"] .oa-config-section + .oa-config-section { margin-top: 16px; }
 
 .oa-segmented-option {
   position: relative;

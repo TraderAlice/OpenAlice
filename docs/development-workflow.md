@@ -414,6 +414,57 @@ prevent publication. Beta runs current-candidate acceptance, not this N-1 gate.
 The state journey and platform limitations are owned by
 [N-1 desktop upgrade acceptance](managed-workspace-runtime.md#n-1-desktop-upgrade-acceptance).
 
+Required Release inputs (notes, neutral inputs, installer, CLI, desktop,
+Broker Packs, package-channel inputs and desktop receipts) are retained for
+30 days. Retrying does not extend untouched artifacts' expiry. Formal CLI
+uploads use exactly `cli-release-<platform>-<arch>` on all six targets; standalone
+Windows previews retain their source/attempt names. Do not use upload overwrite:
+it deletes the previous artifact before the replacement upload succeeds.
+
+All full-set CLI consumers select the newest ID for each exact name across the
+run's attempts, record those IDs in the job summary, download each directly by
+REST ID and extract into separate fresh directories. Selection validates the
+Actions run/source identity; staging requires exactly six targets, expected
+version and target, checksum sidecars, content manifests and native signatures.
+Embedded source metadata must agree when present (older POSIX manifests rely on
+the authenticated artifact run identity). Only the twelve verified archive and
+sidecar files enter the publication directory. Producer-success gates remain in
+force; artifact presence never substitutes for successful acceptance.
+
+```mermaid
+flowchart LR
+  subgraph Before
+    A[Windows source/attempt names] --> B[Wildcard download and merge]
+    C[Old and new attempts] --> B
+    B --> D[Archive and sidecar can come from different attempts]
+  end
+  subgraph After
+    E[Fixed exact name per target] --> F[Latest ID per name, recorded]
+    F --> G[Exact REST ID download, isolated directories]
+    G --> H[Validate six targets, source, version and checksums]
+    H --> I[Stage explicit verified files]
+  end
+```
+
+Full retries select the new uploads; partial retries inherit untouched successful
+platforms; publisher-only retries consume the same selected IDs while they remain
+available. Missing/expired inputs, duplicate ZIP entries or payloads, and invalid
+latest artifacts stop the consumer without fallback. Rebuild expired required
+producers before retrying consumers; never repair this by mixing directories.
+
+The incident run `36994301678` at source
+`2cf59b6bf91ebd644921cee8cd62472f3b524b77` retains its original workflow when
+rerun. This change cannot retrofit its Windows source/attempt artifact names,
+and the new selector deliberately rejects that legacy formal-CLI layout.
+Do not delete old artifacts or attempt to apply a new workflow to that run.
+After this fix is reviewed and integrated into `dev`, promote the accepted source
+to `master` through the normal gates, prepare the intended product version if
+needed, and manually dispatch a **new** Release run from that corrected master
+SHA with the matching tag/channel. An already published tag needs a new version;
+a still-unused tag must still match the new source's root package version. Omit
+`candidate-run` because old-source desktop bytes cannot certify the changed SHA.
+No release dispatch is implied by merging this workflow fix.
+
 Separate per-platform build and upgrade jobs preserve candidates for selective
 retry without repeating packaging, signing or notarization.
 
@@ -422,7 +473,9 @@ operation `verify-desktop` takes `candidate-run`, `source-sha`, `tag`,
 `previous-tag`, and one `desktop-target` (`macOS-arm64`, `macOS-x64`, or
 `Windows-x64`), with `channel=stable`. The dispatch revision owns the verifier;
 the explicit source SHA owns the product. Selection requires a completed
-master Release from this repository and a unique unexpired artifact. It then
+master Release from this repository and the latest exact-name artifact, which
+must be unexpired. Selection records its ID and downloads that exact ID; an
+invalid latest candidate fails without falling back to an earlier attempt. It then
 verifies exact bytes, runs the installed N-1 journey, and uploads a receipt
 bound to both identities. No packaging, signing, tag, or publication occurs.
 Historical artifacts lacking `candidate-manifest.json` cannot use this path.

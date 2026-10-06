@@ -23,7 +23,7 @@ export function collectTestCommands(root, packages, ownerForRoot) {
       const id = `${workspace.name}#${name}`
       const profile = profiles.commands[id]
       const owner = workspace.root === '.' ? 'repo-tooling' : ownerForRoot(workspace.root)
-      const selector = /(?:^|\s)(?:vitest|(?:\S*\/)?scripts\/run-tests\.mjs)(?:\s|$)/.test(command)
+      const selector = /(?:^|\s)(?:vitest|vp\s+test|(?:\S*\/)?scripts\/run-tests\.mjs)(?:\s|$)/.test(command)
       const lane = command.match(/--lane\s+(\S+)/)?.[1] ?? 'hermetic'
       return {
         id, name, manifest: `${workspace.root === '.' ? '' : `${workspace.root}/`}package.json`,

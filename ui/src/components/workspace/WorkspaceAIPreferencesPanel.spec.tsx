@@ -100,7 +100,7 @@ describe('WorkspaceAIPreferencesPanel', () => {
     expect(screen.getByText('无头运行')).toBeTruthy()
     expect(screen.getByRole('combobox', { name: '交互式 Session的默认 Agent Runtime' }).textContent).toBe('Pi')
     expect((await screen.findAllByText('DeepSeek API')).length).toBeGreaterThan(0)
-    expect(screen.getAllByText('deepseek-v4-flash, high').length).toBeGreaterThan(0)
+    expect(screen.getAllByText('DeepSeek V4 Flash').length).toBeGreaterThan(0)
     fireEvent.click(screen.getByRole('combobox', { name: '交互式 Session的默认 Agent Runtime' }))
     expect(await screen.findByRole('option', { name: '跟随最近使用 — Pi' })).toBeTruthy()
     fireEvent.keyDown(screen.getByRole('option', { name: '跟随最近使用 — Pi' }), { key: 'Escape' })

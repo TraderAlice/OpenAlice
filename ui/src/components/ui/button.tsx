@@ -1,6 +1,8 @@
 import { Button as ButtonPrimitive } from "@base-ui/react/button"
 import { cva, type VariantProps } from "class-variance-authority"
 
+import { StatusIndicator } from "@/components/motion/StatusIndicator"
+
 import { cn } from "@/lib/utils"
 
 const buttonVariants = cva(
@@ -44,14 +46,29 @@ function Button({
   className,
   variant = "default",
   size = "default",
+  pending,
+  disabled,
+  children,
   ...props
-}: ButtonPrimitive.Props & VariantProps<typeof buttonVariants>) {
+}: ButtonPrimitive.Props & VariantProps<typeof buttonVariants> & { pending?: boolean }) {
   return (
     <ButtonPrimitive
       data-slot="button"
+      data-variant={variant}
       className={cn(buttonVariants({ variant, size, className }))}
       {...props}
-    />
+      disabled={disabled || pending}
+      aria-busy={pending || props['aria-busy']}
+    >
+      {pending === undefined ? children : (
+        <span className="grid min-w-0 place-items-center [gap:inherit]">
+          <span className={cn("col-start-1 row-start-1 inline-flex items-center justify-center [gap:inherit]", pending && "opacity-0")}>
+            {children}
+          </span>
+          {pending && <StatusIndicator size={16} className="col-start-1 row-start-1" />}
+        </span>
+      )}
+    </ButtonPrimitive>
   )
 }
 

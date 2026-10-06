@@ -1,6 +1,8 @@
 import { ConversationTranscriptItem } from '../components/conversation/ConversationTranscript'
 import aliceWave from '../../../default/stickers/alice-color/wave.png'
+import { layout, prepare } from '@chenglou/pretext'
 import {
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -122,6 +124,44 @@ function ComposerNotice({
       />
       <div className="min-w-0 flex-1">{children}</div>
     </div>
+  )
+}
+
+function StableIntentLabel({ children }: { children: string }) {
+  const labelRef = useRef<HTMLSpanElement>(null)
+
+  useLayoutEffect(() => {
+    const label = labelRef.current
+    if (!label) return
+
+    const measure = () => {
+      if (label.clientWidth <= 0) return
+      const style = window.getComputedStyle(label)
+      const lineHeight = Number.parseFloat(style.lineHeight)
+      if (!style.font || !Number.isFinite(lineHeight)) return
+      try {
+        label.style.minHeight = `${Math.ceil(
+          layout(prepare(children, style.font), label.clientWidth, lineHeight).height,
+        )}px`
+      } catch {
+        label.style.removeProperty('min-height')
+      }
+    }
+
+    measure()
+    void document.fonts?.ready.then(measure)
+    const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(measure)
+    observer?.observe(label)
+    return () => observer?.disconnect()
+  }, [children])
+
+  return (
+    <span
+      ref={labelRef}
+      className="min-w-0 flex-1 text-[14px] font-medium leading-5 text-muted-foreground transition-colors group-hover:text-foreground group-focus-visible:text-foreground"
+    >
+      {children}
+    </span>
   )
 }
 
@@ -458,7 +498,7 @@ export function HarnessLandingPage({
                   aria-hidden
                   className="h-[17px] w-[17px] shrink-0 text-muted-foreground transition-colors duration-[var(--motion-fast)] group-hover:text-foreground group-focus-visible:text-foreground"
                 />
-                <span className="min-w-0 flex-1 text-[14px] font-medium leading-5 text-muted-foreground transition-colors group-hover:text-foreground group-focus-visible:text-foreground">{example.title}</span>
+                <StableIntentLabel>{example.title}</StableIntentLabel>
               </button>
             )
           })}

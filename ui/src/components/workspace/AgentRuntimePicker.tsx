@@ -2,6 +2,7 @@ import {
   forwardRef,
   useImperativeHandle,
   useMemo,
+  useRef,
   useState,
 } from 'react'
 import { useTranslation } from 'react-i18next'
@@ -21,6 +22,8 @@ import {
   DropdownMenuGroup,
   DropdownMenuItem,
   DropdownMenuLabel,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
@@ -71,6 +74,7 @@ function AgentRuntimeRow({
     <button
       type="button"
       onClick={onSelect}
+      aria-pressed={selected}
       className={`flex min-h-11 w-full min-w-0 items-start gap-2 rounded-md px-2.5 py-2 text-left text-sm leading-5 transition-colors hover:bg-muted ${
         selected ? 'bg-muted/50 text-foreground' : 'text-foreground'
       }`}
@@ -86,7 +90,7 @@ function AgentRuntimeRow({
           )}
         </span>
       </span>
-      {selected && <span className="mt-0.5"><SelectionCheckIcon /></span>}
+      <span className="mt-0.5 size-4 shrink-0">{selected && <SelectionCheckIcon />}</span>
     </button>
   )
 }
@@ -163,6 +167,7 @@ export const AgentRuntimePicker = forwardRef<AgentRuntimePickerHandle, AgentRunt
     ref,
   ) {
     const { t } = useTranslation()
+    const triggerRef = useRef<HTMLButtonElement>(null)
     const [menuOpen, setMenuOpen] = useState(false)
     const [othersOpen, setOthersOpen] = useState(false)
     const [query, setQuery] = useState('')
@@ -210,6 +215,7 @@ export const AgentRuntimePicker = forwardRef<AgentRuntimePickerHandle, AgentRunt
       <>
         <DropdownMenu open={menuOpen} onOpenChange={setMenuOpen}>
           <DropdownMenuTrigger
+            ref={triggerRef}
             disabled={disabled || agents.length === 0}
             render={<button
               type="button"
@@ -230,12 +236,15 @@ export const AgentRuntimePicker = forwardRef<AgentRuntimePickerHandle, AgentRunt
             sideOffset={6}
             className="min-w-[min(16rem,calc(100vw-2rem))]"
           >
+            <DropdownMenuRadioGroup value={selectedId}>
             {primary.map((agent) => {
               const active = agent.id === selectedId
               const missing = agent.installed === false
               return (
-                <DropdownMenuItem
+                <DropdownMenuRadioItem
                   key={agent.id}
+                  value={agent.id}
+                  closeOnClick
                   disabled={missing}
                   onClick={() => {
                     if (missing) return
@@ -250,8 +259,7 @@ export const AgentRuntimePicker = forwardRef<AgentRuntimePickerHandle, AgentRunt
                       {t('chatLanding.agentNotInstalled')}
                     </span>
                   )}
-                  <span className="size-4 shrink-0">{active && <SelectionCheckIcon />}</span>
-                </DropdownMenuItem>
+                </DropdownMenuRadioItem>
               )
             })}
             {selectedOutsidePrimary && selected && (
@@ -261,7 +269,9 @@ export const AgentRuntimePicker = forwardRef<AgentRuntimePickerHandle, AgentRunt
                   <DropdownMenuLabel inset>
                     {t('chatLanding.currentRuntime')}
                   </DropdownMenuLabel>
-                  <DropdownMenuItem
+                  <DropdownMenuRadioItem
+                    value={selected.id}
+                    closeOnClick
                     disabled={selected.installed === false}
                     onClick={() => {
                       if (selected.installed === false) return
@@ -278,11 +288,11 @@ export const AgentRuntimePicker = forwardRef<AgentRuntimePickerHandle, AgentRunt
                         {t('chatLanding.agentNotInstalled')}
                       </span>
                     )}
-                    <SelectionCheckIcon />
-                  </DropdownMenuItem>
+                  </DropdownMenuRadioItem>
                 </DropdownMenuGroup>
               </>
             )}
+            </DropdownMenuRadioGroup>
             <DropdownMenuSeparator />
             <DropdownMenuItem
               onClick={() => setOthersOpen(true)}
@@ -300,7 +310,7 @@ export const AgentRuntimePicker = forwardRef<AgentRuntimePickerHandle, AgentRunt
             if (!open) setQuery('')
           }}
         >
-          <DialogContent className="flex max-h-[min(40rem,calc(100dvh-2rem))] w-full max-w-[calc(100%-2rem)] flex-col gap-3 overflow-hidden sm:max-w-lg">
+          <DialogContent finalFocus={triggerRef} className="flex max-h-[min(40rem,calc(100dvh-2rem))] w-full max-w-[calc(100%-2rem)] flex-col gap-3 overflow-hidden sm:max-w-lg">
             <DialogHeader>
               <DialogTitle>{t('chatLanding.allRuntimesTitle')}</DialogTitle>
               <DialogDescription>{t('chatLanding.allRuntimesDescription')}</DialogDescription>

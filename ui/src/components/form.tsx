@@ -87,7 +87,7 @@ export function ConfigSection({
       aria-labelledby={titleId}
       className={`oa-config-section min-w-0 rounded-2xl bg-secondary p-(--oa-panel-inset) text-start ${className}`}
     >
-      <div className={`min-w-0 ${children ? 'mb-4' : ''}`}>
+      <div className={`oa-section-heading min-w-0 ${children ? 'mb-4' : ''}`}>
         <div className="flex min-h-6 min-w-0 flex-wrap items-center gap-2">
           <Heading
             id={titleId}

@@ -65,6 +65,7 @@ export function AppearanceSection({ standalone = false }: { standalone?: boolean
   const [paletteFilter, setPaletteFilter] = useState<PaletteLibraryFilter>('recommended')
   const [customizingPalettes, setCustomizingPalettes] = useState(false)
   const paletteEditorId = useId()
+  const styleGroupName = useId()
   const modes: readonly AppTheme[] = ['auto', 'day', 'night']
   const activeStyleDefinition: UiStyleProfileDefinition = UI_STYLE_PROFILES.find(
     (profile) => profile.id === uiStyle,
@@ -173,14 +174,14 @@ export function AppearanceSection({ standalone = false }: { standalone?: boolean
           <PaletteSlotCard
             slot="day"
             palette={paletteDefinition(dayPalette)}
-            active={effectiveSlot === 'day'}
+            active={effectiveSlot === 'day' && activePalette === dayPalette}
             editing={customizingPalettes && editingSlot === 'day'}
             onSelect={() => editSlot('day')}
           />
           <PaletteSlotCard
             slot="night"
             palette={paletteDefinition(nightPalette)}
-            active={effectiveSlot === 'night'}
+            active={effectiveSlot === 'night' && activePalette === nightPalette}
             editing={customizingPalettes && editingSlot === 'night'}
             onSelect={() => editSlot('night')}
           />
@@ -249,6 +250,7 @@ export function AppearanceSection({ standalone = false }: { standalone?: boolean
               <StyleProfileCard
                 key={profile.id}
                 profile={profile.id}
+                groupName={styleGroupName}
                 label={t(profile.labelKey)}
                 description={t(profile.descriptionKey)}
                 selected={uiStyle === profile.id}
@@ -258,7 +260,7 @@ export function AppearanceSection({ standalone = false }: { standalone?: boolean
           </div>
           {recommendedPalettePair && (
             <div
-              data-palette-preview={recommendedPalettePair.day}
+              data-palette-preview={recommendedPalettePair[effectiveSlot]}
               className="oa-palette-preview mt-3 flex min-w-0 flex-col gap-3 rounded-lg border border-border bg-background p-3 sm:flex-row sm:items-center"
             >
               <span className="oa-palette-preview-shell flex h-11 w-full shrink-0 overflow-hidden rounded border sm:w-24" aria-hidden>
@@ -279,7 +281,8 @@ export function AppearanceSection({ standalone = false }: { standalone?: boolean
                 </span>
                 <p className="mt-0.5 text-sm leading-snug text-muted-foreground">
                   {t('settings.appearance.recommendedPaletteDescription', {
-                    palette: t(paletteDefinition(recommendedPalettePair.day).labelKey),
+                    day: t(paletteDefinition(recommendedPalettePair.day).labelKey),
+                    night: t(paletteDefinition(recommendedPalettePair.night).labelKey),
                   })}
                 </p>
               </div>
@@ -314,42 +317,52 @@ export function AppearanceSection({ standalone = false }: { standalone?: boolean
 
 function StyleProfileCard({
   profile,
+  groupName,
   label,
   description,
   selected,
   onSelect,
 }: {
   profile: UiStyleProfileId
+  groupName: string
   label: string
   description: string
   selected: boolean
   onSelect: (profile: UiStyleProfileId) => void
 }) {
   return (
-    <button
-      type="button"
-      role="radio"
-      aria-checked={selected}
-      aria-label={label}
+    <label
       title={description}
-      data-ui-style-preview={profile}
       data-selected={selected}
-      onClick={() => onSelect(profile)}
-      className="oa-style-profile-card oa-pressable min-h-20 min-w-0 border border-border bg-background p-2.5 text-left"
+      className="oa-style-profile-card"
     >
-      <span className="oa-style-profile-preview flex h-10 overflow-hidden border border-border bg-card" aria-hidden>
-        <span className="oa-style-profile-rail w-3.5 shrink-0 border-r border-border bg-sidebar" />
-        <span className="flex min-w-0 flex-1 flex-col gap-1 p-1.5">
-          <span className="oa-style-profile-toolbar h-1.5 w-full bg-muted" />
-          <span className="oa-style-profile-row h-2 w-4/5 border border-border bg-background" />
-          <span className="oa-style-profile-row h-2 w-3/5 border border-border bg-background" />
+      <input
+        className="absolute inset-0 m-0 size-full cursor-pointer opacity-0"
+        type="radio"
+        name={groupName}
+        value={profile}
+        checked={selected}
+        aria-label={label}
+        aria-checked={selected}
+        onChange={() => onSelect(profile)}
+      />
+      <span className="oa-style-profile-preview" data-ui-style-preview={profile} aria-hidden>
+        <span className="oa-style-profile-rail"><i /><i /><i /><i /></span>
+        <span className="oa-style-profile-canvas">
+          <span className="oa-style-profile-toolbar"><i /><i /></span>
+          <svg className="oa-style-profile-chart" viewBox="0 0 150 32" preserveAspectRatio="none">
+            <path d="M8 25H142M8 16H142" fill="none" stroke="var(--border)" strokeWidth="0.6" />
+            <path d="M8 24L30 20L46 23L65 13L88 16L105 9L125 12L142 6" fill="none" stroke="var(--foreground)" strokeWidth="1.5" />
+          </svg>
+          <span className="grid grid-cols-3 gap-1"><i className="oa-style-profile-row" /><i className="oa-style-profile-row" /><i className="oa-style-profile-row" /></span>
         </span>
+        <span className="oa-style-profile-popup"><i /><i /><i /></span>
       </span>
       <span className="mt-2 flex items-center justify-between gap-2 text-sm font-semibold text-foreground">
         {label}
         <span className="size-4 shrink-0">{selected && <SelectionCheckIcon />}</span>
       </span>
-    </button>
+    </label>
   )
 }
 

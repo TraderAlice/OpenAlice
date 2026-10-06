@@ -106,7 +106,6 @@ describe('RSSHub news presets', () => {
       return <FeedsSection feeds={feeds} onChange={setFeeds} />
     }
     render(<Editor />)
-    fireEvent.click(screen.getByRole('button', { name: 'RSSHub', expanded: false }))
     fireEvent.change(screen.getByLabelText('RSSHub instance URL'), {
       target: { value: ' https://news.example.com/rsshub/// ' },
     })
@@ -126,7 +125,6 @@ describe('RSSHub news presets', () => {
   it('requires an HTTP instance URL without embedded secrets or discarded URL components', () => {
     const onChange = vi.fn()
     render(<FeedsSection feeds={[]} onChange={onChange} />)
-    fireEvent.click(screen.getByRole('button', { name: 'RSSHub', expanded: false }))
     const input = screen.getByLabelText('RSSHub instance URL')
     const add = screen.getByRole('button', { name: 'Add 财联社 · 电报' })
     expect(add.hasAttribute('disabled')).toBe(true)
@@ -146,7 +144,6 @@ describe('RSSHub news presets', () => {
     render(<FeedsSection feeds={[{
       name: 'My CLS', source: 'CLS', url: 'https://old.example.com/cls/telegraph', enabled: false,
     }]} onChange={onChange} />)
-    fireEvent.click(screen.getByRole('button', { name: 'RSSHub', expanded: false }))
     fireEvent.change(screen.getByLabelText('RSSHub instance URL'), { target: { value: 'http://localhost:1200' } })
     const add = screen.getByRole('button', { name: 'Added 财联社 · 电报' })
     expect(add.hasAttribute('disabled')).toBe(true)

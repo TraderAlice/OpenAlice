@@ -24,6 +24,7 @@ import { inboxLive, refreshInbox, removeInboxAfterDelete } from '../live/inbox'
 import { useInboxSelection } from '../live/inbox-selection'
 import { useInboxRead } from '../live/inbox-read'
 import { useIssues } from '../hooks/useIssues'
+import { useActivitySessionLabel } from '../hooks/useWorkspaceData'
 import { useWorkspace } from '../tabs/store'
 import { useWorkspaces } from '../contexts/workspaces-context'
 import { workspaceDisplayName, workspaceDisplayTitle } from '../components/workspace/display'
@@ -270,8 +271,17 @@ function Detail({ entry, onDelete }: { entry: InboxEntry; onDelete?: () => void 
   const origin = entry.origin
   const issueId = origin?.issueId
   const senderSignature = origin?.resumeId ? `@${origin.resumeId}` : null
-  const senderLabel = [origin?.agent, senderSignature].filter(Boolean).join(' — ') || null
-  const senderDisplay = origin?.agent ?? (senderSignature ? t('inbox.senderSession') : null)
+  // Reuse the shared Workspace snapshot and exact source identity; a runtime
+  // may be shared by many senders and must never select a Session by itself.
+  const resolveSessionLabel = useActivitySessionLabel()
+  const senderName = resolveSessionLabel({
+    workspaceId: entry.workspaceId,
+    sessionRecordId: origin?.sessionId,
+    resumeId: origin?.resumeId,
+    agent: origin?.agent,
+  })?.trim() || null
+  const senderDisplay = senderName || origin?.agent || (senderSignature ? t('inbox.senderSession') : null)
+  const senderLabel = [senderName, origin?.agent, senderSignature].filter(Boolean).join(' — ') || null
   // Interactive provenance — the human-attended session this push came from
   // (server-stamped from AQ_SESSION_ID, validated against the session registry).
   // Navigable: opens/focuses that exact session tab.
@@ -396,7 +406,7 @@ function Detail({ entry, onDelete }: { entry: InboxEntry; onDelete?: () => void 
                         {origin?.kind === 'interactive'
                           ? <Terminal size={12} strokeWidth={1.75} className="shrink-0" aria-hidden />
                           : <Bot size={12} strokeWidth={1.75} className="shrink-0" aria-hidden />}
-                        <span>{t('inbox.fromSender', { sender: senderDisplay })}</span>
+                        <span className="min-w-0 break-words text-left [overflow-wrap:anywhere]">{t('inbox.fromSender', { sender: senderDisplay })}</span>
                     </PopoverTrigger>
                     <PopoverContent
                       id={`inbox-sender-${entry.id}`}
@@ -411,8 +421,9 @@ function Detail({ entry, onDelete }: { entry: InboxEntry; onDelete?: () => void 
                       <p className="text-sm font-medium text-muted-foreground/70">
                         {t('inbox.senderSession')}
                       </p>
-                      {origin?.agent && (
-                        <p className="mt-1 text-sm font-medium text-foreground">{origin.agent}</p>
+                      <p className="mt-1 break-words text-sm font-medium text-foreground [overflow-wrap:anywhere]">{senderDisplay}</p>
+                      {senderName && origin?.agent && (
+                        <p className="mt-0.5 text-sm text-muted-foreground">{origin.agent}</p>
                       )}
                       {senderSignature && (
                         <p className="mt-0.5 break-all font-mono text-sm leading-relaxed text-muted-foreground">
@@ -525,7 +536,7 @@ function Detail({ entry, onDelete }: { entry: InboxEntry; onDelete?: () => void 
 
       {wsAlive ? (
         <InboxReplyThread
-          sender={origin?.agent ?? senderSignature ?? displayLabel}
+          sender={senderName ?? origin?.agent ?? senderSignature ?? displayLabel}
           hasExactSender={hasSenderIdentity}
           load={loadInquiries}
           ask={askInbox}

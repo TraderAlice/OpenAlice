@@ -96,7 +96,7 @@ export function EquityCurve({
   const isAllView = selectedAccountId === 'all'
 
   return (
-    <div ref={ref} tabIndex={onPointClick ? -1 : undefined} aria-label="Equity curve" className={cn('flex min-w-0 flex-col rounded-lg border border-border bg-card p-(--oa-panel-inset) outline-none', className)} aria-busy={loading}>
+    <div ref={ref} tabIndex={onPointClick ? -1 : undefined} aria-label="Equity curve" className={cn('oa-data-surface flex min-w-0 flex-col rounded-lg border border-border bg-card p-(--oa-panel-inset) outline-none', className)} aria-busy={loading}>
       {/* Header */}
       <div className="mb-3 flex min-h-(--oa-control-height) flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-1">

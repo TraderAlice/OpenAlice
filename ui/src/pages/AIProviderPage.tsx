@@ -1,3 +1,4 @@
+import { ModelIdentity } from '../components/ModelIdentity'
 import { Select } from '@/components/ui/select'
 import { DetailsSummary } from '../components/ui/collapsible'
 /**
@@ -39,7 +40,6 @@ import {
   agentWireShapes,
   compatibleAgentIds,
   credentialMatchesQuery,
-  describeModelSemantics,
   isApiKeyPreset,
   presetDefaultModel,
   presetModel,
@@ -196,9 +196,7 @@ export function AIProviderPage() {
                           )}
                         </div>
                         <div className="mt-0.5 flex min-w-0 flex-col gap-0.5 text-sm text-muted-foreground">
-                          <span className="truncate">
-                            {t('aiProvider.defaultModel')}: <span className="font-mono">{cred.lastModel || t('aiProvider.notSet')}</span>
-                          </span>
+                          {cred.lastModel && <ModelIdentity model={cred.lastModel} vendor={cred.vendor} />}
                           <span className="flex min-w-0 flex-wrap gap-x-2 gap-y-0.5">
                             {Object.values(cred.wires)[0] && <span className="truncate font-mono">{Object.values(cred.wires)[0]}</span>}
                             {compatibleAgents.length > 0 && (
@@ -446,7 +444,6 @@ function WorkspaceDefaultsSection({
       || selectedCredential?.lastModel?.trim()
       || presetDefaultModel(selectedPreset)
     const selectedSemantics = presetModel(selectedPreset, selectedModelId)?.semantics ?? null
-    const semanticsSummary = describeModelSemantics(selectedSemantics)
     return (
       <div key={agent.id} className="flex min-h-12 flex-col gap-3 rounded-lg border border-border bg-background px-4 py-3 sm:flex-row sm:items-center">
         <div className="flex min-w-0 flex-1 items-start gap-3">
@@ -486,12 +483,7 @@ function WorkspaceDefaultsSection({
               {t('aiProvider.protocol', { protocol: WIRE_SHAPE_GUIDANCE[wireShapes[0]!] })}
             </p>
           )}
-          {(agent.id === 'pi' || agent.id === 'opencode') && current && semanticsSummary && (
-            <p className="px-1 text-sm leading-snug text-muted-foreground">
-              {t('aiProvider.model', { model: selectedModelId })}<br />
-              {t('aiProvider.automatic', { summary: semanticsSummary })}
-            </p>
-          )}
+          {current && selectedModelId && <ModelIdentity model={selectedModelId} label={presetModel(selectedPreset, selectedModelId)?.label} vendor={selectedCredential?.vendor} className="px-1 text-sm text-muted-foreground" />}
           {(agent.id === 'pi' || agent.id === 'opencode') && current && !selectedSemantics?.reasoning && (
             <details className="px-1 text-sm text-muted-foreground">
               <DetailsSummary>{t('aiProvider.advancedReasoning')}</DetailsSummary>

@@ -70,9 +70,9 @@ export function ActivityBarUtilityMenu({
             onClick={() => {
               if (!menuOpen) setMenuOpen(true)
             }}
-            className={`oa-application-menu oa-pressable relative flex min-w-0 cursor-pointer items-center rounded-md text-left text-sm text-sidebar-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring/45 ${
+            className={`oa-application-menu oa-pressable relative flex min-w-0 cursor-pointer items-center rounded-md text-left text-[13px] text-sidebar-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring/45 ${
               compactRail
-                ? 'size-11 justify-center p-0'
+                ? `${denseRail ? 'h-[26px] w-[26px]' : 'h-8 w-8'} justify-center p-0`
                 : 'min-h-10 w-full gap-2.5 px-2 py-1.5'
             } ${menuOpen ? 'bg-sidebar-accent text-sidebar-accent-foreground' : 'hover:bg-sidebar-accent/60'}`}
           />
@@ -99,7 +99,7 @@ export function ActivityBarUtilityMenu({
         align="start"
         side="top"
         sideOffset={6}
-        className="min-w-[min(15rem,calc(100vw-2rem))]"
+        className="w-[208px] max-w-[calc(100vw-1rem)] rounded-xl border border-border/70 bg-popover p-1.5 shadow-lg ring-0"
       >
         {companion.visible !== null && (
           <DropdownMenuItem
@@ -139,7 +139,7 @@ export function ActivityBarUtilityMenu({
             <span className="min-w-0 flex-1">{t('settings.group.appearance')}</span>
             <span className="shrink-0 text-muted-foreground">{t(`theme.mode.${theme}`)}</span>
           </DropdownMenuSubTrigger>
-          <DropdownMenuSubContent>
+          <DropdownMenuSubContent className="w-[148px] border border-border/70 bg-popover p-1.5 shadow-lg ring-0">
             <DropdownMenuRadioGroup
               value={theme}
               onValueChange={(value) => {

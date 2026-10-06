@@ -1,4 +1,4 @@
-import { defineConfig } from 'vitest/config'
+import { defineConfig } from 'vite-plus'
 import { fileURLToPath } from 'node:url'
 import { resolve, dirname } from 'node:path'
 import { collectionWideTestInputs } from './scripts/test-collection-inputs.mjs'

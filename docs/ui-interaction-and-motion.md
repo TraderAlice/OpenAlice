@@ -9,6 +9,9 @@ under `ui/src/components/`.
 
 OpenAlice presents working state, the next available action, and precise feedback.
 Shared components own visual geometry, interaction states, and motion.
+The shared Button `pending` state keeps its label and width, exposes `aria-busy`,
+and prevents duplicate activation. Runtime menus expose the current choice as
+a radio item; the full catalog restores focus to the original trigger.
 
 ## Visual Language
 
@@ -17,8 +20,8 @@ The workbench follows the compact layout of the current Codex desktop app.
 colors, and `theme/style-profiles.css` owns selectable component appearance.
 Product state and workflow contracts remain owned by their feature modules.
 
-- The platform font stack uses Apple system fonts on macOS, Segoe UI on Windows,
-  and locale-aware CJK fallbacks. Navigation, labels, menu choices, and desktop
+- The bundled Instrument Sans Variable font retains its existing license and
+  locale-aware CJK fallbacks. Navigation, labels, menu choices, and desktop
   fields use 14px type with 20px leading. Reading content and touch fields retain
   16px. Page and dialog titles share the 18px heading role with 24px leading.
 - `--oa-nav-height` owns 32px desktop navigation rows with 16px icons, an 8px
@@ -735,8 +738,8 @@ cannot prove timing, continuity, or pointer feedback.
 Text wrapping and block height are owned by the semantic DOM. Development
 checks run after `document.fonts.ready` and cover long Latin labels, CJK text,
 mixed scripts, unbroken identifiers, narrow widths, and text-spacing overrides.
-Measurements stay at the verification boundary. Platform-font product text
-uses browser layout throughout.
+The launch suggestion label retains its existing Pretext measurement owner and
+loads the bundled font before measuring. Semantic DOM owns the rendered text.
 
 ```bash
 pnpm -F @traderalice/connector-protocol build

@@ -1,3 +1,5 @@
+import { ModelIdentity } from '../ModelIdentity'
+import type { ReactNode } from 'react'
 import { DetailsSummary } from '../ui/collapsible'
 import { useRef } from 'react'
 import { useTranslation } from 'react-i18next'
@@ -37,10 +39,11 @@ export function SessionDetailsDialog({ record, onClose }: { record: SessionRecor
     [text('started'), date(last ? last.startedAt : fallback?.startedAt ?? record.startedAt)],
     [text('active'), date(data.entry?.interactive?.lastActiveAt ?? record.lastActiveAt)],
   ]
-  const configuration = [
+  const sessionModel = (config ? config.model : last?.configuration.model)
+  const configuration: [string, ReactNode][] = [
     [text('runtime'), record.agent],
     [text('provider'), config?.credentialSource ?? last?.configuration.credentialSource ?? unknown],
-    [text('model'), (config ? config.model : last?.configuration.model) ?? unknown],
+    [text('model'), sessionModel ? <ModelIdentity model={sessionModel} /> : unknown],
     [text('effort'), (config ? config.reasoningEffort : last?.configuration.effort) ?? unknown],
   ]
   const diagnostics = [

@@ -29,8 +29,8 @@ describe('ModelCombobox', () => {
 
     await userEvent.click(screen.getByRole('combobox', { name: 'Model' }))
 
-    expect(screen.getByRole('option', { name: /deepseek-v4-pro/ })).toBeTruthy()
-    const flash = screen.getByRole('option', { name: /deepseek-v4-flash/ })
+    expect(screen.getByRole('option', { name: /DeepSeek V4 Pro/ })).toBeTruthy()
+    const flash = screen.getByRole('option', { name: /DeepSeek V4 Flash/ })
     expect(flash).toBeTruthy()
     fireEvent.click(flash)
     expect(onChange).toHaveBeenCalledWith('deepseek-v4-flash')

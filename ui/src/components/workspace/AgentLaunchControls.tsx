@@ -11,7 +11,6 @@ import { useTranslation } from 'react-i18next'
 import {
   AlertTriangle,
   ChevronDown,
-  Cpu,
   Gauge,
   Info,
   KeyRound,
@@ -48,6 +47,8 @@ import { useAgentRuntimes } from '../../hooks/useAgentRuntimes'
 import { projectAgentRuntimeQuickAccess } from '../../lib/agentRuntimeQuickAccess'
 import { AgentRuntimeIcon } from '../../lib/agentRuntimeIcon'
 import { AIProviderIcon } from '@/lib/aiProviderIcon'
+import { ModelIdentity } from '../ModelIdentity'
+import { modelDisplayName, modelManufacturer } from '../../lib/modelIdentity'
 import { ModelCatalogStatus } from '../ModelCatalogStatus'
 import { ModelCombobox } from '../credentials/PresetFields'
 import {
@@ -223,6 +224,8 @@ function AgentLaunchInferenceMenu({
   const resolvedModel = config.launchModel
     ?? config.defaultModel
     ?? t('chatLanding.runtimeDefaultModel')
+  const resolvedModelLabel = config.modelOptions.find((model) => model.id === resolvedModel)?.label
+  const modelVendor = modelManufacturer(resolvedModel, config.credential?.vendor)
   const modelValue = config.launchModel ?? ''
   const effortValue = config.selectedReasoningEffort ?? ''
   const knownModels = config.modelOptions.filter((model) => model.id !== config.defaultModel)
@@ -258,9 +261,7 @@ function AgentLaunchInferenceMenu({
               : 'group/inference oa-pressable inline-flex min-h-9 min-w-0 max-w-full items-center gap-2 rounded-full bg-secondary px-3 py-1.5 text-sm leading-5 text-foreground transition-colors hover:bg-muted'}
           />}
         >
-          {access?.icon ?? <Cpu className="size-4 shrink-0 text-muted-foreground" />}
-          <span className="min-w-0 flex-1 truncate text-left">{resolvedModel}</span>
-          <span className="truncate text-muted-foreground">{resolvedEffort}</span>
+          <ModelIdentity model={resolvedModel} label={resolvedModelLabel} vendor={config.credential?.vendor} truncate className="flex-1 text-left" />
           <ChevronDown className="size-4 shrink-0 opacity-60 transition-transform duration-[var(--motion-standard)] [transition-timing-function:var(--motion-ease-out)] group-aria-expanded/inference:rotate-180 group-focus-visible/inference:transition-none motion-reduce:transition-none" />
         </DropdownMenuTrigger>
         <DropdownMenuContent
@@ -279,7 +280,7 @@ function AgentLaunchInferenceMenu({
             </DropdownMenuSubContent>
           </DropdownMenuSub>}
           <DropdownMenuSub>
-            <DropdownMenuSubTrigger icon={<Cpu className="size-4 text-muted-foreground" />} detail={resolvedModel}>
+            <DropdownMenuSubTrigger icon={<AIProviderIcon vendor={modelVendor} className="size-4" />} detail={modelDisplayName(resolvedModel, resolvedModelLabel)}>
               {t('chatLanding.modelField')}
             </DropdownMenuSubTrigger>
             <DropdownMenuSubContent className="flex min-w-[min(20rem,calc(100vw-2rem))] flex-col overflow-hidden">
@@ -290,26 +291,22 @@ function AgentLaunchInferenceMenu({
                 onValueChange={(value) => config.selectModel(value ? String(value) : null)}
               >
                 <DropdownMenuRadioItem value="" closeOnClick={false}>
-                  {config.defaultModel ? (
-                    <span className="flex min-w-0 flex-1 items-center gap-2">
-                      <span className="shrink-0">{t('chatLanding.defaultLabel')}</span>
-                      <span className="min-w-0 flex-1 break-words text-muted-foreground">{config.defaultModel}</span>
-                    </span>
-                  ) : (
-                    <span className="min-w-0 flex-1 break-words">{t('chatLanding.runtimeDefaultModel')}</span>
-                  )}
+                  <ModelIdentity
+                    model={config.defaultModel ?? t('chatLanding.runtimeDefaultModel')}
+                    label={config.modelOptions.find((model) => model.id === config.defaultModel)?.label}
+                    vendor={config.credential?.vendor}
+                    className="flex-1"
+                  />
+                  {config.defaultModel && <span className="shrink-0 text-muted-foreground">{t('chatLanding.defaultLabel')}</span>}
                 </DropdownMenuRadioItem>
                 {customCurrentModel && (
                   <DropdownMenuRadioItem value={customCurrentModel} closeOnClick={false}>
-                    <span className="min-w-0 flex-1 break-words">{customCurrentModel}</span>
+                    <ModelIdentity model={customCurrentModel} vendor={config.credential?.vendor} className="flex-1" />
                   </DropdownMenuRadioItem>
                 )}
                 {knownModels.map((model) => (
                   <DropdownMenuRadioItem key={model.id} value={model.id} closeOnClick={false}>
-                    <span className="min-w-0 flex-1">
-                      <span className="block [overflow-wrap:anywhere]">{model.label}</span>
-                      {model.label !== model.id && <span className="block text-xs text-muted-foreground [overflow-wrap:anywhere]">{model.id}</span>}
-                    </span>
+                    <ModelIdentity model={model.id} label={model.label} vendor={config.credential?.vendor} className="flex-1" />
                   </DropdownMenuRadioItem>
                 ))}
               </DropdownMenuRadioGroup>

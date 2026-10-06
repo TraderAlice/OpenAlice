@@ -241,6 +241,7 @@ jobs:
         with:
           name: release-notes
           path: notes.md
+          retention-days: 30
           if-no-files-found: error
 
   # Local reusable workflows and checkout resolve to this dispatch's SHA.
@@ -380,7 +381,7 @@ jobs:
             dist/cli-installer/OpenAlice-*-install.ps1
             dist/cli-installer/OpenAlice-*-install.ps1.sha256
           if-no-files-found: error
-          retention-days: 1
+          retention-days: 30
 
   build-cli-neutral:
     name: Build shared CLI inputs
@@ -409,7 +410,7 @@ jobs:
           name: release-neutral-inputs
           path: dist/release-neutral-inputs
           if-no-files-found: error
-          retention-days: 3
+          retention-days: 30
 
   build-cli-release:
     name: Build native CLI (${{ matrix.platform }}-${{ matrix.arch }})
@@ -532,7 +533,7 @@ jobs:
             dist/bun-release/openalice-cli-*.report.json
           if-no-files-found: error
           compression-level: 0
-          retention-days: 1
+          retention-days: 30
 
   build-cli-windows:
     needs: [release, build-cli-neutral]
@@ -544,6 +545,7 @@ jobs:
     with:
       channel_build: true
       artifact_prefix: cli-release
+      fixed_artifact_names: true
       neutral_inputs: true
       neutral_artifact: release-neutral-inputs
       native_acceptance: ${{ needs.release.outputs.channel == 'stable' }}
@@ -556,6 +558,7 @@ jobs:
     timeout-minutes: 10
     permissions:
       contents: read
+      actions: read
 
     steps:
       - uses: actions/checkout@v7
@@ -564,11 +567,14 @@ jobs:
         with:
           node-version: 22.19.0
 
-      - uses: actions/download-artifact@v4
-        with:
-          pattern: cli-release-*
-          path: dist/release-cli
-          merge-multiple: true
+      - name: Select, verify and stage six CLI targets
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CANDIDATE_VERSION: ${{ needs.release.outputs.version }}
+          CANDIDATE_SOURCE_SHA: ${{ needs.release.outputs.source_sha }}
+        run: >-
+          node scripts/stage-cli-release.mjs dist/cli-candidates dist/release-cli
+          "$CANDIDATE_VERSION" "$CANDIDATE_SOURCE_SHA"
 
       - name: Derive package-manager metadata from accepted archives
         run: |
@@ -597,11 +603,11 @@ jobs:
           include-hidden-files: true
           if-no-files-found: error
           compression-level: 0
-          retention-days: 1
+          retention-days: 30
 
   accept-cli-homebrew:
     name: Accept Homebrew CLI (${{ matrix.arch }})
-    needs: [release, build-cli-release]
+    needs: [release, build-cli-release, build-cli-windows]
     if: needs.release.outputs.created == 'true' && needs.release.outputs.channel == 'stable' && needs.build-cli-release.result == 'success'
     strategy:
       fail-fast: false
@@ -615,6 +621,7 @@ jobs:
     timeout-minutes: 15
     permissions:
       contents: read
+      actions: read
 
     steps:
       - uses: actions/checkout@v7
@@ -623,11 +630,14 @@ jobs:
         with:
           node-version: 22.19.0
 
-      - uses: actions/download-artifact@v4
-        with:
-          pattern: cli-release-*
-          path: dist/release-cli
-          merge-multiple: true
+      - name: Select, verify and stage six CLI targets
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CANDIDATE_VERSION: ${{ needs.release.outputs.version }}
+          CANDIDATE_SOURCE_SHA: ${{ needs.release.outputs.source_sha }}
+        run: >-
+          node scripts/stage-cli-release.mjs dist/cli-candidates dist/release-cli
+          "$CANDIDATE_VERSION" "$CANDIDATE_SOURCE_SHA"
 
       - name: Install and run the accepted archive through Homebrew
         shell: bash
@@ -668,7 +678,7 @@ jobs:
 
   accept-cli-linuxbrew:
     name: Accept Linuxbrew CLI (${{ matrix.arch }})
-    needs: [release, build-cli-release]
+    needs: [release, build-cli-release, build-cli-windows]
     if: needs.release.outputs.created == 'true' && needs.release.outputs.channel == 'stable' && needs.build-cli-release.result == 'success'
     strategy:
       fail-fast: false
@@ -682,6 +692,7 @@ jobs:
     timeout-minutes: 25
     permissions:
       contents: read
+      actions: read
 
     steps:
       - uses: actions/checkout@v7
@@ -690,11 +701,14 @@ jobs:
         with:
           node-version: 22.19.0
 
-      - uses: actions/download-artifact@v4
-        with:
-          pattern: cli-release-*
-          path: dist/release-cli
-          merge-multiple: true
+      - name: Select, verify and stage six CLI targets
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CANDIDATE_VERSION: ${{ needs.release.outputs.version }}
+          CANDIDATE_SOURCE_SHA: ${{ needs.release.outputs.source_sha }}
+        run: >-
+          node scripts/stage-cli-release.mjs dist/cli-candidates dist/release-cli
+          "$CANDIDATE_VERSION" "$CANDIDATE_SOURCE_SHA"
 
       - name: Install and run the accepted archive through Linuxbrew
         shell: bash
@@ -733,7 +747,7 @@ jobs:
 
   accept-cli-aur:
     name: Accept Arch/AUR CLI package (${{ matrix.arch }})
-    needs: [release, build-cli-release]
+    needs: [release, build-cli-release, build-cli-windows]
     if: needs.release.outputs.created == 'true' && needs.release.outputs.channel == 'stable' && needs.build-cli-release.result == 'success'
     strategy:
       fail-fast: false
@@ -747,6 +761,7 @@ jobs:
     timeout-minutes: 25
     permissions:
       contents: read
+      actions: read
 
     steps:
       - uses: actions/checkout@v7
@@ -755,11 +770,14 @@ jobs:
         with:
           node-version: 22.19.0
 
-      - uses: actions/download-artifact@v4
-        with:
-          pattern: cli-release-*
-          path: dist/release-cli
-          merge-multiple: true
+      - name: Select, verify and stage six CLI targets
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CANDIDATE_VERSION: ${{ needs.release.outputs.version }}
+          CANDIDATE_SOURCE_SHA: ${{ needs.release.outputs.source_sha }}
+        run: >-
+          node scripts/stage-cli-release.mjs dist/cli-candidates dist/release-cli
+          "$CANDIDATE_VERSION" "$CANDIDATE_SOURCE_SHA"
 
       - name: Build, install, and run the generated AUR package
         shell: bash
@@ -896,7 +914,7 @@ jobs:
             dist/broker-packs/*.tgz
           if-no-files-found: error
           compression-level: 0
-          retention-days: 1
+          retention-days: 30
 
   publish-release:
     name: Publish accepted release
@@ -972,11 +990,14 @@ jobs:
           path: dist/release-broker-packs
           merge-multiple: true
 
-      - uses: actions/download-artifact@v4
-        with:
-          pattern: cli-release-*
-          path: dist/release-cli
-          merge-multiple: true
+      - name: Select, verify and stage six CLI targets
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CANDIDATE_VERSION: ${{ needs.release.outputs.version }}
+          CANDIDATE_SOURCE_SHA: ${{ needs.release.outputs.source_sha }}
+        run: >-
+          node scripts/stage-cli-release.mjs dist/cli-candidates dist/release-cli
+          "$CANDIDATE_VERSION" "$CANDIDATE_SOURCE_SHA"
 
       - uses: actions/download-artifact@v4
         with:
@@ -988,9 +1009,6 @@ jobs:
         with:
           name: cli-package-channels
           path: dist/release-cli-packages
-
-      - name: Verify final CLI archives before beta or stable publication
-        run: node scripts/verify-cli-release.mjs dist/release-cli
 
       - name: Stage GitHub-safe AUR metadata asset
         if: needs.release.outputs.channel == 'stable'

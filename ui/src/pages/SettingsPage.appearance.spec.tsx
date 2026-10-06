@@ -43,14 +43,28 @@ afterEach(() => {
 })
 
 describe('AppearanceSection palette pair editor', () => {
-  it('switches component style immediately without changing the palette pair', () => {
+  it('switches every component style immediately and preserves the saved palette pair', () => {
     render(<AppearanceSection />)
 
     fireEvent.click(screen.getByRole('button', { name: 'Interface style Default' }))
-    expect(screen.getByRole('radio', { name: 'Default' }).getAttribute('aria-checked')).toBe('true')
-    fireEvent.click(screen.getByRole('radio', { name: 'Windows 98' }))
 
-    expect(useThemeStore.getState().uiStyle).toBe('win98')
+    expect(screen.getByRole('radio', { name: 'Default' }).getAttribute('aria-checked')).toBe('true')
+    const profiles = [
+      ['Broker Classic', 'broker-classic'],
+      ['Studio', 'studio'],
+      ['Outline', 'outline'],
+      ['Default', 'default'],
+      ['Windows 98', 'win98'],
+    ] as const
+    const selections = profiles.map(([label]) => {
+      fireEvent.click(screen.getByRole('radio', { name: label }))
+      const { uiStyle, dayPalette, nightPalette, stylePaletteMode } = useThemeStore.getState()
+      return { uiStyle, dayPalette, nightPalette, stylePaletteMode }
+    })
+
+    expect(selections).toEqual(profiles.map(([, uiStyle]) => ({
+      uiStyle, dayPalette: 'paper', nightPalette: 'graphite', stylePaletteMode: 'saved',
+    })))
     expect(useThemeStore.getState().dayPalette).toBe('paper')
     expect(useThemeStore.getState().nightPalette).toBe('graphite')
     expect(useThemeStore.getState().stylePaletteMode).toBe('saved')
@@ -80,8 +94,9 @@ describe('AppearanceSection palette pair editor', () => {
     expect(screen.getByText('Current Day palette: Paper')).toBeTruthy()
     expect(screen.getByRole('button', { name: 'Edit Day palette: Paper' })).toBeTruthy()
 
-    fireEvent.click(screen.getByRole('radio', { name: 'Windows 98' }))
-    expect(screen.getByText('Current Day palette: Windows Classic')).toBeTruthy()
+    fireEvent.click(screen.getByRole('radio', { name: 'Broker Classic' }))
+    expect(screen.getByText('Current Day palette: Paper')).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: 'Use recommended colors' }))
     fireEvent.click(screen.getByRole('button', { name: 'Use saved colors' }))
     expect(useThemeStore.getState().stylePaletteMode).toBe('saved')
     expect(screen.getByText('Current Day palette: Paper')).toBeTruthy()

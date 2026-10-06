@@ -1,7 +1,8 @@
+import { ModelIdentity } from '../ModelIdentity'
 import { Select } from '@/components/ui/select'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Cpu, KeyRound, Pencil, RotateCcw } from 'lucide-react'
+import { KeyRound, Pencil, RotateCcw } from 'lucide-react'
 
 import type { QuickChatLaunchPreference } from '@/api/preferences'
 import { Button } from '@/components/ui/button'
@@ -84,14 +85,14 @@ function preferenceSummary(
   credentials: Readonly<Record<string, SavedCredential>>,
   nativeLabel: string,
 ): { access: string; inference: string; vendor?: string } {
-  if (!preference) return { access: nativeLabel, inference: '—' }
+  if (!preference) return { access: nativeLabel, inference: '' }
   const credential = preference.accessMode === 'vault' && preference.credentialSlug
     ? credentials[preference.credentialSlug]
     : undefined
   const access = preference.accessMode === 'vault'
     ? credentialAccessLabel(credential ?? null) || preference.credentialSlug || 'Vault'
     : nativeLabel
-  const inference = [preference.model, preference.reasoningEffort].filter(Boolean).join(', ') || 'Runtime default'
+  const inference = preference.model ?? ''
   return { access, inference, ...(credential?.vendor ? { vendor: credential.vendor } : {}) }
 }
 
@@ -377,7 +378,10 @@ export function WorkspaceAIPreferencesPanel({ workspace, agents, onSaved, onConf
                           : t('workspaceSettings.preferences.currentlyResolvesTo')}
                       </span>
                       <span className="font-medium text-foreground">
-                        {[recentAgentName, recentSummary.access, recentSummary.inference].join(', ')}
+                        {recentAgentName}, {recentSummary.access}
+                      </span>
+                      <span className="inline-flex">
+                        <ModelIdentity model={recentSummary.inference || t('chatLanding.runtimeDefaultModel')} vendor={recentSummary.vendor} />
                       </span>
                     </div>
                   )}
@@ -439,7 +443,7 @@ export function WorkspaceAIPreferencesPanel({ workspace, agents, onSaved, onConf
                                 : <KeyRound size={12} className="shrink-0" />}
                               <span className="truncate">{summary.access}</span>
                             </div>
-                            <div className="flex min-w-0 items-center gap-1.5 text-muted-foreground"><Cpu size={12} className="shrink-0" /><span className="truncate">{summary.inference}</span></div>
+                            <ModelIdentity model={summary.inference || t('chatLanding.runtimeDefaultModel')} vendor={summary.vendor} className="text-muted-foreground" />
                           </div>
                           <Button
                             variant="ghost"

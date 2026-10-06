@@ -1,3 +1,4 @@
+import { ModelCatalogStatus } from '../ModelCatalogStatus'
 import { Select } from '@/components/ui/select'
 import { DetailsSummary } from '../ui/collapsible'
 import { useProviderModels } from '../../hooks/useProviderModels'
@@ -34,7 +35,6 @@ import {
   agentWireShapes,
   anthropicAuthModeForBaseUrl,
   baseUrlToVendor,
-  describeModelSemantics,
   savedCredentialModel,
   vendorPreset,
   presetModels,
@@ -377,7 +377,6 @@ export function WorkspaceAIConfigModal({
   })
   const selectedModelSemantics = providerModels.semantics
   const supportedReasoningEfforts = providerModels.effortOptions
-  const semanticsSummary = describeModelSemantics(selectedModelSemantics)
   const gate = { claude: claudeGate, codex: codexGate, opencode: opencodeGate, pi: piGate }[tab]
   const key = testKey(form)
   const testing = gate.testing
@@ -732,9 +731,10 @@ export function WorkspaceAIConfigModal({
                     <Button
                       type="button"
                       onClick={handleSaveMetadata}
-                      disabled={metadataSaving || !metadataDirty}
+                      pending={metadataSaving}
+                      disabled={!metadataDirty}
                     >
-                      {metadataSaving ? t('common.saving') : t('common.save')}
+                      {t('common.save')}
                     </Button>
                   </div>
                 </div>
@@ -968,16 +968,7 @@ export function WorkspaceAIConfigModal({
               ariaLabel={t('workspaceSettings.ai.model')}
               suggestionsLabel={t('workspaceSettings.ai.modelSuggestions')}
             />
-            {modelSuggestions.length > 0 && (
-              <p className="text-[11px] text-muted-foreground/70 mt-1">{t('workspaceSettings.ai.modelSuggestions')}</p>
-            )}
-
-            {semanticsSummary && (
-              <div className="mt-2 rounded-md border border-primary/20 bg-primary/5 px-3 py-2 text-[11px] leading-relaxed text-muted-foreground">
-                <strong className="text-foreground">{t('workspaceSettings.ai.registeredAutomatically')}</strong>{' '}
-                {semanticsSummary}.
-              </div>
-            )}
+            <ModelCatalogStatus catalog={providerModels} selectedModel={form.model} />
 
             {supportedReasoningEfforts.length > 0 && (
               <div className="mt-3">
@@ -1137,9 +1128,9 @@ export function WorkspaceAIConfigModal({
                   type="button"
                   size="sm"
                   onClick={handleSaveCredential}
-                  disabled={savingCred}
+                  pending={savingCred}
                 >
-                  {savingCred ? t('common.saving') : t('workspaceSettings.ai.saveToAlice')}
+                  {t('workspaceSettings.ai.saveToAlice')}
                 </Button>
               </div>
             </div>
@@ -1237,9 +1228,10 @@ export function WorkspaceAIConfigModal({
               <Button
                 type="button"
                 onClick={handleSave}
-                disabled={saving || !dirty}
+                pending={saving}
+                disabled={!dirty}
               >
-                {saving ? t('common.saving') : t('common.save')}
+                {t('common.save')}
               </Button>
             )}
           </div>

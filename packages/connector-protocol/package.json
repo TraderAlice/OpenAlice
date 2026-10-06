@@ -24,7 +24,8 @@
   "devDependencies": {
     "@types/node": "^22.13.4",
     "typescript": "^5.7.3",
-    "vitest": "^3.2.6"
+    "vite": "npm:@voidzero-dev/vite-plus-core@1.0.0",
+    "vitest": "5.0.1"
   },
   "engines": {
     "node": ">=22.19.0"

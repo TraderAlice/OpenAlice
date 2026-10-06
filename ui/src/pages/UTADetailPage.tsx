@@ -510,7 +510,7 @@ function AccountPanel({ account, positions, delta24h, clock, connecting, selecto
   </div>
   if (!account) {
     return (
-      <div ref={panelRef} className="min-w-0 rounded-lg border border-border bg-card p-(--oa-panel-inset)" style={{ minHeight: loadedHeight }} aria-busy={!error}>
+      <div ref={panelRef} className="oa-data-surface min-w-0 rounded-lg border border-border bg-card p-(--oa-panel-inset)" style={{ minHeight: loadedHeight }} aria-busy={!error}>
         {header}
         <p className="mb-3.5 text-sm text-muted-foreground" role="status">
           {error ? 'Account data is unavailable.' : connecting ? 'Connecting to broker…' : 'Loading account info…'}
@@ -561,7 +561,7 @@ function AccountPanel({ account, positions, delta24h, clock, connecting, selecto
     : null
 
   return (
-    <div ref={panelRef} className="min-w-0 rounded-lg border border-border bg-card p-(--oa-panel-inset)">
+    <div ref={panelRef} className="oa-data-surface min-w-0 rounded-lg border border-border bg-card p-(--oa-panel-inset)">
       {header}
 
       <Metric
@@ -1087,7 +1087,7 @@ const ORDER_HISTORY_COMPACT_WIDTH = 760
 
 function OrderStatusBadge({ status }: { status: OrderHistoryStatus }) {
   return (
-    <span className={`rounded-sm px-1.5 py-0.5 text-sm leading-5 font-medium ${ORDER_STATUS_STYLES[status] ?? 'bg-muted text-muted-foreground'}`}>
+    <span className={`rounded-sm px-1.5 py-0.5 text-[10px] leading-[14px] font-medium ${ORDER_STATUS_STYLES[status] ?? 'bg-muted text-muted-foreground'}`}>
       {status}
     </span>
   )

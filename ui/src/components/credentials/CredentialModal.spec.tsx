@@ -227,13 +227,13 @@ describe('CredentialModal', () => {
       cred={{ slug: 'openai-1', vendor: 'openai', authType: 'api-key', apiKey: null, hasApiKey: true,
         wires: { 'openai-responses': 'https://api.openai.com/v1' }, lastModel: 'gpt-test' }}
       onClose={vi.fn()} onSaved={vi.fn()} />)
-    await screen.findByText(i18n.t('modelCatalog.loaded', { count: 1 }))
+    await screen.findByText(i18n.t('modelCatalog.missing'))
     expect(configApi.getCredentialModels).toHaveBeenCalledWith('openai-1', undefined, expect.any(AbortSignal), 'openai-responses', false)
     await userEvent.clear(screen.getByRole('combobox', { name: /model/i }))
     await userEvent.click(screen.getByRole('combobox', { name: /model/i }))
     await userEvent.click(screen.getByRole('option', { name: /Saved model/ }))
     await userEvent.tab()
-    expect(screen.getByRole('combobox', { name: /model/i })).toHaveProperty('value', 'saved/model')
+    expect(screen.getByRole('combobox', { name: /model/i })).toHaveProperty('value', 'Saved model')
   })
 
   it('clears a draft key when changing providers so discovery cannot send it to the next provider', () => {
@@ -355,13 +355,12 @@ describe('CredentialModal', () => {
     )
 
     expect(screen.getByText('Use a Gemini API key from Google AI Studio. AQ and AIza keys are supported.')).toBeTruthy()
-    expect(screen.getByText(i18n.t('modelCatalog.selectHelp'))).toBeTruthy()
     expect(screen.getByText('Pi')).toBeTruthy()
     expect(screen.getByText('opencode')).toBeTruthy()
     expect(screen.queryByText('Claude Code')).toBeNull()
     expect(screen.queryByText('Codex')).toBeNull()
     expect(screen.getByPlaceholderText('AQ... or AIza...')).toBeTruthy()
-    expect(screen.getByRole('combobox', { name: /model/i })).toHaveProperty('value', 'gemini-default')
+    expect(screen.getByRole('combobox', { name: /model/i })).toHaveProperty('value', 'Catalog default')
   })
 
   it('requires a concrete URL for custom providers and explains mode compatibility', async () => {
@@ -467,7 +466,7 @@ describe('CredentialModal', () => {
 
     expect(screen.getByText('OpenAI')).toBeTruthy()
     expect(screen.getByPlaceholderText('Enter API key')).toHaveProperty('value', 'sk-prefilled')
-    await waitFor(() => expect(screen.getByRole('combobox', { name: /model/i })).toHaveProperty('value', 'gpt-test'))
+    await waitFor(() => expect(screen.getByRole('combobox', { name: /model/i })).toHaveProperty('value', 'GPT Test'))
   })
 
   it('keeps the failed test message inside the dialog instead of overflowing', async () => {

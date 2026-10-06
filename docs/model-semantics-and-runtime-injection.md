@@ -96,6 +96,16 @@ same endpoint. Failed refreshes preserve the list and timestamp, with a
 one-minute retry delay; successful empty lists remain empty. Incomplete or
 failed discovery is never committed.
 
+The UI revalidates saved-account and native-runtime catalogs when the window
+regains focus or the document becomes visible. These reads share the backend
+freshness policy. Draft discovery remains debounced and account-scoped.
+`ModelIdentity` owns model names and manufacturer logos across selectors,
+credential summaries, preferences and Session details. Catalog labels supply
+names; known model families supply a readable fallback. Unknown IDs remain
+exact, and hover titles expose the persisted ID. Editable suggestions keep
+exact model IDs. Reasoning and context controls remain at their configuration
+boundary.
+
 Cache identity covers the credential, vendor, endpoint, wire and key. Cache
 files contain an internal identity digest, timestamp, model display fields and
 validated model semantics; no key or raw provider response. Corrupt files are rebuilt. A successful
