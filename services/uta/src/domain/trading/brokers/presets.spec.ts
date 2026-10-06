@@ -27,6 +27,7 @@ import {
   LONGBRIDGE_PRESET,
   CCXT_CUSTOM_PRESET,
   SIMULATOR_PRESET,
+  CN_LOCAL_PAPER_PRESET,
   BUILTIN_BROKER_PRESETS,
 } from '@traderalice/uta-protocol'
 import { loadBrokerEngine } from './registry.js'
@@ -49,6 +50,7 @@ const SAMPLE_CONFIGS: Record<string, Record<string, unknown>> = {
     privateKey: '0x59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d',
   },
   'mock-simulator': { cash: 50000 },
+  'cn-local-paper': { cash: 1_000_000 },
 }
 
 // ==================== Catalog integrity ====================
@@ -196,6 +198,19 @@ describe('isPaperPreset', () => {
   it('true for Alpaca paper, false for Alpaca live', () => {
     expect(isPaperPreset('alpaca', { mode: 'paper' })).toBe(true)
     expect(isPaperPreset('alpaca', { mode: 'live' })).toBe(false)
+  })
+
+  it('true for CN local paper', () => {
+    expect(isPaperPreset('cn-local-paper', { cash: 1_000_000 })).toBe(true)
+  })
+
+  it('CN local paper engine config sets variant', () => {
+    const cfg = CN_LOCAL_PAPER_PRESET.toEngineConfig({ cash: 500_000 })
+    expect(cfg).toMatchObject({
+      variant: 'cn-local-paper',
+      cash: 500_000,
+      quoteProvider: 'tencent',
+    })
   })
 
   it('true for Longbridge paper, false for Longbridge live', () => {
