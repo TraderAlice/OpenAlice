@@ -67,7 +67,7 @@ export const zh: Resources = {
 
   modelCatalog: {
     bundled: "正在使用内置模型建议。",
-    missing: "最新模型列表中没有 {{model}}。已保留你的选择，该模型的可用性可能发生了变化。",
+    missing: "模型未列入目录",
     loading: "正在读取此 AI 访问的模型列表…",
     failed: "读取模型失败，请重试；若服务商不提供模型列表 API，可手动输入 ID。",
     empty: "未发现模型。请先为此账户配置模型提供商，再刷新。",
@@ -1281,8 +1281,6 @@ export const zh: Resources = {
     noCompatible: '凭证库里还没有兼容凭证。',
     dontSeed: '由 Agent Runtime 管理',
     protocol: '协议：{{protocol}}',
-    model: '模型：{{model}}',
-    automatic: '自动登记：{{summary}}',
     advancedReasoning: '高级——未知模型的思考能力',
     useRuntimeDefault: '由 Agent Runtime 管理',
     supportsReasoning: '模型支持思考模式',
@@ -1525,7 +1523,6 @@ export const zh: Resources = {
       authHeaderHelp: 'Anthropic 官方接口使用 x-api-key；MiniMax、LongCat 等兼容网关通常要求 Authorization: Bearer。',
       model: '模型',
       modelSuggestions: '来自匹配提供方的建议；也可以输入任意模型 ID。',
-      registeredAutomatically: '自动登记：',
       reasoningEffort: '思考强度',
       reasoningEffortLabel: '{{agent}} 思考强度',
       registeredDefault: '注册默认值',

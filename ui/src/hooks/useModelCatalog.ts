@@ -31,7 +31,12 @@ export function useModelCatalog(request: Request | null) {
     setCatalog((old) => old?.key === key
       ? { ...old, error: null, loading: true }
       : { key, models: null, error: null, loading: true })
+    let initialized = false
+    let pending = false
     const read = async (force = false) => {
+      if (pending || controller.signal.aborted) return
+      window.clearTimeout(timer)
+      pending = true
       try {
         if ('slug' in input || 'native' in input) {
           const result = 'native' in input
@@ -55,10 +60,23 @@ export function useModelCatalog(request: Request | null) {
           ...(old?.key === key ? old : { key, models: null }),
           error: error instanceof Error ? error.message : String(error), loading: false,
         }))
+      } finally {
+        pending = false
+        initialized = true
       }
     }
+    const revalidate = () => {
+      if (initialized && document.visibilityState === 'visible' && !('apiKey' in input)) void read()
+    }
+    window.addEventListener('focus', revalidate)
+    document.addEventListener('visibilitychange', revalidate)
     timer = window.setTimeout(() => { void read(manual) }, 'apiKey' in input ? 400 : 0)
-    return () => { window.clearTimeout(timer); controller.abort() }
+    return () => {
+      window.clearTimeout(timer)
+      controller.abort()
+      window.removeEventListener('focus', revalidate)
+      document.removeEventListener('visibilitychange', revalidate)
+    }
   }, [key, revision])
   const current = request && catalog?.key === key ? catalog : null
   return {
@@ -75,5 +93,6 @@ export function useModelCatalog(request: Request | null) {
 
 export function catalogModelOptions(discovered: readonly PresetModel[] | null, fallback: readonly PresetModel[]): readonly PresetModel[] {
   if (discovered === null) return fallback
-  return discovered.map((model) => ({ ...fallback.find((known) => known.id === model.id), ...model }))
+  const registered = new Map(fallback.map((model) => [model.id, model]))
+  return discovered.map((model) => ({ ...registered.get(model.id), ...model }))
 }
