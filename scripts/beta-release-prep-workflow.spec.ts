@@ -112,7 +112,7 @@ describe('exact beta release-preparation workflow lane', () => {
     }
     expect(jobs['bun-cli-feasibility'].if).toContain("github.base_ref == 'master'")
     expect(jobs['checkout-remote'].if).toContain("github.base_ref == 'master'")
-    expect(jobs['checkout-install'].if).not.toContain("github.base_ref == 'master'")
+    expect(jobs['checkout-install'].if).toContain("github.base_ref == 'master'")
     expect(jobs['build-dev-cli-neutral'].if).toBe("github.event_name == 'push'")
     expect(jobs['build-dev-cli'].if).toBe("github.event_name == 'push'")
     expect(jobs['build-dev-cli'].needs).toEqual(['build-dev-cli-neutral', 'build-dev-broker-packs'])

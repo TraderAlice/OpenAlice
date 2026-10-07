@@ -58,7 +58,7 @@ describe('CLI installer dev publication workflow', () => {
       expect(job.if).toContain("needs.release-prep-scope.result != 'success'")
       expect(job.if).toContain("beta_release_prep != 'true'")
     }
-    expect(checkoutInstall.if).not.toContain("github.base_ref == 'master'")
+    expect(checkoutInstall.if).toContain("github.base_ref == 'master'")
     expect(checkoutInstall.if).toContain("needs.release-prep-scope.result != 'success'")
     expect(checkoutInstall.if).toContain("beta_release_prep != 'true'")
   })
