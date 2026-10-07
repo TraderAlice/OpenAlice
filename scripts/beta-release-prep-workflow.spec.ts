@@ -100,10 +100,10 @@ describe('exact beta release-preparation workflow lane', () => {
     const cli = workflow('cli-installer-smoke.yml')
     const jobs = cli.jobs
     const scope = jobs['release-prep-scope']
-    expect(cli.on?.pull_request?.branches).toEqual(['master'])
+    expect(cli.on?.pull_request?.branches).toEqual(['dev', 'master'])
     expectTrustedClassifier(scope)
     expectOutcomeGatedOutput(scope)
-    expect(scope.if).toBe("github.event_name != 'push' && !inputs.windows_preview")
+    expect(scope.if).toBe("github.event_name != 'push' && !inputs.windows_preview && !inputs.windows_network && (github.event_name != 'pull_request' || github.base_ref == 'master')")
     for (const name of ['bun-cli-feasibility', 'checkout-install', 'checkout-remote']) {
       expect(jobs[name].needs).toBe('release-prep-scope')
       expect(jobs[name].if).toContain('!cancelled()')
