@@ -104,7 +104,7 @@ if ($text -isnot [string] -or $text.Trim() -notmatch '^[a-f0-9]{64}\\s') { throw
     // and excluding every host development tool from PATH.
     ...Object.fromEntries(['APPDATA', 'LOCALAPPDATA', 'ProgramData', 'SystemDrive',
       'USERNAME', 'USERDOMAIN', 'COMPUTERNAME', 'HOMEDRIVE', 'HOMEPATH', 'ComSpec',
-      'ProgramFiles', 'ProgramFiles(x86)'].flatMap(key => process.env[key] ? [[key, process.env[key]!]] : [])),
+      'ProgramFiles', 'ProgramFiles(x86)', 'PATHEXT'].flatMap(key => process.env[key] ? [[key, process.env[key]!]] : [])),
     SystemRoot: process.env.SystemRoot!, WINDIR: process.env.WINDIR!,
     OS: 'Windows_NT', PROCESSOR_ARCHITECTURE: process.arch === 'arm64' ? 'ARM64' : 'AMD64',
     PSExecutionPolicyPreference: 'Restricted',
@@ -118,6 +118,16 @@ if ($text -isnot [string] -or $text.Trim() -notmatch '^[a-f0-9]{64}\\s') { throw
       OPENALICE_INSTALL_SOURCE: join(installDir, 'cli/provenance', `${releaseName}.json`),
     } : {}),
   }
+  // PATHEXT is part of the Windows process contract, not a development tool.
+  // Verify native command exit-code propagation in the updater's exact env.
+  const nativeCommand = JSON.parse(await command(powershell, ['-NoProfile', '-Command', `
+    $ErrorActionPreference = 'Stop'
+    Set-StrictMode -Version 2
+    $text = & (Join-Path $env:SystemRoot 'System32/tar.exe') --version
+    if ($LASTEXITCODE -ne 0 -or -not $text) { throw 'Native tar execution failed in updater environment' }
+    @{ pathExt = $env:PATHEXT; tarVersion = [string]$text; exitCode = $LASTEXITCODE } | ConvertTo-Json -Compress
+  `], environment))
+  console.log('[windows-smoke] updater native command', JSON.stringify(nativeCommand))
   let uninstalled = false
   let cleanupExecutable = executable
   let cleanupEnvironment = environment
@@ -221,7 +231,7 @@ if ($text -isnot [string] -or $text.Trim() -notmatch '^[a-f0-9]{64}\\s') { throw
     report = {
       status: 'pass', host, testedSourceCommit: sourceCommit, mode: published ? 'public-network' : 'local-candidate',
       installerSource: publishedInstaller ? 'published' : 'checkout', installerSha256: createHash('sha256').update(await readFile(installer)).digest('hex'),
-      sidecar, productVersion: candidate.version, previousPublishedVersion: published ? stableVersion : null, uninstallReceipt,
+      sidecar, nativeCommand, productVersion: candidate.version, previousPublishedVersion: published ? stableVersion : null, uninstallReceipt,
       statusScope: published ? 'published binary updater and published update installer; checkout installer for initial installs unless selected otherwise' : 'synthetic previous version; local archives',
       arch: process.arch, archiveSha256: candidate.sha256,
       contentIdentity: candidate.contentIdentity, sourceCommit: candidate.sourceCommit,
