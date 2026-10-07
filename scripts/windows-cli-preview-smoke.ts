@@ -278,11 +278,16 @@ async function command(exe: string, args: string[], env = process.env) {
   const child = Bun.spawn([exe, ...args], { env, cwd: scratch, stdout: 'pipe', stderr: 'pipe' })
   const stdout = new Response(child.stdout).text()
   const stderr = new Response(child.stderr).text()
-  const timeout = setTimeout(() => child.kill(), 120_000)
+  // Public PowerShell downloads plus extraction are much slower than local
+  // candidates (about 100s per archive on the hosted runner). Keep a bounded
+  // network budget distinct from the ordinary local command deadline.
+  const timeoutMs = published && (args.includes('-Version') || args[0] === 'update') ? 300_000 : 120_000
+  let timedOut = false
+  const timeout = setTimeout(() => { timedOut = true; child.kill() }, timeoutMs)
   try {
     const code = await child.exited
     const [out, err] = await Promise.all([stdout, stderr])
-    if (code !== 0) throw new Error(`${exe} ${args[0]} exited ${code}: ${err}\n${out}`)
+    if (code !== 0 || timedOut) throw new Error(`${exe} ${args[0]} ${timedOut ? `timed out after ${timeoutMs}ms` : `exited ${code}`}: ${err}\n${out}`)
     return out
   } finally { clearTimeout(timeout) }
 }
