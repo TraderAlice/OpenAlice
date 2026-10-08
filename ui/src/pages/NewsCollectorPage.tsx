@@ -105,11 +105,70 @@ export function isValidFeedUrl(value: string): boolean {
   }
 }
 
+const GELONGHUI_DIRECT_FEED: NewsCollectorFeed = {
+  name: '格隆汇实时快讯',
+  source: 'gelonghui',
+  url: 'https://www.gelonghui.com/live',
+  enabled: true,
+  description: 'Built-in direct collection from Gelonghui live news.',
+}
+const LEGACY_GELONGHUI_RSSHUB_NAME = '格隆汇 · 实时快讯'
+
+function isGelonghuiDirectFeed(feed: NewsCollectorFeed): boolean {
+  return feed.source.trim().toLowerCase() === GELONGHUI_DIRECT_FEED.source && feed.url.trim() === GELONGHUI_DIRECT_FEED.url
+}
+
+function isLegacyGelonghuiRssHubPreset(feed: NewsCollectorFeed): boolean {
+  if (feed.source.trim().toLowerCase() !== GELONGHUI_DIRECT_FEED.source || feed.name !== LEGACY_GELONGHUI_RSSHUB_NAME) return false
+
+  try {
+    const url = new URL(feed.url)
+    return ['http:', 'https:'].includes(url.protocol) && url.pathname.replace(/\/+$/, '').endsWith('/gelonghui/live')
+  } catch {
+    return false
+  }
+}
+
 const RSSHUB_PRESETS = [
   { name: '财联社 · 电报', source: 'cls', route: 'cls/telegraph', description: 'CLS telegraph news via your RSSHub instance.' },
-  { name: '格隆汇 · 实时快讯', source: 'gelonghui', route: 'gelonghui/live', description: 'Gelonghui live news via your RSSHub instance.' },
   { name: '金十数据 · 市场快讯', source: 'jin10', route: 'jin10', description: 'Jin10 market news via your RSSHub instance.' },
 ]
+
+function BuiltInGelonghuiSource({ feeds, onChange }: {
+  feeds: NewsCollectorFeed[]
+  onChange: (feeds: NewsCollectorFeed[]) => void
+}) {
+  const addOrReplace = () => {
+    const existingIndex = feeds.findIndex((feed) => isGelonghuiDirectFeed(feed) || isLegacyGelonghuiRssHubPreset(feed))
+    const directFeed = { ...GELONGHUI_DIRECT_FEED }
+
+    if (existingIndex === -1) {
+      onChange([...feeds, directFeed])
+      return
+    }
+
+    onChange(feeds.map((feed, index) => (index === existingIndex ? directFeed : feed)))
+  }
+
+  return (
+    <div className="mb-4 space-y-3 border-b border-border/60 pb-4">
+      <h4 className="text-[13px] font-medium">Built-in direct collection</h4>
+      <p className="text-[12px] leading-5 text-muted-foreground">
+        Collect Gelonghui live news directly with the built-in provider; no RSSHub URL is needed.
+      </p>
+      <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
+        <Button
+          type="button"
+          variant="outline"
+          aria-label="Add or replace built-in Gelonghui direct collection"
+          onClick={addOrReplace}
+        >
+          Add built-in collection · 格隆汇实时快讯
+        </Button>
+      </div>
+    </div>
+  )
+}
 
 function rssHubBaseUrl(value: string): string | null {
   try {
@@ -238,6 +297,7 @@ export function FeedsSection({
           : 'Add a feed to start collecting articles.'
       }
     >
+      <BuiltInGelonghuiSource feeds={feeds} onChange={onChange} />
       <RssHubPresets feeds={feeds} onChange={onChange} />
       {/* Existing feeds */}
       {feeds.length > 0 && (
