@@ -48,6 +48,7 @@ export const BASE_REQUIRED_FILES = [
 export const ASAR_REQUIRED_FILES = [
   'package.json',
   'dist/main.js',
+  'dist/worker-entry.js',
   'dist/electron/main.js',
   'dist/electron/preload.js',
   'dist/electron/web-relay.js',

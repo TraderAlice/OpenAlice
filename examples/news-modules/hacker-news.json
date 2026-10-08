@@ -1,0 +1,33 @@
+{
+  "manifest": {
+    "abiVersion": 1,
+    "moduleId": "community.hacker-news",
+    "version": "1.0.0",
+    "name": "Hacker News JSON",
+    "description": "Reads the public Hacker News Firebase API without RSS or trading credentials.",
+    "entry": "module.mjs",
+    "sources": [
+      {
+        "key": "topstories",
+        "name": "Top stories",
+        "parameters": [
+          {
+            "key": "limit",
+            "label": "Number of stories (1–50)",
+            "type": "number",
+            "required": false
+          },
+          {
+            "key": "baseUrl",
+            "label": "API base URL (optional; defaults to the public Firebase API)",
+            "type": "string",
+            "required": false
+          }
+        ]
+      }
+    ]
+  },
+  "files": {
+    "module.mjs": "export const newsModule = {\n  abiVersion: 1, moduleId: 'community.hacker-news', version: '1.0.0',\n  async collect({ sourceKey, params }, { signal }) {\n    if (sourceKey !== 'topstories') throw new Error('Unknown source');\n    const limit = params.limit ?? 20;\n    if (!Number.isInteger(limit) || limit < 1 || limit > 50) throw new Error('Limit must be 1–50');\n    const base = new URL(params.baseUrl ?? 'https://hacker-news.firebaseio.com/v0/');\n    if (!['http:', 'https:'].includes(base.protocol) || base.username || base.password) throw new Error('Invalid API base');\n    if (!base.pathname.endsWith('/')) base.pathname += '/';\n    async function json(path) {\n      const response = await fetch(new URL(path, base), { signal, redirect: 'error' });\n      if (!response.ok) throw new Error('API request failed');\n      return response.json();\n    }\n    const ids = await json('topstories.json');\n    if (!Array.isArray(ids) || !ids.every(Number.isSafeInteger)) throw new Error('Invalid story IDs');\n    const stories = await Promise.all(ids.slice(0, limit).map(id => json('item/' + id + '.json')));\n    return stories.filter(s => s && !s.deleted && !s.dead).map(s => {\n      if (!Number.isSafeInteger(s.id) || typeof s.title !== 'string' || !Number.isFinite(s.time)) throw new Error('Invalid story');\n      return { externalId: String(s.id), title: s.title, content: s.text ?? '', url: s.url ?? 'https://news.ycombinator.com/item?id=' + s.id, publishedAt: new Date(s.time * 1000).toISOString() };\n    });\n  }\n};\n"
+  }
+}

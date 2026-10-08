@@ -1,11 +1,20 @@
+import type { ModuleSelection, NewsSubscription } from '../../../../src/domain/news/modules/contract'
 import type { NewsCollectorConfig } from '../../api/types'
 
-export function createDemoNewsConfig(): NewsCollectorConfig {
+export type DemoNewsCollectorConfig = NewsCollectorConfig & {
+  modules: ModuleSelection[]
+  subscriptions: NewsSubscription[]
+}
+
+export function createDemoNewsConfig(): DemoNewsCollectorConfig {
   return {
     enabled: true,
     intervalMinutes: 10,
     maxInMemory: 2000,
     retentionDays: 7,
+    rsshubBaseUrl: 'http://127.0.0.1:1200',
+    modules: [],
+    subscriptions: [],
     feeds: [
       {
         name: 'Federal Reserve Press',

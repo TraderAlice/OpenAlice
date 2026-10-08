@@ -22,6 +22,9 @@ export interface NewsRecord {
 
 /** RSS feed configuration entry */
 export interface RSSFeedConfig {
+  id?: string
+  /** Relative RSSHub route; resolved against the collector instance URL. */
+  rsshubRoute?: string
   /** Human-readable name, e.g. "CoinDesk" */
   name: string
   /** RSS / Atom feed URL */
@@ -37,7 +40,7 @@ export interface RSSFeedConfig {
 }
 
 /** Discriminator for how a news item was ingested */
-export type IngestSource = 'rss'
+export type IngestSource = 'rss' | 'module'
 
 // ==================== News Provider Interface ====================
 

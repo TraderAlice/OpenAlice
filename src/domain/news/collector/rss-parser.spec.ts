@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { parseRSSXml, fetchAndParseFeed } from './rss-parser'
+import { parseRSSXml, fetchAndParseFeed, MAX_FEED_RESPONSE_BYTES } from './rss-parser'
 
 describe('parseRSSXml', () => {
   it('parses standard RSS 2.0 items', () => {
@@ -197,24 +197,16 @@ describe('parseRSSXml', () => {
   })
 
 })
-// ==================== fetchAndParseFeed ====================
-
-const MINIMAL_RSS = `<?xml version="1.0"?><rss version="2.0"><channel>
-  <item><title>Test</title><description>Body</description></item>
-</channel></rss>`
+const MINIMAL_RSS = '<rss><channel><item><title>Test</title><description>Body</description></item></channel></rss>'
 
 function mockOkResponse(body: string): Response {
-  return {
-    ok: true,
-    status: 200,
-    statusText: 'OK',
-    text: () => Promise.resolve(body),
-  } as unknown as Response
+  return new Response(body, { status: 200, headers: { 'Content-Type': 'application/xml' } })
 }
 
 function mockErrorResponse(status: number, statusText: string): Response {
-  return { ok: false, status, statusText, text: () => Promise.resolve('') } as unknown as Response
+  return new Response('', { status, statusText })
 }
+
 
 describe('fetchAndParseFeed', () => {
   afterEach(() => {
@@ -226,6 +218,24 @@ describe('fetchAndParseFeed', () => {
     const items = await fetchAndParseFeed('https://example.com/feed')
     expect(items).toHaveLength(1)
     expect(items[0].title).toBe('Test')
+  })
+
+  it('accepts a response exactly at the byte limit', async () => {
+    const body = ' '.repeat(MAX_FEED_RESPONSE_BYTES - Buffer.byteLength(MINIMAL_RSS)) + MINIMAL_RSS
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(mockOkResponse(body))
+    expect(await fetchAndParseFeed('https://example.com/feed')).toHaveLength(1)
+  })
+
+  it('cancels an over-limit response despite a deceptive Content-Length and does not retry', async () => {
+    let cancelled = false
+    const stream = new ReadableStream<Uint8Array>({
+      start(controller) { controller.enqueue(new Uint8Array(MAX_FEED_RESPONSE_BYTES + 1)) },
+      cancel() { cancelled = true },
+    })
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(stream, { headers: { 'content-length': '1' } }))
+    await expect(fetchAndParseFeed('https://example.com/feed', 1)).rejects.toThrow(/exceeds/)
+    expect(fetchSpy).toHaveBeenCalledTimes(1)
+    expect(cancelled).toBe(true)
   })
 
   it('retries once after a network failure and succeeds', async () => {

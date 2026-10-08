@@ -5,6 +5,7 @@ export const OPENALICE_INTERNAL_ROLES = [
   'alice',
   'uta',
   'connector',
+  'news-worker',
 ] as const
 
 export type OpenAliceInternalRole = typeof OPENALICE_INTERNAL_ROLES[number]

@@ -1,5 +1,5 @@
-import { headers } from './client'
-import type { AppConfig, Profile, Preset, PresetModel, Credential, SdkAdapterInfo, WireShape } from './types'
+import { fetchJson, headers } from './client'
+import type { AppConfig, NewsCollectorPresetsResponse, Profile, Preset, PresetModel, Credential, SdkAdapterInfo, WireShape } from './types'
 
 export interface ModelDiscoveryInput {
   vendor?: string
@@ -39,6 +39,10 @@ export const configApi = {
   },
 
   // ==================== Presets ====================
+  async getNewsPresets(signal?: AbortSignal): Promise<NewsCollectorPresetsResponse> {
+    return fetchJson<NewsCollectorPresetsResponse>('/api/config/news-presets', signal ? { signal } : undefined)
+  },
+
 
   async getPresets(): Promise<{ presets: Preset[] }> {
     const res = await fetch('/api/config/presets')

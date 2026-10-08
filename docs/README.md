@@ -43,6 +43,8 @@ GitHub navigation.
 | [[docs/uta-live-testing.md]] | [UTA live testing](uta-live-testing.md) | Real broker/demo acceptance scenarios and trading invariants |
 | [[docs/ibkr-wire-protocol.md]] | [IBKR wire protocol](ibkr-wire-protocol.md) | TWS/Gateway inbound framing, payload-only decoder contract, failure isolation, and verification |
 | [[docs/market-data-architecture.md]] | [Market data architecture](market-data-architecture.md) | TraderHub/reference data, BarService K-lines, and the private provider compatibility layer |
+| [[docs/news-sources.md]] | [News source catalog](news-sources.md) | Generated direct RSS/RSSHub inventory, initial subscription semantics, validation evidence, and regeneration |
+| [[docs/news-modules/sdd.md]] | [News modules](news-modules/sdd.md) | Trusted artifact ABI, exact approval, collection pipeline, lifecycle, RSSHub credentials, and runtime acceptance |
 
 Other files under `docs/images/` are README/product assets rather than owner
 guides.

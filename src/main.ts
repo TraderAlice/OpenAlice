@@ -12,7 +12,7 @@ import {
 // runs go through headless workspace dispatch (cron → workspace).
 import { loadConfig, readMarketDataConfig } from './core/config.js'
 import { printLegacyDataNotice } from './core/legacy-data-notice.js'
-import { userDataHome } from '@/core/paths.js'
+import { userDataHome, dataPath } from '@/core/paths.js'
 import { resolveLauncherRoot } from '@/workspaces/config.js'
 import type { Plugin, EngineContext } from './core/types.js'
 import { McpPlugin } from './server/mcp.js'
@@ -79,9 +79,12 @@ import { artifactConversationToolFactories } from './tool/conversation-artifacts
 import { createToolCallLog } from './core/tool-call-log.js'
 import { NewsCollectorStore, NewsCollector } from './domain/news/index.js'
 import { createNewsArchiveTools } from './tool/news.js'
+import { NewsModuleManager } from './domain/news/modules/manager.js'
+import { RssHubSecretStore } from './domain/news/modules/secrets.js'
 
 const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms))
 let runtimeLock: OpenAliceRuntimeLock | null = null
+let newsCollector: NewsCollector | null = null
 
 async function releaseRuntimeLock(): Promise<void> {
   const current = runtimeLock
@@ -89,7 +92,7 @@ async function releaseRuntimeLock(): Promise<void> {
   await current?.release()
 }
 
-async function main() {
+async function main(shutdownRequested: Promise<void>) {
   // Before migrations create the new config dir: if this checkout carries a
   // pre-global-root data/ store, tell the user how to adopt it (covers bare
   // `pnpm start`; guardian children get OPENALICE_HOME so this stays quiet).
@@ -262,9 +265,7 @@ async function main() {
   if (etfClient) {
     toolCenter.register(createEtfTools(etfClient), 'etf')
   }
-  if (config.news.enabled) {
-    toolCenter.register(createNewsArchiveTools(newsStore), 'rss')
-  }
+  toolCenter.register(createNewsArchiveTools(newsStore), 'rss')
   // v1 calculateIndicator (createAnalysisTools) is retired from the tool surface
   // — calculateQuant (v2, barId-keyed) supersedes it and the two descriptions
   // confused the model / bloated context. The code remains for now.
@@ -321,10 +322,6 @@ async function main() {
   // Snapshot scheduler lives in UTA after Step 6 — Alice no longer
   // drives the periodic equity-curve writes. The UTA service starts
   // its own scheduler at boot.
-
-  // ==================== News Collector ====================
-
-  let newsCollector: NewsCollector | null = null
 
   // ==================== Plugins ====================
 
@@ -418,21 +415,30 @@ async function main() {
   // Optional products actively install their own journal producer after the
   // shared Workspace service is ready. NanoAlice can omit News entirely; the
   // journal core never imports or starts the collector.
-  if (config.news.enabled && config.news.feeds.length > 0) {
-    const newsActivity = workspaceServiceRef.current?.activityJournal.registerFamily({
-      family: 'news',
-      types: ['news.ingested'] as const,
-    })
-    newsCollector = new NewsCollector({
-      store: newsStore,
-      feeds: config.news.feeds,
-      intervalMs: config.news.intervalMinutes * 60 * 1000,
-      ...(newsActivity ? {
-        onIngested: async (record) => {
-          await newsActivity.record('news.ingested', newsActivityPayload(record))
-        },
-      } : {}),
-    })
+  const newsActivity = workspaceServiceRef.current?.activityJournal.registerFamily({
+    family: 'news',
+    types: ['news.ingested'] as const,
+  })
+  newsCollector = new NewsCollector({
+    store: newsStore,
+    feeds: config.news.feeds,
+    rsshubBaseUrl: config.news.rsshubBaseUrl,
+    enabled: config.news.enabled,
+    intervalMs: config.news.intervalMinutes * 60 * 1000,
+    manager: new NewsModuleManager({ directory: dataPath('news-modules') }),
+    secrets: new RssHubSecretStore(dataPath('news-modules')),
+    modules: config.news.modules,
+    subscriptions: config.news.subscriptions,
+    ...(newsActivity ? {
+      onIngested: async (record) => {
+        await newsActivity.record('news.ingested', newsActivityPayload(record))
+      },
+    } : {}),
+  })
+  ctx.newsCollector = newsCollector
+  try { await newsCollector.initialize() }
+  catch { console.warn('news-collector: optional module startup unavailable; native RSS remains usable') }
+  if (config.news.enabled) {
     newsCollector.start()
     const activeCount = config.news.feeds.filter((f) => f.enabled !== false).length
     console.log(`news-collector: started (${activeCount}/${config.news.feeds.length} feeds active, every ${config.news.intervalMinutes}m)`)
@@ -448,19 +454,26 @@ async function main() {
 
   let stopped = false
   const shutdown = async () => {
+    if (stopped) return
     stopped = true
-    await removeCliEndpoint()
-    newsCollector?.stop()
-    for (const plugin of [...corePlugins, ...optionalPlugins.values()]) {
-      await plugin.stop()
-    }
-    await newsStore.close()
-    await toolCallLog.close()
-    await releaseRuntimeLock()
-    process.exit(0)
+    let exitCode = 0
+    try { await removeCliEndpoint() }
+    catch { exitCode = 1; console.error('engine: CLI endpoint cleanup failed') }
+    try { await newsCollector?.close() }
+    catch { exitCode = 1; console.error('news-collector: worker shutdown not confirmed; ownership retained for recovery') }
+    try {
+      for (const plugin of [...corePlugins, ...optionalPlugins.values()]) {
+        await plugin.stop()
+      }
+      await newsStore.close()
+      await toolCallLog.close()
+      if (exitCode === 0) await releaseRuntimeLock()
+    } catch { exitCode = 1; console.error('engine: shutdown failed; runtime ownership retained for recovery') }
+    process.exit(exitCode)
   }
   process.on('SIGINT', shutdown)
   process.on('SIGTERM', shutdown)
+  void shutdownRequested.then(shutdown)
 
   // ==================== Tick Loop ====================
 
@@ -470,6 +483,11 @@ async function main() {
 }
 
 export async function startAliceRuntime(): Promise<void> {
+  const shutdownRequested = new Promise<void>((resolveShutdown) => {
+    process.on('message', (message: unknown) => {
+      if (message && typeof message === 'object' && 'type' in message && message.type === 'openalice:shutdown') resolveShutdown()
+    })
+  })
   const guardianPid = positiveInteger(process.env['OPENALICE_GUARDIAN_PID'])
   const guardianStartedAt = positiveInteger(process.env['OPENALICE_GUARDIAN_STARTED_AT'])
   runtimeLock = await acquireOpenAliceRuntimeLocks({
@@ -485,11 +503,12 @@ export async function startAliceRuntime(): Promise<void> {
     },
   })
   try {
-    await main()
+    await main(shutdownRequested)
   } catch (err) {
-    await releaseRuntimeLock().catch((releaseErr) => {
-      console.error('runtime lock release failed after startup error:', releaseErr)
-    })
+    try {
+      await newsCollector?.close()
+      await releaseRuntimeLock()
+    } catch { console.error('engine: startup cleanup not confirmed; runtime ownership retained for recovery') }
     throw err
   }
 }
