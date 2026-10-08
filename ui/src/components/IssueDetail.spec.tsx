@@ -1,3 +1,4 @@
+import userEvent from '@testing-library/user-event'
 // @vitest-environment jsdom
 
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
@@ -421,9 +422,10 @@ describe('IssueDetail property controls', () => {
     render(<IssueDetail wsId="demo-ws-auto-quant" id="morning-scan" />)
 
     fireEvent.click(screen.getByRole('button', { name: 'Schedule settings' }))
-    const timeout = await screen.findByRole('combobox', { name: 'Run timeout' }) as HTMLSelectElement
-    expect(timeout.value).toBe('')
-    fireEvent.change(timeout, { target: { value: '30m' } })
+    const timeout = await screen.findByRole('combobox', { name: 'Run timeout' })
+    expect(timeout.textContent).toBe('No limit')
+    await userEvent.click(timeout)
+    await userEvent.click(await screen.findByRole('option', { name: '30m' }))
     expect(mocks.updateIssue).not.toHaveBeenCalled()
     fireEvent.click(screen.getByRole('button', { name: 'Save changes' }))
     await waitFor(() => {

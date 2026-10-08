@@ -1,4 +1,3 @@
-import { Collapsible, CollapsibleContent } from '../components/ui/collapsible'
 import { ConversationTranscriptItem } from '../components/conversation/ConversationTranscript'
 import aliceWave from '../../../default/stickers/alice-color/wave.png'
 import { layout, prepare } from '@chenglou/pretext'
@@ -116,7 +115,7 @@ function ComposerNotice({
     <div
       role={tone === 'error' ? 'alert' : 'status'}
       data-tone={tone}
-      className="oa-composer-notice mt-2 flex min-w-0 items-start gap-2.5 rounded-lg border px-3 py-2 text-[12px] leading-[18px] text-muted-foreground"
+      className="oa-composer-notice mt-2 flex min-w-0 items-start gap-2.5 rounded-lg border px-3 py-2 text-sm leading-5 text-muted-foreground"
     >
       <Icon
         aria-hidden
@@ -397,7 +396,7 @@ export function HarnessLandingPage({
               <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
                 <span>{t('chatLanding.agentMissing', { name: selectedInfo.displayName })}</span>
                 {installHint?.cmd && (
-                  <code className="select-all rounded-md bg-muted px-1.5 py-0.5 font-mono text-[11px] leading-[15px] text-foreground">
+                  <code className="select-all rounded-md bg-muted px-1.5 py-0.5 font-mono text-sm leading-5 text-foreground">
                     {installHint.cmd}
                   </code>
                 )}
@@ -444,24 +443,23 @@ export function HarnessLandingPage({
           alt=""
           aria-hidden="true"
           draggable={false}
-          className="oa-harness-hero-mark h-20 w-20 object-contain select-none sm:h-24 sm:w-24"
+          className="oa-harness-hero-mark size-16 object-contain select-none"
         />
-        <h1 className="oa-harness-title mt-3 max-w-[38rem] text-balance text-[24px] font-semibold leading-[30px] tracking-[-0.018em] text-foreground @min-[42rem]/harness:text-[28px] @min-[42rem]/harness:leading-[34px]">
+        <h1 className="oa-harness-title mt-3 max-w-[38rem] text-balance text-[24px] font-semibold leading-8 tracking-[-0.02em] text-foreground @min-[42rem]/harness:text-[28px] @min-[42rem]/harness:leading-9">
           {t(`${copyKey}.heading`)}
         </h1>
       </header>
 
-      <Collapsible open={showStarterIntents}>
-      <CollapsibleContent keepMounted
+      <div
         data-testid="harness-landing-suggestions"
         data-state={showStarterIntents ? 'visible' : 'hidden'}
         className="oa-harness-starters"
         aria-hidden={!showStarterIntents}
         inert={!showStarterIntents}
       >
-        <div className="pt-7">
+        <div className="pt-5">
         <div className="flex h-7 items-center justify-between px-1">
-          <span className="text-[12px] font-medium text-muted-foreground">
+          <span className="text-sm font-medium text-muted-foreground">
             {t(`${copyKey}.examplesLabel`)}
           </span>
           {mode === 'chat' && exampleGroups.length > 1 && (
@@ -506,8 +504,7 @@ export function HarnessLandingPage({
           })}
         </div>
         </div>
-      </CollapsibleContent>
-      </Collapsible>
+      </div>
       </>}
     </ConversationLayout>
   )

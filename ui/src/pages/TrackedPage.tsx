@@ -272,7 +272,7 @@ function GraphLoadError({ onRetry }: { onRetry: () => void }) {
     <div role="alert" className="mx-auto flex max-w-[520px] flex-col items-center px-6 py-16 text-center">
       <CircleAlert size={24} strokeWidth={1.75} className="text-destructive" aria-hidden />
       <h2 className="mt-3 text-[15px] font-medium text-foreground">{t('tracked.graph.loadErrorTitle')}</h2>
-      <p className="mt-1.5 text-[13px] leading-relaxed text-muted-foreground">{t('tracked.graph.loadErrorDescription')}</p>
+      <p className="mt-1.5 text-sm leading-relaxed text-muted-foreground">{t('tracked.graph.loadErrorDescription')}</p>
       <Button
         type="button"
         onClick={onRetry}
@@ -303,7 +303,7 @@ function CollectionLoadError({
       <h2 className="mt-3 text-[15px] font-medium text-foreground">
         {t('tracked.listLoadErrorTitle')}
       </h2>
-      <p className="mt-1.5 text-[13px] leading-relaxed text-muted-foreground">
+      <p className="mt-1.5 text-sm leading-relaxed text-muted-foreground">
         {t('tracked.listLoadErrorDescription')}
       </p>
       <Button
@@ -331,7 +331,7 @@ function StaleCollectionNotice({
   return (
     <div
       role="status"
-      className="mx-4 mt-4 flex items-center gap-2 rounded-md border border-warning/25 bg-warning/[0.06] px-3 py-2 text-[12px] leading-[18px] text-muted-foreground md:mx-8"
+      className="mx-4 mt-4 flex items-center gap-2 rounded-md border border-warning/25 bg-warning/[0.06] px-3 py-2 text-sm leading-5 text-muted-foreground md:mx-8"
     >
       <CircleAlert size={14} className="shrink-0 text-warning" aria-hidden />
       <span className="min-w-0 flex-1">{t('tracked.listStale')}</span>
@@ -360,7 +360,7 @@ function DetailLoadError({ name, onRetry }: { name: string; onRetry: () => void 
       <h2 className="mt-3 text-[15px] font-medium text-foreground">
         {t('tracked.detailLoadErrorTitle', { name })}
       </h2>
-      <p className="mt-1.5 text-[13px] leading-relaxed text-muted-foreground">
+      <p className="mt-1.5 text-sm leading-relaxed text-muted-foreground">
         {t('tracked.detailLoadErrorDescription')}
       </p>
       <Button
@@ -408,17 +408,17 @@ function Detail({ detail }: { detail: EntityDetail }) {
         <h2 className="min-w-0 break-words font-mono text-[18px] font-semibold leading-snug text-foreground sm:text-[20px]">
           {entity.name}
         </h2>
-        <span className="shrink-0 rounded-full bg-muted px-2 py-0.5 text-[11px] leading-[15px] font-medium text-muted-foreground">
+        <span className="shrink-0 rounded-full bg-muted px-2 py-0.5 text-sm leading-5 font-medium text-muted-foreground">
           {entity.type}
         </span>
       </div>
       <p className="text-[14px] text-muted-foreground leading-relaxed mb-6">{entity.description}</p>
 
-      <div className="mb-3 text-[12px] font-medium text-muted-foreground/70">
+      <div className="mb-3 text-sm font-medium text-muted-foreground/70">
         {t('tracked.referencedIn', { count: backlinks.length })}
       </div>
       {backlinks.length === 0 ? (
-        <div className="text-[13px] text-muted-foreground/70 italic">
+        <div className="text-sm text-muted-foreground/70 italic">
           No notes link <span className="font-mono">[[{entity.name}]]</span> yet.
         </div>
       ) : (
@@ -455,7 +455,7 @@ function IssueAnchorDetail({
           <div className="flex items-start gap-3">
             <ListChecks size={17} strokeWidth={1.8} className="mt-1 shrink-0 text-muted-foreground" aria-hidden />
             <div className="min-w-0 flex-1">
-              <div className="mb-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] leading-[15px] font-medium text-muted-foreground">
+              <div className="mb-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm leading-5 font-medium text-muted-foreground">
                 <span>{t('tracked.issue')}</span>
                 <span>{workspaceTag}</span>
                 <span className="font-mono">{issue.id}</span>
@@ -494,7 +494,7 @@ function IssueAnchorDetail({
 
 function IssueMetaPill({ children }: { children: React.ReactNode }) {
   return (
-    <span className="rounded-full border border-border/80 bg-background/70 px-2.5 py-1 text-[11px] leading-[15px] font-medium text-muted-foreground">
+    <span className="rounded-full border border-border/80 bg-background/70 px-2.5 py-1 text-sm leading-5 font-medium text-muted-foreground">
       {children}
     </span>
   )
@@ -581,14 +581,14 @@ function BacklinkRow({
         aria-hidden
       />
       <span className="min-w-0 flex-1">
-        <span className="block break-all font-mono text-[12px] leading-5 text-foreground sm:truncate sm:leading-normal">
+        <span className="block break-all font-mono text-sm leading-5 text-foreground sm:truncate sm:leading-normal">
           {label}
         </span>
-        <span className="mt-0.5 block break-all text-[11px] text-muted-foreground/60 sm:hidden">
+        <span className="mt-0.5 block break-all text-sm text-muted-foreground/60 sm:hidden">
           {backlink.workspaceTag}
         </span>
       </span>
-      <span className="hidden max-w-[35%] shrink-0 truncate text-[11px] text-muted-foreground/60 sm:block">
+      <span className="hidden max-w-[35%] shrink-0 truncate text-sm text-muted-foreground/60 sm:block">
         {backlink.workspaceTag}
       </span>
     </Button>

@@ -1,5 +1,6 @@
+import { Select } from '@/components/ui/select'
 import { useId, useMemo, useState } from 'react'
-import { ConfigSection, Field, SettingsScrollArea, inputClass } from '../components/form'
+import { ConfigSection, Field, SettingsScrollArea } from '../components/form'
 import { PageHeader } from '../components/PageHeader'
 import { SaveIndicator } from '../components/SaveIndicator'
 import { useWorkspaces } from '../contexts/workspaces-context'
@@ -36,11 +37,11 @@ export function IssueSettingsPage() {
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       <PageHeader title="Issue Settings" />
-      <SettingsScrollArea className="px-4 py-5 md:px-8">
-        <div className="mx-auto max-w-[880px]">
+      <SettingsScrollArea>
+        <div className="max-w-[880px]">
           <ConfigSection
             title="Default agent runtime"
-            description="Applied to scheduled and headless issue runs whose frontmatter omits an agent runtime."
+            help="Applied to scheduled and headless issue runs whose frontmatter omits an agent runtime."
           >
             <Field
               label="Agent runtime"
@@ -54,25 +55,18 @@ export function IssueSettingsPage() {
             >
               <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
                 <div className="relative flex-1">
-                  <AgentRuntimeIcon
-                    agentId={issueDefaultAgent ?? installationDefault?.id}
-                    className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground"
-                  />
-                  <select
+                  <Select
                     id={runtimeSelectId}
                     aria-describedby={runtimeDescriptionId}
                     value={issueDefaultAgent ?? ''}
                     disabled={status === 'saving'}
-                    onChange={(event) => void save(event.target.value || null)}
-                    className={`${inputClass} pl-9`}
-                  >
-                    <option value="">Use each Workspace default</option>
-                    {runtimeAgents.map((agent) => (
-                      <option key={agent.id} value={agent.id}>
-                        {agent.displayName}{agent.installed === false ? ' (missing)' : ''}
-                      </option>
-                    ))}
-                  </select>
+                    onValueChange={(selectedValue) => void save(selectedValue || null)}
+                    className="w-full"
+                    options={[
+                      { value: '', label: 'Use each Workspace default', icon: <AgentRuntimeIcon agentId={null} className="size-4" /> },
+                      ...runtimeAgents.map((agent) => ({ value: agent.id, label: `${agent.displayName}${agent.installed === false ? ' (missing)' : ''}`, icon: <AgentRuntimeIcon agentId={agent.id} className="size-4" /> })),
+                    ]}
+                  />
                 </div>
                 <SaveIndicator status={status} />
               </div>

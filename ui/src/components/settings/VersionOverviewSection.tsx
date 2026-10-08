@@ -1,5 +1,5 @@
 import { useEffect, useState, type ReactNode } from 'react'
-import { ArrowRight, BarChart3, ChevronDown, ExternalLink, FlaskConical, Folder, Info, LoaderCircle, MessageCircle, Monitor, RefreshCw, Server } from 'lucide-react'
+import { ArrowRight, ArrowUpCircle, CircleCheck, CircleAlert, CircleHelp, BarChart3, ExternalLink, FlaskConical, Folder, Info, LoaderCircle, MessageCircle, Monitor, RefreshCw, Server } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import type { Resources } from '../../i18n/locales/en'
 import { useUpdateLifecycle } from '../../hooks/useUpdateLifecycle'
@@ -7,8 +7,9 @@ import { projectSetupFailures, useSharedProjectWorkspaceSetup } from '../../hook
 import { useAliceProject } from '../../hooks/useAliceProject'
 import { getBackendConnection } from '../../auth/backendConnection'
 import { useBackendRecoverySignal } from '../../auth/AuthContext'
+import { ConfigSection } from '../form'
 import { Button } from '../ui/button'
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '../ui/collapsible'
+import { Collapsible, CollapsibleContent, CollapsibleDetailsTrigger } from '../ui/collapsible'
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '../ui/dialog'
 import { MachineUpgradeDialog } from './MachineUpgradeDialog'
 import { ProjectUpdateReview } from './ProjectUpdateReview'
@@ -79,25 +80,28 @@ export function VersionOverviewSection() {
     : backend?.decision?.status === 'blocked' ? text('needsAttention') : backend?.hasUpdate ? text('available') : backend?.updateAuthority === 'service' ? t('settings.about.status.serviceManaged')
       : backend?.updateAuthority === 'none' ? t('settings.about.status.noUpdater')
         : backend?.updateAuthority === 'source' ? text('sourceManaged') : backend?.decision?.status === 'current' ? text('current') : text('unknown')
-  const row = (kind: 'app' | 'backend' | 'project', icon: ReactNode, subtitle: string, identity: string, status: string, available: boolean, action: () => void, children?: ReactNode) => <section id={`settings-version-${kind}`} tabIndex={-1} className="min-w-0 scroll-mt-5 outline-none focus-visible:[box-shadow:var(--oa-focus-shadow)]">
-    <div className="grid grid-cols-[1.5rem_minmax(0,1fr)] items-center gap-x-3 gap-y-3 px-4 py-5 sm:grid-cols-[1.5rem_minmax(0,1fr)_auto] sm:px-5">
-      <div className={`self-start pt-0.5 ${available ? 'text-primary' : 'text-muted-foreground'}`} aria-hidden>{icon}</div>
-      <div className="min-w-0"><h3 className="text-sm font-semibold">{text(kind)}</h3><p className="mt-1 break-words text-xs text-muted-foreground">{subtitle}</p></div>
-      <div className="col-start-2 flex flex-wrap items-center gap-x-4 gap-y-2 sm:col-start-3 sm:row-start-1">
-        {identity && <span className="text-xs tabular-nums">{identity}</span>}
-        <span className={`flex items-center gap-1.5 text-xs ${available ? 'text-primary' : status === text('needsAttention') || status === text('checkFailed') ? 'text-warning' : 'text-muted-foreground'}`}><span className={`size-1.5 shrink-0 rounded-full ${available ? 'bg-primary' : status === text('current') ? 'bg-success' : 'bg-current'}`} aria-hidden />{status}</span>
+  const row = (kind: 'app' | 'backend' | 'project', icon: ReactNode, subtitle: ReactNode, identity: string, status: string, available: boolean, action: () => void, children?: ReactNode) => <section id={`settings-version-${kind}`} tabIndex={-1} className="min-w-0 scroll-mt-5 outline-none focus-visible:[box-shadow:var(--oa-focus-shadow)]">
+    <div className="grid grid-cols-[1.25rem_minmax(0,1fr)] items-center gap-x-3 gap-y-2 px-4 py-3 @2xl:grid-cols-[1.25rem_minmax(0,1fr)_8rem_10rem_6rem]">
+      <div className={`self-start pt-0.5 ${available ? 'text-info' : 'text-muted-foreground'}`} aria-hidden>{icon}</div>
+      <div className="min-w-0"><h3 className="text-sm font-semibold">{text(kind)}</h3><div className="mt-1 flex flex-wrap items-center gap-2 break-words text-sm text-muted-foreground">{subtitle}</div></div>
+      {identity && <span className="col-start-2 min-w-0 break-words text-sm tabular-nums @2xl:col-start-3 @2xl:row-start-1">{identity}</span>}
+      <span className={`col-start-2 flex items-start gap-1.5 text-sm @2xl:col-start-4 @2xl:row-start-1 ${available ? 'text-info' : status === text('needsAttention') || status === text('checkFailed') ? 'text-warning' : 'text-muted-foreground'}`}>
+        {available ? <ArrowUpCircle className="mt-0.5 size-4 shrink-0" aria-hidden /> : status === text('current') ? <CircleCheck className="mt-0.5 size-4 shrink-0 text-success" aria-hidden /> : status === text('needsAttention') || status === text('checkFailed') ? <CircleAlert className="mt-0.5 size-4 shrink-0" aria-hidden /> : <CircleHelp className="mt-0.5 size-4 shrink-0" aria-hidden />}
+        <span className="min-w-0">{status}</span>
+      </span>
+      <div className="col-start-2 flex items-center @2xl:col-start-5 @2xl:row-start-1 @2xl:justify-end">
         {(available || (kind === 'project' && activeOperation)) && <Button size="sm" onClick={action}>{activeOperation && kind === 'project' ? text('viewProgress') : text('viewUpdate')}</Button>}
-        {!available && kind !== 'project' && <Button variant="ghost" size="sm" aria-label={`${text(kind)} · ${text('details')}`} onClick={action}>{text('details')}</Button>}
+        {!available && kind !== 'project' && <Button variant="outline" size="sm" aria-label={`${text(kind)}: ${text('details')}`} onClick={action}>{text('details')}</Button>}
       </div>
     </div>{children}
   </section>
-  const projectDetails = <Collapsible open={expanded} onOpenChange={setExpanded}>
-    <CollapsibleTrigger render={<Button variant="ghost" size="sm" className="mb-3 ml-12 sm:ml-14" />}><ChevronDown className={`size-3.5 transition-transform motion-reduce:transition-none ${expanded ? '' : '-rotate-90'}`} />{text('projectDetails')}</CollapsibleTrigger>
-    <CollapsibleContent><div className="mx-4 mb-5 ml-12 space-y-4 border-l border-border pl-4 sm:mx-5 sm:ml-14">
-      {rows.map(item => <div key={item.kind} className="grid min-w-0 grid-cols-[1rem_minmax(0,1fr)] items-start gap-x-3 gap-y-2 sm:grid-cols-[1rem_minmax(0,1fr)_auto]">
+  const projectDetails = <Collapsible open={expanded} onOpenChange={setExpanded} className="mx-4 mb-3 ml-12">
+    <CollapsibleDetailsTrigger>{text('projectDetails')}</CollapsibleDetailsTrigger>
+    <CollapsibleContent><div className="space-y-4 border-l border-border pl-4 pt-4">
+      {rows.map(item => <div key={item.kind} className="grid min-w-0 grid-cols-[1rem_minmax(0,1fr)] items-start gap-x-3 gap-y-2 @2xl:grid-cols-[1rem_minmax(0,1fr)_8rem_10rem_6rem]">
         <span className="pt-0.5 text-muted-foreground" aria-hidden>{item.kind === 'chat' ? <MessageCircle className="size-4" /> : item.kind === 'auto-quant' ? <BarChart3 className="size-4" /> : <FlaskConical className="size-4" />}</span>
-        <div className="min-w-0"><p className="text-sm font-medium">{item.label}</p>{item.workspace && <p className="mt-1 break-words text-xs text-muted-foreground">{item.workspace.displayName || item.workspace.tag} · {text('defaultWorkspace')}</p>}</div>
-        <div className="col-start-2 flex flex-wrap items-center gap-2 text-xs sm:col-start-3 sm:row-start-1">{item.workspace && <span className="flex items-center gap-2 tabular-nums">{version(item.current)}{item.candidate && <><ArrowRight className="size-3 text-muted-foreground" /><span className="text-primary">{version(item.candidate)}</span></>}</span>}<span className={item.candidate ? 'text-primary' : 'text-muted-foreground'}>{item.status}</span></div>
+        <div className="min-w-0"><p className="text-sm font-medium">{item.label}</p>{item.workspace && <div className="mt-1 flex flex-wrap items-center gap-2 text-sm text-muted-foreground"><span>{item.workspace.displayName || item.workspace.tag}</span><span className="rounded-full bg-secondary px-2 py-0.5">{text('defaultWorkspace')}</span></div>}</div>
+        <div className="col-start-2 grid gap-x-3 gap-y-2 text-sm @2xl:col-start-3 @2xl:col-span-2 @2xl:row-start-1 @2xl:grid-cols-subgrid">{item.workspace && <span className="flex min-w-0 flex-wrap items-center gap-2 tabular-nums [overflow-wrap:anywhere]"><span className="min-w-0">{version(item.current)}</span>{item.candidate && <><ArrowRight className="size-3 text-muted-foreground" /><span className="min-w-0 text-info">{version(item.candidate)}</span></>}</span>}<span className={`flex items-start gap-1.5 ${item.status === text('waiting') || item.attention ? 'text-warning' : item.candidate ? 'text-info' : 'text-muted-foreground'}`}>{item.status === text('current') ? <CircleCheck className="mt-0.5 size-4 shrink-0 text-success" aria-hidden /> : item.status === text('waiting') || item.attention ? <CircleAlert className="mt-0.5 size-4 shrink-0" aria-hidden /> : item.candidate ? <ArrowUpCircle className="mt-0.5 size-4 shrink-0" aria-hidden /> : <CircleHelp className="mt-0.5 size-4 shrink-0" aria-hidden />}<span className="min-w-0">{item.status}</span></span></div>
         {item.error && <p role="alert" className="col-span-full break-words text-xs text-warning">{item.error}</p>}
       </div>)}
       {setupFailures.length > 0 && <Button variant="outline" size="sm" disabled={setup?.busy} onClick={() => { void setup?.retry() }}>{setup?.busy ? t('projectSetup.preparing') : t('common.retry')}</Button>}
@@ -105,11 +109,14 @@ export function VersionOverviewSection() {
       {updates.error && <p role="alert" className="break-words text-xs text-warning">{updates.error}</p>}
     </div></CollapsibleContent>
   </Collapsible>
-  return <section className="border-t border-border/60 py-7">
-    <div className="mb-5 flex flex-wrap items-center justify-between gap-3"><h2 id={VERSION_OVERVIEW_ID} tabIndex={-1} className="w-fit scroll-mt-5 rounded-sm text-lg font-semibold outline-none focus-visible:[box-shadow:var(--oa-focus-shadow)]">{text('title')}</h2><Button variant="ghost" size="sm" disabled={updates.checking} onClick={() => { void updates.refresh().catch(error => setLocalError(String(error))) }}><RefreshCw className={`size-3.5 ${updates.checking ? 'animate-spin motion-reduce:animate-none' : ''}`} />{text('checkAgain')}</Button></div>
-    <div className="divide-y divide-border/70 overflow-hidden rounded-lg border border-border/70">
+  return <ConfigSection title={text('title')} headingLevel={2} titleId={VERSION_OVERVIEW_ID} focusableTitle accessory={
+    <Button variant="ghost" size="sm" disabled={updates.checking} onClick={() => { void updates.refresh().catch(error => setLocalError(String(error))) }}>
+      <RefreshCw className={`size-4 ${updates.checking ? 'animate-spin motion-reduce:animate-none' : ''}`} />{text('checkAgain')}
+    </Button>
+  }>
+    <div className="@container divide-y divide-border/70 overflow-hidden rounded-xl border border-border/70 bg-background">
       {row('app', <Monitor className="size-5" />, window.openAlice?.updater ? text('desktop') : text('browser'), version(appVersion), appStatus, appAvailable, () => open(updates.nativeReady ? 'native-review' : 'app'))}
-      {row('backend', <Server className="size-5" />, `${machineName} · ${backendUnavailable ? text('offline') : text('connected')}`, version(backend?.current), integrated ? text('integrated') : backendStatus, Boolean(backend?.hasUpdate), integrated ? () => open(updates.nativeReady ? 'native-review' : 'app') : remote && backend?.hasUpdate ? () => reviewBackend() : () => open('backend'))}
+      {row('backend', <Server className="size-5" />, <><span>{machineName}</span><span className={`rounded-full px-2 py-0.5 ${backendUnavailable ? 'bg-warning/12 text-warning' : 'bg-success/10 text-success'}`}>{backendUnavailable ? text('offline') : text('connected')}</span></>, version(backend?.current), integrated ? text('integrated') : backendStatus, Boolean(backend?.hasUpdate), integrated ? () => open(updates.nativeReady ? 'native-review' : 'app') : remote && backend?.hasUpdate ? () => reviewBackend() : () => open('backend'))}
       {row('project', <Folder className="size-5" />, projectName, '', projectStatus, projectAvailable, () => open('project'), projectDetails)}
     </div>
     {localError && view === null && <p role="alert" className="mt-3 text-sm text-destructive">{localError}</p>}
@@ -139,7 +146,7 @@ export function VersionOverviewSection() {
         </div></>}
       </DialogContent>
     </Dialog>}
-  </section>
+  </ConfigSection>
 }
 function Fact({ label, value }: { label: string; value: string }) { return <div><dt className="text-xs text-muted-foreground">{label}</dt><dd className="mt-1 break-words text-sm font-medium">{value}</dd></div> }
 function ReviewRow({ title, detail }: { title: string; detail: string }) { return <div className="flex items-center gap-3 border-b border-border pb-4"><Info className="size-5 shrink-0 text-primary" /><div className="min-w-0"><p className="font-medium">{title}</p><p className="mt-1 break-words text-sm text-muted-foreground">{detail}</p></div></div> }

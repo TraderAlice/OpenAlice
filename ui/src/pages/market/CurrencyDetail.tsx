@@ -113,7 +113,7 @@ export function CurrencyDetail({ symbol, source }: Props) {
   if (!pair) {
     return (
       <div className="flex flex-col gap-3 min-h-0 flex-1">
-        <div className="rounded-lg border border-warning/30 bg-warning/5 px-3 py-2 text-[12px] leading-[18px] text-muted-foreground">
+        <div className="rounded-lg border border-warning/30 bg-warning/5 px-3 py-2 text-sm leading-5 text-muted-foreground">
           Open a six-letter currency pair such as EURUSD or USDJPY to use the FX workbench.
         </div>
         <div className="h-[420px] shrink-0">
@@ -133,7 +133,7 @@ export function CurrencyDetail({ symbol, source }: Props) {
             </div>
             <div className="mt-1 flex items-baseline gap-2">
               <span className="font-mono text-[26px] font-semibold text-foreground">{fmtFx(stats?.spot, pair)}</span>
-              <span className="text-[11px] text-muted-foreground">{stats?.asOf ?? (snapshot.loading ? 'loading price history…' : 'no price')}</span>
+              <span className="text-sm text-muted-foreground">{stats?.asOf ?? (snapshot.loading ? 'loading price history…' : 'no price')}</span>
             </div>
           </div>
           <div className="grid grid-cols-2 gap-x-6 gap-y-2 sm:grid-cols-5">
@@ -177,12 +177,12 @@ export function CurrencyDetail({ symbol, source }: Props) {
           {!globalMacro && !macroError ? (
             <div className="space-y-3 p-3"><Skeleton className="h-10 w-full" /><Skeleton className="h-10 w-full" /><Skeleton className="h-10 w-full" /></div>
           ) : macroError ? (
-            <p className="p-3 text-[12px] text-destructive">{macroError}</p>
+            <p className="p-3 text-sm text-destructive">{macroError}</p>
           ) : (
             <div>
               <div className="overflow-x-auto">
                 <div className="min-w-[430px]">
-                  <div className="grid grid-cols-[minmax(110px,1fr)_minmax(90px,1fr)_minmax(90px,1fr)_80px] border-b border-border/60 bg-muted/25 px-3 py-2 text-[11px] font-medium text-muted-foreground">
+                  <div className="grid grid-cols-[minmax(110px,1fr)_minmax(90px,1fr)_minmax(90px,1fr)_80px] border-b border-border/60 bg-muted/25 px-3 py-2 text-sm font-medium text-muted-foreground">
                     <span>Driver</span><span className="text-right">{pair.base}</span><span className="text-right">{pair.quote}</span><span className="text-right">Spread</span>
                   </div>
                   <MacroCompareRow label="Short rate" base={baseRow?.shortRate} quote={quoteRow?.shortRate} diff={rateDiff} cellSuffix="%" diffSuffix="pp" />
@@ -190,7 +190,7 @@ export function CurrencyDetail({ symbol, source }: Props) {
                   <MacroCompareRow label="Growth CLI" base={baseRow?.cli} quote={quoteRow?.cli} diff={cliDiff} cellSuffix="" diffSuffix="" />
                 </div>
               </div>
-              <div className="flex flex-wrap items-center justify-between gap-2 border-t border-border/60 px-3 py-2 text-[10px] leading-[14px] text-muted-foreground">
+              <div className="flex flex-wrap items-center justify-between gap-2 border-t border-border/60 px-3 py-2 text-sm leading-5 text-muted-foreground">
                 <span>{baseCountry?.label}{baseCountry?.proxy ? ` (${baseCountry.proxy})` : ''} vs {quoteCountry?.label}{quoteCountry?.proxy ? ` (${quoteCountry.proxy})` : ''}</span>
                 {pair.symbol.includes('USD') && dollar && (
                   <span>Broad USD {dollar.latest.toFixed(1)}, 20 obs {fmtPctSigned(dollar.changePct)}</span>
@@ -204,19 +204,19 @@ export function CurrencyDetail({ symbol, source }: Props) {
           title="Indicative carry curve"
           info="Covered-interest-parity estimate from OECD short-rate proxies. It excludes cross-currency basis, bid/ask, holidays and exact tenor curves; it is not an executable forward quote."
           right={rateDiff == null ? null : (
-            <span className={`text-[11px] font-medium ${rateDiff >= 0 ? 'text-success' : 'text-warning'}`}>
+            <span className={`text-sm font-medium ${rateDiff >= 0 ? 'text-success' : 'text-warning'}`}>
               {pair.base}–{pair.quote} {rateDiff >= 0 ? '+' : ''}{rateDiff.toFixed(2)}pp
             </span>
           )}
           contentClassName="p-0"
         >
           {forwards.length === 0 ? (
-            <p className="p-3 text-[12px] leading-relaxed text-muted-foreground">
+            <p className="p-3 text-sm leading-relaxed text-muted-foreground">
               Short-rate data is unavailable for one or both currencies. Price history remains usable; carry is left blank instead of guessed.
             </p>
           ) : (
             <table className="w-full text-caption">
-              <thead><tr className="border-b border-border/60 bg-muted/25 text-[11px] text-muted-foreground">
+              <thead><tr className="border-b border-border/60 bg-muted/25 text-sm text-muted-foreground">
                 <th className="px-3 py-2 text-left font-medium">Tenor</th><th className="px-3 py-2 text-right font-medium">Outright</th><th className="px-3 py-2 text-right font-medium">Forward points</th>
               </tr></thead>
               <tbody>{forwards.map((point) => (
@@ -237,7 +237,7 @@ export function CurrencyDetail({ symbol, source }: Props) {
       >
         <div className="grid grid-cols-1 gap-4 2xl:grid-cols-[auto_minmax(150px,220px)_minmax(180px,1fr)_minmax(210px,1fr)] 2xl:items-end">
           <div>
-            <label className="mb-1.5 block text-[11px] font-medium text-muted-foreground">Exposure side</label>
+            <label className="mb-1.5 block text-sm font-medium text-muted-foreground">Exposure side</label>
             <SegmentedControl
               value={side}
               options={[
@@ -249,18 +249,18 @@ export function CurrencyDetail({ symbol, source }: Props) {
             />
           </div>
           <label className="block">
-            <span className="mb-1.5 block text-[11px] font-medium text-muted-foreground">Notional ({pair.base})</span>
+            <span className="mb-1.5 block text-sm font-medium text-muted-foreground">Notional ({pair.base})</span>
             <input
               type="number"
               min="0"
               step="100000"
               value={notional}
               onChange={(event) => setNotional(event.target.value)}
-              className="oa-field-control min-h-8 w-full rounded-md border border-input bg-background px-2.5 font-mono text-[12px] leading-[18px] text-foreground outline-none"
+              className="oa-field-control min-h-8 w-full rounded-md border border-input bg-background px-2.5 font-mono text-base leading-5 text-foreground outline-none"
             />
           </label>
           <div>
-            <label className="mb-1.5 block text-[11px] font-medium text-muted-foreground">Pair move (pips)</label>
+            <label className="mb-1.5 block text-sm font-medium text-muted-foreground">Pair move (pips)</label>
             <div className="flex flex-wrap gap-1.5">
               {SHOCKS.map((shock) => (
                 <Button
@@ -270,7 +270,7 @@ export function CurrencyDetail({ symbol, source }: Props) {
                   onClick={() => setMovePips(String(shock))}
                   variant={Number(movePips) === shock ? 'secondary' : 'outline'}
                   size="sm"
-                  className="font-mono text-[11px] leading-[15px]"
+                  className="font-mono text-sm leading-5"
                 >
                   {shock > 0 ? '+' : ''}{shock}
                 </Button>
@@ -281,19 +281,19 @@ export function CurrencyDetail({ symbol, source }: Props) {
                 step="1"
                 value={movePips}
                 onChange={(event) => setMovePips(event.target.value)}
-                className="oa-field-control min-h-8 w-24 rounded-md border border-input bg-background px-2 text-right font-mono text-[11px] leading-[15px] text-foreground outline-none"
+                className="oa-field-control min-h-8 w-24 rounded-md border border-input bg-background px-2 text-right font-mono text-base leading-5 text-foreground outline-none"
               />
             </div>
           </div>
           <div className="border-l-2 border-primary/30 py-1 pl-3">
             <div className="flex items-end justify-between gap-3">
               <div>
-                <p className="text-[11px] font-medium text-muted-foreground">Estimated P&amp;L ({pair.quote})</p>
+                <p className="text-sm font-medium text-muted-foreground">Estimated P&amp;L ({pair.quote})</p>
                 <p className={`mt-0.5 font-mono text-[20px] font-semibold ${scenario && scenario.quotePnl >= 0 ? 'text-success' : 'text-destructive'}`}>
                   {scenario ? fmtPnl(scenario.quotePnl, pair.quote) : '—'}
                 </p>
               </div>
-              <div className="text-right text-[10px] text-muted-foreground">
+              <div className="text-right text-sm text-muted-foreground">
                 <p>spot {scenario ? fmtFx(scenario.shockedSpot, pair) : '—'}</p>
                 <p className="flex justify-end gap-2"><span>{scenario ? fmtPctSigned(scenario.movePercent) : '—'}</span><span>≈ {scenario ? fmtPnl(scenario.basePnlApprox, pair.base) : '—'}</span></p>
               </div>
@@ -303,7 +303,7 @@ export function CurrencyDetail({ symbol, source }: Props) {
       </Card>
 
       <div className="flex flex-wrap items-center gap-2 pb-2">
-        <span className="mr-1 text-[11px] font-medium text-muted-foreground">Continue analysis</span>
+        <span className="mr-1 text-sm font-medium text-muted-foreground">Continue analysis</span>
         <DeskLink label="Global Macro" onClick={() => openOrFocus({ kind: 'market-board', params: { board: 'global-macro' } })} />
         <DeskLink label="US Macro" onClick={() => openOrFocus({ kind: 'market-board', params: { board: 'macro' } })} />
         <DeskLink label="Fed" onClick={() => openOrFocus({ kind: 'market-board', params: { board: 'fed' } })} />
@@ -315,9 +315,9 @@ export function CurrencyDetail({ symbol, source }: Props) {
 function FxMetric({ label, value, subvalue }: { label: string; value: string; subvalue?: string }) {
   return (
     <div className="min-w-0">
-      <p className="text-[11px] font-medium text-muted-foreground">{label}</p>
+      <p className="text-sm font-medium text-muted-foreground">{label}</p>
       <p className="mt-0.5 truncate font-mono text-caption font-medium text-foreground">{value}</p>
-      {subvalue && <p className="truncate text-[9px] text-muted-foreground">{subvalue}</p>}
+      {subvalue && <p className="truncate text-sm text-muted-foreground">{subvalue}</p>}
     </div>
   )
 }
@@ -331,7 +331,7 @@ function MacroCompareRow({ label, base, quote, diff, cellSuffix, diffSuffix }: {
   diffSuffix: string
 }) {
   return (
-    <div className="grid grid-cols-[minmax(110px,1fr)_minmax(90px,1fr)_minmax(90px,1fr)_80px] items-center border-b border-border/50 px-3 py-2.5 text-[12px] leading-[18px] last:border-0">
+    <div className="grid grid-cols-[minmax(110px,1fr)_minmax(90px,1fr)_minmax(90px,1fr)_80px] items-center border-b border-border/50 px-3 py-2.5 text-sm leading-5 last:border-0">
       <span className="font-medium text-foreground">{label}</span>
       <span className="text-right font-mono text-foreground" title={base?.date ?? 'No data'}>{fmtCell(base, cellSuffix)}</span>
       <span className="text-right font-mono text-foreground" title={quote?.date ?? 'No data'}>{fmtCell(quote, cellSuffix)}</span>

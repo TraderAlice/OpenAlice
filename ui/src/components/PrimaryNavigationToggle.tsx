@@ -28,7 +28,7 @@ export function PrimaryNavigationToggle({ collapsed, onToggle, ref }: {
   return (
     <Tooltip>
       <TooltipTrigger render={
-        <Button ref={ref} variant="ghost" size="icon-sm" onClick={onToggle}
+        <Button ref={ref} variant="ghost" size="icon" onClick={onToggle}
           aria-label={label} aria-expanded={!collapsed} aria-controls="activity-bar"
           className="shrink-0 cursor-pointer text-muted-foreground aria-expanded:not-hover:bg-transparent aria-expanded:not-hover:text-muted-foreground" />
       }>

@@ -10,7 +10,6 @@ import { SidebarSectionHeader } from './SidebarSectionHeader'
 import { SidebarRowsSkeleton } from './StateViews'
 import type { EntityListItem } from '../api/entities'
 import type { ViewSpec } from '../tabs/types'
-import { SelectionIndicator } from './SelectionIndicator'
 
 /**
  * Tracked sidebar — the watchlist. Global assets/topics and Workspace-owned
@@ -98,7 +97,7 @@ export function TrackedSidebar({
 
   if (!hasRows && (listError || issueError)) {
     return (
-      <div className="flex items-start gap-2 px-3 py-4 text-[12px] leading-relaxed text-muted-foreground">
+      <div className="flex items-start gap-2 px-3 py-4 text-sm leading-relaxed text-muted-foreground">
         <CircleAlert size={14} className="mt-0.5 shrink-0 text-destructive" aria-hidden />
         <span>{t('tracked.listLoadErrorTitle')}</span>
       </div>
@@ -107,7 +106,7 @@ export function TrackedSidebar({
 
   if (!hasRows) {
     return (
-      <div className="px-3 py-4 text-[12px] text-muted-foreground/70 leading-relaxed">
+      <div className="px-3 py-4 text-sm text-muted-foreground/70 leading-relaxed">
         {t('tracked.nothingTrackedYet')}
       </div>
     )
@@ -187,7 +186,7 @@ export function TrackedSidebar({
 
 function SectionCount({ count }: { count: number }) {
   return (
-    <span className="rounded-full bg-muted px-1.5 py-0.5 text-[10px] leading-[14px] font-medium tabular-nums text-muted-foreground/65">
+    <span className="rounded-full bg-muted px-1.5 py-0.5 text-sm leading-5 font-medium tabular-nums text-muted-foreground/65">
       {count}
     </span>
   )
@@ -218,13 +217,12 @@ function TrackedEntityRow({
           onClick()
         }
       }}
-      className={`group relative mb-0.5 grid min-h-[38px] grid-cols-[20px_minmax(0,1fr)_auto] items-center gap-2 rounded-md px-2.5 py-1.5 outline-none transition-colors ${
+      className={`group relative mb-(--oa-row-gap) grid min-h-[38px] grid-cols-[20px_minmax(0,1fr)_auto] items-center gap-2 rounded-md px-2.5 py-1.5 outline-none transition-colors ${
         active
           ? 'bg-sidebar-accent text-sidebar-accent-foreground'
           : 'text-muted-foreground hover:bg-accent hover:text-foreground focus-visible:bg-accent'
       }`}
     >
-      {active && <SelectionIndicator />}
       <span
         className="flex h-5 w-5 items-center justify-center text-muted-foreground/70 transition-colors group-hover:text-foreground"
         aria-hidden
@@ -235,7 +233,7 @@ function TrackedEntityRow({
       <span className="min-w-0">
         {display.prefix ? (
           <span className="flex min-w-0 items-baseline gap-1.5">
-            <span className="shrink-0 font-mono text-[10px] leading-[14px] font-semibold text-muted-foreground/60">
+            <span className="shrink-0 font-mono text-sm leading-5 font-semibold text-muted-foreground/60">
               {display.prefix}
             </span>
             <span className={`truncate text-[12.5px] ${active ? 'font-semibold text-foreground' : 'font-medium'}`}>
@@ -251,7 +249,7 @@ function TrackedEntityRow({
 
       {entity.backlinkCount > 0 && (
         <span
-          className={`min-w-[20px] rounded-full px-1.5 py-0.5 text-center text-[10px] leading-[14px] font-medium tabular-nums ${
+          className={`min-w-[20px] rounded-full px-1.5 py-0.5 text-center text-sm leading-5 font-medium tabular-nums ${
             active ? 'bg-background/75 text-muted-foreground' : 'bg-muted/70 text-muted-foreground/65'
           }`}
           title={t('tracked.backlinksTooltip', { count: entity.backlinkCount })}
@@ -279,13 +277,12 @@ function TrackedIssueRow({
       data-tracked-entity={`issue:${anchor.workspaceId}:${anchor.issue.id}`}
       onClick={onClick}
       title={`${anchor.issue.title} — ${anchor.workspaceTag}`}
-      className={`group relative mb-0.5 grid min-h-[38px] w-full grid-cols-[20px_minmax(0,1fr)_auto] items-center gap-2 rounded-md px-2.5 py-1.5 text-left outline-none transition-colors ${
+      className={`group relative mb-(--oa-row-gap) grid min-h-[38px] w-full grid-cols-[20px_minmax(0,1fr)_auto] items-center gap-2 rounded-md px-2.5 py-1.5 text-left outline-none transition-colors ${
         active
           ? 'bg-sidebar-accent text-sidebar-accent-foreground'
           : 'text-muted-foreground hover:bg-accent hover:text-foreground focus-visible:bg-accent'
       }`}
     >
-      {active && <SelectionIndicator />}
       <span
         className="flex h-5 w-5 items-center justify-center text-muted-foreground/70 transition-colors group-hover:text-foreground"
         aria-hidden
@@ -293,7 +290,7 @@ function TrackedIssueRow({
         <ListChecks size={13} strokeWidth={1.8} />
       </span>
       <span className="flex min-w-0 items-baseline gap-1.5">
-        <span className="shrink-0 font-mono text-[10px] leading-[14px] font-semibold text-muted-foreground/60">
+        <span className="shrink-0 font-mono text-sm leading-5 font-semibold text-muted-foreground/60">
           {anchor.workspaceTag}
         </span>
         <span className={`truncate text-[12.5px] ${active ? 'font-semibold text-foreground' : 'font-medium'}`}>

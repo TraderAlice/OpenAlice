@@ -136,7 +136,7 @@ describe('ActivityBarUtilityMenu', () => {
 it('uses the blue avatar breadcrumb for setup failures without claiming an available update', async () => {
   mocks.guidance = { availableCount: 0, needsAttentionCount: 0, setupCount: 1 }
   const { rerender } = render(<ActivityBarUtilityMenu compactRail denseRail={false} onOpenSettings={vi.fn()} onOpenConnectors={vi.fn()} />)
-  expect(screen.getByRole('status', { name: 'projectSetup.title' }).className).toContain('bg-primary')
+  expect(screen.getByRole('status', { name: 'projectSetup.title' }).className).toContain('bg-info/12')
   await userEvent.setup().click(screen.getByRole('button', { name: 'Alice’s Settings: Open application menu' }))
   expect(screen.getByRole('menuitem', { name: /Settings.*projectSetup.title/ })).toBeTruthy()
   expect(screen.queryByLabelText('1 updates available')).toBeNull()

@@ -3,6 +3,7 @@
 @import "shadcn/tailwind.css";
 @import "./theme/palette.css";
 @import "./theme/style-profiles.css";
+@import "./theme/motion.css";
 
 @font-face {
   font-family: "Instrument Sans Variable";
@@ -22,6 +23,9 @@
   --color-card-foreground: var(--card-foreground);
   --color-popover: var(--popover);
   --color-popover-foreground: var(--popover-foreground);
+  --color-action: var(--action);
+  --color-action-foreground: var(--action-foreground);
+  --color-action-hover: var(--action-hover);
   --color-primary: var(--primary);
   --color-primary-foreground: var(--primary-foreground);
   --color-secondary: var(--secondary);
@@ -75,12 +79,12 @@
   --color-office-label: var(--office-label);
   --color-office-label-foreground: var(--office-label-foreground);
 
-  /* OpenAlice is a dense workbench: Tailwind's default 14px `text-sm` makes
-     shared controls and overlays compete with page titles. Keep the familiar
-     20px reading rhythm while aligning the global body/control size to the
-     semantic `.text-body` token below. */
-  --text-sm: 13px;
+  --text-xs: 14px;
+  --text-xs--line-height: 20px;
+  --text-sm: 14px;
   --text-sm--line-height: 20px;
+  --text-base: 16px;
+  --text-base--line-height: 24px;
 }
 
 @theme {
@@ -89,9 +93,7 @@
   --font-mono: "SF Mono", "Fira Code", "Cascadia Code", Menlo, Consolas,
     monospace;
 
-  /* Shared workbench geometry. Composer and drawer silhouettes keep their
-     dedicated larger radii at the component boundary. */
-  --radius-sm: 5px;
+  --radius-sm: 6px;
   --radius-md: 8px;
   --radius-lg: 10px;
   --radius-xl: 12px;
@@ -101,16 +103,19 @@
 
 /* Base resolution (no attribute / explicit light). */
 :root {
-  --motion-fast: 110ms;
-  --motion-standard: 160ms;
-  --motion-slow: 250ms;
-  --motion-ease-out: cubic-bezier(0.22, 1, 0.36, 1);
-  --motion-ease-standard: cubic-bezier(0.2, 0, 0, 1);
-  --motion-ease-drawer: var(--motion-ease-out);
+  --page-inset: 24px;
+  --oa-control-height: 36px;
+  --oa-nav-height: 32px;
+  --oa-panel-inset: 16px;
+  --oa-row-gap: 4px;
   --oa-control-hover-border: color-mix(in srgb, var(--foreground) 18%, transparent);
   --oa-control-focus-border: color-mix(in srgb, var(--foreground) 28%, transparent);
-  --oa-focus-ring: color-mix(in srgb, var(--foreground) 46%, transparent);
-  --oa-focus-shadow: 0 0 0 1px var(--oa-focus-ring);
+  --oa-focus-ring: var(--foreground);
+  --oa-focus-shadow: 0 0 0 2px var(--background), 0 0 0 4px var(--oa-focus-ring);
+}
+
+@media (max-width: 767px) {
+  :root { --page-inset: 16px; }
 }
 
 /* Japanese gets a JP-first sans stack so shared Han characters render in
@@ -118,7 +123,7 @@
    would pick (Han unification). Scoped via <html lang="ja">, which the locale
    store keeps in sync. */
 :root:lang(ja) {
-  --font-sans: "Instrument Sans Variable",
+  --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI",
     "Hiragino Kaku Gothic ProN", "Hiragino Sans", "Yu Gothic", "YuGothic",
     "Meiryo", "Noto Sans JP", sans-serif;
 }
@@ -128,7 +133,7 @@
    the default stack would pick. Scoped via <html lang="zh-Hant"> — region-
    neutral (serves both Taiwan and Hong Kong Traditional readers). */
 :root:lang(zh-Hant) {
-  --font-sans: "Instrument Sans Variable",
+  --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI",
     "PingFang TC", "Microsoft JhengHei", "Noto Sans TC",
     "Noto Sans CJK TC", sans-serif;
 }
@@ -143,8 +148,8 @@ body {
   background: var(--app-background-wash), var(--background);
   color: var(--foreground);
   font-family: var(--font-sans);
-  font-size: 14px;
-  line-height: 20px;
+  font-size: 16px;
+  line-height: 24px;
   overflow: hidden;
   text-rendering: optimizeLegibility;
   transition:
@@ -173,25 +178,41 @@ body {
   background: color-mix(in srgb, var(--info) 70%, var(--muted-foreground));
 }
 
-/* Expanded desktop navigation has one inset per hierarchy level. Keep these
-   density rules out of the compact rail and touch navigation. */
-@media (pointer: coarse) {
-  .oa-sidebar-child-row { min-height: 40px; }
+@media (max-width: 767px), (pointer: coarse) {
+  :root { --oa-control-height: 44px; --oa-nav-height: 44px; }
+}
+.oa-primary-nav-row {
+  min-height: var(--oa-nav-height);
+  gap: 8px;
+  padding: 6px 10px;
+  font-size: 14px;
+  line-height: 20px;
+}
+.oa-navigation-icon {
+  display: flex;
+  flex: 0 0 16px;
+  width: 16px;
+  height: 16px;
+  align-items: center;
+  justify-content: center;
+}
+.oa-navigation-icon > svg { width: 16px; height: 16px; }
+.oa-harness-nav-children {
+  margin-inline-start: 24px;
+}
+.oa-harness-nav-children:empty { display: none; }
+.oa-harness-nav-children > .oa-sidebar-child-row,
+.oa-harness-nav-children > [data-slot="collapsible"] > .oa-sidebar-child-row {
+  margin-inline: 0;
+}
+.oa-harness-nav-children > .oa-sidebar-child-row:last-child {
+  margin-block-end: 0;
+}
+.oa-harness-nav-header:has(+ .oa-harness-nav-children:empty) {
+  margin-block-end: 0;
 }
 @media (min-width: 768px) and (hover: hover) and (pointer: fine) {
-  #activity-bar:not([data-rail-layout="compact"]) .oa-nav-item {
-    min-height: 30px;
-    padding-inline: 8px;
-    gap: 8px;
-  }
-  #activity-bar .oa-harness-nav-header { min-height: 30px; }
   #activity-bar .oa-harness-nav-actions > button { height: 28px; }
-  #activity-bar .oa-harness-nav-children { margin-left: 8px; padding-bottom: 4px; }
-  #activity-bar .oa-harness-nav-children .oa-sidebar-child-row {
-    margin-inline: 0;
-    min-height: 30px;
-    padding-block: 4px;
-  }
 }
 
 @media (hover: hover) and (pointer: fine) {
@@ -223,26 +244,6 @@ body {
 :root:not([data-ui-style="win98"]) .oa-field-control[aria-invalid="true"]:focus-visible {
   border-color: color-mix(in srgb, var(--destructive) 64%, var(--border));
   box-shadow: 0 0 0 1px color-mix(in srgb, var(--destructive) 42%, transparent);
-}
-
-:root:not([data-ui-style="win98"]) select.oa-field-control {
-  appearance: none;
-  padding-right: 2rem;
-  background-image:
-    linear-gradient(45deg, transparent 46%, var(--muted-foreground) 46% 54%, transparent 54%),
-    linear-gradient(-45deg, transparent 46%, var(--muted-foreground) 46% 54%, transparent 54%);
-  background-position:
-    calc(100% - 0.8125rem) 50%,
-    calc(100% - 0.5625rem) 50%;
-  background-repeat: no-repeat;
-  background-size: 0.375rem 0.375rem;
-}
-
-@media (forced-colors: active) {
-  :root:not([data-ui-style="win98"]) select.oa-field-control {
-    appearance: auto;
-    background-image: none;
-  }
 }
 
 :where(button:disabled, [role="button"][aria-disabled="true"]) {
@@ -279,19 +280,38 @@ body {
     box-shadow var(--motion-fast) var(--motion-ease-out);
 }
 
-:where(.oa-pressable, .oa-nav-item, .oa-nav-row):focus-visible {
+.oa-nav-row,
+.oa-sidebar-child-row,
+.oa-harness-nav-header {
+  margin-block-end: var(--oa-row-gap);
+}
+
+:where(.oa-nav-item, .oa-nav-row):focus-visible {
+  outline: none;
+  box-shadow: inset 0 0 0 2px var(--oa-focus-ring);
+}
+
+:where(.oa-pressable):focus-visible {
   outline: none;
   box-shadow: var(--oa-focus-shadow);
 }
 
-.oa-data-surface {
-  border-color: color-mix(in srgb, var(--foreground) 9%, transparent);
-  background: color-mix(in srgb, var(--card) 94%, var(--background));
+@media (forced-colors: active) {
+  :root :focus-visible {
+    outline: 2px solid CanvasText;
+    outline-offset: 2px;
+  }
+}
+
+:root[data-ui-style="default"] .oa-data-surface {
+  border: 1px solid var(--oa-surface-border, transparent);
+  background: var(--oa-surface-background, var(--secondary));
+  box-shadow: var(--oa-surface-shadow, none);
 }
 
 .oa-data-surface-header {
   border-color: color-mix(in srgb, var(--foreground) 7%, transparent);
-  background: color-mix(in srgb, var(--secondary) 38%, transparent);
+  background: transparent;
 }
 
 .oa-chart {
@@ -302,21 +322,18 @@ body {
   outline: none;
 }
 
+.oa-chart-tooltip {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--popover);
+  color: var(--popover-foreground);
+}
+
 .oa-chart .recharts-default-tooltip,
 .oa-chart-tooltip {
-  border: 1px solid color-mix(in srgb, var(--foreground) 10%, transparent) !important;
-  border-radius: var(--radius-lg) !important;
-  background: color-mix(in srgb, var(--popover) 96%, transparent) !important;
-  color: var(--popover-foreground) !important;
   box-shadow:
     0 1px 2px color-mix(in srgb, var(--shadow-color) 8%, transparent),
     0 8px 24px color-mix(in srgb, var(--shadow-color) 12%, transparent);
-}
-
-.oa-chart .recharts-default-tooltip {
-  padding: 0.375rem 0.625rem !important;
-  font-size: 0.75rem !important;
-  line-height: 1rem !important;
 }
 
 .oa-chart .recharts-tooltip-cursor {
@@ -348,25 +365,6 @@ body {
   color: var(--destructive);
 }
 
-.oa-demo-banner {
-  background: color-mix(in srgb, var(--secondary) 78%, var(--background));
-  border-color: color-mix(in srgb, var(--foreground) 7%, transparent);
-  box-shadow: inset 0 -1px 0 color-mix(in srgb, var(--shadow-color) 4%, transparent);
-}
-
-.oa-demo-install {
-  background: color-mix(in srgb, var(--card) 72%, transparent);
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--foreground) 7%, transparent);
-  transition:
-    background-color var(--motion-fast) var(--motion-ease-out),
-    box-shadow var(--motion-fast) var(--motion-ease-out);
-}
-
-.oa-demo-install:hover {
-  background: color-mix(in srgb, var(--card) 90%, var(--secondary));
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--foreground) 11%, transparent);
-}
-
 .oa-harness-context-tray {
   background: color-mix(in srgb, var(--secondary) 86%, var(--card));
   box-shadow:
@@ -379,30 +377,13 @@ body {
 }
 
 .oa-harness-composer-shell {
-  background: color-mix(in srgb, var(--card) 94%, transparent);
-  backdrop-filter: blur(16px);
-  box-shadow:
-    0 0 0 1px color-mix(in srgb, var(--shadow-color) 4%, transparent),
-    0 2px 8px color-mix(in srgb, var(--shadow-color) 4%, transparent),
-    0 14px 52px color-mix(in srgb, var(--shadow-color) 8%, transparent),
-    inset 0 1px 0 color-mix(in srgb, var(--foreground) 4%, transparent);
-  transition:
-    box-shadow var(--motion-fast) var(--motion-ease-out);
+  background: var(--card);
+  box-shadow: 0 0 0 1px var(--border), 0 4px 20px color-mix(in srgb, var(--shadow-color) 5%, transparent);
+  transition: box-shadow var(--motion-fast) var(--motion-ease-out);
 }
 
 .oa-harness-composer-shell:focus-within {
-  box-shadow:
-    0 0 0 1px color-mix(in srgb, var(--shadow-color) 5%, transparent),
-    0 2px 8px color-mix(in srgb, var(--shadow-color) 5%, transparent),
-    0 16px 58px color-mix(in srgb, var(--shadow-color) 10%, transparent),
-    inset 0 1px 0 color-mix(in srgb, var(--foreground) 6%, transparent);
-}
-
-@supports (corner-shape: superellipse(1.5)) {
-  .oa-harness-context-tray,
-  .oa-harness-composer-shell {
-    corner-shape: superellipse(1.5);
-  }
+  box-shadow: 0 0 0 2px var(--foreground), 0 6px 24px color-mix(in srgb, var(--shadow-color) 6%, transparent);
 }
 
 .oa-chat-new-action {
@@ -445,11 +426,9 @@ body {
     opacity: 0;
     pointer-events: none;
     transform: scale(0.96);
-    visibility: hidden;
     transition:
       opacity var(--motion-fast) var(--motion-ease-out),
-      transform var(--motion-fast) var(--motion-ease-out),
-      visibility 0s linear var(--motion-fast);
+      transform var(--motion-fast) var(--motion-ease-out);
   }
 
   .oa-session-row:hover .oa-session-overflow-action,
@@ -457,8 +436,6 @@ body {
     opacity: 1;
     pointer-events: auto;
     transform: none;
-    visibility: visible;
-    transition-delay: 0s;
   }
 
   .oa-session-state-action {
@@ -499,7 +476,7 @@ body {
 }
 
 @media (hover: hover) and (pointer: fine) {
-  .oa-pressable:active:not(:disabled):not([aria-disabled="true"]) {
+  .oa-pressable:active:not(:focus-visible):not(:disabled):not([aria-disabled="true"]):not([aria-haspopup]) {
     transform: scale(0.98);
   }
 
@@ -660,39 +637,30 @@ body {
   animation: oa-backdrop-enter var(--motion-standard) ease-out both;
 }
 
-/* Page-owned navigators become touch surfaces inside the phone drawer.
-   A 40px height floor removes the old 18–28px rows; icon controls keep 36px
-   of horizontal room so adjacent workspace names remain distinguishable. */
 .oa-page-sidebar-dialog :is(button, [role="button"]) {
-  min-height: 2.5rem;
+  min-height: 2.75rem;
 }
 
 .oa-page-sidebar-dialog button:has(svg) {
-  min-width: 2.25rem;
+  min-width: 2.75rem;
 }
 
-/* Workspace tree controls stay compact for a fine pointer, but touch-capable
-   desktop/tablet layouts must not collapse them back into 20px hit targets. */
 @media (hover: none), (pointer: coarse) {
   .oa-workspace-row-action {
-    min-width: 2.25rem;
-    min-height: 2.25rem;
-  }
-
-  .oa-workspace-context-item {
-    min-height: 2.5rem;
+    min-width: 2.75rem;
+    min-height: 2.75rem;
   }
 
   .oa-harness-context-tray :is(button, [role="button"]),
   .oa-harness-composer :is(button, [role="button"]),
   .oa-harness-starters .oa-icon-action {
-    min-height: 2.25rem;
+    min-height: 2.75rem;
   }
 
   .oa-harness-context-tray .oa-icon-action,
   .oa-harness-composer .oa-icon-action,
   .oa-harness-starters .oa-icon-action {
-    min-width: 2.25rem;
+    min-width: 2.75rem;
   }
 }
 
@@ -700,7 +668,7 @@ body {
   input:not([type="checkbox"]):not([type="radio"]),
   select
 ) {
-  min-height: 2.5rem;
+  min-height: 2.75rem;
 }
 
 .oa-disclosure-enter {
@@ -745,19 +713,19 @@ body {
    - .text-micro    badges, timestamps, table metadata */
 
 .text-display {
-  @apply text-[28px] leading-[34px] font-bold tabular-nums md:text-[36px] md:leading-[42px];
+  @apply text-[32px] leading-[38px] font-semibold tracking-[-0.025em] tabular-nums md:text-[40px] md:leading-[48px];
 }
 .text-title {
-  @apply text-[16px] leading-[22px] font-semibold;
+  @apply text-[24px] leading-[30px] font-semibold tracking-[-0.02em];
 }
 .text-body {
-  @apply text-[13px] leading-5;
+  @apply text-base;
 }
 .text-caption {
-  @apply text-[12px] leading-[18px];
+  @apply text-sm;
 }
 .text-micro {
-  @apply text-[11px] leading-[15px];
+  @apply text-sm tabular-nums;
 }
 
 /* One chrome row for navigator and working view. Body descriptions are not
@@ -832,9 +800,9 @@ body {
   flex-wrap: wrap;
   align-items: center;
   gap: 4px 8px;
-  min-height: 40px;
-  padding: 4px 12px;
-  border-bottom: 1px solid var(--border);
+  min-height: 44px;
+  padding: 4px 16px;
+  border-bottom: 1px solid transparent;
   color: var(--foreground);
 }
 .oa-topbar-leading { display: flex; flex: 0 0 auto; align-items: center; gap: 4px; }
@@ -842,10 +810,16 @@ body {
 .oa-topbar-identity { display: flex; flex: 1 1 6rem; min-width: 0; align-items: center; gap: 8px; }
 .oa-topbar-actions { display: flex; flex: 0 1 auto; max-width: 100%; min-width: 0; flex-wrap: wrap; align-items: center; gap: 4px; }
 .oa-topbar-actions > div { max-width: 100%; flex-wrap: wrap; }
-.oa-topbar [data-slot="button"] { min-height: 28px; }
+.oa-topbar[data-heading="page"] { min-height: 44px; padding: 4px var(--page-inset); }
+.oa-topbar[data-heading="page"] h2 { font-size: 18px; line-height: 24px; letter-spacing: -0.01em; }
+.oa-desktop-mac .oa-topbar[data-heading="page"],
+:root[data-window-chrome="windows"] .oa-topbar[data-heading="page"] { min-height: 44px; padding-block: 4px; }
+.oa-desktop-mac .oa-topbar[data-heading="page"] h2,
+:root[data-window-chrome="windows"] .oa-topbar[data-heading="page"] h2 { font-size: 18px; line-height: 24px; }
 @media (max-width: 767px), (pointer: coarse) {
   .oa-topbar { min-height: 48px; }
-  .oa-topbar [data-slot="button"] { min-height: 40px; }
+  .oa-topbar[data-heading="page"] { min-height: 56px; padding: 6px var(--page-inset); }
+  .oa-topbar[data-heading="page"] h2 { font-size: 18px; line-height: 24px; }
 }
 
 /* ==================== Live-data pulse ====================
@@ -867,30 +841,6 @@ body {
   border-radius: inherit;
   background: var(--primary);
   animation: session-running-sweep 2.8s ease-in-out infinite;
-}
-
-@keyframes live-pulse {
-  0%, 100% {
-    opacity: 0.55;
-    transform: scale(0.92);
-  }
-  50% {
-    opacity: 1;
-    transform: scale(1.08);
-  }
-}
-.live-pulse {
-  animation: live-pulse 2.4s ease-in-out infinite;
-}
-.live-pulse::after {
-  content: '';
-  position: absolute;
-  inset: -3px;
-  border-radius: 9999px;
-  background: var(--success);
-  opacity: 0.3;
-  animation: live-pulse 2.4s ease-in-out infinite;
-  animation-delay: 0.3s;
 }
 
 @keyframes onboarding-slide-forward {
@@ -1072,26 +1022,25 @@ html[lang="ja"] .oa-onboarding-title {
   }
 }
 
-/* Skeleton placeholder — theme-aware shimmer for first-load states. The block
-   is the tertiary surface (reads on both the page bg and bg-secondary cards); a
-   soft overlay band sweeps across at an ambient cadence (sibling to live-pulse's
-   2.4s, a touch quicker so it reads as "loading" without feeling anxious). Size
-   + radius come from the element's own utility classes. Honors reduced motion. */
 @keyframes skeleton-sweep {
-  0% { background-position: 200% 0; }
-  100% { background-position: -200% 0; }
+  from { transform: translateX(-100%); }
+  to { transform: translateX(100%); }
 }
 .skeleton {
-  background-color: var(--muted);
-  background-image: linear-gradient(
-    90deg,
-    transparent 0%,
-    var(--accent-strong) 50%,
-    transparent 100%
-  );
-  background-size: 200% 100%;
-  background-repeat: no-repeat;
-  animation: skeleton-sweep 1.6s ease-in-out infinite;
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+  background: var(--muted);
+}
+.skeleton::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--foreground) 5%, transparent), transparent);
+  animation: skeleton-sweep var(--shimmer-dur) var(--motion-ease-standard) infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .skeleton::after { animation: none; display: none; }
 }
 @media (prefers-reduced-motion: reduce) {
   .oa-onboarding-slide-forward,
@@ -1107,8 +1056,6 @@ html[lang="ja"] .oa-onboarding-title {
     opacity: 0.7;
   }
   .oa-session-running-line::after,
-  .live-pulse,
-  .live-pulse::after,
   .thinking-dot,
   .message-enter,
   .page-fade-in,
@@ -1151,45 +1098,6 @@ html[lang="ja"] .oa-onboarding-title {
   .oa-nav-item:hover .oa-nav-icon {
     transform: none;
   }
-}
-
-/* ==================== Button utility classes ==================== */
-
-.btn-primary {
-  @apply px-4 py-2 text-[13px] leading-[18px] font-medium rounded-md
-    bg-primary border border-primary text-primary-foreground
-    hover:bg-primary/90 transition-[color,background-color,border-color,box-shadow,transform] duration-[var(--motion-fast)] active:scale-[0.98]
-    disabled:opacity-40 disabled:cursor-default cursor-pointer
-    focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-2 focus-visible:ring-offset-background;
-}
-
-.btn-secondary {
-  @apply px-4 py-2 text-[13px] leading-[18px] font-medium rounded-md border border-border text-muted-foreground
-    hover:bg-muted hover:text-foreground transition-[color,background-color,border-color,box-shadow,transform] duration-[var(--motion-fast)] active:scale-[0.98]
-    disabled:opacity-40 disabled:cursor-default cursor-pointer
-    focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-2 focus-visible:ring-offset-background;
-}
-
-.btn-danger {
-  @apply px-4 py-2 text-[13px] leading-[18px] font-medium rounded-md border border-destructive/30 text-destructive
-    hover:bg-destructive/10 transition-[color,background-color,border-color,box-shadow,transform] duration-[var(--motion-fast)] active:scale-[0.98]
-    disabled:opacity-40 disabled:cursor-default cursor-pointer
-    focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-destructive/40 focus-visible:ring-offset-2 focus-visible:ring-offset-background;
-}
-
-.btn-primary-sm {
-  @apply px-3 py-1.5 text-xs leading-4 font-medium rounded-md
-    bg-primary border border-primary text-primary-foreground
-    hover:bg-primary/90 transition-[color,background-color,border-color,box-shadow,transform] duration-[var(--motion-fast)] active:scale-[0.98]
-    disabled:opacity-40 disabled:cursor-default cursor-pointer
-    focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-1 focus-visible:ring-offset-background;
-}
-
-.btn-secondary-sm {
-  @apply px-3 py-1.5 text-xs leading-4 font-medium rounded-md border border-border text-muted-foreground
-    hover:bg-muted hover:text-foreground transition-[color,background-color,border-color,box-shadow,transform] duration-[var(--motion-fast)] active:scale-[0.98]
-    disabled:opacity-40 disabled:cursor-default cursor-pointer
-    focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-1 focus-visible:ring-offset-background;
 }
 
 /* Native scrollbars stay subtle and gain contrast under the pointer. */
@@ -1298,7 +1206,7 @@ html[lang="ja"] .oa-onboarding-title {
   border-radius: 7px;
   background: var(--background);
   padding: 12px 14px;
-  font-size: 13px;
+  font-size: var(--text-sm);
   line-height: 1.6;
   tab-size: 2;
 }
@@ -1727,7 +1635,7 @@ html[lang="ja"] .oa-onboarding-title {
   }
 }
 .message-enter {
-  animation: fadeSlideIn 0.3s ease-out;
+  animation: fadeSlideIn var(--motion-standard) var(--motion-ease-out);
 }
 
 /* Page transition animation */
@@ -1740,7 +1648,7 @@ html[lang="ja"] .oa-onboarding-title {
   }
 }
 .page-fade-in {
-  animation: pageFadeIn 150ms ease-out;
+  animation: pageFadeIn var(--motion-fast) var(--motion-ease-out);
 }
 
 /* Code block wrapper for copy button */
@@ -1756,7 +1664,7 @@ html[lang="ja"] .oa-onboarding-title {
   border-bottom: none;
   border-radius: 6px 6px 0 0;
   padding: 4px 8px 4px 12px;
-  font-size: 12px;
+  font-size: var(--text-sm);
   color: var(--muted-foreground);
   font-family: var(--font-mono);
 }
@@ -1768,7 +1676,7 @@ html[lang="ja"] .oa-onboarding-title {
   border: none;
   color: var(--muted-foreground);
   cursor: pointer;
-  font-size: 12px;
+  font-size: var(--text-sm);
   padding: 2px 6px;
   border-radius: 4px;
   transition: color 0.15s, background 0.15s;
@@ -1844,12 +1752,52 @@ html[lang="ja"] .oa-onboarding-title {
   }
 }
 
-/* Base UI owns measurement and mount lifetime; hidden panels leave the tab order. */
+.oa-disclosure-trigger {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: calc(100% + 16px);
+  min-height: 44px;
+  margin-inline: -8px;
+  padding: 10px 8px;
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--muted) 35%, transparent);
+  color: var(--foreground);
+  font-size: var(--text-sm);
+  font-weight: 500;
+  line-height: 1.5;
+  text-align: start;
+  list-style: none;
+  outline: none;
+  transition: background-color var(--motion-fast) var(--motion-ease-out);
+}
+.oa-disclosure-trigger::-webkit-details-marker { display: none; }
+.oa-disclosure-trigger:focus-visible { box-shadow: var(--oa-focus-shadow); }
+.oa-disclosure-trigger:disabled { opacity: 0.5; }
+.oa-disclosure-trigger:active { background: var(--muted); }
+@media (hover: hover) {
+  .oa-disclosure-trigger:hover { background: var(--muted); }
+}
+.oa-disclosure-chevron {
+  flex: 0 0 16px;
+  width: 16px;
+  height: 16px;
+  color: var(--muted-foreground);
+  transition: transform var(--motion-standard) var(--motion-ease-out);
+}
+.oa-disclosure-trigger[aria-expanded="true"] > .oa-disclosure-chevron,
+details[open] > .oa-disclosure-trigger > .oa-disclosure-chevron { transform: rotate(90deg); }
+.oa-disclosure-trigger:focus-visible > .oa-disclosure-chevron,
+[data-slot="collapsible"][data-instant] > .oa-disclosure-trigger > .oa-disclosure-chevron { transition: none; }
+
 .oa-collapsible-panel {
   height: var(--collapsible-panel-height);
   overflow: hidden;
   opacity: 1;
-  transition: height 180ms var(--motion-ease-out), opacity 180ms var(--motion-ease-out);
+  transition: height var(--motion-standard) var(--motion-ease-out), opacity var(--motion-standard) var(--motion-ease-out);
+}
+[data-slot="collapsible"][data-instant] > .oa-collapsible-panel {
+  transition: none;
 }
 .oa-collapsible-panel[data-starting-style],
 .oa-collapsible-panel[data-ending-style] {
@@ -1874,17 +1822,17 @@ html[lang="ja"] .oa-onboarding-title {
   background: var(--muted);
   color: var(--foreground);
   text-decoration: none;
-  font-size: 13px;
+  font-size: var(--text-sm);
   line-height: 1.5;
 }
 .markdown-file-type {
   flex: none;
   color: var(--muted-foreground);
-  font-size: 10px;
+  font-size: var(--text-sm);
   font-weight: 600;
 }
 .markdown-file-label { display: grid; min-width: 0; }
-.markdown-file-label > span { color: var(--muted-foreground); font-size: 12px; }
+.markdown-file-label > span { color: var(--muted-foreground); font-size: var(--text-sm); }
 .markdown-content a.markdown-file-image { display: block; width: fit-content; max-width: 100%; }
 .markdown-content a.markdown-file-image img {
   display: block;
@@ -1916,35 +1864,80 @@ html[lang="ja"] .oa-onboarding-title {
 .oa-notification {
   position: relative;
   width: 100%;
-  padding: 12px;
+  padding: 16px;
   border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
+  border-radius: var(--radius-2xl);
   background: var(--popover);
   color: var(--popover-foreground);
   font-family: var(--font-sans);
   box-shadow: 0 4px 14px color-mix(in srgb, var(--foreground) 9%, transparent);
 }
-.oa-notification-header { display: flex; align-items: center; gap: 7px; padding-right: 24px; font-size: 12px; line-height: 20px; }
+.oa-notification-header { display: flex; align-items: center; gap: 8px; padding-right: 32px; font-size: 14px; line-height: 20px; }
 .oa-notification-title { min-width: 0; font-weight: 600; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
 .oa-notification-icon { width: 16px; height: 16px; flex-shrink: 0; color: var(--info); }
 .oa-notification[data-status="success"] .oa-notification-icon { color: var(--success); }
 .oa-notification[data-status="warning"] .oa-notification-icon { color: var(--warning); }
 .oa-notification[data-status="error"] .oa-notification-icon { color: var(--destructive); }
 .oa-notification[data-status="neutral"] .oa-notification-icon { color: var(--muted-foreground); }
-.oa-notification-count { color: var(--muted-foreground); font-size: 11px; flex-shrink: 0; font-variant-numeric: tabular-nums; }
-.oa-notification-close { position: absolute; right: 6px; top: 6px; display: grid; place-items: center; width: 28px; height: 28px; border: 0; border-radius: var(--radius-sm); background: transparent; color: var(--muted-foreground); cursor: pointer; }
-.oa-notification-close:hover { background: var(--accent); color: var(--foreground); }
+.oa-notification-count { color: var(--muted-foreground); font-size: 14px; flex-shrink: 0; font-variant-numeric: tabular-nums; }
+.oa-notification-close { position: absolute; right: 6px; top: 6px; color: var(--muted-foreground); }
 .oa-notification-body { display: flex; align-items: flex-start; gap: 10px; }
 .oa-notification:has(.oa-notification-description, .oa-notification-action, .oa-notification-image) .oa-notification-body { margin-top: 8px; }
 .oa-notification-copy { min-width: 0; flex: 1; }
-.oa-notification-description { margin: 0; font-size: 13px; font-weight: 500; line-height: 20px; overflow-wrap: anywhere; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.oa-notification-description { margin: 0; font-size: 14px; font-weight: 400; line-height: 20px; overflow-wrap: anywhere; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 .oa-notification-image { flex-shrink: 0; width: 64px; height: 48px; border-radius: 6px; object-fit: cover; border: 1px solid var(--border); }
-.oa-notification-action { display: inline-flex; align-items: center; gap: 4px; border: 0; background: transparent; color: var(--primary); font-family: inherit; font-size: 12px; font-weight: 500; line-height: 20px; margin-top: 8px; padding: 0; min-height: 24px; cursor: pointer; }
-.oa-notification-action:hover { text-decoration: underline; }
-.oa-notification-close:focus-visible, .oa-notification-action:focus-visible { outline: 2px solid var(--ring); outline-offset: 3px; }
+.oa-notification-action { margin-top: 12px; }
+@media (pointer: coarse) {
+  .oa-notification-header { min-height: 28px; padding-right: 40px; }
+}
 /* Demo/update chrome sits above the normal workbench header. Office has its
    own explicit offsets in office.css and remains authoritative there. */
 body:has([data-desktop-banner]):not(:has(.oa-office-main)) [data-sonner-toaster] { --offset-top: 88px !important; }
 @media (max-width: 767px) {
   [data-sonner-toaster] { --mobile-offset-top: 96px !important; }
+}
+
+.oa-harness-starters {
+  opacity: 1;
+  visibility: visible;
+  transition: opacity var(--motion-fast) var(--motion-ease-out), visibility var(--motion-fast);
+}
+.oa-harness-starters[data-state="hidden"] {
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+}
+.conversation-shell:has(textarea:focus-visible) .oa-harness-starters {
+  transition: none;
+}
+
+:root[data-ui-style="default"] .oa-config-section {
+  border: 1px solid var(--oa-surface-border, transparent);
+  background: var(--oa-surface-background, var(--secondary));
+  box-shadow: var(--oa-surface-shadow, none);
+}
+:root[data-ui-style="default"] .oa-config-section + .oa-config-section { margin-top: 16px; }
+
+.oa-segmented-option {
+  position: relative;
+  isolation: isolate;
+  transition: scale var(--motion-standard) var(--motion-ease-out), background-color var(--motion-fast) var(--motion-ease-out);
+}
+.oa-segmented-option::before {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  inset: 0;
+  border-radius: inherit;
+  background: var(--foreground);
+  visibility: hidden;
+  scale: 0.94;
+  transition: scale var(--motion-standard) var(--motion-ease-out);
+}
+.oa-segmented-option[data-pressed]::before { visibility: visible; scale: 1; }
+.oa-segmented-option:active { scale: 0.97; transition-duration: var(--motion-fast); }
+.oa-segmented-option:focus-visible,
+.oa-segmented-option:focus-visible::before { transition: none; scale: 1; }
+@media (prefers-reduced-motion: reduce) {
+  .oa-segmented-option, .oa-segmented-option::before { transition: none; scale: 1; }
 }

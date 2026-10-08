@@ -14,7 +14,6 @@ import {
   FlaskConical,
   LayoutDashboard,
   Monitor,
-  Languages,
   LineChart,
   ListChecks,
   Newspaper,
@@ -74,7 +73,6 @@ const CATEGORY_GROUPS = [
     items: [
       { labelKey: 'settings.category.general', category: 'general', Icon: LayoutDashboard },
       { labelKey: 'settings.machines.title', category: 'machines', Icon: Monitor },
-      { labelKey: 'settings.language.title', category: 'language', Icon: Languages },
       { labelKey: 'pet.title', category: 'pet', Icon: Ghost },
       { labelKey: 'settings.category.issues', category: 'issues', Icon: ListChecks },
       { labelKey: 'settings.category.beta', category: 'beta', Icon: FlaskConical },
@@ -162,13 +160,13 @@ export function SettingsCategoryList({ onSelect }: { onSelect?: () => void }) {
           <SidebarSectionHeader>{t(group.labelKey)}</SidebarSectionHeader>
           {group.items.map((item) => {
             const active =
-              focused?.kind === 'settings' && focused.params.category === item.category
+              focused?.kind === 'settings' && (focused.params.category === 'language' ? 'general' : focused.params.category) === item.category
             return (
               <SidebarRow
                 key={item.category}
                 label={t(item.labelKey)}
                 active={active}
-                icon={<item.Icon size={14} strokeWidth={1.75} className="text-muted-foreground/70" aria-hidden />}
+                icon={<item.Icon size={18} strokeWidth={1.75} className="text-muted-foreground" aria-hidden />}
                 trail={item.category === 'general' ? <><UpdateGuidanceBadge count={guidance?.availableCount ?? 0} setupCount={guidance?.setupCount ?? 0} /><UpdateGuidanceBadge count={guidance?.needsAttentionCount ?? 0} tone="attention" /></> : undefined}
                 onClick={() => {
                   navigate(item.category === 'general' ? '/settings' : `/settings/${item.category}`)
@@ -184,10 +182,10 @@ export function SettingsCategoryList({ onSelect }: { onSelect?: () => void }) {
         <SidebarRow
           label={t('settings.group.developer')}
           active={developerActive && !developerExpanded}
-          icon={<Code2 size={14} strokeWidth={1.75} className="text-muted-foreground/70" aria-hidden />}
+          icon={<Code2 size={18} strokeWidth={1.75} className="text-muted-foreground" aria-hidden />}
           trail={(
             <ChevronRight
-              size={14}
+              size={18}
               strokeWidth={1.75}
               aria-hidden
               className={`text-muted-foreground transition-transform motion-reduce:transition-none ${developerExpanded ? 'rotate-90' : ''}`}
@@ -208,7 +206,7 @@ export function SettingsCategoryList({ onSelect }: { onSelect?: () => void }) {
             id={DEVELOPER_GROUP_ID}
             role="group"
             aria-label={t('settings.group.developer')}
-            className="ml-5 border-l border-border/70 pl-1"
+            className="ml-4 pl-1"
           >
             {DEVELOPER_ITEMS.map((item) => {
               const active = developerTab === item.tab
@@ -217,7 +215,7 @@ export function SettingsCategoryList({ onSelect }: { onSelect?: () => void }) {
                   key={item.tab}
                   label={t(item.labelKey)}
                   active={active}
-                  icon={<item.Icon size={14} strokeWidth={1.75} className="text-muted-foreground/70" aria-hidden />}
+                  icon={<item.Icon size={18} strokeWidth={1.75} className="text-muted-foreground" aria-hidden />}
                   onClick={() => {
                     navigate(`/settings/developer/${item.tab}`)
                     onSelect?.()

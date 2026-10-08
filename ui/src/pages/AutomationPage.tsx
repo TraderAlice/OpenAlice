@@ -27,7 +27,7 @@ export function AutomationPage({ spec }: AutomationPageProps) {
       />
       <div
         data-testid="automation-scroll-region"
-        className="flex-1 flex flex-col min-h-0 overflow-y-auto px-4 md:px-6 py-5"
+        className="flex-1 flex flex-col min-h-0 overflow-y-auto px-[var(--page-inset)] py-5"
       >
         <div className="flex-1 min-h-0">
           {section === 'api' ? <AutomationApiSection /> : <AutomationRunsSection />}
