@@ -117,7 +117,14 @@ can be known while its switching mode or effort levels remain unknown.
 
 `AIProvider.resolveModel(id)` is the shared credential-scoped local resolution
 boundary for runtime injection and metadata. It reads the same validated catalog
-snapshot without starting network I/O; absent caches use bundled facts. Stored
+snapshot without starting network I/O; absent caches use bundled facts.
+Pi also projects the available models from that same local credential catalog
+into its existing provider registration. Each model receives its own known
+context/reasoning facts; only the selected model receives Session overrides.
+The scalar Session model remains the default, including a manually entered ID
+absent from the catalog. Successful empty catalogs stay empty except for that
+explicit selection. Launch does not refresh the catalog, duplicate credentials,
+or rewrite unrelated native providers. Other adapters keep scalar injection. Stored
 credentials and Session selection formats are unchanged. Anthropic capability
 objects, Google thinking/token limits, and OpenRouter directory extensions are
 normalized by discovery before caching. Provider request parameters do not imply
