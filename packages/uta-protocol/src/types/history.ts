@@ -29,7 +29,12 @@ export interface HistoryContract {
   multiplier?: string
 }
 
-export type OrderHistoryStatus = 'submitted' | 'filled' | 'cancelled' | 'rejected' | 'user-rejected'
+/** Order lifecycle as a history row reads it. Deliberately the same vocabulary as
+ *  `OperationStatus` (types/git.ts): every verdict a commit can record needs a
+ *  history spelling. `'unconfirmed'` is a write abandoned while the broker call was
+ *  still outstanding — the order MAY be live, so a reader must reconcile it against
+ *  broker state, never present it as a definite rejection or as success. */
+export type OrderHistoryStatus = 'submitted' | 'filled' | 'cancelled' | 'rejected' | 'user-rejected' | 'unconfirmed'
 
 export type OrderHistorySource = 'alice' | 'external'
 
