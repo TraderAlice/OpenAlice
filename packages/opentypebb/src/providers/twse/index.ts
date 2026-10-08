@@ -18,6 +18,7 @@ import { YFinanceEquityHistoricalFetcher } from '../yfinance/models/equity-histo
 import { TWSEEquitySearchFetcher } from './models/equity-search.js'
 import { TWSEEquityQuoteFetcher } from './models/equity-quote.js'
 import { TWSEKeyMetricsFetcher } from './models/key-metrics.js'
+import { TWSECalendarDividendFetcher } from './models/calendar-dividend.js'
 import { TWSEEquityInfoFetcher } from './models/equity-info.js'
 
 export const twseProvider = new Provider({
@@ -26,7 +27,7 @@ export const twseProvider = new Provider({
   description:
     'Taiwan Stock Exchange + TPEx (上市/上櫃) — official free open data: ' +
     'Chinese/English search, daily quotes, key metrics (P/E·yield·P/B), company ' +
-    'profiles. K-lines via Yahoo (.TW/.TWO).',
+    'profiles, and current TWSE cash-dividend calendar (listed only; no history). K-lines via Yahoo (.TW/.TWO).',
   website: 'https://www.twse.com.tw/',
   vendorMeta: {
     coverage: 'Taiwan equities — TWSE listed (.TW) + TPEx OTC (.TWO).',
@@ -40,6 +41,7 @@ export const twseProvider = new Provider({
     EquityQuote: TWSEEquityQuoteFetcher,
     KeyMetrics: TWSEKeyMetricsFetcher,
     EquityInfo: TWSEEquityInfoFetcher,
+    CalendarDividend: TWSECalendarDividendFetcher,
     EquityHistorical: YFinanceEquityHistoricalFetcher,
   },
 })
