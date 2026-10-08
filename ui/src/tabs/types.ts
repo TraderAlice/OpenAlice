@@ -170,3 +170,60 @@ export function getFocusedTab(state: WorkspaceState): Tab | null {
   if (!group?.activeTabId) return null
   return state.tabs[group.activeTabId] ?? null
 }
+
+/**
+ * Map a ViewSpec to the ActivitySection highlighted in the ActivityBar.
+ * Page-owned sidebars keep the highlight in sync while the app shell stays
+ * unaware of each surface's local navigation.
+ *
+ * `uta-detail` and `trading-as-git` are Trading navigator leaves. Account
+ * detail still lives under /settings/uta/:id for historical reasons;
+ * Trading as Git keeps /trading-as-git. Both highlight the Trading rail item.
+ */
+export function specToSection(spec: ViewSpec): ActivitySection {
+  switch (spec.kind) {
+    case 'quick-start':        return 'quick-start'
+    case 'inbox':              return 'inbox'
+    case 'tracked':            return 'tracked'
+    case 'tracked-issue-detail': return 'tracked'
+    case 'chat-landing':       return 'chat'
+    case 'auto-quant-landing': return 'auto-quant'
+    case 'auto-prediction-landing': return 'prediction'
+    case 'harness-surface':    return spec.params.source
+    case 'workspace-manager':  return 'chat'
+    case 'workspace-details': return spec.params.source
+    case 'workspace':
+      return spec.params.source === 'chat'
+        ? 'chat'
+        : spec.params.source === 'auto-quant'
+          ? 'auto-quant'
+          : spec.params.source === 'prediction' ? 'prediction' : 'chat'
+    case 'file-viewer':
+      return spec.params.source === 'chat'
+        ? 'chat'
+        : spec.params.source === 'auto-quant'
+          ? 'auto-quant'
+          : spec.params.source === 'prediction'
+            ? 'prediction'
+            : spec.params.source === 'tracked' ? 'tracked' : 'chat'
+    case 'workspace-list':
+    case 'template-catalog':
+    case 'template-detail':    return 'chat'
+    case 'connectors':         return 'connectors'
+    case 'trading-as-git':
+    case 'portfolio':
+    case 'uta-detail':         return 'portfolio'
+    case 'issue':
+    case 'issue-detail':       return 'issue'
+    case 'automation':         return 'settings'
+    case 'office':             return 'office'
+    case 'news':
+    case 'market-list':
+    case 'market-rotation':
+    case 'market-board':
+    case 'market-detail':      return 'market'
+    case 'settings':
+    case 'design-project':
+    case 'dev':                return 'settings'
+  }
+}

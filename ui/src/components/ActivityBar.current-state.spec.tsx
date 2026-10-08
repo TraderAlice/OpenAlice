@@ -28,7 +28,7 @@ vi.mock('../live/inbox-read', () => ({
   useUnreadInboxCount: () => 0,
 }))
 
-vi.mock('../tabs/types', () => ({ getFocusedTab: () => ({ spec: { kind: mocks.focusedKind } }) }))
+vi.mock('../tabs/types', async (importOriginal) => ({ ...await importOriginal<typeof import('../tabs/types')>(), getFocusedTab: () => ({ spec: { kind: mocks.focusedKind, params: {} } }) }))
 vi.mock('./workspace/ChatWorkspaceSection', () => ({
   ChatWorkspaceSection: ({ mode }: { mode: string }) => <div data-testid={`harness-${mode}`} />,
 }))
@@ -123,9 +123,24 @@ describe('ActivityBar current destination', () => {
     expect(screen.getByTestId('activity-bar').firstElementChild?.querySelector('img')).toBeNull()
   })
 
+  it.each(['chat-landing', 'auto-quant-landing', 'auto-prediction-landing', 'quick-start'])(
+    'does not retain Issues selection when the focused tab enters %s', focusedKind => {
+      const view = render(<ActivityBar open onClose={vi.fn()} />)
+      expect(screen.getByRole('button', { name: 'Issues' }).getAttribute('aria-current')).toBe('page')
+      // Harness clicks and existing-tab focus do not update the old sidebar state.
+      mocks.focusedKind = focusedKind
+      view.rerender(<ActivityBar open onClose={vi.fn()} />)
+      expect(screen.getByRole('button', { name: 'Issues' }).hasAttribute('aria-current')).toBe(false)
+      mocks.focusedKind = 'issue-detail'
+      view.rerender(<ActivityBar open onClose={vi.fn()} />)
+      expect(screen.getByRole('button', { name: 'Issues' }).getAttribute('aria-current')).toBe('page')
+    },
+  )
+
   it('moves Connectors and its warning state into the utility menu', () => {
     mocks.connectorWarnings = 1
     mocks.selectedSidebar = 'connectors'
+    mocks.focusedKind = 'connectors'
     const onClose = vi.fn()
     render(<ActivityBar open onClose={onClose} />)
     expect(screen.queryByRole('button', { name: 'Connectors' })).toBeNull()
