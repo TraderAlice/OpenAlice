@@ -86,6 +86,7 @@ describe('injectWorkspaceContext — instructions', () => {
     expect(instruction).toContain('A comment is a board');
     expect(instruction).toContain('OpenAlice does not wrap');
     expect(instruction).toContain('The `alice` skill contains the exact commands');
+    expect(instruction).toContain('scripts/daily-brief/collect.ps1');
     expect(instruction).not.toContain('alice issue comment --text');
     expect(instruction).not.toContain('alice inbox push --doc');
     expect(instruction).not.toContain('--when');
@@ -132,6 +133,7 @@ describe('injectWorkspaceContext — skills', () => {
       expect(existsSync(join(dir, '.agents/skills', name, 'SKILL.md')), name).toBe(true);
     }
     expect(existsSync(join(dir, '.pi/skills'))).toBe(false);
+    expect(await read('.agents/skills/traderhub/SKILL.md')).toContain('Do not open with `collect.ps1`');
   });
 
   it('keeps peer file access on native Coding Agent capabilities', async () => {

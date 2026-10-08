@@ -1944,6 +1944,7 @@ export const zh: Resources = {
     moreExamples: '换一组工作流',
     marketBriefLabel: '市场脉搏',
     marketBriefTitle: '读懂今天的跨市场信号',
+    marketBriefHint: '先拉指数与宏观看板，通常几十秒；外盘不通会更久，缺数会标明。',
     marketBriefPrompt: '阅读今天的宏观背景、板块轮动和异常异动，给出最值得关注的三个跨资产信号，标明每项数据的截至时间，并把事实证据和你的判断分开。',
     portfolioReviewLabel: '持仓体检',
     portfolioReviewTitle: '压力测试我的当前持仓',

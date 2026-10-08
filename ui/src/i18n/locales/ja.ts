@@ -1941,6 +1941,7 @@ export const ja: Resources = {
     moreExamples: '別のワークフローを表示',
     marketBriefLabel: '市場概況',
     marketBriefTitle: '今日のクロスアセット・シグナルを読む',
+    marketBriefHint: 'まず指数とマクロボードを取得、通常数十秒。海外ソースが不通ならさらに時間がかかり、欠落は明示します。',
     marketBriefPrompt: '今日のマクロ環境、セクターローテーション、異常な値動きを確認し、最も重要なクロスアセット・シグナルを3つ挙げてください。各データの基準時点を示し、事実と判断を分けてください。',
     portfolioReviewLabel: 'ポートフォリオ',
     portfolioReviewTitle: '現在のポジションをストレステストする',
