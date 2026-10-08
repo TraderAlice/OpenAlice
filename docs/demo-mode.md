@@ -34,6 +34,11 @@ the temporary home so native file reads remain real filesystem operations.
 The entry is development-only. It does not start the production Guardian,
 Alice, UTA, Connector or agent CLIs. Electron profile, Workspace root and global
 state are isolated, with no provider credentials passed to the fixture child.
+Intentional quit closes the fixture IPC request source before killing the child.
+Pending and later web requests settle as unavailable (503), and cancelled
+renderer requests stop waiting without a protocol exception. Unexpected send
+failures still reject; an unexpected fixture exit is logged and exits nonzero.
+
 Data-home switching and updates are disabled. Unmocked APIs return 501 rather
 than reaching a live backend. UI analytics are disabled in the native demo.
 
