@@ -2719,6 +2719,12 @@ export const en = {
     openPermissions: 'Open Mode settings',
   },
   tradingReview: {
+    recovery: {
+      title: 'Execution recovery',
+      uncertain: 'A broker call has no saved outcome. Do not retry. Reconcile against broker orders before this wallet can submit again. Recorded outcomes are listed below.',
+      recorded: 'These outcomes were saved. Finish recording them without submitting orders again. Operations not started will be recorded as not executed.',
+      recordResults: 'Record saved results',
+    },
     description: 'Review broker writes staged by agents before they are pushed to the venue.',
     liteTitle: 'Trading as Git is unavailable in Lite mode.',
     liteDescription: 'Lite mode keeps UTA disconnected, so Alice cannot review broker write proposals. Change the trading mode in Settings → Trading → Mode to connect UTA.',

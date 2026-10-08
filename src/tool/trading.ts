@@ -807,6 +807,13 @@ ONLY if the operator has enabled "Allow AI to push trades" in Settings → Agent
       execute: async ({ source }) => {
         const targets = await manager.resolve(source)
         const statuses = await Promise.all(targets.map(async (uta) => ({ uta, status: await uta.status() })))
+        const recovering = statuses.filter(({ status }) => status.execution)
+        if (recovering.length) {
+          return {
+            message: 'Execution recovery is required. Do not reapprove or resubmit these orders. Review the saved outcomes in Trading as Git; an uncertain broker call must be reconciled against the broker.',
+            recovery: recovering.map(({ uta, status }) => ({ source: uta.id, ...compactStatus(status) })),
+          }
+        }
         const pending = statuses.filter(({ status }) => status.pendingMessage)
         if (pending.length === 0) {
           const uncommitted = statuses.filter(({ status }) => status.staged.length > 0)

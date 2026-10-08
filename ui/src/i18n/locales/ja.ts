@@ -2680,6 +2680,12 @@ export const ja: Resources = {
     openPermissions: 'モード設定を開く',
   },
   tradingReview: {
+    recovery: {
+      title: '実行の復旧',
+      uncertain: 'ブローカー呼び出しの結果が保存されていません。再試行しないでください。再び注文を送信する前に、ブローカーの注文と照合する必要があります。保存済みの結果を以下に表示します。',
+      recorded: 'これらの結果は保存済みです。注文を再送信せずに記録を完了できます。未開始の操作は未実行として記録されます。',
+      recordResults: '保存済みの結果を記録',
+    },
     description: 'エージェントがステージしたブローカー書き込みを、取引先へプッシュする前に確認します。',
     liteTitle: 'Lite モードでは Trading as Git を利用できません。',
     liteDescription: 'Lite モードでは UTA が切断されたままになるため、Alice はブローカー書き込みの提案を確認できません。「設定 → 取引 → モード」で取引モードを変更して UTA に接続してください。',
