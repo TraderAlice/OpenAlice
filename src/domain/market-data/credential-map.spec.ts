@@ -31,6 +31,10 @@ describe('buildSDKCredentials — in-process opentypebb path', () => {
     })
   })
 
+  it('maps fxmacrodata → fxmacrodata_api_key', () => {
+    expect(buildSDKCredentials({ fxmacrodata: 'k4' })).toEqual({ fxmacrodata_api_key: 'k4' })
+  })
+
   it('returns {} for undefined input', () => {
     expect(buildSDKCredentials(undefined)).toEqual({})
   })
@@ -77,5 +81,6 @@ describe('buildSDKCredentials hub sentinel', () => {
   it('never touches non-hub providers (fmp has no proxy)', () => {
     const creds = buildSDKCredentials({}, hub)
     expect(creds.fmp_api_key).toBeUndefined()
+    expect(creds.fxmacrodata_api_key).toBeUndefined()
   })
 })
