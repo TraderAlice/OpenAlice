@@ -76,7 +76,7 @@ export const newsListHandlers = [
       if (!(articleTime > startTime && articleTime <= endTime)) return false
       if (sourceFilters?.length && !sourceFilters.includes((article.source ?? '').toLowerCase())) return false
       if (keyword && !includesText(article, keyword)) return false
-      if (symbol && !includesText(article, symbol)) return false
+      if (symbol && !matchesSymbol([article.title, article.content, article.categories ?? ''].join('\n').toLowerCase(), symbol)) return false
       return true
     })
     const items = filtered
@@ -98,4 +98,10 @@ function compareNewsArticles(a: { time: string; title: string }, b: { time: stri
   if (Number.isFinite(aTime) && Number.isFinite(bTime) && aTime !== bTime) return aTime - bTime
   if (Number.isFinite(aTime) !== Number.isFinite(bTime)) return Number.isFinite(aTime) ? -1 : 1
   return a.title < b.title ? -1 : a.title > b.title ? 1 : 0
+}
+
+/** Mirrors the production Symbol token boundary (Keyword remains substring). */
+function matchesSymbol(text: string, symbol: string): boolean {
+  const tokens: string[] = text.match(/[\p{L}\p{N}_^]+(?:[.\/:=-][\p{L}\p{N}_^]+)*/gu) ?? []
+  return tokens.includes(symbol)
 }
