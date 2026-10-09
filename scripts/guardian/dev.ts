@@ -1,3 +1,4 @@
+import { getProductVersion } from '@traderalice/update-lifecycle/node'
 /**
  * Guardian — dev entry.
  *
@@ -17,7 +18,7 @@
 
 import { delimiter, resolve } from 'node:path'
 import { homedir } from 'node:os'
-import { existsSync, readFileSync } from 'node:fs'
+import { existsSync } from 'node:fs'
 import { randomUUID } from 'node:crypto'
 import type { ChildProcess } from 'node:child_process'
 import {
@@ -179,7 +180,7 @@ async function main(): Promise<void> {
       connectorRecovery.stop()
     })
   }
-  const runtimeVersion = readRuntimeVersion()
+  const runtimeVersion = getProductVersion()
   const managedSearchToolsBin = resolve(
     process.cwd(),
     'vendor',
@@ -520,14 +521,6 @@ async function main(): Promise<void> {
   })
 }
 
-function readRuntimeVersion(): string {
-  try {
-    const manifest = JSON.parse(readFileSync(resolve(process.cwd(), 'package.json'), 'utf8')) as { version?: unknown }
-    return typeof manifest.version === 'string' ? manifest.version : 'dev'
-  } catch {
-    return 'dev'
-  }
-}
 
 main().catch(async (err: unknown) => {
   await releaseGuardianRuntimeLock().catch(() => undefined)

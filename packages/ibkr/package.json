@@ -20,7 +20,7 @@
   },
   "scripts": {
     "build": "node -e \"require('node:fs').rmSync('dist',{recursive:true,force:true})\" && tsc",
-    "test": "vitest run --config vitest.config.ts",
+    "test": "node ../../scripts/run-tests.mjs --package @traderalice/ibkr",
     "test:external:readonly": "node ../../scripts/run-tests.mjs --lane external-readonly --package @traderalice/ibkr",
     "test:live-paper": "node ../../scripts/run-tests.mjs --lane live-paper --package @traderalice/ibkr",
     "typecheck": "tsc --noEmit",
@@ -36,7 +36,8 @@
     "ts-proto": "^2.11.5",
     "tsup": "^8.4.0",
     "typescript": "^5.7.3",
-    "vitest": "^3.2.6"
+    "vite": "npm:@voidzero-dev/vite-plus-core@1.0.0",
+    "vitest": "5.0.1"
   },
   "engines": {
     "node": ">=22.19.0"

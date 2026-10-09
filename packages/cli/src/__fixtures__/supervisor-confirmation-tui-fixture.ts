@@ -1,3 +1,4 @@
+import { fixtureHome } from './fixture-home.ts'
 import { resolveLaunchContext } from '../launch-context.ts'
 import { runSupervisorTui } from '../supervisor-tui.ts'
 
@@ -6,13 +7,13 @@ const exitCode = await runSupervisorTui({}, {
   webRelay: null,
   resolveContext: () => resolveLaunchContext({
     cwd: process.cwd(),
-    homeDir: '/fixture',
-    flags: { project: 'default', home: '/fixture/default' },
+    homeDir: `${fixtureHome}`,
+    flags: { project: 'default', home: `${fixtureHome}/default` },
   }),
   inspect: async () => ({ class: 'absent', state: 'absent', owner: null, endpoints: {} }),
   inspectManagedSource: async () => ({
-    appDir: '/fixture/managed-source',
-    installRoot: '/fixture',
+    appDir: `${fixtureHome}/managed-source`,
+    installRoot: `${fixtureHome}`,
     repositoryUrl: 'https://github.com/TraderAlice/OpenAlice.git',
     selector: { kind: 'branch', value: 'dev' },
     state: 'absent',

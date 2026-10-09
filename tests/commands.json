@@ -1,0 +1,483 @@
+{
+  "commands": {
+    "open-alice#test": {
+      "owner": "repo-tooling",
+      "lane": "hermetic",
+      "kind": "spec-selection",
+      "sideEffects": "temporary local files and test-owned subprocesses only",
+      "prerequisites": [
+        "workspace dependencies installed",
+        "build @traderalice/update-lifecycle for native CLI subprocess fixtures; Vitest source aliases do not apply to those children"
+      ]
+    },
+    "open-alice#test:system:dev-stack": {
+      "owner": "runtime-cli",
+      "lane": "system",
+      "kind": "process-acceptance",
+      "sideEffects": "starts a real local dev process tree and uses temporary state",
+      "prerequisites": [
+        "workspace dependencies installed"
+      ]
+    },
+    "open-alice#test:system:guardian": {
+      "owner": "runtime-cli",
+      "lane": "system",
+      "kind": "process-acceptance",
+      "sideEffects": "starts and kills test-owned local Guardian process trees",
+      "prerequisites": [
+        "workspace dependencies installed"
+      ]
+    },
+    "open-alice#test:system:connector": {
+      "owner": "connector",
+      "lane": "system",
+      "kind": "process-acceptance",
+      "sideEffects": "starts a test-owned local Connector process",
+      "prerequisites": [
+        "Connector build/runtime dependencies available"
+      ]
+    },
+    "open-alice#test:system:installer": {
+      "owner": "runtime-cli",
+      "lane": "system",
+      "kind": "host-acceptance",
+      "sideEffects": "builds disposable Docker images and installs into containers",
+      "prerequisites": [
+        "Docker available"
+      ]
+    },
+    "open-alice#test:system:installer:dev": {
+      "owner": "runtime-cli",
+      "lane": "system",
+      "kind": "host-acceptance",
+      "sideEffects": "downloads the dev installer and uses disposable Docker images",
+      "prerequisites": [
+        "Docker and network access available",
+        "published dev candidate available"
+      ]
+    },
+    "open-alice#test:system:remote": {
+      "owner": "runtime-cli",
+      "lane": "system",
+      "kind": "host-acceptance",
+      "sideEffects": "starts disposable Docker/SSH targets and copies an install payload",
+      "prerequisites": [
+        "Docker and a built/selected CLI payload"
+      ]
+    },
+    "open-alice#electron:smoke:demo": {
+      "owner": "desktop",
+      "lane": "system",
+      "kind": "artifact-acceptance",
+      "sideEffects": "builds/uses unsigned artifacts, starts real test-owned Electron/processes, and writes isolated temporary state; setup may download runtime/prior-version bytes",
+      "prerequisites": [
+        "native graphical Electron host",
+        "workspace dependencies and build/vendor prerequisites"
+      ],
+      "platforms": [
+        "macOS-arm64",
+        "macOS-x64",
+        "Windows-x64"
+      ],
+      "artifact": "unsigned Electron package; demo uses the isolated demo runner"
+    },
+    "open-alice#electron:smoke:packaged": {
+      "owner": "desktop",
+      "lane": "system",
+      "kind": "artifact-acceptance",
+      "sideEffects": "builds/uses unsigned artifacts, starts real test-owned Electron/processes, and writes isolated temporary state; setup may download runtime/prior-version bytes",
+      "prerequisites": [
+        "native graphical Electron host",
+        "workspace dependencies and build/vendor prerequisites"
+      ],
+      "platforms": [
+        "macOS-arm64",
+        "macOS-x64"
+      ],
+      "artifact": "unsigned Electron package; demo uses the isolated demo runner"
+    },
+    "open-alice#electron:smoke:startup": {
+      "owner": "desktop",
+      "lane": "system",
+      "kind": "artifact-acceptance",
+      "sideEffects": "builds/uses unsigned artifacts, starts real test-owned Electron/processes, and writes isolated temporary state; setup may download runtime/prior-version bytes",
+      "prerequisites": [
+        "native graphical Electron host",
+        "workspace dependencies and build/vendor prerequisites"
+      ],
+      "platforms": [
+        "macOS-arm64",
+        "macOS-x64",
+        "Windows-x64"
+      ],
+      "artifact": "unsigned Electron package; demo uses the isolated demo runner"
+    },
+    "open-alice#electron:smoke:credential-pi": {
+      "owner": "desktop",
+      "lane": "system",
+      "kind": "artifact-acceptance",
+      "sideEffects": "builds/uses unsigned artifacts, starts real test-owned Electron/processes, and writes isolated temporary state; setup may download runtime/prior-version bytes",
+      "prerequisites": [
+        "native graphical Electron host",
+        "workspace dependencies and build/vendor prerequisites"
+      ],
+      "platforms": [
+        "macOS-arm64",
+        "macOS-x64",
+        "Windows-x64",
+        "Linux-x64"
+      ],
+      "artifact": "unsigned Electron package; credential Add/Test/Save UI, API-bound native Pi execution; excludes launcher and Chat composer"
+    },
+    "open-alice#electron:smoke:onboarding": {
+      "owner": "desktop",
+      "lane": "system",
+      "kind": "artifact-acceptance",
+      "sideEffects": "builds/uses unsigned artifacts, starts real test-owned Electron/processes, and writes isolated temporary state; setup may download runtime/prior-version bytes",
+      "prerequisites": [
+        "native graphical Electron host",
+        "workspace dependencies and build/vendor prerequisites"
+      ],
+      "platforms": [
+        "macOS-arm64",
+        "macOS-x64",
+        "Windows-x64",
+        "Linux-x64"
+      ],
+      "artifact": "deprecated alias for electron:smoke:credential-pi; same credential UI and API-bound native Pi execution scope"
+    },
+    "open-alice#electron:smoke:trading-mode": {
+      "owner": "desktop",
+      "lane": "system",
+      "kind": "artifact-acceptance",
+      "sideEffects": "builds/uses unsigned artifacts, starts real test-owned Electron/processes, and writes isolated temporary state; setup may download runtime/prior-version bytes",
+      "prerequisites": [
+        "native graphical Electron host",
+        "workspace dependencies and build/vendor prerequisites"
+      ],
+      "platforms": [
+        "macOS-arm64",
+        "macOS-x64"
+      ],
+      "artifact": "unsigned Electron package; demo uses the isolated demo runner"
+    },
+    "open-alice#electron:smoke:workspace": {
+      "owner": "desktop",
+      "lane": "system",
+      "kind": "artifact-acceptance",
+      "sideEffects": "builds/uses unsigned artifacts, starts real test-owned Electron/processes, and writes isolated temporary state; setup may download runtime/prior-version bytes",
+      "prerequisites": [
+        "native graphical Electron host",
+        "workspace dependencies and build/vendor prerequisites"
+      ],
+      "platforms": [
+        "macOS-arm64",
+        "macOS-x64",
+        "Windows-x64"
+      ],
+      "artifact": "unsigned Electron package; demo uses the isolated demo runner"
+    },
+    "open-alice#electron:smoke:pty": {
+      "owner": "desktop",
+      "lane": "system",
+      "kind": "artifact-acceptance",
+      "sideEffects": "builds/uses unsigned artifacts, starts real test-owned Electron/processes, and writes isolated temporary state; setup may download runtime/prior-version bytes",
+      "prerequisites": [
+        "native graphical Electron host",
+        "workspace dependencies and build/vendor prerequisites"
+      ],
+      "platforms": [
+        "macOS-arm64",
+        "macOS-x64",
+        "Windows-x64"
+      ],
+      "artifact": "unsigned Electron package; demo uses the isolated demo runner"
+    },
+    "open-alice#electron:smoke:guardian-recovery": {
+      "owner": "desktop",
+      "lane": "system",
+      "kind": "artifact-acceptance",
+      "sideEffects": "builds/uses unsigned artifacts, starts real test-owned Electron/processes, and writes isolated temporary state; setup may download runtime/prior-version bytes",
+      "prerequisites": [
+        "native graphical Electron host",
+        "workspace dependencies and build/vendor prerequisites"
+      ],
+      "platforms": [
+        "macOS-arm64",
+        "macOS-x64",
+        "Windows-x64"
+      ],
+      "artifact": "unsigned Electron package; demo uses the isolated demo runner"
+    },
+    "open-alice#electron:smoke:existing-owner": {
+      "owner": "desktop",
+      "lane": "system",
+      "kind": "artifact-acceptance",
+      "sideEffects": "builds/uses unsigned artifacts, starts real test-owned Electron/processes, and writes isolated temporary state; setup may download runtime/prior-version bytes",
+      "prerequisites": [
+        "native graphical Electron host",
+        "workspace dependencies and build/vendor prerequisites"
+      ],
+      "platforms": [
+        "macOS-arm64",
+        "macOS-x64",
+        "Windows-x64"
+      ],
+      "artifact": "unsigned Electron package; demo uses the isolated demo runner"
+    },
+    "open-alice#electron:smoke:upgrade": {
+      "owner": "desktop",
+      "lane": "system",
+      "kind": "artifact-acceptance",
+      "sideEffects": "builds/uses unsigned artifacts, starts real test-owned Electron/processes, and writes isolated temporary state; setup may download runtime/prior-version bytes",
+      "prerequisites": [
+        "native graphical Electron host",
+        "workspace dependencies and build/vendor prerequisites",
+        "upgrade additionally needs a prior published app and network"
+      ],
+      "platforms": [
+        "macOS-arm64",
+        "macOS-x64",
+        "Windows-x64"
+      ],
+      "artifact": "unsigned Electron package; demo uses the isolated demo runner"
+    },
+    "open-alice#electron:assert-package": {
+      "owner": "desktop",
+      "lane": "system",
+      "kind": "artifact-check",
+      "sideEffects": "reads the unpacked package and inspects its resource layout",
+      "prerequisites": [
+        "unpacked Electron package"
+      ],
+      "platforms": [
+        "macOS-arm64",
+        "macOS-x64",
+        "Windows-x64"
+      ],
+      "artifact": "dist/electron-app or explicit --package-root"
+    },
+    "open-alice#electron:verify-update-assets": {
+      "owner": "desktop",
+      "lane": "system",
+      "kind": "artifact-check",
+      "sideEffects": "reads candidate bytes and updater metadata",
+      "prerequisites": [
+        "candidate updater YAML and referenced package/blockmap files"
+      ],
+      "platforms": [
+        "macOS-arm64",
+        "macOS-x64",
+        "Windows-x64"
+      ],
+      "artifact": "explicit update assets; see runner arguments"
+    },
+    "open-alice#electron:smoke-toolchain": {
+      "owner": "desktop",
+      "lane": "system",
+      "kind": "artifact-acceptance",
+      "sideEffects": "starts packaged native toolchain commands in isolated state",
+      "prerequisites": [
+        "unpacked Electron package and native host"
+      ],
+      "platforms": [
+        "macOS-arm64",
+        "macOS-x64",
+        "Windows-x64"
+      ],
+      "artifact": "dist/electron-app or explicit --package-root"
+    },
+    "open-alice#broker-packs:verify": {
+      "owner": "uta",
+      "lane": "system",
+      "kind": "artifact-check",
+      "sideEffects": "reads built pack archives/manifests; does not authorize broker writes",
+      "prerequisites": [
+        "built Broker Packs; --compiled for compiled variant"
+      ],
+      "artifact": "dist/broker-packs"
+    },
+    "open-alice#broker-packs:upgrade-smoke": {
+      "owner": "uta",
+      "lane": "system",
+      "kind": "artifact-acceptance",
+      "sideEffects": "downloads previous pack bytes and loads accepted old/new artifacts against test-owned state",
+      "prerequisites": [
+        "current built packs",
+        "previous release tag/artifacts and network"
+      ],
+      "artifact": "previous/current Broker Packs"
+    },
+    "@traderalice/uta-broker-alpaca#test:packaged": {
+      "owner": "uta",
+      "lane": "system",
+      "kind": "artifact-acceptance",
+      "sideEffects": "loads the compiled Alpaca pack and test-owned local fixture dependencies",
+      "prerequisites": [
+        "compiled Alpaca pack and local runtime dependencies"
+      ],
+      "artifact": "compiled pack"
+    }
+  },
+  "standalone": [
+    {
+      "id": "cli-package-manager",
+      "path": "scripts/cli-package-manager-smoke.mjs",
+      "invocation": "node scripts/cli-package-manager-smoke.mjs --manager <npm|bun> --packages-dir <artifacts> --expected-version <version> --expected-content-identity <id>",
+      "owner": "runtime-cli",
+      "lane": "system",
+      "kind": "artifact-acceptance",
+      "sideEffects": "installs local artifact packages into temporary npm/Bun prefixes and runs installed CLI processes",
+      "prerequisites": [
+        "selected built npm/Bun artifacts",
+        "npm or Bun and native target host"
+      ],
+      "platforms": [
+        "native CLI targets"
+      ],
+      "arguments": "Explicit artifact arguments are required where shown; consult the runner/owner guide."
+    },
+    {
+      "id": "cli-system-package-manager",
+      "path": "scripts/cli-system-package-manager-smoke.mjs",
+      "invocation": "node scripts/cli-system-package-manager-smoke.mjs <explicit previous/current package and manager arguments>",
+      "owner": "runtime-cli",
+      "lane": "system",
+      "kind": "artifact-acceptance",
+      "sideEffects": "installs/upgrades/removes packages through the host Homebrew or pacman; use disposable host",
+      "prerequisites": [
+        "selected previous/current package artifacts and content identities",
+        "Homebrew or pacman on an owned disposable host"
+      ],
+      "platforms": [
+        "macOS",
+        "Linux"
+      ],
+      "arguments": "Explicit artifact arguments are required where shown; consult the runner/owner guide."
+    },
+    {
+      "id": "cli-linuxbrew",
+      "path": "scripts/cli-linuxbrew-smoke.mjs",
+      "invocation": "node scripts/cli-linuxbrew-smoke.mjs <explicit arch/previous/current artifacts and identities>",
+      "owner": "runtime-cli",
+      "lane": "system",
+      "kind": "artifact-acceptance",
+      "sideEffects": "starts disposable Linuxbrew Docker hosts with selected artifacts",
+      "prerequisites": [
+        "Docker",
+        "previous/current Homebrew formula artifacts and content identities"
+      ],
+      "platforms": [
+        "Linux-arm64",
+        "Linux-x64"
+      ],
+      "arguments": "Explicit artifact arguments are required where shown; consult the runner/owner guide."
+    },
+    {
+      "id": "cli-aur",
+      "path": "scripts/cli-aur-container-smoke.mjs",
+      "invocation": "node scripts/cli-aur-container-smoke.mjs <explicit arch/previous/current PKGBUILD and identities>",
+      "owner": "runtime-cli",
+      "lane": "system",
+      "kind": "artifact-acceptance",
+      "sideEffects": "builds/installs AUR candidates in disposable Arch Docker hosts",
+      "prerequisites": [
+        "Docker",
+        "previous/current PKGBUILD artifacts and content identities"
+      ],
+      "platforms": [
+        "Linux-arm64",
+        "Linux-x64"
+      ],
+      "arguments": "Explicit artifact arguments are required where shown; consult the runner/owner guide."
+    },
+    {
+      "id": "cli-legacy-cutover",
+      "path": "scripts/cli-legacy-cutover-smoke.mjs",
+      "invocation": "node scripts/cli-legacy-cutover-smoke.mjs --archive <tar.gz> --sha256 <hex> --expected-version <version> --expected-content-identity <id>",
+      "owner": "runtime-cli",
+      "lane": "system",
+      "kind": "artifact-acceptance",
+      "sideEffects": "downloads/verifies the legacy installer and runs old/new installed CLI lifecycle against temporary state",
+      "prerequisites": [
+        "selected old/new CLI artifacts",
+        "native package manager/runtime prerequisites"
+      ],
+      "platforms": [
+        "native CLI targets"
+      ],
+      "arguments": "Explicit artifact arguments are required where shown; consult the runner/owner guide."
+    },
+    {
+      "id": "public-cli-channels",
+      "path": "scripts/verify-public-cli-channels.mjs",
+      "invocation": "node scripts/verify-public-cli-channels.mjs --manifest <path> --version <version>",
+      "owner": "runtime-cli",
+      "lane": "system",
+      "kind": "artifact-check",
+      "sideEffects": "reads public release/channel bytes over network and verifies candidate identity",
+      "prerequisites": [
+        "network access",
+        "published selected channel/release and local verification inputs"
+      ],
+      "platforms": [
+        "all"
+      ],
+      "arguments": "Explicit artifact arguments are required where shown; consult the runner/owner guide."
+    },
+    {
+      "id": "windows-cli-preview",
+      "path": "scripts/windows-cli-preview-smoke.ts",
+      "invocation": "bun scripts/windows-cli-preview-smoke.ts <candidate-json>",
+      "owner": "runtime-cli",
+      "lane": "system",
+      "kind": "artifact-acceptance",
+      "sideEffects": "launches native Windows CLI/PTY against isolated state",
+      "prerequisites": [
+        "native Windows host",
+        "Bun on the native Windows host",
+        "selected compiled Windows CLI candidate"
+      ],
+      "platforms": [
+        "Windows-x64",
+        "Windows-arm64"
+      ],
+      "arguments": "Explicit artifact arguments are required where shown; consult the runner/owner guide."
+    },
+    {
+      "id": "bun-native-pty",
+      "path": "scripts/bun-native-pty-smoke.ts",
+      "invocation": "bun scripts/bun-native-pty-smoke.ts",
+      "owner": "runtime-cli",
+      "lane": "system",
+      "kind": "artifact-acceptance",
+      "sideEffects": "spawns a real test-owned native PTY process",
+      "prerequisites": [
+        "Bun and compatible native PTY build"
+      ],
+      "platforms": [
+        "native host"
+      ],
+      "arguments": "Explicit artifact arguments are required where shown; consult the runner/owner guide."
+    },
+    {
+      "id": "desktop-companion",
+      "path": "apps/desktop/src/companion-preview.ts",
+      "invocation": "pnpm -F @traderalice/desktop exec electron ../../dist/electron/companion-preview.js --smoke",
+      "owner": "desktop",
+      "lane": "system",
+      "kind": "artifact-acceptance",
+      "sideEffects": "starts the real isolated native Companion preview",
+      "prerequisites": [
+        "desktop build",
+        "native graphical Electron host"
+      ],
+      "platforms": [
+        "macOS-arm64",
+        "macOS-x64",
+        "Windows-x64"
+      ],
+      "arguments": "Explicit artifact arguments are required where shown; consult the runner/owner guide."
+    }
+  ]
+}

@@ -1,9 +1,15 @@
 import { delay, http, HttpResponse } from 'msw'
+import type { MachineOperation, MachinePlan, MachinePlanInput } from '../../lib/updates/machine-types'
 
 const defaultTarget = { machine: 'local', machineName: 'This computer', project: 'demo', projectName: 'Demo AliceProject' }
 let target = readDemoTarget() ?? defaultTarget
 let generation = 0
-let demoOperation: { id: string; planId: string; mode: 'upgrade'; phase: 'running' | 'succeeded'; stage: 'checking' | 'installing' | 'restarting' | 'verifying'; startedAt: string; error: null } | null = null
+let demoOperation: MachineOperation | null = null
+const plans = new Map<string, MachinePlan>()
+let probeFailures = 0
+let applyFailures = 0
+// Capture once: the tab URL projector may remove query parameters after adoption.
+const machineScenario = typeof window === 'undefined' ? null : new URLSearchParams(window.location.search).get('machineScenario')
 
 function readDemoTarget(): typeof defaultTarget | null {
   if (typeof window === 'undefined') return null
@@ -29,6 +35,7 @@ const machines = [
 ]
 
 export const relayHandlers = [
+  http.get('/relay/v1/startup-target', () => HttpResponse.json({ target: { machine: target.machine, project: target.project }, error: null })),
   http.get('/relay/v1/status', () => HttpResponse.json({ schemaVersion: 1, generation, target, switching: false })),
   http.get('/relay/v1/fleet', async () => {
     await delay(900)
@@ -44,29 +51,51 @@ export const relayHandlers = [
     return HttpResponse.json({ schemaVersion: 1, generation, target, switching: false })
   }),
   http.post('/relay/v1/machines/plan', async ({ request }) => {
-    const input = await request.json() as { mode: 'add' | 'upgrade'; machineKey?: string; projectKey?: string; sshTarget?: string; label?: string }
+    const input = await request.json() as MachinePlanInput
     await delay(700)
+    if (input.mode === 'add' && machineScenario === 'probe-error' && probeFailures++ === 0) return HttpResponse.json({ error: 'Demo: Could not connect to the SSH target. Retry to simulate recovery.' }, { status: 502 })
     const machine = machines.find((entry) => entry.key === input.machineKey)
     const project = machine?.projects.find((entry) => entry.key === input.projectKey)
-    return HttpResponse.json({
-      id: 'demo-machine-plan', mode: input.mode,
+    const plan: MachinePlan = {
+      id: crypto.randomUUID(), mode: input.mode,
       machine: { key: machine?.key ?? null, label: machine?.displayName ?? input.label ?? 'Cloud Linux', sshTarget: machine?.sshTarget ?? input.sshTarget ?? 'alice@cloud.example.com' },
       project: project ? { key: project.key, displayName: project.displayName } : null,
-      platform: 'macOS arm64', installedVersion: '0.93.1', targetVersion: '0.94.1',
-      runtime: 'running · cli-server', actions: ['update remote OpenAlice CLI', 'restart remote OpenAlice Server'], blocker: null, deferredUpdate: false,
+      platform: input.mode === 'add' ? 'Linux x64' : 'macOS arm64',
+      activeVersion: input.mode === 'add' ? '0.94.1' : project?.runtime.class === 'absent' ? null : '0.93.1',
+      installedVersion: input.mode === 'add' ? '0.94.1' : '0.93.1', targetVersion: '0.94.1',
+      runtime: project?.runtime.class === 'absent' ? 'absent · none' : 'running · cli-server',
+      actions: input.mode === 'add' ? [] : ['update remote OpenAlice CLI', project?.runtime.class === 'absent' ? 'start remote OpenAlice Server' : 'restart remote OpenAlice Server'],
+      blocker: input.mode === 'add' && machineScenario === 'blocked' ? 'Demo: The remote Runtime is not compatible.' : null, deferredUpdate: false,
       expiresAt: new Date(Date.now() + 300_000).toISOString(),
-    })
+    }
+    plans.set(plan.id, plan)
+    return HttpResponse.json(plan)
   }),
   http.get('/relay/v1/machines/operation', () => HttpResponse.json(demoOperation)),
-  http.post('/relay/v1/machines/apply', async () => {
-    demoOperation = { id: 'demo-upgrade', planId: 'demo-machine-plan', mode: 'upgrade', phase: 'running', stage: 'checking', startedAt: new Date().toISOString(), error: null }
-    for (const stage of ['installing', 'restarting', 'verifying'] as const) {
+  http.post('/relay/v1/machines/apply', async ({ request }) => {
+    const { id } = await request.json() as { id: string }
+    const plan = plans.get(id)
+    if (!plan || plan.blocker || Date.parse(plan.expiresAt) < Date.now()) return HttpResponse.json({ error: 'Probe and review a fresh plan.' }, { status: 409 })
+    if (demoOperation?.phase === 'running') return HttpResponse.json({ error: 'Another operation is running.' }, { status: 409 })
+    plans.delete(id)
+    demoOperation = { id: crypto.randomUUID(), planId: id, mode: plan.mode, phase: 'running', stage: 'checking', startedAt: new Date().toISOString(), error: null }
+    const stages = plan.mode === 'add' ? ['verifying'] as const : ['installing', 'restarting', 'verifying'] as const
+    for (const stage of stages) {
       await delay(900)
       demoOperation = { ...demoOperation, stage }
     }
     await delay(900)
+    if (plan.mode === 'add' && machineScenario === 'apply-error' && applyFailures++ === 0) {
+      demoOperation = { ...demoOperation, phase: 'failed', error: 'Demo: Verification failed. Review again to simulate recovery.' }
+      return HttpResponse.json({ error: demoOperation.error }, { status: 502 })
+    }
+    const machineKey = plan.machine.key ?? `demo-${crypto.randomUUID()}`
+    if (plan.mode === 'add') machines.push({
+      key: machineKey, displayName: plan.machine.label, sshTarget: plan.machine.sshTarget,
+      connection: 'online', cliVersion: plan.targetVersion, issue: null, projects: [],
+    })
     demoOperation = { ...demoOperation, phase: 'succeeded' }
-    return HttpResponse.json({ machineKey: 'studio' })
+    return HttpResponse.json({ machineKey })
   }),
 ]
 

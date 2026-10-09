@@ -35,5 +35,6 @@ describe('TemplateRegistry manifest compatibility', () => {
       injectInstructions: true,
       injectTools: false,
     });
+    expect(registry.get('legacy-template')?.version).toBeUndefined();
   });
 });

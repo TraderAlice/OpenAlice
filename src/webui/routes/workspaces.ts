@@ -4,7 +4,6 @@ import { createAIProvider } from '../../ai-providers/provider.js'
 import { createWorkspaceContentRoutes } from './workspace-content.js';
 import { createStickerRoutes } from './stickers.js';
 import { prepareProjectWorkspaces, readProjectWorkspaceSetup } from '../../workspaces/project-workspace-setup.js';
-import { readUpdatePreferences } from '../../core/update-preferences.js';
 /**
  * Hono routes for the Workspaces feature, mounted at /api/workspaces.
  *
@@ -1517,7 +1516,7 @@ export function createWorkspaceRoutes(
       if (err instanceof z.ZodError) return c.json({ error: 'bad_request', message: 'Invalid Skill operation' }, 400);
       if (err instanceof TemplateUpgradeError) {
         const status = err.code === 'not_found' ? 404
-          : err.code === 'busy' || err.code === 'staged_changes' || err.code === 'stale_plan'
+          : err.code === 'busy' || err.code === 'staged_changes' || err.code === 'stale_plan' || err.code === 'blocked'
             ? 409
             : 400;
         return c.json({ error: err.code, message: err.message, plan: err.plan }, status);
@@ -1534,11 +1533,12 @@ export function createWorkspaceRoutes(
     if (!validId(id)) return c.json({ error: 'not_found' }, 404);
     try {
       const preferences = await readHarnessPreference();
-      const updatePreferences = await readUpdatePreferences();
       const template = svc.registry.get(id)?.template;
+      // AQ/AP discovery includes stable upstream tags even with auto-apply off.
+      // Manual review must expose those same candidates; permission to merge
+      // still requires the exact reviewed digest and all source-owner guards.
       const includeUnverified = preferences.showUnverifiedHarnessReleases
-        || (template === 'auto-quant-v2' && updatePreferences.autoUpdateAutoQuant)
-        || (template === 'auto-prediction' && updatePreferences.autoUpdateAutoPrediction);
+        || template === 'auto-quant-v2' || template === 'auto-prediction';
       const targetVersion = c.req.query('targetVersion');
       return c.json({
         plan: await svc.sourceUpgrades.plan(
@@ -1569,11 +1569,12 @@ export function createWorkspaceRoutes(
     }
     try {
       const preferences = await readHarnessPreference();
-      const updatePreferences = await readUpdatePreferences();
       const template = svc.registry.get(id)?.template;
+      // AQ/AP discovery includes stable upstream tags even with auto-apply off.
+      // Manual review must expose those same candidates; permission to merge
+      // still requires the exact reviewed digest and all source-owner guards.
       const includeUnverified = preferences.showUnverifiedHarnessReleases
-        || (template === 'auto-quant-v2' && updatePreferences.autoUpdateAutoQuant)
-        || (template === 'auto-prediction' && updatePreferences.autoUpdateAutoPrediction);
+        || template === 'auto-quant-v2' || template === 'auto-prediction';
       const result = await svc.sourceUpgrades.apply(
         id,
         includeUnverified,

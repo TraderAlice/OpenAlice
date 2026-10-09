@@ -10,6 +10,7 @@ export interface WorkspaceAcceptanceReceipt {
   readonly durationMs: number
   readonly error?: string
   readonly checks: {
+    readonly updateLifecycle: boolean
     readonly workspaceCreated: boolean
     readonly gitReady: boolean
     readonly cliEnvironmentInjected: boolean
@@ -52,6 +53,7 @@ export async function runRendererWorkspaceAcceptanceSmoke(
     const shellMarker = '__OPENALICE_WORKSPACE_CLI_CONTRACT_OK__'
     const shellFailureMarker = '__OPENALICE_WORKSPACE_CLI_STEP_FAILED__'
     const checks = {
+      updateLifecycle: false,
       workspaceCreated: false,
       gitReady: false,
       cliEnvironmentInjected: false,
@@ -301,6 +303,18 @@ export async function runRendererWorkspaceAcceptanceSmoke(
       }))
       workspaceId = created.workspace.id
       checks.workspaceCreated = true
+      const inventory = await json(await fetch('/api/updates/inventory?force=1'))
+      if (!inventory.units.some(unit => unit.id === 'alice-harness:' + workspaceId)) throw new Error('Shared update inventory omitted injected Skills')
+      await window.openAlice.clientUpdates.activate()
+      const deadline = Date.now() + 15000
+      let receipt
+      do {
+        receipt = await window.openAlice.clientUpdates.operation()
+        if (receipt?.phase === 'succeeded') break
+        await new Promise(resolve => setTimeout(resolve, 200))
+      } while (Date.now() < deadline)
+      if (receipt?.phase !== 'succeeded' || !receipt.completed['desktop:reconnect']) throw new Error('Packaged native handoff did not verify required readiness: ' + JSON.stringify(receipt))
+      checks.updateLifecycle = true
 
       await json(await fetch('/api/workspaces/' + encodeURIComponent(workspaceId) + '/agent-config/pi', {
         method: 'PUT',

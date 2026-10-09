@@ -1,4 +1,6 @@
-import { BrowserWindow } from 'electron'
+import { app, BrowserWindow } from 'electron'
+import { writeFileSync } from 'node:fs'
+import { join } from 'node:path'
 
 /** Runs inside the real isolated renderer; verifies both native file IPC and app:// requests. */
 export async function runDemoSmoke(win: BrowserWindow): Promise<void> {
@@ -117,4 +119,28 @@ export async function runDemoSmoke(win: BrowserWindow): Promise<void> {
     }
   })()`, true)
   console.log('[electron-demo-smoke] PASS Pet settings import, preview, native playback, mute and reset')
+  await win.webContents.executeJavaScript(`(async () => {
+    const p=await window.openAlice.companion.activity.getPreferences();
+    if(!p.events.completion||!p.events.failure||!p.events.action||!p.events.news||p.events.progress||!p.brief) throw new Error('Official notification defaults missing');
+    await window.openAlice.companion.activity.updatePreferences({events:{...p.events,news:false}});
+    if((await window.openAlice.companion.activity.getPreferences()).events.news!==false) throw new Error('Preference save failed');
+    await window.openAlice.companion.activity.resetPreferences();
+  })()`)
+  writeFileSync(join(app.getPath('userData'), 'notifications-settings.png'), (await win.webContents.capturePage()).toPNG())
+  win.hide()
+  await win.webContents.executeJavaScript(`fetch('/api/agent-runtime/sonner-test',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({state:'success'})})`)
+  const activityStart = Date.now()
+  while (!await pet.webContents.executeJavaScript(`!!activityId`)) {
+    if (Date.now()-activityStart>10_000) throw new Error('Journal did not reach background pet')
+    await new Promise(done=>setTimeout(done,100))
+  }
+  const bubbleState = await pet.webContents.executeJavaScript(`({text:message.textContent,actions:!activityActions.hidden,connected:typeof require==='undefined',outside:activityHit({x:0,y:0})})`)
+  if(bubbleState.text!=='Work completed'||!bubbleState.actions||!bubbleState.connected||bubbleState.outside) throw new Error('Privacy or bubble hit bounds failed')
+  writeFileSync(join(app.getPath('userData'), 'notification-pet.png'), (await pet.webContents.capturePage()).toPNG())
+  await pet.webContents.executeJavaScript(`document.querySelector('#activity-open').click()`)
+  const openStart = Date.now()
+  while(!win.isVisible()) { if(Date.now()-openStart>5000) throw new Error('Bubble did not open main'); await new Promise(done=>setTimeout(done,50)) }
+  if(await pet.webContents.executeJavaScript(`!!activityId`)) throw new Error('Foreground transition left duplicate bubble')
+  console.log('[electron-demo-smoke] PASS notification defaults/save/reset, real Journal IPC to background bubble, privacy/hit bounds and safe Open without duplicate')
+
 }

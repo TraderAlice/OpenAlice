@@ -151,7 +151,7 @@ export async function inspectLocalMachine(
       arch: options.arch ?? process.arch,
       hostname: (options.hostname ?? hostname)(),
       cliVersion: options.cliVersion ?? await readCliVersion(),
-      defaultProject: registry.defaultProject,
+      defaultProject: registry.defaultProject || null,
       projects,
       capabilities: currentMachineCapabilities(),
       issue: null,

@@ -1,3 +1,5 @@
+import { recordOwnerUpdate, projectUpdateUnit } from '@traderalice/update-lifecycle'
+import { FileUpdateJournal } from '@traderalice/update-lifecycle/node'
 /** Download, validate, stage, and atomically activate optional broker packs. */
 
 import { createHash } from 'node:crypto'
@@ -83,7 +85,18 @@ export async function getBrokerPackLocalStatus(engine: InstallableBrokerEngine |
   return { engine, installed: false, source: 'missing' }
 }
 
-export async function installBrokerPack(engine: InstallableBrokerEngine): Promise<BrokerPackLocalStatus> {
+/** Read-only exact target selection; installation revalidates this checksum. */
+export async function planBrokerPack(engine: InstallableBrokerEngine): Promise<BrokerPackReleaseAsset> {
+  const bound = await readBoundCatalog()
+  const catalog = bound?.catalog ?? await fetchCatalog(resolveCatalogUrl())
+  const asset = catalog.packs.find(row => row.engine === engine)
+  if (!asset) throw new Error(`No ${engine} Pack for this platform`)
+  validateAsset(asset, getCurrentVersion())
+  assertBrokerPackRequirements(asset, { platform: process.platform, glibcVersion: runtimeGlibcVersion() })
+  return asset
+}
+
+export async function installBrokerPack(engine: InstallableBrokerEngine, expectedSha256?: string): Promise<BrokerPackLocalStatus> {
   const engineRoot = brokerPackEngineRoot(engine)
   const lock = resolve(engineRoot, '.install.lock')
   await mkdir(engineRoot, { recursive: true })
@@ -96,12 +109,19 @@ export async function installBrokerPack(engine: InstallableBrokerEngine): Promis
     const catalog = bound?.catalog ?? await fetchCatalog(catalogUrl)
     const asset = catalog.packs.find((row) => row.engine === engine)
     if (!asset) throw new Error(`No ${engine} broker pack is published for ${process.platform}-${process.arch}`)
+    if (expectedSha256 && asset.sha256 !== expectedSha256) throw new Error('Broker Pack catalog changed after review')
     validateAsset(asset, getCurrentVersion())
     assertBrokerPackRequirements(asset, {
       platform: process.platform,
       glibcVersion: runtimeGlibcVersion(),
     })
 
+    const prior = await getBrokerPackLocalStatus(engine)
+    const unit = projectUpdateUnit(`pack:${engine}`, 'broker-pack', engineRoot, prior.version ? { version: prior.version } : null, { version: asset.version, artifactSha256: asset.sha256 })
+    return await recordOwnerUpdate({
+      journal: new FileUpdateJournal(resolve(engineRoot, 'update-operations'), unit.id),
+      unit, fingerprint: asset.sha256, id: asset.sha256, receipt: () => asset.sha256,
+      apply: async () => {
     await mkdir(workRoot, { recursive: true })
     const archivePath = resolve(workRoot, basename(asset.file))
     const assetUrl = new URL(asset.file, catalogUrl).href
@@ -147,10 +167,12 @@ export async function installBrokerPack(engine: InstallableBrokerEngine): Promis
     return {
       engine,
       installed: true,
-      source: 'downloaded',
+      source: 'downloaded' as const,
       version: asset.version,
       updateAvailable: false,
     }
+      },
+    })
   } finally {
     await rm(workRoot, { recursive: true, force: true }).catch(() => undefined)
     await rm(lock, { recursive: true, force: true }).catch(() => undefined)

@@ -1,0 +1,204 @@
+import { SessionExecutionManager } from '../../../src/workspaces/session-execution-manager.js'
+import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+
+import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+
+import {
+  SessionRegistry,
+  sessionCoworkerLabel,
+  sessionDisplayTitle,
+  type SessionRecord,
+} from '../../../src/workspaces/session-registry.js'
+import type { Logger } from '../../../src/workspaces/logger.js'
+
+const noopLogger = {
+  debug() {},
+  info() {},
+  warn() {},
+  error() {},
+  event() {},
+  child() {
+    return noopLogger
+  },
+} as unknown as Logger
+
+let root: string
+beforeEach(async () => {
+  root = await mkdtemp(join(tmpdir(), 'sr-'))
+})
+afterEach(async () => {
+  await rm(root, { recursive: true, force: true })
+})
+
+// Petname wsId so bootFixup proves it scans the new human-readable file shape.
+const WS = 'chat-calm-amber-river'
+const LEGACY_UUID_WS = '4894ef8b-66e1-4a41-a222-ba564e51a8c0'
+
+function rec(over: Partial<SessionRecord> = {}): SessionRecord {
+  return {
+    id: 'claude-calm-amber-river',
+    resumeId: 'resume-calm-amber-river-a1b2c3',
+    wsId: WS,
+    agent: 'claude',
+    name: 'c1',
+    createdAt: '2026-06-16T00:00:00.000Z',
+    lastActiveAt: '2026-06-16T00:00:00.000Z',
+    state: 'running',
+    ...over,
+  }
+}
+
+describe('SessionRegistry persistence', () => {
+  it('serializes overlapping writes to the same workspace', async () => {
+    const reg = await SessionRegistry.load(root, noopLogger)
+    await reg.create(rec())
+    await Promise.all(Array.from({ length: 20 }, (_, i) => reg.create(rec({ id: `codex-concurrent-${i}`, resumeId: `resume-concurrent-${i}`, state: 'paused' }))))
+    const restored = await SessionRegistry.load(root, noopLogger)
+    expect(restored.listFor(WS)).toHaveLength(21)
+  })
+
+  it('round-trips native and fallback titles across a reload', async () => {
+    const reg = await SessionRegistry.load(root, noopLogger)
+    await reg.create(rec({
+      id: 'claude-calm-amber-river',
+      title: "What's moving in semiconductors today?",
+      fallbackTitle: 'Tell me about semiconductors.',
+    }))
+    await reg.create(rec({
+      id: 'claude-clear-copper-harbor',
+      resumeId: 'resume-clear-copper-harbor-d4e5f6',
+      name: 'c2',
+      fallbackTitle: '解释一下美债收益率曲线倒挂',
+    }))
+    await reg.create(rec({
+      id: 'claude-quiet-silver-meadow',
+      resumeId: 'resume-quiet-silver-meadow-g7h8i9',
+      name: 'c3',
+    })) // unseeded — no title
+
+    // A fresh instance over the same dir = a server restart.
+    const reloaded = await SessionRegistry.load(root, noopLogger)
+    await reloaded.ensureLoaded(WS)
+    const byId = new Map(reloaded.listFor(WS).map((r) => [r.id, r]))
+
+    expect(byId.get('claude-calm-amber-river')?.title).toBe(
+      "What's moving in semiconductors today?",
+    )
+    expect(byId.get('claude-calm-amber-river')?.fallbackTitle).toBe(
+      'Tell me about semiconductors.',
+    )
+    expect(byId.get('claude-clear-copper-harbor')?.fallbackTitle).toBe(
+      '解释一下美债收益率曲线倒挂',
+    ) // CJK survives
+    expect(byId.get('claude-quiet-silver-meadow')?.title).toBeUndefined() // unseeded stays nameless
+  })
+
+  it('loads pre-v3 titles as fallbacks so a native title can replace them', async () => {
+    const sessionsDir = join(root, 'sessions')
+    await mkdir(sessionsDir, { recursive: true })
+    await writeFile(join(sessionsDir, `${WS}.json`), JSON.stringify({
+      version: 2,
+      records: [rec({
+        state: 'paused',
+        title: 'The old first message',
+      })],
+    }))
+
+    const reg = await SessionRegistry.load(root, noopLogger)
+    await reg.ensureLoaded(WS)
+    const loaded = reg.listFor(WS)[0]!
+    expect(loaded.title).toBeUndefined()
+    expect(loaded.fallbackTitle).toBe('The old first message')
+    expect(sessionDisplayTitle(loaded)).toBe('The old first message')
+
+    await reg.update(WS, loaded.id, { title: 'Native runtime title' })
+    expect(sessionDisplayTitle(reg.get(WS, loaded.id)!)).toBe('Native runtime title')
+    expect(sessionCoworkerLabel(reg.get(WS, loaded.id)!, 'AAPL desk')).toBe('AAPL desk')
+    expect(sessionCoworkerLabel(reg.get(WS, loaded.id)!, '  ')).toBe('Native runtime title')
+  })
+
+  // The exact path the user hit: a reload both flips orphaned running→paused
+  // (bootFixup) AND must keep the title — they share the load codepath.
+  it('keeps the title when bootFixup flips an orphaned running session to paused', async () => {
+    const reg = await SessionRegistry.load(root, noopLogger)
+    await reg.create(rec({
+      id: 'claude-calm-amber-river',
+      state: 'running',
+      title: 'Build a thesis on NVDA',
+    }))
+
+    const reloaded = await SessionRegistry.load(root, noopLogger)
+    await reloaded.ensureLoaded(WS)
+    const executions = await SessionExecutionManager.open(join(root, 'executions.json'), record => reloaded.projectExecution(record))
+    await executions.recoverOrphans(reloaded.listAll())
+    const r = reloaded.listFor(WS)[0]
+
+    expect(r?.state).toBe('paused') // orphaned running flipped on reload
+    expect(r?.title).toBe('Build a thesis on NVDA') // …and the title is intact
+  })
+
+  it('keeps loading legacy UUID workspace files without a migration', async () => {
+    const reg = await SessionRegistry.load(root, noopLogger)
+    await reg.create(rec({
+      id: 'claude-clear-copper-harbor',
+      wsId: LEGACY_UUID_WS,
+      state: 'paused',
+      title: 'Legacy workspace still opens',
+    }))
+
+    const reloaded = await SessionRegistry.load(root, noopLogger)
+    await reloaded.ensureLoaded(LEGACY_UUID_WS)
+
+    expect(reloaded.get(LEGACY_UUID_WS, 'claude-clear-copper-harbor')?.title).toBe(
+      'Legacy workspace still opens',
+    )
+  })
+
+  it('round-trips and indexes the headless run that produced a session', async () => {
+    const reg = await SessionRegistry.load(root, noopLogger)
+    await reg.create(rec({
+      id: 'codex-steady-copper-harbor',
+      agent: 'codex',
+      name: 'x1',
+      sourceRunId: 'run-2026-07-11',
+      surface: 'headless',
+      resumeHint: { kind: 'agent-session-id', value: '019eb75e-0b1b-7fa2' },
+    }))
+
+    const reloaded = await SessionRegistry.load(root, noopLogger)
+    await reloaded.ensureLoaded(WS)
+
+    expect(reloaded.findBySourceRunId(WS, 'run-2026-07-11')).toMatchObject({
+      id: 'codex-steady-copper-harbor',
+      sourceRunId: 'run-2026-07-11',
+      resumeHint: { kind: 'agent-session-id', value: '019eb75e-0b1b-7fa2' },
+    })
+  })
+
+  it('rejects a second roster row for the same resume identity', async () => {
+    const reg = await SessionRegistry.load(root, noopLogger)
+    await reg.create(rec())
+
+    await expect(reg.create(rec({
+      id: 'claude-second-row',
+      name: 'c2',
+    }))).rejects.toThrow('already exists for resume identity')
+  })
+
+  it('rejects duplicate resume identities while loading a persisted file', async () => {
+    const sessionsDir = join(root, 'sessions')
+    await mkdir(sessionsDir, { recursive: true })
+    await writeFile(join(sessionsDir, `${WS}.json`), JSON.stringify({
+      version: 4,
+      records: [
+        rec({ state: 'paused' }),
+        rec({ id: 'claude-second-row', name: 'c2', state: 'paused' }),
+      ],
+    }))
+
+    await expect(SessionRegistry.load(root, noopLogger))
+      .rejects.toThrow('duplicate resume identity')
+  })
+})

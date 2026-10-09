@@ -1,0 +1,39 @@
+{
+  "note": "After VERIFY: alice brief derive --facts-json-file facts.json --ops-json-file derive.ops.json --output facts.derived.json",
+  "ops": [
+    {
+      "op": "delta_bp",
+      "id": "effr_eff_bp",
+      "from_id": "effr_0916",
+      "to_id": "effr_0917",
+      "scale": 100
+    },
+    {
+      "op": "delta_bp",
+      "id": "dgs2_bp",
+      "from_id": "dgs2_0825",
+      "to_id": "dgs2_0928",
+      "scale": 100
+    },
+    {
+      "op": "delta_bp",
+      "id": "dgs10_bp",
+      "from_id": "dgs10_0825",
+      "to_id": "dgs10_0928",
+      "scale": 100
+    },
+    {
+      "op": "delta_bp",
+      "id": "dgs30_bp",
+      "from_id": "dgs30_0825",
+      "to_id": "dgs30_0928",
+      "scale": 100
+    },
+    {
+      "op": "pct_change",
+      "id": "cny_pct",
+      "from_id": "cny_0924",
+      "to_id": "cny_0930"
+    }
+  ]
+}

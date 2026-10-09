@@ -21,6 +21,7 @@ export const CLI_NEUTRAL_INPUT_ROOTS = Object.freeze([
   'packages/ibkr/dist',
   'packages/opentypebb/dist',
   'packages/uta-protocol/dist',
+  'packages/update-lifecycle/dist',
 ])
 
 const MANIFEST_NAME = 'manifest.json'

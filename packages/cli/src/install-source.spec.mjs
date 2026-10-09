@@ -1,3 +1,4 @@
+import { releaseChannelForVersion } from '@traderalice/update-lifecycle'
 import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
@@ -7,7 +8,6 @@ import { afterEach, describe, expect, it } from 'vitest'
 
 import {
   CLI_VERSION,
-  DEFAULT_INSTALL_SOURCE,
   installedContentIdentity,
   installSourceChannelVersionError,
   installSourceUpdateChannel,
@@ -16,6 +16,7 @@ import {
   readInstallSource,
 } from './install-source.mjs'
 
+const sourceExecution = await readInstallSource({ env: {}, bunStandalone: false })
 const temporaryPaths = []
 
 afterEach(async () => {
@@ -23,23 +24,39 @@ afterEach(async () => {
 })
 
 describe('OpenAlice install source', () => {
-  it('uses a channel and release selector matching the local CLI version when metadata is absent', async () => {
+  it('keeps source execution on dev when installed metadata is absent', async () => {
     const root = await mkdtemp(join(tmpdir(), 'openalice-install-source-'))
     temporaryPaths.push(root)
-    await expect(readInstallSource({ metadataUrl: join(root, 'missing.json') }))
-      .resolves.toEqual(DEFAULT_INSTALL_SOURCE)
-    const beta = /^[0-9]+\.[0-9]+\.[0-9]+-beta(?:\.[1-9][0-9]*)?$/.test(CLI_VERSION)
-    expect(DEFAULT_INSTALL_SOURCE).toMatchObject({
+    await expect(readInstallSource({ env: {} }))
+      .resolves.toEqual(sourceExecution)
+    expect(sourceExecution).toMatchObject({
       schemaVersion: 2,
-      selector: beta ? { kind: 'version', value: `v${CLI_VERSION}` } : { kind: 'branch', value: 'master' },
+      selector: { kind: 'branch', value: 'dev' },
       installerUrl: 'https://openalice.ai/install',
-      updateChannel: beta ? 'beta' : 'stable',
+      updateChannel: 'development',
     })
-    expect(installSourceChannelVersionError(DEFAULT_INSTALL_SOURCE)).toBeNull()
+    expect(installSourceChannelVersionError(sourceExecution)).toBeNull()
+  })
+
+  it('does not substitute a channel when an explicit receipt is missing or a native binary has no receipt', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'openalice-missing-provenance-'))
+    temporaryPaths.push(root)
+    const path = join(root, 'missing.json')
+    await expect(readInstallSource({ metadataUrl: path })).rejects.toMatchObject({ code: 'ENOENT' })
+    await expect(readInstallSource({ env: { OPENALICE_INSTALL_SOURCE: path } })).rejects.toMatchObject({ code: 'ENOENT' })
+    await expect(readInstallSource({ env: { OPENALICE_RUNTIME_PROFILE: 'electron-packaged' }, bunStandalone: true, executable: join(root, 'bin', 'openalice') })).resolves.toBeNull()
+  })
+
+  it('uses the desktop launcher mode rather than compiled identity or inherited CLI provenance', async () => {
+    const receipt = '/absent/unrelated-cli-provenance.json'
+    await expect(readInstallSource({ env: { OPENALICE_RUNTIME_PROFILE: 'electron-dev', OPENALICE_INSTALL_SOURCE: receipt } }))
+      .resolves.toMatchObject({ updateChannel: 'development' })
+    await expect(readInstallSource({ env: { OPENALICE_RUNTIME_PROFILE: 'electron-packaged', OPENALICE_INSTALL_SOURCE: receipt } }))
+      .resolves.toMatchObject({ cliVersion: CLI_VERSION, selector: { kind: 'version', value: `v${CLI_VERSION}` }, updateChannel: releaseChannelForVersion(CLI_VERSION) })
   })
 
   it('rejects a contradictory channel and version before a remote installer runs', () => {
-    expect(installSourceChannelVersionError({ ...DEFAULT_INSTALL_SOURCE, cliVersion: '0.94.1-beta', updateChannel: 'stable' }))
+    expect(installSourceChannelVersionError({ ...sourceExecution, cliVersion: '0.94.1-beta', updateChannel: 'stable' }))
       .toContain('marked stable')
   })
 
@@ -53,12 +70,12 @@ describe('OpenAlice install source', () => {
 
   it('compares the complete installer source, including selector and URL', () => {
     const dev = {
-      ...DEFAULT_INSTALL_SOURCE,
+      ...sourceExecution,
       selector: { kind: 'branch', value: 'dev' },
       installerUrl: 'https://raw.githubusercontent.com/TraderAlice/OpenAlice/dev/install',
     }
-    expect(installSourcesMatch(DEFAULT_INSTALL_SOURCE, { ...DEFAULT_INSTALL_SOURCE })).toBe(true)
-    expect(installSourcesMatch(DEFAULT_INSTALL_SOURCE, dev)).toBe(false)
+    expect(installSourcesMatch(sourceExecution, { ...sourceExecution })).toBe(true)
+    expect(installSourcesMatch(sourceExecution, dev)).toBe(false)
   })
 
   it('reads legacy metadata without changing its inferred channel', () => {

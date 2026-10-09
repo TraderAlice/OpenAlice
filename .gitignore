@@ -67,3 +67,6 @@ satellites/**/*.egg-info/
 
 # Isolated Electron demo UI bundle
 /ui/dist-demo/
+
+# Local source-test receipts (CI uploads these as artifacts).
+/artifacts/tests/

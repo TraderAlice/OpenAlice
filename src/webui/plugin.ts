@@ -1,5 +1,5 @@
 import { prepareProjectWorkspaces } from '../workspaces/project-workspace-setup.js'
-import { WorkspaceAutoUpdates } from '../workspaces/workspace-auto-updates.js'
+import { WorkspaceUpdateService } from '../workspaces/workspace-update-service.js'
 import { Hono, type Context } from 'hono'
 import { cors } from 'hono/cors'
 import { createAdaptorServer, serve } from '@hono/node-server'
@@ -91,7 +91,7 @@ export class WebPlugin implements Plugin {
   /** SSE clients grouped by channel ID. Default channel: 'default'. */
   private sseByChannel = new Map<string, Map<string, SSEClient>>()
   private workspaceService: WorkspaceService | null = null
-  private workspaceAutoUpdates: WorkspaceAutoUpdates | null = null
+  private workspaceUpdates: WorkspaceUpdateService | null = null
   private workspacesWs: AttachedWS | null = null
   private workspacesIpc: AttachedWorkspaceIpc | null = null
   private webIpc: AttachedWebIpc | null = null
@@ -251,7 +251,11 @@ export class WebPlugin implements Plugin {
     app.route('/api/connectors', createConnectorRoutes({
       getWorkspaceService: () => this.workspaceService,
     }))
-    app.route('/api/preferences', createPreferencesRoutes())
+    app.route('/api/preferences', createPreferencesRoutes(undefined, undefined, () => {
+      void this.workspaceUpdates?.refreshAndApplyPolicy().catch((error: unknown) => {
+        console.warn('[workspace updates] Could not apply changed policy:', error)
+      })
+    }))
     app.route('/api/ui-layout', createUiLayoutRoutes())
     app.route('/api/market-data', createMarketDataRoutes(ctx))
     app.route('/api/trading/config', createTradingConfigRoutes(ctx))
@@ -291,11 +295,11 @@ export class WebPlugin implements Plugin {
         : {}),
       inboxStore: ctx.inboxStore,
     })
-    this.workspaceAutoUpdates = new WorkspaceAutoUpdates(this.workspaceService)
+    this.workspaceUpdates = new WorkspaceUpdateService(this.workspaceService)
     const defaultWorkspaceService = this.workspaceService
-    const workspaceAutoUpdates = this.workspaceAutoUpdates
+    const workspaceUpdates = this.workspaceUpdates
     let updatesActivated = false
-    app.route('/api/updates', createUpdateRoutes(workspaceAutoUpdates, () => {
+    app.route('/api/updates', createUpdateRoutes(workspaceUpdates, () => {
       if (updatesActivated) return
       updatesActivated = true
       void prepareProjectWorkspaces(defaultWorkspaceService, {
@@ -305,7 +309,7 @@ export class WebPlugin implements Plugin {
         },
       }).catch((error: unknown) => console.warn('[workspace setup] Could not prepare default Workspaces:', error))
         .finally(() => {
-          if (this.workspaceAutoUpdates === workspaceAutoUpdates) workspaceAutoUpdates.start()
+          if (this.workspaceUpdates === workspaceUpdates) workspaceUpdates.start()
         })
     }))
     this.workspacesIpc = attachWorkspacesIpc(this.workspaceService)
@@ -432,8 +436,8 @@ export class WebPlugin implements Plugin {
   }
 
   async stop() {
-    this.workspaceAutoUpdates?.stop()
-    this.workspaceAutoUpdates = null
+    this.workspaceUpdates?.stop()
+    this.workspaceUpdates = null
     this.sseByChannel.clear()
     this.webIpc?.dispose()
     this.webIpc = null

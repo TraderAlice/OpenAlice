@@ -1,5 +1,7 @@
 /** Verify generated Broker Pack catalogs and import every release artifact. */
 
+import { signCliMacOS } from './sign-cli-macos.mjs'
+import { requireBunExecutable } from './bun-toolchain.mjs'
 import { spawnSync } from 'node:child_process'
 import { createHash } from 'node:crypto'
 import { createReadStream } from 'node:fs'
@@ -42,6 +44,7 @@ let compiledProbe: string | undefined
 const tempRoot = await mkdtemp(resolve(tmpdir(), 'openalice-broker-pack-verify-'))
 try {
   if (compiled) {
+    requireBunExecutable('bun')
     const probe = resolve(tempRoot, 'probe.ts')
     const options = pathToFileURL(resolve(repoRoot, 'scripts/bun-compile-options.ts')).href
     const builder = resolve(tempRoot, 'build.ts')
@@ -65,6 +68,7 @@ console.log('COMPILED_PACK_OK', engine);
 const r=await Bun.build({entrypoints:[${JSON.stringify(probe)}],compile:{...runtimeCompileOptions,target:${JSON.stringify(`bun-${process.platform === 'win32' ? 'windows' : process.platform}-${process.arch}`)},outfile:${JSON.stringify(compiledProbe)}}}); if(!r.success) throw new Error(String(r.logs));`)
     const result = spawnSync('bun', [builder], {cwd: tempRoot, encoding:'utf8', timeout:120_000})
     if (result.error || result.status !== 0) throw new Error(`Compiled probe build failed: ${result.error ?? result.stderr}`)
+    if (process.platform === 'darwin') signCliMacOS(compiledProbe, process.arch)
   }
   for (const asset of catalog.packs) await verifyAsset(asset, tempRoot)
 } finally {

@@ -1,3 +1,5 @@
+import { planRuntimeUpdate, beginRuntimeOperation, transitionRuntimeOperation, verifyReleaseEvidence } from '@traderalice/update-lifecycle'
+import { readRemoteUpdate, writeRemoteUpdate, withRemoteUpdateLock } from './remote-update-journal.mjs'
 import { spawn } from 'node:child_process'
 import { createHash } from 'node:crypto'
 import { mkdir, readFile, rename, writeFile } from 'node:fs/promises'
@@ -6,7 +8,7 @@ import { dirname, join, posix } from 'node:path'
 import { createInterface } from 'node:readline/promises'
 
 import {
-  DEFAULT_INSTALL_SOURCE,
+  CLI_VERSION,
   formatInstallSelector,
   installedContentIdentity,
   installSourceChannelVersionError,
@@ -16,9 +18,11 @@ import {
   readInstallSource,
   requireInstallSource,
 } from './install-source.mjs'
+import { packageManagerForSource } from './package-manager.mjs'
 import { formatMissingRuntimeBuildTools } from './runtime-deps.mjs'
 import { connectSsh } from './ssh-connect.mjs'
 import {
+  checkForUpdate,
   fetchDevManifestDocument,
   selectDevManifestTarget,
 } from './update.mjs'
@@ -128,6 +132,14 @@ export function parseRemoteArgs(argv) {
 }
 
 export async function connectRemote(options, dependencies = {}) {
+  if (!options.planOnly && options.mode === 'connect') {
+    return withRemoteUpdateLock(options, { ...dependencies, env: dependencies.env ?? process.env },
+      releaseUpdateLock => connectRemoteUnderLock(options, { ...dependencies, releaseUpdateLock }))
+  }
+  return connectRemoteUnderLock(options, dependencies)
+}
+
+async function connectRemoteUnderLock(options, dependencies) {
   const stdout = dependencies.stdout ?? process.stdout
   const env = dependencies.env ?? process.env
   const localInstall = await resolveLocalInstallIdentity(dependencies, env)
@@ -149,18 +161,32 @@ export async function connectRemote(options, dependencies = {}) {
   if (options.mode === 'stop') {
     return stopManagedRemote(connectionOptions, remote, { ...dependencies, probe, stdout })
   }
-  const devExpectation = await resolveDevInstallExpectation(
-    localInstall,
+  const pendingUpdate = await readRemoteUpdate(connectionOptions, { ...dependencies, env })
+  const selectedInstall = pendingUpdate
+    ? pendingUpdate.install
+    : options.updateIntent === 'update'
+      ? await discoverRemoteUpdate(remote, localInstall, { ...dependencies, env })
+      : localInstall
+  const devExpectation = pendingUpdate ? pendingUpdate.install : selectedInstall.expectedRemoteTarget ? selectedInstall : await resolveDevInstallExpectation(
+    selectedInstall,
     remote,
     { ...dependencies, env },
   )
   let plan = createRemotePlan(connectionOptions, remote, {
-    installSource: localInstall.installSource,
-    contentIdentity: localInstall.contentIdentity,
+    installSource: selectedInstall.installSource,
+    contentIdentity: selectedInstall.contentIdentity,
     ...devExpectation,
     installBaseUrl: dependencies.installBaseUrl ?? env['OPENALICE_REMOTE_TEST_INSTALL_BASE_URL'] ?? '',
     repositoryUrl,
   })
+  if (pendingUpdate) {
+    if (pendingUpdate.projectHome !== (remote.status?.home ?? options.remoteHome))
+      plan.blocker = 'The selected remote project home changed since the approved update.'
+    if (verifyReleaseEvidence(pendingUpdate.operation.target, plan.lifecycle?.target ?? null).status !== 'matched')
+      plan.blocker = 'An interrupted update has a different approved target. Inspect the installed release before continuing.'
+    if (plan.restartServer && !runningOwnerMatches(remote.status, pendingUpdate.owner))
+      plan.blocker = 'The remote CLI Server owner changed since the approved update. The new owner will not be stopped.'
+  }
   await dependencies.onPlan?.(plan)
   stdout.write(formatRemotePlan(plan))
 
@@ -177,6 +203,11 @@ export async function connectRemote(options, dependencies = {}) {
     }
   }
 
+  if (plan.nativeRuntimeExpected && !options.takeover) {
+    return executeNativeUpdate(connectionOptions, remote, plan, pendingUpdate, {
+      ...dependencies, env, probe, stdout, rememberedLocalPort,
+    })
+  }
   const runRemote = dependencies.runRemote ?? runSshCommand
   if (plan.runInstaller) {
     dependencies.onProgress?.('installing')
@@ -327,6 +358,12 @@ export async function connectRemote(options, dependencies = {}) {
       throw startError
     }
   }
+  if (options.machineOnly) {
+    dependencies.onProgress?.('verifying')
+    if (!remote.cliPath || !remote.cliCompatible) throw new Error('The remote OpenAlice CLI is not ready after preparation.')
+    stdout.write('OpenAlice CLI is ready. No AliceProject was started.\n')
+    return 0
+  }
   if (!isRemoteRuntimeAttachable(remote.status)) {
     throw new Error(`Remote OpenAlice Server is not ready after apply (${remote.status?.class ?? 'no status'})`)
   }
@@ -365,7 +402,166 @@ export async function connectRemote(options, dependencies = {}) {
   }, dependencies)
 }
 
+function runtimeRelease(source, contentIdentity, commit) {
+  const channel = installSourceUpdateChannel(source)
+  return { version: source.cliVersion, channel: channel === 'development' ? 'dev' : channel,
+    ...(source.artifact?.sha256 ? { artifactSha256: source.artifact.sha256 } : {}),
+    ...(normalizeContentIdentity(contentIdentity) ? { contentIdentity } : {}),
+    ...(commit ? { commit } : {}) }
+}
+
+function remoteActiveRelease(remote) {
+  if (remote.status?.class !== 'running') return null
+  const matches = runningRuntimeMatchesPlan({ appDir: '' }, remote)
+  const version = remote.status.productVersion ?? remote.status.runtimeVersion ?? (matches ? remote.cliVersion : null)
+  return version ? { version, ...(normalizeContentIdentity(remote.status.provider?.contentIdentity)
+    ? { contentIdentity: remote.status.provider.contentIdentity } : matches ? { contentIdentity: remote.cliContentIdentity } : {}) } : null
+}
+
+function isInstalledRuntimeOwner(remote) {
+  if (runningRuntimeMatchesPlan({ appDir: '' }, remote)) return true
+  const root = normalizeRemoteRuntimeRoot(remote.status?.provider?.root)
+  const releases = remote.managedRuntime?.path && posix.dirname(remote.managedRuntime.path)
+  return Boolean(releases && root?.startsWith(releases + '/') && root.endsWith('/share/openalice')
+    && remoteActiveRelease(remote) && remote.status?.owner?.surface === 'cli-server')
+}
+
+async function discoverRemoteUpdate(remote, localInstall, dependencies) {
+  const source = parseInstallSource(remote.installSource)
+  if (!source) return localInstall
+  // Finish a previously installed release before considering another candidate.
+  if (installedNativeRuntimeMatches(remote) && remote.status?.class === 'running' && !runningRuntimeMatchesPlan({ appDir: '' }, remote))
+    return { installSource: source, contentIdentity: remote.cliContentIdentity }
+  const check = await (dependencies.checkForUpdateImpl ?? checkForUpdate)({
+    installSource: source, currentVersion: remote.cliVersion,
+    platform: remote.platform.os, arch: normalizeRemoteArchitecture(remote.platform.architecture),
+  }, dependencies)
+  if (check.packageManager) throw new Error(`Update this Machine through ${check.packageManager.label}: ${check.packageManager.update}`)
+  if (check.status === 'unsupported') throw new Error(check.message)
+  if (check.status !== 'available') return { installSource: source, contentIdentity: remote.cliContentIdentity }
+  return { installSource: { schemaVersion: 2, repository: source.repository,
+    cliVersion: check.latestVersion, installerUrl: check.installer.url,
+    selector: { kind: check.channel === 'dev' ? 'branch' : 'version', value: check.channel === 'dev' ? 'dev' : `v${check.latestVersion}` },
+    updateChannel: check.channel === 'dev' ? 'development' : check.channel }, contentIdentity: null,
+    ...(check.channel === 'dev' ? { expectedRemoteTarget: { platform: remote.platform.os,
+      arch: normalizeRemoteArchitecture(remote.platform.architecture), sha256: check.latestArtifactSha256,
+      contentIdentity: check.latestContentIdentity }, devCommit: check.latestCommit } : {}) }
+}
+
+async function executeNativeUpdate(options, remote, plan, previous, dependencies) {
+  const { probe, stdout } = dependencies
+  const runRemote = dependencies.runRemote ?? runSshCommand
+  let tunnelResult = 0
+  await (async () => {
+    // Another local controller may have completed work while this plan waited.
+    const currentReceipt = await readRemoteUpdate(options, dependencies)
+    if (JSON.stringify(currentReceipt) !== JSON.stringify(previous))
+      throw new Error('Another controller changed this update. Review a fresh plan.')
+    options = { ...options, remoteHome: options.remoteHome || remote.status?.home || '' }
+    const journalOptions = { ...options, remoteHome: plan.remoteHome === '~/.openalice (remote default)' ? '' : options.remoteHome }
+    const install = { installSource: plan.installSource, contentIdentity: plan.contentIdentity,
+      expectedRemoteTarget: plan.expectedRemoteTarget, devCommit: plan.devCommit,
+      installBaseUrl: plan.installBaseUrl, repositoryUrl: plan.repositoryUrl }
+    let receipt = { schemaVersion: 1, install, projectHome: remote.status?.home ?? options.remoteHome, owner: previous?.owner ?? plan.restartOwner,
+      operation: beginRuntimeOperation(plan.lifecycle) }
+    // A new approval may resume the same target; fresh observed state determines
+    // unfinished stages. No old command is replayed merely because its reply was lost.
+    const persist = async () => writeRemoteUpdate(journalOptions, receipt, dependencies)
+    const complete = async (stage, observed) => {
+      receipt.operation = transitionRuntimeOperation(receipt.operation, { type: 'complete', stage, observed,
+        installationOnly: options.machineOnly === true })
+      await persist()
+    }
+    await persist()
+    try {
+      for (const stage of receipt.operation.stages) {
+        if (stage === 'install') {
+          dependencies.onProgress?.('installing')
+          let actionError
+          try { writeRemoteActionOutput(stdout, await runRemote(options,
+            buildRemoteInstallCommand(plan.installSource, plan.installBaseUrl, plan.expectedRemoteTarget), dependencies)) }
+          catch (error) { actionError = error }
+          dependencies.onProgress?.('verifying-install')
+          try { remote = await probe(options, dependencies) } catch (error) { throw actionError ?? error }
+          if (!remoteCliMatchesRelease(remote, { ...install, nativeRuntimeRequired: true }))
+            throw actionError ?? new Error('The remote installation does not match the approved release.')
+          if (actionError) stdout.write('The remote install completed before the disconnect; continuing from detected state.\n')
+          if (!receipt.projectHome) {
+            receipt.projectHome = remote.status?.home ?? options.remoteHome
+            options = { ...options, remoteHome: options.remoteHome || receipt.projectHome }
+          }
+          await complete(stage, runtimeRelease(remote.installSource, remote.cliContentIdentity, plan.devCommit))
+          // Bind later activation/recovery to the accepted target-local bytes.
+          receipt.operation.target = { ...receipt.operation.target, contentIdentity: remote.cliContentIdentity,
+            artifactSha256: remote.installSource.artifact.sha256 }
+          receipt.install = { ...install, contentIdentity: remote.cliContentIdentity }
+          await persist()
+        } else if (stage === 'activate') {
+          dependencies.onProgress?.('restarting')
+          if (remote.status?.class === 'running') remote = await stopNativeRuntimeAfterUpdate(options,
+            receipt.owner, remote, { ...dependencies, runRemote, probe, stdout })
+          if (remote.status?.class !== 'absent' && remote.status !== null)
+            throw new Error('The previous Runtime has not stopped; activation was not attempted.')
+          let actionError
+          try { writeRemoteActionOutput(stdout, await runRemote(options,
+            buildRemoteServerStartCommand({ ...options, appDir: '' }, remote.cliPath), dependencies)) }
+          catch (error) { actionError = error }
+          try { remote = await probe(options, dependencies) } catch (error) { throw actionError ?? error }
+          if (!isRemoteRuntimeAttachable(remote.status)) throw actionError ?? new Error('The updated Runtime did not become ready.')
+          if (actionError) stdout.write('The remote Server became ready before the disconnect; continuing from detected state.\n')
+          await complete(stage)
+        } else if (stage === 'verify') {
+          dependencies.onProgress?.('verifying')
+          if (!remoteCliMatchesRelease(remote, { ...receipt.install, nativeRuntimeRequired: true }))
+            throw new Error('The installed release changed after approval.')
+          if (!options.machineOnly && (!isRemoteRuntimeAttachable(remote.status) || !runningRuntimeMatchesPlan(options, remote)))
+            throw new Error(formatRunningRuntimeMismatch(options, remote))
+          await complete(stage, options.machineOnly
+            ? runtimeRelease(remote.installSource, remote.cliContentIdentity, plan.devCommit)
+            : remoteActiveRelease(remote))
+        } else if (stage === 'reconnect') {
+          if (dependencies.afterRuntimeReady) await dependencies.afterRuntimeReady()
+          const runtimePort = remoteRuntimePort(remote.status)
+          if (runtimePort === null || (options.remotePortExplicit && runtimePort !== options.remotePort))
+            throw new Error('Remote OpenAlice Server reported an unexpected web endpoint')
+          stdout.write(`Remote OpenAlice Server is ready at ${remote.status.endpoints.web}\n`)
+          let connected = false
+          tunnelResult = await (dependencies.connectTunnel ?? connectSsh)({ destination: options.destination,
+            localPort: options.localPort, preferredLocalPort: dependencies.rememberedLocalPort, remotePort: runtimePort,
+            sshPort: options.sshPort, identityFile: options.identityFile, openBrowser: false, waitMs: options.waitMs,
+            onReady: async ({ localPort }) => {
+              await complete(stage)
+              connected = true
+              await dependencies.releaseUpdateLock?.()
+              try { await rememberRemotePort(journalOptions, localPort, dependencies) }
+              catch (error) { stdout.write(`Could not remember the SSH port: ${error.message}\n`) }
+            },
+          }, dependencies)
+          // GUI adapters restore transport in afterRuntimeReady and don't run a
+          // foreground tunnel. Test adapters likewise return a connection result.
+          if (!connected) {
+            if (tunnelResult !== 0) throw new Error('SSH reconnect did not complete')
+            await complete(stage)
+          }
+        }
+      }
+    } catch (error) {
+      // Once connected the lock is released; later tunnel failures must not
+      // overwrite a newer controller's receipt or undo completed activation.
+      if (receipt.operation.phase !== 'succeeded') {
+        receipt.operation = transitionRuntimeOperation(receipt.operation, { type: 'fail', error: error.message })
+        await persist()
+      }
+      throw error
+    }
+  })()
+  if (options.machineOnly) stdout.write('OpenAlice CLI is ready. No AliceProject was started.\n')
+  return tunnelResult
+}
+
+
 async function stopManagedRemote(options, initialRemote, dependencies) {
+  options = { ...options, remoteHome: options.remoteHome || initialRemote.status?.home || '' }
   const stdout = dependencies.stdout
   const runRemote = dependencies.runRemote ?? runSshCommand
   const probe = dependencies.probe
@@ -463,29 +659,54 @@ function formatManagedRemoteStatus(destination, remote) {
   return `${lines.join('\n')}\n\n`
 }
 
-export function createRemotePlan(options, remote, install = {}) {
-  const installSource = requireInstallSource(install.installSource ?? DEFAULT_INSTALL_SOURCE)
-  const contentIdentity = normalizeContentIdentity(install.contentIdentity)
-  const expectedRemoteTarget = normalizeExpectedRemoteTarget(install.expectedRemoteTarget)
+export function createRemotePlan(options, remote, install) {
+  let installSource = requireInstallSource(install.installSource)
+  let contentIdentity = normalizeContentIdentity(install.contentIdentity)
+  let expectedRemoteTarget = normalizeExpectedRemoteTarget(install.expectedRemoteTarget)
+  const recordedSource = parseInstallSource(remote.installSource)
+  const recordedRelease = recordedSource && remote.cliVersion === recordedSource.cliVersion
+    ? runtimeRelease(recordedSource, remote.cliContentIdentity) : null
+  const candidate = runtimeRelease(installSource, expectedRemoteTarget?.contentIdentity ?? contentIdentity, install.devCommit)
+  // Only compare a client's artifact with the same platform. The remote archive
+  // is verified against its own receipt, not a macOS client's Linux counterpart.
+  if (!expectedRemoteTarget && (installSource.artifact?.platform !== remote.platform?.os
+    || installSource.artifact?.arch !== normalizeRemoteArchitecture(remote.platform?.architecture))) {
+    delete candidate.contentIdentity
+    delete candidate.artifactSha256
+  }
+  if (expectedRemoteTarget) {
+    candidate.contentIdentity = expectedRemoteTarget.contentIdentity
+    candidate.artifactSha256 = expectedRemoteTarget.sha256
+  }
+  const choice = planRuntimeUpdate({ installed: recordedRelease, candidate,
+    active: null, running: false, canActivate: false, installationOnly: true })
+  if (choice.selection === 'installed' && recordedSource) {
+    installSource = recordedSource
+    contentIdentity = normalizeContentIdentity(remote.cliContentIdentity)
+    expectedRemoteTarget = recordedSource.artifact && contentIdentity ? {
+      platform: recordedSource.artifact.platform, arch: recordedSource.artifact.arch,
+      sha256: recordedSource.artifact.sha256, contentIdentity,
+    } : null
+  }
   const devCommit = typeof install.devCommit === 'string' ? install.devCommit : null
   const devBlocker = typeof install.devBlocker === 'string' ? install.devBlocker : ''
   const expectedTargetBlocker = installSourceUpdateChannel(installSource) === 'development'
-    && !expectedRemoteTarget
+    && !expectedRemoteTarget && choice.selection !== 'installed'
     ? 'The latest dev target for this remote host is missing or invalid. Refresh the dev manifest and try again.'
     : ''
   const installBaseUrl = install.installBaseUrl ?? ''
   const repositoryUrl = install.repositoryUrl ?? DEFAULT_REPOSITORY_URL
   const mutations = []
-  let blocker = devBlocker || expectedTargetBlocker || installSourceChannelVersionError(installSource) || ''
+  let blocker = (choice.selection === 'candidate' ? devBlocker : '') || expectedTargetBlocker || installSourceChannelVersionError(installSource) || ''
   let cloneSource = false
   let startServer = false
   let restartServer = false
   let restartOwner = null
   const status = remote.status
-  const reusableExternalRuntime = isRemoteRuntimeAttachable(status)
+  const reusableExternalRuntime = !options.machineOnly && isRemoteRuntimeAttachable(status)
     && !options.appDir
     && status?.provider?.kind !== 'bun'
-  const cliMatchesLocal = remoteCliMatchesRelease(remote, {
+  const cliMatchesTarget = remoteCliMatchesRelease(remote, {
     installSource,
     contentIdentity,
     expectedRemoteTarget,
@@ -494,7 +715,7 @@ export function createRemotePlan(options, remote, install = {}) {
   const bundledRuntime = !options.appDir && remote.managedRuntime?.compatible === true
   const cliUpdateRequired = !remote.cliPath
     || !remote.cliCompatible
-    || !cliMatchesLocal
+    || !cliMatchesTarget
     || (!options.appDir && !reusableExternalRuntime && !bundledRuntime)
   const deferredCliUpdate = cliUpdateRequired
     && reusableExternalRuntime
@@ -518,9 +739,30 @@ export function createRemotePlan(options, remote, install = {}) {
     blocker = `${options.appDir} exists but is not an OpenAlice source checkout. Choose another --app-dir or move the existing path.`
   }
 
+  const lifecycle = nativeRuntimeExpected ? planRuntimeUpdate({
+    installed: recordedRelease,
+    candidate: choice.target,
+    installedVerified: !installCli,
+    active: remoteActiveRelease(remote),
+    running: status?.class === 'running',
+    canActivate: isManagedNativeRemoteRuntime(status) && Boolean(runningOwnerIdentity(status))
+      && status.capabilities?.includes('runtime.stop') === true && isInstalledRuntimeOwner(remote),
+    installationOnly: options.machineOnly === true,
+  }) : null
+  if (!blocker && lifecycle?.blocker) blocker = lifecycle.blocker
+  const manager = recordedSource && packageManagerForSource(recordedSource)
+  if (!blocker && installCli && manager) blocker = `Update this Machine through ${manager.label}: ${manager.update}`
+  if (!blocker && status?.control && (status.control.minClientApiVersion > 1 || status.control.apiVersion < 1))
+    blocker = 'The remote Runtime control protocol is incompatible with this client.'
+
+  // GUI Machine registration prepares only the CLI installation. Project
+  // ownership/start/restart are separate reviewed operations. In particular,
+  // a default project occupied by Electron must not block registering a host.
+  if (!options.machineOnly) {
   const detectedRuntimePort = remoteRuntimePort(status)
   const runningRuntimeMismatch = remoteRuntimeMustMatchPlan(options, remote)
     && !runningRuntimeMatchesPlan(options, remote)
+    && !(nativeRuntimeExpected && lifecycle?.stages.includes('activate') && !lifecycle.blocker)
   if (!blocker && runningRuntimeMismatch) {
     blocker = formatRunningRuntimeMismatch(options, remote)
   } else if (!blocker && status?.class === 'running') {
@@ -562,7 +804,7 @@ export function createRemotePlan(options, remote, install = {}) {
   if (
     !blocker
     && !options.appDir
-    && installCli
+    && lifecycle?.stages.includes('activate')
     && isManagedNativeRemoteRuntime(status)
   ) {
     if (!Array.isArray(status.capabilities) || !status.capabilities.includes('runtime.stop')) {
@@ -576,6 +818,8 @@ export function createRemotePlan(options, remote, install = {}) {
       restartServer = true
       mutations.push('restart remote OpenAlice Server')
     }
+  }
+
   }
 
   if (!blocker && startServer && !nativeRuntimeExpected) {
@@ -608,7 +852,7 @@ export function createRemotePlan(options, remote, install = {}) {
     cliVersion: remote.cliVersion ?? 'unknown',
     cliCompatible: remote.cliCompatible === true,
     cliContentIdentity: remote.cliContentIdentity ?? null,
-    cliMatchesLocal,
+    cliMatchesTarget,
     runtimeClass: status?.class ?? 'unknown',
     runtimeOwner: status?.owner?.surface ?? 'none',
     appDir: serverAppDir || 'matching native release',
@@ -651,6 +895,9 @@ export function createRemotePlan(options, remote, install = {}) {
     devBlocker,
     installBaseUrl,
     repositoryUrl,
+    lifecycle,
+    activeVersion: remoteActiveRelease(remote)?.version ?? null,
+    observed: { installed: remote.installSource ? runtimeRelease(remote.installSource, remote.cliContentIdentity) : remote.cliVersion ? { version: remote.cliVersion } : null, active: remoteActiveRelease(remote) },
     mutations,
     blocker,
   }
@@ -671,8 +918,8 @@ export function formatRemotePlan(plan) {
         : 'Ready'
   const cliState = plan.deferredCliUpdate
     ? ', update deferred: the running Runtime has no safe activation capability'
-    : plan.cliCompatible && plan.cliMatchesLocal
-      ? ', compatible and matches local CLI'
+    : plan.cliCompatible && plan.cliMatchesTarget
+      ? ', compatible with the selected release'
       : ', install/update required'
   const runtimeState = plan.bundledRuntime
     ? `, content ${plan.runtimeContentIdentity}`
@@ -680,7 +927,7 @@ export function formatRemotePlan(plan) {
     ? ', will clone'
     : plan.sourceCheckoutState === 'present' ? ', ready' : ''
   const runtimeLabel = plan.nativeRuntimeExpected ? 'Release' : 'Source'
-  return `\nOpenAlice Remote\n\nRemote plan\n  Target         ${plan.target}\n  Platform       ${plan.platform}\n  CLI            ${plan.cliPath} (${plan.cliVersion}${cliState})\n  Runtime        ${plan.runtimeClass} (${plan.runtimeOwner})\n  Activation     ${formatActivationRoute(plan.activationRoute)}\n  ${runtimeLabel.padEnd(14)} ${plan.appDir} (${plan.sourceMode}${runtimeState})\n  Build tools    ${buildTools}\n  Home           ${plan.remoteHome}\n  Tunnel         127.0.0.1:${plan.localPort} -> remote 127.0.0.1:${plan.remotePort}\n  Actions        ${actions.join('; ')}\n${plan.runInstaller ? `  Installer      ${plan.installSource.installerUrl} (CLI ${plan.installSource.cliVersion}, ${formatInstallSelector(plan.installSource)}, selected by local CLI)\n` : ''}${plan.blocker ? `\nBlocked: ${plan.blocker}\n` : '\nNothing has changed yet.\n'}\n`
+  return `\nOpenAlice Remote\n\nRemote plan\n  Target         ${plan.target}\n  Platform       ${plan.platform}\n  CLI            ${plan.cliPath} (${plan.cliVersion}${cliState})\n  Runtime        ${plan.runtimeClass} (${plan.runtimeOwner})\n  Activation     ${formatActivationRoute(plan.activationRoute)}\n  ${runtimeLabel.padEnd(14)} ${plan.appDir} (${plan.sourceMode}${runtimeState})\n  Build tools    ${buildTools}\n  Home           ${plan.remoteHome}\n  Tunnel         127.0.0.1:${plan.localPort} -> remote 127.0.0.1:${plan.remotePort}\n  Actions        ${actions.join('; ')}\n${plan.runInstaller ? `  Installer      ${plan.installSource.installerUrl} (CLI ${plan.installSource.cliVersion}, ${formatInstallSelector(plan.installSource)}, selected for this Machine)\n` : ''}${plan.blocker ? `\nBlocked: ${plan.blocker}\n` : '\nNothing has changed yet.\n'}\n`
 }
 
 function formatActivationRoute(route) {
@@ -705,7 +952,7 @@ async function resolveLocalInstallIdentity(dependencies, env) {
     const testSource = parseInstallSource({
       schemaVersion: 1,
       repository: 'TraderAlice/OpenAlice',
-      cliVersion: DEFAULT_INSTALL_SOURCE.cliVersion,
+      cliVersion: CLI_VERSION,
       selector: { kind: testKind, value: testValue },
       installerUrl: testUrl,
     })
@@ -827,7 +1074,9 @@ export async function probeRemoteHost(options, dependencies = {}) {
     } catch {
       remoteInstallSource = null
     }
-    const statusOutput = await runRemote(options, buildRemoteStatusCommand(options, cliPath), dependencies)
+    const statusOutput = await runRemote(options, buildRemoteStatusCommand({ ...options,
+      remoteHome: options.remoteHome || posix.join(shellHome, '.openalice'),
+    }, cliPath), dependencies)
     status = parseRemoteStatus(statusOutput)
     cliCompatible = status.protocol === 1
   } catch {
@@ -877,7 +1126,7 @@ async function probeRemoteControl(options, dependencies) {
 }
 
 export function buildRemoteControlProbeCommand(options) {
-  const statusHome = options.remoteHome ? ` --home ${shellQuote(options.remoteHome)}` : ''
+  const statusHome = options.remoteHome ? ` --home ${shellQuote(options.remoteHome)}` : ' --home "$HOME/.openalice"'
   return `cli=$(command -v openalice 2>/dev/null || { [ ! -x "$HOME/.openalice/bin/openalice" ] || printf '%s\\n' "$HOME/.openalice/bin/openalice"; })
 printf 'cli=%s\\n' "$cli"
 if test -n "$cli"; then
@@ -1135,8 +1384,8 @@ Options:
   -h, --help              Show this help
 
 --yes never implies --takeover. Stage 2 supports Linux and macOS SSH hosts.
-  Remote CLI installation always uses the invoking local CLI's recorded installer
-source; this command has no independent branch or version selector.
+  An existing Machine retains its recorded channel and any newer installed release.
+The local release is the bootstrap candidate for an unprepared Machine.
 `
 }
 

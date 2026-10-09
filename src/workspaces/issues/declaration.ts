@@ -249,15 +249,18 @@ export const issueFrontmatterSchema = issueFrontmatterObjectSchema
         message: `${value.assignee} needs a schedule`,
       })
     }
-    if (issueAssigneeResumeId(value.assignee)) {
+    const resumeId = issueAssigneeResumeId(value.assignee)
+    if (resumeId) {
       for (const field of ['agent', 'credential', 'credentialSource', 'model', 'effort'] as const) {
         if (!value[field]) continue
         ctx.addIssue({
           code: 'custom',
           path: [field],
           message: field === 'agent'
-            ? 'assigned Session has a fixed Agent runtime; remove the agent override from this Issue'
-            : `assigned Session reads ${field} from its own AI config; remove the ${field} override from this Issue and update the Session instead`,
+            ? 'assigned Session has a fixed Agent runtime; remove the agent override from this Issue (model and effort remain editable)'
+            : field === 'model' || field === 'effort'
+              ? `remove the ${field} override from this Issue; edit ai.${field === 'model' ? 'model' : 'reasoningEffort'} in .alice/sessions/${resumeId}.json in the Session's Workspace for its next launch (preserve other fields), or use Session Settings while idle; only the Agent runtime is fixed`
+              : `assigned Session reads ${field} from its own AI config; remove the ${field} override from this Issue and update it in Session Settings while idle; only the Agent runtime is fixed`,
         })
       }
     }

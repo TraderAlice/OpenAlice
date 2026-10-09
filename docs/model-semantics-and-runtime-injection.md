@@ -96,6 +96,16 @@ same endpoint. Failed refreshes preserve the list and timestamp, with a
 one-minute retry delay; successful empty lists remain empty. Incomplete or
 failed discovery is never committed.
 
+The UI revalidates saved-account and native-runtime catalogs when the window
+regains focus or the document becomes visible. These reads share the backend
+freshness policy. Draft discovery remains debounced and account-scoped.
+`ModelIdentity` owns model names and manufacturer logos across selectors,
+credential summaries, preferences and Session details. Catalog labels supply
+names; known model families supply a readable fallback. Unknown IDs remain
+exact, and hover titles expose the persisted ID. Editable suggestions keep
+exact model IDs. Reasoning and context controls remain at their configuration
+boundary.
+
 Cache identity covers the credential, vendor, endpoint, wire and key. Cache
 files contain an internal identity digest, timestamp, model display fields and
 validated model semantics; no key or raw provider response. Corrupt files are rebuilt. A successful
@@ -443,6 +453,13 @@ are not a supported Codex project layer, so OpenAlice-managed custom providers
 use an explicit `.codex/openalice-home/`, while model/effort-only login-backed
 preferences leave `CODEX_HOME` unset.
 
+Codex Workspace creation does not read or rewrite global `config.toml` or
+`auth.json`. Interactive, headless, and Web launches trust only their canonical
+Workspace path through a process-local `-c projects={...}` inline TOML table.
+This keeps native project model/effort configuration available without persisting
+trust or racing another Workspace, Codex, or the user's editor. Do not use a
+dotted override key containing a quoted path: Codex splits that key on dots.
+
 Context-window and output limits follow the same ownership boundary. Registered
 model semantics provide known limits; an explicit Workspace preference may
 override the context registration for runtimes that support it; otherwise the
@@ -530,8 +547,9 @@ The visible effective choices are sufficient disclosure there: selecting a
 vault credential must not rewrite the Workspace, and changing a creation
 default never rewrites an existing Workspace. Successful explicit Workspace
 saves use transient confirmation instead of a permanent success state.
-This disclosure applies to all four supported Agent runtimes. Claude Code and
-Codex use their native global login and global runtime configuration by default.
+This disclosure applies to registered Agent runtimes according to their
+declared capabilities, not a fixed four-runtime set. Claude Code and Codex use
+their native global login and global runtime configuration by default.
 Merely storing a compatible credential in Alice never selects or injects it;
 only an explicit Session selection, Workspace fixed/recent preference, or
 new-Workspace creation seed overrides the native fallback. The visible values
@@ -666,7 +684,9 @@ Tests for this subsystem must cover:
 - exact ids and declared aliases resolve, while unknown ids remain unknown;
 - omitted semantic fields do not become false during serialization;
 - registered reasoning models reach Pi and opencode without a manual toggle;
-- explicit effort choices round-trip through all four native runtimes;
+- explicit effort choices round-trip through adapters that declare effort
+  support, preserving runtime-specific representation such as Cursor's
+  model-encoded effort rather than inventing a universal wire field;
 - omitted effort remains absent even when the selected model publishes a default;
 - provider-only thinking switches never become fabricated effort values;
 - non-reasoning and unknown models do not receive fabricated capabilities;
@@ -681,30 +701,6 @@ Tests for this subsystem must cover:
 - diagnostic readiness failures never block an ordinary native launch or resume;
 - missing OpenAlice credentials never block a runtime that can manage its own access;
 - failed interactive resumes return a visible error and remain retryable.
-
-### September 20, 2026 preset audit
-
-Bundled suggestions were checked against the configured providers' live model
-catalogs and primary documentation. New defaults apply to new forms and
-unspecified selections; this audit does not rewrite stored model choices.
-
-- OpenAI/Codex adds GPT-6 Astra; API limits follow [the model page](https://developers.openai.com/api/docs/models/gpt-6-astra).
-  Native Codex subscription metadata retains its separate 272K context and
-  `ultra` effort, verified against the local CLI model catalog.
-- Anthropic adds [Fable 5.1](https://platform.claude.com/docs/en/models/fable-5-1/overview);
-  the direct API ID is `claude-fable-5-1`, while OpenRouter uses `anthropic/claude-fable-5.1`.
-  Opus 5 remains the normal default.
-- Google defaults to [Gemini 3.8 Flash](https://ai.google.dev/gemini-api/docs/models/gemini-3.8-flash),
-  retaining earlier general-purpose tiers; media-only models are not preset suggestions.
-- GLM defaults to [5.3](https://docs.z.ai/guides/llm/glm-5.3), whose reasoning is mandatory.
-  Exact direct-API context remains unspecified; OpenRouter's separately reported limits are retained.
-- DeepSeek uses the live `deepseek-flash` ID for [V4.1 Flash](https://api-docs.deepseek.com/news/news260910/).
-  Old model semantic entries remain resolvable. Volatile price figures are removed from form hints.
-- MiniMax adds the current M2.7/M2.5 HighSpeed choices. Kimi, LongCat and Grok
-  suggestions were checked and remain current. Cursor/native subscription
-  catalogs are runtime-owned, so API listings do not redefine their identifiers.
-- OpenRouter's compact suggestions use IDs verified in its public directory;
-  rankings are not embedded in labels. Its full live catalog stays separate.
 
 ## Registry Maintenance
 
@@ -728,7 +724,7 @@ namespaces that many remote containers cannot create.
 
 | Runtime | Process-local execution policy |
 | --- | --- |
-| Codex | `danger-full-access`, approval `never`; Web thread start/resume use the same wire values |
+| Codex | `danger-full-access`, approval `never`, process-local Workspace trust; Web thread start/resume use the same permission wire values |
 | Claude | `--dangerously-skip-permissions`, injected `sandbox.enabled=false` |
 | Cursor | `--force --trust --sandbox disabled` |
 | Grok | `--always-approve`, `--sandbox off` |

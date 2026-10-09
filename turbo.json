@@ -15,7 +15,7 @@
       "outputs": ["dist/**"]
     },
     "@traderalice/openalice-cli#build": {
-      "dependsOn": [],
+      "dependsOn": ["^build"],
       "outputs": []
     }
   }

@@ -520,7 +520,7 @@ function AccountPanel({ account, positions, delta24h, clock, connecting }: {
 }) {
   if (!account) {
     return (
-      <div className="rounded-lg border border-border bg-card p-4">
+      <div className="oa-data-surface rounded-lg border border-border bg-card p-4">
         {clock != null && (
           <div className="text-[12px] mb-3"><MarketClockChip clock={clock} /></div>
         )}
@@ -577,7 +577,7 @@ function AccountPanel({ account, positions, delta24h, clock, connecting }: {
     : null
 
   return (
-    <div className="rounded-lg border border-border bg-card p-4">
+    <div className="oa-data-surface rounded-lg border border-border bg-card p-4">
       {clock != null && (
         <div className="text-[12px] mb-3"><MarketClockChip clock={clock} /></div>
       )}

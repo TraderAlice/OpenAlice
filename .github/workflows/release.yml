@@ -120,11 +120,16 @@ jobs:
       previous_tag: ${{ steps.plan.outputs.previous_tag }}
       source_sha: ${{ steps.plan.outputs.source_sha }}
       verifier_sha: ${{ steps.verifier.outputs.verifier_sha }}
+      channel_head_sha256: ${{ steps.plan.outputs.channel_head_sha256 }}
 
     steps:
       - uses: actions/checkout@v7
         with:
-          fetch-depth: 0 # full history for git-cliff
+          fetch-depth: 0 # full history for release tag validation and channel selection
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
 
       - name: Validate release intent and version authority
         id: plan
@@ -134,6 +139,7 @@ jobs:
           RELEASE_CHANNEL: ${{ inputs.channel }}
           SOURCE_REF: ${{ github.ref }}
           SOURCE_SHA: ${{ github.sha }}
+          DOWNLOAD_BASE_URL: ${{ secrets.DOWNLOAD_BASE_URL }}
         run: |
           set -euo pipefail
 
@@ -146,28 +152,30 @@ jobs:
             exit 1
           fi
 
-          if [ "$RELEASE_CHANNEL" = "stable" ]; then
-            TAG_PATTERN='^v[0-9]+\.[0-9]+\.[0-9]+$'
-            PREVIOUS_TAG_PATTERN='^v[0-9]+\.[0-9]+\.[0-9]+$'
-          elif [ "$RELEASE_CHANNEL" = "beta" ]; then
-            TAG_PATTERN='^v[0-9]+\.[0-9]+\.[0-9]+-beta(\.[1-9][0-9]*)?$'
-            PREVIOUS_TAG_PATTERN='^v[0-9]+\.[0-9]+\.[0-9]+-beta(\.[1-9][0-9]*)?$'
-          else
-            echo "Release channel must be beta or stable, got: $RELEASE_CHANNEL" >&2
-            exit 1
-          fi
-
-          if [[ ! "$RELEASE_TAG" =~ $TAG_PATTERN ]]; then
-            echo "Release tag $RELEASE_TAG does not match channel $RELEASE_CHANNEL" >&2
-            exit 1
-          fi
-
           VERSION="${RELEASE_TAG#v}"
+          if [ "$RELEASE_TAG" != "v${VERSION}" ]; then
+            echo "Release tag must start with v" >&2
+            exit 1
+          fi
+          if [ "$RELEASE_CHANNEL" = "stable" ]; then
+            MANIFEST_PATH="manifest.json"
+          elif [ "$RELEASE_CHANNEL" = "beta" ]; then
+            MANIFEST_PATH="beta/manifest.json"
+          else
+            echo "Release channel must be beta or stable" >&2
+            exit 1
+          fi
+          BASE_URL="${DOWNLOAD_BASE_URL:-https://download.openalice.ai}"
+          curl -fsSL "${BASE_URL%/}/${MANIFEST_PATH}" -o "$RUNNER_TEMP/openalice-intent-head.json"
+          HEAD_SHA256=$(node scripts/prepare-desktop-release-assets.mjs check-publication \
+            --head-path "$RUNNER_TEMP/openalice-intent-head.json" --version "$VERSION" \
+            --channel "$RELEASE_CHANNEL" --operation "$OPERATION")
+          echo "channel_head_sha256=$HEAD_SHA256" >> "$GITHUB_OUTPUT"
+
           if [ "$OPERATION" = "release" ]; then
             PACKAGE_VERSION=$(node -p "require('./package.json').version")
-            CLI_VERSION=$(node -p "require('./packages/cli/package.json').version")
-            if [ "$PACKAGE_VERSION" != "$VERSION" ] || [ "$CLI_VERSION" != "$VERSION" ]; then
-              echo "Release tag $RELEASE_TAG requires package versions $VERSION; root=$PACKAGE_VERSION cli=$CLI_VERSION" >&2
+            if [ "$PACKAGE_VERSION" != "$VERSION" ]; then
+              echo "Release tag $RELEASE_TAG requires root product version $VERSION; root=$PACKAGE_VERSION" >&2
               exit 1
             fi
 
@@ -189,13 +197,9 @@ jobs:
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
           echo "tag=$RELEASE_TAG" >> "$GITHUB_OUTPUT"
           echo "channel=$RELEASE_CHANNEL" >> "$GITHUB_OUTPUT"
-          PREVIOUS_TAG=$(
-            git for-each-ref --merged="$SOURCE_SHA" --sort=-version:refname \
-              --format='%(refname:short)' refs/tags \
-              | grep -E "$PREVIOUS_TAG_PATTERN" \
-              | head -n 1 \
-              || true
-          )
+          git for-each-ref --merged="$SOURCE_SHA" --format='%(refname:short)' refs/tags > "$RUNNER_TEMP/openalice-reachable-tags.txt"
+          PREVIOUS_TAG=$(node scripts/prepare-desktop-release-assets.mjs previous-tag \
+            --tags-path "$RUNNER_TEMP/openalice-reachable-tags.txt" --channel "$RELEASE_CHANNEL")
           if [ "$OPERATION" = "release" ] && [ -z "$PREVIOUS_TAG" ]; then
             echo "No previous $RELEASE_CHANNEL release tag is reachable from $SOURCE_SHA" >&2
             exit 1
@@ -216,26 +220,20 @@ jobs:
           RELEASE_VERIFIER_SHA: ${{ inputs.desktop-verifier-sha }}
         run: node scripts/select-release-verifier.mjs
 
-      - name: Install git-cliff
-        if: steps.plan.outputs.created == 'true'
-        uses: kenji-miyake/setup-git-cliff@v2
-
       - name: Generate release notes
         if: steps.plan.outputs.created == 'true'
-        id: notes
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ steps.plan.outputs.tag }}
+          PREVIOUS_TAG: ${{ steps.plan.outputs.previous_tag }}
+          SOURCE_SHA: ${{ steps.plan.outputs.source_sha }}
         run: |
-          # Generate notes for this version only (since last tag).
-          # --tag labels the about-to-be-created version: git-cliff runs
-          # BEFORE the tag exists (it's created only after candidate acceptance), so without
-          # this the section header falls back to "[Unreleased]" instead of
-          # the version. See cliff.toml's `{% if version %}` template.
-          TAG="${{ steps.plan.outputs.tag }}"
-          LAST_TAG="${{ steps.plan.outputs.previous_tag }}"
-          if [ -z "$LAST_TAG" ]; then
-            git-cliff --tag "$TAG" --output notes.md
-          else
-            git-cliff "$LAST_TAG"..HEAD --tag "$TAG" --output notes.md
-          fi
+          set -euo pipefail
+          gh api --method POST "repos/$GITHUB_REPOSITORY/releases/generate-notes" \
+            -f tag_name="$RELEASE_TAG" \
+            -f target_commitish="$SOURCE_SHA" \
+            -f previous_tag_name="$PREVIOUS_TAG" \
+            --jq '.body' > notes.md
 
       - name: Preserve release notes for gated publication
         if: steps.plan.outputs.created == 'true'
@@ -243,6 +241,7 @@ jobs:
         with:
           name: release-notes
           path: notes.md
+          retention-days: 30
           if-no-files-found: error
 
   # Local reusable workflows and checkout resolve to this dispatch's SHA.
@@ -382,7 +381,7 @@ jobs:
             dist/cli-installer/OpenAlice-*-install.ps1
             dist/cli-installer/OpenAlice-*-install.ps1.sha256
           if-no-files-found: error
-          retention-days: 1
+          retention-days: 30
 
   build-cli-neutral:
     name: Build shared CLI inputs
@@ -411,7 +410,7 @@ jobs:
           name: release-neutral-inputs
           path: dist/release-neutral-inputs
           if-no-files-found: error
-          retention-days: 3
+          retention-days: 30
 
   build-cli-release:
     name: Build native CLI (${{ matrix.platform }}-${{ matrix.arch }})
@@ -534,7 +533,7 @@ jobs:
             dist/bun-release/openalice-cli-*.report.json
           if-no-files-found: error
           compression-level: 0
-          retention-days: 1
+          retention-days: 30
 
   build-cli-windows:
     needs: [release, build-cli-neutral]
@@ -546,6 +545,7 @@ jobs:
     with:
       channel_build: true
       artifact_prefix: cli-release
+      fixed_artifact_names: true
       neutral_inputs: true
       neutral_artifact: release-neutral-inputs
       native_acceptance: ${{ needs.release.outputs.channel == 'stable' }}
@@ -558,6 +558,7 @@ jobs:
     timeout-minutes: 10
     permissions:
       contents: read
+      actions: read
 
     steps:
       - uses: actions/checkout@v7
@@ -566,11 +567,14 @@ jobs:
         with:
           node-version: 22.19.0
 
-      - uses: actions/download-artifact@v4
-        with:
-          pattern: cli-release-*
-          path: dist/release-cli
-          merge-multiple: true
+      - name: Select, verify and stage six CLI targets
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CANDIDATE_VERSION: ${{ needs.release.outputs.version }}
+          CANDIDATE_SOURCE_SHA: ${{ needs.release.outputs.source_sha }}
+        run: >-
+          node scripts/stage-cli-release.mjs dist/cli-candidates dist/release-cli
+          "$CANDIDATE_VERSION" "$CANDIDATE_SOURCE_SHA"
 
       - name: Derive package-manager metadata from accepted archives
         run: |
@@ -599,11 +603,11 @@ jobs:
           include-hidden-files: true
           if-no-files-found: error
           compression-level: 0
-          retention-days: 1
+          retention-days: 30
 
   accept-cli-homebrew:
     name: Accept Homebrew CLI (${{ matrix.arch }})
-    needs: [release, build-cli-release]
+    needs: [release, build-cli-release, build-cli-windows]
     if: needs.release.outputs.created == 'true' && needs.release.outputs.channel == 'stable' && needs.build-cli-release.result == 'success'
     strategy:
       fail-fast: false
@@ -617,6 +621,7 @@ jobs:
     timeout-minutes: 15
     permissions:
       contents: read
+      actions: read
 
     steps:
       - uses: actions/checkout@v7
@@ -625,11 +630,14 @@ jobs:
         with:
           node-version: 22.19.0
 
-      - uses: actions/download-artifact@v4
-        with:
-          pattern: cli-release-*
-          path: dist/release-cli
-          merge-multiple: true
+      - name: Select, verify and stage six CLI targets
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CANDIDATE_VERSION: ${{ needs.release.outputs.version }}
+          CANDIDATE_SOURCE_SHA: ${{ needs.release.outputs.source_sha }}
+        run: >-
+          node scripts/stage-cli-release.mjs dist/cli-candidates dist/release-cli
+          "$CANDIDATE_VERSION" "$CANDIDATE_SOURCE_SHA"
 
       - name: Install and run the accepted archive through Homebrew
         shell: bash
@@ -670,7 +678,7 @@ jobs:
 
   accept-cli-linuxbrew:
     name: Accept Linuxbrew CLI (${{ matrix.arch }})
-    needs: [release, build-cli-release]
+    needs: [release, build-cli-release, build-cli-windows]
     if: needs.release.outputs.created == 'true' && needs.release.outputs.channel == 'stable' && needs.build-cli-release.result == 'success'
     strategy:
       fail-fast: false
@@ -684,6 +692,7 @@ jobs:
     timeout-minutes: 25
     permissions:
       contents: read
+      actions: read
 
     steps:
       - uses: actions/checkout@v7
@@ -692,11 +701,14 @@ jobs:
         with:
           node-version: 22.19.0
 
-      - uses: actions/download-artifact@v4
-        with:
-          pattern: cli-release-*
-          path: dist/release-cli
-          merge-multiple: true
+      - name: Select, verify and stage six CLI targets
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CANDIDATE_VERSION: ${{ needs.release.outputs.version }}
+          CANDIDATE_SOURCE_SHA: ${{ needs.release.outputs.source_sha }}
+        run: >-
+          node scripts/stage-cli-release.mjs dist/cli-candidates dist/release-cli
+          "$CANDIDATE_VERSION" "$CANDIDATE_SOURCE_SHA"
 
       - name: Install and run the accepted archive through Linuxbrew
         shell: bash
@@ -735,7 +747,7 @@ jobs:
 
   accept-cli-aur:
     name: Accept Arch/AUR CLI package (${{ matrix.arch }})
-    needs: [release, build-cli-release]
+    needs: [release, build-cli-release, build-cli-windows]
     if: needs.release.outputs.created == 'true' && needs.release.outputs.channel == 'stable' && needs.build-cli-release.result == 'success'
     strategy:
       fail-fast: false
@@ -749,6 +761,7 @@ jobs:
     timeout-minutes: 25
     permissions:
       contents: read
+      actions: read
 
     steps:
       - uses: actions/checkout@v7
@@ -757,11 +770,14 @@ jobs:
         with:
           node-version: 22.19.0
 
-      - uses: actions/download-artifact@v4
-        with:
-          pattern: cli-release-*
-          path: dist/release-cli
-          merge-multiple: true
+      - name: Select, verify and stage six CLI targets
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CANDIDATE_VERSION: ${{ needs.release.outputs.version }}
+          CANDIDATE_SOURCE_SHA: ${{ needs.release.outputs.source_sha }}
+        run: >-
+          node scripts/stage-cli-release.mjs dist/cli-candidates dist/release-cli
+          "$CANDIDATE_VERSION" "$CANDIDATE_SOURCE_SHA"
 
       - name: Build, install, and run the generated AUR package
         shell: bash
@@ -885,7 +901,9 @@ jobs:
 
       - name: Prove previous-release Broker Pack upgrade
         if: needs.release.outputs.channel == 'stable'
-        run: pnpm broker-packs:upgrade-smoke -- --from "${{ needs.release.outputs.previous_tag }}"
+        run: |
+          pnpm --filter @traderalice/update-lifecycle... build
+          pnpm broker-packs:upgrade-smoke -- --from "${{ needs.release.outputs.previous_tag }}"
 
       - name: Preserve Broker Packs
         uses: actions/upload-artifact@v4
@@ -896,7 +914,7 @@ jobs:
             dist/broker-packs/*.tgz
           if-no-files-found: error
           compression-level: 0
-          retention-days: 1
+          retention-days: 30
 
   publish-release:
     name: Publish accepted release
@@ -972,11 +990,14 @@ jobs:
           path: dist/release-broker-packs
           merge-multiple: true
 
-      - uses: actions/download-artifact@v4
-        with:
-          pattern: cli-release-*
-          path: dist/release-cli
-          merge-multiple: true
+      - name: Select, verify and stage six CLI targets
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CANDIDATE_VERSION: ${{ needs.release.outputs.version }}
+          CANDIDATE_SOURCE_SHA: ${{ needs.release.outputs.source_sha }}
+        run: >-
+          node scripts/stage-cli-release.mjs dist/cli-candidates dist/release-cli
+          "$CANDIDATE_VERSION" "$CANDIDATE_SOURCE_SHA"
 
       - uses: actions/download-artifact@v4
         with:
@@ -1120,9 +1141,7 @@ jobs:
           gh api "repos/$GITHUB_REPOSITORY/releases/latest" > release.json
           jq -e --arg tag "$RELEASE_TAG" '.tag_name == $tag and .draft == false and .prerelease == false' release.json
           git merge-base --is-ancestor "$RELEASE_TAG^{commit}" origin/master
-          for manifest in package.json packages/cli/package.json; do
-            test "$(git show "$RELEASE_TAG:$manifest" | jq -r .version)" = "${RELEASE_TAG#v}"
-          done
+          test "$(git show "$RELEASE_TAG:package.json" | jq -r .version)" = "${RELEASE_TAG#v}"
 
       - name: Verify npm authority for this explicit publication
         run: node scripts/preflight-public-cli-authority.mjs
@@ -1389,28 +1408,6 @@ jobs:
           python3 -m pip install --user awscli
           echo "$HOME/.local/bin" >> "$GITHUB_PATH"
 
-      - name: Keep mirror repair on the active channel release
-        if: needs.release.outputs.operation == 'mirror'
-        env:
-          DOWNLOAD_BASE_URL: ${{ secrets.DOWNLOAD_BASE_URL }}
-          RELEASE_CHANNEL: ${{ needs.release.outputs.channel }}
-          VERSION: ${{ needs.release.outputs.version }}
-        run: |
-          set -euo pipefail
-          BASE_URL="${DOWNLOAD_BASE_URL:-https://download.openalice.ai}"
-          BASE_URL="${BASE_URL%/}"
-          if [ "$RELEASE_CHANNEL" = "stable" ]; then
-            MANIFEST_PATH="manifest.json"
-          else
-            MANIFEST_PATH="beta/manifest.json"
-          fi
-          curl -fsSL "${BASE_URL}/${MANIFEST_PATH}" -o /tmp/openalice-active-channel.json
-          CHANNEL="$RELEASE_CHANNEL" VERSION="$VERSION" node -e '
-            const value = require("/tmp/openalice-active-channel.json");
-            if (value.version !== process.env.VERSION) process.exit(1);
-            if (value.channel !== undefined && value.channel !== process.env.CHANNEL) process.exit(1);
-          '
-
       - name: Snapshot stable aliases before a beta mirror
         if: needs.release.outputs.channel == 'beta'
         env:
@@ -1435,12 +1432,17 @@ jobs:
           R2_BUCKET: ${{ secrets.R2_BUCKET }}
           RELEASE_CHANNEL: ${{ needs.release.outputs.channel }}
           RELEASE_OPERATION: ${{ needs.release.outputs.operation }}
+          VERSION: ${{ needs.release.outputs.version }}
+          EXPECTED_HEAD_SHA256: ${{ needs.release.outputs.channel_head_sha256 }}
         run: |
+          set -euo pipefail
           ENDPOINT="https://${R2_ACCOUNT_ID}.r2.cloudflarestorage.com"
           if [ "$RELEASE_CHANNEL" = "stable" ]; then
             FEED_PREFIX="latest"
+            MANIFEST_PATH="manifest.json"
           else
             FEED_PREFIX="beta"
+            MANIFEST_PATH="beta/manifest.json"
           fi
 
           aws s3 cp dist/r2-upload "s3://${R2_BUCKET}/" \
@@ -1459,14 +1461,6 @@ jobs:
             --exclude "mac-x64.zip" \
             --exclude "windows-x64.exe" \
             --cache-control "public, max-age=31536000, immutable" \
-            --endpoint-url "$ENDPOINT"
-
-          aws s3 cp dist/r2-upload "s3://${R2_BUCKET}/" \
-            --recursive \
-            --exclude "*" \
-            --include "${FEED_PREFIX}*.yml" \
-            --cache-control "no-cache" \
-            --content-type "text/yaml" \
             --endpoint-url "$ENDPOINT"
 
           for installer in \
@@ -1488,6 +1482,24 @@ jobs:
                 --endpoint-url "$ENDPOINT"
             fi
           done
+
+          # The workflow's publication concurrency group owns all channel writes.
+          # Re-read the object store itself, after immutable uploads, before any
+          # mutable feed, installer alias, or manifest changes.
+          aws s3 cp "s3://${R2_BUCKET}/${MANIFEST_PATH}" "$RUNNER_TEMP/openalice-publish-head.json" \
+            --endpoint-url "$ENDPOINT" --only-show-errors
+          node scripts/prepare-desktop-release-assets.mjs check-publication \
+            --head-path "$RUNNER_TEMP/openalice-publish-head.json" --version "$VERSION" \
+            --channel "$RELEASE_CHANNEL" --operation "$RELEASE_OPERATION" \
+            --expected-sha256 "$EXPECTED_HEAD_SHA256"
+
+          aws s3 cp dist/r2-upload "s3://${R2_BUCKET}/" \
+            --recursive \
+            --exclude "*" \
+            --include "${FEED_PREFIX}*.yml" \
+            --cache-control "no-cache" \
+            --content-type "text/yaml" \
+            --endpoint-url "$ENDPOINT"
 
           if [ "$RELEASE_OPERATION" = "release" ]; then
             aws s3 cp dist/r2-upload/install.ps1 "s3://${R2_BUCKET}/install.ps1" \

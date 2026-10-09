@@ -5,7 +5,6 @@ import {
   anthropicAuthModeForBaseUrl,
   baseUrlToVendor,
   credentialMatchesQuery,
-  describeModelSemantics,
   pickAgentWire,
   presetModel,
   savedCredentialModel,
@@ -161,10 +160,7 @@ describe('saved credential model selection', () => {
     expect(savedCredentialModel({}, modelPreset)).toBe('stable-default')
   })
 
-  it('resolves and describes exact rich model semantics', () => {
-    const semantics = presetModel(modelPreset, 'stable-default')?.semantics
-    expect(describeModelSemantics(semantics))
-      .toBe('Adaptive reasoning · default effort: high · interleaved thinking · 1M context')
+  it('leaves free-typed model semantics unspecified', () => {
     expect(presetModel(modelPreset, 'free-typed-model')).toBeNull()
   })
 })

@@ -1,11 +1,13 @@
 import { createHash } from 'node:crypto'
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { spawnSync } from 'node:child_process'
+import YAML from 'yaml'
+import { chmodSync, copyFileSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { join, resolve } from 'node:path'
 
 import { describe, expect, it } from 'vitest'
 
-import { prepareBuildMetadata, prepareMirrorAssets } from './prepare-desktop-release-assets.mjs'
+import { checkPublicationHead, previousReleaseTag, prepareBuildMetadata, prepareMirrorAssets } from './prepare-desktop-release-assets.mjs'
 
 function withTempDir(run: (dir: string) => void) {
   const dir = mkdtempSync(join(tmpdir(), 'openalice-release-assets-'))
@@ -205,7 +207,86 @@ describe('prepareMirrorAssets', () => {
         tag: 'v1.2.3-rc.1',
         baseUrl: 'https://download.openalice.ai',
         repository: 'TraderAlice/OpenAlice',
-      })).toThrow('unsupported release channel: rc')
+      })).toThrow('unsupported release version: 1.2.3-rc.1')
     })
+  })
+})
+
+describe('channel publication uses shared release policy', () => {
+  const bytes = (channel: string, version: string) => Buffer.from(JSON.stringify({ channel, version }))
+  it.each([
+    ['stable', '0.94.1', '0.94.2'],
+    ['beta', '0.94.1-beta.2', '0.94.1-beta.10'],
+  ])('accepts forward %s publication %s to %s', (channel, current, version) => {
+    const headBytes = bytes(channel, current)
+    expect(checkPublicationHead({ headBytes, channel, version, operation: 'release' }))
+      .toBe(createHash('sha256').update(headBytes).digest('hex'))
+  })
+  it.each([
+    ['stable', '0.94.1', '0.94.1'], ['stable', '0.94.2', '0.94.1'],
+    ['stable', '0.94.1', '0.94.1-beta.2'], ['beta', '0.94.1-beta.10', '0.94.1-beta.2'],
+    ['beta', '0.94.1-beta.2', '0.94.1-beta.01'], ['beta', '0.94.1-beta.2', '0.94.1-beta.0'],
+    ['stable', '0.94.1', '00.94.2'],
+  ])('rejects ordinary %s publication %s to %s', (channel, current, version) => {
+    expect(() => checkPublicationHead({ headBytes: bytes(channel, current), channel, version, operation: 'release' })).toThrow()
+  })
+  it('permits exact active-head repair and refuses a different head even if it remains older', () => {
+    const headBytes = bytes('stable', '0.94.1')
+    const common = { headBytes, channel: 'stable', version: '0.94.1', operation: 'mirror' }
+    const expectedSha256 = checkPublicationHead(common)
+    expect(checkPublicationHead({ ...common, expectedSha256 })).toBe(expectedSha256)
+    expect(() => checkPublicationHead({ ...common, version: '0.94.2' })).toThrow('active channel')
+    expect(() => checkPublicationHead({ ...common, headBytes: bytes('stable', '0.94.2') })).toThrow('active channel')
+    expect(() => checkPublicationHead({ ...common, expectedSha256, operation: 'release', version: '0.94.3', headBytes: bytes('stable', '0.94.2') })).toThrow('head changed')
+  })
+  it('rejects missing or contradictory head identity', () => {
+    for (const headBytes of [Buffer.from('{}'), bytes('beta', '0.94.1-beta.2'), bytes('stable', '0.94.1-beta.2')]) {
+      expect(() => checkPublicationHead({ headBytes, channel: 'stable', version: '0.94.2', operation: 'release' })).toThrow('invalid release identity')
+    }
+  })
+  it('selects release-note predecessors with the same ordering and channel grammar', () => {
+    const tags = ['v0.94.1-beta.2', 'v0.94.1-beta.10', 'v0.94.1', 'v0.94.0', 'v00.95.0', 'v0.94.1-beta.01']
+    expect(previousReleaseTag(tags, 'beta')).toBe('v0.94.1-beta.10')
+    expect(previousReleaseTag(tags, 'stable')).toBe('v0.94.1')
+  })
+})
+
+it.skipIf(process.platform === 'win32').each([
+  ['release', '0.94.2', '0.94.1', true],
+  ['release', '0.94.3', '0.94.2', false],
+  ['mirror', '0.94.1', '0.94.1', true],
+  ['mirror', '0.94.1', '0.94.2', false],
+])('executes the publication shell with %s %s and object-store head %s', (operation, version, storeVersion, accepted) => {
+  withTempDir((temporary) => {
+    const dir = realpathSync(temporary)
+    const repo = resolve(import.meta.dirname, '..')
+    const workflow = YAML.parse(readFileSync(join(repo, '.github/workflows/release.yml'), 'utf8'))
+    const script = workflow.jobs['mirror-release-assets'].steps.find((s: { name?: string }) => s.name === 'Mirror release assets to Cloudflare R2').run
+    for (const path of ['bin', 'scripts', 'packages/update-lifecycle/src', 'dist/r2-upload']) mkdirSync(join(dir, path), { recursive: true })
+    for (const path of ['scripts/prepare-desktop-release-assets.mjs', 'packages/update-lifecycle/src/release-policy.ts']) copyFileSync(join(repo, path), join(dir, path))
+    const intent = JSON.stringify({ channel: 'stable', version: '0.94.1' })
+    writeFileSync(join(dir, 'store.json'), JSON.stringify({ channel: 'stable', version: storeVersion }))
+    writeFileSync(join(dir, 'bin/aws'), String.raw`#!/usr/bin/env node
+const fs = require('node:fs');
+const args = process.argv.slice(2);
+fs.appendFileSync(process.env.FIXTURE_LOG, JSON.stringify(args) + '\n');
+if (args[0] === 's3' && args[1] === 'cp' && args[2] === 's3://fixture/manifest.json') fs.copyFileSync(process.env.FIXTURE_HEAD, args[3]);
+`)
+    chmodSync(join(dir, 'bin/aws'), 0o755)
+    const result = spawnSync('bash', ['-c', script], { cwd: dir, encoding: 'utf8', env: {
+      PATH: `${join(dir, 'bin')}:${process.env.PATH}`, RUNNER_TEMP: dir,
+      R2_BUCKET: 'fixture', R2_ACCOUNT_ID: 'fixture', RELEASE_CHANNEL: 'stable',
+      RELEASE_OPERATION: operation, VERSION: version,
+      EXPECTED_HEAD_SHA256: createHash('sha256').update(intent).digest('hex'),
+      FIXTURE_LOG: join(dir, 'calls.jsonl'), FIXTURE_HEAD: join(dir, 'store.json'),
+    } })
+    expect(result.status, result.stderr).toBe(accepted ? 0 : 1)
+    const calls = readFileSync(join(dir, 'calls.jsonl'), 'utf8').trim().split('\n').map(line => JSON.parse(line) as string[])
+    const mutableWrites = calls.filter(args => args.includes('no-cache'))
+    if (accepted) expect(mutableWrites.some(args => args.includes('s3://fixture/manifest.json'))).toBe(true)
+    else {
+      expect(result.stderr).toContain('Channel head changed')
+      expect(mutableWrites).toEqual([])
+    }
   })
 })

@@ -1,3 +1,4 @@
+import { fixtureHome } from './fixture-home.ts'
 import { resolveLaunchContext } from '../launch-context.ts'
 import { runSupervisorTui } from '../supervisor-tui.ts'
 
@@ -8,8 +9,8 @@ const exitCode = await runSupervisorTui({}, {
   webRelay: null,
   resolveContext: () => resolveLaunchContext({
     cwd: process.cwd(),
-    homeDir: '/fixture',
-    flags: { project: 'default', home: '/fixture/default' },
+    homeDir: `${fixtureHome}`,
+    flags: { project: 'default', home: `${fixtureHome}/default` },
   }),
   inspect: async () => ({ class: 'running', state: 'running', owner: null, endpoints: {} }),
   readLogs: async () => ({

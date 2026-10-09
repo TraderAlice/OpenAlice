@@ -1,3 +1,4 @@
+import { fixtureHome } from './fixture-home.ts'
 import { resolveLaunchContext } from '../launch-context.ts'
 import type { MachineFleetEnvelope, MachineInventory } from '../machine-inventory.ts'
 import { runSupervisorTui } from '../supervisor-tui.ts'
@@ -15,7 +16,8 @@ const startFailure = process.env['OPENALICE_TUI_FIXTURE_START_FAILURE'] === '1'
 const remoteReadyDelayMs = Number(process.env['OPENALICE_TUI_FIXTURE_REMOTE_READY_DELAY_MS'] ?? 0)
 const remote = process.env['OPENALICE_TUI_FIXTURE_REMOTE'] === '1'
 const healthFlap = process.env['OPENALICE_TUI_FIXTURE_HEALTH'] === 'flap'
-const fleetRows = Number(process.env['OPENALICE_TUI_FIXTURE_FLEET_ROWS'] ?? 0)
+const homeAvailable = process.env['OPENALICE_TUI_FIXTURE_HOME_AVAILABLE'] !== '0'
+const fleetRows = Math.max(homeAvailable ? 0 : 1, Number(process.env['OPENALICE_TUI_FIXTURE_FLEET_ROWS'] ?? 0))
 const inboxUnread = Number(process.env['OPENALICE_TUI_FIXTURE_INBOX_UNREAD'] ?? 0)
 const fleet = fleetRows > 0 ? fixtureFleet(fleetRows, remote) : undefined
 const relay = fakeWebRelay()
@@ -25,8 +27,8 @@ const exitCode = await runSupervisorTui({}, {
   webRelay: relay,
   resolveContext: () => resolveLaunchContext({
     cwd: process.cwd(),
-    homeDir: '/fixture',
-    flags: { project: 'default', home: '/fixture/default' },
+    homeDir: `${fixtureHome}`,
+    flags: { project: 'default', home: `${fixtureHome}/default` },
   }),
   inspect: async () => running
     ? {
@@ -34,7 +36,7 @@ const exitCode = await runSupervisorTui({}, {
         state: 'ready',
         owner: { surface: 'cli-server', pid: 4242 },
         endpoints: { web: 'http://127.0.0.1:47331' },
-        provider: { kind: 'source', appDir: '/fixture/openalice' },
+        provider: { kind: 'source', appDir: `${fixtureHome}/openalice` },
         components: { alice: 'ready', uta: 'disabled', connector: 'disabled' },
         uptimeSeconds: 7_380,
       }
@@ -210,12 +212,12 @@ function fixtureProject(index: number): MachineInventory['projects'][number] {
     key,
     id: `alice-project-${key}`,
     displayName: index === 0 ? 'Default AliceProject' : `Local Project ${index + 1}`,
-    home: `/fixture/${key}`,
+    home: `${fixtureHome}/${key}`,
     port: 47_331 + index,
     portAutomatic: true,
     product: 'trader',
     isDefault: index === 0,
-    available: true,
+    available: homeAvailable,
     runtime: {
       class: 'absent',
       state: 'absent',

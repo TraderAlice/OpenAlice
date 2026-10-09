@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import { writeProjectWorkspaceRequest } from '../packages/cli/src/project-workspaces.ts'
 import { spawnSync } from 'node:child_process'
-import { existsSync, mkdirSync, mkdtempSync, rmSync } from 'node:fs'
+import { existsSync, mkdirSync, mkdtempSync, rmSync, readFileSync } from 'node:fs'
 import { createServer as createNetServer } from 'node:net'
 import { homedir, tmpdir } from 'node:os'
 import { delimiter, join, resolve } from 'node:path'
@@ -11,7 +11,7 @@ import {
   createTemporaryDesktopPackageArtifact,
   DEFAULT_DESKTOP_PACKAGE_ROOT,
 } from './desktop-package-artifact.mjs'
-import { buildDesktopPackagedSmokePlan } from './desktop-packaged-smoke-plan.mjs'
+import { buildDesktopPackagedSmokePlan, desktopSmokeStateEnv } from './desktop-packaged-smoke-plan.mjs'
 import { runPnpmSync } from './pnpm-command.mjs'
 import { packagedElectronExecutable } from './smoke-packaged-toolchain.mjs'
 import { spawnDesktopSmoke, stopDesktopSmoke } from './desktop-smoke-process.mjs'
@@ -26,7 +26,7 @@ const plan = buildDesktopPackagedSmokePlan(process.argv.slice(2), process.env)
 const {
   keep,
   keepPackage,
-  onboarding,
+  credentialPi,
   packageRoot: reusedPackageRoot,
   realData,
   signed,
@@ -48,10 +48,11 @@ Options:
   --package-root <path>
                  Reuse an explicit package output (requires --skip-pack)
   --keep-package Keep the temporary package output created by this run
-  --temp-data    Use isolated temporary data/workspace/global stores
-  --real-data    Use real data explicitly (default; kept for compatibility)
-  --onboarding   Build with first-run guide enabled, use temp data, run an
-                 automated renderer onboarding smoke, then exit
+  --temp-data    Use isolated temporary OpenAlice data/workspace/global stores (default)
+  --real-data    Explicitly opt into real OpenAlice user data
+  --credential-pi
+                 Test credential UI and API-bound native Pi execution, then exit
+  --onboarding   Deprecated alias for --credential-pi
   --trading-mode Use temp data, exercise lite -> readonly -> lite UTA lifecycle,
                  then exit
   --workspace-acceptance
@@ -163,7 +164,7 @@ async function main() {
   }
   for (const warning of plan.warnings) console.warn(warning)
 
-  if (process.platform !== 'darwin' && !workspaceAcceptance) {
+  if (process.platform !== 'darwin' && !workspaceAcceptance && !credentialPi) {
     console.error('[desktop-smoke] packaged .app smoke currently runs on macOS only')
     return { code: 1, signal: null }
   }
@@ -177,9 +178,9 @@ async function main() {
   let signalToRaise = null
 
   try {
-    aiMock = onboarding || workspaceAcceptance ? await startWorkspaceAcceptanceAiMock() : null
+    aiMock = credentialPi || workspaceAcceptance ? await startWorkspaceAcceptanceAiMock() : null
     if (aiMock) {
-      if (onboarding) {
+      if (credentialPi) {
         plan.buildEnv.VITE_OPENALICE_ONBOARDING_AI_BASE_URL = aiMock.baseUrl
         plan.launchEnv.OPENALICE_ONBOARDING_AI_BASE_URL = aiMock.baseUrl
       }
@@ -235,7 +236,7 @@ async function main() {
     const smokeHome = smokeRoot ? join(smokeRoot, 'home') : null
     const smokeWorkspaces = smokeRoot ? join(smokeRoot, 'workspaces') : null
     const smokeGlobal = smokeRoot ? join(smokeRoot, 'global') : null
-    if (onboarding && smokeHome) {
+    if (credentialPi && smokeHome) {
       mkdirSync(smokeHome, { recursive: true })
       await writeProjectWorkspaceRequest(smokeHome, ['chat'])
     }
@@ -247,21 +248,26 @@ async function main() {
       join(homedir(), '.local', 'bin'),
     ].filter(Boolean)
     const env = {
-      ...process.env,
+      ...(smokeRoot ? desktopSmokeStateEnv(smokeRoot, process.env) : process.env),
       ...plan.launchEnv,
       PATH: [process.env['PATH'], ...pathAdditions].filter(Boolean).join(delimiter),
       OPENALICE_EXTRA_AGENT_PATH: pathAdditions.join(delimiter),
     }
     for (const key of plan.unsetLaunchEnv) delete env[key]
 
-    if (onboarding || tradingMode || workspaceAcceptance) {
+    if (credentialPi || tradingMode || workspaceAcceptance) {
       env.OPENALICE_UTA_PORT = String(await getAvailablePort())
     }
     if (!realData && smokeHome && smokeWorkspaces && smokeGlobal) {
-      env.OPENALICE_HOME = smokeHome
-      env.AQ_LAUNCHER_ROOT = smokeWorkspaces
-      env.OPENALICE_GLOBAL_DIR = smokeGlobal
-      if (onboarding) env.PI_CODING_AGENT_DIR = join(smokeRoot, 'pi-agent')
+      mkdirSync(env.HOME, { recursive: true })
+    }
+
+    if (workspaceAcceptance) {
+      // Seed only the durable native handoff. The real candidate process must
+      // prove its own identity/readiness; no native installer is simulated here.
+      const { DesktopUpdateLifecycle } = await import('../dist/electron/update-lifecycle.js')
+      const version = JSON.parse(readFileSync(join(repoRoot, 'package.json'), 'utf8')).version
+      await new DesktopUpdateLifecycle(env.OPENALICE_ELECTRON_SMOKE_USER_DATA, () => '0.0.0').install(version, async () => {}, async () => {})
     }
 
     const receiptPath = workspaceAcceptance
@@ -278,9 +284,9 @@ async function main() {
       console.log(`[desktop-smoke] workspaces: ${smokeWorkspaces}`)
       console.log(`[desktop-smoke] global provider keys: ${smokeGlobal}`)
     }
-    if (onboarding) {
-      console.log('[desktop-smoke] onboarding smoke: enabled; app exits automatically after the renderer probe')
-      console.log(`[desktop-smoke] onboarding UTA port: ${env.OPENALICE_UTA_PORT}`)
+    if (credentialPi) {
+      console.log('[desktop-smoke] credential-pi acceptance: credential UI + API-bound native Pi headless reply; app exits automatically')
+      console.log(`[desktop-smoke] credential-pi UTA port: ${env.OPENALICE_UTA_PORT}`)
     } else if (tradingMode) {
       console.log('[desktop-smoke] trading-mode smoke: lite -> readonly -> lite; app exits automatically')
       console.log(`[desktop-smoke] trading-mode UTA port: ${env.OPENALICE_UTA_PORT}`)
@@ -298,10 +304,14 @@ async function main() {
       env,
     })
     appStopped = false
-    const exit = await waitForPackagedApp(appChild, onboarding || tradingMode || workspaceAcceptance)
+    const exit = await waitForPackagedApp(appChild, credentialPi || tradingMode || workspaceAcceptance)
     appStopped = true
     signalToRaise = exit.requestedSignal
     finalCode = exit.timedOut ? 1 : exit.code ?? (exit.signal ? 1 : 0)
+
+    if (credentialPi && finalCode === 0 && (aiMock.stats.credentialTests < 1 || aiMock.stats.readinessTurns < 2)) {
+      throw new Error('credential-pi mock did not observe credential test, configured readiness and native headless reply')
+    }
 
     if (workspaceAcceptance) {
       if (!existsSync(receiptPath)) {

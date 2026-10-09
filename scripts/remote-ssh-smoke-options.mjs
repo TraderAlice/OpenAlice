@@ -31,6 +31,13 @@ export function parseRemoteSshSmokeOptions(argv) {
       options.skipBuild = true
       continue
     }
+    if (arg === '--upgrade-from' || arg === '--upgrade-to') {
+      const value = argv[++index]
+      if (!/^\d+\.\d+\.\d+(?:-beta(?:\.\d+)?)?$/.test(value ?? ''))
+        throw new Error(`${arg} requires an exact published version`)
+      options[arg === '--upgrade-from' ? 'upgradeFrom' : 'upgradeTo'] = value
+      continue
+    }
     if (arg === '--image') {
       const value = argv[index + 1]
       if (!value || value === '--' || value.startsWith('-')) {
@@ -46,6 +53,8 @@ export function parseRemoteSshSmokeOptions(argv) {
   if (options.skipBuild && !options.image) {
     throw new Error('--skip-build requires --image <name>')
   }
+  if (Boolean(options.upgradeFrom) !== Boolean(options.upgradeTo))
+    throw new Error('--upgrade-from and --upgrade-to must be supplied together')
 
   return options
 }

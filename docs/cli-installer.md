@@ -5,6 +5,11 @@ activation, provenance, update, rollback, uninstall, and release acceptance.
 Runtime behavior after activation belongs to [[docs/local-runtime.md]]. Electron
 packaging remains independent under [[docs/managed-workspace-runtime.md]].
 
+Bootstrap Bash/PowerShell stay dependency-free. Each keeps one channel grammar,
+with actual manifest and exact-version planning checked against the shared release
+policy. They reject zero-padded core versions, beta.0/beta.01 and uppercase BETA;
+JavaScript build/release tools import the shared policy directly.
+
 The current CLI payload is one target-native Bun executable plus immutable
 OpenAlice resources. The installer does not install Node.js, Bun, npm, source
 dependencies, build tools, or an Agent Runtime.
@@ -155,9 +160,10 @@ archives, validates the `release.json` target, version, and content-identity
 shape, checks an expected content identity when the update handoff supplied
 one, and runs the staged executable's `--version` before activation. The build
 owns the canonical content-identity calculation; the installer does not
-recompute that payload manifest. Dev and release publication do recompute the
-identity from `release.json` before accepting an archive, so stale or tampered
-manifest identities cannot become channel metadata.
+recompute that payload manifest. Dev, beta and stable publication verify the actual extracted files against
+`release.json`, recompute the identity, and statically verify macOS embedded
+signatures before accepting an archive. A fresh archive checksum cannot hide
+a stale file manifest or invalid code-page signature.
 
 `contentIdentity` is a canonical digest of the complete native payload
 manifest: product metadata plus every shipped file hash, size, mode, and
@@ -175,39 +181,45 @@ https://download.openalice.ai/cli/dev/releases/<commit>/openalice-cli-<version>-
 https://download.openalice.ai/cli/dev/releases/<commit>/openalice-cli-<version>-<platform>-<arch>.tar.gz.sha256
 ```
 
-Every `dev` push builds all four native targets. Publication verifies each
-sidecar and the archive's target/version metadata, uploads an immutable copy
-under `cli/dev/releases/<commit>/`, and preserves a small candidate receipt.
+Every `dev` push builds the complete native target matrix defined in
+`.github/workflows/cli-installer-smoke.yml`. Publication verifies sidecars and
+archive target/version metadata, uploads immutable copies under
+`cli/dev/releases/<commit>/`, and preserves a small candidate receipt.
 A separate activation stage rechecks that remote `refs/heads/dev` is exactly
 the workflow commit before replacing the live manifest. A stale rerun is a
 successful no-op. Candidate upload and channel activation can therefore be
 retried independently without rebuilding accepted native archives, and the
 manifest is the completed-set authority rather than an archive alias.
 
-The rolling-dev matrix does not rebuild the platform-neutral server inputs on
-four hosts. One clean Ubuntu job runs `pnpm build:server` and publishes a
-commit-bound, SHA-256-verified artifact containing exactly `ui/dist` and the
-`dist` outputs of connector-protocol, guardian-runtime, ibkr, opentypebb, and
-uta-protocol. Each native host still checks out the same commit, installs its
-own dependencies and pinned Bun, verifies every received file and the exact
-commit before installing those six roots, then performs the host-native Bun
-compile and smoke. The receipt rejects missing, extra, changed, or pre-existing
-outputs rather than merging trees. It never carries `node_modules`, dugite Git,
-a Bun executable, service/root build output, or a host-native release. Adding a
-shared root requires a reviewed import/build need and a matching contract test;
-a missing input must fail closed instead of widening the artifact to the repo.
+The shared neutral payload includes `packages/update-lifecycle/dist`: both the
+CLI client and backend version services import its built export. Omitting it
+makes a clean native consumer fail to resolve the module even when local builds
+work from an existing workspace build. The commit-bound receipt verifies and
+restores this directory alongside the protocol/runtime packages.
 
-The currently published channel-neutral installer predates this resolver and
-still downloads `openalice-cli-dev-<platform>-<arch>.tar.gz`. Activation
-temporarily refreshes those aliases after the exact-head check solely to keep
-that released bootstrap working. New installer snapshots and native dev
-updates do not consume them. Remove the compatibility writes after a beta or
-stable release has placed the manifest-driven installer on the shared public
-endpoint; do not make aliases part of the next manifest schema.
+The rolling-dev matrix does not rebuild platform-neutral server inputs on each
+native host. One clean Ubuntu job runs `pnpm build:server` and publishes a
+commit-bound, SHA-256-verified artifact. Its exact permitted roots are
+`CLI_NEUTRAL_INPUT_ROOTS` in `scripts/prepare-cli-neutral-inputs.mjs`, including
+the UI and built shared packages such as `update-lifecycle` above.
 
-Versioned beta and stable releases publish the same four target archives and
-sidecars as GitHub Release assets and mirror them unchanged to the download
-CDN. Stable and beta manifests remain separate; immutable
+Each target verifies every received file and the exact commit before installing
+those roots and compiling the native candidate. The receipt rejects missing,
+extra, changed, or pre-existing outputs rather than merging trees. It never
+carries `node_modules`, dugite Git, a Bun executable, service/root build output,
+or a host-native release. Adding a root requires a reviewed import/build need
+and matching contract coverage, not widening the artifact to the repository.
+
+Older released channel-neutral bootstraps download fixed
+`openalice-cli-dev-<platform>-<arch>.tar.gz` aliases. Activation retains
+compatibility writes after the exact-head check for those bootstraps. New
+installer snapshots and native dev updates resolve immutable manifest paths
+and do not consume the aliases. The writes remain a shipped-bootstrap
+compatibility boundary, not part of the native manifest schema.
+
+Versioned beta and stable releases publish the accepted native archive matrix
+and sidecars described in [[docs/cli-package-managers.md]] as GitHub Release
+assets and mirror them unchanged to the CDN. Stable and beta manifests remain separate;
 `OpenAlice-<version>-install` and
 `cli/dev/releases/<commit>/install` files are verified snapshots of the same
 root `install` source, not separate channel scripts.
@@ -488,13 +500,13 @@ is no permanent dual-runtime resolver. Before changing the active pointer, the
 cutover also backs up every legacy launcher; a validation failure restores the
 old launchers and removes the unconfirmed native pointer.
 
-Both rolling `dev` publication and every versioned beta/stable release replay this
-cutover from the published v0.90.1 installer on Linux x64. The acceptance
-fixture pins the historical Pi manifests by SHA-256 because the upstream Pi
-release assets are not part of OpenAlice's durable release surface. It then
-proves native `version`, detached `up`, `status`, `down`, and uninstall with Node
-and Agent Runtimes absent from the new Runtime path, while preserving a data
-marker and a user-owned external Pi executable.
+Stable release publication replays this cutover from the published v0.90.1
+installer on Linux x64. The current beta and rolling-dev workflows do not run
+that stable-only acceptance job; their successful candidate checks are not
+cutover evidence. The fixture pins the historical Pi manifests by SHA-256,
+then proves native version/lifecycle/uninstall behavior with Node and Agent
+Runtimes absent from the new Runtime path, while preserving a data marker and
+user-owned external Pi. See [[docs/development-workflow.md]] for release gates.
 
 The shipped v0.90.1 updater invoked the accepted versioned installer without a
 selector and bound the candidate with `OPENALICE_EXPECTED_CLI_VERSION`. The
@@ -578,7 +590,7 @@ For installer changes run:
 
 ```bash
 bash -n install
-pnpm exec vitest run packages/cli/src/install.spec.mjs
+pnpm exec vitest run tests/e2e/cli-installer/install.spec.mjs
 pnpm test:system:installer
 npx tsc --noEmit
 pnpm test
@@ -590,9 +602,9 @@ For a managed SSH or AliceProject cross-target change, also run:
 pnpm test:system:remote
 pnpm exec vitest run \\
   packages/cli/src/remote.spec.mjs \\
-  packages/cli/src/project-transfer.spec.ts \\
+  tests/integration/project-transfer/project-transfer.spec.ts \\
   packages/cli/src/project-transfer-ssh.spec.ts \\
-  packages/cli/src/project-transfer-stream.spec.ts
+  tests/integration/project-transfer/project-transfer-stream.spec.ts
 ```
 
 OpenAlice assumes the target is already reachable through ordinary SSH. These
@@ -640,3 +652,46 @@ credentials or broker accounts.
 | `No previous OpenAlice release is retained` | Install/update once more before rollback is available |
 | startup says the activation was rolled back | The new direct-install Runtime failed first readiness; run `openalice` again to start the restored release |
 | update reports a non-updating channel | Refresh with the same selector instead of crossing trust boundaries |
+
+## CLI compiler and final artifact integrity
+
+`.bun-version` is the exact compiler source of truth, not a minimum host runtime
+requirement. `scripts/bun-toolchain.mjs` checks both Bun build entry points and
+the PATH executable used by manual compiled Broker Pack verification. The
+remote SSH Docker builder supplies its Bun image version from the same file.
+CI setup-bun consumes that file directly; newer global Bun is rejected.
+
+On existing macOS build runners, `scripts/sign-cli-macos.mjs` stages and signs
+the build-owned executable using system ad-hoc codesign. It preserves existing
+entitlements and runtime settings, verifies them afterward, and replaces the
+input only after native strict verification and static SHA-256 page checks.
+No Developer ID, certificate, timestamp service or notarization secret is used.
+This does not establish a stable TCC identity. Electron signing is independent.
+
+Signing occurs after the last executable mutation and before generating file
+hashes, contentIdentity and release.json. Native smoke must leave those bytes
+unchanged. `scripts/verify-cli-release.mjs` then checks final tar extraction,
+actual file hashes/sizes/modes/link targets, manifest identity and macOS page
+hashes. Dev preparation, package-manager generation and beta/stable publication
+share that verifier. Installers do not repair or re-sign release payloads.
+
+The read-only **CLI artifact acceptance** workflow builds Linux x64 and both Mac
+architectures from the exact PR head, runs compiled recovery/PTY acceptance,
+preserves head-named archives and reports for seven days, and rechecks them on
+Linux. It never publishes or activates a channel. Static checks prove embedded
+integrity; native execution and user permissions remain separate acceptance.
+
+For manual Mac acceptance, download the matching head-named Actions artifact,
+verify its SHA-256 sidecar and unpack into a new temporary directory. Run
+`codesign --verify --strict --verbose=2 <unpacked>/bin/openalice` and the binary's
+`--version`, then install using `bash install --archive <tar> --sha256 <digest>
+--install-dir <new-temporary-root> --no-modify-path --yes`. Keep the existing
+installation and user home intact; use a separate OPENALICE_HOME for startup
+and PTY checks. No machine-wide Gatekeeper/TCC changes or user-side re-signing
+are part of acceptance.
+
+Installer integrity fixtures explicitly set the archived file mode and corrupt
+it relative to the extracted original mode. This keeps the mutation observable
+under both umask 0022 and 0077; chmod to a fixed 0600 can otherwise be a no-op.
+The subsequent content-corruption check remains independent. These local shell
+fixtures prove immutable release validation, not signed native artifact acceptance.

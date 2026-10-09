@@ -26,11 +26,11 @@ import {
   type UiStyleProfileId,
 } from '../theme/styleProfiles'
 import { useEffectivePreferenceSlot } from '../theme/useEffectiveTheme'
-import { AboutOpenAliceSection } from '../components/settings/AboutOpenAliceSection'
+import { VersionOverviewSection } from '../components/settings/VersionOverviewSection'
 import { UpdateLifecycleSection } from '../components/settings/UpdateLifecycleSection'
 import { AliceLocationSection } from '../components/settings/AliceLocationSection'
-import { MachineManagementSection } from '../components/settings/MachineManagementSection'
 import { Button } from '../components/ui/button'
+import { SelectionCheckIcon } from '../components/ui/selection-check-icon'
 import { getBackendConnection } from '../auth/backendConnection'
 import { useRelayConnection } from '../hooks/useRelayConnection'
 
@@ -59,6 +59,7 @@ export function AppearanceSection({ standalone = false }: { standalone?: boolean
   const [paletteFilter, setPaletteFilter] = useState<PaletteLibraryFilter>('recommended')
   const [customizingPalettes, setCustomizingPalettes] = useState(false)
   const paletteEditorId = useId()
+  const styleGroupName = useId()
   const modes: readonly AppTheme[] = ['auto', 'day', 'night']
   const activeStyleDefinition: UiStyleProfileDefinition = UI_STYLE_PROFILES.find(
     (profile) => profile.id === uiStyle,
@@ -129,6 +130,7 @@ export function AppearanceSection({ standalone = false }: { standalone?: boolean
             <StyleProfileCard
               key={profile.id}
               profile={profile.id}
+              groupName={styleGroupName}
               label={t(profile.labelKey)}
               description={t(profile.descriptionKey)}
               selected={uiStyle === profile.id}
@@ -138,7 +140,7 @@ export function AppearanceSection({ standalone = false }: { standalone?: boolean
         </div>
         {recommendedPalettePair && (
           <div
-            data-palette-preview={recommendedPalettePair.day}
+            data-palette-preview={recommendedPalettePair[effectiveSlot]}
             className="oa-palette-preview mt-3 flex min-w-0 flex-col gap-3 rounded-lg border border-border bg-background p-3 sm:flex-row sm:items-center"
           >
             <span className="oa-palette-preview-shell flex h-11 w-full shrink-0 overflow-hidden rounded border sm:w-24" aria-hidden>
@@ -159,7 +161,8 @@ export function AppearanceSection({ standalone = false }: { standalone?: boolean
               </span>
               <p className="mt-0.5 text-[10.5px] leading-snug text-muted-foreground">
                 {t('settings.appearance.recommendedPaletteDescription', {
-                  palette: t(paletteDefinition(recommendedPalettePair.day).labelKey),
+                  day: t(paletteDefinition(recommendedPalettePair.day).labelKey),
+                  night: t(paletteDefinition(recommendedPalettePair.night).labelKey),
                 })}
               </p>
             </div>
@@ -261,14 +264,14 @@ export function AppearanceSection({ standalone = false }: { standalone?: boolean
           <PaletteSlotCard
             slot="day"
             palette={paletteDefinition(dayPalette)}
-            active={effectiveSlot === 'day'}
+            active={effectiveSlot === 'day' && activePalette === dayPalette}
             editing={editingSlot === 'day'}
             onSelect={() => editSlot('day')}
           />
           <PaletteSlotCard
             slot="night"
             palette={paletteDefinition(nightPalette)}
-            active={effectiveSlot === 'night'}
+            active={effectiveSlot === 'night' && activePalette === nightPalette}
             editing={editingSlot === 'night'}
             onSelect={() => editSlot('night')}
           />
@@ -349,39 +352,52 @@ export function AppearanceSection({ standalone = false }: { standalone?: boolean
 
 function StyleProfileCard({
   profile,
+  groupName,
   label,
   description,
   selected,
   onSelect,
 }: {
   profile: UiStyleProfileId
+  groupName: string
   label: string
   description: string
   selected: boolean
   onSelect: (profile: UiStyleProfileId) => void
 }) {
   return (
-    <button
-      type="button"
-      role="radio"
-      aria-checked={selected}
-      aria-label={label}
-      data-ui-style-preview={profile}
+    <label
+      title={description}
       data-selected={selected}
-      onClick={() => onSelect(profile)}
-      className="oa-style-profile-card oa-pressable min-h-24 min-w-0 border border-border bg-background p-2.5 text-left"
+      className="oa-style-profile-card"
     >
-      <span className="oa-style-profile-preview flex h-10 overflow-hidden border border-border bg-card" aria-hidden>
-        <span className="oa-style-profile-rail w-3.5 shrink-0 border-r border-border bg-sidebar" />
-        <span className="flex min-w-0 flex-1 flex-col gap-1 p-1.5">
-          <span className="oa-style-profile-toolbar h-1.5 w-full bg-muted" />
-          <span className="oa-style-profile-row h-2 w-4/5 border border-border bg-background" />
-          <span className="oa-style-profile-row h-2 w-3/5 border border-border bg-background" />
+      <input
+        className="absolute inset-0 m-0 size-full cursor-pointer opacity-0"
+        type="radio"
+        name={groupName}
+        value={profile}
+        checked={selected}
+        aria-label={label}
+        aria-checked={selected}
+        onChange={() => onSelect(profile)}
+      />
+      <span className="oa-style-profile-preview" data-ui-style-preview={profile} aria-hidden>
+        <span className="oa-style-profile-rail"><i /><i /><i /><i /></span>
+        <span className="oa-style-profile-canvas">
+          <span className="oa-style-profile-toolbar"><i /><i /></span>
+          <svg className="oa-style-profile-chart" viewBox="0 0 150 32" preserveAspectRatio="none">
+            <path d="M8 25H142M8 16H142" fill="none" stroke="var(--border)" strokeWidth="0.6" />
+            <path d="M8 24L30 20L46 23L65 13L88 16L105 9L125 12L142 6" fill="none" stroke="var(--foreground)" strokeWidth="1.5" />
+          </svg>
+          <span className="grid grid-cols-3 gap-1"><i className="oa-style-profile-row" /><i className="oa-style-profile-row" /><i className="oa-style-profile-row" /></span>
         </span>
+        <span className="oa-style-profile-popup"><i /><i /><i /></span>
       </span>
-      <span className="mt-2 block text-[12px] font-semibold text-foreground">{label}</span>
-      <span className="mt-0.5 block text-[10.5px] leading-snug text-muted-foreground">{description}</span>
-    </button>
+      <span className="mt-2 flex items-center justify-between gap-2 text-sm font-semibold text-foreground">
+        {label}
+        <span className="size-4 shrink-0">{selected && <SelectionCheckIcon />}</span>
+      </span>
+    </label>
   )
 }
 
@@ -570,8 +586,6 @@ export function DataHomeSection() {
   const backendConnection = getBackendConnection()
   const relay = useRelayConnection()
   const [status, setStatus] = useState<OpenAliceDataHomeStatus | null>(null)
-  const [busy, setBusy] = useState(false)
-  const [restarting, setRestarting] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
@@ -608,38 +622,11 @@ export function DataHomeSection() {
     )
   }
 
-  const runAction = async (action: () => Promise<OpenAliceDataHomeActionResult>) => {
-    setBusy(true)
-    setError(null)
-    try {
-      const result = await action()
-      setStatus(result.status)
-      if (result.outcome === 'restarting') setRestarting(true)
-    } catch {
-      setError(t('settings.dataHome.actionError'))
-    } finally {
-      setBusy(false)
-    }
-  }
-
-  const updateAskOnStartup = async (enabled: boolean) => {
-    setBusy(true)
-    setError(null)
-    try {
-      setStatus(await bridge.setAskOnStartup(enabled))
-    } catch {
-      setError(t('settings.dataHome.actionError'))
-    } finally {
-      setBusy(false)
-    }
-  }
-
   const lockDescription = status?.selectionLock === 'openalice-home-env'
     ? t('settings.dataHome.lockedByHome')
     : status?.selectionLock === 'workspace-root-env'
       ? t('settings.dataHome.lockedByWorkspace')
       : null
-  const recentHomes = status?.recentHomes.filter((path) => path !== status.currentHome) ?? []
 
   return (
     <ConfigSection
@@ -671,66 +658,14 @@ export function DataHomeSection() {
           variant="outline"
           size="sm"
           className="min-h-10 sm:min-h-8"
-          disabled={!status || busy}
+          disabled={!status}
           onClick={() => void bridge.openCurrent()
             .then((message) => { if (message) setError(t('settings.dataHome.openError')) })
             .catch(() => setError(t('settings.dataHome.openError')))}
         >
           {t('settings.dataHome.open')}
         </Button>
-        <Button
-          data-testid="data-home-choose"
-          type="button"
-          size="sm"
-          className="min-h-10 sm:min-h-8"
-          disabled={!status || busy || restarting || status.selectionLocked}
-          onClick={() => void runAction(() => bridge.chooseAndRestart())}
-        >
-          {restarting ? t('settings.dataHome.restarting') : t('settings.dataHome.chooseAndRestart')}
-        </Button>
       </div>
-
-      <div className="mt-4 flex min-h-12 items-center justify-between gap-4 rounded-lg border border-border/60 px-3 py-2.5">
-        <div className="flex-1">
-          <p className="text-[13px] font-medium text-foreground">{t('settings.dataHome.askOnStartup')}</p>
-          <p className="mt-0.5 text-[11px] leading-relaxed text-muted-foreground">
-            {t('settings.dataHome.askOnStartupDescription')}
-          </p>
-        </div>
-        <Toggle
-          checked={status?.askOnStartup ?? false}
-          disabled={!status || busy || status.selectionLocked}
-          ariaLabel={t('settings.dataHome.askOnStartup')}
-          onChange={(enabled) => void updateAskOnStartup(enabled)}
-        />
-      </div>
-
-      {recentHomes.length > 0 && (
-        <div className="mt-4">
-          <p className="mb-2 text-[12px] font-medium text-muted-foreground">
-            {t('settings.dataHome.recent')}
-          </p>
-          <div className="space-y-2">
-            {recentHomes.map((path) => (
-              <div key={path} className="flex min-h-12 items-center gap-2 rounded-lg border border-border/60 px-3 py-2">
-                <span className="min-w-0 flex-1 truncate font-mono text-[12px] leading-[18px] text-foreground" title={path}>
-                  {path}
-                </span>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  className="min-h-10 shrink-0 sm:min-h-8"
-                  disabled={busy || restarting || status?.selectionLocked}
-                  onClick={() => void runAction(() => bridge.useRecentAndRestart(path))}
-                >
-                  {t('settings.dataHome.useAndRestart')}
-                </Button>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
 
       {lockDescription && (
         <p className="mt-3 rounded-lg border border-warning/30 bg-warning/5 px-3 py-2 text-[11px] leading-relaxed text-warning">
@@ -850,10 +785,9 @@ function SettingsSection() {
   return (
     <div className="mx-auto w-full max-w-[1100px]">
       <AliceLocationSection />
-      <MachineManagementSection />
 
       {/* Installation and update ownership */}
-      <AboutOpenAliceSection />
+      <VersionOverviewSection />
       <UpdateLifecycleSection />
 
       {/* Complete OpenAlice home + runtime lock boundary */}

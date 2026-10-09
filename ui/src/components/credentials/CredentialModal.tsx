@@ -1,3 +1,4 @@
+import { modelDisplayName } from '../../lib/modelIdentity'
 import { useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { X } from 'lucide-react'
@@ -291,6 +292,7 @@ export function CredentialModal({ mode, cred, presets, agents, initialPresetId, 
                 {visiblePresets.map((item) => (
                   <button
                     key={item.id}
+                    data-credential-preset={item.id}
                     onClick={() => pickPreset(item)}
                     className="flex min-h-12 w-full items-center gap-3 border-b border-border/60 px-3 py-2 text-left transition-colors last:border-b-0 hover:bg-muted/60"
                   >
@@ -465,15 +467,15 @@ export function CredentialModal({ mode, cred, presets, agents, initialPresetId, 
 
               <Field
                 label={t('aiProvider.credentialModal.defaultModel')}
-                description={t('modelCatalog.selectHelp')}
               >
                 <ModelCombobox
                   value={model}
+                  vendor={VENDOR_BY_PRESET[preset.id]}
                   suggestions={models}
                   onChange={setModel}
                   placeholder={t('modelCatalog.selectPlaceholder')}
                   ariaLabel={t('aiProvider.credentialModal.defaultModel')}
-                  suggestionsLabel={t('aiProvider.credentialModal.defaultModelHelp')}
+                  suggestionsLabel={t('workspaceSettings.ai.modelSuggestions')}
                 />
                 <ModelCatalogStatus catalog={modelCatalog} selectedModel={model} />
               </Field>
@@ -495,7 +497,7 @@ export function CredentialModal({ mode, cred, presets, agents, initialPresetId, 
 
               {!isDirect && (
                 <p className="rounded-lg bg-muted px-3 py-2 text-[10.5px] leading-relaxed text-muted-foreground">
-                  {t('aiProvider.credentialModal.testExplanation', { model: model.trim() || t('aiProvider.credentialModal.selectedModel') })}
+                  {t('aiProvider.credentialModal.testExplanation', { model: model.trim() ? modelDisplayName(model, models.find((candidate) => candidate.id === model)?.label) : t('aiProvider.credentialModal.selectedModel') })}
                 </p>
               )}
 
@@ -504,7 +506,7 @@ export function CredentialModal({ mode, cred, presets, agents, initialPresetId, 
               )}
               {gate.testing && <p className="text-[12px] text-muted-foreground">{t('aiProvider.credentialModal.testingConnection')}</p>}
               {gate.result && !staleResult && (
-                <div className={`min-w-0 max-w-full overflow-hidden rounded-lg px-3 py-2.5 text-[12px] ${gate.result.ok ? 'bg-success/10 text-success' : 'bg-destructive/10 text-destructive'}`}>
+                <div data-testid="credential-test-result" data-ok={gate.result.ok} className={`min-w-0 max-w-full overflow-hidden rounded-lg px-3 py-2.5 text-[12px] ${gate.result.ok ? 'bg-success/10 text-success' : 'bg-destructive/10 text-destructive'}`}>
                   {gate.result.ok ? (
                     gate.result.response?.trim() ? (
                       <>

@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { getProductVersion } from '@traderalice/update-lifecycle/node'
 /**
  * Guardian — built-runtime entry, used by source and native CLI launches.
  *
@@ -201,16 +202,8 @@ const connectorRecovery = new RestartBackoff({
     console.warn(`[guardian/prod] Connector recovery attempt ${attempt} in ${delayMs}ms`)
   },
 })
-let RUNTIME_VERSION = 'dev'
+let RUNTIME_VERSION
 
-async function readRuntimeVersion() {
-  try {
-    const manifest = JSON.parse(await readFile(resolve(process.cwd(), 'package.json'), 'utf8'))
-    return typeof manifest.version === 'string' ? manifest.version : 'dev'
-  } catch {
-    return 'dev'
-  }
-}
 
 function runtimeStatus() {
   const owner = guardianRuntimeLock?.owner
@@ -617,7 +610,7 @@ async function initializeRuntimeState() {
   UTA_URL = `http://127.0.0.1:${UTA_PORT}`
   CONNECTOR_URL = `http://127.0.0.1:${CONNECTOR_PORT}`
   utaStatus = SKIP_UTA ? 'disabled' : 'starting'
-  RUNTIME_VERSION = await readRuntimeVersion()
+  RUNTIME_VERSION = getProductVersion()
 }
 
 export async function startGuardianRuntime() {

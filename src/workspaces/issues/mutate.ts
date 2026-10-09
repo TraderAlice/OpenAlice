@@ -23,6 +23,7 @@ import { join } from 'node:path'
 
 import { parse as parseYaml, stringify as stringifyYaml } from 'yaml'
 
+import { scheduleValidationError } from '../../core/schedule-expr.js'
 import { isModelReasoningEffort, type ModelReasoningEffort } from '../../ai-providers/model-semantics.js'
 import { readWorkspaceFile, writeWorkspaceFile } from '../file-service.js'
 import { deprecatedIssueAssigneeReplacement } from '../session-signature.js'
@@ -157,7 +158,7 @@ export async function updateIssueFields(
   wsDir: string,
   id: string,
   patch: IssueFieldPatch,
-  options?: { allowConnectorDesk?: boolean; allowTelegramConnector?: boolean },
+  options?: { allowConnectorDesk?: boolean; allowTelegramConnector?: boolean; ordinaryScheduleOnly?: boolean },
 ): Promise<MutateResult> {
   if (!ID_RE.test(id)) return { ok: false, reason: 'not_found' }
   const raw = await readWorkspaceFile(wsDir, relFor(id))
@@ -304,8 +305,15 @@ export async function updateIssueFields(
     delete data.telegramConnector
   }
   if (patch.when !== undefined) {
+    // The GUI edits existing ordinary schedules. Check against the same live
+    // read used for this write, rather than a separate route-level projection.
+    if (options?.ordinaryScheduleOnly && (!current.issue.when || current.issue.connectorDesk)) {
+      return { ok: false, reason: 'invalid', error: 'Edit an existing ordinary Issue schedule; manage connector desks in Connector Settings.' }
+    }
     const when = issueWhenSchema.safeParse(patch.when)
     if (!when.success) return { ok: false, reason: 'invalid', error: 'invalid when' }
+    const error = scheduleValidationError(when.data)
+    if (error) return { ok: false, reason: 'invalid', error }
     data.when = when.data
   }
   if (patch.catchUp !== undefined) {

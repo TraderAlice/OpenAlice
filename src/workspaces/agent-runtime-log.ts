@@ -101,6 +101,7 @@ export interface NewsActivityPayload {
   readonly link?: string
   readonly publishedAt: number
   readonly ingestSource: string
+  readonly image?: string
 }
 
 export type AgentRuntimePayload =

@@ -5,7 +5,7 @@ import {
   parseChangedFiles,
 } from './classify-beta-release-prep.mjs'
 
-const manifests = ['package.json', 'packages/cli/package.json']
+const manifests = ['package.json']
 
 function manifest(name, version, extra = '') {
   return `{
@@ -26,11 +26,9 @@ function candidate(overrides = {}) {
     changes: manifests.map((path) => ({ status: 'M', path })),
     baseManifests: {
       'package.json': manifest('open-alice', baseVersion),
-      'packages/cli/package.json': manifest('@traderalice/openalice-cli', baseVersion),
     },
     headManifests: {
       'package.json': manifest('open-alice', nextVersion),
-      'packages/cli/package.json': manifest('@traderalice/openalice-cli', nextVersion),
     },
     ...overrides,
   })
@@ -63,13 +61,10 @@ describe('beta release-preparation classifier', () => {
     expect(candidate({ baseRef: 'dev' }).betaReleasePrep).toBe(false)
     expect(candidate({ eventName: 'workflow_dispatch', baseRef: '' }).betaReleasePrep).toBe(false)
 
-    const mismatch = candidate({
-      headManifests: {
-        'package.json': manifest('open-alice', '0.91.0-beta.2'),
-        'packages/cli/package.json': manifest('@traderalice/openalice-cli', '0.91.0-beta.3'),
-      },
-    })
-    expect(mismatch.betaReleasePrep).toBe(false)
+    expect(candidate({ changes: [
+      { status: 'M', path: 'package.json' }, { status: 'M', path: 'packages/cli/package.json' },
+    ] }).betaReleasePrep).toBe(false)
+
   })
 
   it('rejects extra files, non-modification statuses, and bytes outside version', () => {
@@ -83,7 +78,6 @@ describe('beta release-preparation classifier', () => {
     const extraBytes = candidate({
       headManifests: {
         'package.json': manifest('open-alice', '0.91.0-beta.2', ',\n  "private": true'),
-        'packages/cli/package.json': manifest('@traderalice/openalice-cli', '0.91.0-beta.2'),
       },
     })
     expect(extraBytes.betaReleasePrep).toBe(false)

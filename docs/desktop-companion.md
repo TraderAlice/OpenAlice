@@ -3,10 +3,14 @@
 The normal desktop and isolated Electron demo start one Alice companion window
 from `apps/desktop/src/app-window.ts`. It shares the Electron main process and
 adds a renderer, with no additional Guardian, Alice, UTA or remote connection.
-Closing the main window hides it while the app tray and companion stay available;
-the tray can restore the main window or quit the app. Minimizing the main window
-also leaves the companion available. Quitting destroys the companion and stops
-the managed processes.
+Closing the normal desktop's main window hides it on every platform while the
+app tray, companion and managed processes stay available. The Windows tray or
+macOS menu-bar tray can restore and focus the same window; clicking the macOS
+Dock icon also restores it, including after minimization. Only an explicit Quit
+action (tray menu, macOS app menu or Cmd+Q) starts managed-process shutdown.
+Minimizing the main window also leaves the companion available. Quitting destroys
+the companion and stops the managed processes. The isolated demo retains
+exit-on-close so its disposable fixture backend is cleaned up.
 The bottom-left Alice’s Settings menu also provides Show pet / Hide pet in
 desktop mode. Its local preload bridge reads the saved preference, toggles the
 same native controller as the tray, and subscribes to visibility changes. The
@@ -85,3 +89,52 @@ and saves native renderer captures in its printed temporary directory. Omitting
 runs this acceptance on macOS and Windows; package/workspace acceptance remains
 separate. Real display composition, cross-monitor drag and click-through still
 need native desktop interaction in addition to renderer captures.
+
+## Product activity notifications
+
+Settings → Pet now has a desktop-local notification policy saved atomically in
+Electron userData `activity-notifications.json`. Fresh installs start with explicit
+completion/Inbox, failure, action needed and News switches on, and routine
+progress off. Choices persist across restart and default changes. Previous
+preset-based profiles expand the selected preset and then apply Show/Hide
+choices, preserving enabled, pause, surface and privacy state. Unknown event
+families remain silent until mapped. Restore notification defaults populates
+the five event switches only; pause lasts one hour. Notification enablement
+and surface settings remain independent of pet visibility.
+The browser retains its existing activity notifications and explains that
+these machine-local preferences require the desktop app.
+
+One Electron main-process controller reads the existing ProductActivityJournal
+API every four seconds, via integrated child IPC or the selected relay using
+the owning Electron session's cookies. The pet has no backend connection and
+its `connect-src 'none'` CSP is unchanged. Pure Journal projection, meaningful
+notification mapping and NotificationQueue are shared with the browser;
+Office/history remain unfiltered. Main-native polling feeds the global activity
+summary too, so hidden renderer timers are not the notification source.
+Source identity includes the selected relay generation/machine/project (or the
+integrated home). Initial history is silent; at most 500 new facts are read at
+once, older reconnect backlog is baselined, queue storage is bounded to 100,
+and old-project responses/actions are discarded. Polls never overlap.
+
+Visible non-minimized main windows use top-right notifications. Hidden or
+minimized main windows use an already-visible pet; a hidden pet is never shown
+for a notification. A surface transition clears old announcements without
+replaying them on the other surface. The pet shows one bubble and the main
+surface up to three; errors preempt lower-priority queued announcements.
+Dismissal changes only display state, never task completion or Inbox read state.
+
+Brief pet messages are the default: generic state/count only, no names, raw
+report/error text, headlines or images. Disabling brief mode permits bounded
+text previews. Existing bubble art and decorative click speech remain. Open
+and Dismiss are keyboard-accessible, Escape dismisses, and native hit testing
+includes only the message/action block in addition to the alpha-tested pet.
+Other transparent pixels remain click-through. The bridge accepts only an
+active display token from the owning window's main frame, validates its source
+again, and opens Office, Inbox or News through the existing frontend tab store.
+No arbitrary URL/code or exact article/session deep link is accepted. These
+context-level destinations are intentional current route limits.
+
+The isolated native demo smoke includes real Journal → main IPC → background
+pet, preference/default/reset and safe Open acceptance. Linux virtual-display
+checks do not certify macOS/Windows compositor, keyboard focus, physical
+multi-monitor drag or click-through; those remain native platform gates.

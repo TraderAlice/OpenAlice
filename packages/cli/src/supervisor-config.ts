@@ -1,4 +1,6 @@
 import { writeProjectWorkspaceRequest, type ProjectWorkspace } from './project-workspaces.ts'
+import { migrateSupervisorDefault } from './supervisor-default-migration.ts'
+import { withSupervisorConfigLock } from './supervisor-config-lock.ts'
 import { randomUUID } from 'node:crypto'
 import { constants } from 'node:fs'
 import {
@@ -37,7 +39,7 @@ import {
   type AliceProjectProduct,
 } from './alice-project-product.ts'
 
-const CONFIG_SCHEMA_VERSION = 2
+const CONFIG_SCHEMA_VERSION = 3
 const PROJECT_KEY_PATTERN = /^[a-z][a-z0-9_-]{0,31}$/
 const CONFIG_FILE_NAME = 'config.json'
 const IGNORED_HOME_ENTRIES = new Set([
@@ -65,6 +67,8 @@ const LEGACY_CONFIG_KEYS = new Set([
 const CONFIG_KEYS = new Set([
   'schemaVersion',
   'defaultProject',
+  'defaultTarget',
+  'defaultTargetMigrationError',
   'defaults',
   'projects',
 ])
@@ -79,8 +83,11 @@ const LAUNCH_VALUE_KEYS = new Set([
 ])
 
 export interface SupervisorConfigDocument {
-  schemaVersion: 2
+  schemaVersion: 2 | 3
+  /** Accepted only as migration input; never persisted by schema 3. */
   defaultProject?: string
+  defaultTarget?: { machine: string; project: string } | null
+  defaultTargetMigrationError?: string
   defaults?: LaunchConfigValues
   projects?: Record<string, AliceProjectLaunchConfig>
 }
@@ -164,18 +171,23 @@ export async function resolveStoredLaunchContext(
   const env = options.env ?? process.env
   const supervisorRoot = resolveSupervisorRootPath(options)
   const config = parseSupervisorConfig(await (
-    options.readConfig ?? readSupervisorConfig
+    options.readConfig ?? ((root: string) => readSupervisorConfig(root, { migrate: !flags.home && !env['OPENALICE_HOME'] }))
   )(supervisorRoot))
+  if (config.schemaVersion === 3 && !flags.project && !flags.instance && !flags.home && !env['OPENALICE_HOME'] && !env['OPENALICE_PROJECT'] && !env['OPENALICE_INSTANCE'] && !options.selectedProject) {
+    if (config.defaultTargetMigrationError) throw configError(config.defaultTargetMigrationError)
+    if (!config.defaultTarget) throw configError('Choose a Machine and AliceProject, or pass --project/--home.')
+    if (config.defaultTarget.machine !== 'local') throw configError('Default is remote. Use --machine with an explicit --project for this command.')
+  }
   const selectedProject = flags.project
     ?? flags.instance
     ?? env['OPENALICE_PROJECT']
     ?? env['OPENALICE_INSTANCE']
     ?? options.selectedProject
-    ?? config.defaultProject
+    ?? (config.defaultTarget?.machine === 'local' ? config.defaultTarget.project : config.schemaVersion === 2 ? config.defaultProject : undefined)
     ?? 'default'
   const machineConfig: MachineSupervisorConfig = {
     defaultProject: options.selectedProject
-      ?? config.defaultProject,
+      ?? (config.defaultTarget?.machine === 'local' ? config.defaultTarget.project : config.schemaVersion === 2 ? config.defaultProject : undefined),
     defaults: config.defaults,
   }
 
@@ -243,6 +255,7 @@ export async function persistAliceProjectLaunchConfig(
   patch: LaunchConfigValues,
   options: PersistAliceProjectConfigOptions = {},
 ): Promise<void> {
+  if (!options.readConfig && !options.writeConfig) return withSupervisorConfigLock(context.supervisorRoot, () => persistAliceProjectLaunchConfig(context, patch, { ...options, readConfig: readSupervisorConfigUnlocked, writeConfig: writeSupervisorConfigUnlocked }))
   const readConfig = options.readConfig ?? readSupervisorConfig
   const writeConfig = options.writeConfig ?? writeSupervisorConfig
   const current = parseSupervisorConfig(await readConfig(context.supervisorRoot))
@@ -306,6 +319,7 @@ export async function persistMachineLaunchConfig(
   patch: LaunchConfigValues,
   options: PersistAliceProjectConfigOptions = {},
 ): Promise<void> {
+  if (!options.readConfig && !options.writeConfig) return withSupervisorConfigLock(context.supervisorRoot, () => persistMachineLaunchConfig(context, patch, { ...options, readConfig: readSupervisorConfigUnlocked, writeConfig: writeSupervisorConfigUnlocked }))
   const readConfig = options.readConfig ?? readSupervisorConfig
   const writeConfig = options.writeConfig ?? writeSupervisorConfig
   const current = parseSupervisorConfig(await readConfig(context.supervisorRoot))
@@ -357,6 +371,7 @@ export async function persistSelectedSupervisorAliceProject(
   name: string,
   options: PersistAliceProjectConfigOptions = {},
 ): Promise<void> {
+  if (!options.readConfig && !options.writeConfig) return withSupervisorConfigLock(context.supervisorRoot, () => persistSelectedSupervisorAliceProject(context, name, { ...options, readConfig: readSupervisorConfigUnlocked, writeConfig: writeSupervisorConfigUnlocked }))
   requireProjectKey(name, 'project')
   const readConfig = options.readConfig ?? readSupervisorConfig
   const writeConfig = options.writeConfig ?? writeSupervisorConfig
@@ -382,7 +397,8 @@ export async function persistSelectedSupervisorAliceProject(
   await writeConfig(context.supervisorRoot, {
     ...current,
     schemaVersion: CONFIG_SCHEMA_VERSION,
-    defaultProject: name === 'default' ? undefined : name,
+    defaultTarget: { machine: 'local', project: name },
+    defaultTargetMigrationError: undefined,
   })
 }
 
@@ -397,6 +413,7 @@ export async function createSupervisorAliceProject(
     select?: boolean
   } = {},
 ): Promise<void> {
+  if (!options.readConfig && !options.writeConfig) return withSupervisorConfigLock(context.supervisorRoot, () => createSupervisorAliceProject(context, name, home, { ...options, readConfig: readSupervisorConfigUnlocked, writeConfig: writeSupervisorConfigUnlocked }))
   requireProjectKey(name, 'project')
   if (name === 'default') {
     throw configError('The implicit "default" AliceProject already exists.')
@@ -418,7 +435,7 @@ export async function createSupervisorAliceProject(
   const candidate: SupervisorConfigDocument = {
     ...current,
     schemaVersion: CONFIG_SCHEMA_VERSION,
-    defaultProject: options.select === false ? current.defaultProject : name,
+    defaultTarget: current.defaultTarget ?? null,
     projects: {
       ...current.projects,
       [name]: projectEntry,
@@ -452,20 +469,29 @@ export async function createSupervisorAliceProject(
 
 export async function readSupervisorConfig(
   supervisorRoot: string,
+  options: { legacyDesktopPreferencePath?: string; migrate?: boolean } = {},
 ): Promise<SupervisorConfigDocument> {
+  if (options.migrate === false) {
+    try { return parseSupervisorConfig(JSON.parse(await readFile(supervisorConfigPath(supervisorRoot), 'utf8'))) }
+    catch (error) { if (isNodeError(error, 'ENOENT')) return { schemaVersion: 3, defaultTarget: null }; throw error }
+  }
+  return withSupervisorConfigLock(supervisorRoot, () => readSupervisorConfigUnlocked(supervisorRoot, options.legacyDesktopPreferencePath))
+}
+
+async function readSupervisorConfigUnlocked(supervisorRoot: string, desktopPath?: string): Promise<SupervisorConfigDocument> {
   const path = supervisorConfigPath(supervisorRoot)
   let text: string
   try {
     text = await readFile(path, 'utf8')
   } catch (error: unknown) {
     if (isNodeError(error, 'ENOENT')) {
-      return { schemaVersion: CONFIG_SCHEMA_VERSION }
+      return migrateSupervisorDefault(supervisorRoot, { schemaVersion: 2 }, writeSupervisorConfigUnlocked, desktopPath)
     }
     throw configError(`Could not read Supervisor configuration at ${path}: ${errorMessage(error)}`)
   }
 
   try {
-    return parseSupervisorConfig(JSON.parse(text) as unknown)
+    return await migrateSupervisorDefault(supervisorRoot, parseSupervisorConfig(JSON.parse(text) as unknown), writeSupervisorConfigUnlocked, desktopPath)
   } catch (error: unknown) {
     if (isConfigError(error)) throw error
     throw configError(`Invalid Supervisor configuration at ${path}: ${errorMessage(error)}`)
@@ -476,7 +502,17 @@ export async function writeSupervisorConfig(
   supervisorRoot: string,
   config: SupervisorConfigDocument,
 ): Promise<void> {
+  return withSupervisorConfigLock(supervisorRoot, () => writeSupervisorConfigUnlocked(supervisorRoot, config))
+}
+
+async function writeSupervisorConfigUnlocked(supervisorRoot: string, config: SupervisorConfigDocument, current: () => boolean = () => true): Promise<void> {
   const validated = parseSupervisorConfig(config)
+  if (validated.schemaVersion !== 3) {
+    try {
+      const existing = JSON.parse(await readFile(supervisorConfigPath(supervisorRoot), 'utf8')) as { schemaVersion?: number }
+      if ((existing.schemaVersion ?? 0) >= 3) throw configError('Refusing to overwrite upgraded Supervisor configuration with an old schema.')
+    } catch (error) { if (!isNodeError(error, 'ENOENT')) throw error }
+  }
   const path = supervisorConfigPath(supervisorRoot)
   const temporary = join(
     supervisorRoot,
@@ -489,6 +525,7 @@ export async function writeSupervisorConfig(
       `${JSON.stringify(validated, null, 2)}\n`,
       { encoding: 'utf8', mode: 0o600, flag: 'wx' },
     )
+    if (!current()) { await rm(temporary, { force: true }); return }
     await rename(temporary, path)
   } catch (error: unknown) {
     await rm(temporary, { force: true }).catch(() => undefined)
@@ -506,7 +543,7 @@ export function parseSupervisorConfig(
   assertCurrentSupervisorSchemaVersion(root['schemaVersion'])
 
   const defaultProject = optionalProjectKey(
-    root['defaultProject'],
+    root['schemaVersion'] === 3 ? undefined : root['defaultProject'],
     'defaultProject',
   )
   const defaults = root['defaults'] === undefined
@@ -543,8 +580,8 @@ export function parseSupervisorConfig(
   }
 
   return retainUnknownFields({
-    schemaVersion: CONFIG_SCHEMA_VERSION,
-    ...(defaultProject === undefined ? {} : { defaultProject }),
+    schemaVersion: root['schemaVersion'] === 3 ? 3 : 2,
+    ...(root['schemaVersion'] === 3 ? { defaultTarget: parseDefaultTarget(root['defaultTarget']), ...(typeof root['defaultTargetMigrationError'] === 'string' ? { defaultTargetMigrationError: root['defaultTargetMigrationError'] } : {}) } : defaultProject === undefined ? {} : { defaultProject }),
     ...(defaults === undefined ? {} : { defaults }),
     ...(projects === undefined ? {} : { projects }),
   }, root, CONFIG_KEYS)
@@ -592,7 +629,7 @@ function parseLegacySupervisorConfig(
     )
   }
   return {
-    schemaVersion: CONFIG_SCHEMA_VERSION,
+    schemaVersion: 2,
     ...(defaultProject === undefined ? {} : { defaultProject }),
     ...(defaults === undefined ? {} : { defaults }),
     ...(projects === undefined ? {} : { projects }),
@@ -619,7 +656,7 @@ function buildAliceProjectRegistry(
   config: SupervisorConfigDocument,
   options: ResolveSupervisorRootOptions,
 ): SupervisorAliceProjectRegistry {
-  const defaultProject = config.defaultProject ?? 'default'
+  const defaultProject = config.defaultTarget?.machine === 'local' ? config.defaultTarget.project : config.schemaVersion === 2 ? config.defaultProject ?? 'default' : ''
   const names = [
     'default',
     ...Object.keys(config.projects ?? {})
@@ -627,7 +664,7 @@ function buildAliceProjectRegistry(
       .sort(),
   ]
   const machineConfig: MachineSupervisorConfig = {
-    defaultProject: config.defaultProject,
+    defaultProject: defaultProject || undefined,
     defaults: config.defaults,
   }
   const projects = names.map((name) => {
@@ -853,14 +890,14 @@ function parseLaunchValues(
     : result
 }
 
-function assertCurrentSupervisorSchemaVersion(value: unknown): asserts value is 2 {
+function assertCurrentSupervisorSchemaVersion(value: unknown): asserts value is 2 | 3 {
   if (isNewerSupervisorSchemaVersion(value)) {
     throw configError(
       `Supervisor configuration schemaVersion ${value} is newer than this OpenAlice (supports ${CONFIG_SCHEMA_VERSION}). Update OpenAlice to read this AliceProject configuration.`,
       'ESUPERVISORSCHEMA',
     )
   }
-  if (value !== CONFIG_SCHEMA_VERSION) {
+  if (value !== 2 && value !== CONFIG_SCHEMA_VERSION) {
     throw configError(
       `Supervisor configuration schemaVersion must be ${CONFIG_SCHEMA_VERSION}.`,
     )
@@ -989,4 +1026,18 @@ function isNodeError(error: unknown, code: string): boolean {
 
 function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error)
+}
+
+export function parseDefaultTarget(value: unknown): { machine: string; project: string } | null {
+  if (value === null) return null
+  const record = requireRecord(value, 'defaultTarget')
+  return { machine: requireProjectKey(record['machine'], 'defaultTarget.machine'), project: requireProjectKey(record['project'], 'defaultTarget.project') }
+}
+
+export async function updateSupervisorDefault(supervisorRoot: string, target: { machine: string; project: string } | null, current: () => boolean = () => true): Promise<void> {
+  await withSupervisorConfigLock(supervisorRoot, async () => {
+    const config = await readSupervisorConfigUnlocked(supervisorRoot)
+    if (!current()) return
+    await writeSupervisorConfigUnlocked(supervisorRoot, { ...config, schemaVersion: 3, defaultTarget: parseDefaultTarget(target), defaultTargetMigrationError: undefined }, current)
+  })
 }

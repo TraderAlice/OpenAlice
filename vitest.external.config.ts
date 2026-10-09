@@ -1,3 +1,4 @@
+import { collectionWideTestInputs } from './scripts/test-collection-inputs.mjs'
 import { fileURLToPath } from 'node:url'
 import { resolve, dirname } from 'node:path'
 
@@ -23,6 +24,7 @@ export default {
     alias: workspaceAliases,
   },
   test: {
+    forceRerunTriggers: collectionWideTestInputs(__dirname),
     include: externalReadonlyIncludes,
     testTimeout: 60_000,
     fileParallelism: false,

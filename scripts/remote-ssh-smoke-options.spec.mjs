@@ -41,3 +41,10 @@ describe('parseRemoteSshSmokeOptions', () => {
       .toThrow('unknown option: --wat')
   })
 })
+
+it('requires both exact published versions for remote recovery acceptance', () => {
+  expect(parseRemoteSshSmokeOptions(['--upgrade-from', '0.94.1-beta.2', '--upgrade-to', '0.94.1']))
+    .toMatchObject({ upgradeFrom: '0.94.1-beta.2', upgradeTo: '0.94.1' })
+  expect(() => parseRemoteSshSmokeOptions(['--upgrade-from', '0.94.1-beta.2'])).toThrow('supplied together')
+  expect(() => parseRemoteSshSmokeOptions(['--upgrade-to', 'latest'])).toThrow('exact published version')
+})

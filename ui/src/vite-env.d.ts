@@ -1,16 +1,13 @@
 /// <reference types="vite/client" />
 
-declare const __OPENALICE_UI_VERSION__: string
 
 interface ImportMetaEnv {
   readonly VITE_DEMO_MODE?: string
   readonly VITE_OPENALICE_DEV_RELAY?: string
   readonly VITE_OPENALICE_DEV_BACKEND_PORT?: string
-  readonly VITE_OPENALICE_FIRST_RUN_GUIDE?: string
   readonly VITE_OPENALICE_ONBOARDING_TEST?: string
   readonly VITE_OPENALICE_CREDENTIAL_TEST_MODE?: string
   readonly VITE_OPENALICE_ONBOARDING_AI_BASE_URL?: string
-  readonly VITE_OPENALICE_ONBOARDING_STORAGE_SUFFIX?: string
 }
 
 interface ImportMeta {
@@ -39,14 +36,29 @@ interface Window {
         issue: { message: string } | null
       }> }>
       connect(machine: string, project: string): Promise<unknown>
+      startupTarget(): Promise<{ target: { machine: string; project: string } | null; error: string | null }>
+      controlProject(input: { machine: string; project: string; action: 'create' | 'start'; home?: string }): Promise<void>
       returnIntegrated(): Promise<void>
     }
     readonly desktopMachine?: {
       plan(input: { mode: 'add' | 'upgrade'; sshTarget?: string; label?: string; sshPort?: number; identityFile?: string; machineKey?: string; projectKey?: string }): Promise<unknown>
       apply(id: string): Promise<unknown>
+      abandon(): Promise<void>
       operation(): Promise<unknown>
     }
     readonly companion?: {
+      readonly activity?: {
+        getSignals(): Promise<import('../../apps/desktop/src/activity-projection').AgentActivitySignal[]>
+        onSignals(callback: (input: import('../../apps/desktop/src/activity-projection').AgentActivitySignal[]) => void): () => void
+        getPreferences(): Promise<import('../../apps/desktop/src/activity-policy').ActivityPreferences>
+        updatePreferences(input: Partial<import('../../apps/desktop/src/activity-policy').ActivityPreferences>): Promise<import('../../apps/desktop/src/activity-policy').ActivityPreferences>
+        resetPreferences(): Promise<import('../../apps/desktop/src/activity-policy').ActivityPreferences>
+        onPreferences(callback: (input: import('../../apps/desktop/src/activity-policy').ActivityPreferences) => void): () => void
+        onDisplay(callback: (input: import('../../apps/desktop/src/activity-controller').ActivityDisplay) => void): () => void
+        onOpen(callback: (context: string) => void): () => void
+        open(displayId: string): Promise<boolean>
+        dismiss(displayId: string): Promise<boolean>
+      }
       getSound(): Promise<PetSoundSettings>
       updateSound(settings: Partial<PetSoundSettings>): Promise<PetSoundSettings>
       resetSound(): Promise<PetSoundSettings>
@@ -85,35 +97,20 @@ interface Window {
       setAskOnStartup(enabled: boolean): Promise<OpenAliceDataHomeStatus>
       openCurrent(): Promise<string>
     }
+    readonly clientUpdates?: {
+      abandon(): Promise<void>
+      operation(): Promise<import('@traderalice/update-lifecycle').UpdateOperation | null>
+      review(selection: { client: boolean; backend: boolean; projectUnits: string[] }): Promise<import('@traderalice/update-lifecycle').UpdatePlan>
+      approve(plan: import('@traderalice/update-lifecycle').UpdatePlan, fingerprint: string): Promise<import('@traderalice/update-lifecycle').UpdateOperation>
+      resume(): Promise<unknown>
+      status(): Promise<import('@traderalice/update-lifecycle').ClientUpdateSnapshot>
+      check(): Promise<import('@traderalice/update-lifecycle').ClientUpdateSnapshot>
+      activate(): Promise<void>
+      savePreferences(input: import('@traderalice/update-lifecycle').ClientUpdatePreferences): Promise<import('@traderalice/update-lifecycle').ClientUpdateSnapshot>
+    }
     readonly updater?: {
-      getStatus(): Promise<
-        | { phase: 'available'; version?: string; releaseUrl?: string }
-        | { phase: 'downloading'; version?: string; percent?: number }
-        | { phase: 'downloaded'; version: string; releaseUrl: string }
-        | {
-            phase: 'installing'
-            version: string
-            stage: 'preparing' | 'stopping-services' | 'releasing-runtime' | 'handing-off'
-          }
-        | { phase: 'error'; message: string }
-        | null
-      >
-      checkForUpdates(): Promise<
-        | { supported: true }
-        | { supported: false; reason: 'not-packaged' | 'missing-config' }
-      >
-      onStatus(cb: (status:
-        | { phase: 'available'; version?: string; releaseUrl?: string }
-        | { phase: 'downloading'; version?: string; percent?: number }
-        | { phase: 'downloaded'; version: string; releaseUrl: string }
-        | {
-            phase: 'installing'
-            version: string
-            stage: 'preparing' | 'stopping-services' | 'releasing-runtime' | 'handing-off'
-          }
-        | { phase: 'error'; message: string }
-      ) => void): () => void
-      installAndRestart(): Promise<unknown>
+      getStatus(): Promise<import('@traderalice/update-lifecycle').NativeUpdaterStatus | null>
+      onStatus(cb: (status: import('@traderalice/update-lifecycle').NativeUpdaterStatus) => void): () => void
       openRelease(version?: string): Promise<unknown>
     }
     readonly workspace?: {

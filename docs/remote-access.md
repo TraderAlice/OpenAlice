@@ -14,30 +14,10 @@ this guide is the OpenAlice contract.
 
 ## Status
 
-The repository now contains the Bun-native Stage 0 through Stage 2 path, with
-source checkout support retained only as an explicit development override:
-
-- `openalice up|run` re-executes the installed native command into the existing
-  Guardian/Alice/UTA/Connector process roles without requiring Node, Bun, a
-  checkout, or a current working directory;
-- `openalice up|run|status|down` provides browserless local lifecycle over the
-  same `cli-server` Guardian owner;
-- bare `openalice` starts the TUI and local Web relay; its GUI can select a
-  registered Machine and a running AliceProject;
-- `openalice relay` serves the trusted local Web UI and lets that browser
-  inspect registered Machines and switch one active Machine/AliceProject;
-- `openalice server run|start|status|stop` provides a browserless
-  foreground or detached Runtime lifecycle backed by Guardian's local control
-  endpoint;
-- `openalice machine list|add|rename|remove|enable|disable` owns Herdr-style
-  saved Machine profiles; `--machine <id-or-label> <command>` targets one
-  saved profile, while `machine inspect` remains the product-specific bounded
-  fleet inventory probe;
-- `openalice project transfer` plans and copies one quiescent local
-  AliceProject into a new complete home on a registered SSH Machine, preserving
-  portable configuration and Workspace repositories while deliberately
-  starting with zero resumable Sessions;
-- Electron remains a complete local desktop distribution.
+The Bun-native Runtime, registered SSH Machines, managed remote bootstrap and
+AliceProject transfer are implemented. Source checkout remains an explicit
+[development override](local-runtime.md#installed-runtime-provider).
+Current entry points are defined in [Command Contract](#command-contract).
 
 The release-owned installer advances one checksum-bound native OpenAlice
 release. Agent Runtime executables remain user-owned and are only discovered
@@ -283,7 +263,8 @@ openalice --remote <target> --plan|--status|--stop [options]
 required native CLI/Runtime install or start, checks readiness, and only then
 registers the Machine. The relay can select a registered, enabled Machine and
 one of its running AliceProjects. It cannot select an arbitrary SSH address.
-Settings → General now offers the same Machine preparation from the local GUI:
+Settings → General → Machines offers Machine preparation in an Add Machine
+dialog from the local GUI:
 enter an SSH target and label, run a read-only probe, review the exact planned
 actions, then approve apply. Saved Machines can be re-probed for updates against
 the local CLI release. Select a running AliceProject when reviewing an update so
@@ -297,22 +278,10 @@ active connection. These are local relay controls, never AliceProject API calls.
 read-only planning and explicit status/stop controls; its former one-off
 browser attach is retired.
 
-Local Runtime lifecycle commands are browserless:
-
-```bash
-openalice run [app-dir]
-openalice up [app-dir]
-openalice status
-openalice down
-openalice server run|start|status|stop
-```
-
-`run` owns a foreground Guardian and stops its process tree on normal shell
-termination. `up` starts a detached owner and returns after control and HTTP
-readiness. The `server` presenter remains for managed remote and existing
-scripts. Neither these commands nor their status URLs transfer GUI ownership
-from the local relay to the Runtime. The old `start`, `open`, and `up --open`
-shortcuts are retired.
+Local lifecycle and compatibility commands are owned by
+[Shell CLI Supervisor](cli-supervisor.md#canonical-lifecycle-commands).
+Neither those commands nor their status URLs transfer GUI ownership from the
+local relay to the Runtime.
 
 ### Registered Machines and aggregate inventory
 
@@ -382,30 +351,30 @@ refreshes Fleet state. Stop, restart, takeover, Setup, source, logs, Doctor,
 and configuration mutations remain unavailable for remote Fleet selections;
 offline or incompatible rows never receive guessed lifecycle actions.
 
-The browser relay is an alternate client presentation: `openalice relay`
-opens a stable loopback origin and selects a running local Project when one is
-available. If none is running, its connection screen can still discover
-Machines and Projects. Settings lists only registered SSH Machines and lets the
-user select a running Project. A stopped Project must first be started through
-CLI lifecycle controls. Selecting or switching Projects does not start, stop,
-update, or take over a Runtime; the separate, explicitly approved Machine
-update plan can restart one. One relay has one active target shared by all its tabs. A
-switch probes the candidate and verifies its AliceProject identity before
-promotion; failure retains the old target. Success closes old WebSockets,
-increments a target generation, and reloads all tabs. Switching never stops
-the old Runtime.
+The browser relay is an alternate presentation: `openalice relay` serves a
+stable loopback origin and restores only the shared Supervisor Default.
+Missing or unavailable Default leaves the startup chooser detached rather than
+selecting an arbitrary running project. The chooser can explicitly create,
+start, and connect local or registered remote AliceProjects; these are visible
+user actions, not implicit lifecycle effects of selection.
 
-Electron can host the same relay in its main process. Its default integrated
-mode keeps `app://openalice`, the local Guardian-owned AliceProject, and native
-IPC. Settings can select a running local or SSH Project for separated mode:
-the relay verifies the candidate first, then Electron stops only its own local
-children, releases its local Project lock, and loads the relay's loopback UI.
-The separated renderer uses backend HTTP/WS and receives no backend-specific
-native bridge. Returning to integrated mode reacquires local ownership without
-takeover, starts local children, waits for Alice readiness, and only then loads
-`app://openalice`. The selection is scoped to this Electron process; a fresh
-launch starts in integrated mode. Neither switch stops a selected remote
-Runtime.
+Settings connection switching remains a running-target operation. One relay
+target is shared by its tabs; a switch verifies the endpoint and AliceProject
+identity before presentation and Default persistence. Failure retains the old
+target. Successful promotion closes old WebSockets, advances the target
+generation, and reloads tabs without stopping the old Runtime. Explicit
+Machine update plans remain a separate mutation boundary.
+
+Electron uses the same persistent Default, choosing integrated local ownership
+or the startup chooser/relay as appropriate rather than always resetting to
+integrated mode on a fresh launch. Integrated mode retains `app://openalice`
+and native IPC. For a separated switch, it verifies the replacement target and
+loads its loopback renderer before stopping only its own local children and
+releasing their Guardian lock. The separated renderer uses backend HTTP/WS,
+not a backend-specific native bridge. Returning to integrated mode acquires
+local ownership without takeover, waits for readiness, and presents
+`app://openalice`. Neither switch stops a selected remote Runtime. Selection
+and migration details belong to [[docs/alice-project.md]].
 
 When `--app-dir` is absent, managed remote requires the verified native Runtime
 installed with the matching CLI. No Git checkout, Node, Bun, Python, compiler,
@@ -735,10 +704,11 @@ The read-only plan reports:
 
 Apply rules for an ordinary SSH-managed host:
 
-1. no matching compatible CLI or Runtime: ask before invoking the normal
-   installer with the local CLI's recorded logical release selector and
-   expected target-local artifact identity; the installer obtains the matching
-   platform-native release;
+1. an unprepared Machine uses the client release as a bootstrap candidate; an
+   existing installation retains its recorded channel and any newer release.
+   Explicit GUI updates discover the remote channel's release. Ask before
+   invoking its installation owner; package-manager installations stay owned
+   by their package manager;
 2. native mode never installs source-build dependencies or Agent Runtime
    executables;
 3. explicit source mode validates its own prerequisites and remains separate
@@ -766,14 +736,30 @@ failure. Source preparation uses compact phase output and suppresses successful
 package/build chatter; a failed phase still includes a bounded diagnostic tail.
 
 For an ordinary SSH-managed host, the local orchestrator compares protocol
-ranges and logical release identity; human version strings alone are
-insufficient. Stable, beta, and pinned releases may have different macOS and
+ranges and control compatibility separately from exact installation identity. Different
+client/backend SemVer values alone are not incompatibility evidence. Stable, beta, and pinned releases may have different macOS and
 Linux archive/content identities, but the remote CLI provenance and embedded
-Runtime must agree with that remote host's target. For dev, the latest CDN dev
-manifest is the completed-set authority: the local CLI must match its own
-target, the remote target is selected from the same manifest, and installer
-handoff is bound to the remote checksum and content identity. If the manifest
-cannot be verified or the local CLI is stale, remote mutation is blocked.
+Runtime must agree with that remote host's target. For dev, a discovered candidate must be bound to the remote target checksum
+and content identity from the completed-set manifest. An existing verified
+remote installation can be reused independently of the client's build. A stale
+bootstrap client cannot supply a new dev installation target.
+
+## Interrupted native updates
+
+`packages/update-lifecycle` owns release selection and install/activate/verify/
+reconnect transitions for both native SSH execution and the rehearsal. A stable
+release outranks its same-base beta. Installation and activation are separate:
+when stable is installed but beta is still running, review a restart-only plan.
+No second installation is needed. The review shows installed, running and target
+versions separately. A newer active release is never implicitly downgraded.
+
+The local controller's durable scoped receipt freezes the approved release,
+project home and original process owner. Reopening the client and reviewing the
+same Machine/project resumes from probed state. If stop succeeded before a lost
+reply, resume starts the installed target; if activation succeeded but relay
+reconnection failed, resume verifies and reconnects without stopping again.
+A changed owner prevents automatic stop. Only the selected project is restarted;
+other projects using that machine installation retain their running processes.
 
 ## Future Independent Studio Protocol
 
@@ -804,32 +790,20 @@ Runtime model.
 
 ### Stage 0 — SSH transport (implemented inside the relay)
 
-- the local relay owns the SSH loopback tunnel for its registered remote target;
-- browser UI and PTY WebSocket traverse the relay's stable loopback origin;
-- Machine registration owns remote preparation and Server readiness.
+Registered-Machine relay selection follows [Command Contract](#command-contract).
 
 ### Stage 1 — native Server lifecycle (implemented)
 
-- `server run/start/status/stop`;
-- Guardian-owned local status/stop endpoint;
-- detached start waits for real readiness;
-- status distinguishes absent, compatible, unhealthy, and other owner;
-- stop is structured and capability-gated;
-- Electron behavior remains unchanged.
+Readiness, status and shutdown follow [Server Lifecycle](#server-lifecycle)
+and [Guardian Control Contract](#guardian-control-contract).
 
 ### Stage 2 — managed Bun-native remote (implemented)
 
-- `machine add` plan/apply orchestration;
-- probe and bootstrap the matching native CLI release with explicit consent;
-- run the installed release without Node, Bun, source checkout, build tools, or
-  bundled Agent Runtime executables;
-- retain explicit `--app-dir` source preparation for development only;
-- report unsupported release targets instead of silently cloning source;
-- start/reuse the remote Server;
-- establish the relay's SSH loopback tunnel on target selection;
-- leave the Server alive after disconnect;
-- remaining release observation: validate ordinary Agent TUI interaction under
-  representative network shaping before deciding whether Stage 3 is useful.
+Preparation follows [Registered Machines](#registered-machines-and-aggregate-inventory)
+and [SSH Transport Contract](#ssh-transport-contract). Source overrides belong
+to [Local Runtime](local-runtime.md#installed-runtime-provider).
+Measure ordinary Agent TUI interaction under representative network shaping
+before deciding whether Stage 3 is useful.
 
 ### Stage 3 — terminal transport optimization
 
@@ -881,7 +855,7 @@ Runtime model.
 | ordinary SSH, matching compatible remote CLI/Server | reuses both without mutation |
 | ordinary SSH, matching release across different targets | compares the logical stable/beta/pinned release, then validates the remote archive and Runtime against its own platform/architecture provenance |
 | ordinary SSH, dev client behind latest manifest | blocks install/start mutation and asks the user to update the local dev CLI first |
-| ordinary SSH, protocol-compatible CLI from a different branch/tag/commit | plan names a matching CLI update before connection |
+| ordinary SSH, verified compatible CLI with different client provenance | retain the remote release and channel; no implicit reinstall or downgrade |
 | ordinary SSH, missing remote CLI, interactive | shows plan; default no leaves host unchanged |
 | ordinary SSH, missing remote CLI, non-interactive | fails unless explicit approval is present |
 | ordinary SSH, incompatible running Server | explains process impact before update/restart |
@@ -931,6 +905,19 @@ When this surface changes:
    behavior changes;
 7. run the repository-wide TypeScript and test gates required by `AGENTS.md`.
 
+For pending activation and controller-loss acceptance, add an exact published
+release pair, for example:
+
+```bash
+pnpm test:system:remote -- --upgrade-from 0.94.1-beta.2 --upgrade-to 0.94.1
+```
+
+This opt-in extension downloads official artifacts on the disposable host,
+leaves the old process running after the new installation, executes an
+activation-only plan, interrupts relay restoration, and reconnects over real
+SSH/HTTP without another install or restart. It is external acceptance, never
+part of hermetic `pnpm test`. The host architecture selects the native payload.
+
 Record any network-shaping gap explicitly. A localhost smoke does not verify
 remote TUI behavior, and an SSH tunnel smoke does not verify Electron package
 behavior.
@@ -950,3 +937,12 @@ behavior.
 - installing, pinning, downgrading, or repairing Agent Runtime executables on a
   remote host;
 - moving broker credentials, account state, or trading writes out of UTA.
+
+## Client startup Default
+
+The origin machine's Supervisor owns the complete Default Machine/project pair.
+Remote inventory and lifecycle commands do not choose it. The origin resolves
+implicit commands and forwards an explicit project; the remote machine's own
+Default is irrelevant. Project create/start/inspect do not set either Default.
+A failed remote restore stays detached even when a healthy local runtime is
+available. See [[docs/alice-project.md]] and [[docs/cli-supervisor.md]].

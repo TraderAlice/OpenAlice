@@ -1,12 +1,13 @@
-import { useCallback, useEffect, useState, type ReactElement } from 'react'
+import { useEffect, useState, type ReactElement } from 'react'
 import { AlertTriangle, ArrowRight, GitMerge, LoaderCircle, RefreshCw, ShieldCheck } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 
+import { useWorkspacePlan } from '../../lib/updates/useWorkspacePlan'
+import { workspacePlanIsCurrent } from '../../lib/updates/workspacePlans'
 import { CenteredLoading, EmptyState } from '../StateViews'
 import { Button } from '../ui/button'
 import {
   applyHarnessSourceUpgrade,
-  getHarnessSourceUpgradePlan,
   HarnessSourceUpgradeApiError,
   type HarnessSourceUpgradePlan,
   type HarnessSourceUpgradeResult,
@@ -19,11 +20,14 @@ interface Props {
 
 export function WorkspaceSourceUpgradePanel({ wsId, onWorkspaceChanged }: Props): ReactElement {
   const { t } = useTranslation()
-  const [plan, setPlan] = useState<HarnessSourceUpgradePlan | null>(null)
+  const shared = useWorkspacePlan({ workspaceId: wsId, kind: 'source' })
+  const plan = shared.plan as HarnessSourceUpgradePlan | null
   const [result, setResult] = useState<HarnessSourceUpgradeResult | null>(null)
-  const [loading, setLoading] = useState(true)
+  const { loading } = shared
   const [applying, setApplying] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+  const [applyError, setError] = useState<string | null>(null)
+  const error = applyError ?? shared.error
+  const current = !!plan && workspacePlanIsCurrent(plan)
   const blockerLabels: Record<string, string> = {
     active_runtime: t('workspace.sourceUpgradeBlocker.active_runtime'),
     working_tree_changes: t('workspace.sourceUpgradeBlocker.working_tree_changes'),
@@ -31,39 +35,32 @@ export function WorkspaceSourceUpgradePanel({ wsId, onWorkspaceChanged }: Props)
     incompatible_manifest: t('workspace.sourceUpgradeBlocker.incompatible_manifest'),
   }
 
-  const load = useCallback(async () => {
-    setLoading(true)
-    setError(null)
-    try {
-      setPlan(await getHarnessSourceUpgradePlan(wsId))
-    } catch (err) {
-      if (err instanceof HarnessSourceUpgradeApiError && err.plan) setPlan(err.plan)
-      setError((err as Error).message)
-    } finally {
-      setLoading(false)
-    }
-  }, [wsId])
-
-  useEffect(() => { void load() }, [load])
+  const load = async () => { setError(null); await shared.refresh() }
+  useEffect(() => { setResult(null); setError(null); setApplying(false) }, [shared.identity])
 
   const apply = async () => {
-    if (!plan || plan.blocked || applying) return
+    if (!plan || current || plan.blocked || applying || loading || shared.error) return
     setApplying(true)
     setError(null)
     try {
       const next = await applyHarnessSourceUpgrade(wsId, plan.planDigest, plan.toVersion)
-      setResult(next)
+      if (!shared.isActive()) return
+      shared.invalidate()
+      await shared.refresh()
       onWorkspaceChanged()
-      setPlan(null)
+      if (shared.isCurrent()) setResult(next)
     } catch (err) {
-      if (err instanceof HarnessSourceUpgradeApiError && err.plan) setPlan(err.plan)
-      setError((err as Error).message)
+      if (!shared.isActive()) return
+      if (err instanceof HarnessSourceUpgradeApiError && err.plan) await shared.replace(err.plan)
+      if (shared.isCurrent()) setError((err as Error).message)
     } finally {
-      setApplying(false)
+      if (shared.isCurrent()) setApplying(false)
     }
   }
 
-  if (loading && !plan) {
+  if (shared.current && !result) return <EmptyState icon={<ShieldCheck className="text-success" />} title={t('settings.versions.current')} />
+
+  if (!plan && !error && !result) {
     return <CenteredLoading label={t('workspace.sourceUpgradeLoading')} />
   }
 
@@ -122,12 +119,13 @@ export function WorkspaceSourceUpgradePanel({ wsId, onWorkspaceChanged }: Props)
             </div>
           </section>
 
-          <Button type="button" className="h-10 w-full" onClick={() => void apply()} disabled={plan.blocked || applying}>
+          <Button type="button" className="h-10 w-full" onClick={() => void apply()} disabled={current || plan.blocked || applying || loading || !!shared.error}>
             {applying && <LoaderCircle size={15} className="animate-spin" />}
-            {t(plan.verified ? 'workspace.sourceUpgradeApply' : 'workspace.sourceUpgradeApplyUnverified')}
+            {t(current ? 'settings.versions.current' : plan.verified ? 'workspace.sourceUpgradeApply' : 'workspace.sourceUpgradeApplyUnverified')}
           </Button>
         </div>
       )}
+      {!plan && error && <Button variant="outline" disabled={loading} onClick={() => void load()}><RefreshCw size={13}/>{t('workspace.upgradeRefresh')}</Button>}
       {error && <p className="mt-3 rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2 text-[12px] leading-[18px] text-destructive">{error}</p>}
     </div>
   )

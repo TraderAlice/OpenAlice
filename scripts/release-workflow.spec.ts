@@ -86,7 +86,7 @@ describe('Release workflow critical path', () => {
   it('does not make POSIX system-package acceptance wait for Windows or generate npm packages', () => {
     for (const name of ['accept-cli-homebrew', 'accept-cli-linuxbrew', 'accept-cli-aur']) {
       const job = workflow.jobs[name]
-      expect(needs(job)).toEqual(['release', 'build-cli-release'])
+      expect(needs(job)).toEqual(['release', 'build-cli-release', 'build-cli-windows'])
       const commands = job.steps?.map((entry) => entry.run ?? '').join('\n') ?? ''
       expect(commands.match(/--system-only/g)).toHaveLength(2)
       expect(commands).not.toContain('--require-all')
@@ -106,7 +106,7 @@ describe('Release workflow critical path', () => {
     expect(guard).toContain('releases/latest')
     expect(guard).toContain('.draft == false and .prerelease == false')
     expect(guard).toContain('merge-base --is-ancestor')
-    expect(guard).toContain('packages/cli/package.json')
+    expect(guard).not.toContain('packages/cli/package.json')
     const download = step(job, 'Download and verify existing public release bytes').run ?? ''
     expect(download).toContain('verifyCliNpmPackages')
     expect(download).toContain('verify-public-cli-channels.mjs')
@@ -143,11 +143,12 @@ describe('Release workflow critical path', () => {
     const plan = step(workflow.jobs.release, 'Validate release intent and version authority').run ?? ''
     expect(plan).toContain('refs/heads/master')
     expect(plan).toContain("require('./package.json').version")
-    expect(plan).toContain("require('./packages/cli/package.json').version")
+    expect(plan).not.toContain("require('./packages/cli/package.json').version")
     expect(plan).toContain('Release tag already exists')
     expect(plan).toContain("RELEASE_CHANNEL\" = \"stable")
     expect(plan).toContain("RELEASE_CHANNEL\" = \"beta")
-    expect(plan).toContain('does not match channel')
+    expect(plan).toContain('check-publication')
+    expect(plan).toContain('channel_head_sha256=')
 
     for (const name of [
       'Create beta tag and GitHub prerelease from accepted candidates',
@@ -187,15 +188,6 @@ describe('Release workflow critical path', () => {
     expect(JSON.stringify(workflow)).not.toMatch(/NPM_TOKEN|NODE_AUTH_TOKEN/)
   })
 
-  it('selects the previous release from the same channel', () => {
-    const plan = step(workflow.jobs.release, 'Validate release intent and version authority').run ?? ''
-    expect(plan).toContain('git for-each-ref --merged="$SOURCE_SHA" --sort=-version:refname')
-    expect(plan).toContain('PREVIOUS_TAG_PATTERN')
-    expect(plan).not.toContain('git describe --tags')
-    expect(step(workflow.jobs.release, 'Generate release notes').run)
-      .toContain('${{ steps.plan.outputs.previous_tag }}')
-  })
-
   it('keeps existing-tag mirror repair distinct from new release creation', () => {
     const plan = step(workflow.jobs.release, 'Validate release intent and version authority').run ?? ''
     expect(plan).toContain('Mirror repair requires an existing release tag')
@@ -232,7 +224,7 @@ describe('Release workflow critical path', () => {
     const upgrade = desktopWorkflow.jobs.upgrade
 
     expect(step(desktop, 'Preserve desktop release candidate').uses).toBe('actions/upload-artifact@v4')
-    expect(step(desktop, 'Preserve desktop release candidate').with?.['retention-days']).toBe(3)
+    expect(step(desktop, 'Preserve desktop release candidate').with?.['retention-days']).toBe(30)
     expect(desktop.steps?.map((candidate) => candidate.name)).not.toContain(
       'Prove final desktop artifact upgrades previous release state',
     )
@@ -409,6 +401,26 @@ describe('Release workflow critical path', () => {
       .toContain('desktop-candidate-receipt.mjs stage')
   })
 
+  it('isolates and validates all six CLI targets for every full-set consumer', () => {
+    for (const name of ['publish-release', 'build-cli-package-channels', 'accept-cli-homebrew', 'accept-cli-linuxbrew', 'accept-cli-aur']) {
+      const job = workflow.jobs[name]
+      expect(needs(job)).toContain('build-cli-release')
+      expect(needs(job)).toContain('build-cli-windows')
+      expect(job.permissions?.actions).toBe('read')
+      expect(step(job, 'Select, verify and stage six CLI targets').run).toContain('scripts/stage-cli-release.mjs')
+      expect(job.steps?.some(entry => entry.with?.pattern === 'cli-release-*')).toBe(false)
+    }
+    expect(workflow.jobs['build-cli-windows'].with?.fixed_artifact_names).toBe(true)
+    for (const job of Object.values(workflow.jobs)) {
+      for (const entry of job.steps ?? []) {
+        if (entry.uses?.startsWith('actions/upload-artifact@')) {
+          expect(entry.with?.['retention-days']).toBe(30)
+          expect(entry.with?.overwrite).toBeUndefined()
+        }
+      }
+    }
+  })
+
   it('benchmarks actual CLI consumers without public or signing authority', () => {
     const job = workflow.jobs['benchmark-cli']
     expect(job.if).toBe("inputs.operation == 'benchmark-cli'")
@@ -435,8 +447,7 @@ describe('Release workflow critical path', () => {
     const acceptance = step(called, 'Accept preserved final artifact without rebuilding')
     expect(called.steps!.indexOf(selection)).toBeLessThan(called.steps!.indexOf(verification))
     expect(called.steps!.indexOf(verification)).toBeLessThan(called.steps!.indexOf(acceptance))
-    expect(called.steps?.find((entry) => entry.uses === 'actions/download-artifact@v5')?.with?.['artifact-ids'])
-      .toBe('${{ steps.candidate.outputs.artifact-id }}')
+    expect(step(called, 'Download exact selected candidate ID').run).toContain('release-artifacts.mjs')
     expect(source).not.toMatch(/secrets:|contents: write|electron-builder|pnpm electron:build|gh release/)
     expect(step(called, 'Bind acceptance to unchanged bytes and current verifier').run).toContain('bind-upgrade')
   })
@@ -534,6 +545,9 @@ describe('Release workflow critical path', () => {
     expect(step(brokerPacks, 'Build optional Broker Packs').if).toBeUndefined()
     expect(step(brokerPacks, 'Prove previous-release Broker Pack upgrade').if)
       .toContain("needs.release.outputs.channel == 'stable'")
+    const upgrade = step(brokerPacks, 'Prove previous-release Broker Pack upgrade').run ?? ''
+    expect(upgrade).toContain('pnpm --filter @traderalice/update-lifecycle... build')
+    expect(upgrade.indexOf('update-lifecycle... build')).toBeLessThan(upgrade.indexOf('pnpm broker-packs:upgrade-smoke'))
     expect(step(brokerPacks, 'Preserve Broker Packs').if).toBeUndefined()
   })
 
@@ -636,8 +650,9 @@ describe('Release workflow critical path', () => {
     expect(installer).toContain('Mirror repair requires a channel-aware Release')
     expect(mirror.steps?.some((candidate) => candidate.name === 'Publish generated release metadata and installer'))
       .toBe(false)
-    expect(step(mirror, 'Keep mirror repair on the active channel release').if)
-      .toContain("needs.release.outputs.operation == 'mirror'")
+    expect(upload).toContain('check-publication')
+    expect(upload).toContain('--expected-sha256 "$EXPECTED_HEAD_SHA256"')
+    expect(upload.indexOf('check-publication')).toBeLessThan(upload.indexOf('--include "${FEED_PREFIX}*.yml"'))
     expect(step(mirror, 'Snapshot stable aliases before a beta mirror').if)
       .toContain("needs.release.outputs.channel == 'beta'")
     expect(upload).toContain('s3://${R2_BUCKET}/beta/manifest.json')

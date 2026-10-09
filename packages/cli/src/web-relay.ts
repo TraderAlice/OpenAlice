@@ -1,3 +1,11 @@
+import { UpdateControlService } from './update-control.ts'
+export { UpdateControlService } from './update-control.ts'
+import { ClientUpdateService } from './client-updates.ts'
+export { ClientUpdateService } from './client-updates.ts'
+export { CLI_VERSION } from './install-source.mjs'
+export { readStartupTarget, writeStartupTarget, validateStartupTarget } from './startup-target.ts'
+export { inspectLocalMachine } from './machine-inventory.ts'
+export { resolveLocalStartupHome } from './project-control.ts'
 /** One local browser relay owns exactly one active Machine/AliceProject. */
 import { createReadStream } from 'node:fs'
 import { stat } from 'node:fs/promises'
@@ -7,8 +15,10 @@ import { extname, join, resolve, sep } from 'node:path'
 
 import { isBunStandalone, resolveBunResourceRoot } from './bun-standalone.mjs'
 import { inspectMachineFleet, inspectRegisteredMachine, inspectLocalMachine, type MachineInventory } from './machine-inventory.ts'
+import { controlProject, validateProjectControl, type ProjectControlInput } from './project-control.ts'
 import { MachineManagement } from './machine-management.ts'
 import { readMachineRegistrySummary, requireMachineEnabled } from './machine-registry.ts'
+import { readStartupTarget, writeStartupTarget, DefaultSelection, type StartupTarget } from './startup-target.ts'
 import { connectSsh, openBrowser, waitForOpenAlice } from './ssh-connect.mjs'
 
 type ActiveTarget = {
@@ -40,15 +50,29 @@ export interface WebRelayOptions {
   inspectLocal?: typeof inspectLocalMachine
   inspectRegistered?: typeof inspectRegisteredMachine
   readRegistry?: typeof readMachineRegistrySummary
+  readStartup?: typeof readStartupTarget
+  writeStartup?: typeof writeStartupTarget
   connect?: typeof connectSsh
   waitReady?: typeof waitForOpenAlice
+  clientUpdates?: ClientUpdateService
+  projectControl?: typeof controlProject
   machineManagement?: MachineManagement
+}
+
+export interface RelaySelectionOptions {
+  remember?: boolean
+  signal?: AbortSignal
+  /** Desktop owns presentation; Relay keeps the selection open through it. */
+  present?: () => Promise<void>
+  current?: () => boolean
 }
 
 export class WebRelay {
   private target: ActiveTarget | null = null
+  private readonly defaultSelection = new DefaultSelection()
   private generation = 0
   private switching = false
+  private projectOperation: Promise<void> | null = null
   private targetConnection: 'healthy' | 'reconnecting' | 'unavailable' = 'healthy'
   private recovery: Promise<void> | null = null
   private recoveryTimer: ReturnType<typeof setTimeout> | null = null
@@ -59,8 +83,12 @@ export class WebRelay {
   private readonly sockets = new Set<Duplex>()
   private readonly server = createServer((req, res) => void this.handle(req, res))
   private readonly options: WebRelayOptions
+  private readonly clientUpdates: ClientUpdateService
+  private projectCredentials: { target: ActiveTarget; cookie: string } | null = null
+  readonly updates: UpdateControlService
   private readonly machines: MachineManagement
   private origin = ''
+  private startupError: string | null = null
   private readonly devUi: URL | null
 
   constructor(options: WebRelayOptions = {}) {
@@ -69,7 +97,18 @@ export class WebRelay {
     if (this.devUi && (this.devUi.protocol !== 'http:' || !['127.0.0.1', 'localhost'].includes(this.devUi.hostname) || this.devUi.username || this.devUi.password || this.devUi.pathname !== '/')) {
       throw new Error('Development UI must be a loopback HTTP origin.')
     }
+    this.clientUpdates = options.clientUpdates ?? new ClientUpdateService()
     this.machines = options.machineManagement ?? new MachineManagement()
+    this.updates = new UpdateControlService({
+      scope: () => `${this.target?.machine ?? 'none'}:${this.target?.project ?? 'none'}`,
+      project: async (path, body) => {
+        if (!this.target) throw new Error('Select an AliceProject')
+        const response = await fetch(new URL(path, this.target.endpoint), { method: body === undefined ? 'GET' : 'POST', headers: { 'content-type': 'application/json', ...(this.projectCredentials?.target === this.target ? { cookie: this.projectCredentials.cookie } : {}) }, ...(body === undefined ? {} : { body: JSON.stringify(body) }), signal: AbortSignal.timeout(120_000) })
+        if (!response.ok) throw new Error(`Project update command failed: ${await response.text()}`)
+        return response.json()
+      },
+      backend: { plan: () => { if (!this.target || this.target.machine === 'local') throw new Error('Local backend uses its own installation owner'); return this.planMachine({ mode: 'upgrade', machineKey: this.target.machine, projectKey: this.target.project }) }, apply: id => this.applyMachine(id) },
+    })
     this.server.on('upgrade', (req, socket, head) => this.upgrade(req, socket, head))
   }
 
@@ -78,20 +117,58 @@ export class WebRelay {
       schemaVersion: 1,
       generation: this.generation,
       target: this.target && { machine: this.target.machine, machineName: this.target.machineName, project: this.target.project, projectName: this.target.projectName },
-      switching: this.switching,
+      switching: this.switching || this.projectOperation !== null,
       targetConnection: this.target ? this.targetConnection : null,
+      defaultSaveError: this.startupError,
     }
   }
 
   get originUrl(): string { return this.origin }
 
+  async startupPreference(): Promise<{ target: StartupTarget | null; error: string | null }> {
+    try {
+      return { target: await (this.options.readStartup ?? readStartupTarget)(), error: this.startupError }
+    } catch (error) {
+      return { target: null, error: error instanceof Error ? error.message : String(error) }
+    }
+  }
+
+  /** Default is written only after a candidate passed health and identity checks.
+   * Persistence failure must not tear down an otherwise working attachment. */
+  private async rememberSelection(machine: string, project: string, current: () => boolean = () => !this.closing): Promise<void> {
+    this.startupError = null
+    try { await (this.options.writeStartup ?? writeStartupTarget)({ machine, project }, { current }) }
+    catch (error) { this.startupError = `Connected, but Default was not saved: ${error instanceof Error ? error.message : String(error)}` }
+  }
+
+  setStartupError(error: unknown): void {
+    this.startupError = error instanceof Error ? error.message : String(error)
+  }
+
+  async controlProject(input: unknown): Promise<void> {
+    if (this.projectOperation || this.switching || this.machines.busy) throw new Error('Wait for the current location operation to finish.')
+    const value: ProjectControlInput = validateProjectControl(input)
+    // Resolve the registered destination before executing, never arbitrary SSH.
+    const machine = await this.inspectSelection(value.machine)
+    if (value.action === 'start' && !machine.projects.some(project => project.key === value.project)) throw new Error('This AliceProject is no longer registered.')
+    if (this.projectOperation || this.switching || this.machines.busy) throw new Error('Wait for the current location operation to finish.')
+    const operation = Promise.resolve().then(() => (this.options.projectControl ?? controlProject)(value))
+    this.projectOperation = operation
+    this.announce()
+    try { await operation }
+    finally { this.projectOperation = null; this.announce() }
+  }
+
   get machineOperationBusy(): boolean { return this.machines.busy }
   get machineOperation() { return this.machines.currentOperation }
 
-  planMachine(input: Parameters<MachineManagement['plan']>[0]) { return this.machines.plan(input) }
+  planMachine(input: Parameters<MachineManagement['plan']>[0]) {
+    if (this.projectOperation || this.switching) throw new Error('Wait for the current location operation to finish.')
+    return this.machines.plan(input)
+  }
 
   async applyMachine(id: string) {
-    if (this.switching) throw new Error('Wait for the location switch to finish before applying a Machine plan.')
+    if (this.switching || this.projectOperation) throw new Error('Wait for the location operation to finish before applying a Machine plan.')
     const selected = this.target
     return this.machines.apply(id, async ({ machineKey }) => {
       if (!selected || this.target !== selected || selected.machine !== machineKey) return
@@ -139,6 +216,8 @@ export class WebRelay {
 
   async close(): Promise<void> {
     this.closing = true
+    this.defaultSelection.cancel()
+    this.clientUpdates.stop()
     if (this.recoveryTimer) clearTimeout(this.recoveryTimer)
     this.target?.abort?.abort()
     for (const socket of this.sockets) socket.destroy()
@@ -163,6 +242,8 @@ export class WebRelay {
   }
 
   disconnect(): void {
+    this.defaultSelection.cancel()
+    this.switching = false
     const previous = this.target
     if (!previous) return
     this.target = null
@@ -176,22 +257,42 @@ export class WebRelay {
     previous.abort?.abort()
   }
 
-  async connect(machineKey: string, projectKey: string): Promise<void> {
-    return this.connectTarget(machineKey, projectKey, false)
+  async connect(machineKey: string, projectKey: string, options: RelaySelectionOptions = {}): Promise<void> {
+    if (options.signal?.aborted) throw new Error('Selection cancelled.')
+    await this.connectTarget(machineKey, projectKey, false, undefined, options.remember !== false, undefined, options)
   }
 
-  private async connectTarget(machineKey: string, projectKey: string, duringMachineOperation: boolean, expectedTarget?: ActiveTarget): Promise<void> {
+  /** A --home/env invocation supplies its observed local identity; it never saves. */
+  async connectLocalInvocation(machine: MachineInventory, project: string): Promise<void> {
+    if (machine.key !== 'local') throw new Error('Invocation overrides must be local.')
+    await this.connectTarget('local', project, false, undefined, false, machine)
+  }
+
+  private async connectTarget(machineKey: string, projectKey: string, duringMachineOperation: boolean, expectedTarget?: ActiveTarget, remember = false, localInvocation?: MachineInventory, options: RelaySelectionOptions = {}): Promise<void> {
+    const { signal } = options
+    if (this.projectOperation) throw new Error('Wait for the project operation to finish.')
     if (this.machines.busy && !duringMachineOperation) throw new Error('Wait for the Machine operation to finish before switching locations.')
-    if (this.switching) throw new Error('Another connection switch is in progress.')
+    if (expectedTarget && this.switching) throw new Error('A user selection is in progress.')
+    const operation = this.defaultSelection.begin()
+    const current = () => operation.current() && !this.closing && !signal?.aborted && (options.current?.() ?? true)
+    const cancel = () => {
+      if (!operation.current()) return
+      operation.cancel()
+      this.switching = false
+      this.announce()
+    }
+    signal?.addEventListener('abort', cancel, { once: true })
+    if (signal?.aborted) { cancel(); signal.removeEventListener('abort', cancel); throw new Error('Selection cancelled.') }
     this.switching = true
     this.announce()
     let candidateAbort: AbortController | undefined
+    let attached = false
     try {
-      const machine = await this.inspectSelection(machineKey)
+      const machine = localInvocation ?? await this.inspectSelection(machineKey)
       const project = machine.projects.find((entry) => entry.key === projectKey)
       if (!project) throw new Error(`AliceProject "${projectKey}" is not registered on ${machine.displayName}.`)
       if (!project.available || !project.runtime.webEndpoint) {
-        throw new Error(`AliceProject "${project.displayName}" is not running with a Web endpoint. Start it on that Machine first.`)
+        throw new Error(`AliceProject "${project.displayName}" is stopped or has no running Web endpoint.`)
       }
       const port = loopbackPort(project.runtime.webEndpoint)
       if (port === null) throw new Error('The selected Runtime did not advertise a loopback Web endpoint.')
@@ -231,7 +332,7 @@ export class WebRelay {
       if (identityResponse.status === 401) {
         // A login-gated Runtime can still be selected. Reconfirm ownership
         // through the authenticated SSH inventory; the browser then logs in.
-        const refreshed = await this.inspectSelection(machineKey)
+        const refreshed = localInvocation ?? await this.inspectSelection(machineKey)
         const matching = refreshed.projects.find((entry) => entry.key === projectKey)
         if (matching?.id !== project.id || loopbackPort(matching.runtime.webEndpoint) !== port) {
           throw new Error('The selected Runtime changed while opening the connection.')
@@ -241,9 +342,11 @@ export class WebRelay {
         const identity = await identityResponse.json() as { project?: { id?: string } }
         if (identity.project?.id !== project.id) throw new Error('The Runtime answered for a different AliceProject; connection was not switched.')
       }
-      if (this.closing || (expectedTarget && this.target !== expectedTarget)) throw new Error('The selected location changed during recovery.')
+      if (!current() || (expectedTarget && this.target !== expectedTarget)) throw new Error('The selected location changed during recovery.')
       const previous = this.target
       this.target = { machine: machineKey, machineName: machine.displayName, project: projectKey, projectName: project.displayName, endpoint, inventory: { machine, project }, abort: candidateAbort }
+      attached = true
+      const selected = this.target
       this.targetConnection = 'healthy'
       this.recoveryAttempts = 0
       if (this.recoveryTimer) clearTimeout(this.recoveryTimer)
@@ -252,11 +355,16 @@ export class WebRelay {
       this.announce()
       for (const socket of this.sockets) socket.destroy()
       previous?.abort?.abort()
+      await options.present?.()
+      if (!current() || this.target !== selected) throw new Error('The selected location changed before completion.')
+      if (remember) await this.rememberSelection(machineKey, projectKey, () => current() && this.target === selected)
     } catch (error) {
-      candidateAbort?.abort()
+      // Presentation/save errors do not tear down an already verified attachment.
+      if (!attached) candidateAbort?.abort()
       throw error
     } finally {
-      this.switching = false
+      signal?.removeEventListener('abort', cancel)
+      if (operation.current()) this.switching = false
       this.announce()
     }
   }
@@ -329,7 +437,32 @@ export class WebRelay {
       }
       if (!this.validRequest(req, mutation)) return json(res, 403, { error: 'Relay origin rejected.' })
       res.setHeader('cache-control', 'no-store')
+      // Browser authentication is ephemeral and target-scoped, never journaled.
+      // After a relay restart the next authorized command supplies it again.
+      if (this.target && req.method === 'POST' && ['/relay/v1/updates/review', '/relay/v1/updates/approve', '/relay/v1/updates/resume'].includes(url.pathname)) {
+        const headers = upstreamHeaders(req, new URL(this.target.endpoint), this.target)
+        this.projectCredentials = { target: this.target, cookie: String(headers.cookie ?? '') }
+      }
+      if (url.pathname === '/relay/v1/updates/abandon' && req.method === 'POST') { await this.updates.abandon(); return json(res, 200, { ok: true }) }
+      if (url.pathname === '/relay/v1/updates/operation' && req.method === 'GET') return json(res, 200, await this.updates.status())
+      if (url.pathname === '/relay/v1/updates/review' && req.method === 'POST') return json(res, 200, await this.updates.review(await readJsonBody(req) as Parameters<UpdateControlService['review']>[0]))
+      if (url.pathname === '/relay/v1/updates/approve' && req.method === 'POST') {
+        const body = await readJsonBody(req, 1_048_576) as { plan: Parameters<UpdateControlService['approve']>[0]; fingerprint: string }
+        return json(res, 200, await this.updates.approve(body.plan, body.fingerprint))
+      }
+      if (url.pathname === '/relay/v1/updates/resume' && req.method === 'POST') {
+        void this.updates.resume().catch(error => console.warn('[updates] continuation failed:', error))
+        return json(res, 202, { accepted: true })
+      }
+      if (url.pathname === '/relay/v1/updates' && req.method === 'GET') return json(res, 200, await this.clientUpdates.snapshot())
+      if (url.pathname === '/relay/v1/updates/activate' && req.method === 'POST') {
+        this.clientUpdates.activate()
+        return json(res, 202, { accepted: true })
+      }
+      if (url.pathname === '/relay/v1/updates/check' && req.method === 'POST') return json(res, 200, await this.clientUpdates.check())
+      if (url.pathname === '/relay/v1/updates/preferences' && req.method === 'PUT') return json(res, 200, await this.clientUpdates.savePreferences(await readJsonBody(req)))
       if (url.pathname === '/relay/v1/status' && req.method === 'GET') return json(res, 200, this.status)
+      if (url.pathname === '/relay/v1/startup-target' && req.method === 'GET') return json(res, 200, await this.startupPreference())
       if (url.pathname === '/relay/v1/reconnect' && req.method === 'POST') {
         if (!this.target) return json(res, 503, { error: 'No AliceProject is selected.' })
         if (this.machines.busy) return json(res, 409, { error: 'Wait for the Machine operation to finish.' })
@@ -359,13 +492,24 @@ export class WebRelay {
         req.on('close', () => this.subscribers.delete(res))
         return
       }
+      if (url.pathname === '/relay/v1/projects/control' && req.method === 'POST') {
+        await this.controlProject(await readJsonBody(req))
+        return json(res, 200, this.status)
+      }
       if (url.pathname === '/relay/v1/connect' && req.method === 'POST') {
         const input = await readJsonBody(req) as { machine?: unknown; project?: unknown }
         if (typeof input.machine !== 'string' || typeof input.project !== 'string' || !/^[a-z][a-z0-9_-]{0,31}$/.test(input.machine) || !/^[a-z][a-z0-9_-]{0,63}$/.test(input.project)) {
           return json(res, 400, { error: 'Select a registered Machine and AliceProject.' })
         }
-        await this.connect(input.machine, input.project)
-        return json(res, 200, this.status)
+        const cancellation = new AbortController()
+        const cancelClosedRequest = () => { if (!res.writableEnded) cancellation.abort() }
+        res.once('close', cancelClosedRequest)
+        try {
+          await this.connect(input.machine, input.project, { signal: cancellation.signal })
+          return json(res, 200, this.status)
+        } finally {
+          res.removeListener('close', cancelClosedRequest)
+        }
       }
       if (url.pathname.startsWith('/relay/')) return json(res, 404, { error: 'Unknown relay route.' })
       if (url.pathname.startsWith('/api/') || url.pathname === '/mcp' || url.pathname.startsWith('/mcp/')) {
@@ -527,11 +671,11 @@ function json(res: ServerResponse, status: number, body: unknown): void {
   res.end(JSON.stringify(body))
 }
 
-async function readJsonBody(req: IncomingMessage): Promise<unknown> {
+async function readJsonBody(req: IncomingMessage, limit = MAX_BODY): Promise<unknown> {
   let text = ''
   for await (const chunk of req) {
     text += String(chunk)
-    if (text.length > MAX_BODY) throw new Error('Request body is too large.')
+    if (text.length > limit) throw new Error('Request body is too large.')
   }
   return JSON.parse(text)
 }
@@ -553,10 +697,13 @@ export async function runWebRelay(args: string[]): Promise<number> {
   }
   const relay = new WebRelay({ port })
   const origin = await relay.listen()
-  const local = (await inspectLocalMachine()).machine
-  const first = local?.projects.find((project) => project.key === local.defaultProject && project.runtime.webEndpoint)
-    ?? local?.projects.find((project) => project.runtime.webEndpoint)
-  if (first) await relay.connect('local', first.key).catch((error: unknown) => process.stderr.write(`Local Runtime unavailable: ${String(error)}\n`))
+  const startup = await relay.startupPreference()
+  if (startup.target) {
+    await relay.connect(startup.target.machine, startup.target.project, { remember: false }).catch((error: unknown) => {
+      relay.setStartupError(error)
+      process.stderr.write(`Startup AliceProject unavailable: ${String(error)}\n`)
+    })
+  }
   process.stdout.write(`OpenAlice relay: ${origin}\n`)
   if (open) await openBrowser(`${origin}/settings`)
   await new Promise<void>((done) => {

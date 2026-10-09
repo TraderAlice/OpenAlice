@@ -123,7 +123,12 @@ change.
 
 ## Verification
 
-- `npx tsc --noEmit`, `pnpm test`, `cd ui && npx tsc -b`.
+- Select focused, owner, or full-suite checks via
+  [[docs/development-workflow.md]]
+  ([shared ladder](development-workflow.md#local-feedback-ladder)); run root
+  and/or UI typechecks for the changed code. Shared wire/transport/lifecycle or
+  cross-owner behavior requires the broader gates, including independently
+  selected protocol evidence that a scenario/owner intersection could exclude.
 - `src/workspaces/web-session-host.spec.ts` drives a fake child over stdio for
   every wire; extend it when a transport learns a new message.
 - `src/workspaces/adapters/web-command.spec.ts` pins each runtime's argv.

@@ -1,3 +1,4 @@
+import { releaseChannelMatchesVersion } from '../packages/update-lifecycle/src/release-policy.ts'
 import { createHash } from 'node:crypto'
 import { lstatSync, readFileSync, readdirSync } from 'node:fs'
 import { basename, join } from 'node:path'
@@ -10,9 +11,8 @@ function validateHeader(header) {
   if (!/^[a-f0-9]{40}$/.test(header.sourceSha ?? '')) throw new Error('Invalid candidate source SHA')
   if (!targetKeys.has(`${header.platform}-${header.arch}`)) throw new Error('Invalid candidate target')
   if (!['desktop', 'cli'].includes(header.kind)) throw new Error('Invalid candidate kind')
-  const pattern = header.channel === 'stable' ? /^\d+\.\d+\.\d+$/
-    : header.channel === 'beta' ? /^\d+\.\d+\.\d+-beta(?:\.\d+)?$/ : null
-  if (!pattern?.test(header.version ?? '')) throw new Error('Invalid candidate version/channel')
+  if (!['stable', 'beta'].includes(header.channel) || typeof header.version !== 'string'
+    || !releaseChannelMatchesVersion(header.channel, header.version)) throw new Error('Invalid candidate version/channel')
 }
 
 function validateFiles(files) {

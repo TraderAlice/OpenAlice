@@ -70,7 +70,7 @@ describe('Bun standalone launch boundary', () => {
       executable,
       resourceRoot,
       () => false,
-    )).toBeNull()
+    )).toBe(locations[0])
   })
 
   it('preserves explicit provenance so malformed metadata fails closed downstream', () => {
@@ -143,11 +143,11 @@ describe('Bun standalone launch boundary', () => {
       OPENALICE_INSTALL_SOURCE: metadataPath,
     }))
     expect(buildBunRuntimeEnvironment(
-      { PATH: '/usr/local/bin' },
+      { PATH: '/usr/local/bin', OPENALICE_RUNTIME_PROFILE: 'electron-packaged', OPENALICE_LAUNCHER: 'dev' },
       resourceRoot,
       executable,
       { exists: () => false },
-    )).not.toHaveProperty('OPENALICE_INSTALL_SOURCE')
+    )).toHaveProperty('OPENALICE_INSTALL_SOURCE', resolve('/opt/openalice/install-source.json'))
   })
 
   it('removes desktop-managed Pi selection without replacing native Pi state', () => {

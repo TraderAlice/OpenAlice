@@ -1,6 +1,6 @@
+import { releaseChannelForVersion } from '@traderalice/update-lifecycle'
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import {
-  compareVersions,
   getCurrentVersion,
   fetchLatestRelease,
   getVersionInfo,
@@ -60,45 +60,6 @@ function mockJsonResponse(value: unknown, response?: { status?: number; statusTe
   return fetchMock
 }
 
-describe('compareVersions', () => {
-  it('compares core versions numerically', () => {
-    expect(compareVersions('1.0.0', '1.0.0')).toBe(0)
-    expect(compareVersions('1.0.1', '1.0.0')).toBeGreaterThan(0)
-    expect(compareVersions('1.0.0', '1.0.1')).toBeLessThan(0)
-    expect(compareVersions('2.0.0', '1.99.99')).toBeGreaterThan(0)
-    expect(compareVersions('1.10.0', '1.9.0')).toBeGreaterThan(0)
-  })
-
-  it('treats release as greater than prerelease for the same core', () => {
-    expect(compareVersions('1.0.0', '1.0.0-beta.1')).toBeGreaterThan(0)
-    expect(compareVersions('1.0.0-beta.1', '1.0.0')).toBeLessThan(0)
-  })
-
-  it('compares prerelease identifiers by semver rules', () => {
-    expect(compareVersions('1.0.0-beta.1', '1.0.0-beta.0')).toBeGreaterThan(0)
-    expect(compareVersions('1.0.0-beta.10', '1.0.0-beta.2')).toBeGreaterThan(0)
-    expect(compareVersions('1.0.0-alpha', '1.0.0-beta')).toBeLessThan(0)
-  })
-
-  it('strips a leading v', () => {
-    expect(compareVersions('v1.2.3', '1.2.3')).toBe(0)
-    expect(compareVersions('v1.2.4', 'v1.2.3')).toBeGreaterThan(0)
-  })
-
-  it('handles missing parts as zero', () => {
-    expect(compareVersions('1', '1.0.0')).toBe(0)
-    expect(compareVersions('1.2', '1.2.0')).toBe(0)
-  })
-})
-
-describe('getCurrentVersion', () => {
-  it('returns a non-empty version string from package.json', () => {
-    const version = getCurrentVersion()
-    expect(typeof version).toBe('string')
-    expect(version.length).toBeGreaterThan(0)
-  })
-})
-
 describe('fetchLatestRelease (mocked manifest fetch)', () => {
   const originalFetch = globalThis.fetch
 
@@ -126,6 +87,24 @@ describe('fetchLatestRelease (mocked manifest fetch)', () => {
       body: null,
       publishedAt: '2026-08-30T17:14:22.998Z',
     })
+  })
+
+  it('shares a concurrent forced probe and retains its last manifest after a failed refresh', async () => {
+    let finish!: (value: unknown) => void
+    const fetchMock = vi.fn(() => new Promise(resolve => { finish = resolve }))
+    globalThis.fetch = fetchMock as unknown as typeof fetch
+    const first = fetchLatestRelease({ channel: 'stable' })
+    const second = fetchLatestRelease({ channel: 'stable', force: true })
+    await Promise.resolve()
+    expect(fetchMock).toHaveBeenCalledOnce()
+    finish({ ok: true, json: async () => releaseManifest('stable', '99.0.0') })
+    expect(await first).toEqual(await second)
+    fetchMock.mockRejectedValueOnce(new Error('feed unavailable'))
+    const info = await getVersionInfo({ channel: 'stable', force: true })
+    expect(info.latest).toBe('99.0.0')
+    expect(info.error).toBe('feed unavailable')
+    expect(info.hasUpdate).toBe(false)
+    expect(info.decision).toEqual({ status: 'available', reason: 'newer-release' })
   })
 
   it('reads the beta channel from its separate manifest URL', async () => {
@@ -289,6 +268,18 @@ describe('getVersionInfo', () => {
     expect(fetchMock).not.toHaveBeenCalled()
   })
 
+  it('preserves an older release decision instead of claiming current', async () => {
+    mockJsonResponse(releaseManifest('stable', '0.1.0'))
+    expect(await getVersionInfo({ channel: 'stable' })).toMatchObject({ hasUpdate: false, decision: { status: 'blocked', reason: 'older-release' } })
+  })
+
+  it('treats absent installation metadata as source ownership without feed discovery', async () => {
+    const fetchMock = vi.fn()
+    globalThis.fetch = fetchMock as typeof fetch
+    expect(await getVersionInfo({ env: {} })).toMatchObject({ channel: 'dev', updateAuthority: 'source', latest: null, decision: null })
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
+
   it('reports hasUpdate=true when latest is newer than current', async () => {
     mockJsonResponse(releaseManifest('stable', '999.999.999'))
 
@@ -307,7 +298,7 @@ describe('getVersionInfo', () => {
     const channel = /-beta(?:\.|$)/i.test(current) ? 'beta' : 'stable'
     mockJsonResponse(releaseManifest(channel, current))
 
-    const info = await getVersionInfo()
+    const info = await getVersionInfo({ channel })
 
     expect(info.latest).toBe(current)
     expect(info.hasUpdate).toBe(false)
@@ -371,6 +362,17 @@ describe('getVersionInfo', () => {
     })
     expect(readTextFile).not.toHaveBeenCalled()
     expect(fetchMock).not.toHaveBeenCalled()
+  })
+
+  it('keeps packaged desktop ownership independent of inherited CLI provenance', async () => {
+    const readTextFile = vi.fn(() => { throw new Error('Unrelated CLI receipt') })
+    const info = await getVersionInfo({
+      currentOnly: true,
+      env: { OPENALICE_RUNTIME_PROFILE: 'electron-packaged', OPENALICE_INSTALL_SOURCE: '/cli/install-source.json' },
+      readTextFile,
+    })
+    expect(info).toMatchObject({ current: getCurrentVersion(), channel: releaseChannelForVersion(getCurrentVersion()), updateAuthority: 'desktop', error: null })
+    expect(readTextFile).not.toHaveBeenCalled()
   })
 
   it('normalizes legacy non-master branch provenance to the development channel', async () => {

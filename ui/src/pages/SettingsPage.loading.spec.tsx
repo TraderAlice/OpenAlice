@@ -10,6 +10,7 @@ const mocks = vi.hoisted(() => ({
   configLoad: vi.fn(),
   getVersion: vi.fn(),
   getWorkspaceShell: vi.fn(),
+  refreshMachines: vi.fn(async () => undefined),
 }))
 
 vi.mock('../api', () => ({
@@ -30,8 +31,9 @@ vi.mock('../api/preferences', () => ({
 }))
 
 vi.mock('../hooks/useUpdateLifecycle', () => ({
-  useUpdateLifecycle: () => ({ versionInfo: null, nativeStatus: null, workspaceStates: [],
-    preferences: null, checking: false, error: null, availableCount: 0,
+  useUpdateLifecycle: () => ({ machines: { status: null, fleet: [], loading: false, busy: false, error: null, refresh: mocks.refreshMachines }, versionInfo: null, nativeStatus: null, workspaceStates: [],
+    projectWorkspaces: [], preferences: null, checking: false, error: null, availableCount: 0,
+    guidance: { app: false, backend: false, workspaceIds: [], needsAttentionWorkspaceIds: [], availableCount: 0, needsAttentionCount: 0 },
     refresh: vi.fn(async () => undefined), savePreferences: vi.fn(async () => undefined) }),
 }))
 
@@ -74,7 +76,7 @@ describe('SettingsPage loading', () => {
 
     render(<SettingsPage />)
 
-    expect(screen.getByRole('heading', { name: 'About OpenAlice' })).toBeTruthy()
+    expect(screen.getByRole('heading', { name: 'Versions & updates' })).toBeTruthy()
     expect(screen.queryByRole('heading', { name: 'Language' })).toBeNull()
     expect(screen.getByText('openalice run --home <path>')).toBeTruthy()
     expect(mocks.configLoad).not.toHaveBeenCalled()

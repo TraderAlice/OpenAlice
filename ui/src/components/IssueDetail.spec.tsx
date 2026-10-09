@@ -424,6 +424,8 @@ describe('IssueDetail property controls', () => {
     const timeout = await screen.findByRole('combobox', { name: 'Run timeout' }) as HTMLSelectElement
     expect(timeout.value).toBe('')
     fireEvent.change(timeout, { target: { value: '30m' } })
+    expect(mocks.updateIssue).not.toHaveBeenCalled()
+    fireEvent.click(screen.getByRole('button', { name: 'Save changes' }))
     await waitFor(() => {
       expect(mocks.updateIssue).toHaveBeenCalledWith(
         'demo-ws-auto-quant',
@@ -447,11 +449,13 @@ describe('IssueDetail property controls', () => {
     const toggle = await screen.findByRole('checkbox', { name: /Retry a missed fire/ }) as HTMLInputElement
     expect(toggle.checked).toBe(true)
     fireEvent.click(toggle)
+    expect(mocks.updateIssue).not.toHaveBeenCalled()
+    fireEvent.click(screen.getByRole('button', { name: 'Save changes' }))
     await waitFor(() => {
       expect(mocks.updateIssue).toHaveBeenCalledWith(
         'demo-ws-auto-quant',
         'morning-scan',
-        { catchUp: false },
+        { when: { ...scheduledIssue.issue.when!, catchUp: false } },
       )
     })
   })
@@ -488,7 +492,7 @@ describe('IssueDetail property controls', () => {
     })
     fireEvent.click(screen.getByRole('button', { name: i18n.t('chatLanding.selectModelAndEffort') }))
     fireEvent.click(await screen.findByRole('menuitem', { name: /Model/ }))
-    expect(await screen.findByRole('menuitemradio', { name: /deepseek-v4-flash/i })).toBeTruthy()
+    expect(await screen.findByRole('menuitemradio', { name: /DeepSeek V4 Flash/i })).toBeTruthy()
     expect(screen.queryByRole('menuitemradio', { name: /LongCat/ })).toBeNull()
     fireEvent.click(screen.getByRole('menuitem', { name: /Effort/ }))
     expect(await screen.findByRole('menuitemradio', { name: /low/ })).toBeTruthy()
@@ -520,7 +524,7 @@ describe('IssueDetail property controls', () => {
     const trigger = await screen.findByRole('button', { name: 'AI configuration' })
     await waitFor(() => expect((trigger as HTMLButtonElement).disabled).toBe(false))
     expect(trigger.textContent).toContain('Runtime managed')
-    expect(trigger.textContent).toContain('claude-sonnet-4-5')
+    expect(trigger.textContent).toContain('Claude Sonnet 4.5')
     expect(trigger.textContent).toContain('high')
     expect(screen.queryByRole('combobox', { name: 'Runtime' })).toBeNull()
     expect(screen.getByText('codex')).toBeTruthy()

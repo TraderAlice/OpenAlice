@@ -1,3 +1,5 @@
+import { signCliMacOS } from './sign-cli-macos.mjs'
+import { requireBunVersion } from './bun-toolchain.mjs'
 import { runtimeCompileOptions } from './bun-compile-options.js'
 import { createServer } from 'node:net'
 import { mkdir, readFile, rm, stat, writeFile } from 'node:fs/promises'
@@ -7,10 +9,7 @@ import { fileURLToPath } from 'node:url'
 import { INTERNAL_BOOTSTRAP_ROLE } from '../src/workspaces/bootstrap-runtime.js'
 
 const repositoryRoot = fileURLToPath(new URL('..', import.meta.url))
-const pinnedBunVersion = (await readFile(join(repositoryRoot, '.bun-version'), 'utf8')).trim()
-if (Bun.version !== pinnedBunVersion) {
-  throw new Error(`Bun ${pinnedBunVersion} is required, but ${Bun.version} is running`)
-}
+requireBunVersion(Bun.version)
 
 const outputRoot = resolve(
   process.env['OPENALICE_BUN_OUTPUT_DIR']
@@ -44,6 +43,7 @@ if (!result.success) {
   for (const log of result.logs) console.error(log)
   throw new Error('Bun Alice feasibility build failed')
 }
+if (process.platform === 'darwin') signCliMacOS(executablePath, process.arch)
 
 const bootstrapProbe = Bun.spawn([
   executablePath,
@@ -101,6 +101,7 @@ if (!ptyBuild.success) {
   throw new Error('Bun PTY feasibility build failed')
 }
 
+if (process.platform === 'darwin') signCliMacOS(ptySmokePath, process.arch)
 const ptyProbe = Bun.spawn([ptySmokePath], {
   cwd: outputRoot,
   env: {

@@ -1,3 +1,5 @@
+import { loadBrokerEngine } from './domain/trading/brokers/registry.js'
+import { isInstallableBrokerEngine } from '@/core/broker-packs.js'
 /**
  * UTA service entry — co-located v1.
  *
@@ -150,6 +152,15 @@ export async function startUTAService(): Promise<void> {
     startedAt,
     utas: utaManager.listUTAs().length,
   }))
+
+  // Validate the actual cached SDK module without constructing an account or
+  // broker connection. This distinguishes pointer activation from UTA loading.
+  app.get('/__uta/broker-packs/:engine', async c => {
+    const engine = c.req.param('engine')
+    if (!isInstallableBrokerEngine(engine)) return c.json({ error: 'Unknown engine' }, 404)
+    try { return c.json({ identity: (await loadBrokerEngine(engine)).packIdentity ?? null, startedAt }) }
+    catch (error) { return c.json({ error: String(error) }, 409) }
+  })
 
   // Trading routes — UTA-side handlers, narrowly typed via UTAEngineContext.
   // Only utaManager / fxService / snapshotService are exposed because that's

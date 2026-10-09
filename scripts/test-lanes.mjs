@@ -1,6 +1,10 @@
 import { existsSync, readdirSync, readFileSync } from 'node:fs'
 import { isAbsolute, relative, resolve } from 'node:path'
 
+import { registeredTestDefinitions, selectTestSuites, tierForTestFile } from './test-suites.mjs'
+import { collectTestCommands as collectCommands } from './test-commands.mjs'
+export { systemCommandSuites } from './test-commands.mjs'
+
 const slash = (value) => value.replaceAll('\\', '/')
 
 export const ownerSuites = {
@@ -16,6 +20,7 @@ export const ownerSuites = {
       'src/tool',
       'src/webui',
       'packages/opentypebb',
+      'packages/update-lifecycle',
     ],
   },
   ui: {
@@ -55,30 +60,10 @@ export const ownerSuites = {
 
 export const ownerSuiteNames = Object.freeze(Object.keys(ownerSuites))
 
-export const integrationIncludes = [
-  'src/workspaces/workspace-creation.e2e.spec.ts',
-  'services/uta/src/domain/trading/__test__/e2e/uta-lifecycle.e2e.spec.ts',
-]
+export const integrationIncludes = registeredTestDefinitions.filter((test) => test.lane === 'integration').map((test) => test.path)
 
-export const externalReadonlyIncludes = [
-  'src/domain/market-data/__test__/e2e/market-data.e2e.spec.ts',
-  'src/domain/market-data/__tests__/bbProviders/*.bbProvider.spec.ts',
-  'services/uta/src/domain/trading/__test__/e2e/ccxt-hyperliquid-markets.e2e.spec.ts',
-  'services/uta/src/domain/trading/brokers/ccxt/CcxtBroker.e2e.spec.ts',
-  'packages/opentypebb/src/providers/twse/__tests__/twse.live.spec.ts',
-  'packages/ibkr/tests/e2e/connect.e2e.spec.ts',
-  'packages/ibkr/tests/e2e/contract-details.e2e.spec.ts',
-]
-
-export const livePaperIncludes = [
-  'services/uta/src/domain/trading/__test__/e2e/*.e2e.spec.ts',
-  'packages/ibkr/tests/e2e/order-precision.e2e.spec.ts',
-]
-
-export const livePaperExcludes = [
-  'services/uta/src/domain/trading/__test__/e2e/uta-lifecycle.e2e.spec.ts',
-  'services/uta/src/domain/trading/__test__/e2e/ccxt-hyperliquid-markets.e2e.spec.ts',
-]
+export const externalReadonlyIncludes = registeredTestDefinitions.filter(test => test.lane === 'external-readonly').map(test => test.path)
+export const livePaperIncludes = registeredTestDefinitions.filter(test => test.lane === 'live-paper').map(test => test.path)
 
 export const laneSuites = {
   hermetic: {
@@ -89,7 +74,7 @@ export const laneSuites = {
     runnable: true,
   },
   integration: {
-    config: 'vitest.e2e.config.ts',
+    config: 'vitest.integration.config.ts',
     description: 'Deterministic local product integration with hermetic state.',
     sideEffects: 'temporary local files and test-owned local processes only',
     prerequisites: ['workspace dependencies installed'],
@@ -129,8 +114,6 @@ export const laneSuites = {
 export const laneSuiteNames = Object.freeze(Object.keys(laneSuites))
 
 const workflowContractIncludes = [
-  'scripts/development-test-contract.spec.ts',
-  'scripts/test-lanes.spec.ts',
   'scripts/classify-beta-release-prep.spec.mjs',
   'scripts/prepare-cli-neutral-inputs.spec.mjs',
   'scripts/ci-workflow.spec.ts',
@@ -145,18 +128,14 @@ const platformContractIncludes = [
   'scripts/guardian/shared.spec.ts',
   'scripts/pnpm-command.spec.ts',
   'services/connector/src/core/io-journal.spec.ts',
-  'services/uta/src/uta-startup-resilience.spec.ts',
   'src/core/windows-workspace-shell.spec.ts',
   'src/services/auth/session-store.spec.ts',
   'src/services/auth/token-store.spec.ts',
-  'src/workspaces/adapters/ai-config.spec.ts',
   'src/workspaces/adapters/shell.spec.ts',
   'src/workspaces/agent-conversation-log.spec.ts',
   'src/workspaces/agent-detect.spec.ts',
-  'src/workspaces/cli/shim.spec.ts',
   'src/workspaces/headless-task-win-shim.spec.ts',
   'src/workspaces/spawn-env.spec.ts',
-  'src/workspaces/win-command.spec.ts',
   'src/workspaces/workspace-creator.spec.ts',
 ]
 
@@ -189,93 +168,35 @@ export const areaSuites = {
   'market-data': {
     description: 'Alice/UTA public market-data and provider reads.',
     roots: ['src/domain/market-data', 'packages/opentypebb'],
-    includes: [
-      'services/uta/src/domain/trading/__test__/e2e/ccxt-hyperliquid-markets.e2e.spec.ts',
-      'services/uta/src/domain/trading/brokers/ccxt/CcxtBroker.e2e.spec.ts',
-    ],
   },
   ibkr: {
     description: 'IBKR package, adapter, and paper-account acceptance.',
     roots: ['packages/ibkr', 'packages/uta-broker-ibkr', 'services/uta/src/domain/trading/brokers/ibkr'],
-    includes: [
-      'services/uta/src/domain/trading/__test__/e2e/ibkr-paper.e2e.spec.ts',
-      'services/uta/src/domain/trading/__test__/e2e/uta-ibkr.e2e.spec.ts',
-    ],
   },
   bybit: {
     description: 'Bybit demo-account acceptance.',
-    includes: [
-      'services/uta/src/domain/trading/__test__/e2e/ccxt-bybit.e2e.spec.ts',
-      'services/uta/src/domain/trading/__test__/e2e/uta-bybit.e2e.spec.ts',
-      'services/uta/src/domain/trading/__test__/e2e/uta-ccxt-bybit.e2e.spec.ts',
-    ],
   },
   okx: {
     description: 'OKX demo-account acceptance.',
-    includes: ['services/uta/src/domain/trading/__test__/e2e/ccxt-okx.e2e.spec.ts'],
   },
   alpaca: {
     description: 'Alpaca paper-account acceptance.',
-    includes: [
-      'services/uta/src/domain/trading/__test__/e2e/alpaca-paper.e2e.spec.ts',
-      'services/uta/src/domain/trading/__test__/e2e/uta-alpaca.e2e.spec.ts',
-    ],
   },
   hyperliquid: {
     description: 'Hyperliquid read-only or demo-account acceptance.',
-    includes: [
-      'services/uta/src/domain/trading/__test__/e2e/ccxt-hyperliquid-markets.e2e.spec.ts',
-      'services/uta/src/domain/trading/__test__/e2e/ccxt-hyperliquid.e2e.spec.ts',
-    ],
   },
   'bybit-diagnostic': {
     description: 'Manual raw broker diagnostic that market-buys and best-effort closes.',
-    includes: ['services/uta/src/domain/trading/__test__/e2e/ccxt-raw-diagnostic.e2e.spec.ts'],
   },
   'uta-paper': {
     description: 'Configured UTA paper sweep, excluding the raw market-buy diagnostic.',
     roots: ownerSuites.uta.roots,
-    excludes: ['services/uta/src/domain/trading/__test__/e2e/ccxt-raw-diagnostic.e2e.spec.ts'],
   },
 }
 
 export const areaSuiteNames = Object.freeze(Object.keys(areaSuites))
 
-export const systemCommandSuites = {
-  'dev-stack': {
-    command: 'tsx scripts/guardian/smoke.ts',
-    sideEffects: 'starts a real local dev process tree and uses temporary state',
-    prerequisites: ['workspace dependencies installed'],
-  },
-  guardian: {
-    command: 'tsx scripts/guardian/runtime-recovery-smoke.ts',
-    sideEffects: 'starts and kills test-owned local Guardian process trees',
-    prerequisites: ['workspace dependencies installed'],
-  },
-  connector: {
-    command: 'node scripts/connector-service-smoke.mjs',
-    sideEffects: 'starts a test-owned local Connector process',
-    prerequisites: ['Connector build/runtime dependencies available'],
-  },
-  installer: {
-    command: 'node scripts/install-docker-smoke.mjs',
-    sideEffects: 'builds disposable Docker images and installs into containers',
-    prerequisites: ['Docker available'],
-  },
-  'installer:dev': {
-    command: 'node scripts/install-channel-smoke.mjs',
-    sideEffects: 'downloads the dev installer and uses disposable Docker images',
-    prerequisites: ['Docker and network access available'],
-  },
-  remote: {
-    command: 'node scripts/remote-ssh-smoke.mjs',
-    sideEffects: 'starts disposable Docker/SSH targets and copies an install payload',
-    prerequisites: ['Docker and a built/selected CLI payload'],
-  },
-}
-
-const collectionRoots = ['src', 'packages', 'services', 'apps', 'scripts', 'ui']
-const systemTestFiles = new Set()
+const collectionRoots = ['src', 'packages', 'services', 'apps', 'scripts', 'ui', 'tests']
 
 function isWithin(file, root) {
   return file === root || file.startsWith(`${root}/`)
@@ -317,10 +238,11 @@ function matchesSuiteDefinition(file, suite) {
 
 export function isRiskLaneTest(file) {
   const normalized = slash(file)
+  const central = registeredTestDefinitions.find((test) => test.path === normalized)
+  if (central) return central.lane !== 'hermetic'
   return normalized.includes('.e2e.spec.')
     || normalized.includes('.bbProvider.spec.')
     || normalized.includes('.live.spec.')
-    || systemTestFiles.has(normalized)
 }
 
 export function isHermeticDefaultTest(file) {
@@ -330,26 +252,36 @@ export function isHermeticDefaultTest(file) {
 
 export function lanesForTestFile(file) {
   const normalized = slash(file)
-  return [
-    isHermeticDefaultTest(normalized) && 'hermetic',
-    matchesAny(normalized, integrationIncludes) && 'integration',
-    matchesAny(normalized, externalReadonlyIncludes) && 'external-readonly',
-    matchesAny(normalized, livePaperIncludes)
-      && !matchesAny(normalized, livePaperExcludes)
-      && 'live-paper',
-    systemTestFiles.has(normalized) && 'system',
-  ].filter(Boolean)
+  const central = registeredTestDefinitions.find((test) => test.path === normalized)
+  if (central) return [central.lane]
+  return isHermeticDefaultTest(normalized) ? ['hermetic'] : []
 }
 
 export function ownersForTestFile(file) {
   const normalized = slash(file)
+  const central = registeredTestDefinitions.find((test) => test.path === normalized)
+  if (central) return [central.owner]
   return ownerSuiteNames.filter((owner) => (
     ownerSuites[owner].roots.some((root) => isWithin(normalized, root))
   ))
 }
 
 export function areasForTestFile(file) {
-  return areaSuiteNames.filter((area) => matchesSuiteDefinition(file, areaSuites[area]))
+  const central = registeredTestDefinitions.find((test) => test.path === slash(file))
+  return [...new Set([
+    ...areaSuiteNames.filter((area) => matchesSuiteDefinition(file, areaSuites[area])),
+    ...(central?.areas ?? []),
+  ])]
+}
+
+export function centralHermeticIncludes(project) {
+  return registeredTestDefinitions.filter((test) => (
+    test.lane === 'hermetic' && ownerSuites[test.owner]?.project === project
+  )).map((test) => test.path)
+}
+
+export function collectTestCommands(repoRoot) {
+  return collectCommands(repoRoot, collectWorkspacePackages(repoRoot), (root) => ownersForTestFile(`${root}/catalog.spec.ts`)[0])
 }
 
 function walk(directory, output) {
@@ -410,6 +342,8 @@ export function selectTestFiles(repoRoot, selectors = {}) {
   const areas = selectors.areas ?? []
   const packages = selectors.packages ?? []
   const paths = (selectors.paths ?? []).map(normalizePathSelector)
+  const suites = selectTestSuites(selectors)
+  const suitePaths = new Set(suites.flatMap(suite => suite.files ?? []))
 
   for (const lane of lanes) {
     if (!laneSuites[lane]) throw new Error(`Unknown test lane: ${lane}`)
@@ -432,8 +366,11 @@ export function selectTestFiles(repoRoot, selectors = {}) {
     (lanes.length === 0 || lanesForTestFile(file).some((lane) => lanes.includes(lane)))
     && (owners.length === 0 || ownersForTestFile(file).some((owner) => owners.includes(owner)))
     && (areas.length === 0 || areasForTestFile(file).some((area) => areas.includes(area)))
-    && (packageRoots.length === 0 || packageRoots.some((root) => isWithin(file, root)))
+    && (packageRoots.length === 0 || packageRoots.some((root) => isWithin(file, root))
+      || packages.includes(registeredTestDefinitions.find((test) => test.path === file)?.package))
     && (paths.length === 0 || paths.some((path) => matchesPathSelector(file, path)))
+    && (!selectors.suites?.length || suitePaths.has(file))
+    && (!selectors.tiers?.length || selectors.tiers.includes(tierForTestFile(file)))
   ))
 }
 

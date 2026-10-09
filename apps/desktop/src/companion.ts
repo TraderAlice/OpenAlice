@@ -1,3 +1,5 @@
+import { installCompanionActivity } from './companion-activity.js'
+import type { ActivitySource } from './activity-controller.js'
 import { app, BrowserWindow, ipcMain, Menu, screen } from 'electron'
 import { readFileSync } from 'node:fs'
 import { writeFile, rename } from 'node:fs/promises'
@@ -24,6 +26,7 @@ function companionBounds(window: BrowserWindow): Rect {
 
 export interface CompanionHandle {
   readonly window: BrowserWindow
+  configureActivity(source: ActivitySource): void
   trayMenuItems(): Electron.MenuItemConstructorOptions[]
 }
 
@@ -184,6 +187,7 @@ export function createCompanion(owner: BrowserWindow): CompanionHandle | undefin
     ipcMain.removeHandler(soundUpdate)
     ipcMain.removeHandler(soundReset)
   })
+  const activity = installCompanionActivity(owner, pet)
   const trayMenuItems = (): Electron.MenuItemConstructorOptions[] => [
     { label: enabled ? 'Hide pet' : 'Show pet', click: toggle },
     { label: 'Size', submenu: [170, 220, 280].map(value => ({
@@ -251,5 +255,5 @@ export function createCompanion(owner: BrowserWindow): CompanionHandle | undefin
     console.error('[companion] load failed:', error.message)
     if (!pet.isDestroyed()) pet.destroy()
   })
-  return { window: pet, trayMenuItems }
+  return { window: pet, trayMenuItems, configureActivity: activity.configure }
 }

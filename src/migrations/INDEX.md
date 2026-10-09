@@ -17,3 +17,13 @@ Each row below corresponds to an active migration in `src/migrations/`. The runn
 | `0042_workspace_default_agent` | 0.92.1 | 2026-09-10 | workspaces/*/.alice/workspace.json, workspaces/*/.alice/settings.json | Move the legacy Workspace default Agent into interactive runtime settings, preserving pinned defaults and Session bindings. |
 | `0043_inbox_markdown_body` | 0.92.1 | 2026-09-10 | data/inbox/entries.jsonl | Unify Inbox comments and file pointers into Markdown bodies, preserving provenance and published file revisions. |
 | `0044_dispatch_communication` | 0.93.1-beta | 2026-09-18 | state/headless-tasks.json | Mark historical headless communication as unknown without inferring outbound delivery; preserve original records and a backup. |
+
+## Client Supervisor migrations
+
+These run under the Supervisor configuration lock. Their schema version is the
+durable idempotency marker; project backends must not apply them through a
+project's data/config journal. Existing files remain as backups.
+
+| ID | Schema | Date | Affects | Summary |
+|----|--------|------|---------|---------|
+| `supervisor_0001_unified_default_target` | 3 | 2026-09-30 | Supervisor/config.json | One client-owned Default; preserve legacy startup files and record ambiguous migration choices. |

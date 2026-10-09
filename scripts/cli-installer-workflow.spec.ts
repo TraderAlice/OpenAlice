@@ -141,6 +141,7 @@ describe('CLI installer dev publication workflow', () => {
       'packages/ibkr/dist',
       'packages/opentypebb/dist',
       'packages/uta-protocol/dist',
+      'packages/update-lifecycle/dist',
     ])
     expect(CLI_NEUTRAL_INPUT_ROOTS).not.toContain('node_modules')
     expect(CLI_NEUTRAL_INPUT_ROOTS.every((path: string) => !path.includes('bun-release'))).toBe(true)

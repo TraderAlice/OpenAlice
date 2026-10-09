@@ -1,8 +1,9 @@
+import { ModelIdentity } from './ModelIdentity'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { ReactNode } from 'react'
 import type { TFunction } from 'i18next'
 import { useTranslation } from 'react-i18next'
-import { ArrowLeft, Check, ChevronRight, Clock, Cpu, Hash, History, Inbox, KeyRound, ListChecks, LoaderCircle, MessageSquare, Play, RotateCcw, Settings, SlidersHorizontal, Timer, TrendingUp, UserRound, X } from 'lucide-react'
+import { ArrowLeft, Check, ChevronRight, Clock, Cpu, Hash, History, Inbox, KeyRound, ListChecks, LoaderCircle, MessageSquare, Play, RotateCcw, Settings, SlidersHorizontal, TrendingUp, UserRound, X } from 'lucide-react'
 
 import type { HeadlessTaskStatus, HeadlessTurnProgress } from '../api/headless'
 import type { InboxEntry } from '../api/inbox'
@@ -16,11 +17,10 @@ import type {
   IssueProvenanceRecord,
   IssueRunRecord,
   IssueStatus,
-  IssueTimeout,
   WikilinkIssueRef,
   WikilinkResolution,
 } from '../api/issues'
-import { DEFAULT_ISSUE_COMMENT_PROMPT, ISSUE_TIMEOUTS, issuesApi } from '../api/issues'
+import { DEFAULT_ISSUE_COMMENT_PROMPT, issuesApi } from '../api/issues'
 
 import {
   getAgentReadiness,
@@ -50,6 +50,7 @@ import { previewForEntry } from '../live/inbox-threads'
 import { useWikilinkHandler } from '../live/wikilink'
 import { useWorkspace } from '../tabs/store'
 import { ConfirmDialog } from './ConfirmDialog'
+import { IssueScheduleEditor } from './IssueScheduleEditor'
 import { CadenceSummary, PropertyMenu } from './IssuesBoard'
 import { IssueSectionNavigation } from './IssueSectionNavigation'
 import { STATUS_META } from './issue-status-meta'
@@ -392,7 +393,7 @@ function IssueAiEditor({
       >
         <KeyRound size={15} className="text-muted-foreground" aria-hidden />
         <span className="min-w-0">
-          <span className="block truncate text-[13px] font-normal text-foreground">{summaryModel}</span>
+          <ModelIdentity model={summaryModel} className="text-[13px] font-normal text-foreground" />
           <span className="block truncate text-[11px] text-muted-foreground">{[summaryAccess, summaryEffort].filter((value, index, values) => value !== summaryModel && values.indexOf(value) === index).join(' · ')}</span>
           <span className="sr-only">{provenance}</span>
         </span>
@@ -472,89 +473,6 @@ function IssueAiEditor({
           >
             {t('issues.detail.applyAiConfiguration')}
           </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-  )
-}
-
-function SchedulePolicyEditor({
-  issue,
-  saving,
-  onPatch,
-}: {
-  issue: IssueDetailIssue
-  saving: boolean
-  onPatch: (patch: IssuePatch) => Promise<boolean>
-}) {
-  const { t } = useTranslation()
-  const [open, setOpen] = useState(false)
-
-  if (!issue.when) return null
-
-  return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <Button
-        type="button"
-        variant="ghost"
-        size="sm"
-        disabled={saving}
-        onClick={() => setOpen(true)}
-        aria-label={t('issues.detail.editSchedule')}
-        className="h-auto w-full justify-start px-2 py-2 text-left"
-      >
-        <CadenceSummary when={issue.when} compact />
-        <ChevronRight size={13} className="ml-auto shrink-0 text-muted-foreground" aria-hidden />
-      </Button>
-      <DialogContent className="sm:max-w-md">
-        <DialogHeader>
-          <DialogTitle>{t('issues.detail.scheduleSettings')}</DialogTitle>
-          <DialogDescription>{t('issues.detail.scheduleSettingsDescription')}</DialogDescription>
-        </DialogHeader>
-        <div className="space-y-4">
-          {issue.when.kind === 'cron' && (
-            <label className="flex min-h-12 items-start gap-3 rounded-lg border border-border bg-muted/20 p-3">
-              <input
-                className="mt-1"
-                type="checkbox"
-                checked={issue.when.catchUp !== false}
-                disabled={saving}
-                aria-label={t('issues.detail.catchUp')}
-                onChange={(event) => onPatch({ catchUp: event.target.checked })}
-              />
-              <span>
-                <span className="block text-sm font-medium text-foreground">{t('issues.detail.catchUp')}</span>
-                <span className="mt-0.5 block text-xs leading-relaxed text-muted-foreground">
-                  {t('issues.detail.catchUpDescription')}
-                </span>
-              </span>
-            </label>
-          )}
-          <label className="block space-y-1.5">
-            <span className="flex items-center gap-2 text-xs font-medium text-foreground">
-              <Timer size={14} aria-hidden />
-              {t('issues.detail.timeout')}
-            </span>
-            <select
-              className={`${railControl} w-full`}
-              aria-label={t('issues.detail.timeout')}
-              value={issue.timeout ?? ''}
-              disabled={saving}
-              onChange={(event) => {
-                const value = event.target.value
-                onPatch({ timeout: value === '' ? null : value as IssueTimeout })
-              }}
-            >
-              <option value="">{t('issues.detail.timeoutNone')}</option>
-              {ISSUE_TIMEOUTS.map((timeout) => (
-                <option key={timeout} value={timeout}>{timeout}</option>
-              ))}
-            </select>
-            <span className="block text-[11px] leading-relaxed text-muted-foreground">{t('issues.detail.timeoutHint')}</span>
-          </label>
-        </div>
-        <DialogFooter>
-          <Button onClick={() => setOpen(false)}>{t('common.close')}</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
@@ -961,7 +879,7 @@ function PropertiesRail({
 
         {issue.when && (
           <InspectorSection title={t('issues.detail.schedule')}>
-            <div className="-mx-2"><SchedulePolicyEditor issue={issue} saving={saving} onPatch={onPatch} /></div>
+            <div className="-mx-2"><IssueScheduleEditor key={issue.id} issue={issue} saving={saving} onPatch={onPatch}><CadenceSummary when={issue.when} compact /></IssueScheduleEditor></div>
             <div className="mt-3 flex items-center justify-between gap-3 border-t border-border/50 pt-3 text-xs">
               <span className="flex items-center gap-1.5 text-muted-foreground">
                 <Clock size={13} aria-hidden />
@@ -1183,7 +1101,7 @@ function RunRow({ run, onOpen }: { run: IssueRunRecord; onOpen: (run: IssueRunRe
           {t(`issues.detail.runStatus.${displayStatus}`)}
         </span>
         <span className="text-xs text-muted-foreground">{run.agent}</span>
-        {run.model && <span className="text-xs text-muted-foreground">{run.model}</span>}
+        {run.model && <ModelIdentity model={run.model} className="text-xs text-muted-foreground" />}
         {run.effort && <span className="text-xs text-muted-foreground">{run.effort}</span>}
         <span className="ml-auto text-xs text-muted-foreground" title={new Date(run.startedAt).toLocaleString()}>
           {formatRelativeTime(run.startedAt)}
@@ -1721,8 +1639,8 @@ function WikilinkPicker({
  * priority editable inline; Agent owns assignment and runtime configuration.
  * Each write PATCHes and applies the
  * server-returned detail — authoritative, refetch-free). The scheduled agent
- * runtime is editable because it is operational routing; schedule cadence and
- * fire prompt remain file-owned frontmatter.
+ * runtime and schedule are edited through the same file mutation owner.
+ * Schedule drafts apply explicitly; the canonical What remains file-backed.
  */
 interface IssueDetailProps {
   wsId: string

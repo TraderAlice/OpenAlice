@@ -1,3 +1,4 @@
+import { applyBrokerPackUpdate } from './update-lifecycle.js'
 /**
  * Reconcile previously installed Broker Packs with the running OpenAlice
  * release without turning optional integrations into implicit installs.
@@ -12,7 +13,7 @@ import {
   type InstallableBrokerEngine,
 } from '../../core/broker-packs.js'
 import { getCurrentVersion } from '../../core/version.js'
-import { triggerUTARestart, type TriggerResult } from '../uta-supervisor/restart-trigger.js'
+import { type TriggerResult } from '../uta-supervisor/restart-trigger.js'
 import {
   getBrokerPackLocalStatus,
   installBrokerPack,
@@ -55,7 +56,11 @@ export async function reconcileInstalledBrokerPacks(
 
   const settled = await Promise.allSettled(
     outdated.map(async (engine) => {
-      await installBrokerPack(engine)
+      if (options.restart === false) await installBrokerPack(engine)
+      else {
+        const operation = await applyBrokerPackUpdate(engine)
+        if (['failed', 'recovery', 'blocked'].includes(operation.phase)) throw new Error(operation.error ?? 'Broker Pack update requires recovery')
+      }
       return engine
     }),
   )
@@ -72,9 +77,8 @@ export async function reconcileInstalledBrokerPacks(
     }
   })
 
-  const restart = updated.length > 0 && options.restart !== false
-    ? await triggerUTARestart()
-    : undefined
+  // Each Pack operation verifies its exact module in the UTA owner.
+  const restart = undefined
   return {
     checked: outdated,
     updated,

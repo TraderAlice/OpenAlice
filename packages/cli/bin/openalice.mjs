@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { resolveStoredLaunchContext } from '../src/supervisor-config.ts'
 
 import { realpathSync } from 'node:fs'
 import { runDependencySetup } from '../src/dependency-setup.mjs'
@@ -133,7 +134,9 @@ Prints a completion script to stdout without modifying shell configuration.
       process.stdout.write(formatServerHelp())
       return 0
     }
-    return runServerCommand(action, parseServerArgs(action, serverArgs))
+    const options = parseServerArgs(action, serverArgs)
+    const context = await resolveStoredLaunchContext({ ...(options.homeRoot ? { home: options.homeRoot } : {}) })
+    return runServerCommand(action, { ...options, homeRoot: context.home })
   }
   if (command === 'update') {
     if (args.includes('--help') || args.includes('-h')) {

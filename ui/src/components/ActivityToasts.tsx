@@ -1,116 +1,56 @@
 import { useEffect, useRef } from 'react'
-import { toast } from 'sonner'
 import { useTranslation } from 'react-i18next'
 
 import type { AgentActivitySignal } from '../hooks/useGlobalAgentActivity'
 import { useGlobalAgentActivity } from '../hooks/useGlobalAgentActivity'
 import { useActivitySessionLabel } from '../hooks/useWorkspaceData'
+import { useWorkspaces } from '../contexts/workspaces-context'
 import { useWorkspace } from '../tabs/store'
+import { useSessionDetailsDialog } from './workspace/session-details-store'
+import { useNotifications } from './Toast'
 
-const MAX_ANNOUNCED_SIGNALS = 200
+import { ActivityAnnouncements } from '../../../apps/desktop/src/activity-announcements'
+import type { SerializedNotification } from '../../../apps/desktop/src/activity-policy'
 
-function toastId(signal: AgentActivitySignal): string {
-  if (signal.kind === 'inbox' || signal.kind === 'news' || signal.kind.startsWith('sonner-test-')) {
-    return `openalice-activity:${signal.id}`
-  }
-  const operation = signal.taskId
-    ? `task:${signal.taskId}`
-    : `session:${signal.workspaceId}:${signal.resumeId ?? 'unknown'}`
-  return `openalice-activity:${operation}`
-}
-
-/**
- * Projects significant Agent orchestration onto the shared notification layer.
- * This owns no history or navigation surface: Inbox, Sessions, Automation, and
- * Office remain the authoritative places for detail.
- */
 export function ActivityToasts() {
   const { t } = useTranslation()
-  const openOrFocus = useWorkspace((state) => state.openOrFocus)
+  const queue = useNotifications()
+  const openOrFocus = useWorkspace(state => state.openOrFocus)
   const sessionLabel = useActivitySessionLabel()
+  const { workspaces } = useWorkspaces()
   const { signals, loading, error } = useGlobalAgentActivity()
-  const initialRevision = useRef<number | null>(null)
-  const announced = useRef(new Map<string, number>())
-  const persistentSignals = useRef(new Set<string>())
-
+  const announcements = useRef(new ActivityAnnouncements())
+  const desktop = window.openAlice?.companion?.activity
   useEffect(() => {
-    if (loading) return
-    if (initialRevision.current === null) {
-      // A failed request is not a snapshot. Wait for the first successful load,
-      // including an empty one, before announcing subsequent journal events.
-      if (error) return
-      initialRevision.current = Math.max(0, ...signals.map((signal) => signal.revision))
-      return
-    }
-
-    const nextActive = new Set(
-      signals
-        .filter((signal) => signal.kind === 'conversation' || signal.kind === 'sonner-test-running')
-        .map(toastId),
-    )
-    const currentChannels = new Set(signals.map(toastId))
-    for (const id of persistentSignals.current) {
-      if (!currentChannels.has(id)) toast.dismiss(id)
-    }
-
-    for (const signal of signals) {
-      if (signal.revision <= initialRevision.current) continue
-      const id = toastId(signal)
-      if ((announced.current.get(id) ?? -1) >= signal.revision) continue
-      announced.current.set(id, signal.revision)
-
-      const agent = signal.agent ?? t('activityToast.agent')
-      if (signal.kind === 'conversation') {
-        toast.loading(t('activityToast.conversationRunning', { agent }), {
-          id,
-          duration: Number.POSITIVE_INFINITY,
-        })
-      } else if (signal.kind === 'conversation-failed') {
-        toast.error(t('activityToast.conversationFailed', { agent }), {
-          id,
-          duration: 8_000,
-        })
-      } else if (signal.kind === 'inbox') {
-        toast.success(t('activityToast.inboxDelivered', { agent: sessionLabel(signal) ?? signal.sessionRecordId ?? t('activityToast.session') }), {
-          id,
-          description: signal.detail,
-          duration: 4_000,
-          action: {
-            label: t('activityToast.viewInbox'),
-            onClick: () => openOrFocus({ kind: 'inbox', params: {} }),
-          },
-        })
-      } else if (signal.kind === 'news') {
-        toast.info(t('activityToast.newsIngested', {
-          source: signal.source ?? t('activityToast.newsSource'),
-        }), {
-          id,
-          description: signal.detail,
-          duration: 6_000,
-          action: {
-            label: t('activityToast.viewNews'),
-            onClick: () => openOrFocus({ kind: 'news', params: {} }),
-          },
-        })
-      } else if (signal.kind === 'sonner-test-running') {
-        toast.loading(signal.detail ?? 'Sonner running test', {
-          id,
-          duration: Number.POSITIVE_INFINITY,
-        })
-      } else if (signal.kind === 'sonner-test-success') {
-        toast.success(signal.detail ?? 'Sonner success test', { id, duration: 4_000 })
-      } else {
-        toast.error(signal.detail ?? 'Sonner error test', { id, duration: 8_000 })
-      }
-    }
-
-    persistentSignals.current = nextActive
-    while (announced.current.size > MAX_ANNOUNCED_SIGNALS) {
-      const oldest = announced.current.keys().next().value as string | undefined
-      if (!oldest) break
-      announced.current.delete(oldest)
-    }
-  }, [error, loading, openOrFocus, sessionLabel, signals, t])
-
+    if (!desktop) return
+    // Exact safe destinations only. The desktop owns source generation and target membership.
+    const unsubscribe = desktop.onDisplay((event) => {
+      if (event.type === 'hide') { queue.dismiss(event.displayId); return }
+      const input: SerializedNotification = event.input
+      queue.publish({ ...input, group: undefined, id: event.displayId, duration: input.duration ?? Infinity,
+        onDismiss: () => { void desktop.dismiss(event.displayId) },
+        action: { label: t(input.context === 'inbox' ? 'activityToast.viewInbox' : input.context === 'news' ? 'activityToast.viewNews' : 'activityToast.viewSession'),
+          onClick: () => { void desktop.open(event.displayId) } },
+      })
+    })
+    const offRoute = desktop.onOpen(context => {
+      if (context === 'office' || context === 'inbox' || context === 'news') openOrFocus({ kind: context, params: {} })
+    })
+    return () => { unsubscribe(); offRoute() }
+  }, [desktop, openOrFocus, queue, t])
+  useEffect(() => {
+    if (desktop || loading || error) return
+    announcements.current.accept(signals, queue, {
+      t: (key, values) => t(key as `activityToast.${"agent"}`, values),
+      agent: signal => sessionLabel(signal) ?? signal.agent ?? t('activityToast.agent'),
+      action: signal => ({ label: t('activityToast.viewSession'), onClick: () => {
+        const record = workspaces.find(ws => ws.id === signal.workspaceId)?.sessions.find(session =>
+          signal.sessionRecordId ? session.id === signal.sessionRecordId : session.resumeId === signal.resumeId)
+        if (record) useSessionDetailsDialog.getState().show(record)
+        else openOrFocus({ kind: 'office', params: {} })
+      } }),
+      open: context => openOrFocus({ kind: context, params: {} }),
+    })
+  }, [desktop, error, loading, openOrFocus, queue, sessionLabel, signals, t, workspaces])
   return null
 }

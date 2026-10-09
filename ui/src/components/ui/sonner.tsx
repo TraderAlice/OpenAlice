@@ -40,6 +40,7 @@ const Toaster = ({ ...props }: ToasterProps) => {
           '--normal-text': 'var(--popover-foreground)',
           '--normal-border': 'var(--border)',
           '--border-radius': 'var(--radius-lg)',
+          '--width': '352px',
         } as CSSProperties
       }
       {...props}

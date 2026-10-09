@@ -4,6 +4,7 @@ import { PageHeader } from '../components/PageHeader'
 import { ConfigSection, SettingsScrollArea } from '../components/form'
 import { Toggle } from '../components/Toggle'
 import { Button } from '../components/ui/button'
+import { ActivityPreferencesSection } from './ActivityPreferencesSection'
 import { usePetSound } from '../hooks/usePetSound'
 
 export function PetSettingsPage() {
@@ -17,6 +18,7 @@ export function PetSettingsPage() {
     <PageHeader title={t('pet.title')} />
     <SettingsScrollArea className="px-6">
       <div className="max-w-2xl">
+        <ActivityPreferencesSection />
         <ConfigSection title={t('pet.sound')} description={t('pet.description')}>
           {sound.loading ? <p role="status">{t('pet.loading')}</p> : !sound.settings ?
             <p className="text-sm text-muted-foreground">{t('pet.desktopOnly')}</p> :

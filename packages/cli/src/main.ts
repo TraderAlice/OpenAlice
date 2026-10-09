@@ -1,3 +1,5 @@
+import { resolveStartupTarget } from './startup-target.ts'
+import { runMachineTarget } from './machine-target-command.mjs'
 import { runProjectCli } from './project-cli.ts'
 import { main as runLegacyCommand } from '../bin/openalice.mjs'
 import { isBunStandalone } from './bun-standalone.mjs'
@@ -60,6 +62,11 @@ Options:
     await setup()
     return (dependencies.runTui ?? runSupervisorTui)(flags)
   }
+  if (command === '--machine' && args[0] && args[1]?.startsWith('--') && !['--help', '-h'].includes(args[1])) {
+    const flags = parseTuiLaunchArgs(argv)
+    if (!flags.project) throw usageError('--machine requires --project for startup.')
+    return (dependencies.runTui ?? runSupervisorTui)(flags)
+  }
   if (command === '--remote' || command === '--machine') {
     return (dependencies.runCommand ?? runLegacyCommand)(argv)
   }
@@ -71,6 +78,11 @@ Options:
     const flags = parseTuiLaunchArgs(argv)
     await setup()
     return (dependencies.runTui ?? runSupervisorTui)(flags)
+  }
+  if (!dependencies.runCommand && ['up', 'run', 'down', 'status', 'logs', 'doctor'].includes(command) && !args.some(arg => ['--project', '--instance', '--home', '--help', '-h'].includes(arg)) && !process.env.OPENALICE_HOME && !process.env.OPENALICE_PROJECT && !process.env.OPENALICE_INSTANCE) {
+    const { target } = await resolveStartupTarget()
+    if (!target) throw usageError('Choose a Default AliceProject or pass --project/--home.')
+    if (target.machine !== 'local') return runMachineTarget(target.machine, [command, ...args, '--project', target.project])
   }
   const startsLocalRuntime = ['up', 'run'].includes(command)
     || (command === 'server' && ['start', 'run'].includes(args[0] ?? ''))

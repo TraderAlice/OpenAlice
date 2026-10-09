@@ -172,7 +172,9 @@ export class SessionExecutionManager {
       record.taskId = launched.taskId ?? request.taskId
       record.startedAt = Date.now()
       await this.transition(record, 'running')
-      controller.signal.throwIfAborted()
+      // The child is launched. Shutdown during the running projection must
+      // still attach its completion and return its result for dispatch persistence.
+      // The stop path already owns cancellation and the terminal reason.
       const completion = launched.completed.then(
         result => this.finish(record, result.interrupted ? 'interrupted' : result.failed ? 'failed' : 'ended', result.reason),
         async error => {

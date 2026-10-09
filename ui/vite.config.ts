@@ -1,4 +1,4 @@
-import { defineConfig } from 'vite'
+import { defineConfig } from 'vite-plus'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 import { readFileSync } from 'node:fs'
@@ -73,7 +73,6 @@ export default defineConfig({
   // The dev-only routing values use VITE_ environment keys injected by Vite
   // into import.meta.env. `define` does not replace bare globals in dev modules.
   define: {
-    __OPENALICE_UI_VERSION__: JSON.stringify((JSON.parse(readFileSync(resolve(__dirname, '..', 'package.json'), 'utf-8')) as { version: string }).version),
   },
   // Dev server with API proxy to the backend.
   // Backend port is read from `data/config/ports.json` (web.port) so

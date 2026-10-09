@@ -19,6 +19,14 @@ const remoteMachine: RegisteredMachine = {
 }
 
 describe('Machine inventory', () => {
+  it('round-trips a Machine without a configured default project', async () => {
+    const envelope = await inspectLocalMachine({
+      loadRegistry: async () => ({ defaultProject: '', projects: [] }),
+      cliVersion: '0.94.1',
+    })
+    expect(envelope.machine.defaultProject).toBeNull()
+    expect(parseMachineInspectEnvelope(JSON.stringify(envelope))).toEqual(envelope)
+  })
   it('keeps disabled profiles visible without contacting SSH', async () => {
     const runRemote = vi.fn()
     const result = await inspectRegisteredMachine({ ...remoteMachine, enabled: false }, { runRemote })

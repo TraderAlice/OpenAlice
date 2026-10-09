@@ -19,7 +19,7 @@
  * drift on file format or validation; writes are working-tree only (no commit):
  *   PATCH /api/issues/:wsId/:id           body { status?, priority?, assignee?,
  *                                          agent?, credential?, model?, effort?,
- *                                          timeout?, what?, commentPrompt?, catchUp? }
+ *                                          timeout?, what?, commentPrompt?, catchUp?, when? }
  *   POST  /api/issues/:wsId/:id/comments  body { text }  (author = 'human';
  *     exact Session owners are notified and their final reply returns here)
  *
@@ -164,8 +164,8 @@ export function createIssuesRoutes(svc: WorkspaceService, deps: IssueRoutesDeps 
   // PATCH /api/issues/:wsId/:id — patch board fields { status?, priority?,
   // assignee? } plus scheduled runtime { agent?, credential?, model?, effort?,
   // timeout? } on one issue (the human/UI path). `timeout: null` removes the
-  // optional run watchdog. Other scheduling frontmatter (`when`) stays
-  // file-owned. Returns the updated detail shape; 404 when missing.
+  // optional run watchdog. `when` edits the same file-owned schedule through
+  // the shared mutation owner. Returns updated detail; 404 when missing.
   app.patch('/:wsId/:id', async (c) => {
     const wsId = c.req.param('wsId')
     const id = c.req.param('id')
@@ -188,6 +188,7 @@ export function createIssuesRoutes(svc: WorkspaceService, deps: IssueRoutesDeps 
       what?: string
       commentPrompt?: string | null
       catchUp?: boolean
+      when?: unknown
     } = {}
     if ('status' in fields) {
       const s = fields['status']
@@ -332,6 +333,10 @@ export function createIssuesRoutes(svc: WorkspaceService, deps: IssueRoutesDeps 
         patch.commentPrompt = raw
       }
     }
+    if ('when' in fields) {
+      if (fields['when'] === undefined) return c.json({ error: 'invalid_when' }, 400)
+      patch.when = fields['when']
+    }
     if ('catchUp' in fields) {
       if (typeof fields['catchUp'] !== 'boolean') {
         return c.json({ error: 'invalid_catch_up', message: 'catchUp must be true or false' }, 400)
@@ -341,12 +346,12 @@ export function createIssuesRoutes(svc: WorkspaceService, deps: IssueRoutesDeps 
     if (Object.keys(patch).length === 0) {
       return c.json({
         error: 'no_fields',
-        message: 'provide at least one of status, priority, assignee, agent, credential, model, effort, timeout, what, commentPrompt, catchUp',
+        message: 'provide at least one of status, priority, assignee, agent, credential, model, effort, timeout, what, commentPrompt, catchUp, when',
       }, 400)
     }
 
     try {
-      const res = await updateIssueFields(meta.dir, id, patch)
+      const res = await updateIssueFields(meta.dir, id, patch, { ordinaryScheduleOnly: true })
       if (!res.ok) {
         if (res.reason === 'not_found') return c.json({ error: 'not_found' }, 404)
         return c.json({ error: 'invalid_issue', message: res.error }, 422)

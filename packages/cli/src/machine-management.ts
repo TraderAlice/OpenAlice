@@ -1,3 +1,4 @@
+import type { RuntimeUpdatePlan, ReleaseEvidence } from '@traderalice/update-lifecycle'
 /** Local GUI control for read-only Machine plans and explicitly approved apply. */
 import { randomUUID } from 'node:crypto'
 
@@ -26,6 +27,9 @@ type RemotePlan = {
   activationRoute: string
   installSource: { cliVersion: string }
   deferredCliUpdate: boolean
+  observed?: { installed: ReleaseEvidence | null; active: ReleaseEvidence | null }
+  lifecycle?: RuntimeUpdatePlan
+  activeVersion?: string | null
 }
 
 export interface MachinePlanPreview {
@@ -34,7 +38,10 @@ export interface MachinePlanPreview {
   machine: { key: string | null; label: string; sshTarget: string }
   project: { key: string; displayName: string } | null
   platform: string
+  observed?: { installed: ReleaseEvidence | null; active: ReleaseEvidence | null }
+  releaseIdentity?: RuntimeUpdatePlan['target']
   installedVersion: string
+  activeVersion: string | null
   targetVersion: string
   runtime: string
   actions: string[]
@@ -100,7 +107,10 @@ export class MachineManagement {
       machine: { key: resolved.machine?.key ?? null, label: resolved.profile.label, sshTarget: resolved.profile.sshTarget },
       project: resolved.project ? { key: resolved.project.key, displayName: resolved.project.displayName } : null,
       platform: plan.platform,
+      releaseIdentity: plan.lifecycle?.target,
+      observed: plan.observed,
       installedVersion: plan.cliVersion,
+      activeVersion: plan.activeVersion ?? null,
       targetVersion: plan.installSource.cliVersion,
       runtime: `${plan.runtimeClass} · ${plan.runtimeOwner}`,
       actions: plan.mutations,
@@ -129,9 +139,18 @@ export class MachineManagement {
         throw new Error('The Machine profile changed. Probe again before applying changes.')
       }
       let confirmations = 0
+      let result: { machineKey: string; inventory: Awaited<ReturnType<typeof inspectRegisteredMachine>> } | undefined
+      const finish = async () => {
+        const machine = current.mode === 'add'
+          ? await (this.options.register ?? registerMachineProfile)(current.profile) : current.machine!
+        const inventory = await (this.options.inspect ?? inspectRegisteredMachine)(machine)
+        result = { machineKey: machine.key, inventory }
+        await afterApply?.(result)
+      }
       await (this.options.connectRemote ?? connectRemote)(this.remoteOptions(current, false), {
         stdout: NULL_OUTPUT,
         connectTunnel: async () => 0,
+        afterRuntimeReady: finish,
         onProgress: (stage: MachineOperation['stage']) => {
           if (this.operation) this.operation = { ...this.operation, stage }
         },
@@ -145,13 +164,9 @@ export class MachineManagement {
           return true
         },
       })
-      const machine = current.mode === 'add'
-        ? await (this.options.register ?? registerMachineProfile)(current.profile)
-        : current.machine!
-      const inventory = await (this.options.inspect ?? inspectRegisteredMachine)(machine)
-      await afterApply?.({ machineKey: machine.key, inventory })
+      if (!result) await finish()
       if (this.operation) this.operation = { ...this.operation, phase: 'succeeded', stage: 'verifying' }
-      return { machineKey: machine.key, inventory }
+      return result!
     } catch (error) {
       if (this.operation) this.operation = { ...this.operation, phase: 'failed', error: error instanceof Error ? error.message : String(error) }
       throw error
@@ -170,8 +185,8 @@ export class MachineManagement {
       if (input.projectKey !== undefined) {
         const inventory = await (this.options.inspect ?? inspectRegisteredMachine)(machine)
         const selected = inventory.projects.find((entry) => entry.key === input.projectKey)
-        if (!selected || !selected.available || selected.runtime.class !== 'running') {
-          throw new Error('The selected AliceProject is no longer running on this Machine. Refresh and probe again.')
+        if (!selected || !selected.available || !['running', 'absent'].includes(selected.runtime.class)) {
+          throw new Error('The selected AliceProject is no longer available on this Machine. Refresh and probe again.')
         }
         project = { key: selected.key, displayName: selected.displayName, home: selected.home }
       }
@@ -199,6 +214,6 @@ export class MachineManagement {
     if (input.profile.identityFile !== undefined) argv.push('--identity', input.profile.identityFile)
     if (input.project) argv.push('--home', input.project.home)
     const options = parseRemoteArgs(argv)
-    return { ...options, batchMode: true, planOnly }
+    return { ...options, batchMode: true, planOnly, machineOnly: input.mode === 'add', updateIntent: input.mode === 'upgrade' ? 'update' : 'connect' }
   }
 }

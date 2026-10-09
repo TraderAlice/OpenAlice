@@ -35,8 +35,10 @@ On app activation, Auto Quant and Auto Prediction check their canonical
 repositories for the newest stable SemVer tag and automatically apply it by
 default, including tags outside OpenAlice's verified catalog. Pre-releases are
 excluded. The update status retains `verified: false` for an upstream tag that
-OpenAlice has not catalogued. Settings can disable automatic updates for each
-Workspace. The manual source-upgrade UI can include these releases when auto
+OpenAlice has not catalogued. Settings can disable automatic application for each
+Workspace without disabling read-only release discovery. Manual update checks
+never apply source merges; activation and saved policy changes run the separate
+project policy command. The manual source-upgrade UI can include these releases when auto
 updates are enabled or the advanced Harness preference is enabled. Discovery
 alone does not check out code or install dependencies; apply remains subject to
 the merge and activity guards below.

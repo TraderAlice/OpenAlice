@@ -22,6 +22,7 @@ import {
 import { appResourcesHome } from '@/core/paths.js'
 
 export interface BrokerEngineEntry {
+  packIdentity?: { version: string; contentId: string; apiVersion: number }
   configSchema: z.ZodType
   createBroker: (config: { id: string; label?: string; brokerConfig: Record<string, unknown> }) => IBroker
 }
@@ -99,7 +100,8 @@ async function loadBrokerEngineUncached(engine: BrokerEngine): Promise<BrokerEng
   }
   if (installed) {
     try {
-      return validateModule(engine, await import(pathToFileURL(installed.entry).href))
+      return { ...validateModule(engine, await import(pathToFileURL(installed.entry).href)),
+        packIdentity: { version: installed.manifest.version, contentId: installed.manifest.contentId, apiVersion: installed.manifest.apiVersion } }
     } catch (err) {
       throw new BrokerPackUnavailableError(
         engine,

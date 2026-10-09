@@ -1,3 +1,4 @@
+import { fixtureHome } from './fixture-home.ts'
 import { resolveLaunchContext } from '../launch-context.ts'
 import type { MachineFleetEnvelope, MachineInventory } from '../machine-inventory.ts'
 import type { ProjectTransferPlan } from '../project-transfer.ts'
@@ -20,7 +21,7 @@ const fleet: MachineFleetEnvelope = {
   schemaVersion: 1,
   generatedAt: '2026-08-23T00:00:00.000Z',
   machines: [
-    machine('local', 'This computer', 'local', [project('source', 'Source Project', '/fixture/source')]),
+    machine('local', 'This computer', 'local', [project('source', 'Source Project', `${fixtureHome}/source`)]),
     machine('cloud', 'Cloud fixture', 'online', [project('default', 'Remote Default', '/home/alice/.openalice')]),
   ],
 }
@@ -30,8 +31,8 @@ const exitCode = await runSupervisorTui({}, {
   webRelay: null,
   resolveContext: () => resolveLaunchContext({
     cwd: process.cwd(),
-    homeDir: '/fixture',
-    flags: { project: 'source', home: '/fixture/source' },
+    homeDir: `${fixtureHome}`,
+    flags: { project: 'source', home: `${fixtureHome}/source` },
   }),
   inspect: async () => ({ class: 'absent', state: 'absent', owner: null, endpoints: {} }),
   inspectTransferSource: async () => ({ class: 'absent', state: 'absent', owner: null, endpoints: {} }),

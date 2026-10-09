@@ -2,12 +2,12 @@ import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { SessionExecutionManager, type ExecutionRequest } from './session-execution-manager.js'
+import { SessionExecutionManager, type ExecutionRequest, type ExecutionRecord } from './session-execution-manager.js'
 const directories: string[] = []
 afterEach(async () => { await Promise.all(directories.splice(0).map(dir => rm(dir, { recursive: true, force: true }))) })
 const request: ExecutionRequest = { workspaceId: 'ws', resumeId: 'resume', recordId: 'row', agent: 'claude', surface: 'webpi', intent: 'fresh', origin: { kind: 'user', entry: 'quick-chat' }, configuration: { credentialSource: 'native' } }
 function deferred<T>() { let resolve!: (value: T) => void; const promise = new Promise<T>(done => { resolve = done }); return { promise, resolve } }
-async function setup() { const dir = await mkdtemp(join(tmpdir(), 'execution-manager-')); directories.push(dir); const file = join(dir, 'executions.json'); const project = vi.fn(async () => {}); return { file, project, manager: await SessionExecutionManager.open(file, project) } }
+async function setup() { const dir = await mkdtemp(join(tmpdir(), 'execution-manager-')); directories.push(dir); const file = join(dir, 'executions.json'); const project = vi.fn(async (_record: ExecutionRecord) => {}); return { file, project, manager: await SessionExecutionManager.open(file, project) } }
 describe('Session execution authority', () => {
   it('records startup before starting a child and rejects overlapping launches', async () => {
     const { manager, project } = await setup()
@@ -199,4 +199,28 @@ it('keeps user attribution when interruption overtakes an orderly handoff stop',
   exit.resolve()
   await Promise.all([handoff, interrupt])
   expect(manager.list()[0]).toMatchObject({ phase: 'interrupted', reason: 'user-interrupted', interruption: { actor: request.origin } })
+})
+
+
+it('returns a launched headless result when shutdown interrupts running projection', async () => {
+  const { manager, project } = await setup()
+  const projecting = deferred<void>()
+  const releaseProjection = deferred<void>()
+  project.mockImplementation(async record => {
+    if (record.phase === 'running') { projecting.resolve(); await releaseProjection.promise }
+  })
+  const running = manager.run({ ...request, surface: 'headless', taskId: 'shutdown-race' }, async (ready, signal) => {
+    ready(123)
+    await new Promise<void>(resolve => signal.addEventListener('abort', () => resolve(), { once: true }))
+    return 'stopped-result'
+  }, () => ({ reason: 'child-stopped' }))
+  // Observe rejection immediately so the regression run has no unhandled promise.
+  const result = running.then(value => ({ value }), error => ({ error }))
+  await projecting.promise
+  const stopping = manager.stopAll('shutdown-during-projection')
+  await stopping
+  releaseProjection.resolve()
+  expect(await result).toEqual({ value: 'stopped-result' })
+  expect(manager.list()[0]).toMatchObject({ phase: 'ended', reason: 'shutdown-during-projection' })
+  expect(manager.current('resume')).toBeNull()
 })
