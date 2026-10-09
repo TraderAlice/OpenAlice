@@ -88,5 +88,14 @@ export function createReferenceRoutes(ctx: EngineContext): Hono {
     }
   })
 
+  // GET /api/reference/cn-ashare → CSI/CNI indexes + Stock Connect day-end
+  app.get('/cn-ashare', async (c) => {
+    try {
+      return c.json(await ctx.reference.cnAshare())
+    } catch (err) {
+      return c.json({ error: err instanceof Error ? err.message : String(err) }, 502)
+    }
+  })
+
   return app
 }

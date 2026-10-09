@@ -31,7 +31,7 @@ over a free-form markdown list so ids stay machine-readable.
 
 | Id | Meaning | Primary evidence surface |
 |---|---|---|
-| `cn-ashare` | China A-shares | CSI/CNI indexes first, then ETF/`market-data` bars; optional Tushare; not US `movers` |
+| `cn-ashare` | China A-shares | `traderhub board get --board cn-ashare` first (CSI/CNI + Connect); then ETF/`market-data` bars; optional Tushare; not US `movers` |
 | `us-equity` | US equities | `traderhub board get --board movers` + `board rotation` |
 | `hk-equity` | Hong Kong | `alice market` bars (e.g. Yahoo `.HK` / HSI); **calendar** via `alice-uta market calendar --market HK` or daily-brief `HK CALENDAR`; optional **Longbridge** live quote via `alice-uta` if that UTA is connected — LB is **not** a historical bar source in OpenAlice today |
 | `macro` | Rates / USD / oil / cross-country | `board macro`, `board global-macro`, `board fed` |

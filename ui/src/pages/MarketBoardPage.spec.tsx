@@ -280,4 +280,40 @@ describe('MarketBoardPage', () => {
     await waitFor(() => expect(screen.getByText('Showing 2 of 2 events')).toBeTruthy())
     expect(screen.getByRole('button', { name: 'IPOs (2)' }).getAttribute('aria-pressed')).toBe('true')
   })
+
+  it('renders the cn-ashare board indexes and Connect legs', () => {
+    mocks.boardData = {
+      sessionDate: '2026-10-08',
+      indexes: [{
+        id: 'CSI:000300', code: '000300', label: 'CSI 300', source: 'CSI',
+        tradeDate: '2026-10-08', close: 4310.12, changePct: 0.16, amount: 4961.79, pe: 13.11,
+        quality: 'A', domain: 'market', dataType: 'official_close',
+      }],
+      connect: {
+        sse: {
+          market: 'SSE Northbound', tradeDate: '2026-10-08', turnover: 134535.72,
+          tradeCount: 6824276, etfTurnover: 2043.61, buyTurnover: null, sellTurnover: null,
+          top10: [{ rank: 1, code: '603259', name: 'WUXI APPTEC', turnover: 2_729_984_203 }],
+          source: 'HKEX', quality: 'A', domain: 'flow', dataType: 'exchange_day_end',
+          turnoverUnit: 'RMB_million',
+        },
+        szse: null,
+        hkex: { sseSouthbound: null, szseSouthbound: null },
+      },
+      meta: { provider: 'csi+hkex', asOf: '2026-10-09T00:00:00.000Z', origin: 'local' },
+    }
+
+    render(
+      <MarketBoardPage
+        spec={{ kind: 'market-board', params: { board: 'cn-ashare' } }}
+        visible
+      />,
+    )
+
+    expect(screen.getByTestId('cn-ashare-board')).toBeTruthy()
+    expect(screen.getByText('CSI:000300')).toBeTruthy()
+    expect(screen.getByText('+0.16%')).toBeTruthy()
+    expect(screen.getByText('沪股通（北向）')).toBeTruthy()
+    expect(screen.getByText('603259')).toBeTruthy()
+  })
 })

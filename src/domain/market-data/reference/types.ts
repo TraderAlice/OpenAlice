@@ -22,6 +22,7 @@ import type { ValuationStrip } from './valuation.js'
 import type { GlobalMacroBoard } from './global-macro.js'
 import type { ShippingBoard } from './shipping.js'
 import type { FedBoard } from './fed.js'
+import type { CnAshareBoard } from './cn-ashare.js'
 
 /** Envelope on every reference payload. Provider is an explicit label —
  *  same philosophy as the bar layer's sourceId: annotate the source,
@@ -130,4 +131,7 @@ export interface ReferenceDataService {
   /** Fed policy read: H.4.1 balance sheet (FRED key required), primary
    *  dealer positions (NY Fed, keyless), FOMC documents (keyless). */
   fed(): Promise<FedBoard>
+  /** China A-share indexes (CSI/CNI) + Stock Connect day-end (HKEX
+   *  Historical Daily). Local-only in v1 — no hosted hub path. */
+  cnAshare(): Promise<CnAshareBoard>
 }

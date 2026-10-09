@@ -45,6 +45,12 @@ K-lines and quantitative work
 boards, fundamentals, macro series, calendars, ETFs, and related slow-moving
 research data. `alice market` owns bar discovery and raw history; `alice analysis` supplies optional price-path calculations.
 
+The `cn-ashare` board is **local-only** in v1: CSI/CNI index strips plus Stock
+Connect day-end from HKEX Historical DailyStat. It is registered on
+`ReferenceDataService.cnAshare()` / `traderhub board get --board cn-ashare` /
+`GET /api/reference/cn-ashare`, but does not call the hosted hub until a
+compatible hub route exists.
+
 ## TraderHub and Reference Data
 
 `src/domain/market-data/reference/` defines OpenAlice-owned board contracts.

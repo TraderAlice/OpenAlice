@@ -16,7 +16,7 @@ import {
   type EarningsEvent, type IpoEvent, type DividendEvent,
   type MacroBoard, type MacroSeriesCard, type TermStructureBoard, type TermCurve,
   type GlobalMacroBoard, type GlobalMacroCell, type ShippingBoard, type ShippingCurve,
-  type FedBoard,
+  type FedBoard, type CnAshareBoard, type CnConnectLeg, type CnIndexCard,
 } from '../api/reference'
 import { useWorkspace } from '../tabs/store'
 import type { ViewSpec } from '../tabs/types'
@@ -44,6 +44,8 @@ export function MarketBoardPage({ spec }: PageProps) {
       return <ShippingBoardView />
     case 'fed':
       return <FedBoardView />
+    case 'cn-ashare':
+      return <CnAshareBoardView />
   }
 }
 
@@ -969,6 +971,166 @@ function ChokepointCard({ curve }: { curve: ShippingCurve }) {
       </MeasuredChartFrame>
     </div>
   )
+}
+
+// ==================== China A-shares ====================
+
+function CnAshareBoardView() {
+  const { t } = useTranslation()
+  const { data, updatedAt, loading, error } = useReferenceBoard<CnAshareBoard>(referenceApi.cnAshare, 30 * 60 * 1000)
+
+  return (
+    <div className="flex flex-col flex-1 min-h-0" data-testid="cn-ashare-board">
+      <PageHeader
+        title={t('market.boardCnAshare')}
+        description={
+          <span className="inline-flex flex-wrap items-center gap-x-2 gap-y-0.5">
+            <span>{t('market.cnAshareSubtitle')}</span>
+            {data?.sessionDate && (
+              <span className="font-mono text-muted-foreground">{data.sessionDate}</span>
+            )}
+            {data && <BoardMeta meta={data.meta} />}
+          </span>
+        }
+        live={{ lastUpdated: updatedAt, label: 'Fetched', hideDot: true }}
+      />
+      <div className="flex-1 overflow-y-auto px-4 md:px-8 py-4 flex flex-col gap-5 min-h-0">
+        {loading && !data && <CenteredLoading label={t('common.loading')} />}
+        {error && (
+          <div className="rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2 text-[13px] leading-5 text-destructive">{error}</div>
+        )}
+        {data?.errors && Object.entries(data.errors).map(([k, msg]) => (
+          <div key={k} className="rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2 text-[13px] leading-5 text-destructive">{k}: {msg}</div>
+        ))}
+        {data && (
+          <>
+            <section aria-label={t('market.cnAshareIndexes')}>
+              <h3 className="mb-2 text-[12px] leading-[18px] font-semibold text-muted-foreground">{t('market.cnAshareIndexes')}</h3>
+              {data.indexes.length === 0 ? (
+                <div className="text-[13px] text-muted-foreground">{t('market.noMatches')}</div>
+              ) : (
+                <div className="overflow-x-auto rounded-lg border border-border">
+                  <table className="w-full text-[12px] leading-[18px]">
+                    <thead className="bg-muted/40 text-muted-foreground">
+                      <tr>
+                        <th className="px-3 py-1.5 text-left font-medium">{t('market.colSymbol')}</th>
+                        <th className="px-3 py-1.5 text-left font-medium">{t('market.cnAshareIndexName')}</th>
+                        <th className="px-3 py-1.5 text-right font-medium">{t('market.colPrice')}</th>
+                        <th className="px-3 py-1.5 text-right font-medium">{t('market.colChangePct')}</th>
+                        <th className="px-3 py-1.5 text-right font-medium">{t('market.cnAshareAmount')}</th>
+                        <th className="px-3 py-1.5 text-right font-medium">PE</th>
+                        <th className="px-3 py-1.5 text-left font-medium">{t('market.colDate')}</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {data.indexes.map((row) => (
+                        <CnIndexRow key={row.id} row={row} />
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </section>
+
+            <section aria-label={t('market.cnAshareConnect')}>
+              <h3 className="mb-1 text-[12px] leading-[18px] font-semibold text-muted-foreground">{t('market.cnAshareConnect')}</h3>
+              <p className="mb-3 text-[11px] leading-[15px] text-muted-foreground">{t('market.cnAshareConnectNote')}</p>
+              <div className="grid gap-3 grid-cols-1 lg:grid-cols-2">
+                <CnConnectCard title={t('market.cnAshareSseNb')} leg={data.connect.sse} />
+                <CnConnectCard title={t('market.cnAshareSzseNb')} leg={data.connect.szse} />
+                <CnConnectCard title={t('market.cnAshareSseSb')} leg={data.connect.hkex.sseSouthbound} />
+                <CnConnectCard title={t('market.cnAshareSzseSb')} leg={data.connect.hkex.szseSouthbound} />
+              </div>
+            </section>
+          </>
+        )}
+      </div>
+    </div>
+  )
+}
+
+function CnIndexRow({ row }: { row: CnIndexCard }) {
+  return (
+    <tr className="border-t border-border/60">
+      <td className="px-3 py-1.5 font-mono text-foreground">{row.id}</td>
+      <td className="px-3 py-1.5 text-foreground">{row.label}</td>
+      <td className="px-3 py-1.5 text-right font-mono tabular-nums">{fmtPrice(row.close)}</td>
+      <td className={`px-3 py-1.5 text-right font-mono tabular-nums ${signColor(row.changePct)}`}>
+        {fmtCnChangePct(row.changePct)}
+      </td>
+      <td className="px-3 py-1.5 text-right font-mono tabular-nums text-muted-foreground">{fmtPrice(row.amount)}</td>
+      <td className="px-3 py-1.5 text-right font-mono tabular-nums text-muted-foreground">{fmtPrice(row.pe)}</td>
+      <td className="px-3 py-1.5 font-mono text-muted-foreground">{row.tradeDate || '—'}</td>
+    </tr>
+  )
+}
+
+function CnConnectCard({ title, leg }: { title: string; leg: CnConnectLeg | null }) {
+  const { t } = useTranslation()
+  if (!leg) {
+    return (
+      <div className="rounded-lg border border-border/60 bg-card px-3 py-3 text-[13px] text-muted-foreground">
+        <div className="mb-1 text-[13px] font-semibold text-foreground">{title}</div>
+        <div>{t('market.noMatches')}</div>
+      </div>
+    )
+  }
+  const unit = leg.turnoverUnit === 'RMB_million'
+    ? t('market.cnAshareUnitRmbM')
+    : leg.turnoverUnit === 'HKD_million'
+      ? t('market.cnAshareUnitHkdM')
+      : ''
+  return (
+    <div className="rounded-lg border border-border bg-card px-3 py-3 sm:px-4">
+      <div className="mb-2 flex flex-wrap items-baseline justify-between gap-x-2 gap-y-0.5">
+        <span className="text-[13px] leading-[18px] font-semibold text-foreground">{title}</span>
+        <span className="font-mono text-[11px] text-muted-foreground">{leg.tradeDate}</span>
+      </div>
+      <dl className="grid grid-cols-2 gap-x-3 gap-y-2 sm:grid-cols-4">
+        <CnMetric label={t('market.cnAshareTurnover')} value={fmtPrice(leg.turnover)} hint={unit} />
+        <CnMetric label={t('market.cnAshareTradeCount')} value={fmtCompact(leg.tradeCount)} />
+        <CnMetric label={t('market.cnAshareEtfTurnover')} value={fmtPrice(leg.etfTurnover)} hint={unit} />
+        {(leg.buyTurnover != null || leg.sellTurnover != null) && (
+          <>
+            <CnMetric label={t('market.cnAshareBuy')} value={fmtPrice(leg.buyTurnover)} hint={unit} />
+            <CnMetric label={t('market.cnAshareSell')} value={fmtPrice(leg.sellTurnover)} hint={unit} />
+          </>
+        )}
+      </dl>
+      {leg.top10.length > 0 && (
+        <div className="mt-3">
+          <div className="mb-1 text-[11px] font-medium text-muted-foreground">{t('market.cnAshareTop10')}</div>
+          <ul className="flex flex-col gap-0.5">
+            {leg.top10.slice(0, 5).map((row) => (
+              <li key={`${row.rank}-${row.code}`} className="flex items-center gap-2 text-[11px] leading-[15px]">
+                <span className="w-4 shrink-0 font-mono text-muted-foreground">{row.rank}</span>
+                <span className="w-14 shrink-0 font-mono text-foreground">{row.code}</span>
+                <span className="min-w-0 flex-1 truncate text-muted-foreground">{row.name}</span>
+                <span className="shrink-0 font-mono tabular-nums text-foreground">{fmtCompact(row.turnover)}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+    </div>
+  )
+}
+
+function CnMetric({ label, value, hint }: { label: string; value: string; hint?: string }) {
+  return (
+    <div className="min-w-0">
+      <dt className="text-[10px] leading-4 text-muted-foreground">{label}</dt>
+      <dd className="truncate font-mono text-[13px] leading-[18px] font-medium tabular-nums text-foreground">
+        {value}
+        {hint ? <span className="ml-1 text-[10px] font-normal text-muted-foreground">{hint}</span> : null}
+      </dd>
+    </div>
+  )
+}
+
+/** CSI/CNI changePct is already percent units (0.16 = +0.16%). */
+function fmtCnChangePct(x: number | null): string {
+  return x == null ? '—' : `${x > 0 ? '+' : ''}${x.toFixed(2)}%`
 }
 
 // ==================== Fed ====================

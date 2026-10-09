@@ -53,6 +53,25 @@ function mkCtx(overrides?: Partial<ReferenceDataService>): EngineContext {
       curves: [{ key: 'suez', name: 'Suez Canal', points: [{ date: '2026-06-07', tons: 1.69e6, vessels: 39 }], latest: { date: '2026-06-07', tons: 1.69e6, vessels: 39 } }],
       meta: { provider: 'imf-portwatch', asOf: '2026-06-10T00:00:00.000Z' },
     }),
+    cnAshare: async () => ({
+      sessionDate: '2026-10-08',
+      indexes: [{
+        id: 'CSI:000300', code: '000300', label: 'CSI 300', source: 'CSI' as const,
+        tradeDate: '2026-10-08', close: 4310.12, changePct: 0.16, amount: 4961.79, pe: 13.11,
+        quality: 'A' as const, domain: 'market' as const, dataType: 'official_close' as const,
+      }],
+      connect: {
+        sse: {
+          market: 'SSE Northbound', tradeDate: '2026-10-08', turnover: 134535.72,
+          tradeCount: 6824276, etfTurnover: 2043.61, buyTurnover: null, sellTurnover: null,
+          top10: [], source: 'HKEX' as const, quality: 'A' as const, domain: 'flow' as const,
+          dataType: 'exchange_day_end' as const, turnoverUnit: 'RMB_million' as const,
+        },
+        szse: null,
+        hkex: { sseSouthbound: null, szseSouthbound: null },
+      },
+      meta: { provider: 'csi+hkex', asOf: '2026-10-09T00:00:00.000Z', origin: 'local' as const },
+    }),
     ...overrides,
   }
   return { reference } as unknown as EngineContext
@@ -113,6 +132,14 @@ describe('reference routes', () => {
     const res = await createReferenceRoutes(mkCtx()).request('/shipping')
     const body = await res.json()
     expect(body.curves[0].name).toBe('Suez Canal')
+  })
+
+  it('GET /cn-ashare returns indexes + Connect legs', async () => {
+    const res = await createReferenceRoutes(mkCtx()).request('/cn-ashare')
+    const body = await res.json()
+    expect(body.indexes[0].id).toBe('CSI:000300')
+    expect(body.connect.sse.market).toBe('SSE Northbound')
+    expect(body.meta.origin).toBe('local')
   })
 
   it('GET /movers surfaces a failure as { error } with 502, not a crash', async () => {

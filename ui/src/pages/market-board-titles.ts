@@ -11,4 +11,5 @@ export const MARKET_BOARD_TITLES: Record<BoardKind, string> = {
   'global-macro': 'Global Macro',
   shipping: 'Shipping',
   fed: 'Fed',
+  'cn-ashare': 'A-shares',
 }

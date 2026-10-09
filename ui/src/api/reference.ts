@@ -185,6 +185,66 @@ export interface FedBoard {
   meta: ReferenceMeta
 }
 
+export interface CnIndexCard {
+  id: string
+  code: string
+  label: string
+  source: 'CSI' | 'CNI'
+  tradeDate: string
+  close: number | null
+  /** Percent units (0.16 = +0.16%), matching CSI changePct. */
+  changePct: number | null
+  amount: number | null
+  pe: number | null
+  quality: 'A' | 'B' | 'C'
+  domain: 'market' | 'flow'
+  dataType: 'official_close' | 'exchange_day_end'
+}
+
+export interface CnConnectTopName {
+  rank: number
+  code: string
+  name: string
+  turnover: number | null
+}
+
+export interface CnConnectLeg {
+  market: string
+  tradeDate: string
+  turnover: number | null
+  tradeCount: number | null
+  etfTurnover: number | null
+  buyTurnover: number | null
+  sellTurnover: number | null
+  top10: CnConnectTopName[]
+  source: 'HKEX'
+  quality: 'A' | 'B' | 'C'
+  domain: 'market' | 'flow'
+  dataType: 'official_close' | 'exchange_day_end'
+  turnoverUnit: 'RMB_million' | 'HKD_million' | 'unknown'
+}
+
+export interface CnAshareBoard {
+  sessionDate: string | null
+  indexes: CnIndexCard[]
+  connect: {
+    sse: CnConnectLeg | null
+    szse: CnConnectLeg | null
+    hkex: {
+      sseSouthbound: CnConnectLeg | null
+      szseSouthbound: CnConnectLeg | null
+    }
+  }
+  errors?: {
+    indexes?: string
+    connect?: string
+    sse?: string
+    szse?: string
+    hkex?: string
+  }
+  meta: ReferenceMeta
+}
+
 export const referenceApi = {
   movers: () => fetchJson<MoversBoard>('/api/reference/movers'),
   calendar: () => fetchJson<CalendarBoard>('/api/reference/calendar'),
@@ -194,4 +254,5 @@ export const referenceApi = {
   globalMacro: () => fetchJson<GlobalMacroBoard>('/api/reference/global-macro'),
   shipping: () => fetchJson<ShippingBoard>('/api/reference/shipping'),
   fed: () => fetchJson<FedBoard>('/api/reference/fed'),
+  cnAshare: () => fetchJson<CnAshareBoard>('/api/reference/cn-ashare'),
 }

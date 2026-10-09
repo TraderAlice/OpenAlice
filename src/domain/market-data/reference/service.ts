@@ -12,6 +12,7 @@ import { fetchValuationStrip, type ValuationStrip } from './valuation.js'
 import { fetchGlobalMacro, type GlobalMacroBoard } from './global-macro.js'
 import { fetchShipping, type ShippingBoard } from './shipping.js'
 import { fetchFedBoard, type FedBoard } from './fed.js'
+import { fetchCnAshareBoard, type CnAshareBoard } from './cn-ashare.js'
 import { cachedBoard } from './cache.js'
 import { createHubFetcher, markLocal, type HubConfig } from './hub.js'
 
@@ -50,6 +51,7 @@ const TTL = {
   valuation: 6 * 60 * 60_000,   // multpl updates ~daily
   globalMacro: 6 * 60 * 60_000, // OECD updates monthly/quarterly + tiny quota
   shipping: 6 * 60 * 60_000,    // PortWatch updates weekly
+  cnAshare: 30 * 60_000,        // day-end indexes + Connect; refresh within the hour
 } as const
 
 export function createReferenceData(deps: ReferenceDataDeps): ReferenceDataService {
@@ -146,6 +148,10 @@ export function createReferenceData(deps: ReferenceDataDeps): ReferenceDataServi
     return hub ?? markLocal(await fetchValuationStrip(deps.indexClient))
   })
 
+  // Local-only: do not call viaHub — hosted hub does not publish cn-ashare yet.
+  const cnAshare = cachedBoard(TTL.cnAshare, async (): Promise<CnAshareBoard> =>
+    markLocal(await fetchCnAshareBoard()))
+
   return {
     movers,
     // calendar(opts) with a custom window bypasses the cache (rare, AI-only
@@ -160,6 +166,7 @@ export function createReferenceData(deps: ReferenceDataDeps): ReferenceDataServi
     globalMacro,
     shipping,
     fed,
+    cnAshare,
   }
 }
 

@@ -12,6 +12,7 @@ import type { ReferenceDataService } from '@/domain/market-data/reference/types.
 const BOARDS = [
   'movers', 'calendar', 'macro', 'valuation',
   'term-structure', 'global-macro', 'shipping', 'fed',
+  'cn-ashare',
 ] as const
 
 export function createReferenceBoardTools(reference: ReferenceDataService) {
@@ -28,6 +29,8 @@ Available boards:
 - global-macro: 7 countries × CPI/short-rate/CLI/house/equity indices (OECD + BIS + World Bank, via FRED; CPI annual, rest monthly — check each cell's date)
 - shipping: daily transit volume at 6 maritime chokepoints (IMF PortWatch)
 - fed: balance sheet, primary dealer positioning, FOMC documents
+- cn-ashare: CSI/CNI index strip + Stock Connect day-end (HKEX Historical Daily;
+  SSE/SZSE Northbound + Southbound). Local-only; turnover is not 北向净流入.
 
 meta.origin tells you who served it ('hub' = hosted TraderHub, 'local' = this
 instance's own keys); meta.stale means the upstream refresh failed and you are
@@ -47,6 +50,7 @@ seeing the last good snapshot. For sector rotation use the sectorRotation tool.`
           case 'global-macro': return reference.globalMacro()
           case 'shipping': return reference.shipping()
           case 'fed': return reference.fed()
+          case 'cn-ashare': return reference.cnAshare()
         }
       },
     }),

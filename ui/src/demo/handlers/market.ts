@@ -6,7 +6,7 @@ import {
   demoSectorRotation,
 } from '../fixtures/market'
 import type { BarSourceCandidate, BarMeta } from '../../api/market'
-import type { MoversBoard, MoverRow, CalendarBoard, MacroBoard, MacroSeriesCard, TermStructureBoard, ValuationStrip, GlobalMacroBoard, ShippingBoard, FedBoard } from '../../api/reference'
+import type { MoversBoard, MoverRow, CalendarBoard, MacroBoard, MacroSeriesCard, TermStructureBoard, ValuationStrip, GlobalMacroBoard, ShippingBoard, FedBoard, CnAshareBoard, CnConnectLeg } from '../../api/reference'
 
 const AAPL = 'AAPL'
 const DEMO_FX: Record<string, { name: string; spot: number; aliases: string[] }> = {
@@ -49,6 +49,7 @@ export const marketHandlers = [
   http.get('/api/reference/global-macro', () => HttpResponse.json(demoGlobalMacro)),
   http.get('/api/reference/shipping', () => HttpResponse.json(demoShipping)),
   http.get('/api/reference/fed', () => HttpResponse.json(demoFed)),
+  http.get('/api/reference/cn-ashare', () => HttpResponse.json(demoCnAshare)),
 
   // ---- federated bars (multi-source K-lines) ----
   // Cover the provider/asset-class combinations that have historically broken
@@ -376,4 +377,50 @@ const demoShipping: ShippingBoard = {
     shippingCurve('cape of good hope', 'Cape of Good Hope', 5.9e6, 95),
   ],
   meta: { provider: 'imf-portwatch', asOf: '2026-06-10T13:30:00.000Z' },
+}
+
+function demoConnectLeg(market: string, turnover: number, unit: CnConnectLeg['turnoverUnit']): CnConnectLeg {
+  return {
+    market,
+    tradeDate: '2026-10-08',
+    turnover,
+    tradeCount: 1_000_000,
+    etfTurnover: 2_000,
+    buyTurnover: unit === 'HKD_million' ? turnover * 0.48 : null,
+    sellTurnover: unit === 'HKD_million' ? turnover * 0.52 : null,
+    top10: [
+      { rank: 1, code: '600519', name: 'KWEICHOW MOUTAI', turnover: 1_500_000_000 },
+      { rank: 2, code: '300750', name: 'CATL', turnover: 1_200_000_000 },
+    ],
+    source: 'HKEX',
+    quality: 'A',
+    domain: 'flow',
+    dataType: 'exchange_day_end',
+    turnoverUnit: unit,
+  }
+}
+
+const demoCnAshare: CnAshareBoard = {
+  sessionDate: '2026-10-08',
+  indexes: [
+    {
+      id: 'CSI:000300', code: '000300', label: 'CSI 300', source: 'CSI',
+      tradeDate: '2026-10-08', close: 4310.12, changePct: 0.16, amount: 4961.79, pe: 13.11,
+      quality: 'A', domain: 'market', dataType: 'official_close',
+    },
+    {
+      id: 'CNI:399006', code: '399006', label: 'ChiNext', source: 'CNI',
+      tradeDate: '2026-10-08', close: 2800.5, changePct: 1.2, amount: 2000, pe: null,
+      quality: 'A', domain: 'market', dataType: 'official_close',
+    },
+  ],
+  connect: {
+    sse: demoConnectLeg('SSE Northbound', 134535.72, 'RMB_million'),
+    szse: demoConnectLeg('SZSE Northbound', 98001, 'RMB_million'),
+    hkex: {
+      sseSouthbound: demoConnectLeg('SSE Southbound', 50388, 'HKD_million'),
+      szseSouthbound: demoConnectLeg('SZSE Southbound', 28553, 'HKD_million'),
+    },
+  },
+  meta: { provider: 'csi+cni+hkex', asOf: '2026-10-09T08:00:00.000Z', origin: 'local' },
 }
