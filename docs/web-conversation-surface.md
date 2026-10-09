@@ -176,10 +176,13 @@ Web shutdown waits for child termination, including the SIGKILL fallback, before
 another writer may start. The UI renders background occupancy without attaching
 a terminal to a headless Session.
 
-Quick Start exposes a TUI / GUI selector beside the runtime. GUI is available
-only with `web.freshSession`; `quick-chat` accepts `surface: webpi` and starts
-the structured host directly with the same Session runtime binding. Omission
-keeps the terminal default. The initial prompt is sent once after Web startup.
+Quick Start does not expose a TUI / GUI selector. A runtime with
+`web.freshSession` always launches the Web surface; TUI-only runtimes stay on
+the terminal. `quick-chat` accepts `surface: webpi` and starts the structured
+host directly with the same Session runtime binding. Omission keeps the
+terminal default. The initial prompt is sent once after Web startup. An
+already-running Session may still switch surfaces from the Workspace header
+when the runtime supports Web.
 
 ## File references in GUI prose
 

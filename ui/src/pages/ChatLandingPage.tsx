@@ -17,14 +17,12 @@ import {
   BriefcaseBusiness,
   CalendarClock,
   ChartNoAxesCombined,
-  ChevronDown,
   CircleAlert,
   Code2,
   FileSearch,
   FlaskConical,
   Inbox,
   KeyRound,
-  LayoutGrid,
   LoaderCircle,
   ExternalLink,
   RefreshCw,
@@ -39,13 +37,6 @@ import {
   AgentLaunchSelectors,
   type AgentLaunchSelectorsHandle,
 } from '../components/workspace/AgentLaunchControls'
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuRadioGroup,
-  DropdownMenuRadioItem,
-  DropdownMenuTrigger,
-} from '../components/ui/dropdown-menu'
 import { RecoverySurface, RefreshNotice } from '../components/StateViews'
 import { Button } from '../components/ui/button'
 import {
@@ -239,10 +230,10 @@ export function HarnessLandingPage({
     managedWorkspaceLaunch: mode === 'chat' && credentialWorkspace !== null && credentialWorkspace !== undefined,
   })
   const effectiveAgent = launchConfig.effectiveAgent
-  const [uiMode, setUiMode] = useState<'terminal' | 'webpi'>(import.meta.env.VITE_DEMO_MODE ? 'webpi' : 'terminal')
   const selectedInfo = launchConfig.selectedAgent
-  const supportsGui = Boolean(selectedInfo?.capabilities.web?.freshSession)
-  const surface = supportsGui ? uiMode : 'terminal'
+  // Capable runtimes always open the Web surface; TUI-only agents stay on
+  // terminal. Quick Start no longer exposes a TUI/GUI switch.
+  const surface = selectedInfo?.capabilities.web?.freshSession ? 'webpi' : 'terminal'
   const installHint = selectedInfo ? installHintFor(selectedInfo.id) : undefined
   const exampleGroups = mode === 'chat'
     ? chatLandingExampleGroups((key) => t(key as never), project?.product)
@@ -362,18 +353,6 @@ export function HarnessLandingPage({
               menuPlacement="up"
               toolbar
             />
-            <DropdownMenu>
-              <DropdownMenuTrigger render={<Button variant="ghost" size="sm" aria-label={`${t('chatLanding.uiMode')}: ${surface === 'webpi' ? 'GUI' : 'TUI'}`} disabled={launching} />}>
-                <LayoutGrid size={14} aria-hidden />
-                <span>{surface === 'webpi' ? 'GUI' : 'TUI'}</span><ChevronDown size={14} aria-hidden />
-              </DropdownMenuTrigger>
-              <DropdownMenuContent side="top" align="start">
-                <DropdownMenuRadioGroup value={surface} onValueChange={value => setUiMode(value as 'terminal' | 'webpi')}>
-                  <DropdownMenuRadioItem value="terminal" closeOnClick>TUI</DropdownMenuRadioItem>
-                  <DropdownMenuRadioItem value="webpi" disabled={!supportsGui} closeOnClick>GUI</DropdownMenuRadioItem>
-                </DropdownMenuRadioGroup>
-              </DropdownMenuContent>
-            </DropdownMenu>
 
           </>}
 

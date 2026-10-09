@@ -75,8 +75,8 @@ remains an intentional recovery scenario.
 
 ## Chat entry walkthroughs
 
-Demo Chat defaults to the standard GUI for capable runtimes; normal launches
-retain their existing default. Suggested workflows still fill the composer so
+Demo Chat launches capable runtimes on the standard GUI with no TUI/GUI
+selector; TUI-only runtimes stay on the terminal. Suggested workflows still fill the composer so
 the visitor can read the request before sending. Both pages of Chat suggestions
 (and the Nano starters) have distinct prewritten answers in
 `ui/src/demo/fixtures/chat-workflows.ts`, matched against the shared localized

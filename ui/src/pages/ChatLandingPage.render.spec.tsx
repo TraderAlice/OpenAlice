@@ -509,14 +509,14 @@ describe('ChatLandingPage workflow starters', () => {
 })
 
 describe('ChatLandingPage keyboard submission', () => {
-  it('defaults the demo to GUI and sends a selected starter through quick chat', async () => {
-    vi.stubEnv('VITE_DEMO_MODE', 'true')
+  it('launches a capable runtime on GUI without exposing a TUI/GUI selector', async () => {
     mocks.useWorkspaces.mockImplementation(() => ({
       ...context([chatWorkspace()]),
       agents: [{ ...piAgent, capabilities: { ...piAgent.capabilities, web: { wire: 'pi-rpc', freshSession: true } } }],
     }))
     render(<ChatLandingPage spec={{ params: { targetWsId: 'chat-1' } }} />)
-    await screen.findByRole('button', { name: 'UI mode: GUI' })
+    await screen.findByRole('button', { name: 'AI Provider, Model and reasoning' })
+    expect(screen.queryByRole('button', { name: /UI mode:/ })).toBeNull()
     fireEvent.click(screen.getByRole('button', { name: "Read today's cross-asset signals" }))
     fireEvent.click(screen.getByRole('button', { name: 'Send' }))
     await waitFor(() => expect(mocks.quickChat).toHaveBeenCalled())
@@ -541,20 +541,19 @@ describe('ChatLandingPage keyboard submission', () => {
     expect(screen.queryByText('Starting session…')).toBeNull()
   })
 
-  it('offers GUI for a capable runtime and passes the selected surface', async () => {
+  it('keeps TUI-only runtimes on the terminal without a surface selector', async () => {
     mocks.useWorkspaces.mockImplementation(() => ({
       ...context([chatWorkspace()]),
-      agents: [{ ...piAgent, capabilities: { ...piAgent.capabilities, web: { wire: 'pi-rpc', freshSession: true } } }],
+      agents: [piAgent],
     }))
     render(<ChatLandingPage spec={{ params: { targetWsId: 'chat-1' } }} />)
     await screen.findByRole('button', { name: 'AI Provider, Model and reasoning' })
-    fireEvent.click(screen.getByRole('button', { name: 'UI mode: TUI' }))
-    fireEvent.click(await screen.findByRole('menuitemradio', { name: 'GUI' }))
+    expect(screen.queryByRole('button', { name: /UI mode:/ })).toBeNull()
     const composer = screen.getByPlaceholderText('Describe the task, question, or decision…')
-    fireEvent.change(composer, { target: { value: 'GUI hello' } })
+    fireEvent.change(composer, { target: { value: 'TUI hello' } })
     fireEvent.keyDown(composer, { key: 'Enter', code: 'Enter' })
     await waitFor(() => expect(mocks.quickChat).toHaveBeenCalled())
-    expect(mocks.quickChat.mock.calls[0]?.[8]).toBe('webpi')
+    expect(mocks.quickChat.mock.calls[0]?.[8]).toBe('terminal')
   })
 
   it('does not submit when Enter confirms an IME composition candidate', async () => {
