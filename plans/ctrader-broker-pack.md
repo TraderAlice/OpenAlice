@@ -1,6 +1,6 @@
 # cTrader Broker Pack
 
-**Status:** active — increment 2 done (transport + session); read surface next
+**Status:** active — increment 3 done in code (read surface); spike on real demo pending app approval; writes next
 
 **Owner guides:** [[docs/broker-packs.md]], [[docs/uta-live-testing.md]],
 [[docs/project-structure.md]]
@@ -43,8 +43,17 @@ no local terminal process. This matches the existing Broker Pack shape
 - Each integrator registers an application in the Open API portal; Spotware
   approves it before custom redirect URIs can be added.
 
-Unconfirmed, to measure in the spike: rate limits, heartbeat interval,
-trendbar/tick history limits, volume and price encodings, error codes.
+- Rate limits (Open API overview): 50 requests/s per connection for
+  non-historical data, 5 requests/s for historical data.
+- JSON mode sends enums as their numeric proto values and int64 as JSON
+  numbers (Spotware's JSON sample app, `Open-API-Example-mobile-trader`).
+- Encodings (proto comments): volume in cents of base units; spot and
+  trendbar prices as 1/100000 integers; order/position prices as doubles;
+  money scaled by `moneyDigits`.
+
+Unconfirmed, to measure in the spike: trendbar range limits per period,
+whether a spot subscription on a closed market yields an initial tick,
+error codes seen in practice.
 
 ## Decisions
 
@@ -69,6 +78,21 @@ trendbar/tick history limits, volume and price encodings, error codes.
   account list and refuses a demo/live environment mismatch.
 - **Rate limits:** documented 50 req/s general and 5 req/s historical per
   connection; the transport queues FIFO at 45 and 4.
+- **Contract identity:** nativeKey = the broker's symbol name, `conId` =
+  symbolId, secType `CFD` for every instrument, exchange `CTRADER`,
+  currency = quote asset. `assetClassFor` classifies the broker's own asset
+  class / category names (forex, metals, indices, crypto…), not a
+  per-broker table.
+- **Quantities:** base units (volume / 100), never lots. Contract details
+  expose min size and increment in units.
+- **Positions:** one UTA row per (symbol, side) with a volume-weighted
+  average cost; hedged accounts keep long and short as separate rows. Marks
+  use the close-out side (bid for long, ask for short) in the quote
+  currency; account totals use the deposit currency.
+- **Quotes:** spot stream first; without a tick within the timeout, the last
+  1-minute bar close; otherwise `MARKET_CLOSED`.
+- **Market clock:** cTrader has no venue-wide clock; the schedule of the
+  broker's first listed symbol is reported.
 - **Safety:** acceptance uses demo accounts only; every live-paper run ends
   with a flat-account check.
 
@@ -91,10 +115,10 @@ trendbar/tick history limits, volume and price encodings, error codes.
 2. **First authorization UX.** A local redirect URI on the OpenAlice UI
    versus pasting tokens generated in the Open API playground. Depends on
    whether Spotware accepts loopback redirect URIs.
-3. **Hedging vs netting accounts.** Map cTrader positions (position ids,
-   possibly several per symbol) onto UTA `Position` without losing identity.
-4. **Asset-class mapping** of cTrader symbol categories to
-   `assetClassFor` values and `secType`.
+3. **Hedging vs netting accounts.** Reads merge per (symbol, side). Still
+   open for writes: which positionIds `closePosition` closes (and in which
+   order) for a merged row, and whether a UTA consumer collides on two rows
+   with the same aliceId (long and short of one symbol).
 
 ## Increments
 
@@ -103,7 +127,7 @@ trendbar/tick history limits, volume and price encodings, error codes.
 - [x] cTID and a demo account at any cTrader broker
 - [ ] Open API application registered (submitted 2026-10-10) and approved; clientId/secret kept
       outside the repository
-- [ ] `pnpm install` in this worktree; baseline `pnpm test:changed`
+- [x] `pnpm install` in this worktree; baseline `pnpm test:changed`
 
 ### 1. Feasibility spike (outside the repo tree)
 
@@ -131,10 +155,17 @@ trendbar/tick history limits, volume and price encodings, error codes.
 
 ### 3. Read surface (`IBroker`)
 
-- [ ] init/close, connection state
-- [ ] searchContracts, getContractDetails, nativeKey grammar
-- [ ] getAccount, getPositions, getOrders/getOrder/getOpenOrders
-- [ ] getQuote, getMarketClock, getHistorical, getCapabilities, assetClassFor
+- [x] init/close, connection state (`CtraderBroker.ts`)
+- [x] Catalog (`ctrader-catalog.ts`): symbols, assets, categories, asset
+      classes, cached specs; searchContracts, getContractDetails, nativeKey
+- [x] getAccount, getPositions, getOrders/getOrder/getOpenOrders
+- [x] Spot cache (`ctrader-spots.ts`) with replay after reconnect; getQuote
+      with bar fallback
+- [x] getMarketClock, getHistorical (windowed paging, range back-off),
+      getCapabilities, assetClassFor
+- [x] Pure encodings (`ctrader-mapping.ts`) and specs; broker specs against
+      a multi-asset fixture account
+- [ ] Confirm encodings and limits on the real demo (spike)
 
 ### 4. Write surface
 

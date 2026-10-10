@@ -89,6 +89,8 @@ export const PayloadType = {
   DEAL_LIST_BY_POSITION_ID_RES: 2180,
   ORDER_LIST_BY_POSITION_ID_REQ: 2183,
   ORDER_LIST_BY_POSITION_ID_RES: 2184,
+  GET_POSITION_UNREALIZED_PNL_REQ: 2187,
+  GET_POSITION_UNREALIZED_PNL_RES: 2188,
 } as const
 
 export type PayloadTypeValue = (typeof PayloadType)[keyof typeof PayloadType]
