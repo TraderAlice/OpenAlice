@@ -215,8 +215,14 @@ error codes seen in practice.
 ### 6. Verification and acceptance
 
 - [x] Package typecheck, root `npx tsc --noEmit`, `cd ui && npx tsc -b`
-- [ ] `pnpm test` complete; `pnpm test:integration:uta`
-- [ ] `pnpm broker-packs:build` and `--compiled` verification
+- [x] `pnpm test` complete (2026-10-10, Windows x64 at a22a1b3e): 7722 passed;
+      the 14 failures in 11 files reproduce identically on clean `dev`
+      d2914227 (symlink EPERM and CLI lifecycle on this host); two load
+      timeouts (presets/Hyperliquid, web-relay) pass on rerun
+- [x] `pnpm test:integration:uta` (291 passed)
+- [x] `pnpm broker-packs:build` + Node verification on win32-x64: six archives
+      verified, ctrader 2.4 MiB
+- [ ] `--compiled` verification (needs Bun; not installed on this host)
 - [ ] Live-paper scenarios plus the new-broker checklist on demo; flat
       afterwards
 - [ ] Real browser route: connect, view, place/cancel from the UI
