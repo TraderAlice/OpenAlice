@@ -34,8 +34,8 @@ export const POSITIONS = [
 ]
 
 export const ORDERS = [
-  { orderId: 9001, orderType: 2, orderStatus: 1, limitPrice: 1.1, timeInForce: 2, clientOrderId: 'alice-1',
-    tradeData: { symbolId: SYMBOL.EURUSD, volume: 100_000, tradeSide: 1 } },
+  { orderId: 9001, orderType: 2, orderStatus: 1, limitPrice: 1.1, timeInForce: 2, clientOrderId: 'oa-abc',
+    tradeData: { symbolId: SYMBOL.EURUSD, volume: 100_000, tradeSide: 1, label: 'alice-1' } },
   { orderId: 9002, orderType: 6, orderStatus: 1, stopPrice: 4000, slippageInPoints: 50, timeInForce: 1,
     expirationTimestamp: Date.UTC(2026, 9, 16, 21, 0, 0), stopLoss: 4100, takeProfit: 3900,
     tradeData: { symbolId: SYMBOL.XAUUSD, volume: 100, tradeSide: 2, label: 'gold-short' } },

@@ -192,11 +192,6 @@ describe('CtraderBroker orders (read)', () => {
     expect(await broker.getOrder('not-a-number')).toBeNull()
     expect((await broker.getOrders(['9001', '1234', '9002'])).map((o) => o.orderId)).toEqual(['9001', '9002'])
   })
-
-  it('refuses writes until they are implemented', async () => {
-    const { broker } = await makeBroker()
-    expect(await broker.placeOrder()).toMatchObject({ success: false, error: expect.stringMatching(/not implemented/) })
-  })
 })
 
 describe('CtraderBroker market clock', () => {

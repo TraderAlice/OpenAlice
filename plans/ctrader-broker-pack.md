@@ -1,6 +1,6 @@
 # cTrader Broker Pack
 
-**Status:** active — increment 3 done in code (read surface); spike on real demo pending app approval; writes next
+**Status:** active — increments 2–4 done in code (transport, session, reads, writes); real-demo spike pending app approval; OpenAlice integration (increment 5) next
 
 **Owner guides:** [[docs/broker-packs.md]], [[docs/uta-live-testing.md]],
 [[docs/project-structure.md]]
@@ -93,6 +93,20 @@ error codes seen in practice.
   1-minute bar close; otherwise `MARKET_CLOSED`.
 - **Market clock:** cTrader has no venue-wide clock; the schedule of the
   broker's first listed symbol is reported.
+- **Time in force:** cTrader has no DAY; UTA's default `DAY` becomes, for a
+  pending order, GOOD_TILL_DATE at the symbol's next session close (from its
+  own schedule). Market orders send no time in force unless IOC/FOK/OPG.
+- **Market-order protection:** the venue refuses absolute SL/TP on market
+  orders, so the order carries fill-relative distances (protected from
+  birth); after the fill the position is amended to the exact prices. A
+  failed amend is reported in `message` with the active levels.
+- **Lost replies:** every order carries a generated `clientOrderId`; when the
+  reply never arrives the adapter looks the order up before answering, and
+  otherwise reports an explicit "outcome unknown" instead of a rejection.
+  The user's `orderRef` travels as the order label.
+- **closePosition:** closes hedged positions of one symbol oldest first;
+  refuses when both long and short are open on the symbol; partial progress
+  is reported in `message`.
 - **Safety:** acceptance uses demo accounts only; every live-paper run ends
   with a flat-account check.
 
@@ -115,10 +129,10 @@ error codes seen in practice.
 2. **First authorization UX.** A local redirect URI on the OpenAlice UI
    versus pasting tokens generated in the Open API playground. Depends on
    whether Spotware accepts loopback redirect URIs.
-3. **Hedging vs netting accounts.** Reads merge per (symbol, side). Still
-   open for writes: which positionIds `closePosition` closes (and in which
-   order) for a merged row, and whether a UTA consumer collides on two rows
-   with the same aliceId (long and short of one symbol).
+3. **Hedging vs netting accounts.** Reads merge per (symbol, side);
+   `closePosition` closes oldest first and refuses mixed sides. Still open:
+   whether a UTA consumer collides on two rows with the same aliceId (long
+   and short of one symbol) — check against UTA position consumers.
 
 ## Increments
 
@@ -169,10 +183,17 @@ error codes seen in practice.
 
 ### 4. Write surface
 
-- [ ] placeOrder (market, limit, stop, stop-limit; attached SL/TP via legs)
-- [ ] modifyOrder (identity preserved or remapped), cancelOrder
-- [ ] closePosition (full and partial)
-- [ ] Error mapping that preserves venue messages
+- [x] Order builder (`ctrader-order-builder.ts`): MKT/LMT/STP/STP LMT, volume
+      and price grid validation with lot-size hints, time in force, SL/TP
+      side checks, amend payloads
+- [x] Execution tracker (`ctrader-executions.ts`) for fills/cancels that
+      follow the first reply
+- [x] placeOrder, modifyOrder (id preserved), cancelOrder, closePosition
+      (full and partial, FIFO across hedged positions)
+- [x] Venue rejection text preserved in `PlaceOrderResult.error`
+- [x] Write specs against a stateful fake venue (`__test__/fake-trading-venue.ts`)
+- [ ] Confirm on the real demo: execution event sequence, whether amend
+      without SL/TP clears them, relative protection rounding, partial fills
 
 ### 5. OpenAlice integration
 

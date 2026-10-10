@@ -15,9 +15,10 @@
  *     totals are in the deposit currency
  */
 
+import { randomUUID } from 'node:crypto'
 import { z } from 'zod'
 import Decimal from 'decimal.js'
-import { Contract, ContractDescription, ContractDetails, Order, OrderState } from '@traderalice/ibkr'
+import { Contract, ContractDescription, ContractDetails, Execution, Order, OrderState } from '@traderalice/ibkr'
 import {
   BrokerError,
   type AccountCapabilities,
@@ -31,6 +32,7 @@ import {
   type PlaceOrderResult,
   type Position,
   type Quote,
+  type TpSlParams,
 } from '../types.js'
 import '../../contract-ext.js'
 import { buildContract, buildPosition } from '../contract-builder.js'
@@ -40,6 +42,8 @@ import { CtraderApiError, type CtraderTransportOptions } from './ctrader-transpo
 import { CtraderSession, toBrokerError, type CtraderTokenRefresh } from './ctrader-session.js'
 import { CtraderCatalog, type CatalogSymbol, type SymbolSpec } from './ctrader-catalog.js'
 import { CtraderSpots } from './ctrader-spots.js'
+import { CtraderExecutions, ExecutionType, parseExecution, type ExecutionUpdate } from './ctrader-executions.js'
+import { buildAmendOrder, buildNewOrder } from './ctrader-order-builder.js'
 import {
   BAR_INTERVAL_MS,
   BAR_INTERVAL_TO_PERIOD,
@@ -93,6 +97,10 @@ export interface CtraderBrokerOptions {
   now?: () => Date
   /** How long getQuote waits for a first tick before falling back to bars. */
   quoteTimeoutMs?: number
+  /** How long a write waits for its fill / cancel confirmation. */
+  fillTimeoutMs?: number
+  /** How long a trading request waits for its first reply. */
+  orderReplyTimeoutMs?: number
 }
 
 export interface CtraderBrokerMeta {
@@ -107,6 +115,7 @@ const ORDER_TYPES = ['MKT', 'LMT', 'STP', 'STP LMT']
 const NOT_FOUND_CODES = new Set(['ORDER_NOT_FOUND', 'ENTITY_NOT_FOUND', 'POSITION_NOT_FOUND'])
 const DEFAULT_BAR_LIMIT = 500
 const MAX_BAR_PAGES = 40
+const ORDER_REPLY_TIMEOUT_MS = 20_000
 
 /** Conservative request windows per interval; halved on INCORRECT_BOUNDARIES. */
 const BAR_WINDOW_MS: Record<BarParams['interval'], number> = {
@@ -134,6 +143,42 @@ function obj(value: unknown): Row {
   return value && typeof value === 'object' ? (value as Row) : {}
 }
 
+function optional<K extends string, V>(key: K, value: V | undefined): Partial<Record<K, V>> {
+  return value === undefined ? {} : ({ [key]: value } as Record<K, V>)
+}
+
+/** Unique per order and ≤ 50 chars (venue limit); used to find orders whose reply was lost. */
+function newClientOrderId(): string {
+  return `oa-${randomUUID().replace(/-/g, '').slice(0, 24)}`
+}
+
+function makeOrderState(status: string): OrderState {
+  const state = new OrderState()
+  state.status = status
+  return state
+}
+
+/** Updates after which an order needs no further waiting. */
+const TERMINAL_TYPES = [
+  ExecutionType.ORDER_FILLED,
+  ExecutionType.ORDER_REJECTED,
+  ExecutionType.ORDER_CANCELLED,
+  ExecutionType.ORDER_EXPIRED,
+  ExecutionType.ORDER_ERROR,
+]
+
+function isFailure(update: ExecutionUpdate): boolean {
+  return update.executionType === ExecutionType.ORDER_ERROR
+    || update.executionType === ExecutionType.ORDER_REJECTED
+    || update.executionType === ExecutionType.ORDER_CANCEL_REJECTED
+}
+
+function failureResult(context: string, update: ExecutionUpdate): PlaceOrderResult & { error: string } {
+  const code = update.errorCode ?? (update.executionType === ExecutionType.ORDER_CANCEL_REJECTED ? 'CANCEL_REJECTED' : 'ORDER_REJECTED')
+  const detail = update.description ? `: ${update.description}` : ''
+  return { success: false, error: `cTrader ${context} rejected: ${code}${detail}` }
+}
+
 // ==================== broker ====================
 
 export class CtraderBroker implements IBroker<CtraderBrokerMeta> {
@@ -155,8 +200,11 @@ export class CtraderBroker implements IBroker<CtraderBrokerMeta> {
   private readonly session: CtraderSession
   private readonly catalog: CtraderCatalog
   private readonly spots: CtraderSpots
+  private readonly executions: CtraderExecutions
   private readonly now: () => Date
   private readonly quoteTimeoutMs: number
+  private readonly fillTimeoutMs: number
+  private readonly orderReplyTimeoutMs: number
 
   constructor(options: CtraderBrokerOptions) {
     const cfg = options.config
@@ -165,6 +213,8 @@ export class CtraderBroker implements IBroker<CtraderBrokerMeta> {
     this.meta = { environment: cfg.environment, ...(cfg.traderLogin !== undefined ? { traderLogin: cfg.traderLogin } : {}) }
     this.now = options.now ?? (() => new Date())
     this.quoteTimeoutMs = options.quoteTimeoutMs ?? 3_000
+    this.fillTimeoutMs = options.fillTimeoutMs ?? 8_000
+    this.orderReplyTimeoutMs = options.orderReplyTimeoutMs ?? ORDER_REPLY_TIMEOUT_MS
     this.session = new CtraderSession({
       environment: cfg.environment,
       account: {
@@ -182,6 +232,7 @@ export class CtraderBroker implements IBroker<CtraderBrokerMeta> {
     })
     this.catalog = new CtraderCatalog(this.session)
     this.spots = new CtraderSpots(this.session, this.now)
+    this.executions = new CtraderExecutions(this.session)
   }
 
   // ---- Lifecycle ----
@@ -365,22 +416,220 @@ export class CtraderBroker implements IBroker<CtraderBrokerMeta> {
     return this.mapOrders(rows(res.payload?.['order']))
   }
 
-  // ---- Order writes (increment 4) ----
+  // ---- Order writes ----
 
-  async placeOrder(): Promise<PlaceOrderResult> {
-    return { success: false, error: 'cTrader order placement is not implemented yet' }
+  async placeOrder(contract: Contract, order: Order, tpsl?: TpSlParams): Promise<PlaceOrderResult> {
+    const blocked = this.writeBlocked()
+    if (blocked) return blocked
+    const sym = this.resolveSymbol(contract)
+    if (!sym) return { success: false, error: `Cannot resolve contract "${contract.symbol}" to a cTrader symbol` }
+    let spec: SymbolSpec | undefined
+    let reference: { bid: Decimal; ask: Decimal } | undefined
+    try {
+      spec = await this.catalog.specFor(sym.symbolId)
+      if (spec && (order.orderType || '').toUpperCase() === 'MKT' && (tpsl?.stopLoss || tpsl?.takeProfit)) {
+        const price = await this.priceFor(sym.symbolId, spec)
+        reference = { bid: new Decimal(price.bid), ask: new Decimal(price.ask) }
+      }
+    } catch (err) {
+      return { success: false, error: toBrokerError(err, 'placeOrder').message }
+    }
+    if (!spec) return { success: false, error: `No cTrader specification for ${sym.name}` }
+
+    const clientOrderId = newClientOrderId()
+    const plan = buildNewOrder({
+      order, symbol: sym, spec, clientOrderId, now: this.now(),
+      ...(tpsl ? { tpsl } : {}),
+      ...(reference ? { reference } : {}),
+    })
+    if (!plan.ok) return { success: false, error: plan.error }
+
+    const sentAt = this.now().getTime()
+    let first: ExecutionUpdate
+    try {
+      first = await this.sendOrderRequest(PayloadType.NEW_ORDER_REQ, plan.value.payload)
+    } catch (err) {
+      if (err instanceof CtraderApiError || err instanceof BrokerError) {
+        return { success: false, error: toBrokerError(err, 'placeOrder').message }
+      }
+      // The reply was lost: the order may exist. Look it up before reporting.
+      const found = await this.findByClientOrderId(clientOrderId, sentAt).catch(() => null)
+      if (found) {
+        return { success: true, orderId: found.orderId!, orderState: found.orderState, message: 'cTrader order confirmed by lookup after its reply was lost' }
+      }
+      const reason = err instanceof Error ? err.message : String(err)
+      return { success: false, error: `cTrader placeOrder outcome unknown (${reason}). Check open orders and positions before retrying.` }
+    }
+    if (isFailure(first)) return failureResult('placeOrder', first)
+
+    let final = first
+    if (plan.value.isMarket && first.executionType !== ExecutionType.ORDER_FILLED) {
+      final = await this.executions.waitFor(first.orderId, TERMINAL_TYPES, this.fillTimeoutMs) ?? first
+      if (isFailure(final)) return failureResult('placeOrder', final)
+    }
+    const result = this.resultFrom(final)
+    if (plan.value.marketProtection && final.executionType === ExecutionType.ORDER_FILLED) {
+      const note = await this.applyExactProtection(final, plan.value.marketProtection, spec)
+      if (note) result.message = note
+    }
+    return result
   }
 
-  async modifyOrder(): Promise<PlaceOrderResult> {
-    return { success: false, error: 'cTrader order modification is not implemented yet' }
+  async modifyOrder(orderId: string, changes: Partial<Order>): Promise<PlaceOrderResult> {
+    const blocked = this.writeBlocked()
+    if (blocked) return blocked
+    const id = Number(orderId)
+    if (!Number.isSafeInteger(id) || id <= 0) return { success: false, error: `Invalid cTrader order id "${orderId}"` }
+    try {
+      const res = await this.session.accountRequest(PayloadType.ORDER_DETAILS_REQ, { orderId: id }, { expect: PayloadType.ORDER_DETAILS_RES })
+      const raw = obj(res.payload?.['order'])
+      const td = obj(raw['tradeData'])
+      const symbolId = num(td['symbolId'])
+      const sym = symbolId !== undefined ? this.catalog.byId(symbolId) : undefined
+      if (!sym) return { success: false, error: `Order ${orderId} is on an unknown symbol` }
+      if ((num(raw['orderStatus']) ?? 0) !== 1) {
+        return { success: false, error: `Order ${orderId} is no longer working (${orderStatusToIbkr(num(raw['orderStatus']) ?? 0)})` }
+      }
+      const spec = await this.catalog.specFor(sym.symbolId)
+      if (!spec) return { success: false, error: `No cTrader specification for ${sym.name}` }
+      const plan = buildAmendOrder({
+        current: {
+          orderId: id,
+          orderType: num(raw['orderType']) ?? OrderType.LIMIT,
+          tradeSide: num(td['tradeSide']) ?? TradeSide.BUY,
+          volume: num(td['volume']) ?? 0,
+          ...optional('limitPrice', num(raw['limitPrice'])),
+          ...optional('stopPrice', num(raw['stopPrice'])),
+          ...optional('stopLoss', num(raw['stopLoss'])),
+          ...optional('takeProfit', num(raw['takeProfit'])),
+          ...optional('timeInForce', num(raw['timeInForce'])),
+          ...optional('expirationTimestamp', num(raw['expirationTimestamp'])),
+        },
+        changes,
+        symbol: sym,
+        spec,
+        now: this.now(),
+      })
+      if (!plan.ok) return { success: false, error: plan.error }
+      const update = await this.sendOrderRequest(PayloadType.AMEND_ORDER_REQ, plan.value)
+      if (isFailure(update)) return failureResult('modifyOrder', update)
+      return this.resultFrom(update)
+    } catch (err) {
+      if (err instanceof CtraderApiError && NOT_FOUND_CODES.has(err.errorCode)) return { success: false, error: `cTrader order ${orderId} not found` }
+      return { success: false, error: toBrokerError(err, 'modifyOrder').message }
+    }
   }
 
-  async cancelOrder(): Promise<PlaceOrderResult> {
-    return { success: false, error: 'cTrader order cancellation is not implemented yet' }
+  async cancelOrder(orderId: string): Promise<PlaceOrderResult> {
+    const blocked = this.writeBlocked()
+    if (blocked) return blocked
+    const id = Number(orderId)
+    if (!Number.isSafeInteger(id) || id <= 0) return { success: false, error: `Invalid cTrader order id "${orderId}"` }
+    try {
+      const first = await this.sendOrderRequest(PayloadType.CANCEL_ORDER_REQ, { orderId: id })
+      if (isFailure(first)) return failureResult('cancelOrder', first)
+      const final = first.executionType === ExecutionType.ORDER_CANCELLED
+        ? first
+        : await this.executions.waitFor(id, [ExecutionType.ORDER_CANCELLED, ExecutionType.ORDER_CANCEL_REJECTED, ExecutionType.ORDER_ERROR], this.fillTimeoutMs) ?? first
+      if (isFailure(final)) return failureResult('cancelOrder', final)
+      return this.resultFrom(final)
+    } catch (err) {
+      if (err instanceof CtraderApiError && NOT_FOUND_CODES.has(err.errorCode)) return { success: false, error: `cTrader order ${orderId} not found` }
+      return { success: false, error: toBrokerError(err, 'cancelOrder').message }
+    }
   }
 
-  async closePosition(): Promise<PlaceOrderResult> {
-    return { success: false, error: 'cTrader position closing is not implemented yet' }
+  /**
+   * Close all or part of the open position on a symbol. Hedged accounts may
+   * hold several positions per symbol; they are closed oldest first. A
+   * symbol with both long and short positions open is refused, since the
+   * contract alone cannot say which side to close.
+   */
+  async closePosition(contract: Contract, quantity?: Decimal): Promise<PlaceOrderResult> {
+    const blocked = this.writeBlocked()
+    if (blocked) return blocked
+    const sym = this.resolveSymbol(contract)
+    if (!sym) return { success: false, error: `Cannot resolve contract "${contract.symbol}" to a cTrader symbol` }
+
+    let open: Array<{ positionId: number; volume: number; side: number; openedAt: number }>
+    let spec: SymbolSpec | undefined
+    try {
+      const res = await this.session.accountRequest(PayloadType.RECONCILE_REQ, {}, { expect: PayloadType.RECONCILE_RES })
+      open = rows(res.payload?.['position'])
+        .filter((p) => (num(p['positionStatus']) ?? PositionStatus.OPEN) === PositionStatus.OPEN)
+        .map((p) => {
+          const td = obj(p['tradeData'])
+          return {
+            positionId: num(p['positionId']) ?? 0,
+            symbolId: num(td['symbolId']),
+            volume: num(td['volume']) ?? 0,
+            side: num(td['tradeSide']) ?? TradeSide.BUY,
+            openedAt: num(td['openTimestamp']) ?? 0,
+          }
+        })
+        .filter((p) => p.symbolId === sym.symbolId && p.positionId > 0 && p.volume > 0)
+        .sort((a, b) => a.openedAt - b.openedAt || a.positionId - b.positionId)
+      spec = await this.catalog.specFor(sym.symbolId)
+    } catch (err) {
+      return { success: false, error: toBrokerError(err, 'closePosition').message }
+    }
+    if (open.length === 0) return { success: false, error: `No open ${sym.name} position to close` }
+    if (new Set(open.map((p) => p.side)).size > 1) {
+      return { success: false, error: `Both long and short ${sym.name} positions are open; close each side with an opposite order instead` }
+    }
+
+    const total = open.reduce((sum, p) => sum + p.volume, 0)
+    let target = total
+    if (quantity !== undefined) {
+      const cents = quantity.mul(100)
+      if (!quantity.isFinite() || quantity.lte(0) || !cents.isInteger()) return { success: false, error: `Invalid close quantity ${quantity.toString()}` }
+      target = cents.toNumber()
+      if (target > total) {
+        return { success: false, error: `Close quantity ${quantity.toString()} exceeds the open ${sym.name} position of ${volumeToUnits(total).toString()} units` }
+      }
+      const step = spec?.stepVolume
+      if (target !== total && step && target % step !== 0) {
+        return { success: false, error: `Close quantity ${quantity.toString()} is not a multiple of the ${sym.name} step of ${volumeToUnits(step).toString()} units` }
+      }
+    }
+
+    const closed: ExecutionUpdate[] = []
+    let remaining = target
+    let failure: string | undefined
+    for (const position of open) {
+      if (remaining <= 0) break
+      const volume = Math.min(remaining, position.volume)
+      try {
+        const first = await this.sendOrderRequest(PayloadType.CLOSE_POSITION_REQ, { positionId: position.positionId, volume })
+        if (isFailure(first)) {
+          failure = failureResult('closePosition', first).error
+          break
+        }
+        const final = first.executionType === ExecutionType.ORDER_FILLED
+          ? first
+          : await this.executions.waitFor(first.orderId, TERMINAL_TYPES, this.fillTimeoutMs) ?? first
+        if (isFailure(final)) {
+          failure = failureResult('closePosition', final).error
+          break
+        }
+        closed.push(final)
+        remaining -= volume
+      } catch (err) {
+        failure = toBrokerError(err, 'closePosition').message
+        break
+      }
+    }
+
+    if (closed.length === 0) return { success: false, error: failure ?? `Could not close ${sym.name}` }
+    const result = this.resultFrom(closed[0]!)
+    const notes: string[] = []
+    if (closed.length > 1) notes.push(`closed ${closed.length} positions via orders ${closed.map((u) => u.orderId).join(', ')}`)
+    if (failure) notes.push(`${volumeToUnits(remaining).toString()} units remain open: ${failure}`)
+    if (notes.length > 0) result.message = notes.join('; ')
+    if (closed.some((u) => u.executionType !== ExecutionType.ORDER_FILLED)) {
+      result.orderState = makeOrderState('Submitted')
+    }
+    return result
   }
 
   // ---- Market data ----
@@ -490,6 +739,113 @@ export class CtraderBroker implements IBroker<CtraderBrokerMeta> {
     }
   }
 
+  /** A failed result when writes are impossible right now, else null. */
+  private writeBlocked(): PlaceOrderResult | null {
+    if (!this.catalog.isLoaded) return { success: false, error: 'cTrader account is not connected yet' }
+    let canTrade = true
+    try {
+      canTrade = this.session.accountRef.canTrade
+    } catch {
+      return { success: false, error: 'cTrader account is not connected yet' }
+    }
+    if (!canTrade) {
+      return { success: false, error: 'This cTrader token was granted view-only access; re-authorize the application with the trading scope' }
+    }
+    return null
+  }
+
+  /** Send a trading request; its first reply is an execution or an order error. */
+  private async sendOrderRequest(payloadType: number, payload: Record<string, unknown>): Promise<ExecutionUpdate> {
+    const reply = await this.session.accountRequest(payloadType, payload, {
+      expect: [PayloadType.EXECUTION_EVENT, PayloadType.ORDER_ERROR_EVENT],
+      timeoutMs: this.orderReplyTimeoutMs,
+    })
+    const update = parseExecution(reply, Date.now())
+    if (!update) {
+      const errorCode = typeof reply.payload?.['errorCode'] === 'string' ? reply.payload['errorCode'] : 'UNEXPECTED_REPLY'
+      return {
+        executionType: ExecutionType.ORDER_ERROR, orderId: 0, order: undefined, position: undefined, deal: undefined,
+        errorCode, description: typeof reply.payload?.['description'] === 'string' ? reply.payload['description'] : undefined,
+        receivedAt: Date.now(),
+      }
+    }
+    return update
+  }
+
+  private resultFrom(update: ExecutionUpdate): PlaceOrderResult {
+    const orderStatus = num(update.order?.['orderStatus'])
+    const status = update.executionType === ExecutionType.ORDER_FILLED
+      ? 'Filled'
+      : update.executionType === ExecutionType.ORDER_CANCELLED || update.executionType === ExecutionType.ORDER_EXPIRED
+        ? 'Cancelled'
+        : orderStatus !== undefined ? orderStatusToIbkr(orderStatus) : 'Submitted'
+    const result: PlaceOrderResult = { success: true, orderId: String(update.orderId), orderState: makeOrderState(status) }
+    const deal = update.deal
+    const price = num(deal?.['executionPrice'])
+    const filled = num(deal?.['filledVolume'])
+    if (deal && price !== undefined && filled !== undefined && filled > 0) {
+      const execution = new Execution()
+      execution.execId = String(num(deal['dealId']) ?? '')
+      execution.orderId = update.orderId
+      execution.time = new Date(num(deal['executionTimestamp']) ?? Date.now()).toISOString()
+      execution.side = num(deal['tradeSide']) === TradeSide.SELL ? 'SLD' : 'BOT'
+      execution.shares = volumeToUnits(filled)
+      execution.cumQty = volumeToUnits(filled)
+      execution.price = price
+      execution.avgPrice = price
+      execution.exchange = EXCHANGE
+      result.execution = execution
+    }
+    return result
+  }
+
+  /**
+   * After a market fill, move the fill-relative protection to the exact
+   * requested prices. Returns a note for the result, or null when exact.
+   */
+  private async applyExactProtection(
+    fill: ExecutionUpdate,
+    wanted: { stopLoss?: number; takeProfit?: number },
+    spec: SymbolSpec,
+  ): Promise<string | null> {
+    const positionId = num(fill.position?.['positionId']) ?? num(fill.deal?.['positionId'])
+    if (positionId === undefined) return 'Protection was placed relative to the fill; the position id was not reported, so exact prices were not applied'
+    const tick = new Decimal(10).pow(-spec.digits).div(2)
+    const close = (a: number | undefined, b: number | undefined) =>
+      b === undefined || (a !== undefined && new Decimal(a).minus(b).abs().lt(tick))
+    const currentSl = num(fill.position?.['stopLoss'])
+    const currentTp = num(fill.position?.['takeProfit'])
+    if (close(currentSl, wanted.stopLoss) && close(currentTp, wanted.takeProfit)) return null
+
+    const payload: Record<string, unknown> = { positionId }
+    const sl = wanted.stopLoss ?? currentSl
+    const tp = wanted.takeProfit ?? currentTp
+    if (sl !== undefined) payload['stopLoss'] = sl
+    if (tp !== undefined) payload['takeProfit'] = tp
+    try {
+      const update = await this.sendOrderRequest(PayloadType.AMEND_POSITION_SLTP_REQ, payload)
+      if (isFailure(update)) {
+        return `Protection is active relative to the fill (SL ${currentSl ?? '-'}, TP ${currentTp ?? '-'}); moving it to the exact prices failed: ${failureResult('amend', update).error}`
+      }
+      return null
+    } catch (err) {
+      return `Protection is active relative to the fill (SL ${currentSl ?? '-'}, TP ${currentTp ?? '-'}); moving it to the exact prices failed: ${toBrokerError(err, 'amend').message}`
+    }
+  }
+
+  /** Find a recently placed order by its clientOrderId (lost-reply recovery). */
+  private async findByClientOrderId(clientOrderId: string, sentAt: number): Promise<OpenOrder | null> {
+    const res = await this.session.accountRequest(
+      PayloadType.ORDER_LIST_REQ,
+      { fromTimestamp: sentAt - 60_000, toTimestamp: this.now().getTime() + 60_000 },
+      { expect: PayloadType.ORDER_LIST_RES },
+    )
+    const raw = rows(res.payload?.['order']).find((o) => o['clientOrderId'] === clientOrderId)
+    if (!raw) return null
+    const [mapped] = await this.mapOrders([raw])
+    return mapped ?? null
+  }
+
   private requireCatalog(): void {
     if (!this.catalog.isLoaded) throw new BrokerError('CONNECTING', 'cTrader symbol catalog is not loaded yet')
   }
@@ -591,8 +947,8 @@ export class CtraderBroker implements IBroker<CtraderBrokerMeta> {
     }
     const expiry = num(raw['expirationTimestamp'])
     if (num(raw['timeInForce']) === TimeInForce.GOOD_TILL_DATE && expiry !== undefined) order.goodTillDate = formatGoodTillDate(expiry)
-    const ref = typeof raw['clientOrderId'] === 'string' ? raw['clientOrderId'] : typeof td['label'] === 'string' ? td['label'] : ''
-    if (ref) order.orderRef = ref
+    // orderRef travels as the label; clientOrderId is generated per order.
+    if (typeof td['label'] === 'string' && td['label']) order.orderRef = td['label']
 
     const orderState = new OrderState()
     orderState.status = orderStatusToIbkr(num(raw['orderStatus']) ?? 1)
