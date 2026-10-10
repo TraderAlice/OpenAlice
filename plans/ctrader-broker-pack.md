@@ -1,6 +1,6 @@
 # cTrader Broker Pack
 
-**Status:** active — increment 0 (design + spike)
+**Status:** active — increment 2 (transport done; session next)
 
 **Owner guides:** [[docs/broker-packs.md]], [[docs/uta-live-testing.md]],
 [[docs/project-structure.md]]
@@ -88,8 +88,8 @@ trendbar/tick history limits, volume and price encodings, error codes.
 
 ### 0. Prerequisites (branch owner)
 
-- [ ] cTID and a demo account at any cTrader broker
-- [ ] Open API application registered and approved; clientId/secret kept
+- [x] cTID and a demo account at any cTrader broker
+- [ ] Open API application registered (submitted 2026-10-10) and approved; clientId/secret kept
       outside the repository
 - [ ] `pnpm install` in this worktree; baseline `pnpm test:changed`
 
@@ -104,10 +104,14 @@ trendbar/tick history limits, volume and price encodings, error codes.
 
 ### 2. Transport and session
 
-- [ ] WebSocket JSON client: request/response correlation, timeouts,
-      heartbeat, reconnect with backoff, connection-state listener
-- [ ] App + account auth; token refresh per the chosen answer to Q1
-- [ ] Specs against a fake server
+- [x] WebSocket JSON transport (`ctrader-transport.ts`): clientMsgId
+      correlation, connect/request timeouts, heartbeat, error envelopes,
+      event fan-out; execution replies both settle and broadcast
+- [x] Payload type table from the official proto (`ctrader-protocol.ts`)
+- [x] Transport specs against a fake socket
+- [ ] Session: app + account auth, reconnect with backoff and re-auth,
+      connection-state listener
+- [ ] Token refresh per the chosen answer to Q1
 
 ### 3. Read surface (`IBroker`)
 
