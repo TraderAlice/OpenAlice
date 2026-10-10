@@ -58,6 +58,7 @@ const configs = {
   ccxt: {exchange:'binance', keyless:true}, alpaca:{paper:true}, ibkr:{},
   leverup:{network:'testnet',privateKey:'0x'+'1'.repeat(64)},
   longbridge:{appKey:'offline',appSecret:'offline',accessToken:'offline',paper:true},
+  ctrader:{environment:'demo',clientId:'offline',clientSecret:'offline',accessToken:'offline',traderLogin:1},
 };
 const broker = m.createBroker({id:'offline-pack-smoke',brokerConfig:configs[engine]});
 if (typeof broker.getAccount !== 'function') throw new Error('Invalid broker');

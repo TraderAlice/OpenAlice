@@ -45,6 +45,6 @@ function safeAssetPart(value: string): string {
 
 /** Longbridge has no Windows ARM64 native binding. Other engines are portable. */
 export function supportedBrokerPackEngines(platform = process.platform, arch = process.arch): InstallableBrokerEngine[] {
-  return (['ccxt', 'alpaca', 'ibkr', 'leverup', 'longbridge'] as InstallableBrokerEngine[])
+  return (['ccxt', 'alpaca', 'ibkr', 'leverup', 'longbridge', 'ctrader'] as InstallableBrokerEngine[])
     .filter(engine => !(engine === 'longbridge' && platform === 'win32' && arch === 'arm64'))
 }

@@ -197,16 +197,24 @@ error codes seen in practice.
 
 ### 5. OpenAlice integration
 
-- [ ] `BrokerEngine` union and preset in `@traderalice/uta-protocol`
-- [ ] Registry, broker-pack catalog/requirements, build/verify scripts,
-      dev binding, test lanes
-- [ ] Desktop package assertion, release matrix, upgrade-rehearsal snapshot
-- [ ] UI types, Connect-broker card, demo handlers
-- [ ] Owner guide updates: broker-packs, uta-live-testing
+- [x] `BrokerEngine` union and `CTRADER_PRESET` in `@traderalice/uta-protocol`
+      (Recommended section, `securities` guard set, mode demo/live, login +
+      Client ID/Secret + access/refresh tokens; secrets write-only)
+- [x] Pack wrapper `packages/uta-broker-ctrader` (no third-party SDK: the
+      runtime's global WebSocket is enough on Node ≥ 22 and Bun)
+- [x] Registry, installable engines, supported platforms, build/verify
+      scripts, dev binding, test lanes, CLI dev-asset spec, lockfile importer
+- [x] Desktop package assertion: nothing to add (no SDK). Release workflows
+      carry no engine lists. Dev upgrade-rehearsal asset list extended.
+- [x] UI engine type, demo preset and pack row; Connect-broker card and form
+      walked in `dev:demo` (card in Recommended, install step, six fields,
+      secrets masked, no console errors)
+- [x] Owner guide: broker-packs
+- [ ] Owner guide: uta-live-testing scenarios for cTrader (after the spike)
 
 ### 6. Verification and acceptance
 
-- [ ] Package typecheck, root `npx tsc --noEmit`, `cd ui && npx tsc -b`
+- [x] Package typecheck, root `npx tsc --noEmit`, `cd ui && npx tsc -b`
 - [ ] `pnpm test` complete; `pnpm test:integration:uta`
 - [ ] `pnpm broker-packs:build` and `--compiled` verification
 - [ ] Live-paper scenarios plus the new-broker checklist on demo; flat

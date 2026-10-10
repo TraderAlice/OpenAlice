@@ -227,7 +227,12 @@ export class CtraderBroker implements IBroker<CtraderBrokerMeta> {
         accessToken: cfg.accessToken,
         ...(cfg.refreshToken ? { refreshToken: cfg.refreshToken } : {}),
       },
-      ...(options.onTokensRefreshed ? { onTokensRefreshed: options.onTokensRefreshed } : {}),
+      // Until a credential store exists (plan Q1) a rotated token lives only in
+      // memory; say so loudly, since the stored refresh token is now void.
+      onTokensRefreshed: options.onTokensRefreshed ?? (() => {
+        console.warn(`UTA[${this.id}]: cTrader access token refreshed in memory; the stored refresh token is no longer valid. Re-authorize before the next restart.`)
+        throw new Error('no credential store configured')
+      }),
       ...(options.transport ? { transport: options.transport } : {}),
     })
     this.catalog = new CtraderCatalog(this.session)
