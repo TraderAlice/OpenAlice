@@ -51,7 +51,11 @@ class FakeSocket implements WebSocketLike {
   }
 }
 
-function setup(options: { heartbeatIntervalMs?: number; requestTimeoutMs?: number } = {}) {
+function setup(options: {
+  heartbeatIntervalMs?: number
+  requestTimeoutMs?: number
+  rateLimits?: { general: { limit: number; windowMs: number }; historical: { limit: number; windowMs: number } }
+} = {}) {
   let socket: FakeSocket | null = null
   const transport = new CtraderTransport({
     url: 'wss://example.test:5036',
@@ -59,6 +63,7 @@ function setup(options: { heartbeatIntervalMs?: number; requestTimeoutMs?: numbe
     connectTimeoutMs: 1_000,
     requestTimeoutMs: options.requestTimeoutMs ?? 1_000,
     heartbeatIntervalMs: options.heartbeatIntervalMs ?? 0,
+    ...(options.rateLimits ? { rateLimits: options.rateLimits } : {}),
   })
   return { transport, socket: () => socket! }
 }
@@ -148,11 +153,11 @@ describe('CtraderTransport request', () => {
     expect((err as Error).message).toContain('Access token expired')
   })
 
-  it('marks rate-limit and routing errors transient', async () => {
+  it('marks rate-limit and routing errors transient and keeps retryAfter', async () => {
     const { transport, socket } = await connected()
     const req = transport.request(PayloadType.GET_TRENDBARS_REQ)
-    socket().reply({ clientMsgId: socket().lastSent().clientMsgId, payloadType: PayloadType.ERROR_RES, payload: { errorCode: 'BLOCKED_PAYLOAD_TYPE' } })
-    await expect(req).rejects.toMatchObject({ errorCode: 'BLOCKED_PAYLOAD_TYPE', transient: true })
+    socket().reply({ clientMsgId: socket().lastSent().clientMsgId, payloadType: PayloadType.OA_ERROR_RES, payload: { errorCode: 'BLOCKED_PAYLOAD_TYPE', retryAfter: 3 } })
+    await expect(req).rejects.toMatchObject({ errorCode: 'BLOCKED_PAYLOAD_TYPE', transient: true, retryAfterSec: 3 })
   })
 
   it('rejects a reply of an unexpected type when expect is given', async () => {
@@ -260,6 +265,49 @@ describe('CtraderTransport events', () => {
     transport.close()
     transport.onClose((r) => reasons.push(`late:${r}`))
     expect(reasons).toEqual(['socket closed (1000)', 'late:socket closed (1000)'])
+  })
+})
+
+describe('CtraderTransport rate limits', () => {
+  const rateLimits = { general: { limit: 3, windowMs: 1_000 }, historical: { limit: 2, windowMs: 1_000 } }
+
+  it('queues historical requests beyond the limit until the window slides', async () => {
+    const { transport, socket } = await connected({ rateLimits })
+    for (let i = 0; i < 3; i++) void transport.request(PayloadType.GET_TRENDBARS_REQ).catch(() => {})
+    const trendbars = () => socket().sent.filter((m) => m.payloadType === PayloadType.GET_TRENDBARS_REQ)
+    expect(trendbars()).toHaveLength(2)
+
+    await vi.advanceTimersByTimeAsync(999)
+    expect(trendbars()).toHaveLength(2)
+    await vi.advanceTimersByTimeAsync(1)
+    expect(trendbars()).toHaveLength(3)
+  })
+
+  it('keeps separate budgets for historical and general requests', async () => {
+    const { transport, socket } = await connected({ rateLimits })
+    for (let i = 0; i < 2; i++) void transport.request(PayloadType.GET_TRENDBARS_REQ).catch(() => {})
+    for (let i = 0; i < 3; i++) void transport.request(PayloadType.TRADER_REQ).catch(() => {})
+    expect(socket().sent).toHaveLength(5)
+    void transport.request(PayloadType.RECONCILE_REQ).catch(() => {})
+    expect(socket().sent).toHaveLength(5)
+  })
+
+  it('starts the reply timeout only once a queued request is sent', async () => {
+    const { transport, socket } = await connected({ rateLimits, requestTimeoutMs: 500 })
+    for (let i = 0; i < 2; i++) void transport.request(PayloadType.GET_TRENDBARS_REQ).catch(() => {})
+    const queued = transport.request(PayloadType.GET_TRENDBARS_REQ)
+    await vi.advanceTimersByTimeAsync(1_000)
+    const sent = socket().lastSent()
+    socket().reply({ clientMsgId: sent.clientMsgId, payloadType: PayloadType.GET_TRENDBARS_RES, payload: { trendbar: [] } })
+    await expect(queued).resolves.toMatchObject({ payloadType: PayloadType.GET_TRENDBARS_RES })
+  })
+
+  it('rejects queued requests when the connection closes', async () => {
+    const { transport, socket } = await connected({ rateLimits })
+    for (let i = 0; i < 2; i++) void transport.request(PayloadType.GET_TRENDBARS_REQ).catch(() => {})
+    const queued = transport.request(PayloadType.GET_TRENDBARS_REQ)
+    socket().drop(1006)
+    await expect(queued).rejects.toThrow(/Not connected/)
   })
 })
 

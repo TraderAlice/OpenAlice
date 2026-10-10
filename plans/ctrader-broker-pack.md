@@ -1,6 +1,6 @@
 # cTrader Broker Pack
 
-**Status:** active — increment 2 (transport done; session next)
+**Status:** active — increment 2 done (transport + session); read surface next
 
 **Owner guides:** [[docs/broker-packs.md]], [[docs/uta-live-testing.md]],
 [[docs/project-structure.md]]
@@ -60,6 +60,15 @@ trendbar/tick history limits, volume and price encodings, error codes.
   volume, stop distance, trading hours, asset class) is read from the
   account's symbol catalog at runtime.
 - **Units:** all volume and price conversion goes through `decimal.js`.
+- **Reconnect owner:** UTA. Its recovery loop already retries `init()` with
+  backoff after a `dead` signal, so the session never reconnects by itself;
+  `ensureConnected()` shares one in-flight attempt (no parallel handshakes,
+  cf. #1762). `alive` is emitted only after a full re-handshake.
+- **Account selection:** by the login shown in cTrader apps (`traderLogin`)
+  or by `ctidTraderAccountId`; the session resolves it through the token's
+  account list and refuses a demo/live environment mismatch.
+- **Rate limits:** documented 50 req/s general and 5 req/s historical per
+  connection; the transport queues FIFO at 45 and 4.
 - **Safety:** acceptance uses demo accounts only; every live-paper run ends
   with a flat-account check.
 
@@ -75,7 +84,10 @@ trendbar/tick history limits, volume and price encodings, error codes.
      primitive available to UTA);
    - c. Alice owns the OAuth/refresh lifecycle and hands UTA a current
      access token.
-   Unsealed token files are not an option.
+   Unsealed token files are not an option. The session already implements
+   the mechanics (refresh once per attempt, keep the new pair in memory
+   first, hand it to `onTokensRefreshed`, re-handshake on a new socket); only
+   the persistence target is open.
 2. **First authorization UX.** A local redirect URI on the OpenAlice UI
    versus pasting tokens generated in the Open API playground. Depends on
    whether Spotware accepts loopback redirect URIs.
@@ -109,9 +121,13 @@ trendbar/tick history limits, volume and price encodings, error codes.
       event fan-out; execution replies both settle and broadcast
 - [x] Payload type table from the official proto (`ctrader-protocol.ts`)
 - [x] Transport specs against a fake socket
-- [ ] Session: app + account auth, reconnect with backoff and re-auth,
-      connection-state listener
-- [ ] Token refresh per the chosen answer to Q1
+- [x] Rate limiter (`rate-limiter.ts`) with separate historical budget
+- [x] Session (`ctrader-session.ts`): app auth, account discovery, account
+      auth, in-flight guard, dead/alive signals, server disconnect and token
+      invalidation events, BrokerError mapping
+- [x] Token refresh mechanics with a persistence hook
+- [x] Session specs against `__test__/fake-ctrader-server.ts`
+- [ ] Token persistence target per the answer to Q1
 
 ### 3. Read surface (`IBroker`)
 

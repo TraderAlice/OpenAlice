@@ -64,6 +64,8 @@ export const PayloadType = {
   GET_TRENDBARS_RES: 2138,
   MARGIN_CHANGED_EVENT: 2141,
   OA_ERROR_RES: 2142,
+  CASH_FLOW_HISTORY_LIST_REQ: 2143,
+  CASH_FLOW_HISTORY_LIST_RES: 2144,
   GET_TICKDATA_REQ: 2145,
   GET_TICKDATA_RES: 2146,
   ACCOUNTS_TOKEN_INVALIDATED_EVENT: 2147,
@@ -83,6 +85,10 @@ export const PayloadType = {
   ORDER_LIST_RES: 2176,
   ORDER_DETAILS_REQ: 2181,
   ORDER_DETAILS_RES: 2182,
+  DEAL_LIST_BY_POSITION_ID_REQ: 2179,
+  DEAL_LIST_BY_POSITION_ID_RES: 2180,
+  ORDER_LIST_BY_POSITION_ID_REQ: 2183,
+  ORDER_LIST_BY_POSITION_ID_RES: 2184,
 } as const
 
 export type PayloadTypeValue = (typeof PayloadType)[keyof typeof PayloadType]
@@ -118,11 +124,33 @@ export const BROADCAST_REPLY_PAYLOAD_TYPES: ReadonlySet<number> = new Set([
   PayloadType.ORDER_ERROR_EVENT,
 ])
 
-/** Common ProtoErrorCode names that mean the request can be retried later. */
+/**
+ * Documented per-connection limits: 50 requests/s for non-historical data
+ * and 5 requests/s for historical data. Kept slightly below the ceiling.
+ */
+export const RATE_LIMITS = {
+  general: { limit: 45, windowMs: 1_000 },
+  historical: { limit: 4, windowMs: 1_000 },
+} as const
+
+export const HISTORICAL_PAYLOAD_TYPES: ReadonlySet<number> = new Set([
+  PayloadType.GET_TRENDBARS_REQ,
+  PayloadType.GET_TICKDATA_REQ,
+  PayloadType.DEAL_LIST_REQ,
+  PayloadType.ORDER_LIST_REQ,
+  PayloadType.CASH_FLOW_HISTORY_LIST_REQ,
+  PayloadType.DEAL_LIST_BY_POSITION_ID_REQ,
+  PayloadType.ORDER_LIST_BY_POSITION_ID_REQ,
+])
+
+/** Error codes (common and OA) that mean the request can be retried later. */
 export const TRANSIENT_ERROR_CODES: ReadonlySet<string> = new Set([
   'TIMEOUT_ERROR',
   'CANT_ROUTE_REQUEST',
   'BLOCKED_PAYLOAD_TYPE',
+  'REQUEST_FREQUENCY_EXCEEDED',
+  'SERVER_IS_UNDER_MAINTENANCE',
+  'CH_SERVER_NOT_REACHABLE',
 ])
 
 /** One message on the JSON wire, in either direction. */
@@ -137,4 +165,6 @@ export interface CtraderErrorPayload {
   description?: string
   ctidTraderAccountId?: number
   maintenanceEndTimestamp?: number
+  /** Seconds until a rate-limited payload type unlocks (BLOCKED_PAYLOAD_TYPE). */
+  retryAfter?: number
 }

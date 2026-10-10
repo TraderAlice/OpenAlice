@@ -16,11 +16,14 @@ import {
   BROADCAST_REPLY_PAYLOAD_TYPES,
   ERROR_PAYLOAD_TYPES,
   EVENT_PAYLOAD_TYPES,
+  HISTORICAL_PAYLOAD_TYPES,
   PayloadType,
+  RATE_LIMITS,
   TRANSIENT_ERROR_CODES,
   type CtraderEnvelope,
   type CtraderErrorPayload,
 } from './ctrader-protocol.js'
+import { RateLimiter } from './rate-limiter.js'
 
 /** The subset of the WHATWG WebSocket API the transport relies on. */
 export interface WebSocketLike {
@@ -48,6 +51,7 @@ export class CtraderApiError extends Error {
   readonly errorCode: string
   readonly transient: boolean
   readonly payloadType: number
+  readonly retryAfterSec: number | undefined
 
   constructor(payloadType: number, payload: CtraderErrorPayload) {
     const errorCode = payload.errorCode ?? 'UNKNOWN_ERROR'
@@ -56,6 +60,7 @@ export class CtraderApiError extends Error {
     this.errorCode = errorCode
     this.payloadType = payloadType
     this.transient = TRANSIENT_ERROR_CODES.has(errorCode)
+    this.retryAfterSec = typeof payload.retryAfter === 'number' ? payload.retryAfter : undefined
   }
 }
 
@@ -74,6 +79,8 @@ export interface CtraderTransportOptions {
   requestTimeoutMs?: number
   /** The proxy drops connections that are silent for 30s; stay well below. */
   heartbeatIntervalMs?: number
+  /** Override the documented per-connection limits (tests). */
+  rateLimits?: { general: { limit: number; windowMs: number }; historical: { limit: number; windowMs: number } }
 }
 
 export interface RequestOptions {
@@ -104,6 +111,8 @@ export class CtraderTransport {
   private readonly pending = new Map<string, Pending>()
   private readonly eventListeners = new Set<EventListener>()
   private readonly closeListeners = new Set<CloseListener>()
+  private readonly generalLimiter: RateLimiter
+  private readonly historicalLimiter: RateLimiter
   private nextId = 1
   private closed = false
   private closeReason: string | null = null
@@ -114,6 +123,9 @@ export class CtraderTransport {
     this.connectTimeoutMs = options.connectTimeoutMs ?? 15_000
     this.requestTimeoutMs = options.requestTimeoutMs ?? 15_000
     this.heartbeatIntervalMs = options.heartbeatIntervalMs ?? 10_000
+    const limits = options.rateLimits ?? RATE_LIMITS
+    this.generalLimiter = new RateLimiter(limits.general.limit, limits.general.windowMs)
+    this.historicalLimiter = new RateLimiter(limits.historical.limit, limits.historical.windowMs)
   }
 
   get isOpen(): boolean {
@@ -169,12 +181,19 @@ export class CtraderTransport {
 
   /**
    * Send a request and resolve with the first reply carrying the same
-   * clientMsgId. Error envelopes reject with CtraderApiError.
+   * clientMsgId. Error envelopes reject with CtraderApiError. Requests over
+   * the per-connection rate limit wait for a slot (FIFO); the reply timeout
+   * starts when the request is actually sent.
    */
   request(payloadType: number, payload: Record<string, unknown> = {}, options: RequestOptions = {}): Promise<CtraderEnvelope> {
-    if (!this.isOpen) {
-      return Promise.reject(new CtraderTransportError(this.closeReason ? `Not connected: ${this.closeReason}` : 'Not connected'))
-    }
+    if (!this.isOpen) return Promise.reject(this.notConnected())
+    const limiter = HISTORICAL_PAYLOAD_TYPES.has(payloadType) ? this.historicalLimiter : this.generalLimiter
+    if (limiter.tryAcquire()) return this.dispatch(payloadType, payload, options)
+    return limiter.waitTurn().then(() => this.dispatch(payloadType, payload, options))
+  }
+
+  private dispatch(payloadType: number, payload: Record<string, unknown>, options: RequestOptions): Promise<CtraderEnvelope> {
+    if (!this.isOpen) return Promise.reject(this.notConnected())
     const clientMsgId = `oa-${this.nextId++}`
     const expect = options.expect === undefined ? null : ([] as number[]).concat(options.expect)
     const timeoutMs = options.timeoutMs ?? this.requestTimeoutMs
@@ -216,6 +235,10 @@ export class CtraderTransport {
   }
 
   // ==================== internals ====================
+
+  private notConnected(): CtraderTransportError {
+    return new CtraderTransportError(this.closeReason ? `Not connected: ${this.closeReason}` : 'Not connected')
+  }
 
   private send(message: CtraderEnvelope): void {
     if (!this.socket || this.socket.readyState !== WS_OPEN) {
@@ -278,6 +301,8 @@ export class CtraderTransport {
     this.closeReason = reason
     if (this.heartbeat) clearInterval(this.heartbeat)
     this.heartbeat = null
+    this.generalLimiter.dispose()
+    this.historicalLimiter.dispose()
 
     const socket = this.socket
     if (socket) {
