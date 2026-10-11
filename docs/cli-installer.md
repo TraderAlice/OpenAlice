@@ -132,6 +132,51 @@ rebuilding. An installer or test-only fix may replay those bytes; executable
 changes require a new candidate. The earlier custom ZIPs remain historical
 diagnostic fixtures, not a second channel or an upgrade target.
 
+### Windows PowerShell 5.1 public-network acceptance
+
+The existing Windows smoke has two deliberately separate modes. Candidate
+acceptance uses local archives and a synthetic previous version; it cannot prove
+public checksum transport or a released updater. The public mode uses the system
+`WindowsPowerShell/v1.0/powershell.exe`, asserts Desktop edition and version 5.1,
+and records the full host version in `native-smoke.json`:
+
+```bash
+bun scripts/windows-cli-preview-smoke.ts --published
+# Also accept the public manifest's checksum-bound installer snapshot:
+bun scripts/windows-cli-preview-smoke.ts --published --published-installer
+
+gh workflow run cli-installer-smoke.yml --ref <branch> -f windows_network=true
+# Published installer instead of checked-out installer:
+gh workflow run cli-installer-smoke.yml --ref <branch> \
+  -f windows_network=true -f windows_published_installer=true
+```
+
+This explicit system lane needs native Windows, system Git/Bash and tar, Bun
+from `.bun-version`, and public GitHub/CDN access; it needs no release credentials
+or workspace dependency install. It resolves the live stable and beta manifests,
+requires different releases, and fails if the target changes during acceptance.
+It probes the live binary SHA256 sidecar with the checked-out `Download-Text`
+function (or selected published snapshot), requiring `System.Byte[]` input and
+`System.String` output. Ordinary installer invocations then download and verify
+the real archives without `-Archive` or `-Sha256` overrides.
+
+The shared lifecycle checks fresh beta install/version/start/stop, then a fresh
+stable install followed by the **released binary's** real `update --channel beta`
+while its Runtime is running, pending activation, rollback in both directions,
+updated Runtime readiness, and deferred data-preserving uninstall. This does not
+execute unshipped updater code: source updater coverage remains in its existing
+integration tests and candidate acceptance. Receipts distinguish checkout versus
+published installer, actual release identities, and synthetic versus real updates.
+
+The installer workflow selects this Windows job for installer/CLI/update-lifecycle
+PR changes to dev or master; unrelated UI/business changes do not run it. Manual
+network mode runs only this lane and does not publish or activate any channel.
+Tests allocate temporary install/home/profile paths, bind loopback, use lite
+mode without provider credentials, avoid persistent PATH changes, and clean only
+their own files and Runtime. An unavailable release/network is a failure, never a
+skipped pass. The `runtime-cli-acceptance` suite owns both modes of the existing
+`windows-cli-preview` runner.
+
 ## Artifact contract
 
 Every accepted archive is named:

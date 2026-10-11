@@ -3,6 +3,14 @@ name: CLI Installer Smoke
 on:
   workflow_dispatch:
     inputs:
+      windows_network:
+        description: Only accept public stable-to-beta downloads on Windows PowerShell 5.1
+        type: boolean
+        default: false
+      windows_published_installer:
+        description: Use the checksum-bound published installer instead of checkout (network mode)
+        type: boolean
+        default: false
       windows_preview:
         description: Build only the independent Windows x64/ARM64 preview
         type: boolean
@@ -19,11 +27,18 @@ on:
   # below builds every native candidate and accepts the live preview channel.
   # Hosted checkout/Bun/SSH candidate work begins at the master boundary.
   pull_request:
-    branches: [master]
+    branches: [dev, master]
     paths:
       - ".bun-version"
       - ".github/workflows/cli-installer-smoke.yml"
       - ".github/workflows/release.yml"
+      - "install.ps1"
+      - "scripts/windows-cli-preview-smoke.ts"
+      - "scripts/windows-cli-preview.spec.ts"
+      - "scripts/cli-installer-workflow.spec.ts"
+      - "tests/integration/installer-powershell/**"
+      - ".github/workflows/windows-cli-preview.yml"
+      - "packages/update-lifecycle/**"
       - "install"
       - "package.json"
       - "packages/cli/**"
@@ -78,15 +93,75 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  windows-network-scope:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      relevant: ${{ steps.scope.outputs.relevant }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - id: scope
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          # Keep unrelated UI/business PRs off the Windows network lane.
+          git diff --name-only "$BASE_SHA" "$HEAD_SHA" > "$RUNNER_TEMP/windows-network-paths"
+          if grep -Eq '^(install\.ps1|packages/cli/|packages/update-lifecycle/|scripts/windows-cli-preview|scripts/cli-installer-workflow|tests/integration/installer-powershell/|\.github/workflows/(cli-installer-smoke|windows-cli-preview)\.yml)' "$RUNNER_TEMP/windows-network-paths"; then
+            echo 'relevant=true' >> "$GITHUB_OUTPUT"
+          else
+            echo 'relevant=false' >> "$GITHUB_OUTPUT"
+          fi
+
+  windows-network:
+    needs: windows-network-scope
+    if: >-
+      !cancelled() &&
+      ((github.event_name == 'workflow_dispatch' && inputs.windows_network) ||
+       (github.event_name == 'pull_request' && needs.windows-network-scope.outputs.relevant == 'true'))
+    name: PowerShell 5.1 public install and update
+    runs-on: windows-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version-file: .bun-version
+      - name: Accept real public release lifecycle
+        env:
+          PUBLISHED_INSTALLER: ${{ inputs.windows_published_installer && '1' || '0' }}
+        shell: powershell
+        run: |
+          $extra = @()
+          if ($env:PUBLISHED_INSTALLER -eq '1') { $extra += '--published-installer' }
+          bun scripts/windows-cli-preview-smoke.ts --published @extra
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Preserve PowerShell and public release evidence
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: windows-network-${{ github.event.pull_request.head.sha || github.sha }}
+          path: dist/windows-cli-preview/**/native-smoke.json
+          if-no-files-found: warn
+          retention-days: 30
+
   windows-preview:
-    if: github.event_name == 'workflow_dispatch' && inputs.windows_preview
+    if: github.event_name == 'workflow_dispatch' && inputs.windows_preview && !inputs.windows_network
     uses: ./.github/workflows/windows-cli-preview.yml
     with:
       candidate_run: ${{ inputs.windows_candidate_run || '' }}
       channel_build: ${{ inputs.windows_channel_build || false }}
 
   release-prep-scope:
-    if: github.event_name != 'push' && !inputs.windows_preview
+    if: github.event_name != 'push' && !inputs.windows_preview && !inputs.windows_network && (github.event_name != 'pull_request' || github.base_ref == 'master')
     name: release-prep scope
     runs-on: ubuntu-latest
     timeout-minutes: 5
@@ -118,7 +193,7 @@ jobs:
     needs: release-prep-scope
     if: >-
       !cancelled() &&
-      !inputs.windows_preview &&
+      !inputs.windows_preview && !inputs.windows_network &&
       github.event_name != 'push' &&
       (github.event_name != 'pull_request' || github.base_ref == 'master') &&
       (
@@ -185,8 +260,9 @@ jobs:
     needs: release-prep-scope
     if: >-
       !cancelled() &&
-      !inputs.windows_preview &&
+      !inputs.windows_preview && !inputs.windows_network &&
       github.event_name != 'push' &&
+      (github.event_name != 'pull_request' || github.base_ref == 'master') &&
       (
         needs.release-prep-scope.result != 'success' ||
         needs.release-prep-scope.outputs.beta_release_prep != 'true'
@@ -209,7 +285,7 @@ jobs:
     needs: release-prep-scope
     if: >-
       !cancelled() &&
-      !inputs.windows_preview &&
+      !inputs.windows_preview && !inputs.windows_network &&
       github.event_name != 'push' &&
       (github.event_name != 'pull_request' || github.base_ref == 'master') &&
       (
@@ -639,7 +715,7 @@ jobs:
           echo "activated=true" >> "$GITHUB_OUTPUT"
 
   dev-channel-install:
-    if: always() && !inputs.windows_preview && ((github.event_name == 'push' && needs.activate-dev-cli.result == 'success' && needs.activate-dev-cli.outputs.activated == 'true') || github.event_name == 'workflow_dispatch')
+    if: always() && !inputs.windows_preview && !inputs.windows_network && ((github.event_name == 'push' && needs.activate-dev-cli.result == 'success' && needs.activate-dev-cli.outputs.activated == 'true') || github.event_name == 'workflow_dispatch')
     name: Live raw dev channel install
     needs: activate-dev-cli
     runs-on: ubuntu-latest
