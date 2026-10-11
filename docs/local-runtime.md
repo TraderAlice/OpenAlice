@@ -68,6 +68,13 @@ Source development remains ordinary:
 pnpm dev
 ```
 
+Both development entry points enable the `openalice-source` package-export
+condition before loading Guardian. Workspace packages resolve to TypeScript
+source, so a fresh dependency install does not require prebuilt `dist/` files.
+Guardian passes the same condition to its backend children.
+The frontend Vite config aliases its workspace dependencies to source for both
+module transformation and dependency optimization.
+
 `pnpm dev` serves the browser through the local Web relay, with Vite behind it
 for hot reload. The printed UI URL can switch between registered Machines and
 running AliceProjects. The Guardian-owned development AliceProject is included
