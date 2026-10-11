@@ -92,6 +92,26 @@ or reading the accepted release's local helper. Machine/user Group Policy still
 takes precedence. A manually downloaded script can use the same per-process flag;
 do not ask users to run `Set-ExecutionPolicy` globally.
 
+### Windows PowerShell support contract
+
+Windows PowerShell 5.1 is the supported bootstrap baseline. PowerShell 7
+(`pwsh`) is optional, not an install/update prerequisite. The installer keeps
+5.1-compatible syntax; users may invoke it from PowerShell 7, but OpenAlice does
+not select `pwsh` from PATH or install it on their behalf.
+
+`openalice update` and the deferred direct-install uninstaller intentionally
+launch `%SystemRoot%\System32\WindowsPowerShell\v1.0\powershell.exe`.
+They clear inherited `PSModulePath` so a parent PowerShell 7 session cannot
+substitute its modules into the in-box host. The native Windows preview smoke
+uses the same 5.1 host. Keep that acceptance path when changing the installer;
+a PowerShell 7-only pass is not evidence that ordinary Windows bootstrap works.
+
+Download text must be decoded from `byte[]` when necessary on either host.
+Switching to PowerShell 7 does not remove that requirement: release sidecars
+may be served as `application/octet-stream`. `Download-Text` owns the conversion;
+callers continue to receive text. A future change to the minimum host is a
+separate prerequisite decision, not an update failure workaround.
+
 Windows uses `cli/current.txt` instead of a directory symlink. It contains
 only a retained release name; `bin/*.cmd` launchers resolve it each time and
 export the same layout/provenance fields as POSIX launchers. Atomic file
