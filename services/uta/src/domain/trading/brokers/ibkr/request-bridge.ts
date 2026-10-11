@@ -92,6 +92,9 @@ export class RequestBridge extends DefaultEWrapper {
   private connectResolve: (() => void) | null = null
   private connectReject: ((err: Error) => void) | null = null
   private connectTimer: ReturnType<typeof setTimeout> | null = null
+  // Latest waitForConnect() call. Only that attempt owns the shared EClient and
+  // the connect waiter above; a superseded attempt must leave both alone.
+  private connectAttempt = 0
 
   // ---- Current time request ----
   private currentTimePending: PendingRequest<number> | null = null
@@ -136,6 +139,7 @@ export class RequestBridge extends DefaultEWrapper {
     timeoutMs = 15_000,
   ): Promise<void> {
     this.client_ = client
+    const attempt = ++this.connectAttempt
 
     if (this.connectReject) {
       this.rejectConnect(new BrokerError('NETWORK', 'Previous TWS/Gateway connection attempt was superseded'))
@@ -160,7 +164,11 @@ export class RequestBridge extends DefaultEWrapper {
       // Also make the bridge timeout authoritative. Without this teardown, a
       // custom short timeout could reject while EClient's independent 10s
       // protocol timer kept the socket attempt alive in the background.
-      try { client.disconnect() } catch { /* best-effort teardown */ }
+      // A superseded attempt skips it: by now its successor is already opening
+      // a socket on the same EClient, and EClient closes the replaced one.
+      if (attempt === this.connectAttempt) {
+        try { client.disconnect() } catch { /* best-effort teardown */ }
+      }
       throw error
     })
     const [transportResult, handshakeResult] = await Promise.allSettled([
@@ -174,10 +182,12 @@ export class RequestBridge extends DefaultEWrapper {
         ? transportResult.reason
         : null
     if (failure !== null) {
-      this.clearConnectWaiter()
-      // A failed handshake must leave no half-connected EClient for the UTA
-      // recovery loop to mistake for a successful reconnect.
-      try { client.disconnect() } catch { /* best-effort teardown */ }
+      if (attempt === this.connectAttempt) {
+        this.clearConnectWaiter()
+        // A failed handshake must leave no half-connected EClient for the UTA
+        // recovery loop to mistake for a successful reconnect.
+        try { client.disconnect() } catch { /* best-effort teardown */ }
+      }
       throw failure
     }
   }
