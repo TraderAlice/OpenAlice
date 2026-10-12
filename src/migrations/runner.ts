@@ -13,7 +13,7 @@
  * time (warning UI is out of scope for the framework).
  */
 
-import { readFile, writeFile, mkdir, unlink, cp } from 'node:fs/promises'
+import { readFile, writeFile, mkdir, unlink, cp, rm } from 'node:fs/promises'
 import { readFileSync } from 'node:fs'
 import { resolve, dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -99,18 +99,39 @@ async function writeMeta(ctx: MigrationContext, meta: ConfigMeta): Promise<void>
 
 // ==================== Snapshot ====================
 
-/** Copy data/config/ to data/_backup/{ts}-{label}/config/. Returns path or null if config dir doesn't exist. */
-async function defaultSnapshot(label: string): Promise<string | null> {
+/** Copy config into a pre-migration snapshot, projecting sensitive legacy config before it is copied. */
+export async function createMigrationSnapshot(
+  configDir: string, backupDir: string, label: string, projectNewsConfig?: (config: unknown) => unknown,
+): Promise<string | null> {
   const ts = new Date().toISOString().replace(/[:.]/g, '-')
-  const target = resolve(BACKUP_DIR, `${ts}-${label}`, 'config')
+  const target = resolve(backupDir, `${ts}-${label}`, 'config')
+  let projectedNews: string | undefined
+  if (projectNewsConfig) {
+    try {
+      const news = JSON.parse(await readFile(resolve(configDir, 'news.json'), 'utf-8')) as unknown
+      projectedNews = JSON.stringify(projectNewsConfig(news), null, 2) + '\n'
+    } catch (err: unknown) {
+      if (!isENOENT(err)) throw err
+    }
+  }
   try {
     await mkdir(dirname(target), { recursive: true })
-    await cp(CONFIG_DIR, target, { recursive: true, errorOnExist: false })
+    await cp(configDir, target, {
+      recursive: true,
+      errorOnExist: false,
+      ...(projectedNews === undefined ? {} : { filter: (source) => resolve(source) !== resolve(configDir, 'news.json') }),
+    })
+    if (projectedNews !== undefined) await writeFile(resolve(target, 'news.json'), projectedNews, { mode: 0o600, flag: 'wx' })
     return target
   } catch (err: unknown) {
+    await rm(target, { recursive: true, force: true })
     if (isENOENT(err)) return null
     throw err
   }
+}
+
+async function defaultSnapshot(label: string, projectNewsConfig?: (config: unknown) => unknown): Promise<string | null> {
+  return createMigrationSnapshot(CONFIG_DIR, BACKUP_DIR, label, projectNewsConfig)
 }
 
 // ==================== Runner ====================
@@ -121,7 +142,7 @@ export interface RunnerOpts {
   /** Override the default registry (used in tests). */
   registry?: Migration[]
   /** Override the snapshot strategy (used in tests). */
-  snapshot?: (label: string) => Promise<string | null>
+  snapshot?: (label: string, projectNewsConfig?: (config: unknown) => unknown) => Promise<string | null>
 }
 
 export async function runMigrations(opts: RunnerOpts = {}): Promise<void> {
@@ -138,7 +159,7 @@ export async function runMigrations(opts: RunnerOpts = {}): Promise<void> {
   for (const m of pending) {
     let snapshotPath: string | null = null
     try {
-      snapshotPath = await snapshot(`pre-${m.id}`)
+      snapshotPath = await snapshot(`pre-${m.id}`, m.snapshotNewsConfig)
       await m.up(ctx)
       meta.appliedMigrations.push({
         id: m.id,

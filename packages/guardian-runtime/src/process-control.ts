@@ -1,4 +1,4 @@
-import { execFile } from 'node:child_process'
+import { execFile, type ChildProcess } from 'node:child_process'
 import { readFileSync } from 'node:fs'
 import { readFile } from 'node:fs/promises'
 import { hostname } from 'node:os'
@@ -75,6 +75,14 @@ export function normalizeProcessExitCode(value: unknown): number {
   return typeof value === 'number' && Number.isInteger(value) && value >= 0
     ? value
     : 0
+}
+
+/** Ask the owned Alice child to finish cleanup; Windows signals cannot do that. */
+export function requestAliceShutdown(child: Pick<ChildProcess, 'connected' | 'send'>, onFallback: () => void): void {
+  if (!child.connected) { onFallback(); return }
+  try {
+    child.send({ type: 'openalice:shutdown' }, (error) => { if (error) onFallback() })
+  } catch { onFallback() }
 }
 
 export async function isSameProcess(

@@ -1,4 +1,5 @@
 import { migration as migration_0044_dispatch_communication } from './0044_dispatch_communication/index.js'
+import { migration as migration_0045_news_modules } from './0045_news_modules/index.js'
 /**
  * Ordered registry of migrations introduced after the 0.89.2-beta baseline.
  *
@@ -20,7 +21,7 @@ import { migration as migration_0042_workspace_default_agent } from './0042_work
 import { migration as migration_0043_inbox_markdown_body } from './0043_inbox_markdown_body/index.js'
 
 export const MIGRATION_BASELINE = '0.89.2-beta'
-export const NEXT_MIGRATION_NUMBER = 45
+export const NEXT_MIGRATION_NUMBER = 46
 
 export const REGISTRY: Migration[] = [
   migration_0039_workspace_session_runtime_bindings,
@@ -29,4 +30,5 @@ export const REGISTRY: Migration[] = [
   migration_0042_workspace_default_agent,
   migration_0043_inbox_markdown_body,
   migration_0044_dispatch_communication,
+  migration_0045_news_modules,
 ]

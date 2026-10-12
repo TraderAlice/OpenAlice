@@ -120,6 +120,14 @@ export class NewsCollectorStore implements INewsProvider {
     )
   }
 
+  /** Change memory policy without pruning or rewriting the durable archive. */
+  configureMemory(maxInMemory: number, retentionDays: number): void {
+    this.maxInMemory = maxInMemory
+    this.retentionDays = retentionDays
+    const cutoff = Date.now() - retentionDays * 86400000
+    this.buffer = this.buffer.filter(record => record.pubTs >= cutoff).slice(-maxInMemory)
+  }
+
   /**
    * Ingest a single news item. Returns true if new (not a duplicate).
    *

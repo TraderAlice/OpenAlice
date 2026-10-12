@@ -40,6 +40,8 @@ export interface Migration {
   summary: string
   /** Optional pointer to a design doc. */
   rationale?: string
+  /** Return a credential-free news.json copy for the portable pre-migration snapshot. */
+  snapshotNewsConfig?: (config: unknown) => unknown
   /**
    * Apply the migration. Body MUST be idempotent — return as a no-op
    * when data is already at target shape.

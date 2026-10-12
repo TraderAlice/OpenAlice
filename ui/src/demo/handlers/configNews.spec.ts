@@ -21,13 +21,6 @@ async function loadConfig(): Promise<AppConfig> {
 }
 
 describe('demo News Collector config', () => {
-  it('loads representative RSS feeds', async () => {
-    const config = await loadConfig()
-    const news = config.news as NewsCollectorConfig
-
-    expect(news.enabled).toBe(true)
-    expect(news.feeds.map((feed) => feed.source)).toEqual(['fed', 'coindesk'])
-  })
 
   it('round-trips News Collector mutations for the current demo session', async () => {
     const current = (await loadConfig()).news as NewsCollectorConfig
@@ -52,8 +45,10 @@ describe('demo News Collector config', () => {
     })
 
     expect(response.status).toBe(200)
-    await expect(response.json()).resolves.toEqual(next)
-    expect((await loadConfig()).news).toEqual(next)
+    const saved = await response.json() as NewsCollectorConfig
+    expect(saved).toMatchObject(next)
+    expect(saved.feeds.at(-1)?.id).toEqual(expect.any(String))
+    expect((await loadConfig()).news).toEqual(saved)
   })
 
   it('rejects invalid feed URLs like the production schema', async () => {

@@ -34,6 +34,7 @@ import {
   resolveGuardianTradingMode,
   takeoverRequested,
   proxyEnvFromRules,
+  requestAliceShutdown,
   resolveAliceProjectIdentity,
   type GuardianTradingModePlan,
   type RuntimeProcessLock,
@@ -96,7 +97,7 @@ let desktopRelay: WebRelay | null = null
 const DEFAULT_WEB_PORT_START = 47331
 const READY_TIMEOUT_MS = 30_000
 const UTA_READY_TIMEOUT_MS = 15_000
-const SIGTERM_GRACE_MS = 5_000
+const SIGTERM_GRACE_MS = 10_000
 const UTA_RESTART_GRACE_MS = 8_000
 const DATA_HOME_PREFERENCES_FILE = 'openalice-data-home.json'
 const UPDATE_ATTEMPT_FILE = 'openalice-update-attempt.json'
@@ -155,6 +156,14 @@ if (existingOwnerSmokeMode() || process.env['OPENALICE_ELECTRON_SMOKE_STARTUP'] 
 // correct and preserves graceful SIGTERM.
 function killTree(child: ChildProcess, signal: NodeJS.Signals = 'SIGTERM'): void {
   if (child.pid == null) return
+  if (child === alice && signal === 'SIGTERM') {
+    requestAliceShutdown(child, () => {
+      if (process.platform !== 'win32') {
+        try { child.kill('SIGTERM') } catch { /* already gone */ }
+      }
+    })
+    return
+  }
   if (process.platform === 'win32') {
     try { spawnSync('taskkill', ['/pid', String(child.pid), '/T', '/F']) } catch { /* already gone */ }
   } else {
@@ -803,7 +812,7 @@ app.whenReady().then(async () => {
       }),
   }
   try {
-    guardianRuntimeLock = await acquireGuardianRuntime({
+    const startupOwner = await acquireGuardianRuntime({
       userDataHome,
       launcherRoot,
       launcher: app.isPackaged ? 'guardian-electron-packaged' : 'guardian-electron-dev',
@@ -814,6 +823,8 @@ app.whenReady().then(async () => {
         shutdown()
       },
     })
+    if (appQuitting) { await startupOwner.release(); return }
+    guardianRuntimeLock = startupOwner
     if (takeover) console.log('[guardian] takeover → previous OpenAlice runtime stopped')
   } catch (err) {
     dialog.showErrorBox(
@@ -885,6 +896,7 @@ app.whenReady().then(async () => {
   // Node runtime mode. Without it each spawn would open a new app window.
 
   const spawnUTA = (): ChildProcess => {
+    if (appQuitting) throw new Error('Desktop runtime is shutting down')
     const child = spawn(process.execPath, [utaEntry], {
       env: {
         ...process.env,
@@ -909,6 +921,7 @@ app.whenReady().then(async () => {
   }
 
   const spawnConnector = (): ChildProcess => {
+    if (appQuitting) throw new Error('Desktop runtime is shutting down')
     const child = spawn(process.execPath, [connectorEntry], {
       env: {
         ...process.env,
@@ -934,6 +947,7 @@ app.whenReady().then(async () => {
   }
 
   const spawnAlice = (): ChildProcess => {
+    if (appQuitting) throw new Error('Desktop runtime is shutting down')
     aliceStderrTail = new BoundedTextTail()
     const child = spawn(process.execPath, [aliceEntry], {
       env: {
@@ -975,6 +989,7 @@ app.whenReady().then(async () => {
     })
     child.once('exit', (code, signal) => {
       cancelOpenAliceWebRequests('The local Alice process exited before its IPC request completed.')
+      if (appQuitting && typeof code === 'number' && code !== 0) process.exitCode = code
       if (appQuitting || localRuntimeSuspended) return
       const message = `Alice exited unexpectedly code=${code} signal=${signal}`
       console.error(`[guardian] ${message}`)
@@ -1047,6 +1062,7 @@ app.whenReady().then(async () => {
       return new Response(err instanceof Error ? err.message : String(err), { status: 503 })
     }
   })
+  if (appQuitting) return
   if (tradingMode.mode !== 'lite') {
     uta = spawnUTA()
     void waitForUTA(utaUrl).then((ready) => {
@@ -1054,7 +1070,9 @@ app.whenReady().then(async () => {
       else console.warn(`[guardian] UTA did not become ready within ${UTA_READY_TIMEOUT_MS / 1000}s — continuing with trading offline`)
     })
   }
-  if (await readConnectorServiceEnabled(homeEnv.OPENALICE_HOME)) {
+  const connectorEnabled = await readConnectorServiceEnabled(homeEnv.OPENALICE_HOME)
+  if (appQuitting) return
+  if (connectorEnabled) {
     connector = spawnConnector()
     void waitForConnector(connectorUrl).then((ready) => {
       if (ready) console.log(`[guardian] Connector ready pid=${connector?.pid ?? ''}`)
@@ -1065,6 +1083,7 @@ app.whenReady().then(async () => {
   alice = spawnAlice()
   console.log(`[guardian] Alice pid=${alice.pid} web=ipc mcpPort=${mcpPort ?? 'disabled'}`)
   await waitForAliceReady()
+  if (appQuitting) return
   aliceBecameReady = true
 
   // Alice migrations can create connector-service.json from the retired
@@ -1322,7 +1341,7 @@ app.whenReady().then(async () => {
     if (modeSwitching) throw new Error('A connection switch is already in progress.')
     modeSwitching = true
     try {
-      guardianRuntimeLock = await acquireGuardianRuntime({
+      const localOwner = await acquireGuardianRuntime({
         userDataHome,
         launcherRoot,
         launcher: app.isPackaged ? 'guardian-electron-packaged' : 'guardian-electron-dev',
@@ -1333,13 +1352,20 @@ app.whenReady().then(async () => {
           shutdown()
         },
       })
+      if (appQuitting) { await localOwner.release(); return }
+      guardianRuntimeLock = localOwner
       tradingMode = await resolveGuardianTradingMode(process.env, homeEnv.OPENALICE_HOME)
+      if (appQuitting) return
       if (tradingMode.mode !== 'lite') uta = spawnUTA()
-      if (await readConnectorServiceEnabled(homeEnv.OPENALICE_HOME)) connector = spawnConnector()
+      const connectorEnabled = await readConnectorServiceEnabled(homeEnv.OPENALICE_HOME)
+      if (appQuitting) return
+      if (connectorEnabled) connector = spawnConnector()
       alice = spawnAlice()
       await waitForAliceReady()
+      if (appQuitting) return
       aliceBecameReady = true
       await win.loadURL('app://openalice/settings')
+      if (appQuitting) return
       localRuntimeSuspended = false
       flagWatchAbort = new AbortController()
       watchLocalFlags()
@@ -1517,7 +1543,7 @@ async function reconcileUTA(
 
   restartingUTA = true
   try {
-    while (pendingUTAMode && !appQuitting) {
+    while (pendingUTAMode && !appQuitting && !localRuntimeSuspended) {
       const targetMode = pendingUTAMode
       pendingUTAMode = null
       const running = uta !== null && uta.exitCode === null
@@ -1536,6 +1562,7 @@ async function reconcileUTA(
         if (uta === old) uta = null
       }
 
+      if (appQuitting || localRuntimeSuspended) return
       if (action === 'start' || action === 'restart') {
         if (action === 'start') console.log(`[guardian] trading mode ${targetMode.mode} — starting UTA`)
         uta = spawnUTA()
@@ -1586,6 +1613,7 @@ async function reconcileConnector(
     } else if (connector?.exitCode !== null) {
       connector = null
     }
+    if (appQuitting || localRuntimeSuspended) return
     connector = spawnConnector()
     const ready = await waitForConnector(connectorUrl)
     console.log(ready ? '[guardian] Connector online' : '[guardian] Connector did not become ready')
