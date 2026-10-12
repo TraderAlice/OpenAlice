@@ -14,6 +14,10 @@ describe('demo Chat workflow coverage', () => {
       ).flat())
       const answers = new Map<string, string>()
       for (const example of examples) {
+        if (example.id === 'market') {
+          expect(example.hint?.length).toBeGreaterThan(12)
+          expect(example.prompt).not.toContain(example.hint!)
+        }
         const answer = demoChatWorkflowReply(example.prompt)
         expect(answer).toContain('https://github.com/TraderAlice/OpenAlice')
         expect(answer).toContain('demo')
