@@ -83,6 +83,21 @@ export function volumeOnGrid(units: Decimal, spec: SymbolSpec, symbolName: strin
   return { ok: true, value: volume }
 }
 
+/** Points from a stop-limit's stop to its limit; the limit may not be on the wrong side. */
+function stopLimitSlippage(side: 'BUY' | 'SELL', stop: Decimal, limit: Decimal, digits: number): BuildResult<number> {
+  const distance = side === 'BUY' ? limit.minus(stop) : stop.minus(limit)
+  if (distance.lt(0)) {
+    return fail(`For a ${side.toLowerCase()} stop-limit the limit must be ${side === 'BUY' ? 'at or above' : 'at or below'} the stop price`)
+  }
+  return { ok: true, value: distance.mul(new Decimal(10).pow(digits)).toNumber() }
+}
+
+/** A stop-limit's limit price, which the venue stores as a distance in points from the stop. */
+export function stopLimitPrice(stopPrice: Decimal, slippageInPoints: number, side: 'BUY' | 'SELL', digits: number): Decimal {
+  const offset = new Decimal(slippageInPoints).mul(new Decimal(10).pow(-digits))
+  return stopPrice.plus(side === 'BUY' ? offset : offset.neg()).toDecimalPlaces(digits)
+}
+
 /** "YYYYMMDD HH:mm:ss [UTC]" or "YYYYMMDD-HH:mm:ss" → epoch ms (UTC). */
 export function parseGoodTillDate(value: string): number | null {
   const m = /^(\d{4})(\d{2})(\d{2})[ -](\d{2}):(\d{2}):(\d{2})(?:\s+(?:UTC|GMT|Z))?$/.exec(value.trim())
@@ -218,13 +233,11 @@ export function buildNewOrder(input: NewOrderInput): BuildResult<NewOrderPlan> {
       if (!stop.ok) return stop
       const limit = priceOnGrid(order.lmtPrice, spec, 'Limit price', name)
       if (!limit.ok) return limit
-      const distance = side === 'BUY' ? order.lmtPrice.minus(order.auxPrice) : order.auxPrice.minus(order.lmtPrice)
-      if (distance.lt(0)) {
-        return fail(`For a ${side.toLowerCase()} stop-limit the limit must be ${side === 'BUY' ? 'at or above' : 'at or below'} the stop price`)
-      }
+      const slippage = stopLimitSlippage(side, order.auxPrice, order.lmtPrice, spec.digits)
+      if (!slippage.ok) return slippage
       payload['orderType'] = OrderType.STOP_LIMIT
       payload['stopPrice'] = stop.value
-      payload['slippageInPoints'] = distance.mul(new Decimal(10).pow(spec.digits)).toNumber()
+      payload['slippageInPoints'] = slippage.value
       entry = order.auxPrice
       entryLabel = 'stop price'
       break
@@ -294,6 +307,8 @@ export interface AmendInput {
     takeProfit?: number
     timeInForce?: number
     expirationTimestamp?: number
+    /** Stop-limit only: the limit's distance from the stop, in points. */
+    slippageInPoints?: number
   }
   changes: Partial<Order>
   symbol: CatalogSymbol
@@ -313,6 +328,9 @@ export function buildAmendOrder(input: AmendInput): BuildResult<Record<string, u
   if (current.timeInForce === TimeInForce.GOOD_TILL_DATE && current.expirationTimestamp !== undefined) {
     payload['expirationTimestamp'] = current.expirationTimestamp
   }
+  const type = current.orderType
+  const isStopLimit = type === OrderType.STOP_LIMIT
+  if (isStopLimit && current.slippageInPoints !== undefined) payload['slippageInPoints'] = current.slippageInPoints
 
   let changed = false
   if (isSet(changes.totalQuantity)) {
@@ -322,30 +340,35 @@ export function buildAmendOrder(input: AmendInput): BuildResult<Record<string, u
     changed = true
   }
 
-  const type = current.orderType
-  const buy = current.tradeSide !== TradeSide.SELL
   if (isSet(changes.lmtPrice)) {
+    if (type !== OrderType.LIMIT && !isStopLimit) return fail('lmtPrice can only be changed on limit or stop-limit orders')
     const p = priceOnGrid(changes.lmtPrice, spec, 'Limit price', name)
     if (!p.ok) return p
-    if (type === OrderType.LIMIT) {
-      payload['limitPrice'] = p.value
-    } else if (type === OrderType.STOP_LIMIT) {
-      const stop = isSet(changes.auxPrice) ? changes.auxPrice : current.stopPrice !== undefined ? new Decimal(current.stopPrice) : undefined
-      if (!stop) return fail('Cannot amend the limit of a stop-limit order without its stop price')
-      const distance = buy ? changes.lmtPrice.minus(stop) : stop.minus(changes.lmtPrice)
-      if (distance.lt(0)) return fail(`For a ${buy ? 'buy' : 'sell'} stop-limit the limit must be ${buy ? 'at or above' : 'at or below'} the stop price`)
-      payload['slippageInPoints'] = distance.mul(new Decimal(10).pow(spec.digits)).toNumber()
-    } else {
-      return fail('lmtPrice can only be changed on limit or stop-limit orders')
-    }
+    if (type === OrderType.LIMIT) payload['limitPrice'] = p.value
     changed = true
   }
   if (isSet(changes.auxPrice)) {
-    if (type !== OrderType.STOP && type !== OrderType.STOP_LIMIT) return fail('auxPrice can only be changed on stop or stop-limit orders')
+    if (type !== OrderType.STOP && !isStopLimit) return fail('auxPrice can only be changed on stop or stop-limit orders')
     const p = priceOnGrid(changes.auxPrice, spec, 'Stop price', name)
     if (!p.ok) return p
     payload['stopPrice'] = p.value
     changed = true
+  }
+  if (isStopLimit && (isSet(changes.lmtPrice) || isSet(changes.auxPrice))) {
+    // The limit is stored as a distance from the stop. Recompute it so the
+    // limit stays put when only the stop moves, as it does on IBKR.
+    const side = current.tradeSide === TradeSide.SELL ? 'SELL' : 'BUY'
+    const currentStop = current.stopPrice !== undefined ? new Decimal(current.stopPrice) : undefined
+    const stop = isSet(changes.auxPrice) ? changes.auxPrice : currentStop
+    const limit = isSet(changes.lmtPrice)
+      ? changes.lmtPrice
+      : currentStop && current.slippageInPoints !== undefined
+        ? stopLimitPrice(currentStop, current.slippageInPoints, side, spec.digits)
+        : undefined
+    if (!stop || !limit) return fail('Cannot amend a stop-limit order whose current stop or limit price is unknown')
+    const slippage = stopLimitSlippage(side, stop, limit, spec.digits)
+    if (!slippage.ok) return slippage
+    payload['slippageInPoints'] = slippage.value
   }
   if (changes.tif !== undefined && changes.tif !== '') {
     const probe = Object.assign(new Order(), { tif: changes.tif, goodTillDate: changes.goodTillDate ?? '' })

@@ -43,7 +43,7 @@ import { CtraderSession, toBrokerError, type CtraderTokenRefresh } from './ctrad
 import { CtraderCatalog, type CatalogSymbol, type SymbolSpec } from './ctrader-catalog.js'
 import { CtraderSpots } from './ctrader-spots.js'
 import { CtraderExecutions, ExecutionType, parseExecution, type ExecutionUpdate } from './ctrader-executions.js'
-import { buildAmendOrder, buildNewOrder, priceOnGrid } from './ctrader-order-builder.js'
+import { buildAmendOrder, buildNewOrder, priceOnGrid, stopLimitPrice } from './ctrader-order-builder.js'
 import {
   closedLegStatus,
   decideHedgedOrder,
@@ -618,6 +618,7 @@ export class CtraderBroker implements IBroker<CtraderBrokerMeta> {
           ...optional('takeProfit', num(raw['takeProfit'])),
           ...optional('timeInForce', num(raw['timeInForce'])),
           ...optional('expirationTimestamp', num(raw['expirationTimestamp'])),
+          ...optional('slippageInPoints', num(raw['slippageInPoints'])),
         },
         changes,
         symbol: sym,
@@ -1141,8 +1142,7 @@ export class CtraderBroker implements IBroker<CtraderBrokerMeta> {
     }
     const slippage = num(raw['slippageInPoints'])
     if (type === OrderType.STOP_LIMIT && stopPrice !== undefined && slippage !== undefined && digits !== undefined) {
-      const offset = new Decimal(slippage).mul(new Decimal(10).pow(-digits))
-      order.lmtPrice = new Decimal(stopPrice).plus(action === 'BUY' ? offset : offset.neg()).toDecimalPlaces(digits)
+      order.lmtPrice = stopLimitPrice(new Decimal(stopPrice), slippage, action, digits)
     }
     const expiry = num(raw['expirationTimestamp'])
     if (num(raw['timeInForce']) === TimeInForce.GOOD_TILL_DATE && expiry !== undefined) order.goodTillDate = formatGoodTillDate(expiry)

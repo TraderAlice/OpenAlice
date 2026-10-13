@@ -171,6 +171,24 @@ describe('buildAmendOrder', () => {
     expect(r).toEqual({ ok: true, value: { orderId: 9002, slippageInPoints: 200 } })
   })
 
+  // Sell stop 4000 with its limit 200 points (2.00) lower, at 3998.
+  const sellStopLimit = { orderId: 9002, orderType: OrderType.STOP_LIMIT, tradeSide: 2, volume: 100, stopPrice: 4000, slippageInPoints: 200 }
+
+  it('keeps a stop-limit limit in place when only the stop moves', () => {
+    const r = buildAmendOrder({ current: sellStopLimit, changes: { auxPrice: new Decimal('4001') }, symbol: XAUUSD, spec: XAU_SPEC, now: WEDNESDAY })
+    expect(r).toEqual({ ok: true, value: { orderId: 9002, stopPrice: 4001, slippageInPoints: 300 } })
+  })
+
+  it('refuses to move a stop-limit stop past its limit', () => {
+    expect(buildAmendOrder({ current: sellStopLimit, changes: { auxPrice: new Decimal('3997') }, symbol: XAUUSD, spec: XAU_SPEC, now: WEDNESDAY }))
+      .toMatchObject({ ok: false, error: expect.stringMatching(/at or below the stop price/) })
+  })
+
+  it('re-sends the stop-limit distance when only the volume changes', () => {
+    const r = buildAmendOrder({ current: sellStopLimit, changes: { totalQuantity: new Decimal(2) }, symbol: XAUUSD, spec: XAU_SPEC, now: WEDNESDAY })
+    expect(r).toEqual({ ok: true, value: { orderId: 9002, slippageInPoints: 200, volume: 200 } })
+  })
+
   it('refuses changes that do not fit the order type or switch time in force', () => {
     expect(buildAmendOrder({ current, changes: { auxPrice: new Decimal('1.2') }, symbol: EURUSD, spec: EUR_SPEC, now: WEDNESDAY }))
       .toMatchObject({ ok: false, error: expect.stringMatching(/auxPrice can only be changed/) })
