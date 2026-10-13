@@ -282,10 +282,9 @@ Workspace interface. Missing or unsupported membership is an explicit recovery
 state, not permission to guess a Harness from a tag or show the old manager.
 
 The Harness options menu identity opens the current Workspace's details in the same
-Harness shell (`/<harness>/workspaces/:wsId/details`); the adjacent chevron is an
-independent Workspace switcher. Keep configuration and conversation browsing
-as separate actions below it. Do not make the identity click switch Workspaces,
-open agent configuration, or navigate to the global Workspace catalog.
+Harness shell (`/<harness>/workspaces/:wsId/details`). A separate Switch workspace
+row opens the Workspace selection submenu. Configuration and conversation
+browsing remain separate actions below these rows.
 
 Details distinguish the Workspace-owned README and recorded applied/source
 versions from the current catalog's Harness guide. Catalog documentation is

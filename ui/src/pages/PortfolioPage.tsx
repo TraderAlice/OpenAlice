@@ -302,10 +302,10 @@ export function PortfolioPage() {
     const timestamp = curveAccountId === 'all' ? point.snapshotTimestamps?.[accountId] : point.timestamp
     if (!timestamp) return
     try {
-      const { snapshots } = await api.trading.snapshots(accountId, { limit: 1, startTime: timestamp, endTime: timestamp })
+      const { snapshots } = await api.trading.snapshots(accountId, { limit: 2, startTime: timestamp, endTime: timestamp })
       if (request !== snapshotRequest.current) return
-      const snapshot = snapshots.find(snapshot => snapshot.accountId === accountId && snapshot.timestamp === timestamp)
-      if (snapshot) {
+      const snapshot = snapshots.length === 1 ? snapshots[0] : null
+      if (snapshot?.accountId === accountId && snapshot.timestamp === timestamp) {
         setSelectedTimestamp(point.timestamp)
         setSelectedSnapshot(snapshot)
       }
