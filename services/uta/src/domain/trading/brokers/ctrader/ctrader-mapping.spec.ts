@@ -141,6 +141,17 @@ describe('trading schedule', () => {
     expect(clock).toMatchObject({ isOpen: false, nextOpen: new Date('2026-10-13T13:00:00Z') })
   })
 
+  it('lands on the exact schedule second in the venue time zone (real EURUSD demo schedule)', () => {
+    // Spotware demo EURUSD, America/New_York: Sun 17:00:05 → Mon 16:29:55, daily.
+    const eurusd = [
+      { startSecond: 61_205, endSecond: 145_795 }, { startSecond: 147_605, endSecond: 232_195 },
+      { startSecond: 234_005, endSecond: 318_595 }, { startSecond: 320_405, endSecond: 404_995 },
+      { startSecond: 406_805, endSecond: 491_395 },
+    ]
+    const clock = scheduleClock(eurusd, 'America/New_York', new Date('2026-10-13T13:56:40.882Z'))
+    expect(clock).toMatchObject({ isOpen: true, nextClose: new Date('2026-10-13T20:29:55.000Z') })
+  })
+
   it('treats a symbol without schedule as always open', () => {
     expect(scheduleClock([], undefined, new Date()).isOpen).toBe(true)
   })

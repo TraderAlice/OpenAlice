@@ -249,7 +249,9 @@ export function scheduleClock(schedule: ScheduleInterval[], timeZone: string | u
   if (schedule.length === 0) return { isOpen: true, timestamp: now }
   const tz = timeZone || 'UTC'
   const nowSec = secondsIntoWeek(now, tz)
-  const weekStartMs = now.getTime() - nowSec * 1000
+  // secondsIntoWeek has whole-second resolution; drop the sub-second part of
+  // `now` so session boundaries land on the schedule's exact second.
+  const weekStartMs = Math.floor(now.getTime() / 1000) * 1000 - nowSec * 1000
   const at = (sec: number) => new Date(weekStartMs + sec * 1000)
 
   const sorted = [...schedule].sort((a, b) => a.startSecond - b.startSecond)

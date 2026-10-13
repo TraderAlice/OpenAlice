@@ -139,18 +139,42 @@ error codes seen in practice.
 ### 0. Prerequisites (branch owner)
 
 - [x] cTID and a demo account at any cTrader broker
-- [ ] Open API application registered (submitted 2026-10-10) and approved; clientId/secret kept
-      outside the repository
+- [x] Open API application registered 2026-10-10, active 2026-10-13 (review
+      took three days; Spotware's review mails come from a no-reply address,
+      the KYC contact is review@ctraderapi.com); clientId/secret kept outside
+      the repository
 - [x] `pnpm install` in this worktree; baseline `pnpm test:changed`
 
 ### 1. Feasibility spike (outside the repo tree)
 
-- [ ] Script: app auth → account list → account auth → trader info
-- [ ] Symbol catalog: list, full details for several asset classes
-- [ ] Spot subscription, trendbars, ticks; record encodings and limits
+The spike drives the real `CtraderBroker` against Spotware's demo, with a
+redacting wire log; it is not committed.
+
+- [x] App auth → account list → account auth → trader info (2026-10-13)
+- [x] Symbol catalog: FX, metals and share CFDs resolve with categories;
+      full specs for EURUSD and XAUUSD
+- [x] Spot subscription, 1m/1h/1d trendbars; encodings recorded below
 - [ ] Place/amend/cancel a pending order; open/close the minimum market
       position; observe execution events; account left flat
-- [ ] Record findings and answer open questions 2–4 here
+- [ ] Record write-side findings and answer open questions 2–3 here
+
+Read-side findings (Spotware demo, 2026-10-13):
+
+- Enums are numeric on the JSON wire (`permissionScope: 1`, `accountType: 0`);
+  unknown extra fields (e.g. `accountLifetimeType`) appear and are ignored.
+- The first SPOT_EVENT can arrive **before** SUBSCRIBE_SPOTS_RES; the spot
+  cache must accept it (it does). Spot events can carry one side only, and a
+  zero spread (bid = ask) does occur on the demo.
+- `moneyDigits` 2 on the trader; EURUSD lot 100 000 units, min/step 1 000;
+  XAUUSD lot 100 oz, min/step 1 oz; `distanceSetIn` 1 (points).
+- Schedules use the symbol's own time zone (EURUSD `America/New_York` with a
+  daily 16:29:55–17:00:05 break; XAUUSD `UTC`). The market clock rounded
+  session edges with the current milliseconds — fixed, covered by a spec.
+- Daily bars open at 21:00 UTC; the in-progress bar is not returned.
+- The demo account is HEDGED (`accountType` 0).
+- First authorization (Q2): the portal's Sandbox page issues access and
+  refresh tokens for the developer's own accounts with the trading scope;
+  that is enough for bring-your-own-application users.
 
 ### 2. Transport and session
 
