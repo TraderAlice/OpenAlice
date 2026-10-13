@@ -324,7 +324,9 @@ Protection and hedged-linking findings (Spotware demo, 2026-10-13):
 - [x] `pnpm test` complete (2026-10-14, Windows x64, branch rebased on `dev`
       5da8dfcc): 7752 passed; the 14 failures in 11 files reproduce
       identically on clean `dev` 5da8dfcc (symlink EPERM and CLI environment
-      on this host); one load timeout (presets/LeverUp) passes on rerun
+      on this host); one load timeout (presets/LeverUp) passes on rerun.
+      After the entry-price fix, `pnpm test:changed`: 7755 passed, the
+      same 14 baseline failures
 - [x] `pnpm test:integration:uta` (291 passed, 2026-10-14)
 - [x] `pnpm broker-packs:build` + Node verification on win32-x64: six archives
       verified, ctrader 2.4 MiB
