@@ -158,7 +158,10 @@ redacting wire log; it is not committed.
       position; observe execution events; account left flat (2026-10-13,
       Spotware demo account, user-approved; final check 0 positions / 0 orders)
 - [x] Record write-side findings (below)
-- [ ] Re-run the pending-order amend on the demo after the expiry fix
+- [x] Re-run the pending-order amend on the demo after the expiry fix
+      (2026-10-13, user-approved): the amend now carries the expiry, the
+      venue answers REPLACED with GOOD_TILL_DATE and the same expiry; order
+      cancelled, account flat
 
 Read-side findings (Spotware demo, 2026-10-13):
 
