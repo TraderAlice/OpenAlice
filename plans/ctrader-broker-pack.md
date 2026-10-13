@@ -291,6 +291,15 @@ Protection and hedged-linking findings (Spotware demo, 2026-10-13):
       partial fills were not observed (demo market orders filled whole)
 - [x] A stop-only amend keeps a stop-limit's limit price (the venue stores
       the limit as a distance from the stop; pre-submission review)
+- [x] Every amend re-sends the entry price: the venue rejects a stop or
+      stop-limit amend without its stop price ("Stop price should be
+      defined"), found by the demo re-check below
+- [x] Demo re-check (2026-10-14, user-approved, two runs): one SELL STOP
+      LIMIT 500 pips below the market, amended stop-only, volume-only and
+      limit-only, then cancelled. First run: the stop-only amend kept the
+      limit and the GTD expiry; the other two were rejected for the missing
+      stop price. After the fix all eight checks passed. Account back at its
+      baseline (0 positions, 0 orders) after both runs
 
 ### 5. OpenAlice integration
 

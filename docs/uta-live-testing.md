@@ -277,9 +277,11 @@ whenever a scenario disagrees:
 - Market orders accept protection only as a distance from the fill. The
   adapter moves it to the exact prices after the fill and says so in the
   result message if that fails.
-- An amend without `expirationTimestamp` turns GTD into GTC, and a
-  stop-limit's limit is stored as a distance from its stop. S4 on a GTD or
-  stop-limit order must show the expiry and the untouched price unchanged.
+- An amend without `expirationTimestamp` turns GTD into GTC; an amend of a
+  stop or stop-limit order without its stop price is rejected even when the
+  stop is unchanged; and a stop-limit's limit is stored as a distance from
+  its stop. S4 must include a volume-only amend of a stop-limit GTD order and
+  show the expiry and the untouched prices unchanged.
 - Modify keeps the order id. There is no DAY time in force: a pending DAY
   order becomes GTD at the symbol's session close.
 - A HEDGED account opens an opposite position instead of reducing. The
@@ -481,5 +483,8 @@ a stop removed the take-profit unless both are sent. (3) A pending order
 linked to a position outlives the position's close. Pre-submission review
 then found two adapter-only gaps: a stop-only amend moved a stop-limit's
 limit with it, and symbol specs were cached across SYMBOL_CHANGED events and
-reconnects. The agent-surface S1–S12 round through `alice-uta` is still to
-run for this venue.
+reconnects. The demo re-check of that fix found a fourth venue rule: an
+amend of a stop or stop-limit order must carry the stop price, so
+volume-only and limit-only amends had been rejected all along; the fake
+venue had accepted them. The agent-surface S1–S12 round through `alice-uta`
+is still to run for this venue.
