@@ -148,9 +148,11 @@ error codes seen in practice.
    versus pasting tokens generated in the Open API playground. Depends on
    whether Spotware accepts loopback redirect URIs.
 3. **Hedging vs netting accounts.** Reads merge per (symbol, side);
-   `closePosition` closes oldest first and refuses mixed sides. Still open:
-   whether a UTA consumer collides on two rows with the same aliceId (long
-   and short of one symbol) — check against UTA position consumers.
+   `closePosition` closes oldest first and refuses mixed sides. Settled
+   2026-10-13: no UTA consumer keys positions by aliceId (the snapshot builder
+   lists rows, the UI keys rows by index), and UTA's close-quantity check
+   takes the first matching row while the adapter refuses mixed sides, so a
+   long and a short row of one symbol do not collide.
 
 ## Increments
 
@@ -269,7 +271,9 @@ Protection and hedged-linking findings (Spotware demo, 2026-10-13):
       getCapabilities, assetClassFor
 - [x] Pure encodings (`ctrader-mapping.ts`) and specs; broker specs against
       a multi-asset fixture account
-- [ ] Confirm encodings and limits on the real demo (spike)
+- [x] Confirm encodings and limits on the real demo (spike, 2026-10-13)
+- [x] Symbol specs re-read after SYMBOL_CHANGED events and after reconnects
+      (pre-submission review)
 
 ### 4. Write surface
 
@@ -282,8 +286,11 @@ Protection and hedged-linking findings (Spotware demo, 2026-10-13):
       (full and partial, FIFO across hedged positions)
 - [x] Venue rejection text preserved in `PlaceOrderResult.error`
 - [x] Write specs against a stateful fake venue (`__test__/fake-trading-venue.ts`)
-- [ ] Confirm on the real demo: execution event sequence, whether amend
-      without SL/TP clears them, relative protection rounding, partial fills
+- [x] Confirm on the real demo: execution event sequence, relative
+      protection rounding, amend keeps SL/TP (re-sent) and expiry (fixed);
+      partial fills were not observed (demo market orders filled whole)
+- [x] A stop-only amend keeps a stop-limit's limit price (the venue stores
+      the limit as a distance from the stop; pre-submission review)
 
 ### 5. OpenAlice integration
 
@@ -300,7 +307,7 @@ Protection and hedged-linking findings (Spotware demo, 2026-10-13):
       walked in `dev:demo` (card in Recommended, install step, six fields,
       secrets masked, no console errors)
 - [x] Owner guide: broker-packs
-- [ ] Owner guide: uta-live-testing scenarios for cTrader (after the spike)
+- [x] Owner guide: uta-live-testing venue facts and round record for cTrader
 
 ### 6. Verification and acceptance
 
