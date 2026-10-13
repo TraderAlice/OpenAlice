@@ -106,7 +106,25 @@ error codes seen in practice.
   The user's `orderRef` travels as the order label.
 - **closePosition:** closes hedged positions of one symbol oldest first;
   refuses when both long and short are open on the symbol; partial progress
-  is reported in `message`.
+  is reported in `message`. After a full close, pending orders still linked
+  to the closed position are cancelled so they cannot fire later.
+- **Position protection as legs:** cTrader keeps SL/TP on the position (an
+  internal STOP_LOSS_TAKE_PROFIT order). UTA moves stops by modifying
+  orders, so each protected position is exposed as synthetic orders
+  `sl-<positionId>` (STP, `auxPrice`) and `tp-<positionId>` (LMT,
+  `lmtPrice`) in `getOpenOrders`, returned as `legs` from a protected market
+  order, and routed by `modifyOrder` / `cancelOrder` to
+  AMEND_POSITION_SLTP (the other level is always re-sent). A leg of a closed
+  position settles as Filled when the protection order fired nearer its
+  level, otherwise Cancelled. Found during dogfooding: without this an agent
+  could not move a stop to break-even.
+- **Hedged accounts reduce like netting:** on a HEDGED account an opposite
+  order opens a second position instead of reducing (IBKR habit: a separate
+  protective SELL STP after a buy would open a hedge). Orders against an
+  open position are linked to it with `positionId` (oldest position that
+  can absorb the volume); orders that would flip, straddle several
+  positions, face both sides, or carry their own SL/TP are refused with an
+  explanation. NETTED accounts are left to the venue.
 - **Safety:** acceptance uses demo accounts only; every live-paper run ends
   with a flat-account check.
 
@@ -162,6 +180,11 @@ redacting wire log; it is not committed.
       (2026-10-13, user-approved): the amend now carries the expiry, the
       venue answers REPLACED with GOOD_TILL_DATE and the same expiry; order
       cancelled, account flat
+- [ ] Demo check of protection legs and hedged linking: legs listed after a
+      protected market order; SL moved to break-even; TP cancelled while SL
+      stays (does AMEND_POSITION_SLTP drop an omitted level?); a pending SELL
+      STP linked with `positionId` is accepted as a closing order; whether
+      the venue cancels a linked pending order when its position closes
 
 Read-side findings (Spotware demo, 2026-10-13):
 

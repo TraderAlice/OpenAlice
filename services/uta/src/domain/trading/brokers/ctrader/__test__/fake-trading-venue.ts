@@ -28,17 +28,36 @@ export interface FakeVenue {
   rejectProtectionAmend?: string
   /** Adverse fill offset for market orders, in price units. */
   fillSlippage?: number
+  /** AMEND_POSITION_SLTP without a level keeps it (default: removes it). */
+  sltpOmissionKeeps?: boolean
+  /** Simulate the venue closing a position at its stop-loss or take-profit. */
+  triggerProtection(positionId: number, kind: 'stopLoss' | 'takeProfit'): void
 }
 
 export function installTradingVenue(server: FakeCtraderServer): FakeVenue {
-  const venue: FakeVenue = {
-    positions: structuredClone(POSITIONS) as Row[],
-    orders: structuredClone(ORDERS) as Row[],
-  }
   let nextOrderId = 9100
   let nextPositionId = 600
   let nextDealId = 7000
   let clock = Date.UTC(2026, 9, 14, 9, 0, 0)
+  const venue: FakeVenue = {
+    positions: structuredClone(POSITIONS) as Row[],
+    orders: structuredClone(ORDERS) as Row[],
+    triggerProtection(positionId, kind) {
+      const position = venue.positions.find((x) => x['positionId'] === positionId && x['positionStatus'] === 1)
+      if (!position) throw new Error(`no open position ${positionId}`)
+      const level = position[kind]
+      if (level === undefined) throw new Error(`position ${positionId} has no ${kind}`)
+      const td = position['tradeData']
+      venue.orders.push({
+        orderId: nextOrderId++, orderType: 4, orderStatus: 2, positionId, executionPrice: level,
+        ...(position['stopLoss'] !== undefined ? { stopLoss: position['stopLoss'] } : {}),
+        ...(position['takeProfit'] !== undefined ? { takeProfit: position['takeProfit'] } : {}),
+        tradeData: { symbolId: td['symbolId'], volume: td['volume'], tradeSide: td['tradeSide'] === 1 ? 2 : 1 },
+        utcLastUpdateTimestamp: clock++,
+      })
+      position['positionStatus'] = 2
+    },
+  }
   const exec = (executionType: number, body: Row): FakeReply => ({
     payloadType: PayloadType.EXECUTION_EVENT,
     payload: { ctidTraderAccountId: 4242, executionType, ...body },
@@ -57,6 +76,15 @@ export function installTradingVenue(server: FakeCtraderServer): FakeVenue {
     payloadType: PayloadType.ORDER_LIST_RES,
     payload: { ctidTraderAccountId: 4242, order: venue.orders, hasMore: false },
   })
+  server.handlers[PayloadType.ORDER_LIST_BY_POSITION_ID_REQ] = (p) => ({
+    payloadType: PayloadType.ORDER_LIST_BY_POSITION_ID_RES,
+    payload: {
+      ctidTraderAccountId: 4242,
+      order: venue.orders.filter((o) => o['positionId'] === p['positionId'])
+        .sort((a, b) => (b['utcLastUpdateTimestamp'] ?? 0) - (a['utcLastUpdateTimestamp'] ?? 0)),
+      hasMore: false,
+    },
+  })
 
   server.handlers[PayloadType.NEW_ORDER_REQ] = (p) => {
     if (venue.rejectNext) {
@@ -72,7 +100,7 @@ export function installTradingVenue(server: FakeCtraderServer): FakeVenue {
       orderId: nextOrderId++, orderType: p['orderType'], orderStatus: 1, tradeData,
       clientOrderId: p['clientOrderId'], timeInForce: p['timeInForce'] ?? 2, utcLastUpdateTimestamp: clock++,
     }
-    for (const key of ['limitPrice', 'stopPrice', 'stopLoss', 'takeProfit', 'expirationTimestamp', 'slippageInPoints']) {
+    for (const key of ['limitPrice', 'stopPrice', 'stopLoss', 'takeProfit', 'expirationTimestamp', 'slippageInPoints', 'positionId']) {
       if (p[key] !== undefined) order[key] = p[key]
     }
     venue.orders.push(order)
@@ -87,6 +115,21 @@ export function installTradingVenue(server: FakeCtraderServer): FakeVenue {
     const spot = SPOTS[symbolId]!
     const slip = venue.fillSlippage ?? 0
     const price = (side === 1 ? spot.ask : spot.bid) / scale + (side === 1 ? slip : -slip)
+    if (p['positionId'] !== undefined) {
+      // Market order linked to a position: it reduces that position.
+      const target = venue.positions.find((x) => x['positionId'] === p['positionId'] && x['positionStatus'] === 1)
+      if (!target) return { payloadType: PayloadType.ORDER_ERROR_EVENT, payload: { ctidTraderAccountId: 4242, errorCode: 'POSITION_NOT_FOUND' } }
+      target['tradeData']['volume'] -= p['volume'] as number
+      if (target['tradeData']['volume'] <= 0) target['positionStatus'] = 2
+      order['orderStatus'] = 2
+      order['executionPrice'] = price
+      order['closingOrder'] = true
+      const reduceDeal = {
+        dealId: nextDealId++, orderId: order['orderId'], positionId: target['positionId'], volume: p['volume'], filledVolume: p['volume'],
+        symbolId, executionPrice: price, tradeSide: side, executionTimestamp: clock++, dealStatus: 2,
+      }
+      return [accepted, exec(EXEC.FILLED, { order: { ...order }, position: { ...target }, deal: reduceDeal })]
+    }
     const position: Row = {
       positionId: nextPositionId++, positionStatus: 1, swap: 0, price, usedMargin: 1000, moneyDigits: 2, tradeData: { ...tradeData },
     }
@@ -160,8 +203,10 @@ export function installTradingVenue(server: FakeCtraderServer): FakeVenue {
     }
     const position = venue.positions.find((x) => x['positionId'] === p['positionId'])
     if (!position) return { payloadType: PayloadType.ORDER_ERROR_EVENT, payload: { ctidTraderAccountId: 4242, errorCode: 'POSITION_NOT_FOUND' } }
-    if (p['stopLoss'] !== undefined) position['stopLoss'] = p['stopLoss']
-    if (p['takeProfit'] !== undefined) position['takeProfit'] = p['takeProfit']
+    for (const key of ['stopLoss', 'takeProfit']) {
+      if (p[key] !== undefined) position[key] = p[key]
+      else if (!venue.sltpOmissionKeeps) delete position[key]
+    }
     return exec(EXEC.ACCEPTED, { order: { orderId: nextOrderId++, orderType: 4, orderStatus: 1, tradeData: { ...position['tradeData'] } }, position: { ...position } })
   }
 

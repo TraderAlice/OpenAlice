@@ -18,7 +18,7 @@
 import { randomUUID } from 'node:crypto'
 import { z } from 'zod'
 import Decimal from 'decimal.js'
-import { Contract, ContractDescription, ContractDetails, Execution, Order, OrderState } from '@traderalice/ibkr'
+import { Contract, ContractDescription, ContractDetails, Execution, Order, OrderState, UNSET_DECIMAL } from '@traderalice/ibkr'
 import {
   BrokerError,
   type AccountCapabilities,
@@ -43,7 +43,18 @@ import { CtraderSession, toBrokerError, type CtraderTokenRefresh } from './ctrad
 import { CtraderCatalog, type CatalogSymbol, type SymbolSpec } from './ctrader-catalog.js'
 import { CtraderSpots } from './ctrader-spots.js'
 import { CtraderExecutions, ExecutionType, parseExecution, type ExecutionUpdate } from './ctrader-executions.js'
-import { buildAmendOrder, buildNewOrder } from './ctrader-order-builder.js'
+import { buildAmendOrder, buildNewOrder, priceOnGrid } from './ctrader-order-builder.js'
+import {
+  closedLegStatus,
+  decideHedgedOrder,
+  legRefs,
+  makeLegOrder,
+  parseLegId,
+  protectionLegs,
+  viewPosition,
+  type LegKind,
+  type RawPositionView,
+} from './ctrader-protection.js'
 import {
   BAR_INTERVAL_MS,
   BAR_INTERVAL_TO_PERIOD,
@@ -205,6 +216,8 @@ export class CtraderBroker implements IBroker<CtraderBrokerMeta> {
   private readonly quoteTimeoutMs: number
   private readonly fillTimeoutMs: number
   private readonly orderReplyTimeoutMs: number
+  /** HEDGED (or spread-betting) accounts keep separate positions per order; null until known. */
+  private hedged: boolean | null = null
 
   constructor(options: CtraderBrokerOptions) {
     const cfg = options.config
@@ -245,6 +258,12 @@ export class CtraderBroker implements IBroker<CtraderBrokerMeta> {
   async init(): Promise<void> {
     await this.call('connect', () => this.session.ensureConnected())
     if (!this.catalog.isLoaded) await this.call('catalog load', () => this.catalog.load())
+    if (this.hedged === null) {
+      const res = await this.call('account type', () =>
+        this.session.accountRequest(PayloadType.TRADER_REQ, {}, { expect: PayloadType.TRADER_RES }))
+      // ProtoOAAccountType: 0 HEDGED, 1 NETTED, 2 SPREAD_BETTING. Only NETTED reduces implicitly.
+      this.hedged = (num(obj(res.payload?.['trader'])['accountType']) ?? 0) !== 1
+    }
   }
 
   async close(): Promise<void> {
@@ -400,6 +419,11 @@ export class CtraderBroker implements IBroker<CtraderBrokerMeta> {
   }
 
   async getOrder(orderId: string): Promise<OpenOrder | null> {
+    const leg = parseLegId(orderId)
+    if (leg) {
+      this.requireCatalog()
+      return this.call('getOrder', () => this.getLeg(leg.kind, leg.positionId))
+    }
     const id = Number(orderId)
     if (!Number.isSafeInteger(id) || id <= 0) return null
     this.requireCatalog()
@@ -414,11 +438,61 @@ export class CtraderBroker implements IBroker<CtraderBrokerMeta> {
     }
   }
 
+  /** Pending orders plus the stop-loss / take-profit legs of open positions. */
   async getOpenOrders(): Promise<OpenOrder[]> {
     this.requireCatalog()
     const res = await this.call('getOpenOrders', () =>
       this.session.accountRequest(PayloadType.RECONCILE_REQ, {}, { expect: PayloadType.RECONCILE_RES }))
-    return this.mapOrders(rows(res.payload?.['order']))
+    const orders = await this.mapOrders(rows(res.payload?.['order']))
+    const positions = rows(res.payload?.['position']).map(viewPosition).filter((p): p is RawPositionView => p !== null && p.open)
+    if (positions.length === 0) return orders
+    const specs = await this.call('symbol details', () => this.catalog.specsFor(positions.map((p) => p.symbolId)))
+    const legs = positions.flatMap((p) => protectionLegs(p, this.contractForId(p.symbolId), specs.get(p.symbolId)?.digits))
+    return [...orders, ...legs]
+  }
+
+  /** A protection leg: live from the open position, or settled from its order history. */
+  private async getLeg(kind: LegKind, positionId: number): Promise<OpenOrder | null> {
+    const res = await this.session.accountRequest(PayloadType.RECONCILE_REQ, {}, { expect: PayloadType.RECONCILE_RES })
+    const open = rows(res.payload?.['position']).map(viewPosition).find((p) => p?.positionId === positionId && p.open)
+    if (open) {
+      const digits = (await this.catalog.specFor(open.symbolId))?.digits
+      const price = open[kind]
+      return makeLegOrder({
+        kind, positionId, positionSide: open.side, volume: open.volume, price,
+        status: price === undefined ? 'Cancelled' : 'Submitted', contract: this.contractForId(open.symbolId), digits,
+      })
+    }
+    // Position closed: its order history says whether this leg fired.
+    const now = this.now().getTime()
+    const history = await this.session.accountRequest(
+      PayloadType.ORDER_LIST_BY_POSITION_ID_REQ,
+      { positionId, fromTimestamp: now - 90 * 86_400_000, toTimestamp: now },
+      { expect: PayloadType.ORDER_LIST_BY_POSITION_ID_RES },
+    )
+    const orders = rows(history.payload?.['order'])
+    const any = orders[0]
+    if (!any) return null
+    const td = obj(any['tradeData'])
+    const symbolId = num(td['symbolId'])
+    if (symbolId === undefined) return null
+    // The opening order carries the position's side; closing and protection
+    // orders trade the opposite way.
+    const opening = orders.find((o) => o['closingOrder'] !== true && num(o['orderType']) !== 4)
+    const anySide = num(td['tradeSide']) ?? TradeSide.SELL
+    const positionSide = opening
+      ? num(obj(opening['tradeData'])['tradeSide']) ?? TradeSide.BUY
+      : anySide === TradeSide.SELL ? TradeSide.BUY : TradeSide.SELL
+    const protection = orders.find((o) => num(o['orderType']) === 4)
+    return makeLegOrder({
+      kind, positionId,
+      positionSide,
+      volume: num(obj((opening ?? any)['tradeData'])['volume']) ?? 0,
+      price: protection ? num(protection[kind]) : undefined,
+      status: closedLegStatus(kind, orders),
+      contract: this.contractForId(symbolId),
+      digits: (await this.catalog.specFor(symbolId))?.digits,
+    })
   }
 
   // ---- Order writes ----
@@ -449,6 +523,29 @@ export class CtraderBroker implements IBroker<CtraderBrokerMeta> {
     })
     if (!plan.ok) return { success: false, error: plan.error }
 
+    // Hedged accounts: an order against an open position must reduce it, as
+    // it would on a netting (IBKR-style) account, not open an opposite one.
+    let reducing = false
+    if (this.hedged) {
+      let decision
+      try {
+        const res = await this.session.accountRequest(PayloadType.RECONCILE_REQ, {}, { expect: PayloadType.RECONCILE_RES })
+        const positions = rows(res.payload?.['position']).map(viewPosition)
+          .filter((p): p is RawPositionView => p !== null && p.symbolId === sym.symbolId)
+        decision = decideHedgedOrder(positions, sym.name, plan.value.payload['tradeSide'] as number, plan.value.payload['volume'] as number)
+      } catch (err) {
+        return { success: false, error: toBrokerError(err, 'placeOrder').message }
+      }
+      if (decision.kind === 'refuse') return { success: false, error: decision.error }
+      if (decision.kind === 'reduce') {
+        if (tpsl?.stopLoss || tpsl?.takeProfit) {
+          return { success: false, error: `This order reduces the open ${sym.name} position; set stop-loss / take-profit on the position instead (modify its sl-/tp- order)` }
+        }
+        plan.value.payload['positionId'] = decision.positionId
+        reducing = true
+      }
+    }
+
     const sentAt = this.now().getTime()
     let first: ExecutionUpdate
     try {
@@ -473,9 +570,19 @@ export class CtraderBroker implements IBroker<CtraderBrokerMeta> {
       if (isFailure(final)) return failureResult('placeOrder', final)
     }
     const result = this.resultFrom(final)
-    if (plan.value.marketProtection && final.executionType === ExecutionType.ORDER_FILLED) {
+    if (plan.value.marketProtection && final.executionType === ExecutionType.ORDER_FILLED && !reducing) {
       const note = await this.applyExactProtection(final, plan.value.marketProtection, spec)
       if (note) result.message = note
+      // Surface the protection as trackable legs from birth.
+      const positionId = num(final.position?.['positionId']) ?? num(final.deal?.['positionId'])
+      if (positionId !== undefined) {
+        const legs = legRefs({
+          positionId,
+          stopLoss: plan.value.marketProtection.stopLoss ?? num(final.position?.['stopLoss']),
+          takeProfit: plan.value.marketProtection.takeProfit ?? num(final.position?.['takeProfit']),
+        })
+        if (legs.length > 0) result.legs = legs
+      }
     }
     return result
   }
@@ -483,6 +590,8 @@ export class CtraderBroker implements IBroker<CtraderBrokerMeta> {
   async modifyOrder(orderId: string, changes: Partial<Order>): Promise<PlaceOrderResult> {
     const blocked = this.writeBlocked()
     if (blocked) return blocked
+    const leg = parseLegId(orderId)
+    if (leg) return this.amendLeg(orderId, leg.kind, leg.positionId, changes)
     const id = Number(orderId)
     if (!Number.isSafeInteger(id) || id <= 0) return { success: false, error: `Invalid cTrader order id "${orderId}"` }
     try {
@@ -528,6 +637,8 @@ export class CtraderBroker implements IBroker<CtraderBrokerMeta> {
   async cancelOrder(orderId: string): Promise<PlaceOrderResult> {
     const blocked = this.writeBlocked()
     if (blocked) return blocked
+    const leg = parseLegId(orderId)
+    if (leg) return this.amendLeg(orderId, leg.kind, leg.positionId, null)
     const id = Number(orderId)
     if (!Number.isSafeInteger(id) || id <= 0) return { success: false, error: `Invalid cTrader order id "${orderId}"` }
     try {
@@ -541,6 +652,51 @@ export class CtraderBroker implements IBroker<CtraderBrokerMeta> {
     } catch (err) {
       if (err instanceof CtraderApiError && NOT_FOUND_CODES.has(err.errorCode)) return { success: false, error: `cTrader order ${orderId} not found` }
       return { success: false, error: toBrokerError(err, 'cancelOrder').message }
+    }
+  }
+
+  /**
+   * Move (`changes`) or remove (`null`) one protection level of an open
+   * position. The other level is always re-sent so it is never dropped.
+   */
+  private async amendLeg(orderId: string, kind: LegKind, positionId: number, changes: Partial<Order> | null): Promise<PlaceOrderResult> {
+    try {
+      const res = await this.session.accountRequest(PayloadType.RECONCILE_REQ, {}, { expect: PayloadType.RECONCILE_RES })
+      const position = rows(res.payload?.['position']).map(viewPosition).find((p) => p?.positionId === positionId && p.open)
+      if (!position) return { success: false, error: `Position ${positionId} is no longer open` }
+      const sym = this.catalog.byId(position.symbolId)
+      const spec = await this.catalog.specFor(position.symbolId)
+      if (!sym || !spec) return { success: false, error: `Position ${positionId} is on an unknown symbol` }
+
+      const levels: { stopLoss: number | undefined; takeProfit: number | undefined } = {
+        stopLoss: position.stopLoss,
+        takeProfit: position.takeProfit,
+      }
+      if (changes === null) {
+        if (levels[kind] === undefined) return { success: false, error: `Position ${positionId} has no ${kind === 'stopLoss' ? 'stop-loss' : 'take-profit'} to cancel` }
+        levels[kind] = undefined
+      } else {
+        if (changes.totalQuantity != null && !changes.totalQuantity.equals(UNSET_DECIMAL)) {
+          return { success: false, error: 'Position protection always covers the whole position; use closePosition to exit part of it' }
+        }
+        const field = kind === 'stopLoss' ? changes.auxPrice : changes.lmtPrice
+        const fieldName = kind === 'stopLoss' ? 'auxPrice' : 'lmtPrice'
+        if (field == null || field.equals(UNSET_DECIMAL)) {
+          return { success: false, error: `Give the new ${kind === 'stopLoss' ? 'stop-loss' : 'take-profit'} price as ${fieldName}` }
+        }
+        const price = priceOnGrid(field, spec, kind === 'stopLoss' ? 'Stop loss' : 'Take profit', sym.name)
+        if (!price.ok) return { success: false, error: price.error }
+        levels[kind] = price.value
+      }
+
+      const payload: Record<string, unknown> = { positionId }
+      if (levels.stopLoss !== undefined) payload['stopLoss'] = levels.stopLoss
+      if (levels.takeProfit !== undefined) payload['takeProfit'] = levels.takeProfit
+      const update = await this.sendOrderRequest(PayloadType.AMEND_POSITION_SLTP_REQ, payload)
+      if (isFailure(update)) return failureResult(changes === null ? 'cancelOrder' : 'modifyOrder', update)
+      return { success: true, orderId, orderState: makeOrderState(changes === null ? 'Cancelled' : 'Submitted') }
+    } catch (err) {
+      return { success: false, error: toBrokerError(err, changes === null ? 'cancelOrder' : 'modifyOrder').message }
     }
   }
 
@@ -599,6 +755,7 @@ export class CtraderBroker implements IBroker<CtraderBrokerMeta> {
     }
 
     const closed: ExecutionUpdate[] = []
+    const fullyClosed: number[] = []
     let remaining = target
     let failure: string | undefined
     for (const position of open) {
@@ -618,6 +775,7 @@ export class CtraderBroker implements IBroker<CtraderBrokerMeta> {
           break
         }
         closed.push(final)
+        if (volume === position.volume) fullyClosed.push(position.positionId)
         remaining -= volume
       } catch (err) {
         failure = toBrokerError(err, 'closePosition').message
@@ -628,6 +786,8 @@ export class CtraderBroker implements IBroker<CtraderBrokerMeta> {
     if (closed.length === 0) return { success: false, error: failure ?? `Could not close ${sym.name}` }
     const result = this.resultFrom(closed[0]!)
     const notes: string[] = []
+    const orphans = await this.cancelLinkedOrders(fullyClosed)
+    if (orphans) notes.push(orphans)
     if (closed.length > 1) notes.push(`closed ${closed.length} positions via orders ${closed.map((u) => u.orderId).join(', ')}`)
     if (failure) notes.push(`${volumeToUnits(remaining).toString()} units remain open: ${failure}`)
     if (notes.length > 0) result.message = notes.join('; ')
@@ -635,6 +795,35 @@ export class CtraderBroker implements IBroker<CtraderBrokerMeta> {
       result.orderState = makeOrderState('Submitted')
     }
     return result
+  }
+
+  /**
+   * Cancel pending orders still linked to positions that no longer exist
+   * (e.g. a reducing stop placed IBKR-style), so they cannot fire later.
+   * Returns a note for the result, or null when nothing needed attention.
+   */
+  private async cancelLinkedOrders(positionIds: number[]): Promise<string | null> {
+    if (positionIds.length === 0) return null
+    try {
+      const res = await this.session.accountRequest(PayloadType.RECONCILE_REQ, {}, { expect: PayloadType.RECONCILE_RES })
+      const linked = rows(res.payload?.['order'])
+        .filter((o) => positionIds.includes(num(o['positionId']) ?? -1) && num(o['orderType']) !== 4)
+        .map((o) => num(o['orderId']))
+        .filter((id): id is number => id !== undefined)
+      const failed: number[] = []
+      for (const id of linked) {
+        try {
+          const update = await this.sendOrderRequest(PayloadType.CANCEL_ORDER_REQ, { orderId: id })
+          if (isFailure(update)) failed.push(id)
+        } catch {
+          failed.push(id)
+        }
+      }
+      if (failed.length > 0) return `linked pending orders ${failed.join(', ')} could not be cancelled; cancel them before they trigger`
+      return linked.length > 0 ? `cancelled linked pending orders ${linked.join(', ')}` : null
+    } catch (err) {
+      return `could not check for linked pending orders (${toBrokerError(err, 'closePosition').message}); review open orders`
+    }
   }
 
   // ---- Market data ----
@@ -866,6 +1055,11 @@ export class CtraderBroker implements IBroker<CtraderBrokerMeta> {
       multiplier: '1',
       ...(sym.description ? { description: sym.description } : {}),
     })
+  }
+
+  private contractForId(symbolId: number): Contract {
+    const sym = this.catalog.byId(symbolId)
+    return sym ? this.contractFor(sym) : this.unknownContract(symbolId)
   }
 
   private unknownContract(symbolId: number): Contract {
