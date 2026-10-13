@@ -644,7 +644,11 @@ export function createTradingRoutes(ctx: UTAEngineContext) {
     const id = c.req.param('id')
     const limit = Number(c.req.query('limit')) || 100
     try {
-      const snapshots = await ctx.snapshotService.getRecent(id, limit)
+      const snapshots = await ctx.snapshotService.getSnapshots(id, {
+        limit,
+        startTime: c.req.query('startTime'),
+        endTime: c.req.query('endTime'),
+      })
       return c.json({ snapshots })
     } catch {
       return c.json({ snapshots: [] })
@@ -670,13 +674,13 @@ export function createTradingRoutes(ctx: UTAEngineContext) {
       // Gather snapshots per account
       const perAccount = await Promise.all(
         accounts.map(async (uta) => {
-          const snaps = await ctx.snapshotService!.getRecent(uta.id, limit)
+          const snaps = await ctx.snapshotService!.getSnapshots(uta.id, { limit })
           return { id: uta.id, label: uta.label, snaps }
         }),
       )
 
       // Build time-indexed map: group snapshots by minute-rounded timestamp
-      const timeMap = new Map<string, { equity: number; accounts: Record<string, string> }>()
+      const timeMap = new Map<string, { accounts: Record<string, string>; snapshotTimestamps: Record<string, string> }>()
 
       for (const { id: accId, snaps } of perAccount) {
         for (const snap of snaps) {
@@ -687,12 +691,11 @@ export function createTradingRoutes(ctx: UTAEngineContext) {
 
           let entry = timeMap.get(key)
           if (!entry) {
-            entry = { equity: 0, accounts: {} }
+            entry = { accounts: {}, snapshotTimestamps: {} }
             timeMap.set(key, entry)
           }
           entry.accounts[accId] = snap.account.netLiquidation
-          // Recalculate total equity from all accounts at this time
-          entry.equity = Object.values(entry.accounts).reduce((s, v) => s + (Number(v) || 0), 0)
+          entry.snapshotTimestamps[accId] = snap.timestamp
         }
       }
 
@@ -703,19 +706,22 @@ export function createTradingRoutes(ctx: UTAEngineContext) {
       // Carry forward: fill missing accounts with their last known value
       const allAccountIds = accounts.map(a => a.id)
       const lastKnown: Record<string, string> = {}
+      const lastSnapshotTimestamps: Record<string, string> = {}
 
-      const points = sorted.map(([timestamp, { accounts: accs }]) => {
+      const points = sorted.map(([timestamp, { accounts: accs, snapshotTimestamps }]) => {
         // Fill missing accounts from last known
         for (const id of allAccountIds) {
           if (!(id in accs) && id in lastKnown) {
             accs[id] = lastKnown[id]
+            snapshotTimestamps[id] = lastSnapshotTimestamps[id]
           }
         }
         // Update last known
         Object.assign(lastKnown, accs)
+        Object.assign(lastSnapshotTimestamps, snapshotTimestamps)
         // Recalculate equity with filled values
         const equity = Object.values(accs).reduce((s, v) => s + (Number(v) || 0), 0)
-        return { timestamp, equity: String(equity), accounts: accs }
+        return { timestamp, equity: String(equity), accounts: accs, snapshotTimestamps }
       })
 
       return c.json({ points })

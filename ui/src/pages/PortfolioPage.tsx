@@ -294,17 +294,17 @@ export function PortfolioPage() {
 
   const handlePointClick = async (point: EquityCurvePoint) => {
     if (curveLoading) return
+    const request = ++snapshotRequest.current
+    setSelectedSnapshot(null)
+    setSelectedTimestamp(null)
     const accountId = curveAccountId !== 'all' ? curveAccountId : Object.keys(point.accounts)[0]
     if (!accountId) return
-    const request = ++snapshotRequest.current
+    const timestamp = curveAccountId === 'all' ? point.snapshotTimestamps?.[accountId] : point.timestamp
+    if (!timestamp) return
     try {
-      const { snapshots } = await api.trading.snapshots(accountId, { limit: 200 })
+      const { snapshots } = await api.trading.snapshots(accountId, { limit: 1, startTime: timestamp, endTime: timestamp })
       if (request !== snapshotRequest.current) return
-      const selectedTime = new Date(point.timestamp).getTime() + (curveAccountId === 'all' ? 59_999 : 0)
-      const snapshot = snapshots.reduce<UTASnapshotSummary | null>((latest, snapshot) => {
-        const time = new Date(snapshot.timestamp).getTime()
-        return time <= selectedTime && (!latest || time > new Date(latest.timestamp).getTime()) ? snapshot : latest
-      }, null)
+      const snapshot = snapshots.find(snapshot => snapshot.accountId === accountId && snapshot.timestamp === timestamp)
       if (snapshot) {
         setSelectedTimestamp(point.timestamp)
         setSelectedSnapshot(snapshot)
