@@ -330,6 +330,11 @@ export function buildAmendOrder(input: AmendInput): BuildResult<Record<string, u
   }
   const type = current.orderType
   const isStopLimit = type === OrderType.STOP_LIMIT
+  // The venue rejects a stop or stop-limit amend without its stop price, even
+  // an unchanged one (Spotware demo, 2026-10-14); re-send the entry price of
+  // every pending type so a volume-only amend is accepted.
+  if ((type === OrderType.STOP || isStopLimit) && current.stopPrice !== undefined) payload['stopPrice'] = current.stopPrice
+  if (type === OrderType.LIMIT && current.limitPrice !== undefined) payload['limitPrice'] = current.limitPrice
   if (isStopLimit && current.slippageInPoints !== undefined) payload['slippageInPoints'] = current.slippageInPoints
 
   let changed = false

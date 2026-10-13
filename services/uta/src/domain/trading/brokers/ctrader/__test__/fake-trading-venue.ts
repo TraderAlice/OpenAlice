@@ -152,6 +152,11 @@ export function installTradingVenue(server: FakeCtraderServer): FakeVenue {
   server.handlers[PayloadType.AMEND_ORDER_REQ] = (p) => {
     const order = venue.orders.find((o) => o['orderId'] === p['orderId'] && o['orderStatus'] === 1)
     if (!order) return { payloadType: PayloadType.ORDER_ERROR_EVENT, payload: { ctidTraderAccountId: 4242, errorCode: 'ORDER_NOT_FOUND', orderId: p['orderId'] } }
+    // Real venue (Spotware demo, 2026-10-14): amending a stop or stop-limit
+    // order without its stop price is rejected, even when the stop is unchanged.
+    if ((order['orderType'] === 3 || order['orderType'] === 6) && p['stopPrice'] === undefined) {
+      return { payloadType: PayloadType.ORDER_ERROR_EVENT, payload: { ctidTraderAccountId: 4242, errorCode: 'INVALID_REQUEST', description: 'Stop price should be defined', orderId: p['orderId'] } }
+    }
     if (p['volume'] !== undefined) order['tradeData']['volume'] = p['volume']
     for (const key of ['limitPrice', 'stopPrice', 'stopLoss', 'takeProfit', 'expirationTimestamp', 'slippageInPoints']) {
       if (p[key] !== undefined) order[key] = p[key]

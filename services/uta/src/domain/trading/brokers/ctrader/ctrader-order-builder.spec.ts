@@ -168,7 +168,15 @@ describe('buildAmendOrder', () => {
   it('recomputes the stop-limit distance when the limit changes', () => {
     const stopLimit = { orderId: 9002, orderType: OrderType.STOP_LIMIT, tradeSide: 2, volume: 100, stopPrice: 4000 }
     const r = buildAmendOrder({ current: stopLimit, changes: { lmtPrice: new Decimal('3998') }, symbol: XAUUSD, spec: XAU_SPEC, now: WEDNESDAY })
-    expect(r).toEqual({ ok: true, value: { orderId: 9002, slippageInPoints: 200 } })
+    expect(r).toEqual({ ok: true, value: { orderId: 9002, stopPrice: 4000, slippageInPoints: 200 } })
+  })
+
+  it('re-sends the entry price on a volume-only amend, which the venue requires', () => {
+    const limit = buildAmendOrder({ current, changes: { totalQuantity: new Decimal(2000) }, symbol: EURUSD, spec: EUR_SPEC, now: WEDNESDAY })
+    expect(limit).toEqual({ ok: true, value: { orderId: 9001, limitPrice: 1.1, stopLoss: 1.09, volume: 200_000 } })
+    const stop = { orderId: 9003, orderType: OrderType.STOP, tradeSide: 2, volume: 100, stopPrice: 4000 }
+    expect(buildAmendOrder({ current: stop, changes: { totalQuantity: new Decimal(2) }, symbol: XAUUSD, spec: XAU_SPEC, now: WEDNESDAY }))
+      .toEqual({ ok: true, value: { orderId: 9003, stopPrice: 4000, volume: 200 } })
   })
 
   // Sell stop 4000 with its limit 200 points (2.00) lower, at 3998.
@@ -186,7 +194,7 @@ describe('buildAmendOrder', () => {
 
   it('re-sends the stop-limit distance when only the volume changes', () => {
     const r = buildAmendOrder({ current: sellStopLimit, changes: { totalQuantity: new Decimal(2) }, symbol: XAUUSD, spec: XAU_SPEC, now: WEDNESDAY })
-    expect(r).toEqual({ ok: true, value: { orderId: 9002, slippageInPoints: 200, volume: 200 } })
+    expect(r).toEqual({ ok: true, value: { orderId: 9002, stopPrice: 4000, slippageInPoints: 200, volume: 200 } })
   })
 
   it('refuses changes that do not fit the order type or switch time in force', () => {

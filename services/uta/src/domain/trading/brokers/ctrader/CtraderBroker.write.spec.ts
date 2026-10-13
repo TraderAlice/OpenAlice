@@ -178,6 +178,16 @@ describe('modifyOrder and cancelOrder', () => {
     expect(after!.order.lmtPrice.toString()).toBe('3999.5')
   })
 
+  it('changes only the volume or only the limit of a stop-limit order', async () => {
+    const { broker } = await makeBroker()
+    expect(await broker.modifyOrder('9002', { totalQuantity: new Decimal(2) })).toMatchObject({ success: true })
+    expect(await broker.modifyOrder('9002', { lmtPrice: new Decimal('3999') })).toMatchObject({ success: true })
+    const after = await broker.getOrder('9002')
+    expect(after!.order.totalQuantity.toString()).toBe('2')
+    expect(after!.order.auxPrice.toString()).toBe('4000')
+    expect(after!.order.lmtPrice.toString()).toBe('3999')
+  })
+
   it('refuses to amend unknown or finished orders', async () => {
     const { venue, broker } = await makeBroker()
     expect(await broker.modifyOrder('1234', { lmtPrice: new Decimal('1.1') })).toEqual({ success: false, error: 'cTrader order 1234 not found' })
