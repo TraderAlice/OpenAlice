@@ -312,14 +312,15 @@ Protection and hedged-linking findings (Spotware demo, 2026-10-13):
 ### 6. Verification and acceptance
 
 - [x] Package typecheck, root `npx tsc --noEmit`, `cd ui && npx tsc -b`
-- [x] `pnpm test` complete (2026-10-10, Windows x64 at a22a1b3e): 7722 passed;
-      the 14 failures in 11 files reproduce identically on clean `dev`
-      d2914227 (symlink EPERM and CLI lifecycle on this host); two load
-      timeouts (presets/Hyperliquid, web-relay) pass on rerun
-- [x] `pnpm test:integration:uta` (291 passed)
+- [x] `pnpm test` complete (2026-10-14, Windows x64, branch rebased on `dev`
+      5da8dfcc): 7752 passed; the 14 failures in 11 files reproduce
+      identically on clean `dev` 5da8dfcc (symlink EPERM and CLI environment
+      on this host); one load timeout (presets/LeverUp) passes on rerun
+- [x] `pnpm test:integration:uta` (291 passed, 2026-10-14)
 - [x] `pnpm broker-packs:build` + Node verification on win32-x64: six archives
       verified, ctrader 2.4 MiB
-- [ ] `--compiled` verification (needs Bun; not installed on this host)
+- [x] `--compiled` verification with the pinned Bun 1.4.2 on win32-x64
+      (2026-10-14): all six packs import and construct in the compiled probe
 - [ ] Live-paper scenarios plus the new-broker checklist on demo; flat
       afterwards
 - [ ] Real browser route: connect, view, place/cancel from the UI
