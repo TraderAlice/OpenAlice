@@ -156,6 +156,18 @@ describe('modifyOrder and cancelOrder', () => {
     expect(venue.orders.find((o) => o['orderId'] === 9001)).toMatchObject({ limitPrice: 1.105 })
   })
 
+  it('keeps a DAY (GTD) order expiring at the same time after an amend', async () => {
+    const { broker } = await makeBroker()
+    const placed = await broker.placeOrder(contract('EURUSD'), order({ action: 'BUY', orderType: 'LMT', qty: '1000', lmt: '1.1', tif: 'DAY' }))
+    const before = await broker.getOrder(placed.orderId!)
+    expect(before!.order).toMatchObject({ tif: 'GTD', goodTillDate: '20261016 22:00:00 UTC' })
+
+    expect(await broker.modifyOrder(placed.orderId!, { lmtPrice: new Decimal('1.105') })).toMatchObject({ success: true })
+    const after = await broker.getOrder(placed.orderId!)
+    expect(after!.order).toMatchObject({ tif: 'GTD', goodTillDate: '20261016 22:00:00 UTC' })
+    expect(after!.order.lmtPrice.toString()).toBe('1.105')
+  })
+
   it('refuses to amend unknown or finished orders', async () => {
     const { venue, broker } = await makeBroker()
     expect(await broker.modifyOrder('1234', { lmtPrice: new Decimal('1.1') })).toEqual({ success: false, error: 'cTrader order 1234 not found' })

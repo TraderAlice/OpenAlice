@@ -159,6 +159,12 @@ describe('buildAmendOrder', () => {
     expect(r).toEqual({ ok: true, value: { orderId: 9001, stopLoss: 1.09, limitPrice: 1.105, volume: 300_000 } })
   })
 
+  it('re-sends the expiry of a GTD order so the venue keeps it GTD', () => {
+    const gtd = { ...current, timeInForce: TimeInForce.GOOD_TILL_DATE, expirationTimestamp: 1_791_923_395_000 }
+    const r = buildAmendOrder({ current: gtd, changes: { lmtPrice: new Decimal('1.105') }, symbol: EURUSD, spec: EUR_SPEC, now: WEDNESDAY })
+    expect(r).toEqual({ ok: true, value: { orderId: 9001, stopLoss: 1.09, expirationTimestamp: 1_791_923_395_000, limitPrice: 1.105 } })
+  })
+
   it('recomputes the stop-limit distance when the limit changes', () => {
     const stopLimit = { orderId: 9002, orderType: OrderType.STOP_LIMIT, tradeSide: 2, volume: 100, stopPrice: 4000 }
     const r = buildAmendOrder({ current: stopLimit, changes: { lmtPrice: new Decimal('3998') }, symbol: XAUUSD, spec: XAU_SPEC, now: WEDNESDAY })

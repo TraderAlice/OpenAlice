@@ -113,6 +113,12 @@ export function installTradingVenue(server: FakeCtraderServer): FakeVenue {
     for (const key of ['limitPrice', 'stopPrice', 'stopLoss', 'takeProfit', 'expirationTimestamp', 'slippageInPoints']) {
       if (p[key] !== undefined) order[key] = p[key]
     }
+    // Real venue (Spotware demo, 2026-10-13): an amend without an expiry
+    // turns a GOOD_TILL_DATE order into GOOD_TILL_CANCEL.
+    if (p['expirationTimestamp'] === undefined && order['timeInForce'] === 1) {
+      order['timeInForce'] = 2
+      delete order['expirationTimestamp']
+    }
     order['utcLastUpdateTimestamp'] = clock++
     return exec(EXEC.REPLACED, { order: { ...order } })
   }

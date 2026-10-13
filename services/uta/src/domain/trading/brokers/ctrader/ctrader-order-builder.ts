@@ -305,9 +305,14 @@ export function buildAmendOrder(input: AmendInput): BuildResult<Record<string, u
   const { current, changes, spec, symbol } = input
   const name = symbol.name
   const payload: Record<string, unknown> = { orderId: current.orderId }
-  // Re-send existing protection so an amend never silently drops it.
+  // Re-send existing protection and expiry so an amend never silently drops
+  // them. Observed on the Spotware demo (2026-10-13): an amend without
+  // expirationTimestamp turns a GOOD_TILL_DATE order into GOOD_TILL_CANCEL.
   if (current.stopLoss !== undefined) payload['stopLoss'] = current.stopLoss
   if (current.takeProfit !== undefined) payload['takeProfit'] = current.takeProfit
+  if (current.timeInForce === TimeInForce.GOOD_TILL_DATE && current.expirationTimestamp !== undefined) {
+    payload['expirationTimestamp'] = current.expirationTimestamp
+  }
 
   let changed = false
   if (isSet(changes.totalQuantity)) {

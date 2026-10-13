@@ -154,9 +154,11 @@ redacting wire log; it is not committed.
 - [x] Symbol catalog: FX, metals and share CFDs resolve with categories;
       full specs for EURUSD and XAUUSD
 - [x] Spot subscription, 1m/1h/1d trendbars; encodings recorded below
-- [ ] Place/amend/cancel a pending order; open/close the minimum market
-      position; observe execution events; account left flat
-- [ ] Record write-side findings and answer open questions 2–3 here
+- [x] Place/amend/cancel a pending order; open/close the minimum market
+      position; observe execution events; account left flat (2026-10-13,
+      Spotware demo account, user-approved; final check 0 positions / 0 orders)
+- [x] Record write-side findings (below)
+- [ ] Re-run the pending-order amend on the demo after the expiry fix
 
 Read-side findings (Spotware demo, 2026-10-13):
 
@@ -175,6 +177,29 @@ Read-side findings (Spotware demo, 2026-10-13):
 - First authorization (Q2): the portal's Sandbox page issues access and
   refresh tokens for the developer's own accounts with the trading scope;
   that is enough for bring-your-own-application users.
+
+Write-side findings (Spotware demo, 2026-10-13):
+
+- Pending DAY order → GOOD_TILL_DATE at the session close (20:29:55 UTC for
+  EURUSD), as designed.
+- **An amend without `expirationTimestamp` silently turns a GOOD_TILL_DATE
+  order into GOOD_TILL_CANCEL.** Fixed: the amend re-sends the current
+  expiry (as it already re-sends SL/TP); the fake venue now reproduces the
+  venue behaviour and a broker spec guards it.
+- Market order: ORDER_ACCEPTED (settles the request) then ORDER_FILLED, both
+  with the request's clientMsgId; default time in force IOC.
+- Fill-relative protection lands one point off when the fill differs from
+  the quote (requested 1.10966/1.12966, venue set 1.10965/1.12965); the
+  follow-up AMEND_POSITION_SLTP moved it to the exact prices.
+- Protection is a separate STOP_LOSS_TAKE_PROFIT order (type 4) owned by the
+  position; its events can carry the **order's clientOrderId** in the
+  `clientMsgId` field. Request ids (`oa-<n>`) and order ids
+  (`oa-<24 hex>`) never collide, and unmatched ids are treated as events.
+- AMEND_POSITION_SLTP answers ORDER_ACCEPTED (protection order) and then
+  ORDER_REPLACED with the request id.
+- CLOSE_POSITION (partial and full): ACCEPTED → FILLED, then the protection
+  order is REPLACED (partial) or CANCELLED (flat).
+- Round-trip cost of 2 000 EURUSD units on the demo: 0.21 EUR.
 
 ### 2. Transport and session
 
