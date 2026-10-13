@@ -180,11 +180,8 @@ redacting wire log; it is not committed.
       (2026-10-13, user-approved): the amend now carries the expiry, the
       venue answers REPLACED with GOOD_TILL_DATE and the same expiry; order
       cancelled, account flat
-- [ ] Demo check of protection legs and hedged linking: legs listed after a
-      protected market order; SL moved to break-even; TP cancelled while SL
-      stays (does AMEND_POSITION_SLTP drop an omitted level?); a pending SELL
-      STP linked with `positionId` is accepted as a closing order; whether
-      the venue cancels a linked pending order when its position closes
+- [x] Demo check of protection legs and hedged linking (2026-10-13,
+      user-approved, two runs, account flat after each): see findings below
 
 Read-side findings (Spotware demo, 2026-10-13):
 
@@ -226,6 +223,24 @@ Write-side findings (Spotware demo, 2026-10-13):
 - CLOSE_POSITION (partial and full): ACCEPTED → FILLED, then the protection
   order is REPLACED (partial) or CANCELLED (flat).
 - Round-trip cost of 2 000 EURUSD units on the demo: 0.21 EUR.
+
+Protection and hedged-linking findings (Spotware demo, 2026-10-13):
+
+- A protected market order returns `sl-`/`tp-` legs; both are listed by
+  `getOpenOrders` and moved by `modifyOrder` (AMEND_POSITION_SLTP answers
+  REPLACED on the position's STOP_LOSS_TAKE_PROFIT order).
+- **AMEND_POSITION_SLTP drops a level that is omitted**: sending only
+  `stopLoss` removed the take-profit. Re-sending the other level on every
+  amend (already the design) is required; cancelling a leg is "send only the
+  other one".
+- A pending SELL STOP sent with the long's `positionId` is accepted, stays
+  attached (`positionId` set) but reports `closingOrder: false`. When it
+  triggered (11 s, stop 1 point below the bid) it **closed the long and
+  opened no short**: linking reduces as intended. Amending it keeps the link.
+- Closing a position cancels only the venue's own protection order; a
+  linked pending order **stays active** with the position gone. The
+  adapter's post-close cancellation of linked orders is therefore required.
+- After a manual close both legs settle as Cancelled.
 
 ### 2. Transport and session
 
