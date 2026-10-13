@@ -934,7 +934,7 @@ function ConnectorPreferences({
               <div className="flex min-w-0 items-start gap-2.5">
                 <Send size={15} className="mt-0.5 shrink-0 text-muted-foreground" aria-hidden />
                 <div>
-                  <h3 className="text-[12.5px] font-semibold text-foreground">{fieldLabel}</h3>
+                  <h3 className="text-sm font-semibold text-foreground">{fieldLabel}</h3>
                   {field.description && (
                     <p className="mt-0.5 text-[11.5px] leading-5 text-muted-foreground">
                       {t(`connectorSettings.fieldDescriptions.${field.key}`, { defaultValue: field.description })}
@@ -1173,7 +1173,7 @@ function ConnectorCredentialsEditor({
           const fieldLabelContent = fieldMissing ? (
             <span className="flex items-center gap-1.5">
               <span>{fieldLabel}</span>
-              <span className="rounded-md bg-warning/10 px-1.5 py-0.5 text-[9.5px] leading-5 font-medium text-warning">
+              <span className="rounded-md bg-warning/10 px-1.5 py-0.5 text-sm leading-5 font-medium text-warning">
                 {t('connectorSettings.required')}
               </span>
             </span>
@@ -1368,7 +1368,7 @@ function ConnectorSetupGuide({ definition, t }: { definition: ConnectorDefinitio
           <ListChecks size={15} aria-hidden />
         </span>
         <div className="min-w-0 flex-1">
-          <h4 className="text-[12.5px] font-semibold leading-5 text-foreground">
+          <h4 className="text-sm font-semibold leading-5 text-foreground">
             {t('connectorSettings.setupGuide.title', { name: definition.label })}
           </h4>
           <p className="mt-0.5 text-[11.5px] leading-5 text-muted-foreground">
