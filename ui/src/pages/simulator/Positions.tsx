@@ -61,16 +61,16 @@ export function Positions({ state }: { state: SimulatorState }) {
                     <div className="flex items-center gap-1.5 flex-wrap">
                       <span className="font-medium text-foreground">{describePosition(p)}</span>
                       {p.secType && (
-                        <span className="rounded-sm bg-muted px-1 py-0.5 text-[10px] leading-[14px] text-muted-foreground/80">{p.secType}</span>
+                        <span className="rounded-sm bg-muted px-1 py-0.5 text-sm leading-5 text-muted-foreground/80">{p.secType}</span>
                       )}
-                      <span className={`rounded-sm px-1 py-0.5 text-[10px] leading-[14px] font-medium ${p.side === 'long' ? 'bg-success/15 text-success' : 'bg-destructive/15 text-destructive'}`}>
+                      <span className={`rounded-sm px-1 py-0.5 text-sm leading-5 font-medium ${p.side === 'long' ? 'bg-success/15 text-success' : 'bg-destructive/15 text-destructive'}`}>
                         {p.side}
                       </span>
                       {p.multiplier && p.multiplier !== '1' && (
-                        <span className="text-[9px] text-muted-foreground/60" title={`Each contract = ${p.multiplier} units`}>×{p.multiplier}</span>
+                        <span className="text-sm text-muted-foreground/60" title={`Each contract = ${p.multiplier} units`}>×{p.multiplier}</span>
                       )}
                       {p.avgCostSource === 'wallet' && (
-                        <span className="text-[9px] text-muted-foreground/60" title="Cost basis derived from UTA reconcile pipeline (wallet-source position)">wallet</span>
+                        <span className="text-sm text-muted-foreground/60" title="Cost basis derived from UTA reconcile pipeline (wallet-source position)">wallet</span>
                       )}
                     </div>
                   </td>

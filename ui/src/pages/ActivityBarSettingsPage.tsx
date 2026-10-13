@@ -346,10 +346,10 @@ export function ActivityBarSettingsPage() {
         title={t('settings.activityBar.title')}
         right={<SaveIndicator status={status} onRetry={retry} />}
       />
-      <SettingsScrollArea className="px-4 py-5 md:px-8">
-        <div ref={rootRef} className="mx-auto flex w-full max-w-[880px] flex-col gap-4">
+      <SettingsScrollArea>
+        <div ref={rootRef} className="flex w-full max-w-[880px] flex-col gap-4">
           {error && (
-            <p className="text-[13px] text-destructive">{t('settings.activityBar.loadError')}</p>
+            <p className="text-sm text-destructive">{t('settings.activityBar.loadError')}</p>
           )}
           {groups.map((group) => (
             <section
@@ -360,7 +360,7 @@ export function ActivityBarSettingsPage() {
                 active?.kind === 'group' && active.id === group.id ? 'oa-sortable-placeholder' : ''
               }`}
             >
-              <div data-nav-group-header className="flex min-h-12 items-center gap-2 border-b border-border/50 px-3 py-2">
+              <div data-nav-group-header className="flex min-h-12 items-center gap-2 px-3 py-2">
                 <Button
                   type="button"
                   variant="ghost"
@@ -385,7 +385,7 @@ export function ActivityBarSettingsPage() {
                   <GripVertical size={14} strokeWidth={1.75} aria-hidden />
                 </Button>
                 {group.builtin ? (
-                  <h3 className="min-w-0 flex-1 text-[12px] leading-[18px] font-semibold text-muted-foreground">
+                  <h3 className="min-w-0 flex-1 text-sm leading-5 font-semibold text-muted-foreground">
                     {group.labelKey ? t(group.labelKey) : t('settings.activityBar.primaryGroup')}
                   </h3>
                 ) : (
@@ -398,7 +398,7 @@ export function ActivityBarSettingsPage() {
                       if (!value.trim()) return
                       update(renameCustomGroup(draft, group.id, value))
                     }}
-                    className="oa-field-control h-8 min-w-0 flex-1 rounded-md border border-transparent bg-transparent px-2 text-[13px] font-semibold leading-[18px] text-foreground outline-none"
+                    className="oa-field-control h-8 min-w-0 flex-1 rounded-md border border-transparent bg-transparent px-2 text-base font-semibold leading-5 text-foreground outline-none"
                   />
                 )}
                 {!group.builtin && (
@@ -414,7 +414,7 @@ export function ActivityBarSettingsPage() {
                   </Button>
                 )}
               </div>
-              <div data-nav-item-list className="flex flex-col py-1">
+              <div data-nav-item-list className="flex flex-col border-t border-border/50 py-1 empty:hidden">
                 {group.items.map((item) => {
                   const label = t(item.leaf.labelKey)
                   const Icon = item.leaf.icon
@@ -453,9 +453,9 @@ export function ActivityBarSettingsPage() {
                         <GripVertical size={14} strokeWidth={1.75} aria-hidden />
                       </Button>
                       <Icon size={14} strokeWidth={1.75} className="text-muted-foreground" aria-hidden />
-                      <span className="min-w-0 flex-1 truncate text-[13px] text-foreground">{label}</span>
+                      <span className="min-w-0 flex-1 truncate text-sm text-foreground">{label}</span>
                       {item.pinned ? (
-                        <span className="text-[11px] text-muted-foreground">{t('settings.activityBar.pinned')}</span>
+                        <span className="text-sm text-muted-foreground">{t('settings.activityBar.pinned')}</span>
                       ) : (
                         <Toggle
                           size="sm"
@@ -501,7 +501,7 @@ export function ActivityBarSettingsPage() {
                 {t('settings.activityBar.reset')}
               </Button>
             </div>
-            <p className="text-[11px] text-muted-foreground">{t('settings.activityBar.path')}</p>
+            <p className="text-sm text-muted-foreground">{t('settings.activityBar.path')}</p>
           </div>
         </div>
       </SettingsScrollArea>
@@ -535,7 +535,7 @@ function OverlayItem({
     <div className="flex items-center gap-2">
       <GripVertical size={14} strokeWidth={1.75} className="text-muted-foreground" aria-hidden />
       <Icon size={14} strokeWidth={1.75} className="text-muted-foreground" aria-hidden />
-      <span className="truncate text-[13px] text-foreground">{t(item.leaf.labelKey)}</span>
+      <span className="truncate text-sm text-foreground">{t(item.leaf.labelKey)}</span>
     </div>
   )
 }
@@ -553,7 +553,7 @@ function OverlayGroup({
   return (
     <div className="flex items-center gap-2 py-1">
       <GripVertical size={14} strokeWidth={1.75} className="text-muted-foreground" aria-hidden />
-      <span className="text-[12px] font-semibold text-foreground">
+      <span className="text-sm font-semibold text-foreground">
         {group.labelKey ? t(group.labelKey) : group.label ?? t('settings.activityBar.primaryGroup')}
       </span>
     </div>

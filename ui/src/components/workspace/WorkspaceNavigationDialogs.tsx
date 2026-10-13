@@ -89,7 +89,7 @@ export function WorkspacePickerDialog(props: WorkspacePickerDialogProps): ReactE
               value={query}
               onChange={(event) => setQuery(event.target.value)}
               placeholder={t('chat.workspaceSearchPlaceholder')}
-              className="min-w-0 flex-1 bg-transparent text-sm text-foreground outline-none placeholder:text-muted-foreground/65"
+              className="min-w-0 flex-1 bg-transparent text-base text-foreground outline-none placeholder:text-muted-foreground/65"
             />
           </label>
         </div>
@@ -131,7 +131,7 @@ export function WorkspacePickerDialog(props: WorkspacePickerDialogProps): ReactE
                           </span>
                           <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${running ? 'bg-success' : 'bg-muted-foreground/30'}`} aria-hidden />
                         </span>
-                        <span className="mt-0.5 flex min-w-0 flex-wrap items-center gap-x-2 text-[11px] text-muted-foreground">
+                        <span className="mt-0.5 flex min-w-0 flex-wrap items-center gap-x-2 text-sm text-muted-foreground">
                           {workspace.displayName?.trim() && workspace.displayName.trim() !== workspace.tag && (
                             <span className="truncate font-mono">{workspace.tag}</span>
                           )}
@@ -285,7 +285,7 @@ export function ConversationBrowserDialog(props: ConversationBrowserDialogProps)
                 : isPrediction
                   ? t('autoPrediction.researchSearchPlaceholder')
                   : t('chat.conversationSearchPlaceholder')}
-              className="min-w-0 flex-1 bg-transparent text-sm text-foreground outline-none placeholder:text-muted-foreground/65"
+              className="min-w-0 flex-1 bg-transparent text-base text-foreground outline-none placeholder:text-muted-foreground/65"
             />
           </label>
           <div className="flex flex-wrap items-center justify-between gap-2">
@@ -380,14 +380,14 @@ export function ConversationBrowserDialog(props: ConversationBrowserDialogProps)
                       </span>
                       <span className="min-w-0 flex-1">
                         <span className={`block truncate text-sm font-medium ${row.failed ? 'text-muted-foreground/70' : ''}`} title={row.title}>{row.title}</span>
-                        <span className="mt-0.5 flex min-w-0 flex-wrap items-center gap-x-2 text-[11px] text-muted-foreground">
+                        <span className="mt-0.5 flex min-w-0 flex-wrap items-center gap-x-2 text-sm text-muted-foreground">
                           {sourceLabel && <span className="truncate">{sourceLabel}</span>}
                           <span className="truncate">{workspaceDisplayName(workspace)}</span>
                           <span className="font-mono">{row.agent}</span>
                           {occupancyIso && <span>{formatRelativeTime(occupancyIso)}</span>}
                         </span>
                       </span>
-                      <span className={`hidden shrink-0 items-center gap-1.5 rounded-full px-2 py-1 text-[10px] font-medium sm:inline-flex ${
+                      <span className={`hidden shrink-0 items-center gap-1.5 rounded-full px-2 py-1 text-sm font-medium sm:inline-flex ${
                         row.presence === 'archived'
                           ? 'bg-muted text-muted-foreground'
                           : row.occupancyRunning

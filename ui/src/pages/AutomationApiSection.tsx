@@ -6,11 +6,11 @@
  * the retired event-bus webhook route is not part of the architecture.
  */
 
-const CODE = 'rounded bg-code-background px-1 py-0.5 font-mono text-[12px] text-foreground/90'
+const CODE = 'rounded bg-code-background px-1 py-0.5 font-mono text-sm text-foreground/90'
 
 function Block({ children }: { children: string }) {
   return (
-    <pre className="overflow-auto rounded bg-code-background p-3 text-[12px] leading-snug text-muted-foreground whitespace-pre-wrap">
+    <pre className="overflow-auto rounded bg-code-background p-3 text-sm leading-snug text-muted-foreground whitespace-pre-wrap">
       {children}
     </pre>
   )

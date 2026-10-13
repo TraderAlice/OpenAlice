@@ -109,7 +109,7 @@ export function MarketSidebar({ onNavigate }: { onNavigate?: () => void }) {
           onKeyDown={handleSearchKeyDown}
           placeholder={t('market.searchPlaceholder')}
           aria-label={t('market.searchPlaceholder')}
-          className={`${inputClass} px-2.5 text-[13px]`}
+          className={`${inputClass} px-2.5`}
         />
       </div>
 
@@ -121,13 +121,13 @@ export function MarketSidebar({ onNavigate }: { onNavigate?: () => void }) {
               {t('market.searchResults')}{loading ? ` (${t('common.searching')})` : results.length ? ` (${results.length})` : ''}
             </SidebarSectionHeader>
             {loading && (
-              <div className="flex items-center gap-2 px-3 py-2 text-[12px] leading-[18px] text-muted-foreground">
+              <div className="flex items-center gap-2 px-3 py-2 text-sm leading-5 text-muted-foreground">
                 <Spinner size="sm" />
                 <span>{t('common.searching')}</span>
               </div>
             )}
             {!loading && results.length === 0 && (
-              <p className="px-3 py-2 text-[12px] leading-relaxed text-muted-foreground">{t('market.noMatches')}</p>
+              <p className="px-3 py-2 text-sm leading-relaxed text-muted-foreground">{t('market.noMatches')}</p>
             )}
             {results.map((c, index) => (
               <div
@@ -167,15 +167,15 @@ export function MarketSidebar({ onNavigate }: { onNavigate?: () => void }) {
             onClick={() => openOrFocus({ kind: 'market-list', params: {} })}
           />
           <Collapsible open={watchlistOpen} onOpenChange={setWatchlistOpen}>
-            <CollapsibleTrigger aria-label={t('market.watchlist')} className="oa-nav-row group mx-2 flex min-h-10 w-[calc(100%-1rem)] items-center gap-2 rounded-md px-2 py-1.5 text-left text-[13px] leading-[18px] text-sidebar-foreground hover:bg-sidebar-accent/60 focus-visible:outline-2 focus-visible:outline-ring md:min-h-8">
+            <CollapsibleTrigger aria-label={t('market.watchlist')} className="oa-nav-row group mx-2 flex min-h-10 w-[calc(100%-1rem)] items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm leading-5 text-sidebar-foreground hover:bg-sidebar-accent/60 focus-visible:outline-2 focus-visible:outline-ring md:min-h-8">
               <span>{t('market.watchlist')}</span>
-              {watchlist.length > 0 && <span className="text-[11px] tabular-nums text-muted-foreground">{watchlist.length}</span>}
+              {watchlist.length > 0 && <span className="text-sm tabular-nums text-muted-foreground">{watchlist.length}</span>}
               <ChevronDown aria-hidden className="ml-auto size-3.5 text-muted-foreground transition-transform duration-[180ms] group-aria-[expanded=false]:-rotate-90 motion-reduce:transition-none" />
             </CollapsibleTrigger>
             <CollapsibleContent aria-hidden={!watchlistOpen} inert={!watchlistOpen}>
               <div className="ml-3 border-l border-border/50">
                 {watchlist.length === 0 ? (
-                  <p className="px-3 py-2 text-[12px] leading-relaxed text-muted-foreground">
+                  <p className="px-3 py-2 text-sm leading-relaxed text-muted-foreground">
                     {t('market.emptyWatchlistHint')}
                   </p>
                 ) : (
@@ -271,7 +271,7 @@ function MarketSection({ label, children, count }: {
 }) {
   return (
     <section role="group" aria-label={label} className="mt-3">
-      <SidebarSectionHeader hierarchy trailing={count ? <span className="text-[11px] tabular-nums text-muted-foreground">{count}</span> : undefined}>
+      <SidebarSectionHeader hierarchy trailing={count ? <span className="text-sm tabular-nums text-muted-foreground">{count}</span> : undefined}>
         {label}
       </SidebarSectionHeader>
       <div className="ml-3">{children}</div>
@@ -281,7 +281,7 @@ function MarketSection({ label, children, count }: {
 
 function AssetClassChip({ cls }: { cls: string }) {
   return (
-    <span className={`shrink-0 rounded-sm px-1 font-mono text-[10px] leading-[14px] ${ASSET_CLASS_COLORS[cls] ?? ASSET_CLASS_COLORS.unknown}`}>
+    <span className={`shrink-0 rounded-sm px-1 font-mono text-sm leading-5 ${ASSET_CLASS_COLORS[cls] ?? ASSET_CLASS_COLORS.unknown}`}>
       {cls}
     </span>
   )
@@ -294,9 +294,9 @@ function SourceTrail({ c }: { c: BarSourceCandidate }) {
   // crushed. (Asset class is shown in the wider main search box, not here.)
   return (
     <span className="flex shrink-0 items-center gap-1" title={`${c.barId}${c.barCapability ? `, ${c.barCapability}` : ''}`}>
-      <span className="text-[10px] text-foreground/75 font-medium truncate max-w-[96px]">{c.sourceId}</span>
+      <span className="text-sm text-foreground/75 font-medium truncate max-w-[96px]">{c.sourceId}</span>
       {c.barCapability && (
-        <span className={`text-[9px] ${CAPABILITY_COLOR[c.barCapability] ?? 'text-muted-foreground'}`}>{c.barCapability}</span>
+        <span className={`text-sm ${CAPABILITY_COLOR[c.barCapability] ?? 'text-muted-foreground'}`}>{c.barCapability}</span>
       )}
     </span>
   )

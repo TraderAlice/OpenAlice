@@ -39,9 +39,9 @@ function CategoryGroup({ group, category, active, onSelect }: NavigationProps & 
   }, [selected])
   return (
     <Collapsible open={open} onOpenChange={setOpen}>
-      <CollapsibleTrigger aria-label={t(group.labelKey)} className="oa-nav-row group mx-2 flex min-h-10 w-[calc(100%-1rem)] items-center gap-2 rounded-md px-2 py-1.5 text-left text-[13px] leading-[18px] text-sidebar-foreground transition-colors motion-reduce:transition-none hover:bg-sidebar-accent/60 focus-visible:outline-2 focus-visible:outline-ring md:min-h-8">
+      <CollapsibleTrigger aria-label={t(group.labelKey)} className="oa-nav-row group mx-2 flex min-h-10 w-[calc(100%-1rem)] items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm leading-5 text-sidebar-foreground transition-colors motion-reduce:transition-none hover:bg-sidebar-accent/60 focus-visible:outline-2 focus-visible:outline-ring md:min-h-8">
         <span className="min-w-0 truncate">{t(group.labelKey)}</span>
-        {!open && selected && <span className="ml-auto min-w-0 max-w-[45%] truncate text-[11px] text-muted-foreground" title={t(selected.labelKey)}>{t(selected.labelKey)}</span>}
+        {!open && selected && <span className="ml-auto min-w-0 max-w-[45%] truncate text-sm text-muted-foreground" title={t(selected.labelKey)}>{t(selected.labelKey)}</span>}
         <ChevronDown className="ml-auto size-3.5 shrink-0 text-muted-foreground transition-transform duration-[180ms] group-aria-[expanded=false]:-rotate-90 motion-reduce:transition-none" aria-hidden />
       </CollapsibleTrigger>
       <CollapsibleContent aria-hidden={!open} inert={!open}>

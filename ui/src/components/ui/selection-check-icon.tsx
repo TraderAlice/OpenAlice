@@ -1,13 +1,8 @@
-import { CheckIcon } from 'lucide-react'
-
-/** Shared selection ink with one neutral color and fixed optical geometry. */
 function SelectionCheckIcon() {
   return (
-    <CheckIcon
-      aria-hidden="true"
-      className="h-3.5 w-3.5 shrink-0 text-foreground"
-      strokeWidth={2.25}
-    />
+    <svg aria-hidden="true" className="size-4 shrink-0 text-foreground" width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+      <path d="m3 8.2 3.35 3.1L13 4.8" />
+    </svg>
   )
 }
 

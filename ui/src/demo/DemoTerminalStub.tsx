@@ -1,39 +1,32 @@
 import type { ReactElement } from 'react'
 import { ArrowUpRight } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
+import { buttonVariants } from '../components/ui/button'
 
 interface DemoTerminalStubProps {
   readonly label: string
 }
 
 export function DemoTerminalStub({ label }: DemoTerminalStubProps): ReactElement {
+  const { t } = useTranslation()
   return (
     <div className="flex h-full w-full items-center justify-center bg-background p-8 text-muted-foreground">
       <div className="max-w-md text-left space-y-3">
-        <div className="font-mono text-[11px] leading-4 text-muted-foreground/70">
+        <div className="font-mono text-sm leading-5 text-muted-foreground/70">
           {label}
         </div>
         <div className="text-base font-semibold text-foreground">
           Agent terminal
         </div>
-        <div className="text-sm leading-relaxed text-muted-foreground">
-          In a real OpenAlice install, this pane is a live PTY running{' '}
-          <span className="text-foreground">Claude Code</span>,{' '}
-          <span className="text-foreground">Codex</span>,{' '}
-          <span className="text-foreground">opencode</span>,{' '}
-          <span className="text-foreground">Pi</span>, or{' '}
-          <span className="text-foreground">shell</span> — the AI agent drives it directly: reads files, runs commands, reports back.
-        </div>
-        <div className="text-xs text-muted-foreground/70">
-          Demo mode shows the workspace structure without a live process.
-        </div>
+        <p className="text-sm leading-6 text-muted-foreground">{t('demoBanner.terminal')}</p>
         <div className="pt-2">
           <a
             href="https://github.com/TraderAlice/OpenAlice"
             target="_blank"
             rel="noopener noreferrer"
-            className="oa-demo-install oa-pressable inline-flex h-8 items-center gap-1.5 rounded-lg px-2.5 text-xs font-semibold text-foreground"
+            className={buttonVariants({ variant: 'outline' })}
           >
-            <span>Install OpenAlice</span>
+            <span>{t('demoBanner.install')}</span>
             <ArrowUpRight className="h-3.5 w-3.5" aria-hidden />
           </a>
         </div>

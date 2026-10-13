@@ -7,10 +7,11 @@ interface ToggleProps {
   size?: 'sm' | 'md'
   ariaLabel: string
   disabled?: boolean
+  pending?: boolean
   title?: string
 }
 
-export function Toggle({ id, checked, onChange, size = 'md', ariaLabel, disabled = false, title }: ToggleProps) {
+export function Toggle({ id, checked, onChange, size = 'md', ariaLabel, disabled = false, pending = false, title }: ToggleProps) {
   return (
     <Switch
       id={id}
@@ -20,6 +21,8 @@ export function Toggle({ id, checked, onChange, size = 'md', ariaLabel, disabled
       aria-label={ariaLabel}
       title={title}
       disabled={disabled}
+      readOnly={pending}
+      aria-busy={pending || undefined}
     />
   )
 }

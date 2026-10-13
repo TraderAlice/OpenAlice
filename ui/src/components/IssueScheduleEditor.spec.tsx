@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { useState } from 'react'
 import { i18n } from '../i18n'
@@ -41,7 +42,7 @@ describe('IssueScheduleEditor', () => {
     expect(patch).toHaveBeenCalledExactlyOnceWith({ when: { kind: 'cron', cron: '0 * * * *', timezone: 'America/Los_Angeles' } })
     fireEvent.click(screen.getByRole('button', { name: 'Schedule settings' }))
     expect(cron().value).toBe('0 * * * *')
-    expect((screen.getByRole('combobox', { name: 'Run timeout' }) as HTMLSelectElement).value).toBe('30m')
+    expect(screen.getByRole('combobox', { name: 'Run timeout' }).textContent).toBe('30m')
   })
   it('retains the draft on failure and allows retry', async () => {
     const patch = vi.fn().mockResolvedValueOnce(false).mockResolvedValueOnce(true)
@@ -77,7 +78,8 @@ describe('IssueScheduleEditor', () => {
   })
   it('submits timeout-only changes without rewriting when', async () => {
     const { onPatch } = editor()
-    fireEvent.change(screen.getByRole('combobox', { name: 'Run timeout' }), { target: { value: '' } })
+    await userEvent.click(screen.getByRole('combobox', { name: 'Run timeout' }))
+    await userEvent.click(await screen.findByRole('option', { name: 'No limit' }))
     expect(onPatch).not.toHaveBeenCalled()
     fireEvent.click(save())
     await waitFor(() => expect(onPatch).toHaveBeenCalledExactlyOnceWith({ timeout: null }))
@@ -111,7 +113,7 @@ describe('IssueScheduleEditor', () => {
     expect(save().disabled).toBe(true)
     fireEvent.click(screen.getByRole('button', { name: 'Reload latest' }))
     expect(cron().value).toBe('*/15 * * * *')
-    expect((screen.getByRole('combobox', { name: 'Run timeout' }) as HTMLSelectElement).value).toBe('60m')
+    expect(screen.getByRole('combobox', { name: 'Run timeout' }).textContent).toBe('60m')
     expect(onPatch).not.toHaveBeenCalled()
   })
   it('does not expose a generic cadence writer for connector desks', () => {

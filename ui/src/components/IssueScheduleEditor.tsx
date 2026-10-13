@@ -6,6 +6,8 @@ import { ISSUE_TIMEOUTS, type IssueDetailIssue, type IssuePatch, type IssueTimeo
 import type { ScheduleWhen } from '../api/schedule'
 import { inputClass } from './form'
 import { Button } from './ui/button'
+import { Checkbox } from './ui/checkbox'
+import { Select } from './ui/select'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from './ui/dialog'
 
 type Draft = {
@@ -133,7 +135,7 @@ export function IssueScheduleEditor({ issue, saving, onPatch, children }: {
               </div>
               <label className="block space-y-1.5">
                 <span className="text-xs font-medium">{t(`issues.detail.scheduleEditor.${draft.kind}Label`)}</span>
-                <input className={`${inputClass} h-9`} value={draft[draft.kind]} spellCheck={false}
+                <input className={inputClass} value={draft[draft.kind]} spellCheck={false}
                   aria-invalid={Boolean(fieldError)} aria-describedby={`${id}-hint${fieldError ? ` ${id}-error` : ''}`}
                   onChange={(event) => edit({ [draft.kind]: event.target.value })} />
               </label>
@@ -142,14 +144,14 @@ export function IssueScheduleEditor({ issue, saving, onPatch, children }: {
               {draft.kind === 'cron' && <>
                 <label className="block space-y-1.5">
                   <span className="text-xs font-medium">{t('issues.detail.scheduleEditor.timezone')}</span>
-                  <input className={`${inputClass} h-9`} list={`${id}-zones`} value={draft.timezone ?? ''} placeholder="local" spellCheck={false}
+                  <input className={inputClass} list={`${id}-zones`} value={draft.timezone ?? ''} placeholder="local" spellCheck={false}
                     aria-invalid={error === 'invalid_timezone'} aria-describedby={`${id}-zone-hint${error === 'invalid_timezone' ? ` ${id}-error` : ''}`}
                     onChange={(event) => edit({ timezone: event.target.value || undefined })} />
                   <datalist id={`${id}-zones`}><option value="local" /><option value="America/Los_Angeles" /><option value="America/New_York" /><option value="UTC" /></datalist>
                 </label>
                 <p id={`${id}-zone-hint`} className="text-xs leading-relaxed text-muted-foreground">{t('issues.detail.scheduleEditor.timezoneHint')}</p>
-                <label className="flex min-h-12 items-start gap-3 rounded-lg border border-border bg-muted/20 p-3">
-                  <input type="checkbox" className="mt-1" checked={draft.catchUp !== false} onChange={(event) => edit({ catchUp: event.target.checked })} />
+                <label className="flex items-center gap-3 rounded-lg border border-border bg-muted/20 px-3 py-2">
+                  <Checkbox disabled={busy} checked={draft.catchUp !== false} onChange={(event) => edit({ catchUp: event.target.checked })} />
                   <span><span className="block text-sm font-medium">{t('issues.detail.catchUp')}</span><span className="mt-1 block text-xs leading-relaxed text-muted-foreground">{t('issues.detail.catchUpDescription')}</span></span>
                 </label>
               </>}
@@ -159,10 +161,9 @@ export function IssueScheduleEditor({ issue, saving, onPatch, children }: {
               <legend className="sr-only">{t('issues.detail.scheduleEditor.limits')}</legend>
               <h3 className="mb-3 font-medium">{t('issues.detail.scheduleEditor.limits')}</h3>
               <label className="block space-y-1.5"><span className="text-xs font-medium">{t('issues.detail.timeout')}</span>
-                <select className={`${inputClass} h-9`} value={draft.timeout} onChange={(event) => edit({ timeout: event.target.value as Draft['timeout'] })}>
-                  <option value="">{t('issues.detail.timeoutNone')}</option>
-                  {ISSUE_TIMEOUTS.map((value) => <option key={value} value={value}>{value}</option>)}
-                </select>
+                <Select type="button" disabled={busy} value={draft.timeout} aria-label={t('issues.detail.timeout')}
+                  onValueChange={(timeout) => edit({ timeout: timeout as Draft['timeout'] })}
+                  options={[{ value: '', label: t('issues.detail.timeoutNone') }, ...ISSUE_TIMEOUTS.map((value) => ({ value, label: value }))]} />
               </label>
               <p className="mt-2 text-xs leading-relaxed text-muted-foreground">{t('issues.detail.scheduleEditor.timeoutHint')}</p>
             </fieldset>

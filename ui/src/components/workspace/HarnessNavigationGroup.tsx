@@ -3,7 +3,6 @@ import { Plus } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { Tooltip, TooltipContent, TooltipTrigger } from '../ui/tooltip'
 
-/** One office in the primary navigation, not a tree of all Workspaces. */
 export function HarnessNavigationGroup({ title, compact, compactIcon, active, newLabel, showNewAction = true, onOpen, menu, children }: {
   title: string
   compact: boolean
@@ -21,7 +20,7 @@ export function HarnessNavigationGroup({ title, compact, compactIcon, active, ne
     return (
       <Tooltip>
         <TooltipTrigger render={<button type="button" aria-label={label} aria-current={active ? 'page' : undefined} onClick={onOpen}
-          className={`oa-nav-item flex h-8 w-8 items-center justify-center rounded-md ${active ? 'bg-sidebar-accent text-sidebar-accent-foreground' : 'text-sidebar-foreground/75 hover:bg-sidebar-accent/60'}`} />}>
+          className={`oa-nav-item flex size-11 items-center justify-center [&_svg]:size-4 rounded-md ${active ? 'bg-sidebar-accent text-sidebar-accent-foreground' : 'text-sidebar-foreground hover:bg-sidebar-accent/60'}`} />}>
           {compactIcon}
         </TooltipTrigger>
         <TooltipContent side="right">{label}</TooltipContent>
@@ -29,22 +28,22 @@ export function HarnessNavigationGroup({ title, compact, compactIcon, active, ne
     )
   }
   return (
-    <section aria-label={label} className="min-w-0">
-      <div className={`oa-harness-nav-header flex min-h-10 items-center rounded-md md:min-h-8 ${active ? 'bg-sidebar-accent' : 'hover:bg-sidebar-accent/60'}`}>
+    <section aria-label={label} className="oa-harness-nav-group min-w-0">
+      <div className={`oa-harness-nav-header flex min-h-(--oa-nav-height) items-center rounded-md ${active ? 'bg-sidebar-accent' : 'hover:bg-sidebar-accent/60'}`}>
         <button type="button" aria-label={label} aria-current={active ? 'page' : undefined} onClick={onOpen}
-          className={`oa-nav-item flex min-h-10 min-w-0 flex-1 items-center gap-2.5 rounded-md px-2.5 text-left text-[13px] leading-[18px] md:min-h-8 ${active ? 'text-foreground' : 'text-sidebar-foreground/75 hover:text-foreground'}`}>
-          <span className="flex h-[18px] w-[18px] shrink-0 items-center justify-center">{compactIcon}</span>
+          className={`oa-nav-item oa-primary-nav-row flex min-w-0 flex-1 items-center rounded-md text-left font-normal aria-[current=page]:font-medium ${active ? 'text-foreground' : 'text-sidebar-foreground hover:text-foreground'}`}>
+          <span className="oa-navigation-icon">{compactIcon}</span>
           <span className="truncate">{title}</span>
         </button>
         <div className="oa-harness-nav-actions flex shrink-0 items-center pr-1">
           {menu}
           {showNewAction && <button type="button" aria-label={`${title}: ${newLabel}`} title={newLabel} onClick={onOpen}
-            className="oa-icon-action flex h-8 w-7 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-sidebar-accent hover:text-foreground">
+            className="oa-icon-action oa-workspace-row-action flex h-8 w-7 shrink-0 items-center justify-center rounded-full text-muted-foreground hover:bg-sidebar-accent hover:text-foreground">
             <Plus size={14} aria-hidden />
           </button>}
         </div>
       </div>
-      <div className="oa-harness-nav-children ml-3 min-w-0 pb-2">{children}</div>
+      <div className="oa-harness-nav-children min-w-0">{children}</div>
     </section>
   )
 }

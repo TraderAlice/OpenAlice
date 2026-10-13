@@ -11,13 +11,13 @@ interface SwitchProps extends SwitchPrimitive.Root.Props {
 const switchSize = {
   sm: {
     footprint: '-mx-1 -my-[11px]',
-    track: 'h-[18px] w-8',
-    thumb: 'size-3 data-checked:translate-x-[14px]',
+    track: 'h-[22px] w-9',
+    thumb: 'size-4 data-checked:translate-x-[14px]',
   },
   md: {
     footprint: '-my-[9px]',
-    track: 'h-[22px] w-10',
-    thumb: 'size-4 data-checked:translate-x-[18px]',
+    track: 'h-[26px] w-11',
+    thumb: 'size-5 data-checked:translate-x-[18px]',
   },
 } satisfies Record<SwitchSize, Record<'footprint' | 'track' | 'thumb', string>>
 
@@ -30,7 +30,7 @@ function Switch({ className, size = 'md', ...props }: SwitchProps) {
       nativeButton
       render={<button type="button" />}
       className={cn(
-        'group/switch inline-flex size-10 shrink-0 cursor-pointer items-center justify-center rounded-full outline-none disabled:cursor-not-allowed disabled:opacity-40',
+        'group/switch inline-flex h-11 w-12 shrink-0 touch-manipulation cursor-pointer items-center justify-center rounded-full outline-none disabled:cursor-not-allowed disabled:opacity-40',
         'focus-visible:[&_[data-slot=switch-track]]:[box-shadow:var(--oa-focus-shadow)]',
         geometry.footprint,
         className,
@@ -41,14 +41,14 @@ function Switch({ className, size = 'md', ...props }: SwitchProps) {
         aria-hidden="true"
         data-slot="switch-track"
         className={cn(
-          'inline-flex shrink-0 items-center rounded-full bg-muted p-[3px] transition-[background-color,box-shadow] duration-[var(--motion-fast)] [transition-timing-function:var(--motion-ease-out)] group-data-checked/switch:bg-primary motion-reduce:transition-none',
+          'inline-flex shrink-0 items-center rounded-full bg-muted p-[3px] transition-[background-color,box-shadow] duration-[var(--motion-standard)] [transition-timing-function:var(--motion-ease-out)] group-data-checked/switch:bg-action group-focus-visible/switch:transition-none motion-reduce:transition-none',
           geometry.track,
         )}
       >
         <SwitchPrimitive.Thumb
           data-slot="switch-thumb"
           className={cn(
-            'block shrink-0 translate-x-0 rounded-full bg-muted-foreground transition-[translate,background-color] duration-[var(--motion-fast)] [transition-timing-function:var(--motion-ease-out)] data-checked:bg-primary-foreground motion-reduce:transition-none',
+            'block shrink-0 translate-x-0 rounded-full bg-muted-foreground transition-[translate,scale,background-color] duration-[var(--motion-standard)] [transition-timing-function:var(--motion-ease-out)] data-checked:bg-action-foreground origin-left data-checked:origin-right motion-safe:group-[:active:not(:focus-visible):not([data-readonly])]/switch:scale-x-125 group-focus-visible/switch:transition-none motion-reduce:transition-none',
             geometry.thumb,
           )}
         />

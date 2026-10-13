@@ -1039,7 +1039,7 @@ describe('OfficeBuilding', () => {
     expect(screen.queryByRole('menuitemradio', { name: 'Live map' })).toBeNull()
     expect(screen.queryByRole('menuitemradio', { name: 'All groups' })).toBeNull()
     expect(screen.getByLabelText('Current floor view: Live map').textContent).toContain('Current')
-    expect(document.activeElement).toBe(screen.getByRole('menuitem', { name: 'Activity log' }))
+    await waitFor(() => expect(document.activeElement).toBe(screen.getByRole('menuitem', { name: 'Activity log' })))
     await userEvent.keyboard('{Escape}')
     const predictionSign = screen.getByRole('button', { name: /Enter prediction workspace/ })
     expect(predictionSign.textContent).toContain('0/0 awake')

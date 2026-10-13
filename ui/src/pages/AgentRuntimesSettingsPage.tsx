@@ -1,16 +1,18 @@
 import { useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { ArrowDown, ArrowUp, RefreshCw } from 'lucide-react'
+import { ArrowDown, ArrowUp, ChevronDown, CircleCheck, CircleDashed, CircleX, LoaderCircle, TriangleAlert, RefreshCw, Search } from 'lucide-react'
 
 import { ConfigSection, SettingsScrollArea, inputClass } from '../components/form'
+import { CountBadge } from '../components/CountBadge'
 import { PageHeader } from '../components/PageHeader'
 import { EmptyState, PageLoading } from '../components/StateViews'
 import { Button } from '../components/ui/button'
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '../components/ui/collapsible'
 import { Toggle } from '../components/Toggle'
 import { installHintFor } from '../components/workspace/agentInstall'
-import type { AgentInfo, AgentRuntimeReadinessRow } from '../components/workspace/api'
+import type { AgentInfo, AgentRuntimeReadinessRow, AgentRuntimeReadinessStatus } from '../components/workspace/api'
 import { useAgentRuntimes } from '../hooks/useAgentRuntimes'
-import { canAddAgentRuntimeQuickAccess } from '../lib/agentRuntimeQuickAccess'
+import { AGENT_RUNTIME_QUICK_ACCESS_LIMIT, canAddAgentRuntimeQuickAccess } from '../lib/agentRuntimeQuickAccess'
 import { AgentRuntimeIcon } from '../lib/agentRuntimeIcon'
 import { agentRuntimeSettingsStatusKey } from '../lib/agentRuntimeReadiness'
 
@@ -48,6 +50,18 @@ const RUNTIME_COPY = {
     auth: 'aiProvider.runtime.pi.auth',
   },
 } as const
+
+const RUNTIME_STATUS_APPEARANCE = {
+  unknown: { Icon: CircleDashed, color: 'text-muted-foreground' },
+  ready: { Icon: CircleCheck, color: 'text-success' },
+  checking: { Icon: LoaderCircle, color: 'text-info' },
+  not_installed: { Icon: TriangleAlert, color: 'text-warning' },
+  auth_required: { Icon: TriangleAlert, color: 'text-warning' },
+  provider_required: { Icon: TriangleAlert, color: 'text-warning' },
+  output_unrecognized: { Icon: TriangleAlert, color: 'text-warning' },
+  timeout: { Icon: TriangleAlert, color: 'text-warning' },
+  failed: { Icon: CircleX, color: 'text-destructive' },
+} satisfies Record<AgentRuntimeReadinessStatus, { Icon: typeof CircleCheck; color: string }>
 
 const REPAIR_KEYS = {
   'runtime-install': 'settings.agentRuntimes.repair.runtimeInstall',
@@ -95,11 +109,8 @@ export function AgentRuntimesSettingsPage() {
 
   const persist = async (ids: readonly string[]) => {
     setSaving(true)
-    try {
-      await saveQuickAccess(ids)
-    } finally {
-      setSaving(false)
-    }
+    await saveQuickAccess(ids).catch(() => undefined)
+    setSaving(false)
   }
 
   const togglePin = (agentId: string, pinnedNow: boolean) => {
@@ -139,45 +150,45 @@ export function AgentRuntimesSettingsPage() {
           <Button
             variant="outline"
             disabled={refreshing}
+            focusableWhenDisabled
             onClick={() => void refresh()}
             aria-label={t('settings.agentRuntimes.refresh')}
           >
-            <RefreshCw className={refreshing ? 'animate-spin' : undefined} />
+            <RefreshCw className={refreshing ? 'animate-spin motion-reduce:animate-none' : undefined} />
             {refreshing ? t('settings.agentRuntimes.refreshing') : t('settings.agentRuntimes.refresh')}
           </Button>
         )}
       />
-      <SettingsScrollArea className="px-4 py-5 md:px-8">
-        <div className="mx-auto max-w-[880px]">
+      <SettingsScrollArea>
+        <div className="max-w-[880px]">
           {error && (
-            <p role="alert" className="mb-4 rounded-lg border border-destructive/40 bg-destructive/5 px-3 py-2 text-[12px] text-destructive">
+            <p role="alert" className="mb-4 rounded-lg border border-destructive/40 bg-destructive/5 px-3 py-2 text-sm text-destructive">
               {error}
             </p>
           )}
 
           <ConfigSection
             title={t('settings.agentRuntimes.quickAccess')}
+            help={t(pinned.length ? 'settings.agentRuntimes.quickAccessDescription' : 'settings.agentRuntimes.quickAccessEmpty')}
+            accessory={<CountBadge count={pinned.length} label={t('settings.agentRuntimes.quickAccessCount', { count: pinned.length, limit: AGENT_RUNTIME_QUICK_ACCESS_LIMIT })} />}
           >
-            {pinned.length === 0 ? (
-              <div className="[&>div]:py-8">
-                <EmptyState title={t('settings.agentRuntimes.quickAccessEmpty')} />
-              </div>
-            ) : (
-              <ol className="overflow-hidden rounded-lg border border-border/70 bg-background">
+            {pinned.length > 0 && (
+              <ol className="overflow-hidden rounded-lg bg-background">
                 {pinned.map((agent, index) => {
                   return (
                     <li
                       key={agent.id}
-                      className="flex min-h-12 min-w-0 items-center gap-2 border-b border-border/60 px-3 py-2 last:border-b-0"
+                      className="flex min-h-11 min-w-0 items-center gap-2 border-b border-border/60 px-3 py-2 last:border-b-0"
                     >
-                      <span className="w-5 shrink-0 text-[11px] leading-[15px] tabular-nums text-muted-foreground">{index + 1}</span>
+                      <span className="w-5 shrink-0 text-sm leading-5 tabular-nums text-muted-foreground">{index + 1}</span>
                       <AgentRuntimeIcon agentId={agent.id} className="size-4 shrink-0" />
-                      <span className="min-w-0 flex-1 truncate text-[13px] leading-[18px] font-medium">{agent.displayName}</span>
+                      <span className="min-w-0 flex-1 truncate text-sm leading-5 font-medium">{agent.displayName}</span>
                       <div className="flex shrink-0 items-center gap-1">
                         <Button
                           variant="ghost"
                           size="icon-sm"
                           disabled={saving || index === 0}
+                          focusableWhenDisabled
                           aria-label={t('settings.agentRuntimes.moveUp', { name: agent.displayName })}
                           onClick={() => movePin(agent.id, -1)}
                         >
@@ -187,6 +198,7 @@ export function AgentRuntimesSettingsPage() {
                           variant="ghost"
                           size="icon-sm"
                           disabled={saving || index === pinned.length - 1}
+                          focusableWhenDisabled
                           aria-label={t('settings.agentRuntimes.moveDown', { name: agent.displayName })}
                           onClick={() => movePin(agent.id, 1)}
                         >
@@ -195,7 +207,7 @@ export function AgentRuntimesSettingsPage() {
                         <Toggle
                           size="sm"
                           checked
-                          disabled={saving}
+                          pending={saving}
                           ariaLabel={t('settings.agentRuntimes.unpin', { name: agent.displayName })}
                           onChange={() => togglePin(agent.id, true)}
                         />
@@ -209,14 +221,19 @@ export function AgentRuntimesSettingsPage() {
 
           <ConfigSection
             title={t('settings.agentRuntimes.catalog')}
+            accessory={<CountBadge count={visible.length} label={t('settings.agentRuntimes.catalogCount', { count: visible.length })} />}
           >
-            <input
-              value={query}
-              onChange={(event) => setQuery(event.target.value)}
-              placeholder={t('settings.agentRuntimes.search')}
-              aria-label={t('settings.agentRuntimes.search')}
-              className={`${inputClass} mb-3`}
-            />
+            <label className="relative mb-3 block">
+              <Search aria-hidden className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
+              <input
+                type="search"
+                value={query}
+                onChange={(event) => setQuery(event.target.value)}
+                placeholder={t('settings.agentRuntimes.search')}
+                aria-label={t('settings.agentRuntimes.search')}
+                className={`${inputClass} pl-11`}
+              />
+            </label>
             {visible.length === 0 ? (
               <div className="rounded-lg border border-dashed border-border">
                 <EmptyState title={catalog.length === 0
@@ -225,7 +242,7 @@ export function AgentRuntimesSettingsPage() {
                 />
               </div>
             ) : (
-              <div className="overflow-hidden rounded-lg border border-border/70 bg-background">
+              <div className="overflow-hidden rounded-lg bg-background">
                 {visible.map((agent) => (
                   <RuntimeSettingsCard
                     key={agent.id}
@@ -272,56 +289,29 @@ function RuntimeSettingsCard({
   const hint = installHintFor(agent.id)
   const binPath = row?.binPath ?? agent.binPath ?? null
 
+  const needsAttention = row?.repairTarget && row.status !== 'ready' && row.status !== 'checking'
+  const { Icon: StatusIcon, color: statusColor } = RUNTIME_STATUS_APPEARANCE[row?.status ?? 'unknown']
+
   return (
-    <article className="min-w-0 border-b border-border/60 px-3 py-3 last:border-b-0 sm:px-4">
-      <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-start">
-        <div className="flex min-w-0 flex-1 items-start gap-3">
-          <AgentRuntimeIcon agentId={agent.id} className="mt-0.5 size-5 shrink-0" />
-          <div className="min-w-0 flex-1">
-            <div className="flex min-w-0 flex-wrap items-baseline gap-x-2 gap-y-0.5">
-              <h3 className="min-w-0 truncate text-[13px] leading-[18px] font-semibold text-foreground">{agent.displayName}</h3>
-              <span className="font-mono text-[11px] leading-[15px] text-muted-foreground">{agent.id}</span>
-            </div>
-            <p className="mt-0.5 flex flex-wrap items-center gap-x-2 text-[12px] leading-[18px] text-muted-foreground">
-              <span>{installed ? t('settings.agentRuntimes.installed') : t('settings.agentRuntimes.notInstalled')}</span>
+    <article className="@container/runtime min-w-0 border-b border-border/60 px-3 last:border-b-0">
+      <Collapsible className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-start gap-x-3">
+        <CollapsibleTrigger className="group/runtime flex min-h-11 w-full cursor-pointer items-center gap-2 rounded-md py-2 text-left outline-none focus-visible:[box-shadow:var(--oa-focus-shadow)]">
+          <AgentRuntimeIcon agentId={agent.id} className="size-5 shrink-0" />
+          <span className="flex min-w-0 flex-1 flex-col gap-1 @min-[24rem]/runtime:flex-row @min-[24rem]/runtime:items-center @min-[24rem]/runtime:gap-3">
+            <span className="min-w-0 flex-1 text-sm font-medium [overflow-wrap:anywhere]">{agent.displayName}</span>
+            <span className={`flex items-start gap-1.5 text-sm leading-5 ${statusColor}`}>
+              <StatusIcon aria-hidden className={`mt-0.5 size-4 shrink-0 ${row?.status === 'checking' ? 'animate-spin motion-reduce:animate-none' : ''}`} />
               <span>{t(agentRuntimeSettingsStatusKey(row))}</span>
-            </p>
-            <p className="mt-0.5 truncate font-mono text-[11px] leading-[15px] text-muted-foreground" title={binPath ?? undefined}>
-              {binPath ?? t('settings.agentRuntimes.unknownPath')}
-            </p>
-            {row?.message && (
-              <p className="mt-1 text-[12px] leading-relaxed text-muted-foreground">{row.message}</p>
-            )}
-            {row?.repairTarget && (
-              <p className="mt-1 text-[12px] leading-relaxed text-muted-foreground">{t(REPAIR_KEYS[row.repairTarget])}</p>
-            )}
-            {agent.id in RUNTIME_COPY && (
-              <dl className="mt-2 grid gap-x-4 gap-y-1 text-[11px] leading-snug text-muted-foreground md:grid-cols-2">
-                <div className="grid grid-cols-[3.5rem_minmax(0,1fr)] gap-2">
-                  <dt className="text-muted-foreground/70">{t('settings.agentRuntimes.models')}</dt>
-                  <dd>{t(RUNTIME_COPY[agent.id as keyof typeof RUNTIME_COPY].models)}</dd>
-                </div>
-                <div className="grid grid-cols-[3.5rem_minmax(0,1fr)] gap-2">
-                  <dt className="text-muted-foreground/70">{t('settings.agentRuntimes.auth')}</dt>
-                  <dd>{t(RUNTIME_COPY[agent.id as keyof typeof RUNTIME_COPY].auth)}</dd>
-                </div>
-              </dl>
-            )}
-            {!installed && hint && (
-              <p className="mt-2 text-[12px] text-muted-foreground">
-                {hint.cmd && <span className="mr-2 font-mono">{hint.cmd}</span>}
-                <a href={hint.url} target="_blank" rel="noreferrer" className="text-primary hover:underline">
-                  {t('settings.agentRuntimes.installDocs')}
-                </a>
-              </p>
-            )}
-          </div>
-        </div>
-        <div className="flex shrink-0 flex-wrap items-center gap-2 self-end sm:flex-col sm:items-end sm:self-start">
+            </span>
+          </span>
+          <ChevronDown aria-hidden className="size-3.5 shrink-0 text-muted-foreground transition-transform duration-[var(--motion-fast)] group-data-panel-open/runtime:rotate-180 motion-reduce:transition-none" />
+        </CollapsibleTrigger>
+        <div className="flex min-h-11 shrink-0 self-stretch items-center gap-3">
           <Toggle
             size="sm"
             checked={pinned}
-            disabled={saving || (!pinned && pinDisabled)}
+            disabled={!pinned && pinDisabled}
+            pending={saving}
             ariaLabel={pinned
               ? t('settings.agentRuntimes.unpin', { name: agent.displayName })
               : !installed
@@ -331,11 +321,49 @@ function RuntimeSettingsCard({
                   : t('settings.agentRuntimes.pin', { name: agent.displayName })}
             onChange={() => onTogglePin()}
           />
-          <Button variant="outline" size="sm" disabled={probing} onClick={onProbe}>
-            {t('settings.agentRuntimes.probe')}
-          </Button>
         </div>
-      </div>
+        <CollapsibleContent keepMounted className="col-span-2">
+          <div className="space-y-3 pb-4 pt-1 pl-7 text-sm leading-5 text-muted-foreground">
+            <p>{installed ? t('settings.agentRuntimes.installed') : t('settings.agentRuntimes.notInstalled')}</p>
+            <p className="break-all font-mono text-sm">{binPath ?? t('settings.agentRuntimes.unknownPath')}</p>
+            {row?.message && <p>{row.message}</p>}
+            {agent.id in RUNTIME_COPY && (
+              <dl className="grid gap-3 md:grid-cols-2">
+                <div>
+                  <dt className="mb-1 font-medium text-foreground">{t('settings.agentRuntimes.models')}</dt>
+                  <dd>{t(RUNTIME_COPY[agent.id as keyof typeof RUNTIME_COPY].models)}</dd>
+                </div>
+                <div>
+                  <dt className="mb-1 font-medium text-foreground">{t('settings.agentRuntimes.auth')}</dt>
+                  <dd>{t(RUNTIME_COPY[agent.id as keyof typeof RUNTIME_COPY].auth)}</dd>
+                </div>
+              </dl>
+            )}
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={probing}
+              focusableWhenDisabled
+              onClick={onProbe}
+              aria-label={`${agent.displayName}: ${t('settings.agentRuntimes.probe')}`}
+            >
+              <RefreshCw aria-hidden className={row?.status === 'checking' ? 'animate-spin motion-reduce:animate-none' : undefined} />
+              {t('settings.agentRuntimes.probe')}
+            </Button>
+            {!installed && hint && (
+              <p>
+                {hint.cmd && <span className="mr-2 break-all font-mono">{hint.cmd}</span>}
+                <a href={hint.url} target="_blank" rel="noreferrer" className="text-primary underline underline-offset-4">
+                  {t('settings.agentRuntimes.installDocs')}
+                </a>
+              </p>
+            )}
+          </div>
+        </CollapsibleContent>
+      </Collapsible>
+      {needsAttention && row.repairTarget && (
+        <p className="pb-3 pl-7 text-sm leading-5 text-warning">{t(REPAIR_KEYS[row.repairTarget])}</p>
+      )}
     </article>
   )
 }

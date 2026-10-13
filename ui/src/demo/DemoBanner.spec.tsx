@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { cleanup, render, screen } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 
 import { i18n } from '../i18n'
@@ -18,8 +18,9 @@ describe('DemoBanner', () => {
 
     const badge = screen.getByText('演示')
     expect(badge.children).toHaveLength(0)
-    expect(screen.getByText('录制预览')).toBeTruthy()
-    expect(screen.getByText(/更改不会保存/)).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: '帮助：演示' }))
+    expect(screen.getByText(/录制数据/)).toBeTruthy()
+    expect(screen.getByText(/连接实时服务/)).toBeTruthy()
     expect(document.body.textContent).not.toContain('·')
     expect(screen.getByRole('link', { name: '安装 OpenAlice' }).getAttribute('href')).toBe(
       'https://github.com/TraderAlice/OpenAlice',

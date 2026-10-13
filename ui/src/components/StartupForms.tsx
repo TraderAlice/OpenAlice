@@ -1,3 +1,4 @@
+import { DetailsSummary } from './ui/collapsible'
 import { useTranslation } from 'react-i18next'
 import { LoaderCircle } from 'lucide-react'
 import { inputClass } from './form'
@@ -16,7 +17,7 @@ export function StartupSshForm({ value, onChange, onSubmit, busy }: { value: Ssh
     <div className="grid grid-cols-2 gap-4">{field('user', t('startup.user'), 'alice')}{field('port', t('settings.machines.sshPort'), '22')}</div>
     {!validPort && <p role="alert" className="text-sm text-destructive">{t('startup.invalidPort')}</p>}
     <p className="text-sm text-muted-foreground">{t('startup.sshAuth')}</p>
-    <details className="rounded-lg border border-border/70 p-4"><summary className="cursor-pointer text-sm">{t('startup.advanced')}</summary><div className="mt-4">{field('identity', t('settings.machines.identityFile'), '~/.ssh/id_ed25519')}</div></details>
+    <details className="rounded-lg border border-border/70 p-4"><DetailsSummary>{t('startup.advanced')}</DetailsSummary><div className="mt-4">{field('identity', t('settings.machines.identityFile'), '~/.ssh/id_ed25519')}</div></details>
     <p className="text-xs leading-relaxed text-muted-foreground">{t('startup.relaySsh')}</p>
     <div className="flex justify-end"><Button type="submit" disabled={busy || !validPort || !value.host.trim() || !value.label.trim()}>{t('startup.testSsh')}</Button></div>
   </form>

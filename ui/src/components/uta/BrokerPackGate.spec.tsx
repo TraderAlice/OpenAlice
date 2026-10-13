@@ -32,10 +32,10 @@ describe('Broker Pack account gates', () => {
     expect(onRetry).toHaveBeenCalledOnce()
   })
 
-  it('keeps compact account gates focused on the reason and action', () => {
+  it('opens compact account guidance beside its action', () => {
     render(<BrokerSupportGate readiness={missing} onInstall={vi.fn()} onRetry={vi.fn()} compact />)
 
-    expect(screen.queryByText('Broker support is not installed')).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: 'common.helpFor' }))
     expect(screen.getByText(/Runtime can load the configured account/i)).toBeTruthy()
     expect(screen.getByRole('button', { name: 'Install' })).toBeTruthy()
   })

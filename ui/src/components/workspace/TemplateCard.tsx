@@ -48,17 +48,17 @@ export function TemplateCard({ template: t, agents, onOpen }: Props) {
             <h3 className="text-[14px] leading-[19px] font-semibold text-foreground truncate" title={t.name}>
               {title}
             </h3>
-            <span className="text-[11px] leading-[15px] font-mono text-muted-foreground tabular-nums">
+            <span className="text-sm leading-5 font-mono text-muted-foreground tabular-nums">
               v{t.version}
             </span>
             {t.community && (
-              <span className="rounded-sm border border-border px-1.5 py-0.5 text-[10px] leading-[14px] font-medium text-muted-foreground">
+              <span className="rounded-sm border border-border px-1.5 py-0.5 text-sm leading-5 font-medium text-muted-foreground">
                 {tr('templates.communityBadge')}
               </span>
             )}
           </div>
           {t.description && (
-            <p className="text-[12px] leading-[18px] text-muted-foreground line-clamp-3 mt-1">
+            <p className="text-sm leading-5 text-muted-foreground line-clamp-3 mt-1">
               {t.description}
             </p>
           )}
@@ -66,7 +66,7 @@ export function TemplateCard({ template: t, agents, onOpen }: Props) {
       </div>
 
       <div className="flex flex-wrap items-center gap-3 border-t border-border pt-3">
-        <div className="text-[11px] leading-[15px] font-medium text-muted-foreground/70">
+        <div className="text-sm leading-5 font-medium text-muted-foreground/70">
           {tr('templates.agentsLabel')}
         </div>
         <div className="flex items-center gap-2 text-muted-foreground flex-wrap">
@@ -77,7 +77,7 @@ export function TemplateCard({ template: t, agents, onOpen }: Props) {
             return (
               <span
                 key={a.id}
-                className={`flex items-center gap-1 text-[11px] leading-[15px] ${missing ? 'opacity-40' : ''}`}
+                className={`flex items-center gap-1 text-sm leading-5 ${missing ? 'opacity-40' : ''}`}
                 title={missing ? `${a.id} — ${tr('templates.agentNotInstalled')}` : a.id}
               >
                 <AgentGlyph agent={a.id} />
