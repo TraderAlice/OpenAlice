@@ -98,6 +98,26 @@ describe('CtraderBroker init and catalog', () => {
     await broker.getContractDetails(contract({ symbol: 'EURUSD' }))
     expect(server.requestsOf(PayloadType.SYMBOL_BY_ID_REQ)).toHaveLength(1)
   })
+
+  it('re-reads a symbol spec after the venue reports it changed', async () => {
+    const { server, broker } = await makeBroker()
+    await broker.getContractDetails(contract({ symbol: 'EURUSD' }))
+    await broker.getContractDetails(contract({ symbol: 'XAUUSD' }))
+    server.push(PayloadType.SYMBOL_CHANGED_EVENT, { ctidTraderAccountId: 4242, symbolId: [SYMBOL.EURUSD] })
+    await broker.getContractDetails(contract({ symbol: 'EURUSD' }))
+    await broker.getContractDetails(contract({ symbol: 'XAUUSD' }))
+    const reads = server.requestsOf(PayloadType.SYMBOL_BY_ID_REQ).map((m) => m.payload!['symbolId'])
+    expect(reads).toEqual([[SYMBOL.EURUSD], [SYMBOL.XAUUSD], [SYMBOL.EURUSD]])
+  })
+
+  it('re-reads symbol specs after a reconnect, since changes may have been missed', async () => {
+    const { server, broker } = await makeBroker()
+    await broker.getContractDetails(contract({ symbol: 'EURUSD' }))
+    server.current.drop()
+    await broker.init()
+    await broker.getContractDetails(contract({ symbol: 'EURUSD' }))
+    expect(server.requestsOf(PayloadType.SYMBOL_BY_ID_REQ)).toHaveLength(2)
+  })
 })
 
 describe('CtraderBroker account and positions', () => {

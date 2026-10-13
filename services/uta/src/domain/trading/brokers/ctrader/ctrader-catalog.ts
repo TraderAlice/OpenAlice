@@ -99,7 +99,20 @@ export class CtraderCatalog {
   private readonly specs = new Map<number, SymbolSpec>()
   private loadedAt: Date | null = null
 
-  constructor(private readonly session: CtraderSession) {}
+  constructor(private readonly session: CtraderSession) {
+    // Specs (trading mode, schedule, volume limits) can change while the
+    // account is connected. Drop changed ones so the next read fetches them,
+    // and drop all after a reconnect: changes may have been missed meanwhile.
+    session.onEvent((message) => {
+      if (message.payloadType !== PayloadType.SYMBOL_CHANGED_EVENT) return
+      const ids = message.payload?.['symbolId']
+      for (const id of Array.isArray(ids) ? ids : []) {
+        const symbolId = num(id)
+        if (symbolId !== undefined) this.specs.delete(symbolId)
+      }
+    })
+    session.onReady(() => this.specs.clear())
+  }
 
   get isLoaded(): boolean {
     return this.loadedAt !== null
