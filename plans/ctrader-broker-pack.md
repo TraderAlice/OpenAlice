@@ -92,7 +92,9 @@ error codes seen in practice.
 - **Quotes:** spot stream first; without a tick within the timeout, the last
   1-minute bar close; otherwise `MARKET_CLOSED`.
 - **Market clock:** cTrader has no venue-wide clock; the schedule of the
-  broker's first listed symbol is reported.
+  broker's first listed symbol is reported. Each symbol's own hours are in
+  its contract details: `tradingHours` in IBKR's format for the coming week,
+  wall-clock in the symbol's `timeZoneId`.
 - **Time in force:** cTrader has no DAY; UTA's default `DAY` becomes, for a
   pending order, GOOD_TILL_DATE at the symbol's next session close (from its
   own schedule). Market orders send no time in force unless IOC/FOK/OPG.
@@ -197,6 +199,11 @@ Read-side findings (Spotware demo, 2026-10-13):
 - Schedules use the symbol's own time zone (EURUSD `America/New_York` with a
   daily 16:29:55–17:00:05 break; XAUUSD `UTC`). The market clock rounded
   session edges with the current milliseconds — fixed, covered by a spec.
+  Contract details left `tradingHours` empty, so an agent could not tell when
+  a symbol trades; they now list the coming week. Read back on the demo
+  (2026-10-14): XAUUSD and XTIUSD 22:01–20:59 UTC daily, US 30 / US 500 /
+  US TECH 100 18:00–16:59 New York, BTCUSD and ETHUSD every day including
+  the weekend.
 - Daily bars open at 21:00 UTC; the in-progress bar is not returned.
 - The demo account is HEDGED (`accountType` 0).
 - First authorization (Q2): the portal's Sandbox page issues access and

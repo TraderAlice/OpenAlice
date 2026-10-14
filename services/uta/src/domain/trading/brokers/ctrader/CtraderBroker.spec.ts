@@ -92,6 +92,17 @@ describe('CtraderBroker init and catalog', () => {
     expect(await broker.getContractDetails(contract({ symbol: 'NOPE' }))).toBeNull()
   })
 
+  it('exposes each symbol\'s own trading hours in contract details', async () => {
+    const { broker } = await makeBroker({ now: WEDNESDAY })
+    const gold = await broker.getContractDetails(contract({ symbol: 'XAUUSD' }))
+    expect(gold!.tradingHours).toBe('20261011:2200-20261016:2200;20261017:CLOSED;20261018:2200-20261023:2200')
+    expect(gold!.timeZoneId).toBe('UTC')
+    // A symbol without a schedule reports no hours rather than invented ones.
+    const index = await broker.getContractDetails(contract({ symbol: 'US 500' }))
+    expect(index!.tradingHours).toBe('')
+    expect(index!.timeZoneId).toBe('')
+  })
+
   it('caches symbol specs across calls', async () => {
     const { server, broker } = await makeBroker()
     await broker.getContractDetails(contract({ symbol: 'EURUSD' }))

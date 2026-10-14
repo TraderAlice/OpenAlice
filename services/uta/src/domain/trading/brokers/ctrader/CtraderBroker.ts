@@ -69,6 +69,7 @@ import {
   plainPrice,
   scaledPrice,
   scheduleClock,
+  scheduleTradingHours,
   timeInForceToIbkr,
   tradeSideToAction,
   trendbarToBar,
@@ -310,7 +311,8 @@ export class CtraderBroker implements IBroker<CtraderBrokerMeta> {
       details.minTick = new Decimal(10).pow(-spec.digits).toNumber()
       if (spec.minVolume !== undefined) details.minSize = volumeToUnits(spec.minVolume)
       if (spec.stepVolume !== undefined) details.sizeIncrement = volumeToUnits(spec.stepVolume)
-      details.timeZoneId = spec.scheduleTimeZone ?? ''
+      details.tradingHours = scheduleTradingHours(spec.schedule, spec.scheduleTimeZone, this.now())
+      details.timeZoneId = spec.scheduleTimeZone || (details.tradingHours ? 'UTC' : '')
     }
     return details
   }
@@ -849,6 +851,7 @@ export class CtraderBroker implements IBroker<CtraderBrokerMeta> {
   /**
    * cTrader has no venue-wide clock; each symbol has its own weekly
    * schedule. Report the schedule of the broker's first listed symbol.
+   * A symbol's own hours are in its contract details (`tradingHours`).
    */
   async getMarketClock(): Promise<MarketClock> {
     this.requireCatalog()

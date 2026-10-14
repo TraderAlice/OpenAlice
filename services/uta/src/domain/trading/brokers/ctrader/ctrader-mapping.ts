@@ -263,3 +263,83 @@ export function scheduleClock(schedule: ScheduleInterval[], timeZone: string | u
   const nextOpen = next ? at(next.startSecond) : at(sorted[0]!.startSecond + WEEK_SECONDS)
   return { isOpen: false, nextOpen, timestamp: now }
 }
+
+/** UTC midnight of the calendar date of this week's Sunday in `timeZone`. */
+function sundayOfWeek(now: Date, timeZone: string): number {
+  let parts: Intl.DateTimeFormatPart[]
+  try {
+    parts = new Intl.DateTimeFormat('en-US', {
+      timeZone, weekday: 'short', year: 'numeric', month: '2-digit', day: '2-digit',
+    }).formatToParts(now)
+  } catch {
+    return sundayOfWeek(now, 'UTC')
+  }
+  const get = (type: string) => parts.find((p) => p.type === type)?.value ?? '0'
+  return Date.UTC(Number(get('year')), Number(get('month')) - 1, Number(get('day')) - (WEEKDAYS[get('weekday')] ?? 0))
+}
+
+/**
+ * The weekly schedule as IBKR-style `tradingHours`: the sessions overlapping
+ * the next `days` days (from today 00:00 in the schedule's time zone) as
+ * `YYYYMMDD:HHMM-YYYYMMDD:HHMM`, and each of those days without a session as
+ * `YYYYMMDD:CLOSED`, joined with `;`. Times are wall-clock in `timeZone`, so a
+ * DST change does not shift them. Session starts round up and ends round down
+ * to the minute, so the hours never claim the symbol trades when it does not.
+ * A session with no edge in the coming weeks (around the clock) is cut at the
+ * window. Empty when the symbol has no schedule.
+ */
+export function scheduleTradingHours(
+  schedule: ScheduleInterval[],
+  timeZone: string | undefined,
+  now: Date,
+  days = 7,
+): string {
+  if (schedule.length === 0) return ''
+  const tz = timeZone || 'UTC'
+  const sunday = sundayOfWeek(now, tz)
+  const from = Math.floor(secondsIntoWeek(now, tz) / 86_400) * 86_400
+  const to = from + days * 86_400
+
+  // Last week's sessions cover one still running today; touching ones merge.
+  const weeks: ScheduleInterval[] = []
+  let horizonEnd = 0
+  for (let w = -1; w * WEEK_SECONDS < to; w++) {
+    for (const i of schedule) {
+      weeks.push({ startSecond: i.startSecond + w * WEEK_SECONDS, endSecond: i.endSecond + w * WEEK_SECONDS })
+    }
+    horizonEnd = (w + 1) * WEEK_SECONDS
+  }
+  weeks.sort((a, b) => a.startSecond - b.startSecond)
+  const merged: ScheduleInterval[] = []
+  for (const i of weeks) {
+    const last = merged[merged.length - 1]
+    if (last && i.startSecond <= last.endSecond) last.endSecond = Math.max(last.endSecond, i.endSecond)
+    else merged.push({ ...i })
+  }
+
+  const sessions = merged
+    .filter((i) => i.endSecond > from && i.startSecond < to)
+    .map((i) => ({
+      startSecond: i.startSecond <= -WEEK_SECONDS ? from : Math.ceil(i.startSecond / 60) * 60,
+      endSecond: i.endSecond >= horizonEnd ? to : Math.floor(i.endSecond / 60) * 60,
+    }))
+    .filter((i) => i.endSecond > i.startSecond)
+
+  const pad = (n: number) => String(n).padStart(2, '0')
+  const date = (sec: number) => {
+    const d = new Date(sunday + Math.floor(sec / 86_400) * 86_400_000)
+    return `${d.getUTCFullYear()}${pad(d.getUTCMonth() + 1)}${pad(d.getUTCDate())}`
+  }
+  const stamp = (sec: number) => {
+    const s = ((sec % 86_400) + 86_400) % 86_400
+    return `${date(sec)}:${pad(Math.floor(s / 3600))}${pad(Math.floor((s % 3600) / 60))}`
+  }
+
+  const entries = sessions.map((i) => ({ at: i.startSecond, text: `${stamp(i.startSecond)}-${stamp(i.endSecond)}` }))
+  for (let day = from; day < to; day += 86_400) {
+    if (!sessions.some((i) => i.endSecond > day && i.startSecond < day + 86_400)) {
+      entries.push({ at: day, text: `${date(day)}:CLOSED` })
+    }
+  }
+  return entries.sort((a, b) => a.at - b.at).map((e) => e.text).join(';')
+}
