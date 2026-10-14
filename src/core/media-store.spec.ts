@@ -12,6 +12,16 @@ describe('resolveMediaPath', () => {
     const result = resolveMediaPath('2026-01-01/ace-aim-air.png')
     expect(result).toContain(join('data', 'media', '2026-01-01', 'ace-aim-air.png'))
   })
+
+  it.each([
+    '../config/auth.json',
+    '../../config/auth.json',
+    '2026-01-01/../../../etc/passwd',
+    '..',
+    '../..',
+  ])('should reject path traversal input %s (CWE-22)', (name) => {
+    expect(() => resolveMediaPath(name)).toThrow(/escapes the media store/)
+  })
 })
 
 // ==================== persistMedia ====================
