@@ -218,7 +218,7 @@ describe('Feishu owner chat', () => {
     const adapter = new FeishuConnectorAdapter({ startupTimeoutMs: 200 })
     await adapter.start({
       enabled: true,
-      settings: { appId: APP_ID, appSecret: APP_SECRET },
+      settings: { appId: APP_ID, appSecret: APP_SECRET, ownerUserId: 'ou_owner' },
     }, context({ updateSettings }))
     await receiveHandler?.(p2pEvent('/link'))
     expect(updateSettings).toHaveBeenCalledWith({ ownerUserId: 'ou_owner', chatId: 'oc_chat' })
