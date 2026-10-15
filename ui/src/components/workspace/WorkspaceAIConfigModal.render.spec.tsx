@@ -252,14 +252,31 @@ describe('WorkspaceAIConfigModal local model metadata', () => {
     )
 
     const dialog = screen.getByRole('dialog', { name: '工作区设置' })
+
+    const disabledTabStop = document.createElement('button')
+    disabledTabStop.disabled = true
+    disabledTabStop.tabIndex = 0
+    dialog.append(disabledTabStop)
+
     const focusable = Array.from(dialog.querySelectorAll<HTMLElement>(
-      'button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
+      'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
+    )).filter((element) => (
+      !element.matches(':disabled') &&
+      element.tabIndex >= 0 &&
+      element.closest('[hidden], [aria-hidden="true"]') === null
     ))
     const first = focusable[0]!
     const last = focusable[focusable.length - 1]!
 
     last.focus()
-    fireEvent.keyDown(document, { key: 'Tab' })
+    expect(document.activeElement).toBe(last)
+    const forwardTab = new KeyboardEvent('keydown', {
+      key: 'Tab',
+      bubbles: true,
+      cancelable: true,
+    })
+    document.dispatchEvent(forwardTab)
+    expect(forwardTab.defaultPrevented).toBe(true)
     expect(document.activeElement).toBe(first)
 
     first.focus()
