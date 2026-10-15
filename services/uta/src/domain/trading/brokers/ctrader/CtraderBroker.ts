@@ -45,12 +45,12 @@ import { CtraderSpots } from './ctrader-spots.js'
 import { CtraderExecutions, ExecutionType, parseExecution, type ExecutionUpdate } from './ctrader-executions.js'
 import { buildAmendOrder, buildNewOrder, priceOnGrid, stopLimitPrice } from './ctrader-order-builder.js'
 import {
-  closedLegStatus,
   decideHedgedOrder,
   legRefs,
   makeLegOrder,
   parseLegId,
   protectionLegs,
+  settleClosedLeg,
   viewPosition,
   type LegKind,
   type RawPositionView,
@@ -453,7 +453,7 @@ export class CtraderBroker implements IBroker<CtraderBrokerMeta> {
     return [...orders, ...legs]
   }
 
-  /** A protection leg: live from the open position, or settled from its order history. */
+  /** A protection leg: live from the open position, or settled from its closing deals. */
   private async getLeg(kind: LegKind, positionId: number): Promise<OpenOrder | null> {
     const res = await this.session.accountRequest(PayloadType.RECONCILE_REQ, {}, { expect: PayloadType.RECONCILE_RES })
     const open = rows(res.payload?.['position']).map(viewPosition).find((p) => p?.positionId === positionId && p.open)
@@ -465,36 +465,57 @@ export class CtraderBroker implements IBroker<CtraderBrokerMeta> {
         status: price === undefined ? 'Cancelled' : 'Submitted', contract: this.contractForId(open.symbolId), digits,
       })
     }
-    // Position closed: its order history says whether this leg fired.
+    // Position closed: its deals say how it closed and at what price. The
+    // venue's order list by position leaves out the protection order, so the
+    // closing deals' own orders are looked up instead.
     const now = this.now().getTime()
     const history = await this.session.accountRequest(
-      PayloadType.ORDER_LIST_BY_POSITION_ID_REQ,
+      PayloadType.DEAL_LIST_BY_POSITION_ID_REQ,
       { positionId, fromTimestamp: now - 90 * 86_400_000, toTimestamp: now },
-      { expect: PayloadType.ORDER_LIST_BY_POSITION_ID_RES },
+      { expect: PayloadType.DEAL_LIST_BY_POSITION_ID_RES },
     )
-    const orders = rows(history.payload?.['order'])
-    const any = orders[0]
-    if (!any) return null
-    const td = obj(any['tradeData'])
-    const symbolId = num(td['symbolId'])
+    const deals = rows(history.payload?.['deal']).filter((d) => (num(d['filledVolume']) ?? 0) > 0)
+    const symbolId = num(deals[0]?.['symbolId'])
     if (symbolId === undefined) return null
-    // The opening order carries the position's side; closing and protection
-    // orders trade the opposite way.
-    const opening = orders.find((o) => o['closingOrder'] !== true && num(o['orderType']) !== 4)
-    const anySide = num(td['tradeSide']) ?? TradeSide.SELL
-    const positionSide = opening
-      ? num(obj(opening['tradeData'])['tradeSide']) ?? TradeSide.BUY
-      : anySide === TradeSide.SELL ? TradeSide.BUY : TradeSide.SELL
-    const protection = orders.find((o) => num(o['orderType']) === 4)
+    const closing = deals.filter((d) => d['closePositionDetail'] !== undefined)
+    // The opening deal carries the position's side; closing deals trade the opposite way.
+    const opening = deals.filter((d) => d['closePositionDetail'] === undefined)
+    const positionSide = opening[0]
+      ? num(opening[0]['tradeSide']) ?? TradeSide.BUY
+      : num(closing[0]?.['tradeSide']) === TradeSide.BUY ? TradeSide.SELL : TradeSide.BUY
+    const volumeOf = (list: Row[]) => list.reduce((sum, d) => sum + (num(d['filledVolume']) ?? 0), 0)
+
+    let protection: Row | undefined
+    for (const orderId of new Set(closing.map((d) => num(d['orderId'])))) {
+      if (orderId === undefined) continue
+      const order = await this.closingOrder(orderId)
+      if (num(order?.['orderType']) === OrderType.STOP_LOSS_TAKE_PROFIT) {
+        protection = order
+        break
+      }
+    }
+    const settled = settleClosedLeg(kind, protection, closing)
     return makeLegOrder({
       kind, positionId,
       positionSide,
-      volume: num(obj((opening ?? any)['tradeData'])['volume']) ?? 0,
-      price: protection ? num(protection[kind]) : undefined,
-      status: closedLegStatus(kind, orders),
+      volume: volumeOf(opening) || volumeOf(closing),
+      price: settled.level,
+      status: settled.status,
       contract: this.contractForId(symbolId),
       digits: (await this.catalog.specFor(symbolId))?.digits,
+      ...(settled.fillPrice && settled.filledVolume ? { fill: { price: settled.fillPrice, volume: settled.filledVolume } } : {}),
     })
+  }
+
+  /** The raw order behind a closing deal; undefined when the venue no longer knows it. */
+  private async closingOrder(orderId: number): Promise<Row | undefined> {
+    try {
+      const res = await this.session.accountRequest(PayloadType.ORDER_DETAILS_REQ, { orderId }, { expect: PayloadType.ORDER_DETAILS_RES })
+      return obj(res.payload?.['order'])
+    } catch (err) {
+      if (err instanceof CtraderApiError && NOT_FOUND_CODES.has(err.errorCode)) return undefined
+      throw err
+    }
   }
 
   // ---- Order writes ----
@@ -1135,6 +1156,8 @@ export class CtraderBroker implements IBroker<CtraderBrokerMeta> {
     const order = new Order()
     order.action = action
     order.totalQuantity = volumeToUnits(volume)
+    const executed = num(raw['executedVolume'])
+    if (executed !== undefined && executed > 0) order.filledQuantity = volumeToUnits(executed)
     order.orderType = orderTypeToIbkr(type)
     order.tif = timeInForceToIbkr(num(raw['timeInForce']))
     const limitPrice = num(raw['limitPrice'])

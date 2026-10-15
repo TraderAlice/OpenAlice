@@ -223,6 +223,21 @@ describe('CtraderBroker orders (read)', () => {
     expect(await broker.getOrder('not-a-number')).toBeNull()
     expect((await broker.getOrders(['9001', '1234', '9002'])).map((o) => o.orderId)).toEqual(['9001', '9002'])
   })
+
+  it('reports the filled quantity and price of an order that filled later', async () => {
+    const { server, broker } = await makeBroker()
+    server.handlers[PayloadType.ORDER_DETAILS_REQ] = () => ({
+      payloadType: PayloadType.ORDER_DETAILS_RES,
+      payload: {
+        ctidTraderAccountId: 4242, deal: [],
+        order: { orderId: 9010, orderType: 2, orderStatus: 2, limitPrice: 4190, executionPrice: 4189.75, executedVolume: 300,
+          tradeData: { symbolId: 41, volume: 300, tradeSide: 1 } },
+      },
+    })
+    const filled = await broker.getOrder('9010')
+    expect(filled).toMatchObject({ avgFillPrice: '4189.75', orderState: { status: 'Filled' } })
+    expect(filled!.order.filledQuantity.toString()).toBe('3')
+  })
 })
 
 describe('CtraderBroker market clock', () => {

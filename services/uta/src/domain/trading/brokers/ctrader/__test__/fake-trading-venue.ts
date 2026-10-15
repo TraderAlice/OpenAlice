@@ -30,8 +30,10 @@ export interface FakeVenue {
   fillSlippage?: number
   /** AMEND_POSITION_SLTP without a level keeps it (default: removes it). */
   sltpOmissionKeeps?: boolean
-  /** Simulate the venue closing a position at its stop-loss or take-profit. */
-  triggerProtection(positionId: number, kind: 'stopLoss' | 'takeProfit'): void
+  /** Every deal, closing ones with their closePositionDetail. */
+  deals: Row[]
+  /** Simulate the venue closing a position at its stop-loss or take-profit (at `fillPrice` when given). */
+  triggerProtection(positionId: number, kind: 'stopLoss' | 'takeProfit', fillPrice?: number): void
 }
 
 export function installTradingVenue(server: FakeCtraderServer): FakeVenue {
@@ -42,22 +44,35 @@ export function installTradingVenue(server: FakeCtraderServer): FakeVenue {
   const venue: FakeVenue = {
     positions: structuredClone(POSITIONS) as Row[],
     orders: structuredClone(ORDERS) as Row[],
-    triggerProtection(positionId, kind) {
+    deals: [],
+    triggerProtection(positionId, kind, fillPrice) {
       const position = venue.positions.find((x) => x['positionId'] === positionId && x['positionStatus'] === 1)
       if (!position) throw new Error(`no open position ${positionId}`)
       const level = position[kind]
       if (level === undefined) throw new Error(`position ${positionId} has no ${kind}`)
       const td = position['tradeData']
-      venue.orders.push({
-        orderId: nextOrderId++, orderType: 4, orderStatus: 2, positionId, executionPrice: level,
-        ...(position['stopLoss'] !== undefined ? { stopLoss: position['stopLoss'] } : {}),
-        ...(position['takeProfit'] !== undefined ? { takeProfit: position['takeProfit'] } : {}),
+      const price = fillPrice ?? level
+      // Real venue (Spotware demo): the STOP_LOSS_TAKE_PROFIT order carries
+      // the stop-loss as stopPrice and the take-profit as limitPrice.
+      const order: Row = {
+        orderId: nextOrderId++, orderType: 4, orderStatus: 2, closingOrder: true, positionId,
+        executionPrice: price, executedVolume: td['volume'],
+        ...(position['stopLoss'] !== undefined ? { stopPrice: position['stopLoss'] } : {}),
+        ...(position['takeProfit'] !== undefined ? { limitPrice: position['takeProfit'] } : {}),
         tradeData: { symbolId: td['symbolId'], volume: td['volume'], tradeSide: td['tradeSide'] === 1 ? 2 : 1 },
         utcLastUpdateTimestamp: clock++,
-      })
+      }
+      venue.orders.push(order)
+      venue.deals.push(closingDeal(order, position, td['volume'], price))
       position['positionStatus'] = 2
     },
   }
+  const closingDeal = (order: Row, position: Row, volume: number, price: number): Row => ({
+    dealId: nextDealId++, orderId: order['orderId'], positionId: position['positionId'], volume, filledVolume: volume,
+    symbolId: position['tradeData']['symbolId'], executionPrice: price, tradeSide: order['tradeData']['tradeSide'],
+    executionTimestamp: clock++, dealStatus: 2,
+    closePositionDetail: { entryPrice: position['price'], grossProfit: 0, swap: 0, commission: 0, balance: 0, closedVolume: volume, moneyDigits: 2 },
+  })
   const exec = (executionType: number, body: Row): FakeReply => ({
     payloadType: PayloadType.EXECUTION_EVENT,
     payload: { ctidTraderAccountId: 4242, executionType, ...body },
@@ -70,8 +85,13 @@ export function installTradingVenue(server: FakeCtraderServer): FakeVenue {
   })
   server.handlers[PayloadType.ORDER_DETAILS_REQ] = (p) => {
     const order = venue.orders.find((o) => o['orderId'] === p['orderId'])
-    return order ? { payloadType: PayloadType.ORDER_DETAILS_RES, payload: { ctidTraderAccountId: 4242, order, deal: [] } } : { error: 'ORDER_NOT_FOUND' }
+    const deal = venue.deals.filter((d) => d['orderId'] === p['orderId'])
+    return order ? { payloadType: PayloadType.ORDER_DETAILS_RES, payload: { ctidTraderAccountId: 4242, order, deal } } : { error: 'ORDER_NOT_FOUND' }
   }
+  server.handlers[PayloadType.DEAL_LIST_BY_POSITION_ID_REQ] = (p) => ({
+    payloadType: PayloadType.DEAL_LIST_BY_POSITION_ID_RES,
+    payload: { ctidTraderAccountId: 4242, deal: venue.deals.filter((d) => d['positionId'] === p['positionId']), hasMore: false },
+  })
   server.handlers[PayloadType.ORDER_LIST_REQ] = () => ({
     payloadType: PayloadType.ORDER_LIST_RES,
     payload: { ctidTraderAccountId: 4242, order: venue.orders, hasMore: false },
@@ -124,10 +144,8 @@ export function installTradingVenue(server: FakeCtraderServer): FakeVenue {
       order['orderStatus'] = 2
       order['executionPrice'] = price
       order['closingOrder'] = true
-      const reduceDeal = {
-        dealId: nextDealId++, orderId: order['orderId'], positionId: target['positionId'], volume: p['volume'], filledVolume: p['volume'],
-        symbolId, executionPrice: price, tradeSide: side, executionTimestamp: clock++, dealStatus: 2,
-      }
+      const reduceDeal = closingDeal(order, target, p['volume'] as number, price)
+      venue.deals.push(reduceDeal)
       return [accepted, exec(EXEC.FILLED, { order: { ...order }, position: { ...target }, deal: reduceDeal })]
     }
     const position: Row = {
@@ -146,6 +164,7 @@ export function installTradingVenue(server: FakeCtraderServer): FakeVenue {
       dealId: nextDealId++, orderId: order['orderId'], positionId: position['positionId'], volume: p['volume'], filledVolume: p['volume'],
       symbolId, executionPrice: price, tradeSide: side, executionTimestamp: clock++, dealStatus: 2,
     }
+    venue.deals.push(deal)
     return [accepted, exec(EXEC.FILLED, { order: { ...order }, position: { ...position }, deal })]
   }
 
@@ -195,10 +214,8 @@ export function installTradingVenue(server: FakeCtraderServer): FakeVenue {
     venue.orders.push(order)
     td['volume'] -= volume
     if (td['volume'] === 0) position['positionStatus'] = 2
-    const deal = {
-      dealId: nextDealId++, orderId: order['orderId'], positionId: position['positionId'], volume, filledVolume: volume,
-      symbolId: td['symbolId'], executionPrice: price, tradeSide: side, executionTimestamp: clock++, dealStatus: 2,
-    }
+    const deal = closingDeal(order, position, volume, price)
+    venue.deals.push(deal)
     return [exec(EXEC.ACCEPTED, { order: { ...order, orderStatus: 1 } }), exec(EXEC.FILLED, { order: { ...order }, position: { ...position }, deal })]
   }
 

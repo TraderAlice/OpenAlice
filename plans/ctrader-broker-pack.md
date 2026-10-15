@@ -220,6 +220,15 @@ Write-side findings (Spotware demo, 2026-10-13):
   venue behaviour and a broker spec guards it.
 - Market order: ORDER_ACCEPTED (settles the request) then ORDER_FILLED, both
   with the request's clientMsgId; default time in force IOC.
+- A fired take-profit (2026-10-15, user-approved, minimum EURUSD with 2-pip
+  SL/TP; flat afterwards) closes the position through the
+  STOP_LOSS_TAKE_PROFIT order, which carries the stop-loss as `stopPrice`
+  and the take-profit as `limitPrice` — not `stopLoss`/`takeProfit`, so the
+  old settle logic reported a fired leg as cancelled. The order list by
+  position leaves that order out; the closing deal points to it. Settled
+  legs now come from the position's deals, with the real exit price and
+  volume, which UTA needs to list the fill. Filled orders also report
+  `executedVolume` as their filled quantity.
 - Fill-relative protection lands one point off when the fill differs from
   the quote (requested 1.10966/1.12966, venue set 1.10965/1.12965); the
   follow-up AMEND_POSITION_SLTP moved it to the exact prices.

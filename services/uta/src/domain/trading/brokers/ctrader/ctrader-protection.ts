@@ -90,6 +90,8 @@ export function makeLegOrder(params: {
   status: 'Submitted' | 'Filled' | 'Cancelled'
   contract: Contract
   digits: number | undefined
+  /** The real exit of a leg that fired: price and volume (cents). */
+  fill?: { price: Decimal; volume: number }
 }): OpenOrder {
   const order = new Order()
   order.action = params.positionSide === TradeSide.SELL ? 'BUY' : 'SELL'
@@ -105,7 +107,12 @@ export function makeLegOrder(params: {
   }
   const orderState = new OrderState()
   orderState.status = params.status
-  return { contract: params.contract, order, orderState, orderId: legId(params.kind, params.positionId) }
+  const leg: OpenOrder = { contract: params.contract, order, orderState, orderId: legId(params.kind, params.positionId) }
+  if (params.fill) {
+    order.filledQuantity = volumeToUnits(params.fill.volume)
+    leg.avgFillPrice = plainPrice(params.fill.price.toNumber(), params.digits)
+  }
+  return leg
 }
 
 /** The working protection orders of an open position (none when unprotected). */
@@ -130,25 +137,49 @@ export function legRefs(position: Pick<RawPositionView, 'positionId' | 'stopLoss
   return legs
 }
 
+export interface ClosedLeg {
+  status: 'Filled' | 'Cancelled'
+  /** The leg's level on the protection order, when known. */
+  level?: number
+  /** Volume-weighted price of the closing deals the leg filled, and their volume in cents. */
+  fillPrice?: Decimal
+  filledVolume?: number
+}
+
 /**
- * Status of a leg whose position is no longer open: 'Filled' when the
- * position's protection order executed nearer this leg's level, otherwise
- * 'Cancelled' (closed manually, or by the other leg).
+ * How a leg ended once its position is closed. The venue serves both legs
+ * with one STOP_LOSS_TAKE_PROFIT order that carries the stop-loss as
+ * `stopPrice` and the take-profit as `limitPrice` (Spotware demo,
+ * 2026-10-15). The leg 'Filled' when the position's closing deals came from
+ * that order and executed nearer this leg's level; the deals give the real
+ * exit price. Otherwise 'Cancelled': closed by another order, or by the
+ * other leg.
  */
-export function closedLegStatus(kind: LegKind, positionOrders: Row[]): 'Filled' | 'Cancelled' {
-  const STOP_LOSS_TAKE_PROFIT = 4
-  const FILLED = 2
-  const fired = positionOrders.find((o) => num(o['orderType']) === STOP_LOSS_TAKE_PROFIT && num(o['orderStatus']) === FILLED)
-  if (!fired) return 'Cancelled'
-  const price = num(fired['executionPrice'])
-  const sl = num(fired['stopLoss'])
-  const tp = num(fired['takeProfit'])
-  if (price === undefined) return 'Cancelled'
-  if (sl === undefined && tp === undefined) return 'Cancelled'
+export function settleClosedLeg(kind: LegKind, protection: Row | undefined, closingDeals: Row[]): ClosedLeg {
+  const levels: Record<LegKind, number | undefined> = {
+    stopLoss: num(protection?.['stopPrice']) ?? num(protection?.['stopLoss']),
+    takeProfit: num(protection?.['limitPrice']) ?? num(protection?.['takeProfit']),
+  }
+  const level = levels[kind]
+  const protectionId = num(protection?.['orderId'])
+  const fired = protectionId === undefined ? [] : closingDeals.filter((d) => num(d['orderId']) === protectionId)
+  let volume = 0
+  let notional = new Decimal(0)
+  for (const deal of fired) {
+    const filled = num(deal['filledVolume']) ?? 0
+    const price = num(deal['executionPrice'])
+    if (filled <= 0 || price === undefined) continue
+    volume += filled
+    notional = notional.plus(new Decimal(price).times(filled))
+  }
+  if (volume === 0) return { status: 'Cancelled', level }
+  const fillPrice = notional.div(volume)
+  const sl = levels.stopLoss
+  const tp = levels.takeProfit
   const firedKind: LegKind = sl === undefined ? 'takeProfit'
     : tp === undefined ? 'stopLoss'
-    : Math.abs(price - sl) <= Math.abs(price - tp) ? 'stopLoss' : 'takeProfit'
-  return firedKind === kind ? 'Filled' : 'Cancelled'
+    : fillPrice.minus(sl).abs().lte(fillPrice.minus(tp).abs()) ? 'stopLoss' : 'takeProfit'
+  return firedKind === kind ? { status: 'Filled', level, fillPrice, filledVolume: volume } : { status: 'Cancelled', level }
 }
 
 export type ReduceDecision =

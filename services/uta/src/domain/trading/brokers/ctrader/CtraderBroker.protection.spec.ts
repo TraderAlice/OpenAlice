@@ -4,7 +4,7 @@ import { Contract, Order } from '@traderalice/ibkr'
 import '../../contract-ext.js'
 import { PayloadType } from './ctrader-protocol.js'
 import { CtraderBroker, ctraderConfigSchema } from './CtraderBroker.js'
-import { closedLegStatus, decideHedgedOrder, legId, parseLegId, viewPosition, type RawPositionView } from './ctrader-protection.js'
+import { decideHedgedOrder, settleClosedLeg, legId, parseLegId, viewPosition, type RawPositionView } from './ctrader-protection.js'
 import { FakeCtraderServer } from './__test__/fake-ctrader-server.js'
 import { SYMBOL, installReadHandlers } from './__test__/ctrader-fixtures.js'
 import { installTradingVenue } from './__test__/fake-trading-venue.js'
@@ -85,11 +85,22 @@ describe('protection helpers', () => {
       .toMatchObject({ kind: 'refuse', error: expect.stringMatching(/Both long and short/) })
   })
 
-  it('settles a closed position leg from its fired protection order', () => {
-    const fired = [{ orderType: 4, orderStatus: 2, executionPrice: 4250.4, stopLoss: 4250, takeProfit: 4000 }]
-    expect(closedLegStatus('stopLoss', fired)).toBe('Filled')
-    expect(closedLegStatus('takeProfit', fired)).toBe('Cancelled')
-    expect(closedLegStatus('stopLoss', [{ orderType: 1, orderStatus: 2, closingOrder: true }])).toBe('Cancelled')
+  it('settles a closed position leg from the deals of its fired protection order', () => {
+    // Real venue shape: the stop-loss is stopPrice, the take-profit limitPrice.
+    const protection = { orderId: 77, orderType: 4, stopPrice: 4250, limitPrice: 4000 }
+    const deals = [
+      { orderId: 77, filledVolume: 100, executionPrice: 4250.4 },
+      { orderId: 77, filledVolume: 100, executionPrice: 4250.8 },
+    ]
+    const sl = settleClosedLeg('stopLoss', protection, deals)
+    expect(sl).toMatchObject({ status: 'Filled', level: 4250, filledVolume: 200 })
+    expect(sl.fillPrice!.toString()).toBe('4250.6')
+    expect(settleClosedLeg('takeProfit', protection, deals)).toEqual({ status: 'Cancelled', level: 4000 })
+    // Closed by another order: neither leg fired.
+    expect(settleClosedLeg('stopLoss', undefined, [{ orderId: 78, filledVolume: 200, executionPrice: 4100 }]))
+      .toEqual({ status: 'Cancelled', level: undefined })
+    // A protection order without closing deals did not fire.
+    expect(settleClosedLeg('stopLoss', protection, [])).toEqual({ status: 'Cancelled', level: 4250 })
   })
 
   it('reads raw positions', () => {
@@ -163,17 +174,44 @@ describe('position protection legs', () => {
     expect(await broker.cancelOrder('tp-503')).toMatchObject({ success: false, error: expect.stringMatching(/no take-profit/) })
   })
 
-  it('settles legs after the venue closes the position at its stop-loss', async () => {
+  it('settles legs after the venue closes the position at its stop-loss, with the real exit price', async () => {
     const { venue, broker } = await makeBroker()
     protectGold(venue)
-    venue.triggerProtection(503, 'stopLoss')
+    venue.triggerProtection(503, 'stopLoss', 4251.35)
     const sl = await broker.getOrder('sl-503')
     const tp = await broker.getOrder('tp-503')
     expect(sl!.orderState.status).toBe('Filled')
+    expect(sl!.avgFillPrice).toBe('4251.35')
+    expect(sl!.order.filledQuantity.toString()).toBe('2')
+    expect(sl!.order.auxPrice.toString()).toBe('4250')
     expect(tp!.orderState.status).toBe('Cancelled')
+    expect(tp!.avgFillPrice).toBeUndefined()
     expect(sl!.order.action).toBe('BUY')
     expect(sl!.contract.symbol).toBe('XAUUSD')
     expect((await broker.getOpenOrders()).some((o) => o.orderId === 'sl-503')).toBe(false)
+  })
+
+  it('settles the take-profit leg when the target fires', async () => {
+    const { venue, broker } = await makeBroker()
+    protectGold(venue)
+    venue.triggerProtection(503, 'takeProfit')
+    const tp = await broker.getOrder('tp-503')
+    expect(tp).toMatchObject({ avgFillPrice: '4000', orderState: { status: 'Filled' } })
+    expect(tp!.order.lmtPrice.toString()).toBe('4000')
+    expect((await broker.getOrder('sl-503'))!.orderState.status).toBe('Cancelled')
+  })
+
+  it('cancels both legs of a position closed by a market order', async () => {
+    const { venue, broker } = await makeBroker()
+    protectGold(venue)
+    expect(await broker.closePosition(contract('XAUUSD'), new Decimal(2))).toMatchObject({ success: true })
+    expect(venue.positions.find((p) => p['positionId'] === 503)!['positionStatus']).toBe(2)
+    for (const id of ['sl-503', 'tp-503']) {
+      const leg = await broker.getOrder(id)
+      expect(leg).toMatchObject({ orderState: { status: 'Cancelled' } })
+      expect(leg!.avgFillPrice).toBeUndefined()
+      expect(leg!.order.action).toBe('BUY')
+    }
   })
 })
 
