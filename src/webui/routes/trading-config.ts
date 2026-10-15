@@ -1,3 +1,4 @@
+import { applyBrokerPackUpdate } from '../../services/broker-packs/update-lifecycle.js'
 import { Hono } from 'hono'
 import type { EngineContext } from '../../core/types.js'
 import {
@@ -19,7 +20,6 @@ import {
 } from '../../core/broker-packs.js'
 import {
   getBrokerPackLocalStatus,
-  installBrokerPack,
 } from '../../services/broker-packs/installer.js'
 
 /** Fire-and-forget UTA restart after a config mutation. Logs but doesn't
@@ -163,9 +163,10 @@ export function createTradingConfigRoutes(ctx: EngineContext) {
     const rawEngine = c.req.param('engine')
     if (!isInstallableBrokerEngine(rawEngine)) return c.json({ error: `Unknown broker pack: ${rawEngine}` }, 404)
     try {
-      const status = await installBrokerPack(rawEngine)
-      notifyUTAReload()
-      return c.json(status)
+      const operation = await applyBrokerPackUpdate(rawEngine)
+      if (['failed', 'blocked', 'recovery'].includes(operation.phase)) throw new Error(operation.error ?? 'Broker Pack recovery required')
+      const status = await getBrokerPackLocalStatus(rawEngine)
+      return c.json({ ...status, operation })
     } catch (err) {
       return c.json({ error: err instanceof Error ? err.message : String(err) }, 400)
     }

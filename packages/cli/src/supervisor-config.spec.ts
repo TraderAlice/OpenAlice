@@ -11,7 +11,7 @@ import {
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import {
   createSupervisorAliceProject,
@@ -127,7 +127,7 @@ describe('Supervisor configuration', () => {
   it('persists an AliceProject source atomically outside the selected home', async () => {
     const root = await mkdtemp(join(tmpdir(), 'openalice-supervisor-config-'))
     temporaryPaths.push(root)
-    const context = await resolveStoredLaunchContext({}, {
+    const context = await resolveStoredLaunchContext({ project: 'default' }, {
       homeDir: join(root, 'user'),
       cwd: '/repo',
       platform: 'linux',
@@ -142,7 +142,8 @@ describe('Supervisor configuration', () => {
       await readFile(supervisorConfigPath(context.supervisorRoot), 'utf8'),
     )
     expect(saved).toEqual({
-      schemaVersion: 2,
+      schemaVersion: 3,
+      defaultTarget: null,
       projects: {
         default: {
           name: 'default',
@@ -152,7 +153,7 @@ describe('Supervisor configuration', () => {
     })
     expect(context.supervisorRoot.startsWith(context.home)).toBe(false)
 
-    const resolved = await resolveStoredLaunchContext({}, {
+    const resolved = await resolveStoredLaunchContext({ project: 'default' }, {
       homeDir: join(root, 'user'),
       cwd: '/elsewhere',
       platform: 'linux',
@@ -168,7 +169,7 @@ describe('Supervisor configuration', () => {
   it('removes an AliceProject override when a setting returns to inheritance', async () => {
     const root = await mkdtemp(join(tmpdir(), 'openalice-supervisor-inherit-'))
     temporaryPaths.push(root)
-    const context = await resolveStoredLaunchContext({}, {
+    const context = await resolveStoredLaunchContext({ project: 'default' }, {
       homeDir: join(root, 'user'),
       platform: 'linux',
       env: { XDG_CONFIG_HOME: join(root, 'config') },
@@ -195,7 +196,7 @@ describe('Supervisor configuration', () => {
     const root = await mkdtemp(join(tmpdir(), 'openalice-supervisor-machine-'))
     temporaryPaths.push(root)
     const homeDir = join(root, 'user')
-    const context = await resolveStoredLaunchContext({}, {
+    const context = await resolveStoredLaunchContext({ project: 'default' }, {
       homeDir,
       platform: 'linux',
       env: { XDG_CONFIG_HOME: join(root, 'config') },
@@ -215,7 +216,7 @@ describe('Supervisor configuration', () => {
       port: 48_001,
       updateChecks: false,
     })
-    const inherited = await resolveStoredLaunchContext({}, {
+    const inherited = await resolveStoredLaunchContext({ project: 'default' }, {
       homeDir,
       platform: 'linux',
       env: { XDG_CONFIG_HOME: join(root, 'config') },
@@ -232,7 +233,7 @@ describe('Supervisor configuration', () => {
     })
 
     await persistAliceProjectLaunchConfig(inherited, { port: 48_002 })
-    const overridden = await resolveStoredLaunchContext({ port: 48_004 }, {
+    const overridden = await resolveStoredLaunchContext({ project: 'default', port: 48_004 }, {
       homeDir,
       platform: 'linux',
       env: {
@@ -259,7 +260,7 @@ describe('Supervisor configuration', () => {
     temporaryPaths.push(root)
     const homeDir = join(root, 'user')
     const configRoot = join(root, 'config')
-    const context = await resolveStoredLaunchContext({}, {
+    const context = await resolveStoredLaunchContext({ project: 'default' }, {
       homeDir,
       cwd: root,
       platform: 'linux',
@@ -272,6 +273,7 @@ describe('Supervisor configuration', () => {
       './research-home',
       { homeDir, cwd: root, platform: 'linux' },
     )
+    await persistSelectedSupervisorAliceProject(context, 'research', { homeDir, cwd: root, platform: 'linux' })
     const researchHome = await realpath(resolve(root, 'research-home'))
 
     const registry = await readSupervisorAliceProjectRegistry(context, {
@@ -301,7 +303,7 @@ describe('Supervisor configuration', () => {
       ],
     })
 
-    const selected = await resolveStoredLaunchContext({}, {
+    const selected = await resolveStoredLaunchContext({ project: 'research' }, {
       homeDir,
       cwd: root,
       platform: 'linux',
@@ -326,7 +328,7 @@ describe('Supervisor configuration', () => {
     const root = await mkdtemp(join(tmpdir(), 'openalice-supervisor-transfer-register-'))
     temporaryPaths.push(root)
     const homeDir = join(root, 'user')
-    const context = await resolveStoredLaunchContext({}, {
+    const context = await resolveStoredLaunchContext({ project: 'default' }, {
       homeDir,
       cwd: root,
       platform: 'linux',
@@ -356,7 +358,7 @@ describe('Supervisor configuration', () => {
       cwd: root,
       platform: 'linux',
     })
-    expect(registry.defaultProject).toBe('research')
+    expect(registry.defaultProject).toBe('')
     expect(registry.projects.find((project) => project.key === 'migrated')).toMatchObject({
       displayName: 'Migrated Alice',
       isDefault: false,
@@ -367,7 +369,7 @@ describe('Supervisor configuration', () => {
     const root = await mkdtemp(join(tmpdir(), 'openalice-supervisor-nano-'))
     temporaryPaths.push(root)
     const homeDir = join(root, 'user')
-    const context = await resolveStoredLaunchContext({}, {
+    const context = await resolveStoredLaunchContext({ project: 'default' }, {
       homeDir,
       cwd: root,
       platform: 'linux',
@@ -385,7 +387,7 @@ describe('Supervisor configuration', () => {
       version: 1,
       product: 'nano',
     })
-    const selected = await resolveStoredLaunchContext({}, {
+    const selected = await resolveStoredLaunchContext({ project: 'office' }, {
       homeDir,
       cwd: root,
       platform: 'linux',
@@ -402,7 +404,7 @@ describe('Supervisor configuration', () => {
     temporaryPaths.push(root)
     const homeDir = join(root, 'user')
     const projectHome = join(root, 'existing-home')
-    const context = await resolveStoredLaunchContext({}, {
+    const context = await resolveStoredLaunchContext({ project: 'default' }, {
       homeDir,
       cwd: root,
       platform: 'linux',
@@ -430,7 +432,7 @@ describe('Supervisor configuration', () => {
     const root = await mkdtemp(join(tmpdir(), 'openalice-supervisor-collision-'))
     temporaryPaths.push(root)
     const homeDir = join(root, 'user')
-    const context = await resolveStoredLaunchContext({}, {
+    const context = await resolveStoredLaunchContext({ project: 'default' }, {
       homeDir,
       cwd: root,
       platform: 'linux',
@@ -467,7 +469,7 @@ describe('Supervisor configuration', () => {
       { homeDir, cwd: root, platform: 'linux' },
     )).rejects.toThrow(/non-empty and is not an existing OpenAlice home/)
 
-    const selected = await resolveStoredLaunchContext({}, {
+    const selected = await resolveStoredLaunchContext({ project: 'paper' }, {
       homeDir,
       cwd: root,
       platform: 'linux',
@@ -483,7 +485,7 @@ describe('Supervisor configuration', () => {
     const root = await mkdtemp(join(tmpdir(), 'openalice-supervisor-symlink-'))
     temporaryPaths.push(root)
     const homeDir = join(root, 'user')
-    const context = await resolveStoredLaunchContext({}, {
+    const context = await resolveStoredLaunchContext({ project: 'default' }, {
       homeDir,
       cwd: root,
       platform: 'linux',
@@ -518,7 +520,7 @@ describe('Supervisor configuration', () => {
   it('rejects corrupt, unknown, and mismatched configuration fields', () => {
     expect(() => parseSupervisorConfig({
       schemaVersion: 0,
-    })).toThrow(/schemaVersion must be 2/)
+    })).toThrow(/schemaVersion must be 3/)
     expect(() => parseSupervisorConfig({
       schemaVersion: 1,
       surprise: true,
@@ -543,7 +545,7 @@ describe('Supervisor configuration', () => {
   it('reports a newer schemaVersion before unknown-field validation', () => {
     try {
       parseSupervisorConfig({
-        schemaVersion: 3,
+        schemaVersion: 4,
         surprise: true,
         defaults: { futureDefault: true },
       })
@@ -555,7 +557,7 @@ describe('Supervisor configuration', () => {
         code: 'ESUPERVISORSCHEMA',
         exitCode: 2,
       })
-      expect((error as Error).message).toMatch(/schemaVersion 3 is newer than this OpenAlice/)
+      expect((error as Error).message).toMatch(/schemaVersion 4 is newer than this OpenAlice/)
       expect((error as Error).message).not.toMatch(/unknown field/)
       expect((error as Error).message).not.toMatch(/must be 2/)
     }
@@ -605,7 +607,7 @@ describe('Supervisor configuration', () => {
       readConfig: async () => parsed,
     })
     await writeSupervisorConfig(context.supervisorRoot, parsed)
-    await expect(readSupervisorConfig(context.supervisorRoot)).resolves.toEqual(parsed)
+    await expect(readSupervisorConfig(context.supervisorRoot)).resolves.toEqual({ ...parsed, schemaVersion: 3, defaultTarget: null })
 
     await persistAliceProjectLaunchConfig(context, { port: 48_002 }, {
       homeDir: join(root, 'user'),
@@ -616,7 +618,8 @@ describe('Supervisor configuration', () => {
     expect(JSON.parse(
       await readFile(supervisorConfigPath(context.supervisorRoot), 'utf8'),
     )).toEqual({
-      schemaVersion: 2,
+      schemaVersion: 3,
+      defaultTarget: null,
       futureRoot: 'keep-root',
       defaults: {
         port: 48_001,
@@ -655,4 +658,11 @@ describe('Supervisor configuration', () => {
       },
     })
   })
+})
+
+// Default migration must never consult the maintainer's installed Desktop state.
+vi.mock('./supervisor-default-migration.ts', async importOriginal => {
+  const actual = await importOriginal<typeof import('./supervisor-default-migration.ts')>()
+  return { ...actual, migrateSupervisorDefault: (root: string, config: Parameters<typeof actual.migrateSupervisorDefault>[1], save: Parameters<typeof actual.migrateSupervisorDefault>[2], desktopPath?: string) =>
+    actual.migrateSupervisorDefault(root, config, save, desktopPath ?? join(root, 'fixture-desktop-preferences.json')) }
 })

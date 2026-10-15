@@ -1,3 +1,4 @@
+import { latestArtifact, recordSelection } from './release-artifacts.mjs'
 import { execFileSync } from 'node:child_process'
 import { appendFileSync } from 'node:fs'
 import { resolve } from 'node:path'
@@ -22,9 +23,7 @@ export function selectReleaseCandidate({ run, artifacts, runId, sourceSha, targe
     throw new Error('Candidate must come from the selected completed master Release run')
   }
   const name = `${rehearsalBranch ? 'rehearsal' : 'release'}-assets-${target}`
-  const matches = artifacts.filter((artifact) => artifact.name === name)
-  if (matches.length !== 1) throw new Error(`Expected exactly one candidate artifact: ${name}`)
-  const artifact = matches[0]
+  const artifact = latestArtifact(artifacts, name, now)
   const expiry = Date.parse(artifact.expires_at)
   if (!Number.isSafeInteger(artifact.id) || artifact.id <= 0 || artifact.expired !== false
     || !Number.isFinite(expiry) || expiry <= now
@@ -64,7 +63,7 @@ if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1]
     if (process.env.GITHUB_OUTPUT) {
       appendFileSync(process.env.GITHUB_OUTPUT, `artifact-id=${result.artifactId}\nsource-sha=${result.sourceSha}\n`)
     }
-    console.log(JSON.stringify(result))
+    recordSelection(result)
   } catch (error) {
     console.error(error.message)
     process.exitCode = 1

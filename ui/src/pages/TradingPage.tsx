@@ -442,7 +442,7 @@ export function TradingPage() {
   return (
     <div className="flex flex-col flex-1 min-h-0">
       <PageHeader
-        title="Trading"
+        title="Broker"
         live={lastUpdated && equity?.accounts.some((row) => brokerReadiness.data?.accounts.some(
           (account) => account.accountId === row.id && account.operational,
         )) ? { lastUpdated } : undefined}
@@ -555,7 +555,7 @@ export function TradingPage() {
 function PageShell({ children, scroll = true }: { children?: React.ReactNode; scroll?: boolean }) {
   return (
     <div className="flex flex-col flex-1 min-h-0">
-      <PageHeader title="Trading" />
+      <PageHeader title="Broker" />
       <SettingsScrollArea scroll={scroll} className={scroll ? 'px-4 py-5 md:px-6' : ''}>{children}</SettingsScrollArea>
     </div>
   )

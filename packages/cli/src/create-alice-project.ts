@@ -1,4 +1,5 @@
-import { parseProjectWorkspaces, type ProjectWorkspace } from './project-workspaces.ts'
+import { readdir } from 'node:fs/promises'
+import { PROJECT_WORKSPACES } from './project-workspaces.ts'
 /**
  * `openalice create alice-project` — interactive or scripted AliceProject birth.
  */
@@ -34,7 +35,7 @@ Options:
   --name <key>       Project key (lowercase, not "default")
   --home <path>      Complete OPENALICE_HOME for this project
   --product <kind>   trader (default) or nano
-  --workspaces <list> chat (default), auto-quant, auto-prediction; or none
+  --require-empty    Reject an existing non-empty home (GUI creation safety)
   --yes              Non-interactive; requires --name and --home
 `
 }
@@ -44,19 +45,16 @@ export interface CreateAliceProjectOptions {
   home?: string
   product?: AliceProjectProduct
   yes?: boolean
-  workspaces?: ProjectWorkspace[]
+  requireEmpty?: boolean
 }
 
 export function parseCreateAliceProjectArgs(argv: string[]): CreateAliceProjectOptions {
   const options: CreateAliceProjectOptions = {}
   for (let index = 0; index < argv.length; index += 1) {
     const arg = argv[index]
+    if (arg === '--require-empty') { options.requireEmpty = true; continue }
     if (arg === '--yes' || arg === '-y') {
       options.yes = true
-      continue
-    }
-    if (arg === '--workspaces') {
-      options.workspaces = parseProjectWorkspaces(requireValue(argv, ++index, arg))
       continue
     }
     if (arg === '--name') {
@@ -122,9 +120,7 @@ export async function runCreateAliceProjectCommand(
       ?? (interactive ? await prompt(`Complete home [${suggestedHome}]: `) : suggestedHome)
   ).trim() || suggestedHome
 
-  const workspaces = options.workspaces ?? (interactive
-    ? parseProjectWorkspaces((await prompt('Workspaces: chat, auto-quant, auto-prediction, or none [chat]: ')).trim() || 'chat')
-    : ['chat'] as ProjectWorkspace[])
+  const workspaces = [...PROJECT_WORKSPACES]
 
   if (interactive && !options.yes) {
     stdout.write(
@@ -137,7 +133,11 @@ export async function runCreateAliceProjectCommand(
     }
   }
 
-  const context = await (io.resolveContext ?? (() => resolveStoredLaunchContext({})))()
+  if (options.requireEmpty) {
+    const entries = await readdir(home).catch(error => { if (error.code === 'ENOENT') return []; throw error })
+    if (entries.some(entry => !['.DS_Store', 'Thumbs.db', 'desktop.ini'].includes(entry))) throw usageError('Choose a new or empty data folder.')
+  }
+  const context = await (io.resolveContext ?? (() => resolveStoredLaunchContext({ project: 'default' })))()
   await createSupervisorAliceProject(context, name, home, {
     product,
     workspaces,
@@ -147,8 +147,8 @@ export async function runCreateAliceProjectCommand(
   stdout.write(
     `Created AliceProject ${name} (${product === 'nano' ? 'NanoAlice' : 'TraderAlice'}).\n`
     + `Home: ${home}\n`
-    + `Workspaces: ${workspaces.join(', ') || 'none (set up later)'}. Prepared automatically on first start; no Agent is launched.\n`
-    + `Selected as the next bare-start default. Start with: openalice up --project ${name}\n`,
+    + `Workspaces: ${workspaces.join(', ')}. Prepared after the app opens; no Agent is launched.\n`
+    + `Lifecycle default unchanged. Start with: openalice up --project ${name}\n`,
   )
   return 0
 }

@@ -88,18 +88,26 @@ describe('CI workflow authority lanes', () => {
     expect(fullWorkflow.jobs['post-merge-dev-smoke']).toBeUndefined()
   })
 
-  it('keeps routine dev PR feedback to checkout, install, workflow contracts, and a complete build', () => {
+  it('keeps routine dev PR feedback to checkout, install, required local evidence, workflow contracts, and a complete build', () => {
     const cleanBuild = devPrWorkflow.jobs['clean-build']
 
     expect(commands(cleanBuild)).toEqual([
       'pnpm install --frozen-lockfile',
       'pnpm test:contract:workflow',
+      'pnpm test:critical --receipt artifacts/tests/critical-local.json',
       'pnpm build',
+      'pnpm exec tsc -p tests/tsconfig.json --noEmit',
     ])
     expect(commands(cleanBuild)).not.toContain('npx tsc --noEmit')
     expect(commands(cleanBuild)).not.toContain('pnpm test')
     expect(cleanBuild.strategy).toBeUndefined()
     expect(cleanBuild['timeout-minutes']).toBe(15)
+    const required = step(cleanBuild, 'Verify required local product and protocol evidence')
+    expect(required['continue-on-error']).toBeUndefined()
+    const upload = step(cleanBuild, 'Upload required evidence receipt')
+    expect(upload.if).toBe('always()')
+    expect(upload.with?.['if-no-files-found']).toBe('error')
+    expect(upload.with?.path).toBe('artifacts/tests/critical-local.json')
   })
 
   it('loads the beta classifier from trusted master before running source contracts', () => {
@@ -109,7 +117,7 @@ describe('CI workflow authority lanes', () => {
     expect(classifier['continue-on-error']).toBe(true)
     expect(classifier.if).toBe("github.event_name == 'pull_request'")
     expect(classifier.env?.BASE_SHA).toBe('${{ github.event.pull_request.base.sha }}')
-    expect(classifier.run).toContain('git show "${BASE_SHA}:scripts/classify-beta-release-prep.mjs"')
+    expect(classifier.run).toContain('git archive "$BASE_SHA" scripts/classify-beta-release-prep.mjs packages/update-lifecycle/src/release-policy.ts')
     expect(classifier.run).toContain('--github-output "$GITHUB_OUTPUT"')
     expect(sourceContracts.outputs?.beta_release_prep)
       .toContain("steps.beta-release-prep.outcome == 'success'")
@@ -118,6 +126,7 @@ describe('CI workflow authority lanes', () => {
       'pnpm test:contract:workflow',
       'npx tsc --noEmit',
     ]))
+    expect(commands(sourceContracts)).toContain('pnpm test:critical --receipt artifacts/tests/critical-local.json')
     expect(commands(sourceContracts)).not.toContain('pnpm build')
     expect(commands(sourceContracts)).not.toContain('pnpm test')
   })
@@ -148,6 +157,11 @@ describe('CI workflow authority lanes', () => {
     expect(devSmoke.if).toContain("beta_release_prep != 'true'")
     expect(commands(devSmoke)).toContain('pnpm test:system:guardian')
     expect(commands(devSmoke)).toContain('pnpm test:system:dev-stack')
+    const nativeCommands = commands(devSmoke)
+    const packageBuild = nativeCommands.indexOf('pnpm --filter @traderalice/update-lifecycle... build')
+    expect(packageBuild).toBeGreaterThanOrEqual(0)
+    expect(packageBuild).toBeLessThan(nativeCommands.indexOf('pnpm test:system:guardian'))
+    expect(packageBuild).toBeLessThan(nativeCommands.indexOf('pnpm test:system:dev-stack'))
   })
 
   it('validates the selected ref without a hidden scheduled checkout override', () => {
@@ -157,7 +171,9 @@ describe('CI workflow authority lanes', () => {
     }
   })
 
-  it('keeps the runtime-visible root and CLI version baselines synchronized', () => {
-    expect(packageJson.version).toBe(cliPackageJson.version)
+  it('authors product identity only at the root; CLI distribution metadata is generated', () => {
+    expect(packageJson.version).toEqual(expect.any(String))
+    expect(cliPackageJson.version).toBeUndefined()
+    expect(cliPackageJson.private).toBe(true)
   })
 })

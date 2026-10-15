@@ -1,4 +1,5 @@
 import { prepareProjectWorkspaces } from '../workspaces/project-workspace-setup.js'
+import { WorkspaceUpdateService } from '../workspaces/workspace-update-service.js'
 import { Hono, type Context } from 'hono'
 import { cors } from 'hono/cors'
 import { createAdaptorServer, serve } from '@hono/node-server'
@@ -34,6 +35,7 @@ import { createAliceProjectRoutes } from './routes/alice-project.js'
 import { createHarnessSurfaceRoutes } from './routes/harness-surfaces.js'
 import { createAuthRoutes } from './routes/auth.js'
 import { createPreferencesRoutes } from './routes/preferences.js'
+import { createUpdateRoutes } from './routes/updates.js'
 import { createUiLayoutRoutes } from './routes/ui-layout.js'
 import { initializeWindowsWorkspaceShellPreference } from '../core/windows-workspace-shell.js'
 import { createAuthMiddleware } from './middleware/auth.js'
@@ -89,6 +91,7 @@ export class WebPlugin implements Plugin {
   /** SSE clients grouped by channel ID. Default channel: 'default'. */
   private sseByChannel = new Map<string, Map<string, SSEClient>>()
   private workspaceService: WorkspaceService | null = null
+  private workspaceUpdates: WorkspaceUpdateService | null = null
   private workspacesWs: AttachedWS | null = null
   private workspacesIpc: AttachedWorkspaceIpc | null = null
   private webIpc: AttachedWebIpc | null = null
@@ -248,7 +251,11 @@ export class WebPlugin implements Plugin {
     app.route('/api/connectors', createConnectorRoutes({
       getWorkspaceService: () => this.workspaceService,
     }))
-    app.route('/api/preferences', createPreferencesRoutes())
+    app.route('/api/preferences', createPreferencesRoutes(undefined, undefined, () => {
+      void this.workspaceUpdates?.refreshAndApplyPolicy().catch((error: unknown) => {
+        console.warn('[workspace updates] Could not apply changed policy:', error)
+      })
+    }))
     app.route('/api/ui-layout', createUiLayoutRoutes())
     app.route('/api/market-data', createMarketDataRoutes(ctx))
     app.route('/api/trading/config', createTradingConfigRoutes(ctx))
@@ -288,12 +295,23 @@ export class WebPlugin implements Plugin {
         : {}),
       inboxStore: ctx.inboxStore,
     })
-    await prepareProjectWorkspaces(this.workspaceService, {
-      onProgress: (workspace, error) => {
-        if (error) console.warn(`[workspace setup] ${workspace}: ${error}. Retry from Quick Start or restart the project.`)
-        else console.log(`[workspace setup] Preparing ${workspace}…`)
-      },
-    }).catch((error: unknown) => console.warn('[workspace setup] Could not read setup request:', error))
+    this.workspaceUpdates = new WorkspaceUpdateService(this.workspaceService)
+    const defaultWorkspaceService = this.workspaceService
+    const workspaceUpdates = this.workspaceUpdates
+    let updatesActivated = false
+    app.route('/api/updates', createUpdateRoutes(workspaceUpdates, () => {
+      if (updatesActivated) return
+      updatesActivated = true
+      void prepareProjectWorkspaces(defaultWorkspaceService, {
+        onProgress: (workspace, error) => {
+          if (error) console.warn(`[workspace setup] ${workspace}: ${error}. Retry from Quick Start or restart the Runtime.`)
+          else console.log(`[workspace setup] Preparing ${workspace}…`)
+        },
+      }).catch((error: unknown) => console.warn('[workspace setup] Could not prepare default Workspaces:', error))
+        .finally(() => {
+          if (this.workspaceUpdates === workspaceUpdates) workspaceUpdates.start()
+        })
+    }))
     this.workspacesIpc = attachWorkspacesIpc(this.workspaceService)
     if (this.workspaceServiceRef) this.workspaceServiceRef.current = this.workspaceService
     app.route('/api/workspaces', createWorkspaceRoutes(this.workspaceService))
@@ -417,6 +435,8 @@ export class WebPlugin implements Plugin {
   }
 
   async stop() {
+    this.workspaceUpdates?.stop()
+    this.workspaceUpdates = null
     this.sseByChannel.clear()
     this.webIpc?.dispose()
     this.webIpc = null

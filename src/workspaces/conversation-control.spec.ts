@@ -63,7 +63,7 @@ function fakeService(opts: {
     resolveHeadlessDefaultAgentId: vi.fn(async () => opts.defaultAgent ?? 'pi'),
     resolveDefaultAgentId: vi.fn(async () => 'pi'),
     resolveOrCreateChatWorkspace: vi.fn(async () => ({ ok: true as const, workspace })),
-    dispatchHeadlessTask,
+    executions: { dispatch: dispatchHeadlessTask },
     headlessTasks: { get: () => opts.task ?? null },
     headlessLogsDir: opts.logsDir ?? '/tmp/logs',
     recordAgentRuntime: vi.fn(async () => undefined),
@@ -207,7 +207,7 @@ describe('Workspace conversation control', () => {
     expect(dispatchHeadlessTask).toHaveBeenCalledWith(
       workspace,
       expect.anything(),
-      'Start fresh.',
+      'Start fresh.', expect.objectContaining({ entry: expect.any(String), kind: expect.any(String) }),
       undefined,
       undefined,
       undefined,
@@ -282,7 +282,7 @@ describe('Workspace conversation control', () => {
     expect(dispatchHeadlessTask).toHaveBeenCalledWith(
       workspace,
       expect.anything(),
-      'Evaluate this prediction market.',
+      'Evaluate this prediction market.', expect.objectContaining({ entry: expect.any(String), kind: expect.any(String) }),
       300_000,
       undefined,
       undefined,
@@ -330,7 +330,7 @@ describe('Workspace conversation control', () => {
     expect(dispatchHeadlessTask).toHaveBeenCalledWith(
       workspace,
       adapter,
-      'Why did you create this?',
+      'Why did you create this?', expect.objectContaining({ entry: expect.any(String), kind: expect.any(String) }),
       300_000,
       undefined,
       'resume-peer',
@@ -359,13 +359,13 @@ describe('Workspace conversation control', () => {
     })
     const dispatchedPrompt = (dispatchHeadlessTask.mock.calls as unknown[][])[0]?.[2]
     expect(dispatchedPrompt).toBe('Why did the report reach this conclusion?')
-    const conversation = (dispatchHeadlessTask.mock.calls as unknown[][])[0]?.[8]
+    const conversation = (dispatchHeadlessTask.mock.calls as unknown[][])[0]?.[9]
     expect(conversation).toMatchObject({
       promptMode: 'plain',
       originalPrompt: 'Why did the report reach this conclusion?',
       deliveredPrompt: 'Why did the report reach this conclusion?',
     })
-    expect((dispatchHeadlessTask.mock.calls as unknown[][])[0]?.[9]).toEqual({
+    expect((dispatchHeadlessTask.mock.calls as unknown[][])[0]?.[10]).toEqual({
       kind: 'conversation',
       caller: { kind: 'human' },
       reason: 'missing-origin',
@@ -389,7 +389,7 @@ describe('Workspace conversation control', () => {
     expect(dispatchedPrompt).toContain('fresh worker reconstructing')
     expect(dispatchedPrompt).toContain('not the original author')
     expect(dispatchedPrompt).toContain('research/report.md')
-    const conversation = (dispatchHeadlessTask.mock.calls as unknown[][])[0]?.[8]
+    const conversation = (dispatchHeadlessTask.mock.calls as unknown[][])[0]?.[9]
     expect(conversation).toMatchObject({
       promptMode: 'reconstruction',
       originalPrompt: 'Why did the report reach this conclusion?',

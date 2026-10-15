@@ -14,11 +14,12 @@
  * have, then announce ourselves with `TERM_PROGRAM=auto-quant-launcher`.
  */
 
-import { existsSync } from 'node:fs';
+import { existsSync, statSync } from 'node:fs';
 import { homedir } from 'node:os';
-import { delimiter, dirname, join } from 'node:path';
+import { basename, delimiter, dirname, join } from 'node:path';
 
 import { runtimeProfileFromEnv } from '@/core/runtime-profile.js';
+import { resolveBashPath } from '@/core/shell-resolver.js';
 
 const STRIP_EXACT = new Set<string>([
   'TERM_PROGRAM',
@@ -61,10 +62,19 @@ const POSIX_USER_BIN_DIRS = [
   '.local/bin',
   '.bun/bin',
   '.npm-global/bin',
+  '.grok/bin',
+  '.cursor/bin',
   'Library/pnpm',
   '.yarn/bin',
   '.cargo/bin',
   '.volta/bin',
+] as const;
+
+const WINDOWS_HOME_BIN_DIRS = [
+  '.cursor/bin',
+  '.local/bin',
+  'bin',
+  '.grok/bin',
 ] as const;
 
 export function buildSpawnEnv(
@@ -122,28 +132,37 @@ export function buildSpawnEnv(
  *
  * macOS apps launched from Finder do not inherit the user's login-shell PATH,
  * so Homebrew / pnpm / ~/.local installs disappear even though `codex` or
- * `claude` works in Terminal. Do not infer `~/.bun/bin`; hang a bun-global
- * CLI on a real PATH dir or set OPENALICE_EXTRA_AGENT_PATH. Keep this pure
- * and synchronous: it is used both for `/agents` availability probes and for
- * the actual PTY spawn env.
+ * `claude` works in Terminal. Windows GUI launches can likewise omit the
+ * user's per-user CLI directories, so recover the standard npm / pnpm / Bun
+ * locations plus the native agent locations used by the registered adapters.
+ * Keep this pure and synchronous: it is used both for `/agents` availability
+ * probes and for the actual PTY spawn env.
  */
-export function buildCliPath(env: NodeJS.ProcessEnv = process.env): string {
+export function buildCliPath(
+  env: NodeJS.ProcessEnv = process.env,
+  opts: { platform?: NodeJS.Platform } = {},
+): string {
+  const platform = opts.platform ?? process.platform;
   const path = env['PATH'] ?? env['Path'] ?? '';
   const profile = runtimeProfileFromEnv(env);
-  const managedPiDir = profile.managedPiPath && !profile.managedPiNodePath && existsSync(profile.managedPiPath)
+  const managedPiDir = profile.managedPiPath && !profile.managedPiNodePath && isRegularFile(profile.managedPiPath)
     ? dirname(profile.managedPiPath)
     : null;
+  const bashSupportPaths = platform === 'win32'
+    ? windowsBashSupportPaths(resolveBashPath(env, 'win32'))
+    : [];
 
-  const home = env['HOME'] ?? homedir();
+  const home = env['USERPROFILE'] ?? env['HOME'] ?? homedir();
   const pathEntries = path.split(delimiter);
   const candidates = [
     env['OPENALICE_WORKSPACE_CLI_BIN_PATH'],
     managedPiDir,
     ...profile.managedToolchainPath,
+    ...bashSupportPaths,
     ...(env['OPENALICE_EXTRA_AGENT_PATH'] ?? '').split(delimiter),
     ...pathEntries,
-    ...(process.platform === 'win32'
-      ? []
+    ...(platform === 'win32'
+      ? windowsUserAgentBinPaths(env, home)
       : [
           env['PNPM_HOME'],
           ...POSIX_USER_BIN_DIRS.map((p) => join(home, p)),
@@ -163,6 +182,49 @@ export function buildCliPath(env: NodeJS.ProcessEnv = process.env): string {
     if (pathEntries.includes(dir) || existsSync(dir)) out.push(dir);
   }
   return out.join(delimiter);
+}
+
+/**
+ * Git for Windows keeps bash and its POSIX helpers in sibling directories.
+ * Both directories must be on PATH when a Windows shim delegates to its
+ * extensionless shell script.
+ */
+function windowsBashSupportPaths(bashPath: string | null): string[] {
+  if (!bashPath) return [];
+
+  const shellDir = dirname(bashPath);
+  const paths = [shellDir];
+  if (basename(shellDir).toLowerCase() === 'bin') {
+    const parentDir = dirname(shellDir);
+    const rootDir = basename(parentDir).toLowerCase() === 'usr'
+      ? dirname(parentDir)
+      : parentDir;
+    paths.push(join(rootDir, 'usr', 'bin'), join(rootDir, 'bin'));
+  }
+  return paths;
+}
+
+function windowsUserAgentBinPaths(env: NodeJS.ProcessEnv, home: string): string[] {
+  const bunInstall = env['BUN_INSTALL']?.trim() || join(home, '.bun');
+  const appData = env['APPDATA']?.trim() || join(home, 'AppData', 'Roaming');
+  const localAppData = env['LOCALAPPDATA']?.trim() || join(home, 'AppData', 'Local');
+  return [
+    join(bunInstall, 'bin'),
+    join(appData, 'npm'),
+    join(localAppData, 'pnpm'),
+    ...WINDOWS_HOME_BIN_DIRS.map((p) => join(home, p)),
+    join(localAppData, 'agy', 'bin'),
+    join(localAppData, 'Microsoft', 'WinGet', 'Links'),
+  ];
+}
+
+function isRegularFile(path: string | null | undefined): path is string {
+  if (!path) return false;
+  try {
+    return statSync(path).isFile();
+  } catch {
+    return false;
+  }
 }
 
 function shouldStrip(name: string, value: string): boolean {

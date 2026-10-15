@@ -1,3 +1,5 @@
+import { resolveStartupTarget } from './startup-target.ts'
+import { runMachineTarget } from './machine-target-command.mjs'
 import { runProjectCli } from './project-cli.ts'
 import { main as runLegacyCommand } from '../bin/openalice.mjs'
 import { isBunStandalone } from './bun-standalone.mjs'
@@ -7,6 +9,7 @@ import {
   type TuiLaunchFlags,
 } from './launch-context.ts'
 import { runSupervisorTui } from './supervisor-tui.ts'
+import { runWebRelay } from './web-relay.ts'
 
 export interface CliDependencies {
   standalone?: boolean
@@ -15,6 +18,7 @@ export interface CliDependencies {
   runTui?: (
     flags?: TuiLaunchFlags,
   ) => Promise<number>
+  runRelay?: (args: string[]) => Promise<number>
 }
 
 export async function main(
@@ -23,6 +27,13 @@ export async function main(
 ): Promise<number> {
   const [command, ...args] = argv
   if (command === 'exec') return runProjectCli(args)
+  if (command === 'relay') return (dependencies.runRelay ?? runWebRelay)(args)
+  if (command === 'start') {
+    throw usageError('"openalice start" is retired. Run "openalice" for the TUI and relay GUI, or "openalice run" for a foreground Runtime without a GUI.')
+  }
+  if (command === 'open') {
+    throw usageError('"openalice open" is retired. Run "openalice" for the TUI and relay GUI, or "openalice relay" for a GUI without the TUI.')
+  }
   const setup = async () => {
     if (!(dependencies.standalone ?? isBunStandalone())) return 0
     return (dependencies.runSetup ?? ((setupArgs: string[]) => runDependencySetup(setupArgs, { quietReady: true })))(args.includes('--json') ? ['--json'] : [])
@@ -51,6 +62,14 @@ Options:
     await setup()
     return (dependencies.runTui ?? runSupervisorTui)(flags)
   }
+  if (command === '--machine' && args[0] && args[1]?.startsWith('--') && !['--help', '-h'].includes(args[1])) {
+    const flags = parseTuiLaunchArgs(argv)
+    if (!flags.project) throw usageError('--machine requires --project for startup.')
+    return (dependencies.runTui ?? runSupervisorTui)(flags)
+  }
+  if (command === '--remote' || command === '--machine') {
+    return (dependencies.runCommand ?? runLegacyCommand)(argv)
+  }
   if (command === undefined) {
     await setup()
     return (dependencies.runTui ?? runSupervisorTui)({})
@@ -60,7 +79,12 @@ Options:
     await setup()
     return (dependencies.runTui ?? runSupervisorTui)(flags)
   }
-  const startsLocalRuntime = ['up', 'run', 'start'].includes(command)
+  if (!dependencies.runCommand && ['up', 'run', 'down', 'status', 'logs', 'doctor'].includes(command) && !args.some(arg => ['--project', '--instance', '--home', '--help', '-h'].includes(arg)) && !process.env.OPENALICE_HOME && !process.env.OPENALICE_PROJECT && !process.env.OPENALICE_INSTANCE) {
+    const { target } = await resolveStartupTarget()
+    if (!target) throw usageError('Choose a Default AliceProject or pass --project/--home.')
+    if (target.machine !== 'local') return runMachineTarget(target.machine, [command, ...args, '--project', target.project])
+  }
+  const startsLocalRuntime = ['up', 'run'].includes(command)
     || (command === 'server' && ['start', 'run'].includes(args[0] ?? ''))
   if (startsLocalRuntime && !args.includes('--help') && !args.includes('-h')) {
     const setupCode = await setup()

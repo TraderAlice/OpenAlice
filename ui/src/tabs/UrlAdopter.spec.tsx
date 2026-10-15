@@ -183,8 +183,8 @@ describe('UrlAdopter Auto Prediction', () => {
   })
 })
 
-describe('UrlAdopter Settings Harness', () => {
-  it('adopts the Harness settings category from /settings/harness', async () => {
+describe('UrlAdopter Settings visibility', () => {
+  it('redirects the former Harness path to visibility settings', async () => {
     render(
       <MemoryRouter initialEntries={['/settings/harness']}>
         <UrlAdopter />
@@ -193,7 +193,7 @@ describe('UrlAdopter Settings Harness', () => {
 
     await waitFor(() => expect(mocks.openOrFocus).toHaveBeenCalledWith({
       kind: 'settings',
-      params: { category: 'harness' },
+      params: { category: 'visibility' },
     }))
     expect(mocks.setSidebar).toHaveBeenCalledWith('settings')
   })
@@ -362,4 +362,10 @@ describe('UrlAdopter Market News', () => {
     }))
     expect(mocks.setSidebar).toHaveBeenCalledWith('market')
   })
+})
+
+it('adopts the Machines deep link as a settings tab', async () => {
+  render(<MemoryRouter initialEntries={['/settings/machines']}><UrlAdopter /></MemoryRouter>)
+  await waitFor(() => expect(mocks.openOrFocus).toHaveBeenCalledWith({ kind: 'settings', params: { category: 'machines' } }))
+  expect(mocks.setSidebar).toHaveBeenCalledWith('settings')
 })

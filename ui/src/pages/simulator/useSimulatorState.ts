@@ -88,7 +88,7 @@ export function useSimulatorState(): UseSimulatorStateResult {
       const s = await simulatorApi.state(selectedId)
       setState(s)
     } catch (err) {
-      toast.error(`State fetch failed: ${err instanceof Error ? err.message : err}`)
+      toast.error(`State fetch failed: ${err instanceof Error ? err.message : err}`, `simulator-state:${selectedId}`)
       setState(null)
     }
   }, [selectedId, toast])

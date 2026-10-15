@@ -1,3 +1,4 @@
+import { newsActivityPayload } from './domain/news/activity.js'
 import { publishCliEndpoint } from './server/cli-endpoint.js'
 import { createMarketBarsTools } from './tool/market-bars.js'
 import {
@@ -428,15 +429,7 @@ async function main() {
       intervalMs: config.news.intervalMinutes * 60 * 1000,
       ...(newsActivity ? {
         onIngested: async (record) => {
-          await newsActivity.record('news.ingested', {
-            newsItemId: record.seq,
-            dedupKey: record.dedupKey,
-            title: record.title,
-            ...(record.metadata.source ? { source: record.metadata.source } : {}),
-            ...(record.metadata.link ? { link: record.metadata.link } : {}),
-            publishedAt: record.pubTs,
-            ingestSource: record.metadata.ingestSource ?? 'rss',
-          })
+          await newsActivity.record('news.ingested', newsActivityPayload(record))
         },
       } : {}),
     })

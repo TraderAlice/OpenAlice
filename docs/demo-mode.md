@@ -89,3 +89,32 @@ Replies distinguish illustrative analysis and proposed work from actual market
 reads, saved files, scheduled jobs or backtests. Unrecognized prompts retain the
 existing simulated conversation/permission flow. Browser and Electron resolve
 the same fixtures through their normal demo transports.
+
+## Workspace preparation recovery
+
+Browser demo accepts `?workspaceSetup=failed`, `preparing`, or `read-error`.
+The failure scenario follows the avatar blue dot through Settings Overview to
+Auto Quant preparation; Retry simulates recovery without creating real files.
+The preparing scenario stays quiet. These fixtures exercise UI guidance and
+recovery only, not a live Workspace clone or native packaging.
+
+## Machine settings review
+
+`/settings/machines` opens the dedicated fleet page. Add Machine uses a read-only
+probe followed by explicit approval; the demo saves a temporary in-memory row
+without switching the current target. Reload clears these added rows.
+
+Append `?machineScenario=probe-error`, `blocked`, or `apply-error` for failure
+acceptance. Probe/apply errors fail once, then allow a fresh review to simulate
+recovery. Blocked plans never allow approval. The normal add plan has no remote
+changes and still requires approval to save the profile. All SSH, remote state,
+installation and persistence in these scenarios are simulated through MSW; no
+SSH connection is attempted.
+
+## Update overview walkthrough
+
+Open `/settings?updates=ready` in the browser demo to exercise the three-object
+overview, the collapsed default Harness details, and one-step Alice Project
+review/apply/completion. The fixture updates only in-memory Chat content. The
+ordinary demo retains the Quant active-work blocker for the disabled-apply path.
+No real installation, Workspace file, or remote Machine is updated.

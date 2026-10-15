@@ -1,3 +1,5 @@
+import { signCliMacOS } from './sign-cli-macos.mjs'
+import { requireBunVersion } from './bun-toolchain.mjs'
 import { runtimeCompileOptions } from './bun-compile-options.js'
 import { createServer } from 'node:net'
 import { mkdir, readFile, rm, stat, symlink, writeFile } from 'node:fs/promises'
@@ -8,10 +10,7 @@ import { prepareBunBrokerPackFixture } from './bun-broker-pack-fixture.js'
 import { inspectSystemDependencies } from '../packages/cli/src/system-dependencies.mjs'
 
 const repositoryRoot = fileURLToPath(new URL('..', import.meta.url))
-const pinnedBunVersion = (await readFile(join(repositoryRoot, '.bun-version'), 'utf8')).trim()
-if (Bun.version !== pinnedBunVersion) {
-  throw new Error(`Bun ${pinnedBunVersion} is required, but ${Bun.version} is running`)
-}
+requireBunVersion(Bun.version)
 
 const product = JSON.parse(await readFile(join(repositoryRoot, 'package.json'), 'utf8')) as {
   version?: unknown
@@ -59,6 +58,7 @@ if (!build.success) {
   for (const log of build.logs) console.error(log)
   throw new Error('Bun multiprocess Runtime build failed')
 }
+if (process.platform === 'darwin') signCliMacOS(executablePath, process.arch)
 const buildDurationMs = Math.round(performance.now() - buildStartedAt)
 
 const [webPort, mcpPort, utaPort, connectorPort] = await allocatePorts(4)

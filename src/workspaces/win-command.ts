@@ -27,7 +27,7 @@
  * On non-Windows this is the identity function: the kernel reads shebangs and a
  * bare-name PATH lookup finds shell-script shims fine.
  */
-import { existsSync, readFileSync } from 'node:fs';
+import { readFileSync, statSync } from 'node:fs';
 import { basename, delimiter, dirname, join, relative, resolve } from 'node:path';
 
 import { resolveBashPath } from '../core/shell-resolver.js';
@@ -75,7 +75,7 @@ export function resolveLaunchCommand(
   let resolved: string | null;
   if (explicitPath) {
     const candidate = explicitCandidate(name, opts.cwd);
-    if (!isBatchExtension(explicitExt) || !existsSync(candidate)) {
+    if (!isBatchExtension(explicitExt) || !isRegularFile(candidate)) {
       return { argv, viaShell: false, mode: 'direct' };
     }
     resolved = candidate;
@@ -104,15 +104,21 @@ export function resolveLaunchCommand(
     const node = opts.nodeExecPath ?? (standalone
       ? lookupExactOnWindowsPath('node.exe', env)
       : process.execPath);
-    const direct = node ? resolveStockNpmShim(resolved, rest, node) : null;
-    if (direct) return { argv: direct, viaShell: false, mode: 'node-shim' };
+    const direct = resolveStockNpmShim(resolved, rest, node);
+    if (direct) {
+      return {
+        argv: direct,
+        viaShell: false,
+        mode: direct[0] === node ? 'node-shim' : 'direct',
+      };
+    }
 
     // npm-style installs also publish an extensionless POSIX shim next to the
     // `.cmd`. Git Bash can execute that script while receiving the prompt as a
     // separate argv item, so neither Bash nor cmd.exe evaluates prompt text.
     const posixShim = resolved.slice(0, -ext.length);
     const bash = resolveBashPath(env, 'win32');
-    if (existsSync(posixShim) && bash && existsSync(bash)) {
+    if (isRegularFile(posixShim) && bash && isRegularFile(bash)) {
       return {
         argv: [bash, windowsPathForBash(posixShim), ...rest],
         viaShell: false,
@@ -138,7 +144,7 @@ export function resolveLaunchCommand(
  *
  * This intentionally recognizes only npm's generated final invocation:
  *
- *   "%_prog%" "%dp0%\\node_modules\\some-package\\cli.js" %*
+ *   "%_prog%" "%dp0%\\node_modules\\some-package\\cli.(js|exe)" %*
  *
  * Anything hand-written, outside the shim directory, or with extra shell
  * syntax falls back to the existing cmd.exe path (and remains rejected by the
@@ -147,7 +153,7 @@ export function resolveLaunchCommand(
 export function resolveStockNpmShim(
   shimPath: string,
   args: readonly string[],
-  nodeExecPath: string,
+  nodeExecPath: string | null,
 ): readonly string[] | null {
   let source: string;
   try {
@@ -160,7 +166,7 @@ export function resolveStockNpmShim(
   // `%~dp0\\..\\package\\...` and repeat the same entry in their local-node
   // and PATH-node branches. Accept both generated shapes only when every
   // captured entry is identical.
-  const matches = [...source.matchAll(/"(?:%dp0%|%~dp0)\\([^"\r\n]+\.(?:c|m)?js)"\s+%\*/gim)];
+  const matches = [...source.matchAll(/"(?:%dp0%|%~dp0)\\([^"\r\n]+\.(?:(?:c|m)?js|exe|com))"\s+%\*/gim)];
   const entries = [...new Set(matches.map((match) => match[1]).filter((value): value is string => !!value))];
   if (entries.length !== 1) return null;
   const rawRelative = entries[0];
@@ -172,8 +178,18 @@ export function resolveStockNpmShim(
     : root;
   const entry = resolve(root, rawRelative.replace(/\\/g, '/'));
   const rel = relative(allowedRoot, entry);
-  if (!rel || rel.startsWith('..') || rel.includes(':') || !existsSync(entry)) return null;
+  if (!rel || rel.startsWith('..') || rel.includes(':') || !isRegularFile(entry)) return null;
+  if (/\.(?:exe|com)$/i.test(entry)) return [entry, ...args];
+  if (!nodeExecPath) return null;
   return [nodeExecPath, entry, ...args];
+}
+
+function isRegularFile(path: string): boolean {
+  try {
+    return statSync(path).isFile();
+  } catch {
+    return false;
+  }
 }
 
 function lookupOnWindowsPath(name: string, env: NodeJS.ProcessEnv): string | null {
@@ -190,7 +206,7 @@ function lookupOnWindowsPath(name: string, env: NodeJS.ProcessEnv): string | nul
       // Windows' filesystem is case-insensitive, so we normalize the appended
       // extension to lowercase for a clean, deterministic command string.
       const candidate = join(dir, name + ext.toLowerCase());
-      if (existsSync(candidate)) return candidate;
+      if (isRegularFile(candidate)) return candidate;
     }
   }
   return null;
@@ -200,7 +216,7 @@ function lookupExactOnWindowsPath(name: string, env: NodeJS.ProcessEnv): string 
   const dirs = (env['PATH'] ?? env['Path'] ?? '').split(delimiter).filter(Boolean);
   for (const dir of dirs) {
     const candidate = join(dir, name);
-    if (existsSync(candidate)) return candidate;
+    if (isRegularFile(candidate)) return candidate;
   }
   return null;
 }

@@ -3,7 +3,6 @@ import { EventEmitter } from 'node:events'
 import { describe, expect, it, vi } from 'vitest'
 
 import {
-  buildRemoteClientUrl,
   buildSshArgs,
   connectSsh,
   openBrowser,
@@ -56,20 +55,14 @@ describe('OpenAlice SSH connector', () => {
     ])
   })
 
-  it('puts remote connection identity in a client-only URL fragment', () => {
-    const clientUrl = buildRemoteClientUrl(
-      'http://127.0.0.1:40123',
-      parseSshConnectArgs(['alice@example.com', '--ssh-port', '2222', '--remote-port', '48000']),
-    )
-    const url = new URL(clientUrl)
-    const fragment = new URLSearchParams(url.hash.slice(1))
+  it('uses non-interactive SSH only for browser-driven discovery and switching', () => {
+    const options = parseSshConnectArgs(['host-alias'])
+    expect(buildSshArgs({ ...options, batchMode: true }, 40123)).toContain('BatchMode=yes')
+    expect(buildSshArgs(options, 40123)).not.toContain('BatchMode=yes')
+  })
 
-    expect(url.origin).toBe('http://127.0.0.1:40123')
-    expect(fragment.get('openalice-remote')).toBe('1')
-    expect(fragment.get('target')).toBe('alice@example.com')
-    expect(fragment.get('ssh-port')).toBe('2222')
-    expect(fragment.get('runtime-port')).toBe('48000')
-    expect(url.search).toBe('')
+  it('does not permit a browser to open the backend SSH tunnel directly', async () => {
+    await expect(connectSsh({ ...parseSshConnectArgs(['host']), openBrowser: true })).rejects.toThrow('Direct SSH browser attach is retired')
   })
 
   it('waits for the OpenAlice auth contract rather than accepting arbitrary HTTP', async () => {
@@ -85,7 +78,7 @@ describe('OpenAlice SSH connector', () => {
     expect(fetchImpl).toHaveBeenCalledTimes(3)
   })
 
-  it('opens a tunnel, probes it, and keeps the browser on the local URL', async () => {
+  it('opens a tunnel for the relay without opening a browser', async () => {
     const child = new FakeChild()
     const spawnProcess = vi.fn(() => child)
     const waitForRuntime = vi.fn(async () => ({ authed: true }))
@@ -98,11 +91,10 @@ describe('OpenAlice SSH connector', () => {
       launchBrowser,
       stdout,
     })
-    await vi.waitFor(() => expect(launchBrowser).toHaveBeenCalledWith(
-      'http://127.0.0.1:40123/#openalice-remote=1&target=host&ssh-port=22&runtime-port=47331',
-    ))
+    await vi.waitFor(() => expect(waitForRuntime).toHaveBeenCalledWith('http://127.0.0.1:40123', expect.any(Object)))
     child.emit('exit', 0, null)
     await expect(result).resolves.toBe(0)
+    expect(launchBrowser).not.toHaveBeenCalled()
     expect(spawnProcess).toHaveBeenCalledWith('ssh', expect.arrayContaining([
       '-L', '127.0.0.1:40123:127.0.0.1:47331', 'host',
     ]), expect.any(Object))
@@ -124,7 +116,7 @@ describe('OpenAlice SSH connector', () => {
     await vi.waitFor(() => expect(onReady).toHaveBeenCalledWith({
       localPort: 40124,
       localUrl: 'http://127.0.0.1:40124',
-      clientUrl: 'http://127.0.0.1:40124/#openalice-remote=1&target=host&ssh-port=22&runtime-port=47331',
+      clientUrl: 'http://127.0.0.1:40124',
     }))
     child.emit('exit', 0, null)
     await expect(result).resolves.toBe(0)

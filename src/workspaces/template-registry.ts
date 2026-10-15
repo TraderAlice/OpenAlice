@@ -85,9 +85,9 @@ export interface TemplateMeta {
    * Template version, declared in README frontmatter. Used for the
    * lineage-based upgrade hint (compare a workspace's spawned-from version
    * against the current template version). Templates without a README, or
-   * without a `version:` key, fall back to "0.0.0".
+   * without a `version:` key, have no reported version.
    */
-  readonly version: string;
+  readonly version?: string;
   /**
    * Adapter ids the template wants enabled by default in new workspaces
    * (the create form pre-checks these). Sourced from `template.json`'s
@@ -179,7 +179,7 @@ export class TemplateRegistry {
       const tplMeta = await readTemplateMeta(join(templateDir, 'template.json'));
       const readmePath = join(templateDir, 'README.md');
       const hasReadme = existsSync(readmePath);
-      const version = hasReadme ? await readReadmeVersion(readmePath) : '0.0.0';
+      const version = hasReadme ? await readReadmeVersion(readmePath) : undefined;
       const meta: TemplateMeta = {
         name,
         ...(tplMeta.description !== undefined ? { description: tplMeta.description } : {}),
@@ -259,30 +259,30 @@ interface ParsedTemplateMeta {
  * not in README frontmatter (the frontmatter is the human-facing
  * description's metadata, not a config surface).
  *
- * Returns "0.0.0" when:
+ * Returns undefined when:
  *   - the file is unreadable
  *   - there's no frontmatter block (no `---` at the very top)
  *   - the frontmatter has no `version:` key
  *   - the value isn't a non-empty string
  */
-export async function readReadmeVersion(readmePath: string): Promise<string> {
+export async function readReadmeVersion(readmePath: string): Promise<string | undefined> {
   try {
     const raw = await readFile(readmePath, 'utf8');
     return extractVersion(raw);
   } catch {
-    return '0.0.0';
+    return undefined;
   }
 }
 
-function extractVersion(raw: string): string {
+function extractVersion(raw: string): string | undefined {
   // Frontmatter must be at the very top — no leading whitespace except a BOM.
   const text = raw.replace(/^﻿/, '');
-  if (!text.startsWith('---')) return '0.0.0';
+  if (!text.startsWith('---')) return undefined;
   // Find the closing fence. Must start at column 0 on its own line.
   const closeRe = /^---\s*$/m;
   const remainder = text.slice(3);
   const closeMatch = closeRe.exec(remainder);
-  if (!closeMatch || closeMatch.index === undefined) return '0.0.0';
+  if (!closeMatch || closeMatch.index === undefined) return undefined;
   const block = remainder.slice(0, closeMatch.index);
   // Naive line-by-line parse — sufficient for `version: 1.0.0` and
   // `version: "1.0.0"`. Quoted strings get unquoted.
@@ -297,7 +297,7 @@ function extractVersion(raw: string): string {
       if (v.length > 0) return v;
     }
   }
-  return '0.0.0';
+  return undefined;
 }
 
 async function readTemplateMeta(path: string): Promise<ParsedTemplateMeta> {

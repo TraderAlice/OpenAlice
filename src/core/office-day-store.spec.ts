@@ -89,7 +89,7 @@ describe('OfficeDayStore', () => {
       revision: 1,
       day: result.day,
     })
-    expect((await stat(path)).mode & 0o777).toBe(0o600)
+    expect((await stat(path)).mode & 0o777).toBe(process.platform === 'win32' ? 0o666 : 0o600)
     expect(await readdir(join(dir, 'nested'))).toEqual(['day.json'])
   })
 

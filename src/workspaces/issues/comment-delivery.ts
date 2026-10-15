@@ -13,10 +13,6 @@ import {
 } from './comments.js'
 import { renderIssueCommentPrompt } from './comment-prompt.js'
 import { issueAssigneeResumeId, issueTimeoutMs, type IssueRecord } from './declaration.js'
-import {
-  projectDeskComment,
-  projectWorkspaceDeskFailure,
-} from './telegram-desk-project.js'
 
 export type IssueCommentDispatchResult =
   | { status: 'not_requested'; reason: 'non_human_note' | 'owner_commented' }
@@ -84,6 +80,7 @@ export async function dispatchIssueCommentReply(input: {
         issueId: input.issue.id,
         prompt: issueCommentReplyPrompt(input),
         commentId: input.comment.id,
+        source: input.source,
       })
       return { status: 'scheduled', delivery: { state: 'pending', targetResumeId: result.resumeId, taskId: result.taskId } }
     }
@@ -197,7 +194,6 @@ export async function recordIssueCommentReply(input: {
       },
     )
     if (!updated.ok) throw new Error(updated.error)
-    await projectDeskComment(appended.issue, appended.comment, undefined, { workspaceId: input.task.wsId }).catch(() => undefined)
     return 'replied'
   }
 
@@ -217,11 +213,5 @@ export async function recordIssueCommentReply(input: {
     },
   )
   if (!updated.ok) throw new Error(updated.error)
-  await projectWorkspaceDeskFailure({
-    wsDir: input.issueWorkspaceDir,
-    issueId: input.issueId,
-    conversationId: input.sourceCommentId,
-    text: `The Agent could not complete this reply: ${failureText}`,
-  }).catch(() => undefined)
   return 'failed'
 }

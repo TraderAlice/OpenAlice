@@ -1,3 +1,4 @@
+import { safeNotificationImage } from '../lib/notifications/image'
 import { memo, useCallback, useEffect, useId, useMemo, useRef, useState, type FormEvent } from 'react'
 import { ChevronDown, CircleAlert, RefreshCw, Search } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
@@ -224,7 +225,7 @@ const NewsStreamRow = memo(function NewsStreamRow({ article, locale, onTag }: { 
   const [failedImage, setFailedImage] = useState<string | null>(null)
   const summaryId = useId()
   const link = safeNewsUrl(article.link)
-  const image = safeNewsUrl(article.image, true)
+  const image = safeNotificationImage(article.image)
   const labels = new Map<string, { tag: string; flag?: string }>()
   for (const tag of (article.categories ?? '').split(/[;,]/).map((value) => value.trim()).filter(Boolean)) {
     const definition = NEWS_TAG_DEFINITIONS.get(tag.toLowerCase())

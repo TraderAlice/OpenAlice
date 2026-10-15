@@ -52,6 +52,18 @@ export const AGENT_INSTALL: Record<string, AgentInstallHint> = {
   },
 }
 
-export function installHintFor(agentId: string): AgentInstallHint | undefined {
-  return AGENT_INSTALL[agentId]
+function defaultInstallPlatform(): string {
+  return typeof navigator === 'undefined' ? '' : navigator.platform
+}
+
+/** Hide shell-only one-liners on Windows while keeping authoritative docs. */
+export function installHintFor(
+  agentId: string,
+  platform: string = defaultInstallPlatform(),
+): AgentInstallHint | undefined {
+  const hint = AGENT_INSTALL[agentId]
+  if (!hint?.cmd || !/^win/i.test(platform) || !/\|\s*(?:bash|sh)\s*$/i.test(hint.cmd)) {
+    return hint
+  }
+  return { url: hint.url }
 }

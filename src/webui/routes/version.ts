@@ -15,7 +15,9 @@ export function createVersionRoutes() {
   const app = new Hono()
 
   app.get('/', async (c) => {
-    const info = await getVersionInfo()
+    const info = c.req.query('currentOnly') === '1'
+      ? await getVersionInfo({ currentOnly: true })
+      : await getVersionInfo()
     return c.json(info)
   })
 

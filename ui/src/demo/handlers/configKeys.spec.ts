@@ -22,6 +22,7 @@ function modelIds(presetId: string): string[] {
 describe('demo credential catalog', () => {
   it('covers the current OpenAI and Anthropic forms instead of falling back to Custom', () => {
     expect(modelIds('codex-api')).toEqual([
+      'gpt-6-astra',
       'gpt-5.6-sol',
       'gpt-5.6-terra',
       'gpt-5.6-luna',
@@ -29,7 +30,7 @@ describe('demo credential catalog', () => {
       'gpt-5.4',
     ])
     expect(modelIds('claude-api')).toEqual([
-      'claude-fable-5',
+      'claude-fable-5-1',
       'claude-opus-5',
       'claude-sonnet-5',
       'claude-haiku-4-5',
@@ -39,21 +40,24 @@ describe('demo credential catalog', () => {
     expect(modelIds('openrouter')).toEqual([
       'openai/gpt-5.6-luna',
       'anthropic/claude-sonnet-5',
-      'deepseek/deepseek-v4-flash-0731',
+      'deepseek/deepseek-v4.1-flash',
       'tencent/hy3',
-      'z-ai/glm-5.2',
+      'z-ai/glm-5.3',
       'xiaomi/mimo-v2.5',
       'anthropic/claude-opus-5',
-      'anthropic/claude-fable-5',
+      'anthropic/claude-fable-5.1',
+      'openai/gpt-6-astra',
       'openai/gpt-5.6-sol',
       'openai/gpt-5.6-terra',
       'x-ai/grok-4.6',
-      'google/gemini-3.7-flash',
+      'google/gemini-3.8-flash',
       'minimax/minimax-m3',
       'moonshotai/kimi-k3',
       'deepseek/deepseek-v4-pro',
     ])
     expect(modelIds('gemini')).toEqual([
+      'gemini-3.8-flash',
+      'gemini-3.7-flash',
       'gemini-3.6-flash',
       'gemini-3.5-flash-lite',
       'gemini-3.5-flash',

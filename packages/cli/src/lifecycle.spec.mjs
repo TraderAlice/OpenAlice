@@ -9,7 +9,6 @@ import { readActivationReceipt, recordPendingActivation } from './activation.mjs
 
 import {
   inspectRuntime,
-  openRuntime,
   startRuntime,
   stopRuntime,
 } from './lifecycle.mjs'
@@ -341,6 +340,8 @@ describe('OpenAlice Runtime lifecycle core', () => {
         detached: true,
         env: {
           OPENALICE_APP_HOME: resources,
+          OPENALICE_RUNTIME_PROFILE: 'electron-packaged',
+          OPENALICE_LAUNCHER: 'electron',
           OPENALICE_MANAGED_PI_PATH: '/desktop/pi/cli.js',
           OPENALICE_MANAGED_PI_NODE_PATH: '/desktop/node',
           PI_CODING_AGENT_DIR: '/native/pi',
@@ -368,6 +369,7 @@ describe('OpenAlice Runtime lifecycle core', () => {
           cwd: resources,
           env: expect.objectContaining({
             OPENALICE_RUNTIME_PROVIDER: 'bun',
+            OPENALICE_LAUNCHER: 'cli-server',
             OPENALICE_RUNTIME_CONTENT_IDENTITY: 'bbbbbbbbbbbbbbbb',
             OPENALICE_RUNTIME_EXECUTABLE: '/opt/openalice/releases/v1/bin/openalice',
             PI_CODING_AGENT_DIR: '/native/pi',
@@ -375,6 +377,7 @@ describe('OpenAlice Runtime lifecycle core', () => {
         }),
       )
       const spawnedEnv = spawnProcess.mock.calls[0][2].env
+      expect(spawnedEnv).not.toHaveProperty('OPENALICE_RUNTIME_PROFILE')
       expect(spawnedEnv).not.toHaveProperty('OPENALICE_MANAGED_PI_PATH')
       expect(spawnedEnv).not.toHaveProperty('OPENALICE_MANAGED_PI_NODE_PATH')
     } finally {
@@ -462,37 +465,6 @@ describe('OpenAlice Runtime lifecycle core', () => {
       code: 'EOWNED',
       message: expect.stringContaining('electron already owns'),
     })
-  })
-
-  it('opens only a verified advertised Web endpoint, including Electron ownership', async () => {
-    const launchBrowser = vi.fn(async () => undefined)
-    const status = {
-      ...runningStatus(),
-      class: 'owned_elsewhere',
-      owner: { ...runningStatus().owner, surface: 'electron' },
-    }
-    await expect(openRuntime({ homeRoot: '/tmp/alice-home' }, {
-      readStatus: async () => status,
-      probeRuntime: async (url) => url === status.endpoints.web,
-      launchBrowser,
-    })).resolves.toEqual({ opened: true, url: status.endpoints.web, status })
-    expect(launchBrowser).toHaveBeenCalledWith(status.endpoints.web)
-  })
-
-  it('does not open an absent or unready Runtime', async () => {
-    await expect(openRuntime({ homeRoot: '/tmp/alice-home' }, {
-      readStatus: async () => absentStatus(),
-    })).rejects.toMatchObject({ code: 'ERUNTIMENOTREADY' })
-    await expect(openRuntime({ homeRoot: '/tmp/alice-home' }, {
-      readStatus: async () => runningStatus(),
-      probeRuntime: async () => false,
-    })).rejects.toThrow('Web UI is not ready')
-    await expect(openRuntime({ homeRoot: '/tmp/alice-home' }, {
-      readStatus: async () => ({
-        ...runningStatus(),
-        endpoints: { web: 'https://example.com/openalice' },
-      }),
-    })).rejects.toMatchObject({ code: 'EINVALIDENDPOINT' })
   })
 
   it('delegates graceful stop to the Guardian control client', async () => {

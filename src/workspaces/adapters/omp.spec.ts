@@ -4,7 +4,8 @@ import { join, resolve } from 'node:path';
 
 import { describe, expect, it } from 'vitest';
 
-import type { SpawnContext } from '../cli-adapter.js';
+import type { SpawnContext, WorkspaceAiCred } from '../cli-adapter.js';
+import registerSessionProvider from '../cli/bin/pi-session-provider.js';
 import { parseHeadlessOutputText } from '../headless-output.js';
 import {
   encodeOmpAbsoluteSessionDirName,
@@ -184,10 +185,60 @@ describe('omp sessionRuntime', () => {
         reasoningEffort: 'none',
       },
     });
-    expect(projected.interactiveArgs).toEqual(['--model', 'gpt-4o-mini', '--thinking', 'off']);
-    expect(projected.env['OPENAI_API_KEY']).toBe(SECRET);
-    expect(projected.env['OPENAI_BASE_URL']).toBe('https://proxy.example/v1');
+    expect(projected.interactiveArgs).toEqual([
+      '--extension', expect.stringMatching(/pi-session-provider\.ts$/),
+      '--model', 'openalice-session/gpt-4o-mini', '--thinking', 'off',
+    ]);
+    expect(JSON.parse(projected.env['OPENALICE_PI_SESSION_PROVIDER']!)).toMatchObject({
+      providerId: 'openalice-session',
+      provider: { apiKey: SECRET, baseUrl: 'https://proxy.example/v1', api: 'openai-completions' },
+    });
     expect(JSON.stringify(projected.interactiveArgs)).not.toContain(SECRET);
+  });
+
+  it.each([
+    ['anthropic', 'anthropic-messages', 'MiniMax-M3'],
+    ['openai-chat', 'openai-completions', 'vendor/custom-model'],
+    ['openai-responses', 'openai-responses', 'gateway-model'],
+    ['google-generative-ai', 'google-generative-ai', 'gemini-custom'],
+  ] as const)('registers %s account, endpoint and model for all launch surfaces', (wireShape, api, model) => {
+    const projected = ompAdapter.sessionRuntime!.project(ctx(), {
+      binding: { version: 1, credential: { source: 'vault', credentialSlug: 'custom', wireShape }, model },
+      ai: { apiKey: SECRET, baseUrl: 'https://account.example/api', model, wireShape, authMode: 'bearer', contextWindow: 204800, reasoning: true },
+    });
+    const old = process.env['OPENALICE_PI_SESSION_PROVIDER'];
+    let registration: unknown;
+    try {
+      process.env['OPENALICE_PI_SESSION_PROVIDER'] = projected.env['OPENALICE_PI_SESSION_PROVIDER'];
+      registerSessionProvider({ registerProvider: (id, provider) => { registration = { id, provider }; } });
+    } finally {
+      if (old === undefined) delete process.env['OPENALICE_PI_SESSION_PROVIDER'];
+      else process.env['OPENALICE_PI_SESSION_PROVIDER'] = old;
+    }
+    expect(registration).toMatchObject({
+      id: 'openalice-session',
+      provider: { api, apiKey: SECRET, baseUrl: 'https://account.example/api', models: [{ id: model, contextWindow: 204800, reasoning: true }] },
+    });
+    if (wireShape === 'anthropic') {
+      expect(registration).toMatchObject({ provider: { headers: { Authorization: `Bearer ${SECRET}` } } });
+    }
+    for (const command of [
+      ompAdapter.composeCommand([], ctx({ sessionRuntime: projected })),
+      ompAdapter.composeHeadlessCommand!([], ctx({ sessionRuntime: projected }), 'hi'),
+      ompAdapter.composeWebCommand!([], ctx({ sessionRuntime: projected })),
+    ]) {
+      expect(command).toContain(`openalice-session/${model}`);
+      expect(command).toContain('--extension');
+      expect(JSON.stringify(command)).not.toContain(SECRET);
+    }
+  });
+
+  it.each([null, { model: 'minimax/MiniMax-M3' } satisfies WorkspaceAiCred])('leaves native access unchanged (%j)', (ai) => {
+    const projected = ompAdapter.sessionRuntime!.project(ctx(), {
+      binding: { version: 1, credential: { source: 'native' }, model: 'minimax/MiniMax-M3' }, ai,
+    });
+    expect(projected.env).toEqual({});
+    expect(projected.interactiveArgs).toEqual(['--model', 'minimax/MiniMax-M3']);
   });
 
   it('rejects ultra and maps the remaining Alice efforts', () => {

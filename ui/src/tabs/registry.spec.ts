@@ -173,3 +173,7 @@ describe('shared product shells', () => {
     expect(getView('harness-surface').toUrl(studio)).toBe('/prediction/workspaces/prediction-1/studio')
   })
 })
+
+it('projects Machines onto its independent settings URL', () => {
+  expect(getView('settings').toUrl({ kind: 'settings', params: { category: 'machines' } })).toBe('/settings/machines')
+})

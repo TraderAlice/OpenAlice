@@ -1,3 +1,4 @@
+import { fixtureHome } from './fixture-home.ts'
 import { resolveLaunchContext } from '../launch-context.ts'
 import { runSupervisorTui } from '../supervisor-tui.ts'
 
@@ -5,10 +6,11 @@ let diagnoses = 0
 
 const exitCode = await runSupervisorTui({}, {
   env: process.env,
+  webRelay: null,
   resolveContext: () => resolveLaunchContext({
     cwd: process.cwd(),
-    homeDir: '/fixture',
-    flags: { project: 'default', home: '/fixture/default' },
+    homeDir: `${fixtureHome}`,
+    flags: { project: 'default', home: `${fixtureHome}/default` },
   }),
   inspect: async () => ({
     class: 'incompatible',

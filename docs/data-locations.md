@@ -28,7 +28,9 @@ collide.
 
 Workspace launcher state includes the private
 `workspaces/state/agent-conversations.jsonl` prompt/reply event stream and
-`workspaces/state/agent-runtime.jsonl` occupancy journal. Both move with the
+`workspaces/state/agent-runtime.jsonl` occupancy journal.
+`workspaces/state/session-executions.json` is the secret-free process lifecycle
+ledger (source, selection, PID, states, and exit reason). These move with the
 complete home and are not part of any Workspace repository. Treat the
 conversation stream as sensitive history when backing up or sharing a home;
 the occupancy journal has no prompt bodies.
@@ -117,48 +119,30 @@ The packaged and Electron-development app resolve a home before acquiring any
 Guardian lock, relocating legacy data, reading ports, running migrations, or
 starting a child process.
 
-Resolution precedence is:
+Selection uses the same client Supervisor `config.json.defaultTarget` as Web,
+TUI and CLI. Explicit `OPENALICE_HOME` is an invocation override. A null,
+unavailable or ambiguous migrated Default opens the existing project chooser;
+it never silently selects `~/.openalice`.
 
-1. explicit `OPENALICE_HOME` — authoritative and UI-locked;
-2. the desktop's saved selection;
-3. `~/.openalice`.
+**Settings → General → Data location** reveals the effective home and can open
+its folder. Switch projects through **Where Alice is working**. The independent
+recent-directory list and ask-on-startup policy are retired. Choosing another
+project after an existing-owner dialog returns to the shared chooser rather
+than writing a native directory preference.
 
-On a genuinely fresh install, the native startup prompt offers the default or
-another folder. Existing `~/.openalice` users continue without an upgrade
-prompt. An old packaged install with legacy data under Electron `userData`
-also continues through the existing default relocation path before selection
-is introduced.
-
-**Settings → General → Data location** shows the effective root and its source.
-The desktop can open the current folder, choose another folder and restart,
-reuse a recent folder, or ask which location to use on every startup. If a
-healthy development or CLI Server Runtime already owns the selected home,
-Electron's primary action is **Open in browser**: it probes the advertised
-loopback Web endpoint, opens that page, and quits without taking the lock.
-**Choose another data location** remains available when the home is not
-environment-locked. Dismissing the dialog keeps the existing AliceProject and
-quits the redundant desktop launch. Takeover stays an explicit, destructive
-secondary action.
-Electron-owned, stale, starting, unhealthy, and incompatible owners keep
-tailored recovery dialogs and never receive a misleading browser button.
-
-The launcher preference is machine-local metadata stored at:
-
-```text
-<Electron app.getPath("userData")>/openalice-data-home.json
-```
-
-It contains only the selected path, up to eight recent paths, and the startup
-prompt preference. It contains no account or provider secret. It must stay
-outside every selectable home because a home cannot reliably store the pointer
-that selects itself.
+The old `<Electron userData>/openalice-data-home.json` is read only as migration
+input. Its selectedHome must map to one registered local project. Conflicts,
+corruption or unmapped folders require explicit selection. The old file remains
+as a backup, and no project data is moved or deleted by selection migration.
+See [[docs/alice-project.md]] for save/cancel semantics and the Supervisor-root
+migration boundary.
 
 ## Browser, CLI, and Development Flow
 
 The local CLI already exposes the same complete-root boundary:
 
 ```bash
-openalice start --home ~/.openalice-dev/feature-a
+openalice run --home ~/.openalice-dev/feature-a
 ```
 
 `pnpm dev` accepts an equivalent focused override. Keep these homes outside the
@@ -174,19 +158,18 @@ development/CLI operation that may stop an owner of the same home. Separate
 homes are the normal choice for concurrent worktrees; takeover is recovery,
 not concurrency.
 
-Bare `openalice` exposes those separate homes through `i AliceProjects`. The
-machine-local Supervisor registry lives outside every complete home. It always
-retains the implicit `default`, may register named homes, and remembers the
-selected name for the next bare start. Creating or selecting an entry does not
-move, copy, stop, or delete another home. Named entries require an explicit
-separate Home; equal and nested registered paths are rejected. An inherited
-existing target must be empty or recognizable as an OpenAlice home. An
-accepted target is created/canonicalized during registration; if that
-registered path later disappears, a bare Supervisor launch keeps the entry,
-falls back to an available project, and directs the user to `i AliceProjects` to
-repair the remembered selection. An explicit environment/flag selection fails
-instead of falling back, so automation cannot accidentally target another
-Home. The missing path is never silently recreated. An inherited Web port
+Bare `openalice` exposes registered homes through AliceProjects. The
+machine-local Supervisor registry lives outside every complete home and stores
+the shared Machine/AliceProject Default. Creating an entry does not select it
+or move, copy, stop, or delete another home. Named projects require a separate
+home; equal and nested registered paths are rejected.
+
+If the remembered home disappears, retain the registry entry and show the
+startup chooser or a visible target error. Do not attach to another available
+project or silently recreate the missing path. Explicit environment/flag
+selection also remains authoritative rather than falling back.
+
+An inherited Web port
 remains automatic from 47331 so concurrent AliceProjects probe upward, while a
 configured port is intentionally pinned. First Alice boot must not write
 `data/config/ports.json` merely to materialize that default: a file `web`
@@ -196,14 +179,41 @@ pins; delete the key or the file to restore probing. `openalice up --port`
 and `OPENALICE_WEB_PORT` remain one-run pins and do not rewrite the file.
 
 The machine-wide Supervisor root also owns `machines.json`. This second
-registry names SSH Machines for fleet inspection; it does not move with a
-complete home and does not belong to the Electron browser profile. The local
-Machine is implicit. Stored rows contain only connection metadata (target,
-port, display name, and optional local identity-file path), never key bytes or
-AliceProject data. `remote-targets.json` beside it remains a hashed,
-non-enumerable tunnel-port cache rather than durable fleet identity.
+registry stores Herdr-style remote Machine profiles; it does not move with a
+complete home and does not belong to the Electron browser profile. Stored rows
+contain an opaque id, display name, SSH target, optional port, enabled state,
+and local identity-file path, never key bytes or AliceProject data.
+`remote-targets.json` beside it remains a hashed, non-enumerable tunnel-port
+cache rather than durable fleet identity.
 
-A received AliceProject is registered in this machine-wide registry only after
+The persisted shape is distinct from the `machine list --json` presentation:
+
+```json
+{
+  "schemaVersion": 1,
+  "machines": {
+    "cloud": {
+      "id": "0123456789abcdef0123456789abcdef",
+      "displayName": "Cloud",
+      "sshTarget": "alice@cloud",
+      "enabled": true
+    }
+  }
+}
+```
+
+The map key is an internal Fleet/transfer handle. Optional `sshPort` is an
+integer from 1 to 65535; optional `identityFile` is an absolute local path.
+Omitting `sshPort` lets OpenSSH config choose it. Older rows may omit `id` and
+`enabled`; they use the map key as id and are enabled by default. Public JSON
+uses an array with `id`, `label`, `target`, `enabled`, and nullable `sshPort`.
+Do not write that output back as the registry. New CLI labels must be unique and cannot
+be `local` or a profile id. Selectors resolve id, then label, then internal key.
+Unknown fields survive writes; an old `remoteSession` field is inert metadata,
+not a session selector. OpenAlice does not consume Herdr's catalog format.
+
+A received AliceProject is registered in the Supervisor's `config.json`, not
+`machines.json`, only after
 its sibling staging Home has passed checksum and space validation and has been
 atomically published. Registration does not select it as the remote default.
 The new Home owns a new `sealing.key`; source machine locks, Runtime payloads,
@@ -219,10 +229,16 @@ for released automation only.
 
 ## Switching and Failure Safety
 
-Switching never moves, copies, merges, or deletes current data. The desktop
-validates the target, saves the selection, then performs a full Guardian
-restart. The newly selected home may be empty or an existing OpenAlice home.
-A non-empty unrelated directory requires confirmation.
+Selection never moves, copies, merges, or deletes project data. Startup chooses
+a registered Machine/AliceProject; explicit create may prepare a new or empty
+home and rejects an unrelated non-empty directory. Verify the target and
+successful client presentation before remembering the shared Default. A failed
+switch preserves the old connection and Default.
+
+The retired Electron directory picker, recent-home list, and ask-on-startup
+setting are not alternative selection authorities. Integrated/separated mode
+transitions and owned-child retirement follow [[docs/remote-access.md]];
+complete-home ownership remains with the selected AliceProject.
 
 `openalice project copy-ai-creds` is the explicit exception for AI credential
 rows in `<home>/data/config/ai-provider-manager.json`. It merges only the
@@ -251,10 +267,12 @@ failed bootstrap quarantine directories when Windows still holds a handle.
 
 ## Load-Bearing Code and Verification
 
-- `apps/desktop/src/data-home.ts` — preference parsing, canonicalization,
-  writeability checks, recent paths, and startup policy.
-- `apps/desktop/src/data-home-desktop.ts` — native selection dialogs, startup
-  resolution, Settings controller, and relaunch requests.
+- `apps/desktop/src/data-home.ts` — legacy preference parsing and canonicalization
+  helpers retained for migration and isolated data-home utilities.
+- `apps/desktop/src/data-home-desktop.ts` — explicit invocation-home resolution
+  and read-only Settings folder disclosure.
+- `packages/cli/src/supervisor-default-migration.ts` — one-time legacy startup
+  migration into the client Supervisor Default.
 - `apps/desktop/src/main.ts` — Guardian wiring, duplicate-owner choice, safe
   relaunch, and the machine-local preference location.
 - `apps/desktop/src/existing-owner-startup.ts` — existing-owner dialog and
@@ -271,8 +289,8 @@ failed bootstrap quarantine directories when Windows still holds a handle.
 
 For changes to this subsystem, run the focused unit/UI specs, Guardian recovery
 tests, strict desktop and UI type checks, and an isolated packaged onboarding
-or Workspace smoke. Manually verify a fresh startup prompt, a saved recent
-location, a missing saved location, and the duplicate-owner “choose another”
+or Workspace smoke. Manually verify the initial project chooser, a saved Default,
+a missing Default location, and the duplicate-owner “choose another”
 path. For healthy foreign `dev` / CLI Server owners, also run
 `pnpm electron:smoke:existing-owner` on disposable homes. Never use a real
 user home for these checks.

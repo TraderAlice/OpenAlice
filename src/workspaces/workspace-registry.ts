@@ -1,4 +1,5 @@
-import { mkdir, readFile, rename, writeFile } from 'node:fs/promises';
+import { randomUUID } from 'node:crypto';
+import { mkdir, readFile, rename, rm, writeFile } from 'node:fs/promises';
 import { dirname } from 'node:path';
 
 import type { Logger } from './logger.js';
@@ -41,6 +42,7 @@ interface FileShape {
 export class WorkspaceRegistry {
   private readonly byId = new Map<string, WorkspaceMeta>();
   private readonly tagsInUse = new Set<string>();
+  private flushQueue: Promise<void> = Promise.resolve();
 
   private constructor(private readonly path: string) {}
 
@@ -112,14 +114,23 @@ export class WorkspaceRegistry {
     return ws;
   }
 
-  private async flush(): Promise<void> {
-    const payload: FileShape = {
-      version: 1,
-      workspaces: Array.from(this.byId.values()),
-    };
-    const tmp = `${this.path}.tmp`;
-    await writeFile(tmp, JSON.stringify(payload, null, 2), 'utf8');
-    await rename(tmp, this.path);
+  private flush(): Promise<void> {
+    const pending = this.flushQueue.then(async () => {
+      const payload: FileShape = {
+        version: 1,
+        workspaces: Array.from(this.byId.values()),
+      };
+      const tmp = `${this.path}.${randomUUID()}.tmp`;
+      try {
+        await writeFile(tmp, JSON.stringify(payload, null, 2), 'utf8');
+        await rename(tmp, this.path);
+      } catch (error) {
+        await rm(tmp, { force: true }).catch(() => undefined);
+        throw error;
+      }
+    });
+    this.flushQueue = pending.catch(() => undefined);
+    return pending;
   }
 }
 

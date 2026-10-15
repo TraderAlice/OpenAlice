@@ -2,7 +2,7 @@
  * AlpacaBroker — IBroker adapter for Alpaca
  *
  * Direct implementation against @alpacahq/alpaca-trade-api SDK.
- * Supports equities and spot crypto trading, plus read-only options research.
+ * Supports equities, spot crypto and permission-gated single-leg options trading.
  * Native keys are stock tickers, slash crypto pairs, or OCC option symbols.
  *
  * Takes IBKR Order objects, reads relevant fields, ignores the rest.
@@ -147,6 +147,8 @@ export class AlpacaBroker implements IBroker {
   /** symbol → asset, derived from `catalog` for O(1) name/exchange joins on
    *  position & order rows (issue #340). Rebuilt whenever the catalog loads. */
   private catalogBySymbol: Map<string, AlpacaAssetRaw> | null = null
+  /** Venue permissions, populated at connect and refreshed on account reads/writes. */
+  private optionsTradingLevel = 0
 
   constructor(config: AlpacaBrokerConfig) {
     this.config = config
@@ -178,6 +180,7 @@ export class AlpacaBroker implements IBroker {
     for (let attempt = 1; attempt <= AlpacaBroker.MAX_INIT_RETRIES; attempt++) {
       try {
         const account = await this.client.getAccount() as AlpacaBrokerRaw
+        this.optionsTradingLevel = account.options_trading_level ?? 0
         console.log(
           `AlpacaBroker[${this.id}]: connected (paper=${this.config.paper}, equity=$${parseFloat(account.equity).toFixed(2)})`,
         )
@@ -281,8 +284,31 @@ export class AlpacaBroker implements IBroker {
       if (asset?.price_increment) details.minTick = Number(asset.price_increment)
       if (asset?.min_order_size) details.minSize = new Decimal(asset.min_order_size)
       if (asset?.min_trade_increment) details.sizeIncrement = new Decimal(asset.min_trade_increment)
-    } else if (details.contract.secType === 'OPT') details.orderTypes = ''
+    } else if (details.contract.secType === 'OPT') {
+      details.orderTypes = this.optionsTradingLevel > 0 ? 'MKT,LMT,STP,STP LMT' : ''
+      details.minSize = new Decimal(1)
+      details.sizeIncrement = new Decimal(1)
+    }
     return details
+  }
+
+  /** Validate only fields this adapter can faithfully send. Alpaca remains the
+   * authority for strategy approval, collateral and opening/closing exposure. */
+  private validateOptionOrder(order: Partial<Order>, tpsl?: TpSlParams, amendment = false): string | undefined {
+    if ((!amendment || order.orderType) && !['MKT', 'LMT', 'STP', 'STP LMT'].includes(order.orderType ?? '')) return 'Alpaca single-leg options support MKT, LMT, STP and STP LMT only.'
+    if ((!amendment || order.tif) && !['DAY', 'GTC'].includes(order.tif ?? 'DAY')) return 'Alpaca options require DAY or GTC time in force.'
+    if (order.parentId || order.ocaGroup || order.goodTillDate || (order.trailStopPrice != null && !order.trailStopPrice.equals(UNSET_DECIMAL))) return 'Alpaca options do not support parent/OCA, GTD or trailing-stop fields.'
+    const qty = order.totalQuantity
+    if ((!amendment || (qty != null && !qty.equals(UNSET_DECIMAL))) && (!qty || qty.equals(UNSET_DECIMAL) || !qty.isFinite() || !qty.isInteger() || qty.lte(0))) return 'Alpaca options require a positive whole number of contracts.'
+    if (order.cashQty != null && !order.cashQty.equals(UNSET_DECIMAL)) return 'Alpaca options do not support cash-notional orders.'
+    if (tpsl || order.outsideRth || (order.trailingPercent != null && !order.trailingPercent.equals(UNSET_DECIMAL))) return 'Alpaca options do not support attached TP/SL, trailing or extended-hours orders.'
+  }
+
+  private async optionPermissionError(): Promise<string | undefined> {
+    const account = await this.client.getAccount() as AlpacaBrokerRaw
+    this.optionsTradingLevel = account.options_trading_level ?? 0
+    if (this.optionsTradingLevel < 1) return `Alpaca options trading is disabled for this account (options_trading_level=${this.optionsTradingLevel}). Enable options approval in Alpaca.`
+    if (account.trading_blocked || account.account_blocked) return 'Alpaca reports that this account is blocked for trading.'
   }
 
   // ---- Trading operations ----
@@ -293,7 +319,10 @@ export class AlpacaBroker implements IBroker {
       return { success: false, error: 'Cannot resolve contract to Alpaca symbol' }
     }
 
-    if (this.contractFor(symbol).secType === 'OPT') return { success: false, error: 'Alpaca options are read-only; options orders are not enabled.' }
+    if (this.contractFor(symbol).secType === 'OPT') {
+      const error = this.validateOptionOrder(order, tpsl)
+      if (error) return { success: false, error }
+    }
     if (this.contractFor(symbol).secType === 'CRYPTO') {
       if (!['MKT', 'LMT', 'STP LMT'].includes(order.orderType)) return { success: false, error: 'Alpaca crypto supports MKT, LMT and STP LMT only.' }
       if (!['GTC', 'IOC'].includes(order.tif)) return { success: false, error: 'Alpaca crypto requires GTC or IOC time in force.' }
@@ -301,6 +330,10 @@ export class AlpacaBroker implements IBroker {
     }
 
     try {
+      if (this.contractFor(symbol).secType === 'OPT') {
+        const error = await this.optionPermissionError()
+        if (error) return { success: false, error }
+      }
       const alpacaOrder: Record<string, unknown> = {
         symbol,
         side: order.action.toLowerCase(), // BUY → buy, SELL → sell
@@ -374,7 +407,13 @@ export class AlpacaBroker implements IBroker {
     try {
       const existing = await this.client.getOrder(orderId) as AlpacaOrderRaw
       const contract = this.contractFor(existing.symbol, existing.asset_class)
-      if (contract.secType === 'OPT') return { success: false, error: 'Alpaca options are read-only.' }
+      if (contract.secType === 'OPT') {
+        const error = this.validateOptionOrder(changes, undefined, true)
+        if (error) return { success: false, error }
+        if (changes.orderType && ibkrOrderTypeToAlpaca(changes.orderType) !== existing.type) return { success: false, error: 'Alpaca cannot replace the order type; cancel and submit a new order.' }
+        const permissionError = await this.optionPermissionError()
+        if (permissionError) return { success: false, error: permissionError }
+      }
       if (contract.secType === 'CRYPTO') {
         if (changes.tif && !['GTC', 'IOC'].includes(changes.tif)) return { success: false, error: 'Alpaca crypto requires GTC or IOC time in force.' }
         if (changes.trailingPercent != null && !changes.trailingPercent.equals(UNSET_DECIMAL)) return { success: false, error: 'Alpaca crypto does not support trailing orders.' }
@@ -415,13 +454,12 @@ export class AlpacaBroker implements IBroker {
       return { success: false, error: 'Cannot resolve contract to Alpaca symbol' }
     }
 
-    if (this.contractFor(symbol).secType === 'OPT') return { success: false, error: 'Alpaca options are read-only.' }
-
     // Partial close → reverse market order
     if (quantity != null) {
       const positions = await this.getPositions()
-      const pos = positions.find(p => p.contract.symbol === symbol)
+      const pos = positions.find(p => this.getNativeKey(p.contract) === symbol)
       if (!pos) return { success: false, error: `No position for ${symbol}` }
+      if (!quantity.isFinite() || quantity.lte(0) || quantity.gt(new Decimal(pos.quantity).abs())) return { success: false, error: 'Close quantity must be positive and cannot exceed the position.' }
 
       const order = new Order()
       order.action = pos.side === 'long' ? 'SELL' : 'BUY'
@@ -454,6 +492,8 @@ export class AlpacaBroker implements IBroker {
         this.client.getAccount() as Promise<AlpacaBrokerRaw>,
         this.client.getPositions() as Promise<AlpacaPositionRaw[]>,
       ])
+
+      this.optionsTradingLevel = account.options_trading_level ?? 0
 
       // Alpaca account API doesn't provide unrealizedPnL — aggregate from positions with Decimal
       const unrealizedPnL = positions.reduce(
@@ -501,7 +541,8 @@ export class AlpacaBroker implements IBroker {
         contract: this.contractFor(p.symbol, p.asset_class),
         currency: 'USD',
         side: p.side === 'long' ? 'long' as const : 'short' as const,
-        quantity: new Decimal(p.qty),
+        // UTA carries direction in side; Alpaca encodes shorts in qty too.
+        quantity: new Decimal(p.qty).abs(),
         avgCost: new Decimal(p.avg_entry_price).toString(),
         marketPrice: new Decimal(p.current_price).toString(),
         // Pass-through: Alpaca's API already provides multiplier-applied
@@ -657,7 +698,7 @@ export class AlpacaBroker implements IBroker {
 
   getCapabilities(): AccountCapabilities {
     return {
-      supportedSecTypes: ['STK', 'CRYPTO'],
+      supportedSecTypes: ['STK', 'CRYPTO', ...(this.optionsTradingLevel > 0 ? ['OPT'] : [])],
       supportedOrderTypes: ['MKT', 'LMT', 'STP', 'STP LMT', 'TRAIL'],
       historicalBars: { supported: true, quality: 'iex', qualityBySecType: { CRYPTO: 'realtime' } },
     }
@@ -718,7 +759,7 @@ export class AlpacaBroker implements IBroker {
       const contract = makeContract(row.symbol, 'us_option')
       contract.multiplier = row.multiplier ?? row.size
       return contract
-    }), hint: 'Alpaca options are read-only. Use option-chain for feed-labelled snapshots and option-contracts for open interest with observation dates.' }
+    }), hint: 'Single-leg options trading requires Alpaca account approval; quantities are whole contracts and prices are per unit of the underlying. Use option-chain for feed-labelled snapshots and option-contracts for open interest with observation dates.' }
   }
 
   async getOrderBook(contract: Contract, limit = 20): Promise<Record<string, unknown>> {

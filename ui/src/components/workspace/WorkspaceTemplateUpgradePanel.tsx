@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState, type ReactElement } from 'react'
+import { useEffect, useMemo, useState, type ReactElement } from 'react'
 import {
   AlertTriangle,
   ArrowRight,
@@ -13,13 +13,13 @@ import {
 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 
+import { useWorkspacePlan } from '../../lib/updates/useWorkspacePlan'
 import { CenteredLoading, EmptyState } from '../StateViews'
 import { Button } from '../ui/button'
 import { useWorkspace } from '../../tabs/store'
 import { SelectionCheckIcon } from '../ui/selection-check-icon'
 import {
   applyTemplateUpgrade,
-  getTemplateUpgradePlan,
   TemplateUpgradeApiError,
   type SkillProjectionRequest,
   type TemplateUpgradeFilePlan,
@@ -49,44 +49,27 @@ export function WorkspaceTemplateUpgradePanel({
 }: Props): ReactElement {
   const { t } = useTranslation()
   const { openOrFocus } = useWorkspace()
-  const [plan, setPlan] = useState<TemplateUpgradePlan | null>(null)
-  const [loading, setLoading] = useState(true)
+  const shared = useWorkspacePlan({ workspaceId: wsId, kind: 'template', layer, projection })
+  const plan = shared.plan as TemplateUpgradePlan | null
+  const { loading, unsupported } = shared
   const [applying, setApplying] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-  const [unsupported, setUnsupported] = useState(false)
+  const [applyError, setError] = useState<string | null>(null)
+  const error = applyError ?? shared.error
   const [result, setResult] = useState<TemplateUpgradeResult | null>(null)
   const [resolutions, setResolutions] = useState<Record<string, TemplateUpgradeResolution>>({})
 
-  const load = useCallback(async (): Promise<void> => {
-    setLoading(true)
-    setError(null)
-    setUnsupported(false)
-    try {
-      const next = await (layer === 'template' ? getTemplateUpgradePlan(wsId) : getTemplateUpgradePlan(wsId, layer, projection))
-      setPlan(next)
-      setResolutions((current) => Object.fromEntries(
-        Object.entries(current).filter(([path]) =>
-          next.files.some((file) => file.path === path && file.status === 'conflict')),
-      ))
-    } catch (err) {
-      if (err instanceof TemplateUpgradeApiError && err.code === 'unsupported') {
-        setUnsupported(true)
-      }
-      setError((err as Error).message)
-    } finally {
-      setLoading(false)
-    }
-  }, [wsId, layer, projection])
+  const load = async () => { setError(null); await shared.refresh() }
+  useEffect(() => { setResolutions({}) }, [wsId, layer, projection?.skill, projection?.action, plan?.planDigest])
 
-  useEffect(() => { void load() }, [load])
+  useEffect(() => { setResult(null); setError(null); setApplying(false) }, [shared.identity])
 
   const conflicts = useMemo(
     () => plan?.files.filter((file) => file.status === 'conflict') ?? [],
     [plan],
   )
   const unresolved = conflicts.filter((file) => !resolutions[file.path]).length
-  const current = projection ? !plan?.files.some((file) => file.status === 'ready' || file.status === 'conflict') : plan?.fromVersion === plan?.toVersion && (layer === 'template' || !plan?.files.some((file) => file.status === 'ready' || file.status === 'conflict'))
-  const canApply = !!plan && !current && !plan.blocked && unresolved === 0 && !applying
+  const current = plan?.update.status === 'current' && !plan.blocked
+  const canApply = !!plan && plan.update.status === 'available' && !plan.blocked && unresolved === 0 && !applying && !loading && !shared.error
 
   const apply = async (): Promise<void> => {
     if (!plan || !canApply) return
@@ -94,18 +77,21 @@ export function WorkspaceTemplateUpgradePanel({
     setError(null)
     try {
       const next = await (layer === 'template' ? applyTemplateUpgrade(wsId, plan.planDigest, resolutions) : applyTemplateUpgrade(wsId, plan.planDigest, resolutions, layer, projection))
-      setResult(next)
+      if (!shared.isActive()) return
+      shared.invalidate()
+      await shared.refresh()
       onWorkspaceChanged()
-      await load()
+      if (shared.isCurrent()) setResult(next)
     } catch (err) {
-      if (err instanceof TemplateUpgradeApiError && err.plan) { setPlan(err.plan); setResolutions({}) }
-      setError((err as Error).message)
+      if (!shared.isActive()) return
+      if (err instanceof TemplateUpgradeApiError && err.plan) { await shared.replace(err.plan); if (shared.isCurrent()) setResolutions({}) }
+      if (shared.isCurrent()) setError((err as Error).message)
     } finally {
-      setApplying(false)
+      if (shared.isCurrent()) setApplying(false)
     }
   }
 
-  if (loading && !plan) {
+  if (!plan && !error) {
     return <CenteredLoading label={t('workspace.upgradeLoading')} />
   }
 
@@ -198,6 +184,9 @@ export function WorkspaceTemplateUpgradePanel({
                       })}
                     </li>
                   ))}
+                  {plan.blockers.filter(reason => reason !== 'active_sessions' && reason !== 'staged_changes').map(reason => (
+                    <li key={reason}>{t(`workspace.upgradeBlockedReason.${reason}`, { defaultValue: reason })}</li>
+                  ))}
                   {plan.blockers.includes('staged_changes') && <li>{t('workspace.upgradeBlockedStaged')}</li>}
                 </ul>
               </div>
@@ -274,6 +263,7 @@ export function WorkspaceTemplateUpgradePanel({
           </>
         )}
 
+        {!plan && error && <Button variant="outline" disabled={loading} onClick={() => void load()}><RefreshCw size={13}/>{t('workspace.upgradeRefresh')}</Button>}
         {error && !unsupported && (
           <div className="rounded-lg border border-destructive/35 bg-destructive/8 px-3 py-2.5 text-[12px] text-destructive" role="alert">
             {error}

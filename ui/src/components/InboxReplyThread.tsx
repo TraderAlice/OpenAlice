@@ -32,7 +32,7 @@ export function InboxReplyThread({
           <span className="text-[11px] leading-[15px] tabular-nums text-muted-foreground/45">{records.length}</span>
         )}
       </div>
-      <p className="mt-1 text-[12px] leading-relaxed text-muted-foreground/65">
+      <p className="mt-1 break-words [overflow-wrap:anywhere] text-[12px] leading-relaxed text-muted-foreground/65">
         {hasExactSender
           ? t('inbox.repliesDescription', { sender })
           : t('inbox.repliesWorkspaceDescription', { workspace: sender })}

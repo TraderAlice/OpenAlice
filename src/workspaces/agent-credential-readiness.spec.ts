@@ -158,11 +158,11 @@ describe('agent credential readiness', () => {
     expect(a.writeAiConfig).toHaveBeenCalledOnce();
     expect(a.writeAiConfig).toHaveBeenCalledWith('/tmp/ws-1', expect.objectContaining({
       apiKey: 'sk-oa',
-      model: 'gpt-5.6-sol',
+      model: 'gpt-6-astra',
       wireShape: 'openai-chat',
       contextWindow: 1_050_000,
     }));
-    expect(vi.mocked(setCredentialLastModel)).toHaveBeenCalledWith('openai-1', 'gpt-5.6-sol');
+    expect(vi.mocked(setCredentialLastModel)).toHaveBeenCalledWith('openai-1', 'gpt-6-astra');
   });
 
   it('keeps native login ready but rejects an explicit credential without a model', async () => {

@@ -1,3 +1,5 @@
+import { readStartupTarget, writeStartupTarget, resolveStartupTarget } from './startup-target.ts'
+import { runRemoteProjectCommand } from './project-control.ts'
 import { PROJECT_WORKSPACES, PROJECT_WORKSPACE_LABELS, type ProjectWorkspace } from './project-workspaces.ts'
 import { spawn } from 'node:child_process'
 import {
@@ -24,12 +26,12 @@ import {
 } from './machine-inventory.ts'
 import {
   readMachineRegistrySummary,
+  requireMachineEnabled,
   type MachineRegistrySummary,
   type RegisteredMachine,
 } from './machine-registry.ts'
 import {
   inspectRuntime,
-  openRuntime,
   startRuntime,
   stopRuntime,
 } from './lifecycle.mjs'
@@ -45,7 +47,7 @@ import {
   type TuiLaunchFlags,
 } from './launch-context.ts'
 import { resolveInstalledLayout } from './install-layout.mjs'
-import { CLI_VERSION, readInstallSource } from './install-source.mjs'
+import { CLI_VERSION, readInstallSource, installSourceUpdateChannel } from './install-source.mjs'
 import { findOpenAliceRoot } from './local-start.mjs'
 import { readRuntimeLogs } from './logs.mjs'
 import { probeOpenAlice } from './runtime-client.mjs'
@@ -222,7 +224,8 @@ import {
   type SupervisorHomeHotspotTarget,
   type SupervisorHomeTarget,
 } from './supervisor-tui-view.ts'
-import { connectSsh, openBrowser } from './ssh-connect.mjs'
+import { openBrowser } from './ssh-connect.mjs'
+import { WebRelay } from './web-relay.ts'
 import { buildRemoteSshArgs } from './remote.mjs'
 import { planProjectTransfer, type ProjectTransferPlan } from './project-transfer.ts'
 import { transferProjectOverSsh } from './project-transfer-ssh.ts'
@@ -414,6 +417,7 @@ export interface SupervisorSnapshot {
   managedSource?: ManagedSourcePlan | null
   fleet?: SupervisorFleetState | null
   activeTarget?: SupervisorActiveTarget | null
+  webRelayUrl?: string
   connectionEvents?: SupervisorConnectionEvent[]
   launchFlight?: SupervisorLaunchFlight | null
   inbox?: SupervisorInboxSnapshot | null
@@ -427,10 +431,10 @@ export interface SupervisorTuiDependencies {
   inspect?: (options?: { homeRoot?: string; waitMs?: number }) => Promise<RuntimeSummary>
   start?: (options: Record<string, unknown>) => Promise<unknown>
   stop?: (options: Record<string, unknown>) => Promise<unknown>
-  open?: (options: Record<string, unknown>) => Promise<unknown>
+  openBrowser?: typeof openBrowser
   readLogs?: (options: Record<string, unknown>) => Promise<RuntimeLogs>
   diagnose?: (options: Record<string, unknown>) => Promise<DoctorReport>
-  checkUpdate?: (channel: SupervisorUpdateChannel) => Promise<UpdateResult>
+  checkUpdate?: (channel?: SupervisorUpdateChannel) => Promise<UpdateResult>
   discoverUpdate?: () => Promise<UpdateResult | null>
   applyUpdate?: (result: UpdateResult) => Promise<number>
   resolveContext?: (
@@ -486,6 +490,7 @@ export interface SupervisorTuiDependencies {
     signal: AbortSignal
     onReady: (connection: { localPort: number; localUrl: string; clientUrl: string }) => void
   }) => Promise<number>
+  webRelay?: WebRelay | null
   planProjectTransfer?: typeof planProjectTransfer
   sendProjectTransfer?: (input: {
     machine: RegisteredMachine
@@ -502,7 +507,6 @@ interface SupervisorServices {
   inspect: NonNullable<SupervisorTuiDependencies['inspect']>
   start: NonNullable<SupervisorTuiDependencies['start']>
   stop: NonNullable<SupervisorTuiDependencies['stop']>
-  open: NonNullable<SupervisorTuiDependencies['open']>
   readLogs: NonNullable<SupervisorTuiDependencies['readLogs']>
   diagnose: NonNullable<SupervisorTuiDependencies['diagnose']>
   checkUpdate: NonNullable<SupervisorTuiDependencies['checkUpdate']>
@@ -522,6 +526,7 @@ export async function runSupervisorTui(
 ): Promise<number> {
   const stdin = dependencies.stdin ?? process.stdin
   const stdout = dependencies.stdout ?? process.stdout
+  const openWebBrowser = dependencies.openBrowser ?? openBrowser
   const readInbox = dependencies.readInbox ?? readSupervisorInbox
   const setInboxRead = dependencies.setInboxRead ?? setSupervisorInboxRead
   if (!stdin.isTTY || !stdout.isTTY) {
@@ -531,18 +536,34 @@ export async function runSupervisorTui(
     )
   }
 
-  const resolveContext = dependencies.resolveContext
-    ?? ((flags: TuiLaunchFlags) => {
+  const resolveContext = async (flags: TuiLaunchFlags, selectedProject?: string) => {
+      if (dependencies.resolveContext) {
+        return dependencies.resolveContext(selectedProject ? { ...flags, project: selectedProject } : flags)
+      }
       if (dependencies.machineConfig || dependencies.projectConfig) {
         return resolveLaunchContext({
           flags,
           env: dependencies.env,
-          machineConfig: dependencies.machineConfig,
+          machineConfig: selectedProject
+            ? { ...dependencies.machineConfig, defaultProject: selectedProject }
+            : dependencies.machineConfig,
           projectConfig: dependencies.projectConfig,
         })
       }
-      return resolveStoredLaunchContext(flags, { env: dependencies.env })
-    })
+      const remote = flags.machine && flags.machine !== 'local'
+      const localFlags = remote
+        ? { ...flags, project: undefined, instance: undefined }
+        : { ...flags, project: flags.project ?? flags.instance }
+      // A detached TUI still needs an editable local presentation context.
+      // Selecting that context internally must not invent a CLI override or
+      // attach it in place of an unavailable/remote saved Default.
+      if (!selectedProject) {
+        const target = hasExplicitProjectOrHomeSelection(flags, dependencies.env ?? process.env)
+          ? null : await readStartupTarget({ supervisorRoot: resolveSupervisorRootPath({ env: dependencies.env }) })
+        selectedProject = target?.machine === 'local' ? target.project : 'default'
+      }
+      return resolveStoredLaunchContext(localFlags, { env: dependencies.env, selectedProject })
+    }
   let context: ResolvedLaunchContext | undefined
   let startupNotice: string | undefined
   let configRecovery = false
@@ -562,7 +583,7 @@ export async function runSupervisorTui(
       context = await resolveAvailableStoredLaunchContext({
         env: dependencies.env,
       })
-      startupNotice = storedHomeRecoveryNotice(error, context.project)
+      startupNotice = storedHomeRecoveryNotice(error)
     } else if (isSupervisorConfigError(error)) {
       if (explicitCliSelection) throw error
       configRecovery = true
@@ -608,6 +629,48 @@ export async function runSupervisorTui(
   }
   const now = dependencies.now ?? (() => Date.now())
   let activeTarget = localSupervisorTarget(context, runtime)
+  const webRelay = dependencies.webRelay === undefined ? new WebRelay({ readStartup: () => readStartupTarget({ supervisorRoot }), writeStartup: (target, options) => writeStartupTarget(target, { ...options, supervisorRoot }) }) : dependencies.webRelay
+  if (webRelay) {
+    await webRelay.listen()
+    const explicit = !!launchFlags.machine || hasExplicitProjectOrHomeSelection(launchFlags, dependencies.env ?? process.env)
+      || dependencies.resolveContext !== undefined || dependencies.machineConfig !== undefined || dependencies.projectConfig !== undefined
+    if (launchFlags.machine && !launchFlags.project) throw new Error('--machine requires --project for an explicit startup selection.')
+    const invocationTarget = activeTarget
+    let startup: { target: { machine: string; project: string } | null; error: string | null }
+    try {
+      const resolved = await resolveStartupTarget({
+        machine: launchFlags.machine,
+        project: explicit ? launchFlags.project ?? launchFlags.instance ?? context?.project : undefined,
+        home: launchFlags.home,
+        env: dependencies.env,
+      }, { supervisorRoot, readDefault: async () => {
+        const preference = await webRelay.startupPreference()
+        if (preference.error) throw new Error(preference.error)
+        return preference.target
+      } })
+      startup = { target: resolved.target, error: null }
+    } catch (error) { startup = { target: null, error: safeError(error) } }
+    activeTarget = null
+    if (startup.error) diagnostic = startup.error
+    if (startup.target) {
+      try {
+        const invocationMachine = explicit && startup.target.machine === 'local' && invocationTarget && fleet
+          ? alignLocalFleetProject(fleet.machines, context, runtime).find(machine => machine.key === 'local') : undefined
+        if (invocationMachine) await webRelay.connectLocalInvocation(invocationMachine, startup.target.project)
+        else await webRelay.connect(startup.target.machine, startup.target.project, { remember: false })
+        const selection = webRelay.activeSelection
+        if (selection?.machine.key === 'local') {
+          context = await resolveContext(launchFlags, selection.project.key)
+          services = createServices(dependencies, context)
+          runtime = await services.inspect({ homeRoot: context.home, waitMs: 2_000 })
+          activeTarget = localSupervisorTarget(context, runtime)
+        } else if (selection) activeTarget = remoteSupervisorTarget(selection.machine, selection.project, selection.endpoint, webRelay.originUrl)
+      } catch (error) {
+        diagnostic = safeError(error)
+        webRelay.setStartupError(error)
+      }
+    }
+  }
   let connectionEvents: SupervisorConnectionEvent[] = activeTarget
     ? [createSupervisorConnectionEvent('connected', activeTarget, now(), 'startup')]
     : []
@@ -615,7 +678,7 @@ export async function runSupervisorTui(
   const piTui = await (dependencies.loadTui ?? loadPiTui)(dependencies.env)
   const resolvedChannel = dependencies.channel
     ?? await (dependencies.resolveChannel ?? resolveSupervisorChannel)()
-  const channel = normalizeSupervisorUpdateChannel(resolvedChannel) ?? 'stable'
+  const channel = resolvedChannel
   const terminal = new piTui.ProcessTerminal()
   const ui = new piTui.TUI(
     terminal,
@@ -899,6 +962,7 @@ export async function runSupervisorTui(
     notice: startupNotice,
     fleet,
     activeTarget: forceHomeStart ? undefined : activeTarget,
+    webRelayUrl: webRelay?.originUrl,
     connectionEvents,
     inbox,
   }, {
@@ -945,24 +1009,24 @@ export async function runSupervisorTui(
       void toggleInboxRead(entry.id)
     },
     onOpenInboxEntry: (entry) => {
-      const base = activeTarget?.clientUrl ?? activeTarget?.endpoint
+      const base = webRelay?.originUrl
       if (!base) return
       const url = supervisorInboxWorkspaceUrl(base, entry.workspaceId)
-      void openBrowser(url).then(
+      void openWebBrowser(url).then(
         () => screen.update({ notice: `Opened Workspace ${entry.workspaceLabel ?? entry.workspaceId}.` }),
         (error: unknown) => screen.update({ diagnostic: safeError(error) }),
       )
     },
     onOpenActiveTarget: () => {
-      const url = activeTarget?.clientUrl ?? activeTarget?.endpoint
+      const url = webRelay?.originUrl
       if (!url) return
-      void openBrowser(url).then(
-        () => screen.update({ notice: 'Opened the active AliceProject Web UI.' }),
+      void openWebBrowser(url).then(
+        () => screen.update({ notice: 'Opened the OpenAlice Web GUI.' }),
         (error: unknown) => screen.update({ diagnostic: safeError(error) }),
       )
     },
     onDisconnectActiveTarget: () => {
-      disconnectActiveRemoteTarget()
+      void disconnectActiveRemoteTarget()
     },
     onRefreshActiveTarget: () => {
       if (activeTarget?.kind === 'local') void refreshRuntime({ manual: true })
@@ -986,9 +1050,7 @@ export async function runSupervisorTui(
     patch,
   ) => {
     await persistAliceProjectLaunchConfig(currentContext, patch)
-    return resolveStoredLaunchContext(launchFlags, {
-      env: dependencies.env,
-    })
+    return resolveContext(launchFlags, currentContext.project)
   })
   const loadProjectConfig = dependencies.loadProjectConfig
     ?? readAliceProjectLaunchConfig
@@ -999,9 +1061,7 @@ export async function runSupervisorTui(
     patch,
   ) => {
     await persistMachineLaunchConfig(currentContext, patch)
-    return resolveStoredLaunchContext(launchFlags, {
-      env: dependencies.env,
-    })
+    return resolveContext(launchFlags, currentContext.project)
   })
   const loadProjectRegistry = dependencies.loadProjectRegistry
     ?? readSupervisorAliceProjectRegistry
@@ -1009,10 +1069,7 @@ export async function runSupervisorTui(
     currentContext,
     name,
   ) => {
-    await persistSelectedSupervisorAliceProject(currentContext, name)
-    return resolveStoredLaunchContext(launchFlags, {
-      env: dependencies.env,
-    })
+    return resolveContext(launchFlags, name)
   })
   const createProject = dependencies.createProject ?? (async (
     currentContext,
@@ -1020,10 +1077,8 @@ export async function runSupervisorTui(
     home,
     workspaces,
   ) => {
-    await createSupervisorAliceProject(currentContext, name, home, { workspaces: workspaces ?? ['chat'] })
-    return resolveStoredLaunchContext(launchFlags, {
-      env: dependencies.env,
-    })
+    await createSupervisorAliceProject(currentContext, name, home, { select: false, workspaces: workspaces ?? [...PROJECT_WORKSPACES] })
+    return resolveContext(launchFlags, name)
   })
   const prepareManaged = dependencies.prepareManagedSource
     ?? (() => prepareManagedSource())
@@ -1040,39 +1095,104 @@ export async function runSupervisorTui(
     inspectRuntime: (options) => services.inspect(options),
     loadMachineRegistry: loadMachines,
   }))
-  const connectRemoteProject = dependencies.connectRemoteProject ?? (async ({
-    machine,
-    project,
-    signal,
-    onReady,
-  }) => {
-    const registry = await loadMachines()
-    const target = registry.machines.find((entry) => entry.key === machine.key)
-    if (!target) throw new Error(`Machine "${machine.key}" is no longer registered.`)
-    const remotePort = loopbackEndpointPort(project.runtime.webEndpoint)
-    if (remotePort === null) {
-      throw new Error(`AliceProject "${project.key}" does not advertise a loopback Web endpoint.`)
+  const connectRemoteProject = dependencies.connectRemoteProject ?? (async ({ machine, project, signal, onReady }) => {
+    if (!webRelay) throw new Error('The Web relay is unavailable.')
+    tuiConnectionRequest = true
+    try {
+      await webRelay.connect(machine.key, project.key, { signal })
+      const selection = webRelay.activeSelection
+      if (!selection) throw new Error('The selected relay target disappeared during connection.')
+      const localUrl = selection.endpoint
+      onReady({ localPort: Number(new URL(localUrl).port), localUrl, clientUrl: webRelay.originUrl })
+    } finally {
+      tuiConnectionRequest = false
     }
-    return connectSsh({
-      destination: target.sshTarget,
-      localPort: 0,
-      remotePort,
-      sshPort: target.sshPort ?? null,
-      identityFile: target.identityFile ?? null,
-      openBrowser: false,
-      waitMs: 60_000,
-      signal,
-      onReady,
-    }, { stdout: SILENT_OUTPUT })
+    return new Promise<number>((done) => {
+      const finish = () => { unsubscribe(); signal.removeEventListener('abort', onAbort); done(0) }
+      const onAbort = () => {
+        if (webRelay.status.target?.machine === machine.key && webRelay.status.target.project === project.key) webRelay.disconnect()
+        finish()
+      }
+      const unsubscribe = webRelay.subscribe(() => {
+        if (webRelay.status.target?.machine !== machine.key || webRelay.status.target.project !== project.key) finish()
+      })
+      signal.addEventListener('abort', onAbort, { once: true })
+      if (signal.aborted || webRelay.status.target?.machine !== machine.key || webRelay.status.target.project !== project.key) onAbort()
+    })
   })
   const planTransfer = dependencies.planProjectTransfer ?? planProjectTransfer
   const sendTransfer = dependencies.sendProjectTransfer ?? ((input) => transferProjectOverSsh(input))
   const inspectTransferSource = dependencies.inspectTransferSource
     ?? ((home) => inspectRuntime({ homeRoot: home, waitMs: 2_000 }))
-  const startRemoteProject = dependencies.startRemoteProject
-    ?? ((machine, projectKey) => runRemoteProjectStart(machine, projectKey))
+  const startRemoteProject = async (machine: RegisteredMachine, projectKey: string) => {
+    const current = (await loadMachines()).machines.find((entry) => entry.key === machine.key)
+    if (!current) throw new Error(`Machine "${machine.key}" is no longer registered.`)
+    requireMachineEnabled(current)
+    return (dependencies.startRemoteProject ?? ((machine, project) => runRemoteProjectCommand(machine, ['up', '--project', project, '--wait', '30'])))(current, projectKey)
+  }
   const probeTarget = dependencies.probeTarget
     ?? ((endpoint) => probeOpenAlice(endpoint, { timeoutMs: 1_500 }))
+
+  let observedRelayGeneration = webRelay?.status.generation ?? 0
+  let tuiConnectionRequest = false
+  let relayExplicitlyDisconnected = false
+  const removeRelayObserver = webRelay?.subscribe(() => {
+    if (!active || !webRelay || webRelay.status.generation === observedRelayGeneration) return
+    observedRelayGeneration = webRelay.status.generation
+    if (!tuiConnectionRequest) {
+      relayExplicitlyDisconnected = !webRelay.activeSelection
+      void syncFromRelay()
+    }
+  })
+
+  async function syncFromRelay(): Promise<void> {
+    if (!webRelay || !active) return
+    const generation = webRelay.status.generation
+    const selection = webRelay.activeSelection
+    const previous = activeTarget
+    try {
+      if (!selection) {
+        activeTarget = null
+      } else if (selection.machine.key === 'local') {
+        if (!context) throw new Error('The selected local AliceProject has no TUI launch context.')
+        const selectedContext = context.project === selection.project.key
+          ? context : await selectProject(context, selection.project.key)
+        const selectedServices = selectedContext === context
+          ? services : createServices(dependencies, selectedContext)
+        const selectedRuntime = await selectedServices.inspect({ homeRoot: selectedContext.home, waitMs: 2_000 })
+        if (webRelay.status.generation !== generation) return
+        context = selectedContext
+        services = selectedServices
+        runtime = selectedRuntime
+        activeTarget = localSupervisorTarget(context, runtime)
+      } else {
+        activeTarget = remoteSupervisorTarget(selection.machine, selection.project, selection.endpoint, webRelay.originUrl)
+      }
+      if (!active || webRelay.status.generation !== generation) return
+      if (previous && (previous.machineKey !== activeTarget?.machineKey || previous.projectKey !== activeTarget?.projectKey)) {
+        recordConnectionEvent('disconnected', previous, 'target-switch')
+      }
+      if (activeTarget && (previous?.machineKey !== activeTarget.machineKey || previous.projectKey !== activeTarget.projectKey)) {
+        recordConnectionEvent('connected', activeTarget, 'target-switch')
+      }
+      inbox = null
+      screen.update({
+        context,
+        runtime,
+        activeTarget,
+        connectionEvents,
+        inbox,
+        panel: activeTarget ? 'overview' : 'fleet',
+        notice: activeTarget
+          ? `Connected to ${activeTarget.machineName} / ${activeTarget.projectName} from Web Settings.`
+          : 'The Web connection was disconnected.',
+        diagnostic: webRelay.status.defaultSaveError ?? undefined,
+      })
+      if (activeTarget) void refreshInbox({ quiet: true })
+    } catch (error) {
+      if (active) screen.update({ diagnostic: safeError(error) })
+    }
+  }
 
   function recordConnectionEvent(
     kind: SupervisorConnectionEventKind,
@@ -1132,7 +1252,7 @@ export async function runSupervisorTui(
     }
   }
 
-  function disconnectActiveRemoteTarget(): void {
+  async function disconnectActiveRemoteTarget(): Promise<void> {
     const target = activeTarget
     if (!target || target.kind !== 'ssh') return
     const key = fleetTunnelKey(target.machineKey, target.projectKey)
@@ -1142,13 +1262,16 @@ export async function runSupervisorTui(
       notice: undefined,
       diagnostic: undefined,
     })
+    if (webRelay) webRelay.disconnect()
+
     if (controller) {
       tunnelCloseOrigins.set(key, 'user-disconnect')
       controller.abort()
       return
     }
     recordConnectionEvent('disconnected', target, 'user-disconnect')
-    activeTarget = localSupervisorTarget(context, runtime)
+    activeTarget = webRelay?.status.target?.machine === 'local' || !webRelay
+      ? localSupervisorTarget(context, runtime) : null
     if (activeTarget) recordConnectionEvent('connected', activeTarget, 'target-switch')
     inbox = null
     screen.update({
@@ -1276,7 +1399,7 @@ export async function runSupervisorTui(
       screen.update({
         busy: `Checking ${activeTarget?.machineName ?? 'local Runtime'} / ${activeTarget?.projectName ?? context.aliceProject.displayName}`,
         notice: undefined,
-        diagnostic: undefined,
+        diagnostic: webRelay?.status.defaultSaveError ?? undefined,
       })
     }
     try {
@@ -1288,7 +1411,18 @@ export async function runSupervisorTui(
       runtime = nextRuntime
       const previousTarget = activeTarget
       if (!activeTarget || activeTarget.kind === 'local') {
-        activeTarget = localSupervisorTarget(context, nextRuntime)
+        const local = localSupervisorTarget(context, nextRuntime)
+        if (webRelay) {
+          const selected = webRelay.status.target
+          if (!local && selected?.machine === 'local' && selected.project === context.project) {
+            tuiConnectionRequest = true
+            try { webRelay.disconnect() } finally { tuiConnectionRequest = false }
+          }
+          activeTarget = webRelay.status.target?.machine === 'local'
+            && webRelay.status.target.project === context.project ? local : null
+        } else {
+          activeTarget = local
+        }
         if (activeTarget?.endpoint !== previousTarget?.endpoint) inbox = null
       }
       const localTargetLost = previousTarget?.kind === 'local' && !activeTarget
@@ -1334,7 +1468,7 @@ export async function runSupervisorTui(
               ),
             )
           : currentFleet,
-        diagnostic: undefined,
+        diagnostic: webRelay?.status.defaultSaveError ?? undefined,
       })
       if (activeTarget && (!inbox || activeTarget.endpoint !== inbox.endpoint)) {
         void refreshInbox({ quiet: true })
@@ -1424,6 +1558,13 @@ export async function runSupervisorTui(
           context = await selectProject(context, project.key)
           services = createServices(dependencies, context)
           runtime = await services.inspect({ homeRoot: context.home, waitMs: 2_000 })
+          if (webRelay) {
+            tuiConnectionRequest = true
+            try {
+              if (localSupervisorTarget(context, runtime)) await webRelay.connect('local', project.key)
+              else webRelay.disconnect()
+            } finally { tuiConnectionRequest = false }
+          }
           abortRemoteTunnels()
           const previousTarget = activeTarget
           const previousEndpoint = activeTarget?.endpoint
@@ -1478,6 +1619,12 @@ export async function runSupervisorTui(
       }
       const localTarget = localSupervisorTarget(context, runtime)
       if (localTarget) {
+        if (webRelay) {
+          tuiConnectionRequest = true
+          try { await webRelay.connect('local', project.key) }
+          catch (error) { screen.update({ diagnostic: safeError(error) }); return }
+          finally { tuiConnectionRequest = false }
+        }
         abortRemoteTunnels()
         const previousEndpoint = activeTarget?.endpoint
         activeTarget = localTarget
@@ -1602,11 +1749,14 @@ export async function runSupervisorTui(
       tunnelCloseOrigins.delete(key)
       if (active) {
         clearTunnelState(key)
+        const replacement = webRelay?.status.target
+        if (replacement && (replacement.machine !== machine.key || replacement.project !== project.key)) return
         if (activeTarget?.kind === 'ssh'
           && activeTarget.machineKey === machine.key
           && activeTarget.projectKey === project.key) {
           recordConnectionEvent('disconnected', activeTarget, closeOrigin)
-          activeTarget = localSupervisorTarget(context, runtime)
+          activeTarget = webRelay?.status.target?.machine === 'local' || !webRelay
+            ? localSupervisorTarget(context, runtime) : null
           if (activeTarget) recordConnectionEvent('connected', activeTarget, 'target-switch')
           inbox = null
           screen.update({
@@ -1788,7 +1938,7 @@ export async function runSupervisorTui(
         const selectedIndex = Math.max(0, items.findIndex((item) => item.value === selectedItem?.value))
         const observatory = renderSupervisorReleaseObservatory({
           installedVersion: screen.snapshot.version,
-          currentLane: normalizeSupervisorUpdateChannel(screen.snapshot.channel) ?? 'stable',
+          currentLane: screen.snapshot.channel,
           selected: selectedIndex,
         }, width)
         const baseList = selectListPointerTarget(
@@ -1897,7 +2047,7 @@ export async function runSupervisorTui(
     try {
       if (action === 'update') {
         const update = await services.checkUpdate(
-          normalizeSupervisorUpdateChannel(screen.snapshot.channel) ?? 'stable',
+          normalizeSupervisorUpdateChannel(screen.snapshot.channel) ?? undefined,
         )
         screen.update({
           update,
@@ -1938,7 +2088,11 @@ export async function runSupervisorTui(
         if (action === 'start-open') {
           screen.update({ notice: 'Runtime started.' })
           try {
-            await services.open({ homeRoot, waitMs: 2_000 })
+            if (!webRelay) throw new Error('The Web relay is unavailable.')
+            tuiConnectionRequest = true
+            try { await webRelay.connect('local', context.project) }
+            finally { tuiConnectionRequest = false }
+            await openWebBrowser(webRelay.originUrl)
             screen.update({
               notice: 'OpenAlice started and opened in your browser.',
             })
@@ -1949,7 +2103,8 @@ export async function runSupervisorTui(
           screen.update({ notice: 'Runtime started in the background.' })
         }
       } else if (action === 'open') {
-        await services.open({ homeRoot, waitMs: 2_000 })
+        if (!webRelay) throw new Error('The Web relay is unavailable.')
+        await openWebBrowser(webRelay.originUrl)
         screen.update({ notice: 'Opened the verified Web UI.' })
       } else if (action === 'stop') {
         await services.stop({ homeRoot, waitMs: 15_000 })
@@ -2875,6 +3030,12 @@ export async function runSupervisorTui(
       setMessage('Switching AliceProject…')
       try {
         const next = await operation()
+        if (!active) return
+        if (webRelay && !start) {
+          tuiConnectionRequest = true
+          try { await webRelay.connect('local', next.project) }
+          finally { tuiConnectionRequest = false }
+        }
         projectContext = next
         context = projectContext
         services = createServices(dependencies, projectContext)
@@ -2894,31 +3055,27 @@ export async function runSupervisorTui(
       if (start && !projectsActive) await requestAction('start-open')
     }
     const showCreateWorkspaces = (name: string, home: string) => {
-      const selected = new Set<ProjectWorkspace>(['chat'])
       let cursor = 0
       selectWorkspaceRow = index => { cursor = index; ui.requestRender() }
       ui.setShowHardwareCursor(false)
       creatorView = {
         step: 'workspaces', currentProjectName: projectContext.aliceProject.displayName,
-        projectKey: name, detail: '↑↓ Choose · Space Toggle · Chat recommended; others optional.',
-        message: 'Prepare selected workspaces on startup. Agent Sessions start only when you ask.',
+        projectKey: name, detail: 'All default Workspaces are prepared after the app opens.',
+        message: 'Chat, Auto Quant, and Auto Prediction will initialize in the background. Agent Sessions start only when you ask.',
       }
       setMessage(creatorView.message)
       component = {
         render: (width) => PROJECT_WORKSPACES.map((kind, index) =>
-          truncateDisplayWidth(`${index === cursor ? '›' : ' '} [${selected.has(kind) ? 'x' : ' '}] ${PROJECT_WORKSPACE_LABELS[kind]}`, width)),
+          truncateDisplayWidth(`${index === cursor ? '›' : ' '} [x] ${PROJECT_WORKSPACE_LABELS[kind]}`, width)),
         invalidate: () => {},
         handleInput: (data) => {
           if (piTui.matchesKey(data, 'escape')) { showCreateHomeInput(name, home); return }
           if (piTui.matchesKey(data, 'up')) cursor = (cursor + 2) % 3
           else if (piTui.matchesKey(data, 'down')) cursor = (cursor + 1) % 3
-          else if (data === ' ') {
-            const kind = PROJECT_WORKSPACES[cursor]!
-            if (selected.has(kind)) selected.delete(kind); else selected.add(kind)
-          } else if (piTui.matchesKey(data, 'enter')) {
+          else if (piTui.matchesKey(data, 'enter')) {
             void activateContext(
-              () => createProject(projectContext, name, home, PROJECT_WORKSPACES.filter(kind => selected.has(kind))),
-              (next) => `Created ${next.aliceProject.displayName}. Starting and preparing workspaces…`,
+              () => createProject(projectContext, name, home, PROJECT_WORKSPACES),
+              (next) => `Created ${next.aliceProject.displayName}. Starting; Workspaces will prepare after the app opens…`,
               true,
             )
           }
@@ -3044,7 +3201,7 @@ export async function runSupervisorTui(
       }
       void activateContext(
         () => selectProject(projectContext, item.value),
-        (next) => `Selected AliceProject ${next.aliceProject.displayName}; future bare starts use it.`,
+        (next) => `Opened AliceProject ${next.aliceProject.displayName}; Default updated.`,
       )
     }
 
@@ -3375,6 +3532,7 @@ export async function runSupervisorTui(
       const registry = await loadMachines()
       const machine = registry.machines.find((entry) => entry.key === destination.key)
       if (!machine) { state.error = 'Destination Machine is no longer registered.'; state.phase = 'failed'; component = failureComponent(); return }
+      if (machine.enabled === false) { state.error = 'Destination Machine is disabled.'; state.phase = 'failed'; component = failureComponent(); return }
       state.phase = 'transferring'
       transferController = new AbortController()
       let progress = { files: 0, bytes: 0, totalFiles: state.plan!.portable.files, totalBytes: state.plan!.portable.bytes }
@@ -3543,8 +3701,10 @@ export async function runSupervisorTui(
       clearInterval(inboxPoll)
       clearInterval(connectionPoll)
       stopMotionTimer()
+      removeRelayObserver?.()
       for (const controller of tunnelControllers.values()) controller.abort()
       tunnelControllers.clear()
+      if (webRelay) void webRelay.close()
       closeSourcePrompt?.()
       closeSettings?.()
       closeProjects?.()
@@ -3562,6 +3722,9 @@ export async function runSupervisorTui(
     screen.setDetachHandler(() => finish())
     const onTerminate = () => finish()
     const removeInputListener = ui.addInputListener((data) => {
+      // Raw listeners run before pi-tui's focused-component release filter.
+      // Never route a release against state changed by the corresponding press.
+      if (piTui.isKeyRelease(data)) return { consume: true }
       const pointer = parseSupervisorPointer(data)
       if (pointer) {
         if (commandPaletteActive) {
@@ -3641,26 +3804,12 @@ export async function runSupervisorTui(
 }
 
 export async function resolveSupervisorChannel(
-  options: {
-    moduleUrl?: string
-    resolveLayout?: (moduleUrl?: string) => unknown
-    readSource?: () => Promise<{
-      updateChannel?: string
-      selector?: { kind?: string; value?: string }
-    }>
-  } = {},
-): Promise<SupervisorUpdateChannel> {
-  const moduleUrl = options.moduleUrl ?? import.meta.url
-  const layout = (
-    options.resolveLayout ?? resolveInstalledLayout
-  )(moduleUrl)
-  if (!layout) return 'dev'
+  options: { readSource?: typeof readInstallSource } = {},
+): Promise<string> {
   const source = await (options.readSource ?? readInstallSource)()
-  const explicit = normalizeSupervisorUpdateChannel(source.updateChannel)
-  if (explicit) return explicit
-  if (source.selector?.kind === 'branch' && source.selector.value === 'dev') return 'dev'
-  if (source.selector?.kind === 'version' && source.selector.value?.includes('-beta')) return 'beta'
-  return 'stable'
+  if (!source) return 'unknown'
+  const channel = installSourceUpdateChannel(source)
+  return channel === 'development' ? 'dev' : channel
 }
 
 function normalizeSupervisorUpdateChannel(value: unknown): SupervisorUpdateChannel | null {
@@ -4137,11 +4286,11 @@ export class SupervisorScreen implements Component {
       if (matchesKey(data, 'enter')) {
         return this.activateCommandDeckItem(items[this.commandDeckState.selected])
       }
-      if (data === '\x7f' || data === '\b') {
+      if (matchesKey(data, 'backspace') || data === '\x7f' || data === '\b') {
         this.setCommandDeckQuery(dropLastCommandQueryCodePoint(this.commandDeckQuery))
         return true
       }
-      if (data === '\x15') {
+      if (matchesKey(data, 'ctrl+u') || data === '\x15') {
         this.setCommandDeckQuery('')
         return true
       }
@@ -4464,6 +4613,10 @@ export class SupervisorScreen implements Component {
     }
     if (matchesKey(data, 'o') && this.snapshot.activeTarget) {
       this.onOpenActiveTarget?.()
+      return true
+    }
+    if (matchesKey(data, 'o') && !this.snapshot.activeTarget && this.snapshot.webRelayUrl && this.onOpenActiveTarget) {
+      this.onOpenActiveTarget()
       return true
     }
     const keyActions: Array<[KeyId, SupervisorAction]> = [
@@ -5548,6 +5701,11 @@ function appendCommandQueryInput(
   input: string,
   maxCodePoints: number,
 ): string | null {
+  // ProcessTerminal forwards a complete paste with these markers. Keep it as
+  // search text, never shortcuts, and flatten whitespace for the single line.
+  if (input.startsWith('\x1b[200~') && input.endsWith('\x1b[201~')) {
+    input = input.slice(6, -6).replace(/[\r\n\t]+/gu, ' ')
+  }
   if (!input || /[\u0000-\u001f\u007f-\u009f]/u.test(input)) return null
   const remaining = Math.max(0, maxCodePoints - [...current].length)
   return `${current}${[...input].slice(0, remaining).join('')}`
@@ -5612,9 +5770,6 @@ function createServices(
     stop: options.configRecovery
       ? refuseProjectAction
       : dependencies.stop ?? ((stopOptions) => stopRuntime(stopOptions, shared)),
-    open: options.configRecovery
-      ? refuseProjectAction
-      : dependencies.open ?? ((openOptions) => openRuntime(openOptions, shared)),
     readLogs: options.configRecovery
       ? refuseProjectAction
       : dependencies.readLogs ?? ((logOptions) => readRuntimeLogs(logOptions, shared)),
@@ -6253,7 +6408,6 @@ function safeError(error: unknown): string {
 
 function storedHomeRecoveryNotice(
   error: unknown,
-  fallbackProject: string,
 ): string {
   const message = error instanceof Error ? error.message : String(error)
   const match = message.match(/for AliceProject "([^"]+)" (is missing|is unavailable or not writable)/)
@@ -6261,24 +6415,12 @@ function storedHomeRecoveryNotice(
     ? `AliceProject "${match[1]}" ${match[2]}.`
     : 'The remembered AliceProject home is unavailable.'
   return sanitize(
-    `${unavailable} Using "${fallbackProject}"; press i AliceProjects to recover.`,
+    `${unavailable} No Runtime attached; press i AliceProjects to choose.`,
   )
 }
 
 function sanitize(value: string): string {
   return value.replaceAll(/[\u0000-\u001f\u007f-\u009f]/g, ' ')
-}
-
-function loopbackEndpointPort(value: string | null): number | null {
-  if (!value) return null
-  try {
-    const url = new URL(value)
-    if (url.protocol !== 'http:' || url.hostname !== '127.0.0.1') return null
-    const port = Number(url.port || '80')
-    return Number.isInteger(port) && port >= 1 && port <= 65_535 ? port : null
-  } catch {
-    return null
-  }
 }
 
 function remoteHomesOverlap(left: string, right: string): boolean {
@@ -6291,30 +6433,6 @@ function remoteHomesOverlap(left: string, right: string): boolean {
     || (!rightRelative.startsWith('../') && rightRelative !== '..')
 }
 
-async function runRemoteProjectStart(
-  machine: RegisteredMachine,
-  projectKey: string,
-): Promise<void> {
-  if (!/^[a-z][a-z0-9_-]{0,31}$/u.test(projectKey)) throw new Error('Invalid remote AliceProject key.')
-  const command = `set -eu
-cli=$(command -v openalice 2>/dev/null || { [ ! -x "$HOME/.openalice/bin/openalice" ] || printf '%s\\n' "$HOME/.openalice/bin/openalice"; })
-[ -n "$cli" ] || exit 127
-exec "$cli" up --project ${projectKey} --wait 30`
-  const child = spawn('ssh', buildRemoteSshArgs({
-    destination: machine.sshTarget,
-    sshPort: machine.sshPort ?? null,
-    identityFile: machine.identityFile ?? null,
-  }, command), { stdio: ['ignore', 'ignore', 'pipe'], windowsHide: true })
-  let stderr = ''
-  child.stderr?.on('data', (chunk) => { stderr = `${stderr}${String(chunk)}`.slice(-4_096) })
-  await new Promise<void>((resolvePromise, reject) => {
-    child.once('error', reject)
-    child.once('exit', (code, signal) => {
-      if (code === 0) resolvePromise()
-      else reject(new Error(`Remote start failed ${signal ? `with ${signal}` : `with code ${code ?? 'unknown'}`}${stderr.trim() ? `: ${stderr.trim()}` : ''}`))
-    })
-  })
-}
 
 function alignLocalFleetProject(
   machines: MachineInventory[],
@@ -6334,6 +6452,7 @@ function alignLocalFleetProject(
       portAutomatic: context.provenance.port.source === 'default',
       product: existing?.product ?? 'trader',
       isDefault: existing?.isDefault ?? false,
+      // Endpoint/process liveness does not prove the complete Home is present.
       available: existing?.available ?? true,
       runtime: {
         class: runtime?.class ?? 'unavailable',

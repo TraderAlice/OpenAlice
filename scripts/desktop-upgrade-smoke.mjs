@@ -6,6 +6,7 @@ import {
   mkdirSync,
   mkdtempSync,
   readFileSync,
+  readdirSync,
   realpathSync,
   rmSync,
   writeFileSync,
@@ -30,6 +31,7 @@ import {
   selectPreviousDesktopTag,
   versionFromTag,
   waitForChromiumProfileRelease,
+  waitForDesktopUpgradeDocument,
   windowsInstallerArgs,
 } from './desktop-upgrade-smoke-lib.mjs'
 import { packagedElectronExecutable } from './smoke-packaged-toolchain.mjs'
@@ -307,7 +309,19 @@ async function waitForRenderer(debugPort, child, timeoutMs = 90_000) {
           typeof target.url === 'string' &&
           target.url.startsWith('app://openalice') &&
           target.webSocketDebuggerUrl)
-        if (page) return CdpClient.connect(page.webSocketDebuggerUrl)
+        if (page) {
+          const client = await CdpClient.connect(page.webSocketDebuggerUrl)
+          try {
+            await waitForDesktopUpgradeDocument(expression => client.evaluate(expression), {
+              timeoutMs: Math.max(1, deadline - Date.now()),
+            })
+            console.log('[desktop-upgrade] product document loaded')
+            return client
+          } catch (error) {
+            client.close()
+            throw error
+          }
+        }
       }
     } catch (error) {
       lastError = error
@@ -315,6 +329,33 @@ async function waitForRenderer(debugPort, child, timeoutMs = 90_000) {
     await sleep(250)
   }
   throw new Error(`timed out waiting for OpenAlice renderer${lastError ? `: ${lastError.message}` : ''}`)
+}
+
+async function waitForProjectWorkspaceSetup(home, timeoutMs = 120_000) {
+  const setupPath = join(home, 'workspace-setup.json')
+  const deadline = Date.now() + timeoutMs
+  let lastState = 'waiting for workspace-setup.json'
+  while (Date.now() < deadline) {
+    try {
+      const setup = JSON.parse(readFileSync(setupPath, 'utf8'))
+      if (setup?.schemaVersion !== 1 || !Array.isArray(setup.pending)) {
+        throw new Error(`invalid default Workspace setup state at ${setupPath}`)
+      }
+      if (setup.pending.length === 0) {
+        console.log('[desktop-upgrade] default Workspace setup settled')
+        return
+      }
+      lastState = `pending=${JSON.stringify(setup.pending)}`
+    } catch (error) {
+      if ((error instanceof Error && error.name === 'SyntaxError') || error?.code === 'ENOENT') {
+        lastState = 'waiting for workspace-setup.json to be written'
+      } else {
+        throw error
+      }
+    }
+    await sleep(250)
+  }
+  throw new Error(`timed out waiting for default Workspace setup under ${home}: ${lastState}`)
 }
 
 function terminateTree(child) {
@@ -331,7 +372,7 @@ function waitForExit(child, timeoutMs = 30_000) {
   return new Promise((resolveExit, rejectExit) => {
     const timeout = setTimeout(() => {
       terminateTree(child)
-      rejectExit(new Error('OpenAlice did not exit after renderer close'))
+      rejectExit(new Error('OpenAlice did not exit after explicit Electron quit'))
     }, timeoutMs)
     child.once('exit', (code) => {
       clearTimeout(timeout)
@@ -340,7 +381,14 @@ function waitForExit(child, timeoutMs = 30_000) {
   })
 }
 
-async function runRendererJourney({ executable, env, electronUserData, expression, label }) {
+async function runRendererJourney({
+  executable,
+  env,
+  electronUserData,
+  expression,
+  label,
+  waitForWorkspaceSetup = false,
+}) {
   const debugPort = await getAvailablePort()
   console.log(`[desktop-upgrade] launch ${label}: ${executable}`)
   const child = spawn(executable, [
@@ -369,10 +417,28 @@ async function runRendererJourney({ executable, env, electronUserData, expressio
         client = await waitForRenderer(debugPort, child)
       }
     }
-    await client.evaluate('window.close(); true').catch(() => undefined)
+    if (waitForWorkspaceSetup && typeof env.OPENALICE_HOME === 'string' && env.OPENALICE_HOME.length > 0) {
+      await waitForProjectWorkspaceSetup(env.OPENALICE_HOME)
+    }
     client.close()
     client = null
-    const exitCode = await waitForExit(child)
+    // Main-window close now hides the desktop while its tray/runtime stay alive.
+    // Electron's browser-target Browser.close command invokes the normal Quit
+    // lifecycle; unlike a renderer close or forced kill, it drains managed children.
+    const browser = await fetch(`http://127.0.0.1:${debugPort}/json/version`).then(response => response.json())
+    if (!browser.webSocketDebuggerUrl) throw new Error('Electron browser DevTools target is unavailable')
+    client = await CdpClient.connect(browser.webSocketDebuggerUrl)
+    const exited = waitForExit(child)
+    await Promise.race([
+      client.command('Browser.close').catch(error => {
+        // Electron intentionally does not reply to Browser.close before exiting.
+        if (error.message !== 'DevTools connection closed') throw error
+      }),
+      exited,
+    ])
+    const exitCode = await exited
+    client.close()
+    client = null
     if (exitCode !== 0) throw new Error(`${label} exited ${exitCode}`)
     if (process.platform === 'darwin') {
       await waitForChromiumProfileRelease(electronUserData, {
@@ -515,6 +581,7 @@ async function main() {
       electronUserData,
       expression: verifyExpression,
       label: `candidate ${candidateVersion}`,
+      waitForWorkspaceSetup: true,
     })
     const restarted = await runRendererJourney({
       executable: candidateExecutable,
@@ -522,6 +589,7 @@ async function main() {
       electronUserData,
       expression: verifyExpression,
       label: `candidate restart ${candidateVersion}`,
+      waitForWorkspaceSetup: true,
     })
 
     const checks = {
@@ -569,11 +637,15 @@ async function main() {
         await sleep(500)
         rmSync(smokeRoot, { recursive: true, force: true, maxRetries: 20, retryDelay: 250 })
       } catch (cleanupError) {
-        if (journeyCompleted) throw cleanupError
-        console.error(
-          `[desktop-upgrade] cleanup also failed for ${smokeRoot}: ` +
-          `${cleanupError instanceof Error ? cleanupError.message : String(cleanupError)}`,
-        )
+        let remaining = []
+        try { remaining = readdirSync(smokeRoot).slice(0, 20) } catch { /* root may already be gone */ }
+        const detail = cleanupError instanceof Error ? cleanupError.message : String(cleanupError)
+        const message = `[desktop-upgrade] cleanup failed for ${smokeRoot}: ${detail}`
+        if (journeyCompleted) {
+          console.warn(`${message}; remaining entries: ${remaining.join(', ') || '<unavailable>'}`)
+        } else {
+          console.error(`${message}; remaining entries: ${remaining.join(', ') || '<unavailable>'}`)
+        }
       }
     }
   }

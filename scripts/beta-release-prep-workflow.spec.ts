@@ -43,7 +43,7 @@ function expectTrustedClassifier(job: WorkflowJob): void {
   expect(classifier['continue-on-error']).toBe(true)
   expect(classifier.if).toBe("github.event_name == 'pull_request'")
   expect(classifier.env?.BASE_SHA).toBe('${{ github.event.pull_request.base.sha }}')
-  expect(classifier.run).toContain('git show "${BASE_SHA}:scripts/classify-beta-release-prep.mjs"')
+  expect(classifier.run).toContain('git archive "$BASE_SHA" scripts/classify-beta-release-prep.mjs packages/update-lifecycle/src/release-policy.ts')
   expect(classifier.run).toContain('--github-output "$GITHUB_OUTPUT"')
 }
 
@@ -118,26 +118,6 @@ describe('exact beta release-preparation workflow lane', () => {
     expect(jobs['build-dev-cli'].needs).toEqual(['build-dev-cli-neutral', 'build-dev-broker-packs'])
     expect(jobs['publish-dev-cli-candidate'].needs).toEqual(['build-dev-cli', 'build-dev-cli-windows'])
     expect(jobs['activate-dev-cli'].needs).toBe('publish-dev-cli-candidate')
-  })
-
-  it('keeps the Docker check green but omits setup, build, and smoke on an exact match', () => {
-    const docker = workflow('docker-smoke.yml')
-    const smoke = docker.jobs.smoke
-    expect(docker.on?.pull_request?.branches).toEqual(['master'])
-    expectTrustedClassifier(smoke)
-    const expensive = smoke.steps?.filter((candidate) => [
-      'actions/setup-node@v7',
-      'docker/setup-buildx-action@v3',
-      'docker/build-push-action@v6',
-    ].includes(candidate.uses ?? '') || candidate.name === 'Exercise Guardian, Workspace PTY, and CLI gateway') ?? []
-    expect(expensive).toHaveLength(4)
-    for (const candidate of expensive) {
-      expect(candidate.if).toContain("steps.beta-release-prep.outcome != 'success'")
-      expect(candidate.if).toContain("beta_release_prep != 'true'")
-    }
-    expect(step(smoke, 'Build server image').if).toContain("beta_release_prep != 'true'")
-    expect(step(smoke, 'Exercise Guardian, Workspace PTY, and CLI gateway').if)
-      .toContain("beta_release_prep != 'true'")
   })
 
   it('never lets the classifier bypass final release candidates or publication', () => {

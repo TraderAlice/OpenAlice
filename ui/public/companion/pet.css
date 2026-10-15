@@ -1,0 +1,27 @@
+/* Squish / mirror timings follow MeteorNOX's Whale Widget; see NOTICE.md. */
+* { box-sizing: border-box; }
+html, body { margin: 0; width: 100%; height: 100%; overflow: hidden; background: transparent; user-select: none; -webkit-user-select: none; }
+#mirror { position: absolute; inset: 0; transition: transform .3s ease; pointer-events: none; }
+#mirror.flipped { transform: scaleX(-1); }
+/* Native window is 2.7 × character stage width: reserve both sides for face-level speech. */
+#body { position: absolute; inset: 0 calc(100% * .85 / 2.7); transform-origin: 50% 100%; transition: transform .22s cubic-bezier(.34,1.56,.64,1); }
+#body.pressed { transform: scaleY(.88) scaleX(1.05); }
+#pet { position: absolute; bottom: 0; left: 5%; width: 90%; padding: 0; margin: 0; border: 0; background: transparent; aspect-ratio: 1; cursor: grab; outline-offset: -10px; pointer-events: auto; touch-action: none; }
+#pet:focus-visible { outline: 2px solid #648bc8; border-radius: 40%; }
+#pet img { display: block; width: 100%; height: 100%; pointer-events: none; -webkit-user-drag: none; }
+#body.pressed #pet { cursor: grabbing; }
+#bubble { position: absolute; top: calc(26% - 55px); left: -80%; width: 100%; aspect-ratio: 1; pointer-events: none; }
+#bubble img { position: absolute; inset: 0; width: 100%; height: 100%; display: block; opacity: 0; transform: scale(.7); transition: opacity .2s ease, transform .2s ease; }
+.bubble-main { transform-origin: 88% 80%; }
+#bubble.open img { opacity: 1; transform: scale(1); }
+#message { position: absolute; left: 15%; right: 15%; top: 25%; height: 43%; display: flex; align-items: center; justify-content: center; text-align: center; font: 500 clamp(12px, calc(6vw / 2.7), 18px)/1.5 system-ui, sans-serif; color: #292527; white-space: pre-line; opacity: 0; transition: opacity .16s ease, transform .3s ease; }
+#bubble.open #message { opacity: 1; transition: opacity .16s ease .12s, transform .3s ease; }
+#mirror.flipped #message { transform: scaleX(-1); }
+@media (prefers-reduced-motion: reduce) { #mirror, #body, #message, #bubble img, #bubble.open #message { transition: none; transition-delay: 0s !important; } }
+
+#bubble.activity #message { top: 25%; height: 29%; font-size: clamp(11px, calc(5vw / 2.7), 15px); overflow: hidden; }
+#activity-actions { position: absolute; left: 18%; right: 18%; top: 55%; display: flex; justify-content: center; gap: 6px; pointer-events: auto; }
+#activity-actions[hidden] { display: none; }
+#activity-actions button { font: 11px/1.5 system-ui; padding: 2px 4px; color: #292527; background: transparent; border: 0; border-radius: 3px; text-decoration: underline; cursor: pointer; }
+#activity-actions button:focus-visible { outline: 2px solid #648bc8; }
+#mirror.flipped #activity-actions { transform: scaleX(-1); }

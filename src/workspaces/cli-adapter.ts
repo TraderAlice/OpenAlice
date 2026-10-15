@@ -201,7 +201,8 @@ export type SessionCredentialBinding =
     }
 
 /**
- * Immutable launch selection owned by a product `resumeId`. Omitted model
+ * Durable launch selection owned by a product `resumeId`. An explicit idle edit
+ * may replace it without changing the Session's Agent runtime. Omitted model
  * delegates model selection to the credential/runtime. Omitted effort means
  * exactly "not specified": it remains absent from adapter argv/config even
  * when the selected model publishes a provider default. An adapter still must
@@ -267,6 +268,9 @@ export type AgentInteractiveSetupStatus =
   | 'unknown';
 
 export interface CliAdapter {
+  /** Runtime-owned model directory. Never inject Vault credentials into discovery. */
+  discoverModels?(cwd: string): Promise<import('../ai-providers/discovered-model.js').DiscoveredModel[]>;
+
   readonly id: string;                          // 'claude' | 'codex' | 'shell'
   readonly displayName: string;
   /**

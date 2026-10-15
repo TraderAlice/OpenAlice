@@ -40,6 +40,7 @@ describe('CLI platform-neutral build inputs', () => {
       'packages/ibkr/dist',
       'packages/opentypebb/dist',
       'packages/uta-protocol/dist',
+      'packages/update-lifecycle/dist',
     ])
     expect(prepared).toEqual(verified)
     expect(prepared.files).toHaveLength(CLI_NEUTRAL_INPUT_ROOTS.length)

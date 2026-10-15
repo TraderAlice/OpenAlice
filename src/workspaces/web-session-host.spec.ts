@@ -163,7 +163,7 @@ describe('WebSessionHost with the pi-rpc transport', () => {
     expect(onNativeSessionId).toHaveBeenCalledWith('record-1', 'omp-777')
   })
 
-  it('deduplicates repeated opens and stops intentionally', async () => {
+  it('rejects an unmanaged duplicate open and stops intentionally', async () => {
     let spawns = 0
     const onExit = vi.fn()
     const host = new WebSessionHost(logger, { onExit }, () => {
@@ -171,7 +171,7 @@ describe('WebSessionHost with the pi-rpc transport', () => {
       return piRpcProcess() as never
     })
     await host.start(input({}))
-    await host.start(input({}))
+    await expect(host.start(input({}))).rejects.toThrow('already owns')
     expect(spawns).toBe(1)
     expect(await host.stop('record-1', 'switch to TUI')).toBe(true)
     expect(host.has('record-1')).toBe(false)

@@ -266,6 +266,23 @@ Guardian passes explicit `HTTP_PROXY`, `HTTPS_PROXY`, `ALL_PROXY`, and
 host system proxy through Chromium when no explicit environment value exists,
 on every supported desktop platform. Lower-case environment names are accepted
 and normalized for child processes.
+The development Guardian also maps Windows WinINet manual HTTP(S) proxy
+settings into the same child environment. PAC-only and SOCKS-only settings
+remain untouched; use explicit proxy environment variables when the system
+proxy cannot be resolved.
+
+For a domestic/headless server, set the explicit app fallback before starting
+Guardian, for example:
+
+`OPENALICE_PROXY_URL=http://127.0.0.1:7897 node scripts/guardian/prod.mjs`
+
+Standard `HTTP_PROXY`, `HTTPS_PROXY`, and `ALL_PROXY` values, including their
+lower-case forms, remain authoritative over `OPENALICE_PROXY_URL`. The
+configured proxy service must already be running and reachable at that URL;
+Guardian only forwards the setting to UTA, Connector Service, and Alice and
+does not start or manage the proxy process.
+`OPENALICE_PROXY_URL` accepts only HTTP(S) URLs; malformed or SOCKS-only values
+are ignored rather than injected as child proxy settings.
 
 Connector Service owns one shared proxy transport. It installs an Undici
 dispatcher for fetch/WebSocket SDKs and gives adapters an explicit Node agent
@@ -364,6 +381,15 @@ Socket Mode (`xapp` app-level token + `xoxb` bot token) instead of a public
 Request URL. Slash commands are created in the Slack app settings; Connector
 listens for them over the socket and does not register them at runtime. Raw
 Slack messages are not read. The owner DMs the app and runs `/link`.
+
+Telegram's Bot API does not allow `getUpdates` long polling while an outgoing
+webhook is configured. grammY therefore calls `deleteWebhook` as part of
+`bot.start()` before entering the polling loop. This cleanup is idempotent, but
+Connector must not pass `drop_pending_updates: true`: queued owner messages are
+valid work, not disposable startup residue. A failure or timeout before
+`onStart` is reported with its stage (`bot_init`, `webhook_cleanup`, or
+`polling`) so the health record distinguishes Bot API initialization from
+webhook cleanup and the actual update stream.
 
 Do not use Slack's hosted Deno/Functions platform for this connector. That
 path expects Slack to host the app. Socket Mode plus the Web API is the
@@ -537,10 +563,11 @@ The surfaces deliberately have different jobs:
   is stamped as a comment. Connector interprets automated silence from the
   forwarded source; comments
   that arrived from that connector are not echoed.
-  Pending comment replies also carry compact turn progress. The connector chat
-  ships sealed mid-turn `text` blocks (the last consecutive text before a
-  tool or error) and skips tool/error blocks. A text already sent this way
-  is not sent again as the final comment.
+  Pending comment replies also carry compact turn progress. The execution-owned
+  delivery snapshot authorizes sealed mid-turn `text` blocks (the last
+  consecutive text before a tool or error); tool/error blocks remain local.
+  A terminal event always closes the same task turn, independently of comment
+  persistence or whether progress already contained the final text.
 - **Beta → Connectors** is the operations view: service health, the same
   seven-stage setup lifecycle used by Settings, durable private-chat linkage,
   last delivery evidence, and an explicit reconnect action only for an actual
@@ -711,7 +738,7 @@ Changes to this subsystem require:
 - Settings browser verification without exposing token values;
 - dev Guardian enable/restart/disable recovery under an isolated
   `OPENALICE_HOME`;
-- Docker build/runtime smoke and packaged Electron resource assertion.
+- packaged Electron resource assertion.
 
 Real Telegram/Discord delivery needs user-owned platform credentials and is a
 manual acceptance lane; credential-free CI must not pretend that a live
@@ -760,3 +787,47 @@ produce a success acknowledgement. Connector restart invalidates old panels.
 The control contract is platform-neutral; Telegram currently implements its UI.
 See [Telegram inline keyboards](https://core.telegram.org/bots/api#inlinekeyboardbutton)
 and [callback acknowledgement](https://core.telegram.org/bots/api#answercallbackquery).
+
+## Execution-owned reply lifecycle
+
+Alice fixes an external delivery snapshot at dispatch. Connector does not infer
+a recipient from the target Session or an Issue association. `DispatchDelivery`
+projects accepted/progress/final/failed using the headless taskId throughout;
+Issue comment persistence no longer sends execution terminal events. Explicit
+standalone desk comments retain their own message identity. In-turn comments
+reuse the authorized task route and source.
+
+New live events carry an optional `activityLeaseMs` (currently 60 seconds).
+Alice renews active turns every 20 seconds, including tool-only periods. The
+shared delivery manager expires local activity through `stopOwnerActivity` when
+renewals stop. Expiry does not declare the Agent failed or send a final answer;
+a subsequent renewal may resume activity. Telegram implements this adapter
+hook. Its repeated accepted events retain the existing draft text. Terminal
+turns reject late progress/accepted and duplicate public finals in the bounded
+in-process dedup window. Lease cleanup is independent of reply-media resolution.
+
+Alice persists terminal handoff state on the Task before posting. `accepted`
+means the Connector's HTTP 202 receipt, **not** confirmed Telegram delivery;
+external delivery outcomes remain in the Connector I/O journal. A receipt lost
+in transit is `uncertain`. Recovery sends only a textless close, preserving the
+uncertain result as `closed` plus its error; it does not replay public text or
+files. Reconciled interrupted tasks with explicit routes also close activity.
+Recovery is bounded to 32 completed turns per sweep plus live turns.
+
+Queues and dedup remain process-local. This is not exactly-once or durable
+end-to-end delivery: a Connector crash after acceptance may lose unsent output.
+A crash clears its local draft timers; Alice resumes leases for still-running
+turns. Unknown historical tasks never replay. Upgrade-era legacy drafts without
+a lease require a Connector restart during the separately scheduled deployment.
+
+The lease field is additive: an older Connector can consume the existing four
+phases but will not enforce expiry. Mixed-version operation therefore lacks the
+lease fallback until Connector is upgraded; both components should be deployed
+together. No new model-facing flags or syntax are introduced.
+
+Acceptance covers an actual Node child emitting Codex events through
+WorkspaceService into a local HTTP receiver: a private ask followed by a desk
+comment in the same Session, including Issue rebinding/deletion before exit.
+The shared delivery-manager tests cover lease expiry, renewal, terminal cleanup,
+and late progress; the built Connector process smoke verifies its HTTP boundary.
+These checks do not send real Telegram messages or claim external delivery.

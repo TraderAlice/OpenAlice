@@ -30,6 +30,7 @@ describe('OpenAlice installed layout', () => {
     const installRoot = join(tmpdir(), 'openalice-native-layout', '.openalice')
     const releaseDir = join(installRoot, 'cli', 'releases', '0.91.0-darwin-arm64-0123456789abcdef')
     expect(resolveInstalledLayout(import.meta.url, {
+      platform: 'darwin',
       env: {
         OPENALICE_INSTALL_ROOT: installRoot,
         OPENALICE_RELEASE_DIR: releaseDir,

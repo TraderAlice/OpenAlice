@@ -9,6 +9,11 @@ Related guides: [[docs/project-structure.md]] and
 live in [[docs/conversation-provenance.md]]. The agent-facing usage manual ships as
 `default/skills/self-scheduling/SKILL.md`.
 
+Issue, schedule, and Connector-triggered launches enter
+`WorkspaceService.executions.dispatch` with mandatory execution attribution.
+See [[docs/workspace-lifecycle.md]] for the canonical execution ledger and state
+authority; the Office occupancy stream below is a presentation journal.
+
 ## Runtime occupancy journal
 
 `workspaces/state/agent-runtime.jsonl` is an append-only projection of desk
@@ -19,8 +24,9 @@ emits them. Completion stays on `runtime.stopped` with clipped assistant
 text and block metrics. Tool input/output and the user prompt stay out —
 they already live in the structured run snapshot and conversation log.
 TUI has no equivalent extractor yet, so headed Sessions still only write
-occupancy. The journal is not a dispatch authority. Office reads this file;
-Automation → Runs remains the current headless-task table.
+occupancy. This is the Agent family of [[docs/product-activity-journal.md]],
+not a dispatch authority. Office reads the journal; Developer → Runs at
+`/settings/developer/runs` is the current headless-task table.
 
 ## One Object, Two Roles
 
@@ -92,9 +98,9 @@ The filename stem is the stable issue id. Frontmatter:
   omitted, the Issue inherits that Agent's Workspace **headless** preference
   (fixed, then recent) rather than inspecting deprecated native-project export
   files.
-- `model` — optional native model id for this Issue's run. Omission inherits the
+- `model` — optional native model id for a fresh Session. Omission inherits the
   selected credential, Workspace, or native runtime model.
-- `effort` — optional one-run reasoning effort:
+- `effort` — optional reasoning effort for a fresh Session:
   `none | minimal | low | medium | high | xhigh | max`. The chosen runtime must
   expose that level; omission inherits its Workspace/native default.
 - `timeout` — optional scheduled-run and comment-reply watchdog: `15m | 30m | 45m | 60m`. Omission
@@ -140,7 +146,10 @@ because that Session owns its runtime conversation. `@new-then-resume` may use
 them for its first dispatch; after it becomes an exact Session owner, the claim
 rewrite removes the tuple. The Issue page may still replace the Session's
 credential, model, and effort (not the Agent runtime) after a successful first
-run; the next scheduled or comment-reply turn replays the updated binding.
+run; the next scheduled or comment-reply turn replays the updated binding. A
+valid edit to that Session's `.alice/sessions/<resumeId>.json` `ai` binding is
+also reconciled for a later launch. Do not treat the Issue-file restriction as
+a ban on changing an existing Session's model or effort.
 
 The 0.89.2-beta baseline has one ownership field and behavior-named scheduling
 tokens. `@workspace` remains a deprecated read alias for `@new-each-run`, and
@@ -382,6 +391,30 @@ An active peer Issue assigned to a retired `@resumeId` remains visibly owned by
 that signature but cannot fire until a human assigns an active Session or
 restores the departed Workspace. See [[docs/workspace-lifecycle.md]].
 
+## Editing an existing schedule in the GUI
+
+For ordinary Issues with `when`, the detail inspector's **Schedule** summary
+opens one draft editor for Interval (`every`), Cron and Once (`at`). Cadence,
+cron timezone/catch-up and the independent run timeout apply together only on
+**Save changes**; Cancel discards the draft, and a failed save retains it.
+Polling does not overwrite a draft; a changed saved schedule or timeout requires
+explicit reload before another save. This is a UI stale-value guard, not a
+file-level compare-and-swap guarantee.
+
+The existing Issue PATCH accepts `when` and delegates to `updateIssueFields`.
+Write-time validation reuses the browser-safe `schedule-expr`/`duration` owner;
+the file reader still exposes historical malformed schedules for inspection.
+Cron stays five-field with `local`/IANA timezone semantics. Once requires an
+absolute ISO timestamp with Z or an explicit UTC offset. Interval accepts the
+existing positive h/m/s duration grammar. Omitted timezone remains host-local.
+The phone desk keeps its dedicated Connector Settings cadence writer; the
+ordinary GUI does not add/remove schedules or change Issue ownership.
+
+Saving does not reset the scanner's markers or alter an admitted run's frozen
+settings. The returned detail is authoritative for cadence, next-due and health;
+an edited schedule may already be due. Done/canceled Issues remain inactive.
+No second schedule store, scheduler or execution path is introduced.
+
 ## Structured Runtime Output
 
 Claude Code, Codex, opencode, and Pi all emit different JSON event streams.
@@ -532,21 +565,28 @@ central schedule store or revive the legacy cron/AgentWork path.
 
 ## Verification
 
+Use [[docs/development-workflow.md]]
+([shared ladder](development-workflow.md#local-feedback-ladder)) to select the
+applicable subset for a leaf edit or expand to owner/full-suite acceptance.
+The following focused checklist covers issues, schedules and headless execution;
+shared lifecycle/protocol or cross-owner changes still require the broader
+gates. Dynamic dispatch, registry and child-process effects need explicit
+evidence beyond changed-file imports.
+
 ```bash
 npx tsc --noEmit
 pnpm vitest run \
   src/workspaces/headless-output.spec.ts \
-  src/workspaces/headless-task.spec.ts \
+  tests/integration/headless-process/headless-task.spec.ts \
   src/workspaces/headless-task-registry.spec.ts \
   src/webui/routes/headless.spec.ts \
   src/workspaces/issues/declaration.spec.ts \
-  src/workspaces/issues/mutate.spec.ts \
-  src/workspaces/issues/comment-delivery.spec.ts \
+  tests/integration/issue-lifecycle/mutate.spec.ts \
+  tests/integration/issue-lifecycle/comment-delivery.spec.ts \
   src/workspaces/issues/board.spec.ts \
-  src/webui/routes/issues.spec.ts \
-  src/workspaces/issues/auto-complete.spec.ts \
+  tests/integration/issue-routes/issues.spec.ts \
+  tests/integration/issue-lifecycle/auto-complete.spec.ts \
   src/workspaces/schedule/scanner.spec.ts
-pnpm test
 ```
 
 For UI changes, run strict UI types and verify Issue board, issue detail,
@@ -567,3 +607,31 @@ Retry persists `trigger.retryOfTaskId`, exposed by Issue run history as
 without that optional field have unknown retry lineage. Active Issue runs and
 dispatch-start races are rejected, including schedule ticks; there is no force
 override that launches concurrent turns against the same owner.
+
+## Reply routing ownership
+
+Issue execution and comment recruitment enter the shared dispatch communication
+contract described in [[docs/conversation-provenance.md]]. `trigger` remains the
+schedule/run index and `inquiry` remains the business follow-up index. Neither is
+an outbound transport address. Headless execution owns Connector terminal events,
+so failures writing a reply comment cannot leave transport activity running.
+New comment recruits preserve their source through the scheduler. The immutable
+reply reference determines which comment receives progress and completion.
+
+## Waiting for interactive handoff
+
+A dispatch to an occupied interactive Session waits in the execution manager's
+approval queue. See [[docs/workspace-lifecycle.md]] for the single admission
+contract. Scanner timer ticks do not await those decisions: pending fires retain
+per-Issue exclusion while other Issues and later ticks continue. Markers advance
+only after dispatch is accepted; declining leaves the normal missed-occurrence
+policy in charge. Shutdown cancels admissions and drains pending fire bookkeeping.
+
+Session interruption does not add a scheduler retry engine. A Session admission
+refusal follows the existing missed-admission policy (including cron `catchUp`);
+the next ordinary scheduler offer rechecks the manager. User cooldown expiry
+does not replay canceled takeover requests. Fault blocks require explicit user
+release. An interrupted accepted run remains an interrupted attempt, retains
+partial output, fails pending delivery/inquiry completion, and cannot
+auto-complete a one-shot Issue. See
+[Session launch admission](workspace-lifecycle.md#interruption-and-session-launch-admission).

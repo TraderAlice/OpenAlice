@@ -29,14 +29,10 @@ import {
   findConnectorDesks,
   type ConnectorDesk,
 } from './connector-desk.js'
-import { projectDeskComment, projectDeskLifecycle } from './telegram-desk-project.js'
+import { projectDeskLifecycle } from './telegram-desk-project.js'
 
 export {
-  projectDeskComment,
   projectDeskLifecycle,
-  projectDeskTurnProgress,
-  projectWorkspaceDeskFailure,
-  projectWorkspaceDeskTurnProgress,
   shouldProjectDeskComment,
 } from './telegram-desk-project.js'
 
@@ -151,14 +147,7 @@ export async function ingestConnectorOwnerMessages(
   if (dispatched.status !== 'not_requested') {
     await updateIssueCommentDelivery(workspace.dir, desk.issue.id, appended.comment.id, dispatched.delivery)
   }
-  if (dispatched.status === 'scheduled') {
-    await projectDeskLifecycle({
-      issue: appended.issue,
-      conversationId: appended.comment.id,
-      phase: 'accepted',
-      client,
-    }).catch(() => undefined)
-  } else {
+  if (dispatched.status !== 'scheduled') {
     const reason = dispatched.status === 'failed'
       ? dispatched.delivery.error
       : 'No Agent reply was scheduled for this message.'
@@ -220,11 +209,6 @@ export async function stampTelegramDeskScheduledFire(input: {
     at: input.task.finishedAt ?? Date.now(),
     fingerprint: `telegram-desk-fire:${input.task.taskId}`,
   })
-  await projectDeskComment(appended.issue, appended.comment, input.client, {
-    workspaceId: input.task.wsId,
-    progressScopeId: input.task.taskId,
-    triggerMetadata,
-  }).catch(() => undefined)
   return appended.comment
 }
 

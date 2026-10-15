@@ -170,8 +170,8 @@ At minimum:
 npx tsc --noEmit
 cd ui && npx tsc -b
 pnpm vitest run src/tool/workspace-list.spec.ts \
-  src/workspaces/adapters/ai-config.spec.ts \
-  src/webui/routes/workspaces.spec.ts
+  tests/integration/agent-configuration/ai-config.spec.ts \
+  tests/integration/workspace-routes/workspaces.spec.ts
 ```
 
 Then use the real `/chat/manager` route with at least two available runtimes:

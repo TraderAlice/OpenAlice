@@ -13,6 +13,9 @@
  * "running" from a previous Alice life. (Durable/detached runs are a later
  * upgrade; see project_workspace_automation_design.)
  */
+import { dispatchCommunicationSchema, type DispatchCommunication } from './dispatch-communication.js'
+import type { OwnerChatMessage } from '@traderalice/connector-protocol'
+
 import { randomBytes } from 'node:crypto'
 import { mkdir, readFile, rename, writeFile } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
@@ -87,6 +90,9 @@ export interface HeadlessTaskInquiry {
 }
 
 export interface HeadlessTaskRecord {
+  /** Absent on historical tasks; never infer delivery from their subject. */
+  readonly communication?: DispatchCommunication
+  terminalDelivery?: { message: OwnerChatMessage; state: 'pending' | 'accepted' | 'uncertain' | 'closed'; error?: string }
   readonly taskId: string
   /**
    * OpenAlice-owned identity of the resumable runtime conversation. Unlike
@@ -123,6 +129,7 @@ export interface HeadlessTaskRecord {
   launchErrorCode?: HeadlessLaunchErrorCode
   exitCode?: number | null
   signal?: string | null
+  interruptionReason?: string
   killed?: boolean
   error?: string
   /** Watchdog policy recorded at dispatch time. A positive number is the armed
@@ -180,7 +187,17 @@ export class HeadlessTaskRegistry {
       const parsed = JSON.parse(await readFile(this.path, 'utf8')) as {
         tasks?: HeadlessTaskRecord[]
       }
-      this.tasks = Array.isArray(parsed.tasks) ? parsed.tasks : []
+      this.tasks = (Array.isArray(parsed.tasks) ? parsed.tasks : []).map(task => {
+        if (!task.communication) return task
+        const checked = dispatchCommunicationSchema.safeParse(task.communication)
+        if (checked.success && checked.data.target.workspaceId === task.wsId
+          && checked.data.target.resumeId === task.resumeId && checked.data.target.agent === task.agent) {
+          return { ...task, communication: checked.data }
+        }
+        this.logger.warn('headless.communication_invalid', { taskId: task.taskId })
+        const { communication: _invalid, terminalDelivery: _delivery, ...historical } = task
+        return historical
+      })
     } catch {
       this.tasks = [] // missing or corrupt → start clean
     }
@@ -201,6 +218,7 @@ export class HeadlessTaskRegistry {
   }
 
   async create(input: {
+    communication?: DispatchCommunication
     wsId: string
     agent: string
     model?: string
@@ -222,6 +240,7 @@ export class HeadlessTaskRegistry {
     while (this.tasks.some((task) => task.taskId === taskId)) taskId = randomTaskId()
     const rec: HeadlessTaskRecord = {
       taskId,
+      ...(input.communication ? { communication: dispatchCommunicationSchema.parse(input.communication) } : {}),
       resumeId: input.resumeId,
       ...(input.parentTaskId ? { parentTaskId: input.parentTaskId } : {}),
       wsId: input.wsId,
@@ -257,6 +276,7 @@ export class HeadlessTaskRegistry {
         | 'launchErrorCode'
         | 'exitCode'
         | 'signal'
+        | 'interruptionReason'
         | 'killed'
         | 'error'
         | 'output'
@@ -267,6 +287,13 @@ export class HeadlessTaskRegistry {
     if (!rec) return
     Object.assign(rec, patch)
     if (rec.status !== 'running') delete rec.progress
+    await this.flush()
+  }
+
+  async setTerminalDelivery(taskId: string, delivery: NonNullable<HeadlessTaskRecord['terminalDelivery']>): Promise<void> {
+    const rec = this.get(taskId)
+    if (!rec) return
+    rec.terminalDelivery = delivery
     await this.flush()
   }
 

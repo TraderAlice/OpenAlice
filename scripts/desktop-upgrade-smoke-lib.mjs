@@ -15,6 +15,30 @@ export function readInstalledDesktopVersion(installRoot) {
 }
 
 export const DESKTOP_UPGRADE_RECEIPT_SCHEMA_VERSION = 1
+
+// The app:// target and its API can be available while Electron's initial
+// loadURL is still pending. Quitting then aborts startup and can open a fatal
+// dialog. Require a loaded, mounted product document before the state journey.
+export async function waitForDesktopUpgradeDocument(evaluate, options = {}) {
+  const {
+    timeoutMs = 90_000,
+    now = Date.now,
+    sleep = (ms) => new Promise(resolveSleep => setTimeout(resolveSleep, ms)),
+  } = options
+  const deadline = now() + timeoutMs
+  while (now() < deadline) {
+    try {
+      if (await evaluate(`document.readyState === 'complete' &&
+        location.href.startsWith('app://openalice/') &&
+        Boolean(document.getElementById('root')?.childElementCount)`)) return
+    } catch (error) {
+      if (!String(error?.message ?? error).includes('Execution context was destroyed')) throw error
+    }
+    await sleep(250)
+  }
+  throw new Error('timed out waiting for loaded OpenAlice upgrade document')
+}
+
 export const CHROMIUM_PROFILE_SINGLETON_NAMES = Object.freeze([
   'SingletonLock',
   'SingletonSocket',

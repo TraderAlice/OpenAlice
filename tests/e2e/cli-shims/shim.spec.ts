@@ -1,0 +1,484 @@
+import { execFile } from 'node:child_process'
+import { readFileSync } from 'node:fs'
+import { mkdtemp, rm, writeFile } from 'node:fs/promises'
+import { createServer } from 'node:http'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+import { fileURLToPath } from 'node:url'
+import { promisify } from 'node:util'
+
+import { describe, it, expect } from 'vitest'
+
+const execFileAsync = promisify(execFile)
+
+/** Public command launchers share one explicit CommonJS payload. */
+const EXPORT_BINARIES = ['alice', 'alice-workspace', 'traderhub', 'alice-uta']
+const payloadPath = fileURLToPath(new URL('../../../src/workspaces/cli/bin/openalice-cli.cjs', import.meta.url))
+
+const read = (name: string) =>
+  readFileSync(fileURLToPath(new URL(`../../../src/workspaces/cli/bin/${name}`, import.meta.url)))
+
+function runCli(name: string, args: string[], env: NodeJS.ProcessEnv) {
+  const launcherPath = fileURLToPath(new URL(`../../../src/workspaces/cli/bin/${name}`, import.meta.url))
+  return process.platform === 'win32'
+    ? execFileAsync(process.execPath, [payloadPath, ...args], {
+        env: { ...env, OPENALICE_CLI_BIN: name },
+        timeout: 5_000,
+      })
+    : execFileAsync(launcherPath, args, {
+        env: {
+          ...env,
+          // Deliberately remove host command lookup: the packaged launcher must
+          // be able to use OpenAlice's Electron Node on a clean machine.
+          PATH: '',
+          OPENALICE_MANAGED_PI_NODE_PATH: process.execPath,
+        },
+        timeout: 5_000,
+      })
+}
+
+describe('CLI launchers and payload', () => {
+  it('every POSIX export launcher is byte-identical and selects the managed Node runtime', () => {
+    const canonical = read('alice')
+    for (const name of EXPORT_BINARIES) {
+      expect(read(name).equals(canonical), `${name} has drifted from the alice launcher`).toBe(true)
+    }
+    const src = canonical.toString('utf8')
+    expect(src).toContain('#!/bin/sh')
+    expect(src).toContain('OPENALICE_MANAGED_PI_NODE_PATH')
+    expect(src).toContain('cygpath -u "$launcher"')
+    expect(src).toContain('cygpath -u "$managed_node"')
+    expect(src).toContain('cygpath -w "$payload"')
+    expect(src).toContain('MSYS2_ENV_CONV_EXCL')
+    expect(src).toContain('OPENALICE_TOOL_URL;OPENALICE_TOOL_SOCKET')
+    expect(src).toContain('openalice-cli.cjs')
+    expect(src).not.toContain('/usr/bin/env node')
+  })
+
+  it('the explicit CommonJS payload receives the public export name', () => {
+    const src = read('openalice-cli.cjs').toString('utf8')
+    expect(src).toContain('OPENALICE_CLI_BIN')
+    expect(src).toContain('exportKey') // routes to the per-export gateway path
+    expect(src).not.toContain('require(')
+    expect(src).toContain("await import('node:http')")
+  })
+
+  it('can fetch a manifest with no host Node available', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'openalice-cli-shim-'))
+    const socketPath = process.platform === 'win32'
+      ? `\\\\.\\pipe\\openalice-cli-shim-${process.pid}-${Date.now()}`
+      : join(dir, 'tools.sock')
+    const seen: string[] = []
+    const server = createServer((req, res) => {
+      seen.push(req.url ?? '')
+      res.writeHead(200, { 'content-type': 'application/json' })
+      res.end(JSON.stringify({
+        description: 'test manifest',
+        warnings: ['Skills are outdated; run alice harness upgrade --apply.'],
+        groupDescriptions: {
+          market: 'Discover symbols and bar sources',
+        },
+        groups: {
+          market: {
+            search: {
+              tool: 'marketSearchForResearch',
+              description: 'Search market data',
+              inputSchema: { type: 'object', properties: {} },
+            },
+          },
+        },
+      }))
+    })
+    await new Promise<void>((resolve, reject) => {
+      server.once('error', reject)
+      server.listen(socketPath, resolve)
+    })
+    try {
+      const { stdout, stderr } = await runCli('alice', [], {
+          ...process.env,
+          AQ_WS_ID: 'ws1',
+          OPENALICE_TOOL_SOCKET: socketPath,
+          OPENALICE_TOOL_URL: '/cli',
+          OPENALICE_CLI_DEBUG: '1',
+      })
+      expect(stderr).toContain('[openalice-cli-debug] runtime')
+      expect(stderr).toContain('[openalice-cli-debug] socket.response')
+      expect(stderr).toContain('Warning: Skills are outdated; run alice harness upgrade --apply.')
+      expect(stdout).not.toContain('Warning:')
+      expect(stdout).toContain('OpenAlice CLI')
+      expect(stdout).toContain('market')
+      expect(stdout).toContain('Discover symbols and bar sources')
+      expect(stdout).not.toContain('MCP-only tool')
+      expect(seen).toEqual(['/cli/ws1/data/manifest'])
+    } finally {
+      await new Promise<void>((resolve) => server.close(() => resolve()))
+      await rm(dir, { recursive: true, force: true })
+    }
+  })
+
+  it('shows a group purpose before its verb help', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'openalice-cli-shim-group-help-'))
+    const socketPath = process.platform === 'win32'
+      ? `\\\\.\\pipe\\openalice-cli-shim-group-help-${process.pid}-${Date.now()}`
+      : join(dir, 'tools.sock')
+    const server = createServer((_req, res) => {
+      res.writeHead(200, { 'content-type': 'application/json' })
+      res.end(JSON.stringify({
+        description: 'Workspace collaboration',
+        groupDescriptions: {
+          inbox: 'Deliver reports to the human Inbox',
+        },
+        groups: {
+          inbox: {
+            push: {
+              tool: 'inbox_push',
+              description: 'Push one delivery',
+              schema: { type: 'object', properties: {} },
+            },
+          },
+        },
+      }))
+    })
+    await new Promise<void>((resolve, reject) => {
+      server.once('error', reject)
+      server.listen(socketPath, resolve)
+    })
+    try {
+      const { stdout, stderr } = await runCli('alice-workspace', ['inbox'], {
+        ...process.env,
+        AQ_WS_ID: 'ws1',
+        OPENALICE_TOOL_SOCKET: socketPath,
+        OPENALICE_TOOL_URL: '/cli',
+      })
+      expect(stdout).toContain('alice inbox <verb>')
+      expect(stderr).toContain('compatibility alias')
+      expect(stdout).toContain('Deliver reports to the human Inbox')
+      expect(stdout).toContain('push')
+    } finally {
+      await new Promise<void>((resolve) => server.close(() => resolve()))
+      await rm(dir, { recursive: true, force: true })
+    }
+  })
+
+  it('reports a wrong CLI endpoint instead of throwing on an HTML manifest response', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'openalice-cli-shim-html-'))
+    const socketPath = process.platform === 'win32'
+      ? `\\\\.\\pipe\\openalice-cli-shim-html-${process.pid}-${Date.now()}`
+      : join(dir, 'tools.sock')
+    const server = createServer((_req, res) => {
+      res.writeHead(200, { 'content-type': 'text/html' })
+      res.end('<!DOCTYPE html><html><body>Vite fallback</body></html>')
+    })
+    await new Promise<void>((resolve, reject) => {
+      server.once('error', reject)
+      server.listen(socketPath, resolve)
+    })
+    try {
+      await expect(runCli('alice-workspace', ['issue', 'list'], {
+          ...process.env,
+          AQ_WS_ID: 'ws1',
+          OPENALICE_TOOL_SOCKET: socketPath,
+          OPENALICE_TOOL_URL: '/cli',
+      })).rejects.toMatchObject({
+        stderr: expect.stringContaining('invalid OpenAlice CLI manifest'),
+      })
+    } finally {
+      await new Promise<void>((resolve) => server.close(() => resolve()))
+      await rm(dir, { recursive: true, force: true })
+    }
+  })
+
+  it('accepts kebab-case shell flags for camelCase tool schema keys', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'openalice-cli-shim-flags-'))
+    const socketPath = process.platform === 'win32'
+      ? `\\\\.\\pipe\\openalice-cli-shim-flags-${process.pid}-${Date.now()}`
+      : join(dir, 'tools.sock')
+    let invocation: { tool?: string; args?: Record<string, unknown> } | null = null
+    const manifest = {
+      description: 'test manifest',
+      groups: {
+        provenance: {
+          show: {
+            tool: 'provenance_show',
+            description: 'Show provenance',
+            schema: {
+              type: 'object',
+              properties: {
+                issueId: { type: 'string' },
+                accountId: { type: 'string' },
+                await: { type: 'boolean' },
+                reconstruct: { type: 'boolean' },
+                taskId: { type: 'array', items: { type: 'string' } },
+                docs: { type: 'array', items: { type: 'object' } },
+                metadataFilter: { type: 'object' },
+              },
+            },
+          },
+        },
+      },
+    }
+    const server = createServer((req, res) => {
+      if (req.method === 'POST') {
+        const chunks: Buffer[] = []
+        req.on('data', (chunk) => chunks.push(Buffer.from(chunk)))
+        req.on('end', () => {
+          invocation = JSON.parse(Buffer.concat(chunks).toString('utf8'))
+          res.writeHead(200, { 'content-type': 'application/json' })
+          res.end(JSON.stringify({ content: [{ type: 'text', text: '{"ok":true}' }] }))
+        })
+        return
+      }
+      res.writeHead(200, { 'content-type': 'application/json' })
+      res.end(JSON.stringify(manifest))
+    })
+    await new Promise<void>((resolve, reject) => {
+      server.once('error', reject)
+      server.listen(socketPath, resolve)
+    })
+    const env = {
+      ...process.env,
+      AQ_WS_ID: 'ws1',
+      OPENALICE_TOOL_SOCKET: socketPath,
+      OPENALICE_TOOL_URL: '/cli',
+    }
+    try {
+      const help = await runCli('alice-workspace', ['provenance', 'show', '--help'], env)
+      expect(help.stdout).toContain('--issue-id')
+      expect(help.stdout).toContain('--await')
+      expect(help.stdout).not.toContain('--await <boolean>')
+      expect(help.stdout).toContain('--reconstruct')
+      expect(help.stdout).not.toContain('--reconstruct <boolean>')
+      expect(help.stdout).toContain('--task-id <value> (repeatable)')
+      expect(help.stdout).not.toContain('--task-id <array>')
+      expect(help.stdout).not.toContain('--issueId')
+      expect(help.stdout).toContain('--docs <value> (repeatable)')
+      expect(help.stdout).not.toContain('--doc <value>')
+      expect(help.stdout).toContain('--meta <key=value> (repeatable)')
+      expect(help.stdout).not.toContain('--metadata-filter')
+
+      await runCli('alice-workspace', [
+        'provenance', 'show', '--issue-id', 'audit', '--account-id', 'alpaca-paper',
+        '--await', '--reconstruct',
+        '--task-id', 'run-a', '--task-id', 'run-b',
+        '--docs', '{"path":"research/a.md"}' , '--meta', 'ticker=AAPL',
+      ], env)
+      expect(invocation).toEqual({
+        tool: 'provenance_show',
+        args: {
+          issueId: 'audit',
+          accountId: 'alpaca-paper',
+          await: true,
+          reconstruct: true,
+          taskId: ['run-a', 'run-b'],
+          docs: [{ path: 'research/a.md' }],
+          metadataFilter: { ticker: 'AAPL' },
+        },
+      })
+    } finally {
+      await new Promise<void>((resolve) => server.close(() => resolve()))
+      await rm(dir, { recursive: true, force: true })
+    }
+  })
+
+  it('turns common UTA command mistakes into executable recovery guidance', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'openalice-cli-shim-uta-recovery-'))
+    const socketPath = process.platform === 'win32'
+      ? `\\\\.\\pipe\\openalice-cli-shim-uta-recovery-${process.pid}-${Date.now()}`
+      : join(dir, 'tools.sock')
+    let invocations = 0
+    const manifest = {
+      description: 'UTA test manifest',
+      groups: {
+        account: {
+          portfolio: {
+            tool: 'getPortfolio',
+            description: 'Query portfolio',
+            schema: {
+              type: 'object',
+              properties: {
+                source: { type: 'string' },
+                symbol: { type: 'string' },
+                subAccountId: { type: 'string' },
+              },
+            },
+          },
+        },
+        contract: {
+          search: {
+            tool: 'searchContracts',
+            description: 'Search contracts',
+            schema: {
+              type: 'object',
+              properties: {
+                pattern: { type: 'string' },
+                assetClass: { type: 'string' },
+                source: { type: 'string' },
+              },
+              required: ['pattern'],
+            },
+          },
+          quote: {
+            tool: 'getQuote',
+            description: 'Quote a contract',
+            schema: {
+              type: 'object',
+              properties: {
+                aliceId: { type: 'string' },
+                source: { type: 'string' },
+              },
+              required: ['aliceId'],
+            },
+          },
+        },
+      },
+    }
+    const server = createServer((req, res) => {
+      if (req.method === 'POST') invocations++
+      res.writeHead(200, { 'content-type': 'application/json' })
+      res.end(JSON.stringify(manifest))
+    })
+    await new Promise<void>((resolve, reject) => {
+      server.once('error', reject)
+      server.listen(socketPath, resolve)
+    })
+    const env = {
+      ...process.env,
+      AQ_WS_ID: 'ws1',
+      OPENALICE_TOOL_SOCKET: socketPath,
+      OPENALICE_TOOL_URL: '/cli',
+    }
+    try {
+      await expect(runCli('alice-uta', ['positions', 'alpaca-paper'], env)).rejects.toMatchObject({
+        stderr: expect.stringContaining('To list positions, run `alice-uta account portfolio --help`.'),
+      })
+      await expect(runCli('alice-uta', ['account', 'portfolio', '--account', 'alpaca-paper'], env)).rejects.toMatchObject({
+        stderr: expect.stringContaining('Use `--source <account-id>`'),
+      })
+      await expect(runCli('alice-uta', ['contract', 'search', '--query', 'SPY'], env)).rejects.toMatchObject({
+        stderr: expect.stringContaining('Contract search uses `--pattern <symbol-or-keyword>`.'),
+      })
+      await expect(runCli('alice-uta', ['contract', 'quote', '--symbols', 'SPY,QQQ'], env)).rejects.toMatchObject({
+        stderr: expect.stringContaining('Quote accepts one `--alice-id`'),
+      })
+      await expect(runCli('alice-uta', ['account', 'portfolio', 'alpaca-paper'], env)).rejects.toMatchObject({
+        stderr: expect.stringContaining('unexpected positional argument "alpaca-paper"'),
+      })
+      expect(invocations).toBe(0)
+    } finally {
+      await new Promise<void>((resolve) => server.close(() => resolve()))
+      await rm(dir, { recursive: true, force: true })
+    }
+  })
+
+  it('reads string values from files without shell interpolation', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'openalice-cli-shim-string-file-'))
+    const socketPath = process.platform === 'win32'
+      ? `\\\\.\\pipe\\openalice-cli-shim-string-file-${process.pid}-${Date.now()}`
+      : join(dir, 'tools.sock')
+    const messagePath = join(dir, 'message.txt')
+    await writeFile(messagePath, 'Buy MU below $971 after support confirmation\n')
+    let invocation: { tool?: string; args?: Record<string, unknown> } | null = null
+    const server = createServer((req, res) => {
+      if (req.method === 'POST') {
+        const chunks: Buffer[] = []
+        req.on('data', (chunk) => chunks.push(Buffer.from(chunk)))
+        req.on('end', () => {
+          invocation = JSON.parse(Buffer.concat(chunks).toString('utf8'))
+          res.writeHead(200, { 'content-type': 'application/json' })
+          res.end(JSON.stringify({ content: [{ type: 'text', text: '{"ok":true}' }] }))
+        })
+        return
+      }
+      res.writeHead(200, { 'content-type': 'application/json' })
+      res.end(JSON.stringify({
+        description: 'UTA test manifest',
+        groups: {
+          order: {
+            place: {
+              tool: 'placeOrder',
+              description: 'Place an order',
+              schema: {
+                type: 'object',
+                properties: { commitMessage: { type: 'string', description: 'Trading thesis' } },
+              },
+            },
+          },
+        },
+      }))
+    })
+    await new Promise<void>((resolve, reject) => {
+      server.once('error', reject)
+      server.listen(socketPath, resolve)
+    })
+    const env = {
+      ...process.env,
+      AQ_WS_ID: 'ws1',
+      OPENALICE_TOOL_SOCKET: socketPath,
+      OPENALICE_TOOL_URL: '/cli',
+    }
+    try {
+      const help = await runCli('alice-uta', ['order', 'place', '--help'], env)
+      expect(help.stdout).toContain('--commit-message-file <path>')
+
+      await runCli('alice-uta', ['order', 'place', '--commit-message-file', messagePath], env)
+      expect(invocation).toEqual({
+        tool: 'placeOrder',
+        args: { commitMessage: 'Buy MU below $971 after support confirmation' },
+      })
+    } finally {
+      await new Promise<void>((resolve) => server.close(() => resolve()))
+      await rm(dir, { recursive: true, force: true })
+    }
+  })
+
+  it('every Windows `.cmd` twin derives its export and selects the managed Node runtime', () => {
+    const canonical = read('alice.cmd')
+    for (const name of EXPORT_BINARIES) {
+      expect(read(`${name}.cmd`).equals(canonical), `${name}.cmd has drifted`).toBe(true)
+    }
+    const cmd = canonical.toString('utf8')
+    expect(cmd).toContain('OPENALICE_CLI_BIN=%~n0')
+    expect(cmd).toContain('OPENALICE_MANAGED_PI_NODE_PATH')
+    expect(cmd).toContain('openalice-cli.cjs')
+    expect(cmd).toContain('%*')
+  })
+})
+
+it('publishes a Markdown body-file through the real CLI without shell interpolation or attachment flags', async () => {
+  const { createMemoryInboxStore } = await import('../../../src/core/inbox-store.js')
+  const { inboxPushFactory } = await import('../../../src/tool/inbox-push.js')
+  const dir = await mkdtemp(join(tmpdir(), 'inbox-cli-body-'))
+  const store = createMemoryInboxStore()
+  const body = '# Close report\n\nCash $971. [[report.pdf]]\n\nAfter the file.\n'
+  await writeFile(join(dir, 'message.md'), body)
+  const tool = inboxPushFactory.build({ workspaceId: 'ws1', workspaceLabel: 'Test', inboxStore: store, entityStore: {} as never })
+  const server = createServer((req, res) => {
+    res.setHeader('content-type', 'application/json')
+    if (req.method !== 'POST') {
+      res.end(JSON.stringify({ groups: { inbox: { push: { tool: 'inbox_push', description: 'Publish Markdown', schema: { type: 'object', required: ['body'], properties: { body: { type: 'string' } } } } } } }))
+      return
+    }
+    const chunks: Buffer[] = []
+    req.on('data', chunk => chunks.push(chunk))
+    req.on('end', async () => {
+      const input = JSON.parse(Buffer.concat(chunks).toString())
+      const result = await tool.execute!(input.args, { toolCallId: 'cli', messages: [] })
+      res.end(JSON.stringify({ content: [{ type: 'text', text: JSON.stringify(result) }] }))
+    })
+  })
+  await new Promise<void>(resolve => server.listen(0, '127.0.0.1', resolve))
+  try {
+    const address = server.address() as { port: number }
+    await runCli('alice', ['inbox', 'push', '--body-file', join(dir, 'message.md')], {
+      ...process.env, AQ_WS_ID: 'ws1', OPENALICE_TOOL_SOCKET: '', OPENALICE_TOOL_URL: `http://127.0.0.1:${address.port}/cli`,
+    })
+    const { entries } = await store.read()
+    expect(entries).toHaveLength(1)
+    expect(entries[0].body).toBe(body)
+    expect(entries[0]).not.toHaveProperty('docs')
+    expect(entries[0]).not.toHaveProperty('comments')
+  } finally {
+    await new Promise<void>(resolve => server.close(() => resolve()))
+    await rm(dir, { recursive: true, force: true })
+  }
+})

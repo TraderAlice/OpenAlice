@@ -17,6 +17,16 @@ allowBuilds:
 
 minimumReleaseAgeExclude:
   - '@earendil-works/pi-tui@0.83.0'
+  - '@voidzero-dev/vite-plus-core@1.0.0'
+  - '@voidzero-dev/vite-plus-darwin-arm64@1.0.0'
+  - '@voidzero-dev/vite-plus-darwin-x64@1.0.0'
+  - '@voidzero-dev/vite-plus-linux-arm64-gnu@1.0.0'
+  - '@voidzero-dev/vite-plus-linux-arm64-musl@1.0.0'
+  - '@voidzero-dev/vite-plus-linux-x64-gnu@1.0.0'
+  - '@voidzero-dev/vite-plus-linux-x64-musl@1.0.0'
+  - '@voidzero-dev/vite-plus-win32-arm64-msvc@1.0.0'
+  - '@voidzero-dev/vite-plus-win32-x64-msvc@1.0.0'
+  - vite-plus@1.0.0
 
 overrides:
   '@alpacahq/alpaca-trade-api>axios': ^0.33.0
@@ -49,8 +59,8 @@ overrides:
   express-rate-limit: ^8.2.2
   picomatch: ^4.0.4
   rollup: ^4.59.0
-  vitest>vite: ^7.3.5
-  '@vitest/mocker>vite': ^7.3.5
+  'vite@*': npm:@voidzero-dev/vite-plus-core@1.0.0
+  'vitest@*': 5.0.1
 
 patchedDependencies:
   # Adapted from stablyai/orca@ab0f220. See THIRD_PARTY_NOTICES.md.

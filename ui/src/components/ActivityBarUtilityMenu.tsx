@@ -1,9 +1,12 @@
 import aliceWave from '../../../default/stickers/alice-color/wave.png'
-import { Ellipsis, Laptop, Moon, Plug, Settings, Sun } from 'lucide-react'
+import { Ellipsis, Laptop, Moon, Plug, Settings, Sun, Ghost } from 'lucide-react'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { useThemeStore, type AppTheme } from '../theme/store'
+import { useDesktopCompanion } from '../hooks/useDesktopCompanion'
+import { useUpdateLifecycle } from '../hooks/useUpdateLifecycle'
+import { UpdateGuidanceBadge } from './settings/UpdateGuidanceBadge'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -44,6 +47,15 @@ export function ActivityBarUtilityMenu({
   const theme = useThemeStore((state) => state.theme)
   const setTheme = useThemeStore((state) => state.setTheme)
   const [menuOpen, setMenuOpen] = useState(false)
+  const companion = useDesktopCompanion(menuOpen)
+  const guidance = useUpdateLifecycle({ optional: true })?.guidance
+  const setupCount = guidance?.setupCount ?? 0
+  const updateCount = guidance?.availableCount ?? 0
+  const needsAttentionCount = guidance?.needsAttentionCount ?? 0
+  const warningLabel = [
+    ...(needsAttentionCount > 0 ? [t('nav.updatesNeedAttention', { count: needsAttentionCount })] : []),
+    ...(connectorWarnings > 0 ? [t('nav.connectorNeedsAttention', { count: connectorWarnings })] : []),
+  ].join('; ')
   const CurrentThemeIcon = THEME_MODES.find((item) => item.mode === theme)?.Icon ?? Laptop
 
   return (
@@ -71,11 +83,13 @@ export function ActivityBarUtilityMenu({
         {!compactRail && (
           <span className="min-w-0 flex-1 truncate text-[14px] font-medium">{t('nav.yourAlice')}</span>
         )}
-        {connectorWarnings > 0 && (
+        {(updateCount > 0 || setupCount > 0) && <span role="status" aria-label={[updateCount > 0 ? t('nav.updatesAvailable', { count: updateCount }) : '', setupCount > 0 ? t('projectSetup.title') : ''].filter(Boolean).join('; ')}
+          className={`size-2 shrink-0 rounded-full bg-primary shadow-[0_0_0_3px_var(--sidebar)] ${compactRail ? 'absolute -right-0.5 -top-0.5' : ''}`} />}
+        {warningLabel && (
           <span
             role="status"
-            aria-label={t('nav.connectorNeedsAttention', { count: connectorWarnings })}
-            className={`h-1.5 w-1.5 shrink-0 rounded-full bg-warning ${compactRail ? 'absolute right-1 top-1' : ''}`}
+            aria-label={warningLabel}
+            className={`h-1.5 w-1.5 shrink-0 rounded-full bg-warning ${compactRail ? 'absolute -bottom-0.5 -right-0.5' : ''}`}
           />
         )}
         {!compactRail && <Ellipsis size={16} strokeWidth={1.75} aria-hidden
@@ -88,12 +102,25 @@ export function ActivityBarUtilityMenu({
         sideOffset={6}
         className="w-[208px] max-w-[calc(100vw-1rem)] rounded-xl border border-border/70 bg-popover p-1.5 shadow-lg ring-0"
       >
+        {companion.visible !== null && (
+          <DropdownMenuItem
+            onClick={() => { void companion.toggle() }}
+            disabled={companion.pending}
+            className="min-h-9 cursor-pointer gap-2 px-2.5 text-[12px]"
+          >
+            <Ghost size={15} strokeWidth={1.75} aria-hidden />
+            <span>{t(companion.visible ? 'nav.hideCompanion' : 'nav.showCompanion')}</span>
+          </DropdownMenuItem>
+        )}
+        {companion.failed && <div role="alert" className="px-2.5 py-1 text-xs text-destructive">{t('nav.companionError')}</div>}
         <DropdownMenuItem
           onClick={onOpenSettings}
           className="min-h-9 cursor-pointer gap-2 px-2.5 text-[12px]"
         >
           <Settings size={15} strokeWidth={1.75} aria-hidden />
-          <span>{t('nav.item.settings')}</span>
+          <span className="flex-1">{t('nav.item.settings')}</span>
+          <UpdateGuidanceBadge count={updateCount} setupCount={setupCount} />
+          <UpdateGuidanceBadge count={needsAttentionCount} tone="attention" />
         </DropdownMenuItem>
         <DropdownMenuItem
           onClick={onOpenConnectors}
@@ -118,7 +145,7 @@ export function ActivityBarUtilityMenu({
             className="min-h-9 cursor-pointer gap-2 px-2.5 text-[12px] [&>svg:last-child]:ml-1"
           >
             <CurrentThemeIcon size={15} strokeWidth={1.75} aria-hidden />
-            <span className="min-w-0 flex-1 truncate">{t('settings.category.appearance')}</span>
+            <span className="min-w-0 flex-1 truncate">{t('settings.group.appearance')}</span>
             <span className="shrink-0 text-muted-foreground">{t(`theme.mode.${theme}`)}</span>
           </DropdownMenuSubTrigger>
           <DropdownMenuSubContent className="w-[148px] border border-border/70 bg-popover p-1.5 shadow-lg ring-0">

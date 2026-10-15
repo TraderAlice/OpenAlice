@@ -76,9 +76,9 @@ export function ConfigSection({
     <section
       id={id}
       aria-labelledby={titleId}
-      className={`min-w-0 border-b border-border/60 py-5 last:border-b-0 ${className}`}
+      className={`oa-config-section min-w-0 border-b border-border/60 py-5 last:border-b-0 ${className}`}
     >
-      <div className="mb-3 min-w-0">
+      <div className="oa-section-heading mb-3 min-w-0">
         <h3
           id={titleId}
           tabIndex={focusableTitle ? -1 : undefined}

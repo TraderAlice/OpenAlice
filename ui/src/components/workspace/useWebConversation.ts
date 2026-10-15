@@ -1,6 +1,10 @@
+import { getLaunchPreview, clearLaunchPreview } from '../conversation/launch-preview'
+import type { ConversationItem } from '../conversation/types'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   abortWebSession,
+  openWebSession,
+  type PausedSessionRuntimeUpdate,
   getWebSession,
   promptWebSession,
   respondWebSession,
@@ -16,11 +20,17 @@ import { presentWebTranscript } from './web-presentation'
  *
  * One mounted identity; WebSessionView keys this hook's owner by workspace/session.
  */
-export function useWebConversation(wsId: string, sessionId: string) {
+export function useWebConversation(wsId: string, sessionId: string, readOnly = false) {
+  const [launchPrompt] = useState(() => getLaunchPreview(wsId, sessionId))
   const [snapshot, setSnapshot] = useState<WebSessionSnapshot | null>(null)
   const [error, setError] = useState<string | null>(null)
   const current = useRef<WebSessionSnapshot | null>(null)
   const alive = useRef(false)
+  const generation = useRef(0)
+  const restarting = useRef(false)
+  const [reconfiguring, setReconfiguring] = useState(false)
+  useEffect(() => { if (snapshot) clearLaunchPreview(wsId, sessionId) }, [snapshot, wsId, sessionId])
+  useEffect(() => () => clearLaunchPreview(wsId, sessionId), [wsId, sessionId])
   const accept = useCallback((next: WebSessionSnapshot) => {
     if (!alive.current || (current.current && next.revision < current.current.revision)) return
     current.current = next
@@ -28,12 +38,15 @@ export function useWebConversation(wsId: string, sessionId: string) {
     setError(next.error)
   }, [])
   const refresh = useCallback(async () => {
+    if (readOnly || restarting.current) return
+    const epoch = generation.current
     try {
       const next = await getWebSession(wsId, sessionId, current.current?.revision)
+      if (epoch !== generation.current) return
       if (next) accept(next)
       else if (alive.current) setError(current.current?.error ?? null)
-    } catch (error) { if (alive.current) setError(error instanceof Error ? error.message : String(error)) }
-  }, [accept, wsId, sessionId])
+    } catch (error) { if (alive.current && epoch === generation.current) setError(error instanceof Error ? error.message : String(error)) }
+  }, [accept, wsId, sessionId, readOnly])
   useEffect(() => {
     alive.current = true
     let cancelled = false
@@ -46,11 +59,28 @@ export function useWebConversation(wsId: string, sessionId: string) {
     void poll()
     return () => { alive.current = false; cancelled = true; window.clearTimeout(timer) }
   }, [refresh])
+  const reconfigure = useCallback(async (runtime: PausedSessionRuntimeUpdate) => {
+    if (restarting.current || isBusy(current.current?.phase)) throw new Error('Wait for the current response to finish')
+    restarting.current = true
+    generation.current += 1
+    setReconfiguring(true)
+    try {
+      const next = await openWebSession(wsId, sessionId, runtime)
+      // A new process owns a new revision sequence. Keep rendered history until it is ready.
+      current.current = null
+      accept(next)
+    } finally {
+      restarting.current = false
+      if (alive.current) setReconfiguring(false)
+    }
+  }, [accept, wsId, sessionId])
   const items = useMemo(() => presentWebTranscript(snapshot ? [...snapshot.messages, ...(snapshot.streamingMessage ? [snapshot.streamingMessage] : [])] : []), [snapshot])
   return {
     snapshot,
     error,
-    items,
+    reconfiguring,
+    reconfigure,
+    items: !snapshot && launchPrompt ? [{ kind: 'user', key: 'launch-preview', content: [{ kind: 'markdown', text: launchPrompt }] }] as ConversationItem[] : items,
     busy: isBusy(snapshot?.phase),
     requests: snapshot?.requests ?? [],
     refresh,

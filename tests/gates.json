@@ -1,0 +1,82 @@
+{
+  "critical-local": {
+    "description": "Bounded broker-free Chat, real local Session recovery, approval HTTP contracts and desktop receipt integrity. No native desktop or venue acceptance is implied.",
+    "evidence": [
+      {
+        "requirement": "local-chat-restart",
+        "spec": "tests/integration/first-run/broker-free-chat.spec.ts",
+        "assertion": "creates one broker-free Chat, decodes a local reply, and reuses its Session after restart"
+      },
+      {
+        "requirement": "local-child-recovery",
+        "spec": "tests/integration/conversation-recovery/session-recovery.spec.ts",
+        "assertion": "records real child failure and resumes the persisted native identity after restart"
+      },
+      {
+        "requirement": "local-child-recovery",
+        "spec": "tests/integration/conversation-recovery/session-recovery.spec.ts",
+        "assertion": "interrupts through HTTP, requires explicit release, and rejects an old execution interrupt after resume"
+      },
+      {
+        "requirement": "local-child-recovery",
+        "spec": "tests/integration/conversation-recovery/session-recovery.spec.ts",
+        "assertion": "waits for terminal dispatch persistence before dispose resolves"
+      },
+      {
+        "requirement": "local-child-recovery",
+        "spec": "tests/integration/conversation-recovery/session-recovery.spec.ts",
+        "assertion": "cleans transcript watchers after rejected completion and shares the failed disposal"
+      },
+      {
+        "requirement": "local-approval-http",
+        "spec": "tests/integration/alice-uta/approval-http.spec.ts",
+        "assertion": "refuses missing and stale approval hashes over real HTTP without a venue write"
+      },
+      {
+        "requirement": "local-approval-http",
+        "spec": "tests/integration/alice-uta/approval-http.spec.ts",
+        "assertion": "honors a readonly mode change after staging and server readonly policy without a venue write"
+      },
+      {
+        "requirement": "local-approval-http",
+        "spec": "tests/integration/alice-uta/approval-http.spec.ts",
+        "assertion": "serializes duplicate HTTP approvals and refuses replay after ledger restart"
+      },
+      {
+        "requirement": "local-approval-http",
+        "spec": "tests/integration/alice-uta/approval-http.spec.ts",
+        "assertion": "reports transport loss and recovers the same prepared approval after HTTP reconnect"
+      },
+      {
+        "requirement": "local-approval-http",
+        "spec": "tests/integration/alice-uta/approval-http.spec.ts",
+        "assertion": "preserves a venue rejection as a failed operation rather than successful submission"
+      },
+      {
+        "requirement": "local-approval-http",
+        "spec": "tests/integration/alice-uta/approval-http.spec.ts",
+        "assertion": "cancels a loopback read without losing the prepared approval or writing to the venue"
+      },
+      {
+        "requirement": "required-run-truth",
+        "spec": "tests/integration/test-selection/test-results.spec.ts",
+        "assertion": "rejects all-skipped, hook failure, nonzero and missing reports from real Vitest processes"
+      },
+      {
+        "requirement": "required-run-truth",
+        "spec": "tests/integration/test-selection/test-results.spec.ts",
+        "assertion": "fails required evidence omitted or skipped despite other passing assertions"
+      },
+      {
+        "requirement": "required-run-truth",
+        "spec": "tests/integration/test-selection/test-results.spec.ts",
+        "assertion": "rejects attempts to narrow the required gate before execution"
+      },
+      {
+        "requirement": "complete-workspace-receipt",
+        "spec": "scripts/workspace-acceptance-receipt.spec.ts",
+        "assertion": "rejects an empty or truncated receipt and a failed cleanup"
+      }
+    ]
+  }
+}

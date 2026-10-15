@@ -3,6 +3,7 @@ import { spawn } from 'node:child_process'
 import { createHash } from 'node:crypto'
 
 import type { RegisteredMachine } from './machine-registry.ts'
+import { requireMachineEnabled } from './machine-registry.ts'
 import { buildRemoteSshArgs } from './remote.mjs'
 import {
   writeProjectTransferStream,
@@ -24,6 +25,7 @@ export async function transferProjectOverSsh(input: {
   signal?: AbortSignal
   onProgress?: (progress: { files: number; bytes: number; totalFiles: number; totalBytes: number }) => void
 }): Promise<ProjectTransferReceipt> {
+  requireMachineEnabled(input.machine)
   input.signal?.throwIfAborted()
   const spawnProcess = input.spawnProcess ?? spawn
   const ssh = spawnProcess('ssh', buildRemoteSshArgs({

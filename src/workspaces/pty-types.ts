@@ -22,6 +22,7 @@ export interface PtyProcess {
   write(data: Buffer | string): void;
   resize(cols: number, rows: number): void;
   kill(signal?: string): void;
+  terminateTree?(): Promise<void>;
   pause?(): void;
   resume?(): void;
 }

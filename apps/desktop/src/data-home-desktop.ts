@@ -2,20 +2,9 @@ import { dialog, shell } from 'electron'
 import { homedir } from 'node:os'
 
 import {
-  assertSeparateDataHomes,
-  defaultDataHomePreferences,
-  hasExistingOpenAliceHome,
-  prepareDataHome,
-  readDataHomePreferences,
-  rememberDataHome,
-  resolveDataHomeSelectionLock,
-  setAskForDataHomeOnStartup,
-  shouldAskForDataHomeAtStartup,
-  writeDataHomePreferences,
-  type DataHomePreferences,
-  type DataHomeSelectionLock,
-  type DataHomeSource,
-  type PreparedDataHome,
+  assertSeparateDataHomes, defaultDataHomePreferences, prepareDataHome,
+  resolveDataHomeSelectionLock, type DataHomePreferences, type DataHomeSelectionLock,
+  type DataHomeSource, type PreparedDataHome,
 } from './data-home.js'
 import type {
   OpenAliceDataHomeActionResult,
@@ -93,90 +82,7 @@ export async function resolveDesktopDataHome(options: {
     }
   }
 
-  let preferences = await readDataHomePreferences(options.preferencePath)
-  let selected: PreparedDataHome | null = null
-  let source: DataHomeSource = 'default'
-  let selectedDefault = false
-  let recoveredUnavailableSelection = false
-  if (preferences.selectedHome) {
-    try {
-      selected = await prepareDataHome(preferences.selectedHome)
-      source = 'desktop-preference'
-    } catch (error) {
-      const { response } = await dialog.showMessageBox({
-        type: 'warning',
-        title: 'OpenAlice data location is unavailable',
-        message: 'The previously selected data location cannot be opened.',
-        detail: `${preferences.selectedHome}\n\n${dataHomeErrorDetail(error)}\n\nOpenAlice will not create an empty replacement at a missing saved path.`,
-        buttons: ['Choose another folder', 'Use default location', 'Quit'],
-        defaultId: 0,
-        cancelId: 2,
-        noLink: true,
-      })
-      if (response === 2) return null
-      if (response === 0) {
-        selected = await chooseDataHomeDirectory()
-        if (!selected) return null
-        source = 'desktop-preference'
-      } else {
-        selected = await prepareDataHome(options.defaultHome, { create: true })
-        source = 'default'
-        selectedDefault = true
-      }
-      recoveredUnavailableSelection = true
-    }
-  }
-
-  const shouldAsk = !recoveredUnavailableSelection && shouldAskForDataHomeAtStartup({
-    preferences,
-    selectionLock,
-    legacyDataPresent: options.legacyDataPresent,
-    defaultHomeHasState: hasExistingOpenAliceHome(options.defaultHome),
-  })
-  if (shouldAsk) {
-    const currentLabel = selected ? 'Use current location' : 'Use default location'
-    const currentPath = selected?.path ?? options.defaultHome
-    const { response } = await dialog.showMessageBox({
-      type: 'question',
-      title: 'Choose where OpenAlice works',
-      message: preferences.askOnStartup
-        ? 'Which data location should this AliceProject use?'
-        : 'Choose an OpenAlice data location before the first Workspace opens.',
-      detail: `${currentPath}\n\nEach location owns its data, Workspaces, credentials, Broker Packs, and runtime locks. Separate locations can run concurrently.`,
-      buttons: [currentLabel, 'Choose another folder', 'Quit'],
-      defaultId: 0,
-      cancelId: 2,
-      noLink: true,
-    })
-    if (response === 2) return null
-    if (response === 1) {
-      const chosen = await chooseDataHomeDirectory(selected?.path)
-      if (!chosen) return null
-      selected = chosen
-      source = 'desktop-preference'
-      selectedDefault = false
-    } else if (!selected) {
-      selected = await prepareDataHome(options.defaultHome, { create: true })
-      source = 'default'
-      selectedDefault = true
-    }
-  }
-
-  if (!selected) {
-    selected = await prepareDataHome(options.defaultHome, { create: true })
-    source = 'default'
-    selectedDefault = true
-  }
-
-  preferences = rememberDataHome(preferences, selected.path, { startupPromptCompleted: true })
-  await writeDataHomePreferences(options.preferencePath, preferences)
-  return {
-    home: selected.path,
-    source,
-    selectedDefault,
-    selectionLock,
-    preferences,
-  }
+  throw new Error('Choose a registered AliceProject from the startup chooser.')
 }
 
 export function createDesktopDataHomeController(options: {
@@ -188,45 +94,16 @@ export function createDesktopDataHomeController(options: {
   readonly initialPreferences: DataHomePreferences
   readonly requestRelaunch: () => void
 }): OpenAliceDataHomeController {
-  let preferences = options.initialPreferences
   const getStatus = (): OpenAliceDataHomeStatus => ({
-    currentHome: options.currentHome,
-    defaultHome: options.defaultHome,
-    source: options.source,
-    recentHomes: preferences.recentHomes,
-    askOnStartup: preferences.askOnStartup,
-    selectionLocked: options.selectionLock !== null,
-    selectionLock: options.selectionLock,
+    currentHome: options.currentHome, defaultHome: options.defaultHome,
+    source: options.source, recentHomes: [], askOnStartup: false,
+    selectionLocked: options.selectionLock !== null, selectionLock: options.selectionLock,
   })
-  const restartWith = async (prepared: PreparedDataHome): Promise<OpenAliceDataHomeActionResult> => {
-    if (options.selectionLock !== null) return { outcome: 'locked', status: getStatus() }
-    assertSeparateDataHomes(options.currentHome, prepared.path)
-    if (prepared.path === options.currentHome) return { outcome: 'unchanged', status: getStatus() }
-    preferences = rememberDataHome(preferences, prepared.path, { startupPromptCompleted: true })
-    await writeDataHomePreferences(options.preferencePath, preferences)
-    options.requestRelaunch()
-    return { outcome: 'restarting', status: getStatus() }
-  }
-
   return {
     getStatus,
-    chooseAndRestart: async () => {
-      if (options.selectionLock !== null) return { outcome: 'locked', status: getStatus() }
-      const prepared = await chooseDataHomeDirectory(options.currentHome)
-      if (!prepared) return { outcome: 'cancelled', status: getStatus() }
-      return restartWith(prepared)
-    },
-    useRecentAndRestart: async (path) => {
-      if (options.selectionLock !== null) return { outcome: 'locked', status: getStatus() }
-      if (!preferences.recentHomes.includes(path)) throw new Error('That data location is not in the recent list.')
-      return restartWith(await prepareDataHome(path))
-    },
-    setAskOnStartup: async (enabled) => {
-      if (options.selectionLock !== null) return getStatus()
-      preferences = setAskForDataHomeOnStartup(preferences, enabled)
-      await writeDataHomePreferences(options.preferencePath, preferences)
-      return getStatus()
-    },
+    chooseAndRestart: async () => { throw new Error('Choose a registered AliceProject in Where Alice is working.') },
+    useRecentAndRestart: async () => { throw new Error('Choose a registered AliceProject in Where Alice is working.') },
+    setAskOnStartup: async () => { throw new Error('Startup uses the shared Default AliceProject.') },
     openCurrent: () => shell.openPath(options.currentHome),
   }
 }

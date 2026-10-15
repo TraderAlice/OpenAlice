@@ -15,10 +15,12 @@ import {
 import { inboxUnreadDutyRegistration, type OfficeInboxDutyCandidate } from '../office/duty-registry'
 import { readWorkspaceFile } from '../components/workspace/api'
 import { InboxPage } from './InboxPage'
+import type { SessionRecord } from '../components/workspace/api'
 
 const workspaceMocks = vi.hoisted(() => ({
   openHeadlessRun: vi.fn(),
   resumeSession: vi.fn(),
+  sessions: [] as SessionRecord[],
 }))
 const officeReturnMock = vi.hoisted(() => vi.fn())
 
@@ -34,7 +36,7 @@ vi.mock('../contexts/workspaces-context', () => ({
     workspaces: [{
       id: 'ws-1',
       tag: 'research',
-      sessions: [],
+      sessions: workspaceMocks.sessions,
     }],
     openHeadlessRun: workspaceMocks.openHeadlessRun,
     resumeSession: workspaceMocks.resumeSession,
@@ -46,7 +48,7 @@ vi.mock('../hooks/useIssues', () => ({
 }))
 
 vi.mock('../components/InboxReplyThread', () => ({
-  InboxReplyThread: () => null,
+  InboxReplyThread: ({ sender }: { sender: string }) => <div data-testid="reply-sender">{sender}</div>,
 }))
 
 vi.mock('../office/useOfficeInboxDutyReturn', () => ({
@@ -59,6 +61,7 @@ vi.mock('../components/workspace/api', async (importOriginal) => {
 })
 
 beforeEach(async () => {
+  workspaceMocks.sessions = []
   await i18n.changeLanguage('en')
   window.sessionStorage.clear()
   vi.mocked(readWorkspaceFile).mockResolvedValue({
@@ -456,5 +459,78 @@ describe('InboxPage editorial reading surface', () => {
     expect(screen.queryByRole('heading', { name: /Attachments/ })).toBeNull()
     expect(screen.getByText(/\[\[research\/close-report.md\]\]/)).toBeTruthy()
     expect(screen.getByText(/\[\[notes\/context.txt\]\]/)).toBeTruthy()
+  })
+})
+
+
+describe('InboxPage sender identity', () => {
+  const first = { id: 'first', resumeId: 'resume-first', agent: 'pi', displayName: 'Researcher', title: 'First title', name: 'p1', state: 'paused' } as SessionRecord
+  const second = { id: 'second', resumeId: 'resume-second', agent: 'pi', displayName: 'Risk reviewer', title: 'Second title', name: 'p2', state: 'paused' } as SessionRecord
+
+  async function show(origin: InboxEntry['origin'], workspaceId = 'ws-1') {
+    const entry: InboxEntry = { id: 'sender-case', ts: Date.now(), workspaceId, body: 'Sender identity report.', origin }
+    vi.spyOn(api.inbox, 'history').mockResolvedValue({ entries: [entry], hasMore: false })
+    useInboxSelection.getState().select(entry.id)
+    const view = render(<InboxPage visible />)
+    await screen.findByRole('article')
+    return view
+  }
+
+  it('uses the exact interactive sender and preserves popup provenance and navigation', async () => {
+    workspaceMocks.sessions = [first, second]
+    await show({ kind: 'interactive', sessionId: 'second', resumeId: 'resume-second', agent: 'pi' })
+    const sender = screen.getByRole('button', { name: 'Show sender details for Risk reviewer' })
+    expect(screen.getByTestId('reply-sender').textContent).toBe('Risk reviewer')
+    expect(screen.queryByText('from Researcher')).toBeNull()
+    fireEvent.click(sender)
+    expect(screen.getByRole('dialog', { name: 'Sender identity: Risk reviewer — pi — @resume-second' })).toBeTruthy()
+    expect(screen.getByText('pi')).toBeTruthy()
+    expect(screen.getByText('@resume-second')).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: 'Open conversation' }))
+    await waitFor(() => expect(workspaceMocks.resumeSession).toHaveBeenCalledWith('ws-1', 'second', 'chat'))
+  })
+
+  it.each([
+    { session: first, expected: 'Researcher' },
+    { session: { ...first, displayName: ' ' }, expected: 'First title' },
+    { session: { ...first, displayName: undefined, title: ' ' }, expected: 'p1' },
+    { session: { ...first, displayName: undefined, title: null, name: '' }, expected: 'pi' },
+  ])('uses the existing name priority for headless senders: $expected', async ({ session, expected }) => {
+    workspaceMocks.sessions = [second, session]
+    await show({ kind: 'headless', resumeId: 'resume-first', agent: 'pi', runId: 'run-first' })
+    expect(screen.getByRole('button', { name: `Show sender details for ${expected}` })).toBeTruthy()
+    expect(screen.getByTestId('reply-sender').textContent).toBe(expected)
+  })
+
+  it.each([
+    { kind: 'interactive' as const, sessionId: 'deleted', resumeId: 'resume-first', agent: 'pi' },
+    { kind: 'headless' as const, resumeId: 'deleted', agent: 'pi' },
+    { kind: 'headless' as const, runId: 'legacy-run', agent: 'pi' },
+    { kind: 'manual' as const, agent: 'pi' },
+  ])('does not borrow another sender for unavailable or legacy identity: $kind $sessionId $resumeId', async (origin) => {
+    workspaceMocks.sessions = [first, second]
+    await show(origin)
+    expect(screen.getByRole('button', { name: 'Show sender details for pi' })).toBeTruthy()
+  })
+
+  it('does not borrow a name from another Workspace', async () => {
+    workspaceMocks.sessions = [first]
+    await show({ kind: 'interactive', sessionId: 'first', resumeId: 'resume-first', agent: 'pi' }, 'deleted-workspace')
+    fireEvent.click(screen.getByRole('button', { name: 'Show sender details for pi' }))
+    expect(screen.queryByRole('button', { name: 'Open conversation' })).toBeNull()
+  })
+
+  it('falls back while the shared snapshot loads and resolves after it arrives', async () => {
+    const view = await show({ kind: 'headless', resumeId: 'resume-first', agent: 'pi' })
+    expect(screen.getByRole('button', { name: 'Show sender details for pi' })).toBeTruthy()
+    workspaceMocks.sessions = [first]
+    view.rerender(<InboxPage visible />)
+    expect(screen.getByRole('button', { name: 'Show sender details for Researcher' })).toBeTruthy()
+  })
+
+  it('keeps unattributed messages usable without inventing a sender', async () => {
+    await show(undefined)
+    expect(screen.queryByRole('button', { name: /Show sender details/ })).toBeNull()
+    expect(screen.getByRole('button', { name: 'Open Workspace' })).toBeTruthy()
   })
 })

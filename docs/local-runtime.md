@@ -24,6 +24,19 @@ their existing process ownership, health, restart, lock, signal, and shutdown
 semantics. Bun changes the shipped executable and resource provider, not those
 boundaries.
 
+On Linux, Guardian's positive PID probe also checks `/proc/<pid>/stat`. It
+parses fields after the final `)` of the process name, which may itself contain
+parentheses or text resembling state fields. A `Z` thread-group leader alone
+does not prove exit: worker threads can still run. Only `Z` with exactly one
+remaining thread establishes that the sole zombie cannot execute or create
+another worker. Multiple, missing or invalid thread counts remain live, as do
+sleeping, stopped and uninterruptible tasks. Unreadable procfs or a
+permission-denied signal probe cannot establish exit. Shutdown still retains
+descendant PIDs across wrapper exit,
+forces live survivors after the grace period, and reports survivors after the
+force period. This proves execution stopped, not that an external init reaped
+all PID entries or that native service ports/locks were independently accepted.
+
 The browser, API, authentication, Workspace WebSocket, and terminal share one
 verified loopback origin. No public domain, hosted Studio protocol, or SSH
 transport is required for local use.
@@ -54,6 +67,12 @@ Source development remains ordinary:
 ```bash
 pnpm dev
 ```
+
+`pnpm dev` serves the browser through the local Web relay, with Vite behind it
+for hot reload. The printed UI URL can switch between registered Machines and
+running AliceProjects. The Guardian-owned development AliceProject is included
+in the relay's local inventory without changing the saved Supervisor registry.
+Use `pnpm dev:no-relay` only to debug the older direct Vite-to-backend path.
 
 An explicit `--app-dir`, AliceProject source setting, or
 `OPENALICE_APP_HOME` can select a checkout for development. Normal installed
@@ -115,37 +134,17 @@ artifact does not absorb live broker SDKs. See [[docs/broker-packs.md]].
 
 ## Commands and lifecycle
 
-Common entry points:
-
-```bash
-openalice                 # Supervisor TUI
-openalice up              # persistent background Runtime
-openalice status
-openalice open
-openalice down
-openalice run             # foreground Runtime
-openalice doctor
-openalice logs
-openalice version --json
-openalice update --check
-openalice rollback --plan
-```
-
-`openalice up` waits for Guardian control and Alice readiness, then returns;
-the Runtime survives the launching shell. `openalice run` owns the foreground
-Guardian tree and Ctrl+C stops it. The Supervisor TUI detaches without stopping
-an already-running Runtime. A healthy matching owner is reused; takeover always
-requires the existing explicit Guardian recovery path.
+Runtime lifecycle commands and their readiness/ownership semantics are owned by
+[Shell CLI Supervisor](cli-supervisor.md#canonical-lifecycle-commands).
+Installed version, update and rollback commands belong to the
+[CLI installer](cli-installer.md#update-and-rollback).
 
 Installation never starts a Runtime. Update or rollback changes the next CLI
 invocation and does not hot-reload an already-running process tree. Restart is
 an explicit lifecycle decision.
 
-Stable, beta, and dev direct installs perform bounded, channel-keyed update
-checks on their own manifests at interactive startup. Network failure is silent
-and never blocks use. Pinned and custom installs do not silently cross into a
-release channel. Package-manager-owned installs report their manager's stable
-update command and are never overwritten by the direct installer.
+Channel discovery and package-manager update ownership follow the
+[CLI installer update contract](cli-installer.md#update-and-rollback).
 
 ## Data and concurrent development
 
@@ -185,7 +184,8 @@ Routine verification is non-trading and uses isolated homes. Live-paper broker
 acceptance remains a separate explicit lane under [[docs/uta-live-testing.md]].
 
 Every native `dev` and versioned beta/stable candidate runs the artifact
-acceptance itself: the compiled CLI opens a captured platform browser command,
+acceptance itself: the compiled CLI starts its WebRelay, opens that local GUI
+through a captured platform browser command,
 launches two external OpenCode-adapter PTYs with distinct PIDs, sends independent
 input and resize messages, stops one Session, and proves the other remains
 interactive.

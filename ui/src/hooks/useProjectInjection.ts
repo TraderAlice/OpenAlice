@@ -29,11 +29,11 @@ export interface ProjectInjection {
 }
 export function injectionStatus(row: InjectionWorkspace) {
   const p = row.plan
-  if (!p) return 'error'
-  if (p.blocked) return 'busy'
+  if (!p?.update || p.update.status === 'unknown') return 'error'
+  if (p.blocked || p.update.status === 'blocked') return 'busy'
   if (p.summary.conflicts) return 'conflicts'
   if (p.summary.ready) return 'update'
-  if (p.fromVersion !== p.toVersion) return 'record'
+  if (p.update.status === 'available') return 'record'
   return p.summary.preserved ? 'customized' : 'current'
 }
 export function useProjectInjection() {

@@ -1,4 +1,5 @@
 import { authHandlers } from './auth'
+import { relayHandlers } from './relay'
 import { tradingHandlers } from './trading'
 import { workspacesHandlers } from './workspaces'
 import { inboxHandlers } from './inbox'
@@ -17,6 +18,7 @@ import { newsListHandlers } from './newsList'
 import { devMiscHandlers } from './devMisc'
 import { headlessHandlers } from './headless'
 import { preferencesHandlers } from './preferences'
+import { updatesHandlers } from './updates'
 import { uiLayoutHandlers } from './ui-layout'
 import { inquiryHandlers } from './inquiries'
 import { connectorsHandlers } from './connectors'
@@ -28,6 +30,7 @@ import { catchAllHandlers } from './catchAll'
 // placed earlier.
 export const handlers = [
   ...authHandlers,
+  ...relayHandlers,
   ...tradingHandlers,
   ...workspacesHandlers,
   ...inboxHandlers,
@@ -46,6 +49,7 @@ export const handlers = [
   ...devMiscHandlers,
   ...headlessHandlers,
   ...preferencesHandlers,
+  ...updatesHandlers,
   ...uiLayoutHandlers,
   ...inquiryHandlers,
   ...connectorsHandlers,

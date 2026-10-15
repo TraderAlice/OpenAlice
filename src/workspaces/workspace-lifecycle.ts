@@ -8,7 +8,7 @@ import { isTerminalStatus, readWorkspaceIssues } from './issues/declaration.js'
 import type { Logger } from './logger.js'
 import type { ResumeRegistry } from './resume-registry.js'
 import type { ScrollbackStore } from './scrollback-store.js'
-import type { SessionPool } from './session-pool.js'
+import type { SessionPoolView } from './session-pool.js'
 import type { WebSessionHost } from './web-session-host.js'
 import type { SessionRecord, SessionRegistry } from './session-registry.js'
 import {
@@ -46,7 +46,8 @@ export interface WorkspaceLifecycleManagerDeps {
   sessionRegistry: SessionRegistry
   scrollbackStore: ScrollbackStore
   headlessTasks: HeadlessTaskRegistry
-  pool: SessionPool
+  pool: Pick<SessionPoolView, 'get' | 'liveSessionCount'>
+  executions: { stop(resumeId: string, reason: string): Promise<boolean> }
   web?: WebSessionHost
   /** Includes synchronous wait:true/probe-style runs not yet in HeadlessTaskRegistry. */
   isWorkspaceHeadlessActive?: (workspaceId: string) => boolean
@@ -397,11 +398,9 @@ export class WorkspaceLifecycleManager {
         const dump = live.dumpReplayBuffer()
         if (dump.length > 0) scrollbackFile = await this.deps.scrollbackStore.dump(wsId, record.id, dump)
       }
-      this.deps.pool.disposeToken(record.id, 'workspace offboarded')
-      await this.deps.web?.stop(record.id, 'workspace offboarded')
+      await this.deps.executions.stop(record.resumeId, 'workspace-offboarded')
       if (record.state === 'running' || scrollbackFile) {
         await this.deps.sessionRegistry.update(wsId, record.id, {
-          state: 'paused',
           lastActiveAt: new Date().toISOString(),
           ...(scrollbackFile ? { scrollbackFile } : {}),
         })

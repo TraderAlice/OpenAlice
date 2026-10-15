@@ -44,8 +44,21 @@ export function detectAgentBinary(
   opts: { platform?: NodeJS.Platform; env?: NodeJS.ProcessEnv } = {},
 ): AgentAvailability {
   const env = opts.env ?? process.env;
-  const managed = id === 'pi' ? runtimeProfileFromEnv(env).managedPiPath : null;
-  if (managed && isFile(managed)) return availabilityForPath(managed);
+  const profile = id === 'pi' ? runtimeProfileFromEnv(env) : null;
+  const managed = profile?.managedPiPath ?? null;
+  const managedNode = profile?.managedPiNodePath ?? null;
+  if (managed && isFile(managed)) {
+    if (managedNode && !isFile(managedNode)) return detectBinary(binary, opts);
+    const availability = availabilityForPath(managed);
+    if (availability.installed && managedNode) {
+      const nodeAvailability = availabilityForPath(managedNode);
+      return {
+        ...availability,
+        fingerprint: `${availability.fingerprint ?? ''}|node:${nodeAvailability.fingerprint ?? ''}`,
+      };
+    }
+    return availability;
+  }
   return detectBinary(binary, opts);
 }
 

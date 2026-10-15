@@ -85,7 +85,7 @@ export function EquityCurve({
   const isAllView = selectedAccountId === 'all'
 
   return (
-    <div className="border border-border rounded-lg bg-secondary p-4">
+    <div className="oa-data-surface border border-border rounded-lg bg-secondary p-4">
       {/* Header */}
       <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <h3 className="text-[13px] font-semibold leading-5 text-foreground">

@@ -26,11 +26,18 @@ describe('trusted release candidate selection', () => {
     expect(() => selectReleaseCandidate(input)).toThrow()
     input.run.head_branch = 'master'
     input.artifacts[0].workflow_run.head_branch = 'master'
-    expect(() => selectReleaseCandidate(input)).toThrow('Expected exactly one candidate')
+    expect(() => selectReleaseCandidate(input)).toThrow('Missing artifact')
   })
   it('selects preserved bytes even when a later acceptance job failed', () => {
     expect(selectReleaseCandidate(fixture())).toEqual({ runId: 123, sourceSha: 'a'.repeat(40),
       target: 'macOS-arm64', artifactId: 456, artifactName: 'release-assets-macOS-arm64' })
+  })
+  it('selects the latest exact name across retries and never falls back', () => {
+    const input = fixture()
+    input.artifacts.push({ ...input.artifacts[0], id: 457 })
+    expect(selectReleaseCandidate(input).artifactId).toBe(457)
+    input.artifacts[1].expired = true
+    expect(() => selectReleaseCandidate(input)).toThrow('Latest artifact expired')
   })
   it.each([
     ['another run', (v) => { v.run.id = 124 }],
@@ -41,7 +48,7 @@ describe('trusted release candidate selection', () => {
     ['PR event', (v) => { v.run.event = 'pull_request' }],
     ['still running', (v) => { v.run.status = 'in_progress' }],
     ['missing artifact', (v) => { v.artifacts = [] }],
-    ['ambiguous artifact', (v) => { v.artifacts.push({ ...v.artifacts[0], id: 457 }) }],
+    ['duplicate artifact ID', (v) => { v.artifacts.push({ ...v.artifacts[0] }) }],
     ['expired flag', (v) => { v.artifacts[0].expired = true }],
     ['expired timestamp', (v) => { v.artifacts[0].expires_at = '2026-09-01T00:00:00Z' }],
     ['artifact source mismatch', (v) => { v.artifacts[0].workflow_run.head_sha = 'b'.repeat(40) }],

@@ -8,6 +8,7 @@ import type { AgentLaunchConfigState } from '../../hooks/useAgentLaunchConfig'
 import type { PinnedRuntimeDraft } from '../../hooks/usePinnedRuntimeDraft'
 import type { SessionRecord } from './api'
 import { SessionSettingsDialog } from './SessionSettingsDialog'
+import { useWorkspace } from '../../tabs/store'
 
 const launchConfig = {
   effectiveAgent: 'claude',
@@ -53,7 +54,9 @@ vi.mock('../../hooks/usePinnedRuntimeDraft', async (importOriginal) => ({
 }))
 
 vi.mock('./AgentLaunchControls', () => ({
-  AgentLaunchSelectors: () => <div>AI selectors</div>,
+  AgentLaunchSelectors: ({ onConfigureProvider }: { onConfigureProvider: () => void }) => (
+    <div>AI selectors<button onClick={onConfigureProvider}>Add API account</button></div>
+  ),
 }))
 
 function record(patch?: Partial<SessionRecord>): SessionRecord {
@@ -94,8 +97,21 @@ beforeEach(async () => {
 })
 
 afterEach(cleanup)
+afterEach(() => vi.restoreAllMocks())
 
 describe('SessionSettingsDialog', () => {
+  it('opens account settings and closes the dialog without changing the session runtime', () => {
+    const openAccounts = vi.spyOn(useWorkspace.getState(), 'openOrFocus').mockImplementation(() => {})
+    const onOpenChange = vi.fn()
+    const onSaveRuntime = vi.fn()
+    render(<SessionSettingsDialog open onOpenChange={onOpenChange} record={record()} agents={[]}
+      workspaceId="workspace-1" onSaveDisplayName={vi.fn()} onSaveRuntime={onSaveRuntime} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Add API account' }))
+    expect(onOpenChange).toHaveBeenCalledWith(false)
+    expect(openAccounts).toHaveBeenCalledWith({ kind: 'settings', params: { category: 'ai-provider' } })
+    expect(onSaveRuntime).not.toHaveBeenCalled()
+  })
+
   it('saves the selected credential, model, and effort without resuming', async () => {
     const onOpenChange = vi.fn()
     const onSaveDisplayName = vi.fn(async () => {})

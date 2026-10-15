@@ -15,6 +15,9 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock('../api', () => ({
   api: {
+    trading: {
+      loadTradingConfig: vi.fn().mockResolvedValue({ utas: [] }),
+    },
     marketData: {
       hubStatus: mocks.hubStatus,
       testProvider: mocks.testProvider,

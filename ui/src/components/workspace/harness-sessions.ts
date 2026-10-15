@@ -190,3 +190,15 @@ export function flattenHarnessSessions(
   return orderHarnessSessions(workspaces.flatMap((workspace) =>
     joinWorkspaceHarnessSessions(workspace, directories.get(workspace.id) ?? null, opts)))
 }
+
+
+/** Operational occupancy is visible even when a task is hidden from conversation history. */
+export function runningWorkspaceSessions(workspace: Workspace, directory: WorkspaceSessionDirectory | null): HarnessSession[] {
+  const entries = new Map(directory?.sessions.map(entry => [entry.resumeId, entry]) ?? [])
+  return orderHarnessSessions(workspace.sessions.flatMap(session => {
+    const entry = entries.get(session.resumeId) ?? null
+    if (entry?.lifecycle === 'retired') return []
+    const row = toHarnessSession(workspace.id, session, entry)
+    return row.headlessOccupying ? [row] : []
+  }))
+}

@@ -16,6 +16,7 @@
  * remove a session, use the sidebar's × button.
  */
 
+import { setLaunchPreview } from '../components/conversation/launch-preview'
 import {
   useCallback,
   useEffect,
@@ -92,7 +93,7 @@ function deprecatedExportTab(agent: AgentId | undefined): Tab | undefined {
 
 const LIST_POLL_MS = 3000
 
-export function WorkspacesProvider({ children }: { children: ReactNode }) {
+export function WorkspacesProvider({ children, renderContent }: { children: ReactNode; renderContent?: (content: ReactNode) => ReactNode }) {
   const [workspaces, setWorkspaces] = useState<Workspace[]>([])
   const [templates, setTemplates] = useState<TemplateInfo[]>([])
   const [templatesLoaded, setTemplatesLoaded] = useState(false)
@@ -453,6 +454,7 @@ export function WorkspacesProvider({ children }: { children: ReactNode }) {
         credentialSource,
         surface,
       )
+      if (session.surface === 'webpi') setLaunchPreview(workspace.id, session.sessionId, prompt)
       const nowIso = new Date().toISOString()
       const newRecord: SessionRecord = {
         id: session.sessionId,
@@ -878,9 +880,7 @@ export function WorkspacesProvider({ children }: { children: ReactNode }) {
   const pendingDeleteLabel =
     pendingDeleteSession?.title?.trim() || pendingDeleteSession?.name || ''
 
-  return (
-    <WorkspaceActionsContext.Provider value={workspaceActions}>
-      <WorkspacesContext.Provider value={contextValue}>
+  const content = <>
         {children}
         {configuringAgentTarget !== null && (
           <WorkspaceAIConfigModal
@@ -931,6 +931,12 @@ export function WorkspacesProvider({ children }: { children: ReactNode }) {
             onClose={() => setPendingSessionDelete(null)}
           />
         )}
+  </>
+
+  return (
+    <WorkspaceActionsContext.Provider value={workspaceActions}>
+      <WorkspacesContext.Provider value={contextValue}>
+        {renderContent ? renderContent(content) : content}
       </WorkspacesContext.Provider>
     </WorkspaceActionsContext.Provider>
   )

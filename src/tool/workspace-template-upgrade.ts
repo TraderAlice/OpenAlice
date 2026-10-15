@@ -38,18 +38,13 @@ function previewPayload(plan: TemplateUpgradePlan, mode: OutputMode, explicitTar
   const changes = plan.files.filter((file) => file.status === 'ready')
   const preserved = plan.files.filter((file) => file.status === 'preserved')
   const conflicts = plan.files.filter((file) => file.status === 'conflict')
-  const sameVersion = plan.fromVersion === plan.toVersion
-  const versionMismatch = plan.template !== 'alice-harness' && sameVersion && (changes.length > 0 || conflicts.length > 0)
-  const current = sameVersion && changes.length === 0 && conflicts.length === 0
-  const status = plan.blocked
-    ? 'blocked'
-    : versionMismatch
-      ? 'template_version_not_bumped'
-      : current
-      ? 'current'
-      : conflicts.length > 0
-        ? 'needs_resolution'
-        : 'ready'
+  const versionMismatch = plan.blockers.includes('template_version_not_bumped')
+  const current = plan.update.status === 'current' && !plan.blocked
+  const status = versionMismatch ? 'template_version_not_bumped'
+    : plan.blocked ? 'blocked'
+      : current ? 'current'
+        : conflicts.length > 0 ? 'needs_resolution' : 'ready'
+
 
   return {
     status,
@@ -58,6 +53,7 @@ function previewPayload(plan: TemplateUpgradePlan, mode: OutputMode, explicitTar
     fromVersion: plan.fromVersion,
     toVersion: plan.toVersion,
     source: plan.source,
+    update: plan.update,
     summary: plan.summary,
     blockers: plan.blockers,
     activity: {
@@ -169,23 +165,14 @@ export const workspaceTemplateUpgradeFactory: WorkspaceToolFactory = {
           if (plan.blocked) {
             return {
               ok: false as const,
-              error: { code: 'blocked', message: 'Prepare this Workspace before applying the upgrade.' },
-              preview,
-            }
-          }
-          const changedAtSameVersion = plan.template !== 'alice-harness' && plan.fromVersion === plan.toVersion
-            && plan.files.some((file) => file.status === 'ready' || file.status === 'conflict')
-          if (changedAtSameVersion) {
-            return {
-              ok: false as const,
               error: {
-                code: 'template_version_not_bumped',
-                message: 'The template contents changed without a version bump. Update the template version before applying.',
+                code: plan.blockers.includes('template_version_not_bumped') ? 'template_version_not_bumped' : 'blocked',
+                message: 'Resolve the blockers in the Workspace upgrade preview before applying.',
               },
               preview,
             }
           }
-          if (plan.fromVersion === plan.toVersion && !plan.files.some((file) => file.status === 'ready' || file.status === 'conflict')) {
+          if (plan.update.status === 'current') {
             return { ok: true as const, action: 'noop' as const, preview }
           }
 

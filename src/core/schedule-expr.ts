@@ -99,3 +99,39 @@ export function nextCronFire(expr: string, afterMs: number, timezone?: string): 
     return null
   }
 }
+
+/** Write-time validation shared by schedule editors and mutation owners.
+ * Keep the file reader permissive so historical invalid schedules remain inspectable.
+ * No clock/marker changes: this only validates the declaration, never schedules a run.
+ */
+export function scheduleValidationError(value: unknown):
+  'invalid_schedule' | 'invalid_interval' | 'invalid_cron' | 'invalid_timezone' | 'invalid_at' | null {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return 'invalid_schedule'
+  const schedule = value as Record<string, unknown>
+  switch (schedule.kind) {
+    case 'every': {
+      if (typeof schedule.every !== 'string') return 'invalid_interval'
+      const ms = parseDuration(schedule.every)
+      return ms !== null && Number.isFinite(ms) && ms > 0 ? null : 'invalid_interval'
+    }
+    case 'at': {
+      if (typeof schedule.at !== 'string') return 'invalid_at'
+      const parts = /^(\d{4})-(\d{2})-(\d{2})T\d{2}:\d{2}(?::\d{2}(?:\.\d{1,3})?)?(?:Z|[+-]\d{2}:\d{2})$/.exec(schedule.at)
+      if (!parts || !Number.isFinite(Date.parse(schedule.at))) return 'invalid_at'
+      const [, year, month, day] = parts
+      const days = new Date(Date.UTC(Number(year), Number(month), 0)).getUTCDate()
+      return Number(month) >= 1 && Number(month) <= 12 && Number(day) >= 1 && Number(day) <= days ? null : 'invalid_at'
+    }
+    case 'cron': {
+      if (schedule.timezone !== undefined && (typeof schedule.timezone !== 'string' || !isValidScheduleTimezone(schedule.timezone))) return 'invalid_timezone'
+      if (schedule.catchUp !== undefined && typeof schedule.catchUp !== 'boolean') return 'invalid_schedule'
+      if (typeof schedule.cron !== 'string') return 'invalid_cron'
+      // Reuse the evaluator's field-count, calendar and timezone semantics.
+      // A fixed baseline keeps validation independent of the browser clock.
+      return nextCronFire(schedule.cron, Date.UTC(2000, 0, 1), schedule.timezone as string | undefined) === null
+        ? 'invalid_cron'
+        : null
+    }
+    default: return 'invalid_schedule'
+  }
+}

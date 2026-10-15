@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto'
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { basename, join } from 'node:path'
 
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
@@ -34,7 +34,7 @@ describe('publish CLI npm packages', () => {
 
     expect(publishCliNpmPackages({ packagesDir: root, runNpm, logger: silent() }))
       .toEqual({ version: '0.90.2', packages: packageNames })
-    expect(calls.filter(([command]) => command === 'publish').map(([_, path]) => path.split('/').at(-1)))
+    expect(calls.filter(([command]) => command === 'publish').map(([_, path]) => basename(path)))
       .toEqual(packageNames.map((name) => `${name}-0.90.2.tgz`))
   })
 

@@ -10,6 +10,7 @@ export function useSessionActivation(options: {
   automatic: boolean
   open(): Promise<void>
   busyMessage: string
+  onBusy?(): void
 }) {
   const latest = useRef(options)
   latest.current = options
@@ -28,7 +29,10 @@ export function useSessionActivation(options: {
       if (current.workspaceId) {
         const directory = await getWorkspaceSessionDirectory(current.workspaceId, current.record.resumeId)
         const entry = directory.sessions.find(row => row.resumeId === current.record.resumeId) ?? null
-        if (isHeadlessOccupying(current.record, entry)) throw new Error(current.busyMessage)
+        if (isHeadlessOccupying(current.record, entry)) {
+          if (current.onBusy) { current.onBusy(); return }
+          throw new Error(current.busyMessage)
+        }
       }
       await current.open()
     } catch (cause) {

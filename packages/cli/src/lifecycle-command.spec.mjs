@@ -1,6 +1,8 @@
+import { mkdtemp, writeFile, rm } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import {
   formatLifecycleHelp,
@@ -10,8 +12,16 @@ import {
   runLifecycleCommand,
 } from './lifecycle-command.mjs'
 
+let supervisorRoot
+beforeEach(async () => {
+  supervisorRoot = await mkdtemp(join(tmpdir(), 'cli-default-presenter-'))
+  await writeFile(join(supervisorRoot, 'config.json'), JSON.stringify({ schemaVersion: 3, defaultTarget: { machine: 'local', project: 'default' } }))
+  vi.stubEnv('OPENALICE_SUPERVISOR_HOME', supervisorRoot)
+})
+afterEach(async () => { vi.unstubAllEnvs(); await rm(supervisorRoot, { force: true, recursive: true }) })
+
 describe('OpenAlice top-level lifecycle commands', () => {
-  it('parses background startup independently from browser opening', () => {
+  it('keeps background startup browserless', () => {
     expect(parseLifecycleArgs('up', [
       '/tmp/OpenAlice',
       '--instance', 'research',
@@ -19,7 +29,6 @@ describe('OpenAlice top-level lifecycle commands', () => {
       '--port', '41000',
       '--log', '/tmp/openalice.log',
       '--wait', '15',
-      '--open',
       '--json',
     ])).toEqual(expect.objectContaining({
       appDir: '/tmp/OpenAlice',
@@ -28,7 +37,7 @@ describe('OpenAlice top-level lifecycle commands', () => {
       port: 41000,
       logFile: '/tmp/openalice.log',
       waitMs: 15_000,
-      openBrowser: true,
+      openBrowser: false,
       json: true,
     }))
     expect(parseLifecycleArgs('up', [])).toEqual(expect.objectContaining({
@@ -43,7 +52,8 @@ describe('OpenAlice top-level lifecycle commands', () => {
       openBrowser: false,
       json: false,
     }))
-    expect(() => parseLifecycleArgs('run', ['--open'])).toThrow('does not support --open')
+    expect(() => parseLifecycleArgs('run', ['--open'])).toThrow('is retired')
+    expect(() => parseLifecycleArgs('up', ['--open'])).toThrow('is retired')
     expect(() => parseLifecycleArgs('run', ['--json'])).toThrow('does not support --json')
   })
 
@@ -101,7 +111,7 @@ describe('OpenAlice top-level lifecycle commands', () => {
     })
   })
 
-  it('presents structured background readiness and optional browser opening', async () => {
+  it('presents structured background readiness without opening a browser', async () => {
     const stdout = output()
     const startRuntime = vi.fn(async (_options, dependencies) => {
       const result = startedResult()
@@ -113,15 +123,15 @@ describe('OpenAlice top-level lifecycle commands', () => {
       url: runningStatus().endpoints.web,
       status: runningStatus(),
     }))
-    await expect(runLifecycleCommand('up', parseLifecycleArgs('up', ['--open']), {
+    await expect(runLifecycleCommand('up', parseLifecycleArgs('up', []), {
       startRuntime,
       openRuntime,
       stdout,
     })).resolves.toBe(0)
     expect(stdout.text()).toContain('OpenAlice Runtime:')
     expect(stdout.text()).toContain('keep running')
-    expect(stdout.text()).toContain('Opened OpenAlice Web UI')
-    expect(openRuntime).toHaveBeenCalledOnce()
+    expect(stdout.text()).not.toContain('Opened OpenAlice Web UI')
+    expect(openRuntime).not.toHaveBeenCalled()
   })
 
   it('shows a pending activation when up finds an older Runtime already running', async () => {
@@ -293,9 +303,10 @@ describe('OpenAlice top-level lifecycle commands', () => {
 
   it('generates root help and four shell completions from one command registry', () => {
     const help = formatRootHelp()
-    for (const command of ['up', 'run', 'down', 'status', 'logs', 'doctor', 'open', 'create', 'project', 'completion']) {
+    for (const command of ['up', 'run', 'down', 'status', 'logs', 'doctor', 'create', 'project', 'completion']) {
       expect(help).toContain(command)
     }
+    expect(() => formatLifecycleHelp('open')).toThrow('Unknown lifecycle command')
     expect(formatLifecycleHelp('up')).toContain('installed OpenAlice Runtime in the background')
     expect(formatLifecycleHelp('run')).toContain('foreground')
     expect(formatShellCompletion('bash')).toContain('complete -F _openalice_completion openalice')

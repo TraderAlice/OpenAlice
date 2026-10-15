@@ -408,7 +408,7 @@ describe('WorkspaceManagerPage runtime selection', () => {
 
     render(<WorkspaceManagerPage spec={{ kind: 'workspace-manager', params: {} }} />)
 
-    expect(await findModelEditor('MiniMax-M2.5')).toBeTruthy()
+    expect(await findModelEditor('MiniMax M2.5')).toBeTruthy()
     expect(screen.queryByText('Saved in this workspace')).toBeNull()
     expect(screen.queryByText(/context$/)).toBeNull()
     expect(screen.getByRole('status').textContent).toContain('Claude still needs its own first-run setup')
@@ -464,7 +464,7 @@ describe('WorkspaceManagerPage runtime selection', () => {
 
     render(<WorkspaceManagerPage spec={{ kind: 'workspace-manager', params: {} }} />)
 
-    expect(await findModelEditor('anthropic/claude-sonnet-4.6')).toBeTruthy()
+    expect(await findModelEditor('Claude Sonnet 4.6')).toBeTruthy()
     await waitFor(() => {
       const options = [...document.querySelectorAll('datalist option')]
         .map((option) => option.getAttribute('value'))
@@ -522,16 +522,16 @@ describe('WorkspaceManagerPage runtime selection', () => {
 
     render(<WorkspaceManagerPage spec={{ kind: 'workspace-manager', params: {} }} />)
 
-    expect((await screen.findByRole('button', { name: 'AI access' })).textContent).toContain('Gemini')
-    const geminiModel = await findModelEditor('gemini-3.1-flash-lite')
+    expect((await screen.findByRole('button', { name: 'AI Provider' })).textContent).toContain('Gemini')
+    const geminiModel = await findModelEditor('Gemini 3.1 Flash Lite')
     expect(geminiModel.title).toBe('256K context')
     expect(screen.queryByText('Agent runtime')).toBeNull()
     fireEvent.click(screen.getByRole('button', { name: 'Adjust workspace AI' }))
     expect(mocks.openAgentConfig).toHaveBeenCalledWith('workspace-manager', 'pi', 'ai')
 
-    fireEvent.click(screen.getByRole('button', { name: 'AI access' }))
+    fireEvent.click(screen.getByRole('button', { name: 'AI Provider' }))
     fireEvent.click(screen.getByRole('menuitem', { name: /DeepSeek/ }))
-    expect(await findModelEditor('deepseek-chat')).toBeTruthy()
+    expect(await findModelEditor('DeepSeek Chat')).toBeTruthy()
     expect(mocks.rememberQuickChatLaunch).toHaveBeenCalledWith({
       agent: 'pi',
       accessMode: 'vault',
@@ -573,7 +573,7 @@ describe('WorkspaceManagerPage runtime selection', () => {
     render(<WorkspaceManagerPage spec={{ kind: 'workspace-manager', params: {} }} />)
 
     await waitFor(() => expect(mocks.listAgentCredentials).toHaveBeenCalled())
-    expect(screen.getByRole('button', { name: 'AI access' }).textContent).toContain('Pi account')
+    expect(screen.getByRole('button', { name: 'AI Provider' }).textContent).toContain('Pi account')
     expect(screen.queryByText('Gemini')).toBeNull()
     expect((screen.getByRole('combobox', { name: 'AI model' }) as HTMLInputElement).placeholder)
       .not.toContain('gemini-3.1-flash-lite')
@@ -581,7 +581,7 @@ describe('WorkspaceManagerPage runtime selection', () => {
     await act(async () => {
       resolvePreferences({ lastCredentialByAgent: { pi: 'google-1' }, recentChatWorkspaceId: null })
     })
-    expect((await screen.findByRole('button', { name: 'AI access' })).textContent).toContain('Gemini')
+    expect((await screen.findByRole('button', { name: 'AI Provider' })).textContent).toContain('Gemini')
   })
 
   it('shows model/context for a usable hand-edited Manager config without a vault credential', async () => {
@@ -613,7 +613,7 @@ describe('WorkspaceManagerPage runtime selection', () => {
 
     const localModel = await findModelEditor('local-manual-model')
     expect(localModel.title).toBe('128K context')
-    expect(screen.getByRole('button', { name: 'AI access' }).textContent).toContain('Workspace AI setup')
+    expect(screen.getByRole('button', { name: 'AI Provider' }).textContent).toContain('Workspace AI setup')
   })
 
   it('opens a paused Manager Session directly in its saved terminal', async () => {

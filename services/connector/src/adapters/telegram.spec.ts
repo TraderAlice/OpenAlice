@@ -8,6 +8,7 @@ import { TelegramConnectorAdapter, withTimeout } from './telegram.js'
 const handlers = new Map<string, (ctx: any) => Promise<void>>()
 const startMock = vi.fn()
 const stopMock = vi.fn()
+const initMock = vi.fn()
 const getMe = vi.fn(async () => ({ id: 1, is_bot: true, first_name: 'OpenAlice', username: 'openalice_bot' }))
 const setMyCommands = vi.fn(async () => undefined)
 const sendRichMessage = vi.fn(async () => undefined)
@@ -36,6 +37,9 @@ vi.mock('grammy', async (importOriginal) => {
         sendDocument,
         sendPhoto,
         sendSticker,
+      }
+      init(signal?: AbortSignal) {
+        return initMock(signal)
       }
       command(name: string, handler: (ctx: any) => Promise<void>) { handlers.set(name, handler) }
       on(name: string, handler: (ctx: any) => Promise<void>) { handlers.set(name, handler) }
@@ -94,6 +98,8 @@ describe('Telegram polling readiness', () => {
   beforeEach(() => {
     startMock.mockReset()
     stopMock.mockReset()
+    initMock.mockReset()
+    initMock.mockResolvedValue(undefined)
     getMe.mockReset()
     getMe.mockResolvedValue({ id: 1, is_bot: true, first_name: 'OpenAlice', username: 'openalice_bot' })
     setMyCommands.mockReset()
@@ -126,6 +132,46 @@ describe('Telegram polling readiness', () => {
     await vi.waitFor(() => {
       expect(adapter.health().status).toBe('awaiting_link')
     })
+    await adapter.stop()
+  })
+
+  it('initializes the Bot API before polling and preserves queued updates', async () => {
+    startMock.mockImplementation((options: { onStart?: () => void; drop_pending_updates?: boolean }) => {
+      queueMicrotask(() => options.onStart?.())
+      return new Promise(() => undefined)
+    })
+    const adapter = new TelegramConnectorAdapter({ attemptTimeoutMs: 200, reconnectDelayMs: 20 })
+
+    await startUntilReady(adapter, { botToken: 'token' })
+
+    expect(initMock).toHaveBeenCalledOnce()
+    expect(startMock).toHaveBeenCalledWith(expect.objectContaining({ drop_pending_updates: false }))
+    await adapter.stop()
+  })
+
+  it('reports the Bot API initialization stage when getMe fails', async () => {
+    initMock.mockRejectedValue(new Error("Call to 'getMe' failed! (401: Unauthorized)"))
+    const adapter = new TelegramConnectorAdapter({ attemptTimeoutMs: 200, reconnectDelayMs: 20 })
+
+    await adapter.start({ enabled: true, settings: { botToken: 'token' } }, context())
+    await vi.waitFor(() => {
+      expect(adapter.health()).toMatchObject({
+        status: 'degraded',
+        lastError: expect.stringContaining("Telegram startup [bot_init] failed — Call to 'getMe' failed!"),
+      })
+    })
+    await adapter.stop()
+  })
+
+  it('reports a Bot API initialization timeout separately from polling setup', async () => {
+    initMock.mockImplementation(() => new Promise(() => undefined))
+    const adapter = new TelegramConnectorAdapter({ attemptTimeoutMs: 20, reconnectDelayMs: 5 })
+
+    await adapter.start({ enabled: true, settings: { botToken: 'token' } }, context())
+    await vi.waitFor(() => {
+      expect(adapter.health().lastError).toContain('Telegram startup [bot_init] timed out after 20ms')
+    })
+    expect(startMock).not.toHaveBeenCalled()
     await adapter.stop()
   })
 

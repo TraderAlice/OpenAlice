@@ -14,6 +14,7 @@ import {
 } from '@/components/ui/dialog'
 import { pinnedLaunchFromBinding, usePinnedRuntimeDraft } from '../../hooks/usePinnedRuntimeDraft'
 import { AgentLaunchSelectors } from './AgentLaunchControls'
+import { useWorkspace } from '../../tabs/store'
 import { sessionCoworkerLabel } from './display'
 import type {
   AgentInfo,
@@ -61,6 +62,7 @@ export function SessionSettingsDialog({
   onPause,
 }: SessionSettingsDialogProps) {
   const { t } = useTranslation()
+  const openOrFocus = useWorkspace((state) => state.openOrFocus)
   const initialLaunch = useMemo(
     () => pinnedLaunchFromBinding(record.agent, record.runtime),
     [record.agent, record.runtime],
@@ -157,7 +159,10 @@ export function SessionSettingsDialog({
               <fieldset disabled={!aiEditable || saving} className="min-w-0 disabled:opacity-60">
                 <AgentLaunchSelectors
                   config={config}
-                  onConfigureProvider={() => config.selectRuntimeDefault()}
+                  onConfigureProvider={() => {
+                    onOpenChange(false)
+                    openOrFocus({ kind: 'settings', params: { category: 'ai-provider' } })
+                  }}
                   showRuntime={false}
                   menuPlacement="down"
                   toolbar

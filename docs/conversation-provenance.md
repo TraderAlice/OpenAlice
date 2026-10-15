@@ -116,7 +116,7 @@ Rules:
 
 A product Session may carry an optional, mutable `displayName` on the
 Workspace Session dossier at `.alice/sessions/<resumeId>.json`. It sits
-beside the frozen `ai` launch binding, not inside it and not on the
+beside the Session's `ai` launch binding, not inside it and not on the
 launcher roster.
 
 This is the coworker's nametag:
@@ -136,8 +136,11 @@ This is the coworker's nametag:
 - `workspaces/state/resume-identities.json` hydrates the name in memory and
   strips it on flush, the same way it treats `runtimeBinding`.
 
-Do not hand-edit the dossier JSON. One bad write can destroy the Session's
-credential, model, or effort binding.
+Session Settings validates and writes the AI binding immediately while idle.
+Agents may also edit a dossier's `ai.model` or `ai.reasoningEffort` for a later
+launch, preserving its credential and the rest of the JSON; the scheduler
+reconciles valid external edits. A malformed dossier cannot be loaded, so do
+not replace the whole file with a partial model/effort fragment.
 
 ## Layered Index
 
@@ -182,12 +185,14 @@ support activity feeds and auditing, but do not change the forward semantics.
 | PID/live PTY | Ephemeral process incarnation | No |
 
 `ResumeRegistry` must bind a `resumeId` immutably to one `workspaceId` and one
-runtime kind. It also owns that Session's immutable, secret-free runtime
-binding: credential source reference, model, and effort. It may learn or
+Agent runtime kind. The Session's secret-free AI binding (credential source
+reference, model, and effort) lives in its Workspace dossier. The registry
+hydrates and caches it for launches; explicit idle edits and valid dossier
+edits can replace it without changing the Session's identity. It may learn or
 refresh the native locator and re-resolve a referenced vault secret at launch,
 but it must never reassign the product Session to another Workspace/runtime or
-silently replace its launch selection. Native ids, API keys, and provider
-payloads remain backend-only.
+silently replace its AI choice with later Workspace defaults. Native ids, API
+keys, and provider payloads remain backend-only.
 
 ## Standard Provenance Envelope
 
@@ -386,7 +391,9 @@ otherwise the historical wrapper around the comment. The final assistant respons
 reply comment, linked by `replyTo`; delivery state stays on the source comment.
 While that delivery is `pending`, compact turn progress (semantic text blocks
 and tool status, never tool payloads) may ride on the same record so Inbox,
-Issue, and Connector can watch the turn without each parsing headless logs.
+and Issue can watch the turn without each parsing headless logs. Connector
+consumes the Task communication contract through the execution-owned delivery
+projector, independently of this comment snapshot.
 This bounded snapshot is live transport, not durable transcript history, and
 is removed from the task record at terminal state.
 
@@ -395,12 +402,15 @@ live timeline. The Telegram phone desk already ships sealed mid-turn `text`
 blocks from that progress; tool and error blocks stay local to the workstation
 surfaces.
 
-For a human comment without a fixed owner, OpenAlice follows the Issue creation
-provenance and uses the universal follow-up rule: continue the attributable
-creator, or recruit a reconstructed Agent in the Issue Workspace when creation
-has no Session origin. This answering Session is a collaborator, not an
-execution owner; `assignee` stays unchanged. Agent-authored comments without a
-fixed owner remain durable notes so progress logging does not fan out workers.
+For a human comment without a fixed owner, the Issue's assignee policy wins.
+`@new-then-resume` recruits and claims its first Session using the Issue's Agent,
+credential, model, and effort; `@new-each-run` recruits a fresh worker without
+claiming ownership. Both share dispatch exclusion with scheduled fires and
+never fall back to an earlier creator. Ordinary human-owned or unassigned
+Issues use creation provenance: continue the attributable creator, or recruit
+a reconstruction Agent in the Issue Workspace. That fallback answerer is a
+collaborator and does not change `assignee`. Agent-authored comments without a
+fixed owner remain durable notes rather than recruiting workers.
 
 #### Mode A: one responsible Session
 
@@ -433,7 +443,7 @@ assignee: "@new-then-resume"
 - OpenAlice immediately rewrites `@new-then-resume` to that Session's exact `@resumeId`.
 - Later fires and Issue comments continue the same accountable coworker.
 - The Issue may specify `agent` before the first claim; after the claim, the
-  concrete Session owns its runtime.
+  concrete Session keeps its Agent runtime and owns a separately editable AI binding.
 
 #### Mode C: a fresh worker per fire
 
@@ -515,8 +525,8 @@ can explain the original trigger and falsifiers from its conversational context.
 
 ### One recurring Issue, multiple workers
 
-A financial/industrial scan has historical Codex runs and later Pi runs. If its
-assignee is `workspace`, each report has a different `resumeId`. “Who created
+A financial/industrial scan has historical Codex runs and later Pi runs. With
+`assignee: "@new-each-run"`, each report has a different `resumeId`. “Who created
 the scan?”, “who wrote the 10 July report?”, and “who ran it most recently?” are
 three different provenance queries.
 
@@ -707,13 +717,13 @@ blocks — are a separate append-only journal at
 `<launcherRoot>/state/agent-runtime.jsonl`. Completion keeps assistant
 text and metrics on `runtime.stopped`. It is a replay projection for
 Office, not a dispatch authority and not a prompt or tool-I/O log. TUI
-internals are not extracted yet. See
-[[docs/workspace-issues-and-scheduling.md]].
+internals are not extracted yet. This is the Agent family of
+[[docs/product-activity-journal.md]], separate from conversation history.
 
-The file is private launcher state (`0600` where supported), not Workspace Git
-content. It can contain complete prompts and replies and must be treated as
-sensitive local conversation history. Native runtime session ids and raw tool
-blocks never enter it.
+`agent-conversations.jsonl` is private launcher state (`0600` where supported),
+not Workspace Git content. It can contain complete prompts and replies and must
+be treated as sensitive local conversation history. Native runtime session ids
+and raw tool blocks never enter that conversation stream.
 
 `HeadlessTaskRegistry` remains execution truth and structured headless logs
 remain diagnostic truth. The independent event stream is an analysis/audit
@@ -823,3 +833,32 @@ binding under the execution claim: omitted fields retain that binding, changing
 credential discards inherited model/effort, and explicit fields persist for
 subsequent turns. Busy Sessions reject before editing the binding. Runtime
 identity cannot change. No new persisted format is introduced.
+
+## Dispatch communication contract
+
+Each new headless Task stores a validated `communication` snapshot, constructed
+once by `buildDispatchCommunication` in `src/workspaces/dispatch-communication.ts`.
+It separates origin, resolved execution target, optional business subject, and
+reply ownership (`caller`, `issue-comment`, `issue-run`, or `none`). Conversation
+dispatch logs store that same snapshot. A Session's previous `parentTaskId` is
+still continuation lineage; the caller's execution belongs to `origin.execution`.
+Fresh-owner comment recruitment carries the original source through the scanner.
+
+An Issue subject is not permission to publish. Internal `issue ask --owner`,
+`--creator`, and `--run-id` return to their caller even when the addressed Session
+owns a Connector desk. Explicit comments remain public desk contributions.
+Only an admitted comment reply or desk Issue run receives an external delivery
+snapshot from Alice. It fixes the connector, conversation/automation semantics,
+and execution Workspace for file resolution. The Issue may live elsewhere.
+Changing or deleting an Issue during a turn cannot redirect its output.
+
+Task progress and completion consume this snapshot. Comment/history persistence
+is separate from transport completion: empty answers, failed runs, interrupted
+runs, and failed comment writes still end admitted external activity. A live
+turn uses its taskId at every stage; commentId identifies the discussion edge,
+not a second transport turn. Old trigger/inquiry fields remain business indexes
+for scheduling and provenance; they are not outbound routing selectors.
+
+Migration `0044_dispatch_communication` backs up the old registry and labels old
+records unknown with no delivery destination. Missing/invalid communication
+never gets an inferred Connector route. Append-only history is not rewritten.

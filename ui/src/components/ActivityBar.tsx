@@ -23,6 +23,8 @@ import {
 import { SelectionIndicator } from './SelectionIndicator'
 import { Button } from '@/components/ui/button'
 import { ChatWorkspaceSection } from './workspace/ChatWorkspaceSection'
+import { useUpdateLifecycle } from '../hooks/useUpdateLifecycle'
+import { focusVersionOverviewAfterNavigation } from '../lib/updates/focusVersionOverview'
 
 /**
  * Map ActivityBar page enum (visual layout grouping) to the ActivitySection
@@ -117,6 +119,8 @@ export function ActivityBar({
   const unreadInbox = useUnreadInboxCount()
   const pendingPush = usePendingPushCount()
   const connectorWarnings = useConnectorWarningCount()
+  const updateGuidance = useUpdateLifecycle({ optional: true })?.guidance
+  const updateGuidanceCount = (updateGuidance?.availableCount ?? 0) + (updateGuidance?.needsAttentionCount ?? 0) + (updateGuidance?.setupCount ?? 0)
   const collapsedSections = useActivityBarCollapse((s) => s.collapsedSections)
   const setCollapsed = useActivityBarCollapse((s) => s.setCollapsed)
   const railCollapsed = useActivityBarCollapse((s) => s.railCollapsed)
@@ -286,6 +290,7 @@ export function ActivityBar({
               setSidebar('settings')
               openOrFocus({ kind: 'settings', params: { category: 'general' } })
               onClose()
+              if (updateGuidanceCount > 0) focusVersionOverviewAfterNavigation()
             }}
           />
         </div>

@@ -1,5 +1,12 @@
 import { readFileSync } from 'node:fs'
 
+export const requiredWorkspaceChecks = [
+  'updateLifecycle', 'workspaceCreated', 'gitReady', 'cliEnvironmentInjected', 'allCliManifestsLoaded',
+  'shellCliRoundTrip', 'scheduledIssueDispatched', 'scheduledIssueAutoCompleted',
+  'managedPiAssistantReply', 'managedPiStructuredOutput', 'managedPiDiagnosticCompaction',
+  'managedPiCliSideEffect', 'cleanupComplete',
+]
+
 export function inspectWorkspaceAcceptanceReceipt(receipt) {
   if (!receipt || typeof receipt !== 'object' || Array.isArray(receipt)) {
     throw new Error('Workspace acceptance receipt must be a JSON object')
@@ -8,9 +15,10 @@ export function inspectWorkspaceAcceptanceReceipt(receipt) {
   if (!checks || typeof checks !== 'object' || Array.isArray(checks)) {
     throw new Error('Workspace acceptance receipt is missing checks')
   }
-  const incompleteChecks = Object.entries(checks)
-    .filter(([, ok]) => ok !== true)
-    .map(([name]) => name)
+  const incompleteChecks = [...new Set([
+    ...requiredWorkspaceChecks.filter(name => checks[name] !== true),
+    ...Object.entries(checks).filter(([, ok]) => ok !== true).map(([name]) => name),
+  ])]
   const error = typeof receipt.error === 'string' && receipt.error.trim()
     ? receipt.error.trim()
     : null

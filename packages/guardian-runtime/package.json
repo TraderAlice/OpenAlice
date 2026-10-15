@@ -15,13 +15,14 @@
   ],
   "scripts": {
     "build": "node -e \"require('node:fs').rmSync('dist',{recursive:true,force:true})\" && tsc",
-    "test": "vitest run --config vitest.config.ts",
+    "test": "node ../../scripts/run-tests.mjs --package @traderalice/guardian-runtime",
     "typecheck": "tsc --noEmit"
   },
   "devDependencies": {
     "@types/node": "^25.2.3",
     "typescript": "^5.9.3",
-    "vitest": "^4.1.5"
+    "vite": "npm:@voidzero-dev/vite-plus-core@1.0.0",
+    "vitest": "5.0.1"
   },
   "engines": {
     "node": ">=22.19.0"

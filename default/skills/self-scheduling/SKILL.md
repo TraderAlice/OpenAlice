@@ -47,6 +47,18 @@ You have two equivalent paths, and both write the **same**
    comments, but the document and schedule shape read most clearly as text. The
    file is always the single source of truth either way.
 
+### Change a scheduled Issue's model or effort
+
+For `@new-then-resume` / `@new-each-run`, update the Issue's `model` / `effort`.
+For an exact `@resumeId`, edit `ai.model` / `ai.reasoningEffort` in the owning
+Session's Workspace at `.alice/sessions/<resumeId>.json`; preserve all other
+fields, especially `agent` and `ai.credential`, and keep valid JSON. Only the
+Agent runtime is fixed; model and effort remain editable. Alice reconciles the
+file on the scheduler tick for the next launch, without changing the current
+process or losing context. Session Settings while idle is the validated UI
+alternative. Use `alice conversation ask --resume-id <resumeId> --model <id>
+--effort <level> --prompt <message>` only when you also intend to send a turn.
+
 ### CLI verbs
 
 ```bash
@@ -184,16 +196,16 @@ plain tracked item; add a `when` and it starts firing.
     then never again.
 - **`agent`** *(optional)* — runtime override for `@new-then-resume` / `@new-each-run`
   scheduled work; defaults to this Workspace's runtime resolution. An exact
-  Session assignee already has an immutable runtime, so Session-owned Issues
+  Session assignee already has a fixed Agent runtime, so Session-owned Issues
   cannot set this.
 - **`credential`** *(optional)* — secret-free OpenAlice vault slug for the
   fresh Session. Never put a key or endpoint in the Issue file.
 - **`credentialSource: native`** *(optional)* — explicitly use the Agent
   runtime's own login. It cannot be combined with `credential`. Omit both to
   inherit this Workspace's headless fixed/recent preference.
-- **`model`** *(optional)* — native model id for one scheduled run. Omit it to
+- **`model`** *(optional)* — native model id for a fresh Session. Omit it to
   inherit the selected credential, Workspace, or native runtime default.
-- **`effort`** *(optional)* — one-run reasoning effort: `none`, `minimal`,
+- **`effort`** *(optional)* — reasoning effort for a fresh Session: `none`, `minimal`,
   `low`, `medium`, `high`, `xhigh`, or `max`. Use a level supported by the
   selected runtime; omit it to inherit.
 - **`timeout`** *(optional)* — scheduled-run watchdog: `15m`, `30m`, `45m`, or
@@ -206,12 +218,12 @@ plain tracked item; add a `when` and it starts firing.
   `{author}`, `{what}`. Must include `{comment}`. Chat-style Issues use
   `{comment}` alone.
 
-`agent`, `credential`/`credentialSource`, `model`, and `effort` are one Session-creation tuple.
-They are valid only for `@new-then-resume` / `@new-each-run`; an exact `@resumeId` Session owns
-the complete tuple, so do not write those fields back onto the Issue file. Humans may still
-change that Session's credential, model, and effort from the Issue page; the Agent runtime
-stays locked. The scheduler freezes explicit values into the fresh Session runtime
-binding and does not rewrite persistent Workspace configuration.
+`agent`, `credential`/`credentialSource`, `model`, and `effort` on an Issue seed a
+new Session. They are valid only for `@new-then-resume` / `@new-each-run`;
+do not write them into an Issue assigned to an exact `@resumeId` (see above).
+The scheduler freezes Issue values into a fresh Session binding without
+rewriting Workspace configuration. Session credentials may also change through
+Session Settings while idle; never put a key in either file.
 
 > **Deprecated assignee aliases:** never write `@workspace` or `@new` in a new
 > or edited Issue. They exist only so older Workspace files can be migrated:

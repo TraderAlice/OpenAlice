@@ -16,6 +16,7 @@ function plan(overrides: Partial<TemplateUpgradePlan> = {}): TemplateUpgradePlan
     fromVersion: '1.5.0',
     toVersion: '1.6.1',
     strategy: 'managed-context',
+    update: { status: 'available', reason: 'newer-release' },
     planDigest: 'digest-1',
     source: 'recorded-baseline',
     blocked: false,
@@ -188,7 +189,7 @@ describe('workspace_template_upgrade', () => {
   })
 
   it('surfaces changed template contents that forgot to advance the version', async () => {
-    const { tool, templateUpgrades } = setup(plan({ fromVersion: '1.6.1', toVersion: '1.6.1' }))
+    const { tool, templateUpgrades } = setup(plan({ fromVersion: '1.6.1', toVersion: '1.6.1', update: { status: 'current', reason: 'same-release' }, blocked: true, blockers: ['template_version_not_bumped'] }))
     const result = await run(tool, { apply: true, mode: 'summary' })
     expect(result).toMatchObject({
       ok: false,

@@ -33,8 +33,7 @@ for macOS or Windows. The desktop app includes Pi; connect a model credential or
 supported login to start researching. **You do not need a broker account.**
 
 Prefer a terminal or server? See the [CLI installer](docs/cli-installer.md),
-[remote quickstart](docs/remote-quickstart.md), or
-[Docker setup](https://openalice.ai/docs/deployment/docker).
+or [remote quickstart](docs/remote-quickstart.md).
 For platform details, see the [installation guide](https://openalice.ai/docs/getting-started/installation).
 
 Try a first task in Ask Alice:

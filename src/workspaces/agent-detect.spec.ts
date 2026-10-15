@@ -1,4 +1,4 @@
-import { chmod, mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { chmod, mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { delimiter, join } from 'node:path';
 
@@ -62,6 +62,12 @@ describe('findExecutableOnPath (win32)', () => {
     const env = { PATH: dir, PATHEXT: '.COM;.EXE;.CMD' };
     expect(findExecutableOnPath('opencode', { platform: 'win32', env })).toBe(p);
   });
+
+  it('ignores a directory shadowing a Windows executable', async () => {
+    await mkdir(join(dir, 'codex.exe'));
+    const env = { PATH: dir, PATHEXT: '.EXE;.CMD' };
+    expect(findExecutableOnPath('codex', { platform: 'win32', env })).toBeNull();
+  });
 });
 
 describe('detectBinary', () => {
@@ -95,6 +101,34 @@ describe('detectAgentBinary', () => {
       },
     })).toEqual({ installed: true, path: managedPi, fingerprint: expect.any(String) });
     expect(findExecutableOnPath('pi', { platform: 'linux', env: { PATH: dir } })).toBe(pathPi);
+  });
+
+  it('does not claim managed Pi when its configured Node entry is missing', async () => {
+    const managedPi = await touch('managed-pi');
+    expect(detectAgentBinary('pi', 'pi', {
+      platform: 'linux',
+      env: {
+        OPENALICE_MANAGED_PI_PATH: managedPi,
+        OPENALICE_MANAGED_PI_NODE_PATH: join(dir, 'missing-node'),
+        PATH: '',
+      },
+    })).toEqual({ installed: false, path: null, fingerprint: null });
+  });
+
+  it('includes managed Pi Node metadata in the fingerprint', async () => {
+    const managedPi = await touch('managed-pi-with-node');
+    const managedNode = await touch('managed-node');
+    const env = {
+      OPENALICE_MANAGED_PI_PATH: managedPi,
+      OPENALICE_MANAGED_PI_NODE_PATH: managedNode,
+      PATH: '',
+    };
+    const first = detectAgentBinary('pi', 'pi', { platform: 'linux', env });
+    await writeFile(managedNode, 'changed');
+    const second = detectAgentBinary('pi', 'pi', { platform: 'linux', env });
+    expect(first).toMatchObject({ installed: true, path: managedPi });
+    expect(second).toMatchObject({ installed: true, path: managedPi });
+    expect(second.fingerprint).not.toBe(first.fingerprint);
   });
 
   it('falls back to PATH when managed Pi path is absent or invalid', async () => {

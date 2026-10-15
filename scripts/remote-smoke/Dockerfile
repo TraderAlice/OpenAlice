@@ -1,4 +1,5 @@
-FROM oven/bun:1.4.0 AS bun-runtime
+ARG BUN_VERSION
+FROM oven/bun:${BUN_VERSION} AS bun-runtime
 
 FROM node:22-bookworm AS builder
 COPY --from=bun-runtime /usr/local/bin/bun /usr/local/bin/bun

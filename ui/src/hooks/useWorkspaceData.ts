@@ -1,3 +1,4 @@
+import { sessionCoworkerLabel } from '../components/workspace/display'
 import { useCallback, useMemo } from 'react'
 
 import {
@@ -65,4 +66,16 @@ export function useWorkspaceSessionData(
     () => ({ ...workspace, session, updateRuntime }),
     [session, updateRuntime, workspace],
   )
+}
+
+/** Session identity for activity notifications, scoped to the publishing Workspace. */
+export function useActivitySessionLabel() {
+  const { workspaces } = useWorkspaces()
+  return useCallback((source: { workspaceId?: string; sessionRecordId?: string; resumeId?: string; agent?: string }) => {
+    const sessions = workspaces.find((workspace) => workspace.id === source.workspaceId)?.sessions ?? []
+    const session = source.sessionRecordId
+      ? sessions.find((candidate) => candidate.id === source.sessionRecordId)
+      : source.resumeId ? sessions.find((candidate) => candidate.resumeId === source.resumeId && (!source.agent || candidate.agent === source.agent)) : undefined
+    return session ? sessionCoworkerLabel(session) : null
+  }, [workspaces])
 }

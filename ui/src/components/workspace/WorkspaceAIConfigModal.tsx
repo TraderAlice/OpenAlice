@@ -1,3 +1,5 @@
+import { ModelCatalogStatus } from '../ModelCatalogStatus'
+import { useProviderModels } from '../../hooks/useProviderModels'
 /**
  * Per-workspace settings modal.
  *
@@ -30,8 +32,6 @@ import {
   agentWireShapes,
   anthropicAuthModeForBaseUrl,
   baseUrlToVendor,
-  describeModelSemantics,
-  presetModel,
   savedCredentialModel,
   vendorPreset,
   presetModels,
@@ -40,10 +40,12 @@ import {
 import { ModelCombobox } from '../credentials/PresetFields'
 import { useTestGate } from '../../lib/useTestGate'
 import { useWorkspaces } from '../../contexts/workspaces-context'
+import { useWorkspace } from '../../tabs/store'
 import { notifyWorkspaceAgentConfigChanged } from '../../lib/workspaceAiEvents'
 import { AgentRuntimeIcon } from '../../lib/agentRuntimeIcon'
 import { WorkspaceTemplateUpgradePanel } from './WorkspaceTemplateUpgradePanel'
 import { WorkspaceSourceUpgradePanel } from './WorkspaceSourceUpgradePanel'
+import { workspacePlanRequest } from '../../lib/updates/workspacePlans'
 import { WorkspaceAbsorbPanel } from './WorkspaceAbsorbPanel'
 import { WorkspaceLaunchConfigurationPanel } from './WorkspaceLaunchConfigurationPanel'
 import { WorkspaceAIPreferencesPanel } from './WorkspaceAIPreferencesPanel'
@@ -288,6 +290,7 @@ export function WorkspaceAIConfigModal({
   initialSection = 'general',
 }: Props) {
   const { t } = useTranslation()
+  const openOrFocus = useWorkspace((state) => state.openOrFocus)
   const backdropRef = useRef<HTMLDivElement>(null)
   const dialogRef = useRef<HTMLDivElement>(null)
   const onCloseRef = useRef(onClose)
@@ -469,21 +472,14 @@ export function WorkspaceAIConfigModal({
     const p = vendorPreset(vendor, presets)
     return p ? presetModels(p) : []
   }, [form.baseUrl, formCredentialVendor, tab, presets])
-  const selectedModelSemantics = useMemo(() => {
-    const vendor = formCredentialVendor
-      ?? baseUrlToVendor(form.baseUrl, TAB_FALLBACK_VENDOR[tab])
-    if (!vendor) return null
-    return presetModel(vendorPreset(vendor, presets), form.model)?.semantics ?? null
-  }, [form.baseUrl, form.model, formCredentialVendor, tab, presets])
-  const supportedReasoningEfforts = useMemo(() => {
-    const efforts = selectedModelSemantics?.reasoning?.efforts ?? []
-    // Claude Code project settings support these persisted values. `max` is a
-    // session-only CLI choice, so do not offer a value the injector cannot own.
-    return tab === 'claude'
-      ? efforts.filter((effort) => effort === 'low' || effort === 'medium' || effort === 'high' || effort === 'xhigh')
-      : efforts
-  }, [selectedModelSemantics, tab])
-  const semanticsSummary = describeModelSemantics(selectedModelSemantics)
+  const providerModels = useProviderModels({
+    request: formCredentialByKey && formCredentialByKey.wires?.[form.wireShape] === form.baseUrl
+      ? { slug: formCredentialByKey.slug, agent: tab }
+      : form.apiKey.trim() ? { wireShape: form.wireShape, baseUrl: form.baseUrl || undefined, apiKey: form.apiKey.trim() } : null,
+    model: form.model, fallback: modelSuggestions, agent: tab, persistedSettings: true,
+  })
+  const selectedModelSemantics = providerModels.semantics
+  const supportedReasoningEfforts = providerModels.effortOptions
   const gate = { claude: claudeGate, codex: codexGate, opencode: opencodeGate, pi: piGate }[tab]
   const key = testKey(form)
   const testing = gate.testing
@@ -1085,7 +1081,8 @@ export function WorkspaceAIConfigModal({
             <label className="block text-xs font-medium text-muted-foreground mb-1">{t('workspaceSettings.ai.model')}</label>
             <ModelCombobox
               value={form.model}
-              suggestions={modelSuggestions}
+              vendor={formCredentialVendor ?? baseUrlToVendor(form.baseUrl, TAB_FALLBACK_VENDOR[tab])}
+              suggestions={providerModels.models}
               onChange={(v) => setForm({
                 ...form,
                 model: v,
@@ -1097,16 +1094,7 @@ export function WorkspaceAIConfigModal({
               ariaLabel={t('workspaceSettings.ai.model')}
               suggestionsLabel={t('workspaceSettings.ai.modelSuggestions')}
             />
-            {modelSuggestions.length > 0 && (
-              <p className="text-[11px] text-muted-foreground/70 mt-1">{t('workspaceSettings.ai.modelSuggestions')}</p>
-            )}
-
-            {semanticsSummary && (
-              <div className="mt-2 rounded-md border border-primary/20 bg-primary/5 px-3 py-2 text-[11px] leading-relaxed text-muted-foreground">
-                <strong className="text-foreground">{t('workspaceSettings.ai.registeredAutomatically')}</strong>{' '}
-                {semanticsSummary}.
-              </div>
-            )}
+            <ModelCatalogStatus catalog={providerModels} selectedModel={form.model} />
 
             {supportedReasoningEfforts.length > 0 && (
               <div className="mt-3">
@@ -1398,12 +1386,15 @@ export function WorkspaceAIConfigModal({
                 workspace={workspace}
                 agents={agents}
                 onSaved={refresh}
-                onConfigureProvider={() => setSection('ai')}
+                onConfigureProvider={() => {
+                  onClose()
+                  openOrFocus({ kind: 'settings', params: { category: 'ai-provider' } })
+                }}
               />
             )}
 
             {section === 'template' && (
-              workspace?.upgradeAvailable?.kind === 'source'
+              workspace && workspacePlanRequest(workspace).kind === 'source'
                 ? <WorkspaceSourceUpgradePanel wsId={wsId} onWorkspaceChanged={refresh} />
                 : <WorkspaceTemplateUpgradePanel
                     wsId={wsId}

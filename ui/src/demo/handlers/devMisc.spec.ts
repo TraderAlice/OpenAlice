@@ -14,6 +14,12 @@ afterEach(() => server.resetHandlers())
 afterAll(() => server.close())
 
 describe('demo version handlers', () => {
+  it('provides AliceProject identity for connection settings', async () => {
+    const response = await fetch(`${baseUrl}/api/alice-project`)
+    const body = await response.json()
+    expect(response.status).toBe(200)
+    expect(body.project.displayName).toBe('Demo AliceProject')
+  })
   it.each([
     ['GET', '/api/version'],
     ['POST', '/api/version/check'],
@@ -23,7 +29,7 @@ describe('demo version handlers', () => {
 
     expect(response.status).toBe(200)
     expect(body.current).toBe(packageJson.version)
-    expect(body.channel).toBe('stable')
+    expect(body.channel).toBe('dev')
     expect(body.updateAuthority).toBe('source')
   })
 })

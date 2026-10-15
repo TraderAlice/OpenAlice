@@ -59,6 +59,8 @@ export interface ConnectorAdapter {
   sendOwnerFile?(attachment: ConnectorAttachment, presentation?: import('./reply-directives.js').ReplyMedia): Promise<void>
   /** Optional transport-native lifecycle projection for desk-capable adapters. */
   sendOwnerChat?(message: OwnerChatMessage): Promise<void>
+  /** Stop ephemeral activity after a lost lease, without claiming the Agent ended. */
+  stopOwnerActivity?(conversationId: string): Promise<void>
   /** Directed current-file delivery. Must not send an Inbox summary. */
   deliverArtifact?(delivery: ConnectorArtifactDelivery): Promise<void>
   /** Directed UTA review panel. Must not send an Inbox summary. */

@@ -32,9 +32,9 @@ describe.each(Object.entries(locales))('%s locale', (_locale, resources) => {
     expect(resources.settings.beta.office).toBeTruthy()
   })
 
-  it('exposes Harness as a Settings category for Ask Alice and Auto Quant', () => {
-    expect(resources.settings.category.harness).toBe('Harness')
-    expect(resources.settings.harness.showHeadlessBorn).toBeTruthy()
+  it('exposes Session visibility under Appearance', () => {
+    expect(resources.settings.category.visibility).toBeTruthy()
+    expect(resources.settings.visibility.sessions).toBeTruthy()
   })
 
   it('exposes Agent runtimes as a Settings category', () => {

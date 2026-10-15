@@ -8,14 +8,10 @@ import type { ConnectorClient } from '@traderalice/connector-protocol'
 import type { HeadlessTurnProgress } from '../headless-progress.js'
 import { createTelegramConnectorDesk } from './telegram-connector.js'
 import {
-  alreadyProjectedDeskText,
   deskProgressMessageId,
   deskProgressScope,
   projectDeskComment,
   projectDeskLifecycle,
-  projectDeskTurnProgress,
-  projectWorkspaceDeskTurnProgress,
-  resetProjectedDeskTexts,
   sealedProgressTexts,
   shouldProjectDeskComment,
 } from './telegram-desk-project.js'
@@ -24,14 +20,12 @@ let home: string
 let wsDir: string
 
 beforeEach(async () => {
-  resetProjectedDeskTexts()
   home = await mkdtemp(join(tmpdir(), 'tg-desk-progress-'))
   wsDir = join(home, 'ws')
   await mkdir(join(wsDir, '.alice', 'issues'), { recursive: true })
 })
 
 afterEach(async () => {
-  resetProjectedDeskTexts()
   await rm(home, { recursive: true, force: true })
 })
 
@@ -106,111 +100,23 @@ describe('sealedProgressTexts', () => {
 })
 
 describe('deskProgressScope', () => {
-  it('prefers the comment id for an Issue reply and the task id for a fire', () => {
-    expect(deskProgressScope({
-      taskId: 'run-reply',
-      inquiry: {
-        subject: {
-          kind: 'issue',
-          workspaceId: 'ws-a',
-          issueId: 'telegram-phone-desk',
-          relation: 'owner',
-          commentId: 'telegram-1',
-        },
-      },
-    })).toEqual({
-      workspaceId: 'ws-a',
-      issueId: 'telegram-phone-desk',
-      scopeId: 'telegram-1',
-    })
-    expect(deskProgressScope({
-      taskId: 'run-fire',
-      trigger: { kind: 'issue', workspaceId: 'ws-a', issueId: 'telegram-phone-desk' },
-    })).toEqual({
-      workspaceId: 'ws-a',
-      issueId: 'telegram-phone-desk',
-      scopeId: 'run-fire',
-    })
-    expect(deskProgressScope({
-      taskId: 'run-inbox',
-      inquiry: {
-        subject: { kind: 'inbox', entryId: 'in-1' },
-      },
-    })).toBeNull()
-  })
-})
-
-describe('projectDeskTurnProgress', () => {
-  const desk = { connectorDesk: 'telegram', status: 'todo' as const }
-
-  it('sends sealed texts once and skips tools', async () => {
-    const { client, sent } = mockClient()
-    const snapshot = progress([
-      { type: 'text', text: 'Looking at the book.' },
-      { type: 'tool', id: 't1', name: 'Read', status: 'running' },
-      { type: 'text', text: 'Still thinking.' },
-    ])
-    await projectDeskTurnProgress({
-      issue: desk,
-      scopeId: 'telegram-1',
-      progress: snapshot,
-      client,
-    })
-    await projectDeskTurnProgress({
-      issue: desk,
-      scopeId: 'telegram-1',
-      progress: snapshot,
-      client,
-    })
-    expect(sent).toEqual([expect.objectContaining({
-      id: deskProgressMessageId('telegram-1', 'Looking at the book.'),
-      conversationId: 'telegram-1',
-      phase: 'progress',
-      text: 'Looking at the book.',
-    })])
-    expect(alreadyProjectedDeskText('telegram-1', 'Looking at the book.')).toBe(true)
+  it('does not publish an internal ask merely because its subject is a desk Issue', () => {
+    expect(deskProgressScope({ taskId: 'internal-ask', inquiry: {
+      subject: { kind: 'issue', workspaceId: 'ws-a', issueId: 'telegram-phone-desk', relation: 'run', runId: 'previous-run' },
+    } })).toBeNull()
   })
 
-  it('does not project ordinary Issues or a canceled desk', async () => {
-    const { client, sent } = mockClient()
-    const snapshot = progress([
-      { type: 'text', text: 'Looking.' },
-      { type: 'tool', id: 't1', name: 'Read', status: 'running' },
-    ])
-    await projectDeskTurnProgress({
-      issue: { status: 'todo' },
-      scopeId: 'c1',
-      progress: snapshot,
-      client,
-    })
-    await projectDeskTurnProgress({
-      issue: { connectorDesk: 'telegram', status: 'canceled' },
-      scopeId: 'c1',
-      progress: snapshot,
-      client,
-    })
-    expect(sent).toEqual([])
+  it('requires an explicit delivery and uses the task identity rather than the comment id', () => {
+    const task = { taskId: 'run-reply', communication: {
+      version: 1 as const, origin: { kind: 'human' as const },
+      target: { workspaceId: 'execution', resumeId: 'r', agent: 'codex' },
+      reply: { kind: 'issue-comment' as const, workspaceId: 'ws-a', issueId: 'desk', commentId: 'c1' },
+      delivery: { connectorId: 'telegram', source: 'conversation' as const, contentWorkspaceId: 'execution' },
+    } }
+    expect(deskProgressScope(task)).toEqual({ workspaceId: 'ws-a', issueId: 'desk', scopeId: 'run-reply' })
+    expect(deskProgressScope({ ...task, communication: undefined })).toBeNull()
   })
 
-  it('loads the live desk Issue from the Workspace', async () => {
-    const created = await createTelegramConnectorDesk(
-      { id: 'ws-a', dir: wsDir },
-      [{ id: 'ws-a', dir: wsDir }],
-    )
-    expect(created.ok).toBe(true)
-    const { client, sent } = mockClient()
-    await projectWorkspaceDeskTurnProgress({
-      wsDir,
-      issueId: created.ok ? created.issue.id : 'telegram-phone-desk',
-      scopeId: 'run-1',
-      progress: progress([
-        { type: 'text', text: 'Heartbeat check.' },
-        { type: 'error', message: 'later' },
-      ]),
-      client,
-    })
-    expect(sent.map((item) => item.text)).toEqual(['Heartbeat check.'])
-  })
 })
 
 describe('owner-chat lifecycle', () => {
@@ -268,59 +174,4 @@ describe('final comment projection', () => {
     expect(sent[1]).toMatchObject({ source: 'automation', text: '[[no-reply]] quiet', phase: 'progress' })
   })
 
-  it('persists a final comment even when the same text was shown in an ephemeral draft', async () => {
-    const { client, sent } = mockClient()
-    const issue = { connectorDesk: 'telegram' }
-    await projectDeskTurnProgress({
-      issue: { ...issue, status: 'todo' },
-      scopeId: 'telegram-1',
-      progress: progress([
-        { type: 'text', text: 'Looking at the book.' },
-        { type: 'tool', id: 't1', name: 'Read', status: 'completed' },
-        { type: 'text', text: 'Looking at the book.' },
-      ]),
-      client,
-    })
-    const comment = {
-      id: 'comment-reply-run-1',
-      author: '@resume-a',
-      at: 'now',
-      markdown: 'Looking at the book.',
-      replyTo: 'telegram-1',
-    }
-    expect(shouldProjectDeskComment(issue, comment)).toBe(true)
-    await projectDeskComment(issue, comment, client)
-    expect(sent).toHaveLength(2)
-    expect(sent[1]).toMatchObject({
-      conversationId: 'telegram-1',
-      phase: 'final',
-      text: 'Looking at the book.',
-    })
-    expect(alreadyProjectedDeskText('telegram-1', 'Looking at the book.')).toBe(false)
-  })
-
-  it('still ships a different final reply', async () => {
-    const { client, sent } = mockClient()
-    const issue = { connectorDesk: 'telegram' }
-    await projectDeskTurnProgress({
-      issue: { ...issue, status: 'todo' },
-      scopeId: 'run-1',
-      progress: progress([
-        { type: 'text', text: 'Looking at the book.' },
-        { type: 'tool', id: 't1', name: 'Read', status: 'completed' },
-        { type: 'text', text: 'Here is the answer.' },
-      ]),
-      client,
-    })
-    await projectDeskComment(issue, {
-      id: 'comment-fire-run-1',
-      author: '@resume-a',
-      at: 'now',
-      markdown: 'Here is the answer.',
-    }, client, { progressScopeId: 'run-1' })
-    expect(sent.map((item) => item.text)).toEqual([
-      'Looking at the book.',
-      'Here is the answer.',
-    ])
-  })
 })

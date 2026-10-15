@@ -16,9 +16,12 @@
  * keeps running on the server. Use the sidebar's × to actually delete.
  */
 
+import { inspectOccupiedSession } from '../components/workspace/session-busy-store'
 import { useHarnessWorkbenchContext } from '../components/harness/context'
-import { useEffect } from 'react'
-import { ChevronDown, Unplug, Monitor, Settings } from 'lucide-react'
+import { useEffect, useRef } from 'react'
+import { useSessionTakeovers } from '../hooks/useSessionTakeovers'
+import type { SessionRecord } from '../components/workspace/api'
+import { Monitor, Settings } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import '@xterm/xterm/css/xterm.css'
 
@@ -32,7 +35,6 @@ import { WorkspaceView } from '../components/workspace/WorkspaceView'
 import { PageTopBar } from '../components/PageTopBar'
 import { WorkspaceFilesToggle } from '../components/workspace/WorkspaceFilesToggle'
 import { Button } from '../components/ui/button'
-import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from '../components/ui/dropdown-menu'
 import { AgentRuntimeIcon } from '../lib/agentRuntimeIcon'
 import type { ViewSpec } from '../tabs/types'
 
@@ -56,6 +58,20 @@ export function WorkspacePage({ spec, visible }: Props) {
     loading,
     error: loadError,
   } = useWorkspaceSessionData(wsId, sessionId)
+  const takeovers = useSessionTakeovers()
+  const heldRecord = useRef<SessionRecord | null>(null)
+  if (heldRecord.current?.id !== sessionId) heldRecord.current = null
+  if (activeRecord?.state === 'running' && activeRecord.surface !== 'headless') heldRecord.current = activeRecord
+  const takeover = takeovers?.requests.filter(row => row.workspaceId === wsId && row.recordId === sessionId && ['handoff', 'running', 'completed'].includes(row.state)).at(-1)
+  const handedOver = !!(takeover && heldRecord.current && (takeover.state === 'handoff' || takeover.state === 'running' || activeRecord?.state !== 'running' || activeRecord.surface === 'headless'))
+  const shownRecord = handedOver ? heldRecord.current : activeRecord
+  const interaction = (event: React.SyntheticEvent) => {
+    if (visible && activeRecord && !handedOver && !(event.target as HTMLElement).closest('[data-takeover-control]')) takeovers?.activity(wsId, activeRecord.id)
+  }
+  useEffect(() => {
+    if (handedOver || !visible || activeRecord?.state !== 'running' || activeRecord.surface !== 'headless') return
+    inspectOccupiedSession({ record: activeRecord, workspaceId: wsId, source })
+  }, [visible, activeRecord, wsId, sessionId, source, handedOver])
   const effectiveDefaultAgent = workspace?.defaultAgent ?? ctx.defaultAgent
   const defaultAgentEnabled =
     effectiveDefaultAgent !== null &&
@@ -114,21 +130,21 @@ export function WorkspacePage({ spec, visible }: Props) {
   const workspaceName = workspaceDisplayName(workspace)
   const hasCustomName = workspaceName !== workspace.tag
   const terminalCanvas =
-    activeRecord?.state === 'running' &&
-    (activeRecord.surface ?? 'terminal') === 'terminal'
-  const pausedCanvas = activeRecord?.state === 'paused'
-  const webCanvas = activeRecord?.state === 'running' && activeRecord.surface === 'webpi'
-  const workspaceCanvas = terminalCanvas || pausedCanvas
+    shownRecord?.state === 'running' &&
+    (shownRecord.surface ?? 'terminal') === 'terminal'
+  const pausedCanvas = shownRecord?.state === 'paused'
+  const webCanvas = shownRecord?.state === 'running' && shownRecord.surface === 'webpi'
+  const workspaceCanvas = terminalCanvas || webCanvas || pausedCanvas
   // The surface toggle is offered only for runtimes that expose a structured
   // protocol; a TUI-only runtime keeps its terminal without a dead button.
-  const canSwitchSurface = activeRecord?.state === 'running' && activeRecord.surface !== 'headless'
+  const canSwitchSurface = !handedOver && activeRecord?.state === 'running' && activeRecord.surface !== 'headless'
     && (webCanvas || agentSupportsWeb(ctx.agents, activeRecord.agent))
   const runtimeLabel = activeRecord
     ? ctx.agents.find((agent) => agent.id === activeRecord.agent)?.displayName ?? activeRecord.agent
     : ''
   const workspaceActions = (
     <>
-      {!workbench && activeRecord && canSwitchSurface && (
+      {activeRecord && canSwitchSurface && (
         <Button
           type="button"
           onClick={() => {
@@ -146,17 +162,9 @@ export function WorkspacePage({ spec, visible }: Props) {
           {webCanvas
             ? <Monitor size={13} strokeWidth={2.25} aria-hidden="true" />
             : <AgentRuntimeIcon agentId={activeRecord.agent} className="h-[13px] w-[13px]" />}
-          {webCanvas ? 'Open TUI' : 'Web Beta'}
+          {webCanvas ? 'TUI' : 'GUI'}
         </Button>
       )}
-      {activeRecord && (terminalCanvas || webCanvas) && <DropdownMenu>
-        <DropdownMenuTrigger render={<Button variant="ghost" size="icon" aria-label={t('workspace.interactiveOwnership.actions')}><ChevronDown size={14} /></Button>} />
-        <DropdownMenuContent align="end" className="min-w-64">
-          <DropdownMenuItem onClick={() => void ctx.pauseSession(wsId, activeRecord.id)}>
-            <Unplug size={14} />{t('workspace.interactiveOwnership.disconnect')}
-          </DropdownMenuItem>
-        </DropdownMenuContent>
-      </DropdownMenu>}
       <WorkspaceFilesToggle />
       {!workbench && <Button
         type="button"
@@ -182,7 +190,7 @@ export function WorkspacePage({ spec, visible }: Props) {
   )
 
   return (
-    <div className={`workspaces-root workspace-page-shell flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden${terminalCanvas ? ' is-terminal-canvas' : ''}${pausedCanvas ? ' is-paused-canvas' : ''}`}>
+    <div onKeyDownCapture={interaction} onInputCapture={interaction} onPointerDownCapture={interaction} onWheelCapture={interaction} className={`workspaces-root workspace-page-shell flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden${terminalCanvas ? ' is-terminal-canvas' : ''}${pausedCanvas ? ' is-paused-canvas' : ''}`}>
       {/* Running renderers fill the shared header slot with session identity
        * and these actions. Paused sessions own their header here. */}
       {!terminalCanvas && !webCanvas && (
@@ -195,13 +203,18 @@ export function WorkspacePage({ spec, visible }: Props) {
         </PageTopBar>
       )}
 
+      {handedOver && takeover && <div role="status" className="flex flex-wrap items-center justify-between gap-2 border-b border-border bg-muted/40 px-4 py-2 text-xs">
+        <button className="text-left text-muted-foreground hover:text-foreground" onClick={() => takeovers?.select(takeover.id)}>{t(takeover.state === 'completed' ? 'takeover.complete' : 'takeover.occupied')} · {takeover.origin.issueId ?? takeover.origin.entry}</button>
+        {takeover.state === 'completed' && activeRecord && <Button variant="outline" size="sm" onClick={() => void (heldRecord.current?.surface === 'webpi' ? ctx.openWebSession(wsId, activeRecord.id, source) : ctx.resumeSession(wsId, activeRecord.id, source))}>{t('takeover.reopen')}</Button>}
+      </div>}
       <div className={`flex min-h-0 min-w-0 flex-1 flex-col${workspaceCanvas ? '' : ' p-3'}`}>
         <WorkspaceView
           visible={visible}
           wsId={wsId}
           sessionId={sessionId}
           {...(source ? { source } : {})}
-          activeRecord={activeRecord}
+          activeRecord={shownRecord}
+          readOnly={handedOver}
           agents={ctx.agents}
           label={workspaceName}
           terminalHeaderActions={terminalCanvas || webCanvas ? workspaceActions : undefined}

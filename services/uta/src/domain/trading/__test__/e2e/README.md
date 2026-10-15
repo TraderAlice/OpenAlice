@@ -1,9 +1,10 @@
 # UTA Acceptance Tests
 
-This directory contains two deliberately separate acceptance layers:
+UTA acceptance has deliberately separate layers:
 
-- `uta-lifecycle.e2e.spec.ts` uses `MockBroker` and is part of the ordinary,
-  non-trading product E2E suite.
+- [The trading scenario](../../../../../../../tests/integration/trading-approval/uta-lifecycle.spec.ts)
+  uses `MockBroker` in the central product-scenario directory and is part of
+  the non-trading `test:integration:uta` suite.
 - The broker and `uta-*` paper/demo specs talk to configured external accounts.
   Several of them submit and cancel orders, so they only run through the
   explicit live-paper command.
@@ -35,7 +36,7 @@ the live-paper config exits before collecting tests or initializing a broker.
 |---------|-------|---------|
 | `{broker}.e2e.spec.ts` | Broker API | `alpaca-paper`, `ibkr-paper` — calls `broker.placeOrder()` directly |
 | `uta-{broker}.e2e.spec.ts` | UTA (Trading-as-Git) | `uta-alpaca`, `uta-ibkr` — uses `stagePlaceOrder → commit → push` |
-| `uta-lifecycle.e2e.spec.ts` | UTA + MockBroker | Pure in-memory; ordinary `test:integration:uta` |
+| `tests/integration/trading-approval/uta-lifecycle.spec.ts` (repo root) | UTA + MockBroker | Pure in-memory; `test:integration:uta` |
 
 ## Precondition Pattern
 

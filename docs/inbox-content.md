@@ -39,3 +39,9 @@ untouched. There is no legacy authoring or dual-read contract.
   adapter upload / Telegram on-demand file controls derive their files from it.
   Connector alone decides channel delivery and automation `[[no-reply]]` rules;
   Inbox publication never treats that marker as a command to discard a report.
+
+Inbox activity toasts identify the publishing Session using its Workspace-scoped
+record ID (or native resume ID plus runtime when no record ID is available).
+They use the shared Session display-name/title/name precedence and show the
+Inbox summary as the description. A missing source falls back to a Session
+identifier or generic Session label, never a runtime name presented as a person.

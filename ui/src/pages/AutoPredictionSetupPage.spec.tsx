@@ -18,6 +18,10 @@ vi.mock('../contexts/workspaces-context', () => ({
   useWorkspaces: () => mocks.useWorkspaces(),
 }))
 
+vi.mock('../hooks/useProjectWorkspaceSetup', () => ({
+  useProjectWorkspaceSetup: () => ({ setup: { pending: [], errors: {}, phase: 'complete' }, error: null, busy: false, retry: vi.fn() }),
+}))
+
 const workspace: Workspace = {
   id: 'prediction-existing',
   tag: 'prediction',

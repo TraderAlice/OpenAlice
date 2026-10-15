@@ -6,7 +6,6 @@ import { describe, expect, it, vi } from 'vitest'
 
 import {
   checkForUpdate,
-  compareVersions,
   downloadAndRunInstaller,
   maybeNotifyUpdate,
   parseUpdateArgs,
@@ -14,7 +13,7 @@ import {
 } from './update.mjs'
 
 const currentCliVersion = JSON.parse(
-  readFileSync(new URL('../package.json', import.meta.url), 'utf8'),
+  readFileSync(new URL('../../../package.json', import.meta.url), 'utf8'),
 ).version
 const [currentMajor = '0', currentMinor = '0'] = currentCliVersion.split('.')
 const newerStableVersion = `${currentMajor}.${Number(currentMinor) + 1}.0`
@@ -49,14 +48,6 @@ const devSource = {
 }
 
 describe('OpenAlice CLI updates', () => {
-  it('compares product release and prerelease versions', () => {
-    expect(compareVersions('0.88.0-beta', '0.87.0-beta')).toBe(1)
-    expect(compareVersions('0.87.0', '0.87.0-beta')).toBe(1)
-    expect(compareVersions('0.87.0-beta.2', '0.87.0-beta.1')).toBe(1)
-    expect(compareVersions('0.87.0-beta', '0.87.0-beta')).toBe(0)
-    expect(compareVersions('0.86.0', '0.87.0-beta')).toBe(-1)
-  })
-
   it('requires JSON update output to be a read-only check', () => {
     expect(parseUpdateArgs(['--check', '--json'])).toEqual({
       checkOnly: true,
@@ -70,6 +61,7 @@ describe('OpenAlice CLI updates', () => {
     const result = await checkForUpdate({
       currentVersion: '0.87.0',
       installSource: stableSource,
+      platform: 'linux',
     }, {
       fetchImpl: manifestFetch(newerStableVersion),
       env: {},
@@ -87,6 +79,7 @@ describe('OpenAlice CLI updates', () => {
     await expect(checkForUpdate({
       currentVersion: `${currentMajor}.${currentMinor}.0-beta.1`,
       installSource: betaSource,
+      platform: 'linux',
     }, { fetchImpl, env: {} })).resolves.toMatchObject({
       status: 'available',
       latestVersion: newerBetaVersion,
@@ -207,11 +200,29 @@ describe('OpenAlice CLI updates', () => {
     })).rejects.toThrow('dev manifest is invalid')
   })
 
+  it.each([
+    ['0.94.1', '0.94.0', stableSource, 'blocked', 'older-release'],
+    ['0.94.1', '0.94.1-beta.2', betaSource, 'blocked', 'older-release'],
+    ['0.94.1-beta.10', '0.94.1-beta.2', betaSource, 'blocked', 'older-release'],
+    ['0.94.1+local.7', '0.94.1', stableSource, 'current', 'same-release'],
+    ['invalid', '0.94.1', stableSource, 'unknown', 'invalid-identity'],
+  ])('preserves the CLI decision for %s -> %s', async (currentVersion, candidate, installSource, status, reason) => {
+    await expect(checkForUpdate({ currentVersion, installSource, platform: 'linux' }, { fetchImpl: manifestFetch(candidate), env: {} })).resolves.toMatchObject({ status, reason })
+  })
+
+  it('cannot execute an older manifest as an update', async () => {
+    const applyUpdate = vi.fn(), stdout = { write: vi.fn() }
+    await runUpdateCommand(['--yes'], { readInstallSourceImpl: async () => stableSource, fetchImpl: manifestFetch('0.1.0'), env: {}, platform: 'linux', applyUpdate, stdout })
+    expect(applyUpdate).not.toHaveBeenCalled()
+    expect(stdout.write.mock.calls.flat().join('')).toContain('Update blocked: older-release')
+  })
+
   it('treats an explicit cross-channel selection as an installable switch', async () => {
     await expect(checkForUpdate({
       currentVersion: newerStableVersion,
       installSource: stableSource,
       channel: 'beta',
+      platform: 'linux',
     }, { fetchImpl: manifestFetch(newerBetaVersion), env: {} })).resolves.toMatchObject({
       status: 'available',
       channel: 'beta',
@@ -229,6 +240,7 @@ describe('OpenAlice CLI updates', () => {
         selector: { kind: 'branch', value: 'master' },
         installerUrl: 'https://openalice.ai/install',
       },
+      platform: 'linux',
     }, {
       fetchImpl: manifestFetch(newerStableVersion),
       env: {},
@@ -251,6 +263,7 @@ describe('OpenAlice CLI updates', () => {
     await expect(runUpdateCommand(['--yes'], {
       applyUpdate,
       fetchImpl: manifestFetch(newerStableVersion),
+      platform: 'linux',
       layout: { installRoot: '/tmp/.openalice' },
       readInstallSourceImpl: async () => stableSource,
       stdout,
@@ -307,6 +320,7 @@ describe('OpenAlice CLI updates', () => {
       },
     }, {
       layout: { installRoot: '/tmp/.openalice' },
+      platform: 'linux',
       yes: true,
       env: { PATH: '/bin' },
       fetchImpl: async () => ({
@@ -437,6 +451,7 @@ describe('OpenAlice CLI updates', () => {
       },
     }, {
       layout: { installRoot: '/tmp/.openalice' },
+      platform: 'linux',
       yes: true,
       env: { PATH: '/bin' },
       fetchImpl: async () => ({
@@ -465,6 +480,7 @@ describe('OpenAlice CLI updates', () => {
     const stderr = { isTTY: true, write: vi.fn() }
     const dependencies = {
       interactive: true,
+      platform: 'linux',
       layout: { updateCachePath: '/tmp/update-cache.json' },
       readFileImpl: async () => {
         if (cache == null) {

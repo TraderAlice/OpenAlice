@@ -1,6 +1,4 @@
 import { createHash } from 'node:crypto'
-import { readFile } from 'node:fs/promises'
-import { join } from 'node:path'
 
 import { ConnectorClient, OWNER_CHAT_TEXT_MAX } from '@traderalice/connector-protocol'
 
@@ -13,14 +11,9 @@ import type {
 import type { HeadlessTurnProgress } from '../headless-progress.js'
 import type { IssueComment } from './comments.js'
 import {
-  ISSUES_DIR_REL,
   isConnectorDeskIssue,
-  parseIssueContent,
   type IssueRecord,
 } from './declaration.js'
-
-const MAX_PROGRESS_SCOPES = 64
-const sentByScope = new Map<string, Set<string>>()
 
 export function normalizeDeskText(text: string): string {
   return text.trim().slice(0, OWNER_CHAT_TEXT_MAX)
@@ -59,52 +52,14 @@ export function deskProgressMessageId(scopeId: string, text: string): string {
 
 export function deskProgressScope(task: {
   readonly taskId: string
+  readonly communication?: import('../dispatch-communication.js').DispatchCommunication
   readonly inquiry?: Pick<HeadlessTaskInquiry, 'subject'>
   readonly trigger?: HeadlessTaskTrigger
 }): { workspaceId: string; issueId: string; scopeId: string } | null {
-  const subject = task.inquiry?.subject
-  if (subject?.kind === 'issue') {
-    return {
-      workspaceId: subject.workspaceId,
-      issueId: subject.issueId,
-      scopeId: subject.commentId ?? task.taskId,
-    }
-  }
-  const trigger = task.trigger
-  if (trigger?.kind === 'issue') {
-    return {
-      workspaceId: trigger.workspaceId,
-      issueId: trigger.issueId,
-      scopeId: task.taskId,
-    }
-  }
-  return null
-}
-
-export function alreadyProjectedDeskText(scopeId: string, text: string): boolean {
-  return sentByScope.get(scopeId)?.has(normalizeDeskText(text)) === true
-}
-
-export function forgetProjectedDeskTexts(scopeId: string): void {
-  sentByScope.delete(scopeId)
-}
-
-/** Test-only: drop in-memory desk-progress dedup. */
-export function resetProjectedDeskTexts(): void {
-  sentByScope.clear()
-}
-
-function markProjectedDeskText(scopeId: string, text: string): void {
-  let seen = sentByScope.get(scopeId)
-  if (!seen) {
-    if (sentByScope.size >= MAX_PROGRESS_SCOPES) {
-      const oldest = sentByScope.keys().next().value
-      if (oldest !== undefined) sentByScope.delete(oldest)
-    }
-    seen = new Set()
-    sentByScope.set(scopeId, seen)
-  }
-  seen.add(text)
+  const communication = task.communication
+  const reply = communication?.reply
+  if (!communication?.delivery || !reply || (reply.kind !== 'issue-comment' && reply.kind !== 'issue-run')) return null
+  return { workspaceId: reply.workspaceId, issueId: reply.issueId, scopeId: task.taskId }
 }
 
 export function shouldProjectDeskComment(
@@ -117,6 +72,7 @@ export function shouldProjectDeskComment(
     phase?: 'progress' | 'final'
     progressScopeId?: string
     triggerMetadata?: HeadlessTaskTriggerMetadata
+    delivery?: import('../dispatch-communication.js').DispatchCommunication['delivery']
   },
 ): boolean {
   if (!isConnectorDeskIssue(issue) || comment.via) return false
@@ -134,50 +90,21 @@ export async function projectDeskComment(
     phase?: 'progress' | 'final'
     progressScopeId?: string
     triggerMetadata?: HeadlessTaskTriggerMetadata
+    delivery?: import('../dispatch-communication.js').DispatchCommunication['delivery']
   },
 ): Promise<void> {
   const scope = opts?.progressScopeId ?? comment.replyTo
-  try {
-    if (!isConnectorDeskIssue(issue) || comment.via || !issue.connectorDesk) return
-    const phase = opts?.phase ?? 'final'
-    await client.sendOwnerMessage({
-      id: `desk-${comment.id}`,
-      adapterId: issue.connectorDesk,
-      conversationId: scope ?? comment.id,
-      phase,
-      text: normalizeDeskText(comment.markdown) || undefined,
-      workspaceId: opts?.workspaceId,
-      source: opts?.automated || opts?.triggerMetadata?.kind === 'connector-cron-issue' ? 'automation' : 'conversation',
-    }, AbortSignal.timeout(5_000))
-  } finally {
-    if (scope && opts?.phase !== 'progress') forgetProjectedDeskTexts(scope)
-  }
-}
-
-export async function projectDeskTurnProgress(input: {
-  issue: Pick<IssueRecord, 'connectorDesk' | 'status'>
-  scopeId: string
-  progress: HeadlessTurnProgress
-  triggerMetadata?: HeadlessTaskTriggerMetadata
-  client?: ConnectorClient
-}): Promise<string[]> {
-  if (!isConnectorDeskIssue(input.issue) || input.issue.status === 'canceled') return []
-  const client = input.client ?? new ConnectorClient(resolveConnectorUrl())
-  const sent: string[] = []
-  for (const text of sealedProgressTexts(input.progress, input.triggerMetadata)) {
-    if (alreadyProjectedDeskText(input.scopeId, text)) continue
-    await client.sendOwnerMessage({
-      id: deskProgressMessageId(input.scopeId, text),
-      adapterId: input.issue.connectorDesk,
-      conversationId: input.scopeId,
-      phase: 'progress',
-      source: input.triggerMetadata?.kind === 'connector-cron-issue' ? 'automation' : 'conversation',
-      text,
-    }, AbortSignal.timeout(5_000))
-    markProjectedDeskText(input.scopeId, text)
-    sent.push(text)
-  }
-  return sent
+  if (!isConnectorDeskIssue(issue) || comment.via || !issue.connectorDesk) return
+  const phase = opts?.phase ?? 'final'
+  await client.sendOwnerMessage({
+    id: `desk-${comment.id}`,
+    adapterId: opts?.delivery?.connectorId ?? issue.connectorDesk,
+    conversationId: scope ?? comment.id,
+    phase,
+    text: normalizeDeskText(comment.markdown) || undefined,
+    workspaceId: opts?.delivery?.contentWorkspaceId ?? opts?.workspaceId,
+    source: opts?.delivery?.source ?? (opts?.automated || opts?.triggerMetadata?.kind === 'connector-cron-issue' ? 'automation' : 'conversation'),
+  }, AbortSignal.timeout(5_000))
 }
 
 export async function projectDeskLifecycle(input: {
@@ -196,39 +123,4 @@ export async function projectDeskLifecycle(input: {
     phase: input.phase,
     ...(input.text ? { text: normalizeDeskText(input.text) } : {}),
   }, AbortSignal.timeout(5_000))
-}
-
-export async function projectWorkspaceDeskFailure(input: {
-  wsDir: string
-  issueId: string
-  conversationId: string
-  text: string
-  client?: ConnectorClient
-}): Promise<void> {
-  const issue = await readDeskIssue(input.wsDir, input.issueId)
-  if (!issue) return
-  await projectDeskLifecycle({ ...input, issue, phase: 'failed' })
-}
-
-export async function projectWorkspaceDeskTurnProgress(input: {
-  wsDir: string
-  issueId: string
-  scopeId: string
-  progress: HeadlessTurnProgress
-  triggerMetadata?: HeadlessTaskTriggerMetadata
-  client?: ConnectorClient
-}): Promise<string[]> {
-  const issue = await readDeskIssue(input.wsDir, input.issueId)
-  if (!issue) return []
-  return projectDeskTurnProgress({ ...input, issue })
-}
-
-async function readDeskIssue(wsDir: string, issueId: string): Promise<IssueRecord | null> {
-  try {
-    const raw = await readFile(join(wsDir, ISSUES_DIR_REL, `${issueId}.md`), 'utf8')
-    const parsed = parseIssueContent(issueId, raw)
-    return parsed.ok ? parsed.issue : null
-  } catch {
-    return null
-  }
 }

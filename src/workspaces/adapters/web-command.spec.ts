@@ -52,6 +52,16 @@ describe('Web surface command composition', () => {
     }
   })
 
+  it('lets every Web runtime except Pi compose a fresh Session without a native id', () => {
+    for (const adapter of webAdapters) {
+      if (adapter.id === 'pi') {
+        expect(() => adapter.composeWebCommand!([], ctx()), adapter.id).toThrow(/concrete Pi session id/)
+        continue
+      }
+      expect(() => adapter.composeWebCommand!([], ctx()), adapter.id).not.toThrow()
+    }
+  })
+
   it('composes omp RPC with auto-approve and by-id resume', () => {
     expect(ompAdapter.composeWebCommand!([], ctx({ resume: { sessionId: 'omp-1' } })))
       .toEqual(['omp', '--mode', 'rpc', '--auto-approve', '--resume', 'omp-1'])

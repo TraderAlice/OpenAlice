@@ -93,11 +93,11 @@ describe('global activity filters', () => {
     ])
   })
 
-  it('removes completed or paused scheduling and retains recent failures as the same signal family', () => {
+  it('projects distinct terminal states and retains recent failures as the same signal family', () => {
     const started = event(1, 'runtime.started', { cause: conversationCause() })
     expect(conversationActivityFilter.project({
       runtimeEvents: [started, event(2, 'runtime.stopped', { status: 'paused' })],
-    }, 2_000)).toEqual([])
+    }, 2_000)).toEqual([expect.objectContaining({ kind: 'conversation-paused' })])
 
     expect(conversationActivityFilter.project({
       runtimeEvents: [started, event(2, 'runtime.stopped', { status: 'failed', error: 'no auth' })],
@@ -108,6 +108,27 @@ describe('global activity filters', () => {
         detail: 'no auth',
       }),
     ])
+  })
+
+  it('does not classify recoverable tool errors as terminal failure and resets a taskless restart', () => {
+    const started = event(1, 'runtime.started', { taskId: undefined, cause: conversationCause() })
+    const recoverable = event(2, 'runtime.turn.error', { taskId: undefined, message: 'Tool recovered' })
+    const first = conversationActivityFilter.project({ runtimeEvents: [started, recoverable] }, 2_000)
+    expect(first[0]).toMatchObject({ kind: 'conversation', revision: 1 })
+    const restarted = conversationActivityFilter.project({ runtimeEvents: [started, event(3, 'runtime.stopped', { taskId: undefined, status: 'done' }), event(4, 'runtime.started', { taskId: undefined, cause: conversationCause() })] }, 4_000)
+    expect(restarted[0]).toMatchObject({ kind: 'conversation', revision: 4 })
+    expect(restarted[0].operationId).not.toBe(first[0].operationId)
+  })
+
+  it('distinguishes launch failure, rejection, success, interruption and pause', () => {
+    const started = event(1, 'runtime.started', { cause: conversationCause() })
+    for (const status of ['done', 'interrupted', 'paused'] as const) {
+      const result = conversationActivityFilter.project({ runtimeEvents: [started, event(2, 'runtime.stopped', { status })] }, 2_000)
+      expect(result[0].kind).toBe(status === 'done' ? 'conversation-completed' : `conversation-${status}`)
+    }
+    for (const [type, failureKind] of [['runtime.spawn_failed', 'spawn'], ['runtime.rejected', 'rejected']] as const) {
+      expect(conversationActivityFilter.project({ runtimeEvents: [started, event(2, type, { error: 'No auth', reason: 'Busy' })] }, 2_000)[0]).toMatchObject({ kind: 'conversation-failed', failureKind })
+    }
   })
 
   it('surfaces only recent Agent-originated Inbox deliveries', () => {
@@ -140,14 +161,14 @@ describe('global activity filters', () => {
         agent: undefined,
         newsItemId: 42,
         title: 'Markets reopen after holiday',
-        source: 'Reuters',
+        source: 'Reuters', image: 'https://cdn.example.com/photo.jpg',
       }, 10_000)],
     }, 11_000)).toEqual([
       expect.objectContaining({
         id: 'news:42',
         kind: 'news',
         detail: 'Markets reopen after holiday',
-        source: 'Reuters',
+        source: 'Reuters', image: 'https://cdn.example.com/photo.jpg',
       }),
     ])
   })

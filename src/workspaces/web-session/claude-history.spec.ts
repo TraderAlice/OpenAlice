@@ -18,7 +18,7 @@ it('reads only the requested session under the configured native directory', asy
   const cwd = join(root, 'workspace'); await mkdir(cwd)
   const config = join(root, 'config')
   const { realpath } = await import('node:fs/promises')
-  const key = (await realpath(cwd)).replaceAll('/', '-').replaceAll('.', '-')
+  const key = (await realpath(cwd)).replace(/[\\/:.]/g, '-')
   const dir = join(config, 'projects', key); await mkdir(dir, { recursive: true })
   const id = '11111111-1111-4111-8111-111111111111'
   const record = entry('a', null, 'user')

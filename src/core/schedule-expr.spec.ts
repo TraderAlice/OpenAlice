@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 
-import { computeNextRun, nextCronFire, scheduleCatchesUp } from './schedule-expr.js'
+import { computeNextRun, nextCronFire, scheduleCatchesUp, scheduleValidationError } from './schedule-expr.js'
 
 describe('schedule-expr', () => {
   const base = Date.UTC(2026, 0, 1, 12, 0, 0) // 2026-01-01T12:00:00Z (a Thursday)
@@ -62,5 +62,30 @@ describe('schedule-expr', () => {
       expect(nextCronFire('0 9 * *', base)).toBeNull() // only 4 fields
       expect(nextCronFire('0 9 * * *', base, 'US/Definitely-Not-A-Zone')).toBeNull()
     })
+  })
+})
+
+describe('schedule write validation', () => {
+  it.each([
+    [{ kind: 'every', every: '0m' }, 'invalid_interval'],
+    [{ kind: 'every', every: '1d' }, 'invalid_interval'],
+    [{ kind: 'every', every: '9'.repeat(400) + 'h' }, 'invalid_interval'],
+    [{ kind: 'cron', cron: '0 0 * *' }, 'invalid_cron'],
+    [{ kind: 'cron', cron: '0 0 31 2 *' }, 'invalid_cron'],
+    [{ kind: 'cron', cron: '0 * * * *', timezone: 'Mars/Base' }, 'invalid_timezone'],
+    [{ kind: 'at', at: '2026-02-30T09:00:00Z' }, 'invalid_at'],
+    [{ kind: 'at', at: '2026-10-03T09:00:00' }, 'invalid_at'],
+    [null, 'invalid_schedule'],
+  ])('rejects %j without changing reader behavior', (value, error) => {
+    expect(scheduleValidationError(value)).toBe(error)
+  })
+  it.each([
+    { kind: 'every', every: '5m30s' },
+    { kind: 'cron', cron: '0 * * * *', timezone: 'America/Los_Angeles', catchUp: false },
+    { kind: 'cron', cron: '30 8 * * 1-5', timezone: 'local' },
+    { kind: 'cron', cron: '0 0 29 2 *' },
+    { kind: 'at', at: '2020-01-01T09:00:00-07:00' },
+  ])('accepts %j, including absolute times already past', (value) => {
+    expect(scheduleValidationError(value)).toBeNull()
   })
 })

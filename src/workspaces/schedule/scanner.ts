@@ -1,3 +1,6 @@
+import type { ExecutionOrigin } from '../session-execution-manager.js'
+import type { AgentConversationDispatch } from '../agent-conversation-log.js'
+import type { IssueCommentRequest } from '../dispatch-communication.js'
 /**
  * ScheduleScanner - the dumb external scheduler for workspace self-declared
  * issues. Each tick it enumerates every workspace, reads that workspace's own
@@ -98,6 +101,7 @@ export interface ScheduleScannerDeps {
     meta: WorkspaceMeta,
     adapter: CliAdapter,
     prompt: string,
+    origin: ExecutionOrigin,
     timeoutMs?: number,
     /** Composite source of the dispatch. Execution may happen elsewhere. */
     trigger?: HeadlessTaskTrigger,
@@ -107,7 +111,7 @@ export interface ScheduleScannerDeps {
     inquiry?: HeadlessTaskInquiry,
     /** Fresh-Session credential/model/effort selection inherited from Issue frontmatter. */
     selection?: SessionRuntimeSelection,
-    conversation?: undefined,
+    conversation?: AgentConversationDispatch,
     /** Birth stamp when this fire allocates a new product Session. */
     createdBy?: SessionCreatedBy,
   ) => Promise<{ taskId: string; resumeId: string }>
@@ -121,6 +125,8 @@ export interface ScheduleScannerDeps {
   }) => Promise<void>
   /** Observe direct Issue file edits during the scanner's normal live read. */
   observeIssues?: (workspace: WorkspaceMeta, issues: readonly IssueRecord[]) => Promise<void>
+  /** Reconcile Workspace-owned Session config files on the infrastructure tick. */
+  reconcileSessionRuntimeBindings?: () => Promise<void>
   markers: MarkerStore
   logger: Logger
   /** Injectable clock for tests. */
@@ -136,6 +142,9 @@ export class ScheduleScanner {
   /** Close the tiny manual-retry vs schedule-tick race for one Issue. This is
    * only a dispatch-start lock, not a per-Workspace execution lock. */
   private readonly dispatchingIssues = new Set<string>()
+  private readonly pendingFires = new Map<string, Promise<void>>()
+
+  async waitForDispatches(): Promise<void> { await Promise.allSettled(this.pendingFires.values()) }
   /** Snapshot built as a side-effect of each scan; null until the first scan. */
   private lastSnapshot: ScheduleSnapshot | null = null
   private readonly now: () => number
@@ -221,11 +230,11 @@ export class ScheduleScanner {
   }
 
   /** Comments share the scheduler's dispatch/claim exclusion, without advancing its clock. */
-  async runIssueComment(input: { workspaceId: string; issueId: string; prompt: string; commentId: string }): Promise<{ taskId: string; resumeId: string }> {
+  async runIssueComment(input: IssueCommentRequest): Promise<{ taskId: string; resumeId: string }> {
     const ws = this.deps.registry.get(input.workspaceId)
     if (!ws) throw new Error('Workspace not found.')
     return this.dispatchIssue(ws, input.issueId, input.prompt, undefined, undefined, undefined,
-      false, undefined, undefined, true, input.commentId)
+      false, undefined, undefined, true, input.commentId, undefined, input.source)
   }
 
   private arm(): void {
@@ -239,7 +248,7 @@ export class ScheduleScanner {
     this.timer = null
     if (this.stopped) return
     try {
-      await this.scan()
+      await this.scan(false)
     } catch (err) {
       this.deps.logger.warn('schedule.scan_failed', { err })
     }
@@ -247,7 +256,7 @@ export class ScheduleScanner {
   }
 
   /** One full pass over all workspaces. Public for tests / a future "scan now". */
-  async scan(): Promise<void> {
+  async scan(waitForDispatch = true): Promise<void> {
     if (this.scanning) {
       this.deps.logger.info('schedule.scan_overlap_skipped', {})
       return
@@ -256,6 +265,7 @@ export class ScheduleScanner {
     const nowMs = this.now()
     const seen = new Set<string>()
     try {
+      await this.deps.reconcileSessionRuntimeBindings?.()
       // registry.list() order is preserved by Promise.all → stable display order.
       const extraDesks = extraConnectorDeskKeys(
         await findConnectorDesks(
@@ -263,7 +273,7 @@ export class ScheduleScanner {
         ),
       )
       const workspaces = await Promise.all(
-        this.deps.registry.list().map((ws) => this.scanWorkspace(ws, nowMs, seen, extraDesks)),
+        this.deps.registry.list().map((ws) => this.scanWorkspace(ws, nowMs, seen, extraDesks, waitForDispatch)),
       )
       await this.deps.markers.prune(seen)
       this.lastSnapshot = { workspaces }
@@ -282,6 +292,7 @@ export class ScheduleScanner {
     nowMs: number,
     seen: Set<string>,
     extraDesks: ReadonlySet<string>,
+    waitForDispatch: boolean,
   ): Promise<ScheduleSnapshotWorkspace> {
     let res
     try {
@@ -312,8 +323,9 @@ export class ScheduleScanner {
       if (!when) continue
       if (isConnectorDeskIssue(issue) && extraDesks.has(`${ws.id}:${issue.id}`)) continue
       seen.add(this.deps.markers.key(ws.id, issue.id))
-      if (isFireable(issue) && this.isDue(ws.id, issue.id, when, nowMs)) {
-        await this.fire(
+      const fireKey = `${ws.id}:${issue.id}`
+      if (!this.pendingFires.has(fireKey) && isFireable(issue) && this.isDue(ws.id, issue.id, when, nowMs)) {
+        const firing = this.fire(
           ws,
           issue.id,
           when,
@@ -325,7 +337,10 @@ export class ScheduleScanner {
           issueTimeoutMs(issue.timeout),
           issue.connectorDesk,
           nowMs,
-        )
+        ).catch(err => this.deps.logger.warn('schedule.fire_failed', { wsId: ws.id, issueId: issue.id, err }))
+          .finally(() => { this.pendingFires.delete(fireKey) })
+        this.pendingFires.set(fireKey, firing)
+        if (waitForDispatch) await firing
       }
       // Read the marker AFTER any fire so last/next reflect a just-fired run.
       const last = this.deps.markers.get(ws.id, issue.id) ?? null
@@ -422,6 +437,7 @@ export class ScheduleScanner {
     manual = false,
     commentId?: string,
     retryOfTaskId?: string,
+    commentSource?: IssueCommentRequest['source'],
   ): Promise<{ taskId: string; resumeId: string }> {
     const dispatchKey = `${issueWorkspace.id}:${issueId}`
     if (this.dispatchingIssues.has(dispatchKey)) {
@@ -498,15 +514,31 @@ export class ScheduleScanner {
         question: what,
         resolution: { mode: resumeId ? 'exact' : 'reconstructed' },
       } : undefined
+      const conversation: AgentConversationDispatch | undefined = inquiry ? {
+        source: commentSource ?? { kind: 'human' },
+        requestedTarget: resumeId ? { kind: 'resume', resumeId } : { kind: 'workspace', workspaceId: executionWorkspace.id },
+        originalPrompt: what, deliveredPrompt: what, promptMode: 'plain', subject: inquiry.subject,
+        resolution: resumeId
+          ? { mode: 'exact', origin: { kind: 'session', workspaceId: executionWorkspace.id, resumeId, agent: adapter.id } }
+          : { mode: 'reconstructed', workspaceId: executionWorkspace.id, reason: 'explicit-workspace' },
+      } : undefined
+      const origin: ExecutionOrigin = {
+        kind: manual ? 'issue' : 'schedule',
+        entry: commentId ? 'issue-comment' : manual ? (retryOfTaskId ? 'issue-retry' : 'issue-manual') : 'issue-schedule',
+        workspaceId: issueWorkspace.id, issueId,
+        ...(trigger?.metadata ? { connectorId: trigger.metadata.connectorId } : {}),
+        ...(commentSource?.kind === 'session' ? { resumeId: commentSource.resumeId } : {}),
+      }
       const result = inquiry
-        ? await this.deps.dispatch(executionWorkspace, adapter, what, timeoutMs, undefined,
-            resumeId, inquiry, selection, undefined, createdBy)
+        ? await this.deps.dispatch(executionWorkspace, adapter, what, origin, timeoutMs, undefined,
+            resumeId, inquiry, selection, conversation, createdBy)
         : resumeId
         ? selection
           ? await this.deps.dispatch(
               executionWorkspace,
               adapter,
               what,
+              origin,
               timeoutMs,
               trigger,
               resumeId,
@@ -517,6 +549,7 @@ export class ScheduleScanner {
               executionWorkspace,
               adapter,
               what,
+              origin,
               timeoutMs,
               trigger,
               resumeId,
@@ -526,6 +559,7 @@ export class ScheduleScanner {
               executionWorkspace,
               adapter,
               what,
+              origin,
               timeoutMs,
               trigger,
               undefined,
@@ -538,6 +572,7 @@ export class ScheduleScanner {
               executionWorkspace,
               adapter,
               what,
+              origin,
               timeoutMs,
               trigger,
               undefined,

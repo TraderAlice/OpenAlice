@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import { writeProjectWorkspaceRequest } from '../packages/cli/src/project-workspaces.ts'
-import { spawn, spawnSync } from 'node:child_process'
-import { existsSync, mkdirSync, mkdtempSync, rmSync } from 'node:fs'
+import { spawnSync } from 'node:child_process'
+import { existsSync, mkdirSync, mkdtempSync, rmSync, readFileSync } from 'node:fs'
 import { createServer as createNetServer } from 'node:net'
 import { homedir, tmpdir } from 'node:os'
 import { delimiter, join, resolve } from 'node:path'
@@ -11,9 +11,10 @@ import {
   createTemporaryDesktopPackageArtifact,
   DEFAULT_DESKTOP_PACKAGE_ROOT,
 } from './desktop-package-artifact.mjs'
-import { buildDesktopPackagedSmokePlan } from './desktop-packaged-smoke-plan.mjs'
+import { buildDesktopPackagedSmokePlan, desktopSmokeStateEnv } from './desktop-packaged-smoke-plan.mjs'
 import { runPnpmSync } from './pnpm-command.mjs'
 import { packagedElectronExecutable } from './smoke-packaged-toolchain.mjs'
+import { spawnDesktopSmoke, stopDesktopSmoke } from './desktop-smoke-process.mjs'
 import { startWorkspaceAcceptanceAiMock } from './workspace-acceptance-ai-mock.mjs'
 import {
   formatWorkspaceAcceptanceFailure,
@@ -25,7 +26,7 @@ const plan = buildDesktopPackagedSmokePlan(process.argv.slice(2), process.env)
 const {
   keep,
   keepPackage,
-  onboarding,
+  credentialPi,
   packageRoot: reusedPackageRoot,
   realData,
   signed,
@@ -47,10 +48,11 @@ Options:
   --package-root <path>
                  Reuse an explicit package output (requires --skip-pack)
   --keep-package Keep the temporary package output created by this run
-  --temp-data    Use isolated temporary data/workspace/global stores
-  --real-data    Use real data explicitly (default; kept for compatibility)
-  --onboarding   Build with first-run guide enabled, use temp data, run an
-                 automated renderer onboarding smoke, then exit
+  --temp-data    Use isolated temporary OpenAlice data/workspace/global stores (default)
+  --real-data    Explicitly opt into real OpenAlice user data
+  --credential-pi
+                 Test credential UI and API-bound native Pi execution, then exit
+  --onboarding   Deprecated alias for --credential-pi
   --trading-mode Use temp data, exercise lite -> readonly -> lite UTA lifecycle,
                  then exit
   --workspace-acceptance
@@ -99,9 +101,27 @@ function waitForPackagedApp(child, automated) {
   return new Promise((resolve, reject) => {
     let requestedSignal = null
     let timedOut = false
-    const forwardSignal = (signal) => {
+    let settled = false
+    let shutdown = null
+    const finish = async (code, signal) => {
+      if (settled) return
+      settled = true
+      cleanup()
+      try {
+        await (shutdown ?? stopDesktopSmoke(child))
+        resolve({ code, signal, requestedSignal, timedOut })
+      } catch (error) { reject(error) }
+    }
+    const requestStop = (signal) => {
       requestedSignal = signal
-      child.kill('SIGTERM')
+      shutdown ??= stopDesktopSmoke(child)
+      void shutdown.then(() => finish(child.exitCode, child.signalCode), (error) => {
+        cleanup()
+        reject(error)
+      })
+    }
+    const forwardSignal = (signal) => {
+      requestStop(signal)
     }
     const onSigint = () => forwardSignal('SIGINT')
     const onSigterm = () => forwardSignal('SIGTERM')
@@ -112,23 +132,22 @@ function waitForPackagedApp(child, automated) {
       ? setTimeout(() => {
           timedOut = true
           console.error('[desktop-smoke] automated packaged smoke timed out')
-          child.kill('SIGTERM')
+          requestStop(null)
         }, 180_000)
       : null
     timeout?.unref()
 
-    const finish = () => {
+    const cleanup = () => {
       if (timeout) clearTimeout(timeout)
       process.off('SIGINT', onSigint)
       process.off('SIGTERM', onSigterm)
     }
     child.once('error', (error) => {
-      finish()
+      cleanup()
       reject(error)
     })
     child.once('exit', (code, signal) => {
-      finish()
-      resolve({ code, signal, requestedSignal, timedOut })
+      void finish(code, signal)
     })
   })
 }
@@ -145,7 +164,7 @@ async function main() {
   }
   for (const warning of plan.warnings) console.warn(warning)
 
-  if (process.platform !== 'darwin' && !workspaceAcceptance) {
+  if (process.platform !== 'darwin' && !workspaceAcceptance && !credentialPi) {
     console.error('[desktop-smoke] packaged .app smoke currently runs on macOS only')
     return { code: 1, signal: null }
   }
@@ -153,13 +172,15 @@ async function main() {
   let aiMock = null
   let packageArtifact = null
   let smokeRoot = null
+  let appChild = null
+  let appStopped = true
   let finalCode = 0
   let signalToRaise = null
 
   try {
-    aiMock = onboarding || workspaceAcceptance ? await startWorkspaceAcceptanceAiMock() : null
+    aiMock = credentialPi || workspaceAcceptance ? await startWorkspaceAcceptanceAiMock() : null
     if (aiMock) {
-      if (onboarding) {
+      if (credentialPi) {
         plan.buildEnv.VITE_OPENALICE_ONBOARDING_AI_BASE_URL = aiMock.baseUrl
         plan.launchEnv.OPENALICE_ONBOARDING_AI_BASE_URL = aiMock.baseUrl
       }
@@ -215,7 +236,7 @@ async function main() {
     const smokeHome = smokeRoot ? join(smokeRoot, 'home') : null
     const smokeWorkspaces = smokeRoot ? join(smokeRoot, 'workspaces') : null
     const smokeGlobal = smokeRoot ? join(smokeRoot, 'global') : null
-    if (onboarding && smokeHome) {
+    if (credentialPi && smokeHome) {
       mkdirSync(smokeHome, { recursive: true })
       await writeProjectWorkspaceRequest(smokeHome, ['chat'])
     }
@@ -227,21 +248,26 @@ async function main() {
       join(homedir(), '.local', 'bin'),
     ].filter(Boolean)
     const env = {
-      ...process.env,
+      ...(smokeRoot ? desktopSmokeStateEnv(smokeRoot, process.env) : process.env),
       ...plan.launchEnv,
       PATH: [process.env['PATH'], ...pathAdditions].filter(Boolean).join(delimiter),
       OPENALICE_EXTRA_AGENT_PATH: pathAdditions.join(delimiter),
     }
     for (const key of plan.unsetLaunchEnv) delete env[key]
 
-    if (onboarding || tradingMode || workspaceAcceptance) {
+    if (credentialPi || tradingMode || workspaceAcceptance) {
       env.OPENALICE_UTA_PORT = String(await getAvailablePort())
     }
     if (!realData && smokeHome && smokeWorkspaces && smokeGlobal) {
-      env.OPENALICE_HOME = smokeHome
-      env.AQ_LAUNCHER_ROOT = smokeWorkspaces
-      env.OPENALICE_GLOBAL_DIR = smokeGlobal
-      if (onboarding) env.PI_CODING_AGENT_DIR = join(smokeRoot, 'pi-agent')
+      mkdirSync(env.HOME, { recursive: true })
+    }
+
+    if (workspaceAcceptance) {
+      // Seed only the durable native handoff. The real candidate process must
+      // prove its own identity/readiness; no native installer is simulated here.
+      const { DesktopUpdateLifecycle } = await import('../dist/electron/update-lifecycle.js')
+      const version = JSON.parse(readFileSync(join(repoRoot, 'package.json'), 'utf8')).version
+      await new DesktopUpdateLifecycle(env.OPENALICE_ELECTRON_SMOKE_USER_DATA, () => '0.0.0').install(version, async () => {}, async () => {})
     }
 
     const receiptPath = workspaceAcceptance
@@ -258,9 +284,9 @@ async function main() {
       console.log(`[desktop-smoke] workspaces: ${smokeWorkspaces}`)
       console.log(`[desktop-smoke] global provider keys: ${smokeGlobal}`)
     }
-    if (onboarding) {
-      console.log('[desktop-smoke] onboarding smoke: enabled; app exits automatically after the renderer probe')
-      console.log(`[desktop-smoke] onboarding UTA port: ${env.OPENALICE_UTA_PORT}`)
+    if (credentialPi) {
+      console.log('[desktop-smoke] credential-pi acceptance: credential UI + API-bound native Pi headless reply; app exits automatically')
+      console.log(`[desktop-smoke] credential-pi UTA port: ${env.OPENALICE_UTA_PORT}`)
     } else if (tradingMode) {
       console.log('[desktop-smoke] trading-mode smoke: lite -> readonly -> lite; app exits automatically')
       console.log(`[desktop-smoke] trading-mode UTA port: ${env.OPENALICE_UTA_PORT}`)
@@ -272,14 +298,20 @@ async function main() {
       console.log('[desktop-smoke] close the app window or press Ctrl-C here to stop')
     }
 
-    const child = spawn(appPath, [], {
+    appChild = spawnDesktopSmoke(appPath, [], {
       cwd: repoRoot,
       stdio: 'inherit',
       env,
     })
-    const exit = await waitForPackagedApp(child, onboarding || tradingMode || workspaceAcceptance)
+    appStopped = false
+    const exit = await waitForPackagedApp(appChild, credentialPi || tradingMode || workspaceAcceptance)
+    appStopped = true
     signalToRaise = exit.requestedSignal
     finalCode = exit.timedOut ? 1 : exit.code ?? (exit.signal ? 1 : 0)
+
+    if (credentialPi && finalCode === 0 && (aiMock.stats.credentialTests < 1 || aiMock.stats.readinessTurns < 2)) {
+      throw new Error('credential-pi mock did not observe credential test, configured readiness and native headless reply')
+    }
 
     if (workspaceAcceptance) {
       if (!existsSync(receiptPath)) {
@@ -303,18 +335,27 @@ async function main() {
     console.error(`[desktop-smoke] ${error instanceof Error ? error.message : String(error)}`)
   } finally {
     aiMock?.server.close()
-    if (smokeRoot && !keep) {
+    if (!appStopped) {
+      try {
+        await stopDesktopSmoke(appChild)
+        appStopped = true
+      } catch (error) {
+        finalCode = 1
+        console.error(`[desktop-smoke] app cleanup failed; keeping package and data: ${error instanceof Error ? error.message : String(error)}`)
+      }
+    }
+    if (smokeRoot && !keep && appStopped) {
       try {
         rmSync(smokeRoot, { recursive: true, force: true, maxRetries: 8, retryDelay: 250 })
       } catch (error) {
         finalCode = 1
         console.error(`[desktop-smoke] failed to clean temporary data ${smokeRoot}: ${error instanceof Error ? error.message : String(error)}`)
       }
-    } else if (smokeRoot && keep) {
+    } else if (smokeRoot && (keep || !appStopped)) {
       console.log(`[desktop-smoke] kept temporary data: ${smokeRoot}`)
     }
 
-    const packageCleanup = cleanupTemporaryDesktopPackageArtifact(packageArtifact, { keep: keepPackage })
+    const packageCleanup = cleanupTemporaryDesktopPackageArtifact(packageArtifact, { keep: keepPackage || !appStopped })
     if (packageCleanup.kept) {
       console.log(`[desktop-smoke] kept temporary package: ${packageArtifact.packageRoot}`)
     } else if (packageCleanup.cleaned) {

@@ -1,20 +1,18 @@
+import { signCliMacOS } from './sign-cli-macos.mjs'
+import { requireBunVersion } from './bun-toolchain.mjs'
 import { runtimeCompileOptions } from './bun-compile-options.js'
 import { mkdir, readFile, rm, stat, writeFile } from 'node:fs/promises'
 import { basename, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 const repositoryRoot = fileURLToPath(new URL('..', import.meta.url))
-const pinnedBunVersion = (await readFile(join(repositoryRoot, '.bun-version'), 'utf8')).trim()
+requireBunVersion(Bun.version)
 
-if (Bun.version !== pinnedBunVersion) {
-  throw new Error(`Bun ${pinnedBunVersion} is required, but ${Bun.version} is running`)
-}
-
-const cliPackage = JSON.parse(
-  await readFile(join(repositoryRoot, 'packages/cli/package.json'), 'utf8'),
+const product = JSON.parse(
+  await readFile(join(repositoryRoot, 'package.json'), 'utf8'),
 ) as { version?: unknown }
-if (typeof cliPackage.version !== 'string' || cliPackage.version.length === 0) {
-  throw new Error('packages/cli/package.json must contain a version')
+if (typeof product.version !== 'string' || product.version.length === 0) {
+  throw new Error('package.json must contain a version')
 }
 
 const outputRoot = resolve(
@@ -36,7 +34,7 @@ const result = await Bun.build({
     ...runtimeCompileOptions,
   },
   define: {
-    'globalThis.__OPENALICE_BUILD_VERSION__': JSON.stringify(cliPackage.version),
+    'globalThis.__OPENALICE_BUILD_VERSION__': JSON.stringify(product.version),
   },
   minify: true,
 })
@@ -46,12 +44,13 @@ if (!result.success) {
   for (const log of result.logs) console.error(log)
   throw new Error('Bun CLI feasibility build failed')
 }
+if (process.platform === 'darwin') signCliMacOS(executablePath, process.arch)
 
 const smokeEnvironment = minimalSmokeEnvironment(outputRoot)
 const version = runProbe(executablePath, ['--version'], smokeEnvironment)
-if (version.stdout.trim() !== cliPackage.version) {
+if (version.stdout.trim() !== product.version) {
   throw new Error(
-    `compiled CLI reported ${JSON.stringify(version.stdout.trim())}, expected ${cliPackage.version}`,
+    `compiled CLI reported ${JSON.stringify(version.stdout.trim())}, expected ${product.version}`,
   )
 }
 
@@ -62,7 +61,7 @@ if (!help.stdout.includes('openalice')) {
 
 const versionJson = runProbe(executablePath, ['version', '--json'], smokeEnvironment)
 const versionMetadata = JSON.parse(versionJson.stdout) as { version?: unknown }
-if (versionMetadata.version !== cliPackage.version) {
+if (versionMetadata.version !== product.version) {
   throw new Error('compiled CLI version metadata did not use the build-time product version')
 }
 
@@ -83,7 +82,7 @@ const executable = await stat(executablePath)
 const report = {
   schemaVersion: 1,
   status: 'pass',
-  productVersion: cliPackage.version,
+  productVersion: product.version,
   bunVersion: Bun.version,
   platform: process.platform,
   arch: process.arch,

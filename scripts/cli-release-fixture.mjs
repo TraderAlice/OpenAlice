@@ -1,3 +1,4 @@
+import { signCliMacOS } from './sign-cli-macos.mjs'
 import { execFileSync } from 'node:child_process'
 import { createHash } from 'node:crypto'
 import {
@@ -38,7 +39,7 @@ export function preparePreviousCliReleaseArchives({ inputDir, outputDir, version
     })
     const stagingRoot = mkdtempSync(join(tmpdir(), 'openalice-cli-previous-'))
     try {
-      execFileSync('tar', ['-xzf', currentArchive, '-C', stagingRoot])
+      execFileSync('tar', ['-xzpf', currentArchive, '--no-same-owner', '-C', stagingRoot])
       const currentReleaseRoot = join(stagingRoot, current.releaseName)
       const rewritten = rewriteExpandedCliRelease({
         releaseRoot: currentReleaseRoot,
@@ -94,9 +95,7 @@ export function rewriteExpandedCliRelease({ releaseRoot, fromVersion, toVersion 
     throw new Error(`native executable did not contain embedded version ${fromVersion}`)
   }
   writeFileSync(executablePath, executable)
-  if (process.platform === 'darwin' && isMachO(executable)) {
-    execFileSync('/usr/bin/codesign', ['--force', '--sign', '-', executablePath])
-  }
+  if (isMachO(executable)) signCliMacOS(executablePath, release.arch)
   const rewrittenExecutable = readFileSync(executablePath)
   const executableSha256 = sha256(rewrittenExecutable)
 

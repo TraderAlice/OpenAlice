@@ -1,3 +1,4 @@
+import { modelDisplayName } from '../../lib/modelIdentity'
 import { useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { X } from 'lucide-react'
@@ -25,6 +26,8 @@ import { AIProviderIcon } from '../../lib/aiProviderIcon'
 import { Dialog } from '../uta/Dialog'
 import { Button } from '../ui/button'
 import { ModelCombobox } from './PresetFields'
+import { useProviderModels } from '../../hooks/useProviderModels'
+import { ModelCatalogStatus } from '../ModelCatalogStatus'
 
 const SHAPE_ORDER: WireShape[] = ['anthropic', 'google-generative-ai', 'openai-chat', 'openai-responses']
 const STORED_REGION_ID = '__stored__'
@@ -97,7 +100,6 @@ export function CredentialModal({ mode, cred, presets, agents, initialPresetId, 
   const isCustom = !!preset && !isDirect && regions.length === 0
   const usingStoredRegion = !isCustom && regionId === STORED_REGION_ID
   const region = usingStoredRegion ? undefined : regionById(preset, regionId)
-  const models = preset ? presetModels(preset) : []
 
   const wires: Partial<Record<WireShape, string>> = isCustom
     ? (customUrl.trim() ? { [customShape]: customUrl.trim() } : {})
@@ -111,6 +113,13 @@ export function CredentialModal({ mode, cred, presets, agents, initialPresetId, 
       : regionShapes(region)
   const primaryShape = shapes[0]
   const primaryUrl = primaryShape ? (wires[primaryShape] ?? '') : ''
+  const storedAccess = cred && primaryShape && primaryShape in (cred.wires ?? {})
+    && primaryUrl === cred.wires?.[primaryShape] && (!apiKey.trim() || apiKey === cred.apiKey)
+  const modelCatalog = useProviderModels({ model, fallback: preset ? presetModels(preset) : [], request: !isDirect && primaryShape && (!isCustom || primaryUrl.trim()) && (!primaryUrl || validEndpoint(primaryUrl))
+    ? storedAccess ? { slug: cred.slug, wireShape: primaryShape }
+      : apiKey.trim() ? { vendor: preset ? VENDOR_BY_PRESET[preset.id] ?? 'custom' : 'custom', wires, wireShape: primaryShape, baseUrl: primaryUrl, apiKey: apiKey.trim() } : null
+    : null })
+  const models = modelCatalog.models
   const compatibilityWires = isCustom ? { [customShape]: customUrl.trim() } : wires
   const compatibleAgents = isDirect && preset?.directAgentId
     ? agents.some((agent) => agent.id === preset.directAgentId) ? [preset.directAgentId] : []
@@ -283,6 +292,7 @@ export function CredentialModal({ mode, cred, presets, agents, initialPresetId, 
                 {visiblePresets.map((item) => (
                   <button
                     key={item.id}
+                    data-credential-preset={item.id}
                     onClick={() => pickPreset(item)}
                     className="flex min-h-12 w-full items-center gap-3 border-b border-border/60 px-3 py-2 text-left transition-colors last:border-b-0 hover:bg-muted/60"
                   >
@@ -321,7 +331,12 @@ export function CredentialModal({ mode, cred, presets, agents, initialPresetId, 
                   <span className="min-w-0 truncate text-[11px] text-muted-foreground">{preset.description}</span>
                 </div>
                 {mode === 'add' && (
-                  <button onClick={() => { setPreset(null); gate.reset() }} className="text-[11px] text-primary hover:underline">{t('common.change')}</button>
+                  <button onClick={() => {
+                    setPreset(null)
+                    // Automatic discovery must not carry a key to a different provider.
+                    setApiKey('')
+                    gate.reset()
+                  }} className="text-[11px] text-primary hover:underline">{t('common.change')}</button>
                 )}
               </div>
 
@@ -452,16 +467,17 @@ export function CredentialModal({ mode, cred, presets, agents, initialPresetId, 
 
               <Field
                 label={t('aiProvider.credentialModal.defaultModel')}
-                description={preset.setup?.modelHelp ?? t('aiProvider.credentialModal.defaultModelHelp')}
               >
                 <ModelCombobox
                   value={model}
+                  vendor={VENDOR_BY_PRESET[preset.id]}
                   suggestions={models}
                   onChange={setModel}
-                  placeholder={t('aiProvider.credentialModal.modelPlaceholder')}
+                  placeholder={t('modelCatalog.selectPlaceholder')}
                   ariaLabel={t('aiProvider.credentialModal.defaultModel')}
-                  suggestionsLabel={t('aiProvider.credentialModal.defaultModelHelp')}
+                  suggestionsLabel={t('workspaceSettings.ai.modelSuggestions')}
                 />
+                <ModelCatalogStatus catalog={modelCatalog} selectedModel={model} />
               </Field>
 
               {!isDirect && <details className="rounded-lg border border-border bg-secondary/20 px-3 py-2">
@@ -481,7 +497,7 @@ export function CredentialModal({ mode, cred, presets, agents, initialPresetId, 
 
               {!isDirect && (
                 <p className="rounded-lg bg-muted px-3 py-2 text-[10.5px] leading-relaxed text-muted-foreground">
-                  {t('aiProvider.credentialModal.testExplanation', { model: model.trim() || t('aiProvider.credentialModal.selectedModel') })}
+                  {t('aiProvider.credentialModal.testExplanation', { model: model.trim() ? modelDisplayName(model, models.find((candidate) => candidate.id === model)?.label) : t('aiProvider.credentialModal.selectedModel') })}
                 </p>
               )}
 
@@ -490,7 +506,7 @@ export function CredentialModal({ mode, cred, presets, agents, initialPresetId, 
               )}
               {gate.testing && <p className="text-[12px] text-muted-foreground">{t('aiProvider.credentialModal.testingConnection')}</p>}
               {gate.result && !staleResult && (
-                <div className={`min-w-0 max-w-full overflow-hidden rounded-lg px-3 py-2.5 text-[12px] ${gate.result.ok ? 'bg-success/10 text-success' : 'bg-destructive/10 text-destructive'}`}>
+                <div data-testid="credential-test-result" data-ok={gate.result.ok} className={`min-w-0 max-w-full overflow-hidden rounded-lg px-3 py-2.5 text-[12px] ${gate.result.ok ? 'bg-success/10 text-success' : 'bg-destructive/10 text-destructive'}`}>
                   {gate.result.ok ? (
                     gate.result.response?.trim() ? (
                       <>

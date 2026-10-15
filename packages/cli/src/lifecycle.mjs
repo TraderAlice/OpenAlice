@@ -15,8 +15,6 @@ import {
 } from './local-start.mjs'
 import {
   createStartupSignalGuard,
-  openBrowser,
-  probeOpenAlice,
 } from './runtime-client.mjs'
 import {
   readRuntimeStatus,
@@ -117,7 +115,6 @@ export async function startRuntime(options, dependencies = {}) {
     port: options.port,
     takeover: options.takeover,
   })
-  runtimeEnv.OPENALICE_LAUNCHER = 'cli-server'
   runtimeEnv.OPENALICE_SERVER_MODE = detached ? 'detached' : 'foreground'
   runtimeEnv.OPENALICE_RUNTIME_PROVIDER = runtimeProvider.kind
   if (standalone) {
@@ -128,6 +125,7 @@ export async function startRuntime(options, dependencies = {}) {
       { inspectDependencies: dependencies.inspectDependencies },
     )
   }
+  runtimeEnv.OPENALICE_LAUNCHER = 'cli-server'
   delete runtimeEnv.OPENALICE_RUNTIME_CONTENT_IDENTITY
   if (runtimeProvider.contentIdentity) {
     runtimeEnv.OPENALICE_RUNTIME_CONTENT_IDENTITY = runtimeProvider.contentIdentity
@@ -300,29 +298,6 @@ export async function stopRuntime(options = {}, dependencies = {}) {
     homeRoot: options.homeRoot,
     waitMs: options.waitMs,
   }, dependencies)
-}
-
-export async function openRuntime(options = {}, dependencies = {}) {
-  const status = await inspectRuntime(options, dependencies)
-  const url = status.endpoints?.web
-  if (!url) {
-    throw lifecycleError(
-      'ERUNTIMENOTREADY',
-      status.class === 'absent'
-        ? `OpenAlice is not running for ${status.home}. Run "openalice up" first.`
-        : `OpenAlice Runtime is ${status.class} and did not advertise a Web URL.`,
-    )
-  }
-  if (!isLoopbackWebUrl(url)) {
-    throw lifecycleError('EINVALIDENDPOINT', `OpenAlice Runtime advertised a non-loopback Web URL: ${url}`)
-  }
-  const probeRuntime = dependencies.probeRuntime ?? probeOpenAlice
-  if (!await probeRuntime(url)) {
-    throw lifecycleError('ERUNTIMENOTREADY', `OpenAlice Web UI is not ready at ${url}`)
-  }
-  const launchBrowser = dependencies.launchBrowser ?? openBrowser
-  await launchBrowser(url)
-  return { opened: true, url, status }
 }
 
 export function lifecycleError(code, message, exitCode = 1) {

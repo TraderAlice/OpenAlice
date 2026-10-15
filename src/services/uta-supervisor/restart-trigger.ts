@@ -44,13 +44,26 @@ interface HealthBody {
 
 async function fetchHealth(url: string): Promise<HealthBody | null> {
   try {
-    const res = await fetch(url)
+    const res = await fetch(url, { signal: AbortSignal.timeout(5000) })
     if (!res.ok) return null
     return (await res.json()) as HealthBody
   } catch { return null }
 }
 
-export async function triggerUTARestart(opts: TriggerOpts = {}): Promise<TriggerResult> {
+const restartTails = new Map<string, Promise<TriggerResult>>()
+
+/** Different Pack owners still share one UTA process and one restart flag.
+ * Serialize requests so a later activation cannot consume an earlier boot or
+ * race another writer's atomic temporary file. */
+export function triggerUTARestart(opts: TriggerOpts = {}): Promise<TriggerResult> {
+  const key = opts.flagPath ?? dataPath('control', 'restart-uta.flag')
+  const prior = restartTails.get(key)
+  const run = (prior ? prior.catch(() => undefined) : Promise.resolve()).then(() => restartUTA(opts))
+  restartTails.set(key, run)
+  void run.finally(() => { if (restartTails.get(key) === run) restartTails.delete(key) }).catch(() => undefined)
+  return run
+}
+async function restartUTA(opts: TriggerOpts): Promise<TriggerResult> {
   if (isUTADisabled()) {
     return { triggered: false, ready: false, error: 'UTA disabled by OPENALICE_LITE_MODE' }
   }

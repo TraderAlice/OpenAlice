@@ -342,7 +342,11 @@ describe('built-in Agent Session runtime projection', () => {
     expect(piAdapter.sessionRuntime!.project(ctx, runtime).webArgs)
       .toContain('--extension')
     expect(ompAdapter.sessionRuntime!.project(ctx, runtime).interactiveArgs)
-      .toEqual(['--model', 'session-model', '--thinking', 'high'])
+      .toEqual([
+        '--extension', expect.stringMatching(/pi-session-provider\.ts$/),
+        '--model', 'openalice-session/session-model',
+        '--thinking', 'high',
+      ])
     expect(agyAdapter.sessionRuntime!.project(ctx, runtime).interactiveArgs)
       .toEqual(['--model', 'session-model', '--effort', 'high'])
   })
@@ -408,4 +412,22 @@ describe('Session follow-up selection', () => {
   it('keeps model choices when explicitly supplied with a new credential', () => {
     expect(mergeSessionRuntimeSelection(binding, { credentialSource: 'native', model: 'new' })).toEqual({ credentialSource: 'native', model: 'new' })
   })
+})
+
+it('projects provider-resolved capabilities into launch and resume without injecting a default effort', async () => {
+  const { AIProvider } = await import('../ai-providers/provider.js')
+  const resolve = vi.spyOn(AIProvider.prototype, 'resolveModel').mockReturnValue({
+    id: 'private-model', label: 'Private', semantics: {
+      contextWindow: 12345, reasoning: { supported: true, efforts: ['low', 'high'], defaultEffort: 'high' },
+    },
+  })
+  try {
+    const credential: Credential = { ...openai, vendor: 'custom', lastModel: 'private-model', wires: { 'openai-chat': 'https://private.test/v1' } }
+    const resolved = await createSessionRuntimeBinding({ adapter: piAdapter, cwd: '/workspace', selection: { credentialSlug: 'private' }, credentials: { private: credential } })
+    expect(resolved.ai).toMatchObject({ model: 'private-model', contextWindow: 12345, reasoning: true })
+    expect(resolved.ai).not.toHaveProperty('reasoningEffort')
+    const resumed = await resolveSessionRuntimeBinding({ adapter: piAdapter, cwd: '/workspace', binding: { ...resolved.binding, reasoningEffort: 'low' }, credentials: { private: credential } })
+    expect(resumed.ai).toMatchObject({ reasoning: true, reasoningEffort: 'low', contextWindow: 12345 })
+    expect(resolve).toHaveBeenCalledWith('private-model')
+  } finally { resolve.mockRestore() }
 })

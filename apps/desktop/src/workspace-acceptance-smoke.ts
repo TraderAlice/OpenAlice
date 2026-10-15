@@ -10,6 +10,7 @@ export interface WorkspaceAcceptanceReceipt {
   readonly durationMs: number
   readonly error?: string
   readonly checks: {
+    readonly updateLifecycle: boolean
     readonly workspaceCreated: boolean
     readonly gitReady: boolean
     readonly cliEnvironmentInjected: boolean
@@ -52,6 +53,7 @@ export async function runRendererWorkspaceAcceptanceSmoke(
     const shellMarker = '__OPENALICE_WORKSPACE_CLI_CONTRACT_OK__'
     const shellFailureMarker = '__OPENALICE_WORKSPACE_CLI_STEP_FAILED__'
     const checks = {
+      updateLifecycle: false,
       workspaceCreated: false,
       gitReady: false,
       cliEnvironmentInjected: false,
@@ -227,9 +229,21 @@ export async function runRendererWorkspaceAcceptanceSmoke(
           () => shellReadyReject(new Error('Workspace shell-ready timeout: ' + output.slice(-4000))),
           10000,
         )
-        bridge.send(connectionId, new TextEncoder().encode(
+        const shellProbe = new TextEncoder().encode(
           "printf '__OPENALICE_%s_READY__\\\\n' 'SHELL'\\r",
-        ))
+        )
+        // A quiet terminal is not a reliable readiness signal: ConPTY may keep
+        // emitting prompt-control bytes after the login shell is usable. This
+        // probe has no side effects, so use its marker as the readiness signal
+        // and retry until the shell acknowledges it. ConPTY can lose the first
+        // typed byte during startup.
+        while (!output.includes('__OPENALICE_SHELL_READY__')) {
+          bridge.send(connectionId, shellProbe)
+          await Promise.race([
+            shellReady,
+            new Promise((resolve) => setTimeout(resolve, 500)),
+          ])
+        }
         await shellReady
         helperReadyTimer = setTimeout(
           () => helperReadyReject(new Error('Workspace CLI helper-ready timeout: ' + output.slice(-4000))),
@@ -289,6 +303,18 @@ export async function runRendererWorkspaceAcceptanceSmoke(
       }))
       workspaceId = created.workspace.id
       checks.workspaceCreated = true
+      const inventory = await json(await fetch('/api/updates/inventory?force=1'))
+      if (!inventory.units.some(unit => unit.id === 'alice-harness:' + workspaceId)) throw new Error('Shared update inventory omitted injected Skills')
+      await window.openAlice.clientUpdates.activate()
+      const deadline = Date.now() + 15000
+      let receipt
+      do {
+        receipt = await window.openAlice.clientUpdates.operation()
+        if (receipt?.phase === 'succeeded') break
+        await new Promise(resolve => setTimeout(resolve, 200))
+      } while (Date.now() < deadline)
+      if (receipt?.phase !== 'succeeded' || !receipt.completed['desktop:reconnect']) throw new Error('Packaged native handoff did not verify required readiness: ' + JSON.stringify(receipt))
+      checks.updateLifecycle = true
 
       await json(await fetch('/api/workspaces/' + encodeURIComponent(workspaceId) + '/agent-config/pi', {
         method: 'PUT',

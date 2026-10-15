@@ -1,7 +1,7 @@
 # Shell CLI Supervisor
 
 This guide owns the computer-level `openalice` command surface above Guardian:
-background and foreground lifecycle, status presentation, browser opening,
+background and foreground lifecycle, status presentation, relay GUI opening,
 machine-readable envelopes, shell completion, compatibility aliases, and the
 boundary of the Supervisor TUI.
 
@@ -12,10 +12,9 @@ takeover, and process-tree truth belong to [[docs/project-structure.md]] and
 `packages/guardian-runtime/`.
 
 Remaining Supervisor product work is tracked in
-[[plans/shell-first-cli-supervisor.md]]. Native Bun distribution and explicit
-release-channel work are tracked in [[plans/bun-cli-distribution.md]] and
-[[plans/release-channels-0.90.2.md]]. This guide describes only behavior already
-shipped in the current tree.
+[[plans/shell-first-cli-supervisor.md]]. Native distribution belongs to
+[[docs/cli-installer.md]]; channel publication and release decisions belong to
+[[docs/development-workflow.md]]. This guide describes implemented behavior.
 
 ## Product Boundary
 
@@ -48,19 +47,43 @@ openalice down [options]
 openalice status [options]
 openalice logs [options]
 openalice doctor [options]
-openalice open [options]
+openalice relay [--port <port>] [--no-open]
 openalice create alice-project [options]
 openalice project [list|use|copy-ai-creds|transfer] [options]
 ```
 
+Remote selectors and Machine preparation are defined in
+[Remote Command Contract](remote-access.md#command-contract). The default TUI
+and `relay` entry points are defined under [Default and Compatibility Surface](#default-and-compatibility-surface).
+
+Startup selection uses the current machine's **Default** pair in
+`Supervisor/config.json.defaultTarget`. Only successful user attachment changes
+it. Restore, reconnect, polling, inventory, create and start do not. Missing or
+unavailable Default leaves the relay detached in the existing launcher, without
+falling back to a healthy local runtime. TUI relay synchronization observes the
+selection without writing a second default. Explicit `--project` selects local;
+`--machine <key> --project <key>` selects a complete remote pair. Home/environment
+overrides apply to the invocation. `project use` explicitly changes this same
+Default (including `--machine <key> project use <key>` on the origin).
+
+Implicit lifecycle commands resolve the pair on the origin and send an explicit
+project over SSH. The remote machine's own Default is never consulted. Unsupported
+remote commands fail visibly; compatibility `server` commands require a local
+Default or explicit home. Creation does not change a local or remote Default.
+
+TUI selection and Settings operate one relay target. Detaching closes the relay
+and its SSH tunnel, not the selected Runtime. Transport, trusted local UI and
+client authority belong to [Remote Runtime and Access](remote-access.md#ssh-transport-contract).
+
 | Command | Contract |
 |---|---|
 | `create alice-project` | Register a named complete home. Interactive or `--yes` with `--name`, `--home`, and optional `--product trader\|nano`. Product is immutable birth (Trader default; Nano never starts UTA). TUI create remains Trader-equivalent. |
-| `project list` | Print registered AliceProjects and the remembered bare-start default. `--json` emits the registry summary. |
-| `project use <key>` | Record that AliceProject as the next bare-start default. Does not start, stop, or copy another project. |
-| `machine list` | Print the implicit local Machine and explicitly registered SSH Machines. `--json` emits a versioned secret-free summary. |
-| `machine add/remove` | Atomically remember or forget local SSH connection metadata. Non-interactive mutation requires `--yes`; remote state is never changed. |
-| `machine inspect [key]` | Build a typed Machine → AliceProject inventory; each remote Machine uses one bounded aggregate SSH command. |
+| `project list` | Print registered AliceProjects and the local lifecycle default. `--json` emits the registry summary. |
+| `project use <key>` | Record that AliceProject as the local lifecycle default. Does not start, stop, or copy another project. |
+| `machine list` | Print saved Machine profiles by opaque id, label, target, and enabled state. `--json` emits a versioned secret-free summary. |
+| `machine add` | Prepare the selected remote Server, then atomically save its SSH profile. Non-interactive mutation requires `--yes`. |
+| `machine rename/enable/disable/remove` | Mutate local profile metadata after explicit confirmation; remove never deletes remote data. |
+| `machine inspect [id-or-label]` | Build a typed Machine → AliceProject inventory; each enabled remote Machine uses one bounded aggregate SSH command. Disabled rows stay visible without SSH. |
 | `project copy-ai-creds` | Copy AI credential rows from one complete home into another. Interactive unless `--from`, `--to`, and `--yes` are set. Matching vendor+key rows are skipped; colliding slugs are renamed. Workspace launch preferences, broker accounts, and `sealing.key` are never copied. Secrets are never printed. |
 | `project transfer` | Plan or copy a stopped local AliceProject to a new complete Home on a registered SSH Machine. Portable configuration and Workspace/Git state transfer; Session/runtime/auth state does not. Credentials use the SSH stream and are re-sealed with a new remote key. The source and remote default remain unchanged. |
 | `up` | Prepare the selected provider when needed, start `cli-server` detached, and return only after Guardian control plus Alice HTTP readiness |
@@ -69,7 +92,6 @@ openalice project [list|use|copy-ai-creds|transfer] [options]
 | `status` | Read normalized status and activation state without mutation |
 | `logs` | Read a bounded, redacted tail from safe Runtime log rotations |
 | `doctor` | Run read-only provenance, ownership, readiness, component, provider, update-metadata, and log-layout checks |
-| `open` | Require an advertised Web endpoint and a successful `/api/auth/status` probe before invoking the platform browser opener |
 
 `up` is idempotent for an already healthy matching owner. `down` is idempotent
 when no owner exists. Ordinary start never signals another owner. `--takeover`
@@ -85,23 +107,18 @@ restores the exact retained pointer without touching user data. A
 package-manager install is only reported as pending because its manager remains
 the sole owner of package files.
 
-Native CLI installs use the Bun standalone provider, which skips source
-preparation and re-enters one executable as distinct
-Guardian/Alice/UTA/Connector processes; its release gate lives in
-[[plans/bun-cli-distribution.md]]. `up` and `run` remain
-browserless lifecycle commands and accept home, port, wait, and takeover
-options; `--app-dir` is an advanced source override with the preparation and
-rebuild options documented in [[docs/local-runtime.md]]. `--open` performs a
-separate verified browser open after readiness.
+`up` and `run` accept home, port, wait and takeover options. Native provider
+boundaries and the explicit `--app-dir` source override belong to
+[Local Runtime](local-runtime.md#installed-runtime-provider).
 
 ## Default and Compatibility Surface
 
-- bare `openalice` enters the local Supervisor TUI;
+- bare `openalice` enters the local Supervisor TUI and starts its Web relay;
 - `openalice tui` is the explicit equivalent for tests and scripts;
-- `openalice start` retains the existing foreground, browser-oriented
-  compatibility launcher and also selects the installed bundle by default;
-- `openalice server run|start|status|stop` remains available for managed remote
-  and existing scripts;
+- `openalice relay` runs the same Web controller without TUI presentation;
+- the old `openalice start` and `openalice open` browser shortcuts are retired;
+- `openalice server run|start|status|stop` remains available for managed
+  remote and existing scripts;
 - new code uses `run|up|status|down`;
 - `server status --json` retains its legacy raw status payload.
 
@@ -840,10 +857,10 @@ the Supervisor reads a versioned machine-local document at
 AliceProject map outside every selectable complete home.
 
 The same Supervisor root may contain `machines.json`, a separate versioned
-registry for the implicit local computer plus named SSH hosts. It is not part
-of any AliceProject and is not selected by `OPENALICE_HOME`. Writes are atomic
-and owner-private; unknown additive fields survive rewrites, while an invalid
-or newer known schema fails visibly. This registry remains separate from the
+registry for saved Herdr-style remote Machine profiles. It is not part of any
+AliceProject and is not selected by `OPENALICE_HOME`. Writes are atomic and
+owner-private; unknown additive fields survive rewrites, while an invalid or
+newer known schema fails visibly. This registry remains separate from the
 hashed `remote-targets.json` tunnel-port cache.
 
 Bare `openalice` and flag-less `openalice tui` must still open a machine-level
@@ -856,12 +873,12 @@ another home. Config recovery itself never inspects those homes. An unavailable
 registered Home still fails when an environment or flag selection is explicit,
 because that path would otherwise start a different project.
 
-The current schema (`schemaVersion: 2`) preserves additive unknown fields
+The current schema (`schemaVersion: 3`) preserves additive unknown fields
 through parse and write so a later OpenAlice can add keys without being
 stripped by an older Supervisor save. Invalid known fields still fail. A
 genuinely newer `schemaVersion` is detected before unknown-field handling and
 reported as a distinct newer-schema error. Released v1 documents still
-canonicalize to v2 and still reject unknown v1 fields. Do not invent permanent
+canonicalize their registry fields before the Supervisor-root migration to v3. Do not invent permanent
 compatibility for unreleased shapes.
 
 The `p` Setup overlay atomically edits the selected AliceProject's data home,
@@ -894,29 +911,33 @@ presenting its filesystem path as a second product concept.
 
 The `i` AliceProject overlay reads the same atomic registry, always shows the
 implicit `default`, and adds every configured named project. Selecting one
-switches the live Supervisor view and records it as the next bare-start
-default; it does not stop, move, copy, or delete another project. Creating an
+verifies and attaches its Runtime, then records it as the next bare-start
+Default only after successful connection; it does not stop, move, copy, or delete another project. Creating an
 AliceProject collects a validated lowercase key and separate complete home
-inside the TUI, rejects equal or nested registered homes, and selects the new
-entry atomically. The final Workspaces step defaults to Chat, allows optional
-Auto Quant and Auto Prediction (or none), then starts the selected project.
-The backend prepares those durable instances before the first page opens;
-Agent Sessions remain stopped. Failed preparation can be retried from Quick
-Start. CLI `create alice-project --workspaces` records the same selection
-for the next start. See [[docs/alice-project.md]]. An existing target must be empty or recognizable as an
+inside the TUI, rejects equal or nested registered homes, without changing Default before successful connection. The final Workspaces step reviews Chat, Auto Quant, and Auto
+Prediction, then starts the selected project. The app opens first and prepares
+those durable instances asynchronously; Agent Sessions remain stopped. Failed
+preparation can be retried from Quick Start. The CLI records the same three
+defaults for the next app activation. See [[docs/alice-project.md]]. An existing target must be empty or recognizable as an
 OpenAlice complete home; an unrelated non-empty directory is rejected. A new
 target is created and canonicalized when registered, so a later missing
-registered Home is never silently recreated. A bare TUI launch falls back to
-the first available project, keeps the unavailable registry entry intact,
-and shows a persistent notice directing the user to `i AliceProjects`; selecting
-the displayed fallback repairs the remembered default. An explicit
-environment/flag selection still fails instead of falling back because
-automation must never run against a different Home. The suggested Home is a
+registered Home is never silently recreated. An unavailable remembered Default
+leaves the Runtime detached and presents an available local context for recovery;
+that presentation is neither attachment nor a replacement Default. The notice
+directs the user to `i AliceProjects`; a failed connection preserves the remembered
+Default. An explicit environment/flag selection still fails rather than targeting
+a different Home because automation must never run against a different Home. The suggested Home is a
 sibling such as
 `~/.openalice-research` and remains editable before creation. A session whose
 project or complete home came from `OPENALICE_PROJECT`,
 `OPENALICE_HOME`, `--project`, or `--home` shows the registry read-only
 instead of pretending that a lower-priority selection can win.
+
+Internal startup, picker and post-save context selection preserve ordinary
+machine-config provenance. Only actual CLI/environment overrides lock the picker;
+a `null` Default does not prevent saving Setup. Runtime endpoint liveness and
+registered Home availability are independent: a running endpoint cannot turn an
+explicitly missing Home into an available registry entry.
 
 The registry appears as an AliceProject Switchboard rather than the underlying
 selection widget. Its map identifies current, bare-start default, available,
@@ -949,20 +970,19 @@ home. Installer launchers supply the lower-priority internal pair
 `OPENALICE_MANAGED_RUNTIME_CONTENT_IDENTITY`; ordinary users do not need to set
 them.
 
-Only an installer-owned Runtime carrying `OPENALICE_MANAGED_PI_PATH` receives
-project-private `PI_CODING_AGENT_DIR` and `PI_CODING_AGENT_SESSION_DIR`
-values. Source development and an external Pi retain their native user
-configuration and session roots.
+Source development and native standalone CLI launches use external Agent
+Runtimes and retain their native configuration/session roots. An explicitly
+supplied managed-Pi environment may use project-private directories through
+the common launch-context builder; that conditional projection is not an
+installer promise to bundle Pi. See [[docs/managed-workspace-runtime.md]] for
+the packaged Electron boundary.
 
-The same stored resolver selects homes for `up`, `run`, `down`, `status`,
-`open`, `logs`, and `doctor`; those commands also accept
-`--project <key>` and load a Home registered through the TUI.
-Consequently a Runtime started through the TUI and one started by
-`openalice up` receive the same managed-Pi environment, source, Web-port
-policy, and update-check setting unless an explicit command option overrides
-them. The transitional `start` and `server` compatibility presenters still
-own their legacy option parsing and output until the root parser conversion is
-complete.
+The same stored target resolver serves `up`, `run`, `down`, `status`, `logs`,
+and `doctor`; explicit `--project <key>` selects a registered local home.
+TUI and lifecycle starts use the same target, source, Web-port, and update-check
+policy unless an invocation override applies. `open` and `start` are retired
+and fail with replacement guidance; `server` remains the documented
+compatibility command, not a second startup-default authority.
 
 An inherited default Web port remains automatic for the source-backed built
 Guardian: it probes upward from 47331 together with unconfigured
@@ -1058,10 +1078,10 @@ Human `status` reports:
 
 Dev-owned Runtimes may be inspected and opened. A healthy local `dev` or
 `cli-server` owner also advertises a verified loopback Web endpoint that
-Electron can open in the default browser without takeover. `down` still
-refuses both. Only a matching `cli-server` that advertises `runtime.stop`
-accepts the stop transaction. The Electron browser handoff is documented in
-[[docs/data-locations.md]].
+Electron can open in the default browser without takeover. A compatible
+Runtime accepts the stop transaction only when it
+advertises `runtime.stop`; its owner surface remains diagnostic. The Electron
+browser handoff is documented in [[docs/data-locations.md]].
 
 Source dev and built Guardian entries publish the same private, local
 `runtime.status` contract. In particular, `pnpm dev` advertises its owner PID,
@@ -1289,13 +1309,9 @@ This source entry does not install or copy a CLI payload. When `pnpm dev`
 already owns the selected home, the TUI and read-only commands discover that
 live Runtime rather than starting or replacing another owner.
 
-For command-only changes:
-
-```bash
-pnpm -F @traderalice/openalice-cli test
-npx tsc --noEmit
-pnpm test
-```
+Use the [Local Feedback Ladder](development-workflow.md#local-feedback-ladder)
+to select focused, owner/package or full-suite evidence; typecheck the changed
+owner and exercise the actual CLI command.
 
 Config-recovery and in-TUI update work must keep the focused Supervisor config
 and TUI specs green: parser preservation, distinct newer-schema errors, recovery
@@ -1320,7 +1336,7 @@ Manually use an isolated home and unused port to walk:
 openalice up --home <temporary-home> --port <unused-port>
 openalice status --home <temporary-home>
 openalice status --home <temporary-home> --json
-openalice open --home <temporary-home>
+openalice relay
 openalice down --home <temporary-home>
 ```
 

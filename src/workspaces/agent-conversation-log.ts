@@ -1,3 +1,4 @@
+import type { DispatchCommunication } from './dispatch-communication.js'
 /**
  * Append-only cross-Agent conversation log.
  *
@@ -40,6 +41,7 @@ export interface AgentConversationDispatch {
 }
 
 export interface AgentConversationDispatchedEvent {
+  readonly communication?: DispatchCommunication
   readonly schemaVersion: 1
   readonly eventId: string
   readonly type: 'conversation.dispatched'
@@ -143,6 +145,7 @@ export class AgentConversationLog {
     readonly workspaceId: string
     readonly agent: string
     readonly startedAt: number
+    readonly communication?: DispatchCommunication
     readonly conversation: AgentConversationDispatch
   }): Promise<void> {
     const reason = input.conversation.resolution.mode === 'reconstructed'
@@ -152,6 +155,7 @@ export class AgentConversationLog {
       schemaVersion: 1,
       eventId: randomUUID(),
       type: 'conversation.dispatched',
+      ...(input.communication ? { communication: input.communication } : {}),
       at: input.startedAt,
       taskId: input.taskId,
       ...(input.parentTaskId ? { parentTaskId: input.parentTaskId } : {}),

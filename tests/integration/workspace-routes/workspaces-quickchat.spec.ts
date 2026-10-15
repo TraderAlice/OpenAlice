@@ -1,0 +1,1125 @@
+import { installExecutionFixture } from '../../../src/webui/routes/workspace-execution-fixture.js';
+/**
+ * POST /quick-chat — native runtime authentication plus explicit or remembered
+ * Workspace launch bindings. Managed launches never rewrite native CLI project
+ * configuration.
+ *
+ * core/config is partial-mocked so we can drive the vault per-test without
+ * touching the real ai-provider-manager.json.
+ */
+import { describe, expect, it, vi, beforeEach } from 'vitest';
+import { mkdtemp, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+
+import { createWorkspaceRoutes } from '../../../src/webui/routes/workspaces.js';
+import {
+  readCredentials,
+  readWorkspaceDefaultAgent,
+  setCredentialLastModel,
+  type Credential,
+} from '../../../src/core/config.js';
+import type { WorkspaceService } from '../../../src/workspaces/service.js';
+import type { WorkspaceAiCred } from '../../../src/workspaces/cli-adapter.js';
+import {
+  ChatWorkspaceResolver,
+  TemplateWorkspaceResolver,
+} from '../../../src/workspaces/chat-workspace-resolver.js';
+import { createBuiltinAdapterRegistry } from '../../../src/workspaces/adapters/index.js';
+import {
+  emptyWorkspaceRuntimeSettings,
+  readWorkspaceRuntimeSettings,
+  writeWorkspaceRuntimeSettings,
+} from '../../../src/workspaces/workspace-runtime-settings.js';
+
+/* eslint-disable @typescript-eslint/no-explicit-any */
+
+vi.mock('../../../src/core/config.js', async (importActual) => {
+  const actual = await importActual<typeof import('../../../src/core/config.js')>();
+  return {
+    ...actual,
+    readCredentials: vi.fn(),
+    readWorkspaceDefaultAgent: vi.fn(async () => null),
+    setCredentialLastModel: vi.fn(async () => {}),
+  };
+});
+
+const openaiKey: Credential = {
+  vendor: 'openai', authType: 'api-key', apiKey: 'sk-oa', wires: { 'openai-chat': '' },
+};
+
+function build(opts: {
+  workspaces?: any[];
+  sessionsByWorkspace?: Record<string, any[]>;
+  recentChatWorkspaceId?: string | null;
+  autoQuantDefaultWorkspaceId?: string | null;
+  autoPredictionDefaultWorkspaceId?: string | null;
+  claudeConfig?: WorkspaceAiCred | null;
+  claudeInteractiveSetupStatus?: 'ready' | 'runtime-onboarding-required' | 'workspace-trust-required' | 'unknown';
+  opencodeConfig?: WorkspaceAiCred | null;
+  opencodeRuntimeSource?: 'global-config' | 'global-login' | 'managed-runtime';
+  runtimeWorkspace?: any;
+} = {}) {
+  const builtinAdapters = createBuiltinAdapterRegistry();
+  const META = {
+    id: 'ws-1',
+    dir: '/w',
+    template: 'chat',
+    tag: 'chat-x',
+    createdAt: '2026-07-01T00:00:00.000Z',
+  };
+  const opencode = {
+    ...builtinAdapters.get('opencode')!,
+    lifecycle: undefined,
+    writeAiConfig: vi.fn(async () => {}),
+    readAiConfig: vi.fn(async () => opts.opencodeConfig ?? null),
+  };
+  const claude = {
+    ...builtinAdapters.get('claude')!,
+    lifecycle: undefined,
+    readAiConfig: vi.fn(async () => opts.claudeConfig ?? null),
+    readInteractiveSetupStatus: vi.fn(async () => opts.claudeInteractiveSetupStatus ?? 'ready'),
+  };
+  const shell = {
+    ...builtinAdapters.get('shell')!,
+  };
+  const adapters: Record<string, any> = { opencode, claude, shell };
+  const spawn = vi.fn((_wsId: string, ctx: any) => ({
+    recordId: ctx.recordId,
+    wsId: 'ws-1',
+    name: ctx.recordName,
+    pid: 1,
+    agentSessionId: null,
+    startedAt: 1,
+  }));
+  const setTerminalViewAttributes = vi.fn(() => true);
+  const creator = {
+    create: vi.fn(async (tag: string, template: string) => ({
+      ok: true as const,
+      workspace: { ...META, tag, template },
+    })),
+  };
+  const registry = {
+    list: () => opts.workspaces ?? [],
+    get: (id: string) => (opts.workspaces ?? []).find((w) => w.id === id) ?? (id === META.id ? META : undefined),
+  };
+  const sessionRecords = new Map<string, any>(
+    Object.entries(opts.sessionsByWorkspace ?? {}).flatMap(([wsId, rows]) =>
+      rows.map((row) => [`${wsId}:${row.id}`, row] as const)),
+  );
+  const sessionsFor = (wsId: string) => [...sessionRecords.entries()]
+    .filter(([key]) => key.startsWith(`${wsId}:`))
+    .map(([, row]) => row);
+  const sessionRegistry = {
+    ensureLoaded: vi.fn(async () => {}),
+    listFor: vi.fn(sessionsFor),
+    findById: vi.fn((id: string) => [...sessionRecords.values()].find((row) => row.id === id)),
+    findByResumeId: vi.fn((wsId: string, resumeId: string) =>
+      sessionsFor(wsId).find((row) => row.resumeId === resumeId)),
+    get: vi.fn((wsId: string, id: string) => sessionRecords.get(`${wsId}:${id}`)),
+    nextName: () => 'o1',
+    create: vi.fn(async (record: any) => { sessionRecords.set(`${record.wsId}:${record.id}`, record); }),
+    update: vi.fn(async (wsId: string, id: string, patch: any) => {
+      const record = sessionRecords.get(`${wsId}:${id}`);
+      if (!record) return undefined;
+      Object.assign(record, patch);
+      return record;
+    }),
+    remove: vi.fn(async (wsId: string, id: string) => sessionRecords.delete(`${wsId}:${id}`)),
+  };
+  const resumeRecords = new Map<string, any>();
+  const resumeRegistry = {
+    get: (id: string) => resumeRecords.get(id) ?? null,
+    ensure: vi.fn(async (input: any) => {
+      const resumeId = input.resumeId ?? `resume-${resumeRecords.size + 1}`;
+      const record = { resumeId, ...input };
+      resumeRecords.set(resumeId, record);
+      return record;
+    }),
+  };
+  const sessionCoordinator = {
+    ensure: vi.fn(async (input: any) => {
+      const identity = await resumeRegistry.ensure(input);
+      const existing = sessionRegistry.findByResumeId(input.wsId, identity.resumeId);
+      if (existing) {
+        Object.assign(existing, {
+          state: input.state ?? existing.state,
+          surface: input.surface ?? existing.surface,
+        });
+        return { identity, session: existing, created: false };
+      }
+      const now = '2026-07-12T00:00:00.000Z';
+      const record = {
+        id: `${input.agent}-test-${resumeRecords.size}`,
+        resumeId: identity.resumeId,
+        wsId: input.wsId,
+        agent: input.agent,
+        name: sessionRegistry.nextName(),
+        createdAt: now,
+        lastActiveAt: now,
+        state: input.state ?? 'paused',
+        surface: input.surface ?? 'headless',
+        ...(input.fallbackTitle ? { fallbackTitle: input.fallbackTitle } : {}),
+        ...(input.sourceRunId ? { sourceRunId: input.sourceRunId } : {}),
+      };
+      await sessionRegistry.create(record);
+      return { identity, session: record, created: true };
+    }),
+    transition: vi.fn(async (input: any) => {
+      const record = sessionRegistry.findByResumeId(input.wsId, input.resumeId);
+      if (!record) throw new Error('missing test SessionRecord');
+      Object.assign(record, { state: input.state, surface: input.surface });
+      return record;
+    }),
+  };
+  const chatWorkspaceResolver = new ChatWorkspaceResolver({
+    registry: registry as any,
+    sessionRegistry: sessionRegistry as any,
+    creator,
+  });
+  const autoQuantWorkspaceResolver = new TemplateWorkspaceResolver(
+    { registry: registry as any, sessionRegistry: sessionRegistry as any, creator },
+    'auto-quant-v2',
+    'auto-quant',
+  );
+  const autoPredictionWorkspaceResolver = new TemplateWorkspaceResolver(
+    { registry: registry as any, sessionRegistry: sessionRegistry as any, creator },
+    'auto-prediction',
+    'prediction',
+  );
+  const svc = {
+    // Default []: today's tag never matches → creator.create path. Tests that
+    // exercise targetWsId pass the workspace in so registry resolves it by id.
+    registry,
+    resolveRuntimeWorkspace: (id: string) => (
+      opts.runtimeWorkspace?.id === id ? opts.runtimeWorkspace : registry.get(id)
+    ),
+    creator,
+    resolveOrCreateChatWorkspace: (preferredWorkspaceId?: string | null) =>
+      chatWorkspaceResolver.resolveOrCreate(preferredWorkspaceId),
+    resolveOrCreateAutoQuantWorkspace: (preferredWorkspaceId?: string | null, sourceVersion?: string) =>
+      autoQuantWorkspaceResolver.resolveOrCreate(preferredWorkspaceId, sourceVersion),
+    resolveOrCreateAutoPredictionWorkspace: (preferredWorkspaceId?: string | null, sourceVersion?: string) =>
+      autoPredictionWorkspaceResolver.resolveOrCreate(preferredWorkspaceId, sourceVersion),
+    resolveAdapter: (_m: any, agentId?: string) => adapters[agentId ?? 'claude'] ?? claude,
+    adapters: {
+      get: (id: string) => adapters[id],
+      list: () => [claude, opencode, shell],
+    },
+    sessionRegistry,
+    resumeRegistry,
+    sessionCoordinator,
+    pool: { spawn, get: vi.fn(() => undefined), setTerminalViewAttributes },
+    publicMeta: vi.fn(async (workspace: any) => workspace),
+    config: { launcherRepoRoot: '/repo' },
+    getAgentRuntimeReadiness: vi.fn(() => ({
+      agents: opts.opencodeRuntimeSource
+        ? {
+            opencode: {
+              agent: 'opencode',
+              displayName: 'opencode',
+              installed: true,
+              binPath: '/usr/local/bin/opencode',
+              status: 'ready',
+              ready: true,
+              source: opts.opencodeRuntimeSource,
+              checkedAt: '2026-07-12T00:00:00.000Z',
+              durationMs: 1,
+            },
+          }
+        : {},
+      overallReady: opts.opencodeRuntimeSource !== undefined,
+      checkedAt: opts.opencodeRuntimeSource ? '2026-07-12T00:00:00.000Z' : null,
+    })),
+  } as unknown as WorkspaceService;
+  const rememberRecentChatWorkspace = vi.fn(async (workspaceId: string | null) => ({
+    lastCredentialByAgent: {},
+    recentChatWorkspaceId: workspaceId,
+  }));
+  const rememberAutoQuantDefaultWorkspace = vi.fn(async (workspaceId: string | null) => ({
+    defaultWorkspaceId: workspaceId,
+  }));
+  const rememberAutoPredictionDefaultWorkspace = vi.fn(async (workspaceId: string | null) => ({
+    defaultWorkspaceId: workspaceId,
+  }));
+  const app = createWorkspaceRoutes(installExecutionFixture(svc), {
+    readQuickChatPreferences: vi.fn(async () => ({
+      lastCredentialByAgent: {},
+      recentChatWorkspaceId: opts.recentChatWorkspaceId ?? null,
+    })),
+    rememberRecentChatWorkspace,
+    readAutoQuantPreferences: vi.fn(async () => ({
+      defaultWorkspaceId: opts.autoQuantDefaultWorkspaceId ?? null,
+    })),
+    rememberAutoQuantDefaultWorkspace,
+    readAutoPredictionPreferences: vi.fn(async () => ({
+      defaultWorkspaceId: opts.autoPredictionDefaultWorkspaceId ?? null,
+    })),
+    rememberAutoPredictionDefaultWorkspace,
+  });
+  return {
+    svc,
+    app,
+    opencode,
+    spawn,
+    resumeRecords,
+    creator,
+    rememberRecentChatWorkspace,
+    rememberAutoQuantDefaultWorkspace,
+    rememberAutoPredictionDefaultWorkspace,
+    setTerminalViewAttributes,
+  };
+}
+
+async function quickChat(app: any, body: unknown) {
+  const res = await app.request('/quick-chat', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  return { status: res.status, body: await res.json().catch(() => null) };
+}
+
+async function get(app: any, path: string) {
+  const res = await app.request(path);
+  return { status: res.status, body: await res.json().catch(() => null) };
+}
+
+async function spawnSession(app: any, body: unknown) {
+  const res = await app.request('/ws-1/sessions/spawn', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  return { status: res.status, body: await res.json().catch(() => null) };
+}
+
+beforeEach(() => {
+  vi.mocked(readCredentials).mockReset();
+  vi.mocked(readWorkspaceDefaultAgent).mockResolvedValue(null);
+  vi.mocked(setCredentialLastModel).mockClear();
+});
+
+describe('PUT /terminal-view-attributes', () => {
+  it('validates and publishes the renderer palette to the session pool', async () => {
+    const { app, setTerminalViewAttributes } = build();
+    const attributes = {
+      foreground: [1, 2, 3],
+      background: [4, 5, 6],
+      cursor: [7, 8, 9],
+      ansi: Array.from({ length: 256 }, () => [0, 0, 0]),
+      colorSchemeMode: 'dark',
+      cursorStyle: 'block',
+      cursorBlink: true,
+    };
+    const response = await app.request('/terminal-view-attributes', {
+      method: 'PUT',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(attributes),
+    });
+
+    expect(response.status).toBe(200);
+    expect(setTerminalViewAttributes).toHaveBeenCalledWith(attributes);
+  });
+
+  it('rejects incomplete palettes', async () => {
+    const { app, setTerminalViewAttributes } = build();
+    const response = await app.request('/terminal-view-attributes', {
+      method: 'PUT',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ foreground: [1, 2, 3], ansi: [] }),
+    });
+
+    expect(response.status).toBe(400);
+    expect(setTerminalViewAttributes).not.toHaveBeenCalled();
+  });
+});
+
+describe('GET /credentials — Quick Chat launch metadata', () => {
+  it('returns the model a compatible credential would inject before first use', async () => {
+    vi.mocked(readCredentials).mockResolvedValue({
+      'google-1': {
+        vendor: 'google',
+        authType: 'api-key',
+        apiKey: 'AQ.test',
+        wires: { 'google-generative-ai': 'https://generativelanguage.googleapis.com/v1beta' },
+      },
+    });
+    const { app } = build();
+
+    const result = await get(app, '/credentials?agent=opencode');
+
+    expect(result.status).toBe(200);
+    expect(result.body.credentials).toEqual([
+      expect.objectContaining({
+        slug: 'google-1',
+        resolvedModel: 'gemini-3.8-flash',
+        resolvedReasoning: true,
+        resolvedReasoningMode: 'adaptive',
+      }),
+    ]);
+  });
+
+  it('returns the target workspace model, context, and protocol for the selected credential', async () => {
+    vi.mocked(readCredentials).mockResolvedValue({
+      'google-1': {
+        vendor: 'google',
+        authType: 'api-key',
+        apiKey: 'AQ.test',
+        wires: { 'google-generative-ai': 'https://generativelanguage.googleapis.com/v1beta' },
+      },
+    });
+    const { app } = build({
+      opencodeConfig: {
+        apiKey: 'AQ.test',
+        model: 'gemini-3.5-flash',
+        contextWindow: 512_000,
+        wireShape: 'google-generative-ai',
+        reasoningEffort: 'medium',
+      },
+    });
+
+    const result = await get(app, '/ws-1/agent-config/opencode/credential');
+
+    expect(result.status).toBe(200);
+    expect(result.body).toEqual({
+      configured: true,
+      slug: 'google-1',
+      model: 'gemini-3.5-flash',
+      contextWindow: 512_000,
+      wireShape: 'google-generative-ai',
+      reasoningMode: 'adaptive',
+      reasoningEffort: 'medium',
+    });
+  });
+
+  it('reports a registered thinking-switch default when the model has no effort tier', async () => {
+    vi.mocked(readCredentials).mockResolvedValue({
+      'longcat-1': {
+        vendor: 'longcat',
+        authType: 'api-key',
+        apiKey: 'longcat-test-key',
+        wires: { 'openai-chat': 'https://api.longcat.chat/openai/v1' },
+      },
+    });
+    const { app } = build({
+      opencodeConfig: {
+        apiKey: 'longcat-test-key',
+        model: 'LongCat-2.0',
+        wireShape: 'openai-chat',
+        reasoning: true,
+      },
+    });
+
+    const result = await get(app, '/ws-1/agent-config/opencode/credential');
+
+    expect(result).toEqual({
+      status: 200,
+      body: {
+        configured: true,
+        slug: 'longcat-1',
+        model: 'LongCat-2.0',
+        contextWindow: null,
+        wireShape: 'openai-chat',
+        reasoning: true,
+        reasoningMode: 'optional',
+        reasoningDefaultEnabled: true,
+      },
+    });
+  });
+
+  it('keeps hand-edited Workspace config visible when no vault key matches', async () => {
+    vi.mocked(readCredentials).mockResolvedValue({});
+    const { app } = build({
+      opencodeConfig: {
+        apiKey: 'hand-edited-key',
+        model: 'local-manual-model',
+        contextWindow: 128_000,
+        wireShape: 'openai-chat',
+      },
+    });
+
+    const result = await get(app, '/ws-1/agent-config/opencode/credential');
+
+    expect(result).toEqual({
+      status: 200,
+      body: {
+        configured: true,
+        slug: null,
+        model: 'local-manual-model',
+        contextWindow: 128_000,
+        wireShape: 'openai-chat',
+      },
+    });
+  });
+
+  it('returns Claude project metadata and its native interactive setup gate', async () => {
+    vi.mocked(readCredentials).mockResolvedValue({
+      'minimax-1': {
+        vendor: 'minimax',
+        authType: 'api-key',
+        apiKey: 'minimax-test-key',
+        wires: { anthropic: 'https://api.example.test/anthropic' },
+      },
+    });
+    const { app } = build({
+      claudeConfig: {
+        apiKey: 'minimax-test-key',
+        model: 'MiniMax-M2.5',
+        wireShape: 'anthropic',
+      },
+      claudeInteractiveSetupStatus: 'workspace-trust-required',
+    });
+
+    const result = await get(app, '/ws-1/agent-config/claude/credential');
+
+    expect(result).toEqual({
+      status: 200,
+      body: {
+        configured: true,
+        slug: 'minimax-1',
+        model: 'MiniMax-M2.5',
+        contextWindow: null,
+        wireShape: 'anthropic',
+        reasoningMode: 'adaptive',
+        interactiveSetupStatus: 'workspace-trust-required',
+      },
+    });
+  });
+
+  it('reads launch metadata from the reserved Manager runtime workspace', async () => {
+    vi.mocked(readCredentials).mockResolvedValue({
+      'google-1': {
+        vendor: 'google',
+        authType: 'api-key',
+        apiKey: 'AQ.test',
+        wires: { 'google-generative-ai': 'https://generativelanguage.googleapis.com/v1beta' },
+      },
+    });
+    const { app } = build({
+      runtimeWorkspace: {
+        id: 'workspace-manager',
+        dir: '/manager',
+        template: 'workspace-manager',
+        tag: 'Workspace Manager',
+        createdAt: '2026-07-16T00:00:00.000Z',
+      },
+      opencodeConfig: {
+        apiKey: 'AQ.test',
+        model: 'gemini-3.5-flash',
+        contextWindow: 512_000,
+        wireShape: 'google-generative-ai',
+      },
+    });
+
+    const credential = await get(app, '/workspace-manager/agent-config/opencode/credential');
+    const readiness = await get(app, '/workspace-manager/agent-readiness');
+
+    expect(credential).toEqual({
+      status: 200,
+      body: {
+        configured: true,
+        slug: 'google-1',
+        model: 'gemini-3.5-flash',
+        contextWindow: 512_000,
+        wireShape: 'google-generative-ai',
+        reasoningMode: 'adaptive',
+      },
+    });
+    expect(readiness.status).toBe(200);
+    expect(readiness.body.agents.opencode).toMatchObject({
+      agent: 'opencode',
+      ready: true,
+      source: 'workspace-config',
+      detectedCredentialSlug: 'google-1',
+    });
+  });
+
+  it('writes AI adjustments to the reserved Manager runtime workspace', async () => {
+    vi.mocked(readCredentials).mockResolvedValue({});
+    const { app, opencode } = build({
+      runtimeWorkspace: {
+        id: 'workspace-manager',
+        dir: '/manager',
+        template: 'workspace-manager',
+        tag: 'Workspace Manager',
+        createdAt: '2026-07-16T00:00:00.000Z',
+      },
+    });
+    const config = {
+      apiKey: 'AQ.test',
+      model: 'gemini-3.5-flash',
+      contextWindow: 512_000,
+      wireShape: 'google-generative-ai',
+    };
+
+    const response = await app.request('/workspace-manager/agent-config/opencode', {
+      method: 'PUT',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(config),
+    });
+
+    expect(response.status).toBe(200);
+    expect(opencode.writeAiConfig).toHaveBeenCalledWith('/manager', {
+      ...config,
+      reasoning: true,
+    });
+  });
+});
+
+describe('POST /quick-chat — native auth and explicit credential overrides', () => {
+  it('starts GUI directly without spawning a terminal and forwards the prompt', async () => {
+    vi.mocked(readCredentials).mockResolvedValue({});
+    const { app, svc, opencode, spawn } = build();
+    (opencode.capabilities as any).web = { wire: 'acp', freshSession: true };
+    (opencode as any).composeWebCommand = vi.fn();
+    svc.executions.web = vi.fn(async () => ({} as any));
+    (svc as any).web = { prompt: vi.fn(async () => ({})) } as any;
+    const r = await quickChat(app, { prompt: 'GUI hello', agent: 'opencode', surface: 'webpi' });
+    expect(r.status).toBe(201);
+    expect(r.body.session.surface).toBe('webpi');
+    expect(spawn).not.toHaveBeenCalled();
+    expect(svc.executions.web).toHaveBeenCalledOnce();
+    expect(svc.web.prompt).toHaveBeenCalledWith(r.body.session.sessionId, 'GUI hello');
+  });
+
+  it('rejects GUI for a runtime without fresh Web support before spawning', async () => {
+    const { app, spawn } = build();
+    const r = await quickChat(app, { prompt: 'hello', agent: 'shell', surface: 'webpi' });
+    expect(r.status).toBe(400);
+    expect(spawn).not.toHaveBeenCalled();
+  });
+
+  it('opencode + empty vault → native launch without injection', async () => {
+    vi.mocked(readCredentials).mockResolvedValue({});
+    const { app, opencode, spawn } = build();
+    const r = await quickChat(app, { prompt: 'hi', agent: 'opencode' });
+    expect(r.status).toBe(201);
+    expect(opencode.writeAiConfig).not.toHaveBeenCalled();
+    expect(spawn).toHaveBeenCalledOnce();
+  });
+
+  it('opencode + compatible cred → keeps native auth until the credential is explicitly selected', async () => {
+    vi.mocked(readCredentials).mockResolvedValue({ 'openai-1': openaiKey });
+    const { app, opencode, spawn } = build();
+    const r = await quickChat(app, { prompt: 'hi', agent: 'opencode' });
+    expect(r.status).toBe(201);
+    expect(opencode.writeAiConfig).not.toHaveBeenCalled();
+    expect(vi.mocked(setCredentialLastModel)).not.toHaveBeenCalled();
+    expect(spawn).toHaveBeenCalledOnce();
+  });
+
+  it('opencode + existing usable workspace config → spawns without vault injection', async () => {
+    vi.mocked(readCredentials).mockResolvedValue({});
+    const { app, opencode, spawn } = build({
+      opencodeConfig: {
+        apiKey: 'sk-existing',
+        model: 'deepseek-chat',
+        wireShape: 'openai-chat',
+      },
+    });
+    const r = await quickChat(app, { prompt: 'hi', agent: 'opencode' });
+
+    expect(r.status).toBe(201);
+    expect(opencode.readAiConfig).not.toHaveBeenCalled();
+    expect(opencode.writeAiConfig).not.toHaveBeenCalled();
+    expect(spawn).toHaveBeenCalledOnce();
+  });
+
+  it('uses and updates the target Workspace Ask Alice recent binding', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'quick-chat-settings-'));
+    try {
+      const settings = emptyWorkspaceRuntimeSettings();
+      settings.runtime.interactive.recent.agent = 'opencode';
+      settings.runtime.interactive.recent.agents.opencode = {
+        accessMode: 'vault',
+        credentialSlug: 'openai-2',
+        wireShape: 'openai-chat',
+        model: 'remembered-model',
+        reasoningEffort: 'medium',
+      };
+      await writeWorkspaceRuntimeSettings(dir, settings);
+      vi.mocked(readCredentials).mockResolvedValue({
+        'openai-2': { ...openaiKey, apiKey: 'sk-second' },
+      });
+      const workspace = { id: 'ws-1', dir, template: 'chat', tag: 'chat-x' };
+      const { app, spawn } = build({ workspaces: [workspace] });
+
+      const launch = await quickChat(app, { prompt: 'hi', targetWsId: 'ws-1' });
+      expect(launch.status, JSON.stringify(launch.body)).toBe(201);
+      expect((spawn.mock.calls[0] as any[])[1]).toMatchObject({
+        agentId: 'opencode',
+        sessionRuntime: {
+          binding: {
+            credential: { source: 'vault', credentialSlug: 'openai-2' },
+            model: 'remembered-model',
+            reasoningEffort: 'medium',
+          },
+          ai: { apiKey: 'sk-second' },
+        },
+      });
+
+      const updated = await readWorkspaceRuntimeSettings(dir);
+      expect(updated).toMatchObject({
+        ok: true,
+        settings: {
+          runtime: {
+            interactive: {
+              recent: {
+                agent: 'opencode',
+                agents: {
+                  opencode: {
+                    accessMode: 'vault',
+                    credentialSlug: 'openai-2',
+                    model: 'remembered-model',
+                    reasoningEffort: 'medium',
+                  },
+                },
+              },
+            },
+          },
+        },
+      });
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('explicit native access bypasses an existing Workspace provider', async () => {
+    vi.mocked(readCredentials).mockResolvedValue({ 'openai-1': openaiKey });
+    const { app, opencode, spawn } = build({
+      opencodeConfig: {
+        apiKey: 'workspace-key',
+        model: 'workspace-model',
+        wireShape: 'openai-chat',
+      },
+    });
+
+    const result = await quickChat(app, {
+      prompt: 'use my opencode account',
+      agent: 'opencode',
+      credentialSource: 'native',
+      model: 'native-model',
+    });
+
+    expect(result.status).toBe(201);
+    expect(opencode.readAiConfig).not.toHaveBeenCalled();
+    expect((spawn.mock.calls[0] as any[])[1].sessionRuntime).toEqual({
+      binding: {
+        version: 1,
+        credential: { source: 'native' },
+        model: 'native-model',
+      },
+      ai: { model: 'native-model', reasoningEffort: null },
+    });
+  });
+
+  it('honors an explicit credentialSlug pick', async () => {
+    vi.mocked(readCredentials).mockResolvedValue({
+      'openai-1': openaiKey,
+      'openai-2': { ...openaiKey, apiKey: 'sk-second', lastModel: 'gpt-5.5-mini' },
+    });
+    const { app, opencode, spawn } = build();
+    const launch = await quickChat(app, { prompt: 'hi', agent: 'opencode', credentialSlug: 'openai-2' });
+    expect(launch.status, JSON.stringify(launch.body)).toBe(201);
+    expect(opencode.writeAiConfig).not.toHaveBeenCalled();
+    const runtime = (spawn.mock.calls[0] as any[])[1].sessionRuntime;
+    expect(runtime.binding).toMatchObject({
+      credential: { source: 'vault', credentialSlug: 'openai-2' },
+      model: 'gpt-5.5-mini',
+    });
+    expect(runtime.ai.apiKey).toBe('sk-second');
+  });
+
+  it('upgrades a legacy resumed Session to native ownership without reading current Workspace credentials', async () => {
+    vi.mocked(readCredentials).mockResolvedValue({});
+    const { app, opencode, resumeRecords, spawn } = build({
+      opencodeConfig: {
+        apiKey: 'workspace-key-added-after-session-creation',
+        model: 'workspace-model-added-later',
+        wireShape: 'openai-chat',
+      },
+    });
+    resumeRecords.set('resume-legacy', {
+      resumeId: 'resume-legacy',
+      wsId: 'ws-1',
+      agent: 'opencode',
+      agentSessionId: 'native-session-1',
+    });
+
+    const result = await spawnSession(app, {
+      agent: 'opencode',
+      resumeId: 'resume-legacy',
+    });
+
+    expect(result.status).toBe(201);
+    expect(opencode.readAiConfig).not.toHaveBeenCalled();
+    expect((spawn.mock.calls[0] as any[])[1].sessionRuntime).toEqual({
+      binding: { version: 1, credential: { source: 'native' } },
+      ai: null,
+    });
+    expect(resumeRecords.get('resume-legacy').runtimeBinding).toEqual({
+      version: 1,
+      credential: { source: 'native' },
+    });
+  });
+
+  it('explicit credential pick overrides a globally-ready opencode config', async () => {
+    vi.mocked(readCredentials).mockResolvedValue({
+      'openai-2': { ...openaiKey, apiKey: 'sk-second', lastModel: 'gpt-5.5-mini' },
+    });
+    const { app, opencode, spawn } = build({ opencodeRuntimeSource: 'global-config' });
+
+    const r = await quickChat(app, {
+      prompt: 'hi',
+      agent: 'opencode',
+      credentialSlug: 'openai-2',
+    });
+
+    expect(r.status, JSON.stringify(r.body)).toBe(201);
+    expect(opencode.writeAiConfig).not.toHaveBeenCalled();
+    expect((spawn.mock.calls[0] as any[])[1].sessionRuntime).toMatchObject({
+      binding: {
+        credential: { source: 'vault', credentialSlug: 'openai-2' },
+        model: 'gpt-5.5-mini',
+      },
+      ai: { apiKey: 'sk-second' },
+    });
+    expect(spawn).toHaveBeenCalledOnce();
+  });
+
+  it('claude is never injected (own CLI login) — vault is not even read', async () => {
+    const { app, spawn } = build();
+    const r = await quickChat(app, { prompt: 'hi', agent: 'claude' });
+    expect(r.status).toBe(201);
+    expect(vi.mocked(readCredentials)).not.toHaveBeenCalled();
+    expect(spawn).toHaveBeenCalledOnce();
+  });
+
+  it('reuses the preferred recent Chat workspace across days', async () => {
+    const recent = {
+      id: 'ws-recent',
+      dir: '/recent',
+      template: 'chat',
+      tag: 'long-running-chat',
+      createdAt: '2026-06-01T00:00:00.000Z',
+    };
+    const { app, creator, spawn } = build({
+      workspaces: [recent],
+      recentChatWorkspaceId: recent.id,
+    });
+
+    const r = await quickChat(app, { prompt: 'continue yesterday', agent: 'claude' });
+    expect(r.status).toBe(201);
+    expect(creator.create).not.toHaveBeenCalled();
+    expect((spawn.mock.calls[0] as any[])[0]).toBe(recent.id);
+  });
+
+  it('falls back to the most recently active Chat workspace and remembers it', async () => {
+    const older = {
+      id: 'ws-older', dir: '/older', template: 'chat', tag: 'older',
+      createdAt: '2026-07-09T00:00:00.000Z',
+    };
+    const active = {
+      id: 'ws-active', dir: '/active', template: 'chat', tag: 'active',
+      createdAt: '2026-07-01T00:00:00.000Z',
+    };
+    const { app, creator, spawn, rememberRecentChatWorkspace } = build({
+      workspaces: [older, active],
+      recentChatWorkspaceId: 'deleted-workspace',
+      sessionsByWorkspace: {
+        [older.id]: [{ lastActiveAt: '2026-07-09T01:00:00.000Z' }],
+        [active.id]: [{ lastActiveAt: '2026-07-10T01:00:00.000Z' }],
+      },
+    });
+
+    const r = await quickChat(app, { prompt: 'pick up the active desk', agent: 'claude' });
+    expect(r.status).toBe(201);
+    expect(creator.create).not.toHaveBeenCalled();
+    expect((spawn.mock.calls[0] as any[])[0]).toBe(active.id);
+    expect(rememberRecentChatWorkspace).toHaveBeenCalledWith(active.id);
+  });
+
+  it('creates one stable starter Chat workspace when none exists', async () => {
+    const { app, creator, rememberRecentChatWorkspace } = build();
+    const r = await quickChat(app, { prompt: 'first chat', agent: 'claude' });
+
+    expect(r.status).toBe(201);
+    expect(creator.create).toHaveBeenCalledWith('chat', 'chat');
+    expect(rememberRecentChatWorkspace).toHaveBeenCalledWith('ws-1');
+  });
+
+  it('requires AutoQuant initialization instead of creating a Workspace from the composer', async () => {
+    const { app, creator, rememberRecentChatWorkspace } = build();
+    const r = await quickChat(app, {
+      prompt: 'research momentum',
+      agent: 'claude',
+      template: 'auto-quant-v2',
+    });
+
+    expect(r.status).toBe(409);
+    expect(r.body.error).toBe('auto_quant_not_initialized');
+    expect(creator.create).not.toHaveBeenCalled();
+    expect(rememberRecentChatWorkspace).not.toHaveBeenCalled();
+  });
+
+  it('initializes the first Chat workspace without pinning a Harness version', async () => {
+    const { app, creator, rememberRecentChatWorkspace } = build();
+    const response = await app.request('/chat/initialize', { method: 'POST' });
+    const body = await response.json() as any;
+
+    expect(response.status).toBe(201);
+    expect(body.workspace).toMatchObject({ tag: 'chat', template: 'chat' });
+    expect(creator.create).toHaveBeenCalledWith('chat', 'chat');
+    expect(rememberRecentChatWorkspace).toHaveBeenCalledWith('ws-1');
+  });
+
+  it('reuses an existing Chat workspace instead of creating another', async () => {
+    const existing = {
+      id: 'chat-existing',
+      dir: '/chat',
+      template: 'chat',
+      tag: 'chat',
+      createdAt: '2026-07-01T00:00:00.000Z',
+    };
+    const { app, creator, rememberRecentChatWorkspace } = build({ workspaces: [existing] });
+
+    const response = await app.request('/chat/initialize', { method: 'POST' });
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({
+      workspace: { id: 'chat-existing', template: 'chat' },
+    });
+    expect(creator.create).not.toHaveBeenCalled();
+    expect(rememberRecentChatWorkspace).toHaveBeenCalledWith('chat-existing');
+  });
+
+  it('initializes the first AutoQuant Workspace and stores it as the default', async () => {
+    const { app, creator, rememberAutoQuantDefaultWorkspace } = build();
+    const response = await app.request('/auto-quant/initialize', { method: 'POST' });
+    const body = await response.json() as any;
+
+    expect(response.status).toBe(201);
+    expect(body.workspace).toMatchObject({ tag: 'auto-quant', template: 'auto-quant-v2' });
+    expect(creator.create).toHaveBeenCalledWith('auto-quant', 'auto-quant-v2');
+    expect(rememberAutoQuantDefaultWorkspace).toHaveBeenCalledWith('ws-1');
+  });
+
+  it('requires explicit selection when an AutoQuant Workspace already exists', async () => {
+    const existing = {
+      id: 'aq-existing',
+      dir: '/aq',
+      template: 'auto-quant-v2',
+      tag: 'auto-quant',
+      createdAt: '2026-07-01T00:00:00.000Z',
+    };
+    const { app, creator } = build({ workspaces: [existing] });
+
+    const response = await app.request('/auto-quant/initialize', { method: 'POST' });
+    expect(response.status).toBe(409);
+    expect(await response.json()).toMatchObject({
+      error: 'auto_quant_workspace_selection_required',
+    });
+    expect(creator.create).not.toHaveBeenCalled();
+  });
+
+  it('uses the explicitly selected AutoQuant default for targetless research', async () => {
+    const existing = {
+      id: 'aq-existing',
+      dir: '/aq',
+      template: 'auto-quant-v2',
+      tag: 'auto-quant',
+      createdAt: '2026-07-01T00:00:00.000Z',
+    };
+    const { app, creator, spawn } = build({
+      workspaces: [existing],
+      autoQuantDefaultWorkspaceId: existing.id,
+    });
+
+    const r = await quickChat(app, {
+      prompt: 'research momentum',
+      agent: 'claude',
+      template: 'auto-quant-v2',
+    });
+    expect(r.status).toBe(201);
+    expect((spawn.mock.calls[0] as any[])[0]).toBe(existing.id);
+    expect(creator.create).not.toHaveBeenCalled();
+  });
+
+  it('does not let an explicit target bypass the AutoQuant default pointer', async () => {
+    const defaultWorkspace = {
+      id: 'aq-default',
+      dir: '/aq-default',
+      template: 'auto-quant-v2',
+      tag: 'auto-quant',
+      createdAt: '2026-07-01T00:00:00.000Z',
+    };
+    const otherWorkspace = {
+      ...defaultWorkspace,
+      id: 'aq-other',
+      dir: '/aq-other',
+      tag: 'auto-quant-2',
+    };
+    const { app, spawn } = build({
+      workspaces: [defaultWorkspace, otherWorkspace],
+      autoQuantDefaultWorkspaceId: defaultWorkspace.id,
+    });
+
+    const r = await quickChat(app, {
+      prompt: 'research momentum',
+      agent: 'claude',
+      template: 'auto-quant-v2',
+      targetWsId: otherWorkspace.id,
+    });
+    expect(r.status).toBe(400);
+    expect(r.body.error).toBe('auto_quant_workspace_not_default');
+    expect(spawn).not.toHaveBeenCalled();
+  });
+
+  it('requires Auto Prediction initialization instead of creating a Workspace from the composer', async () => {
+    const { app, creator } = build();
+    const r = await quickChat(app, {
+      prompt: 'evaluate this market',
+      agent: 'claude',
+      template: 'auto-prediction',
+    });
+
+    expect(r.status).toBe(409);
+    expect(r.body.error).toBe('auto_prediction_not_initialized');
+    expect(creator.create).not.toHaveBeenCalled();
+  });
+
+  it('initializes the first Auto Prediction Workspace and stores it as the default', async () => {
+    const { app, creator, rememberAutoPredictionDefaultWorkspace } = build();
+    const response = await app.request('/auto-prediction/initialize', { method: 'POST' });
+    const body = await response.json() as any;
+
+    expect(response.status).toBe(201);
+    expect(body.workspace).toMatchObject({ tag: 'prediction', template: 'auto-prediction' });
+    expect(creator.create).toHaveBeenCalledWith('prediction', 'auto-prediction');
+    expect(rememberAutoPredictionDefaultWorkspace).toHaveBeenCalledWith('ws-1');
+  });
+
+  it('uses the selected Auto Prediction default for targetless research', async () => {
+    const existing = {
+      id: 'prediction-existing',
+      dir: '/prediction',
+      template: 'auto-prediction',
+      tag: 'prediction',
+      createdAt: '2026-07-01T00:00:00.000Z',
+    };
+    const { app, creator, spawn } = build({
+      workspaces: [existing],
+      autoPredictionDefaultWorkspaceId: existing.id,
+    });
+
+    const r = await quickChat(app, {
+      prompt: 'evaluate this market',
+      agent: 'claude',
+      template: 'auto-prediction',
+    });
+    expect(r.status).toBe(201);
+    expect((spawn.mock.calls[0] as any[])[0]).toBe(existing.id);
+    expect(creator.create).not.toHaveBeenCalled();
+  });
+
+  // targetWsId — the chat sidebar's per-workspace "+": spawn INTO the given
+  // workspace, not today's (so no creator.create).
+  it('targetWsId spawns into the given workspace, skipping find-or-create', async () => {
+    const { app, spawn, creator } = build({
+      workspaces: [{ id: 'ws-1', dir: '/w', template: 'chat', tag: 'chat-x' }],
+    });
+    const r = await quickChat(app, { prompt: 'hi', agent: 'claude', targetWsId: 'ws-1' });
+    expect(r.status).toBe(201);
+    expect(creator.create).not.toHaveBeenCalled(); // reused, not created
+    expect(spawn).toHaveBeenCalledOnce();
+    expect((spawn.mock.calls[0] as any[])[0]).toBe('ws-1'); // spawned into the target
+  });
+
+  it('omitted agent ignores utility adapters and uses the first registered agent runtime', async () => {
+    const { app, spawn } = build({
+      workspaces: [{ id: 'ws-1', dir: '/w', template: 'chat', tag: 'chat-x' }],
+    });
+    const r = await quickChat(app, { prompt: 'hi', targetWsId: 'ws-1' });
+    expect(r.status).toBe(201);
+    expect(spawn).toHaveBeenCalledOnce();
+    expect((spawn.mock.calls[0] as any[])[1].agentId).toBe('claude');
+  });
+
+  it('omitted agent honors a configured default runtime when registered', async () => {
+    vi.mocked(readWorkspaceDefaultAgent).mockResolvedValue('opencode');
+    vi.mocked(readCredentials).mockResolvedValue({ 'openai-1': openaiKey });
+    const { app, spawn } = build({
+      workspaces: [{ id: 'ws-1', dir: '/w', template: 'chat', tag: 'chat-x' }],
+    });
+    const r = await quickChat(app, { prompt: 'hi', targetWsId: 'ws-1' });
+    expect(r.status).toBe(201);
+    expect((spawn.mock.calls[0] as any[])[1].agentId).toBe('opencode');
+  });
+
+  it('omitted agent prefers the target Workspace runtime over the installation default', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'quick-chat-runtime-'));
+    try {
+      const settings = emptyWorkspaceRuntimeSettings();
+      settings.runtime.interactive.defaultAgent = 'opencode';
+      settings.runtime.interactive.recent.agent = 'claude';
+      await writeWorkspaceRuntimeSettings(dir, settings);
+      vi.mocked(readWorkspaceDefaultAgent).mockResolvedValue('claude');
+      vi.mocked(readCredentials).mockResolvedValue({ 'openai-1': openaiKey });
+      const workspace = { id: 'ws-1', dir, template: 'chat', tag: 'chat-x' };
+      const { app, spawn } = build({ workspaces: [workspace] });
+
+      const r = await quickChat(app, { prompt: 'hi', targetWsId: 'ws-1' });
+      expect(r.status).toBe(201);
+      expect((spawn.mock.calls[0] as any[])[1].agentId).toBe('opencode');
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('unknown targetWsId → 404 workspace_not_found, no spawn', async () => {
+    const { app, spawn, creator } = build();
+    const r = await quickChat(app, { prompt: 'hi', targetWsId: 'nope' });
+    expect(r.status).toBe(404);
+    expect(r.body.error).toBe('workspace_not_found');
+    expect(creator.create).not.toHaveBeenCalled();
+    expect(spawn).not.toHaveBeenCalled();
+  });
+
+  it('normal opencode spawn + empty vault/config → native launch', async () => {
+    vi.mocked(readCredentials).mockResolvedValue({});
+    const { app, opencode, spawn } = build();
+
+    const r = await spawnSession(app, { agent: 'opencode' });
+
+    expect(r.status).toBe(201);
+    expect(opencode.writeAiConfig).not.toHaveBeenCalled();
+    expect(spawn).toHaveBeenCalledOnce();
+  });
+
+  it('normal opencode spawn + compatible cred → does not infer an override', async () => {
+    vi.mocked(readCredentials).mockResolvedValue({ 'openai-1': openaiKey });
+    const { app, opencode, spawn } = build();
+
+    const r = await spawnSession(app, { agent: 'opencode' });
+
+    expect(r.status).toBe(201);
+    expect(opencode.writeAiConfig).not.toHaveBeenCalled();
+    expect(spawn).toHaveBeenCalledOnce();
+  });
+
+  it('agent-readiness delegates authentication to the native runtime', async () => {
+    vi.mocked(readCredentials).mockResolvedValue({});
+    const { app } = build();
+
+    const res = await app.request('/ws-1/agent-readiness/opencode');
+    const body = await res.json();
+
+    expect(res.status).toBe(200);
+    expect(body).toMatchObject({
+      agent: 'opencode',
+      ready: true,
+      requiresCredential: false,
+      source: 'runtime-login',
+    });
+  });
+});

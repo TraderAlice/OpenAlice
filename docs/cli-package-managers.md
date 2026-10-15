@@ -332,8 +332,8 @@ For channel changes run:
 
 ```bash
 pnpm exec vitest run \
-  scripts/cli-release-fixture.spec.mjs \
-  scripts/build-cli-package-channels.spec.mjs \
+  tests/integration/cli-release-artifacts/cli-release-fixture.spec.mjs \
+  tests/integration/cli-release-artifacts/build-cli-package-channels.spec.mjs \
   scripts/pack-cli-npm-packages.spec.mjs \
   scripts/release-workflow.spec.ts \
   packages/cli/src/package-manager.spec.mjs

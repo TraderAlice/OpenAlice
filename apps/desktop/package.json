@@ -16,7 +16,8 @@
     "electron": "^39.8.5",
     "electron-builder": "^26.0.0",
     "electron-builder-squirrel-windows": "^26.0.0",
-    "electron-updater": "^6.8.9"
+    "electron-updater": "^6.8.9",
+    "@traderalice/update-lifecycle": "workspace:*"
   },
   "engines": {
     "node": ">=22.19.0"

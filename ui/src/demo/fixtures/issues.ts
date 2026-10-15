@@ -1,3 +1,4 @@
+import { computeNextRun } from '../../../../src/core/schedule-expr'
 import { demoWorkspaces, demoResumeRuntimes } from './workspaces'
 import type {
   IssueComment,
@@ -37,6 +38,10 @@ const now = demoLocalDayAnchor()
 
 export const demoIssuesSnapshot: IssueSnapshot = {
   workspaces: [
+    {
+      wsId: 'demo-chat-ws', tag: 'chat-may26', status: 'ok',
+      issues: [{ id: 'ev-supply-review', title: 'EV supply chain review', status: 'in_progress', priority: 'medium', assignee: '@demo-resume-o1', agent: 'opencode' }, { id: 'scan-open', title: 'Open issue scan', status: 'in_progress', priority: 'medium', assignee: '@resume-demo-headless-running', agent: 'claude' }],
+    },
     {
       wsId: 'demo-ws-auto-quant',
       tag: 'auto-quant',
@@ -594,6 +599,16 @@ export function demoIssueUpdate(
   if (patch.timeout !== undefined) {
     if (patch.timeout === null) delete boardIssue.timeout
     else boardIssue.timeout = patch.timeout
+  }
+  if (patch.when !== undefined) boardIssue.when = patch.when
+  if (patch.catchUp !== undefined && boardIssue.when?.kind === 'cron') {
+    boardIssue.when = { ...boardIssue.when, catchUp: patch.catchUp }
+  }
+  if (patch.when !== undefined && boardIssue.when) {
+    const nowMs = Date.now()
+    const base = boardIssue.lastFiredAtMs ?? (boardIssue.when.kind === 'cron' ? nowMs - 60_000 : 0)
+    const next = computeNextRun(boardIssue.when, base)
+    boardIssue.nextDueAtMs = next === null ? null : Math.max(next, nowMs)
   }
   return demoIssueDetail(wsId, id)
 }

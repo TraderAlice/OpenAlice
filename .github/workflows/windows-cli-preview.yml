@@ -23,6 +23,9 @@ on:
       channel_build:
         type: boolean
         default: false
+      fixed_artifact_names:
+        type: boolean
+        default: false
       artifact_prefix:
         type: string
         default: openalice-windows
@@ -106,7 +109,7 @@ jobs:
         if: inputs.candidate_run == ''
         uses: actions/upload-artifact@v6
         with:
-          name: ${{ inputs.artifact_prefix || 'openalice-windows' }}-${{ inputs.channel_build && 'win32-' || '' }}${{ matrix.arch }}-${{ github.sha }}-${{ github.run_attempt }}
+          name: ${{ inputs.fixed_artifact_names && format('{0}-win32-{1}', inputs.artifact_prefix, matrix.arch) || format('{0}-{1}{2}-{3}-{4}', inputs.artifact_prefix || 'openalice-windows', inputs.channel_build && 'win32-' || '', matrix.arch, github.sha, github.run_attempt) }}
           path: |
             dist/windows-cli-preview/${{ matrix.arch }}/*.zip
             dist/windows-cli-preview/${{ matrix.arch }}/*.tar.gz

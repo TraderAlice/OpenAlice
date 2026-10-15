@@ -127,9 +127,11 @@ describe('buildSpawnEnv', () => {
       const localBin = join(home, '.local/bin')
       const pnpmHome = join(home, 'Library/pnpm')
       const bunBin = join(home, '.bun/bin')
+      const grokBin = join(home, '.grok/bin')
       mkdirSync(localBin, { recursive: true })
       mkdirSync(pnpmHome, { recursive: true })
       mkdirSync(bunBin, { recursive: true })
+      mkdirSync(grokBin, { recursive: true })
 
       const path = buildCliPath({ HOME: home, PATH: '/usr/bin:/bin' })
         .split(delimiter)
@@ -137,8 +139,61 @@ describe('buildSpawnEnv', () => {
       expect(path).toContain(localBin)
       expect(path).toContain(pnpmHome)
       expect(path).toContain(bunBin)
+      expect(path).toContain(grokBin)
       expect(path).toContain('/usr/bin')
       expect(path).toContain('/bin')
+    } finally {
+      rmSync(home, { recursive: true, force: true })
+    }
+  })
+
+  it('adds Git Bash support directories to a Windows spawn PATH', () => {
+    const root = mkdtempSync(join(tmpdir(), 'openalice-git-bash-path-'))
+    try {
+      const gitRoot = join(root, 'Git')
+      const gitCmd = join(gitRoot, 'cmd')
+      const gitUsrBin = join(gitRoot, 'usr', 'bin')
+      const gitBin = join(gitRoot, 'bin')
+      mkdirSync(gitCmd, { recursive: true })
+      mkdirSync(gitUsrBin, { recursive: true })
+      mkdirSync(gitBin, { recursive: true })
+      writeFileSync(join(gitCmd, 'git.exe'), '')
+      writeFileSync(join(gitUsrBin, 'bash.exe'), '')
+
+      const path = buildCliPath({ PATH: gitCmd }, { platform: 'win32' }).split(delimiter)
+
+      expect(path.slice(0, 2)).toEqual([gitUsrBin, gitBin])
+    } finally {
+      rmSync(root, { recursive: true, force: true })
+    }
+  })
+
+  it('adds common Windows user agent bins missing from a GUI app PATH', () => {
+    const home = mkdtempSync(join(tmpdir(), 'openalice-windows-home-'))
+    try {
+      const appData = join(home, 'AppData', 'Roaming')
+      const localAppData = join(home, 'AppData', 'Local')
+      const agentPaths = [
+        join(home, '.bun', 'bin'),
+        join(home, '.local', 'bin'),
+        join(home, 'bin'),
+        join(home, '.grok', 'bin'),
+        join(appData, 'npm'),
+        join(localAppData, 'pnpm'),
+        join(localAppData, 'agy', 'bin'),
+        join(localAppData, 'Microsoft', 'WinGet', 'Links'),
+      ]
+      for (const agentPath of agentPaths) mkdirSync(agentPath, { recursive: true })
+
+      const path = buildCliPath({
+        HOME: home,
+        USERPROFILE: home,
+        APPDATA: appData,
+        LOCALAPPDATA: localAppData,
+        PATH: join(home, 'host-bin'),
+      }, { platform: 'win32' }).split(delimiter)
+
+      for (const agentPath of agentPaths) expect(path).toContain(agentPath)
     } finally {
       rmSync(home, { recursive: true, force: true })
     }

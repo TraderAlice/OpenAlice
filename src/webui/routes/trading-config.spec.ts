@@ -10,14 +10,16 @@ import { describe, it, expect, beforeEach, vi } from 'vitest'
 
 const brokerPackMocks = vi.hoisted(() => ({
   getBrokerPackLocalStatus: vi.fn(),
-  installBrokerPack: vi.fn(),
+  applyBrokerPackUpdate: vi.fn(),
   triggerUTARestart: vi.fn(),
 }))
 
 vi.mock('../../services/broker-packs/installer.js', () => ({
   getBrokerPackLocalStatus: brokerPackMocks.getBrokerPackLocalStatus,
-  installBrokerPack: brokerPackMocks.installBrokerPack,
+
 }))
+
+vi.mock('../../services/broker-packs/update-lifecycle.js', () => ({ applyBrokerPackUpdate: brokerPackMocks.applyBrokerPackUpdate }))
 
 vi.mock('../../services/uta-supervisor/restart-trigger.js', () => ({
   triggerUTARestart: brokerPackMocks.triggerUTARestart,
@@ -74,7 +76,7 @@ beforeEach(() => {
     installed: engine === 'mock',
     source: engine === 'mock' ? 'builtin' : 'missing',
   }))
-  brokerPackMocks.installBrokerPack.mockResolvedValue({
+  brokerPackMocks.applyBrokerPackUpdate.mockResolvedValue({ phase: 'succeeded',
     engine: 'ccxt', installed: true, source: 'downloaded', version: '0.80.0-beta',
   })
   brokerPackMocks.triggerUTARestart.mockResolvedValue({ triggered: true, ready: true })
@@ -181,20 +183,21 @@ describe('POST /broker-packs/:engine/install', () => {
 
     expect(status).toBe(404)
     expect(body).toEqual({ error: 'Unknown broker pack: not-real' })
-    expect(brokerPackMocks.installBrokerPack).not.toHaveBeenCalled()
+    expect(brokerPackMocks.applyBrokerPackUpdate).not.toHaveBeenCalled()
   })
 
-  it('installs a known engine and requests a supervised UTA restart', async () => {
+  it('delegates installation and verified UTA activation to the Pack owner', async () => {
     const { status, body } = await req(makeRoutes(), 'POST', '/broker-packs/ccxt/install')
 
     expect(status).toBe(200)
-    expect(body).toMatchObject({ engine: 'ccxt', installed: true, source: 'downloaded' })
-    expect(brokerPackMocks.installBrokerPack).toHaveBeenCalledWith('ccxt')
-    await vi.waitFor(() => expect(brokerPackMocks.triggerUTARestart).toHaveBeenCalledOnce())
+    expect(body).toMatchObject({ engine: 'ccxt' })
+    expect(brokerPackMocks.applyBrokerPackUpdate).toHaveBeenCalledWith('ccxt')
+    expect(body.operation).toMatchObject({ phase: 'succeeded' })
+    expect(brokerPackMocks.triggerUTARestart).not.toHaveBeenCalled()
   })
 
   it('returns an actionable install error without restarting UTA', async () => {
-    brokerPackMocks.installBrokerPack.mockRejectedValueOnce(new Error('checksum mismatch'))
+    brokerPackMocks.applyBrokerPackUpdate.mockRejectedValueOnce(new Error('checksum mismatch'))
 
     const { status, body } = await req(makeRoutes(), 'POST', '/broker-packs/ccxt/install')
 

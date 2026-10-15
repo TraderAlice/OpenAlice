@@ -1,7 +1,8 @@
-/** `openalice machine` — persistent SSH hosts and fleet inventory. */
+/** `openalice machine` — Herdr-style persistent remote profiles. */
 import { createInterface } from 'node:readline/promises'
 import { stdin as input, stdout as output } from 'node:process'
 
+import { connectRemote, parseRemoteArgs } from './remote.mjs'
 import {
   inspectLocalMachine,
   inspectRegisteredMachine,
@@ -11,30 +12,44 @@ import {
   type MachineInventoryOptions,
 } from './machine-inventory.ts'
 import {
+  findRegisteredMachine,
+  machineIsEnabled,
+  machineProfileId,
   readMachineRegistrySummary,
-  registerMachine,
+  registerMachineProfile,
+  validateMachineProfile,
+  renameMachine,
   removeMachine,
+  setMachineEnabled,
   type MachineRegistryOptions,
   type MachineRegistrySummary,
+  type RegisterMachineProfileInput,
   type RegisteredMachine,
 } from './machine-registry.ts'
 
 export function formatMachineHelp(): string {
-  return `Manage local and SSH Machines
+  return `Manage saved remote Machines
 
 Usage:
   openalice machine list [--json]
-  openalice machine add <key> --target <user@host> [options]
-  openalice machine remove <key> [--yes]
-  openalice machine inspect [key] [--json]
+  openalice machine add <user@host> --label <label> [options]
+  openalice machine rename <id-or-label> --label <label> [--yes]
+  openalice machine remove <id-or-label> [--yes]
+  openalice machine enable <id-or-label> [--yes]
+  openalice machine disable <id-or-label> [--yes]
 
-The local Machine is implicit. Registered SSH Machines are stored outside every
-AliceProject. inspect performs one aggregate SSH request per remote Machine and
-never scans arbitrary remote directories.
+OpenAlice also keeps its product-specific inventory probe available for remote
+fleet refreshes:
+  openalice machine inspect [id-or-label] [--json]
+
+Machine profiles are stored outside every AliceProject. Adding a profile
+prepares the matching remote OpenAlice Server before saving it. The profile
+contains only connection metadata. Select an AliceProject with --project or
+--home on commands that support it; Herdr server sessions have no equivalent
+in OpenAlice.
 
 Options:
-  --target <user@host>  OpenSSH destination
-  --name <label>        Display name (defaults to the Machine key)
+  --label <label>       Human-readable Machine label
   --ssh-port <port>     Override the OpenSSH-configured port
   --identity <path>     Absolute or ~/ local private-key path
   --json                Print a versioned machine-readable result
@@ -47,8 +62,14 @@ export interface MachineCommandIo extends MachineRegistryOptions, MachineInvento
   prompt?: (question: string) => Promise<string>
   interactive?: boolean
   loadMachines?: () => Promise<MachineRegistrySummary>
-  addMachine?: typeof registerMachine
+  addMachineProfile?: typeof registerMachineProfile
+  setupRemote?: (
+    input: RegisterMachineProfileInput & { assumeYes: boolean },
+    io: MachineCommandIo,
+  ) => Promise<void>
+  renameMachine?: typeof renameMachine
   deleteMachine?: typeof removeMachine
+  setMachineEnabled?: typeof setMachineEnabled
   inspectLocal?: (options?: MachineInventoryOptions) => Promise<MachineInspectEnvelope>
   inspectRemote?: (
     machine: RegisteredMachine,
@@ -63,7 +84,10 @@ export async function runMachineCommand(
   const [action, ...rest] = argv
   if (!action || action === 'list') return runList(action ? rest : [], io)
   if (action === 'add') return runAdd(rest, io)
+  if (action === 'rename') return runRename(rest, io)
   if (action === 'remove') return runRemove(rest, io)
+  if (action === 'enable') return runEnablement(rest, true, io)
+  if (action === 'disable') return runEnablement(rest, false, io)
   if (action === 'inspect') return runInspect(rest, io)
   throw usageError(`Unknown machine command: ${action}\n\n${formatMachineHelp()}`)
 }
@@ -75,8 +99,7 @@ async function runList(argv: string[], io: MachineCommandIo): Promise<number> {
   if (json) {
     stdout.write(`${JSON.stringify({
       schemaVersion: 1,
-      defaultMachine: summary.defaultMachine,
-      machines: [localMachineRow(summary.defaultMachine), ...summary.machines.map(publicMachineRow)],
+      machines: summary.machines.map(publicMachineRow),
     })}\n`)
   } else {
     stdout.write(formatMachineList(summary))
@@ -86,35 +109,71 @@ async function runList(argv: string[], io: MachineCommandIo): Promise<number> {
 
 async function runAdd(argv: string[], io: MachineCommandIo): Promise<number> {
   const parsed = parseAddArgs(argv)
+  validateMachineProfile(parsed, await loadMachines(io))
   if (!await confirmMutation(
     io,
     parsed.yes,
-    `Register SSH Machine ${parsed.key} (${parsed.sshTarget}${parsed.sshPort ? `:${parsed.sshPort}` : ''})? [y/N]: `,
+    `Set up and save Machine ${parsed.label} (${parsed.sshTarget}${parsed.sshPort ? `:${parsed.sshPort}` : ''})? [y/N]: `,
   )) {
     ;(io.stdout ?? process.stdout).write('Cancelled.\n')
     return 0
   }
-  const added = await (io.addMachine ?? registerMachine)({
-    key: parsed.key,
-    displayName: parsed.displayName,
+  const input = {
+    label: parsed.label,
     sshTarget: parsed.sshTarget,
     sshPort: parsed.sshPort,
     identityFile: parsed.identityFile,
-  }, io)
+  }
+  await (io.setupRemote ?? setupRemote)(
+    { ...input, assumeYes: parsed.yes },
+    io,
+  )
+  const added = await (io.addMachineProfile ?? registerMachineProfile)(input, io)
   ;(io.stdout ?? process.stdout).write(
-    `Registered Machine ${added.key} (${added.sshTarget}${added.sshPort ? `:${added.sshPort}` : ''}).\n`,
+    `Added Machine ${machineProfileId(added)} (${added.displayName}) at ${added.sshTarget}.\n`,
+  )
+  return 0
+}
+
+async function runRename(argv: string[], io: MachineCommandIo): Promise<number> {
+  const { selector, label, yes } = parseRenameArgs(argv)
+  if (!await confirmMutation(io, yes, `Rename Machine ${selector} to ${label}? [y/N]: `)) {
+    ;(io.stdout ?? process.stdout).write('Cancelled.\n')
+    return 0
+  }
+  const renamed = await (io.renameMachine ?? renameMachine)(selector, label, io)
+  ;(io.stdout ?? process.stdout).write(
+    `Renamed Machine ${machineProfileId(renamed)} to ${renamed.displayName}.\n`,
   )
   return 0
 }
 
 async function runRemove(argv: string[], io: MachineCommandIo): Promise<number> {
-  const { key, yes } = parseRemoveArgs(argv)
-  if (!await confirmMutation(io, yes, `Remove registered Machine ${key}? [y/N]: `)) {
+  const { selector, yes } = parseRemoveArgs(argv)
+  if (!await confirmMutation(io, yes, `Remove saved Machine ${selector}? [y/N]: `)) {
     ;(io.stdout ?? process.stdout).write('Cancelled.\n')
     return 0
   }
-  const removed = await (io.deleteMachine ?? removeMachine)(key, io)
-  ;(io.stdout ?? process.stdout).write(`Removed Machine ${removed.key}. Remote data was not changed.\n`)
+  const removed = await (io.deleteMachine ?? removeMachine)(selector, io)
+  ;(io.stdout ?? process.stdout).write(`Removed Machine ${machineProfileId(removed)}. Remote data was not changed.\n`)
+  return 0
+}
+
+async function runEnablement(
+  argv: string[],
+  enabled: boolean,
+  io: MachineCommandIo,
+): Promise<number> {
+  const { selector, yes } = parseRemoveArgs(argv)
+  const action = enabled ? 'Enable' : 'Disable'
+  if (!await confirmMutation(io, yes, `${action} Machine ${selector}? [y/N]: `)) {
+    ;(io.stdout ?? process.stdout).write('Cancelled.\n')
+    return 0
+  }
+  const updated = await (io.setMachineEnabled ?? setMachineEnabled)(selector, enabled, io)
+  ;(io.stdout ?? process.stdout).write(
+    `${action}d Machine ${machineProfileId(updated)}.\n`,
+  )
   return 0
 }
 
@@ -151,42 +210,55 @@ async function runInspect(argv: string[], io: MachineCommandIo): Promise<number>
 }
 
 function parseAddArgs(argv: string[]): {
-  key: string
-  displayName?: string
+  label: string
   sshTarget: string
   sshPort?: number
   identityFile?: string
   yes: boolean
 } {
-  const key = argv[0]
-  if (!key || key.startsWith('-')) throw usageError('Usage: openalice machine add <key> --target <user@host> [options]')
-  let displayName: string | undefined
-  let sshTarget: string | undefined
+  const sshTarget = argv[0]
+  if (!sshTarget || sshTarget.startsWith('-')) throw usageError('Usage: openalice machine add <user@host> --label <label> [options]')
+  let label: string | undefined
   let identityFile: string | undefined
   let sshPort: number | undefined
   let yes = false
   for (let index = 1; index < argv.length; index += 1) {
     const arg = argv[index]
-    if (arg === '--target') sshTarget = requireValue(argv, ++index, arg)
-    else if (arg === '--name') displayName = requireValue(argv, ++index, arg)
+    if (arg === '--label') label = requireValue(argv, ++index, arg)
+    else if (arg === '--remote-session') throw usageError('--remote-session is unsupported: OpenAlice has no named server sessions. Use --project or --home on the target command.')
     else if (arg === '--identity') identityFile = requireValue(argv, ++index, arg)
     else if (arg === '--ssh-port') sshPort = requirePort(requireValue(argv, ++index, arg), arg)
     else if (arg === '--yes' || arg === '-y') yes = true
     else throw usageError(`Unknown option: ${String(arg)}`)
   }
-  if (!sshTarget) throw usageError('--target is required')
-  return { key, displayName, sshTarget, sshPort, identityFile, yes }
+  if (!label) throw usageError('--label is required')
+  return { label, sshTarget, sshPort, identityFile, yes }
 }
 
-function parseRemoveArgs(argv: string[]): { key: string; yes: boolean } {
-  const key = argv[0]
-  if (!key || key.startsWith('-')) throw usageError('Usage: openalice machine remove <key> [--yes]')
+function parseRemoveArgs(argv: string[]): { selector: string; yes: boolean } {
+  const selector = argv[0]
+  if (!selector || selector.startsWith('-')) throw usageError('Usage: openalice machine remove <id-or-label> [--yes]')
   let yes = false
   for (const arg of argv.slice(1)) {
     if (arg === '--yes' || arg === '-y') yes = true
     else throw usageError(`Unknown option: ${arg}`)
   }
-  return { key, yes }
+  return { selector, yes }
+}
+
+function parseRenameArgs(argv: string[]): { selector: string; label: string; yes: boolean } {
+  const selector = argv[0]
+  if (!selector || selector.startsWith('-')) throw usageError('Usage: openalice machine rename <id-or-label> --label <label> [--yes]')
+  let label: string | undefined
+  let yes = false
+  for (let index = 1; index < argv.length; index += 1) {
+    const arg = argv[index]
+    if (arg === '--label') label = requireValue(argv, ++index, arg)
+    else if (arg === '--yes' || arg === '-y') yes = true
+    else throw usageError(`Unknown option: ${arg}`)
+  }
+  if (!label) throw usageError('--label is required')
+  return { selector, label, yes }
 }
 
 function parseInspectArgs(argv: string[]): { key?: string; json: boolean } {
@@ -236,8 +308,22 @@ async function loadMachines(io: MachineCommandIo): Promise<MachineRegistrySummar
   return (io.loadMachines ?? (() => readMachineRegistrySummary(io)))()
 }
 
+async function setupRemote(
+  input: RegisterMachineProfileInput & { assumeYes: boolean },
+  io: MachineCommandIo,
+): Promise<void> {
+  const argv = [input.sshTarget, '--yes', '--no-open']
+  if (input.sshPort !== undefined) argv.push('--ssh-port', String(input.sshPort))
+  if (input.identityFile !== undefined) argv.push('--identity', input.identityFile)
+  await connectRemote(parseRemoteArgs(argv), {
+    stdout: io.stdout ?? process.stdout,
+    env: io.env ?? process.env,
+    connectTunnel: async () => 0,
+  })
+}
+
 function requireMachine(summary: MachineRegistrySummary, key: string): RegisteredMachine {
-  const machine = summary.machines.find((entry) => entry.key === key)
+  const machine = findRegisteredMachine(summary, key)
   if (!machine) throw usageError(`Machine "${key}" is not registered.`)
   return machine
 }
@@ -250,11 +336,11 @@ function writeInspection(io: MachineCommandIo, json: boolean, envelope: MachineI
 }
 
 export function formatMachineList(summary: MachineRegistrySummary): string {
-  const rows = [localMachineRow(summary.defaultMachine), ...summary.machines.map(publicMachineRow)]
-  const width = Math.max(7, ...rows.map((row) => row.key.length))
+  const rows = summary.machines.map(publicMachineRow)
+  const width = Math.max(5, ...rows.map((row) => row.label.length))
   return `${['Machines', '', ...rows.map((row) => {
-    const defaultMark = row.isDefault ? '  (default)' : ''
-    return `  ${row.key.padEnd(width)}  ${row.displayName}  ${row.sshTarget ?? 'local'}${defaultMark}`
+    const state = row.enabled ? 'enabled' : 'disabled'
+    return `  ${row.label.padEnd(width)}  ${row.id}  ${row.target}  [${state}]`
   }), ''].join('\n')}\n`
 }
 
@@ -271,17 +357,13 @@ export function formatMachineInventory(machines: MachineInventory[]): string {
   return `${lines.join('\n')}\n`
 }
 
-function localMachineRow(defaultMachine: string) {
-  return { key: 'local', displayName: 'This computer', sshTarget: null, sshPort: null, isDefault: defaultMachine === 'local' }
-}
-
 function publicMachineRow(machine: RegisteredMachine) {
   return {
-    key: machine.key,
-    displayName: machine.displayName,
-    sshTarget: machine.sshTarget,
+    id: machineProfileId(machine),
+    label: machine.displayName,
+    target: machine.sshTarget,
+    enabled: machineIsEnabled(machine),
     sshPort: machine.sshPort ?? null,
-    isDefault: machine.isDefault,
   }
 }
 

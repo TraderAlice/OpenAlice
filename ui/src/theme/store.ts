@@ -124,7 +124,7 @@ export const useThemeStore = create<ThemeStore>()(
       setTheme: (theme) => set({ theme }),
       setDayPalette: (dayPalette) => set({ dayPalette }),
       setNightPalette: (nightPalette) => set({ nightPalette }),
-      setUiStyle: (uiStyle) => set({ uiStyle }),
+      setUiStyle: (uiStyle) => set((state) => state.uiStyle === uiStyle ? state : { uiStyle, stylePaletteMode: 'saved' }),
       setStylePaletteMode: (stylePaletteMode) => set({ stylePaletteMode }),
       cycleTheme: () => {
         const i = CYCLE.indexOf(get().theme)

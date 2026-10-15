@@ -1,4 +1,5 @@
 import { execFile } from 'node:child_process'
+import { readFileSync } from 'node:fs'
 import { readFile } from 'node:fs/promises'
 import { hostname } from 'node:os'
 import { promisify } from 'node:util'
@@ -22,10 +23,29 @@ export const defaultProcessController: ProcessController = {
     if (!Number.isInteger(pid) || pid <= 0) return false
     try {
       process.kill(pid, 0)
-      return true
-    } catch {
-      return false
+    } catch (error) {
+      // Permission failure cannot establish that an owner has exited.
+      const code = (error as NodeJS.ErrnoException).code
+      return code !== 'ESRCH' && code !== 'ERR_OUT_OF_RANGE'
     }
+    if (process.platform === 'linux') {
+      try {
+        // comm can contain parentheses and fake state fields: parse only after
+        // its final ')'. A Z leader can still have executing worker threads.
+        // Only Z with exactly one remaining thread proves the group exited:
+        // that sole zombie cannot create another worker after this snapshot.
+        // Missing/invalid thread counts stay live, as does restricted procfs.
+        const stat = readFileSync(`/proc/${pid}/stat`, 'utf8')
+        const commEnd = stat.lastIndexOf(')')
+        if (stat.startsWith(`${pid} (`) && commEnd > stat.indexOf('(') && stat[commEnd + 1] === ' ') {
+          const fields = stat.slice(commEnd + 2).trim().split(/\s+/)
+          if (fields[0] === 'Z' && fields[17] === '1') return false
+        }
+      } catch {
+        // Restricted procfs or an exit/read race: retain the positive probe.
+      }
+    }
+    return true
   },
   startedAt: readProcessStartedAt,
   machineId: readMachineId,

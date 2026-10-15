@@ -114,7 +114,6 @@ export function classifyGuardianRuntimeStatus(
   }
   const raw = runtime as Record<string, unknown>
   const owner = sanitizeControlOwner(raw.owner)
-  const surface = owner?.surface
   const state = typeof raw.state === 'string' && /^[a-z][a-z0-9.-]{0,63}$/.test(raw.state)
     ? raw.state
     : 'unknown'
@@ -138,8 +137,7 @@ export function classifyGuardianRuntimeStatus(
     }
   }
   let statusClass: DiscoveredRuntimeClass
-  if (surface !== 'cli-server') statusClass = 'owned_elsewhere'
-  else if (state === 'starting' || state === 'stopping') statusClass = state
+  if (state === 'starting' || state === 'stopping') statusClass = state
   else if (state === 'running' && (raw.components as { alice?: string } | undefined)?.alice === 'ready') {
     statusClass = 'running'
   } else statusClass = 'unhealthy'

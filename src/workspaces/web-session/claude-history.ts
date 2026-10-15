@@ -11,7 +11,7 @@ export async function readClaudeHistory(cwd: string, sessionId: string, env: Rea
   const config = env['CLAUDE_CONFIG_DIR'] || join(env['HOME'] || homedir(), '.claude')
   const canonical = await realpath(cwd)
   for (const directory of new Set([canonical, resolve(cwd)])) {
-    const key = directory.replaceAll('/', '-').replaceAll('.', '-')
+    const key = directory.replace(/[\\/:.]/g, '-')
     try {
       return selectClaudeHistory(await readFile(join(config, 'projects', key, `${sessionId}.jsonl`), 'utf8'))
     } catch (error) {

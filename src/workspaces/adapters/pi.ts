@@ -1,4 +1,5 @@
-import { createReadStream, existsSync } from 'node:fs';
+import { discoverNativeModels } from '../native-model-discovery.js';
+import { createReadStream, existsSync, statSync } from 'node:fs';
 import { mkdir, readFile, readdir, realpath, rename, writeFile } from 'node:fs/promises';
 import { dirname, join, resolve } from 'node:path';
 import { createInterface } from 'node:readline';
@@ -65,11 +66,27 @@ function piSessionDir(cwd: string): string {
   return join(resolvePiAgentDir(process.env), 'sessions', `--${safeCwd}--`);
 }
 
+function isRegularFile(path: string | null | undefined): path is string {
+  if (!path) return false;
+  try {
+    return statSync(path).isFile();
+  } catch {
+    return false;
+  }
+}
+
+function usesManagedPiBinary(env: Readonly<Record<string, string | undefined>>): boolean {
+  const profile = runtimeProfileFromEnv(env);
+  if (!isRegularFile(profile.managedPiPath)) return false;
+  if (profile.managedPiNodePath && !isRegularFile(profile.managedPiNodePath)) return false;
+  return true;
+}
+
 function piCommandHead(env: Readonly<Record<string, string | undefined>>): readonly string[] {
   const profile = runtimeProfileFromEnv(env);
-  if (!profile.managedPiPath) return ['pi'];
-  if (profile.managedPiNodePath) return [profile.managedPiNodePath, profile.managedPiPath];
-  return [profile.managedPiPath];
+  if (!usesManagedPiBinary(env)) return ['pi'];
+  if (profile.managedPiNodePath) return [profile.managedPiNodePath, profile.managedPiPath!];
+  return [profile.managedPiPath!];
 }
 
 export async function syncPiWindowsShellPath(
@@ -176,11 +193,12 @@ function sortPiTrust(trust: Readonly<Record<string, boolean | null>>): Record<st
 }
 
 function piHeadlessApproveArgs(env: Readonly<Record<string, string | undefined>>): readonly string[] {
-  // Packaged desktop and Docker both use an OpenAlice-pinned Pi. Contributor
-  // dev intentionally uses whatever `pi` is on PATH; its install/version/trust
-  // policy belongs to that developer, so do not attach version-specific flags.
+  // Packaged desktop uses an OpenAlice-managed Pi and Docker uses its
+  // image-provided Pi. Contributor dev intentionally uses whatever `pi` is on
+  // PATH; its install/version/trust policy belongs to that developer, so do not
+  // attach version-specific flags.
   const profile = runtimeProfileFromEnv(env);
-  return profile.managedPiPath || profile.launcher === 'docker' ? ['--approve'] : [];
+  return usesManagedPiBinary(env) || profile.launcher === 'docker' ? ['--approve'] : [];
 }
 
 /**
@@ -216,6 +234,7 @@ function piHeadlessApproveArgs(env: Readonly<Record<string, string | undefined>>
  * transcriptDiscovery stays 'none'.
  */
 export const piAdapter: CliAdapter = {
+  discoverModels: (cwd) => discoverNativeModels('pi', 'pi', cwd),
   id: 'pi',
   displayName: 'Pi',
   binary: 'pi',

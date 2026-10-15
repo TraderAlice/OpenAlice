@@ -1,3 +1,6 @@
+import { signCliMacOS } from './sign-cli-macos.mjs'
+import { verifyCliReleaseArchive } from './verify-cli-release.mjs'
+import { requireBunVersion } from './bun-toolchain.mjs'
 import { acceptNativeUpgrade } from './native-upgrade-acceptance.mjs'
 import { writeDevBrokerBinding } from './dev-broker-binding.mjs'
 import { runtimeCompileOptions } from './bun-compile-options.js'
@@ -23,10 +26,7 @@ import { bunReleaseContentIdentity } from './bun-release-content-identity.mjs'
 import { inspectSystemDependencies } from '../packages/cli/src/system-dependencies.mjs'
 
 const repositoryRoot = fileURLToPath(new URL('..', import.meta.url))
-const pinnedBunVersion = (await readFile(join(repositoryRoot, '.bun-version'), 'utf8')).trim()
-if (Bun.version !== pinnedBunVersion) {
-  throw new Error(`Bun ${pinnedBunVersion} is required, but ${Bun.version} is running`)
-}
+requireBunVersion(Bun.version)
 if (!['darwin', 'linux'].includes(process.platform)) {
   throw new Error(`Bun CLI releases are currently supported on macOS and Linux, not ${process.platform}`)
 }
@@ -54,6 +54,8 @@ const releaseStartedAt = performance.now()
 await rm(releaseRoot, { recursive: true, force: true })
 await rm(smokeHome, { recursive: true, force: true })
 await rm(archivePath, { force: true })
+await rm(`${archivePath}.sha256`, { force: true })
+await rm(join(outputRoot, 'report.json'), { force: true })
 await mkdir(dirname(executablePath), { recursive: true })
 await mkdir(resourceRoot, { recursive: true })
 
@@ -99,6 +101,8 @@ await cp(join(repositoryRoot, 'node_modules/dugite/LICENSE'), join(releaseRoot, 
 await materializeWorkspaceCli()
 
 await writeDevBrokerBinding(resourceRoot, { commit: process.env['OPENALICE_DEV_COMMIT'], inputDir: join(repositoryRoot, 'dist/dev-broker-packs'), version: product.version, platform: platformName, arch: process.arch })
+
+const signature = platformName === 'darwin' ? signCliMacOS(executablePath, process.arch) : undefined
 
 const files = await releaseFiles(releaseRoot, new Set(['release.json']))
 const unsignedReleaseMetadata = {
@@ -160,11 +164,19 @@ if (archive.exitCode !== 0) {
 }
 const archiveHash = await sha256File(archivePath)
 await writeFile(`${archivePath}.sha256`, `${archiveHash}  ${basename(archivePath)}\n`)
+try {
+  verifyCliReleaseArchive({ archivePath, version: product.version, platform: platformName, arch: process.arch })
+} catch (error) {
+  await rm(archivePath, { force: true })
+  await rm(`${archivePath}.sha256`, { force: true })
+  throw error
+}
 const archiveDurationMs = Math.round(performance.now() - archiveStartedAt)
 
 const report = {
   schemaVersion: 1,
   status: 'pass',
+  signature,
   version: product.version,
   bunVersion: Bun.version,
   platform: platformName,
@@ -321,8 +333,9 @@ async function smokeRelease(options: {
     helperServer.stop(true)
   }
 
-  const [webPort, mcpPort, utaPort, connectorPort] = await allocatePorts(4)
+  const [webPort, mcpPort, utaPort, connectorPort, relayPort] = await allocatePorts(5)
   const runtimeHome = join(options.smokeHome, 'runtime-home')
+  const supervisorHome = join(options.smokeHome, 'supervisor')
   const userHome = join(options.smokeHome, 'user-home')
   const externalAgentRoot = join(options.smokeHome, 'external-agent')
   const externalAgentBin = join(externalAgentRoot, 'bin')
@@ -334,8 +347,13 @@ async function smokeRelease(options: {
   const nativeOpenCodeTuiConfig = '{"theme":"system"}\n'
   await Promise.all([
     mkdir(externalAgentBin, { recursive: true }),
+    mkdir(supervisorHome, { recursive: true }),
     mkdir(join(userHome, '.config', 'opencode'), { recursive: true }),
   ])
+  await writeFile(join(supervisorHome, 'config.json'), JSON.stringify({
+    schemaVersion: 2,
+    defaults: { home: runtimeHome, port: webPort },
+  }))
   await writeFile(join(userHome, '.config', 'opencode', 'tui.json'), nativeOpenCodeTuiConfig)
   await writeFile(externalOpenCode, `#!/bin/sh
 if [ "${'$'}{1-}" = "session" ] && [ "${'$'}{2-}" = "list" ]; then
@@ -362,6 +380,7 @@ printf '%s\\n' "${'$'}1" > "${'$'}OPENALICE_SMOKE_OPEN_RECEIPT"
     PATH: [externalAgentBin, ...new Set(dependencies.map(check => dirname(check.executable!)))].join(':'),
     TMPDIR: process.env['TMPDIR'] ?? '/tmp',
     OPENALICE_HOME: runtimeHome,
+    OPENALICE_SUPERVISOR_HOME: supervisorHome,
     OPENALICE_TRADING_MODE: 'lite',
     OPENALICE_DISABLE_AUTH: '1',
     OPENALICE_BIND_HOST: '127.0.0.1',
@@ -394,6 +413,7 @@ printf '%s\\n' "${'$'}1" > "${'$'}OPENALICE_SMOKE_OPEN_RECEIPT"
   })
   const stdoutPromise = new Response(runtime.stdout).text()
   const stderrPromise = new Response(runtime.stderr).text()
+  let relay: ReturnType<typeof Bun.spawn> | null = null
   let runtimeError: unknown = null
   let realOpenCodeReport: { path: string; version: string; ptyBytes: number } | null = null
   let browserOpenUrl: string | null = null
@@ -445,13 +465,31 @@ printf '%s\\n' "${'$'}1" > "${'$'}OPENALICE_SMOKE_OPEN_RECEIPT"
       total: guardian + alice,
     }
     const baseUrl = `http://127.0.0.1:${webPort}`
-    const openOutput = run([
+    const relayUrl = `http://127.0.0.1:${relayPort}`
+    relay = Bun.spawn([
       options.executablePath,
-      'open', '--home', runtimeHome, '--wait', '3',
-    ], runtimeEnv)
+      'relay', '--port', String(relayPort),
+    ], {
+      cwd: options.smokeHome,
+      env: runtimeEnv,
+      stdout: 'pipe',
+      stderr: 'pipe',
+    })
+    await waitForHttp(`${relayUrl}/settings`, 15_000)
     browserOpenUrl = (await waitForFileText(openReceipt, 5_000)).trim()
-    if (browserOpenUrl !== baseUrl || !openOutput.includes(`Opened OpenAlice Web UI: ${baseUrl}`)) {
-      throw new Error(`compiled CLI did not open its verified Web endpoint: ${openOutput} / ${browserOpenUrl}`)
+    const initialRelay = await fetchJson(`${relayUrl}/relay/v1/status`) as { target?: unknown }
+    if (browserOpenUrl !== `${relayUrl}/settings` || initialRelay.target) {
+      throw new Error(`compiled CLI did not open its unselected startup shell: ${JSON.stringify(initialRelay)} / ${browserOpenUrl}`)
+    }
+    // Fresh clients have no Recent. Exercise the same explicit selection as
+    // the GUI instead of reviving the retired silent-local-fallback contract.
+    const relayStatus = await fetchJson(`${relayUrl}/relay/v1/connect`, {
+      method: 'POST', headers: { 'content-type': 'application/json', origin: relayUrl },
+      body: JSON.stringify({ machine: 'local', project: 'default' }),
+    }) as { target?: { machine?: string; project?: string } }
+    const recent = await fetchJson(`${relayUrl}/relay/v1/startup-target`) as { target?: { machine?: string; project?: string } }
+    if (relayStatus.target?.machine !== 'local' || recent.target?.project !== 'default') {
+      throw new Error(`compiled CLI did not attach and remember the selected project: ${JSON.stringify({ relayStatus, recent })}`)
     }
     const inventory = await fetchJson(`${baseUrl}/api/workspaces/agents`) as {
       agents?: Array<{ id?: string; installed?: boolean }>
@@ -589,6 +627,10 @@ printf '%s\\n' "${'$'}1" > "${'$'}OPENALICE_SMOKE_OPEN_RECEIPT"
   } catch (error) {
     runtimeError = error
   } finally {
+    if (relay) {
+      relay.kill('SIGTERM')
+      await relay.exited
+    }
     runtime.kill('SIGTERM')
   }
   const exitCode = await runtime.exited

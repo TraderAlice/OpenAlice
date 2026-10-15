@@ -1,16 +1,19 @@
 // @vitest-environment jsdom
 
-import { cleanup, render, screen } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import type { ReactNode } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import '../i18n'
 import type { Workspace } from '../components/workspace/api'
 import { HarnessWorkbenchContext } from '../components/harness/context'
+import { useSessionBusyDialog } from '../components/workspace/session-busy-store'
 import { WorkspacePage } from './WorkspacePage'
 
 const mocks = vi.hoisted(() => ({
+  takeovers: null as any,
   openOrFocus: vi.fn(),
+  closeMatching: vi.fn(),
   spawn: vi.fn(),
   openAgentConfig: vi.fn(),
   resumeSession: vi.fn(),
@@ -20,11 +23,13 @@ const mocks = vi.hoisted(() => ({
   workspaces: [] as Workspace[],
 }))
 
+vi.mock('../hooks/useSessionTakeovers', () => ({ useSessionTakeovers: () => mocks.takeovers, awaitingTakeover: (row: any) => row.state === 'pending' }))
+
 vi.mock('../contexts/workspaces-context', () => ({
   useWorkspaces: () => ({
     workspaces: mocks.workspaces,
     defaultAgent: 'codex',
-    agents: [{ id: 'codex', kind: 'agent' }, { id: 'pi', kind: 'agent' }],
+    agents: [{ id: 'codex', kind: 'agent' }, { id: 'pi', kind: 'agent', capabilities: { web: { wire: 'pi-rpc' } } }],
     spawn: mocks.spawn,
     openAgentConfig: mocks.openAgentConfig,
     resumeSession: mocks.resumeSession,
@@ -34,9 +39,10 @@ vi.mock('../contexts/workspaces-context', () => ({
 }))
 
 vi.mock('../tabs/store', () => ({
-  useWorkspace: (
-    selector: (state: { openOrFocus: typeof mocks.openOrFocus }) => unknown,
-  ) => selector({ openOrFocus: mocks.openOrFocus }),
+  useWorkspace: Object.assign((selector: (state: { openOrFocus: typeof mocks.openOrFocus }) => unknown) => selector({ openOrFocus: mocks.openOrFocus }), {
+    getState: () => ({ openOrFocus: mocks.openOrFocus, closeMatching: mocks.closeMatching,
+      tree: { kind: 'leaf', group: { activeTabId: null } }, tabs: {} }),
+  }),
 }))
 
 vi.mock('./ChatLandingPage', () => ({
@@ -72,6 +78,7 @@ function workspace(overrides: Partial<Workspace> = {}): Workspace {
 
 beforeEach(() => {
   vi.clearAllMocks()
+  mocks.takeovers = null
   mocks.workspaces = [workspace({ displayName: 'Optical Networking Follow-up' })]
 })
 
@@ -206,4 +213,46 @@ it('leaves only the panel entry in the Harness header', () => {
   expect(screen.getByRole('button', { name: 'Files' })).toBeTruthy()
   expect(screen.queryByRole('button', { name: 'Settings' })).toBeNull()
   expect(screen.queryByRole('button', { name: 'Web Beta' })).toBeNull()
+})
+
+it('offers GUI directly in the running TUI Harness header', () => {
+  mocks.workspaces = [workspace({ sessions: [{ id: 'pi-one', resumeId: 'native-one', wsId: 'chat-1', agent: 'pi', name: 'p1', title: 'Research', state: 'running', surface: 'terminal', pid: 1, startedAt: 1, createdAt: '', lastActiveAt: '' }] })]
+  render(<HarnessWorkbenchContext.Provider value={{ wsId: 'chat-1', open: false, toggle: vi.fn() }}>
+    <WorkspacePage spec={{ kind: 'workspace', params: { wsId: 'chat-1', sessionId: 'pi-one', source: 'chat' } }} visible />
+  </HarnessWorkbenchContext.Provider>)
+  fireEvent.click(screen.getByRole('button', { name: 'GUI' }))
+  expect(mocks.openWebSession).toHaveBeenCalledWith('chat-1', 'pi-one', 'chat')
+})
+
+it('replaces a background deep link with transient inspection instead of retaining a Session tab', () => {
+  const record = { id: 'background', resumeId: 'resume-background', wsId: 'chat-1', agent: 'pi', name: 'p1', title: 'Research', state: 'running' as const, surface: 'headless' as const, pid: null, startedAt: 1, createdAt: '', lastActiveAt: '' }
+  mocks.workspaces = [workspace({ sessions: [record] })]
+  render(<WorkspacePage spec={{ kind: 'workspace', params: { wsId: 'chat-1', sessionId: 'background', source: 'chat' } }} visible />)
+  expect(useSessionBusyDialog.getState().target?.record.id).toBe('background')
+  const predicate = mocks.closeMatching.mock.calls[0]![0]
+  expect(predicate({ kind: 'workspace', params: { wsId: 'chat-1', sessionId: 'background' } })).toBe(true)
+  expect(predicate({ kind: 'workspace', params: { wsId: 'chat-1', sessionId: 'other' } })).toBe(false)
+  expect(mocks.openOrFocus).toHaveBeenCalledWith({ kind: 'chat-landing', params: { targetWsId: 'chat-1' } })
+  expect(mocks.resumeSession).not.toHaveBeenCalled()
+  useSessionBusyDialog.getState().close()
+})
+
+it('keeps an already-open GUI mounted read-only through takeover instead of closing its tab', () => {
+  const record = { id: 'pi-one', resumeId: 'native-one', wsId: 'chat-1', agent: 'pi', name: 'p1', title: 'Research', state: 'running' as const, surface: 'webpi' as const, pid: 1, startedAt: 1, createdAt: '', lastActiveAt: '' }
+  mocks.workspaces = [workspace({ sessions: [record] })]
+  mocks.takeovers = { requests: [], activity: vi.fn(), select: vi.fn() }
+  const props = { spec: { kind: 'workspace' as const, params: { wsId: 'chat-1', sessionId: 'pi-one', source: 'chat' as const } }, visible: true }
+  const view = render(<WorkspacePage {...props} />)
+  mocks.takeovers.requests = [{ id: 'takeover', workspaceId: 'chat-1', recordId: 'pi-one', state: 'running', origin: { issueId: 'scan' } }]
+  mocks.workspaces = [workspace({ sessions: [{ ...record, surface: 'headless' }] })]
+  view.rerender(<WorkspacePage {...props} />)
+  expect(mocks.workspaceViewProps.mock.lastCall?.[0]).toMatchObject({ readOnly: true, activeRecord: { surface: 'webpi' } })
+  expect(mocks.closeMatching).not.toHaveBeenCalled()
+  expect(mocks.resumeSession).not.toHaveBeenCalled()
+  expect(screen.queryByRole('button', { name: 'TUI' })).toBeNull()
+  mocks.takeovers.requests[0].state = 'completed'
+  mocks.workspaces = [workspace({ sessions: [{ ...record, state: 'paused' }] })]
+  view.rerender(<WorkspacePage {...props} />)
+  fireEvent.click(screen.getByRole('button', { name: 'Return to conversation' }))
+  expect(mocks.openWebSession).toHaveBeenCalledWith('chat-1', 'pi-one', 'chat')
 })

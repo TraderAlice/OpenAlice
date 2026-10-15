@@ -147,7 +147,7 @@ export type WorkspaceConversationAskResult =
 
 export interface WorkspaceConversationControl {
   /** Follow the live Issue ownership policy, including first-owner recruitment. */
-  replyToIssue?(input: { workspaceId: string; issueId: string; prompt: string; commentId: string }): Promise<{ taskId: string; resumeId: string }>
+  replyToIssue?(input: import('../workspaces/dispatch-communication.js').IssueCommentRequest): Promise<{ taskId: string; resumeId: string }>
 
   ask(input: {
     readonly prompt: string
@@ -242,7 +242,7 @@ export interface WorkspaceToolContext {
    *  agent). Factories pass it through to call sites (e.g. inbox_push →
    *  inboxStore.append) so a pushed entry self-links to its originating run /
    *  issue. Absent (interactive session, or no header) → undefined. */
-  callerRun?: Pick<HeadlessTaskRecord, 'taskId' | 'status' | 'trigger' | 'inquiry'>
+  callerRun?: Pick<HeadlessTaskRecord, 'taskId' | 'status' | 'trigger' | 'inquiry' | 'communication'>
   origin?: InboxOrigin
   /** GLOBAL issue-board reader — the cross-workspace board the
    *  `alice` CLI surfaces (issue_list / issue_show read EVERY

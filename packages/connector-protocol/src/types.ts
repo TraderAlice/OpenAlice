@@ -197,6 +197,8 @@ export type OwnerChatPhase = z.infer<typeof ownerChatPhaseSchema>
  * `accepted` starts transport-native activity without requiring model text.
  * `progress` is ephemeral; final without text silently ends activity. */
 export const ownerChatMessageSchema = z.object({
+  /** Renewed by Alice while the execution lives; expiry only stops local activity. */
+  activityLeaseMs: z.number().int().min(1000).max(120_000).optional(),
   id: z.string().min(1),
   adapterId: z.string().min(1),
   conversationId: z.string().min(1),

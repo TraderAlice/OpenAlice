@@ -46,10 +46,10 @@ export function harnessSurfaceUrl(response: HarnessSurfaceResponse): string | nu
   const routeHost = response.surface.routeHost
   if (!routeHost) return null
   const protocol = window.location.protocol === 'https:' ? 'https:' : 'http:'
-  if (response.gatewayPort) return `${protocol}//${routeHost}:${response.gatewayPort}/`
-  const devPort = typeof __OPENALICE_DEV_BACKEND_PORT__ === 'number'
-    ? __OPENALICE_DEV_BACKEND_PORT__
-    : 0
+  if (response.gatewayPort && import.meta.env.VITE_OPENALICE_DEV_RELAY !== '1') {
+    return `${protocol}//${routeHost}:${response.gatewayPort}/`
+  }
+  const devPort = Number(import.meta.env.VITE_OPENALICE_DEV_BACKEND_PORT ?? 0)
   const port = import.meta.env.DEV && devPort > 0
     ? String(devPort)
     : window.location.port

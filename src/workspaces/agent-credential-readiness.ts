@@ -88,7 +88,7 @@ function injectableCredentials(
     const model = resolveInjectionModel(credential)
     const wsCred = credentialToWorkspaceAiCred(credential, adapter, {
       ...(model ? { model } : {}),
-    })
+    }, slug)
     if (wsCred && hasInjectableProviderBinding(wsCred)) out.push([slug, credential, wsCred])
   }
   return out

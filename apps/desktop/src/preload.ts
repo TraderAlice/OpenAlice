@@ -21,16 +21,7 @@ interface PtyListeners {
   readonly close: Set<(msg: { code: number; reason: string }) => void>
 }
 
-type UpdaterStatus =
-  | { phase: 'available'; version?: string; releaseUrl?: string }
-  | { phase: 'downloading'; version?: string; percent?: number }
-  | { phase: 'downloaded'; version: string; releaseUrl: string }
-  | {
-      phase: 'installing'
-      version: string
-      stage: 'preparing' | 'stopping-services' | 'releasing-runtime' | 'handing-off'
-    }
-  | { phase: 'error'; message: string }
+type UpdaterStatus = import('@traderalice/update-lifecycle').NativeUpdaterStatus
 
 const ptyListeners = new Map<string, PtyListeners>()
 const updaterListeners = new Set<(status: UpdaterStatus) => void>()
@@ -126,6 +117,69 @@ ipcRenderer.on('openalice:updater:status', (_event, raw: unknown) => {
 })
 
 const api = {
+  desktopConnection: {
+    status: () => ipcRenderer.invoke('openalice:desktop-connection:status'),
+    fleet: () => ipcRenderer.invoke('openalice:desktop-connection:fleet'),
+    startupTarget: () => ipcRenderer.invoke('openalice:desktop-connection:startup-target'),
+    connect: (machine: string, project: string) => ipcRenderer.invoke('openalice:desktop-connection:connect', machine, project),
+    controlProject: (input: unknown) => ipcRenderer.invoke('openalice:desktop-connection:project-control', input),
+    returnIntegrated: () => ipcRenderer.invoke('openalice:desktop-connection:return-integrated'),
+  },
+  desktopMachine: {
+    plan: (input: unknown) => ipcRenderer.invoke('openalice:desktop-machine:plan', input),
+    apply: (id: string) => ipcRenderer.invoke('openalice:desktop-machine:apply', id),
+    abandon: () => ipcRenderer.invoke('openalice:updates:abandon'),
+    operation: () => ipcRenderer.invoke('openalice:desktop-machine:operation'),
+  },
+  companion: {
+    activity: {
+      getSignals: () => ipcRenderer.invoke('openalice:activity:signals'),
+      onSignals: (callback: (input: unknown) => void) => {
+        const listener = (_event: Electron.IpcRendererEvent, input: unknown) => callback(input)
+        ipcRenderer.on('openalice:activity:signals', listener)
+        return () => ipcRenderer.removeListener('openalice:activity:signals', listener)
+      },
+      getPreferences: () => ipcRenderer.invoke('openalice:activity:preferences'),
+      updatePreferences: (input: unknown) => ipcRenderer.invoke('openalice:activity:update-preferences', input),
+      resetPreferences: () => ipcRenderer.invoke('openalice:activity:reset-preferences'),
+      open: (displayId: string) => ipcRenderer.invoke('openalice:activity:open', displayId),
+      dismiss: (displayId: string) => ipcRenderer.invoke('openalice:activity:dismiss', displayId),
+      onPreferences: (callback: (input: unknown) => void) => {
+        const listener = (_event: Electron.IpcRendererEvent, input: unknown) => callback(input)
+        ipcRenderer.on('openalice:activity:preferences-changed', listener)
+        return () => ipcRenderer.removeListener('openalice:activity:preferences-changed', listener)
+      },
+      onDisplay: (callback: (input: unknown) => void) => {
+        let active = true
+        const changed = new Set<string>()
+        const listener = (_event: Electron.IpcRendererEvent, input: { displayId: string }) => { changed.add(input.displayId); callback(input) }
+        ipcRenderer.on('openalice:activity:display', listener)
+        // Fetch after listener registration to close initial-render delivery gaps.
+        void ipcRenderer.invoke('openalice:activity:snapshot').then(events => { if (active) for (const event of events) if (!changed.has(event.displayId)) callback(event) }).catch(() => {})
+        return () => { active = false; ipcRenderer.removeListener('openalice:activity:display', listener) }
+      },
+      onOpen: (callback: (context: string) => void) => {
+        const listener = (_event: Electron.IpcRendererEvent, context: string) => callback(context)
+        ipcRenderer.on('openalice:activity:open', listener)
+        return () => ipcRenderer.removeListener('openalice:activity:open', listener)
+      },
+    },
+    getSound: () => ipcRenderer.invoke('openalice:companion:sound:get'),
+    updateSound: (settings: unknown) => ipcRenderer.invoke('openalice:companion:sound:update', settings),
+    resetSound: () => ipcRenderer.invoke('openalice:companion:sound:reset'),
+    onSound: (callback: (settings: unknown) => void) => {
+      const listener = (_event: Electron.IpcRendererEvent, settings: unknown) => callback(settings)
+      ipcRenderer.on('openalice:companion:sound:changed', listener)
+      return () => ipcRenderer.removeListener('openalice:companion:sound:changed', listener)
+    },
+    getVisible: (): Promise<boolean> => ipcRenderer.invoke('openalice:companion:get-visible'),
+    toggle: (): Promise<boolean> => ipcRenderer.invoke('openalice:companion:toggle'),
+    onVisibility: (callback: (visible: boolean) => void) => {
+      const listener = (_event: Electron.IpcRendererEvent, visible: boolean) => callback(visible)
+      ipcRenderer.on('openalice:companion:visibility', listener)
+      return () => ipcRenderer.removeListener('openalice:companion:visibility', listener)
+    },
+  },
   windowChrome: {
     platform: process.platform,
     setTheme: (theme: { color: string; symbolColor: string }) =>
@@ -146,14 +200,23 @@ const api = {
       ipcRenderer.invoke('openalice:data-home:set-ask-on-startup', enabled),
     openCurrent: () => ipcRenderer.invoke('openalice:data-home:open-current'),
   },
+  clientUpdates: {
+    abandon: () => ipcRenderer.invoke('openalice:updates:abandon'),
+    operation: () => ipcRenderer.invoke('openalice:updates:status'),
+    review: (selection: unknown) => ipcRenderer.invoke('openalice:updates:review', selection),
+    approve: (plan: unknown, fingerprint: string) => ipcRenderer.invoke('openalice:updates:approve', plan, fingerprint),
+    resume: () => ipcRenderer.invoke('openalice:updates:resume'),
+    status: () => ipcRenderer.invoke('openalice:client-updates:status'),
+    check: () => ipcRenderer.invoke('openalice:client-updates:check'),
+    activate: () => ipcRenderer.invoke('openalice:client-updates:activate'),
+    savePreferences: (input: { autoCheck: boolean }) => ipcRenderer.invoke('openalice:client-updates:preferences', input),
+  },
   updater: {
     getStatus: () => ipcRenderer.invoke('openalice:updater:get-status'),
-    checkForUpdates: () => ipcRenderer.invoke('openalice:updater:check-for-updates'),
     onStatus: (cb: (status: UpdaterStatus) => void) => {
       updaterListeners.add(cb)
       return () => updaterListeners.delete(cb)
     },
-    installAndRestart: () => ipcRenderer.invoke('openalice:updater:install-and-restart'),
     openRelease: (version?: string) => ipcRenderer.invoke('openalice:updater:open-release', version),
   },
   workspace: {
@@ -211,4 +274,17 @@ const api = {
   },
 }
 
-contextBridge.exposeInMainWorld('openAlice', api)
+// A separated window must use the relay's HTTP/WS transport. It retains only
+// desktop chrome, updates, and the explicit path back to local integration;
+// backend-specific file and PTY IPC never reach a remote-connected renderer.
+if (window.location.protocol === 'app:') {
+  contextBridge.exposeInMainWorld('openAlice', api)
+} else if (window.location.protocol === 'http:' && window.location.hostname === '127.0.0.1') {
+  contextBridge.exposeInMainWorld('openAlice', {
+    desktopConnection: api.desktopConnection,
+    desktopMachine: api.desktopMachine,
+    windowChrome: api.windowChrome,
+    updater: api.updater,
+    clientUpdates: api.clientUpdates,
+  })
+}

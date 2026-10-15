@@ -148,9 +148,6 @@ export async function stopRuntimeServer(options = {}, dependencies = {}) {
   const timeoutMs = options.waitMs ?? 15_000
   let status = await readStatus(options, dependencies)
   if (status.class === 'absent') return { stopped: false, status }
-  if (status.owner?.surface !== 'cli-server') {
-    throw controlError('EOWNED', `OpenAlice is owned by ${status.owner?.surface ?? status.class}; refusing server stop`)
-  }
   if (!status.capabilities?.includes('runtime.stop')) {
     throw controlError('ESTOPUNSUPPORTED', 'This OpenAlice owner does not advertise runtime.stop')
   }
@@ -203,7 +200,6 @@ function classifyControlStatus(homeRoot, runtime, fallbackAliceProject) {
     )
   }
   const owner = sanitizeControlOwner(runtime.owner)
-  const surface = owner?.surface
   const state = typeof runtime.state === 'string' && /^[a-z][a-z0-9.-]{0,63}$/.test(runtime.state)
     ? runtime.state
     : 'unknown'
@@ -227,8 +223,7 @@ function classifyControlStatus(homeRoot, runtime, fallbackAliceProject) {
     }
   }
   let statusClass
-  if (surface !== 'cli-server') statusClass = 'owned_elsewhere'
-  else if (state === 'starting' || state === 'stopping') statusClass = state
+  if (state === 'starting' || state === 'stopping') statusClass = state
   else if (state === 'running' && runtime.components?.alice === 'ready') statusClass = 'running'
   else statusClass = 'unhealthy'
   const productVersion = sanitizeVersion(runtime.productVersion)

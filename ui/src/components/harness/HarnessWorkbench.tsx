@@ -1,3 +1,4 @@
+import { useActivityBarCollapse } from '../../live/activity-bar-collapse'
 import { KlinePanel } from '../market/KlinePanel'
 import { useEffect, useLayoutEffect, useRef, type ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
@@ -56,6 +57,16 @@ function WorkspaceWorkbench({ wsId, spec, source, children, title }: { wsId: str
     const timer = window.setTimeout(() => root?.classList.remove('is-disclosing'), 280)
     return () => window.clearTimeout(timer)
   }, [wsId, state.open, panel])
+  useLayoutEffect(() => {
+    if (typeof window.matchMedia !== 'function') return
+    const compact = window.matchMedia('(min-width: 768px) and (max-width: 1279px)')
+    const collapseNavigation = () => {
+      if (state.open && compact.matches) useActivityBarCollapse.getState().setRailCollapsed(true)
+    }
+    collapseNavigation()
+    compact.addEventListener('change', collapseNavigation)
+    return () => compact.removeEventListener('change', collapseNavigation)
+  }, [state.open])
   const toggle = () => {
     if (state.open) patch(wsId, { open: false })
     else if (state.tabs.length) patch(wsId, { open: true })
