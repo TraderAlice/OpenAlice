@@ -98,7 +98,7 @@ describe('NewsCollectorPage feed editor', () => {
 })
 
 describe('RSSHub news presets', () => {
-  it('adds all sources under a reverse-proxy prefix without replacing existing feeds', () => {
+  it('adds CLS and Jin10 under a reverse-proxy prefix without replacing existing feeds', () => {
     function Editor() {
       const [feeds, setFeeds] = useState<NewsCollectorFeed[]>([{
         name: 'Existing feed', source: 'existing', url: 'https://example.com/rss', enabled: false,
@@ -110,16 +110,81 @@ describe('RSSHub news presets', () => {
       target: { value: ' https://news.example.com/rsshub/// ' },
     })
     fireEvent.click(screen.getByRole('button', { name: 'Add 财联社 · 电报' }))
-    fireEvent.click(screen.getByRole('button', { name: 'Add 格隆汇 · 实时快讯' }))
     fireEvent.click(screen.getByRole('button', { name: 'Add 金十数据 · 市场快讯' }))
     expect(screen.getByText('https://news.example.com/rsshub/jin10')).toBeTruthy()
     expect(screen.getByText('https://news.example.com/rsshub/cls/telegraph')).toBeTruthy()
-    expect(screen.getByText('https://news.example.com/rsshub/gelonghui/live')).toBeTruthy()
+    expect(screen.queryByText('https://news.example.com/rsshub/gelonghui/live')).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Add 格隆汇 · 实时快讯' })).toBeNull()
     expect(screen.getByText('https://example.com/rss')).toBeTruthy()
     expect(screen.getByRole('switch', { name: 'Existing feed' }).getAttribute('aria-checked')).toBe('false')
     expect(screen.getByRole('button', { name: 'Added 财联社 · 电报' }).hasAttribute('disabled')).toBe(true)
     fireEvent.change(screen.getByLabelText('RSSHub instance URL'), { target: { value: 'http://localhost:1200' } })
     expect(screen.getByText('https://news.example.com/rsshub/cls/telegraph')).toBeTruthy()
+  })
+
+  it('adds the built-in Gelonghui source without an RSSHub URL', () => {
+    function Editor() {
+      const [feeds, setFeeds] = useState<NewsCollectorFeed[]>([{
+        name: 'Existing feed', source: 'existing', url: 'https://example.com/rss', enabled: false,
+      }])
+      return <FeedsSection feeds={feeds} onChange={setFeeds} />
+    }
+    render(<Editor />)
+
+    expect((screen.getByLabelText('RSSHub instance URL') as HTMLInputElement).value).toBe('')
+    const add = screen.getByRole('button', { name: 'Add or replace built-in Gelonghui direct collection' })
+    expect(add.hasAttribute('disabled')).toBe(false)
+    fireEvent.click(add)
+
+    expect(screen.getByRole('switch', { name: '格隆汇实时快讯' }).getAttribute('aria-checked')).toBe('true')
+    expect(screen.getByText('https://www.gelonghui.com/live')).toBeTruthy()
+    expect(screen.getByText('Built-in direct collection from Gelonghui live news.')).toBeTruthy()
+    expect(screen.getByText('source: gelonghui')).toBeTruthy()
+    expect(screen.getByText('https://example.com/rss')).toBeTruthy()
+    expect(screen.getByRole('switch', { name: 'Existing feed' }).getAttribute('aria-checked')).toBe('false')
+  })
+
+
+  it('preserves a custom feed whose source tag matches the built-in provider', () => {
+    const customUrl = 'https://example.com/custom-news.xml'
+    function Editor() {
+      const [feeds, setFeeds] = useState<NewsCollectorFeed[]>([{
+        name: 'Custom Gelonghui-tagged feed', source: 'gelonghui', url: customUrl, enabled: false,
+      }])
+      return <FeedsSection feeds={feeds} onChange={setFeeds} />
+    }
+    render(<Editor />)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Add or replace built-in Gelonghui direct collection' }))
+
+    expect(screen.getByText(customUrl)).toBeTruthy()
+    expect(screen.getByRole('switch', { name: 'Custom Gelonghui-tagged feed' }).getAttribute('aria-checked')).toBe('false')
+    expect(screen.getByRole('switch', { name: '格隆汇实时快讯' }).getAttribute('aria-checked')).toBe('true')
+  })
+  it('replaces a legacy Gelonghui feed in place without duplicating or changing other feeds', () => {
+    const urls = [
+      'https://example.com/before',
+      'https://old-rsshub.example.com/gelonghui/live',
+      'https://example.com/after',
+    ]
+    function Editor() {
+      const [feeds, setFeeds] = useState<NewsCollectorFeed[]>([
+        { name: 'Before', source: 'before', url: urls[0], enabled: true },
+        { name: '格隆汇 · 实时快讯', source: 'gelonghui', url: urls[1], enabled: false },
+        { name: 'After', source: 'after', url: urls[2], enabled: false },
+      ])
+      return <FeedsSection feeds={feeds} onChange={setFeeds} />
+    }
+    render(<Editor />)
+    fireEvent.click(screen.getByRole('button', { name: 'Add or replace built-in Gelonghui direct collection' }))
+
+    const displayedUrls = screen.getAllByText(/^https?:\/\//).map((element) => element.textContent)
+    expect(displayedUrls).toEqual([urls[0], 'https://www.gelonghui.com/live', urls[2]])
+    expect(screen.queryByText(urls[1])).toBeNull()
+    expect(screen.getAllByText('source: gelonghui')).toHaveLength(1)
+    expect(screen.getByRole('switch', { name: '格隆汇实时快讯' }).getAttribute('aria-checked')).toBe('true')
+    expect(screen.getByRole('switch', { name: 'Before' }).getAttribute('aria-checked')).toBe('true')
+    expect(screen.getByRole('switch', { name: 'After' }).getAttribute('aria-checked')).toBe('false')
   })
 
   it('requires an HTTP instance URL without embedded secrets or discarded URL components', () => {

@@ -118,13 +118,20 @@ combines credential access, model selection, and those semantics before each
 adapter projects the result into one target CLI process. Follow
 [[docs/model-semantics-and-runtime-injection.md]] for that boundary.
 
-## Optional RSSHub News Sources
+## News Source Collection
 
-Alice owns RSS collection and the JSONL archive in `src/domain/news/`.
-Settings → News Sources (`/settings/news-collector`) offers opt-in presets
-for 财联社 (CLS), 格隆汇 (Gelonghui), and 金十数据 (Jin10). Enter an RSSHub
-instance URL and add each wanted source. Existing subscriptions are preserved.
-A source already configured, even if disabled, cannot be added again by a preset.
+Alice owns news collection and the JSONL archive in `src/domain/news/`.
+Settings → News Sources (`/settings/news-collector`) has a built-in direct
+Gelonghui source; adding it does not require RSSHub or Docker. It reads
+Gelonghui's live API directly. That endpoint is undocumented and currently
+returns only the latest 15 items, so the integration is best-effort and may
+break if Gelonghui changes it.
+
+财联社 (CLS) and 金十数据 (Jin10) remain opt-in RSSHub presets. Enter an
+RSSHub instance URL and add each wanted source. Existing subscriptions are
+preserved; a source already configured, even if disabled, cannot be added
+again by an RSSHub preset. Direct CLS collection is intentionally not used
+without written authorization and a reliable API contract.
 
 RSSHub is an independently operated service, not an Alice-managed process or a
 mandatory Docker dependency. For a native Alice backend on the same machine,

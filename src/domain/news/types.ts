@@ -20,13 +20,13 @@ export interface NewsRecord {
   metadata: Record<string, string | null>
 }
 
-/** RSS feed configuration entry */
+/** News source configuration entry. */
 export interface RSSFeedConfig {
   /** Human-readable name, e.g. "CoinDesk" */
   name: string
-  /** RSS / Atom feed URL */
+  /** RSS / Atom URL, or the canonical provider page when source is built in. */
   url: string
-  /** Source tag stored in metadata.source */
+  /** Source tag stored in metadata.source; built-in providers also match their canonical feed URL. */
   source: string
   /** Optional category tags */
   categories?: string[]
@@ -36,8 +36,8 @@ export interface RSSFeedConfig {
   enabled?: boolean
 }
 
-/** Discriminator for how a news item was ingested */
-export type IngestSource = 'rss'
+/** Discriminator for how a news item was ingested. */
+export type IngestSource = 'rss' | 'provider'
 
 // ==================== News Provider Interface ====================
 
