@@ -16,6 +16,8 @@ import { Contract, Order, UNSET_DECIMAL, UNSET_DOUBLE } from '@traderalice/ibkr'
 import type {
   GitCommit,
   HistoryContract,
+  OperationResult,
+  OperationStatus,
   OrderHistoryEntry,
   OrderHistoryStatus,
   TradeHistoryEntry,
@@ -67,7 +69,42 @@ function orderFields(order: Order | undefined): {
   }
 }
 
-/** Project the commit log into one-row-per-order history, newest first. */
+/** Runtime mirror of `OperationStatus`. Total by construction: a member added to
+ *  the union fails to compile here instead of being read as an unknown verdict. */
+const OPERATION_STATUSES: Record<OperationStatus, true> = {
+  submitted: true,
+  filled: true,
+  rejected: true,
+  cancelled: true,
+  'user-rejected': true,
+  unconfirmed: true,
+}
+
+function isOperationStatus(value: unknown): value is OperationStatus {
+  return typeof value === 'string' && Object.hasOwn(OPERATION_STATUSES, value)
+}
+
+/** Cause line for a row whose commit recorded no readable verdict. */
+const UNREADABLE_VERDICT_REASON =
+  'This operation has no recorded verdict — its outcome is unknown, so the order may be live; reconcile against broker state before retrying.'
+
+/** Verdict → history status. A readable verdict is copied verbatim, 'unconfirmed'
+ *  (the write was abandoned while the broker call was still outstanding, so the
+ *  order MAY be live) included. Everything else resolves to that same indeterminate
+ *  reading: a status outside the vocabulary, or no result at all — a lost verdict
+ *  on a record that exists, since every writer records one verdict per operation,
+ *  so such a commit was still pushed or rejected over. 'rejected' is never assumed:
+ *  it asserts a venue answer this log does not have, and is exactly the reading
+ *  that invites a blind re-submit of an order that may already be live. */
+function historyStatusOf(result: OperationResult | undefined): OrderHistoryStatus {
+  return isOperationStatus(result?.status) ? result.status : 'unconfirmed'
+}
+
+/** Project the commit log into one-row-per-order history, newest first.
+ *
+ *  Statuses go through `historyStatusOf`: an indeterminate write reaches the
+ *  caller as 'unconfirmed', and so does a commit whose verdict cannot be read —
+ *  neither is ever presented as 'rejected'. */
 export function projectOrderHistory(commits: GitCommit[], opts: { limit?: number } = {}): OrderHistoryEntry[] {
   const byOrderId = new Map<string, OrderHistoryEntry>()
   const anonymous: OrderHistoryEntry[] = [] // rejected-before-submit rows have no orderId
@@ -78,6 +115,10 @@ export function projectOrderHistory(commits: GitCommit[], opts: { limit?: number
       const result = commit.results[i]
 
       if (op.action === 'placeOrder' || op.action === 'observeExternalOrder' || op.action === 'closePosition') {
+        // A verdict the log did not spell out is surfaced, not laundered: the row
+        // gets the indeterminate status *and* a cause line naming the gap.
+        const status = historyStatusOf(result)
+        const error = result?.error ?? (isOperationStatus(result?.status) ? undefined : UNREADABLE_VERDICT_REASON)
         const entry: OrderHistoryEntry = {
           ...(result?.orderId && { orderId: result.orderId }),
           timestamp: commit.timestamp,
@@ -85,13 +126,13 @@ export function projectOrderHistory(commits: GitCommit[], opts: { limit?: number
           ...(op.action === 'closePosition'
             ? { side: 'SELL' as const, orderType: 'MKT', ...(op.quantity != null && { quantity: String(op.quantity) }) }
             : orderFields(op.order)),
-          status: (result?.status ?? 'rejected') as OrderHistoryStatus,
+          status,
           ...(result?.filledQty && { filledQty: result.filledQty }),
           ...(result?.filledPrice && { avgFillPrice: result.filledPrice }),
           source: op.action === 'observeExternalOrder' ? 'external' : 'alice',
           commitHash: commit.hash,
           message: commit.message,
-          ...(result?.error && { error: result.error }),
+          ...(error && { error }),
         }
         if (result?.orderId) byOrderId.set(result.orderId, entry)
         else anonymous.push(entry)
@@ -117,7 +158,7 @@ export function projectOrderHistory(commits: GitCommit[], opts: { limit?: number
         if (!result.orderId || !result.success) continue
         const target = byOrderId.get(result.orderId)
         if (!target) continue
-        target.status = result.status as OrderHistoryStatus
+        target.status = historyStatusOf(result)
         target.resolvedAt = commit.timestamp
         if (result.filledQty) target.filledQty = result.filledQty
         if (result.filledPrice) target.avgFillPrice = result.filledPrice
