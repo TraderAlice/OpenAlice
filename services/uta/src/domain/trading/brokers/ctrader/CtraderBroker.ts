@@ -37,7 +37,7 @@ import {
 import '../../contract-ext.js'
 import { buildContract, buildPosition } from '../contract-builder.js'
 import { fuzzyRankContracts } from '../fuzzy-rank.js'
-import { PayloadType } from './ctrader-protocol.js'
+import { PayloadType, type CtraderEnvelope } from './ctrader-protocol.js'
 import { CtraderApiError, type CtraderTransportOptions } from './ctrader-transport.js'
 import { CtraderSession, toBrokerError, type CtraderTokenRefresh } from './ctrader-session.js'
 import { CtraderCatalog, type CatalogSymbol, type SymbolSpec } from './ctrader-catalog.js'
@@ -468,12 +468,22 @@ export class CtraderBroker implements IBroker<CtraderBrokerMeta> {
     // Position closed: its deals say how it closed and at what price. The
     // venue's order list by position leaves out the protection order, so the
     // closing deals' own orders are looked up instead.
+    // The demo venue (2026-10-16) answered INCORRECT_BOUNDARIES for a while
+    // after positions closed, then accepted the same window. An unreadable
+    // leg is reported as unknown (null) so the caller retries it later; one
+    // throw would stop UTA from syncing every other order and from pushing.
     const now = this.now().getTime()
-    const history = await this.session.accountRequest(
-      PayloadType.DEAL_LIST_BY_POSITION_ID_REQ,
-      { positionId, fromTimestamp: now - 90 * 86_400_000, toTimestamp: now },
-      { expect: PayloadType.DEAL_LIST_BY_POSITION_ID_RES },
-    )
+    let history: CtraderEnvelope
+    try {
+      history = await this.session.accountRequest(
+        PayloadType.DEAL_LIST_BY_POSITION_ID_REQ,
+        { positionId, fromTimestamp: now - 90 * 86_400_000, toTimestamp: now },
+        { expect: PayloadType.DEAL_LIST_BY_POSITION_ID_RES },
+      )
+    } catch (err) {
+      if (err instanceof CtraderApiError && err.errorCode === 'INCORRECT_BOUNDARIES') return null
+      throw err
+    }
     const deals = rows(history.payload?.['deal']).filter((d) => (num(d['filledVolume']) ?? 0) > 0)
     const symbolId = num(deals[0]?.['symbolId'])
     if (symbolId === undefined) return null

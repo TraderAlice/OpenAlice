@@ -191,6 +191,17 @@ describe('position protection legs', () => {
     expect((await broker.getOpenOrders()).some((o) => o.orderId === 'sl-503')).toBe(false)
   })
 
+  it('reports a closed leg as unknown while the venue refuses its deal history', async () => {
+    const { server, venue, broker } = await makeBroker()
+    protectGold(venue)
+    venue.triggerProtection(503, 'stopLoss')
+    const deals = server.handlers[PayloadType.DEAL_LIST_BY_POSITION_ID_REQ]
+    server.handlers[PayloadType.DEAL_LIST_BY_POSITION_ID_REQ] = () => ({ error: 'INCORRECT_BOUNDARIES' })
+    expect(await broker.getOrder('sl-503')).toBeNull()
+    server.handlers[PayloadType.DEAL_LIST_BY_POSITION_ID_REQ] = deals
+    expect((await broker.getOrder('sl-503'))!.orderState.status).toBe('Filled')
+  })
+
   it('settles the take-profit leg when the target fires', async () => {
     const { venue, broker } = await makeBroker()
     protectGold(venue)
