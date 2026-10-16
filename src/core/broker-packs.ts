@@ -16,6 +16,7 @@ export const INSTALLABLE_BROKER_ENGINES = [
   'ibkr',
   'leverup',
   'longbridge',
+  'ctrader',
 ] as const
 
 export type InstallableBrokerEngine = typeof INSTALLABLE_BROKER_ENGINES[number]

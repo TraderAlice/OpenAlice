@@ -38,6 +38,7 @@ export const ownerSuites = {
       'packages/uta-broker-ibkr',
       'packages/uta-broker-leverup',
       'packages/uta-broker-longbridge',
+      'packages/uta-broker-ctrader',
     ],
   },
   connector: {

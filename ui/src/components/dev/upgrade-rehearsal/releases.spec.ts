@@ -40,8 +40,9 @@ it('models current dev CLI and broker artifacts without desktop/package-manager 
   const release=p.records.at(-1)!
   const assets=releaseAssets(release)
   expect(release.commit).toHaveLength(40)
-  expect(assets).toHaveLength(49)
+  expect(assets).toHaveLength(55)
   expect(assets.every(a=>a.startsWith(`cli/dev/releases/${release.commit}/`))).toBe(true)
   expect(assets.filter(a=>a.includes('Broker-Packs-'))).toHaveLength(6)
   expect(assets.some(a=>a.endsWith('longbridge-0.94.1-win32-arm64.tgz'))).toBe(false)
+  expect(assets.filter(a=>a.includes('Broker-ctrader-'))).toHaveLength(6)
 })

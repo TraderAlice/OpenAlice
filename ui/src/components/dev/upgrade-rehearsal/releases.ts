@@ -87,6 +87,7 @@ export function releaseAssets(r: ReleaseIdentity): string[] {
           'ibkr',
           'leverup',
           'longbridge',
+          'ctrader',
         ]) {
           if (
             engine === 'longbridge' &&
