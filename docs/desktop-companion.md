@@ -17,6 +17,17 @@ same native controller as the tray, and subscribes to visibility changes. The
 entry is omitted in browsers and when the companion is unavailable; only the
 owning app window's main frame can use these IPC commands.
 
+Custom tray and companion menu labels follow the renderer's existing language
+preference (`en`, `zh`, `zh-Hant`, `ja`). The UI republishes the saved locale at
+boot and on changes through a narrow, main-frame-checked preload call. The
+native process keeps only an in-memory projection; it does not persist a second
+language preference. English is used until the renderer publishes its locale.
+Windows/macOS menus read the current copy when opened; Linux's attached tray
+menu is rebuilt on a language change. An already open native popup may keep its
+old labels until reopened. Electron application-menu roles, keyboard shortcuts,
+and OS-owned text keep native OS behavior. Native dialogs and pet dialogue are
+outside this custom-menu change.
+
 The first version uses a maintainer-supplied character and a generated speech bubble in
 `ui/public/companion/`. Its local speech is decorative, never a claim about an
 Agent's execution status. Single click cycles through short lines, double click

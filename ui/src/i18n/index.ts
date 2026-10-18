@@ -27,7 +27,14 @@ export const resources = {
   'zh-Hant': { translation: zhHant },
 }
 
+function publishNativeLocale(locale: AppLocale): void {
+  void window.openAlice?.setNativeMenuLocale?.(locale).catch(error => {
+    console.error('[i18n] native menu locale update failed', error)
+  })
+}
+
 function applyLocale(locale: AppLocale): void {
+  publishNativeLocale(locale)
   setAppLocale(locale) // formatters (lib/intl, lib/format) follow
   document.documentElement.lang = locale // drives :lang(ja)/:lang(zh-Hant) font swap in index.css
   void i18n.changeLanguage(locale)
@@ -49,6 +56,7 @@ void i18n.use(initReactI18next).init({
 // i18next itself; these two are ours).
 setAppLocale(initial)
 document.documentElement.lang = initial
+publishNativeLocale(initial)
 
 // Re-apply on every switch. Plain subscribe fires on any state change; guard
 // on the locale field so unrelated store writes don't thrash changeLanguage.

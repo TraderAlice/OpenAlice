@@ -1,3 +1,4 @@
+import { nativeMenuLabels, registerNativeMenuLocale } from './native-menu-locale.js'
 import { runRendererCredentialPiSmoke } from './credential-pi-smoke.js'
 /**
  * Electron main process — OpenAlice's desktop guardian.
@@ -1676,13 +1677,16 @@ function createTray(win: BrowserWindow, companion?: CompanionHandle): void {
     if (!appQuitting) showAppWindow(win)
   }
   const trayMenu = () => Menu.buildFromTemplate([
-    { label: 'Show OpenAlice', click: show },
+    { label: nativeMenuLabels().show, click: show },
     ...(companion && !companion.window.isDestroyed()
-      ? [{ label: 'Pet', submenu: companion.trayMenuItems() }]
+      ? [{ label: nativeMenuLabels().pet, submenu: companion.trayMenuItems() }]
       : []),
     { type: 'separator' },
-    { label: 'Quit', click: () => app.quit() },
+    { label: nativeMenuLabels().quit, click: () => app.quit() },
   ])
+  registerNativeMenuLocale(win, () => {
+    if (process.platform === 'linux') tray?.setContextMenu(trayMenu())
+  })
   tray.on('click', show)
   tray.on('right-click', () => tray?.popUpContextMenu(trayMenu()))
   if (process.platform === 'linux') tray.setContextMenu(trayMenu())

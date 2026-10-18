@@ -117,6 +117,7 @@ ipcRenderer.on('openalice:updater:status', (_event, raw: unknown) => {
 })
 
 const api = {
+  setNativeMenuLocale: (locale: string): Promise<void> => ipcRenderer.invoke('openalice:native-menu:locale', locale),
   desktopConnection: {
     status: () => ipcRenderer.invoke('openalice:desktop-connection:status'),
     fleet: () => ipcRenderer.invoke('openalice:desktop-connection:fleet'),

@@ -21,6 +21,7 @@ interface Window {
    * sync with apps/desktop/src/preload.ts; never expose raw ipcRenderer.
    */
   readonly openAlice?: {
+    setNativeMenuLocale?(locale: import('./lib/intl').AppLocale): Promise<void>
     readonly desktopConnection?: {
       status(): Promise<{
         schemaVersion: 1
