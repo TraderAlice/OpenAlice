@@ -128,6 +128,7 @@ const BASE_EXPORTS: Record<string, CliExport> = {
       },
       index: {
         search: 'indexSearch',
+        constituents: 'indexGetConstituents',
       },
     },
   },
