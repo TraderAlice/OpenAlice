@@ -137,6 +137,24 @@ Provider discovery is self-described. Optional vendors expose `vendorMeta`, and
 the runtime joins that metadata with current configuration. Do not maintain a
 copied provider inventory in prose.
 
+## Taiwan dividend calendar
+
+The existing `twse` provider supports `CalendarDividend` through the typed
+`SDKEquityClient.getCalendarDividend({ provider: 'twse' })` and existing
+`/api/market-data-v1/equity/calendar/dividend?provider=twse` route. It reads the
+official TWSE `exchangeReport/TWT48U_ALL` announcement snapshot for listed
+securities (`.TW`), including listed ETFs. This is not TPEx coverage or a
+historical dividend series. Optional ISO date bounds filter that current
+snapshot inclusively; an empty historical window does not establish that no
+events occurred.
+
+Only cash-dividend and combined cash/rights events enter the existing dividend
+model. Pure rights events are excluded. ROC dates and security codes are
+normalized using the existing Taiwan helpers; undisclosed amounts remain null.
+The provider does not infer payment/record dates, FX, ratios, or income metrics.
+The default TraderHub calendar board continues to select its existing provider;
+this slice is an explicit provider request, not a new Taiwan board or tool set.
+
 ## Verification
 
 Select focused, package/owner, or full-suite evidence with the
