@@ -86,7 +86,12 @@ usable absolute path when its source Workspace is available. `peer path` is the
 lower-level addressing primitive for inspecting that desk. In both cases,
 native Coding Agent file, search, and Git capabilities own the read flow. Do
 not grow a second Workspace file API merely to reproduce those capabilities;
-adapter permission problems belong at the runtime boundary.
+adapter permission problems belong at the runtime boundary. Peer paths are
+addresses, not read-only capabilities. The own-Workspace writing discipline is
+an instruction-level collaboration policy: native tools run with the host
+user's authority under the intentional
+[managed execution policy](managed-workspace-runtime.md#managed-agent-execution-permissions),
+including headless runs. Do not describe this as cwd-enforced isolation.
 
 ## Snapshot and upgrade semantics
 
