@@ -203,6 +203,19 @@ and agent configuration in yesterday's Workspace.
 Tracked is a global, file-backed index over those durable Workspaces:
 
 - `EntityStore` persists only deliberately registered asset/topic anchors.
+  `alice track remove --name <exact-name>` previews one anchor; `--apply`
+  explicitly stops tracking that name through the existing serialized delete.
+  Apply only at the user's request. Removal is case-insensitive and idempotent;
+  it does not delete reports, authored links, Issues, Inbox or provenance. It is
+  not an archive: re-adding a name creates a new tracking timestamp and existing
+  authored links resolve again. The command returns an operation result, not a
+  new durable removal-audit ledger.
+- Backlinks describe currently readable authored links, not deletion history.
+  Zero backlinks can mean an intentionally unlinked entity, an unreadable or
+  missing report, or a Workspace no longer in the scan. It is never a garbage
+  collection signal. Report removal and Workspace lifecycle do not implicitly
+  delete anchors. Existing report/Inbox provenance retains its own owner;
+  absent historical files do not justify inventing a deletion actor or reason.
 - `entity-backlinks.ts` scans authored `[[name]]` links in Workspace Markdown
   and Issue notes; prose is never inferred into an edge.
 - the Tracked sidebar combines those global asset/topic anchors with the live

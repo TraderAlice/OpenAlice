@@ -200,6 +200,7 @@ const BASE_EXPORTS: Record<string, CliExport> = {
       track: {
         add: 'entity_upsert',
         search: 'entity_search',
+        remove: 'entity_remove',
       },
       // Current-Workspace managed template reconciliation. Preview is the
       // default; `--apply` explicitly performs the reviewed safe operation.
