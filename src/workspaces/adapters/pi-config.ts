@@ -180,13 +180,17 @@ export function buildPiProvider(cwd: string, cred: WorkspaceAiCred): Record<stri
       provider['apiKey'] = cred.apiKey;
     }
   }
+  const models = new Map<string, Record<string, unknown>>(
+    (cred.models ?? []).map(model => [model.id, { ...model }]),
+  );
   if (cred.model) {
     const model: Record<string, unknown> = { id: cred.model };
     const contextWindow = positiveNumber(cred.contextWindow);
     if (contextWindow !== null) model['contextWindow'] = contextWindow;
     if (typeof cred.reasoning === 'boolean') model['reasoning'] = cred.reasoning;
-    provider['models'] = [model];
+    models.set(cred.model, model);
   }
+  if (models.size > 0) provider['models'] = [...models.values()];
   return provider;
 }
 
@@ -523,7 +527,7 @@ function providerForProjectSelection(
   // Older cross-process global writes could tear provider registration away
   // from the project selection. The project file is the durable Workspace
   // intent, so recover that model id without borrowing stale model semantics.
-  return { ...provider, models: [{ id: selectedModel }] };
+  return { ...provider, models: [...models, { id: selectedModel }] };
 }
 
 /**
@@ -660,6 +664,14 @@ export async function readPiWorkspaceConfig(
     baseUrl,
     apiKey,
     model,
+    ...(modelEntries.length > 1 ? { models: modelEntries.flatMap(entry => {
+      if (typeof entry['id'] !== 'string') return [];
+      const contextWindow = positiveNumber(entry['contextWindow'] as number | undefined);
+      return [{ id: entry['id'],
+        ...(contextWindow !== null ? { contextWindow } : {}),
+        ...(typeof entry['reasoning'] === 'boolean' ? { reasoning: entry['reasoning'] } : {}),
+      }];
+    }) } : {}),
     wireShape,
     ...(wireShape === 'anthropic' ? { authMode: bearerKey ? 'bearer' as const : 'x-api-key' as const } : {}),
     ...(contextWindow !== null ? { contextWindow } : {}),
