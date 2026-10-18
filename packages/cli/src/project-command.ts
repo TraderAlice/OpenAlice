@@ -109,11 +109,7 @@ export interface ProjectCommandIo {
   inspectSourceRuntime?: (home: string) => Promise<{ class?: string; owner?: { surface?: string } | null }>
   stopSourceRuntime?: (home: string) => Promise<unknown>
   planTransfer?: typeof planProjectTransfer
-  sendTransfer?: (input: {
-    machine: RegisteredMachine
-    plan: ProjectTransferPlan
-    stderr?: { write(chunk: string): void }
-  }) => Promise<ProjectTransferReceipt>
+  sendTransfer?: typeof transferProjectOverSsh
   receiveTransfer?: () => Promise<ProjectTransferReceipt>
   transferSource?: Readable
 }
@@ -350,7 +346,23 @@ async function runProjectTransfer(argv: string[], io: ProjectCommandIo): Promise
     ...transferInput,
     stderr: transferInput.stderr,
   }))
-  const receipt = await sender({ machine, plan, stderr })
+  const startedAt = performance.now()
+  let lastProgressAt = startedAt
+  if (!options.json) stderr.write('Transferring portable files; waiting for the verified remote receipt.\n')
+  const receipt = await sender({
+    machine, plan, stderr,
+    onProgress: options.json ? undefined : (progress) => {
+      const now = performance.now()
+      if (now - lastProgressAt < 1000 && progress.files !== progress.totalFiles) return
+      lastProgressAt = now
+      const seconds = (now - startedAt) / 1000
+      const rate = seconds > 0 ? progress.bytes / seconds : 0
+      const remaining = Math.max(0, progress.totalBytes - progress.bytes)
+      const eta = rate > 0 ? `${Math.ceil(remaining / rate)}s` : 'unknown'
+      stderr.write(`Streaming ${progress.files}/${progress.totalFiles} files, ${(progress.bytes / 1048576).toFixed(1)}/${(progress.totalBytes / 1048576).toFixed(1)} MiB, ${(rate / 1048576).toFixed(1)} MiB/s, stream ETA ${eta}\n`)
+      if (progress.files === progress.totalFiles) stderr.write('Portable files sent; awaiting remote verification and publication.\n')
+    },
+  })
   stdout.write(options.json
     ? `${JSON.stringify({ schemaVersion: 1, plan, receipt })}\n`
     : formatProjectTransferReceipt(receipt))

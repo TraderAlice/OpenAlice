@@ -21,6 +21,7 @@ import {
 const temporary: string[] = []
 
 afterEach(async () => {
+  vi.restoreAllMocks()
   const { rm } = await import('node:fs/promises')
   await Promise.all(temporary.splice(0).map((path) => rm(path, { recursive: true, force: true })))
 })
@@ -181,6 +182,42 @@ describe('openalice project', () => {
     expect(send).toHaveBeenCalledOnce()
     expect(stdout.join('')).toContain('AliceProject transfer complete')
     expect(stdout.join('')).toContain('Sessions imported: 0')
+  })
+
+  it.each([false, true])('reports bounded stream progress without polluting receipt output (json=%s)', async (json) => {
+    const env = await setupProjects()
+    const stdout: string[] = []
+    const stderr: string[] = []
+    let now = 0
+    vi.spyOn(performance, 'now').mockImplementation(() => now)
+    const sendTransfer: NonNullable<Parameters<typeof runProjectCommand>[1]>['sendTransfer'] = async ({ plan, onProgress }) => {
+      for (let files = 1; files <= 100; files++) {
+        now = files * 25
+        onProgress?.({ files, totalFiles: 100, bytes: files * 1048576, totalBytes: 100 * 1048576 })
+      }
+      expect(stdout.join('')).not.toContain('AliceProject transfer complete')
+      return receipt(plan.transferId, plan.destination.home)
+    }
+    await expect(runProjectCommand([
+      'transfer', '--from', 'default', '--to-machine', 'cloud',
+      '--to-project', 'remote-copy', '--to-home', '/srv/openalice/remote-copy',
+      '--yes', ...(json ? ['--json'] : []),
+    ], transferIo(env, {
+      stdout: { write: (chunk: string) => stdout.push(chunk) },
+      stderr: { write: (chunk: string) => stderr.push(chunk) },
+      sendTransfer,
+    }))).resolves.toBe(0)
+    if (json) {
+      expect(stderr).toEqual([])
+      expect(JSON.parse(stdout.join('')).receipt.transferId).toBe('transfer-command')
+    } else {
+      const updates = stderr.filter(line => line.startsWith('Streaming'))
+      expect(updates).toHaveLength(3)
+      expect(updates[0]).toContain('40/100 files, 40.0/100.0 MiB, 40.0 MiB/s, stream ETA 2s')
+      expect(stderr.at(-1)).toContain('awaiting remote verification and publication')
+      expect(stdout.join('')).toContain('AliceProject transfer complete')
+      expect(stdout.join('')).not.toContain('Streaming')
+    }
   })
 
   it('refuses to stop a foreign source owner', async () => {
