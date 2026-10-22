@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 
 import type { InboxEntry } from '../api/inbox'
 import { reconcileInboxHistoryState, type InboxState } from './inbox'
@@ -47,4 +47,28 @@ describe('reconcileInboxHistoryState', () => {
     expect(next.entries[0]).toBe(current.entries[0])
     expect(next.entries[1]).toBe(incoming[1])
   })
+})
+
+
+it('keeps bulk counts consistent with concurrent local reads and ignores stale polls', async () => {
+  const { api } = await import('../api')
+  const { inboxLive, applyInboxBulkRead, refreshInbox, setInboxReadAtOptimistically } = await import('./inbox')
+  const first = entry('old', 'Old')
+  const newcomer = entry('new', 'New')
+  const history = vi.spyOn(api.inbox, 'history').mockResolvedValue({ entries: [newcomer, first], hasMore: true, unreadCount: 125 })
+  const stop = inboxLive.subscribe(() => {})
+  try {
+    await vi.waitFor(() => expect(inboxLive.getState().unreadCount).toBe(125))
+    let finish!: (value: Awaited<ReturnType<typeof api.inbox.history>>) => void
+    history.mockImplementationOnce(() => new Promise((resolve) => { finish = resolve }))
+    refreshInbox()
+    setInboxReadAtOptimistically('old', 10)
+    applyInboxBulkRead(['old', ...Array.from({ length: 123 }, (_, i) => `older-${i}`)], 20)
+    expect(inboxLive.getState().unreadCount).toBe(1)
+    finish({ entries: [first], hasMore: true, unreadCount: 125 })
+    await Promise.resolve()
+    expect(inboxLive.getState().unreadCount).toBe(1)
+    expect(inboxLive.getState().entries[0]).toBe(newcomer)
+    expect(inboxLive.getState().entries[0]?.readAt).toBeUndefined()
+  } finally { stop(); history.mockRestore() }
 })

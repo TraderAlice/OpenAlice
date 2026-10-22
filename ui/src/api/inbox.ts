@@ -59,6 +59,7 @@ export interface InboxEntry {
 export interface InboxHistoryResponse {
   entries: InboxEntry[]
   hasMore: boolean
+  unreadCount?: number
 }
 
 export interface InboxSeedBody {
@@ -106,6 +107,14 @@ export const inboxApi = {
     if (res.status === 204) return true
     if (res.status === 404) return false
     throw new Error(`inbox delete failed: ${res.status}`)
+  },
+
+  async markAllRead(excludeIds: string[]): Promise<{ ids: string[]; readAt: number }> {
+    return fetchJson('/api/inbox/read-all', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ excludeIds }),
+    })
   },
 
   async markRead(id: string): Promise<{ ok: true; id: string; readAt: number }> {

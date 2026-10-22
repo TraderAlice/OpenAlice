@@ -3191,6 +3191,12 @@ export const zh: Resources = {
     backToTracked: '返回追踪',
   },
   inbox: {
+    unreadCount: '{{count}} 条未读',
+    markAllRead: '全部标为已读',
+    markAllReadSuccess: '已将 {{count}} 条更新标为已读。',
+    markAllReadProtected: 'Office 审阅中的消息仍保留未读。',
+    markAllReadError: '无法标为已读，请重试。',
+
     noMessages: '收件箱为空。',
     emptyHint: '工作区会把状态更新推送到这里。',
     untitledUpdate: '没有摘要的更新',

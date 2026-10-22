@@ -26,11 +26,19 @@ export const inboxHandlers = [
         return readAt === undefined ? entry : { ...entry, readAt }
       }),
       hasMore: false,
+      unreadCount: demoInboxEntries.filter((entry) => !demoInboxReadAt(entry.id)).length,
     }),
   ),
   http.post('/api/inbox/seed', () =>
     HttpResponse.json({ error: 'Demo mode — inbox seed is disabled.' }, { status: 400 }),
   ),
+  http.put('/api/inbox/read-all', async ({ request }) => {
+    const { excludeIds } = await request.json() as { excludeIds: string[] }
+    const ids = demoInboxEntries.filter((entry) => !demoInboxReadAt(entry.id) && !excludeIds.includes(entry.id)).map((entry) => entry.id)
+    const readAt = Date.now()
+    for (const id of ids) demoInboxReadState.set(id, readAt)
+    return HttpResponse.json({ ids, readAt })
+  }),
   http.put('/api/inbox/:id/read', ({ params }) => {
     const id = String(params.id)
     if (!demoInboxEntries.some((entry) => entry.id === id)) {

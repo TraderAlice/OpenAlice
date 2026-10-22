@@ -68,3 +68,33 @@ it('resolves inline files in the publisher Workspace and serves only the stored 
     expect((await inboxStore.get(entry.id))?.body).toBe(entry.body)
   } finally { await rm(home, { recursive: true, force: true }) }
 })
+
+it('bulk marks every existing unread across pages and workspaces, preserves exclusions and future arrivals', async () => {
+  const inboxStore = createMemoryInboxStore()
+  for (let i = 0; i < 125; i++) await inboxStore.append({ workspaceId: `ws-${i % 2}`, body: `report ${i}` })
+  const app = createInboxRoutes({ inboxStore })
+  const page = await (await app.request('/history?limit=100&workspaceId=ws-1')).json()
+  expect(page.unreadCount).toBe(125)
+  const protectedId = page.entries[0].id
+  const response = await app.request('/read-all', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ excludeIds: [protectedId] }) })
+  const result = await response.json()
+  expect(response.status).toBe(200)
+  expect(result.ids).toHaveLength(124)
+  const arrival = await inboxStore.append({ workspaceId: 'new', body: 'new arrival' })
+  expect((await inboxStore.get(arrival.id))?.readAt).toBeUndefined()
+  expect((await inboxStore.get(protectedId))?.readAt).toBeUndefined()
+  expect((await inboxStore.read()).unreadCount).toBe(2)
+  const repeat = await inboxStore.markAllRead([protectedId, arrival.id])
+  expect(repeat.ids).toEqual([])
+  expect((await inboxStore.read({ limit: 200 })).entries).toHaveLength(126)
+})
+
+it('rejects malformed bulk requests without changing read state', async () => {
+  const inboxStore = createMemoryInboxStore()
+  await inboxStore.append({ workspaceId: 'ws', body: 'report' })
+  const app = createInboxRoutes({ inboxStore })
+  for (const body of ['null', '{}', '{"excludeIds":[1]}', 'bad json']) {
+    expect((await app.request('/read-all', { method: 'PUT', body })).status).toBe(400)
+  }
+  expect((await inboxStore.read()).unreadCount).toBe(1)
+})

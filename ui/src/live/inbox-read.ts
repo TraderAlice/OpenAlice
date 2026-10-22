@@ -2,9 +2,12 @@ import { create } from 'zustand'
 import { api } from '../api'
 import {
   inboxLive,
+  applyInboxBulkRead,
+  setInboxBulkWritePending,
   refreshInbox,
   setInboxReadAtOptimistically,
 } from './inbox'
+import { readOfficeInboxDutyExcursion } from '../office/inbox-duty-excursion'
 import { reloadOnHotUpdate } from '../lib/hmr'
 
 reloadOnHotUpdate('live/inbox-read')
@@ -35,12 +38,12 @@ interface InboxReadActions {
    *  shift+u shortcut) is parked for v1; the action is here so it's
    *  trivial to wire when we decide to add it. */
   markUnread: (id: string) => void
-  /** Mark every currently-loaded entry as read. Reserved for a future
-   *  explicit "Mark all as read" button — not auto-fired anywhere. */
-  markAllRead: () => void
+  markingAllRead: boolean
+  markAllRead: () => Promise<number | undefined>
 }
 
-export const useInboxRead = create<InboxReadActions>()(() => ({
+export const useInboxRead = create<InboxReadActions>()((set, get) => ({
+  markingAllRead: false,
   markRead: (id) => {
     const entry = inboxLive.getState().entries.find((e) => e.id === id)
     if (entry?.readAt) return
@@ -55,26 +58,26 @@ export const useInboxRead = create<InboxReadActions>()(() => ({
     void api.inbox.markUnread(id)
       .catch(() => refreshInbox())
   },
-  markAllRead: () => {
-    const unread = inboxLive.getState().entries.filter((e) => !e.readAt)
-    if (unread.length === 0) return
-    const optimisticReadAt = Date.now()
-    for (const entry of unread) {
-      setInboxReadAtOptimistically(entry.id, optimisticReadAt)
+  markAllRead: async () => {
+    if (get().markingAllRead) return
+    set({ markingAllRead: true })
+    setInboxBulkWritePending(true)
+    const target = readOfficeInboxDutyExcursion()?.duty.destination.inboxEntryId
+    try {
+      const result = await api.inbox.markAllRead(target ? [target] : [])
+      applyInboxBulkRead(result.ids, result.readAt)
+      return result.ids.length
+    } finally {
+      setInboxBulkWritePending(false)
+      refreshInbox()
+      set({ markingAllRead: false })
     }
-    void Promise.all(unread.map((entry) => api.inbox.markRead(entry.id)))
-      .then((results) => {
-        for (const result of results) {
-          setInboxReadAtOptimistically(result.id, result.readAt)
-        }
-      })
-      .catch(() => refreshInbox())
   },
 }))
 
-/** Activity-bar badge count: loaded entries without a server read marker. */
+/** Shared global count, including entries outside the loaded page. */
 export function useUnreadInboxCount(): number {
   return inboxLive.useStore((s) =>
-    s.entries.reduce((n, e) => (e.readAt ? n : n + 1), 0),
+    s.unreadCount ?? s.entries.reduce((n, e) => (e.readAt ? n : n + 1), 0),
   )
 }

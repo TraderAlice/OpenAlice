@@ -3227,6 +3227,12 @@ export const en = {
     backToTracked: 'Back to Tracked',
   },
   inbox: {
+    unreadCount: '{{count}} unread',
+    markAllRead: 'Mark all as read',
+    markAllReadSuccess: 'Marked {{count}} updates as read.',
+    markAllReadProtected: 'The active Office review stays unread.',
+    markAllReadError: 'Could not mark updates as read. Please try again.',
+
     noMessages: 'No inbox messages.',
     emptyHint: 'Workspaces will push status updates here.',
     untitledUpdate: 'Update without a summary',

@@ -45,3 +45,18 @@ record ID (or native resume ID plus runtime when no record ID is available).
 They use the shared Session display-name/title/name precedence and show the
 Inbox summary as the description. A missing source falls back to a Session
 identifier or generic Session label, never a runtime name presented as a person.
+
+## Read state and bulk triage
+
+The Inbox toolbar exposes an explicit Mark all as read action below search. Its
+unread count and the activity badge use the global count returned with history,
+independent of the loaded 100 rows and local search. The server snapshots all
+existing unread IDs and atomically updates the existing version-1 read-state
+sidecar once. Entries appended after that snapshot remain unread. It does not
+delete messages or change the selected report, filter, or reading position.
+
+The same-tab Office dossier review checkpoint is excluded from bulk read, just
+as it is from selection-driven read; its disposition remains Office-owned.
+Repeated clicks share a pending guard. Failed writes leave the UI unmarked and
+show retryable feedback; subsequent history polls reconcile authoritative state.
+Polls spanning a bulk write are discarded to keep global counts consistent.

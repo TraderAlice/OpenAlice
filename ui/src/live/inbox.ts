@@ -22,6 +22,8 @@ reloadOnHotUpdate('live/inbox')
 
 export interface InboxState {
   entries: InboxEntry[]
+  /** Global server count, including rows outside the loaded page. */
+  unreadCount?: number
   /** True until the initial history fetch resolves. UI shows a skeleton. */
   loading: boolean
 }
@@ -29,10 +31,11 @@ export interface InboxState {
 export function reconcileInboxHistoryState(
   current: InboxState,
   incomingEntries: InboxEntry[],
+  unreadCount = current.unreadCount,
 ): InboxState {
   const entries = reconcileJsonCollection(current.entries, incomingEntries, (entry) => entry.id)
-  if (entries === current.entries && !current.loading) return current
-  return { ...current, entries, loading: false }
+  if (entries === current.entries && !current.loading && unreadCount === current.unreadCount) return current
+  return { ...current, entries, loading: false, ...(unreadCount === undefined ? {} : { unreadCount }) }
 }
 
 const POLL_INTERVAL_MS = 20_000
@@ -42,6 +45,8 @@ const POLL_INTERVAL_MS = 20_000
  *  no subscriber is mounted; calls become no-ops in that window which
  *  is harmless (delete actions originate from mounted UI). */
 let applyState: ((next: InboxState | ((prev: InboxState) => InboxState)) => void) | null = null
+let revision = 0
+let bulkWritePending = false
 let triggerRefresh: (() => void) | null = null
 
 export const inboxLive = createLiveStore<InboxState>({
@@ -49,12 +54,15 @@ export const inboxLive = createLiveStore<InboxState>({
   initialState: { entries: [], loading: true },
   subscribe: ({ apply }) => {
     let disposed = false
+    let request = 0
 
     async function refresh() {
+      const startedRequest = ++request
+      const startedRevision = revision
       try {
-        const { entries } = await api.inbox.history({ limit: 100 })
-        if (disposed) return
-        apply((prev) => reconcileInboxHistoryState(prev, entries))
+        const { entries, unreadCount } = await api.inbox.history({ limit: 100 })
+        if (disposed || bulkWritePending || startedRequest !== request || startedRevision !== revision) return
+        apply((prev) => reconcileInboxHistoryState(prev, entries, unreadCount))
       } catch {
         if (disposed) return
         apply((prev) => prev.loading ? { ...prev, loading: false } : prev)
@@ -86,8 +94,10 @@ export function refreshInbox(): void {
 /** Remove a server-confirmed deletion from the in-memory list immediately.
  *  Pairs with `refreshInbox()` so server state remains authoritative. */
 export function removeInboxAfterDelete(id: string): void {
+  revision++
   applyState?.((prev) => ({
     ...prev,
+    unreadCount: prev.unreadCount === undefined ? undefined : Math.max(0, prev.unreadCount - (prev.entries.some((e) => e.id === id && !e.readAt) ? 1 : 0)),
     entries: prev.entries.filter((e) => e.id !== id),
   }))
 }
@@ -95,8 +105,10 @@ export function removeInboxAfterDelete(id: string): void {
 /** Optimistically mirror server-side read-state writes in the loaded feed.
  *  The next /history poll remains authoritative and will reconcile drift. */
 export function setInboxReadAtOptimistically(id: string, readAt: number | null): void {
+  revision++
   applyState?.((prev) => ({
     ...prev,
+    unreadCount: prev.unreadCount === undefined ? undefined : Math.max(0, prev.unreadCount + (prev.entries.some((e) => e.id === id && Boolean(e.readAt) !== Boolean(readAt)) ? (readAt ? -1 : 1) : 0)),
     entries: prev.entries.map((entry) => {
       if (entry.id !== id) return entry
       if (readAt == null) {
@@ -107,4 +119,21 @@ export function setInboxReadAtOptimistically(id: string, readAt: number | null):
       return { ...entry, readAt }
     }),
   }))
+}
+
+/** Apply only server-confirmed IDs, retaining selection, ordering and new arrivals. */
+export function applyInboxBulkRead(ids: string[], readAt: number): void {
+  revision++
+  const marked = new Set(ids)
+  applyState?.((prev) => ({
+    ...prev,
+    unreadCount: prev.unreadCount === undefined ? undefined : Math.max(0, prev.unreadCount - ids.length + prev.entries.filter((entry) => marked.has(entry.id) && entry.readAt).length),
+    entries: prev.entries.map((entry) => marked.has(entry.id) ? { ...entry, readAt } : entry),
+  }))
+}
+
+/** Discard polls spanning a bulk write so counts cannot be decremented twice. */
+export function setInboxBulkWritePending(pending: boolean): void {
+  bulkWritePending = pending
+  revision++
 }

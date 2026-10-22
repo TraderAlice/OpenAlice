@@ -1,5 +1,5 @@
 import { inboxFiles } from '@traderalice/connector-protocol'
-import { describe, it, expect, beforeEach } from 'vitest'
+import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -9,6 +9,8 @@ import {
   type IInboxStore,
   type InboxEntry,
 } from './inbox-store.js'
+
+vi.mock('node:fs/promises', async (importOriginal) => ({ ...await importOriginal<typeof import('node:fs/promises')>() }))
 
 describe('InboxStore (in-memory)', () => {
   let store: IInboxStore
@@ -441,4 +443,72 @@ describe('InboxStore (JSONL persistence)', () => {
     expect(entries).not.toContain('entries.jsonl.tmp')
     await rm(dir, { recursive: true, force: true })
   })
+})
+
+it('atomically persists bulk reads across 100 entries and preserves a protected review', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'inbox-bulk-'))
+  try {
+    const options = { filePath: join(dir, 'entries.jsonl'), readStatePath: join(dir, 'read-state.json') }
+    const store = createInboxStore(options)
+    const entries = []
+    for (let i = 0; i < 105; i++) entries.push(await store.append({ workspaceId: 'ws', body: `report ${i}` }))
+    const protectedId = entries[0]!.id
+    const result = await store.markAllRead([protectedId])
+    expect(result.ids).toHaveLength(104)
+    const reopened = createInboxStore(options)
+    expect((await reopened.read()).unreadCount).toBe(1)
+    expect((await reopened.get(protectedId))?.readAt).toBeUndefined()
+    expect((await reopened.get(entries[1]!.id))?.readAt).toBe(result.readAt)
+    const newcomer = await store.append({ workspaceId: 'ws', body: 'arrival' })
+    expect((await reopened.get(newcomer.id))?.readAt).toBeUndefined()
+    expect((await reopened.read()).entries).toHaveLength(100)
+  } finally { await rm(dir, { recursive: true, force: true }) }
+})
+
+it('leaves the prior read state intact when a bulk write fails', async () => {
+  const { mkdir, readFile } = await import('node:fs/promises')
+  const dir = await mkdtemp(join(tmpdir(), 'inbox-bulk-failure-'))
+  try {
+    const readStatePath = join(dir, 'read-state.json')
+    const store = createInboxStore({ filePath: join(dir, 'entries.jsonl'), readStatePath })
+    const first = await store.append({ workspaceId: 'ws', body: 'already read' })
+    await store.markRead(first.id, 42)
+    const next = await store.append({ workspaceId: 'ws', body: 'still unread' })
+    const before = await readFile(readStatePath, 'utf8')
+    await mkdir(`${readStatePath}.tmp`)
+    await expect(store.markAllRead()).rejects.toThrow()
+    expect(await readFile(readStatePath, 'utf8')).toBe(before)
+    expect((await store.get(next.id))?.readAt).toBeUndefined()
+    await rm(`${readStatePath}.tmp`, { recursive: true })
+    expect((await store.markAllRead()).ids).toEqual([next.id])
+  } finally { await rm(dir, { recursive: true, force: true }) }
+})
+
+
+it('does not mark arrivals appended while the bulk snapshot is waiting on read state', async () => {
+  const fs = await import('node:fs/promises')
+  const dir = await mkdtemp(join(tmpdir(), 'inbox-bulk-arrival-'))
+  let spy: ReturnType<typeof vi.spyOn> | undefined
+  try {
+    const readStatePath = join(dir, 'read-state.json')
+    const store = createInboxStore({ filePath: join(dir, 'entries.jsonl'), readStatePath })
+    const old = await store.append({ workspaceId: 'ws', body: 'old' })
+    const original = fs.readFile
+    let release!: () => void
+    let captured!: () => void
+    const snapshotCaptured = new Promise<void>((resolve) => { captured = resolve })
+    const wait = new Promise<void>((resolve) => { release = resolve })
+    let blocked = false
+    spy = vi.spyOn(fs, 'readFile').mockImplementation(async (...args: Parameters<typeof fs.readFile>) => {
+      if (args[0] === readStatePath && !blocked) { blocked = true; captured(); await wait }
+      return original(...args)
+    })
+    const bulk = store.markAllRead()
+    await snapshotCaptured
+    const arrival = await store.append({ workspaceId: 'ws', body: 'new' })
+    release()
+    expect((await bulk).ids).toEqual([old.id])
+    expect((await store.get(arrival.id))?.readAt).toBeUndefined()
+    expect((await store.read()).unreadCount).toBe(1)
+  } finally { spy?.mockRestore(); await rm(dir, { recursive: true, force: true }) }
 })

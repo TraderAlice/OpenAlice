@@ -32,6 +32,17 @@ export function createInboxRoutes(deps: InboxRoutesDeps) {
     return c.json(result)
   })
 
+  app.put('/read-all', async (c) => {
+    const body: unknown = await c.req.json().catch(() => null)
+    if (!body || typeof body !== 'object' || !('excludeIds' in body)
+      || !Array.isArray(body.excludeIds)
+      || body.excludeIds.length > 100
+      || !body.excludeIds.every((id: unknown) => typeof id === 'string' && id.length > 0 && id.length <= 200)) {
+      return c.json({ error: 'excludeIds must be an array of entry IDs' }, 400)
+    }
+    return c.json(await deps.inboxStore.markAllRead(body.excludeIds))
+  })
+
   app.get('/:id/files', async c => {
     const entry = await deps.inboxStore.get(c.req.param('id'))
     if (!entry) return c.json({ error: 'not_found' }, 404)
