@@ -122,12 +122,12 @@ export function setInboxReadAtOptimistically(id: string, readAt: number | null):
 }
 
 /** Apply only server-confirmed IDs, retaining selection, ordering and new arrivals. */
-export function applyInboxBulkRead(ids: string[], readAt: number): void {
+export function applyInboxBulkRead(ids: string[], readAt: number, unreadCount: number): void {
   revision++
   const marked = new Set(ids)
   applyState?.((prev) => ({
     ...prev,
-    unreadCount: prev.unreadCount === undefined ? undefined : Math.max(0, prev.unreadCount - ids.length + prev.entries.filter((entry) => marked.has(entry.id) && entry.readAt).length),
+    unreadCount,
     entries: prev.entries.map((entry) => marked.has(entry.id) ? { ...entry, readAt } : entry),
   }))
 }

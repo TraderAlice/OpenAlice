@@ -455,6 +455,7 @@ it('atomically persists bulk reads across 100 entries and preserves a protected 
     const protectedId = entries[0]!.id
     const result = await store.markAllRead([protectedId])
     expect(result.ids).toHaveLength(104)
+    expect(result.unreadCount).toBe(1)
     const reopened = createInboxStore(options)
     expect((await reopened.read()).unreadCount).toBe(1)
     expect((await reopened.get(protectedId))?.readAt).toBeUndefined()
@@ -507,7 +508,9 @@ it('does not mark arrivals appended while the bulk snapshot is waiting on read s
     await snapshotCaptured
     const arrival = await store.append({ workspaceId: 'ws', body: 'new' })
     release()
-    expect((await bulk).ids).toEqual([old.id])
+    const result = await bulk
+    expect(result.ids).toEqual([old.id])
+    expect(result.unreadCount).toBe(1)
     expect((await store.get(arrival.id))?.readAt).toBeUndefined()
     expect((await store.read()).unreadCount).toBe(1)
   } finally { spy?.mockRestore(); await rm(dir, { recursive: true, force: true }) }

@@ -37,7 +37,7 @@ export const inboxHandlers = [
     const ids = demoInboxEntries.filter((entry) => !demoInboxReadAt(entry.id) && !excludeIds.includes(entry.id)).map((entry) => entry.id)
     const readAt = Date.now()
     for (const id of ids) demoInboxReadState.set(id, readAt)
-    return HttpResponse.json({ ids, readAt })
+    return HttpResponse.json({ ids, readAt, unreadCount: demoInboxEntries.filter((entry) => !demoInboxReadAt(entry.id)).length })
   }),
   http.put('/api/inbox/:id/read', ({ params }) => {
     const id = String(params.id)

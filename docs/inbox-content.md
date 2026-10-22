@@ -60,3 +60,5 @@ as it is from selection-driven read; its disposition remains Office-owned.
 Repeated clicks share a pending guard. Failed writes leave the UI unmarked and
 show retryable feedback; subsequent history polls reconcile authoritative state.
 Polls spanning a bulk write are discarded to keep global counts consistent.
+Bulk responses carry the current server unread count; clients must not subtract
+the number of marked IDs from an older count that may exclude new arrivals.

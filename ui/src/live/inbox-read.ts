@@ -65,7 +65,7 @@ export const useInboxRead = create<InboxReadActions>()((set, get) => ({
     const target = readOfficeInboxDutyExcursion()?.duty.destination.inboxEntryId
     try {
       const result = await api.inbox.markAllRead(target ? [target] : [])
-      applyInboxBulkRead(result.ids, result.readAt)
+      applyInboxBulkRead(result.ids, result.readAt, result.unreadCount)
       return result.ids.length
     } finally {
       setInboxBulkWritePending(false)

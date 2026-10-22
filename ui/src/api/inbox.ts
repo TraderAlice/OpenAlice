@@ -109,7 +109,7 @@ export const inboxApi = {
     throw new Error(`inbox delete failed: ${res.status}`)
   },
 
-  async markAllRead(excludeIds: string[]): Promise<{ ids: string[]; readAt: number }> {
+  async markAllRead(excludeIds: string[]): Promise<{ ids: string[]; readAt: number; unreadCount: number }> {
     return fetchJson('/api/inbox/read-all', {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },

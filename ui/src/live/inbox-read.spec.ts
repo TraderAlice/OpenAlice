@@ -7,7 +7,7 @@ import { useInboxRead } from './inbox-read'
 beforeEach(() => { vi.clearAllMocks(); mocks.excursion = null; useInboxRead.setState({ markingAllRead: false }) })
 describe('markAllRead', () => {
   it('guards repeated clicks, protects the Office target, and applies only acknowledged IDs', async () => {
-    let finish!: (value: { ids: string[]; readAt: number }) => void
+    let finish!: (value: { ids: string[]; readAt: number; unreadCount: number }) => void
     mocks.excursion = { duty: { destination: { inboxEntryId: 'protected' } } }
     mocks.markAllRead.mockImplementation(() => new Promise((resolve) => { finish = resolve }))
     const pending = useInboxRead.getState().markAllRead()
@@ -15,13 +15,13 @@ describe('markAllRead', () => {
     await useInboxRead.getState().markAllRead()
     expect(mocks.markAllRead).toHaveBeenCalledExactlyOnceWith(['protected'])
     expect(mocks.apply).not.toHaveBeenCalled()
-    finish({ ids: ['old-1', 'old-2'], readAt: 42 })
+    finish({ ids: ['old-1', 'old-2'], readAt: 42, unreadCount: 1 })
     expect(await pending).toBe(2)
-    expect(mocks.apply).toHaveBeenCalledExactlyOnceWith(['old-1', 'old-2'], 42)
+    expect(mocks.apply).toHaveBeenCalledExactlyOnceWith(['old-1', 'old-2'], 42, 1)
     expect(useInboxRead.getState().markingAllRead).toBe(false)
   })
   it('does not falsely mark entries on failure, releases the lock and supports retry', async () => {
-    mocks.markAllRead.mockRejectedValueOnce(new Error('write failed')).mockResolvedValueOnce({ ids: [], readAt: 42 })
+    mocks.markAllRead.mockRejectedValueOnce(new Error('write failed')).mockResolvedValueOnce({ ids: [], readAt: 42, unreadCount: 0 })
     await expect(useInboxRead.getState().markAllRead()).rejects.toThrow('write failed')
     expect(mocks.apply).not.toHaveBeenCalled()
     expect(mocks.refresh).toHaveBeenCalledOnce()

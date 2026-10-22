@@ -63,12 +63,30 @@ it('keeps bulk counts consistent with concurrent local reads and ignores stale p
     history.mockImplementationOnce(() => new Promise((resolve) => { finish = resolve }))
     refreshInbox()
     setInboxReadAtOptimistically('old', 10)
-    applyInboxBulkRead(['old', ...Array.from({ length: 123 }, (_, i) => `older-${i}`)], 20)
+    applyInboxBulkRead(['old', ...Array.from({ length: 123 }, (_, i) => `older-${i}`)], 20, 1)
     expect(inboxLive.getState().unreadCount).toBe(1)
     finish({ entries: [first], hasMore: true, unreadCount: 125 })
     await Promise.resolve()
     expect(inboxLive.getState().unreadCount).toBe(1)
     expect(inboxLive.getState().entries[0]).toBe(newcomer)
     expect(inboxLive.getState().entries[0]?.readAt).toBeUndefined()
+  } finally { stop(); history.mockRestore() }
+})
+
+
+it('uses the server count when unseen arrivals were marked and refresh fails', async () => {
+  const { api } = await import('../api')
+  const { inboxLive, applyInboxBulkRead, refreshInbox } = await import('./inbox')
+  const protectedEntry = entry('protected', 'Office review')
+  const history = vi.spyOn(api.inbox, 'history').mockResolvedValue({ entries: [protectedEntry, entry('old', 'Old')], hasMore: false, unreadCount: 2 })
+  const stop = inboxLive.subscribe(() => {})
+  try {
+    await vi.waitFor(() => expect(inboxLive.getState().unreadCount).toBe(2))
+    history.mockRejectedValue(new Error('offline'))
+    applyInboxBulkRead(['old', 'unseen-arrival'], 42, 1)
+    refreshInbox()
+    await Promise.resolve()
+    expect(inboxLive.getState().unreadCount).toBe(1)
+    expect(inboxLive.getState().entries.find((entry) => entry.id === 'protected')?.readAt).toBeUndefined()
   } finally { stop(); history.mockRestore() }
 })

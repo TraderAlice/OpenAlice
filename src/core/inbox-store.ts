@@ -79,6 +79,7 @@ export interface InboxReadOpts {
 }
 
 export interface InboxBulkReadResult {
+  unreadCount: number
   ids: string[]
   readAt: number
 }
@@ -299,11 +300,16 @@ export function createInboxStore(opts: InboxStoreOptions = {}): IInboxStore {
     const candidates = snapshot.entries.filter((entry) => !excluded.has(entry.id))
     return withReadStateLock(async () => {
       const state = await readReadState()
-      const ids = candidates.filter((entry) => !state.read[entry.id]).map((entry) => entry.id)
+      // Re-read only to count current messages and discard removed candidates.
+      // The original snapshot still exclusively determines which IDs may be read.
+      const current = await read({ limit: Number.MAX_SAFE_INTEGER })
+      const unreadIds = new Set(current.entries.filter((entry) => !entry.readAt).map((entry) => entry.id))
+      const ids = candidates.filter((entry) => unreadIds.has(entry.id)).map((entry) => entry.id)
+      const unreadCount = current.unreadCount - ids.length
       const readAt = Date.now()
       for (const id of ids) state.read[id] = readAt
       if (ids.length) await writeReadState(state)
-      return { ids, readAt }
+      return { ids, readAt, unreadCount }
     })
   }
 
@@ -435,7 +441,7 @@ export function createMemoryInboxStore(): IInboxStore {
     const unread = entries.filter((entry) => !entry.readAt && !excluded.has(entry.id))
     const readAt = Date.now()
     for (const entry of unread) entry.readAt = readAt
-    return { ids: unread.map((entry) => entry.id), readAt }
+    return { ids: unread.map((entry) => entry.id), readAt, unreadCount: entries.filter((entry) => !entry.readAt).length }
   }
 
   async function markUnread(id: string): Promise<boolean> {

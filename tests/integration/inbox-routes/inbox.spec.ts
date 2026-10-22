@@ -80,6 +80,7 @@ it('bulk marks every existing unread across pages and workspaces, preserves excl
   const result = await response.json()
   expect(response.status).toBe(200)
   expect(result.ids).toHaveLength(124)
+  expect(result.unreadCount).toBe(1)
   const arrival = await inboxStore.append({ workspaceId: 'new', body: 'new arrival' })
   expect((await inboxStore.get(arrival.id))?.readAt).toBeUndefined()
   expect((await inboxStore.get(protectedId))?.readAt).toBeUndefined()

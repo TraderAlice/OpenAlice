@@ -38,3 +38,10 @@ the repository demo/MSW surface, not production/native end-to-end acceptance.
 
 Full `pnpm test` retry exited 1 after 332.99s; no feature assertion failures.
 Native acceptance remains blocked by missing installed binaries, not waived.
+
+Independent review found and resolved stale bulk count arithmetic: unseen arrivals
+could zero the badge despite a protected unread target. The server now returns
+its unread count; regression includes stale client history and failed refresh.
+Final focused run: 84 assertions pass. Independent re-review: 38 assertions pass,
+no further concrete defect found. Browser light/dark checks rerun successfully.
+The full-suite result above is from before this review correction.
