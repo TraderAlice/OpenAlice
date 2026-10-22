@@ -29,7 +29,7 @@ the durable truth after it changes. Git history is the archive.
 
 ## Active
 
-- [[plans/inbox-mark-all-read.md]] — Inbox bulk read; local-only feature branch hold.
+- [[plans/inbox-mark-all-read.md]] — Inbox bulk read; PR #1789 acceptance and authorized merge.
 
 - [[plans/settings-machines-dialog.md]] — Move machine management into General / Machines and replace inline SSH setup with a reviewed dialog; Draft PR only.
 

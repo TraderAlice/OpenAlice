@@ -1,6 +1,6 @@
 # Inbox mark all as read
 
-Status: local implementation and verification; feature branch hold (no push/PR/merge/deploy).
+Status: reviewed implementation; PR #1789. Maintainer authorized push and merge on 2026-10-22; required checks and review rules apply. No deployment.
 Related issues: none supplied.
 Base: explicitly requested origin/master, 87bc415260aaac92a072d89a1c6440268a3efdf1.
 Owner guides: docs/inbox-content.md, docs/ui-interaction-and-motion.md, docs/testing.md.
@@ -27,7 +27,7 @@ failed in dugite with getaddrinfo EAI_AGAIN github.com; ignore-scripts installat
 succeeded for pure JS tests. Native/runtime coverage must not be claimed from that.
 
 Completion: focused regression coverage, owning types and applicable acceptance pass,
-or exact remaining blockers are reported with local diff. No external delivery.
+or exact remaining blockers are reported in PR #1789. Merge is authorized when required checks and review rules permit.
 
 Verification evidence: 83 focused assertions across six files pass, including all
 new store/API/live-state/component cases and InboxPage regressions. Final copy-only
