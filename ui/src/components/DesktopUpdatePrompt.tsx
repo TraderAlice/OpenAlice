@@ -3,6 +3,7 @@ import { useUpdateLifecycle, type NativeStatus } from '../hooks/useUpdateLifecyc
 import { Download, ExternalLink, RefreshCcw, X } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { Dialog } from './uta/Dialog'
+import { Button } from './ui/button'
 
 function previewStatus(): NativeStatus | null {
   if (!import.meta.env.DEV || typeof window === 'undefined') return null
@@ -61,24 +62,26 @@ export function DesktopUpdatePrompt() {
           <h2 className="text-[15px] font-semibold text-foreground leading-snug">
             {installing ? t('settings.about.prompt.installingTitle') : t('settings.about.prompt.readyTitle')}
           </h2>
-          <p className="text-[12px] text-muted-foreground truncate">OpenAlice v{status.version}</p>
+          <p className="text-sm text-muted-foreground truncate">OpenAlice v{status.version}</p>
         </div>
-        <button
+        <Button
           type="button"
           onClick={dismiss}
           disabled={installing}
-          className="h-8 w-8 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted disabled:opacity-40 flex items-center justify-center transition-colors"
+          variant="ghost"
+          size="icon-sm"
+          className="text-muted-foreground"
           aria-label={t('settings.about.prompt.close')}
         >
           <X size={16} />
-        </button>
+        </Button>
       </div>
 
       <div className="px-5 py-4 space-y-3">
-        <p className="text-[13px] leading-relaxed text-foreground">
+        <p className="text-sm leading-relaxed text-foreground">
           {installing ? installText : t('settings.about.prompt.readyBody')}
         </p>
-        <p className="text-[12px] leading-relaxed text-muted-foreground">
+        <p className="text-sm leading-relaxed text-muted-foreground">
           {t('settings.about.installHandoffNote')}
         </p>
         {installing && (
@@ -91,39 +94,38 @@ export function DesktopUpdatePrompt() {
           </div>
         )}
         {error && (
-          <div className="rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-[12px] leading-relaxed text-destructive">
+          <div className="rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm leading-relaxed text-destructive">
             {error}
           </div>
         )}
       </div>
 
       <div className="px-5 py-3 border-t border-border flex flex-col-reverse sm:flex-row sm:items-center sm:justify-end gap-2">
-        <button
+        <Button
           type="button"
           onClick={dismiss}
           disabled={installing}
-          className="btn-secondary"
+          variant="secondary"
         >
           {t('settings.about.prompt.later')}
-        </button>
-        <button
+        </Button>
+        <Button
           type="button"
           onClick={handleRelease}
           disabled={installing}
-          className="btn-secondary inline-flex items-center justify-center gap-2"
+          variant="secondary"
         >
           <ExternalLink size={14} />
           {t('settings.about.viewReleases')}
-        </button>
-        <button
+        </Button>
+        <Button
           type="button"
           onClick={handleInstall}
           disabled={installing}
-          className="btn-primary inline-flex items-center justify-center gap-2"
         >
           <RefreshCcw size={14} />
           {installing ? installText : t('settings.about.prompt.restartNow')}
-        </button>
+        </Button>
       </div>
     </Dialog>
   )

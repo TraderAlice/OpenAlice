@@ -204,7 +204,7 @@ describe('ChatWorkspaceSection actions', () => {
     focusedTabState.tab = { spec: { kind: 'workspace', params: { source: 'chat', wsId: current.id, sessionId: current.sessions[0].id } } }
     const other = { ...chatWorkspace, id: 'other-chat', sessions: [{ ...chatSession(10), title: 'Other office conversation', wsId: 'other-chat' }] }
     renderSection([current, other], null, undefined, 'focused', 'navigation')
-    expect(screen.getAllByRole('button', { name: /^Conversation \d+$/ })).toHaveLength(4)
+    expect(screen.getAllByRole('button', { name: /^Conversation \d+$/ })).toHaveLength(3)
     expect(screen.queryByRole('button', { name: 'Other office conversation' })).toBeNull()
     fireEvent.click(screen.getByRole('button', { name: 'Conversation 1' }))
     expect(actions.resumeSession).toHaveBeenCalledWith(current.id, current.sessions[0].id, 'chat')

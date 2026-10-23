@@ -1,3 +1,4 @@
+import { Select } from '@/components/ui/select'
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
 import { ChevronRight } from 'lucide-react'
@@ -120,16 +121,13 @@ function SnapshotsTab() {
       <div className="max-w-[900px] space-y-4">
         {/* Account selector */}
         <div className="flex items-center gap-3">
-          <label className="text-[13px] text-muted-foreground">Account:</label>
-          <select
+          <label className="text-sm text-muted-foreground">Account:</label>
+          <Select
             value={selectedAccount}
-            onChange={e => setSelectedAccount(e.target.value)}
-            className="h-8 rounded-md border border-border bg-background px-2 py-1.5 text-[13px] leading-[18px] text-foreground"
-          >
-            {accounts.map(a => (
-              <option key={a.id} value={a.id}>{a.label} ({a.id})</option>
-            ))}
-          </select>
+            onValueChange={(selectedValue) => setSelectedAccount(selectedValue)}
+            size="sm" className="w-auto max-w-full" aria-label="Account"
+            options={accounts.map(a => ({ value: a.id, label: [a.label, " (", a.id, ")"].join('') }))}
+          />
           <Button
             type="button"
             variant="outline"
@@ -139,7 +137,7 @@ function SnapshotsTab() {
           >
             Refresh
           </Button>
-          <span className="text-[11px] text-muted-foreground/50">{snapshots.length} snapshots</span>
+          <span className="text-sm text-muted-foreground/50">{snapshots.length} snapshots</span>
         </div>
 
         {/* Snapshots table */}
@@ -149,9 +147,9 @@ function SnapshotsTab() {
           <EmptyState title="No snapshots for this account." />
         ) : (
           <div className="border border-border rounded-lg overflow-hidden">
-            <table className="w-full text-[13px]">
+            <table className="w-full text-sm">
               <thead>
-                <tr className="bg-secondary text-left text-[11px] text-muted-foreground">
+                <tr className="bg-secondary text-left text-sm text-muted-foreground">
                   <th className="px-3 py-2 font-medium">Timestamp</th>
                   <th className="px-3 py-2 font-medium">Trigger</th>
                   <th className="px-3 py-2 font-medium text-center">Health</th>
@@ -194,11 +192,11 @@ function SnapshotRow({ snapshot: s, expanded, onToggle, onDelete }: {
         className="border-t border-border hover:bg-muted/30 transition-colors cursor-pointer"
         onClick={onToggle}
       >
-        <td className="px-3 py-2 font-mono text-[11px] leading-[15px] text-foreground">
+        <td className="px-3 py-2 font-mono text-sm leading-5 text-foreground">
           {new Date(s.timestamp).toLocaleString()}
         </td>
         <td className="px-3 py-2">
-          <span className="text-[10px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground">{s.trigger}</span>
+          <span className="text-sm px-1.5 py-0.5 rounded bg-muted text-muted-foreground">{s.trigger}</span>
         </td>
         <td className="px-3 py-2 text-center">
           <div className={`w-2 h-2 rounded-full ${healthColor} mx-auto`} />
@@ -235,14 +233,14 @@ function SnapshotRow({ snapshot: s, expanded, onToggle, onDelete }: {
           <td colSpan={6} className="px-3 py-3 bg-secondary/50">
             <div className="space-y-2">
               {/* Account metrics */}
-              <div className="flex gap-4 text-[11px]">
+              <div className="flex gap-4 text-sm">
                 <span className="text-muted-foreground">Cash: <span className="text-foreground">${Number(s.account.totalCashValue).toLocaleString(getIntlLocale(), { minimumFractionDigits: 2 })}</span></span>
                 <span className="text-muted-foreground">Unrealized PnL: <span className={Number(s.account.unrealizedPnL) >= 0 ? 'text-success' : 'text-destructive'}>{Number(s.account.unrealizedPnL) >= 0 ? '+' : ''}${Number(s.account.unrealizedPnL).toLocaleString(getIntlLocale(), { minimumFractionDigits: 2 })}</span></span>
                 {s.account.baseCurrency && <span className="text-muted-foreground">Base: <span className="text-foreground">{s.account.baseCurrency}</span></span>}
               </div>
               {/* Positions detail */}
               {s.positions.length > 0 && (
-                <table className="w-full text-[11px]">
+                <table className="w-full text-sm">
                   <thead>
                     <tr className="text-muted-foreground text-left">
                       <th className="pr-3 pb-1 font-medium">Symbol</th>
@@ -276,7 +274,7 @@ function SnapshotRow({ snapshot: s, expanded, onToggle, onDelete }: {
                 </table>
               )}
               {s.positions.length === 0 && (
-                <p className="text-[11px] text-muted-foreground">No positions in this snapshot.</p>
+                <p className="text-sm text-muted-foreground">No positions in this snapshot.</p>
               )}
             </div>
           </td>
@@ -354,7 +352,7 @@ function ToolsTab() {
             onChange={(e) => setFilter(e.target.value)}
             placeholder={t('dev.filterTools')}
             aria-label={t('dev.filterTools')}
-            className="oa-field-control h-8 w-full rounded-md border border-input bg-background px-2.5 py-1.5 text-xs text-foreground outline-none"
+            className="oa-field-control h-8 w-full rounded-md border border-input bg-background px-2.5 py-1.5 text-base text-foreground outline-none"
           />
         </div>
         <div className="flex-1 overflow-y-auto px-1 pb-3">
@@ -513,32 +511,33 @@ function ToolExecutePanel({ detail, result, onResult }: ToolExecutePanelProps) {
           <h3 className="text-xs font-semibold text-muted-foreground">Input</h3>
           {properties.map((prop) => (
             <div key={prop.key}>
-              <label className="flex items-center gap-1.5 text-[13px] leading-[18px] text-foreground mb-1">
+              <label className="flex items-center gap-1.5 text-sm leading-5 text-foreground mb-1">
                 <span className="font-mono">{prop.key}</span>
-                <span className="text-[10px] text-muted-foreground/60">{prop.type}</span>
-                {prop.required && <span className="text-[10px] text-primary/70">required</span>}
+                <span className="text-sm text-muted-foreground/60">{prop.type}</span>
+                {prop.required && <span className="text-sm text-primary/70">required</span>}
               </label>
               {prop.type === 'boolean' ? (
-                <select
+                <Select
                   value={inputs[prop.key] ?? ''}
-                  onChange={(e) => setInputs((prev) => ({ ...prev, [prop.key]: e.target.value }))}
-                  className="oa-field-control h-8 rounded-md border border-input bg-background px-2.5 py-1.5 text-xs text-foreground outline-none"
-                >
-                  <option value="">-</option>
-                  <option value="true">true</option>
-                  <option value="false">false</option>
-                </select>
+                  onValueChange={(selectedValue) => setInputs((prev) => ({ ...prev, [prop.key]: selectedValue }))}
+                  size="sm" aria-label={prop.key}
+                  options={[
+                    { value: '', label: '-' },
+                    { value: 'true', label: 'true' },
+                    { value: 'false', label: 'false' },
+                  ]}
+                />
               ) : (
                 <input
                   type={prop.type === 'number' || prop.type === 'integer' ? 'number' : 'text'}
                   value={inputs[prop.key] ?? ''}
                   onChange={(e) => setInputs((prev) => ({ ...prev, [prop.key]: e.target.value }))}
                   placeholder={prop.description || prop.key}
-                  className="oa-field-control h-8 w-full rounded-md border border-input bg-background px-2.5 py-1.5 font-mono text-xs text-foreground outline-none"
+                  className="oa-field-control h-8 w-full rounded-md border border-input bg-background px-2.5 py-1.5 font-mono text-base text-foreground outline-none"
                 />
               )}
               {prop.description && (
-                <p className="text-[11px] text-muted-foreground/60 mt-0.5">{prop.description}</p>
+                <p className="text-sm text-muted-foreground/60 mt-0.5">{prop.description}</p>
               )}
             </div>
           ))}

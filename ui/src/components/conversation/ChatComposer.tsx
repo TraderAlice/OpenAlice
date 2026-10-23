@@ -20,10 +20,10 @@ export function ChatComposer({ value, onChange, onSubmit, placeholder, disabled,
   context, controls, details, inputRef, autoFocus,
 }: ChatComposerProps) {
   return <ComposerShell context={context} controls={controls} details={details} action={
-    busy ? onStop && <Button size="icon" className="conversation-send" disabled={pending} aria-label={stopLabel} onClick={onStop}>
-      {pending ? <LoaderCircle size={16} className="animate-spin" aria-hidden /> : <Square size={14} fill="currentColor" aria-hidden />}
-    </Button> : <Button size="icon" className="conversation-send" disabled={!canSend || pending} aria-label={sendLabel} aria-busy={pending} onClick={onSubmit}>
-      {pending ? <LoaderCircle size={16} className="animate-spin" aria-hidden /> : <ArrowUp size={18} aria-hidden />}
+    busy ? onStop && <Button size="icon" variant="secondary" disabled={pending} aria-label={stopLabel} onClick={onStop}>
+      {pending ? <LoaderCircle size={16} className="animate-spin motion-reduce:animate-none" aria-hidden /> : <Square size={14} fill="currentColor" aria-hidden />}
+    </Button> : <Button size="icon" disabled={!canSend || pending} aria-label={sendLabel} aria-busy={pending} onClick={onSubmit}>
+      {pending ? <LoaderCircle size={16} className="animate-spin motion-reduce:animate-none" aria-hidden /> : <ArrowUp size={18} aria-hidden />}
     </Button>
   }>
     <Textarea ref={inputRef} value={value} rows={1} aria-label={placeholder} placeholder={placeholder}

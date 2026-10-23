@@ -1,9 +1,10 @@
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from './ui/collapsible'
+import { CountBadge } from './CountBadge'
 import { useEffect, useState } from 'react'
 import type { TFunction } from 'i18next'
 import { useTranslation } from 'react-i18next'
 import {
   Layers,
-  ChevronDown,
   ChevronRight,
   Clock,
   Copy,
@@ -148,7 +149,7 @@ export function CadencePill({ when }: { when: ScheduleWhen }) {
   return (
     <span
       title={cadenceTitle(when, t)}
-      className="inline-flex shrink-0 items-center gap-1 rounded-full bg-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground"
+      className="inline-flex shrink-0 items-center gap-1 rounded-full bg-muted px-2 py-0.5 text-sm font-medium text-muted-foreground"
     >
       <Clock size={10} className="text-muted-foreground/70" />
       {cadenceLabel(when, t)}
@@ -208,7 +209,7 @@ export function AutomationHealthPill({ health }: { health: IssueAutomationHealth
   return (
     <span
       title={health.message}
-      className={`inline-flex shrink-0 items-center gap-1.5 rounded-full px-2 py-0.5 text-[11px] font-medium ${AUTOMATION_HEALTH_CLASS[health.state]}`}
+      className={`inline-flex shrink-0 items-center gap-1.5 rounded-full px-2 py-0.5 text-sm font-medium ${AUTOMATION_HEALTH_CLASS[health.state]}`}
     >
       <span className="h-1.5 w-1.5 rounded-full bg-current" aria-hidden />
       {t(`issues.health.${health.state}`)}
@@ -230,7 +231,7 @@ export function PriorityIndicator({ priority }: { priority: IssuePriority }) {
       <span
         title={t('issues.priority.urgent')}
         aria-label={t('issues.priority.label', { priority: t('issues.priority.urgent') })}
-        className="inline-flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-[3px] bg-warning text-[10px] font-bold leading-none text-warning-foreground"
+        className="inline-flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-[3px] bg-warning text-sm font-bold leading-none text-warning-foreground"
       >
         !
       </span>
@@ -317,7 +318,7 @@ function BoardCadence({ issue }: { issue: IssueListItem }) {
   return (
     <span
       title={cadenceTitle(issue.when, t)}
-      className="inline-flex min-w-0 items-center gap-1.5 text-[11px] text-muted-foreground"
+      className="inline-flex min-w-0 items-center gap-1.5 text-sm text-muted-foreground"
     >
       <Clock size={11} className="shrink-0 text-muted-foreground/70" aria-hidden />
       <span className="truncate tabular-nums">{nextRun || cadenceLabel(issue.when, t)}</span>
@@ -367,7 +368,7 @@ export function PropertyMenu({ field, issue, onPatch, controlId, showLabel = fal
       if (/^[0-5]$/.test(event.key) && values[index]) { event.preventDefault(); void choose(values[index]) }
     }}>
       <div className="mb-1 border-b border-border px-2 py-2 text-xs text-muted-foreground">{t(`issues.detail.${field}`)}</div>
-      {values.map((value, index) => <DropdownMenuItem key={value} disabled={saving} closeOnClick={false} onClick={() => void choose(value)} className={`gap-2.5 text-[13px] ${issue[field] === value ? 'bg-muted' : ''}`} aria-label={optionLabel(value)}>
+      {values.map((value, index) => <DropdownMenuItem key={value} disabled={saving} closeOnClick={false} onClick={() => void choose(value)} className={`gap-2.5 text-sm ${issue[field] === value ? 'bg-muted' : ''}`} aria-label={optionLabel(value)}>
         {icon(value)}<span className="flex-1">{optionLabel(value)}</span>
         {issue[field] === value && <SelectionCheckIcon />}
         <span className="w-3 text-right text-xs text-muted-foreground">{index + (field === 'priority' ? 0 : 1)}</span>
@@ -391,7 +392,7 @@ function IssueRow({ wsId, wsTag, issue, dupOthers, onOpen, onPatch, columns }: B
         title={t('issues.openIssue', { id: issue.id })}
         className="oa-pressable flex h-11 min-w-0 flex-1 items-center gap-3 px-1 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
       >
-        <span className={`min-w-0 flex-1 truncate text-[13px] ${terminal ? 'text-muted-foreground' : 'text-foreground'}`}>
+        <span className={`min-w-0 flex-1 truncate text-sm ${terminal ? 'text-muted-foreground' : 'text-foreground'}`}>
           {issue.title}
         </span>
         {issue.nameCollision && (
@@ -399,7 +400,7 @@ function IssueRow({ wsId, wsTag, issue, dupOthers, onOpen, onPatch, columns }: B
             <Copy size={12} aria-hidden />
           </span>
         )}
-        {columns.includes('workspace') && <span className="hidden max-w-36 shrink-0 items-center gap-1.5 rounded-full border border-border/70 px-2 py-0.5 text-[11px] text-muted-foreground lg:inline-flex" title={t('issues.workspaceTitle', { workspace: wsTag, id: wsId.slice(0, 8) })}>
+        {columns.includes('workspace') && <span className="hidden max-w-36 shrink-0 items-center gap-1.5 rounded-full border border-border/70 px-2 py-0.5 text-sm text-muted-foreground lg:inline-flex" title={t('issues.workspaceTitle', { workspace: wsTag, id: wsId.slice(0, 8) })}>
           <Layers size={11} className="shrink-0" aria-hidden />
           <span className="truncate">{wsTag}</span>
         </span>}
@@ -440,29 +441,25 @@ function StatusGroup({
   const statusLabel = label ?? t(`issues.status.${status}`)
   const listId = `issues-status-${groupKey}`
   return (
-    <section
+    <Collapsible open={!collapsed || hideHeading} onOpenChange={onToggle}
+      render={<section />}
       data-testid={`issue-status-group-${groupKey}`}
       className="min-w-0"
     >
-      {!hideHeading && <button
+      {!hideHeading && <CollapsibleTrigger
         type="button"
-        onClick={onToggle}
         aria-expanded={!collapsed}
         aria-controls={listId}
         aria-label={t(collapsed ? 'issues.expandStatus' : 'issues.collapseStatus', { status: statusLabel })}
         className="flex h-9 w-full items-center gap-2 rounded-lg bg-muted/45 px-3 text-left transition-colors hover:bg-muted/60 sm:px-4"
       >
-        {collapsed ? (
-          <ChevronRight size={14} className="shrink-0 text-muted-foreground/70" />
-        ) : (
-          <ChevronDown size={14} className="shrink-0 text-muted-foreground/70" />
-        )}
+        <ChevronRight size={14} aria-hidden className={`shrink-0 text-muted-foreground transition-transform duration-[var(--motion-fast)] motion-reduce:transition-none ${collapsed ? '' : 'rotate-90'}`} />
         {!label && <meta.Icon size={14} className={`shrink-0 ${meta.className}`} />}
-        <span className="text-[13px] font-medium text-foreground">{statusLabel}</span>
-        <span className="text-xs text-muted-foreground">{rows.length}</span>
-      </button>}
-      {(!collapsed || hideHeading) && (
-        <ul id={listId} className="py-1">
+        <span className="text-sm font-medium text-foreground">{statusLabel}</span>
+        <CountBadge count={rows.length} label={`${statusLabel}: ${rows.length}`} />
+      </CollapsibleTrigger>}
+      <CollapsibleContent id={listId} aria-hidden={collapsed && !hideHeading} inert={collapsed && !hideHeading}>
+        <ul className="py-1">
           {rows.map((row) => (
             <IssueRow
               key={`${row.wsId}:${row.issue.id}`}
@@ -473,8 +470,8 @@ function StatusGroup({
             />
           ))}
         </ul>
-      )}
-    </section>
+      </CollapsibleContent>
+    </Collapsible>
   )
 }
 
@@ -603,7 +600,7 @@ export function IssuesBoard() {
           <p className="mt-3 text-sm text-muted-foreground">{t('issues.emptyTitle')}</p>
           <p className="mt-1 text-xs text-muted-foreground/80">
             {t('issues.emptyPrefix')}{' '}
-            <code className="rounded bg-muted px-1 py-0.5 font-mono text-[11px] text-foreground/80">
+            <code className="rounded bg-muted px-1 py-0.5 font-mono text-sm text-foreground/80">
               .alice/issues/&lt;id&gt;.md
             </code>
             {t('issues.emptySuffixBeforeWhen')}<span className="text-foreground">when</span>{t('issues.emptySuffixAfterWhen')}

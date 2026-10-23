@@ -137,7 +137,7 @@ describe('InboxSidebar Workspace labels', () => {
     expect(screen.getByText('Update without a summary')).toBeTruthy()
   })
 
-  it('gives a long report a concise accessible name and an optional excerpt', () => {
+  it('gives a long report a concise accessible name and subject', () => {
     const omittedTail = 'TAIL_MARKER_THAT_MUST_NOT_BE_THE_ROW_NAME'
     mocks.mode = 'time'
     mocks.entries = [{
@@ -158,7 +158,7 @@ describe('InboxSidebar Workspace labels', () => {
     expect(accessibleName).toContain('Unread')
     expect(accessibleName).not.toContain(omittedTail)
     expect(accessibleName.length).toBeLessThan(160)
-    expect(screen.getByText(/VST led on datacenter-power flow/)).toBeTruthy()
+    expect(screen.queryByText(/VST led on datacenter-power flow/)).toBeNull()
     expect(screen.queryByText(omittedTail)).toBeNull()
   })
 

@@ -23,7 +23,7 @@ export function BarFreshness({ meta }: { meta: BarMeta }) {
     freshness?.timestampKind === 'date' ? 'Daily record: intraday delay cannot be inferred.' : null,
   ].filter(Boolean).join(' ')
   return <Tooltip>
-    <TooltipTrigger render={<span tabIndex={0} className="block w-fit max-w-full text-[11px] leading-5 text-muted-foreground tabular-nums outline-none focus-visible:ring-2 focus-visible:ring-ring" />}>
+    <TooltipTrigger render={<span tabIndex={0} className="block w-fit max-w-full text-sm leading-5 text-muted-foreground tabular-nums outline-none focus-visible:ring-2 focus-visible:ring-ring" />}>
       {freshness?.historical ? 'Historical · ' : ''}Latest record: {instant ? new Date(latest).toISOString().replace('T', ' ').replace('.000Z', ' UTC') : latest}
       {age && ` · ${age}`}
     </TooltipTrigger>

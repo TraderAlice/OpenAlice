@@ -20,7 +20,7 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from '@/components/ui/tooltip'
-import { SelectionIndicator } from './SelectionIndicator'
+import { CountBadge } from './CountBadge'
 import { Button } from '@/components/ui/button'
 import { ChatWorkspaceSection } from './workspace/ChatWorkspaceSection'
 import { useUpdateLifecycle } from '../hooks/useUpdateLifecycle'
@@ -133,8 +133,8 @@ export function ActivityBar({
     .filter(mode => mode === 'chat' || !layout.hidden.includes(mode))
   const railContent = (
     <>
-        <div className={`oa-activity-brand ${denseRail ? 'h-10 md:h-8' : 'h-10'} flex shrink-0 items-center ${compactRail ? 'justify-center px-0' : narrowRail ? 'gap-1.5 px-2.5' : 'gap-2.5 px-3.5'}`}>
-              <h1 className={`min-w-0 flex-1 truncate text-[13px] font-semibold leading-[18px] tracking-[-0.01em] text-foreground ${compactRail ? 'md:hidden' : ''}`}>OpenAlice</h1>
+        <div className={`oa-activity-brand h-11 flex shrink-0 items-center ${compactRail ? 'justify-center px-0' : narrowRail ? 'gap-1.5 px-2.5' : 'gap-2.5 px-3.5'}`}>
+              <h1 className={`min-w-0 flex-1 truncate text-lg font-semibold leading-6 tracking-[-0.015em] text-foreground ${compactRail ? 'md:hidden' : ''}`}>OpenAlice</h1>
               {!desktopStatic ? (
                 <Button
                   type="button"
@@ -169,11 +169,11 @@ export function ActivityBar({
                 key={section.id}
                 className={
                   compactRail && si > 0
-                    ? `${denseRail ? 'mt-3 pt-3 md:mt-0.5 md:pt-0.5 md:w-8' : 'mt-3 pt-3 md:w-8'} border-t border-sidebar-border/70`
+                    ? 'mt-3 pt-3 md:w-11 border-t border-sidebar-border/70'
                     : si > 0
                       ? denseRail ? 'mt-2' : 'mt-3'
                       : compactRail
-                        ? 'md:w-8'
+                        ? 'md:w-11'
                         : ''
                 }
               >
@@ -191,23 +191,23 @@ export function ActivityBar({
                   />
                 )}
                 {showItems && (
-                  <div className={`flex flex-col ${denseRail ? 'gap-1 md:gap-px' : 'gap-px'}`} id={`activity-section-${section.id}`}>
+                  <div className="flex flex-col gap-(--oa-row-gap)" id={`activity-section-${section.id}`}>
                     {section.items.map((item) => {
                       const sec = activitySectionFor(item.page)
                       const isActive = item.page === 'chat' ? focusedKind === 'quick-start' : selectedSidebar === sec
                       const Icon = item.icon
-                      let badge: { count: number; label: string; tone: string } | null = null
+                      let badge: { count: number; label: string; tone: 'neutral' | 'info' } | null = null
                       if (item.page === 'inbox' && unreadInbox > 0) {
                         badge = {
                           count: unreadInbox,
                           label: t('nav.unread', { count: unreadInbox }),
-                          tone: 'oa-inbox-unread-count',
+                          tone: 'info',
                         }
                       } else if (item.page === 'portfolio' && pendingPush > 0) {
                         badge = {
                           count: pendingPush,
                           label: t('nav.pendingPush', { count: pendingPush }),
-                          tone: 'bg-info text-info-foreground',
+                          tone: 'info',
                         }
                       }
                       const handleClick = () => {
@@ -222,35 +222,31 @@ export function ActivityBar({
                           type="button"
                           onClick={handleClick}
                           aria-label={label}
+                          aria-describedby={badge ? `activity-count-${item.page}` : undefined}
                           aria-current={isActive ? 'page' : undefined}
-                          className={`oa-nav-item relative flex items-center rounded-md text-left ${
+                          className={`oa-nav-item relative flex items-center rounded-md text-left font-normal aria-[current=page]:font-medium ${
                             compactRail
-                              ? denseRail
-                                ? 'md:h-[26px] md:w-8 md:min-h-[26px] md:justify-center md:gap-0 md:px-0 md:py-0'
-                                : 'md:h-8 md:w-8 md:min-h-8 md:justify-center md:gap-0 md:px-0 md:py-0'
-                              : denseRail
-                                ? `min-h-[28px] ${narrowRail ? 'gap-2 px-2' : 'gap-2.5 px-2.5'} py-1 text-[12px]`
-                                : 'min-h-10 gap-2.5 px-2.5 py-1 text-[13px] leading-[18px] md:min-h-8'
+                              ? 'size-11 justify-center gap-0 p-0'
+                              : 'oa-primary-nav-row'
                           } ${
                             isActive
                               ? 'bg-sidebar-accent text-sidebar-accent-foreground'
-                              : 'text-sidebar-foreground/75 hover:bg-sidebar-accent/60 hover:text-sidebar-foreground'
+                              : 'text-sidebar-foreground hover:bg-sidebar-accent/60 hover:text-sidebar-foreground'
                           }`}
                         >
-                          {isActive && <SelectionIndicator />}
-                          <span className={`oa-nav-icon relative flex h-[18px] w-[18px] shrink-0 items-center justify-center ${denseRail ? 'md:h-3.5 md:w-3.5' : ''}`}>
-                            <Icon size={denseRail ? 14 : 15} strokeWidth={1.75} />
+                          <span className="oa-nav-icon oa-navigation-icon relative">
+                            <Icon size={16} strokeWidth={1.75} />
                           </span>
                           <span className={`flex-1 truncate ${compactRail ? 'md:hidden' : ''}`}>{label}</span>
                           {badge !== null && (
-                            <span
-                              aria-label={badge.label}
-                              className={`flex h-[18px] min-w-[18px] shrink-0 items-center justify-center rounded-full px-1.5 text-[10px] leading-[14px] font-semibold tabular-nums ${badge.tone} ${
-                                compactRail ? 'md:absolute md:-right-1 md:-top-1 md:h-4 md:min-w-4 md:px-1 md:text-[9px]' : ''
-                              }`}
-                            >
-                              {badge.count > 99 ? '99+' : badge.count}
-                            </span>
+                            <CountBadge
+                              id={`activity-count-${item.page}`}
+                              count={badge.count}
+                              label={badge.label}
+                              limit={99}
+                              tone={badge.tone}
+                              className={compactRail ? 'md:absolute md:-right-1 md:-top-0.5 md:h-5 md:min-w-5 md:px-1 ring-2 ring-sidebar' : undefined}
+                            />
                           )}
                         </button>
                       )
@@ -267,7 +263,7 @@ export function ActivityBar({
               </div>
             )
           })}
-          <div className={compactRail ? 'mt-4 flex flex-col gap-1 border-t border-sidebar-border/70 pt-3' : 'mt-5 space-y-1'}>
+          <div className={compactRail ? 'mt-3 flex w-11 flex-col gap-(--oa-row-gap) border-t border-sidebar-border/70 pt-3' : 'mt-(--oa-row-gap) space-y-(--oa-row-gap)'}>
             {harnesses.map(mode => (
               <ChatWorkspaceSection key={mode} mode={mode} placement="navigation" compact={compactRail} onNavigate={onClose} />
             ))}
@@ -275,7 +271,7 @@ export function ActivityBar({
         </nav>
 
         {/* Application controls pinned to the bottom of the rail. */}
-        <div className={`shrink-0 border-t border-border/55 ${compactRail ? `flex justify-center ${denseRail ? 'py-0.5' : 'py-2'}` : 'p-1.5'}`}>
+        <div className={`shrink-0 border-t border-border/55 ${compactRail ? 'flex justify-center py-2' : 'p-1.5'}`}>
           <ActivityBarUtilityMenu
             compactRail={compactRail}
             denseRail={denseRail}
@@ -298,7 +294,7 @@ export function ActivityBar({
   )
 
   const railClassName = `
-    w-[280px] ${compactRail ? 'md:w-[50px]' : narrowRail ? 'md:w-[232px]' : 'md:w-[260px]'} h-full flex flex-col shrink-0
+    w-[280px] ${compactRail ? 'md:w-[64px]' : narrowRail ? 'md:w-[220px]' : 'md:w-[240px]'} h-full flex flex-col shrink-0
     bg-sidebar border-r border-sidebar-border/70
   `
 
@@ -367,7 +363,7 @@ function SectionHeader({
     <button
       type="button"
       onClick={onToggleCollapse}
-      className="mb-0.5 flex min-h-10 w-full items-center gap-1.5 px-2.5 py-1 text-left text-[12px] font-medium leading-4 text-muted-foreground/75 transition-colors hover:text-foreground md:min-h-6"
+      className="mb-0.5 flex min-h-10 w-full items-center gap-1.5 px-2.5 py-1 text-left text-sm font-medium leading-5 text-muted-foreground/75 transition-colors hover:text-foreground md:min-h-6"
       aria-expanded={!isCollapsed}
       aria-controls={controlsId}
       aria-label={label}

@@ -109,13 +109,13 @@ export function FileViewerPage({ spec }: Props) {
         <FileText size={13} strokeWidth={1.75} className="mt-1 shrink-0 text-muted-foreground/70 sm:mt-0" aria-hidden />
         <div className="min-w-0 flex-1 sm:contents">
           <span
-            className="block break-all font-mono text-[12px] leading-4 text-foreground sm:min-w-0 sm:flex-1 sm:truncate sm:leading-normal"
+            className="block break-all font-mono text-sm leading-5 text-foreground sm:min-w-0 sm:flex-1 sm:truncate sm:leading-normal"
             title={path}
           >
             {path}
           </span>
           <span
-            className="mt-1 block break-all text-[11px] text-muted-foreground/70 sm:ml-auto sm:mt-0 sm:max-w-[min(35vw,20rem)] sm:truncate sm:text-right"
+            className="mt-1 block break-all text-sm text-muted-foreground/70 sm:ml-auto sm:mt-0 sm:max-w-[min(35vw,20rem)] sm:truncate sm:text-right"
             title={workspaceTitle}
           >
             {workspaceName}

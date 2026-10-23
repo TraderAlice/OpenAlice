@@ -1,3 +1,4 @@
+import { Select } from '@/components/ui/select'
 import { useCallback, useEffect, useMemo, useState, type ReactElement } from 'react'
 import {
   AlertTriangle,
@@ -13,7 +14,6 @@ import {
   Users,
 } from 'lucide-react'
 
-import { inputClass } from '../form'
 import { Button } from '../ui/button'
 import { SelectionCheckIcon } from '../ui/selection-check-icon'
 import {
@@ -125,12 +125,12 @@ export function WorkspaceAbsorbPanel({
               <Check size={24} />
             </div>
             <h3 className="mt-4 text-[16px] font-semibold text-foreground">Workspace absorbed</h3>
-            <p className="mt-2 text-[12px] leading-relaxed text-muted-foreground">
+            <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
               The source desk is archived intact. {result.changedPaths.length} reviewed file{result.changedPaths.length === 1 ? '' : 's'} landed in this Workspace.
             </p>
             <div className="mt-4 rounded-lg border border-border bg-secondary/35 px-3 py-2 text-left">
-              <div className="text-[11px] font-medium text-muted-foreground">Audit commit</div>
-              <code className="mt-1 block font-mono text-[12px] leading-[18px] text-foreground">{result.commit}</code>
+              <div className="text-sm font-medium text-muted-foreground">Audit commit</div>
+              <code className="mt-1 block font-mono text-sm leading-5 text-foreground">{result.commit}</code>
             </div>
           </div>
         </div>
@@ -146,49 +146,46 @@ export function WorkspaceAbsorbPanel({
       <div className="flex-1 space-y-4 overflow-y-auto p-4 sm:p-5">
         <section className="overflow-hidden rounded-lg border border-border bg-secondary/25">
           <div className="p-4">
-            <div className="flex items-center gap-2 text-[12px] leading-[18px] font-semibold text-muted-foreground">
+            <div className="flex items-center gap-2 text-sm leading-5 font-semibold text-muted-foreground">
               <FileInput size={14} />
               Absorb another Workspace
             </div>
-            <p className="mt-1 text-[12px] leading-relaxed text-muted-foreground">
+            <p className="mt-1 text-sm leading-relaxed text-muted-foreground">
               Bring reviewed working files into this desk, then archive the source intact. Sessions, credentials, schedules, and authorship never move.
             </p>
             <div className="mt-4 grid items-stretch gap-2 sm:grid-cols-[1fr_auto_1fr] sm:items-center">
               <DirectionCard label="Keep this Workspace" workspace={target} tone="target" />
               <ArrowRight size={16} className="mx-auto rotate-90 text-muted-foreground sm:rotate-0" />
               <label className="flex min-w-0 flex-col justify-center rounded-lg border border-dashed border-border bg-background px-3 py-2.5">
-                <span className="text-[11px] font-medium text-muted-foreground">Archive after absorb</span>
-                <select
+                <span className="text-sm font-medium text-muted-foreground">Archive after absorb</span>
+                <Select
                   value={sourceId}
-                  onChange={(event) => {
-                    setSourceId(event.target.value)
+                  onValueChange={(selectedValue) => {
+                    setSourceId(selectedValue)
                     setPlan(null)
                     setResult(null)
                     setError(null)
                   }}
-                  className={`${inputClass} mt-1 font-semibold`}
+                  className="mt-1"
                   aria-label="Workspace to absorb"
-                >
-                  <option value="">Choose a Workspace…</option>
-                  {candidates.map((workspace) => (
-                    <option key={workspace.id} value={workspace.id}>
-                      {workspace.displayName?.trim() || workspace.tag}
-                    </option>
-                  ))}
-                </select>
+                  options={[
+                    { value: '', label: 'Choose a Workspace…' },
+                    ...candidates.map((workspace) => ({ value: workspace.id, label: workspace.displayName?.trim() || workspace.tag })),
+                  ]}
+                />
               </label>
             </div>
           </div>
         </section>
 
         {!sourceId && candidates.length === 0 && (
-          <div className="rounded-lg border border-border bg-secondary/25 px-3 py-3 text-[12px] leading-[18px] text-muted-foreground">
+          <div className="rounded-lg border border-border bg-secondary/25 px-3 py-3 text-sm leading-5 text-muted-foreground">
             There is no other active Workspace to absorb.
           </div>
         )}
 
         {loading && !plan && (
-          <div className="flex min-h-40 items-center justify-center gap-2 text-[12px] leading-[18px] text-muted-foreground">
+          <div className="flex min-h-40 items-center justify-center gap-2 text-sm leading-5 text-muted-foreground">
             <LoaderCircle size={15} className="animate-spin" />
             Reviewing both Workspaces…
           </div>
@@ -199,8 +196,8 @@ export function WorkspaceAbsorbPanel({
             <section className="overflow-hidden rounded-lg border border-border bg-secondary/25">
               <div className="flex items-center justify-between gap-3 p-3.5">
                 <div>
-                  <div className="text-[12px] font-semibold text-foreground">What comes over</div>
-                  <p className="mt-0.5 text-[11px] text-muted-foreground">Git-tracked and non-ignored working files only.</p>
+                  <div className="text-sm font-semibold text-foreground">What comes over</div>
+                  <p className="mt-0.5 text-sm text-muted-foreground">Git-tracked and non-ignored working files only.</p>
                 </div>
                 <Button
                   type="button"
@@ -224,7 +221,7 @@ export function WorkspaceAbsorbPanel({
             <RetirementImpact plan={plan} />
 
             {plan.summary.ready === 0 && plan.summary.conflicts === 0 && (
-              <div className="rounded-lg border border-border bg-secondary/25 px-3 py-2.5 text-[11px] leading-relaxed text-muted-foreground">
+              <div className="rounded-lg border border-border bg-secondary/25 px-3 py-2.5 text-sm leading-relaxed text-muted-foreground">
                 No source working files need copying. Continuing will only archive the source desk and preserve its history.
               </div>
             )}
@@ -251,12 +248,12 @@ export function WorkspaceAbsorbPanel({
             {conflicts.length > 0 && (
               <section className="overflow-hidden rounded-lg border border-warning/35 bg-secondary/20">
                 <div className="border-b border-border px-4 py-3">
-                  <div className="flex items-center gap-2 text-[13px] leading-[18px] font-semibold text-foreground">
+                  <div className="flex items-center gap-2 text-sm leading-5 font-semibold text-foreground">
                     <AlertTriangle size={15} className="text-warning" />
                     Paths that need a decision
-                    <span className="rounded-full bg-warning/12 px-2 py-0.5 text-[10px] leading-[14px] text-warning">{conflicts.length}</span>
+                    <span className="rounded-full bg-warning/12 px-2 py-0.5 text-sm leading-5 text-warning">{conflicts.length}</span>
                   </div>
-                  <p className="mt-1 text-[11px] leading-relaxed text-muted-foreground">
+                  <p className="mt-1 text-sm leading-relaxed text-muted-foreground">
                     Keep both is selected by default and places the source copy below <code className="font-mono">{plan.importRoot}</code>.
                   </p>
                 </div>
@@ -276,14 +273,14 @@ export function WorkspaceAbsorbPanel({
         )}
 
         {error && (
-          <div className="rounded-lg border border-destructive/35 bg-destructive/8 px-3 py-2.5 text-[12px] leading-[18px] text-destructive" role="alert">
+          <div className="rounded-lg border border-destructive/35 bg-destructive/8 px-3 py-2.5 text-sm leading-5 text-destructive" role="alert">
             {error}
           </div>
         )}
       </div>
 
       <div className="flex flex-col gap-2 border-t border-border bg-secondary/30 p-3 sm:flex-row sm:items-center sm:justify-between">
-        <div className="min-h-5 text-[11px] text-muted-foreground">
+        <div className="min-h-5 text-sm text-muted-foreground">
           {plan && !plan.blocked && unresolved === 0 && (
             <>The source will leave the active Workspace list but remain restorable.</>
           )}
@@ -313,9 +310,9 @@ function DirectionCard({ label, workspace, tone }: {
 }): ReactElement {
   return (
     <div className={`min-w-0 rounded-lg border px-3 py-2.5 ${tone === 'target' ? 'border-primary/35 bg-primary/6' : 'border-border bg-background'}`}>
-      <div className="text-[11px] font-medium text-muted-foreground">{label}</div>
-      <div className="mt-1 truncate text-[13px] font-semibold text-foreground">{workspace.displayName?.trim() || workspace.tag}</div>
-      <code className="mt-0.5 block truncate font-mono text-[10px] leading-[14px] text-muted-foreground">{workspace.tag}</code>
+      <div className="text-sm font-medium text-muted-foreground">{label}</div>
+      <div className="mt-1 truncate text-sm font-semibold text-foreground">{workspace.displayName?.trim() || workspace.tag}</div>
+      <code className="mt-0.5 block truncate font-mono text-sm leading-5 text-muted-foreground">{workspace.tag}</code>
     </div>
   )
 }
@@ -329,7 +326,7 @@ function Metric({ value, label, tone }: {
   return (
     <div className="border-r border-border px-2 py-2.5 text-center last:border-r-0">
       <div className={`text-[16px] font-semibold tabular-nums ${color}`}>{value}</div>
-      <div className="mt-0.5 truncate text-[10px] text-muted-foreground">{label}</div>
+      <div className="mt-0.5 truncate text-sm text-muted-foreground">{label}</div>
     </div>
   )
 }
@@ -347,8 +344,8 @@ function RetirementImpact({ plan }: { plan: WorkspaceAbsorbPlan }): ReactElement
       <div className="flex items-start gap-3">
         <Users size={16} className="mt-0.5 shrink-0 text-muted-foreground" />
         <div className="min-w-0">
-          <div className="text-[12px] font-semibold text-foreground">What retires with {plan.source.tag}</div>
-          <p className="mt-1 text-[11px] leading-relaxed text-muted-foreground">
+          <div className="text-sm font-semibold text-foreground">What retires with {plan.source.tag}</div>
+          <p className="mt-1 text-sm leading-relaxed text-muted-foreground">
             {facts.join(', ')}. They remain in the archived desk for audit and restore; they do not become target identities.
           </p>
         </div>
@@ -365,7 +362,7 @@ function ActivityBlockers({ plan }: { plan: WorkspaceAbsorbPlan }): ReactElement
     ...plan.activity.target.headless.map((item) => `${plan.target.tag}: ${item.taskId ?? 'synchronous run'} (${item.agent})`),
   ]
   return (
-    <div className="rounded-lg border border-warning/35 bg-warning/8 px-3 py-3 text-[12px] leading-[18px] text-foreground">
+    <div className="rounded-lg border border-warning/35 bg-warning/8 px-3 py-3 text-sm leading-5 text-foreground">
       <div className="flex items-center gap-2 font-semibold text-warning">
         <AlertTriangle size={15} />
         Finish the real work listed below before absorbing
@@ -390,9 +387,9 @@ function FileGroup({ title, files, icon, defaultOpen = false }: {
       <Button type="button" variant="ghost" onClick={() => setOpen((value) => !value)} className="h-auto w-full justify-start gap-3 whitespace-normal rounded-lg px-4 py-3 text-left" aria-expanded={open}>
         {open ? <ChevronDown size={15} className="mt-0.5 text-muted-foreground" /> : <ChevronRight size={15} className="mt-0.5 text-muted-foreground" />}
         <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-2 text-[13px] leading-[18px] font-semibold text-foreground">
+          <div className="flex items-center gap-2 text-sm leading-5 font-semibold text-foreground">
             {title}
-            <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] leading-[14px] text-muted-foreground">{files.length}</span>
+            <span className="rounded-full bg-muted px-2 py-0.5 text-sm leading-5 text-muted-foreground">{files.length}</span>
           </div>
         </div>
       </Button>
@@ -401,8 +398,8 @@ function FileGroup({ title, files, icon, defaultOpen = false }: {
           {files.map((file) => (
             <div key={file.path} className="flex items-center gap-2 border-b border-border/60 py-2 last:border-b-0">
               {icon === 'ready' ? <Check size={13} className="text-primary" /> : <ShieldCheck size={13} className="text-muted-foreground" />}
-              <code className="min-w-0 flex-1 truncate font-mono text-[11px] leading-[15px] text-foreground" title={file.path}>{file.path}</code>
-              <span className="text-[10px] text-muted-foreground">{formatBytes(file.sourceSize)}</span>
+              <code className="min-w-0 flex-1 truncate font-mono text-sm leading-5 text-foreground" title={file.path}>{file.path}</code>
+              <span className="text-sm text-muted-foreground">{formatBytes(file.sourceSize)}</span>
             </div>
           ))}
         </div>
@@ -421,8 +418,8 @@ function ConflictFile({ file, value, onChange }: {
     <div className="px-4 py-3">
       <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
         <div className="min-w-0">
-          <code className="block truncate font-mono text-[11px] font-semibold text-foreground" title={file.path}>{file.path}</code>
-          <p className="mt-1 text-[10px] text-muted-foreground">Source {formatBytes(file.sourceSize)}, target {file.targetSize === null ? 'non-file path' : formatBytes(file.targetSize)}</p>
+          <code className="block truncate font-mono text-sm font-semibold text-foreground" title={file.path}>{file.path}</code>
+          <p className="mt-1 text-sm text-muted-foreground">Source {formatBytes(file.sourceSize)}, target {file.targetSize === null ? 'non-file path' : formatBytes(file.targetSize)}</p>
         </div>
         <div className="flex shrink-0 flex-wrap rounded-lg border border-border bg-background p-0.5" role="radiogroup" aria-label={file.path}>
           <Choice active={value === 'target'} onClick={() => onChange('target')}>Keep target</Choice>
@@ -430,7 +427,7 @@ function ConflictFile({ file, value, onChange }: {
           <Choice active={value === 'both'} onClick={() => onChange('both')}>Keep both</Choice>
         </div>
       </div>
-      <Button type="button" variant="ghost" size="sm" onClick={() => setPreviewOpen((open) => !open)} className="mt-2 px-1 text-[11px] text-muted-foreground" aria-expanded={previewOpen}>
+      <Button type="button" variant="ghost" size="sm" onClick={() => setPreviewOpen((open) => !open)} className="mt-2 px-1 text-sm text-muted-foreground" aria-expanded={previewOpen}>
         {previewOpen ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
         Compare
       </Button>
@@ -461,11 +458,11 @@ function Choice({ active, disabled = false, onClick, children }: {
 function Preview({ title, value, truncated }: { title: string; value: string | null; truncated: boolean }): ReactElement {
   return (
     <div className="min-w-0 overflow-hidden rounded-lg border border-border bg-background">
-      <div className="flex items-center justify-between border-b border-border px-2.5 py-1.5 text-[10px] leading-[14px] font-semibold text-muted-foreground">
+      <div className="flex items-center justify-between border-b border-border px-2.5 py-1.5 text-sm leading-5 font-semibold text-muted-foreground">
         <span>{title}</span>
         {truncated && <span>Preview truncated</span>}
       </div>
-      <pre className="max-h-52 overflow-auto whitespace-pre-wrap break-words px-2.5 py-2 font-mono text-[10px] leading-relaxed text-foreground">
+      <pre className="max-h-52 overflow-auto whitespace-pre-wrap break-words px-2.5 py-2 font-mono text-sm leading-relaxed text-foreground">
         {value ?? 'Binary file or non-file path'}
       </pre>
     </div>

@@ -1,6 +1,7 @@
+import { Select } from '@/components/ui/select'
 import { useState, useEffect, useId, useMemo } from 'react'
 import { AlertTriangle } from 'lucide-react'
-import { SettingsScrollArea, inputClass } from '../components/form'
+import { SettingsScrollArea } from '../components/form'
 import { EmptyState as SharedEmptyState, RecoverySurface, Skeleton } from '../components/StateViews'
 import { Toggle } from '../components/Toggle'
 import { useTradingConfig } from '../hooks/useTradingConfig'
@@ -113,10 +114,10 @@ export function ExternalOrderMonitoringRow() {
   return (
     <div className="flex min-h-12 flex-col items-stretch gap-3 rounded-lg border border-border px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
       <div className="min-w-0">
-        <label htmlFor={selectId} className="text-[12px] font-medium text-foreground">
+        <label htmlFor={selectId} className="text-sm font-medium text-foreground">
           External order monitoring
         </label>
-        <div id={descriptionId} className="text-[11px] text-muted-foreground">
+        <div id={descriptionId} className="text-sm text-muted-foreground">
           How often to scan for orders placed outside Alice (exchange app, direct API).
           Known pending orders are tracked every 10s regardless.
         </div>
@@ -126,21 +127,18 @@ export function ExternalOrderMonitoringRow() {
           id={statusId}
           role="status"
           aria-atomic="true"
-          className="text-[11px] text-muted-foreground"
+          className="text-sm text-muted-foreground"
         >
           {msg}
         </span>
-        <select
+        <Select
           id={selectId}
           aria-describedby={`${descriptionId} ${statusId}`}
           value={value}
-          onChange={(e) => { void save(e.target.value) }}
-          className={`${inputClass} w-full sm:w-auto`}
-        >
-          {OBSERVE_CADENCE_OPTIONS.map((v) => (
-            <option key={v} value={v}>{v === 'off' ? 'Off' : `Every ${v}`}</option>
-          ))}
-        </select>
+          onValueChange={(selectedValue) => { void save(selectedValue) }}
+          className="w-full sm:w-auto"
+          options={OBSERVE_CADENCE_OPTIONS.map((v) => ({ value: v, label: v === 'off' ? 'Off' : `Every ${v}` }))}
+        />
       </div>
     </div>
   )
@@ -205,13 +203,13 @@ export function KeylessDataSourcesRow({ ccxtPack, onInstall }: {
     <div className="px-4 py-3 border border-border rounded-lg">
       <div className="flex flex-col items-start gap-3 sm:flex-row sm:justify-between">
         <div className="min-w-0">
-          <div className="text-[12px] font-medium text-foreground">Public crypto data sources</div>
-          <div className="text-[11px] text-muted-foreground leading-relaxed mt-0.5">
+          <div className="text-sm font-medium text-foreground">Public crypto data sources</div>
+          <div className="text-sm text-muted-foreground leading-relaxed mt-0.5">
             Optional keyless K-line feeds. Disabled by default; enabled sources appear as read-only broker-style bar IDs.
           </div>
         </div>
         <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto sm:justify-end">
-          {msg && <span className="text-[11px] text-muted-foreground">{msg}</span>}
+          {msg && <span className="text-sm text-muted-foreground">{msg}</span>}
           {ccxtPack && !ccxtPack.installed && (
             <Button type="button" variant="outline" disabled={installing} onClick={() => { void install() }}>
               {installing ? 'Installing…' : ccxtPack.source === 'broken' ? 'Repair data support' : 'Install data support'}
@@ -224,7 +222,7 @@ export function KeylessDataSourcesRow({ ccxtPack, onInstall }: {
           const checked = runtimeConfig.keylessDataSources.includes(source.id)
           return (
             <div key={source.id} className="flex min-h-12 items-center justify-between gap-2 rounded-md border border-border bg-secondary/40 px-3 py-2">
-              <span className="text-[12px] text-foreground">{source.label}</span>
+              <span className="text-sm text-foreground">{source.label}</span>
               <Toggle
                 size="sm"
                 checked={checked}
@@ -285,22 +283,22 @@ export function MissingBrokerPacksNotice({ packs, onInstall }: {
       <div className="flex items-start gap-2.5">
         <AlertTriangle size={15} className="mt-0.5 shrink-0 text-warning" />
         <div className="min-w-0 flex-1">
-          <div className="text-[12px] font-medium text-foreground">Broker support needs attention</div>
-          <p className="mt-0.5 text-[11px] leading-relaxed text-muted-foreground">
+          <div className="text-sm font-medium text-foreground">Broker support needs attention</div>
+          <p className="mt-0.5 text-sm leading-relaxed text-muted-foreground">
             Update or repair only the integrations already used by these accounts or K-line sources.
           </p>
           <div className="mt-3 divide-y divide-border/60 border-y border-border/60">
             {actionable.map((pack) => (
               <div key={pack.engine} className="flex items-center justify-between gap-3 py-2.5">
                 <div className="min-w-0">
-                  <div className="text-[12px] font-medium text-foreground">{pack.engine}</div>
-                  <div className="truncate text-[11px] text-muted-foreground">Required by {pack.requiredBy.join(', ')}</div>
+                  <div className="text-sm font-medium text-foreground">{pack.engine}</div>
+                  <div className="truncate text-sm text-muted-foreground">Required by {pack.requiredBy.join(', ')}</div>
                   {pack.updateAvailable && pack.version && (
-                    <div className="mt-0.5 text-[11px] text-warning">
+                    <div className="mt-0.5 text-sm text-warning">
                       Installed support is from OpenAlice {pack.version}
                     </div>
                   )}
-                  {pack.reason && <div className="mt-0.5 text-[11px] text-warning">{pack.reason}</div>}
+                  {pack.reason && <div className="mt-0.5 text-sm text-warning">{pack.reason}</div>}
                 </div>
                 <Button
                   type="button"
@@ -320,7 +318,7 @@ export function MissingBrokerPacksNotice({ packs, onInstall }: {
               </div>
             ))}
           </div>
-          {error && <p className="mt-2 text-[11px] text-destructive">{error}</p>}
+          {error && <p className="mt-2 text-sm text-destructive">{error}</p>}
         </div>
       </div>
     </div>
@@ -412,7 +410,7 @@ export function TradingPage() {
 
   if (tc.loading) return (
     <PageShell>
-      <div className="max-w-[820px] mx-auto space-y-2.5" aria-hidden="true">
+      <div className="max-w-[820px] space-y-2.5" aria-hidden="true">
         {Array.from({ length: 3 }).map((_, i) => (
           <div key={i} className="flex items-center gap-3 px-4 py-3.5 rounded-lg border border-border bg-secondary">
             <Skeleton className="h-9 w-9 rounded-lg" />
@@ -443,13 +441,13 @@ export function TradingPage() {
     <div className="flex flex-col flex-1 min-h-0">
       <PageHeader
         title="Broker"
-        live={lastUpdated && equity?.accounts.some((row) => brokerReadiness.data?.accounts.some(
+        live={{ lastUpdated: equity?.accounts.some((row) => brokerReadiness.data?.accounts.some(
           (account) => account.accountId === row.id && account.operational,
-        )) ? { lastUpdated } : undefined}
+        )) ? lastUpdated : null }}
       />
 
-      <SettingsScrollArea className="px-4 py-5 md:px-6">
-        <div className="max-w-[820px] mx-auto space-y-4">
+      <SettingsScrollArea>
+        <div className="max-w-[820px] space-y-4">
           {serviceStatus?.available === false && <TradingServiceOfflineBanner status={serviceStatus} />}
           <MissingBrokerPacksNotice packs={brokerPacks} onInstall={brokerReadiness.install} />
           {tc.utas.length === 0 ? (
@@ -556,7 +554,7 @@ function PageShell({ children, scroll = true }: { children?: React.ReactNode; sc
   return (
     <div className="flex flex-col flex-1 min-h-0">
       <PageHeader title="Broker" />
-      <SettingsScrollArea scroll={scroll} className={scroll ? 'px-4 py-5 md:px-6' : ''}>{children}</SettingsScrollArea>
+      <SettingsScrollArea scroll={scroll}>{children}</SettingsScrollArea>
     </div>
   )
 }
@@ -566,8 +564,8 @@ function TradingServiceOfflineBanner({ status }: { status: TradingServiceStatus 
     <div className="flex gap-3 rounded-lg border border-warning/30 bg-warning/5 px-4 py-3" role="status">
       <AlertTriangle size={16} className="mt-0.5 shrink-0 text-warning" aria-hidden />
       <div className="min-w-0">
-        <div className="text-[12px] font-medium text-foreground">Trading service offline</div>
-        <div className="mt-0.5 text-[11px] text-muted-foreground leading-relaxed">
+        <div className="text-sm font-medium text-foreground">Trading service offline</div>
+        <div className="mt-0.5 text-sm text-muted-foreground leading-relaxed">
           {status.hint ?? 'Alice is running in lite mode.'}
           {status.reason ? <span className="ml-1 font-mono text-muted-foreground/70">{status.reason}</span> : null}
         </div>
@@ -628,8 +626,8 @@ function UTACard({ uta, preset, health, readiness, equity, onClick }: {
     >
       <div className="flex items-center gap-3">
         <div className="flex-1 min-w-0">
-          <div className="text-[13px] font-medium text-foreground truncate">{uta.label || uta.id}</div>
-          <div className="mt-0.5 flex min-w-0 flex-wrap gap-x-2 text-[11px] text-muted-foreground">
+          <div className="text-sm font-medium text-foreground truncate">{uta.label || uta.id}</div>
+          <div className="mt-0.5 flex min-w-0 flex-wrap gap-x-2 text-sm text-muted-foreground">
             <span className="truncate font-mono">{uta.id}</span>
             <span className="truncate font-mono">{buildSubtitle(uta, preset)}</span>
             {uta.guards.length > 0 && <span className="text-muted-foreground/70">{uta.guards.length} guard{uta.guards.length > 1 ? 's' : ''}</span>}
@@ -637,7 +635,7 @@ function UTACard({ uta, preset, health, readiness, equity, onClick }: {
         </div>
         <div className="shrink-0 flex items-center gap-3">
           {equityNode && (
-            <span className="text-[11px] text-muted-foreground/80 hidden sm:inline">{equityNode}</span>
+            <span className="text-sm text-muted-foreground/80 hidden sm:inline">{equityNode}</span>
           )}
           <AccountReadinessBadge readiness={readiness} health={health} />
         </div>

@@ -154,8 +154,8 @@ export function AssigneeEditor({
       >
         <span className="relative"><IssueAssigneeAvatar value={value} />{health && <span title={t(`issues.health.${health.state}`)} className={`absolute -right-0.5 -top-0.5 size-2 rounded-full ring-2 ring-background ${health.state === "running" ? "bg-info" : health.state === "healthy" ? "bg-success" : ["failed", "blocked"].includes(health.state) ? "bg-destructive" : ["interrupted", "due"].includes(health.state) ? "bg-warning" : "bg-muted-foreground"}`} />}</span>
         <span className="min-w-0 flex-1">
-          <span className={`block truncate text-[13px] text-foreground ${compact ? "font-normal" : "font-medium"}`}>{triggerLabel || selectedLabel}</span>
-          {!compact && !triggerLabel && selectedDescription && <span className="block truncate text-[11px] text-muted-foreground">{selectedDescription}</span>}
+          <span className={`block truncate text-sm text-foreground ${compact ? "font-normal" : "font-medium"}`}>{triggerLabel || selectedLabel}</span>
+          {!compact && !triggerLabel && selectedDescription && <span className="block truncate text-sm text-muted-foreground">{selectedDescription}</span>}
         </span>
         <ChevronRight size={14} className="shrink-0 text-muted-foreground/70" aria-hidden />
       </Button>
@@ -178,11 +178,11 @@ export function AssigneeEditor({
             value={query}
             onChange={(event) => setQuery(event.target.value)}
             placeholder={t('issues.detail.searchSessions')}
-            className="min-w-0 flex-1 bg-transparent text-sm text-foreground outline-none placeholder:text-muted-foreground"
+            className="min-w-0 flex-1 bg-transparent text-base text-foreground outline-none placeholder:text-muted-foreground"
           />
         </label>
         <div className="min-h-0 max-w-full overflow-x-hidden overflow-y-auto px-2 pb-4">
-          <p className="px-2 pb-1.5 pt-2 text-[11px] font-medium text-muted-foreground">
+          <p className="px-2 pb-1.5 pt-2 text-sm font-medium text-muted-foreground">
             {t('issues.detail.assignmentPolicy')}
           </p>
           <div className="space-y-0.5">
@@ -197,7 +197,7 @@ export function AssigneeEditor({
               />
             ))}
           </div>
-          <p className="mt-2 border-t border-border/60 px-2 pb-1.5 pt-3 text-[11px] font-medium text-muted-foreground">
+          <p className="mt-2 border-t border-border/60 px-2 pb-1.5 pt-3 text-sm font-medium text-muted-foreground">
             {t('issues.detail.workspaceSessions')}
           </p>
           <div className="space-y-0.5">
@@ -241,7 +241,7 @@ export function AssigneeEditor({
         <DialogFooter className="mx-0 mb-0 min-w-0 flex-col items-stretch rounded-none px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="min-w-0 w-full max-w-full overflow-hidden text-left sm:mr-auto sm:flex-1">
             {error && <p role="alert" className="mb-2 text-xs text-destructive">{error}</p>}
-            <span className="block text-[11px] font-medium text-muted-foreground">
+            <span className="block text-sm font-medium text-muted-foreground">
               {t('issues.detail.pendingAssignee')}
             </span>
             <span className="mt-0.5 block truncate text-sm font-medium text-foreground">{draftLabel}</span>

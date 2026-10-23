@@ -129,7 +129,7 @@ export function FinancialStatementsPanel({ symbol }: Props) {
               role="tab"
               aria-selected={tab === t.key}
               onClick={() => setTab(t.key)}
-              className={`min-h-10 cursor-pointer px-2.5 py-1 text-[12px] sm:min-h-0 ${
+              className={`min-h-10 cursor-pointer px-2.5 py-1 text-sm sm:min-h-0 ${
                 i > 0 ? 'border-l border-border' : ''
               } ${tab === t.key ? 'bg-muted text-foreground' : 'text-muted-foreground hover:text-foreground'}`}
             >
@@ -140,7 +140,7 @@ export function FinancialStatementsPanel({ symbol }: Props) {
       }
     >
       {loading && !entry && (
-        <table aria-hidden="true" className="w-full text-[12px] border-collapse">
+        <table aria-hidden="true" className="w-full text-sm border-collapse">
           <thead>
             <tr className="border-b border-border/60">
               <th className="text-left px-3 py-2 sticky left-0 bg-secondary/30">
@@ -169,12 +169,12 @@ export function FinancialStatementsPanel({ symbol }: Props) {
           </tbody>
         </table>
       )}
-      {entry?.error && <div className="p-3 text-[12px] text-destructive">{entry.error}</div>}
+      {entry?.error && <div className="p-3 text-sm text-destructive">{entry.error}</div>}
       {!entry?.error && rows.length === 0 && !loading && (
-        <div className="p-3 text-[12px] text-muted-foreground">No data.</div>
+        <div className="p-3 text-sm text-muted-foreground">No data.</div>
       )}
       {rows.length > 0 && (
-        <table className="w-full text-[12px] border-collapse">
+        <table className="w-full text-sm border-collapse">
           <thead>
             <tr className="border-b border-border/60">
               <th className="text-left font-medium text-muted-foreground/70 px-3 py-2 sticky left-0 bg-secondary/30">Item</th>

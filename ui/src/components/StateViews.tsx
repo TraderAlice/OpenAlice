@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react'
 import { AlertTriangle, CloudOff, RefreshCw } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { StatusIndicator } from '@/components/motion/StatusIndicator'
 
 // ==================== Spinner ====================
 
@@ -9,12 +10,7 @@ interface SpinnerProps {
 }
 
 export function Spinner({ size = 'md' }: SpinnerProps) {
-  const dim = size === 'sm' ? 'w-4 h-4' : 'w-6 h-6'
-  return (
-    <div
-      className={`${dim} border-2 border-primary/20 border-t-accent rounded-full animate-spin`}
-    />
-  )
+  return <StatusIndicator size={size === 'sm' ? 16 : 24} />
 }
 
 // ==================== PageLoading ====================

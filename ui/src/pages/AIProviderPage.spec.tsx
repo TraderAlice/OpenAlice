@@ -1,3 +1,4 @@
+import userEvent from '@testing-library/user-event'
 // @vitest-environment jsdom
 
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
@@ -102,7 +103,8 @@ describe('AIProviderPage', () => {
     render(<AIProviderPage />)
 
     const select = await screen.findByRole('combobox', { name: 'Pi 默认凭证' })
-    fireEvent.change(select, { target: { value: 'google-1' } })
+    fireEvent.click(select)
+    await userEvent.click(await screen.findByRole('option', { name: 'Gemini — google-1' }))
 
     await waitFor(() => expect(mocks.setWorkspaceCredentialDefaults).toHaveBeenCalledWith(
       { pi: { credentialSlug: 'google-1', wireShape: 'google-generative-ai' } },
