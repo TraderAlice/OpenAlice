@@ -482,8 +482,9 @@ row, and `SaveIndicator` retains its idle slot. Failed settings writes expose a
 recoverable error beside the control. Trading mode descriptions remain visible.
 
 Landing suggestions retain layout space as the draft changes, keeping the
-heading and composer anchored. Keyboard input updates immediately. Market
-shortcuts reuse one shared component.
+heading and composer anchored. Hidden suggestions immediately become inert and
+aria-hidden. Keyboard input updates immediately. Market shortcuts reuse one
+shared component.
 
 Behavioral UI primitives live as source under `ui/src/components/ui/`. They are
 initialized from shadcn's Base UI recipes through `ui/components.json`, then
@@ -806,11 +807,6 @@ The Harness shell must not hide this action behind the work-panel menu.
 At 768–1279px, opening the right work panel collapses the left activity rail
 and keeps the conversation visible beside the panel. Only phone viewports
 below 768px replace the conversation with the work panel.
-
-Start keeps Suggested workflows in the shared Collapsible panel. Typing closes
-its measured height and fades it; clearing the draft reverses the transition.
-Closed content becomes inert and aria-hidden immediately. The shared reduced
-motion rule removes the transition.
 
 First submission renders the submitted user message on the same conversation
 canvas with a live startup status while the request is pending. The composer
