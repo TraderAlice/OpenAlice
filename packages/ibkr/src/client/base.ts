@@ -6,7 +6,7 @@
  */
 
 import { makeMsg, makeMsgProto, makeField, makeInitialMsg, readMsg, readFields } from '../comm.js'
-import { Connection } from '../connection.js'
+import { Connection, type ConnectionWrapper } from '../connection.js'
 import { EReader } from '../reader.js'
 import { Decoder, applyAllHandlers } from '../decoder/index.js'
 import type { EWrapper } from '../wrapper.js'
@@ -82,6 +82,8 @@ export class EClient {
   optCapab: string | null = null
   reader: EReader | null = null
   connectOptions: string | null = null
+  // Bumped each time connect() opens a Connection; see connectionWrapperFor().
+  private connectionGeneration = 0
 
   constructor(wrapper: EWrapper) {
     this.wrapper = wrapper
@@ -170,15 +172,26 @@ export class EClient {
       return
     }
 
+    // This attempt owns the Connection it opens. The client is reused across
+    // reconnects, so a newer connect() or a disconnect()/reset() can replace
+    // `this.conn` while this attempt still awaits its socket or handshake. A
+    // replaced attempt must only close its own socket: it must not greet, read
+    // from, or tear down the connection that replaced it.
+    let conn: Connection | null = null
     try {
       this.host = host
       this.port = port
       this.clientId = clientId
 
-      this.conn = new Connection(this.host, this.port)
-      this.conn.wrapper = this.wrapper as any
+      conn = new Connection(this.host, this.port)
+      conn.wrapper = this.connectionWrapperFor(++this.connectionGeneration)
+      this.conn = conn
 
-      await this.conn.connect()
+      await conn.connect()
+      if (this.conn !== conn) {
+        closeReplacedConnection(conn)
+        return
+      }
       this.setConnState(EClient.CONNECTING)
 
       // Send handshake: "API\0" + version range
@@ -195,11 +208,18 @@ export class EClient {
       // peer can consume the write and close its socket before the next
       // JavaScript turn (notably on Windows); registering afterwards misses
       // that close and leaves this connect attempt waiting for its 10s timer.
-      const handshake = this.waitForHandshake()
-      this.conn.sendMsg(msg2)
+      const handshake = this.waitForHandshake(conn)
+      // Observe the rejection before anything else can interrupt this attempt:
+      // an unobserved rejected handshake terminates the Node process.
+      handshake.catch(() => undefined)
+      conn.sendMsg(msg2)
 
       // Wait for server version response
       const { serverVersion, connTime } = await handshake
+      if (this.conn !== conn) {
+        closeReplacedConnection(conn)
+        return
+      }
       this.serverVersion_ = serverVersion
       this.connTime = connTime
 
@@ -208,7 +228,7 @@ export class EClient {
       this.setConnState(EClient.CONNECTED)
 
       // Start reader
-      this.reader = new EReader(this.conn, (msgBuf: Buffer) => {
+      this.reader = new EReader(conn, (msgBuf: Buffer) => {
         this.onMessage(msgBuf)
       }, (error: unknown) => {
         this.handleReaderError(error)
@@ -219,6 +239,11 @@ export class EClient {
       this.startApi()
       this.wrapper.connectAck()
     } catch {
+      if (conn !== null && this.conn !== conn) {
+        // A newer attempt owns the client and its wrapper now.
+        closeReplacedConnection(conn)
+        return
+      }
       if (this.wrapper) {
         this.wrapper.error(NO_VALID_ID, currentTimeMillis(), errors.CONNECT_FAIL.code(), errors.CONNECT_FAIL.msg())
       }
@@ -337,11 +362,29 @@ export class EClient {
     conn?.disconnect()
   }
 
-  private waitForHandshake(): Promise<{ serverVersion: number; connTime: string }> {
+  /**
+   * The wrapper a Connection reports through. It forwards until a newer
+   * connect() opens a replacement: a superseded socket can still fail or close
+   * after its successor connected, and that must not reach the wrapper now
+   * serving the successor. Teardown of the current Connection still reports,
+   * including handleReaderError(), which resets the client before closing it.
+   */
+  private connectionWrapperFor(generation: number): ConnectionWrapper {
+    const current = (): boolean => generation === this.connectionGeneration
+    return {
+      error: (reqId, errorTime, errorCode, errorString, advancedOrderRejectJson) => {
+        if (current()) this.wrapper.error(reqId, errorTime, errorCode, errorString, advancedOrderRejectJson)
+      },
+      connectionClosed: () => {
+        if (current()) this.wrapper.connectionClosed()
+      },
+    }
+  }
+
+  private waitForHandshake(conn: Connection): Promise<{ serverVersion: number; connTime: string }> {
     return new Promise((resolve, reject) => {
-      const conn = this.conn
-      const socket = conn?.socket
-      if (!conn || !socket) {
+      const socket = conn.socket
+      if (!socket) {
         reject(new Error('Connection closed before handshake started'))
         return
       }
@@ -389,4 +432,14 @@ export class EClient {
       }, 10000)
     })
   }
+}
+
+/**
+ * Close the socket of a connect attempt that was replaced mid-flight. The
+ * wrapper is detached first because it now serves the replacing attempt; its
+ * connectionClosed()/error() callbacks must not report this socket's close.
+ */
+function closeReplacedConnection(conn: Connection): void {
+  conn.wrapper = null
+  conn.disconnect()
 }
