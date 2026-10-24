@@ -147,7 +147,7 @@ describe('GET /broker-packs — optional engine requirements', () => {
     const { status, body } = await req(makeRoutes(), 'GET', '/broker-packs')
 
     expect(status).toBe(200)
-    expect((body as { packs: unknown[] }).packs).toHaveLength(6)
+    expect((body as { packs: unknown[] }).packs).toHaveLength(7)
     expect((body as { accounts: unknown[] }).accounts).toEqual([
       expect.objectContaining({
         accountId: 'legacy-account', state: 'unsupported-preset', operational: false,

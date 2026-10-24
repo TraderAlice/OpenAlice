@@ -25,6 +25,7 @@ import {
   ALPACA_PRESET,
   IBKR_PRESET,
   LONGBRIDGE_PRESET,
+  CTRADER_PRESET,
   CCXT_CUSTOM_PRESET,
   SIMULATOR_PRESET,
   BUILTIN_BROKER_PRESETS,
@@ -43,6 +44,7 @@ const SAMPLE_CONFIGS: Record<string, Record<string, unknown>> = {
   alpaca:          { mode: 'paper', apiKey: 'k', apiSecret: 's' },
   'ibkr-tws':      { host: '127.0.0.1', port: 7497, clientId: 0 },
   longbridge:      { mode: 'live', appKey: 'k', appSecret: 's', accessToken: 't' },
+  ctrader:         { mode: 'demo', traderLogin: '1000001', clientId: 'c', clientSecret: 's', accessToken: 't' },
   'ccxt-custom':   { exchange: 'kucoin', apiKey: 'k', secret: 's' },
   'leverup-monad': {
     mode: 'testnet',
@@ -162,6 +164,19 @@ describe('preset → engine config translation', () => {
     expect(cfg.paper).toBe(false)
   })
 
+  it('cTrader maps mode to environment and keeps the login numeric', () => {
+    const parsed = CTRADER_PRESET.zodSchema.parse({ mode: 'live', traderLogin: '123', clientId: 'c', clientSecret: 's', accessToken: 't', refreshToken: 'r' }) as Record<string, unknown>
+    expect(CTRADER_PRESET.toEngineConfig(parsed)).toEqual({
+      environment: 'live', traderLogin: 123, clientId: 'c', clientSecret: 's', accessToken: 't', refreshToken: 'r',
+    })
+  })
+
+  it('cTrader omits an absent refresh token', () => {
+    const cfg = CTRADER_PRESET.toEngineConfig({ mode: 'demo', traderLogin: 1, clientId: 'c', clientSecret: 's', accessToken: 't' })
+    expect(cfg).not.toHaveProperty('refreshToken')
+    expect(cfg.environment).toBe('demo')
+  })
+
   it('IBKR passes host/port/clientId straight through', () => {
     const cfg = IBKR_PRESET.toEngineConfig({ host: '10.0.0.5', port: 7496, clientId: 7 })
     expect(cfg).toMatchObject({ host: '10.0.0.5', port: 7496, clientId: 7 })
@@ -201,6 +216,11 @@ describe('isPaperPreset', () => {
   it('true for Longbridge paper, false for Longbridge live', () => {
     expect(isPaperPreset('longbridge', { mode: 'paper' })).toBe(true)
     expect(isPaperPreset('longbridge', { mode: 'live' })).toBe(false)
+  })
+
+  it('true for cTrader demo, false for cTrader live', () => {
+    expect(isPaperPreset('ctrader', { mode: 'demo' })).toBe(true)
+    expect(isPaperPreset('ctrader', { mode: 'live' })).toBe(false)
   })
 
   it('IBKR uses port-based detection (7497 / 4002 → paper)', () => {

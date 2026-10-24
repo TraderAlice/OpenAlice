@@ -7,7 +7,7 @@ export function readDevBrokerCatalog(inputDir, { commit, version, platform, arch
   if (!/^[a-f0-9]{40}$/.test(commit)) throw new Error('Invalid dev broker commit')
   const name = `OpenAlice-Broker-Packs-${version}-${platform}-${arch}.json`
   const catalog = JSON.parse(readFileSync(join(inputDir, name), 'utf8'))
-  const engines = ['ccxt', 'alpaca', 'ibkr', 'leverup', 'longbridge']
+  const engines = ['ccxt', 'alpaca', 'ibkr', 'leverup', 'longbridge', 'ctrader']
     .filter(engine => !(engine === 'longbridge' && platform === 'win32' && arch === 'arm64'))
   if (catalog.schemaVersion !== 1 || catalog.sourceCommit !== commit || catalog.openAliceVersion !== version
       || catalog.platform !== platform || catalog.arch !== arch || !Array.isArray(catalog.packs)

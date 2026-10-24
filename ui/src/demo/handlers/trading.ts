@@ -82,6 +82,26 @@ const demoBrokerPresets = [
     },
   },
   {
+    id: 'ctrader', label: 'cTrader',
+    description: 'Any broker that offers cTrader — FX, metals, indices, commodities, stock and crypto CFDs. Cloud Open API; no terminal has to run.',
+    category: 'recommended', defaultName: 'ctrader-main', badge: 'CT', badgeColor: 'text-primary',
+    engine: 'ctrader', guardCategory: 'securities',
+    modes: [{ id: 'demo', label: 'Demo' }, { id: 'live', label: 'Live' }],
+    subtitleFields: [{ field: 'mode', prefix: 'cTrader · ' }, { field: 'traderLogin', prefix: '#' }],
+    schema: {
+      type: 'object',
+      properties: {
+        mode: { type: 'string', title: 'Environment', enum: ['demo', 'live'], default: 'demo' },
+        traderLogin: { type: 'number', title: 'Account number (as shown in cTrader)' },
+        clientId: { type: 'string', title: 'Open API Client ID' },
+        clientSecret: { type: 'string', title: 'Open API Client Secret', writeOnly: true },
+        accessToken: { type: 'string', title: 'Access Token', writeOnly: true },
+        refreshToken: { type: 'string', title: 'Refresh Token (optional)', writeOnly: true },
+      },
+      required: ['mode', 'traderLogin', 'clientId', 'clientSecret', 'accessToken'],
+    },
+  },
+  {
     id: 'okx', label: 'OKX', description: 'OKX Unified Trading Account.',
     category: 'crypto', defaultName: 'OKX', badge: 'OK', badgeColor: 'text-info',
     engine: 'ccxt', guardCategory: 'crypto', subtitleFields: [],
@@ -202,6 +222,7 @@ export const tradingHandlers = [
       { engine: 'ibkr', installed: false, source: 'missing', requiredBy: [] },
       { engine: 'leverup', installed: false, source: 'missing', requiredBy: [] },
       { engine: 'longbridge', installed: false, source: 'missing', requiredBy: [] },
+      { engine: 'ctrader', installed: false, source: 'missing', requiredBy: [] },
     ],
     accounts: [
       { accountId: DEMO_UTA_PAPER, label: 'Alpaca Paper', presetId: 'alpaca-paper', configuredEnabled: true, engine: 'alpaca', state: 'needs-install', operational: false, action: 'install' },

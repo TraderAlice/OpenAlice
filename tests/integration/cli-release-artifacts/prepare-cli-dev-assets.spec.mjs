@@ -143,7 +143,7 @@ async function fixture({ tamperedIdentityTarget, largeWindowsMetadata = false } 
       }],
     }
     const packs = []
-    for (const engine of ['ccxt', 'alpaca', 'ibkr', 'leverup', 'longbridge'].filter(e => !(e === 'longbridge' && platform === 'win32' && arch === 'arm64'))) {
+    for (const engine of ['ccxt', 'alpaca', 'ibkr', 'leverup', 'longbridge', 'ctrader'].filter(e => !(e === 'longbridge' && platform === 'win32' && arch === 'arm64'))) {
       const file = `OpenAlice-Broker-${engine}-${version}-${platform}-${arch}.tgz`
       const bytes = Buffer.from(`fixture-${engine}-${platform}-${arch}`)
       await writeFile(join(input, file), bytes)

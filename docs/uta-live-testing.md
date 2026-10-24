@@ -259,6 +259,46 @@ With an `OPT` or `FOP` paper position and an entitled or delayed quote:
 5. Requests use `regulatorySnapshot=false`; this acceptance must never opt the
    account into paid per-request regulatory snapshots.
 
+## cTrader acceptance notes
+
+The cTrader engine speaks the Open API JSON protocol directly; there is no SDK
+and no local terminal. Use a demo account authorized for the application with
+the trading scope, and confirm `mode: demo`: the session refuses a live login
+on a demo connection and the reverse.
+
+Venue facts the adapter depends on (Spotware demo, 2026-10-13). Re-check them
+whenever a scenario disagrees:
+
+- A position's stop-loss and take-profit live on the position, served by an
+  internal STOP_LOSS_TAKE_PROFIT order that reconcile does not list. The
+  adapter exposes them as `sl-<positionId>` / `tp-<positionId>` orders. S5
+  must show both legs in `order list`, and moving or cancelling one must leave
+  the other in place: AMEND_POSITION_SLTP drops a level the request omits.
+- Market orders accept protection only as a distance from the fill. The
+  adapter moves it to the exact prices after the fill and says so in the
+  result message if that fails.
+- An amend without `expirationTimestamp` turns GTD into GTC; an amend of a
+  stop or stop-limit order without its stop price is rejected even when the
+  stop is unchanged; and a stop-limit's limit is stored as a distance from
+  its stop. S4 must include a volume-only amend of a stop-limit GTD order and
+  show the expiry and the untouched prices unchanged.
+- Modify keeps the order id. There is no DAY time in force: a pending DAY
+  order becomes GTD at the symbol's session close.
+- A HEDGED account opens an opposite position instead of reducing. The
+  adapter links a reducing order to its position with `positionId` (a linked
+  stop closes the position when it triggers) and refuses orders it cannot
+  link. S6/S9 must never leave a hedge behind. The venue does not cancel a
+  linked pending order when its position closes; the adapter does, so check
+  `order list` for leftovers after every close.
+- Quantities are base units, never lots; volume errors name the lot size.
+- Refreshing the access token rotates the refresh token. Until a credential
+  store exists the new pair lives only in memory, so a UTA restart after a
+  refresh needs a new authorization.
+
+Adapter-level probes (`createBroker` plus a wire log that redacts the auth
+fields) are legitimate venue checks. They must refuse to run unless the
+account is demo and flat, and must end with a flat check even after failure.
+
 ## Scenario catalog
 
 Run the relevant S1–S14 scenarios for a trading-path change; run the full
@@ -434,3 +474,17 @@ meanwhile); multi-currency books (HKD+USD) blind-sum at the BROKER layer
 (`getAccount` + `aggregateAccountFromPositions`) remained a deferred
 follow-up. S2/S4/S6/S8/S9/S11/S12 green; restart survival incl. TWS
 reconnect verified.
+
+Round 8 (2026-10-13, cTrader Spotware demo, adapter-level probes before the
+agent-surface catalog): 3 venue findings, each fixed with a fake-venue spec
+that reproduces the venue. (1) An amend without the expiry silently turned a
+GTD order into GTC. (2) AMEND_POSITION_SLTP drops an omitted level, so moving
+a stop removed the take-profit unless both are sent. (3) A pending order
+linked to a position outlives the position's close. Pre-submission review
+then found two adapter-only gaps: a stop-only amend moved a stop-limit's
+limit with it, and symbol specs were cached across SYMBOL_CHANGED events and
+reconnects. The demo re-check of that fix found a fourth venue rule: an
+amend of a stop or stop-limit order must carry the stop price, so
+volume-only and limit-only amends had been rejected all along; the fake
+venue had accepted them. The agent-surface S1–S12 round through `alice-uta`
+is still to run for this venue.

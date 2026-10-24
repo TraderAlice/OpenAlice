@@ -15,7 +15,7 @@ import { createHash, randomBytes } from 'node:crypto'
 
 // ==================== Types ====================
 
-export type BrokerEngine = 'ccxt' | 'alpaca' | 'ibkr' | 'leverup' | 'longbridge' | 'mock'
+export type BrokerEngine = 'ccxt' | 'alpaca' | 'ibkr' | 'leverup' | 'longbridge' | 'ctrader' | 'mock'
 
 export interface ModeOption {
   id: string
@@ -432,6 +432,53 @@ export const LONGBRIDGE_PRESET: BrokerPresetDef = {
   isPaper: (d) => d.mode === 'paper',
 }
 
+export const CTRADER_PRESET: BrokerPresetDef = {
+  id: 'ctrader',
+  label: 'cTrader',
+  description: 'Any broker that offers cTrader — FX, metals, indices, commodities, stock and crypto CFDs. Cloud Open API; no terminal has to run.',
+  category: 'recommended',
+  hint: `cTrader connects through Spotware's **Open API**, so nothing needs to run on this machine.
+
+1. At openapi.ctrader.com → **Applications**, register an application and wait for Spotware's approval. Copy its **Client ID** and **Client Secret**.
+2. Authorize your cTrader ID for that application with the **trading** scope (the application's Playground/Sandbox page) and copy the **access token** and **refresh token**.
+3. Enter the **account number** shown in cTrader and pick the environment that matches it — demo accounts only work with Demo, live accounts only with Live.
+
+Quantities are in **units of the base asset**, not lots (lot sizes differ per broker and symbol). Access tokens last about 30 days. OpenAlice refreshes an expired token while running, but cannot store the rotated token yet — after a restart you may need to authorize again.`,
+  defaultName: 'ctrader-main',
+  badge: 'CT',
+  badgeColor: 'text-primary',
+  engine: 'ctrader',
+  // Leverage is account-level on cTrader; the guard set matches what UTA enforces.
+  guardCategory: 'securities',
+  modes: [
+    { id: 'demo', label: 'Demo' },
+    { id: 'live', label: 'Live' },
+  ],
+  zodSchema: z.object({
+    mode: z.enum(['demo', 'live']).default('demo').describe('Environment'),
+    traderLogin: z.coerce.number().int().positive().describe('Account number (as shown in cTrader)'),
+    clientId: z.string().min(1).describe('Open API Client ID'),
+    clientSecret: z.string().min(1).describe('Open API Client Secret'),
+    accessToken: z.string().min(1).describe('Access Token'),
+    refreshToken: z.string().optional().describe('Refresh Token (optional)'),
+  }),
+  subtitleFields: [
+    { field: 'mode', prefix: 'cTrader · ' },
+    { field: 'traderLogin', prefix: '#' },
+  ],
+  writeOnlyFields: ['clientSecret', 'accessToken', 'refreshToken'],
+  fingerprintFields: ['mode', 'traderLogin'],
+  toEngineConfig: (d) => ({
+    environment: d.mode,
+    traderLogin: d.traderLogin,
+    clientId: d.clientId,
+    clientSecret: d.clientSecret,
+    accessToken: d.accessToken,
+    ...(d.refreshToken ? { refreshToken: d.refreshToken } : {}),
+  }),
+  isPaper: (d) => d.mode === 'demo',
+}
+
 // ==================== Other ecosystem brokers (lower-tier, isolated) ====================
 
 export const LEVERUP_PRESET: BrokerPresetDef = {
@@ -508,6 +555,7 @@ export const BROKER_PRESET_CATALOG: BrokerPresetDef[] = [
   IBKR_PRESET,
   ALPACA_PRESET,
   LONGBRIDGE_PRESET,
+  CTRADER_PRESET,
   HYPERLIQUID_PRESET,
   // ---- Crypto ----
   BINANCE_PRESET,

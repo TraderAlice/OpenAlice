@@ -8,8 +8,8 @@ market-data source selection; those remain in [[docs/uta-live-testing.md]] and
 ## Boundary
 
 The installed OpenAlice core contains Alice, UTA Core, and the Mock simulator.
-It does not contain the live broker SDKs for CCXT, Alpaca, IBKR, LeverUp, or
-Longbridge. Those implementations ship as versioned, platform-specific Broker
+It does not contain the live broker SDKs for CCXT, Alpaca, IBKR, LeverUp,
+Longbridge, or cTrader. Those implementations ship as versioned, platform-specific Broker
 Packs and are installed only after the user chooses a broker or public crypto
 data source in the Trading UI.
 
@@ -35,7 +35,7 @@ Pack API version 1 exports:
 
 ```ts
 BROKER_PACK_API_VERSION: 1
-BROKER_ENGINE: 'ccxt' | 'alpaca' | 'ibkr' | 'leverup' | 'longbridge'
+BROKER_ENGINE: 'ccxt' | 'alpaca' | 'ibkr' | 'leverup' | 'longbridge' | 'ctrader'
 configSchema: ZodType
 createBroker(config): IBroker
 ```
@@ -200,7 +200,9 @@ a release starts.
 
 Desktop package acceptance rejects `ccxt`, `longbridge`, its native binding,
 and `@alpacahq/alpaca-trade-api` if they reappear under packaged
-`node_modules`. Adding a new Pack requires extending that assertion and the
+`node_modules`. The cTrader Pack has no third-party SDK (it speaks the Open API
+JSON protocol over the runtime's global WebSocket), so it adds nothing to that
+list. Adding a new Pack requires extending that assertion and the
 release matrix as appropriate.
 
 ## UI Contract
@@ -292,7 +294,7 @@ default in compiled executables, preventing physical Pack SDK resolution even
 when the identical archive imports under Node. See [Bun executable configuration](https://bun.sh/docs/bundler/executables).
 
 After building the release archives, run
-`pnpm exec tsx scripts/verify-broker-packs.ts --compiled`. This extracts all five
+`pnpm exec tsx scripts/verify-broker-packs.ts --compiled`. This extracts all six
 archives and uses a compiled probe with the release compile options to import
 and construct each broker, including Longbridge's platform-native binding.
 It uses synthetic configuration, never calls init, and does not connect or trade.
