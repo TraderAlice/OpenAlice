@@ -3,6 +3,8 @@ export interface ChatLandingExample {
   label: string | null
   title: string
   prompt: string
+  /** Visible wait-time copy on the landing card; never part of the Agent prompt. */
+  hint?: string
 }
 
 export function chatLandingExampleGroups(
@@ -39,6 +41,7 @@ export function chatLandingExampleGroups(
         label: t('chatLanding.marketBriefLabel'),
         title: t('chatLanding.marketBriefTitle'),
         prompt: t('chatLanding.marketBriefPrompt'),
+        hint: t('chatLanding.marketBriefHint'),
       },
       {
         id: 'portfolio',
