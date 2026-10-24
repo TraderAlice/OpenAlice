@@ -40,6 +40,7 @@ import {
   planPorts,
   spawnChild,
   waitForHttp,
+  recentChildOutput,
   installCascadeShutdown,
   OptionalServiceController,
   startFlagWatcher,
@@ -354,11 +355,37 @@ async function main(): Promise<void> {
     prefixLogs: true,
   })
 
-  const aliceReady = await waitForHttp(`http://127.0.0.1:${ports.webPort}/api/version`, { timeoutMs: 20_000 })
-  if (!aliceReady) {
+  // Readiness gate. A plain timeout can't tell "Alice is slow" apart from
+  // "Alice died on boot", and the child's own `[alice] fatal: …` line scrolls
+  // past the abort banner — so race the probe against the child exiting, honor
+  // a configurable gate, and re-quote the child's tail when the gate fails.
+  const aliceReadyDeadline = Date.now()
+  let aliceExit: { code: number | null; signal: NodeJS.Signals | null } | null = null
+  const aliceExited = new Promise<'exited'>((onExit) => {
+    alice.once('exit', (code, signal) => {
+      aliceExit = { code, signal }
+      onExit('exited')
+    })
+  })
+  const aliceReady = await Promise.race([
+    waitForHttp(`http://127.0.0.1:${ports.webPort}/api/version`, { timeoutMs: options.readyTimeoutMs }),
+    aliceExited,
+  ])
+  if (aliceReady !== true) {
     aliceStatus = 'offline'
-    console.error(`[guardian] Alice failed to come up within 20s — aborting before Vite starts`)
-    console.error('[guardian] If another process won a startup race, rerun with --takeover or use `pnpm dev -- --home <path>`.')
+    const elapsedS = ((Date.now() - aliceReadyDeadline) / 1000).toFixed(1)
+    const exitInfo = aliceExit as { code: number | null; signal: NodeJS.Signals | null } | null
+    if (exitInfo) {
+      console.error(`[guardian] Alice exited ${elapsedS}s after spawn (code=${exitInfo.code ?? 'null'}, signal=${exitInfo.signal ?? 'none'}) — aborting before Vite starts`)
+      console.error('[guardian] This is a crash, not a startup race: the [alice] output below is the reason.')
+    } else {
+      console.error(`[guardian] Alice did not answer /api/version within ${elapsedS}s (ready timeout ${options.readyTimeoutMs}ms) — aborting before Vite starts`)
+      console.error('[guardian] The process is still alive, so this is a slow or blocked boot — not a confirmed crash.')
+      console.error('[guardian] If another process won a startup race, rerun with --takeover or use `pnpm dev -- --home <path>`.')
+      console.error('[guardian] On a slow machine, raise the gate: `pnpm dev -- --ready-timeout <ms>`.')
+    }
+    const aliceTail = recentChildOutput(alice, 20)
+    if (aliceTail) console.error(`[guardian] last alice output:\n${aliceTail}`)
     try { alice.kill('SIGTERM') } catch { /* noop */ }
     try { uta?.process.kill('SIGTERM') } catch { /* noop */ }
     try { connector?.process.kill('SIGTERM') } catch { /* noop */ }
