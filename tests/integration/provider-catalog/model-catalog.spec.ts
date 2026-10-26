@@ -7,7 +7,7 @@ import { discoverModels } from '../../../src/ai-providers/model-discovery.js'
 import type { CredentialVendor, CredentialWireShape } from '../../../src/core/config.js'
 vi.mock('../../../src/ai-providers/model-discovery.js', () => ({ discoverModels: vi.fn() }))
 const provider = (access: { slug: string; vendor: string; input: { wireShape: string; baseUrl?: string; apiKey: string } }) => createAIProvider(access.slug, { vendor: access.vendor as CredentialVendor, authType: 'api-key', apiKey: access.input.apiKey, wires: { [access.input.wireShape as CredentialWireShape]: access.input.baseUrl ?? '' } })
-import { MODEL_CATALOG_TTL_MS, ProviderModelCatalogStore, cachedProviderModel } from '../../../src/ai-providers/model-catalog.js'
+import { MODEL_CATALOG_TTL_MS, ProviderModelCatalogStore, cachedProviderModel, cachedProviderModels } from '../../../src/ai-providers/model-catalog.js'
 
 const access = { slug: 'test', vendor: 'openai', input: { wireShape: 'openai-chat', baseUrl: 'https://example.test/v1', apiKey: 'test-only-secret' } }
 const model = (id: string) => ({ id, label: id })
@@ -130,4 +130,21 @@ it('preserves discovered semantics across restart and shares them with local run
   expect(cachedProviderModel(account, upstream.id, directory)).toEqual(first.models[0])
   const changedKey = provider({ ...access, input: { ...access.input, apiKey: 'another-key' } })
   expect(cachedProviderModel(changedKey, upstream.id, directory).semantics?.contextWindow).not.toBe(1234)
+})
+
+it('projects the whole local catalog without discovery and preserves empty/foreign-cache boundaries', async () => {
+  const discover = vi.mocked(discoverModels).mockResolvedValue([model('research'), model('fast')])
+  const instance = provider(access)
+  await new ProviderModelCatalogStore({ directory }).read(instance, true)
+  discover.mockClear()
+  expect(cachedProviderModels(instance, directory).map(entry => entry.id)).toEqual(['research', 'fast'])
+  expect(cachedProviderModels(provider({ ...access, input: { ...access.input, apiKey: 'other' } }), directory))
+    .not.toContainEqual(model('research'))
+  expect(discover).not.toHaveBeenCalled()
+  discover.mockResolvedValue([])
+  await new ProviderModelCatalogStore({ directory }).read(instance, true)
+  discover.mockClear()
+  expect(cachedProviderModels(instance, directory)).toEqual([])
+  expect(cachedProviderModel(instance, 'manual', directory).id).toBe('manual')
+  expect(discover).not.toHaveBeenCalled()
 })

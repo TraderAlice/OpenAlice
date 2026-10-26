@@ -107,13 +107,15 @@ export class ProviderModelCatalogStore {
 export const providerModelCatalog = new ProviderModelCatalogStore()
 
 /** Launch reads local facts only: no network or credential writes on this path. */
-export function cachedProviderModel(provider: AIProvider, model: string, directory = dataPath('model-catalog', 'providers')): ModelOption {
+export function cachedProviderModels(provider: AIProvider, directory = dataPath('model-catalog', 'providers')): ModelOption[] {
   try {
     const snapshot = snapshotSchema.parse(JSON.parse(readFileSync(join(directory, `${provider.catalogSlot}.json`), 'utf8')))
-    if (snapshot.identity === provider.catalogIdentity) {
-      const found = snapshot.models.find((entry) => entry.id === model)
-      if (found) return provider.describeModel(found)
-    }
+    if (snapshot.identity === provider.catalogIdentity) return snapshot.models.map(model => provider.describeModel(model))
   } catch { /* Missing or corrupt optional cache falls back to bundled facts. */ }
-  return provider.describeModel({ id: model, label: model })
+  return provider.models
+}
+
+export function cachedProviderModel(provider: AIProvider, model: string, directory = dataPath('model-catalog', 'providers')): ModelOption {
+  return cachedProviderModels(provider, directory).find(entry => entry.id === model)
+    ?? provider.describeModel({ id: model, label: model })
 }
