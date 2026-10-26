@@ -489,21 +489,30 @@ An old Workspace `.pi-agent/` tree is migrated into the applicable native
 agent-directory layout before launch and removed only after its configuration
 and session data are preserved.
 
-### Codex interactive permissions
+### Managed Agent execution permissions
 
-OpenAlice launches interactive Codex TUI sessions with explicit
-`--sandbox danger-full-access --ask-for-approval never` arguments. This applies
-to fresh sessions, Quick Chat prompts, and resumed sessions. Launch-time flags
-are intentional: otherwise Codex may inherit a restrictive global or project
-default, silently sandbox the session, and prevent the injected `alice`,
-`alice-workspace`, `alice-uta`, and `traderhub` CLIs from reaching their local
-OpenAlice transport.
+Alice-managed interactive, headless and Web launches intentionally use the
+native Agent's full-access, unattended execution policy. This also applies to
+fresh and resumed Sessions. Codex uses `danger-full-access` and approval
+`never`; Claude bypasses tool permission checks and disables its sandbox.
+The other adapters apply their equivalent native policy. Pi has no per-tool
+sandbox; its resource-trust bootstrap is separate from filesystem containment.
+This is the launch contract established by #1433, not a hard Workspace sandbox.
 
-Headless Codex remains narrower: it uses `approval_policy=never`, a
-workspace-write sandbox, and explicit loopback network access. That is enough
-for unattended Workspace CLI work without granting an automation run unrelated
-host access. Neither policy bypasses OpenAlice's trading boundary; broker writes
-and their approval rules remain enforced by UTA.
+The Agent runs with the host user's available filesystem and process authority,
+subject to OS permissions and any native enterprise restrictions. A Workspace's
+working directory does not confine native Bash, Git or file operations to that
+directory. `alice peer path` resolves an address; it does not grant or enforce a
+read-only capability. Instructions to write only in the owning Workspace are
+collaboration policy, not cwd/path enforcement. Headless execution does not
+narrow that boundary.
+
+Launch arguments are process-local; they do not change global user Agent
+configuration. Operations through `alice-uta` still follow UTA's trading mode
+and approval rules. That service-level trading boundary is distinct from host
+filesystem containment and should not be described as a sandbox for native
+tools. The load-bearing launch policies live in `src/workspaces/adapters/`
+and the Web transports under `src/workspaces/web-session/`.
 
 ## Workspace Bootstrap and Skills
 
