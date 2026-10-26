@@ -81,3 +81,34 @@ describe('Windows preview delivery boundary', () => {
     expect(read('install.ps1')).toContain('[IO.File]::Delete($backup)')
   })
 })
+
+describe('Windows public installer acceptance boundary', () => {
+  it('adds a read-only path-scoped PR lane and an isolated manual entry', () => {
+    const workflow = YAML.parse(read('.github/workflows/cli-installer-smoke.yml'))
+    expect(workflow.on.pull_request.branches).toEqual(['dev', 'master'])
+    expect(workflow.on.pull_request.paths).toContain('install.ps1')
+    const network = workflow.jobs['windows-network']
+    expect(network.permissions).toEqual({ contents: 'read' })
+    expect(network['runs-on']).toBe('windows-latest')
+    expect(network.if).toContain("needs.windows-network-scope.outputs.relevant == 'true'")
+    expect(network.if).toContain('inputs.windows_network')
+    expect(network.steps.find((s: { run?: string }) => s.run?.includes('--published')).shell).toBe('powershell')
+    for (const job of ['release-prep-scope', 'bun-cli-feasibility', 'checkout-install', 'checkout-remote', 'dev-channel-install']) {
+      expect(workflow.jobs[job].if).toContain('!inputs.windows_network')
+    }
+    expect(JSON.stringify(network)).not.toContain('secrets.')
+  })
+
+  it('filters unrelated changes but keeps installer and update ownership', () => {
+    const workflow = YAML.parse(read('.github/workflows/cli-installer-smoke.yml'))
+    const scope = workflow.jobs['windows-network-scope'].steps.find((s: { id?: string }) => s.id === 'scope').run
+    const expression = scope.match(/grep -Eq '([^']+)'/)[1]
+    const relevant = new RegExp(expression)
+    for (const path of ['install.ps1', 'packages/cli/src/update.mjs', 'packages/cli/src/uninstall.mjs', 'packages/update-lifecycle/src/release-policy.ts', 'scripts/windows-cli-preview-smoke.ts']) {
+      expect(relevant.test(path), path).toBe(true)
+    }
+    for (const path of ['ui/src/App.tsx', 'src/domain/trading.ts', 'README.md']) {
+      expect(relevant.test(path), path).toBe(false)
+    }
+  })
+})

@@ -45,7 +45,7 @@ function step(job: WorkflowJob, name: string): WorkflowStep {
 describe('CLI installer dev publication workflow', () => {
   it('owns every dev push while reserving hosted PR acceptance for master', () => {
     expect(workflow.on?.push?.branches).toEqual(['dev'])
-    expect(workflow.on?.pull_request?.branches).toEqual(['master'])
+    expect(workflow.on?.pull_request?.branches).toEqual(['dev', 'master'])
   })
 
   it('keeps master and manual acceptance behind the trusted preflight', () => {
@@ -58,7 +58,7 @@ describe('CLI installer dev publication workflow', () => {
       expect(job.if).toContain("needs.release-prep-scope.result != 'success'")
       expect(job.if).toContain("beta_release_prep != 'true'")
     }
-    expect(checkoutInstall.if).not.toContain("github.base_ref == 'master'")
+    expect(checkoutInstall.if).toContain("github.base_ref == 'master'")
     expect(checkoutInstall.if).toContain("needs.release-prep-scope.result != 'success'")
     expect(checkoutInstall.if).toContain("beta_release_prep != 'true'")
   })
