@@ -11,7 +11,7 @@ import type { ReferenceDataService } from '@/domain/market-data/reference/types.
 
 const BOARDS = [
   'movers', 'calendar', 'macro', 'valuation',
-  'term-structure', 'global-macro', 'shipping', 'fed',
+  'term-structure', 'global-macro', 'shipping', 'fed', 'economic-calendar',
 ] as const
 
 export function createReferenceBoardTools(reference: ReferenceDataService) {
@@ -22,6 +22,7 @@ export function createReferenceBoardTools(reference: ReferenceDataService) {
 Available boards:
 - movers: gainers/losers/most-active + value/growth/size screener lists (intraday)
 - calendar: upcoming earnings, IPOs and ex-dividend dates (14-day window by default)
+- economic-calendar: economic releases with actual, consensus and previous values (14 days); preserve source times and unknown timezones
 - macro: 14 US macro series cards — rates, labor, CPI YoY, oil, dollar, M2, sentiment (FRED)
 - valuation: S&P 500 PE / Shiller CAPE / earnings yield / dividend yield (multpl)
 - term-structure: BTC/ETH futures curve with annualized basis vs perpetual (Deribit)
@@ -41,6 +42,7 @@ seeing the last good snapshot. For sector rotation use the sectorRotation tool.`
         switch (board) {
           case 'movers': return reference.movers()
           case 'calendar': return reference.calendar(days ? { days } : undefined)
+          case 'economic-calendar': return reference.economicCalendar()
           case 'macro': return reference.macro()
           case 'valuation': return reference.valuation()
           case 'term-structure': return reference.termStructure()

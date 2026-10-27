@@ -2,6 +2,7 @@ import { z } from 'zod'
 import { readFile, writeFile, mkdir, unlink, rm, rename, chmod } from 'fs/promises'
 import { resolve, join, dirname } from 'path'
 import { homedir } from 'os'
+import { randomUUID } from 'node:crypto'
 import { newsCollectorSchema } from '../domain/news/config.js'
 import { runMigrations } from '../migrations/runner.js'
 import { dataPath } from '@/core/paths.js'
@@ -1097,7 +1098,14 @@ export async function writeConfigSection(section: ConfigSection, data: unknown):
   const schema = sectionSchemas[section]
   const validated = schema.parse(data)
   await mkdir(CONFIG_DIR, { recursive: true })
-  await writeFile(resolve(CONFIG_DIR, sectionFiles[section]), JSON.stringify(validated, null, 2) + '\n')
+  if (section === 'news') {
+    const target = resolve(CONFIG_DIR, `${section}.json`)
+    const staging = target + '.' + randomUUID() + '.tmp'
+    try {
+      await writeFile(staging, JSON.stringify(validated, null, 2) + '\n', { mode: 0o600, flag: 'wx' })
+      await rename(staging, target)
+    } finally { await rm(staging, { force: true }) }
+  } else await writeFile(resolve(CONFIG_DIR, sectionFiles[section]), JSON.stringify(validated, null, 2) + '\n')
   if (section === 'marketData') {
     const keys = (validated as { providerKeys?: Record<string, string | undefined> }).providerKeys
     if (keys) await mirrorProviderKeysToGlobal(keys)

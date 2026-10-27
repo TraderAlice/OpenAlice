@@ -120,6 +120,14 @@ export class NewsCollectorStore implements INewsProvider {
     )
   }
 
+  /** Change memory policy without pruning or rewriting the durable archive. */
+  configureMemory(maxInMemory: number, retentionDays: number): void {
+    this.maxInMemory = maxInMemory
+    this.retentionDays = retentionDays
+    const cutoff = Date.now() - retentionDays * 86400000
+    this.buffer = this.buffer.filter(record => record.pubTs >= cutoff).slice(-maxInMemory)
+  }
+
   /**
    * Ingest a single news item. Returns true if new (not a duplicate).
    *
@@ -180,6 +188,7 @@ export class NewsCollectorStore implements INewsProvider {
     // Memory
     this.dedupSet.add(item.dedupKey)
     this.buffer.push(record)
+    this.buffer.sort((a, b) => a.pubTs - b.pubTs)
 
     // Evict oldest if over limit
     if (this.buffer.length > this.maxInMemory) {
@@ -226,6 +235,24 @@ export class NewsCollectorStore implements INewsProvider {
 
   // ==================== INewsProvider ====================
 
+  async *scanNews(): AsyncIterable<NewsItem> {
+    await this.writeChain
+    const upperId = this.seq
+    const input = createReadStream(this.logPath, { encoding: 'utf8' })
+    const lines = createInterface({ input, crlfDelay: Infinity })
+    const seen = new Set<number>()
+    try {
+      for await (const line of lines) {
+        let record: NewsRecord
+        try { record = JSON.parse(line) } catch { continue }
+        if (!Number.isSafeInteger(record?.seq) || record.seq < 0 || record.seq > upperId || seen.has(record.seq)) continue
+        seen.add(record.seq)
+        yield recordToNewsItem(record)
+      }
+    } catch (error) { if (!isENOENT(error)) throw error }
+    finally { lines.close(); input.destroy() }
+  }
+
   async getNewsV2(options: GetNewsV2Options): Promise<NewsItem[]> {
     const { endTime, startTime, lookback, limit } = options
     const endMs = endTime.getTime()
@@ -258,19 +285,49 @@ export class NewsCollectorStore implements INewsProvider {
 
   /** Stable IDs address the durable archive, not just the recent memory index. */
   async getNewsById(id: number): Promise<NewsItem | null> {
-    const cached = this.buffer.find((record) => record.seq === id)
-    if (cached) return recordToNewsItem(cached)
+    return (await this.getNewsByIds([id]))[0] ?? null
+  }
+
+  async getNewsByIds(ids: number[], options?: { preview?: boolean }): Promise<NewsItem[]> {
+    const found: NewsItem[] = []
+    await this.visitRecords(ids, record => {
+      const item = recordToNewsItem(record)
+      found.push(options?.preview ? { ...item, content: '', metadata: Object.fromEntries(['source', 'publisher', 'author', 'role', 'link', 'categories', 'timeBasis'].map(key => [key, item.metadata[key] ?? null])) } : item)
+    })
+    return found
+  }
+
+  async matchNewsArchive(ids: number[], filters: { source?: string; keyword?: string }) {
+    const sourceIds: number[] = [], keywordIds: number[] = [], sources = new Set<string>()
+    const source = filters.source?.toLowerCase(), keyword = filters.keyword?.toLowerCase()
+    await this.visitRecords(ids, record => {
+      const publisher = record.metadata.publisher ?? record.metadata.source
+      if (publisher) sources.add(publisher)
+      if (source && publisher?.toLowerCase() === source) sourceIds.push(record.seq)
+      if (keyword && [record.title, record.content, ...Object.values(record.metadata)].join('\n').toLowerCase().includes(keyword)) keywordIds.push(record.seq)
+    })
+    return { sourceIds, keywordIds, sources: [...sources] }
+  }
+
+  private async visitRecords(ids: number[], visit: (record: NewsRecord) => void): Promise<void> {
+    const remaining = new Set(ids)
+    const add = (record: NewsRecord) => {
+      visit(record)
+      remaining.delete(record.seq)
+    }
+    for (const record of this.buffer) if (remaining.has(record.seq)) add(record)
+    if (!remaining.size) return
     const input = createReadStream(this.logPath, { encoding: 'utf8' })
     const lines = createInterface({ input, crlfDelay: Infinity })
     try {
       for await (const line of lines) {
         let record: NewsRecord
         try { record = JSON.parse(line) } catch { continue }
-        if (record?.seq === id) return recordToNewsItem(record)
+        if (remaining.has(record?.seq)) add(record)
+        if (!remaining.size) break
       }
-      return null
     } catch (error) {
-      if (isENOENT(error)) return null
+      if (isENOENT(error)) return
       throw error
     } finally {
       lines.close()

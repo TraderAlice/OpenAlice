@@ -14,25 +14,8 @@
 import type { OhlcvData } from './indicator/types.js'
 import type { EquityClientLike } from '../market-data/client/types.js'
 
-export interface SectorEtf {
-  symbol: string
-  sector: string
-}
-
-/** The 11 SPDR Select Sector ETFs (GICS). The enumerated rotation universe. */
-export const GICS_SECTOR_ETFS: SectorEtf[] = [
-  { symbol: 'XLK', sector: 'Technology' },
-  { symbol: 'XLC', sector: 'Communication Services' },
-  { symbol: 'XLY', sector: 'Consumer Discretionary' },
-  { symbol: 'XLP', sector: 'Consumer Staples' },
-  { symbol: 'XLE', sector: 'Energy' },
-  { symbol: 'XLF', sector: 'Financials' },
-  { symbol: 'XLV', sector: 'Health Care' },
-  { symbol: 'XLI', sector: 'Industrials' },
-  { symbol: 'XLB', sector: 'Materials' },
-  { symbol: 'XLRE', sector: 'Real Estate' },
-  { symbol: 'XLU', sector: 'Utilities' },
-]
+import { GICS_SECTOR_ETFS } from './sector-catalog.js'
+export { GICS_SECTOR_ETFS, type SectorEtf } from './sector-catalog.js'
 
 /** Broad-market anchor for relative strength (beat/lag the tape). */
 export const BENCHMARK_SYMBOL = 'SPY'

@@ -14,6 +14,7 @@ import { fetchShipping, type ShippingBoard } from './shipping.js'
 import { fetchFedBoard, type FedBoard } from './fed.js'
 import { cachedBoard } from './cache.js'
 import { createHubFetcher, markLocal, type HubConfig } from './hub.js'
+import { economicCalendarSchema, type EconomicCalendarBoard } from './economic-calendar.js'
 
 export interface ReferenceDataDeps {
   equityClient: EquityClientLike
@@ -83,6 +84,21 @@ export function createReferenceData(deps: ReferenceDataDeps): ReferenceDataServi
     }
   })
 
+  const economicCalendar = cachedBoard(TTL.calendar, async (): Promise<EconomicCalendarBoard> => {
+    const hub = economicCalendarSchema.safeParse(await viaHub<EconomicCalendarBoard>('economic-calendar'))
+    if (hub.success) return hub.data
+    if (!deps.economyClient.getCalendar) throw new Error('Economic calendar unavailable')
+    const start = new Date()
+    const end = new Date(start.getTime() + CALENDAR_DAYS * 86400000)
+    const window = { start: isoDay(start), end: isoDay(end) }
+    try {
+      const events = await deps.economyClient.getCalendar({ provider: 'fmp', start_date: window.start, end_date: window.end })
+      return economicCalendarSchema.parse({ events, window, meta: { provider: 'fmp', asOf: new Date().toISOString(), origin: 'local' } })
+    } catch {
+      throw new Error('Economic calendar unavailable. Check the configured market data source.')
+    }
+  })
+
   const calendarCached = cachedBoard(TTL.calendar, async (): Promise<CalendarBoard> => {
     const hub = await viaHub<CalendarBoard>('calendar')
     if (hub) return hub
@@ -129,8 +145,16 @@ export function createReferenceData(deps: ReferenceDataDeps): ReferenceDataServi
 
   const macro = cachedBoard(TTL.macro, async () =>
     (await viaHub<MacroBoard>('macro')) ?? markLocal(await fetchMacroBoard(deps.economyClient)))
-  const globalMacro = cachedBoard(TTL.globalMacro, async () =>
-    (await viaHub<GlobalMacroBoard>('global-macro')) ?? markLocal(await fetchGlobalMacro(deps.economyClient)))
+  const globalMacro = cachedBoard(TTL.globalMacro, async () => {
+    const hub = await viaHub<GlobalMacroBoard>('global-macro')
+    if (hub?.rows?.some(row => [row.cpiYoy, row.shortRate, row.cli, row.housePrice, row.sharePrice]
+      .some(cell => Array.isArray(cell?.history) && cell.history.length > 0))) return hub
+    try { return markLocal(await fetchGlobalMacro(deps.economyClient)) }
+    catch (error) {
+      if (!hub?.rows?.length) throw error
+      return { ...hub, historyError: error instanceof Error ? error.message : String(error) }
+    }
+  })
   const shipping = cachedBoard(TTL.shipping, async () =>
     (await viaHub<ShippingBoard>('shipping')) ?? markLocal(await fetchShipping(deps.economyClient)))
   const fed = cachedBoard(TTL.fed, async () =>
@@ -148,6 +172,7 @@ export function createReferenceData(deps: ReferenceDataDeps): ReferenceDataServi
 
   return {
     movers,
+    economicCalendar,
     // calendar(opts) with a custom window bypasses the cache (rare, AI-only
     // path through the route's ?days=); the default window is cached.
     async calendar(opts): Promise<CalendarBoard> {

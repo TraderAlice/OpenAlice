@@ -273,7 +273,7 @@ export class WebPlugin implements Plugin {
     }))
     app.route('/api/tools', createToolsRoutes(ctx.toolCenter))
     app.route('/api/agent-status', createAgentStatusRoutes(ctx))
-    app.route('/api/news', createNewsRoutes(ctx))
+    app.route('/api/news', createNewsRoutes(ctx, { getWorkspaceService: () => this.workspaceService }))
     app.route('/api/market', createMarketRoutes(ctx))
     app.route('/api/bars', createBarsRoutes(ctx))
     app.route('/api/reference', createReferenceRoutes(ctx))

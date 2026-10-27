@@ -10,6 +10,7 @@ const ROW = {
 
 function mkCtx(overrides?: Partial<ReferenceDataService>): EngineContext {
   const reference: ReferenceDataService = {
+    economicCalendar: async () => ({ events: [], window: { start: '2026-10-25', end: '2026-11-08' }, meta: { provider: 'fmp', asOf: '2026-10-25T00:00:00Z' } }),
     movers: async () => ({
       gainers: [ROW], losers: [], active: [ROW],
       undervaluedGrowth: [ROW], growthTech: [], smallCaps: [], undervaluedLarge: [],
@@ -59,6 +60,14 @@ function mkCtx(overrides?: Partial<ReferenceDataService>): EngineContext {
 }
 
 describe('reference routes', () => {
+  it('serves economic releases through a separate endpoint and sanitizes failures', async () => {
+    const response = await createReferenceRoutes(mkCtx()).request('/economic-calendar')
+    expect(response.status).toBe(200)
+    expect(await response.json()).toMatchObject({ events: [], meta: { provider: 'fmp' } })
+    const failed = await createReferenceRoutes(mkCtx({ economicCalendar: async () => { throw new Error('private upstream request detail') } })).request('/economic-calendar')
+    expect(failed.status).toBe(502)
+    expect(await failed.text()).not.toContain('private upstream')
+  })
   it('GET /movers returns the board with explicit provider meta', async () => {
     const res = await createReferenceRoutes(mkCtx()).request('/movers')
     const body = await res.json()

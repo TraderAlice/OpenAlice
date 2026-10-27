@@ -52,6 +52,28 @@ Each response carries an explicit `meta` envelope describing origin and as-of
 time. The hosted hub is preferred when enabled; typed local providers are the
 fallback where a board implements one.
 
+Global Macro retains up to five years of actual observations in each cell's
+optional `history`, ordered oldest first and normalized to the cell's display
+units. The latest `value`/`date` remain available to existing callers. History is
+retained from the same five batched OECD calls, not requested once per scrub.
+A history-capable hub is preferred; a snapshot-only hub falls through to a
+local OECD board without mixing sources. If local history fails entirely, the
+hub snapshot remains readable with `historyError`. The six-hour cache applies
+to the resulting board. No new provider or endpoint is added.
+
+Each cell's `date` describes its supplied observation period; board fetch/cache
+timestamps do not replace it. The map timeline compares finite values sharing
+one supplied date; country details and the table follow the chosen period when
+history is available. Missing/undated/non-finite values stay uncolored and empty;
+quarterly values are not interpolated or carried into other months. A
+snapshot-only response retains its original latest-cell display and disables
+historical scrubbing. These are currently available observations and revisions,
+not historical publication vintages or a point-in-time backtesting feed. This
+display does not certify source freshness, frequency or full country coverage.
+The bundled geography and projection source notice are in
+`ui/src/components/market/world-map.LICENSE`; UI behavior belongs to
+[[docs/ui-interaction-and-motion.md]].
+
 Configuration lives in
 `<OPENALICE_HOME>/data/config/market-data.json`:
 
@@ -76,6 +98,18 @@ Configuration lives in
 Self-hosters may point `hub.baseUrl` at their own compatible TraderHub. A
 `hub:<baseUrl>` credential sentinel routes supported keyed-provider requests
 through the hub without copying the hub's upstream credential into OpenAlice.
+
+## Economic-release calendar
+
+`GET /api/reference/economic-calendar` and the native `marketGetBoard` choice
+`economic-calendar` share a validated reference board (`events`, 14-day `window`,
+`meta`) and the existing 30-minute cache. A compatible hub is preferred; the
+local path reuses `SDKEconomyClient.getCalendar` with its configured FMP access.
+This endpoint is distinct from `/api/reference/calendar`'s corporate calendar.
+Unavailable access fails explicitly, with sanitized provider errors; no key,
+provider or subscription is activated by this feature. Its DTO strips unknown
+fields. Economic actual/consensus/previous zeros remain real values in the FMP
+adapter. Source date text does not certify a timezone or an event's punctuality.
 
 ## Bar and K-line Providers
 
@@ -268,6 +302,24 @@ substitutes a quote or switches sources to manufacture a complete candle.
 Diagnostics describe rows reaching the bar service, not invisible upstream gaps.
 
 ## Market references in replies
+
+The existing analytics boards consume the same reference responses. Movers
+searches only its returned list and supports finite numeric sorting; the third
+sort state restores provider order. Missing values remain last in both directions.
+Sector Rotation switches relative returns across 1D/1W/1M/3M/6M; its score and
+twenty-day volume-share baseline stay fixed and are explained in the collapsed
+methodology. Return differences and volume-share changes use percentage points.
+Numeric axes include zero symmetrically and labels remain visible without
+scatter animation. ETF rows open the existing instrument detail.
+
+Term Structure places supplied expiries on a numeric time axis. Price and
+annualized-basis modes retain missing nodes as gaps, using the valid perpetual
+reference or zero respectively. Basis is unavailable below seven days or without
+a valid reference. A far-end label compares only the actual longest maturity;
+missing far quotes do not borrow a nearer contract or classify the whole curve.
+Inline contract details retain exact supplied dates, days, prices and basis.
+All three boards expose local refresh/retry and distinguish fetch time from
+underlying as-of data; no provider activation or source substitution is implied.
 
 `[[market/{barId}/{interval}]]` is a reserved Connector Protocol reference,
 separate from files and Tracked entities. The last slash delimits the interval;

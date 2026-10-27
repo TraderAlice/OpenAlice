@@ -239,6 +239,11 @@ body {
 }
 
 @media (forced-colors: active) {
+  :root :focus-visible {
+    outline: 2px solid Highlight;
+    outline-offset: 2px;
+  }
+
   :root:not([data-ui-style="win98"]) select.oa-field-control {
     appearance: auto;
     background-image: none;

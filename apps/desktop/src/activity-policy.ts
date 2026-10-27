@@ -32,14 +32,14 @@ export function allowsActivity(prefs: ActivityPreferences, signal: AgentActivity
   if (!kind || !prefs.enabled || prefs.pausedUntil > now) return false
   return prefs.events[kind]
 }
-export type ActivityContext = 'office' | 'inbox' | 'news'
+export type ActivityContext = 'office' | 'inbox' | 'news' | `news:${string}`
 export type SerializedNotification = Omit<NotificationInput, 'action' | 'duration' | 'onDismiss'> & {
   duration: number | null
   context: ActivityContext
 }
 export function briefNotification(input: SerializedNotification): SerializedNotification {
   const title = input.status === 'error' ? 'Work failed' : input.status === 'warning' ? 'Action needed'
-    : input.context === 'news' ? 'News updated' : input.context === 'inbox' ? 'Report ready'
+    : input.context === 'news' || input.context.startsWith('news:') ? 'News updated' : input.context === 'inbox' ? 'Report ready'
       : input.status === 'running' ? 'Work in progress' : input.status === 'success' ? 'Work completed' : 'Activity updated'
   // No names, raw details, article images or source labels reach the pet in brief mode.
   return { id: input.id, status: input.status, title, duration: input.duration, context: input.context,

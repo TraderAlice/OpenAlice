@@ -131,7 +131,8 @@ includes only the message/action block in addition to the alpha-tested pet.
 Other transparent pixels remain click-through. The bridge accepts only an
 active display token from the owning window's main frame, validates its source
 again, and opens Office, Inbox or News through the existing frontend tab store.
-No arbitrary URL/code or exact article/session deep link is accepted. These
+No arbitrary URL/code or session deep link is accepted. A checked followed-event
+ID may open and expand its event in the existing News tab. These
 context-level destinations are intentional current route limits.
 
 The isolated native demo smoke includes real Journal → main IPC → background

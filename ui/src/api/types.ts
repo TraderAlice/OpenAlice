@@ -236,9 +236,11 @@ export interface McpConfig {
 // ==================== News Collector ====================
 
 export interface NewsCollectorFeed {
+  id?: string
   name: string
   url: string
   source: string
+  rsshubRoute?: string
   categories?: string[]
   description?: string
   enabled?: boolean
@@ -249,25 +251,158 @@ export interface NewsCollectorConfig {
   intervalMinutes: number
   maxInMemory: number
   retentionDays: number
+  rsshubBaseUrl: string
+  modules: ModuleSelection[]
+  subscriptions: NewsSubscription[]
   feeds: NewsCollectorFeed[]
+}
+
+export interface NewsCollectorPresetsResponse {
+  feeds: NewsCollectorPreset[]
+}
+
+export interface NewsCollectorPreset extends NewsCollectorFeed {
+  regions?: string[]
+  markets?: string[]
+}
+
+export type NewsCollectorFeedState =
+  | 'disabled'
+  | 'never_attempted'
+  | 'checking'
+  | 'healthy'
+  | 'error'
+
+export interface NewsCollectorFeedStatus {
+  id?: string
+  source: string
+  url: string
+  name: string
+  state: NewsCollectorFeedState
+  lastAttemptAt: number | null
+  lastSuccessAt: number | null
+  lastItemCount: number | null
+  lastNewItemCount: number | null
+  lastError: string | null
+  lastPublishedAt?: number | null
+  lastUndatedItemCount?: number | null
+  lastEmptyContentCount?: number | null
+  lastEmptyItemCount?: number | null
+  lastDurationMs?: number | null
+}
+
+export interface NewsCollectorStatusResponse {
+  feeds: NewsCollectorFeedStatus[]
+}
+
+export interface NewsCollectorCollectResult {
+  total: number
+  new: number
+}
+
+// ==================== News Modules ====================
+
+export interface ModuleSelection {
+  moduleId: string
+  contentHash: string
+  enabled: boolean
+}
+
+export interface NewsSubscription {
+  id: string
+  moduleId: string
+  sourceKey: string
+  name: string
+  source: string
+  enabled: boolean
+  params: Record<string, string | number | boolean>
+  categories: string[]
+}
+
+export interface NewsModuleManifest {
+  abiVersion: 1 | 2
+  credentials?: Array<{ key: string; label: string }>
+  moduleId: string
+  version: string
+  name: string
+  description: string
+  entry: string
+  sources: Array<{
+    key: string
+    name: string
+    parameters: Array<{ key: string; label: string; type: 'string' | 'number' | 'boolean'; required: boolean }>
+  }>
+}
+
+export interface NewsModuleArtifact {
+  manifest: NewsModuleManifest
+  files: Record<string, string>
+}
+
+export interface InstalledModule {
+  manifest: NewsModuleManifest
+  contentHash: string
+  approved: boolean
+}
+
+export interface ModuleStatus {
+  moduleId: string | null
+  manifest: NewsModuleManifest | null
+  contentHash: string
+  installed: boolean
+  approved: boolean
+  desiredEnabled: boolean
+  loaded: boolean
+  loadedHash: string | null
+  state: 'disabled' | 'running' | 'failed' | 'unapproved' | 'missing' | 'invalid'
+  lastError: string | null
+}
+
+export interface RssHubKeyStatus {
+  configured: boolean
+  available: boolean
+  baseUrl: string | null
 }
 
 // ==================== News Articles ====================
 
+export type { NewsReadProgress, NewsReadStatus, NewsReaderPatch, NewsReaderState, NewsStory, NewsStoryDetail, NewsStoryPreview } from '../../../src/domain/news/reading-contract'
+
 export interface NewsArticle {
+  important?: boolean
+  id?: number
+  // null means conflicting event assignments; absent means not prepared.
+  eventRef?: { storyId: string; developmentId: string } | null
   time: string
+  timeBasis?: 'collection'
+  contentBasis?: 'feed-content' | 'feed-summary' | 'missing'
   title: string
   content: string
   source: string | null
   link: string | null
   categories: string | null
   image?: string | null
+  publisher?: string
+  author?: string
+  kind?: 'article' | 'social' | 'announcement'
+  role?: 'official' | 'reporting' | 'discussion'
+  language?: string
+  symbols?: string[]
+  media?: Array<{ type: 'image' | 'video'; url: string }>
+  quote?: { author: string; text: string; url: string }
 }
+
+export interface NewsModuleCredential { key: string; label: string; configured: boolean; available: boolean }
 
 export interface NewsListResponse {
   items: NewsArticle[]
   count: number
   lookback: string | null
+  stories?: import('../../../src/domain/news/reading-contract').NewsStoryPreview[]
+  storyError?: boolean
+  storySources?: string[]
+  storyTopics?: Array<{ topic: string; count: number }>
+  storyNextOffset?: number | null
 }
 
 

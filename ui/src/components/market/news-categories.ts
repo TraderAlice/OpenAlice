@@ -1,4 +1,6 @@
 export const NEWS_CATEGORIES = [
+  { id: 'ai', labelKey: 'news.categoryAi', tags: ['ai', 'artificial-intelligence', 'llm', 'machine-learning'] },
+  { id: 'technology', labelKey: 'news.categoryTechnology', tags: ['tech', 'technology', 'semiconductors', 'chips', 'computing'] },
   { id: 'themes', labelKey: 'news.categoryThemes', tags: ['theme', 'themes', 'concept', 'concepts'] },
   { id: 'a-shares', labelKey: 'news.categoryAShares', tags: ['cn', 'china', 'a-share', 'a-shares', 'ashare'] },
   { id: 'chinext', labelKey: 'news.categoryChiNext', tags: ['chinext', 'gem'] },
@@ -24,7 +26,7 @@ export type NewsCategoryId = typeof NEWS_CATEGORIES[number]['id']
 
 export const NEWS_CATEGORY_GROUPS = [
   { labelKey: 'news.groupEquities', categories: ['a-shares', 'chinext', 'star', 'bse', 'neeq', 'hk', 'us'] },
-  { labelKey: 'news.groupTopics', categories: ['themes', 'industries', 'ipo', 'china-concepts'] },
+  { labelKey: 'news.groupTopics', categories: ['ai', 'technology', 'themes', 'industries', 'ipo', 'china-concepts'] },
   { labelKey: 'news.groupAssets', categories: ['funds', 'bonds', 'futures', 'fx', 'options', 'warrants'] },
   { labelKey: 'news.groupMacro', categories: ['macro', 'wealth'] },
 ] as const satisfies ReadonlyArray<{ labelKey: string; categories: readonly NewsCategoryId[] }>

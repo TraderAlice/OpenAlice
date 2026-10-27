@@ -54,6 +54,11 @@ async function main(): Promise<number> {
         await startConnectorService()
         return 0
       }
+      case 'news-worker': {
+        const { runNewsWorker } = await import('../../../src/domain/news/modules/worker-entry.js')
+        await runNewsWorker()
+        return 0
+      }
     }
   }
 

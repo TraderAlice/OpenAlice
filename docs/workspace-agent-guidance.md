@@ -42,6 +42,7 @@ One concept has one primary owner:
 | Delegating quantitative research from Chat to AutoQuant | `delegate-autoquant` |
 | Issue file shape, ownership, schedules, headless delivery | `self-scheduling` |
 | Low-frequency market/fundamental/macro data | `traderhub` |
+| Subscribed news evidence, event identity and native-agent event publication | `alice` (news reference) |
 | K-line discovery, raw OHLCV, freshness and reply chart references | `market-data` |
 | Optional quantitative formulas and snapshots | `alice-analysis` |
 | Broker accounts/contracts/quotes and trading writes | `alice-uta` |

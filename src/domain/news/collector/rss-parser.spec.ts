@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { parseRSSXml, fetchAndParseFeed } from './rss-parser'
+import { parseRSSXml, fetchAndParseFeed, MAX_FEED_RESPONSE_BYTES } from './rss-parser'
 
 describe('parseRSSXml', () => {
   it('parses standard RSS 2.0 items', () => {
@@ -35,6 +35,33 @@ describe('parseRSSXml', () => {
 
     expect(items[1].title).toBe('ETH upgrade announced')
     expect(items[1].guid).toBe('article-2-uuid')
+  })
+
+  it('reads XML-escaped HTML bodies while preserving literal code and Atom text', () => {
+    const xml = '<rss><channel><item><title>Chart</title><description>&lt;p&gt;Market&amp;nbsp;update&lt;br&gt;&lt;img src="https://cdn.example.com/chart.png"&gt;&lt;/p&gt;</description></item><item><title>Code</title><description>&lt;p&gt;Use &amp;lt;tag&amp;gt; literally&lt;/p&gt;</description></item><item><title>CDATA code</title><description><![CDATA[<p>Use &lt;tag&gt; literally</p>]]></description></item></channel></rss>'
+    const items = parseRSSXml(xml)
+    expect(items[0].content).toBe('Market\u00a0update')
+    expect(items[0].image).toBe('https://cdn.example.com/chart.png')
+    expect(items[1].content).toBe('Use <tag> literally')
+    expect(items[2].content).toBe('Use <tag> literally')
+    expect(parseRSSXml('<feed><entry><title>Text</title><content type="text">Use &lt;tag&gt; literally</content></entry><entry><title>HTML</title><content type="html">&lt;p&gt;HTML body&lt;/p&gt;</content></entry></feed>').map(item => item.content)).toEqual(['Use <tag> literally', 'HTML body'])
+    expect(parseRSSXml('<feed><entry><summary>Use &lt;tag&gt; literally</summary></entry></feed>')[0].content).toBe('Use <tag> literally')
+    expect(parseRSSXml('<rss><channel><item><title>&#128640; &#x1f680; &#1114112;</title></item></channel></rss>')[0].title).toBe('🚀 🚀 &#1114112;')
+  })
+
+  it('cleans escaped RSS headline formatting without removing literal comparisons or unknown angle-bracket text', () => {
+    const items = parseRSSXml('<rss><channel><item><title>&lt;b&gt;Market close&lt;/b&gt;&lt;br/&gt;&lt;span class="section-news"&gt;Risk &lt;5%&lt;/span&gt;</title></item><item><title>Stocks &lt;rises&gt;</title></item></channel></rss>')
+    expect(items.map(item => item.title)).toEqual(['Market close Risk <5%', 'Stocks <rises>'])
+  })
+
+  it('preserves financial comparisons while stripping actual HTML', () => {
+    const items = parseRSSXml('<rss><channel><item><description>Risk &lt;5% and yield &gt;2%</description></item><item><description>Risk &lt; 5% and yield &gt; 2%</description></item><item><description><![CDATA[<p title="yield > 2%">Risk <5% and yield >2%</p><!-- hidden -->]]></description></item></channel></rss>')
+    expect(items.map(item => item.content)).toEqual(['Risk <5% and yield >2%', 'Risk < 5% and yield > 2%', 'Risk <5% and yield >2%'])
+  })
+
+  it('preserves incomplete HTML without overlapping whitespace matches', () => {
+    const content = '<p' + ' '.repeat(100_000) + 'unfinished'
+    expect(parseRSSXml(`<rss><channel><item><description><![CDATA[${content}]]></description></item></channel></rss>`)[0].content).toBe(content)
   })
 
   it('handles CDATA-wrapped content', () => {
@@ -75,6 +102,28 @@ describe('parseRSSXml', () => {
     expect(items[0].guid).toBe('urn:uuid:atom-1')
     expect(items[0].content).toBe('Solana reached a new all-time high price today.')
     expect(items[0].pubDate).toEqual(new Date('2026-02-27T09:00:00Z'))
+  })
+
+  it('prefers nonempty feed content over a summary and falls back past empty formatting', () => {
+    const atom = parseRSSXml('<feed><entry><title>Decision</title><summary>Short summary</summary><content type="html">&lt;p&gt;The detailed policy announcement.&lt;/p&gt;</content></entry></feed>')[0]
+    expect(atom.content).toBe('The detailed policy announcement.')
+    expect(atom).toHaveProperty('contentBasis', 'feed-content')
+    const rss = parseRSSXml('<rss><channel><item><title>Decision</title><content:encoded><![CDATA[<p> </p>]]></content:encoded><description>Available summary</description></item></channel></rss>')[0]
+    expect(rss.content).toBe('Available summary')
+    expect(rss).toHaveProperty('contentBasis', 'feed-summary')
+    expect(parseRSSXml('<rss><channel><item><title>Headline only</title></item></channel></rss>')[0]).toHaveProperty('contentBasis', 'missing')
+  })
+
+  it('keeps publication dates unknown when the source supplies no timezone', () => {
+    for (const date of ['2026-10-28', '2026-10-28T09:30:00', 'Wed, 28 Oct 2026 09:30:00']) {
+      expect(parseRSSXml(`<rss><channel><item><title>Release</title><pubDate>${date}</pubDate></item></channel></rss>`)[0].pubDate).toBeNull()
+    }
+  })
+
+  it.each(['&nbsp;', '&#160;', '&#32;', '<p>&nbsp;</p>'])('falls back from entity-only content %s', content => {
+    const item = parseRSSXml(`<rss><channel><item><title>Release</title><content:encoded><![CDATA[${content}]]></content:encoded><description>Available summary</description></item></channel></rss>`)[0]
+    expect(item.content).toBe('Available summary')
+    expect(item.contentBasis).toBe('feed-summary')
   })
 
   it('decodes XML entities', () => {
@@ -197,24 +246,16 @@ describe('parseRSSXml', () => {
   })
 
 })
-// ==================== fetchAndParseFeed ====================
-
-const MINIMAL_RSS = `<?xml version="1.0"?><rss version="2.0"><channel>
-  <item><title>Test</title><description>Body</description></item>
-</channel></rss>`
+const MINIMAL_RSS = '<rss><channel><item><title>Test</title><description>Body</description></item></channel></rss>'
 
 function mockOkResponse(body: string): Response {
-  return {
-    ok: true,
-    status: 200,
-    statusText: 'OK',
-    text: () => Promise.resolve(body),
-  } as unknown as Response
+  return new Response(body, { status: 200, headers: { 'Content-Type': 'application/xml' } })
 }
 
 function mockErrorResponse(status: number, statusText: string): Response {
-  return { ok: false, status, statusText, text: () => Promise.resolve('') } as unknown as Response
+  return new Response('', { status, statusText })
 }
+
 
 describe('fetchAndParseFeed', () => {
   afterEach(() => {
@@ -226,6 +267,24 @@ describe('fetchAndParseFeed', () => {
     const items = await fetchAndParseFeed('https://example.com/feed')
     expect(items).toHaveLength(1)
     expect(items[0].title).toBe('Test')
+  })
+
+  it('accepts a response exactly at the byte limit', async () => {
+    const body = ' '.repeat(MAX_FEED_RESPONSE_BYTES - Buffer.byteLength(MINIMAL_RSS)) + MINIMAL_RSS
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(mockOkResponse(body))
+    expect(await fetchAndParseFeed('https://example.com/feed')).toHaveLength(1)
+  })
+
+  it('cancels an over-limit response despite a deceptive Content-Length and does not retry', async () => {
+    let cancelled = false
+    const stream = new ReadableStream<Uint8Array>({
+      start(controller) { controller.enqueue(new Uint8Array(MAX_FEED_RESPONSE_BYTES + 1)) },
+      cancel() { cancelled = true },
+    })
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(stream, { headers: { 'content-length': '1' } }))
+    await expect(fetchAndParseFeed('https://example.com/feed', 1)).rejects.toThrow(/exceeds/)
+    expect(fetchSpy).toHaveBeenCalledTimes(1)
+    expect(cancelled).toBe(true)
   })
 
   it('retries once after a network failure and succeeds', async () => {

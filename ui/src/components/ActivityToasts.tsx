@@ -12,6 +12,10 @@ import { useNotifications } from './Toast'
 import { ActivityAnnouncements } from '../../../apps/desktop/src/activity-announcements'
 import type { SerializedNotification } from '../../../apps/desktop/src/activity-policy'
 
+function newsDestination(context: string): string | undefined {
+  return /^news:[a-z0-9][a-z0-9-]{0,79}$/.test(context) ? context.slice(5) : undefined
+}
+
 export function ActivityToasts() {
   const { t } = useTranslation()
   const queue = useNotifications()
@@ -29,12 +33,14 @@ export function ActivityToasts() {
       const input: SerializedNotification = event.input
       queue.publish({ ...input, group: undefined, id: event.displayId, duration: input.duration ?? Infinity,
         onDismiss: () => { void desktop.dismiss(event.displayId) },
-        action: { label: t(input.context === 'inbox' ? 'activityToast.viewInbox' : input.context === 'news' ? 'activityToast.viewNews' : 'activityToast.viewSession'),
+        action: { label: t(input.context === 'inbox' ? 'activityToast.viewInbox' : input.context === 'news' || newsDestination(input.context) ? 'activityToast.viewNews' : 'activityToast.viewSession'),
           onClick: () => { void desktop.open(event.displayId) } },
       })
     })
     const offRoute = desktop.onOpen(context => {
-      if (context === 'office' || context === 'inbox' || context === 'news') openOrFocus({ kind: context, params: {} })
+      const eventId = newsDestination(context)
+      if (eventId) openOrFocus({ kind: 'news', params: { view: 'events', eventId } })
+      else if (context === 'office' || context === 'inbox' || context === 'news') openOrFocus({ kind: context, params: {} })
     })
     return () => { unsubscribe(); offRoute() }
   }, [desktop, openOrFocus, queue, t])
@@ -49,7 +55,11 @@ export function ActivityToasts() {
         if (record) useSessionDetailsDialog.getState().show(record)
         else openOrFocus({ kind: 'office', params: {} })
       } }),
-      open: context => openOrFocus({ kind: context, params: {} }),
+      open: context => {
+        const eventId = newsDestination(context)
+        if (eventId) openOrFocus({ kind: 'news', params: { view: 'events', eventId } })
+        else if (context === 'office' || context === 'inbox' || context === 'news') openOrFocus({ kind: context, params: {} })
+      },
     })
   }, [desktop, error, loading, openOrFocus, queue, sessionLabel, signals, t, workspaces])
   return null

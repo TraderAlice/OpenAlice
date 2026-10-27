@@ -13,6 +13,13 @@ import type { EngineContext } from '../../core/types.js'
 
 export function createReferenceRoutes(ctx: EngineContext): Hono {
   const app = new Hono()
+  app.get('/economic-calendar', async (c) => {
+    try {
+      return c.json(await ctx.reference.economicCalendar())
+    } catch {
+      return c.json({ error: 'Economic calendar unavailable. Check the configured market data source.' }, 502)
+    }
+  })
 
   // GET /api/reference/movers → gainers / losers / active board
   app.get('/movers', async (c) => {

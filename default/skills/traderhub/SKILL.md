@@ -10,7 +10,7 @@ description: >
   a calendar, or a ready-made board: "what's CPI", "AAPL ratios", "earnings
   this week", "which sectors are rotating in", "Suez canal traffic", "Fed
   balance sheet". Data is served hub-first (hosted TraderHub) with local
-  fallback — no API keys needed. Discover flags live with
+  fallback. Access depends on the selected provider. Discover flags live with
   `traderhub <group> <verb> --help`; do NOT guess flags.
 ---
 
@@ -38,6 +38,7 @@ Boards are the finished product — pre-aggregated, cached, one call:
 traderhub board get --board macro          # 14 US macro cards (rates, CPI YoY, labor, oil, M2…)
 traderhub board get --board movers         # gainers/losers/active + 4 screener lists
 traderhub board get --board calendar       # earnings + IPOs + ex-dividends, 14d window
+traderhub board get --board economic-calendar # economic releases: actual / forecast / previous
 traderhub board get --board calendar --days 30
 traderhub board get --board valuation      # S&P 500 PE / CAPE / yields
 traderhub board get --board term-structure # BTC/ETH futures curve + annualized basis

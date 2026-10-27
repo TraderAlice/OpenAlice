@@ -113,8 +113,9 @@ export type MutateResult =
   | { ok: true; issue: IssueRecord; previous: IssueRecord }
   | { ok: false; reason: 'not_found' }
   | { ok: false; reason: 'invalid'; error: string }
+  | { ok: false; reason: 'conflict'; error: string }
 
-/** Result of `createIssue` — adds the `conflict` case (id already exists). */
+/** Result of `createIssue`; conflict means the id already exists. */
 export type CreateResult =
   | { ok: true; issue: IssueRecord }
   | { ok: false; reason: 'conflict'; id: string }
@@ -158,7 +159,7 @@ export async function updateIssueFields(
   wsDir: string,
   id: string,
   patch: IssueFieldPatch,
-  options?: { allowConnectorDesk?: boolean; allowTelegramConnector?: boolean; ordinaryScheduleOnly?: boolean },
+  options?: { allowConnectorDesk?: boolean; allowTelegramConnector?: boolean; ordinaryScheduleOnly?: boolean; expectedWhat?: string },
 ): Promise<MutateResult> {
   if (!ID_RE.test(id)) return { ok: false, reason: 'not_found' }
   const raw = await readWorkspaceFile(wsDir, relFor(id))
@@ -171,6 +172,7 @@ export async function updateIssueFields(
   // was already broken, and so the merge starts from a known-good frontmatter.
   const current = parseIssueContent(id, raw)
   if (!current.ok) return { ok: false, reason: 'invalid', error: current.error }
+  if (options?.expectedWhat !== undefined && current.issue.what !== options.expectedWhat) return { ok: false, reason: 'conflict', error: 'Issue instructions changed before update' }
 
   // Parse the raw frontmatter object (NOT the zod-defaulted record) so we
   // preserve every author-written key verbatim and only overwrite what changed.

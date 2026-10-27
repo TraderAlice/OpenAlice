@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest'
+import { afterEach, describe, it, expect, vi } from 'vitest'
 import { createReferenceData } from './service.js'
 import type { EconomyClientLike, EquityClientLike } from '../client/types.js'
 
@@ -29,7 +29,73 @@ function mkEquityClient(overrides: Partial<EquityClientLike>): EquityClientLike 
 const DERIVATIVES_STUB = {} as never
 const INDEX_STUB = {} as never
 
+afterEach(() => vi.unstubAllGlobals())
+
+function macroService(hub: unknown, failLocal = false) {
+  vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify(hub))))
+  const get = vi.fn(async () => {
+    if (failLocal) throw new Error('OECD unavailable')
+    return [{ country: 'United States', date: '2026-04-01', value: 2 }, { country: 'United States', date: '2026-03-01', value: 1 }]
+  })
+  return { get, ref: createReferenceData({
+    economyClient: { getCPI: get, getInterestRates: get, getCompositeLeadingIndicator: get, getHousePriceIndex: get, getSharePriceIndex: get } as unknown as EconomyClientLike,
+    derivativesClient: DERIVATIVES_STUB, indexClient: INDEX_STUB,
+    equityClient: mkEquityClient({}), equityProvider: 'yfinance',
+    hub: { enabled: true, baseUrl: 'https://hub.test' },
+  }) }
+}
+
+const hubCell = { value: 9, date: '2026-04-01' }
+const hubRow = { country: 'united_states', label: 'United States', cpiYoy: hubCell, shortRate: hubCell, cli: hubCell, housePrice: hubCell, sharePrice: hubCell }
+const hubMacro = { rows: [hubRow], meta: { provider: 'fred', asOf: '2026-10-25T00:00:00Z' } }
+
 describe('reference service', () => {
+  it('rejects malformed hub economic data and sanitizes provider failures for native callers', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({ events: 'invalid', meta: { provider: 'hub', asOf: '2026-10-25T00:00:00Z' } }))))
+    const getCalendar = vi.fn(async () => { throw new Error('private provider request detail') })
+    const ref = createReferenceData({ economyClient: { ...ECONOMY_STUB, getCalendar } as unknown as EconomyClientLike, equityClient: mkEquityClient({}), equityProvider: 'yfinance', derivativesClient: DERIVATIVES_STUB, indexClient: INDEX_STUB, hub: { enabled: true, baseUrl: 'https://hub.test' } })
+    await expect(ref.economicCalendar()).rejects.toThrow('Economic calendar unavailable. Check the configured market data source.')
+    expect(getCalendar).toHaveBeenCalledTimes(1)
+  })
+
+  it('serves and caches the existing economic calendar without substituting corporate earnings', async () => {
+    const getCalendar = vi.fn(async () => [{ date: '2026-10-25T12:00:00Z', event: 'Example release', actual: 0, consensus: 0, previous: 0 }])
+    const ref = createReferenceData({ economyClient: { ...ECONOMY_STUB, getCalendar } as unknown as EconomyClientLike, equityClient: mkEquityClient({}), equityProvider: 'yfinance', derivativesClient: DERIVATIVES_STUB, indexClient: INDEX_STUB })
+    expect(await ref.economicCalendar()).toMatchObject({ events: [{ event: 'Example release', actual: 0, consensus: 0, previous: 0 }], meta: { provider: 'fmp', origin: 'local' } })
+    await ref.economicCalendar()
+    expect(getCalendar).toHaveBeenCalledTimes(1)
+    expect(getCalendar).toHaveBeenCalledWith({ provider: 'fmp', start_date: expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/), end_date: expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/) })
+  })
+
+  it('builds and caches real local history when the hub only offers a snapshot', async () => {
+    const { ref, get } = macroService(hubMacro)
+    const board = await ref.globalMacro()
+    expect(board.meta).toMatchObject({ provider: 'oecd', origin: 'local' })
+    expect(board.rows[0].cpiYoy.history).toHaveLength(2)
+    expect(board.rows[0].cpiYoy.value).toBe(2)
+    await ref.globalMacro()
+    expect(get).toHaveBeenCalledTimes(5)
+  })
+
+  it('keeps a history-capable hub and never mixes its values with local history', async () => {
+    const { ref, get } = macroService({ ...hubMacro, rows: [{ ...hubRow, cpiYoy: { ...hubCell, history: [{ date: '2026-04-01', value: 9 }] } }] })
+    expect((await ref.globalMacro()).meta.origin).toBe('hub')
+    expect(get).not.toHaveBeenCalled()
+  })
+
+  it('preserves a usable snapshot with a visible history error if local history fails', async () => {
+    const { ref } = macroService(hubMacro, true)
+    const board = await ref.globalMacro()
+    expect(board.rows[0].cpiYoy.value).toBe(9)
+    expect(board.meta.origin).toBe('hub')
+    expect(board.historyError).toContain('OECD unavailable')
+  })
+
+  it('still fails loudly when neither the hub nor local data is available', async () => {
+    const { ref } = macroService({}, true)
+    await expect(ref.globalMacro()).rejects.toThrow('OECD unavailable')
+  })
+
   it('movers: one list failing does not kill the board', async () => {
     const ref = createReferenceData({
       economyClient: ECONOMY_STUB,

@@ -1,9 +1,13 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach, afterAll } from 'vitest'
 import { NewsCollectorStore, computeDedupKey } from './store'
-import { unlink, readFile } from 'node:fs/promises'
-import { resolve } from 'node:path'
+import { unlink, readFile, rm } from 'node:fs/promises'
+import { mkdtempSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 
-const TEST_LOG_PATH = resolve('data/test-news-collector/news.jsonl')
+const testDirectory = mkdtempSync(join(tmpdir(), 'alice-news-store-'))
+const TEST_LOG_PATH = join(testDirectory, 'news.jsonl')
+afterAll(async () => { await rm(testDirectory, { recursive: true, force: true }) })
 
 describe('computeDedupKey', () => {
   it('prefers guid', () => {
@@ -61,6 +65,7 @@ describe('NewsCollectorStore', () => {
     await recovered.init()
     expect(await recovered.getNewsById(old!.seq)).toMatchObject({ title: 'old' })
     expect(await recovered.getNewsById(99999)).toBeNull()
+    expect((await recovered.getNewsByIds([old!.seq, old!.seq, 99999])).map(item => item.id)).toEqual([old!.seq])
     await recovered.close()
   })
 
@@ -213,6 +218,23 @@ describe('NewsCollectorStore', () => {
     expect(smallStore.count).toBe(3)
     expect(smallStore.dedupCount).toBe(5) // All dedup keys retained
     await smallStore.close()
+  })
+
+  it.each(['ingest', 'reconfigure'] as const)('keeps newer publications when late older reports arrive during %s, including after restart', async (mode) => {
+    const bounded = new NewsCollectorStore({ logPath: TEST_LOG_PATH, maxInMemory: mode === 'ingest' ? 2 : 3, retentionDays: 7 })
+    await bounded.init()
+    const now = Date.now()
+    for (const [title, age] of [['Newest', 60_000], ['Recent', 120_000], ['Late old report', 86400000]] as const) {
+      await bounded.ingest({ title, content: title, pubTime: new Date(now - age), dedupKey: title, metadata: { source: 'test' } })
+    }
+    if (mode === 'reconfigure') bounded.configureMemory(2, 7)
+    const query = { endTime: new Date(now), lookback: '7d' }
+    expect((await bounded.getNewsV2(query)).map(item => item.title)).toEqual(['Recent', 'Newest'])
+    expect((await bounded.getNewsById(3))?.title).toBe('Late old report')
+    const recovered = new NewsCollectorStore({ logPath: TEST_LOG_PATH, maxInMemory: 2, retentionDays: 7 })
+    await recovered.init()
+    expect(await recovered.getNewsV2(query)).toEqual(await bounded.getNewsV2(query))
+    expect(recovered.dedupCount).toBe(3)
   })
 
   describe('INewsProvider', () => {

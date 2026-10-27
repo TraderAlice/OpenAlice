@@ -21,7 +21,7 @@ export function officeReplayFocusForEvent(
   if (event.type === 'inbox.received') {
     return { seq: event.seq, targetIds: ['inbox-service'], label, summary, channel }
   }
-  if (event.type === 'news.ingested') {
+  if (event.type === 'news.ingested' || event.type === 'news.story.updated') {
     return { seq: event.seq, targetIds: ['news-service'], label, summary, channel }
   }
   const workspaceId = event.payload.workspaceId

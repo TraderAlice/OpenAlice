@@ -38,6 +38,8 @@ import {
   type AdapterRegistry,
   type CliAdapter,
 } from '../../workspaces/cli-adapter.js'
+import { getNewsFeedPresets, newsCollectorSchema } from '../../domain/news/config.js'
+import { NewsModuleActivationError, NewsModuleValidationError } from '../../domain/news/modules/manager.js'
 
 interface ConfigRouteOpts {
   ctx?: EngineContext
@@ -104,6 +106,8 @@ export function createConfigRoutes(opts?: ConfigRouteOpts) {
       return c.json({ error: String(err) }, 500)
     }
   })
+
+  app.get('/news-presets', (c) => c.json({ feeds: getNewsFeedPresets() }))
 
   // ==================== Presets ====================
 
@@ -436,6 +440,7 @@ export function createConfigRoutes(opts?: ConfigRouteOpts) {
   })
 
   // ==================== Generic Section Writer ====================
+  let newsWriteChain: Promise<void> = Promise.resolve()
 
   app.put('/:section', async (c) => {
     try {
@@ -443,27 +448,47 @@ export function createConfigRoutes(opts?: ConfigRouteOpts) {
       if (!validSections.includes(section)) {
         return c.json({ error: `Invalid section "${section}". Valid: ${validSections.join(', ')}` }, 400)
       }
-      const body = await c.req.json()
-      const validated = await writeConfigSection(section, body)
-      // Keep the in-memory ctx.config in sync with disk so any code path
-      // reading it (provider resolver, market-data helpers, …) picks up
-      // edits without a restart. Object.assign preserves ctx.config's
-      // object identity — we just swap its contents.
-      if (opts?.ctx) {
-        const fresh = await loadConfig()
-        Object.assign(opts.ctx.config, fresh)
+      const body = section === 'news' ? await c.req.json().catch(() => null) : await c.req.json()
+      if (section === 'news') {
+        const ctx = opts?.ctx
+        const collector = ctx?.newsCollector
+        if (!ctx || !collector) return c.json({ error: 'News collector unavailable' }, 409)
+        if (!body || typeof body !== 'object' || !Object.hasOwn(body, 'modules') || !Object.hasOwn(body, 'subscriptions')) {
+          return c.json({ error: 'Invalid news configuration' }, 400)
+        }
+        const parsed = newsCollectorSchema.safeParse(body)
+        if (!parsed.success) return c.json({ error: 'Invalid news configuration' }, 400)
+        const pending = newsWriteChain.catch(() => {}).then(async () => {
+          const news = parsed.data
+          await collector.configure({
+            feeds: news.feeds, intervalMs: news.intervalMinutes * 60 * 1000,
+            rsshubBaseUrl: news.rsshubBaseUrl, enabled: news.enabled,
+            modules: news.modules, subscriptions: news.subscriptions,
+            maxInMemory: news.maxInMemory, retentionDays: news.retentionDays,
+          }, async () => { await writeConfigSection('news', news) })
+          ctx.config.news = news
+          return c.json(news)
+        })
+        newsWriteChain = pending.then(() => {}, () => {})
+        return await pending.catch(error => c.json(
+          { error: 'News configuration update failed' },
+          error instanceof NewsModuleValidationError || error instanceof NewsModuleActivationError ? 400 : 500,
+        ))
       }
-      // trading.json and snapshot.json are consumed by the UTA process at
-      // boot (order-sync and snapshot pump cadence) — bounce UTA via the
-      // Guardian flag protocol, same as broker config edits.
-      // Fire-and-forget: progress is visible through the health badges.
-      if (section === 'trading' || section === 'snapshot') {
-        triggerUTARestart().catch(() => { /* surfaced via health badges */ })
+      const persist = async () => {
+        const validated = await writeConfigSection(section, body)
+        // Keep context identity while installing the freshly persisted section.
+        if (opts?.ctx) {
+          const fresh = await loadConfig()
+          Object.assign(opts.ctx.config, fresh)
+        }
+        // UTA consumes these sections at boot; retain its supervised restart protocol.
+        if (section === 'trading' || section === 'snapshot') {
+          triggerUTARestart().catch(() => { /* surfaced via health badges */ })
+        }
+        return c.json(validated)
       }
-      // marketData edits are picked up lazily by the provider resolver
-      // (it reads ctx.config per request), so no explicit hot-reload hook
-      // is needed. Connector Service owns its own restart flag and API.
-      return c.json(validated)
+      return await persist()
     } catch (err) {
       if (err instanceof Error && err.name === 'ZodError') {
         return c.json({ error: 'Validation failed', details: JSON.parse(err.message) }, 400)

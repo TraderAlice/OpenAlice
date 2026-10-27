@@ -1,0 +1,19 @@
+Natural Earth, Admin 0 countries, 1:110 million.
+Public domain: https://www.naturalearthdata.com/about/terms-of-use/
+
+Source:
+https://raw.githubusercontent.com/nvkelso/natural-earth-vector/ca96624a56bd078437bca8184e78163e5039ad19/geojson/ne_110m_admin_0_countries.geojson
+Source SHA-256:
+6866c877d39cba9c357620878839b336d569f8c662d3cfab4cb1dbe2d39c977f
+
+world-map.json contains 176 supplied country/region geometries (Antarctica
+excluded), not 176 countries with macroeconomic data. Small territories absent
+from this resolution are not added or inferred. Boundaries follow the dataset.
+
+Generated with d3-geo 3.1.1 geoNaturalEarth1().fitExtent([[8,8],[992,512]],
+featureCollection), geoPath(projection).digits(2), on a 1000 x 520 viewBox.
+IDs use ISO_A2_EH where supplied, otherwise ne-ADM0_A3. Names use NAME_EN/ADMIN.
+Centers are projected path centroids rounded to one decimal. No D3 runtime code
+or package is included. Paths are rendered as data through React/native SVG.
+The UI groups the supplied mainland and Taiwan geometries into one China path
+for shared country selection and coloring; the source geometry is unmodified.

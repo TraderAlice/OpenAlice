@@ -31,6 +31,11 @@ the durable truth after it changes. Git history is the archive.
 
 - [[plans/windows-signpath.md]] — SignPath Foundation self-signed onboarding,
   public signing policy, and production Windows release integration.
+- [[plans/news-event-reading.md]] — Readiness candidate for existing Draft PR #1767: current dev integrated; source/filter persistence, RSS provenance/time handling and collected-country identities fixed. Frozen source b49e45eae passed the complete suite (7978/0/152), all 15 critical requirements, typechecks and builds; actual desktop/narrow/history/filter and new-report labels accepted. Original archive/human state preserved; 12-source collection and native five-minute preparation continue. #17 cleanup, 24-hour completion, broader semantic and final artifact/remote acceptance remain open. New source channels are deferred; no merge or release.
+
+- [[plans/news-module-injection-research.md]] — Approved News Modules and RSSHub key work on Draft PR #1767; current remote acceptance is incomplete, no merge or release.
+- [[plans/news-management-experiment.md]] — Local source-editing and shared RSSHub endpoint experiment, isolated user home, real collector/UI acceptance; no PR or publishing.
+
 - [[plans/settings-machines-dialog.md]] — Move machine management into General / Machines and replace inline SSH setup with a reviewed dialog; Draft PR only.
 
 - [[plans/review-updates-shared-plan.md]] — Share automatic/manual update review

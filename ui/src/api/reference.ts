@@ -82,6 +82,25 @@ export interface CalendarBoard {
   meta: ReferenceMeta
 }
 
+export interface EconomicCalendarEvent {
+  date: string | null
+  event: string | null
+  country: string | null
+  importance: string | null
+  source: string | null
+  currency: string | null
+  unit: string | null
+  actual: number | string | null
+  consensus: number | string | null
+  previous: number | string | null
+}
+
+export interface EconomicCalendarBoard {
+  events: EconomicCalendarEvent[]
+  window: { start: string; end: string }
+  meta: ReferenceMeta
+}
+
 export type MacroUnit = 'percent' | 'usd' | 'index' | 'count'
 
 export interface MacroPoint {
@@ -133,6 +152,7 @@ export interface GlobalMacroCell {
   value: number | null
   date: string | null
   error?: string
+  history?: Array<{ date: string; value: number }>
 }
 
 export interface GlobalMacroRow {
@@ -150,6 +170,7 @@ export interface GlobalMacroRow {
 export interface GlobalMacroBoard {
   rows: GlobalMacroRow[]
   meta: ReferenceMeta
+  historyError?: string
 }
 
 export interface ShippingPoint {
@@ -186,6 +207,7 @@ export interface FedBoard {
 }
 
 export const referenceApi = {
+  economicCalendar: () => fetchJson<EconomicCalendarBoard>('/api/reference/economic-calendar'),
   movers: () => fetchJson<MoversBoard>('/api/reference/movers'),
   calendar: () => fetchJson<CalendarBoard>('/api/reference/calendar'),
   macro: () => fetchJson<MacroBoard>('/api/reference/macro'),

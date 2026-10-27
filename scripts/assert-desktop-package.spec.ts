@@ -92,7 +92,7 @@ describe('assertDesktopPackage', () => {
     const filters = matchers.map((matcher: unknown) => new AppFileWalker(matcher, info).filter)
     const selected = (file: string) => filters.some((filter: (path: string, stat: unknown) => boolean) =>
       filter(join(root, file), fileStat))
-    for (const file of ['dist/main.js', 'dist/electron/main.js', 'services/uta/dist/uta.js', 'services/connector/dist/connector.cjs']) {
+    for (const file of ['dist/main.js', 'dist/worker-entry.js', 'dist/electron/main.js', 'services/uta/dist/uta.js', 'services/connector/dist/connector.cjs']) {
       expect(selected(file), file).toBe(true)
     }
     for (const file of ['default/alice-harness.json', 'ui/dist/index.html', 'vendor/pi/package.json', 'src/main.ts', 'docs/README.md']) {

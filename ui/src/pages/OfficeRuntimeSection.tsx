@@ -113,7 +113,7 @@ export function revealOfficeJournalRow(
 
 function officeLogFamilyForEvent(event: AgentRuntimeEvent): Exclude<OfficeLogChannel, 'all'> {
   if (event.type === 'inbox.received') return 'inbox'
-  if (event.type === 'news.ingested') return 'news'
+  if (event.type === 'news.ingested' || event.type === 'news.story.updated') return 'news'
   return 'agent'
 }
 
@@ -134,7 +134,7 @@ function eventLabel(event: AgentRuntimeEvent, t: TFunction): string {
   if (event.type === 'runtime.turn.error') return t('office.logEventError')
   if (event.type === 'dev.sonner_test') return t('office.logEventTest')
   if (event.type === 'inbox.received') return t('office.logEventInbox')
-  if (event.type === 'news.ingested') return t('office.logEventNews')
+  if (event.type === 'news.ingested' || event.type === 'news.story.updated') return t('office.logEventNews')
   return event.type satisfies never
 }
 

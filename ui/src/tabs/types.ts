@@ -39,7 +39,7 @@ export type ViewSpec =
   | { kind: 'tracked-issue-detail'; params: { wsId: string; id: string } }
   | { kind: 'automation';     params: { section: 'runs' | 'api' } }
   | { kind: 'office';         params: Record<string, never> }
-  | { kind: 'news';           params: { category?: string; view?: string } }
+  | { kind: 'news';           params: { category?: string; view?: string; keyword?: string; source?: string; readStatus?: string; eventId?: string; country?: string; industry?: string; asset?: string } }
   | { kind: 'market-list';    params: Record<string, never> }
   | { kind: 'market-rotation'; params: Record<string, never> }
   | { kind: 'market-board';   params: { board: 'movers' | 'calendar' | 'macro' | 'term-structure' | 'global-macro' | 'shipping' | 'fed' } }

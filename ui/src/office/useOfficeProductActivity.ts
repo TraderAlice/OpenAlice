@@ -72,7 +72,7 @@ export function projectOfficeProductActivity(
   const ordered = [...events].sort((a, b) => b.seq - a.seq)
   const agent = ordered.find((event) => OFFICE_AGENT_REVIEW_TYPE_SET.has(event.type))
   const inbox = ordered.find((event) => event.type === 'inbox.received')
-  const news = ordered.find((event) => event.type === 'news.ingested')
+  const news = ordered.find((event) => event.type === 'news.ingested' || event.type === 'news.story.updated')
 
   return {
     agent: agent
@@ -135,7 +135,7 @@ export function projectOfficeProductActivity(
 
 function activityKindForEvent(event: AgentRuntimeEvent): OfficeActivityKind | null {
   if (event.type === 'inbox.received') return 'inbox'
-  if (event.type === 'news.ingested') return 'news'
+  if (event.type === 'news.ingested' || event.type === 'news.story.updated') return 'news'
   return OFFICE_AGENT_REVIEW_TYPE_SET.has(event.type) ? 'agent' : null
 }
 

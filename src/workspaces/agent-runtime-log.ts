@@ -25,6 +25,7 @@ export const AGENT_RUNTIME_EVENT_TYPES = [
   'dev.sonner_test',
   'inbox.received',
   'news.ingested',
+  'news.story.updated',
 ] as const
 
 export type AgentRuntimeEventType = (typeof AGENT_RUNTIME_EVENT_TYPES)[number]
@@ -138,6 +139,7 @@ export type AgentRuntimePayload =
     })
   | InboxActivityPayload
   | NewsActivityPayload
+  | { readonly storyId: string; readonly revision: number; readonly title: string; readonly developmentIds: string[] }
 
 export type AgentRuntimeEvent = EventLogEntry<AgentRuntimePayload> & {
   readonly type: AgentRuntimeEventType

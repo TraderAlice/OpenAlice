@@ -24,6 +24,7 @@ const BASE_EXPORTS: Record<string, CliExport> = {
     description: 'Market & research data sources',
     groupDescriptions: {
       rss: 'Search and read the user\'s collected subscribed-feed archive',
+      events: 'Read and publish evidence-linked events prepared from collected originals',
       market: 'Discover symbols, bar sources, and optional market-data vendors',
       analysis: 'Read dated K-lines and calculate indicators',
     },
@@ -38,6 +39,15 @@ const BASE_EXPORTS: Record<string, CliExport> = {
         // window: date-bounded, oldest-first — for aligning catalysts to a price path.
         window: 'windowRss',
         read: 'readRss',
+      },
+      events: {
+        pending: 'pendingNewsReports',
+        review: 'recordNewsReview',
+        list: 'listNewsStories',
+        read: 'readNewsStory',
+        publish: 'publishNewsStory',
+        associations: 'readNewsAssociations',
+        'publish-associations': 'publishNewsAssociations',
       },
       market: {
         search: 'marketSearchForResearch',

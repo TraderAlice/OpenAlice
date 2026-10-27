@@ -1,9 +1,11 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
-import { LineChart, Line, YAxis, XAxis, Tooltip } from 'recharts'
-import { Search } from 'lucide-react'
+import { LineChart, Line, YAxis, XAxis, Tooltip, ReferenceLine } from 'recharts'
+import { ArrowDown, ArrowUp, ArrowUpDown, RefreshCw, Search } from 'lucide-react'
+import { compareNumbers, type SortDirection } from '../lib/compare-numbers'
 import { useReferenceBoard } from '../components/market/useReferenceBoard'
 import { BoardMeta } from '../components/market/BoardMeta'
+import { GlobalMacroMap, macroCellAtPeriod, macroCountryName } from '../components/market/GlobalMacroMap'
 import { PageHeader } from '../components/PageHeader'
 import { CenteredLoading } from '../components/StateViews'
 import { Button } from '../components/ui/button'
@@ -20,6 +22,7 @@ import {
 } from '../api/reference'
 import { useWorkspace } from '../tabs/store'
 import type { ViewSpec } from '../tabs/types'
+import { newsCountryCode } from '../../../src/domain/market-data/reference/countries'
 
 const REFRESH_MS = 5 * 60 * 1000
 
@@ -50,22 +53,43 @@ export function MarketBoardPage({ spec }: PageProps) {
 // ==================== Movers ====================
 
 type MoversList = 'gainers' | 'losers' | 'active' | 'undervaluedGrowth' | 'growthTech' | 'smallCaps' | 'undervaluedLarge'
+const MOVER_COLUMNS = [
+  { key: 'price', label: 'market.colPrice', className: 'w-1/4 md:w-auto' },
+  { key: 'percent_change', label: 'market.colChangePct', className: 'w-1/4 md:w-auto' },
+  { key: 'volume', label: 'market.colVolume', className: 'hidden md:table-cell' },
+  { key: 'relative_volume', label: 'market.colRvol', className: 'hidden md:table-cell' },
+  { key: 'dollar_volume', label: 'market.colDollarVolume', className: 'hidden md:table-cell' },
+] as const
+type MoverMetric = typeof MOVER_COLUMNS[number]['key']
 
 function MoversBoardView() {
   const { t } = useTranslation()
-  const { data, updatedAt, loading, error } = useReferenceBoard<MoversBoard>(referenceApi.movers, REFRESH_MS)
+  const { data, updatedAt, loading, error, retry } = useReferenceBoard<MoversBoard>(referenceApi.movers, REFRESH_MS)
   const [list, setList] = useState<MoversList>('gainers')
-
-  const rows = data?.[list] ?? []
+  const [search, setSearch] = useState('')
+  const [sort, setSort] = useState<{ key: MoverMetric; direction: SortDirection } | null>(null)
+  const sourceRows = data?.[list] ?? []
+  const rows = useMemo(() => {
+    const query = search.trim().toLowerCase()
+    const matched = sourceRows.filter(row => !query || `${row.symbol} ${row.name ?? ''}`.toLowerCase().includes(query))
+    return sort ? matched.sort((a, b) => compareNumbers(a[sort.key], b[sort.key], sort.direction)) : matched
+  }, [sourceRows, search, sort])
+  const sortBy = (key: MoverMetric) => {
+    if (sort?.key !== key) setSort({ key, direction: 'descending' })
+    else if (sort.direction === 'descending') setSort({ key, direction: 'ascending' })
+    else setSort(null)
+  }
 
   return (
     <div className="flex flex-col flex-1 min-h-0">
       <PageHeader
         title={t('market.boardMovers')}
+        right={<Button size="xs" variant="ghost" onClick={retry} disabled={loading} aria-label={t('common.refresh')}><RefreshCw aria-hidden className={`size-3.5 ${loading ? 'animate-spin motion-reduce:animate-none' : ''}`} /></Button>}
         description={
           <span className="inline-flex flex-wrap items-center gap-x-2 gap-y-0.5">
             <span>{t('market.moversSubtitle')}</span>
             {data && <BoardMeta meta={data.meta} />}
+            {data?.meta.asOf && <span>{t('market.asOf')} {data.meta.asOf}</span>}
           </span>
         }
         live={{ lastUpdated: updatedAt, label: 'Fetched', hideDot: true }}
@@ -91,14 +115,31 @@ function MoversBoardView() {
           ))}
         </div>
 
+        <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+          <label className="flex min-w-0 basis-full items-center gap-2 whitespace-nowrap sm:basis-0 sm:flex-1">{t('market.moversSearch')}
+            <input className={`${inputClass} h-8 min-w-20 flex-1 text-xs`} value={search} onChange={event => setSearch(event.target.value)} />
+          </label>
+          <label className="flex shrink-0 items-center gap-1.5 whitespace-nowrap">{t('market.sortBy')}
+            <select className={`${inputClass} h-8 w-auto text-xs`} value={sort?.key ?? ''} onChange={event => {
+              const column = MOVER_COLUMNS.find(item => item.key === event.target.value)
+              setSort(column ? { key: column.key, direction: 'descending' } : null)
+            }}>
+              <option value="">{t('market.defaultOrder')}</option>
+              {MOVER_COLUMNS.map(column => <option key={column.key} value={column.key}>{t(column.label)}</option>)}
+            </select>
+          </label>
+          {sort && <Button size="icon-sm" variant="ghost" aria-label={t(sort.direction === 'descending' ? 'market.sortAscending' : 'market.sortDescending')} onClick={() => setSort({ ...sort, direction: sort.direction === 'descending' ? 'ascending' : 'descending' })}><ArrowUpDown className="size-3.5" aria-hidden /></Button>}
+          {data && <span className="tabular-nums">{t('market.listMatches', { count: rows.length, total: sourceRows.length })}</span>}
+        </div>
+
         {loading && !data && <CenteredLoading label={t('common.loading')} />}
         {error && (
-          <div className="rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2 text-[13px] leading-5 text-destructive">{error}</div>
+          <div role="alert" className="flex items-center justify-between gap-3 rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2 text-[13px] leading-5 text-destructive"><span>{error}</span><Button size="xs" variant="ghost" onClick={retry}>{t('common.retry')}</Button></div>
         )}
         {data && rows.length === 0 && !loading && (
           <div className="text-[13px] text-muted-foreground">{t('market.noMatches')}</div>
         )}
-        {rows.length > 0 && <MoversTable rows={rows} />}
+        {rows.length > 0 && <MoversTable rows={rows} sort={sort} onSort={sortBy} />}
       </div>
     </div>
   )
@@ -116,20 +157,22 @@ function listLabelKey(k: MoversList) {
   }
 }
 
-function MoversTable({ rows }: { rows: MoverRow[] }) {
+function MoversTable({ rows, sort, onSort }: { rows: MoverRow[]; sort: { key: MoverMetric; direction: SortDirection } | null; onSort: (key: MoverMetric) => void }) {
   const { t } = useTranslation()
   const open = useOpenEquity()
   return (
     <div className="min-w-0 overflow-x-auto">
-      <table className="w-full table-fixed md:table-auto text-[12px] border-collapse">
+      <table className="w-full table-fixed md:table-auto text-[12px] tabular-nums border-collapse">
         <thead>
           <tr className="text-muted-foreground/70 text-left border-b border-border">
             <th className="w-1/2 md:w-auto py-1.5 pr-2 md:pr-3 font-medium">{t('market.colSymbol')}</th>
-            <th className="w-1/4 md:w-auto py-1.5 px-1.5 md:px-3 font-medium text-right">{t('market.colPrice')}</th>
-            <th className="w-1/4 md:w-auto py-1.5 pl-1.5 md:px-3 font-medium text-right">{t('market.colChangePct')}</th>
-            <th className="hidden md:table-cell py-1.5 px-3 font-medium text-right">{t('market.colVolume')}</th>
-            <th className="hidden md:table-cell py-1.5 px-3 font-medium text-right">{t('market.colRvol')}</th>
-            <th className="hidden md:table-cell py-1.5 pl-3 font-medium text-right">{t('market.colDollarVolume')}</th>
+            {MOVER_COLUMNS.map(column => {
+              const direction = sort?.key === column.key ? sort.direction : undefined
+              const Icon = direction === 'ascending' ? ArrowUp : direction === 'descending' ? ArrowDown : ArrowUpDown
+              return <th key={column.key} scope="col" aria-sort={direction ?? 'none'} className={`${column.className} px-1.5 md:px-3 py-1 font-medium text-right`}>
+                <button type="button" onClick={() => onSort(column.key)} className="flex min-h-8 w-full items-center justify-end gap-1 rounded-sm focus-visible:outline-2 focus-visible:outline-ring">{t(column.label)}<Icon className="size-3 shrink-0 text-muted-foreground" aria-hidden /></button>
+              </th>
+            })}
           </tr>
         </thead>
         <tbody>
@@ -145,7 +188,7 @@ function MoversTable({ rows }: { rows: MoverRow[] }) {
               <td className="py-1.5 px-1.5 md:px-3 text-right font-mono text-foreground">{fmtPrice(r.price)}</td>
               <td className={`py-1.5 pl-1.5 md:px-3 text-right font-mono ${signColor(r.percent_change)}`}>{fmtPct(r.percent_change)}</td>
               <td className="hidden md:table-cell py-1.5 px-3 text-right text-foreground">{fmtCompact(r.volume)}</td>
-              <td className={`hidden md:table-cell py-1.5 px-3 text-right ${rvolColor(r.relative_volume)}`}>{r.relative_volume?.toFixed(2) ?? '—'}</td>
+              <td className={`hidden md:table-cell py-1.5 px-3 text-right ${rvolColor(r.relative_volume)}`}>{r.relative_volume != null && Number.isFinite(r.relative_volume) ? r.relative_volume.toFixed(2) : '—'}</td>
               <td className="hidden md:table-cell py-1.5 pl-3 text-right text-foreground">{fmtCompact(r.dollar_volume, '$')}</td>
             </tr>
           ))}
@@ -621,16 +664,18 @@ const MACRO_LABEL_KEYS = {
 
 function TermStructureBoardView() {
   const { t } = useTranslation()
-  const { data, updatedAt, loading, error } = useReferenceBoard<TermStructureBoard>(referenceApi.termStructure, 5 * 60 * 1000)
+  const { data, updatedAt, loading, error, retry } = useReferenceBoard<TermStructureBoard>(referenceApi.termStructure, 5 * 60 * 1000)
 
   return (
     <div className="flex flex-col flex-1 min-h-0">
       <PageHeader
         title={t('market.boardTermStructure')}
+        right={<Button size="xs" variant="ghost" onClick={retry} disabled={loading} aria-label={t('common.refresh')}><RefreshCw aria-hidden className={`size-3.5 ${loading ? 'animate-spin motion-reduce:animate-none' : ''}`} /></Button>}
         description={
           <span className="inline-flex flex-wrap items-center gap-x-2 gap-y-0.5">
             <span>{t('market.termSubtitle')}</span>
             {data && <BoardMeta meta={data.meta} />}
+            {data?.meta.asOf && <span>{t('market.asOf')} {data.meta.asOf}</span>}
           </span>
         }
         live={{ lastUpdated: updatedAt, label: 'Fetched', hideDot: true }}
@@ -638,11 +683,12 @@ function TermStructureBoardView() {
       <div className="flex-1 overflow-y-auto px-4 md:px-8 py-4 flex flex-col gap-6 min-h-0">
         {loading && !data && <CenteredLoading label={t('common.loading')} />}
         {error && (
-          <div className="rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2 text-[13px] leading-5 text-destructive">{error}</div>
+          <div role="alert" className="flex items-center justify-between gap-3 rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2 text-[13px] leading-5 text-destructive"><span>{error}</span><Button size="xs" variant="ghost" onClick={retry}>{t('common.retry')}</Button></div>
         )}
         {data?.errors && Object.entries(data.errors).map(([sym, msg]) => (
-          <div key={sym} className="rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2 text-[13px] leading-5 text-destructive">{sym}: {msg}</div>
+          <div key={sym} role="alert" className="flex items-center justify-between gap-3 rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2 text-[13px] leading-5 text-destructive"><span>{sym}: {msg}</span><Button size="xs" variant="ghost" onClick={retry}>{t('common.retry')}</Button></div>
         ))}
+        {data && !data.curves.length && <p className="text-xs text-muted-foreground">{t('market.termNoContracts')}</p>}
         {data?.curves.map((curve) => <TermCurveCard key={curve.symbol} curve={curve} />)}
       </div>
     </div>
@@ -651,53 +697,65 @@ function TermStructureBoardView() {
 
 function TermCurveCard({ curve }: { curve: TermCurve }) {
   const { t } = useTranslation()
-  // Contango when the far end trades above spot; backwardation otherwise.
-  const far = curve.points[curve.points.length - 1]
-  const regime = far?.price != null && curve.spot != null
-    ? (far.price >= curve.spot ? t('market.termContango') : t('market.termBackwardation'))
-    : null
+  const [mode, setMode] = useState<'price' | 'basis'>('price')
+  const reference = curve.spot != null && Number.isFinite(curve.spot) && curve.spot > 0 ? curve.spot : null
+  const basisFor = (point: TermCurve['points'][number]) => reference !== null && point.daysToExpiry != null && point.daysToExpiry >= 7 && point.annualizedBasis != null && Number.isFinite(point.annualizedBasis) ? point.annualizedBasis : null
   const chartData = curve.points
-    .filter((p) => p.price != null)
-    .map((p) => ({ ...p, label: p.expiration.slice(2) }))
+    .map(point => ({ ...point, time: Date.parse(`${point.expiration}T00:00:00Z`), price: point.price != null && Number.isFinite(point.price) ? point.price : null, basis: basisFor(point) }))
+    .filter(point => Number.isFinite(point.time))
+    .sort((a, b) => a.time - b.time)
+  const far = chartData.at(-1)
+  const regime = far?.price != null && reference !== null ? t(far.price > reference ? 'market.termFarPremium' : far.price < reference ? 'market.termFarDiscount' : 'market.termFarParity') : null
+  const baseline = mode === 'price' ? reference : 0
+  const values = chartData.flatMap(point => point[mode] === null ? [] : [point[mode]!])
+  const domainValues = baseline !== null ? [...values, baseline] : values
+  const lower = domainValues.length ? Math.min(...domainValues) : 0
+  const upper = domainValues.length ? Math.max(...domainValues) : 1
+  const padding = lower === upper ? Math.abs(lower) * 0.01 || 1 : 0
   return (
     <div className="flex flex-col gap-2 rounded-lg border border-border bg-card px-3 py-3 sm:px-4">
       <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
         <span className="shrink-0 text-[15px] font-semibold font-mono text-foreground">{curve.symbol}</span>
-        {curve.spot != null && (
-          <span className="whitespace-nowrap text-[12px] text-muted-foreground">{t('market.termSpotPerp')} <span className="font-mono text-foreground">{curve.spot.toLocaleString('en-US')}</span></span>
-        )}
+        <span className="whitespace-nowrap text-[12px] text-muted-foreground">{t('market.termSpotPerp')} <span className="font-mono tabular-nums text-foreground">{fmtPrice(reference)}</span></span>
         {regime && <span className="whitespace-nowrap text-[11px] font-medium text-muted-foreground/70">{regime}</span>}
+        <div role="group" aria-label={t('market.termMode', { symbol: curve.symbol })} className="ml-auto flex gap-0.5">
+          <Button size="xs" variant={mode === 'price' ? 'secondary' : 'ghost'} aria-pressed={mode === 'price'} onClick={() => setMode('price')}>{t('market.termPrice')}</Button>
+          <Button size="xs" variant={mode === 'basis' ? 'secondary' : 'ghost'} aria-pressed={mode === 'basis'} onClick={() => setMode('basis')}>{t('market.termBasis')}</Button>
+        </div>
       </div>
+      {values.length === 0 ? <p role="status" className="flex h-40 items-center justify-center text-xs text-muted-foreground">{t(mode === 'basis' ? 'market.termNoBasis' : 'market.termNoQuotes')}</p> :
       <MeasuredChartFrame className="h-40">
         {({ width, height }) => {
           const compact = width < 420
           return (
             <LineChart accessibilityLayer width={width} height={height} data={chartData} margin={{ top: 8, right: compact ? 8 : 16, bottom: 0, left: 0 }}>
               <XAxis
-                dataKey="label"
+                dataKey="time" type="number" scale="time" domain={['dataMin', 'dataMax']}
                 tick={{ fontSize: 10, fill: 'var(--chart-axis)' }}
                 stroke="var(--chart-axis)"
                 interval="preserveStartEnd"
                 minTickGap={compact ? 18 : 28}
-                tickFormatter={(label: string) => formatTermAxisLabel(label, width)}
+                tickFormatter={(value: number) => formatTermAxisLabel(new Date(value).toISOString().slice(2, 10), width)}
               />
               <YAxis
-                domain={['dataMin', 'dataMax']}
+                domain={[lower - padding, upper + padding]}
                 tick={{ fontSize: 10, fill: 'var(--chart-axis)' }}
                 stroke="var(--chart-axis)"
                 width={compact ? 48 : 70}
-                tickFormatter={(value: number) => formatTermAxisPrice(value, width)}
+                tickFormatter={(value: number) => mode === 'price' ? formatTermAxisPrice(value, width) : `${value.toFixed(1)}%`}
               />
               <Tooltip
                 isAnimationActive={false}
-                formatter={(v) => [Number(v).toLocaleString('en-US'), '']}
-                labelFormatter={(l) => `20${l}`}
+                formatter={(value) => [mode === 'price' ? fmtPrice(Number(value)) : fmtBasis(Number(value)), t(mode === 'price' ? 'market.termPrice' : 'market.termBasis')]}
+                labelFormatter={(value) => new Date(Number(value)).toISOString().slice(0, 10)}
                 separator=""
                 cursor={{ strokeDasharray: '3 3' }}
               />
+              {baseline !== null && <ReferenceLine y={baseline} stroke="var(--chart-axis)" strokeDasharray="4 4" />}
               <Line
-                type="monotone"
-                dataKey="price"
+                type="linear"
+                dataKey={mode}
+                connectNulls={false}
                 stroke="var(--primary)"
                 strokeWidth={1.5}
                 dot={{ r: 2.5 }}
@@ -707,22 +765,23 @@ function TermCurveCard({ curve }: { curve: TermCurve }) {
             </LineChart>
           )
         }}
-      </MeasuredChartFrame>
-      <div className="grid grid-cols-2 gap-1.5 sm:flex sm:flex-wrap">
-        {curve.points.map((p) => (
-          <span key={p.expiration} className="flex items-center justify-between gap-2 whitespace-nowrap rounded-sm bg-muted/60 px-1.5 py-0.5 font-mono text-[11px] leading-[15px]" title={`${p.daysToExpiry ?? '—'}d`}>
-            {p.expiration.slice(2)}{' '}
-            <span className={p.annualizedBasis == null ? 'text-muted-foreground' : p.annualizedBasis >= 0 ? 'text-success' : 'text-destructive'}>
-              {p.annualizedBasis == null ? '—' : `${p.annualizedBasis >= 0 ? '+' : ''}${p.annualizedBasis.toFixed(1)}%`}
-            </span>
-          </span>
-        ))}
-        {curve.points.length > 0 && (
-          <span className="col-span-2 text-[10px] text-muted-foreground/60 self-center sm:ml-1">{t('market.termBasisNote')}</span>
-        )}
-      </div>
+      </MeasuredChartFrame>}
+      <details className="min-w-0 border-t border-border/60 pt-1 text-xs">
+        <summary className="cursor-pointer rounded-sm py-1 text-muted-foreground focus-visible:outline-2 focus-visible:outline-ring">{t('market.termContracts')}</summary>
+        <div className="overflow-x-auto">
+          <table aria-label={`${curve.symbol} ${t('market.termContracts')}`} className="w-full text-right text-xs tabular-nums">
+            <thead><tr className="border-b border-border text-muted-foreground"><th scope="col" className="py-1 text-left font-medium">{t('market.termExpiry')}</th><th scope="col" className="px-2 py-1 font-medium">{t('market.termDays')}</th><th scope="col" className="px-2 py-1 font-medium">{t('market.colPrice')}</th><th scope="col" className="py-1 font-medium">{t('market.termBasis')}</th></tr></thead>
+            <tbody>{[...curve.points].sort((a, b) => a.expiration.localeCompare(b.expiration)).map(point => <tr key={point.expiration} className="border-b border-border/40"><td className="whitespace-nowrap py-1.5 text-left">{point.expiration}</td><td className="px-2">{point.daysToExpiry != null && Number.isFinite(point.daysToExpiry) ? point.daysToExpiry : '—'}</td><td className="whitespace-nowrap px-2">{fmtPrice(point.price)}</td><td className={signColor(basisFor(point))}>{fmtBasis(basisFor(point))}</td></tr>)}</tbody>
+          </table>
+        </div>
+        <p className="pt-2 text-[11px] text-muted-foreground">{t('market.termBasisHelp')}</p>
+      </details>
     </div>
   )
+}
+
+function fmtBasis(value: number | null) {
+  return value === null || !Number.isFinite(value) ? '—' : `${value > 0 ? '+' : ''}${value.toFixed(1)}%`
 }
 
 export function formatTermAxisLabel(label: string, chartWidth: number) {
@@ -740,8 +799,22 @@ export function formatTermAxisPrice(value: number, chartWidth: number) {
 // ==================== Global macro ====================
 
 function GlobalMacroBoardView() {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
   const { data, updatedAt, loading, error } = useReferenceBoard<GlobalMacroBoard>(referenceApi.globalMacro, 60 * 60 * 1000)
+  const [display, setDisplay] = useState<'map' | 'table'>('map')
+  const [selectedCountry, setSelectedCountry] = useState<string | null>(null)
+  const [period, setPeriod] = useState<string | null>(null)
+  const openOrFocus = useWorkspace(state => state.openOrFocus)
+  const locale = i18n.resolvedLanguage ?? i18n.language
+  const rows = data?.rows.map(row => period ? {
+    ...row,
+    cpiYoy: macroCellAtPeriod(row.cpiYoy, period),
+    shortRate: macroCellAtPeriod(row.shortRate, period),
+    cli: macroCellAtPeriod(row.cli, period),
+    housePrice: macroCellAtPeriod(row.housePrice, period),
+    sharePrice: macroCellAtPeriod(row.sharePrice, period),
+  } : row) ?? []
+  const selectedRow = rows.find(row => row.country === selectedCountry)
 
   return (
     <div className="flex flex-col flex-1 min-h-0">
@@ -762,13 +835,20 @@ function GlobalMacroBoardView() {
         )}
         {data && (
           <>
+            <div role="group" aria-label={t('market.macroDisplay')} className="mb-4 flex gap-1">
+              <Button variant={display === 'map' ? 'secondary' : 'ghost'} size="sm" aria-pressed={display === 'map'} onClick={() => setDisplay('map')}>{t('market.mapView')}</Button>
+              <Button variant={display === 'table' ? 'secondary' : 'ghost'} size="sm" aria-pressed={display === 'table'} onClick={() => setDisplay('table')}>{t('market.tableView')}</Button>
+            </div>
+            {data.historyError && <p className="mb-3 text-xs text-muted-foreground" title={data.historyError}>{t('market.mapHistoryError')}</p>}
+            <div hidden={display !== 'map'}><GlobalMacroMap rows={data.rows} selectedCountry={selectedCountry} onSelectCountry={setSelectedCountry} onPeriodChange={setPeriod} /></div>
+            {display === 'table' && <>
             <div
               data-testid="global-macro-mobile"
               className="divide-y divide-border/60 border-y border-border/70 md:hidden"
             >
-              {data.rows.map((r) => (
+              {rows.map((r) => (
                 <article key={r.country} className="py-3">
-                  <h3 className="truncate text-[13px] leading-[18px] font-semibold text-foreground">{r.label}</h3>
+                  <h3 className="truncate text-[13px] leading-[18px] font-semibold text-foreground">{macroCountryName(r, locale)}</h3>
                   <dl className="mt-2 grid grid-cols-3 gap-x-3">
                     <GlobalMetric
                       label={t('market.colCpiYoy')}
@@ -817,9 +897,9 @@ function GlobalMacroBoardView() {
                   </tr>
                 </thead>
                 <tbody>
-                  {data.rows.map((r) => (
+                  {rows.map((r) => (
                     <tr key={r.country} className="border-b border-border/50 hover:bg-secondary/40">
-                      <td className="py-1.5 pr-3 text-foreground font-medium">{r.label}</td>
+                      <td className="py-1.5 pr-3 text-foreground font-medium">{macroCountryName(r, locale)}</td>
                       <GlobalCell cell={r.cpiYoy} fmt={(v) => `${v.toFixed(2)}%`} colorBy="cpi" />
                       <GlobalCell cell={r.shortRate} fmt={(v) => `${v.toFixed(2)}%`} />
                       <GlobalCell cell={r.cli} fmt={(v) => v.toFixed(1)} colorBy="cli" />
@@ -830,7 +910,19 @@ function GlobalMacroBoardView() {
                 </tbody>
               </table>
             </div>
-            <p className="mt-2 text-[10px] text-muted-foreground/60">{t('market.globalMacroNote')}</p>
+            </>}
+            {selectedRow && <section role="region" aria-label={macroCountryName(selectedRow, locale)} className="mt-5 border-t border-border pt-4">
+              <h3 className="text-sm font-semibold" aria-live="polite">{macroCountryName(selectedRow, locale)}</h3>
+              <dl className="mt-3 grid grid-cols-2 gap-x-4 gap-y-3 sm:grid-cols-5">
+                <GlobalMetric label={t('market.colCpiYoy')} cell={selectedRow.cpiYoy} fmt={value => `${value.toFixed(2)}%`} colorBy="cpi" />
+                <GlobalMetric label={t('market.colShortRate')} cell={selectedRow.shortRate} fmt={value => `${value.toFixed(2)}%`} />
+                <GlobalMetric label={t('market.colCli')} cell={selectedRow.cli} fmt={value => value.toFixed(1)} colorBy="cli" />
+                <GlobalMetric label={t('market.colHousePrice')} cell={selectedRow.housePrice} fmt={value => value.toFixed(1)} />
+                <GlobalMetric label={t('market.colSharePrice')} cell={selectedRow.sharePrice} fmt={value => value.toFixed(1)} />
+              </dl>
+              <Button variant="link" size="sm" className="mt-3 px-0" onClick={() => openOrFocus({ kind: 'news', params: { view: 'events', ...(newsCountryCode(selectedRow.country) ? { country: newsCountryCode(selectedRow.country) } : { keyword: macroCountryName(selectedRow, locale) }) } })}>{t('market.mapSearchNews')}</Button>
+            </section>}
+            {display === 'table' && <p className="mt-2 text-[10px] text-muted-foreground/60">{t('market.globalMacroNote')}</p>}
           </>
         )}
       </div>
@@ -864,6 +956,7 @@ function GlobalMetric({
   fmt: (v: number) => string
   colorBy?: GlobalCellColor
 }) {
+  const { t } = useTranslation()
   const value = cell.value == null ? '—' : fmt(cell.value)
   const title = globalCellTitle(cell)
   return (
@@ -873,19 +966,22 @@ function GlobalMetric({
         className={`truncate font-mono text-[13px] leading-[18px] font-medium tabular-nums ${globalCellColor(cell, colorBy)}`}
         aria-label={`${label}: ${value}${title ? `, ${title}` : ''}`}
       >
-        {value}
+        <span>{value}</span>
+        {cell.value != null && <span className="mt-1 block font-sans text-[10px] leading-4 text-muted-foreground">{cell.date || t('market.observationUnknown')}</span>}
       </dd>
     </div>
   )
 }
 
 function GlobalCell({ cell, fmt, colorBy }: { cell: GlobalMacroCell; fmt: (v: number) => string; colorBy?: GlobalCellColor }) {
+  const { t } = useTranslation()
   if (cell.value == null) {
     return <td className="py-1.5 px-3 text-right text-muted-foreground/50" title={globalCellTitle(cell)}>—</td>
   }
   return (
     <td className={`py-1.5 px-3 text-right font-mono ${globalCellColor(cell, colorBy)}`} title={globalCellTitle(cell)}>
-      {fmt(cell.value)}
+      <span className="block">{fmt(cell.value)}</span>
+      <span className="block font-sans text-[10px] leading-4 text-muted-foreground">{cell.date || t('market.observationUnknown')}</span>
     </td>
   )
 }
@@ -1043,14 +1139,14 @@ const FED_LABEL_KEYS = {
 } as const
 
 function fmtPrice(x: number | null): string {
-  return x == null ? '—' : x.toLocaleString('en-US', { maximumFractionDigits: 2 })
+  return x == null || !Number.isFinite(x) ? '—' : x.toLocaleString('en-US', { maximumFractionDigits: 2 })
 }
 function fmtPct(x: number | null): string {
   // percent_change is normalized to a fraction in the provider (0.052 = +5.2%).
-  return x == null ? '—' : `${x > 0 ? '+' : ''}${(x * 100).toFixed(2)}%`
+  return x == null || !Number.isFinite(x) ? '—' : `${x > 0 ? '+' : ''}${(x * 100).toFixed(2)}%`
 }
 function fmtCompact(x: number | null, prefix = ''): string {
-  if (x == null) return '—'
+  if (x == null || !Number.isFinite(x)) return '—'
   const abs = Math.abs(x)
   if (abs >= 1e12) return `${prefix}${(x / 1e12).toFixed(2)}T`
   if (abs >= 1e9) return `${prefix}${(x / 1e9).toFixed(2)}B`
@@ -1059,10 +1155,10 @@ function fmtCompact(x: number | null, prefix = ''): string {
   return `${prefix}${x.toFixed(0)}`
 }
 function signColor(x: number | null): string {
-  if (x == null) return 'text-muted-foreground'
+  if (x == null || !Number.isFinite(x)) return 'text-muted-foreground'
   return x > 0 ? 'text-success' : x < 0 ? 'text-destructive' : 'text-muted-foreground'
 }
 function rvolColor(x: number | null): string {
-  if (x == null) return 'text-muted-foreground'
+  if (x == null || !Number.isFinite(x)) return 'text-muted-foreground'
   return x >= 2 ? 'text-warning font-semibold' : 'text-foreground'
 }

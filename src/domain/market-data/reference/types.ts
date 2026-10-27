@@ -22,6 +22,7 @@ import type { ValuationStrip } from './valuation.js'
 import type { GlobalMacroBoard } from './global-macro.js'
 import type { ShippingBoard } from './shipping.js'
 import type { FedBoard } from './fed.js'
+import type { EconomicCalendarBoard } from './economic-calendar.js'
 
 /** Envelope on every reference payload. Provider is an explicit label —
  *  same philosophy as the bar layer's sourceId: annotate the source,
@@ -109,6 +110,7 @@ export interface MacroBoard {
  *  the clients directly for now and converge here as the contract grows. */
 export interface ReferenceDataService {
   movers(): Promise<MoversBoard>
+  economicCalendar(): Promise<EconomicCalendarBoard>
   /** Upcoming earnings / IPOs / ex-dividend dates. Requires an FMP key —
    *  fails loud with an actionable message when it's missing. */
   calendar(opts?: { days?: number }): Promise<CalendarBoard>

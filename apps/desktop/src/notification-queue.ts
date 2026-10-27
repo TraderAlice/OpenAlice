@@ -12,6 +12,7 @@ export interface NotificationContent {
 }
 
 export interface NotificationInput extends NotificationContent {
+  newsStoryId?: string
   id?: string
   group?: string
   windowMs?: number

@@ -22,6 +22,9 @@ export interface NewsRecord {
 
 /** RSS feed configuration entry */
 export interface RSSFeedConfig {
+  id?: string
+  /** Relative RSSHub route; resolved against the collector instance URL. */
+  rsshubRoute?: string
   /** Human-readable name, e.g. "CoinDesk" */
   name: string
   /** RSS / Atom feed URL */
@@ -37,7 +40,7 @@ export interface RSSFeedConfig {
 }
 
 /** Discriminator for how a news item was ingested */
-export type IngestSource = 'rss'
+export type IngestSource = 'rss' | 'module'
 
 // ==================== News Provider Interface ====================
 
@@ -75,6 +78,8 @@ export interface GetNewsV2Options {
 
 /** News data provider interface */
 export interface INewsProvider {
+  /** Stream the complete durable archive in ingestion order, beyond the memory index. */
+  scanNews?(): AsyncIterable<NewsItem>
   /**
    * Get news (supports semantic time and count limit)
    *
@@ -84,4 +89,7 @@ export interface INewsProvider {
   getNewsV2(options: GetNewsV2Options): Promise<NewsItem[]>
   /** Resolve a durable id beyond the recent search index, when supported. */
   getNewsById?(id: number): Promise<NewsItem | null>
+  /** Resolve evidence in one archive pass; previews omit bodies and rich media. */
+  getNewsByIds?(ids: number[], options?: { preview?: boolean }): Promise<NewsItem[]>
+  matchNewsArchive?(ids: number[], filters: { source?: string; keyword?: string }): Promise<{ sourceIds: number[]; keywordIds: number[]; sources: string[] }>
 }

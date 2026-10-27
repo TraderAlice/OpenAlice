@@ -17,6 +17,8 @@ export interface GlobalMacroCell {
   value: number | null
   date: string | null
   error?: string
+  /** Actual observations in display units, ordered oldest first. */
+  history?: Array<{ date: string; value: number }>
 }
 
 export interface GlobalMacroRow {
@@ -35,6 +37,7 @@ export interface GlobalMacroRow {
 export interface GlobalMacroBoard {
   rows: GlobalMacroRow[]
   meta: ReferenceMeta
+  historyError?: string
 }
 
 const COUNTRIES: Array<{ slug: string; label: string }> = [
@@ -48,8 +51,9 @@ const COUNTRIES: Array<{ slug: string; label: string }> = [
 ]
 
 export async function fetchGlobalMacro(economyClient: EconomyClientLike): Promise<GlobalMacroBoard> {
-  const start = new Date()
-  start.setMonth(start.getMonth() - 14)
+  const now = new Date()
+  const endDate = now.toISOString().slice(0, 10)
+  const start = new Date(Date.UTC(now.getUTCFullYear() - 5, now.getUTCMonth(), 1))
   const startDate = start.toISOString().slice(0, 10)
   // ONE batched SDMX call per indicator ("USA+CHN+…" in REF_AREA) instead of
   // per-country fan-out — 5 requests total vs 35. OECD's anonymous per-IP
@@ -58,30 +62,36 @@ export async function fetchGlobalMacro(economyClient: EconomyClientLike): Promis
   const allCountries = COUNTRIES.map((c) => c.slug).join(',')
 
   const settled = await Promise.allSettled([
-    economyClient.getCPI({ provider: 'oecd', country: allCountries, transform: 'yoy', frequency: 'monthly', start_date: startDate }),
-    economyClient.getInterestRates({ provider: 'oecd', country: allCountries, duration: 'short', start_date: startDate }),
-    economyClient.getCompositeLeadingIndicator({ provider: 'oecd', country: allCountries, start_date: startDate }),
-    economyClient.getHousePriceIndex({ provider: 'oecd', country: allCountries, start_date: startDate }),
-    economyClient.getSharePriceIndex({ provider: 'oecd', country: allCountries, start_date: startDate }),
+    economyClient.getCPI({ provider: 'oecd', country: allCountries, transform: 'yoy', frequency: 'monthly', start_date: startDate, end_date: endDate }),
+    economyClient.getInterestRates({ provider: 'oecd', country: allCountries, duration: 'short', start_date: startDate, end_date: endDate }),
+    economyClient.getCompositeLeadingIndicator({ provider: 'oecd', country: allCountries, start_date: startDate, end_date: endDate }),
+    economyClient.getHousePriceIndex({ provider: 'oecd', country: allCountries, start_date: startDate, end_date: endDate }),
+    economyClient.getSharePriceIndex({ provider: 'oecd', country: allCountries, start_date: startDate, end_date: endDate }),
   ] as const)
 
   type Row = { date: string; country?: string | null; value?: number | null }
 
-  // indicator → country label → latest cell
+  // Keep the observations behind each latest cell for the historical timeline.
   const cellsByIndicator = settled.map((r, idx): { cells: Map<string, GlobalMacroCell>; error?: string } => {
     if (r.status === 'rejected') {
       return { cells: new Map(), error: r.reason instanceof Error ? r.reason.message : String(r.reason) }
     }
     const scale = idx === 1 ? 100 : 1 // rates come back as fractions
-    const latestByCountry = new Map<string, Row>()
+    const byCountry = new Map<string, Map<string, number>>()
     for (const row of r.value as Row[]) {
-      if (typeof row.value !== 'number' || !row.country) continue
-      const prev = latestByCountry.get(row.country)
-      if (!prev || row.date > prev.date) latestByCountry.set(row.country, row)
+      if (typeof row.value !== 'number' || !Number.isFinite(row.value * scale) || !row.country) continue
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(row.date) || row.date < startDate || row.date > endDate) continue
+      const parsed = new Date(`${row.date}T00:00:00Z`)
+      if (!Number.isFinite(parsed.getTime()) || parsed.toISOString().slice(0, 10) !== row.date) continue
+      const points = byCountry.get(row.country) ?? new Map<string, number>()
+      points.set(row.date, row.value * scale)
+      byCountry.set(row.country, points)
     }
     const cells = new Map<string, GlobalMacroCell>()
-    for (const [country, row] of latestByCountry) {
-      cells.set(country, { value: (row.value as number) * scale, date: row.date })
+    for (const [country, points] of byCountry) {
+      const history = [...points].sort(([a], [b]) => a.localeCompare(b)).map(([date, value]) => ({ date, value }))
+      const latest = history[history.length - 1]
+      cells.set(country, { ...latest, history })
     }
     return { cells }
   })

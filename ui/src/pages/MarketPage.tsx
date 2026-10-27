@@ -8,6 +8,7 @@ import { SeriesCard } from '../components/market/SeriesCard'
 import { Skeleton } from '../components/StateViews'
 import { Button } from '../components/ui/button'
 import { referenceApi, type ValuationStrip } from '../api/reference'
+import { NewsMarketContext } from '../components/news/NewsMarketContext'
 import { useWorkspace } from '../tabs/store'
 
 export function MarketPage() {
@@ -29,6 +30,7 @@ export function MarketPage() {
       <PageHeader title={t('market.pageTitle')} description={t('market.pageDescription')} />
       <div className="flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto px-4 py-4 md:px-8">
         <SearchBox />
+        <NewsMarketContext watchlist={[]} title={t('market.browseMarkets')} showMarkets />
 
         <section className="border-y border-border/60 py-4">
           <div className="flex flex-col gap-3.5">

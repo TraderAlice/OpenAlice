@@ -36,7 +36,95 @@ information should recede without becoming illegible.
 - Keep copy direct and operational. Lead with the state or object, then the
   explanation and next action.
 
-News rows in `ui/src/pages/NewsPage.tsx` form a local-calendar-day timeline.
+News in `ui/src/pages/NewsPage.tsx` defaults to reversible reading groups from
+`ui/src/components/news/reading-groups.ts`. Prepared occurrence identities group
+coverage of the same development; separate developments and conflicting
+assignments stay apart. Unprepared reports use conservative headline matching
+within 24 hours, with number/polarity checks and no transitive chaining. That
+fallback is limited to the returned query window (up to 200 articles) and does
+not establish persistent event identity. See [Event reading](news-reading.md).
+The All reports switch restores every report. Group counts expand originals
+inside the News panel, ordered earliest first; filters and the stream stay in
+place, and focus remains on the disclosure control. Browse sources is a native link to the existing
+settings catalog and focuses its directory heading; source cards require explicit subscription and identify the
+RSSHub dependency. Manual grouping correction remains outside the reader.
+
+The prepared event list leads with the headline and timestamp, with status and
+topics beneath. A single-development event does not repeat that development in
+the list; continuing events retain a latest-development preview. Full summaries
+and evidence remain available. Date, symbol and keyword fields keep visible
+labels after entry. Keyword search stays in a compact row; Filters discloses
+the date and symbol fields. Applied advanced conditions remain counted on that
+control after a valid search closes the fields. Invalid dates reopen their
+fields and focus the start date; Clear resets the conditions and collapses them.
+Prepared details expand in their own News-panel row, using
+native disclosures for developments and originals. Citation actions open and
+focus the supporting originals there; retain the existing layout, theme and
+density rather than adding a separate workbench or drawer. Citation actions focus
+their destination heading and clear the official-only filter, so cited material
+cannot disappear behind an earlier filter. Inline content does not trap focus;
+collapsing it leaves focus on the disclosure control.
+
+Prepared rows show compact declared-source names and actionable topic labels;
+Hot alone adds source-coverage ranks with pagination offsets. News omits the
+global market-context strip and economic-calendar preview. Explicit event assets
+remain inside opened details; selecting one opens its mini chart inline with
+1M/3M/1Y controls, a source/date and local retry state. Closing the chart returns
+focus to its ticker. Market selection never changes the news query, and the
+strip does not animate or imply a news/asset association.
+
+Market overview owns the global group controls and price context.
+The shared component opts into switching only on Market overview,
+between overview/watchlist, forex, commodities, crypto
+and sector ETF groups with pressed-state buttons. Only the selected group
+loads, and switching closes its chart. Sector tiles have equal areas, explicit
+signed lookback returns, source/as-of and a cached-data label when applicable;
+color supplements the numbers. Each tile opens the same inline chart and closing
+restores its focus. Event asset cards stay limited to the event's explicit codes.
+
+At the top of News, Important events lists up to three numbered headlines
+with a View all action. Headline activation opens/focuses its existing inline
+event row. Event rows provide a Flag control with pressed state and a visible
+importance label; clearing the last visible important event focuses its list.
+Importance uses its own text/icon cue rather than price-direction color or heat.
+Unavailable/empty important results stay explicit, without blocking the stream.
+Automatic importance is displayed as analysis inside the expanded event, with
+its own evidence action. Reader corrections remain independent of later
+automatic assessments.
+
+Prepared event rows keep the headline, metadata, two-line latest change, reading
+status and common actions compact. Timelines, conditional paths and detailed
+provenance move into the same opened row. Paths use short wrapping steps and an
+explicit analysis label with their condition. Evidence actions expand the same
+row, select exact supporting originals and focus their heading. Publisher counts
+refer to identifiable owners across available evidence; channel labels and
+48-hour heat stay separate inside details. Official-source metadata is described
+as provenance, never confirmation of the claim. Missing or unsupported paths
+stay explicit without inventing an affected asset.
+
+The economic-release preview component is not mounted on the News homepage.
+Event timelines use actual development nodes, wrapping on narrow screens; their
+buttons open exact evidence in the existing event details. Related daily-price
+cards mount only in the opened event, reusing the existing lazy chart/range/
+close-focus behavior. Unsupported codes never trigger a default-asset chart.
+
+Opening current event details successfully marks their exact revision read;
+failed/aborted/stale loads do not. The pre-open development snapshot remains
+stable while the event stays open, including delayed initial opens. The row shows
+Unread, Read, an exact new-development count or a content-update label. Details
+retain explicit mark-unread and full asset-code text, with at most three charts.
+Related events load lazily and name their shared stored topics/codes. Selecting
+one enters a labelled inline reading view with Back to list and heading focus;
+returning focuses the original list, and changing filters resets this navigation.
+The temporary view has its own accessible list name and no inherited Hot rank.
+
+The compact reading-status select appears with source controls on event views.
+It preserves the chosen URL state and resets pagination. A filtered-out open row
+stays readable during polling, without an invented rank; closing it restores
+focus to the list. Explicit refresh resets that retained reading view. Latest's
+Important strip clears a hidden reading filter when opening its full results.
+
+News rows form a local-calendar-day timeline.
 Time stays in the left gutter. The headline is a separate, prominent block above
 the summary, which previews up to three lines. Editorial images align with the
 headline on the right, with the source below; narrow screens place this image
@@ -48,15 +136,66 @@ under `ui/public/market/flags/`; unknown tags remain text. The current news
 contract has no structured related-company identity or company-logo field.
 
 The news scroller reveals already-fetched results in batches of 40 when its
-bottom sentinel approaches the viewport. Appending keeps the reading position;
+bottom sentinel approaches the viewport. A keyboard-accessible Show more
+reports action focuses the first newly revealed headline. Automatic appending keeps the reading position;
 changing a filter resets the batch and scroll position. This is not server
-pagination: the existing query limit and refresh cadence remain unchanged.
+pagination: the existing query limit remains unchanged. A visible automatic
+updates checkbox pauses the 60-second polling, including publication of an
+in-flight automatic result; manual refresh and filter changes still work.
+The collector settings similarly pause automatic feed/module status updates
+and offer a manual status refresh. Disabling collection uses a native disabled
+fieldset so pointer, keyboard and accessibility state agree.
+
+News and source forms link custom errors to their invalid fields and focus the
+first invalid field after rendering its description on submit. Credential submit stays focusable while saving,
+blocks duplicate submissions and announces the outcome in a stable polite
+region. In forced colors, the shared focus rule restores a system-color outline
+because browsers can suppress box shadows in this mode.
 
 Market navigation keeps News first, followed by Markets (market overview and
 an expandable watchlist), Analytics (movers, sector rotation, term structure),
 and Macro boards. Section headings are static; only news categories and the
 watchlist disclose child items. The watchlist uses the shared Collapsible
 primitive and keeps pinned entries intact when closed.
+
+Global Macro keeps its existing Market panel and defaults to a lightweight
+Map view, with a Table alternative retaining the desktop comparison and mobile
+metric groups. The map uses bundled Natural Earth paths, existing chart/theme
+tokens and a numeric legend; it shades finite values from one supplied
+observation period. Other periods, unknown dates and missing values remain
+uncolored. Its bottom historical timeline uses a native range input with
+previous/next/latest buttons and a date selector sharing the same state.
+Dragging, keyboard arrows and the buttons update map colors, legend, inline
+country metrics and the table to the exact selected observation period; switching
+Map/Table preserves the period and zoom. Missing months remain empty, including
+quarterly metrics without a record that month. Snapshot-only data stays readable
+with a disabled timeline and a short unavailable-history message. Only supplied
+macro countries are selectable; the remaining geometry
+is background, not evidence of worldwide data coverage. Country paths support
+Enter/Space, alongside a native country selector and labeled zoom/reset controls.
+China's mainland and Taiwan geometries form one rendered path, sharing the same
+fill, selection, pointer/keyboard target and China label. No separate Taiwan
+label or country option is introduced; upstream statistics remain unchanged.
+
+Hovering or focusing a supplied country opens a compact value/date tooltip;
+clicking or using Enter/Space still selects the country and reveals its current
+indicator's history curve inline. The curve uses only supplied observations,
+marks the chosen period, breaks at missing periods and retains dots for isolated
+points. Missing history has an explicit empty state. The numeric legend supports
+hover/focus previews and click/tap to pin a range; Escape or Clear range removes
+it. Indicator/period changes clear the range. Values use five equal ranges, or
+one when all values match; the last range includes the maximum. Other countries
+dim without changing selection, stored data, coverage counts or the table.
+
+Selecting a country shows its metric values and source dates inline beneath
+the map. History-capable data follows the timeline period; a snapshot-only
+response shows each metric's latest supplied value and individual date, which
+can differ from the snapshot map cohort. Search news opens the existing
+singleton News tab with the canonical structured country filter. Only current,
+active evidence-bound relationships enter those results; an uncatalogued
+country retains keyword discovery as a fallback. Country/industry/asset filters
+and their clear action stay in the same News panel. No drawer or separate
+workbench is introduced. Observation dates remain visible in both table layouts.
 
 The stable page hierarchy is:
 

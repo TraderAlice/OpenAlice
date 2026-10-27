@@ -28,6 +28,11 @@ function aaplOnly(payload: object): (req: { request: Request }) => Response {
 }
 
 export const marketHandlers = [
+  http.get('/api/reference/economic-calendar', () => HttpResponse.json({
+    events: [{ date: new Date(Date.now() + 3600000).toISOString(), event: '【演示】经济数据发布', country: null, importance: 'High', currency: null, source: null, unit: '%', actual: null, consensus: 0, previous: 0 }],
+    window: { start: new Date().toISOString().slice(0, 10), end: new Date(Date.now() + 14 * 86400000).toISOString().slice(0, 10) },
+    meta: { provider: 'demo', asOf: new Date().toISOString() },
+  })),
   // Search — AAPL / Apple matches the snapshot; anything else returns empty.
   http.get('/api/market/search', ({ request }) => {
     const q = (new URL(request.url).searchParams.get('query') ?? '').toLowerCase()

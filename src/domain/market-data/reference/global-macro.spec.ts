@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
 import { fetchGlobalMacro } from './global-macro.js'
 import type { EconomyClientLike } from '../client/types.js'
 
@@ -22,6 +22,32 @@ function mkClient(overrides: Partial<Record<'getCPI' | 'getInterestRates' | 'get
 }
 
 describe('global macro board', () => {
+  it('retains five years of sorted unique finite observations and normalizes historical rates', async () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-10-25T00:00:00Z'))
+    try {
+      const client = mkClient({ getCPI: async () => [
+        { date: '2026-04-01', country: 'United States', value: 3.2 },
+        { date: '2026-03-01', country: 'United States', value: 1 },
+        { date: '2026-03-01', country: 'United States', value: 0 },
+        { date: '2020-01-01', country: 'United States', value: 2 },
+        { date: '2026-05-01', country: 'United States', value: NaN },
+        { date: '2026-06-01', country: 'United States', value: Infinity },
+        { date: '2026-02-30', country: 'United States', value: 99 },
+        { date: '2027-01-01', country: 'United States', value: 99 },
+      ] })
+      const methods = ['getCPI', 'getInterestRates', 'getCompositeLeadingIndicator', 'getHousePriceIndex', 'getSharePriceIndex'] as const
+      const spies = methods.map(method => vi.spyOn(client, method))
+      const board = await fetchGlobalMacro(client)
+      const us = board.rows[0]
+      expect(us.cpiYoy.history).toEqual([{ date: '2026-03-01', value: 0 }, { date: '2026-04-01', value: 3.2 }])
+      expect(us.cpiYoy.value).toBe(3.2)
+      expect(us.shortRate.history?.map(point => point.value)).toEqual([expect.closeTo(-96.28, 5), expect.closeTo(3.72, 5)])
+      expect(spies.every(spy => spy.mock.calls.length === 1)).toBe(true)
+      expect(spies[0]).toHaveBeenCalledWith(expect.objectContaining({ start_date: '2021-10-01', end_date: '2026-10-25' }))
+    } finally { vi.useRealTimers() }
+  })
+
   it('batches per indicator, groups by country, normalizes units in-domain', async () => {
     const client = mkClient({})
     const board = await fetchGlobalMacro(client)

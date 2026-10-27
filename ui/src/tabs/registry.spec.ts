@@ -2,6 +2,10 @@ import { describe, expect, it } from 'vitest'
 
 import { getView, getViewShell } from './registry'
 
+it('projects News reading status into a reload-safe URL', () => {
+  expect(getView('news').toUrl({ kind: 'news', params: { view: 'events', readStatus: 'updated', keyword: 'shipping' } })).toBe('/market/news?view=events&keyword=shipping&readStatus=updated')
+})
+
 it('keeps Quick Start and Chat as separate URL identities', () => {
   expect(getView('quick-start').toUrl({ kind: 'quick-start', params: {} })).toBe('/quick-start')
   expect(getView('chat-landing').toUrl({ kind: 'chat-landing', params: {} })).toBe('/chat')
@@ -77,6 +81,10 @@ describe('Office URL projection', () => {
 })
 
 describe('Market News URL projection', () => {
+  it('round-trips a country-name search alongside the selected News view', () => {
+    const url = getView('news').toUrl({ kind: 'news', params: { view: 'events', keyword: 'United States' } })
+    expect(url).toBe('/market/news?view=events&keyword=United+States')
+  })
   it('projects News onto the Market navigator route', () => {
     expect(getView('news').toUrl({ kind: 'news', params: {} })).toBe('/market/news')
   })

@@ -255,7 +255,12 @@ function AdoptNewsSelection() {
   const [search] = useSearchParams()
   const category = search.get('category') || undefined
   const view = search.get('view') || undefined
-  return <AdoptTraderStatic spec={{ kind: 'news', params: { ...(category ? { category } : {}), ...(view ? { view } : {}) } }} />
+  const keyword = search.get('keyword')?.trim().slice(0, 500) || undefined
+  const source = search.get('source')?.trim().slice(0, 500) || undefined
+  const readStatus = search.get('readStatus')
+  const eventId = search.get('eventId')
+  const relationships = Object.fromEntries(['country', 'industry', 'asset'].flatMap(key => { const value = search.get(key)?.trim(); return value && value.length <= 500 ? [[key, value]] : [] }))
+  return <AdoptTraderStatic spec={{ kind: 'news', params: { ...relationships, ...(category ? { category } : {}), ...(view ? { view } : {}), ...(keyword ? { keyword } : {}), ...(source ? { source } : {}), ...(readStatus === 'unread' || readStatus === 'updated' ? { readStatus } : {}), ...(eventId && /^[a-z0-9][a-z0-9-]{0,79}$/.test(eventId) ? { eventId } : {}) } }} />
 }
 
 function AdoptTracked() {

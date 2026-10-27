@@ -18,6 +18,8 @@ import { createMemoryInboxStore } from '../../../src/core/inbox-store.js'
 import { extractMcpShape } from '../../../src/core/mcp-export.js'
 import { inboxPushFactory } from '../../../src/tool/inbox-push.js'
 import { registerCliRoutes, type CliGatewayDeps } from '../../../src/server/cli.js'
+import { createNewsReadingTools } from '../../../src/domain/news/query/reading.js'
+import { NewsStoryStore } from '../../../src/domain/news/stories.js'
 
 /**
  * Exercise gateway validation, dispatch and response unwrapping with a local
@@ -65,7 +67,39 @@ const post = (path: string, body: unknown) =>
     body: JSON.stringify(body),
   })
 
-describe('CLI gateway — data export', () => {
+describe('Native event CLI', () => {
+  it('publishes from an exact JSON file and reads the same persisted event through the real shim', async () => {
+    const home = await mkdtemp(join(tmpdir(), 'alice-event-cli-'))
+    const original = { id: 8, title: 'Port closure', content: 'The port is closed after a storm.', time: new Date('2026-10-24T01:00:00Z'), metadata: { source: 'Port authority' } }
+    const store = new NewsStoryStore({ getNewsV2: async () => [original], getNewsById: async id => id === 8 ? original : null }, join(home, 'stories'))
+    const tc = new ToolCenter()
+    tc.register(createNewsReadingTools(store), 'news-reading')
+    const gateway = new Hono()
+    registerCliRoutes(gateway, {
+      toolCenter: tc, workspaceToolCenter: new WorkspaceToolCenter(), inboxStore: {} as never, entityStore: {} as never,
+      getWorkspaceService: () => ({ registry: { get: () => ({ id: 'events', tag: 'events', dir: home }) } }) as never,
+    })
+    const server = serve({ fetch: gateway.fetch, hostname: '127.0.0.1', port: 0 })
+    try {
+      if (!server.listening) await new Promise<void>(resolve => server.once('listening', () => resolve()))
+      const address = server.address()
+      if (!address || typeof address === 'string') throw new Error('Missing CLI test port')
+      const artifact = { version: 1, id: 'storm-port', revision: 1, title: 'Storm closes port', summary: 'Observed $971; shell syntax stays data.', reason: 'Possible shipping disruption; price effects unknown.', topics: ['weather', 'shipping'], symbols: [], selected: false, status: 'watching', updatedAt: '2026-10-24T01:01:00Z', preparedBy: 'CLI test', overviewReportIds: [8], importance: { level: 'normal', reason: 'A local port closure is reported; broader impact is unknown.', reportIds: [8] }, transmission: null, comparisons: [], developments: [{ id: 'closure', time: '2026-10-24T01:00:00Z', title: 'Closure', summary: 'Port closed.', reportIds: [8] }] }
+      const file = join(home, 'event.json')
+      await writeFile(file, JSON.stringify(artifact))
+      const env = { ...process.env, OPENALICE_CLI_BIN: 'alice', OPENALICE_TOOL_URL: `http://127.0.0.1:${address.port}/cli`, OPENALICE_TOOL_SOCKET: '', AQ_WS_ID: 'events', AQ_RESUME_ID: '' }
+      const run = (args: string[]) => promisify(execFile)(process.execPath, [resolve('src/workspaces/cli/bin/openalice-cli.cjs'), ...args], { env, timeout: 15_000 })
+      expect(JSON.parse((await run(['events', 'publish', '--artifact-file', file])).stdout)).toEqual({ id: 'storm-port', revision: 1 })
+      expect(JSON.parse((await run(['events', 'read', '--id', 'storm-port'])).stdout)).toMatchObject({ summary: artifact.summary, selected: false, reports: [{ id: 8, content: original.content }] })
+      expect(JSON.parse((await run(['events', 'list'])).stdout)).toMatchObject({ stories: [{ id: 'storm-port' }] })
+    } finally {
+      await new Promise<void>(resolve => server.close(() => resolve()))
+      await rm(home, { recursive: true, force: true })
+    }
+  }, 30_000)
+})
+
+describe('CLI gateway — data export', { timeout: process.platform === 'win32' ? 30_000 : 5_000 }, () => {
   it('manifest lists grouped verbs with resolved tool names', async () => {
     const res = await app.request('/cli/ws1/data/manifest')
     expect(res.status).toBe(200)

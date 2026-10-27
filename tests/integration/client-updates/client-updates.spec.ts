@@ -74,7 +74,7 @@ it('preserves the production CLI blocked decision through client service and rel
   await writeFile(source, JSON.stringify({ schemaVersion: 2, repository: 'TraderAlice/OpenAlice', cliVersion: CLI_VERSION, selector: { kind: 'branch', value: 'master' }, installerUrl: 'https://openalice.ai/install', updateChannel: 'stable' }))
   vi.stubEnv('OPENALICE_INSTALL_SOURCE', source)
   const realFetch = globalThis.fetch
-  vi.stubGlobal('fetch', vi.fn(async (url, init) => String(url).startsWith('http://127.0.0.1:') ? realFetch(url, init) : new Response(JSON.stringify({ channel: 'stable', version: '0.1.0', releaseNotesUrl: 'https://example.test/release', installer: { url: 'https://example.test/install', versionedUrl: 'https://example.test/v0.1.0/install', sha256: 'a'.repeat(64) } }), { headers: { 'content-type': 'application/json' } })))
+  vi.stubGlobal('fetch', vi.fn(async (url, init) => String(url).startsWith('http://127.0.0.1:') ? realFetch(url, init) : new Response(JSON.stringify({ channel: 'stable', version: '0.1.0', releaseNotesUrl: 'https://example.test/release', installer: { url: 'https://example.test/install', versionedUrl: 'https://example.test/v0.1.0/install', sha256: 'a'.repeat(64) }, windowsInstaller: { url: 'https://example.test/install.ps1', versionedUrl: 'https://example.test/v0.1.0/install.ps1', sha256: 'b'.repeat(64) } }), { headers: { 'content-type': 'application/json' } })))
   const owner = new ClientUpdateService({ path: join(root, 'policy.json') })
   services.push(owner)
   const relay = new WebRelay({ clientUpdates: owner })
@@ -82,6 +82,7 @@ it('preserves the production CLI blocked decision through client service and rel
     await owner.check()
     const origin = await relay.listen()
     const snapshot = await fetch(`${origin}/relay/v1/updates`).then(response => response.json())
+    expect(snapshot.discovery.error).toBeNull()
     expect(snapshot.discovery.value).toMatchObject({ currentVersion: CLI_VERSION, status: 'blocked', reason: 'older-release' })
   } finally {
     await relay.close()

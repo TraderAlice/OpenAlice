@@ -35,6 +35,7 @@ export interface AgentActivitySignal {
   readonly taskId?: string
   readonly inboxEntryId?: string
   readonly newsItemId?: number
+  readonly storyId?: string
   readonly source?: string
   readonly image?: string
   readonly operationId?: string
@@ -221,12 +222,15 @@ export const newsActivityFilter: GlobalActivityFilter = {
   id: 'product-news',
   project({ runtimeEvents }, now) {
     return runtimeEvents.flatMap((event): AgentActivitySignal[] => {
-      if (event.type !== 'news.ingested' || event.payload.newsItemId === undefined) return []
+      if (event.type !== 'news.ingested' && event.type !== 'news.story.updated') return []
+      if (event.type === 'news.ingested' && event.payload.newsItemId === undefined) return []
+      if (event.type === 'news.story.updated' && (!event.payload.storyId || !/^[a-z0-9][a-z0-9-]{0,79}$/.test(event.payload.storyId))) return []
       if (Math.max(0, now - event.ts) > RECENT_SIGNAL_MS) return []
       return [{
-        id: `news:${event.payload.newsItemId}`,
+        id: event.type === 'news.story.updated' ? `news:story:${event.payload.storyId}:${event.payload.revision}` : `news:${event.payload.newsItemId}`,
         kind: 'news',
         newsItemId: event.payload.newsItemId,
+        ...(event.type === 'news.story.updated' ? { storyId: event.payload.storyId } : {}),
         source: event.payload.source,
         detail: event.payload.title,
         image: event.payload.image,

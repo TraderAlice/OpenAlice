@@ -335,6 +335,10 @@ describe('UrlAdopter Tracked selection', () => {
 })
 
 describe('UrlAdopter Market News', () => {
+  it('adopts a country-name News search without creating another News identity', async () => {
+    render(<MemoryRouter initialEntries={['/market/news?view=events&keyword=Canada']}><UrlAdopter /></MemoryRouter>)
+    await waitFor(() => expect(mocks.openOrFocus).toHaveBeenCalledWith({ kind: 'news', params: { view: 'events', keyword: 'Canada' } }))
+  })
   it('adopts News under Market from /market/news', async () => {
     render(
       <MemoryRouter initialEntries={['/market/news']}>

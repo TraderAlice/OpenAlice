@@ -1,6 +1,8 @@
 import type { QueryExecutor } from '@traderalice/opentypebb'
 import type { UTAManagerSDK } from '../services/uta-client/index.js'
 import type { INewsProvider } from '../domain/news/types.js'
+import type { NewsCollector } from '../domain/news/collector/rss.js'
+import type { NewsStoryStore } from '../domain/news/stories.js'
 import type { MarketSearchDeps } from '../domain/market-data/aggregate-search.js'
 import type { EquityClientLike } from '../domain/market-data/client/types.js'
 import type { BarService } from '../domain/market-data/bars/index.js'
@@ -66,6 +68,8 @@ export interface EngineContext {
   utaManager: UTAManagerSDK
   tradingModePolicy: () => TradingModePolicy
   newsProvider?: INewsProvider
+  newsStories?: NewsStoryStore
+  newsCollector?: NewsCollector
 }
 
 /** A media attachment collected from tool results (e.g. browser screenshots). */

@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { cleanup, render, screen, waitFor, within } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -64,6 +64,25 @@ beforeEach(async () => {
 afterEach(cleanup)
 
 describe('MarketBoardPage', () => {
+  it('keeps the timeline, country values, source dates and table on the same historical observation', async () => {
+    const user = userEvent.setup()
+    await i18n.changeLanguage('en')
+    const history = [{ date: '2025-01-01', value: 0 }, { date: '2025-02-01', value: 4 }]
+    const present = { value: 4, date: '2025-02-01', history }
+    mocks.boardData = { meta: {}, rows: [{ country: 'US', label: 'United States', cpiYoy: present, shortRate: present, cli: present, housePrice: { value: 90, date: '2025-02-01', history: [{ date: '2025-02-01', value: 90 }] }, sharePrice: present }] }
+    render(<MarketBoardPage spec={{ kind: 'market-board', params: { board: 'global-macro' } }} visible />)
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Country' }), 'US')
+    fireEvent.change(screen.getByRole('slider', { name: 'Historical timeline' }), { target: { value: '0' } })
+    const details = screen.getByRole('region', { name: 'United States' })
+    expect(within(details).getByLabelText('CPI YoY: 0.00%, 2025-01-01')).toBeTruthy()
+    expect(within(details).queryByText('90.0')).toBeNull()
+    await user.click(screen.getByRole('button', { name: 'Table' }))
+    expect(within(screen.getByTestId('global-macro-desktop')).getAllByText('2025-01-01')).toHaveLength(4)
+    expect(within(screen.getByTestId('global-macro-desktop')).queryByText('2025-02-01')).toBeNull()
+    await user.click(screen.getByRole('button', { name: 'Map' }))
+    expect(screen.getByRole('slider', { name: 'Historical timeline' }).getAttribute('aria-valuetext')).toBe('2025-01-01')
+  })
+
   it('opens an equity detail from the keyboard-accessible symbol control', async () => {
     const user = userEvent.setup()
     render(
@@ -109,6 +128,7 @@ describe('MarketBoardPage', () => {
   })
 
   it('gives Global Macro a scan-first mobile hierarchy without removing the desktop comparison table', async () => {
+    const user = userEvent.setup()
     await i18n.changeLanguage('en')
     mocks.boardData = {
       meta: {},
@@ -130,6 +150,7 @@ describe('MarketBoardPage', () => {
       />,
     )
 
+    await user.click(screen.getByRole('button', { name: 'Table' }))
     const mobile = screen.getByTestId('global-macro-mobile')
     const desktop = screen.getByTestId('global-macro-desktop')
     expect(mobile.className).toContain('md:hidden')
@@ -152,6 +173,30 @@ describe('MarketBoardPage', () => {
 
     const comparisonTable = within(desktop).getByRole('table')
     expect(within(comparisonTable).getAllByRole('columnheader')).toHaveLength(6)
+    expect(within(comparisonTable).getAllByText('2026-06-01')).toHaveLength(2)
+    expect(within(mobile).getAllByText('2026-06-01')).toHaveLength(2)
+  })
+
+  it('opens inline macro country details and structured country News filtering', async () => {
+    const user = userEvent.setup()
+    await i18n.changeLanguage('en')
+    mocks.boardData = { meta: {}, rows: [{ country: 'US', label: 'United States', cpiYoy: { value: 2.95, date: '2024-01-01' }, shortRate: { value: 3.7, date: '2026-09-01' }, cli: { value: 101, date: '2026-09-01' }, housePrice: { value: null, date: null }, sharePrice: { value: null, date: null } }] }
+    render(<MarketBoardPage spec={{ kind: 'market-board', params: { board: 'global-macro' } }} visible />)
+    expect(screen.getByRole('button', { name: 'Map' }).getAttribute('aria-pressed')).toBe('true')
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Indicator' }), 'shortRate')
+    await user.click(screen.getByRole('button', { name: 'Zoom in' }))
+    const viewBox = screen.getByRole('group', { name: 'World macro map' }).getAttribute('viewBox')
+    await user.click(screen.getByRole('button', { name: 'Table' }))
+    await user.click(screen.getByRole('button', { name: 'Map' }))
+    expect((screen.getByRole('combobox', { name: 'Indicator' }) as HTMLSelectElement).value).toBe('shortRate')
+    expect((screen.getByRole('combobox', { name: 'Observation period' }) as HTMLSelectElement).value).toBe('2026-09-01')
+    expect(screen.getByRole('group', { name: 'World macro map' }).getAttribute('viewBox')).toBe(viewBox)
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Country' }), 'US')
+    const details = screen.getByRole('region', { name: 'United States' })
+    expect(within(details).getByText('2024-01-01')).toBeTruthy()
+    expect(screen.queryByRole('dialog')).toBeNull()
+    await user.click(within(details).getByRole('button', { name: 'Search news' }))
+    expect(mocks.openOrFocus).toHaveBeenCalledWith({ kind: 'news', params: { view: 'events', country: 'US' } })
   })
 
   it('keeps Shipping card metadata intact when the card narrows', () => {
@@ -187,7 +232,8 @@ describe('MarketBoardPage', () => {
     expect(screen.getByText('1.40M t').className).toContain('whitespace-nowrap')
   })
 
-  it('uses a stable mobile grid for term basis values', () => {
+  it('keeps contract dates, prices and basis readable in the inline details', async () => {
+    const user = userEvent.setup()
     mocks.boardData = {
       meta: {},
       curves: [{
@@ -217,10 +263,12 @@ describe('MarketBoardPage', () => {
       />,
     )
 
-    const firstBasis = screen.getByText('26-08-30')
-    expect(firstBasis.className).toContain('justify-between')
-    expect(firstBasis.parentElement?.className).toContain('grid-cols-2')
-    expect(firstBasis.parentElement?.className).toContain('sm:flex')
+    await user.click(screen.getByText('合约明细'))
+    const table = screen.getByRole('table', { name: 'BTC 合约明细' })
+    expect(within(table).getByText('2026-08-30')).toBeTruthy()
+    expect(within(table).getByText('119,000')).toBeTruthy()
+    expect(within(table).getByText('+7.2%')).toBeTruthy()
+    expect(within(table).getByText('+8.1%')).toBeTruthy()
   })
 
   it('compresses term-axis labels without losing desktop precision', () => {

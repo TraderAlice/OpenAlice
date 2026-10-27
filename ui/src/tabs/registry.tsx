@@ -222,6 +222,11 @@ const newsModule: ViewModule<'news'> = {
     const search = new URLSearchParams()
     if (params.category) search.set('category', params.category)
     if (params.view) search.set('view', params.view)
+    if (params.keyword?.trim()) search.set('keyword', params.keyword.trim().slice(0, 500))
+    if (params.source?.trim()) search.set('source', params.source.trim().slice(0, 500))
+    if (params.readStatus === 'unread' || params.readStatus === 'updated') search.set('readStatus', params.readStatus)
+    if (params.eventId && /^[a-z0-9][a-z0-9-]{0,79}$/.test(params.eventId)) search.set('eventId', params.eventId)
+    for (const key of ['country', 'industry', 'asset'] as const) if (params[key]?.trim()) search.set(key, params[key]!.trim().slice(0, 500))
     return '/market/news' + (search.size ? '?' + search : '')
   },
   shell: 'market',

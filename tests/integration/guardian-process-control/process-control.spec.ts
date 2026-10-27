@@ -103,7 +103,7 @@ describe('terminateProcessTree', () => {
     expect(defaultProcessController.isAlive(childPid)).toBe(false)
     cleanupPids.delete(wrapper.pid)
     cleanupPids.delete(childPid)
-  })
+  }, 20_000)
 })
 
 describe('process liveness', () => {

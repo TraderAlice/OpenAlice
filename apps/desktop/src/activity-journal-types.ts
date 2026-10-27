@@ -10,6 +10,7 @@ export type AgentRuntimeEventType =
   | 'dev.sonner_test'
   | 'inbox.received'
   | 'news.ingested'
+  | 'news.story.updated'
 
 export type AgentRuntimeSurface = 'terminal' | 'webpi' | 'headless'
 
@@ -60,6 +61,9 @@ export interface AgentRuntimePayload {
   summary?: string
   documentCount?: number
   newsItemId?: number
+  storyId?: string
+  revision?: number
+  developmentIds?: string[]
   dedupKey?: string
   title?: string
   source?: string

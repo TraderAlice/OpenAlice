@@ -59,10 +59,10 @@ export class FMPEconomicCalendarFetcher extends Fetcher {
     data: Record<string, unknown>[],
   ): FMPEconomicCalendarData[] {
     return data.map(d => {
-      // Replace empty strings/zeros with null
+      // A zero release or estimate is data, not a missing value.
       const cleaned: Record<string, unknown> = {}
       for (const [k, v] of Object.entries(d)) {
-        cleaned[k] = (v === '' || v === 0) ? null : v
+        cleaned[k] = v === '' ? null : v
       }
       const aliased = applyAliases(cleaned, ALIAS_DICT)
       // Normalize change_percent from percent to decimal

@@ -55,6 +55,7 @@ fit the task.
 |---|---|---|
 | Current market boards, fundamentals, macro, calendars | `traderhub` | `traderhub` |
 | Symbol discovery, collected RSS, K-lines and bounded analysis | `alice` | `alice`, `alice-analysis` |
+| Organize collected news and continuing events from original evidence | `alice rss`, `alice events` | `alice` (news reference) |
 | Peer addressing, Agent conversation, Inbox, Issues and provenance | `alice` | `alice` |
 | Issue files, schedules, headless delivery contracts | `.alice/issues/` + `alice issue` | `self-scheduling` |
 | Accounts, positions, orders, trading-as-git | `alice-uta` | `alice-uta` |

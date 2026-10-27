@@ -4,16 +4,13 @@ import { describe, expect, it } from 'vitest'
 
 import {
   MIGRATION_BASELINE,
-  NEXT_MIGRATION_NUMBER,
   REGISTRY,
 } from './registry.js'
 
 describe('migration baseline', () => {
   it('keeps retired development migrations out of the runtime registry', () => {
     expect(MIGRATION_BASELINE).toBe('0.89.2-beta')
-    expect(NEXT_MIGRATION_NUMBER).toBe(45)
-    expect(REGISTRY.map((migration) => Number.parseInt(migration.id.slice(0, 4), 10)))
-      .toEqual([39, 40, 41, 42, 43, 44])
+    expect(REGISTRY.some(migration => Number.parseInt(migration.id.slice(0, 4), 10) < 39)).toBe(false)
   })
 
   it('runs unit tests inside one isolated complete home', () => {

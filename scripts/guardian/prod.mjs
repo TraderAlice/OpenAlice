@@ -40,6 +40,7 @@ import {
   resolveAliceProjectIdentity,
   readAliceProjectProduct,
   normalizeProcessExitCode,
+  requestAliceShutdown,
   RestartBackoff,
   takeoverRequested,
   proxyEnvFromRules,
@@ -302,6 +303,7 @@ function makeUTASpec() {
 }
 
 function spawnUTA() {
+  if (stopping) return null
   const spec = makeUTASpec()
   const child = spawn(spec.cmd, spec.args, { env: spec.env, stdio: 'inherit' })
   child.once('exit', (code, signal) => {
@@ -314,6 +316,7 @@ function spawnUTA() {
 }
 
 function spawnConnector() {
+  if (stopping) return null
   const spec = runtimeProcessSpec({
     role: 'connector',
     legacyPath: 'services/connector/dist/connector.cjs',
@@ -348,6 +351,7 @@ function spawnConnector() {
 }
 
 function spawnAlice() {
+  if (stopping) return null
   const spec = runtimeProcessSpec({
     role: 'alice',
     legacyPath: 'dist/main.js',
@@ -374,10 +378,10 @@ function spawnAlice() {
         ? { OPENALICE_PROJECT_PRODUCT: 'nano', OPENALICE_UTA_DISABLED: '1' }
         : {}),
     },
-    stdio: 'inherit',
+    stdio: ['inherit', 'inherit', 'inherit', 'ipc'],
   })
   child.once('exit', (code, signal) => {
-    if (stopping) return
+    if (stopping) { shutdownExitCode = Math.max(shutdownExitCode, normalizeProcessExitCode(code)); return }
     aliceStatus = 'offline'
     console.error(`[guardian/prod] Alice exited unexpectedly (code=${code}, signal=${signal})`)
     shutdown(typeof code === 'number' && code !== 0 ? code : 1)
@@ -430,6 +434,7 @@ async function restartConnector({ recovery = false } = {}) {
   if (stopping) return false
   if (!recovery) connectorRecovery.reset()
   const enabled = await readConnectorEnabled()
+  if (stopping) return false
   if (!enabled) {
     if (connectorChild && connectorChild.exitCode === null) {
       console.log('[guardian/prod] Connector disabled — stopping service')
@@ -455,6 +460,7 @@ async function restartConnector({ recovery = false } = {}) {
         await exited
       }
     }
+    if (stopping) return false
     connectorChild = spawnConnector()
     const ready = await waitForConnector()
     connectorStatus = ready ? 'ready' : 'offline'
@@ -484,6 +490,7 @@ async function restartUTA() {
   if (stopping) return
   TRADING_MODE = await resolveTradingMode(process.env, DATA_HOME)
   const product = await readAliceProjectProduct(DATA_HOME)
+  if (stopping) return
   if (product === 'nano' || TRADING_MODE.mode === 'lite') {
     if (utaChild && utaChild.exitCode === null) {
       console.log(`[guardian/prod] ${product === 'nano' ? 'NanoAlice' : 'trading mode lite'} — stopping UTA`)
@@ -521,6 +528,7 @@ async function restartUTA() {
         await exited
       }
     }
+    if (stopping) return
     utaChild = spawnUTA()
     const ready = await waitForUTA()
     utaStatus = ready ? 'ready' : 'offline'
@@ -543,31 +551,41 @@ function shutdown(exitCode = 0) {
   if (utaChild) utaStatus = 'stopping'
   if (connectorChild) connectorStatus = 'stopping'
   console.log('[guardian/prod] shutting down')
-  for (const c of [utaChild, connectorChild, aliceChild]) {
-    if (c && c.exitCode === null && !c.killed) {
-      try { c.kill('SIGTERM') } catch { /* noop */ }
-    }
+  const children = [utaChild, connectorChild, aliceChild].filter(c => c && c.exitCode === null && c.signalCode === null)
+  const exited = Promise.all(children.map(c => new Promise(resolveExit => c.once('exit', resolveExit))))
+  for (const c of children) {
+    if (c === aliceChild) requestAliceShutdown(c, () => {
+      if (process.platform !== 'win32') { try { c.kill('SIGTERM') } catch { /* already gone */ } }
+    })
+    else { try { c.kill('SIGTERM') } catch { /* already gone */ } }
   }
-  setTimeout(() => {
-    for (const c of [utaChild, connectorChild, aliceChild]) {
-      if (c && c.exitCode === null) {
-        try { c.kill('SIGKILL') } catch { /* noop */ }
+  void Promise.race([exited, sleep(10_000)]).then(async () => {
+    for (const c of children) {
+      if (c.exitCode === null && c.signalCode === null) {
+        shutdownExitCode = Math.max(shutdownExitCode, 1)
+        try { c.kill('SIGKILL') } catch { /* already gone */ }
       }
+    }
+    await Promise.race([exited, sleep(2_000)])
+    if (children.some(c => c.exitCode === null && c.signalCode === null)) {
+      console.error('[guardian/prod] child shutdown not confirmed; ownership retained for recovery')
+      process.exit(1)
     }
     const currentControl = guardianControlServer
     guardianControlServer = null
     const current = guardianRuntimeLock
     guardianRuntimeLock = null
-    void Promise.resolve(currentControl?.close())
+    await Promise.resolve(currentControl?.close())
       .catch((err) => console.error('[guardian/prod] control endpoint close failed:', err))
       .then(() => current?.release())
       .catch((err) => console.error('[guardian/prod] runtime lock release failed:', err))
-      .finally(() => process.exit(shutdownExitCode))
-  }, 5_000)
+    process.exit(shutdownExitCode)
+  })
 }
 
 async function startFlagWatcher() {
   await mkdir(dirname(FLAG_PATH), { recursive: true })
+  if (stopping) return
   let pending
   const fire = (kind) => {
     if (pending) clearTimeout(pending)
@@ -619,6 +637,7 @@ export async function startGuardianRuntime() {
   process.on('SIGHUP', () => shutdown())
 
   await initializeRuntimeState()
+  if (stopping) return
   if (!process.env.OPENALICE_HOME && process.env.OPENALICE_USER_DATA_HOME) {
     console.warn('[guardian/prod] OPENALICE_USER_DATA_HOME is deprecated — set OPENALICE_HOME instead')
   }
@@ -634,7 +653,7 @@ export async function startGuardianRuntime() {
   console.log(`[guardian/prod] MCP   → optional on http://127.0.0.1:${MCP_PORT}/mcp`)
   console.log(`[guardian/prod] flags → ${FLAG_PATH}, ${CONNECTOR_FLAG_PATH}`)
 
-  guardianRuntimeLock = await acquireGuardianRuntime({
+  const startupOwner = await acquireGuardianRuntime({
     userDataHome: DATA_HOME,
     launcherRoot: LAUNCHER_ROOT,
     launcher: GUARDIAN_LAUNCHER,
@@ -645,14 +664,18 @@ export async function startGuardianRuntime() {
       shutdown()
     },
   })
+  if (stopping) { await startupOwner.release(); return }
+  guardianRuntimeLock = startupOwner
   if (TAKEOVER) console.log('[guardian/prod] takeover → previous OpenAlice runtime stopped')
 
-  guardianControlServer = await startGuardianControlServer({
+  const controlServer = await startGuardianControlServer({
     homeRoot: DATA_HOME,
     allowStop: true,
     getStatus: runtimeStatus,
     onStop: () => shutdown(),
   })
+  if (stopping) { await controlServer.close(); return }
+  guardianControlServer = controlServer
   console.log(`[guardian/prod] Control → ${guardianControlServer.endpoint}`)
 
   if (!SKIP_UTA) {
@@ -665,7 +688,9 @@ export async function startGuardianRuntime() {
     })
   }
 
-  if (await readConnectorEnabled()) {
+  const connectorEnabled = await readConnectorEnabled()
+  if (stopping) return
+  if (connectorEnabled) {
     connectorStatus = 'starting'
     connectorChild = spawnConnector()
     void waitForConnector().then((ready) => {

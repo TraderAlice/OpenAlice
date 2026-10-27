@@ -23,6 +23,12 @@ installs Agent/dev and Inbox families; enabled News collection registers
 per-item News facts. Other product families can use the same registration
 boundary without adding a second polling or dispatch path.
 
+News also records `news.story.updated` after a durable event publication and
+its follow receipt. The bounded payload carries story ID/revision, title and
+new development IDs. It reuses the News family and projection; it never starts
+preparation. Browser and desktop announcements open that exact checked event
+inside the existing News tab. Recording failure leaves the event committed.
+
 ## Persistence and reads
 
 The physical journal remains `<launcherRoot>/state/agent-runtime.jsonl`, normally

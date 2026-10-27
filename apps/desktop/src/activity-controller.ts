@@ -8,6 +8,7 @@ const text = z.string().max(16_384).optional()
 const payloadSchema = z.object({
   workspaceId: text, resumeId: text, agent: text, sessionRecordId: text, taskId: text,
   inboxEntryId: text, newsItemId: z.number().int().nonnegative().optional(), source: text,
+  storyId: z.string().regex(/^[a-z0-9][a-z0-9-]{0,79}$/).optional(), revision: z.number().int().positive().optional(), developmentIds: z.array(z.string().max(80)).max(100).optional(),
   title: text, image: text, summary: text, error: text, reason: text, launchErrorCode: text,
   message: text, originKind: z.string().optional(), testState: z.enum(['running', 'success', 'error']).optional(),
   status: z.enum(['done', 'failed', 'interrupted', 'paused']).optional(),
@@ -57,7 +58,7 @@ export class ActivityController {
           : this.surface.petVisible() && this.prefs.pet ? 'pet' : null)
         if (!chosen || !this.identity) { close(); return }
         // Functions remain in main. Only the safe context and display token cross IPC.
-        const context: ActivityContext = input.group?.startsWith('news:') ? 'news'
+        const context: ActivityContext = input.newsStoryId && /^[a-z0-9][a-z0-9-]{0,79}$/.test(input.newsStoryId) ? `news:${input.newsStoryId}` : input.group?.startsWith('news:') ? 'news'
           : input.group?.startsWith('inbox:') ? 'inbox' : 'office'
         const { action: _action, image: _image, onDismiss: _onDismiss, ...content } = input
         let serialized: SerializedNotification = { ...content, duration: Number.isFinite(input.duration) ? input.duration : null, context }

@@ -1,5 +1,6 @@
 import type { AgentActivitySignal } from './activity-projection.js'
 import type { NotificationInput } from './notification-queue.js'
+import type { ActivityContext } from './activity-policy.js'
 function operationId(signal: AgentActivitySignal): string {
   return signal.operationId ?? (signal.taskId ? `task:${signal.taskId}`
     : signal.workspaceId && signal.resumeId ? `session:${signal.workspaceId}:${signal.resumeId}` : `event:${signal.revision}`)
@@ -10,7 +11,7 @@ export interface AnnouncementContext {
   agent(signal: AgentActivitySignal): string
   action(signal: AgentActivitySignal): NotificationInput['action']
   t(key: string, values?: { agent?: string }): string
-  open(context: 'office' | 'inbox' | 'news'): void
+  open(context: ActivityContext): void
 }
 export class ActivityAnnouncements {
   private announcedThrough: number | null = null
@@ -74,10 +75,10 @@ export class ActivityAnnouncements {
         }
         case 'news':
           input = { status: 'info', title: signal.source ?? context.t('activityToast.newsSource'),
-            description: signal.detail, articleId: signal.newsItemId, image: signal.image,
-            group: `news:${(signal.source ?? '').trim().toLowerCase()}`, windowMs: 4_000,
+            description: signal.detail, articleId: signal.newsItemId, image: signal.image, newsStoryId: signal.storyId,
+            group: signal.storyId ? `news:story:${signal.storyId}` : `news:${(signal.source ?? '').trim().toLowerCase()}`, windowMs: 4_000,
             revision: signal.revision, duration: 6_000,
-            action: { label: context.t('activityToast.viewNews'), onClick: () => context.open('news') },
+            action: { label: context.t('activityToast.viewNews'), onClick: () => context.open(signal.storyId ? `news:${signal.storyId}` : 'news') },
           }
           break
         default:

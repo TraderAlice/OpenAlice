@@ -26,6 +26,21 @@ function setup() {
 beforeEach(() => { vi.useFakeTimers(); vi.setSystemTime(new Date('2026-09-30T12:00:00Z')) })
 afterEach(() => { vi.useRealTimers() })
 describe('desktop Journal arbitration', () => {
+  it('routes one followed-event update to its exact News event and obeys the existing News preference', async () => {
+    const s = setup()
+    await s.page([])
+    await s.page([event(1, 'news.story.updated', { storyId: 'port-closure', revision: 2, title: 'Port update', developmentIds: ['reopening'] })])
+    const display = s.controller.snapshot()[0]
+    expect(display?.input.context).toBe('news:port-closure')
+    expect(s.controller.open(display.displayId, 'main')).toBe(true)
+    expect(s.open).toHaveBeenCalledWith('news:port-closure')
+    await s.page([event(1, 'news.story.updated', { storyId: 'port-closure', revision: 2, title: 'Port update', developmentIds: ['reopening'] })])
+    expect(s.controller.snapshot()).toEqual([])
+    s.controller.setPreferences({ ...structuredClone(defaults), events: { ...defaults.events, news: false } })
+    await s.page([event(2, 'news.story.updated', { storyId: 'port-closure', revision: 3, title: 'Port update', developmentIds: ['other'] })])
+    expect(s.controller.snapshot()).toEqual([])
+    s.controller.stop()
+  })
   it('stops without querying a destroyed surface or restarting after late work', async () => {
     let destroyed = false
     let identity = 'project-a'
