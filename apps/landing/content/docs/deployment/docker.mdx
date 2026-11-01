@@ -1,0 +1,16 @@
+export const metadata = {
+  title: "Docker deployment",
+  description: "The former Docker Compose distribution has been retired; use the native CLI on a private host for current releases.",
+  releaseChannel: "stable",
+  targetVersion: "0.94.1",
+}
+
+# Docker deployment
+
+The official Docker Compose deployment was retired before OpenAlice 0.94.1. Current releases do not include a root `Dockerfile` or `docker-compose.yml`, so older commands such as `docker compose up -d --build` will not start a supported OpenAlice server. This page remains available to correct links to the former deployment guide.
+
+For an always-on instance, install the [native CLI](/docs/getting-started/installation) on a private Linux or macOS host, then [register it as a Machine](/docs/deployment/remote-access). OpenAlice keeps the browser on your computer while the Runtime, Workspaces, credentials, and optional trading services stay on that host. The native Runtime does not need Node, Bun, or a source checkout; you install and authenticate your preferred Agent CLI separately.
+
+If you maintain your own container, it is a custom deployment. Pin an OpenAlice release and provide the required native dependencies, persistent `OPENALICE_HOME`, authentication, Agent runtimes, and private network boundary yourself. The former Compose image, bundled Agent list, volume name, and smoke commands no longer describe a release artifact.
+
+See [Data & Credentials](/docs/deployment/data-and-credentials) for state and backup guidance, or [Source & Dev](/docs/getting-started/developer-setup) to build from source.

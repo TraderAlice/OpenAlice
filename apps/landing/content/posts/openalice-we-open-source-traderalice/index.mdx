@@ -1,0 +1,83 @@
+export const metadata = {
+  title: "We Open-Sourced the Core of TraderAlice",
+  description: "TraderAlice is now open source. Meet OpenAlice — a locally-hosted, MIT-licensed trading agent you can run for free.",
+  date: "2026-02-19",
+  author: "TraderAlice Team",
+};
+
+It's been a month since our last blog post. Instead of announcing a big fundraise or sharing a founding story, we're bringing something different this time: **TraderAlice is now open source.**
+
+We've open-sourced a ready-to-use version of TraderAlice — better performance, running entirely on your local machine.
+
+Like most projects that slap `Open` in front of their name to signal open-source, this one is called **OpenAlice**. Luckily, we don't have any paying users yet, so everyone can start their Vibe Trading journey with OpenAlice — *free, controllable, and faster.*
+
+
+## What is OpenAlice
+
+In short, OpenAlice is a **Personal AI Trading Agent**. She automatically fetches news, computes quantitative factors, logs trade rationale, builds strategies across different timeframes, and monitors and adjusts your portfolio 24/7.
+
+Here's what makes OpenAlice different:
+
+**File-Driven** — OpenAlice uses a ready-to-use File-Driven Agent design. No complex configuration needed to get started. Both humans and AI can control Alice's behavior by reading and modifying files. Inspired by [OpenClaw](https://github.com/openclaw/openclaw) and [Claude Code](https://docs.anthropic.com/en/docs/claude-code).
+
+**Reasoning-Driven** — Every trading decision Alice makes is based on continuous reasoning and signal mixing. You can visit [traderalice.com/live](https://www.traderalice.com/live) to see how Alice reasons in real time.
+
+**OS-Native** — OpenAlice can interact with your operating system. Search the web through your browser, send you messages via iMessage. She can even connect to a speaker on your local network to wake you up.
+
+
+## Why Open Source
+
+Because open source helps us improve Alice's performance faster.
+
+As we developed the commercial version of TraderAlice, we found ourselves dealing with more and more problems that had nothing to do with Alice — pricing plans, production environments, permission systems. Our team hates dealing with databases and hosting because it wastes so much time, which contradicts why we started building Alice in the first place.
+
+So we decided to go with a lighter open-source model to speed up Alice's iteration cycle. Yes, it's that simple. Not because we ran out of money. Not because the team fell apart. Just because we want Alice to be **faster** and **better**.
+
+> From day one, we wanted to keep Alice at the cutting edge. We intend to keep that promise.
+
+
+## Open Source Is the Best Form for a Trading Agent
+
+We believe that for a Trading Agent, analytical performance matters a lot — but **security and controllability matter even more**. Hosting APIs and keys that involve real money in the cloud is unsafe, no matter what technology you use.
+
+That's why we've long had the idea of building a locally-hosted trading core. After finishing the initial prototype, we were pleasantly surprised: *this is great.*
+
+We wanted even more features that are only possible when running locally. For example, if we can run the browser automation core on your machine, users don't need to pay for expensive virtual machines.
+
+Users can also run a locally-hosted model as Alice's brain, keeping security entirely in their own hands — we know some people care a lot about this.
+
+Running a Trading Agent locally has so many advantages that if we could bring Alice's analytical tools local too, the experience would be even better. So really, there was nothing to hesitate about.
+
+
+## Thanks to OpenClaw
+
+Usually, we thank Manus, Cursor, and Claude Code. Now we're adding **OpenClaw** to the list. Thanks to OpenClaw for showing us what the AI industry actually needs right now.
+
+Before building this site, the TraderAlice team developed something called "V3" — event-driven, modular, fully open-source. V3's architecture was very similar to OpenClaw: an experimental General Agent.
+
+But for various reasons, we never shipped V3. Instead, we moved on to V4 — the Alice that's currently running. She's excellent, but she doesn't have that *spark* V3 had. Building a commercial product came at a significant cost: compliance, security, controllability, predictability, and so on.
+
+When OpenClaw blew up, we started rethinking the question: *why did we choose to build TraderAlice?*
+
+So we came back.
+
+As a team with "development" as our first principle, our engineering mindset is kind of funny. If you read the codebase, you'll find that we stuffed the entirety of OpenClaw into the root directory and `hacked` its features onto Alice.
+
+Thanks to the MIT license for letting us freely use OpenClaw's code. In return, OpenAlice is also MIT-licensed.
+
+Our only request is that you keep Alice's name. Even if someone forks it and renames it `CloseAlice`, we won't say a word. We just want Alice.
+
+
+## What About Monetization?
+
+The TraderAlice team has some pretty smart people. Of course we've thought about how to make money.
+
+Even with Alice open-sourced, we can still offer value-added services — data feed subscriptions, managed hosting, transaction fees, and so on.
+
+As for the specifics of how we'll make money, we're still thinking it through. But before that, we'll focus on making Alice great. **That's what matters most.**
+
+---
+
+Repo: https://github.com/TraderAlice/OpenAlice
+
+Follow us: https://x.com/OpenAliceAI

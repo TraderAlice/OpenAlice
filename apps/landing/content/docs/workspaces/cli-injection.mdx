@@ -1,0 +1,97 @@
+export const metadata = {
+  title: "CLI Injection",
+  description: "How OpenAlice exposes tools to workspace agents through injected CLI binaries instead of a universal MCP shim.",
+}
+
+# CLI Injection
+
+Workspaces are **CLI-first**. The launcher does not inject an `.mcp.json` by default. Instead, it puts OpenAlice's domain CLIs on the agent's `PATH`, then injects short playbook skills that teach the agent how to use them.
+
+This keeps the model loop native. Claude Code, Codex, opencode, and other CLIs keep their own prompt cache, terminal rendering, config files, and session behavior. OpenAlice only supplies the repo and tool surface.
+
+## The injected binaries
+
+| Binary | For | Command groups |
+|--------|-----|----------------|
+| **`alice`** | Workspace research data, subscribed RSS, symbols, K-lines, and bounded analysis | `rss`, `market`, `analysis`, `think` |
+| **`alice-workspace`** | Peer addressing, Agent conversation, human Inbox delivery, durable work, and provenance | `inbox`, `peer`, `track`, `issue`, `signature`, `provenance`, `conversation` |
+| **`traderhub`** | Low-frequency [Data Hub](/docs/market-data/data-hub) | `board`, `equity`, `etf`, `economy`, `global`, `shipping`, `fed`, `crypto`, `index` |
+| **`alice-uta`** | Beta trading layer | `account`, `contract`, `order`, `position`, `git`, `market`, `sim` |
+
+```bash
+alice market search --query AAPL
+alice rss grep --pattern "rate cut"
+traderhub board get --board macro
+alice-workspace track add --name "NVDA supply chain"
+alice-workspace signature show
+alice-workspace inbox ask --id <entryId> --prompt "Why did you send this?" --await
+alice-uta order place --alice-id alpaca-paper:AAPL --side buy --qty 10
+```
+
+Trading commands can stage intent, but execution still flows through [Trading as Git](/docs/core-concepts/trading-as-git): stage, commit, then push. Push waits for human approval in the Web UI or linked Telegram `/uta` by default; Pro mode can explicitly delegate it to the AI.
+
+The four CLI names are authority boundaries, not one flat command bag. Current
+top-level and group help explains which namespace owns an action before listing
+verbs; use that live help when an older copied skill shows stale syntax.
+
+Every string option also has a generated `--<name>-file <path>` form; use `-`
+as the path to read stdin. This preserves the exact value when shell expansion
+would otherwise change it. In particular, single-quote dollar-denominated
+trading theses or pass them through `--commit-message-file`—a double-quoted
+`"$971"` is expanded by the shell before OpenAlice can see it.
+
+## Workspace identity
+
+Every injected CLI call is scoped through the workspace gateway. The binary knows which workspace it belongs to through the launch environment, and the server receives calls through a `/cli/<wsId>` boundary.
+
+That identity matters:
+
+- A workspace cannot mislabel another workspace's Inbox entries.
+- Tracked entities and issues can be attributed to the workspace that wrote them.
+- Peer access is explicit. Inbox reads expose a safe absolute attachment path
+  when available; `alice-workspace peer path --id <wsId>` resolves the broader
+  Workspace root as an addressing fallback. Native Agent tools own file reads,
+  search, and Git operations after resolution.
+- A Session receives an OpenAlice-owned `resumeId`, used for signatures, provenance, exact follow-up, and headless-to-interactive continuation. Native CLI session ids stay behind the backend boundary.
+
+## Guidance layers
+
+OpenAlice keeps always-loaded instructions short. Durable behavior lives in `CLAUDE.md` and `AGENTS.md`; changing command manuals and examples live in discoverable skills; the live CLI manifest and validation errors are the final authority.
+
+One concept has one primary skill owner:
+
+| Concept | Skill |
+|---|---|
+| Inbox, Issue collaboration, provenance, peer questions | `alice-workspace` |
+| Delegating quantitative research from Chat to AutoQuant | `delegate-autoquant` |
+| Issue file shape, ownership, schedules, headless delivery | `self-scheduling` |
+| Low-frequency market and fundamental data | `traderhub` |
+| K-line analysis and source choice | `alice-analysis` |
+| Broker state and trading writes | `alice-uta` |
+
+This avoids copying a volatile flag manual into every Workspace prompt. When a Workspace carries an older skill snapshot, the live CLI should reject stale syntax with a boundary-aware error and point to the current command.
+
+## Skills vs MCP
+
+The injected playbook skills are documentation for the agent, not a separate runtime server. They teach command syntax, boundaries, and safety rules. The actual operations happen through local binaries on `PATH`.
+
+Claude Code reads its copy from `.claude/skills/`. Codex and current Pi share
+the canonical `.agents/skills/` copy. Pi keeps Workspace selection and
+OpenAlice rollback metadata under `.pi/`; it does not need a second OpenAlice
+skill tree.
+
+One skill is always injected: `self-scheduling`. It teaches the `.alice/issues/<id>.md` format so every workspace can create or update a scheduled issue, even if the template opts out of the broader `alice*` tool playbooks.
+
+## Why this design
+
+- **Native CLI behavior stays intact.** OpenAlice does not need to normalize every agent vendor's event stream.
+- **The surface is inspectable.** The agent runs commands a human can run too.
+- **The contract is narrow.** The launcher owns PATH injection and identity; each CLI owns its domain.
+- **Tools are repo-friendly.** Output can become files, commits, issues, or Inbox entries inside the same workspace.
+
+## Next Steps
+
+- [Settings Injection](/docs/workspaces/settings-injection) - See how instructions, credentials, and skills get written.
+- [Sessions & Collaboration](/docs/workspaces/sessions-and-collaboration) - Learn how `resumeId`, signatures, and peer questions work.
+- [Self-Describing Issues](/docs/workspaces/self-describing-issues) - See the issue format every workspace can use.
+- [Workspaces](/docs/workspaces/workspaces) - See how sessions are created and resumed.

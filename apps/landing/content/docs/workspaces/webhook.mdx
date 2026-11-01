@@ -1,0 +1,159 @@
+export const metadata = {
+  title: "Webhook",
+  description: "API contract for letting another agent, script, or monitor trigger a headless OpenAlice workspace run.",
+}
+
+# Webhook
+
+The workspace webhook lets an external system ask a specific OpenAlice workspace to run.
+
+Use it when another AI agent, local script, monitor, alerting system, or scheduler should delegate work to OpenAlice:
+
+```text
+POST /api/workspaces/:id/headless
+```
+
+This starts a headless agent run inside the target workspace. The run inherits that workspace's files, git history, tools, credentials, agent configuration, issues, and tracked context.
+
+## Endpoint
+
+```text
+POST http://localhost:47331/api/workspaces/:id/headless
+```
+
+`47331` is the default Alice backend port. In development, the terminal output from `pnpm dev` is the source of truth if ports auto-bump.
+
+The `:id` path segment is the workspace id, not the display tag. External callers should store the workspace id returned by OpenAlice, or let a human copy it from the workspace URL/API.
+
+## Request
+
+```json
+{
+  "prompt": "Check whether today changes the [[NVDA]] thesis and push a short Inbox report.",
+  "agent": "claude",
+  "timeoutMs": 600000
+}
+```
+
+| Field | Required | Meaning |
+|-------|:--------:|---------|
+| `prompt` | Yes | Standalone instruction for the headless run, capped at 16000 characters |
+| `agent` | No | Agent CLI to use; must be enabled on this workspace |
+| `resumeId` | No | Continue one exact product Session; it must belong to this Workspace and requires async mode |
+| `timeoutMs` | No | Watchdog timeout; default 5 minutes, capped at 30 minutes |
+| `wait` | No | `true` blocks until the run exits; default is async |
+
+Omit `agent` to use the Workspace's fixed headless Agent, then its most recent
+headless Agent. OpenAlice falls back through the legacy Workspace and
+installation defaults before the live registered adapter order. The `shell`
+adapter is not valid for this endpoint because it has no model loop.
+
+## Example
+
+```bash
+curl -X POST http://localhost:47331/api/workspaces/ws-news/headless \
+  -H "Content-Type: application/json" \
+  -d '{
+    "prompt": "Read the latest notes and market context for [[NVDA]]. If something materially changes the thesis, update research/nvda.md and push an Inbox report. If nothing changed, exit silently.",
+    "agent": "claude",
+    "timeoutMs": 600000
+  }'
+```
+
+Write the prompt as if the receiving agent only has the workspace. It does not inherit the external agent's conversation.
+
+## Async Response
+
+Async mode is the default and recommended path:
+
+```json
+{
+  "taskId": "run-xxxxxxxx",
+  "resumeId": "resume-calm-amber-river-a1b2c3",
+  "status": "running"
+}
+```
+
+Poll the run record:
+
+```text
+GET /api/headless/:taskId
+```
+
+List recent runs for a workspace:
+
+```text
+GET /api/headless?wsId=<workspace-id>
+```
+
+Filter to running tasks:
+
+```text
+GET /api/headless?wsId=<workspace-id>&status=running
+```
+
+The run record tells you process status. The user-facing result should be pushed to [Inbox](/docs/workspaces/inbox) by the agent.
+
+## Synchronous Mode
+
+Use `wait: true` only for tests, smoke checks, or simple local scripts:
+
+```json
+{
+  "prompt": "Run the workspace checks and summarize failures.",
+  "wait": true,
+  "timeoutMs": 600000
+}
+```
+
+In synchronous mode the HTTP request stays open until the process exits or times out. For real workflows, async mode is safer because trading and research tasks can take minutes.
+
+## Status Codes
+
+| Status | Meaning |
+|--------|---------|
+| `202` | Accepted in async mode; returns `{ taskId, resumeId, status: "running" }` |
+| `200` | `wait: true` only; returns the completed process result |
+| `400` | Missing prompt, prompt too long, unknown or utility agent, or no headless-capable agent |
+| `404` | Unknown workspace id |
+| `409` | Requested Session belongs elsewhere, is busy, retired, or cannot resume |
+| `429` | Headless capacity reached |
+| `500` | Spawn or runtime failure before a task record can complete |
+
+Capacity is global. If the host is already running too many headless tasks, retry later.
+
+## Auth and Network Boundary
+
+Localhost callers are allowed on the default local bind. Non-local callers must pass the admin-auth gate.
+
+For remote access, put Alice behind the setup described in [Remote Access](/docs/deployment/remote-access). Treat access to this endpoint as agent-level access: anyone who can call it can ask an enabled OpenAlice agent to work inside the target workspace.
+
+If the external agent runs on the same machine, prefer localhost. If it runs elsewhere, use TLS, keep the admin token secret, and avoid exposing Alice directly to the public internet.
+
+## Prompt Contract for External Agents
+
+When another AI configures this webhook, give it a narrow contract:
+
+- Pick the correct workspace id.
+- Send a standalone prompt.
+- Tell OpenAlice what files or context to inspect.
+- Tell OpenAlice when to push to Inbox.
+- Tell OpenAlice when to exit silently.
+- Poll `/api/headless/:taskId` for process status if needed.
+- Store `resumeId` when later work should continue the same accountable Session.
+- Read Inbox, not stdout, for the durable user-facing answer.
+
+Good prompt shape:
+
+```text
+You are running inside the portfolio-risk workspace.
+Read positions.md, risk-rules.md, and today's market notes.
+If any position violates a risk rule, write reports/risk-alert.md and push it to Inbox.
+If nothing violates the rules, exit silently.
+```
+
+## Related
+
+- [Automation](/docs/workspaces/automation) - How scheduled issues and headless runs fit together.
+- [Issue Board](/docs/workspaces/issues) - The workspace-owned task files that can self-schedule.
+- [Inbox](/docs/workspaces/inbox) - The result channel for triggered runs.

@@ -1,0 +1,182 @@
+export const metadata = {
+  title: "What is OpenAlice",
+  description: "OpenAlice turns coding agents into local trading agents by treating trading work as workspace-based, file-backed, CLI-driven tasks.",
+  releaseChannel: "stable",
+  targetVersion: "0.94.1",
+}
+
+# What is OpenAlice
+
+OpenAlice is a local trading workspace for coding agents. It starts from one belief: a serious trading task is not a chat message or a button click. It is an abstract coding task.
+
+A tradeable decision has inputs, intermediate artifacts, state changes, review, execution, monitoring, and post-mortem. That shape is already familiar to coding agents. They know how to inspect files, call CLIs, write reports, compare diffs, commit changes, and ask for approval before doing something irreversible.
+
+OpenAlice gives that familiar loop a trading workspace: issue-shaped task management, tracked entities, markdown research reports, inbox delivery, market-data tools, file-backed state, and an optional beta trading layer for account operations.
+
+![OpenAlice Ask Alice composer, the main entry point into workspace-backed agent sessions](/docs/product/ask-alice.jpg "medium")
+
+## The Core Bet
+
+Instead of building another closed trading chatbot, OpenAlice turns existing coding agents into trading agents.
+
+Claude Code, Codex, Cursor Agent, Antigravity, Grok Build, Oh My Pi, OpenCode,
+Pi, or any compatible coding agent can run inside an OpenAlice Workspace and
+keep its native strengths: prompt cache, terminal habits, file editing, tool
+calling, and provider login. OpenAlice does not replace the model loop. It gives
+the model loop a place to work.
+
+That place is a directory:
+
+- **Data is CLI-shaped** - market data, news, fundamentals, technical analysis, account state, and trading actions are exposed as command-line tools the agent can call and compose.
+- **Research is file-shaped** - markdown reports, watchlists, tracked entities, issue files, and inbox notes become durable artifacts instead of disappearing into chat history.
+- **Work is issue-shaped** - an issue is a self-describing unit of work, similar to a Linear ticket. Status, priority, assignee, context, links, and comments tell both the human and the agent what matters.
+- **Scheduling is self-describing** - add a timezone-aware `when` and explicit Session/Workspace owner to the same Issue file; its Markdown body is the work instruction. There is no parallel job definition to keep in sync.
+- **Memory is graph-shaped** - tracked entities and `[[wikilinks]]` let Alice maintain an Obsidian-like map of assets, topics, theses, and recurring work.
+- **Collaboration is attributable** - every agent Session has a stable `resumeId`, so Inbox, Issues, reports, and scheduled runs can return to the exact coworker that produced them or honestly label a reconstruction. A dedicated Workspace Manager coordinates the active floor without becoming another business desk.
+- **Trading is optional and approval-gated by default** - if you connect accounts, order intent flows through the UTA beta stack and [Trading as Git](/docs/core-concepts/trading-as-git). Pro mode can explicitly delegate push authority to the AI, but that dangerous switch is off by default.
+
+The result is closer to Linear + Obsidian for a trading desk than to a broker bot. Alice can keep work organized, remember what matters, run recurring checks, and report back with durable artifacts. Actual broker execution sits behind a separate approval-first beta layer.
+
+## How Trading Work Is Organized
+
+OpenAlice is not a fixed workflow. The slogan is "your one-person Wall Street" because the system is organized around the kinds of work an institutional trading desk has to do, then lets agents execute those jobs inside workspaces.
+
+Those jobs include:
+
+- **Idea discovery** - finding unusual moves, new catalysts, crowded trades, sector rotation, and market regimes worth attention.
+- **Trend and theme research** - building context around assets, sectors, macro variables, and narratives that may matter over multiple sessions.
+- **Topic tracking** - keeping a living memory of assets and themes through tracked entities, backlinks, watchlists, and recurring notes.
+- **Pre-trade research** - turning a possible trade into a thesis, invalidation level, data provenance, sizing context, and risk checklist.
+- **In-trade timing** - monitoring price action, news, liquidity, technical levels, and changing conditions while a thesis is active.
+- **Risk approval** - separating proposed order intent from execution approval, with a durable record of what was approved or rejected.
+- **Post-trade adjustment** - reviewing fills, portfolio state, drawdowns, thesis drift, and whether the next action is hold, trim, add, hedge, or exit.
+
+The Workspace system is what makes those tasks agent-operable. A workspace gives an agent files, git history, markdown reports, issues, tracked entities, Inbox delivery, market-data CLIs, and optional UTA tools. Different agents can work in different workspaces, but the important trading objects stay visible: the issue that describes the job, the tracked entities it touches, the report it produces, and the approval record if it reaches execution.
+
+This is why OpenAlice treats automation as workspace work, not as a separate bot layer. A timer does not call a magic trading endpoint. It launches an agent against a self-describing task, with the same files, tools, memory, and reporting path a human-attended session uses.
+
+## What OpenAlice Provides
+
+### Workspaces
+
+A [Workspace](/docs/workspaces/workspaces) is the agent's operating room: a
+per-task directory, a git repo, and durable Sessions running your chosen agent
+CLI (`claude`, `codex`, `cursor-agent`, `agy`, `grok`, `omp`, `opencode`, `pi`,
+or `shell`). The agent can read and write ordinary files while calling
+OpenAlice tools through `alice`, `alice-uta`, `alice-workspace`, and `traderhub`. A Pi
+Supported Sessions can switch between their terminal and the Web browser conversation surface
+without changing identity.
+
+Workspaces are the default surface for non-trivial AI work because they keep context durable. The research, instructions, generated files, issue updates, and terminal history stay in one place.
+
+### Issues
+
+OpenAlice issues live as markdown files under `.alice/issues/<id>.md`. They are readable by humans, editable by agents, and visible in the Web UI issue board.
+
+An Issue is both a coordination object and an execution object. Its frontmatter carries human workflow fields (`status`, `priority`, `assignee`) and optional automation fields (`when`, `agent`); its Markdown body is the canonical What. An exact `@resumeId` keeps one owner, `@new-then-resume` recruits once then becomes exact, and `@new-each-run` intentionally recruits a fresh worker per fire. Comments to an exact owner become a durable question-and-reply thread in Activity.
+
+### Tracked Entities
+
+Tracked entities are Alice's long-term memory for assets, themes, people, sectors, and open theses. They let a workspace attach new findings to `[[names]]` that can be searched, linked, and revisited across future work.
+
+This is the Obsidian side of OpenAlice: a research graph that grows while the agent works, rather than a pile of isolated chat transcripts.
+
+### Inbox
+
+The [Inbox](/docs/workspaces/inbox) is the delivery surface. Workspace runs can push revision-stamped Markdown or sandboxed static HTML reports back to you, linked to the Workspace, Issue, run, and Session that produced them. Reply threads stay beside the entry; opening the original conversation is a separate action. Optional Discord, Telegram, Slack, and Feishu/Lark connectors project the durable notification outward after local append succeeds. Telegram can browse Inbox and review pending UTA commits on demand; Telegram and Feishu/Lark can each carry a private phone-desk Issue without creating another agent runtime.
+
+That matters because not every result should be a chat reply. A recurring scan, thesis update, earnings note, or sector monitor should arrive as a durable report you can open, ask its sender about, and trace back to the files and Session that produced it.
+
+### Web UI
+
+The Web UI wraps the work surfaces: Ask Alice, Workspace Manager, Workspaces,
+Issues, Tracked, Inbox, market views, settings, the beta trading pages, and an
+optional [Office preview](/docs/workspaces/office) that projects
+Workspace/Session occupancy without becoming another runtime. The Activity Bar
+itself can be regrouped, reordered, and trimmed from **Settings → Activity
+bar**; deep links to hidden surfaces still work.
+Daily use is intentionally closer to an operations desk than a chat app: work
+items, long-term memory, reports, ownership, and review surfaces all stay
+visible.
+
+### Research and Data
+
+OpenAlice ships with a broad research surface:
+
+- market data across equities, crypto, commodities, FX, and macro series,
+  including a read-only [FX Workbench](/docs/market-data/fx-workbench) for spot,
+  macro divergence, indicative carry, and manual exposure scenarios
+- optional keyless read-only crypto K-line sources for Binance, OKX, and Bybit
+- symbol search and federated bar lookup
+- company profiles, financial statements, ratios, earnings, insider activity, and movers
+- technical analysis through the [Quant Calculator](/docs/market-data/technical-analysis)
+- RSS collection and searchable news archives
+
+The agent can use these from a workspace without needing a separate data notebook or broker terminal.
+
+### Beta Trading Layer
+
+OpenAlice can also connect broker accounts through a [Unified Trading Account](/docs/core-concepts/unified-trading-account). UTA hides broker-specific details behind one account abstraction and owns the account's trading history, snapshots, and execution path.
+
+Live broker engines ship as optional [Broker
+Packs](/docs/trading/broker-packs). Core and Mock work without vendor SDKs; the
+Trading UI installs a checksummed, version/platform-specific Pack only when a
+selected account or public data source needs it.
+
+[Trading as Git](/docs/core-concepts/trading-as-git) is the required workflow once you use UTA. Alice can submit order intent, but execution is separated from submission: staged operations are committed with a message and then pushed. By default, push waits for human review in the Web UI or linked Telegram `/uta`. An operator can explicitly enable direct AI push in Pro mode; the durable record remains, but the per-push human approval does not.
+
+This separation also matters architecturally. It lets Alice and UTA run in different trust zones: Alice can research and propose from the main app, while a trusted UTA device holds exchange keys and performs the final approval/execution step. The co-located UTA service already follows this split, and a standalone UTA deployment tool is planned.
+
+This layer is still unstable beta infrastructure. Use paper or demo accounts first. If you hit UTA errors, broker connection failures, or confusing execution behavior, bring the error to the community or open a GitHub issue so we can reproduce it.
+
+## Why Local and File-backed
+
+OpenAlice runs on your machine. Trading involves private keys, account state, strategy notes, and real money. The default trust model is local ownership: your files, your credentials, your broker connections, your decision history.
+
+There is no database to provision. Config, sessions, trading history, news, issues, inbox entries, and workspace artifacts live under `~/.openalice` (or `OPENALICE_HOME`) as JSON, JSONL, Markdown, and git repositories. Broker credentials are [sealed at rest](/docs/deployment/data-and-credentials#sealed-broker-credentials).
+
+This also makes the system debuggable. If a packaged app gets stuck, a source install lets you inspect logs, read the files, patch the code, and report a concrete failure.
+
+## What It Is Good For
+
+OpenAlice is designed for people who want AI help managing trading work:
+
+- researching companies, sectors, macro themes, and cross-asset moves
+- turning recurring research into scheduled issue runs
+- maintaining watchlists and tracked entities over time
+- summarizing news and market data into durable reports
+- reviewing account state and portfolio changes
+- optionally proposing trades through an approval-first beta path
+- preserving the reasoning trail behind each decision
+
+It is not trying to be a black-box signal seller or a broker-hosted auto-trader. The human remains the account owner and controls whether execution stays approval-first or is explicitly delegated.
+
+## Current Boundary
+
+OpenAlice is experimental software in active development. Interfaces are moving,
+and the UTA trading stack is especially beta. Stable releases include desktop
+packages.
+
+The Workspaces / Issues / tracked entities / Inbox stack is the most stable and useful path today. Workspace Manager, remote CLI/SSH access, external Connectors, template upgrade/absorb, and Web are newer beta surfaces. Treat live broker execution as opt-in, paper-test it first, and do not use live funds unless you understand the risks, can verify the behavior yourself, and are comfortable with the failure modes of beta software.
+
+## Ways to Run It
+
+- **[macOS desktop](/docs/getting-started/install-macos)** - signed and notarized DMGs for Apple Silicon and Intel Macs; the shortest no-terminal path.
+- **[Windows](/docs/getting-started/install-windows)** - native CLI, unsigned self-contained desktop package, or source for detailed logs. State lives outside the application bundle.
+- **[Source & Dev](/docs/getting-started/developer-setup)** - the best path for Linux, contributors, and anyone who wants logs or local patches.
+- **[CLI & Remote Access](/docs/deployment/remote-access)** - use the installed
+  headless Runtime and Supervisor locally, or keep the browser local while the
+  same release runs on a private SSH host. Source checkout selection remains an
+  advanced development override.
+
+## Next Steps
+
+- [Installation Overview](/docs/getting-started/installation) - Choose the right run path for your platform.
+- [Quick Start](/docs/getting-started/quick-start) - Open Alice and run your first research task.
+- [Issue Board](/docs/workspaces/issues) - Track work and schedule recurring runs as markdown issues.
+- [Tracked Entities](/docs/workspaces/entities) - Build the Obsidian-like memory layer for assets and themes.
+- [Inbox](/docs/workspaces/inbox) - See how finished work gets delivered back to you.
+- [Sessions & Collaboration](/docs/workspaces/sessions-and-collaboration) - Understand Session identity, signatures, and attributable follow-up.
+- [Workspace Manager](/docs/workspaces/manager) - Audit and coordinate active desks.
+- [CLI & Remote Access](/docs/deployment/remote-access) - Run the installed Runtime locally or over private SSH.
+- [AliceProjects](/docs/deployment/alice-projects) - Understand the runtime boundary above Workspaces and Sessions.

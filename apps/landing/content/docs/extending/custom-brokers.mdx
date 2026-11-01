@@ -1,0 +1,221 @@
+export const metadata = {
+  title: "Custom Brokers",
+  description: "How to add a broker engine, versioned Broker Pack wrapper, release asset, and user-facing account preset to OpenAlice's UTA service.",
+}
+
+# Custom Brokers
+
+Broker execution no longer lives in Alice's main `src/domain` tree. It runs in
+the separate UTA service, while the account-wizard contract lives in the shared
+UTA protocol package.
+
+That split is load-bearing:
+
+- **engine implementation:** `services/uta/src/domain/trading/brokers/`
+- **optional Pack wrapper:** `packages/uta-broker-<engine>/`
+- **runtime Pack loader:** `services/uta/src/domain/trading/brokers/registry.ts`
+- **user-facing preset catalog:** `packages/uta-protocol/src/brokers/preset-catalog.ts`
+- **canonical broker types:** `packages/uta-protocol/src/types/broker.ts`
+
+Mock is the only built-in engine. Live broker SDKs must stay in versioned,
+platform-specific Broker Packs so Alice and UTA Core can start without loading
+or distributing every vendor dependency. Adding a genuinely new engine touches
+the service, a wrapper package, release catalogs, Pack assertions, and the
+shared preset package. Adding another account form backed by an existing engine
+may need only a preset plus tests. The CCXT family demonstrates that
+many-presets-to-one-Pack pattern.
+
+## 1. Implement the engine
+
+Create the implementation under the UTA service, for example:
+
+```text
+services/uta/src/domain/trading/brokers/my-broker/
+├── MyBroker.ts
+├── MyBroker.spec.ts
+└── index.ts
+```
+
+Implement the canonical `IBroker` contract from `@traderalice/uta-protocol`.
+Do not copy the interface into your module; it evolves as contract search,
+sub-accounts, historical bars, and broker capabilities grow.
+
+The required core includes lifecycle, contract search, order operations,
+account/position/order reads, quotes, capabilities, and contract identity.
+Optional hooks cover features such as contract expansion, catalog refresh,
+sub-accounts, broad open-order observation, and historical bars.
+
+```typescript
+import { z } from 'zod'
+import type { IBroker } from '@traderalice/uta-protocol'
+
+export class MyBroker implements IBroker {
+  static configSchema = z.object({
+    apiKey: z.string().min(1),
+    apiSecret: z.string().min(1),
+    sandbox: z.boolean().default(true),
+  })
+
+  static fromConfig(config: {
+    id: string
+    label?: string
+    brokerConfig: Record<string, unknown>
+  }): MyBroker {
+    const parsed = MyBroker.configSchema.parse(config.brokerConfig)
+    return new MyBroker({
+      id: config.id,
+      label: config.label ?? config.id,
+      ...parsed,
+    })
+  }
+
+  // Implement the current IBroker contract from uta-protocol.
+}
+```
+
+Use `Decimal` for quantities and calculations. Shared order and contract types
+come from `@traderalice/ibkr`; UTA-specific types such as `Position`,
+`AccountInfo`, `Quote`, and `BrokerError` come from
+`@traderalice/uta-protocol`.
+
+## 2. Wrap it as Broker Pack API v1
+
+Create `packages/uta-broker-my-broker/` with a private build package. Third-party
+SDK dependencies belong here, not in UTA Core. Its entry exports:
+
+```typescript
+import { MyBroker } from '../../../services/uta/src/domain/trading/brokers/my-broker/MyBroker.js'
+
+export const BROKER_PACK_API_VERSION = 1
+export const BROKER_ENGINE = 'my-broker'
+export const configSchema = MyBroker.configSchema
+
+export function createBroker(config) {
+  return Object.assign(MyBroker.fromConfig(config), {
+    brokerEngine: BROKER_ENGINE,
+  })
+}
+```
+
+The runtime loader verifies API version, engine id, schema, and factory before
+constructing an account. Pack code crosses a structural boundary: do not rely
+on `instanceof` across separate dependency copies; use stable errors and checks
+such as `Decimal.isDecimal`.
+
+## 3. Register the engine and release assets
+
+If this is a new engine family:
+
+1. Add its stable id to `BrokerEngine` in
+   `packages/uta-protocol/src/brokers/preset-catalog.ts`.
+2. Add it to the installable Pack engine catalog and loader workspace map.
+3. Extend the Pack build/release matrix, catalog verification, and packaged-app
+   assertion so the vendor SDK cannot leak back into core.
+4. Build and extract the release archive in a clean process before publishing.
+
+Release assets are version, platform, and architecture specific. The published
+catalog names the archive size, SHA-256, API entry, and platform requirements.
+The Trading UI installs through Alice; UTA never runs a package manager.
+
+If an existing engine can support the account type, skip this step and point
+the new preset at that engine.
+
+## 4. Add the user-facing preset
+
+Add a `BrokerPresetDef` to
+`packages/uta-protocol/src/brokers/preset-catalog.ts`, then append it to
+`BROKER_PRESET_CATALOG` in the intended UI order.
+
+```typescript
+export const MY_BROKER_PRESET: BrokerPresetDef = {
+  id: 'my-broker',
+  label: 'My Broker',
+  description: 'Short account-picker description.',
+  category: 'recommended',
+  defaultName: 'my-broker-paper',
+  badge: 'MB',
+  badgeColor: 'text-blue-400',
+  engine: 'my-broker',
+  guardCategory: 'securities',
+  modes: [
+    { id: 'paper', label: 'Paper Trading' },
+    { id: 'live', label: 'Live Trading' },
+  ],
+  zodSchema: z.object({
+    mode: z.enum(['paper', 'live']).default('paper').describe('Mode'),
+    apiKey: z.string().min(1).describe('API Key'),
+    apiSecret: z.string().min(1).describe('Secret Key'),
+  }),
+  subtitleFields: [{ field: 'mode', prefix: 'My Broker · ' }],
+  writeOnlyFields: ['apiKey', 'apiSecret'],
+  fingerprintFields: ['mode', 'apiKey'],
+  toEngineConfig: (data) => ({
+    apiKey: data.apiKey,
+    apiSecret: data.apiSecret,
+    sandbox: data.mode === 'paper',
+  }),
+}
+```
+
+The preset is the persisted/user-facing contract:
+
+| Field | Why it matters |
+|-------|----------------|
+| `id` | Stable value stored as `UTAConfig.presetId`; renaming it breaks existing derived UTA ids. |
+| `zodSchema` | Validates the form-shaped `presetConfig`; field descriptions drive the wizard. |
+| `engine` | Selects the internal implementation without serializing the engine class into account records. |
+| `toEngineConfig` | Translates user-facing modes/fields into the engine's internal config. |
+| `writeOnlyFields` | Keeps secrets out of normal account reads and renders password inputs. |
+| `fingerprintFields` | Defines physical account identity for deterministic UTA id derivation; exclude cosmetic fields. |
+| `modes` / `isPaper` | Describes live vs paper/demo/testnet behavior for the UI and E2E safety filters. |
+| `guardCategory` | Selects the crypto or securities guard family. |
+
+Keep preset ids and fingerprint semantics stable after release. If one engine
+backs several account types, create several presets rather than leaking a
+generic engine config into the UI.
+
+## 5. Test core, Pack, and preset
+
+At minimum:
+
+- add focused engine specs beside the implementation;
+- add a minimal valid preset sample to
+  `services/uta/src/domain/trading/brokers/presets.spec.ts`;
+- verify the preset schema → `toEngineConfig` → engine schema round trip;
+- verify paper/demo/testnet classification without touching a live account;
+- add contract, capability, and error-path tests for every supported feature.
+- run `pnpm broker-packs:build` and `pnpm broker-packs:verify`;
+- inspect the extracted archive for real dependency directories rather than
+  pnpm symlinks, junctions, or workspace metadata;
+- import its entry in a clean Node process and test installation/repair.
+
+Before calling a broker supported, run the applicable demo-account scenarios
+from OpenAlice's `docs/uta-live-testing.md`. Unit tests cannot reproduce venue
+amendment rules, partial fills, external orders, restart recovery, or the
+quality of real broker error messages.
+
+## Financial precision and errors
+
+Use `decimal.js` for quantity and financial math. Position monetary fields are
+decimal strings; convert them deliberately and never introduce binary
+floating-point into execution calculations.
+
+Throw `BrokerError` with a current canonical code:
+
+| Code | Behavior |
+|------|----------|
+| `CONFIG`, `AUTH` | Permanent; disables the account until configuration changes. |
+| `CONNECTING` | Transient readiness state; data is pending while connection/recovery continues. |
+| `NETWORK`, `EXCHANGE`, `MARKET_CLOSED`, `UNKNOWN` | Transient/runtime failure classes handled by UTA recovery and callers. |
+
+Study `AlpacaBroker` for a straightforward REST implementation,
+`CcxtBroker` for one engine behind several presets, and `IbkrBroker` for a
+callback SDK bridged into the async interface.
+
+## Next Steps
+
+- [Unified Trading Account](/docs/core-concepts/unified-trading-account) — Understand the service boundary your broker plugs into.
+- [Trading Setup](/docs/trading/accounts-and-brokers) — See preset configuration and account lifecycle.
+- [Broker Packs](/docs/trading/broker-packs) — Understand the distribution and installation boundary.
+- [Orders & Execution](/docs/trading/orders-and-execution) — Match broker capabilities to execution behavior.
+- [Custom Guards](/docs/extending/custom-guards) — Add account-specific push-time constraints.

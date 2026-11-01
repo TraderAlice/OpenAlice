@@ -1,0 +1,253 @@
+export const metadata = {
+  title: "Orders & Execution",
+  description: "Order types, time in force, bracket orders, and the full execution flow in OpenAlice.",
+}
+
+# Orders & Execution
+
+All order execution follows the [Trading-as-Git](/docs/core-concepts/trading-as-git) workflow: stage → commit → push. This page covers the order types, parameters, and reading tools available.
+
+Read this after you have a paper or demo account connected. The default and
+recommended safety policy is simple: Alice can prepare intent, but a trade does
+not execute until a human approves the push in the Web UI or linked Telegram
+`/uta`. Pro mode has a separate **Allow AI to push trades** switch; enabling it
+deliberately removes that approval step for agent-initiated pushes.
+
+> **UTA is beta.** Start with paper, demo, or testnet accounts, then move to live funds only after you have validated the full stage -> commit -> approval -> push path yourself. See [What is UTA](/docs/core-concepts/unified-trading-account).
+
+## Order Types
+
+| Type | Required Parameters | Description |
+|------|-------------------|-------------|
+| `MKT` | `totalQuantity` or `cashQty` | Market order — execute immediately at best available price |
+| `LMT` | `totalQuantity` + `lmtPrice` | Limit order — execute at specified price or better |
+| `STP` | `totalQuantity` + `auxPrice` | Stop order — becomes market order when stop price is hit |
+| `STP LMT` | `totalQuantity` + `auxPrice` + `lmtPrice` | Stop-limit — becomes limit order when stop price is hit |
+| `TRAIL` | `totalQuantity` + `auxPrice` or `trailingPercent` | Trailing stop — stop price trails the market by a fixed offset |
+| `TRAIL LIMIT` | `totalQuantity` + `auxPrice` + `lmtPrice` | Trailing stop-limit — trailing stop that becomes a limit order |
+| `MOC` | `totalQuantity` | Market-on-close — execute at the closing price |
+
+> **Venue reach varies.** The enum above is the same on every broker, but end-to-end support is not. `STP` / `STP LMT` reach CCXT crypto venues (mapped to the base type plus a trigger price) and work on Alpaca/IBKR. `TRAIL` / `TRAIL LIMIT` are listed but are **refused on CCXT crypto venues** (not venue-verified — they fail at push); use `STP` / `STP LMT` there instead.
+
+**Quantity options:**
+- `totalQuantity` — Number of shares/contracts
+- `cashQty` — Dollar amount (mutually exclusive with totalQuantity, broker support varies)
+
+## Time in Force
+
+| TIF | Description |
+|-----|-------------|
+| `DAY` | Expires at end of trading day (default) |
+| `GTC` | Good till cancelled |
+| `IOC` | Immediate or cancel — fill what you can, cancel the rest |
+| `FOK` | Fill or kill — fill entirely or cancel |
+| `OPG` | Opening — execute at the market open |
+| `GTD` | Good till date — requires `goodTillDate` parameter |
+
+## Take Profit & Stop Loss (TPSL)
+
+Attach automatic exit orders when placing an entry order:
+
+```
+Buy 100 shares of AAPL at market with a take profit at $200
+and a stop loss at $175.
+```
+
+Alice stages this as a single `placeOrder` with TPSL parameters:
+
+```json
+{
+  "action": "BUY",
+  "orderType": "MKT",
+  "totalQuantity": 100,
+  "takeProfit": { "price": "200" },
+  "stopLoss": { "price": "175" }
+}
+```
+
+For a stop-limit stop loss, add `limitPrice`:
+
+```json
+{
+  "stopLoss": { "price": "175", "limitPrice": "174.50" }
+}
+```
+
+### Where attached TP/SL works
+
+Attached TP/SL works end-to-end **only on Alpaca** today. There, routing is by leg count:
+
+- **Both** a take profit and a stop loss → an `order_class: bracket` order (the two legs run under One-Cancels-All — fill one, the other is cancelled).
+- **A single leg** (just a TP, or just a SL) → `order_class: oto` (one-triggers-other). A lone leg under `bracket` is rejected by Alpaca, so the leg count picks the class.
+
+The bracket/oto child legs are tracked from birth: their `orderId`s surface on the place result (the held stop leg never shows up in the open-orders listing, so place time is the only moment Alice learns it exists) — which is also the handle for cancelling them later.
+
+On **all CCXT venues** (OKX, Bybit, Hyperliquid, Bitget, ccxt-custom) and on **IBKR**, attached TP/SL is **refused at push** with an actionable error. The fix is to place the entry first, then a separate `STP` / `STP LMT` (or limit take-profit) protective order against the resulting position.
+
+> **Why a loud refusal, not a best-effort attempt.** A missing stop that *looks* attached is the worst failure mode a trading system has. On OKX spot, ccxt accepted the unified `takeProfit`/`stopLoss` params and then silently dropped them at the venue mapping — the entry filled **unprotected** while the ledger read "long with a stop." OpenAlice now refuses rather than risk that silent downgrade; venue-verified attach support is added per-exchange as it's confirmed to reach the venue.
+
+## Full Execution Flow
+
+```
+1. placeOrder          → Stage the order
+2. tradingCommit       → Bundle with a message, get commit hash
+3. tradingPush         → Request execution
+4. [Default: user approves] → UTA dispatches to broker
+   [AI push enabled]        → UTA dispatches immediately
+5. tradingSync         → Check fill status from broker
+```
+
+### Staging
+
+The `placeOrder` tool stages an operation without executing it. Multiple orders can be staged before committing:
+
+```
+Stage: BUY 10 AAPL @ MKT
+Stage: SELL 5 NVDA @ LMT 135.00
+```
+
+### Multi-wallet accounts
+
+When one UTA spans multiple broker compartments, `placeOrder` and
+`closePosition` require an explicit `subAccountId`. The Web UI presents the same
+choice as a wallet picker; agent tools refuse to stage the write without it and
+list the valid ids. Bitget Classic uses `spot` for Spot and `derivatives` for
+USDT-M Futures. Single-wallet brokers ignore this selector.
+
+### Committing
+
+`tradingCommit` bundles all staged operations with a descriptive message:
+
+```
+Commit a3f8c1d2: "Rotate portfolio — reduce NVDA, add AAPL"
+  2 operations staged
+```
+
+**Stage and commit in one call.** `placeOrder`, `closePosition`, `modifyOrder`, and `cancelOrder` now accept an optional `commitMessage` — pass it and the operation stages *and* commits in a single tool call (one decision = one operation, the dominant flow). This does not itself execute. On `placeOrder` / `closePosition` the account `source` is now optional too — when omitted it's derived from the `aliceId` prefix.
+
+At the CLI boundary, protect currency text from shell expansion. Use single
+quotes, or the generated file-backed string flag when a thesis contains `$`:
+
+```bash
+alice-uta order place ... --commit-message 'Buy below $971 after support confirmation'
+alice-uta order place ... --commit-message-file /path/to/thesis.txt
+```
+
+Every string flag supports the matching `--<name>-file` form; `-` reads stdin.
+Do not put dollar-denominated text in a double-quoted value such as `"$971"`,
+because the shell can change it before OpenAlice receives the command.
+
+### Pushing
+
+`tradingPush` signals that the commit is ready for execution. By default it
+returns pending operations for manual approval under **Trading → [Trading as
+Git](/docs/core-concepts/trading-as-git)**, on an account detail page in the
+same navigator, or in a linked Telegram owner's `/uta` panel. If the operator
+enables **Allow AI to push trades** under **Settings → Agent Permissions** while
+in Pro mode, the same tool dispatches directly instead. That switch is off by
+default and should stay off for the approval-first path.
+
+When approved:
+1. The UTA validates and dispatches approved operations to the broker
+2. Any configured push-time middleware can reject before dispatch
+3. Results are recorded (submitted/filled/rejected)
+4. A snapshot captures the account state
+
+### Syncing
+
+After pushing, orders may not fill immediately. An **auto-sync poller** now closes the loop for you: a fast lane runs every ~10 seconds and reconciles any *pending* orders against the broker, moving them to `filled` / `cancelled` as the exchange reports back. Only accounts that actually have pending orders incur a broker round-trip, so the poll is cheap. Fills are recorded at their **execution price**, which feeds a weighted-average cost-basis reconstruction so unrealized P&L stays honest (this fixed a class of CCXT-spot positions that previously showed zero P&L).
+
+You rarely need to sync by hand anymore, but `tradingSync` still forces an immediate check:
+
+```
+tradingSync(delayMs: 3000)  // Wait 3s for exchange to settle, then check
+```
+
+### External-Order Observation
+
+Orders you place **outside OpenAlice** — directly in a broker's app or API — don't go through the stage-commit-push flow, so OpenAlice would normally never see them. A background observer closes that gap: on a slow lane (default every **15 minutes**, configurable in `trading.json` via `observeExternalOrdersEvery`, `off` to disable, editable from the Trading page), the UTA lists open orders, spots any IDs it never placed, and records them.
+
+These land as a single **squashed `[observed]` commit** — if a pass finds several external orders, they bundle into one commit (each as an `observeExternalOrder` operation) so the history stays readable rather than flooding with one commit per order. Once observed, the order joins the normal ~10s pending-sync lane, so its fills and cancels track like any other. The point is a faithful audit trail: your git log reflects everything that happened on the account, whether Alice placed it or you did.
+
+## Reading Tools
+
+| Tool | Description |
+|------|-------------|
+| `getAccount` | Account info: net liquidation, cash, buying power, P&L |
+| `getPortfolio` | Current positions with unrealized P&L and portfolio weight |
+| `getOrders` | Pending orders (or specific orders by ID) |
+| `getQuote` | Latest price for a contract |
+| `getMarketClock` | Market open/close status and schedule |
+| `tradingLog` | Commit history (filterable by symbol) |
+| `tradingShow` | Details of a specific commit by hash |
+| `tradingStatus` | Current staging area contents |
+| `orderHistory` | One row per order, lifecycle collapsed (submitted → filled / cancelled / rejected, with fill qty + price) |
+| `tradeHistory` | Fills only, with execution price / qty / value |
+| `simulatePriceChange` | Dry-run portfolio impact of price movements |
+
+To go from a directory `aliceId` (an IBKR bond issuer or FX family) or an underlying's option chain / futures months to concrete tradeable contracts, use `expandContract` — see [Contract Search](/docs/trading/accounts-and-brokers#contract-search).
+
+### Order & Trade History
+
+`orderHistory` and `tradeHistory` are projections of the [Trading-as-Git](/docs/core-concepts/trading-as-git) log, so they always agree with `tradingLog` / `tradingShow` — and the same projection backs the Web UI's exchange-frontend views.
+
+- **`orderHistory`** — one row per order with its lifecycle collapsed (submitted → filled / cancelled / rejected), carrying fill qty and price. `source` is `alice` for orders Alice placed, `external` for orders observed on the broker but never placed through OpenAlice.
+- **`tradeHistory`** — fills only, each with execution price, qty, and value. `source` is `order` (a real fill of one of your orders), `external`, or `reconcile` (balance drift folded in at the observed price — transfers, fees — not a real fill record).
+
+Both take an optional `limit` (default 50). They're also exposed as HTTP routes for the frontend: `GET /api/trading/uta/:id/order-history` and `GET /api/trading/uta/:id/trade-history` (each accepts a `limit` query, default 50).
+
+The Trading as Git review history now keeps structured order terms beside the
+human commit message. Place-order entries show side, symbol, order type,
+quantity or cash quantity, limit/stop price, time in force, and final status;
+the detail view preserves the original thesis underneath. Filled history
+distinguishes the requested terms from the actual execution price instead of
+collapsing both into one ambiguous summary.
+
+### Multi-Account Queries
+
+Most reading tools accept an optional `source` parameter:
+
+- **Omit** — Query all enabled accounts
+- **Account ID** — Target a specific account (e.g. `"alpaca-paper"`)
+- **Broker type** — Target all accounts of a type (e.g. `"ccxt"`)
+
+## Price Simulation
+
+The `simulatePriceChange` tool lets you model portfolio impact without placing orders:
+
+```
+What would happen if AAPL dropped 10% and NVDA went to $150?
+```
+
+Alice calls `simulatePriceChange` with:
+```json
+{
+  "priceChanges": [
+    { "symbol": "AAPL", "change": "-10%" },
+    { "symbol": "NVDA", "change": "@150" }
+  ]
+}
+```
+
+Returns current vs simulated equity, P&L changes per position, and worst-case analysis.
+
+## Financial Precision
+
+All monetary calculations use `decimal.js` for arbitrary-precision decimal arithmetic. This prevents floating-point errors that could affect order quantities and P&L calculations.
+
+**Wire format is string-only.** Every monetary field on the UTA — quantities, prices, equity, P&L — serializes as a string on the way in and out (HTTP, JSON sessions, broker payloads). The internal math uses `Decimal`, but anywhere a number leaves or enters the system it's a string, so frontend code does an explicit `String(x) → Decimal → display` conversion. The point is to make precision-loss seams visible: any place that has to coerce string→number is a spot you can audit.
+
+Order entry schemas reflect this — `totalQuantity`, `lmtPrice`, `auxPrice`, `trailingPercent`, `takeProfit.price`, `stopLoss.price` are all `string` on the wire, not number.
+
+> **Why the AI's view of an order is terse.** Trading tool outputs are *compacted* before Alice sees them: a raw broker Order is an IBKR-superset object of ~120 fields, most carrying unset sentinels that read as real constraints to an LLM. The compaction layer strips those (unset = absent), shows money at 2 decimals and prices at 8, and drops the raw broker echo. This changes only the AI-facing payload — the Web UI and the stored ledger keep full precision.
+
+## Manual Order Entry
+
+The UTA Detail page (`/uta/:id`) reads like an exchange frontend — a two-column layout with positions, orders, and an equity curve on one side and an **account panel** on the other that shows only the metrics the broker actually reports (an unreported field is omitted, never faked as `0`). A **Place Order** button opens a manual order form that bypasses Alice: it POSTs to a route that bundles stage → commit → push into one HTTP roundtrip — the same UTA push path still runs, but you don't go through chat to enter the order. The response carries the full `PushResult` (submitted/rejected breakdown with fills + errors), and on error it tags `phase` (`stage` / `commit` / `push`) so you can see which step failed. Clicking through from the market workbench prefills the form via a `?aliceId=` query param.
+
+## Next Steps
+
+- [Trading as Git](/docs/core-concepts/trading-as-git) — Review the approval workflow behind every execution.
+- [Snapshots & Equity](/docs/trading/snapshots-and-equity) — Track account state after fills.
+- [Trading Setup](/docs/trading/accounts-and-brokers) — Check broker-specific caveats before going live.
+- [Unified Trading Account](/docs/core-concepts/unified-trading-account) — Understand the broker carrier behind execution.

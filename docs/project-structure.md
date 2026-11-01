@@ -102,6 +102,7 @@ packages/
 
 ui/                            React/Vite renderer
 apps/desktop/                  Electron main/preload/IPC shell
+apps/landing/                  Public Next.js website, user documentation, and blog
 scripts/guardian/              dev/prod supervisors, local control + recovery tests
 tests/integration/             registered collaboration tests grouped by topic
 tests/e2e/                     application-entry workflows
@@ -450,6 +451,7 @@ directly and do not become permanent compatibility code.
 | Shared Alice ↔ UTA shapes | `packages/uta-protocol/` and both callers |
 | External Inbox notifications and IM adapters | [Connector Service](connector-service.md) |
 | Renderer/API surface | `ui/`, `src/webui/`, and matching demo handlers |
+| Public website, user documentation, blog, and media rendering | `apps/landing/` + [Public website](landing.md) |
 | Issues, schedules, headless runs, Inbox delivery | [Workspace issues and scheduling](workspace-issues-and-scheduling.md) |
 | Product activity facts, family pagination, Office/Sonner projections | [Product Activity Journal](product-activity-journal.md) |
 | Historical event-bus retirement | [Event-system retirement note](event-system.md) |

@@ -317,6 +317,15 @@
         "compiled Alpaca pack and local runtime dependencies"
       ],
       "artifact": "compiled pack"
+    },
+    "@traderalice/landing#test": {
+      "owner": "repo-tooling",
+      "lane": "hermetic",
+      "kind": "spec-selection",
+      "sideEffects": "test-owned temporary files and injected HTTP responses only; no production media requests or writes",
+      "prerequisites": [
+        "workspace dependencies installed"
+      ]
     }
   },
   "standalone": [

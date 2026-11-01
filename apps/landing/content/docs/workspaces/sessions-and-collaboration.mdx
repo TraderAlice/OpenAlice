@@ -1,0 +1,372 @@
+export const metadata = {
+  title: "Sessions & Collaboration",
+  description: "How OpenAlice identifies durable agent Sessions, attributes artifacts, resumes exact coworkers, and lets Sessions ask one another without guessing ownership.",
+  releaseChannel: "stable",
+  targetVersion: "0.94.1",
+}
+
+# Sessions & Collaboration
+
+A [Workspace](/docs/workspaces/workspaces) is a durable work group: files,
+tools, issues, and git history. A **Session** is one particular agent
+conversation—a coworker at its own desk in that group. Several Sessions can use
+the same Workspace without becoming the same coworker.
+
+OpenAlice gives every Session a stable `resumeId`, such as:
+
+```text
+resume-calm-amber-river-a1b2c3
+```
+
+The visible form is `@resumeId`. That signature is the product-level answer to “who produced this?” and the handle OpenAlice uses to continue the exact conversation later.
+
+## The identity layers
+
+| Identity | Meaning |
+|---|---|
+| `workspaceId` | The durable desk and context boundary |
+| `resumeId` | One stateful product Session; the canonical follow-up handle |
+| `taskId` | One headless turn in that Session |
+| Session record id | Durable launcher roster row and process-attachment target for one product Session |
+| Native agent session id | Claude/Codex/Cursor/Antigravity/Grok/Oh My Pi/OpenCode/Pi continuation detail; backend-only |
+
+A new worker in the same Workspace receives a new `resumeId`. A later turn in the same conversation keeps the existing `resumeId` but receives a new `taskId`. OpenAlice never exposes the runtime-native continuation id as its public protocol.
+
+## How a Session was recruited
+
+New Sessions may carry a server-stamped `createdBy` record describing how that
+coworker was first recruited:
+
+| Kind | Meaning |
+|---|---|
+| `interactive` | Ask Alice, an ordinary spawn, AutoQuant, Auto Prediction, or Workspace Manager created it |
+| `issue` | A schedule or retry recruited a fresh Issue owner |
+| `headless` | The direct async headless API created it |
+| `conversation` | An Agent or human inquiry recruited a fresh worker |
+
+Birth is first-write-wins: continue and resume never rewrite it, and agents
+cannot claim it through tool arguments. It is distinct from the trigger or
+inquiry attached to one later headless run. Historical Sessions without this
+metadata remain valid with unknown birth. The secret-free record is available
+through Session Directory surfaces even where the UI does not yet show a badge.
+
+## The active Session roster
+
+Every product Session receives one persistent roster record at the same birth
+boundary as its `resumeId`, whether its first turn is interactive or headless.
+Ask Alice, AutoQuant, and Auto Prediction receive those rows in the first
+Workspace payload; the Session Directory decorates them with presence, birth,
+and latest-run facts
+without inventing a second UI row. Issue-born coworkers use their readable
+Issue identity instead of exposing the full automation prompt, while explicit
+coworker names and ordinary interactive titles remain unchanged. Quiet
+**Issue**, **Conversation**, or **Background** source labels preserve
+provenance without splitting the roster into separate identity systems.
+
+Session rows reuse each Agent Runtime's official brand mark where available;
+Shell keeps a terminal glyph and unknown extension runtimes use a generic Bot
+fallback. The icon identifies the runtime and keeps the same visual emphasis
+when the Session is paused, running, or selected. Row treatment and the trailing
+action communicate lifecycle state, while `resumeId` remains the durable
+coworker identity.
+
+By default, a Session born from an Issue or headless API call that has never
+opened a TUI or Web stays on its Issue page instead of crowding the shared
+desk roster. Enable **Settings → Appearance → Visibility → Show headless-born Sessions** to
+include those existing rows in Ask Alice, AutoQuant, and Auto Prediction.
+
+Issue attachment is independent from Session birth. By default, an exact
+Session currently assigned to an ordinary Issue—and any Session actively
+executing one—stays on Issue and Automation surfaces even if it has previously
+opened a TUI. Enable **Show Issue-attached Sessions** to include those rows in
+the shared Harness rosters without changing their owner, execution, or identity.
+
+Connector chat Sessions from phone-desk Issues are a deliberate exception. They
+remain real, attributable, resumable Sessions with Issue and diagnostic history,
+but never appear in the Ask Alice, AutoQuant, or Auto Prediction roster—even
+when either visibility preference is enabled—because the connector owns their
+transport-facing desk.
+
+The quick sidebar shows the eight most recent non-running Sessions. If the
+currently open Session is older, it replaces the last visible recent row so its
+navigation never disappears. Every running or headless-occupying Session stays
+in the separate **Running in background** group and does not consume that
+eight-row budget. **View all conversations** in Ask Alice—or **View all
+research** in AutoQuant—opens the complete searchable inventory; the cap
+changes presentation only, not membership, identity, or retention.
+
+Interactive terminal/Web attachment and headless turns reuse that same
+record. They may change its latest surface and running/paused state, but they do
+not allocate a new `resumeId` or roster identity. Individual executions remain
+`taskId` records.
+
+Only coworkers with active floor presence appear in the normal roster.
+**Archive** files a paused coworker out of that list without destroying the
+`resumeId`, native continuation, run history, or provenance. Browse → Archived
+can open or **Restore to roster** that coworker. An archived exact owner can
+still receive follow-up and scheduled work; archiving is organization, not
+retirement.
+
+OpenAlice disables Archive while the coworker occupies an interactive terminal
+or a running headless turn. The same occupancy prevents a second TUI
+spawn/resume for that `resumeId`. Automation continues to list individual
+`taskId` run records; it is not the Session roster.
+
+Ask Alice, AutoQuant, and Auto Prediction separate occupied rows into **Running
+in background**.
+Selecting one opens an explanation instead of a second process: it identifies
+the originating Issue when available (or the Agent otherwise) and keeps TUI or
+Web unavailable until the headless turn finishes. Long Session titles wrap
+inside that dialog rather than widening the application shell.
+
+## Global activity notices
+
+OpenAlice surfaces only significant cross-Agent facts as transient global
+notices: another Agent request starting, that request failing, or an attributable
+Inbox delivery arriving. A running request keeps one progress notice until the
+operation settles; successful completion dismisses it, while a failure remains
+briefly visible. Tool-level chatter is filtered out. These notices own no
+history or navigation: Sessions, Issues, Inbox, Automation, and Office remain
+authoritative.
+
+## Runtime choice belongs to the Session
+
+When OpenAlice creates a Session, it captures the selected Agent runtime,
+credential source, model, and reasoning effort in a secret-free binding owned
+by that `resumeId`. A business Workspace stores it at
+`.alice/sessions/<resumeId>.json` under its `ai` object; the global
+`resume-identities.json` registry keeps product identity, lifecycle, and
+native-session mapping rather than AI configuration. The same dossier may also
+carry a sibling `displayName`, but that nametag does not change the AI binding.
+The binding is projected for the interactive terminal, Web, headless Issue
+work, and exact resume.
+
+Workspace AI settings and Issue `agent` / `credential` or `credentialSource` /
+`model` / `effort` fields are defaults for creating a new Session. Changing
+them later does not retarget an existing `@resumeId`; start a new Session when
+you want the new defaults. A fixed Issue owner likewise keeps its Session
+binding, while `@new-then-resume` or `@new-each-run` can seed a fresh one.
+
+There is one deliberate edit boundary for an existing coworker. Open the row's
+overflow menu and choose **Settings**; while a Session is paused, the same
+dialog can atomically replace its credential source, model, and effort while
+keeping the Agent and `resumeId`. The paused Resume screen leads to this editor
+too. The Session stays paused, the replacement applies on its next resume, and
+neither the Workspace's fixed nor recent preference changes. Running, shell,
+retired, and missing-identity Sessions cannot change the AI binding.
+
+An Issue with an exact idle Session owner exposes the same access/model/effort
+boundary from its **Execution** inspector. It shows a before/after capability
+confirmation, keeps the Agent frozen, and applies the replacement to the next
+scheduled or comment-reply turn. A running TUI, Web, or headless turn blocks
+the edit until that turn finishes.
+
+For runtime-managed access, the binding records that the Agent owns its complete
+authentication and provider-configuration chain.
+For an Alice-vault choice, it stores the credential slug and wire shape but
+resolves the secret only at launch. A legacy Session created from the deprecated
+native project-config export may instead retain a provider fingerprint and
+stops with a clear error if that provider is later removed or replaced.
+OpenAlice never silently resumes the same coworker through a different account
+or model.
+
+A legacy Session without a persisted binding upgrades to explicit native
+runtime ownership on its next activation. It does not adopt an Alice-vault or
+project-config provider that was added after the Session was created.
+
+## Coworker names and Session titles
+
+A Session may have an optional Workspace-owned **coworker name**. The row's
+**Settings** dialog can change it whether the Session is running or paused, and
+agents can use the CLI described below. This
+`displayName` is a mutable nametag: OpenAlice shows it before the native or
+launch-time conversation title, then falls back to the launcher's sticky name
+such as `c1` or `x1`. Native title refresh never overwrites the nametag, and a
+rename does not count as Session activity or reorder the roster.
+
+Agents can set or clear that nametag through the Workspace CLI:
+
+```bash
+alice-workspace session rename --resume-id <resumeId> --display-name "AAPL desk"
+alice-workspace session rename --resume-id <resumeId> --display-name ""
+```
+
+The name is trimmed and limited to 120 characters. It is stored beside the
+Session's frozen `ai` object in `.alice/sessions/<resumeId>.json`, moves with the
+Workspace, and is deliberately omitted from the global resume registry. Do not
+hand-edit the dossier: a bad write can also damage that coworker's launch
+binding.
+
+Without a nametag, OpenAlice prefers the native runtime's generated or
+user-renamed title, then the launch-time prompt, then the sticky fallback.
+Runtime-specific title discovery stays behind the adapter boundary; native
+continuation ids remain private.
+
+## Paused Sessions
+
+Opening a paused Session shows a terminal-shaped wake screen rather than an
+empty pane. It identifies the Session title and Agent, discloses the current
+credential source, model, and effort, and offers **Resume in TUI**. For a
+model-loop Agent, **Change AI** opens the shared Session settings dialog for the
+next resume. A paused Session can choose **Open in Web** when its installed Agent supports a structured browser conversation. The optional
+Session details disclosure shows creation time and the product `resumeId`; it
+does not pretend that the placeholder terminal backdrop is the real transcript.
+
+Resume replays the Session's persisted binding and the native runtime's own
+continuation mechanism. A shell Session restores captured scrollback above a
+fresh prompt; model-loop runtimes re-render their native conversation.
+
+## Signatures and provenance
+
+OpenAlice stamps structured actions from the authoritative Session context. An agent does not submit its own identity in an Inbox, Issue, or trade tool call.
+
+Standalone Markdown can carry the same attribution visibly:
+
+```md
+---
+
+Signed-by: @resume-calm-amber-river-a1b2c3
+```
+
+The Web UI recognizes the signature and can open the corresponding Session. Reports published through Inbox also receive a content revision hash, so OpenAlice can distinguish the bytes that were sent from later edits to the live file.
+
+## Exact, unavailable, or reconstructed
+
+All follow-up surfaces use the same rule:
+
+1. If an artifact has a known `resumeId`, continue that exact Session.
+2. If the Session is deleted, retired, departed, purged, or missing its native continuation, preserve the attribution and report that it is unavailable. Do not impersonate it with a replacement.
+3. If only the Workspace is known, recruit a new Session there and label the answer **reconstructed**.
+4. If even the Workspace is unknown, return unavailable rather than guessing.
+
+This distinction matters when a report has changed since publication, an Issue has a different current owner from its creator, or an old Workspace has been offboarded.
+
+The resolution label and the delivered prompt are separate. A fallback worker
+is still labeled `reconstructed` so it cannot impersonate a missing author, but
+`conversation ask --ws-id` sends the caller's prompt unchanged by default. Add
+`--reconstruct` only when you want OpenAlice to include explicit reconstruction
+guidance.
+
+## Ask the responsible Session
+
+The product exposes provenance through business objects rather than making users copy runtime ids:
+
+- **Inbox:** reply to the sender in place, open the exact conversation separately, or ask the Workspace to reconstruct when no sender Session was recorded.
+- **Issue:** comment to a fixed Session owner in the Activity timeline. Without
+  one, a human comment asks the attributable creator or a visibly reconstructed
+  Workspace Session without changing ownership; explicitly ask the creator or
+  one selected scheduled run when historical context is the question.
+- **Signed Markdown:** open the exact `@resumeId` linked from the document.
+- **Trade decision:** attribute the decision Session separately from human approval and UTA/broker execution evidence.
+
+Agents can use the same model from `alice-workspace`:
+
+```bash
+alice-workspace inbox ask --id <entryId> --prompt "Why did you send this?" --await
+alice-workspace issue ask --id <issueId> --creator --prompt "What was the original intent?" --await
+alice-workspace issue comment --id <issueId> --text "What should happen next?"
+alice-workspace conversation ask --resume-id <resumeId> --prompt "Re-check the thesis" --await
+alice-workspace conversation ask --inbox-id <entryId> --prompt "Explain this delivery" --await
+alice-workspace conversation ask --ws-id <workspaceId> --prompt "Take ownership of the next step"
+alice-workspace conversation ask --harness chat --prompt "Start a new Chat assignment"
+alice-workspace conversation ask --harness autoquant --prompt "Research this quantitative hypothesis"
+alice-workspace conversation ask --ws-id <workspaceId> --prompt "Reconstruct the missing rationale" --reconstruct --await
+```
+
+`--harness chat` resolves the recent/default Chat desk and creates the stable
+starter only when no Chat Workspace exists. `--harness autoquant` requires the
+explicitly initialized default AutoQuant desk; it never creates, guesses, or
+switches that Workspace as a side effect. Both recruit a fresh Session in the
+resolved desk. Use `--resume-id` when the intent is to continue an existing
+coworker instead.
+
+## Consultation versus delegation
+
+Use `--await` when the answer is needed in the current turn. Conversation
+dispatch has no implicit execution deadline: without `--timeout-ms`, the Agent
+may run until its natural exit and an awaited request waits for terminal state.
+For delegated work, omit `--await`, retain the returned `taskId` and `resumeId`,
+and retrieve the reply later with `conversation read` or `conversation await`.
+
+Add `--timeout-ms <milliseconds>` to `conversation ask` only when the caller
+intentionally wants a hard execution watchdog. On standalone `conversation
+await` and `conversation collect`, the same option bounds only that server-side
+wait; returning from the wait does not stop the underlying task unless the
+dispatch itself carried the explicit watchdog.
+
+For several independent peers, dispatch every question first and then collect
+their task ids together:
+
+```bash
+alice-workspace conversation collect --task-id <taskA> --task-id <taskB>
+```
+
+This lets runs overlap instead of manufacturing shell sleep loops. A bounded
+collect does not discard the tasks; read or collect them again later.
+
+OpenAlice does not inject an unsolicited completion message into another
+Agent's active transcript. For longer work that should notify a human, ask the
+peer to manage a local Issue or schedule and publish the finished report with
+`inbox push`.
+
+An Issue can also begin with `assignee: "@new-then-resume"`: the first scheduled
+fire recruits a Session and immediately persists its exact signature, so later
+fires and comments keep one accountable coworker. `@new-each-run` is the
+explicit fresh-worker-per-fire mode.
+
+The [Workspace Manager](/docs/workspaces/manager) uses this same contract across
+the active floor. It continues a known `resumeId` before falling back to a
+Workspace reconstruction and keeps that resolution mode visible.
+
+## Agent conversation log · Beta
+
+Every dispatched Workspace conversation appends private dispatch and completion
+events to:
+
+```text
+<AQ_LAUNCHER_ROOT>/state/agent-conversations.jsonl
+```
+
+The log records routing identity, the original and delivered prompts, terminal
+status, final assistant text, duration, and compact errors. It uses mode `0600`
+where supported, stays outside Workspace git repositories, and must be treated
+as sensitive conversation history.
+
+The authenticated **Dev → Logs → Agent conversations** view shows a bounded,
+read-only projection with newest conversations first. A dispatch without a
+completion event appears as running. The view can inspect routing, prompts, and
+replies, but cannot replay, resume, edit, delete, or expose the underlying file
+path.
+
+## Runtime occupancy journal · Beta
+
+OpenAlice separately appends Session/process lifecycle and bounded headless
+turn assets to:
+
+```text
+<AQ_LAUNCHER_ROOT>/state/agent-runtime.jsonl
+```
+
+The journal records Session birth, runtime start/stop, spawn failure, declined
+dispatch, and structured headless text/tool/error events. Completion can carry
+clipped assistant text and metrics. User prompts and tool input/output remain
+out of this file; TUI/Web internals are not extracted yet.
+
+[Office](/docs/workspaces/office) folds this journal with the active Session
+roster for current mood and replay. The file is an audit projection, never a
+dispatch authority or replacement for durable Runs and native transcripts.
+
+## Web conversations
+
+A supported Agent can open the same durable Session in the terminal or browser. The Web view uses that Agent's structured protocol; the Agent still owns its transcript, credentials, tools, and approvals. Switching surfaces keeps the same `resumeId` and native conversation, with only one process attached at a time.
+
+Web is available for Pi, Oh My Pi, Cursor Agent, Grok Build, OpenCode, Claude Code, and Codex when their installed CLIs support the required protocol. Antigravity and Shell remain terminal-only. The launch picker offers GUI only when the selected runtime supports a fresh Web Session. Runtime permission or input requests appear in the conversation so you can answer them there. A paused Web Session can reopen with a new access, model, or effort choice while retaining its identity.
+
+## Next Steps
+
+- [Lifecycle & Offboarding](/docs/workspaces/lifecycle) — See what happens to Sessions when a Workspace departs.
+- [Issue Board](/docs/workspaces/issues) — Choose between a stable Session owner and a fresh Workspace worker.
+- [Inbox](/docs/workspaces/inbox) — Deliver revision-stamped reports and ask their sender.
+- [Automation](/docs/workspaces/automation) — Understand `taskId`, `resumeId`, and scheduled execution.
+- [Workspace Manager](/docs/workspaces/manager) — Coordinate attributable coworkers across desks.
+- [Office · Beta](/docs/workspaces/office) — Inspect and replay Workspace/Session occupancy.

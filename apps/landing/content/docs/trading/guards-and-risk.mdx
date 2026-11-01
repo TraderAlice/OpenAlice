@@ -1,0 +1,150 @@
+export const metadata = {
+  title: "Guards & Risk",
+  description: "Optional push-time middleware for accounts that need code-level trading constraints.",
+}
+
+# Guards & Risk
+
+Guards are optional push-time middleware that run inside each UTA before orders reach the broker. They are useful when an account needs code-level constraints, such as position-size limits, cooldowns, or symbol allowlists.
+
+Most users do not need to configure guards to get the main OpenAlice safety model. The default and recommended wall is still [Trading-as-Git](/docs/core-concepts/trading-as-git): Alice can stage and commit intent, while broker execution waits for human approval in the Web UI or linked Telegram `/uta`. Guards are an extra middleware layer for stricter accounts.
+
+> **UTA is beta.** Guards are an extra safety layer, not a substitute for validating broker behavior with a simulator, paper account, demo account, or testnet first. See [What is UTA](/docs/core-concepts/unified-trading-account).
+
+## Global trading mode comes first
+
+Open **Settings → Agent Permissions** to choose the global broker capability:
+
+| Mode | UTA behavior | Broker writes |
+|------|--------------|---------------|
+| **Lite** | UTA stays disconnected; Alice's research/workspace surfaces remain usable. | Unavailable. |
+| **Readonly** | UTA connects so accounts, positions, and broker data can be read. | Blocked globally. |
+| **Pro** | UTA is fully enabled. | Still subject to account permissions, Trading-as-Git, and guards. |
+
+With no saved choice, a fresh install with no UTA accounts defaults to Lite;
+an existing install with configured accounts defaults to Pro for compatibility.
+`OPENALICE_TRADING_MODE=lite|readonly|pro` can lock the mode for managed
+deployments.
+
+Pro also exposes **Allow AI to push trades**. It is off by default. Leave it
+off to require human approval for every AI-initiated push. Turning it on lets
+an agent's `tradingPush` send committed operations directly to the broker;
+guards and per-account read-only settings still apply, but the human approval
+step no longer does. Use that switch only on paper/demo accounts unless you
+have independently accepted the automation risk.
+
+## How Guards Work
+
+When configured, the guard pipeline runs during push:
+
+1. Fetches current positions and account info from the broker
+2. Builds a `GuardContext` with the operation, positions, and account data
+3. Runs each guard sequentially — first rejection wins
+4. If all guards pass, the operation continues to broker dispatch
+5. If any guard rejects, the operation fails with a clear reason
+
+```
+tradingPush → Guard Pipeline → Broker
+                  │
+                  ├── max-position-size ✓
+                  ├── cooldown ✓
+                  └── symbol-whitelist ✗ "DOGE not in whitelist"
+                                         → Operation rejected
+```
+
+## Built-in Guards
+
+### max-position-size
+
+Prevents any single position from exceeding a percentage of your total equity.
+
+```json
+{
+  "type": "max-position-size",
+  "options": { "maxPercentOfEquity": 20 }
+}
+```
+
+The guard estimates the projected position value after the order and compares it to net liquidation. If the projected size exceeds the threshold, the order is rejected:
+
+```
+[guard:max-position-size] Position for NVDA would be 32.5% of equity (limit: 20%)
+```
+
+### cooldown
+
+Enforces a minimum time between trades on the same symbol, preventing impulsive rapid-fire trading.
+
+```json
+{
+  "type": "cooldown",
+  "options": { "minIntervalMs": 300000 }
+}
+```
+
+### symbol-whitelist
+
+Restricts trading to a predefined list of symbols.
+
+```json
+{
+  "type": "symbol-whitelist",
+  "options": { "symbols": ["AAPL", "MSFT", "GOOGL", "NVDA", "TSLA"] }
+}
+```
+
+Any order for a symbol not in the list is rejected immediately.
+
+## Configuring Guards
+
+Configure guards in the Trading account editor. `accounts.json` is sealed at
+rest and is not a hand-editable configuration file. The logical account shape
+contains a `guards` array like this:
+
+```json
+{
+  "id": "alpaca-paper",
+  "presetId": "alpaca",
+  "enabled": true,
+  "guards": [
+    { "type": "max-position-size", "options": { "maxPercentOfEquity": 15 } },
+    { "type": "cooldown", "options": { "minIntervalMs": 600000 } },
+    { "type": "symbol-whitelist", "options": { "symbols": ["AAPL", "MSFT"] } }
+  ],
+  "presetConfig": { "mode": "paper", "apiKey": "...", "apiSecret": "..." }
+}
+```
+
+Guards are resolved from the registry at account init time. Unknown guard types are skipped with a warning.
+
+## Guard Categories
+
+Each broker type declares a guard category:
+
+| Preset family | Category |
+|---------------|----------|
+| CCXT-backed exchanges and crypto-native brokers | `crypto` |
+| Alpaca, IBKR, and Longbridge | `securities` |
+
+This categorization controls which guard choices the account editor offers; the
+backend registry remains the enforcement source.
+
+## Rejection Flow
+
+When a guard rejects an operation during push:
+
+1. The operation result is recorded as `rejected` with the guard name and reason
+2. The commit is still recorded in the git history (with rejection details)
+3. Alice sees the rejection reason and can adjust her approach
+
+This means rejected trades are part of the audit trail — you can always trace why something was blocked.
+
+## Custom Guards
+
+You can create custom guards by implementing the `OperationGuard` interface and registering them. See [Custom Guards](/docs/extending/custom-guards) for a step-by-step guide.
+
+## Next Steps
+
+- [Trading as Git](/docs/core-concepts/trading-as-git) — Start with the approval workflow that every trade uses.
+- [Orders & Execution](/docs/trading/orders-and-execution) — See the push flow around this middleware layer.
+- [Custom Guards](/docs/extending/custom-guards) — Write project-specific constraints when the built-ins are not enough.

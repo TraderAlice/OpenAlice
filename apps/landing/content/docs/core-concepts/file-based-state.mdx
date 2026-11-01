@@ -1,0 +1,186 @@
+export const metadata = {
+  title: "File-based State",
+  description: "How OpenAlice stores configuration, Workspaces, Session identity, provenance, Inbox, trading history, and migrations as inspectable files instead of a database.",
+}
+
+# File-based State
+
+OpenAlice has no database. State lives as JSON, JSONL, Markdown, and git repositories under **`~/.openalice`** by default. `OPENALICE_HOME` selects another user root.
+
+## Directory structure
+
+```text
+<OPENALICE_HOME>/
+├── data/                         # portable application data
+│   ├── config/                   # validated config + migration journal
+│   ├── inbox/                    # immutable delivery records
+│   ├── entities/                 # tracked assets and topics
+│   ├── trading/                  # UTA history and snapshots
+│   ├── news-collector/           # RSS archive
+│   ├── tool-calls/
+│   ├── media/
+│   ├── cache/
+│   ├── preferences.json          # home-scoped Quick Start, AutoQuant, and Harness choices
+│   ├── ui-layout.json            # home-scoped Activity Bar groups/order/visibility
+│   └── _backup/                  # migration snapshots
+├── workspaces/                   # default launcher root
+│   ├── workspaces.json           # active runtime registry
+│   ├── workspaces/               # active git checkouts only
+│   │   └── <wsId>/.alice/
+│   │       ├── workspace.json    # display metadata + default Agent
+│   │       ├── settings.json     # secret-free launch preferences
+│   │       ├── sessions/         # per-Session AI config + optional coworker name
+│   │       └── issues/
+│   ├── departed-workspaces/      # retained offboarded checkouts
+│   ├── auto-quant-v2-mirror/
+│   └── state/
+│       ├── workspace-catalog.json
+│       ├── resume-identities.json
+│       ├── sessions/
+│       ├── scrollback/
+│       ├── schedule-markers.json
+│       ├── headless-tasks.json
+│       ├── headless-logs/
+│       ├── artifact-provenance.json
+│       ├── workspace-manager-sessions/
+│       └── agent-conversations.jsonl
+├── state/
+│   ├── guardian.lock
+│   └── runtime.lock
+├── runtime/
+│   └── broker-packs/               # replaceable optional integration payloads
+├── provider-keys.json
+└── sealing.key
+```
+
+Active and historical state are deliberately separate. `workspaces.json` says what Alice can run now; the catalog, departed checkout directory, Session identities, run history, and provenance explain what existed before. See [Lifecycle & Offboarding](/docs/workspaces/lifecycle).
+
+Workspace registry and lifecycle rows do not pin an Agent-adapter allowlist.
+Adapter availability is installation-wide; each launch separately reports
+whether its runtime and credential are ready.
+
+Each business Workspace can carry version 3 of `.alice/settings.json`. Its
+interactive and headless modes keep fixed policy separate from successful
+recent Agent, access source, model, and effort choices. Vault keys remain in the
+selected OpenAlice home. Each resolved binding lives beside the desk at
+`.alice/sessions/<resumeId>.json` for exact continuation, without storing a
+secret or resolved endpoint. Its `ai` object is the launch binding; an optional
+sibling `displayName` is the mutable coworker nametag. Later Workspace defaults
+cannot rewrite the binding; the user may replace access/model/effort explicitly
+while the Session is paused.
+
+The selected path is one **complete home**. Desktop home switching, CLI
+`--home`, locks, Workspaces, credentials, and replaceable runtime state all use
+this boundary. Different complete homes can run concurrently; two writers must
+never share one physical home. See [Data &
+Credentials](/docs/deployment/data-and-credentials#selectable-complete-homes).
+
+## Root overrides
+
+| Variable | Purpose |
+|---|---|
+| `OPENALICE_HOME` | Select the OpenAlice user root |
+| `AQ_LAUNCHER_ROOT` | Move only the Workspace launcher root |
+| `OPENALICE_GLOBAL_DIR` | Move the user-global provider-key store |
+| `OPENALICE_APP_HOME` | Point to replaceable app resources, not user state |
+
+`sealing.key` is machine-bound and decrypts broker and Connector credentials. A backup that includes it is sensitive; omitting it intentionally makes copied integration config unreadable.
+
+## Configuration and migrations
+
+Configuration lives under `data/config/` and is validated by schemas. Missing files are seeded with defaults. Many user settings hot-reload, while startup/boundary settings require restart; [Configuration Reference](/docs/configuration/configuration-reference) documents the difference.
+
+The Activity Bar is separate home-scoped user chrome at
+`data/ui-layout.json`. It stores built-in/custom group order and hidden rail
+entries, travels with the complete AliceProject home, and is managed through
+**Settings → Activity bar**. Missing or malformed data falls back to the default
+layout with Dev Panel hidden; Settings itself cannot be hidden.
+
+Other non-sensitive installation preferences live in `data/preferences.json`.
+They include recent Quick Start choices, the selected AutoQuant and Auto
+Prediction desks, and the shared Harness roster's visibility switches.
+**Settings → Appearance → Visibility** manages `showHeadlessBornSessions` and
+`showIssueAttachedSessions`. Both default off: the first keeps Issue/API-born
+Sessions that have never opened a TUI or Web off the Ask Alice, AutoQuant, and
+Auto Prediction rosters; the second keeps exact Issue owners and current Issue
+workers on Issue and Automation surfaces. These are independent presentation
+preferences and do not change Session identity or execution.
+
+`accounts.json` and external Connector credentials are exceptions to ordinary
+hand editing: they are sealed with AES-256-GCM and managed through the Web UI.
+
+Upgrade-time transformations live in `src/migrations/`, are idempotent, declare their affected paths, and journal completion in `data/config/_meta.json`. Migrations may touch the Workspace launcher root when the persisted contract lives there. Pre-migration snapshots go under `data/_backup/`.
+
+## Workspace Sessions and provenance
+
+OpenAlice owns product identity while native agent CLIs own their conversation stores:
+
+- `resume-identities.json` maps durable `resumeId` values to Workspace,
+  lifecycle, and native-session identity; it does not own AI configuration;
+- `.alice/sessions/<resumeId>.json` stores each business Session's secret-free
+  `ai` binding plus its optional coworker `displayName`;
+- per-Workspace Session records own the durable product roster row and latest
+  surface for every headless or interactive Session; live processes attach to
+  that same row;
+- `headless-tasks.json` owns one record per async turn and its `taskId` lineage;
+- `agent-conversations.jsonl` is the private append-only dispatch/completion
+  log for Workspace conversation prompts and replies;
+- `agent-runtime.jsonl` is the append-only occupancy/replay journal for Session
+  birth, process transitions, and bounded headless turn projections;
+- Claude Code, Codex, Cursor Agent, Antigravity, Grok Build, Oh My Pi,
+  OpenCode, and Pi keep their native transcript/session formats;
+- Web renders supported Agents through their native structured protocols rather than copying conversations into an OpenAlice chat database.
+
+`artifact-provenance.json` joins Inbox entries, Issue mutations, report revisions, and trade decisions back to their Session. See [Sessions & Collaboration](/docs/workspaces/sessions-and-collaboration).
+
+The Agent conversation log stays outside every Workspace repository and uses
+mode `0600` where supported. Because it includes full prompts and final replies,
+treat it as sensitive when backing up, moving, or sharing a complete home.
+The runtime journal excludes prompts and tool input/output but can retain
+clipped assistant text and errors; it is an Office projection, not a dispatch
+authority.
+
+## Issues
+
+Each Issue is a Markdown file inside its Workspace:
+
+```text
+<workspace>/.alice/issues/<id>.md
+<workspace>/.alice/issues/<id>.comments.json
+```
+
+The document holds board fields, ownership, optional schedule, and canonical What. The sidecar holds stable Markdown comments, reply links, and delivery state. Schedule markers stay in launcher state; schedule meaning stays in the Issue. See [Issue Board](/docs/workspaces/issues).
+
+## Inbox
+
+Inbox entries are append-only JSONL under `data/inbox/entries.jsonl`. Each entry points to live Workspace documents while retaining publication-time revision and Session/run/Issue provenance. Delete rewrites the file atomically rather than mutating individual lines. See [Inbox](/docs/workspaces/inbox).
+
+Optional [External Connectors](/docs/integration/external-connectors) project an
+entry outward only after this append succeeds. Their bounded I/O journal remains
+local diagnostic evidence, not another Inbox database.
+
+## Trading history
+
+UTA owns broker and trading state under `data/trading/<accountId>/`. Trading-as-Git commits, staged operations, snapshots, approvals, broker orders, and fills remain separate from Alice's Session provenance. A Session can be attributed as the initiator of a decision without moving execution authority out of UTA.
+
+## Workspace-owned guidance
+
+OpenAlice no longer keeps an installation-wide mutable persona file. The Chat
+template owns Alice's baseline identity in its `instruction.md`, which creation
+copies byte-identically to the Workspace's `CLAUDE.md` and `AGENTS.md`.
+
+Workspace instructions and skills follow a durable principle: creation
+snapshots are explicit files and later guidance upgrades remain diff-visible.
+Existing Workspaces keep their own committed guidance rather than inheriting a
+hidden global prompt change.
+
+[Template Upgrade](/docs/workspaces/upgrades-and-absorb#template-upgrade) now
+turns that principle into a three-way, reviewed transaction instead of an
+invisible replacement.
+
+## Next Steps
+
+- [Data & Credentials](/docs/deployment/data-and-credentials) — Auth, sealed credentials, backup, and ports.
+- [Structure](/docs/workspaces/structure) — Active/departed Workspace and Session layout.
+- [Sessions & Collaboration](/docs/workspaces/sessions-and-collaboration) — Product identity and provenance.
+- [Configuration Reference](/docs/configuration/configuration-reference) — Config file schemas and change surfaces.

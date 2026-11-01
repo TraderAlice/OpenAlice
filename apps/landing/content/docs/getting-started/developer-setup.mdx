@@ -1,0 +1,131 @@
+export const metadata = {
+  title: "Source & Dev",
+  description: "Clone OpenAlice, run the local development stack, understand ports and first-run behavior, and debug from source.",
+}
+
+# Source & Dev
+
+Use this path when you want logs, debuggability, local patches, or explicit
+control over the checkout. It is the recommended path for contributors, Linux
+users, and anyone debugging beta behavior. For the smaller installed headless
+Runtime or a private SSH host, see
+[CLI & Remote Access](/docs/deployment/remote-access).
+
+## Prerequisites
+
+- **Node.js 22.19.0+** - [Download](https://nodejs.org/)
+- **pnpm 10+** - install with `npm install -g pnpm` or [Corepack](https://pnpm.io/installation#using-corepack)
+- **Git** - needed to clone the repo
+- **An agent CLI** - at least one of `claude`, `codex`, `cursor-agent`, `agy`,
+  `grok`, `omp`, `opencode`, or `pi`
+
+The simplest model path is Claude Code: run `claude` once and log in with your Pro/Max subscription. No API key is needed. If you prefer API-key providers, add a credential in [AI Providers](/docs/integration/ai-providers).
+
+## Install
+
+```bash
+git clone https://github.com/TraderAlice/OpenAlice.git
+cd OpenAlice
+pnpm install
+```
+
+## Run
+
+```bash
+pnpm dev
+```
+
+The dev orchestrator prints the URLs it picked. Open the **UI** URL, usually:
+
+```text
+http://localhost:5173
+```
+
+No database or config file is required before first launch.
+
+For an isolated data home, keep state outside the checkout:
+
+```bash
+pnpm dev -- --home ~/.openalice-dev/feature-a
+```
+
+Separate complete homes are the normal way to run multiple worktrees at once.
+`--takeover` is recovery authority for the same home, not a concurrency tool.
+
+## What `pnpm dev` starts
+
+`pnpm dev` runs the Guardian orchestrator, which brings up the local stack in order:
+
+| Process | Default port | Purpose |
+|---------|--------------|---------|
+| UTA service | `47333` (127.0.0.1) | Broker carrier and keyless data UTAs |
+| Alice backend | `47331` | API, workspace runtime, auth boundary |
+| MCP server | `47332` (`/mcp`) | External MCP and internal CLI gateway |
+| Vite UI | `5173` | Frontend dev server with hot reload |
+
+Ports auto-bump if a number is taken. Always trust the URLs printed by the terminal over the defaults in the table.
+
+## Useful commands
+
+```bash
+pnpm dev                 # Start local development stack
+pnpm cli                 # Open the real Supervisor CLI against this checkout
+pnpm cli status --json   # Inspect the selected home and active Runtime
+pnpm test:cli            # Run the CLI unit and PTY suite
+pnpm build               # Production build (backend + UI)
+pnpm test                # Unit tests (Vitest)
+pnpm test:e2e            # End-to-end tests
+```
+
+`pnpm cli` runs the same TypeScript Supervisor entry point shipped by the
+installer, without confusing CLI dogfooding with installer smoke tests. While
+`pnpm dev` owns the selected home, it publishes a read-only Runtime status that
+the source or installed CLI can discover. `status`, `doctor`, and `open` can
+inspect that dev owner and open its advertised IPv4 loopback Web UI; stop and
+restart commands refuse to take over the development process.
+
+## First-run behavior
+
+On first startup, OpenAlice automatically:
+
+1. Creates JSON config files under `~/.openalice/data/config/`.
+2. Resolves the implicit Default AliceProject from the complete home.
+3. Starts TraderAlice in Lite mode when no broker accounts or explicit trading
+   mode exist, keeping UTA disconnected while research and workspaces remain
+   available.
+4. Loads the local SEC/TMX symbol index for instant equity search.
+
+Optional keyless crypto K-line sources are disabled by default. Switch to
+Readonly or Pro, then enable Binance, OKX, or Bybit under **Trading → Public
+crypto data sources** when you want them.
+
+All of this lives outside the git checkout under `~/.openalice` unless `OPENALICE_HOME` points somewhere else. Updating the repo does not erase your workspaces, config, Inbox, sessions, or broker-account data.
+
+## Troubleshooting
+
+**A port is already in use** — Guardian probes upward only when the Web port is
+unconfigured. A missing `~/.openalice/data/config/ports.json` is the unpinned
+state. Any written `web` value, including an older `{ "web": 3002 }`, is a pin
+and fails visibly on collision; delete that field/file to restore probing. Use
+`OPENALICE_WEB_PORT` for a one-run pin without rewriting the file.
+
+**Claude Code is not authenticated** — Run `claude` directly, finish login, then restart `pnpm dev`.
+
+**Using API keys instead of CLI login** — Add a credential in **Settings -> AI Provider**. The credential is tested before saving and injected into future workspaces.
+
+**`pnpm install` fails** — Check `node -v` and `pnpm -v`. OpenAlice expects Node 22+ and pnpm 10+.
+
+**You want a browser Runtime without memorizing Guardian commands** — Install
+the CLI and use `openalice up`, followed by `openalice open`. It can bootstrap
+the matching installed Runtime from any directory, reuse a compatible active
+owner for the same home, expose structured status, tail bounded redacted logs,
+and run read-only diagnostics;
+see [CLI & Remote Access](/docs/deployment/remote-access).
+
+## Next Steps
+
+- [Quick Start](/docs/getting-started/quick-start) - Run the product loop after the dev server starts.
+- [File-based State](/docs/core-concepts/file-based-state) - Understand `~/.openalice`.
+- [Configuration Reference](/docs/configuration/configuration-reference) - Inspect config files and defaults.
+- [CLI & Remote Access](/docs/deployment/remote-access) - Run a native Runtime on a private server.
+- [CLI & Remote Access](/docs/deployment/remote-access) - Use the installed Runtime locally or through SSH, or select this checkout as an advanced source override.

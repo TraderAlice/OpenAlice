@@ -1,0 +1,148 @@
+export const metadata = {
+  title: "How AI Can Trade Well | Introducing the Unified Trading Account (UTA)",
+  description: "Why we built UTA — a universal abstraction between AI and brokers that unifies asset identity, standardizes operations, and gives AI the ability to trade across any exchange.",
+  date: "2026-04-05",
+  author: "TraderAlice Team",
+};
+
+# How AI Can Trade Well | Introducing the Unified Trading Account (UTA)
+
+This post covers the origin and application of the Unified Trading Account (UTA) — a concept we introduced to improve the quality of AI-driven trading.
+
+OpenAlice is an open-source, high-performance Trading Agent engine. If UTA and AI trading sound interesting to you, come check out our code: [github.com/TraderAlice/OpenAlice](https://github.com/TraderAlice/OpenAlice)
+
+---
+
+## Not Abstract Enough
+
+Half a year ago, OpenAlice was still a closed-source project called TraderAlice. The first assets we supported were crypto.
+
+Crypto's asset structure is relatively simple — a trading pair, a direction, an amount, and you're done. At most you distinguish between perpetuals and spot. So Alice's entire interface was designed pretty sloppily. At the time, we figured it was good enough.
+
+Then one day, our beloved Angel investor showed up and said, very earnestly: "[Cherry](https://x.com/0xcherry)(*Our dear founder), I think crypto is cooked. How about you try hooking up US equities?"
+
+Then we actually tried to integrate it, and found that Alice's interface couldn't connect to US equity exchanges at all. For the longest time, we could only make do with synthetic US stock perps on Hyperliquid's HIP-3. Our timeline for supporting real US equities was entirely dependent on when benevolent deployers would get around to listing contracts on HIP-3.
+
+That could take forever.
+
+Young as we were, we learned our first lesson: **before you build the Agent, build the abstraction.** That's how UTA was born.
+
+
+## From "Asset Identity" to "Operation Standardization"
+
+After stepping on every crypto-shaped landmine, we knew exactly what to do next: build a high-dimensional abstraction that unifies asset types.
+
+<img src="/blog/openalice-what-is-uta-unified-trading-account/uta-origin.jpeg" alt="The origin of UTA" />
+
+
+No matter what asset you're dealing with, trading is just two directions — buy and sell. The operational layer is relatively standard. What's *not* standard is **what you're actually buying**.
+
+A BTC/USDT perpetual contract and a call option on Apple — as "tradeable things," their structures are completely different. Expiry dates, strike prices, exchanges, currencies… different asset classes need different field combinations just to uniquely identify "what exactly am I buying."
+
+So we needed an abstraction capable of uniquely identifying any tradeable asset. With that requirement in hand, we went looking — and found that IBKR did it best.
+
+This wasn't a coincidence.
+
+IBKR's founder Peterffy started out in options. Options are the single hardest asset class to pin down in terms of identity — same underlying, same expiry, and you still have to distinguish between strike prices and call/put. The combinatorial explosion of contracts is enormous.
+
+<img src="/blog/openalice-what-is-uta-unified-trading-account/uta-ibkr-options.jpeg" alt="Trading-as-Git with UTA" />
+
+
+So IBKR's team are absolute veterans when it comes to handling asset identity. It's in their DNA — their founder literally came from this problem.
+
+We adopted IBKR's Contract interface style to define asset identity.
+
+During our research, we also discovered that IBKR's operation standardization was equally excellent. As the broker connecting the most exchanges (unverified, debatable, please don't @ me) — stocks, options, futures, bonds, forex, commodities, basically everything you can think of — IBKR's operational interfaces are about as standardized as they get.
+
+If you can handle IBKR-level complexity, every other exchange is a walk in the park. Asset standardization and operation standardization — IBKR gave us both in one package.
+
+That's why we settled on the IBKR style.
+
+Later, we rewrote IBKR's SDK in TypeScript as the single source of truth for the entire system. 
+
+Since we're going deep into the TypeScript ecosystem, without native type support the downstream work simply couldn't happen. So we built the wheel ourselves.
+
+Alice is like a compressed archive — once you start unpacking, one thing leads to another, endlessly.
+
+The universal trading account model built with IBKR-style architecture is what we call the **Unified Trading Account (UTA)**.
+
+## What UTA Actually Is
+
+<img src="/blog/openalice-what-is-uta-unified-trading-account/uta-architecture.jpeg" alt="UTA architecture" />
+
+
+UTA stands for Unified Trading Account.
+
+Put simply, it was designed to solve the problem of how AI can operate across different exchange accounts using a standardized method.
+
+More fundamentally: we want AI to develop the ability to *process* Trading as a domain. That requires first defining what the abstract structure of financial trading actually looks like.
+
+**UTA is the universal abstraction between AI and brokers.**
+
+Think of it this way: an IDE is a programmer's standardized workspace. No matter what language you write, the shape and logic of the IDE is unified — files, editing, compilation, debugging.
+
+UTA is the IDE for AI trading. No matter whether the underlying broker is IBKR or something else, the operational interface AI sees is isomorphic. This is also one realization of what we call **"Vibe Coding and Vibe Trading are equivalent"** — you express the intent, the system handles the structural complexity.
+
+
+## UTA in Practice: Infinitely Expandable Asset Space
+
+Once all assets are uniformly abstracted into contracts, the entire asset universe becomes a searchable space.
+
+Example: if Alice wants to construct a strategy and we've defined the requirements for it, we can't possibly know in advance which specific assets we'll need to buy.
+
+In this scenario, we can't shove every tradeable asset into the context window — there are too many, and flooding the context would severely pollute AI's reasoning.
+
+The best approach is heuristic search: don't enumerate assets. Let the AI search with strategic intent when it needs to, progressively narrowing the scope until it lands on the specific contract to trade.
+
+There's another benefit to expanding the asset space.
+
+A simple question: what kind of trading is comfortable for AI?
+
+AI isn't suited for sub-second high-frequency trading — AI's strength is in analysis and reasoning, not speed. AI trading is naturally day-scale, week-scale, analysis-driven.
+
+Analysis-driven trading requires good asset allocation. Asset allocation inevitably means cross-category. Cross-category means cross-exchange. Cross-exchange means you *must* have a unified asset and operation abstraction.
+
+With UTA, search results might simultaneously include COMEX gold futures, a gold mining ETF, and PAXG on a crypto exchange.
+
+Because UTA unifies asset identity and operation standardization, these assets all look the same to the AI — directly comparable, side by side.
+
+**UTA lets AI perform heuristic search across an infinite asset space, and enables cross-asset comparison and operation.** That's one of UTA's most powerful applications.
+
+## UTA in Practice: Trading-as-Git
+
+For a full explanation of Trading-as-Git, see [our previous writeup](/blog/trading-as-git-intro).
+
+Trading-as-Git brings version control into the trading domain. In short, before the AI executes any trading action, it goes through this routine:
+
+- **Stage**: Buffer operations (place order, close position, cancel)
+- **Commit**: Confirm intent, attach the decision rationale
+- **Push**: Execute — run the guard pipeline for safety checks first, only then actually send to the broker
+
+The effectiveness of Trading-as-Git speaks for itself. What I want to highlight here is the engineering side.
+
+Without UTA, we'd have to design a separate operational interface for each broker, and a separate TaG architecture to go with it. The workload would be enormous.
+
+And for the AI, each additional broker means another full set of tools — polluting the context and making tool resolution much harder.
+
+With UTA, Trading-as-Git doesn't need to be designed at the broker level. It only needs to follow the universal UTA interface. Workload drops dramatically, tool hit rate goes way up, and the AI develops a much better understanding of what standardized trading operations actually do.
+
+## Closing: Do the Hard and Correct Work
+
+UTA was proposed to solve a set of concrete problems:
+
+- Heuristic search across the asset space
+- Cross-asset comparison and operation
+- Reusable quality improvements (Trading-as-Git developed directly on the UTA interface)
+- …
+
+And UTA's implementation follows this chain:
+
+**Unified asset identity (Contract) → Unified operation interface (IBroker) → Unified decision space (heuristic search) → AI gains general-purpose processing capability over financial trading as a domain.**
+
+This is extremely difficult work. But it's also critical work for AI to trade well.
+
+For AI, this is the equivalent of introducing an IDE for the entire trading domain. And we're putting in the work to build it — in fact, we're most of the way there.
+
+<div className="flex justify-center my-8">
+  <img src="/sticker/alice_smile.png" alt="Alice smiling" className="w-32 h-32 object-contain" />
+</div>

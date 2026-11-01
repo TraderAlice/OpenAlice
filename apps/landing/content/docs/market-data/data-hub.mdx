@@ -1,0 +1,132 @@
+export const metadata = {
+  title: "Data Hub",
+  description: "TraderHub — the hosted low-frequency data source that makes a fresh OpenAlice install work with zero API keys. Reference boards, keyed datasets, and an explicit hub → your-keys → loud-error resolution chain.",
+}
+
+# Data Hub
+
+> **Status: stable.** The Data Hub is read-only, has no side effects, and never touches your broker. A fresh install reads market data through it without a single API key configured.
+
+Most market-data providers gate the good stuff behind an account: FRED needs a key, FMP needs a key, EIA and BLS need keys. That's a lot of sign-ups before OpenAlice can show you a macro dashboard. The **Data Hub** removes that wall.
+
+The Hub (hosted at `https://traderhub.openalice.ai`) is a thin, hosted relay for **low-frequency** market data — macro series, calendars, sector boards, fundamentals. OpenAlice ships pointed at it, so the moment you start the app the reference boards populate, **zero keys required**. Your own provider keys remain the fallback path; the Hub is a convenience layer, never a correctness dependency.
+
+![OpenAlice Market page showing Hub-backed reference boards and valuation cards](/docs/product/market.jpg "medium")
+
+## The resolution chain
+
+Every Hub-backed read resolves in a fixed, explicit order:
+
+```
+hub  →  your own provider key  →  loud error
+```
+
+1. **Hub** — if `hub.enabled` (the default) and the Hub is reachable, serve from it.
+2. **Your key** — if the Hub is off, down, or doesn't cover that dataset, fall back to your own provider key (from `market-data.json` or the global `provider-keys.json`).
+3. **Loud error** — if neither path can serve it, OpenAlice raises an explicit error. It never silently returns empty.
+
+Turn the Hub off (Settings › Market Data, or `hub.enabled: false`) and behavior collapses to exactly the bring-your-own-keys model — same tools, same shapes, just sourced from your own accounts.
+
+> **The Hub is a convenience, not a lock-in.** Point `hub.baseUrl` at a self-hosted relay, or switch it off entirely and supply your own keys. K-lines and quotes deliberately stay *off* the Hub — realtime data comes from your broker (via UTA) or your vendor, where freshness incentives actually live. Live K-line/quote vendors are now a toggleable picker (Chart Vendors) — see [Symbol Search](/docs/market-data/symbol-search) — distinct from the Hub's low-frequency provider keys. The Hub only ever serves shape-checked data, never configuration.
+
+## Origin & staleness — never silent
+
+Every Hub-aware payload carries a `meta` envelope so you always know where the number came from and how fresh it is:
+
+| `meta` field | Meaning |
+|--------------|---------|
+| `provider` | The upstream source (`yfinance`, `fred`, `fred+bls+eia`, …) |
+| `asOf` | When the payload was assembled |
+| `cachedAt` | Set when served from cache (in-process or the Hub) |
+| `origin` | `hub` (served by TraderHub) or `local` (built from your own keys) |
+| `stale` | `true` when an upstream refresh **failed** and this is the last-good copy |
+
+In the Web UI these surface as small **hub / local / stale** badges on each board. A `stale` badge means "the source didn't refresh, you're looking at the last good copy" — explicit, never hidden.
+
+## Reference boards
+
+The Hub serves nine curated **boards** — single-call, top-of-funnel reads, each its own cross-section of the market. All of them come through one tool, `marketGetBoard` (the `rotation` board has its own dedicated `sectorRotation` tool), the route `GET /api/reference/{board}`, and the `traderhub board get --board <name>` CLI command.
+
+| Board | What it carries | Source | Refresh |
+|-------|-----------------|--------|---------|
+| **movers** | Gainers / losers / most-active + Yahoo screeners (undervalued growth, growth tech, small caps, undervalued large) | yfinance | ~60s |
+| **calendar** | Earnings, IPOs, ex-dividend (default 14-day window) | FMP | ~30m |
+| **macro** | 14 curated FRED series — Fed funds, 2y/10y, 10y–2y spread, unemployment, jobless claims, WTI, dollar index, payrolls, M2, sentiment, breakeven, CPI YoY | FRED | ~30m |
+| **fed** | H.4.1 balance sheet (assets, Treasuries, MBS), primary-dealer net positions, FOMC documents | FRED + NY Fed + federalreserve.gov | ~60m |
+| **valuation** | S&P 500 strip — PE, Shiller CAPE, earnings yield, dividend yield (5y history) | multpl.com | ~6h |
+| **global-macro** | 7 countries × 5 indicators (CPI YoY, short rate, leading indicator, house prices, share prices) | OECD | ~6h |
+| **shipping** | 6 maritime chokepoints (Suez, Panama, Hormuz, Malacca, Bab el-Mandeb, Cape of Good Hope) — daily tonnage + vessel counts | IMF PortWatch | ~6h |
+| **term-structure** | BTC/ETH futures curve with perpetual anchor + annualized basis | Deribit | ~120s |
+| **rotation** | GICS-11 sector ETF cross-section vs SPY — see [Sector Rotation](/docs/market-data/sector-rotation) | yfinance | on demand |
+
+Each board is independently breaker-protected: a transport failure on one board trips a short (~60s) per-board breaker and falls back to local, while its siblings keep serving from the Hub. One bad board never cascades.
+
+```
+You: Show me the macro board.
+
+Alice: [calls marketGetBoard(board="macro")]
+       Fed funds 5.33 · 10y 4.21 · 10y–2y −0.38 (inverted)
+       Unemployment 4.1 · WTI 78.40 · M2 …
+       origin: hub · asOf 2 min ago
+```
+
+## Provider keys — local and global
+
+When you *do* bring your own keys (to bypass the Hub, or to cover a dataset it doesn't relay), there are two places they live:
+
+- **Per-install** — `market-data.json` → `providerKeys`. Scoped to this checkout.
+- **User-global** — `~/.openalice/provider-keys.json`. Shared across every checkout and the desktop app on this machine.
+
+They merge **local-wins**: the global file fills gaps, an explicit per-install key overrides it for that provider. Covered keys: `fred`, `fmp`, `eia`, `bls`, `nasdaq`, `tradingeconomics`, `econdb`, `intrinio`, `benzinga`, `tiingo`, `biztoc`.
+
+For the keyed economic sources (FRED / EIA / BLS), a *missing* key doesn't break the board — OpenAlice routes the request through the Hub's keyed proxy instead, which supplies its own key. Drop your own key in and it takes over immediately.
+
+> **No more OpenBB sidecar.** Earlier versions could point market data at an external `openbb-api` backend (a separate Python server). That backend is gone — market data now runs entirely in-process through the SDK, with the Hub as the zero-key relay on top. There's nothing to stand up alongside OpenAlice.
+
+## On the CLI
+
+Inside a workspace, the boards and fundamentals are a dedicated CLI away — `traderhub`:
+
+```bash
+traderhub board get --board macro
+traderhub board get --board calendar --days 14
+traderhub board rotation
+traderhub equity profile --symbol NVDA
+traderhub economy fred-series --series-id DGS10
+```
+
+`traderhub` groups the whole low-frequency surface: `board`, `equity`, `etf`, `economy`, `global`, `shipping`, `fed`, `crypto`, `index`. It's TraderHub-first throughout — same resolution chain as the tools. See [MCP & CLI Access](/docs/connectors/mcp-integration).
+
+## Configuration
+
+The Hub is configured in `~/.openalice/data/config/market-data.json`:
+
+```json
+{
+  "hub": {
+    "enabled": true,
+    "baseUrl": "https://traderhub.openalice.ai"
+  },
+  "providers": { "equity": "yfinance", "crypto": "yfinance", "currency": "yfinance", "commodity": "yfinance" },
+  "extraVendors": [],
+  "providerKeys": {}
+}
+```
+
+| Field | Description |
+|-------|-------------|
+| `hub.enabled` | Master switch. `false` = bring-your-own-keys only, no Hub calls |
+| `hub.baseUrl` | The Hub endpoint. Point at a self-hosted relay to keep the zero-key model on your own infra |
+| `providers` | Default vendor per asset class (the fallback path) |
+| `extraVendors` | Opt-in incremental equity vendors federated into search (e.g. `eastmoney`, `twse`) — additive, never a replacement; toggled via `setMarketVendor` / the Chart Vendors UI |
+| `providerKeys` | Per-install vendor keys; merge with the global `provider-keys.json` |
+
+See the full schema in the [Configuration Reference](/docs/configuration/configuration-reference).
+
+## Next Steps
+
+- [FX Workbench](/docs/market-data/fx-workbench) — Combine currency bars with macro divergence and indicative carry.
+- [Symbol Search](/docs/market-data/symbol-search) — See how vendor symbols and broker contracts differ.
+- [Equity Research](/docs/market-data/equity-research) — Use the zero-key research tools.
+- [Technical Analysis](/docs/market-data/technical-analysis) — Feed Hub and broker bars into quant scripts.
+- [Configuration Reference](/docs/configuration/configuration-reference) — Tune Hub and provider-key settings.

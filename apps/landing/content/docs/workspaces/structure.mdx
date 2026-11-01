@@ -1,0 +1,128 @@
+export const metadata = {
+  title: "Structure",
+  description: "How active and departed OpenAlice Workspaces, durable Sessions, terminal/Web surfaces, issues, runs, and provenance are stored on disk.",
+  releaseChannel: "stable",
+  targetVersion: "0.94.1",
+}
+
+# Structure
+
+A Workspace is a git-backed desk plus one or more durable agent Sessions. The repo gives agents a place to read, write, commit, and leave artifacts; each Session gives one particular conversation a stable identity that can continue through an interactive terminal, Web, or headless turns.
+
+## Launcher layout
+
+The default launcher root is `<OPENALICE_HOME>/workspaces`:
+
+```text
+~/.openalice/workspaces/
+├── workspaces.json                 # active runtime registry
+├── workspaces/                     # active Workspace checkouts only
+│   └── <wsId>/
+│       ├── .git/
+│       ├── CLAUDE.md
+│       ├── AGENTS.md
+│       ├── .agents/skills/
+│       ├── .claude/skills/
+│       └── .alice/
+│           ├── workspace.json    # display metadata + default Agent
+│           ├── settings.json     # secret-free interactive/headless preferences
+│           ├── sessions/         # secret-free per-Session AI config
+│           └── issues/
+├── departed-workspaces/            # retained offboarded checkouts
+├── auto-quant-v2-mirror/
+└── state/
+    ├── workspace-catalog.json
+    ├── resume-identities.json
+    ├── sessions/
+    ├── scrollback/
+    ├── schedule-markers.json
+    ├── headless-tasks.json
+    ├── headless-logs/
+    ├── artifact-provenance.json
+    ├── workspace-manager-sessions/
+    └── agent-conversations.jsonl
+```
+
+`workspaces.json` lists desks Alice can run now. `workspace-catalog.json` retains lifecycle history, including departed and purged desks. Filesystem discovery under `workspaces/` therefore means “active Workspaces,” not “everything that has ever existed.”
+
+The launcher-owned **Workspace Manager** uses the active `workspaces/` directory
+as its floor view but is deliberately absent from `workspaces.json`. Its durable
+Sessions use the reserved `workspace-manager` identity, preventing the control
+plane from appearing as another business desk in its own inventory. Their
+secret-free binding files live under `state/workspace-manager-sessions/` rather
+than creating `.alice/` at the active-floor root.
+
+The `wsId` is opaque, stable, and never reused. A human-readable tag can change without changing Workspace identity.
+
+When a creation seed, fixed default, or accepted fresh launch records a
+preference, version 3 of `.alice/settings.json` is created and travels with the
+Workspace. It is safe to track: fixed and recent interactive/headless layers
+store runtime-managed-or-vault access choices, vault slugs, models, and efforts,
+but no API key or endpoint. Successful launches update only their recent mode.
+Each resolved binding travels separately at `.alice/sessions/<resumeId>.json`.
+Normal launches cannot rewrite it from newer Workspace defaults; **Session
+settings** may replace access/model/effort only while that Session is paused,
+and an idle exact Issue owner exposes the same boundary in Issue detail. The
+Agent runtime remains frozen.
+
+Workspace identity does not include a frozen Agent-adapter list. Every active
+desk sees the installation's current registered adapters, while runtime
+installation and credential readiness are checked when a Session launches.
+
+## Product Sessions
+
+One Workspace can host many Sessions. Their identities are deliberately separate:
+
+- `resumeId` identifies one durable product Session across interactive and headless turns.
+- `taskId` identifies one headless execution.
+- the Session record id identifies one durable launcher roster row and
+  process-attachment target for that product Session.
+- the native Claude/Codex/Cursor/Antigravity/Grok/Oh My Pi/OpenCode/Pi Session
+  id stays backend-only.
+
+Opening the same `resumeId` again reuses its persistent Session record and
+native conversation. A finished headless run attaches an interactive surface
+to that row without creating a duplicate coworker. See [Sessions & Collaboration](/docs/workspaces/sessions-and-collaboration).
+
+## Terminal and Web
+
+Claude Code, Codex, Cursor Agent, Antigravity, Grok Build, Oh My Pi, OpenCode,
+Pi, and shell normally run in OpenAlice's persistent terminal surface. You can
+read it, type into it, scroll back, pause it, and reattach later.
+
+Supported Agent Sessions can switch between the terminal and **Web**. Web uses each Agent's structured protocol and the same native conversation; it does not create another `resumeId` or transcript. Pi, Oh My Pi, Cursor Agent, Grok Build, OpenCode, Claude Code, and Codex support Web when their installed CLI provides the required protocol. Antigravity and Shell remain terminal-only.
+
+## Lifecycle
+
+1. **Create** — bootstrap the checkout, write instructions, skills, and secret-free runtime preferences, then initialize git.
+2. **Run** — create Sessions that use the Workspace's files and CLIs.
+3. **Iterate** — agents write files, update Issues, commit, schedule work, and publish to Inbox.
+4. **Pause** — stop an interactive process while retaining its Session identity and scrollback.
+5. **Offboard** — inventory active work, write `.alice/HANDOFF.md`, move the complete checkout to `departed-workspaces/`, and retire its signatures.
+6. **Restore or purge** — restore the exact path and Sessions, or irreversibly remove the checkout while retaining historical attribution.
+
+There is no “delete the registry row and leave the folder behind” path. See [Lifecycle & Offboarding](/docs/workspaces/lifecycle).
+
+Template Upgrade reconciles managed assets in place without changing Workspace
+identity. Workspace Absorb copies reviewed source files into a target audit
+commit, then moves the intact source checkout to `departed-workspaces/` with an
+`absorbedIntoWorkspaceId` catalog link. See [Upgrades &
+Absorb](/docs/workspaces/upgrades-and-absorb).
+
+## Headless runs
+
+A scheduled Issue or explicit headless request launches a registered agent CLI
+against the same Workspace. The run receives its own `taskId` and belongs to a
+product `resumeId`. OpenAlice records normalized assistant text,
+tool/error blocks, bounded diagnostics, timing, status, and lineage.
+
+Runs appear newest-first in the Automation surface. Opening a completed run continues its `resumeId` instead of treating the run id as a conversation id.
+
+## Next Steps
+
+- [Lifecycle & Offboarding](/docs/workspaces/lifecycle) — Handoff, departed desks, restore, and purge.
+- [Sessions & Collaboration](/docs/workspaces/sessions-and-collaboration) — Product identity, signatures, and exact follow-up.
+- [CLI Injection](/docs/workspaces/cli-injection) — How agents receive OpenAlice tools.
+- [Automation](/docs/workspaces/automation) — How headless runs and schedules use this structure.
+- [Workspace Manager](/docs/workspaces/manager) — Why the control plane sees the active floor but is not a registered desk.
+- [Upgrades & Absorb](/docs/workspaces/upgrades-and-absorb) — Reconcile template assets or consolidate two desks.

@@ -1,0 +1,149 @@
+export const metadata = {
+  title: "Symbol Search",
+  description: "How to search for symbols across equities, crypto, currencies, and commodities in OpenAlice — with a multi-vendor, agent-toggleable equity picker (global yfinance + CN A-share + Taiwan).",
+}
+
+# Symbol Search
+
+> **Status: stable.** The Analysis section covers OpenAlice's read-only market research tools — symbol discovery, equity fundamentals, technical analysis, and news. They have no side effects, no broker contact, and are safe to exercise without an account configured. In contrast to the [Trading](/docs/trading/accounts-and-brokers) stack, these surfaces are considered ready for daily use.
+
+OpenAlice has two different search tools for two different purposes:
+
+- **`marketSearchForResearch`** — Search for symbols to use with market data tools (profiles, financials, indicators). Works across all asset classes.
+- **`searchContracts`** — Search your connected broker accounts for tradeable contracts. Used before placing orders.
+
+## marketSearchForResearch
+
+Unified cross-asset search for market data research. Covers four asset classes:
+
+| Asset Class | Source | Speed |
+|-------------|--------|-------|
+| **Equity** | Local SEC/TMX cache (~13k US/CA stocks) **plus** an online fan-out across every *enabled* equity vendor | Local cache instant; online vendor hits complete after |
+| **Crypto** | Yahoo Finance online search | ~1-2 seconds |
+| **Currency** | Yahoo Finance online search (filtered to XXXUSD pairs) | ~1-2 seconds |
+| **Commodity** | Canonical catalog (~25 items: `gold`, `crude_oil`, `copper`, ...) | Instant |
+
+Equity search no longer stops at the local index. It fans out concurrently across `[primary yfinance, ...extraVendors]` — yfinance (the global default: US, plus CN `.SS`/`.SZ`, HK `.HK`, TW `.TW`/`.TWO`, JP `.T`, KR `.KS`, EU…) plus any regional vendors the user has opted into (`eastmoney` for CN A-shares, `twse` for Taiwan). See [Vendors](#vendors--self-describing--agent-toggleable) below.
+
+All results include an `assetClass` field so you know which category each symbol belongs to, and a `sourceId` naming the vendor that produced the hit. Searches run in parallel — the local SEC index returns instantly while crypto, currency, and online equity vendor hits complete after. Cross-vendor results are kept **redundant on purpose**: `600519.SS` from yfinance and `1.600519` from eastmoney are distinct candidates in different symbol namespaces, not duplicates to be merged.
+
+For commodities, use the canonical id (e.g. `gold`, `crude_oil`, `copper`) with `calculateQuant` and other tools. Provider-specific tickers like `GC=F` or `GCUSD` are resolved automatically behind the scenes.
+
+```
+You: Search for anything related to "nvidia"
+
+Alice: Found 3 results:
+  • NVDA (equity) — NVIDIA Corp
+  • NVDA240621C00130000 (equity) — options chain
+  ...
+```
+
+Use this tool to find the correct symbol before calling data tools like `equityGetProfile`, `equityGetFinancials`, or `calculateQuant`.
+
+## Vendors — self-describing & agent-toggleable
+
+Equity search is **federated across vendors**, and the vendor list is itself a runtime surface. Each vendor *owns its own description*: the prose (what it covers, how to address its symbols) lives on the provider's `vendorMeta`, so adding a vendor carries its own usage note — there's no outer catalog to forget to update.
+
+`listMarketVendors` joins that self-description to current on/off state and returns, per vendor: `id`, `name`, `enabled`, `alwaysOn`, `keyless`, `coverage`, `howToUse`, and `website`. `setMarketVendor(vendor, enabled)` flips the vendor in `marketData.extraVendors` and persists it — live on the **next search, no restart**. yfinance is the always-on primary equity vendor and cannot be toggled off.
+
+### The discoverability loop
+
+The picker exists so an agent can self-serve when a query comes up empty — it never depends on the user remembering to open a settings page:
+
+```
+You: Find 茅台 (Kweichow Moutai)
+
+Alice: [marketSearchForResearch("茅台") → no equity hits]
+       [listMarketVendors() → eastmoney is off, covers CN A-shares by Chinese name]
+       [setMarketVendor("eastmoney", true)]
+       [marketSearchForResearch("茅台") → 1.600519 (eastmoney) · Kweichow Moutai]
+```
+
+Two AI tools back this loop — `listMarketVendors` and `setMarketVendor` — alongside the CLI `alice market vendors` (list) and `alice market vendor-set` (toggle).
+
+### Vendor catalog
+
+| Vendor | Toggle | Key | Coverage | Notes |
+|--------|--------|-----|----------|-------|
+| **yfinance** (Yahoo Finance) | Always-on primary | Keyless | Global default — US, plus CN `.SS`/`.SZ`, HK `.HK`, TW `.TW`/`.TWO`, JP `.T`, KR `.KS`, EU and more | Symbols are Yahoo tickers (bare for US, suffixed elsewhere). Search takes English or pinyin; weak on native-language names — for those, enable the local vendor. |
+| **eastmoney** (东方财富) | Opt-in | Keyless | CN A-shares — Shanghai (沪) + Shenzhen (深) listed equities | Search by **Chinese name** (`茅台` → `600519`, `比亚迪` → `002594`) — the reason to enable it over yfinance. K-lines are 前复权 (forward-adjusted). **Search + bars only** — no quote/metrics/profiles. Served from China, so it can be slow or blocked outside the mainland. |
+| **twse** (TWSE + TPEx 臺灣證交所) | Opt-in | Keyless | Taiwan equities — TWSE listed (`.TW`) + TPEx OTC (`.TWO`) | Search by 繁体中文 (`台積電`, `聯發科`) — **not** simplified — or by English / stock code. Adds official quotes, KeyMetrics (P/E · 殖利率 · P/B), and company profiles on top of yfinance; K-lines still come from Yahoo. |
+
+> **`providers` vs `extraVendors`.** `providers` sets the per-asset *default* vendor used for bar routing; `extraVendors` is the opt-in list of *incremental* equity vendors federated into search alongside the default. Enabling a regional vendor is purely additive — it surfaces extra candidates in their own namespace, it never replaces yfinance.
+
+## searchContracts
+
+Broker-level search that queries your connected trading accounts for contracts you can actually trade. Returns `aliceId` values needed for placing orders.
+
+```
+You: Search for AAPL contracts I can trade
+
+Alice: Found on alpaca-paper:
+  • alpaca-paper|AAPL — Apple Inc (US equity)
+```
+
+The `aliceId` format is `accountId|nativeKey` — this is what you pass to `placeOrder`, `getQuote`, and other trading tools.
+
+## searchBars — federated K-line sources
+
+For **OHLCV K-lines** (charting and technical analysis) there's a third search, `searchBars`, backed by a *federated bar layer*. The same symbol often has several K-line sources — a data vendor, and any connected broker whose bars match exactly what you'd trade — and `searchBars` returns them all as **barId** candidates:
+
+```
+You: Where can I get AAPL daily bars?
+
+Alice: [calls searchBars(query="AAPL")]
+  • yfinance|AAPL      vendor · delayed
+  • alpaca-paper|AAPL  broker · iex
+```
+
+Each candidate carries a `barId` (`"{source}|{symbol}"`), a `source` (`vendor` / `uta`), an `assetClass`, and a `barCapability` freshness tier (`realtime` / `iex` / `delayed` / …). The freshness tier is also embedded **inline in the candidate label** — `AAPL · Apple Inc (yfinance) · delayed`, `AAPL (alpaca-paper) · iex` — so an agent can't miss that a vendor source is EOD-delayed even when it falls back to one. Candidates are sorted **broker-fresh-first** (`realtime` > `iex` > `subscription` > `delayed` > `free`), but the list stays fully redundant — the order is only the suggested default pick. The sources are **not** merged — picking one is a deliberate choice of provenance and freshness. You feed the chosen barId to the [Quant Calculator](/docs/market-data/technical-analysis)'s `bars(...)`, and in the Web UI you pick the provider right on the chart (it threads through as a `?source=` param).
+
+### Keyless data accounts — optional crypto K-lines with no key
+
+OpenAlice can create three **keyless, read-only data UTAs** —
+`binance-readonly`, `okx-readonly`, and `bybit-readonly`. They are disabled by
+default. In Readonly or Pro mode, enable the desired exchanges under **Trading
+→ Public crypto data sources**. Enabled sources need no API key, expose public
+K-lines in `searchBars` (`binance-readonly|BTC/USDT`, …), refuse orders, and
+stay out of portfolio-account surfaces. See [Keyless Data
+Accounts](/docs/trading/accounts-and-brokers#keyless-data-accounts).
+
+> **Three searches, three jobs.** `marketSearchForResearch` finds vendor symbols for fundamental research; `searchContracts` finds tradeable contracts on your broker accounts; `searchBars` finds K-line sources (vendor or broker) for charting and quant.
+
+## Symbol Index
+
+The equity symbol index is a local cache of ~13,000 US and Canadian stock symbols sourced from SEC and TMX listings. It's loaded once on startup and supports instant regex matching — no network calls needed for equity symbol lookups.
+
+## Data Backend Configuration
+
+Market data runs entirely **in-process** through the SDK — there's no external sidecar or Docker container to stand up. (The old `openbb-api` backend was removed.) Low-frequency data resolves through the hosted [Data Hub](/docs/market-data/data-hub) first, falling back to your own provider keys, so a fresh install needs zero data-provider accounts. Configuration lives in `~/.openalice/data/config/market-data.json`:
+
+```json
+{
+  "hub": { "enabled": true, "baseUrl": "https://traderhub.openalice.ai" },
+  "providers": {
+    "equity": "yfinance",
+    "crypto": "yfinance",
+    "currency": "yfinance",
+    "commodity": "yfinance"
+  },
+  "extraVendors": [],
+  "providerKeys": {}
+}
+```
+
+| Field | Description |
+|-------|-------------|
+| `hub` | The [Data Hub](/docs/market-data/data-hub) — `enabled` toggles the zero-key relay, `baseUrl` points it (self-host-friendly) |
+| `providers` | Default data provider per asset class, used for bar routing (the fallback path) |
+| `extraVendors` | Opt-in incremental equity vendors federated into search alongside the default, e.g. `["eastmoney", "twse"]`. Flipped by `setMarketVendor`; see [Vendors](#vendors--self-describing--agent-toggleable) |
+| `providerKeys` | Per-install vendor keys (FMP, FRED, …); merge with the global `~/.openalice/provider-keys.json` |
+
+See the [Data Hub](/docs/market-data/data-hub) page for the full resolution model and the nine reference boards it serves.
+
+## Next Steps
+
+- [Equity Research](/docs/market-data/equity-research) — Use research symbols for fundamentals and profiles.
+- [Technical Analysis](/docs/market-data/technical-analysis) — Use `searchBars` sources for quant scripts.
+- [Trading Setup](/docs/trading/accounts-and-brokers) — Connect accounts that provide tradeable contracts.
+- [Orders & Execution](/docs/trading/orders-and-execution) — Place orders with the correct `aliceId`.

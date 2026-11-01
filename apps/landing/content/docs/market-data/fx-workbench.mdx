@@ -1,0 +1,62 @@
+export const metadata = {
+  title: "FX Workbench",
+  description: "Research a currency pair with spot history, realized risk, cross-country macro divergence, indicative carry, and a manual exposure scenario.",
+}
+
+# FX Workbench
+
+The **FX Workbench** turns a six-letter currency pair such as `EURUSD` or
+`USDJPY` into one read-only research view. It combines price behavior,
+country-level macro data, an indicative carry curve, and a manual exposure
+scenario without requiring a broker or bank-account connection.
+
+Open **Market**, choose one of the major-pair shortcuts, or search for a
+currency pair and open its detail page.
+
+## What the pair view shows
+
+- **Spot and price risk** — the latest close, 1-week, 1-month, and 3-month
+  returns, 20-day annualized realized volatility, and the selected range.
+- **Price history** — the normal federated K-line chart, including its chosen
+  vendor or broker source and freshness metadata.
+- **Macro divergence** — base-versus-quote short rates, CPI inflation, and
+  OECD leading-indicator momentum.
+- **Indicative carry** — 1-, 3-, 6-, and 12-month outright and forward-point
+  estimates from covered-interest parity.
+- **Exposure scenario** — a local what-if calculation for a long or short base
+  currency notional and a move expressed in pips.
+
+The current shortcut set is `EURUSD`, `USDJPY`, `GBPUSD`, and `USDCNH`, but the
+pair parser also accepts common spellings such as `EUR/USD`, `USD.CHF`, and
+`EURUSD=X`.
+
+## Read the caveats with the numbers
+
+This surface is for research, not execution:
+
+- the latest chart close is a research spot reference, not an executable quote;
+- macro observations can have different publication dates;
+- EUR uses Germany as its current macro proxy, while CNH uses onshore China;
+- indicative forwards use country-level short-rate proxies and omit
+  cross-currency basis, bid/ask, holidays, and exact tenor curves;
+- scenario P&L is linear spot delta and excludes options convexity, carry,
+  funding, fees, and basis.
+
+If one side lacks a short-rate observation, OpenAlice leaves carry blank rather
+than guessing. Scenario inputs stay in the browser tab and are never sent to a
+broker.
+
+## Where the data comes from
+
+The chart uses the same source-explicit K-line path documented under [Symbol
+Search](/docs/market-data/symbol-search#searchbars--federated-k-line-sources).
+Macro comparisons use the Data Hub's **global-macro** board, while broad-dollar
+context uses the US **macro** board. Every board retains its normal origin,
+date, and staleness metadata.
+
+## Next Steps
+
+- [Data Hub](/docs/market-data/data-hub) — Understand the macro boards and their provenance.
+- [Symbol Search](/docs/market-data/symbol-search) — Choose a currency symbol and K-line source.
+- [Quant Calculator](/docs/market-data/technical-analysis) — Run reproducible analysis over the selected bars.
+- [Trading Setup](/docs/trading/accounts-and-brokers) — Keep research symbols separate from broker-tradeable contracts.

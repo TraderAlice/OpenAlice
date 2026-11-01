@@ -1,0 +1,114 @@
+export const metadata = {
+  title: "Auto Prediction",
+  description: "Use OpenAlice's pre-alpha Auto Prediction activity as a pinned, Agent-native prediction-market research desk.",
+}
+
+# Auto Prediction
+
+**Auto Prediction** is OpenAlice's pre-alpha, Agent-native prediction-market
+research activity. It runs inside one durable [Workspace](/docs/workspaces/workspaces)
+created from an exact release of
+[Auto Prediction](https://github.com/TraderAlice/Auto-Prediction). OpenAlice
+provides native coding-agent Sessions, collaboration, Inbox, source provenance,
+and a managed route into the Workspace-owned Studio.
+
+> Auto Prediction is a research surface, not an execution venue. Its current
+> workflow develops and challenges evidence-backed hypotheses; it does not send
+> orders or bypass OpenAlice's separate Trading as Git approval boundary.
+
+<ProductDemo
+  src="/pic/product-autoprediction-demo-260824.mp4"
+  poster="/pic/product-autoprediction-demo-260824.jpg"
+  title="Open an Auto Prediction discovery desk in Studio"
+>
+  Move from the native Prediction activity into the Workspace-owned Studio,
+  where market coverage, preflight, evidence, counterevidence, and research
+  state remain visible together.
+</ProductDemo>
+
+## Initialize the desk
+
+Open **Prediction** from the Beta group in the activity navigation. Before the
+first research Session, initialize one Auto Prediction Workspace or explicitly
+select an existing compatible desk as the default.
+
+- The composer never guesses the latest Workspace.
+- Sending a prompt never creates a new desk as a side effect.
+- Once initialized, new research starts or continues a native coding-agent
+  Session inside that selected repository.
+- Changing the default Workspace remains an explicit, low-frequency action.
+
+The current approved source is Auto Prediction `v0.1.2` at commit
+`d6c9447cab29898a6eb5fa06be3598b8474cc02f`. Earlier qualified releases remain
+available for explicit rollback and source-history work. Versions are immutable
+creation inputs, never floating branches.
+
+## Research and Studio
+
+The repository root is the research desk. Its coding agent reads the upstream
+`AGENTS.md`, inspects venue evidence, develops semantic hypotheses, runs the
+repository's checks, and preserves positive and negative evidence in the
+formats owned by Auto Prediction.
+
+Open **Studio** beside **New research** after a default Workspace exists.
+OpenAlice starts the command declared by the repository's `harness.json`,
+allocates exact loopback ports, waits for its readiness path, and embeds the
+ready app through an opaque managed Surface URL. HTTP, server-sent events, and
+WebSockets pass through that route without exposing an arbitrary local-port
+proxy. The Studio remains a separate origin and owns its own frontend, APIs,
+campaigns, evidence model, internal workers, and SQLite state.
+
+The Studio may become ready while its initial market catalog refresh continues
+in the background. OpenAlice shows distinct starting, failed, and ready states,
+with **Refresh**, **Restart**, **Logs**, and **Open separately** controls.
+
+If source dependencies are missing, OpenAlice does not install them silently.
+Choose **Set up with Agent** to open a prefilled Quick Start task, review the
+Agent, credential, model, and effort, and let that Session prepare the Workspace
+before restarting Studio.
+
+## Source and provenance
+
+Initialization retains upstream Git ancestry and records the exact approved
+source in:
+
+```text
+.alice/harness-source.json
+```
+
+Source updates are never automatic. **Settings → Harness** can preview a newer
+verified release, fetch its exact commit, validate the manifest, show changed
+paths, and preview the Git merge. Apply requires the same reviewed digest and
+refuses active Sessions, active Studio processes, conflicting tracked changes,
+incompatible manifests, or unresolved conflicts. A successful apply preserves
+research history in a no-fast-forward merge commit and records a receipt.
+
+Optional **Show unverified Harness releases** discovers the newest stable
+upstream SemVer tag that is absent from OpenAlice's verified catalog.
+Prereleases are excluded, the candidate is visibly marked unverified, and it
+still requires an explicit preview and apply.
+
+## Ownership boundaries
+
+- Auto Prediction owns prediction-research truth, campaigns, evidence,
+  application state, and Studio business APIs.
+- The coding agent owns dependency preparation, repository iteration, and the
+  research artifacts it creates.
+- OpenAlice owns Workspace and Session lifecycle, collaboration, Inbox,
+  source receipts, managed Studio routing, and bounded process supervision.
+- Harness processes bind only to the exact loopback host and ports OpenAlice
+  supplies and suppress automatic browser opening in managed mode.
+- Restart removes the old route and process tree before publishing the new
+  generation. Optional Harness processes recover with capped backoff, but
+  source versions never upgrade by themselves.
+- UTA and Trading as Git remain the only route to broker state and reviewed
+  trading operations.
+
+## Next steps
+
+- [Workspaces](/docs/workspaces/workspaces) — Understand the durable repository and Session model.
+- [Templates](/docs/workspaces/templates) — Review source-backed Harness creation.
+- [Workspace Upgrades & Absorb](/docs/workspaces/upgrades-and-absorb) — Review the Harness source-upgrade contract.
+- [Inbox](/docs/workspaces/inbox) — Publish a durable human-facing research delivery.
+- [AI Providers](/docs/integration/ai-providers) — Configure the coding Agent used by the desk.
+- [Trading as Git](/docs/core-concepts/trading-as-git) — Keep any later trading intent behind review.

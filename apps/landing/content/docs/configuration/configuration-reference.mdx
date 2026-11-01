@@ -1,0 +1,426 @@
+export const metadata = {
+  title: "Configuration Reference",
+  description: "Complete reference for all OpenAlice configuration files — fields, types, and defaults.",
+}
+
+# Configuration Reference
+
+Installation configuration lives in `~/.openalice/data/config/` as JSON files
+(the user-data home; `OPENALICE_HOME` overrides the root
+there). A Workspace can additionally keep its own public metadata in
+`.alice/workspace.json`. Missing installation files are auto-created with
+defaults on startup. Most ordinary config supports hot reload; process
+ownership, ports, and optional-service lifecycle require Guardian reconciliation
+or restart. `accounts.json` and external `connectors.json` are **sealed** and
+managed through the Web UI rather than hand-edited.
+
+This page is a reference, not the recommended first-run path. For normal setup:
+
+- Use the browser settings and setup wizards as the main configuration surface.
+- Add model credentials through the [AI Provider](/docs/integration/ai-providers) page.
+- Add broker accounts through the Trading page wizard.
+- Use Settings for hot-reloaded config where the UI exposes an editor.
+- Edit JSON directly only when you need a field the UI does not expose yet.
+
+The files fall into three buckets:
+
+| Bucket | Files | How to change them |
+|--------|-------|--------------------|
+| UI-managed secrets | `ai-provider-manager.json`, `accounts.json`, `connectors.json` | Use the Web UI; account and Connector configs are sealed |
+| Home-scoped preferences | `../preferences.json`, `../ui-layout.json` | Use Settings; stored directly under `<OPENALICE_HOME>/data/` |
+| Hot-reloaded config | `agent.json`, `market-data.json`, `trading.json`, `news.json`, `tools.json`, `webhook.json` | UI Settings or direct JSON edit |
+| Startup / boundary config | `ports.json`, `auth.json`, `mcp.json` fallback, `connector-service.json` | Edit through Settings or restart when noted |
+
+## Appearance preferences
+
+Open **Settings → General → Appearance** to choose color and layout preferences.
+Changes apply immediately and persist locally on that browser/device; they are
+not files under `~/.openalice/data/config/` and do not sync to another browser.
+
+**Interface style** changes component shape, density, typography, and motion
+without changing the saved colors:
+
+| Style | Behavior |
+|---|---|
+| **Default** | The standard OpenAlice workstation |
+| **Windows 98** | Square geometry, bevels, classic typography, and reduced decorative motion |
+| **Broker Classic** | A denser broker-terminal-inspired workstation; compact density applies only on desktop-sized fine-pointer devices |
+
+Color mode is independent: **Auto** follows the operating system's Day/Night
+preference, while **Day** and **Night** pin one saved palette slot. Windows 98
+also offers **Use recommended colors**, which applies the Windows Classic
+palette to both slots only while that style is active. **Use saved colors** or
+switch styles to return to the saved Day & Night pair; the recommendation never
+overwrites those global selections.
+
+## Activity Bar layout
+
+Open **Settings → Activity bar** to reorder the rail's items and groups, move
+items between groups, create or rename custom groups, and hide surfaces you do
+not use. Changes autosave to `<OPENALICE_HOME>/data/ui-layout.json` and travel
+with that complete AliceProject home; unlike Appearance, they are not merely a
+browser-local preference.
+
+The version 1 document contains ordered `groups` plus a `hidden` page-id list.
+Built-in groups are `primary`, `beta`, and `system`; custom group ids begin with
+`custom:` and labels are limited to 40 characters. Settings is pinned and
+cannot be hidden. Dev Panel is hidden in the default layout. A hidden surface
+stays available through direct/deep links, and a missing or malformed file
+falls back to the complete default layout.
+
+The default Beta group exposes one `portfolio` rail item labelled **Trading**.
+Its page navigator contains **Trading as Git**, **All Accounts**, and each
+connected account. `trading-as-git` is no longer a separate Activity Bar page
+id; layout normalization drops that retired id from older saved group and
+hidden lists while the `/trading-as-git` deep link continues to work.
+
+## User preferences
+
+Open **Settings → Appearance → Visibility** for options shared by the Ask Alice, AutoQuant, and
+Prediction desks. **Show headless-born Sessions** defaults off: an Issue/API-born
+Session that has never opened a TUI or Web remains accessible from its Issue
+instead of appearing in the shared desk rosters. Turning the option on restores those
+existing Session rows; it does not create, archive, retire, or move them.
+
+**Show Issue-attached Sessions** is a separate option and also defaults off. An
+exact Session currently assigned to an ordinary Issue, or a Session actively
+executing one, stays on Issue and Automation surfaces instead of the Ask Alice,
+AutoQuant, or Prediction roster. Turning it on changes presentation only; it
+does not change the Issue owner, execution, Session identity, or lifecycle.
+Connector chat Sessions always stay hidden from these rosters, regardless of
+this preference.
+
+The version 1 document at `data/preferences.json` stores only non-sensitive,
+home-scoped convenience state:
+
+| Path | Meaning |
+|------|---------|
+| `harness.showHeadlessBornSessions` | Include never-interactive Issue/API-born Sessions in the Ask Alice, AutoQuant, and Prediction rosters |
+| `harness.showIssueAttachedSessions` | Include exact owners and active workers for ordinary Issues in the shared Harness rosters; Connector chat Sessions remain hidden |
+| `harness.showUnverifiedHarnessReleases` | Discover the newest stable upstream Harness tag outside OpenAlice's verified catalog; it remains explicitly unverified and preview-only until applied |
+| `quickChat.*` | Recent Quick Start Workspace and launch choices |
+| `autoQuant.defaultWorkspaceId` | Durable AutoQuant desk selection |
+| `autoPrediction.defaultWorkspaceId` | Durable Auto Prediction desk selection |
+| `agentRuntimes.quickAccessIds` | Up to four manually ordered installed-runtime fallbacks |
+| `agentRuntimes.recentAgentIds` | Up to four successfully launched runtimes, newest first |
+
+Recent runtime use wins over the manual fallback order in compact launch menus;
+selection and failed launch attempts do not update it. Installation paths and
+readiness are probed live and are not stored in this file. Missing or malformed
+preferences fall back to defaults rather than blocking startup.
+
+## ai-provider-manager.json
+
+The **credential vault** — api-key credentials injected into workspaces. As of 0.40 there's no in-process model loop, so this file holds no backends or active-profile pointer; just a map of slug → credential. Edit it through the Web UI's [AI Provider](/docs/integration/ai-providers) page rather than by hand.
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `credentials` | `Record<string, Credential>` | `{}` | Saved credentials, keyed by an arbitrary slug |
+| `workspaceCredentialDefaults` | `Record<agentId, WorkspaceCredentialDefault>` | `{}` | Legacy creation seeds: credential plus optional model/protocol and model-specific Oh My Pi/Pi/opencode overrides for compatible registered runtimes |
+| `workspaceDefaultAgent` | string \| null | `null` | Installation fallback for a fresh Session when the target Workspace has no valid `defaultAgent`; `shell` is not stored as a default |
+| `issueDefaultAgent` | string \| null | `null` | Separate default runtime for issue-triggered headless work |
+
+Each `WorkspaceCredentialDefault`:
+
+| Field | Type | Description |
+|---|---|---|
+| `credentialSlug` | string | Required reference into `credentials` |
+| `model` | string | Optional model selected for the new Workspace |
+| `wireShape` | `WireShape` | Optional explicit protocol when the credential exposes several |
+| `contextWindow` | positive number | Optional model-specific Oh My Pi/Pi/opencode override; known models otherwise use the registry |
+| `reasoning` | boolean | Advanced Oh My Pi/Pi/opencode capability override for an unknown model |
+| `reasoningModel` | string | Model id to which the unknown-model override belongs |
+
+Each `Credential`:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `vendor` | enum | `anthropic` / `openai` / `google` / `xai` / `minimax` / `glm` / `kimi` / `deepseek` / `longcat` / `openrouter` / `cursor` / `custom` |
+| `label` | string | Optional human-readable name; the map key remains the stable slug |
+| `authType` | `"api-key"` \| `"subscription"` | `api-key` stores the key here; `subscription` defers to the CLI's own login |
+| `apiKey` | string | The secret (present for `api-key`) |
+| `wires` | `Record<WireShape, string>` | Map of wire shape (`anthropic` / `google-generative-ai` / `openai-chat` / `openai-responses`) → endpoint URL. One key can declare several |
+| `baseUrl` | string | Optional endpoint for a runtime-direct credential such as Cursor Dashboard; it does not declare an HTTP wire |
+| `lastModel` | string | Last model selected with this credential; used as the next workspace/quick-chat default |
+
+Credentials are deduplicated by `{ vendor, authType, apiKey }` — re-saving the same key upgrades its `wires` in place. See [AI Providers](/docs/integration/ai-providers) for the full model.
+
+## accounts.json
+
+UTA (Unified Trading Account) definitions. Array of UTA objects, **preset-driven** — you pick a `presetId` from the broker preset catalog and fill `presetConfig` with the values that preset's Zod schema requires.
+
+> **Sealed at rest.** Unlike every other config file, `accounts.json` is encrypted (AES-256-GCM) under a machine-bound key at `~/.openalice/sealing.key`, so broker credentials never sit on disk in plaintext. That means it's **UI-managed, not hand-edited** — add and edit accounts through the Web UI's account form. The fields below describe the *logical* shape the UI writes. See [Data & Credentials](/docs/deployment/data-and-credentials#sealed-broker-credentials).
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `id` | string | — | Unique UTA identifier; used as the `aliceId` prefix |
+| `label` | string | — | Display name (optional, defaults to `id`) |
+| `presetId` | string | — | One of the catalog ids: `binance`, `okx`, `bybit`, `hyperliquid`, `bitget`, `ccxt-custom`, `alpaca`, `ibkr-tws`, `longbridge`, `leverup-monad`, `mock-simulator` |
+| `enabled` | boolean | `true` | Whether to load this UTA on startup |
+| `guards` | array | `[]` | Optional advanced push-time middleware configs: `[{ type, options }]` |
+| `presetConfig` | object | `{}` | User-supplied form values, validated against the chosen preset's own Zod schema |
+| `ephemeral` | boolean | — | Test/throwaway UTA — purged at every startup (`~/.openalice/data/trading/<id>/` wiped). Only allowed on `mock-simulator`; setting it on a real broker would destroy account history at next boot. |
+| `keyless` | boolean | `false` | Public-data only, no API key. Serves K-lines/quotes but refuses orders; excluded from portfolio equity. Implies `readOnly`. |
+| `readOnly` | boolean | `false` | Watch-only — orders refused. Can also be set on a keyed account |
+| `editable` | boolean | `true` | Whether the UI can modify/remove it (the built-in data UTAs are non-editable) |
+
+> **Optional keyless data UTAs.** `trading.json` can enable Binance, OKX, and
+> Bybit public-data sources. Enabled entries are materialized at UTA startup as
+> `binance-readonly` / `okx-readonly` / `bybit-readonly`; they are code-defined,
+> not written to sealed `accounts.json`. The default list is empty. See [Keyless
+> Data Accounts](/docs/trading/accounts-and-brokers#keyless-data-accounts).
+
+The `presetConfig` shape varies by preset:
+
+| Preset | Required `presetConfig` fields |
+|--------|-------------------------------|
+| `binance` | `mode` (`live` \| `demo`), `apiKey`, `secret` |
+| `okx` | `mode` (`live` \| `demo`), `apiKey`, `secret`, `password` |
+| `bybit` | `mode` (`live` \| `testnet` \| `demo`), `apiKey`, `secret` |
+| `hyperliquid` | `mode` (`live` \| `testnet`), `walletAddress`, `privateKey` |
+| `bitget` | `mode` (`live` \| `demo`), `apiKey`, `secret`, `password` |
+| `ccxt-custom` | `exchange`; optional `sandbox`, `demoTrading`, `apiKey`, `secret`, `password`, `uid`, `walletAddress`, `privateKey` |
+| `alpaca` | `mode` (`paper` \| `live`), `apiKey`, `apiSecret` |
+| `ibkr-tws` | optional `host` (default `127.0.0.1`), `port` (default `7497`), `clientId` (default `0`), `accountId` |
+| `longbridge` | `mode` (`live` \| `paper`), `appKey`, `appSecret`, `accessToken` |
+| `leverup-monad` | `mode` (`live` \| `testnet`), `privateKey` |
+| `mock-simulator` | `cash` (starting USD, default `100000`) — in-memory simulator, testing only |
+
+Manage trading accounts through the Web UI wizard when possible; the file is sealed at rest and not meant to be hand-edited for ordinary setup. See [Trading Setup](/docs/trading/accounts-and-brokers).
+
+Live engines are optional runtime payloads rather than fields in this file. The
+Trading wizard installs, updates, or repairs the matching [Broker
+Pack](/docs/trading/broker-packs) before testing credentials. Production
+startup also reconciles already active downloaded Packs with the current
+release. `OPENALICE_BROKER_PACK_AUTO_UPDATE=0` disables that reconciliation as
+an emergency override; it does not install a missing Pack.
+
+## engine.json
+
+Core engine settings.
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `pairs` | string[] | `["BTC/USD", "ETH/USD", "SOL/USD"]` | Default trading pairs |
+| `interval` | number | `5000` | Tick loop interval (ms) |
+| `port` | number | `3000` | Legacy port setting |
+
+## agent.json
+
+AI agent behavior.
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `maxSteps` | number | `20` | Max tool-call steps per run |
+| `allowAiTrading` | boolean | `false` | Whether agent `tradingPush` may dispatch committed operations directly. Keep false for manual approval in the Web UI or linked Telegram `/uta`; only effective with Pro trading capability. |
+| `claudeCode.disallowedTools` | string[] | (see below) | Tools blocked in the workspace Claude Code CLI |
+| `claudeCode.maxTurns` | number | `20` | Max conversation turns for a headless Claude run |
+
+Default disallowed tools: `Task`, `TaskOutput`, `AskUserQuestion`, `TodoWrite`, `NotebookEdit`, `Skill`, `EnterPlanMode`, `ExitPlanMode`, `mcp__claude_ai_Figma__*`
+
+## ports.json
+
+`ports.json` stores an explicitly pinned Alice Web listener:
+
+| Field | Type | Usual Guardian default | Description |
+|-------|------|------------------------|-------------|
+| `web` | number | `47331` | Alice backend / Web UI + API |
+
+The other listeners are child-process/runtime configuration rather than fields
+in this file:
+
+| Environment override | Usual default | Service |
+|---|---|---|
+| `OPENALICE_MCP_PORT` | `47332` | MCP/Workspace CLI gateway, loopback only |
+| `OPENALICE_UTA_PORT` | `47333` | UTA, loopback only |
+| `OPENALICE_CONNECTOR_PORT` | `47334` | Optional Connector Service, loopback only |
+| `OPENALICE_UI_PORT` | `5173` | Vite UI in development |
+
+Missing `ports.json` means unconfigured: Alice uses `47331` in memory and
+Guardian probes upward from that default when another AliceProject already owns
+it. First boot does not create this file merely to record the default.
+
+Any written `web` number is a pin and fails loudly when occupied. This includes
+older shipped `{ "web": 3002 }` files, which OpenAlice preserves rather than
+silently changing their meaning. Delete the `web` field or the file to restore
+automatic probing. `OPENALICE_WEB_PORT` wins for one launch and is not written
+back to `ports.json`.
+
+## connectors.json and connector-service.json
+
+`connectors.json` is the sealed external-notification configuration for Discord,
+Telegram, Slack, Feishu/Lark, and future adapters. Its logical shape contains
+adapter enablement and settings, but secret token and App-secret fields never
+return through the public Settings API. Telegram uses a bot token; Slack uses
+bot plus app-level tokens; Discord uses application id plus bot token;
+Feishu/Lark uses App ID, App secret, and a `feishu` or `lark` domain. Owner and
+private-chat ids are learned through `/link`. Configure it through **Settings →
+Connectors**.
+
+`connector-service.json` contains only:
+
+```json
+{ "enabled": false }
+```
+
+Guardian reads that non-secret switch to decide whether to run the optional
+service. Settings changes also write a restart flag so Connector Service can
+reconcile without restarting Alice or UTA. See [External
+Connectors](/docs/integration/external-connectors).
+
+## mcp.json
+
+MCP server configuration — exposes the ToolCenter to external MCP clients and the workspace CLIs. The listener is **always bound to loopback** and never honors `OPENALICE_BIND_HOST` (it carries the full, unauthenticated tool surface). See [MCP & CLI Access](/docs/connectors/mcp-integration).
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `port` | number | `3001` | Legacy fallback only — `ports.json` / `OPENALICE_MCP_PORT` (`47332`) take precedence. |
+
+## auth.json
+
+The admin-token gate for the web boundary. Generated on first boot; the token is printed once to stdout and stored only as a scrypt hash. **Rotate** by deleting this file and restarting. See [Data & Credentials](/docs/deployment/data-and-credentials#admin-token).
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `version` | number | Record version (`1`) |
+| `scheme` | string | Always `"scrypt"` |
+| `salt` | string | base64 salt fed to scrypt |
+| `hash` | string | base64 scrypt digest of the admin token (never the plaintext) |
+| `params` | object | scrypt cost params `{ N, r, p, keyLen }` |
+| `createdAt` | string | ISO timestamp of first generation |
+| `lastRotatedAt` | string | ISO timestamp of the last rotation |
+
+Loopback requests bypass the gate entirely (zero-friction dev); set `OPENALICE_TRUSTED_PROXIES` for reverse-proxy setups or `OPENALICE_DISABLE_AUTH=1` to opt out.
+
+## crypto.json
+
+Legacy global crypto provider. New installs typically leave this as `{ "provider": { "type": "none" } }` and use `accounts.json` per-account `presetConfig` instead. Kept for backwards compatibility.
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `provider` | discriminated union | `{ type: "none" }` | `{ type: "ccxt", exchange, apiKey?, apiSecret?, password?, sandbox?, demoTrading?, options? }` or `{ type: "none" }` |
+| `guards` | array | `[]` | Legacy global guard middleware (rarely used) |
+
+## securities.json
+
+Legacy global securities provider. Same deprecation story as `crypto.json` — prefer per-account config.
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `provider` | discriminated union | `{ type: "none" }` | `{ type: "alpaca", apiKey?, secretKey?, paper? }` or `{ type: "none" }` |
+| `guards` | array | `[]` | Legacy global guard middleware |
+
+## market-data.json
+
+Market data settings. The data engine runs in-process through the SDK — the external `openbb-api` backend was removed, so there's no sidecar to configure. See the [Data Hub](/docs/market-data/data-hub) page for the resolution model.
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `hub.enabled` | boolean | `true` | Use the hosted [Data Hub](/docs/market-data/data-hub) for low-frequency data (zero-key). `false` = bring-your-own-keys only |
+| `hub.baseUrl` | string | `"https://traderhub.openalice.ai"` | Hub endpoint; point at a self-hosted relay to keep the zero-key model on your own infra |
+| `providers.equity` | string | `"yfinance"` | Default equity data provider (fallback path) |
+| `providers.crypto` | string | `"yfinance"` | Default crypto data provider |
+| `providers.currency` | string | `"yfinance"` | Default currency data provider |
+| `providers.commodity` | string | `"yfinance"` | Default commodity data provider |
+| `providerKeys` | object | `{}` | Per-install vendor keys: `fred`, `fmp`, `eia`, `bls`, `nasdaq`, `tradingeconomics`, `econdb`, `intrinio`, `benzinga`, `tiingo`, `biztoc`. Merge **local-wins** with the global `provider-keys.json` |
+
+## provider-keys.json
+
+User-global data-vendor keys at the `~/.openalice` root (above `data/`), shared across every checkout and the desktop app on this machine. The location is overridable via `OPENALICE_GLOBAL_DIR` (default `~/.openalice/provider-keys.json`) — resolved off the real home directory independently of `OPENALICE_HOME`, so it stays global even when `OPENALICE_HOME=$PWD` pins `data/` to a checkout. Same key set as `market-data.json` → `providerKeys`; the per-install file overrides this one key-by-key. Missing FRED / EIA / BLS keys route through the Hub's keyed proxy automatically. See [Data Hub — provider keys](/docs/market-data/data-hub#provider-keys-local-and-global).
+
+## trading.json
+
+Trading-engine knobs.
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `mode` | `"lite"` \| `"readonly"` \| `"pro"` | auto | Global UTA capability. Auto chooses Pro when saved UTA accounts exist, otherwise Lite. `OPENALICE_TRADING_MODE` wins and locks the UI. |
+| `observeExternalOrdersEvery` | string | `"15m"` | How often to scan the broker for orders placed outside OpenAlice and record them as `[observed]` commits. `off` disables; `1m` / `5m` / `10m` / `15m` otherwise. See [Orders & Execution](/docs/trading/orders-and-execution#external-order-observation) |
+| `keylessDataSources` | (`"binance"` \| `"okx"` \| `"bybit"`)[] | `[]` | Opt-in public crypto K-line sources materialized as read-only data UTAs at UTA startup |
+
+Use **Settings → Agent Permissions** for `mode` and the Trading page for public
+data-source toggles. Those UI flows coordinate the UTA stop/start needed for a
+runtime change; direct JSON edits do not provide that feedback.
+
+## news.json
+
+News collector settings.
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `enabled` | boolean | `true` | Master switch |
+| `intervalMinutes` | number | `10` | Fetch interval |
+| `maxInMemory` | number | `2000` | Max items in memory buffer |
+| `retentionDays` | number | `7` | Items older than this not loaded on startup |
+| `feeds` | array | (8 default feeds) | RSS/Atom feed definitions |
+
+Default feeds: Federal Reserve Press, ECB Press, MarketWatch Top Stories, WSJ Markets, CNBC Economy, Nikkei Asia, SCMP Business, CoinDesk.
+
+## snapshot.json
+
+Account snapshot settings.
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `enabled` | boolean | `true` | Enable scheduled snapshots |
+| `every` | string | `"15m"` | Snapshot interval |
+
+## Native context and compaction
+
+OpenAlice no longer owns a global `compaction.json` policy or a
+`workspaceDefaultContextWindow` field; both predate the supported 0.89.2-beta
+baseline. Context and compaction belong to the selected model and Agent runtime;
+OpenAlice stores an explicit context override only inside a specific Oh My Pi,
+Pi, or opencode Workspace binding.
+
+## tools.json
+
+Tool enable/disable.
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `disabled` | string[] | `[]` | Tool names to disable globally |
+
+## web-subchannels.json
+
+Web UI sub-channel definitions. Array of channel objects. This is an advanced config file for specialized chat surfaces; most installs never need to edit it directly.
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `id` | string | — | URL-safe identifier (lowercase alphanumeric with `-` / `_`) |
+| `label` | string | — | Display name |
+| `systemPrompt` | string | — | System prompt override for this channel |
+| `disabledTools` | string[] | — | Additional tool names to disable on top of the global `tools.disabled` list |
+
+## Workspace instruction ownership
+
+There is no installation-wide Persona configuration or global persona editor.
+Each instruction-bearing template owns one `instruction.md`; Workspace creation
+copies it to `CLAUDE.md` and `AGENTS.md`. Those committed Workspace files are
+the editable source of truth for that desk. Later template changes arrive only
+through the reviewed [Template Upgrade](/docs/workspaces/upgrades-and-absorb#template-upgrade)
+flow.
+
+## .alice/workspace.json
+
+This file belongs to one Workspace rather than the installation config root.
+OpenAlice updates it through Workspace Settings and keeps it in the Workspace's
+Git-visible `.alice/` directory.
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `displayName` | string | Optional user-facing Workspace name |
+| `description` | string | Optional durable description |
+| `defaultAgent` | string | Optional registered Agent runtime used for a fresh Session in this Workspace |
+
+An explicit Quick Chat, sidebar, CLI, or API runtime wins for one launch without
+rewriting `defaultAgent`. If the field is absent or names an unavailable
+runtime, OpenAlice falls back to `workspaceDefaultAgent`, then the first live
+registered runtime.
+
+## Next Steps
+
+- [Installation Overview](/docs/getting-started/installation) — Choose the right run path for your machine.
+- [AI Providers](/docs/integration/ai-providers) — Manage model credentials without hand-editing the vault.
+- [Trading Setup](/docs/trading/accounts-and-brokers) — Manage sealed broker config through the wizard.
+- [Remote Access](/docs/deployment/remote-access) — Understand auth, ports, and network exposure.

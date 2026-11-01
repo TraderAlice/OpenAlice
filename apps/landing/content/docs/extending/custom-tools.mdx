@@ -1,0 +1,104 @@
+export const metadata = {
+  title: "Custom Tools",
+  description: "How to add custom AI tools to OpenAlice — define with Zod, register in ToolCenter.",
+}
+
+# Custom Tools
+
+Tools are capabilities that Alice can use during conversations. Adding a custom tool makes it available to all AI providers automatically.
+
+## Tool Definition
+
+Tools are defined using the Vercel AI SDK's `tool()` function with a Zod schema:
+
+```typescript
+import { tool } from 'ai'
+import { z } from 'zod'
+
+const myTools = {
+  myCustomTool: tool({
+    description: 'A clear description of what this tool does and when to use it.',
+    inputSchema: z.object({
+      query: z.string().describe('What to search for'),
+      limit: z.number().int().positive().optional().describe('Max results'),
+    }),
+    execute: async ({ query, limit }) => {
+      // Your business logic here
+      return { results: [], count: 0 }
+    },
+  }),
+}
+```
+
+Key points:
+- **description** — Written for the AI. Be specific about when to use the tool and what it returns.
+- **inputSchema** — Zod schema. Add `.describe()` to every field — the AI uses these to understand parameters.
+- **execute** — Async function that receives validated input and returns JSON-serializable data.
+
+## Registration
+
+Register tools with ToolCenter during bootstrap in `main.ts`:
+
+```typescript
+toolCenter.register(myTools, 'my-category')
+```
+
+The second argument is a group name for organizational purposes (shown in the tool inventory API).
+
+Once registered, tools are automatically:
+- Available to the Vercel AI SDK provider (via `getVercelTools()`)
+- Available to the Agent SDK provider (via the in-process MCP server)
+- Listed in the tool inventory API
+- Controllable via the disable list
+
+## The Bridge Pattern
+
+OpenAlice follows a pattern where `tool/` files are thin shells that delegate to `domain/` modules:
+
+```
+src/tool/equity.ts      → delegates to → src/domain/market-data/
+src/tool/news.ts        → delegates to → src/domain/news/
+src/tool/analysis.ts    → delegates to → src/domain/analysis/
+```
+
+This separation keeps business logic testable and independent from the AI tool interface. For simple tools, you can put everything in the tool definition. For complex tools, create a domain module. Trading is the exception: `src/tool/trading.ts` is a thin HTTP-SDK wrapper that forwards to the separate UTA service, not a local `domain/` module.
+
+## Disabling Tools
+
+### Globally
+
+Add tool names to `data/config/tools.json`:
+
+```json
+{
+  "disabled": ["myCustomTool", "placeOrder"]
+}
+```
+
+### Per Channel
+
+Add to a sub-channel's `disabledTools` in `data/config/web-subchannels.json`:
+
+```json
+{
+  "id": "research",
+  "label": "Research Only",
+  "disabledTools": ["placeOrder", "tradingCommit", "tradingPush"]
+}
+```
+
+The disable list is read on each request, so changes take effect immediately.
+
+## Tips
+
+- Keep tool descriptions concise but specific — the AI reads them to decide when to use each tool
+- Return structured JSON from `execute` — the AI parses the output to form its response
+- Use `.describe()` on every Zod field — this is how the AI understands parameters
+- Throw errors for exceptional cases — the framework catches and reports them to the AI
+- Keep `execute` functions thin — delegate to domain modules for testability
+
+## Next Steps
+
+- [MCP Server](/docs/connectors/mcp-integration) — Expose registered tools to external MCP clients.
+- [Workspaces](/docs/workspaces/workspaces) — Make tools reachable from native agent CLIs.
+- [Custom Brokers](/docs/extending/custom-brokers) — Add broker-backed tools through the UTA layer.

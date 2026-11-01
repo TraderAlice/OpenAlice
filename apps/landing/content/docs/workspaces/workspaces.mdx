@@ -1,0 +1,211 @@
+export const metadata = {
+  title: "Workspaces",
+  description: "The repo-shaped working asset at the center of OpenAlice: a task directory, git history, agent terminal, and OpenAlice tool surface.",
+  releaseChannel: "stable",
+  targetVersion: "0.94.1",
+}
+
+# Workspaces
+
+A **Workspace** is the core OpenAlice working asset: a repo-shaped place where an agent does a real task. It has files, instructions, tools, terminal output, git history, and artifacts the agent can leave behind.
+
+It is the main container for [Trading as Collaboration](/docs/core-concepts/trading-as-collaboration). OpenAlice turns trading work into issue-shaped, file-shaped, git-shaped collaboration so humans and agents can share context instead of passing around isolated recommendations.
+
+![OpenAlice Workspaces activity showing the template catalog and workspace sidebar](/docs/product/workspace-templates.jpg "medium")
+
+## What a workspace gives Alice
+
+- **A working repo.** The agent can write Markdown, scripts, notes, issue files, and committed artifacts inside a normal git directory.
+- **A native agent CLI.** The model loop runs inside `claude`, `codex`,
+  `cursor-agent`, `agy`, `grok`, `omp`, `opencode`, `pi`, or `shell`, so
+  OpenAlice does not need to reimplement each vendor's terminal UI, prompt
+  cache, or Session format. Supported Agents can also render their native
+  conversation in the Web browser surface.
+- **OpenAlice tools on `PATH`.** The `alice*` CLIs expose market data, RSS, analysis tools, workspace collaboration, entity tracking, and optional beta trading commands.
+- **Durable context.** A workspace can accumulate files, issues, tracked entities, inbox entries, and git history across many sessions.
+- **A delivery path.** Finished reports and checkpoints can be pushed to the [Inbox](/docs/workspaces/inbox), linked back to the workspace that produced them.
+- **Durable coworkers.** Every agent Session has a stable `resumeId`, so reports, Issues, and scheduled runs can point back to the exact conversation that produced them.
+
+Workspaces are the recommended substrate for any non-trivial AI work. Interactive sessions and scheduled jobs both run through workspace-backed agent CLIs; scheduled jobs use [workspace automation](/docs/workspaces/automation).
+
+## The core surfaces
+
+OpenAlice's main product surfaces are built around workspace-shaped work:
+
+| Surface | What it does |
+|---------|--------------|
+| [Ask Alice](/docs/getting-started/quick-start#your-first-research-task) | Starts a workspace-backed agent session for ad-hoc research or trading questions |
+| [Issue Board](/docs/workspaces/issues) | Turns follow-up work into self-describing Markdown issues the agent can read and update |
+| [Entities & Tracking](/docs/workspaces/entities) | Keeps durable memory for assets, themes, and topics across workspaces |
+| [Inbox](/docs/workspaces/inbox) | Receives finished reports, questions, and status updates from workspace runs |
+| [AutoQuant](/docs/workspaces/autoquant) | Runs Agent-native quantitative research inside one pinned AutoQuant V2 desk |
+| [Auto Prediction](/docs/workspaces/auto-prediction) | Runs prediction-market research and a managed Studio inside one pinned Auto Prediction desk |
+| [Workspace Templates](/docs/workspaces/templates) | Creates repeatable Workspace shapes such as `chat`, `auto-quant-v2`, and `auto-prediction` |
+| [Sessions & Collaboration](/docs/workspaces/sessions-and-collaboration) | Attributes work to an exact Session and lets users or agents ask its creator, owner, or sender |
+| [Workspace Manager](/docs/workspaces/manager) | Audits active desks, finds accountable Sessions, and coordinates maintenance |
+| [Office · Beta](/docs/workspaces/office) | Projects Harness neighborhoods, Workspace furniture pods, and Session coworkers onto one continuous map |
+
+The everyday `chat` workspace is the simplest example: OpenAlice packages the context and workbench for talking about markets into a git repo, injects the `alice*` CLI surface, and lets the agent work like it is handling a coding task.
+
+## New conversation versus new workspace
+
+**New conversation** creates a fresh Session inside the selected or most recently active Chat Workspace. **New Workspace** creates a new durable context container with its own files, Issues, git history, and settings.
+
+When a new AliceProject has no Chat Workspace, Ask Alice shows **Initialize Ask
+Alice** before the composer. Initialization creates one durable starter Chat
+Workspace at the current template; Chat deliberately does not pin a visible
+Harness version. Later conversations become Sessions inside that Workspace.
+
+OpenAlice remembers the recent Chat Workspace and reuses it for Quick Chat. It does not create a date-based Workspace every day: a calendar boundary is not a context boundary, and daily repositories would strand yesterday's files and history.
+
+The Ask Alice sidebar keeps navigation separate from Workspace state through
+three remembered views:
+
+- **Current** — the default focused view. It shows recent conversations from
+  one selected Chat Workspace, and **New chat** starts another Session inside
+  that Workspace. Open the Chat Workspace menu at the bottom to change views,
+  switch desks, or browse every conversation without expanding the whole tree.
+- **Recent** — combines Sessions from all Chat Workspaces by latest activity and
+  shows the owning Workspace under each conversation.
+- **Workspaces** — groups conversations under every Chat Workspace for batch
+  browsing. Switching views changes only the sidebar navigation, not any
+  Workspace or Session.
+
+The selected view is stored in the browser and restored on the next visit. It
+does not create, rename, move, pause, or delete durable work.
+
+Sessions occupied by a headless turn appear in a separate collapsible
+**Running in background** group instead of looking paused or silently ignoring
+clicks. Opening one explains the single-process rule and names the originating
+Issue when available. TUI and Web actions return when the headless turn
+finishes; OpenAlice never attaches two Agent processes to the same Session
+transcript.
+
+**Switch Workspace** opens a searchable picker with conversation counts and
+recent activity. **Browse all conversations** opens a separate searchable
+directory without leaving the current view; scope it to the current Workspace
+or all Chat Workspaces, then filter running or paused Sessions. Choosing a row
+navigates only after the dialog closes and restores focus to the control that
+opened it.
+
+The Current and Recent quick lists show at most eight non-running conversations
+and add an inline **View all** row when more exist. An older conversation that
+is currently open remains in the quick list, while every running conversation
+stays in **Running in background**. The browser dialog always retains the full
+inventory; this is a navigation work-set limit, not Session deletion.
+
+On desktop, OpenAlice's page navigators share one accessible resize boundary.
+Drag the separator, focus it for keyboard resizing, or use the header control to
+collapse the navigator to its compact rail; expanding restores the remembered
+width instead of overwriting it with a responsive fallback. Narrow layouts keep
+navigation in the mobile Sheet, and reduced-motion preferences remove the
+collapse animation.
+
+Before sending, Quick Chat shows the effective AI source, model, reasoning
+effort, and model-specific context when those facts are available. Choosing
+another provider is a visible fresh-Session choice rather than a hidden global
+fallback. Once accepted, that choice becomes the recent interactive preference.
+**Runtime managed** leaves login, environment, and provider configuration to the
+selected Agent; a saved-access choice projects a compatible vault credential.
+
+Several Sessions can share one Workspace. Each receives its own stable `resumeId`; opening a finished headless run or an Inbox sender reuses that product Session instead of fabricating a new identity. See [Sessions & Collaboration](/docs/workspaces/sessions-and-collaboration).
+
+## Coordinate and maintain the floor
+
+The launcher-level [Workspace Manager](/docs/workspaces/manager) is a dedicated
+control plane, not a business Workspace. Supported installed Agents can use Web or
+TUI; Antigravity and Shell use TUI. Use it to inventory active desks, ask exact
+Sessions, review Issue health, and preview template upgrades.
+
+Durable Workspaces can also:
+
+- reconcile newer launcher-managed assets through a three-way Template Upgrade;
+- directionally absorb selected files from another Workspace and archive the
+  source;
+- switch complete data homes when the desktop needs separate environments.
+
+See [Upgrades & Absorb](/docs/workspaces/upgrades-and-absorb) and [Data &
+Credentials](/docs/deployment/data-and-credentials#selectable-complete-homes).
+
+## Leaving the active floor
+
+Workspaces are **offboarded**, not blindly deleted. OpenAlice writes a handoff, moves the complete checkout to a departed inventory, and retires its Session signatures. Restore returns the exact path and identities; purge removes the checkout but keeps historical attribution. See [Lifecycle & Offboarding](/docs/workspaces/lifecycle).
+
+## Runtime defaults
+
+Each business Workspace uses version 3 of `.alice/settings.json` once a creation
+seed, fixed default, or accepted fresh launch records a preference. Interactive
+and headless work have separate modes. Each mode can pin a default Agent and one
+runtime-managed-or-vault tuple per Agent while keeping a separate recent Agent
+and recent tuple from successful launches. API keys, endpoints, and resolved
+provider payloads never enter this file.
+
+For a fresh interactive Session, an explicit Quick Chat, sidebar, CLI, or API
+choice wins. Missing fields inherit the Workspace's fixed interactive tuple for
+that Agent, then its matching recent tuple, then runtime-managed state. With no
+explicit Agent, OpenAlice tries the fixed interactive Agent, recent interactive
+Agent, `.alice/workspace.json` `defaultAgent`, Alice's installation fallback,
+and finally the first registered runtime.
+
+Headless work uses the independent headless mode. A scheduled Issue's explicit
+`agent`, `credential` or `credentialSource`, `model`, or `effort` wins for that
+fresh Session; omitted values inherit the Workspace's fixed headless tuple,
+then its matching recent tuple, then runtime-managed state. This lets attended
+Chat and unattended work keep different policy and history.
+
+A successful fresh launch updates only the recent layer; it never overwrites a
+pinned default. Resuming an existing Session replays its persisted binding and
+changes neither layer. A user may explicitly replace access/model/effort while
+that Session is paused; the edit applies only to its next resume and still
+changes neither Workspace layer. Switching to another credential also clears
+any model or effort that belonged to the previous credential instead of
+combining incompatible settings.
+
+Workspace creation may seed fixed preferences for both modes from [default
+Workspace credentials](/docs/integration/ai-providers#default-workspace-credentials)
+or a template's `agentCredentials`. The seed stores only a vault reference and
+safe model semantics in `.alice/settings.json`; it does not copy a secret into
+the Workspace or write native project configuration.
+
+## Inspect the next launch
+
+Open **Workspace Settings → AI preferences** to inspect both **Interactive
+sessions** and **Headless runs** in one vertical flow. Each mode can follow the
+most recent successful runtime or pin a fixed Agent and per-Agent access, model,
+and effort tuple. Changes autosave without altering the recent layer.
+
+Use **Workspace Settings → Agent runtimes** for availability and launch
+diagnostics. Its read-only preview shows the selected runtime and launch mode,
+working directory, adapter command, transcript capability, and
+launcher-controlled environment groups. Shell appears only in the preview as a
+utility alongside the registered model-loop adapters.
+
+The preview uses the same launch composer as the real terminal, but it does not
+prepare the Workspace, project Session credentials, or start a process. Secrets
+are redacted, inherited host environment values are omitted, and `PATH` is
+summarized instead of exposed in full.
+
+The Agent runtimes panel labels **Native CLI config export** as deprecated. That
+advanced editor exists only for people who intentionally launch a CLI directly
+from the Workspace directory; managed OpenAlice Sessions do not read it as
+their fresh Session default.
+
+## Where to go deeper
+
+- [Trading as Collaboration](/docs/core-concepts/trading-as-collaboration) - the product model behind workspaces, issues, Inbox, entities, and git.
+- [Workspace Structure](/docs/workspaces/structure) - directory layout, git repo, terminal session, lifecycle, and headless runs.
+- [Sessions & Collaboration](/docs/workspaces/sessions-and-collaboration) - durable Session identities, signatures, exact follow-up, and Web.
+- [Lifecycle & Offboarding](/docs/workspaces/lifecycle) - handoff, departed desks, restore, purge, and Session retirement.
+- [Workspace Manager](/docs/workspaces/manager) - coordinate active desks from one accountable control plane.
+- [Upgrades & Absorb](/docs/workspaces/upgrades-and-absorb) - safely update or consolidate durable Workspaces.
+- [CLI Injection](/docs/workspaces/cli-injection) - how the `alice*` binaries expose OpenAlice to the agent without an MCP shim.
+- [Settings Injection](/docs/workspaces/settings-injection) - how persona, skills, and AI provider credentials are written into the workspace.
+- [AutoQuant](/docs/workspaces/autoquant) - how one pinned AutoQuant V2 desk becomes a first-class research activity.
+- [Auto Prediction](/docs/workspaces/auto-prediction) - how a pinned prediction-market Harness exposes research Sessions and a managed Studio.
+- [Self-Describing Issues](/docs/workspaces/self-describing-issues) - how issue files double as work items, schedules, graph nodes, and run context.
+
+## Next Steps
+
+- [Quick Start](/docs/getting-started/quick-start) - Use a workspace-backed conversation end to end.
+- [Issue Board](/docs/workspaces/issues) - Track work and schedule recurring runs with the same Markdown file.
+- [Inbox](/docs/workspaces/inbox) - See how agents push finished work back to you.

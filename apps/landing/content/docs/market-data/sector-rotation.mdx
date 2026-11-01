@@ -1,0 +1,85 @@
+export const metadata = {
+  title: "Sector Rotation",
+  description: "A GICS-11 cross-section of where capital is rotating — momentum, relative strength, and dollar-volume share across the sector ETFs, ranked by a blended rotation score.",
+}
+
+# Sector Rotation
+
+`sectorRotation` is a single-call, top-of-funnel read of **where money is moving across the market right now**. It takes the 11 GICS sector ETFs plus SPY as a benchmark, measures momentum and volume across five horizons, and ranks each sector by a blended **rotation score**.
+
+<ProductDemo
+  src="/pic/product-market-demo-260823.mp4"
+  poster="/pic/product-market-demo-260823.jpg"
+  title="Open the live sector-rotation map"
+>
+  Move from the Market overview into the read-only sector map, then focus on the
+  ranked cross-section and the evidence behind each quadrant.
+</ProductDemo>
+
+It takes **no parameters** — it's a fixed cross-section:
+
+```
+You: What's rotating right now?
+
+Alice: [calls sectorRotation()]
+
+       Rotating in:   XLK Technology (+score)   XLE Energy
+       Rotating out:  XLU Utilities (−score)    XLP Staples
+       …
+```
+
+## The Universe
+
+Eleven GICS sector ETFs, measured against **SPY** for relative strength:
+
+| ETF | Sector | ETF | Sector |
+|-----|--------|-----|--------|
+| **XLK** | Technology | **XLI** | Industrials |
+| **XLC** | Communication Services | **XLB** | Materials |
+| **XLY** | Consumer Discretionary | **XLRE** | Real Estate |
+| **XLP** | Consumer Staples | **XLU** | Utilities |
+| **XLE** | Energy | **XLV** | Health Care |
+| **XLF** | Financials | | |
+
+## What Each Row Carries
+
+For every sector, across the **1D / 1W / 1M / 3M / 6M** horizons:
+
+| Field | Meaning |
+|-------|---------|
+| `returns` | Price return per horizon |
+| `rel_strength` | Return vs SPY per horizon (is it leading or lagging the market?) |
+| `momentum_acceleration` | Short-horizon pace minus long-horizon pace (>0 = accelerating) |
+| `dollar_volume` | Latest close × volume — traded notional |
+| `dv_share` | This sector's share of the 11-set's total dollar volume |
+| `dv_share_change` | `dv_share` minus its 20-day baseline — the rotation signal (capital flowing in or out) |
+| `rvol` | Relative volume (today vs the 20-day average) |
+| `rotation_score` | Blended z-score of momentum acceleration + dollar-volume-share change |
+
+Rows come back sorted by `rotation_score`, descending — the sectors capital is flowing *into* at the top, the ones it's leaving at the bottom.
+
+## The Quadrant Map
+
+The Web UI plots the same data as a rotation map. Each sector is a dot:
+
+- **X-axis** — 1-month relative strength vs SPY (leading ← → lagging)
+- **Y-axis** — `dv_share_change` (losing volume share ↓ ↑ gaining)
+- **Color** — `rotation_score` (green positive, red negative)
+
+That yields the classic four quadrants: **rotating in** (strong + gaining volume, upper-right), **improving** (weak but gaining, upper-left), **weakening** (strong but losing, lower-right), and **rotating out** (weak + losing, lower-left).
+
+## In the Pre-Trade Pipeline
+
+`sectorRotation` is the wide, top-down first pass of a two-step research pipeline shipped as agent skills:
+
+1. **`sector-rotation`** — read what's moving across the whole market; hand the standouts down.
+2. **`build-thesis`** — evaluate a specific name on both its left side (fundamentals / valuation) and right side (price, volume, structure).
+
+From the standout sectors you'd typically drill in with [Equity Research](/docs/market-data/equity-research) (movers, ETF holdings) and the [Quant Calculator](/docs/market-data/technical-analysis) (per-name momentum, volume confirmation).
+
+## Next Steps
+
+- [Equity Research](/docs/market-data/equity-research) — Drill into the names behind a sector move.
+- [Technical Analysis](/docs/market-data/technical-analysis) — Confirm momentum and volume per name.
+- [Symbol Search](/docs/market-data/symbol-search) — Resolve candidates across vendors and brokers.
+- [Workspace Automation](/docs/workspaces/automation) — Turn a rotation scan into a recurring issue.

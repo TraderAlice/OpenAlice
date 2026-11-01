@@ -1,0 +1,103 @@
+export const metadata = {
+  title: "Self-Describing Issues",
+  description: "How one Markdown file describes the work, ownership, priority, and optional timezone-aware schedule for an OpenAlice Issue.",
+}
+
+# Self-Describing Issues
+
+An OpenAlice Issue is a Markdown file under `.alice/issues/<id>.md`, not a database row that only the UI understands.
+
+```md
+---
+title: Track NVDA supply-chain updates
+status: todo
+priority: medium
+assignee: "@new-then-resume"
+when: { kind: cron, cron: "0 9 * * 1", timezone: America/New_York }
+agent: codex
+model: gpt-5.6-sol
+effort: high
+timeout: 30m
+---
+
+Review [[NVDA]] and its major suppliers every Monday morning.
+Write `research/nvda-supply-chain.md`; push only material changes to Inbox.
+```
+
+The filename stem is the stable id. Everything below frontmatter is the canonical **What** passed to a scheduled agent. Comments live in the adjacent `<id>.comments.json` sidecar so an arbitrary agent rewrite cannot erase them. For an exact Session owner, a comment can be delivered asynchronously and its reply remains in the same durable Activity thread.
+
+## One object, two roles
+
+- Without `when`, the file is a board work item.
+- With `when`, the same file schedules a headless run.
+- `done` or `canceled` stops future fires without deleting the Issue.
+
+There is no parallel schedule object, prompt field, or execution-owner field to keep in sync.
+
+## Ownership
+
+- `@new-then-resume` recruits one Session on the first fire, then persists it as the exact owner.
+- `@new-each-run` recruits a new Session for every fire.
+- An exact `@resumeId` continues one responsible Session.
+- `@human` and `@unassigned` are valid for unscheduled work.
+- Agent-facing `@me` is resolved to the caller's concrete signature before storage.
+
+When an attributable resumable Session creates the Issue, an omitted owner is
+that creator. Otherwise, omission defaults scheduled work to
+`@new-then-resume` and unscheduled work to `@unassigned`. Write
+`@new-each-run` explicitly only when every scheduled fire should recruit a
+newcomer.
+
+For `@new-each-run` and the first `@new-then-resume` dispatch, optional `agent`,
+`credential` or `credentialSource: native`, `model`, and `effort` fields create
+the Session without rewriting fixed Workspace AI preferences. Omit both access
+fields to inherit the Workspace's fixed, then recent, headless preference. An
+exact Session already owns its runtime conversation, so the tuple is forbidden
+with `@resumeId` in the Markdown file. For an idle exact owner, the Issue
+detail UI can explicitly replace the Session's credential source, model, and
+effort after confirmation; that updates the Session dossier, never the Issue
+frontmatter or Agent runtime.
+
+The separate optional `timeout` field accepts `15m`, `30m`, `45m`, or `60m`.
+It limits one scheduled run and is valid even for an exact Session owner. Omit
+it for no watchdog so the Agent can finish naturally.
+
+Deprecated `@new` and `@workspace` values remain read aliases only. New writes
+must use the behavior-named canonical values; pre-0.89.2 parallel ownership
+formats are outside the supported baseline.
+
+Human comments without a fixed Session owner ask the attributable creator when
+possible, or recruit a visibly reconstructed Session in the Issue Workspace.
+The reply is appended to Activity without changing `assignee`. Agent-authored
+progress comments without a fixed owner remain durable notes.
+
+This makes the file answer both “what should happen?” and “who is responsible?” without confusing the creator with the current owner.
+
+## Why Markdown
+
+- Agents can inspect and edit the work with normal repo tools.
+- Humans can review changes in git diffs.
+- `[[wikilinks]]` connect Issues to tracked entities and related work.
+- The same artifact drives the terminal, Web UI, and headless scanner.
+- Timezone and ownership survive restarts because they live with the task.
+
+## CLI and UI
+
+```bash
+alice-workspace issue create --title "Review CPI release" --what "..." --assignee me
+alice-workspace issue list
+alice-workspace issue update --id <id> --status in_progress
+alice-workspace issue comment --id <id> --text "Waiting for the revision."
+```
+
+The Issue Board renders the same files, derives automation health, keeps
+change/conversation Activity separate from the operational Runs ledger, and
+exposes attributable follow-up. **Run now** starts an extra immediate turn;
+failed or interrupted scheduled work can use **Retry now**. Neither action
+shifts the normal cadence.
+
+## Next Steps
+
+- [Issue Board](/docs/workspaces/issues) — Full schema, health, activity, and UI behavior.
+- [Automation](/docs/workspaces/automation) — How scheduled files become headless turns.
+- [Sessions & Collaboration](/docs/workspaces/sessions-and-collaboration) — Understand recruit-once, recruit-each-run, and exact Session ownership.

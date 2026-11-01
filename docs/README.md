@@ -26,6 +26,7 @@ GitHub navigation.
 | [[docs/data-locations.md]] | [Data locations](data-locations.md) | Complete-home ownership, shared Default selection, concurrent AliceProjects, and directory safety |
 | [[docs/remote-access.md]] | [Remote Runtime and access](remote-access.md) | Server lifecycle, SSH transport, managed remote bootstrap, client authority, and staged Studio protocol |
 | [[docs/demo-mode.md]] | [Demo mode](demo-mode.md) | Shared mock data, isolated native Electron preview and demo smoke |
+| [[docs/landing.md]] | [Public website](landing.md) | Website source and public content, media preparation, independent builds and deployment configuration |
 | [[docs/desktop-companion.md]] | [Desktop companion](desktop-companion.md) | Alice floating window, native lifecycle, interaction, assets and platform acceptance |
 | [[docs/inbox-content.md]] | [Inbox content](inbox-content.md) | Markdown publication, shared file references, migration and UI hook |
 | [[docs/connector-service.md]] | [Connector Service](connector-service.md) | Optional external Inbox projection, adapters, secrets, health, Guardian lifecycle |

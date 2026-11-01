@@ -1,0 +1,139 @@
+export const metadata = {
+  title: "Broker Packs",
+  description: "Install and safely update versioned broker integrations while keeping OpenAlice core, research, and the mock simulator usable without live broker SDKs.",
+}
+
+# Broker Packs
+
+OpenAlice 0.81 moves live broker SDKs into optional, versioned **Broker Packs**.
+The installed core contains Alice, UTA Core, and the Mock simulator; integrations
+for CCXT, Alpaca, IBKR, LeverUp, and Longbridge are downloaded only when you
+choose a broker or public crypto data source that needs them.
+
+This keeps a fresh OpenAlice installation smaller and lets research, Chat,
+Issues, Inbox, and the simulator work even when no live broker support is
+installed.
+
+## Three separate layers
+
+| Layer | Responsibility |
+|---|---|
+| UTA Core | Accounts, approvals, snapshots, FX, HTTP, and the common broker interface |
+| Broker Pack | One broker engine plus its external SDK dependencies |
+| Market-data routing | Whether an installed engine participates in K-lines and contract discovery |
+
+Installing a Pack does not create an account, enable live trading, or turn on a
+public data source. Disabling a data source also does not uninstall its Pack.
+
+## Install and update from the Trading UI
+
+OpenAlice surfaces Pack installation where it is needed:
+
+- choosing a broker stops before the credential form and offers **Install** or
+  **Repair** when its engine is absent;
+- existing accounts show **Install**, **Update**, or **Repair** when their Pack
+  needs attention;
+- enabling a public Binance, OKX, or Bybit data source first requires the CCXT
+  Pack;
+- an already enabled source can still be disabled when its Pack is missing.
+
+The installation transaction:
+
+1. selects the exact OpenAlice version, operating system, and architecture;
+2. downloads the matching catalog and Pack archive;
+3. verifies the published SHA-256 checksum and package identity;
+4. extracts into an immutable, content-addressed release directory;
+5. atomically switches the active Pack pointer;
+6. restarts UTA so it can load the new engine.
+
+Failure before the pointer switch leaves the previous active release intact.
+Repair creates a new immutable copy rather than overwriting files a Windows UTA
+process may still have open.
+
+## Automatic updates after an OpenAlice upgrade
+
+Broker Pack compatibility follows the Pack API version, not exact equality with
+the OpenAlice product version. After a production upgrade, Alice reconciles
+only Packs that already have an active downloaded release:
+
+1. a compatible older Pack can continue serving while Alice downloads the
+   current platform artifact;
+2. Alice verifies and installs the new immutable release;
+3. it atomically switches `active.json`;
+4. Guardian restarts UTA so the new engine is loaded.
+
+An older Pack with an unsupported API is not loaded, but Alice can still
+replace it automatically. Missing Packs remain an explicit installation choice,
+and malformed or corrupt releases remain visible **Repair** cases.
+
+Set `OPENALICE_BROKER_PACK_AUTO_UPDATE=0` only as an emergency way to disable
+startup reconciliation. Source development and test runtimes do not perform
+this automatic network update.
+
+## Pack mapping
+
+| Pack | Used by |
+|---|---|
+| `ccxt` | Binance, OKX, Bybit, Bitget, Hyperliquid, custom CCXT, and keyless public crypto data |
+| `alpaca` | Alpaca paper and live accounts |
+| `ibkr` | TWS and IB Gateway accounts |
+| `longbridge` | Longbridge accounts |
+| `leverup` | LeverUp accounts |
+| Built-in Mock | Local simulator; no download required |
+
+Pack availability is platform-specific. The 0.81 release publishes catalogs and
+archives for macOS Arm64, macOS Intel, Windows x64, and Linux x64.
+
+Some native dependencies have operating-system requirements. For example, the
+current Longbridge Linux Pack requires glibc 2.39; OpenAlice rejects an
+incompatible host before loading the native module instead of crashing UTA.
+
+## Installed location
+
+Packs are replaceable runtime state under the selected complete data home:
+
+```text
+<OPENALICE_HOME>/runtime/broker-packs/<engine>/
+├── active.json
+└── releases/
+    └── <openalice-version>-<content-id>/
+```
+
+They are intentionally outside portable `data/`. Back up user data,
+Workspaces, `sealing.key`, and credentials; reinstall Broker Packs after moving
+to a different machine or architecture.
+
+See [Data & Credentials](/docs/deployment/data-and-credentials) for complete
+home selection and backup boundaries.
+
+## Missing or degraded Pack
+
+A missing Pack affects only the accounts and data sources that require that
+engine:
+
+- Alice and Workspace Chat remain usable;
+- UTA Core still starts;
+- the Mock simulator remains available;
+- other installed engines remain independent;
+- OpenAlice never silently falls back to another market-data provider.
+
+Use **Repair** when checksum, extraction, or runtime validation reports a
+damaged Pack. If a platform requirement is unsupported, move the Runtime to a
+compatible host rather than bypassing the check.
+
+## Safety boundary
+
+Broker Packs change how integration code is distributed, not the trading
+approval model. Adding a Pack does not grant an agent permission to execute.
+Accounts still follow UTA, Trading as Git, and the configured manual/AI push
+policy.
+
+Start with Mock, paper, demo, or testnet accounts. Validate connection, account
+reads, staging, approval, push, synchronization, and recovery before live funds.
+
+## Next Steps
+
+- [Trading Setup](/docs/trading/accounts-and-brokers) — Install or update support and configure an account.
+- [Unified Trading Account](/docs/core-concepts/unified-trading-account) — Understand the core interface Packs implement.
+- [Trading as Git](/docs/core-concepts/trading-as-git) — Review the approval boundary after installation.
+- [Data & Credentials](/docs/deployment/data-and-credentials) — See where replaceable runtime state lives.

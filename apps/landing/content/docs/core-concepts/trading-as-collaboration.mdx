@@ -1,0 +1,59 @@
+export const metadata = {
+  title: "Trading as Collaboration",
+  description: "The product model behind OpenAlice: make trading legible as human+AI and AI+AI collaboration by borrowing the coordination primitives that made coding agent-friendly.",
+}
+
+# Trading as Collaboration
+
+OpenAlice starts from a product bet: **trading should be treated as a collaboration problem**.
+
+Coding agents moved fast because software work was already deeply collaborative before AI arrived. A team writing code together had decades of scaffolding ready: git for versioned change, issue trackers for work, Markdown for shared context, lint and tests for consistency, PRs for review, and a habit of leaving artifacts that another worker can inspect. A coding agent can move into that environment on day one because the work is already shaped for many participants.
+
+Trading is different. Most trading tools still treat the trader as a lone decision maker consuming information. Reading Seeking Alpha, watching news, or receiving a stock recommendation can inform you, but it is not collaboration on *your* trade. The missing context is personal and stateful: your positions, your constraints, your thesis history, your rejected ideas, your risk boundary, and the tasks already in motion.
+
+That makes the problem both simple and hard.
+
+- **Simple:** if trading can be turned into a human+AI and AI+AI collaboration problem, agents can help with it much more naturally.
+- **Hard:** trading has not historically been modeled this way, so there is no mature collaboration stack to inherit.
+
+OpenAlice's answer is to reuse the coordination primitives that already worked for coding, then map trading work onto them.
+
+| Coding collaboration | OpenAlice trading collaboration |
+|----------------------|----------------------------------|
+| Issues describe requirements and follow-up work | [Issue Board](/docs/workspaces/issues) describes research tasks, monitoring work, scheduled checks, and open questions |
+| Markdown keeps working context readable | Workspace Markdown holds theses, reports, notes, and decision context |
+| Inbox / comments route communication | [Inbox](/docs/workspaces/inbox) delivers reports, questions, and status updates from agents back to the user |
+| Git records code changes | Workspace git records research artifacts, and [Trading as Git](/docs/core-concepts/trading-as-git) records optional account operations |
+| Project repos give agents a place to work | [Workspaces](/docs/workspaces/workspaces) are repo-shaped trading workbenches |
+| Knowledge bases preserve links and memory | [Entities & Tracking](/docs/workspaces/entities) gives Alice an Obsidian-like graph of assets, topics, and backlinks |
+
+The result is not "AI reads market data and chats back." It is a trading desk shape: work items, working documents, memory, reviewable changes, delivery, and optional execution approval.
+
+## The workspace is the collaboration container
+
+A [Workspace](/docs/workspaces/workspaces) is the working repo for a trading task. It gives an agent the same kind of environment a coding task would have: files to inspect, tools on `PATH`, instructions, git history, and somewhere to leave artifacts.
+
+That is why OpenAlice routes even chat through workspaces. Talking to Alice about markets is still work with context, not a stateless message exchange. The `chat` template packages that context and workbench into a repo, then lets the agent write research, track issues, commit useful artifacts, and push finished work to the Inbox.
+
+## Linear, Obsidian, Git
+
+OpenAlice deliberately borrows from three familiar collaboration shapes:
+
+- **Linear-like issues** turn vague follow-up into explicit, inspectable work.
+- **Obsidian-like links** let assets, topics, theses, and issue files accumulate memory across workspaces.
+- **Git-like history** makes changes reviewable and reversible, whether the artifact is a research note or a staged trading operation.
+
+These analogies are not decoration. They are the product model. If trading work becomes issue-shaped, file-shaped, link-shaped, and git-shaped, agents can coordinate with humans and with each other instead of acting like isolated recommendation engines.
+
+## What remains hard
+
+The hard part is not calling a broker API or summarizing a news article. The hard part is discovering what good trading collaboration should look like.
+
+OpenAlice treats the current system as a working answer, not a final ontology. Issues, Inbox, tracked entities, workspace repos, and Trading as Git are the first stable primitives. They are meant to make trading context durable enough that humans and agents can share it, inspect it, argue with it, and improve it over time.
+
+## Next Steps
+
+- [Workspaces](/docs/workspaces/workspaces) - See the product surface built around this model.
+- [Issue Board](/docs/workspaces/issues) - Turn trading follow-up into explicit work.
+- [Entities & Tracking](/docs/workspaces/entities) - Preserve assets, themes, and backlinks.
+- [Trading as Git](/docs/core-concepts/trading-as-git) - Review the git-like execution boundary.

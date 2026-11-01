@@ -9,7 +9,7 @@ RUN corepack enable \
   && corepack prepare pnpm@11.7.0 --activate \
   && pnpm install --frozen-lockfile \
   && pnpm exec tsx scripts/build-migration-index.ts \
-  && pnpm exec turbo run build --filter=!./packages/uta-broker-* \
+  && pnpm exec turbo run build --filter=!@traderalice/landing --filter=!./packages/uta-broker-* \
   && pnpm exec tsup src/main.ts --format esm --dts \
   && pnpm build:bun:release
 

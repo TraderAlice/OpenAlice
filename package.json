@@ -17,9 +17,9 @@
     "dev:onboarding": "tsx scripts/onboarding-test-dev.ts",
     "remote": "node packages/cli/bin/openalice.ts --remote",
     "prebuild": "tsx scripts/build-migration-index.ts",
-    "build": "turbo run build && tsup src/main.ts --format esm --dts",
+    "build": "turbo run build --filter=!@traderalice/landing && tsup src/main.ts --format esm --dts",
     "prebuild:server": "tsx scripts/build-migration-index.ts",
-    "build:server": "turbo run build --filter=!@traderalice/desktop --filter=!./packages/uta-broker-* && tsup src/main.ts --format esm --dts",
+    "build:server": "turbo run build --filter=!@traderalice/landing --filter=!@traderalice/desktop --filter=!./packages/uta-broker-* && tsup src/main.ts --format esm --dts",
     "build:bun-cli:feasibility": "bun scripts/build-bun-cli-feasibility.ts",
     "build:bun-alice:feasibility": "bun scripts/build-bun-alice-feasibility.ts",
     "build:bun-runtime:feasibility": "bun scripts/build-bun-runtime-feasibility.ts",
@@ -90,7 +90,9 @@
     "postinstall": "node scripts/fix-pty-perms.mjs",
     "test:critical": "node scripts/run-tests.mjs --gate critical-local",
     "test:unit": "node scripts/run-tests.mjs --tier unit",
-    "test:e2e": "node scripts/run-tests.mjs --tier e2e"
+    "test:e2e": "node scripts/run-tests.mjs --tier e2e",
+    "landing:dev": "pnpm --filter @traderalice/landing dev",
+    "landing:build": "pnpm --filter @traderalice/landing build"
   },
   "keywords": [
     "trading",

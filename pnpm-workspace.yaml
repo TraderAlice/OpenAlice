@@ -5,6 +5,9 @@ packages:
   - ui
 
 allowBuilds:
+  '@parcel/watcher': true
+  sharp: true
+  unrs-resolver: true
   bufferutil: false
   ccxt: false
   dugite: true
@@ -34,10 +37,13 @@ overrides:
   '@babel/core': ^7.29.6
   '@hono/node-server': ^2.0.12
   body-parser: ^2.3.0
-  'brace-expansion@^1.0.0': 5.0.8
-  'brace-expansion@^2.0.0': 5.0.8
+  # Older minimatch callers need the callable CommonJS export, absent in v5.
+  'brace-expansion@^1.0.0': 1.1.21
+  'brace-expansion@^2.0.0': 2.1.7
   'brace-expansion@>=3.0.0': 5.0.8
   esbuild: ^0.28.1
+  # Preserve the migrated site's existing lint rules during the source-only move.
+  'eslint-config-next@16.0.7>eslint-plugin-react-hooks': 7.0.1
   fast-uri: ^3.1.4
   hono: ^4.12.32
   js-yaml: ^4.3.0
@@ -61,6 +67,13 @@ overrides:
   rollup: ^4.59.0
   'vite@*': npm:@voidzero-dev/vite-plus-core@1.0.0
   'vitest@*': 5.0.1
+
+packageExtensions:
+  # This analytics adapter supports several frameworks; the website uses Next.
+  '@vercel/analytics@1.6.0':
+    peerDependenciesMeta:
+      nuxt:
+        optional: true
 
 patchedDependencies:
   # Adapted from stablyai/orca@ab0f220. See THIRD_PARTY_NOTICES.md.

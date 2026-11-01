@@ -1,0 +1,152 @@
+export const metadata = {
+  title: "Retrospective / Time Machine",
+  description: "Rewind a name to a past moment, reconstruct what it looked like THEN with no lookahead, align dated news to the price path, and pressure-test a hypothetical entry — all gated on data freshness.",
+}
+
+# Retrospective / Time Machine
+
+Rewind a name to a moment in the past, reconstruct what it looked like **then** — with no future knowledge leaking in — align the dated news catalysts against the price path, and pressure-test a hypothetical entry: *"if I'd bought here, would a trailing stop have saved me?"*
+
+It strings together three primitives — the as-of snapshot, the date-windowed news read, and the one-entry backtest — into one honest replay. The whole value is honesty: **no lookahead** (never use a price the moment didn't yet know) and **no stale data** (never report yesterday's close as "now"). A retro built on a stale or future-leaking price is worse than no retro, so every read is gated on a freshness contract.
+
+> These are the **Retrospective / Time-Machine** primitives. They pair with the dateless [Quant Calculator](/docs/market-data/technical-analysis) — when you need a date axis, an as-of cutoff, or a path, you reach here instead.
+
+## The freshness contract
+
+Every snapshot result carries a freshness contract, surfaced loudly so a delayed source can't silently masquerade as the live price:
+
+| Field | Meaning |
+|-------|---------|
+| `asOf` | The effective point-in-time anchor the read was clamped to. |
+| `isLatestActual` | Did the data actually reach `asOf`? `false` = the held close is **stale**. |
+| `staleTradingDays` | How many trading days the data stops **behind** the anchor. |
+| `freshnessWarning` | A human banner — present **only** when the data doesn't reach the anchor. |
+
+> **`isLatestActual: false` means the "latest" close is STALE.** Do not report it as the current price. Say "as of `<date>`, N trading days behind", and for anything time-sensitive pull a realtime broker source. This is the exact trap that turns an overnight catalyst into a missed or misread move — a confident "flat green close" while the real reaction already happened after the last bar you can see.
+
+A free vendor (yfinance) lags a day or two; a free broker tier (alpaca SIP) may not have today's bar yet. `marketSnapshot` defends against this by auto-picking the **freshest** source when you hand it a bare symbol — a **realtime broker before a delayed vendor** — so the analyst's natural reach lands on the live print, not a vendor that stopped a day behind.
+
+## marketSnapshot — the as-of read
+
+A point-in-time read of one name: the dated bars **never run past `asOf`** (no lookahead), the most-recent actual print, a compact technical state, and the freshness contract above.
+
+```bash
+alice analysis snapshot --query XLE --asOf 2026-04-03            # summary
+alice analysis snapshot --query XLE --asOf 2026-04-03 --bars 30  # + dated path
+```
+
+**Parameters:**
+
+| Param | Description |
+|-------|-------------|
+| `query` | Symbol or keyword (e.g. `XLE`, `NVDA`). Auto-picks the freshest source. Omit if `barId` is given. |
+| `barId` | Pin a specific source, e.g. `alpaca-paper\|XLE`. Takes precedence over `query`. |
+| `asset` | Asset class (`equity` / `crypto` / `currency` / `commodity`) — needed only for a **vendor** barId/symbol; broker barIds infer it. |
+| `asOf` | Point-in-time `YYYY-MM-DD`. Bars never run past it (no lookahead). Default: now. |
+| `interval` | Bar interval (default `1d`). |
+| `count` | Analysis window **fetched** for the levels (default `90`; `sma50` needs ≥50). This is *not* the output size. |
+| `bars` | How many recent dated bars to **return** (default `0` = summary only). Opt-in dated path, capped at `count`. |
+
+**Returns:**
+
+- **`latest`** — the most recent actual bar ≤ `asOf` (the honest "current as of T"): `close`, `prevClose`, `changePct`, `dayHigh`, `dayLow`, and `dayAmplitudePct` — the `(high − low) / prevClose` intraday range that a single vs-prevClose number hides (a sleepy green close can mask an intraday plunge-and-recover).
+- **`levels`** — compact technical state over the window: `sma20`, `sma50`, `rsi14`, `periodHigh`, `periodLow`, and `distFromHighPct` / `distFromLowPct` (how far off the period high/low — the "dump-from-the-top" feel).
+- **`windowBars`** — how many bars are in the analysis window (the levels were computed over these; the `bars` array may hold fewer).
+- **`bars`** — when `bars=N`, the last N dated OHLCV bars, ascending, ≤ `asOf`.
+
+> **Why is the dated path opt-in?** A summary-only read is **~709 bytes**; the same call with 90 bars is **~9.7 KB**. Keeping `bars=0` by default means a "how's X" read stays light — add `--bars N` only when you actually need the per-day series, and let `windowBars` tell you how many are available.
+
+## simulate — backtest one entry + one exit
+
+A **path-dependent** walk over dated bars. Enter at the **close** of the first bar on/after `entryDate`, walk the bars forward to `asOf` (no lookahead past it), and apply **one** built-in exit rule. The reusable version of hand-rolling an equity path in Python every time.
+
+```bash
+alice analysis simulate --query XLE --entryDate 2026-04-03 \
+  --exitRule trailing_stop --exitPct 8
+```
+
+**Exit rules** (pass `exitRule` plus its param):
+
+| Rule | Param | Exits when |
+|------|-------|------------|
+| `trailing_stop` | `exitPct` | close falls `exitPct`% from the running **peak** close |
+| `ma_break` | `exitPeriod` | first close **below** its `exitPeriod`-bar SMA |
+| `stop` | `exitPct` | close falls `exitPct`% **below entry** |
+| `target` | `exitPct` | close rises `exitPct`% **above entry** |
+| `hold` | — | never exits — measure entry → `asOf` |
+
+`exitPct` is required for `trailing_stop` / `stop` / `target`; `exitPeriod` is required for `ma_break`.
+
+**Returns:**
+
+- **`entry`** — `{ date, price }` (the close of the first bar on/after `entryDate`). **`exit`** — `{ date, price, reason }`, or `null`/absent until a rule triggers.
+- **`returnPct`** — entry → exit, or entry → last bar if still open.
+- **`mfePct`** / **`maePct`** — max favorable / adverse excursion: the best and worst it went *while you held* (intrabar high/low vs entry), the round trip a single end-number hides.
+- **`peak`** / **`trough`** — the dated high/low over the hold.
+- **`open`** — `true` means no exit triggered by `asOf`; the position is still open and the return is **mark-to-market**, not realized.
+- **`barsHeld`**, a **sampled `path`** (≤20 `{date, close}` points to narrate), and a **`note`**.
+
+> **Entry-slip honesty.** When the requested `entryDate` falls on a weekend/holiday, the result enters the **next session** and records it rather than silently substituting a different date: `Requested entryDate <D> was not a trading day; entered the next session <D2>.`
+
+**MCP params:** `query` / `barId` / `asset` / `entryDate` / `exitRule` (enum) / `exitPct` / `exitPeriod` / `interval` / `asOf`. Source resolution matches `marketSnapshot` — a bare symbol auto-picks the freshest source (realtime broker > delayed vendor).
+
+## Dated news (windowRss)
+
+To attribute a move to a catalyst, pull the news **in the window**, oldest-first, and lay the ISO timestamps against the bars:
+
+```bash
+alice rss window --from 2026-04-01 --to 2026-04-10 --pattern "Iran|oil|OPEC"
+```
+
+`windowRss` is a date-windowed event-study read — `id` + ISO `time` + title (plus a matched snippet when a `pattern` is given), sorted oldest→newest so the timeline lines up with the price path. The output is capped (default **40**); the result reports the `total` and how many were `omitted`. Coverage is the user's **subscribed feeds only** — an empty window means "nothing in the feeds for that span", not "nothing happened". See [News & RSS](/docs/market-data/news-and-rss) for the full archive-search family.
+
+## Worked example
+
+Rewind XLE to early April and replay it end to end:
+
+1. **Snapshot the anchor (no lookahead).** Reconstruct the moment with `asOf`.
+   ```bash
+   alice analysis snapshot --query XLE --asOf 2026-04-03 --bars 30
+   ```
+   Check the freshness contract first, then read the `latest` print (close, vs-prevClose, day high/low, **amplitude**) and `levels` (sma20/50, rsi14, distance from the period high).
+
+2. **Align the catalysts to the price.** Pull the dated news in the window, oldest-first, and put each ISO `time` next to the bar it moved.
+   ```bash
+   alice rss window --from 2026-04-01 --to 2026-04-10 --pattern "Iran|oil|OPEC"
+   ```
+   This is how you answer "was the spike policy or earnings". An empty window means "not in the subscribed feeds" — say so.
+
+3. **Test the entry across a couple of exit rules.** "If I'd bought at the anchor, would a stop have worked?"
+   ```bash
+   alice analysis simulate --query XLE --entryDate 2026-04-03 --exitRule trailing_stop --exitPct 8
+   alice analysis simulate --query XLE --entryDate 2026-04-03 --exitRule ma_break --exitPeriod 50
+   alice analysis simulate --query XLE --entryDate 2026-04-03 --exitRule hold
+   ```
+   Read `entry`/`exit`, `returnPct`, and **MFE/MAE**. The interesting finding is usually "the move was real but giving it back to a loose stop ate most of it" — or the reverse.
+
+## Write it down honestly
+
+A retro is only worth as much as its weakest assumption. State, every time:
+
+- the **`asOf`**, and that the analysis used **no later data**;
+- the **source and freshness** of every "current" number (which feed, and whether `isLatestActual` was true);
+- what you **couldn't see** — feed gaps, cookie-gated sources (options flow, sentiment), or a broker SIP tier that didn't have the latest day yet. Name the gap rather than paper over it.
+
+> The failure mode this exists to prevent: a confident call built on a stale or future-leaking price. When in doubt, distrust the data before the market.
+
+## Relationship to the Quant Calculator
+
+The [Quant Calculator](/docs/market-data/technical-analysis) (`calculateQuant`) returns the **latest scalars** with **no date axis** — it's dateless by design, and cannot emit a dated series or guarantee a cutoff. `marketSnapshot` and `simulate` are the **dated / as-of** reads: they pin a point in time, refuse lookahead past it, and surface the freshness contract.
+
+- Reach for **quant** when you want a number *now* (a golden-cross status, an RSI panel across timeframes).
+- Reach for **snapshot** when the question is "what did/does X look like *at* time T", or you need the per-day series.
+- Reach for **simulate** when the question is "if I'd entered on date D, would `<exit rule>` have worked".
+
+All three are exposed both as **MCP tools** (`marketSnapshot`, `simulate`) and as **workspace CLI verbs** — `alice analysis snapshot` / `alice analysis simulate`, with `alice rss window` for the dated news read.
+
+## Next Steps
+
+- [News & RSS](/docs/market-data/news-and-rss) — Add dated news context to as-of analysis.
+- [Technical Analysis](/docs/market-data/technical-analysis) — Use current quant panels when you do not need an as-of date.
+- [Workspace Automation](/docs/workspaces/automation) — Run retrospective checks on a cadence.
+- [Trading as Git](/docs/core-concepts/trading-as-git) — Record any resulting trade intent before execution.

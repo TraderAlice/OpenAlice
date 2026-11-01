@@ -1,0 +1,176 @@
+export const metadata = {
+  title: "Quant Calculator",
+  description: "Compute technical analysis with calculateQuant — a barId-keyed, Python/pandas-subset DSL over K-lines, with multi-symbol/timeframe panels in one call.",
+}
+
+# Quant Calculator
+
+The **Quant Calculator** (`calculateQuant`) is a bounded, side-effect-free scripting language for technical analysis. You write a short Python/pandas-subset script; it fetches K-lines by **barId** and returns a value — or a whole *panel* of values in one call.
+
+It pairs with **`searchBars`**, which finds the barId to compute on. The loop is always: **search for a source → compute on it.**
+
+```
+You: What's the 50/200 golden-cross status on AAPL?
+
+Alice: [searchBars(query="AAPL") → picks "yfinance|AAPL"]
+       [calculateQuant(script="""
+         s = bars("yfinance|AAPL", "1d", count=250, asset="equity")
+         sma(s.close, 50) - sma(s.close, 200)
+       """)]
+       +4.10 — the 50-day is above the 200-day. Uptrend intact.
+```
+
+> **Why barId-keyed?** The same asset has many K-line sources — a data vendor, or a broker whose bars match exactly what you'd trade. A barId (`"{source}|{symbol}"`) pins the computation to a *specific* source, so a basis check between a broker and a vendor is just two `bars()` calls. See [Symbol Search](/docs/market-data/symbol-search) for the federated bar layer behind `searchBars`.
+
+## Finding a barId — searchBars
+
+`searchBars({ query, limit? })` federates **equity vendors** (yfinance plus any enabled regional vendor — `eastmoney` for CN A-shares, `twse` for Taiwan), the **crypto / currency / commodity** vendors, **and** your connected brokers, returning candidates you paste straight into `bars(...)`. Candidates are sorted **broker-fresh-first** — realtime broker bars float above delayed vendors:
+
+```json
+{
+  "candidates": [
+    { "barId": "alpaca-paper|AAPL", "source": "uta",    "assetClass": "equity", "barCapability": "iex",      "label": "AAPL (alpaca-paper) · iex" },
+    { "barId": "yfinance|AAPL",     "source": "vendor", "assetClass": "equity", "barCapability": "delayed",  "label": "AAPL · Apple Inc (yfinance) · delayed" },
+    { "barId": "eastmoney|1.600519","source": "vendor", "assetClass": "equity", "barCapability": "delayed",  "label": "600519 · 贵州茅台 (eastmoney) · delayed" }
+  ]
+}
+```
+
+The freshness tier is embedded **inline in the `label`** (` · delayed`, ` · iex`, …), not just in the structured `barCapability` field — so a delayed source is impossible to miss. Pick by **freshness** (`barCapability`: `realtime` / `iex` / `delayed` / …) and by whether it's a broker you actually trade. For crypto without an API key, enable the optional Binance, OKX, or Bybit public data source on the Trading page; it then appears here as `binance-readonly`, `okx-readonly`, or `bybit-readonly`.
+
+> **CN / Taiwan barIds** come from enabling the regional vendor first (`listMarketVendors` / `setMarketVendor`). Once `eastmoney` or `twse` is on, `searchBars` surfaces them — e.g. `eastmoney|1.600519` (前复权 K-lines) or `twse|2330.TW`.
+
+## The Language
+
+A script is zero or more `name = …` bindings, then a final result expression:
+
+```python
+s = bars("alpaca-paper|AAPL", "1d", count=250)
+sma(s.close, 50) - sma(s.close, 200)        # +ve = 50 above 200 (uptrend)
+```
+
+### bars() — fetch K-lines
+
+```
+bars(barId, interval, count= / start= / end= / asOf=, asset=)
+```
+
+- **`barId`** — `"{source}|{symbol}"` from `searchBars`. A **broker** barId (`alpaca-paper|AAPL`, `binance-readonly|BTC/USDT`) needs no `asset=`; a **vendor** barId (`yfinance|AAPL`, `fmp|AAPL`) requires `asset="equity" | "crypto" | "currency" | "commodity"`.
+- **`interval`** — `1m` `5m` `15m` `30m` `1h` `4h` `1d` `1w`.
+- **Window** — supply one: `count=N` (most-recent N bars, the natural window for indicators), `start=`/`end=` (a `YYYY-MM-DD` range), or `end=` + `count=` (a point-in-time backtest anchored at `end`).
+
+> For an **honest as-of read** — dated bars with a no-lookahead guarantee and a loud freshness contract — or to **backtest a concrete entry/exit**, reach for `marketSnapshot` / `simulate` instead. `quant` returns dateless scalars; see [Retrospective / Time Machine](/docs/market-data/retrospective).
+
+Daily and weekly (`1d` / `1w`) bar dates render **date-only** (the calendar day), even from brokers that stamp the session open — a daily bar is a day, not an instant.
+
+### Columns & indexing
+
+A `bars()` result exposes five **series**: `s.open`, `s.high`, `s.low`, `s.close`, `s.volume`. Index them with bracket notation:
+
+```python
+s.close[-1]     # latest close
+s.close[-2]     # one bar back
+```
+
+**Indicators already return the latest scalar — do not index them.** Write `sma(s.close, 50)`, never `sma(s.close, 50)[-1]`. Only raw columns are series.
+
+### Arithmetic
+
+`+` `-` `*` `/`, parentheses, and unary minus, between scalars:
+
+```python
+s.close[-1] / sma(s.close, 200)      # price as a multiple of its 200-day
+```
+
+## Function Catalog
+
+Every indicator returns the **latest value** directly (a scalar, or a small record for `bbands` / `macd`).
+
+| Group | Functions |
+|-------|-----------|
+| **Trend** | `sma(s, n)` · `ema(s, n)` · `macd(s, fast, slow, signal)` · `slope(s, n)` — signed, rankable trend |
+| **Momentum** | `rsi(s, n=14)` · `roc(s, n)` — % change over n bars |
+| **Volatility** | `stdev(s)` · `atr(high, low, close, n)` · `bbands(s, n, std)` · `zscore(s, n?)` — how extended vs the window |
+| **Volume** | `rvol(volume, n=20)` · `obv(close, volume)` · `mfi(high, low, close, volume, n=14)` · `vwap(high, low, close, volume)` |
+| **Stats** | `max(s)` · `min(s)` · `sum(s)` · `average(s)` · `median(s)` · `highest(s, n)` · `lowest(s, n)` |
+| **Comparison** | `correlation(a, b)` — −1…1; relative strength / pairs / "tracks the sector?" |
+
+Records: `bbands(s, n, std)` → `{ upper, middle, lower }`; `macd(s, fast, slow, signal)` → `{ macd, signal, histogram }`.
+
+## Panels — many computations in one call
+
+The final expression can be a **labeled dict** or a **positional list** — each entry a single value (max 50). Use this instead of calling the tool N times:
+
+```python
+h1  = bars("binance-readonly|BTC/USDT", "1h",  count=250)
+h4  = bars("binance-readonly|BTC/USDT", "4h",  count=250)
+h12 = bars("binance-readonly|BTC/USDT", "12h", count=250)
+{ "1h": rsi(h1.close, 14), "4h": rsi(h4.close, 14), "12h": rsi(h12.close, 14) }
+```
+→ `{ "1h": 53.2, "4h": 48.9, "12h": 61.4 }`
+
+A one-call dashboard for a single name:
+
+```python
+s = bars("yfinance|NVDA", "1d", count=250, asset="equity")
+{
+  "rsi":       rsi(s.close, 14),
+  "roc_20d_%": roc(s.close, 20),
+  "vs_200ma":  s.close[-1] - sma(s.close, 200),
+  "trend":     slope(s.close, 50),
+  "z_20d":     zscore(s.close, 20),
+  "atr_14":    atr(s.high, s.low, s.close, 14),
+}
+```
+
+## Response Shape
+
+Every call returns `{ value, dataRange }`:
+
+- **`value`** — the computed scalar, record, or panel.
+- **`dataRange`** — the actual OHLCV time span used per source (barId, from-date, to-date, bar count), so you can tell whether enough history was available for the indicator to be meaningful.
+
+Precision defaults to 4 decimals; pass `precision` (0–10) to adjust.
+
+### Mapping a dumped series to dates
+
+`quant` returns **dateless** scalars. To recover the day axis, pass the opt-in `dates` flag (off by default):
+
+```python
+calculateQuant({ script, dates: true })
+```
+
+The response then also carries `dates[barId] = ['YYYY-MM-DD', …]` — one ascending date axis per source — so a dumped series maps back to its days. For a **full dated snapshot** (dated bars + freshness contract, no-lookahead), prefer [`marketSnapshot`](/docs/market-data/retrospective) instead of stitching `dates` onto a `quant` dump.
+
+## Self-correction
+
+On failure the tool returns `{ error: { kind, message, suggestion } }` rather than throwing — read it and fix the script. It pinpoints the problem: unknown function (with a "did you mean"), wrong arity or type, insufficient bars (raise `count=`), an undeclared name, and common Python reflexes it doesn't support:
+
+- `s.close.rolling(50).mean()` → *use `sma(s.close, 50)`*
+- `sma(...)[-1]` → *drop the `[-1]` — indicators return the latest value*
+- slices / `if` / boolean operators → not supported here
+
+## Limits
+
+- **No conditionals or booleans** — there's no `if` and no crossover operator. Compute the parts and compare them in your own reasoning, or return them together in a panel.
+- Indicators return scalars; only raw columns (`s.close`, …) are series.
+- For arbitrary or looping logic beyond these primitives, use an
+  [**AutoQuant Workspace**](/docs/workspaces/autoquant), not this tool.
+
+## From the CLI
+
+Inside a workspace the same two operations are on `PATH`:
+
+```bash
+alice analysis search-bars --query AAPL
+alice analysis quant --script $'s = bars("yfinance|AAPL", "1d", count=250, asset="equity")\nsma(s.close, 50)'
+```
+
+The same group also carries the **Time-Machine** primitives — `alice analysis snapshot` (honest as-of read) and `alice analysis simulate` (path-dependent backtest). See [Retrospective / Time Machine](/docs/market-data/retrospective).
+
+## Next Steps
+
+- [Symbol Search](/docs/market-data/symbol-search) — Find valid bar sources before writing scripts.
+- [Retrospective / Time Machine](/docs/market-data/retrospective) — Use dated reads when lookahead matters.
+- [Sector Rotation](/docs/market-data/sector-rotation) — Start from broad market structure.
+- [Quick Start](/docs/getting-started/quick-start) — Try a read-only research request before trading.

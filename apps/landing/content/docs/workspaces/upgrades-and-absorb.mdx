@@ -1,0 +1,200 @@
+export const metadata = {
+  title: "Workspace Upgrades & Absorb",
+  description: "Safely reconcile newer template assets into a durable Workspace or directionally absorb one Workspace into another with preview, conflict review, audit commits, and recovery.",
+}
+
+# Workspace Upgrades & Absorb
+
+OpenAlice provides three explicit maintenance workflows for durable Workspaces:
+
+- **Template Upgrade** brings newer launcher-managed assets into the same desk.
+- **Workspace Absorb** copies selected work from one desk into another, then
+  archives the source.
+- **Harness Source Upgrade** merges a reviewed upstream release into a
+  source-backed desk.
+
+Both are preview-first and preserve Workspace history. They solve different
+problems and never collapse two identities by accident.
+
+## Choose the right action
+
+| Goal | Action |
+|---|---|
+| Refresh managed instructions, skills, or template files | Template Upgrade |
+| Move AutoQuant or Auto Prediction to a reviewed upstream release | Harness Source Upgrade |
+| Combine useful files from two overlapping desks | Workspace Absorb |
+| Stop a desk but keep it inspectable | Offboard |
+| Remove an already departed checkout | Purge |
+
+## Template Upgrade
+
+A Workspace starts with a snapshot of its template. Over time, both sides may
+change: OpenAlice ships newer managed assets, while the Workspace edits its own
+instructions and skills. Upgrade performs a three-way comparison instead of
+overwriting the desk.
+
+```text
+Base       files installed when the Workspace was created or last upgraded
+Local      files in the Workspace now
+Incoming   files from the current template
+```
+
+Each managed path is classified before anything changes:
+
+| Classification | Meaning | Default action |
+|---|---|---|
+| Ready | Incoming changed; Local still matches Base | Apply Incoming |
+| Preserved | Local changed; Incoming still matches Base | Keep Local |
+| Conflict | Local and Incoming both changed | Require an explicit choice |
+| Unchanged | Local already equals Incoming | Do nothing |
+
+Conflicts are decided per file. You can keep the Workspace copy, use the new
+template copy, or leave the upgrade unapplied while you investigate.
+
+### Preview and apply
+
+Open the Workspace settings and select **Template upgrade**, or ask the
+[Workspace Manager](/docs/workspaces/manager) to preview upgrades across the
+floor. The review shows:
+
+- current and incoming template versions;
+- every managed path and classification;
+- content diffs for conflicts;
+- blockers such as live Sessions or headless runs;
+- the exact reviewed plan digest.
+
+Apply rechecks the plan so a stale preview cannot mutate newer files. It takes a
+backup, writes the reviewed results, updates the baseline, and creates an audit
+commit. A failed transaction restores the previous files; startup recovery
+handles an interrupted transaction before allowing another upgrade.
+
+### Chat Workspace update signal
+
+When the managed Chat Harness has newer instructions or skills, the bottom Chat
+Workspace context shows **Update available · v…**. Open its Workspace options
+and choose **Template update** to review the change under **Workspace Settings →
+Template**. This is a shortcut into the same preview-first workflow, not an
+automatic rewrite.
+
+The current Chat Harness update carries the behavior-named scheduled-Issue
+guidance (`@new-then-resume` and `@new-each-run`) to Workspaces created with the
+older aliases. Existing local edits still follow the Ready / Preserved /
+Conflict rules above.
+
+Template Upgrade only owns assets declared by the template. It does not absorb
+arbitrary research, copy credentials, rewrite Session identity, or move the
+Workspace.
+
+Source-backed Harnesses own a stricter upgrade contract. AutoQuant and Auto
+Prediction pin one exact upstream release at creation and are excluded from
+generic Template Upgrade; OpenAlice never rewrites that source choice
+automatically.
+
+### CLI preview
+
+Agents and the manager can inspect an upgrade through the Workspace CLI:
+
+```bash
+alice-workspace template upgrade --id <workspaceId>
+```
+
+Applying remains an explicit reviewed action. Old Workspaces continue to work
+with their existing guidance snapshot until you choose to upgrade.
+
+## Harness Source Upgrade
+
+Open **Workspace Settings → Harness** for a source-backed desk. OpenAlice starts
+from the exact repository, version, and commit recorded in
+`.alice/harness-source.json`, then fetches the selected release, validates its
+`harness.json`, computes changed paths, and previews the Git merge. Verified
+releases come from OpenAlice's exact catalog.
+
+Optional **Show unverified Harness releases** discovers the newest stable
+upstream SemVer tag that is absent from that catalog. Prereleases are excluded,
+the release is visibly marked unverified, and it still requires an explicit
+preview and apply.
+
+Apply requires the same reviewed digest, no active Session or headless work, a
+stopped Studio, no conflicting tracked changes, and a conflict-free merge. A
+successful apply creates a no-fast-forward merge commit plus a receipt;
+interrupted merges remain recoverable. Harness source upgrades never run in the
+background or as part of an OpenAlice update.
+
+## Workspace Absorb
+
+Absorb is directional. You choose one Workspace to keep and one to retire:
+
+```text
+source Workspace ── selected files ──> target Workspace
+       │                                  stays active
+       └── complete checkout ─────────> departed-workspaces/
+```
+
+The target keeps its id, directory, template, git history, Sessions, Issues,
+and schedules. The source keeps its historical identity but leaves the active
+floor after the reviewed files are copied.
+
+### What moves
+
+The plan reads tracked files plus untracked, non-ignored files from the source:
+
+- a path missing from the target can be copied directly;
+- identical files are recognized and skipped;
+- a different file at the same path requires **Keep target**, **Use source**, or
+  **Keep both**;
+- **Keep both** stores the source version under an `imports/` directory tied to
+  the source Workspace.
+
+### What does not move
+
+Absorb does not copy runtime or identity-bearing assets:
+
+- `.git` and `.alice` internals;
+- managed prompt and skill trees;
+- provider credentials and `.env*` files;
+- runtime homes, dependency caches, or build output;
+- the source's Issues, schedules, Sessions, or template identity.
+
+Source Issues remain readable in the departed checkout but stop scheduling.
+Source `resumeId` records retire with the source. Existing Inbox, report, run,
+and trade provenance continues to name the original Workspace and Session.
+
+### Safe transaction
+
+Both Workspaces must have no live interactive or headless work. The target must
+also have no staged git changes because Absorb creates one isolated audit
+commit.
+
+Apply then:
+
+1. recomputes and validates the reviewed plan;
+2. snapshots target paths and writes a recovery journal;
+3. offboards the source, closing its scheduling and runtime door;
+4. copies the chosen files;
+5. creates one target git commit with source and plan evidence;
+6. records which active Workspace absorbed the departed source.
+
+If the operation fails, target paths and the source location are restored. The
+complete departed source checkout is the lossless backstop; Absorb never deletes
+it.
+
+### Product flow
+
+Start from the target Workspace settings:
+
+1. Confirm **Keep this Workspace**.
+2. Choose an active source under **Absorb another Workspace**.
+3. Review copied files, duplicates, collisions, and stopped work.
+4. Resolve every collision.
+5. Confirm **Absorb and archive source**.
+6. Inspect the audit commit and departed source record.
+
+Do not use Absorb merely to share a file. A normal explicit copy or commit is
+simpler when both desks should remain active.
+
+## Next Steps
+
+- [Workspace Manager](/docs/workspaces/manager) — Audit the floor and preview maintenance.
+- [Templates](/docs/workspaces/templates) — Understand template-owned assets and guidance snapshots.
+- [Lifecycle & Offboarding](/docs/workspaces/lifecycle) — See how the source becomes a departed desk.
+- [Structure](/docs/workspaces/structure) — Review the active/departed on-disk layout.
