@@ -6,7 +6,7 @@
  * post-bootstrap caller). On disk we keep only a scrypt-derived hash so
  * `cat data/config/auth.json` doesn't leak the live credential.
  *
- * Threat model assumptions (see safe/THREAT_MODEL.md):
+ * Threat model assumptions:
  *  - Token is the only "identity." There is no user concept.
  *  - We trust the disk inode permissions to be tight (chmod 600).
  *  - We do NOT defend against host root — root can read anything.

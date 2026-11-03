@@ -1,9 +1,8 @@
 /**
  * Origin gate for the PTY WebSocket upgrade — unit tests for
  * `isWsOriginAllowed`. The upgrade path itself is event-driven on
- * `http.Server` and is exercised via integration (see
- * safe/playbooks/07-websocket-auth.md); the origin decision is pure
- * and testable here.
+ * `http.Server` and is exercised via integration; the origin decision
+ * is pure and testable here.
  */
 
 import { describe, it, expect } from 'vitest';
