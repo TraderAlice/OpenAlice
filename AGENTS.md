@@ -27,8 +27,7 @@ Detailed delivery and release procedure lives in
   not one-off startup cleanup.
 - Never put secrets in tracked files, logs, fixtures, PR bodies, or agent instructions.
 
-Details: [[docs/project-structure.md]], [[docs/alice-project.md]], and
-[[docs/data-locations.md]].
+Details: [[docs/project-structure.md]] and [[docs/alice-project.md]].
 
 ## Delivery Authority
 

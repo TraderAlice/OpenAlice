@@ -16,10 +16,9 @@ pnpm landing:build
 pnpm --filter @traderalice/landing start
 ```
 
-Development startup and builds need access to the public media index. They
-download only its JSON metadata; images and videos remain remote. Serving an
-existing build does not fetch the index again.
+Development startup and builds fetch the public media JSON index; images and
+videos remain remote on the CDN. Serving an existing build does not fetch the
+index again.
 
-See the [website owner guide](../../docs/landing.md) for media ownership,
-verification, and deployment boundaries, and [AGENTS.md](AGENTS.md) for visual
-acceptance requirements.
+See [AGENTS.md](AGENTS.md) for source/media ownership, build boundaries, and
+visual acceptance requirements.

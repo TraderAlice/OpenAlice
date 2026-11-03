@@ -2,8 +2,8 @@
 
 This guide owns external Connector process boundaries, adapter extension,
 secrets, delivery guarantees, health, and acceptance. Related contracts live in
-[[docs/inbox-content.md]], [[docs/workspace-issues-and-scheduling.md]], and
-[[docs/conversation-provenance.md]].
+[[docs/workspace-issues-and-scheduling.md]] and
+[[docs/workspace-lifecycle.md]].
 
 ## Product and process boundary
 
