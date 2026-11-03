@@ -68,6 +68,10 @@ export default defineConfig({
   resolve: {
     alias: {
       '@': resolve(__dirname, 'src'),
+      // The dev server and dependency optimizer need source entries before
+      // workspace packages have been built, just like the Vitest aliases.
+      '@traderalice/update-lifecycle': resolve(__dirname, '../packages/update-lifecycle/src/index.ts'),
+      '@traderalice/connector-protocol': resolve(__dirname, '../packages/connector-protocol/src/index.ts'),
     },
   },
   // The dev-only routing values use VITE_ environment keys injected by Vite
