@@ -59,7 +59,9 @@ safety boundaries, and release gates live in [[docs/testing.md]] and
   TODO files or Linear tasks; handle findings already owned by the current
   change in that change.
 - Substantial multi-session work uses one canonical `plans/<topic>.md` entry and
-  follows [[PLANS.md]].
+  follows [[PLANS.md]]. Never let plans grow unbounded or turn into turn-by-turn
+  execution logs; delete `plans/<topic>.md` and its `PLANS.md` bullet in the same
+  change that completes the work.
 - Durable subsystem truth and the complete guide catalog live in
   [[docs/README.md]]. Keep that index current instead of copying it here.
 - `README.md` is public positioning. Ask for product framing before rewriting
