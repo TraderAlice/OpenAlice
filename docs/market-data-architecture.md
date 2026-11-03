@@ -3,8 +3,7 @@
 This guide owns OpenAlice's market-data contracts and provider boundaries.
 New features extend TraderHub, the bar service, or a typed domain contract —
 never the embedded OpenBB compatibility model by default. Related:
-[[docs/project-structure.md]], [[docs/uta-live-testing.md]], and
-[[docs/broker-packs.md]].
+[[docs/project-structure.md]] and [[docs/uta-live-testing.md]].
 
 ## Layers
 

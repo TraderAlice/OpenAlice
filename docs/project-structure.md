@@ -83,7 +83,7 @@ docs/                          owner guides and contributor documentation
 ```
 
 `src/ai-providers/` is not an inference engine. Provider/model semantics and
-adapter projection follow [[docs/model-semantics-and-runtime-injection.md]].
+adapter projection follow [[docs/alice-harness.md]].
 
 ## Workspace boundary
 
@@ -102,7 +102,7 @@ boundaries. Chat may maintain a recent-Workspace pointer; AutoQuant and Auto
 Prediction require explicit readiness pointers and never guess a desk on send.
 Source-backed Harnesses retain their own upstream repository, business state,
 and lifecycles. Alice supervises declared web capabilities through the shared
-contract in [[docs/harness-web-surfaces.md]] rather than reproducing them.
+contract in [[docs/alice-harness.md]] rather than reproducing them.
 
 The active floor contains active Workspace checkouts only. Do not reintroduce
 automatic date-based Chat Workspaces: a date is not a context boundary and
@@ -117,7 +117,7 @@ Execution identities remain distinct:
 
 Changing surface never creates another product Session or roster row.
 Provenance and reconstruction rules belong to
-[[docs/conversation-provenance.md]].
+[[docs/workspace-lifecycle.md]].
 
 Built-in templates use cross-platform `bootstrap.mjs` and shared Git helpers;
 do not add Bash bootstraps for built-ins. Source-backed Harnesses record an
@@ -203,18 +203,16 @@ backup behavior. Unreleased development shapes are replaced directly.
 | Change | Start with |
 |---|---|
 | Workspace execution, Agent launch, managed runtime, PATH | `src/workspaces/` + [[docs/managed-workspace-runtime.md]] |
-| Offboarding, restore/purge, Session retirement | [[docs/workspace-lifecycle.md]] |
-| Managed template reconciliation | [[docs/workspace-template-upgrade.md]] |
-| Broker/account/execution behavior | `services/uta/src/domain/trading/` + [[docs/uta-live-testing.md]] |
+| Offboarding, restore/purge, Session retirement, template upgrade, absorb | [[docs/workspace-lifecycle.md]] |
+| Broker/account/execution behavior, Broker Packs, IBKR wire protocol | `services/uta/src/domain/trading/` + [[docs/uta-live-testing.md]] |
 | Shared Alice ↔ UTA shapes | `packages/uta-protocol/` and both callers |
 | External Inbox/chat adapters | [[docs/connector-service.md]] |
 | Renderer/API surface | `ui/`, `src/webui/`, and matching demo handlers |
-| Public website/user tutorials | `apps/landing/` + [[docs/landing.md]] |
-| Issues, schedules, headless runs | [[docs/workspace-issues-and-scheduling.md]] |
-| Product activity facts | [[docs/product-activity-journal.md]] |
+| Public website/user tutorials | `apps/landing/` + [[apps/landing/AGENTS.md]] |
+| Issues, schedules, headless runs, Inbox, activity journal | [[docs/workspace-issues-and-scheduling.md]] |
 | User-state schema | `src/migrations/` + generated index |
 | Process locks/optional-service supervision | `packages/guardian-runtime/` and all launchers |
-| AliceProject selection/complete homes | [[docs/data-locations.md]] and startup owners |
+| AliceProject selection/complete homes and local runtime bootstrap | [[docs/alice-project.md]] and startup owners |
 
 Test policy lives in [[docs/testing.md]] and `tests/gates.json`. Current code,
 tests, and runtime behavior override stale prose; update this guide only when a

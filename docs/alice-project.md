@@ -1,59 +1,54 @@
-# AliceProject
+# AliceProject, Data Locations, and Local Runtime
 
-This guide owns the top-level local-runtime concept, identity, and
-concurrency boundary. Guardian recovery mechanics belong to
-[[docs/project-structure.md]], machine-level lifecycle commands to
-[[docs/cli-supervisor.md]], and the complete-home filesystem contract to
-[[docs/data-locations.md]].
+This guide owns the top-level local runtime identity (`AliceProject`), complete-home
+filesystem isolation (`OPENALICE_HOME`), client startup selection, and the local
+CLI/source runtime provider. Process-tree recovery belongs to
+[[docs/project-structure.md]], top-level CLI/TUI commands to
+[[docs/cli-supervisor.md]], installation/updates to [[docs/cli-installer.md]],
+and Electron packaging to [[docs/managed-workspace-runtime.md]].
 
-## Definition
+---
 
-An **AliceProject** is one independently startable OpenAlice product
-runtime: one complete `OPENALICE_HOME`, one Guardian owner tree (Alice
-backend, optional UTA, optional Connector), one logical product endpoint,
-with many browser windows or one Electron renderer attached. It sits above
-`Workspace` (a durable agent context inside one project) and `Session` (one
-conversation). Neither a Workspace nor a browser tab owns the backend
-process. Ordinary users have one implicit `Default AliceProject`; named
-projects are for independently owned contexts (concurrent checkouts,
-separate personas, isolated non-trading uses).
+## 1. AliceProject Identity and Topology
 
-The backend is per project because it owns file-backed registries, PTYs,
-credentials, runtime locks, and service connections beneath one complete
-home; making it a multi-project tenant would weaken the single-writer
-invariant. Local concurrency scales by starting another AliceProject, never
-by switching a shared backend in place, and opening another project never
-stops or mutates the first.
+An **AliceProject** is one independently startable OpenAlice runtime:
 
-## Identity
+```text
+AliceProject
+├── one complete OPENALICE_HOME
+├── one Guardian owner tree (Alice backend + optional UTA + optional Connector)
+├── one logical product endpoint
+└── many browser windows or one Electron renderer attached
+```
 
-Four identity fields plus an immutable product birth:
+`AliceProject` sits above `Workspace` (a durable agent context inside one
+project) and `Session` (one conversation). Neither a Workspace nor a browser tab
+owns the backend process. Because the backend owns file-backed registries,
+Workspace PTYs, credentials, runtime locks, and local service connections
+beneath one complete home, local concurrency scales by starting another
+AliceProject with a separate home—never by turning one backend into a
+multi-project tenant or switching a shared backend in place.
 
-- `id`: stable `alice-project-…` identifier derived from the canonical
-  complete home (or supplied explicitly by the Supervisor);
-- `key`: machine-local CLI selector (`default`, `research`, …);
-- `displayName`: mutable;
-- `home`: canonical complete `OPENALICE_HOME` and ownership boundary;
-- `product`: `trader` (default) or `nano`, written once at create. Missing
-  stamps are `trader`; an unreadable or malformed stamp blocks startup
-  instead of silently enabling the Trader runtime and UTA. Concurrent
-  creates are first-writer-wins and registration must agree with the
-  recorded product.
+### Identity fields and product birth
 
-NanoAlice is experimental: Guardian never starts UTA for it and its chrome
-hides Market, Trading-as-Git, Portfolio, and matching Settings categories.
-Product is not a Settings switch — create another AliceProject to change
-product.
+- `id`: stable `alice-project-…` identifier derived from the canonical complete
+  home (or supplied explicitly by the Supervisor).
+- `key`: machine-local CLI selector (`default`, `research`, …).
+- `displayName`: mutable human-facing name.
+- `home`: canonical complete `OPENALICE_HOME` and single-writer boundary.
+- `product`: `trader` (TraderAlice, default) or `nano` (NanoAlice), written once
+  at creation to `<OPENALICE_HOME>/data/config/alice-project.json`. Missing
+  stamps default to `trader`; an unreadable or malformed stamp blocks startup
+  rather than silently starting UTA.
 
-Named-project creation selects Chat, Auto Quant, and Auto Prediction by
-default and records the `workspace-setup.json` birth request without
-preparing any Workspace; the backend resolves/creates selected Workspaces
-under its writer lease and checkpoints success (never starting an Agent
-Session or copying credentials; interrupted attempts reuse the existing
-Workspace; failed items stay pending). A prepared Workspace may still need
-an Agent or credentials before its first Session — readiness belongs to the
-normal launch controls. Users configure providers and Runtimes from ordinary
-Settings/Chat surfaces; no full-screen first-run wizard gates the product.
+NanoAlice never starts UTA and hides trading-specific chrome (Market, Trading as
+Git, Portfolio, and matching Settings categories). Product is immutable after
+creation—create another AliceProject to use a different product.
+
+Named-project creation records a `workspace-setup.json` birth request (Chat,
+AutoQuant, Auto Prediction by default) and prepares the selected Workspaces
+asynchronously after the app shell opens under the backend's writer lease. It
+never starts an Agent Session or copies credentials.
 
 ```bash
 openalice create alice-project --name office --home ~/.openalice-office --product nano --yes
@@ -61,76 +56,138 @@ openalice project use office
 openalice project copy-ai-creds --from default --to office --yes
 ```
 
-`project use` only changes the Supervisor's remembered default. `copy-ai-creds`
-is the explicit AI-vault exception: it copies only `credentials` from the
-per-home `ai-provider-manager.json`, never prints secrets, and leaves
-Workspace launch preferences and broker credentials project-local.
+`project use` only updates the Supervisor's remembered default. `copy-ai-creds`
+is the explicit exception for AI credentials: it merges only the `credentials`
+map of `<home>/data/config/ai-provider-manager.json` into the destination home,
+never prints secrets, and never copies Workspace launch preferences, broker
+accounts, `sealing.key`, or `provider-keys.json`.
 
-The application/source root is launch metadata, not identity; ports and Web
-URLs are live discovery data. Guardian's `instanceId` is one process-tree
-ownership run and must never be presented as an AliceProject.
-Supervisor-launched children receive `OPENALICE_PROJECT_{ID,KEY,NAME}` and
-optionally `OPENALICE_PROJECT_APP_ROOT`; direct dev/Electron launches derive
-identity from the complete home. Load-bearing paths:
-`packages/guardian-runtime/src/alice-project.ts`,
-`packages/cli/src/alice-project.ts` (installer projection),
-`packages/cli/src/supervisor-config.ts`, `scripts/guardian/{dev.ts,prod.mjs}`,
-`src/webui/routes/alice-project.ts`, `ui/src/hooks/useAliceProject.ts`.
+### Lifecycle and discovery invariants
 
-## Persistence and released compatibility
+- One writable complete home has at most one Guardian owner.
+- Project `id` never depends on display name, port, or browser URL; Guardian
+  `instanceId` is process-tree run identity, not product hierarchy.
+- **Open** attaches a window to a verified running endpoint; **Select** changes
+  the Supervisor default; **Start/Stop** affect only the selected project's
+  matching owner; **Take over** (`--takeover`) is explicit recovery for the same
+  home, never concurrency.
+- Selecting or opening project B never stops, moves, copies, merges, or deletes
+  project A.
+- Electron reads its current project via preload/IPC; browser mode reads the
+  same secret-free shape through authenticated HTTP. Frontend components must
+  consume project identity through `useAliceProject`.
 
-The Supervisor registry lives outside every project home at the platform
-Supervisor root. Canonical schema is version 3 (`schemaVersion`,
-`defaultTarget: {machine, project}`, `projects: {key: {name, displayName,
-home}}`). Released v1/v2 registries migrate once under the Supervisor write
-lock (old file preserved as `config.pre-default-target.json`). Deprecated
-`--instance`/`OPENALICE_INSTANCE` remain automation aliases; new
-integrations use `--project`/`OPENALICE_PROJECT`. The registry never stores
-credentials or Workspace state; equal or nested complete homes are rejected;
-missing registered homes stay visible and fail without silent replacement
-state.
+---
 
-## Lifecycle and discovery
+## 2. Complete Home (`OPENALICE_HOME`) and Data Locations
 
-Guardian remains the exclusive writer lease for one project's complete home:
-two Guardians for the same project are rejected or require explicit takeover;
-two projects with distinct homes run concurrently. Lifecycle actions stay
-deliberately separate — **Open** attaches to a verified running endpoint;
-**Select** changes the Supervisor default; **Start/Stop** affect only the
-selected project's matching owner; **Take over** is explicit recovery.
-Selecting or opening project B never stops project A, and the browser never
-hot-swaps one React tree between unrelated backend origins. Electron reads
-its current project through preload/IPC; browser mode reads the same shape
-through authenticated HTTP. Frontend components must consume the project via
-`useAliceProject`, never calling the HTTP route or bridge directly.
+A selectable **data location** is the complete `OPENALICE_HOME`, never only its
+`data/` subdirectory or Electron's browser profile:
 
-## Client startup selection
+```text
+<OPENALICE_HOME>/
+├── data/                 portable configuration, sessions, trading, inbox, office, cron, news
+├── workspaces/           Workspace repositories, departed archives, and launcher state
+├── state/                Guardian and runtime ownership locks
+├── runtime/              optional Broker Packs
+├── provider-keys.json    AI provider credentials (unless OPENALICE_GLOBAL_DIR overrides)
+└── sealing.key           machine-bound encryption key (deliberately outside data/)
+```
 
-Client startup selects where Alice works before mounting any project-owned
-UI. The current machine's Supervisor owns one **Default** Machine/project
-pair in `config.json.defaultTarget` (`null` opens the chooser); Desktop,
-Web, TUI, and CLI share this authority — there is no independent Recent or
-local lifecycle default. Electron opens its client relay shell for a remote
-or unresolved Default without locking or starting a local project; explicit
-home/project/environment overrides apply only to that invocation.
+Two AliceProjects run concurrently when they use distinct complete homes and
+unpinned ports. Default Web ports probe upward from `47331`; first boot must not
+write `data/config/ports.json` merely to materialize the default, because a file
+`web` entry is a hard pin. `openalice up --port` and `OPENALICE_WEB_PORT` are
+one-run pins and do not rewrite the file.
 
-Restore, reconnect, polling, and inventory never change Default. A
-successful user switch saves after health and identity verification (relay
-owns the entire operation; persistence failure keeps the connection and
-reports that Default was not saved). Create, start, and inspect alone do not
-select a project; `project use` is the explicit set-Default operation. The
-schema-3 migration examines the old startup pair, Electron selectedHome, and
-old local default once (conflicting inputs produce a recoverable chooser
-error; unreachable targets preserved; old files remain backups; inventory in
-`src/migrations/INDEX.md`).
+### Launcher and Workspace state boundaries
 
-## Invariants
+- `workspaces/state/` holds `agent-conversations.jsonl` (sensitive prompt/reply
+  stream), `agent-runtime.jsonl` (occupancy/activity journal without prompt
+  bodies), `session-executions.json` (secret-free process lifecycle ledger), and
+  `resume-identities.json` (product-to-native Session ID ledger).
+- `openalice project transfer` excludes those runtime journals, resume
+  identities, headless logs, locks, ports, auth, and `sealing.key`; it transfers
+  portable `data/` and Workspace repositories, rebases paths, re-seals
+  credentials with a fresh remote key, and reports zero imported resumable
+  Sessions.
+- Each Workspace stores secret-free launch preferences in `.alice/settings.json`
+  and per-Session bindings/nametags in `.alice/sessions/<resumeId>.json`
+  (Workspace Manager bindings live under
+  `workspaces/state/workspace-manager-sessions/` instead of the floor root).
+  Vault secrets stay in the complete home and never travel with a copied
+  Workspace repo.
+- `data/inbox/routine-follow-ups.json` (Office decision queue and immutable
+  receipt ledger) and `data/office/day.json` (server-local shift and admission
+  ledger) are presentation/workflow sidecars. Malformed state in either file
+  fails closed on its Office API without discarding the file or blocking other
+  Alice surfaces.
 
-- one writable complete home has at most one Guardian owner;
-- project id does not depend on display name, port, or browser URL;
-- a project switch never moves, copies, merges, or deletes state;
-- AI vault copy is a separate confirmed command, never bundled with select;
-- opening a project never stops another project;
-- browser and Electron show the same secret-free identity shape;
-- `Workspace` is never renamed or overloaded to mean AliceProject;
-- Guardian `instanceId` is process identity, not product hierarchy.
+---
+
+## 3. Supervisor Registry and Client Startup Selection
+
+The machine-local Supervisor root lives outside every project home and owns:
+
+1. `config.json` (schemaVersion 3): `defaultTarget: { machine, project }` plus
+   registered local `projects`. Equal or nested homes are rejected; missing
+   registered homes remain visible and fail closed instead of silently recreating
+   an empty folder or falling back to `~/.openalice`.
+2. `machines.json` (schemaVersion 1): saved SSH Machine profiles (`id`,
+   `displayName`, `sshTarget`, `enabled`, optional `sshPort` and local
+   `identityFile` path—never key bytes or project data). `remote-targets.json`
+   beside it is a hashed tunnel-port cache only.
+
+Client startup (Desktop, Web, TUI, and CLI) uses `config.json.defaultTarget` as
+its single authority. A `null`, unavailable, or ambiguous migrated Default opens
+the Machine/AliceProject chooser before mounting any project-owned UI or
+acquiring a local lock. Restore, reconnect, polling, create, start, and inspect
+never mutate Default; only a verified user switch or explicit `project use`
+updates it. When `--project`, `--home`, `OPENALICE_PROJECT`, or `OPENALICE_HOME`
+override the target for one invocation, TUI project selection is read-only.
+
+---
+
+## 4. Local Runtime Provider and Process Architecture
+
+The installed CLI is a target-specific Bun executable that re-enters its own
+bytes under internal roles to run Guardian, Alice, optional UTA, and optional
+Connector as separate processes. Immutable assets (`ui/dist`, `default/`,
+templates, adapter/CLI helpers) resolve from `share/openalice/` and are covered
+by the release `contentIdentity`. The installed CLI requires working system
+Git/Bash (`dependencyPolicy: "system"`) and needs no host Node, Bun, or npm.
+
+- **Source development**: `pnpm dev` runs the local Web relay in front of Vite
+  (`pnpm dev -- --home ~/.openalice-dev/<feature>` for concurrent worktrees).
+  `--app-dir` or `OPENALICE_APP_HOME` explicitly selects a source checkout;
+  installed startup never clones source or installs dependencies.
+- **External Agent Runtimes**: Pi, OpenCode, Codex, Claude Code, Agy, Grok, and
+  OMP remain user-owned external executables in CLI mode. The CLI strips
+  Electron-only managed-Pi variables while preserving user `PI_*` settings.
+- **PTY flow control**: Each Session owns an independent child process and PTY.
+  Under output pressure, the POSIX Bun PTY backend pauses/resumes the child
+  process group at the kernel boundary (resuming before graceful shutdown);
+  Windows ConPTY detaches an over-watermark WebSocket consumer with retryable
+  close code `1013` while retaining the agent and replay buffer.
+- **Linux PID liveness**: Guardian parses `/proc/<pid>/stat` after the final `)`
+  of the command name; a zombie thread-group leader (`Z`) proves exit only when
+  a single thread remains.
+
+---
+
+## 5. Load-Bearing Paths and Verification
+
+- `packages/guardian-runtime/src/alice-project.ts` &
+  `packages/cli/src/alice-project.ts` — canonical identity and environment hash.
+- `packages/cli/src/supervisor-config.ts` &
+  `supervisor-default-migration.ts` — machine registry and schema-3 migration.
+- `apps/desktop/src/main.ts`, `data-home-desktop.ts`,
+  `existing-owner-startup.ts` — desktop home resolution, lock handoff, and
+  narrow IPC bridge.
+- `src/webui/routes/alice-project.ts` & `ui/src/hooks/useAliceProject.ts` —
+  secret-free identity endpoint and renderer hook.
+
+Verify changes with focused unit/UI specs, Guardian recovery tests, strict root/
+desktop/UI typechecks, and an isolated onboarding or existing-owner smoke
+(`pnpm electron:smoke:existing-owner` on disposable homes, never a real user
+home).

@@ -1,121 +1,152 @@
-# Alice Harness injection
+# Alice Harness, Model Semantics, and Managed Web Surfaces
 
-AliceProject supplies CLI runtime capabilities and companion Skills independently
-of Workspace templates. CLI availability and copied Skill inclusion are separate
-preferences. Chat template versions and source-backed Harness pins do not
-version this injection layer.
+This guide owns everything OpenAlice injects into or supervises around a
+Workspace: the three-layer AI credential/model/adapter projection, always-loaded
+instructions and CLI shims, versioned Alice Harness Skills, Sticker Packs, and
+managed Harness Studio web surfaces (AutoQuant and Auto Prediction).
 
-## Version and ownership
+---
 
-`default/alice-harness.json` declares the Project injection release. Its
-effective revision fingerprints the complete owned Skill trees. CLI implementation
-or registry changes do not change that file-bundle revision; executable behavior
-follows the running Project and is never pinned to an old Workspace receipt.
+## 1. Model Semantics and Runtime Injection
 
-Each Workspace records accepted state in `.alice/alice-harness-version.json`,
-with bundle and per-Skill revisions plus optional upgrade commit. Baselines and
-recovery journals live under `.alice/alice-harness-upgrade/`. These are local
-bookkeeping excluded from Workspace Git. Status surfaces distinguish accepted
-and available revisions.
+OpenAlice does not run an in-process model loop. Native coding-agent CLIs own
+inference, transcripts, login, and native configuration. Runtime injection
+crosses three strict layers:
 
-`ALICE_HARNESS_SKILLS` in `src/workspaces/alice-harness-policy.ts` is the sole
-catalog of complete Alice-owned Skill trees. `.agents/skills` is primary;
-`.claude/skills` is its runtime mirror; legacy `.pi/skills` exists only for
-reconciliation. The catalog also handles legacy `alice-workspace` copies without
-restoring that name as current guidance.
+```text
+Credential access (Vault account/vendor + auth + wire-to-endpoint map)
+  ↓
+Model selection & semantics (exact model ID + limits/reasoning + unknown-model overrides)
+  ↓
+Per-process adapter projection (CliAdapter.sessionRuntime.project → child argv/env)
+```
 
-Template instructions, README, and other bundled Skills remain template-owned.
-Template plans exclude Alice-owned paths. Source upgrades are upstream Git
-merges and do not advance Alice injection metadata. Sticker packs use their
-separate Project projection in [[docs/sticker-packs.md]].
+- **Credential access & catalogs**: `CredentialAIProvider` projects Vault records
+  and caches read-only discovery snapshots under
+  `<OPENALICE_HOME>/data/model-catalog/providers/` without storing keys or raw
+  responses. `NativeAIProvider` runs bounded runtime-owned discovery without
+  reading tokens or creating Vault records. Catalog membership is advisory,
+  never a launch gate.
+- **Model semantics (`src/ai-providers/model-semantics.ts`)**: Offline resolution
+  of limits and reasoning (`none`, `optional`, `adaptive`, `required`), effort
+  tiers, and thinking switches. Unknown free-typed model IDs remain valid;
+  unknown-model overrides bind to one exact model ID.
+- **Adapter projection (`src/workspaces/cli-adapter.ts`)**: Every
+  provider-capable adapter implements `sessionRuntime.project(...)` and declares
+  `capabilities.aiProvider`. Secrets resolve just in time into the child
+  environment and never appear in argv or Workspace files. Omitted effort stays
+  omitted.
+- **Workspace preferences & frozen Session bindings**: `.alice/settings.json`
+  stores secret-free `interactive` and `headless` creation defaults (fixed vs
+  recent Agent + credential slug/model/effort tuple). At Session birth, the
+  resolved `SessionRuntimeBinding` freezes into `.alice/sessions/<resumeId>.json`
+  (or `workspaces/state/workspace-manager-sessions/` for Workspace Manager) and
+  replays across every surface; later Workspace preference changes never mutate
+  an existing Session's binding.
+- **Native auth & permissions**: Absence of a managed credential defaults to
+  native runtime auth (never picking an arbitrary Vault key). Alice-managed
+  Sessions configure full host access and automatic tool approval through
+  process-local adapter flags on both fresh launch and resume, never by
+  rewriting global user config.
 
-## Workspace preferences
+---
 
-`.alice/alice-harness-config.json` is Workspace-owned tracked config. Omitted CLI
-entries are enabled. A CLI-wide disable wins over group switches. The gateway
-reads current config for discovery and invocation, including compatibility
-exports. Disabled tools return 403; malformed config fails closed.
+## 2. Workspace Agent Guidance and Live CLI Shims
 
-These switches customize capabilities, not a security sandbox against an Agent
-that can edit its own files. UTA permission and trading-write authority are
-unchanged.
+Guidance is organized into three layers so always-loaded prompts stay compact:
 
-Skill inclusion is an independent optional name-to-boolean map. Omitted Skills
-follow template defaults, with self-scheduling always included. Explicit choices
-override defaults. CLI switches never add/remove Skill files, and excluding a
-Skill never disables commands.
+1. **Always-loaded contract (`CLAUDE.md` & `AGENTS.md`)**: Copied from
+   `src/workspaces/templates/<template>/files/instruction.md` at Workspace
+   creation. Holds durable behavioral rules and Skill routing only.
+2. **Discoverable Skills (`default/skills/*/SKILL.md`)**: Projected into
+   `.agents/skills/` (primary) and `.claude/skills/` (mirror):
+   - `alice`: Inbox, Issues, provenance, peers, Session nametags
+   - `file-delivery`: Connector reply attachments
+   - `delegate-autoquant`: Chat → AutoQuant delegation
+   - `self-scheduling`: Issue frontmatter, schedules, headless delivery
+   - `traderhub`: Low-frequency market/fundamental/macro data
+   - `market-data`: K-line discovery, OHLCV, chart references
+   - `alice-analysis`: Quantitative formulas and technical snapshots
+   - `alice-uta`: Broker reads and trading writes/approvals
+3. **Live CLI authority (`alice`, `traderhub`, `alice-uta`)**: The live CLI
+   manifest and tool gateway own exact command syntax and validation;
+   `alice-workspace` is a legacy alias only. Adapters must preserve Alice's
+   composed `PATH` across login shells so global binaries never shadow Workspace
+   shims.
 
-Preference saves apply CLI switches immediately without overwriting Skill files.
-Updates reconcile excluded files with local-edit review rather than silent
-deletion. Exclusions persist until changed and never remove the Project
-prototype. Re-enabling restores files on the next update even at the same bundle
-revision or with the CLI disabled.
+---
 
-## Independent updates
+## 3. Alice Harness Skill Distribution and Preferences
 
-Project Settings → Workspace injection owns prototypes, inventory, and batch
-updates; Workspace details owns preferences. Batch apply uses displayed digests,
-skips blocked/conflicting checkouts, and isolates each Workspace result.
+`default/alice-harness.json` and `ALICE_HARNESS_SKILLS`
+(`src/workspaces/alice-harness-policy.ts`) version Project-owned Skill trees
+independently of Workspace templates.
 
-Existing Workspaces stay unversioned until explicit adoption. First preview uses
-the root-commit baseline without startup rewrites; unknown/custom content is
-preserved or reviewed. Adoption and missing default config use one transaction.
+- **State & preferences**: `.alice/alice-harness-version.json` records accepted
+  bundle and per-Skill revisions (local bookkeeping, git-excluded).
+  `.alice/alice-harness-config.json` is tracked Workspace config controlling CLI
+  enablement (disabled tools return `403`; malformed config fails closed) and
+  independent per-Skill inclusion booleans (`self-scheduling` is always
+  included).
+- **Scoped and bundle updates**: Settings → Workspace injection and
+  `alice harness upgrade [--apply] [--skill <name> --action install|update|remove|restore]`
+  use the shared three-way managed-file transaction engine, checkout lease, and
+  preview digest verification.
 
-The shared managed-file engine supplies leases, staged-index blockers, exact
-digests, atomic replacement, isolated commit, rollback, and committed recovery
-before scheduled work. Config joins the digest and is never overwritten.
+---
 
-Skill updates may run during active Sessions; Agents must reread changed files
-because model context is not reloaded. Template/source upgrades and CLI config
-writes retain separate activity gates.
+## 4. Sticker Packs (`default/stickers/`)
 
-Scoped operations affect one Skill identity across `.agents` and `.claude`.
-They preview exact files and commit retention preference with those files while
-preserving CLI switches. Update uses three-way comparison; restore deliberately
-replaces the reviewed local copy. Unverified or divergent comparisons never
-mean equal.
+AliceProjects supply optional Sticker Pack prototypes (`Alice Color`, `Alice Ink`,
+plus custom imports under `data/stickers/packs/<id>/` capped at 512 KiB/image,
+100 images, 32 MiB total).
 
-A scoped operation merges only that Skill into Base and updates only its
-`skillVersions` entry; removal clears it. Whole-bundle revision changes only on
-a full update. Legacy scoped adoption stays `unversioned` until full review.
-Recovery preserves the same bookkeeping.
+- Enabled by default for new Chat Workspaces only. Projects selected images to
+  flat `sticker/<name>.png|.webp` paths and generates
+  `.agents/skills/alice-stickers/SKILL.md` (plus `.claude/skills/` mirror),
+  tracked in `.alice/stickers.json` with rollback journals at
+  `.alice/sticker-transaction.json`.
+- Connector resolves `[[sticker/wave.png]]` through the generic Workspace file
+  boundary to send native stickers.
 
-`alice harness upgrade` previews; `--apply` applies. `--skill` plus an action
-(`install`, `update`, `remove`, `restore`) scopes the operation. CLI and UI use
-the same digest, conflict, and lease contracts.
+---
 
-## CLI context injection
+## 5. Managed Harness Web Surfaces (Studio)
 
-Workspace launch supplies `OPENALICE_HOME`, `OPENALICE_PROJECT_ID`, the tool
-endpoint, and `AQ_WS_ID`; Session/run identity is separate. Project-only calls
-omit Workspace identity and expose only global registry commands. Workspace
-calls enforce current preferences. [[docs/cli-supervisor.md]] owns Project and
-endpoint resolution.
+OpenAlice supervises Harness-owned web applications (AutoQuant Studio and Auto
+Prediction Studio) declared via root `harness.json` (`manifestVersion: 1`,
+`capabilities.studio: { command, ports, entryPort, readinessPath }`):
 
-Adapters must preserve Alice's composed PATH through native shell startup. A
-login profile or shell snapshot must not replace it with a global `alice`.
-Required corrections are process-local adapter launch policy, including resume;
-OpenAlice does not rewrite user shell profiles or global native config.
+- **Managed launch**: OpenAlice allocates loopback ports, injects
+  `HARNESS_CAPABILITY=studio`, `HARNESS_HOST=127.0.0.1`, `HARNESS_PORTS`, and
+  `HARNESS_NO_OPEN=1`, supervises one foreground process tree per Workspace
+  generation, and waits for HTTP 2xx on `readinessPath`.
+- **Opaque routing & security**: A ready generation receives
+  `oa-surface-<opaque>.localhost` (no arbitrary `/proxy/<port>` route). Browser,
+  `pnpm dev` Web relay, and SSH tunnels route by `Host` header; Electron uses an
+  ephemeral loopback-only Surface Gateway exposing Harness routes only. The
+  proxy strips OpenAlice auth/cookie/CSRF headers.
+- **Source-backed Harness upgrades (`src/workspaces/harness-source-upgrade.ts`)**:
+  Source-pinned templates record their commit in tracked
+  `.alice/harness-source.json`. Preview fetches the target commit, validates
+  `harness.json`, and checks Git mergeability; apply requires idle Sessions/Studio,
+  a clean working tree for touched paths, and creates a no-fast-forward Git merge
+  commit under the shared checkout lease.
 
-CLI discovery may warn on stderr about stale Skills without changing JSON/
-output files or blocking commands. Updates change files, not loaded context or
-preferences; Project-only calls have no Workspace bundle.
+---
 
-## Load-bearing paths
+## 6. Load-Bearing Paths and Verification
 
-- `default/alice-harness.json` and `default/skills/` — release and prototypes.
-- `src/workspaces/alice-harness-policy.ts` — owned Skills and preferences.
-- `src/workspaces/template-upgrade.ts` — shared plans, scoped updates, receipts.
-- `src/workspaces/workspace-operation-guard.ts` — checkout serialization.
-- `src/workspaces/context-injector.ts` and adapters — copies and launch PATH.
-- `src/server/` CLI gateway and Workspace injection routes/UI — live enforcement,
-  catalog, comparisons, and updates.
+- `src/ai-providers/{preset-catalog,model-semantics,presets,provider,model-catalog}.ts`
+  — provider presets, model semantics, and catalog caching.
+- `src/workspaces/{cli-adapter,session-runtime-binding,workspace-runtime-settings,session-runtime-store,credential-injection}.ts`
+  & `src/workspaces/adapters/` — binding resolution and process projection.
+- `src/workspaces/{context-injector,alice-harness-policy,template-upgrade}.ts` —
+  prompt/Skill/sticker injection and three-way updates.
+- `src/workspaces/{harness-manifest,harness-surface-manager,harness-source-upgrade}.ts`
+  & `src/webui/harness-surface-proxy.ts` — Studio supervision, proxy routing,
+  and source merges.
 
-## Verification gates
-
-Test bundle/scoped apply, preference independence, stale digests, conflicts,
-rollback/recovery, per-Skill revisions, legacy adoption, exclusion/re-enable,
-and gateway enforcement. For PATH changes, use the real Workspace headless API
-with default shell options: check `command -v alice` and a bounded read without
-PATH/login overrides. Exit zero alone can hide stale binaries or normalized
-provider failure. Expand cross-runtime scope via [[docs/development-workflow.md]].
+Verify changes with owning root/UI typechecks, adapter/binding/harness unit and
+integration suites, and a real Workspace CLI/Studio execution check (`command -v alice`
+in headless shell plus real adapter launch/resume).

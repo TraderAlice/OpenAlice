@@ -6,14 +6,14 @@ bootstrap, control/status contracts, multi-client authority, and the staged
 path toward an independent Studio frontend.
 
 Start with [[docs/remote-quickstart.md]] for user-facing setup. This guide
-complements [[docs/local-runtime.md]], [[docs/cli-supervisor.md]], and
+complements [[docs/alice-project.md]], [[docs/cli-supervisor.md]], and
 [[docs/managed-workspace-runtime.md]].
 
 ## Status
 
 The Bun-native Runtime, registered SSH Machines, managed remote bootstrap,
 and AliceProject transfer are implemented; source checkout remains an
-explicit development override ([[docs/local-runtime.md]]). The installer
+explicit development override ([[docs/alice-project.md]]). The installer
 advances one checksum-bound native release; Agent Runtime executables are
 user-owned and only discovered from `PATH`. Normal `pnpm dev` puts the relay
 in front of Vite. Native `server run/start` derives content identity from
@@ -264,7 +264,7 @@ ownership after a bounded grace without killing the PTY or Agent.
 Browser/tunnel disconnect and controller transfer never stop the Guardian
 tree, PTY, or Agent conversation (the processes live on). A full
 Guardian/server restart or reboot stops the PTY, and conversation survives
-only via native Agent resume/provenance ([[docs/conversation-provenance.md]]);
+only via native Agent resume/provenance ([[docs/workspace-lifecycle.md]]);
 a child restart under Guardian is PTY-ownership dependent. Server detach must
 not be marketed as crash-proof terminal persistence, and live PTY handoff
 during Runtime upgrade is explicitly deferred.

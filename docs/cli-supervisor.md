@@ -6,7 +6,7 @@ machine-readable envelopes, shell completion, compatibility aliases, and the
 boundary of the Supervisor TUI.
 
 Installer transactions belong to [[docs/cli-installer.md]]. Source preparation
-and the native headless bundle provider belong to [[docs/local-runtime.md]].
+and the native headless bundle provider belong to [[docs/alice-project.md]].
 Remote orchestration belongs to [[docs/remote-access.md]]. Guardian lock,
 takeover, and process-tree truth belong to [[docs/project-structure.md]] and
 `packages/guardian-runtime/`. Remaining Supervisor product work is tracked in
