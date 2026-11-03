@@ -236,6 +236,11 @@ export const demoEquityCurve: EquityCurvePoint[] = (() => {
         [DEMO_UTA_IBKR]: IBKR_CURVE[i].equity,
         [DEMO_UTA_CRYPTO]: CRYPTO_CURVE[i].equity,
       },
+      snapshotTimestamps: {
+        [DEMO_UTA_PAPER]: PAPER_CURVE[i].timestamp,
+        [DEMO_UTA_IBKR]: IBKR_CURVE[i].timestamp,
+        [DEMO_UTA_CRYPTO]: CRYPTO_CURVE[i].timestamp,
+      },
     })
   }
   return out
@@ -252,7 +257,7 @@ export const demoEquityCurveByUTA: Record<string, EquityCurvePoint[]> = {
 export const demoSnapshotsByUTA: Record<string, UTASnapshotSummary[]> = Object.fromEntries(
   demoTradingAccounts.map((a) => [
     a.id,
-    demoEquityCurveByUTA[a.id]!.slice(-5).map((p) => ({
+    demoEquityCurveByUTA[a.id]!.map((p) => ({
       accountId: a.id,
       timestamp: p.timestamp,
       trigger: 'daily',

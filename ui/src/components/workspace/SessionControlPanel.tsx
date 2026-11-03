@@ -1,3 +1,4 @@
+import { DetailsSummary } from '../ui/collapsible'
 import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { LoaderCircle, ShieldAlert, Square } from 'lucide-react'
@@ -73,11 +74,11 @@ export function SessionControlPanel({ control, compact = false, sessionName }: {
           : t('sessionControl.manual')}</span>
         <Button variant="outline" size="sm" disabled={control.busy || Boolean(pendingExecutionId)} onClick={() => void control.release(block.id)}>{t('sessionControl.release')}</Button>
       </div>
-      <details className="text-xs text-muted-foreground"><summary className="cursor-pointer">{t('sessionControl.reason')}</summary><p className="mt-1 break-words">{block.reason}</p><p>{block.actor.entry} · {new Date(block.createdAt).toLocaleString(i18n.language)}</p></details>
+      <details className="text-xs text-muted-foreground"><DetailsSummary>{t('sessionControl.reason')}</DetailsSummary><p className="mt-1 break-words">{block.reason}</p><p>{block.actor.entry} · {new Date(block.createdAt).toLocaleString(i18n.language)}</p></details>
     </div>)}
     {data && !run && data.blocks.length === 0 && <p className="text-sm text-muted-foreground">{t('sessionControl.ready')}</p>}
     {data && <details className="text-xs text-muted-foreground">
-      <summary className="cursor-pointer">{t('sessionControl.settings')}</summary>
+      <DetailsSummary>{t('sessionControl.settings')}</DetailsSummary>
       <form className="mt-3 flex flex-wrap items-end gap-2" onSubmit={event => { event.preventDefault(); void control.configure(Number(seconds)) }}>
         <label className="space-y-1">{t('sessionControl.seconds')}<input className={`${inputClass} w-28`} type="number" min={10} max={86400} required disabled={Boolean(pendingExecutionId)} value={seconds} onChange={event => setSeconds(event.target.value)} /></label>
         <Button type="submit" size="sm" variant="outline" disabled={control.busy || Boolean(pendingExecutionId)}>{t('common.save')}</Button>

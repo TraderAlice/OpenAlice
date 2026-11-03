@@ -1,3 +1,4 @@
+import { Select } from '@/components/ui/select'
 import { Field, inputClass } from '../form'
 import { Toggle } from '../Toggle'
 import type { SchemaField } from '../../hooks/useSchemaForm'
@@ -27,18 +28,18 @@ export function SchemaFormFields({ fields, formData, setField, showSecrets }: {
                   onChange={(v) => setField(f.key, v ? 'true' : 'false')}
                 />
                 <span>
-                  <span className="text-[13px] text-foreground">{f.title}</span>
-                  {f.description && <p className="text-[11px] text-muted-foreground/60 mt-0.5">{f.description}</p>}
+                  <span className="text-sm text-foreground">{f.title}</span>
+                  {f.description && <p className="text-sm text-muted-foreground/60 mt-0.5">{f.description}</p>}
                 </span>
               </label>
             )
           case 'select':
             return (
               <Field key={f.key} label={f.title}>
-                <select className={inputClass} value={value} onChange={(e) => setField(f.key, e.target.value)}>
-                  {f.options?.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
-                </select>
-                {f.description && <p className="text-[11px] text-muted-foreground/60 mt-1">{f.description}</p>}
+                <Select aria-label={f.title} value={value} onValueChange={(selectedValue) => setField(f.key, selectedValue)}
+                  options={f.options?.map(o => ({ value: o.value, label: o.label })) ?? []}
+                />
+                {f.description && <p className="text-sm text-muted-foreground/60 mt-1">{f.description}</p>}
               </Field>
             )
           case 'password':
@@ -51,7 +52,7 @@ export function SchemaFormFields({ fields, formData, setField, showSecrets }: {
                   onChange={(e) => setField(f.key, e.target.value)}
                   placeholder={f.required ? 'Required' : ''}
                 />
-                {f.description && <p className="text-[11px] text-muted-foreground/60 mt-1">{f.description}</p>}
+                {f.description && <p className="text-sm text-muted-foreground/60 mt-1">{f.description}</p>}
               </Field>
             )
           case 'text':
@@ -65,7 +66,7 @@ export function SchemaFormFields({ fields, formData, setField, showSecrets }: {
                   onChange={(e) => setField(f.key, e.target.value)}
                   placeholder={f.required ? 'Required' : ''}
                 />
-                {f.description && <p className="text-[11px] text-muted-foreground/60 mt-1">{f.description}</p>}
+                {f.description && <p className="text-sm text-muted-foreground/60 mt-1">{f.description}</p>}
               </Field>
             )
         }

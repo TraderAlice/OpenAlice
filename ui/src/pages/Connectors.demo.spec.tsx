@@ -143,7 +143,6 @@ describe('Connector demo routes', () => {
     const diagnostics = (await screen.findByText('Technical details')).closest('details') as HTMLDetailsElement
     expect(diagnostics.open).toBe(false)
     const diagnosticSummary = within(diagnostics).getByText('Technical details').closest('summary') as HTMLElement
-    expect(diagnosticSummary.className).toContain('min-h-10')
     fireEvent.click(diagnosticSummary)
     expect(diagnostics.open).toBe(true)
     fireEvent.click(await screen.findByRole('button', { name: 'Reconnect' }))
@@ -179,7 +178,6 @@ describe('Connector demo routes', () => {
     const diagnostics = within(lifecycle).getByText('Technical details').closest('details') as HTMLDetailsElement
     expect(diagnostics.open).toBe(false)
     expect(within(diagnostics).getByText('offline')).toBeTruthy()
-    expect(within(diagnostics).getByText('Technical details').closest('summary')?.className).toContain('min-h-10')
     expect(reconnect.className).toContain('h-8')
     fireEvent.click(reconnect)
 
@@ -323,7 +321,7 @@ describe('Connector demo routes', () => {
     expect(within(card).getByText('Start Discord')).toBeTruthy()
     const details = within(card).getByRole('button', { name: 'Discord setup details' })
     expect(details.className).toContain('bg-background/50')
-    expect(details.className).not.toContain('bg-primary text-primary-foreground')
+    expect(details.className).not.toContain('bg-action text-action-foreground')
   })
 
   it('shows linked startup progress without offering a premature reconnect', async () => {
@@ -470,8 +468,8 @@ describe('Connector demo routes', () => {
     expect(appToken.required).toBe(true)
     const initialHint = within(dialog).getByText('Still needed: Bot token, App-level token.')
     expect(saveConnection.getAttribute('aria-describedby')).toBe(initialHint.id)
-    expect(botToken.className).toContain('h-8')
-    expect(appToken.className).toContain('h-8')
+    expect(botToken.className).toContain('h-(--oa-control-height)')
+    expect(appToken.className).toContain('h-(--oa-control-height)')
     draftToggles.forEach((button) => expect(button.className).toContain('min-w-10'))
     setupLinks.forEach((link) => expect(link.className).toContain('h-8'))
     expect(setupLinks[0].closest('[data-connector-setup-links]')).toBeTruthy()

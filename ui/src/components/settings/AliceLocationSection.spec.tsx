@@ -42,7 +42,7 @@ describe('AliceLocationSection', () => {
     expect(screen.getByText('Where Alice is working')).toBeTruthy()
     expect(screen.getByText('Studio Mac')).toBeTruthy()
     expect(screen.getByText('Research desk')).toBeTruthy()
-    expect(screen.getByText('Connected · Remote')).toBeTruthy()
+    expect(screen.getByRole('status').textContent).toBe('ConnectedRemote')
     expect(screen.queryByText('127.0.0.1:54000')).toBeNull()
 
     fireEvent.click(screen.getByRole('button', { name: 'Location details' }))
@@ -71,7 +71,7 @@ describe('AliceLocationSection', () => {
 
     render(<AliceLocationSection />)
     expect(screen.getByText('This machine')).toBeTruthy()
-    expect(screen.getByText('Connected · Integrated mode')).toBeTruthy()
+    expect(screen.getByRole('status').textContent).toBe('ConnectedIntegrated mode')
     fireEvent.click(screen.getByRole('button', { name: 'Switch location' }))
     expect(screen.getByRole('dialog')).toBeTruthy()
   })

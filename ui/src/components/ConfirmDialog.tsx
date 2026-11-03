@@ -1,4 +1,5 @@
 import { useRef, useState, type ReactNode } from 'react'
+import { Button } from './ui/button'
 
 import {
   AlertDialog,
@@ -59,42 +60,42 @@ export function ConfirmDialog({
     }
   }
 
-  const confirmClass = variant === 'danger' ? 'btn-danger' : 'btn-primary'
-
   return (
     <AlertDialog
       open
       onOpenChange={(open) => {
-        if (!open && !busy) onClose()
+        if (!open && !busy) {
+          onClose()
+        }
       }}
     >
       <AlertDialogContent
-        className="w-[calc(100%-2rem)] max-w-[440px] gap-0 overflow-hidden p-0"
+        className="w-[calc(100%-2rem)] max-w-[440px] gap-0 p-0"
         initialFocus={cancelRef}
-        finalFocus={restoreFocusRef}
+        finalFocus={() => restoreFocusRef.current?.isConnected ? restoreFocusRef.current : false}
       >
-        <div className="border-b border-border px-5 py-4">
-          <AlertDialogTitle className="text-[15px] font-semibold">
+        <div className="px-6 pt-6 pb-3">
+          <AlertDialogTitle>
             {title}
           </AlertDialogTitle>
         </div>
         <AlertDialogDescription
-          render={<div className="px-5 py-4 text-[13px] leading-relaxed text-foreground" />}
+          render={<div className="px-6 pb-6 text-sm leading-relaxed text-foreground" />}
         >
           {message}
         </AlertDialogDescription>
-        <div className="flex justify-end gap-2 border-t border-border px-5 py-3">
-          <AlertDialogCancel ref={cancelRef} className="btn-secondary" disabled={busy}>
+        <div className="flex justify-end gap-2 bg-secondary px-6 py-4">
+          <AlertDialogCancel ref={cancelRef} variant="secondary" disabled={busy}>
             {cancelLabel}
           </AlertDialogCancel>
-          <button
+          <Button
             type="button"
             onClick={handleConfirm}
             disabled={busy}
-            className={confirmClass}
+            variant={variant === 'danger' ? 'destructive' : 'default'}
           >
             {busy ? workingLabel : confirmLabel}
-          </button>
+          </Button>
         </div>
       </AlertDialogContent>
     </AlertDialog>

@@ -466,12 +466,12 @@ describe('Snapshot Service', () => {
   })
 
   // #25
-  it('getRecent delegates to store', async () => {
+  it('getSnapshots delegates to store', async () => {
     // Take a snapshot first
     await service.takeSnapshot('acc1', 'manual')
     await service.takeSnapshot('acc1', 'scheduled')
 
-    const recent = await service.getRecent('acc1', 1)
+    const recent = await service.getSnapshots('acc1', { limit: 1 })
     expect(recent).toHaveLength(1)
   })
 })
@@ -486,7 +486,7 @@ describe('Snapshot Scheduler', () => {
     mockService = {
       takeSnapshot: vi.fn(async () => null),
       takeAllSnapshots: vi.fn(async () => {}),
-      getRecent: vi.fn(async () => []),
+      getSnapshots: vi.fn(async () => []),
       deleteSnapshot: vi.fn(async () => false),
     }
 

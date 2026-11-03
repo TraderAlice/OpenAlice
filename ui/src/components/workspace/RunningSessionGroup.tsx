@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { ChevronRight, Info, LoaderCircle } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
+import { CountBadge } from '../CountBadge'
 import { SidebarChildRow, SidebarChildRowButton } from '../SidebarChildRow'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '../ui/collapsible'
 import { AgentRuntimeIcon } from '../../lib/agentRuntimeIcon'
@@ -35,11 +36,12 @@ export function RunningSessionGroup({ sessions, onSelect }: {
   const focusClass = 'has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-inset has-[:focus-visible]:ring-ring'
   return <Collapsible>
     <SidebarChildRow active={false} className={focusClass}>
-      <CollapsibleTrigger render={<SidebarChildRowButton
+      <CollapsibleTrigger aria-label={label} render={<SidebarChildRowButton
         className="group/running text-muted-foreground"
         icon={<LoaderCircle size={14} aria-hidden className="animate-spin [animation-duration:2s] motion-reduce:animate-none" />}
       />}>
-        <span className="min-w-0 flex-1 truncate tabular-nums">{label}</span>
+        <span className="min-w-0 flex-1 truncate">{t('workspace.sessionDetails.running')}</span>
+        <CountBadge count={sessions.length} tone="success" label={label} />
         <ChevronRight size={14} aria-hidden className="shrink-0 transition-transform group-data-[panel-open]/running:rotate-90 motion-reduce:transition-none" />
       </CollapsibleTrigger>
     </SidebarChildRow>

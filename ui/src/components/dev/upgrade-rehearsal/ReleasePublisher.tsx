@@ -1,8 +1,9 @@
+import { Select } from '@/components/ui/select'
 import { useState } from 'react'
 import { Button } from '../../ui/button'
 import {
   Collapsible,
-  CollapsibleTrigger,
+  CollapsibleDetailsTrigger,
   CollapsibleContent,
 } from '../../ui/collapsible'
 import {
@@ -33,18 +34,20 @@ export function ReleasePublisher({
             outside this rehearsal.
           </p>
         </div>
-        <label className="text-xs text-muted-foreground">
+        <label className="flex min-w-0 max-w-full flex-wrap items-center gap-2 text-sm text-muted-foreground">
           Release channel
-          <select
+          <Select
             aria-label="Release channel"
             value={channel}
-            onChange={(e) => setChannel(e.target.value as ReleaseChannel)}
-            className="ml-2 rounded-lg border border-border bg-background p-2 text-sm text-foreground"
-          >
-            <option value="stable">Stable</option>
-            <option value="beta">Beta</option>
-            <option value="dev">Dev commit</option>
-          </select>
+            onValueChange={(selectedValue) => setChannel(selectedValue as ReleaseChannel)}
+            size="sm"
+            className="w-auto max-w-full"
+            options={[
+              { value: 'stable', label: 'Stable' },
+              { value: 'beta', label: 'Beta' },
+              { value: 'dev', label: 'Dev commit' },
+            ]}
+          />
         </label>
       </div>
       <div className="flex flex-wrap items-center justify-between gap-4">
@@ -88,9 +91,9 @@ export function ReleasePublisher({
         ))}
       </ol>
       <Collapsible>
-        <CollapsibleTrigger className="text-sm text-muted-foreground">
+        <CollapsibleDetailsTrigger>
           Release history · {publication.records.length}
-        </CollapsibleTrigger>
+        </CollapsibleDetailsTrigger>
         <CollapsibleContent>
           <ul className="mt-3 space-y-3">
             {[...publication.records].reverse().map((r) => (
@@ -105,9 +108,9 @@ export function ReleasePublisher({
                   </span>
                 </div>
                 <Collapsible>
-                  <CollapsibleTrigger className="mt-2 text-muted-foreground">
+                  <CollapsibleDetailsTrigger className="mt-2">
                     {releaseAssets(r).length} artifacts
-                  </CollapsibleTrigger>
+                  </CollapsibleDetailsTrigger>
                   <CollapsibleContent>
                     <div className="mt-2 max-h-48 overflow-auto">
                       {releaseAssets(r).map((name) => (

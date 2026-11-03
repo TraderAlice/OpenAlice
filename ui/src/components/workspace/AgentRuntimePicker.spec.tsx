@@ -73,11 +73,11 @@ describe('AgentRuntimePicker', () => {
     const trigger = screen.getByRole('button', { name: i18n.t('chatLanding.selectAgent') })
     expect(trigger.textContent).toContain('Pi')
     await user.click(trigger)
-    expect(await screen.findByRole('menuitem', { name: /Claude/ })).toBeTruthy()
-    expect(screen.getByRole('menuitem', { name: /Cursor Agent/ })).toBeTruthy()
+    expect(await screen.findByRole('menuitemradio', { name: /Claude/ })).toBeTruthy()
+    expect(screen.getByRole('menuitemradio', { name: /Cursor Agent/ })).toBeTruthy()
     expect(screen.getByText(i18n.t('chatLanding.currentRuntime'))).toBeTruthy()
-    expect(screen.getByRole('menuitem', { name: /^Pi/ })).toBeTruthy()
-    expect(screen.getAllByRole('menuitem').filter((item) => item.textContent && /Claude|Cursor|Antigravity|Grok/.test(item.textContent))).toHaveLength(4)
+    expect(screen.getByRole('menuitemradio', { name: /^Pi/ })).toBeTruthy()
+    expect(screen.getAllByRole('menuitemradio').filter((item) => item.textContent && /Claude|Cursor|Antigravity|Grok/.test(item.textContent))).toHaveLength(4)
     expect(screen.getByRole('menuitem', { name: i18n.t('chatLanding.otherRuntimes') })).toBeTruthy()
   })
 
@@ -95,10 +95,10 @@ describe('AgentRuntimePicker', () => {
     )
 
     await user.click(screen.getByRole('button', { name: i18n.t('chatLanding.selectAgent') }))
-    const current = await screen.findByRole('menuitem', { name: /Codex/ })
+    const current = await screen.findByRole('menuitemradio', { name: /Codex/ })
     expect(current.getAttribute('data-disabled')).toBe('')
     expect(current.textContent).toContain(i18n.t('chatLanding.agentNotInstalled'))
-    expect(screen.getAllByRole('menuitem').filter((item) => (
+    expect(screen.getAllByRole('menuitemradio').filter((item) => (
       item.textContent?.includes('Claude')
       || item.textContent?.includes('Cursor')
       || item.textContent?.includes('Antigravity')

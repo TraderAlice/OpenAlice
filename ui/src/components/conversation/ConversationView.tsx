@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
+import { Button } from '../ui/button'
 import { ConversationLayout } from './ConversationLayout'
 import { ChatComposer, type ChatComposerProps } from './ChatComposer'
 import { ConversationTranscriptItem } from './ConversationTranscript'
@@ -105,7 +106,7 @@ export function ConversationView(props: ConversationViewProps) {
       setFollowing(followingRef.current)
     }}
     composer={<>
-      {!following && <div className="conversation-jump-row"><button type="button" className="conversation-jump-latest" onClick={() => jump()}>Jump to latest</button></div>}
+      {!following && <div className="conversation-jump-row"><Button type="button" variant="outline" className="pointer-events-auto shadow-sm" onClick={() => jump()}>Jump to latest</Button></div>}
       {props.status}
       {(props.send || (props.busy && props.stop)) && (props.renderComposer ?? ((composer) => <ChatComposer {...composer} />))({
         context: props.context, controls: props.controls,

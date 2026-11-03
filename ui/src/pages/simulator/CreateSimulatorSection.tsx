@@ -69,13 +69,13 @@ export function CreateSimulatorSection({ onCreated }: {
     >
       <div className="flex items-center gap-2 flex-wrap">
         <input
-          className={`${inputClass} min-h-8 w-48 py-1 text-sm`}
+          className={`${inputClass} min-h-8 w-48 py-1 text-base`}
           placeholder="name (e.g. simulator)"
           value={name}
           onChange={(e) => setName(e.target.value)}
         />
         <input
-          className={`${inputClass} min-h-8 w-32 py-1 font-mono text-xs`}
+          className={`${inputClass} min-h-8 w-32 py-1 font-mono text-base`}
           placeholder="cash (USD)"
           value={cash}
           onChange={(e) => setCash(e.target.value)}

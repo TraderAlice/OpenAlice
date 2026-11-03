@@ -3,15 +3,17 @@
   justify-content: space-between;
   align-items: start;
   gap: 16px;
+  flex-wrap: wrap;
   margin: 8px 0 24px;
 }
 .cap-section-intro h2 {
-  font-size: 19px;
+  font-size: 18px;
+  line-height: 24px;
   font-weight: 600;
   letter-spacing: -0.025em;
 }
 .cap-section-intro h2 span {
-  font-size: 12px;
+  font-size: var(--text-sm);
   color: var(--muted-foreground);
   margin-left: 8px;
   font-variant-numeric: tabular-nums;
@@ -19,7 +21,7 @@
 .cap-section-intro p,
 .cap-reader-heading p,
 .cap-injection p {
-  font-size: 13px;
+  font-size: var(--text-sm);
   line-height: 1.7;
   color: var(--muted-foreground);
   margin-top: 8px;
@@ -45,10 +47,11 @@
   align-items: center;
   gap: 8px;
   color: var(--muted-foreground);
-  padding: 7px 9px;
+  padding: 8px 12px;
+  min-height: 44px;
   border: 1px solid var(--input);
-  border-radius: 7px;
-  margin-bottom: 14px;
+  border-radius: 9999px;
+  margin-bottom: 16px;
 }
 .cap-search:focus-within {
   box-shadow: var(--oa-focus-shadow);
@@ -58,16 +61,16 @@
   min-width: 0;
   background: transparent;
   outline: none;
-  font-size: 12px;
+  font-size: var(--text-base);
 }
 .cap-row {
   display: flex;
   align-items: center;
-  gap: 9px;
+  gap: 12px;
   width: 100%;
   text-align: left;
-  padding: 10px 9px;
-  border-radius: 6px;
+  padding: 12px;
+  border-radius: var(--radius-lg);
   color: var(--muted-foreground);
   transition:
     background var(--motion-fast),
@@ -92,12 +95,12 @@
 .cap-row strong {
   display: block;
   overflow-wrap: anywhere;
-  font-size: 12px;
+  font-size: var(--text-sm);
   font-weight: 500;
 }
 .cap-row small {
   display: block;
-  font-size: 10px;
+  font-size: var(--text-sm);
   margin-top: 3px;
   color: var(--muted-foreground);
   overflow-wrap: anywhere;
@@ -107,7 +110,7 @@
   stroke-width: 1.5;
 }
 .cap-directory h3 {
-  font-size: 11px;
+  font-size: var(--text-sm);
   font-weight: 600;
   color: var(--muted-foreground);
   padding: 20px 9px 6px;
@@ -118,7 +121,7 @@
   min-width: 0;
 }
 .cap-eyebrow {
-  font-size: 10px;
+  font-size: var(--text-sm);
   font-weight: 600;
   letter-spacing: 0.08em;
   color: var(--muted-foreground);
@@ -128,7 +131,8 @@
   margin-bottom: 12px;
 }
 .cap-reader-heading h2 {
-  font-size: 25px;
+  font-size: 22px;
+  line-height: 28px;
   font-weight: 600;
   letter-spacing: -0.025em;
   margin-top: 8px;
@@ -137,7 +141,7 @@
 .cap-path {
   display: block;
   font:
-    11px/1.7 ui-monospace,
+    14px/1.7 ui-monospace,
     monospace;
   color: var(--muted-foreground);
   overflow-wrap: anywhere;
@@ -147,6 +151,7 @@
 }
 .cap-document-toolbar {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
   gap: 10px;
@@ -155,18 +160,18 @@
   margin: 14px 0;
 }
 .cap-document-toolbar [data-slot='tabs-trigger'] {
-  font-size: 11px;
+  font-size: var(--text-sm);
 }
 .cap-source {
   white-space: pre-wrap;
   overflow-wrap: anywhere;
   font:
-    12px/1.8 ui-monospace,
+    14px/1.8 ui-monospace,
     monospace;
   max-width: 100%;
 }
 .cap-files {
-  font-size: 12px;
+  font-size: var(--text-sm);
   border-bottom: 1px solid var(--border);
   padding: 12px 0;
 }
@@ -188,7 +193,7 @@
 }
 .cap-cli-tabs [data-slot='tabs-trigger'] {
   font-family: ui-monospace, monospace;
-  font-size: 12px;
+  font-size: var(--text-sm);
   flex: none;
 }
 .cap-command {
@@ -197,19 +202,19 @@
   justify-content: space-between;
   gap: 8px;
   background: var(--muted);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   padding: 12px 14px;
-  font-size: 13px;
+  font-size: var(--text-sm);
   overflow-wrap: anywhere;
 }
 .cap-note {
-  font-size: 11px;
+  font-size: var(--text-sm);
   line-height: 1.6;
   color: var(--muted-foreground);
   margin: 10px 0 26px;
 }
 .cap-live {
-  font-size: 11px;
+  font-size: var(--text-sm);
   white-space: nowrap;
   background: var(--muted);
   border-radius: 20px;
@@ -217,14 +222,14 @@
   color: var(--muted-foreground);
 }
 .cap-subtitle {
-  font-size: 13px;
+  font-size: var(--text-sm);
   font-weight: 600;
   margin: 28px 0 12px;
 }
 .cap-parameters > div {
   padding: 16px 0;
   border-top: 1px solid var(--border);
-  font-size: 12px;
+  font-size: var(--text-sm);
 }
 .cap-parameters > div > div {
   display: flex;
@@ -235,7 +240,7 @@
 .cap-parameters span,
 .cap-parameters p {
   color: var(--muted-foreground);
-  font-size: 12px;
+  font-size: var(--text-sm);
   line-height: 1.7;
 }
 .cap-parameters p {
@@ -243,13 +248,13 @@
 }
 .cap-parameters b {
   font-weight: 500;
-  font-size: 10px;
+  font-size: var(--text-sm);
   border: 1px solid var(--border);
   border-radius: 4px;
   padding: 1px 5px;
 }
 .cap-empty {
-  font-size: 12px;
+  font-size: var(--text-sm);
   color: var(--muted-foreground);
   padding: 24px 10px;
 }
@@ -266,7 +271,7 @@
   margin-top: 10px;
 }
 .cap-injection code {
-  font-size: 12px;
+  font-size: var(--text-sm);
   overflow-wrap: anywhere;
 }
 .cap-root-list {
@@ -336,7 +341,7 @@
   justify-content: space-between;
   gap: 12px;
   padding: 8px 0;
-  font-size: 12px;
+  font-size: var(--text-sm);
 }
 .cap-mirror summary {
   cursor: pointer;
@@ -366,7 +371,7 @@
   padding: 16px 0;
 }
 .cap-mirror-diff h3 {
-  font-size: 12px;
+  font-size: var(--text-sm);
   font-weight: 600;
   margin-bottom: 12px;
 }
@@ -388,11 +393,11 @@
   align-items: center;
   gap: 6px;
   width: 100%;
-  min-height: 30px;
+  min-height: 40px;
   padding: 4px 8px;
   border-radius: 4px;
   text-align: left;
-  font-size: 12px;
+  font-size: var(--text-sm);
   color: var(--foreground);
 }
 .cap-cli-group-trigger:hover { background: var(--accent); }
@@ -402,7 +407,7 @@
 }
 .cap-cli-group-trigger span { flex: 1; }
 .cap-cli-group-trigger small {
-  font-size: 10px;
+  font-size: var(--text-sm);
   font-weight: 400;
   color: var(--muted-foreground);
   font-variant-numeric: tabular-nums;
@@ -414,13 +419,13 @@
 }
 .cap-cli-group-trigger svg.is-open { transform: rotate(90deg); }
 .cap-cli-row {
-  min-height: 28px;
+  min-height: 40px;
   padding: 4px 9px 4px 27px;
   border-radius: 4px;
 }
 .cap-cli-row strong { font-weight: 400; line-height: 20px; }
 @media (pointer: coarse), (max-width: 640px) {
-  .cap-cli-row, .cap-cli-group-trigger { min-height: 40px; }
+  .cap-cli-row, .cap-cli-group-trigger { min-height: 44px; }
 }
 @media (prefers-reduced-motion: reduce) {
   .cap-cli-group-trigger svg { transition: none; }
@@ -428,10 +433,10 @@
 
 .cap-origin-group h3 {
   display: flex; align-items: center; gap: 8px;
-  font-size: 13px; font-weight: 600; color: var(--foreground);
+  font-size: var(--text-sm); font-weight: 600; color: var(--foreground);
   padding: 16px 9px 6px;
 }
-.cap-origin-group h3 span { font-size: 11px; font-weight: 400; color: var(--muted-foreground); }
+.cap-origin-group h3 span { font-size: var(--text-sm); font-weight: 400; color: var(--muted-foreground); }
 .cap-origin-group .cap-row {
   margin-left: 8px;
   width: calc(100% - 8px);

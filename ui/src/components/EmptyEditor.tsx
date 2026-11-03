@@ -15,10 +15,10 @@ export function EmptyEditor() {
       />
       <div className="space-y-2 max-w-md">
         <h2 className="text-base font-semibold text-foreground">OpenAlice</h2>
-        <p className="text-[13px] text-muted-foreground leading-relaxed">
+        <p className="text-sm text-muted-foreground leading-relaxed">
           Click an icon on the activity bar to open its sidebar, then pick something from the sidebar to open it as a tab.
         </p>
-        <p className="text-[12px] text-muted-foreground/70 leading-relaxed">
+        <p className="text-sm text-muted-foreground/70 leading-relaxed">
           First time here? Open <span className="text-foreground">Settings → AI Provider</span> to configure a model, then jump back to <span className="text-foreground">Chat</span>.
         </p>
       </div>

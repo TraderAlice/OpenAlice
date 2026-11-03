@@ -147,7 +147,7 @@ export function HarnessSetupPage({
         )}
         <div className="mb-6 flex flex-col items-center text-center">
           <Icon className="mb-4 size-7 text-primary" />
-          <p className="mb-2 text-[12px] font-medium leading-4 text-muted-foreground">
+          <p className="mb-2 text-sm font-medium leading-5 text-muted-foreground">
             {t(`${copyPrefix}.eyebrow`)}
           </p>
           <h1 className="text-2xl font-semibold text-foreground">

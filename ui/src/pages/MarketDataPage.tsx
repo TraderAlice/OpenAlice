@@ -1,9 +1,11 @@
 import { useEffect, useRef, useState } from 'react'
-import { CheckCircle2, ChevronRight, CircleAlert, LoaderCircle, MinusCircle } from 'lucide-react'
+import { CheckCircle2, CircleAlert, LoaderCircle, MinusCircle } from 'lucide-react'
 import { api, type AppConfig } from '../api'
 import { SaveIndicator } from '../components/SaveIndicator'
 import { ConfigSection, SettingsScrollArea, inputClass } from '../components/form'
 import { Toggle } from '../components/Toggle'
+import { ContextHelp } from '../components/ContextHelp'
+import { Collapsible, CollapsibleContent, CollapsibleDetailsTrigger } from '../components/ui/collapsible'
 import { useConfigPage } from '../hooks/useConfigPage'
 import { PageHeader } from '../components/PageHeader'
 import { CenteredLoading } from '../components/StateViews'
@@ -211,7 +213,7 @@ export function MarketDataPage() {
   if (!config) {
     return (
       <div className="flex flex-col flex-1 min-h-0">
-        <PageHeader title="Market Data" description="Structured financial data — prices, fundamentals, macro indicators." />
+        <PageHeader title="Market Data" help="Structured financial data — prices, fundamentals, macro indicators." />
         <div className="flex-1 flex items-center justify-center">
           <CenteredLoading />
         </div>
@@ -268,7 +270,7 @@ export function MarketDataPage() {
     <div className="flex flex-col flex-1 min-h-0">
       <PageHeader
         title="Market Data"
-        description="Structured financial data — prices, fundamentals, macro indicators."
+        help="Structured financial data — prices, fundamentals, macro indicators."
         right={
           <div className="flex items-center gap-3">
             <SaveIndicator status={status} onRetry={retry} />
@@ -282,8 +284,8 @@ export function MarketDataPage() {
         }
       />
 
-      <SettingsScrollArea className="px-4 py-5 md:px-8">
-        <div className={`max-w-[880px] mx-auto ${!enabled ? 'opacity-40 pointer-events-none' : ''}`}>
+      <SettingsScrollArea>
+        <div className={`max-w-[880px] ${!enabled ? 'opacity-40 pointer-events-none' : ''}`}>
           <HubCard
             hub={hub}
             ping={ping}
@@ -303,7 +305,7 @@ export function MarketDataPage() {
           onToggle={(uta, checked) => { void updateUTASource(uta, checked) }}
           onManage={() => openOrFocus({ kind: 'settings', params: { category: 'trading' } })}
         />
-        <div className={`mx-auto max-w-[880px] ${!enabled ? 'pointer-events-none opacity-40' : ''}`}>
+        <div className={`max-w-[880px] ${!enabled ? 'pointer-events-none opacity-40' : ''}`}>
           <AdvancedSection
             open={advancedOpen}
             onToggle={() => setAdvancedOpen((o) => !o)}
@@ -315,7 +317,7 @@ export function MarketDataPage() {
             highlightFmp={highlightFmp}
           />
         </div>
-        {loadError && <p className="text-[13px] text-destructive mt-4 max-w-[880px] mx-auto">Failed to load configuration.</p>}
+        {loadError && <p className="text-sm text-destructive mt-4 max-w-[880px]">Failed to load configuration.</p>}
       </SettingsScrollArea>
     </div>
   )
@@ -330,14 +332,14 @@ function BrokerKlineSourcesSection({ utas, loading, error, savingId, savedId, on
   onToggle: (uta: UTAConfig, checked: boolean) => void
   onManage: () => void
 }) {
-  return <section className="mx-auto mb-6 max-w-[880px]">
+  return <section className="mb-6 max-w-[880px]">
     <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-      <h2 className="text-[13px] font-semibold text-foreground">Broker K-line sources</h2>
+      <div className="flex items-center gap-2">
+        <h2 className="text-lg font-semibold text-foreground">Broker K-line sources</h2>
+        <ContextHelp label="Broker K-line sources">Configured UTAs supply K-line data and contract discovery. These switches share the Broker setting “Use as data source”. Each chart also supports explicit source selection.</ContextHelp>
+      </div>
       <Button type="button" variant="ghost" size="sm" onClick={onManage}>Manage UTAs in Broker</Button>
     </div>
-    <p className="mb-2.5 max-w-[640px] text-[12px] leading-5 text-muted-foreground">
-      Choose which configured UTAs join default K-line and contract discovery. This is the same setting as “Use as data source” in each UTA’s Broker settings; explicit source selection remains available.
-    </p>
     {loading ? <p role="status" className="text-xs text-muted-foreground">Loading broker sources…</p> : utas.length === 0 && !error ? (
       <p className="rounded-lg border border-dashed border-border px-4 py-3 text-xs text-muted-foreground">No UTAs configured. Add one in Broker to use its K-line data.</p>
     ) : <div className="space-y-2.5">
@@ -348,7 +350,7 @@ function BrokerKlineSourcesSection({ utas, loading, error, savingId, savedId, on
         checked={uta.asVendor !== false}
         disabled={savingId !== null}
         onChange={(checked) => onToggle(uta, checked)}
-        status={savingId === uta.id ? <SaveIndicator status="saving" /> : savedId === uta.id ? <SaveIndicator status="saved" /> : null}
+        status={<SaveIndicator status={savingId === uta.id ? "saving" : savedId === uta.id ? "saved" : "idle"} />}
       />)}
     </div>}
     {error && <p role="alert" className="mt-2 text-xs text-destructive">{error}</p>}
@@ -369,9 +371,12 @@ function HubCard({
   const host = hub.baseUrl.replace(/^https?:\/\//, '').replace(/\/+$/, '')
 
   return (
-    <section className="mb-6 rounded-lg border border-border/70 bg-card p-4">
+    <section className="mb-6 rounded-2xl bg-secondary p-5 sm:p-6">
       <div className="flex items-center justify-between mb-1.5">
-        <h2 className="text-[14px] leading-[19px] font-semibold">Data Hub</h2>
+        <div className="flex items-center gap-2">
+          <h2 className="text-lg font-semibold">Data Hub</h2>
+          <ContextHelp label="Data Hub">The hosted hub serves public market data anonymously. Configured provider keys take precedence.</ContextHelp>
+        </div>
         <Toggle ariaLabel="Data Hub" size="sm" checked={hub.enabled} onChange={onToggle} />
       </div>
       {hub.enabled ? (
@@ -379,22 +384,18 @@ function HubCard({
           {ping === 'checking' && <LoaderCircle aria-hidden className="size-3.5 shrink-0 animate-spin text-muted-foreground motion-reduce:animate-none" />}
           {ping === 'ok' && <CheckCircle2 aria-hidden className="size-3.5 shrink-0 text-success" />}
           {ping === 'down' && <CircleAlert aria-hidden className="size-3.5 shrink-0 text-destructive" />}
-          <span className="text-[13px] text-foreground">
+          <span className="text-sm text-foreground">
             {ping === 'checking' && 'Checking…'}
-            {ping === 'ok' && <>Connected <span className="ml-1 font-mono text-[12px] leading-[18px] text-muted-foreground">{host}</span></>}
+            {ping === 'ok' && <>Connected <span className="ml-1 font-mono text-sm leading-5 text-muted-foreground">{host}</span></>}
             {ping === 'down' && 'Unreachable — using local sources'}
           </span>
         </div>
       ) : (
         <div className="flex items-center gap-2 mb-1.5">
           <MinusCircle aria-hidden className="size-3.5 shrink-0 text-muted-foreground" />
-          <span className="text-[13px] text-muted-foreground">Off — boards and series use your own keys and vendors.</span>
+          <span className="text-sm text-muted-foreground">Off — boards and series use your own keys and vendors.</span>
         </div>
       )}
-      <p className="text-[12px] text-muted-foreground">
-        Low-frequency data is served from the hosted hub — no API keys needed.
-        Anonymous reads of public data; your own keys always take precedence.
-      </p>
     </section>
   )
 }
@@ -404,31 +405,25 @@ function HubCard({
 function SourcesCard({ rows, onAddFmp }: { rows: SourceRow[]; onAddFmp: () => void }) {
   return (
     <section className="mb-6">
-      <h2 className="mb-2 text-[13px] leading-[18px] font-semibold text-foreground">Data sources</h2>
-      <div className="divide-y divide-border/40 overflow-hidden rounded-lg border border-border/70 bg-card">
+      <h2 className="mb-3 text-lg font-semibold text-foreground">Data sources</h2>
+      <div className="divide-y divide-border/60 overflow-hidden rounded-2xl bg-secondary">
         {rows.map((row) => (
-          <div key={row.name} className="flex items-center gap-3 px-4 py-3">
+          <div key={row.name} className="grid min-h-14 grid-cols-[auto_minmax(0,1fr)] items-center gap-x-3 gap-y-1 px-4 py-2 sm:grid-cols-[auto_minmax(0,1fr)_auto] sm:px-5">
             {row.state === 'ok'
               ? <CheckCircle2 aria-hidden className="size-3.5 shrink-0 text-success" />
               : <MinusCircle aria-hidden className="size-3.5 shrink-0 text-muted-foreground" />}
-            <div className="flex-1 min-w-0">
-              <span className="text-[13px] text-foreground font-medium">{row.name}</span>
-              {row.detail && <span className="text-[12px] text-muted-foreground/60 ml-2">{row.detail}</span>}
+            <div className="flex min-w-0 flex-1 items-center gap-1">
+              <span className="text-sm font-medium text-foreground">{row.name}</span>
+              {row.detail && <ContextHelp label={row.name}>{row.detail}</ContextHelp>}
             </div>
-            <span className={`text-[12px] ${row.state === 'ok' ? 'text-muted-foreground' : 'text-muted-foreground/60'}`}>
-              {row.source}
-            </span>
-            {row.cta && (
-              <Button
-                type="button"
-                onClick={onAddFmp}
-                className="shrink-0 text-[12px]"
-                size="sm"
-                variant="outline"
-              >
-                Add key
-              </Button>
-            )}
+            <div className="col-start-2 flex min-w-0 items-center justify-between gap-3 pb-1 sm:col-start-3 sm:pb-0">
+              <span className="text-sm text-muted-foreground">{row.source}</span>
+              {row.cta && (
+                <Button type="button" onClick={onAddFmp} size="sm" variant="outline">
+                  Add key
+                </Button>
+              )}
+            </div>
           </div>
         ))}
       </div>
@@ -446,37 +441,31 @@ function ChartVendorsSection({
   onToggle: (id: string, on: boolean) => void
 }) {
   return (
-    <section className="mb-6">
-      <h2 className="mb-2 text-[13px] leading-[18px] font-semibold text-foreground">Chart vendors</h2>
-      <p className="text-[12px] text-muted-foreground/70 mb-2.5 max-w-[640px]">
-        Live K-line &amp; quote sources — queried per symbol, never via the hub. Switch one on and it
-        joins the search pool; what it covers is found by searching, not configured here. yfinance is
-        the always-on global default.
-      </p>
+    <ConfigSection title="Chart vendors" help="Vendors supply live charts and quotes. Enabled vendors join symbol search. yfinance is the default global source." className="mb-6">
       <div className="space-y-2.5">
         {CHART_VENDORS.map((v) => {
           const on = v.alwaysOn || extraVendors.includes(v.id)
           return (
-            <div key={v.id} className="rounded-lg border border-border/70 bg-card px-4 py-3.5">
+            <div key={v.id} className="rounded-xl bg-background px-4 py-3">
               <div className="flex items-center justify-between gap-3">
                 <div className="flex items-center gap-2 min-w-0">
                   {on
                     ? <CheckCircle2 aria-hidden className="size-3.5 shrink-0 text-success" />
                     : <MinusCircle aria-hidden className="size-3.5 shrink-0 text-muted-foreground" />}
-                  <span className="text-[13px] leading-[18px] font-semibold text-foreground truncate">{v.name}</span>
+                  <span className="text-base font-medium text-foreground">{v.name}</span>
+                  <ContextHelp label={v.name}>{v.desc}</ContextHelp>
                 </div>
                 {v.alwaysOn ? (
-                  <span className="shrink-0 text-[11px] font-medium text-muted-foreground">Always on</span>
+                  <span className="shrink-0 text-sm font-medium text-muted-foreground">Always on</span>
                 ) : (
                   <Toggle ariaLabel={v.name} size="sm" checked={on} onChange={(val) => onToggle(v.id, val)} />
                 )}
               </div>
-              <p className="mt-1.5 max-w-2xl text-[12px] leading-5 text-muted-foreground/70">{v.desc}</p>
             </div>
           )
         })}
       </div>
-    </section>
+    </ConfigSection>
   )
 }
 
@@ -502,20 +491,10 @@ function AdvancedSection({
   highlightFmp: boolean
 }) {
   return (
-    <section className="mb-8">
-      <Button
-        type="button"
-        onClick={onToggle}
-        className="px-1 text-[13px]"
-        variant="ghost"
-        size="sm"
-        aria-expanded={open}
-      >
-        <ChevronRight aria-hidden className={`size-3.5 ${open ? 'rotate-90' : ''}`} />
-        Advanced
-      </Button>
+    <Collapsible open={open} onOpenChange={onToggle} className="mb-8">
+      <CollapsibleDetailsTrigger>Advanced</CollapsibleDetailsTrigger>
 
-      {open && (
+      <CollapsibleContent>
         <div className="mt-2 rounded-lg border border-border/70 bg-card px-5">
           <KeyProvidersSection
             providerKeys={providerKeys}
@@ -526,19 +505,19 @@ function AdvancedSection({
 
           <ConfigSection
             title="Data Hub Endpoint"
-            description="Self-hosters point this at their own TraderHub instance."
+            help="Self-hosted installations can connect to a custom TraderHub instance."
           >
             <input
               type="text"
               value={hub.baseUrl}
               onChange={(e) => onHubChange({ ...hub, baseUrl: e.target.value })}
               placeholder="https://traderhub.openalice.ai"
-              className={`${inputClass} max-w-[420px] font-mono text-[12px]`}
+              className={`${inputClass} max-w-[420px] font-mono text-base`}
             />
           </ConfigSection>
         </div>
-      )}
-    </section>
+      </CollapsibleContent>
+    </Collapsible>
   )
 }
 
@@ -578,7 +557,7 @@ function TestButton({
       aria-label={providerTestStatusLabel(providerName, status)}
       variant="outline"
       size="default"
-      className={`shrink-0 text-[13px] ${
+      className={`shrink-0 text-sm ${
         status === 'ok'
           ? 'border-success/50 text-success'
           : status === 'error'
@@ -635,13 +614,13 @@ function KeyProvidersSection({
   return (
     <ConfigSection
       title="Data Provider Keys"
-      description="Low-frequency data — boards, economy, fundamentals — is served by the Data Hub. Add a key only to go direct, or to unlock the slice the hub doesn't serve (FMP fundamentals)."
+      help="Provider keys enable direct access. An FMP key also enables equity fundamentals and discovery."
     >
       <div className="space-y-4">
         {KEY_GROUPS.map((group, gi) => (
           <div key={gi}>
             {group.label && (
-              <p className="mb-3 border-t border-border/40 pt-3 text-[11px] font-medium text-muted-foreground">
+              <p className="mb-3 border-t border-border/40 pt-3 text-sm font-medium text-muted-foreground">
                 {group.label}
               </p>
             )}
@@ -662,11 +641,11 @@ function KeyProvidersSection({
                     <div className="mb-3.5 last:mb-0">
                       <label
                         htmlFor={inputId}
-                        className="block text-[13px] text-foreground mb-1.5 font-medium"
+                        className="block text-sm text-foreground mb-1.5 font-medium"
                       >
                         {name}
                       </label>
-                      <p id={descriptionId} className="text-[12px] text-muted-foreground/70 mb-2">
+                      <p id={descriptionId} className="text-sm text-muted-foreground/70 mb-2">
                         {desc}
                       </p>
                       <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
@@ -687,7 +666,7 @@ function KeyProvidersSection({
                           onClick={() => testProvider(key)}
                         />
                       </div>
-                      <p id={hintId} className="text-[12px] text-muted-foreground/60 mt-1">
+                      <p id={hintId} className="text-sm text-muted-foreground/60 mt-1">
                         {hint}
                       </p>
                       <span

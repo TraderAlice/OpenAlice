@@ -1,9 +1,10 @@
+import { Select } from '@/components/ui/select'
 import { useId, useMemo, useState } from 'react'
 import { ChevronDown, MessageSquare } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { TELEGRAM_DESK_CADENCES } from '../api/connectors'
 import { ConfirmDialog } from './ConfirmDialog'
-import { Field, inputClass } from './form'
+import { Field } from './form'
 import { MarkdownWhatEditor } from './MarkdownWhatEditor'
 import { useAgentLaunchPreferences } from '../hooks/useAgentLaunchConfig'
 import { useTelegramConnectorDesk } from '../hooks/useTelegramConnectorDesk'
@@ -68,15 +69,15 @@ export function TelegramDeskPanel({
         <div className="flex min-w-0 flex-1 items-start gap-2.5">
           <MessageSquare size={15} className="mt-0.5 shrink-0 text-muted-foreground" aria-hidden />
           <div>
-            <h3 className="text-[13px] font-semibold text-foreground">{t('connectorSettings.desk.title', { name: deskName })}</h3>
-            <p className="mt-1 text-[12px] leading-5 text-muted-foreground">
+            <h3 className="text-sm font-semibold text-foreground">{t('connectorSettings.desk.title', { name: deskName })}</h3>
+            <p className="mt-1 text-sm leading-5 text-muted-foreground">
               {t('connectorSettings.desk.description', { name: deskName })}
             </p>
           </div>
         </div>
         {linked ? (
           <div className="flex min-h-10 items-center gap-2">
-            <span className="text-[12px] font-medium text-foreground">
+            <span className="text-sm font-medium text-foreground">
               {desk
                 ? t(online ? 'connectorSettings.desk.on' : 'connectorSettings.desk.waiting')
                 : t('connectorSettings.desk.off')}
@@ -104,14 +105,14 @@ export function TelegramDeskPanel({
       </div>
 
       {loading ? (
-        <p className="mt-3 text-[12px] text-muted-foreground">{t('connectorSettings.desk.loading')}</p>
+        <p className="mt-3 text-sm text-muted-foreground">{t('connectorSettings.desk.loading')}</p>
       ) : !linked ? (
         <p className="mt-3 border-t border-border/60 pt-3 text-[11.5px] leading-5 text-muted-foreground">
           {t('connectorSettings.desk.needLink')}
         </p>
       ) : desk ? (
         <div className="mt-3 space-y-3 border-t border-border/60 pt-3">
-          <p className="mt-1 text-[12px] leading-5 text-muted-foreground">
+          <p className="mt-1 text-sm leading-5 text-muted-foreground">
             {t(online
               ? 'connectorSettings.desk.boundWorkspace'
               : 'connectorSettings.desk.waitingForConnector', {
@@ -121,7 +122,7 @@ export function TelegramDeskPanel({
           </p>
           <button
             type="button"
-            className="oa-pressable flex min-h-11 w-full items-center justify-between rounded-lg border border-border/60 bg-background/30 px-3 py-2.5 text-left text-[12px] font-medium text-foreground hover:bg-secondary/35"
+            className="oa-pressable flex min-h-11 w-full items-center justify-between rounded-lg border border-border/60 bg-background/30 px-3 py-2.5 text-left text-sm font-medium text-foreground hover:bg-secondary/35"
             aria-expanded={advancedOpen}
             onClick={() => setAdvancedOpen((open) => !open)}
           >
@@ -135,27 +136,23 @@ export function TelegramDeskPanel({
                 controlId={cadenceSelectId}
                 description={t('connectorSettings.desk.cadenceDescription')}
               >
-                <select
+                <Select
                   id={cadenceSelectId}
-                  className={inputClass}
                   value={currentEvery ?? ''}
                   disabled={working}
-                  onChange={(event) => {
-                    const next = event.target.value
+                  onValueChange={(selectedValue) => {
+                    const next = selectedValue
                     if (!next) return
                     void saveCadence(next)
                   }}
-                >
-                  {!currentEvery && <option value="">{t('connectorSettings.desk.cadenceCustom')}</option>}
-                  {cadenceOptions.map((every) => (
-                    <option key={every} value={every}>
-                      {t('connectorSettings.desk.cadenceEvery', { every })}
-                    </option>
-                  ))}
-                </select>
+                  options={[
+                    ...(!currentEvery ? [{ value: '', label: t('connectorSettings.desk.cadenceCustom') }] : []),
+                    ...cadenceOptions.map((every) => ({ value: every, label: t('connectorSettings.desk.cadenceEvery', { every }) })),
+                  ]}
+                />
               </Field>
               <div>
-                <h4 className="text-[12px] font-medium text-foreground">{t('connectorSettings.desk.what')}</h4>
+                <h4 className="text-sm font-medium text-foreground">{t('connectorSettings.desk.what')}</h4>
                 <p className="mb-2 mt-1 text-[11.5px] leading-5 text-muted-foreground">
                   {t('connectorSettings.desk.whatDescription')}
                 </p>
@@ -171,7 +168,7 @@ export function TelegramDeskPanel({
           <div className="flex flex-wrap gap-2">
             <button
               type="button"
-              className="oa-pressable inline-flex min-h-11 items-center gap-2 rounded-lg border border-border px-3 py-2 text-[12px] text-foreground hover:border-primary/50"
+              className="oa-pressable inline-flex min-h-11 items-center gap-2 rounded-lg border border-border px-3 py-2 text-sm text-foreground hover:border-primary/50"
               onClick={() => openOrFocus({
                 kind: 'issue-detail',
                 params: { wsId: desk.wsId, id: desk.issue.id },
@@ -185,26 +182,20 @@ export function TelegramDeskPanel({
       ) : (
         <div className="mt-3 space-y-3 border-t border-border/60 pt-3">
           {choices.length === 0 ? (
-            <p className="text-[12px] text-muted-foreground">{t('connectorSettings.desk.noWorkspaces')}</p>
+            <p className="text-sm text-muted-foreground">{t('connectorSettings.desk.noWorkspaces')}</p>
           ) : (
             <Field
               label={t('connectorSettings.desk.workspace')}
               controlId={workspaceSelectId}
               description={t('connectorSettings.desk.workspaceDescription')}
             >
-              <select
+              <Select
                 id={workspaceSelectId}
-                className={inputClass}
                 value={selectedWsId}
                   disabled={working || !launchPreferencesLoaded}
-                onChange={(event) => setWsId(event.target.value)}
-              >
-                {choices.map((workspace) => (
-                  <option key={workspace.id} value={workspace.id}>
-                    {workspaceDisplayName(workspace)}
-                  </option>
-                ))}
-              </select>
+                onValueChange={(selectedValue) => setWsId(selectedValue)}
+                options={choices.map((workspace) => ({ value: workspace.id, label: workspaceDisplayName(workspace) }))}
+              />
             </Field>
           )}
           <p className="text-[11.5px] leading-5 text-muted-foreground">
@@ -216,7 +207,7 @@ export function TelegramDeskPanel({
       )}
 
       {error && (
-        <p className="mt-3 text-[12px] text-destructive" role="alert">
+        <p className="mt-3 text-sm text-destructive" role="alert">
           {t('connectorSettings.desk.actionError', { error })}
         </p>
       )}

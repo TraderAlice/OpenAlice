@@ -22,7 +22,7 @@ export function MarketDetailPage({ spec }: MarketDetailPageProps) {
           ? 'FX spot, carry, macro, and scenario analysis'
           : `${assetClass} price history`}
       />
-      <div className="flex-1 flex flex-col gap-3 px-4 md:px-8 py-4 min-h-0 overflow-y-auto">
+      <div className="flex-1 flex flex-col gap-3 px-[var(--page-inset)] py-4 min-h-0 overflow-y-auto">
         <SearchBox />
         {assetClass === 'equity' ? (
           <EquityDetail symbol={symbol} source={source} displayName={identity?.name} securityCode={identity?.code} />
