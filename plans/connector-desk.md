@@ -2,7 +2,7 @@
 
 **Status:** active — increment 2
 
-**Owner guides:** [[docs/connector-service.md]], [[docs/workspace-issues-and-scheduling.md]], [[docs/conversation-provenance.md]]
+**Owner guides:** [[docs/connector-service.md]], [[docs/workspace-issues-and-scheduling.md]], [[docs/workspace-lifecycle.md]]
 
 **Delivery:** serial PRs to `dev` (`area:collaboration`, `area:settings`). `review:deep` for the persisted flag.
 

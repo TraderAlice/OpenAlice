@@ -1,7 +1,7 @@
 # Windows SignPath onboarding
 
 Status: active. Related issue: none yet. Owner guides:
-[[docs/windows-code-signing.md]], [[docs/development-workflow.md]],
+[[docs/cli-installer.md]], [[docs/development-workflow.md]],
 [[docs/managed-workspace-runtime.md]].
 
 Scope: SignPath Foundation test signing and eventual Windows Electron release

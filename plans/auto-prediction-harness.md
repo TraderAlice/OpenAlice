@@ -1,7 +1,7 @@
 # Plan: Auto Prediction Harness
 
-**Status:** active — increment 2 implemented; increment 3 source lifecycle in progress
-**Owner guides:** [[docs/project-structure.md]], [[docs/managed-workspace-runtime.md]], [[docs/harness-web-surfaces.md]], [[docs/workspace-lifecycle.md]], [[docs/conversation-provenance.md]]
+**Status:** active — increment 2 & 3 implemented; cross-runtime acceptance in progress
+**Owner guides:** [[docs/project-structure.md]], [[docs/managed-workspace-runtime.md]], [[docs/alice-harness.md]], [[docs/workspace-lifecycle.md]]
 **Delivery:** serial PRs to `dev` (`area:workspace`, `area:app-shell`, `review:deep`).
 
 ## Goal
