@@ -95,6 +95,16 @@ function parsePort(raw: unknown, origin: string): number {
 }
 
 /**
+ * Strip a leading UTF-8 BOM. `data/config/*.json` is user-editable, and the
+ * Windows tools people edit it with (PowerShell 5.1 `Set-Content -Encoding
+ * utf8`, Notepad) prepend a BOM that `JSON.parse` rejects — turning a
+ * readable-by-eye file into an unparseable one.
+ */
+function stripJsonBom(text: string): string {
+  return text.replace(/^\uFEFF/, '')
+}
+
+/**
  * Read `data/config/ports.json` under `userDataHome`. Missing file → {}.
  * Present-but-broken (bad JSON / non-integer values) fails loud — a typo in
  * explicit config should abort the boot, not silently fall back to defaults.
@@ -109,7 +119,7 @@ export async function readPortsFile(userDataHome: string): Promise<Partial<Recor
   }
   let parsed: unknown
   try {
-    parsed = JSON.parse(raw)
+    parsed = JSON.parse(stripJsonBom(raw))
   } catch (err) {
     throw new Error(`[guardian] ${filePath} is not valid JSON: ${err instanceof Error ? err.message : String(err)}`)
   }
@@ -259,10 +269,41 @@ export function spawnChild(spec: SpawnSpec): ChildProcess {
 
   if (spec.prefixLogs) {
     const tag = `[${spec.name}] `
-    child.stdout?.on('data', (buf: Buffer) => writePrefixed(process.stdout, buf, tag))
-    child.stderr?.on('data', (buf: Buffer) => writePrefixed(process.stderr, buf, tag))
+    child.stdout?.on('data', (buf: Buffer) => writePrefixed(process.stdout, buf, tag, (line) => captureChildLine(child, line)))
+    child.stderr?.on('data', (buf: Buffer) => writePrefixed(process.stderr, buf, tag, (line) => captureChildLine(child, line)))
   }
   return child
+}
+
+/**
+ * Tail of the lines a prefixed child printed, keyed by the child Guardian
+ * spawned (same WeakMap side-table idiom as `knownDescendants`).
+ *
+ * A readiness timeout on its own is an accusation, not a diagnosis: when Alice
+ * died on a malformed config the reason was already on the terminal
+ * (`[alice] fatal: SyntaxError: …`) while the abort line blamed a startup race.
+ * Keeping the tail lets the abort path re-quote what the child actually said.
+ * Children spawned without `prefixLogs` inherit stdio, so their bytes never
+ * reach here and the tail stays empty.
+ */
+const recentChildLines = new WeakMap<ChildProcess, string[]>()
+const CHILD_OUTPUT_TAIL = 120
+
+function captureChildLine(child: ChildProcess, line: string): void {
+  let lines = recentChildLines.get(child)
+  if (!lines) {
+    lines = []
+    recentChildLines.set(child, lines)
+  }
+  lines.push(line)
+  if (lines.length > CHILD_OUTPUT_TAIL) lines.splice(0, lines.length - CHILD_OUTPUT_TAIL)
+}
+
+/** Last `limit` captured output lines of a child, tag-prefixed. '' when none. */
+export function recentChildOutput(child: ChildProcess, limit = 12): string {
+  const lines = recentChildLines.get(child)
+  if (!lines || lines.length === 0) return ''
+  return lines.slice(-limit).join('\n')
 }
 
 /**
@@ -306,12 +347,17 @@ async function waitForChildTreeExit(child: ChildProcess, timeoutMs: number): Pro
   return !childTreeAlive(child)
 }
 
-function writePrefixed(stream: NodeJS.WriteStream, buf: Buffer, tag: string): void {
+function writePrefixed(stream: NodeJS.WriteStream, buf: Buffer, tag: string, capture?: (line: string) => void): void {
   const lines = buf.toString('utf8').split('\n')
   // Last element is "" when buf ended with \n; preserve that the right way
   // so partial mid-line writes aren't mangled with mid-stream prefixes.
   for (let i = 0; i < lines.length - 1; i++) {
-    stream.write(tag + lines[i] + '\n')
+    const line = tag + lines[i]
+    stream.write(line + '\n')
+    // Only complete lines are captured — the trailing partial is emitted again
+    // once terminated, and duplicating half a line in a diagnostic tail is worse
+    // than losing it.
+    capture?.(line)
   }
   // Trailing partial line (no terminating \n) goes through without prefix —
   // it'll get prefixed when the next chunk completes the line. Good enough
@@ -530,7 +576,7 @@ export class OptionalServiceController {
 export async function readConnectorServiceEnabled(userDataHome: string): Promise<boolean> {
   const filePath = resolve(userDataHome, 'data', 'config', 'connector-service.json')
   try {
-    const value = JSON.parse(await readFile(filePath, 'utf8')) as { enabled?: unknown }
+    const value = JSON.parse(stripJsonBom(await readFile(filePath, 'utf8'))) as { enabled?: unknown }
     return value.enabled === true
   } catch {
     return false

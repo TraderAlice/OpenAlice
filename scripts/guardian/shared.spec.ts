@@ -1,10 +1,11 @@
 import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import type { ChildProcess } from 'node:child_process'
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 
-import { isLiteModeEnv, readPortsFile, resolveGuardianTradingMode, resolvePortConfig, resolveWindowsBin, startFlagWatcher } from './shared.js'
+import { isLiteModeEnv, readConnectorServiceEnabled, readPortsFile, recentChildOutput, resolveGuardianTradingMode, resolvePortConfig, resolveWindowsBin, spawnChild, startFlagWatcher } from './shared.js'
 
 let home: string
 
@@ -38,6 +39,13 @@ describe('readPortsFile', () => {
   it('reads all four ports', async () => {
     await writePortsFile('{ "web": 18331, "mcp": 18332, "uta": 18333, "ui": 15173 }')
     expect(await readPortsFile(home)).toEqual({ web: 18331, mcp: 18332, uta: 18333, ui: 15173 })
+  })
+
+  it('reads a file saved with a UTF-8 BOM by PowerShell or Notepad', async () => {
+    // `Set-Content -Encoding utf8` on PowerShell 5.1 prepends \uFEFF, and the
+    // result is a config Guardian could not parse even though it reads fine.
+    await writePortsFile('\uFEFF{ "web": 12345 }')
+    expect(await readPortsFile(home)).toEqual({ web: 12345 })
   })
 
   it('fails loud on broken JSON instead of silently defaulting', async () => {
@@ -114,6 +122,57 @@ describe('isLiteModeEnv', () => {
     expect(isLiteModeEnv({})).toBe(false)
     expect(isLiteModeEnv({ OPENALICE_LITE_MODE: '' })).toBe(false)
     expect(isLiteModeEnv({ OPENALICE_LITE_MODE: '0', OPENALICE_UTA_DISABLED: 'false' })).toBe(false)
+  })
+})
+
+describe('readConnectorServiceEnabled', () => {
+  it('is false when the file is missing', async () => {
+    expect(await readConnectorServiceEnabled(home)).toBe(false)
+  })
+
+  it('reads only an explicit true', async () => {
+    await writeConfigFile('connector-service.json', '{ "enabled": false }')
+    expect(await readConnectorServiceEnabled(home)).toBe(false)
+    await writeConfigFile('connector-service.json', '{ "enabled": true }')
+    expect(await readConnectorServiceEnabled(home)).toBe(true)
+  })
+
+  it('reads a file saved with a UTF-8 BOM', async () => {
+    await writeConfigFile('connector-service.json', '\uFEFF{ "enabled": true }')
+    expect(await readConnectorServiceEnabled(home)).toBe(true)
+  })
+})
+
+describe('recentChildOutput', () => {
+  it('keeps the tagged tail of a prefixed child so a failed gate can quote it', async () => {
+    // The whole point of the buffer: Guardian's readiness abort has to show the
+    // child's own last words, which otherwise scroll past the banner.
+    const scriptPath = join(home, 'talkative-child.mjs')
+    await writeFile(scriptPath, 'for (let i = 1; i <= 5; i++) console.log(`line-${i}`)\n')
+    const child = spawnChild({
+      name: 'capture',
+      command: process.execPath,
+      args: [scriptPath],
+      env: process.env,
+      prefixLogs: true,
+    })
+    await new Promise<void>((done, fail) => {
+      child.once('error', fail)
+      child.once('close', () => done())
+    })
+    expect(recentChildOutput(child, 2).split('\n')).toEqual(['[capture] line-4', '[capture] line-5'])
+    expect(recentChildOutput(child)).toContain('[capture] line-1')
+  })
+
+  it('is empty for a child that printed nothing', async () => {
+    const scriptPath = join(home, 'silent-child.mjs')
+    await writeFile(scriptPath, 'void 0\n')
+    const child = await new Promise<ChildProcess>((done, fail) => {
+      const spawned = spawnChild({ name: 'silent', command: process.execPath, args: [scriptPath], env: process.env, prefixLogs: true })
+      spawned.once('error', fail)
+      spawned.once('close', () => done(spawned))
+    })
+    expect(recentChildOutput(child)).toBe('')
   })
 })
 

@@ -29,7 +29,7 @@ function globalProviderKeysFile(): string {
 
 async function readGlobalProviderKeys(): Promise<Record<string, string>> {
   try {
-    const raw: unknown = JSON.parse(await readFile(globalProviderKeysFile(), 'utf-8'))
+    const raw: unknown = JSON.parse(stripJsonBom(await readFile(globalProviderKeysFile(), 'utf-8')))
     if (typeof raw !== 'object' || raw === null) return {}
     return Object.fromEntries(
       Object.entries(raw).filter(([, v]) => typeof v === 'string' && v !== ''),
@@ -505,16 +505,68 @@ export type Config = {
 
 // ==================== Loader ====================
 
-/** Read a JSON config file. Returns undefined if file does not exist. */
-async function loadJsonFile(filename: string): Promise<unknown | undefined> {
+function isENOENT(err: unknown): boolean {
+  return err instanceof Error && (err as NodeJS.ErrnoException).code === 'ENOENT'
+}
+
+/**
+ * Strip a leading UTF-8 byte-order mark.
+ *
+ * Everything under `data/config` is user-editable, and the tools people use to
+ * edit it on Windows (PowerShell 5.1 `Set-Content -Encoding utf8`, Notepad)
+ * prepend a BOM that `JSON.parse` rejects. Reading the file back as plain
+ * `utf-8` keeps that marker in the string, so a cosmetic encoding detail used
+ * to look exactly like a corrupt config: the boot path aborted, and the
+ * hot-read helpers below answered by falling back to defaults.
+ */
+function stripJsonBom(text: string): string {
+  return text.replace(/^\uFEFF/, '')
+}
+
+/**
+ * Read and parse a JSON file under `data/config`.
+ *
+ * A missing file yields `undefined` in both modes. A present-but-broken file is
+ * handled per caller, because the two paths want opposite things:
+ *
+ * - `abort` (boot): throw with the offending path. A corrupt config has to stop
+ *   the process; continuing on defaults would let the next section write
+ *   persist them over the user's real settings.
+ * - `defaults` (per-request hot read): warn and yield `undefined` so the
+ *   request still serves, but the operator sees which file is unreadable
+ *   before a later write cements the fallback.
+ */
+async function readConfigJsonFile(
+  filename: string,
+  recover: 'abort' | 'defaults',
+): Promise<unknown | undefined> {
+  const path = resolve(CONFIG_DIR, filename)
+  let text: string
   try {
-    return JSON.parse(await readFile(resolve(CONFIG_DIR, filename), 'utf-8'))
+    text = stripJsonBom(await readFile(path, 'utf-8'))
   } catch (err: unknown) {
-    if (err instanceof Error && 'code' in err && (err as NodeJS.ErrnoException).code === 'ENOENT') {
-      return undefined
-    }
+    if (isENOENT(err)) return undefined
     throw err
   }
+  try {
+    return JSON.parse(text)
+  } catch (err: unknown) {
+    const detail = err instanceof Error ? err.message : String(err)
+    if (recover === 'abort') {
+      throw new Error(`Invalid JSON in ${path}: ${detail}`, { cause: err })
+    }
+    console.warn(
+      `[config] ${path} is not valid JSON (${detail}). ` +
+      'Serving defaults for this read — repair the file before saving this ' +
+      'section, or the defaults are written back over it.',
+    )
+    return undefined
+  }
+}
+
+/** Read a JSON config file. Returns undefined if file does not exist. */
+async function loadJsonFile(filename: string): Promise<unknown | undefined> {
+  return readConfigJsonFile(filename, 'abort')
 }
 
 /** Silently remove a config file (ignore if missing). */
@@ -826,8 +878,7 @@ export async function purgeEphemeralUTAs(utas: UTAConfig[]): Promise<UTAConfig[]
 /** Read agent config from disk (called per-request for hot-reload). */
 export async function readAgentConfig() {
   try {
-    const raw = JSON.parse(await readFile(resolve(CONFIG_DIR, 'agent.json'), 'utf-8'))
-    return agentSchema.parse(raw)
+    return agentSchema.parse((await readConfigJsonFile('agent.json', 'defaults')) ?? {})
   } catch {
     return agentSchema.parse({})
   }
@@ -836,8 +887,7 @@ export async function readAgentConfig() {
 /** Read AI provider config from disk (called per-request for hot-reload). */
 export async function readAIProviderConfig() {
   try {
-    const raw = JSON.parse(await readFile(resolve(CONFIG_DIR, 'ai-provider-manager.json'), 'utf-8'))
-    return aiProviderSchema.parse(raw)
+    return aiProviderSchema.parse((await readConfigJsonFile('ai-provider-manager.json', 'defaults')) ?? {})
   } catch {
     return aiProviderSchema.parse({})
   }
@@ -846,8 +896,7 @@ export async function readAIProviderConfig() {
 /** Read market data config from disk (called per-request for hot-reload). */
 export async function readMarketDataConfig() {
   try {
-    const raw = JSON.parse(await readFile(resolve(CONFIG_DIR, 'market-data.json'), 'utf-8'))
-    return applyGlobalProviderKeys(marketDataSchema.parse(raw))
+    return applyGlobalProviderKeys(marketDataSchema.parse((await readConfigJsonFile('market-data.json', 'defaults')) ?? {}))
   } catch {
     return applyGlobalProviderKeys(marketDataSchema.parse({}))
   }
@@ -879,8 +928,7 @@ export async function updateExtraVendors(
 /** Read tools config from disk (called per-request for hot-reload). */
 export async function readToolsConfig() {
   try {
-    const raw = JSON.parse(await readFile(resolve(CONFIG_DIR, 'tools.json'), 'utf-8'))
-    return toolsSchema.parse(raw)
+    return toolsSchema.parse((await readConfigJsonFile('tools.json', 'defaults')) ?? {})
   } catch {
     return toolsSchema.parse({})
   }
@@ -902,9 +950,22 @@ export async function readCredentials(): Promise<Record<string, Credential>> {
   return { ...config.credentials }
 }
 
+/**
+ * Read the credential vault for a read-modify-write.
+ *
+ * Same result as `readAIProviderConfig` for a healthy file, but a
+ * present-but-corrupt one aborts instead of yielding schema defaults: these
+ * callers write the whole file back, so the defaults would be persisted over
+ * the user's real credentials — an unexplained, unrecoverable vault wipe
+ * triggered by nothing more than a bad edit.
+ */
+async function readAIProviderVaultForWrite() {
+  return aiProviderSchema.parse((await readConfigJsonFile('ai-provider-manager.json', 'abort')) ?? {})
+}
+
 /** Write a single credential (create or update). */
 export async function writeCredential(slug: string, credential: Credential): Promise<void> {
-  const config = await readAIProviderConfig()
+  const config = await readAIProviderVaultForWrite()
   const validated = credentialSchema.parse(credential)
   config.credentials[slug] = validated
   await mkdir(CONFIG_DIR, { recursive: true })
@@ -923,7 +984,7 @@ export async function writeCredential(slug: string, credential: Credential): Pro
  * Alice" path.
  */
 export async function addCredential(credential: Credential): Promise<string> {
-  const config = await readAIProviderConfig()
+  const config = await readAIProviderVaultForWrite()
   const validated = credentialSchema.parse(credential)
   const match = Object.entries(config.credentials).find(([, c]) =>
     c.vendor === validated.vendor &&
@@ -967,7 +1028,7 @@ export async function addCredential(credential: Credential): Promise<string> {
  */
 export async function setCredentialLastModel(slug: string, model: string): Promise<void> {
   if (!model) return
-  const config = await readAIProviderConfig()
+  const config = await readAIProviderVaultForWrite()
   const cred = config.credentials[slug]
   if (!cred || cred.lastModel === model) return
   config.credentials[slug] = { ...cred, lastModel: model }
@@ -977,7 +1038,7 @@ export async function setCredentialLastModel(slug: string, model: string): Promi
 
 /** Delete a credential from the vault. */
 export async function deleteCredential(slug: string): Promise<void> {
-  const config = await readAIProviderConfig()
+  const config = await readAIProviderVaultForWrite()
   delete config.credentials[slug]
   // Drop any workspace-default that pointed at the now-gone slug, so the
   // Settings dropdown never shows a dangling default (injection would skip it
@@ -1005,7 +1066,7 @@ export async function readWorkspaceCredentialDefaults(): Promise<Record<string, 
 export async function writeWorkspaceCredentialDefaults(
   defaults: Record<string, WorkspaceCredentialDefault>,
 ): Promise<void> {
-  const config = await readAIProviderConfig()
+  const config = await readAIProviderVaultForWrite()
   const cleaned: Record<string, WorkspaceCredentialDefault> = {}
   for (const [agentId, def] of Object.entries(defaults)) {
     const parsed = workspaceCredentialDefaultSchema.parse(def)
@@ -1020,7 +1081,7 @@ export async function writeWorkspaceCredentialDefaults(
 export async function writeWorkspaceCreationDefaults(
   defaults: Record<string, WorkspaceCredentialDefault>,
 ): Promise<void> {
-  const config = await readAIProviderConfig()
+  const config = await readAIProviderVaultForWrite()
   const cleaned: Record<string, WorkspaceCredentialDefault> = {}
   for (const [agentId, def] of Object.entries(defaults)) {
     const parsed = workspaceCredentialDefaultSchema.parse(def)
@@ -1037,7 +1098,7 @@ export async function readWorkspaceDefaultAgent(): Promise<string | null> {
 }
 
 export async function writeWorkspaceDefaultAgent(agentId: string | null): Promise<void> {
-  const config = await readAIProviderConfig()
+  const config = await readAIProviderVaultForWrite()
   config.workspaceDefaultAgent = agentId && agentId.trim() ? agentId.trim() : null
   await mkdir(CONFIG_DIR, { recursive: true })
   await writeFile(resolve(CONFIG_DIR, 'ai-provider-manager.json'), JSON.stringify(config, null, 2) + '\n')
@@ -1049,7 +1110,7 @@ export async function readIssueDefaultAgent(): Promise<string | null> {
 }
 
 export async function writeIssueDefaultAgent(agentId: string | null): Promise<void> {
-  const config = await readAIProviderConfig()
+  const config = await readAIProviderVaultForWrite()
   config.issueDefaultAgent = agentId && agentId.trim() ? agentId.trim() : null
   await mkdir(CONFIG_DIR, { recursive: true })
   await writeFile(resolve(CONFIG_DIR, 'ai-provider-manager.json'), JSON.stringify(config, null, 2) + '\n')

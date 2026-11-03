@@ -48,11 +48,23 @@ export function getAppVersion(): string {
 export function makeDefaultContext(): MigrationContext {
   return {
     async readJson<T>(filename: string): Promise<T | undefined> {
+      const path = resolve(CONFIG_DIR, filename)
+      let text: string
       try {
-        return JSON.parse(await readFile(resolve(CONFIG_DIR, filename), 'utf-8'))
+        text = await readFile(path, 'utf-8')
       } catch (err: unknown) {
         if (isENOENT(err)) return undefined
         throw err
+      }
+      try {
+        // `data/config` is user-editable and Windows editors (PowerShell 5.1
+        // `Set-Content -Encoding utf8`, Notepad) prepend a UTF-8 BOM that
+        // `JSON.parse` rejects. Migrations run before the config loader, so an
+        // unstripped BOM here bricks boot with a bare SyntaxError.
+        return JSON.parse(stripJsonBom(text)) as T
+      } catch (err: unknown) {
+        const detail = err instanceof Error ? err.message : String(err)
+        throw new Error(`Invalid JSON in ${path}: ${detail}`, { cause: err })
       }
     },
     async writeJson(filename: string, data: unknown): Promise<void> {
@@ -78,6 +90,10 @@ export function makeDefaultContext(): MigrationContext {
 
 function isENOENT(err: unknown): boolean {
   return err instanceof Error && (err as NodeJS.ErrnoException).code === 'ENOENT'
+}
+
+function stripJsonBom(text: string): string {
+  return text.replace(/^\uFEFF/, '')
 }
 
 // ==================== Journal ====================

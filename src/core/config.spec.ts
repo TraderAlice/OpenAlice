@@ -161,6 +161,65 @@ describe('readMarketDataConfig', () => {
   })
 })
 
+// ==================== Encoding and corrupt-file handling ====================
+//
+// `data/config/*.json` is user-editable, and the Windows editors people use
+// (PowerShell 5.1 `Set-Content -Encoding utf8`, Notepad) prepend a UTF-8 BOM
+// that `JSON.parse` rejects. Before the strip, that cosmetic detail looked
+// exactly like a corrupt config: boot aborted with `Unexpected token 'ï»¿'`
+// and the per-request hot reads answered with schema defaults.
+
+/** Simulate a file that exists and holds these exact characters. */
+function fileContains(text: string) {
+  mockReadFile.mockResolvedValueOnce(text as any)
+}
+
+describe('UTF-8 BOM tolerance', () => {
+  it('hot reads a BOM-prefixed vault instead of serving defaults', async () => {
+    fileContains('\uFEFF' + JSON.stringify({
+      credentials: { 'openai-1': { vendor: 'openai', authType: 'api-key', apiKey: 'sk' } },
+    }))
+    const cfg = await readAIProviderConfig()
+    expect(cfg.credentials['openai-1'].apiKey).toBe('sk')
+  })
+
+  it('boot reads a BOM-prefixed accounts file without reseeding it', async () => {
+    fileContains('\uFEFF' + JSON.stringify([
+      { id: 'alp', presetId: 'alpaca', enabled: true, guards: [], presetConfig: { mode: 'paper', apiKey: 'k', apiSecret: 's' } },
+    ]))
+    const accounts = await readUTAsConfig()
+    expect(accounts.map((a) => a.id)).toEqual(['alp'])
+    expect(mockWriteFile).not.toHaveBeenCalled()
+  })
+})
+
+describe('present-but-corrupt config files', () => {
+  it('hot read warns with the offending path and still serves defaults', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    try {
+      fileContains('{ "credentials": ')
+      const cfg = await readAIProviderConfig()
+      expect(cfg.credentials).toEqual({})
+      expect(warn).toHaveBeenCalledWith(expect.stringMatching(/ai-provider-manager\.json is not valid JSON/))
+    } finally {
+      warn.mockRestore()
+    }
+  })
+
+  it('boot read aborts and names the file', async () => {
+    fileContains('this is not json')
+    await expect(readUTAsConfig()).rejects.toThrow(/Invalid JSON in .*accounts\.json/)
+  })
+
+  it('credential delete refuses to write defaults over an unreadable vault', async () => {
+    // The reason the hot-read warn exists: read-modify-write callers would
+    // otherwise persist the empty defaults straight back over real keys.
+    fileContains('this is not json')
+    await expect(deleteCredential('openai-1')).rejects.toThrow(/Invalid JSON in .*ai-provider-manager\.json/)
+    expect(mockWriteFile).not.toHaveBeenCalled()
+  })
+})
+
 // ==================== writeConfigSection ====================
 
 describe('writeConfigSection', () => {
