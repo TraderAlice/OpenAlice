@@ -15,8 +15,8 @@
  *                          carry an Origin header that matches the
  *                          configured allowlist.
  *
- * Reference: `safe/playbooks/01-auth-bypass.md`, `safe/playbooks/02-csrf-cross-origin.md`,
- * `safe/playbooks/03-localhost-spoofing.md`.
+ * Invariants mirror the original red-team playbooks (auth bypass, CSRF
+ * cross-origin, localhost spoofing).
  */
 
 import type { Context, MiddlewareHandler } from 'hono'
@@ -75,7 +75,7 @@ export function createAuthMiddleware(opts: AuthMiddlewareOptions): MiddlewareHan
     // Localhost passthrough — only honored when no trusted proxy is
     // configured. With a trusted proxy in front, the proxy IS at 127.0.0.1
     // from Alice's view, so trusting "localhost requests" would let every
-    // public request through. See safe/playbooks/03-localhost-spoofing.md.
+    // public request through.
     if (trustedProxies.size === 0) {
       const clientIp = getSocketRemoteAddress(c)
       const origin = c.req.header('origin')
@@ -177,7 +177,7 @@ function readSessionCookie(cookieHeader: string): string | null {
     if (name === SESSION_COOKIE_NAME) {
       const value = entry.slice(eq + 1).trim()
       // Empty value is "no session" — explicitly do NOT treat empty
-      // string as a valid SID. See safe/playbooks/01-auth-bypass.md.
+      // string as a valid SID.
       return value.length > 0 ? decodeURIComponent(value) : null
     }
   }
