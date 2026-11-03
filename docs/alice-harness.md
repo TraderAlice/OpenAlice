@@ -101,11 +101,16 @@ AliceProjects supply optional Sticker Pack prototypes (`Alice Color`, `Alice Ink
 plus custom imports under `data/stickers/packs/<id>/` capped at 512 KiB/image,
 100 images, 32 MiB total).
 
-- Enabled by default for new Chat Workspaces only. Projects selected images to
-  flat `sticker/<name>.png|.webp` paths and generates
+- Enabled by default for new Chat Workspaces only (excluded from ordinary
+  Harness/template updates). Projects selected images to flat
+  `sticker/<name>.png|.webp` paths and generates
   `.agents/skills/alice-stickers/SKILL.md` (plus `.claude/skills/` mirror),
   tracked in `.alice/stickers.json` with rollback journals at
   `.alice/sticker-transaction.json`.
+- **Ownership & safety**: Projection rejects symlinked `sticker/` or Skill paths
+  and conflicting unmanaged filenames, never deletes personal files or
+  intervening user edits, and leaves modified managed files in place until an
+  explicit `restore` action.
 - Connector resolves `[[sticker/wave.png]]` through the generic Workspace file
   boundary to send native stickers.
 
@@ -117,6 +122,12 @@ OpenAlice supervises Harness-owned web applications (AutoQuant Studio and Auto
 Prediction Studio) declared via root `harness.json` (`manifestVersion: 1`,
 `capabilities.studio: { command, ports, entryPort, readinessPath }`):
 
+- **Ownership & teardown boundary**: The Harness repository owns its own
+  business state, APIs, and dependencies; OpenAlice never reproduces Harness
+  business routes/state and Studio launch never runs dependency installers.
+  Stopping or replacing a generation removes its route before termination and
+  kills the full descendant process group even if a wrapper script already
+  exited.
 - **Managed launch**: OpenAlice allocates loopback ports, injects
   `HARNESS_CAPABILITY=studio`, `HARNESS_HOST=127.0.0.1`, `HARNESS_PORTS`, and
   `HARNESS_NO_OPEN=1`, supervises one foreground process tree per Workspace

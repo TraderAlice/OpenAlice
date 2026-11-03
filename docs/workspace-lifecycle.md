@@ -63,9 +63,12 @@ schedules, Connector, offboarding, and shutdown.
   idle (`working`, `compacting`, `retrying`, and `awaiting-input` cannot be
   interrupted by idle takeover; terminal handoff requires explicit approval).
 - **Emergency interrupt & admission blocks**: `interrupt(resumeId, executionId, actor)`
-  requires the exact `executionId` and escalates process-tree termination.
-  `user-cooldown` follows explicit user interruption; `execution-fault` follows
-  consecutive failures and requires explicit user release.
+  requires the exact `executionId` and escalates process-tree termination. HTTP
+  interrupt and release routes are always user-attributed (client-supplied actor
+  fields are rejected). `user-cooldown` follows explicit user interruption;
+  `execution-fault` follows consecutive failures and requires explicit user
+  release. Takeover approval never overrides an active admission block, and
+  release endpoints clear only the block without launching work.
 
 ---
 

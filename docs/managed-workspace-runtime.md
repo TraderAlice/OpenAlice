@@ -101,9 +101,13 @@ pnpm electron:demo                 # native Electron Demo Mode (child IPC MSW)
 pnpm electron:smoke:demo           # automated native Electron demo smoke
 ```
 
-- Native `pnpm electron:demo` builds `ui/dist-demo/` and `dist/demo/`, seeds an
-  isolated temporary `openalice-demo-*` home for real file IPC reads, disables
-  updates and data-home switching, and exits cleanly when the window closes.
+- **Process & credential isolation**: Native `pnpm electron:demo` builds
+  `ui/dist-demo/` and `dist/demo/`, seeds an isolated temporary
+  `openalice-demo-*` home for real file IPC reads, disables updates, analytics,
+  and data-home switching, and exits cleanly when the window closes. It never
+  starts production Guardian, Alice, UTA, Connector, or agent processes, never
+  passes provider credentials to the fixture child, and fails unmocked `/api/*`
+  requests explicitly with HTTP `501`.
 - Demo query parameters exercise recovery states without real mutations:
   `?workspaceSetup=failed|preparing|read-error`,
   `/settings/machines?machineScenario=probe-error|blocked|apply-error`, and
