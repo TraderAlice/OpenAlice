@@ -14,10 +14,13 @@ the durable truth after it changes. Git history is the archive.
   step complete before its code and required verification exist.
 - Record material discoveries and changed decisions in the plan. Move stable
   architectural conclusions into the linked owner guide.
+- Never let a plan grow unbounded: do not append turn-by-turn execution diaries,
+  per-iteration micro-decisions, or CI run logs. Collapse shipped increments to a
+  brief baseline summary and keep only remaining active work.
 - Completing a plan is a deletion: remove `plans/<topic>.md` and its Active
-  bullet in the same change that records acceptance. Do not keep a Completed
-  section, tombstone bullets, or an on-tree `plans/archive/`. Recover a
-  finished plan from git:
+  bullet in the same change that finishes the work. Do not leave completed plans
+  on `dev`, and do not keep a Completed section, tombstone bullets, or an
+  on-tree `plans/archive/`. Recover a finished plan from git:
 
   ```bash
   git log --diff-filter=D --summary -- plans/
