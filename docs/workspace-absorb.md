@@ -1,104 +1,80 @@
 # Workspace Absorb
 
-Workspace Absorb is the directional form of Workspace merge. The user chooses
-one desk to keep and one desk to retire:
+Workspace Absorb is directional consolidation: one target desk stays active and
+one source desk retires intact.
 
 ```text
-source Workspace ── files ──> target Workspace
-       │                         stays active
-       └── exact checkout ──> departed-workspaces/
+source Workspace ── reviewed files ──> target Workspace (stays active)
+       └──────── exact checkout ────> departed-workspaces/
 ```
 
-The product says **“Absorb another Workspace”**, not “merge A and B.” Direction
-is load-bearing: the target keeps its id, cwd, template, Git history, Sessions,
-and schedules; the source keeps its historical identity but leaves the active
-office floor.
+The target keeps its id, cwd, template, Git history, Sessions, and schedules.
+The source keeps historical identity but leaves the active floor. This is not a
+symmetric merge.
 
-Related guides: [[docs/workspace-lifecycle.md]],
-[[docs/workspace-template-upgrade.md]], and
-[[docs/conversation-provenance.md]].
+## What moves
 
-## What Moves
+Plans use the source Git working tree: tracked files plus untracked, non-ignored
+files. Ignored build output and dependency caches do not become target assets.
 
-OpenAlice plans from the source Git working tree: tracked files plus untracked,
-non-ignored files. Build output, dependency caches, and other ignored data do
-not become target assets merely because they happen to exist on disk.
-
-- A source file whose path is free in the target moves to that same path.
-- Identical files are recognized as duplicates and are not rewritten.
-- A different file at the same path requires a visible choice: keep the target,
-  use the source, or keep both. “Keep both” places the source copy below
+- A free target path receives the source file at the same path.
+- Identical files are duplicates and are not rewritten.
+- A content collision requires an explicit keep-target, use-source, or keep-both
+  choice. Keep-both places the source below
   `imports/<source-tag>-<source-id>/...`.
-- Source runtime/configuration assets do not move: `.git`, `.alice`, managed
-  prompt/skill trees, provider credentials, runtime homes, root template files,
-  `.env*` files, and dependency/build caches remain with the archived source
-  checkout.
 
-This boundary prevents a consolidation from silently replacing the target
-persona, re-enabling a scheduled Issue, copying API keys, or teaching two
-different template versions to one Agent. Source Issues and schedules remain
-readable in the departed checkout; they stop running when the source leaves the
-active registry.
+Source runtime/configuration assets never move: `.git`, `.alice`, managed prompt/
+Skill trees, provider credentials, runtime homes, root template files, `.env*`,
+and dependency/build caches remain in the archived source. This prevents silent
+persona replacement, schedule reactivation, credential copying, or mixed
+template versions. Source Issues/schedules remain readable but stop running
+when the source leaves the active registry.
 
-## What Does Not Change Identity
+## Identity and provenance
 
-Absorb never rewrites historical authorship:
+Absorb never rewrites authorship. Source resumeIds retire with the source;
+historical artifacts retain original Workspace and Session signatures. Copied
+files are new target assets with an audit commit, not target-Session authorship.
 
-- source `resumeId` records retire with the source Workspace;
-- old Inbox, report, Issue-run, and trade provenance keeps the original
-  Workspace and Session signature;
-- the Catalog records `absorbedIntoWorkspaceId`, `absorbedAt`, and the target
-  Git commit so the UI can explain where the desk went;
-- the source checkout moves intact to `departed-workspaces/<workspaceId>` and
-  can still be inspected or explicitly restored, including its
-  `.alice/sessions/` AI launch configuration.
+The Catalog records `absorbedIntoWorkspaceId`, `absorbedAt`, and target import
+commit. The complete source checkout remains inspectable or restorable in
+`departed-workspaces/<workspaceId>`, including `.alice/sessions/`. Restore
+intentionally creates two active copies and never removes target imports.
 
-Copied files are new target assets with an audit commit. They do not make the
-target Session the author of the source's old work.
+## Activity and concurrency
 
-## Preparation and Concurrency
+Preview and apply inspect process-backed TUI, Web, and headless activity, not
+persisted flags. Exited children are pruned even if outer cleanup was lost.
+Review names actual open work rather than hiding it behind a disabled action.
 
-Preview and apply inspect process-backed Workspace activity, not persisted
-`state: running` flags or a bare counter. The review lists the exact open TUI,
-Web, and headless turns. An exited child process is pruned from the guard even
-if an outer cleanup promise was lost, preventing a zombie “someone is working”
-blocker.
+Both desks must be idle and the target staged index clean. Apply holds an
+ordered two-Workspace lease so opposite-direction or concurrent mutations
+cannot deadlock or race.
 
-Both source and target must have no live interactive or headless work. The
-target must also have no staged Git changes, because Absorb creates one isolated
-audit commit. Applying holds an ordered two-Workspace operation lease, so two
-opposite-direction requests cannot deadlock or mutate either checkout at the
-same time.
+## Transaction and recovery
 
-## Transaction and Recovery
+1. Recompute the plan under both leases and reject a stale digest.
+2. Snapshot every target path that may change and write an Absorb journal.
+3. Offboard the source, closing scheduling/runtime admission before reading it.
+4. Copy only reviewed files from the departed checkout.
+5. Create one target Git commit with source/plan trailers.
+6. Mark the source Catalog row absorbed and remove the journal.
 
-Apply follows this order:
+Ordinary failure restores target paths and returns the source to its original
+cwd. After process interruption, recovery either finishes a detected Absorb
+commit forward or rolls back uncommitted target changes before restoring the
+source. The intact source archive is the lossless backstop and is never deleted
+by Absorb.
 
-1. recompute the plan under both leases and reject a stale digest;
-2. snapshot every target path that may change and write an Absorb journal;
-3. offboard the source, closing its scheduling/runtime door before reading it;
-4. copy the reviewed files from the departed checkout;
-5. create one target Git commit with source/plan trailers;
-6. mark the source Catalog row as absorbed and remove the journal.
+## Load-bearing paths and verification
 
-If a normal error occurs, target paths are restored and the source is restored
-to its original cwd. On process restart, the journal either finishes a detected
-Absorb commit forward or rolls the uncommitted target changes back before
-restoring the source. The source archive is therefore the lossless backstop;
-Absorb never deletes it.
+- `src/workspaces/workspace-absorb.ts` — plan, transaction, rollback, Catalog link.
+- `src/workspaces/workspace-operation-guard.ts` — ordered leases/activity exclusion.
+- `src/workspaces/workspace-lifecycle.ts` and `workspace-catalog.ts` — source
+  offboarding, durable history, restore, and recovery.
+- Workspace routes and target Settings UI — preview, choices, apply, and result.
 
-## Product Surface
-
-The action lives in the target Workspace settings. Its flow is intentionally a
-sentence the user can verify:
-
-1. **Keep this Workspace** — the already-open target.
-2. **Choose a Workspace to absorb** — active sources only; never the target.
-3. **Review what comes over** — counts, stopped schedules/Sessions, and every
-   path collision.
-4. **Absorb and archive source** — destructive direction is repeated on the
-   final button.
-5. **Done** — show the commit and the departed source record.
-
-Do not hide preparation behind a disabled button. If real work is open, list it
-by Session/run. If no process evidence exists, applying must not be blocked.
+Verification covers collision choices, excluded runtime/secrets, staged/active
+blockers, stale digest, lease ordering, rollback, and committed recovery. Run a
+real source → target → departed journey and confirm source provenance stays
+retired and attributable. Use [[docs/development-workflow.md]] for lifecycle gates.

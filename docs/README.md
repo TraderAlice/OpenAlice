@@ -59,43 +59,21 @@ Generated migration inventory: [[src/migrations/INDEX.md]]
   understand Server lifetime and security, and see the design inspiration
   behind the remote path.
 
-Reference notes under `docs/reference/` are non-authoritative research
-material. The [installer script note](reference/install-script/README.md)
-records Claude Code and Codex upstream links and design lessons without
-vendoring third-party code. The
-[Pi and Herdr CLI architecture note](reference/pi-herdr-cli-architecture.md)
-pins the TypeScript TUI, startup, configuration, persistent Runtime, command,
-and running-update comparison behind the Shell CLI plan. The
-[Herdr remote Runtime note](reference/herdr-remote-architecture.md) records a
-pinned public-source architecture comparison behind the authoritative remote
-guide, also without vendoring third-party code.
-
-## Incident Records
-
-- [[docs/incidents/2026-07-17-ibkr-contract-resolution.md]] —
-  [IBKR conId contract-resolution repair](incidents/2026-07-17-ibkr-contract-resolution.md):
-  recorded paper diagnosis, canonical routing invariants, and safe cleanup
-  evidence from the completed repair; current acceptance lives in the UTA guide.
-- [[docs/incidents/2026-07-28-broker-pack-upgrade-gap.md]] —
-  [v0.85 Broker Pack upgrade gap](incidents/2026-07-28-broker-pack-upgrade-gap.md):
-  previous-release Pack activation failed after a desktop upgrade and
-  established the N-1→N release gate.
-
-## Retired Architecture
-
-- [[docs/event-system.md]] — [Event-system retirement note](event-system.md):
-  a short pointer for the removed Alice event-bus scheduler and webhook API.
-  The active journal is owned by the Product Activity Journal guide above.
-
 ## Maintenance Rule
 
-- Every owner guide states what it owns and points to the current load-bearing
-  code paths.
-- When code and a guide disagree, verify the runtime and update the guide in the
-  same change.
-- Do not copy an owner guide back into `AGENTS.md`; add or update its wikilink.
-- Do not leave executable instructions in a retired guide. Keep a short
-  tombstone when old external links need a destination.
-- Keep each contract in one owner guide and link to it rather than copying it.
-  Prefer self-describing code/catalogs over copied provider, event, or route
-  inventories that immediately drift.
+Owner guides hold only subsystem boundaries, cross-process/cross-owner
+contracts, non-obvious state and security invariants, and load-bearing entry
+paths. Update a guide only when one of those boundaries, contracts, invariants,
+or paths actually changes.
+
+Do not append PR changelogs, restate TypeScript types or code branches in prose,
+list per-flag CLI manuals, transcribe UI pixel/CSS layouts, or record one-off
+CI/release run links in `docs/*.md`. Code and `.spec.ts` files own implementation
+detail; Git history and Issues own incident/release logs;
+`apps/landing/content/docs/` owns user-facing tutorials.
+
+Keep each contract in one owner guide and link to it rather than copying it.
+When current code and a guide disagree, verify runtime behavior and update the
+guide in the same change. Do not copy guides back into `AGENTS.md`; maintain
+their wikilinks here. Retired guides contain only short tombstones needed by old
+external links, never executable instructions.

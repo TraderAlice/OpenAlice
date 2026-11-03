@@ -13,8 +13,7 @@ This keeps the model loop native. Claude Code, Codex, opencode, and other CLIs k
 
 | Binary | For | Command groups |
 |--------|-----|----------------|
-| **`alice`** | Workspace research data, subscribed RSS, symbols, K-lines, and bounded analysis | `rss`, `market`, `analysis`, `think` |
-| **`alice-workspace`** | Peer addressing, Agent conversation, human Inbox delivery, durable work, and provenance | `inbox`, `peer`, `track`, `issue`, `signature`, `provenance`, `conversation` |
+| **`alice`** | Workspace research data, subscribed RSS, symbols, K-lines, bounded analysis, peer addressing, Agent conversation, human Inbox delivery, durable work, and provenance | `rss`, `market`, `analysis`, `inbox`, `peer`, `track`, `issue`, `signature`, `provenance`, `conversation`, `session`, `harness`, `template` |
 | **`traderhub`** | Low-frequency [Data Hub](/docs/market-data/data-hub) | `board`, `equity`, `etf`, `economy`, `global`, `shipping`, `fed`, `crypto`, `index` |
 | **`alice-uta`** | Beta trading layer | `account`, `contract`, `order`, `position`, `git`, `market`, `sim` |
 
@@ -22,15 +21,15 @@ This keeps the model loop native. Claude Code, Codex, opencode, and other CLIs k
 alice market search --query AAPL
 alice rss grep --pattern "rate cut"
 traderhub board get --board macro
-alice-workspace track add --name "NVDA supply chain"
-alice-workspace signature show
-alice-workspace inbox ask --id <entryId> --prompt "Why did you send this?" --await
+alice track add --name "NVDA supply chain"
+alice signature show
+alice inbox ask --id <entryId> --prompt "Why did you send this?" --await
 alice-uta order place --alice-id alpaca-paper:AAPL --side buy --qty 10
 ```
 
 Trading commands can stage intent, but execution still flows through [Trading as Git](/docs/core-concepts/trading-as-git): stage, commit, then push. Push waits for human approval in the Web UI or linked Telegram `/uta` by default; Pro mode can explicitly delegate it to the AI.
 
-The four CLI names are authority boundaries, not one flat command bag. Current
+The three CLI names are authority boundaries, not one flat command bag. Current
 top-level and group help explains which namespace owns an action before listing
 verbs; use that live help when an older copied skill shows stale syntax.
 
@@ -49,7 +48,7 @@ That identity matters:
 - A workspace cannot mislabel another workspace's Inbox entries.
 - Tracked entities and issues can be attributed to the workspace that wrote them.
 - Peer access is explicit. Inbox reads expose a safe absolute attachment path
-  when available; `alice-workspace peer path --id <wsId>` resolves the broader
+  when available; `alice peer path --id <wsId>` resolves the broader
   Workspace root as an addressing fallback. Native Agent tools own file reads,
   search, and Git operations after resolution.
 - A Session receives an OpenAlice-owned `resumeId`, used for signatures, provenance, exact follow-up, and headless-to-interactive continuation. Native CLI session ids stay behind the backend boundary.
@@ -62,11 +61,12 @@ One concept has one primary skill owner:
 
 | Concept | Skill |
 |---|---|
-| Inbox, Issue collaboration, provenance, peer questions | `alice-workspace` |
+| Inbox, Issue collaboration, provenance, peer questions | `alice` |
 | Delegating quantitative research from Chat to AutoQuant | `delegate-autoquant` |
 | Issue file shape, ownership, schedules, headless delivery | `self-scheduling` |
 | Low-frequency market and fundamental data | `traderhub` |
-| K-line analysis and source choice | `alice-analysis` |
+| K-line discovery, OHLCV, and chart references | `market-data` |
+| Optional quantitative formulas and snapshots | `alice-analysis` |
 | Broker state and trading writes | `alice-uta` |
 
 This avoids copying a volatile flag manual into every Workspace prompt. When a Workspace carries an older skill snapshot, the live CLI should reject stale syntax with a boundary-aware error and point to the current command.

@@ -2,8 +2,7 @@
 
 This guide owns the append-only product activity facts and their read
 projections. Workspace dispatch belongs to
-[[docs/workspace-issues-and-scheduling.md]]; the retired event-bus architecture
-is described separately in [[docs/event-system.md]].
+[[docs/workspace-issues-and-scheduling.md]].
 
 ## Boundary
 
@@ -53,6 +52,6 @@ separate conversation stream described in [[docs/conversation-provenance.md]].
 
 Regression coverage lives beside those owners, including
 `src/workspaces/agent-runtime-log.spec.ts`,
-`src/webui/routes/agent-runtime.spec.ts`, and
+`tests/integration/runtime-log-routes/agent-runtime.spec.ts`, and
 `ui/src/office/useOfficeProductActivity.spec.ts`. Test selection and side-effect
 rules belong to [[docs/testing.md]].
