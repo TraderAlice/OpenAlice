@@ -1,469 +1,221 @@
 # Project Structure
 
-This guide owns OpenAlice's current process boundaries, source-tree ownership,
-and persistent-state layout. Update it when a top-level subsystem moves or a
-new long-lived process, package, or state root is introduced.
+This guide owns process boundaries, source-tree ownership, persistent-state
+layout, and change routing. Update it when a top-level subsystem, long-lived
+process, package, or state root moves.
 
-Related guides: [[docs/managed-workspace-runtime.md]],
-[[docs/alice-project.md]],
-[[docs/model-semantics-and-runtime-injection.md]],
-[[docs/cli-installer.md]], [[docs/local-runtime.md]], [[docs/broker-packs.md]],
-[[docs/data-locations.md]],
-[[docs/workspace-lifecycle.md]],
-[[docs/workspace-template-upgrade.md]],
-[[docs/workspace-issues-and-scheduling.md]],
-[[docs/conversation-provenance.md]], and [[docs/market-data-architecture.md]].
+## Runtime topology
 
-## Runtime Topology
-
-The top-level product unit is an **AliceProject**. One AliceProject owns one
-complete `OPENALICE_HOME`, one Guardian tree, one Alice backend, and one
-logical frontend endpoint. Browser windows attach to that endpoint; they are
-not additional backend instances. Multiple AliceProjects run concurrently by
-using separate complete homes. See [[docs/alice-project.md]] for identity,
-registry, discovery, and lifecycle semantics.
-
-OpenAlice has two principal long-running service processes plus an optional
-Connector Service supervised by Guardian:
+An **AliceProject** owns one complete `OPENALICE_HOME`, one Guardian tree, one
+Alice backend, and one logical frontend endpoint. Browser windows attach to that
+endpoint; they are not additional backends. Concurrent AliceProjects require
+separate complete homes.
 
 ```text
 Guardian
-├── built Runtime control    versioned status + self-owned Server stop
-├── Alice                    Workspace runtime + product/API process
-│   ├── Web UI transport     HTTP/Vite in dev, app:// + IPC in Electron
-│   ├── Workspace PTYs       claude / codex / cursor-agent / agy / grok / omp / opencode / pi / shell
+├── Runtime control           versioned status and self-owned Server stop
+├── Alice                     Workspace runtime and product/API process
+│   ├── Web UI transport      HTTP/Vite dev; app:// + IPC in Electron
+│   ├── Agent processes      native coding CLIs, PTY, Web, and headless
 │   ├── ToolCenter           market, news, analysis, Inbox, UTA bridges
-│   └── file-backed state    config, sessions, issues, schedules, tool-call log
-├── UTA                      broker carrier and trading authority
-│   ├── broker connections
-│   ├── account state
-│   ├── staged/committed trading operations
-│   └── snapshots, FX, and execution
-└── Connector Service        optional external Inbox notification adapters
+│   └── file-backed state    config, Sessions, Issues, schedules, journals
+├── UTA                      optional broker carrier and trading authority
+└── Connector Service        optional external Inbox/chat adapters
 ```
 
-Launchers share the same ownership model:
+Launchers share this ownership model:
 
-- `scripts/guardian/dev.ts` runs UTA, Alice, the local Web relay, and Vite for
-  `pnpm dev`; `pnpm dev:no-relay` leaves the relay out for direct-path debugging.
-- `apps/desktop/src/main.ts` is the packaged Electron Guardian and renderer
-  host. It starts Alice/UTA through Electron's Node mode.
-- `scripts/guardian/prod.mjs` supervises built Runtime services and defaults to
-  the `source` launcher. CLI lifecycle commands supply `cli-server` plus a
-  versioned local status/stop capability. There is no shipped product Dockerfile
-  or Compose deployment; custom container/runtime-profile compatibility is not
-  a supported installer recipe. The CLI TUI and `openalice relay` serve their
-  client-owned Web GUI on loopback.
-- `packages/guardian-runtime/` owns cross-launcher single-writer locks,
-  heartbeat metadata, process identity, and controlled takeover.
+- `scripts/guardian/dev.ts` supervises development services and Vite.
+- `apps/desktop/src/main.ts` is the packaged Electron Guardian/renderer host.
+- `scripts/guardian/prod.mjs` supervises built Runtime services.
+- `packages/guardian-runtime/` owns single-writer locks, heartbeat/process
+  identity, and controlled takeover across launchers.
 
-UTA may be disabled in lite/read-only mode. Alice and the Workspace UI must
-remain usable without it; only broker/trading capabilities disappear.
+UTA may be disabled in lite/read-only mode. Alice and Workspaces remain usable;
+only broker/trading capabilities disappear. Connector is likewise optional and
+must not gate Inbox or Chat.
 
-## Source Ownership
+Native coding-agent CLIs own model loops. Alice owns launch, context injection,
+and secret-free Session bindings. New Agent-facing capabilities belong in
+templates, Skills, or satellite repositories, not a parallel workflow engine.
+
+## Source ownership
 
 ```text
 src/                           Alice process
 ├── main.ts                    composition root
-├── core/                      config, credentials, paths, sessions, Inbox,
-│                              ToolCenter, sealing, runtime profile, journals
-├── ai-providers/              provider/model preset catalog only
-├── domain/                    non-broker domains
-│   ├── market-data/           market/fundamental data access
-│   ├── analysis/              indicators and technical analysis
-│   ├── news/                  RSS collection and archive search
-│   └── thinking/              safe expression evaluation
-├── tool/                      agent-facing tool definitions and bridges
-├── workspaces/                launcher, PTYs, templates, adapters, issues,
-│   │                          schedules, CLI shims, file/git operations
-│   ├── adapters/              claude / codex / cursor / agy / grok / omp / opencode / pi / shell
-│   ├── cli/                   alice, alice-uta, alice-workspace, traderhub
-│   └── templates/             built-in Chat, pinned AutoQuant V2, and pinned Auto Prediction Harnesses
+├── core/                      config, credentials, paths, ToolCenter, Inbox,
+│                              sealing, runtime profile, journals
+├── ai-providers/              credential catalogs and model semantics
+├── domain/                    market data, analysis, news, thinking
+├── tool/                      Agent-facing tool definitions and bridges
+├── workspaces/                Sessions, execution, templates, adapters,
+│   │                          Issues, schedules, CLI shims, file/Git operations
+│   ├── adapters/              native CLI launch/projection and Web protocols
+│   ├── cli/                   alice, alice-uta, traderhub public shims
+│   └── templates/             Chat and source-backed Harness definitions
 ├── services/
-│   ├── auth/                  admin token and web session services
+│   ├── auth/                  admin token and Web Sessions
 │   ├── uta-client/            Alice-side UTA SDK adapters
-│   └── uta-supervisor/        UTA health and restart signaling
-├── server/                    MCP, local CLI gateway, market-data compat mount
-├── webui/                     Hono routes, auth middleware, Workspace WS/IPC
-└── migrations/                versioned user-state migrations
+│   └── uta-supervisor/        UTA health/restart signaling
+├── server/                    local CLI/tool gateways and compatibility mounts
+├── webui/                     Hono routes, auth middleware, Workspace transport
+└── migrations/                versioned persisted-state migrations
 
-services/uta/                  UTA process
-├── src/main.ts                service composition root
-├── src/http/                  trading/simulator HTTP boundary
-└── src/domain/trading/        UTA Core plus source adapters for Broker Packs
-
+services/uta/                  UTA process and broker/trading domain
+services/connector/            optional Connector Service
 packages/
 ├── cli/                       installable local Runtime/connection CLI
 ├── guardian-runtime/          process ownership and recovery primitives
-├── uta-protocol/              schemas and wire types shared by Alice + UTA
-├── ibkr/                      IBKR TWS protocol package, owned by UTA
-├── uta-broker-*/              optional live-engine release wrappers
-└── opentypebb/                embedded market-data compatibility package
+├── connector-protocol/        Alice ↔ Connector schemas and client
+├── uta-protocol/              Alice ↔ UTA schemas and wire types
+├── ibkr/                      UTA-owned IBKR wire protocol
+├── uta-broker-*/              optional broker-engine release wrappers
+└── opentypebb/                embedded market-data compatibility
 
 ui/                            React/Vite renderer
 apps/desktop/                  Electron main/preload/IPC shell
-apps/landing/                  Public Next.js website, user documentation, and blog
-scripts/guardian/              dev/prod supervisors, local control + recovery tests
-tests/integration/             registered collaboration tests grouped by topic
-tests/e2e/                     application-entry workflows
-tests/suites.json              integration/E2E suite registry
-tests/commands.json            dedicated acceptance prerequisites (manifest commands stay in place)
-default/                       shipped skills and factory defaults
+apps/landing/                  public website, user documentation, and blog
+scripts/guardian/              dev/prod supervisors and recovery tests
+tests/                         registered integration/E2E suites and gates
+default/                       shipped Skills and factory defaults
 docs/                          owner guides and contributor documentation
 ```
 
-The model execution loop is not in `src/ai-providers/`. Native coding-agent
-CLIs own their model loops. Alice's provider catalog describes credential and
-wire suggestions plus curated model semantics; a Workspace Session binding
-combines credential access, model selection, and those semantics before each
-adapter projects the result into one target CLI process. Follow
-[[docs/model-semantics-and-runtime-injection.md]] for that boundary.
+`src/ai-providers/` is not an inference engine. Provider/model semantics and
+adapter projection follow [[docs/model-semantics-and-runtime-injection.md]].
 
-## Optional RSSHub News Sources
+## Workspace boundary
 
-Alice owns RSS collection and the JSONL archive in `src/domain/news/`.
-Settings → News Sources (`/settings/news-collector`) offers opt-in presets
-for 财联社 (CLS), 格隆汇 (Gelonghui), and 金十数据 (Jin10). Enter an RSSHub
-instance URL and add each wanted source. Existing subscriptions are preserved.
-A source already configured, even if disabled, cannot be added again by a preset.
-
-RSSHub is an independently operated service, not an Alice-managed process or a
-mandatory Docker dependency. For a native Alice backend on the same machine,
-this verified, pinned RSSHub image can run on loopback:
-
-```bash
-docker run -d --name openalice-news-rsshub --restart unless-stopped -p 127.0.0.1:1200:1200 -e CACHE_TYPE=memory -e CACHE_EXPIRE=600 diygod/rsshub@sha256:0c36f939df98144fc2cbba1c5d7feefbc1675cc6ad5e99544fa1c77ac84a4e0d
-```
-
-Use `http://127.0.0.1:1200` in the preset form. Docker must remain running;
-`docker stop openalice-news-rsshub` stops the service, and
-`docker start openalice-news-rsshub` starts it again. Operators own RSSHub
-updates and should recheck routes before replacing the pinned image.
-
-The address is resolved by the **Alice backend**, not the browser. With a remote
-backend, a browser-local RSSHub is not sufficient. For separate Alice and RSSHub
-containers, use a private shared Docker network and RSSHub's service name
-(for example `http://rsshub:1200`), not loopback. Do not expose an unauthenticated
-RSSHub publicly merely to make it reachable.
-
-HTTP(S) base URLs may include a reverse-proxy prefix, such as
-`https://news.example.com/rsshub/`. Presets preserve the prefix and append
-their route. Credentials, query strings, and fragments are rejected; do not put
-secrets in feed URLs, which can appear in collection errors. Public instances
-may rate-limit or return challenge pages. Adding a preset does not test connectivity.
-
-The form writes ordinary `news.feeds` entries through the existing config API.
-No new persisted shape or migration is needed. Existing installations see the
-presets without resetting config. The instance field is an add-time input, not a
-global setting: changing it does not rewrite saved feeds. Remove and re-add a
-preset to change its instance. Restart Alice after saving, when no Workspace
-session needs to remain running: the collector reads its feed list at startup.
-Then open News and filter by the saved source tag to verify reception.
-
-RSSHub owns provider adaptation; Alice owns parsing, deduplication, storage, and
-queries. Entries may lack an article link or body. Preserve available fields
-without inventing URLs or substituting headlines as full articles. Feed access
-does not grant redistribution rights or access to paid content.
-
-## Workspace Architecture
-
-A Workspace is the primary capability boundary. It is a persistent directory
-and git repository plus PTY sessions, scrollback, issues, schedules, and agent
-configuration. The launcher supplies reusable infrastructure; the work itself
-lives in templates, skills, files, and satellite repositories.
+A Workspace is a durable directory and Git repository plus Sessions, Issues,
+schedules, and Agent configuration. The launcher supplies reusable execution;
+work and new domain capabilities live in Workspace files, templates, Skills,
+and satellite repositories.
 
 Coding-agent adapters are installation capabilities, not Workspace identity.
-Every registered adapter is eligible in every active Workspace; install and
-credential readiness are checked when a runtime is selected. Workspace registry
-and lifecycle rows do not persist adapter allowlists. A future user choice for
-the default enabled adapter set belongs in installation preferences, never in
-historical Workspace metadata.
+Every registered adapter is eligible in every active Workspace; readiness is
+checked at selection. Workspace registry/lifecycle rows do not persist adapter
+allowlists.
 
-Chat uses that boundary deliberately:
+Chat, AutoQuant, and Auto Prediction use the same durable Workspace and Session
+boundaries. Chat may maintain a recent-Workspace pointer; AutoQuant and Auto
+Prediction require explicit readiness pointers and never guess a desk on send.
+Source-backed Harnesses retain their own upstream repository, business state,
+and lifecycles. Alice supervises declared web capabilities through the shared
+contract in [[docs/harness-web-surfaces.md]] rather than reproducing them.
 
-- **New conversation** creates a Session inside the recent Chat Workspace.
-- **New Workspace** explicitly creates a new durable context container.
-- A new Alice Project with no Chat Workspace first shows **Initialize Ask
-  Alice**, the same setup chrome as AutoQuant, without a pinned Harness
-  version. Initialize creates the stable starter workspace at the latest Chat
-  Harness, then the composer appears.
-- The global Ask Alice composer stores `quickChat.recentChatWorkspaceId` in
-  `data/preferences.json`. A missing or stale pointer falls back to the most
-  recently active Chat Workspace; only a user with no Chat Workspace gets a
-  new stable starter workspace (from that setup page, or as a fallback on
-  first send).
-- Chat navigation treats a Workspace as a potentially large conversation
-  container. Its sidebar disclosure is a bounded recent/running preview; the
-  Workspace page is the searchable, lifecycle-filtered catalog for the full
-  Session history. Do not render an unbounded Session tree in the shell.
+The active floor contains active Workspace checkouts only. Do not reintroduce
+automatic date-based Chat Workspaces: a date is not a context boundary and
+would strand files, Issues, Git history, and configuration.
 
-Do not reintroduce date-based automatic Chat Workspaces. A date is not a
-context boundary, and new daily repositories strand files, issues, git history,
-and agent configuration in yesterday's Workspace.
+Execution identities remain distinct:
 
-Tracked is a global, file-backed index over those durable Workspaces:
+- `resumeId`: canonical product Session across interactive/headless turns;
+- `SessionRecord.id`: one durable launcher roster/process-attachment row;
+- `taskId`: one headless execution;
+- `agentSessionId`: backend-only native CLI conversation locator.
 
-- `EntityStore` persists only deliberately registered asset/topic anchors.
-- `entity-backlinks.ts` scans authored `[[name]]` links in Workspace Markdown
-  and Issue notes; prose is never inferred into an edge.
-- the Tracked sidebar combines those global asset/topic anchors with the live
-  Workspace Issue index. Issues keep their canonical `workspaceId + issueId`
-  identity, render their complete Markdown body without the work-item controls,
-  and open the canonical Issues detail surface through the explicit Details
-  action; they are never copied into `EntityStore`. The active entity or Issue
-  is encoded in `/tracked` query parameters so refresh and browser Back restore
-  the same selection while retaining one Tracked tab.
-- the relationship graph is a read-time projection of those two canonical
-  sources. Shared notes bridge every registered entity they reference, while
-  unlinked entities and Issues remain visible. Selecting either an entity or
-  an Issue preserves the current Detail/Graph mode; in Graph mode both focus
-  their existing graph node and defer navigation to the preview's explicit
-  Details action. The graph has no second persisted index or layout state to
-  migrate.
-- opening a graph material node keeps the same Tracked provenance and return
-  path as opening it from the backlink detail list.
+Changing surface never creates another product Session or roster row.
+Provenance and reconstruction rules belong to
+[[docs/conversation-provenance.md]].
 
-AutoQuant uses the same durable Workspace boundary with a stricter entry rule:
+Built-in templates use cross-platform `bootstrap.mjs` and shared Git helpers;
+do not add Bash bootstraps for built-ins. Source-backed Harnesses record an
+immutable source receipt. Workspace tools are exposed through the three public
+CLI shims `alice`, `alice-uta`, and `traderhub`; live CLI manifests own verbs and
+flags. `.agents/skills` is primary and `.claude/skills` its runtime mirror.
+Secret-bearing native provider/rollback files remain excluded from Git.
 
-- `autoQuant.defaultWorkspaceId` in `data/preferences.json` is the readiness
-  pointer for the AutoQuant Harness.
-- A missing or stale pointer shows initialization or explicit selection; the
-  research composer never guesses the latest desk and never creates one as a
-  side effect of sending.
-- Once initialized, daily navigation is Session-first. Workspace creation,
-  configuration, and default switching remain low-frequency controls.
-- AutoQuant's Coding Agent owns Projects, Studies, experiments, dependencies,
-  artifacts, and local Git history inside that desk; Alice does not reproduce
-  those lifecycles.
+## Alice ↔ UTA boundary
 
-Auto Prediction is the third source-backed conversation Harness and begins in
-the Beta section:
+UTA is the only owner of broker connections and trading writes. Alice crosses
+`@traderalice/uta-protocol` over local HTTP:
 
-- `autoPrediction.defaultWorkspaceId` is its explicit readiness pointer.
-- initialization clones one launcher-approved immutable commit from
-  `TraderAlice/Auto-Prediction`, retains upstream ancestry, and writes the
-  source receipt to `.alice/harness-source.json`;
-- native Coding Agent Sessions work inside that repository through the shared
-  Harness composer, roster, provenance, and Workspace lifecycle;
-- Auto Prediction continues to own its SQLite state, evidence, campaigns,
-  internal Agent workers, and Studio business APIs. Alice may start its
-  declared Studio capability but does not reproduce those lifecycles.
+- `services/uta/src/domain/trading/` owns broker implementations, account state,
+  approval/Git semantics, FX, and snapshots.
+- `packages/uta-broker-*/` package optional live engines separately; production
+  resolves them from `<OPENALICE_HOME>/runtime/broker-packs/`.
+- `src/services/uta-client/` presents the remote boundary as SDK adapters.
+- `src/tool/trading.ts` is a thin Agent bridge, not a broker domain.
+- Alice `/api/trading/*` routes proxy rather than implement trades.
+- `data/control/restart-uta.flag` signals Guardian for restart-required config.
 
-AutoQuant and Auto Prediction are the first two specimens for the shared
-managed web-surface contract. Alice allocates loopback ports, supervises the
-declared foreground command, waits on Harness-owned readiness, and exposes an
-opaque host route through the current browser/SSH/Electron transport. See
-[[docs/harness-web-surfaces.md]]. A future financial-dashboard Workspace should
-implement the same observed contract rather than receive a one-off launcher.
+Alice availability is not UTA/broker health. An absent Broker Pack disables only
+dependent accounts/data sources, not UTA Core or other engines.
 
-Load-bearing paths:
+## Tools and delivery
 
-- `src/workspaces/service.ts` — Workspace lifecycle and composition.
-- `src/workspaces/session-pool.ts` — PTY process ownership.
-- `src/workspaces/web-session-host.ts` and `src/workspaces/web-session/` —
-  the browser conversation surface: one long-lived structured-protocol
-  process per Session record, projected into a neutral snapshot. Transports
-  own the wire (`pi-rpc`, `acp`, `claude-stream-json`, `codex-app-server`);
-  adapters declare `capabilities.web` and compose the process command. The
-  persisted `SessionRecord.surface` value stays `webpi` for every runtime.
-- `src/workspaces/harness-surface-manager.ts` — managed Harness web processes,
-  readiness, routes, logs, and cleanup.
-- `src/workspaces/session-registry.ts` — durable session metadata.
-- `src/workspaces/workspace-runtime-settings.ts` — versioned, secret-free
-  `.alice/settings.json` launch preferences.
-- `src/workspaces/scrollback-store.ts` — terminal replay.
-- `src/workspaces/template-registry.ts` — template declarations.
-- `src/workspaces/template-upgrade.ts` — reviewed managed-asset reconciliation
-  and interrupted-upgrade recovery.
-- `src/workspaces/workspace-operation-guard.ts` — shared checkout-mutation
-  lease for template upgrade, offboarding, and Workspace Absorb.
-- `src/workspaces/workspace-creator.ts` — bootstrap and initial git state.
-- `src/workspaces/context-injector.ts` — persona and shared skill injection.
-- `src/workspaces/adapters/` — CLI-specific command/config behavior.
-- `src/workspaces/protocol.ts` — UI ↔ Workspace contract.
-
-Conversation execution has four deliberately separate identities, plus one
-provenance link:
-
-- `resumeId` is Alice's canonical product Session identity across headless and
-  interactive turns. Product APIs, artifact provenance, and follow-up flows
-  identify the same stateful Session by this id.
-- `taskId` identifies one headless execution. Every follow-up turn gets a new
-  task id, so run history remains append-only.
-- `SessionRecord.id` is Alice's durable launcher-owned roster/attachment key.
-  Every non-purged product Session receives one at the same birth boundary as
-  its `resumeId`; tabs, process attachment, and pause/resume routes use it, but
-  it is not the product Session identity.
-- `agentSessionId` is the backend-only native CLI conversation id. The
-  `ResumeRegistry` maps `resumeId` to this adapter-specific value; it must not
-  appear in frontend resume requests or Inbox provenance.
-- `sourceRunId` preserves the first associated headless execution provenance.
-
-Do not use a headless task id directly as a roster or process-attachment id,
-and do not create another `SessionRecord` when the same `resumeId` changes
-between headless, terminal, and Web execution. The run is execution
-provenance; `resumeId` is the product identity; `SessionRecord` is its one
-durable launcher-owned roster record.
-
-For the broader “ask the agent who produced this” model — including mutable
-Issues, Inbox deliveries, document revisions, reconstruction fallback, and
-trade-decision attribution — follow [[docs/conversation-provenance.md]].
-
-Built-in templates use cross-platform `bootstrap.mjs` files and route git
-through `src/workspaces/templates/_common.mjs`. Do not add new Bash bootstraps
-for built-in templates. `bootstrap.sh` remains only as a third-party fallback.
-Source-backed Harnesses declare an explicit repository and version-to-commit
-catalog in `template.json`; creation records the chosen immutable source in
-`.alice/harness-source.json`.
-
-Workspace tools are exposed as CLI shims on `PATH`. The `alice*` and
-`traderhub` skills teach the native agents how to call those shims. Shared
-project skills are copied to `.agents/skills/` and Claude-specific discovery to
-`.claude/skills/`. Managed Session provider/model/effort selection comes from
-`.alice/settings.json`, is frozen into `.alice/sessions/<resumeId>.json` as
-the `ai` object (a sibling `displayName` may name the coworker), and
-is projected into the child process by the adapter. Pi's deprecated native-config export
-registers an OpenAlice-managed provider through the Workspace-local
-`.pi/extensions/openalice-provider.ts` and selects it through `.pi/settings.json`;
-the sensitive provider definition and rollback state stay in
-`.pi/openalice-provider.json`. The shared runtime lifecycle also gives
-Workspaces without an explicit Pi theme the native `light/dark` automatic pair.
-OpenAlice never writes Pi's global model registry, redirects Pi away from its
-native global packages/settings/auth/sessions, or replaces an explicit Pi
-project theme.
-OpenCode's deprecated provider export stays in `opencode.json`; TUI configuration
-remains in its native `tui.json` project layer. The runtime lifecycle selects the
-native `system` theme only when the project has no explicit OpenCode TUI or
-legacy theme config. Codex needs no project theme setting: it derives its
-palette directly from the terminal's OSC 10/11 replies.
-The deprecated Claude Code and opencode exports keep reversible OpenAlice ownership metadata in
-`.claude/openalice-provider.json` and `.opencode/openalice-provider.json` so
-provider reset preserves unrelated native settings. Those files are sensitive
-and excluded from the Workspace repository.
-
-## Alice and UTA Boundary
-
-UTA is the only owner of broker connections and trading writes. The contract
-crosses `@traderalice/uta-protocol` over local HTTP:
-
-- `services/uta/src/domain/trading/` contains broker implementations,
-  account state, approval/git semantics, FX, and snapshots.
-- `packages/uta-broker-*/` package live broker implementations and third-party
-  SDKs separately from UTA Core; production resolves them from
-  `<OPENALICE_HOME>/runtime/broker-packs/`.
-- `src/services/uta-client/` presents that remote boundary to Alice as SDK
-  adapters.
-- `src/tool/trading.ts` is a thin agent-facing bridge, not a broker domain.
-- Alice's `/api/trading/*` routes proxy to UTA rather than implementing trades.
-- Configuration changes that require UTA restart use
-  `data/control/restart-uta.flag`, watched by Guardian.
-
-Do not use Alice process availability as evidence that UTA or a broker is
-healthy. Do not let an optional UTA failure block read-only Workspace use.
-An absent Broker Pack disables only accounts and K-line sources that require
-that engine; it must not prevent UTA Core or another engine from starting. See
-[[docs/broker-packs.md]] for the install and activation contract.
-
-## Tools, Automation, and Delivery
-
-`src/core/tool-center.ts` is the tool registry. Workspace-scoped registration
-passes through `src/core/workspace-tool-center.ts`, which binds the Workspace
-identity before exposing tools.
-
-Scheduled work uses the same Workspace execution plane as attended work:
+`src/core/tool-center.ts` owns the registry;
+`src/core/workspace-tool-center.ts` binds Workspace identity before exposure.
+Scheduled and attended work share the Workspace execution plane:
 
 ```text
-issue/schedule -> headless Workspace run -> native agent -> inbox_push -> Inbox
+Issue/schedule -> headless Workspace run -> native Agent -> Inbox delivery
 ```
 
-Inbox is the durable agent-to-user delivery surface. Agents publish reports or
-status by calling the injected `inbox_push` capability. Alice stamps the
-product Session and exact execution identity out-of-band. The user can return
-to the exact originating Session regardless of whether its first turn was
-headless or interactive; opening TUI/Web attaches a process to the existing
-durable Session record.
+Inbox is durable Agent-to-user delivery. Alice stamps product Session and
+execution origin out-of-band. Follow-up opens the existing product Session,
+regardless of whether its first turn was interactive or headless.
 
-## Persistent State
+## Persistent state
 
-Each AliceProject owns one complete `OPENALICE_HOME`. Guardian injects the
-resolved home into its child processes so services agree on that boundary.
-`~/.openalice` is the conventional implicit local home, not a fallback that may
-replace an unavailable or unresolved Supervisor Default.
-
-The machine-local Supervisor registry and shared Machine/AliceProject Default
-live outside every project home. Desktop startup uses that authority before
-acquiring Guardian ownership; its former Electron `userData` path preference
-is migration input only. See [[docs/alice-project.md]] and
-[[docs/data-locations.md]]. Never select a project by moving only `data/`:
-Workspaces, locks, credentials, sealing, and Broker Packs must remain coherent.
+Guardian injects one resolved complete home into child processes.
+`~/.openalice` is the conventional implicit local home, never a fallback for an
+unavailable resolved Supervisor Default. The machine-local Supervisor registry
+and shared Machine/AliceProject Default live outside every project home.
 
 ```text
 <OPENALICE_HOME>/
 ├── data/                      portable user data
-│   ├── config/                JSON config + migration journal
-│   ├── sessions/              web/admin sessions
+│   ├── config/                JSON config and migration journal
+│   ├── sessions/              Web/admin Sessions
 │   ├── trading/               account history and snapshots
-│   ├── inbox/                 Inbox records + Office routine follow-up queue
-│   ├── office/                shared Office Day shift + evidence receipts
-│   ├── event-log/             UTA account-health and snapshot journal
+│   ├── inbox/                 Inbox records and follow-up queue
+│   ├── office/                Office shift and evidence receipts
+│   ├── event-log/             UTA health/snapshot journal
 │   ├── cron/                  schedules/jobs
 │   ├── news-collector/        RSS archive
 │   └── _backup/               migration snapshots
 ├── workspaces/                default launcher root
 │   ├── workspaces.json        active Workspace registry
-│   ├── workspaces/            active Workspace repositories only
+│   ├── workspaces/            active repositories only
 │   ├── departed-workspaces/   retained offboarded repositories
-│   ├── state/                 lifecycle catalog, Sessions, scrollback, tasks,
-│   │                          provenance, Agent conversation log, compatibility lock
-│   └── auto-quant-v2-mirror/  shared AutoQuant V2 source mirror
-├── state/
-│   ├── guardian.lock          launcher ownership
-│   └── runtime.lock           shared writer ownership
-├── runtime/
-│   └── broker-packs/          replaceable, platform-specific broker SDK packs
-├── provider-keys.json         user-global AI provider credentials
-└── sealing.key                machine-bound encryption key; not in data/
+│   ├── state/                 Catalog, Sessions, tasks, provenance, journals
+│   └── auto-quant-v2-mirror/  shared source mirror
+├── state/                     Guardian and Runtime ownership locks
+├── runtime/broker-packs/      replaceable platform-specific broker SDKs
+├── provider-keys.json         user-global AI credentials
+└── sealing.key                machine-bound key, deliberately outside data/
 ```
 
-Overrides:
+`AQ_LAUNCHER_ROOT` moves only the Workspace root; `OPENALICE_GLOBAL_DIR` moves
+the global provider-key store; `OPENALICE_APP_HOME` points to replaceable app
+resources. Never select a project by moving only `data/`: Workspaces, locks,
+credentials, sealing, and Broker Packs must remain coherent.
 
-- `AQ_LAUNCHER_ROOT` moves only the Workspace launcher root.
-- `OPENALICE_GLOBAL_DIR` moves the user-global `provider-keys.json` store.
-- `OPENALICE_APP_HOME` points to replaceable app resources such as templates,
-  defaults, UI assets, and packaged CLI shims.
+`data/` is the portable backup/migration unit, but its sealed contents need the
+separate machine key. Shipped persisted-shape changes use idempotent migrations
+in `src/migrations/`, declare affected paths for the generated index, and test
+backup behavior. Unreleased development shapes are replaced directly.
 
-`data/` is the portable backup/migration unit. `sealing.key` deliberately
-lives beside it so a copied data directory does not carry its decryption key.
-The active migration chain starts after the 0.89.2-beta baseline. A
-transformation for a persisted shape that has shipped belongs in
-`src/migrations/`, must be idempotent, and must declare affected paths for the
-generated `src/migrations/INDEX.md`. Unreleased development shapes are replaced
-directly and do not become permanent compatibility code.
-
-## Change Routing
+## Change routing
 
 | Change | Start with |
 |---|---|
-| Workspace lifecycle, agent launch, packaged Pi, shell/PATH | `src/workspaces/` + [Managed Workspace runtime](managed-workspace-runtime.md) |
-| Workspace offboarding, restore/purge, Session retirement | [Workspace and Session lifecycle](workspace-lifecycle.md) |
-| Template versions, managed-asset reconciliation, upgrade recovery | [Workspace Template Upgrade](workspace-template-upgrade.md) |
-| Broker/account/execution behavior | `services/uta/src/domain/trading/` + [UTA live testing](uta-live-testing.md) |
+| Workspace execution, Agent launch, managed runtime, PATH | `src/workspaces/` + [[docs/managed-workspace-runtime.md]] |
+| Offboarding, restore/purge, Session retirement | [[docs/workspace-lifecycle.md]] |
+| Managed template reconciliation | [[docs/workspace-template-upgrade.md]] |
+| Broker/account/execution behavior | `services/uta/src/domain/trading/` + [[docs/uta-live-testing.md]] |
 | Shared Alice ↔ UTA shapes | `packages/uta-protocol/` and both callers |
-| External Inbox notifications and IM adapters | [Connector Service](connector-service.md) |
+| External Inbox/chat adapters | [[docs/connector-service.md]] |
 | Renderer/API surface | `ui/`, `src/webui/`, and matching demo handlers |
-| Public website, user documentation, blog, and media rendering | `apps/landing/` + [Public website](landing.md) |
-| Issues, schedules, headless runs, Inbox delivery | [Workspace issues and scheduling](workspace-issues-and-scheduling.md) |
-| Product activity facts, family pagination, Office/Sonner projections | [Product Activity Journal](product-activity-journal.md) |
-| Historical event-bus retirement | [Event-system retirement note](event-system.md) |
-| User-state schema | `src/migrations/` + generated migration index |
-| Process lock/recovery and optional-service supervision | `packages/guardian-runtime/` and all three launchers |
-| AliceProject selection and concurrent complete homes | [Data locations](data-locations.md), `packages/cli/src/startup-target.ts`, and `apps/desktop/src/main.ts` |
+| Public website/user tutorials | `apps/landing/` + [[docs/landing.md]] |
+| Issues, schedules, headless runs | [[docs/workspace-issues-and-scheduling.md]] |
+| Product activity facts | [[docs/product-activity-journal.md]] |
+| User-state schema | `src/migrations/` + generated index |
+| Process locks/optional-service supervision | `packages/guardian-runtime/` and all launchers |
+| AliceProject selection/complete homes | [[docs/data-locations.md]] and startup owners |
 
-When current code disagrees with this guide, verify the runtime behavior and
-update the guide in the same change rather than leaving a second source of
-truth in `AGENTS.md`.
-
-Required local test policy lives in `tests/gates.json`; `scripts/test-results.mjs`
-resolves it through the coverage manifests and inspects actual runner outcomes.
-`tests/helpers/` contains isolated local journey fixtures, never product runtime
-or an independent test runner. See [[docs/testing.md]].
+Test policy lives in [[docs/testing.md]] and `tests/gates.json`. Current code,
+tests, and runtime behavior override stale prose; update this guide only when a
+boundary or load-bearing path actually changes.

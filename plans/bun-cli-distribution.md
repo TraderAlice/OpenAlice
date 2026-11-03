@@ -466,7 +466,6 @@ Research references:
 - [OpenCode build script](https://github.com/anomalyco/opencode/blob/dev/packages/opencode/script/build.ts)
 - [OpenCode publish script](https://github.com/anomalyco/opencode/blob/dev/packages/opencode/script/publish.ts)
 - [OpenCode download matrix](https://opencode.ai/zh/download)
-- [[docs/reference/install-script/README.md]]
 
 ## Motivation
 

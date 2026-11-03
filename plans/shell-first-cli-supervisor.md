@@ -40,11 +40,6 @@ Owner guides:
 - [[docs/data-locations.md]]
 - [[docs/development-workflow.md]]
 
-Research:
-
-- [[docs/reference/pi-herdr-cli-architecture.md]]
-- [[docs/reference/herdr-remote-architecture.md]]
-
 Predecessor:
 
 - CLI lifecycle quality shipped in PR #847. The durable contract is
@@ -711,8 +706,7 @@ This plan is complete only when:
   TypeScript plus `@earendil-works/pi-tui`; assigned Pi as the startup,
   settings, and TUI reference, Herdr as the persistent Runtime and command
   semantics reference, and Guardian plus the OpenAlice installer as the final
-  ownership and update authority. Recorded the comparison in
-  [[docs/reference/pi-herdr-cli-architecture.md]].
+  ownership and update authority.
 - 2026-07-30: Started the replacement implementation from merged PR #868.
   Added the native TypeScript CLI entry and first `pi-tui` Supervisor shell,
   made bare `openalice` enter it, retained `openalice tui` and every explicit
@@ -751,8 +745,7 @@ This plan is complete only when:
   and installer/package paths. None of the three upstream breaking-change
   groups are reachable from OpenAlice. The exact Supervisor `pi-tui` API
   surface and Node floor remain compatible; `0.83.0` is the accepted baseline
-  without a compatibility fork. Recorded the break matrix and future extension
-  guardrail in [[docs/reference/pi-herdr-cli-architecture.md]].
+  without a compatibility fork.
 - 2026-07-30: Added the immutable launch-context foundation for the TUI:
   default/machine/instance/environment/flag precedence, field provenance,
   named complete-home selection, source root, port, update policy, and a

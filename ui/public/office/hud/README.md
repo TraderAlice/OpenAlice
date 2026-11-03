@@ -20,7 +20,7 @@ Live labels, button behavior, focus rings, and accessible names remain DOM-owned
 - `replay-latch-v1.png` — mechanical disclosure latch for the Occupancy replay deck
 - `replay-visitor-v1.png` — replay-only locator for the present-day Alice visitor
 
-All assets use `docs/assets/office/style-master-v1.png` as their visual reference.
+All assets use `ui/public/office/style-master-v1.png` as their visual reference.
 The command glyphs are separate transparent images so their silhouettes remain
 legible at UI size and their accessible labels stay DOM-owned. The generated
 masters are packaged onto native RGBA canvases with nearest-neighbor sampling and

@@ -15,7 +15,7 @@ Art direction:
 - no text, logos, characters, UI panels, or baked backgrounds.
 
 The visual style master is stored at
-`docs/assets/office/style-master-v1.png`; it is a generation reference, not a
+`ui/public/office/style-master-v1.png`; it is a generation reference, not a
 runtime asset. Generate each new prop as a standalone transparent image using
 that master as the style reference, verify its alpha channel, and add it to
 `ui/src/office/furniture.ts` before use.

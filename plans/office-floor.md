@@ -3620,7 +3620,7 @@ Sixteen-member Grok party follow-up (2026-08-30):
   while repairing already-retained collisions. Chose the authored extension: aliases would make Agent Files nominally
   different but leave the in-world cast visibly cloned, while dropping retained identity wholesale would make every
   established coworker change after refresh.
-- Used the built-in image generator with `docs/assets/office/style-master-v1.png` as the palette reference and the Grok
+- Used the built-in image generator with `ui/public/office/style-master-v1.png` as the palette reference and the Grok
   Navigator portrait / seated idle / seated typing assets as pose references. Four feminine three-pose identities add
   distinct silhouettes and palettes: violet Tactician, coral Diplomat, copper Artificer, and blue-black Librarian. The
   standard hard-alpha packager produced twelve project-bound PNGs on native 72x104 and 176x176 canvases; source masters
