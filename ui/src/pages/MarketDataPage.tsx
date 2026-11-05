@@ -82,6 +82,7 @@ const KEY_GROUPS: { label: string | null; providers: ProviderEntry[] }[] = [
     providers: [
       { key: 'econdb', name: 'EconDB', desc: 'Global macro indicators, country profiles, shipping data.', hint: 'econdb.com' },
       { key: 'intrinio', name: 'Intrinio', desc: 'Equities, ETFs, fundamentals, news, options snapshots.', hint: 'intrinio.com' },
+      { key: 'fxmacrodata', name: 'FXMacroData', desc: 'Macro releases, release calendars, policy rates and FX reference rates for 22 currencies.', hint: 'fxmacrodata.com — USD works without a key' },
     ],
   },
 ]
