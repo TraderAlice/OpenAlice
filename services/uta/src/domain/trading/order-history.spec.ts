@@ -40,6 +40,12 @@ function limitBuy(qty: string, price: string): Order {
   return o
 }
 
+/** A persisted verdict is data, not a type: the log rehydrates from disk without
+ *  validating results, so a record can carry a status the union never listed. */
+function persistedResult(value: unknown): OperationResult {
+  return value as OperationResult
+}
+
 describe('projectOrderHistory', () => {
   it('collapses place→sync-fill into one resolved row', () => {
     const commits = [
@@ -116,6 +122,58 @@ describe('projectOrderHistory', () => {
     expect(rows).toHaveLength(1)
     expect(rows[0].status).toBe('rejected')
     expect(rows[0].error).toBe('price band')
+  })
+
+  it('keeps an explicitly unconfirmed broker write visible as unconfirmed', () => {
+    const commits = [
+      commit(
+        [{ action: 'placeOrder', contract: contract(), order: limitBuy('0.01', '1650') }],
+        [{ action: 'placeOrder', success: false, orderId: 'live-maybe', status: 'unconfirmed', error: 'broker call still outstanding' }],
+        'buy the dip',
+      ),
+    ]
+    const rows = projectOrderHistory(commits)
+    expect(rows).toHaveLength(1)
+    expect(rows[0]).toMatchObject({
+      orderId: 'live-maybe',
+      status: 'unconfirmed',
+      error: 'broker call still outstanding',
+      message: 'buy the dip',
+    })
+    expect(rows[0].status).not.toBe('rejected')
+  })
+
+  it('reads an unresolvable verdict as unconfirmed and names the gap on the row', () => {
+    // No writer omits a verdict (one per operation), so these are records whose
+    // verdict was lost or written by something that knows a status the vocabulary
+    // does not. Neither is a venue rejection: 'rejected' would assert an answer
+    // this log does not have, and the order may be live.
+    const open = commit(
+      [{ action: 'placeOrder', contract: contract(), order: limitBuy('0.01', '1650') }],
+      [{ action: 'placeOrder', success: true, orderId: 'o1', status: 'submitted' }],
+    )
+    const lostVerdict = commit(
+      [{ action: 'placeOrder', contract: contract(), order: limitBuy('0.02', '1650') }],
+      [],
+    )
+    const unknownStatus = commit(
+      [{ action: 'placeOrder', contract: contract(), order: limitBuy('0.03', '1650') }],
+      [persistedResult({ action: 'placeOrder', success: false, status: 'ghosted' })],
+    )
+    const unknownSync = commit(
+      [{ action: 'syncOrders' }],
+      [persistedResult({ action: 'syncOrders', success: true, orderId: 'o1', status: 'ghosted' })],
+    )
+
+    const unresolved = projectOrderHistory([open, lostVerdict, unknownStatus])
+
+    const anonymous = unresolved.filter((row) => !row.orderId)
+    expect(anonymous.map((row) => row.status)).toEqual(['unconfirmed', 'unconfirmed'])
+    expect(anonymous.every((row) => row.error?.includes('no recorded verdict'))).toBe(true)
+    const rows = projectOrderHistory([open, lostVerdict, unknownStatus, unknownSync])
+    const resolved = rows.find((row) => row.orderId === 'o1')
+    expect(resolved?.status).toBe('unconfirmed')
+    expect(resolved?.resolvedAt).toBeDefined()
   })
 })
 
