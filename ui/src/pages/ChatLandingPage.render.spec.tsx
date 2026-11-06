@@ -482,6 +482,7 @@ describe('ChatLandingPage workflow starters', () => {
     expect(suggestions[0]?.className).not.toContain('oa-suggestion-enter')
     expect(suggestions[0]?.className).toContain('border-b')
     expect(suggestions[0]?.textContent).toContain("Read today's cross-asset signals")
+    expect(suggestions[0]?.textContent).toContain('Pulls index compilers and macro boards first')
 
     fireEvent.click(screen.getByRole('button', { name: 'Show more workflows' }))
     expect(strip.textContent).toContain('Find what actually needs follow-up')
@@ -505,6 +506,8 @@ describe('ChatLandingPage workflow starters', () => {
     fireEvent.click(refreshedStarter)
     expect((screen.getByPlaceholderText('Describe the task, question, or decision…') as HTMLTextAreaElement).value)
       .toContain("Read today's macro backdrop")
+    expect((screen.getByPlaceholderText('Describe the task, question, or decision…') as HTMLTextAreaElement).value)
+      .not.toContain('Pulls index compilers and macro boards first')
   })
 })
 

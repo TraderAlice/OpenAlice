@@ -60,6 +60,10 @@ fit the task.
 | Accounts, positions, orders, trading-as-git | `alice-uta` | `alice-uta` |
 | Optional website adapters, if installed separately | `opencli` | `opencli-reader` |
 
+**Market brief:** For「今日宏观 · 跨资产」, follow the `traderhub` skill
+(board- and compiler-first, then `alice brief`). Do not start with
+`scripts/daily-brief/collect.ps1`.
+
 Use the bundled research skills (`build-thesis`, `sector-rotation`,
 `scan-value-chain`, `retrospective`) when their workflow matches the request.
 They are methods, not mandatory ceremony.
