@@ -9,8 +9,8 @@ This file contains only rules that apply at the start of every task. Current
 code, tests, rendered behavior, and GitHub state override stale prose. Before
 editing a subsystem, select and read its owner guide from [[docs/README.md]].
 Detailed delivery and release procedure lives in
-[[docs/development-workflow.md]], test selection and side effects live in
-[[docs/testing.md]], and active multi-step work lives in [[PLANS.md]].
+[[docs/architecture/development-workflow.md]], test selection and side effects live in
+[[docs/architecture/testing.md]], and active multi-step work lives in [[PLANS.md]].
 
 ## Product and Architecture Boundaries
 
@@ -27,7 +27,7 @@ Detailed delivery and release procedure lives in
   not one-off startup cleanup.
 - Never put secrets in tracked files, logs, fixtures, PR bodies, or agent instructions.
 
-Details: [[docs/project-structure.md]] and [[docs/alice-project.md]].
+Details: [[docs/architecture/project-structure.md]] and [[docs/architecture/alice-project.md]].
 
 ## Delivery Authority
 
@@ -43,14 +43,14 @@ Details: [[docs/project-structure.md]] and [[docs/alice-project.md]].
 - Prefer merge commits; delete feature branches only after a confirmed merge.
 
 Detailed delivery modes, autonomous-contribution acceptance, CI feedback, and
-release procedures live in [[docs/development-workflow.md]].
+release procedures live in [[docs/architecture/development-workflow.md]].
 
 ## Verification Ladder
 
 Verify changes with relevant tests, owning typechecks, and the affected real
 surface; report actual results and unverified risks. Detailed test selection,
-safety boundaries, and release gates live in [[docs/testing.md]] and
-[[docs/development-workflow.md]].
+safety boundaries, and release gates live in [[docs/architecture/testing.md]] and
+[[docs/architecture/development-workflow.md]].
 
 ## Repository Records
 

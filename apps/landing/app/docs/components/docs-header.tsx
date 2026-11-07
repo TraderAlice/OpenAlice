@@ -1,8 +1,10 @@
 "use client"
 
 import Link from "next/link"
+import { usePathname } from "next/navigation"
 import { SearchIcon } from "lucide-react"
 import { DocsMobileNav } from "./docs-mobile-nav"
+import { detectSectionForPath } from "./docs-sidebar"
 import type { DocsNavTree } from "@/lib/docs/types"
 
 export function DocsHeader({
@@ -12,6 +14,9 @@ export function DocsHeader({
   tree: DocsNavTree
   onSearchOpen: () => void
 }) {
+  const pathname = usePathname()
+  const isArchitecture = detectSectionForPath(tree, pathname) === "architecture"
+
   return (
     <header className="docs-header">
       <div className="docs-header-content">
@@ -49,6 +54,15 @@ export function DocsHeader({
             <span className="docs-header-search-text">Search docs...</span>
             <kbd className="docs-header-search-kbd">⌘K</kbd>
           </button>
+          <Link
+            href="/docs/core-concepts/trading-as-collaboration"
+            data-evt="docs_header_architecture"
+            data-target="docs_architecture"
+            data-location="nav"
+            className={`docs-header-link${isArchitecture ? " docs-header-link--active" : ""}`}
+          >
+            Architecture
+          </Link>
           <a
             href="https://github.com/TraderAlice/OpenAlice"
             target="_blank"

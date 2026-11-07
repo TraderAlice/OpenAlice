@@ -19,6 +19,7 @@ export default async function config(phase: string) {
     pageExtensions: ["js", "jsx", "md", "mdx", "ts", "tsx"],
     images: {
       remotePatterns: mediaRemotePatterns(baseUrl),
+      unoptimized: phase === PHASE_DEVELOPMENT_SERVER,
     },
     async redirects() {
       return [{ source: "/live", destination: "/", permanent: false }];
