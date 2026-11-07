@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs'
 import { describe, expect, it, vi } from 'vitest'
-import { desktopSmokeGroupAlive, spawnDesktopSmoke, stopDesktopSmoke } from '../../../scripts/desktop-smoke-process.mjs'
+import { desktopSmokeGroupAlive, spawnDesktopSmoke, stopDesktopSmoke } from '../../../scripts/desktop/desktop-smoke-process.mjs'
 
 function alive(pid) {
   try { process.kill(pid, 0) } catch { return false }

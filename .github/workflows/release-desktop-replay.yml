@@ -58,15 +58,15 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           CANDIDATE_TARGET: ${{ runner.os }}-${{ inputs.arch }}
           CANDIDATE_REHEARSAL_BRANCH: ${{ inputs.rehearsal && github.ref_name || '' }}
-        run: node scripts/select-release-candidate.mjs "$CANDIDATE_RUN" "$CANDIDATE_SOURCE_SHA" "$CANDIDATE_TARGET"
+        run: node scripts/cli/select-release-candidate.mjs "$CANDIDATE_RUN" "$CANDIDATE_SOURCE_SHA" "$CANDIDATE_TARGET"
       - name: Download exact selected candidate ID
         env:
           GH_TOKEN: ${{ github.token }}
           SELECTED_ARTIFACT_ID: ${{ steps.candidate.outputs.artifact-id }}
         shell: bash
-        run: node scripts/release-artifacts.mjs "$SELECTED_ARTIFACT_ID" dist/electron-app
+        run: node scripts/cli/release-artifacts.mjs "$SELECTED_ARTIFACT_ID" dist/electron-app
       - name: Verify selected candidate bytes
-        run: node scripts/desktop-candidate-receipt.mjs verify-selected dist/electron-app
+        run: node scripts/desktop/desktop-candidate-receipt.mjs verify-selected dist/electron-app
       - uses: pnpm/action-setup@v6
       - run: pnpm install --frozen-lockfile
       - name: Accept preserved final artifact without rebuilding
@@ -79,7 +79,7 @@ jobs:
       - name: Bind acceptance to unchanged bytes and current verifier
         shell: bash
         run: >-
-          node scripts/desktop-candidate-receipt.mjs bind-upgrade dist/electron-app
+          node scripts/desktop/desktop-candidate-receipt.mjs bind-upgrade dist/electron-app
           "$RUNNER_TEMP/openalice-desktop-upgrade.json"
       - uses: actions/upload-artifact@v4
         with:

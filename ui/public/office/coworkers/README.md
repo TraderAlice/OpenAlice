@@ -27,10 +27,9 @@ generated full-resolution masters are intentionally not shipped at runtime.
 The roster now contains thirty curated identities. Six additional feminine coworkers were generated as transparent
 three-pose sheets: two Codex variants (field mechanic and cyber scout), a Claude botanical archivist, a Pi field
 mathematician, and two OpenCode variants (workshop hacker and systems analyst). Each sheet keeps one identity across a
-standing portrait, seated idle pose, and seated typing pose. `scripts/package-office-coworker-sheet.py` splits those
+standing portrait, seated idle pose, and seated typing pose. The packaging pipeline splits those
 sheets and packages hard-alpha 72x104 portraits plus 176x176 seated canvases. Packaging applies the hard-alpha matte
-before measuring each pose, so faint generated fringe cannot shrink the visible character. Existing idle/work pairs
-can be repacked with `scripts/normalize-office-coworker-pair.py`; both frames share one scale, fit a 164x164 visual
+before measuring each pose, so faint generated fringe cannot shrink the visible character. Both seated frames share one scale, fit a 164x164 visual
 area, and keep the same bottom-center anchor. This keeps every seated NPC legible at map scale without resizing Alice,
 desks, or collision geometry.
 

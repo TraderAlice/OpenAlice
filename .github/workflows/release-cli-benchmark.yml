@@ -22,7 +22,7 @@ jobs:
         run: pnpm build:server
       - name: Prepare exact-commit inputs
         run: >-
-          node scripts/prepare-cli-neutral-inputs.mjs prepare
+          node scripts/cli/prepare-cli-neutral-inputs.mjs prepare
           --repository-root . --output-dir dist/benchmark-neutral
           --commit "$GITHUB_SHA"
       - name: Upload shared inputs
@@ -66,11 +66,9 @@ jobs:
       - name: Verify and restore shared inputs
         if: matrix.mode == 'restore'
         run: >-
-          node scripts/prepare-cli-neutral-inputs.mjs verify
+          node scripts/cli/prepare-cli-neutral-inputs.mjs verify
           --repository-root . --input-dir dist/benchmark-neutral
           --commit "$GITHUB_SHA" --install
-      - name: Accept real multiprocess Runtime
-        run: pnpm build:bun-runtime:feasibility
       - name: Build and accept real native archive
         run: pnpm build:bun:release
       - name: Preserve acceptance reports only

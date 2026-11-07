@@ -41,7 +41,7 @@ jobs:
           fi
 
       - name: Verify selected channel authority without publishing
-        run: node scripts/preflight-public-cli-authority.mjs
+        run: node scripts/cli/preflight-public-cli-authority.mjs
         env:
           OPENALICE_PUBLISH_HOMEBREW: ${{ inputs.homebrew }}
           OPENALICE_PUBLISH_AUR: ${{ inputs.aur }}
