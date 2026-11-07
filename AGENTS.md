@@ -6,10 +6,6 @@ broker credentials, connections, state, and every trading write. Persisted state
 is file-backed rather than database-backed.
 
 Current code, tests, rendered behavior, and GitHub state override stale prose.
-Subsystem reference docs live under `docs/architecture/`, delivery and release
-procedure lives in [[docs/architecture/development-workflow.md]], test selection
-and side effects live in [[docs/architecture/testing.md]], and active multi-step
-work lives in [[PLANS.md]].
 
 ## Product and Architecture Boundaries
 
@@ -26,30 +22,26 @@ work lives in [[PLANS.md]].
   not one-off startup cleanup.
 - Never put secrets in tracked files, logs, fixtures, PR bodies, or agent instructions.
 
-Details: [[docs/architecture/project-structure.md]] and [[docs/architecture/alice-project.md]].
-
 ## Delivery Authority
 
 - Work from current `dev` on a focused feature branch; routine PRs target `dev`.
-- After local verification, open and merge routine PRs unless a review pause or
-  feature-branch iteration hold applies. Pending CI alone does not block;
-  known product or contract failures must be resolved first.
+- After local verification, open and merge routine PRs (`gh pr merge --merge --delete-branch`)
+  unless a review pause or feature-branch iteration hold applies. Pending CI
+  alone does not block; known product or contract failures must be resolved first.
 - A review pause blocks merging. A feature-branch iteration hold keeps work on
   one branch without opening or merging its PR until the maintainer accepts it.
 - `master` is the release source; merging there does not publish. Never
   force-push or delete `dev` or `master`, or commit directly to `master`.
   Direct `dev` commits require an explicit integration request.
-- Prefer merge commits; delete feature branches only after a confirmed merge.
 
-Detailed delivery modes, autonomous-contribution acceptance, CI feedback, and
-release procedures live in [[docs/architecture/development-workflow.md]].
+## Verification
 
-## Verification Ladder
+Verify changes proportionally with the affected tests, owning typechecks, and
+real surface before merging, and report actual results:
 
-Verify changes with relevant tests, owning typechecks, and the affected real
-surface; report actual results and unverified risks. Detailed test selection,
-safety boundaries, and release gates live in [[docs/architecture/testing.md]] and
-[[docs/architecture/development-workflow.md]].
+- Tests: `pnpm test:changed` (or `pnpm test:select --owner <owner>` / `pnpm test` for broad changes)
+- Typechecks: root `npx tsc --noEmit`, UI `cd ui && npx tsc -b`, or package-local `build`/`typecheck`
+- Website (`apps/landing/`): `pnpm --filter @traderalice/landing test && pnpm landing:build`
 
 ## Repository Records
 
@@ -63,7 +55,7 @@ safety boundaries, and release gates live in [[docs/architecture/testing.md]] an
   change that completes the work.
 - `docs/` holds user guides (`docs/guides/`) and architecture notes
   (`docs/architecture/`), indexed by `docs/SUMMARY.md`. Read `docs/architecture/`
-  when you need subsystem context, but **do not create or update architecture
-  docs unless the user explicitly asks**.
+  only when you need specific subsystem context, and **do not create or update
+  architecture docs unless the user explicitly asks**.
 - `README.md` is public positioning. Ask for product framing before rewriting
   its tagline, pillars, hero, or other marketing copy.
