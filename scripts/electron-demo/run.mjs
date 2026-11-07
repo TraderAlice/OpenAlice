@@ -2,7 +2,7 @@ import { spawnSync } from 'node:child_process'
 import { createRequire } from 'node:module'
 import { fileURLToPath } from 'node:url'
 import { build } from 'tsup'
-import { spawnDesktopSmoke, stopDesktopSmoke } from '../desktop-smoke-process.mjs'
+import { spawnDesktopSmoke, stopDesktopSmoke } from '../desktop/desktop-smoke-process.mjs'
 const root = fileURLToPath(new URL('../../', import.meta.url))
 const require = createRequire(new URL('../../apps/desktop/package.json', import.meta.url))
 const flags = new Set(process.argv.slice(2))

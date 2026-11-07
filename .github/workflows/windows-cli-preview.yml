@@ -93,7 +93,7 @@ jobs:
           path: dist/dev-neutral-inputs
       - name: Verify shared server inputs
         if: inputs.candidate_run == '' && inputs.neutral_inputs
-        run: node scripts/prepare-cli-neutral-inputs.mjs verify --repository-root . --input-dir dist/dev-neutral-inputs --commit "${{ github.sha }}" --install
+        run: node scripts/cli/prepare-cli-neutral-inputs.mjs verify --repository-root . --input-dir dist/dev-neutral-inputs --commit "${{ github.sha }}" --install
       - uses: actions/download-artifact@v4
         if: inputs.dev_broker_packs && inputs.candidate_run == ''
         with:
@@ -103,7 +103,7 @@ jobs:
         if: inputs.candidate_run == ''
         env:
           OPENALICE_DEV_COMMIT: ${{ inputs.dev_broker_packs && github.sha || '' }}
-        run: bun scripts/build-windows-cli-preview.ts ${{ matrix.arch }}
+        run: bun scripts/cli/build-windows-cli-preview.ts ${{ matrix.arch }}
       - name: Preserve complete candidate for reproduction
         id: preserve
         if: inputs.candidate_run == ''
@@ -132,17 +132,17 @@ jobs:
           merge-multiple: false
       - name: Check native ConPTY input resize and independent termination
         if: inputs.native_acceptance
-        run: bun scripts/bun-native-pty-smoke.ts
+        run: bun scripts/cli/bun-native-pty-smoke.ts
       - name: Install and start the packaged Runtime
         if: ${{ !cancelled() && inputs.native_acceptance && (steps.preserve.outcome == 'success' || steps.download.outcome == 'success') }}
-        run: bun scripts/windows-cli-preview-smoke.ts
+        run: bun scripts/cli/windows-cli-preview-smoke.ts
       - name: Accept Windows npm and Bun native command shims
         if: ${{ !cancelled() && inputs.native_acceptance && inputs.channel_build && (steps.preserve.outcome == 'success' || steps.download.outcome == 'success') }}
         shell: pwsh
         run: |
           $candidates = @(Get-ChildItem -Recurse -Path dist/windows-cli-preview/${{ matrix.arch }} -Filter candidate.json)
           if ($candidates.Count -ne 1) { throw 'Expected exactly one package candidate' }
-          ./scripts/windows-cli-package-smoke.ps1 -CandidateDir $candidates[0].DirectoryName
+          ./scripts/cli/windows-cli-package-smoke.ps1 -CandidateDir $candidates[0].DirectoryName
       - name: Preserve native verification receipt
         if: always()
         uses: actions/upload-artifact@v6

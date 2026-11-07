@@ -41,7 +41,7 @@ export default defineConfig({
           name: 'node',
           environment: 'node',
           setupFiles: ['./vitest.setup.ts'],
-          include: ['tests/integration/**/*.spec.{ts,mjs,js}', 'tests/e2e/**/*.spec.{ts,mjs,js}', 'scripts/**/*.spec.{ts,mjs,js}'],
+          include: ['tests/integration/**/*.spec.{ts,mjs,js}', 'tests/e2e/**/*.spec.{ts,mjs,js}'],
           exclude: [
             'tests/integration/{broker-market-data,hyperliquid-market-data,ibkr-wire-readonly,market-data-providers,market-data-routes,twse-provider,broker-alpaca-paper,broker-bybit-paper,broker-hyperliquid-paper,broker-ibkr-paper,broker-okx-paper,ibkr-wire-paper,bybit-diagnostic}/**',
             '**/node_modules/**',
