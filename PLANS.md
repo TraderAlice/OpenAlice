@@ -1,19 +1,16 @@
 # OpenAlice Implementation Plans
 
-This file indexes **active** multi-step implementation work. Plans describe
-how repository truth will change; owner guides under [[docs/README.md]] describe
-the durable truth after it changes. Git history is the archive.
+This file indexes **active** multi-step implementation work. Git history is the
+archive for completed plans.
 
 ## Plan Contract
 
-- Create `plans/<topic>.md` when work spans multiple subsystems, delivery
+- Create `plans/<topic>.md` only when work spans multiple subsystems, delivery
   increments, or sessions.
-- Each plan names its status, related issues, owner guides, scope, decisions,
-  ordered checklist, verification, and completion criteria.
+- Each plan names its status, related issues, scope, key decisions, ordered
+  checklist, verification, and completion criteria.
 - Update progress in the same commit as the work it describes. Do not mark a
   step complete before its code and required verification exist.
-- Record material discoveries and changed decisions in the plan. Move stable
-  architectural conclusions into the linked owner guide.
 - Never let a plan grow unbounded: do not append turn-by-turn execution diaries,
   per-iteration micro-decisions, or CI run logs. Collapse shipped increments to a
   brief baseline summary and keep only remaining active work.
