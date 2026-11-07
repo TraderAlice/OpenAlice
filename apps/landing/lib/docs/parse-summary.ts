@@ -22,6 +22,7 @@ export function parseSummary(markdown: string): DocsNavTree {
   const lines = markdown.split("\n")
   const entries: DocsNavEntry[] = []
   let currentGroup: DocsNavGroup | null = null
+  let currentSection: "guides" | "architecture" = "guides"
   let pageStack: DocsNavPage[] = []
   let indentSize: number | null = null
 
@@ -45,14 +46,29 @@ export function parseSummary(markdown: string): DocsNavTree {
     // Skip blank lines
     if (line.trim() === "") continue
 
-    // Skip decorative title
-    if (RE_TITLE.test(line)) continue
+    // Top-level section header (# Guides / # Architecture)
+    if (RE_TITLE.test(line)) {
+      const headingText = line.replace(RE_TITLE, "").trim().toLowerCase()
+      if (headingText.startsWith("arch")) {
+        flushGroup()
+        currentSection = "architecture"
+      } else if (headingText.startsWith("guide")) {
+        flushGroup()
+        currentSection = "guides"
+      }
+      continue
+    }
 
     // Group heading
     const groupMatch = line.match(RE_GROUP)
     if (groupMatch) {
       flushGroup()
-      currentGroup = { kind: "group", title: groupMatch[1].trim(), items: [] }
+      currentGroup = {
+        kind: "group",
+        title: groupMatch[1].trim(),
+        section: currentSection,
+        items: [],
+      }
       continue
     }
 

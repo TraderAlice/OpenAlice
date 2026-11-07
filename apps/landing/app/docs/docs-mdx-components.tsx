@@ -46,6 +46,24 @@ export const docsMdxComponents: MDXComponents = {
     <blockquote className="docs-quote">{children}</blockquote>
   ),
   code: ({ children, className }) => {
+    if (className === "language-product-demo" && typeof children === "string") {
+      try {
+        const payload = JSON.parse(children.trim()) as {
+          src: string
+          poster: string
+          title: string
+          caption?: string
+        }
+        return (
+          <ProductDemo src={payload.src} poster={payload.poster} title={payload.title}>
+            {payload.caption}
+          </ProductDemo>
+        )
+      } catch {
+        // Fall through to standard code block
+      }
+    }
+
     if (className?.startsWith("language-")) {
       return <code className={className}>{children}</code>
     }
@@ -56,9 +74,18 @@ export const docsMdxComponents: MDXComponents = {
       </code>
     )
   },
-  pre: ({ children }) => (
-    <pre className="docs-code-block">{children}</pre>
-  ),
+  pre: ({ children }) => {
+    const child = Array.isArray(children) ? children[0] : children
+    if (
+      child &&
+      typeof child === "object" &&
+      "props" in child &&
+      (child as { props?: { className?: string } }).props?.className === "language-product-demo"
+    ) {
+      return <>{children}</>
+    }
+    return <pre className="docs-code-block">{children}</pre>
+  },
   em: ({ children }) => (
     <em className="italic">{children}</em>
   ),

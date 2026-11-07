@@ -1,5 +1,5 @@
 import fs from "fs"
-import path from "path"
+import { resolveDocFilePath } from "./navigation"
 
 export interface DocsHeading {
   id: string
@@ -26,18 +26,10 @@ function stripMarkdown(value: string): string {
     .trim()
 }
 
-function readDocSource(slugPath: string): string | null {
-  const docsRoot = path.join(process.cwd(), "content/docs")
-  const candidates = [
-    path.join(docsRoot, `${slugPath}.mdx`),
-    path.join(docsRoot, slugPath, "README.mdx"),
-  ]
-
-  for (const candidate of candidates) {
-    if (fs.existsSync(candidate)) return fs.readFileSync(candidate, "utf8")
-  }
-
-  return null
+export function readDocSource(slugPath: string): string | null {
+  const resolved = resolveDocFilePath(slugPath)
+  if (!resolved) return null
+  return fs.readFileSync(resolved, "utf8")
 }
 
 export function getDocHeadings(slugPath: string): DocsHeading[] {
