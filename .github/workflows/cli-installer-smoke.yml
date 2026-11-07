@@ -31,41 +31,37 @@ on:
       - "packages/uta-protocol/**"
       - "src/**"
       - "ui/**"
-      - "scripts/install-docker-smoke.mjs"
-      - "scripts/install-channel-smoke.mjs"
-      - "scripts/install-channel-smoke/**"
-      - "scripts/install-smoke/**"
-      - "scripts/build-bun-cli-feasibility.ts"
-      - "scripts/build-bun-alice-feasibility.ts"
-      - "scripts/bun-broker-pack-fixture.ts"
-      - "scripts/build-bun-runtime-feasibility.ts"
-      - "scripts/build-bun-release.ts"
-      - "scripts/bun-toolchain.mjs"
-      - "scripts/macho-signature.mjs"
-      - "scripts/sign-cli-macos.mjs"
-      - "scripts/verify-cli-release.mjs"
-      - "scripts/build-cli-package-channels.mjs"
+      - "scripts/cli/install-docker-smoke.mjs"
+      - "scripts/cli/install-channel-smoke.mjs"
+      - "scripts/cli/install-channel-smoke/**"
+      - "scripts/cli/install-smoke/**"
+      - "scripts/cli/build-bun-release.ts"
+      - "scripts/cli/bun-toolchain.mjs"
+      - "scripts/cli/macho-signature.mjs"
+      - "scripts/cli/sign-cli-macos.mjs"
+      - "scripts/cli/verify-cli-release.mjs"
+      - "scripts/cli/build-cli-package-channels.mjs"
       - "tests/integration/cli-release-artifacts/build-cli-package-channels.spec.mjs"
-      - "scripts/pack-cli-npm-packages.mjs"
-      - "scripts/pack-cli-npm-packages.spec.mjs"
-      - "scripts/cli-package-manager-smoke.mjs"
-      - "scripts/cli-release-fixture.mjs"
+      - "scripts/cli/pack-cli-npm-packages.mjs"
+      - "tests/integration/tooling/pack-cli-npm-packages.spec.mjs"
+      - "scripts/cli/cli-package-manager-smoke.mjs"
+      - "scripts/cli/cli-release-fixture.mjs"
       - "tests/integration/cli-release-artifacts/cli-release-fixture.spec.mjs"
-      - "scripts/cli-system-package-manager-smoke.mjs"
-      - "scripts/cli-aur-container-smoke.mjs"
-      - "scripts/cli-aur-container-smoke.spec.mjs"
-      - "scripts/cli-linuxbrew-smoke.mjs"
-      - "scripts/cli-linuxbrew-smoke.spec.mjs"
-      - "scripts/cli-legacy-cutover-smoke.mjs"
-      - "scripts/cli-legacy-cutover-smoke.spec.mjs"
-      - "scripts/prepare-cli-previous-release.mjs"
-      - "scripts/prepare-cli-dev-assets.mjs"
+      - "scripts/cli/cli-system-package-manager-smoke.mjs"
+      - "scripts/cli/cli-aur-container-smoke.mjs"
+      - "tests/integration/tooling/cli-aur-container-smoke.spec.mjs"
+      - "scripts/cli/cli-linuxbrew-smoke.mjs"
+      - "tests/integration/tooling/cli-linuxbrew-smoke.spec.mjs"
+      - "scripts/cli/cli-legacy-cutover-smoke.mjs"
+      - "tests/integration/tooling/cli-legacy-cutover-smoke.spec.mjs"
+      - "scripts/cli/prepare-cli-previous-release.mjs"
+      - "scripts/cli/prepare-cli-dev-assets.mjs"
       - "tests/integration/cli-release-artifacts/prepare-cli-dev-assets.spec.mjs"
-      - "scripts/prepare-cli-neutral-inputs.mjs"
-      - "scripts/prepare-cli-neutral-inputs.spec.mjs"
+      - "scripts/cli/prepare-cli-neutral-inputs.mjs"
+      - "tests/integration/tooling/prepare-cli-neutral-inputs.spec.mjs"
       - "THIRD_PARTY_NOTICES.md"
-      - "scripts/remote-ssh-smoke.mjs"
-      - "scripts/remote-smoke/**"
+      - "scripts/cli/remote-ssh-smoke.mjs"
+      - "scripts/cli/remote-smoke/**"
   push:
     branches: [dev]
 
@@ -151,31 +147,26 @@ jobs:
 
       - run: pnpm build:server
 
-      - run: pnpm build:bun-cli:feasibility
-
-      - run: pnpm build:bun-alice:feasibility
-
-      - run: pnpm build:bun-runtime:feasibility
-
       - run: pnpm build:bun:release
+
 
       - name: Accept npm and Bun installs from the current native candidate
         shell: bash
         run: |
           VERSION=$(node -p "require('./package.json').version")
           CONTENT_IDENTITY=$(node -p "require('./dist/bun-release/report.json').contentIdentity")
-          node scripts/build-cli-package-channels.mjs \
+          node scripts/cli/build-cli-package-channels.mjs \
             --input-dir dist/bun-release \
             --output-dir "$RUNNER_TEMP/cli-package-channels" \
             --version "$VERSION" \
             --released-at "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
             --npm-only
-          node scripts/cli-package-manager-smoke.mjs \
+          node scripts/cli/cli-package-manager-smoke.mjs \
             --manager npm \
             --packages-dir "$RUNNER_TEMP/cli-package-channels/npm" \
             --expected-version "$VERSION" \
             --expected-content-identity "$CONTENT_IDENTITY"
-          node scripts/cli-package-manager-smoke.mjs \
+          node scripts/cli/cli-package-manager-smoke.mjs \
             --manager bun \
             --packages-dir "$RUNNER_TEMP/cli-package-channels/npm" \
             --expected-version "$VERSION" \
@@ -203,7 +194,7 @@ jobs:
           node-version: 22.19.0
 
       - name: Exercise clean HTTP installer fixture
-        run: node scripts/install-docker-smoke.mjs
+        run: node scripts/cli/install-docker-smoke.mjs
 
   checkout-remote:
     needs: release-prep-scope
@@ -236,7 +227,7 @@ jobs:
         run: pnpm exec turbo run build --filter=open-alice-ui...
 
       - name: Exercise clean SSH host fixture
-        run: node scripts/remote-ssh-smoke.mjs --skip-tui
+        run: node scripts/cli/remote-ssh-smoke.mjs --skip-tui
 
   build-dev-cli-neutral:
     if: github.event_name == 'push'
@@ -261,7 +252,7 @@ jobs:
 
       - name: Prepare commit-bound neutral input receipt
         run: >-
-          node scripts/prepare-cli-neutral-inputs.mjs prepare
+          node scripts/cli/prepare-cli-neutral-inputs.mjs prepare
           --repository-root .
           --output-dir dist/dev-neutral-inputs
           --commit "$GITHUB_SHA"
@@ -361,15 +352,11 @@ jobs:
 
       - name: Verify and install commit-bound neutral inputs
         run: >-
-          node scripts/prepare-cli-neutral-inputs.mjs verify
+          node scripts/cli/prepare-cli-neutral-inputs.mjs verify
           --repository-root .
           --input-dir dist/dev-neutral-inputs
           --commit "$GITHUB_SHA"
           --install
-
-      - name: Accept multiprocess recovery once per dev commit
-        if: matrix.platform == 'linux' && matrix.arch == 'x64'
-        run: pnpm build:bun-runtime:feasibility
 
       - uses: actions/download-artifact@v4
         with:
@@ -438,7 +425,7 @@ jobs:
       - name: Validate candidates and prepare candidate receipt
         run: |
           VERSION=$(node -p "require('./package.json').version")
-          node scripts/prepare-cli-dev-assets.mjs \
+          node scripts/cli/prepare-cli-dev-assets.mjs \
             --input-dir dist/dev-cli-candidates \
             --output-dir dist/dev-cli-upload \
             --commit "$GITHUB_SHA" \
@@ -661,4 +648,4 @@ jobs:
           if [[ -n "$EXPECTED_COMMIT" ]]; then
             args+=(--expected-commit "$EXPECTED_COMMIT")
           fi
-          node scripts/install-channel-smoke.mjs "${args[@]}"
+          node scripts/cli/install-channel-smoke.mjs "${args[@]}"

@@ -1,5 +1,5 @@
 import { fixtureMachO } from '../../../scripts/fixtures/macho.mjs'
-import { pinnedBunVersion } from '../../../scripts/bun-toolchain.mjs'
+import { pinnedBunVersion } from '../../../scripts/cli/bun-toolchain.mjs'
 import { createHash } from 'node:crypto'
 import { execFile } from 'node:child_process'
 import { access, chmod, mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises'
@@ -10,9 +10,9 @@ import { promisify } from 'node:util'
 import { afterEach, describe, expect, it } from 'vitest'
 
 import { cliExecutableName } from '../../../packages/cli/src/release-targets.mjs'
-import { bunReleaseContentIdentity } from '../../../scripts/bun-release-content-identity.mjs'
-import { writeDevBrokerBinding } from '../../../scripts/dev-broker-binding.mjs'
-import { prepareCliDevAssets } from '../../../scripts/prepare-cli-dev-assets.mjs'
+import { bunReleaseContentIdentity } from '../../../scripts/cli/bun-release-content-identity.mjs'
+import { writeDevBrokerBinding } from '../../../scripts/cli/dev-broker-binding.mjs'
+import { prepareCliDevAssets } from '../../../scripts/cli/prepare-cli-dev-assets.mjs'
 
 const execFileAsync = promisify(execFile)
 const version = '0.90.1'

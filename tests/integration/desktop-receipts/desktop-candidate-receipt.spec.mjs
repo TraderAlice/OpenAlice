@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os'
 import { execFileSync } from 'node:child_process'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
-import { DESKTOP_UPGRADE_CHECKS, recordDesktopCandidate, verifyDesktopCandidate, bindDesktopUpgrade, stageDesktopCandidates } from '../../../scripts/desktop-candidate-receipt.mjs'
+import { DESKTOP_UPGRADE_CHECKS, recordDesktopCandidate, verifyDesktopCandidate, bindDesktopUpgrade, stageDesktopCandidates } from '../../../scripts/desktop/desktop-candidate-receipt.mjs'
 
 const roots = []
 afterEach(() => { for (const path of roots.splice(0)) rmSync(path, { recursive: true, force: true }) })
@@ -43,7 +43,7 @@ describe('desktop candidate acceptance integration', () => {
     const rawPath = join(options.inputDirectory, 'raw-receipt.json')
     writeFileSync(rawPath, JSON.stringify(record.rawReceipt))
     const original = readFileSync(join(record.directory, record.filename))
-    execFileSync(process.execPath, [join(import.meta.dirname, '../../../scripts/desktop-candidate-receipt.mjs'),
+    execFileSync(process.execPath, [join(import.meta.dirname, '../../../scripts/desktop/desktop-candidate-receipt.mjs'),
       'bind-upgrade', record.directory, rawPath], { env: { ...process.env,
       RUNNER_OS: 'macOS', CANDIDATE_ARCH: 'arm64', CANDIDATE_CHANNEL: 'stable',
       GITHUB_SHA: options.sourceSha, CANDIDATE_SOURCE_SHA: options.sourceSha,
@@ -62,7 +62,7 @@ describe('desktop candidate acceptance integration', () => {
     const env = { ...process.env, RUNNER_OS: 'macOS', CANDIDATE_ARCH: 'arm64',
       CANDIDATE_SOURCE_SHA: options.sourceSha, CANDIDATE_VERSION: options.version,
       CANDIDATE_CHANNEL: 'stable', GITHUB_ENV: output }
-    const args = [join(import.meta.dirname, '../../../scripts/desktop-candidate-receipt.mjs'), 'verify-selected', record.directory]
+    const args = [join(import.meta.dirname, '../../../scripts/desktop/desktop-candidate-receipt.mjs'), 'verify-selected', record.directory]
     execFileSync(process.execPath, args, { env })
     expect(readFileSync(output, 'utf8')).toBe(`CANDIDATE_ID=${record.expected.candidateId}\n`)
     rmSync(output)

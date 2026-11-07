@@ -1,5 +1,5 @@
 import { fixtureMachO } from '../../../scripts/fixtures/macho.mjs'
-import { pinnedBunVersion } from '../../../scripts/bun-toolchain.mjs'
+import { pinnedBunVersion } from '../../../scripts/cli/bun-toolchain.mjs'
 import { createHash } from 'node:crypto'
 import { execFile } from 'node:child_process'
 import { chmod, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
@@ -12,11 +12,11 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
   preparePreviousCliReleaseArchives,
   syntheticPreviousVersion,
-} from '../../../scripts/cli-release-fixture.mjs'
+} from '../../../scripts/cli/cli-release-fixture.mjs'
 import { cliExecutableName } from '../../../packages/cli/src/release-targets.mjs'
-import { bunReleaseContentIdentity } from '../../../scripts/bun-release-content-identity.mjs'
+import { bunReleaseContentIdentity } from '../../../scripts/cli/bun-release-content-identity.mjs'
 
-vi.mock('../../../scripts/sign-cli-macos.mjs', async () => {
+vi.mock('../../../scripts/cli/sign-cli-macos.mjs', async () => {
   const { readFileSync, writeFileSync } = await import('node:fs')
   const { rehashFixtureMachO } = await import('../../../scripts/fixtures/macho.mjs')
   return { signCliMacOS: (path) => writeFileSync(path, rehashFixtureMachO(readFileSync(path))) }

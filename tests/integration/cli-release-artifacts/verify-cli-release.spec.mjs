@@ -1,5 +1,5 @@
-import { downloadArtifact } from '../../../scripts/release-artifacts.mjs'
-import { stageCliRelease } from '../../../scripts/stage-cli-release.mjs'
+import { downloadArtifact } from '../../../scripts/cli/release-artifacts.mjs'
+import { stageCliRelease } from '../../../scripts/cli/stage-cli-release.mjs'
 import { CLI_RELEASE_TARGETS } from '../../../packages/cli/src/release-targets.mjs'
 import { execFileSync } from 'node:child_process'
 import { createHash } from 'node:crypto'
@@ -7,10 +7,10 @@ import { chmodSync, copyFileSync, existsSync, linkSync, mkdirSync, mkdtempSync, 
 import { tmpdir } from 'node:os'
 import { basename, join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
-import { bunReleaseContentIdentity } from '../../../scripts/bun-release-content-identity.mjs'
-import { pinnedBunVersion } from '../../../scripts/bun-toolchain.mjs'
+import { bunReleaseContentIdentity } from '../../../scripts/cli/bun-release-content-identity.mjs'
+import { pinnedBunVersion } from '../../../scripts/cli/bun-toolchain.mjs'
 import { fixtureMachO } from '../../../scripts/fixtures/macho.mjs'
-import { verifyCliReleaseArchive, verifyCliReleaseDirectory } from '../../../scripts/verify-cli-release.mjs'
+import { verifyCliReleaseArchive, verifyCliReleaseDirectory } from '../../../scripts/cli/verify-cli-release.mjs'
 
 const roots = []
 const hash = bytes => createHash('sha256').update(bytes).digest('hex')
@@ -39,7 +39,7 @@ describe.skipIf(process.platform === 'win32')('final CLI archive gate', () => {
   for (const arch of ['arm64', 'x64']) it(`verifies actual ${arch} archive bytes and signatures with a restrictive umask`, () => {
     const f = fixture({ arch })
     expect(verifyCliReleaseArchive(f.options).signature.codeSlots).toBe(2)
-    execFileSync(process.execPath, ['--input-type=module', '-e', `process.umask(0o077); const { verifyCliReleaseArchive } = await import(${JSON.stringify(new URL('../../../scripts/verify-cli-release.mjs', import.meta.url).href)}); verifyCliReleaseArchive(${JSON.stringify(f.options)})`])
+    execFileSync(process.execPath, ['--input-type=module', '-e', `process.umask(0o077); const { verifyCliReleaseArchive } = await import(${JSON.stringify(new URL('../../../scripts/cli/verify-cli-release.mjs', import.meta.url).href)}); verifyCliReleaseArchive(${JSON.stringify(f.options)})`])
     expect(verifyCliReleaseDirectory(f.root)[0].bunVersion).toBe(pinnedBunVersion())
   })
   it('rejects altered resources, permissions, missing manifest coverage, and stale identity even with a fresh archive checksum', () => {

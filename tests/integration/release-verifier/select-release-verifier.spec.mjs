@@ -3,7 +3,7 @@ import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, expect, it } from 'vitest'
-import { selectReleaseVerifier } from '../../../scripts/select-release-verifier.mjs'
+import { selectReleaseVerifier } from '../../../scripts/cli/select-release-verifier.mjs'
 
 const roots = []
 afterEach(() => roots.splice(0).forEach((root) => rmSync(root, { recursive: true, force: true })))
