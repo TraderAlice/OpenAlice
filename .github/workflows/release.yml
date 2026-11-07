@@ -61,7 +61,7 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - os: macos-14
+          - os: macos-15
             arch: arm64
           - os: macos-15-intel
             arch: x64
@@ -97,7 +97,7 @@ jobs:
       rehearsal: ${{ inputs.operation == 'verify-desktop-rehearsal' }}
       tag: ${{ inputs.tag }}
       previous-tag: ${{ inputs.previous-tag }}
-      os: ${{ inputs.desktop-target == 'macOS-arm64' && 'macos-14' || inputs.desktop-target == 'macOS-x64' && 'macos-15-intel' || 'windows-latest' }}
+      os: ${{ inputs.desktop-target == 'macOS-arm64' && 'macos-15' || inputs.desktop-target == 'macOS-x64' && 'macos-15-intel' || 'windows-latest' }}
       arch: ${{ inputs.desktop-target == 'macOS-arm64' && 'arm64' || 'x64' }}
 
   release:
@@ -292,7 +292,7 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - os: macos-14
+          - os: macos-15
             arch: arm64
           - os: macos-15-intel
             arch: x64
@@ -420,7 +420,7 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - os: macos-14
+          - os: macos-15
             platform: darwin
             arch: arm64
           - os: macos-15-intel
@@ -613,7 +613,7 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - os: macos-14
+          - os: macos-15
             arch: arm64
           - os: macos-15-intel
             arch: x64
@@ -862,7 +862,7 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - os: macos-14
+          - os: macos-15
             arch: arm64
           - os: macos-15-intel
             arch: x64
