@@ -258,5 +258,5 @@ accepted promotion evidence plus version-prep and final artifact gates.
 
 Deferred concrete defects become GitHub Issues with reproduction, subsystem,
 evidence, and deferral reason; do not file one for work the current PR completes.
-Guide maintenance follows [[docs/README.md]]. If a required gate cannot run,
+If a required gate cannot run,
 record the exact residual risk; an unrelated green test is not a substitute.
