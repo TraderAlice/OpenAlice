@@ -1,11 +1,11 @@
 import { inboxFiles } from '@traderalice/connector-protocol'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Clock, Layers, Search, X } from 'lucide-react'
+import { CheckCheck, Clock, Layers, Search, X } from 'lucide-react'
 import { useWorkspaces } from '../contexts/workspaces-context'
 import { formatRelativeTime } from '../lib/intl'
 import { inboxLive } from '../live/inbox'
-import { useInboxRead } from '../live/inbox-read'
+import { useInboxRead, useUnreadInboxCount } from '../live/inbox-read'
 import { useInboxSelection } from '../live/inbox-selection'
 import { useInboxViewMode } from '../live/inbox-view-mode'
 import { presentInboxEntry } from '../lib/inbox-presentation'
@@ -16,6 +16,7 @@ import {
 } from '../office/inbox-duty-excursion'
 import { workspaceDisplayName } from './workspace/display'
 import { Skeleton } from './StateViews'
+import { useToast } from './Toast'
 import { Button } from './ui/button'
 import { inputClass } from './form'
 import {
@@ -42,11 +43,16 @@ import type { InboxEntry } from '../api/inbox'
  */
 export function InboxSidebar({ onNavigate }: { onNavigate?: () => void } = {}) {
   const { t } = useTranslation()
+  const toast = useToast()
   const entries = inboxLive.useStore((s) => s.entries)
   const loading = inboxLive.useStore((s) => s.loading)
   const selectedId = useInboxSelection((s) => s.selectedEntryId)
   const select = useInboxSelection((s) => s.select)
   const markRead = useInboxRead((s) => s.markRead)
+  const unreadCount = useUnreadInboxCount()
+  const markAllRead = useInboxRead((s) => s.markAllRead)
+  const markingAllRead = useInboxRead((s) => s.markingAllRead)
+  const [feedback, setFeedback] = useState<{ error: boolean; text: string } | null>(null)
   const mode = useInboxViewMode((s) => s.mode)
   const { workspaces } = useWorkspaces()
   const [query, setQuery] = useState('')
@@ -141,13 +147,6 @@ export function InboxSidebar({ onNavigate }: { onNavigate?: () => void } = {}) {
     )
   }
 
-  if (entries.length === 0) {
-    return (
-      <div className="px-3 py-4 text-[12px] text-muted-foreground/70 leading-relaxed">
-        {t('inbox.noMessages')}
-      </div>
-    )
-  }
 
   return (
     <div className="flex h-full min-h-0 flex-col py-1">
@@ -181,6 +180,45 @@ export function InboxSidebar({ onNavigate }: { onNavigate?: () => void } = {}) {
             </Button>
           )}
         </div>
+        <div className="flex flex-wrap items-center justify-between gap-x-1 gap-y-1 pt-1.5">
+          <span className="px-1 text-[11px] tabular-nums text-muted-foreground" aria-live="polite">
+            {t('inbox.unreadCount', { count: unreadCount })}
+          </span>
+          <Button
+            type="button"
+            variant="ghost"
+            size="xs"
+            className="text-[11px] text-muted-foreground"
+            disabled={loading || unreadCount === 0 || markingAllRead}
+            aria-busy={markingAllRead}
+            onClick={async () => {
+              setFeedback(null)
+              try {
+                const count = await markAllRead()
+                if (count !== undefined) {
+                  const text = [
+                    t('inbox.markAllReadSuccess', { count }),
+                    officeReviewTargetId ? t('inbox.markAllReadProtected') : '',
+                  ].filter(Boolean).join(' ')
+                  setFeedback({ error: false, text })
+                  toast.success(text)
+                }
+              } catch {
+                const text = t('inbox.markAllReadError')
+                setFeedback({ error: true, text })
+                toast.error(text, 'inbox-mark-all-read')
+              }
+            }}
+          >
+            <CheckCheck aria-hidden />
+            {t('inbox.markAllRead')}
+          </Button>
+        </div>
+        {feedback && (
+          <div role={feedback.error ? 'alert' : 'status'} className="sr-only">
+            {feedback.text}
+          </div>
+        )}
         {normalizedQuery && (
           <div
             aria-live="polite"
@@ -192,7 +230,9 @@ export function InboxSidebar({ onNavigate }: { onNavigate?: () => void } = {}) {
       </div>
 
       <div className="min-h-0 flex-1 overflow-y-auto">
-        {normalizedQuery && filteredEntries.length === 0 ? (
+        {entries.length === 0 ? (
+          <div className="px-3 py-4 text-[12px] text-muted-foreground/70 leading-relaxed">{t('inbox.noMessages')}</div>
+        ) : normalizedQuery && filteredEntries.length === 0 ? (
           <div className="px-3 py-5 text-center text-[11px] leading-relaxed text-muted-foreground/65">
             {t('inbox.noSearchResults', { query: query.trim() })}
           </div>

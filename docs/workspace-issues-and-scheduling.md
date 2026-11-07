@@ -73,9 +73,14 @@ Alice with the originating `SessionOrigin` and `@resumeId`.
   authoritative Inbox entry and source Workspace on every read and never serves
   active content as same-origin HTML. `useInboxContent(entry)` and
   `MarkdownContent` render documents as compact file blocks and images inline
-   without a separate attachment tray. Connector notifications pass `body`
+  without a separate attachment tray. Connector notifications pass `body`
   unchanged (`content-references.ts` in Connector Protocol owns the pure bracket
   grammar).
+- **Read state & bulk triage**: Global unread count is independent of loaded rows
+  and local search. Bulk `Mark all as read` snapshots existing unread IDs into
+  the v1 read-state sidecar atomically, excludes the active Office dossier
+  review checkpoint, leaves newer arrivals unread, and returns the authoritative
+  server unread count.
 
 ---
 
