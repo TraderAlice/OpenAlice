@@ -30,7 +30,7 @@ jobs:
       matrix:
         include:
           - { os: ubuntu-24.04, platform: linux, arch: x64 }
-          - { os: macos-14, platform: darwin, arch: arm64 }
+          - { os: macos-15, platform: darwin, arch: arm64 }
           - { os: macos-15-intel, platform: darwin, arch: x64 }
     runs-on: ${{ matrix.os }}
     timeout-minutes: 25
