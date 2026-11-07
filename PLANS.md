@@ -1,47 +1,10 @@
-# OpenAlice Implementation Plans
+# Implementation Plans
 
-This file indexes **active** multi-step implementation work. Git history is the
-archive for completed plans.
+`plans/<topic>.md` is only for substantial multi-session or multi-step work.
+Active plans are indexed in `plans/index.md`.
 
-## Plan Contract
+Never let plan files grow unbounded or turn into turn-by-turn execution logs;
+keep only brief context and remaining open work.
 
-- Create `plans/<topic>.md` only when work spans multiple subsystems, delivery
-  increments, or sessions.
-- Each plan names its status, related issues, scope, key decisions, ordered
-  checklist, verification, and completion criteria.
-- Update progress in the same commit as the work it describes. Do not mark a
-  step complete before its code and required verification exist.
-- Never let a plan grow unbounded: do not append turn-by-turn execution diaries,
-  per-iteration micro-decisions, or CI run logs. Collapse shipped increments to a
-  brief baseline summary and keep only remaining active work.
-- Completing a plan is a deletion: remove `plans/<topic>.md` and its Active
-  bullet in the same change that finishes the work. Do not leave completed plans
-  on `dev`, and do not keep a Completed section, tombstone bullets, or an
-  on-tree `plans/archive/`. Recover a finished plan from git:
-
-  ```bash
-  git log --diff-filter=D --summary -- plans/
-  git show <deletion-commit>^:plans/<topic>.md
-  ```
-
-- Use GitHub issues for externally visible defects and deferred findings; plans
-  may coordinate those issues but do not replace them.
-
-## Active
-
-- [[plans/windows-signpath.md]] — SignPath Foundation self-signed onboarding,
-  public signing policy, and production Windows release integration.
-- [[plans/remote-project-fleet.md]] — Machine-aware Supervisor fleet, remote
-  AliceProject inventory/connection, and local-to-SSH project transfer are in
-  `dev`; Increment 7 (controller-driven remote release convergence) remains open.
-- [[plans/auto-prediction-harness.md]] — Auto Prediction Beta conversation
-  Harness, managed AP/AQ Studio supervision, opaque routing, and shared source
-  release lifecycle are in `dev`; cross-runtime acceptance remains active.
-- [[plans/session-presence.md]] — In-desk Session presence (`active` /
-  `archived` / `deleted`) separate from Workspace `retired`, uncapped Ask Alice
-  roster, and Archive as the primary floor action. Increments 1–2 are in `dev`;
-  Increment 3 (`deleted` / undelete) remains open.
-- [[plans/connector-desk.md]] — Shared desk execution specimen where each
-  `desk`-capable adapter owns its own Issue (`connectorDesk: <id>`). Increments
-  1–2 (specimen extraction + Feishu adapter) are in `dev`; Increment 3 (Feishu
-  `/inbox` and `/uta` cards) remains deferred.
+When work is completed, delete `plans/<topic>.md` and remove its entry from
+`plans/index.md` in the same change.

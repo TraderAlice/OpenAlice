@@ -15,7 +15,7 @@
   ],
   "scripts": {
     "build": "node -e \"require('node:fs').rmSync('dist',{recursive:true,force:true})\" && tsc",
-    "test": "node ../../scripts/run-tests.mjs --package @traderalice/guardian-runtime",
+    "test": "vp test run --config ../../vitest.config.ts packages/guardian-runtime",
     "typecheck": "tsc --noEmit"
   },
   "devDependencies": {

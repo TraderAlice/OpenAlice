@@ -1,11 +1,10 @@
 # Remote Machine Fleet and AliceProject Transfer
 
 **Status:** Active (Increments 1–6 and 8 shipped in `dev`; Increment 7 remains open)
-**Owner guides:** [[docs/cli-supervisor.md]], [[docs/remote-access.md]], [[docs/alice-project.md]], [[docs/workspace-lifecycle.md]], [[docs/alice-harness.md]], [[docs/workspace-issues-and-scheduling.md]], [[docs/uta-live-testing.md]], [[docs/managed-workspace-runtime.md]], [[docs/development-workflow.md]]
 
 ## Shipped Baseline (Increments 1–6 & 8)
 
-Machine registry (`machines.json`), aggregate SSH `machine inspect`, Supervisor TUI Fleet workbench, bounded SSH `project transfer` (re-sealing Alice-owned credentials under a new remote key while excluding native/OpenAlice Session continuation state), and remote readiness/browser recovery truth are implemented in `dev` and documented in [[docs/remote-access.md]] and [[docs/cli-supervisor.md]].
+Machine registry (`machines.json`), aggregate SSH `machine inspect`, Supervisor TUI Fleet workbench, bounded SSH `project transfer` (re-sealing Alice-owned credentials under a new remote key while excluding native/OpenAlice Session continuation state), and remote readiness/browser recovery truth are implemented in `dev`.
 
 ## Active Work: Increment 7 — Controller-Driven Remote Release Convergence
 
@@ -29,10 +28,8 @@ Machine registry (`machines.json`), aggregate SSH `machine inspect`, Supervisor 
 - [ ] Add focused managed-SSH, dev-manifest, stale-controller, cross-channel,
   consent/default-No, and post-install identity tests. Extend the disposable
   Docker SSH journey without exposing a public Web port.
-- [ ] Update [[docs/remote-access.md]], CLI help, and Supervisor wording with
-  the shipped apply authority and downgrade rules.
-- [ ] Delete this plan and its [[PLANS.md]] bullet once Increment 7 is merged
-  and verified.
+- [ ] Update CLI help and Supervisor wording with the shipped apply authority and downgrade rules.
+- [ ] Delete this plan and its `plans/index.md` bullet once Increment 7 is merged and verified.
 
 ## Verification
 
