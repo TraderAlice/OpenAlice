@@ -5,12 +5,11 @@ launches Workspaces and injects trading context; the separate UTA process owns
 broker credentials, connections, state, and every trading write. Persisted state
 is file-backed rather than database-backed.
 
-This file contains only rules that apply at the start of every task. Current
-code, tests, rendered behavior, and GitHub state override stale prose. Before
-editing a subsystem, select and read its owner guide from [[docs/README.md]].
-Detailed delivery and release procedure lives in
-[[docs/architecture/development-workflow.md]], test selection and side effects live in
-[[docs/architecture/testing.md]], and active multi-step work lives in [[PLANS.md]].
+Current code, tests, rendered behavior, and GitHub state override stale prose.
+Subsystem reference docs live under `docs/architecture/`, delivery and release
+procedure lives in [[docs/architecture/development-workflow.md]], test selection
+and side effects live in [[docs/architecture/testing.md]], and active multi-step
+work lives in [[PLANS.md]].
 
 ## Product and Architecture Boundaries
 
@@ -62,8 +61,9 @@ safety boundaries, and release gates live in [[docs/architecture/testing.md]] an
   follows [[PLANS.md]]. Never let plans grow unbounded or turn into turn-by-turn
   execution logs; delete `plans/<topic>.md` and its `PLANS.md` bullet in the same
   change that completes the work.
-- Durable subsystem truth and the complete guide catalog live in
-  [[docs/README.md]]. Keep that index current instead of copying it here.
+- `docs/` holds user guides (`docs/guides/`) and architecture notes
+  (`docs/architecture/`), indexed by `docs/SUMMARY.md`. Read `docs/architecture/`
+  when you need subsystem context, but **do not create or update architecture
+  docs unless the user explicitly asks**.
 - `README.md` is public positioning. Ask for product framing before rewriting
   its tagline, pillars, hero, or other marketing copy.
-
