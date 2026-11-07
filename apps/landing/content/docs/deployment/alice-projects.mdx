@@ -1,0 +1,127 @@
+export const metadata = {
+  title: "AliceProjects",
+  description: "Understand OpenAlice's top-level local runtime, complete-home, Guardian, product, and concurrency boundary.",
+}
+
+# AliceProjects
+
+An **AliceProject** is one independently startable OpenAlice runtime. It owns:
+
+```text
+AliceProject
+├── one complete OPENALICE_HOME
+├── one Guardian process tree
+│   ├── one Alice backend
+│   ├── optional UTA
+│   └── optional Connector Service
+├── one logical frontend endpoint
+└── many Workspaces and Sessions
+```
+
+An AliceProject sits above a [Workspace](/docs/workspaces/workspaces). A
+Workspace is a durable agent desk inside one project; a Session is one
+conversation inside a Workspace. A browser tab does not own the backend.
+
+The ordinary user has one implicit **Default AliceProject**. Named projects are
+useful when two source checkouts must run concurrently, or when separate
+companies, personas, experiments, or non-trading uses must not share state and
+failure domains.
+
+## Identity and complete homes
+
+Each project has a stable id, a machine-local selector key, a mutable display
+name, and one canonical complete home. Ports, URLs, application roots, and one
+Guardian process-tree id are live launch details rather than project identity.
+
+Two AliceProjects can run at the same time when they use distinct complete
+homes and ports. Equal or nested homes are rejected, and a second Guardian may
+not write the same home. Selecting or opening project B never stops, moves,
+copies, or deletes project A.
+
+Open **Settings → General → About OpenAlice** to see the current AliceProject's
+name, health, stable id, home, and application root beside the installation and
+update status.
+
+## TraderAlice and NanoAlice
+
+Product is an immutable project-birth choice:
+
+- **TraderAlice** is the default trading product. Lite and Pro remain trading
+  intensity choices inside TraderAlice.
+- **NanoAlice** is an experimental general-purpose product. Its Guardian never
+  starts UTA for that complete home.
+
+The choice is written once to
+`<OPENALICE_HOME>/data/config/alice-project.json`. A missing stamp means
+TraderAlice for compatibility. An unreadable or malformed stamp blocks startup
+instead of silently enabling trading services. Product is not a Settings
+toggle; create a separate AliceProject to use another product.
+
+NanoAlice also removes product chrome that assumes the trading stack: Market
+(including the News feed nested beneath it) and **Trading** disappear from the
+Activity Bar. Trading is the parent rail item for Trading as Git, All Accounts,
+and connected account details. **Trading**, **Market Data**, and **News
+Sources** also disappear from Settings.
+Bookmarks to those routes return to Ask Alice or the Settings index rather than
+opening a half-available screen. AutoQuant and Tracked remain visible while
+their longer-term Nano boundary is reviewed separately.
+
+## Create and select projects
+
+The installed CLI can create a named project directly:
+
+```bash
+openalice create alice-project
+openalice create alice-project \
+  --name office \
+  --home ~/.openalice-office \
+  --product nano \
+  --yes
+openalice project list
+openalice project use office
+```
+
+Bare `openalice` opens the Supervisor. Its `i` panel lists the implicit default
+and registered AliceProjects, selects the target for subsequent actions, or
+creates a separate Trader-equivalent project. The explicit lifecycle commands
+accept `--project <key>`, and `OPENALICE_PROJECT` selects one registered project
+for a launch.
+
+Released automation using `--instance` or `OPENALICE_INSTANCE` continues to
+work as a deprecated compatibility alias. Current UI, documentation, and new
+integrations should use AliceProject terminology.
+
+The machine-local Supervisor registry lives outside every project home. It
+stores selectors, paths, ports, update policy, and optional source selection;
+it never stores product credentials or Workspace contents.
+
+`openalice project list --json` exposes the same registered-home summary for
+automation. `openalice project use <key>` changes only the Supervisor's
+remembered target for a future bare start; it does not start or stop a Runtime
+and does not move project state.
+
+## Copy AI credentials explicitly
+
+AliceProjects normally keep credentials isolated. When two registered homes
+should intentionally share the same AI access rows, use the dedicated command:
+
+```bash
+openalice project copy-ai-creds --from default --to office
+openalice project copy-ai-creds --from default --to office --yes
+```
+
+Interactive use asks for confirmation. Non-interactive use requires `--from`,
+`--to`, and `--yes`. The command merges only the `credentials` map from
+`data/config/ai-provider-manager.json`: identical vendor/auth/key rows are
+skipped, and a source slug that collides with a different destination row is
+renamed. It never prints secrets or copies Workspace launch preferences,
+broker accounts, `provider-keys.json`, or `sealing.key`.
+
+Credential copy is a separate, explicit mutation. Creating, selecting,
+opening, or stopping an AliceProject still never copies or merges its home.
+
+## Next Steps
+
+- [CLI & Remote Access](/docs/deployment/remote-access) — Start, inspect, and connect to AliceProjects.
+- [Data & Credentials](/docs/deployment/data-and-credentials) — Understand and back up a complete home.
+- [Workspaces](/docs/workspaces/workspaces) — Create durable agent desks inside a project.

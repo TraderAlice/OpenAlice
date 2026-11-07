@@ -1,293 +1,182 @@
 # Workspace and Session Lifecycle
 
-This guide owns Workspace offboarding, departed-directory layout, restore and
-purge semantics, Session retirement, handoff artifacts, and recovery after an
-interrupted lifecycle transition.
+This guide owns Workspace and Session identity, provenance, execution authority,
+Web conversation surfaces, offboarding/restore/purge, template upgrades,
+Workspace Absorb, and the launcher-level Workspace Manager. Context/Skill/model
+injection belongs to [[docs/alice-harness.md]], and Issues/scheduling/Inbox
+delivery belong to [[docs/workspace-issues-and-scheduling.md]].
 
-Related guides: [[docs/project-structure.md]],
-[[docs/conversation-provenance.md]], and
-[[docs/workspace-issues-and-scheduling.md]]. For in-place managed-asset
-reconciliation, see [[docs/workspace-template-upgrade.md]].
-For directional desk consolidation, see [[docs/workspace-absorb.md]].
+---
 
-## The Active Directory Is an Office Floor
+## 1. Identity and Provenance (`resumeId`)
 
-The directory at `<launcherRoot>/workspaces/` contains active Workspaces only.
-It is intentionally safe to use as the cwd for a future manager Agent: ordinary
-filesystem discovery there means “the desks currently in service,” not “every
-desk that has ever existed.”
+`resumeId` is OpenAlice's canonical, durable product Session identity across
+interactive and headless turns; `@resumeId` is its visible signature. Every live
+Agent receives `OPENALICE_RESUME_ID` and `OPENALICE_SIGNATURE`, while
+server-side request origin remains authoritative for Inbox, Issue, and trade
+attribution.
 
-That manager now exists as the launcher-owned control plane described in
-[[docs/workspace-manager.md]]. It is intentionally absent from the active
-Workspace registry, so the office floor never contains a synthetic seventeenth
-business desk merely because the user opened management chat.
+| Identity | Scope | Product exposure |
+|---|---|---|
+| `workspaceId` | Durable context and capability boundary | Public |
+| `resumeId` | One stateful product Session across interactive and headless turns | Public follow-up handle |
+| `SessionRecord.id` | Durable launcher roster and process-attachment key | Attachment surfaces only |
+| `taskId` / `runId` | One headless execution turn | Public execution evidence |
+| `agent` | Runtime kind (`claude`, `codex`, `pi`, `opencode`, `agy`, …) | Display/selection metadata |
+| `agentSessionId` | Native CLI conversation locator | Backend only (`ResumeRegistry`) |
 
-```text
-<launcherRoot>/
-├── workspaces.json                 active runtime registry only
-├── workspaces/                     active Workspace checkouts only
-├── departed-workspaces/            retained offboarded checkouts
-└── state/
-    ├── workspace-catalog.json      complete lifecycle history
-    ├── resume-identities.json      identity, lifecycle, and native mappings
-    ├── headless-tasks.json         immutable execution history
-    ├── agent-runtime.jsonl         desk occupancy lifecycle journal
-    └── artifact-provenance.json    immutable attribution history
-```
+- `ResumeRegistry` binds one `resumeId` immutably to one Workspace and runtime.
+  `SessionRecord` is born with `resumeId` and survives surface/lifecycle changes
+  without duplicating roster rows.
+- Optional mutable `displayName` lives beside the secret-free `ai` binding in
+  `.alice/sessions/<resumeId>.json`.
+- **Provenance edges**: Attributable occurrences (reports `{ workspaceId, path, revision? }`,
+  Inbox `{ inboxEntryId }`, Issues `{ workspaceId, issueId }`, and trade
+  decisions `{ accountId, decisionId }` keyed by UTA Git commit hash) carry a
+  server-stamped `SessionOrigin`. Agents cannot spoof origin via tool arguments.
+- **Follow-up resolution** (`src/workspaces/conversation-control.ts`):
+  1. Known usable `resumeId` continues that exact Session (`exact`).
+  2. Known unavailable Session returns `unavailable` with preserved origin/reason.
+  3. Unknown origin in a known Workspace recruits a new Session labeled
+     `reconstructed` (never presented as original author).
+  4. Unknown Workspace returns `unavailable`.
+- **Dispatch communication** (`buildDispatchCommunication`): Separates caller
+  origin, execution target, subject, and reply ownership (`caller`,
+  `issue-comment`, `issue-run`, `none`) in an immutable task snapshot.
+  `workspaces/state/agent-conversations.jsonl` is an append-only private
+  dispatch/reply projection, never a dispatch authority.
 
-`workspaces.json` answers “what can Alice run now?” The Catalog answers “what
-has existed, where did it go, and can it be restored?” Catalog rows are never
-deleted and Workspace ids are never reused, including after purge.
+---
 
-## State Machines
+## 2. Session Execution Authority and Takeover
 
-Workspace lifecycle:
+`WorkspaceService.executions` (`SessionExecutionManager`) is the sole entry point
+for starting or stopping Session processes across HTTP, IPC, tools, Issues,
+schedules, Connector, offboarding, and shutdown.
 
-```text
-active -> offboarding -> departed -> restoring -> active
-                              |
-                              +-> purging -> purged
-```
+- Phases are `starting → running → stopping → ended` (or `failed`). The manager
+  persists admission before spawn, excludes concurrent writers of one `resumeId`,
+  waits for real process exit on stop/handoff, and rejects stale callbacks.
+  Failed execution-journal writes block new admission.
+- **Interactive takeover**: Background dispatch to an occupied Session enters
+  FIFO takeover admission. Approval and inactivity timeout require observed GUI
+  idle (`working`, `compacting`, `retrying`, and `awaiting-input` cannot be
+  interrupted by idle takeover; terminal handoff requires explicit approval).
+- **Emergency interrupt & admission blocks**: `interrupt(resumeId, executionId, actor)`
+  requires the exact `executionId` and escalates process-tree termination. HTTP
+  interrupt and release routes are always user-attributed (client-supplied actor
+  fields are rejected). `user-cooldown` follows explicit user interruption;
+  `execution-fault` follows consecutive failures and requires explicit user
+  release. Takeover approval never overrides an active admission block, and
+  release endpoints clear only the block without launching work.
 
-`offboarding`, `restoring`, and `purging` are durable transition records, not
-display-only statuses. The Catalog is written before registry/filesystem
-mutation. On startup `WorkspaceLifecycleManager.recover()` finishes an
-interrupted transition idempotently.
+---
 
-Product Session lifecycle:
+## 3. Web Conversation Surface (`WebSessionHost`)
 
-```text
-active -> retired
-   ^         |
-   +---------+  Workspace restore / explicit recall
-```
+The Web surface attaches to an existing Workspace Session through its runtime's
+structured stdio protocol (`pi-rpc`, `acp`, `claude-stream-json`,
+`codex-app-server`) instead of a PTY.
 
-In-desk floor presence (independent of `lifecycle`):
+- **Layer separation**: Adapters declare `capabilities.web` (`agentSupportsWeb`
+  is the sole launch gate) and compose argv; Transports speak one wire over
+  stdio and drive neutral state; `WebSessionHost` supervises the child process
+  and snapshot revision without branching on runtime IDs; Browser polls neutral
+  snapshots (`GET /web?revision=`) and responds to permission/question requests
+  by exact runtime-supplied `optionId` (`POST /web/respond`).
+- **Exact continuation**: Web never resumes "last." It reopens the exact native
+  ID mapped to `resumeId` or starts a fresh conversation for a new Session. If a
+  transport cannot load an existing transcript, opening fails with guidance
+  rather than substituting a fresh conversation.
+- **Ephemeral snapshots**: Neutral snapshots (`src/workspaces/web-session/model.ts`)
+  are never persisted as a second transcript store. `SessionRecord.surface`
+  retains the persisted literal `webpi` for compatibility across all Web runtimes.
 
-```text
-active <-> archived <-> deleted
-```
+---
 
-`presence` answers whether the coworker is on the Ask Alice roster, filed in
-the archive, or softly dismissed. Missing `presence` is `active`. Archiving a
-running interactive Session first pauses it; the presence write still refuses a
-live seat or headless turn. `lifecycle:
-retired` still means the coworker left with the Workspace; restore recalls the
-desk without washing archived or deleted people back onto the floor.
+## 4. Active Floor, Offboarding, Restore, and Purge
 
-`SessionRecord` is the durable launcher roster row shared by headless and
-interactive execution. Pausing, archiving, soft-deleting, or retiring a Session
-does not destroy that row. `resumeId` remains the coworker identity; retirement
-is stored on `ResumeIdentityRecord` and retains the roster row, native runtime
-mapping, run history, Inbox links, and provenance. Its secret-free AI
-configuration lives with the desk at `.alice/sessions/<resumeId>.json`, so
-offboarding moves it into the departed checkout and restore recalls the same
-binding instead of re-resolving changed Workspace defaults. A retired Session
-is not schedulable or resumable. It may carry `successorResumeId` for explicit
-handoff. OpenAlice never silently pretends a successor authored the
-predecessor's work.
+`<launcherRoot>/workspaces/` contains active Workspace checkouts only.
+`workspaces.json` tracks active desks; `WorkspaceCatalog` tracks all desks ever
+created (`active → offboarding → departed → restoring → active` or
+`departed → purging → purged`). Catalog rows are never deleted and Workspace IDs
+are never reused.
 
-## Session execution authority
+- **Offboarding**: Blocked by live headless runs. Interactive processes pause;
+  Alice writes `.alice/HANDOFF.md` and `.alice/offboarding.json`, removes the
+  active registry row, atomically moves the checkout to
+  `departed-workspaces/<workspaceId>`, and retires owned `resumeId`s.
+- **Restore & Purge**: Restore returns the checkout to its exact original cwd,
+  recalls `resumeId`s, and marks the Catalog active. Purge is departed-only and
+  irreversible: it deletes the checkout, interactive Session records, and
+  scrollback while preserving Catalog tombstones, retired `resumeId`s, Inbox
+  records, and provenance so `@resumeId` signatures resolve to `retired/purged`
+  rather than unknown.
 
-`WorkspaceService.executions` is the only application entry point for starting
-or stopping a Session process. It exposes terminal, Web, asynchronous dispatch,
-synchronous wait, and diagnostic probe operations backed by
-`SessionExecutionManager`. HTTP, Electron IPC, conversation tools, Issues,
-schedules, Connector-driven work, offboarding, and shutdown share this boundary.
-The old service launch methods and coordinator state-transition method are
-removed. The exposed PTY/Web containers provide observation and transport, not
-process control. An architecture test guards this boundary.
+---
 
-Every launch requires a concrete `origin` (caller kind and entry point, with
-Issue/Session/Connector identifiers where applicable), intent, surface, and
-secret-free credential/model/effort selection. Birth provenance remains
-immutable on the Session; execution provenance records each subsequent launch.
+## 5. Workspace Template Upgrade and Absorb
 
-`workspaces/state/session-executions.json` records a unique execution ID,
-requested/start/end timestamps, PID, optional task ID, phase, runtime activity,
-and termination reason. The phases are `starting -> running -> stopping ->
-ended`, with `failed` for startup or runtime failure. A natural exit can go
-directly from running to ended/failed. Web protocol activity additionally
-reports idle, working, awaiting-input, and other runtime states; TUI does not
-invent model activity from terminal bytes.
+Both operations serialize on the shared checkout-operation lease
+(`src/workspaces/workspace-operation-guard.ts`), require idle Sessions and a
+clean staged Git index, validate an exact preview digest, write recovery
+journals before mutation, and recover idempotently on startup before scheduled
+work runs.
 
-The manager persists admission before spawning, excludes concurrent writers of
-one `resumeId`, waits for actual exit on stop/handoff, and rejects callbacks from
-an older execution. A shutdown closes admission and waits for startup/stop work. The Workspace
-service also drains dispatch admissions and terminal task/conversation/Issue/
-delivery persistence after child exit. Concurrent dispose callers await the
-same shutdown promise; a closed service rejects new headless dispatches.
-PTY exit ends its execution; there is no hidden automatic respawn. A new process
-requires another managed launch and receives another execution ID.
+### Template Upgrade (`upgradeStrategy: "managed-context"`)
 
-Session roster `running/paused` is only a projection. Ordinary metadata updates
-cannot change it, and allocating a Session does not mark it running. At startup,
-the manager closes executions whose owner restarted and reconciles orphaned
-roster rows. A reconciliation record identifies the system recovery operation;
-it does not claim to know the original caller of an older unrecorded process.
-Existing roster and Session AI storage formats remain unchanged.
+Reconciles only template README/instructions and template-owned `.agents/skills/**`
+/ `.claude/skills/**` (plus legacy `.pi/skills/**` cleanup) using a fingerprint
+three-way plan (`Base` under `.alice/template-upgrade/`, `Local`, `Incoming`).
+Non-overlapping dual edits merge via `git merge-file --diff3`; conflicts require
+explicit per-path resolution and never write conflict markers automatically.
+Apply commits only the selected managed paths and advances `Base` to `Incoming`.
 
-Read execution history with
-`GET /api/workspaces/:id/sessions/:sid/executions`. It returns `{ executions }`
-for that Session; no keys, environment variables, prompts, or command lines are
-stored in this journal. A failed journal blocks new execution admission. A stop
-still terminates the process if writing its journal fails and reports the
-persistence failure to the caller.
+### Workspace Absorb (`src/workspaces/workspace-absorb.ts`)
 
-## Interactive takeover
+Directional consolidation: one target Workspace stays active and one source
+Workspace offboards intact to `departed-workspaces/<sourceId>`.
 
-Background dispatch to an existing Session enters the execution manager's FIFO
-takeover admission before acquiring the resume lock. Pending requests leave
-interactive input available. The manager records source, request and decision
-times, inactivity deadline and handoff state in
-`state/session-executions.json.takeovers.json`. This file also owns the global
-idle interval (60 seconds by default, configurable from 10 to 3600 seconds).
-Configuration changes apply to new requests. A restart cancels pending requests;
-it does not replay work from this diagnostic journal. The journal retains active
-requests plus the last 500 resolved requests; no prompt or credential is stored.
+- Moves only tracked and untracked-non-ignored user files from the source working
+  tree. Collisions require an explicit `keep-target`, `use-source`, or
+  `keep-both` (`imports/<source-tag>-<source-id>/...`) choice.
+- Never moves `.git`, `.alice`, managed prompt/Skill trees, credentials, root
+  template files, `.env*`, or caches.
+- Source `resumeId`s retire with the source; historical provenance is never
+  rewritten, and the Catalog records `absorbedIntoWorkspaceId`, `absorbedAt`,
+  and the target import commit.
 
-User activity within the target Session resets its server-owned deadline.
-Approval and timeout both wait for an observed GUI `idle` phase. Working,
-compacting, retrying and awaiting-input phases cannot be interrupted by this
-mechanism. A terminal has no trustworthy activity signal: it requires explicit
-approval, which clearly states that its process will stop. Closing the request
-Dialog merely hides it; rejecting declines that caller without stopping the
-Session. A Session cannot request its own handoff.
+---
 
-The head request reserves the identity before stopping the current process,
-waits for actual exit, and retains its reservation through background completion.
-Later requests queue; interactive starts and prompts cannot race the handoff.
-Different Sessions remain independent. Shutdown cancels waiting admissions before
-stopping managed processes. Failed persistence closes admission.
+## 6. Workspace Manager (`workspace-manager`)
 
-`GET /api/workspaces/session-takeovers` projects requests and server time;
-`POST /api/workspaces/session-takeovers/:requestId/decision` accepts approve or
-reject; `PUT /api/workspaces/session-takeovers/settings` sets `idleSeconds`.
-Session-local `/activity` requests record interaction without starting a process.
-Pending dispatch callers wait for admission; they receive the ordinary task ID
-once work is admitted, or a concrete refusal/error. Scheduling cursors retain
-their existing dispatch success/failure semantics.
+The launcher-level coordination desk uses the reserved ID `workspace-manager` and
+runs with `<launcherRoot>/workspaces/` (the active floor) as its `cwd`. It is
+deliberately excluded from `workspaces.json` and stores its secret-free Session
+bindings under `<launcherRoot>/state/workspace-manager-sessions/<resumeId>.json`
+so it never writes `.alice/` at the floor root.
 
-## Offboarding Transaction
+- Uses `alice peer list`, `alice issue list --mode detailed`, `peer path`,
+  `peer sessions`, and `conversation ask` to inspect and coordinate active desks.
+- Must never write research, reports, or Issues at the floor root; durable work
+  and approved direct edits belong inside a selected target Workspace.
 
-Before moving a Workspace, Alice gathers:
+---
 
-- live headless runs;
-- interactive Session seats and resumeIds;
-- open and scheduled Issues;
-- git branch, clean/dirty state, and changed paths.
+## 7. Load-Bearing Paths and Verification
 
-A live headless run is a hard blocker. Interactive PTYs are paused; Shell
-scrollback is persisted. Dirty files and open Issues are not blockers because
-the complete checkout moves intact, but they are recorded in the handoff.
+- `src/workspaces/{service,workspace-lifecycle,workspace-catalog}.ts` — lifecycle,
+  offboard/restore/purge, and startup recovery.
+- `src/workspaces/session-execution-manager.ts` — process authority, takeover,
+  interruption, and admission blocks.
+- `src/workspaces/{resume-registry,session-registry,product-session-coordinator,conversation-control}.ts`
+  — Session identity, roster, and follow-up provenance.
+- `src/workspaces/web-session-host.ts` & `src/workspaces/web-session/` —
+  structured Web conversation host and wire transports.
+- `src/workspaces/{template-upgrade,workspace-absorb,workspace-operation-guard,manager-workspace}.ts`
+  — template upgrade, Absorb, checkout leases, and Workspace Manager.
 
-Alice writes two self-contained artifacts before the move:
-
-- `.alice/HANDOFF.md` — readable reason, notes, signatures, open Issues, and
-  uncommitted paths;
-- `.alice/offboarding.json` — the same transition snapshot in a stable
-  structured form.
-
-It then removes the active registry row, atomically renames the checkout to
-`departed-workspaces/<workspaceId>`, retires every resume identity owned by the
-Workspace, and completes the Catalog transition. Scheduled Issue scanning only
-enumerates the active registry, and headless dispatch independently rejects a
-non-active Catalog row to close scheduling races.
-
-## Restore and Purge
-
-Restore is “rehire with the old desk”:
-
-1. refuse a missing archive, occupied active path, or active tag collision;
-2. move the checkout back to its immutable original `activeDir`;
-3. re-add the exact durable `WorkspaceMeta` to the active registry;
-4. recall its resume identities without changing their ids or native mappings;
-5. mark the Catalog row active.
-
-Returning to the exact cwd is load-bearing. Claude, Codex, opencode, Pi, trust
-stores, and transcript discovery may key native state by project path.
-
-An absorbed Workspace is still a departed Workspace, with an additional
-Catalog link to the active target and its import commit. Restoring it is an
-explicit decision to recreate two active copies; it never removes files already
-copied into the target.
-
-Purge is deliberately separate and irreversible. It is allowed only after
-offboarding. Purge removes the departed checkout, interactive Session records,
-Shell scrollback, and the Workspace-local Session AI configuration. It retains
-the Catalog tombstone, retired resumeIds, headless run history, Inbox entries,
-and artifact provenance so historical signatures still resolve to
-“retired/purged,” never “unknown author.”
-
-## Baseline Boundary
-
-The 0.89.2-beta baseline starts with an explicit Workspace Catalog and no
-per-Workspace adapter allowlist. Pre-Catalog orphan directories and historical
-`agents` arrays are not supported upgrade inputs. Restored desks use the live
-installation adapter registry like every other Workspace; the adapter set
-present when a desk was created or departed is not part of its durable identity.
-
-## Load-Bearing Code
-
-- `src/workspaces/workspace-catalog.ts` — immutable ids and durable states.
-- `src/workspaces/workspace-lifecycle.ts` — assess/offboard/restore/purge and
-  interrupted-transition recovery.
-- `src/workspaces/workspace-absorb.ts` — directional copy plan, two-desk
-  transaction, rollback, and Catalog link.
-- `src/workspaces/resume-registry.ts` — active/retired Session signatures and
-  successor links.
-- `src/webui/routes/workspaces.ts` — lifecycle API surface.
-- `ui/src/components/workspace/WorkspaceOffboardingDialog.tsx` — blockers,
-  handoff inventory, reason, and notes before departure.
-- Restore and purge remain lifecycle API operations. The retired global
-  `/workspaces` inventory redirects to `/chat`; `WorkspaceListPage.tsx` is
-  not mounted and must not be treated as the current restore/purge UI.
-
-Do not reintroduce “delete the registry row and leave the folder in place.” It
-pollutes manager discovery, destroys restore metadata, and turns known retired
-coworkers into unexplained missing state.
-
-### Interruption and Session launch admission
-
-Scheduling offers work; `SessionExecutionManager` decides whether the Session can
-accept it. Its persistent admission sidecar (`session-executions.json.admission.json`)
-owns launch blocks. It never starts work, retries a task, or advances a schedule.
-Every managed start checks admission before spawning; takeover also checks before
-queuing and immediately before handoff. Approval cannot override a launch block.
-
-`interrupt(resumeId, executionId, actor)` is the emergency stop for any execution
-surface, including headless and stalled startup. The expected execution ID prevents
-a stale click from stopping a subsequent run. The manager records who interrupted,
-when, and why, cancels pending takeover offers, signals the process tree, escalates
-to forced termination, and records `interrupted` only after exit is confirmed.
-History and partial output survive. A failed stop retains `stopping`, occupancy,
-and `stopError`; another interrupt retries termination. Routine internal `stop`
-remains for orderly shutdown, surface replacement and handoff, without a user
-cooldown. GUI turn abort remains distinct from terminating the Session process.
-
-Admission blocks are independent of execution outcomes:
-
-- `user-cooldown`: an explicit user interruption blocks all new starts for
-  600 seconds by default. The global setting accepts 10–86400 seconds and applies
-  to future interruptions. Expiry merely restores eligibility.
-- `execution-fault`: three consecutive failed executions block starts until
-  explicit user release. Success resets the streak; interruption does not count
-  as a failure. Releasing the fault resets its streak.
-- Active execution and takeover ownership remain live manager constraints.
-  Releasing one persisted block cannot override other blocks or occupancy.
-
-Only user-attributed controls may release blocks or change cooldown policy. HTTP
-handlers supply that attribution themselves; client-provided actors are rejected
-for interruption. Release and interruption retain actor provenance. Admission
-refusals expose `session_blocked`, the current policy blocks, and `retryAt` only
-when all policy blocks have deadlines.
-
-The UI reads `GET /api/workspaces/:id/sessions/:sid/control` through
-`useSessionControl`. Busy and details dialogs share `SessionControlPanel`.
-`POST .../interrupt` requires `executionId`; `POST .../blocks/:blockId/release`
-releases only that block. `PUT /api/workspaces/session-controls/settings` changes
-`cooldownSeconds`. No release endpoint starts an execution.
-
-The sidecar is new optional state with an explicit version, created lazily; the
-execution journal adds optional interruption metadata and an `interrupted` phase.
-No existing Session identity/configuration file is rewritten or migrated.
+Verify changes with owning root/UI typechecks, focused lifecycle/provenance/wire/
+upgrade specs (`tests/integration/workspace-upgrades/template-upgrade.spec.ts`,
+`web-session-host.spec.ts`), and real surface journeys (headless-to-interactive
+continuation, Web ↔ TUI transcript preservation, and source → target Absorb).

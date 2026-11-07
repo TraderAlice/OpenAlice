@@ -67,7 +67,7 @@ describe('no-flash theme bootstrap', () => {
   })
 
   it('applies a valid style profile before first paint and repairs invalid values', () => {
-    expect(applyNoFlashTheme({ uiStyle: 'win98' }, false).uiStyle).toBe('win98')
+    expect(applyNoFlashTheme({ uiStyle: 'studio' }, false).uiStyle).toBe('studio')
     expect(applyNoFlashTheme({ uiStyle: 'aqua' }, false).uiStyle).toBe('default')
   })
 

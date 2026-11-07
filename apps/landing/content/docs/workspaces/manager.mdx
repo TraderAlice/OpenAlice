@@ -1,0 +1,150 @@
+export const metadata = {
+  title: "Workspace Manager",
+  description: "Use OpenAlice's launcher-level chief of staff to audit active Workspaces, find accountable Sessions, and coordinate maintenance without creating another business desk.",
+  releaseChannel: "stable",
+  targetVersion: "0.94.1",
+}
+
+# Workspace Manager
+
+The **Workspace Manager** is a launcher-level agent for coordinating the active
+Workspace floor. It can inventory desks, find stale or duplicated work, inspect
+Issue health, locate the Session that made a decision, and preview maintenance
+actions from one dedicated control plane.
+
+It is not another Chat Workspace. The manager does not own a research topic,
+portfolio, or business artifact directory. Its job is to help you decide which
+existing desk or accountable coworker should do the work.
+
+## When to use it
+
+Open the **Workspace Manager** entry under Ask Alice when you want to ask:
+
+- What does each active Workspace own?
+- Where are two desks doing the same job?
+- Which scheduled Issues are failed, interrupted, stale, or unowned?
+- Who produced this Inbox report or historical decision?
+- Which Workspace should receive a new task?
+- Which desks have safe template upgrades available?
+
+The manager is most useful after your OpenAlice floor has grown beyond a few
+desks. It starts from product indexes rather than crawling every checkout, then
+drills into only the Workspaces and Sessions relevant to the question.
+
+## Start a manager conversation
+
+1. Open **Ask Alice**.
+2. Select **Workspace Manager — Coordinate every active desk**.
+3. Choose an installed Agent runtime, AI access source, model, and effort.
+4. Choose a quick start or write your own request.
+
+Good first requests include:
+
+```text
+Audit every active Workspace. Summarize its role, current work, and obvious overlap.
+```
+
+```text
+Review Issues and schedules across the floor. Flag failed, interrupted,
+duplicated, or unowned work, but do not change anything yet.
+```
+
+```text
+Preview template upgrades for all active Workspaces and explain which ones are
+safe to apply.
+```
+
+The Manager uses the same launch tuple as Quick Start: Agent runtime,
+runtime-managed or saved AI access, model, and effort. Compatible recent
+choices are restored without rewriting a Workspace. Choose Web or TUI for any installed Agent that supports both surfaces; Antigravity and Shell use TUI. The
+manager conversation has a durable `resumeId`, so reopening it after a launcher
+restart continues the same product Session rather than creating another
+coworker.
+
+Because the Manager has no business Workspace checkout, its secret-free Session
+bindings live under
+`<AQ_LAUNCHER_ROOT>/state/workspace-manager-sessions/<resumeId>.json`. Ordinary
+business Session bindings live with their desk at
+`.alice/sessions/<resumeId>.json`; the Manager never creates `.alice/` at the
+active-floor root.
+
+## Exact coworkers before reconstruction
+
+OpenAlice separates an attributable Session from a newly recruited fallback:
+
+| Situation | Manager action | Meaning |
+|---|---|---|
+| A report, Issue, or decision has a `resumeId` | Continue that exact Session | The original coworker keeps its conversation context |
+| A Workspace is known but no attributable Session exists | Recruit from the Workspace | A fresh worker answers from that desk without impersonating the missing author |
+| A Session retired with an offboarded Workspace | Preserve attribution, report unavailable | A replacement is never presented as the original author |
+
+This is why the manager starts from Session signatures and provenance instead
+of asking a random agent to guess what happened. Reconstruction can still be
+useful, but the result remains visibly labeled as reconstruction. A normal
+Workspace ask delivers the manager's prompt unchanged; explicit reconstruction
+guidance is added only when the manager requests it.
+
+The underlying CLI makes that distinction visible:
+
+```bash
+# Continue one exact coworker and wait until the turn finishes.
+alice-workspace conversation ask --resume-id <resumeId> --prompt "..." --await
+
+# Recruit a fresh coworker for delegated work.
+alice-workspace conversation ask --ws-id <workspaceId> --prompt "..."
+
+# Ask a fresh coworker to reconstruct missing historical intent.
+alice-workspace conversation ask --ws-id <workspaceId> --prompt "..." --reconstruct --await
+```
+
+These conversation calls have no default execution timeout. Add
+`--timeout-ms` only when the requested work has a deliberate hard deadline.
+
+## What the manager can inspect
+
+The manager's active-floor inventory includes:
+
+- Workspace id, name, and template;
+- Session totals and recent attributable Session titles;
+- live interactive and headless activity;
+- Issue status, ownership, schedules, and automation health;
+- Inbox, run, and artifact provenance;
+- template-upgrade availability.
+
+Departed Workspaces are not part of the active inventory. Their historical
+catalog and provenance remain available through the normal lifecycle surfaces.
+
+## Management boundaries
+
+The manager follows the same safety boundaries as the rest of OpenAlice:
+
+- it reads peers through the Workspace CLI rather than calling private
+  localhost APIs;
+- it asks an attributable Session before recruiting a substitute;
+- template upgrades and lifecycle changes are preview-first;
+- it does not write reports, Issues, or research at the active-floor root;
+- durable work belongs in a selected target Workspace;
+- approved direct edits are committed inside that target's git repository;
+- active Sessions and headless runs block unsafe maintenance operations.
+
+Entering the manager surface authorizes the dedicated management skill and
+active-floor view. It does not silently authorize an upgrade, absorb, offboard,
+or cross-Workspace edit.
+
+## Manager versus Workspace actions
+
+| Need | Use |
+|---|---|
+| Coordinate the floor or find ownership | Workspace Manager |
+| Continue one specific conversation | The exact Session |
+| Do research or create a durable artifact | A business Workspace |
+| Bring newer template-owned files into a desk | [Template Upgrade](/docs/workspaces/upgrades-and-absorb#template-upgrade) |
+| Consolidate one desk into another | [Workspace Absorb](/docs/workspaces/upgrades-and-absorb#workspace-absorb) |
+| Retire a desk without merging it | [Lifecycle & Offboarding](/docs/workspaces/lifecycle) |
+
+## Next Steps
+
+- [Sessions & Collaboration](/docs/workspaces/sessions-and-collaboration) — Understand exact continuation and reconstruction.
+- [Issue Board](/docs/workspaces/issues) — Read ownership, health, comments, and runs.
+- [Upgrades & Absorb](/docs/workspaces/upgrades-and-absorb) — Review the maintenance actions the manager can preview.
+- [Lifecycle & Offboarding](/docs/workspaces/lifecycle) — Retire or restore a complete desk.

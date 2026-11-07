@@ -1,0 +1,154 @@
+export const metadata = {
+  title: "Custom Guards",
+  description: "How to add push-time safety checks inside OpenAlice's UTA service and expose them in account settings.",
+}
+
+# Custom Guards
+
+Guards are optional push-time middleware inside the UTA service. They run after
+a human approves a Trading-as-Git push but before each staged operation reaches
+the broker. A guard can reject an operation with a reason; it cannot bypass the
+approval wall.
+
+The current implementation lives under:
+
+```text
+services/uta/src/domain/trading/guards/
+```
+
+There is no dynamic out-of-tree guard plugin loader today. A built-in guard
+must be imported and registered by the UTA service, and a guard users can edit
+in the Web UI also needs a matching UI descriptor.
+
+## OperationGuard contract
+
+```typescript
+interface OperationGuard {
+  readonly name: string
+  check(ctx: GuardContext): Promise<string | null> | string | null
+}
+
+interface GuardContext {
+  readonly operation: Operation
+  readonly positions: readonly Position[]
+  readonly account: Readonly<AccountInfo>
+}
+```
+
+Return `null` to allow the operation or a string to reject it. The pipeline
+fetches current broker positions and account state before evaluating the guard.
+Treat the context as read-only.
+
+## 1. Implement a stateless check
+
+Prefer decisions that can be recomputed from the operation and broker state.
+In-memory counters disappear on restart and should not be used for durable
+daily limits unless they are backed by persisted execution history.
+
+```typescript
+import type { OperationGuard, GuardContext } from './types.js'
+import { getOperationSymbol } from '../git/types.js'
+
+export class SymbolBlocklistGuard implements OperationGuard {
+  readonly name = 'symbol-blocklist'
+  private readonly blocked: Set<string>
+
+  constructor(options: Record<string, unknown>) {
+    const symbols = options.symbols as string[] | undefined
+    if (!symbols?.length) {
+      throw new Error('symbol-blocklist guard requires a non-empty "symbols" array')
+    }
+    this.blocked = new Set(symbols)
+  }
+
+  check(ctx: GuardContext): string | null {
+    const symbol = getOperationSymbol(ctx.operation)
+    if (symbol !== 'unknown' && this.blocked.has(symbol)) {
+      return `Symbol ${symbol} is blocked for this account`
+    }
+    return null
+  }
+}
+```
+
+## 2. Register it in UTA
+
+Add the guard to `services/uta/src/domain/trading/guards/registry.ts` so it is
+loaded before account configs are resolved:
+
+```typescript
+import { SymbolBlocklistGuard } from './symbol-blocklist.js'
+
+const builtinGuards: GuardRegistryEntry[] = [
+  // existing entries...
+  {
+    type: 'symbol-blocklist',
+    create: (options) => new SymbolBlocklistGuard(options),
+  },
+]
+```
+
+`registerGuard(entry)` exists for code that is explicitly imported during UTA
+startup. Calling it from an unreferenced module is not enough; the service has
+no filesystem discovery step for third-party guard packages.
+
+## 3. Expose it in account settings
+
+If users should configure the guard in the normal account editor, update
+`ui/src/components/guards.tsx`:
+
+- add the type to the relevant crypto/securities guard lists;
+- add safe defaults;
+- add the editor and summary rendering for its options;
+- cover the UI behavior with focused tests.
+
+The account's `guards` array is part of its sealed UTA configuration and should
+normally be edited through the Web UI:
+
+```json
+{
+  "guards": [
+    {
+      "type": "symbol-blocklist",
+      "options": { "symbols": ["GME", "AMC"] }
+    }
+  ]
+}
+```
+
+Unknown types are skipped with a warning. Invalid options should fail loudly
+when the guard is created rather than silently weakening the policy.
+
+## Pipeline behavior
+
+Guards run sequentially during push:
+
+1. UTA reads current positions and account state from the broker.
+2. It builds a `GuardContext` for the staged operation.
+3. Guards run in configured order; the first rejection wins.
+4. A rejected operation records the reason and is not dispatched.
+5. An allowed operation continues to the broker.
+
+This is a last-mile code constraint, not an authorization system. Trading mode,
+human approval, account read-only state, and broker permissions remain separate
+boundaries.
+
+## Built-in references
+
+| Guard | Source | What it checks |
+|-------|--------|----------------|
+| `max-position-size` | `services/uta/src/domain/trading/guards/max-position-size.ts` | Projected position value vs account equity. |
+| `cooldown` | `services/uta/src/domain/trading/guards/cooldown.ts` | Minimum time between operations on a symbol. |
+| `symbol-whitelist` | `services/uta/src/domain/trading/guards/symbol-whitelist.ts` | Whether the operation's symbol is explicitly allowed. |
+
+Add unit coverage to `guards.spec.ts` for allow, reject, invalid-options, and
+registry resolution paths. If the guard depends on real venue state, also run
+the applicable demo-account scenarios from OpenAlice's
+`docs/uta-live-testing.md` and leave the account flat afterward.
+
+## Next Steps
+
+- [Guards & Risk](/docs/trading/guards-and-risk) — See how guards appear in normal account use.
+- [Orders & Execution](/docs/trading/orders-and-execution) — Understand approval and push-time execution.
+- [Custom Brokers](/docs/extending/custom-brokers) — Keep broker capabilities and guard policy separate.
+- [Trading Setup](/docs/trading/accounts-and-brokers) — Attach middleware only to accounts that need it.

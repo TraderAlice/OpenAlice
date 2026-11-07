@@ -128,7 +128,7 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
       })
       child.onExit(({ exitCode }) => {
         clearTimeout(timeout)
-        if (exitCode === 0 && unreachable) resolve(output)
+        if (exitCode === 0 && exiting) resolve(output)
         else reject(new Error(`Supervisor remote health exited ${exitCode}:\n${output}`))
       })
     })
@@ -143,7 +143,10 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
     expect(plain).toContain('ROUTE')
     expect(plain).toContain('SERVICES')
     expect(plain).toContain('RECOVERED')
-    expect(plain).toContain('FIXTURE_RESULT starts=0 opens=0 loads=0 diagnoses=0 disconnects=1 probes=4')
+    const result = plain.match(/FIXTURE_RESULT starts=0 opens=0 loads=0 diagnoses=0 disconnects=1 probes=(\d+)/)
+    expect(result).not.toBeNull()
+    // The fourth probe recovers; healthy polling can continue until q is handled.
+    expect(Number(result![1])).toBeGreaterThanOrEqual(4)
     expect(transcript).toContain('\u001b[?25h')
   }, 12_000)
 

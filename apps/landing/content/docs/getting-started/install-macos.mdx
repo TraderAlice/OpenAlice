@@ -1,0 +1,117 @@
+export const metadata = {
+  title: "macOS",
+  description: "Install the signed macOS desktop package for Apple Silicon or Intel, and understand its updates and data location.",
+  releaseChannel: "stable",
+  targetVersion: "0.94.1",
+}
+
+# macOS
+
+The macOS desktop app is published in the stable OpenAlice release as separate
+signed and notarized packages for Apple Silicon and Intel. It is the shortest
+no-terminal installation path. Use [Source &
+Dev](/docs/getting-started/developer-setup) when you need build logs or want to
+change the code; use [CLI & Remote
+Access](/docs/deployment/remote-access) for terminal control or a private
+remote host.
+
+Download the package for your architecture:
+
+- [Download the Apple Silicon macOS `.dmg`](https://download.openalice.ai/mac-arm64.dmg)
+- [Download the Intel macOS `.dmg`](https://download.openalice.ai/mac-x64.dmg)
+
+The package bundles its own Node runtime, managed Pi agent, pinned `fd` and
+`ripgrep` search tools, and git path; supervises the optional UTA service plus
+Alice backend; opens the UI in a native window; and uses the same
+`~/.openalice` data store as a source checkout.
+
+## Requirements
+
+- Apple Silicon or Intel Mac matching the downloaded package.
+- macOS with permission to run a signed downloaded app.
+- Model access for at least one agent path:
+  - packaged path: let the included Pi runtime manage access through its own
+    login/provider flow or add a compatible API-key credential in [AI
+    Providers](/docs/integration/ai-providers), or
+  - install Claude Code, Codex, Cursor Agent, Antigravity, Grok Build, Oh My
+    Pi, OpenCode, or Pi yourself and use that CLI's normal login/configuration.
+
+## Install
+
+1. Download the `.dmg`.
+2. Open it and move OpenAlice into Applications.
+3. Launch OpenAlice.
+4. If macOS asks for confirmation, allow the signed app to open.
+5. Wait for the app window to load Ask Alice.
+
+OpenAlice stores user data outside the app bundle, under `~/.openalice`.
+Replacing the app does not erase your workspaces, config, Inbox, sessions, or
+broker-account data.
+
+If a healthy source-development or CLI Server Runtime already owns that
+complete home, desktop startup offers **Open in browser** as the primary action.
+It verifies the advertised loopback Web endpoint, opens the existing
+AliceProject without takeover, and quits the redundant desktop launch. Choosing
+another data location remains available; starting, unhealthy, stale,
+incompatible, and Electron-owned Runtimes keep their explicit recovery paths.
+
+## Desktop updates
+
+The app shows download progress, then named
+shutdown and native-installer handoff stages. After **Restart and update**, it
+stops managed services, releases the Runtime lock, closes, and should reopen on
+the new version automatically. The native handoff can take up to a minute, so
+do not manually relaunch OpenAlice during that installer window.
+
+If the handoff fails before closing, OpenAlice stays on or relaunches the
+current version and shows the diagnostic log path. If the old version returns
+after an incomplete handoff, the next launch identifies the failed target
+version and offers retry or manual installation. A backend startup failure also
+opens a native error with the last Alice output and log location rather than
+silently quitting.
+
+If the package remains unable to start, install the latest `.dmg` again or use
+the source path for detailed logs; your data remains under `~/.openalice`.
+
+## Configure an agent
+
+The desktop package already contains managed Pi, but it does not contain a
+model account or API key. With runtime-managed access, Pi keeps its own
+login/provider state inside the selected OpenAlice home. For the no-terminal path, open
+**Settings → AI Provider**, save a compatible credential, and optionally set it
+as Pi's default for new Workspaces.
+
+OpenAlice can also use native agent CLIs you installed yourself. If you use
+Claude Code:
+
+```bash
+claude
+```
+
+Complete the login flow once. New workspaces can then use that CLI subscription login.
+
+An Alice-managed key is tested before saving and can be injected into future
+Workspaces. Runtime availability and model access are separate: managed Pi
+supplies the runtime, while either Pi's runtime-managed provider state or an
+explicit AI Provider vault binding supplies the model connection.
+
+## When to use source instead
+
+Use [Source & Dev](/docs/getting-started/developer-setup) if:
+
+- the desktop app gets stuck before the UI loads;
+- you need terminal logs;
+- you want to patch or inspect the code;
+- you are testing broker or UTA behavior;
+- you are filing a bug and want reproducible output;
+- you want to avoid the packaged update path.
+
+The desktop package is the normal no-terminal path. Source remains useful when
+you need to inspect or change the implementation.
+
+## Next Steps
+
+- [Quick Start](/docs/getting-started/quick-start) - Run the workspace -> issue -> Inbox loop.
+- [AI Providers](/docs/integration/ai-providers) - Configure API-key credentials.
+- [Data & Credentials](/docs/deployment/data-and-credentials) - See where macOS stores state.
+- [What is UTA](/docs/core-concepts/unified-trading-account) - Read before broker execution.

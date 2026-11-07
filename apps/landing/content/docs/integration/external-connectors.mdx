@@ -1,0 +1,339 @@
+export const metadata = {
+  title: "External Connectors",
+  description: "Project durable Inbox updates into private Discord, Telegram, Slack, or Feishu/Lark chats; use connector-owned phone desks; and review pending trades from Telegram.",
+}
+
+# External Connectors
+
+The optional **Connector Service** sends durable OpenAlice Inbox updates to a
+private Discord, Telegram, Slack, or Feishu/Lark app chat. A connector that
+advertises the desk capability can also carry one private **phone-desk Issue**
+for the current [AliceProject](/docs/deployment/alice-projects). Connector
+transports messages; Alice, UTA, and Workspace-owned Issues remain the execution
+authorities and sources of truth.
+
+```text
+Workspace Session
+  -> durable Inbox entry
+  -> optional Connector Service
+  -> linked Discord, Telegram, Slack, or Feishu/Lark owner
+
+Desk-capable connector owner DM
+  -> that connector's phone-desk Issue comment
+  -> ordinary comment/reply dispatch
+  -> reply comment projected back to that connector
+
+Telegram /uta
+  -> bounded review / approve / reject request
+  -> Alice action bridge
+  -> UTA validates the current pending hash and trading mode
+```
+
+The local Inbox append always completes first. If an external platform is down,
+rate-limited, misconfigured, or disabled, the Inbox entry remains successful
+and unread state does not change.
+
+## Current scope
+
+Connector Service supports:
+
+- Discord app direct messages;
+- Telegram private bot chats;
+- Slack app direct messages over Socket Mode;
+- Feishu or Lark enterprise self-built app chats over a long connection;
+- one linked owner per adapter;
+- outbound Inbox notifications;
+- one optional phone-desk Issue per desk-capable connector and AliceProject;
+- `/link`, `/status`, `/test`, `/inbox`, `/settings`, and `/uta` control commands;
+- Markdown and static HTML report files.
+
+Discord and Slack ordinary DMs are not ingested. Telegram and Feishu/Lark owner
+DMs enter only through that connector's explicitly enabled phone desk. No
+adapter broadcasts to groups or channels, interprets chat inside Connector
+Service, or bypasses Issue ownership, scheduling, trading mode, or UTA.
+
+## Set up a connector
+
+Open **Settings → Connectors**. This surface owns credentials, linking and
+unlinking, start and stop actions, test delivery, and each supported phone desk.
+
+The setup progresses through visible states:
+
+| State | What to do |
+|---|---|
+| Credentials needed | Create a bot/application and save its required credentials |
+| Ready to link | Start the adapter so it can receive `/link` |
+| Starting | Wait for the bot's platform connection to become live |
+| Awaiting link | Open the private bot chat and send `/link` |
+| Linked | Use **Send test**, enable that connector's phone desk when available, or wait for Inbox delivery |
+| Linked offline | Start the connector, or unlink and relink later |
+| Error | Inspect credentials and Connector logs; local Inbox remains available |
+
+Saving credentials is not the same as linking an owner. The bot must be online
+when you send `/link`; OpenAlice then records the Discord, Telegram, Slack, or
+Feishu/Lark account and private chat allowed to receive notifications and
+control commands.
+
+**Unlink** clears that learned owner while keeping sealed bot credentials, so a
+different private account can send `/link`. **Remove token** or **Remove
+secret** is the separate, destructive credential action. Secret drafts are
+masked by default, can be revealed explicitly to check a paste, and must contain
+at least 20 non-whitespace characters before they can replace a sealed value.
+Background Settings saves omit secret drafts, so an unrelated enable or unlink
+action cannot accidentally overwrite them.
+
+### Discord
+
+Create a Discord application and bot, then save its credentials in OpenAlice.
+No guild or channel is required. Open the app's direct-message context and run
+`/link` from the account that should own the connector.
+
+Discord ordinary DM text is not read. Only the registered slash commands enter
+the connector control plane.
+
+### Telegram
+
+Create a bot with BotFather, save its token, start the adapter, and send `/link`
+from the owner's private chat. The adapter uses private-chat long polling and
+rejects commands from any account other than the linked owner.
+
+`Awaiting link` means long polling is already receiving `/link`; a service whose
+HTTP health endpoint is available but whose platform connection is not ready
+remains `Starting`. Startup failures remain visible as adapter errors instead
+of looking like a configured but mysteriously absent bot. A transient Telegram
+handshake, polling, or command-menu failure no longer kills the adapter: it
+abandons a stuck connection attempt and reconnects with bounded exponential
+backoff. Missing tokens and other configuration errors still fail explicitly.
+
+### Slack
+
+Create and install a Slack app in the owner's Workspace. Enable Socket Mode,
+create an `xapp` app-level token with `connections:write`, and save it together
+with the app's `xoxb` bot token. Create the six slash commands in Slack's app
+settings, then open the app DM and run `/link` from the account that should own
+the connector. OpenAlice connects outbound over Socket Mode, so it does not
+need a public Request URL and does not use Slack's hosted Functions platform.
+
+### Feishu / Lark
+
+Create an enterprise **self-built app** with bot capability, enable long
+connection, and subscribe to `im.message.receive_v1`. Save its `cli_…` App ID,
+App secret, and the matching `feishu` (`open.feishu.cn`) or `lark`
+(`open.larksuite.com`) domain. Do not mix the two domains. Store apps cannot use
+this long-connection path, and a group custom-bot webhook is send-only rather
+than an OpenAlice Connector.
+
+OpenAlice does not need a public Request URL. Start the adapter, DM the bot, and
+send plain-text `/link`; Feishu has no platform slash-command menu. OpenAlice
+learns the owner's `open_id` and private `chat_id`. Keep the app available only
+to the intended owner, and leave IP allowlists empty unless the Connector's
+egress IP is explicitly listed.
+
+Feishu/Lark currently supports owner chat, its own phone desk, proactive Inbox
+push with Markdown/post content and file upload, plus link/status/test. Its
+`/inbox`, `/settings`, and `/uta` replies are placeholders.
+
+Slack and Discord likewise implement link/status/test and proactive Inbox
+delivery, while `/inbox`, `/settings`, and `/uta` remain placeholders. Telegram
+provides the interactive Inbox, Settings, and UTA forms described below.
+
+## Browse Inbox from Telegram
+
+Run `/inbox` in the linked private chat to browse five bounded summaries per
+page. The view starts with unread entries and can switch to the full Inbox
+history. Open an item for its longer summary and file count; this does not mark
+the entry read or expose a raw Workspace path.
+
+For an entry with files, choose **View files**, select one file, and confirm the
+send. Alice re-reads and validates the current Workspace file before delivering
+that one copy back to the requesting Telegram connector. Canceling queues
+nothing. This pull path is deliberately separate from phone-desk messages and
+does not make Connector Service a Workspace reader.
+
+Run `/settings` to turn **Inbox push** off or on. With push off, new entries stay
+in OpenAlice and `/inbox` remains available; `/test` still works. The same
+preference is available on each connector's Settings card, although only
+Telegram currently implements the chat-side form.
+
+## Review pending UTA commits from Telegram
+
+Run `/uta` in the linked Telegram owner chat to load a bounded snapshot of
+non-data trading accounts and their current staged or committed operations.
+Select an account, review the commit and operations, then choose **Approve** or
+**Reject**. Both paths require a second confirmation; **Refresh** discards the
+old presentation and asks Alice for the current state again.
+
+Approve sends the committed operations to the broker. Reject records the
+decision without broker contact. Readonly mode hides Approve but still permits
+Reject; Lite mode reports trading as unavailable. A commit with more operations
+than Telegram can display is review-only and must be handled in **Trading as
+Git**. The first version does not proactively notify Telegram that approval is
+waiting and cannot stage or create an order from chat.
+
+Connector never reads or writes UTA directly. It queues a short-lived owner
+action for Alice, which resolves the account through `UTAManagerSDK` and
+requires the exact pending hash shown by the review. A missing or changed hash
+fails without mutation, so an old Telegram button cannot approve a replacement
+commit. Callback data contains only page-local indexes; raw account ids and
+pending hashes are not placed in Telegram callback payloads.
+
+## Connector phone desks
+
+After Telegram or Feishu/Lark is linked, that connector's Settings card can
+enable one phone desk. Each connector owns its own work item, so Telegram and
+Feishu may run desks concurrently without sharing an inbound queue or reply
+route. Choose the Workspace that owns a desk; the picker defaults to the
+current/recent Ask Alice Chat Workspace. Moving it later is explicit: disable
+that desk, then enable it in another Workspace.
+
+Each phone desk is one real Issue with a protected `connectorDesk: <connectorId>`
+marker:
+
+- **What** is the editable heartbeat Input Prompt and is sent unchanged on each
+  scheduled wake;
+- **Heartbeat** offers 1h, 2h, 4h, 8h, 12h, or 24h cadence choices;
+- **Comments** are the transcript: linked-owner DMs arrive as human comments,
+  while Alice replies and scheduled results become reply comments;
+- if another DM arrives while the desk is generating, it waits; several waiting
+  messages are quoted together as one follow-up comment when the desk is idle;
+- Telegram starts a native Bot API live draft as soon as the owner DM is
+  accepted. Sealed mid-turn text refreshes it, with a periodic keepalive; if
+  drafts are unavailable, the adapter falls back to the typing action. Tool
+  names, status, input, output, and errors stay inside OpenAlice;
+- a durable final or failed message is always delivered. Ephemeral progress
+  never suppresses an identical final reply;
+- `[[no-reply]]` suppresses projection only for a connector's own scheduled
+  phone-desk fire, which OpenAlice stamps and matches to that connector.
+  In ordinary owner chat the same literal text is treated as message content;
+- **Open phone desk** opens the ordinary Issue detail and Activity timeline.
+
+Phone desks are intentionally hidden from the global Issue Board and Tracked
+list, but their detail, schedule, run history, and comment sidecar remain normal
+Workspace state. Only Settings can create the protected marker, and only one
+live desk per connector may exist in an AliceProject. Disabling one cancels its
+heartbeat and keeps its Issue and comments for a later re-enable. Existing
+`telegram-phone-desk.md` files keep that filename; the startup migration rewrites
+the retired `telegramConnector: true` field to `connectorDesk: telegram`.
+
+## Settings and operations views
+
+The two Connector surfaces deliberately have different jobs:
+
+- **Settings → Connectors** — credentials, setup sequence, enable/stop,
+  link/unlink, test sends, and connector phone desks.
+- **Beta → Connectors** — read-only service health, adapter status, linked
+  owner, and recent delivery evidence.
+
+Stopping Connector Service is a global kill switch. It does not delete sealed
+tokens, the learned owner, or phone-desk state, so the same connector can be
+restarted later.
+
+## Network proxies and reconnects
+
+Telegram, Discord, Slack, and Feishu/Lark share one Connector-owned proxy
+transport for their HTTP, fetch, and WebSocket paths. The Connector process
+recognizes the conventional upper- or lower-case `HTTP_PROXY`, `HTTPS_PROXY`,
+`ALL_PROXY`, and `NO_PROXY` variables; only `http://` and `https://` proxy URLs
+are accepted.
+`ALL_PROXY` is the fallback, `HTTPS_PROXY` falls back to the HTTP value, and
+`NO_PROXY` supports comma-separated hosts, domain suffixes, optional ports, and
+`*`.
+
+Desktop builds also translate Electron's current system proxy into those child
+environment values when no explicit proxy variable wins, while always keeping
+loopback addresses outside the proxy. The transport is scoped to Connector
+Service and its adapters rather than replacing Node's process-global HTTP
+agents.
+
+Transient adapter and Session failures retry indefinitely with exponential
+backoff and jitter. Health reports `lastAttemptAt`, `nextAttemptAt`, and
+`consecutiveFailures` so a recovering connector does not look healthy or
+permanently dead. Telegram additionally supervises its long-poll session and
+reconnects in place after a dropped or stuck attempt. If the optional Connector
+child exits, Guardian retries it with capped backoff after removing the old
+process tree. Health and recent delivery evidence remain visible in **Beta →
+Connectors** while local Inbox stays authoritative.
+
+## What gets delivered
+
+Every external notification includes the Inbox message and visible Session
+signature when one exists:
+
+```text
+pi · @resume-…
+```
+
+The `@resumeId` is the accountable sender; the runtime label is only supporting
+context.
+
+Inbox documents are handled as follows:
+
+- Markdown and static HTML reports are sent as files rather than flattened into
+  the chat message;
+- Telegram proactive notifications list available files and let the owner pull
+  one on demand; Discord, Slack, and Feishu/Lark retain push-time attachments;
+- Alice reads the live Workspace file and sends a delivery copy; the Connector
+  Service never reads a Workspace directly;
+- source and delivery hashes remain distinct when text encoding needs a safe
+  UTF-8 normalization;
+- one notification carries at most five eligible files, each at most 1 MiB;
+- missing, oversized, unsupported, or path-escaping files do not block the text
+  notification;
+- HTML stays an attachment with `text/html` media type and is never executed or
+  translated by the connector.
+
+Static HTML is a human-facing presentation asset. Keep a concise Markdown Inbox
+comment so both the user and other agents can understand the result without
+parsing the HTML report.
+
+## Delivery guarantees
+
+Connector delivery is intentionally downstream of durable local state:
+
+- `inbox push` succeeds when the Inbox append succeeds, even if every connector
+  fails;
+- an external failure never marks an Inbox entry read;
+- disabled Connector Service makes no external request;
+- an adapter awaiting `/link` is online but not delivery-ready;
+- disabling **Inbox push** skips proactive Inbox delivery for that adapter but
+  does not disable `/test`, Telegram `/inbox` or `/uta`, or connector phone desks;
+- degraded health and logs make partial or failed delivery visible to the
+  operator.
+
+Use `/status` inside the linked private chat to check the adapter, and `/test`
+or **Send test** in Settings for an explicit probe.
+
+Telegram formats common Markdown as MarkdownV2 for readable headings, lists,
+bold text, and code. If the platform rejects that representation, Connector
+falls back to rich-message delivery and then escaped plain text rather than
+dropping the notification.
+
+Mid-turn phone-desk text uses the same safe delivery path. Live drafts and
+typing indicators are ephemeral; the durable final reply is sent separately
+even when its text matches the last progress update.
+
+## Privacy and security
+
+- Bot tokens and Feishu/Lark App secrets are sealed at rest and never returned
+  by the Settings API.
+- Each adapter authorizes exactly one linked owner account/private chat.
+- Desk owner text is accepted only from that connector's linked private chat
+  and only while its live phone-desk Issue exists.
+- Connector Service runs as an optional Guardian child and can restart without
+  restarting Alice or UTA.
+- A bounded private I/O journal stores correlation and delivery evidence for
+  diagnostics; it does not store bot tokens or App secrets.
+- Platform account and chat identifiers are pseudonymized in that journal.
+- Notification text is retained locally because it is the payload being tested;
+  treat the OpenAlice data home as sensitive.
+
+If you do not need external delivery, leave Connector Service disabled. Inbox,
+Workspaces, research, and Lite mode continue to work normally.
+
+## Next Steps
+
+- [Inbox](/docs/workspaces/inbox) — Understand the durable source of every connector notification.
+- [Trading as Git](/docs/core-concepts/trading-as-git) — Understand the approval wall behind Telegram `/uta`.
+- [Sessions & Collaboration](/docs/workspaces/sessions-and-collaboration) — Read the sender signature and follow up exactly.
+- [Data & Credentials](/docs/deployment/data-and-credentials) — Back up the sealed configuration and data home.
+- [CLI & Remote Access](/docs/deployment/remote-access) — Run the optional service on a private host.

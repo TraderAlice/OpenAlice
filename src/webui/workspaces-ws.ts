@@ -24,7 +24,7 @@ const WS_PATH = '/api/workspaces/pty';
  * WS upgrade requests don't traverse the Hono middleware chain (we own
  * the `upgrade` event ourselves). So we re-apply the same auth check
  * here: same localhost passthrough rules, same cookie lookup, same
- * default-deny. See safe/playbooks/07-websocket-auth.md.
+ * default-deny.
  */
 function readSessionCookie(cookieHeader: string | undefined): string | null {
   if (!cookieHeader) return null;

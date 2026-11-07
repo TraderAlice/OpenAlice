@@ -226,10 +226,10 @@ describe('CredentialModal', () => {
       cred={{ slug: 'openai-1', vendor: 'openai', authType: 'api-key', apiKey: null, hasApiKey: true,
         wires: { 'openai-responses': 'https://api.openai.com/v1' }, lastModel: 'gpt-test' }}
       onClose={vi.fn()} onSaved={vi.fn()} />)
-    await screen.findByText(i18n.t('modelCatalog.loaded', { count: 1 }))
+    await screen.findByText(i18n.t('modelCatalog.missing'))
     expect(configApi.getCredentialModels).toHaveBeenCalledWith('openai-1', undefined, expect.any(AbortSignal), 'openai-responses', false)
     fireEvent.focus(screen.getByRole('combobox', { name: /model/i }))
-    fireEvent.click(screen.getByRole('option', { name: /saved\/model/ }))
+    fireEvent.click(screen.getByRole('option', { name: /Saved model/ }))
     expect(screen.getByDisplayValue('saved/model')).toBeTruthy()
   })
 
@@ -246,7 +246,7 @@ describe('CredentialModal', () => {
     setup()
     await screen.findByText(i18n.t('modelCatalog.loaded', { count: 1 }))
     fireEvent.focus(screen.getByRole('combobox', { name: /model/i }))
-    fireEvent.click(screen.getByRole('option', { name: /account-only\/model-9/ }))
+    fireEvent.click(screen.getByRole('option', { name: /Account model/ }))
     fireEvent.click(screen.getByRole('button', { name: 'Test connection' }))
     await waitFor(() => expect(api.config.testCredential).toHaveBeenCalledWith(expect.objectContaining({ model: 'account-only/model-9' })))
   })
@@ -351,7 +351,6 @@ describe('CredentialModal', () => {
     )
 
     expect(screen.getByText('Use a Gemini API key from Google AI Studio. AQ and AIza keys are supported.')).toBeTruthy()
-    expect(screen.getByText(i18n.t('modelCatalog.selectHelp'))).toBeTruthy()
     expect(screen.getByText('Pi')).toBeTruthy()
     expect(screen.getByText('opencode')).toBeTruthy()
     expect(screen.queryByText('Claude Code')).toBeNull()

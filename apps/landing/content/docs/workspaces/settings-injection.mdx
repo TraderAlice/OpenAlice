@@ -1,0 +1,226 @@
+export const metadata = {
+  title: "Settings Injection",
+  description: "How OpenAlice writes template-owned instructions, skills, and explicit AI provider bindings at Workspace creation and Session launch.",
+}
+
+# Settings Injection
+
+Workspace creation is not only a directory copy. The launcher composes the
+settings that make an agent useful in that repo: template-owned instructions,
+skills, and optional secret-free runtime preferences. A new Session then
+freezes its own runtime, credential source, model, and reasoning choices for
+reliable resume.
+
+The goal is simple: when the CLI starts, it should already know what kind of workspace it is in, which OpenAlice tools are available, and which model/provider config it should use.
+
+## Instruction files
+
+Templates author one neutral `instruction.md`. At creation time OpenAlice writes the composed instruction into the filenames expected by the selected agent family:
+
+- `CLAUDE.md` for Claude Code.
+- `AGENTS.md` for Codex, opencode, pi, and other agent CLIs that follow the shared convention.
+
+The content is identical where possible. One source keeps Claude, Codex, and other agents from drifting into different task definitions.
+
+The instruction file is an always-loaded contract, not a command manual. It should contain durable behavior and route the agent to the skill that owns a changing procedure. Exact flags and validation come from the live CLI manifest.
+
+`injectInstructions: true` enables this copy. The Chat template includes
+Alice's baseline identity directly in its instruction source. OpenAlice has no
+mutable installation-wide persona layer. The released `injectPersona` manifest
+spelling remains a narrow third-party compatibility alias for
+`injectInstructions`; it does not restore a global persona.
+
+Templates can opt out when an upstream Harness already owns its instructions.
+AutoQuant V2 keeps its upstream `AGENTS.md`; OpenAlice injects discoverable
+collaboration, data, Inbox, and UTA skills without replacing that file.
+
+## Tool skills
+
+Templates decide whether the agent should receive OpenAlice's CLI playbooks:
+
+| Template key | Effect |
+|--------------|--------|
+| `injectTools` | Injects the per-CLI playbook skills for `alice`, `alice-workspace`, `alice-uta`, and `traderhub` |
+| `bundledSkills` | Copies template-specific skill folders into the workspace |
+| `injectInstructions` | Copies the template's `instruction.md` to `CLAUDE.md` and `AGENTS.md` |
+
+`self-scheduling` is always injected so any workspace can understand self-describing issue files and scheduled runs.
+
+OpenAlice writes one canonical copy for each discovery convention:
+
+- `.claude/skills/` for Claude Code;
+- `.agents/skills/` for Codex, current Pi, and compatible shared-skill readers.
+
+Pi stores Workspace trust and OpenAlice rollback metadata under `.pi/`. Its
+global model registry remains user-owned. Skills are not duplicated into
+`.pi/skills/`; current Pi discovers the shared `.agents/skills/` tree from the
+Workspace directory. The older Workspace-local Pi provider extension and
+sensitive sidecar now belong only to the deprecated native-config export path;
+managed Sessions receive their provider through the one-process runtime
+projection described below.
+
+## Snapshot and upgrades
+
+Instructions and skills are copied when the Workspace is created and committed as part of its initial desk state. OpenAlice does not silently replace them later: users and agents may have edited those files, and an invisible overwrite would mutate a durable work log.
+
+The template README version records material guidance changes. An older Workspace can therefore show that an upgrade is available. Applying an upgrade is explicit and diff-visible; until that workflow is used, current CLI help and self-correcting validation errors are the compatibility layer for an older desk.
+
+## Workspace runtime settings
+
+The model runs inside the selected CLI. Managed Sessions resolve their defaults
+from version 3 of `.alice/settings.json`, not from native project configuration.
+The file separates `interactive` and `headless` launch modes. Each mode stores:
+
+- an optional fixed `defaultAgent`;
+- fixed per-Agent preferences under `agents`;
+- a separate `recent.agent` and `recent.agents` layer updated by successful
+  fresh launches;
+- `accessMode: native` for runtime-managed access or `accessMode: vault` with a
+  secret-free `credentialSlug` and optional wire shape;
+- optional model and reasoning effort inside either preference.
+
+For example:
+
+```json
+{
+  "version": 3,
+  "runtime": {
+    "interactive": {
+      "defaultAgent": "codex",
+      "agents": {
+        "codex": {
+          "accessMode": "native",
+          "model": "gpt-5.6-sol",
+          "reasoningEffort": "low"
+        }
+      },
+      "recent": {
+        "agent": "pi",
+        "agents": {
+          "pi": {
+            "accessMode": "vault",
+            "credentialSlug": "deepseek-main",
+            "wireShape": "openai-chat",
+            "model": "deepseek-v4-flash",
+            "reasoningEffort": "high"
+          }
+        }
+      }
+    },
+    "headless": {
+      "defaultAgent": "pi",
+      "agents": {
+        "pi": {
+          "accessMode": "vault",
+          "credentialSlug": "deepseek-main",
+          "wireShape": "openai-chat",
+          "model": "deepseek-v4-flash",
+          "reasoningEffort": "high"
+        }
+      },
+      "recent": { "agents": {} }
+    }
+  }
+}
+```
+
+“Follow recent” is represented by an absent fixed field. Successful launches
+update only `recent`; they never convert themselves into fixed policy. Workspace
+creation seeds fixed preferences for both modes. Only version 3 is current;
+unreleased version 1/2 development files are not a permanent compatibility or
+upgrade boundary.
+
+When a vault choice is used, OpenAlice resolves the secret at launch and
+projects it into that one child process through the adapter's supported
+environment and command shape.
+
+- **Claude Code** can let its complete runtime configuration manage access or
+  use an explicit `anthropic`-wire override. Managed-vault launches isolate
+  Claude's user and local setting sources so they cannot replace the Session
+  binding after OpenAlice projects it. The project source remains enabled so
+  the Workspace's native `CLAUDE.md` persona and `.claude/skills` still load.
+- **Codex** can use runtime-managed access or an explicit
+  `openai-responses`-wire override.
+- **Cursor Agent** can use `cursor-agent login` or the dedicated runtime-direct
+  Cursor Dashboard credential. The key stays in environment projection; it is
+  not assigned a model API wire.
+- **Antigravity** can use its native browser/keyring login or a Google Gemini
+  vault key projected as `GEMINI_API_KEY`. A custom Gemini host also projects
+  `GOOGLE_GEMINI_BASE_URL`; OpenAlice does not write Antigravity's upstream
+  `modelProvider` setting.
+- **Grok Build** can use `grok login` or an explicit `openai-chat` /
+  `openai-responses` vault override, normally an xAI credential.
+- **Oh My Pi / OpenCode / Pi** can use runtime-managed provider state or an
+  explicit compatible Google, OpenAI, Anthropic, or gateway vault override.
+  Packaged desktop builds include managed Pi, whose runtime state persists
+  inside the selected OpenAlice home; Cursor Agent, Antigravity, Grok Build,
+  and Oh My Pi must be installed separately on `PATH`.
+
+The Web UI exposes compatible saved credentials in the launch picker. A changed
+Alice-managed key, endpoint, or wire still uses the vault's test-before-save
+flow so bad keys and wrong endpoints are caught early. Runtime-managed model or
+effort changes have no Alice-managed HTTP credential to probe and are validated
+by the Agent at launch.
+
+For known models, OpenAlice resolves context limits and reasoning behavior from
+its model registry. A Workspace preference is projected into each fresh
+Session's native runtime setting. Unknown model ids keep the native runtime
+fallback; Oh My Pi, Pi, and opencode additionally expose advanced capability
+and context overrides when OpenAlice cannot infer those facts. Cursor model ids
+already encode effort and Fast as suffixes, so OpenAlice never invents a
+separate Cursor effort flag. Antigravity receives only its native `low`,
+`medium`, or `high` effort values; its available model ids vary with upstream
+authentication and billing tier.
+
+The **Native CLI config export (Deprecated)** editor under **Workspace Settings
+→ Agent runtimes** is a separate compatibility path. It writes Alice-owned keys
+into the CLI's project files for people who deliberately launch that CLI outside
+OpenAlice. Managed Sessions do not resolve fresh defaults from this export; a
+native CLI may still discover it through its own project precedence. Reset
+restores only Alice-owned values and preserves unrelated user settings.
+
+## Session runtime bindings
+
+Workspace runtime preferences seed a **new** Session. After the launch choice is
+accepted, OpenAlice persists a secret-free binding at
+`.alice/sessions/<resumeId>.json` under its `ai` object: the Agent runtime,
+credential source, model, and reasoning effort. An optional sibling
+`displayName` is the mutable coworker nametag and is not part of that frozen AI
+binding. The global resume registry keeps identity, lifecycle, and
+native-session mapping only. Every interactive, Web, headless Issue, and
+resumed launch projects the same binding.
+
+Changing a Workspace preference later does not retarget an existing Session. A
+vault-backed binding resolves the secret only when launching; deleting or
+changing the referenced account produces an explicit error instead of silently
+resuming through another provider. The explicit replacement boundary is
+**Session settings** on a paused coworker, or the AI configuration editor on an
+Issue with an idle exact Session owner: either atomically replaces that
+Session's secret-free access/model/effort selection without changing its Agent,
+waking it, or changing Workspace fixed/recent preferences. See
+[Sessions & Collaboration](/docs/workspaces/sessions-and-collaboration#runtime-choice-belongs-to-the-session).
+
+## Template credentials
+
+Templates can declare an optional `agentCredentials` map:
+
+```json
+{
+  "agentCredentials": {
+    "codex": { "credentialSlug": "openai-main", "model": "gpt-5.4" }
+  }
+}
+```
+
+This is the per-template counterpart to the user-level default Workspace
+credential. When both exist, the template's `agentCredentials` wins for that
+Agent. Creation converts compatible declarations into secret-free fixed
+preferences for both `.alice/settings.json` modes before the initial Workspace
+commit; the API key remains in Alice's vault. Built-in templates normally rely
+on the user's defaults instead.
+
+## Next Steps
+
+- [CLI Injection](/docs/workspaces/cli-injection) - See how the injected tools are exposed at runtime.
+- [AI Providers](/docs/integration/ai-providers) - Configure credentials in the vault.
+- [Workspace Templates](/docs/workspaces/templates) - See the template metadata keys.

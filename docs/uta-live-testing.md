@@ -1,436 +1,173 @@
-# UTA Live Testing — the self-bootstrapped scenario catalog
+# UTA Trading, Broker Packs, and Live Acceptance
 
-This guide owns live broker/demo acceptance. Architecture and delivery context:
-[[docs/project-structure.md]] and [[docs/development-workflow.md]].
+This guide owns the Unified Trading Authority (UTA) boundary, optional Broker
+Pack packaging and runtime loading, the IBKR wire framing contract, and the live
+paper/demo acceptance catalog. Market-data routing belongs to
+[[docs/market-data-architecture.md]].
 
-This guide exists because five dogfood rounds (2026-06-12) surfaced ~20 real
-bugs that **no unit test and no human UI session would ever catch** — they
-only appear on the real usage path, through the agent surface, against real
-venue behavior. Examples of the species: contract search returning a false
-"not tradeable" (SDK shape drift), an attached TP/SL that the ledger showed
-but the exchange never received, 19-digit order ids silently float-truncated
-so every later cancel-by-id would miss, `getOrders` crashing only in the
-split-process path.
+---
 
-**The method**: an AI session walks REAL trading workflows end-to-end on the
-demo accounts, exclusively through the agent surface (`alice-uta` CLI),
-fixing what it hits and adding a regression spec per fix. Run it after any
-change to trading paths, and as the acceptance gate for new broker
-integrations.
+## 1. UTA Core and Broker Pack Boundary
 
-The automated account-trading suite is deliberately separate from ordinary
-product E2E. It will not start unless both its explicit script and acknowledgement
-are present:
+The installed core ships Alice, UTA Core, and the Mock simulator only. Live
+broker integrations (`ccxt`, `alpaca`, `ibkr`, `leverup`, `longbridge`) ship as
+versioned, platform-specific **Broker Packs** installed on demand:
 
-```bash
-OPENALICE_UTA_LIVE_PAPER=1 pnpm test:live:bybit-paper
+1. **UTA Core** (`services/uta/`) owns account orchestration, staged/committed
+   Git-style trading approvals, snapshots, FX, and the `IBroker` boundary. It
+   must start without any live Pack.
+2. **Broker Packs** (`packages/uta-broker-*`) export `BROKER_PACK_API_VERSION: 1`,
+   `BROKER_ENGINE`, `configSchema`, and `createBroker(config): IBroker`. Third-party
+   SDKs stay external inside each deployed Pack except Alpaca, whose pure-JS
+   closure is bundled for compiled Bun compatibility. Core code must use
+   structural checks (`Decimal.isDecimal`) and stable error codes rather than
+   cross-package `instanceof`.
+3. **Market-data vendor routing** is separate from Pack installation: installing
+   a Pack does not enable a K-line source, and disabling `asVendor` does not
+   uninstall a Pack.
+
+### Pack installation layout and transaction
+
+```text
+<OPENALICE_HOME>/runtime/broker-packs/<engine>/
+├── active.json
+└── releases/<openalice-version>-<content-id>/{broker-pack.json,dist/index.js,package.json,node_modules/}
 ```
 
-`pnpm test:integration` never submits broker orders or contacts public
-providers. It contains only deterministic local product integration tests.
-Public providers, locally configured API keys, and read-only TWS/Gateway checks
-live in the explicit `pnpm test:external:readonly` lane.
+Alice owns Pack installation; UTA never runs a package manager. Installation
+streams the version/OS/arch asset into private staging, verifies its published
+SHA-256 and manifest, writes an immutable release, atomically updates
+`active.json`, requests a serialized UTA restart, and verifies loaded module
+identity via `GET /__uta/broker-packs/:engine`. A pointer change alone never
+proves a cached SDK was replaced. Missing or broken Packs stay visible as
+`needs-install` or `needs-repair` in `GET /api/trading/config/broker-packs`
+without blocking Alice, Chat, or other engines. `canTrade` additionally requires
+configured-on, writable, `pro` mode, and a healthy trading-tier UTA.
 
-## Choose the verification layer
-
-Do not jump from a unit change straight to an account-trading sweep. Start at
-the lowest layer that can disprove the change, then move outward only when the
-touched contract requires it.
-
-| Change surface | Minimum verification | When live-paper is required |
-|---|---|---|
-| UTA staging, commit, ledger, reconciliation, or state transitions | Targeted unit specs, then `pnpm test:integration:uta` (`uta-lifecycle` uses `MockBroker`) | Only when venue behavior or a real execution response is part of the claim |
-| Public market loading or read-only provider integration | `pnpm test:external:readonly` or a targeted spec with `vitest.external.config.ts`; report DNS/TLS/provider downtime separately from product failures | Not required when no configured account or private endpoint is used |
-| Broker account parsing, order ids, status mapping, modify/cancel, permissions, TP/SL, or venue-specific parameters | Targeted broker spec against one verified demo/paper account | Required: these semantics cannot be proven by `MockBroker` |
-| Alice-to-UTA protocol or `alice-uta` CLI changes | Protocol/unit specs, then the relevant scenario through a real Workspace CLI | Required if the changed command reaches an order write or approval boundary |
-| New broker or new traded market type | Full applicable S1-S14 catalog for that venue | Always required before claiming support |
-| UTA health/restart/supervision without trading changes | Health and restart smoke with a broker disabled or read-only | Only if recovery of pending/open orders is part of the change |
-
-For CCXT public K-line changes, run the gated keyless freshness acceptance. It
-uses no credentials or trading endpoints, exercises old start windows through
-the raw-history path exported as `alice market bars`, and asserts that Binance,
-OKX, and Bybit still return a latest bar across 1m, 15m, 1h, 4h, and 1d:
+### Release assets and verification
 
 ```bash
-pnpm exec vitest run \
-  --config vitest.external.config.ts \
-  tests/integration/broker-market-data/CcxtBroker.spec.ts
+pnpm broker-packs:build
+pnpm broker-packs:upgrade-smoke
+pnpm exec tsx scripts/verify-broker-packs.ts --compiled
 ```
 
-Keep this outside ordinary CI: it is real venue evidence, but DNS, venue
-availability, geo restrictions, and public rate limits are external failure
-modes. The deterministic broker specs must model the venue's first-page
-pagination behavior so the product regression remains covered offline.
+Desktop package assertions reject `ccxt`, `longbridge`, and
+`@alpacahq/alpaca-trade-api` under packaged `node_modules`. Bun standalone
+builds must keep `autoloadPackageJson` enabled (`scripts/bun-compile-options.ts`)
+so the compiled UTA role resolves Pack-local `node_modules`.
 
-The commands are intentionally asymmetric:
+---
+
+## 2. IBKR Wire Protocol and Decoder Boundary
+
+`packages/ibkr/src/client/base.ts` owns inbound TWS/IB Gateway framing:
+
+- Before server version 201, consume the leading NUL-delimited text `msgId`;
+  from version 201+, consume the leading 4-byte big-endian `msgId`.
+- If the wire id selects protobuf, pass the remaining bytes unchanged; otherwise
+  split only the remaining text payload into fields.
+- `Decoder.interpret(msgId, fields)` is strictly **payload-only**: handlers
+  start at the first payload field and must never consume or reconstruct an
+  envelope message id, guess account patterns, or shift fields on error.
+
+### Failure containment
+
+A missing or invalid field is unrecoverable on that connection:
+
+1. Report safe framing metadata (`msgId` and field count) without logging raw
+   account or position payloads.
+2. Discard all successor frames already buffered in that socket read.
+3. Disconnect only the affected IBKR connection so UTA marks that account
+   `offline/down` and reconnects cleanly without crashing the UTA process or
+   disturbing other accounts.
+
+The same containment applies during the initial `nextValidId` handshake if the
+socket closes early.
+
+### Venue-specific invariants (IBKR & Alpaca)
+
+- **IBKR canonical contracts**: `conId` alone is not a complete routing
+  contract; quote and order paths resolve through a clean `{ conId }` details
+  lookup without letting caller-supplied symbol/exchange/currency poison it.
+  `STK / SMART / USD` defaults apply only to symbol-form stocks without a
+  `conId`.
+- **IBKR silent half-open recovery**:UTA must transition a frozen Gateway
+  (`docker pause`) to `offline/down` within heartbeat+timeout (~50s), refuse
+  stale reads, and require `reqCurrentTime` before any place/modify/cancel send.
+- **IBKR option mark overlay**: Positive snapshot bid+ask computes midpoint and
+  recomputes `marketValue`/`unrealizedPnL` via `derivePositionMath` without
+  mutating the `updatePortfolio()` cache, using `regulatorySnapshot=false`.
+- **Alpaca multi-asset**: Spot crypto keeps `CRYPTO` identity with slash pairs
+  (`BTC/USD`) except the upstream positions path which requires compact symbols
+  (`BTCUSD`). Single-leg options require positive `options_trading_level`, whole
+  contracts, per-unit premium prices, MKT/LMT/STP/STP LMT, and DAY/GTC; short
+  quantities remain positive counts with direction in `side`.
+
+---
+
+## 3. Live Paper/Demo Testing & Scenario Catalog
+
+An AI session walks real trading workflows end-to-end on demo/paper accounts
+exclusively through `alice-uta`, fixing defects and adding a regression spec per
+fix.
+
+### Verification layers
 
 ```bash
-# Ordinary product E2E: safe for routine local development and CI.
-pnpm test:integration
-
-# Explicit read-only external integration: may use public network APIs, local
-# provider keys, or a locally running TWS/Gateway, but never submits orders.
-pnpm test:external:readonly
-
-# Provider-specific account-trading acceptance. Prefer one provider at a time.
-OPENALICE_UTA_LIVE_PAPER=1 pnpm test:live:bybit-paper
-
-# Full configured demo/paper sweep. Use only deliberately. This excludes the
-# raw Bybit market-buy diagnostic below.
-OPENALICE_UTA_LIVE_PAPER=1 pnpm test:live:uta-paper
-
-# Destructive diagnostic: performs a market buy and best-effort close.
-OPENALICE_UTA_LIVE_PAPER=1 pnpm test:live:bybit-diagnostic
+pnpm test:integration                                        # MockBroker product E2E
+pnpm test:external:readonly                                  # public providers, read-only TWS
+OPENALICE_UTA_LIVE_PAPER=1 pnpm test:live:bybit-paper        # single venue paper sweep
+OPENALICE_UTA_LIVE_PAPER=1 pnpm test:live:uta-paper          # full demo/paper sweep
 ```
 
-The environment variable is an acknowledgement, not proof that an account is
-safe. Before setting it, inspect the selected account configuration and confirm
-its resolved preset is paper/demo/sandbox. Never print credentials while doing
-that inspection.
+### Ground rules
 
-## Live-paper run record and cleanup
+- **Demo/paper accounts only** — inspect config and verify `mode` before setting
+  `OPENALICE_UTA_LIVE_PAPER=1`; never print credentials or overwrite tracked
+  fixtures.
+- **Agent surface only (`alice-uta`)** — tool-level `wallet/push` refuses
+  self-approval by design; the explicit HTTP `wallet/push` endpoint stands in
+  for human approval.
+- **Never trust the ledger over the venue** — verify orders/positions on the
+  exchange side. `ccxt` is an SDK, not a semantic layer: behavior verified on
+  one venue is unverified on the next.
+- **Leave accounts flat** — after both success and failure, cancel open hangers,
+  close test-created positions, `git reject` leftover staging, and confirm
+  pre-run baseline.
 
-For every live-paper run, record enough evidence to distinguish a product bug
-from venue or network behavior:
+### Scenario catalog (S1–S14)
 
-1. Account id, provider/venue, resolved paper/demo mode, scenario/spec, and
-   current Git commit.
-2. Pre-run positions and open orders. These are the cleanup baseline, not an
-   assumption that the account starts empty.
-3. Submitted order ids as strings, relevant Alice/UTA logs, and raw venue
-   status for any disputed transition.
-4. Post-run positions and open orders compared with the baseline.
-
-Automated cancellation is helpful but not a safety boundary: a process can be
-interrupted between submit and cleanup. After success **and after failure**,
-query the venue again, cancel new open orders, close only positions created by
-the test, reject leftover Alice staging, and confirm the account returned to
-its baseline. If that cannot be proven, stop the development lane and report
-the account as requiring manual cleanup.
-
-IBKR routing smoke uses
-`services/uta/src/domain/trading/__test__/e2e/live-paper-evidence.ts` to append
-a small JSONL run record under ignored `data/uta-live-paper-runs/` by default.
-Set `OPENALICE_UTA_LIVE_RECORD_DIR` to choose another local destination. The
-record format deliberately excludes account ids, balances, credentials, and
-position payloads. When live contract data should become an offline regression
-input, manually review and copy only stable canonical contract fields into a
-tracked fixture; never make a test overwrite tracked fixtures directly.
-
-When selecting a test by name, keep the shared lane and file selection explicit:
-
-```bash
-OPENALICE_UTA_LIVE_PAPER=1 pnpm test:select \
-  --lane live-paper \
-  --path tests/integration/broker-ibkr-paper/ibkr-paper.spec.ts \
-  -- -t 'canonical conId routing'
-```
-
-## Ground rules
-
-- **Demo/paper accounts only.** Verify `mode` in the account config before
-  starting. No real funds, ever.
-- **Agent surface only** — drive everything through `alice-uta` (and `alice`
-  for pre-trade data). The HTTP routes and UI are tested by humans; the CLI/
-  tool path is where agent-only bugs hide. Exception: `wallet/push` over
-  HTTP stands in for "the user clicked approve" (the tool-level push
-  deliberately refuses — that wall is a feature, don't bypass it via tools).
-- **Never trust the ledger over the venue.** After any order that matters
-  (especially anything conditional), verify on the exchange side — a probe
-  script via `createBroker()` + raw ccxt calls is legitimate (and doubles as
-  the "external actor" for observation tests). The TP/SL-that-never-existed
-  bug looked perfect in git.
-- **ccxt is an SDK, not a semantic layer.** Identical calls behave
-  differently per venue (bybit's unscoped open-orders listing silently hides
-  spot; okx rejects `reduceOnly` on spot; conditional orders live in
-  separate API namespaces; hyperliquid's unscoped `fetchBalance()` reads
-  the perp clearinghouse, which is 0 for a unified-mode wallet whose funds
-  sit in the spot clearinghouse). Anything that works on one venue is
-  UNVERIFIED on the next until tested there.
-- **Balance routing must remain authoritative.** Hyperliquid mode-query
-  failures or unknown modes must fail the account read, not fall back to a
-  partial ledger. Exercise mode changes with real CCXT routing: its cached
-  `enableUnifiedMargin` can override an explicit `type: swap`, so the venue
-  override must select physical pools explicitly.
-- **A zero balance is a finding, not a pass.** `getAccount()` returning
-  `netLiquidation: '0'` on a funded demo/testnet wallet is exactly how the
-  hyperliquid unified-account bug looked; compare against the venue UI's
-  portfolio value before accepting a balance read.
-- **Leave accounts flat.** Sell back fills, cancel hangers, `git reject`
-  stray staging. Finish with: 0 open orders per account, `git status`
-  clean, position quantities at their pre-session baseline.
-- **Price bands**: venues reject limits too far from market (okx 51138/…,
-  bybit 170193/170194). For marketable orders use quote ±0.3%; for hangers
-  use deep prices the band allows (~15-30% away worked on okx/bybit demo).
-  Re-quote right before pushing — the band moves with the market.
-- Every bug found: fix in place if in scope, otherwise file a GitHub issue with
-  the scenario, venue, evidence, and suspected path. Every fix gets a
-  regression spec before the round continues.
-
-## Setup
-
-Inside a real OpenAlice Workspace, the launcher injects the selected project's
-`OPENALICE_TOOL_URL` or `OPENALICE_TOOL_SOCKET` plus `AQ_WS_ID`:
-
-```bash
-alice-uta                         # discover groups/verbs
-alice-uta order place --help      # flags come from the live manifest
-```
-
-Outside a Workspace, use the installed Supervisor's explicit project routing:
-
-```bash
-openalice exec --project <project-key> alice-uta
-openalice exec --project <project-key> alice-uta order place --help
-```
-
-For an explicitly selected saved remote target, add `--machine <id-or-label>`
-before `exec`. A manual source-shim invocation must supply the discovered
-routing environment and a Workspace id from that AliceProject, then execute
-`src/workspaces/cli/bin/alice-uta` directly, not through `node`: it is a shell
-launcher for the shared payload. Do not infer an endpoint from historical ports
-or read a different project's default home.
-
-Approval remains a human action. Use the UI, or the explicit wallet/push HTTP
-acceptance path against the verified selected endpoint with the exact pending
-hash; never bypass the tool's approval refusal or assume a fixed UTA port.
-
-Probe scripts (external orders, raw venue checks) live as throwaway `.mts`
-files under `data/` (gitignored), run with
-`NODE_OPTIONS='--conditions=openalice-source' npx tsx data/<file>.mts`,
-importing `readUTAsConfig` + `createBroker` by absolute/relative path.
-Delete after use.
-
-## IBKR canonical contract acceptance
-
-`conId` identifies an instrument but is not a complete routing contract. Quote
-and order paths resolve it through a clean `{ conId }` details request;
-caller-supplied display symbols, exchanges, and currencies must not poison that
-lookup. `STK / SMART / USD` defaults apply only to symbol-form stocks without a
-conId. Close-position routing preserves the venue contract.
-
-Offline coverage in `services/uta/src/domain/trading/brokers/ibkr/IbkrBroker.spec.ts`
-uses the reviewed `contract-resolution.v1.json` fixture to exercise canonical
-routing, cache sharing, mutation isolation, and failed-lookup retry. Explicit
-paper acceptance uses `ibkr-paper.e2e.spec.ts` for canonical what-if validation
-and `uta-ibkr.e2e.spec.ts` for FX identity/stage/commit/reject without push.
-The live-paper acknowledgement and exact pre-run account baseline above still
-apply. These scenarios are not part of a documentation smoke run.
-
-Historical diagnosis and recorded repair evidence:
-[[docs/incidents/2026-07-17-ibkr-contract-resolution.md]].
-
-## IBKR half-open and option-mark acceptance
-
-These two read-only checks cover the failure modes from issues #294 and #314.
-They do not authorize an order submission and are safe to run with the UTA and
-Gateway both configured read-only.
-
-### Silent half-open recovery
-
-Freeze the Gateway process/container without closing its TCP socket (for a
-Docker Gateway, `docker pause <container>` is deterministic). Always install a
-shell trap or otherwise guarantee `docker unpause <container>` on exit.
-
-Acceptance:
-
-1. Before the drop, `/api/trading/uta` reports `healthy/readable` and account
-   reads succeed.
-2. Within the heartbeat interval plus timeout (currently at most about 50s),
-   UTA moves directly to `offline/down`; it must not require six caller-driven
-   cache-read failures.
-3. While dead, account/position reads refuse rather than serving stale cache.
-4. After unpause, recovery reconnects and passes a private account read before
-   returning to `healthy/readable`.
-5. The unit-level write boundary separately proves place/modify/cancel performs
-   `reqCurrentTime` before the client send and never calls the send method when
-   that probe times out. Do not submit a live order merely to test this gate.
-
-### Option position mark overlay
-
-With an `OPT` or `FOP` paper position and an entitled or delayed quote:
-
-1. Positive snapshot bid+ask produces midpoint `(bid + ask) / 2`.
-2. `marketValue` and `unrealizedPnL` are recomputed through
-   `derivePositionMath`, including quantity, side, and contract multiplier.
-3. The broker-owned `updatePortfolio()` cache is not mutated.
-4. Missing entitlement, incomplete bid/ask, or timeout returns the cached row;
-   it must not fail the whole portfolio read.
-5. Requests use `regulatorySnapshot=false`; this acceptance must never opt the
-   account into paid per-request regulatory snapshots.
-
-## Scenario catalog
-
-Run the relevant S1–S14 scenarios for a trading-path change; run the full
-applicable catalog per venue for a new broker integration. S13/S14 apply only
-to venues with the corresponding directory/derivatives surfaces. Each scenario
-names the bug class it guards against.
-
-**S1 — Read-state agreement.** `account info`, `account portfolio`,
-`/equity`: account-level unrealizedPnL must equal the positions sum;
-portfolio rows must carry `secType` + `aliceId` (same-symbol spot vs perp
-must be distinguishable AND actionable). *Guards: PnL aggregation drift,
-ambiguous rows.*
-
-**S2 — Simple lifecycle.** Marketable limit (quote×1.003) → fill appears as
-a `[sync]` commit within ~15s with execution price+qty → `order trades`
-shows it → sell back. *Guards: fill-awareness, execution data loss.*
-
-**S3 — Hanger stability.** Deep limit order, leave it ≥3 poller passes
-(~40s): must stay `Submitted`, no spurious transitions, no per-pass cost
-explosion (listing mode) → cancel, verify `cancelled` recorded. *Guards:
-absence-as-terminal false positives, poller churn.*
-
-**S4 — Amendment.** Hanger → `order modify` (price AND qty) → `order list`
-must show the new values with the SAME full-precision string orderId →
-cancel. *Guards: editOrder venue quirks, id truncation.*
-
-**S5 — Attached TP/SL.** `order place … --takeProfit '{"price":…}'
---stopLoss '{"price":…}'`. On a ccxt venue WITHOUT a verified
-`placeOrderWithTpSl` override this must REFUSE loudly (never place a naked
-entry). On a verified venue: after fill, confirm BOTH protective legs exist
-on the exchange — including the trigger/algo namespace — before calling it
-working. On a native-bracket venue (Alpaca): the push result must carry
-`legs` ids, and after the entry fills `order list` must show BOTH legs as
-tracked orders. The held SL leg never appears in the venue's open-orders
-listing (Alpaca holds it while the TP works) — place-time is the ONLY
-moment Alice can learn it exists, so a venue listing diff can NOT recover
-a missed leg. *Guards: the silent unprotected-position failure (okx,
-ledger lied protected) and its mirror, the naked ledger (alpaca, ledger
-blind to real protection) — both fatal to "trust the log".*
-
-**S6 — Standalone stop.** `STP` with a far trigger → accepted → tracked as
-`submitted` across passes even though algo orders are invisible to the
-regular listing (the absence-confirm must find it via the `{stop:true}`
-fallback, NOT mis-terminal it) → cancel through Alice. *Guards: conditional
-order type mapping, algo-namespace tracking.*
-
-**S7 — External order observation.** Place an order via a direct broker
-probe script (git never sees it) → `[observed]` commit within the
-observation cadence (`trading.json observeExternalOrdersEvery`; drop to
-`1m` for the test via `PUT /api/config/trading`, restore after) → pending
-takeover → cancel it through Alice. *Guards: narrative holes, listing
-namespace blindness (bybit defaultType lesson).*
-
-**S8 — Restart survival.** With a hanger pending: restart UTA (`touch
-services/uta/src/main.ts` under tsx watch) → after recovery the order is
-still tracked, syncable and cancellable (persisted localSymbol must rebuild
-the broker's id→symbol cache). *Guards: in-memory cache dependence.*
-
-**S9 — Partial close.** `position close --qty <half>` on a SPOT position
-(must NOT send reduceOnly) and, where a perp position exists, on the perp
-(must send it) → fill recorded, remaining qty correct. *Guards: derivatives
-params leaking onto spot.*
-
-**S10 — Notional entry.** `order place --orderType MKT --cashQty 30` →
-fill qty ≈ cash/price and trade value ≈ cash. *Guards: amount-vs-cost
-semantics (bybit market-buy), conversion drift.*
-
-**S11 — Error ergonomics.** Deliberately: bad aliceId format, unknown
-`--source`, an out-of-band limit price, modify of a nonexistent id. Every
-error must be actionable for an agent: state the expected format / list the
-available accounts / carry the venue's own message (not a bare HTTP code).
-*Guards: stranded-agent errors.*
-
-**S12 — Staging undo.** Stage → `git reject --reason …` → status clean,
-history shows `user-rejected` with the reason; a `--commitMessage` one-step
-ends in `awaitingApproval` and rejects cleanly too. *Guards: approval-flow
-dead ends.*
-
-## New-broker acceptance checklist (beyond the core lifecycle scenarios)
-
-- `getOpenOrders` must SEE a real open order you placed — empty-without-
-  error is the silent failure mode (bybit returned [] for spot under
-  defaultType 'swap'). Sweep every market type the account trades; throw on
-  partial listings.
-- Order ids round-trip as STRINGS end-to-end (place → list → modify →
-  cancel → history).
-- Fees: an in-kind-fee venue (buy ETH, fee in ETH) must show the dust as a
-  `reconcile` trade, not corrupt cost basis.
-- Conditional orders: where do they live (regular vs trigger namespace)?
-  Document it in the venue's `exchanges/<name>.ts` override file — that
-  file is the canonical home for every quirk you find.
-- Bracket/attached orders: if the venue creates child orders, `placeOrder`
-  must return their ids via `PlaceOrderResult.legs` so the ledger tracks
-  them from birth. Verify a leg the venue HIDES from its open-orders
-  listing (Alpaca's held stop) still shows in `order list` and syncs.
-- Amendment identity: does modify keep the order id or mint a new one
-  (Alpaca replaceOrder does)? After modify, the NEW id must be tracked and
-  the OLD id must resolve — no ghost pending.
-- Error messages from the venue must reach the user (no swallowed response
-  bodies — the Alpaca opaque-422 lesson; IBKR's >=2000 "informational"
-  blanket that swallowed 10xxx real errors).
-- Hub/leaf: if the venue's search returns directory rows (see S13), wire
-  them through the nativeKey grammar + expandContract rather than letting
-  them mis-resolve or vanish.
-
-**S13 — Hub/leaf identity (venues with directory-style search results).**
-Search must classify rows: LEAVES carry a tradeable aliceId; DIRECTORIES
-(bond issuers, FX families) are marked `expandable: true` and their aliceId
-must REFUSE quote/trade with a message pointing at `contract expand`.
-Expand each hub kind: FX family → concrete pairs (auto, at search); bond
-issuer → individual bonds; underlying + expiry → concrete option contracts;
-underlying without expiry → option parameter grid. Every leaf that comes out
-must round-trip: aliceId → quote (or a LOUD entitlement error) → place/track/
-cancel. *Guards: the symbol-key-assumes-STK mis-resolution, directory rows
-dying as unaddressable search noise.*
-
-**S14 — Derivative position signs & units (the four-combo matrix).** Open
-all four option combos the venue allows (long/short × call/put; deep-ITM
-entries fill blind off intrinsic, shorts fill by selling under fair). For
-EACH leg verify on EVERY surface (portfolio tool, UI, simulator):
-`side` correct; `avgCost` and `marketPrice` in the SAME unit (venue
-averageCost is often multiplier-baked — IBKR reports 103 for an option
-bought at 1.03); `unrealizedPnL` sign matches reality for the side; account
-equity moves the right direction. Then run `sim price-change` on the
-UNDERLYING's symbol: derivative rows must be excluded loudly, never
-re-marked with the stock's price (symbol collision produced +23,000%
-"moves" and sign-inverted PnL — the community "option direction is
-flipped" report). *Guards: unit-mismatched cost basis, symbol-collision
-re-marking, sign inversion on recompute surfaces.*
-
-## Scoreboard so far
-
-Rounds 1–5 (2026-06-12, okx + bybit + alpaca demo): ~20 bugs found and
-fixed across PRs #325–#333 — fill-awareness paralysis, cost-basis at wrong
-prices, search false negatives, unprotected TP/SL, id truncation, spot
-reduceOnly, getOrders crash, and friends. Round 5 (bybit sweep) found zero
-new product bugs — the venue-quirk fixes generalized. That's the signal the
-catalog converges; keep it that way.
-
-Round 6 (2026-06-12, alpaca market-open): 3 bugs. CLI gateway silently
-stripped unknown flags (a typo'd `--quantity` staged a quantity-less LMT
-order that committed clean) → strictObject + stage-time per-orderType
-required-field gate. Bracket TP/SL legs were untracked from birth — the
-ledger was blind to real protection on the exchange, and the held SL leg
-is unrecoverable from listings → `PlaceOrderResult.legs` tracked through
-the ledger. Plus sync-commit log rows now attribute per-update symbols
-(was `unknown`). S2/S3/S4/S5/S6 all green after fixes; OCO leg-cancel
-behavior (cancel one → venue kills both) verified and synced faithfully.
-
-Round 7 (2026-06-12, IBKR paper first acceptance run): 5 findings, 2
-pre-located by reading the adapter BEFORE connecting (do this for every
-new broker). (1) `placeOrder(_tpsl)` silently ignored TP/SL — the okx
-naked-entry species, gated with a loud refusal pre-test (native bracket =
-parent/child + `legs`). (2) `getOpenOrders` unwired despite
-the bridge primitive existing — 5-line wire-up; NOTE reqOpenOrders only
-sees THIS clientId's orders, manual TWS-UI orders need reqAllOpenOrders +
-permId identity (deferred). (3) By-conId quote → TWS error 321: reqMktData
-won't resolve a bare conId even though the wire carries it — enrich via
-reqContractDetails once + cache. (4) Account-cache delta semantics: TWS
-pushes position DELTAS between accountDownloadEnd markers; the
-swap-on-end cache showed a filled sell as still-held for minutes, zero-qty
-(closed) updates were dropped entirely, and repeated updates duplicated
-rows — upsert-by-conId into live cache + pending. Found by S8's restart
-then cross-checking venue truth with an independent-clientId probe.
-(5) `decodeContractProto` had an EMPTY `if (cp.secType !== undefined)`
-body — a dropped assignment; every portfolio row violated the
-IBKR-superset row contract with secType ''.
-IBKR venue facts: modify keeps the SAME orderId (assert the inverse of
-Alpaca); stops sit `PreSubmitted` (not terminal); paper quotes need
-delayed data — full-protobuf REQ_MARKET_DATA_TYPE(3) + REQ_MKT_DATA still
-got 10089 (entitlement question parked, price oracle = Alpaca AAPL quote
-meanwhile); multi-currency books (HKD+USD) blind-sum at the BROKER layer
-(`getAccount` + `aggregateAccountFromPositions`) remained a deferred
-follow-up. S2/S4/S6/S8/S9/S11/S12 green; restart survival incl. TWS
-reconnect verified.
+- **S1 — Read-state agreement**: `account info`, `account portfolio`, `/equity`
+  agree on `unrealizedPnL`; rows carry distinguishable, actionable `secType` +
+  `aliceId`.
+- **S2 — Simple lifecycle**: Marketable limit (`quote × 1.003`) → `[sync]` fill
+  commit within ~15s with price+qty → `order trades` → sell back.
+- **S3 — Hanger stability**: Deep limit (`~15–30%` away) survives ≥3 poller
+  passes (~40s) as `Submitted` without churn → cancel records `cancelled`.
+- **S4 — Amendment**: `order modify` (price and qty) preserves full-precision
+  string `orderId` (or tracks replacement ID and resolves old ID on venues like
+  Alpaca) → cancel.
+- **S5 — Attached TP/SL**: Refuses loudly on unsupported venues (never places a
+  naked entry); on supported venues, confirms both legs exist on the exchange
+  (and tracks `PlaceOrderResult.legs` from birth).
+- **S6 — Standalone stop**: `STP` with far trigger stays tracked across passes
+  via `{ stop: true }` fallback rather than false terminal state → cancel.
+- **S7 — External order observation**: Direct venue order outside Alice →
+  `[observed]` commit within cadence → takeover and cancel through Alice.
+- **S8 — Restart survival**: Pending hanger survives a UTA restart and remains
+  syncable and cancellable from persisted `localSymbol`.
+- **S9 — Partial close**: `position close --qty <half>` omits `reduceOnly` on
+  spot and includes it on perps.
+- **S10 — Notional entry**: `--orderType MKT --cashQty 30` fills `qty ≈ cash/price`.
+- **S11 — Error ergonomics**: Bad `aliceId`, unknown `--source`, out-of-band
+  price, or missing order ID return actionable agent errors including venue
+  messages.
+- **S12 — Staging undo**: Stage → `git reject --reason …` restores clean status
+  and `user-rejected` history.
+- **S13 — Hub/leaf contract discovery**: Directory rows (`expandable: true`)
+  refuse direct quote/trade and point to `contract expand`; leaf `aliceId` rows
+  round-trip quote → place → cancel.
+- **S14 — Derivative position signs & units**: Option legs preserve consistent
+  per-unit `avgCost` vs `marketPrice`, `side`, and `unrealizedPnL` sign;
+  underlying `sim price-change` excludes derivative rows loudly.

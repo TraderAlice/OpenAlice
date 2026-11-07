@@ -1,0 +1,47 @@
+export const metadata = {
+  title: "MCP Server",
+  description: "How OpenAlice exposes its tool catalog over MCP — the global server plus per-workspace scoping.",
+}
+
+# MCP Server
+
+OpenAlice runs one MCP (Model Context Protocol) server that exposes Alice's tool catalog — trading, market data, news, analysis — to MCP clients. Most workspace agents do not need to think about this layer: the default workspace path is the injected `alice*` CLI surface. External MCP clients can connect directly when you want OpenAlice's tools outside the OpenAlice app.
+
+> **Workspace agents are CLI-first.** Inside an OpenAlice workspace, OpenAlice prefers injected CLIs (`alice`, `alice-workspace`, `alice-uta`, `traderhub`) over MCP. CLI calls cost fewer tokens, compose with Unix tools (`grep`, `jq`, pipes, redirection), and fit the native terminal workflow that coding agents already understand. MCP is heavier, and for some coding agents it is the wrong injection shape in headless runs; Codex, for example, should not be treated as having a reliable headless MCP injection path. OpenAlice keeps MCP mainly for users who need to connect OpenAlice to an external MCP consumer, such as Claude Desktop or another agent outside the workspace.
+
+The product model is still workspace-first. MCP is an adapter surface, not a second chatbot or a second scheduler.
+
+## What it serves
+
+The server publishes [ToolCenter](/docs/extending/custom-tools)'s full registry in MCP shape. Consumers:
+
+- External MCP clients (Claude Desktop, other agents) you point at the endpoint yourself.
+- Specialized workspace runtimes or templates that explicitly choose MCP. This is not the default OpenAlice workspace path; use the [CLI injection](/docs/workspaces/cli-injection) surface unless a runtime specifically needs MCP.
+
+> The launcher injects **no `.mcp.json`** into workspaces. Workspace agents reach Alice's tools through the `alice` / `alice-uta` / `alice-workspace` / `traderhub` binaries on `PATH`, which call the registry over a sibling `/cli/:wsId` gateway — same tools in shell-command shape. Scheduling is not a separate cron tool the agent calls; it is encoded in workspace issue files (`.alice/issues/<id>.md`) and fired by the scanner. See [Workspaces](/docs/workspaces/workspaces) and [Workspace Automation](/docs/workspaces/automation).
+
+## Configuration
+
+The MCP port is set in `~/.openalice/data/config/ports.json` (alongside `web`, `uta`, `ui`), which the **Guardian** orchestrator reads before spawning the processes — default `47332`, served at `/mcp`, so clients connect to `http://localhost:47332/mcp`. An `OPENALICE_MCP_PORT` env var overrides the file.
+
+The listener is **always bound to loopback** and never honors `OPENALICE_BIND_HOST`: it carries the full tool surface — including trading — with no auth gate, so its security model is "local processes only." The MCP port must remain on loopback, including on remote hosts; Agent CLIs running with Alice use it locally.
+
+## Global vs. workspace-scoped tools
+
+The server exposes **two** MCP endpoints. External clients pick whichever matches the job:
+
+| Endpoint | Scope |
+|----------|-------|
+| `/mcp` | The **global** server above — the full tool catalog |
+| `/mcp/:wsId` | A **workspace-scoped** server that adds workspace-local, identity-bound tools — [`inbox_push`](/docs/workspaces/inbox) and the [`entity_upsert` / `entity_search`](/docs/workspaces/entities) tracking tools |
+
+The `wsId` is carried in the URL path and filled by the router, so a consumer never has to traffic its own identity. This is how workspace-scoped capabilities are exposed without polluting the global tool list. Workspace agents reach the same workspace-scoped surface over the sibling `/cli/:wsId` gateway instead — `alice-workspace inbox push`, `alice-workspace track`. See [Workspaces](/docs/workspaces/workspaces) for the full picture.
+
+External agents that need OpenAlice to do workspace-shaped work should use the [Workspace Webhook](/docs/workspaces/webhook). MCP exposes tools; the webhook starts a real workspace run.
+
+## Next Steps
+
+- [Workspaces](/docs/workspaces/workspaces) — The default way agents use OpenAlice.
+- [Custom Tools](/docs/extending/custom-tools) — Add capabilities to the ToolCenter.
+- [Workspace Automation](/docs/workspaces/automation) — Understand issue-shaped automation.
+- [Workspace Webhook](/docs/workspaces/webhook) — Trigger a workspace from another agent.

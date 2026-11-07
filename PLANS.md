@@ -14,10 +14,13 @@ the durable truth after it changes. Git history is the archive.
   step complete before its code and required verification exist.
 - Record material discoveries and changed decisions in the plan. Move stable
   architectural conclusions into the linked owner guide.
+- Never let a plan grow unbounded: do not append turn-by-turn execution diaries,
+  per-iteration micro-decisions, or CI run logs. Collapse shipped increments to a
+  brief baseline summary and keep only remaining active work.
 - Completing a plan is a deletion: remove `plans/<topic>.md` and its Active
-  bullet in the same change that records acceptance. Do not keep a Completed
-  section, tombstone bullets, or an on-tree `plans/archive/`. Recover a
-  finished plan from git:
+  bullet in the same change that finishes the work. Do not leave completed plans
+  on `dev`, and do not keep a Completed section, tombstone bullets, or an
+  on-tree `plans/archive/`. Recover a finished plan from git:
 
   ```bash
   git log --diff-filter=D --summary -- plans/
@@ -29,115 +32,19 @@ the durable truth after it changes. Git history is the archive.
 
 ## Active
 
-- [[plans/inbox-mark-all-read.md]] — Inbox bulk read; PR #1789 acceptance and authorized merge.
-
-- [[plans/settings-machines-dialog.md]] — Move machine management into General / Machines and replace inline SSH setup with a reviewed dialog; Draft PR only.
-
-- [[plans/review-updates-shared-plan.md]] — Share automatic/manual update review
-  plans and open exact single targets. Independent Draft #1693; preserve the
-  coordinated owner review from #1692 and keep attention #1691 separate.
-
-- [[plans/cli-artifact-signature.md]] — Bun compiler pin, final macOS ad-hoc
-  signatures and shared final-archive acceptance for #1670. Draft PR acceptance
-  remains pending.
-
-- [[plans/compact-notifications.md]] — Approved compact type-specific pop-out
-  notifications, bounded news/Inbox grouping and optional news thumbnails;
-  implementation and Draft PR review only, no merge authority.
-
-- [[plans/cli-relay-entry-unification.md]] — Consolidates CLI-launched browser
-  sessions on the client-owned WebRelay while retaining explicit local and
-  remote Runtime lifecycle commands.
-
-- [[plans/desktop-companion.md]] — Native Alice companion using supplied art,
-  upstream press/drag/bubble motion and macOS/Windows acceptance.
-
-- [[plans/web-conversation-surface.md]] — Generalizes WebPi into one Web
-  conversation surface: a neutral `WebSessionHost` with `pi-rpc`, `acp`,
-  `claude-stream-json`, and `codex-app-server` transports, first-class
-  permission requests, and capability-gated UI. Live per-runtime acceptance
-  remains open.
-- [[plans/unified-page-topbar.md]] — Unifies navigator and content toolbars
-  across the UI, with fixed page actions and content-owned sidebar restoration.
-  Held on `codex/ui-usability-followup` for visual acceptance.
-
-- [[plans/interaction-density-convergence.md]] — Converges field focus, compact-rail expansion, Connector setup hierarchy, and dense market surfaces through shared interaction primitives on the current `dev` baseline.
-- [[plans/tui-experience.md]] — Rebuilds the Shell Supervisor as a polished,
-  mouse-capable terminal control surface using Oh My Pi as the interaction and
-  finish benchmark while preserving the Node CLI and Runtime ownership
-  boundary. Work remains on `codex/tui-usability` for integrated acceptance
-  before any `dev` PR.
-- [[plans/bun-cli-distribution.md]] — Replaces the expanded Node headless
-  Runtime with a Bun-compiled, multi-process CLI distribution. Direct,
-  npm/Bun, Homebrew, and AUR channels consume one accepted artifact set.
-  Active follow-up: system-owned Git/Bash and consent-based dependency
-  coordination across CLI installers/package managers; Electron stays separate.
-  Stable `0.91.1` and its Homebrew formula are publicly accepted after the
-  separate beta checkpoint. Windows x64 npm first publication is complete;
-  all seven OIDC exchanges and complete npm/Bun publication now pass.
-  Public macOS npm/Bun and Linux npm 12 lifecycle acceptance passed.
-  Native Intel acceptance passed; renderer latency remains tracked in #1350.
-  AUR registration remains deferred.
-  The CLI package owns OpenAlice only: Agent Runtime installation and Electron
-  packaging stay outside this plan. The native CLI is public through the
-  separately dispatched `v0.91.0-beta.3`; stable/beta discovery now uses the
-  OpenAlice CDN manifests. Managed SSH installation and Project transfer pass
-  the disposable Docker target; beta3 core Runtime/PTY state survives a long
-  tunnel outage, and the following `dev` increment refreshes Settings identity
-  after recovery. Native Windows x64/ARM64 now proceed from accepted previews
-  into the shared stable/beta/dev installer, updater, and npm topology; external
-  package-manager activation remains a separate checkpoint. Routine dev
-  and exact-beta source feedback is reduced to local-first, lightweight
-  hosted lanes while `master` promotion, stable, and final artifact acceptance
-  retain the complete gates.
-- [[plans/remote-project-fleet.md]] — Adds a machine-aware Supervisor fleet,
-  remote AliceProject inventory/connection, and safe local-to-SSH project
-  transfer for portable configuration and Workspaces while deliberately
-  excluding native/OpenAlice Session continuation state. The completed
-  remote-readiness increment makes the attached browser truthful about remote
-  identity, Agent and Broker Pack capability, scheduled-work blockers,
-  reconnect recovery, and public Session titles. Controller/remote release
-  negotiation remains a separate SSH-managed increment without background
-  polling or infrastructure-provider ownership.
+- [[plans/windows-signpath.md]] — SignPath Foundation self-signed onboarding,
+  public signing policy, and production Windows release integration.
+- [[plans/remote-project-fleet.md]] — Machine-aware Supervisor fleet, remote
+  AliceProject inventory/connection, and local-to-SSH project transfer are in
+  `dev`; Increment 7 (controller-driven remote release convergence) remains open.
 - [[plans/auto-prediction-harness.md]] — Auto Prediction Beta conversation
-  Harness is in `dev`; managed AP/AQ Studio supervision, opaque routing, and
-  embedded product surfaces are implemented. Shared verified/unverified source
-  release management and cross-runtime acceptance remain active.
-- [[plans/antigravity-adapter.md]] — Antigravity (`agy`) CliAdapter.
-  PATH `agy` only; never spawn `antigravity` / `gemini`.
-  Serial PR from `feat/agy-adapter`; do not merge until Ame says so.
-- [[plans/product-activity-journal.md]] — Standard append-only product activity
-  journal consumed by Office and Sonner. Agent runtime facts are live; Inbox
-  and per-item News facts are the current increment. It remains a projection,
-  never a dispatch bus.
-- [[plans/office-floor.md]] — Office overworld rebuild: one continuous 4:3
-  top-down tilemap; Harness=functional neighborhood, Workspace=furniture pod,
-  `resumeId`=employee. Scene graph, top-down placeholders, game chrome, camera,
-  and browser acceptance remain active.
-- [[plans/issue-comment-prompt.md]] — Optional per-Issue `commentPrompt`
-  template for comment-reply Input Prompts. Omission keeps the historical
-  wrapper; chat desks seed `{comment}`.
-- [[plans/telegram-connector-issue.md]] — One Issue per Alice Project is the
-  Telegram phone desk: What is the heartbeat prompt, comments are the chat,
-  Connector only transports. Increment 1 bound the desk in Settings.
-  Increment 2 projects comments unless `[[no-reply]]`.
-- [[plans/connector-desk.md]] — Desk specimen is shared; each `desk` adapter
-  owns its own Issue. Increment 1 generalizes `telegramConnector` →
-  `connectorDesk: <id>`. Feishu adapter is a later increment.
-- [[plans/connector-inbox-commands.md]] — Connectors declare `inbox` and
-  `settings` capabilities and implement their own slash-command forms.
-  Telegram uses a bounded `/inbox` summary plus on-demand file pull;
-  Discord/Slack stay placeholders. `inboxPush` can mute push without
-  touching the phone desk.
-- [[plans/session-presence.md]] — Give product Sessions an in-desk presence
-  (`active` / `archived` / `deleted`) separate from workspace `retired`, uncap
-  the Ask Alice roster, and make Archive the floor action instead of deleting
-  a coworker. Increment 1 landed in PR #1069; persisted presence remains open.
-- [[plans/shell-first-cli-supervisor.md]] — Delivers a first-class Shell
-  Supervisor TUI, persistent Guardian-owned Runtime lifecycle, standalone
-  headless release bundle, atomic update/rollback, and real N-1 plus PTY
-  acceptance through serial increments. Increments 1–2 and most of 4/6/7 are
-  in `dev`; remaining work is the TypeScript CLI conversion, logs/Doctor/update
-  UX, config check, registry deletion, authenticity-hardened updates, and
-  release-gate N-1.
-- [[plans/companion-activity-notifications.md]] — Shared Journal notification preferences and background companion bubbles; Draft PR only, no release authority.
+  Harness, managed AP/AQ Studio supervision, opaque routing, and shared source
+  release lifecycle are in `dev`; cross-runtime acceptance remains active.
+- [[plans/session-presence.md]] — In-desk Session presence (`active` /
+  `archived` / `deleted`) separate from Workspace `retired`, uncapped Ask Alice
+  roster, and Archive as the primary floor action. Increments 1–2 are in `dev`;
+  Increment 3 (`deleted` / undelete) remains open.
+- [[plans/connector-desk.md]] — Shared desk execution specimen where each
+  `desk`-capable adapter owns its own Issue (`connectorDesk: <id>`). Increments
+  1–2 (specimen extraction + Feishu adapter) are in `dev`; Increment 3 (Feishu
+  `/inbox` and `/uta` cards) remains deferred.

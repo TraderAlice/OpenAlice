@@ -1,6 +1,7 @@
 import { useCallback, useMemo, useSyncExternalStore } from 'react'
 
 import { useThemeStore } from './store'
+import { resolveStylePalettePair } from './styleProfiles'
 import {
   paletteAppearance,
   resolveEffectiveSlot,
@@ -38,6 +39,10 @@ export function useEffectivePalette(): ThemePaletteId {
   const slot = useEffectivePreferenceSlot()
   const dayPalette = useThemeStore((s) => s.dayPalette)
   const nightPalette = useThemeStore((s) => s.nightPalette)
+  const uiStyle = useThemeStore((s) => s.uiStyle)
+  const stylePaletteMode = useThemeStore((s) => s.stylePaletteMode)
+  const recommended = resolveStylePalettePair(uiStyle, stylePaletteMode)
+  if (recommended) return recommended[slot]
   return slot === 'night' ? nightPalette : dayPalette
 }
 

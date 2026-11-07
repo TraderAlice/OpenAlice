@@ -1,0 +1,64 @@
+export const metadata = {
+  title: "CLI & Remote Access",
+  description: "Install the native OpenAlice CLI, manage AliceProjects, and connect a local browser to a registered SSH Machine.",
+  releaseChannel: "stable",
+  targetVersion: "0.94.1",
+}
+
+# CLI & Remote Access
+
+The native `openalice` command controls a local Runtime and, through a local Web relay, connects your browser to a registered Machine. The selected Machine runs Alice, Workspaces, Agent processes, credentials, and optional trading services. The browser stays on your computer. Closing a browser tab does not stop the Runtime.
+
+## Install the stable CLI
+
+On macOS or Linux:
+
+```bash
+curl -fsSL https://openalice.ai/install | bash
+```
+
+On Windows x64 or ARM64, use [the PowerShell installer](/docs/getting-started/install-windows). npm, Bun, and Homebrew options are on the [installation overview](/docs/getting-started/installation). The direct installer also accepts `--channel beta` or `--channel dev`; package managers follow stable. Run the activation command printed by the installer, then check `openalice --version`.
+
+The native command does not need Node, Bun, or a source checkout at runtime. Git and Bash are separate system dependencies, and your chosen coding Agent CLI is user-owned. Run `openalice setup --check` to inspect prerequisites. Each Agent needs its own login or compatible [saved AI credential](/docs/integration/ai-providers).
+
+## Local Runtime
+
+Run `openalice` for the terminal supervisor and local Web GUI. The supervisor can select an AliceProject, start or open its Runtime, inspect logs and diagnostics, and check for updates. `q` exits the supervisor without stopping a detached Runtime. For explicit control:
+
+```bash
+openalice up               # start a detached Runtime
+openalice status --json    # inspect it
+openalice open             # open the local Web GUI
+openalice logs --lines 200
+openalice doctor --json
+openalice down             # stop the owning Runtime
+```
+
+`openalice relay` opens a local Web GUI without the supervisor TUI. The CLI can create named AliceProjects with independent complete homes; see [AliceProjects](/docs/deployment/alice-projects). A source checkout is an explicit development override.
+
+## Register a remote Machine
+
+Use a private Linux or macOS host reachable through OpenSSH. OpenAlice uses your normal SSH configuration and host verification; it does not copy SSH keys or create another credential system. Verify SSH access first, then review the plan:
+
+```bash
+ssh openalice-box
+openalice --remote openalice-box --plan
+openalice machine add openalice-box --label "Cloud"
+```
+
+`--plan` is read-only. `machine add` probes the host, previews and confirms any required install or start actions, verifies Runtime health, and saves the profile. The remote native release is installed when needed. It does not install or authenticate an Agent CLI. You can also register and inspect Machines under **Settings → General → Machines** in the local Web GUI.
+
+Start `openalice` and open its Web GUI, or run `openalice relay`. Choose the registered Machine and a running AliceProject under **Settings → General → Where Alice is working**. The local relay owns the SSH loopback tunnel and serves the UI. Its TUI and browser share one selected target. Switching targets does not stop the previous Runtime.
+
+```bash
+openalice machine list
+openalice machine inspect Cloud
+openalice --machine Cloud status --json
+openalice --remote openalice-box --status
+```
+
+`--machine` targets a saved enabled profile. `--remote` remains useful for planning and explicit status or stop operations; the former one-off `openalice remote <host>` browser attach is retired. A Machine can be disabled to prevent new selection without stopping an already-running Runtime.
+
+Keep the backend loopback-only; do not expose its port directly to the internet. Back up each AliceProject's complete `OPENALICE_HOME` on the host. Closing the local relay ends its tunnel but leaves a detached remote Runtime running.
+
+See the [OpenAlice remote quickstart](https://github.com/TraderAlice/OpenAlice/blob/master/docs/remote-quickstart.md) for the full current walkthrough and [Data & Credentials](/docs/deployment/data-and-credentials) for state ownership.

@@ -58,10 +58,10 @@ describe('test catalog ownership contract', () => {
 
   it('keeps root owner commands synchronized with the ownership map', () => {
     const scripts = readJson('package.json').scripts as Record<string, string>
-    expect(scripts.test).toBe('vitest run')
+    expect(scripts.test).toBe('vp test --config vitest.config.ts')
     expect(scripts['test:select']).toBe('node scripts/run-tests.mjs')
     expect(scripts['test:changed']).toBe('node scripts/run-tests.mjs --changed origin/dev')
-    expect(scripts['test:watch']).toBe('vitest --config vitest.config.ts')
+    expect(scripts['test:watch']).toBe('vp test --config vitest.config.ts --watch')
     for (const owner of ownerSuiteNames) {
       expect(scripts[`test:owner:${owner}`]).toBe(ownerSuiteCommand(owner))
     }

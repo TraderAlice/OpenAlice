@@ -9,41 +9,24 @@ GitHub navigation.
 
 | Wikilink route | Guide | Owns |
 |---|---|---|
-| [[docs/alice-project.md]] | [AliceProject](alice-project.md) | Top-level local runtime identity, one-project/one-backend topology, concurrency, and display contract |
 | [[docs/project-structure.md]] | [Project structure](project-structure.md) | Process boundaries, source ownership, state roots, architectural entry points |
+| [[docs/alice-project.md]] | [AliceProject and local runtime](alice-project.md) | Top-level runtime identity, complete-home data locations, concurrency, and source-backed/native local bootstrap |
 | [[docs/development-workflow.md]] | [Development workflow](development-workflow.md) | Branches, delivery modes, PRs, promotions, external review, risk gates |
-| [[docs/update-lifecycle.md]] | [Update lifecycle](update-lifecycle.md) | Shared inventory, exact-target planning, durable owner coordination and rehearsal |
-| [[docs/testing.md]] | [Testing](testing.md) | Unit/integration/E2E scope and suite registration, required gates/run receipts, ownership, execution conditions, selectors, and package-local semantics |
-| [[docs/managed-workspace-runtime.md]] | [Managed Workspace runtime](managed-workspace-runtime.md) | Electron packaging, local package diagnostics, managed Pi, PortableGit/Bash, runtime profile, Workspace PATH |
-| [[docs/harness-web-surfaces.md]] | [Harness web surfaces](harness-web-surfaces.md) | Harness manifests, managed Studio ports, readiness, routing, transport, lifecycle, and embedding |
-| [[docs/model-semantics-and-runtime-injection.md]] | [Model semantics and runtime injection](model-semantics-and-runtime-injection.md) | AI credential access, model semantics, Workspace selection, and native Agent projection |
-| [[docs/broker-packs.md]] | [Broker Packs](broker-packs.md) | Optional broker SDK packaging, UI installation, activation, runtime loading, release assets |
-| [[docs/cli-installer.md]] | [CLI installer](cli-installer.md) | Bootstrap consent, installed layout, atomic updates, PATH integration, installer tests, and release checks |
-| [[docs/cli-package-managers.md]] | [CLI package-manager channels](cli-package-managers.md) | npm/Bun platform packages, Homebrew formula, AUR package, provenance, update ownership, and publication order |
+| [[docs/testing.md]] | [Testing](testing.md) | Unit/integration/E2E scope and suite registration, required gates/run receipts, ownership, execution conditions, and selectors |
+| [[docs/workspace-lifecycle.md]] | [Workspace and Session lifecycle](workspace-lifecycle.md) | Workspace Manager, unified Session execution, provenance (`resumeId`), Web conversation surface, template upgrade, absorb, and offboarding |
+| [[docs/alice-harness.md]] | [Alice Harness and runtime injection](alice-harness.md) | Project CLI runtime, AI credential/model semantics, Workspace agent guidance, Skill/sticker distribution, and Harness web surfaces |
+| [[docs/workspace-issues-and-scheduling.md]] | [Workspace issues, scheduling, and Inbox](workspace-issues-and-scheduling.md) | Markdown issue contract, schedule scanner, headless execution, Inbox content publication, and Product Activity Journal |
 | [[docs/cli-supervisor.md]] | [Shell CLI Supervisor](cli-supervisor.md) | Top-level Runtime lifecycle, status/JSON presentation, browser opening, completion, compatibility aliases, and TUI boundary |
-| [[docs/local-runtime.md]] | [Local Runtime and CLI bootstrap](local-runtime.md) | Source-backed localhost startup, dependency bootstrap, Runtime ownership, and headless bundle boundary |
-| [[docs/data-locations.md]] | [Data locations](data-locations.md) | Complete-home ownership, shared Default selection, concurrent AliceProjects, and directory safety |
-| [[docs/remote-access.md]] | [Remote Runtime and access](remote-access.md) | Server lifecycle, SSH transport, managed remote bootstrap, client authority, and staged Studio protocol |
-| [[docs/demo-mode.md]] | [Demo mode](demo-mode.md) | Shared mock data, isolated native Electron preview and demo smoke |
-| [[docs/desktop-companion.md]] | [Desktop companion](desktop-companion.md) | Alice floating window, native lifecycle, interaction, assets and platform acceptance |
-| [[docs/inbox-content.md]] | [Inbox content](inbox-content.md) | Markdown publication, shared file references, migration and UI hook |
-| [[docs/connector-service.md]] | [Connector Service](connector-service.md) | Optional external Inbox projection, adapters, secrets, health, Guardian lifecycle |
-| [[docs/ui-interaction-and-motion.md]] | [UI interaction and motion](ui-interaction-and-motion.md) | Clickable affordances, shared motion tokens, entrances/disclosures, reduced-motion policy |
-| [[docs/alice-harness.md]] | [Alice Harness injection](alice-harness.md) | Project CLI runtime, Skill prototypes/distribution, Workspace preferences and scoped file operations |
-| [[docs/sticker-packs.md]] | [Sticker packs](sticker-packs.md) | Project-owned sticker prototypes, optional Chat Skill projection, imports and file ownership |
-| [[docs/workspace-agent-guidance.md]] | [Workspace agent guidance](workspace-agent-guidance.md) | Always-loaded prompt contract, skill ownership, Workspace capability browser, live CLI authority, guidance versioning |
-| [[docs/workspace-lifecycle.md]] | [Workspace and Session lifecycle](workspace-lifecycle.md) | Unified Session execution, attribution, recovery, offboarding, handoff, restore/purge, retirement |
-| [[docs/workspace-manager.md]] | [Workspace Manager](workspace-manager.md) | Launcher-owned control plane, Web quick start, active-desk inventory, and management boundaries |
-| [[docs/web-conversation-surface.md]] | [Web conversation surface](web-conversation-surface.md) | Structured-protocol browser conversation for any runtime: wires, transports, neutral snapshot, permission requests, routes |
-| [[docs/workspace-template-upgrade.md]] | [Workspace Template Upgrade](workspace-template-upgrade.md) | Managed-asset baselines, three-way review, apply transactions, recovery, and the separate Absorb boundary |
-| [[docs/workspace-absorb.md]] | [Workspace Absorb](workspace-absorb.md) | Directional Workspace consolidation, collision review, archived source identity, and recovery |
-| [[docs/workspace-issues-and-scheduling.md]] | [Workspace issues and scheduling](workspace-issues-and-scheduling.md) | Markdown issue contract, global board, schedule scanner, headless execution, Inbox delivery |
-| [[docs/conversation-provenance.md]] | [Workspace Session and artifact provenance](conversation-provenance.md) | `resumeId` identity, artifact trails, Issue execution responsibility, and provenance-before-collaboration sequencing |
-| [[docs/product-activity-journal.md]] | [Product Activity Journal](product-activity-journal.md) | Append-only Agent, Inbox, and News facts, family-aware reads, and UI projections; never dispatch |
-| [[docs/uta-live-testing.md]] | [UTA live testing](uta-live-testing.md) | Real broker/demo acceptance scenarios and trading invariants |
-| [[docs/ibkr-wire-protocol.md]] | [IBKR wire protocol](ibkr-wire-protocol.md) | TWS/Gateway inbound framing, payload-only decoder contract, failure isolation, and verification |
-| [[docs/market-data-architecture.md]] | [Market data architecture](market-data-architecture.md) | TraderHub/reference data, BarService K-lines, and the private provider compatibility layer |
+| [[docs/remote-access.md]] | [Remote Runtime and access](remote-access.md) | Server lifecycle, SSH transport, managed remote bootstrap, client authority, AliceProject transfer, and staged Studio protocol |
+| [[docs/cli-installer.md]] | [CLI installer, channels, and updates](cli-installer.md) | Bootstrap consent, installed layout, package-manager channels, update lifecycle coordination, and Windows code signing |
+| [[docs/managed-workspace-runtime.md]] | [Desktop packaging and managed runtime](managed-workspace-runtime.md) | Electron packaging, managed Pi/Git/Bash runtime, Desktop companion floating window, and isolated demo mode |
+| [[docs/uta-live-testing.md]] | [UTA, Broker Packs, and IBKR](uta-live-testing.md) | Broker/trading invariants, optional Broker Packs, IBKR wire-protocol framing/decoder contract, and live acceptance scenarios |
+| [[docs/market-data-architecture.md]] | [Market data architecture](market-data-architecture.md) | TraderHub/reference data, BarService K-lines, RSS archive, and the private provider compatibility layer |
+| [[docs/connector-service.md]] | [Connector Service](connector-service.md) | Optional external Inbox projection, phone-desk chat, adapters, secrets, health, and Guardian lifecycle |
+| [[docs/ui-interaction-and-motion.md]] | [UI interaction and motion](ui-interaction-and-motion.md) | Clickable affordances, shared motion tokens, entrances/disclosures, and reduced-motion policy |
 
+Public website (`apps/landing/`) ownership and contributor rules live next to the
+code at [[apps/landing/AGENTS.md]] ([`apps/landing/AGENTS.md`](../apps/landing/AGENTS.md)).
 Other files under `docs/images/` are README/product assets rather than owner
 guides.
 
@@ -57,43 +40,20 @@ Generated migration inventory: [[src/migrations/INDEX.md]]
   understand Server lifetime and security, and see the design inspiration
   behind the remote path.
 
-Reference notes under `docs/reference/` are non-authoritative research
-material. The [installer script note](reference/install-script/README.md)
-records Claude Code and Codex upstream links and design lessons without
-vendoring third-party code. The
-[Pi and Herdr CLI architecture note](reference/pi-herdr-cli-architecture.md)
-pins the TypeScript TUI, startup, configuration, persistent Runtime, command,
-and running-update comparison behind the Shell CLI plan. The
-[Herdr remote Runtime note](reference/herdr-remote-architecture.md) records a
-pinned public-source architecture comparison behind the authoritative remote
-guide, also without vendoring third-party code.
-
-## Incident Records
-
-- [[docs/incidents/2026-07-17-ibkr-contract-resolution.md]] —
-  [IBKR conId contract-resolution repair](incidents/2026-07-17-ibkr-contract-resolution.md):
-  recorded paper diagnosis, canonical routing invariants, and safe cleanup
-  evidence from the completed repair; current acceptance lives in the UTA guide.
-- [[docs/incidents/2026-07-28-broker-pack-upgrade-gap.md]] —
-  [v0.85 Broker Pack upgrade gap](incidents/2026-07-28-broker-pack-upgrade-gap.md):
-  previous-release Pack activation failed after a desktop upgrade and
-  established the N-1→N release gate.
-
-## Retired Architecture
-
-- [[docs/event-system.md]] — [Event-system retirement note](event-system.md):
-  a short pointer for the removed Alice event-bus scheduler and webhook API.
-  The active journal is owned by the Product Activity Journal guide above.
-
 ## Maintenance Rule
 
-- Every owner guide states what it owns and points to the current load-bearing
-  code paths.
-- When code and a guide disagree, verify the runtime and update the guide in the
-  same change.
-- Do not copy an owner guide back into `AGENTS.md`; add or update its wikilink.
-- Do not leave executable instructions in a retired guide. Keep a short
-  tombstone when old external links need a destination.
-- Keep each contract in one owner guide and link to it rather than copying it.
-  Prefer self-describing code/catalogs over copied provider, event, or route
-  inventories that immediately drift.
+Owner guides hold only subsystem boundaries, cross-process/cross-owner
+contracts, non-obvious state and security invariants, and load-bearing entry
+paths. Update a guide only when one of those boundaries, contracts, invariants,
+or paths actually changes.
+
+Do not append PR changelogs, restate TypeScript types or code branches in prose,
+list per-flag CLI manuals, transcribe UI pixel/CSS layouts, or record one-off
+CI/release run links in `docs/*.md`. Code and `.spec.ts` files own implementation
+detail; Git history and Issues own incident/release logs;
+`apps/landing/content/docs/` owns user-facing tutorials.
+
+Keep each contract in one owner guide and link to it rather than copying it.
+When current code and a guide disagree, verify runtime behavior and update the
+guide in the same change. Do not copy guides back into `AGENTS.md`; maintain
+their wikilinks here.

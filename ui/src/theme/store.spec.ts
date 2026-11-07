@@ -60,8 +60,8 @@ describe('theme preference persistence', () => {
       theme: 'auto',
       dayPalette: 'paper',
       nightPalette: 'graphite',
-      uiStyle: 'broker-classic',
-    }).uiStyle).toBe('broker-classic')
+      uiStyle: 'outline',
+    }).uiStyle).toBe('outline')
 
     expect(normalizeThemePreferences({ uiStyle: 'aqua' }).uiStyle).toBe('default')
     expect(normalizeThemePreferences({ stylePaletteMode: 'recommended' }).stylePaletteMode)

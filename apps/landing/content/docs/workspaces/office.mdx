@@ -1,0 +1,124 @@
+export const metadata = {
+  title: "Office · Beta",
+  description: "Explore every active Workspace and Session on one top-down map, inspect coworkers and files, and replay the launcher-owned runtime journal.",
+}
+
+# Office · Beta
+
+**Office** is a gated preview of the active Workspace floor. It turns
+OpenAlice's existing identity and runtime records into one continuous 4:3
+top-down map:
+
+```text
+AliceProject
+└── one Office map
+    ├── Harness neighborhood (Chat / AutoQuant / Auto Prediction / Other)
+    │   └── Workspace group = furniture pod + sign + filing cabinet
+    │       └── Session / resumeId = one coworker at a desk
+    └── Alice = map character and camera anchor
+```
+
+The picture is a read-only projection. It does not create a second roster,
+conversation store, task queue, file browser, or dispatch path. `resumeId`
+remains the coworker's product identity, `taskId` remains one headless turn, and
+the persistent Session record remains the launcher row to which a process
+attaches.
+
+## Turn on the preview
+
+Open **Settings → Beta** and enable **Office**. That browser/device preference
+is still the product-preview gate and defaults off because the map is
+unfinished. **Settings → Activity bar** separately controls where the Office
+entry sits—or whether it is hidden—inside this AliceProject's home-scoped rail
+layout. Neither setting changes Workspace or backend state.
+
+The direct `/office` route still opens when the Activity Bar entry is gated or
+hidden, which keeps development links and bookmarks usable.
+
+## Read the map
+
+Office places every active business Workspace into a shared tile coordinate
+system instead of drawing one card or room per Workspace. Harness is a
+functional neighborhood label, while each Workspace is a distinct furniture
+pod with its own sign, coworkers, desks, and filing cabinet. The layout expands
+in two dimensions as more groups appear.
+
+**Live map** shows awake Workspace groups plus a recent minimum for each
+Harness, so Chat, AutoQuant, and Auto Prediction can remain locatable even while quiet. Sleeping
+groups keep their state but move out of the default view. Open **Menu → All
+groups** to inspect the whole active floor.
+
+The latest runtime event gives each coworker a compact visible state:
+
+| Mood | Meaning |
+|---|---|
+| `idle` | The Session exists but owns no live process |
+| `working` | A terminal, Web, or headless turn is running, or a tool is active |
+| `talking` | A headless turn emitted a semantic text block |
+| `waiting` | A requested dispatch could not be admitted |
+| `review` | A turn completed and its latest result is available |
+| `failed` | Launch or execution ended with a visible failure |
+
+Speech bubbles are bounded projections of the runtime journal. Tool activity
+shows only a tool name and status; OpenAlice does not copy tool input/output or
+the user prompt into Office.
+
+## Move around
+
+Drag empty map space to pan the camera. Focus the map and use **WASD** or the
+arrow keys to move Alice in 24-pixel tile steps; Alice and Workspace pods share
+the same coordinate system. **Reset map view** restores the automatic framing
+around Alice and the visible groups.
+
+The map keeps native buttons and readable labels for coworkers, Workspace
+signs, the menu, and reset control. Reduced-motion preference stops looping
+sprite and camera motion without removing textual state.
+
+## Inspect a coworker or cabinet
+
+Select a coworker to open the bottom inspection dialog. It shows the coworker
+name, `@resumeId`, current mood and surface, and an **Open session** action.
+Recent attributable artifacts form a small read-only drawer:
+
+- reports open in the file viewer;
+- Issues open in Issue detail;
+- Inbox references select the corresponding entry;
+- trade decisions open **Trading as Git** inside the **Trading** navigator when
+  that product surface is available.
+
+Select a Workspace sign or filing cabinet to open the existing Workspace Files
+panel. Office does not implement a second file browser or copy files into an
+Office database.
+
+## Replay occupancy
+
+Open **Menu → Occupancy log**, then expand **Replay**. The slider folds the same
+append-only runtime events up to a selected sequence number. Moving to an
+earlier sequence pauses live updates; choose **Live** or move to the newest
+sequence to resume the current map.
+
+The occupancy log shows Session birth, process start and stop, spawn failures,
+declined asks, and structured headless text/tool/error events. Interactive TUI
+and Web Sessions currently contribute occupancy only; OpenAlice does not
+extract their internal message/tool stream for Office.
+
+## Runtime journal
+
+The source is:
+
+```text
+<OPENALICE_HOME>/workspaces/state/agent-runtime.jsonl
+```
+
+It is launcher-owned append-only state and moves with the complete
+AliceProject home. It records replay evidence rather than dispatch authority:
+deleting or editing it must never be used to start, stop, or resume a Session.
+The journal excludes user prompts and tool payloads, but can contain clipped
+assistant text and errors, so treat a complete-home backup as private.
+
+## Next Steps
+
+- [Sessions & Collaboration](/docs/workspaces/sessions-and-collaboration) — Understand the identities and coworker names behind each desk.
+- [Workspaces](/docs/workspaces/workspaces) — Understand the files and lifecycle behind each group.
+- [Automation](/docs/workspaces/automation) — Inspect durable per-turn Runs and diagnostics.
+- [Data & Credentials](/docs/deployment/data-and-credentials) — Back up the complete home that owns the runtime journal and Activity Bar layout.

@@ -45,7 +45,7 @@ export function Metric({ label, value, delta, valueSign, size = 'md', className 
   return (
     <div className={className}>
       <p className="text-[11px] font-medium leading-4 text-muted-foreground">{label}</p>
-      <p className={valueClass}>{value}</p>
+      <p className={`oa-metric-value ${valueClass}`}>{value}</p>
       {delta && (
         <p className={`mt-0.5 inline-flex items-center gap-1 text-[12px] leading-4 tabular-nums ${signColor(delta.sign)}`}>
           <DeltaIcon sign={delta.sign} />

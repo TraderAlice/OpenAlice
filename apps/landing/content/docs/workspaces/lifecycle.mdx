@@ -1,0 +1,110 @@
+export const metadata = {
+  title: "Lifecycle & Offboarding",
+  description: "How OpenAlice offboards, restores, and purges Workspaces while preserving handoff files, Session identities, run history, and provenance.",
+}
+
+# Lifecycle & Offboarding
+
+Removing a Workspace from daily use is not a blind directory delete. OpenAlice treats it like offboarding a desk and its coworkers: inspect active work, write a handoff, move the complete checkout out of the active floor, and retain enough history to explain old reports later.
+
+## Active and departed desks
+
+```text
+<OPENALICE_HOME>/workspaces/
+├── workspaces.json
+├── workspaces/                 # active checkouts only
+├── departed-workspaces/        # retained offboarded checkouts
+└── state/
+    ├── workspace-catalog.json
+    ├── resume-identities.json
+    ├── headless-tasks.json
+    ├── artifact-provenance.json
+    └── workspace-manager-sessions/
+```
+
+`workspaces.json` answers “what can Alice run now?” The catalog records everything that has existed, where it went, and whether it can be restored. Workspace ids are never reused.
+
+The [Workspace Manager](/docs/workspaces/manager) uses this active floor as its
+coordination cwd but is not itself a registered Workspace, so inventory does not
+become self-referential.
+
+Session floor presence is a separate axis from Workspace lifecycle:
+
+```text
+active <-> archived <-> deleted
+```
+
+Missing presence means `active`. Archive hides a coworker from the ordinary Ask
+Alice/AutoQuant roster while retaining exact continuation and provenance;
+Restore returns it to the roster. Deleted is a soft dismissal: historical
+signatures and artifacts still resolve to that `resumeId`, but new follow-up is
+unavailable. This does not replace `lifecycle: retired`, which still means the
+whole Workspace departed.
+
+## Offboarding
+
+Before a Workspace departs, OpenAlice inventories:
+
+- live headless runs;
+- interactive Sessions and their signatures;
+- open and scheduled Issues;
+- the current git branch, dirty state, and changed paths.
+
+A live headless run is a hard blocker. Dirty files and open Issues are not: the complete checkout moves intact and the handoff records them.
+
+OpenAlice writes two artifacts inside the Workspace before moving it:
+
+- `.alice/HANDOFF.md` — readable reason, notes, signatures, Issues, and uncommitted paths;
+- `.alice/offboarding.json` — the same transition snapshot in a stable structured form.
+
+It then moves the checkout to `departed-workspaces/<workspaceId>`, removes it from the active registry, and retires its Session identities. Scheduled scanning sees active Workspaces only, so local schedules stop after departure.
+
+## Restore versus purge
+
+**Restore** returns the exact checkout to its original active path and recalls
+the same `resumeId` values, runtime mappings, and Workspace-local
+`.alice/sessions/<resumeId>.json` AI bindings. Returning to the same path matters
+because Agent trust stores and native conversation discovery may be
+cwd-dependent.
+
+Restore preserves durable Workspace identity, not the adapter inventory from
+the day the desk departed. Restored Workspaces use the installation's current
+registered Agent adapters and launch-time readiness checks like every active
+desk.
+
+Restore also preserves each coworker's floor presence. It does not silently
+return archived or deleted Sessions to the active roster.
+
+An absorbed source is still a departed Workspace with an additional link to the
+active target and its import commit. Restoring it explicitly recreates two
+active copies; it never removes files already copied into the target. See
+[Upgrades & Absorb](/docs/workspaces/upgrades-and-absorb#workspace-absorb).
+
+**Purge** is separate and irreversible. It removes the departed checkout,
+including its Workspace-local Session AI configuration, plus interactive
+Session records and terminal scrollback. It deliberately retains the catalog
+tombstone, retired signatures, headless run history, Inbox entries, and artifact
+provenance. An old report therefore resolves to a known retired or purged author
+instead of an unexplained missing id.
+
+## Session retirement and handoff
+
+Pausing or closing one terminal tab does not retire a Session. Offboarding retires every Session identity owned by the Workspace. A retired Session cannot resume or run a schedule, but its attribution remains valid.
+
+The global resume registry preserves identity and native continuation mapping;
+the secret-free Agent/access/model/effort binding moves with the departed
+checkout. Historical attribution therefore survives even after purge removes
+the binding that could launch the coworker.
+
+An explicit successor may be recorded for handoff. The successor is a new coworker, not a rewrite of historical authorship: old work stays signed by the original `@resumeId`.
+
+## In the Web UI
+
+The Workspaces page separates active and departed inventories. Offboarding shows blockers and the handoff snapshot before confirmation. Departed entries can be restored or purged; purge is available only after offboarding.
+
+## Next Steps
+
+- [Structure](/docs/workspaces/structure) — See the complete active state layout.
+- [Sessions & Collaboration](/docs/workspaces/sessions-and-collaboration) — Understand Session retirement and exact follow-up.
+- [Automation](/docs/workspaces/automation) — See why live runs block departure.
+- [Upgrades & Absorb](/docs/workspaces/upgrades-and-absorb) — Update one desk or archive a source after directional consolidation.

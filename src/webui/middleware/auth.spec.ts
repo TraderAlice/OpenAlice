@@ -2,7 +2,8 @@
  * Auth middleware unit tests.
  *
  * Targets the in-process logic of `createAuthMiddleware` against the
- * playbook-defined cases in safe/playbooks/01-03. Uses Hono's test
+ * red-team playbook-defined auth-bypass / CSRF / localhost-spoofing
+ * cases. Uses Hono's test
  * client (no real HTTP server). The Node socket-level remoteAddress
  * is fed via a mocked `c.env.incoming.socket.remoteAddress`.
  */

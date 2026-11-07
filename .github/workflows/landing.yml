@@ -1,0 +1,45 @@
+name: Landing Validation
+
+on:
+  pull_request:
+    branches: [dev, master]
+    paths:
+      - 'apps/landing/**'
+      - 'package.json'
+      - 'pnpm-lock.yaml'
+      - 'pnpm-workspace.yaml'
+      - 'turbo.json'
+      - '.github/workflows/landing.yml'
+  push:
+    branches: [dev, master]
+    paths:
+      - 'apps/landing/**'
+      - 'package.json'
+      - 'pnpm-lock.yaml'
+      - 'pnpm-workspace.yaml'
+      - 'turbo.json'
+      - '.github/workflows/landing.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: landing-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  landing:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile --filter @traderalice/landing
+      - run: pnpm --filter @traderalice/landing test
+      - run: pnpm --filter @traderalice/landing lint
+      - run: pnpm landing:build

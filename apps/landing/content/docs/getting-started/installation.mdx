@@ -1,0 +1,145 @@
+export const metadata = {
+  title: "Installation Overview",
+  description: "Install the native CLI with Shell, PowerShell, npm, Bun, or Homebrew, or choose desktop, source, and server setup.",
+  releaseChannel: "stable",
+  targetVersion: "0.94.1",
+}
+
+# Installation Overview
+
+Pick the path that matches what you are trying to do.
+
+- **[macOS desktop](/docs/getting-started/install-macos):** Install the signed
+  and notarized package for Apple Silicon or Intel.
+- **[Windows](/docs/getting-started/install-windows):** Install the native CLI
+  with PowerShell, npm, or Bun; choose the unsigned desktop package or source
+  when they better fit your workflow.
+- **[Native CLI](/docs/deployment/remote-access):** Install a local Runtime with
+  the stable direct installer or a package manager.
+- **[Private server](/docs/deployment/remote-access#register-a-remote-machine):**
+  Run Alice on a registered SSH Machine while its browser stays local.
+- **[Source & Dev](/docs/getting-started/developer-setup):** Build and debug
+  OpenAlice from a checkout.
+
+OpenAlice does **not** need a database. State is file-backed: config, sessions, trading history, news, issues, inbox entries, workspace artifacts, and provider settings live under `~/.openalice` by default. An installed remote Runtime uses its own complete home on that host. See [Data & Credentials](/docs/deployment/data-and-credentials) when you need the exact layout, admin token recovery, sealed broker credentials, or port configuration.
+
+## Install the stable CLI
+
+On macOS or Linux:
+
+```bash
+curl -fsSL https://openalice.ai/install | bash
+```
+
+On Windows x64 or ARM64, use PowerShell:
+
+```powershell
+& ([scriptblock]::Create((Invoke-RestMethod https://openalice.ai/install.ps1)))
+```
+
+Or choose one package manager:
+
+```bash
+npm install -g openalice --allow-scripts=openalice
+bun add -g --trust openalice
+brew install traderalice/tap/openalice
+```
+
+npm and Bun support macOS, Linux, and Windows. Homebrew supports macOS and
+Linux. Linux native packages require glibc. npm 12 requires the script approval
+shown above; Bun requires `--trust`. AUR is not publicly available yet.
+
+Then run `openalice`. The native executable does not require Node or Bun at
+runtime. Git and Bash are separate system dependencies: direct installation
+and setup reuse existing tools and ask before installing missing ones;
+Homebrew resolves them as dependencies. Choose and authenticate your coding
+agent separately. Use `openalice setup --check` to inspect prerequisites.
+
+### Preview channels and updates
+
+The direct Shell installer accepts `--channel beta` or `--channel dev`:
+
+```bash
+curl -fsSL https://openalice.ai/install | bash -s -- --channel beta
+```
+
+PowerShell accepts `-Channel beta` or `-Channel dev` after the command.
+Package managers follow stable. Dev builds follow the latest published dev
+candidate and may differ from the stable documentation.
+
+Direct installs update with `openalice update`. For npm, Bun, or Homebrew,
+use the owning package manager to update or uninstall. Stop an active Runtime
+with `openalice down` before upgrading, then start it with `openalice up`.
+Removing installation files preserves AliceProjects and user data.
+
+For development and source debugging, follow [Source & Dev](/docs/getting-started/developer-setup).
+
+The packaged desktop builds include their own Workspace runtime: Electron's
+Node, managed Pi, and pinned `fd`/`ripgrep`, with PortableGit and Bash added on Windows. They still
+need model access: let managed Pi manage access through its own login/provider
+flow, configure an API key in **Settings → AI Provider**, or use another
+installed Agent with its own login and configuration. If something
+breaks and you want visibility, the source path is the easiest way to see logs,
+patch locally, and report a useful bug. Stable releases publish desktop packages
+alongside the CLI.
+
+Current OpenAlice releases recognize Cursor Agent (`cursor-agent`), Antigravity
+(`agy`), Grok Build (`grok`), and Oh My Pi (`omp`) when those upstream CLIs are
+on `PATH`. They use the same durable interactive/headless Session boundary but
+are not bundled into the desktop packages; the runtime picker shows an install
+hint when one is missing. See [AI Providers](/docs/integration/ai-providers#additional-native-runtimes)
+for authentication and model semantics.
+
+## Check the installed version
+
+Open **Settings → General → About OpenAlice** to see the running version,
+runtime profile, release channel, and update status. **Check for updates**
+refreshes the release lookup immediately.
+
+Desktop auto-update has a separate handoff from installing a fresh package. If
+an update fails, install the latest desktop package again or use source for
+detailed logs.
+The desktop UI reports determinate download progress, then **Preparing the
+update**, **Safely stopping OpenAlice services**, **Finishing the current
+session**, and **Handing the update to the system installer** without inventing
+an installer percentage. OpenAlice closes while the native installer replaces
+it and should reopen automatically; the handoff can take up to a minute.
+
+Before closing, the desktop records a machine-local
+`openalice-update-attempt.json` marker outside `OPENALICE_HOME`. The new version
+clears it on first launch. If the old version is still present after the
+installer window, OpenAlice archives the marker as `.failed` and reports the
+failed target version and diagnostic log path instead of treating the handoff
+as a silent crash. An Alice backend failure before the window loads likewise
+shows the last diagnostic lines and log path in a native error.
+
+Desktop diagnostics can contain local paths and Runtime context; review the
+bounded log before sharing it.
+
+Release candidates now run an isolated previous-release-to-candidate desktop
+journey on Apple Silicon, Intel macOS, and Windows, preserving Workspace
+identity, display metadata, and renderer state before publication. This is a
+stronger upgrade gate, though it does not prove every in-app installer handoff.
+If a package still cannot start, install the latest package again or switch to
+source. User data remains outside the app bundle under the selected OpenAlice
+home.
+
+## First thing after install
+
+Once OpenAlice opens, do the core loop before connecting broker accounts:
+
+1. Open [Quick Start](/docs/getting-started/quick-start).
+2. Ask Alice for a research task.
+3. Track an entity.
+4. Create or schedule an issue.
+5. Read the result in Inbox.
+
+Broker execution is optional beta infrastructure. Use simulator, paper, demo, or testnet accounts first; read [What is UTA](/docs/core-concepts/unified-trading-account) before connecting live funds.
+
+## Next Steps
+
+- [macOS](/docs/getting-started/install-macos) - Install the signed desktop package.
+- [Windows](/docs/getting-started/install-windows) - Choose the native CLI, unsigned desktop package, or source.
+- [Source & Dev](/docs/getting-started/developer-setup) - Clone, run, debug, test, and build.
+- [CLI & Remote Access](/docs/deployment/remote-access) - Supervise local AliceProjects or connect to a private SSH host.
+- [AliceProjects](/docs/deployment/alice-projects) - Separate complete homes, runtimes, and TraderAlice/NanoAlice product identity.

@@ -17,6 +17,12 @@
     "@traderalice/openalice-cli#build": {
       "dependsOn": ["^build"],
       "outputs": []
+    },
+    "@traderalice/landing#build": {
+      "dependsOn": [],
+      "outputs": [".next/**", "!.next/cache/**"],
+      "cache": false,
+      "env": ["NEXT_PUBLIC_MEDIA_BASE_URL"]
     }
   }
 }

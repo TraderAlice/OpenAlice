@@ -4,7 +4,8 @@
  * See:
  *   - token-store.ts   — single admin token, scrypt-hashed at rest
  *   - session-store.ts — opaque session IDs, file-as-truth
- *   - safe/AGENT_BRIEF.md — the red-team brief that drives this design
+ *   - The design is driven by the red-team threat model for the auth
+ *     surface (the retired AGENT_BRIEF scaffold).
  */
 
 export {

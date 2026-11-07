@@ -9,7 +9,7 @@
  * its `models` → schema.model.oneOf (see src/ai-providers/presets.ts buildJsonSchema).
  */
 
-import type { ModelSemantics, Preset, PresetModel, SerializedRegion, WireShape } from '../api'
+import type { Preset, PresetModel, SerializedRegion, WireShape } from '../api'
 import type { AgentInfo, AgentProviderCapabilities } from '../components/workspace/api'
 
 export interface LabeledOption {
@@ -202,28 +202,6 @@ export function presetModel(p: Preset | null | undefined, modelId: string): Pres
   return presetModels(p).find((model) => model.id === modelId.trim()) ?? null
 }
 
-/** Compact explanation for known facts; null means the registry is silent. */
-export function describeModelSemantics(semantics: ModelSemantics | null | undefined): string | null {
-  if (!semantics) return null
-  const parts: string[] = []
-  if (semantics.reasoning) {
-    if (semantics.reasoning.mode) parts.push({
-      none: 'No reasoning mode',
-      optional: 'Reasoning optional',
-      adaptive: 'Adaptive reasoning',
-      required: 'Reasoning always on',
-    }[semantics.reasoning.mode])
-    else if (semantics.reasoning.supported !== undefined) parts.push(semantics.reasoning.supported ? 'Reasoning supported' : 'No reasoning mode')
-    if (semantics.reasoning.defaultEffort) parts.push(`default effort: ${semantics.reasoning.defaultEffort}`)
-    else if (semantics.reasoning.defaultEnabled !== undefined) {
-      parts.push(`thinking default: ${semantics.reasoning.defaultEnabled ? 'on' : 'off'}`)
-    }
-    if (semantics.reasoning.interleaved) parts.push('interleaved thinking')
-  }
-  if (semantics.contextWindow) parts.push(`${formatTokenCount(semantics.contextWindow)} context`)
-  return parts.length > 0 ? parts.join(' · ') : null
-}
-
 /** Use the catalog's actual field default instead of assuming list order. */
 export function presetDefaultModel(p: Preset | null | undefined): string {
   if (!p) return ''
@@ -343,13 +321,4 @@ export function baseUrlToVendor(baseUrl: string | null | undefined, fallback?: s
     if (pattern.test(url)) return vendor
   }
   return fallback ?? null
-}
-
-function formatTokenCount(value: number): string {
-  if (value >= 1_000_000) {
-    const millions = value / 1_000_000
-    return `${Number.isInteger(millions) ? millions.toFixed(0) : millions.toFixed(2)}M`
-  }
-  if (value >= 1_000) return `${Math.round(value / 1_000)}K`
-  return String(value)
 }

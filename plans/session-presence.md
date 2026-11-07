@@ -1,7 +1,7 @@
 # Plan: Session floor presence (active / archived / deleted)
 
 **Status:** active  
-**Owner guides:** [[docs/workspace-lifecycle.md]], [[docs/conversation-provenance.md]]  
+**Owner guides:** [[docs/workspace-lifecycle.md]]  
 **Delivery:** serial PRs to `dev` (`area:workspace`). Increment 2 is `review:deep`. Open PR, do not merge.
 
 ## Goal

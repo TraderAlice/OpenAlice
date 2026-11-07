@@ -1,0 +1,150 @@
+export const metadata = {
+  title: "Equity Research",
+  description: "Company profiles, financial statements, analyst estimates, earnings calendar, and insider trading data.",
+}
+
+# Equity Research
+
+OpenAlice provides a suite of equity research tools powered by its in-process market-data engine. They work out of the box with **no API keys** — the [Data Hub](/docs/market-data/data-hub) serves the keyed sources (FMP, FRED, …) for free, with the free `yfinance` provider as the local fallback. Beyond that global `yfinance` default, regional equity vendors can be enabled — `eastmoney` for CN A-shares and `twse` for Taiwan — to add native-language search, quotes, metrics, and profiles that `yfinance` doesn't serve for those names.
+
+## Available Tools
+
+### equityGetProfile
+
+Company overview combined with key valuation metrics.
+
+**Returns:** name, sector, industry, description, website, CEO, employee count, market cap, PE ratio, PB ratio, EV/EBITDA, dividend yield, and more.
+
+```
+You: Tell me about Apple.
+
+Alice: [calls equityGetProfile("AAPL")]
+
+      Apple Inc (AAPL) — Technology / Consumer Electronics
+      Market Cap: $3.2T | PE: 32.5 | Dividend Yield: 0.5%
+      ...
+```
+
+### equityGetFinancials
+
+Financial statements: income statement, balance sheet, or cash flow.
+
+**Parameters:**
+- `type` — `income`, `balance`, or `cash`
+- `period` — `annual` or `quarter` (default: annual)
+- `limit` — Number of periods (default: 5)
+
+```
+You: Show me Apple's quarterly income for the last 4 quarters.
+
+Alice: [calls equityGetFinancials("AAPL", type="income", period="quarter", limit=4)]
+```
+
+### equityGetRatios
+
+Financial ratios across profitability, liquidity, leverage, and efficiency.
+
+**Returns:** ROE, ROA, gross margin, net margin, operating margin, current ratio, quick ratio, debt/equity, asset turnover, inventory turnover.
+
+### equityGetEarningsCalendar
+
+Upcoming and recent earnings release dates.
+
+**Parameters:**
+- `symbol` — Specific company (optional)
+- `start_date` / `end_date` — Date range for market-wide calendar
+
+> Check the earnings calendar before holding positions through earnings — these events carry significant risk.
+
+### equityGetInsiderTrading
+
+Recent buy/sell transactions by company insiders (executives, directors, major shareholders).
+
+**Parameters:**
+- `symbol` — Company ticker
+- `limit` — Number of transactions (default: 20)
+
+Insider buying is often a bullish signal. Large insider selling may warrant caution.
+
+### equityDiscover
+
+Market movers — what's trending right now, enriched with volume context.
+
+**Parameters:**
+- `type` — `gainers` (top price gainers), `losers` (top losers), or `active` (most traded by volume)
+- `sortBy` *(optional)* — `default` (keep the provider's ranking), `relative_volume` (re-rank by *unusual* volume), or `dollar_volume` (re-rank by traded notional — where the money actually is)
+
+Each row carries volume context so you can separate a real anomaly from an ever-active mega-cap:
+
+| Field | Meaning |
+|-------|---------|
+| `avg_volume` | 3-month average daily volume |
+| `relative_volume` | Today's volume ÷ that average (>1 = heavier than usual) |
+| `turnover` | Volume ÷ shares outstanding |
+| `dollar_volume` | Price × volume — traded notional, comparable across tickers |
+
+```
+You: What's moving on unusual volume today?
+
+Alice: [calls equityDiscover(type="active", sortBy="relative_volume")]
+
+      1. RDW   +8.1%   RVOL 2.3×
+      2. AVGO  +3.4%   RVOL 3.3×
+      ...
+```
+
+Sorting `active` by `relative_volume` surfaces genuine anomalies instead of names that are *always* heavily traded (NVDA at a normal RVOL of ~1.0); `dollar_volume` instead ranks by sheer notional.
+
+> The same gainers / losers / most-active cross-section (plus Yahoo screeners) is also available pre-assembled as the **`movers`** [Data Hub board](/docs/market-data/data-hub#reference-boards) — `marketGetBoard(board="movers")`, or the Movers board in the Web UI — when you want the whole picture in one call rather than a single `type`.
+
+### ETF tools
+
+Thematic and structural lookups on ETFs — one level finer than the broad GICS [sector rotation](/docs/market-data/sector-rotation):
+
+| Tool | What it returns |
+|------|-----------------|
+| `etfSearch(query, limit?)` | ETFs by theme or keyword — "robotics", "uranium", "cybersecurity" |
+| `etfGetInfo(symbol)` | Profile + a reflexivity read: issuer, category, inception, **AUM**, NAV, average volume |
+| `etfGetHoldings(symbol)` | Underlying positions and weights — catches single-name concentration a label hides |
+| `etfGetSectors(symbol)` | The ETF's GICS sector breakdown |
+
+```
+You: What's actually inside SMH?
+
+Alice: [calls etfGetHoldings("SMH")]
+      NVDA 21% · TSM 13% · AVGO 8% · …
+```
+
+## Data Providers
+
+The default provider is `yfinance` (free, no API key). Some tools draw on premium providers — but the [Data Hub](/docs/market-data/data-hub) relays those keyless, so you only need your own key to bypass the hub or cover a dataset it doesn't. For regional equity coverage, the [Chart Vendors picker](/docs/market-data/symbol-search) adds `eastmoney` (CN A-shares) and `twse` (Taiwan) — these are keyless and simply **toggled on**, not keyed. For `.TW`/`.TWO` names, `twse` adds official Taiwan key metrics (P/E · 殖利率/yield · P/B) and company profiles on top of `yfinance`:
+
+| Provider | Used by | Your own key needed? |
+|----------|---------|:----------------:|
+| `yfinance` | Profile, financials, historical | No |
+| `fmp` | Ratios, earnings calendar, insider trading | No (Hub relays it) |
+| `fred` | Macro / economic data | No (Hub relays it) |
+| `benzinga` | News, analyst ratings | Yes |
+
+To supply your own key (per-install), add it in `~/.openalice/data/config/market-data.json`; for a machine-wide key shared across checkouts, use `~/.openalice/provider-keys.json` instead (they merge local-wins):
+
+```json
+{
+  "providerKeys": {
+    "fmp": "your-fmp-key"
+  }
+}
+```
+
+## Usage Tips
+
+- Always use `marketSearchForResearch` first if you're unsure of the exact symbol
+- Financial data is fetched live — no caching, always current
+- Combine multiple tools for comprehensive analysis: profile for overview, financials for fundamentals, estimates for sentiment, insider trading for signals
+
+## Next Steps
+
+- [Symbol Search](/docs/market-data/symbol-search) — Resolve research symbols before analysis.
+- [Data Hub](/docs/market-data/data-hub) — Understand the zero-key provider path.
+- [Technical Analysis](/docs/market-data/technical-analysis) — Add price/volume structure to a thesis.
+- [Trading Setup](/docs/trading/accounts-and-brokers) — Move from research symbols to tradeable contracts.

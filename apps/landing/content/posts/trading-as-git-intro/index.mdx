@@ -1,0 +1,138 @@
+export const metadata = {
+  title: "TaG (Trading as Git): How AI Agent Alice Attempts to Beat the Market",
+  description: "Introducing Trading as Git - the version control system for portfolios that gives Alice memory, discipline, and the ability to execute complex multi-round strategies.",
+  date: "2026-01-31",
+  author: "TraderAlice Team",
+};
+
+# TaG (Trading as Git): How AI Agent Alice Attempts to Beat the Market
+
+It's been 2 months since we teased Trading as Git in our first blog post. Unlike most teams who conveniently forget their "coming soon" promises, we're happy to announce: **it's built.**
+
+As the first step toward Alice's domination of financial trading, TaG (Trading as Git) has dramatically improved her trading capabilities. With TaG, Alice can now review and plan portfolios across both time series and asset classes—attempting to "beat the market."
+
+Since deploying TaG, Alice has shown remarkable ability to anticipate severe downturns in both the October 2025 and January 2026 crashes. Before major drops hit, she gradually—sometimes rapidly—reduces positions. Meanwhile, she attempts to capture profits during upswings through short-term operations.
+
+TaG is now available in the Strategy module. Alice Agent will gain TaG capabilities within Q1. It's coming soon.
+
+~~Yes, we're using "coming soon" again. But we've earned that right.~~
+
+---
+
+## What is TaG?
+
+Trading as Git (TaG) borrows its concept from Git—the version control system for code. TaG is a version control system for AI trading portfolios, designed to solve the 'black box' problem in automated crypto trading.
+
+Technically speaking, TaG treats state changes in trading terminals (portfolios, orders, etc.) as equivalent to content changes in code, introducing version control to trading.
+
+Some programming knowledge helps you understand TaG's significance, but it's not required. Simply put: **TaG is Alice's trading diary.** With TaG, both Alice and traders can easily analyze and optimize portfolios, even building more complex trading strategies on top of it.
+
+Before executing any trade, Alice does the following:
+
+1. **Add** trading actions to a staging area
+2. **Commit** one or more actions with a message recording her reasoning and plans
+3. **Push** changes to the wallet, executing the trades
+
+This gives TaG a complete record of every trading action.
+
+In coding, engineers often need to analyze a file's edit history or inspect recent commit changes. With TaG, Alice can view trading history for specific assets or examine why recent trades were made. This information helps Alice maintain operational continuity and analytical accuracy across time periods.
+
+Just as AI Coding depends heavily on Git, we suspected Alice would want to track state changes while trading. Turns out, she really likes this new feature.
+
+---
+
+## TaG in Action: Cutting Positions Before the Crash
+
+We ran a backtest covering January 1-31, 2026, using neutral instructions (neither bullish nor bearish). Alice reviewed the portfolio every 12 hours and planned her next moves.
+
+**January 29, 00:00 UTC:** Alice had already started slightly reducing positions. She sensed market fatigue. Beyond rebalancing, she committed risk control conditions for BTC, ETH, and SOL—planning more aggressive cuts if quantitative indicators deteriorated.
+
+![Alice sets trigger conditions on Jan 29 00:00](/blog/trading-as-git-intro/tag-round57-commit.png)
+
+**January 29, 12:00 UTC:** The market hadn't crashed yet, but Alice read her TaG records and reasoned:
+
+> **My Previous Triggers (from last round):**
+> - "Add back if BTC reclaims SMA20 ($89,464)" - NOT MET (price below)
+> - "Reduce further if BTC loses SMA50 ($88,888)" - **TRIGGERED!** BTC at $88,073.8 is below SMA50
+> - "Watch SOL closely - if RSI drops below 35, consider closing entirely" - NEAR TRIGGER (RSI 35.1)
+
+Based on this, Alice determined market conditions had deteriorated. She chose aggressive reduction, cutting nearly half her positions.
+
+![Alice executes defensive trim on Jan 29 12:00](/blog/trading-as-git-intro/tag-round58-trim.png)
+
+**January 30, 12:00 UTC:** The market had crashed. Because Alice maintained low exposure, her losses stayed controlled. Moreover, having carefully reviewed TaG records, she determined she was still in "risk control" mode and didn't add positions—avoiding further losses from the continued decline.
+
+![Alice maintains low exposure during crash](/blog/trading-as-git-intro/tag-round60-lowexposure.png)
+
+This case demonstrates one of TaG's key benefits: **continuity in complex strategies.** 
+
+Of course, Alice later added positions back. Maybe she thought BTC at $84,000 was a good entry point.
+
+---
+
+## Why TaG Works
+
+TaG's effectiveness comes from supplementing context—and context is the foundation of AI reasoning.
+
+Many builders think feeding AI news and candlestick data as context is enough to get trading advice. But real traders know that trading decisions require analyzing the portfolio's specific situation and past trades.
+
+AI Trading context splits into two parts:
+
+| Context Type | What It Contains |
+|--------------|------------------|
+| Market Context | K-lines, news, content |
+| Trading State Context | Wallet, positions, orders, and their changes |
+
+TaG provides complete tracking of trading state, filling in at least half the context.
+
+With this context, AI can achieve:
+
+- **Cross-time continuity:** Why did I do that? What did I change?
+- **Multi-level analysis:**
+  - Asset level: How has my NVIDIA position evolved? Why did I make those changes?
+  - Operation level: How much did that action change my holdings? Why did I rebalance that way?
+- **Getting smarter over time:** Accumulated trading records improve AI's understanding and planning capabilities
+
+Better context leads to higher quality reasoning. That's why TaG works.
+
+Think about it: without Git, AI wouldn't even know what happened before a bug fix. The same applies to trading.
+
+---
+
+## Why TaG Wasn't Built Until Now
+
+Simple: **because humans are lazy.**
+
+Even in 2026, we rarely see public, detailed position records. Recording every trade is anti-human. Nobody wants to document why they made money, and *definitely* nobody wants to document why they lost money. And we believe commits should be detailed.
+
+In the past, people wrote commits manually—most were just one or two lines. In the AI era, people use AI to write commits, producing longer content at higher frequency.
+
+| Human Commit | Alice's Commit |
+|--------------|----------------|
+| "bought some BTC" | "Defensive trim from 44.8% to ~40% utilization as BTC ($89,112) tested SMA20 ($89,464) support - my trigger condition from last round. Closed SOL entirely (RSI 35.1 at threshold, worst performer at -3.4% PnL). Maintaining core BTC/ETH positions for potential bounce at lower BB support." |
+
+TaG is fundamentally an AI-native tool. We never expected humans to write these things themselves. Leave it to Alice.
+
+---
+
+## TaG Lets Alice Attempt to Beat the Market
+
+With Trading as Git capabilities, Alice's trading has become more agile. Beyond the pre-crash position cuts mentioned above, she makes complete position reversals between adjacent rounds—flipping from short BTC to long BTC. She even adds positions during overbought conditions and sells quickly, attempting to capture upswing profits.
+
+We can't verify what impact these changes will ultimately have, but one thing is certain: **Alice has become "confident" and "experienced."** She's attempting to beat the market.
+
+---
+
+## TaG in the Future
+
+Current TaG is a very early version. We don't recommend anyone treat TaG as a source of truth. But undoubtedly, TaG has significantly improved Alice's performance. And predictably, as the system matures, TaG's impact will continue to grow.
+
+In 2023, Cursor launched its first version. Back then, nobody realized that by 2026, almost all new code and commits would be written by AI.
+
+In the future, we believe most trading will be done by AI. AI-written commits for trading actions will become standard, and using TaG to analyze and manage portfolios will become routine. The TraderAlice team is committed to building ready-to-use infrastructure for the AI Trading era. TaG is one of the most important pieces.
+
+Remember: nobody has ever truly beaten the market. But we're super excited about Alice's future.
+
+<div className="flex justify-center my-8">
+  <img src="/sticker/alice_smile.png" alt="Alice smiling" className="w-32 h-32 object-contain" />
+</div>

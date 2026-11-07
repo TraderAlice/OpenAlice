@@ -49,7 +49,7 @@ implemented and selected from the negotiated server version and message id.
 The message id is a wire-envelope field and is removed by `EClient` before a
 text payload reaches `Decoder.interpret()`. Decoder handlers begin at the first
 payload field; they must not read or reconstruct the message id. See the
-[IBKR wire protocol owner guide](../../docs/ibkr-wire-protocol.md) before
+[UTA and IBKR wire protocol owner guide](../../docs/uta-live-testing.md) before
 changing framing or text handlers.
 
 ## Project Structure
@@ -121,7 +121,7 @@ collected without the explicit live-paper acknowledgement.
 
 Text-decoder changes must include payload-only fixtures for the touched handler
 category plus framing and malformed-message recovery coverage. Run the
-[owner-guide verification ladder](../../docs/ibkr-wire-protocol.md#verification-ladder)
+[owner-guide verification ladder](../../docs/uta-live-testing.md)
 before live broker acceptance.
 
 ### TWS Ports

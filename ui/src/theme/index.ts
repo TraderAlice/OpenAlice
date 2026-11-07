@@ -14,18 +14,13 @@
 
 import { resolveEffectivePalette } from './palettes'
 import { useThemeStore, readInitialThemePreferences } from './store'
-import { UI_STYLE_PROFILES, type UiStyleProfileDefinition } from './styleProfiles'
+import { resolveStylePalettePair } from './styleProfiles'
 
 const systemTheme = window.matchMedia('(prefers-color-scheme: dark)')
 
 function applyTheme(state: ReturnType<typeof readInitialThemePreferences>): void {
   const root = document.documentElement
-  const styleDefinition: UiStyleProfileDefinition | undefined = UI_STYLE_PROFILES.find(
-    ({ id }) => id === state.uiStyle,
-  )
-  const stylePalettePair = state.stylePaletteMode === 'recommended'
-    ? styleDefinition?.recommendedPalettePair
-    : undefined
+  const stylePalettePair = resolveStylePalettePair(state.uiStyle, state.stylePaletteMode)
   root.dataset.theme = state.theme
   root.dataset.dayPalette = state.dayPalette
   root.dataset.nightPalette = state.nightPalette

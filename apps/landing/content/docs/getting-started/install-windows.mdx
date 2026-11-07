@@ -1,0 +1,203 @@
+export const metadata = {
+  title: "Windows",
+  description: "Install the native Windows CLI with PowerShell, npm, or Bun, or choose desktop and source setup.",
+  releaseChannel: "stable",
+  targetVersion: "0.94.1",
+}
+
+# Windows
+
+## Native CLI (x64 and ARM64)
+
+Open PowerShell 5.1 or newer and run:
+
+```powershell
+& ([scriptblock]::Create((Invoke-RestMethod https://openalice.ai/install.ps1)))
+```
+
+This installs the stable CLI for your architecture. Windows must provide
+`tar.exe`. The installer does not require administrator access or a persistent
+execution-policy change. It can add its command directory to your user PATH;
+open a new terminal afterward.
+
+Alternatively, use npm or Bun:
+
+```powershell
+npm install -g openalice --allow-scripts=openalice
+```
+
+```powershell
+bun add -g --trust openalice
+```
+
+The npm flag approves OpenAlice's installation script for npm 12. Bun requires
+`--trust` for the same materialization step. Then start OpenAlice:
+
+```powershell
+openalice
+```
+
+The native CLI does not require Node or Bun at runtime. Git/Bash and coding
+agents are separate dependencies. Existing Git/Bash installations are reused;
+missing tools require separate consent and may require elevation. Run
+`openalice setup --check` to inspect dependencies or `openalice setup` to retry
+setup. Choose and authenticate your preferred coding agent.
+
+Add `-Channel beta` or `-Channel dev` to the PowerShell command to select a
+preview channel, or `-Plan` to review the installation plan. npm/Bun follow
+stable. For direct installs use `openalice update`; for package-manager installs
+update through that manager. Stop a running Runtime with `openalice down`, then
+restart with `openalice up` to activate an update.
+
+Bun on Windows has a known uninstall issue: removing the package can leave a
+global `openalice.exe` entry. See [issue #1347](https://github.com/TraderAlice/OpenAlice/issues/1347).
+
+## Other Windows paths
+
+OpenAlice also provides:
+
+- the **source install** for development, debugging, and reporting failures; and
+- the **self-contained desktop package** bundles Electron Node, managed Pi,
+  PortableGit, Bash, pinned `fd`/`ripgrep`, and the OpenAlice Workspace CLIs.
+
+The desktop package is published in the stable release, but its `.exe` remains
+unsigned and may trigger SmartScreen. Use the source path below when you need
+detailed build and runtime logs.
+
+## Desktop installer
+
+[Download the unsigned Windows x64 `.exe`](https://download.openalice.ai/windows-x64.exe)
+
+The packaged default does not require Node, npm, pnpm, Git for Windows, WSL, or
+a separately installed agent CLI, but it is not the most debuggable Windows
+path yet. After installation, let managed Pi manage access through its own
+login/provider flow or choose **Settings → AI Provider**, then create a Chat
+Workspace using Pi. A saved vault credential can optionally become Pi's default
+for new Workspaces.
+
+The app supplies the runtime, not the model account. You may also install
+Claude Code, Codex, Cursor Agent, Antigravity, Grok Build, Oh My Pi, OpenCode,
+or Pi yourself and use its normal login/config. Follow the selected runtime's
+upstream Windows instructions; the POSIX one-line install hints shown on other
+platforms are not Windows setup commands.
+
+The app shows download progress, then named
+shutdown and installer-handoff stages. **Restart and update** stops managed
+services, releases the Runtime lock, runs the assisted NSIS replacement
+silently, and should reopen OpenAlice automatically. The app may remain closed
+for up to a minute; do not launch another copy during that handoff.
+
+The 0.89 updater also takes over residual processes from older installations
+and bypasses legacy long-path uninstallers before replacement. If the handoff
+cannot start, OpenAlice keeps or relaunches the current version and reports the
+diagnostic log. If the old version returns after an incomplete update, the next
+launch identifies the target that failed and offers retry or manual
+installation. User data remains outside the app bundle under the selected
+OpenAlice home.
+
+## Source install
+
+### Requirements
+
+Install these first:
+
+- [Node.js 22.19.0+](https://nodejs.org/)
+- [Git for Windows](https://gitforwindows.org/)
+- pnpm 10+
+- an agent CLI, usually `claude` or `codex`
+
+Install pnpm with:
+
+```powershell
+npm install -g pnpm
+```
+
+Or use Corepack if you already prefer it:
+
+```powershell
+corepack enable
+corepack prepare pnpm@latest --activate
+```
+
+### Clone and install
+
+Open PowerShell, then run:
+
+```powershell
+git clone https://github.com/TraderAlice/OpenAlice.git
+cd OpenAlice
+pnpm install
+```
+
+### Run OpenAlice
+
+```powershell
+pnpm dev
+```
+
+The dev orchestrator prints the URLs it picked. Open the **UI** URL, usually:
+
+```text
+http://localhost:5173
+```
+
+Trust the URL printed by the terminal if the port auto-bumps.
+
+### Runtime-managed access
+
+OpenAlice does not run the model loop inside its own backend. It starts native agent CLIs inside workspaces.
+
+For Claude Code:
+
+```powershell
+claude
+```
+
+Complete the login flow once. If you use Codex:
+
+```powershell
+codex login
+```
+
+You can also add API-key credentials later in **Settings -> AI Provider**.
+
+### Do you need WSL or Git Bash?
+
+Usually, no.
+
+Built-in workspace templates bootstrap on OpenAlice's Node process and bundled
+git path. They do not need bash, WSL, or system git at runtime. A source
+checkout discovers Git Bash from the Workspace-shell preference, `PATH`, or
+standard Git for Windows locations.
+
+Install Git for Windows for source-based Workspace terminals and scheduled
+shell work. WSL2 is not required. A third-party template may still bring its
+own additional shell assumptions.
+
+## Troubleshooting
+
+**PowerShell cannot run pnpm** — Check your execution policy or use a normal terminal profile that can run global npm binaries.
+
+**A port is already in use** — `pnpm dev` probes and auto-bumps ports. Open the URL it prints.
+
+**SmartScreen blocks the `.exe`** — Use the source path above. The package is
+self-contained, but the Windows installer remains unsigned.
+
+**The app fails after a desktop update** — Read the native error's last Alice
+output and diagnostic log path. Retry from Settings or install the latest
+`.exe` again; use the source path when you need the clearest logs. Your
+workspaces and settings live outside the app bundle.
+
+**Agent authentication fails** — Run `claude` or `codex login` directly in the same Windows user account, complete login, then restart `pnpm dev`.
+
+**A Workspace or scheduled run cannot find Bash** — Open **Settings → General
+→ Workspace shell (Windows)**. Use Automatic with Git for Windows installed,
+or select an absolute `bin\bash.exe` path. An invalid custom path fails loudly
+instead of silently falling back.
+
+## Next Steps
+
+- [Quick Start](/docs/getting-started/quick-start) - Run a real workspace-backed task.
+- [Source & Dev](/docs/getting-started/developer-setup) - Learn the dev process, ports, tests, and logs.
+- [AI Providers](/docs/integration/ai-providers) - Use API keys instead of CLI subscription login.
+- [Workspace Templates](/docs/workspaces/templates) - Understand why built-in templates work without bash.

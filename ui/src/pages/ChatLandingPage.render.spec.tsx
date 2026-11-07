@@ -193,8 +193,13 @@ async function findInferenceTrigger(model: string): Promise<HTMLButtonElement> {
   return trigger
 }
 
-function expectDefaultEffort(label: string): void {
-  expect(screen.getByRole('button', { name: 'AI Provider, Model and reasoning' }).textContent).toContain(label)
+async function expectDefaultEffort(label: string): Promise<void> {
+  const trigger = screen.getByRole('button', { name: 'AI Provider, Model and reasoning' })
+  trigger.focus()
+  fireEvent.keyDown(trigger, { key: 'ArrowDown' })
+  const effort = await screen.findByRole('menuitem', { name: /Effort/ })
+  expect(effort.textContent).toContain(label)
+  fireEvent.keyDown(effort, { key: 'Escape' })
 }
 
 async function openInferenceSubmenu(label: 'Model' | 'Effort'): Promise<void> {
@@ -705,7 +710,7 @@ describe('ChatLandingPage keyboard submission', () => {
     fireEvent.click(screen.getByRole('button', { name: 'AI Provider, Model and reasoning' }))
     fireEvent.click(await screen.findByRole('menuitem', { name: /^AI Provider/ }))
     fireEvent.click(screen.getByRole('menuitem', { name: /deepseek-1/ }))
-    expect(await findInferenceTrigger('deepseek-v4-flash')).toBeTruthy()
+    expect(await findInferenceTrigger('DeepSeek V4 Flash')).toBeTruthy()
     expect(screen.queryByText('New Session only')).toBeNull()
     expect(screen.queryByText(/instead of Workspace/)).toBeNull()
     expect(screen.queryByText('Workspace settings stay unchanged')).toBeNull()
@@ -853,8 +858,7 @@ describe('ChatLandingPage AI source disclosure', () => {
     expect((await screen.findByRole('button', { name: 'AI Provider, Model and reasoning' })).getAttribute('title')).toContain('DeepSeek')
     await waitFor(() => {
       const summary = screen.getByRole('button', { name: 'AI Provider, Model and reasoning' }).textContent
-      expect(summary).toContain('deepseek-v4-flash')
-      expect(summary).toContain('high reasoning')
+      expect(summary).toContain('DeepSeek V4 Flash')
     })
     fireEvent.change(screen.getByPlaceholderText('Describe the task, question, or decision…'), { target: { value: 'Continue.' } })
     fireEvent.click(screen.getByRole('button', { name: 'Send' }))
@@ -930,7 +934,8 @@ describe('ChatLandingPage AI source disclosure', () => {
 
     render(<ChatLandingPage spec={{ params: { targetWsId: 'chat-1' } }} />)
 
-    expect((await findInferenceTrigger('gpt-5.6-sol')).textContent).toContain('Default effort')
+    await findInferenceTrigger('GPT 5.6 Sol')
+    await expectDefaultEffort('Default effort')
     fireEvent.change(screen.getByPlaceholderText('Describe the task, question, or decision…'), { target: { value: 'Use model defaults.' } })
     fireEvent.click(screen.getByRole('button', { name: 'Send' }))
 
@@ -957,7 +962,7 @@ describe('ChatLandingPage AI source disclosure', () => {
     })]
     render(<ChatLandingPage spec={{ params: { targetWsId: 'chat-1' } }} />)
 
-    expect(await findInferenceTrigger('gemini-3.1-flash-lite')).toBeTruthy()
+    expect(await findInferenceTrigger('Gemini 3.1 Flash Lite')).toBeTruthy()
     expect(screen.queryByText('Saved in this workspace')).toBeNull()
     expect(screen.queryByText(/Sending will configure this workspace/)).toBeNull()
     expect(screen.queryByRole('button', { name: 'Adjust workspace AI' })).toBeNull()
@@ -972,9 +977,9 @@ describe('ChatLandingPage AI source disclosure', () => {
     fireEvent.click(screen.getByRole('menuitem', { name: /google-1/ }))
     expect(screen.queryByText('New Session only')).toBeNull()
     expect(screen.queryByText('Workspace settings stay unchanged')).toBeNull()
-    expect(await findInferenceTrigger('gemini-3.1-flash-lite')).toBeTruthy()
+    expect(await findInferenceTrigger('Gemini 3.1 Flash Lite')).toBeTruthy()
     expect(screen.queryByRole('button', { name: 'Configure workspace AI' })).toBeNull()
-    expectDefaultEffort('Default effort')
+    await expectDefaultEffort('Default effort')
   })
 
   it('keeps effort unspecified when a required reasoning model exposes no effort tiers', async () => {
@@ -996,8 +1001,8 @@ describe('ChatLandingPage AI source disclosure', () => {
 
     render(<ChatLandingPage spec={{ params: { targetWsId: 'chat-1' } }} />)
 
-    await findInferenceTrigger('kimi-k2.7-code')
-    expectDefaultEffort('Default effort')
+    await findInferenceTrigger('Kimi K2.7 Code')
+    await expectDefaultEffort('Default effort')
   })
 
   it('keeps an in-progress provider choice when polling replaces equivalent Workspace settings', async () => {
@@ -1026,11 +1031,11 @@ describe('ChatLandingPage AI source disclosure', () => {
     })]
     const view = render(<ChatLandingPage spec={{ params: { targetWsId: 'chat-1' } }} />)
 
-    expect(await findInferenceTrigger('gemini-3.1-flash-lite')).toBeTruthy()
+    expect(await findInferenceTrigger('Gemini 3.1 Flash Lite')).toBeTruthy()
     fireEvent.click(screen.getByRole('button', { name: 'AI Provider, Model and reasoning' }))
     fireEvent.click(await screen.findByRole('menuitem', { name: /^AI Provider/ }))
     fireEvent.click(screen.getByRole('menuitem', { name: /deepseek-1/ }))
-    expect(await findInferenceTrigger('deepseek-v3.2')).toBeTruthy()
+    expect(await findInferenceTrigger('DeepSeek V3.2')).toBeTruthy()
 
     workspaces = structuredClone(workspaces)
     await act(async () => {
@@ -1038,7 +1043,7 @@ describe('ChatLandingPage AI source disclosure', () => {
     })
 
     expect(mocks.detectWorkspaceCredential).not.toHaveBeenCalled()
-    expect(await findInferenceTrigger('deepseek-v3.2')).toBeTruthy()
+    expect(await findInferenceTrigger('DeepSeek V3.2')).toBeTruthy()
     expect(screen.getByRole('button', { name: 'AI Provider, Model and reasoning' }).textContent).not.toContain('gemini-3.1-pro-preview')
   })
 })
