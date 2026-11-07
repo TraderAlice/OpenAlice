@@ -1,8 +1,5 @@
-import { collectionWideTestInputs } from './scripts/test-collection-inputs.mjs'
 import { fileURLToPath } from 'node:url'
 import { resolve, dirname } from 'node:path'
-
-import { externalReadonlyIncludes } from './scripts/test-lanes.mjs'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 
@@ -24,8 +21,14 @@ export default {
     alias: workspaceAliases,
   },
   test: {
-    forceRerunTriggers: collectionWideTestInputs(__dirname),
-    include: externalReadonlyIncludes,
+    include: [
+      'tests/integration/broker-market-data/**/*.spec.*',
+      'tests/integration/hyperliquid-market-data/**/*.spec.*',
+      'tests/integration/ibkr-wire-readonly/**/*.spec.*',
+      'tests/integration/market-data-providers/**/*.spec.*',
+      'tests/integration/market-data-routes/**/*.spec.*',
+      'tests/integration/twse-provider/**/*.spec.*',
+    ],
     testTimeout: 60_000,
     fileParallelism: false,
     pool: 'forks',

@@ -1,15 +1,11 @@
-import { collectionWideTestInputs } from './scripts/test-collection-inputs.mjs'
 import { fileURLToPath } from 'node:url'
 import { resolve, dirname } from 'node:path'
 
-import {
-  assertLivePaperAcknowledgement,
-  livePaperIncludes,
-} from './scripts/test-lanes.mjs'
+if (process.env.OPENALICE_UTA_LIVE_PAPER !== '1') {
+  throw new Error('UTA live-paper tests submit real orders to configured demo/paper accounts. Set OPENALICE_UTA_LIVE_PAPER=1 to run.')
+}
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
-
-assertLivePaperAcknowledgement()
 
 // Live-paper acceptance deliberately does not load vitest.setup.ts because it
 // must resolve the verified demo/paper accounts from the real local config.
@@ -28,8 +24,15 @@ export default {
     alias: workspaceAliases,
   },
   test: {
-    forceRerunTriggers: collectionWideTestInputs(__dirname),
-    include: livePaperIncludes,
+    include: [
+      'tests/integration/broker-alpaca-paper/**/*.spec.*',
+      'tests/integration/broker-bybit-paper/**/*.spec.*',
+      'tests/integration/broker-hyperliquid-paper/**/*.spec.*',
+      'tests/integration/broker-ibkr-paper/**/*.spec.*',
+      'tests/integration/broker-okx-paper/**/*.spec.*',
+      'tests/integration/ibkr-wire-paper/**/*.spec.*',
+      'tests/integration/bybit-diagnostic/**/*.spec.*',
+    ],
     testTimeout: 60_000,
     fileParallelism: false,
     pool: 'forks',

@@ -99,9 +99,6 @@ jobs:
         if: steps.beta-release-prep.outcome != 'success' || steps.beta-release-prep.outputs.beta_release_prep != 'true'
         run: pnpm install --frozen-lockfile
 
-      - name: Verify CI workflow contracts
-        if: steps.beta-release-prep.outcome != 'success' || steps.beta-release-prep.outputs.beta_release_prep != 'true'
-        run: pnpm test:contract:workflow
 
       - name: Typecheck root workspace
         if: steps.beta-release-prep.outcome != 'success' || steps.beta-release-prep.outputs.beta_release_prep != 'true'

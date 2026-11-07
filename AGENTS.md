@@ -39,7 +39,7 @@ Current code, tests, rendered behavior, and GitHub state override stale prose.
 Verify changes proportionally with the affected tests, owning typechecks, and
 real surface before merging, and report actual results:
 
-- Tests: `pnpm test:changed` (or `pnpm test:select --owner <owner>` / `pnpm test` for broad changes)
+- Tests: `pnpm test:changed` (or `pnpm test` / `pnpm test:integration` for broader changes)
 - Typechecks: root `npx tsc --noEmit`, UI `cd ui && npx tsc -b`, or package-local `build`/`typecheck`
 - Website (`apps/landing/`): `pnpm --filter @traderalice/landing test && pnpm landing:build`
 
@@ -49,10 +49,7 @@ real surface before merging, and report actual results:
   suspected subsystem, reason for deferral, and evidence. Do not create repo
   TODO files or Linear tasks; handle findings already owned by the current
   change in that change.
-- Substantial multi-session work uses one canonical `plans/<topic>.md` entry and
-  follows [[PLANS.md]]. Never let plans grow unbounded or turn into turn-by-turn
-  execution logs; delete `plans/<topic>.md` and its `PLANS.md` bullet in the same
-  change that completes the work.
+- Substantial multi-session work uses one canonical `plans/<topic>.md` entry indexed in `plans/index.md` (see [[PLANS.md]]). Never let plans grow unbounded; delete `plans/<topic>.md` and its `plans/index.md` bullet when the work completes.
 - `docs/` holds user guides (`docs/guides/`) and architecture notes
   (`docs/architecture/`), indexed by `docs/SUMMARY.md`. Read `docs/architecture/`
   only when you need specific subsystem context, and **do not create or update
