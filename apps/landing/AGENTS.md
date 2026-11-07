@@ -8,10 +8,9 @@ in `apps/landing/`. Run commands from this directory or use the root
 
 | Path | Owns |
 |---|---|
-| `apps/landing/app/`, `components/`, `lib/` | Next.js routes, website presentation, MDX rendering, and media resolution |
-| `apps/landing/content/docs/` | Public user documentation; `SUMMARY.md` supplies website navigation |
+| `apps/landing/app/`, `components/`, `lib/` | Next.js routes, website presentation, Markdown/MDX rendering, and media resolution |
 | `apps/landing/content/posts/` | Public blog content and its registry |
-| `docs/` (repo root) | Repository engineering owner guides catalogued in [[docs/README.md]] |
+| `docs/` (repo root) | Unified `.md` documentation (`docs/guides/`, `docs/architecture/`, `docs/SUMMARY.md`, and `docs/README.md`) |
 
 The private `TraderAlice/alice-landing` repository retains raw media, recording
 recipes, and R2 publishing credentials. `next.config.ts` calls
