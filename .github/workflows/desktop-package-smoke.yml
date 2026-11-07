@@ -7,7 +7,7 @@ on:
         description: Native host for manual rehearsal; promotion PRs always retain every host.
         type: choice
         default: all
-        options: [all, macos-14, macos-15-intel, windows-latest]
+        options: [all, macos-15, macos-15-intel, windows-latest]
   pull_request:
     branches: [master]
     paths:
@@ -160,10 +160,10 @@ jobs:
       matrix:
         include: >-
           ${{ fromJSON(
-            github.event_name == 'workflow_dispatch' && inputs.host == 'macos-14' && '[{"os":"macos-14","arch":"arm64"}]' ||
+            github.event_name == 'workflow_dispatch' && inputs.host == 'macos-15' && '[{"os":"macos-15","arch":"arm64"}]' ||
             github.event_name == 'workflow_dispatch' && inputs.host == 'macos-15-intel' && '[{"os":"macos-15-intel","arch":"x64"}]' ||
             github.event_name == 'workflow_dispatch' && inputs.host == 'windows-latest' && '[{"os":"windows-latest","arch":"x64"}]' ||
-            '[{"os":"macos-14","arch":"arm64"},{"os":"macos-15-intel","arch":"x64"},{"os":"windows-latest","arch":"x64"}]'
+            '[{"os":"macos-15","arch":"arm64"},{"os":"macos-15-intel","arch":"x64"},{"os":"windows-latest","arch":"x64"}]'
           ) }}
 
     steps:
