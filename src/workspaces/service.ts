@@ -3103,22 +3103,25 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
     },
     deliverToHeadless: async (resumeId, pointerText) => {
       if (activeResumeIds.has(resumeId)) return 'busy';
+      const identity = resumeRegistry.get(resumeId);
+      if (!identity || !identity.agentSessionId || identity.lifecycle === 'retired') return 'unavailable';
       const latestTask = headlessTasks.latestForResumeId(resumeId);
-      if (!latestTask?.communication?.delivery) return 'unavailable';
-      await sessionRegistry.ensureLoaded(latestTask.wsId);
-      const record = sessionRegistry.findByResumeId(latestTask.wsId, resumeId);
+      if (!latestTask) return 'unavailable';
+      await sessionRegistry.ensureLoaded(identity.wsId);
+      const record = sessionRegistry.findByResumeId(identity.wsId, resumeId);
       if (record && (pool.get(record.id) || web.has(record.id))) return 'unavailable';
-      const meta = registry.get(latestTask.wsId);
-      const adapter = adapters.get(latestTask.agent);
+      const meta = registry.get(identity.wsId);
+      const adapter = adapters.get(identity.agent);
       if (!meta || !adapter) return 'unavailable';
       await dispatchHeadlessTaskMethod(
         meta,
         adapter,
         pointerText,
-        { kind: 'system', entry: 'session-wake-mailbox', workspaceId: latestTask.wsId, resumeId },
+        { kind: 'system', entry: 'session-wake-mailbox', workspaceId: identity.wsId, resumeId },
         undefined,
-        undefined,
+        latestTask.trigger,
         resumeId,
+        latestTask.inquiry,
       );
       return 'delivered';
     },
