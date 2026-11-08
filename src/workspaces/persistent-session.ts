@@ -36,6 +36,7 @@ export interface PersistentSessionOptions {
   readonly pty?: PtyBackend;
   readonly initialTerminalViewAttributes?: TerminalViewAttributes;
   readonly onTerminalViewAttributes?: (attributes: TerminalViewAttributes) => void;
+  readonly onQuiescent?: (session: PersistentSession) => void;
   /**
    * V3.S5 — bytes prepended to the ReplayBuffer before the PTY spawns. Used
    * by shell resume: the prior session's scrollback is pushed back into the
@@ -62,9 +63,15 @@ export type SessionAttachResult =
   | { readonly ok: true }
   | { readonly ok: false; readonly reason: 'locked'; readonly owner: SessionControllerOwner };
 
+type PointerPromptResult =
+  | { ok: true }
+  | { ok: false; reason: 'disposed' | 'not_settled' | 'interrupted' | 'write_error' };
+
 const MAX_DIM = 1000;
 const CURSOR_TICK_MS = 2000;
 const CURSOR_BYTES_INTERVAL = 64 * 1024;
+const DEFAULT_QUIESCENCE_MS = 3000;
+const DEFAULT_POINTER_ENTER_DELAY_MS = 500;
 
 /**
  * A PTY whose lifetime is decoupled from any single WebSocket.
@@ -121,6 +128,11 @@ export class PersistentSession {
    */
   private firstExit: { code: number; signal: number | null } | null = null;
   private exitWaiters: Set<(info: { code: number; signal: number | null }) => void> = new Set();
+  private lastOutputAt = Date.now();
+  private lastUserInputAt = 0;
+  private quiescenceTimer: ReturnType<typeof setTimeout> | null = null;
+  private pendingPointerTimer: ReturnType<typeof setTimeout> | null = null;
+  private pendingPointerResolve: ((result: PointerPromptResult) => void) | null = null;
 
   constructor(opts: PersistentSessionOptions) {
     this.opts = opts;
@@ -257,6 +269,92 @@ export class PersistentSession {
 
   get startedAt(): number {
     return this._startedAt;
+  }
+
+  get lastOutputAtMs(): number {
+    return this.lastOutputAt;
+  }
+
+  readScreenTail(maxLines = 8): string[] {
+    return this.headless.readScreenTail(maxLines);
+  }
+
+  isTuiSettledForDelivery(quiescenceMs = DEFAULT_QUIESCENCE_MS): boolean {
+    if (this.disposed || this.currentChildExited || this.firstExit !== null) return false;
+    if (Date.now() - this.lastOutputAt < quiescenceMs) return false;
+    if (Date.now() - this.lastUserInputAt < quiescenceMs) return false;
+    if (this.headless.isSpinnerInTitle() || this.headless.isPermissionPromptVisible()) return false;
+    return true;
+  }
+
+  sendPointerPrompt(
+    text: string,
+    opts?: { enterDelayMs?: number; requireSettled?: boolean; quiescenceMs?: number },
+  ): Promise<PointerPromptResult> {
+    const sanitized = text.replace(/[\r\n\x00-\x1f\x7f]+/g, ' ').trim();
+    if (!sanitized) return Promise.resolve({ ok: false, reason: 'write_error' });
+    if (this.disposed || this.currentChildExited) {
+      return Promise.resolve({ ok: false, reason: 'disposed' });
+    }
+    if (
+      opts?.requireSettled !== false
+      && !this.isTuiSettledForDelivery(opts?.quiescenceMs ?? DEFAULT_QUIESCENCE_MS)
+    ) {
+      return Promise.resolve({ ok: false, reason: 'not_settled' });
+    }
+
+    this.cancelPendingPointer('interrupted');
+    const userInputBaseline = this.lastUserInputAt;
+    let resolve!: (result: PointerPromptResult) => void;
+    const promise = new Promise<PointerPromptResult>((promiseResolve) => {
+      resolve = promiseResolve;
+    });
+    this.pendingPointerResolve = resolve;
+    try {
+      this.term.write(sanitized);
+    } catch (err) {
+      if (this.pendingPointerResolve === resolve) this.pendingPointerResolve = null;
+      this.log.warn('session.write_error', { err });
+      resolve({ ok: false, reason: 'write_error' });
+      return promise;
+    }
+    // A synchronous test/backend hook may have cancelled the delivery from
+    // inside write(); do not arm Enter after that interruption.
+    if (this.pendingPointerResolve !== resolve) return promise;
+
+    this.pendingPointerTimer = setTimeout(() => {
+      this.pendingPointerTimer = null;
+      this.pendingPointerResolve = null;
+      if (this.disposed || this.currentChildExited) {
+        resolve({ ok: false, reason: 'disposed' });
+        return;
+      }
+      if (
+        this.lastUserInputAt !== userInputBaseline
+        || this.headless.isPermissionPromptVisible()
+      ) {
+        resolve({ ok: false, reason: 'interrupted' });
+        return;
+      }
+      try {
+        this.term.write('\r');
+        resolve({ ok: true });
+      } catch (err) {
+        this.log.warn('session.write_error', { err });
+        resolve({ ok: false, reason: 'write_error' });
+      }
+    }, opts?.enterDelayMs ?? DEFAULT_POINTER_ENTER_DELAY_MS);
+    this.pendingPointerTimer.unref();
+    return promise;
+  }
+
+  private cancelPendingPointer(reason: 'disposed' | 'interrupted'): void {
+    const timer = this.pendingPointerTimer;
+    const resolve = this.pendingPointerResolve;
+    this.pendingPointerTimer = null;
+    this.pendingPointerResolve = null;
+    if (timer !== null) clearTimeout(timer);
+    resolve?.({ ok: false, reason });
   }
 
   /**
@@ -462,6 +560,11 @@ export class PersistentSession {
   dispose(reason: string): void {
     if (this.disposed) return;
     this.disposed = true;
+    if (this.quiescenceTimer) {
+      clearTimeout(this.quiescenceTimer);
+      this.quiescenceTimer = null;
+    }
+    this.cancelPendingPointer('disposed');
     if (this.cursorTimer) {
       clearInterval(this.cursorTimer);
       this.cursorTimer = null;
@@ -490,6 +593,17 @@ export class PersistentSession {
 
   private onPtyData(data: Buffer | string): void {
     if (this.disposed) return;
+    this.lastOutputAt = Date.now();
+    if (this.quiescenceTimer) {
+      clearTimeout(this.quiescenceTimer);
+      this.quiescenceTimer = null;
+    }
+    this.quiescenceTimer = setTimeout(() => {
+      this.quiescenceTimer = null;
+      if (this.isTuiSettledForDelivery()) this.opts.onQuiescent?.(this);
+    }, DEFAULT_QUIESCENCE_MS);
+    this.quiescenceTimer.unref();
+
     const buf = Buffer.isBuffer(data) ? data : Buffer.from(data, 'utf8');
     this.buffer.append(buf);
 
@@ -572,6 +686,8 @@ export class PersistentSession {
     if (this.ws !== ws) return; // stale (this ws was kicked)
 
     if (isBinary) {
+      this.lastUserInputAt = Date.now();
+      this.cancelPendingPointer('interrupted');
       const buf = toBuffer(raw);
       if (!buf) return;
       try {

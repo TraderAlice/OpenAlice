@@ -18,6 +18,7 @@ import type { HeadlessInquirySubject } from '../workspaces/headless-task-registr
 const MAX_TIMEOUT_MS = 2_147_478_647
 const MAX_PROMPT_CHARS = 16_000
 const AWAIT_POLL_MS = 250
+export const DEFAULT_AWAIT_BUDGET_MS = 30_000
 
 const conversationSelectionShape = {
   credential: z.string().min(1).optional().describe('OpenAlice vault credential slug, never an API key. Omit to retain the Session or Workspace selection.'),
@@ -135,9 +136,16 @@ export async function askWorkspaceConversation(
       resolution: result.resolution.mode === 'reconstructed'
         ? { mode: result.resolution.mode, reason: result.resolution.reason }
         : { mode: result.resolution.mode },
+      ...(result.deduplicated ? { deduplicated: true } : {}),
     }
-    if (!input.await) return dispatched
-    const task = await awaitConversationTask(ctx.conversation, result.taskId, input.timeoutMs)
+    if (!input.await) {
+      return {
+        ...dispatched,
+        next: 'Task is running in the background. End your current turn now; OpenAlice will automatically wake this Session when it finishes (then run `alice conversation check`).',
+      }
+    }
+    const waitBudgetMs = input.timeoutMs ?? DEFAULT_AWAIT_BUDGET_MS
+    const task = await awaitConversationTask(ctx.conversation, result.taskId, waitBudgetMs)
     if (!task) {
       return {
         ok: false as const,
@@ -150,7 +158,7 @@ export async function askWorkspaceConversation(
       ...taskProjection(task, 'summary'),
       awaited: task.status !== 'running',
       ...(task.status === 'running'
-        ? { next: `alice conversation await --task-id ${task.taskId}` }
+        ? { next: `Task is still running in the background (taskId: ${task.taskId}). End your current turn now and let the user know; OpenAlice will wake you when it finishes, or run alice conversation await --task-id ${task.taskId}.` }
         : {}),
     }
   } catch (err) {
@@ -303,6 +311,27 @@ export const conversationCreateFactory: WorkspaceToolFactory = {
   },
 }
 
+export const conversationCheckFactory: WorkspaceToolFactory = {
+  name: 'conversation_check',
+  build(ctx) {
+    return tool({
+      description: 'Check and acknowledge completed peer conversation replies in this Session mailbox. Run this when woken by an OpenAlice peer-task notification.',
+      inputSchema: z.object({
+        resumeId: z.string().min(1).optional().describe('Optional Session resumeId; defaults to the calling Session.'),
+      }),
+      execute: async (input) => {
+        const callerSession = sessionOriginFromInboxOrigin(ctx.workspaceId, ctx.origin)
+        const recipientResumeId = input.resumeId ?? callerSession?.resumeId
+        const messages = await ctx.conversation?.check?.({
+          ...(recipientResumeId ? { recipientResumeId } : {}),
+          workspaceId: ctx.workspaceId,
+        }) ?? []
+        return { ok: true as const, count: messages.length, messages }
+      },
+    })
+  },
+}
+
 export const conversationAwaitFactory: WorkspaceToolFactory = {
   name: 'conversation_await',
   build(ctx) {
@@ -442,6 +471,7 @@ export const conversationReadFactory: WorkspaceToolFactory = {
 export const conversationToolFactories: WorkspaceToolFactory[] = [
   conversationCreateFactory,
   conversationAskFactory,
+  conversationCheckFactory,
   conversationAwaitFactory,
   conversationCollectFactory,
   conversationReadFactory,

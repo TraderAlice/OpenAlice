@@ -6,9 +6,11 @@ import type { WorkspaceToolContext } from '../../../src/core/workspace-tool-cent
 import {
   conversationCreateFactory,
   conversationAskFactory,
+  conversationCheckFactory,
   conversationAwaitFactory,
   conversationCollectFactory,
   conversationReadFactory,
+  DEFAULT_AWAIT_BUDGET_MS,
   taskProjection,
 } from '../../../src/tool/conversation.js'
 
@@ -252,6 +254,78 @@ describe('conversation_ask', () => {
       assistantText: 'The report followed the issue rule.',
     })
     expect(read).toHaveBeenCalledWith('task-1')
+  })
+
+  it('returns a running task after the default wait budget without arming an execution watchdog', async () => {
+    vi.useFakeTimers()
+    try {
+      const ask = vi.fn(async (_opts: unknown) => ({
+        status: 'dispatched' as const,
+        taskId: completedTask.taskId,
+        resumeId: completedTask.resumeId,
+        workspaceId: completedTask.workspaceId,
+        workspace: 'peer',
+        agent: completedTask.agent,
+        resolution: {
+          mode: 'exact' as const,
+          origin: { kind: 'session' as const, workspaceId: 'ws-peer', resumeId: 'resume-1', agent: 'pi' },
+        },
+      }))
+      const runningTask = {
+        ...completedTask,
+        status: 'running' as const,
+        durationMs: undefined,
+        structured: null,
+      }
+      const read = vi.fn(async () => runningTask)
+      const tool = conversationAskFactory.build(context({ conversation: { ask, read } }))
+      const pending = run(tool, { prompt: 'why?', resumeId: 'resume-1', await: true })
+
+      await vi.advanceTimersByTimeAsync(DEFAULT_AWAIT_BUDGET_MS)
+
+      await expect(pending).resolves.toMatchObject({
+        ok: true,
+        awaited: false,
+        status: 'running',
+        taskId: 'task-1',
+        next: expect.stringContaining('Task is still running in the background'),
+      })
+      expect(ask.mock.calls[0]?.[0]).not.toHaveProperty('timeoutMs')
+      expect(read).toHaveBeenCalledWith('task-1')
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+})
+
+describe('conversation_check', () => {
+  it('checks and returns replies for the calling Session mailbox', async () => {
+    const messages = [{
+      id: 'mail-task-1',
+      taskId: 'task-1',
+      resumeId: 'resume-1',
+      workspaceId: 'ws-peer',
+      agent: 'pi',
+      status: 'done' as const,
+      assistantText: 'The report followed the issue rule.',
+      createdAt: 10,
+    }]
+    const check = vi.fn(async () => messages)
+    const tool = conversationCheckFactory.build(context({
+      origin: {
+        kind: 'headless',
+        runId: 'run-caller',
+        resumeId: 'resume-caller',
+        agent: 'codex',
+      },
+      conversation: { ask: vi.fn(), check, read: vi.fn() },
+    }))
+
+    await expect(run(tool, {})).resolves.toEqual({ ok: true, count: 1, messages })
+    expect(check).toHaveBeenCalledWith({
+      recipientResumeId: 'resume-caller',
+      workspaceId: 'ws-caller',
+    })
   })
 })
 

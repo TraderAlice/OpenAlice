@@ -85,6 +85,7 @@ export class SessionPool {
     private readonly configFactory: SessionConfigFactory,
     private readonly logger: Logger,
     private readonly transcriptWatcher?: TranscriptWatcher,
+    private readonly onSessionQuiescent?: (session: PersistentSession) => void,
   ) {}
 
   /** Spawn a PTY for a pre-allocated record. */
@@ -101,6 +102,10 @@ export class SessionPool {
         ? { initialTerminalViewAttributes: this.terminalViewAttributes }
         : {}),
       onTerminalViewAttributes: (attributes) => this.setTerminalViewAttributes(attributes),
+      onQuiescent: (current) => {
+        opts.onQuiescent?.(current);
+        this.onSessionQuiescent?.(current);
+      },
       onDisposed: () => this.onSessionDisposed(wsId, recordId, session),
     });
 
