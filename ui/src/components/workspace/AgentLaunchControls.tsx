@@ -17,7 +17,9 @@ import {
   ChevronDown,
   Info,
   KeyRound,
+  Search,
   Settings2,
+  X,
 } from 'lucide-react'
 
 import { Button } from '@/components/ui/button'
@@ -287,6 +289,18 @@ function AgentLaunchAccessItems({ config, onConfigureProvider }: {
   )
 }
 
+function matchesModelQuery(
+  model: { id: string; label?: string },
+  normalizedQuery: string,
+  vendor?: string | null,
+): boolean {
+  if (!normalizedQuery) return true
+  const display = modelDisplayName(model.id, model.label)
+  const manufacturer = modelManufacturer(model.id, vendor) ?? ''
+  const haystack = `${model.id} ${model.label ?? ''} ${display} ${manufacturer}`.toLowerCase()
+  return normalizedQuery.split(/\s+/).every((token) => haystack.includes(token))
+}
+
 function AgentLaunchInferenceMenu({
   config,
   menuPlacement,
@@ -304,7 +318,9 @@ function AgentLaunchInferenceMenu({
 }) {
   const { t } = useTranslation()
   const [open, setOpen] = useState(false)
+  const [modelQuery, setModelQuery] = useState('')
   useEffect(() => { if (disabled) setOpen(false) }, [disabled])
+  useEffect(() => { if (!open) setModelQuery('') }, [open])
   const pendingCustomModelRef = useRef(false)
   const [customModelOpen, setCustomModelOpen] = useState(false)
   const [customModelDraft, setCustomModelDraft] = useState('')
@@ -340,6 +356,27 @@ function AgentLaunchInferenceMenu({
     && !config.modelOptions.some((model) => model.id === config.launchModel)
     ? config.launchModel
     : null
+  const normalizedModelQuery = modelQuery.trim().toLowerCase()
+  const defaultModelOptionLabel = config.modelOptions.find((model) => model.id === config.defaultModel)?.label
+  const showDefaultModel = !normalizedModelQuery || matchesModelQuery(
+    {
+      id: config.defaultModel ?? t('chatLanding.runtimeDefaultModel'),
+      label: defaultModelOptionLabel ?? t('chatLanding.runtimeDefaultModel'),
+    },
+    normalizedModelQuery,
+    config.credential?.vendor,
+  )
+  const showCustomCurrentModel = customCurrentModel !== null && (
+    !normalizedModelQuery || matchesModelQuery(
+      { id: customCurrentModel },
+      normalizedModelQuery,
+      config.credential?.vendor,
+    )
+  )
+  const filteredKnownModels = useMemo(
+    () => knownModels.filter((model) => matchesModelQuery(model, normalizedModelQuery, config.credential?.vendor)),
+    [config.credential?.vendor, knownModels, normalizedModelQuery],
+  )
 
   const saveCustomModel = () => {
     const model = customModelDraft.trim()
@@ -389,38 +426,79 @@ function AgentLaunchInferenceMenu({
               {access.items}
             </DropdownMenuSubContent>
           </DropdownMenuSub>}
-          <DropdownMenuSub>
+          <DropdownMenuSub onOpenChange={(subOpen) => { if (!subOpen) setModelQuery('') }}>
             <DropdownMenuSubTrigger className="min-h-10 px-2.5 py-2 text-[12px]">
               <span className="font-medium">{t('chatLanding.modelField')}</span>
               <span className="ml-auto max-w-[170px] truncate text-muted-foreground" title={resolvedModel}>{modelDisplayName(resolvedModel, resolvedModelLabel)}</span>
             </DropdownMenuSubTrigger>
             <DropdownMenuSubContent className="w-[300px] max-w-[calc(100vw-2rem)] border border-border/70 bg-secondary p-1.5 shadow-lg ring-0">
               <ModelCatalogStatus catalog={config.modelCatalog} selectedModel={config.launchModel ?? config.defaultModel} />
-              <DropdownMenuRadioGroup
-                className="max-h-64 overflow-y-auto"
-                value={modelValue}
-                onValueChange={(value) => config.selectModel(value ? String(value) : null)}
-              >
-                <DropdownMenuRadioItem value="" closeOnClick={false} className="min-h-9 px-2.5 pr-8 text-[12px]">
-                  <ModelIdentity
-                    model={config.defaultModel ?? t('chatLanding.runtimeDefaultModel')}
-                    label={config.modelOptions.find((model) => model.id === config.defaultModel)?.label}
-                    vendor={config.credential?.vendor}
-                    className="flex-1"
+              {knownModels.length > 0 && (
+                <div
+                  className="relative px-1 pb-1.5 pt-0.5"
+                  onPointerDown={(event) => event.stopPropagation()}
+                  onClick={(event) => event.stopPropagation()}
+                >
+                  <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+                  <input
+                    type="text"
+                    value={modelQuery}
+                    onChange={(event) => setModelQuery(event.target.value)}
+                    onKeyDown={(event) => {
+                      if (event.key !== 'Escape') event.stopPropagation()
+                    }}
+                    placeholder={t('chatLanding.searchModels')}
+                    aria-label={t('chatLanding.searchModels')}
+                    spellCheck={false}
+                    autoCapitalize="off"
+                    autoCorrect="off"
+                    className="h-8 w-full rounded-md border border-border/70 bg-background/70 pl-7 pr-7 text-[12px] text-foreground outline-none transition-colors placeholder:text-muted-foreground focus:border-primary/50 focus:ring-1 focus:ring-primary/40"
                   />
-                  {config.defaultModel && <span className="shrink-0 text-muted-foreground">{t('chatLanding.defaultLabel')}</span>}
-                </DropdownMenuRadioItem>
-                {customCurrentModel && (
-                  <DropdownMenuRadioItem value={customCurrentModel} closeOnClick={false} className="min-h-9 px-2.5 pr-8 text-[12px]">
-                    <ModelIdentity model={customCurrentModel} vendor={config.credential?.vendor} className="flex-1" />
-                  </DropdownMenuRadioItem>
-                )}
-                {knownModels.map((model) => (
-                  <DropdownMenuRadioItem key={model.id} value={model.id} closeOnClick={false} className="min-h-9 px-2.5 pr-8 text-[12px]">
-                    <ModelIdentity model={model.id} label={model.label} vendor={config.credential?.vendor} className="flex-1" />
-                  </DropdownMenuRadioItem>
-                ))}
-              </DropdownMenuRadioGroup>
+                  {modelQuery && (
+                    <button
+                      type="button"
+                      onClick={() => setModelQuery('')}
+                      aria-label={t('common.clear', { defaultValue: 'Clear' })}
+                      className="absolute right-2.5 top-1/2 flex h-5 w-5 -translate-y-1/2 items-center justify-center rounded text-muted-foreground hover:text-foreground"
+                    >
+                      <X className="h-3 w-3" />
+                    </button>
+                  )}
+                </div>
+              )}
+              {!showDefaultModel && !showCustomCurrentModel && filteredKnownModels.length === 0 ? (
+                <p className="px-2.5 py-4 text-center text-[12px] text-muted-foreground">
+                  {t('chatLanding.noModelMatches', { query: modelQuery.trim() })}
+                </p>
+              ) : (
+                <DropdownMenuRadioGroup
+                  className="max-h-64 overflow-y-auto"
+                  value={modelValue}
+                  onValueChange={(value) => config.selectModel(value ? String(value) : null)}
+                >
+                  {showDefaultModel && (
+                    <DropdownMenuRadioItem value="" closeOnClick={false} className="min-h-9 px-2.5 pr-8 text-[12px]">
+                      <ModelIdentity
+                        model={config.defaultModel ?? t('chatLanding.runtimeDefaultModel')}
+                        label={defaultModelOptionLabel}
+                        vendor={config.credential?.vendor}
+                        className="flex-1"
+                      />
+                      {config.defaultModel && <span className="shrink-0 text-muted-foreground">{t('chatLanding.defaultLabel')}</span>}
+                    </DropdownMenuRadioItem>
+                  )}
+                  {showCustomCurrentModel && customCurrentModel && (
+                    <DropdownMenuRadioItem value={customCurrentModel} closeOnClick={false} className="min-h-9 px-2.5 pr-8 text-[12px]">
+                      <ModelIdentity model={customCurrentModel} vendor={config.credential?.vendor} className="flex-1" />
+                    </DropdownMenuRadioItem>
+                  )}
+                  {filteredKnownModels.map((model) => (
+                    <DropdownMenuRadioItem key={model.id} value={model.id} closeOnClick={false} className="min-h-9 px-2.5 pr-8 text-[12px]">
+                      <ModelIdentity model={model.id} label={model.label} vendor={config.credential?.vendor} className="flex-1" />
+                    </DropdownMenuRadioItem>
+                  ))}
+                </DropdownMenuRadioGroup>
+              )}
               <DropdownMenuSeparator />
               <DropdownMenuItem
                 className="min-h-9 px-2.5 text-[12px]"
