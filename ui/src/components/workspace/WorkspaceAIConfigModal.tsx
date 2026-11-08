@@ -102,6 +102,7 @@ const DIALOG_FOCUSABLE_SELECTOR = [
 function dialogFocusableElements(dialog: HTMLElement): HTMLElement[] {
   return Array.from(dialog.querySelectorAll<HTMLElement>(DIALOG_FOCUSABLE_SELECTOR))
     .filter((element) => (
+      !element.matches(':disabled') &&
       element.tabIndex >= 0 &&
       element.closest('[hidden], [aria-hidden="true"]') === null
     ))
