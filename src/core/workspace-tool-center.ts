@@ -283,6 +283,40 @@ export interface WorkspaceToolContext {
     readonly resumeId: string
     readonly displayName: string | null
   }) => Promise<{ resumeId: string; displayName?: string }>
+  /** Session control plane — inspect, interrupt, reconfigure, and change
+   * presence of product Sessions. Backed by the live WorkspaceService at the
+   * CLI/MCP build sites; absent in unit tests and older embedders. */
+  sessionControl?: {
+    show(resumeId: string): Promise<Record<string, unknown> | null>
+    interrupt(resumeId: string): Promise<{ resumeId: string; stopped: boolean }>
+    configure(input: {
+      resumeId: string
+      credential?: string
+      credentialSource?: 'native'
+      model?: string
+      effort?: string
+    }): Promise<{ resumeId: string; agent: string; runtime: unknown }>
+    setPresence(input: { resumeId: string; presence: 'active' | 'deleted' }): Promise<{ resumeId: string; presence: string }>
+    unreadCount(resumeId: string): number
+  }
+  /** Headless-run observability plane (read-only, agentSessionId never leaks). */
+  headlessControl?: {
+    list(input: {
+      wsId?: string
+      status?: HeadlessTaskStatus
+      limit?: number
+    }): {
+      tasks: unknown[]
+      summary: { done: number; needsAttention: number }
+      capacity: { running: number; limit: number }
+    }
+    show(taskId: string): Record<string, unknown> | null
+    logs(taskId: string, tailBytes?: number): Promise<Record<string, unknown> | null>
+  }
+  /** Scheduled Workspace Issue snapshot (next due times). */
+  scheduleControl?: {
+    list(wsId?: string): Promise<unknown>
+  }
 }
 
 // ==================== Factory shape ====================

@@ -29,6 +29,8 @@ import { entitySearchFactory } from '../../../src/tool/entity-search.js'
 import { issueToolFactories } from '../../../src/tool/issue-tools.js'
 import { sessionSignatureFactory } from '../../../src/tool/session-signature.js'
 import { sessionRenameFactory } from '../../../src/tool/session-rename.js'
+import { sessionToolFactories } from '../../../src/tool/session-tools.js'
+import { headlessToolFactories } from '../../../src/tool/headless-tools.js'
 import { provenanceShowFactory } from '../../../src/tool/provenance-show.js'
 import { conversationToolFactories } from '../../../src/tool/conversation.js'
 import { artifactConversationToolFactories } from '../../../src/tool/conversation-artifacts.js'
@@ -121,6 +123,8 @@ describe('CLI_EXPORTS — workspace export (scoped collaboration tools)', () => 
   wtc.register(provenanceShowFactory)
   for (const f of conversationToolFactories) wtc.register(f)
   for (const f of artifactConversationToolFactories) wtc.register(f)
+  for (const f of sessionToolFactories) wtc.register(f)
+  for (const f of headlessToolFactories) wtc.register(f)
   const built = wtc.build({
     workspaceId: 'ws-test',
     workspaceLabel: 'test',

@@ -13,7 +13,9 @@ keep using their native file, search, and Git tools inside any resolved path.
 | `issue` | Durable work, ownership, scheduling, Activity | Ad-hoc questions |
 | `provenance` | Artifact-to-Session attribution | Guessing intent |
 | `signature` | The current Session's safe `@resumeId` | Runtime-native ids |
-| `session` | This Workspace's coworker nametag | Conversation title, AI binding, or launcher nickname |
+| `session` | Session rosters, status, interrupt, idle AI config, archive/restore | Conversation title or launcher nickname |
+| `headless` | Background run status and structured logs | Dispatching new runs |
+| `schedule` | Scheduled Issues and their next due times | Editing schedules |
 | `track` | Shared durable asset/topic index | Work status |
 | `template` | Managed Workspace guidance upgrades | Harness research lifecycle |
 
@@ -207,6 +209,35 @@ alice session rename --resume-id <resumeId> --display-name 'AAPL desk'
 `resumeId` is the product follow-up handle; `taskId` is one execution. Native
 runtime Session ids remain backend-only. `inbox ask` identifies the sender of a
 delivery, which may differ from whoever last edited its live document.
+
+## Inspect and control Sessions, runs, and schedules
+
+`session` is the product Session control plane — audit, unstick, reconfigure,
+or archive without touching native runtime ids:
+
+```bash
+alice session list                      # active Sessions here (unread counts included)
+alice session list --state all          # include archived Sessions
+alice session show --resume-id <resumeId>
+alice session interrupt --resume-id <resumeId>   # stop a stuck running turn
+alice session config --resume-id <resumeId> --model <id>   # idle AI binding edits
+alice session delete --resume-id <resumeId>      # archive; restore with session restore
+```
+
+`config` accepts `--credential <slug>` or `--credential-source native`
+(mutually exclusive), `--model`, and `--effort`; the Session must be idle.
+
+`headless` and `schedule` are read-only observability over background work:
+
+```bash
+alice headless list --status failed --limit 5
+alice headless show --task-id <taskId>
+alice headless logs --task-id <taskId> --tail-bytes 8192
+alice schedule list
+```
+
+From the workspace-manager context, `session list` without `--ws-id` spans
+every Workspace; elsewhere commands default to this Workspace.
 
 ## Coordinate durable work
 
