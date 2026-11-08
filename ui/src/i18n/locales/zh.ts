@@ -1867,6 +1867,8 @@ export const zh: Resources = {
     allRuntimesDescription: '已安装的运行时现在就可以启动。缺失的运行时仍会显示，并附带安装指引。',
     searchRuntimes: '搜索运行时…',
     noRuntimeMatches: '没有匹配“{{query}}”的运行时。',
+    searchModels: '搜索模型…',
+    noModelMatches: '没有匹配“{{query}}”的模型。',
     installedRuntimes: '已安装',
     notInstalledRuntimes: '未安装',
     pickerRuntimeChecking: '正在检查',
