@@ -161,6 +161,7 @@ const BASE_EXPORTS: Record<string, CliExport> = {
         await: 'conversation_await',
         collect: 'conversation_collect',
         read: 'conversation_read',
+        check: 'conversation_check',
       },
       // inbox push: one Markdown body with inline Workspace file references.
       // --body-file publishes Markdown read from a local file.

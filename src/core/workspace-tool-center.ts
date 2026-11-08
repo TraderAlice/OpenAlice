@@ -139,11 +139,25 @@ export type WorkspaceConversationAskResult =
       readonly workspace: string
       readonly agent: string
       readonly resolution: Exclude<WorkspaceConversationResolution, { mode: 'unavailable' }>
+      readonly deduplicated?: boolean
     }
   | {
       readonly status: 'unavailable'
       readonly resolution: Extract<WorkspaceConversationResolution, { mode: 'unavailable' }>
     }
+
+export interface WorkspaceConversationMailboxItem {
+  readonly id: string
+  readonly taskId: string
+  readonly resumeId: string
+  readonly workspaceId: string
+  readonly agent: string
+  readonly status: 'done' | 'failed' | 'interrupted'
+  readonly assistantText: string | null
+  readonly error?: string
+  readonly durationMs?: number
+  readonly createdAt: number
+}
 
 export interface WorkspaceConversationControl {
   /** Follow the live Issue ownership policy, including first-owner recruitment. */
@@ -165,6 +179,10 @@ export interface WorkspaceConversationControl {
     /** Optional business reverse link persisted with the dispatched task. */
     readonly subject?: HeadlessInquirySubject
   }): Promise<WorkspaceConversationAskResult>
+  check?(input: {
+    readonly recipientResumeId?: string
+    readonly workspaceId?: string
+  }): Promise<WorkspaceConversationMailboxItem[]>
   read(taskId: string): Promise<WorkspaceConversationTask | null>
 }
 

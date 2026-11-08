@@ -11,6 +11,7 @@ import {
   resolveWorkspaceConversationTarget,
 } from './conversation-control.js'
 import { headlessLogPaths, type HeadlessTaskRecord } from './headless-task-registry.js'
+import { SessionMailbox } from './session-mailbox.js'
 import type { WorkspaceService } from './service.js'
 
 const dirs: string[] = []
@@ -32,6 +33,8 @@ function fakeService(opts: {
   provenance?: ProvenanceRecord | null
   reconstruction?: ProvenanceRecord | null
   task?: HeadlessTaskRecord | null
+  tasks?: HeadlessTaskRecord[]
+  sessionMailbox?: SessionMailbox
   logsDir?: string
   defaultAgent?: string
   workspaceTemplate?: string
@@ -64,7 +67,18 @@ function fakeService(opts: {
     resolveDefaultAgentId: vi.fn(async () => 'pi'),
     resolveOrCreateChatWorkspace: vi.fn(async () => ({ ok: true as const, workspace })),
     executions: { dispatch: dispatchHeadlessTask },
-    headlessTasks: { get: () => opts.task ?? null },
+    headlessTasks: {
+      get: (taskId: string) => opts.tasks?.find((task) => task.taskId === taskId)
+        ?? (opts.task?.taskId === taskId ? opts.task : null),
+      list: (query: { status?: HeadlessTaskRecord['status'] } = {}) =>
+        (opts.tasks ?? (opts.task ? [opts.task] : []))
+          .filter((task) => !query.status || task.status === query.status),
+    },
+    sessionMailbox: opts.sessionMailbox,
+    sessionRegistry: {
+      ensureLoaded: vi.fn(async () => undefined),
+      listFor: vi.fn(() => []),
+    },
     headlessLogsDir: opts.logsDir ?? '/tmp/logs',
     recordAgentRuntime: vi.fn(async () => undefined),
   } as unknown as WorkspaceService
@@ -345,6 +359,48 @@ describe('Workspace conversation control', () => {
     )
   })
 
+  it('returns an in-flight task instead of dispatching a duplicate Session continuation', async () => {
+    const identity = { ...origin, wsId: origin.workspaceId, agentSessionId: 'native-private' }
+    const caller = {
+      kind: 'session' as const,
+      workspaceId: 'ws-caller',
+      resumeId: 'resume-caller',
+      agent: 'codex',
+    }
+    const runningTask: HeadlessTaskRecord = {
+      taskId: 'task-in-flight',
+      resumeId: origin.resumeId,
+      wsId: origin.workspaceId,
+      agent: origin.agent,
+      prompt: 'First question',
+      status: 'running',
+      startedAt: 1,
+      communication: {
+        version: 1,
+        origin: caller,
+        target: { workspaceId: origin.workspaceId, resumeId: origin.resumeId, agent: origin.agent },
+        reply: { kind: 'caller' },
+      },
+    }
+    const { svc, dispatchHeadlessTask } = fakeService({
+      identity,
+      provenance: issueProvenance(),
+      tasks: [runningTask],
+    })
+
+    await expect(createWorkspaceConversationControl(svc).ask({
+      target: { kind: 'issue', workspaceId: 'ws-peer', issueId: 'audit' },
+      prompt: 'Second question',
+      source: caller,
+    })).resolves.toMatchObject({
+      status: 'dispatched',
+      taskId: 'task-in-flight',
+      resumeId: origin.resumeId,
+      deduplicated: true,
+    })
+    expect(dispatchHeadlessTask).not.toHaveBeenCalled()
+  })
+
   it('keeps reconstructed provenance while delivering a plain prompt by default', async () => {
     const { svc, dispatchHeadlessTask, appendProvenance } = fakeService()
     const result = await createWorkspaceConversationControl(svc).ask({
@@ -463,5 +519,52 @@ describe('Workspace conversation control', () => {
     const result = await createWorkspaceConversationControl(svc).read(task.taskId)
     expect(result).toMatchObject({ taskId: 'task-1', resumeId: 'resume-1', structured })
     expect(result).not.toHaveProperty('agentSessionId')
+  })
+
+  it('returns full mailbox replies and acknowledges them after one check', async () => {
+    const stateDir = await mkdtemp(join(tmpdir(), 'conversation-mailbox-'))
+    dirs.push(stateDir)
+    const sessionMailbox = await SessionMailbox.load(join(stateDir, 'session-mailbox.json'))
+    await sessionMailbox.enqueue({
+      recipientResumeId: 'resume-caller',
+      recipientWorkspaceId: 'ws-caller',
+      taskId: 'task-1',
+      childResumeId: 'resume-1',
+      childWorkspaceId: 'ws-peer',
+      childAgent: 'pi',
+      taskStatus: 'done',
+      assistantPreview: 'preview',
+      durationMs: 1,
+      createdAt: 10,
+    })
+    const task: HeadlessTaskRecord = {
+      taskId: 'task-1', resumeId: 'resume-1', wsId: 'ws-peer', agent: 'pi',
+      prompt: 'why?', status: 'done', startedAt: 1, finishedAt: 2, durationMs: 1,
+    }
+    const structured = {
+      schemaVersion: 1 as const,
+      assistantText: 'full structured reply',
+      blocks: [{ type: 'text' as const, text: 'full structured reply' }],
+      metrics: { textBlocks: 1, toolCalls: 0, toolFailures: 0 },
+      truncated: false,
+    }
+    await writeFile(headlessLogPaths(stateDir, task.taskId).structured, JSON.stringify(structured))
+    const { svc } = fakeService({ task, logsDir: stateDir, sessionMailbox })
+    const control = createWorkspaceConversationControl(svc)
+
+    await expect(control.check?.({ recipientResumeId: 'resume-caller' })).resolves.toEqual([{
+      id: 'mail-task-1',
+      taskId: 'task-1',
+      resumeId: 'resume-1',
+      workspaceId: 'ws-peer',
+      agent: 'pi',
+      status: 'done',
+      assistantText: 'full structured reply',
+      durationMs: 1,
+      createdAt: 10,
+    }])
+    await expect(control.check?.({ recipientResumeId: 'resume-caller' })).resolves.toEqual([])
+    const reloaded = await SessionMailbox.load(join(stateDir, 'session-mailbox.json'))
+    expect(reloaded.pendingFor('resume-caller')).toEqual([])
   })
 })
