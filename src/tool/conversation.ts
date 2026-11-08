@@ -35,7 +35,7 @@ export const conversationAskCommonShape = {
   timeoutMs: z.coerce.number().int().positive().max(MAX_TIMEOUT_MS).optional()
     .describe('Optional headless watchdog in milliseconds. Omit to allow the Session to run without a time limit.'),
   await: z.boolean().optional().default(false)
-    .describe('Wait server-side for a reply needed now; omit for asynchronous delegation and use the returned taskId later.'),
+    .describe('Wait server-side (bounded 30s quick-reply window) for a reply needed now; omit for asynchronous delegation so OpenAlice wakes this Session when the task finishes (then run `alice conversation check`).'),
   reconstruct: z.boolean().optional().default(false)
     .describe('Explicitly add artifact-reconstruction guidance if OpenAlice must recruit a fallback worker.'),
 }
@@ -201,9 +201,10 @@ export const conversationAskFactory: WorkspaceToolFactory = {
         'provenance; wsId for a fresh worker in an exact desk; or harness for a fresh',
         'worker in the current default Chat/AutoQuant desk.',
         '',
-        'Use --await when this turn needs the reply. Without it, the call returns a',
-        'short taskId immediately for delegated work or several concurrent questions;',
-        'retrieve those replies later with conversation_read/await/collect.',
+        'Use --await only when this turn expects a quick reply (bounded 30s wait window, never kills the task).',
+        'Without --await, the call dispatches asynchronously and returns taskId/resumeId immediately: end your',
+        'turn and OpenAlice will automatically wake this Session when the peer task finishes (then run',
+        '`alice conversation check`, or use conversation_read/await/collect).',
         '',
         'Prompts are delivered unchanged by default. Use --reconstruct only when the',
         'intent is to have a fresh worker reconstruct an artifact whose author is absent.',
@@ -294,7 +295,7 @@ export const conversationCreateFactory: WorkspaceToolFactory = {
   build(ctx) {
     const ask = conversationAskFactory.build(ctx)
     return tool({
-      description: 'Create a new Session and deliver its first prompt. Choose exactly one Workspace or Harness. Retain resumeId and use conversation ask for follow-ups; taskId identifies only this turn.',
+      description: 'Create a new Session and deliver its first prompt. Choose exactly one Workspace or Harness. Retain resumeId and use conversation ask for follow-ups; taskId identifies only this turn. Dispatches asynchronously by default and wakes this Session on completion (then run `alice conversation check`).',
       inputSchema: z.object({
         ...conversationAskCommonShape,
         ...conversationSelectionShape,
