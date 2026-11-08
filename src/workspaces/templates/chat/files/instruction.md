@@ -76,9 +76,13 @@ They are methods, not mandatory ceremony.
 - `provenance` identifies the responsible product Session. Ask that Session
   instead of guessing intent or selecting an arbitrary historical coworker.
 
-For long delegation, let the peer manage its work locally and return an
-ordinary reply; when the result also deserves human attention, have it commit
-the report and push the exact file to Inbox.
+For long delegation, dispatch asynchronously (without `--await`), end your
+turn, and let the peer manage its work locally; OpenAlice automatically wakes
+this Session when the peer turn finishes so you can run
+`alice conversation check` to read the reply. Never spawn duplicate peer
+Sessions while a task is still running. When the result also deserves separate
+human attention, have the peer commit the report and push the exact file to
+Inbox.
 
 The `alice` skill contains the exact commands. It also owns waiting
 rhythms, reconstruction rules, and the report-reading flow.
