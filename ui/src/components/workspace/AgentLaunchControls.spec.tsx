@@ -380,6 +380,43 @@ describe('AgentLaunchSelectors keyboard menus', () => {
     await user.click(screen.getByRole('button', { name: i18n.t('common.save') }))
     expect(selectModel).toHaveBeenCalledWith('private-model-1')
   })
+
+  it('filters models in the model submenu search bar and shows an empty state when no model matches', async () => {
+    const user = userEvent.setup()
+    const selectModel = vi.fn()
+    render(
+      <AgentLaunchSelectors
+        config={launchConfig({
+          modelOptions: [
+            { id: 'gpt-5', label: 'GPT-5' },
+            { id: 'gpt-5.6-sol', label: 'GPT-5.6 (Latest)' },
+            { id: 'deepseek-v4-flash', label: 'DeepSeek V4 Flash (deepseek)' },
+          ],
+          selectModel,
+        })}
+        onConfigureProvider={vi.fn()}
+        showRuntime={false}
+        toolbar
+      />,
+    )
+
+    const trigger = screen.getByRole('button', { name: i18n.t('chatLanding.selectModelAndEffort') })
+    trigger.focus()
+    await user.keyboard('{ArrowDown}')
+    await user.click(screen.getByRole('menuitem', { name: /Model/ }))
+
+    const searchInput = await screen.findByRole('textbox', { name: i18n.t('chatLanding.searchModels') })
+    fireEvent.change(searchInput, { target: { value: 'deepseek flash' } })
+
+    expect(screen.queryByRole('menuitemradio', { name: /GPT-5.6/ })).toBeNull()
+    const deepseekOption = screen.getByRole('menuitemradio', { name: /DeepSeek V4 Flash/ })
+    expect(deepseekOption).toBeTruthy()
+    fireEvent.click(deepseekOption)
+    expect(selectModel).toHaveBeenCalledWith('deepseek-v4-flash')
+
+    fireEvent.change(searchInput, { target: { value: 'nonexistent-xyz' } })
+    expect(screen.getByText(i18n.t('chatLanding.noModelMatches', { query: 'nonexistent-xyz' }))).toBeTruthy()
+  })
 })
 
 describe('AgentLaunchDetails setup notices', () => {

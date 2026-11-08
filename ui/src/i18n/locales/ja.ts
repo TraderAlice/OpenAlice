@@ -1864,6 +1864,8 @@ export const ja: Resources = {
     allRuntimesDescription: 'インストール済みのランタイムは今すぐ起動できます。未インストールのランタイムも案内付きで残ります。',
     searchRuntimes: 'ランタイムを検索…',
     noRuntimeMatches: '“{{query}}” に一致するランタイムはありません。',
+    searchModels: 'モデルを検索…',
+    noModelMatches: '“{{query}}” に一致するモデルはありません。',
     installedRuntimes: 'インストール済み',
     notInstalledRuntimes: '未インストール',
     pickerRuntimeChecking: '確認中',

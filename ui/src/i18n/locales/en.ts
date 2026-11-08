@@ -1897,6 +1897,8 @@ export const en = {
     allRuntimesDescription: 'Installed runtimes can be launched now. Missing runtimes stay visible with install guidance.',
     searchRuntimes: 'Search runtimes…',
     noRuntimeMatches: 'No runtimes match “{{query}}”.',
+    searchModels: 'Search models…',
+    noModelMatches: 'No models match “{{query}}”.',
     installedRuntimes: 'Installed',
     notInstalledRuntimes: 'Not installed',
     pickerRuntimeChecking: 'Checking',

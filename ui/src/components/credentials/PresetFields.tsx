@@ -1,6 +1,6 @@
 import { ModelIdentity } from '../ModelIdentity'
 import { AIProviderIcon } from '../../lib/aiProviderIcon'
-import { modelManufacturer } from '../../lib/modelIdentity'
+import { modelDisplayName, modelManufacturer } from '../../lib/modelIdentity'
 /**
  * Reusable preset-enumeration form controls, shared by the AI Provider
  * credential vault and the per-workspace AI config modal.
@@ -10,7 +10,7 @@ import { modelManufacturer } from '../../lib/modelIdentity'
  *   Free-typed IDs remain available for providers without a model-list API.
  */
 
-import { useId, useRef, useState } from 'react'
+import { useId, useMemo, useRef, useState } from 'react'
 import { ChevronDown } from 'lucide-react'
 import { inputClass } from '../form'
 import type { LabeledOption } from '../../lib/presetHelpers'
@@ -35,18 +35,39 @@ export function ModelCombobox({
   const listId = useId()
   const inputRef = useRef<HTMLInputElement>(null)
   const [open, setOpen] = useState(false)
+  const [filterQuery, setFilterQuery] = useState('')
   const [activeModelId, setActiveModelId] = useState<string | null>(null)
-  const activeIndex = suggestions.findIndex((model) => model.id === activeModelId)
-  const activeModel = suggestions[activeIndex]
+  const filteredSuggestions = useMemo(() => {
+    const normalized = filterQuery.trim().toLowerCase()
+    if (!normalized) return suggestions
+    const matched = suggestions.filter((model) => {
+      const display = modelDisplayName(model.id, model.label)
+      const haystack = `${model.id} ${model.label ?? ''} ${display}`.toLowerCase()
+      return normalized.split(/\s+/).every((token) => haystack.includes(token))
+    })
+    return matched.length > 0 ? matched : suggestions
+  }, [filterQuery, suggestions])
+  const activeIndex = filteredSuggestions.findIndex((model) => model.id === activeModelId)
+  const activeModel = filteredSuggestions[activeIndex]
 
-  const openSuggestions = () => {
+  const openSuggestions = (nextQuery = '') => {
     if (suggestions.length === 0) return
+    setFilterQuery(nextQuery)
     setOpen(true)
-    setActiveModelId(suggestions[0]?.id ?? null)
+    const normalized = nextQuery.trim().toLowerCase()
+    const firstMatch = normalized
+      ? suggestions.find((model) => {
+          const display = modelDisplayName(model.id, model.label)
+          const haystack = `${model.id} ${model.label ?? ''} ${display}`.toLowerCase()
+          return normalized.split(/\s+/).every((token) => haystack.includes(token))
+        })
+      : suggestions[0]
+    setActiveModelId((firstMatch ?? suggestions[0])?.id ?? null)
   }
 
   const chooseSuggestion = (model: LabeledOption) => {
     onChange(model.id)
+    setFilterQuery('')
     setOpen(false)
     setActiveModelId(null)
   }
@@ -77,21 +98,21 @@ export function ModelCombobox({
         value={value}
         onChange={(event) => {
           onChange(event.target.value)
-          openSuggestions()
+          openSuggestions(event.target.value)
         }}
-        onFocus={openSuggestions}
+        onFocus={() => openSuggestions('')}
         onKeyDown={(event) => {
           if (event.key === 'Escape' && open) {
             event.preventDefault()
             setOpen(false)
             setActiveModelId(null)
-          } else if (suggestions.length > 0 && (event.key === 'ArrowDown' || event.key === 'ArrowUp')) {
+          } else if (filteredSuggestions.length > 0 && (event.key === 'ArrowDown' || event.key === 'ArrowUp')) {
             event.preventDefault()
             setOpen(true)
             const nextIndex = activeIndex < 0
-              ? event.key === 'ArrowUp' ? suggestions.length - 1 : 0
-              : (activeIndex + (event.key === 'ArrowUp' ? -1 : 1) + suggestions.length) % suggestions.length
-            setActiveModelId(suggestions[nextIndex]?.id ?? null)
+              ? event.key === 'ArrowUp' ? filteredSuggestions.length - 1 : 0
+              : (activeIndex + (event.key === 'ArrowUp' ? -1 : 1) + filteredSuggestions.length) % filteredSuggestions.length
+            setActiveModelId(filteredSuggestions[nextIndex]?.id ?? null)
           } else if (event.key === 'Enter' && open && activeModel) {
             event.preventDefault()
             chooseSuggestion(activeModel)
@@ -113,7 +134,7 @@ export function ModelCombobox({
               setOpen(false)
               setActiveModelId(null)
             } else {
-              openSuggestions()
+              openSuggestions('')
               inputRef.current?.focus()
             }
           }}
@@ -123,14 +144,14 @@ export function ModelCombobox({
         </button>
       )}
 
-      {open && suggestions.length > 0 && (
+      {open && filteredSuggestions.length > 0 && (
         <div
           id={listId}
           role="listbox"
           aria-label={suggestionsLabel ?? 'Model suggestions'}
           className="oa-popover-enter absolute left-0 right-0 top-full z-40 mt-1 max-h-52 overflow-y-auto rounded-lg border border-border/70 bg-secondary p-1 shadow-lg"
         >
-          {suggestions.map((model, index) => (
+          {filteredSuggestions.map((model, index) => (
             <button
               key={model.id}
               id={`${listId}-${index}`}
