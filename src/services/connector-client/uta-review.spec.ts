@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import type { ConnectorUtaPresentation, ConnectorUtaRequest } from '@traderalice/connector-protocol'
+import { UTAHttpError } from '@traderalice/uta-protocol'
 import { compactUtaOperation, processConnectorUtaRequests } from './uta-review.js'
 import type { UTAManagerSDK } from '../uta-client/index.js'
 import type { TradingModePolicy } from '../trading-mode.js'
@@ -343,5 +344,69 @@ describe('processConnectorUtaRequests', () => {
     })
     expect(reject).toHaveBeenCalled()
     expect(failUta).toHaveBeenLastCalledWith(expect.objectContaining({ reason: 'conflict' }))
+  })
+
+  it('reports an indeterminate write as a reconcile notice, never as a retryable failure', async () => {
+    // The push route answers 504 + WRITE_OUTCOME_UNCONFIRMED when the wallet write
+    // was abandoned while the broker call was still outstanding: the order MAY be
+    // live. Nothing here may read as "push again", and nothing as "it went through".
+    const indeterminate = new UTAHttpError(504, {
+      error: 'Wallet write abc12345 did not confirm: 1 operation(s) did not settle within the 90000ms write bound — outcome indeterminate, reconcile against broker state',
+      code: 'WRITE_OUTCOME_UNCONFIRMED',
+      hash: 'abc12345',
+      unconfirmed: [{ action: 'placeOrder', success: false, status: 'unconfirmed' }],
+    }, 'Wallet write abc12345 did not confirm')
+    const push = vi.fn(async () => { throw indeterminate })
+    const failUta = vi.fn(async (..._args: unknown[]) => undefined)
+    const presentUta = vi.fn(async (_presentation: ConnectorUtaPresentation) => undefined)
+    const ackUtaActions = vi.fn(async () => undefined)
+    const releaseUtaActions = vi.fn(async () => undefined)
+    await processConnectorUtaRequests({
+      isEnabled: async () => true,
+      drainUtaActions: async () => [],
+      claimUtaActions: async () => ({
+        claimId: 'claim-uta',
+        items: [request({ action: 'push', utaId: 'alpaca-paper', pendingHash: 'abc12345' })],
+      }),
+      ackUtaActions,
+      releaseUtaActions,
+      presentUta,
+      failUta,
+      warn: vi.fn(),
+      utaManager: manager([account({ push })]),
+      tradingModePolicy: () => PRO,
+    })
+    expect(push).toHaveBeenCalledWith('abc12345')
+    const failure = failUta.mock.calls[0]?.[0] as { reason: string; message: string } | undefined
+    expect(failure?.message).toContain('MAY be live')
+    expect(failure?.message).toContain('abc12345')
+    expect(failure?.message).toContain('Reconcile against broker state')
+    expect(failure?.message).not.toMatch(/Send \/uta again/)
+    // Never a push: the venue acceptance was never seen.
+    expect(presentUta).not.toHaveBeenCalled()
+    // Terminal: the owner gets one honest notice, not a redelivery loop.
+    expect(failure?.reason).toBe('unavailable')
+    expect(ackUtaActions).toHaveBeenCalledWith('claim-uta', ['uta-1'])
+    expect(releaseUtaActions).not.toHaveBeenCalled()
+  })
+
+  it('keeps a bare 504 without the route code an ordinary failure', async () => {
+    // Only the push route's own code claims an indeterminate write. A plain
+    // gateway timeout says nothing about whether the order landed, so it must not
+    // be promoted to "may be live" — that would teach the owner to distrust
+    // every slow network.
+    const gateway = new UTAHttpError(504, { error: 'upstream timeout' }, 'upstream timeout')
+    const failUta = vi.fn(async () => undefined)
+    const push = vi.fn(async () => { throw gateway })
+    await processConnectorUtaRequests({
+      isEnabled: async () => true,
+      drainUtaActions: async () => [request({ action: 'push', utaId: 'alpaca-paper', pendingHash: 'abc12345' })],
+      presentUta: async () => undefined,
+      failUta,
+      warn: vi.fn(),
+      utaManager: manager([account({ push })]),
+      tradingModePolicy: () => PRO,
+    })
+    expect(failUta).toHaveBeenCalledWith(expect.objectContaining({ reason: 'delivery_failed' }))
   })
 })
