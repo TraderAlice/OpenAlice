@@ -142,7 +142,9 @@ const BASE_EXPORTS: Record<string, CliExport> = {
       issue: 'Read the shared work board and manage this Workspace\'s durable work',
       provenance: 'Trace business artifacts to attributable product Sessions',
       signature: 'Show this Session\'s safe product identity',
-      session: 'Rename or inspect this Workspace\'s product Sessions',
+      session: 'Inspect, rename, configure, interrupt, or archive product Sessions',
+      headless: 'Inspect background headless runs and their structured logs',
+      schedule: 'Inspect scheduled Workspace Issues and their next due times',
       track: 'Maintain the shared index of durable assets and topics',
       harness: 'Review and update Project-provided Skill files while respecting Workspace preferences',
       template: 'Preview or apply managed Workspace-template updates',
@@ -161,6 +163,7 @@ const BASE_EXPORTS: Record<string, CliExport> = {
         await: 'conversation_await',
         collect: 'conversation_collect',
         read: 'conversation_read',
+        check: 'conversation_check',
       },
       // inbox push: one Markdown body with inline Workspace file references.
       // --body-file publishes Markdown read from a local file.
@@ -193,8 +196,26 @@ const BASE_EXPORTS: Record<string, CliExport> = {
       signature: {
         show: 'session_signature',
       },
+      // session: the product Session control plane. `list` defaults to this
+      // Workspace's active Sessions; presence/state flags filter the roster.
       session: {
+        list: 'session_list',
+        show: 'session_show',
         rename: 'session_rename',
+        config: 'session_config',
+        interrupt: 'session_interrupt',
+        delete: 'session_delete',
+        restore: 'session_restore',
+      },
+      // headless/schedule: read-only observability over background runs and
+      // scheduled Issues — the CLI mirror of the WebUI panels.
+      headless: {
+        list: 'headless_list',
+        show: 'headless_show',
+        logs: 'headless_logs',
+      },
+      schedule: {
+        list: 'schedule_list',
       },
       // track: the durable cross-workspace tracked-entity index ([[name]]).
       track: {

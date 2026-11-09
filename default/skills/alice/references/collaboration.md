@@ -13,7 +13,9 @@ keep using their native file, search, and Git tools inside any resolved path.
 | `issue` | Durable work, ownership, scheduling, Activity | Ad-hoc questions |
 | `provenance` | Artifact-to-Session attribution | Guessing intent |
 | `signature` | The current Session's safe `@resumeId` | Runtime-native ids |
-| `session` | This Workspace's coworker nametag | Conversation title, AI binding, or launcher nickname |
+| `session` | Session rosters, status, interrupt, idle AI config, archive/restore | Conversation title or launcher nickname |
+| `headless` | Background run status and structured logs | Dispatching new runs |
+| `schedule` | Scheduled Issues and their next due times | Editing schedules |
 | `track` | Shared durable asset/topic index | Work status |
 | `template` | Managed Workspace guidance upgrades | Harness research lifecycle |
 
@@ -82,14 +84,22 @@ the prompt when no original author is available.
 Choose the waiting rhythm from the work:
 
 - A short answer needed now: add `--await`.
-- A longer delegation: omit `--await`, retain `taskId`, then retrieve it later.
+- A longer delegation: omit `--await`, retain `taskId`, end your turn, and wait
+  for OpenAlice to wake your Session when the child task finishes.
 - Several independent peers: dispatch first, then collect the task ids together.
 
 ```bash
+alice conversation check
 alice conversation await --task-id <taskId>
 alice conversation read --task-id <taskId>
 alice conversation collect --task-id <taskA> --task-id <taskB>
 ```
+
+When a Session dispatches work via `conversation create` or `conversation ask`,
+OpenAlice records the caller Session and automatically delivers a wakeup
+notification when the child task finishes. When woken, run
+`alice conversation check` to retrieve and acknowledge all completed peer
+replies for this Session.
 
 Conversation work has no implicit execution deadline. `--await`, `conversation
 await`, and `conversation collect` also wait for terminal task state when no
@@ -98,9 +108,12 @@ deliberately wants a hard execution watchdog (for `conversation ask`) or a
 bounded server-side wait (for `await`/`collect`). A bounded wait returning does
 not stop a task unless that same explicit timeout was attached at dispatch.
 
-There is no unsolicited Agent-to-Agent completion notification bus. Inbox
-notifies the human; `await`, `read`, and `collect` retrieve direct Agent replies.
-Do not build shell sleep loops.
+`--await` on `create`/`ask` uses a bounded server-side wait window (default
+30s) for quick answers and never kills the child task when the wait window
+expires. If the task is still `"running"`, end your turn and wait for OpenAlice
+to wake you (or use `conversation check` / `read` later), and never spawn
+duplicate sessions for the same in-flight request. Do not build shell sleep
+loops.
 
 ## Notify the human and deliver reports
 
@@ -196,6 +209,35 @@ alice session rename --resume-id <resumeId> --display-name 'AAPL desk'
 `resumeId` is the product follow-up handle; `taskId` is one execution. Native
 runtime Session ids remain backend-only. `inbox ask` identifies the sender of a
 delivery, which may differ from whoever last edited its live document.
+
+## Inspect and control Sessions, runs, and schedules
+
+`session` is the product Session control plane — audit, unstick, reconfigure,
+or archive without touching native runtime ids:
+
+```bash
+alice session list                      # active Sessions here (unread counts included)
+alice session list --state all          # include archived Sessions
+alice session show --resume-id <resumeId>
+alice session interrupt --resume-id <resumeId>   # stop a stuck running turn
+alice session config --resume-id <resumeId> --model <id>   # idle AI binding edits
+alice session delete --resume-id <resumeId>      # archive; restore with session restore
+```
+
+`config` accepts `--credential <slug>` or `--credential-source native`
+(mutually exclusive), `--model`, and `--effort`; the Session must be idle.
+
+`headless` and `schedule` are read-only observability over background work:
+
+```bash
+alice headless list --status failed --limit 5
+alice headless show --task-id <taskId>
+alice headless logs --task-id <taskId> --tail-bytes 8192
+alice schedule list
+```
+
+From the workspace-manager context, `session list` without `--ws-id` spans
+every Workspace; elsewhere commands default to this Workspace.
 
 ## Coordinate durable work
 

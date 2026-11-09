@@ -58,6 +58,7 @@ export class HeadlessTerminalSnapshot {
   private queryReplyForwardingDepth = 0
   private pendingAsyncWrites = 0
   private disposed = false
+  private currentTitle = ''
 
   constructor(options: HeadlessTerminalSnapshotOptions) {
     this.terminal = new Terminal({
@@ -67,6 +68,9 @@ export class HeadlessTerminalSnapshot {
       allowProposedApi: true,
       logLevel: 'off',
       vtExtensions: { kittyKeyboard: true },
+    })
+    this.terminal.onTitleChange((title) => {
+      this.currentTitle = title
     })
     this.serializer = new SerializeAddon()
     this.terminal.loadAddon(this.serializer)
@@ -124,6 +128,41 @@ export class HeadlessTerminalSnapshot {
     this.terminal.resize(cols, rows)
   }
 
+  getTitle(): string {
+    return this.currentTitle
+  }
+
+  readScreenTail(maxLines = 8): string[] {
+    if (this.disposed) return []
+    const buffer = this.terminal.buffer.active
+    const lines: string[] = []
+    for (
+      let y = buffer.baseY + this.terminal.rows - 1;
+      y >= 0 && lines.length < maxLines;
+      y -= 1
+    ) {
+      const line = buffer.getLine(y)
+      if (!line) continue
+      const text = line.translateToString(true).trimEnd()
+      if (!text.trim()) continue
+      lines.unshift(text)
+    }
+    return lines
+  }
+
+  isSpinnerInTitle(): boolean {
+    return /[⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏◐◓◑◒⣾⣽⣻⢿⡿⣟⣯⣷]/.test(this.currentTitle)
+      || /\b(working|thinking|running)\b/i.test(this.currentTitle)
+  }
+
+  isPermissionPromptVisible(): boolean {
+    const tail = this.readScreenTail(8).join('\n')
+    return /\b(Allow|Approve|Reject|Deny)\b.*\b(once|always|tool|command|bash|edit|write)\b/i.test(tail)
+      || /Do you want to (proceed|allow|run|make this edit|execute)\b/i.test(tail)
+      || /\[(y\/n|Y\/n|y\/N|yes\/no)\]/i.test(tail)
+      || /\bYes,\s*(allow|proceed|run)\b/i.test(tail)
+  }
+
   /**
    * Return null when queued writes have not parsed yet so callers can safely
    * fall back to the raw replay buffer instead of serializing partial state.
@@ -171,6 +210,7 @@ export class HeadlessTerminalSnapshot {
   dispose(): void {
     if (this.disposed) return
     this.disposed = true
+    this.currentTitle = ''
     this.terminal.dispose()
   }
 }

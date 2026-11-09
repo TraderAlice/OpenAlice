@@ -368,6 +368,8 @@ import {
   SessionRegistry,
   type SessionRecord,
 } from './session-registry.js';
+import { SessionMailbox } from './session-mailbox.js';
+import { SessionWakeDelivery } from './session-wake-delivery.js';
 import { ProductSessionCoordinator } from './product-session-coordinator.js';
 import { projectPublicSession } from './public-session.js';
 import { NativeSessionTitleResolver } from './session-title-resolver.js';
@@ -432,6 +434,8 @@ export interface WorkspaceService {
   /** Coordinates runtime starts with directory-wide lifecycle operations. */
   readonly operationGuard: WorkspaceOperationGuard;
   readonly sessionRegistry: SessionRegistry;
+  readonly sessionMailbox: SessionMailbox;
+  readonly sessionWakeDelivery: SessionWakeDelivery;
   readonly sessionCoordinator: ProductSessionCoordinator;
   readonly scrollbackStore: ScrollbackStore;
   readonly templates: TemplateRegistry;
@@ -725,6 +729,9 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
   const sessionRegistry = await SessionRegistry.load(
     join(config.launcherRoot, 'state'),
     launcherLogger.child({ scope: 'session-registry' }),
+  );
+  const sessionMailbox = await SessionMailbox.load(
+    join(config.launcherRoot, 'state', 'session-mailbox.json'),
   );
 
   // The headless-task management plane. load() reconciles leftover `running`
@@ -2175,6 +2182,20 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
             toolFailures: r.structured.metrics.toolFailures,
           },
         });
+        if (conversation?.source.kind === 'session') {
+          await sessionWakeDelivery.notifyTaskCompleted({
+            recipientResumeId: conversation.source.resumeId,
+            recipientWorkspaceId: conversation.source.workspaceId,
+            taskId: rec.taskId,
+            childResumeId: rec.resumeId,
+            childWorkspaceId: ws.id,
+            childAgent: adapter.id,
+            taskStatus: status,
+            assistantPreview: r.structured.assistantText?.slice(0, 2000) ?? null,
+            ...(failure ? { error: failure } : {}),
+            ...(r.durationMs !== undefined ? { durationMs: r.durationMs } : {}),
+          }).catch((err) => launcherLogger.warn('session_wake.notify_failed', { taskId: rec.taskId, err }));
+        }
         await dispatchDelivery.finish(rec, r.structured.assistantText);
         if (conversation) {
           await agentConversationLog.recordCompletion({
@@ -2271,6 +2292,19 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
           finishedAt: Date.now(),
           error: message,
         });
+        if (conversation?.source.kind === 'session') {
+          await sessionWakeDelivery.notifyTaskCompleted({
+            recipientResumeId: conversation.source.resumeId,
+            recipientWorkspaceId: conversation.source.workspaceId,
+            taskId: rec.taskId,
+            childResumeId: rec.resumeId,
+            childWorkspaceId: ws.id,
+            childAgent: adapter.id,
+            taskStatus: status,
+            assistantPreview: null,
+            error: message,
+          }).catch((notifyErr) => launcherLogger.warn('session_wake.notify_failed', { taskId: rec.taskId, err: notifyErr }));
+        }
         if (conversation) {
           await agentConversationLog.recordCompletion({
             taskId: rec.taskId,
@@ -2306,6 +2340,9 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
       .finally(async () => {
         await dispatchDelivery.finish(rec).catch(err => launcherLogger.warn('dispatch.delivery_finish_failed', { taskId: rec.taskId, err }));
         activeResumeIds.delete(rec.resumeId);
+        void sessionWakeDelivery.onSessionSettled(rec.resumeId).catch((err) =>
+          launcherLogger.warn('session_wake.headless_settlement_failed', { resumeId: rec.resumeId, err }),
+        );
         releaseTakeover();
       });
     headlessDispatchCompletions.add(completion);
@@ -3010,6 +3047,13 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
     },
     launcherLogger.child({ scope: 'pool' }),
     transcriptWatcher,
+    (session) => {
+      const productSession = sessionRegistry.get(session.wsId, session.recordId);
+      if (!productSession?.resumeId) return;
+      void sessionWakeDelivery.onSessionSettled(productSession.resumeId).catch((err) =>
+        launcherLogger.warn('session_wake.pty_settlement_failed', { resumeId: productSession.resumeId, err }),
+      );
+    },
   );
 
   const web = new WebSessionHost(
@@ -3032,6 +3076,57 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
       },
     },
   );
+
+  const sessionWakeDelivery = new SessionWakeDelivery({
+    mailbox: sessionMailbox,
+    deliverToWeb: async (resumeId, pointerText) => {
+      const identity = resumeRegistry.get(resumeId);
+      if (!identity) return 'absent';
+      await sessionRegistry.ensureLoaded(identity.wsId);
+      const record = sessionRegistry.findByResumeId(identity.wsId, resumeId);
+      if (!record || !web.has(record.id)) return 'absent';
+      if (web.get(record.id)?.phase !== 'idle') return 'busy';
+      await web.prompt(record.id, pointerText);
+      return 'delivered';
+    },
+    deliverToPty: async (resumeId, pointerText) => {
+      const identity = resumeRegistry.get(resumeId);
+      if (!identity) return 'absent';
+      await sessionRegistry.ensureLoaded(identity.wsId);
+      const record = sessionRegistry.findByResumeId(identity.wsId, resumeId);
+      if (!record) return 'absent';
+      const pty = pool.get(record.id);
+      if (!pty) return 'absent';
+      if (!pty.isTuiSettledForDelivery()) return 'busy';
+      const sent = await pty.sendPointerPrompt(pointerText);
+      return sent.ok ? 'delivered' : 'busy';
+    },
+    deliverToHeadless: async (resumeId, pointerText) => {
+      if (activeResumeIds.has(resumeId)) return 'busy';
+      const identity = resumeRegistry.get(resumeId);
+      if (!identity || !identity.agentSessionId || identity.lifecycle === 'retired') return 'unavailable';
+      const latestTask = headlessTasks.latestForResumeId(resumeId);
+      if (!latestTask) return 'unavailable';
+      await sessionRegistry.ensureLoaded(identity.wsId);
+      const record = sessionRegistry.findByResumeId(identity.wsId, resumeId);
+      if (record && (pool.get(record.id) || web.has(record.id))) return 'unavailable';
+      const meta = registry.get(identity.wsId);
+      const adapter = adapters.get(identity.agent);
+      if (!meta || !adapter) return 'unavailable';
+      await dispatchHeadlessTaskMethod(
+        meta,
+        adapter,
+        pointerText,
+        { kind: 'system', entry: 'session-wake-mailbox', workspaceId: identity.wsId, resumeId },
+        undefined,
+        latestTask.trigger,
+        resumeId,
+        latestTask.inquiry,
+      );
+      return 'delivered';
+    },
+    warn: (event, detail) => launcherLogger.warn(event, detail),
+  });
 
   const executeWebSession = async (
     meta: WorkspaceMeta,
@@ -3150,7 +3245,14 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
       start: async report => {
         let completed!: Promise<{ reason: string; failed?: boolean }>;
         const snapshot = await web.start({
-          onActivity: phase => { void report(phase).catch(() => launcherLogger.error('session_execution.activity_failed', { recordId: record.id })); },
+          onActivity: phase => {
+            void report(phase).catch(() => launcherLogger.error('session_execution.activity_failed', { recordId: record.id }));
+            if (phase === 'idle') {
+              void sessionWakeDelivery.onSessionSettled(record.resumeId).catch((err) =>
+                launcherLogger.warn('session_wake.web_settlement_failed', { resumeId: record.resumeId, err }),
+              );
+            }
+          },
           recordId: record.id,
           wsId: record.wsId,
           resumeId: record.resumeId,
@@ -3521,6 +3623,8 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
     workspaceAbsorbs,
     operationGuard: workspaceOperationGuard,
     sessionRegistry,
+    sessionMailbox,
+    sessionWakeDelivery,
     sessionCoordinator,
     scrollbackStore,
     templates,

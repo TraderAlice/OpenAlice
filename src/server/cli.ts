@@ -2,6 +2,8 @@ import { registerConnectorModelRoutes } from './connector-model.js'
 import { registerMarketReferenceRoute } from './market-reference.js'
 import { registerWorkspaceFileRoutes } from './workspace-files.js'
 import { registerProjectCliRoutes } from './project-cli.js'
+import { open, readFile, stat } from 'node:fs/promises'
+
 /**
  * CLI gateway — the third adapter over the tool registry.
  *
@@ -31,6 +33,7 @@ import { z } from 'zod'
 import type { Tool } from 'ai'
 import type { ToolCenter } from '../core/tool-center.js'
 import {
+  type WorkspaceToolContext,
   type WorkspaceToolCenter,
   makeInboxEntryOriginResolver,
   makeWorkspaceResolver,
@@ -51,6 +54,17 @@ import {
 } from './cli-commands.js'
 import { resolveInboxOrigin } from './inbox-origin.js'
 import { extractTradeDecisionRefs } from './trade-provenance.js'
+import { headlessLogPaths } from '../workspaces/headless-task-registry.js'
+import { parseHeadlessOutputText, type HeadlessStructuredOutput } from '../workspaces/headless-output.js'
+import { sessionPresence } from '../workspaces/resume-registry.js'
+import {
+  mergeSessionRuntimeSelection,
+  createNativeSessionRuntimeBinding,
+  createSessionRuntimeBinding,
+  type SessionRuntimeSelection,
+} from '../workspaces/session-runtime-binding.js'
+import { projectPublicSessionRuntime } from '../workspaces/public-session.js'
+import { isAgentRuntime } from '../workspaces/cli-adapter.js'
 import { createWorkspaceConversationControl } from '../workspaces/conversation-control.js'
 
 export interface CliGatewayDeps {
@@ -64,6 +78,200 @@ export interface CliGatewayDeps {
 }
 
 type WsMeta = { id: string; tag: string; dir?: string }
+
+const DEFAULT_TAIL_BYTES = 64 * 1024
+const MAX_TAIL_BYTES = 1024 * 1024
+const STRUCTURED_TAIL_BYTES = 2 * 1024 * 1024
+
+/** Read the last `tailBytes` of a file; null when the file doesn't exist.
+ *  Mirrors the WebUI /api/headless reader so CLI and panel agree byte-for-byte. */
+async function readLogTail(
+  path: string,
+  tailBytes: number,
+): Promise<{ text: string; sizeBytes: number; truncated: boolean } | null> {
+  let sizeBytes: number
+  try {
+    sizeBytes = (await stat(path)).size
+  } catch {
+    return null
+  }
+  const start = Math.max(0, sizeBytes - tailBytes)
+  const fh = await open(path, 'r')
+  try {
+    const buffer = Buffer.alloc(sizeBytes - start)
+    await fh.read(buffer, 0, buffer.length, start)
+    return { text: buffer.toString('utf8'), sizeBytes, truncated: start > 0 }
+  } finally {
+    await fh.close()
+  }
+}
+
+async function readStructuredLog(path: string): Promise<HeadlessStructuredOutput | null> {
+  try {
+    const parsed = JSON.parse(await readFile(path, 'utf8')) as HeadlessStructuredOutput
+    if (parsed.schemaVersion !== 1 || !Array.isArray(parsed.blocks)) return null
+    return parsed
+  } catch {
+    return null
+  }
+}
+
+/** Session control plane over the live WorkspaceService — shared by the CLI
+ *  gateway and the MCP build site so the two surfaces never drift. */
+export function makeSessionControl(svc: WorkspaceService): NonNullable<WorkspaceToolContext['sessionControl']> {
+  return {
+    unreadCount: (resumeId) => svc.sessionMailbox.unreadFor(resumeId).length,
+    show: async (resumeId) => {
+      const identity = svc.resumeRegistry.get(resumeId)
+      if (!identity) return null
+      const directory = await svc.sessionDirectory(identity.wsId, undefined, resumeId)
+      const entry = directory?.sessions[0]
+      const record = svc.sessionRegistry.findByResumeId(identity.wsId, resumeId)
+      const pty = record ? svc.pool.get(record.id) : undefined
+      const recentExecutions = svc.headlessTasks
+        .list({ wsId: identity.wsId, limit: 50 })
+        .filter((t) => t.resumeId === resumeId)
+        .slice(0, 5)
+        .map(({ agentSessionId: _nativeSessionId, ...rest }) => rest)
+      return {
+        ...(entry ?? { resumeId, wsId: identity.wsId, agent: identity.agent }),
+        wsId: identity.wsId,
+        unreadMailboxCount: svc.sessionMailbox.unreadFor(resumeId).length,
+        hasActiveWatermark: svc.sessionMailbox.hasActiveWatermark(resumeId),
+        currentExecution: svc.executions.current(resumeId),
+        recentExecutions,
+        ...(pty ? {
+          terminal: {
+            tuiSettled: pty.isTuiSettledForDelivery(),
+            screenTail: pty.readScreenTail(6),
+          },
+        } : {}),
+      }
+    },
+    interrupt: async (resumeId) => {
+      const stopped = await svc.executions.stop(resumeId, 'cli-interrupt')
+      return { resumeId, stopped }
+    },
+    configure: async ({ resumeId, credential, credentialSource, model, effort }) => {
+      const identity = svc.resumeRegistry.get(resumeId)
+      if (!identity) throw new Error(`Unknown Session: ${resumeId}`)
+      if (identity.lifecycle === 'retired') {
+        throw new Error('this Session retired with its Workspace')
+      }
+      if (sessionPresence(identity) === 'deleted') {
+        throw new Error('This Session is no longer available')
+      }
+      const interactive = svc.sessionRegistry.findByResumeId(identity.wsId, resumeId)
+      const busy = 'Wait for the current turn to finish before changing credential, model, or effort'
+      if (
+        interactive
+        && (interactive.state === 'running' || svc.pool.get(interactive.id) || svc.web.has(interactive.id))
+      ) {
+        throw new Error(busy)
+      }
+      if (svc.headlessTasks.latestForResumeId(resumeId)?.status === 'running') {
+        throw new Error(busy)
+      }
+      const adapter = svc.adapters.get(identity.agent)
+      if (!adapter || !isAgentRuntime(adapter)) {
+        throw new Error(`Session runtime "${identity.agent}" does not support managed AI configuration`)
+      }
+      const meta = svc.resolveRuntimeWorkspace(identity.wsId) ?? svc.registry.get(identity.wsId)
+      if (!meta) throw new Error(`unknown workspace: ${identity.wsId}`)
+      const previous = identity.runtimeBinding ?? createNativeSessionRuntimeBinding({ adapter }).binding
+      const selection: SessionRuntimeSelection = {
+        ...(credentialSource === 'native' ? { credentialSource: 'native' as const } : {}),
+        ...(credential ? { credentialSlug: credential } : {}),
+        ...(model ? { model } : {}),
+        ...(effort ? { reasoningEffort: effort as SessionRuntimeSelection['reasoningEffort'] } : {}),
+      }
+      const resolved = await createSessionRuntimeBinding({
+        adapter,
+        cwd: meta.dir,
+        selection: mergeSessionRuntimeSelection(previous, selection),
+      })
+      await svc.resumeRegistry.replaceRuntimeBinding({
+        resumeId: identity.resumeId,
+        wsId: identity.wsId,
+        agent: identity.agent,
+        runtimeBinding: resolved.binding,
+      })
+      return {
+        resumeId: identity.resumeId,
+        agent: identity.agent,
+        runtime: projectPublicSessionRuntime(resolved.binding),
+      }
+    },
+    setPresence: async ({ resumeId, presence }) => {
+      const identity = svc.resumeRegistry.get(resumeId)
+      if (!identity) throw new Error(`Unknown Session: ${resumeId}`)
+      const updated = presence === 'deleted'
+        ? await svc.deleteSessionPresence({ wsId: identity.wsId, resumeId })
+        : await svc.setSessionPresence({ wsId: identity.wsId, resumeId, presence: 'active' })
+      return { resumeId: updated.resumeId, presence: sessionPresence(updated) }
+    },
+  }
+}
+
+/** Headless-run observability plane — read-only, agentSessionId stripped. */
+export function makeHeadlessControl(svc: WorkspaceService): NonNullable<WorkspaceToolContext['headlessControl']> {
+  return {
+    list: ({ wsId, status, limit = 50 }) => {
+      const tasks = svc.headlessTasks.list({ wsId, status, limit }).map(({ agentSessionId: _nativeSessionId, ...rest }) => rest)
+      return {
+        tasks,
+        summary: {
+          done: svc.headlessTasks.count({ wsId, status: 'done' }),
+          needsAttention:
+            svc.headlessTasks.count({ wsId, status: 'failed' })
+            + svc.headlessTasks.count({ wsId, status: 'interrupted' }),
+        },
+        capacity: { running: svc.headlessTasks.runningCount(), limit: svc.headlessCapacity },
+      }
+    },
+    show: (taskId) => {
+      const rec = svc.headlessTasks.get(taskId)
+      if (!rec) return null
+      const { agentSessionId: _nativeSessionId, ...rest } = rec
+      return rest
+    },
+    logs: async (taskId, tailBytes = DEFAULT_TAIL_BYTES) => {
+      const rec = svc.headlessTasks.get(taskId)
+      if (!rec) return null
+      const bounded = Math.min(tailBytes, MAX_TAIL_BYTES)
+      const paths = headlessLogPaths(svc.headlessLogsDir, taskId)
+      const [stdout, stderr, storedStructured] = await Promise.all([
+        readLogTail(paths.stdout, bounded),
+        readLogTail(paths.stderr, bounded),
+        readStructuredLog(paths.structured),
+      ])
+      const adapter = svc.adapters.get(rec.agent)
+      const structuredSource = storedStructured ? null : await readLogTail(paths.stdout, STRUCTURED_TAIL_BYTES)
+      const structured = storedStructured ?? parseHeadlessOutputText({
+        text: structuredSource?.text ?? '',
+        ...(adapter?.extractHeadlessOutputEvents
+          ? { extractEvents: adapter.extractHeadlessOutputEvents.bind(adapter) }
+          : {}),
+        ...(adapter?.extractHeadlessAssistantText
+          ? { extractAssistantText: adapter.extractHeadlessAssistantText.bind(adapter) }
+          : {}),
+        sourceTruncated: structuredSource?.truncated ?? false,
+        runStillActive: rec.status === 'running',
+      })
+      return { taskId, status: rec.status, structured, stdout, stderr }
+    },
+  }
+}
+
+/** Scheduled Workspace Issue snapshot, optionally narrowed to one Workspace. */
+export function makeScheduleControl(svc: WorkspaceService): NonNullable<WorkspaceToolContext['scheduleControl']> {
+  return {
+    list: async (wsId) => {
+      const snap = await svc.scheduleSnapshot()
+      return wsId ? { workspaces: snap.workspaces.filter((w) => w.wsId === wsId) } : snap
+    },
+  }
+}
 
 /** Mount /cli/:wsId/:export/* onto an existing Hono app (the MCP server's app). */
 export function registerCliRoutes(app: Hono, deps: CliGatewayDeps, manifestOnly = false): void {
@@ -129,6 +337,11 @@ export function registerCliRoutes(app: Hono, deps: CliGatewayDeps, manifestOnly 
               ...(identity.displayName ? { displayName: identity.displayName } : {}),
             }
           },
+        } : {}),
+        ...(svc ? {
+          sessionControl: makeSessionControl(svc),
+          headlessControl: makeHeadlessControl(svc),
+          scheduleControl: makeScheduleControl(svc),
         } : {}),
         // Lets workspace_path resolve ANY peer's dir (not just the caller) —
         // the in-workspace cross-workspace addressing path. Shared with the

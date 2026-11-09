@@ -25,7 +25,8 @@ export async function main(
   argv: string[] = process.argv.slice(2),
   dependencies: CliDependencies = {},
 ): Promise<number> {
-  const [command, ...args] = argv
+  const normalizedArgv = argv[0] === '--' ? argv.slice(1) : argv
+  const [command, ...args] = normalizedArgv
   if (command === 'exec') return runProjectCli(args)
   if (command === 'relay') return (dependencies.runRelay ?? runWebRelay)(args)
   if (command === 'start') {
@@ -68,7 +69,7 @@ Options:
     return (dependencies.runTui ?? runSupervisorTui)(flags)
   }
   if (command === '--remote' || command === '--machine') {
-    return (dependencies.runCommand ?? runLegacyCommand)(argv)
+    return (dependencies.runCommand ?? runLegacyCommand)(normalizedArgv)
   }
   if (command === undefined) {
     await setup()
@@ -90,7 +91,7 @@ Options:
     const setupCode = await setup()
     if (setupCode !== 0) return setupCode
   }
-  return (dependencies.runCommand ?? runLegacyCommand)(argv)
+  return (dependencies.runCommand ?? runLegacyCommand)(normalizedArgv)
 }
 
 function usageError(message: string): Error & { code: string; exitCode: number } {

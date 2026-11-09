@@ -183,20 +183,40 @@ async function fetchJson(url, opts) {
   if (process.env.OPENALICE_TOOL_SOCKET && url.startsWith('/')) {
     return fetchSocketJson(process.env.OPENALICE_TOOL_SOCKET, url, opts)
   }
-  let resp
-  try {
-    resp = await fetch(url, opts)
-  } catch (e) {
-    fail(`cannot reach OpenAlice at ${url} — is the backend running? (${e && e.message})`)
-  }
-  let body = null
-  const text = await resp.text()
-  try {
-    body = text ? JSON.parse(text) : null
-  } catch {
-    body = text
-  }
-  return { ok: resp.ok, status: resp.status, body }
+  return fetchHttpJson(url, opts)
+}
+
+async function fetchHttpJson(url, opts) {
+  const parsedUrl = new URL(url)
+  const lib = parsedUrl.protocol === 'https:' ? await import('node:https') : await import('node:http')
+  debug('http.request', { url, method: opts && opts.method ? opts.method : 'GET' })
+  return new Promise((resolve) => {
+    const req = lib.request(
+      parsedUrl,
+      {
+        method: opts && opts.method ? opts.method : 'GET',
+        headers: opts && opts.headers ? opts.headers : undefined,
+      },
+      (res) => {
+        let raw = ''
+        res.setEncoding('utf8')
+        res.on('data', (chunk) => { raw += chunk })
+        res.on('end', () => {
+          let body = null
+          try { body = raw ? JSON.parse(raw) : null } catch { body = raw }
+          debug('http.response', { url, status: res.statusCode, bytes: raw.length })
+          resolve({ ok: res.statusCode >= 200 && res.statusCode < 300, status: res.statusCode, body })
+        })
+      },
+    )
+    req.setTimeout(0)
+    req.on('error', (e) => {
+      debug('http.error', { url, code: e && e.code, message: e && e.message })
+      fail(`cannot reach OpenAlice at ${url} — is the backend running? (${e && e.message})`)
+    })
+    if (opts && opts.body) req.write(opts.body)
+    req.end()
+  })
 }
 
 async function fetchSocketJson(socketPath, path, opts) {

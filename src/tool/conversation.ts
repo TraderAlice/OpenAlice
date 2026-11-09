@@ -18,6 +18,7 @@ import type { HeadlessInquirySubject } from '../workspaces/headless-task-registr
 const MAX_TIMEOUT_MS = 2_147_478_647
 const MAX_PROMPT_CHARS = 16_000
 const AWAIT_POLL_MS = 250
+export const DEFAULT_AWAIT_BUDGET_MS = 30_000
 
 const conversationSelectionShape = {
   credential: z.string().min(1).optional().describe('OpenAlice vault credential slug, never an API key. Omit to retain the Session or Workspace selection.'),
@@ -34,7 +35,7 @@ export const conversationAskCommonShape = {
   timeoutMs: z.coerce.number().int().positive().max(MAX_TIMEOUT_MS).optional()
     .describe('Optional headless watchdog in milliseconds. Omit to allow the Session to run without a time limit.'),
   await: z.boolean().optional().default(false)
-    .describe('Wait server-side for a reply needed now; omit for asynchronous delegation and use the returned taskId later.'),
+    .describe('Wait server-side (bounded 30s quick-reply window) for a reply needed now; omit for asynchronous delegation so OpenAlice wakes this Session when the task finishes (then run `alice conversation check`).'),
   reconstruct: z.boolean().optional().default(false)
     .describe('Explicitly add artifact-reconstruction guidance if OpenAlice must recruit a fallback worker.'),
 }
@@ -135,9 +136,16 @@ export async function askWorkspaceConversation(
       resolution: result.resolution.mode === 'reconstructed'
         ? { mode: result.resolution.mode, reason: result.resolution.reason }
         : { mode: result.resolution.mode },
+      ...(result.deduplicated ? { deduplicated: true } : {}),
     }
-    if (!input.await) return dispatched
-    const task = await awaitConversationTask(ctx.conversation, result.taskId, input.timeoutMs)
+    if (!input.await) {
+      return {
+        ...dispatched,
+        next: 'Task is running in the background. End your current turn now; OpenAlice will automatically wake this Session when it finishes (then run `alice conversation check`).',
+      }
+    }
+    const waitBudgetMs = input.timeoutMs ?? DEFAULT_AWAIT_BUDGET_MS
+    const task = await awaitConversationTask(ctx.conversation, result.taskId, waitBudgetMs)
     if (!task) {
       return {
         ok: false as const,
@@ -150,7 +158,7 @@ export async function askWorkspaceConversation(
       ...taskProjection(task, 'summary'),
       awaited: task.status !== 'running',
       ...(task.status === 'running'
-        ? { next: `alice conversation await --task-id ${task.taskId}` }
+        ? { next: `Task is still running in the background (taskId: ${task.taskId}). End your current turn now and let the user know; OpenAlice will wake you when it finishes, or run alice conversation await --task-id ${task.taskId}.` }
         : {}),
     }
   } catch (err) {
@@ -193,9 +201,10 @@ export const conversationAskFactory: WorkspaceToolFactory = {
         'provenance; wsId for a fresh worker in an exact desk; or harness for a fresh',
         'worker in the current default Chat/AutoQuant desk.',
         '',
-        'Use --await when this turn needs the reply. Without it, the call returns a',
-        'short taskId immediately for delegated work or several concurrent questions;',
-        'retrieve those replies later with conversation_read/await/collect.',
+        'Use --await only when this turn expects a quick reply (bounded 30s wait window, never kills the task).',
+        'Without --await, the call dispatches asynchronously and returns taskId/resumeId immediately: end your',
+        'turn and OpenAlice will automatically wake this Session when the peer task finishes (then run',
+        '`alice conversation check`, or use conversation_read/await/collect).',
         '',
         'Prompts are delivered unchanged by default. Use --reconstruct only when the',
         'intent is to have a fresh worker reconstruct an artifact whose author is absent.',
@@ -286,7 +295,7 @@ export const conversationCreateFactory: WorkspaceToolFactory = {
   build(ctx) {
     const ask = conversationAskFactory.build(ctx)
     return tool({
-      description: 'Create a new Session and deliver its first prompt. Choose exactly one Workspace or Harness. Retain resumeId and use conversation ask for follow-ups; taskId identifies only this turn.',
+      description: 'Create a new Session and deliver its first prompt. Choose exactly one Workspace or Harness. Retain resumeId and use conversation ask for follow-ups; taskId identifies only this turn. Dispatches asynchronously by default and wakes this Session on completion (then run `alice conversation check`).',
       inputSchema: z.object({
         ...conversationAskCommonShape,
         ...conversationSelectionShape,
@@ -298,6 +307,27 @@ export const conversationCreateFactory: WorkspaceToolFactory = {
           return { ok: false, error: 'conversation create requires exactly one target: --ws-id or --harness; use conversation ask --resume-id to continue a Session' }
         }
         return ask.execute!(input, options)
+      },
+    })
+  },
+}
+
+export const conversationCheckFactory: WorkspaceToolFactory = {
+  name: 'conversation_check',
+  build(ctx) {
+    return tool({
+      description: 'Check and acknowledge completed peer conversation replies in this Session mailbox. Run this when woken by an OpenAlice peer-task notification.',
+      inputSchema: z.object({
+        resumeId: z.string().min(1).optional().describe('Optional Session resumeId; defaults to the calling Session.'),
+      }),
+      execute: async (input) => {
+        const callerSession = sessionOriginFromInboxOrigin(ctx.workspaceId, ctx.origin)
+        const recipientResumeId = input.resumeId ?? callerSession?.resumeId
+        const messages = await ctx.conversation?.check?.({
+          ...(recipientResumeId ? { recipientResumeId } : {}),
+          workspaceId: ctx.workspaceId,
+        }) ?? []
+        return { ok: true as const, count: messages.length, messages }
       },
     })
   },
@@ -442,6 +472,7 @@ export const conversationReadFactory: WorkspaceToolFactory = {
 export const conversationToolFactories: WorkspaceToolFactory[] = [
   conversationCreateFactory,
   conversationAskFactory,
+  conversationCheckFactory,
   conversationAwaitFactory,
   conversationCollectFactory,
   conversationReadFactory,

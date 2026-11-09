@@ -57,8 +57,11 @@ instructions.
   the relevant Workspace with `conversation create --ws-id`. Add `--reconstruct`
   only for missing historical intent and never claim the fresh worker carries
   the original coworker's memory.
-- Use `--await` for a short answer needed now. For delegated work or several
-  desks, dispatch first and retrieve/collect the answers later.
+- Use `--await` for a short answer needed now (bounded 30s wait window). For
+  delegated work or several desks, dispatch without `--await`, end your turn so
+  OpenAlice wakes your Session when tasks finish, and run
+  `alice conversation check` (or `read` / `collect`) to retrieve the answers.
+  Never spawn duplicate peer Sessions while a task is still running.
 
 ## Mutations require a preview and a clear user instruction
 

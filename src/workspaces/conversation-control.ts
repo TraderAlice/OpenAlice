@@ -11,6 +11,7 @@ import type {
   WorkspaceConversationAskResult,
   WorkspaceConversationCaller,
   WorkspaceConversationControl,
+  WorkspaceConversationMailboxItem,
   WorkspaceConversationResolution,
   WorkspaceConversationTarget,
   WorkspaceConversationTask,
@@ -321,6 +322,29 @@ export function createWorkspaceConversationControl(
       const prompt = promptMode === 'reconstruction'
         ? reconstructionPrompt(input.target, input.prompt, Boolean(continuingOrigin))
         : input.prompt
+      if (input.source?.kind === 'session') {
+        const callerResumeId = input.source.resumeId
+        const existingTask = (svc.headlessTasks?.list?.({ wsId: meta.id, status: 'running' }) ?? [])
+          .find((task) => {
+            const initiator = task.communication?.origin
+            if (initiator?.kind !== 'session' || initiator.resumeId !== callerResumeId) return false
+            return continuingOrigin
+              ? task.resumeId === continuingOrigin.resumeId
+              : task.prompt === prompt
+          })
+        if (existingTask) {
+          return {
+            status: 'dispatched',
+            taskId: existingTask.taskId,
+            resumeId: existingTask.resumeId,
+            workspaceId: meta.id,
+            workspace: meta.tag,
+            agent: existingTask.agent,
+            resolution,
+            deduplicated: true,
+          }
+        }
+      }
       const conversation: AgentConversationDispatch = {
         source: input.source ?? { kind: 'human' },
         requestedTarget: input.target,
@@ -411,6 +435,40 @@ export function createWorkspaceConversationControl(
         agent: adapter.id,
         resolution: effectiveResolution,
       }
+    },
+
+    async check(input): Promise<WorkspaceConversationMailboxItem[]> {
+      if (!svc.sessionMailbox) return []
+      const acknowledged = []
+      if (input.recipientResumeId) {
+        acknowledged.push(...await svc.sessionMailbox.checkAndAck(input.recipientResumeId))
+      } else if (input.workspaceId) {
+        await svc.sessionRegistry.ensureLoaded(input.workspaceId)
+        const recipientResumeIds = new Set(
+          svc.sessionRegistry.listFor(input.workspaceId).map((record) => record.resumeId),
+        )
+        for (const recipientResumeId of recipientResumeIds) {
+          acknowledged.push(...await svc.sessionMailbox.checkAndAck(recipientResumeId))
+        }
+      }
+      acknowledged.sort((a, b) => a.createdAt - b.createdAt)
+      return Promise.all(acknowledged.map(async (message) => {
+        const task = await this.read(message.taskId)
+        const error = task?.error ?? message.error
+        const durationMs = task?.durationMs ?? message.durationMs
+        return {
+          id: message.id,
+          taskId: message.taskId,
+          resumeId: message.childResumeId,
+          workspaceId: message.childWorkspaceId,
+          agent: message.childAgent,
+          status: message.taskStatus,
+          assistantText: task?.structured?.assistantText ?? message.assistantPreview,
+          ...(error ? { error } : {}),
+          ...(durationMs !== undefined ? { durationMs } : {}),
+          createdAt: message.createdAt,
+        }
+      }))
     },
 
     async read(taskId) {

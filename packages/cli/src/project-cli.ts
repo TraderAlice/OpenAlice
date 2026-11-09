@@ -9,15 +9,21 @@ export async function runProjectCli(argv: string[]): Promise<number> {
   const args = [...argv]
   let project: string | undefined
   let home: string | undefined
-  while (args[0] === '--project' || args[0] === '--home') {
+  let wsSelector: string | undefined
+  while (args[0] === '--project' || args[0] === '--home' || args[0] === '--ws' || args[0] === '--workspace' || args[0] === '--manager') {
     const flag = args.shift()
+    if (flag === '--manager') {
+      wsSelector = 'workspace-manager'
+      continue
+    }
     const value = args.shift()
     if (!value || value.startsWith('-')) throw new Error(`${flag} requires a value`)
     if (flag === '--project') project = value
-    else home = value
+    else if (flag === '--home') home = value
+    else wsSelector = value
   }
   if (!args.length || args[0] === '--help' || args[0] === '-h') {
-    process.stdout.write('Usage: openalice exec [--project <key> | --home <path>] <alice|traderhub|alice-uta> [command flags]\nExample: openalice exec --project research alice market bars --symbol AAPL --asset-class equity --count 250 --output bars.json\nWorkspace context is inherited unless an explicit Project/home is selected. Existing output files are never overwritten.\n')
+    process.stdout.write('Usage: openalice exec [--project <key> | --home <path>] [--ws <id-or-tag> | --manager] <alice|traderhub|alice-uta> [command flags]\nExample: openalice exec --project research alice market bars --symbol AAPL --asset-class equity --count 250 --output bars.json\nWorkspace context is inherited unless an explicit Project/home is selected. Existing output files are never overwritten.\n')
     return 0
   }
   const binary = args.shift()!
@@ -30,6 +36,28 @@ export async function runProjectCli(argv: string[]): Promise<number> {
     }
   }
   const context = await resolveStoredLaunchContext({ ...(project ? { project } : {}), ...(home ? { home } : {}) }, { env })
+  if (wsSelector !== undefined) {
+    delete env.AQ_RUN_ID
+    delete env.AQ_SESSION_ID
+    if (wsSelector === 'workspace-manager') env.AQ_WS_ID = 'workspace-manager'
+    else {
+      let registryDoc: string | undefined
+      try { registryDoc = await readFile(join(context.home, 'workspaces', 'workspaces.json'), 'utf8') }
+      catch (error) {
+        if (error !== null && typeof error === 'object' && 'code' in error && error.code !== 'ENOENT') throw error
+      }
+      if (registryDoc === undefined) env.AQ_WS_ID = wsSelector
+      else {
+        const workspaces = parseWorkspaceEntries(JSON.parse(registryDoc))
+        const ciMatches = workspaces.filter(w => w.tag.toLowerCase() === wsSelector.toLowerCase())
+        const matched = workspaces.find(w => w.id === wsSelector)
+          ?? workspaces.find(w => w.tag === wsSelector)
+          ?? (ciMatches.length === 1 ? ciMatches[0] : undefined)
+        if (!matched) throw new Error(`Workspace not found in ${context.home}: ${wsSelector}`)
+        env.AQ_WS_ID = matched.id
+      }
+    }
+  }
   const endpointPath = join(context.home, 'state', 'cli-endpoint.json')
   let endpoint: { schemaVersion?: number; projectId?: string; home?: string; appRoot?: string; url?: string; socket?: string }
   try { endpoint = JSON.parse(await readFile(endpointPath, 'utf8')) }
@@ -59,4 +87,9 @@ export async function runProjectCli(argv: string[]): Promise<number> {
     child.once('error', reject)
     child.once('exit', code => done(code ?? 1))
   })
+}
+
+function parseWorkspaceEntries(value: unknown): Array<{ id: string; tag: string }> {
+  const entries = Array.isArray(value) ? value : value !== null && typeof value === 'object' && 'workspaces' in value && Array.isArray(value.workspaces) ? value.workspaces : []
+  return entries.filter((w): w is { id: string; tag: string } => w !== null && typeof w === 'object' && 'id' in w && 'tag' in w && typeof w.id === 'string' && typeof w.tag === 'string')
 }
