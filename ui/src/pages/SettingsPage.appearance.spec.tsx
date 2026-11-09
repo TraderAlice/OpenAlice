@@ -32,6 +32,8 @@ beforeEach(() => {
     nightPalette: 'graphite',
     uiStyle: 'default',
     stylePaletteMode: 'saved',
+    fontSize: 'default',
+    zoomRatio: 100,
   })
 })
 
@@ -199,5 +201,39 @@ describe('AppearanceSection palette pair editor', () => {
     expect(screen.getByRole('button', { name: 'Customize palettes' }).getAttribute('aria-expanded'))
       .toBe('false')
     expect(screen.queryByRole('button', { name: 'Choose Linen' })).toBeNull()
+  })
+
+  it('switches font size and updates the theme store', () => {
+    render(<AppearanceSection />)
+
+    expect(screen.getByRole('button', { name: 'Default' }).getAttribute('aria-pressed')).toBe('true')
+
+    fireEvent.click(screen.getByRole('button', { name: 'Large' }))
+    expect(useThemeStore.getState().fontSize).toBe('large')
+    expect(screen.getByRole('button', { name: 'Large' }).getAttribute('aria-pressed')).toBe('true')
+
+    fireEvent.click(screen.getByRole('button', { name: 'Small' }))
+    expect(useThemeStore.getState().fontSize).toBe('small')
+
+    fireEvent.click(screen.getByRole('button', { name: 'Extra Large' }))
+    expect(useThemeStore.getState().fontSize).toBe('xlarge')
+  })
+
+  it('switches zoom ratio and resets it back to 100%', () => {
+    render(<AppearanceSection />)
+
+    expect(screen.getByRole('button', { name: '100%' }).getAttribute('aria-pressed')).toBe('true')
+    expect(screen.queryByRole('button', { name: 'Reset' })).toBeNull()
+
+    fireEvent.click(screen.getByRole('button', { name: '125%' }))
+    expect(useThemeStore.getState().zoomRatio).toBe(125)
+    expect(screen.getByRole('button', { name: '125%' }).getAttribute('aria-pressed')).toBe('true')
+
+    const resetBtn = screen.getByRole('button', { name: 'Reset' })
+    expect(resetBtn).toBeTruthy()
+    fireEvent.click(resetBtn)
+
+    expect(useThemeStore.getState().zoomRatio).toBe(100)
+    expect(screen.getByRole('button', { name: '100%' }).getAttribute('aria-pressed')).toBe('true')
   })
 })

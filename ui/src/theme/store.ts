@@ -38,6 +38,32 @@ import {
 
 export type AppTheme = ThemePreferenceMode
 
+export type AppFontSize = 'small' | 'default' | 'large' | 'xlarge'
+export type AppZoomRatio = number
+
+export const FONT_SIZE_OPTIONS = [
+  { value: 'small', labelKey: 'settings.appearance.fontSizeOption.small' },
+  { value: 'default', labelKey: 'settings.appearance.fontSizeOption.default' },
+  { value: 'large', labelKey: 'settings.appearance.fontSizeOption.large' },
+  { value: 'xlarge', labelKey: 'settings.appearance.fontSizeOption.xlarge' },
+] as const
+
+export const ZOOM_RATIO_OPTIONS: readonly number[] = [80, 90, 100, 110, 125, 150, 175, 200] as const
+
+export const DEFAULT_FONT_SIZE: AppFontSize = 'default'
+export const DEFAULT_ZOOM_RATIO: number = 100
+
+export function isAppFontSize(value: unknown): value is AppFontSize {
+  return value === 'small' || value === 'default' || value === 'large' || value === 'xlarge'
+}
+
+export function normalizeZoomRatio(value: unknown, fallback: number = DEFAULT_ZOOM_RATIO): number {
+  if (typeof value === 'number' && Number.isFinite(value) && value >= 50 && value <= 300) {
+    return Math.round(value)
+  }
+  return fallback
+}
+
 /** Cycle order for the single toggle button: auto → day → night → auto. */
 const CYCLE: readonly AppTheme[] = ['auto', 'day', 'night']
 
@@ -47,6 +73,8 @@ export interface ThemePreferences {
   nightPalette: ThemePaletteId
   uiStyle: UiStyleProfileId
   stylePaletteMode: UiStylePaletteMode
+  fontSize: AppFontSize
+  zoomRatio: number
 }
 
 interface ThemeStore {
@@ -55,11 +83,15 @@ interface ThemeStore {
   nightPalette: ThemePaletteId
   uiStyle: UiStyleProfileId
   stylePaletteMode: UiStylePaletteMode
+  fontSize: AppFontSize
+  zoomRatio: number
   setTheme: (theme: AppTheme) => void
   setDayPalette: (palette: ThemePaletteId) => void
   setNightPalette: (palette: ThemePaletteId) => void
   setUiStyle: (profile: UiStyleProfileId) => void
   setStylePaletteMode: (mode: UiStylePaletteMode) => void
+  setFontSize: (fontSize: AppFontSize) => void
+  setZoomRatio: (zoomRatio: number) => void
   /** Advance to the next mode (drives the ActivityBar toggle). */
   cycleTheme: () => void
 }
@@ -70,6 +102,8 @@ const DEFAULT_PREFERENCES: ThemePreferences = {
   nightPalette: DEFAULT_NIGHT_PALETTE,
   uiStyle: DEFAULT_UI_STYLE_PROFILE,
   stylePaletteMode: 'saved',
+  fontSize: DEFAULT_FONT_SIZE,
+  zoomRatio: DEFAULT_ZOOM_RATIO,
 }
 
 /** Normalize both the universal-slot shape and the legacy v1 light/dark shape. */
@@ -90,6 +124,8 @@ export function normalizeThemePreferences(
     stylePaletteMode: isUiStylePaletteMode(stored.stylePaletteMode)
       ? stored.stylePaletteMode
       : fallback.stylePaletteMode,
+    fontSize: isAppFontSize(stored.fontSize) ? stored.fontSize : fallback.fontSize,
+    zoomRatio: normalizeZoomRatio(stored.zoomRatio, fallback.zoomRatio),
   }
 }
 
@@ -121,11 +157,15 @@ export const useThemeStore = create<ThemeStore>()(
       nightPalette: DEFAULT_NIGHT_PALETTE,
       uiStyle: DEFAULT_UI_STYLE_PROFILE,
       stylePaletteMode: 'saved',
+      fontSize: DEFAULT_FONT_SIZE,
+      zoomRatio: DEFAULT_ZOOM_RATIO,
       setTheme: (theme) => set({ theme }),
       setDayPalette: (dayPalette) => set({ dayPalette }),
       setNightPalette: (nightPalette) => set({ nightPalette }),
       setUiStyle: (uiStyle) => set((state) => state.uiStyle === uiStyle ? state : { uiStyle, stylePaletteMode: 'saved' }),
       setStylePaletteMode: (stylePaletteMode) => set({ stylePaletteMode }),
+      setFontSize: (fontSize) => set({ fontSize }),
+      setZoomRatio: (zoomRatio) => set({ zoomRatio: normalizeZoomRatio(zoomRatio) }),
       cycleTheme: () => {
         const i = CYCLE.indexOf(get().theme)
         set({ theme: CYCLE[(i + 1) % CYCLE.length]! })
@@ -152,6 +192,6 @@ export const useThemeStore = create<ThemeStore>()(
 
 /** Persisted preferences at boot (zustand persist rehydrates localStorage sync). */
 export function readInitialThemePreferences(): ThemePreferences {
-  const { theme, dayPalette, nightPalette, uiStyle, stylePaletteMode } = useThemeStore.getState()
-  return { theme, dayPalette, nightPalette, uiStyle, stylePaletteMode }
+  const { theme, dayPalette, nightPalette, uiStyle, stylePaletteMode, fontSize, zoomRatio } = useThemeStore.getState()
+  return { theme, dayPalette, nightPalette, uiStyle, stylePaletteMode, fontSize, zoomRatio }
 }

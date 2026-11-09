@@ -38,13 +38,24 @@
           var effective = t === 'auto'
             ? (matchMedia('(prefers-color-scheme: dark)').matches ? 'night' : 'day')
             : t;
+          var fontSizes = ['small', 'default', 'large', 'xlarge'];
+          var fontSize = fontSizes.indexOf(state.fontSize) >= 0 ? state.fontSize : 'default';
+          var zoomRatio = typeof state.zoomRatio === 'number' && state.zoomRatio >= 50 && state.zoomRatio <= 300 ? state.zoomRatio : 100;
           var root = document.documentElement;
           root.dataset.theme = t;
           root.dataset.dayPalette = day;
           root.dataset.nightPalette = night;
           root.dataset.uiStyle = uiStyle;
           root.dataset.stylePaletteMode = stylePaletteMode;
+          root.dataset.fontSize = fontSize;
           root.dataset.palette = effective === 'night' ? effectiveNight : effectiveDay;
+          if (zoomRatio !== 100) {
+            if (window.openAlice && window.openAlice.zoom && window.openAlice.zoom.setZoomFactor) {
+              window.openAlice.zoom.setZoomFactor(zoomRatio / 100);
+            } else {
+              root.style.zoom = String(zoomRatio / 100);
+            }
+          }
         } catch (e) {
           var root = document.documentElement;
           root.dataset.theme = 'auto';
@@ -52,6 +63,7 @@
           root.dataset.nightPalette = 'graphite';
           root.dataset.uiStyle = 'default';
           root.dataset.stylePaletteMode = 'saved';
+          root.dataset.fontSize = 'default';
           root.dataset.palette = 'codex';
         }
       })();

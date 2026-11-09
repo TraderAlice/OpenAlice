@@ -14,7 +14,7 @@
  * preload bridge is the faster local capability surface for Electron.
  */
 
-import { contextBridge, ipcRenderer } from 'electron'
+import { contextBridge, ipcRenderer, webFrame } from 'electron'
 
 interface PtyListeners {
   readonly message: Set<(msg: { type: 'data' | 'control'; data: unknown }) => void>
@@ -180,6 +180,14 @@ const api = {
       return () => ipcRenderer.removeListener('openalice:companion:visibility', listener)
     },
   },
+  zoom: {
+    setZoomFactor: (factor: number) => {
+      if (typeof factor === 'number' && Number.isFinite(factor) && factor > 0) {
+        webFrame.setZoomFactor(factor)
+      }
+    },
+    getZoomFactor: () => webFrame.getZoomFactor(),
+  },
   windowChrome: {
     platform: process.platform,
     setTheme: (theme: { color: string; symbolColor: string }) =>
@@ -286,5 +294,6 @@ if (window.location.protocol === 'app:') {
     windowChrome: api.windowChrome,
     updater: api.updater,
     clientUpdates: api.clientUpdates,
+    zoom: api.zoom,
   })
 }

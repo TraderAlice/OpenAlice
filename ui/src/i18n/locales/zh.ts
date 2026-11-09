@@ -782,6 +782,18 @@ export const zh: Resources = {
       usedForDay: '用于日间',
       usedForNight: '用于暗夜',
       usedForBoth: '同时用于日间与暗夜',
+      fontSize: '字体大小',
+      fontSizeDescription: '调整界面全局文本的显示大小。',
+      fontSizeOption: {
+        small: '小',
+        default: '标准',
+        large: '大',
+        xlarge: '特大',
+      },
+      zoomRatio: '界面缩放',
+      zoomRatioDescription: '缩放整个应用的显示比例。可使用快捷键 Ctrl +/- 缩放，Ctrl 0 重置。',
+      zoomRatioOption: '{{ratio}}%',
+      resetZoom: '重置',
     },
     about: {
       title: '关于 OpenAlice',

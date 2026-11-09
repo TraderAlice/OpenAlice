@@ -22,6 +22,7 @@ import {
   installTerminalKeyboardController,
 } from './terminal-keyboard-controller';
 import { TerminalKittyKeyboardModeTracker } from './terminal-kitty-keyboard-mode-tracker';
+import { useThemeStore, type AppFontSize } from '../../theme/store';
 import {
   colorSchemeUpdateSequence,
   terminalThemesEqual,
@@ -199,6 +200,15 @@ export interface TerminalViewProps {
   readonly onSessionLost?: () => void;
 }
 
+function terminalFontSize(fontSize: AppFontSize): number {
+  switch (fontSize) {
+    case 'small': return 12;
+    case 'large': return 15;
+    case 'xlarge': return 17;
+    default: return 13;
+  }
+}
+
 export function TerminalView(props: TerminalViewProps): ReactElement {
   if (import.meta.env.VITE_DEMO_MODE) {
     return (
@@ -236,9 +246,16 @@ export function TerminalView(props: TerminalViewProps): ReactElement {
   appearanceRef.current = terminalAppearance;
   const applyAppearanceRef = useRef<((appearance: TerminalAppearance) => void) | null>(null);
 
+  const appFontSize = useThemeStore((s) => s.fontSize);
+  const applyFontSizeRef = useRef<((size: AppFontSize) => void) | null>(null);
+
   useEffect(() => {
     applyAppearanceRef.current?.(terminalAppearance);
   }, [terminalAppearance]);
+
+  useEffect(() => {
+    applyFontSizeRef.current?.(appFontSize);
+  }, [appFontSize]);
 
   useEffect(() => {
     const container = containerRef.current;
@@ -254,7 +271,7 @@ export function TerminalView(props: TerminalViewProps): ReactElement {
     const term = new Xterm({
       theme: appearanceRef.current.theme,
       fontFamily: TERMINAL_FONT_FAMILY,
-      fontSize: 13,
+      fontSize: terminalFontSize(appFontSize),
       lineHeight: 1.2,
       cursorBlink: true,
       allowProposedApi: true,
@@ -370,6 +387,15 @@ export function TerminalView(props: TerminalViewProps): ReactElement {
       appliedColorSchemeMode = appearance.mode;
     };
     applyAppearanceRef.current = applyAppearance;
+
+    const applyFontSize = (size: AppFontSize): void => {
+      const targetSize = terminalFontSize(size);
+      if (term.options.fontSize !== targetSize) {
+        term.options.fontSize = targetSize;
+        safeFit(fit);
+      }
+    };
+    applyFontSizeRef.current = applyFontSize;
 
     const containsMode2031 = (params: (number | number[])[]): boolean =>
       params.some((value) => Array.isArray(value) ? value.includes(2031) : value === 2031);
@@ -688,6 +714,7 @@ export function TerminalView(props: TerminalViewProps): ReactElement {
       if (connectRef.current === connect) connectRef.current = null;
       if (retryRecoverableRef.current === retryRecoverableConnection) retryRecoverableRef.current = null;
       if (applyAppearanceRef.current === applyAppearance) applyAppearanceRef.current = null;
+      if (applyFontSizeRef.current === applyFontSize) applyFontSizeRef.current = null;
       webgl?.dispose();
       term.dispose();
     };

@@ -797,6 +797,18 @@ export const en = {
       usedForDay: 'Used for Day',
       usedForNight: 'Used for Night',
       usedForBoth: 'Used for Day & Night',
+      fontSize: 'Font Size',
+      fontSizeDescription: 'Adjust the global text size across the interface.',
+      fontSizeOption: {
+        small: 'Small',
+        default: 'Default',
+        large: 'Large',
+        xlarge: 'Extra Large',
+      },
+      zoomRatio: 'Interface Zoom',
+      zoomRatioDescription: 'Scale the display size of the application. Use Ctrl +/- to zoom, Ctrl 0 to reset.',
+      zoomRatioOption: '{{ratio}}%',
+      resetZoom: 'Reset',
     },
     about: {
       title: 'About OpenAlice',

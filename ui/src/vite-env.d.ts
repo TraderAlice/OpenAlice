@@ -87,6 +87,10 @@ interface Window {
         }
       }>
     }
+    readonly zoom?: {
+      setZoomFactor(factor: number): void
+      getZoomFactor(): number
+    }
     readonly keyboard?: {
       getInputSourceId(): Promise<string | null>
     }

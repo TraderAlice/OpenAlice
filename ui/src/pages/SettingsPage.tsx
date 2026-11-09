@@ -19,7 +19,12 @@ import {
   type ThemePaletteId,
   type ThemePreferenceSlot,
 } from '../theme/palettes'
-import { useThemeStore, type AppTheme } from '../theme/store'
+import {
+  useThemeStore,
+  type AppTheme,
+  FONT_SIZE_OPTIONS,
+  ZOOM_RATIO_OPTIONS,
+} from '../theme/store'
 import {
   UI_STYLE_PROFILES,
   type UiStyleProfileDefinition,
@@ -49,11 +54,15 @@ export function AppearanceSection({ standalone = false }: { standalone?: boolean
   const nightPalette = useThemeStore((s) => s.nightPalette)
   const uiStyle = useThemeStore((s) => s.uiStyle)
   const stylePaletteMode = useThemeStore((s) => s.stylePaletteMode)
+  const fontSize = useThemeStore((s) => s.fontSize)
+  const zoomRatio = useThemeStore((s) => s.zoomRatio)
   const setTheme = useThemeStore((s) => s.setTheme)
   const setDayPalette = useThemeStore((s) => s.setDayPalette)
   const setNightPalette = useThemeStore((s) => s.setNightPalette)
   const setUiStyle = useThemeStore((s) => s.setUiStyle)
   const setStylePaletteMode = useThemeStore((s) => s.setStylePaletteMode)
+  const setFontSize = useThemeStore((s) => s.setFontSize)
+  const setZoomRatio = useThemeStore((s) => s.setZoomRatio)
   const effectiveSlot = useEffectivePreferenceSlot()
   const [editingSlot, setEditingSlot] = useState<ThemePreferenceSlot>(effectiveSlot)
   const [paletteFilter, setPaletteFilter] = useState<PaletteLibraryFilter>('recommended')
@@ -335,6 +344,76 @@ export function AppearanceSection({ standalone = false }: { standalone?: boolean
             nightPalette={nightPalette}
             onSelect={choosePalette}
           />
+        </div>
+      </div>
+
+      <div className="border-b border-border/60 py-5">
+        <div>
+          <span className="text-sm font-medium text-foreground">
+            {t('settings.appearance.fontSize')}
+          </span>
+          <p className="mt-0.5 text-[12px] leading-relaxed text-muted-foreground">
+            {t('settings.appearance.fontSizeDescription')}
+          </p>
+        </div>
+        <div className="mt-3 flex flex-wrap gap-2" role="group" aria-label={t('settings.appearance.fontSize')}>
+          {FONT_SIZE_OPTIONS.map((opt) => (
+            <button
+              key={opt.value}
+              type="button"
+              onClick={() => setFontSize(opt.value)}
+              aria-pressed={fontSize === opt.value}
+              className={`oa-pressable min-h-10 rounded-md border px-3 py-1.5 text-[12px] leading-[18px] font-medium transition-colors sm:min-h-0 ${
+                fontSize === opt.value
+                  ? 'border-primary bg-primary-muted text-primary'
+                  : 'border-border bg-background text-muted-foreground hover:text-foreground'
+              }`}
+            >
+              {t(opt.labelKey)}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="py-5">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <span className="text-sm font-medium text-foreground">
+              {t('settings.appearance.zoomRatio')}
+            </span>
+            <p className="mt-0.5 text-[12px] leading-relaxed text-muted-foreground">
+              {t('settings.appearance.zoomRatioDescription')}
+            </p>
+          </div>
+          {zoomRatio !== 100 && (
+            <Button
+              type="button"
+              onClick={() => setZoomRatio(100)}
+              variant="outline"
+              size="sm"
+              className="min-h-10 text-muted-foreground sm:min-h-8"
+            >
+              <RotateCcw className="h-3.5 w-3.5" aria-hidden />
+              {t('settings.appearance.resetZoom')}
+            </Button>
+          )}
+        </div>
+        <div className="mt-3 flex flex-wrap gap-2" role="group" aria-label={t('settings.appearance.zoomRatio')}>
+          {ZOOM_RATIO_OPTIONS.map((ratio) => (
+            <button
+              key={ratio}
+              type="button"
+              onClick={() => setZoomRatio(ratio)}
+              aria-pressed={zoomRatio === ratio}
+              className={`oa-pressable min-h-10 rounded-md border px-3 py-1.5 text-[12px] leading-[18px] font-medium transition-colors sm:min-h-0 ${
+                zoomRatio === ratio
+                  ? 'border-primary bg-primary-muted text-primary'
+                  : 'border-border bg-background text-muted-foreground hover:text-foreground'
+              }`}
+            >
+              {ratio}%
+            </button>
+          ))}
         </div>
       </div>
 
