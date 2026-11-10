@@ -1660,7 +1660,7 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
     timeoutMs: number,
     origin: ExecutionOrigin,
   ): Promise<HeadlessProbeResult> => {
-    const operationLease = workspaceOperationGuard.acquire(ws.id, 'headless-probe');
+    const operationLease = workspaceOperationGuard.acquireShared(ws.id, 'headless-probe');
     if (!operationLease) throw new Error(`workspace is busy with ${workspaceOperationGuard.current(ws.id)}`);
     const activityLease = headlessActivity.begin({ workspaceId: ws.id, agent: adapter.id });
     let startLeaseReleased = false;
@@ -1738,7 +1738,7 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
       onProgress?: (snapshot: HeadlessStructuredOutput) => void;
     },
   ): Promise<HeadlessTaskResult> => {
-    const operationLease = workspaceOperationGuard.acquire(ws.id, 'headless-run');
+    const operationLease = workspaceOperationGuard.acquireShared(ws.id, 'headless-run');
     if (!operationLease) throw new Error(`workspace is busy with ${workspaceOperationGuard.current(ws.id)}`);
     let startLeaseReleased = false;
     const releaseStartLease = () => {
@@ -1939,9 +1939,11 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
       if (identity.agent !== adapter.id) {
         throw new HeadlessResumeError('wrong_agent', `resume conversation belongs to ${identity.agent}`);
       }
-      if (!identity.agentSessionId) {
-        throw new HeadlessResumeError('not_ready', 'runtime session id has not been captured yet');
-      }
+      // A birth run can fail before capturing a native CLI session id (spawn
+      // error, busy guard). Resuming such a conversation starts the native
+      // session fresh for the existing resumeId instead of stranding it: no
+      // nativeResume -> adapter spawns without --resume and onSessionId binds
+      // the captured id below.
       await sessionRegistry.ensureLoaded(ws.id);
       // Claim before stopping an interactive owner: no UI launch or second
       // dispatch may enter the transcript during the handoff.
@@ -1953,7 +1955,9 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
         if (productSession?.state === 'running') {
           throw new HeadlessResumeError('busy', 'interactive execution must pass takeover admission');
         }
-        nativeResume = { sessionId: identity.agentSessionId };
+        if (identity.agentSessionId) {
+          nativeResume = { sessionId: identity.agentSessionId };
+        }
         parentTaskId = identity.latestTaskId ?? headlessTasks.latestForResumeId(resumeId)?.taskId;
         const previous = identity.runtimeBinding ?? createNativeSessionRuntimeBinding({ adapter }).binding;
         if (conversation && selection && Object.values(selection).some(value => value !== undefined)) {
@@ -2340,6 +2344,40 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
       .finally(async () => {
         await dispatchDelivery.finish(rec).catch(err => launcherLogger.warn('dispatch.delivery_finish_failed', { taskId: rec.taskId, err }));
         activeResumeIds.delete(rec.resumeId);
+        // A `@new-then-resume` birth run that never captured a native session
+        // id (spawn error, busy guard) must not strand the Issue on
+        // `@resume-<id>` forever: roll the assignee back so the next scheduled
+        // tick claims a fresh Session instead of failing `not_ready`.
+        if (!resumeId && createdBy?.kind === 'issue' && createdBy.policy === 'new-then-resume'
+          && !resumeRegistry.get(rec.resumeId)?.agentSessionId) {
+          try {
+            const issueWorkspace = registry.get(createdBy.workspaceId);
+            if (issueWorkspace) {
+              const live = await readWorkspaceIssues(issueWorkspace.dir);
+              const issue = live.ok ? live.issues.find((row) => row.id === createdBy.issueId) : undefined;
+              if (issue && issue.assignee === sessionSignature(rec.resumeId)) {
+                await updateIssueFields(issueWorkspace.dir, createdBy.issueId, {
+                  assignee: '@new-then-resume',
+                  agent: adapter.id,
+                  ...(sessionRuntime.binding.credential.source === 'vault'
+                    ? { credential: sessionRuntime.binding.credential.credentialSlug }
+                    : {}),
+                  ...(sessionRuntime.binding.model ? { model: sessionRuntime.binding.model } : {}),
+                  ...(sessionRuntime.binding.reasoningEffort ? { effort: sessionRuntime.binding.reasoningEffort } : {}),
+                });
+                launcherLogger.info('issue.new_then_resume_rolled_back', {
+                  wsId: createdBy.workspaceId, issueId: createdBy.issueId,
+                  taskId: rec.taskId, resumeId: rec.resumeId,
+                });
+              }
+            }
+          } catch (err) {
+            launcherLogger.warn('issue.new_then_resume_rollback_failed', {
+              wsId: createdBy.workspaceId, issueId: createdBy.issueId,
+              taskId: rec.taskId, err,
+            });
+          }
+        }
         void sessionWakeDelivery.onSessionSettled(rec.resumeId).catch((err) =>
           launcherLogger.warn('session_wake.headless_settlement_failed', { resumeId: rec.resumeId, err }),
         );
@@ -2363,17 +2401,21 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
       const record = sessionRegistry.findByResumeId(ws.id, resumeId);
       if (record) {
         const identity = resumeRegistry.get(resumeId);
-        if (!identity || identity.wsId !== ws.id || identity.agent !== args[1].id || identity.lifecycle === 'retired' || sessionPresence(identity) === 'deleted' || !identity.agentSessionId) {
+        if (!identity || identity.wsId !== ws.id || identity.agent !== args[1].id || identity.lifecycle === 'retired' || sessionPresence(identity) === 'deleted') {
           throw new HeadlessResumeError('not_ready', 'Session is not eligible for background takeover');
         }
         if (!args[1].capabilities.headless || !args[1].composeHeadlessCommand) throw new Error('Runtime does not support background execution');
-        const source = trigger?.kind === 'issue' ? trigger : inquiry?.subject.kind === 'issue' ? inquiry.subject : undefined;
-        try { release = await executionManager.takeovers.acquire({ workspaceId: ws.id, recordId: record.id, resumeId },
-          validateExecutionOrigin({ ...origin, ...(source ? { workspaceId: source.workspaceId, issueId: source.issueId } : {}) }),
-          executionManager.takeovers.idleSeconds); }
-        catch (error) {
-          if (error instanceof SessionTakeoverDeclinedError) throw new HeadlessResumeError('takeover_declined', error.message);
-          throw error;
+        // Without a captured native session id there is no interactive child to
+        // take over: the impl spawns fresh for this resumeId and captures the id.
+        if (identity.agentSessionId) {
+          const source = trigger?.kind === 'issue' ? trigger : inquiry?.subject.kind === 'issue' ? inquiry.subject : undefined;
+          try { release = await executionManager.takeovers.acquire({ workspaceId: ws.id, recordId: record.id, resumeId },
+            validateExecutionOrigin({ ...origin, ...(source ? { workspaceId: source.workspaceId, issueId: source.issueId } : {}) }),
+            executionManager.takeovers.idleSeconds); }
+          catch (error) {
+            if (error instanceof SessionTakeoverDeclinedError) throw new HeadlessResumeError('takeover_declined', error.message);
+            throw error;
+          }
         }
       }
     }
@@ -3142,7 +3184,7 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
     origin = validateExecutionOrigin(origin);
     executionManager.admission.assertAllowed(record.resumeId);
     if (!claimResume(record.resumeId)) throw new HeadlessResumeError('busy', 'this conversation already has a running turn');
-    const operationLease = workspaceOperationGuard.acquire(meta.id, 'web-session-start');
+    const operationLease = workspaceOperationGuard.acquireShared(meta.id, 'web-session-start');
     if (!operationLease) {
       activeResumeIds.delete(record.resumeId);
       throw new Error(`workspace is busy with ${workspaceOperationGuard.current(meta.id)}`);

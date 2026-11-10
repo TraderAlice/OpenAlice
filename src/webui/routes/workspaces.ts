@@ -386,7 +386,7 @@ export function createWorkspaceRoutes(
     },
   ): Promise<SpawnSessionResult> {
     const id = meta.id;
-    const operationLease = svc.operationGuard?.acquire(id, 'interactive-session-start') ?? null;
+    const operationLease = svc.operationGuard?.acquireShared(id, 'interactive-session-start') ?? null;
     if (svc.operationGuard && !operationLease) {
       return {
         ok: false,
