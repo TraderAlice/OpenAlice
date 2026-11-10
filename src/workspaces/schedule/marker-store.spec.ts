@@ -50,4 +50,25 @@ describe('ScheduleMarkerStore', () => {
     expect(saved.version).toBe(2)
     expect(saved.markers['ws task']).toEqual({ fired: 80 })
   })
+
+  it('persists 20 concurrent set/hold calls cleanly without tmp-file races', async () => {
+    const path = join(dir, 'markers.json')
+    const warns: unknown[] = []
+    const logger = { ...noopLogger, warn: (_: string, meta: unknown) => warns.push(meta) } as unknown as Logger
+    const store = await ScheduleMarkerStore.load(path, logger)
+    await Promise.all(
+      Array.from({ length: 20 }, (_, i) =>
+        i % 2 === 0 ? store.set('ws', `task-${i}`, 100 + i) : store.hold('ws', `task-${i}`, 200 + i),
+      ),
+    )
+    expect(warns).toEqual([])
+    const saved = JSON.parse(await readFile(path, 'utf8')) as { version: number; markers: Record<string, { fired?: number; held?: number }> }
+    expect(Object.keys(saved.markers)).toHaveLength(20)
+    for (let i = 0; i < 20; i++) {
+      const record = saved.markers[`ws task-${i}`]
+      expect(record).toBeDefined()
+      if (i % 2 === 0) expect(record!.fired).toBe(100 + i)
+      else expect(record!.held).toBe(200 + i)
+    }
+  })
 })

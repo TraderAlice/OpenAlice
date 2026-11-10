@@ -35,6 +35,8 @@ interface MarkerRecord {
 
 export class ScheduleMarkerStore {
   private readonly records = new Map<string, MarkerRecord>()
+  private flushSeq = 0
+  private flushChain: Promise<void> = Promise.resolve()
 
   private constructor(
     private readonly path: string,
@@ -93,17 +95,23 @@ export class ScheduleMarkerStore {
     if (changed) await this.flush()
   }
 
-  private async flush(): Promise<void> {
-    try {
-      await mkdir(dirname(this.path), { recursive: true })
-      const markers: Record<string, MarkerRecord> = {}
-      for (const [key, value] of this.records) markers[key] = value
-      const tmp = `${this.path}.tmp`
-      await writeFile(tmp, JSON.stringify({ version: 2, markers }, null, 2), 'utf8')
-      await rename(tmp, this.path)
-    } catch (err) {
-      this.logger.warn('schedule_marker.flush_failed', { err })
+  private flush(): Promise<void> {
+    const run = async (): Promise<void> => {
+      try {
+        await mkdir(dirname(this.path), { recursive: true })
+        const markers: Record<string, MarkerRecord> = {}
+        for (const [key, value] of this.records) markers[key] = value
+        // Unique tmp name + chained writes: concurrent set()/hold() calls on the
+        // same tick otherwise race on rename() of a single shared .tmp file.
+        const tmp = `${this.path}.${process.pid}.${++this.flushSeq}.tmp`
+        await writeFile(tmp, JSON.stringify({ version: 2, markers }, null, 2), 'utf8')
+        await rename(tmp, this.path)
+      } catch (err) {
+        this.logger.warn('schedule_marker.flush_failed', { err })
+      }
     }
+    this.flushChain = this.flushChain.then(run, run)
+    return this.flushChain
   }
 }
 
