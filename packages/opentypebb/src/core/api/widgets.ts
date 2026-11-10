@@ -37,6 +37,7 @@ const PROVIDER_DISPLAY: Record<string, string> = {
   multpl: 'Multpl',
   intrinio: 'Intrinio',
   federal_reserve: 'Federal Reserve',
+  fxmacrodata: 'FXMacroData',
   stub: 'Stub',
 }
 
