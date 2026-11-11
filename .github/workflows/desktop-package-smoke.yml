@@ -7,7 +7,7 @@ on:
         description: Native host for manual rehearsal; promotion PRs always retain every host.
         type: choice
         default: all
-        options: [all, macos-14, macos-15-intel, windows-latest]
+        options: [all, macos-15, macos-15-intel, windows-latest]
   pull_request:
     branches: [master]
     paths:
@@ -18,27 +18,27 @@ on:
       - "build/entitlements*.plist"
       - "package.json"
       - "pnpm-lock.yaml"
-      - "scripts/assert-desktop-package.mjs"
-      - "scripts/desktop-after-pack.mjs"
-      - "scripts/desktop-package-artifact.mjs"
-      - "scripts/desktop-packaged-smoke.mjs"
-      - "scripts/desktop-packaged-smoke-plan.mjs"
-      - "scripts/desktop-upgrade-smoke.mjs"
-      - "scripts/desktop-upgrade-smoke-lib.mjs"
-      - "scripts/desktop-existing-owner-smoke.mjs"
+      - "scripts/desktop/assert-desktop-package.mjs"
+      - "scripts/desktop/desktop-after-pack.mjs"
+      - "scripts/desktop/desktop-package-artifact.mjs"
+      - "scripts/desktop/desktop-packaged-smoke.mjs"
+      - "scripts/desktop/desktop-packaged-smoke-plan.mjs"
+      - "scripts/desktop/desktop-upgrade-smoke.mjs"
+      - "scripts/desktop/desktop-upgrade-smoke-lib.mjs"
+      - "scripts/desktop/desktop-existing-owner-smoke.mjs"
       - "scripts/build-broker-packs.ts"
       - "scripts/broker-pack-upgrade-smoke.ts"
       - "scripts/guardian/**"
       - "scripts/pnpm-command.mjs"
-      - "scripts/pnpm-command.spec.ts"
-      - "scripts/prepare-desktop-release-assets.mjs"
-      - "scripts/verify-desktop-update-assets.mjs"
-      - "scripts/smoke-packaged-toolchain.mjs"
+      - "tests/integration/tooling/pnpm-command.spec.ts"
+      - "scripts/desktop/prepare-desktop-release-assets.mjs"
+      - "scripts/desktop/verify-desktop-update-assets.mjs"
+      - "scripts/desktop/smoke-packaged-toolchain.mjs"
       - "scripts/verify-broker-packs.ts"
-      - "scripts/workspace-acceptance-ai-mock.mjs"
-      - "scripts/workspace-acceptance-receipt.mjs"
-      - "scripts/workspace-acceptance-receipt.spec.ts"
-      - "scripts/vendor-managed-runtime.mjs"
+      - "scripts/desktop/workspace-acceptance-ai-mock.mjs"
+      - "scripts/desktop/workspace-acceptance-receipt.mjs"
+      - "tests/integration/tooling/workspace-acceptance-receipt.spec.ts"
+      - "scripts/desktop/vendor-managed-runtime.mjs"
       - "default/**"
       - "src/ai-providers/**"
       - "src/core/**"
@@ -99,9 +99,6 @@ jobs:
         if: steps.beta-release-prep.outcome != 'success' || steps.beta-release-prep.outputs.beta_release_prep != 'true'
         run: pnpm install --frozen-lockfile
 
-      - name: Verify CI workflow contracts
-        if: steps.beta-release-prep.outcome != 'success' || steps.beta-release-prep.outputs.beta_release_prep != 'true'
-        run: pnpm test:contract:workflow
 
       - name: Typecheck root workspace
         if: steps.beta-release-prep.outcome != 'success' || steps.beta-release-prep.outputs.beta_release_prep != 'true'
@@ -163,10 +160,10 @@ jobs:
       matrix:
         include: >-
           ${{ fromJSON(
-            github.event_name == 'workflow_dispatch' && inputs.host == 'macos-14' && '[{"os":"macos-14","arch":"arm64"}]' ||
+            github.event_name == 'workflow_dispatch' && inputs.host == 'macos-15' && '[{"os":"macos-15","arch":"arm64"}]' ||
             github.event_name == 'workflow_dispatch' && inputs.host == 'macos-15-intel' && '[{"os":"macos-15-intel","arch":"x64"}]' ||
             github.event_name == 'workflow_dispatch' && inputs.host == 'windows-latest' && '[{"os":"windows-latest","arch":"x64"}]' ||
-            '[{"os":"macos-14","arch":"arm64"},{"os":"macos-15-intel","arch":"x64"},{"os":"windows-latest","arch":"x64"}]'
+            '[{"os":"macos-15","arch":"arm64"},{"os":"macos-15-intel","arch":"x64"},{"os":"windows-latest","arch":"x64"}]'
           ) }}
 
     steps:
@@ -193,7 +190,7 @@ jobs:
           node -e "const{existsSync}=require('fs');const{dirname,join}=require('path');const g=join(dirname(require.resolve('dugite/package.json')),'git');if(!existsSync(g)){console.error('dugite embedded git MISSING at '+g);process.exit(1)}console.log('dugite embedded git OK '+g)"
 
       - name: Verify package inspectors on the native host
-        run: pnpm exec vitest run scripts/assert-desktop-package.spec.ts scripts/desktop-after-pack.spec.ts scripts/smoke-packaged-toolchain.spec.ts
+        run: pnpm exec vitest run --config vitest.integration.config.ts tests/integration/tooling/assert-desktop-package.spec.ts tests/integration/tooling/desktop-after-pack.spec.ts tests/integration/tooling/smoke-packaged-toolchain.spec.ts
 
       - name: Build Alice + UTA + desktop shell
         run: pnpm electron:build

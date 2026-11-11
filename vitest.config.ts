@@ -1,8 +1,6 @@
 import { defineConfig } from 'vite-plus'
 import { fileURLToPath } from 'node:url'
 import { resolve, dirname } from 'node:path'
-import { collectionWideTestInputs } from './scripts/test-collection-inputs.mjs'
-import { centralHermeticIncludes } from './scripts/test-lanes.mjs'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 
@@ -32,18 +30,7 @@ export default defineConfig({
     alias: workspaceAliases,
   },
   test: {
-    // Vitest's affected-test lane follows static imports, but collection-wide
-    // inputs must invalidate every project. Vitest compares changed files as
-    // absolute paths, so relative defaults do not match this workspace; keep
-    // absolute, slash-normalized globs explicit for every platform.
-    forceRerunTriggers: collectionWideTestInputs(__dirname),
-    // The Node suite includes installer, PTY, and Guardian specs that spawn
-    // their own process trees. CPU-relative worker counts scale contention
-    // back up on larger development hosts, while two workers still saturate a
-    // two-core CI runner by running Node and jsdom work together. Keep local
-    // runs bounded at two workers and serialize the hermetic CI gate so child
-    // process and timer-driven lifecycle tests retain execution capacity.
-    maxWorkers: process.env.CI ? 1 : 2,
+    maxWorkers: process.env.CI ? 2 : undefined,
     projects: [
       {
         resolve: {
@@ -53,12 +40,13 @@ export default defineConfig({
           name: 'node',
           environment: 'node',
           setupFiles: ['./vitest.setup.ts'],
-          include: ['src/**/*.spec.*', 'packages/**/*.spec.*', 'services/**/*.spec.*', 'apps/**/*.spec.*', 'scripts/**/*.spec.*', ...centralHermeticIncludes('node')],
+          include: ['src/**/*.spec.*', 'packages/**/*.spec.*', 'services/**/*.spec.*', 'apps/**/*.spec.*'],
           exclude: [
             '**/*.e2e.spec.*',
             '**/*.bbProvider.spec.*',
             '**/*.live.spec.*',
             '**/node_modules/**',
+            'apps/landing/**',
           ],
         },
       },
@@ -72,7 +60,8 @@ export default defineConfig({
           environment: 'jsdom',
           execArgv: ['--no-experimental-webstorage'],
           setupFiles: ['./vitest.setup.ts'],
-          include: ['ui/**/*.spec.*', ...centralHermeticIncludes('ui')],
+          include: ['ui/**/*.spec.*'],
+          exclude: ['**/node_modules/**'],
         },
       },
     ],

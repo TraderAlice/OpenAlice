@@ -61,7 +61,7 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - os: macos-14
+          - os: macos-15
             arch: arm64
           - os: macos-15-intel
             arch: x64
@@ -97,7 +97,7 @@ jobs:
       rehearsal: ${{ inputs.operation == 'verify-desktop-rehearsal' }}
       tag: ${{ inputs.tag }}
       previous-tag: ${{ inputs.previous-tag }}
-      os: ${{ inputs.desktop-target == 'macOS-arm64' && 'macos-14' || inputs.desktop-target == 'macOS-x64' && 'macos-15-intel' || 'windows-latest' }}
+      os: ${{ inputs.desktop-target == 'macOS-arm64' && 'macos-15' || inputs.desktop-target == 'macOS-x64' && 'macos-15-intel' || 'windows-latest' }}
       arch: ${{ inputs.desktop-target == 'macOS-arm64' && 'arm64' || 'x64' }}
 
   release:
@@ -167,7 +167,7 @@ jobs:
           fi
           BASE_URL="${DOWNLOAD_BASE_URL:-https://download.openalice.ai}"
           curl -fsSL "${BASE_URL%/}/${MANIFEST_PATH}" -o "$RUNNER_TEMP/openalice-intent-head.json"
-          HEAD_SHA256=$(node scripts/prepare-desktop-release-assets.mjs check-publication \
+          HEAD_SHA256=$(node scripts/desktop/prepare-desktop-release-assets.mjs check-publication \
             --head-path "$RUNNER_TEMP/openalice-intent-head.json" --version "$VERSION" \
             --channel "$RELEASE_CHANNEL" --operation "$OPERATION")
           echo "channel_head_sha256=$HEAD_SHA256" >> "$GITHUB_OUTPUT"
@@ -198,7 +198,7 @@ jobs:
           echo "tag=$RELEASE_TAG" >> "$GITHUB_OUTPUT"
           echo "channel=$RELEASE_CHANNEL" >> "$GITHUB_OUTPUT"
           git for-each-ref --merged="$SOURCE_SHA" --format='%(refname:short)' refs/tags > "$RUNNER_TEMP/openalice-reachable-tags.txt"
-          PREVIOUS_TAG=$(node scripts/prepare-desktop-release-assets.mjs previous-tag \
+          PREVIOUS_TAG=$(node scripts/desktop/prepare-desktop-release-assets.mjs previous-tag \
             --tags-path "$RUNNER_TEMP/openalice-reachable-tags.txt" --channel "$RELEASE_CHANNEL")
           if [ "$OPERATION" = "release" ] && [ -z "$PREVIOUS_TAG" ]; then
             echo "No previous $RELEASE_CHANNEL release tag is reachable from $SOURCE_SHA" >&2
@@ -218,7 +218,7 @@ jobs:
         if: steps.plan.outputs.created == 'true'
         env:
           RELEASE_VERIFIER_SHA: ${{ inputs.desktop-verifier-sha }}
-        run: node scripts/select-release-verifier.mjs
+        run: node scripts/cli/select-release-verifier.mjs
 
       - name: Generate release notes
         if: steps.plan.outputs.created == 'true'
@@ -271,7 +271,7 @@ jobs:
           node-version: 22.19.0
 
       - name: Verify every opted-in public channel before release publication
-        run: node scripts/preflight-public-cli-authority.mjs
+        run: node scripts/cli/preflight-public-cli-authority.mjs
         env:
           OPENALICE_PUBLISH_NPM: ${{ vars.OPENALICE_PUBLISH_NPM }}
           OPENALICE_PUBLISH_HOMEBREW: ${{ vars.OPENALICE_PUBLISH_HOMEBREW }}
@@ -292,7 +292,7 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - os: macos-14
+          - os: macos-15
             arch: arm64
           - os: macos-15-intel
             arch: x64
@@ -336,7 +336,7 @@ jobs:
       - run: pnpm install --frozen-lockfile --filter @traderalice/openalice-cli
 
       - name: Exercise candidate installer in a clean HTTP fixture
-        run: node scripts/install-docker-smoke.mjs
+        run: node scripts/cli/install-docker-smoke.mjs
 
       - name: Build trusted local UI for Web relay
         if: needs.release.outputs.channel == 'stable'
@@ -344,7 +344,7 @@ jobs:
 
       - name: Exercise candidate installer through managed SSH remote
         if: needs.release.outputs.channel == 'stable'
-        run: node scripts/remote-ssh-smoke.mjs --skip-tui
+        run: node scripts/cli/remote-ssh-smoke.mjs --skip-tui
 
   build-cli-installer:
     name: Build channel-neutral CLI installer snapshot
@@ -398,11 +398,11 @@ jobs:
         with:
           node-version: 22.19.0
           cache: pnpm
-      - run: pnpm install --frozen-lockfile --filter='!@traderalice/desktop'
+      - run: pnpm install --frozen-lockfile --filter='!@traderalice/desktop' --filter='!@traderalice/landing' --filter='!./packages/uta-broker-*'
       - run: pnpm build:server
       - name: Record commit-bound platform-neutral inputs
         run: >-
-          node scripts/prepare-cli-neutral-inputs.mjs prepare
+          node scripts/cli/prepare-cli-neutral-inputs.mjs prepare
           --repository-root . --output-dir dist/release-neutral-inputs
           --commit "$GITHUB_SHA"
       - uses: actions/upload-artifact@v4
@@ -420,7 +420,7 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - os: macos-14
+          - os: macos-15
             platform: darwin
             arch: arm64
           - os: macos-15-intel
@@ -452,7 +452,7 @@ jobs:
           bun-version-file: ".bun-version"
 
       - name: Install dependencies
-        run: pnpm install --frozen-lockfile --filter='!@traderalice/desktop'
+        run: pnpm install --frozen-lockfile --filter='!@traderalice/desktop' --filter='!@traderalice/landing' --filter='!./packages/uta-broker-*'
 
       - uses: actions/download-artifact@v4
         with:
@@ -461,14 +461,12 @@ jobs:
 
       - name: Verify and install shared CLI inputs
         run: >-
-          node scripts/prepare-cli-neutral-inputs.mjs verify
+          node scripts/cli/prepare-cli-neutral-inputs.mjs verify
           --repository-root . --input-dir dist/release-neutral-inputs
           --commit "$GITHUB_SHA" --install
 
       - name: Build native CLI
-        run: |
-          pnpm build:bun-runtime:feasibility
-          pnpm build:bun:release
+        run: pnpm build:bun:release
 
       - name: Install and boot the native candidate outside the checkout
         shell: bash
@@ -500,18 +498,18 @@ jobs:
         run: |
           VERSION=$(node -p "require('./package.json').version")
           CONTENT_IDENTITY=$(node -p "require('./dist/bun-release/report.json').contentIdentity")
-          node scripts/build-cli-package-channels.mjs \
+          node scripts/cli/build-cli-package-channels.mjs \
             --input-dir dist/bun-release \
             --output-dir "$RUNNER_TEMP/cli-package-channels" \
             --version "$VERSION" \
             --released-at "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
             --npm-only
-          node scripts/cli-package-manager-smoke.mjs \
+          node scripts/cli/cli-package-manager-smoke.mjs \
             --manager npm \
             --packages-dir "$RUNNER_TEMP/cli-package-channels/npm" \
             --expected-version "$VERSION" \
             --expected-content-identity "$CONTENT_IDENTITY"
-          node scripts/cli-package-manager-smoke.mjs \
+          node scripts/cli/cli-package-manager-smoke.mjs \
             --manager bun \
             --packages-dir "$RUNNER_TEMP/cli-package-channels/npm" \
             --expected-version "$VERSION" \
@@ -573,19 +571,19 @@ jobs:
           CANDIDATE_VERSION: ${{ needs.release.outputs.version }}
           CANDIDATE_SOURCE_SHA: ${{ needs.release.outputs.source_sha }}
         run: >-
-          node scripts/stage-cli-release.mjs dist/cli-candidates dist/release-cli
+          node scripts/cli/stage-cli-release.mjs dist/cli-candidates dist/release-cli
           "$CANDIDATE_VERSION" "$CANDIDATE_SOURCE_SHA"
 
       - name: Derive package-manager metadata from accepted archives
         run: |
           VERSION=$(node -p "require('./package.json').version")
-          node scripts/build-cli-package-channels.mjs \
+          node scripts/cli/build-cli-package-channels.mjs \
             --input-dir dist/release-cli \
             --output-dir dist/cli-package-channels \
             --version "$VERSION" \
             --released-at "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
             --require-all
-          node scripts/pack-cli-npm-packages.mjs \
+          node scripts/cli/pack-cli-npm-packages.mjs \
             --input-dir dist/cli-package-channels/npm \
             --output-dir dist/cli-npm-tarballs
 
@@ -613,7 +611,7 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - os: macos-14
+          - os: macos-15
             arch: arm64
           - os: macos-15-intel
             arch: x64
@@ -636,7 +634,7 @@ jobs:
           CANDIDATE_VERSION: ${{ needs.release.outputs.version }}
           CANDIDATE_SOURCE_SHA: ${{ needs.release.outputs.source_sha }}
         run: >-
-          node scripts/stage-cli-release.mjs dist/cli-candidates dist/release-cli
+          node scripts/cli/stage-cli-release.mjs dist/cli-candidates dist/release-cli
           "$CANDIDATE_VERSION" "$CANDIDATE_SOURCE_SHA"
 
       - name: Install and run the accepted archive through Homebrew
@@ -645,20 +643,20 @@ jobs:
           set -euo pipefail
           VERSION=$(node -p "require('./package.json').version")
           CURRENT_ASSET_BASE_URL=$(node -e "const{pathToFileURL}=require('url');const{resolve}=require('path');process.stdout.write(pathToFileURL(resolve('dist/release-cli')).href)")
-          node scripts/prepare-cli-previous-release.mjs \
+          node scripts/cli/prepare-cli-previous-release.mjs \
             --input-dir dist/release-cli \
             --output-dir dist/cli-package-homebrew-previous \
             --version "$VERSION"
           PREVIOUS_VERSION=$(node -p "require('./dist/cli-package-homebrew-previous/fixture.json').previousVersion")
           PREVIOUS_ASSET_BASE_URL=$(node -e "const{pathToFileURL}=require('url');const{resolve}=require('path');process.stdout.write(pathToFileURL(resolve('dist/cli-package-homebrew-previous')).href)")
-          node scripts/build-cli-package-channels.mjs \
+          node scripts/cli/build-cli-package-channels.mjs \
             --input-dir dist/release-cli \
             --output-dir dist/cli-package-homebrew-current \
             --version "$VERSION" \
             --released-at "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
             --asset-base-url "$CURRENT_ASSET_BASE_URL" \
             --system-only
-          node scripts/build-cli-package-channels.mjs \
+          node scripts/cli/build-cli-package-channels.mjs \
             --input-dir dist/cli-package-homebrew-previous \
             --output-dir dist/cli-package-homebrew-previous-channels \
             --version "$PREVIOUS_VERSION" \
@@ -667,7 +665,7 @@ jobs:
             --system-only
           CURRENT_ID=$(node -e "const f=require('./dist/cli-package-homebrew-current/cli-package-channels.json');process.stdout.write(f.targets.find(t=>t.platform==='darwin'&&t.arch==='${{ matrix.arch }}').contentIdentity)")
           PREVIOUS_ID=$(node -e "const f=require('./dist/cli-package-homebrew-previous/fixture.json');process.stdout.write(f.targets.find(t=>t.platform==='darwin'&&t.arch==='${{ matrix.arch }}').previousContentIdentity)")
-          node scripts/cli-system-package-manager-smoke.mjs \
+          node scripts/cli/cli-system-package-manager-smoke.mjs \
             --manager brew \
             --previous-version "$PREVIOUS_VERSION" \
             --current-version "$VERSION" \
@@ -707,7 +705,7 @@ jobs:
           CANDIDATE_VERSION: ${{ needs.release.outputs.version }}
           CANDIDATE_SOURCE_SHA: ${{ needs.release.outputs.source_sha }}
         run: >-
-          node scripts/stage-cli-release.mjs dist/cli-candidates dist/release-cli
+          node scripts/cli/stage-cli-release.mjs dist/cli-candidates dist/release-cli
           "$CANDIDATE_VERSION" "$CANDIDATE_SOURCE_SHA"
 
       - name: Install and run the accepted archive through Linuxbrew
@@ -715,19 +713,19 @@ jobs:
         run: |
           set -euo pipefail
           VERSION=$(node -p "require('./package.json').version")
-          node scripts/prepare-cli-previous-release.mjs \
+          node scripts/cli/prepare-cli-previous-release.mjs \
             --input-dir dist/release-cli \
             --output-dir dist/cli-package-linuxbrew-previous \
             --version "$VERSION"
           PREVIOUS_VERSION=$(node -p "require('./dist/cli-package-linuxbrew-previous/fixture.json').previousVersion")
-          node scripts/build-cli-package-channels.mjs \
+          node scripts/cli/build-cli-package-channels.mjs \
             --input-dir dist/release-cli \
             --output-dir dist/cli-package-linuxbrew-current \
             --version "$VERSION" \
             --released-at "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
             --asset-base-url file:///work/dist/release-cli \
             --system-only
-          node scripts/build-cli-package-channels.mjs \
+          node scripts/cli/build-cli-package-channels.mjs \
             --input-dir dist/cli-package-linuxbrew-previous \
             --output-dir dist/cli-package-linuxbrew-previous-channels \
             --version "$PREVIOUS_VERSION" \
@@ -736,7 +734,7 @@ jobs:
             --system-only
           CURRENT_ID=$(node -e "const f=require('./dist/cli-package-linuxbrew-current/cli-package-channels.json');process.stdout.write(f.targets.find(t=>t.platform==='linux'&&t.arch==='${{ matrix.arch }}').contentIdentity)")
           PREVIOUS_ID=$(node -e "const f=require('./dist/cli-package-linuxbrew-previous/fixture.json');process.stdout.write(f.targets.find(t=>t.platform==='linux'&&t.arch==='${{ matrix.arch }}').previousContentIdentity)")
-          node scripts/cli-linuxbrew-smoke.mjs \
+          node scripts/cli/cli-linuxbrew-smoke.mjs \
             --arch "${{ matrix.arch }}" \
             --previous-version "$PREVIOUS_VERSION" \
             --current-version "$VERSION" \
@@ -776,7 +774,7 @@ jobs:
           CANDIDATE_VERSION: ${{ needs.release.outputs.version }}
           CANDIDATE_SOURCE_SHA: ${{ needs.release.outputs.source_sha }}
         run: >-
-          node scripts/stage-cli-release.mjs dist/cli-candidates dist/release-cli
+          node scripts/cli/stage-cli-release.mjs dist/cli-candidates dist/release-cli
           "$CANDIDATE_VERSION" "$CANDIDATE_SOURCE_SHA"
 
       - name: Build, install, and run the generated AUR package
@@ -784,19 +782,19 @@ jobs:
         run: |
           set -euo pipefail
           VERSION=$(node -p "require('./package.json').version")
-          node scripts/prepare-cli-previous-release.mjs \
+          node scripts/cli/prepare-cli-previous-release.mjs \
             --input-dir dist/release-cli \
             --output-dir dist/cli-package-aur-previous \
             --version "$VERSION"
           PREVIOUS_VERSION=$(node -p "require('./dist/cli-package-aur-previous/fixture.json').previousVersion")
-          node scripts/build-cli-package-channels.mjs \
+          node scripts/cli/build-cli-package-channels.mjs \
             --input-dir dist/release-cli \
             --output-dir dist/cli-package-aur-current \
             --version "$VERSION" \
             --released-at "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
             --asset-base-url file:///work/dist/release-cli \
             --system-only
-          node scripts/build-cli-package-channels.mjs \
+          node scripts/cli/build-cli-package-channels.mjs \
             --input-dir dist/cli-package-aur-previous \
             --output-dir dist/cli-package-aur-previous-channels \
             --version "$PREVIOUS_VERSION" \
@@ -805,7 +803,7 @@ jobs:
             --system-only
           CURRENT_ID=$(node -e "const f=require('./dist/cli-package-aur-current/cli-package-channels.json');process.stdout.write(f.targets.find(t=>t.platform==='linux'&&t.arch==='${{ matrix.arch }}').contentIdentity)")
           PREVIOUS_ID=$(node -e "const f=require('./dist/cli-package-aur-previous/fixture.json');process.stdout.write(f.targets.find(t=>t.platform==='linux'&&t.arch==='${{ matrix.arch }}').previousContentIdentity)")
-          node scripts/cli-aur-container-smoke.mjs \
+          node scripts/cli/cli-aur-container-smoke.mjs \
             --arch "${{ matrix.arch }}" \
             --previous-version "$PREVIOUS_VERSION" \
             --current-version "$VERSION" \
@@ -843,7 +841,7 @@ jobs:
           ARCHIVE=$(find dist/release-cli-linux-x64 -maxdepth 1 -name '*.tar.gz' -print -quit)
           SHA256=$(awk 'NR == 1 { print $1 }' "$ARCHIVE.sha256")
           CONTENT_IDENTITY=$(node -e "const fs=require('fs');const p=fs.readdirSync('dist/release-cli-linux-x64').find(v=>v.endsWith('.report.json'));process.stdout.write(require('./dist/release-cli-linux-x64/'+p).contentIdentity)")
-          node scripts/cli-legacy-cutover-smoke.mjs \
+          node scripts/cli/cli-legacy-cutover-smoke.mjs \
             --archive "$ARCHIVE" \
             --sha256 "$SHA256" \
             --expected-version "$VERSION" \
@@ -862,7 +860,7 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - os: macos-14
+          - os: macos-15
             arch: arm64
           - os: macos-15-intel
             arch: x64
@@ -887,17 +885,14 @@ jobs:
           cache: pnpm
 
       - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+        run: pnpm install --frozen-lockfile --filter='!@traderalice/desktop' --filter='!@traderalice/landing'
 
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version-file: ".bun-version"
 
-      - name: Build optional Broker Packs
-        run: pnpm broker-packs:build
-
-      - name: Verify Broker Packs in compiled runtime
-        run: pnpm exec tsx scripts/verify-broker-packs.ts --compiled
+      - name: Build and verify optional Broker Packs in compiled runtime
+        run: pnpm broker-packs:build:compiled
 
       - name: Prove previous-release Broker Pack upgrade
         if: needs.release.outputs.channel == 'stable'
@@ -981,7 +976,7 @@ jobs:
           CANDIDATE_CHANNEL: ${{ needs.release.outputs.channel }}
           CANDIDATE_PREVIOUS_TAG: ${{ needs.release.outputs.previous_tag }}
         run: >-
-          node scripts/desktop-candidate-receipt.mjs stage
+          node scripts/desktop/desktop-candidate-receipt.mjs stage
           dist/desktop-candidates dist/desktop-receipts dist/release-assets
 
       - uses: actions/download-artifact@v4
@@ -996,7 +991,7 @@ jobs:
           CANDIDATE_VERSION: ${{ needs.release.outputs.version }}
           CANDIDATE_SOURCE_SHA: ${{ needs.release.outputs.source_sha }}
         run: >-
-          node scripts/stage-cli-release.mjs dist/cli-candidates dist/release-cli
+          node scripts/cli/stage-cli-release.mjs dist/cli-candidates dist/release-cli
           "$CANDIDATE_VERSION" "$CANDIDATE_SOURCE_SHA"
 
       - uses: actions/download-artifact@v4
@@ -1095,7 +1090,7 @@ jobs:
           SOURCE_REF: ${{ github.ref }}
         run: '[[ "$SOURCE_REF" = refs/heads/dev || "$SOURCE_REF" = refs/heads/master ]]'
       - name: Verify all trusted publisher connections
-        run: node scripts/preflight-public-cli-authority.mjs
+        run: node scripts/cli/preflight-public-cli-authority.mjs
         env:
           OPENALICE_PUBLISH_NPM: 'true'
 
@@ -1144,7 +1139,7 @@ jobs:
           test "$(git show "$RELEASE_TAG:package.json" | jq -r .version)" = "${RELEASE_TAG#v}"
 
       - name: Verify npm authority for this explicit publication
-        run: node scripts/preflight-public-cli-authority.mjs
+        run: node scripts/cli/preflight-public-cli-authority.mjs
         env:
           OPENALICE_PUBLISH_NPM: 'true'
           OPENALICE_PUBLISH_HOMEBREW: 'false'
@@ -1163,13 +1158,13 @@ jobs:
             filename="$package-${RELEASE_TAG#v}.tgz"
             curl --fail --location --retry 3 "$base/$filename" -o "dist/existing-npm/$filename"
           done
-          node --input-type=module -e "import { verifyCliNpmPackages } from './scripts/publish-cli-npm-packages.mjs'; verifyCliNpmPackages('dist/existing-npm');"
-          node scripts/verify-public-cli-channels.mjs \
+          node --input-type=module -e "import { verifyCliNpmPackages } from './scripts/cli/publish-cli-npm-packages.mjs'; verifyCliNpmPackages('dist/existing-npm');"
+          node scripts/cli/verify-public-cli-channels.mjs \
             --manifest dist/existing-npm/cli-package-channels.json \
             --version "${RELEASE_TAG#v}" > dist/existing-npm/public-channel-receipt.json
 
       - name: Publish platform packages before the meta package
-        run: node scripts/publish-cli-npm-packages.mjs --packages-dir dist/existing-npm
+        run: node scripts/cli/publish-cli-npm-packages.mjs --packages-dir dist/existing-npm
 
       - name: Preserve publication receipt
         if: always()
@@ -1215,7 +1210,7 @@ jobs:
 
       - name: Publish platform packages before the meta package
         run: >-
-          node scripts/publish-cli-npm-packages.mjs
+          node scripts/cli/publish-cli-npm-packages.mjs
           --packages-dir dist/cli-package-channels/cli-npm-tarballs
 
   verify-public-cli-channels:
@@ -1242,7 +1237,7 @@ jobs:
         env:
           VERSION: ${{ needs.release.outputs.version }}
         run: >-
-          node scripts/verify-public-cli-channels.mjs
+          node scripts/cli/verify-public-cli-channels.mjs
           --manifest dist/cli-package-channels/cli-package-channels/cli-package-channels.json
           --version "$VERSION"
           > dist/cli-package-channels/public-channel-receipt.json
@@ -1397,7 +1392,7 @@ jobs:
           TAG: ${{ needs.release.outputs.tag }}
           DOWNLOAD_BASE_URL: ${{ secrets.DOWNLOAD_BASE_URL }}
         run: |
-          node scripts/prepare-desktop-release-assets.mjs mirror \
+          node scripts/desktop/prepare-desktop-release-assets.mjs mirror \
             --out-dir dist/r2-upload \
             --tag "$TAG" \
             --base-url "${DOWNLOAD_BASE_URL:-https://download.openalice.ai}" \
@@ -1488,7 +1483,7 @@ jobs:
           # mutable feed, installer alias, or manifest changes.
           aws s3 cp "s3://${R2_BUCKET}/${MANIFEST_PATH}" "$RUNNER_TEMP/openalice-publish-head.json" \
             --endpoint-url "$ENDPOINT" --only-show-errors
-          node scripts/prepare-desktop-release-assets.mjs check-publication \
+          node scripts/desktop/prepare-desktop-release-assets.mjs check-publication \
             --head-path "$RUNNER_TEMP/openalice-publish-head.json" --version "$VERSION" \
             --channel "$RELEASE_CHANNEL" --operation "$RELEASE_OPERATION" \
             --expected-sha256 "$EXPECTED_HEAD_SHA256"

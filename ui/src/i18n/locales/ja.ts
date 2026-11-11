@@ -1881,6 +1881,8 @@ export const ja: Resources = {
     allRuntimesDescription: 'インストール済みのランタイムは今すぐ起動できます。未インストールのランタイムも案内付きで残ります。',
     searchRuntimes: 'ランタイムを検索…',
     noRuntimeMatches: '“{{query}}” に一致するランタイムはありません。',
+    searchModels: 'モデルを検索…',
+    noModelMatches: '“{{query}}” に一致するモデルはありません。',
     installedRuntimes: 'インストール済み',
     notInstalledRuntimes: '未インストール',
     pickerRuntimeChecking: '確認中',
@@ -3206,6 +3208,12 @@ export const ja: Resources = {
     backToTracked: '追跡に戻る',
   },
   inbox: {
+    unreadCount: '未読 {{count}} 件',
+    markAllRead: 'すべて既読にする',
+    markAllReadSuccess: '{{count}} 件を既読にしました。',
+    markAllReadProtected: 'Office で確認中の更新は未読のままです。',
+    markAllReadError: '既読にできませんでした。もう一度お試しください。',
+
     noMessages: '受信トレイにメッセージがありません。',
     emptyHint: 'ワークスペースがステータス更新をここに送ります。',
     untitledUpdate: '要約のない更新',

@@ -48,7 +48,6 @@ describe('ModelCombobox', () => {
     await userEvent.type(input, 'deepseek-v4-pro-private')
     expect(onChange).toHaveBeenLastCalledWith('deepseek-v4-pro-private')
 
-    await userEvent.click(screen.getByRole('button', { name: 'Model suggestions' }))
     await userEvent.click(await screen.findByRole('option', { name: /DeepSeek V4 Pro/ }))
 
     await userEvent.clear(input)

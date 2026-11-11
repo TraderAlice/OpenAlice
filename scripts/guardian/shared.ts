@@ -476,10 +476,11 @@ export class OptionalServiceController {
   }
 
   private captureProcessTree(): void {
-    if (this.treeScanInProgress || this.child.pid == null) return
+    const pid = this.child.pid
+    if (this.treeScanInProgress || pid == null) return
     this.treeScanInProgress = true
     const current = this.child
-    void listDescendantPids(current.pid).then((pids) => {
+    void listDescendantPids(pid).then((pids) => {
       if (pids.length > 0) knownDescendants.set(current, pids)
     }).catch(() => undefined).finally(() => { this.treeScanInProgress = false })
   }

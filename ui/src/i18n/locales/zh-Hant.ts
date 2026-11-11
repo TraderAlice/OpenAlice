@@ -1889,6 +1889,8 @@ export const zhHant: Resources = {
     allRuntimesDescription: '已安裝的執行環境現在就可以啟動。缺少的執行環境仍會顯示，並附帶安裝指引。',
     searchRuntimes: '搜尋執行環境…',
     noRuntimeMatches: '沒有符合「{{query}}」的執行環境。',
+    searchModels: '搜尋模型…',
+    noModelMatches: '沒有符合「{{query}}」的模型。',
     installedRuntimes: '已安裝',
     notInstalledRuntimes: '未安裝',
     pickerRuntimeChecking: '正在檢查',
@@ -3214,6 +3216,12 @@ export const zhHant: Resources = {
     backToTracked: '返回追蹤',
   },
   inbox: {
+    unreadCount: '{{count}} 則未讀',
+    markAllRead: '全部標為已讀',
+    markAllReadSuccess: '已將 {{count}} 則更新標為已讀。',
+    markAllReadProtected: 'Office 審閱中的訊息仍保留未讀。',
+    markAllReadError: '無法標為已讀，請重試。',
+
     noMessages: '收件匣是空的。',
     emptyHint: '工作區會將狀態更新推送到這裡。',
     untitledUpdate: '沒有摘要的更新',

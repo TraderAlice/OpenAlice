@@ -23,21 +23,25 @@ export function ModelCombobox({ value, suggestions, onChange, placeholder, ariaL
   const [editing, setEditing] = useState(false)
   const selected = suggestions.find((model) => model.id === value)
   const displayValue = selected && !editing ? modelDisplayName(value, selected.label) : value
-  const matches = (model: LabeledOption, query: string) => !filtering || `${model.id} ${modelDisplayName(model.id, model.label)}`.toLocaleLowerCase().includes(query.toLocaleLowerCase())
+  const tokens = filtering ? value.trim().toLowerCase().split(/\s+/).filter(Boolean) : []
+  const matches = tokens.length ? suggestions.filter((model) => {
+    const text = `${model.id} ${model.label ?? ''} ${modelDisplayName(model.id, model.label)}`.toLowerCase()
+    return tokens.every((token) => text.includes(token))
+  }) : suggestions
   return <Autocomplete.Root
     items={suggestions}
+    filteredItems={matches.length ? matches : suggestions}
     value={displayValue}
     onValueChange={(nextValue, details) => {
       setFiltering(details.reason === 'input-change')
       onChange(nextValue)
     }}
-    open={open && suggestions.some((model) => matches(model, displayValue))}
+    open={open && suggestions.length > 0}
     onOpenChange={(nextOpen, details) => {
       setOpen(nextOpen)
       if (!nextOpen || details.reason === 'trigger-press') setFiltering(false)
     }}
     itemToStringValue={(model: LabeledOption) => model.id}
-    filter={matches}
     autoHighlight
     openOnInputClick
   >

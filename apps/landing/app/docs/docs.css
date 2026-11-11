@@ -205,7 +205,8 @@ body:has(.oa-docs) {
   white-space: nowrap;
 }
 
-.docs-header-link:hover {
+.docs-header-link:hover,
+.docs-header-link--active {
   color: var(--foreground);
 }
 
@@ -271,16 +272,76 @@ body:has(.oa-docs) {
   display: none;
 }
 
+/* --- Architecture secondary nav in sidebar --- */
+.docs-aside-arch-header {
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 4px;
+  padding-bottom: 14px;
+  padding-top: 20px;
+}
+
+.docs-aside-back {
+  align-items: center;
+  color: var(--muted-foreground);
+  display: inline-flex;
+  font-size: 13px;
+  gap: 6px;
+  text-decoration: none;
+  transition: color 0.15s;
+}
+
+.docs-aside-back:hover {
+  color: var(--foreground);
+}
+
+.docs-aside-back svg {
+  height: 14px;
+  width: 14px;
+}
+
+.docs-aside-arch-badge {
+  color: var(--foreground);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  margin-top: 10px;
+}
+
+.docs-aside-arch-footer {
+  border-top: 1px solid var(--border);
+  margin-top: 28px;
+  padding-top: 16px;
+}
+
+.docs-aside-arch-link {
+  align-items: center;
+  color: var(--muted-foreground);
+  display: flex;
+  font-size: 13px;
+  justify-content: space-between;
+  text-decoration: none;
+  transition: color 0.15s;
+}
+
+.docs-aside-arch-link:hover {
+  color: var(--foreground);
+}
+
+.docs-aside-arch-link svg {
+  height: 14px;
+  width: 14px;
+}
+
 /* --- Nav separator (group title) --- */
 .docs-nav-separator {
   color: var(--docs-text-subtle);
   display: flex;
-  font-size: clamp(12px, 0.9vw, 14px);
+  font-size: clamp(11px, 0.85vw, 13px);
   font-variant: all-petite-caps;
   font-weight: 600;
+  line-height: 1.25;
   padding-bottom: 8px;
-  padding-top: 32px;
-  white-space: nowrap;
+  padding-top: 28px;
 }
 
 .docs-nav-separator:first-child {

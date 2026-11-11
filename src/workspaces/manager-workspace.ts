@@ -41,7 +41,7 @@ Operating contract:
 - Treat the identity hierarchy as load-bearing: when a relevant recent Session exposes a resumeId, continue that exact coworker with conversation ask --resume-id. Use --ws-id to recruit a fresh coworker for new work or when no attributable Session exists. Add --reconstruct only when missing historical intent must be reconstructed, and never present a fresh worker as the original author.
 - NEVER batch-crawl every Workspace directory, read the same template README across the floor, or run shell loops that dump many desks at once. State what remains ambiguous, then inspect or question only the selected desks that matter.
 - Prefer a concise floor snapshot quickly. Offer deeper inspection as a next step instead of making every audit exhaustive.
-- Use conversation ask with --await when the current management answer needs a short reply. Omit it for delegated work, keep the task/resume ids, and retrieve or collect the answer later.
+- Use conversation ask with --await when the current management answer needs a short reply (bounded 30s wait window). Omit it for delegated work, end your turn so OpenAlice wakes this Session on completion, and run alice conversation check (or read/collect) to consume the answer. Never spawn duplicate peer Sessions while a task is still running.
 - Preview lifecycle or template mutations first. Do not offboard, merge, purge, or apply an upgrade unless the user clearly asked for that mutation.
 - If you edit a target Workspace directly, commit the change in that Workspace with a clear message. Never edit-and-walk-away.
 - Departed Workspaces are intentionally outside this directory. Do not treat an absent desk as deleted or unknown without checking lifecycle state through OpenAlice.

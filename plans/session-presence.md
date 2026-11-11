@@ -1,8 +1,6 @@
 # Plan: Session floor presence (active / archived / deleted)
 
-**Status:** active  
-**Owner guides:** [[docs/workspace-lifecycle.md]], [[docs/conversation-provenance.md]]  
-**Delivery:** serial PRs to `dev` (`area:workspace`). Increment 2 is `review:deep`. Open PR, do not merge.
+**Status:** active
 
 ## Goal
 
@@ -61,31 +59,14 @@ presence:  'active' | 'archived' | 'deleted'  // 人：在职 / 归档 / 软删�
 3. **归档即 follow-up unavailable** — 归档只是收纳，不是人走了。否。
 4. **Play 归档行则自动 Restore** — 打开档案夹不应把人弹回工位。否。
 
-## Increments
+## Shipped Baseline (Increments 1–2)
 
-### 1. 侧栏自己滚（无持久化）
+Sidebar roster truncation removed; full roster scrolls. `presence`
+(`active` / `archived` / `deleted`, default `active`) is separate from
+`lifecycle: retired` (whole-desk offboard). Archive/Restore flow, Browse
+filtering, follow-up and assignment gating are in `dev`.
 
-Ask Alice 壳（Quant 共用）：
-
-- 去掉 `FOCUSED_CHAT_SESSION_LIMIT`（8）和 `CHAT_SIDEBAR_SESSION_LIMIT`（6）以及行内 `ConversationListFooter`。
-- Focused / Workspace 树下列完整名册，现有 `overflow-y-auto` 自己滚。
-- Recent across Workspaces 去掉 `ALL_WORKSPACES_SESSION_LIMIT`（30），同样滚。
-- Browse 只留在底栏折叠菜单。不在列表底下再放一颗。
-
-验收：60 人的 desk 可以一滚到底；底栏仍能打开 Browse。
-
-### 2. `presence` + Archive（`review:deep`）
-
-- `ResumeIdentityRecord.presence?`；读写缺省 `active`。不改 `resume-identities.json` version，不加 migration。
-- `ResumeRegistry.setPresence({ resumeId, presence, now })`：`retired` 身份拒绝改 presence。
-- `PATCH /api/workspaces/:id/resumes/:resumeId` body `{ presence }`。409：running / retired / 非法迁移（例如 `deleted → active` 必须先 undelete）。
-- Directory 投影 `presence`。Join 仍藏 `retired`；名册再滤非 `active` presence。
-- SessionRow More：在职 → Archive；归档行（Browse）→ Restore + Delete。
-- `conversation-control`：`deleted` → `deleted-session`；`archived` 仍 exact。
-- Issue 选人列表只出在职。owner guide 补 presence 与 `retired` 的分工。
-- Demo `/resumes` 带一条 archived 同事，确认不进 Recent。
-
-### 3. Soft-delete 收尾（可与 2 同 PR，若 2 已过大则拆）
+## Active Work: Increment 3 — Soft-delete
 
 - More → Delete（二次确认）→ `deleted`。
 - Undelete → `archived`。
@@ -108,26 +89,12 @@ cd ui && npx tsc -b
 pnpm test
 ```
 
-浏览器（5175 Chat + 一眼 Quant）：
-
-1. 名册可滚完全部在职员工；列表下没有 Browse。
-2. Archive 后行消失；Browse → Archived 能 Restore。
-3. 占班中不能 Archive。
-4. Soft-delete 后 Browse / 名册都没有；`@resumeId` 仍解析为这个人，只是不可上工。
-5. Offboard / restore 桌仍只动 `lifecycle`，不把归档人洗成在职。
+Browser (Chat + Quant): soft-delete hides the row from roster and Browse but
+`@resumeId` still resolves (unavailable for new work); `retired` still means
+whole-desk offboard only.
 
 ## Acceptance
 
-- [x] 侧栏按最近占班列出全部在职员工，不再截断
-- [x] 行内 Browse 去掉；查找只走底栏
-- [x] Archive 把人移出名册，不毁掉 `resumeId`
-- [ ] Deleted 是软开除，工作留痕仍找得到人
-- [ ] `retired` 仍只表示跟桌走了
-- [ ] PR 开出后交给审查，不合
-
-## Checklist
-
-- [x] Increment 1：去掉截断和行内 Browse + 单测
-- [x] Increment 2：`presence` + PATCH + 名册/Browse/follow-up + owner guide
-- [ ] Increment 3：soft-delete / undelete（若未并进 2）
-- [ ] 浏览器走 Chat 与 Quant
+- [ ] Delete (confirmed) → `deleted`; Undelete → `archived`
+- [ ] `ensure` / new headless / new assignment reject `deleted`
+- [ ] Open PR handed to review, not merged

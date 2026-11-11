@@ -20,9 +20,9 @@
   },
   "scripts": {
     "build": "node -e \"require('node:fs').rmSync('dist',{recursive:true,force:true})\" && tsc",
-    "test": "node ../../scripts/run-tests.mjs --package @traderalice/ibkr",
-    "test:external:readonly": "node ../../scripts/run-tests.mjs --lane external-readonly --package @traderalice/ibkr",
-    "test:live-paper": "node ../../scripts/run-tests.mjs --lane live-paper --package @traderalice/ibkr",
+    "test": "vp test run --config ../../vitest.config.ts packages/ibkr",
+    "test:external:readonly": "vp test run --config ../../vitest.external.config.ts tests/integration/ibkr-wire-readonly",
+    "test:live-paper": "vp test run --config ../../vitest.uta-live.config.ts tests/integration/ibkr-wire-paper tests/integration/broker-ibkr-paper",
     "typecheck": "tsc --noEmit",
     "generate:proto": "bash generate-proto.sh"
   },

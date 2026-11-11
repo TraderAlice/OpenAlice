@@ -220,7 +220,7 @@ export class WebPlugin implements Plugin {
     // Public surface (/api/auth/*, /api/version, /login, static assets, /mcp) is
     // allowlisted inside the middleware itself. Localhost requests
     // bypass when no trusted proxy is configured — preserving the
-    // zero-friction dev UX. See safe/playbooks/{01,02,03}-*.md for the
+    // zero-friction dev UX. The auth middleware spec tests are the
     // testable contract.
     const trustedProxies = (process.env['OPENALICE_TRUSTED_PROXIES'] ?? '')
       .split(',').map((s) => s.trim()).filter(Boolean)

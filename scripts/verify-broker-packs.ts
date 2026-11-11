@@ -1,7 +1,7 @@
 /** Verify generated Broker Pack catalogs and import every release artifact. */
 
-import { signCliMacOS } from './sign-cli-macos.mjs'
-import { requireBunExecutable } from './bun-toolchain.mjs'
+import { signCliMacOS } from './cli/sign-cli-macos.mjs'
+import { requireBunExecutable } from './cli/bun-toolchain.mjs'
 import { spawnSync } from 'node:child_process'
 import { createHash } from 'node:crypto'
 import { createReadStream } from 'node:fs'
@@ -46,7 +46,7 @@ try {
   if (compiled) {
     requireBunExecutable('bun')
     const probe = resolve(tempRoot, 'probe.ts')
-    const options = pathToFileURL(resolve(repoRoot, 'scripts/bun-compile-options.ts')).href
+    const options = pathToFileURL(resolve(repoRoot, 'scripts/cli/bun-compile-options.ts')).href
     const builder = resolve(tempRoot, 'build.ts')
     compiledProbe = resolve(tempRoot, process.platform === 'win32' ? 'probe.exe' : 'probe')
     await writeFile(probe, `
@@ -70,7 +70,7 @@ const r=await Bun.build({entrypoints:[${JSON.stringify(probe)}],compile:{...runt
     if (result.error || result.status !== 0) throw new Error(`Compiled probe build failed: ${result.error ?? result.stderr}`)
     if (process.platform === 'darwin') signCliMacOS(compiledProbe, process.arch)
   }
-  for (const asset of catalog.packs) await verifyAsset(asset, tempRoot)
+  await Promise.all(catalog.packs.map((asset) => verifyAsset(asset, tempRoot)))
 } finally {
   await rm(tempRoot, { recursive: true, force: true })
 }

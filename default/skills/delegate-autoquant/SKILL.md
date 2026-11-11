@@ -35,7 +35,7 @@ correct handoff.
 Use the `alice` collaboration surface:
 
 ```bash
-alice conversation create --harness autoquant --await --prompt '
+alice conversation create --harness autoquant --prompt '
 Research question: <question>
 Decision this supports: <decision>
 Caller-owned scope and constraints: <assets, direction, horizon, cadence, benchmark, costs, limits>
@@ -45,12 +45,28 @@ Ask before proceeding if a missing caller-owned fact would materially change the
 '
 ```
 
-Add `--await` when the current turn needs the answer. For longer delegation,
-omit it, retain the returned `taskId`, and use `conversation await`, `read`, or
-`collect` as described by the `alice` skill. There is no unsolicited
-Agent-to-Agent completion notification bus. AutoQuant assignments deliberately
-have no default runtime deadline; add `--timeout-ms` only when the caller has
-chosen a real hard stop for that particular study.
+Quantitative research takes minutes, so dispatch is asynchronous by default:
+`alice conversation create --harness autoquant --prompt ...` dispatches the
+assignment in the background and returns `taskId` and `resumeId` immediately.
+
+- Once dispatched, **end your current turn** and tell the user that AutoQuant
+  (`@<resumeId>`) is working on the assignment in the background. If you used
+  `--await` and it returned `status: "running"` after its bounded quick-reply
+  window, end your turn the same way.
+- Do not poll in a loop, and do not spawn duplicate AutoQuant sessions while a
+  task is still running.
+- When the AutoQuant turn finishes, OpenAlice automatically wakes your Session
+  with a notification (`You have N completed peer task(s). Run
+  `alice conversation check`...`). Run `alice conversation check` (or
+  `alice conversation read --task-id <taskId>`) to consume the result and
+  report back to the user.
+- Keep `--await` only for quick follow-up questions
+  (`alice conversation ask --resume-id <resumeId> --await ...`) where an
+  immediate short answer is expected.
+
+AutoQuant assignments deliberately have no default runtime deadline; add
+`--timeout-ms` only when the caller has chosen a real hard stop for that
+particular study.
 
 If AutoQuant is not initialized, report that boundary and direct the user to
 initialize the Quant desk. Do not silently perform the research in Chat or

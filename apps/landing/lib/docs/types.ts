@@ -25,10 +25,13 @@ export interface DocsNavSeparator {
   kind: "separator"
 }
 
+export type DocsSection = "guides" | "architecture"
+
 /** A section group: ## Heading */
 export interface DocsNavGroup {
   kind: "group"
   title: string
+  section?: DocsSection
   items: DocsNavItem[]
 }
 

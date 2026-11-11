@@ -3,10 +3,10 @@ import { chmodSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSyn
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
-import { pinnedBunVersion, requireBunExecutable, requireBunVersion } from '../../../scripts/bun-toolchain.mjs'
+import { pinnedBunVersion, requireBunExecutable, requireBunVersion } from '../../../scripts/cli/bun-toolchain.mjs'
 import { fixtureMachO } from '../../../scripts/fixtures/macho.mjs'
-import { inspectMachOSignature } from '../../../scripts/macho-signature.mjs'
-import { signCliMacOS } from '../../../scripts/sign-cli-macos.mjs'
+import { inspectMachOSignature } from '../../../scripts/cli/macho-signature.mjs'
+import { signCliMacOS } from '../../../scripts/cli/sign-cli-macos.mjs'
 
 const roots = []
 function temporary() { const root = mkdtempSync(join(tmpdir(), 'openalice-signature-test-')); roots.push(root); return root }

@@ -78,13 +78,21 @@ export interface InboxReadOpts {
   unread?: boolean
 }
 
+export interface InboxBulkReadResult {
+  unreadCount: number
+  ids: string[]
+  readAt: number
+}
+
 export interface IInboxStore {
   append(input: InboxInput): Promise<InboxEntry>
-  read(opts?: InboxReadOpts): Promise<{ entries: InboxEntry[]; hasMore: boolean }>
+  read(opts?: InboxReadOpts): Promise<{ entries: InboxEntry[]; hasMore: boolean; unreadCount: number }>
   /** Point lookup for business actions such as "ask this entry's sender". */
   get(id: string): Promise<InboxEntry | null>
   /** Mark an entry read. Returns false when the entry id does not exist. */
   markRead(id: string, readAt?: number): Promise<boolean>
+  /** Snapshot all existing unread entries, excluding active review targets. */
+  markAllRead(excludeIds?: readonly string[]): Promise<InboxBulkReadResult>
   /** Mark an entry unread. Returns false when the entry id does not exist. */
   markUnread(id: string): Promise<boolean>
   /** Hard-delete an entry by id. Returns true if removed, false if no
@@ -199,13 +207,13 @@ export function createInboxStore(opts: InboxStoreOptions = {}): IInboxStore {
     return entry
   }
 
-  async function read(opts: InboxReadOpts = {}): Promise<{ entries: InboxEntry[]; hasMore: boolean }> {
+  async function read(opts: InboxReadOpts = {}): Promise<{ entries: InboxEntry[]; hasMore: boolean; unreadCount: number }> {
     let raw: string
     try {
       raw = await readFile(filePath, 'utf-8')
     } catch (err: unknown) {
       if (err instanceof Error && 'code' in err && (err as NodeJS.ErrnoException).code === 'ENOENT') {
-        return { entries: [], hasMore: false }
+        return { entries: [], hasMore: false, unreadCount: 0 }
       }
       throw err
     }
@@ -221,6 +229,8 @@ export function createInboxStore(opts: InboxStoreOptions = {}): IInboxStore {
           ? { ...entry, readAt }
           : entry
       })
+
+    const unreadCount = all.filter((entry) => !entry.readAt).length
 
     if (opts.workspaceId) {
       all = all.filter((e) => e.workspaceId === opts.workspaceId)
@@ -239,7 +249,7 @@ export function createInboxStore(opts: InboxStoreOptions = {}): IInboxStore {
     const window = scoped.slice(-limit)
     const entries = [...window].reverse()
     const hasMore = window.length < scoped.length
-    return { entries, hasMore }
+    return { entries, hasMore, unreadCount }
   }
 
   async function get(id: string): Promise<InboxEntry | null> {
@@ -280,6 +290,27 @@ export function createInboxStore(opts: InboxStoreOptions = {}): IInboxStore {
       await writeReadState(state)
     })
     return true
+  }
+
+  async function markAllRead(excludeIds: readonly string[] = []): Promise<InboxBulkReadResult> {
+    // Capture IDs before waiting for another writer. Later appends are never
+    // covered by a timestamp watermark or a second history scan.
+    const snapshot = await read({ limit: Number.MAX_SAFE_INTEGER, unread: true })
+    const excluded = new Set(excludeIds)
+    const candidates = snapshot.entries.filter((entry) => !excluded.has(entry.id))
+    return withReadStateLock(async () => {
+      const state = await readReadState()
+      // Re-read only to count current messages and discard removed candidates.
+      // The original snapshot still exclusively determines which IDs may be read.
+      const current = await read({ limit: Number.MAX_SAFE_INTEGER })
+      const unreadIds = new Set(current.entries.filter((entry) => !entry.readAt).map((entry) => entry.id))
+      const ids = candidates.filter((entry) => unreadIds.has(entry.id)).map((entry) => entry.id)
+      const unreadCount = current.unreadCount - ids.length
+      const readAt = Date.now()
+      for (const id of ids) state.read[id] = readAt
+      if (ids.length) await writeReadState(state)
+      return { ids, readAt, unreadCount }
+    })
   }
 
   async function markUnread(id: string): Promise<boolean> {
@@ -352,7 +383,7 @@ export function createInboxStore(opts: InboxStoreOptions = {}): IInboxStore {
     }
   }
 
-  return { append, read, get, markRead, markUnread, delete: deleteEntry, onAppended, onRemoved }
+  return { append, read, get, markRead, markAllRead, markUnread, delete: deleteEntry, onAppended, onRemoved }
 }
 
 // ==================== In-memory store (tests) ====================
@@ -374,7 +405,7 @@ export function createMemoryInboxStore(): IInboxStore {
     return entry
   }
 
-  async function read(opts: InboxReadOpts = {}): Promise<{ entries: InboxEntry[]; hasMore: boolean }> {
+  async function read(opts: InboxReadOpts = {}): Promise<{ entries: InboxEntry[]; hasMore: boolean; unreadCount: number }> {
     let scoped = opts.workspaceId ? entries.filter((e) => e.workspaceId === opts.workspaceId) : [...entries]
     if (opts.unread) scoped = scoped.filter((e) => !e.readAt)
     if (opts.before) {
@@ -383,7 +414,7 @@ export function createMemoryInboxStore(): IInboxStore {
     }
     const limit = opts.limit ?? 100
     const window = scoped.slice(-limit)
-    return { entries: [...window].reverse(), hasMore: window.length < scoped.length }
+    return { entries: [...window].reverse(), hasMore: window.length < scoped.length, unreadCount: entries.filter((entry) => !entry.readAt).length }
   }
 
   async function get(id: string): Promise<InboxEntry | null> {
@@ -403,6 +434,14 @@ export function createMemoryInboxStore(): IInboxStore {
     if (!entry) return false
     entry.readAt = readAt
     return true
+  }
+
+  async function markAllRead(excludeIds: readonly string[] = []): Promise<InboxBulkReadResult> {
+    const excluded = new Set(excludeIds)
+    const unread = entries.filter((entry) => !entry.readAt && !excluded.has(entry.id))
+    const readAt = Date.now()
+    for (const entry of unread) entry.readAt = readAt
+    return { ids: unread.map((entry) => entry.id), readAt, unreadCount: entries.filter((entry) => !entry.readAt).length }
   }
 
   async function markUnread(id: string): Promise<boolean> {
@@ -426,5 +465,5 @@ export function createMemoryInboxStore(): IInboxStore {
     }
   }
 
-  return { append, read, get, markRead, markUnread, delete: deleteEntry, onAppended, onRemoved }
+  return { append, read, get, markRead, markAllRead, markUnread, delete: deleteEntry, onAppended, onRemoved }
 }

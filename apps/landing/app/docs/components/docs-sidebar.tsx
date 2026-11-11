@@ -2,17 +2,34 @@
 
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { ExternalLink } from "lucide-react"
+import { ArrowLeft, ArrowRight, ExternalLink } from "lucide-react"
 import type {
   DocsNavTree,
   DocsNavEntry,
   DocsNavItem,
   DocsNavPage,
+  DocsSection,
 } from "@/lib/docs/types"
 
 function isPageActive(page: DocsNavPage, currentPath: string): boolean {
   if (currentPath === page.href) return true
   return page.children.some((child) => isPageActive(child, currentPath))
+}
+
+export function detectSectionForPath(tree: DocsNavTree, currentPath: string): DocsSection | null {
+  for (const entry of tree.entries) {
+    if (entry.kind === "group") {
+      for (const item of entry.items) {
+        if (item.kind === "page" && isPageActive(item, currentPath)) {
+          return entry.section ?? "guides"
+        }
+      }
+    }
+  }
+  if (currentPath.startsWith("/docs/architecture/")) {
+    return "architecture"
+  }
+  return null
 }
 
 function NavPage({
@@ -161,17 +178,51 @@ export function DocsNavList({
   location?: string
   onNavigate?: () => void
 }) {
+  const activeSection: DocsSection = detectSectionForPath(tree, currentPath) ?? "guides"
+
+  const filteredEntries = tree.entries.filter((entry) => {
+    if (entry.kind === "group") {
+      return (entry.section ?? "guides") === activeSection
+    }
+    return activeSection === "guides"
+  })
+
   return (
     <>
-      {tree.entries.map((entry, i) => (
+      {activeSection === "architecture" && (
+        <div className="docs-aside-arch-header">
+          <Link
+            href="/docs/getting-started/what-is-openalice"
+            className="docs-aside-back"
+            onClick={onNavigate}
+          >
+            <ArrowLeft aria-hidden="true" />
+            <span>Back to Guides</span>
+          </Link>
+          <div className="docs-aside-arch-badge">Architecture &amp; Internals</div>
+        </div>
+      )}
+      {filteredEntries.map((entry, i) => (
         <NavEntry
-          key={entry.kind === "group" ? entry.title : `entry-${i}`}
+          key={entry.kind === "group" ? `${entry.section}-${entry.title}` : `entry-${i}`}
           entry={entry}
           currentPath={currentPath}
           location={location}
           onNavigate={onNavigate}
         />
       ))}
+      {activeSection === "guides" && (
+        <div className="docs-aside-arch-footer">
+          <Link
+            href="/docs/core-concepts/trading-as-collaboration"
+            className="docs-aside-arch-link"
+            onClick={onNavigate}
+          >
+            <span>Architecture &amp; Internals</span>
+            <ArrowRight aria-hidden="true" />
+          </Link>
+        </div>
+      )}
     </>
   )
 }

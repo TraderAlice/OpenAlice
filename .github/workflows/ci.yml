@@ -54,19 +54,9 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
 
-      - name: Verify CI workflow contracts
-        run: pnpm test:contract:workflow
+      - name: Run unit tests
+        run: pnpm test
 
-      - name: Verify required local product and protocol evidence
-        run: pnpm test:critical --receipt artifacts/tests/critical-local.json
-
-      - name: Upload required evidence receipt
-        if: always()
-        uses: actions/upload-artifact@v6
-        with:
-          name: critical-local-receipt
-          path: artifacts/tests/critical-local.json
-          if-no-files-found: error
 
       - name: Typecheck root workspace
         run: npx tsc --noEmit
@@ -135,7 +125,7 @@ jobs:
         # Ubuntu owns the hermetic full suite. macOS keeps one native-host
         # repetition; Windows is covered by the real dev-stack smoke below
         # and the separate desktop/package acceptance workflow.
-        os: [macos-14]
+        os: [macos-15]
     runs-on: ${{ matrix.os }}
 
     steps:

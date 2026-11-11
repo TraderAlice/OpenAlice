@@ -1885,6 +1885,8 @@ export const zh: Resources = {
     allRuntimesDescription: '已安装的运行时现在就可以启动。缺失的运行时仍会显示，并附带安装指引。',
     searchRuntimes: '搜索运行时…',
     noRuntimeMatches: '没有匹配“{{query}}”的运行时。',
+    searchModels: '搜索模型…',
+    noModelMatches: '没有匹配“{{query}}”的模型。',
     installedRuntimes: '已安装',
     notInstalledRuntimes: '未安装',
     pickerRuntimeChecking: '正在检查',
@@ -3210,6 +3212,12 @@ export const zh: Resources = {
     backToTracked: '返回追踪',
   },
   inbox: {
+    unreadCount: '{{count}} 条未读',
+    markAllRead: '全部标为已读',
+    markAllReadSuccess: '已将 {{count}} 条更新标为已读。',
+    markAllReadProtected: 'Office 审阅中的消息仍保留未读。',
+    markAllReadError: '无法标为已读，请重试。',
+
     noMessages: '收件箱为空。',
     emptyHint: '工作区会把状态更新推送到这里。',
     untitledUpdate: '没有摘要的更新',

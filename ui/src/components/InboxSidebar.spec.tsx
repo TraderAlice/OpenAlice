@@ -21,9 +21,14 @@ const mocks = vi.hoisted(() => ({
   mode: 'workspace' as 'workspace' | 'time',
   workspaces: [] as Array<{ id: string; tag: string; displayName?: string }>,
   markRead: vi.fn(),
+  markAllRead: vi.fn(),
+  markingAllRead: false,
+  unreadCount: 120,
   select: vi.fn(),
   setMode: vi.fn(),
 }))
+
+vi.mock('./Toast', () => ({ useToast: () => ({ success: vi.fn(), error: vi.fn() }) }))
 
 vi.mock('../live/inbox', () => ({
   inboxLive: {
@@ -33,8 +38,8 @@ vi.mock('../live/inbox', () => ({
 }))
 
 vi.mock('../live/inbox-read', () => ({
-  useInboxRead: (selector: (state: { markRead: typeof mocks.markRead }) => unknown) =>
-    selector({ markRead: mocks.markRead }),
+  useInboxRead: (selector: (state: typeof mocks) => unknown) => selector(mocks),
+  useUnreadInboxCount: () => mocks.unreadCount,
 }))
 
 vi.mock('../live/inbox-selection', () => ({
@@ -79,6 +84,9 @@ beforeEach(async () => {
     workspaceLabel: 'old-desk',
     body: 'Research is ready.'
   }]
+  mocks.markAllRead.mockResolvedValue(120)
+  mocks.markingAllRead = false
+  mocks.unreadCount = 120
   mocks.loading = false
   mocks.selectedEntryId = 'inbox-1'
   mocks.mode = 'workspace'
@@ -309,5 +317,51 @@ describe('InboxSidebar Office review selection', () => {
     clearOfficeInboxDutyExcursion()
     await user.click(screen.getByRole('button', { name: /Research is ready/ }))
     expect(mocks.markRead).toHaveBeenCalledWith(target.id)
+  })
+})
+
+
+describe('Inbox bulk read toolbar', () => {
+  it('uses the global count and works from a filtered view without changing selection or scroll', async () => {
+    const onNavigate = vi.fn()
+    render(<InboxSidebar onNavigate={onNavigate} />)
+    const user = userEvent.setup()
+    await user.type(screen.getByRole('searchbox'), 'no matching report')
+    expect(screen.getByText('120 unread')).toBeTruthy()
+    const scroller = screen.getByText(/no matching report/, { selector: 'div' }).parentElement!
+    scroller.scrollTop = 50
+    const button = screen.getByRole('button', { name: 'Mark all as read' })
+    button.focus()
+    await user.keyboard('{Enter}')
+    expect(mocks.markAllRead).toHaveBeenCalledTimes(1)
+    expect(mocks.select).not.toHaveBeenCalled()
+    expect(onNavigate).not.toHaveBeenCalled()
+    expect(scroller.scrollTop).toBe(50)
+    expect(screen.getByRole('status').textContent).toContain('120')
+    expect(screen.getByRole('searchbox').getAttribute('value')).toBe('no matching report')
+  })
+
+  it('reports failure and allows a keyboard retry', async () => {
+    mocks.markAllRead.mockRejectedValueOnce(new Error('offline'))
+    render(<InboxSidebar />)
+    const user = userEvent.setup()
+    const button = screen.getByRole('button', { name: 'Mark all as read' })
+    await user.click(button)
+    expect(screen.getByRole('alert').textContent).toContain('Please try again')
+    button.focus()
+    await user.keyboard(' ')
+    expect(mocks.markAllRead).toHaveBeenCalledTimes(2)
+    expect(screen.getByRole('status')).toBeTruthy()
+  })
+
+  it.each(['empty', 'read', 'pending'] as const)('disables the action when %s', (state) => {
+    if (state === 'empty') mocks.entries = []
+    mocks.unreadCount = state === 'pending' ? 120 : 0
+    mocks.markingAllRead = state === 'pending'
+    render(<InboxSidebar />)
+    const button = screen.getByRole('button', { name: 'Mark all as read' }) as HTMLButtonElement
+    expect(button.disabled).toBe(true)
+    fireEvent.click(button)
+    expect(mocks.markAllRead).not.toHaveBeenCalled()
   })
 })

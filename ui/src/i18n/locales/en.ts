@@ -1914,6 +1914,8 @@ export const en = {
     allRuntimesDescription: 'Installed runtimes can be launched now. Missing runtimes stay visible with install guidance.',
     searchRuntimes: 'Search runtimes…',
     noRuntimeMatches: 'No runtimes match “{{query}}”.',
+    searchModels: 'Search models…',
+    noModelMatches: 'No models match “{{query}}”.',
     installedRuntimes: 'Installed',
     notInstalledRuntimes: 'Not installed',
     pickerRuntimeChecking: 'Checking',
@@ -3245,6 +3247,12 @@ export const en = {
     backToTracked: 'Back to Tracked',
   },
   inbox: {
+    unreadCount: '{{count}} unread',
+    markAllRead: 'Mark all as read',
+    markAllReadSuccess: 'Marked {{count}} updates as read.',
+    markAllReadProtected: 'The active Office review stays unread.',
+    markAllReadError: 'Could not mark updates as read. Please try again.',
+
     noMessages: 'No inbox messages.',
     emptyHint: 'Workspaces will push status updates here.',
     untitledUpdate: 'Update without a summary',

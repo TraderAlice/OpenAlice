@@ -1,8 +1,6 @@
-import { collectionWideTestInputs } from './scripts/test-collection-inputs.mjs'
+import { defineConfig } from 'vite-plus'
 import { fileURLToPath } from 'node:url'
 import { resolve, dirname } from 'node:path'
-
-import { integrationIncludes } from './scripts/test-lanes.mjs'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 
@@ -19,20 +17,51 @@ const workspaceAliases = {
   '@traderalice/opentypebb': resolve(__dirname, './packages/opentypebb/src/index.ts'),
 }
 
+const uiAliases = {
+  ...workspaceAliases,
+  '@': resolve(__dirname, './ui/src'),
+}
+
 // Deterministic local integration only; these are not end-to-end app journeys. Public providers and local
 // credentials belong to vitest.external.config.ts; tests that submit orders
 // belong to vitest.uta-live.config.ts.
-export default {
+export default defineConfig({
   resolve: {
     alias: workspaceAliases,
   },
   test: {
-    forceRerunTriggers: collectionWideTestInputs(__dirname),
-    include: integrationIncludes,
-    setupFiles: ['./vitest.setup.ts'],
     testTimeout: 60_000,
-    fileParallelism: false,
-    pool: 'forks',
-    singleFork: true,
+    maxWorkers: 2,
+    projects: [
+      {
+        resolve: {
+          alias: workspaceAliases,
+        },
+        test: {
+          name: 'node',
+          environment: 'node',
+          setupFiles: ['./vitest.setup.ts'],
+          include: ['tests/integration/**/*.spec.{ts,mjs,js}', 'tests/e2e/**/*.spec.{ts,mjs,js}'],
+          exclude: [
+            'tests/integration/{broker-market-data,hyperliquid-market-data,ibkr-wire-readonly,market-data-providers,market-data-routes,twse-provider,broker-alpaca-paper,broker-bybit-paper,broker-hyperliquid-paper,broker-ibkr-paper,broker-okx-paper,ibkr-wire-paper,bybit-diagnostic}/**',
+            '**/node_modules/**',
+          ],
+        },
+      },
+      {
+        esbuild: { jsx: 'automatic', jsxImportSource: 'react' },
+        resolve: {
+          alias: uiAliases,
+        },
+        test: {
+          name: 'ui',
+          environment: 'jsdom',
+          execArgv: ['--no-experimental-webstorage'],
+          setupFiles: ['./vitest.setup.ts'],
+          include: ['tests/integration/**/*.spec.tsx', 'tests/e2e/**/*.spec.tsx'],
+          exclude: ['**/node_modules/**'],
+        },
+      },
+    ],
   },
-}
+})
