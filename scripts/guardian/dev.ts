@@ -59,6 +59,9 @@ import { buildGuardianChildEnv } from './system-proxy.js'
 import { probeFreePort } from '../probe-port.js'
 import { createDevRelay } from './dev-relay.js'
 
+/** Windows / first-boot `tsx` plus news and equity-index recovery often exceeds 20s. */
+const ALICE_READY_TIMEOUT_MS = 90_000
+
 let guardianRuntimeLock: RuntimeProcessLock | null = null
 let guardianControlServer: { endpoint: string; close: () => Promise<void> } | null = null
 
@@ -354,10 +357,12 @@ async function main(): Promise<void> {
     prefixLogs: true,
   })
 
-  const aliceReady = await waitForHttp(`http://127.0.0.1:${ports.webPort}/api/version`, { timeoutMs: 20_000 })
+  const aliceReady = await waitForHttp(`http://127.0.0.1:${ports.webPort}/api/version`, {
+    timeoutMs: ALICE_READY_TIMEOUT_MS,
+  })
   if (!aliceReady) {
     aliceStatus = 'offline'
-    console.error(`[guardian] Alice failed to come up within 20s — aborting before Vite starts`)
+    console.error(`[guardian] Alice failed to come up within ${ALICE_READY_TIMEOUT_MS / 1000}s — aborting before Vite starts`)
     console.error('[guardian] If another process won a startup race, rerun with --takeover or use `pnpm dev -- --home <path>`.')
     try { alice.kill('SIGTERM') } catch { /* noop */ }
     try { uta?.process.kill('SIGTERM') } catch { /* noop */ }
