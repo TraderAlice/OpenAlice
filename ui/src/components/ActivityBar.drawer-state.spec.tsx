@@ -25,7 +25,7 @@ vi.mock('../live/inbox-read', () => ({
   useUnreadInboxCount: () => 0,
 }))
 
-vi.mock('../tabs/types', () => ({ getFocusedTab: () => ({ spec: { kind: 'issue' } }) }))
+vi.mock('../tabs/types', async (importOriginal) => ({ ...await importOriginal<typeof import('../tabs/types')>(), getFocusedTab: () => ({ spec: { kind: 'issue' } }) }))
 vi.mock('./workspace/ChatWorkspaceSection', () => ({
   ChatWorkspaceSection: ({ mode }: { mode: string }) => <button className="min-h-10 md:min-h-8">{mode} Harness</button>,
 }))
