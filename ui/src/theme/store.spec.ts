@@ -16,6 +16,8 @@ describe('theme preference persistence', () => {
       nightPalette: 'midnight',
       uiStyle: 'default',
       stylePaletteMode: 'saved',
+      fontSize: 'default',
+      zoomRatio: 100,
     })
   })
 
@@ -32,6 +34,8 @@ describe('theme preference persistence', () => {
       nightPalette: 'linen',
       uiStyle: 'default',
       stylePaletteMode: 'saved',
+      fontSize: 'default',
+      zoomRatio: 100,
     })
   })
 
@@ -46,12 +50,16 @@ describe('theme preference persistence', () => {
       nightPalette: 'midnight',
       uiStyle: 'win98',
       stylePaletteMode: 'recommended',
+      fontSize: 'default',
+      zoomRatio: 100,
     })).toEqual({
       theme: 'auto',
       dayPalette: 'porcelain',
       nightPalette: 'graphite',
       uiStyle: 'win98',
       stylePaletteMode: 'recommended',
+      fontSize: 'default',
+      zoomRatio: 100,
     })
   })
 
@@ -81,6 +89,22 @@ describe('theme preference persistence', () => {
       nightPalette: 'windows-classic',
       uiStyle: 'win98',
       stylePaletteMode: 'saved',
+      fontSize: 'default',
+      zoomRatio: 100,
+    })
+  })
+
+  it('persists font size and zoom ratio preferences and repairs invalid values', () => {
+    expect(normalizeThemePreferences({ fontSize: 'large', zoomRatio: 125 })).toMatchObject({
+      fontSize: 'large',
+      zoomRatio: 125,
+    })
+    expect(normalizeThemePreferences({ fontSize: 'huge', zoomRatio: 1000 })).toMatchObject({
+      fontSize: 'default',
+      zoomRatio: 100,
+    })
+    expect(normalizeThemePreferences({ zoomRatio: 40 })).toMatchObject({
+      zoomRatio: 100,
     })
   })
 

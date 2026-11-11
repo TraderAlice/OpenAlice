@@ -143,7 +143,7 @@ body {
   background: var(--app-background-wash), var(--background);
   color: var(--foreground);
   font-family: var(--font-sans);
-  font-size: 14px;
+  font-size: var(--app-font-size, 14px);
   line-height: 20px;
   overflow: hidden;
   text-rendering: optimizeLegibility;
@@ -151,6 +151,74 @@ body {
     background-color var(--motion-slow) var(--motion-ease-out),
     color var(--motion-slow) var(--motion-ease-out);
 }
+
+/* ==================== Font Size Preferences ==================== */
+:root {
+  --app-font-size: 14px;
+}
+
+:root[data-font-size="small"] {
+  --app-font-size: 12.5px;
+  --markdown-font-size: 13.5px;
+}
+:root[data-font-size="small"] .text-\[9px\] { font-size: 8px; }
+:root[data-font-size="small"] .text-\[10px\] { font-size: 9px; }
+:root[data-font-size="small"] .text-\[10\.5px\] { font-size: 9.5px; }
+:root[data-font-size="small"] .text-\[11px\] { font-size: 10px; }
+:root[data-font-size="small"] .text-\[12px\] { font-size: 11px; }
+:root[data-font-size="small"] .text-\[13px\] { font-size: 12px; }
+:root[data-font-size="small"] .text-\[14px\] { font-size: 13px; }
+:root[data-font-size="small"] .text-\[15px\] { font-size: 13.5px; }
+:root[data-font-size="small"] .text-\[16px\] { font-size: 14.5px; }
+:root[data-font-size="small"] .text-\[18px\] { font-size: 16px; }
+:root[data-font-size="small"] .text-\[20px\] { font-size: 18px; }
+:root[data-font-size="small"] .text-xs { font-size: 10.5px; }
+:root[data-font-size="small"] .text-sm { font-size: 11.5px; }
+:root[data-font-size="small"] .text-base { font-size: 13px; }
+:root[data-font-size="small"] .text-lg { font-size: 15px; }
+:root[data-font-size="small"] .text-xl { font-size: 17px; }
+
+:root[data-font-size="large"] {
+  --app-font-size: 15.5px;
+  --markdown-font-size: 16.5px;
+}
+:root[data-font-size="large"] .text-\[9px\] { font-size: 10px; }
+:root[data-font-size="large"] .text-\[10px\] { font-size: 11px; }
+:root[data-font-size="large"] .text-\[10\.5px\] { font-size: 11.5px; }
+:root[data-font-size="large"] .text-\[11px\] { font-size: 12.5px; }
+:root[data-font-size="large"] .text-\[12px\] { font-size: 13.5px; }
+:root[data-font-size="large"] .text-\[13px\] { font-size: 14.5px; }
+:root[data-font-size="large"] .text-\[14px\] { font-size: 15.5px; }
+:root[data-font-size="large"] .text-\[15px\] { font-size: 16.5px; }
+:root[data-font-size="large"] .text-\[16px\] { font-size: 18px; }
+:root[data-font-size="large"] .text-\[18px\] { font-size: 20px; }
+:root[data-font-size="large"] .text-\[20px\] { font-size: 22px; }
+:root[data-font-size="large"] .text-xs { font-size: 13.5px; }
+:root[data-font-size="large"] .text-sm { font-size: 14.5px; }
+:root[data-font-size="large"] .text-base { font-size: 16.5px; }
+:root[data-font-size="large"] .text-lg { font-size: 19px; }
+:root[data-font-size="large"] .text-xl { font-size: 22px; }
+
+:root[data-font-size="xlarge"] {
+  --app-font-size: 17px;
+  --markdown-font-size: 18.5px;
+}
+:root[data-font-size="xlarge"] .text-\[9px\] { font-size: 11px; }
+:root[data-font-size="xlarge"] .text-\[10px\] { font-size: 12px; }
+:root[data-font-size="xlarge"] .text-\[10\.5px\] { font-size: 12.5px; }
+:root[data-font-size="xlarge"] .text-\[11px\] { font-size: 13.5px; }
+:root[data-font-size="xlarge"] .text-\[12px\] { font-size: 15px; }
+:root[data-font-size="xlarge"] .text-\[13px\] { font-size: 16px; }
+:root[data-font-size="xlarge"] .text-\[14px\] { font-size: 17.5px; }
+:root[data-font-size="xlarge"] .text-\[15px\] { font-size: 18.5px; }
+:root[data-font-size="xlarge"] .text-\[16px\] { font-size: 20px; }
+:root[data-font-size="xlarge"] .text-\[18px\] { font-size: 22px; }
+:root[data-font-size="xlarge"] .text-\[20px\] { font-size: 25px; }
+:root[data-font-size="xlarge"] .text-xs { font-size: 15px; }
+:root[data-font-size="xlarge"] .text-sm { font-size: 16px; }
+:root[data-font-size="xlarge"] .text-base { font-size: 18px; }
+:root[data-font-size="xlarge"] .text-lg { font-size: 21px; }
+:root[data-font-size="xlarge"] .text-xl { font-size: 25px; }
 
 ::selection {
   background: color-mix(in srgb, var(--primary) 28%, transparent);

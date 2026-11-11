@@ -779,6 +779,18 @@ export const ja: Resources = {
       usedForDay: '昼に使用',
       usedForNight: '夜に使用',
       usedForBoth: '昼と夜の両方に使用',
+      fontSize: 'フォントサイズ',
+      fontSizeDescription: 'UI全体のテキストサイズを調整します。',
+      fontSizeOption: {
+        small: '小',
+        default: '標準',
+        large: '大',
+        xlarge: '特大',
+      },
+      zoomRatio: 'UI拡大率',
+      zoomRatioDescription: 'アプリケーション全体の表示倍率を調整します。Ctrl +/- で拡大/縮小、Ctrl 0 でリセットできます。',
+      zoomRatioOption: '{{ratio}}%',
+      resetZoom: 'リセット',
     },
     about: {
       title: 'OpenAlice について',
