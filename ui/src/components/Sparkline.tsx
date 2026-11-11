@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { useId, useMemo } from 'react'
 import { AreaChart, Area, YAxis } from 'recharts'
 import { MeasuredChartFrame } from './MeasuredChartFrame'
 
@@ -31,6 +31,7 @@ export function Sparkline({
   width,
   className,
 }: SparklineProps) {
+  const gradId = useId()
   const data = useMemo(() => values.map((v, i) => ({ i, v })), [values])
 
   const stroke = useMemo(() => {
@@ -44,13 +45,6 @@ export function Sparkline({
   }, [color, values])
 
   if (values.length < 2) return null
-
-  // Unique gradient id per render so multiple sparklines in one tree don't
-  // clobber each other's <linearGradient> defs.
-  const gradId = useMemo(
-    () => `sparkline-grad-${Math.random().toString(36).slice(2, 9)}`,
-    [],
-  )
 
   const containerStyle = width != null
     ? { width, height }

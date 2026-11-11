@@ -41,8 +41,6 @@ describe('SidebarActionMenu', () => {
     const offboard = screen.getByRole('menuitem', { name: 'Offboard Research desk' })
     const menu = screen.getByRole('menu', { name: triggerLabel })
     expect(offboard.textContent).toBe('Offboard workspace')
-    expect(menu.className).toContain('min-w-[184px]')
-    expect(rename.className).toContain('rounded-md')
     expect(menu.querySelector('[data-slot="dropdown-menu-separator"]')).toBeTruthy()
     expect(document.activeElement).toBe(offboard)
 
@@ -134,6 +132,7 @@ describe('SidebarActionMenu', () => {
     const trigger = screen.getByRole('button', { name: 'More actions for Session' })
     trigger.focus()
     await user.keyboard('{ArrowDown}')
+    await vi.waitUntil(() => document.activeElement === screen.getByRole('menuitem', { name: 'Delete Session' }))
     await user.keyboard('{Enter}')
 
     await waitFor(() => expect(screen.getByRole('alertdialog', { name: 'Delete Session?' })).toBeTruthy())

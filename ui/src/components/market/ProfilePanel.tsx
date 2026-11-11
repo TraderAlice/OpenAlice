@@ -57,9 +57,9 @@ export function ProfilePanel({ symbol }: Props) {
           <Skeleton className="h-3 w-44 rounded" />
         </div>
       )}
-      {error && !loading && <div className="text-[12px] text-destructive">{error}</div>}
+      {error && !loading && <div className="text-sm text-destructive">{error}</div>}
       {!loading && !error && profile && (
-        <div className="flex flex-col gap-3 text-[12px]">
+        <div className="flex flex-col gap-3 text-sm">
           <dl className="grid grid-cols-[90px_1fr] gap-y-1 gap-x-3">
             <KV label="Sector"    value={sector} />
             <KV label="Industry"  value={industry} />
@@ -77,7 +77,7 @@ export function ProfilePanel({ symbol }: Props) {
         </div>
       )}
       {!loading && !error && !profile && (
-        <div className="text-[12px] text-muted-foreground">No profile data.</div>
+        <div className="text-sm text-muted-foreground">No profile data.</div>
       )}
     </Card>
   )

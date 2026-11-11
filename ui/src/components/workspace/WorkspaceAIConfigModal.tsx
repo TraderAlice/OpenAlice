@@ -1,4 +1,6 @@
 import { ModelCatalogStatus } from '../ModelCatalogStatus'
+import { Select } from '@/components/ui/select'
+import { DetailsSummary } from '../ui/collapsible'
 import { useProviderModels } from '../../hooks/useProviderModels'
 /**
  * Per-workspace settings modal.
@@ -10,6 +12,7 @@ import { useProviderModels } from '../../hooks/useProviderModels'
  */
 
 import { useEffect, useId, useMemo, useRef, useState } from 'react'
+import { Dialog, DialogContent } from '../ui/dialog'
 import { useTranslation } from 'react-i18next'
 import { AlertTriangle, ArrowUpCircle, BrainCircuit, GitMerge, Info, Layers3, Rocket, RotateCcw, Settings, X } from 'lucide-react'
 import {
@@ -89,56 +92,6 @@ const CONTEXT_WINDOW_OPTIONS = [
   { value: 512_000, label: '512K' },
   { value: 1_000_000, label: '1M' },
 ] as const
-
-const DIALOG_FOCUSABLE_SELECTOR = [
-  'a[href]',
-  'button:not([disabled])',
-  'input:not([disabled])',
-  'select:not([disabled])',
-  'textarea:not([disabled])',
-  '[tabindex]:not([tabindex="-1"])',
-].join(',')
-
-function dialogFocusableElements(dialog: HTMLElement): HTMLElement[] {
-  return Array.from(dialog.querySelectorAll<HTMLElement>(DIALOG_FOCUSABLE_SELECTOR))
-    .filter((element) => (
-      element.tabIndex >= 0 &&
-      element.closest('[hidden], [aria-hidden="true"]') === null
-    ))
-}
-
-function makeDialogBackgroundInert(modalBranch: HTMLElement): () => void {
-  const changed: Array<{
-    element: HTMLElement
-    hadInert: boolean
-    ariaHidden: string | null
-  }> = []
-  let branch: HTMLElement | null = modalBranch
-
-  while (branch?.parentElement) {
-    const parent: HTMLElement = branch.parentElement
-    for (const sibling of Array.from(parent.children)) {
-      if (sibling === branch || !(sibling instanceof HTMLElement)) continue
-      changed.push({
-        element: sibling,
-        hadInert: sibling.hasAttribute('inert'),
-        ariaHidden: sibling.getAttribute('aria-hidden'),
-      })
-      sibling.setAttribute('inert', '')
-      sibling.setAttribute('aria-hidden', 'true')
-    }
-    if (parent === document.body) break
-    branch = parent
-  }
-
-  return () => {
-    for (const { element, hadInert, ariaHidden } of changed.reverse()) {
-      if (!hadInert) element.removeAttribute('inert')
-      if (ariaHidden === null) element.removeAttribute('aria-hidden')
-      else element.setAttribute('aria-hidden', ariaHidden)
-    }
-  }
-}
 
 export interface FormState {
   baseUrl: string
@@ -291,11 +244,10 @@ export function WorkspaceAIConfigModal({
 }: Props) {
   const { t } = useTranslation()
   const openOrFocus = useWorkspace((state) => state.openOrFocus)
-  const backdropRef = useRef<HTMLDivElement>(null)
   const dialogRef = useRef<HTMLDivElement>(null)
-  const onCloseRef = useRef(onClose)
   const dialogTitleId = useId()
   const dialogDescriptionId = useId()
+  const restoreFocusRef = useRef<HTMLElement | null>(typeof document !== 'undefined' && document.activeElement instanceof HTMLElement ? document.activeElement : null)
   const {
     workspaces,
     agents = [],
@@ -334,61 +286,6 @@ export function WorkspaceAIConfigModal({
   const opencodeGate = useTestGate()
   const piGate = useTestGate()
   const [presets, setPresets] = useState<Preset[]>([])
-
-  onCloseRef.current = onClose
-
-  useEffect(() => {
-    const dialog = dialogRef.current
-    const backdrop = backdropRef.current
-    if (!dialog || !backdrop) return
-
-    const previouslyFocused = document.activeElement instanceof HTMLElement
-      ? document.activeElement
-      : null
-    const restoreBackground = makeDialogBackgroundInert(backdrop)
-    const initialFocus = dialog.querySelector<HTMLElement>('[aria-current="page"]')
-      ?? dialogFocusableElements(dialog)[0]
-      ?? dialog
-    initialFocus.focus()
-
-    const handleDialogKeyDown = (event: KeyboardEvent) => {
-      if (event.defaultPrevented) return
-      if (event.key === 'Escape') {
-        event.preventDefault()
-        onCloseRef.current()
-        return
-      }
-      if (event.key !== 'Tab') return
-
-      const focusable = dialogFocusableElements(dialog)
-      if (focusable.length === 0) {
-        event.preventDefault()
-        dialog.focus()
-        return
-      }
-
-      const first = focusable[0]!
-      const last = focusable[focusable.length - 1]!
-      const active = document.activeElement
-      if (!dialog.contains(active)) {
-        event.preventDefault()
-        first.focus()
-      } else if (event.shiftKey && active === first) {
-        event.preventDefault()
-        last.focus()
-      } else if (!event.shiftKey && active === last) {
-        event.preventDefault()
-        first.focus()
-      }
-    }
-
-    document.addEventListener('keydown', handleDialogKeyDown)
-    return () => {
-      document.removeEventListener('keydown', handleDialogKeyDown)
-      restoreBackground()
-      if (previouslyFocused?.isConnected) previouslyFocused.focus()
-    }
-  }, [])
 
   useEffect(() => {
     setSection(initialSection)
@@ -652,36 +549,24 @@ export function WorkspaceAIConfigModal({
     )
   }
 
-  // Backdrop close uses onMouseDown (not onClick) so that text-selection
-  // drags that start inside an input and release outside the card don't
-  // count as a backdrop click and dismiss the modal — that's what was
-  // making the window "flash" on what felt like random clicks.
-  const handleBackdropMouseDown = (e: React.MouseEvent) => {
-    if (e.target === e.currentTarget) onClose()
-  }
-
   return (
-    <div
-      ref={backdropRef}
-      className="fixed inset-0 z-[60] flex items-stretch justify-center bg-backdrop backdrop-blur-sm sm:items-center"
-      onMouseDown={handleBackdropMouseDown}
-    >
-      <div
+    <Dialog open onOpenChange={(open) => { if (!open) onClose() }}>
+      <DialogContent
         ref={dialogRef}
         data-testid="workspace-settings-dialog"
-        role="dialog"
         aria-modal="true"
         aria-labelledby={dialogTitleId}
         aria-describedby={dialogDescriptionId}
-        tabIndex={-1}
-        className="flex h-full w-full flex-col overflow-hidden border-y border-border bg-background shadow-2xl sm:h-auto sm:w-[calc(100vw-24px)] sm:max-w-3xl sm:max-h-[85dvh] sm:rounded-lg sm:border"
-        onMouseDown={(e) => e.stopPropagation()}
+        showCloseButton={false}
+        initialFocus={() => dialogRef.current?.querySelector<HTMLElement>('[aria-current="page"]') ?? dialogRef.current}
+        finalFocus={restoreFocusRef}
+        className="flex h-full max-h-none w-full max-w-none flex-col gap-0 overflow-hidden rounded-none border-y border-border bg-background p-0 sm:h-auto sm:w-[calc(100vw-24px)] sm:max-w-3xl sm:max-h-[85dvh] sm:rounded-lg sm:border"
       >
         {/* Header */}
         <div className="flex shrink-0 items-center justify-between border-b border-border px-4 py-3 sm:p-4">
           <div className="min-w-0">
             <h2 id={dialogTitleId} className="text-[15px] font-semibold text-foreground">{t('workspaceSettings.title')}</h2>
-            <p id={dialogDescriptionId} className="mt-0.5 truncate text-[11px] text-muted-foreground">{workspaceLabel}</p>
+            <p id={dialogDescriptionId} className="mt-0.5 truncate text-sm text-muted-foreground">{workspaceLabel}</p>
           </div>
           <Button
             type="button"
@@ -703,7 +588,7 @@ export function WorkspaceAIConfigModal({
               type="button"
               onClick={() => setSection('general')}
               aria-current={section === 'general' ? 'page' : undefined}
-              className={`flex min-h-11 min-w-max flex-none items-center gap-2 rounded-md px-2.5 py-2 text-left text-[12px] leading-[18px] font-medium transition-colors sm:mt-0 sm:h-8 sm:min-h-8 sm:w-full ${
+              className={`flex min-h-11 min-w-max flex-none items-center gap-2 rounded-md px-2.5 py-2 text-left text-sm leading-5 font-medium transition-colors sm:mt-0 sm:h-8 sm:min-h-8 sm:w-full ${
                 section === 'general'
                   ? 'bg-muted text-foreground'
                   : 'text-muted-foreground hover:bg-muted hover:text-foreground'
@@ -716,7 +601,7 @@ export function WorkspaceAIConfigModal({
               type="button"
               onClick={() => setSection('launch')}
               aria-current={section === 'launch' ? 'page' : undefined}
-              className={`flex min-h-11 min-w-max flex-none items-center gap-2 rounded-md px-2.5 py-2 text-left text-[12px] leading-[18px] font-medium transition-colors sm:mt-1 sm:h-8 sm:min-h-8 sm:w-full ${
+              className={`flex min-h-11 min-w-max flex-none items-center gap-2 rounded-md px-2.5 py-2 text-left text-sm leading-5 font-medium transition-colors sm:mt-1 sm:h-8 sm:min-h-8 sm:w-full ${
                 section === 'launch'
                   ? 'bg-muted text-foreground'
                   : 'text-muted-foreground hover:bg-muted hover:text-foreground'
@@ -729,7 +614,7 @@ export function WorkspaceAIConfigModal({
               type="button"
               onClick={() => setSection('preferences')}
               aria-current={section === 'preferences' ? 'page' : undefined}
-              className={`flex min-h-11 min-w-max flex-none items-center gap-2 rounded-md px-2.5 py-2 text-left text-[12px] leading-[18px] font-medium transition-colors sm:mt-1 sm:h-8 sm:min-h-8 sm:w-full ${
+              className={`flex min-h-11 min-w-max flex-none items-center gap-2 rounded-md px-2.5 py-2 text-left text-sm leading-5 font-medium transition-colors sm:mt-1 sm:h-8 sm:min-h-8 sm:w-full ${
                 section === 'preferences'
                   ? 'bg-muted text-foreground'
                   : 'text-muted-foreground hover:bg-muted hover:text-foreground'
@@ -742,7 +627,7 @@ export function WorkspaceAIConfigModal({
               type="button"
               onClick={() => setSection('template')}
               aria-current={section === 'template' ? 'page' : undefined}
-              className={`flex min-h-11 min-w-max flex-none items-center gap-2 rounded-md px-2.5 py-2 text-left text-[12px] leading-[18px] font-medium transition-colors sm:mt-1 sm:h-8 sm:min-h-8 sm:w-full ${
+              className={`flex min-h-11 min-w-max flex-none items-center gap-2 rounded-md px-2.5 py-2 text-left text-sm leading-5 font-medium transition-colors sm:mt-1 sm:h-8 sm:min-h-8 sm:w-full ${
                 section === 'template'
                   ? 'bg-muted text-foreground'
                   : 'text-muted-foreground hover:bg-muted hover:text-foreground'
@@ -758,7 +643,7 @@ export function WorkspaceAIConfigModal({
               type="button"
               onClick={() => setSection('absorb')}
               aria-current={section === 'absorb' ? 'page' : undefined}
-              className={`flex min-h-11 min-w-max flex-none items-center gap-2 rounded-md px-2.5 py-2 text-left text-[12px] leading-[18px] font-medium transition-colors sm:mt-1 sm:h-8 sm:min-h-8 sm:w-full ${
+              className={`flex min-h-11 min-w-max flex-none items-center gap-2 rounded-md px-2.5 py-2 text-left text-sm leading-5 font-medium transition-colors sm:mt-1 sm:h-8 sm:min-h-8 sm:w-full ${
                 section === 'absorb'
                   ? 'bg-muted text-foreground'
                   : 'text-muted-foreground hover:bg-muted hover:text-foreground'
@@ -783,7 +668,7 @@ export function WorkspaceAIConfigModal({
                       placeholder={stableTag}
                       className={inputClass}
                     />
-                    <div className="mt-1 flex items-center justify-between gap-3 text-[11px] leading-[15px] text-muted-foreground/70">
+                    <div className="mt-1 flex items-center justify-between gap-3 text-sm leading-5 text-muted-foreground/70">
                       <span>{t('workspaceSettings.general.displayNameHelp')}</span>
                       <span>{displayName.length}/80</span>
                     </div>
@@ -799,7 +684,7 @@ export function WorkspaceAIConfigModal({
                       placeholder={t('workspaceSettings.general.descriptionPlaceholder')}
                       className={`${inputClass} min-h-28 resize-y leading-relaxed`}
                     />
-                    <div className="mt-1 flex items-center justify-between gap-3 text-[11px] leading-[15px] text-muted-foreground/70">
+                    <div className="mt-1 flex items-center justify-between gap-3 text-sm leading-5 text-muted-foreground/70">
                       <span>{t('workspaceSettings.general.descriptionHelp')}</span>
                       <span>{description.length}/240</span>
                     </div>
@@ -809,9 +694,9 @@ export function WorkspaceAIConfigModal({
                     <div className="flex items-start gap-2">
                       <Info size={14} className="mt-0.5 shrink-0 text-muted-foreground" />
                       <div className="min-w-0">
-                        <div className="text-[11px] font-medium text-muted-foreground">{t('workspaceSettings.general.stableTag')}</div>
-                        <div className="mt-1 truncate font-mono text-[12px] leading-[18px] text-foreground">{stableTag}</div>
-                        <p className="mt-1 text-[11px] leading-snug text-muted-foreground/75">
+                        <div className="text-sm font-medium text-muted-foreground">{t('workspaceSettings.general.stableTag')}</div>
+                        <div className="mt-1 truncate font-mono text-sm leading-5 text-foreground">{stableTag}</div>
+                        <p className="mt-1 text-sm leading-snug text-muted-foreground/75">
                           {t('workspaceSettings.general.stableTagHelp')}
                         </p>
                       </div>
@@ -819,19 +704,19 @@ export function WorkspaceAIConfigModal({
                   </div>
 
                   {error && (
-                    <div className="rounded-md border border-destructive/40 bg-destructive/10 text-destructive text-[12px] leading-[18px] px-3 py-2">
+                    <div className="rounded-md border border-destructive/40 bg-destructive/10 text-destructive text-sm leading-5 px-3 py-2">
                       {error}
                     </div>
                   )}
                   {metadataSavedFlash && (
-                    <div className="rounded-md border border-success/40 bg-success/10 text-success text-[12px] leading-[18px] px-3 py-2">
+                    <div className="rounded-md border border-success/40 bg-success/10 text-success text-sm leading-5 px-3 py-2">
                       {t('workspaceSettings.general.saved')}
                     </div>
                   )}
                   </div>
                 </div>
                 <div className="flex shrink-0 items-center justify-end gap-2 border-t border-border bg-secondary/30 px-3 py-2.5 sm:grid sm:grid-cols-[minmax(0,1fr)_auto]">
-                  <p className="hidden min-w-0 text-[11px] leading-snug text-muted-foreground/75 sm:block">
+                  <p className="hidden min-w-0 text-sm leading-snug text-muted-foreground/75 sm:block">
                     {t('workspaceSettings.general.storedIn')}
                   </p>
                   <div className="flex justify-end gap-2">
@@ -846,9 +731,10 @@ export function WorkspaceAIConfigModal({
                     <Button
                       type="button"
                       onClick={handleSaveMetadata}
-                      disabled={metadataSaving || !metadataDirty}
+                      pending={metadataSaving}
+                      disabled={!metadataDirty}
                     >
-                      {metadataSaving ? t('common.saving') : t('common.save')}
+                      {t('common.save')}
                     </Button>
                   </div>
                 </div>
@@ -858,7 +744,7 @@ export function WorkspaceAIConfigModal({
             {section === 'ai' && (
               <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
         <div className="shrink-0 border-b border-warning/30 bg-warning/5 px-4 py-3">
-          <div className="flex items-start gap-2 text-[11px] leading-relaxed text-muted-foreground">
+          <div className="flex items-start gap-2 text-sm leading-relaxed text-muted-foreground">
             <AlertTriangle size={15} className="mt-0.5 shrink-0 text-warning" />
             <div>
               <div className="font-semibold text-foreground">{t('workspaceSettings.ai.deprecatedTitle')}</div>
@@ -877,7 +763,7 @@ export function WorkspaceAIConfigModal({
                 setPickedCredential('')
                 setPickedWireShape('')
               }}
-              className={`flex min-h-11 flex-none items-center justify-center gap-2 whitespace-nowrap px-3 py-2 text-[13px] leading-[18px] font-medium transition-colors sm:h-9 sm:min-h-9 sm:flex-1 sm:px-4 ${
+              className={`flex min-h-11 flex-none items-center justify-center gap-2 whitespace-nowrap px-3 py-2 text-sm leading-5 font-medium transition-colors sm:h-9 sm:min-h-9 sm:flex-1 sm:px-4 ${
                 tab === id
                   ? 'text-primary border-b-2 border-primary -mb-px'
                   : 'text-muted-foreground hover:text-foreground'
@@ -897,7 +783,7 @@ export function WorkspaceAIConfigModal({
         >
           {/* Quick pick — load a saved credential into the form */}
           {credentials.length === 0 ? (
-            <p className="text-[11px] leading-snug text-muted-foreground/75">
+            <p className="text-sm leading-snug text-muted-foreground/75">
               {t('workspaceSettings.ai.noCompatibleCredential', { agent: TAB_LABEL[tab] })}
             </p>
           ) : (
@@ -918,45 +804,37 @@ export function WorkspaceAIConfigModal({
               return (
                 <>
                   <div className="flex flex-col gap-2 sm:flex-row">
-                    <select
+                    <Select
                       aria-label={t('workspaceSettings.ai.savedCredentialLabel', { agent: TAB_LABEL[tab] })}
                       value={pickedCredential}
-                      onChange={(e) => {
-                        const slug = e.target.value
+                      onValueChange={(selectedValue) => {
+                        const slug = selectedValue
                         const cred = compatible.find((candidate) => candidate.slug === slug)
                         setPickedCredential(slug)
                         setPickedWireShape(
                           cred ? (agentWireShapes(cred.wires, agents, tab, cred.vendor)[0] ?? '') : '',
                         )
                       }}
-                      className={inputClass + ' flex-1'}
+                      className="flex-1"
                       disabled={compatible.length === 0}
-                    >
-                      <option value="">
-                        {compatible.length === 0
-                          ? t('workspaceSettings.ai.noCompatibleCredential', { agent: TAB_LABEL[tab] })
-                          : t('workspaceSettings.ai.selectCredential')}
-                      </option>
-                      {compatible.map((cred) => {
-                        const shapes = agentWireShapes(cred.wires, agents, tab, cred.vendor)
-                        return (
-                          <option key={cred.slug} value={cred.slug}>
-                            {(cred.label?.trim() || cred.slug)}{shapes.length > 1 ? `, ${t('workspaceSettings.ai.protocolCount', { count: shapes.length })}` : ''}
-                          </option>
-                        )
-                      })}
-                    </select>
+                      options={[
+                        { value: '', label: compatible.length === 0
+                            ? t('workspaceSettings.ai.noCompatibleCredential', { agent: TAB_LABEL[tab] })
+                            : t('workspaceSettings.ai.selectCredential') },
+                        ...compatible.map((cred) => {
+                          const shapes = agentWireShapes(cred.wires, agents, tab, cred.vendor)
+                          return { value: cred.slug, label: [cred.label?.trim() || cred.slug, shapes.length > 1 ? `, ${t('workspaceSettings.ai.protocolCount', { count: shapes.length })}` : ''].join('') }
+                        }),
+                      ]}
+                    />
                     {selectedWireOptions.length > 1 && (
-                      <select
+                      <Select
                         aria-label={t('workspaceSettings.ai.savedCredentialProtocolLabel')}
                         value={pickedWireShape}
-                        onChange={(e) => setPickedWireShape(e.target.value as WireShape)}
-                        className={inputClass + ' sm:max-w-[210px]'}
-                      >
-                        {selectedWireOptions.map((shape) => (
-                          <option key={shape} value={shape}>{WIRE_SHAPE_GUIDANCE[shape]}</option>
-                        ))}
-                      </select>
+                        onValueChange={(selectedValue) => setPickedWireShape(selectedValue as WireShape)}
+                        className="sm:max-w-[210px]"
+                        options={selectedWireOptions.map((shape) => ({ value: shape, label: WIRE_SHAPE_GUIDANCE[shape] }))}
+                      />
                     )}
                     <Button
                       onClick={applyCredential}
@@ -966,7 +844,7 @@ export function WorkspaceAIConfigModal({
                       {t('workspaceSettings.ai.load')}
                     </Button>
                   </div>
-                  <p className="text-[11px] text-muted-foreground/80 leading-snug mt-1.5">
+                  <p className="text-sm text-muted-foreground/80 leading-snug mt-1.5">
                     {compatible.length === 0 && credentials.length > 0
                       ? t('workspaceSettings.ai.incompatibleHelp', { agent: TAB_LABEL[tab] })
                       : t('workspaceSettings.ai.loadHelp')}
@@ -981,11 +859,11 @@ export function WorkspaceAIConfigModal({
           {(tabProviderCapabilities?.wirePreference.length ?? 0) > 1 && (
             <div>
               <label className="block text-xs font-medium text-muted-foreground mb-1">{t('workspaceSettings.ai.apiProtocol')}</label>
-              <select
+              <Select
                 aria-label={t('workspaceSettings.ai.apiProtocolLabel', { agent: TAB_LABEL[tab] })}
                 value={form.wireShape}
-                onChange={(e) => {
-                  const wireShape = e.target.value as WireShape
+                onValueChange={(selectedValue) => {
+                  const wireShape = selectedValue as WireShape
                   const selected = credentials.find((candidate) => candidate.slug === pickedCredential)
                   const selectedBaseUrl = selected?.wires[wireShape]
                   setForm({
@@ -998,13 +876,9 @@ export function WorkspaceAIConfigModal({
                   })
                   gate.reset()
                 }}
-                className={inputClass}
-              >
-                {formWireOptions.map((shape) => (
-                  <option key={shape} value={shape}>{WIRE_SHAPE_GUIDANCE[shape]}</option>
-                ))}
-              </select>
-              <p className="text-[11px] text-muted-foreground/80 leading-snug mt-1">
+                options={formWireOptions.map((shape) => ({ value: shape, label: WIRE_SHAPE_GUIDANCE[shape] }))}
+              />
+              <p className="text-sm text-muted-foreground/80 leading-snug mt-1">
                 {t('workspaceSettings.ai.apiProtocolHelp')}
               </p>
             </div>
@@ -1062,16 +936,16 @@ export function WorkspaceAIConfigModal({
           {form.wireShape === 'anthropic' && (
             <div>
               <label className="block text-xs font-medium text-muted-foreground mb-1">{t('workspaceSettings.ai.authHeader')}</label>
-              <select
+              <Select
                 aria-label={t('workspaceSettings.ai.authHeaderLabel', { agent: TAB_LABEL[tab] })}
                 value={form.authMode}
-                onChange={(e) => setForm({ ...form, authMode: e.target.value as FormState['authMode'] })}
-                className={inputClass}
-              >
-                <option value="x-api-key">x-api-key — Anthropic default</option>
-                <option value="bearer">Authorization: Bearer — gateways (MiniMax, LongCat, proxies)</option>
-              </select>
-              <p className="text-[11px] text-muted-foreground/80 leading-snug mt-1">
+                onValueChange={(selectedValue) => setForm({ ...form, authMode: selectedValue as FormState['authMode'] })}
+                options={[
+                  { value: 'x-api-key', label: 'x-api-key — Anthropic default' },
+                  { value: 'bearer', label: 'Authorization: Bearer — gateways (MiniMax, LongCat, proxies)' },
+                ]}
+              />
+              <p className="text-sm text-muted-foreground/80 leading-snug mt-1">
                 {t('workspaceSettings.ai.authHeaderHelp')}
               </p>
             </div>
@@ -1090,7 +964,7 @@ export function WorkspaceAIConfigModal({
                 reasoning: v === form.model ? form.reasoning : null,
                 reasoningEffort: v === form.model ? form.reasoningEffort : null,
               })}
-              placeholder={tab === 'claude' ? 'claude-opus-4-8' : tab === 'opencode' || tab === 'pi' ? 'deepseek-chat' : 'gpt-5.5'}
+              placeholder={t('modelCatalog.selectPlaceholder')}
               ariaLabel={t('workspaceSettings.ai.model')}
               suggestionsLabel={t('workspaceSettings.ai.modelSuggestions')}
             />
@@ -1101,26 +975,22 @@ export function WorkspaceAIConfigModal({
                 <label className="block text-xs font-medium text-muted-foreground mb-1">
                   {t('workspaceSettings.ai.reasoningEffort')}
                 </label>
-                <select
+                <Select
                   aria-label={t('workspaceSettings.ai.reasoningEffortLabel', { agent: TAB_LABEL[tab] })}
                   value={form.reasoningEffort ?? ''}
-                  onChange={(event) => setForm({
+                  onValueChange={(selectedValue) => setForm({
                     ...form,
-                    reasoningEffort: event.target.value
-                      ? event.target.value as ModelReasoningEffort
+                    reasoningEffort: selectedValue
+                      ? selectedValue as ModelReasoningEffort
                       : null,
                   })}
-                  className={inputClass}
-                >
-                  <option value="">{t('workspaceSettings.ai.effortNotSpecified')}</option>
-                  {supportedReasoningEfforts.map((effort) => (
-                    <option key={effort} value={effort}>
-                      {effort}{effort === selectedModelSemantics?.reasoning?.defaultEffort
-                        ? ` — ${t('workspaceSettings.ai.registeredDefault')}`
-                        : ''}
-                    </option>
-                  ))}
-                </select>
+                  options={[
+                    { value: '', label: t('workspaceSettings.ai.effortNotSpecified') },
+                    ...supportedReasoningEfforts.map((effort) => ({ value: effort, label: [effort, effort === selectedModelSemantics?.reasoning?.defaultEffort
+                          ? ` — ${t('workspaceSettings.ai.registeredDefault')}`
+                          : ''].join('') })),
+                  ]}
+                />
                 <p className="text-[10.5px] leading-snug text-muted-foreground/80 mt-1">
                   {selectedModelSemantics?.reasoning?.defaultEffort
                     ? t('workspaceSettings.ai.reasoningEffortHelp', {
@@ -1156,23 +1026,23 @@ export function WorkspaceAIConfigModal({
 
             {modelRegistration?.reasoning === true && !selectedModelSemantics?.reasoning && (
               <details className="mt-2 rounded-md border border-border bg-secondary/40 px-3 py-2">
-                <summary className="cursor-pointer text-[11px] font-medium text-muted-foreground">
+                <DetailsSummary>
                   {t('aiProvider.advancedReasoning')}
-                </summary>
+                </DetailsSummary>
                 <div className="mt-2 space-y-1.5">
-                  <select
+                  <Select
                     aria-label={t('workspaceSettings.ai.reasoningOverrideLabel', { agent: TAB_LABEL[tab] })}
-                    className={inputClass}
                     value={form.reasoning === null ? 'auto' : form.reasoning ? 'enabled' : 'disabled'}
-                    onChange={(event) => setForm({
+                    onValueChange={(selectedValue) => setForm({
                       ...form,
-                      reasoning: event.target.value === 'auto' ? null : event.target.value === 'enabled',
+                      reasoning: selectedValue === 'auto' ? null : selectedValue === 'enabled',
                     })}
-                  >
-                    <option value="auto">{t('aiProvider.useRuntimeDefault')}</option>
-                    <option value="enabled">{t('aiProvider.supportsReasoning')}</option>
-                    <option value="disabled">{t('aiProvider.noReasoning')}</option>
-                  </select>
+                    options={[
+                      { value: 'auto', label: t('aiProvider.useRuntimeDefault') },
+                      { value: 'enabled', label: t('aiProvider.supportsReasoning') },
+                      { value: 'disabled', label: t('aiProvider.noReasoning') },
+                    ]}
+                  />
                   <p className="text-[10.5px] leading-snug text-muted-foreground/80">
                     {t('workspaceSettings.ai.unknownReasoningHelp')}
                   </p>
@@ -1185,35 +1055,31 @@ export function WorkspaceAIConfigModal({
           {modelRegistration?.contextWindow === true && (
             <div>
               <label className="block text-xs font-medium text-muted-foreground mb-1">{t('workspaceSettings.ai.contextWindow')}</label>
-              <select
+              <Select
                 aria-label={t('workspaceSettings.ai.contextWindowLabel', { agent: TAB_LABEL[tab] })}
-                value={form.contextWindow ?? ''}
-                onChange={(e) => setForm({
+                value={form.contextWindow === null ? '' : String(form.contextWindow)}
+                onValueChange={(selectedValue) => setForm({
                   ...form,
-                  contextWindow: e.target.value ? Number(e.target.value) : null,
+                  contextWindow: selectedValue ? Number(selectedValue) : null,
                 })}
-                className={inputClass}
-              >
-                <option value="">
-                  {selectedModelSemantics?.contextWindow
-                    ? t('workspaceSettings.ai.contextAutomatic', {
-                      limit: formatContextWindow(selectedModelSemantics.contextWindow),
-                    })
-                    : t('workspaceSettings.ai.runtimeDefaultOption')}
-                </option>
-                {CONTEXT_WINDOW_OPTIONS.map((option) => (
-                  <option key={option.value} value={option.value}>{option.label}</option>
-                ))}
-              </select>
+                options={[
+                  { value: '', label: selectedModelSemantics?.contextWindow
+                      ? t('workspaceSettings.ai.contextAutomatic', {
+                        limit: formatContextWindow(selectedModelSemantics.contextWindow),
+                      })
+                      : t('workspaceSettings.ai.runtimeDefaultOption') },
+                  ...CONTEXT_WINDOW_OPTIONS.map((option) => ({ value: String(option.value), label: option.label })),
+                ]}
+              />
             </div>
           )}
 
           {(tab === 'codex' || tab === 'opencode' || tab === 'pi') && (
             <details className="rounded-md border border-border bg-secondary/40 px-3 py-2.5">
-              <summary className="cursor-pointer text-[11px] font-medium text-muted-foreground">
+              <DetailsSummary>
                 {t('workspaceSettings.ai.protocolDetails')}
-              </summary>
-              <div className="mt-2 space-y-2 border-t border-border/60 pt-2 text-[11px] leading-relaxed text-muted-foreground">
+              </DetailsSummary>
+              <div className="mt-2 space-y-2 border-t border-border/60 pt-2 text-sm leading-relaxed text-muted-foreground">
                 {tab === 'codex' ? (
                   <p>{t('workspaceSettings.ai.codexResponsesOnly')}</p>
                 ) : (
@@ -1234,17 +1100,17 @@ export function WorkspaceAIConfigModal({
           )}
 
           {error && (
-            <div className="rounded-md border border-destructive/40 bg-destructive/10 text-destructive text-[12px] leading-[18px] px-3 py-2">
+            <div className="rounded-md border border-destructive/40 bg-destructive/10 text-destructive text-sm leading-5 px-3 py-2">
               {error}
             </div>
           )}
           {savedFlash && (
-            <div className="rounded-md border border-success/40 bg-success/10 text-success text-[12px] leading-[18px] px-3 py-2">
+            <div className="rounded-md border border-success/40 bg-success/10 text-success text-sm leading-5 px-3 py-2">
               {t('workspaceSettings.ai.saved')}
             </div>
           )}
           {offerSaveCred && (
-            <div className="rounded-md border border-primary/40 bg-primary/10 text-foreground text-[12px] leading-[18px] px-3 py-2.5 flex items-center justify-between gap-3">
+            <div className="rounded-md border border-primary/40 bg-primary/10 text-foreground text-sm leading-5 px-3 py-2.5 flex items-center justify-between gap-3">
               <span className="leading-snug">
                 {t('workspaceSettings.ai.saveCredentialPrompt')}
               </span>
@@ -1262,25 +1128,25 @@ export function WorkspaceAIConfigModal({
                   type="button"
                   size="sm"
                   onClick={handleSaveCredential}
-                  disabled={savingCred}
+                  pending={savingCred}
                 >
-                  {savingCred ? t('common.saving') : t('workspaceSettings.ai.saveToAlice')}
+                  {t('workspaceSettings.ai.saveToAlice')}
                 </Button>
               </div>
             </div>
           )}
           {credFlash && (
-            <div className="rounded-md border border-success/40 bg-success/10 text-success text-[12px] leading-[18px] px-3 py-2">
+            <div className="rounded-md border border-success/40 bg-success/10 text-success text-sm leading-5 px-3 py-2">
               {credFlash}
             </div>
           )}
           {testing && (
-            <div className="rounded-md border border-border bg-secondary text-muted-foreground text-[12px] leading-[18px] px-3 py-2">
+            <div className="rounded-md border border-border bg-secondary text-muted-foreground text-sm leading-5 px-3 py-2">
               {t('workspaceSettings.ai.testingConnection')}
             </div>
           )}
           {!testing && result?.ok && resultMatchesCurrent && (
-            <div className="rounded-md border border-success/40 bg-success/10 text-success text-[12px] leading-[18px] px-3 py-2">
+            <div className="rounded-md border border-success/40 bg-success/10 text-success text-sm leading-5 px-3 py-2">
               {result.response?.trim() ? (
                 <>
                   <div className="font-medium mb-0.5">
@@ -1302,7 +1168,7 @@ export function WorkspaceAIConfigModal({
             </div>
           )}
           {!testing && result && !result.ok && resultMatchesCurrent && (
-            <div className="rounded-md border border-destructive/40 bg-destructive/10 text-destructive text-[12px] leading-[18px] px-3 py-2">
+            <div className="rounded-md border border-destructive/40 bg-destructive/10 text-destructive text-sm leading-5 px-3 py-2">
               <div className="font-medium mb-0.5">{t('workspaceSettings.ai.testFailed')}</div>
               <div className="whitespace-pre-wrap break-words font-mono text-[11.5px]">
                 {result.error}
@@ -1310,12 +1176,12 @@ export function WorkspaceAIConfigModal({
             </div>
           )}
           {!testing && result && !resultMatchesCurrent && (
-            <div className="rounded-md border border-warning/30 bg-warning/5 text-warning/90 text-[12px] leading-[18px] px-3 py-2">
+            <div className="rounded-md border border-warning/30 bg-warning/5 text-warning/90 text-sm leading-5 px-3 py-2">
               {t('workspaceSettings.ai.formChanged')}
             </div>
           )}
 
-          <p className="text-[11px] text-muted-foreground/80 leading-snug pt-1">
+          <p className="text-sm text-muted-foreground/80 leading-snug pt-1">
             {t('workspaceSettings.ai.changesHelp')}
           </p>
         </div>
@@ -1362,9 +1228,10 @@ export function WorkspaceAIConfigModal({
               <Button
                 type="button"
                 onClick={handleSave}
-                disabled={saving || !dirty}
+                pending={saving}
+                disabled={!dirty}
               >
-                {saving ? t('common.saving') : t('common.save')}
+                {t('common.save')}
               </Button>
             )}
           </div>
@@ -1413,7 +1280,7 @@ export function WorkspaceAIConfigModal({
             )}
           </div>
         </div>
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   )
 }

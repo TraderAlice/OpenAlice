@@ -27,7 +27,7 @@ vi.mock('../live/inbox-read', () => ({
 
 vi.mock('../tabs/types', () => ({ getFocusedTab: () => ({ spec: { kind: 'issue' } }) }))
 vi.mock('./workspace/ChatWorkspaceSection', () => ({
-  ChatWorkspaceSection: ({ mode }: { mode: string }) => <button className="min-h-10 md:min-h-8">{mode} Harness</button>,
+  ChatWorkspaceSection: ({ mode }: { mode: string }) => <button>{mode} Harness</button>,
 }))
 
 vi.mock('../live/trading-push', () => ({
@@ -106,16 +106,12 @@ describe('ActivityBar mobile drawer state', () => {
     expect(activityBar.getAttribute('tabindex')).toBeNull()
   })
 
-  it('keeps mobile drawer actions tappable without changing desktop density', () => {
+  it('keeps primary drawer actions on the shared navigation scale', () => {
     render(<ActivityBar open onClose={vi.fn()} desktopStatic={false} />)
 
     const primaryAction = screen.getByRole('button', { name: 'Quick Start' })
-    const predictionAction = screen.getByRole('button', { name: 'prediction Harness' })
 
-    expect(primaryAction.className).toContain('min-h-10')
-    expect(primaryAction.className).toContain('md:min-h-8')
-    expect(predictionAction.className).toContain('min-h-10')
-    expect(predictionAction.className).toContain('md:min-h-8')
+    expect(primaryAction.className).toContain('oa-primary-nav-row')
     expect(screen.queryByRole('button', { name: 'Beta' })).toBeNull()
     expect(screen.queryByRole('button', { name: 'nav.about' })).toBeNull()
   })

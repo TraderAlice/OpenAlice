@@ -1,3 +1,4 @@
+import userEvent from '@testing-library/user-event'
 // @vitest-environment jsdom
 
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
@@ -118,7 +119,7 @@ describe('TelegramDeskPanel', () => {
 
   it('defaults the unbound picker to the Ask Alice Chat workspace', () => {
     render(<TelegramDeskPanel linked online label="Telegram" />)
-    expect((screen.getByLabelText('Workspace') as HTMLSelectElement).value).toBe('ws-b')
+    expect(screen.getByLabelText('Workspace').textContent).toBe('Beta desk')
     const toggle = screen.getByRole('switch', { name: 'Turn Chat on Telegram on or off' })
     expect(toggle.parentElement?.className).not.toContain('border')
     expect(toggle.parentElement?.className).not.toContain('rounded')
@@ -128,7 +129,7 @@ describe('TelegramDeskPanel', () => {
   it('falls back to the active Chat workspace when Ask Alice has no remembered target', () => {
     launchMocks.recentChatWorkspaceId = null
     render(<TelegramDeskPanel linked online label="Telegram" />)
-    expect((screen.getByLabelText('Workspace') as HTMLSelectElement).value).toBe('ws-c')
+    expect(screen.getByLabelText('Workspace').textContent).toBe('Gamma desk')
   })
 
   it('enables the desk in the Ask Alice workspace without a manual pick', async () => {
@@ -139,7 +140,8 @@ describe('TelegramDeskPanel', () => {
 
   it('enables the desk in the selected workspace once linked', async () => {
     render(<TelegramDeskPanel linked online label="Telegram" />)
-    fireEvent.change(screen.getByLabelText('Workspace'), { target: { value: 'ws-c' } })
+    fireEvent.click(screen.getByLabelText('Workspace'))
+    await userEvent.click(await screen.findByRole('option', { name: 'Gamma desk' }))
     fireEvent.click(screen.getByRole('switch', { name: 'Turn Chat on Telegram on or off' }))
     await waitFor(() => expect(mocks.desk.enable).toHaveBeenCalledWith('ws-c'))
   })

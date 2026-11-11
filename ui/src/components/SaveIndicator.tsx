@@ -1,48 +1,39 @@
-import { Check, CircleAlert, LoaderCircle } from 'lucide-react'
+import { StatusIndicator } from './motion/StatusIndicator'
 import { useTranslation } from 'react-i18next'
 import type { SaveStatus } from '../hooks/useAutoSave'
 import { Button } from './ui/button'
 
 export function SaveIndicator({ status, onRetry }: { status: SaveStatus; onRetry?: () => void }) {
   const { t } = useTranslation()
-  if (status === 'idle') return null
+  const labels = [t('common.saving'), t('common.saved'), t('common.saveFailed')]
 
   return (
-    <span
-      role="status"
-      aria-live="polite"
-      aria-atomic="true"
-      className="inline-flex shrink-0 items-center gap-1.5 text-[11px]"
-    >
-      {status === 'saving' && (
-        <>
-          <LoaderCircle className="size-3 animate-spin text-primary motion-reduce:animate-none" aria-hidden />
-          <span className="text-muted-foreground">{t('common.saving')}</span>
-        </>
-      )}
-      {status === 'saved' && (
-        <>
-          <Check className="size-3 text-success" aria-hidden />
-          <span className="text-muted-foreground">{t('common.saved')}</span>
-        </>
-      )}
-      {status === 'error' && (
-        <>
-          <CircleAlert className="size-3 text-destructive" aria-hidden />
-          <span className="text-destructive">{t('common.saveFailed')}</span>
-          {onRetry && (
-            <Button
-              type="button"
-              onClick={onRetry}
-              variant="link"
-              size="xs"
-              className="ml-0.5 h-auto px-0 py-0 text-destructive"
-            >
+    <span className="inline-grid min-w-24 shrink-0 text-sm">
+      <span aria-hidden="true" className="invisible col-start-1 row-start-1 inline-flex min-h-8 items-center gap-1.5 whitespace-nowrap">
+        <span className="size-4 shrink-0" />
+        <span className="grid">
+          {labels.map((label, index) => <span key={index} data-label={label} className="col-start-1 row-start-1 before:content-[attr(data-label)]" />)}
+        </span>
+        {onRetry && <span data-label={t('common.retry')} className="ml-0.5 inline-flex h-8 items-center border border-transparent font-medium leading-5 before:content-[attr(data-label)] [@media(pointer:coarse)]:min-h-11 [@media(pointer:coarse)]:min-w-11" />}
+      </span>
+      <span
+        role={status === 'idle' ? undefined : 'status'}
+        aria-live="polite"
+        aria-atomic="true"
+        className="col-start-1 row-start-1 inline-flex min-h-8 items-center justify-end gap-1.5 whitespace-nowrap"
+      >
+        {status !== 'idle' && <>
+          <StatusIndicator state={status === 'saving' ? 'loading' : status === 'saved' ? 'done' : 'error'} size={16} />
+          <span className={status === 'error' ? 'text-destructive' : 'text-muted-foreground'}>
+            {t(status === 'saving' ? 'common.saving' : status === 'saved' ? 'common.saved' : 'common.saveFailed')}
+          </span>
+          {status === 'error' && onRetry && (
+            <Button type="button" onClick={onRetry} variant="link" size="sm" className="ml-0.5 px-0 py-0 text-destructive">
               {t('common.retry')}
             </Button>
           )}
-        </>
-      )}
+        </>}
+      </span>
     </span>
   )
 }

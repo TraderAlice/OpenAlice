@@ -52,12 +52,12 @@ export function ConfigurationDialog({
               <DialogTitle
                 ref={titleRef}
                 tabIndex={-1}
-                className="truncate text-[16px] font-semibold leading-6 outline-none"
+                className="break-words text-[16px] font-semibold leading-6 outline-none"
               >
                 {title}
               </DialogTitle>
               {description && (
-                <DialogDescription className="mt-0.5 text-[12px] leading-5">
+                <DialogDescription className="mt-0.5 text-sm leading-5">
                   {description}
                 </DialogDescription>
               )}

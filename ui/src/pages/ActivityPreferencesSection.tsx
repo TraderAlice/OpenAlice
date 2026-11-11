@@ -11,18 +11,18 @@ export function ActivityPreferencesSection() {
   const [now, setNow] = useState(Date.now())
   useEffect(() => { const timer = window.setInterval(() => setNow(Date.now()), 10_000); return () => window.clearInterval(timer) }, [])
   const settings = prefs.settings
-  return <ConfigSection title={t('activityPreferences.title')} description={t('activityPreferences.description')}>
+  return <ConfigSection title={t('activityPreferences.title')} help={t('activityPreferences.description')}>
     {prefs.loading ? <p role="status">{t('pet.loading')}</p> : !settings ? <p className="text-sm text-muted-foreground">{t('activityPreferences.desktopOnly')}</p> :
       <div className="space-y-4">
         {(['enabled', 'main', 'pet', 'brief'] as const).map(key => <div key={key} className="flex items-center justify-between gap-4">
           <label htmlFor={`activity-${key}`} className="text-sm">{t(`activityPreferences.${key}`)}</label>
-          <Toggle id={`activity-${key}`} checked={settings[key]} disabled={prefs.pending} ariaLabel={t(`activityPreferences.${key}`)} onChange={value => { void prefs.update({ [key]: value }) }} />
+          <Toggle id={`activity-${key}`} checked={settings[key]} pending={prefs.pending} ariaLabel={t(`activityPreferences.${key}`)} onChange={value => { void prefs.update({ [key]: value }) }} />
         </div>)}
         <div className="space-y-3 pt-2">
           <h4 className="text-sm font-medium">{t('activityPreferences.events')}</h4>
           {EVENT_CLASSES.map(kind => <div key={kind} className="flex items-center justify-between gap-4">
             <label htmlFor={`activity-event-${kind}`} className="text-sm">{t(`activityPreferences.event.${kind}`)}</label>
-            <Toggle id={`activity-event-${kind}`} checked={settings.events[kind]} disabled={prefs.pending}
+            <Toggle id={`activity-event-${kind}`} checked={settings.events[kind]} pending={prefs.pending}
               ariaLabel={t(`activityPreferences.event.${kind}`)}
               onChange={value => { void prefs.update({ events: { ...settings.events, [kind]: value } }) }} />
           </div>)}

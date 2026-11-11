@@ -1,10 +1,11 @@
+import { Select } from '@/components/ui/select'
+import { Checkbox } from '@/components/ui/checkbox'
 import { displayVersion } from '../components/dev/upgrade-rehearsal/releases'
 import { ReleasePublisher } from '../components/dev/upgrade-rehearsal/ReleasePublisher'
 import { identityLabel, type ReleaseChannel } from '@traderalice/update-lifecycle'
 import {
   ArrowRight,
   Check,
-  ChevronDown,
   FlaskConical,
   Monitor,
   Package,
@@ -16,7 +17,7 @@ import { Button } from '../components/ui/button'
 import {
   Collapsible,
   CollapsibleContent,
-  CollapsibleTrigger,
+  CollapsibleDetailsTrigger,
 } from '../components/ui/collapsible'
 import { useUpgradeRehearsal } from '../hooks/useUpgradeRehearsal'
 import {
@@ -57,13 +58,10 @@ function Disclosure({
   children: React.ReactNode
 }) {
   return (
-    <Collapsible className="border-t border-border">
-      <CollapsibleTrigger className="flex w-full items-center justify-between gap-3 px-5 py-4 text-left text-sm font-medium">
-        {title}
-        <ChevronDown size={16} />
-      </CollapsibleTrigger>
+    <Collapsible className="border-t border-border px-5 py-2">
+      <CollapsibleDetailsTrigger>{title}</CollapsibleDetailsTrigger>
       <CollapsibleContent>
-        <div className="px-5 pb-5 text-sm text-muted-foreground">
+        <div className="pt-3 pb-3 text-sm text-muted-foreground">
           {children}
         </div>
       </CollapsibleContent>
@@ -162,40 +160,36 @@ export function UpgradeRehearsalPage() {
       <div className="flex flex-wrap items-end gap-4">
         <label className="min-w-0 flex-1 text-xs text-muted-foreground">
           Scenario
-          <select
+          <Select
             aria-label="Scenario"
             disabled={!editing}
             value={s.scenario}
-            onChange={(e) =>
-              dispatch({ type: 'scenario', value: e.target.value as Scenario })
+            onValueChange={(selectedValue) =>
+              dispatch({ type: 'scenario', value: selectedValue as Scenario })
             }
-            className="mt-2 block h-10 w-full rounded-lg border border-border bg-background px-3 text-sm text-foreground disabled:opacity-60"
-          >
-            {Object.entries(scenarios).map(([k, v]) => (
-              <option key={k} value={k}>
-                {v}
-              </option>
-            ))}
-          </select>
+            className="mt-2"
+            options={Object.entries(scenarios).map(([k, v]) => ({ value: k, label: v }))}
+          />
         </label>
         <label className="text-xs text-muted-foreground">
           Follow channel
-          <select
+          <Select
             aria-label="Follow channel"
             disabled={!editing}
             value={s.channel}
-            onChange={(e) =>
+            onValueChange={(selectedValue) =>
               dispatch({
                 type: 'channel',
-                value: e.target.value as ReleaseChannel,
+                value: selectedValue as ReleaseChannel,
               })
             }
-            className="mt-2 block h-10 rounded-lg border border-border bg-background px-3 text-sm text-foreground"
-          >
-            <option value="stable">Stable</option>
-            <option value="beta">Beta</option>
-            <option value="dev">Dev commit</option>
-          </select>
+            className="mt-2 w-auto"
+            options={[
+              { value: 'stable', label: 'Stable' },
+              { value: 'beta', label: 'Beta' },
+              { value: 'dev', label: 'Dev commit' },
+            ]}
+          />
         </label>
         <Button
           variant="outline"
@@ -291,8 +285,7 @@ export function UpgradeRehearsalPage() {
           <div className="p-5 space-y-3 text-sm">
             {s.scenario !== 'integrated' && (
               <label className="flex items-center gap-2">
-                <input
-                  type="checkbox"
+                <Checkbox
                   checked={s.backend}
                   disabled={!editing}
                   onChange={(e) =>
@@ -303,8 +296,7 @@ export function UpgradeRehearsalPage() {
               </label>
             )}
             <label className="flex items-center gap-2">
-              <input
-                type="checkbox"
+              <Checkbox
                 checked={s.content}
                 disabled={!editing}
                 onChange={(e) =>

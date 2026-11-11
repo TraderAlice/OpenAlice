@@ -223,10 +223,10 @@ export function WorkspaceListPage() {
           {sections.map((sec) => (
             <section key={sec.key}>
               <div className="mb-2.5 flex items-baseline gap-2">
-                <h3 className="text-[12px] font-semibold text-foreground/85">
+                <h3 className="text-sm font-semibold text-foreground/85">
                   {sec.title}
                 </h3>
-                <span className="text-[11px] tabular-nums text-muted-foreground">{sec.workspaces.length}</span>
+                <span className="text-sm tabular-nums text-muted-foreground">{sec.workspaces.length}</span>
               </div>
               <div className="grid grid-cols-1 gap-3 sm:gap-4 lg:grid-cols-2">
                 {sec.workspaces.map((w) => (
@@ -253,16 +253,16 @@ export function WorkspaceListPage() {
           {(departed.length > 0 || departedError) && (
             <section className="border-t border-border pt-6">
               <div className="mb-3 flex items-baseline gap-2">
-                <h3 className="text-[12px] font-semibold text-foreground/85">
+                <h3 className="text-sm font-semibold text-foreground/85">
                   {t('workspace.departedTitle')}
                 </h3>
-                <span className="text-[11px] tabular-nums text-muted-foreground">{departed.length}</span>
+                <span className="text-sm tabular-nums text-muted-foreground">{departed.length}</span>
               </div>
-              <p className="mb-3 max-w-2xl text-[12px] leading-relaxed text-muted-foreground">
+              <p className="mb-3 max-w-2xl text-sm leading-relaxed text-muted-foreground">
                 {t('workspace.departedDescription')}
               </p>
               {departedError && (
-                <div className="mb-3 rounded-md border border-danger/30 bg-danger/5 px-3 py-2 text-[12px] text-danger">
+                <div className="mb-3 rounded-md border border-danger/30 bg-danger/5 px-3 py-2 text-sm text-danger">
                   {departedError}
                 </div>
               )}
@@ -284,17 +284,17 @@ export function WorkspaceListPage() {
                       <div className="flex items-start justify-between gap-3">
                         <div className="min-w-0">
                           <div className="truncate text-[14px] font-medium text-foreground">{workspace.tag}</div>
-                          <div className="mt-0.5 font-mono text-[10px] text-muted-foreground">{workspace.id}</div>
+                          <div className="mt-0.5 font-mono text-sm text-muted-foreground">{workspace.id}</div>
                         </div>
-                        <span className="rounded-full border border-border bg-muted/40 px-2 py-0.5 text-[10px] text-muted-foreground">
+                        <span className="rounded-full border border-border bg-muted/40 px-2 py-0.5 text-sm text-muted-foreground">
                           {lifecycleLabel}
                         </span>
                       </div>
-                      <p className="mt-3 line-clamp-2 text-[12px] leading-relaxed text-muted-foreground">
+                      <p className="mt-3 line-clamp-2 text-sm leading-relaxed text-muted-foreground">
                         {workspace.reason ?? t('workspace.departedNoReason')}
                       </p>
                       {workspace.absorbedIntoWorkspaceId && (
-                        <div className="mt-3 flex items-center gap-2 rounded-md border border-primary/20 bg-primary/6 px-2.5 py-2 text-[11px] text-muted-foreground">
+                        <div className="mt-3 flex items-center gap-2 rounded-md border border-primary/20 bg-primary/6 px-2.5 py-2 text-sm text-muted-foreground">
                           <GitMerge size={13} className="shrink-0 text-primary" />
                           <span>
                             {t('workspace.departedAbsorbedInto')}{' '}
@@ -307,7 +307,7 @@ export function WorkspaceListPage() {
                           </span>
                         </div>
                       )}
-                      <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-muted-foreground">
+                      <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-sm text-muted-foreground">
                         <span>
                           {t(
                             (workspace.handoff?.resumeIds.length ?? 0) === 1

@@ -20,7 +20,7 @@ export function skillProjectionStatus(skill: SkillProjection) {
 export function InjectionVersion({ version, empty, date }: { version?: string | null; empty: string; date?: string | null }) {
   if (!version || version === 'unversioned') return <span className="text-xs text-muted-foreground">{empty}</span>
   const [release, revision] = version.split('+')
-  return <span title={`${version}${date ? ` · ${date}` : ''}`} className="inline-flex flex-wrap items-baseline gap-1.5 text-xs tabular-nums"><span>{release}</span>{revision && <span className="font-mono text-[10px] text-muted-foreground">{revision.slice(0, 7)}</span>}</span>
+  return <span title={`${version}${date ? ` · ${date}` : ''}`} className="inline-flex flex-wrap items-baseline gap-1.5 text-xs tabular-nums"><span>{release}</span>{revision && <span className="font-mono text-sm text-muted-foreground">{revision.slice(0, 7)}</span>}</span>
 }
 
 export function SkillProjectionBrowser({ data, disabled, onChange, mode = 'workspace' }: {
@@ -44,13 +44,13 @@ export function SkillProjectionBrowser({ data, disabled, onChange, mode = 'works
         </DropdownMenuTrigger><DropdownMenuContent>{data.workspaces.map((row) => <DropdownMenuItem key={row.id} onClick={() => { setWorkspaceId(row.id); setExpanded(null) }}>{row.name || row.id}</DropdownMenuItem>)}</DropdownMenuContent></DropdownMenu>
         {workspace && <span className="flex items-center gap-2 text-xs text-muted-foreground">{t('skillManager.lastBundle')}<InjectionVersion version={workspace.plan?.fromVersion} empty={t('aliceHarness.unversioned')} /></span>}
       </div> : <p className="max-w-xl text-xs text-muted-foreground">{t('skillManager.prototypeHint')}</p>}
-      <label className="flex w-full items-center gap-2 rounded-md border border-input px-2.5 py-2 text-muted-foreground focus-within:ring-2 focus-within:ring-ring sm:w-48">
-        <Search size={14} aria-hidden="true" /><input aria-label={t('skillManager.search')} placeholder={t('skillManager.search')} value={search} onChange={(event) => setSearch(event.target.value)} className="min-w-0 flex-1 bg-transparent text-xs text-foreground outline-none" />
+      <label className="flex min-h-11 w-full items-center gap-2 rounded-full border border-input px-3 py-2 text-muted-foreground focus-within:ring-2 focus-within:ring-ring sm:w-48">
+        <Search size={14} aria-hidden="true" /><input aria-label={t('skillManager.search')} placeholder={t('skillManager.search')} value={search} onChange={(event) => setSearch(event.target.value)} className="min-w-0 flex-1 bg-transparent text-base text-foreground outline-none" />
       </label>
     </div>
     {mode === 'workspace' && workspace?.error && <p role="alert" className="mb-4 text-sm">{workspace.error}</p>}
     {mode === 'workspace' && workspace?.plan?.blocked && <p className="mb-4 text-xs text-warning">{t('skillManager.blocked')}</p>}
-    {mode === 'workspace' && <div aria-hidden="true" className="hidden grid-cols-[minmax(0,1.4fr)_1fr_1fr_1.1fr_100px] gap-3 border-b border-border pb-2 text-[11px] text-muted-foreground @min-[560px]:grid"><span>Skill</span><span>{t('skillManager.injectedVersion')}</span><span>{t('skillManager.projectVersion')}</span><span>{t('skillManager.status')}</span><span /></div>}
+    {mode === 'workspace' && <div aria-hidden="true" className="hidden grid-cols-[minmax(0,1.4fr)_1fr_1fr_1.1fr_100px] gap-3 border-b border-border pb-2 text-sm text-muted-foreground @min-[560px]:grid"><span>Skill</span><span>{t('skillManager.injectedVersion')}</span><span>{t('skillManager.projectVersion')}</span><span>{t('skillManager.status')}</span><span /></div>}
     {!skills.length && <p role="status" className="py-6 text-sm text-muted-foreground">{t('skillManager.noResults')}</p>}
     {mode === 'workspace' && !workspace && <p className="py-6 text-sm text-muted-foreground">{t('distribution.empty')}</p>}
     <ul>{(mode === 'project' || workspace) && skills.map((skill) => {
@@ -59,10 +59,10 @@ export function SkillProjectionBrowser({ data, disabled, onChange, mode = 'works
       const open = expanded === skill.name
       return <li key={skill.name} className="border-b border-border/65">
         <div className={`grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 gap-y-2 py-3 ${mode === 'workspace' ? '@min-[560px]:grid-cols-[minmax(0,1.4fr)_1fr_1fr_1.1fr_100px]' : ''}`}>
-          <button type="button" aria-expanded={open} onClick={() => setExpanded(open ? null : skill.name)} className="flex min-w-0 items-center gap-2 rounded py-1 text-left text-[13px] font-medium outline-none focus-visible:ring-2 focus-visible:ring-ring"><ChevronRight size={13} className={`shrink-0 text-muted-foreground transition-transform duration-[var(--motion-fast)] motion-reduce:transition-none ${open ? 'rotate-90' : ''}`} /><span className="truncate">{skill.name}</span></button>
+          <button type="button" aria-expanded={open} onClick={() => setExpanded(open ? null : skill.name)} className="flex min-w-0 items-center gap-2 rounded py-1 text-left text-sm font-medium outline-none focus-visible:ring-2 focus-visible:ring-ring"><ChevronRight size={13} className={`shrink-0 text-muted-foreground transition-transform duration-[var(--motion-fast)] motion-reduce:transition-none ${open ? 'rotate-90' : ''}`} /><span className="truncate">{skill.name}</span></button>
           {mode === 'workspace' ? <>
-            <span className="order-3 flex items-center gap-2 @min-[560px]:order-none"><span className="text-[10px] text-muted-foreground @min-[560px]:hidden">{t('skillManager.injectedVersion')}</span><InjectionVersion version={copy?.injectedVersion} date={copy?.injectedAt} empty={copy?.installed ? t('aliceHarness.unversioned') : '—'} /></span>
-            <span className="order-4 flex items-center gap-2 @min-[560px]:order-none"><span className="text-[10px] text-muted-foreground @min-[560px]:hidden">Project</span><InjectionVersion version={data.version} empty="—" /></span>
+            <span className="order-3 col-span-2 flex min-w-0 flex-wrap items-center justify-between gap-x-3 gap-y-1 @min-[560px]:order-none @min-[560px]:col-span-1 @min-[560px]:justify-start"><span className="text-sm text-muted-foreground @min-[560px]:hidden">{t('skillManager.injectedVersion')}</span><InjectionVersion version={copy?.injectedVersion} date={copy?.injectedAt} empty={copy?.installed ? t('aliceHarness.unversioned') : '—'} /></span>
+            <span className="order-4 col-span-2 flex min-w-0 flex-wrap items-center justify-between gap-x-3 gap-y-1 @min-[560px]:order-none @min-[560px]:col-span-1 @min-[560px]:justify-start"><span className="text-sm text-muted-foreground @min-[560px]:hidden">Project</span><InjectionVersion version={data.version} empty="—" /></span>
             <span className="order-5 col-span-2 text-xs text-muted-foreground @min-[560px]:order-none @min-[560px]:col-span-1">{copy ? t(`skillManager.${skillProjectionStatus(copy)}`) : t('distribution.error')}{copy?.mirrorDiverged && <span className="ml-1 text-warning">· {t('skillManager.mirrorShort')}</span>}</span>
             <div className="flex items-center justify-end gap-0.5">
               {primary && copy && <Button size="sm" variant="ghost" disabled={disabled} onClick={() => act(skill.name, primary)}>{t(`skillManager.${primary}`)}</Button>}

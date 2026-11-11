@@ -125,7 +125,7 @@ export function PageSidebarLayout({
   actions,
   sidebar,
   children,
-  defaultWidth = 260,
+  defaultWidth = 220,
   desktopMinWidth = 768,
 }: PageSidebarLayoutProps) {
   const { t } = useTranslation()

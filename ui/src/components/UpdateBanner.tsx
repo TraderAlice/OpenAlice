@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { Button, buttonVariants } from './ui/button'
 import { useUpdateLifecycle } from '../hooks/useUpdateLifecycle'
 
 const SKIP_STORAGE_KEY = 'openalice.update.skipVersion'
@@ -54,7 +55,7 @@ export function UpdateBanner() {
   }
 
   return (
-    <div data-desktop-banner className="flex items-center gap-3 px-4 py-2 bg-primary-muted/30 border-b border-primary/40 text-[12px] text-foreground">
+    <div data-desktop-banner className="flex min-h-12 shrink-0 items-center gap-2 border-b border-border/60 bg-secondary px-4 py-1 text-sm text-foreground">
       <span className="shrink-0">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-primary">
           <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
@@ -87,24 +88,26 @@ export function UpdateBanner() {
           href={info.releaseUrl}
           target="_blank"
           rel="noopener noreferrer"
-          className="text-primary hover:underline shrink-0"
+          className={buttonVariants({ variant: 'ghost', size: 'sm' })}
         >
           <span className="hidden sm:inline">Release notes</span>
           <span className="sm:hidden">Notes</span>
           {' '}→
         </a>
       )}
-      <button
+      <Button
+        variant="ghost"
+        size="sm"
         onClick={handleSkip}
-        className="text-muted-foreground hover:text-foreground shrink-0 text-[11px]"
         title="Don't show this update again"
       >
         <span className="hidden sm:inline">Skip this version</span>
         <span className="sm:hidden">Skip</span>
-      </button>
-      <button
+      </Button>
+      <Button
+        variant="ghost"
+        size="icon-sm"
         onClick={handleDismiss}
-        className="text-muted-foreground hover:text-foreground shrink-0"
         title="Dismiss until next reload"
         aria-label="Dismiss"
       >
@@ -112,7 +115,7 @@ export function UpdateBanner() {
           <line x1="18" y1="6" x2="6" y2="18" />
           <line x1="6" y1="6" x2="18" y2="18" />
         </svg>
-      </button>
+      </Button>
     </div>
   )
 }

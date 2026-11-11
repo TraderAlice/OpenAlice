@@ -1,4 +1,6 @@
 import type { ReactNode } from 'react'
+import { ToggleGroup } from '@base-ui/react/toggle-group'
+import { Toggle } from '@base-ui/react/toggle'
 
 export interface SegmentedOption<T extends string> {
   value: T
@@ -16,11 +18,6 @@ interface SegmentedControlProps<T extends string> {
   className?: string
 }
 
-/**
- * A single visual language for small, mutually-exclusive view controls.
- * The container scrolls horizontally when labels do not fit, so data pages
- * keep the same control on phone and desktop instead of changing semantics.
- */
 export function SegmentedControl<T extends string>({
   value,
   options,
@@ -30,33 +27,33 @@ export function SegmentedControl<T extends string>({
   className = '',
 }: SegmentedControlProps<T>) {
   return (
-    <div
-      role="group"
+    <ToggleGroup
+      value={[value]}
+      onValueChange={([next]) => { if (next !== undefined) onChange(next) }}
       aria-label={ariaLabel}
-      className={`scrollbar-hide flex w-fit max-w-full items-center gap-0.5 overflow-x-auto rounded-lg border border-border/70 bg-muted/45 p-0.5 ${className}`}
+      className={`scrollbar-hide flex w-fit max-w-full items-center gap-0.5 overflow-x-auto rounded-lg bg-secondary p-0.5 ${className}`}
     >
       {options.map((option) => {
         const active = option.value === value
         return (
-          <button
+          <Toggle
             key={option.value}
+            value={option.value}
             type="button"
-            aria-pressed={active}
             aria-label={option.ariaLabel}
             aria-controls={option.ariaControls}
-            onClick={() => onChange(option.value)}
-            className={`shrink-0 whitespace-nowrap rounded-md font-medium outline-none transition-[background-color,color,box-shadow,transform] duration-[var(--motion-fast)] [transition-timing-function:var(--motion-ease-out)] focus-visible:[box-shadow:var(--oa-focus-shadow)] active:scale-[0.98] motion-reduce:transition-none ${
-              compact ? 'min-h-6 px-2 text-[10px]' : 'min-h-7 px-2.5 text-[11px]'
+            className={`oa-segmented-option shrink-0 whitespace-nowrap rounded-md font-medium outline-none focus-visible:[box-shadow:var(--oa-focus-shadow)] [@media(pointer:coarse)]:min-h-11 ${
+              compact ? 'min-h-7 px-2.5 text-sm' : 'min-h-8 px-3 text-sm'
             } ${
               active
-                ? 'bg-background text-foreground shadow-sm ring-1 ring-border/60'
-                : 'text-muted-foreground hover:bg-accent hover:text-foreground'
+                ? 'text-background'
+                : 'text-foreground hover:bg-muted'
             }`}
           >
             {option.label}
-          </button>
+          </Toggle>
         )
       })}
-    </div>
+    </ToggleGroup>
   )
 }

@@ -62,6 +62,7 @@ describe('Session visibility settings', () => {
 
     const toggle = screen.getByRole('switch', { name: 'Show Issue-attached Sessions' })
     expect(toggle.getAttribute('aria-checked')).toBe('false')
+    fireEvent.click(screen.getByRole('button', { name: 'Help: Show Issue-attached Sessions' }))
     expect(screen.getByText(/Connector chat Sessions always stay hidden/)).toBeTruthy()
     fireEvent.click(toggle)
     await waitFor(() => expect(mocks.save).toHaveBeenCalledWith({

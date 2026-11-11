@@ -33,12 +33,12 @@ export function EventLog({ events }: { events: SimulatorEvent[] }) {
             <tbody>
               {visible.map((ev) => (
                 <tr key={ev.id} className="text-foreground">
-                  <td className="py-0.5 pr-3 font-mono text-[11px] leading-[15px] text-muted-foreground/80 w-20">{formatTime(ev.ts)}</td>
-                  <td className="py-0.5 pr-3 text-muted-foreground/60 text-[11px] w-20">{formatRelativeTime(ev.ts)}</td>
+                  <td className="py-0.5 pr-3 font-mono text-sm leading-5 text-muted-foreground/80 w-20">{formatTime(ev.ts)}</td>
+                  <td className="py-0.5 pr-3 text-muted-foreground/60 text-sm w-20">{formatRelativeTime(ev.ts)}</td>
                   <td className="py-0.5 pr-3">
                     <span className={ev.status === 'err' ? 'text-destructive' : 'text-foreground'}>{ev.label}</span>
                     {ev.detail && (
-                      <span className="ml-2 text-[11px] text-destructive/80" title={ev.detail}>
+                      <span className="ml-2 text-sm text-destructive/80" title={ev.detail}>
                         {ev.detail.slice(0, 60)}{ev.detail.length > 60 ? '…' : ''}
                       </span>
                     )}
@@ -51,7 +51,7 @@ export function EventLog({ events }: { events: SimulatorEvent[] }) {
           {events.length > COLLAPSED_COUNT && (
             <Button
               onClick={() => setExpanded(!expanded)}
-              className="mt-2 text-[11px] text-muted-foreground"
+              className="mt-2 text-sm text-muted-foreground"
               variant="ghost"
               size="xs"
             >

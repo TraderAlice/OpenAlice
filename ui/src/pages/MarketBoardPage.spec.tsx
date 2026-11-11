@@ -95,7 +95,7 @@ describe('MarketBoardPage', () => {
     const listGroup = screen.getByRole('group', { name: '异动' })
     const listButtons = within(listGroup).getAllByRole('button')
     expect(listButtons).toHaveLength(7)
-    expect(listGroup.className).toContain('flex-wrap')
+    expect(listGroup.className).toContain('overflow-x-auto')
     expect(listButtons.every((button) => button.className.includes('whitespace-nowrap'))).toBe(true)
     expect(screen.getByRole('button', { name: '涨幅榜' }).getAttribute('aria-pressed')).toBe('true')
 

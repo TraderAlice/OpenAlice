@@ -1,3 +1,4 @@
+import { Button } from './button'
 import { useState } from 'react'
 import { ArrowRight, CheckCircle2, Info, Loader2, Newspaper, OctagonX, TriangleAlert, X } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
@@ -20,18 +21,18 @@ export function NotificationCard({ content, onClose }: { content: NotificationCo
         <span className="oa-notification-title">{content.title}</span>
         {content.articleId !== undefined ? <span className="oa-notification-count">· {t('activityToast.newsCount', { count: content.count ?? 1 })}</span> : (content.count ?? 0) > 1 && <span className="oa-notification-count">×{content.count}</span>}
       </div>
-      <button type="button" className="oa-notification-close" aria-label={t('activityToast.dismiss')} onClick={onClose}>
+      <Button type="button" variant="ghost" size="icon-sm" className="oa-notification-close" aria-label={t('activityToast.dismiss')} onClick={onClose}>
         <X size={14} aria-hidden="true" />
-      </button>
+      </Button>
       <div className="oa-notification-body">
         <div className="oa-notification-copy">
           {content.description && <p className="oa-notification-description">{content.description}</p>}
-          {content.action && <button type="button" className="oa-notification-action" onClick={() => {
+          {content.action && <Button type="button" variant="secondary" size="sm" className="oa-notification-action" onClick={() => {
             content.action!.onClick()
             onClose()
           }}>
             {content.action.label}<ArrowRight size={12} aria-hidden="true" />
-          </button>}
+          </Button>}
         </div>
         {image && image !== failedImage && <img key={image} src={image} alt="" width={64} height={48}
           decoding="async" referrerPolicy="no-referrer" onError={() => setFailedImage(image)} className="oa-notification-image" />}
