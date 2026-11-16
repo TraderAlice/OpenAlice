@@ -12,7 +12,7 @@ import { SidebarRow } from './SidebarRow'
 import { SidebarSectionHeader } from './SidebarSectionHeader'
 import { Spinner } from './StateViews'
 import { Button } from './ui/button'
-import { inputClass } from './form'
+import { inputClass, isImeComposing } from './form'
 import { NewsMarketNavigation } from './market/NewsMarketNavigation.js'
 
 const ASSET_CLASS_COLORS: Record<string, string> = {
@@ -93,6 +93,7 @@ export function MarketSidebar({ onNavigate }: { onNavigate?: () => void }) {
       event.preventDefault()
       setHighlight((current) => Math.max(current - 1, 0))
     } else if (event.key === 'Enter') {
+      if (isImeComposing(event)) return
       event.preventDefault()
       handleSelectResult(results[highlight])
     }

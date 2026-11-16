@@ -23,7 +23,7 @@ import {
 } from 'lucide-react'
 
 import { Button } from '@/components/ui/button'
-import { inputClass } from '@/components/form'
+import { inputClass, isImeComposing } from '@/components/form'
 import { SelectionCheckIcon } from '@/components/ui/selection-check-icon'
 import {
   Dialog,
@@ -153,7 +153,10 @@ function AgentLaunchModelEditor({
         onChange={(event) => setDraft(event.target.value)}
         onBlur={commit}
         onKeyDown={(event) => {
-          if (event.key === 'Enter') event.currentTarget.blur()
+          if (event.key === 'Enter') {
+            if (isImeComposing(event)) return
+            event.currentTarget.blur()
+          }
           if (event.key === 'Escape') {
             setDraft(config.launchModel ?? '')
             event.currentTarget.blur()

@@ -1,4 +1,4 @@
-import { useId, useRef, useState, type ReactNode } from 'react'
+import { useId, useMemo, useRef, useState, type ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
 import { ChevronRight } from 'lucide-react'
 import { scheduleValidationError } from '../../../src/core/schedule-expr'
@@ -60,6 +60,14 @@ export function IssueScheduleEditor({ issue, saving, onPatch, children }: {
   const [discard, setDiscard] = useState(false)
   const [failed, setFailed] = useState(false)
   const [submitting, setSubmitting] = useState(false)
+  const [touched, setTouched] = useState(false)
+  const timezones = useMemo(() => Array.from(new Set([
+    'local',
+    'UTC',
+    ...('supportedValuesOf' in Intl && typeof Intl.supportedValuesOf === 'function'
+      ? Intl.supportedValuesOf('timeZone')
+      : ['America/Los_Angeles', 'America/New_York']),
+  ])), [])
   const busy = saving || submitting
   const when = draft ? whenFrom(draft) : undefined
   const error = when ? scheduleValidationError(when) : null
@@ -72,16 +80,23 @@ export function IssueScheduleEditor({ issue, saving, onPatch, children }: {
     setDraft(next)
     setOriginal(next)
     setBase(signature(issue))
+    setTouched(false)
     setFailed(false)
     setDiscard(false)
   }
   const edit = (patch: Partial<Draft>) => {
-    setDraft((prev) => prev ? { ...prev, ...patch } : prev)
+    if (!draft) return
+    const next = { ...draft, ...patch }
+    setDraft(next)
+    if ('kind' in patch || scheduleValidationError(whenFrom(next)) === null) {
+      setTouched(false)
+    }
     setFailed(false)
   }
   const close = () => { setOpen(false); setDiscard(false) }
   const save = async () => {
-    if (busy || stale || error || !changed || !draft || !when) return
+    if (error) { setTouched(true); return }
+    if (busy || stale || !changed || !draft || !when) return
     setSubmitting(true)
     setFailed(false)
     try {
@@ -99,7 +114,9 @@ export function IssueScheduleEditor({ issue, saving, onPatch, children }: {
   }
   if (!issue.when) return null
   if (issue.connectorDesk) return <div className="space-y-2 text-xs">{children}<p className="text-muted-foreground">{t('issues.detail.scheduleEditor.connector')}</p></div>
-  const fieldError = error && error !== 'invalid_timezone'
+  const visibleError = touched ? error : null
+  const fieldError = Boolean(visibleError && visibleError !== 'invalid_timezone')
+  const timezoneError = visibleError === 'invalid_timezone'
   return (
     <Dialog open={open} onOpenChange={(next) => {
       if (busy) return
@@ -134,7 +151,8 @@ export function IssueScheduleEditor({ issue, saving, onPatch, children }: {
               <label className="block space-y-1.5">
                 <span className="text-xs font-medium">{t(`issues.detail.scheduleEditor.${draft.kind}Label`)}</span>
                 <input className={`${inputClass} h-9`} value={draft[draft.kind]} spellCheck={false}
-                  aria-invalid={Boolean(fieldError)} aria-describedby={`${id}-hint${fieldError ? ` ${id}-error` : ''}`}
+                  aria-invalid={fieldError ? true : undefined} aria-describedby={`${id}-hint${fieldError ? ` ${id}-error` : ''}`}
+                  onBlur={() => { if (error) setTouched(true) }}
                   onChange={(event) => edit({ [draft.kind]: event.target.value })} />
               </label>
               <p id={`${id}-hint`} className="text-xs leading-relaxed text-muted-foreground">{t(`issues.detail.scheduleEditor.${draft.kind}Hint`)}</p>
@@ -143,9 +161,10 @@ export function IssueScheduleEditor({ issue, saving, onPatch, children }: {
                 <label className="block space-y-1.5">
                   <span className="text-xs font-medium">{t('issues.detail.scheduleEditor.timezone')}</span>
                   <input className={`${inputClass} h-9`} list={`${id}-zones`} value={draft.timezone ?? ''} placeholder="local" spellCheck={false}
-                    aria-invalid={error === 'invalid_timezone'} aria-describedby={`${id}-zone-hint${error === 'invalid_timezone' ? ` ${id}-error` : ''}`}
+                    aria-invalid={timezoneError ? true : undefined} aria-describedby={`${id}-zone-hint${timezoneError ? ` ${id}-error` : ''}`}
+                    onBlur={() => { if (error) setTouched(true) }}
                     onChange={(event) => edit({ timezone: event.target.value || undefined })} />
-                  <datalist id={`${id}-zones`}><option value="local" /><option value="America/Los_Angeles" /><option value="America/New_York" /><option value="UTC" /></datalist>
+                  <datalist id={`${id}-zones`}>{timezones.map((zone) => <option key={zone} value={zone} />)}</datalist>
                 </label>
                 <p id={`${id}-zone-hint`} className="text-xs leading-relaxed text-muted-foreground">{t('issues.detail.scheduleEditor.timezoneHint')}</p>
                 <label className="flex min-h-12 items-start gap-3 rounded-lg border border-border bg-muted/20 p-3">
@@ -153,7 +172,7 @@ export function IssueScheduleEditor({ issue, saving, onPatch, children }: {
                   <span><span className="block text-sm font-medium">{t('issues.detail.catchUp')}</span><span className="mt-1 block text-xs leading-relaxed text-muted-foreground">{t('issues.detail.catchUpDescription')}</span></span>
                 </label>
               </>}
-              {error && <p id={`${id}-error`} role="alert" className="text-xs text-destructive">{t(`issues.detail.scheduleEditor.${error}`)}</p>}
+              {visibleError && <p id={`${id}-error`} aria-live="polite" className="text-xs text-destructive">{t(`issues.detail.scheduleEditor.${visibleError}`)}</p>}
             </fieldset>
             <fieldset disabled={busy} className="min-w-0 border-t border-border pt-4">
               <legend className="sr-only">{t('issues.detail.scheduleEditor.limits')}</legend>

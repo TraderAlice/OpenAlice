@@ -77,6 +77,12 @@ describe('InboxReplyThread', () => {
     fireEvent.keyDown(textbox, { key: 'Enter', code: 'Enter', shiftKey: true })
     expect(ask).not.toHaveBeenCalled()
 
+    fireEvent.keyDown(textbox, { key: 'Enter', code: 'Enter', isComposing: true })
+    expect(ask).not.toHaveBeenCalled()
+
+    fireEvent.keyDown(textbox, { key: 'Enter', code: 'Enter', keyCode: 229 })
+    expect(ask).not.toHaveBeenCalled()
+
     fireEvent.keyDown(textbox, { key: 'Enter', code: 'Enter' })
     await waitFor(() => expect(ask).toHaveBeenCalledWith('First line'))
   })

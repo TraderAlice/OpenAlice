@@ -92,6 +92,12 @@ describe('MarketSidebar search keyboard controls', () => {
     const search = screen.getByRole('textbox', { name: 'Search assets…' })
 
     fireEvent.change(search, { target: { value: 'apple' } })
+    fireEvent.keyDown(search, { key: 'Enter', isComposing: true })
+    expect(getFocusedTab(useWorkspace.getState())).toBeNull()
+
+    fireEvent.keyDown(search, { key: 'Enter', keyCode: 229 })
+    expect(getFocusedTab(useWorkspace.getState())).toBeNull()
+
     fireEvent.keyDown(search, { key: 'Enter' })
 
     expect(getFocusedTab(useWorkspace.getState())?.spec).toEqual({

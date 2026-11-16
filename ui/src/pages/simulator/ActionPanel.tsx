@@ -92,8 +92,8 @@ function QuickTickTab({ utaId, knownKeys, run, loading }: {
   }
 
   const setExact = () => {
-    if (!key || !setPriceInput) return
-    run(
+    if (loading || !key || !setPriceInput) return
+    void run(
       `Set ${key} = ${setPriceInput}`,
       async () => {
         await simulatorApi.setMarkPrice(utaId, key, setPriceInput)
@@ -103,22 +103,28 @@ function QuickTickTab({ utaId, knownKeys, run, loading }: {
   }
 
   return (
-    <div className="flex items-center gap-2 flex-wrap">
-      <KeySelect value={key} onChange={setKey} options={knownKeys} placeholder="symbol" />
+    <form
+      className="flex items-center gap-2 flex-wrap"
+      onSubmit={(e) => {
+        e.preventDefault()
+        setExact()
+      }}
+    >
+      <KeySelect value={key} onChange={setKey} options={knownKeys} placeholder="symbol" ariaLabel="Symbol" />
       <span className="text-muted-foreground text-xs">Δ</span>
-      <Button disabled={loading || !key} onClick={() => tick(-5)} variant="outline" size="sm">−5%</Button>
-      <Button disabled={loading || !key} onClick={() => tick(-1)} variant="outline" size="sm">−1%</Button>
-      <Button disabled={loading || !key} onClick={() => tick(1)} variant="outline" size="sm">+1%</Button>
-      <Button disabled={loading || !key} onClick={() => tick(5)} variant="outline" size="sm">+5%</Button>
+      <Button type="button" disabled={loading || !key} onClick={() => tick(-5)} variant="outline" size="sm">−5%</Button>
+      <Button type="button" disabled={loading || !key} onClick={() => tick(-1)} variant="outline" size="sm">−1%</Button>
+      <Button type="button" disabled={loading || !key} onClick={() => tick(1)} variant="outline" size="sm">+1%</Button>
+      <Button type="button" disabled={loading || !key} onClick={() => tick(5)} variant="outline" size="sm">+5%</Button>
       <input
-        className={`${inputClassMono} w-32`}
+        className={`${inputClassMono} w-32 tabular-nums`}
         placeholder="set exact"
+        aria-label="Exact mark price"
         value={setPriceInput}
         onChange={(e) => setSetPriceInput(e.target.value)}
-        onKeyDown={(e) => { if (e.key === 'Enter') setExact() }}
       />
-      <Button disabled={loading || !key || !setPriceInput} onClick={setExact} size="sm">Set</Button>
-    </div>
+      <Button type="submit" disabled={loading || !key || !setPriceInput} size="sm">Set</Button>
+    </form>
   )
 }
 
@@ -141,8 +147,8 @@ function DepositTab({ utaId, knownKeys, run, loading }: {
   const draftOk = built && 'nativeKey' in built ? built : null
 
   const submitDeposit = () => {
-    if (!draftOk || !qty) return
-    run(
+    if (loading || !draftOk || !qty) return
+    void run(
       `Deposit ${qty} ${draftOk.nativeKey}`,
       async () => {
         await simulatorApi.externalDeposit(utaId, {
@@ -156,8 +162,8 @@ function DepositTab({ utaId, knownKeys, run, loading }: {
   }
 
   const submitWithdraw = () => {
-    if (!withdrawKey || !withdrawQty) return
-    run(
+    if (loading || !withdrawKey || !withdrawQty) return
+    void run(
       `Withdraw ${withdrawQty} ${withdrawKey}`,
       async () => {
         await simulatorApi.externalWithdraw(utaId, withdrawKey, withdrawQty)
@@ -167,7 +173,14 @@ function DepositTab({ utaId, knownKeys, run, loading }: {
   }
 
   return (
-    <div className="space-y-2">
+    <form
+      className="space-y-2"
+      onSubmit={(e) => {
+        e.preventDefault()
+        if (mode === 'in') submitDeposit()
+        else submitWithdraw()
+      }}
+    >
       <div className="flex items-center gap-2 flex-wrap">
         <SegmentedControl
           value={mode}
@@ -184,15 +197,15 @@ function DepositTab({ utaId, knownKeys, run, loading }: {
           <>
             <InstrumentInput draft={draft} onChange={setDraft} />
             <input
-              className={`${inputClassMono} w-24`}
+              className={`${inputClassMono} w-24 tabular-nums`}
               placeholder="quantity"
+              aria-label="Deposit quantity"
               value={qty}
               onChange={(e) => setQty(e.target.value)}
-              onKeyDown={(e) => { if (e.key === 'Enter') submitDeposit() }}
             />
             <Button
+              type="submit"
               disabled={loading || !draftOk || !qty}
-              onClick={submitDeposit}
               size="sm"
             >Deposit</Button>
             {draftOk && <span className="text-[11px] leading-[15px] text-muted-foreground/70 font-mono">→ {draftOk.nativeKey}</span>}
@@ -200,24 +213,24 @@ function DepositTab({ utaId, knownKeys, run, loading }: {
           </>
         ) : (
           <>
-            <KeySelect value={withdrawKey} onChange={setWithdrawKey} options={knownKeys} placeholder="native key" />
+            <KeySelect value={withdrawKey} onChange={setWithdrawKey} options={knownKeys} placeholder="native key" ariaLabel="Withdraw instrument" />
             <input
-              className={`${inputClassMono} w-32`}
+              className={`${inputClassMono} w-32 tabular-nums`}
               placeholder="quantity"
+              aria-label="Withdraw quantity"
               value={withdrawQty}
               onChange={(e) => setWithdrawQty(e.target.value)}
-              onKeyDown={(e) => { if (e.key === 'Enter') submitWithdraw() }}
             />
             <Button
+              type="submit"
               disabled={loading || !withdrawKey || !withdrawQty}
-              onClick={submitWithdraw}
               size="sm"
             >Withdraw</Button>
           </>
         )}
 
       </div>
-    </div>
+    </form>
   )
 }
 
@@ -239,8 +252,8 @@ function TradeTab({ utaId, run, loading }: {
   const draftOk = 'nativeKey' in built ? built : null
 
   const submit = () => {
-    if (!draftOk || !qty || !price) return
-    run(
+    if (loading || !draftOk || !qty || !price) return
+    void run(
       `External ${side} ${qty} ${draftOk.nativeKey} @ ${price}`,
       async () => {
         await simulatorApi.externalTrade(utaId, {
@@ -256,7 +269,13 @@ function TradeTab({ utaId, run, loading }: {
   }
 
   return (
-    <div className="flex items-center gap-2 flex-wrap">
+    <form
+      className="flex items-center gap-2 flex-wrap"
+      onSubmit={(e) => {
+        e.preventDefault()
+        submit()
+      }}
+    >
       <SegmentedControl
         value={side}
         options={[
@@ -268,12 +287,24 @@ function TradeTab({ utaId, run, loading }: {
         compact
       />
       <InstrumentInput draft={draft} onChange={setDraft} />
-      <input className={`${inputClassMono} w-24`} placeholder="qty" value={qty} onChange={(e) => setQty(e.target.value)} />
-      <input className={`${inputClassMono} w-24`} placeholder="price" value={price} onChange={(e) => setPrice(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') submit() }} />
-      <Button disabled={loading || !draftOk || !qty || !price} onClick={submit} size="sm">Submit</Button>
+      <input
+        className={`${inputClassMono} w-24 tabular-nums`}
+        placeholder="qty"
+        aria-label="Trade quantity"
+        value={qty}
+        onChange={(e) => setQty(e.target.value)}
+      />
+      <input
+        className={`${inputClassMono} w-24 tabular-nums`}
+        placeholder="price"
+        aria-label="Trade price"
+        value={price}
+        onChange={(e) => setPrice(e.target.value)}
+      />
+      <Button type="submit" disabled={loading || !draftOk || !qty || !price} size="sm">Submit</Button>
       {draftOk && <span className="text-[11px] leading-[15px] text-muted-foreground/70 font-mono">→ {draftOk.nativeKey}</span>}
       {draftError && draft.symbol && <span className="text-[11px] text-warning">{draftError}</span>}
-    </div>
+    </form>
   )
 }
 
@@ -292,12 +323,12 @@ function OrderTab({ utaId, knownKeys, run, loading }: {
   const [lmtPrice, setLmtPrice] = useState('')
 
   const submit = () => {
-    if (!key || !qty) return
+    if (loading || !key || !qty) return
     if (orderType === 'LMT' && !lmtPrice) return
     const aliceId = `${utaId}|${key}`
     const labelBits = [side, orderType, qty, key]
     if (orderType === 'LMT') labelBits.push(`@${lmtPrice}`)
-    run(
+    void run(
       labelBits.join(' '),
       async () => {
         await api.trading.placeOrder(utaId, {
@@ -316,7 +347,13 @@ function OrderTab({ utaId, knownKeys, run, loading }: {
   }
 
   return (
-    <div className="flex items-center gap-2 flex-wrap">
+    <form
+      className="flex items-center gap-2 flex-wrap"
+      onSubmit={(e) => {
+        e.preventDefault()
+        submit()
+      }}
+    >
       <SegmentedControl
         value={side}
         options={[
@@ -327,33 +364,52 @@ function OrderTab({ utaId, knownKeys, run, loading }: {
         ariaLabel="Order side"
         compact
       />
-      <select value={orderType} onChange={(e) => setOrderType(e.target.value as 'MKT' | 'LMT')} className={`${inputClass} w-20`}>
+      <select
+        value={orderType}
+        onChange={(e) => setOrderType(e.target.value as 'MKT' | 'LMT')}
+        aria-label="Order type"
+        className={`${inputClass} w-20`}
+      >
         <option value="MKT">MKT</option>
         <option value="LMT">LMT</option>
       </select>
-      <KeySelect value={key} onChange={setKey} options={knownKeys} placeholder="symbol" />
-      <input className={`${inputClassMono} w-28`} placeholder="qty" value={qty} onChange={(e) => setQty(e.target.value)} />
+      <KeySelect value={key} onChange={setKey} options={knownKeys} placeholder="symbol" ariaLabel="Order symbol" />
+      <input
+        className={`${inputClassMono} w-28 tabular-nums`}
+        placeholder="qty"
+        aria-label="Order quantity"
+        value={qty}
+        onChange={(e) => setQty(e.target.value)}
+      />
       {orderType === 'LMT' && (
-        <input className={`${inputClassMono} w-28`} placeholder="limit price" value={lmtPrice} onChange={(e) => setLmtPrice(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') submit() }} />
+        <input
+          className={`${inputClassMono} w-28 tabular-nums`}
+          placeholder="limit price"
+          aria-label="Limit price"
+          value={lmtPrice}
+          onChange={(e) => setLmtPrice(e.target.value)}
+        />
       )}
-      <Button disabled={loading || !key || !qty || (orderType === 'LMT' && !lmtPrice)} onClick={submit} size="sm">Place</Button>
-    </div>
+      <Button type="submit" disabled={loading || !key || !qty || (orderType === 'LMT' && !lmtPrice)} size="sm">Place</Button>
+    </form>
   )
 }
 
 // ==================== Shared helper ====================
 
-function KeySelect({ value, onChange, options, placeholder }: {
+function KeySelect({ value, onChange, options, placeholder, ariaLabel }: {
   value: string
   onChange: (v: string) => void
   options: string[]
   placeholder: string
+  ariaLabel?: string
 }) {
   return (
     <>
       <input
         className={`${inputClassMono} w-36`}
         placeholder={placeholder}
+        aria-label={ariaLabel ?? placeholder}
         value={value}
         onChange={(e) => onChange(e.target.value.trim())}
         list="sim-action-known-keys"

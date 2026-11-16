@@ -12,7 +12,7 @@ import { modelDisplayName, modelManufacturer } from '../../lib/modelIdentity'
 
 import { useId, useMemo, useRef, useState } from 'react'
 import { ChevronDown } from 'lucide-react'
-import { inputClass } from '../form'
+import { inputClass, isImeComposing } from '../form'
 import type { LabeledOption } from '../../lib/presetHelpers'
 
 export function ModelCombobox({
@@ -114,6 +114,7 @@ export function ModelCombobox({
               : (activeIndex + (event.key === 'ArrowUp' ? -1 : 1) + filteredSuggestions.length) % filteredSuggestions.length
             setActiveModelId(filteredSuggestions[nextIndex]?.id ?? null)
           } else if (event.key === 'Enter' && open && activeModel) {
+            if (isImeComposing(event)) return
             event.preventDefault()
             chooseSuggestion(activeModel)
           }
