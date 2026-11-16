@@ -1,0 +1,4 @@
+interface:
+  display_name: "Fetch TWSE OHLCV"
+  short_description: "Acquire official TWSE daily OHLCV"
+  default_prompt: "Use $fetch-twse-ohlcv to acquire bounded official TWSE daily OHLCV into an auditable AutoQuant staging package."

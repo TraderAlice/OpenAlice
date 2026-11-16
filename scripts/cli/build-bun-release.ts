@@ -61,7 +61,8 @@ await mkdir(resourceRoot, { recursive: true })
 
 for (const required of [
   'ui/dist/index.html',
-  'src/workspaces/templates/chat/bootstrap.mjs',
+  'templates/chat/bootstrap.mjs',
+  'templates/auto-quant-v2/bootstrap.mjs',
   'src/workspaces/cli/bin/pi-session-provider.ts',
 ]) {
   await stat(join(repositoryRoot, required)).catch(() => {
@@ -91,7 +92,7 @@ const buildDurationMs = Math.round(performance.now() - buildStartedAt)
 await Promise.all([
   copyTree('ui/dist'),
   copyTree('default'),
-  copyTree('src/workspaces/templates'),
+  copyTree('templates'),
   cp(join(repositoryRoot, 'package.json'), join(resourceRoot, 'package.json')),
   cp(join(repositoryRoot, 'LICENSE'), join(releaseRoot, 'LICENSE')),
   cp(join(repositoryRoot, 'THIRD_PARTY_NOTICES.md'), join(releaseRoot, 'THIRD_PARTY_NOTICES.md')),
@@ -262,7 +263,7 @@ async function smokeRelease(options: {
     run([git, 'ls-remote', 'https://github.com/git/git.git', 'HEAD'], gitEnv)
   }
 
-  const templateRoot = join(options.resourceRoot, 'src/workspaces/templates')
+  const templateRoot = join(options.resourceRoot, 'templates')
   await Promise.all([
     stat(join(options.resourceRoot, 'default/skills')),
     stat(join(options.resourceRoot, 'src/workspaces/cli/bin/pi-session-provider.ts')),
@@ -278,11 +279,11 @@ async function smokeRelease(options: {
     ], {
       ...gitEnv,
       AQ_TEMPLATE_ROOT: join(templateRoot, template),
+      AQ_TEMPLATE_FILES_DIR: join(templateRoot, template, 'files'),
       OPENALICE_APP_HOME: options.resourceRoot,
       OPENALICE_TEMPLATE_SOURCE_REPOSITORY: sourceRepository,
       OPENALICE_TEMPLATE_SOURCE_VERSION: 'HEAD',
       OPENALICE_TEMPLATE_SOURCE_COMMIT: sourceCommit,
-      ...(template === 'auto-quant-v2' ? { AQ_TEMPLATE_DIR: sourceRepository } : {}),
       ...(template === 'auto-prediction' ? { AUTO_PREDICTION_TEMPLATE_DIR: sourceRepository } : {}),
     })
     if (!(await readFile(join(workspace, '.git/HEAD'), 'utf8')).startsWith('ref: refs/heads/')) {

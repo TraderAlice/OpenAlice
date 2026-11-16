@@ -1,0 +1,13 @@
+{
+  "kind": "autoquant-book-risk-scenarios",
+  "lookbackBars": [
+    63,
+    126,
+    252
+  ],
+  "minimumObservations": 40,
+  "primaryLookbackBars": 252,
+  "reductionWeight": 0.01,
+  "rollingStepBars": 5,
+  "schemaVersion": 1
+}

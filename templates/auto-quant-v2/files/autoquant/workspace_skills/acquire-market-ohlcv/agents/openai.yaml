@@ -1,0 +1,4 @@
+interface:
+  display_name: "Market OHLCV Router"
+  short_description: "Route OHLCV acquisition across markets and providers."
+  default_prompt: "Use $acquire-market-ohlcv to choose a defensible source and acquisition route for this historical OHLCV request."

@@ -1,0 +1,4 @@
+interface:
+  display_name: "Fetch Nikkei OHLCV"
+  short_description: "Acquire recent Japanese daily OHLCV."
+  default_prompt: "Use $fetch-nikkei-ohlcv to acquire a bounded recent Japanese daily OHLCV sample and package it for AutoQuant."

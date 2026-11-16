@@ -1,0 +1,9 @@
+{
+  "displayName": "AutoQuant",
+  "groupOrder": 20,
+  "description": "Agent-native quantitative research desk. A native Coding Agent owns projects, experiments, reports, dependencies, and local Git history inside an embedded AutoQuant V2 workbench.",
+  "defaultAgents": ["codex", "claude"],
+  "injectTools": true,
+  "injectInstructions": false,
+  "bundledSkills": []
+}

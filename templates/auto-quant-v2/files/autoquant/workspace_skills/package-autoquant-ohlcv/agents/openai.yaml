@@ -1,0 +1,4 @@
+interface:
+  display_name: "Package AutoQuant OHLCV"
+  short_description: "Audit and package bars for strict AutoQuant intake."
+  default_prompt: "Use $package-autoquant-ohlcv to audit these acquired bars and prepare a provenance-honest AutoQuant dataset package."

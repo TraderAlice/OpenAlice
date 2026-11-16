@@ -46,11 +46,9 @@ OpenAlice's managed Surface route.
   AutoQuant default. Only explicit Workspace selection or creation changes the
   default, and OpenAlice saves that choice before navigating.
 
-The default source is AutoQuant V2 `v0.9.34` at commit
-`52d63148d826e6c35d48c3167d95a4cc7a4eb6c4`. The creation flow also retains
-approved `v0.9.32`, `v0.9.31`, `v0.8.31`, `v0.8.30`, and `v0.8.27` sources for
-reproducible older desks. Versions are exact inputs, not floating branches or
-ranges.
+New desks are materialized directly from OpenAlice's embedded AutoQuant V2
+template (`templates/auto-quant-v2`, currently `v0.9.34`) without requiring an
+external Git clone or network fetch.
 
 ## Managed Studio
 
@@ -103,16 +101,14 @@ durable human-facing delivery or asynchronous notification is actually wanted.
 
 ## Source and provenance
 
-Bootstrap retains the upstream Git history and canonical `origin`, creates a
-fresh research branch at the selected commit, and records the exact source in:
+Bootstrap copies the embedded AutoQuant V2 workbench (`autoquant/`, Studio
+assets, project templates, and canonical OHLCV skills) directly into the new
+Workspace and initializes a local `research/<tag>` Git branch so the coding
+agent can inspect, run, and modify both Projects and workbench code locally.
 
-```text
-.alice/harness-source.json
-```
-
-The Workspace keeps the upstream AutoQuant `AGENTS.md`. OpenAlice does not
+The Workspace keeps AutoQuant's own `AGENTS.md`. OpenAlice does not
 replace it with the Chat template's Alice instructions; it adds discoverable
-collaboration, market-data, Inbox, and UTA skills alongside the upstream
+collaboration, market-data, Inbox, and UTA skills alongside AutoQuant's
 instructions.
 
 Python 3.11, `uv`, AutoQuant dependencies, Projects, Studies, and research
@@ -121,7 +117,6 @@ first orientation is:
 
 ```bash
 uv run aq project list .
-uv run aq validate .
 uv run aq orient . --json
 ```
 
@@ -133,13 +128,13 @@ uv run aq orient . --json
 - UTA alone owns live accounts, approvals, and trading writes.
 - Existing Auto-Quant Classic Workspaces are left intact and are not
   reinterpreted as V2 desks.
-- Source versions are never upgraded automatically. Generic Template Upgrade
-  does not apply; use the preview-first Harness source upgrade in **Settings →
-  Harness**, which preserves upstream history and explicit source choice.
+- Existing desks are never rewritten automatically when OpenAlice updates its
+  embedded template; local Git history inside each desk stays under your and
+  your Agent's control.
 
 ## Next Steps
 
 - [Workspaces](/docs/workspaces/workspaces) — Understand the durable desk and Session model.
-- [Templates](/docs/workspaces/templates) — See the source-aware `auto-quant-v2` template.
+- [Templates](/docs/workspaces/templates) — See how first-class templates materialize Workspaces.
 - [Inbox](/docs/workspaces/inbox) — Publish evidence-bound reports back to the user.
 - [AI Providers](/docs/integration/ai-providers) — Configure the coding Agent used by the desk.

@@ -1,0 +1,4 @@
+interface:
+  display_name: "Fetch Daum OHLCV"
+  short_description: "Acquire South Korean daily OHLCV."
+  default_prompt: "Use $fetch-daum-ohlcv to acquire bounded raw Korean daily OHLCV and package it for AutoQuant."

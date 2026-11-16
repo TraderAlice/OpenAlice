@@ -1,0 +1,4 @@
+interface:
+  display_name: "Fetch Euronext OHLCV"
+  short_description: "Acquire official Euronext daily OHLCV."
+  default_prompt: "Use $fetch-euronext-ohlcv to acquire bounded official Euronext daily OHLCV and package it for AutoQuant."

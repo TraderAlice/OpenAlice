@@ -90,14 +90,14 @@ describe('uiBundlePath', () => {
 })
 
 describe('templatesPath', () => {
-  it('resolves to <APP_RESOURCES_HOME>/src/workspaces/templates', async () => {
+  it('resolves to <APP_RESOURCES_HOME>/templates', async () => {
     const { templatesPath } = await loadPaths({ OPENALICE_APP_HOME: '/foo' })
-    expect(templatesPath()).toBe(resolve('/foo', 'src', 'workspaces', 'templates'))
+    expect(templatesPath()).toBe(resolve('/foo', 'templates'))
   })
 
   it('falls back to cwd-relative path when unset', async () => {
     const { templatesPath } = await loadPaths()
-    expect(templatesPath()).toBe(resolve(process.cwd(), 'src/workspaces/templates'))
+    expect(templatesPath()).toBe(resolve(process.cwd(), 'templates'))
   })
 })
 
@@ -125,7 +125,7 @@ describe('two homes are independent', () => {
     expect(dataPath('config')).toBe(resolve('/Users/x/Library/Application Support/OpenAlice', 'data', 'config'))
     expect(defaultPath('assets', 'example.txt')).toBe(resolve('/Applications/OpenAlice.app/Contents/Resources', 'default', 'assets', 'example.txt'))
     expect(uiBundlePath()).toBe(resolve('/Applications/OpenAlice.app/Contents/Resources', 'ui', 'dist'))
-    expect(templatesPath()).toBe(resolve('/Applications/OpenAlice.app/Contents/Resources', 'src', 'workspaces', 'templates'))
+    expect(templatesPath()).toBe(resolve('/Applications/OpenAlice.app/Contents/Resources', 'templates'))
   })
 })
 

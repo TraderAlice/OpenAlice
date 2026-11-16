@@ -134,6 +134,19 @@ describe('AutoQuant setup', () => {
     await waitFor(() => expect(mocks.initializeAutoQuant).toHaveBeenCalledOnce())
   })
 
+  it('shows the embedded template version when no external source catalog is declared', () => {
+    const embedded: TemplateInfo = {
+      name: 'auto-quant-v2',
+      displayName: 'AutoQuant',
+      defaultAgents: ['codex'],
+      version: '0.9.34',
+      hasReadme: true,
+    }
+    mocks.useWorkspaces.mockReturnValue({ ...context([]), templates: [embedded] })
+    render(<AutoQuantSetupPage />)
+    expect(screen.getByText('v0.9.34')).toBeTruthy()
+  })
+
   it('requires explicit selection when an AutoQuant Workspace already exists', async () => {
     mocks.useWorkspaces.mockReturnValue(context([existingWorkspace]))
     render(<AutoQuantSetupPage />)
