@@ -581,7 +581,7 @@ describe('TemplateUpgradeManager', () => {
 
   it('materializes the real Chat template deterministically before cleaning its temp tree', async () => {
     const templates = await TemplateRegistry.load(
-      join(process.cwd(), 'src', 'workspaces', 'templates'),
+      join(process.cwd(), 'templates'),
       logger,
     );
     const upgrade = new TemplateUpgradeManager({ registry, templates, logger });

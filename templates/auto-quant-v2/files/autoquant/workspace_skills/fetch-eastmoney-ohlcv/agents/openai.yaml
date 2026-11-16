@@ -1,0 +1,4 @@
+interface:
+  display_name: "Fetch Eastmoney OHLCV"
+  short_description: "Acquire auditable mainland China daily OHLCV"
+  default_prompt: "Use $fetch-eastmoney-ohlcv to acquire bounded mainland China daily OHLCV into an auditable AutoQuant staging package."

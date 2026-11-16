@@ -12,14 +12,12 @@ import { fileURLToPath } from 'node:url';
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
-import { defaultPath } from '@/core/paths.js';
+import { defaultPath, templatesPath } from '@/core/paths.js';
 
 import { injectWorkspaceContext } from './context-injector.js';
 import type { TemplateMeta } from './template-registry.js';
 
-// src/workspaces/ — this spec's directory.
-const HERE = fileURLToPath(new URL('.', import.meta.url));
-const CHAT_FILES = join(HERE, 'templates', 'chat', 'files');
+const CHAT_FILES = join(templatesPath(), 'chat', 'files');
 
 function makeTemplate(over: Partial<TemplateMeta>): TemplateMeta {
   return {

@@ -1,0 +1,4 @@
+interface:
+  display_name: "Fetch Sina OHLCV"
+  short_description: "Acquire recent China A-share daily OHLCV."
+  default_prompt: "Use $fetch-sina-ohlcv to acquire bounded recent raw A-share daily OHLCV and package it for AutoQuant."

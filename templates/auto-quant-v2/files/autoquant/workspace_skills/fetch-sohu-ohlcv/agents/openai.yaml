@@ -1,0 +1,4 @@
+interface:
+  display_name: "Fetch Sohu OHLCV"
+  short_description: "Acquire auditable raw daily mainland-China OHLCV from Sohu"
+  default_prompt: "Use $fetch-sohu-ohlcv to acquire a bounded raw mainland-China equity panel and preserve exact provider evidence."

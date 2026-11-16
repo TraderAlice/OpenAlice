@@ -1,0 +1,4 @@
+interface:
+  display_name: "Fetch FinMind Taiwan OHLCV"
+  short_description: "Acquire auditable raw Taiwan daily OHLCV from FinMind"
+  default_prompt: "Use $fetch-finmind-ohlcv to acquire a bounded raw Taiwan equity panel and preserve exact provider evidence."

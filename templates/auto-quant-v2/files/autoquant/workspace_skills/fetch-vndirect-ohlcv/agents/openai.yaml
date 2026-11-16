@@ -1,0 +1,4 @@
+interface:
+  display_name: "Fetch VNDIRECT OHLCV"
+  short_description: "Acquire Vietnam daily OHLCV"
+  default_prompt: "Use $fetch-vndirect-ohlcv to acquire bounded Vietnam daily OHLCV into an auditable AutoQuant staging package."
