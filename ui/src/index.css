@@ -4,6 +4,8 @@
 @import "./theme/palette.css";
 @import "./theme/style-profiles.css";
 
+@custom-variant dark (&:where([data-appearance="dark"], [data-appearance="dark"] *));
+
 @font-face {
   font-family: "Instrument Sans Variable";
   font-style: normal;
@@ -282,6 +284,13 @@ body {
 :where(.oa-pressable, .oa-nav-item, .oa-nav-row):focus-visible {
   outline: none;
   box-shadow: var(--oa-focus-shadow);
+}
+
+@media (forced-colors: active) {
+  :where(.oa-pressable, .oa-nav-item, .oa-nav-row, .oa-field-control, .btn-primary, .btn-secondary, .btn-danger, .btn-primary-sm, .btn-secondary-sm):focus-visible {
+    outline: 2px solid Highlight;
+    outline-offset: 2px;
+  }
 }
 
 .oa-data-surface {
@@ -1094,6 +1103,9 @@ html[lang="ja"] .oa-onboarding-title {
   animation: skeleton-sweep 1.6s ease-in-out infinite;
 }
 @media (prefers-reduced-motion: reduce) {
+  html:focus-within {
+    scroll-behavior: auto;
+  }
   .oa-onboarding-slide-forward,
   .oa-onboarding-slide-back,
   .oa-onboarding-completion-ring,
@@ -1198,25 +1210,44 @@ html[lang="ja"] .oa-onboarding-title {
   scrollbar-width: thin;
 }
 
-::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
+@media (prefers-contrast: more) {
+  * {
+    scrollbar-color: color-mix(in srgb, var(--foreground) 55%, transparent) transparent;
+  }
 }
-::-webkit-scrollbar-track {
-  background: transparent;
-}
-::-webkit-scrollbar-thumb {
-  border: 2px solid transparent;
-  border-radius: 999px;
-  background: color-mix(in srgb, var(--muted-foreground) 22%, transparent);
-  background-clip: padding-box;
-}
-::-webkit-scrollbar-thumb:hover {
-  background: color-mix(in srgb, var(--muted-foreground) 34%, transparent);
-  background-clip: padding-box;
-}
-::-webkit-scrollbar-button {
-  display: none;
+
+@supports not (scrollbar-color: auto) {
+  ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    border: 2px solid transparent;
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--muted-foreground) 22%, transparent);
+    background-clip: padding-box;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: color-mix(in srgb, var(--muted-foreground) 34%, transparent);
+    background-clip: padding-box;
+  }
+  ::-webkit-scrollbar-button {
+    display: none;
+  }
+
+  @media (prefers-contrast: more) {
+    ::-webkit-scrollbar-thumb {
+      background: color-mix(in srgb, var(--foreground) 55%, transparent);
+      background-clip: padding-box;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: color-mix(in srgb, var(--foreground) 72%, transparent);
+      background-clip: padding-box;
+    }
+  }
 }
 
 /* Hide scrollbar utility — content still scrolls (programmatically or via
@@ -1357,17 +1388,18 @@ html[lang="ja"] .oa-onboarding-title {
 
 /* Obsidian-style [[name]] wikilinks → clickable entity references. */
 .markdown-content a.wikilink {
-  display: inline-block;
-  max-width: 100%;
   color: var(--primary);
   cursor: pointer;
-  text-decoration: none;
-  vertical-align: baseline;
+  text-decoration-line: underline;
+  text-decoration-style: dashed;
+  text-decoration-color: color-mix(in srgb, var(--primary) 45%, transparent);
+  text-decoration-thickness: 1px;
+  text-underline-offset: 0.16em;
   overflow-wrap: anywhere;
-  border-bottom: 1px dashed color-mix(in srgb, var(--primary) 45%, transparent);
 }
 .markdown-content a.wikilink:hover {
-  border-bottom-style: solid;
+  text-decoration-style: solid;
+  text-decoration-color: var(--primary);
 }
 
 .markdown-content a.session-signature {
@@ -1831,19 +1863,6 @@ html[lang="ja"] .oa-onboarding-title {
   }
 }
 
-/* Final cascade-level safety net. Several domain animations are declared
-   below the first reduced-motion block, so this lives at EOF on purpose. */
-@media (prefers-reduced-motion: reduce) {
-  *,
-  *::before,
-  *::after {
-    scroll-behavior: auto !important;
-    animation-duration: 0.01ms !important;
-    animation-iteration-count: 1 !important;
-    transition-duration: 0.01ms !important;
-  }
-}
-
 /* Base UI owns measurement and mount lifetime; hidden panels leave the tab order. */
 .oa-collapsible-panel {
   height: var(--collapsible-panel-height);
@@ -1857,6 +1876,11 @@ html[lang="ja"] .oa-onboarding-title {
   opacity: 0;
 }
 @media (prefers-reduced-motion: reduce) {
+  .thinking-dot,
+  .message-enter,
+  .page-fade-in {
+    animation: none;
+  }
   .oa-collapsible-panel { transition: none; }
 }
 
