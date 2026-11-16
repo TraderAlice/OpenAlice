@@ -39,9 +39,10 @@ interface SidebarRowProps {
  * - Active rows use a muted fill and the project-owned neutral selection mark.
  * - Hover state is a half-opacity tint of the active background.
  *
- * The `div role="button"` owns row activation and lets `trail` contain action
- * buttons within valid HTML.
- * Enter / Space activate the row for keyboard users.
+ * A native `<button type="button">` owns row activation when `trail` is absent;
+ * when `trail` is present, `<div role="button">` owns activation so `trail` may
+ * contain either badges or action buttons within valid HTML, with Enter on
+ * keydown and Space on keyup.
  */
 export function SidebarRow({
   label,
@@ -54,7 +55,13 @@ export function SidebarRow({
   ariaExpanded,
   ariaControls,
 }: SidebarRowProps) {
-  const row = (
+  const baseClassName = `oa-nav-row group relative mx-2 flex min-h-10 cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-[13px] leading-[18px] outline-none md:min-h-8 ${
+    active
+      ? 'bg-sidebar-accent text-sidebar-accent-foreground'
+      : 'text-sidebar-foreground hover:bg-sidebar-accent/60'
+  } ${dim ? 'opacity-60' : ''}`
+
+  const row = trail ? (
     <div
       role="button"
       tabIndex={0}
@@ -63,22 +70,39 @@ export function SidebarRow({
       aria-controls={ariaControls}
       onClick={onClick}
       onKeyDown={(e) => {
-        if (e.key === 'Enter' || e.key === ' ') {
+        if (e.key === 'Enter') {
+          e.preventDefault()
+          onClick()
+        } else if (e.key === ' ') {
+          e.preventDefault()
+        }
+      }}
+      onKeyUp={(e) => {
+        if (e.key === ' ') {
           e.preventDefault()
           onClick()
         }
       }}
-      className={`oa-nav-row group relative mx-2 flex min-h-10 cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-[13px] leading-[18px] outline-none md:min-h-8 ${
-        active
-          ? 'bg-sidebar-accent text-sidebar-accent-foreground'
-          : 'text-sidebar-foreground hover:bg-sidebar-accent/60'
-      } ${dim ? 'opacity-60' : ''}`}
+      className={baseClassName}
     >
       {active && <SelectionIndicator />}
       {icon && <span className="flex h-[18px] w-[18px] shrink-0 items-center justify-center">{icon}</span>}
       <span className="truncate flex-1">{label}</span>
-      {trail && <div className="shrink-0 flex items-center gap-0.5">{trail}</div>}
+      <div className="shrink-0 flex items-center gap-0.5">{trail}</div>
     </div>
+  ) : (
+    <button
+      type="button"
+      aria-current={active ? 'page' : undefined}
+      aria-expanded={ariaExpanded}
+      aria-controls={ariaControls}
+      onClick={onClick}
+      className={`${baseClassName} w-[calc(100%-1rem)] text-left`}
+    >
+      {active && <SelectionIndicator />}
+      {icon && <span className="flex h-[18px] w-[18px] shrink-0 items-center justify-center">{icon}</span>}
+      <span className="truncate flex-1">{label}</span>
+    </button>
   )
   if (!title) return row
   return (

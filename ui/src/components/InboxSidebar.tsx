@@ -415,19 +415,12 @@ function ClusterRow({
     moreAttachments: (count) => t('inbox.moreAttachments', { count }),
   })
   return (
-    <div
-      role="button"
-      tabIndex={0}
+    <button
+      type="button"
       aria-label={rowLabel}
       aria-current={active || undefined}
       onClick={onClick}
-      onKeyDown={(e) => {
-        if (e.key === 'Enter' || e.key === ' ') {
-          e.preventDefault()
-          onClick()
-        }
-      }}
-      className={`group relative grid min-h-11 grid-cols-[auto_minmax(0,1fr)] gap-x-1.5 gap-y-0.5 pl-3 pr-3 py-1.5 cursor-pointer transition-colors outline-none focus-visible:bg-muted/70 ${
+      className={`group relative grid min-h-11 w-full grid-cols-[auto_minmax(0,1fr)] gap-x-1.5 gap-y-0.5 pl-3 pr-3 py-1.5 text-left cursor-pointer transition-colors outline-none focus-visible:bg-muted/70 ${
         active ? 'bg-muted' : 'hover:bg-muted/50'
       }`}
     >
@@ -445,7 +438,7 @@ function ClusterRow({
           {subject}
         </span>
         {excerpt && (
-          <span className="mt-0.5 hidden truncate text-[11px] leading-4 text-muted-foreground/65 sm:block">
+          <span className="mt-0.5 hidden truncate text-[11px] leading-4 text-muted-foreground/65 @[15rem]/sidebar:block">
             {excerpt}
           </span>
         )}
@@ -453,7 +446,7 @@ function ClusterRow({
       <span className="col-start-2 text-[10px] text-muted-foreground/50 tabular-nums">
         {time}
       </span>
-    </div>
+    </button>
   )
 }
 
@@ -519,25 +512,18 @@ function TimeRow({
     moreAttachments: (count) => t('inbox.moreAttachments', { count }),
   })
   return (
-    <div
-      role="button"
-      tabIndex={0}
+    <button
+      type="button"
       aria-label={rowLabel}
       aria-current={active || undefined}
       onClick={onClick}
-      onKeyDown={(e) => {
-        if (e.key === 'Enter' || e.key === ' ') {
-          e.preventDefault()
-          onClick()
-        }
-      }}
-      className={`group relative flex min-h-14 flex-col justify-center gap-1 px-3 py-2 cursor-pointer transition-colors outline-none focus-visible:bg-muted/70 ${
+      className={`group relative flex min-h-14 w-full flex-col justify-center gap-1 px-3 py-2 text-left cursor-pointer transition-colors outline-none focus-visible:bg-muted/70 ${
         active ? 'bg-muted' : 'hover:bg-muted/50'
       }`}
     >
       {active && <SelectionIndicator />}
 
-      <div className="flex min-w-0 items-start gap-1.5">
+      <span className="flex w-full min-w-0 items-start gap-1.5">
         <span
           aria-hidden
           className={`mt-1.5 shrink-0 w-1.5 h-1.5 rounded-full ${unread ? 'oa-inbox-unread-dot' : 'bg-transparent'}`}
@@ -551,22 +537,22 @@ function TimeRow({
             {subject}
           </span>
           {excerpt && (
-            <span className="mt-0.5 hidden truncate text-[11px] leading-4 text-muted-foreground/65 sm:block">
+            <span className="mt-0.5 hidden truncate text-[11px] leading-4 text-muted-foreground/65 @[15rem]/sidebar:block">
               {excerpt}
             </span>
           )}
         </span>
-      </div>
+      </span>
 
-      <div className="flex min-w-0 items-center gap-2 pl-3">
+      <span className="flex w-full min-w-0 items-center gap-2 pl-3">
         <span className="min-w-0 flex-1 truncate text-[10px] text-muted-foreground/60">
           {source}
         </span>
         <span className="shrink-0 text-[10px] text-muted-foreground/60 tabular-nums">
           {time}
         </span>
-      </div>
-    </div>
+      </span>
+    </button>
   )
 }
 
@@ -581,13 +567,19 @@ const BUCKET_KEYS = {
   Older: 'inbox.dateOlder',
 } as const satisfies Record<Bucket, string>
 
-function groupByBucket(entries: readonly InboxEntry[]): Array<[Bucket, InboxEntry[]]> {
-  const now = Date.now()
+export function groupByBucket(
+  entries: readonly InboxEntry[],
+  now = Date.now(),
+): Array<[Bucket, InboxEntry[]]> {
   const startOfDay = new Date(now)
   startOfDay.setHours(0, 0, 0, 0)
   const today = startOfDay.getTime()
-  const yesterday = today - 86_400_000
-  const weekStart = today - 6 * 86_400_000
+  const yesterdayDate = new Date(startOfDay)
+  yesterdayDate.setDate(yesterdayDate.getDate() - 1)
+  const yesterday = yesterdayDate.getTime()
+  const weekStartDate = new Date(startOfDay)
+  weekStartDate.setDate(weekStartDate.getDate() - 6)
+  const weekStart = weekStartDate.getTime()
 
   const buckets: Record<Bucket, InboxEntry[]> = {
     Today: [],

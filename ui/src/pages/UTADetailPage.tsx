@@ -283,7 +283,7 @@ export function UTADetailPage({ spec }: UTADetailPageProps) {
         }
       />
 
-      <div className="flex-1 overflow-y-auto px-4 md:px-6 py-5">
+      <div className="flex-1 overflow-y-auto px-4 @[42rem]/content:px-6 py-5">
         <div className="max-w-[1240px] mx-auto">
           {dataError && (
             <div className="mb-4 rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2 text-[12px] leading-[18px] text-destructive">
@@ -419,7 +419,7 @@ function Shell({ title, children }: { title: string; children?: React.ReactNode 
   return (
     <div className="flex flex-col flex-1 min-h-0">
       <PageHeader title={title} description={<Link to="/trading" className="text-muted-foreground hover:text-foreground">← Trading</Link>} />
-      <div className="flex-1 overflow-y-auto px-4 md:px-6 py-5">
+      <div className="flex-1 overflow-y-auto px-4 @[42rem]/content:px-6 py-5">
         <div className="max-w-[720px] mx-auto">{children}</div>
       </div>
     </div>
@@ -687,7 +687,7 @@ export function PositionsSection({ positions, onCloseClick, canClose = true, clo
     <Section title={`Positions (${positions.length})`}>
       <div
         data-testid="uta-positions-mobile"
-        className="overflow-hidden rounded-lg border border-border md:hidden"
+        className="overflow-hidden rounded-lg border border-border @[42rem]/content:hidden"
       >
         {groups.map((g) => {
           const sumValue = g.positions.reduce((sum, position) => sum + Number(position.marketValue), 0)
@@ -728,7 +728,7 @@ export function PositionsSection({ positions, onCloseClick, canClose = true, clo
 
       <div
         data-testid="uta-positions-desktop"
-        className="hidden overflow-x-auto rounded-lg border border-border md:block"
+        className="hidden overflow-x-auto rounded-lg border border-border @[42rem]/content:block"
       >
         <table className="w-full text-[13px]">
           <thead>

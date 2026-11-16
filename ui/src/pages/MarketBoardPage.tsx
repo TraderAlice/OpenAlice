@@ -70,7 +70,7 @@ function MoversBoardView() {
         }
         live={{ lastUpdated: updatedAt, label: 'Fetched', hideDot: true }}
       />
-      <div className="flex-1 overflow-y-auto px-4 md:px-8 py-4 flex flex-col gap-4 min-h-0">
+      <div className="flex-1 overflow-y-auto px-4 @[42rem]/content:px-8 py-4 flex flex-col gap-4 min-h-0">
         <div
           className="flex flex-wrap items-center gap-1"
           role="group"
@@ -121,15 +121,15 @@ function MoversTable({ rows }: { rows: MoverRow[] }) {
   const open = useOpenEquity()
   return (
     <div className="min-w-0 overflow-x-auto">
-      <table className="w-full table-fixed md:table-auto text-[12px] border-collapse">
+      <table className="w-full table-fixed @[42rem]/content:table-auto text-[12px] border-collapse">
         <thead>
           <tr className="text-muted-foreground/70 text-left border-b border-border">
-            <th className="w-1/2 md:w-auto py-1.5 pr-2 md:pr-3 font-medium">{t('market.colSymbol')}</th>
-            <th className="w-1/4 md:w-auto py-1.5 px-1.5 md:px-3 font-medium text-right">{t('market.colPrice')}</th>
-            <th className="w-1/4 md:w-auto py-1.5 pl-1.5 md:px-3 font-medium text-right">{t('market.colChangePct')}</th>
-            <th className="hidden md:table-cell py-1.5 px-3 font-medium text-right">{t('market.colVolume')}</th>
-            <th className="hidden md:table-cell py-1.5 px-3 font-medium text-right">{t('market.colRvol')}</th>
-            <th className="hidden md:table-cell py-1.5 pl-3 font-medium text-right">{t('market.colDollarVolume')}</th>
+            <th scope="col" className="w-1/2 @[42rem]/content:w-auto py-1.5 pr-2 @[42rem]/content:pr-3 font-medium">{t('market.colSymbol')}</th>
+            <th scope="col" className="w-1/4 @[42rem]/content:w-auto py-1.5 px-1.5 @[42rem]/content:px-3 font-medium text-right">{t('market.colPrice')}</th>
+            <th scope="col" className="w-1/4 @[42rem]/content:w-auto py-1.5 pl-1.5 @[42rem]/content:px-3 font-medium text-right">{t('market.colChangePct')}</th>
+            <th scope="col" className="hidden @[42rem]/content:table-cell py-1.5 px-3 font-medium text-right">{t('market.colVolume')}</th>
+            <th scope="col" className="hidden @[42rem]/content:table-cell py-1.5 px-3 font-medium text-right">{t('market.colRvol')}</th>
+            <th scope="col" className="hidden @[42rem]/content:table-cell py-1.5 pl-3 font-medium text-right">{t('market.colDollarVolume')}</th>
           </tr>
         </thead>
         <tbody>
@@ -139,14 +139,14 @@ function MoversTable({ rows }: { rows: MoverRow[] }) {
               className="border-b border-border/50 hover:bg-secondary/40 cursor-pointer"
               onClick={() => open(r.symbol)}
             >
-              <td className="min-w-0 py-1.5 pr-2 md:pr-3">
+              <td className="min-w-0 py-1.5 pr-2 @[42rem]/content:pr-3">
                 <EquityDetailButton symbol={r.symbol} name={r.name} />
               </td>
-              <td className="py-1.5 px-1.5 md:px-3 text-right font-mono text-foreground">{fmtPrice(r.price)}</td>
-              <td className={`py-1.5 pl-1.5 md:px-3 text-right font-mono ${signColor(r.percent_change)}`}>{fmtPct(r.percent_change)}</td>
-              <td className="hidden md:table-cell py-1.5 px-3 text-right text-foreground">{fmtCompact(r.volume)}</td>
-              <td className={`hidden md:table-cell py-1.5 px-3 text-right ${rvolColor(r.relative_volume)}`}>{r.relative_volume?.toFixed(2) ?? '—'}</td>
-              <td className="hidden md:table-cell py-1.5 pl-3 text-right text-foreground">{fmtCompact(r.dollar_volume, '$')}</td>
+              <td className="py-1.5 px-1.5 @[42rem]/content:px-3 text-right font-mono text-foreground">{fmtPrice(r.price)}</td>
+              <td className={`py-1.5 pl-1.5 @[42rem]/content:px-3 text-right font-mono ${signColor(r.percent_change)}`}>{fmtPct(r.percent_change)}</td>
+              <td className="hidden @[42rem]/content:table-cell py-1.5 px-3 text-right tabular-nums text-foreground">{fmtCompact(r.volume)}</td>
+              <td className={`hidden @[42rem]/content:table-cell py-1.5 px-3 text-right tabular-nums ${rvolColor(r.relative_volume)}`}>{r.relative_volume?.toFixed(2) ?? '—'}</td>
+              <td className="hidden @[42rem]/content:table-cell py-1.5 pl-3 text-right tabular-nums text-foreground">{fmtCompact(r.dollar_volume, '$')}</td>
             </tr>
           ))}
         </tbody>
@@ -204,7 +204,7 @@ function CalendarBoardView() {
         }
         live={{ lastUpdated: updatedAt, label: 'Fetched', hideDot: true }}
       />
-      <div className="flex-1 overflow-y-auto px-4 md:px-8 py-4 flex flex-col gap-4 min-h-0">
+      <div className="flex-1 overflow-y-auto px-4 @[42rem]/content:px-8 py-4 flex flex-col gap-4 min-h-0">
         <div
           className="grid grid-cols-3 gap-0.5 rounded-lg border border-border/70 bg-muted/60 p-0.5"
           role="group"
@@ -217,7 +217,7 @@ function CalendarBoardView() {
               onClick={() => setList(k)}
               aria-pressed={list === k}
               aria-label={`${t(calendarLabelKey(k))} (${data?.[k].length ?? 0})`}
-              className={`oa-pressable flex min-h-11 min-w-0 flex-col items-center justify-center rounded-md px-2 py-1 text-[12px] leading-[18px] font-medium sm:flex-row sm:gap-1.5 ${
+              className={`oa-pressable flex min-h-11 min-w-0 flex-col items-center justify-center rounded-md px-2 py-1 text-[12px] leading-[18px] font-medium @sm/content:flex-row @sm/content:gap-1.5 ${
                 list === k
                   ? 'bg-background text-foreground shadow-sm ring-1 ring-border/60'
                   : 'text-muted-foreground hover:text-foreground hover:bg-secondary'
@@ -458,7 +458,7 @@ function DividendTable({ rows }: { rows: DividendEvent[] }) {
 
 function CalTable({ head, rightCols = [], children }: { head: string[]; rightCols?: number[]; children: React.ReactNode }) {
   return (
-    <div data-testid="calendar-desktop" className="hidden overflow-x-auto md:block">
+    <div data-testid="calendar-desktop" className="hidden overflow-x-auto @[42rem]/content:block">
       <table className="w-full text-[12px] border-collapse">
         <thead>
           <tr className="text-muted-foreground/70 text-left border-b border-border">
@@ -500,7 +500,7 @@ function CalendarMobileList<T>({
   }, [date, rows])
 
   return (
-    <div data-testid="calendar-mobile" className="space-y-4 md:hidden">
+    <div data-testid="calendar-mobile" className="space-y-4 @[42rem]/content:hidden">
       {groups.map((group) => (
         <section key={group.date} className="space-y-1.5">
           <div className="border-b border-border/70 pb-1 text-[11px] font-medium text-muted-foreground">
@@ -578,13 +578,13 @@ function MacroBoardView() {
         }
         live={{ lastUpdated: updatedAt, label: 'Fetched', hideDot: true }}
       />
-      <div className="flex-1 overflow-y-auto px-4 md:px-8 py-4 min-h-0">
+      <div className="flex-1 overflow-y-auto px-4 @[42rem]/content:px-8 py-4 min-h-0">
         {loading && !data && <CenteredLoading label={t('common.loading')} />}
         {error && (
           <div className="rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2 text-[13px] leading-5 text-destructive">{error}</div>
         )}
         {data && (
-          <div className="grid gap-3 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="grid gap-3 grid-cols-1 @lg/content:grid-cols-2 @[54rem]/content:grid-cols-3">
             {data.cards.map((c) => {
               const labelKey = MACRO_LABEL_KEYS[c.id as keyof typeof MACRO_LABEL_KEYS]
               return (
@@ -635,7 +635,7 @@ function TermStructureBoardView() {
         }
         live={{ lastUpdated: updatedAt, label: 'Fetched', hideDot: true }}
       />
-      <div className="flex-1 overflow-y-auto px-4 md:px-8 py-4 flex flex-col gap-6 min-h-0">
+      <div className="flex-1 overflow-y-auto px-4 @[42rem]/content:px-8 py-4 flex flex-col gap-6 min-h-0">
         {loading && !data && <CenteredLoading label={t('common.loading')} />}
         {error && (
           <div className="rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2 text-[13px] leading-5 text-destructive">{error}</div>
@@ -660,7 +660,7 @@ function TermCurveCard({ curve }: { curve: TermCurve }) {
     .filter((p) => p.price != null)
     .map((p) => ({ ...p, label: p.expiration.slice(2) }))
   return (
-    <div className="flex flex-col gap-2 rounded-lg border border-border bg-card px-3 py-3 sm:px-4">
+    <div className="flex flex-col gap-2 rounded-lg border border-border bg-card px-3 py-3 @sm/content:px-4">
       <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
         <span className="shrink-0 text-[15px] font-semibold font-mono text-foreground">{curve.symbol}</span>
         {curve.spot != null && (
@@ -708,7 +708,7 @@ function TermCurveCard({ curve }: { curve: TermCurve }) {
           )
         }}
       </MeasuredChartFrame>
-      <div className="grid grid-cols-2 gap-1.5 sm:flex sm:flex-wrap">
+      <div className="grid grid-cols-2 gap-1.5 @sm/content:flex @sm/content:flex-wrap">
         {curve.points.map((p) => (
           <span key={p.expiration} className="flex items-center justify-between gap-2 whitespace-nowrap rounded-sm bg-muted/60 px-1.5 py-0.5 font-mono text-[11px] leading-[15px]" title={`${p.daysToExpiry ?? '—'}d`}>
             {p.expiration.slice(2)}{' '}
@@ -718,7 +718,7 @@ function TermCurveCard({ curve }: { curve: TermCurve }) {
           </span>
         ))}
         {curve.points.length > 0 && (
-          <span className="col-span-2 text-[10px] text-muted-foreground/60 self-center sm:ml-1">{t('market.termBasisNote')}</span>
+          <span className="col-span-2 text-[10px] text-muted-foreground/60 self-center @sm/content:ml-1">{t('market.termBasisNote')}</span>
         )}
       </div>
     </div>
@@ -755,7 +755,7 @@ function GlobalMacroBoardView() {
         }
         live={{ lastUpdated: updatedAt, label: 'Fetched', hideDot: true }}
       />
-      <div className="flex-1 overflow-y-auto px-4 md:px-8 py-4 min-h-0">
+      <div className="flex-1 overflow-y-auto px-4 @[42rem]/content:px-8 py-4 min-h-0">
         {loading && !data && <CenteredLoading label={t('common.loading')} />}
         {error && (
           <div className="rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2 text-[13px] leading-5 text-destructive">{error}</div>
@@ -764,7 +764,7 @@ function GlobalMacroBoardView() {
           <>
             <div
               data-testid="global-macro-mobile"
-              className="divide-y divide-border/60 border-y border-border/70 md:hidden"
+              className="divide-y divide-border/60 border-y border-border/70 @[42rem]/content:hidden"
             >
               {data.rows.map((r) => (
                 <article key={r.country} className="py-3">
@@ -804,7 +804,7 @@ function GlobalMacroBoardView() {
               ))}
             </div>
 
-            <div data-testid="global-macro-desktop" className="hidden overflow-x-auto md:block">
+            <div data-testid="global-macro-desktop" className="hidden overflow-x-auto @[42rem]/content:block">
               <table className="w-full text-[12px] border-collapse">
                 <thead>
                   <tr className="text-muted-foreground/70 text-left border-b border-border">
@@ -908,7 +908,7 @@ function ShippingBoardView() {
         }
         live={{ lastUpdated: updatedAt, label: 'Fetched', hideDot: true }}
       />
-      <div className="flex-1 overflow-y-auto px-4 md:px-8 py-4 min-h-0">
+      <div className="flex-1 overflow-y-auto px-4 @[42rem]/content:px-8 py-4 min-h-0">
         {loading && !data && <CenteredLoading label={t('common.loading')} />}
         {error && (
           <div className="rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2 text-[13px] leading-5 text-destructive">{error}</div>
@@ -917,7 +917,7 @@ function ShippingBoardView() {
           <div key={key} className="mb-3 rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2 text-[13px] leading-5 text-destructive">{key}: {msg}</div>
         ))}
         {data && (
-          <div className="grid gap-3 grid-cols-1 lg:grid-cols-2">
+          <div className="grid gap-3 grid-cols-1 @[48rem]/content:grid-cols-2">
             {data.curves.map((c) => <ChokepointCard key={c.key} curve={c} />)}
           </div>
         )}
@@ -932,11 +932,11 @@ function ChokepointCard({ curve }: { curve: ShippingCurve }) {
     .filter((p) => p.tons != null)
     .map((p) => ({ ...p, mt: (p.tons as number) / 1e6, label: p.date.slice(5) }))
   return (
-    <div className="flex flex-col gap-1.5 rounded-lg border border-border bg-card px-3 py-3 sm:px-4">
-      <div className="flex flex-col gap-1 sm:flex-row sm:items-baseline sm:justify-between sm:gap-2">
-        <span className="text-[13px] leading-[18px] font-semibold text-foreground sm:shrink-0">{curve.name}</span>
+    <div className="flex flex-col gap-1.5 rounded-lg border border-border bg-card px-3 py-3 @sm/content:px-4">
+      <div className="flex flex-col gap-1 @sm/content:flex-row @sm/content:items-baseline @sm/content:justify-between @sm/content:gap-2">
+        <span className="text-[13px] leading-[18px] font-semibold text-foreground @sm/content:shrink-0">{curve.name}</span>
         {curve.latest && (
-          <span className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11px] leading-[15px] text-muted-foreground sm:justify-end">
+          <span className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11px] leading-[15px] text-muted-foreground @sm/content:justify-end">
             <span className="whitespace-nowrap">{curve.latest.date}</span>
             <span className="whitespace-nowrap">{curve.latest.vessels ?? '—'} {t('market.shippingVessels')}</span>
             <span className="whitespace-nowrap">{curve.latest.tons != null ? (curve.latest.tons / 1e6).toFixed(2) + 'M t' : '—'}</span>
@@ -989,7 +989,7 @@ function FedBoardView() {
         }
         live={{ lastUpdated: updatedAt, label: 'Fetched', hideDot: true }}
       />
-      <div className="flex-1 overflow-y-auto px-4 md:px-8 py-4 flex flex-col gap-5 min-h-0">
+      <div className="flex-1 overflow-y-auto px-4 @[42rem]/content:px-8 py-4 flex flex-col gap-5 min-h-0">
         {loading && !data && <CenteredLoading label={t('common.loading')} />}
         {error && (
           <div className="rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2 text-[13px] leading-5 text-destructive">{error}</div>
@@ -998,7 +998,7 @@ function FedBoardView() {
           <div key={k} className="rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2 text-[13px] leading-5 text-destructive">{k}: {msg}</div>
         ))}
         {data && data.cards.length > 0 && (
-          <div className="grid gap-3 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="grid gap-3 grid-cols-1 @lg/content:grid-cols-2 @[54rem]/content:grid-cols-3">
             {data.cards.map((c) => {
               const labelKey = FED_LABEL_KEYS[c.id as keyof typeof FED_LABEL_KEYS]
               return (
