@@ -74,26 +74,32 @@ quantitative research assignment to the initialized default desk. The
 underlying public route is:
 
 ```bash
-alice-workspace conversation ask --harness autoquant \
+alice conversation create --harness autoquant \
   --prompt "Research this hypothesis, preserve the stated constraints, and return the evidence paths"
 ```
 
-Add `--await` when the current answer needs the result. Otherwise retain the
-returned `taskId` and later use `conversation await`, `read`, or `collect`.
-AutoQuant delegation has no default execution deadline; use `--timeout-ms` only
-for a caller-chosen hard stop.
+Delegation dispatches asynchronously by default and returns `taskId` and
+`resumeId` immediately. Once dispatched, the calling Session ends its turn;
+when AutoQuant finishes, OpenAlice automatically wakes the calling Session so it
+can run `alice conversation check` (or `alice conversation read --task-id <taskId>`,
+`await`, or `collect`) to consume the reply. Reserve `--await` for quick
+follow-up questions on an existing Session
+(`alice conversation ask --resume-id <resumeId> --await ...`), which waits up to
+a bounded quick-reply window without stopping the background run. AutoQuant
+delegation has no default execution deadline; use `--timeout-ms` only for a
+caller-chosen hard stop.
 
 The Harness target requires an explicitly initialized default AutoQuant
 Workspace. It never creates or guesses a desk during delegation. The returned
 Agent message should name its Project and applicable immutable evidence ids,
 give the absolute Project root and primary deliverable directory, distinguish
 validation from holdout evidence, and state assumptions and the no-trading
-boundary. Continue the returned `resumeId` for clarification instead of
-recruiting another worker and losing its context.
+boundary. Continue the returned `resumeId` with `alice conversation ask --resume-id <resumeId>`
+for clarification instead of recruiting another worker and losing its context.
 
 AutoQuant does not automatically publish a Report or Dossier to Inbox. Its
-ordinary Agent reply is the handoff; request `inbox push` only when a durable
-human-facing delivery or asynchronous notification is actually wanted.
+ordinary Agent reply is the handoff; request `alice inbox push` only when a
+durable human-facing delivery or asynchronous notification is actually wanted.
 
 ## Source and provenance
 
