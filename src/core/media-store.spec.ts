@@ -12,6 +12,13 @@ describe('resolveMediaPath', () => {
     const result = resolveMediaPath('2026-01-01/ace-aim-air.png')
     expect(result).toContain(join('data', 'media', '2026-01-01', 'ace-aim-air.png'))
   })
+
+  it('should reject paths that escape the media dir', () => {
+    // The route decodes URL segments before calling us, so `%2e%2e%2f` arrives
+    // here as `../`. Both forms have to be rejected, not resolved.
+    expect(() => resolveMediaPath('../secrets.txt')).toThrow(/escapes media dir/)
+    expect(() => resolveMediaPath('2026-01-01/../../etc/passwd')).toThrow(/escapes media dir/)
+  })
 })
 
 // ==================== persistMedia ====================
