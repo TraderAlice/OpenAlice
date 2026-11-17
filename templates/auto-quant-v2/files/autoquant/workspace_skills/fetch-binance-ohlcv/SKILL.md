@@ -1,43 +1,38 @@
 ---
 name: fetch-binance-ohlcv
-description: Acquire bounded closed paginated Binance Spot public K-lines, preserve exact request and file hashes, verify a continuous UTC bar-close grid, and emit an auditable AutoQuant V2 staging package. Use for continuous crypto OHLCV research when Binance Spot is an authorized provider route.
+description: Fetch paginated closed Binance Spot public 1h K-lines on a verified continuous UTC bar-close grid via `aq-python`, ready for `aq data ingest`.
 ---
 
 # Fetch Binance OHLCV
 
-Use the public Spot K-line route for bounded research input. Keep provider
-instrument identity, quote asset, access terms, and venue claims explicit.
-
-## Prepare
-
-1. Read `$acquire-market-ohlcv` and
-   [assets-format.md](references/assets-format.md).
-2. Choose inclusive first and last completed bar-close timestamps in UTC.
-3. State the exact higher feature intervals AutoQuant should derive.
-4. Pass the applicable access/terms understanding explicitly.
+Fetch continuous UTC `1h` closed Spot K-lines from Binance public endpoints when `alice market bars` / `aq data fetch` does not cover the requested pair or history.
 
 ## Fetch
 
+1. Prepare an asset inventory JSON using [assets-format.md](references/assets-format.md).
+2. Choose inclusive completed bar-close UTC bounds (`--start-close`, `--end-close`) and run:
+
 ```bash
 aq-python scripts/fetch_binance_hourly.py \
-  --output <workspace>/staging/market-data/<dataset-id> \
+  --output /tmp/aq-fetch/<dataset-id> \
   --assets /absolute/path/assets.json \
   --dataset-id <dataset-id> \
   --start-close 2025-01-01T01:00:00Z \
   --end-close 2026-01-01T00:00:00Z \
-  --feature-intervals 3h,4h,6h,12h,1d \
+  --feature-intervals 4h,1d \
   --terms "caller-authorized research retrieval; Binance terms apply"
 ```
 
-The output directory must be absent or empty. The script paginates with an
-explicit range, converts provider open times to nominal bar-close timestamps,
-deduplicates, and rejects any missing or extra hour.
+The script paginates across the requested window, converts Binance open times to completed UTC bar-close timestamps, deduplicates, and fails closed if any expected hour is missing.
 
-## Verify and hand off
+## Inspect & Ingest
 
-- Inspect the exact request window, returned count, first/last close,
-  duplicates, zero-volume rows, and file hashes in `provider-audit.json`.
-- Confirm every provider symbol and quote currency.
-- Invoke `$package-autoquant-ohlcv` and strict Project intake.
-- Do not infer order-book liquidity, futures funding, margin, fill, Broker, or
-  account authority from Spot OHLCV.
+1. Review `provider-audit.json` for bar count, first/last close, and zero-volume hours, and note that Spot OHLCV does not include perpetual funding rates or order-book depth.
+2. Ingest directly into `<project>/data/`:
+   ```bash
+   uv run aq data ingest . /tmp/aq-fetch/<dataset-id> \
+     --project <project-id> \
+     --dataset-id <dataset-id> \
+     --source binance-spot \
+     --json
+   ```

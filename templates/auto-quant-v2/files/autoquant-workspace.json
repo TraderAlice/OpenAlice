@@ -1,6 +1,6 @@
 {
-  "default_project": null,
-  "name": "AutoQuant V2 Research Desk",
+  "schema_version": 1,
+  "name": "AutoQuant Research Desk",
   "projects_directory": "projects",
-  "schema_version": 1
+  "default_project": null
 }

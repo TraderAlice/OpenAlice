@@ -1,6 +1,6 @@
 {
   "manifestVersion": 1,
-  "version": "0.9.34",
+  "version": "1.0.0",
   "capabilities": {
     "studio": {
       "command": ["uv", "run", "--frozen", "--no-sync", "aq", "studio", "serve", ".", "--no-open"],

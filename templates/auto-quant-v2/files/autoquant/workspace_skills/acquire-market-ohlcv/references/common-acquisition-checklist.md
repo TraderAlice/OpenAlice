@@ -1,55 +1,23 @@
-# Common acquisition checklist
+# Common OHLCV Acquisition Checklist
 
-## Before fetching
+## Before Fetching
 
-- Recover the research question before choosing data.
-- Name the economic instrument, provider symbol, listing venue, quote
-  currency, and asset class separately.
-- Use a bounded date range and completed bars only.
-- State whether prices must be raw, split-adjusted,
-  split-and-dividend-adjusted, or only provider-adjusted.
-- State whether the Study needs a common aligned panel or observed-only bars.
-- Prefer two independently usable sources. Select by task fitness rather than
-  a permanent global priority.
-- Do not reduce the requested universe, history, or semantics because staged
-  data happens to exist. Reacquiring duplicate task-complete bytes is valid.
+- Clarify the research question, listing venue, quote currency, interval, and required date span before downloading bars.
+- Check OpenAlice native market data (`alice market search-bars` + `alice market bars` / `uv run aq data fetch`) or caller-provided CSV/Parquet files first when they cover the needed symbols, interval, and history.
+- Use a bounded date range of **completed bars only** (exclude the forming current session or partial intraday bar).
+- Decide whether the study requires **raw**, **split-adjusted**, or **split-and-dividend-adjusted** prices:
+  - Total-return and multi-year momentum/portfolio backtests generally require split-and-dividend or split-adjusted prices so stock splits do not appear as `-50%` crashes.
+  - Event or microstructure studies around nominal price levels may require raw prices.
 
-## Preserve
+## Quality Checks Before Ingestion
 
-- The exact executed script and arguments.
-- Provider source URI and terms/access claim.
-- Retrieval timestamp when known.
-- Raw response or the closest provider-delivered file.
-- SHA-256 for raw and normalized files.
-- Symbol and venue mapping evidence.
-- Transformation rules, especially timestamp and adjustment changes.
-- Missing, duplicate, zero-volume, non-positive, and invalid-OHLC counts.
+- **OHLCV invariants**: Unique monotonic `(timestamp, asset)` keys, positive prices, `high >= max(open, close)`, `low <= min(open, close)`, and non-negative volume.
+- **Volume units**: Confirm whether the provider reports shares or 100-share lots (bundled A-share scripts convert lots to shares automatically and audit against turnover value where available).
+- **Suspensions & holidays**: Keep market closures and trading halts absent rather than forward-filling synthetic flat bars.
+- **Cross-market clocks**: When combining daily bars from different timezones (for example `XTKS` Tokyo and `XNYS` New York), map session dates to real scheduled UTC close timestamps via `exchange_calendars` (see `$package-autoquant-ohlcv`) so same-date New York closes never leak into earlier Tokyo closes.
+- **Survivorship disclosure**: Treat current index or ETF constituent lists as a point-in-time snapshot, not a survivorship-free historical universe, and note that limitation in `research.md`.
 
-## Reject or disclose
+## Optional Cross-Check & Direct Ingestion
 
-- A forming current bar.
-- Naive intraday timestamps or an invented bar-close shift.
-- Forward-filled closures or suspensions.
-- Adjusted close combined silently with raw open/high/low.
-- A total-return claim inferred only from a field named “adjusted.”
-- A venue/calendar claim inferred only from a ticker suffix.
-- A “free” or redistribution-rights claim not supported by current terms.
-- Current-constituent universes represented as survivorship-free history.
-
-## Compare two sources
-
-For an overlapping sample, compare dates, row counts, split/dividend regions,
-OHLC returns, volume scale, latest completed date, and missing observations.
-Explain differences; do not average conflicting providers.
-Use numerical comparison only for compatible adjustment claims. Use explicit
-coverage-only comparison for incompatible raw/adjusted packages.
-
-When an independently attempted provider command fails, preserve the standard
-route-failure audit through `scripts/run_route_attempt.py`; do not handwrite a
-success-shaped package or describe one local failure as global unavailability.
-
-## Hand off
-
-Use `$package-autoquant-ohlcv`. A successful download is not yet a valid
-AutoQuant dataset, and a valid dataset package does not authenticate provider
-truth.
+- Pick one appropriate source by default. Fetch a second independent provider only when diagnosing suspicious jumps, unadjusted splits, or missing history—and compare prices numerically only when adjustment semantics match.
+- Ingest verified CSV/Parquet/DataFrame data directly into `<project>/data/` via `uv run aq data ingest` or `aq.ingest_ohlcv(...)`.

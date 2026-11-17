@@ -139,12 +139,12 @@ describe('AutoQuant setup', () => {
       name: 'auto-quant-v2',
       displayName: 'AutoQuant',
       defaultAgents: ['codex'],
-      version: '0.9.34',
+      version: '1.0.0',
       hasReadme: true,
     }
     mocks.useWorkspaces.mockReturnValue({ ...context([]), templates: [embedded] })
     render(<AutoQuantSetupPage />)
-    expect(screen.getByText('v0.9.34')).toBeTruthy()
+    expect(screen.getByText('v1.0.0')).toBeTruthy()
   })
 
   it('requires explicit selection when an AutoQuant Workspace already exists', async () => {

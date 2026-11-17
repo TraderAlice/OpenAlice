@@ -1,75 +1,36 @@
-"""Verified read-only snapshots and local HTTP presentation for AutoQuant."""
+"""Modular read-only Quant Studio backend and OpenAlice managed surface."""
 
 from __future__ import annotations
 
+import csv
 import ipaddress
 import json
+import math
 import os
-import shlex
+import re
+import signal
+import sys
 import threading
 import webbrowser
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from importlib.resources import files
-from pathlib import Path
-from typing import Any, Callable, Mapping
-from urllib.parse import urlsplit
+from pathlib import Path, PurePosixPath
+from typing import Any, Mapping
+from urllib.parse import parse_qs, unquote, urlsplit
 
-from .allocation_explorer import (
-    DEFAULT_ALLOCATION_POINTS,
-    load_allocation_diagnostics,
-)
-from .decision_matrix import (
-    STUDIO_COMPARISON_TRIALS,
-    load_session_decision_matrix,
-)
-from .book_risk_explorer import (
-    DEFAULT_BOOK_RISK_POINTS,
-    load_book_risk_diagnostics,
-)
-from .dossiers import list_dossiers, load_dossier_status
-from .factor_explorer import (
-    DEFAULT_FACTOR_POINTS,
-    load_factor_diagnostics,
-)
-from .event_explorer import load_event_study_diagnostics
-from .book_path_stress_explorer import load_book_path_stress_diagnostics
-from .intake import (
-    dataset_snapshot_class_context,
-    load_project_intake,
-    load_study_dataset_snapshot,
-)
-from .holdouts import load_holdout_status
-from .orientation import build_agent_work_brief
-from .portfolio_explorer import (
-    DEFAULT_PORTFOLIO_POINTS,
-    load_portfolio_diagnostics,
-)
-from .rl_explorer import DEFAULT_RL_POINTS, load_rl_diagnostics
-from .research import list_campaign_progress, list_campaigns
-from .research_program import load_research_program
-from .reports import list_reports
-from .run_reports import list_run_reports
-from .reviews import list_reviews
-from .runs import harness_identity, list_runs, load_run, run_failure_disposition
-from .sessions import list_sessions, load_session, session_snapshot
-from .studies import hash_json, list_studies, load_study
-from .workspace import (
-    PROJECT_MANIFEST,
-    SCHEMA_VERSION,
-    WORKSPACE_MANIFEST,
-    AutoQuantValidationError,
-    ProjectContext,
-    ValidationIssue,
-    confined_path,
-    load_project,
-    load_workspace,
-)
+from .version import current_version
 
-
+SCHEMA_VERSION = 1
 STUDIO_KIND = "autoquant-studio-snapshot"
+STUDIO_HEALTH_KIND = "autoquant-studio-health"
+STUDIO_RUN_KIND = "autoquant-studio-run"
+WORKSPACE_MANIFEST = "autoquant-workspace.json"
+WORKSPACE_LOCAL_MANIFEST = "autoquant-workspace.local.json"
+PROJECT_MANIFEST = "project.json"
+
 HARNESS_CAPABILITY = "HARNESS_CAPABILITY"
 HARNESS_HOST = "HARNESS_HOST"
 HARNESS_PORTS = "HARNESS_PORTS"
@@ -78,55 +39,81 @@ STUDIO_MANAGED_PORT_NAMES = frozenset({"http"})
 STANDALONE_STUDIO_HOST = "127.0.0.1"
 STANDALONE_STUDIO_PORT = 8765
 
+SAFE_ID_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$")
+MAX_TEXT_ARTIFACT_BYTES = 1_048_576
+MAX_CSV_PREVIEW_ROWS = 100
 
-@dataclass(frozen=True)
-class StudioLaunch:
-    """Resolved bind and browser authority for one Studio process."""
-
-    host: str
-    port: int
-    open_browser: bool
-    managed: bool
-
-
-STUDIO_ASSETS = {
+STUDIO_ASSETS: dict[str, tuple[str, str]] = {
     "/": ("index.html", "text/html; charset=utf-8"),
     "/index.html": ("index.html", "text/html; charset=utf-8"),
     "/assets/studio.css": ("studio.css", "text/css; charset=utf-8"),
     "/assets/studio.js": ("studio.js", "text/javascript; charset=utf-8"),
 }
-STANDALONE_SECURITY_HEADERS = {
+
+STANDALONE_SECURITY_HEADERS: dict[str, str] = {
     "Content-Security-Policy": (
         "default-src 'none'; script-src 'self'; style-src 'self'; "
         "img-src 'self' data:; connect-src 'self'; font-src 'self'; "
         "base-uri 'none'; form-action 'none'; frame-ancestors 'none'"
     ),
     "Cross-Origin-Resource-Policy": "same-origin",
-    "Permissions-Policy": (
-        "camera=(), microphone=(), geolocation=(), payment=(), usb=()"
-    ),
+    "Permissions-Policy": "camera=(), microphone=(), geolocation=(), payment=(), usb=()",
     "Referrer-Policy": "no-referrer",
     "X-Content-Type-Options": "nosniff",
     "X-Frame-Options": "DENY",
 }
-MANAGED_SECURITY_HEADERS = {
+
+MANAGED_SECURITY_HEADERS: dict[str, str] = {
     "Content-Security-Policy": (
         "default-src 'none'; script-src 'self'; style-src 'self'; "
         "img-src 'self' data:; connect-src 'self'; font-src 'self'; "
         "base-uri 'none'; form-action 'none'; frame-ancestors app: "
         "http://127.0.0.1:* http://localhost:* http://*.localhost:*"
     ),
-    "Permissions-Policy": (
-        "camera=(), microphone=(), geolocation=(), payment=(), usb=()"
-    ),
+    "Permissions-Policy": "camera=(), microphone=(), geolocation=(), payment=(), usb=()",
     "Referrer-Policy": "no-referrer",
     "X-Content-Type-Options": "nosniff",
 }
 
 
-def studio_security_headers(*, managed: bool) -> Mapping[str, str]:
-    """Return the explicit launch-mode response policy."""
+@dataclass(frozen=True)
+class ValidationIssue:
+    path: str
+    code: str
+    message: str
 
+    def to_dict(self) -> dict[str, str]:
+        return asdict(self)
+
+
+class StudioError(ValueError):
+    """Validation or confinement failure while reading or serving Studio state."""
+
+    def __init__(self, issues_or_message: list[ValidationIssue] | str, *, code: str = "studio.invalid"):
+        self.issues = (
+            [ValidationIssue("", code, issues_or_message)]
+            if isinstance(issues_or_message, str)
+            else list(issues_or_message)
+        )
+        super().__init__("; ".join(item.message for item in self.issues))
+
+
+class StudioNotFoundError(StudioError):
+    """Requested Project or Run does not exist."""
+
+
+AutoQuantValidationError = StudioError
+
+
+@dataclass(frozen=True)
+class StudioLaunch:
+    host: str
+    port: int
+    open_browser: bool
+    managed: bool
+
+
+def studio_security_headers(*, managed: bool) -> Mapping[str, str]:
     return MANAGED_SECURITY_HEADERS if managed else STANDALONE_SECURITY_HEADERS
 
 
@@ -134,62 +121,102 @@ def _issue(path: Path | str, code: str, message: str) -> ValidationIssue:
     return ValidationIssue(str(path), code, message)
 
 
+def _sanitize_json(value: Any) -> Any:
+    if isinstance(value, float):
+        return value if math.isfinite(value) else None
+    if isinstance(value, dict):
+        return {str(k): _sanitize_json(v) for k, v in value.items()}
+    if isinstance(value, (list, tuple)):
+        return [_sanitize_json(v) for v in value]
+    return value
+
+
+def _parse_float(raw: str | None) -> float | None:
+    if raw is None or not raw.strip():
+        return None
+    try:
+        val = float(raw.strip())
+    except ValueError:
+        return None
+    return val if math.isfinite(val) else None
+
+
+def _validate_id(value: str, label: str) -> str:
+    if not isinstance(value, str) or not SAFE_ID_RE.fullmatch(value) or ".." in value:
+        raise StudioError([_issue(label, "studio.id", f"Invalid {label}: {value!r}")])
+    return value
+
+
+def _resolve_non_symlink_root(path: str | Path) -> Path:
+    raw = Path(path).expanduser().absolute()
+    if raw.is_symlink():
+        raise StudioError([_issue(raw, "path.symlink", f"Root path cannot be a symlink: {raw}")])
+    resolved = raw.resolve()
+    if not resolved.exists():
+        raise StudioNotFoundError([_issue(raw, "path.missing", f"Path does not exist: {raw}")])
+    if not resolved.is_dir():
+        raise StudioError([_issue(raw, "path.not-dir", f"Expected directory path: {raw}")])
+    return resolved
+
+
+def _confined_path(root: Path, relative: str, issue_path: str | Path = "") -> Path:
+    label = issue_path or relative
+    if not isinstance(relative, str) or not relative or "\\" in relative or "\x00" in relative:
+        raise StudioError([_issue(label, "path.invalid", f"Invalid relative path: {relative!r}")])
+    posix = PurePosixPath(relative)
+    if posix.is_absolute() or relative in {".", ".."} or ".." in posix.parts or "." in posix.parts:
+        raise StudioError([_issue(label, "path.escape", f"Path escapes root: {relative!r}")])
+    current = root
+    for segment in posix.parts:
+        current = current / segment
+        if current.is_symlink():
+            raise StudioError([_issue(label, "path.symlink", f"Symlink not allowed: {current}")])
+    resolved = current.resolve()
+    try:
+        resolved.relative_to(root)
+    except ValueError:
+        raise StudioError([_issue(label, "path.escape", f"Path escapes root: {relative!r}")]) from None
+    return resolved
+
+
+def _read_json_dict(path: Path) -> dict[str, Any]:
+    if path.is_symlink():
+        raise StudioError([_issue(path, "path.symlink", f"Symlink not allowed: {path}")])
+    try:
+        raw = json.loads(path.read_text(encoding="utf-8"))
+    except FileNotFoundError:
+        raise StudioNotFoundError([_issue(path, "manifest.missing", f"Missing file: {path}")]) from None
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError) as error:
+        raise StudioError([_issue(path, "json.invalid", f"Invalid JSON in {path}: {error}")]) from None
+    if not isinstance(raw, dict):
+        raise StudioError([_issue(path, "json.object", f"Expected JSON object in {path}")])
+    return _sanitize_json(raw)
+
+
 def _managed_ports(raw: str | None) -> dict[str, Any]:
     if raw is None:
-        raise AutoQuantValidationError(
-            [
-                _issue(
-                    HARNESS_PORTS,
-                    "studio.managed-ports",
-                    "Managed Studio requires an injected JSON ports object",
-                )
-            ]
-        )
+        raise StudioError([_issue(HARNESS_PORTS, "studio.managed-ports", "Managed Studio requires HARNESS_PORTS JSON")])
 
     def reject_duplicates(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
-        result: dict[str, Any] = {}
-        for key, value in pairs:
-            if key in result:
-                raise ValueError(f"duplicate port name: {key}")
-            result[key] = value
-        return result
+        out: dict[str, Any] = {}
+        for key, val in pairs:
+            if key in out:
+                raise ValueError(f"duplicate port key: {key}")
+            out[key] = val
+        return out
 
     try:
         parsed = json.loads(raw, object_pairs_hook=reject_duplicates)
     except (json.JSONDecodeError, ValueError) as error:
-        raise AutoQuantValidationError(
-            [
-                _issue(
-                    HARNESS_PORTS,
-                    "studio.managed-ports",
-                    "Managed Studio ports must be one unambiguous JSON object",
-                )
-            ]
-        ) from error
+        raise StudioError([_issue(HARNESS_PORTS, "studio.managed-ports", "Managed Studio ports must be unambiguous JSON")]) from error
     if not isinstance(parsed, dict):
-        raise AutoQuantValidationError(
-            [
-                _issue(
-                    HARNESS_PORTS,
-                    "studio.managed-ports",
-                    "Managed Studio ports must be a JSON object",
-                )
-            ]
-        )
+        raise StudioError([_issue(HARNESS_PORTS, "studio.managed-ports", "Managed Studio ports must be a JSON object")])
     return parsed
 
 
 def _managed_host(raw: str | None) -> str:
     if raw is None or not raw or raw.strip() != raw:
-        raise AutoQuantValidationError(
-            [
-                _issue(
-                    HARNESS_HOST,
-                    "studio.managed-host",
-                    "Managed Studio requires one non-empty injected host",
-                )
-            ]
-        )
+        raise StudioError([_issue(HARNESS_HOST, "studio.managed-host", "Managed Studio requires one non-empty injected host")])
     if raw.casefold() == "localhost":
         return raw
     try:
@@ -198,1744 +225,378 @@ def _managed_host(raw: str | None) -> str:
         address = None
     if isinstance(address, ipaddress.IPv4Address) and address.is_loopback:
         return raw
-    raise AutoQuantValidationError(
-        [
-            _issue(
-                HARNESS_HOST,
-                "studio.managed-host",
-                "Managed Studio host must be localhost or a canonical IPv4 "
-                "loopback address",
-            )
-        ]
-    )
+    raise StudioError([_issue(HARNESS_HOST, "studio.managed-host", "Managed Studio host must be localhost or IPv4 loopback")])
 
 
 def resolve_studio_launch(
     *,
-    host: str | None,
-    port: int | None,
-    no_open: bool,
+    host: str | None = None,
+    port: int | None = None,
+    no_open: bool = False,
+    open_browser: bool | None = None,
     environ: Mapping[str, str] | None = None,
 ) -> StudioLaunch:
-    """Resolve standalone defaults or strict generic Harness authority."""
+    """Resolve standalone defaults or strict OpenAlice Harness authority."""
 
+    effective_no_open = (not open_browser) if open_browser is not None else bool(no_open)
     environment = os.environ if environ is None else environ
     if environment.get(HARNESS_CAPABILITY) != "studio":
         return StudioLaunch(
             host=STANDALONE_STUDIO_HOST if host is None else host,
             port=STANDALONE_STUDIO_PORT if port is None else port,
-            open_browser=not no_open,
+            open_browser=not effective_no_open,
             managed=False,
         )
 
     injected_host = _managed_host(environment.get(HARNESS_HOST))
     ports = _managed_ports(environment.get(HARNESS_PORTS))
     if set(ports) != STUDIO_MANAGED_PORT_NAMES:
-        declared = ", ".join(sorted(STUDIO_MANAGED_PORT_NAMES))
-        raise AutoQuantValidationError(
-            [
-                _issue(
-                    HARNESS_PORTS,
-                    "studio.managed-port-names",
-                    "Managed Studio ports must match the manifest exactly: "
-                    f"{declared}",
-                )
-            ]
-        )
+        raise StudioError([_issue(HARNESS_PORTS, "studio.managed-port-names", "Managed Studio ports must match manifest: http")])
     injected_port = ports["http"]
-    if (
-        not isinstance(injected_port, int)
-        or isinstance(injected_port, bool)
-        or not 1 <= injected_port <= 65535
-    ):
-        raise AutoQuantValidationError(
-            [
-                _issue(
-                    f"{HARNESS_PORTS}.http",
-                    "studio.managed-http-port",
-                    "Managed Studio http port must be an integer from 1 to 65535",
-                )
-            ]
-        )
+    if not isinstance(injected_port, int) or isinstance(injected_port, bool) or not 1 <= injected_port <= 65535:
+        raise StudioError([_issue(f"{HARNESS_PORTS}.http", "studio.managed-http-port", "Managed Studio http port must be 1..65535")])
     issues: list[ValidationIssue] = []
     if host is not None and host != injected_host:
-        issues.append(
-            _issue(
-                "--host",
-                "studio.managed-host-conflict",
-                f"Explicit Studio host {host!r} conflicts with injected host {injected_host!r}",
-            )
-        )
+        issues.append(_issue("--host", "studio.managed-host-conflict", f"Explicit Studio host {host!r} conflicts with injected host {injected_host!r}"))
     if port is not None and port != injected_port:
-        issues.append(
-            _issue(
-                "--port",
-                "studio.managed-port-conflict",
-                f"Explicit Studio port {port} conflicts with injected port {injected_port}",
-            )
-        )
+        issues.append(_issue("--port", "studio.managed-port-conflict", f"Explicit Studio port {port} conflicts with injected port {injected_port}"))
     if issues:
-        raise AutoQuantValidationError(issues)
+        raise StudioError(issues)
     return StudioLaunch(
         host=injected_host,
         port=injected_port,
-        open_browser=(
-            not no_open
-            and environment.get(HARNESS_NO_OPEN) != "1"
-        ),
+        open_browser=(not effective_no_open and environment.get(HARNESS_NO_OPEN) != "1"),
         managed=True,
     )
 
 
-def _diagnostics(
-    category: str,
-    error: AutoQuantValidationError,
-) -> list[dict[str, str]]:
-    return [
-        {
-            "category": category,
-            **issue.to_dict(),
+def _locate_source(path: str | Path) -> tuple[str, Path, dict[str, Any], Path | None]:
+    root = _resolve_non_symlink_root(path)
+    ws_manifest, ws_local, proj_manifest = root / WORKSPACE_MANIFEST, root / WORKSPACE_LOCAL_MANIFEST, root / PROJECT_MANIFEST
+
+    if ws_manifest.exists() or ws_manifest.is_symlink():
+        active_cfg = _read_json_dict(ws_manifest)
+        cfg_source = "workspace-manifest"
+        if ws_local.exists() or ws_local.is_symlink():
+            if ws_local.is_symlink() or not ws_local.is_file():
+                raise StudioError([_issue(ws_local, "path.symlink", "Local workspace override must be a regular file")])
+            active_cfg = _read_json_dict(ws_local)
+            cfg_source = "local-override"
+            raw_dir = active_cfg.get("projects_directory", "projects")
+            if not isinstance(raw_dir, str) or not raw_dir.strip() or "\x00" in raw_dir:
+                raise StudioError([_issue(ws_local, "workspace.projects_directory", "Invalid projects_directory")])
+            cand = Path(raw_dir).expanduser()
+            if cand.is_absolute():
+                if cand.is_symlink():
+                    raise StudioError([_issue(cand, "path.symlink", f"Projects directory cannot be a symlink: {cand}")])
+                projects_dir = cand.resolve()
+            else:
+                projects_dir = _confined_path(root, raw_dir, f"{ws_local}/projects_directory")
+        else:
+            projects_dir = _confined_path(root, active_cfg.get("projects_directory", "projects"), f"{ws_manifest}/projects_directory")
+        if projects_dir.exists() and not projects_dir.is_dir():
+            raise StudioError([_issue(projects_dir, "workspace.projects_directory", "Projects path must be a directory")])
+        default_proj = active_cfg.get("default_project")
+        if default_proj is not None:
+            _validate_id(str(default_proj), "default_project")
+        return "workspace", root, {
+            "scope": "workspace",
+            "root_dir": str(root),
+            "name": str(active_cfg.get("name") or root.name),
+            "projects_dir": str(projects_dir),
+            "default_project": default_proj,
+            "configuration_source": cfg_source,
+        }, projects_dir
+
+    if proj_manifest.exists() or proj_manifest.is_symlink():
+        raw_proj = _read_json_dict(proj_manifest)
+        return "project", root, {
+            "scope": "project",
+            "root_dir": str(root),
+            "name": str(raw_proj.get("name") or raw_proj.get("id") or root.name),
+            "projects_dir": None,
+            "default_project": raw_proj.get("id"),
+            "configuration_source": "project-manifest",
+        }, None
+
+    raise StudioError([_issue(root, "studio.root", f"No {WORKSPACE_MANIFEST} or {PROJECT_MANIFEST} found in {root}")])
+
+
+def _normalize_run(raw: dict[str, Any], fallback_id: str, project_id: str) -> dict[str, Any]:
+    metrics_raw = raw.get("metrics") if isinstance(raw.get("metrics"), dict) else {}
+    metrics = {
+        str(k): (float(v) if isinstance(v, (int, float)) and not isinstance(v, bool) and math.isfinite(float(v)) else None)
+        for k, v in metrics_raw.items()
+    }
+    return {
+        "schema_version": raw.get("schema_version", SCHEMA_VERSION),
+        "id": str(raw.get("id") or fallback_id),
+        "project_id": str(raw.get("project_id") or project_id),
+        "kind": str(raw.get("kind") or "custom"),
+        "name": str(raw.get("name") or raw.get("id") or fallback_id),
+        "split": str(raw.get("split") or "in_sample"),
+        "created_at": str(raw.get("created_at") or ""),
+        "hypothesis": str(raw.get("hypothesis") or ""),
+        "parameters": raw.get("parameters") if isinstance(raw.get("parameters"), dict) else {},
+        "dataset": raw.get("dataset"),
+        "provenance": raw.get("provenance") if isinstance(raw.get("provenance"), dict) else {},
+        "metrics": metrics,
+        "series_files": raw.get("series_files") if isinstance(raw.get("series_files"), dict) else {},
+        "artifacts": raw.get("artifacts") if isinstance(raw.get("artifacts"), list) else [],
+        "notes": str(raw.get("notes") or ""),
+    }
+
+
+def _load_project_summary(project_dir: Path) -> dict[str, Any]:
+    raw = _read_json_dict(_confined_path(project_dir, PROJECT_MANIFEST, f"{project_dir}/{PROJECT_MANIFEST}"))
+    proj_id = _validate_id(str(raw.get("id") or project_dir.name), "project.id")
+
+    raw_splits = raw.get("splits") if isinstance(raw.get("splits"), dict) else {}
+    splits = {"train_end": raw_splits.get("train_end"), "val_end": raw_splits.get("val_end"), "holdout_end": raw_splits.get("holdout_end")}
+    raw_audit = raw.get("holdout_audit") if isinstance(raw.get("holdout_audit"), dict) else {}
+    unlocks = raw_audit.get("unlocks") if isinstance(raw.get("unlocks"), list) else []
+    unlock_count = raw_audit.get("unlock_count")
+    if not isinstance(unlock_count, int) or isinstance(unlock_count, bool):
+        unlock_count = len(unlocks)
+
+    research_md = ""
+    research_path = _confined_path(project_dir, "research.md", f"{project_dir}/research.md")
+    if research_path.exists():
+        if not research_path.is_file():
+            raise StudioError([_issue(research_path, "path.invalid", "research.md must be a regular file")])
+        research_md = research_path.read_text(encoding="utf-8", errors="replace")
+
+    datasets: list[dict[str, Any]] = []
+    if (project_dir / "data").is_symlink():
+        raise StudioError([_issue(project_dir / "data", "path.symlink", "Symlink not allowed: data")])
+    manifest_json = _confined_path(project_dir, "data/manifest.json", f"{project_dir}/data/manifest.json")
+    if manifest_json.exists():
+        raw_data = _read_json_dict(manifest_json).get("datasets", {})
+        if isinstance(raw_data, dict):
+            datasets.extend({"id": k, **v} for k, v in sorted(raw_data.items()) if isinstance(v, dict))
+        elif isinstance(raw_data, list):
+            datasets.extend(item for item in raw_data if isinstance(item, dict))
+
+    runs: list[dict[str, Any]] = []
+    runs_dir = _confined_path(project_dir, "runs", f"{project_dir}/runs")
+    if runs_dir.exists():
+        if not runs_dir.is_dir():
+            raise StudioError([_issue(runs_dir, "path.not-dir", "runs must be a directory")])
+        for entry in sorted(runs_dir.iterdir(), key=lambda p: p.name):
+            if entry.is_symlink():
+                raise StudioError([_issue(entry, "path.symlink", f"Symlink not allowed in runs: {entry}")])
+            if entry.name.startswith(".") or not entry.is_dir():
+                continue
+            run_id = _validate_id(entry.name, "run.id")
+            run_file = _confined_path(entry, "run.json", f"{entry}/run.json")
+            if run_file.exists():
+                runs.append(_normalize_run(_read_json_dict(run_file), run_id, proj_id))
+    runs.sort(key=lambda r: (r["created_at"], r["id"]), reverse=True)
+
+    return {
+        "id": proj_id,
+        "name": str(raw.get("name") or proj_id),
+        "description": str(raw.get("description") or ""),
+        "created_at": str(raw.get("created_at") or ""),
+        "root_dir": str(project_dir),
+        "splits": splits,
+        "holdout_audit": {"unlock_count": unlock_count, "unlocks": unlocks},
+        "research_markdown": research_md,
+        "datasets": datasets,
+        "runs": runs,
+    }
+
+
+def build_studio_snapshot(path: str | Path, *, project_id: str | None = None) -> dict[str, Any]:
+    """Build a verified read-only Studio snapshot for a Workspace or Project."""
+
+    scope, root, source_info, projects_dir = _locate_source(path)
+    projects: list[dict[str, Any]] = []
+
+    if scope == "project":
+        summary = _load_project_summary(root)
+        if project_id is not None and project_id != summary["id"]:
+            raise StudioNotFoundError([_issue(project_id, "project.not-found", f"Direct project is {summary['id']!r}, not {project_id!r}")])
+        projects.append(summary)
+    else:
+        assert projects_dir is not None
+        if project_id is not None:
+            _validate_id(project_id, "project_id")
+            target = _confined_path(projects_dir, project_id, f"{projects_dir}/{project_id}")
+            if not target.is_dir() or (not (target / PROJECT_MANIFEST).exists() and not (target / PROJECT_MANIFEST).is_symlink()):
+                raise StudioNotFoundError([_issue(target, "project.not-found", f"Unknown project: {project_id}")])
+            projects.append(_load_project_summary(target))
+        elif projects_dir.exists():
+            for entry in sorted(projects_dir.iterdir(), key=lambda p: p.name):
+                if entry.is_symlink():
+                    raise StudioError([_issue(entry, "path.symlink", f"Symlink not allowed in projects: {entry}")])
+                if entry.name.startswith(".") or not entry.is_dir():
+                    continue
+                if (entry / PROJECT_MANIFEST).exists() or (entry / PROJECT_MANIFEST).is_symlink():
+                    projects.append(_load_project_summary(entry))
+
+    default_proj = source_info.get("default_project")
+    proj_ids = [p["id"] for p in projects]
+    active_id = project_id if (project_id and project_id in proj_ids) else (default_proj if default_proj in proj_ids else (proj_ids[0] if proj_ids else None))
+
+    return {
+        "schema_version": SCHEMA_VERSION,
+        "kind": STUDIO_KIND,
+        "version": current_version(),
+        "generated_at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "source": source_info,
+        "active_project_id": active_id,
+        "projects": projects,
+    }
+
+
+def _read_csv_series(path: Path, *, compute_drawdown: bool = False) -> list[dict[str, Any]]:
+    if path.is_symlink():
+        raise StudioError([_issue(path, "path.symlink", f"Symlink not allowed: {path}")])
+    rows: list[dict[str, Any]] = []
+    peak = -math.inf
+    with path.open("r", encoding="utf-8", newline="") as handle:
+        for raw_row in csv.DictReader(handle):
+            item: dict[str, Any] = {}
+            for key, val in raw_row.items():
+                if key is None:
+                    continue
+                col = key.strip()
+                item[col] = (val or "").strip() if col == "timestamp" else _parse_float(val)
+            if compute_drawdown and item.get("drawdown") is None:
+                eq = item.get("equity")
+                if isinstance(eq, float) and eq > 0:
+                    peak = max(peak, eq)
+                    item["drawdown"] = (eq / peak) - 1.0 if peak > 0 else 0.0
+            rows.append(item)
+    return rows
+
+
+def _sanitize_svg_text(text: str) -> str:
+    cleaned = re.sub(r"(?is)<\s*(script|foreignObject|iframe|object|embed)\b[^>]*>.*?<\s*/\s*\1\s*>", "", text)
+    cleaned = re.sub(r"(?is)<\s*(script|foreignObject|iframe|object|embed)\b[^>]*/?\s*>", "", cleaned)
+    cleaned = re.sub(r'(?i)\s+on[a-z0-9_]+\s*=\s*(?:"[^"]*"|\'[^\']*\'|[^\s>]+)', "", cleaned)
+    return re.sub(r'(?i)(href|xlink:href)\s*=\s*(["\'])\s*(?:javascript:|https?:|//)[^"\']*\2', "", cleaned)
+
+
+def _load_artifact_entry(run_dir: Path, rel_path: str, name: str | None, declared_kind: str | None) -> dict[str, Any]:
+    file_path = _confined_path(run_dir, rel_path, f"{run_dir}/{rel_path}")
+    if not file_path.exists() or not file_path.is_file():
+        raise StudioError([_issue(file_path, "artifact.missing", f"Missing or invalid artifact file: {rel_path}")])
+    size_bytes = file_path.stat().st_size
+    suffix = file_path.suffix.lower()
+    base = {"name": name or file_path.name, "path": rel_path, "declared_kind": declared_kind, "size_bytes": size_bytes}
+
+    if size_bytes > MAX_TEXT_ARTIFACT_BYTES:
+        return {**base, "kind": "binary"}
+    if suffix == ".json":
+        try:
+            raw_json = json.loads(file_path.read_text(encoding="utf-8"))
+        except (OSError, UnicodeDecodeError, json.JSONDecodeError) as error:
+            raise StudioError([_issue(file_path, "json.invalid", f"Invalid artifact JSON: {error}")]) from None
+        return {**base, "kind": "json", "data": _sanitize_json(raw_json)}
+    if suffix == ".svg":
+        return {**base, "kind": "svg", "text": _sanitize_svg_text(file_path.read_text(encoding="utf-8", errors="replace"))}
+    if suffix in {".md", ".markdown"}:
+        return {**base, "kind": "markdown", "text": file_path.read_text(encoding="utf-8", errors="replace")}
+    if suffix == ".csv":
+        text = file_path.read_text(encoding="utf-8", errors="replace")
+        with file_path.open("r", encoding="utf-8", newline="") as handle:
+            reader = list(csv.reader(handle))
+        return {
+            **base,
+            "kind": "csv",
+            "text": text,
+            "columns": reader[0] if reader else [],
+            "rows": reader[1 : 1 + MAX_CSV_PREVIEW_ROWS] if len(reader) > 1 else [],
+            "total_rows": max(0, len(reader) - 1),
         }
-        for issue in error.issues
-    ]
-
-
-def _read_category(
-    category: str,
-    operation: Callable[[], Any],
-) -> tuple[Any, list[dict[str, str]]]:
     try:
-        return operation(), []
-    except AutoQuantValidationError as error:
-        return [], _diagnostics(category, error)
+        return {**base, "kind": "text", "text": file_path.read_text(encoding="utf-8")}
+    except UnicodeDecodeError:
+        return {**base, "kind": "binary"}
 
 
-def _workspace_projects(
-    root: Path,
-    selected_project: str | None,
-) -> tuple[dict[str, Any], list[ProjectContext], list[dict[str, str]]]:
-    workspace = load_workspace(root)
-    projects: list[ProjectContext] = []
-    discovered_ids: set[str] = set()
-    diagnostics: list[dict[str, str]] = []
-    for entry in sorted(workspace.projects_dir.iterdir(), key=lambda item: item.name):
+def _scan_artifacts_dir(run_dir: Path, current: Path, depth: int = 0) -> list[str]:
+    if current.is_symlink():
+        raise StudioError([_issue(current, "path.symlink", f"Symlink not allowed in artifacts: {current}")])
+    if not current.exists() or depth > 3:
+        return []
+    found: list[str] = []
+    for entry in sorted(current.iterdir(), key=lambda p: p.name):
+        if entry.is_symlink():
+            raise StudioError([_issue(entry, "path.symlink", f"Symlink not allowed in artifacts: {entry}")])
         if entry.name.startswith("."):
             continue
-        if entry.is_symlink() or not entry.is_dir():
-            diagnostics.append(
-                {
-                    "category": "workspace",
-                    **_issue(
-                        entry,
-                        "workspace.project-entry",
-                        "Workspace Project entries must be real directories",
-                    ).to_dict(),
-                }
-            )
-            continue
-        try:
-            project = load_project(entry, expected_id=entry.name)
-        except AutoQuantValidationError as error:
-            diagnostics.extend(_diagnostics("workspace", error))
-            continue
-        discovered_ids.add(project.manifest.id)
-        if selected_project is None or project.manifest.id == selected_project:
-            projects.append(project)
-    default_project = workspace.manifest.default_project
-    if default_project is not None and default_project not in discovered_ids:
-        diagnostics.append(
-            {
-                "category": "workspace",
-                **_issue(
-                    workspace.configuration_path,
-                    "workspace.default-project",
-                    f"Default Project '{default_project}' does not exist",
-                ).to_dict(),
-            }
-        )
-    if selected_project is not None and not any(
-        project.manifest.id == selected_project for project in projects
-    ):
-        raise AutoQuantValidationError(
-            [
-                _issue(
-                    selected_project,
-                    "workspace.project-missing",
-                    f"Unknown Workspace Project: {selected_project}",
-                )
-            ]
-        )
-    return (
-        {
-            "name": workspace.manifest.name,
-            "rootDir": str(workspace.root_dir),
-            "projectsDir": str(workspace.projects_dir),
-            "defaultProject": workspace.manifest.default_project,
-            "configurationSource": workspace.configuration_source,
-            "configurationPath": str(workspace.configuration_path),
-        },
-        projects,
-        diagnostics,
-    )
+        if entry.is_dir():
+            found.extend(_scan_artifacts_dir(run_dir, entry, depth + 1))
+        elif entry.is_file():
+            found.append(entry.relative_to(run_dir).as_posix())
+    return found
 
 
-def _resolve_source(
-    directory: str | Path,
-    selected_project: str | None,
-) -> tuple[str, Path, dict[str, Any] | None, list[ProjectContext], list[dict[str, str]]]:
-    raw = Path(directory).expanduser().absolute()
-    if raw.is_symlink():
-        raise AutoQuantValidationError(
-            [_issue(raw, "path.symlink", "Studio input root cannot be a symlink")]
-        )
-    root = raw.resolve()
-    is_project = (root / PROJECT_MANIFEST).is_file()
-    is_workspace = (root / WORKSPACE_MANIFEST).is_file()
-    if is_project and is_workspace:
-        raise AutoQuantValidationError(
-            [_issue(root, "path.ambiguous", "Studio root cannot be both types")]
-        )
-    if is_project:
-        if selected_project is not None:
-            raise AutoQuantValidationError(
-                [
-                    _issue(
-                        selected_project,
-                        "project.unexpected-selection",
-                        "--project cannot select inside a direct Project",
-                    )
-                ]
-            )
-        return "project", root, None, [load_project(root)], []
-    if is_workspace:
-        workspace, projects, diagnostics = _workspace_projects(
-            root,
-            selected_project,
-        )
-        return "workspace", root, workspace, projects, diagnostics
-    raise AutoQuantValidationError(
-        [
-            _issue(
-                root,
-                "path.not-autoquant",
-                f"Not an AutoQuant Project or Workspace: {root}",
-            )
-        ]
-    )
-
-
-def _timeline(
-    runs: list[dict[str, Any]],
-    sessions: list[dict[str, Any]],
-    run_reports: list[dict[str, Any]],
-    reviews: list[dict[str, Any]],
-    dossiers: list[dict[str, Any]],
-) -> list[dict[str, Any]]:
-    events: list[dict[str, Any]] = []
-    for run in runs:
-        events.append(
-            {
-                "kind": "run",
-                "id": run["id"],
-                "at": run["startedAt"],
-                "status": run["status"],
-                "title": f"{run['studyId']} · {run['primaryMetric']}",
-                "value": run["primaryValue"],
-            }
-        )
-    for item in sessions:
-        session = item["session"]
-        events.append(
-            {
-                "kind": "session",
-                "id": session["id"],
-                "at": session["updatedAt"],
-                "status": session["status"],
-                "title": session["studyId"],
-                "value": session["leader"]["value"],
-            }
-        )
-        for experiment in item["experiments"]:
-            events.append(
-                {
-                    "kind": "experiment",
-                    "id": experiment["id"],
-                    "at": experiment["completedAt"],
-                    "status": experiment["verdict"],
-                    "title": experiment["hypothesis"],
-                    "value": experiment["candidateValue"],
-                }
-            )
-        for campaign in item["campaigns"]:
-            events.append(
-                {
-                    "kind": "campaign",
-                    "id": campaign["id"],
-                    "at": campaign["completedAt"],
-                    "status": campaign["status"],
-                    "title": campaign["reason"],
-                    "value": campaign["experiments"],
-                }
-            )
-        for report in item["reports"]:
-            events.append(
-                {
-                    "kind": "report",
-                    "id": report["id"],
-                    "at": report["publishedAt"],
-                    "status": "published",
-                    "title": report["title"],
-                    "value": report["findings"],
-                }
-            )
-        for progress in item["progress"]:
-            events.append(
-                {
-                    "kind": "progress",
-                    "id": progress["campaignId"],
-                    "at": progress["updatedAt"],
-                    "status": progress["phase"],
-                    "title": progress["message"],
-                    "value": progress["turn"],
-                    "mutable": True,
-                }
-            )
-    for report in run_reports:
-        events.append(
-            {
-                "kind": "report",
-                "id": report["id"],
-                "at": report["publishedAt"],
-                "status": "published",
-                "title": report["title"],
-                "value": report["findings"],
-            }
-        )
-    for review in reviews:
-        events.append(
-            {
-                "kind": "review",
-                "id": review["id"],
-                "at": review["publishedAt"],
-                "status": review["conclusion"],
-                "title": review["title"],
-                "value": review["claims"],
-            }
-        )
-    for dossier in dossiers:
-        events.append(
-            {
-                "kind": "dossier",
-                "id": dossier["id"],
-                "at": dossier["publishedAt"],
-                "status": "published",
-                "title": dossier["title"],
-                "value": dossier["findings"],
-            }
-        )
-    return sorted(
-        events,
-        key=lambda event: (event["at"], event["id"]),
-        reverse=True,
-    )[:100]
-
-
-def _portfolio_metric_layers(result: dict[str, Any]) -> dict[str, Any] | None:
-    metrics = result["metrics"]
-    required = ("factor", "portfolio", "implementation", "robustness")
-    if not all(isinstance(metrics.get(key), dict) for key in required):
-        return None
-    try:
-        cost_stress = metrics["robustness"]["cost_stress"]
-        adverse_cost_key = max(
-            cost_stress,
-            key=lambda item: float(item.removesuffix("bps")),
-        )
-        layers = {
-            "kind": "portfolio",
-            "researchHorizon": metrics.get("research_horizon"),
-            "decisionCadence": (
-                metrics["portfolio_mandate"]["implementationPolicy"][
-                    "decisionPolicy"
-                ]
-                if isinstance(metrics.get("portfolio_mandate"), dict)
-                else None
-            ),
-            "mandate": (
-                {
-                    "id": metrics["portfolio_mandate"]["id"],
-                    "direction": metrics["portfolio_mandate"]["source"][
-                        "direction"
-                    ],
-                    "family": metrics["portfolio_mandate"]["construction"][
-                        "family"
-                    ],
-                    "grossLimit": metrics["portfolio_mandate"][
-                        "construction"
-                    ]["grossLimit"],
-                    "maxAbsWeight": metrics["portfolio_mandate"][
-                        "construction"
-                    ]["maxAbsWeight"],
-                    "assetMaxAbsWeights": metrics["portfolio_mandate"][
-                        "construction"
-                    ]["assetMaxAbsWeights"],
-                    "assetPositionRoles": metrics["portfolio_mandate"][
-                        "construction"
-                    ]["assetPositionRoles"],
-                    "positionRolesSource": metrics["portfolio_mandate"][
-                        "source"
-                    ]["assetPositionRoles"],
-                    "longGrossLimit": metrics["portfolio_mandate"][
-                        "construction"
-                    ]["longGrossLimit"],
-                    "shortGrossLimit": metrics["portfolio_mandate"][
-                        "construction"
-                    ]["shortGrossLimit"],
-                    "benchmark": metrics["portfolio_mandate"][
-                        "construction"
-                    ]["benchmark"],
-                    "policySource": metrics["portfolio_mandate"]["source"][
-                        "portfolioPolicy"
-                    ],
-                    "tradableAssets": metrics["portfolio_mandate"][
-                        "tradableAssets"
-                    ],
-                    "contextAssets": metrics["portfolio_mandate"][
-                        "contextAssets"
-                    ],
-                    "riskPolicy": metrics["portfolio_mandate"][
-                        "construction"
-                    ]["riskPolicy"],
-                    "implementationPolicy": metrics["portfolio_mandate"][
-                        "implementationPolicy"
-                    ],
-                }
-                if isinstance(metrics.get("portfolio_mandate"), dict)
-                else None
-            ),
-            "factor": {
-                "validationRankIc": metrics["factor"]["validation"]["mean_rank_ic"],
-                "testRankIc": metrics["factor"]["test"]["mean_rank_ic"],
-            },
-            "portfolio": {
-                "validationNetSharpe": metrics["portfolio"]["validation"]["net"][
-                    "sharpe"
-                ],
-                "testNetSharpe": metrics["portfolio"]["test"]["net"]["sharpe"],
-                "testAnnualReturn": metrics["portfolio"]["test"]["net"][
-                    "annual_return"
-                ],
-                "testMaximumDrawdown": metrics["portfolio"]["test"]["net"][
-                    "maximum_drawdown"
-                ],
-            },
-            "selection": metrics.get("research_integrity"),
-            "implementation": {
-                "testAnnualizedTurnover": metrics["implementation"]["test"][
-                    "annualized_one_way_turnover"
-                ],
-                "testCostDrag": metrics["implementation"]["test"][
-                    "total_cost_drag"
-                ],
-                "testMaximumParticipation": metrics["implementation"]["test"][
-                    "maximum_volume_participation"
-                ],
-            },
-            "robustness": {
-                "testAdverseCostSharpe": cost_stress[adverse_cost_key][
-                    "test"
-                ]["sharpe"],
-                "adverseCostBps": float(
-                    adverse_cost_key.removesuffix("bps")
-                ),
-                "testExtraDelaySharpe": metrics["robustness"]["extra_delay"][
-                    "test"
-                ]["sharpe"],
-            },
-            "constraintsPassed": metrics["constraint_audit"]["passed"],
-        }
-        signal_policy = metrics.get("signal_policy")
-        attribution = metrics.get("attribution")
-        layers["signalPolicy"] = None
-        layers["attribution"] = None
-        layers["liquidityCapacity"] = None
-        layers["executedBookRisk"] = None
-        layers["positionLifecycle"] = None
-        layers["parameterNeighborhood"] = None
-        layers["translationRobustness"] = None
-        if isinstance(signal_policy, dict):
-            validation_policy = signal_policy.get("validation", {})
-            comparison = signal_policy.get(
-                "hysteresis_comparison",
-                {},
-            ).get("validation", {})
-            if isinstance(validation_policy, dict) and isinstance(
-                comparison,
-                dict,
-            ):
-                layers["signalPolicy"] = {
-                    "validationStateChangeRate": validation_policy.get(
-                        "state_change_rate"
-                    ),
-                    "validationEntries": validation_policy.get("entries"),
-                    "validationExits": validation_policy.get("exits"),
-                    "validationReversals": validation_policy.get("reversals"),
-                    "validationTransitionReductionRate": comparison.get(
-                        "transition_reduction_rate"
-                    ),
-                    "validationImplementationTurnoverReduction": comparison.get(
-                        "implementation_turnover_reduction"
-                    ),
-                }
-        if isinstance(attribution, dict):
-            validation_attribution = attribution.get("validation", {})
-            if isinstance(validation_attribution, dict):
-                reconciliation = validation_attribution.get(
-                    "reconciliation",
-                    {},
-                )
-                concentration = validation_attribution.get(
-                    "concentration",
-                    {},
-                )
-                layers["attribution"] = {
-                    "validationReconciliationPassed": reconciliation.get(
-                        "passed"
-                    ),
-                    "validationMaximumAbsoluteNetContributionShare": (
-                        concentration.get(
-                            "maximum_absolute_net_contribution_share"
-                        )
-                    ),
-                    "validationAbsoluteNetContributionHhi": concentration.get(
-                        "absolute_net_contribution_hhi"
-                    ),
-                    "validationMaximumAbsoluteRiskContributionShare": (
-                        concentration.get(
-                            "maximum_absolute_variance_contribution_share"
-                        )
-                    ),
-                }
-        capacity = metrics.get("liquidity_capacity")
-        if isinstance(capacity, dict):
-            validation_capacity = capacity.get("validation", {})
-            conservative = (
-                validation_capacity.get("capacity_1pct", {})
-                if isinstance(validation_capacity, dict)
-                else {}
-            )
-            if isinstance(conservative, dict):
-                layers["liquidityCapacity"] = {
-                    "validationTradeDateCoverage": validation_capacity.get(
-                        "trade_date_coverage"
-                    ),
-                    "validationTenthPercentileNav1Pct": conservative.get(
-                        "tenth_percentile_nav"
-                    ),
-                    "validationReferenceNavBreachRate1Pct": conservative.get(
-                        "reference_nav_breach_rate"
-                    ),
-                    "selectionAuthority": capacity.get("policy", {}).get(
-                        "selection_authority"
-                    ),
-                }
-        execution_risk = metrics.get("execution_risk")
-        if isinstance(execution_risk, dict):
-            validation_execution_risk = execution_risk.get(
-                "validation",
-                {},
-            )
-            if isinstance(validation_execution_risk, dict):
-                layers["executedBookRisk"] = {
-                    "validationForecastCoverage": (
-                        validation_execution_risk.get(
-                            "forecast_coverage"
-                        )
-                    ),
-                    "validationPretradeBreachDates": (
-                        validation_execution_risk.get(
-                            "pretrade_breach_dates"
-                        )
-                    ),
-                    "validationRiskRebalanceOverrideDates": (
-                        validation_execution_risk.get(
-                            "risk_rebalance_override_dates"
-                        )
-                    ),
-                    "validationExecutedBreachDates": (
-                        validation_execution_risk.get(
-                            "executed_breach_dates"
-                        )
-                    ),
-                    "validationMaximumExecutedForecastAnnualized": (
-                        validation_execution_risk.get(
-                            "maximum_executed_forecast_annualized"
-                        )
-                    ),
-                    "selectionAuthority": execution_risk.get(
-                        "policy",
-                        {},
-                    ).get("selection_authority"),
-                }
-        lifecycle = metrics.get("position_lifecycle")
-        if isinstance(lifecycle, dict):
-            validation_lifecycle = lifecycle.get("validation", {})
-            if isinstance(validation_lifecycle, dict):
-                layers["positionLifecycle"] = {
-                    "validationCompleteEpisodes": (
-                        validation_lifecycle.get("complete_episodes")
-                    ),
-                    "validationCompleteEpisodeWinRate": (
-                        validation_lifecycle.get(
-                            "complete_episode_win_rate"
-                        )
-                    ),
-                    "validationMedianCompleteHoldingBars": (
-                        validation_lifecycle.get(
-                            "median_complete_holding_bars"
-                        )
-                    ),
-                    "validationCompletePayoffRatio": (
-                        validation_lifecycle.get("complete_payoff_ratio")
-                    ),
-                    "validationIntentMismatchRate": (
-                        validation_lifecycle.get("intent_mismatch_rate")
-                    ),
-                    "selectionAuthority": lifecycle.get(
-                        "policy",
-                        {},
-                    ).get("selection_authority"),
-                }
-        neighborhood = metrics.get("parameter_neighborhood")
-        if isinstance(neighborhood, dict):
-            validation_neighborhood = neighborhood.get(
-                "validation",
-                {},
-            )
-            aggregate = (
-                validation_neighborhood.get("aggregate", {})
-                if isinstance(validation_neighborhood, dict)
-                else {}
-            )
-            if isinstance(aggregate, dict):
-                layers["parameterNeighborhood"] = {
-                    "validationConfigurationCount": aggregate.get(
-                        "configuration_count"
-                    ),
-                    "validationPositiveNetSharpeRate": aggregate.get(
-                        "positive_net_sharpe_rate"
-                    ),
-                    "validationSignAgreementWithBaseRate": aggregate.get(
-                        "sign_agreement_with_base_rate"
-                    ),
-                    "validationMinimumNetSharpe": aggregate.get(
-                        "minimum_net_sharpe"
-                    ),
-                    "validationWorstNetSharpeDelta": aggregate.get(
-                        "worst_net_sharpe_delta"
-                    ),
-                    "selectionAuthority": neighborhood.get(
-                        "policy",
-                        {},
-                    ).get("selection_authority"),
-                }
-        translation = metrics.get("translation_robustness")
-        if isinstance(translation, dict):
-            diagnosis = translation.get("diagnosis")
-            if isinstance(diagnosis, dict):
-                layers["translationRobustness"] = {
-                    "applicable": translation.get("applicable"),
-                    "reason": translation.get("reason"),
-                    "validationStatus": diagnosis.get("status"),
-                    "minimumActiveStateAgreementRate": diagnosis.get(
-                        "minimum_active_state_agreement_rate"
-                    ),
-                    "maximumMeanAbsoluteTargetDelta": diagnosis.get(
-                        "maximum_mean_absolute_target_delta"
-                    ),
-                    "selectionAuthority": translation.get("policy", {}).get(
-                        "selection_authority"
-                    ),
-                }
-        return layers
-    except (KeyError, TypeError):
-        return None
-
-
-def _factor_metric_layers(result: dict[str, Any]) -> dict[str, Any] | None:
-    metrics = result["metrics"]
-    if not all(
-        isinstance(metrics.get(key), dict)
-        for key in ("validation", "test")
-    ):
-        return None
-    try:
-        layers = {
-            "kind": "factor",
-            "researchHorizon": metrics.get("research_horizon"),
-            "factorOutcome": metrics.get("factor_outcome"),
-            "decisionCadence": (
-                metrics["portfolio_mandate"]["implementationPolicy"][
-                    "decisionPolicy"
-                ]
-                if isinstance(metrics.get("portfolio_mandate"), dict)
-                else None
-            ),
-            "validationMeanIc": metrics["validation"]["mean_ic"],
-            "validationPearsonIc": (
-                metrics["validation"].get("pearson_ic", {}).get("mean_ic")
-            ),
-            "validationIcir": metrics["validation"]["icir"],
-            "testMeanIc": metrics["test"]["mean_ic"],
-            "testIcir": metrics["test"]["icir"],
-            "meanCoverage": metrics["mean_coverage"],
-            "meanRankTurnover": metrics["mean_rank_turnover"],
-            "selection": metrics.get("research_integrity"),
-        }
-        horizon_quality = metrics.get("horizon_quality")
-        quantiles = metrics.get("quantile_analysis")
-        stability = metrics.get("stability")
-        styles = metrics.get("style_correlations")
-        layers.update(
-            {
-                "validationHacTStatistic": None,
-                "validationFarthestHorizonMeanIc": None,
-                "farthestForwardBars": None,
-                "validationQuantileSpread": None,
-                "validationQuantileMonotonicity": None,
-                "validationWorstFoldMeanIc": None,
-                "validationMaximumAbsoluteStyleCorrelation": None,
-                "validationRegimesObserved": None,
-            }
-        )
-        hac = metrics["validation"].get("hac")
-        if isinstance(hac, dict):
-            layers["validationHacTStatistic"] = hac.get("t_statistic")
-        if isinstance(horizon_quality, dict):
-            diagnostic_bars = metrics.get("research_horizon", {}).get(
-                "diagnosticForwardBars",
-                [],
-            )
-            if diagnostic_bars:
-                farthest = int(diagnostic_bars[-1])
-                layers["farthestForwardBars"] = farthest
-                layers["validationFarthestHorizonMeanIc"] = (
-                    horizon_quality.get(str(farthest), {})
-                    .get("validation", {})
-                    .get("mean_ic")
-                )
-        if isinstance(quantiles, dict):
-            primary = str(
-                metrics.get("research_horizon", {}).get(
-                    "primaryForwardBars",
-                    1,
-                )
-            )
-            validation_quantiles = (
-                quantiles.get(primary, {}).get("validation", {})
-            )
-            layers["validationQuantileSpread"] = validation_quantiles.get(
-                "high_minus_low"
-            )
-            layers["validationQuantileMonotonicity"] = (
-                validation_quantiles.get("monotonicity")
-            )
-        if isinstance(stability, dict):
-            folds = stability.get("chronological_folds", {})
-            fold_values = [
-                item.get("mean_ic")
-                for name, item in folds.items()
-                if name.startswith("validation_") and isinstance(item, dict)
-            ]
-            finite_folds = [
-                float(value)
-                for value in fold_values
-                if isinstance(value, (int, float))
-            ]
-            if finite_folds:
-                layers["validationWorstFoldMeanIc"] = min(finite_folds)
-            regimes = (
-                stability.get("causal_regimes", {}).get("validation", {})
-            )
-            if isinstance(regimes, dict):
-                layers["validationRegimesObserved"] = sum(
-                    1
-                    for item in regimes.values()
-                    if isinstance(item, dict)
-                    and isinstance(item.get("mean_ic"), (int, float))
-                )
-        if isinstance(styles, dict):
-            validation_styles = styles.get("validation", {})
-            style_values = [
-                item.get("mean_rank_correlation")
-                for item in validation_styles.values()
-                if isinstance(item, dict)
-            ]
-            finite_styles = [
-                abs(float(value))
-                for value in style_values
-                if isinstance(value, (int, float))
-            ]
-            if finite_styles:
-                layers["validationMaximumAbsoluteStyleCorrelation"] = max(
-                    finite_styles
-                )
-        return layers
-    except (KeyError, TypeError):
-        return None
-
-
-def _rl_metric_layers(result: dict[str, Any]) -> dict[str, Any] | None:
-    metrics = result["metrics"]
-    if not all(
-        isinstance(metrics.get(key), dict)
-        for key in ("rl", "baselines", "comparison", "configuration")
-    ):
-        return None
-    try:
-        aggregate = metrics["rl"]["aggregate"]
-        comparison = metrics["comparison"]
-        return {
-            "kind": "rl-policy",
-            "researchHorizon": metrics.get("research_horizon"),
-            "mandate": (
-                {
-                    "id": metrics["portfolio_mandate"]["id"],
-                    "direction": metrics["portfolio_mandate"]["source"][
-                        "direction"
-                    ],
-                    "family": metrics["portfolio_mandate"]["construction"][
-                        "family"
-                    ],
-                    "grossLimit": metrics["portfolio_mandate"][
-                        "construction"
-                    ]["grossLimit"],
-                    "maxAbsWeight": metrics["portfolio_mandate"][
-                        "construction"
-                    ]["maxAbsWeight"],
-                    "assetMaxAbsWeights": metrics["portfolio_mandate"][
-                        "construction"
-                    ]["assetMaxAbsWeights"],
-                    "assetPositionRoles": metrics["portfolio_mandate"][
-                        "construction"
-                    ]["assetPositionRoles"],
-                    "positionRolesSource": metrics["portfolio_mandate"][
-                        "source"
-                    ]["assetPositionRoles"],
-                    "longGrossLimit": metrics["portfolio_mandate"][
-                        "construction"
-                    ]["longGrossLimit"],
-                    "shortGrossLimit": metrics["portfolio_mandate"][
-                        "construction"
-                    ]["shortGrossLimit"],
-                    "benchmark": metrics["portfolio_mandate"][
-                        "construction"
-                    ]["benchmark"],
-                    "policySource": metrics["portfolio_mandate"]["source"][
-                        "portfolioPolicy"
-                    ],
-                    "tradableAssets": metrics["portfolio_mandate"][
-                        "tradableAssets"
-                    ],
-                    "contextAssets": metrics["portfolio_mandate"][
-                        "contextAssets"
-                    ],
-                    "riskPolicy": metrics["portfolio_mandate"][
-                        "construction"
-                    ]["riskPolicy"],
-                    "implementationPolicy": metrics["portfolio_mandate"][
-                        "implementationPolicy"
-                    ],
-                }
-                if isinstance(metrics.get("portfolio_mandate"), dict)
-                else None
-            ),
-            "validationMeanNetSharpe": metrics[
-                "validation_mean_net_sharpe"
-            ],
-            "testMeanNetSharpe": aggregate["test_net_sharpe"]["mean"],
-            "validationSeedFoldStd": aggregate["validation_net_sharpe"][
-                "standard_deviation"
-            ],
-            "testSeedFoldStd": aggregate["test_net_sharpe"][
-                "standard_deviation"
-            ],
-            "validationBaselineAdvantage": comparison[
-                "mean_validation_advantage_vs_best_baseline"
-            ],
-            "validationCandidateFactorAdvantage": comparison.get(
-                "mean_validation_advantage_vs_candidate_factor"
-            ),
-            "validationCandidateActionFrequency": comparison.get(
-                "mean_validation_candidate_action_frequency"
-            ),
-            "failureRate": aggregate["failure_rate"],
-            "folds": len(metrics["configuration"]["folds"]),
-            "seeds": len(metrics["configuration"]["seeds"]),
-            "policyBehavior": (
-                {
-                    "validationMeanActionRunLength": metrics[
-                        "policy_rationale"
-                    ]["validation"]["mean_action_run_length"],
-                    "validationTransitionRate": metrics[
-                        "policy_rationale"
-                    ]["validation"]["transition_rate"],
-                    "validationRetentionRate": metrics[
-                        "policy_rationale"
-                    ]["validation"]["retention_rate"],
-                    "validationMedianActionMargin": metrics[
-                        "policy_rationale"
-                    ]["validation"]["median_action_margin"],
-                    "validationTieRate": metrics["policy_rationale"][
-                        "validation"
-                    ]["tie_rate"],
-                    "selectionAuthority": metrics["policy_rationale"][
-                        "policy"
-                    ]["selection_authority"],
-                }
-                if isinstance(metrics.get("policy_rationale"), dict)
-                else None
-            ),
-            "factorOpportunity": (
-                {
-                    "validationOracleHitRate": metrics[
-                        "factor_opportunity"
-                    ]["validation"]["oracle_hit_rate"],
-                    "validationMeanSelectedRank": metrics[
-                        "factor_opportunity"
-                    ]["validation"]["mean_selected_rank"],
-                    "validationMeanRealizedRegret": metrics[
-                        "factor_opportunity"
-                    ]["validation"]["mean_realized_regret"],
-                    "validationCandidateOracleFrequency": metrics[
-                        "factor_opportunity"
-                    ]["validation"]["candidate"]["oracle_frequency"],
-                    "validationCandidateMissedOpportunityRate": metrics[
-                        "factor_opportunity"
-                    ]["validation"]["candidate"][
-                        "missed_opportunity_rate"
-                    ],
-                    "selectionAuthority": metrics[
-                        "factor_opportunity"
-                    ]["policy"]["selection_authority"],
-                }
-                if isinstance(metrics.get("factor_opportunity"), dict)
-                else None
-            ),
-            "executedBookRisk": (
-                {
-                    "validationForecastCoverage": metrics[
-                        "execution_risk"
-                    ]["validation"]["forecast_coverage"],
-                    "validationRiskRebalanceOverrideDates": metrics[
-                        "execution_risk"
-                    ]["validation"][
-                        "risk_rebalance_override_dates"
-                    ],
-                    "validationExecutedBreachDates": metrics[
-                        "execution_risk"
-                    ]["validation"]["executed_breach_dates"],
-                    "selectionAuthority": metrics["execution_risk"][
-                        "policy"
-                    ]["selection_authority"],
-                }
-                if isinstance(metrics.get("execution_risk"), dict)
-                else None
-            ),
-        }
-    except (KeyError, TypeError):
-        return None
-
-
-def _run_metric_layers(result: dict[str, Any]) -> dict[str, Any] | None:
-    return (
-        _portfolio_metric_layers(result)
-        or _rl_metric_layers(result)
-        or _factor_metric_layers(result)
-    )
-
-
-def _project_snapshot(project: ProjectContext) -> dict[str, Any]:
-    diagnostics: list[dict[str, str]] = []
-    program_path = confined_path(
-        project.root_dir,
-        project.manifest.research_program,
-        "project/research_program",
-    )
-    studies_raw, issues = _read_category("studies", lambda: list_studies(project))
-    diagnostics.extend(issues)
-    runs_raw, issues = _read_category("runs", lambda: list_runs(project))
-    diagnostics.extend(issues)
-    sessions_raw, issues = _read_category("sessions", lambda: list_sessions(project))
-    diagnostics.extend(issues)
-    intake_raw, issues = _read_category(
-        "intake",
-        lambda: load_project_intake(project),
-    )
-    diagnostics.extend(issues)
-    intake = intake_raw if isinstance(intake_raw, dict) else None
-    if intake is not None:
-        intake_command = (
-            _command(
-                "run.execute",
-                [
-                    "aq",
-                    "run",
-                    "execute",
-                    str(project.root_dir),
-                    "--study",
-                    intake["study"]["id"],
-                    "--json",
-                ],
-                "creates-artifact",
-            )
-            if intake["manifest"]["status"] == "ready-for-run"
-            else _command(
-                "session.start",
-                [
-                    "aq",
-                    "session",
-                    "start",
-                    str(project.root_dir),
-                    "--study",
-                    intake["study"]["id"],
-                    "--request",
-                    str(
-                        project.root_dir
-                        / intake["manifest"]["requestPath"]
-                    ),
-                    "--json",
-                ],
-                "creates-artifact",
-            )
-        )
-        intake = {
-            **intake,
-            "commands": [intake_command],
-        }
-    research_program_status = None
-    try:
-        research_program_status = load_research_program(
-            project,
-            optional=True,
-        )
-    except AutoQuantValidationError as error:
-        diagnostics.extend(_diagnostics("research-program", error))
-    agent_work_brief_raw, issues = _read_category(
-        "agent-work-brief",
-        lambda: build_agent_work_brief(project),
-    )
-    diagnostics.extend(issues)
-    agent_work_brief = (
-        agent_work_brief_raw
-        if isinstance(agent_work_brief_raw, dict)
-        else None
-    )
-    external_holdout_raw, issues = _read_category(
-        "external-holdout",
-        lambda: load_holdout_status(
-            project,
-            optional=True,
-            include_evidence=True,
-        ),
-    )
-    diagnostics.extend(issues)
-    external_holdout = (
-        external_holdout_raw
-        if isinstance(external_holdout_raw, dict)
-        else None
-    )
-    if external_holdout is not None:
-        holdout_action = external_holdout["nextAction"]
-        if intake is not None:
-            intake["commands"] = (
-                [holdout_action] if holdout_action is not None else []
-            )
-        if research_program_status is not None:
-            research_program_status = {
-                **research_program_status,
-                "recommendedLaneId": None,
-                "recommendedAction": holdout_action,
-                "lanes": [
-                    {
-                        **lane,
-                        "commands": [
-                            command
-                            for command in lane["commands"]
-                            if command["effect"] == "read-only"
-                        ],
-                    }
-                    for lane in research_program_status["lanes"]
-                ],
-            }
-    dossier_bundle, issues = _read_category(
-        "dossiers",
-        lambda: {
-            "status": load_dossier_status(project, optional=True),
-            "items": [item.to_dict() for item in list_dossiers(project)],
-        },
-    )
-    diagnostics.extend(issues)
-    if isinstance(dossier_bundle, dict):
-        dossier_status = dossier_bundle["status"]
-        dossiers = dossier_bundle["items"]
-    else:
-        dossier_status = None
-        dossiers = []
-    if external_holdout is not None and dossier_status is not None:
-        dossier_status = {
-            **dossier_status,
-            "nextAction": external_holdout["nextAction"],
-        }
-    studies = []
-    for item in studies_raw:
-        summary = item.to_dict()
-        try:
-            study = load_study(project, item.id)
-            snapshot = load_study_dataset_snapshot(project, study)
-            summary["dataset"] = study.definition.to_dict()["dataset"]
-            summary["datasetHash"] = study.dataset_hash
-            summary["researchRequest"] = study.definition.to_dict().get(
-                "research_request"
-            )
-            summary["upstreamEvidence"] = study.definition.to_dict().get(
-                "upstream_evidence"
-            )
-            summary["datasetContext"] = (
-                dataset_snapshot_class_context(snapshot)
-                if snapshot is not None
-                else None
-            )
-        except AutoQuantValidationError as error:
-            diagnostics.extend(
-                _diagnostics(f"study-dataset:{item.id}", error)
-            )
-        studies.append(summary)
-    runs: list[dict[str, Any]] = []
-    for item in runs_raw:
-        summary = item.to_dict()
-        run_result = load_run(project, item.id).result
-        summary["summary"] = run_result["summary"]
-        summary["errors"] = run_result["errors"]
-        summary["failureDisposition"] = run_failure_disposition(run_result)
-        summary["researchRequest"] = run_result.get("researchRequest")
-        summary["upstreamEvidence"] = run_result.get("upstreamEvidence")
-        metric_layers = _run_metric_layers(run_result)
-        if metric_layers is not None:
-            summary["metricLayers"] = metric_layers
-        runs.append(summary)
-
-    def current_program_run(lane_id: str):
-        if research_program_status is None:
-            return None
-        lane = next(
-            (
-                item
-                for item in research_program_status["lanes"]
-                if item["id"] == lane_id
-            ),
-            None,
-        )
-        if (
-            lane is None
-            or not lane["currentRun"]
-            or lane["latestRun"] is None
-            or lane["latestRun"]["status"] != "succeeded"
-        ):
-            return None
-        return next(
-            (
-                item
-                for item in runs_raw
-                if item.id == lane["latestRun"]["id"]
-            ),
-            None,
-        )
-
-    factor_explorer = None
-    factor_candidate = current_program_run("factor")
-    if research_program_status is None:
-        factor_candidate = next(
-            (
-                item
-                for item in reversed(runs_raw)
-                if item.status == "succeeded"
-                and item.primary_metric == "validation_mean_ic"
-            ),
-            None,
-        )
-    if factor_candidate is not None:
-        try:
-            factor_explorer = load_factor_diagnostics(
-                project,
-                factor_candidate.id,
-                point_limit=DEFAULT_FACTOR_POINTS,
-            )
-        except AutoQuantValidationError as error:
-            diagnostics.extend(
-                _diagnostics(
-                    f"factor-explorer:{factor_candidate.id}",
-                    error,
-                )
-            )
-    portfolio_explorer = None
-    portfolio_candidate = current_program_run("portfolio")
-    if research_program_status is None:
-        portfolio_candidate = next(
-            (
-                item
-                for item in reversed(runs_raw)
-                if item.status == "succeeded"
-                and item.primary_metric == "validation_net_sharpe"
-            ),
-            None,
-        )
-    if portfolio_candidate is not None:
-        try:
-            portfolio_explorer = load_portfolio_diagnostics(
-                project,
-                portfolio_candidate.id,
-                point_limit=DEFAULT_PORTFOLIO_POINTS,
-            )
-        except AutoQuantValidationError as error:
-            diagnostics.extend(
-                _diagnostics(
-                    f"portfolio-explorer:{portfolio_candidate.id}",
-                    error,
-                )
-            )
-    rl_explorer = None
-    rl_candidate = current_program_run("rl")
-    if research_program_status is None:
-        rl_candidate = next(
-            (
-                item
-                for item in reversed(runs_raw)
-                if item.status == "succeeded"
-                and item.primary_metric == "validation_mean_net_sharpe"
-            ),
-            None,
-        )
-    if rl_candidate is not None:
-        try:
-            rl_explorer = load_rl_diagnostics(
-                project,
-                rl_candidate.id,
-                point_limit=DEFAULT_RL_POINTS,
-            )
-        except AutoQuantValidationError as error:
-            diagnostics.extend(
-                _diagnostics(
-                    f"rl-explorer:{rl_candidate.id}",
-                    error,
-                )
-            )
-    book_risk_explorer = None
-    book_risk_candidate = next(
-        (
-            item
-            for item in reversed(runs_raw)
-            if item.status == "succeeded"
-            and item.primary_metric == "current_component_risk_hhi"
-        ),
-        None,
-    )
-    if book_risk_candidate is not None:
-        try:
-            book_risk_explorer = load_book_risk_diagnostics(
-                project,
-                book_risk_candidate.id,
-                point_limit=DEFAULT_BOOK_RISK_POINTS,
-            )
-        except AutoQuantValidationError as error:
-            diagnostics.extend(
-                _diagnostics(
-                    f"book-risk-explorer:{book_risk_candidate.id}",
-                    error,
-                )
-            )
-    event_study_explorer = None
-    event_study_candidate = next(
-        (
-            item
-            for item in reversed(runs_raw)
-            if item.status == "succeeded"
-            and item.primary_metric == "primary_eligible_event_count"
-        ),
-        None,
-    )
-    if event_study_candidate is not None:
-        try:
-            event_study_explorer = load_event_study_diagnostics(
-                project,
-                event_study_candidate.id,
-            )
-        except AutoQuantValidationError as error:
-            diagnostics.extend(
-                _diagnostics(
-                    f"event-study-explorer:{event_study_candidate.id}",
-                    error,
-                )
-            )
-    book_path_stress_explorer = None
-    book_path_stress_candidate = next(
-        (
-            item
-            for item in reversed(runs_raw)
-            if item.status == "succeeded"
-            and item.primary_metric == "worst_terminal_book_return"
-        ),
-        None,
-    )
-    if book_path_stress_candidate is not None:
-        try:
-            book_path_stress_explorer = load_book_path_stress_diagnostics(
-                project,
-                book_path_stress_candidate.id,
-            )
-        except AutoQuantValidationError as error:
-            diagnostics.extend(
-                _diagnostics(
-                    f"book-path-stress-explorer:{book_path_stress_candidate.id}",
-                    error,
-                )
-            )
-    allocation_explorer = None
-    allocation_candidate = next(
-        (
-            item
-            for item in reversed(runs_raw)
-            if item.status == "succeeded"
-            and item.primary_metric
-            == "validation_net_sharpe_advantage"
-        ),
-        None,
-    )
-    if allocation_candidate is not None:
-        try:
-            allocation_explorer = load_allocation_diagnostics(
-                project,
-                allocation_candidate.id,
-                points=DEFAULT_ALLOCATION_POINTS,
-            )
-        except AutoQuantValidationError as error:
-            diagnostics.extend(
-                _diagnostics(
-                    f"allocation-explorer:{allocation_candidate.id}",
-                    error,
-                )
-            )
-    run_reports: list[dict[str, Any]] = []
-    try:
-        run_reports = [item.to_dict() for item in list_run_reports(project)]
-    except AutoQuantValidationError as error:
-        diagnostics.extend(_diagnostics("run-reports", error))
-    reviews: list[dict[str, Any]] = []
-    try:
-        reviews = [item.to_dict() for item in list_reviews(project)]
-    except AutoQuantValidationError as error:
-        diagnostics.extend(_diagnostics("reviews", error))
-    sessions: list[dict[str, Any]] = []
-    for summary in sessions_raw:
-        try:
-            session = load_session(project, summary.id)
-            snapshot = session_snapshot(project, session)
-            campaigns = [
-                item.to_dict() for item in list_campaigns(project, session)
-            ]
-            reports = [
-                item.to_dict() for item in list_reports(project, session)
-            ]
-            progress = list_campaign_progress(session)
-            decision_matrix = None
-            try:
-                decision_matrix = load_session_decision_matrix(
-                    project,
-                    session.manifest["id"],
-                    trial_limit=STUDIO_COMPARISON_TRIALS,
-                )
-            except AutoQuantValidationError as error:
-                diagnostics.extend(
-                    _diagnostics(
-                        f"session-comparison:{session.manifest['id']}",
-                        error,
-                    )
-                )
-            authority = snapshot["authority"]
-            if not authority["valid"]:
-                diagnostics.extend(
-                    {
-                        "category": "session-authority",
-                        **issue,
-                    }
-                    for issue in authority["issues"]
-                )
-            sessions.append(
-                {
-                    "session": snapshot["session"],
-                    "worktree": snapshot["worktree"],
-                    "candidate": snapshot["candidate"],
-                    "delegation": snapshot["delegation"],
-                    "selectionIntegrity": snapshot["selectionIntegrity"],
-                    "decisionMatrix": decision_matrix,
-                    "authority": authority,
-                    "experiments": snapshot["experiments"],
-                    "campaigns": campaigns,
-                    "reports": reports,
-                    "progress": progress,
-                    "commands": _session_commands(project, session, reports),
-                }
-            )
-        except AutoQuantValidationError as error:
-            diagnostics.extend(_diagnostics(f"session:{summary.id}", error))
-    verdicts = {"KEEP": 0, "REVERT": 0, "CRASH": 0}
-    for item in sessions:
-        for experiment in item["experiments"]:
-            verdict = experiment["verdict"]
-            verdicts[verdict] += 1
-    commands: list[dict[str, Any]] = []
-    if factor_explorer is not None:
-        commands.append(
-            _command(
-                "run.factor",
-                [
-                    "aq",
-                    "run",
-                    "factor",
-                    str(project.root_dir),
-                    "--run",
-                    factor_explorer["run"]["id"],
-                    "--json",
-                ],
-                "read-only",
-            )
-        )
-    if portfolio_explorer is not None:
-        commands.append(
-            _command(
-                "run.portfolio",
-                [
-                    "aq",
-                    "run",
-                    "portfolio",
-                    str(project.root_dir),
-                    "--run",
-                    portfolio_explorer["run"]["id"],
-                    "--json",
-                ],
-                "read-only",
-            )
-        )
-    if rl_explorer is not None:
-        commands.append(
-            _command(
-                "run.rl",
-                [
-                    "aq",
-                    "run",
-                    "rl",
-                    str(project.root_dir),
-                    "--run",
-                    rl_explorer["run"]["id"],
-                    "--json",
-                ],
-                "read-only",
-            )
-        )
-    if book_risk_explorer is not None:
-        commands.append(
-            _command(
-                "run.book-risk",
-                [
-                    "aq",
-                    "run",
-                    "book-risk",
-                    str(project.root_dir),
-                    "--run",
-                    book_risk_explorer["run"]["id"],
-                    "--json",
-                ],
-                "read-only",
-            )
-        )
-    if event_study_explorer is not None:
-        commands.append(
-            _command(
-                "run.event-study",
-                [
-                    "aq",
-                    "run",
-                    "event-study",
-                    str(project.root_dir),
-                    "--run",
-                    event_study_explorer["run"]["id"],
-                    "--json",
-                ],
-                "read-only",
-            )
-        )
-    if book_path_stress_explorer is not None:
-        commands.append(
-            _command(
-                "run.book-path-stress",
-                [
-                    "aq",
-                    "run",
-                    "book-path-stress",
-                    str(project.root_dir),
-                    "--run",
-                    book_path_stress_explorer["run"]["id"],
-                    "--json",
-                ],
-                "read-only",
-            )
-        )
-    if allocation_explorer is not None:
-        commands.append(
-            _command(
-                "run.allocation",
-                [
-                    "aq",
-                    "run",
-                    "allocation",
-                    str(project.root_dir),
-                    "--run",
-                    allocation_explorer["run"]["id"],
-                    "--json",
-                ],
-                "read-only",
-            )
-        )
-    if research_program_status is not None:
-        commands.append(
-            _command(
-                "project.program",
-                [
-                    "aq",
-                    "project",
-                    "program",
-                    str(project.root_dir),
-                    "--json",
-                ],
-                "read-only",
-            )
-        )
-    if reviews:
-        commands.append(
-            _command(
-                "review.show",
-                [
-                    "aq",
-                    "review",
-                    "show",
-                    str(project.root_dir),
-                    "--review",
-                    reviews[-1]["id"],
-                    "--json",
-                ],
-                "read-only",
-            )
-        )
-    if (
-        external_holdout is None
-        and dossier_status is not None
-        and dossier_status["nextAction"] is not None
-    ):
-        commands.append(dossier_status["nextAction"])
-    if (
-        external_holdout is not None
-        and external_holdout["nextAction"] is not None
-    ):
-        commands.append(external_holdout["nextAction"])
-    return {
-        "id": project.manifest.id,
-        "name": project.manifest.name,
-        "description": project.manifest.description,
-        "rootDir": str(project.root_dir),
-        "researchProgram": {
-            "path": str(program_path),
-            "text": program_path.read_text(encoding="utf-8"),
-        },
-        "researchProgramStatus": research_program_status,
-        "agentWorkBrief": agent_work_brief,
-        "agentWorkBriefHash": (
-            hash_json(agent_work_brief)
-            if agent_work_brief is not None
-            else None
-        ),
-        "externalHoldout": external_holdout,
-        "dossierStatus": dossier_status,
-        "dossiers": dossiers,
-        "runReports": run_reports,
-        "reviews": reviews,
-        "intake": intake,
-        "factorExplorer": factor_explorer,
-        "portfolioExplorer": portfolio_explorer,
-        "rlExplorer": rl_explorer,
-        "bookRiskExplorer": book_risk_explorer,
-        "eventStudyExplorer": event_study_explorer,
-        "bookPathStressExplorer": book_path_stress_explorer,
-        "allocationExplorer": allocation_explorer,
-        "commands": commands,
-        "valid": not diagnostics,
-        "diagnostics": diagnostics,
-        "counts": {
-            "studies": len(studies),
-            "runs": len(runs),
-            "sessions": len(sessions),
-            "activeSessions": sum(
-                item["session"]["status"] == "active" for item in sessions
-            ),
-            "campaigns": sum(len(item["campaigns"]) for item in sessions),
-            "runningCampaigns": sum(len(item["progress"]) for item in sessions),
-            "delegatedSessions": sum(
-                item["delegation"] is not None for item in sessions
-            ),
-            "reports": len(run_reports) + sum(len(item["reports"]) for item in sessions),
-            "reviews": len(reviews),
-            "dossiers": len(dossiers),
-            "verdicts": verdicts,
-        },
-        "studies": studies,
-        "runs": runs,
-        "sessions": sessions,
-        "timeline": _timeline(runs, sessions, run_reports, reviews, dossiers),
-    }
-
-
-def _command(command_id: str, argv: list[str], effect: str) -> dict[str, Any]:
-    return {
-        "id": command_id,
-        "argv": argv,
-        "display": shlex.join(argv),
-        "effect": effect,
-    }
-
-
-def _session_commands(
-    project: ProjectContext,
-    session,
-    reports: list[dict[str, Any]],
-) -> list[dict[str, Any]]:
-    commands = [
-        _command(
-            "session.show",
-            [
-                "aq",
-                "session",
-                "show",
-                str(project.root_dir),
-                "--session",
-                session.manifest["id"],
-                "--json",
-            ],
-            "read-only",
-        ),
-        _command(
-            "session.compare",
-            [
-                "aq",
-                "session",
-                "compare",
-                str(project.root_dir),
-                "--session",
-                session.manifest["id"],
-                "--json",
-            ],
-            "read-only",
-        ),
-    ]
-    if (
-        session.delegation is not None
-        and session.manifest["status"] == "active"
-    ):
-        commands.append(
-            _command(
-                "report.publish",
-                [
-                    "aq",
-                    "report",
-                    "publish",
-                    str(project.root_dir),
-                    "--session",
-                    session.manifest["id"],
-                    "--analysis",
-                    "report-analysis.json",
-                    "--json",
-                ],
-                "creates-artifact",
-            )
-        )
-    if reports:
-        commands.append(
-            _command(
-                "report.show",
-                [
-                    "aq",
-                    "report",
-                    "show",
-                    str(project.root_dir),
-                    "--session",
-                    session.manifest["id"],
-                    "--report",
-                    reports[-1]["id"],
-                    "--json",
-                ],
-                "read-only",
-            )
-        )
-        if (
-            session.manifest["status"] == "active"
-            and session.manifest["leader"] == session.manifest["baseline"]
-            and reports[-1]["leaderRunId"]
-            == session.manifest["leader"]["runId"]
-        ):
-            commands.append(
-                _command(
-                    "session.complete",
-                    [
-                        "aq",
-                        "session",
-                        "complete",
-                        str(project.root_dir),
-                        "--session",
-                        session.manifest["id"],
-                        "--report",
-                        reports[-1]["id"],
-                        "--json",
-                    ],
-                    "creates-artifact",
-                )
-            )
-    return commands
-
-
-def build_studio_snapshot(
-    directory: str | Path,
+def load_studio_run(
+    path: str | Path,
     *,
-    project_id: str | None = None,
+    project_id: str | None,
+    run_id: str,
+    fixed_project_id: str | None = None,
 ) -> dict[str, Any]:
-    scope, root, workspace, projects, diagnostics = _resolve_source(
-        directory,
-        project_id,
-    )
-    observations = [_project_snapshot(project) for project in projects]
-    harness = harness_identity()
+    """Load detailed Run series and confined custom artifacts."""
+
+    _validate_id(run_id, "run_id")
+    scope, root, source_info, projects_dir = _locate_source(path)
+
+    if scope == "project":
+        proj_manifest = _read_json_dict(_confined_path(root, PROJECT_MANIFEST))
+        resolved_proj_id = _validate_id(str(proj_manifest.get("id") or root.name), "project.id")
+        if project_id is not None and project_id != resolved_proj_id:
+            raise StudioNotFoundError([_issue(project_id, "project.not-found", f"Unknown project: {project_id}")])
+        project_dir = root
+    else:
+        assert projects_dir is not None
+        effective_proj = project_id or fixed_project_id or source_info.get("default_project")
+        if not effective_proj:
+            raise StudioError([_issue("project", "studio.project-required", "Project id is required")])
+        resolved_proj_id = _validate_id(str(effective_proj), "project_id")
+        if fixed_project_id is not None and resolved_proj_id != fixed_project_id:
+            raise StudioNotFoundError([_issue(resolved_proj_id, "project.not-found", f"Server restricted to project {fixed_project_id!r}")])
+        project_dir = _confined_path(projects_dir, resolved_proj_id, f"{projects_dir}/{resolved_proj_id}")
+        if not project_dir.is_dir():
+            raise StudioNotFoundError([_issue(project_dir, "project.not-found", f"Unknown project: {resolved_proj_id}")])
+
+    run_dir = _confined_path(project_dir, f"runs/{run_id}", f"{project_dir}/runs/{run_id}")
+    if not run_dir.is_dir():
+        raise StudioNotFoundError([_issue(run_dir, "run.not-found", f"Unknown run: {run_id}")])
+    run_data = _normalize_run(_read_json_dict(_confined_path(run_dir, "run.json")), run_id, resolved_proj_id)
+
+    if (run_dir / "series").is_symlink():
+        raise StudioError([_issue(run_dir / "series", "path.symlink", "Symlink not allowed: series")])
+    sf = run_data["series_files"]
+    eq_path = _confined_path(run_dir, sf.get("equity", "series/equity.csv"))
+    ic_path = _confined_path(run_dir, sf.get("ic", "series/ic.csv"))
+    qt_path = _confined_path(run_dir, sf.get("quantiles", "series/quantiles.json"))
+
+    seen_paths: dict[str, tuple[str | None, str | None]] = {}
+    for item in run_data["artifacts"]:
+        if isinstance(item, dict) and isinstance(item.get("path"), str):
+            seen_paths[item["path"]] = (item.get("name"), item.get("kind"))
+        elif isinstance(item, str):
+            seen_paths[item] = (None, None)
+    for scanned_rel in _scan_artifacts_dir(run_dir, run_dir / "artifacts"):
+        seen_paths.setdefault(scanned_rel, (None, None))
+
     return {
-        "schemaVersion": SCHEMA_VERSION,
-        "kind": STUDIO_KIND,
-        "generatedAt": datetime.now(timezone.utc).isoformat(),
-        "harness": harness,
-        "source": {
-            "scope": scope,
-            "rootDir": str(root),
-            "workspace": workspace,
+        "ok": True,
+        "kind": STUDIO_RUN_KIND,
+        "project_id": resolved_proj_id,
+        "run": run_data,
+        "series": {
+            "equity": _read_csv_series(eq_path, compute_drawdown=True) if eq_path.is_file() else [],
+            "ic": _read_csv_series(ic_path, compute_drawdown=False) if ic_path.is_file() else [],
+            "quantiles": _read_json_dict(qt_path) if qt_path.is_file() else None,
         },
-        "valid": not diagnostics and all(
-            project["valid"] for project in observations
-        ),
-        "diagnostics": diagnostics,
-        "projects": observations,
+        "artifacts": [_load_artifact_entry(run_dir, rel, meta[0], meta[1]) for rel, meta in seen_paths.items()],
     }
 
 
@@ -1943,146 +604,72 @@ def _asset_bytes(name: str) -> bytes:
     return files("autoquant").joinpath("studio_assets", name).read_bytes()
 
 
-def _error_payload(error: Exception) -> tuple[int, dict[str, Any]]:
-    if isinstance(error, AutoQuantValidationError):
-        return (
-            HTTPStatus.UNPROCESSABLE_ENTITY,
-            {
-                "schemaVersion": SCHEMA_VERSION,
-                "ok": False,
-                "error": {
-                    "code": "validation.failed",
-                    "message": str(error),
-                    "issues": [issue.to_dict() for issue in error.issues],
-                },
-            },
-        )
-    return (
-        HTTPStatus.INTERNAL_SERVER_ERROR,
-        {
-            "schemaVersion": SCHEMA_VERSION,
-            "ok": False,
-            "error": {
-                "code": "studio.failed",
-                "message": str(error),
-                "issues": [],
-            },
-        },
-    )
+def _handler(directory: Path, fixed_project_id: str | None, *, managed: bool) -> type[BaseHTTPRequestHandler]:
+    headers_policy = studio_security_headers(managed=managed)
 
-
-def _handler(
-    directory: Path,
-    project_id: str | None,
-    *,
-    managed: bool,
-) -> type[BaseHTTPRequestHandler]:
     class StudioHandler(BaseHTTPRequestHandler):
-        server_version = "AutoQuantStudio/0.1"
+        server_version = "AutoQuantStudio"
+        sys_version = ""
 
-        def _headers(
-            self,
-            status: int,
-            content_type: str,
-            length: int,
-            *,
-            cache_control: str = "no-store",
-        ) -> None:
+        def _send(self, status: HTTPStatus, content_type: str, body: bytes, *, cache_control: str = "no-store", head_only: bool = False) -> None:
             self.send_response(status)
             self.send_header("Content-Type", content_type)
-            self.send_header("Content-Length", str(length))
+            self.send_header("Content-Length", str(len(body)))
             self.send_header("Cache-Control", cache_control)
-            for key, value in studio_security_headers(managed=managed).items():
+            for key, value in headers_policy.items():
                 self.send_header(key, value)
             self.end_headers()
-
-        def _send(
-            self,
-            status: int,
-            content_type: str,
-            body: bytes,
-            *,
-            cache_control: str = "no-store",
-            head_only: bool = False,
-        ) -> None:
-            self._headers(
-                status,
-                content_type,
-                len(body),
-                cache_control=cache_control,
-            )
             if not head_only:
                 self.wfile.write(body)
 
+        def _send_json(self, status: HTTPStatus, payload: dict[str, Any], *, head_only: bool = False) -> None:
+            raw = json.dumps(payload, ensure_ascii=False, allow_nan=False, separators=(",", ":")).encode("utf-8")
+            self._send(status, "application/json; charset=utf-8", raw, head_only=head_only)
+
         def _route(self, *, head_only: bool = False) -> None:
-            path = urlsplit(self.path).path
+            parsed = urlsplit(self.path)
+            route_path, query = parsed.path, parse_qs(parsed.query, keep_blank_values=False)
             try:
-                if path == "/api/v1/health":
-                    body = json.dumps(
-                        {
-                            "schemaVersion": SCHEMA_VERSION,
-                            "ok": True,
-                            "service": "autoquant-studio",
-                            "mode": "read-only",
-                        },
-                        separators=(",", ":"),
-                    ).encode()
-                    self._send(
+                if route_path == "/api/v1/health":
+                    self._send_json(
                         HTTPStatus.OK,
-                        "application/json; charset=utf-8",
-                        body,
+                        {"ok": True, "kind": STUDIO_HEALTH_KIND, "service": "autoquant-studio", "mode": "read-only", "version": current_version(), "managed": managed},
                         head_only=head_only,
                     )
                     return
-                if path == "/api/v1/snapshot":
-                    body = json.dumps(
-                        build_studio_snapshot(
-                            directory,
-                            project_id=project_id,
-                        ),
-                        ensure_ascii=False,
-                        separators=(",", ":"),
-                    ).encode()
-                    self._send(
-                        HTTPStatus.OK,
-                        "application/json; charset=utf-8",
-                        body,
-                        head_only=head_only,
-                    )
+                if route_path == "/api/v1/snapshot":
+                    req_proj = query.get("project", [None])[0]
+                    if fixed_project_id is not None and req_proj is not None and req_proj != fixed_project_id:
+                        raise StudioNotFoundError(f"Server restricted to project {fixed_project_id!r}")
+                    self._send_json(HTTPStatus.OK, build_studio_snapshot(directory, project_id=fixed_project_id or req_proj), head_only=head_only)
                     return
-                asset = STUDIO_ASSETS.get(path)
-                if asset is not None:
-                    name, content_type = asset
-                    body = _asset_bytes(name)
-                    self._send(
-                        HTTPStatus.OK,
-                        content_type,
-                        body,
-                        cache_control="no-cache",
-                        head_only=head_only,
-                    )
+                if route_path == "/api/v1/run":
+                    req_run = query.get("run", [None])[0]
+                    if not req_run:
+                        raise StudioError("Query parameter 'run' is required", code="studio.run-required")
+                    detail = load_studio_run(directory, project_id=query.get("project", [None])[0], run_id=req_run, fixed_project_id=fixed_project_id)
+                    self._send_json(HTTPStatus.OK, detail, head_only=head_only)
                     return
-                self._send(
-                    HTTPStatus.NOT_FOUND,
-                    "text/plain; charset=utf-8",
-                    b"Not found\n",
-                    head_only=head_only,
-                )
+                if route_path.startswith("/api/v1/runs/"):
+                    parts = route_path.removeprefix("/api/v1/runs/").split("/")
+                    if len(parts) != 2 or not parts[0] or not parts[1]:
+                        raise StudioError("Expected /api/v1/runs/<project_id>/<run_id>", code="studio.route")
+                    detail = load_studio_run(directory, project_id=unquote(parts[0]), run_id=unquote(parts[1]), fixed_project_id=fixed_project_id)
+                    self._send_json(HTTPStatus.OK, detail, head_only=head_only)
+                    return
+                if route_path in STUDIO_ASSETS:
+                    asset_name, content_type = STUDIO_ASSETS[route_path]
+                    self._send(HTTPStatus.OK, content_type, _asset_bytes(asset_name), cache_control="no-cache", head_only=head_only)
+                    return
+                self._send_json(HTTPStatus.NOT_FOUND, {"ok": False, "error": {"code": "studio.not-found", "message": f"Not found: {route_path}"}}, head_only=head_only)
             except (BrokenPipeError, ConnectionResetError):
                 return
+            except StudioNotFoundError as error:
+                self._send_json(HTTPStatus.NOT_FOUND, {"ok": False, "error": {"code": "studio.not-found", "message": str(error), "issues": [i.to_dict() for i in error.issues]}}, head_only=head_only)
+            except StudioError as error:
+                self._send_json(HTTPStatus.BAD_REQUEST, {"ok": False, "error": {"code": "studio.bad-request", "message": str(error), "issues": [i.to_dict() for i in error.issues]}}, head_only=head_only)
             except Exception as error:
-                status, payload = _error_payload(error)
-                body = json.dumps(
-                    payload,
-                    ensure_ascii=False,
-                    separators=(",", ":"),
-                ).encode()
-                self._send(
-                    status,
-                    "application/json; charset=utf-8",
-                    body,
-                    head_only=head_only,
-                )
+                self._send_json(HTTPStatus.INTERNAL_SERVER_ERROR, {"ok": False, "error": {"code": "studio.internal", "message": str(error)}}, head_only=head_only)
 
         def do_GET(self) -> None:
             self._route()
@@ -2091,26 +678,9 @@ def _handler(
             self._route(head_only=True)
 
         def _read_only(self) -> None:
-            self._send(
-                HTTPStatus.METHOD_NOT_ALLOWED,
-                "application/json; charset=utf-8",
-                b'{"schemaVersion":1,"ok":false,"error":{"code":"studio.read-only","message":"Studio routes are read-only","issues":[]}}',
-            )
+            self._send_json(HTTPStatus.METHOD_NOT_ALLOWED, {"ok": False, "error": {"code": "studio.read-only", "message": "Studio routes are read-only"}})
 
-        def do_POST(self) -> None:
-            self._read_only()
-
-        def do_PUT(self) -> None:
-            self._read_only()
-
-        def do_PATCH(self) -> None:
-            self._read_only()
-
-        def do_DELETE(self) -> None:
-            self._read_only()
-
-        def do_OPTIONS(self) -> None:
-            self._read_only()
+        do_POST = do_PUT = do_PATCH = do_DELETE = do_OPTIONS = _read_only
 
         def log_message(self, format: str, *args: Any) -> None:
             return
@@ -2124,261 +694,86 @@ class AutoQuantStudioServer(ThreadingHTTPServer):
 
 
 def create_studio_server(
-    directory: str | Path,
+    path: str | Path,
     *,
     project_id: str | None = None,
-    host: str = "127.0.0.1",
-    port: int = 8765,
+    host: str = STANDALONE_STUDIO_HOST,
+    port: int = STANDALONE_STUDIO_PORT,
     managed: bool = False,
 ) -> AutoQuantStudioServer:
     if not isinstance(port, int) or isinstance(port, bool) or not 0 <= port <= 65535:
-        raise AutoQuantValidationError(
-            [_issue(port, "studio.port", "Studio port must be from 0 to 65535")]
-        )
-    root = Path(directory).expanduser().absolute()
+        raise StudioError([_issue(port, "studio.port", "Studio port must be an integer 0..65535")])
+    root = Path(path).expanduser().absolute()
     build_studio_snapshot(root, project_id=project_id)
-    return AutoQuantStudioServer(
-        (host, port),
-        _handler(root, project_id, managed=managed),
-    )
+    return AutoQuantStudioServer((host, port), _handler(root, project_id, managed=managed))
 
 
 def serve_studio(
-    directory: str | Path,
+    path: str | Path,
     *,
     project_id: str | None = None,
-    host: str = "127.0.0.1",
-    port: int = 8765,
+    host: str | None = STANDALONE_STUDIO_HOST,
+    port: int | None = STANDALONE_STUDIO_PORT,
     open_browser: bool = True,
-    managed: bool = False,
+    no_open: bool | None = None,
+    explicit_host: bool = False,
+    explicit_port: bool = False,
+    managed: bool | None = None,
+    environ: Mapping[str, str] | None = None,
 ) -> None:
-    server = create_studio_server(
-        directory,
-        project_id=project_id,
-        host=host,
-        port=port,
-        managed=managed,
-    )
-    display_host = "127.0.0.1" if host in {"0.0.0.0", "::"} else host
+    """Serve AutoQuant Studio in standalone mode or under OpenAlice Harness authority."""
+
+    env = os.environ if environ is None else environ
+    if managed is None:
+        if env.get(HARNESS_CAPABILITY) == "studio":
+            cli_host = (
+                host
+                if explicit_host or (host is not None and host != STANDALONE_STUDIO_HOST)
+                else (host if host is not None and any(a == "--host" or a.startswith("--host=") for a in sys.argv[1:]) else None)
+            )
+            cli_port = (
+                port
+                if explicit_port or (port is not None and port != STANDALONE_STUDIO_PORT)
+                else (port if port is not None and any(a == "--port" or a.startswith("--port=") for a in sys.argv[1:]) else None)
+            )
+        else:
+            cli_host, cli_port = host, port
+        eff_no_open = (not open_browser) if no_open is None else bool(no_open)
+        launch = resolve_studio_launch(host=cli_host, port=cli_port, no_open=eff_no_open, environ=env)
+    else:
+        eff_open = open_browser if no_open is None else (not no_open)
+        launch = StudioLaunch(
+            host=STANDALONE_STUDIO_HOST if host is None else host,
+            port=STANDALONE_STUDIO_PORT if port is None else port,
+            open_browser=eff_open,
+            managed=bool(managed),
+        )
+
+    server = create_studio_server(path, project_id=project_id, host=launch.host, port=launch.port, managed=launch.managed)
+    display_host = "127.0.0.1" if launch.host in {"0.0.0.0", "::"} else launch.host
     url = f"http://{display_host}:{server.server_port}"
     print(f"AutoQuant Studio: {url}", flush=True)
     print("Mode: local read-only observation", flush=True)
-    if open_browser:
-        threading.Thread(
-            target=webbrowser.open,
-            args=(url,),
-            daemon=True,
-        ).start()
+    if launch.open_browser:
+        threading.Thread(target=webbrowser.open, args=(url,), daemon=True).start()
+
+    previous_sigterm = None
+    if threading.current_thread() is threading.main_thread():
+        previous_sigterm = signal.signal(signal.SIGTERM, lambda _s, _f: threading.Thread(target=server.shutdown, daemon=True).start())
+
     try:
-        server.serve_forever(poll_interval=0.25)
+        server.serve_forever(poll_interval=0.2)
     except KeyboardInterrupt:
         pass
     finally:
+        if previous_sigterm is not None:
+            signal.signal(signal.SIGTERM, previous_sigterm)
         server.server_close()
 
 
 STUDIO_SNAPSHOT_JSON_SCHEMA: dict[str, Any] = {
     "$schema": "https://json-schema.org/draft/2020-12/schema",
-    "title": "AutoQuant Studio snapshot",
+    "title": "AutoQuant Studio Snapshot",
     "type": "object",
-    "additionalProperties": False,
-    "required": [
-        "schemaVersion",
-        "kind",
-        "generatedAt",
-        "harness",
-        "source",
-        "valid",
-        "diagnostics",
-        "projects",
-    ],
-    "properties": {
-        "schemaVersion": {"const": SCHEMA_VERSION},
-        "kind": {"const": STUDIO_KIND},
-        "generatedAt": {"type": "string", "minLength": 1},
-        "harness": {
-            "type": "object",
-            "additionalProperties": False,
-            "required": [
-                "id",
-                "version",
-                "commit",
-                "dirty",
-                "sourceHash",
-                "python",
-                "buildProvenance",
-            ],
-            "properties": {
-                "id": {"type": "string", "minLength": 1},
-                "version": {"type": "string", "minLength": 1},
-                "commit": {"type": "string", "minLength": 1},
-                "dirty": {"type": "boolean"},
-                "sourceHash": {
-                    "type": "string",
-                    "pattern": "^[0-9a-f]{64}$",
-                },
-                "python": {"type": "string", "minLength": 1},
-                "buildProvenance": {
-                    "enum": [
-                        "embedded-distribution",
-                        "source-checkout",
-                        "unavailable",
-                    ]
-                },
-            },
-        },
-        "source": {
-            "type": "object",
-            "additionalProperties": False,
-            "required": ["scope", "rootDir", "workspace"],
-            "properties": {
-                "scope": {"enum": ["workspace", "project"]},
-                "rootDir": {"type": "string", "minLength": 1},
-                "workspace": {"type": ["object", "null"]},
-            },
-        },
-        "valid": {"type": "boolean"},
-        "diagnostics": {
-            "type": "array",
-            "items": {"$ref": "#/$defs/diagnostic"},
-        },
-        "projects": {
-            "type": "array",
-            "items": {"$ref": "#/$defs/project"},
-        },
-    },
-    "$defs": {
-        "diagnostic": {
-            "type": "object",
-            "additionalProperties": False,
-            "required": ["category", "path", "code", "message"],
-            "properties": {
-                "category": {"type": "string", "minLength": 1},
-                "path": {"type": "string", "minLength": 1},
-                "code": {"type": "string", "minLength": 1},
-                "message": {"type": "string", "minLength": 1},
-            },
-        },
-        "project": {
-            "type": "object",
-            "additionalProperties": False,
-            "required": [
-                "id",
-                "name",
-                "description",
-                "rootDir",
-                "researchProgram",
-                "researchProgramStatus",
-                "agentWorkBrief",
-                "agentWorkBriefHash",
-                "externalHoldout",
-                "dossierStatus",
-                "dossiers",
-                "runReports",
-                "reviews",
-                "intake",
-                "factorExplorer",
-                "portfolioExplorer",
-                "rlExplorer",
-                "bookRiskExplorer",
-                "eventStudyExplorer",
-                "bookPathStressExplorer",
-                "allocationExplorer",
-                "commands",
-                "valid",
-                "diagnostics",
-                "counts",
-                "studies",
-                "runs",
-                "sessions",
-                "timeline",
-            ],
-            "properties": {
-                "id": {"type": "string", "minLength": 1},
-                "name": {"type": "string", "minLength": 1},
-                "description": {"type": "string"},
-                "rootDir": {"type": "string", "minLength": 1},
-                "researchProgram": {
-                    "type": "object",
-                    "additionalProperties": False,
-                    "required": ["path", "text"],
-                    "properties": {
-                        "path": {"type": "string", "minLength": 1},
-                        "text": {"type": "string"},
-                    },
-                },
-                "researchProgramStatus": {"type": ["object", "null"]},
-                "agentWorkBrief": {"type": ["object", "null"]},
-                "agentWorkBriefHash": {
-                    "type": ["string", "null"],
-                    "pattern": "^[0-9a-f]{64}$",
-                },
-                "externalHoldout": {"type": ["object", "null"]},
-                "dossierStatus": {"type": ["object", "null"]},
-                "dossiers": {"type": "array"},
-                "runReports": {"type": "array"},
-                "reviews": {"type": "array"},
-                "intake": {"type": ["object", "null"]},
-                "factorExplorer": {"type": ["object", "null"]},
-                "portfolioExplorer": {"type": ["object", "null"]},
-                "rlExplorer": {"type": ["object", "null"]},
-                "bookRiskExplorer": {"type": ["object", "null"]},
-                "eventStudyExplorer": {"type": ["object", "null"]},
-                "bookPathStressExplorer": {"type": ["object", "null"]},
-                "allocationExplorer": {"type": ["object", "null"]},
-                "commands": {
-                    "type": "array",
-                    "items": {"type": "object"},
-                },
-                "valid": {"type": "boolean"},
-                "diagnostics": {
-                    "type": "array",
-                    "items": {"$ref": "#/$defs/diagnostic"},
-                },
-                "counts": {
-                    "type": "object",
-                    "additionalProperties": False,
-                    "required": [
-                        "studies",
-                        "runs",
-                        "sessions",
-                        "activeSessions",
-                        "campaigns",
-                        "runningCampaigns",
-                        "delegatedSessions",
-                        "reports",
-                        "reviews",
-                        "dossiers",
-                        "verdicts",
-                    ],
-                    "properties": {
-                        "studies": {"type": "integer", "minimum": 0},
-                        "runs": {"type": "integer", "minimum": 0},
-                        "sessions": {"type": "integer", "minimum": 0},
-                        "activeSessions": {"type": "integer", "minimum": 0},
-                        "campaigns": {"type": "integer", "minimum": 0},
-                        "runningCampaigns": {"type": "integer", "minimum": 0},
-                        "delegatedSessions": {"type": "integer", "minimum": 0},
-                        "reports": {"type": "integer", "minimum": 0},
-                        "reviews": {"type": "integer", "minimum": 0},
-                        "dossiers": {"type": "integer", "minimum": 0},
-                        "verdicts": {
-                            "type": "object",
-                            "additionalProperties": False,
-                            "required": ["KEEP", "REVERT", "CRASH"],
-                            "properties": {
-                                "KEEP": {"type": "integer", "minimum": 0},
-                                "REVERT": {"type": "integer", "minimum": 0},
-                                "CRASH": {"type": "integer", "minimum": 0},
-                            },
-                        },
-                    },
-                },
-                "studies": {"type": "array"},
-                "runs": {"type": "array"},
-                "sessions": {"type": "array"},
-                "timeline": {"type": "array"},
-            },
-        },
-    },
+    "required": ["schema_version", "kind", "version", "generated_at", "source", "active_project_id", "projects"],
 }

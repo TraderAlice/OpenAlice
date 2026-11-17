@@ -128,7 +128,7 @@ function readHarnessVersion(workspaceRoot) {
       // ignore
     }
   }
-  return '0.9.34'
+  return '1.0.0'
 }
 
 function materializeAutoQuantSkills(workspaceRoot) {
