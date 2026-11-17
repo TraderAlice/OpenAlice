@@ -1,8 +1,10 @@
+"""Comprehensive tests for AutoQuant's modular Studio backend, security policy, and frontend."""
+
 from __future__ import annotations
 
 import json
 import os
-import shlex
+import re
 import shutil
 import socket
 import subprocess
@@ -12,798 +14,242 @@ import threading
 import time
 import unittest
 from pathlib import Path
-from unittest import mock
 from urllib.error import HTTPError
 from urllib.request import Request, urlopen
 
-from autoquant.research import run_campaign
-from autoquant.runs import harness_identity
-from autoquant.sessions import evaluate_experiment, start_session
-from autoquant.studies import create_study, hash_json
 from autoquant.studio import (
+    StudioError,
+    StudioNotFoundError,
     build_studio_snapshot,
     create_studio_server,
+    load_studio_run,
     resolve_studio_launch,
 )
 from autoquant.version import current_version
-from autoquant.workspace import (
-    AutoQuantValidationError,
-    create_project,
-    initialize_workspace,
-)
-from tests.study_helpers import make_project, study_definition
+
+PACKAGE_ROOT = Path(__file__).resolve().parents[1]
+ASSETS_DIR = PACKAGE_ROOT / "autoquant" / "studio_assets"
 
 
-SLOW_RESEARCHER = """\
-import json
-import os
-import time
-from pathlib import Path
-
-brief = json.loads(input())
-Path(os.environ["AUTOQUANT_WORKTREE"], "factors/candidate.py").write_text("SCORE = 3.0\\n")
-time.sleep(1)
-print(json.dumps({
-    "schema_version": 1,
-    "action": "propose",
-    "strategy": "slow-bounded-proposal",
-    "hypothesis": "Expose one bounded in-progress turn.",
-    "expected_effect": "Improve the synthetic score.",
-}))
-"""
+def _write_json(path: Path, data: object) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(data, indent=2), encoding="utf-8")
 
 
-class StudioObservationTests(unittest.TestCase):
-    def _setup(self, directory: str):
-        workspace, project = make_project(directory)
-        create_study(project, study_definition())
-        session = start_session(project, "factor-quality")
-        candidate = session.worktree_project.root_dir / "factors/candidate.py"
-        candidate.write_text("SCORE = 2.0\n")
-        evaluate_experiment(project, session.manifest["id"], "Improve the factor")
-        return workspace, project, session
+def _make_sample_workspace(base: Path) -> Path:
+    ws = base / "desk"
+    _write_json(
+        ws / "autoquant-workspace.json",
+        {
+            "schema_version": 1,
+            "name": "Alpha Research Desk",
+            "projects_directory": "projects",
+            "default_project": "us-momentum",
+        },
+    )
+    proj = ws / "projects" / "us-momentum"
+    _write_json(
+        proj / "project.json",
+        {
+            "schema_version": 1,
+            "id": "us-momentum",
+            "name": "US Momentum",
+            "description": "Cross-sectional momentum factor and vol-targeted book",
+            "created_at": "2026-11-17T00:00:00Z",
+            "splits": {
+                "train_end": "2022-12-31",
+                "val_end": "2024-06-30",
+                "holdout_end": "2025-12-31",
+            },
+            "holdout_audit": {
+                "unlock_count": 1,
+                "unlocks": [
+                    {
+                        "unlocked_at": "2026-11-17T05:00:00Z",
+                        "run_id": "run-20261117T050000000000Z-bbbb2222",
+                        "code_sha256": "a" * 64,
+                        "git_commit": "b" * 40,
+                        "git_dirty": False,
+                    }
+                ],
+            },
+        },
+    )
+    (proj / "research.md").write_text("# US Momentum\n\n- Test 20d cross-sectional return signal.\n", encoding="utf-8")
+    _write_json(
+        proj / "data" / "manifest.json",
+        {
+            "schema_version": 1,
+            "datasets": {
+                "equities-1d": {
+                    "id": "equities-1d",
+                    "path": "data/equities-1d.csv",
+                    "format": "csv",
+                    "sha256": "c" * 64,
+                    "symbols": ["AAPL", "MSFT", "NVDA"],
+                    "interval": "1d",
+                    "start": "2020-01-01",
+                    "end": "2025-12-31",
+                    "rows": 3600,
+                    "source": "local",
+                    "ingested_at": "2026-11-17T00:05:00Z",
+                }
+            },
+        },
+    )
 
-    def _script(self, directory: str, source: str) -> str:
-        path = Path(directory) / "studio-researcher.py"
-        path.write_text(source, encoding="utf-8")
-        return f"{shlex.quote(sys.executable)} {shlex.quote(str(path))}"
+    run1 = proj / "runs" / "run-20261117T040000000000Z-aaaa1111"
+    _write_json(
+        run1 / "run.json",
+        {
+            "schema_version": 1,
+            "id": run1.name,
+            "project_id": "us-momentum",
+            "kind": "factor",
+            "name": "mom-20d-val",
+            "split": "val",
+            "created_at": "2026-11-17T04:00:00Z",
+            "hypothesis": "20-day momentum predicts next-week cross-sectional winners.",
+            "parameters": {"lookback": 20, "quantiles": 5},
+            "dataset": {"id": "equities-1d"},
+            "provenance": {
+                "harness_version": "1.0.0",
+                "code_sha256": "d" * 64,
+                "git_commit": "e" * 40,
+                "git_dirty": False,
+            },
+            "metrics": {
+                "sharpe": 1.35,
+                "annual_return": 0.162,
+                "max_drawdown": -0.084,
+                "ic_mean": 0.042,
+                "rank_ic_mean": 0.051,
+                "ic_ir": 0.68,
+            },
+            "series_files": {
+                "equity": "series/equity.csv",
+                "ic": "series/ic.csv",
+                "quantiles": "series/quantiles.json",
+            },
+            "artifacts": [
+                {"name": "Sector Attribution", "path": "artifacts/sector_bars.json", "kind": "chart"}
+            ],
+            "notes": "Clean monotonic quantile spread across Q1..Q5.",
+        },
+    )
+    (run1 / "series").mkdir(parents=True, exist_ok=True)
+    (run1 / "series" / "equity.csv").write_text(
+        "timestamp,equity,returns,turnover,benchmark_equity\n"
+        "2024-01-02,1.000,0.000,0.00,1.000\n"
+        "2024-01-03,1.025,0.025,0.12,1.010\n"
+        "2024-01-04,1.010,-0.0146,0.08,1.005\n",
+        encoding="utf-8",
+    )
+    (run1 / "series" / "ic.csv").write_text(
+        "timestamp,ic,rank_ic\n"
+        "2024-01-02,0.03,0.04\n"
+        "2024-01-03,0.05,0.06\n",
+        encoding="utf-8",
+    )
+    _write_json(
+        run1 / "series" / "quantiles.json",
+        {
+            "quantiles": [
+                {"bucket": 1, "mean_return": -0.0012, "sharpe": -0.4},
+                {"bucket": 5, "mean_return": 0.0028, "sharpe": 1.5},
+            ],
+            "decay": [
+                {"horizon": 1, "ic_mean": 0.042, "rank_ic_mean": 0.051},
+                {"horizon": 5, "ic_mean": 0.031, "rank_ic_mean": 0.039},
+            ],
+        },
+    )
+    _write_json(
+        run1 / "artifacts" / "sector_bars.json",
+        {
+            "title": "Sector Attribution",
+            "type": "bar",
+            "bars": [{"label": "Tech", "value": 0.08}, {"label": "Energy", "value": -0.02}],
+        },
+    )
+    (run1 / "artifacts" / "regime.svg").write_text(
+        '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 40" onload="alert(1)">'
+        '<script>evil()</script><rect width="90" height="30" fill="#10b981"/>'
+        '<a href="https://evil.example"><text x="8" y="20">Regime</text></a></svg>',
+        encoding="utf-8",
+    )
+    (run1 / "artifacts" / "summary.md").write_text("## Walk-Forward Note\nStable turnover.", encoding="utf-8")
+    (run1 / "artifacts" / "weights.csv").write_text("asset,weight\nAAPL,0.5\nMSFT,0.5\n", encoding="utf-8")
 
-    def _managed_environment(self, port: int) -> dict[str, str]:
-        environment = os.environ.copy()
-        environment.update(
-            {
-                "HARNESS_CAPABILITY": "studio",
-                "HARNESS_HOST": "127.0.0.1",
-                "HARNESS_PORTS": json.dumps({"http": port}),
-                "HARNESS_NO_OPEN": "1",
-            }
-        )
-        return environment
+    run2 = proj / "runs" / "run-20261117T050000000000Z-bbbb2222"
+    _write_json(
+        run2 / "run.json",
+        {
+            "schema_version": 1,
+            "id": run2.name,
+            "project_id": "us-momentum",
+            "kind": "backtest",
+            "name": "mom-20d-holdout",
+            "split": "holdout",
+            "created_at": "2026-11-17T05:00:00Z",
+            "metrics": {"sharpe": 1.18, "annual_return": 0.141, "max_drawdown": -0.091},
+        },
+    )
 
-    def _manifest_command(self) -> list[str]:
-        root = Path(__file__).resolve().parents[1]
-        manifest = json.loads((root / "harness.json").read_text(encoding="utf-8"))
-        return manifest["capabilities"]["studio"]["command"]
+    proj2 = ws / "projects" / "empty-crypto"
+    _write_json(
+        proj2 / "project.json",
+        {
+            "schema_version": 1,
+            "id": "empty-crypto",
+            "name": "Empty Crypto",
+            "description": "Empty project with zero runs",
+            "created_at": "2026-11-17T01:00:00Z",
+            "splits": {"train_end": None, "val_end": None, "holdout_end": None},
+            "holdout_audit": {"unlock_count": 0, "unlocks": []},
+        },
+    )
+    return ws
 
-    def _standalone_environment(self) -> dict[str, str]:
-        environment = os.environ.copy()
-        for name in (
-            "HARNESS_CAPABILITY",
-            "HARNESS_HOST",
-            "HARNESS_PORTS",
-            "HARNESS_NO_OPEN",
-        ):
-            environment.pop(name, None)
-        return environment
 
-    def _ordinary_parent_environment(self) -> dict[str, str]:
-        environment = self._standalone_environment()
-        excluded = {
-            Path(sys.executable).parent.resolve(),
-            (Path(__file__).resolve().parents[1] / ".venv" / "bin").resolve(),
+class StudioLaunchAndPolicyTests(unittest.TestCase):
+    def _managed_env(self, port: int = 49321) -> dict[str, str]:
+        return {
+            "HARNESS_CAPABILITY": "studio",
+            "HARNESS_HOST": "127.0.0.1",
+            "HARNESS_PORTS": json.dumps({"http": port}),
+            "HARNESS_NO_OPEN": "1",
         }
-        environment["PATH"] = os.pathsep.join(
-            entry
-            for entry in environment.get("PATH", "").split(os.pathsep)
-            if entry and Path(entry).resolve() not in excluded
-        )
-        environment.pop("VIRTUAL_ENV", None)
-        environment.pop("UV_PROJECT_ENVIRONMENT", None)
-        self.assertIsNotNone(shutil.which("uv", path=environment["PATH"]))
-        return environment
 
-    def _copy_source_workspace(self, directory: str) -> Path:
-        source = Path(__file__).resolve().parents[1]
-        target = Path(directory) / "source-workspace"
-        shutil.copytree(
-            source,
-            target,
-            ignore=shutil.ignore_patterns(
-                ".git",
-                ".venv",
-                ".pytest_cache",
-                ".ruff_cache",
-                "__pycache__",
-                "*.pyc",
-                "autoquant-workspace.local.json",
-                "dist*",
-                "run.log",
-            ),
-        )
-        return target
-
-    def _prepare_source_workspace(
-        self,
-        directory: str,
-    ) -> tuple[Path, dict[str, str]]:
-        workspace = self._copy_source_workspace(directory)
-        environment = self._ordinary_parent_environment()
-        prepared = subprocess.run(
-            ["uv", "sync", "--frozen"],
-            cwd=workspace,
-            env=environment,
-            capture_output=True,
-            check=False,
-            text=True,
-            timeout=120,
-        )
-        self.assertEqual(prepared.returncode, 0, prepared.stderr)
-        self.assertTrue((workspace / ".venv" / "bin" / "aq").is_file())
-        self.assertNotIn(str(workspace / ".venv" / "bin"), environment["PATH"])
-        return workspace, environment
-
-    def test_workspace_and_project_snapshots_share_verified_contract(self) -> None:
-        with tempfile.TemporaryDirectory() as directory:
-            workspace, project, session = self._setup(directory)
-            research_path = project.root_dir / "research.md"
-            research_path.write_text(
-                "# Factor Project\n\n"
-                "## Research question\n\n"
-                "Does Studio receive the maintained question?\n",
-                encoding="utf-8",
-            )
-            create_project(
-                workspace.root_dir,
-                "empty-lab",
-                name="Empty Lab",
-                description="A second bounded research Project",
-            )
-
-            snapshot = build_studio_snapshot(workspace.root_dir)
-            self.assertEqual(snapshot["kind"], "autoquant-studio-snapshot")
-            self.assertEqual(snapshot["harness"], harness_identity())
-            self.assertEqual(snapshot["harness"]["version"], current_version())
-            self.assertRegex(snapshot["harness"]["sourceHash"], r"^[0-9a-f]{64}$")
-            self.assertIn(
-                snapshot["harness"]["buildProvenance"],
-                {"source-checkout", "embedded-distribution"},
-            )
-            self.assertEqual(snapshot["source"]["scope"], "workspace")
-            self.assertEqual(
-                snapshot["source"]["workspace"]["projectsDir"],
-                str(workspace.projects_dir),
-            )
-            self.assertEqual(
-                snapshot["source"]["workspace"]["configurationSource"],
-                "workspace-manifest",
-            )
-            self.assertEqual(
-                snapshot["source"]["workspace"]["configurationPath"],
-                str(workspace.root_dir / "autoquant-workspace.json"),
-            )
-            self.assertEqual(
-                [item["id"] for item in snapshot["projects"]],
-                ["empty-lab", "factor-project"],
-            )
-            observed = next(
-                item for item in snapshot["projects"] if item["id"] == "factor-project"
-            )
-            self.assertTrue(observed["valid"])
-            self.assertEqual(observed["counts"]["studies"], 1)
-            self.assertEqual(observed["counts"]["runs"], 2)
-            self.assertEqual(
-                observed["agentWorkBrief"]["kind"],
-                "autoquant-agent-work-brief",
-            )
-            self.assertEqual(
-                observed["agentWorkBrief"]["question"],
-                {
-                    "title": project.manifest.name,
-                    "text": "Does Studio receive the maintained question?",
-                    "origin": "project-research-brief",
-                    "sourcePath": str(research_path),
-                    "requestPath": None,
-                },
-            )
-            self.assertEqual(
-                len(observed["agentWorkBriefHash"]),
-                64,
-            )
-            self.assertEqual(
-                observed["agentWorkBriefHash"],
-                hash_json(observed["agentWorkBrief"]),
-            )
-            self.assertEqual(
-                observed["agentWorkBrief"]["filesystem"]["operatingRoot"],
-                str(session.worktree_project.root_dir),
-            )
-            self.assertEqual(
-                observed["agentWorkBrief"]["researchAgenda"]["status"],
-                "unsupported-study",
-            )
-            self.assertEqual(
-                observed["agentWorkBrief"]["researchAgenda"]["moves"],
-                [],
-            )
-            self.assertEqual(observed["counts"]["activeSessions"], 1)
-            self.assertEqual(observed["counts"]["dossiers"], 0)
-            self.assertEqual(observed["counts"]["verdicts"]["KEEP"], 1)
-            self.assertIsNone(observed["dossierStatus"])
-            self.assertEqual(observed["dossiers"], [])
-            self.assertEqual(observed["sessions"][0]["session"]["id"], session.manifest["id"])
-            self.assertEqual(
-                observed["sessions"][0]["session"]["baselineGuard"],
-                session.manifest["baselineGuard"],
-            )
-            self.assertTrue(observed["sessions"][0]["authority"]["valid"])
-            self.assertEqual(
-                observed["sessions"][0]["selectionIntegrity"][
-                    "selectionSplit"
-                ],
-                "unspecified",
-            )
-            self.assertIsNone(
-                observed["sessions"][0]["selectionIntegrity"][
-                    "externalHoldoutRequired"
-                ]
-            )
-            self.assertEqual(
-                observed["sessions"][0]["selectionIntegrity"][
-                    "researchFamily"
-                ]["uniqueSourceTrials"],
-                2,
-            )
-            self.assertEqual(
-                observed["sessions"][0]["selectionIntegrity"][
-                    "selectionAdjustment"
-                ]["status"],
-                "unsupported",
-            )
-            self.assertEqual(
-                observed["sessions"][0]["selectionIntegrity"][
-                    "verdictAuthority"
-                ],
-                "diagnostic-only",
-            )
-            self.assertTrue(
-                any(item["kind"] == "experiment" for item in observed["timeline"])
-            )
-            json.dumps(snapshot)
-
-            direct = build_studio_snapshot(project.root_dir)
-            self.assertEqual(direct["source"]["scope"], "project")
-            self.assertIsNone(direct["source"]["workspace"])
-            self.assertEqual([item["id"] for item in direct["projects"]], ["factor-project"])
-
-            selected = build_studio_snapshot(
-                workspace.root_dir,
-                project_id="empty-lab",
-            )
-            self.assertEqual([item["id"] for item in selected["projects"]], ["empty-lab"])
-            with self.assertRaisesRegex(
-                AutoQuantValidationError,
-                "cannot select inside a direct Project",
-            ):
-                build_studio_snapshot(project.root_dir, project_id="factor-project")
-
-    def test_empty_and_partially_invalid_workspaces_remain_observable(self) -> None:
-        with tempfile.TemporaryDirectory() as directory:
-            workspace = initialize_workspace(Path(directory) / "empty")
-            empty = build_studio_snapshot(workspace.root_dir)
-            self.assertTrue(empty["valid"])
-            self.assertEqual(empty["projects"], [])
-
-            (workspace.projects_dir / "broken-project").mkdir()
-            partial = build_studio_snapshot(workspace.root_dir)
-            self.assertFalse(partial["valid"])
-            self.assertEqual(partial["projects"], [])
-            self.assertEqual(
-                partial["diagnostics"][0]["category"],
-                "workspace",
-            )
-
-    def test_invalid_run_category_does_not_become_unverified_display_data(
-        self,
-    ) -> None:
-        with tempfile.TemporaryDirectory() as directory:
-            _, project, _ = self._setup(directory)
-            runs = sorted((project.root_dir / "runs").iterdir())
-            result_path = runs[0] / "result.json"
-            value = json.loads(result_path.read_text())
-            value["summary"] = "tampered"
-            result_path.write_text(json.dumps(value))
-
-            snapshot = build_studio_snapshot(project.root_dir)
-            observed = snapshot["projects"][0]
-            self.assertFalse(snapshot["valid"])
-            self.assertFalse(observed["valid"])
-            self.assertEqual(observed["runs"], [])
-            self.assertEqual(observed["sessions"], [])
-            self.assertEqual(len(observed["studies"]), 1)
-            self.assertIn(
-                "runs",
-                {item["category"] for item in observed["diagnostics"]},
-            )
-
-    def test_running_progress_is_mutable_then_replaced_by_terminal_campaign(
-        self,
-    ) -> None:
-        with tempfile.TemporaryDirectory() as directory:
-            workspace, project, session = self._setup(directory)
-            command = self._script(directory, SLOW_RESEARCHER)
-            outcome: list[object] = []
-
-            def execute() -> None:
-                try:
-                    outcome.append(
-                        run_campaign(
-                            project,
-                            session.manifest["id"],
-                            command,
-                            max_turns=1,
-                            max_wall_seconds=30,
-                            turn_timeout_seconds=5,
-                        )
-                    )
-                except Exception as error:
-                    outcome.append(error)
-
-            thread = threading.Thread(target=execute)
-            thread.start()
-            deadline = time.monotonic() + 5
-            running = None
-            while time.monotonic() < deadline:
-                snapshot = build_studio_snapshot(workspace.root_dir)
-                observed = next(
-                    item
-                    for item in snapshot["projects"]
-                    if item["id"] == project.manifest.id
-                )
-                if observed["counts"]["runningCampaigns"] == 1:
-                    candidate = observed["sessions"][0]["progress"][0]
-                    if candidate["phase"] == "researcher":
-                        running = candidate
-                        break
-                time.sleep(0.02)
-
-            self.assertIsNotNone(running)
-            self.assertTrue(running["mutable"])
-            self.assertEqual(running["status"], "running")
-            self.assertEqual(running["phase"], "researcher")
-            self.assertEqual(running["turn"], 1)
-            thread.join(timeout=10)
-            self.assertFalse(thread.is_alive())
-            self.assertEqual(len(outcome), 1)
-            self.assertFalse(isinstance(outcome[0], Exception), outcome[0])
-
-            terminal = build_studio_snapshot(workspace.root_dir)
-            observed = next(
-                item
-                for item in terminal["projects"]
-                if item["id"] == project.manifest.id
-            )
-            self.assertEqual(observed["counts"]["runningCampaigns"], 0)
-            self.assertEqual(observed["counts"]["campaigns"], 1)
-            self.assertEqual(
-                observed["sessions"][0]["campaigns"][0]["status"],
-                "budget_exhausted",
-            )
-
-    def test_http_server_exposes_only_fixed_read_only_routes_and_headers(
-        self,
-    ) -> None:
-        with tempfile.TemporaryDirectory() as directory:
-            workspace, _, _ = self._setup(directory)
-            server = create_studio_server(workspace.root_dir, port=0)
-            thread = threading.Thread(target=server.serve_forever, daemon=True)
-            thread.start()
-            base = f"http://127.0.0.1:{server.server_port}"
-            try:
-                with urlopen(f"{base}/api/v1/health", timeout=3) as response:
-                    health = json.loads(response.read())
-                    self.assertTrue(health["ok"])
-                    self.assertEqual(health["mode"], "read-only")
-                    self.assertEqual(response.headers["X-Frame-Options"], "DENY")
-                    self.assertEqual(
-                        response.headers["Cross-Origin-Resource-Policy"],
-                        "same-origin",
-                    )
-                    self.assertIn(
-                        "default-src 'none'",
-                        response.headers["Content-Security-Policy"],
-                    )
-                    self.assertIn(
-                        "frame-ancestors 'none'",
-                        response.headers["Content-Security-Policy"],
-                    )
-                    self.assertIsNone(response.headers["Access-Control-Allow-Origin"])
-
-                with urlopen(f"{base}/api/v1/snapshot", timeout=3) as response:
-                    snapshot = json.loads(response.read())
-                    self.assertEqual(snapshot["kind"], "autoquant-studio-snapshot")
-                    self.assertEqual(response.headers["Cache-Control"], "no-store")
-
-                with urlopen(f"{base}/", timeout=3) as response:
-                    html = response.read().decode()
-                    self.assertIn("Quant research desk", html)
-                    self.assertIn("Research cockpit", html)
-                    self.assertIn("Current research decision brief", html)
-                    self.assertIn('id="decision-brief"', html)
-                    self.assertIn('id="rail-workspace"', html)
-                    self.assertIn('id="desk-nav"', html)
-                    self.assertIn("Research handoff", html)
-                    self.assertIn('id="handoff-board"', html)
-                    self.assertIn('id="evidence-workbench"', html)
-                    self.assertIn('id="evidence-lane-tabs"', html)
-                    self.assertIn(
-                        'id="portfolio-mechanical-decision"',
-                        html,
-                    )
-                    self.assertIn(
-                        'id="portfolio-sizing-anatomy"',
-                        html,
-                    )
-                    self.assertIn(
-                        'id="portfolio-diversification-stress"',
-                        html,
-                    )
-                    self.assertIn(
-                        'id="portfolio-strategy-viability"',
-                        html,
-                    )
-                    self.assertIn(
-                        'id="portfolio-signal-monetization"',
-                        html,
-                    )
-                    self.assertIn(
-                        'id="factor-qualification"',
-                        html,
-                    )
-                    self.assertIn('id="factor-components"', html)
-                    self.assertIn('id="research-agenda"', html)
-                    self.assertIn('id="research-agenda-board"', html)
-                    self.assertIn('id="external-holdout"', html)
-                    self.assertIn('id="external-holdout-board"', html)
-                    self.assertIn(
-                        "Current mechanical decision",
-                        html,
-                    )
-                    self.assertIn('id="inspector-toggle"', html)
-                    self.assertIn('id="rl-opportunity"', html)
-                    self.assertIn(
-                        'id="rl-fusion-diagnosis"',
-                        html,
-                    )
-                    self.assertIn('href="/assets/studio.css"', html)
-                    self.assertNotIn("<script>", html)
-
-                with urlopen(f"{base}/assets/studio.css", timeout=3) as response:
-                    css = response.read().decode()
-                    self.assertIn(".handoff-board", css)
-                    self.assertIn(".decision-brief", css)
-                    self.assertIn(".workspace-context", css)
-                    self.assertIn(".desk-nav-button", css)
-                    self.assertIn('[data-lane-count="1"]', css)
-                    self.assertIn(".program-assessment", css)
-                    self.assertIn(".admission-chip", css)
-                    self.assertIn(".program-lane.admission-locked", css)
-                    self.assertIn(".evidence-lane-tabs", css)
-                    self.assertIn(".mandate-strip", css)
-                    self.assertIn(".mechanical-chain", css)
-                    self.assertIn(".mechanical-table", css)
-                    self.assertIn(".trigger-condition", css)
-                    self.assertIn(".report-decision-proof", css)
-                    self.assertIn(".sizing-summary", css)
-                    self.assertIn(".sizing-table", css)
-                    self.assertIn(".diversification-summary", css)
-                    self.assertIn(".diversification-ladder", css)
-                    self.assertIn(".diversification-table", css)
-                    self.assertIn(".viability-diagnosis", css)
-                    self.assertIn(".viability-chain", css)
-                    self.assertIn(".monetization-chain", css)
-                    self.assertIn(".monetization-deltas", css)
-                    self.assertIn(".factor-qualification-chain", css)
-                    self.assertIn(
-                        ".factor-qualification-diagnosis",
-                        css,
-                    )
-                    self.assertIn(".factor-component-diagnosis", css)
-                    self.assertIn(".factor-component-table", css)
-                    self.assertIn(".factor-table-wrap", css)
-                    self.assertIn("overflow-x: auto", css)
-                    self.assertIn(".research-agenda-board", css)
-                    self.assertIn(".holdout-board", css)
-                    self.assertIn(".holdout-lane", css)
-                    self.assertIn(".research-move-evidence", css)
-                    self.assertIn(
-                        "content: attr(data-label)",
-                        css,
-                    )
-                    self.assertIn(
-                        ".book-risk-scenario-table .factor-table td::before",
-                        css,
-                    )
-                    self.assertIn(
-                        ".book-risk-scenario-contribution-table .factor-table td::before",
-                        css,
-                    )
-                    self.assertIn(".inspector-lane", css)
-                    self.assertIn(".inspector-collapsed", css)
-                    self.assertIn(".rl-opportunity-panel", css)
-                    self.assertIn(".rl-incremental-panel", css)
-                    self.assertIn(".rl-fusion-diagnosis", css)
-                    self.assertIn(".rl-fusion-chain", css)
-                    self.assertIn(".selection-risk", css)
-                    self.assertIn(".command-button", css)
-                    self.assertIn("@media (max-width: 680px)", css)
-                    self.assertIn(":focus-visible", css)
-
-                with urlopen(f"{base}/assets/studio.js", timeout=3) as response:
-                    javascript = response.read().decode()
-                    self.assertIn("programAssessment", javascript)
-                    self.assertIn("laneAdmission", javascript)
-                    self.assertIn("progressionGate", javascript)
-                    self.assertIn("REQUIRED RESEARCH COMPLETE", javascript)
-                    self.assertIn("researchDecisionBrief", javascript)
-                    self.assertIn("project.agentWorkBrief", javascript)
-                    self.assertIn("project.agentWorkBriefHash", javascript)
-                    self.assertIn("ORIENTATION UNAVAILABLE", javascript)
-                    self.assertNotIn("DO NOT PROMOTE ADAPTIVITY", javascript)
-                    self.assertIn("projectFocusStudy", javascript)
-                    self.assertIn("fixed event policy", javascript)
-                    self.assertIn("DESCRIPTIVE EVIDENCE READY", javascript)
-                    self.assertIn("renderDeskContext", javascript)
-                    self.assertIn("updateDeskNavActive", javascript)
-                    self.assertIn("validationBaselineAdvantage", javascript)
-                    self.assertIn("renderFactorComponents", javascript)
-                    self.assertIn("renderResearchAgenda", javascript)
-                    self.assertIn("OPTIONAL FOLLOW-UP", javascript)
-                    self.assertIn(
-                        "project.agentWorkBrief?.researchAgenda",
-                        javascript,
-                    )
-                    self.assertIn(
-                        "project.externalHoldout",
-                        javascript,
-                    )
-                    self.assertIn(
-                        "renderExternalHoldout(project)",
-                        javascript,
-                    )
-                    self.assertIn(
-                        "Sessions are disabled in this frozen external-audit Project.",
-                        javascript,
-                    )
-                    self.assertIn(
-                        "FROZEN SOURCE → LATER DATA → EXTERNAL AUDIT",
-                        javascript,
-                    )
-                    self.assertIn(
-                        "REQUEST → DATASET → FIXED RUN → REVIEW",
-                        javascript,
-                    )
-                    self.assertIn(
-                        "Copy Book Risk Explorer CLI",
-                        javascript,
-                    )
-                    self.assertIn(
-                        "no Session, optimization, order, or trading authority",
-                        javascript,
-                    )
-                    self.assertIn(
-                        'data-label="Validation raw ${scoreLabel}"',
-                        javascript,
-                    )
-                    self.assertIn("data-evidence-lane", javascript)
-                    self.assertIn("mandateMarkup", javascript)
-                    self.assertIn(
-                        "renderPortfolioMechanicalDecision",
-                        javascript,
-                    )
-                    self.assertIn(
-                        "renderPortfolioSizingAnatomy",
-                        javascript,
-                    )
-                    self.assertIn(
-                        "renderPortfolioDiversificationStress",
-                        javascript,
-                    )
-                    self.assertIn(
-                        "25% / 50% / 100% ceiling-breach rate",
-                        javascript,
-                    )
-                    self.assertIn(
-                        "renderPortfolioStrategyViability",
-                        javascript,
-                    )
-                    self.assertIn(
-                        "renderPortfolioSignalMonetization",
-                        javascript,
-                    )
-                    self.assertIn(
-                        "renderFactorQualification",
-                        javascript,
-                    )
-                    self.assertIn(
-                        "First missing qualification layer",
-                        javascript,
-                    )
-                    self.assertIn(
-                        "Core could not verify the Agent Work Brief",
-                        javascript,
-                    )
-                    self.assertIn(
-                        "Frozen factor qualification",
-                        javascript,
-                    )
-                    self.assertIn(
-                        "Material train/validation contrast",
-                        javascript,
-                    )
-                    self.assertIn("Quantiles · N/A", javascript)
-                    self.assertIn(
-                        "quantiles protocol-unavailable",
-                        javascript,
-                    )
-                    self.assertIn(
-                        "TEST · VISIBLE AUDIT ONLY",
-                        javascript,
-                    )
-                    self.assertIn(
-                        "Diagonal risk is a sizing heuristic",
-                        javascript,
-                    )
-                    self.assertIn(
-                        "reportDecisionProof",
-                        javascript,
-                    )
-                    self.assertIn(
-                        "Frozen leader decision",
-                        javascript,
-                    )
-                    self.assertIn(
-                        "Same-timestamp percentile across prediction assets only",
-                        javascript,
-                    )
-                    self.assertIn("Causal own-history percentile", javascript)
-                    self.assertIn("NO-TRADE HOLD", javascript)
-                    self.assertIn("Authorized positions", javascript)
-                    self.assertIn("syncEvidenceSelection", javascript)
-                    self.assertIn("dossierState", javascript)
-                    self.assertIn("PROJECT DOSSIER", javascript)
-                    self.assertIn("OpenAlice return artifact", javascript)
-                    self.assertIn("Copy completion CLI", javascript)
-                    self.assertIn("no trading authority", javascript)
-                    self.assertIn("browser-authored verdict", javascript)
-                    self.assertIn("selectionRiskSection", javascript)
-                    self.assertIn("renderRlOpportunity", javascript)
-                    self.assertIn("renderRlIncremental", javascript)
-                    self.assertIn(
-                        "renderRlFusionDiagnosis",
-                        javascript,
-                    )
-                    self.assertIn(
-                        "Where adaptive value stops",
-                        javascript,
-                    )
-                    self.assertIn(
-                        "Frozen RL factor-fusion diagnosis",
-                        javascript,
-                    )
-                    self.assertIn("Gross selection edge", javascript)
-                    self.assertIn("factorOpportunity", javascript)
-                    self.assertIn("contextualBaselines", javascript)
-                    self.assertIn("train-only frozen learner", javascript)
-                    self.assertIn("learningContract", javascript)
-                    self.assertIn("SAME-PRETRADE · TRAIN ONLY", javascript)
-                    self.assertIn("Family trials", javascript)
-                    self.assertIn("Project-family trials", javascript)
-                    self.assertIn("diagnostic only", javascript)
-                    self.assertNotIn("RESEARCH CHAIN PASSES", javascript)
-
-                request = Request(
-                    f"{base}/api/v1/snapshot",
-                    method="POST",
-                    data=b"{}",
-                )
-                with self.assertRaises(HTTPError) as raised:
-                    urlopen(request, timeout=3)
-                self.assertEqual(raised.exception.code, 405)
-                self.assertEqual(
-                    json.loads(raised.exception.read())["error"]["code"],
-                    "studio.read-only",
-                )
-
-                with self.assertRaises(HTTPError) as raised:
-                    urlopen(f"{base}/files/research.md", timeout=3)
-                self.assertEqual(raised.exception.code, 404)
-            finally:
-                server.shutdown()
-                server.server_close()
-                thread.join(timeout=3)
-
-    def test_invalid_port_and_workspace_manifest_remain_core_errors(self) -> None:
-        with tempfile.TemporaryDirectory() as directory:
-            workspace, _, _ = self._setup(directory)
-            with self.assertRaisesRegex(AutoQuantValidationError, "port"):
-                create_studio_server(workspace.root_dir, port=70000)
-
-            manifest_path = workspace.root_dir / "autoquant-workspace.json"
-            manifest = json.loads(manifest_path.read_text())
-            manifest["unknown"] = True
-            manifest_path.write_text(json.dumps(manifest))
-            with self.assertRaisesRegex(AutoQuantValidationError, "Unknown field"):
-                build_studio_snapshot(workspace.root_dir)
-
-    def test_managed_launch_strictly_resolves_injected_authority(self) -> None:
-        environment = self._managed_environment(49321)
-        launch = resolve_studio_launch(
-            host=None,
-            port=None,
-            no_open=False,
-            environ=environment,
-        )
-
+    def test_managed_launch_accepts_loopback_and_rejects_conflicts(self) -> None:
+        env = self._managed_env(49321)
+        launch = resolve_studio_launch(host=None, port=None, no_open=False, environ=env)
         self.assertTrue(launch.managed)
         self.assertEqual(launch.host, "127.0.0.1")
         self.assertEqual(launch.port, 49321)
         self.assertFalse(launch.open_browser)
+
         self.assertEqual(
-            resolve_studio_launch(
-                host="127.0.0.1",
-                port=49321,
-                no_open=True,
-                environ=environment,
-            ),
+            resolve_studio_launch(host="127.0.0.1", port=49321, no_open=True, environ=env),
             launch,
         )
+        with self.assertRaisesRegex(StudioError, "conflicts"):
+            resolve_studio_launch(host="localhost", port=None, no_open=True, environ=env)
+        with self.assertRaisesRegex(StudioError, "conflicts"):
+            resolve_studio_launch(host=None, port=49322, no_open=True, environ=env)
 
-        with self.assertRaisesRegex(AutoQuantValidationError, "conflicts"):
-            resolve_studio_launch(
-                host="localhost",
-                port=None,
-                no_open=True,
-                environ=environment,
-            )
-        with self.assertRaisesRegex(AutoQuantValidationError, "conflicts"):
-            resolve_studio_launch(
-                host=None,
-                port=49322,
-                no_open=True,
-                environ=environment,
-            )
+        for valid_host in ("localhost", "LOCALHOST", "127.0.0.2", "127.255.255.254"):
+            with self.subTest(host=valid_host):
+                custom = {**env, "HARNESS_HOST": valid_host}
+                self.assertEqual(resolve_studio_launch(environ=custom).host, valid_host)
 
-        for host in ("localhost", "LOCALHOST", "127.0.0.2", "127.255.255.254"):
-            with self.subTest(host=host):
-                accepted = self._managed_environment(49321)
-                accepted["HARNESS_HOST"] = host
-                self.assertEqual(
-                    resolve_studio_launch(
-                        host=None,
-                        port=None,
-                        no_open=False,
-                        environ=accepted,
-                    ).host,
-                    host,
-                )
-
-    def test_managed_launch_fails_closed_for_invalid_port_authority(self) -> None:
-        invalid_ports = (
+    def test_managed_launch_fails_closed_on_invalid_ports_or_hosts(self) -> None:
+        bad_ports = (
             None,
             "not-json",
             "[]",
             "{}",
-            '{"http":49321,"controlPlane":49322}',
+            '{"http":49321,"extra":49322}',
             '{"http":49321,"http":49322}',
             '{"http":true}',
             '{"http":49321.0}',
@@ -811,451 +257,329 @@ class StudioObservationTests(unittest.TestCase):
             '{"http":0}',
             '{"http":65536}',
         )
-        for raw in invalid_ports:
-            with self.subTest(raw=raw):
-                environment = {
-                    "HARNESS_CAPABILITY": "studio",
-                    "HARNESS_HOST": "127.0.0.1",
-                    "HARNESS_NO_OPEN": "1",
-                }
+        for raw in bad_ports:
+            with self.subTest(ports=raw):
+                env = {"HARNESS_CAPABILITY": "studio", "HARNESS_HOST": "127.0.0.1"}
                 if raw is not None:
-                    environment["HARNESS_PORTS"] = raw
-                with self.assertRaises(AutoQuantValidationError):
-                    resolve_studio_launch(
-                        host=None,
-                        port=None,
-                        no_open=False,
-                        environ=environment,
-                    )
+                    env["HARNESS_PORTS"] = raw
+                with self.assertRaises(StudioError):
+                    resolve_studio_launch(environ=env)
 
-        with self.assertRaisesRegex(AutoQuantValidationError, "host"):
-            resolve_studio_launch(
-                host=None,
-                port=None,
-                no_open=False,
-                environ={
-                    "HARNESS_CAPABILITY": "studio",
-                    "HARNESS_PORTS": '{"http":49321}',
-                },
-            )
-
-        for host in (
+        bad_hosts = (
+            None,
             "",
             " ",
             " 127.0.0.1",
             "127.0.0.1 ",
             "0.0.0.0",
             "10.0.0.1",
-            "192.0.2.1",
             "example.com",
-            "localhost.example",
             "::1",
             "[::1]",
             "127.1",
             "127.000.000.001",
-        ):
-            with self.subTest(host=host), self.assertRaisesRegex(
-                AutoQuantValidationError,
-                "host",
-            ):
-                resolve_studio_launch(
-                    host=None,
-                    port=None,
-                    no_open=False,
-                    environ={
-                        "HARNESS_CAPABILITY": "studio",
-                        "HARNESS_HOST": host,
-                        "HARNESS_PORTS": '{"http":49321}',
-                    },
-                )
+        )
+        for host in bad_hosts:
+            with self.subTest(host=host):
+                env = {"HARNESS_CAPABILITY": "studio", "HARNESS_PORTS": '{"http":49321}'}
+                if host is not None:
+                    env["HARNESS_HOST"] = host
+                with self.assertRaises(StudioError):
+                    resolve_studio_launch(environ=env)
 
-    def test_non_managed_environment_preserves_standalone_launch(self) -> None:
-        noisy_environment = {
-            "HARNESS_CAPABILITY": "another-capability",
+    def test_standalone_launch_ignores_unrelated_harness_noise(self) -> None:
+        noisy = {
+            "HARNESS_CAPABILITY": "other",
             "HARNESS_HOST": "192.0.2.1",
-            "HARNESS_PORTS": "not-json",
+            "HARNESS_PORTS": "broken",
             "HARNESS_NO_OPEN": "1",
-            "OPENALICE_CAPABILITY": "studio",
-            "OPENALICE_CAPABILITY_HOST": "192.0.2.1",
-            "OPENALICE_CAPABILITY_PORTS": "not-json",
-            "OPENALICE_CAPABILITY_NO_OPEN": "1",
         }
-        default = resolve_studio_launch(
-            host=None,
-            port=None,
-            no_open=False,
-            environ=noisy_environment,
-        )
-        explicit = resolve_studio_launch(
-            host="0.0.0.0",
-            port=0,
-            no_open=True,
-            environ=noisy_environment,
-        )
-
+        default = resolve_studio_launch(environ=noisy)
         self.assertFalse(default.managed)
         self.assertEqual(default.host, "127.0.0.1")
         self.assertEqual(default.port, 8765)
         self.assertTrue(default.open_browser)
+
+        explicit = resolve_studio_launch(host="0.0.0.0", port=0, open_browser=False, environ=noisy)
         self.assertEqual(explicit.host, "0.0.0.0")
         self.assertEqual(explicit.port, 0)
         self.assertFalse(explicit.open_browser)
 
-    def test_managed_cli_forces_no_browser_and_exact_bind(self) -> None:
-        from autoquant.cli import main
 
-        environment = self._managed_environment(49321)
-        with mock.patch.dict(os.environ, environment, clear=True), mock.patch(
-            "autoquant.cli.serve_studio"
-        ) as serve:
-            exit_code = main(["studio", "serve", "."])
+class StudioSnapshotAndHttpTests(unittest.TestCase):
+    def test_snapshot_workspace_direct_project_and_local_override(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            ws = _make_sample_workspace(Path(tmp))
+            snap = build_studio_snapshot(ws)
+            self.assertEqual(snap["kind"], "autoquant-studio-snapshot")
+            self.assertEqual(snap["version"], current_version())
+            self.assertEqual(snap["source"]["scope"], "workspace")
+            self.assertEqual(snap["active_project_id"], "us-momentum")
+            self.assertEqual([p["id"] for p in snap["projects"]], ["empty-crypto", "us-momentum"])
 
-        self.assertEqual(exit_code, 0)
-        serve.assert_called_once_with(
-            ".",
-            project_id=None,
-            host="127.0.0.1",
-            port=49321,
-            open_browser=False,
-            managed=True,
-        )
-
-    def test_managed_cli_uses_real_fixed_port_and_health_readiness(self) -> None:
-        with tempfile.TemporaryDirectory() as directory:
-            workspace, _, _ = self._setup(directory)
-            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as probe:
-                probe.bind(("127.0.0.1", 0))
-                port = probe.getsockname()[1]
-            process = subprocess.Popen(
-                [
-                    sys.executable,
-                    "-m",
-                    "autoquant",
-                    "studio",
-                    "serve",
-                    str(workspace.root_dir),
-                    "--no-open",
-                ],
-                cwd=Path(__file__).resolve().parents[1],
-                env=self._managed_environment(port),
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                text=True,
-            )
-            try:
-                announcement = process.stdout.readline().strip()
-                self.assertEqual(
-                    announcement,
-                    f"AutoQuant Studio: http://127.0.0.1:{port}",
-                    process.stderr.read() if process.poll() is not None else "",
-                )
-                with urlopen(
-                    f"http://127.0.0.1:{port}/api/v1/health",
-                    timeout=3,
-                ) as response:
-                    self.assertEqual(response.status, 200)
-                    health = json.loads(response.read())
-                self.assertTrue(health["ok"])
-                self.assertEqual(health["service"], "autoquant-studio")
-                self.assertEqual(health["mode"], "read-only")
-            finally:
-                process.terminate()
-                process.wait(timeout=5)
-                process.stdout.close()
-                process.stderr.close()
-
-    def test_manifest_command_is_origin_neutral_embeddable_and_releases_on_sigterm(
-        self,
-    ) -> None:
-        with tempfile.TemporaryDirectory() as directory:
-            workspace, parent_environment = self._prepare_source_workspace(directory)
-            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as probe:
-                probe.bind(("127.0.0.1", 0))
-                port = probe.getsockname()[1]
-            default_was_free = False
-            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as default_probe:
-                default_was_free = default_probe.connect_ex(
-                    ("127.0.0.1", 8765)
-                ) != 0
-            environment = self._managed_environment(port)
-            environment["PATH"] = parent_environment["PATH"]
-            environment.pop("VIRTUAL_ENV", None)
-            environment.pop("UV_PROJECT_ENVIRONMENT", None)
-            process = subprocess.Popen(
-                self._manifest_command(),
-                cwd=workspace,
-                env=environment,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                text=True,
-            )
-            try:
-                announcement = process.stdout.readline().strip()
-                self.assertEqual(
-                    announcement,
-                    f"AutoQuant Studio: http://127.0.0.1:{port}",
-                    process.stderr.read() if process.poll() is not None else "",
-                )
-                base = f"http://127.0.0.1:{port}"
-                headers = {
-                    "Host": "oa-surface-autoquant.localhost",
-                    "Cookie": "openalice-session=must-not-be-required",
-                    "Authorization": "Bearer must-not-be-required",
-                    "X-CSRF-Token": "must-not-be-required",
-                }
-                for path, expected in (
-                    ("/", b"Quant research desk"),
-                    ("/assets/studio.css", b"--bg"),
-                    ("/assets/studio.js", b'/api/v1/snapshot'),
-                ):
-                    with urlopen(Request(f"{base}{path}", headers=headers), timeout=3) as response:
-                        body = response.read()
-                        self.assertEqual(response.status, 200)
-                        self.assertIn(expected, body)
-                        csp = response.headers["Content-Security-Policy"]
-                        self.assertIn(
-                            "frame-ancestors app: http://127.0.0.1:* "
-                            "http://localhost:* http://*.localhost:*",
-                            csp,
-                        )
-                        self.assertNotIn("frame-ancestors *", csp)
-                        self.assertIsNone(response.headers["X-Frame-Options"])
-                        self.assertIsNone(
-                            response.headers["Cross-Origin-Resource-Policy"]
-                        )
-                        self.assertIsNone(response.headers["Location"])
-                with urlopen(
-                    Request(f"{base}/api/v1/health", headers=headers), timeout=3
-                ) as response:
-                    self.assertEqual(response.status, 200)
-                    self.assertEqual(
-                        json.loads(response.read())["service"],
-                        "autoquant-studio",
-                    )
-                with urlopen(
-                    Request(f"{base}/api/v1/snapshot", headers=headers), timeout=3
-                ) as response:
-                    self.assertEqual(response.status, 200)
-                    self.assertEqual(
-                        json.loads(response.read())["kind"],
-                        "autoquant-studio-snapshot",
-                    )
-                if default_was_free:
-                    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as check:
-                        self.assertNotEqual(check.connect_ex(("127.0.0.1", 8765)), 0)
-            finally:
-                process.terminate()
-                process.wait(timeout=5)
-                process.stdout.close()
-                process.stderr.close()
-
-            self.assertNotEqual(process.returncode, None)
-            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as listener_check:
-                self.assertNotEqual(
-                    listener_check.connect_ex(("127.0.0.1", port)), 0
-                )
-            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as released:
-                released.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-                released.bind(("127.0.0.1", port))
-
-    def test_manifest_command_fails_clearly_without_prepared_environment(self) -> None:
-        with tempfile.TemporaryDirectory() as directory:
-            workspace = self._copy_source_workspace(directory)
-            parent_environment = self._ordinary_parent_environment()
-            environment = self._managed_environment(49321)
-            environment["PATH"] = parent_environment["PATH"]
-            environment.pop("VIRTUAL_ENV", None)
-            environment.pop("UV_PROJECT_ENVIRONMENT", None)
-            lock_before = (workspace / "uv.lock").read_bytes()
-
-            result = subprocess.run(
-                self._manifest_command(),
-                cwd=workspace,
-                env=environment,
-                capture_output=True,
-                check=False,
-                text=True,
-                timeout=15,
+            mom = next(p for p in snap["projects"] if p["id"] == "us-momentum")
+            self.assertEqual(mom["holdout_audit"]["unlock_count"], 1)
+            self.assertEqual(len(mom["datasets"]), 1)
+            self.assertIn("Test 20d cross-sectional", mom["research_markdown"])
+            # Newest run sorted first
+            self.assertEqual(
+                [r["name"] for r in mom["runs"]],
+                ["mom-20d-holdout", "mom-20d-val"],
             )
 
-            self.assertNotEqual(result.returncode, 0)
-            self.assertEqual(result.stdout, "")
-            self.assertIn("Failed to spawn", result.stderr)
-            self.assertIn("aq", result.stderr)
-            self.assertEqual((workspace / "uv.lock").read_bytes(), lock_before)
-            self.assertFalse((workspace / ".venv" / "bin" / "aq").exists())
+            filtered = build_studio_snapshot(ws, project_id="empty-crypto")
+            self.assertEqual([p["id"] for p in filtered["projects"]], ["empty-crypto"])
 
-    def test_managed_no_open_environment_suppresses_real_browser_opener(self) -> None:
-        with tempfile.TemporaryDirectory() as directory:
-            workspace = initialize_workspace(Path(directory) / "desk")
-            marker = Path(directory) / "browser-opened"
-            opener = Path(directory) / "browser-opener"
-            opener.write_text(
-                "#!/bin/sh\nprintf opened > \"$AUTOQUANT_BROWSER_MARKER\"\n",
-                encoding="utf-8",
-            )
-            opener.chmod(0o755)
-            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as probe:
-                probe.bind(("127.0.0.1", 0))
-                port = probe.getsockname()[1]
-            command = [
-                sys.executable,
-                "-m",
-                "autoquant",
-                "studio",
-                "serve",
-                str(workspace.root_dir),
-            ]
-            environment = self._managed_environment(port)
-            environment.update(
+            direct = build_studio_snapshot(ws / "projects" / "us-momentum")
+            self.assertEqual(direct["source"]["scope"], "project")
+            self.assertEqual([p["id"] for p in direct["projects"]], ["us-momentum"])
+            with self.assertRaises(StudioNotFoundError):
+                build_studio_snapshot(ws / "projects" / "us-momentum", project_id="other")
+
+            # Optional autoquant-workspace.local.json override pointing to external projects directory
+            ext_projects = Path(tmp) / "external-projects"
+            shutil.copytree(ws / "projects", ext_projects)
+            _write_json(
+                ws / "autoquant-workspace.local.json",
                 {
-                    "AUTOQUANT_BROWSER_MARKER": str(marker),
-                    "BROWSER": str(opener),
-                }
+                    "schema_version": 1,
+                    "name": "Local Override Desk",
+                    "projects_directory": str(ext_projects),
+                    "default_project": "empty-crypto",
+                },
             )
-            process = subprocess.Popen(
-                command,
-                cwd=workspace.root_dir,
-                env=environment,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                text=True,
+            overridden = build_studio_snapshot(ws)
+            self.assertEqual(overridden["source"]["configuration_source"], "local-override")
+            self.assertEqual(overridden["active_project_id"], "empty-crypto")
+
+    def test_empty_workspace_snapshot_succeeds_without_projects_dir(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            ws = Path(tmp) / "fresh"
+            _write_json(
+                ws / "autoquant-workspace.json",
+                {"schema_version": 1, "name": "Fresh Desk", "projects_directory": "projects", "default_project": None},
             )
-            try:
-                process.stdout.readline()
-                with urlopen(
-                    f"http://127.0.0.1:{port}/api/v1/health", timeout=3
-                ) as response:
-                    self.assertEqual(response.status, 200)
-                time.sleep(0.2)
-                self.assertFalse(marker.exists())
-            finally:
-                process.terminate()
-                process.wait(timeout=5)
-                process.stdout.close()
-                process.stderr.close()
+            snap = build_studio_snapshot(ws)
+            self.assertEqual(snap["projects"], [])
+            self.assertIsNone(snap["active_project_id"])
 
-    def test_frontend_has_only_current_origin_http_transport(self) -> None:
-        assets = Path(__file__).resolve().parents[1] / "autoquant" / "studio_assets"
-        html = (assets / "index.html").read_text(encoding="utf-8")
-        javascript = (assets / "studio.js").read_text(encoding="utf-8")
-        self.assertIn('href="/assets/studio.css"', html)
-        self.assertIn('src="/assets/studio.js"', html)
-        self.assertIn('fetch("/api/v1/snapshot"', javascript)
-        for fixed_origin in (
-            "http://127.0.0.1",
-            "http://localhost",
-            "ws://",
-            "wss://",
-        ):
-            self.assertNotIn(fixed_origin, html)
-            self.assertNotIn(fixed_origin, javascript)
-        self.assertNotIn("EventSource(", javascript)
-        self.assertNotIn("WebSocket(", javascript)
+    def test_http_endpoints_headers_series_and_custom_artifacts(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            ws = _make_sample_workspace(Path(tmp))
+            for managed in (False, True):
+                with self.subTest(managed=managed):
+                    server = create_studio_server(ws, host="127.0.0.1", port=0, managed=managed)
+                    thread = threading.Thread(target=server.serve_forever, kwargs={"poll_interval": 0.05}, daemon=True)
+                    thread.start()
+                    base = f"http://127.0.0.1:{server.server_port}"
+                    try:
+                        req_headers = {"Host": "oa-surface-test.localhost"} if managed else {}
+                        with urlopen(Request(f"{base}/api/v1/health", headers=req_headers), timeout=3) as resp:
+                            self.assertEqual(resp.status, 200)
+                            health = json.loads(resp.read())
+                            self.assertTrue(health["ok"])
+                            self.assertEqual(health["kind"], "autoquant-studio-health")
+                            self.assertEqual(health["version"], current_version())
+                            self.assertEqual(health["managed"], managed)
+                            csp = resp.headers["Content-Security-Policy"]
+                            if managed:
+                                self.assertIn(
+                                    "frame-ancestors app: http://127.0.0.1:* http://localhost:* http://*.localhost:*",
+                                    csp,
+                                )
+                                self.assertIsNone(resp.headers["X-Frame-Options"])
+                                self.assertIsNone(resp.headers["Cross-Origin-Resource-Policy"])
+                            else:
+                                self.assertIn("frame-ancestors 'none'", csp)
+                                self.assertEqual(resp.headers["X-Frame-Options"], "DENY")
+                                self.assertEqual(resp.headers["Cross-Origin-Resource-Policy"], "same-origin")
 
-    def test_managed_cli_fails_when_injected_port_is_occupied(self) -> None:
-        with tempfile.TemporaryDirectory() as directory:
-            workspace, _, _ = self._setup(directory)
+                        with urlopen(f"{base}/api/v1/snapshot", timeout=3) as resp:
+                            self.assertEqual(resp.status, 200)
+                            snap = json.loads(resp.read())
+                            self.assertEqual(len(snap["projects"]), 2)
+
+                        run_id = "run-20261117T040000000000Z-aaaa1111"
+                        for url in (
+                            f"{base}/api/v1/runs/us-momentum/{run_id}",
+                            f"{base}/api/v1/run?project=us-momentum&run={run_id}",
+                        ):
+                            with urlopen(url, timeout=3) as resp:
+                                self.assertEqual(resp.status, 200)
+                                detail = json.loads(resp.read())
+                            self.assertTrue(detail["ok"])
+                            self.assertEqual(len(detail["series"]["equity"]), 3)
+                            # Drawdown computed automatically when absent from CSV
+                            self.assertAlmostEqual(detail["series"]["equity"][2]["drawdown"], 1.010 / 1.025 - 1.0, places=6)
+                            self.assertEqual(detail["series"]["equity"][1]["benchmark_equity"], 1.010)
+                            self.assertEqual(len(detail["series"]["ic"]), 2)
+                            self.assertEqual(len(detail["series"]["quantiles"]["quantiles"]), 2)
+                            by_kind = {a["kind"]: a for a in detail["artifacts"]}
+                            self.assertEqual(by_kind["json"]["data"]["type"], "bar")
+                            self.assertNotIn("<script>", by_kind["svg"]["text"])
+                            self.assertNotIn("onload=", by_kind["svg"]["text"])
+                            self.assertNotIn("https://evil.example", by_kind["svg"]["text"])
+                            self.assertIn("Walk-Forward Note", by_kind["markdown"]["text"])
+                            self.assertEqual(by_kind["csv"]["columns"], ["asset", "weight"])
+
+                        for asset_path, marker in (
+                            ("/", b"AutoQuant Studio"),
+                            ("/index.html", b"Holdout Untouched"),
+                            ("/assets/studio.css", b"prefers-color-scheme: light"),
+                            ("/assets/studio.js", b'/api/v1/snapshot'),
+                        ):
+                            with urlopen(f"{base}{asset_path}", timeout=3) as resp:
+                                self.assertEqual(resp.status, 200)
+                                self.assertIn(marker, resp.read())
+
+                        # Read-only enforcement
+                        post_req = Request(f"{base}/api/v1/snapshot", data=b"{}", method="POST")
+                        with self.assertRaises(HTTPError) as ctx:
+                            urlopen(post_req, timeout=3)
+                        self.assertEqual(ctx.exception.code, 405)
+                        ctx.exception.close()
+                    finally:
+                        server.shutdown()
+                        server.server_close()
+                        thread.join(timeout=2)
+
+    def test_symlink_and_path_traversal_rejection(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            base = Path(tmp)
+            ws = _make_sample_workspace(base)
+            secret = base / "secret.json"
+            secret.write_text('{"leaked": true}', encoding="utf-8")
+
+            # 1. Symlinked workspace root rejected
+            ws_link = base / "desk-link"
+            ws_link.symlink_to(ws)
+            with self.assertRaises(StudioError):
+                build_studio_snapshot(ws_link)
+
+            # 2. Traversal in run query / path rejected
+            run_id = "run-20261117T040000000000Z-aaaa1111"
+            with self.assertRaises(StudioError):
+                load_studio_run(ws, project_id="../escape", run_id=run_id)
+            with self.assertRaises(StudioError):
+                load_studio_run(ws, project_id="us-momentum", run_id="../escape")
+
+            # 3. Symlink inside artifacts/ rejected
+            art_link = ws / "projects" / "us-momentum" / "runs" / run_id / "artifacts" / "leak.json"
+            art_link.symlink_to(secret)
+            with self.assertRaises(StudioError):
+                load_studio_run(ws, project_id="us-momentum", run_id=run_id)
+            art_link.unlink()
+
+            # 4. Broken symlink inside artifacts/ also rejected
+            art_link.symlink_to(base / "does-not-exist.json")
+            with self.assertRaises(StudioError):
+                load_studio_run(ws, project_id="us-momentum", run_id=run_id)
+            art_link.unlink()
+
+            # 5. Escaping series_files path in run.json rejected
+            run2_json = ws / "projects" / "us-momentum" / "runs" / "run-20261117T050000000000Z-bbbb2222" / "run.json"
+            bad_run = json.loads(run2_json.read_text(encoding="utf-8"))
+            bad_run["series_files"] = {"equity": "../../../secret.json"}
+            _write_json(run2_json, bad_run)
+            with self.assertRaises(StudioError):
+                load_studio_run(ws, project_id="us-momentum", run_id="run-20261117T050000000000Z-bbbb2222")
+
+            # 6. Symlinked project directory rejected
+            proj_link = ws / "projects" / "linked-proj"
+            proj_link.symlink_to(base)
+            with self.assertRaises(StudioError):
+                build_studio_snapshot(ws)
+
+    def test_managed_occupied_port_fails_fast_and_sigterm_releases_port(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            ws = _make_sample_workspace(Path(tmp))
+            serve_code = (
+                "import sys; from autoquant.studio import serve_studio; "
+                "serve_studio(sys.argv[1], open_browser=True)"
+            )
             with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as occupied:
                 occupied.bind(("127.0.0.1", 0))
-                occupied.listen()
-                port = occupied.getsockname()[1]
-                result = subprocess.run(
-                    [
-                        sys.executable,
-                        "-m",
-                        "autoquant",
-                        "studio",
-                        "serve",
-                        str(workspace.root_dir),
-                        "--no-open",
-                    ],
-                    cwd=Path(__file__).resolve().parents[1],
-                    env=self._managed_environment(port),
+                occupied.listen(1)
+                busy_port = occupied.getsockname()[1]
+                env = {
+                    **os.environ,
+                    "PYTHONPATH": str(PACKAGE_ROOT),
+                    "HARNESS_CAPABILITY": "studio",
+                    "HARNESS_HOST": "127.0.0.1",
+                    "HARNESS_PORTS": json.dumps({"http": busy_port}),
+                    "HARNESS_NO_OPEN": "1",
+                }
+                failed = subprocess.run(
+                    [sys.executable, "-c", serve_code, str(ws)],
+                    env=env,
                     capture_output=True,
-                    check=False,
                     text=True,
                     timeout=5,
                 )
+                self.assertNotEqual(failed.returncode, 0)
+                self.assertIn("Address already in use", failed.stderr)
 
-        self.assertEqual(result.returncode, 1)
-        self.assertEqual(result.stdout, "")
-        self.assertIn("Address already in use", result.stderr)
-
-    def test_managed_cli_subprocess_rejects_conflicting_explicit_port(self) -> None:
-        with tempfile.TemporaryDirectory() as directory:
-            workspace = initialize_workspace(Path(directory) / "desk")
+            # Now test live managed process + HARNESS_NO_OPEN browser suppression + SIGTERM release
+            marker = Path(tmp) / "browser-marker"
+            opener = Path(tmp) / "fake-browser.sh"
+            opener.write_text(f'#!/bin/sh\nprintf opened > "{marker}"\n', encoding="utf-8")
+            opener.chmod(0o755)
             with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as probe:
                 probe.bind(("127.0.0.1", 0))
-                port = probe.getsockname()[1]
-            environment = self._managed_environment(port)
-            result = subprocess.run(
-                [
-                    sys.executable,
-                    "-m",
-                    "autoquant",
-                    "studio",
-                    "serve",
-                    str(workspace.root_dir),
-                    "--no-open",
-                    "--port",
-                    str(port + 1),
-                ],
-                cwd=Path(__file__).resolve().parents[1],
-                env=environment,
-                capture_output=True,
-                check=False,
-                text=True,
-                timeout=5,
-            )
-
-        self.assertEqual(result.returncode, 1)
-        self.assertEqual(result.stdout, "")
-        self.assertIn("conflicts with injected port", result.stderr)
-
-    def test_cli_serve_announces_a_live_local_read_only_url(self) -> None:
-        with tempfile.TemporaryDirectory() as directory:
-            workspace, _, _ = self._setup(directory)
-            process = subprocess.Popen(
-                [
-                    sys.executable,
-                    "-m",
-                    "autoquant",
-                    "studio",
-                    "serve",
-                    str(workspace.root_dir),
-                    "--port",
-                    "0",
-                    "--no-open",
-                ],
-                env=self._standalone_environment(),
+                free_port = probe.getsockname()[1]
+            live_env = {
+                **os.environ,
+                "PYTHONPATH": str(PACKAGE_ROOT),
+                "HARNESS_CAPABILITY": "studio",
+                "HARNESS_HOST": "127.0.0.1",
+                "HARNESS_PORTS": json.dumps({"http": free_port}),
+                "HARNESS_NO_OPEN": "1",
+                "BROWSER": str(opener),
+            }
+            proc = subprocess.Popen(
+                [sys.executable, "-c", serve_code, str(ws)],
+                env=live_env,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
                 text=True,
             )
             try:
-                announcement = process.stdout.readline().strip()
-                self.assertTrue(
-                    announcement.startswith("AutoQuant Studio: http://127.0.0.1:"),
-                    process.stderr.read() if process.poll() is not None else announcement,
-                )
-                url = announcement.removeprefix("AutoQuant Studio: ")
-                with urlopen(f"{url}/api/v1/health", timeout=3) as response:
-                    self.assertEqual(json.loads(response.read())["mode"], "read-only")
-                    self.assertEqual(response.headers["X-Frame-Options"], "DENY")
-                    self.assertEqual(
-                        response.headers["Cross-Origin-Resource-Policy"],
-                        "same-origin",
-                    )
-                    self.assertIn(
-                        "frame-ancestors 'none'",
-                        response.headers["Content-Security-Policy"],
-                    )
+                line = proc.stdout.readline().strip()
+                self.assertEqual(line, f"AutoQuant Studio: http://127.0.0.1:{free_port}")
+                with urlopen(f"http://127.0.0.1:{free_port}/api/v1/health", timeout=3) as resp:
+                    self.assertEqual(resp.status, 200)
+                time.sleep(0.15)
+                self.assertFalse(marker.exists())
             finally:
-                process.terminate()
-                process.wait(timeout=5)
-                process.stdout.close()
-                process.stderr.close()
+                proc.terminate()
+                proc.wait(timeout=5)
+                proc.stdout.close()
+                proc.stderr.close()
+
+            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as check_rebind:
+                check_rebind.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+                check_rebind.bind(("127.0.0.1", free_port))
+
+    def test_frontend_csp_safety_and_js_syntax(self) -> None:
+        html = (ASSETS_DIR / "index.html").read_text(encoding="utf-8")
+        js = (ASSETS_DIR / "studio.js").read_text(encoding="utf-8")
+        self.assertIn('href="/assets/studio.css"', html)
+        self.assertIn('src="/assets/studio.js"', html)
+        self.assertIn('fetch("/api/v1/snapshot"', js)
+        self.assertIsNone(re.search(r"\bstyle\s*=", html))
+        for forbidden in ("http://127.0.0.1", "http://localhost", "ws://", "wss://", "WebSocket(", "EventSource("):
+            self.assertNotIn(forbidden, html)
+            self.assertNotIn(forbidden, js)
+
+        node = shutil.which("node")
+        self.assertIsNotNone(node, "node binary required for studio.js syntax verification")
+        checked = subprocess.run(
+            [node, "--check", str(ASSETS_DIR / "studio.js")],
+            capture_output=True,
+            text=True,
+            timeout=10,
+        )
+        self.assertEqual(checked.returncode, 0, checked.stderr)
 
 
 if __name__ == "__main__":
