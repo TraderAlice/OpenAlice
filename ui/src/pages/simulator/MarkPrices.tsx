@@ -9,7 +9,7 @@
  */
 
 import { useEffect, useRef, useState } from 'react'
-import { Section, inputClass as sharedInputClass } from '../../components/form'
+import { Section, inputClass as sharedInputClass, isImeComposing } from '../../components/form'
 import { simulatorApi, type SimulatorState } from '../../api/simulator'
 import { Button } from '../../components/ui/button'
 
@@ -96,6 +96,7 @@ export function MarkPrices({ utaId, state, run, loading }: {
       const magnitude = e.shiftKey ? 5 : 1
       tick(key, sign * magnitude)
     } else if (e.key === 'Enter') {
+      if (isImeComposing(e)) return
       e.preventDefault()
       setPrice(key, drafts[key] ?? state.markPrices.find(m => m.nativeKey === key)?.price ?? '')
     }
@@ -116,9 +117,9 @@ export function MarkPrices({ utaId, state, run, loading }: {
           <table className="w-full text-sm">
             <thead>
               <tr className="text-left text-muted-foreground text-xs">
-                <th className="pb-1 pr-3">Symbol</th>
-                <th className="pb-1 pr-3 w-40">Price</th>
-                <th className="pb-1 text-right">Quick</th>
+                <th scope="col" className="pb-1 pr-3">Symbol</th>
+                <th scope="col" className="pb-1 pr-3 w-40">Price</th>
+                <th scope="col" className="pb-1 text-right">Quick</th>
               </tr>
             </thead>
             <tbody>
@@ -128,19 +129,20 @@ export function MarkPrices({ utaId, state, run, loading }: {
                   className={`text-foreground ${flashClass(m.nativeKey)}`}
                 >
                   <td className="py-1 pr-3 font-mono text-xs">{m.nativeKey}</td>
-                  <td className="py-1 pr-3">
+                  <td className="py-1 pr-3 tabular-nums">
                     <input
-                      className={inputClass}
+                      className={`${inputClass} tabular-nums`}
+                      aria-label={`Mark price for ${m.nativeKey}`}
                       value={drafts[m.nativeKey] ?? m.price}
                       onChange={(e) => setDrafts({ ...drafts, [m.nativeKey]: e.target.value })}
                       onKeyDown={(e) => handleKeyDown(e, m.nativeKey)}
                     />
                   </td>
                   <td className="py-1 text-right space-x-1">
-                    <Button disabled={loading} onClick={() => tick(m.nativeKey, -5)} variant="outline" size="xs">−5%</Button>
-                    <Button disabled={loading} onClick={() => tick(m.nativeKey, -1)} variant="outline" size="xs">−1%</Button>
-                    <Button disabled={loading} onClick={() => tick(m.nativeKey, 1)} variant="outline" size="xs">+1%</Button>
-                    <Button disabled={loading} onClick={() => tick(m.nativeKey, 5)} variant="outline" size="xs">+5%</Button>
+                    <Button type="button" disabled={loading} onClick={() => tick(m.nativeKey, -5)} variant="outline" size="xs">−5%</Button>
+                    <Button type="button" disabled={loading} onClick={() => tick(m.nativeKey, -1)} variant="outline" size="xs">−1%</Button>
+                    <Button type="button" disabled={loading} onClick={() => tick(m.nativeKey, 1)} variant="outline" size="xs">+1%</Button>
+                    <Button type="button" disabled={loading} onClick={() => tick(m.nativeKey, 5)} variant="outline" size="xs">+5%</Button>
                   </td>
                 </tr>
               ))}
@@ -148,32 +150,41 @@ export function MarkPrices({ utaId, state, run, loading }: {
           </table>
         )}
 
-        <div className="flex items-center gap-2 pt-3 border-t border-border">
-          <input
-            className={`${inputClass} w-44`}
-            placeholder="symbol (e.g. BTC)"
-            value={newKey}
-            onChange={(e) => setNewKey(e.target.value.trim())}
-          />
-          <input
-            className={`${inputClass} w-32`}
-            placeholder="price"
-            value={newPrice}
-            onChange={(e) => setNewPrice(e.target.value)}
-          />
-          <Button
-            disabled={loading || !newKey || !newPrice}
-            onClick={() => run(
+        <form
+          className="flex items-center gap-2 pt-3 border-t border-border"
+          onSubmit={(e) => {
+            e.preventDefault()
+            if (loading || !newKey || !newPrice) return
+            void run(
               `Add ${newKey} = ${newPrice}`,
               async () => {
                 await simulatorApi.setMarkPrice(utaId, newKey, newPrice)
                 setNewKey('')
                 setNewPrice('')
               },
-            )}
+            )
+          }}
+        >
+          <input
+            className={`${inputClass} w-44`}
+            placeholder="symbol (e.g. BTC)"
+            aria-label="New mark symbol"
+            value={newKey}
+            onChange={(e) => setNewKey(e.target.value.trim())}
+          />
+          <input
+            className={`${inputClass} w-32 tabular-nums`}
+            placeholder="price"
+            aria-label="New mark price"
+            value={newPrice}
+            onChange={(e) => setNewPrice(e.target.value)}
+          />
+          <Button
+            type="submit"
+            disabled={loading || !newKey || !newPrice}
             size="sm"
           >Add</Button>
-        </div>
+        </form>
       </div>
     </Section>
   )

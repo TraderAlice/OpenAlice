@@ -417,6 +417,33 @@ describe('AgentLaunchSelectors keyboard menus', () => {
     fireEvent.change(searchInput, { target: { value: 'nonexistent-xyz' } })
     expect(screen.getByText(i18n.t('chatLanding.noModelMatches', { query: 'nonexistent-xyz' }))).toBeTruthy()
   })
+
+  it('ignores Enter in the inline model editor while IME composition is active', () => {
+    const selectModel = vi.fn()
+    render(
+      <AgentLaunchSelectors
+        config={launchConfig({ selectModel })}
+        onConfigureProvider={vi.fn()}
+        showRuntime={false}
+      />,
+    )
+
+    const input = screen.getByRole('combobox', { name: i18n.t('chatLanding.selectModel') }) as HTMLInputElement
+    input.focus()
+    fireEvent.change(input, { target: { value: 'deepseek-r1' } })
+
+    fireEvent.keyDown(input, { key: 'Enter', isComposing: true })
+    expect(document.activeElement).toBe(input)
+    expect(selectModel).not.toHaveBeenCalled()
+
+    fireEvent.keyDown(input, { key: 'Enter', keyCode: 229 })
+    expect(document.activeElement).toBe(input)
+    expect(selectModel).not.toHaveBeenCalled()
+
+    fireEvent.keyDown(input, { key: 'Enter', isComposing: false, keyCode: 13 })
+    expect(document.activeElement).not.toBe(input)
+    expect(selectModel).toHaveBeenCalledWith('deepseek-r1')
+  })
 })
 
 describe('AgentLaunchDetails setup notices', () => {

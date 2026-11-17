@@ -10,7 +10,7 @@
  * smallest thing that unblocks a Docker / LAN / public deployment.
  */
 
-import { useState, useRef, useEffect, type FormEvent } from 'react'
+import { useState, useRef, useEffect, useId, type FormEvent } from 'react'
 import { useAuth } from './AuthContext'
 import { login } from './api'
 import { useTranslation } from 'react-i18next'
@@ -20,6 +20,7 @@ import { inputClass } from '../components/form'
 export function LoginPage() {
   const { t } = useTranslation()
   const { refresh } = useAuth()
+  const tokenInputId = useId()
   const [token, setToken] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
@@ -58,13 +59,15 @@ export function LoginPage() {
 
         <form onSubmit={onSubmit} className="space-y-3">
           <div>
-            <label className="mb-1 block text-[12px] font-medium text-muted-foreground">
+            <label htmlFor={tokenInputId} className="mb-1 block text-[12px] font-medium text-muted-foreground">
               {t('auth.adminTokenLabel')}
             </label>
             <input
+              id={tokenInputId}
               ref={inputRef}
               type="password"
               autoComplete="current-password"
+              required
               value={token}
               onChange={(e) => setToken(e.target.value)}
               disabled={busy}
