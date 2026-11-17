@@ -163,4 +163,37 @@ describe('createLiveStore — reconnect', () => {
     live.reconnect()
     expect(opens).toBe(0)
   })
+
+  it('pauses live source while document is hidden and resumes when visible again', () => {
+    let opens = 0
+    let closes = 0
+    const live = createLiveStore<{ n: number }>({
+      name: 't',
+      initialState: { n: 0 },
+      subscribe: () => {
+        opens++
+        return () => { closes++ }
+      },
+    })
+
+    const unsub = live.subscribe(() => {})
+    expect(opens).toBe(1)
+    expect(closes).toBe(0)
+
+    Object.defineProperty(document, 'visibilityState', {
+      configurable: true,
+      get: () => 'hidden',
+    })
+    document.dispatchEvent(new Event('visibilitychange'))
+    expect(closes).toBe(1)
+
+    Object.defineProperty(document, 'visibilityState', {
+      configurable: true,
+      get: () => 'visible',
+    })
+    document.dispatchEvent(new Event('visibilitychange'))
+    expect(opens).toBe(2)
+    unsub()
+    expect(closes).toBe(2)
+  })
 })

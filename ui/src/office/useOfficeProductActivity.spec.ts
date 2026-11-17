@@ -442,4 +442,35 @@ describe('useOfficeProductActivity', () => {
     expect(hook.result.current.pending.news).toBe(2)
     hook.unmount()
   })
+
+  it('skips interval polling while hidden and refreshes when visible again', async () => {
+    vi.useFakeTimers()
+    const visibility = Object.getOwnPropertyDescriptor(document, 'visibilityState')
+    try {
+      queueRefresh([newsEleven], 11)
+      const hook = renderHook(() => useOfficeProductActivity())
+      await act(async () => {
+        await Promise.resolve()
+      })
+      expect(queryRuntime).toHaveBeenCalledTimes(3)
+
+      Object.defineProperty(document, 'visibilityState', { configurable: true, value: 'hidden' })
+      await act(async () => {
+        vi.advanceTimersByTime(8_000)
+      })
+      expect(queryRuntime).toHaveBeenCalledTimes(3)
+
+      queueRefresh([newsEleven], 11)
+      Object.defineProperty(document, 'visibilityState', { configurable: true, value: 'visible' })
+      await act(async () => {
+        document.dispatchEvent(new Event('visibilitychange'))
+      })
+      expect(queryRuntime).toHaveBeenCalledTimes(6)
+      hook.unmount()
+    } finally {
+      if (visibility) Object.defineProperty(document, 'visibilityState', visibility)
+      else Object.defineProperty(document, 'visibilityState', { configurable: true, value: 'visible' })
+      vi.useRealTimers()
+    }
+  })
 })
