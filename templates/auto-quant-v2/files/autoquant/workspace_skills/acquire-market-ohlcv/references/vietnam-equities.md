@@ -1,24 +1,9 @@
-# Vietnam listed equities
+# Vietnam Listed Equities (`HOSE`, `HNX`, `UPCoM`)
 
-- Preserve `HOSE`, `HNX`, or `UPCoM` explicitly.
-- Use `Asia/Ho_Chi_Minh`; verify session dates and historical market-rule
-  changes relevant to the requested range.
-- Verify currency scale, price scale, volume units, corporate-action
-  adjustment, and symbol reuse.
-- Do not collapse the three venues into one nominal Vietnam calendar without
-  evidence.
+- Preserve the exact board (`HOSE`, `HNX`, or `UPCoM`) and `Asia/Ho_Chi_Minh` session dates separately.
+- Verify VND currency scale (thousand-VND quotes vs full VND), share volume units, and corporate-action adjustments.
 
-## Routes
+## Bundled Fetcher Routes
 
-- VNDIRECT: use `$fetch-vndirect-ohlcv` for explicit raw or
-  provider-adjusted HOSE/HNX/UPCoM daily observations. The route converts
-  thousand-VND prices to VND, preserves share volume, verifies reported
-  value/volume scale, and retains contradictory provider rows in the audit
-  while excluding them from the package.
-- Yahoo: use `$fetch-yahoo-ohlcv` as an independent broad route. Yahoo
-  historical quote OHLC is split-adjusted rather than exchange-unadjusted, so
-  do not compare it with VNDIRECT raw prices as if their semantics matched.
-
-The two routes are real but Vietnam is not accepted as dual-source coverage
-until overlapping acquisitions with the same declared adjustment semantics
-have passed comparison and strict intake. Neither provider is venue authority.
+- `$fetch-vndirect-ohlcv`: Paginated daily route (`fetch_vndirect_daily.py`) for `HOSE`, `HNX`, or `UPCoM` supporting explicit `raw` or `provider-adjusted` prices; converts thousand-VND quotes to VND (`×1000`) and audits against traded value/volume.
+- `$fetch-yahoo-ohlcv`: `.VN` route for `split-adjusted` or `split-and-dividend-adjusted` daily history.

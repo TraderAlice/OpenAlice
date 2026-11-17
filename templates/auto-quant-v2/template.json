@@ -1,7 +1,7 @@
 {
   "displayName": "AutoQuant",
   "groupOrder": 20,
-  "description": "Agent-native quantitative research desk. A native Coding Agent owns projects, experiments, reports, dependencies, and local Git history inside an embedded AutoQuant V2 workbench.",
+  "description": "Agent-native quantitative research desk. A native Coding Agent writes causal Python/pandas research, records immutable Runs across Train/Val/Holdout splits, and visualizes custom artifacts in an embedded Quant Studio.",
   "defaultAgents": ["codex", "claude"],
   "injectTools": true,
   "injectInstructions": false,

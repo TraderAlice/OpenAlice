@@ -1,23 +1,20 @@
 ---
 name: fetch-daum-ohlcv
-description: Acquire bounded raw completed daily OHLCV for named South Korean equities from Daum Finance's paginated daily-history route, preserve exact JSON and pagination evidence, validate Korean symbol identities and share-volume fields, and emit an auditable AutoQuant staging package. Use as an independent raw Korean route for comparison with Naver.
+description: Fetch paginated raw completed daily OHLCV (KRW, shares) for South Korean equities (`XKRX`) from Daum Finance via `aq-python`, ready for `aq data ingest`.
 ---
 
 # Fetch Daum OHLCV
 
-Use Daum as an observable provider route, not KRX authority or a documented
-redistribution contract.
+Fetch paginated raw KRW daily OHLCV for South Korean equities (`XKRX`) from Daum Finance.
 
-## Workflow
+## Fetch
 
-1. Read `$acquire-market-ohlcv` and its South Korea reference.
-2. Prepare [assets-format.md](references/assets-format.md).
-3. Choose a bounded completed daily range.
-4. Run:
+1. Prepare [assets-format.md](references/assets-format.md).
+2. Choose completed daily sessions and run:
 
 ```bash
 aq-python scripts/fetch_daum_daily.py \
-  --output <workspace>/staging/market-data/<dataset-id> \
+  --output /tmp/aq-fetch/<dataset-id> \
   --assets /absolute/path/assets.json \
   --dataset-id <dataset-id> \
   --start YYYY-MM-DD \
@@ -26,28 +23,16 @@ aq-python scripts/fetch_daum_daily.py \
   --terms "caller-authorized research retrieval; Daum terms apply"
 ```
 
-The script requests enough reverse-chronological rows in pages of at most
-1,000, preserves every page, verifies page identity and total counts, and maps
-`openingPrice`, `highPrice`, `lowPrice`, `tradePrice`, and `accTradeVolume`.
-It also records `accTradePrice / accTradeVolume` as a diagnostic. Daum does not
-establish that those aggregates use the exact same session scope as daily
-OHLC, so an out-of-range ratio neither repairs nor invalidates otherwise valid
-OHLCV.
+The script paginates up to 1,000 rows per page, validates page counts, maps raw KRW OHLC and `accTradeVolume` shares, and logs `accTradePrice / accTradeVolume` diagnostics in `provider-audit.json`.
 
-## Verify
+## Inspect & Ingest
 
-- Inspect exact pages, status, source range, price/volume invariants, and
-  hashes.
-- Inspect `valueVolume`, including every out-of-range derived ratio and its
-  distance from the nearest OHLC bound; treat it as provider-scope evidence,
-  not a synthetic price.
-- Compare the same raw assets and dates with `$fetch-naver-ohlcv`.
-- Verify KOSPI/KOSDAQ listing identity independently; this first proof uses
-  the exact `XKRX` label as a broad venue claim.
-- Run `$package-autoquant-ohlcv` and strict intake.
-
-## Stop conditions
-
-Stop on response-shape changes, pagination inconsistency, stale or truncated
-history, ambiguous symbol mapping, or access blocking. Do not relabel Daum
-raw prices as adjusted.
+1. Review `provider-audit.json` for pagination completeness, date coverage, and raw price/volume invariants (note Daum prices are unadjusted for splits—use `$fetch-naver-ohlcv` or `$fetch-yahoo-ohlcv` when split-adjusted KRW prices are needed).
+2. Ingest directly into `<project>/data/`:
+   ```bash
+   uv run aq data ingest . /tmp/aq-fetch/<dataset-id> \
+     --project <project-id> \
+     --dataset-id <dataset-id> \
+     --source daum-raw \
+     --json
+   ```

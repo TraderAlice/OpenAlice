@@ -1,26 +1,20 @@
 ---
 name: fetch-euronext-ohlcv
-description: Acquire bounded official completed daily OHLCV for named Euronext Paris equities from Euronext Live's historical CSV download, preserve exact response bytes and displayed metadata, select explicit non-adjusted or provider-adjusted history, and emit an auditable AutoQuant staging package. Use as the venue-authoritative XPAR route before comparing the same assets with an independent broad provider such as Yahoo.
+description: Fetch official Euronext Live historical daily OHLCV (up to 2 years, raw or provider-adjusted) for Euronext Paris (`XPAR`) EUR equities via `aq-python`.
 ---
 
 # Fetch Euronext OHLCV
 
-Use Euronext Live as the official first route for named `XPAR` equities. This
-initial Skill does not imply one EU calendar, cover Milan's shorter history
-window, authenticate redistribution rights, or explain Euronext's adjustment
-algorithm.
+Fetch official completed daily EUR OHLCV for Euronext Paris (`XPAR`) equities within Euronext Live's displayed two-year download window (use `$fetch-yahoo-ohlcv` `.PA` when longer multi-year history is needed).
 
-## Workflow
+## Fetch
 
-1. Read `$acquire-market-ohlcv` and its EU-venues reference.
-2. Prepare [assets-format.md](references/assets-format.md).
-3. Keep the request within Euronext Live's displayed two-year history limit
-   and exclude forming sessions.
-4. Run:
+1. Prepare [assets-format.md](references/assets-format.md) with verified ISINs.
+2. Keep the range within the trailing two-year limit and run:
 
 ```bash
 aq-python scripts/fetch_euronext_daily.py \
-  --output <workspace>/staging/market-data/<dataset-id> \
+  --output /tmp/aq-fetch/<dataset-id> \
   --assets /absolute/path/assets.json \
   --dataset-id <dataset-id> \
   --start YYYY-MM-DD \
@@ -31,23 +25,16 @@ aq-python scripts/fetch_euronext_daily.py \
   --terms "caller-authorized research retrieval; Euronext terms apply"
 ```
 
-The script requests the official CSV download directly, preserves its UTF-8
-bytes, verifies the displayed ISIN, parses semicolon-delimited OHLC and number
-of shares, reapplies the exact date boundary, and audits `Last` versus `Close`.
+Pass `--adjustment provider-adjusted` when Euronext Live's corporate-action-adjusted series is preferred over `raw`.
 
-## Verify
+## Inspect & Ingest
 
-- Inspect every request URI, response header summary, raw hash, provider
-  metadata line, CSV hash, date range, and omitted observation.
-- Compare only the same adjustment contract with another route. Yahoo quote
-  history is `split-adjusted`; Euronext `provider-adjusted` does not establish
-  that the algorithms are equivalent.
-- Run `$package-autoquant-ohlcv` and strict intake.
-- Keep `XPAR` explicit. Do not generalize this proof to every Euronext or EU
-  venue.
-
-## Stop conditions
-
-Stop on an HTML page, unexpected delimiter/header, ISIN mismatch, ambiguous
-adjustment, stale boundary, history truncation, or access restriction. Do not
-silently shorten the requested range or switch to Yahoo.
+1. Review `provider-audit.json` for ISIN verification, date coverage, and omitted rows.
+2. Ingest directly into `<project>/data/`:
+   ```bash
+   uv run aq data ingest . /tmp/aq-fetch/<dataset-id> \
+     --project <project-id> \
+     --dataset-id <dataset-id> \
+     --source euronext-xpar \
+     --json
+   ```

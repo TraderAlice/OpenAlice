@@ -1,152 +1,87 @@
 ---
-version: 0.9.34
+version: 1.0.0
 ---
 
-# AutoQuant V2
+# AutoQuant
 
-AutoQuant turns quantitative research into a versioned, testable,
-Agent-operable engineering workflow.
-
-It is an AI-native quantitative workbench, not only a backtest library,
-strategy generator, or integration backend. A coding Agent can enter the
-filesystem, understand the current question and evidence, take one bounded
-action, evaluate through fixed contracts, resume after interruption, and
-leave durable work for another Agent or human reviewer.
+AutoQuant (`v1.0.0`) is an agent-native quantitative research workbench. It pairs a thin, composable Python toolkit (`import autoquant as aq`) and `aq` CLI with an immutable file-backed Run ledger and a zero-CDN Quant Studio—operable standalone or as OpenAlice's specialist Quant desk.
 
 ```text
-long-lived Workspace
-└── Project
-    ├── research question and content-locked inputs
-    ├── fixed Studies and bounded Research Sessions
-    ├── factors, portfolios, ML/RL policies, and simulations
-    └── immutable Runs, Reports, Reviews, and Dossiers
+Workspace Root
+├── autoquant-workspace.json  # Workspace configuration & project discovery
+├── autoquant/                # Causal panel, splits, factor, backtest, CLI & Studio
+├── projects/<project-id>/    # Self-contained research Projects
+│   ├── project.json          # Splits (train/val/holdout) & holdout_audit log
+│   ├── research.md           # Hypothesis, constraints, assumptions & findings
+│   ├── data/                 # Normalized OHLCV snapshots + manifest.json
+│   └── runs/<run-id>/        # Immutable run.json, series/* & custom artifacts/*
+├── docs/                     # Practical API, CLI, schema & Studio guides
+├── scripts/                  # Doc link & Workspace skill utilities
+└── tests/                    # Fast deterministic unit & Studio tests
 ```
 
-One Workspace may hold many self-contained Projects. A Project is one evolving
-body of research; a Study locks one evaluation question; a Research Session is
-a bounded editable investigation; a Run is an immutable measurement.
+## Quick Start
 
-## Current release: `0.9.34`
-
-[Current status](docs/STATUS.md) states what this checkout can honestly do.
-[Release history](docs/CHANGELOG.md) indexes bounded outcomes, and
-[versioning and release](docs/design/versioning-and-release.md) owns version
-increments, checkout behavior, audits, tags, compatibility, and host pins.
-
-## Standalone or an OpenAlice desk
-
-AutoQuant has one product shape in both environments:
-
-```text
-standalone clone                    OpenAlice Trading Harness
-└── AutoQuant Workspace             └── AutoQuant Workspace desk
-    └── Quant Agent                     └── Quant coworker
-        └── Projects                        └── Projects
-```
-
-Standalone, a human or Agent operates the workbench directly. Inside
-OpenAlice, the unchanged repository becomes a specialized Workspace desk that
-can receive a quantitative assignment from another coworker and return an
-evidence-bound report. AutoQuant owns research and historical simulation;
-brokers, authenticated accounts, approvals, and live order submission remain
-outside it.
-
-## Quick start
-
-AutoQuant requires Python 3.11 and [uv](https://docs.astral.sh/uv/).
+Requires Python 3.11 and [uv](https://docs.astral.sh/uv/):
 
 ```bash
-git clone git@github.com:TraderAlice/Auto-Quant-V2.git
-cd Auto-Quant-V2
 uv sync --frozen
+uv run aq version
+uv run aq status .
 
-uv run aq --version
-uv run aq project list .
-uv run aq validate .
-uv run aq orient . --json
+# Create a Project with explicit anti-overfitting splits
+uv run aq project create . us-momentum \
+  --name "US Momentum" \
+  --train-end 2022-12-31 \
+  --val-end 2024-06-30 \
+  --holdout-end 2025-12-31
+
+# Launch Quant Studio locally (http://127.0.0.1:8765)
 uv run aq studio serve .
 ```
 
-The repository root is already a Workspace. Its checked-in
-`projects/sample-research-desk` is a deterministic teaching Project with
-inspectable historical evidence, not a real assignment.
+## Minimal Python Workflow
 
-Start genuinely new work as a sibling Project:
+```python
+import autoquant as aq
 
-```bash
-uv run aq project templates --json
-uv run aq project create . research-desk \
-  --name "Research Desk" \
-  --description "Bound and investigate the delegated question" \
-  --template blank \
-  --json
-uv run aq orient . --project research-desk --json
+project = "projects/us-momentum"
+aq.ingest_ohlcv(project, "./bars.csv", dataset_id="etfs", source="local")
+
+# Holdout dates (> val_end) are physically excluded during development
+panel = aq.load_panel(project, dataset_id="etfs", split="val")
+close = panel.pivot(index="timestamp", columns="asset", values="close")
+signal = close.pct_change(20)
+
+# Causal factor IC / quantiles & cost-aware portfolio backtest
+aq.evaluate_factor(signal, panel, project=project, name="mom-20d", split="val")
+weights = signal.gt(0).astype(float).div(signal.gt(0).sum(axis=1).replace(0, 1), axis=0)
+aq.backtest_weights(weights, panel, cost_bps=5.0, project=project, name="mom-long", split="val")
 ```
 
-Before quantitative work, the Agent rewrites the new Project's `research.md`
-in English and asks about every caller-owned ambiguity that could materially
-change the answer. Template choice, data acquisition, strict intake, governed
-iteration, evidence publication, and Studio review are covered by the
-[operator guide](docs/OPERATOR_GUIDE.md).
+When a candidate is finalized on Validation, run `aq.evaluate_holdout(project, evaluator_fn, ...)` to score `(val_end, holdout_end]` once and log the unlock in `project.json`.
 
-## What lives where
+## Core Capabilities
 
-- Workspace: Project discovery and the standardized AutoQuant Harness.
-- Project: the question, source authority, strategies/models, Studies, Runs,
-  Sessions, and durable deliverables for one evolving body of research.
-- Factor: causal predictive evidence over a caller-bound outcome.
-- Portfolio: target-weight construction, risk, cost, and implementation
-  evidence from qualified return research.
-- Governed RL: bounded adaptive value beyond fixed factor sleeves; never a
-  shortcut around the same portfolio and evidence contracts.
-- Fixed research routes: descriptive Book Risk, price Event, path Stress, and
-  strategic Allocation questions that do not pretend to need editable models.
+- **Causal Panel & Calendar Alignment**: Long-form `pandas` OHLCV panels validated for price/volume integrity and `exchange_calendars` sessions, completed-bar resampling, and explicit `causal_asof_fill` (never silent forward-filling).
+- **Anti-Overfitting Split Guardrails**: `load_panel(split="val")` hides Holdout bars during iteration; `evaluate_holdout` audits every Holdout unlock with code and Git provenance.
+- **Factor & Portfolio Engines**: Cross-sectional Pearson/Rank IC, horizon decay, quantile curves, causal `t -> t+1` weight execution, turnover/slippage costs, volatility targeting, and `inverse_vol_weights` / `equal_risk_contribution_weights` helpers.
+- **Hackable Quant Studio**: Multi-run equity/drawdown comparison, factor tear-sheets, Holdout audit badge, and automatic rendering of custom `artifacts/*.json` (`line`, `bar`, `table`), `.svg`, and `.md` files.
+- **Market Data Bridges**: Native `alice market bars` integration (`aq data fetch` / `fetch_alice_bars`) plus 14 bundled regional OHLCV fetcher skills (`aq-python`).
 
-Ordinary factor code receives one long-form pandas panel rather than a
-proprietary DSL. CSV works in the base environment; Parquet and Feather use
-`uv sync --extra columnar`.
+## Documentation
 
-## Documentation map
-
-| Need | Canonical document |
+| Topic | Guide |
 | --- | --- |
-| Operate a Workspace end to end | [Operator guide](docs/OPERATOR_GUIDE.md) |
-| See current tested capability and limits | [Status](docs/STATUS.md) |
-| Discover commands and JSON contracts | [CLI](docs/CLI.md) |
-| Understand Workspace and Project files | [Project format](docs/PROJECT_FORMAT.md) |
-| Understand Core ownership and boundaries | [Architecture](docs/ARCHITECTURE.md) |
-| Change versions or publish a release | [Versioning and release](docs/design/versioning-and-release.md) |
-| Scan published outcomes | [Changelog](docs/CHANGELOG.md) |
-| Contribute framework changes | [AGENTS.md](AGENTS.md) and [PLANS.md](PLANS.md) |
+| Agent operating rules & research discipline | [[AGENTS]] |
+| End-to-end Python API & `aq` CLI workflow | [[docs/GUIDE]] |
+| Ledger schemas, custom Run artifacts & Studio | [[docs/STUDIO_AND_ARTIFACTS]] |
 
-## Repository structure
-
-```text
-Auto-Quant-V2/
-├── autoquant-workspace.json  # checked-in root Workspace
-├── autoquant/                # Core, CLI, templates, Skills, and Studio
-├── projects/                 # sample plus ordinary research Projects
-├── docs/                     # operator references and design invariants
-├── plans/                    # bounded engineering execution records
-├── scripts/                  # repository checks
-├── tests/                    # deterministic bounded verification
-├── AGENTS.md                 # contributor and Agent routing guide
-└── PLANS.md                  # active/completed plan index
-```
-
-Auto-Quant Classic and its flat Freqtrade arena are retired from the current
-tree; Git history remains their archive.
-
-## Development
-
-Read [AGENTS.md](AGENTS.md), [PLANS.md](PLANS.md), and the active plan before
-non-trivial changes. Do not launch an unbounded autonomous loop or use a long
-multi-year backtest as routine validation.
+## Verification
 
 ```bash
-uv run python scripts/check_doc_links.py
+python3 scripts/check_doc_links.py
 uv run python -m unittest discover -s tests -v
-uv build
 ```
 
 ## License
