@@ -381,9 +381,9 @@ function IssueRow({ wsId, wsTag, issue, dupOthers, onOpen, onPatch, columns }: B
   const { t } = useTranslation()
   const terminal = issue.status === 'done' || issue.status === 'canceled'
   return (
-    <li className="group flex h-11 min-w-0 items-center gap-1 px-3 hover:bg-muted/45 sm:px-6">
+    <li className="group flex h-11 min-w-0 items-center gap-1 px-3 hover:bg-muted/45 @sm/content:px-6">
       {columns.includes('priority') && <PropertyMenu controlId={`issue-priority-${wsId}-${issue.id}`} field="priority" issue={issue} onPatch={onPatch} />}
-      {columns.includes('id') && <span className="hidden w-16 shrink-0 truncate text-xs text-muted-foreground sm:block" title={t('issues.issueIdTitle', { id: issue.id })}>#{issue.id}</span>}
+      {columns.includes('id') && <span className="hidden w-16 shrink-0 truncate text-xs text-muted-foreground @sm/content:block" title={t('issues.issueIdTitle', { id: issue.id })}>#{issue.id}</span>}
       {columns.includes('status') && <PropertyMenu controlId={`issue-status-${wsId}-${issue.id}`} field="status" issue={issue} onPatch={onPatch} />}
       <button
         type="button"
@@ -399,12 +399,12 @@ function IssueRow({ wsId, wsTag, issue, dupOthers, onOpen, onPatch, columns }: B
             <Copy size={12} aria-hidden />
           </span>
         )}
-        {columns.includes('workspace') && <span className="hidden max-w-36 shrink-0 items-center gap-1.5 rounded-full border border-border/70 px-2 py-0.5 text-[11px] text-muted-foreground lg:inline-flex" title={t('issues.workspaceTitle', { workspace: wsTag, id: wsId.slice(0, 8) })}>
+        {columns.includes('workspace') && <span className="hidden max-w-36 shrink-0 items-center gap-1.5 rounded-full border border-border/70 px-2 py-0.5 text-[11px] text-muted-foreground @lg/content:inline-flex" title={t('issues.workspaceTitle', { workspace: wsTag, id: wsId.slice(0, 8) })}>
           <Layers size={11} className="shrink-0" aria-hidden />
           <span className="truncate">{wsTag}</span>
         </span>}
         {columns.includes('schedule') && <span data-testid="issue-automation-summary" className="flex shrink-0 items-center gap-4">
-          <span className="hidden w-28 items-center justify-end sm:flex"><BoardCadence issue={issue} /></span>
+          <span className="hidden w-28 items-center justify-end @sm/content:flex"><BoardCadence issue={issue} /></span>
         </span>}
       </button>
       {columns.includes('assignee') && <div className="ml-2 shrink-0"><IssueAssigneePopover wsId={wsId} id={issue.id} assignee={issue.assignee} health={issue.automationHealth} /></div>}
@@ -450,7 +450,7 @@ function StatusGroup({
         aria-expanded={!collapsed}
         aria-controls={listId}
         aria-label={t(collapsed ? 'issues.expandStatus' : 'issues.collapseStatus', { status: statusLabel })}
-        className="flex h-9 w-full items-center gap-2 rounded-lg bg-muted/45 px-3 text-left transition-colors hover:bg-muted/60 sm:px-4"
+        className="flex h-9 w-full items-center gap-2 rounded-lg bg-muted/45 px-3 text-left transition-colors hover:bg-muted/60 @sm/content:px-4"
       >
         {collapsed ? (
           <ChevronRight size={14} className="shrink-0 text-muted-foreground/70" />
@@ -595,7 +595,7 @@ export function IssuesBoard() {
 
   if (rows.length === 0 && invalid.length === 0) {
     return (
-      <div className="mx-auto max-w-[1240px] space-y-3">
+      <div className="@container/content mx-auto max-w-[1240px] space-y-3">
         {toolbar}
         {staleBanner}
         <div className="rounded-lg border border-dashed border-border px-6 py-12 text-center">
@@ -614,7 +614,7 @@ export function IssuesBoard() {
   }
 
   return (
-    <div data-testid="issues-board" className="w-full space-y-1">
+    <div data-testid="issues-board" className="@container/content w-full space-y-1">
       {toolbar}
       {staleBanner}
       {groups.length === 0 && rows.length > 0 && <p className="py-16 text-center text-sm text-muted-foreground">{t('issues.view.noMatches')}</p>}

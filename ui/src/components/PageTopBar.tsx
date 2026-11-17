@@ -62,7 +62,7 @@ export function PageContentLayout({ title, leading, children }: {
           <div ref={setTarget} className="oa-topbar-slot" />
           {headers === 0 && <TopBar title={title} leading={headerLeading} />}
         </div>
-        <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">{children}</div>
+        <div className="@container/content flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">{children}</div>
       </div>
     </HeaderSlot.Provider>
   )

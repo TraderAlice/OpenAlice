@@ -452,7 +452,7 @@ export function PageSidebarLayout({
           className="h-full min-h-0 overflow-hidden bg-sidebar"
         >
           <div data-testid="page-sidebar-desktop" className="h-full min-h-0 w-full overflow-hidden bg-sidebar">
-            <div data-testid="page-sidebar-expanded" className="h-full min-h-0">
+            <div data-testid="page-sidebar-expanded" className="@container/sidebar h-full min-h-0">
               {sidebarPanel}
             </div>
           </div>
@@ -525,24 +525,26 @@ export function PageSidebarLayout({
           finalFocus={mobileTriggerRef}
         >
           <SheetTitle className="sr-only">{title}</SheetTitle>
-          <Sidebar
-            title={title}
-            actions={actionContent}
-            leading={
-              <Button
-                type="button"
-                onClick={() => setDrawerOpen(false)}
-                variant="ghost"
-                size="icon-lg"
-                className="-ml-1 h-10 w-10 text-muted-foreground"
-                aria-label={t('common.closePanel', { title })}
-              >
-                <X size={15} strokeWidth={1.75} aria-hidden />
-              </Button>
-            }
-          >
-            {sidebarContent}
-          </Sidebar>
+          <div className="@container/sidebar flex min-h-0 flex-1 flex-col">
+            <Sidebar
+              title={title}
+              actions={actionContent}
+              leading={
+                <Button
+                  type="button"
+                  onClick={() => setDrawerOpen(false)}
+                  variant="ghost"
+                  size="icon-lg"
+                  className="-ml-1 h-10 w-10 text-muted-foreground"
+                  aria-label={t('common.closePanel', { title })}
+                >
+                  <X size={15} strokeWidth={1.75} aria-hidden />
+                </Button>
+              }
+            >
+              {sidebarContent}
+            </Sidebar>
+          </div>
         </SheetContent>
       </Sheet>
     </div>
