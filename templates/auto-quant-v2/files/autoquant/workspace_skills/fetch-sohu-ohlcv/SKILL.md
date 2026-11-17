@@ -1,23 +1,20 @@
 ---
 name: fetch-sohu-ohlcv
-description: Acquire bounded raw completed daily OHLCV for named XSHG, XSHE, or XBSE listed equities or funds from Sohu Finance's observable historical-quotes route, preserve exact JSONP bytes and request evidence, convert provider lots to shares, check traded value against OHLC, and emit an auditable AutoQuant staging package. Use as an independent mainland-China raw route, especially for validating post-migration Beijing 920 symbols against Sina.
+description: Fetch raw completed daily OHLCV for `XSHG`, `XSHE`, or `XBSE` equities and funds from Sohu Finance via `aq-python`, converting lots to shares and checking traded value against OHLC.
 ---
 
 # Fetch Sohu OHLCV
 
-Use Sohu as an observable provider route, not exchange authority or a
-documented redistribution contract.
+Fetch raw Mainland China daily OHLCV (including post-migration Beijing `920` symbols) from Sohu Finance, converting reported lots to shares (`×100`) and validating against traded value.
 
-## Workflow
+## Fetch
 
-1. Read `$acquire-market-ohlcv` and its mainland-China reference.
-2. Prepare [assets-format.md](references/assets-format.md).
-3. Choose a bounded completed daily range.
-4. Run:
+1. Prepare [assets-format.md](references/assets-format.md) with explicit `equity` or `fund` classes.
+2. Choose completed daily sessions and run:
 
 ```bash
 aq-python scripts/fetch_sohu_daily.py \
-  --output <workspace>/staging/market-data/<dataset-id> \
+  --output /tmp/aq-fetch/<dataset-id> \
   --assets /absolute/path/assets.json \
   --dataset-id <dataset-id> \
   --start YYYY-MM-DD \
@@ -26,23 +23,14 @@ aq-python scripts/fetch_sohu_daily.py \
   --terms "caller-authorized research retrieval; Sohu terms apply"
 ```
 
-The script preserves the exact GB18030 JSONP response, verifies the echoed
-provider code and requested date bounds, maps raw OHLC, converts provider lots
-to shares, and uses reported traded value as an internal consistency check.
-The inventory's caller-verified `equity` or `fund` class is preserved in the
-package; Sohu's provider code does not establish instrument class.
+## Inspect & Ingest
 
-## Verify
-
-- Inspect exact bytes, response metadata, source range, conversion audit, and
-  hashes.
-- Compare the same raw assets and dates with `$fetch-sina-ohlcv` or
-  `$fetch-tencent-ohlcv`.
-- Treat price and volume agreement as separate findings.
-- Run `$package-autoquant-ohlcv` and strict intake.
-
-## Stop conditions
-
-Stop on response-shape changes, provider error status, ambiguous symbol/venue
-mapping, stale or truncated history, contradictory traded value, or access
-blocking. Do not relabel Sohu raw prices as adjusted.
+1. Check `provider-audit.json` for date coverage, lot-to-share conversion, and traded-value consistency checks.
+2. Ingest directly into `<project>/data/`:
+   ```bash
+   uv run aq data ingest . /tmp/aq-fetch/<dataset-id> \
+     --project <project-id> \
+     --dataset-id <dataset-id> \
+     --source sohu-raw \
+     --json
+   ```

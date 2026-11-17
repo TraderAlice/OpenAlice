@@ -1,4 +1,4 @@
 interface:
   display_name: "Market OHLCV Router"
-  short_description: "Route OHLCV acquisition across markets and providers."
-  default_prompt: "Use $acquire-market-ohlcv to choose a defensible source and acquisition route for this historical OHLCV request."
+  short_description: "Acquire OHLCV via Alice market bars or venue fetchers and ingest into AutoQuant."
+  default_prompt: "Use $acquire-market-ohlcv to obtain clean historical OHLCV bars and ingest them into this AutoQuant Project."

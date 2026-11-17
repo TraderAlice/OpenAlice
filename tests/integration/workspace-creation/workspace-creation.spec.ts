@@ -179,7 +179,7 @@ describe('auto-quant workspace create: embedded template → skills → commit',
     expect(existsSync(join(aqDir, 'pyproject.toml'))).toBe(true);
     expect(existsSync(join(aqDir, 'projects/.gitkeep'))).toBe(true);
     expect(existsSync(join(aqDir, 'AGENTS.md'))).toBe(true);
-    expect((await readFile(join(aqDir, 'AGENTS.md'), 'utf8'))).toContain('# AutoQuant V2 contributor guide');
+    expect((await readFile(join(aqDir, 'AGENTS.md'), 'utf8'))).toContain('# AutoQuant Agent Guide');
     // Both AutoQuant's canonical OHLCV skills and OpenAlice's CLI skills exist side-by-side
     expect(existsSync(join(aqDir, '.agents/skills/acquire-market-ohlcv/SKILL.md'))).toBe(true);
     expect(existsSync(join(aqDir, '.claude/skills/acquire-market-ohlcv/SKILL.md'))).toBe(true);
@@ -188,7 +188,7 @@ describe('auto-quant workspace create: embedded template → skills → commit',
     expect(skillManifest).toMatchObject({
       schemaVersion: 1,
       kind: 'autoquant-workspace-skill-bundle',
-      harnessVersion: '0.9.34',
+      harnessVersion: '1.0.0',
     });
     expect(skillManifest.skills).toHaveLength(16);
     expect(existsSync(join(aqDir, '.alice/harness-source.json'))).toBe(false);

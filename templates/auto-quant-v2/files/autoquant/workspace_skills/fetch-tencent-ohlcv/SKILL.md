@@ -1,24 +1,20 @@
 ---
 name: fetch-tencent-ohlcv
-description: Acquire bounded raw completed daily OHLCV for named mainland China listed equities or funds from Tencent Finance's observable K-line route, preserve exact response bytes, convert reported lots to shares explicitly, and emit an AutoQuant staging package. Use when the market router selects Tencent as an independent XSHG or XSHE route or when comparing it against Yahoo or Eastmoney.
+description: Fetch raw completed daily OHLCV for `XSHG` and `XSHE` equities and funds from Tencent Finance via `aq-python`, converting reported lots to shares (`×100`).
 ---
 
 # Fetch Tencent OHLCV
 
-Use Tencent Finance as an observable independent provider route, not official
-venue, calendar, adjustment, or licensing authority.
+Fetch raw Mainland China daily OHLCV (`XSHG` / `XSHE`) from Tencent Finance's historical `day` route.
 
-## Workflow
+## Fetch
 
-1. Read `$acquire-market-ohlcv` and its mainland-China reference.
-2. Prepare the exact inventory in
-   [assets-format.md](references/assets-format.md).
-3. Select only completed daily sessions and record the terms basis.
-4. Run:
+1. Prepare [assets-format.md](references/assets-format.md) with explicit `equity` or `fund` classes.
+2. Choose completed daily sessions and run:
 
 ```bash
 aq-python scripts/fetch_tencent_daily.py \
-  --output <workspace>/staging/market-data/<dataset-id> \
+  --output /tmp/aq-fetch/<dataset-id> \
   --assets /absolute/path/assets.json \
   --dataset-id <dataset-id> \
   --start YYYY-MM-DD \
@@ -27,26 +23,16 @@ aq-python scripts/fetch_tencent_daily.py \
   --terms "caller-authorized research retrieval; Tencent and exchange terms apply"
 ```
 
-The initial procedure accepts raw `day` rows only. It converts Tencent volume
-from lots to shares by multiplying by 100 and discloses that conversion in
-the audit. Confirm it against an independent shares-based route before
-accepting coverage.
-The asset inventory preserves a caller-verified `equity` or `fund` class; the
-provider code does not infer that class.
+The script converts Tencent `day` volume from lots to shares (`×100`) and logs the conversion in `provider-audit.json`.
 
-## Verify
+## Inspect & Ingest
 
-- Inspect exact raw hashes, provider quote metadata, output ranges, row counts,
-  lot conversion, and CSV hashes.
-- Reject a request if the returned first/last observation suggests the
-  provider truncated the requested range.
-- Compare overlapping raw prices and share volumes with the other selected
-  source. Suspensions remain absent observations.
-- Invoke `$package-autoquant-ohlcv` and strict intake; never write directly to
-  `projects/`.
-
-## Stop conditions
-
-Stop on connection closure, throttling, response shape changes, ambiguous
-symbols, missing requested history, or unsupported adjustment needs. Do not
-silently substitute Tencent forward/backward-adjusted rows.
+1. Check `provider-audit.json` to ensure the returned first/last session dates were not truncated and suspension gaps are expected.
+2. Ingest directly into `<project>/data/`:
+   ```bash
+   uv run aq data ingest . /tmp/aq-fetch/<dataset-id> \
+     --project <project-id> \
+     --dataset-id <dataset-id> \
+     --source tencent-raw \
+     --json
+   ```
