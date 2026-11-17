@@ -1,7 +1,7 @@
 [project]
 name = "auto-quant"
-version = "0.9.34"
-description = "Agent-native workbench that turns quantitative research into versioned, testable engineering workflows."
+version = "1.0.0"
+description = "Thin, composable quantitative research toolkit with causal panel alignment, factor/portfolio evaluation, and holdout audit guardrails."
 readme = "README.md"
 requires-python = ">=3.11,<3.13"
 dependencies = [
@@ -16,7 +16,6 @@ columnar = ["pyarrow>=16"]
 [dependency-groups]
 dev = [
     "hatchling>=1.31.0",
-    "jsonschema>=4.23",
 ]
 
 [project.scripts]
