@@ -21,7 +21,7 @@ import { injectWorkspaceContext } from '../../../src/workspaces/context-injector
 import type { TemplateMeta } from '../../../src/workspaces/template-registry.js';
 import { commitInitial } from '../../../src/workspaces/workspace-creator.js';
 
-const HERE = fileURLToPath(new URL('../../../src/workspaces/', import.meta.url));
+const HERE = fileURLToPath(new URL('../../../', import.meta.url));
 const CHAT_DIR = join(HERE, 'templates', 'chat');
 const CHAT_FILES = join(CHAT_DIR, 'files');
 const CHAT_BOOTSTRAP = join(CHAT_DIR, 'bootstrap.mjs');
@@ -163,51 +163,36 @@ describe('chat workspace create: bootstrap → inject → commit', () => {
   });
 });
 
-describe('auto-quant workspace create: clone → branch → commit', () => {
-  it('retains verified upstream ancestry and origin under the local research branch', async () => {
-    // fake upstream: history + an origin pointing at the public repo
-    const src = join(parent, 'fake-auto-quant');
-    await run('git', ['init', '-q', '-b', 'main', src]);
-    await writeFile(join(src, 'strategy.py'), 'print("hi")\n');
-    await writeFile(join(src, 'AGENTS.md'), '# AutoQuant upstream instructions\n');
-    await run('git', ['-C', src, 'add', '.']);
-    await run('git', ['-C', src, '-c', 'user.email=u@x', '-c', 'user.name=u', 'commit', '-q', '-m', 'upstream history']);
-    const sourceCommit = (await run('git', ['-C', src, 'rev-parse', 'HEAD'])).trim();
-    await run('git', ['-C', src, 'tag', 'v0.8.27']);
-    await run('git', ['-C', src, 'remote', 'add', 'origin', 'https://github.com/TraderAlice/Auto-Quant.git']);
-
+describe('auto-quant workspace create: embedded template → skills → commit', () => {
+  it('materializes the embedded AutoQuant V2 workbench, canonical skills, and local research branch offline', async () => {
     const aqDir = join(parent, 'aq-workspace');
     await runBootstrap(AQ_BOOTSTRAP, ['aqtag', aqDir], {
-      AQ_TEMPLATE_DIR: src,
-      AQ_LAUNCHER_ROOT: parent,
-      OPENALICE_TEMPLATE_SOURCE_REPOSITORY: 'https://github.com/TraderAlice/Auto-Quant-V2.git',
-      OPENALICE_TEMPLATE_SOURCE_VERSION: 'v0.8.27',
-      OPENALICE_TEMPLATE_SOURCE_COMMIT: sourceCommit,
-    });
+      AQ_TEMPLATE_ROOT: AQ_DIR,
+      AQ_TEMPLATE_FILES_DIR: join(AQ_DIR, 'files'),
+    }, true);
     // Preserve AutoQuant's own instructions; inject only OpenAlice CLI skills.
     await injectWorkspaceContext({ template: autoQuantMeta(), wsId: 'ws-aq-1', dir: aqDir });
     await commitInitial(aqDir, 'auto-quant-v2: aqtag');
 
-    // working tree carries the exact upstream content and a source receipt.
-    expect(existsSync(join(aqDir, 'strategy.py'))).toBe(true);
-    expect(await readFile(join(aqDir, 'AGENTS.md'), 'utf8')).toBe('# AutoQuant upstream instructions\n');
+    expect(existsSync(join(aqDir, 'autoquant/cli.py'))).toBe(true);
+    expect(existsSync(join(aqDir, 'harness.json'))).toBe(true);
+    expect(existsSync(join(aqDir, 'pyproject.toml'))).toBe(true);
+    expect(existsSync(join(aqDir, 'projects/.gitkeep'))).toBe(true);
+    expect(existsSync(join(aqDir, 'AGENTS.md'))).toBe(true);
+    expect((await readFile(join(aqDir, 'AGENTS.md'), 'utf8'))).toContain('# AutoQuant Agent Guide');
+    // Both AutoQuant's canonical OHLCV skills and OpenAlice's CLI skills exist side-by-side
+    expect(existsSync(join(aqDir, '.agents/skills/acquire-market-ohlcv/SKILL.md'))).toBe(true);
+    expect(existsSync(join(aqDir, '.claude/skills/acquire-market-ohlcv/SKILL.md'))).toBe(true);
     expect(existsSync(join(aqDir, '.claude/skills/alice/SKILL.md'))).toBe(true);
-    expect(JSON.parse(await readFile(join(aqDir, '.alice/harness-source.json'), 'utf8'))).toEqual({
+    const skillManifest = JSON.parse(await readFile(join(aqDir, 'autoquant-skills.json'), 'utf8'));
+    expect(skillManifest).toMatchObject({
       schemaVersion: 1,
-      template: 'auto-quant-v2',
-      repository: 'https://github.com/TraderAlice/Auto-Quant-V2.git',
-      version: 'v0.8.27',
-      commit: sourceCommit,
+      kind: 'autoquant-workspace-skill-bundle',
+      harnessVersion: '1.0.0',
     });
-    // The launcher commit sits directly on the verified upstream commit, and
-    // origin remains the canonical repository for later Agent-managed updates.
-    expect((await run('git', ['-C', aqDir, 'rev-parse', 'HEAD^'])).trim()).toBe(sourceCommit);
-    expect((await run('git', ['-C', aqDir, 'remote', 'get-url', 'origin'])).trim()).toBe(
-      'https://github.com/TraderAlice/Auto-Quant-V2.git',
-    );
-    expect((await run('git', ['-C', aqDir, 'log', '--pretty=%s'])).trim()).toBe(
-      'auto-quant-v2: aqtag\nupstream history',
-    );
+    expect(skillManifest.skills).toHaveLength(16);
+    expect(existsSync(join(aqDir, '.alice/harness-source.json'))).toBe(false);
+    expect((await run('git', ['-C', aqDir, 'log', '--pretty=%s'])).trim()).toBe('auto-quant-v2: aqtag');
     expect((await run('git', ['-C', aqDir, 'status', '--porcelain'])).trim()).toBe('');
     expect((await run('git', ['-C', aqDir, 'rev-parse', '--abbrev-ref', 'HEAD'])).trim()).toBe('research/aqtag');
   });

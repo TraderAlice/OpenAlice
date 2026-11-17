@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en" data-theme="auto" data-palette="codex" data-day-palette="codex" data-night-palette="graphite" data-ui-style="default" data-style-palette-mode="saved">
+<html lang="en" data-theme="auto" data-palette="codex" data-appearance="light" data-day-palette="codex" data-night-palette="graphite" data-ui-style="default" data-style-palette-mode="saved">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
@@ -38,13 +38,22 @@
           var effective = t === 'auto'
             ? (matchMedia('(prefers-color-scheme: dark)').matches ? 'night' : 'day')
             : t;
+          var palette = effective === 'night' ? effectiveNight : effectiveDay;
+          var darkPalettes = ['graphite', 'midnight', 'moss', 'iris'];
+          var appearance = darkPalettes.indexOf(palette) >= 0 ? 'dark' : 'light';
           var root = document.documentElement;
           root.dataset.theme = t;
           root.dataset.dayPalette = day;
           root.dataset.nightPalette = night;
           root.dataset.uiStyle = uiStyle;
           root.dataset.stylePaletteMode = stylePaletteMode;
-          root.dataset.palette = effective === 'night' ? effectiveNight : effectiveDay;
+          root.dataset.palette = palette;
+          root.dataset.appearance = appearance;
+          var colorSchemeMeta = document.querySelector && document.querySelector('meta[name="color-scheme"]');
+          if (colorSchemeMeta) {
+            colorSchemeMeta.content = appearance;
+            if (colorSchemeMeta.setAttribute) colorSchemeMeta.setAttribute('content', appearance);
+          }
         } catch (e) {
           var root = document.documentElement;
           root.dataset.theme = 'auto';
@@ -53,6 +62,12 @@
           root.dataset.uiStyle = 'default';
           root.dataset.stylePaletteMode = 'saved';
           root.dataset.palette = 'codex';
+          root.dataset.appearance = 'light';
+          var colorSchemeMeta = document.querySelector && document.querySelector('meta[name="color-scheme"]');
+          if (colorSchemeMeta) {
+            colorSchemeMeta.content = 'light dark';
+            if (colorSchemeMeta.setAttribute) colorSchemeMeta.setAttribute('content', 'light dark');
+          }
         }
       })();
     </script>

@@ -1,0 +1,4 @@
+interface:
+  display_name: "Fetch Binance OHLCV"
+  short_description: "Acquire closed Binance public K-lines for research."
+  default_prompt: "Use $fetch-binance-ohlcv to acquire closed Binance public K-lines and preserve a reproducible audit."

@@ -34,7 +34,7 @@ const SUPPORTED_ARCHITECTURES = new Set(['arm64', 'x64'])
 const REQUIRED_PATHS = [
   'dist/main.js',
   'ui/dist/index.html',
-  'src/workspaces/templates',
+  'templates',
   'src/workspaces/cli/bin/openalice-cli.cjs',
   'src/workspaces/cli/bin/pi-session-provider.ts',
   'services/uta/dist/uta.js',

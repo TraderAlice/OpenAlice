@@ -92,17 +92,32 @@ export function createLiveStore<S>(opts: LiveStoreOptions<S>): LiveStore<S> {
     lastEventTs = Date.now()
   }
 
-  function start() {
-    if (cleanup) return
+  function openSource() {
+    if (cleanup || (typeof document !== 'undefined' && document.visibilityState === 'hidden')) return
     lastEventTs = Date.now()
     cleanup = opts.subscribe({ apply })
+  }
+
+  function closeSource() {
+    cleanup?.()
+    cleanup = null
+  }
+
+  function start() {
+    if (visibilityHandler) return
+    openSource()
 
     visibilityHandler = () => {
+      if (typeof document !== 'undefined' && document.visibilityState === 'hidden') {
+        closeSource()
+        return
+      }
       if (document.visibilityState !== 'visible') return
-      if (Date.now() - lastEventTs > stale) {
-        // Connection might have died silently while backgrounded — take
-        // the optimistic stance and reconnect. Worst case we drop a few
-        // duplicate events; best case we recover from a zombie socket.
+      if (!cleanup || Date.now() - lastEventTs > stale) {
+        // Connection was paused while hidden or might have died silently
+        // while backgrounded — take the optimistic stance and reconnect.
+        // Worst case we drop a few duplicate events; best case we recover
+        // from a zombie socket or resume polling immediately on return.
         reconnect()
       }
     }
@@ -110,8 +125,7 @@ export function createLiveStore<S>(opts: LiveStoreOptions<S>): LiveStore<S> {
   }
 
   function stop() {
-    cleanup?.()
-    cleanup = null
+    closeSource()
     if (visibilityHandler) {
       document.removeEventListener('visibilitychange', visibilityHandler)
       visibilityHandler = null
@@ -119,9 +133,9 @@ export function createLiveStore<S>(opts: LiveStoreOptions<S>): LiveStore<S> {
   }
 
   function reconnect() {
-    if (!cleanup) return
-    stop()
-    start()
+    if (refCount <= 0) return
+    closeSource()
+    openSource()
   }
 
   function bumpRef(delta: 1 | -1) {

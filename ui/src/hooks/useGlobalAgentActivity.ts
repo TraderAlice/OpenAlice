@@ -70,12 +70,20 @@ export function useGlobalAgentActivity(): GlobalAgentActivityData {
       return () => { active = false; off() }
     }
     void refresh()
-    const id = window.setInterval(() => void refresh(), POLL_MS)
+    const id = window.setInterval(() => {
+      if (typeof document !== 'undefined' && document.visibilityState === 'hidden') return
+      void refresh()
+    }, POLL_MS)
     const refreshFromActivity = () => void refresh()
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') void refresh()
+    }
     window.addEventListener(GLOBAL_ACTIVITY_REFRESH_EVENT, refreshFromActivity)
+    document.addEventListener('visibilitychange', handleVisibilityChange)
     return () => {
       window.clearInterval(id)
       window.removeEventListener(GLOBAL_ACTIVITY_REFRESH_EVENT, refreshFromActivity)
+      document.removeEventListener('visibilitychange', handleVisibilityChange)
     }
   }, [refresh])
 

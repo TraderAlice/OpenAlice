@@ -377,6 +377,14 @@ describe('AgentLaunchSelectors keyboard menus', () => {
     const input = await screen.findByRole('combobox', { name: i18n.t('chatLanding.customModelId') })
     await user.clear(input)
     await user.type(input, 'private-model-1')
+
+    fireEvent.keyDown(input, { key: 'Enter', isComposing: true })
+    expect(document.activeElement).toBe(input)
+    expect(selectModel).not.toHaveBeenCalled()
+    fireEvent.keyDown(input, { key: 'Enter', keyCode: 229 })
+    expect(document.activeElement).toBe(input)
+    expect(selectModel).not.toHaveBeenCalled()
+
     await user.click(screen.getByRole('button', { name: i18n.t('common.save') }))
     expect(selectModel).toHaveBeenCalledWith('private-model-1')
   })
@@ -417,6 +425,8 @@ describe('AgentLaunchSelectors keyboard menus', () => {
     fireEvent.change(searchInput, { target: { value: 'nonexistent-xyz' } })
     expect(screen.getByText(i18n.t('chatLanding.noModelMatches', { query: 'nonexistent-xyz' }))).toBeTruthy()
   })
+
+
 })
 
 describe('AgentLaunchDetails setup notices', () => {

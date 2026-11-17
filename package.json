@@ -190,8 +190,8 @@
         "filter": [
           "ui/dist/**",
           "default/**",
+          "templates/**",
           "src/workspaces/cli/**",
-          "src/workspaces/templates/**",
           "vendor/**",
           "!**/node_modules/**/*.d.ts",
           "!**/node_modules/**/*.d.ts.map",

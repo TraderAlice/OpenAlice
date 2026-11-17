@@ -52,7 +52,12 @@ describe('ModelCombobox', () => {
 
     await userEvent.clear(input)
     await userEvent.type(input, 'flash')
-    await userEvent.keyboard('{ArrowDown}{Enter}')
+    fireEvent.keyDown(input, { key: 'ArrowDown' })
+    fireEvent.keyDown(input, { key: 'Enter', isComposing: true })
+    expect(onChange).toHaveBeenLastCalledWith('flash')
+    fireEvent.keyDown(input, { key: 'Enter', keyCode: 229 })
+    expect(onChange).toHaveBeenLastCalledWith('flash')
+    fireEvent.keyDown(input, { key: 'Enter' })
     expect(onChange).toHaveBeenLastCalledWith('deepseek-v4-flash')
   })
 })

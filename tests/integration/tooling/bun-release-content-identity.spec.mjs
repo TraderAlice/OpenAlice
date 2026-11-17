@@ -8,7 +8,7 @@ describe('Bun native release content identity', () => {
   it.each([
     ['Web UI', 'share/openalice/ui/dist/index.html'],
     ['default resources', 'share/openalice/default/skills/alice/SKILL.md'],
-    ['Workspace templates', 'share/openalice/src/workspaces/templates/chat/bootstrap.mjs'],
+    ['Workspace templates', 'share/openalice/templates/chat/bootstrap.mjs'],
   ])('changes when %s changes while the executable stays byte-identical', (_label, changedPath) => {
     const original = releaseMetadata()
     const changed = releaseMetadata({
@@ -81,7 +81,7 @@ function releaseMetadata(overrides = {}) {
     'bin/openalice': '#!/bin/sh\nprintf openalice\\n\n',
     'share/openalice/ui/dist/index.html': '<main>OpenAlice</main>\n',
     'share/openalice/default/skills/alice/SKILL.md': '# Alice\n',
-    'share/openalice/src/workspaces/templates/chat/bootstrap.mjs': 'export const chat = true\n',
+    'share/openalice/templates/chat/bootstrap.mjs': 'export const chat = true\n',
     ...overrides,
   }
   return {

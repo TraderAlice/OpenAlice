@@ -132,10 +132,10 @@ describe('MarketBoardPage', () => {
 
     const mobile = screen.getByTestId('global-macro-mobile')
     const desktop = screen.getByTestId('global-macro-desktop')
-    expect(mobile.className).toContain('md:hidden')
+    expect(mobile.className).toContain('@[42rem]/content:hidden')
     expect(mobile.className).not.toContain('overflow-x-auto')
     expect(desktop.className).toContain('hidden')
-    expect(desktop.className).toContain('md:block')
+    expect(desktop.className).toContain('@[42rem]/content:block')
     expect(desktop.className).toContain('overflow-x-auto')
 
     expect(within(mobile).getByRole('heading', { name: 'United States' })).toBeTruthy()
@@ -178,7 +178,7 @@ describe('MarketBoardPage', () => {
 
     const header = screen.getByText('Suez Canal').parentElement
     expect(header?.className).toContain('flex-col')
-    expect(header?.className).toContain('sm:flex-row')
+    expect(header?.className).toContain('@sm/content:flex-row')
 
     const metadata = screen.getByText('2026-07-29').parentElement
     expect(metadata?.className).toContain('flex-wrap')
@@ -220,7 +220,7 @@ describe('MarketBoardPage', () => {
     const firstBasis = screen.getByText('26-08-30')
     expect(firstBasis.className).toContain('justify-between')
     expect(firstBasis.parentElement?.className).toContain('grid-cols-2')
-    expect(firstBasis.parentElement?.className).toContain('sm:flex')
+    expect(firstBasis.parentElement?.className).toContain('@sm/content:flex')
   })
 
   it('compresses term-axis labels without losing desktop precision', () => {

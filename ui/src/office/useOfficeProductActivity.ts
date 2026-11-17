@@ -319,12 +319,20 @@ export function useOfficeProductActivity(): OfficeProductActivity {
 
   useEffect(() => {
     void refresh()
-    const poll = window.setInterval(() => void refresh(), POLL_MS)
+    const poll = window.setInterval(() => {
+      if (typeof document !== 'undefined' && document.visibilityState === 'hidden') return
+      void refresh()
+    }, POLL_MS)
     const refreshFromActivity = () => void refresh()
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') void refresh()
+    }
     window.addEventListener(GLOBAL_ACTIVITY_REFRESH_EVENT, refreshFromActivity)
+    document.addEventListener('visibilitychange', handleVisibilityChange)
     return () => {
       window.clearInterval(poll)
       window.removeEventListener(GLOBAL_ACTIVITY_REFRESH_EVENT, refreshFromActivity)
+      document.removeEventListener('visibilitychange', handleVisibilityChange)
       lifecycleGenerationRef.current += 1
       if (freshTimerRef.current != null) window.clearTimeout(freshTimerRef.current)
     }

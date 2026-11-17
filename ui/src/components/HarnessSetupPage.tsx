@@ -70,7 +70,8 @@ export function HarnessSetupPage({
     [ctx.workspaces, templateName],
   )
   const template = ctx.templates.find((candidate) => candidate.name === templateName)
-  const version = template?.source?.defaultVersion
+  const formatVersion = (raw?: string) => raw ? (raw.startsWith('v') ? raw : `v${raw}`) : undefined
+  const version = template?.source?.defaultVersion ?? formatVersion(template?.version)
 
   const chooseWorkspace = async (workspaceId: string) => {
     if (!selectWorkspace) return
@@ -178,7 +179,7 @@ export function HarnessSetupPage({
                     <span className="mt-0.5 block text-xs text-muted-foreground">
                       {t(`${copyPrefix}.workspaceMeta`, {
                         count: workspace.sessions.length,
-                        version: workspace.harnessSource?.version ?? version ?? '—',
+                        version: workspace.harnessSource?.version ?? formatVersion(workspace.spawnedFromVersion) ?? version ?? '—',
                       })}
                     </span>
                   </span>

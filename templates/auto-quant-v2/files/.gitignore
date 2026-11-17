@@ -1,0 +1,18 @@
+# Runtime logs
+*.log
+autoquant-workspace.local.json
+/staging/
+
+# Python / uv
+__pycache__/
+*.pyc
+.venv/
+.python-version.lock
+/dist/
+*.egg-info/
+
+# Editor / OS
+.DS_Store
+.vscode/
+.idea/
+*.swp

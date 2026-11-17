@@ -1,0 +1,4 @@
+interface:
+  display_name: "Fetch Nasdaq OHLCV"
+  short_description: "Acquire Nasdaq historical quote OHLCV"
+  default_prompt: "Use $fetch-nasdaq-ohlcv to acquire bounded U.S. daily OHLCV into an auditable AutoQuant staging package."

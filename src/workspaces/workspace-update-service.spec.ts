@@ -148,3 +148,14 @@ it.each(['review', 'apply'] as const)('distinguishes %s failure from discovery f
   await updates.refreshAndApplyPolicy()
   expect(updates.list()[0]).toMatchObject({ phase: 'failed', failureStage: stage })
 })
+
+it('treats an embedded AutoQuant Workspace without a source receipt as current', async () => {
+  const svc = service()
+  svc.registry.get.mockImplementation((id: string) => (id === 'aq' ? { id, dir: '/workspace/aq', template: 'auto-quant-v2', spawnedFromVersion: '0.9.34' } : undefined) as never)
+  svc.templates.get.mockReturnValueOnce({ version: '0.9.34' } as never)
+  vi.mocked(readHarnessSource).mockResolvedValueOnce(null)
+  const updates = new WorkspaceUpdateService(svc as unknown as WorkspaceService)
+  await updates.check()
+  expect(updates.list()).toMatchObject([{ workspaceId: 'aq', template: 'auto-quant-v2', phase: 'current', fromVersion: '0.9.34' }])
+  expect(svc.sourceUpgrades.latest).not.toHaveBeenCalled()
+})

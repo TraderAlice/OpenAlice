@@ -12,7 +12,7 @@ import {
   rememberOfficeInboxDutyExcursion,
 } from '../office/inbox-duty-excursion'
 import { inboxUnreadDutyRegistration, type OfficeInboxDutyCandidate } from '../office/duty-registry'
-import { InboxSidebar } from './InboxSidebar'
+import { groupByBucket, InboxSidebar } from './InboxSidebar'
 
 const mocks = vi.hoisted(() => ({
   entries: [] as InboxEntry[],
@@ -363,5 +363,92 @@ describe('Inbox bulk read toolbar', () => {
     expect(button.disabled).toBe(true)
     fireEvent.click(button)
     expect(mocks.markAllRead).not.toHaveBeenCalled()
+  })
+})
+
+describe('groupByBucket', () => {
+  function entryAt(id: string, ts: number): InboxEntry {
+    return {
+      id,
+      ts,
+      workspaceId: 'ws-1',
+      body: `Entry ${id}`,
+    }
+  }
+
+  it('buckets entries by calendar day boundaries', () => {
+    const now = new Date(2026, 4, 15, 14, 30, 0, 0).getTime()
+    const todayStart = new Date(2026, 4, 15, 0, 0, 0, 0).getTime()
+    const yesterdayStart = new Date(2026, 4, 14, 0, 0, 0, 0).getTime()
+    const weekStart = new Date(2026, 4, 9, 0, 0, 0, 0).getTime()
+    const olderTs = weekStart - 1
+
+    const grouped = groupByBucket([
+      entryAt('today', todayStart),
+      entryAt('yesterday', yesterdayStart),
+      entryAt('week', weekStart),
+      entryAt('older', olderTs),
+    ], now)
+
+    expect(grouped.map(([bucket, items]) => [bucket, items.map((i) => i.id)])).toEqual([
+      ['Today', ['today']],
+      ['Yesterday', ['yesterday']],
+      ['This week', ['week']],
+      ['Older', ['older']],
+    ])
+  })
+
+  it('uses calendar-day arithmetic across 23-hour spring-forward DST transitions', () => {
+    const RealDate = Date
+    const todayMidnight = RealDate.UTC(2026, 2, 9, 4, 0, 0, 0)
+    // Simulate a 23-hour previous day (spring forward: yesterday midnight is 23h before today midnight).
+    const yesterdayMidnight = RealDate.UTC(2026, 2, 8, 5, 0, 0, 0)
+    const weekStartMidnight = RealDate.UTC(2026, 2, 3, 5, 0, 0, 0)
+    const now = todayMidnight + 10 * 3_600_000
+
+    class DstDate extends RealDate {
+      private offsetApplied = 0
+      constructor(value?: number | string | Date) {
+        super(value === undefined ? now : (value as number))
+      }
+      override setHours(h: number, m = 0, s = 0, ms = 0): number {
+        if (h === 0 && m === 0 && s === 0 && ms === 0) {
+          this.setTime(todayMidnight)
+          return this.getTime()
+        }
+        return super.setHours(h, m, s, ms)
+      }
+      override setDate(day: number): number {
+        const diff = this.getDate() - day
+        this.offsetApplied += diff
+        if (this.offsetApplied === 1) {
+          this.setTime(yesterdayMidnight)
+          return this.getTime()
+        }
+        if (this.offsetApplied === 6) {
+          this.setTime(weekStartMidnight)
+          return this.getTime()
+        }
+        return super.setDate(day)
+      }
+    }
+
+    vi.stubGlobal('Date', DstDate)
+    try {
+      const grouped = groupByBucket([
+        entryAt('yesterday-early', yesterdayMidnight + 1_800_000),
+        entryAt('two-days-ago-late', yesterdayMidnight - 1_800_000),
+        entryAt('week-boundary', weekStartMidnight + 1_800_000),
+        entryAt('older', weekStartMidnight - 1_800_000),
+      ], now)
+
+      expect(grouped.map(([bucket, items]) => [bucket, items.map((i) => i.id)])).toEqual([
+        ['Yesterday', ['yesterday-early']],
+        ['This week', ['two-days-ago-late', 'week-boundary']],
+        ['Older', ['older']],
+      ])
+    } finally {
+      vi.unstubAllGlobals()
+    }
   })
 })

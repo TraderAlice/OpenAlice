@@ -27,7 +27,7 @@ async function writeBasePackage(appRoot: string, manifest: unknown, duplicateRes
   const input = join(dirname(appRoot), 'fixture-source')
   // Native Windows builder retains these empty directory entries when it
   // moves their files to extraResources. They are not duplicated payloads.
-  for (const dir of ['default', 'vendor', 'ui/dist', 'src/workspaces/templates']) {
+  for (const dir of ['default', 'vendor', 'ui/dist', 'templates']) {
     mkdirSync(join(input, dir), { recursive: true })
   }
   if (duplicateResource) writePackageFile(input, 'default/duplicated.md', 'duplicate')

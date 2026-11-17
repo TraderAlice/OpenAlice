@@ -16,8 +16,10 @@ export function workspacePlanKey(request: WorkspacePlanRequest): string {
     ? [request.workspaceId, 'source', request.targetVersion ?? null]
     : [request.workspaceId, request.layer ?? 'template', request.projection?.skill ?? null, request.projection?.action ?? null, request.targetVersion ?? null])
 }
-export function workspacePlanRequest(workspace: Pick<Workspace, 'id' | 'template' | 'upgradeAvailable'>): WorkspacePlanRequest {
-  return workspace.upgradeAvailable?.kind === 'source' || ['auto-quant-v2', 'auto-prediction'].includes(workspace.template ?? '')
+export function workspacePlanRequest(workspace: Pick<Workspace, 'id' | 'template' | 'upgradeAvailable' | 'harnessSource'>): WorkspacePlanRequest {
+  return workspace.upgradeAvailable?.kind === 'source'
+    || workspace.template === 'auto-prediction'
+    || Boolean(workspace.harnessSource && workspace.template === 'auto-quant-v2')
     ? { workspaceId: workspace.id, kind: 'source' }
     : { workspaceId: workspace.id, kind: 'template' }
 }

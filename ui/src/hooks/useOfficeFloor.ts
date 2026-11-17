@@ -35,8 +35,18 @@ export function useOfficeFloor(asOfSeq: number | null = null): OfficeFloorData {
     setLoading(true)
     void refresh()
     if (asOfSeq != null) return
-    const id = setInterval(() => void refresh(), 4000)
-    return () => clearInterval(id)
+    const id = setInterval(() => {
+      if (typeof document !== 'undefined' && document.visibilityState === 'hidden') return
+      void refresh()
+    }, 4000)
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') void refresh()
+    }
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+    return () => {
+      clearInterval(id)
+      document.removeEventListener('visibilitychange', handleVisibilityChange)
+    }
   }, [refresh, asOfSeq])
 
   return { building, loading, error, refresh }

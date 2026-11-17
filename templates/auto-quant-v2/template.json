@@ -1,0 +1,9 @@
+{
+  "displayName": "AutoQuant",
+  "groupOrder": 20,
+  "description": "Agent-native quantitative research desk. A native Coding Agent writes causal Python/pandas research, records immutable Runs across Train/Val/Holdout splits, and visualizes custom artifacts in an embedded Quant Studio.",
+  "defaultAgents": ["codex", "claude"],
+  "injectTools": true,
+  "injectInstructions": false,
+  "bundledSkills": []
+}

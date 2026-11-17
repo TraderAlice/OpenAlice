@@ -247,7 +247,7 @@ export const demoWorkspaces: Workspace[] = [
 ]
 
 // Templates — names + metadata mirror the real template at
-// src/workspaces/templates/chat/template.json. The name matters: the Chat /
+// templates/chat/template.json. The name matters: the Chat /
 // Workspaces sidebars filter on the literal 'chat' template name.
 export const chatTemplate: TemplateInfo = {
   name: 'chat',

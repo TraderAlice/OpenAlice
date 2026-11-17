@@ -287,6 +287,9 @@ describe('WorkspaceManagerPage runtime selection', () => {
     fireEvent.keyDown(composer, { key: 'Enter', code: 'Enter', isComposing: true })
     expect(mocks.quickStartWorkspaceManager).not.toHaveBeenCalled()
 
+    fireEvent.keyDown(composer, { key: 'Enter', code: 'Enter', keyCode: 229 })
+    expect(mocks.quickStartWorkspaceManager).not.toHaveBeenCalled()
+
     fireEvent.keyDown(composer, { key: 'Enter', code: 'Enter', isComposing: false })
     await waitFor(() => expect(mocks.quickStartWorkspaceManager).toHaveBeenCalledWith(
       '检查工作区',

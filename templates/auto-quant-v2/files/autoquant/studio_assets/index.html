@@ -1,0 +1,186 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="color-scheme" content="dark light">
+    <meta name="description" content="AutoQuant Studio — Quant research desk and immutable run ledger.">
+    <title>AutoQuant Studio</title>
+    <link rel="stylesheet" href="/assets/studio.css">
+    <script src="/assets/studio.js" defer></script>
+  </head>
+  <body>
+    <div class="studio-app" id="studio-app">
+      <header class="topbar">
+        <div class="brand">
+          <span class="brand-mark" aria-hidden="true">AQ</span>
+          <div class="brand-text">
+            <strong>AutoQuant Studio</strong>
+            <small id="workspace-name">Quant research desk</small>
+          </div>
+        </div>
+        <div class="topbar-context" id="topbar-context">
+          <label class="sr-only" for="project-select">Project</label>
+          <select id="project-select" class="ctrl-select" aria-label="Active Project"></select>
+          <span class="split-pill" id="split-pill" title="Chronological data splits">Splits: —</span>
+          <button type="button" class="holdout-badge is-untouched" id="holdout-badge" aria-expanded="false">Holdout Untouched</button>
+        </div>
+        <div class="topbar-actions">
+          <span class="sync-pill" id="sync-status" role="status" aria-live="polite">Connecting…</span>
+          <button type="button" class="btn btn-ghost" id="brief-toggle-btn" aria-expanded="false">Brief &amp; Data</button>
+          <button type="button" class="btn btn-ghost" id="auto-refresh-btn" aria-pressed="true">Auto 5s</button>
+          <button type="button" class="btn btn-primary" id="refresh-btn">Refresh</button>
+        </div>
+      </header>
+
+      <section class="audit-drawer" id="audit-drawer" hidden aria-label="Holdout Unlock Audit Log">
+        <div class="section-head">
+          <div>
+            <h2>Holdout Unlock Audit Trail</h2>
+            <p class="muted">Every out-of-sample holdout evaluation is permanently recorded in project.json.</p>
+          </div>
+          <button type="button" class="btn btn-ghost" id="audit-close-btn">Close</button>
+        </div>
+        <div class="table-wrap" id="audit-table-wrap"></div>
+      </section>
+
+      <section class="error-banner" id="error-banner" hidden role="alert"></section>
+
+      <section class="empty-state" id="empty-workspace" hidden>
+        <div class="empty-card">
+          <span class="eyebrow">EMPTY WORKSPACE</span>
+          <h1>No Research Projects Yet</h1>
+          <p class="muted">Create a Project, ingest clean OHLCV market bars, and iterate causally on the Validation split before touching Holdout.</p>
+          <div class="quickstart-grid">
+            <div class="qs-step">
+              <b>1. Create Project &amp; Splits</b>
+              <pre><code>uv run aq project create . us-momentum --name "US Momentum"
+uv run aq project set-splits . --project us-momentum \
+  --train-end 2022-12-31 --val-end 2024-06-30 --holdout-end 2025-12-31</code></pre>
+            </div>
+            <div class="qs-step">
+              <b>2. Ingest Market Bars</b>
+              <pre><code>uv run aq data ingest . --project us-momentum \
+  --source prices.csv --dataset-id equities-1d</code></pre>
+            </div>
+            <div class="qs-step">
+              <b>3. Record Runs in Python</b>
+              <pre><code>import autoquant as aq
+panel = aq.load_panel("projects/us-momentum", split="val")
+mom = panel.pivot(index="timestamp", columns="asset", values="close").pct_change(20)
+aq.evaluate_factor(mom, panel, project="projects/us-momentum", name="mom-20d")</code></pre>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <main class="desk-main" id="desk-main" hidden>
+        <section class="project-header">
+          <div><h1 id="project-title">—</h1><p class="muted" id="project-desc"></p></div>
+          <div class="kpi-strip" id="kpi-strip"></div>
+        </section>
+
+        <section class="card brief-panel" id="brief-panel" hidden>
+          <div class="brief-grid">
+            <div><h3>Research Brief (research.md)</h3><div class="md-body" id="research-md"></div></div>
+            <div><h3>Ingested Datasets (data/manifest.json)</h3><div class="table-wrap" id="datasets-wrap"></div></div>
+          </div>
+        </section>
+
+        <section class="empty-state" id="empty-runs" hidden>
+          <div class="empty-card">
+            <span class="eyebrow">READY FOR RESEARCH</span>
+            <h2>0 Runs Recorded in This Project</h2>
+            <p class="muted">Run causal factor diagnostics or portfolio backtests on the Validation split to populate charts and leaderboard.</p>
+            <div class="quickstart-grid">
+              <div class="qs-step"><b>1. Load Validation Slice</b><pre><code id="qs-step-1">import autoquant as aq
+panel = aq.load_panel(".", split="val")</code></pre></div>
+              <div class="qs-step"><b>2. Evaluate Factor or Backtest</b><pre><code>aq.evaluate_factor(signal_df, panel, project=".", name="alpha-v1")
+aq.backtest_weights(weights_df, panel, project=".", name="bt-v1")</code></pre></div>
+              <div class="qs-step"><b>3. Audited Holdout Check</b><pre><code>aq.evaluate_holdout(".", evaluator_fn, name="final-holdout")</code></pre></div>
+            </div>
+          </div>
+        </section>
+
+        <div id="runs-workspace" hidden>
+          <section class="charts-row">
+            <div class="card chart-card">
+              <div class="chart-head">
+                <div><h3>Equity Curve</h3><small class="muted" id="equity-subtitle">Select up to 5 runs to overlay</small></div>
+                <span class="chart-readout" id="equity-readout"></span>
+              </div>
+              <div class="svg-host" id="equity-chart"></div>
+              <div class="chart-legend" id="equity-legend"></div>
+            </div>
+            <div class="card chart-card">
+              <div class="chart-head">
+                <div><h3>Underwater Drawdown</h3><small class="muted">Peak-to-trough decline</small></div>
+                <span class="chart-readout" id="drawdown-readout"></span>
+              </div>
+              <div class="svg-host" id="drawdown-chart"></div>
+            </div>
+          </section>
+
+          <section class="card factor-panel" id="factor-panel" hidden>
+            <div class="section-head">
+              <div><h3>Factor Diagnostics — <span id="factor-run-label"></span></h3><small class="muted" id="factor-summary"></small></div>
+            </div>
+            <div class="factor-grid">
+              <div class="subchart"><h4>Cumulative IC &amp; Rank IC</h4><div class="svg-host" id="ic-chart"></div></div>
+              <div class="subchart"><h4>Quantile Bucket Returns</h4><div class="svg-host" id="quantile-chart"></div></div>
+              <div class="subchart"><h4>Horizon IC Decay</h4><div class="svg-host" id="decay-chart"></div></div>
+            </div>
+          </section>
+
+          <section class="card artifacts-panel" id="artifacts-panel" hidden>
+            <div class="section-head"><h3>Custom Artifacts — <span id="artifacts-run-label"></span></h3><span class="pill" id="artifacts-count">0</span></div>
+            <div class="artifacts-grid" id="artifacts-grid"></div>
+          </section>
+
+          <section class="custom-panels-host" id="custom-panels-host" hidden></section>
+
+          <section class="lower-grid">
+            <div class="card leaderboard-card">
+              <div class="toolbar">
+                <div class="filter-pills" id="split-filters" role="group" aria-label="Filter runs by split">
+                  <button type="button" class="filter-pill is-active" data-split="all">All</button>
+                  <button type="button" class="filter-pill" data-split="val">Val</button>
+                  <button type="button" class="filter-pill" data-split="holdout">Holdout</button>
+                  <button type="button" class="filter-pill" data-split="train">Train</button>
+                </div>
+                <div class="toolbar-right">
+                  <span class="compare-pill" id="compare-pill" hidden></span>
+                  <button type="button" class="btn btn-ghost btn-xs" id="clear-compare-btn" hidden>Clear</button>
+                  <select id="sort-select" class="ctrl-select ctrl-select-sm" aria-label="Sort runs">
+                    <option value="created_at">Sort: Created (Newest)</option>
+                    <option value="sharpe">Sort: Sharpe</option>
+                    <option value="annual_return">Sort: Annual Return</option>
+                    <option value="max_drawdown">Sort: Max Drawdown</option>
+                    <option value="ic_mean">Sort: IC Mean</option>
+                  </select>
+                </div>
+              </div>
+              <div class="table-wrap leaderboard-scroll">
+                <table class="quant-table">
+                  <thead><tr><th class="col-chk">Cmp</th><th>Run</th><th>Kind</th><th>Split</th><th class="num">Sharpe</th><th class="num">Return</th><th class="num">MaxDD</th><th class="num">IC</th><th class="num">Created</th></tr></thead>
+                  <tbody id="runs-tbody"></tbody>
+                </table>
+              </div>
+            </div>
+
+            <aside class="card detail-card" id="detail-card" aria-label="Selected Run Inspector">
+              <div class="detail-head">
+                <div><span class="eyebrow" id="detail-kind">RUN</span><h3 id="detail-name">Select a run</h3></div>
+                <span class="split-tag" id="detail-split">—</span>
+              </div>
+              <div class="md-body detail-notes" id="detail-notes"></div>
+              <h4>Metrics</h4><div class="metrics-grid" id="detail-metrics"></div>
+              <h4>Parameters</h4><pre class="code-box" id="detail-params">{}</pre>
+              <h4>Provenance &amp; Dataset</h4><dl class="kv-list" id="detail-provenance"></dl>
+            </aside>
+          </section>
+        </div>
+      </main>
+    </div>
+  </body>
+</html>

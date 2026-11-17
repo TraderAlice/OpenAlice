@@ -5,7 +5,23 @@ import { cn } from '@/lib/utils'
 // ==================== Shared class constants ====================
 
 export const inputClass =
-  'oa-field-control h-(--oa-control-height) w-full min-w-0 rounded-lg border border-input bg-background px-3 py-1.5 font-sans text-sm leading-5 [@media(pointer:coarse)]:text-base text-foreground outline-none transition-[border-color,background-color,box-shadow] duration-[var(--motion-fast)] [transition-timing-function:var(--motion-ease-out)] placeholder:text-muted-foreground motion-reduce:transition-none disabled:cursor-not-allowed disabled:bg-input/50 disabled:opacity-50'
+  'oa-field-control h-(--oa-control-height) w-full min-w-0 rounded-lg border border-input bg-background px-3 py-1.5 font-sans text-sm leading-5 [@media(pointer:coarse)]:text-base text-foreground outline-none transition-[border-color,background-color,box-shadow] duration-[var(--motion-fast)] [transition-timing-function:var(--motion-ease-out)] placeholder:text-muted-foreground motion-reduce:transition-none disabled:cursor-not-allowed disabled:bg-input/50 disabled:opacity-50 user-invalid:border-destructive'
+
+/**
+ * Guards custom Enter handlers against CJK IME candidate confirmation.
+ * Checks both `nativeEvent.isComposing` and keyCode 229 (Safari WebKit 165004
+ * dispatches keydown after compositionend with keyCode 229).
+ */
+export function isImeComposing(event: {
+  nativeEvent: { isComposing?: boolean; keyCode?: number }
+  keyCode?: number
+}): boolean {
+  return Boolean(
+    event.nativeEvent.isComposing ||
+      event.nativeEvent.keyCode === 229 ||
+      event.keyCode === 229,
+  )
+}
 
 // ==================== Settings scroll area ====================
 

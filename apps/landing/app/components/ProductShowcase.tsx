@@ -182,6 +182,8 @@ export function ProductShowcase() {
                 alt={active.alt}
                 sizes="(max-width: 767px) calc(100vw - 2rem), 1280px"
                 className="h-full w-full object-contain"
+                preload
+                fetchPriority="high"
               />
             )}
           </div>

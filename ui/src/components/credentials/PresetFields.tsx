@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Autocomplete } from '@base-ui/react/autocomplete'
 import { ChevronDown } from 'lucide-react'
-import { inputClass } from '../form'
+import { inputClass, isImeComposing } from '../form'
 import type { LabeledOption } from '../../lib/presetHelpers'
 import { AIProviderIcon } from '../../lib/aiProviderIcon'
 import { modelDisplayName, modelManufacturer } from '../../lib/modelIdentity'
@@ -53,6 +53,9 @@ export function ModelCombobox({ value, suggestions, onChange, placeholder, ariaL
         aria-label={ariaLabel ?? placeholder ?? 'Model'}
         className={`${inputClass} pl-9 pr-10`}
         placeholder={placeholder}
+        onKeyDown={(event) => {
+          if (event.key === 'Enter' && isImeComposing(event)) event.preventBaseUIHandler()
+        }}
         spellCheck={false}
         autoCapitalize="off"
         autoCorrect="off"

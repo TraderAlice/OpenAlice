@@ -26,6 +26,7 @@ import { WebSessionView } from '../components/workspace/WebSessionView'
 import { SessionActivation } from '../components/workspace/SessionActivation'
 import { Button } from '../components/ui/button'
 import { Tooltip, TooltipContent, TooltipTrigger } from '../components/ui/tooltip'
+import { isImeComposing } from '../components/form'
 import { useWorkspaces } from '../contexts/workspaces-context'
 import { useAgentLaunchConfig, useAgentLaunchPreferences } from '../hooks/useAgentLaunchConfig'
 import { useAgentRuntimes } from '../hooks/useAgentRuntimes'
@@ -116,7 +117,7 @@ export function WorkspaceManagerPage({ spec, visible = true }: { spec: ManagerSp
   }
 
   const onKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>): void => {
-    if (event.key === 'Enter' && !event.shiftKey && !event.nativeEvent.isComposing) {
+    if (event.key === 'Enter' && !event.shiftKey && !isImeComposing(event)) {
       event.preventDefault()
       void submit()
     }

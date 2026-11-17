@@ -147,5 +147,12 @@ it('keeps source commit identity even when version labels are equal', () => {
     fromCommit: 'a', toCommit: 'b', verified: true, protocolCompatible: true, manifestVersion: 1, changedPaths: [], conflictedPaths: [] }
   expect(workspacePlanIsCurrent(source)).toBe(false)
   expect(workspacePlanIsCurrent({ ...source, toCommit: 'a' })).toBe(true)
-  expect(workspacePlanRequest({ ...workspace, template: 'auto-quant-v2', upgradeAvailable: null }).kind).toBe('source')
+  expect(workspacePlanRequest({ ...workspace, template: 'auto-prediction', upgradeAvailable: null }).kind).toBe('source')
+  expect(workspacePlanRequest({ ...workspace, template: 'auto-quant-v2', upgradeAvailable: null }).kind).toBe('template')
+  expect(workspacePlanRequest({
+    ...workspace,
+    template: 'auto-quant-v2',
+    harnessSource: { schemaVersion: 1, template: 'auto-quant-v2', repository: 'https://github.com/TraderAlice/Auto-Quant-V2.git', version: 'v0.9.34', commit: 'a'.repeat(40) },
+    upgradeAvailable: null,
+  }).kind).toBe('source')
 })

@@ -30,8 +30,19 @@ export function useMarketBars(query: Query | null) {
       } finally { if (!cancelled && initial) setLoading(false) }
     }
     void run(true)
-    const timer = setInterval(() => void run(false), /[mh]$/.test(params.interval) ? 60_000 : 300_000)
-    return () => { cancelled = true; clearInterval(timer) }
+    const timer = setInterval(() => {
+      if (typeof document !== 'undefined' && document.visibilityState === 'hidden') return
+      void run(false)
+    }, /[mh]$/.test(params.interval) ? 60_000 : 300_000)
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') void run(false)
+    }
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+    return () => {
+      cancelled = true
+      clearInterval(timer)
+      document.removeEventListener('visibilitychange', handleVisibilityChange)
+    }
   }, [signature, revision])
   return { bars, meta, loading, error, retry }
 }

@@ -63,20 +63,18 @@ export function uiBundlePath(): string {
 }
 
 /**
- * Path to the workspace bootstrap templates (chat / auto-quant / etc).
+ * Path to the workspace bootstrap templates (`chat` / `auto-quant-v2` / etc).
  *
- * Previously resolved via `import.meta.url` from src/workspaces/config.ts,
- * which only worked under tsx because the bundled dist/main.js has
- * import.meta.url pointing at the bundle file (the templates aren't next
- * to it). Routing through APP_RESOURCES_HOME makes this work the same way
- * default/ does: dev points to repo source, packaged points to wherever
- * the bundler copied the templates inside .app/Contents/Resources/.
+ * Routed through APP_RESOURCES_HOME just like `default/`: dev points to the
+ * top-level `templates/` directory in repo root, packaged points to wherever
+ * the bundler copied `templates/` inside `.app/Contents/Resources/` or CLI
+ * `share/openalice/`.
  *
- * `build.extraResources` in package.json ships `src/workspaces/templates/**`, so the
- * `.mjs` bootstraps + their READMEs land in the packaged .app.
+ * `build.extraResources` in package.json ships `templates/**`, so the `.mjs`
+ * bootstraps, `files/`, and their READMEs land in the packaged .app.
  */
 export function templatesPath(): string {
-  return resolve(APP_RESOURCES_HOME, 'src', 'workspaces', 'templates')
+  return resolve(APP_RESOURCES_HOME, 'templates')
 }
 
 /**

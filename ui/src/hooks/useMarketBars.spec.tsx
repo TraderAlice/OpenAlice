@@ -19,3 +19,33 @@ it('discards a stale source response and supports explicit error retry', async (
   await waitFor(() => expect(result.current.bars?.[0].close).toBe(42))
   expect(result.current.error).toBeNull()
 })
+
+it('skips interval polling while hidden and refreshes when visible again', async () => {
+  vi.useFakeTimers()
+  const visibility = Object.getOwnPropertyDescriptor(document, 'visibilityState')
+  try {
+    bars.mockResolvedValue({ results: [{ close: 42 }], meta: { barId: 'a|A' } })
+    const { unmount } = renderHook(() => useMarketBars({ barId: 'a|A', interval: '1m', count: 60 }))
+    await act(async () => {
+      await Promise.resolve()
+    })
+    expect(bars).toHaveBeenCalledTimes(1)
+
+    Object.defineProperty(document, 'visibilityState', { configurable: true, value: 'hidden' })
+    await act(async () => {
+      vi.advanceTimersByTime(120_000)
+    })
+    expect(bars).toHaveBeenCalledTimes(1)
+
+    Object.defineProperty(document, 'visibilityState', { configurable: true, value: 'visible' })
+    await act(async () => {
+      document.dispatchEvent(new Event('visibilitychange'))
+    })
+    expect(bars).toHaveBeenCalledTimes(2)
+    unmount()
+  } finally {
+    if (visibility) Object.defineProperty(document, 'visibilityState', visibility)
+    else Object.defineProperty(document, 'visibilityState', { configurable: true, value: 'visible' })
+    vi.useRealTimers()
+  }
+})

@@ -686,7 +686,7 @@ export function PositionsSection({ positions, onCloseClick, canClose = true, clo
     <Section title={`Positions (${positions.length})`}>
       <div
         data-testid="uta-positions-mobile"
-        className="overflow-hidden rounded-lg border border-border md:hidden"
+        className="overflow-hidden rounded-lg border border-border @[42rem]/content:hidden"
       >
         {groups.map((g) => {
           const sumValue = g.positions.reduce((sum, position) => sum + Number(position.marketValue), 0)
@@ -727,7 +727,7 @@ export function PositionsSection({ positions, onCloseClick, canClose = true, clo
 
       <div
         data-testid="uta-positions-desktop"
-        className="hidden overflow-x-auto rounded-lg border border-border md:block"
+        className="hidden overflow-x-auto rounded-lg border border-border @[42rem]/content:block"
       >
         <table className="w-full text-sm tabular-nums [&_th]:whitespace-nowrap [&_td]:whitespace-nowrap">
           <thead>

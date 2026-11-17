@@ -746,7 +746,7 @@ function PropertiesRail({
   return (
     <aside
       id="issue-work-item"
-      className="mt-5 min-w-0 w-full shrink-0 scroll-mt-20 lg:sticky lg:top-8 lg:col-start-2 lg:row-start-1 lg:row-span-3 lg:mt-0 lg:self-start"
+      className="mt-5 min-w-0 w-full shrink-0 scroll-mt-20 @[52rem]/content:sticky @[52rem]/content:top-8 @[52rem]/content:col-start-2 @[52rem]/content:row-start-1 @[52rem]/content:row-span-3 @[52rem]/content:mt-0 @[52rem]/content:self-start"
     >
       <div className="min-w-0 space-y-7">
         <h3 className="sr-only">{t('issues.detail.workItem')}</h3>
@@ -1022,7 +1022,7 @@ function CommentComposer({
       />
       {error && <p className="mt-1.5 text-xs text-destructive">{error}</p>}
       <div className="mt-2 flex flex-wrap items-center justify-between gap-2 border-t border-border/60 pt-2">
-        <p className="min-w-0 flex-1 basis-full break-words text-sm leading-snug text-muted-foreground sm:basis-auto">
+        <p className="min-w-0 flex-1 basis-full break-words text-sm leading-snug text-muted-foreground @sm/content:basis-auto">
           {ownerResumeId
             ? <>{t('issues.detail.assignedSessionPrefix')} <span className="font-mono text-foreground/75">@{ownerResumeId}</span> {t('issues.detail.assignedSessionSuffix')}</>
             : assignee === '@new-then-resume'
@@ -1034,7 +1034,7 @@ function CommentComposer({
           onClick={() => void submit()}
           disabled={sending || text.trim().length === 0}
           size="sm"
-          className="min-h-10 sm:min-h-7"
+          className="min-h-10 @sm/content:min-h-7"
         >
           {sending
             ? t('issues.detail.sending')
@@ -1103,7 +1103,7 @@ function RunRow({ run, onOpen }: { run: IssueRunRecord; onOpen: (run: IssueRunRe
             : t('issues.detail.noResumableSessionTitle')}
           variant="outline"
           size="sm"
-          className="min-h-10 text-sm sm:min-h-7"
+          className="min-h-10 text-sm @sm/content:min-h-7"
         >
           {t('issues.detail.openConversation')}
         </Button>
@@ -1411,7 +1411,7 @@ export function IssueActivity({
                             type="button"
                             aria-label={t('issues.detail.showSessionDetails', { origin: originLabel })}
                             disabled={openingId !== null}
-                            className="inline-flex min-h-10 items-center rounded-sm font-medium text-foreground/80 underline decoration-border underline-offset-2 transition-[color,box-shadow] hover:text-primary focus-visible:outline-none focus-visible:[box-shadow:var(--oa-focus-shadow)] disabled:cursor-wait disabled:opacity-50 sm:min-h-0"
+                            className="inline-flex min-h-10 items-center rounded-sm font-medium text-foreground/80 underline decoration-border underline-offset-2 transition-[color,box-shadow] hover:text-primary focus-visible:outline-none focus-visible:[box-shadow:var(--oa-focus-shadow)] disabled:cursor-wait disabled:opacity-50 @sm/content:min-h-0"
                           />}
                         >
                             {originLabel}
@@ -1504,7 +1504,7 @@ function RunsSection({
           type="button"
           onClick={() => setExpanded((value) => !value)}
           variant="ghost"
-          className="mt-3 min-h-10 w-full text-xs sm:min-h-8"
+          className="mt-3 min-h-10 w-full text-xs @sm/content:min-h-8"
         >
           {expanded
             ? t('issues.detail.showRecentRuns')
@@ -1821,7 +1821,7 @@ export function IssueDetail({
 
   if (!data) {
     return (
-      <div className="mx-auto max-w-4xl px-4 py-5 md:px-6">
+      <div className="mx-auto max-w-4xl px-4 py-5 @[42rem]/content:px-6">
         {backToBoard}
         {loading ? (
           <CenteredLoading />
@@ -1869,13 +1869,13 @@ export function IssueDetail({
     })),
   ].filter((record) => Number.isFinite(record.at)).sort((a, b) => a.at - b.at)
   return (
-    <div className="mx-auto max-w-[1180px] px-5 pb-16 pt-5 sm:px-8 lg:px-12">
-      <nav aria-label={t('nav.item.issue')} className="mb-8 flex min-w-0 items-center gap-2 text-xs text-muted-foreground lg:mb-12">
+    <div className="mx-auto max-w-[1180px] px-5 pb-16 pt-5 @sm/content:px-8 @[52rem]/content:px-12">
+      <nav aria-label={t('nav.item.issue')} className="mb-8 flex min-w-0 items-center gap-2 text-xs text-muted-foreground @[52rem]/content:mb-12">
         {backToBoard}<ChevronRight size={12} aria-hidden /><span className="truncate" title={id}>{id}</span>
       </nav>
-      <main className="grid min-w-0 gap-x-12 lg:grid-cols-[minmax(0,1fr)_16rem] xl:gap-x-16 lg:items-start">
-        <header className="min-w-0 lg:col-start-1 lg:row-start-1">
-          <h1 className="text-[28px] font-semibold leading-tight tracking-tight text-foreground sm:text-[32px]">{issue.title}</h1>
+      <div className="grid min-w-0 gap-x-12 @[52rem]/content:grid-cols-[minmax(0,1fr)_16rem] @[64rem]/content:gap-x-16 @[52rem]/content:items-start">
+        <header className="min-w-0 @[52rem]/content:col-start-1 @[52rem]/content:row-start-1">
+          <h1 className="text-[28px] font-semibold leading-tight tracking-tight text-foreground @sm/content:text-[32px]">{issue.title}</h1>
         </header>
         <IssueSectionNavigation
           hasRuns={runs.length > 0}
@@ -1903,7 +1903,7 @@ export function IssueDetail({
           onRefreshSessions={refreshSessions}
           sessionsLoaded={sessionsLoaded}
         />
-        <div className="min-w-0 lg:col-start-1 lg:row-start-2">
+        <div className="min-w-0 @[52rem]/content:col-start-1 @[52rem]/content:row-start-2">
           <WhatEditor
             key={`${wsId}:${id}`}
             value={issue.what}
@@ -1919,7 +1919,7 @@ export function IssueDetail({
             onPosted={mutate}
           />
         </div>
-        <div className="min-w-0 lg:col-start-1 lg:row-start-3">
+        <div className="min-w-0 @[52rem]/content:col-start-1 @[52rem]/content:row-start-3">
           <RunsSection
             runs={runs}
             onOpen={(run) => {
@@ -1931,7 +1931,7 @@ export function IssueDetail({
           />
           <InboxReportsSection reports={inboxReports} onOpen={gotoInbox} />
         </div>
-      </main>
+      </div>
       {picker && (
         <WikilinkPicker
           resolution={picker}

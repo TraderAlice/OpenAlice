@@ -8,6 +8,7 @@ import { formatRelativeTime } from '../lib/intl'
 import { ContextHelp } from './ContextHelp'
 import { CountBadge } from './CountBadge'
 import { Button } from './ui/button'
+import { isImeComposing } from './form'
 import { MarkdownContent } from './MarkdownContent'
 import { hasTurnProgress, TurnProgress } from './TurnProgress'
 
@@ -59,7 +60,7 @@ export function InboxReplyThread({
           placeholder={t('inbox.replyPlaceholder')}
           onChange={(event) => thread.setPrompt(event.target.value)}
           onKeyDown={(event) => {
-            if (event.key === 'Enter' && !event.shiftKey && !event.nativeEvent.isComposing) {
+            if (event.key === 'Enter' && !event.shiftKey && !isImeComposing(event)) {
               event.preventDefault()
               void thread.submit()
             }

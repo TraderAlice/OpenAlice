@@ -1,0 +1,4 @@
+interface:
+  display_name: "Market OHLCV Router"
+  short_description: "Acquire OHLCV via Alice market bars or venue fetchers and ingest into AutoQuant."
+  default_prompt: "Use $acquire-market-ohlcv to obtain clean historical OHLCV bars and ingest them into this AutoQuant Project."

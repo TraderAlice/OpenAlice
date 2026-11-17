@@ -2,6 +2,7 @@ import { useEffect, useId, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { type BarSourceCandidate, type AssetClass } from '../../api/market'
+import { isImeComposing } from '../form'
 import { useAssetSearch } from './useAssetSearch'
 import { inputClass } from '../form'
 
@@ -64,6 +65,7 @@ export function SearchBox() {
       e.preventDefault()
       setHighlight((h) => Math.max(h - 1, 0))
     } else if (e.key === 'Enter') {
+      if (isImeComposing(e)) return
       e.preventDefault()
       handleSelect(results[highlight])
     }

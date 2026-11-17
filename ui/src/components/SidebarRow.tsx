@@ -40,7 +40,13 @@ export function SidebarRow({
   ariaExpanded,
   ariaControls,
 }: SidebarRowProps) {
-  const row = (
+  const baseClassName = `oa-nav-row group relative mx-2 flex min-h-(--oa-nav-height) cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-sm leading-5 outline-none ${
+    active
+      ? 'bg-sidebar-accent text-sidebar-accent-foreground'
+      : 'text-sidebar-foreground hover:bg-sidebar-accent/60'
+  } ${dim ? 'opacity-60' : ''}`
+
+  const row = trail ? (
     <div
       role="button"
       tabIndex={0}
@@ -49,21 +55,38 @@ export function SidebarRow({
       aria-controls={ariaControls}
       onClick={onClick}
       onKeyDown={(e) => {
-        if (e.target === e.currentTarget && (e.key === 'Enter' || e.key === ' ')) {
+        if (e.target !== e.currentTarget) return
+        if (e.key === 'Enter') {
+          e.preventDefault()
+          onClick()
+        } else if (e.key === ' ') {
+          e.preventDefault()
+        }
+      }}
+      onKeyUp={(e) => {
+        if (e.target === e.currentTarget && e.key === ' ') {
           e.preventDefault()
           onClick()
         }
       }}
-      className={`oa-nav-row group relative mx-2 flex min-h-(--oa-nav-height) cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-sm leading-5 outline-none ${
-        active
-          ? 'bg-sidebar-accent text-sidebar-accent-foreground'
-          : 'text-sidebar-foreground hover:bg-sidebar-accent/60'
-      } ${dim ? 'opacity-60' : ''}`}
+      className={baseClassName}
     >
       {icon && <span className="oa-navigation-icon">{icon}</span>}
       <span className="truncate flex-1">{label}</span>
-      {trail && <div className="shrink-0 flex items-center gap-0.5">{trail}</div>}
+      <div className="shrink-0 flex items-center gap-0.5">{trail}</div>
     </div>
+  ) : (
+    <button
+      type="button"
+      aria-current={active ? 'page' : undefined}
+      aria-expanded={ariaExpanded}
+      aria-controls={ariaControls}
+      onClick={onClick}
+      className={`${baseClassName} w-[calc(100%-1rem)] text-left`}
+    >
+      {icon && <span className="oa-navigation-icon">{icon}</span>}
+      <span className="truncate flex-1">{label}</span>
+    </button>
   )
   if (!title) return row
   return (

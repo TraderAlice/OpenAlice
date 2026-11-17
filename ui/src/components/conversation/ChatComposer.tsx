@@ -3,6 +3,7 @@ import { ArrowUp, LoaderCircle, Square } from 'lucide-react'
 import { Textarea } from '../ui/textarea'
 import './conversation.css'
 import { Button } from '../ui/button'
+import { isImeComposing } from '../form'
 import { ComposerShell } from './ComposerShell'
 
 export interface ChatComposerProps {
@@ -30,7 +31,7 @@ export function ChatComposer({ value, onChange, onSubmit, placeholder, disabled,
       autoFocus={autoFocus} disabled={disabled} onChange={event => onChange(event.target.value)}
       className="conversation-input"
       onKeyDown={event => {
-        if (event.key === 'Enter' && !event.shiftKey && !event.nativeEvent.isComposing) {
+        if (event.key === 'Enter' && !event.shiftKey && !isImeComposing(event)) {
           event.preventDefault()
           if (canSend && !pending && !busy) onSubmit()
         }
