@@ -46,6 +46,7 @@
 }
 
 :root {
+  color-scheme: light dark;
   --radius: 0.625rem;
   /* Shared night surfaces used by the homepage and product documentation. */
   --oa-night-canvas: #000;
@@ -302,6 +303,7 @@ html[data-palette="blush"] {
 }
 
 .dark {
+  color-scheme: dark;
   /* Alice Cream palette - Dark Mode */
   --background: #1A1A1A; /* Dark Canvas */
   --foreground: #E9D7B7; /* Night Gold */

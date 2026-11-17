@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono, Instrument_Serif } from "next/font/google";
 import { Analytics } from "@vercel/analytics/react";
 import { SpeedInsights } from "@vercel/speed-insights/next";
@@ -22,6 +22,10 @@ const instrumentSerif = Instrument_Serif({
   subsets: ["latin"],
   weight: "400",
 });
+
+export const viewport: Viewport = {
+  colorScheme: "dark light",
+};
 
 export const metadata: Metadata = {
   title: HOME_TITLE,
@@ -56,9 +60,13 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   const isVercel = process.env.VERCEL === "1";
+  const mediaOrigin = new URL(process.env.NEXT_PUBLIC_MEDIA_BASE_URL || "https://download.openalice.ai").origin;
 
   return (
     <html lang="en">
+      <head>
+        <link rel="preconnect" href={mediaOrigin} crossOrigin="anonymous" />
+      </head>
       <body
         className={`${geistSans.variable} ${geistMono.variable} ${instrumentSerif.variable} antialiased`}
       >
