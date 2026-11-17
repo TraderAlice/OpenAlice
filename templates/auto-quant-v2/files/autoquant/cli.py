@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 from collections.abc import Sequence
+import importlib
 import inspect
 import json
 import sys
@@ -323,7 +324,7 @@ def _cmd_studio_snapshot(args: argparse.Namespace) -> int:
 
 
 def _cmd_studio_serve(args: argparse.Namespace) -> int:
-    from . import studio as studio_mod
+    studio_mod = importlib.import_module(f"{__package__}.studio")
 
     serve_fn = studio_mod.serve_studio
     params = inspect.signature(serve_fn).parameters
