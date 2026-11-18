@@ -19,7 +19,10 @@ const ALIAS_DICT: Record<string, string> = {
 }
 
 export const FMPIndexConstituentsQueryParamsSchema = IndexConstituentsQueryParamsSchema.extend({
-  symbol: z.enum(['dowjones', 'sp500', 'nasdaq']).default('dowjones').describe('Index symbol.'),
+  symbol: z.string().trim().toLowerCase()
+    .transform((value) => value === '^gspc' ? 'sp500' : value === '^dji' ? 'dowjones' : value)
+    .pipe(z.enum(['dowjones', 'sp500', 'nasdaq']))
+    .default('dowjones').describe('FMP index name, or ^GSPC / ^DJI.'),
   historical: z.boolean().default(false).describe('Flag to retrieve historical removals and additions.'),
 })
 export type FMPIndexConstituentsQueryParams = z.infer<typeof FMPIndexConstituentsQueryParamsSchema>
