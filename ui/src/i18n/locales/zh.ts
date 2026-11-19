@@ -416,6 +416,25 @@ export const zh: Resources = {
       failed: '失败',
       blocked: '受阻',
     },
+    skipState: {
+      coolingDown: '冷却中',
+      backingOff: '退避重试',
+      paused: '已暂停',
+      retryingAt: '{{time}}重试',
+      retryingSoon: '下次检查时重试',
+      sinceRelative: '始于 {{time}}',
+      ariaLabel: '{{status}} — {{reason}}',
+      hintSessionBlocked:
+        '当前 Session 处于受阻状态，自动计划已暂停。解除 Session 阻止、重新分配议题或手动运行一次后即可恢复。',
+      hintSessionUnavailable:
+        '自动计划已暂停。请将此议题重新分配给活跃的 Session 或“新建 Session”以恢复调度。',
+      hintRuntimeUnavailable:
+        '自动计划已暂停。请选择支持后台执行的 Agent 运行时以恢复调度。',
+      hintWorkspaceUnavailable:
+        '自动计划已暂停。请恢复工作区，或更新议题负责人与运行时设置。',
+      hintParkedDefault:
+        '自动计划已暂停，解决此阻碍或手动运行成功后将自动恢复。',
+    },
     detail: {
       workItem: '工作项',
       updateFailed: '未能保存更改，请重试。',

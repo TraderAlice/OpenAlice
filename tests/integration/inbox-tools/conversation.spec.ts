@@ -476,6 +476,25 @@ describe('conversation creation and selection', () => {
     await run(conversationAskFactory.build(context({ conversation: { ask, read: vi.fn() } as never })), { resumeId: 'r', prompt: 'continue', effort: 'high' })
     expect(ask).toHaveBeenCalledWith(expect.objectContaining({ selection: { reasoningEffort: 'high' }, target: { kind: 'resume', resumeId: 'r' } }))
   })
+
+  it('documents runtime override flags including --model default on conversation_create', () => {
+    const tool = conversationCreateFactory.build(context({ conversation: { ask: vi.fn(), read: vi.fn() } as never }))
+    expect(tool.description).toContain('--agent')
+    expect(tool.description).toContain('--model')
+    expect(tool.description).toContain('--model default')
+    expect(tool.description).toContain('--credential')
+    expect(tool.description).toContain('--credential-source')
+  })
+
+  it('forwards --model default so workspace runtime resolution can clear a persisted model', async () => {
+    const ask = vi.fn(async () => ({ status: 'dispatched', taskId: 't', resumeId: 'r', workspaceId: 'w', workspace: 'w', agent: 'codex', resolution: { mode: 'reconstructed' } }))
+    const tool = conversationCreateFactory.build(context({ conversation: { ask, read: vi.fn() } as never }))
+    await run(tool, { harness: 'autoquant', prompt: 'work', model: 'default' })
+    expect(ask).toHaveBeenCalledWith(expect.objectContaining({
+      target: { kind: 'harness', harness: 'autoquant' },
+      selection: { model: 'default' },
+    }))
+  })
 })
 
 

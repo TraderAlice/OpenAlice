@@ -1,4 +1,5 @@
 import { createMarketBarsTools } from '../../../src/tool/market-bars.js'
+import { createNetworkCheckTools } from '../../../src/tool/network-check.js'
 import { describe, it, expect } from 'vitest'
 import { ToolCenter } from '../../../src/core/tool-center.js'
 import { WorkspaceToolCenter } from '../../../src/core/workspace-tool-center.js'
@@ -31,6 +32,7 @@ import { sessionSignatureFactory } from '../../../src/tool/session-signature.js'
 import { sessionRenameFactory } from '../../../src/tool/session-rename.js'
 import { sessionToolFactories } from '../../../src/tool/session-tools.js'
 import { headlessToolFactories } from '../../../src/tool/headless-tools.js'
+import { workspaceRuntimeToolFactories } from '../../../src/tool/workspace-runtime-tools.js'
 import { provenanceShowFactory } from '../../../src/tool/provenance-show.js'
 import { conversationToolFactories } from '../../../src/tool/conversation.js'
 import { artifactConversationToolFactories } from '../../../src/tool/conversation-artifacts.js'
@@ -56,6 +58,7 @@ describe('CLI_EXPORTS — data export (global tools)', () => {
   tc.register(createSnapshotTools(any), 'snapshot')
   tc.register(createSimulateTools(any), 'simulate')
   tc.register(createEconomyTools(any, any), 'economy')
+  tc.register(createNetworkCheckTools(), 'network')
 
   it('every mapped verb resolves to a registered global tool', () => {
     for (const name of mappedToolNames('data')) {
@@ -125,6 +128,7 @@ describe('CLI_EXPORTS — workspace export (scoped collaboration tools)', () => 
   for (const f of artifactConversationToolFactories) wtc.register(f)
   for (const f of sessionToolFactories) wtc.register(f)
   for (const f of headlessToolFactories) wtc.register(f)
+  for (const f of workspaceRuntimeToolFactories) wtc.register(f)
   const built = wtc.build({
     workspaceId: 'ws-test',
     workspaceLabel: 'test',

@@ -636,6 +636,41 @@ describe('Codex question answers', () => {
     await host.stopAll()
   })
 
+  it('drops stale native gpt-5.6-sol from thread/start while preserving it for vault provider launches', async () => {
+    const warn = vi.spyOn(logger, 'warn')
+    const nativeProc = codexProcess()
+    const nativeHost = new WebSessionHost(logger, {}, () => nativeProc as never)
+    await nativeHost.start(input({
+      agent: 'codex',
+      wire: 'codex-app-server',
+      command: ['codex', 'app-server'],
+      model: 'gpt-5.6-sol',
+    }))
+    const nativeStartParams = nativeProc.received.find((c) => c['method'] === 'thread/start')?.['params'] as Record<string, unknown>
+    expect(nativeStartParams).not.toHaveProperty('model')
+    expect(warn).toHaveBeenCalledWith(
+      'codex.native_unavailable_model_dropped',
+      expect.objectContaining({ model: 'gpt-5.6-sol', surface: 'web' }),
+    )
+    await nativeHost.stopAll()
+
+    warn.mockClear()
+    const vaultProc = codexProcess()
+    const vaultHost = new WebSessionHost(logger, {}, () => vaultProc as never)
+    await vaultHost.start(input({
+      agent: 'codex',
+      wire: 'codex-app-server',
+      command: ['codex', '-c', 'model_provider="openalice_session"', 'app-server'],
+      env: { OPENALICE_SESSION_KEY: 'sk-test' },
+      model: 'gpt-5.6-sol',
+    }))
+    const vaultStartParams = vaultProc.received.find((c) => c['method'] === 'thread/start')?.['params'] as Record<string, unknown>
+    expect(vaultStartParams['model']).toBe('gpt-5.6-sol')
+    expect(warn).not.toHaveBeenCalled()
+    await vaultHost.stopAll()
+    warn.mockRestore()
+  })
+
   it('rejects text answers to permission requests without consuming the request', async () => {
     const process = codexProcess({ permissions: true })
     const host = new WebSessionHost(logger, {}, () => process as never)

@@ -26,4 +26,11 @@ describe('BrokerError.from', () => {
 
     expect(BrokerError.from(invalid).code).toBe('UNKNOWN')
   })
+
+  it('classifies Bun network errors and timeouts as NETWORK', () => {
+    expect(BrokerError.from(new Error('Unable to connect. Is the computer able to access the url?')).code).toBe('NETWORK')
+    expect(BrokerError.from(Object.assign(new Error('socket failed'), { code: 'ConnectionRefused' })).code).toBe('NETWORK')
+    expect(BrokerError.from(Object.assign(new Error('socket failed'), { code: 'FailedToOpenSocket' })).code).toBe('NETWORK')
+    expect(BrokerError.from(new Error('UTA GET http://127.0.0.1:47333/api/accounts timed out after 15000ms')).code).toBe('NETWORK')
+  })
 })

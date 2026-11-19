@@ -86,6 +86,7 @@ import {
 import { ScheduleMarkerStore } from './schedule/marker-store.js';
 import {
   ScheduleScanner,
+  ScheduleDispatchError,
   ScheduledIssueRunNowError,
   DEFAULT_INTERVAL_MS,
 } from './schedule/scanner.js';
@@ -218,6 +219,7 @@ const MAX_CONCURRENT_HEADLESS = 8;
 
 /** Thrown by `dispatchHeadlessTask` when the concurrency cap is hit (→ HTTP 429). */
 export class HeadlessCapacityError extends Error {
+  readonly code = 'headless_capacity' as const;
   constructor(public readonly limit: number) {
     super(`headless capacity reached (${limit} tasks running)`);
     this.name = 'HeadlessCapacityError';
@@ -238,6 +240,7 @@ export class IssueRetryError extends Error {
   constructor(
     public readonly code:
       | 'not_found'
+      | 'invalid'
       | 'not_scheduled'
       | 'not_fireable'
       | 'not_retryable'
@@ -1155,7 +1158,7 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
   const resolveDefaultAgentId = async (wsMeta: WorkspaceMeta): Promise<string | undefined> => {
     const settings = await readWorkspaceRuntimeSettings(wsMeta.dir);
     if (!settings.ok && settings.reason === 'invalid') {
-      throw new Error(`invalid Workspace runtime settings: ${settings.error}`);
+      throw new ScheduleDispatchError('invalid_runtime_settings', `invalid Workspace runtime settings: ${settings.error}`);
     }
     const workspaceDefault = validRegisteredRuntime(settings.ok
       ? resolveWorkspaceRuntimeAgent(settings.settings, 'interactive') ?? null
@@ -1173,7 +1176,7 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
   const resolveHeadlessDefaultAgentId = async (wsMeta: WorkspaceMeta): Promise<string | undefined> => {
     const runtimeSettings = await readWorkspaceRuntimeSettings(wsMeta.dir);
     if (!runtimeSettings.ok && runtimeSettings.reason === 'invalid') {
-      throw new Error(`invalid Workspace runtime settings: ${runtimeSettings.error}`);
+      throw new ScheduleDispatchError('invalid_runtime_settings', `invalid Workspace runtime settings: ${runtimeSettings.error}`);
     }
     return validRegisteredRuntime(runtimeSettings.ok
         ? resolveWorkspaceRuntimeAgent(runtimeSettings.settings, 'headless') ?? null
@@ -1913,10 +1916,10 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
   ): Promise<{ taskId: string; resumeId: string }> => {
     origin = validateExecutionOrigin(origin);
     if (catalog.get(ws.id)?.lifecycle !== 'active') {
-      throw new Error(`workspace is not active: ${ws.id}`);
+      throw new ScheduleDispatchError('workspace_not_active', `workspace is not active: ${ws.id}`);
     }
     if (!adapter.capabilities.headless || !adapter.composeHeadlessCommand) {
-      throw new Error(`adapter "${adapter.id}" has no headless mode`);
+      throw new ScheduleDispatchError('adapter_no_headless', `adapter "${adapter.id}" has no headless mode`);
     }
     if (headlessTasks.runningCount() >= MAX_CONCURRENT_HEADLESS) {
       throw new HeadlessCapacityError(MAX_CONCURRENT_HEADLESS);
@@ -1980,7 +1983,7 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
     } else {
       const read = await readWorkspaceRuntimeSettings(ws.dir);
       if (!read.ok && read.reason === 'invalid') {
-        throw new Error(`invalid Workspace runtime settings: ${read.error}`);
+        throw new ScheduleDispatchError('invalid_runtime_settings', `invalid Workspace runtime settings: ${read.error}`);
       }
       sessionRuntime = await createSessionRuntimeBinding({
         adapter,
@@ -2012,7 +2015,7 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
       const identity = productSession.identity;
       occupancySessionId = productSession.session.id;
       if (catalog.get(ws.id)?.lifecycle !== 'active') {
-        throw new Error(`workspace stopped accepting work during dispatch: ${ws.id}`);
+        throw new ScheduleDispatchError('workspace_not_active', `workspace stopped accepting work during dispatch: ${ws.id}`);
       }
       let occupancyCauseSeq: number | undefined;
       if (productSession.created) {
@@ -2392,7 +2395,7 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
   };
 
   const dispatchHeadlessTaskAdmission: WorkspaceService['executions']['dispatch'] = async (...args) => {
-    if (shuttingDown) throw new Error('Workspace service is shutting down');
+    if (shuttingDown) throw new ScheduleDispatchError('service_shutting_down', 'Workspace service is shutting down');
     const [ws, , , origin, , trigger, resumeId, inquiry] = args;
     let release = () => {};
     if (resumeId) {
@@ -2404,7 +2407,9 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
         if (!identity || identity.wsId !== ws.id || identity.agent !== args[1].id || identity.lifecycle === 'retired' || sessionPresence(identity) === 'deleted') {
           throw new HeadlessResumeError('not_ready', 'Session is not eligible for background takeover');
         }
-        if (!args[1].capabilities.headless || !args[1].composeHeadlessCommand) throw new Error('Runtime does not support background execution');
+        if (!args[1].capabilities.headless || !args[1].composeHeadlessCommand) {
+          throw new ScheduleDispatchError('adapter_no_headless', 'Runtime does not support background execution');
+        }
         // Without a captured native session id there is no interactive child to
         // take over: the impl spawns fresh for this resumeId and captures the id.
         if (identity.agentSessionId) {
@@ -2449,6 +2454,7 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
       return latest?.taskId === runId && (latest.status === 'failed' || latest.status === 'interrupted');
     },
     isIssueRunning: (workspaceId, issueId) => headlessTasks.list({ issue: { workspaceId, issueId } }).some((run) => run.status === 'running'),
+    isSessionBlocked: (resumeId, nowMs) => executionManager.admission.blocks(resumeId, nowMs).length > 0,
     registry,
     resolveResumeWorkspace: (resumeId) => {
       const identity = resumeRegistry.get(resumeId);
@@ -2459,10 +2465,10 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
     resolveAdapter: async (ws, agentId, resumeId) => {
       if (resumeId) {
         const identity = resumeRegistry.get(resumeId);
-        if (!identity) throw new Error(`unknown resume conversation: ${resumeId}`);
-        if (identity.lifecycle === 'retired') throw new Error(`retired resume conversation: ${resumeId}`);
-        if (sessionPresence(identity) === 'deleted') throw new Error(`deleted resume conversation: ${resumeId}`);
-        if (identity.wsId !== ws.id) throw new Error(`resume conversation workspace resolution drifted`);
+        if (!identity) throw new HeadlessResumeError('not_found', `unknown resume conversation: ${resumeId}`);
+        if (identity.lifecycle === 'retired') throw new HeadlessResumeError('retired', `retired resume conversation: ${resumeId}`);
+        if (sessionPresence(identity) === 'deleted') throw new HeadlessResumeError('deleted', `deleted resume conversation: ${resumeId}`);
+        if (identity.wsId !== ws.id) throw new HeadlessResumeError('wrong_workspace', 'resume conversation workspace resolution drifted');
         return resolveAdapter(ws, identity.agent);
       }
       if (agentId) return resolveAdapter(ws, agentId);
@@ -2763,10 +2769,20 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
     const ws = registry.get(wsId);
     if (!ws) throw new IssueRetryError('not_found', 'Workspace not found.');
     const issueResult = await readWorkspaceIssues(ws.dir);
-    const issue = issueResult.ok
-      ? issueResult.issues.find((candidate) => candidate.id === id)
-      : undefined;
-    if (!issue) throw new IssueRetryError('not_found', 'Issue not found.');
+    if (!issueResult.ok) {
+      if (issueResult.reason === 'invalid') {
+        throw new IssueRetryError('invalid', `Issue declaration is invalid: ${issueResult.error}`);
+      }
+      throw new IssueRetryError('not_found', 'Issue not found.');
+    }
+    const issue = issueResult.issues.find((candidate) => candidate.id === id);
+    if (!issue) {
+      const invalid = issueResult.invalid.find((candidate) => candidate.id === id);
+      if (invalid) {
+        throw new IssueRetryError('invalid', `Issue "${id}" is invalid: ${invalid.error}`);
+      }
+      throw new IssueRetryError('not_found', 'Issue not found.');
+    }
     if (!issue.when) {
       throw new IssueRetryError('not_scheduled', 'Only scheduled Issues can be run now.');
     }

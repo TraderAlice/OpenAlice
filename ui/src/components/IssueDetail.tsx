@@ -43,8 +43,10 @@ import {
   usePinnedRuntimeDraft,
 } from '../hooks/usePinnedRuntimeDraft'
 import { useIssueDetail } from '../hooks/useIssueDetail'
+import { resolveScheduleSkipState, useScheduleSnapshot } from '../hooks/useSchedules'
 import { useWorkspaceSessionDirectory } from '../hooks/useWorkspaceSessionDirectory'
 import { useWorkspaces } from '../contexts/workspaces-context'
+import type { ScheduleSkipState } from '../api/schedule'
 import { formatRelativeTime } from '../lib/intl'
 import { useInboxRead } from '../live/inbox-read'
 import { useInboxSelection } from '../live/inbox-selection'
@@ -56,6 +58,7 @@ import { ContextHelp } from './ContextHelp'
 import { IssueScheduleEditor } from './IssueScheduleEditor'
 import { CadenceSummary, PropertyMenu } from './IssuesBoard'
 import { IssueSectionNavigation } from './IssueSectionNavigation'
+import { formatScheduleNextRunLabel, ScheduleSkipStateNotice } from './ScheduleSkipState'
 import { STATUS_META } from './issue-status-meta'
 import { MarkdownContent } from './MarkdownContent'
 import { hasTurnProgress, TurnProgress } from './TurnProgress'
@@ -601,6 +604,7 @@ function CommentBehaviorEditor({
 function PropertiesRail({
   wsId,
   issue,
+  skipState,
   agents,
   issueDefaultAgent,
   defaultAgent,
@@ -622,6 +626,7 @@ function PropertiesRail({
 }: {
   wsId: string
   issue: IssueDetailIssue
+  skipState?: ScheduleSkipState
   agents: readonly AgentInfo[]
   issueDefaultAgent: string | null
   defaultAgent: string | null
@@ -641,7 +646,7 @@ function PropertiesRail({
   onRefreshSessions: () => Promise<void>
   sessionsLoaded: boolean
 }) {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
   const { openHeadlessRun } = useWorkspaces()
   const openAccounts = useWorkspace((state) => state.openOrFocus)
   const [confirmAction, setConfirmAction] = useState<'run' | 'retry' | null>(null)
@@ -874,10 +879,11 @@ function PropertiesRail({
                 <Clock size={13} aria-hidden />
                 {t('issues.detail.nextRun')}
               </span>
-              <span className="tabular-nums text-foreground">
-                {issue.nextDueAtMs ? formatRelativeTime(issue.nextDueAtMs) : '—'}
+              <span className={`tabular-nums ${skipState?.kind === 'parked' ? 'text-muted-foreground' : 'text-foreground'}`}>
+                {formatScheduleNextRunLabel(issue.nextDueAtMs, skipState, t, i18n.language)}
               </span>
             </div>
+            {skipState && <ScheduleSkipStateNotice skipState={skipState} />}
 
             <div className="mt-3 flex flex-wrap items-center gap-2">
               {issue.lastFiredAtMs && (
@@ -1646,6 +1652,9 @@ export function IssueDetail({
 }: IssueDetailProps) {
   const { t } = useTranslation()
   const { data, error, loading, mutate } = useIssueDetail(wsId, id)
+  const { snapshot: scheduleSnapshot, refresh: refreshSchedule } = useScheduleSnapshot({
+    enabled: Boolean(data?.issue.when),
+  })
   const { agents, defaultAgent, issueDefaultAgent, workspaces, openAgentConfig, openHeadlessRun } = useWorkspaces()
   const openOrFocus = useWorkspace((s) => s.openOrFocus)
   const setSidebar = useWorkspace((s) => s.setSidebar)
@@ -1758,6 +1767,7 @@ export function IssueDetail({
       try {
         const next = await issuesApi.update(wsId, id, patch)
         mutate(next)
+        if (next.issue.when || patch.when !== undefined) void refreshSchedule()
         return true
       } catch (e) {
         // Property controls keep the last accepted server value on failure.
@@ -1767,7 +1777,7 @@ export function IssueDetail({
         setSaving(false)
       }
     },
-    [wsId, id, mutate],
+    [wsId, id, mutate, refreshSchedule],
   )
 
   const onRetry = useCallback(async () => {
@@ -1776,12 +1786,13 @@ export function IssueDetail({
     setActionError(null)
     try {
       mutate(await issuesApi.retry(wsId, id))
+      void refreshSchedule()
     } catch (e) {
       setActionError(e instanceof Error ? e.message : String(e))
     } finally {
       setRetrying(false)
     }
-  }, [retrying, wsId, id, mutate])
+  }, [retrying, wsId, id, mutate, refreshSchedule])
 
   const onRunNow = useCallback(async () => {
     if (retrying) return
@@ -1789,12 +1800,13 @@ export function IssueDetail({
     setActionError(null)
     try {
       mutate(await issuesApi.runNow(wsId, id))
+      void refreshSchedule()
     } catch (e) {
       setActionError(e instanceof Error ? e.message : String(e))
     } finally {
       setRetrying(false)
     }
-  }, [retrying, wsId, id, mutate])
+  }, [retrying, wsId, id, mutate, refreshSchedule])
 
   const backToBoard = (
     <Button
@@ -1841,6 +1853,9 @@ export function IssueDetail({
   }
 
   const { issue, runs } = data
+  const activeSkipState = issue.when && issue.status !== 'done' && issue.status !== 'canceled'
+    ? resolveScheduleSkipState(scheduleSnapshot, wsId, id, issue.skipState)
+    : undefined
   const latestRun = runs[0]
   const canRetry = Boolean(
     issue.when
@@ -1884,6 +1899,7 @@ export function IssueDetail({
         <PropertiesRail
           wsId={wsId}
           issue={issue}
+          skipState={activeSkipState}
           agents={agentOptions}
           issueDefaultAgent={workspaceIssueDefaultAgent}
           defaultAgent={workspaceLegacyDefaultAgent}

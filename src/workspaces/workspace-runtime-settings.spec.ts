@@ -103,6 +103,40 @@ describe('Workspace runtime settings', () => {
     })).toEqual({ credentialSource: 'native' })
   })
 
+  it('bypasses a persisted desk or recent model when explicit model is "default" (case-insensitive)', () => {
+    const settings = emptyWorkspaceRuntimeSettings()
+    settings.runtime.headless.agents.codex = {
+      accessMode: 'native',
+      model: 'gpt-5.6-sol',
+      reasoningEffort: 'high',
+    }
+    settings.runtime.headless.recent.agents.pi = {
+      accessMode: 'vault',
+      credentialSlug: 'deepseek-1',
+      model: 'deepseek-reasoner',
+      reasoningEffort: 'medium',
+    }
+
+    expect(resolveWorkspaceRuntimeSelection(settings, 'headless', 'codex', {
+      model: 'default',
+    })).toEqual({
+      credentialSource: 'native',
+      reasoningEffort: 'high',
+    })
+    expect(resolveWorkspaceRuntimeSelection(settings, 'headless', 'codex', {
+      model: ' DEFAULT ',
+    })).toEqual({
+      credentialSource: 'native',
+      reasoningEffort: 'high',
+    })
+    expect(resolveWorkspaceRuntimeSelection(settings, 'headless', 'pi', {
+      model: 'Default',
+    })).toEqual({
+      credentialSlug: 'deepseek-1',
+      reasoningEffort: 'medium',
+    })
+  })
+
   it('resolves fixed scenario runtime before the recent runtime', () => {
     const settings = emptyWorkspaceRuntimeSettings()
     settings.runtime.headless.defaultAgent = 'codex'

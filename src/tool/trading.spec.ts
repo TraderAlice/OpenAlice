@@ -163,8 +163,8 @@ describe('trading tools — partial tolerance (#390)', () => {
   })
 })
 
-describe('inline trading commits', () => {
-  it('returns the resolved account id beside the UTA commit hash', async () => {
+describe('inline trading commits and staged clarity', () => {
+  function stageFixture() {
     const uta = {
       id: 'alpaca-paper',
       stagePlaceOrder: async () => ({
@@ -172,10 +172,62 @@ describe('inline trading commits', () => {
         index: 0,
         operation: { action: 'placeOrder', contract: { symbol: 'AAPL' }, order: { action: 'BUY' } },
       }),
+      stageModifyOrder: async () => ({
+        staged: true,
+        index: 0,
+        operation: { action: 'modifyOrder', orderId: '1', changes: { lmtPrice: '150' } },
+      }),
+      stageClosePosition: async () => ({
+        staged: true,
+        index: 0,
+        operation: { action: 'closePosition', contract: { symbol: 'AAPL' } },
+      }),
+      stageCancelOrder: async () => ({
+        staged: true,
+        index: 0,
+        operation: { action: 'cancelOrder', orderId: '1' },
+      }),
+      status: async () => ({
+        staged: [{ action: 'placeOrder', contract: { symbol: 'AAPL' }, order: { action: 'BUY' } }],
+      }),
       commit: async (message: string) => ({ hash: 'commit-1', message }),
     }
-    const tools = createTradingTools({ resolveOne: async () => uta } as never)
-    const result = await run(tools.placeOrder, {
+    return {
+      uta,
+      manager: {
+        resolveOne: async () => uta,
+        resolve: async () => [uta],
+      } as never,
+    }
+  }
+
+  it('marks staged-only mutations as executed: false with commit + push nextStep', async () => {
+    const { manager } = stageFixture()
+    const tools = createTradingTools(manager, () => false)
+    const expectedNext = 'Staged only (not sent to broker) — run `alice-uta git commit --message "<thesis>"` then `alice-uta git push` to execute (or pass `--commit-message` when staging).'
+
+    for (const [toolName, args] of [
+      ['placeOrder', { aliceId: 'alpaca-paper|AAPL', action: 'BUY', orderType: 'MKT', totalQuantity: '1', tif: 'DAY' }],
+      ['modifyOrder', { source: 'alpaca-paper', orderId: '1', lmtPrice: '150' }],
+      ['closePosition', { aliceId: 'alpaca-paper|AAPL' }],
+      ['cancelOrder', { source: 'alpaca-paper', orderId: '1' }],
+    ] as const) {
+      const result = await run(tools[toolName], args) as Record<string, unknown>
+      expect(result).toMatchObject({
+        source: 'alpaca-paper',
+        staged: true,
+        executed: false,
+        nextStep: expectedNext,
+      })
+    }
+  })
+
+  it('returns executed: false and allowAiTrading-aware nextStep on inline commit', async () => {
+    const { manager } = stageFixture()
+    let aiTrading = false
+    const tools = createTradingTools(manager, () => aiTrading)
+
+    const whenDisabled = await run(tools.placeOrder, {
       aliceId: 'alpaca-paper|AAPL',
       action: 'BUY',
       orderType: 'MKT',
@@ -183,10 +235,52 @@ describe('inline trading commits', () => {
       tif: 'DAY',
       commitMessage: 'Entry thesis',
     }) as Record<string, unknown>
-
-    expect(result).toMatchObject({
+    expect(whenDisabled).toMatchObject({
       source: 'alpaca-paper',
       committed: { hash: 'commit-1', message: 'Entry thesis' },
+      executed: false,
+      nextStep: 'Staged and committed (not sent to broker yet) — run `alice-uta git push` or ask the user to approve in the Web UI (Trading as Git) to execute.',
+    })
+
+    aiTrading = true
+    const whenEnabled = await run(tools.placeOrder, {
+      aliceId: 'alpaca-paper|AAPL',
+      action: 'BUY',
+      orderType: 'MKT',
+      totalQuantity: '1',
+      tif: 'DAY',
+      commitMessage: 'Entry thesis',
+    }) as Record<string, unknown>
+    expect(whenEnabled).toMatchObject({
+      source: 'alpaca-paper',
+      committed: { hash: 'commit-1', message: 'Entry thesis' },
+      executed: false,
+      nextStep: 'Staged and committed (not sent to broker yet) — run `alice-uta git push` to execute.',
+    })
+  })
+
+  it('returns executed: false and matching nextStep from tradingCommit', async () => {
+    const { manager } = stageFixture()
+    let aiTrading = false
+    const tools = createTradingTools(manager, () => aiTrading)
+
+    const disabledRes = await run(tools.tradingCommit, { message: 'Thesis' }) as Record<string, unknown>
+    expect(disabledRes).toMatchObject({
+      source: 'alpaca-paper',
+      hash: 'commit-1',
+      message: 'Thesis',
+      executed: false,
+      nextStep: 'Committed (not sent to broker yet) — run `alice-uta git push` or ask the user to approve in the Web UI (Trading as Git) to execute.',
+    })
+
+    aiTrading = true
+    const enabledRes = await run(tools.tradingCommit, { message: 'Thesis' }) as Record<string, unknown>
+    expect(enabledRes).toMatchObject({
+      source: 'alpaca-paper',
+      hash: 'commit-1',
+      message: 'Thesis',
+      executed: false,
+      nextStep: 'Committed (not sent to broker yet) — run `alice-uta git push` to execute.',
     })
   })
 })

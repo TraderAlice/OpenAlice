@@ -164,10 +164,11 @@ export function createTradingProxyRoutes(opts: {
       } as RequestInit)
     } catch (err) {
       clearTimeout(connectTimer)
-      const msg = err instanceof Error ? err.message : String(err)
+      const host = safeHost(base)
+      const detail = formatProxyNetworkError(err, host, controller.signal.aborted)
       return c.json({
         error: 'UTA unavailable',
-        detail: msg,
+        detail,
         hint: 'Trading service is not reachable. Alice is running in lite mode.',
       }, 502)
     } finally {
@@ -203,6 +204,26 @@ function isVenueMutation(method: string, path: string): boolean {
     normalized.startsWith('/api/simulator') ||
     normalized.startsWith('/simulator')
   )
+}
+
+function safeHost(rawUrl: string): string {
+  try {
+    return new URL(rawUrl).host
+  } catch {
+    return rawUrl
+  }
+}
+
+function formatProxyNetworkError(err: unknown, host: string, timedOut: boolean): string {
+  if (timedOut || (err instanceof Error && (err.name === 'AbortError' || err.name === 'TimeoutError'))) {
+    return `UTA proxy request to ${host} timed out after ${PROXY_TIMEOUT_MS}ms`
+  }
+  const raw = err instanceof Error ? err.message || err.name : String(err)
+  const code = err instanceof Error && typeof (err as Error & { code?: unknown }).code === 'string'
+    ? (err as Error & { code: string }).code
+    : undefined
+  const detail = code && !raw.includes(code) ? `${code}: ${raw}` : raw
+  return detail.includes(host) ? detail : `Failed to reach ${host}: ${detail}`
 }
 
 function url(req: Request): URL {

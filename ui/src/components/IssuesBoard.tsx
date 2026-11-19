@@ -20,11 +20,13 @@ import type {
   IssueStatus,
   IssueWorkspace,
 } from '../api/issues'
-import type { ScheduleWhen } from '../api/schedule'
+import type { ScheduleSkipState, ScheduleWhen } from '../api/schedule'
 import { useIssues } from '../hooks/useIssues'
+import { resolveScheduleSkipState, useScheduleSnapshot } from '../hooks/useSchedules'
 import { useWorkspaces } from '../contexts/workspaces-context'
 import { formatRelativeTime } from '../lib/intl'
 import { useWorkspace } from '../tabs/store'
+import { ScheduleSkipPill } from './ScheduleSkipState'
 import { CenteredLoading } from './StateViews'
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from './ui/dropdown-menu'
 import { SelectionCheckIcon } from './ui/selection-check-icon'
@@ -266,6 +268,8 @@ interface BoardRow {
   wsId: string
   wsTag: string
   issue: IssueListItem
+  /** Active scanner skip state from GET /api/schedule (for non-terminal scheduled issues). */
+  skipState?: ScheduleSkipState
   /** When this issue's name collides across workspaces (`issue.nameCollision`),
    *  how many OTHER workspaces also claim the name — drives the warning tooltip.
    *  Absent ⇒ no collision. */
@@ -297,9 +301,16 @@ const PRIORITY_ORDER: Record<IssuePriority, number> = {
   none: 4,
 }
 
+function rowAttention(row: BoardRow): number {
+  const base = row.issue.automationHealth ? ATTENTION_ORDER[row.issue.automationHealth.state] : 4
+  if (row.skipState?.kind === 'parked') return Math.min(base, ATTENTION_ORDER.blocked)
+  if (row.skipState?.kind === 'deferred') return Math.min(base, ATTENTION_ORDER.interrupted)
+  return base
+}
+
 function boardRowOrder(a: BoardRow, b: BoardRow): number {
-  const aAttention = a.issue.automationHealth ? ATTENTION_ORDER[a.issue.automationHealth.state] : 4
-  const bAttention = b.issue.automationHealth ? ATTENTION_ORDER[b.issue.automationHealth.state] : 4
+  const aAttention = rowAttention(a)
+  const bAttention = rowAttention(b)
   if (aAttention !== bAttention) return aAttention - bAttention
 
   const priority = PRIORITY_ORDER[a.issue.priority] - PRIORITY_ORDER[b.issue.priority]
@@ -378,7 +389,7 @@ export function PropertyMenu({ field, issue, onPatch, controlId, showLabel = fal
   </DropdownMenu>
 }
 
-function IssueRow({ wsId, wsTag, issue, dupOthers, onOpen, onPatch, columns }: BoardRow & { columns: IssueColumn[]; onOpen: () => void; onPatch: (patch: IssuePatch) => Promise<void> }) {
+function IssueRow({ wsId, wsTag, issue, skipState, dupOthers, onOpen, onPatch, columns }: BoardRow & { columns: IssueColumn[]; onOpen: () => void; onPatch: (patch: IssuePatch) => Promise<void> }) {
   const { t } = useTranslation()
   const terminal = issue.status === 'done' || issue.status === 'canceled'
   return (
@@ -405,7 +416,11 @@ function IssueRow({ wsId, wsTag, issue, dupOthers, onOpen, onPatch, columns }: B
           <span className="truncate">{wsTag}</span>
         </span>}
         {columns.includes('schedule') && <span data-testid="issue-automation-summary" className="flex shrink-0 items-center gap-4">
-          <span className="hidden w-28 items-center justify-end @sm/content:flex"><BoardCadence issue={issue} /></span>
+          {!terminal && issue.when && skipState ? (
+            <ScheduleSkipPill skipState={skipState} />
+          ) : (
+            <span className="hidden w-28 items-center justify-end @sm/content:flex"><BoardCadence issue={issue} /></span>
+          )}
         </span>}
       </button>
       {columns.includes('assignee') && <div className="ml-2 shrink-0"><IssueAssigneePopover wsId={wsId} id={issue.id} assignee={issue.assignee} health={issue.automationHealth} /></div>}
@@ -502,6 +517,14 @@ function InvalidWorkspaces({ workspaces }: { workspaces: IssueWorkspace[] }) {
 export function IssuesBoard() {
   const { t } = useTranslation()
   const { data, error, loading, updateIssue } = useIssues()
+  const hasScheduledIssues = Boolean(
+    data?.workspaces?.some(
+      (ws) => ws.status === 'ok' && ws.issues?.some((issue) => Boolean(issue.when)),
+    ),
+  )
+  const { snapshot: scheduleSnapshot, refresh: refreshSchedule } = useScheduleSnapshot({
+    enabled: hasScheduledIssues,
+  })
   const { workspaces: workspaceMetas } = useWorkspaces()
   const openOrFocus = useWorkspace((s) => s.openOrFocus)
   const setSidebar = useWorkspace((s) => s.setSidebar)
@@ -556,14 +579,21 @@ export function IssuesBoard() {
   }
 
   const rows: BoardRow[] = okWorkspaces.flatMap((w) =>
-    (w.issues ?? []).map((issue) => ({
-      wsId: w.wsId,
-      wsTag: workspaceMetas.find((workspace) => workspace.id === w.wsId)?.displayName || w.tag,
-      issue,
-      dupOthers: issue.nameCollision
-        ? Math.max(0, (wsByName.get(nameKey(issue.title))?.size ?? 1) - 1)
-        : undefined,
-    })),
+    (w.issues ?? []).map((issue) => {
+      const terminal = issue.status === 'done' || issue.status === 'canceled'
+      const skipState = !terminal && issue.when
+        ? resolveScheduleSkipState(scheduleSnapshot, w.wsId, issue.id, issue.skipState)
+        : undefined
+      return {
+        wsId: w.wsId,
+        wsTag: workspaceMetas.find((workspace) => workspace.id === w.wsId)?.displayName || w.tag,
+        issue,
+        ...(skipState ? { skipState } : {}),
+        dupOthers: issue.nameCollision
+          ? Math.max(0, (wsByName.get(nameKey(issue.title))?.size ?? 1) - 1)
+          : undefined,
+      }
+    }),
   )
 
   const visibleRows = rows.filter((row) => matchesIssueView(row.issue, row.wsId, view))
@@ -628,7 +658,10 @@ export function IssuesBoard() {
           collapsed={collapsed.has(`${view.grouping}:${g.key}`)}
           onToggle={() => toggle(`${view.grouping}:${g.key}`)}
           onOpenRow={openRow}
-          onPatch={updateIssue}
+          onPatch={async (wsId, id, patch) => {
+            await updateIssue(wsId, id, patch)
+            if (hasScheduledIssues) void refreshSchedule()
+          }}
         />
       ))}
     </div>

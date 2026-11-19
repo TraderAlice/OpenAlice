@@ -11,13 +11,15 @@
  * nothing); we deliberately leave that to the AI caller, which knows
  * 茅台 = Kweichow Moutai = 600519.SS.
  *
- * Maps to: openbb_yfinance equity search (Yahoo search quotes, EQUITY only).
+ * Maps to: openbb_yfinance equity search (Yahoo search quotes: EQUITY, ETF, INDEX).
  */
 
 import { z } from 'zod'
 import { Fetcher } from '../../../core/provider/abstract/fetcher.js'
 import { EquitySearchQueryParamsSchema, EquitySearchDataSchema } from '../../../standard-models/equity-search.js'
 import { searchYahooFinance } from '../utils/helpers.js'
+
+const EQUITY_QUOTE_TYPES = new Set(['EQUITY', 'ETF', 'INDEX'])
 
 export const YFinanceEquitySearchQueryParamsSchema = EquitySearchQueryParamsSchema
 export type YFinanceEquitySearchQueryParams = z.infer<typeof YFinanceEquitySearchQueryParamsSchema>
@@ -41,7 +43,7 @@ export class YFinanceEquitySearchFetcher extends Fetcher {
 
     const quotes = await searchYahooFinance(query.query)
     return quotes
-      .filter((q: any) => q.quoteType === 'EQUITY')
+      .filter((q: any) => EQUITY_QUOTE_TYPES.has(String(q.quoteType ?? '').toUpperCase()))
       .map((q: any) => ({
         symbol: q.symbol ?? '',
         name: q.longname ?? q.shortname ?? null,

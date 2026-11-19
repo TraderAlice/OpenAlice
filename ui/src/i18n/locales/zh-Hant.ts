@@ -420,6 +420,25 @@ export const zhHant: Resources = {
       failed: '失敗',
       blocked: '受阻',
     },
+    skipState: {
+      coolingDown: '冷卻中',
+      backingOff: '退避重試',
+      paused: '已暫停',
+      retryingAt: '{{time}}重試',
+      retryingSoon: '下次檢查時重試',
+      sinceRelative: '始於 {{time}}',
+      ariaLabel: '{{status}} — {{reason}}',
+      hintSessionBlocked:
+        '目前 Session 處於受阻狀態，自動排程已暫停。解除 Session 封鎖、重新指派議題或手動執行一次後即可恢復。',
+      hintSessionUnavailable:
+        '自動排程已暫停。請將此議題重新指派給活躍的 Session 或「新建 Session」以恢復排程。',
+      hintRuntimeUnavailable:
+        '自動排程已暫停。請選擇支援背景執行的 Agent 執行環境以恢復排程。',
+      hintWorkspaceUnavailable:
+        '自動排程已暫停。請恢復工作區，或更新議題負責人與執行環境設定。',
+      hintParkedDefault:
+        '自動排程已暫停，解決此阻礙或手動執行成功後將自動恢復。',
+    },
     detail: {
       workItem: '工作項目',
       updateFailed: '無法儲存變更，請重試。',

@@ -26,6 +26,7 @@ const BASE_EXPORTS: Record<string, CliExport> = {
       rss: 'Search and read the user\'s collected subscribed-feed archive',
       market: 'Discover symbols, bar sources, and optional market-data vendors',
       analysis: 'Read dated K-lines and calculate indicators',
+      network: 'Probe network connectivity to UTA, Yahoo Finance, and TraderHub',
     },
     commands: {
       // `rss`, not `news`: the backing store is the RSS collector's archive —
@@ -55,6 +56,9 @@ const BASE_EXPORTS: Record<string, CliExport> = {
         quant: 'calculateQuant',
         // Dated as-of read with a freshness contract for retrospective analysis.
         snapshot: 'marketSnapshot',
+      },
+      network: {
+        check: 'network_check',
       },
     },
   },
@@ -143,6 +147,7 @@ const BASE_EXPORTS: Record<string, CliExport> = {
       provenance: 'Trace business artifacts to attributable product Sessions',
       signature: 'Show this Session\'s safe product identity',
       session: 'Inspect, rename, configure, interrupt, or archive product Sessions',
+      runtime: 'Inspect and update a Workspace\'s default AI runtime settings (agent, credential, model, effort)',
       headless: 'Inspect background headless runs and their structured logs',
       schedule: 'Inspect scheduled Workspace Issues and their next due times',
       track: 'Maintain the shared index of durable assets and topics',
@@ -206,6 +211,11 @@ const BASE_EXPORTS: Record<string, CliExport> = {
         interrupt: 'session_interrupt',
         delete: 'session_delete',
         restore: 'session_restore',
+      },
+      // runtime: Workspace default AI runtime settings (.alice/settings.json).
+      runtime: {
+        get: 'workspace_runtime_get',
+        set: 'workspace_runtime_set',
       },
       // headless/schedule: read-only observability over background runs and
       // scheduled Issues — the CLI mirror of the WebUI panels.

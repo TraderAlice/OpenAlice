@@ -9,8 +9,8 @@
 import { z } from 'zod'
 import { Fetcher } from '../../../core/provider/abstract/fetcher.js'
 import { OptionsChainsQueryParamsSchema, OptionsChainsDataSchema } from '../../../standard-models/options-chains.js'
-import { EmptyDataError } from '../../../core/provider/utils/errors.js'
-import { getOptionsData } from '../utils/helpers.js'
+import { EmptyDataError, NetworkUnreachableError, RateLimitedError } from '../../../core/provider/utils/errors.js'
+import { classifyYahooFetchError, getOptionsData } from '../utils/helpers.js'
 
 export const YFinanceOptionsChainsQueryParamsSchema = OptionsChainsQueryParamsSchema
 export type YFinanceOptionsChainsQueryParams = z.infer<typeof YFinanceOptionsChainsQueryParamsSchema>
@@ -106,8 +106,21 @@ async function fetchViaDirect(symbol: string): Promise<Record<string, unknown>[]
   const baseUrl = `https://query2.finance.yahoo.com/v7/finance/options/${encodeURIComponent(symbol)}`
 
   // Get first expiration + list of all expirations
-  const resp = await fetch(baseUrl, { signal: AbortSignal.timeout(15000) })
-  if (!resp.ok) throw new EmptyDataError(`Yahoo options API returned ${resp.status}`)
+  let resp: Response
+  try {
+    resp = await fetch(baseUrl, { signal: AbortSignal.timeout(15000) })
+  } catch (err) {
+    throw classifyYahooFetchError(symbol, err)
+  }
+  if (!resp.ok) {
+    if (resp.status === 429 || resp.status === 401 || resp.status === 403) {
+      throw classifyYahooFetchError(
+        symbol,
+        Object.assign(new Error(`Yahoo options API returned ${resp.status}`), { code: resp.status }),
+      )
+    }
+    throw new EmptyDataError(`Yahoo options API returned ${resp.status}`)
+  }
   const json = await resp.json() as any
   const result = json?.optionChain?.result?.[0]
   if (!result) throw new EmptyDataError(`No options data for ${symbol}`)
@@ -206,11 +219,18 @@ export class YFinanceOptionsChainsFetcher extends Fetcher {
     let contracts: Record<string, unknown>[]
     try {
       contracts = await fetchViaYF2(symbol)
-    } catch {
+    } catch (yfErr) {
       try {
         contracts = await fetchViaDirect(symbol)
       } catch (err) {
-        throw new EmptyDataError(`Failed to fetch options for ${query.symbol}: ${err}`)
+        const classified = classifyYahooFetchError(symbol, err)
+        if (classified instanceof NetworkUnreachableError || classified instanceof RateLimitedError) {
+          throw classified
+        }
+        if (yfErr instanceof NetworkUnreachableError || yfErr instanceof RateLimitedError) {
+          throw yfErr
+        }
+        throw new EmptyDataError(`Failed to fetch options for ${query.symbol}: ${classified.message}`)
       }
     }
 

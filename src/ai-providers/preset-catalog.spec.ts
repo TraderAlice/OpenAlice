@@ -98,17 +98,19 @@ describe('credential form catalog', () => {
       });
   });
 
-  it('offers Astra and the GPT 5.6 family to Codex subscriptions and OpenAI API keys', () => {
-    const expected = ['gpt-6-astra', 'gpt-5.6-sol', 'gpt-5.6-terra', 'gpt-5.6-luna', 'gpt-5.5', 'gpt-5.4'];
-    expect(CODEX_OAUTH.models?.map((model) => model.id)).toEqual(expected);
-    expect(CODEX_API.models?.map((model) => model.id)).toEqual(expected);
+  it('offers Astra and supported GPT 5.6 models to Codex subscriptions and OpenAI API keys', () => {
+    const expectedSubscription = ['gpt-6-astra', 'gpt-5.6-terra', 'gpt-5.6-luna', 'gpt-5.5', 'gpt-5.4'];
+    const expectedApi = ['gpt-6-astra', 'gpt-5.6-sol', 'gpt-5.6-terra', 'gpt-5.6-luna', 'gpt-5.5', 'gpt-5.4'];
+    expect(CODEX_OAUTH.models?.map((model) => model.id)).toEqual(expectedSubscription);
+    expect(CODEX_API.models?.map((model) => model.id)).toEqual(expectedApi);
     expect(DEFAULT_MODEL_BY_VENDOR['openai']).toBe('gpt-6-astra');
-    expect(CODEX_OAUTH.models?.find((model) => model.id === 'gpt-5.6-sol')?.semantics)
+    expect(CODEX_OAUTH.models?.find((model) => model.id === 'gpt-5.6-sol')).toBeUndefined();
+    expect(CODEX_OAUTH.models?.find((model) => model.id === 'gpt-5.6-terra')?.semantics)
       .toMatchObject({
         contextWindow: 272_000,
         reasoning: {
           efforts: ['low', 'medium', 'high', 'xhigh', 'max', 'ultra'],
-          defaultEffort: 'low',
+          defaultEffort: 'medium',
         },
       });
     expect(CODEX_OAUTH.models?.find((model) => model.id === 'gpt-5.6-luna')?.semantics)

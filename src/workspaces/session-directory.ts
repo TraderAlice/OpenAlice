@@ -1,3 +1,4 @@
+import { headlessFailureSummary } from './headless-failure.js'
 import type { HeadlessTaskRecord, HeadlessTaskStatus } from './headless-task-registry.js'
 import {
   issueAssigneeResumeId,
@@ -48,6 +49,8 @@ export interface WorkspaceSessionDirectoryEntry {
     durationMs?: number
     issueId?: string
     assistantPreview?: string
+    error?: string
+    toolFailures?: number
   }
   interactive?: {
     name: string
@@ -127,6 +130,8 @@ export function buildWorkspaceSessionDirectory(input: {
             ...(input.issueTitleFor ? { issueTitleFor: input.issueTitleFor } : {}),
           })
         : undefined
+      const latestExecutionError = execution ? headlessFailureSummary(execution) : undefined
+      const latestExecutionToolFailures = execution?.output?.toolFailures ?? 0
       return {
         resumeId: identity.resumeId,
         agent: identity.agent,
@@ -162,6 +167,8 @@ export function buildWorkspaceSessionDirectory(input: {
                 ...(execution.output?.assistantPreview
                   ? { assistantPreview: execution.output.assistantPreview }
                   : {}),
+                ...(latestExecutionError ? { error: latestExecutionError } : {}),
+                ...(latestExecutionToolFailures > 0 ? { toolFailures: latestExecutionToolFailures } : {}),
               },
             }
           : {}),

@@ -1,6 +1,7 @@
 import { newsActivityPayload } from './domain/news/activity.js'
 import { publishCliEndpoint } from './server/cli-endpoint.js'
 import { createMarketBarsTools } from './tool/market-bars.js'
+import { createNetworkCheckTools } from './tool/network-check.js'
 import {
   acquireOpenAliceRuntimeLocks,
   takeoverRequested,
@@ -75,6 +76,7 @@ import { sessionSignatureFactory } from './tool/session-signature.js'
 import { sessionRenameFactory } from './tool/session-rename.js'
 import { sessionToolFactories } from './tool/session-tools.js'
 import { headlessToolFactories } from './tool/headless-tools.js'
+import { workspaceRuntimeToolFactories } from './tool/workspace-runtime-tools.js'
 import { provenanceShowFactory } from './tool/provenance-show.js'
 import { conversationToolFactories } from './tool/conversation.js'
 import { artifactConversationToolFactories } from './tool/conversation-artifacts.js'
@@ -123,6 +125,7 @@ async function main() {
   workspaceToolCenter.register(provenanceShowFactory)
   for (const f of sessionToolFactories) workspaceToolCenter.register(f)
   for (const f of headlessToolFactories) workspaceToolCenter.register(f)
+  for (const f of workspaceRuntimeToolFactories) workspaceToolCenter.register(f)
   for (const f of conversationToolFactories) workspaceToolCenter.register(f)
   for (const f of artifactConversationToolFactories) workspaceToolCenter.register(f)
 
@@ -284,6 +287,14 @@ async function main() {
     toolCenter.register(createIndexTools(indexClient), 'indices')
   }
   toolCenter.register(createEconomyTools(economyClient, commodityClient), 'economy')
+  toolCenter.register(
+    createNetworkCheckTools({
+      utaUrl,
+      utaDisabled: () => currentTradingModePolicy().mode === 'lite',
+      hub: config.marketData.hub,
+    }),
+    'network',
+  )
 
   console.log(`tool-center: ${toolCenter.list().length} tools registered`)
 
