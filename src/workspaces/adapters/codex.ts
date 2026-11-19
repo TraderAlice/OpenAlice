@@ -15,6 +15,7 @@ import type {
 import { isModelReasoningEffort } from '../../ai-providers/model-semantics.js';
 import { readWorkspaceFile, writeWorkspaceFile } from '../file-service.js';
 import type { HeadlessOutputEvent } from '../headless-output.js';
+import { logger } from '../logger.js';
 import { resetOwnedTomlConfig, writeOwnedTomlConfig } from './owned-toml-config.js';
 
 const CODEX_CONFIG_PATH = '.codex/config.toml';
@@ -28,6 +29,10 @@ const CODEX_SESSION_KEY_ENV_NAME = 'OPENALICE_SESSION_KEY';
 const CODEX_PROVIDER_NAME = 'workspace';
 const CODEX_SESSION_PROVIDER_NAME = 'openalice_session';
 const CODEX_DEFAULT_BASE_URL = 'https://api.openai.com/v1';
+// Slugs known to fail with `model_not_found` on ChatGPT subscription (native OAuth)
+// accounts. When persisted in stale `.alice/settings.json` or Session bindings,
+// fall back to omitting `--model` so Codex CLI uses its account default.
+const CODEX_NATIVE_UNAVAILABLE_MODELS: ReadonlySet<string> = new Set(['gpt-5.6-sol']);
 // Alice already composes the Workspace PATH. Login profiles can replace it
 // (notably /etc/profile on Linux), hiding every injected CLI from shell tools.
 const CODEX_SHELL_ARGS = ['-c', 'allow_login_shell=false'] as const;
@@ -205,8 +210,17 @@ export const codexAdapter: CliAdapter = {
   sessionRuntime: {
     project(_ctx, runtime: ResolvedSessionRuntimeBinding) {
       const ai = runtime.ai;
+      const isNative = runtime.binding.credential.source === 'native';
+      let model = runtime.binding.model;
+      if (isNative && model && CODEX_NATIVE_UNAVAILABLE_MODELS.has(model.trim().toLowerCase())) {
+        logger.warn('codex.native_unavailable_model_dropped', {
+          model,
+          reason: 'model is unavailable on native ChatGPT subscription accounts; falling back to Codex CLI default',
+        });
+        model = undefined;
+      }
       const args = [
-        ...(runtime.binding.model ? ['--model', runtime.binding.model] : []),
+        ...(model ? ['--model', model] : []),
         ...(runtime.binding.reasoningEffort
           ? ['-c', `model_reasoning_effort=${tomlString(runtime.binding.reasoningEffort)}`]
           : []),

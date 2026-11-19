@@ -66,6 +66,7 @@ import {
 import { projectPublicSessionRuntime } from '../workspaces/public-session.js'
 import { isAgentRuntime } from '../workspaces/cli-adapter.js'
 import { createWorkspaceConversationControl } from '../workspaces/conversation-control.js'
+import { makeWorkspaceRuntimeControl } from './workspace-runtime-control.js'
 
 export interface CliGatewayDeps {
   toolCenter: ToolCenter
@@ -342,6 +343,7 @@ export function registerCliRoutes(app: Hono, deps: CliGatewayDeps, manifestOnly 
           sessionControl: makeSessionControl(svc),
           headlessControl: makeHeadlessControl(svc),
           scheduleControl: makeScheduleControl(svc),
+          workspaceRuntimeControl: makeWorkspaceRuntimeControl(svc),
         } : {}),
         // Lets workspace_path resolve ANY peer's dir (not just the caller) —
         // the in-workspace cross-workspace addressing path. Shared with the

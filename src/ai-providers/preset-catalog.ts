@@ -184,10 +184,6 @@ export const CODEX_OAUTH: PresetDef = {
       efforts: ['low', 'medium', 'high', 'xhigh', 'max', 'ultra'],
       defaultEffort: 'medium',
     }),
-    codexSubscriptionModel('gpt-5.6-sol', 'GPT 5.6 Sol (Power)', {
-      efforts: ['low', 'medium', 'high', 'xhigh', 'max', 'ultra'],
-      defaultEffort: 'low',
-    }),
     codexSubscriptionModel('gpt-5.6-terra', 'GPT 5.6 Terra (Balanced)', {
       efforts: ['low', 'medium', 'high', 'xhigh', 'max', 'ultra'],
       defaultEffort: 'medium',
