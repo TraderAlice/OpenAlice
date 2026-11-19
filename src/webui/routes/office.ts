@@ -478,6 +478,11 @@ export function createOfficeRoutes(svc: WorkspaceService): Hono {
     const now = officeProjectionNow(sliced, asOfSeq, lastSeq)
     const requested = c.req.query('workspaceId')?.trim()
     const requestedWorkspace = requested ? svc.registry.get(requested) : undefined
+    const activeWorkspaces = requested
+      ? []
+      : svc.listActiveWorkspaces
+        ? await svc.listActiveWorkspaces()
+        : svc.registry.list()
     const rooms = requested
       ? requestedWorkspace
         ? [{
@@ -486,7 +491,7 @@ export function createOfficeRoutes(svc: WorkspaceService): Hono {
             harness: officeHarnessForTemplate(requestedWorkspace.template ?? 'other'),
           }]
         : []
-      : svc.registry.list().map((workspace) => ({
+      : activeWorkspaces.map((workspace) => ({
           id: workspace.id,
           tag: workspace.tag,
           harness: officeHarnessForTemplate(workspace.template ?? 'other'),

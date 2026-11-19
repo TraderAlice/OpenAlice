@@ -25,6 +25,7 @@ import {
   Plus,
   Settings as SettingsIcon,
   Trash2,
+  Zap,
 } from 'lucide-react'
 
 import { useWorkspaces } from '../../contexts/workspaces-context'
@@ -32,11 +33,13 @@ import { RefreshNotice, Skeleton } from '../StateViews'
 import { useWorkspace } from '../../tabs/store'
 import { getFocusedTab } from '../../tabs/types'
 import {
+  isStandbyWorkspace,
   MANAGER_WORKSPACE_ID,
   type ManagerWorkspaceSnapshot,
   type SessionRecord,
   type Workspace,
 } from './api'
+import { WorkspaceActivationBadge } from './WorkspaceActivationBadge'
 import { ConfirmDialog } from '../ConfirmDialog'
 import { CreateWorkspaceDialog } from './CreateWorkspaceDialog'
 import { WorkspaceOffboardingDialog } from './WorkspaceOffboardingDialog'
@@ -234,6 +237,8 @@ export function ChatWorkspaceSection({
   const rememberViewedWorkspace = (workspaceId: string): void => {
     if (mode !== 'chat') return
     setRecentWorkspaceId(workspaceId)
+    const target = chatWorkspaces.find((workspace) => workspace.id === workspaceId)
+    if (target && isStandbyWorkspace(target)) return
     void preferencesApi.rememberRecentChatWorkspace(workspaceId).catch(() => undefined)
   }
 
@@ -313,6 +318,17 @@ export function ChatWorkspaceSection({
     workspaceId: string,
     onSelected: () => void,
   ): void => {
+    const target = chatWorkspaces.find((workspace) => workspace.id === workspaceId)
+    if (target && isStandbyWorkspace(target) && ctx.requestActivateWorkspace) {
+      void ctx.requestActivateWorkspace(workspaceId)
+        .then((activated) => {
+          if (!activated) return
+          if (mode === 'chat') setRecentWorkspaceId(workspaceId)
+          onSelected()
+        })
+        .catch(() => undefined)
+      return
+    }
     if (mode === 'auto-quant') {
       // Unlike Chat's recency hint, this is the durable AutoQuant readiness
       // pointer. Change it only from an explicit Workspace selection/creation,
@@ -387,6 +403,11 @@ export function ChatWorkspaceSection({
       createWorkspaceLabel={mode === 'auto-quant' ? t('autoQuant.newWorkspace')
         : mode === 'prediction' ? t('autoPrediction.newWorkspace') : t('chat.newWorkspace')}
       onConfigure={() => currentWorkspace && ctx.openAgentConfig(currentWorkspace.id)}
+      onActivate={
+        currentWorkspace && ctx.requestActivateWorkspace
+          ? () => void ctx.requestActivateWorkspace?.(currentWorkspace.id)
+          : undefined
+      }
       onDetails={() => currentWorkspace && navigate({ kind: 'workspace-details', params: { wsId: currentWorkspace.id, source } })}
       onUpgrade={() => currentWorkspace && ctx.openAgentConfig(currentWorkspace.id, undefined, 'template')}
       onSelectWorkspace={(workspaceId) => selectHarnessWorkspace(workspaceId, () => {
@@ -608,6 +629,11 @@ export function ChatWorkspaceSection({
             onArchiveSession={archiveRosterSession}
             onSettingsSession={openSessionSettings}
             onConfigure={() => ctx.openAgentConfig(w.id)}
+            onActivate={
+              ctx.requestActivateWorkspace
+                ? () => void ctx.requestActivateWorkspace?.(w.id)
+                : undefined
+            }
             onDelete={() => setPendingDelete(w)}
             onSpawn={() => navigate({ kind: landingKind, params: { targetWsId: w.id } })}
           />
@@ -690,7 +716,12 @@ export function ChatWorkspaceSection({
           presetTemplate={templateName}
           initialTag={nextWorkspaceTag(ctx.workspaces, starterTag)}
           onCreated={(workspace) => {
-            ctx.refresh()
+            void ctx.refresh()
+            if (isStandbyWorkspace(workspace)) {
+              if (mode === 'chat') setRecentWorkspaceId(workspace.id)
+              navigate({ kind: landingKind, params: { targetWsId: workspace.id } })
+              return
+            }
             selectHarnessWorkspace(workspace.id, () => {
               navigate({ kind: landingKind, params: { targetWsId: workspace.id } })
             })
@@ -721,6 +752,7 @@ interface ChatWorkspaceContextFooterProps {
   sessionCount: number
   createWorkspaceLabel: string
   onConfigure: () => void
+  onActivate?: () => void
   onUpgrade: () => void
   onDetails: () => void
   onSelectWorkspace: (workspaceId: string) => void
@@ -852,6 +884,7 @@ function ChatWorkspaceContextFooter(props: ChatWorkspaceContextFooterProps): Rea
                         className="oa-workspace-context-item min-h-8 gap-2 rounded-md py-1 pl-2 pr-8"
                       >
                         <span className="min-w-0 flex-1 truncate">{workspaceDisplayName(workspace)}</span>
+                        <WorkspaceActivationBadge workspace={workspace} size="xs" />
                       </DropdownMenuRadioItem>
                     ))}
                   </DropdownMenuRadioGroup>
@@ -868,6 +901,15 @@ function ChatWorkspaceContextFooter(props: ChatWorkspaceContextFooterProps): Rea
 
           <DropdownMenuSeparator className="mx-0 bg-border/60" />
 
+          {props.workspace && isStandbyWorkspace(props.workspace) && props.onActivate && (
+            <DropdownMenuItem
+              onClick={() => queueAction(() => props.onActivate?.())}
+              className={`${menuItemClass} font-medium text-primary focus:text-primary`}
+            >
+              <Zap size={14} strokeWidth={2} aria-hidden />
+              <span className="min-w-0 flex-1 truncate">{t('workspace.activation.activate')}</span>
+            </DropdownMenuItem>
+          )}
           <DropdownMenuItem
             onClick={() => queueAction(props.onConfigure)}
             disabled={!props.workspace}
@@ -1286,6 +1328,7 @@ interface ChatWorkspaceRowProps {
   onArchiveSession: (row: HarnessSession) => void
   onSettingsSession: (row: HarnessSession) => void
   onConfigure: () => void
+  onActivate?: () => void
   onDelete: () => void
   /** Spawn a fresh agent session in THIS workspace (and open it). */
   onSpawn: () => void
@@ -1381,12 +1424,16 @@ function ChatWorkspaceRow(props: ChatWorkspaceRowProps): ReactElement {
         <button
           type="button"
           onClick={props.onOpen}
+          aria-label={props.label}
           aria-current={isSelected ? 'page' : undefined}
           className="flex-1 min-w-0 flex items-center gap-2 text-left"
         >
           <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${statusClass}`} aria-hidden="true" />
           <span className="min-w-0 flex-1">
-            <span className="block truncate font-medium" title={props.label}>{props.label}</span>
+            <span className="flex items-center gap-1.5 min-w-0">
+              <span className="block truncate font-medium" title={props.label}>{props.label}</span>
+              <WorkspaceActivationBadge workspace={w} size="xs" />
+            </span>
             {subtitle && (
               <span className="text-micro block truncate text-muted-foreground/65" title={subtitle}>
                 {subtitle}
@@ -1417,6 +1464,11 @@ function ChatWorkspaceRow(props: ChatWorkspaceRowProps): ReactElement {
         <SidebarActionMenu
           label={t('common.moreActions', { target: actionWorkspace })}
           items={[
+            ...(isStandbyWorkspace(w) && props.onActivate ? [{
+              label: t('workspace.activation.activate'),
+              icon: <Zap size={13} strokeWidth={2} />,
+              onSelect: () => props.onActivate?.(),
+            }] : []),
             {
               label: t('workspace.configure'),
               ariaLabel: t('chat.workspaceActions.configure', { workspace: actionWorkspace }),

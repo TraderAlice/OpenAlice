@@ -1,9 +1,10 @@
 import { formatRelativeTime } from '../../lib/intl'
-import { ArrowUpCircle, Bot, ChevronRight, Code, Cpu, GitBranch, ScrollText, Sparkles, Terminal, type LucideIcon } from 'lucide-react'
+import { ArrowUpCircle, Bot, ChevronRight, Code, Cpu, GitBranch, LoaderCircle, ScrollText, Sparkles, Terminal, Zap, type LucideIcon } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
-import type { GitLogEntry, Workspace } from './api'
+import { isStandbyWorkspace, type GitLogEntry, type Workspace } from './api'
 import { sessionCoworkerLabel, workspaceDisplayName, workspaceDisplayTitle } from './display'
 import { workspaceActivityMs } from './sidebar-order'
+import { WorkspaceActivationBadge } from './WorkspaceActivationBadge'
 
 /**
  * Single-workspace summary for the Workspaces Overview dashboard. The header,
@@ -39,6 +40,10 @@ interface Props {
   onOpenSession: (sessionId: string) => void
   /** Open the reviewed Template Upgrade preview. */
   onUpgrade?: () => void
+  /** Trigger activation flow for a Standby workspace. */
+  onActivate?: () => void
+  /** True while this workspace is fetching activation preview or activating. */
+  activating?: boolean
 }
 
 export function OverviewCard({
@@ -47,9 +52,12 @@ export function OverviewCard({
   onOpen,
   onOpenSession,
   onUpgrade,
+  onActivate,
+  activating = false,
 }: Props) {
   const { t } = useTranslation()
   const w = workspace
+  const standby = isStandbyWorkspace(w)
   const upgradeVersion = w.upgradeAvailable?.to.replace(/^v(?=\d)/, '') ?? ''
   const label = workspaceDisplayName(w)
   const hasRunning = w.sessions.some((s) => s.state === 'running')
@@ -84,13 +92,29 @@ export function OverviewCard({
             aria-hidden="true"
           />
           <div className="flex-1 min-w-0">
-            <h3 className="text-[14px] leading-[19px] font-semibold text-foreground truncate" title={workspaceDisplayTitle(w)}>
-              {label}
-            </h3>
+            <div className="flex items-center gap-1.5 min-w-0">
+              <h3 className="text-[14px] leading-[19px] font-semibold text-foreground truncate" title={workspaceDisplayTitle(w)}>
+                {label}
+              </h3>
+              <WorkspaceActivationBadge workspace={w} size="xs" />
+            </div>
             <p className="text-[11px] leading-[15px] text-muted-foreground truncate" title={w.description}>
               {w.description?.trim() || t('workspace.activeAgo', { time: formatRelativeTime(lastActivityMs) })}
             </p>
           </div>
+          {standby && onActivate && (
+            <button
+              type="button"
+              onClick={onActivate}
+              disabled={activating}
+              className="oa-pressable pointer-events-auto flex min-h-10 shrink-0 items-center gap-1 rounded border border-primary/40 bg-primary/8 px-2 py-0.5 text-[10px] leading-[14px] font-medium text-primary transition-colors hover:border-primary/80 hover:bg-primary/15 disabled:opacity-50 sm:min-h-0"
+            >
+              {activating
+                ? <LoaderCircle size={10} className="animate-spin motion-reduce:animate-none" aria-hidden="true" />
+                : <Zap size={10} strokeWidth={2.25} aria-hidden="true" />}
+              <span>{activating ? t('workspace.activation.activating') : t('workspace.activation.activate')}</span>
+            </button>
+          )}
           {w.upgradeAvailable && w.template && (
             <button
               type="button"

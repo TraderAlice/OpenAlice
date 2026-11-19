@@ -11,6 +11,7 @@ import {
 } from 'react'
 import { useTranslation } from 'react-i18next'
 import { AgentChatComposer } from '../components/workspace/AgentChatComposer'
+import { StandbyWorkspaceBanner } from '../components/workspace/StandbyWorkspaceBanner'
 import { ConversationLayout } from '../components/conversation/ConversationLayout'
 import { PageTopBar } from '../components/PageTopBar'
 import {
@@ -336,7 +337,12 @@ export function HarnessLandingPage({
   return (
     <ConversationLayout
       welcome={!launching}
-      header={showHeader && <PageTopBar title={t(mode === 'chat' ? 'chat.newChat' : mode === 'auto-quant' ? 'autoQuant.newResearch' : 'autoPrediction.newResearch')} />}
+      header={showHeader && (
+        <>
+          <PageTopBar title={t(mode === 'chat' ? 'chat.newChat' : mode === 'auto-quant' ? 'autoQuant.newResearch' : 'autoPrediction.newResearch')} />
+          <StandbyWorkspaceBanner workspace={credentialWorkspace} />
+        </>
+      )}
       composer={<>
         <AgentChatComposer
           config={launchConfig}

@@ -24,7 +24,11 @@
 import { readFile, readdir } from 'node:fs/promises'
 import { join, relative } from 'node:path'
 
-import type { WorkspaceRegistry } from '../workspaces/workspace-registry.js'
+import type { WorkspaceMeta, WorkspaceRegistry } from '../workspaces/workspace-registry.js'
+
+export type BacklinkWorkspaceLister = () =>
+  | Promise<readonly WorkspaceMeta[]>
+  | readonly WorkspaceMeta[]
 
 export interface Backlink {
   workspaceId: string
@@ -86,9 +90,13 @@ async function listMarkdown(root: string): Promise<string[]> {
  * as one backlink). Callers look up by entity name (case-insensitive); tokens
  * with no matching entity are simply never queried.
  */
-async function scanUncached(registry: WorkspaceRegistry): Promise<Map<string, Backlink[]>> {
+async function scanUncached(
+  registry: WorkspaceRegistry,
+  listWorkspaces?: BacklinkWorkspaceLister,
+): Promise<Map<string, Backlink[]>> {
   const out = new Map<string, Backlink[]>()
-  for (const ws of registry.list()) {
+  const workspaces = listWorkspaces ? await listWorkspaces() : registry.list()
+  for (const ws of workspaces) {
     const files = await listMarkdown(ws.dir)
     for (const rel of files) {
       let content: string
@@ -147,10 +155,13 @@ function entryFor(registry: WorkspaceRegistry): CacheEntry {
   return e
 }
 
-function refresh(registry: WorkspaceRegistry): Promise<Map<string, Backlink[]>> {
+function refresh(
+  registry: WorkspaceRegistry,
+  listWorkspaces?: BacklinkWorkspaceLister,
+): Promise<Map<string, Backlink[]>> {
   const e = entryFor(registry)
   if (e.inflight) return e.inflight
-  e.inflight = scanUncached(registry)
+  e.inflight = scanUncached(registry, listWorkspaces)
     .then((data) => {
       e.data = data
       e.at = Date.now()
@@ -168,23 +179,29 @@ function refresh(registry: WorkspaceRegistry): Promise<Map<string, Backlink[]>> 
  * awaits a full scan. On a scan error the previous cache is kept (serve
  * stale) rather than throwing.
  */
-export async function scanBacklinks(registry: WorkspaceRegistry): Promise<Map<string, Backlink[]>> {
+export async function scanBacklinks(
+  registry: WorkspaceRegistry,
+  listWorkspaces?: BacklinkWorkspaceLister,
+): Promise<Map<string, Backlink[]>> {
   const e = entryFor(registry)
   if (e.data) {
     if (Date.now() - e.at >= TTL_MS && !e.inflight) {
-      void refresh(registry).catch(() => {
+      void refresh(registry, listWorkspaces).catch(() => {
         /* keep serving the stale cache; next call retries */
       })
     }
     return e.data
   }
-  return refresh(registry)
+  return refresh(registry, listWorkspaces)
 }
 
 /** Kick a scan to warm the cache (fire-and-forget) — call at startup so the
  *  first Tracked open is fast. */
-export function warmBacklinks(registry: WorkspaceRegistry): void {
-  void refresh(registry).catch(() => {
+export function warmBacklinks(
+  registry: WorkspaceRegistry,
+  listWorkspaces?: BacklinkWorkspaceLister,
+): void {
+  void refresh(registry, listWorkspaces).catch(() => {
     /* warming is best-effort */
   })
 }

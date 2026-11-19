@@ -274,11 +274,13 @@ export interface MarkerStore {
   getHeld(wsId: string, taskId: string): number | undefined
   set(wsId: string, taskId: string, ts: number): Promise<void>
   hold(wsId: string, taskId: string, ts: number): Promise<void>
-  prune(seenKeys: Set<string>): Promise<void>
+  prune(seenKeys: Set<string>, preserveWorkspaceIds?: ReadonlySet<string>): Promise<void>
 }
 
 export interface ScheduleScannerDeps {
   registry: WorkspaceRegistry
+  /** Canonical active-workspace filter; standby workspaces are never scanned or scheduled. */
+  listActiveWorkspaces?: () => Promise<WorkspaceMeta[]> | WorkspaceMeta[]
   /** Resolve the execution Workspace for an exact signed Session owner. */
   resolveResumeWorkspace?: (resumeId: string) => WorkspaceMeta | undefined
   canRetryIssueRun?: (wsId: string, issueId: string, runId: string) => boolean
@@ -328,6 +330,7 @@ export class ScheduleScanner {
   private timer: ReturnType<typeof setTimeout> | null = null
   private stopped = false
   private scanning = false
+  private rescanRequested = false
   /** Close the tiny manual-retry vs schedule-tick race for one Issue. This is
    * only a dispatch-start lock, not a per-Workspace execution lock. */
   private readonly dispatchingIssues = new Set<string>()
@@ -370,6 +373,25 @@ export class ScheduleScanner {
     return this.lastSnapshot
   }
 
+  /** Drop the cached snapshot and immediately re-scan active workspaces.
+   *  Used when active Workspace slots change so the previous active stops
+   *  scheduling immediately and the newly active begins scheduling. */
+  async refresh(): Promise<void> {
+    this.lastSnapshot = null
+    if (this.stopped) return
+    if (this.scanning) {
+      this.rescanRequested = true
+      return
+    }
+    await this.scan(false)
+  }
+
+  private async activeWorkspaces(): Promise<WorkspaceMeta[]> {
+    return this.deps.listActiveWorkspaces
+      ? await this.deps.listActiveWorkspaces()
+      : this.deps.registry.list()
+  }
+
   /** Dispatch one scheduled Issue immediately without touching its firing
    * marker. This is the authoritative manual-run / retry path: it re-reads the
    * live Issue and reuses the exact prompt, owner, runtime, and optional timeout used by
@@ -403,9 +425,10 @@ export class ScheduleScanner {
       )
     }
     if (isConnectorDeskIssue(issue)) {
+      const active = await this.activeWorkspaces()
       const extras = extraConnectorDeskKeys(
         await findConnectorDesks(
-          this.deps.registry.list().map((item) => ({ id: item.id, dir: item.dir })),
+          active.map((item) => ({ id: item.id, dir: item.dir })),
         ),
       )
       if (extras.has(`${ws.id}:${issue.id}`)) {
@@ -471,16 +494,23 @@ export class ScheduleScanner {
     const seen = new Set<string>()
     try {
       await this.deps.reconcileSessionRuntimeBindings?.()
-      // registry.list() order is preserved by Promise.all → stable display order.
+      const active = await this.activeWorkspaces()
+      const activeIds = new Set(active.map((ws) => ws.id))
+      const standbyIds = new Set(
+        this.deps.registry.list()
+          .filter((ws) => !activeIds.has(ws.id))
+          .map((ws) => ws.id),
+      )
+      // active order is preserved by Promise.all → stable display order.
       const extraDesks = extraConnectorDeskKeys(
         await findConnectorDesks(
-          this.deps.registry.list().map((ws) => ({ id: ws.id, dir: ws.dir })),
+          active.map((ws) => ({ id: ws.id, dir: ws.dir })),
         ),
       )
       const workspaces = await Promise.all(
-        this.deps.registry.list().map((ws) => this.scanWorkspace(ws, nowMs, seen, extraDesks, waitForDispatch)),
+        active.map((ws) => this.scanWorkspace(ws, nowMs, seen, extraDesks, waitForDispatch)),
       )
-      await this.deps.markers.prune(seen)
+      await this.deps.markers.prune(seen, standbyIds.size > 0 ? standbyIds : undefined)
       for (const key of [...this.dispatchGates.keys()]) {
         if (!seen.has(key)) this.dispatchGates.delete(key)
       }
@@ -503,6 +533,10 @@ export class ScheduleScanner {
       this.lastSnapshot = { workspaces }
     } finally {
       this.scanning = false
+      if (this.rescanRequested && !this.stopped) {
+        this.rescanRequested = false
+        void this.scan(false).catch((err) => this.deps.logger.warn('schedule.rescan_failed', { err }))
+      }
     }
   }
 
