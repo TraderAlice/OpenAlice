@@ -14,6 +14,7 @@ import {
   credentialToWorkspaceAiCred,
   resolveInjectionModel,
 } from './credential-injection.js'
+import { isDefaultRuntimeModel } from './workspace-runtime-settings.js'
 
 export class SessionRuntimeBindingError extends Error {
   constructor(
@@ -83,14 +84,19 @@ export function mergeSessionRuntimeSelection(
   if (current.source === 'workspace' && !selection.credentialSource && !selection.credentialSlug) {
     throw new SessionRuntimeBindingError('workspace_binding_changed', 'Select native authentication or a vault credential before editing a legacy Workspace binding')
   }
+  const resetModel = isDefaultRuntimeModel(selection.model)
+  const { model: requestedModel, ...restSelection } = selection
+  const effectiveModel = resetModel
+    ? undefined
+    : requestedModel ?? (!changed ? binding.model : undefined)
   return {
     ...(selection.credentialSource ? { credentialSource: selection.credentialSource }
       : selection.credentialSlug ? { credentialSlug: selection.credentialSlug }
       : current.source === 'vault' ? { credentialSlug: current.credentialSlug }
       : { credentialSource: 'native' as const }),
-    ...(!changed && binding.model ? { model: binding.model } : {}),
     ...(!changed && binding.reasoningEffort ? { reasoningEffort: binding.reasoningEffort } : {}),
-    ...selection,
+    ...restSelection,
+    ...(effectiveModel ? { model: effectiveModel } : {}),
   }
 }
 
@@ -116,8 +122,9 @@ function modelFields(
   model: string | null | undefined,
   reasoningEffort: SessionRuntimeBinding['reasoningEffort'],
 ): Pick<SessionRuntimeBinding, 'model' | 'reasoningEffort'> {
+  const effectiveModel = model && !isDefaultRuntimeModel(model) ? model : undefined
   return {
-    ...(model ? { model } : {}),
+    ...(effectiveModel ? { model: effectiveModel } : {}),
     ...(reasoningEffort ? { reasoningEffort } : {}),
   }
 }
@@ -186,6 +193,9 @@ export async function createSessionRuntimeBinding(input: {
 }): Promise<ResolvedSessionRuntimeBinding> {
   assertedAgentContract(input.adapter)
   const selection = input.selection ?? {}
+  const model = selection.model && !isDefaultRuntimeModel(selection.model)
+    ? selection.model
+    : undefined
   if (selection.credentialSource === 'native') {
     if (selection.credentialSlug) {
       throw new SessionRuntimeBindingError(
@@ -196,7 +206,7 @@ export async function createSessionRuntimeBinding(input: {
     return createNativeSessionRuntimeBinding({
       adapter: input.adapter,
       selection: {
-        ...(selection.model ? { model: selection.model } : {}),
+        ...(model ? { model } : {}),
         ...(selection.reasoningEffort ? { reasoningEffort: selection.reasoningEffort } : {}),
       },
     })
@@ -204,11 +214,17 @@ export async function createSessionRuntimeBinding(input: {
   if (selection.credentialSlug) {
     const credentials = input.credentials ?? await readCredentials()
     return resolveVault(input.adapter, credentials, selection.credentialSlug, {
-      ...(selection.model ? { model: selection.model } : {}),
+      ...(model ? { model } : {}),
       ...(selection.reasoningEffort ? { reasoningEffort: selection.reasoningEffort } : {}),
     })
   }
-  return createNativeSessionRuntimeBinding({ adapter: input.adapter, selection })
+  return createNativeSessionRuntimeBinding({
+    adapter: input.adapter,
+    selection: {
+      ...(model ? { model } : {}),
+      ...(selection.reasoningEffort ? { reasoningEffort: selection.reasoningEffort } : {}),
+    },
+  })
 }
 
 /** Resolve a persisted binding without changing its credential/model choices. */

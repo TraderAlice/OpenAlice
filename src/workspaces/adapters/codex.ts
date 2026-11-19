@@ -33,6 +33,10 @@ const CODEX_DEFAULT_BASE_URL = 'https://api.openai.com/v1';
 // accounts. When persisted in stale `.alice/settings.json` or Session bindings,
 // fall back to omitting `--model` so Codex CLI uses its account default.
 const CODEX_NATIVE_UNAVAILABLE_MODELS: ReadonlySet<string> = new Set(['gpt-5.6-sol']);
+
+export function isCodexNativeUnavailableModel(model: string | null | undefined): boolean {
+  return typeof model === 'string' && CODEX_NATIVE_UNAVAILABLE_MODELS.has(model.trim().toLowerCase());
+}
 // Alice already composes the Workspace PATH. Login profiles can replace it
 // (notably /etc/profile on Linux), hiding every injected CLI from shell tools.
 const CODEX_SHELL_ARGS = ['-c', 'allow_login_shell=false'] as const;
@@ -212,7 +216,7 @@ export const codexAdapter: CliAdapter = {
       const ai = runtime.ai;
       const isNative = runtime.binding.credential.source === 'native';
       let model = runtime.binding.model;
-      if (isNative && model && CODEX_NATIVE_UNAVAILABLE_MODELS.has(model.trim().toLowerCase())) {
+      if (isNative && isCodexNativeUnavailableModel(model)) {
         logger.warn('codex.native_unavailable_model_dropped', {
           model,
           reason: 'model is unavailable on native ChatGPT subscription accounts; falling back to Codex CLI default',
