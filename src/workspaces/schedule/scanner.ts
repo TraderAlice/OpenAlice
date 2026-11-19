@@ -474,6 +474,19 @@ export class ScheduleScanner {
       for (const key of [...this.lastSkippedLogs.keys()]) {
         if (!seen.has(key)) this.lastSkippedLogs.delete(key)
       }
+      // Reconcile each task's skipState against live dispatchGates right before
+      // publishing lastSnapshot so async fire() calls launched by scan(false)
+      // that settled while awaiting other workspaces or prune() are never lost.
+      for (const ws of workspaces) {
+        for (const task of ws.tasks) {
+          const skipState = toScheduleSkipState(this.dispatchGates.get(this.deps.markers.key(ws.wsId, task.id)))
+          if (skipState) {
+            task.skipState = skipState
+          } else {
+            delete task.skipState
+          }
+        }
+      }
       this.lastSnapshot = { workspaces }
     } finally {
       this.scanning = false

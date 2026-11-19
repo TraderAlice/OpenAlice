@@ -1211,6 +1211,49 @@ describe('ScheduleScanner', () => {
       await scanner.scan()
       expect(skipped()).toHaveLength(2)
     })
+
+    it('reconciles skipState on scan(false) whether async fire settles before or after snapshot publish', async () => {
+      const ws1 = await makeWs('w1', [
+        { id: 'fast-fail', title: 'fast fail', when: { kind: 'every', every: '30m' }, what: 'go', assignee: '@resume-1' },
+        { id: 'slow-fail', title: 'slow fail', when: { kind: 'every', every: '30m' }, what: 'go', assignee: '@resume-2' },
+      ])
+      let rejectSlow!: (err: Error) => void
+      const slowPromise = new Promise<{ taskId: string; resumeId: string }>((_, reject) => {
+        rejectSlow = reject
+      })
+      const dispatch = vi.fn(async (_ws, _adapter, _prompt, _origin, _timeout, trigger) => {
+        if (trigger?.kind === 'issue' && trigger.issueId === 'fast-fail') {
+          throw new ScheduleDispatchError('workspace_not_active', 'workspace is not active: w1')
+        }
+        return slowPromise
+      })
+      const { scanner } = scannerFor([ws1], { dispatch, now: NOW })
+
+      // First scan (cold lastSnapshot === null) in non-blocking tick mode:
+      // fast-fail settles BEFORE scan(false) assigns lastSnapshot; slow-fail settles AFTER.
+      await scanner.scan(false)
+      expect(scanner.snapshot()?.workspaces[0]?.tasks.find((t) => t.id === 'fast-fail')?.skipState).toEqual({
+        kind: 'parked',
+        code: 'workspace_not_active',
+        reason: 'workspace is not active: w1',
+        sinceMs: NOW,
+      })
+
+      rejectSlow(new SessionAdmissionError([{
+        id: 'b-slow', resumeId: 'resume-2', kind: 'user-cooldown', createdAt: NOW,
+        expiresAt: NOW + 10 * 60_000, executionId: 'e-slow',
+        actor: { kind: 'user', entry: 'control' },
+        reason: 'Cooling down.',
+      }]))
+      await scanner.waitForDispatches()
+      expect(scanner.snapshot()?.workspaces[0]?.tasks.find((t) => t.id === 'slow-fail')?.skipState).toEqual({
+        kind: 'deferred',
+        code: 'session_blocked',
+        reason: 'Cooling down.',
+        retryAtMs: NOW + 10 * 60_000,
+        sinceMs: NOW,
+      })
+    })
   })
 
   it('ignores a workspace with no issues dir', async () => {
