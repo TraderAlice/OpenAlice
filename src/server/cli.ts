@@ -382,6 +382,7 @@ export function registerCliRoutes(app: Hono, deps: CliGatewayDeps, manifestOnly 
         entityStore,
         ...(svc ? { provenanceStore: svc.provenanceStore } : {}),
         ...(svc ? { conversation: createWorkspaceConversationControl(svc) } : {}),
+        ...(svc ? { orchestration: svc.orchestration } : {}),
         ...(svc ? { templateUpgrades: svc.templateUpgrades, aliceHarnessUpgrades: svc.aliceHarnessUpgrades } : {}),
         ...(svc ? {
           setSessionDisplayName: async (input) => {

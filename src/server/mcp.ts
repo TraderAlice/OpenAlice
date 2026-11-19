@@ -107,6 +107,7 @@ export class McpPlugin implements Plugin {
         entityStore,
         ...(svc ? { provenanceStore: svc.provenanceStore } : {}),
         ...(svc ? { conversation: createWorkspaceConversationControl(svc) } : {}),
+        ...(svc ? { orchestration: svc.orchestration } : {}),
         ...(svc ? { templateUpgrades: svc.templateUpgrades } : {}),
         ...(svc ? {
           setSessionDisplayName: async (input) => {

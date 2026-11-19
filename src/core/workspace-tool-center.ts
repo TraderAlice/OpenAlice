@@ -43,6 +43,7 @@ import type {
   TemplateUpgradePlan,
   TemplateUpgradeResult,
 } from '../workspaces/template-upgrade.js'
+import type { OrchestrationManager } from '../workspaces/orchestration/index.js'
 
 export type WorkspaceConversationTarget =
   | { kind: 'resume'; resumeId: string }
@@ -259,6 +260,8 @@ export interface WorkspaceToolContext {
   /** Embedded provenance-aware headless conversation control; never routes
    * through the public HTTP API. */
   conversation?: WorkspaceConversationControl
+  /** Orca-grade worker orchestration control plane. Backed by WorkspaceService.orchestration. */
+  orchestration?: OrchestrationManager
   /** Agent-INVISIBLE run provenance, resolved server-side from the
    *  `x-openalice-run` header by the MCP / CLI route (never supplied by the
    *  agent). Factories pass it through to call sites (e.g. inbox_push →
