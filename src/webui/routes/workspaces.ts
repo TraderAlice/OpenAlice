@@ -47,7 +47,14 @@ import {
 } from '../../workspaces/session-registry.js';
 import { projectPublicSession, projectPublicSessionRuntime, type PublicSession } from '../../workspaces/public-session.js';
 import type { WorkspaceMeta } from '../../workspaces/workspace-registry.js';
-import { HeadlessCapacityError, HeadlessResumeError, resumeFromRecord, type SessionFactoryContext, type WorkspaceService } from '../../workspaces/service.js';
+import {
+  HeadlessCapacityError,
+  HeadlessResumeError,
+  WorkspaceActivationError,
+  resumeFromRecord,
+  type SessionFactoryContext,
+  type WorkspaceService,
+} from '../../workspaces/service.js';
 import {
   parseSessionPresence,
   ResumePresenceError,
@@ -1111,9 +1118,24 @@ export function createWorkspaceRoutes(
       return c.json({ error: 'workspace_template_mismatch' }, 400);
     }
     try {
-      await rememberAutoQuantWorkspace(workspace.id);
+      if (typeof svc.activateWorkspace === 'function') {
+        await svc.activateWorkspace(workspace.id);
+        if (
+          quickChatPreferences.rememberAutoQuantDefaultWorkspace
+          && quickChatPreferences.rememberAutoQuantDefaultWorkspace
+            !== defaultQuickChatWorkspacePreferenceDeps.rememberAutoQuantDefaultWorkspace
+        ) {
+          await quickChatPreferences.rememberAutoQuantDefaultWorkspace(workspace.id);
+        }
+      } else {
+        await rememberAutoQuantWorkspace(workspace.id);
+      }
       return c.json({ defaultWorkspaceId: workspace.id, ready: true });
     } catch (err) {
+      if (err instanceof WorkspaceActivationError) {
+        const status = err.code === 'not_found' ? 404 : 409;
+        return c.json({ error: err.code === 'not_found' ? 'workspace_not_found' : 'workspace_departed', message: err.message }, status);
+      }
       launcherLogger.warn('auto_quant.preference_write_failed', { id: workspace.id, err });
       return c.json({ error: 'preferences_write_failed', message: (err as Error).message }, 500);
     }
@@ -1218,9 +1240,24 @@ export function createWorkspaceRoutes(
       return c.json({ error: 'workspace_template_mismatch' }, 400);
     }
     try {
-      await rememberAutoPredictionWorkspace(workspace.id);
+      if (typeof svc.activateWorkspace === 'function') {
+        await svc.activateWorkspace(workspace.id);
+        if (
+          quickChatPreferences.rememberAutoPredictionDefaultWorkspace
+          && quickChatPreferences.rememberAutoPredictionDefaultWorkspace
+            !== defaultQuickChatWorkspacePreferenceDeps.rememberAutoPredictionDefaultWorkspace
+        ) {
+          await quickChatPreferences.rememberAutoPredictionDefaultWorkspace(workspace.id);
+        }
+      } else {
+        await rememberAutoPredictionWorkspace(workspace.id);
+      }
       return c.json({ defaultWorkspaceId: workspace.id, ready: true });
     } catch (err) {
+      if (err instanceof WorkspaceActivationError) {
+        const status = err.code === 'not_found' ? 404 : 409;
+        return c.json({ error: err.code === 'not_found' ? 'workspace_not_found' : 'workspace_departed', message: err.message }, status);
+      }
       launcherLogger.warn('auto_prediction.preference_write_failed', { id: workspace.id, err });
       return c.json({ error: 'preferences_write_failed', message: (err as Error).message }, 500);
     }
@@ -1410,7 +1447,39 @@ export function createWorkspaceRoutes(
     }
   });
 
-  // ── single workspace (offboarding + git/files sub-resources) ─────────────
+  // ── single workspace (activation + offboarding + git/files sub-resources) ─
+
+  app.get('/:id/activation-preview', async (c) => {
+    const id = c.req.param('id');
+    if (!validId(id)) return c.json({ error: 'not_found' }, 404);
+    try {
+      const preview = await svc.previewWorkspaceActivation(id);
+      if (!preview) return c.json({ error: 'workspace_not_found' }, 404);
+      return c.json(preview);
+    } catch (err) {
+      launcherLogger.error('workspace.activation_preview_failed', { id, err });
+      return c.json({ error: 'activation_preview_failed', message: (err as Error).message }, 500);
+    }
+  });
+
+  app.post('/:id/activate', async (c) => {
+    const id = c.req.param('id');
+    if (!validId(id)) return c.json({ error: 'not_found' }, 404);
+    try {
+      const result = await svc.activateWorkspace(id);
+      return c.json(result);
+    } catch (err) {
+      if (err instanceof WorkspaceActivationError) {
+        const status = err.code === 'not_found' ? 404 : 409;
+        return c.json({
+          error: err.code === 'not_found' ? 'workspace_not_found' : 'workspace_departed',
+          message: err.message,
+        }, status);
+      }
+      launcherLogger.error('workspace.activate_failed', { id, err });
+      return c.json({ error: 'activate_failed', message: (err as Error).message }, 500);
+    }
+  });
 
   app.get('/:id/offboarding', async (c) => {
     const id = c.req.param('id');

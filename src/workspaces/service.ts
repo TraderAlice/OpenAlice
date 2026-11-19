@@ -143,6 +143,7 @@ import {
   issueAssigneeClaimsFirstSession,
   issueAssigneeResumeId,
   isConnectorDeskIssue,
+  isTerminalStatus,
   type IssueRecord,
 } from './issues/declaration.js';
 import {
@@ -199,11 +200,20 @@ import { WorkspaceSessionRuntimeStore } from './session-runtime-store.js';
 import {
   AUTO_PREDICTION_WORKSPACE_TEMPLATE,
   AUTO_QUANT_WORKSPACE_TEMPLATE,
+  CHAT_WORKSPACE_TEMPLATE,
   ChatWorkspaceResolver,
   TemplateWorkspaceResolver,
   type ChatWorkspaceResolution,
   type TemplateWorkspaceResolution,
 } from './chat-workspace-resolver.js';
+import {
+  ActiveWorkspaceSlotManager,
+  createPreferenceWorkspaceSlotStore,
+  workspaceTemplateSlot,
+  type ActiveWorkspaceSlotStore,
+  type WorkspaceActivationState,
+} from './active-workspace-slots.js';
+import { invalidateBacklinks } from '@/core/entity-backlinks.js';
 
 function automationLatestRun(task: HeadlessTaskRecord) {
   const failure = issueRunFailure(task);
@@ -250,6 +260,37 @@ export class IssueRetryError extends Error {
     super(message);
     this.name = 'IssueRetryError';
   }
+}
+
+export class WorkspaceActivationError extends Error {
+  constructor(
+    public readonly code: 'not_found' | 'departed',
+    message: string,
+  ) {
+    super(message);
+    this.name = 'WorkspaceActivationError';
+  }
+}
+
+export interface WorkspaceActivationCurrentActive {
+  readonly id: string;
+  readonly tag: string;
+  readonly displayName?: string;
+  readonly openIssueCount: number;
+  readonly scheduledIssueCount: number;
+  readonly inFlightRunCount: number;
+}
+
+export interface WorkspaceActivationPreview {
+  readonly workspaceId: string;
+  readonly template: string;
+  readonly alreadyActive: boolean;
+  readonly currentActive: WorkspaceActivationCurrentActive | null;
+}
+
+export interface WorkspaceActivationResult {
+  readonly workspace: unknown;
+  readonly previousActiveId: string | null;
 }
 
 export type SpawnEnvironmentSource = 'terminal' | 'workspace' | 'tools' | 'adapter';
@@ -513,6 +554,14 @@ export interface WorkspaceService {
   /** Best-effort background reconciliation of native runtime Session titles. */
   refreshSessionTitles?(meta: WorkspaceMeta): Promise<void>;
   publicMeta(w: WorkspaceMeta): Promise<unknown>;
+  /** Canonical active Workspaces (at most one per template slot). */
+  listActiveWorkspaces(): Promise<WorkspaceMeta[]>;
+  /** Synchronous snapshot of active Workspaces for background polling hooks. */
+  listActiveWorkspacesSync(): WorkspaceMeta[];
+  /** Preview switching a template's active Workspace slot to `workspaceId`. */
+  previewWorkspaceActivation(workspaceId: string): Promise<WorkspaceActivationPreview | null>;
+  /** Activate `workspaceId` in its template slot (stops previous Studio, refreshes scanner). */
+  activateWorkspace(workspaceId: string): Promise<WorkspaceActivationResult>;
   /**
    * Probe the host PATH for each registered adapter's CLI binary. Keyed by
    * adapter id. Adapters without a `binary` (shell) report installed:true.
@@ -684,6 +733,8 @@ export interface CreateWorkspaceServiceOptions {
    *  every surface (HTTP / CLI / MCP) gets the join, not just the route.
    *  Optional: when absent, `issueDetail` returns `inboxReports: []`. */
   readonly inboxStore?: IInboxStore;
+  /** Internal test seam for active Workspace slot persistence. */
+  readonly activeWorkspaceSlotStore?: ActiveWorkspaceSlotStore;
 }
 
 /**
@@ -723,6 +774,11 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
     launcherLogger.child({ scope: 'registry' }),
   );
   const harnessSurfaces = new HarnessSurfaceManager(registry);
+  const activeSlots = new ActiveWorkspaceSlotManager(
+    registry,
+    opts.activeWorkspaceSlotStore ?? createPreferenceWorkspaceSlotStore(),
+  );
+  let refreshScheduleScanner: (() => Promise<void>) | null = null;
   const catalog = await WorkspaceCatalog.load(
     join(config.launcherRoot, 'state', 'workspace-catalog.json'),
     registry.list(),
@@ -980,7 +1036,7 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
   };
 
   const telegramDeskChatHost = {
-    listWorkspaces: () => registry.list().map((workspace) => ({ id: workspace.id, dir: workspace.dir })),
+    listWorkspaces: () => activeSlots.listActiveWorkspacesSync().map((workspace) => ({ id: workspace.id, dir: workspace.dir })),
     getWorkspace: (id: string) => {
       const workspace = registry.get(id);
       return workspace ? { id: workspace.id, dir: workspace.dir } : undefined;
@@ -1104,7 +1160,14 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
     bootstrapTimeoutMs: config.bootstrapTimeoutMs,
     registry,
     isWorkspaceIdReserved: (id) => catalog.hasId(id),
-    onWorkspaceCreated: (workspace) => catalog.recordCreated(workspace),
+    onWorkspaceCreated: async (workspace) => {
+      await catalog.recordCreated(workspace);
+      const state = await activeSlots.handleWorkspaceCreated(workspace);
+      if (state === 'active') {
+        invalidateBacklinks(registry);
+        await refreshScheduleScanner?.();
+      }
+    },
     logger: launcherLogger.child({ scope: 'creator' }),
   });
   const chatWorkspaceResolver = new ChatWorkspaceResolver({
@@ -1371,20 +1434,32 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
     return 'global-config';
   };
 
-  const resolveOrCreateChatWorkspaceMethod = (
+  const resolveOrCreateChatWorkspaceMethod = async (
     preferredWorkspaceId?: string | null,
-  ): Promise<ChatWorkspaceResolution> =>
-    chatWorkspaceResolver.resolveOrCreate(preferredWorkspaceId);
-  const resolveOrCreateAutoQuantWorkspaceMethod = (
+  ): Promise<ChatWorkspaceResolution> => {
+    const targetId = preferredWorkspaceId
+      ?? (await activeSlots.activeWorkspaceForTemplate(CHAT_WORKSPACE_TEMPLATE))?.id
+      ?? null;
+    return chatWorkspaceResolver.resolveOrCreate(targetId);
+  };
+  const resolveOrCreateAutoQuantWorkspaceMethod = async (
     preferredWorkspaceId?: string | null,
     sourceVersion?: string,
-  ): Promise<TemplateWorkspaceResolution> =>
-    autoQuantWorkspaceResolver.resolveOrCreate(preferredWorkspaceId, sourceVersion);
-  const resolveOrCreateAutoPredictionWorkspaceMethod = (
+  ): Promise<TemplateWorkspaceResolution> => {
+    const targetId = preferredWorkspaceId
+      ?? (await activeSlots.activeWorkspaceForTemplate(AUTO_QUANT_WORKSPACE_TEMPLATE))?.id
+      ?? null;
+    return autoQuantWorkspaceResolver.resolveOrCreate(targetId, sourceVersion);
+  };
+  const resolveOrCreateAutoPredictionWorkspaceMethod = async (
     preferredWorkspaceId?: string | null,
     sourceVersion?: string,
-  ): Promise<TemplateWorkspaceResolution> =>
-    autoPredictionWorkspaceResolver.resolveOrCreate(preferredWorkspaceId, sourceVersion);
+  ): Promise<TemplateWorkspaceResolution> => {
+    const targetId = preferredWorkspaceId
+      ?? (await activeSlots.activeWorkspaceForTemplate(AUTO_PREDICTION_WORKSPACE_TEMPLATE))?.id
+      ?? null;
+    return autoPredictionWorkspaceResolver.resolveOrCreate(targetId, sourceVersion);
+  };
 
   let runtimeReadinessWorkspaceInFlight: Promise<WorkspaceMeta> | null = null;
 
@@ -2456,6 +2531,7 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
     isIssueRunning: (workspaceId, issueId) => headlessTasks.list({ issue: { workspaceId, issueId } }).some((run) => run.status === 'running'),
     isSessionBlocked: (resumeId, nowMs) => executionManager.admission.blocks(resumeId, nowMs).length > 0,
     registry,
+    listActiveWorkspaces: () => activeSlots.listActiveWorkspaces(),
     resolveResumeWorkspace: (resumeId) => {
       const identity = resumeRegistry.get(resumeId);
       return identity && identity.lifecycle !== 'retired' && sessionPresence(identity) !== 'deleted'
@@ -2541,8 +2617,9 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
       ? { intervalMs: opts.scheduleScannerIntervalMs }
       : {}),
   });
+  refreshScheduleScanner = () => scheduleScanner.refresh();
   // Read-only aggregation for the Schedules dashboard (GET /api/schedule).
-  // Walks each workspace's live declaration + the scanner's marker; the route
+  // Walks each active workspace's live declaration + the scanner's marker; the route
   // layer stays a thin adapter and the marker store stays private.
   const scheduleSnapshot = async (): Promise<ScheduleSnapshot> => {
     // Warm path: the scanner rebuilds this every tick (it already reads every
@@ -2552,8 +2629,9 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
     // Cold path: only before the scanner's first tick (delayed to stay
     // test-safe). One live read-only build — no firing.
     const nowMs = Date.now();
+    const activeWorkspaces = await activeSlots.listActiveWorkspaces();
     const workspaces = await Promise.all(
-      registry.list().map(async (ws): Promise<ScheduleSnapshotWorkspace> => {
+      activeWorkspaces.map(async (ws): Promise<ScheduleSnapshotWorkspace> => {
         const res = await readWorkspaceIssues(ws.dir);
         if (!res.ok) {
           return {
@@ -2594,8 +2672,9 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
   const issuesSnapshot = async (): Promise<IssuesSnapshot> => {
     const nowMs = Date.now();
     const availability = detectAgents();
+    const activeWorkspaces = await activeSlots.listActiveWorkspaces();
     const workspaces = await Promise.all(
-      registry.list().map(async (ws): Promise<IssuesSnapshotWorkspace> => {
+      activeWorkspaces.map(async (ws): Promise<IssuesSnapshotWorkspace> => {
         const res = await readWorkspaceIssues(ws.dir);
         if (!res.ok) {
           // 'absent' (no issues dir) is an empty board for that workspace, not an
@@ -2986,8 +3065,9 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
     const token = name.trim().toLowerCase();
     if (!token) return [];
     const out: WikilinkIssueRef[] = [];
+    const activeWorkspaces = await activeSlots.listActiveWorkspaces();
     await Promise.all(
-      registry.list().map(async (ws) => {
+      activeWorkspaces.map(async (ws) => {
         const res = await readWorkspaceIssues(ws.dir);
         if (!res.ok) return;
         for (const issue of res.issues) {
@@ -3420,6 +3500,18 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
       if (!existsSync(join(cwd, '.pi', 'openalice-provider.json')) && !existsSync(join(cwd, '.pi-agent'))) return;
       await piAdapter.writeAiConfig?.(cwd, {});
     },
+    onWorkspaceOffboarded: async () => {
+      await activeSlots.converge();
+      invalidateBacklinks(registry);
+      await refreshScheduleScanner?.();
+    },
+    onWorkspaceRestored: async (workspace) => {
+      const state = await activeSlots.handleWorkspaceCreated(workspace);
+      if (state === 'active') {
+        invalidateBacklinks(registry);
+        await refreshScheduleScanner?.();
+      }
+    },
     logger: launcherLogger.child({ scope: 'workspace-lifecycle' }),
   });
   await lifecycle.recover();
@@ -3455,6 +3547,9 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
     logger: launcherLogger.child({ scope: 'workspace-absorb' }),
   });
   await workspaceAbsorbs.recover();
+  // Converge per-template active Workspace slots after recovery and before
+  // starting the scanner so missing/offboarded pointers fall back cleanly.
+  await activeSlots.converge();
   // Recovery owns the active/departed boundary. Scheduled work must not see an
   // interrupted offboarding/upgrade row between registry load and repair.
   scheduleScanner.start();
@@ -3548,8 +3643,10 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
         }
       }
     }
+    const activationState: WorkspaceActivationState = await activeSlots.activationState(w.id);
     return {
       ...w,
+      activationState,
       ...(metadata.ok ? metadata.metadata : {}),
       ...(!metadata.ok && metadata.reason === 'invalid' ? { metadataError: metadata.error } : {}),
       ...(runtimeSettings.ok ? {
@@ -3592,8 +3689,96 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
     return disposal;
   };
 
+  const previewWorkspaceActivation = async (
+    workspaceId: string,
+  ): Promise<WorkspaceActivationPreview | null> => {
+    const target = registry.get(workspaceId);
+    if (!target) return null;
+    const catalogEntry = catalog.get(workspaceId);
+    if (catalogEntry && catalogEntry.lifecycle !== 'active') return null;
+
+    const template = workspaceTemplateSlot(target.template);
+    const currentActiveWs = await activeSlots.activeWorkspaceForTemplate(template);
+    const alreadyActive = currentActiveWs?.id === target.id;
+    let currentActive: WorkspaceActivationCurrentActive | null = null;
+    if (currentActiveWs) {
+      const [metadata, issues] = await Promise.all([
+        readWorkspaceMetadata(currentActiveWs.dir).catch(() => null),
+        readWorkspaceIssues(currentActiveWs.dir).catch(() => null),
+      ]);
+      const displayName = metadata?.ok ? metadata.metadata.displayName : undefined;
+      const openIssueCount = issues?.ok
+        ? issues.issues.filter((issue) => !isTerminalStatus(issue.status)).length
+        : 0;
+      const scheduledIssueCount = issues?.ok
+        ? issues.issues.filter((issue) => Boolean(issue.when) && !isTerminalStatus(issue.status)).length
+        : 0;
+      const runningTasks = headlessTasks.list({ status: 'running' }).filter((task) =>
+        task.wsId === currentActiveWs.id
+        || (task.trigger?.kind === 'issue' && task.trigger.workspaceId === currentActiveWs.id),
+      );
+      const inFlightRunCount = Math.max(
+        runningTasks.length,
+        headlessActivity.list(currentActiveWs.id).length,
+      );
+      currentActive = {
+        id: currentActiveWs.id,
+        tag: currentActiveWs.tag,
+        ...(displayName ? { displayName } : {}),
+        openIssueCount,
+        scheduledIssueCount,
+        inFlightRunCount,
+      };
+    }
+    return {
+      workspaceId: target.id,
+      template,
+      alreadyActive,
+      currentActive,
+    };
+  };
+
+  const activateWorkspace = async (workspaceId: string): Promise<WorkspaceActivationResult> => {
+    const catalogEntry = catalog.get(workspaceId);
+    if (catalogEntry && catalogEntry.lifecycle !== 'active') {
+      throw new WorkspaceActivationError('departed', `workspace is ${catalogEntry.lifecycle}: ${workspaceId}`);
+    }
+    const target = registry.get(workspaceId);
+    if (!target) {
+      throw new WorkspaceActivationError('not_found', `workspace not found: ${workspaceId}`);
+    }
+
+    const template = workspaceTemplateSlot(target.template);
+    const previousActive = await activeSlots.activeWorkspaceForTemplate(template);
+    const previousActiveId = previousActive?.id ?? null;
+
+    await activeSlots.setActive(template, target.id);
+
+    // Immediately stop any managed Harness Studio process for the previously
+    // active Workspace, while letting any in-flight headless session/issue runs
+    // finish naturally.
+    if (previousActiveId && previousActiveId !== target.id) {
+      await harnessSurfaces.stopWorkspace(previousActiveId);
+    }
+
+    invalidateBacklinks(registry);
+    await scheduleScanner.refresh();
+
+    launcherLogger.info('workspace.activated', {
+      workspaceId: target.id,
+      template,
+      previousActiveId,
+    });
+
+    return {
+      workspace: await publicMeta(target),
+      previousActiveId,
+    };
+  };
+
   const connectorDeskOp = async (connectorId: string): Promise<ConnectorDesk | null> => {
-    const desks = await findConnectorDesks(registry.list().map((ws) => ({ id: ws.id, dir: ws.dir })), connectorId);
+    const active = await activeSlots.listActiveWorkspaces();
+    const desks = await findConnectorDesks(active.map((ws) => ({ id: ws.id, dir: ws.dir })), connectorId);
     return desks[0] ?? null;
   };
   const createConnectorDeskOp = async (connectorId: string, wsId: string): Promise<ConnectorDesk> => (
@@ -3608,7 +3793,8 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
       if (!workspace) {
         throw new Error(`workspace not found: ${wsId}`);
       }
-      const workspaces = registry.list().map((ws) => ({ id: ws.id, dir: ws.dir }));
+      const active = await activeSlots.listActiveWorkspaces();
+      const workspaces = active.map((ws) => ({ id: ws.id, dir: ws.dir }));
       const created = await createConnectorDeskFile(
         connectorId,
         definition.label,
@@ -3726,6 +3912,10 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
     executions,
     refreshSessionTitles,
     publicMeta,
+    listActiveWorkspaces: () => activeSlots.listActiveWorkspaces(),
+    listActiveWorkspacesSync: () => activeSlots.listActiveWorkspacesSync(),
+    previewWorkspaceActivation,
+    activateWorkspace,
     detectAgents,
     getAgentRuntimeReadiness: getAgentRuntimeReadinessMethod,
     beginAgentRuntimeReadinessProbe: beginAgentRuntimeReadinessProbeMethod,

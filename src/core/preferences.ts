@@ -111,6 +111,8 @@ const preferencesSchema = z.object({
     quickAccessIds: [],
     recentAgentIds: [],
   }),
+  /** Optional active workspace slot overrides for custom/third-party templates. */
+  activeWorkspaceByTemplate: z.record(z.string(), z.string()).optional(),
 })
 
 type ParsedQuickChatPreferences = z.infer<typeof quickChatPreferencesSchema>
@@ -183,6 +185,23 @@ export async function readAgentRuntimesPreferences(
   return {
     quickAccessIds: [...preferences.agentRuntimes.quickAccessIds],
     recentAgentIds: [...preferences.agentRuntimes.recentAgentIds],
+  }
+}
+
+/**
+ * Read the single active Workspace pointer for every template slot.
+ * Built-in templates map directly onto their backwards-compatible preference
+ * fields; custom/third-party templates live under `activeWorkspaceByTemplate`.
+ */
+export async function readActiveWorkspaceSlots(
+  path = preferencesPath(),
+): Promise<Record<string, string | null>> {
+  const preferences = await readPreferences(path)
+  return {
+    ...(preferences.activeWorkspaceByTemplate ?? {}),
+    chat: preferences.quickChat.recentChatWorkspaceId,
+    'auto-quant-v2': preferences.autoQuant.defaultWorkspaceId,
+    'auto-prediction': preferences.autoPrediction.defaultWorkspaceId,
   }
 }
 
@@ -318,6 +337,44 @@ export async function rememberAutoPredictionDefaultWorkspace(
   })
   mutationQueue = operation
   return operation
+}
+
+/**
+ * Persist the single active Workspace pointer for a template slot.
+ * Built-in templates write directly to their existing preference keys so
+ * `preferences.json` stays 100% backwards compatible.
+ */
+export async function rememberTemplateActiveWorkspace(
+  template: string,
+  workspaceId: string | null,
+  path = preferencesPath(),
+): Promise<void> {
+  if (template === 'chat') {
+    await rememberRecentChatWorkspace(workspaceId, path)
+    return
+  }
+  if (template === 'auto-quant-v2') {
+    await rememberAutoQuantDefaultWorkspace(workspaceId, path)
+    return
+  }
+  if (template === 'auto-prediction') {
+    await rememberAutoPredictionDefaultWorkspace(workspaceId, path)
+    return
+  }
+  const operation = mutationQueue.catch(() => undefined).then(async () => {
+    const preferences = await readPreferences(path)
+    const nextMap = { ...(preferences.activeWorkspaceByTemplate ?? {}) }
+    if (workspaceId === null) delete nextMap[template]
+    else nextMap[template] = workspaceId
+    const { activeWorkspaceByTemplate: _ignored, ...rest } = preferences
+    const updated = preferencesSchema.parse({
+      ...rest,
+      ...(Object.keys(nextMap).length > 0 ? { activeWorkspaceByTemplate: nextMap } : {}),
+    })
+    await writePreferences(updated, path)
+  })
+  mutationQueue = operation
+  await operation
 }
 
 export async function saveHarnessPreferences(

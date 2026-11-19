@@ -319,7 +319,7 @@ async function main() {
     tradingModePolicy: currentTradingModePolicy,
   })
   startTelegramDeskInboundPoll({
-    listWorkspaces: () => workspaceServiceRef.current?.registry.list() ?? [],
+    listWorkspaces: () => workspaceServiceRef.current?.listActiveWorkspacesSync() ?? [],
     getWorkspace: (id) => workspaceServiceRef.current?.registry.get(id),
     provenanceStore: () => workspaceServiceRef.current?.provenanceStore,
     conversation: () => {
