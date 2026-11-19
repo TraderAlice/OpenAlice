@@ -183,6 +183,10 @@ export interface WorkspaceConversationControl {
     readonly recipientResumeId?: string
     readonly workspaceId?: string
   }): Promise<WorkspaceConversationMailboxItem[]>
+  ackTasks?(input: {
+    readonly recipientResumeId: string
+    readonly taskIds: readonly string[]
+  }): Promise<void>
   read(taskId: string): Promise<WorkspaceConversationTask | null>
 }
 

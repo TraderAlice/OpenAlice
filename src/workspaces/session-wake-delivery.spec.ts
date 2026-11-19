@@ -4,7 +4,7 @@ import { join } from 'node:path'
 
 import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from 'vitest'
 
-import { SessionMailbox } from './session-mailbox.js'
+import { DEFAULT_WATERMARK_TTL_MS, SessionMailbox } from './session-mailbox.js'
 import {
   SessionWakeDelivery,
   formatSessionWakePointer,
@@ -199,5 +199,129 @@ describe('SessionWakeDelivery', () => {
     })
     await mailbox.enqueue(taskInput())
     expect(await bare.tryDeliver(RESUME)).toBe('parked')
+  })
+
+  it('allows re-delivery after watermark TTL expires', async () => {
+    let clock = 10_000
+    const timed = new SessionWakeDelivery({
+      mailbox,
+      deliverToPty: deps.pty,
+      deliverToWeb: deps.web,
+      deliverToHeadless: deps.headless,
+      warn: deps.warn,
+      now: () => clock,
+    })
+
+    await timed.notifyTaskCompleted(taskInput({ taskId: 'run-1' }))
+    expect(deps.headless).toHaveBeenCalledTimes(1)
+    expect(await timed.tryDeliver(RESUME)).toBe('watermarked')
+
+    // Before TTL expires, new task is still coalesced behind the watermark.
+    clock += DEFAULT_WATERMARK_TTL_MS - 1
+    await timed.notifyTaskCompleted(taskInput({ taskId: 'run-2' }))
+    expect(deps.headless).toHaveBeenCalledTimes(1)
+
+    // Once TTL expires, delivery succeeds again and refreshes the watermark.
+    clock += 1
+    expect(await timed.tryDeliver(RESUME)).toBe('delivered')
+    expect(deps.headless).toHaveBeenCalledTimes(2)
+    expect(deps.headless).toHaveBeenLastCalledWith(
+      RESUME,
+      formatSessionWakePointer(2, RESUME),
+    )
+    expect(await timed.tryDeliver(RESUME)).toBe('watermarked')
+
+    // Even with no new unread messages, onSessionSettled re-delivers an expired pending wake.
+    clock += DEFAULT_WATERMARK_TTL_MS
+    await timed.onSessionSettled(RESUME)
+    expect(deps.headless).toHaveBeenCalledTimes(3)
+  })
+
+  it('scopes markNotified to pending ids captured before delivery', async () => {
+    let releaseWeb!: (v: 'delivered') => void
+    const gate = new Promise<'delivered'>((resolve) => {
+      releaseWeb = resolve
+    })
+    deps.web.mockImplementationOnce(() => gate)
+
+    await mailbox.enqueue(taskInput({ taskId: 'run-1', createdAt: 1 }))
+    const first = delivery.tryDeliver(RESUME)
+
+    // A second task completes while the first wake is still in flight.
+    await delivery.notifyTaskCompleted(taskInput({ taskId: 'run-2', createdAt: 2 }))
+
+    releaseWeb('delivered')
+    expect(await first).toBe('delivered')
+
+    // Only run-1 was marked notified; run-2 stayed unread.
+    expect(mailbox.unreadFor(RESUME).map((m) => m.taskId)).toEqual(['run-2'])
+
+    // Acking run-1 directly clears the watermark and leaves run-2 ready for delivery.
+    await mailbox.ackByTaskIds(RESUME, ['run-1'])
+    expect(mailbox.hasActiveWatermark(RESUME)).toBe(false)
+
+    deps.web.mockResolvedValue('delivered')
+    await delivery.onSessionSettled(RESUME)
+    expect(deps.web).toHaveBeenCalledTimes(2)
+    expect(deps.web).toHaveBeenLastCalledWith(
+      RESUME,
+      formatSessionWakePointer(1, RESUME),
+    )
+  })
+
+  it('catches thrown delivery errors, logs a warning, parks, and retries on settle', async () => {
+    deps.headless.mockRejectedValueOnce(new Error('HeadlessCapacityError: capacity reached'))
+
+    await mailbox.enqueue(taskInput())
+    expect(await delivery.tryDeliver(RESUME)).toBe('parked')
+    expect(deps.warn).toHaveBeenCalledWith(
+      'session_wake.delivery_failed',
+      expect.objectContaining({
+        recipientResumeId: RESUME,
+        surface: 'headless',
+        error: 'HeadlessCapacityError: capacity reached',
+      }),
+    )
+    expect(mailbox.unreadFor(RESUME)).toHaveLength(1)
+
+    // Surface settles → retry succeeds.
+    deps.headless.mockResolvedValueOnce('delivered')
+    await delivery.onSessionSettled(RESUME)
+    expect(deps.headless).toHaveBeenCalledTimes(2)
+    expect(mailbox.hasActiveWatermark(RESUME)).toBe(true)
+  })
+
+  it('parks on unavailable so onSessionSettled retries once a surface becomes ready', async () => {
+    deps.headless.mockResolvedValueOnce('unavailable')
+    await mailbox.enqueue(taskInput())
+    expect(await delivery.tryDeliver(RESUME)).toBe('unavailable')
+    expect(mailbox.unreadFor(RESUME)).toHaveLength(1)
+
+    deps.headless.mockResolvedValueOnce('delivered')
+    await delivery.onSessionSettled(RESUME)
+    expect(deps.headless).toHaveBeenCalledTimes(2)
+    expect(mailbox.hasActiveWatermark(RESUME)).toBe(true)
+  })
+
+  it('drains re-entrant settle parked while a busy delivery was in flight', async () => {
+    let releaseWeb!: (v: 'busy') => void
+    const firstGate = new Promise<'busy'>((resolve) => {
+      releaseWeb = resolve
+    })
+    deps.web
+      .mockImplementationOnce(() => firstGate)
+      .mockResolvedValueOnce('delivered')
+
+    await mailbox.enqueue(taskInput())
+    const inFlightAttempt = delivery.tryDeliver(RESUME)
+
+    // Session settles while the first attempt is still awaiting a busy response.
+    await delivery.onSessionSettled(RESUME)
+    expect(deps.web).toHaveBeenCalledTimes(1)
+
+    releaseWeb('busy')
+    expect(await inFlightAttempt).toBe('delivered')
+    expect(deps.web).toHaveBeenCalledTimes(2)
+    expect(mailbox.hasActiveWatermark(RESUME)).toBe(true)
   })
 })

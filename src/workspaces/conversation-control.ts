@@ -471,6 +471,11 @@ export function createWorkspaceConversationControl(
       }))
     },
 
+    async ackTasks(input): Promise<void> {
+      if (!svc.sessionMailbox || input.taskIds.length === 0) return
+      await svc.sessionMailbox.ackByTaskIds(input.recipientResumeId, input.taskIds)
+    },
+
     async read(taskId) {
       const task = svc.headlessTasks.get(taskId)
       if (!task) return null

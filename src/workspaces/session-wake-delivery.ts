@@ -35,6 +35,7 @@ export interface SessionWakeDeliveryDeps {
     pointerText: string,
   ) => Promise<HeadlessDeliveryResult>
   readonly warn?: (event: string, detail: Record<string, unknown>) => void
+  readonly now?: () => number
 }
 
 export type TryDeliverResult = 'delivered' | 'watermarked' | 'parked' | 'noop' | 'unavailable'
@@ -42,6 +43,7 @@ export type TryDeliverResult = 'delivered' | 'watermarked' | 'parked' | 'noop' |
 export class SessionWakeDelivery {
   private readonly inFlight = new Set<string>()
   private readonly parked = new Set<string>()
+  private readonly recheck = new Set<string>()
 
   constructor(private readonly deps: SessionWakeDeliveryDeps) {}
 
@@ -56,14 +58,28 @@ export class SessionWakeDelivery {
   async tryDeliver(recipientResumeId: string): Promise<TryDeliverResult> {
     if (this.inFlight.has(recipientResumeId)) {
       this.parked.add(recipientResumeId)
+      this.recheck.add(recipientResumeId)
       return 'parked'
     }
     this.inFlight.add(recipientResumeId)
     try {
-      return await this.deliver(recipientResumeId)
+      let result = await this.deliver(recipientResumeId)
+      while (this.recheck.delete(recipientResumeId)) {
+        this.parked.delete(recipientResumeId)
+        const next = await this.deliver(recipientResumeId)
+        if (result !== 'delivered' || next === 'delivered') {
+          result = next
+        }
+      }
+      return result
     } finally {
       this.inFlight.delete(recipientResumeId)
+      this.recheck.delete(recipientResumeId)
     }
+  }
+
+  private nowMs(): number {
+    return this.deps.now?.() ?? Date.now()
   }
 
   private async deliver(recipientResumeId: string): Promise<TryDeliverResult> {
@@ -72,52 +88,73 @@ export class SessionWakeDelivery {
 
     // Pointer already injected and awaiting `alice conversation check`: leave
     // new completions unread so one check acks everything together.
-    if (this.deps.mailbox.hasActiveWatermark(recipientResumeId)) return 'watermarked'
+    if (this.deps.mailbox.hasActiveWatermark(recipientResumeId, this.nowMs())) {
+      return 'watermarked'
+    }
 
+    const pendingIds = pending.map((m) => m.id)
     const pointerText = formatSessionWakePointer(pending.length, recipientResumeId)
+    let surface: 'web' | 'pty' | 'headless' = 'web'
 
-    const web = await this.deps.deliverToWeb(recipientResumeId, pointerText)
-    if (web === 'delivered') {
-      await this.deps.mailbox.markNotified(recipientResumeId)
-      return 'delivered'
-    }
-    if (web === 'busy') {
-      this.parked.add(recipientResumeId)
-      return 'parked'
-    }
-
-    const pty = await this.deps.deliverToPty(recipientResumeId, pointerText)
-    if (pty === 'delivered') {
-      await this.deps.mailbox.markNotified(recipientResumeId)
-      return 'delivered'
-    }
-    if (pty === 'busy') {
-      this.parked.add(recipientResumeId)
-      return 'parked'
-    }
-
-    if (this.deps.deliverToHeadless) {
-      const headless = await this.deps.deliverToHeadless(recipientResumeId, pointerText)
-      if (headless === 'delivered') {
-        await this.deps.mailbox.markNotified(recipientResumeId)
+    try {
+      const web = await this.deps.deliverToWeb(recipientResumeId, pointerText)
+      if (web === 'delivered') {
+        await this.deps.mailbox.markNotified(recipientResumeId, pendingIds, this.nowMs())
         return 'delivered'
       }
-      if (headless === 'busy') {
+      if (web === 'busy') {
         this.parked.add(recipientResumeId)
         return 'parked'
       }
-      return 'unavailable'
-    }
 
-    this.parked.add(recipientResumeId)
-    return 'parked'
+      surface = 'pty'
+      const pty = await this.deps.deliverToPty(recipientResumeId, pointerText)
+      if (pty === 'delivered') {
+        await this.deps.mailbox.markNotified(recipientResumeId, pendingIds, this.nowMs())
+        return 'delivered'
+      }
+      if (pty === 'busy') {
+        this.parked.add(recipientResumeId)
+        return 'parked'
+      }
+
+      if (this.deps.deliverToHeadless) {
+        surface = 'headless'
+        const headless = await this.deps.deliverToHeadless(recipientResumeId, pointerText)
+        if (headless === 'delivered') {
+          await this.deps.mailbox.markNotified(recipientResumeId, pendingIds, this.nowMs())
+          return 'delivered'
+        }
+        if (headless === 'busy') {
+          this.parked.add(recipientResumeId)
+          return 'parked'
+        }
+        this.parked.add(recipientResumeId)
+        return 'unavailable'
+      }
+
+      this.parked.add(recipientResumeId)
+      return 'parked'
+    } catch (err) {
+      this.parked.add(recipientResumeId)
+      this.deps.warn?.('session_wake.delivery_failed', {
+        recipientResumeId,
+        surface,
+        error: err instanceof Error ? err.message : String(err),
+        err,
+      })
+      return 'parked'
+    }
   }
 
   /** A surface quiesced (PTY `onQuiescent`, Web idle, headless turn done): retry parked work. */
   async onSessionSettled(recipientResumeId: string): Promise<void> {
     if (
       this.parked.has(recipientResumeId) ||
-      this.deps.mailbox.unreadFor(recipientResumeId).length > 0
+      this.inFlight.has(recipientResumeId) ||
+      this.deps.mailbox.unreadFor(recipientResumeId).length > 0 ||
+      (this.deps.mailbox.pendingFor(recipientResumeId).length > 0 &&
+        !this.deps.mailbox.hasActiveWatermark(recipientResumeId, this.nowMs()))
     ) {
       this.parked.delete(recipientResumeId)
       await this.tryDeliver(recipientResumeId)

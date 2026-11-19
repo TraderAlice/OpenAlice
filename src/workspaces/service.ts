@@ -2381,10 +2381,10 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
             });
           }
         }
+        releaseTakeover();
         void sessionWakeDelivery.onSessionSettled(rec.resumeId).catch((err) =>
           launcherLogger.warn('session_wake.headless_settlement_failed', { resumeId: rec.resumeId, err }),
         );
-        releaseTakeover();
       });
     headlessDispatchCompletions.add(completion);
     void completion.then(
@@ -3175,7 +3175,7 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
         meta,
         adapter,
         pointerText,
-        { kind: 'system', entry: 'session-wake-mailbox', workspaceId: identity.wsId, resumeId },
+        { kind: 'system', entry: 'session-wake-mailbox', workspaceId: identity.wsId },
         undefined,
         latestTask.trigger,
         resumeId,
