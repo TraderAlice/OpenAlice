@@ -1,3 +1,4 @@
+import userEvent from '@testing-library/user-event'
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -76,7 +77,8 @@ describe('WorkspaceAbsorbPanel', () => {
   it('makes direction and retirement explicit and defaults collisions to keep both', async () => {
     render(<WorkspaceAbsorbPanel target={target} workspaces={[target, source]} onWorkspaceChanged={vi.fn()} onClose={vi.fn()} />)
 
-    fireEvent.change(screen.getByLabelText('Workspace to absorb'), { target: { value: source.id } })
+    fireEvent.click(screen.getByLabelText('Workspace to absorb'))
+    await userEvent.click(await screen.findByRole('option', { name: 'source-desk' }))
 
     expect(await screen.findByText('What retires with source-desk')).toBeTruthy()
     expect(screen.getByText(/2 Session records.*1 schedule stopped/)).toBeTruthy()
@@ -87,7 +89,8 @@ describe('WorkspaceAbsorbPanel', () => {
   it('applies the reviewed digest and shows the durable audit result', async () => {
     const onWorkspaceChanged = vi.fn()
     render(<WorkspaceAbsorbPanel target={target} workspaces={[target, source]} onWorkspaceChanged={onWorkspaceChanged} onClose={vi.fn()} />)
-    fireEvent.change(screen.getByLabelText('Workspace to absorb'), { target: { value: source.id } })
+    fireEvent.click(screen.getByLabelText('Workspace to absorb'))
+    await userEvent.click(await screen.findByRole('option', { name: 'source-desk' }))
     await screen.findByText('Paths that need a decision')
     fireEvent.click(screen.getByRole('button', { name: 'Absorb and archive source' }))
 
@@ -120,7 +123,8 @@ describe('WorkspaceAbsorbPanel', () => {
       },
     })
     render(<WorkspaceAbsorbPanel target={target} workspaces={[target, source]} onWorkspaceChanged={vi.fn()} onClose={vi.fn()} />)
-    fireEvent.change(screen.getByLabelText('Workspace to absorb'), { target: { value: source.id } })
+    fireEvent.click(screen.getByLabelText('Workspace to absorb'))
+    await userEvent.click(await screen.findByRole('option', { name: 'source-desk' }))
 
     expect(await screen.findByText(/source-desk: p3 \(pi, webpi\)/)).toBeTruthy()
     expect((screen.getByRole('button', { name: 'Absorb and archive source' }) as HTMLButtonElement).disabled).toBe(true)

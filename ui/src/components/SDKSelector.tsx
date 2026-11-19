@@ -92,10 +92,10 @@ export function SDKSelector(props: SDKSelectorProps) {
             )}
 
             <div className="min-w-0 pr-5">
-              <p className={`text-[13px] leading-[18px] font-medium ${isDisabled ? 'text-muted-foreground' : 'text-foreground'}`}>
+              <p className={`text-sm leading-5 font-medium ${isDisabled ? 'text-muted-foreground' : 'text-foreground'}`}>
                 {opt.name}
               </p>
-              <p className="mt-0.5 text-[11px] leading-relaxed text-muted-foreground/70">
+              <p className="mt-0.5 text-sm leading-relaxed text-muted-foreground/70">
                 {opt.description}
               </p>
             </div>

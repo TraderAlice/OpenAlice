@@ -39,8 +39,9 @@ describe('MarketPage FX desk', () => {
     render(<MarketPage />)
 
     expect(screen.getByRole('heading', { name: '市场' })).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: '帮助：市场' }))
     expect(screen.getByText('搜索资产并查看价格历史。')).toBeTruthy()
-    expect(screen.getByRole('heading', { name: '从现货、套息到宏观，集中在一个货币对视图。' })).toBeTruthy()
+    expect(screen.getByRole('heading', { name: '货币对' })).toBeTruthy()
 
     fireEvent.click(screen.getByRole('button', { name: /跨国宏观/ }))
 

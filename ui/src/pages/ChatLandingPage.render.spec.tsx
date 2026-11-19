@@ -437,8 +437,8 @@ describe('ChatLandingPage adapter inventory', () => {
 
     fireEvent.click(await screen.findByRole('button', { name: 'Select agent' }))
 
-    expect(screen.getByRole('menuitem', { name: /Pi/ })).toBeTruthy()
-    expect(screen.getByRole('menuitem', { name: /opencode/ })).toBeTruthy()
+    expect(screen.getByRole('menuitemradio', { name: /Pi/ })).toBeTruthy()
+    expect(screen.getByRole('menuitemradio', { name: /opencode/ })).toBeTruthy()
   })
 
   it('keeps Session context and AI inference in distinct groups on one surface', async () => {

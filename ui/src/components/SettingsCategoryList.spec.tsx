@@ -93,7 +93,7 @@ describe('SettingsCategoryList', () => {
       'settings.category.trading',
     ])
     expect(within(general!).queryByRole('button', { name: 'settings.category.agentPermissions' })).toBeNull()
-    expect(within(general!).getByRole('button', { name: 'settings.language.title' })).toBeTruthy()
+    expect(within(general!).queryByRole('button', { name: 'settings.language.title' })).toBeNull()
   })
 
   it('hides trading and market-data categories on NanoAlice', () => {

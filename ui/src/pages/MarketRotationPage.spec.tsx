@@ -54,7 +54,8 @@ describe('MarketRotationPage recovery', () => {
     expect((await screen.findByRole('alert')).textContent).toContain('Rotation board unavailable')
     fireEvent.click(screen.getByRole('button', { name: 'Retry' }))
 
-    await screen.findByText('Recovered methodology')
+    fireEvent.click(screen.getByRole('button', { name: 'common.helpFor' }))
+    await screen.findByText(/Recovered methodology/)
     await waitFor(() => expect(mocks.sectorRotation).toHaveBeenCalledTimes(2))
     expect(screen.queryByRole('alert')).toBeNull()
     // Keep both sections at their natural height inside the page's scroll area.

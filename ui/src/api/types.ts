@@ -715,4 +715,5 @@ export interface EquityCurvePoint {
   timestamp: string
   equity: string
   accounts: Record<string, string>
+  snapshotTimestamps?: Record<string, string>
 }

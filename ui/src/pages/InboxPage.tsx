@@ -1,3 +1,4 @@
+import { CountBadge } from '../components/CountBadge'
 import { useInboxContent } from '../hooks/useInboxContent'
 import { Dialog, DialogContent, DialogTitle } from '../components/ui/dialog'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
@@ -159,14 +160,14 @@ export function InboxPage({ visible }: InboxPageProps) {
             fallback={(
               <PageHeader
                 title={t('nav.item.inbox')}
-                description={t('inbox.pageDescription', { count: entries.length })}
+                accessory={<CountBadge count={entries.length} label={t('inbox.pageDescription', { count: entries.length })} />}
               />
             )}
           />
         ) : (
           <PageHeader
             title={t('nav.item.inbox')}
-            description={t('inbox.pageDescription', { count: entries.length })}
+            accessory={<CountBadge count={entries.length} label={t('inbox.pageDescription', { count: entries.length })} />}
           />
         )}
         <div className="flex-1 overflow-y-auto min-h-0">
@@ -384,7 +385,7 @@ function Detail({ entry, onDelete }: { entry: InboxEntry; onDelete?: () => void 
             <h1 className="text-pretty break-words text-[1.35rem] font-semibold leading-snug tracking-[-0.02em] text-foreground md:text-[1.5rem]">
               {documentTitle}
             </h1>
-            <div className="mt-2.5 flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-[12px] leading-[18px] text-muted-foreground">
+            <div className="mt-2.5 flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-sm leading-5 text-muted-foreground">
               <span
                 className={wsAlive ? 'min-w-0 break-words' : 'min-w-0 break-words text-muted-foreground/70 line-through'}
                 title={wsAlive ? displayTitle : t('inbox.workspaceNotExists')}
@@ -399,7 +400,7 @@ function Detail({ entry, onDelete }: { entry: InboxEntry; onDelete?: () => void 
                         ref={senderTriggerRef}
                         type="button"
                         aria-label={t('inbox.showSenderDetails', { sender: senderDisplay })}
-                        className="inline-flex min-h-10 min-w-0 items-center gap-1.5 rounded-sm text-[12px] leading-[18px] text-muted-foreground transition-[color,box-shadow] hover:text-primary focus-visible:outline-none focus-visible:[box-shadow:var(--oa-focus-shadow)] sm:min-h-8"
+                        className="inline-flex min-h-10 min-w-0 items-center gap-1.5 rounded-sm text-sm leading-5 text-muted-foreground transition-[color,box-shadow] hover:text-primary focus-visible:outline-none focus-visible:[box-shadow:var(--oa-focus-shadow)] sm:min-h-8"
                       />}
                     >
                         {origin?.kind === 'interactive'
@@ -417,15 +418,15 @@ function Detail({ entry, onDelete }: { entry: InboxEntry; onDelete?: () => void 
                       finalFocus={senderTriggerRef}
                       className="z-30 w-72 max-w-[calc(100vw-3rem)] gap-0 rounded-xl border border-border/70 bg-secondary p-3 text-left shadow-lg ring-0"
                     >
-                      <p className="text-[11px] font-medium text-muted-foreground/70">
+                      <p className="text-sm font-medium text-muted-foreground/70">
                         {t('inbox.senderSession')}
                       </p>
-                      <p className="mt-1 break-words text-[12px] font-medium text-foreground [overflow-wrap:anywhere]">{senderDisplay}</p>
+                      <p className="mt-1 break-words text-sm font-medium text-foreground [overflow-wrap:anywhere]">{senderDisplay}</p>
                       {senderName && origin?.agent && (
-                        <p className="mt-0.5 text-[11px] text-muted-foreground">{origin.agent}</p>
+                        <p className="mt-0.5 text-sm text-muted-foreground">{origin.agent}</p>
                       )}
                       {senderSignature && (
-                        <p className="mt-0.5 break-all font-mono text-[10px] leading-relaxed text-muted-foreground">
+                        <p className="mt-0.5 break-all font-mono text-sm leading-relaxed text-muted-foreground">
                           {senderSignature}
                         </p>
                       )}
@@ -435,7 +436,7 @@ function Detail({ entry, onDelete }: { entry: InboxEntry; onDelete?: () => void 
                           size="lg"
                           onClick={() => void continueOrigin()}
                           disabled={continuing}
-                          className="mt-3 min-h-10 w-full text-[11px] disabled:cursor-wait"
+                          className="mt-3 min-h-10 w-full text-sm disabled:cursor-wait"
                         >
                           {continuing
                             ? t('inbox.continuingSession')
@@ -456,7 +457,7 @@ function Detail({ entry, onDelete }: { entry: InboxEntry; onDelete?: () => void 
                     size="sm"
                     onClick={openIssue}
                     title={t('inbox.fromIssueTitle', { issue: issueId })}
-                    className="min-h-10 min-w-0 justify-start px-0 text-left text-[12px] text-muted-foreground hover:bg-transparent hover:text-foreground sm:min-h-8"
+                    className="min-h-10 min-w-0 justify-start px-0 text-left text-sm text-muted-foreground hover:bg-transparent hover:text-foreground sm:min-h-8"
                   >
                     <ListChecks size={12} strokeWidth={1.75} className="shrink-0" />
                     <span className="min-w-0 break-words sm:max-w-[220px] sm:truncate">
@@ -466,7 +467,7 @@ function Detail({ entry, onDelete }: { entry: InboxEntry; onDelete?: () => void 
                 </span>
               )}
             </div>
-            <div className="mt-1.5 flex flex-wrap gap-x-2 text-[11px] leading-[15px] tabular-nums text-muted-foreground/55">
+            <div className="mt-1.5 flex flex-wrap gap-x-2 text-sm leading-5 tabular-nums text-muted-foreground/55">
               <span>{formatAbsolute(entry.ts)}</span>
               <span>{relativeTime}</span>
             </div>
@@ -479,7 +480,7 @@ function Detail({ entry, onDelete }: { entry: InboxEntry; onDelete?: () => void 
                 size="sm"
                 onClick={() => void continueOrigin()}
                 disabled={continuing}
-                className="h-10 px-2 text-[11px] text-muted-foreground sm:h-8 sm:px-2.5"
+                className="h-10 px-2 text-sm text-muted-foreground sm:h-8 sm:px-2.5"
                 title={canContinueOrigin ? t('inbox.openConversation') : t('inbox.openWorkspace')}
                 aria-label={canContinueOrigin ? t('inbox.openConversation') : t('inbox.openWorkspace')}
               >
@@ -514,7 +515,7 @@ function Detail({ entry, onDelete }: { entry: InboxEntry; onDelete?: () => void 
           </div>
         </div>
       </header>
-      {continueError && <div className="-mt-4 mb-6 text-[12px] leading-[18px] text-destructive">{continueError}</div>}
+      {continueError && <div className="-mt-4 mb-6 text-sm leading-5 text-destructive">{continueError}</div>}
 
       <div className="min-w-0">
         <MarkdownContent text={content.body} variant="reading" strikethrough={false}
@@ -541,7 +542,7 @@ function Detail({ entry, onDelete }: { entry: InboxEntry; onDelete?: () => void 
           ask={askInbox}
         />
       ) : (
-        <div className="mt-10 border-t border-border/60 pt-6 text-[12px] italic text-muted-foreground/60">
+        <div className="mt-10 border-t border-border/60 pt-6 text-sm italic text-muted-foreground/60">
           {t('inbox.cannotReplyWorkspaceGone')}
         </div>
       )}

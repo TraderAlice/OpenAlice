@@ -19,7 +19,6 @@ import { orderSessionsForSidebar, orderWorkspacesForSidebar, workspaceActivityMs
 import { useReorderMotion } from './useReorderMotion';
 import { SidebarActionMenu } from './SidebarActionMenu';
 import { AgentRuntimeIcon } from '../../lib/agentRuntimeIcon';
-import { SelectionIndicator } from '../SelectionIndicator';
 import { projectHeadlessTaskPresentation } from './headless-task-presentation';
 import { Button } from '../ui/button';
 import { SidebarRow } from '../SidebarRow';
@@ -145,7 +144,7 @@ export function Sidebar(props: SidebarProps): ReactElement {
           onClick={() => setShowCreate(true)}
           variant="outline"
           size="lg"
-          className="w-full justify-start bg-muted/30 px-3 text-[13px] text-muted-foreground hover:text-foreground"
+          className="w-full justify-start bg-muted/30 px-3 text-sm text-muted-foreground hover:text-foreground"
         >
           <Plus size={15} strokeWidth={2.25} className="shrink-0" />
           <span className="truncate">{t('workspace.newWorkspace')}</span>
@@ -206,9 +205,9 @@ export function Sidebar(props: SidebarProps): ReactElement {
         </div>
       )}
       {props.hasLoaded && props.workspaces.length === 0 && !showListError && (
-        <div className="px-3 py-2 text-[12px] text-muted-foreground/60">{t('workspace.emptySidebar')}</div>
+        <div className="px-3 py-2 text-sm text-muted-foreground/60">{t('workspace.emptySidebar')}</div>
       )}
-      {showListError && <div className="px-3 py-2 text-[12px] text-destructive">{props.listError}</div>}
+      {showListError && <div className="px-3 py-2 text-sm text-destructive">{props.listError}</div>}
 
       <div ref={workspaceListRef} className="flex flex-col mt-0.5">
         {orderedWorkspaces.map((w) => (
@@ -382,11 +381,10 @@ export function WorkspaceRow(props: WorkspaceRowProps): ReactElement {
   return (
     <div data-reorder-id={props.reorderId}>
       <div
-        className={`group relative flex items-center gap-1 pl-3 pr-2 py-1.5 text-[12px] leading-[18px] transition-colors ${
+        className={`group relative flex items-center gap-1 pl-3 pr-2 py-1.5 text-sm leading-5 transition-colors ${
           isSelected ? 'bg-sidebar-accent text-sidebar-accent-foreground' : 'text-foreground hover:bg-sidebar-accent/65'
         }`}
       >
-        {isSelected && <SelectionIndicator />}
         <button
           type="button"
           onClick={() => props.onSelectWorkspace(w.id)}
@@ -401,7 +399,7 @@ export function WorkspaceRow(props: WorkspaceRowProps): ReactElement {
           />
           <span className="min-w-0 flex-1 truncate font-medium">{label}</span>
           <span
-            className="text-[10px] leading-[14px] text-muted-foreground/50 tabular-nums shrink-0"
+            className="text-sm leading-5 text-muted-foreground/50 tabular-nums shrink-0"
             title={activityLabel}
           >
             {formatRelativeTime(workspaceActivityMs(w))}
@@ -445,12 +443,12 @@ export function WorkspaceRow(props: WorkspaceRowProps): ReactElement {
                       type="button"
                       role="menuitem"
                       aria-label={`${agent.displayName} (${agentPrefix(agent.id)})`}
-                      className="w-full flex items-center gap-2 px-3 py-1.5 text-[12px] leading-[18px] text-left text-foreground transition-colors hover:bg-muted"
+                      className="w-full flex items-center gap-2 px-3 py-1.5 text-sm leading-5 text-left text-foreground transition-colors hover:bg-muted"
                       onClick={() => onMenuPick(agent.id)}
                     >
                       <Plus size={12} strokeWidth={2.25} className="shrink-0 text-muted-foreground" />
                       <span className="flex-1 truncate">{agent.displayName}</span>
-                      <span className="text-[10px] leading-[14px] font-mono text-muted-foreground/60">{agentPrefix(agent.id)}</span>
+                      <span className="text-sm leading-5 font-mono text-muted-foreground/60">{agentPrefix(agent.id)}</span>
                     </button>
                   </li>
                 ))}
@@ -463,12 +461,12 @@ export function WorkspaceRow(props: WorkspaceRowProps): ReactElement {
                       type="button"
                       role="menuitem"
                       aria-label={`${agent.displayName} (${agentPrefix(agent.id)})`}
-                      className="w-full flex items-center gap-2 px-3 py-1.5 text-[12px] leading-[18px] text-left text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                      className="w-full flex items-center gap-2 px-3 py-1.5 text-sm leading-5 text-left text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
                       onClick={() => onMenuPick(agent.id)}
                     >
                       <Terminal size={12} strokeWidth={2.25} className="shrink-0 text-muted-foreground" />
                       <span className="flex-1 truncate">{agent.displayName}</span>
-                      <span className="text-[10px] leading-[14px] font-mono text-muted-foreground/60">{agentPrefix(agent.id)}</span>
+                      <span className="text-sm leading-5 font-mono text-muted-foreground/60">{agentPrefix(agent.id)}</span>
                     </button>
                   </li>
                 ))}
@@ -573,7 +571,7 @@ function HeadlessGroup(props: {
             ? t('workspace.headlessRunning', { count: runningCount })
             : t('workspace.headlessAutomation')
         }
-        className="group flex w-full items-center gap-1 py-1 pl-3 pr-2 text-[11px] leading-[15px] font-medium text-muted-foreground/70 transition-colors hover:text-foreground select-none"
+        className="group flex w-full items-center gap-1 py-1 pl-3 pr-2 text-sm leading-5 font-medium text-muted-foreground/70 transition-colors hover:text-foreground select-none"
       >
         {open ? <ChevronDown size={11} strokeWidth={2.25} aria-hidden="true" /> : <ChevronRight size={11} strokeWidth={2.25} aria-hidden="true" />}
         <span>{t('workspace.headless')}</span>
@@ -605,7 +603,7 @@ function HeadlessTaskRow(props: {
   if (presentation.summary) titleParts.push(presentation.summary);
 
   return (
-    <div className="group flex items-center gap-1.5 pl-3 pr-2 py-1 text-[11px] leading-[15px]" title={titleParts.join('\n')}>
+    <div className="group flex items-center gap-1.5 pl-3 pr-2 py-1 text-sm leading-5" title={titleParts.join('\n')}>
       <span className={`shrink-0 w-1.5 h-1.5 rounded-full ${HEADLESS_DOT_CLASS[task.status]}`} aria-label={task.status} />
       <span className="shrink-0 flex items-center justify-center w-3.5 text-muted-foreground/50">
         <AgentBadgeGlyph agentId={task.agent} />

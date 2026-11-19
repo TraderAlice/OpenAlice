@@ -32,9 +32,9 @@ afterEach(() => { cleanup(); vi.clearAllMocks(); Reflect.deleteProperty(window, 
 it('shows three parent objects with optional read-only default content, without selection or a chooser', () => {
   render(<VersionOverviewSection />)
   expect(screen.getAllByRole('heading', { level: 3 }).map(node => node.textContent)).toEqual(['App', 'Backend', 'Alice Project'])
-  expect(screen.queryByText('my-chat · Default')).toBeNull()
+  expect(screen.queryByText('my-chat')).toBeNull()
   fireEvent.click(screen.getByRole('button', { name: 'Project details' }))
-  expect(screen.getByText('my-chat · Default')).toBeTruthy()
+  expect(screen.getByText('my-chat')).toBeTruthy()
   expect(screen.getByText('Quant')).toBeTruthy()
   expect(screen.getByText('Prediction')).toBeTruthy()
   expect(screen.queryByRole('checkbox')).toBeNull()
@@ -118,7 +118,7 @@ it('retains a blocked release decision and explains it without an update action'
   const app = within(document.getElementById('settings-version-app')!)
   expect(app.getByText('Needs attention')).toBeTruthy()
   expect(app.queryByRole('button', { name: 'View update' })).toBeNull()
-  fireEvent.click(app.getByRole('button', { name: 'App · Details' }))
+  fireEvent.click(app.getByRole('button', { name: 'App: Details' }))
   expect(screen.getByText('The available release is older than the running version. An ordinary update cannot downgrade it.')).toBeTruthy()
 })
 

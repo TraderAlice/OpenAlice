@@ -1,5 +1,4 @@
 import type { ReactNode } from 'react'
-import { SelectionIndicator } from './SelectionIndicator'
 import { Tooltip, TooltipContent, TooltipTrigger } from './ui/tooltip'
 
 interface SidebarRowProps {
@@ -30,20 +29,6 @@ interface SidebarRowProps {
   ariaControls?: string
 }
 
-/**
- * Standardised row used inside every secondary sidebar (Chat channels,
- * Settings categories, Dev tabs, Portfolio accounts, etc.).
- *
- * Visual contract:
- * - Inactive rows render in full text colour for fast navigation scanning.
- * - Active rows use a muted fill and the project-owned neutral selection mark.
- * - Hover state is a half-opacity tint of the active background.
- *
- * A native `<button type="button">` owns row activation when `trail` is absent;
- * when `trail` is present, `<div role="button">` owns activation so `trail` may
- * contain either badges or action buttons within valid HTML, with Enter on
- * keydown and Space on keyup.
- */
 export function SidebarRow({
   label,
   active = false,
@@ -55,7 +40,7 @@ export function SidebarRow({
   ariaExpanded,
   ariaControls,
 }: SidebarRowProps) {
-  const baseClassName = `oa-nav-row group relative mx-2 flex min-h-10 cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-[13px] leading-[18px] outline-none md:min-h-8 ${
+  const baseClassName = `oa-nav-row group relative mx-2 flex min-h-(--oa-nav-height) cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-sm leading-5 outline-none ${
     active
       ? 'bg-sidebar-accent text-sidebar-accent-foreground'
       : 'text-sidebar-foreground hover:bg-sidebar-accent/60'
@@ -70,6 +55,7 @@ export function SidebarRow({
       aria-controls={ariaControls}
       onClick={onClick}
       onKeyDown={(e) => {
+        if (e.target !== e.currentTarget) return
         if (e.key === 'Enter') {
           e.preventDefault()
           onClick()
@@ -78,15 +64,14 @@ export function SidebarRow({
         }
       }}
       onKeyUp={(e) => {
-        if (e.key === ' ') {
+        if (e.target === e.currentTarget && e.key === ' ') {
           e.preventDefault()
           onClick()
         }
       }}
       className={baseClassName}
     >
-      {active && <SelectionIndicator />}
-      {icon && <span className="flex h-[18px] w-[18px] shrink-0 items-center justify-center">{icon}</span>}
+      {icon && <span className="oa-navigation-icon">{icon}</span>}
       <span className="truncate flex-1">{label}</span>
       <div className="shrink-0 flex items-center gap-0.5">{trail}</div>
     </div>
@@ -99,8 +84,7 @@ export function SidebarRow({
       onClick={onClick}
       className={`${baseClassName} w-[calc(100%-1rem)] text-left`}
     >
-      {active && <SelectionIndicator />}
-      {icon && <span className="flex h-[18px] w-[18px] shrink-0 items-center justify-center">{icon}</span>}
+      {icon && <span className="oa-navigation-icon">{icon}</span>}
       <span className="truncate flex-1">{label}</span>
     </button>
   )

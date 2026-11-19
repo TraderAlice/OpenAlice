@@ -12,6 +12,9 @@
  * own form state across tab switches so partial inputs aren't lost.
  */
 
+import { Autocomplete } from '@/components/ui/autocomplete'
+import { Select } from '@/components/ui/select'
+
 import { useMemo, useState } from 'react'
 import { api } from '../../api'
 import { simulatorApi, type SimulatorState } from '../../api/simulator'
@@ -21,8 +24,6 @@ import { Button } from '../../components/ui/button'
 import { inputClass as sharedInputClass } from '../../components/form'
 import { SegmentedControl } from '../../components/SegmentedControl'
 
-const inputClass =
-  `${sharedInputClass} min-h-8 py-1 text-sm`
 const inputClassMono =
   `${sharedInputClass} min-h-8 py-1 font-mono text-xs`
 
@@ -208,8 +209,8 @@ function DepositTab({ utaId, knownKeys, run, loading }: {
               disabled={loading || !draftOk || !qty}
               size="sm"
             >Deposit</Button>
-            {draftOk && <span className="text-[11px] leading-[15px] text-muted-foreground/70 font-mono">→ {draftOk.nativeKey}</span>}
-            {draftError && draft.symbol && <span className="text-[11px] text-warning">{draftError}</span>}
+            {draftOk && <span className="text-sm leading-5 text-muted-foreground/70 font-mono">→ {draftOk.nativeKey}</span>}
+            {draftError && draft.symbol && <span className="text-sm text-warning">{draftError}</span>}
           </>
         ) : (
           <>
@@ -302,8 +303,8 @@ function TradeTab({ utaId, run, loading }: {
         onChange={(e) => setPrice(e.target.value)}
       />
       <Button type="submit" disabled={loading || !draftOk || !qty || !price} size="sm">Submit</Button>
-      {draftOk && <span className="text-[11px] leading-[15px] text-muted-foreground/70 font-mono">→ {draftOk.nativeKey}</span>}
-      {draftError && draft.symbol && <span className="text-[11px] text-warning">{draftError}</span>}
+      {draftOk && <span className="text-sm leading-5 text-muted-foreground/70 font-mono">→ {draftOk.nativeKey}</span>}
+      {draftError && draft.symbol && <span className="text-sm text-warning">{draftError}</span>}
     </form>
   )
 }
@@ -364,15 +365,12 @@ function OrderTab({ utaId, knownKeys, run, loading }: {
         ariaLabel="Order side"
         compact
       />
-      <select
-        value={orderType}
-        onChange={(e) => setOrderType(e.target.value as 'MKT' | 'LMT')}
-        aria-label="Order type"
-        className={`${inputClass} w-20`}
-      >
-        <option value="MKT">MKT</option>
-        <option value="LMT">LMT</option>
-      </select>
+      <Select value={orderType} onValueChange={(selectedValue) => setOrderType(selectedValue as 'MKT' | 'LMT')} className="w-24" aria-label="Order type"
+        options={[
+          { value: 'MKT', label: 'MKT' },
+          { value: 'LMT', label: 'LMT' },
+        ]}
+      />
       <KeySelect value={key} onChange={setKey} options={knownKeys} placeholder="symbol" ariaLabel="Order symbol" />
       <input
         className={`${inputClassMono} w-28 tabular-nums`}
@@ -405,18 +403,13 @@ function KeySelect({ value, onChange, options, placeholder, ariaLabel }: {
   ariaLabel?: string
 }) {
   return (
-    <>
-      <input
-        className={`${inputClassMono} w-36`}
-        placeholder={placeholder}
-        aria-label={ariaLabel ?? placeholder}
-        value={value}
-        onChange={(e) => onChange(e.target.value.trim())}
-        list="sim-action-known-keys"
-      />
-      <datalist id="sim-action-known-keys">
-        {options.map(k => <option key={k} value={k} />)}
-      </datalist>
-    </>
+    <Autocomplete
+      className="w-36 font-mono"
+      aria-label={ariaLabel ?? placeholder}
+      placeholder={placeholder}
+      value={value}
+      onValueChange={(symbol) => onChange(symbol.trim())}
+      options={options}
+    />
   )
 }

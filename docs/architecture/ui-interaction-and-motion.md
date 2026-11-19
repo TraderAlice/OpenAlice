@@ -85,6 +85,14 @@ dismissal, scroll locking, and focus return.
 - Delete superseded Escape, outside-click, and focus-loop plumbing during
   migration rather than running it beside the primitive.
 
+The compact workspace scale is defined by the shared CSS tokens: `--oa-nav-height`
+for navigation rows, `--oa-control-height` for fields and buttons,
+`--oa-row-gap` for adjacent choices and `--oa-panel-inset` for panel padding.
+Keep selection marks in `SelectionCheckIcon`, use tabular numerals for changing
+figures, and keep reading text and touch controls at their larger sizes.
+Searchable model menus keep their filter and custom-model action visible while
+the choices scroll; provider fields allow free text as well as a suggested model.
+
 Shared resizable layouts use the checked-in Resizable primitive for pointer,
 touch, and keyboard behavior. Derive constraints from the measured split group,
 persist settled user widths rather than temporary responsive caps, and keep

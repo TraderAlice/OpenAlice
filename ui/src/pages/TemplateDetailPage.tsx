@@ -107,36 +107,36 @@ export function TemplateDetailPage({ spec }: Props) {
         <div className="mb-5 flex items-start justify-between gap-3">
           <div className="min-w-0">
             <div className="flex items-baseline gap-2.5 flex-wrap">
-              <span className="text-[12px] font-mono text-muted-foreground tabular-nums shrink-0">
+              <span className="text-sm font-mono text-muted-foreground tabular-nums shrink-0">
                 v{template.version}
               </span>
               {template.community && (
-                <span className="shrink-0 rounded-md border border-border px-2 py-0.5 text-[10px] text-muted-foreground">
+                <span className="shrink-0 rounded-md border border-border px-2 py-0.5 text-sm text-muted-foreground">
                   {t('templates.communityBadge')}
                 </span>
               )}
             </div>
             {template.description && (
-              <p className="text-[12px] text-muted-foreground mt-1.5 max-w-2xl leading-relaxed">
+              <p className="text-sm text-muted-foreground mt-1.5 max-w-2xl leading-relaxed">
                 {template.description}
               </p>
             )}
             <div className="flex items-center gap-3 mt-2.5 flex-wrap">
-              <span className="text-[11px] font-medium text-muted-foreground">
+              <span className="text-sm font-medium text-muted-foreground">
                 {t('templates.agentsLabel')}
               </span>
               <div className="flex items-center gap-2 flex-wrap">
                 {agents.map((a) => (
                   <span
                     key={a.id}
-                    className="inline-flex items-center gap-1.5 text-[11px] text-muted-foreground"
+                    className="inline-flex items-center gap-1.5 text-sm text-muted-foreground"
                   >
                     <AgentRuntimeIcon agentId={a.id} className="size-3.5 shrink-0" />
                     {a.id}
                   </span>
                 ))}
               </div>
-              <span className="text-[11px] font-mono text-muted-foreground/60">
+              <span className="text-sm font-mono text-muted-foreground/60">
                 {template.name}
               </span>
             </div>
@@ -144,20 +144,20 @@ export function TemplateDetailPage({ spec }: Props) {
         </div>
 
         {/* README body — the template's starting-shape doc */}
-        <div className="mb-2 text-[11px] font-medium text-muted-foreground">
+        <div className="mb-2 text-sm font-medium text-muted-foreground">
           {t('templates.readmeLabel')}
         </div>
         <div className="rounded-lg border border-border bg-secondary px-6 py-5">
           {readme === null && !readmeMissing && readmeError === null && (
-            <p className="text-[12px] text-muted-foreground italic">{t('templates.loadingReadme')}</p>
+            <p className="text-sm text-muted-foreground italic">{t('templates.loadingReadme')}</p>
           )}
           {readmeMissing && (
-            <p className="text-[12px] text-muted-foreground italic">{t('templates.noReadme')}</p>
+            <p className="text-sm text-muted-foreground italic">{t('templates.noReadme')}</p>
           )}
           {readmeError && (
             <div
               role="alert"
-              className="flex items-center justify-between gap-3 text-[12px] text-destructive"
+              className="flex items-center justify-between gap-3 text-sm text-destructive"
             >
               <span className="min-w-0 break-words">{readmeError}</span>
               <Button
@@ -172,7 +172,7 @@ export function TemplateDetailPage({ spec }: Props) {
             </div>
           )}
           {readmeBody && (
-            <MarkdownContent text={readmeBody} className="text-[13px] leading-relaxed" />
+            <MarkdownContent text={readmeBody} className="text-sm leading-relaxed" />
           )}
         </div>
       </div>

@@ -46,6 +46,8 @@ describe('AppearanceSection palette pair editor', () => {
   it('switches every component style immediately and preserves the saved palette pair', () => {
     render(<AppearanceSection />)
 
+    fireEvent.click(screen.getByRole('button', { name: 'Interface style Default' }))
+
     expect(screen.getByRole('radio', { name: 'Default' }).getAttribute('aria-checked')).toBe('true')
     const profiles = [
       ['Broker Classic', 'broker-classic'],
@@ -73,6 +75,7 @@ describe('AppearanceSection palette pair editor', () => {
   it('scopes the selected style recommendation without rewriting saved colors', () => {
     render(<AppearanceSection />)
 
+    fireEvent.click(screen.getByRole('button', { name: 'Interface style Default' }))
     fireEvent.click(screen.getByRole('radio', { name: 'Windows 98' }))
     expect(useThemeStore.getState().dayPalette).toBe('paper')
     expect(useThemeStore.getState().nightPalette).toBe('graphite')
@@ -83,20 +86,20 @@ describe('AppearanceSection palette pair editor', () => {
     expect(useThemeStore.getState().dayPalette).toBe('paper')
     expect(useThemeStore.getState().nightPalette).toBe('graphite')
     expect(useThemeStore.getState().stylePaletteMode).toBe('recommended')
-    expect(screen.getByText('Currently using Day · Windows Classic')).toBeTruthy()
+    expect(screen.getByText('Current Day palette: Windows Classic')).toBeTruthy()
     expect(screen.getByRole('button', { name: 'Use saved colors' }).getAttribute('aria-pressed'))
       .toBe('true')
 
     fireEvent.click(screen.getByRole('radio', { name: 'Default' }))
-    expect(screen.getByText('Currently using Day · Paper')).toBeTruthy()
+    expect(screen.getByText('Current Day palette: Paper')).toBeTruthy()
     expect(screen.getByRole('button', { name: 'Edit Day palette: Paper' })).toBeTruthy()
 
     fireEvent.click(screen.getByRole('radio', { name: 'Broker Classic' }))
-    expect(screen.getByText('Currently using Day · Paper')).toBeTruthy()
+    expect(screen.getByText('Current Day palette: Paper')).toBeTruthy()
     fireEvent.click(screen.getByRole('button', { name: 'Use recommended colors' }))
     fireEvent.click(screen.getByRole('button', { name: 'Use saved colors' }))
     expect(useThemeStore.getState().stylePaletteMode).toBe('saved')
-    expect(screen.getByText('Currently using Day · Paper')).toBeTruthy()
+    expect(screen.getByText('Current Day palette: Paper')).toBeTruthy()
   })
 
   it('does not expose the retired editor tab strip preference', () => {
@@ -113,9 +116,9 @@ describe('AppearanceSection palette pair editor', () => {
   it('keeps the palette library collapsed until the user asks to customize it', () => {
     render(<AppearanceSection />)
 
-    expect(screen.getByText('Currently using Day · Paper')).toBeTruthy()
+    expect(screen.getByText('Current Day palette: Paper')).toBeTruthy()
     expect(screen.getByRole('button', { name: 'Edit Day palette: Paper' }).getAttribute('aria-pressed'))
-      .toBe('true')
+      .toBe('false')
     const disclosure = screen.getByRole('button', { name: 'Customize palettes' })
     const editor = document.getElementById(disclosure.getAttribute('aria-controls') ?? '')
 
@@ -124,7 +127,7 @@ describe('AppearanceSection palette pair editor', () => {
     expect(screen.queryByRole('button', { name: 'Recommended' })).toBeNull()
     expect(screen.queryByRole('button', { name: 'Reset pair' })).toBeNull()
     expect(screen.queryByRole('button', { name: 'Choose Paper' })).toBeNull()
-    expect(screen.getByRole('button', { name: 'Auto' }).className).toContain('min-h-10')
+    expect(screen.getByRole('button', { name: 'Auto' }).className).toContain('min-h-8')
 
     fireEvent.click(disclosure)
 
@@ -132,7 +135,7 @@ describe('AppearanceSection palette pair editor', () => {
     expect(editor?.hidden).toBe(false)
     expect(screen.getByRole('button', { name: 'Recommended' }).getAttribute('aria-pressed'))
       .toBe('true')
-    expect(screen.getByRole('button', { name: 'Recommended' }).className).toContain('min-h-10')
+    expect(screen.getByRole('button', { name: 'Recommended' }).className).toContain('min-h-8')
     expect(screen.getByRole('button', { name: 'Reset pair' }).className).toContain('min-h-10')
     expect(screen.getByRole('button', { name: 'Choose Paper' })).toBeTruthy()
     expect(screen.getByRole('button', { name: 'Choose Linen' })).toBeTruthy()
@@ -182,9 +185,9 @@ describe('AppearanceSection palette pair editor', () => {
     systemDark = true
     render(<AppearanceSection />)
 
-    expect(screen.getByText('Currently using Night · Graphite')).toBeTruthy()
+    expect(screen.getByText('Current Night palette: Graphite')).toBeTruthy()
     expect(screen.getByRole('button', { name: 'Edit Night palette: Graphite' }).getAttribute('aria-pressed'))
-      .toBe('true')
+      .toBe('false')
   })
 
   it('preserves a selected pair when the palette editor is collapsed again', () => {

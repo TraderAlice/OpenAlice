@@ -220,9 +220,17 @@ export const tradingHandlers = [
     HttpResponse.json({ success: true, account: demoAccountInfo }),
   ),
 
-  http.get('/api/trading/uta/:id/snapshots', ({ params }) =>
-    HttpResponse.json({ snapshots: demoSnapshotsByUTA[utaId(params)] ?? [] }),
-  ),
+  http.get('/api/trading/uta/:id/snapshots', ({ params, request }) => {
+    const query = new URL(request.url).searchParams
+    const startTime = query.get('startTime')
+    const endTime = query.get('endTime')
+    const limit = Number(query.get('limit')) || 100
+    const snapshots = (demoSnapshotsByUTA[utaId(params)] ?? [])
+      .filter(snapshot => (!startTime || snapshot.timestamp >= startTime) && (!endTime || snapshot.timestamp <= endTime))
+      .sort((a, b) => b.timestamp.localeCompare(a.timestamp))
+      .slice(0, limit)
+    return HttpResponse.json({ snapshots })
+  }),
   http.delete('/api/trading/uta/:id/snapshots/:timestamp', () =>
     HttpResponse.json({ success: true }),
   ),
