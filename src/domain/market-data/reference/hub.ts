@@ -32,6 +32,21 @@ const BREAKER_MS = 60_000
 
 export type HubFetcher = <T extends { meta: ReferenceMeta }>(board: string) => Promise<T | null>
 
+function safeHost(rawUrl: string): string {
+  try {
+    return new URL(rawUrl).host
+  } catch {
+    return rawUrl
+  }
+}
+
+function describeError(err: unknown): string {
+  if (!(err instanceof Error)) return String(err)
+  const code = (err as Error & { code?: unknown }).code
+  const base = err.message || err.name
+  return typeof code === 'string' && code && !base.includes(code) ? `${code}: ${base}` : base
+}
+
 /** Returns null when the hub is disabled, open-circuited, unreachable, or
  *  returns a non-contract shape — the caller falls through to local. */
 export function createHubFetcher(cfg: HubConfig | undefined, opts?: { timeoutMs?: number; breakerMs?: number }): HubFetcher {
@@ -48,15 +63,17 @@ export function createHubFetcher(cfg: HubConfig | undefined, opts?: { timeoutMs?
   return async function hubBoard<T extends { meta: ReferenceMeta }>(board: string): Promise<T | null> {
     if (!cfg?.enabled || !cfg.baseUrl) return null
     if (Date.now() < (downUntil.get(board) ?? 0)) return null
+    const host = safeHost(cfg.baseUrl)
     let res: Response
     try {
       res = await fetch(`${cfg.baseUrl.replace(/\/$/, '')}/api/reference/${board}`, {
         signal: AbortSignal.timeout(timeoutMs),
         headers: { Accept: 'application/json' },
       })
-    } catch {
+    } catch (err) {
       // Transport failure — hub unreachable; back off for this board.
       downUntil.set(board, Date.now() + breakerMs)
+      console.warn(`[hub] ${host} board "${board}" unreachable: ${describeError(err)}; falling back to local`)
       return null
     }
     try {

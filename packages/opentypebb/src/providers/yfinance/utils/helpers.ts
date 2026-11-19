@@ -35,12 +35,18 @@ function httpStatusOf(err: unknown): number | undefined {
   return typeof code === 'number' && code >= 100 && code < 600 ? code : undefined
 }
 
-/** Flatten an error (name + message + `.cause` chain) into one searchable string. */
+/** Flatten an error (name + code + message + `.cause` chain) into one searchable string. */
 function errorHaystack(err: unknown, depth = 0): string {
   if (err == null || depth > 4) return ''
   if (err instanceof Error) {
+    const code = (err as Error & { code?: unknown }).code
     const cause = (err as Error & { cause?: unknown }).cause
-    return [err.name, err.message, errorHaystack(cause, depth + 1)].filter(Boolean).join(' ')
+    return [
+      err.name,
+      typeof code === 'string' ? code : '',
+      err.message,
+      errorHaystack(cause, depth + 1),
+    ].filter(Boolean).join(' ')
   }
   return String(err)
 }
@@ -63,7 +69,11 @@ function errorHaystack(err: unknown, depth = 0): string {
 export function classifyYahooFetchError(symbol: string, err: unknown): Error {
   const status = httpStatusOf(err)
   const hay = errorHaystack(err)
-  const detail = err instanceof Error ? (err.message || err.name) : String(err)
+  const errCode = err instanceof Error && typeof (err as Error & { code?: unknown }).code === 'string'
+    ? (err as Error & { code: string }).code
+    : undefined
+  const baseDetail = err instanceof Error ? (err.message || err.name) : String(err)
+  const detail = errCode && !baseDetail.includes(errCode) ? `${errCode}: ${baseDetail}` : baseDetail
 
   if (status === 429 || /too many requests|rate.?limit(ed)?/i.test(hay)) {
     return new RateLimitedError('Yahoo Finance', detail, { symbol, status: status ?? 429, original: err })
@@ -71,7 +81,7 @@ export function classifyYahooFetchError(symbol: string, err: unknown): Error {
   if (status === 401 || status === 403 || /\bcrumb\b|invalid cookie|consent|unauthorized|forbidden/i.test(hay)) {
     return new RateLimitedError('Yahoo Finance', detail, { symbol, status, original: err })
   }
-  if (/fetch failed|ENOTFOUND|EAI_AGAIN|ECONNREFUSED|ECONNRESET|ETIMEDOUT|EHOSTUNREACH|ENETUNREACH|socket hang up|UNABLE_TO_VERIFY|SELF_SIGNED/i.test(hay)) {
+  if (/fetch failed|unable to connect|connectionrefused|failedtoopensocket|econnaborted|ENOTFOUND|EAI_AGAIN|ECONNREFUSED|ECONNRESET|ETIMEDOUT|EHOSTUNREACH|ENETUNREACH|socket hang up|UNABLE_TO_VERIFY|SELF_SIGNED/i.test(hay)) {
     return new NetworkUnreachableError('finance.yahoo.com', detail, err)
   }
   return err instanceof Error ? err : new Error(detail)
@@ -164,7 +174,7 @@ export async function getPredefinedScreener(
         await new Promise(r => setTimeout(r, 1000))
         continue
       }
-      throw err
+      throw classifyYahooFetchError(scrId, err)
     }
   }
 
@@ -245,7 +255,7 @@ export async function getQuoteSummary(
     recordYFSuccess()
   } catch (err) {
     recordYFFailure()
-    throw err
+    throw classifyYahooFetchError(symbol, err)
   }
 
   if (!result) {
@@ -376,9 +386,16 @@ export async function searchYahooFinance(
   const yf = getYF()
   // validateResult: false — Yahoo changed typeDisp casing (e.g. "cryptocurrency" vs
   // "Cryptocurrency"), causing yahoo-finance2's strict schema validation to throw.
-  const result: any = await withRetry(() =>
-    (yf as any).search(query, { quotesCount: 20, newsCount: 0 }, { validateResult: false }),
-  )
+  let result: any
+  try {
+    result = await withRetry(() =>
+      (yf as any).search(query, { quotesCount: 20, newsCount: 0 }, { validateResult: false }),
+    )
+    recordYFSuccess()
+  } catch (err) {
+    recordYFFailure()
+    throw classifyYahooFetchError(query, err)
+  }
   return (result.quotes ?? []) as Record<string, unknown>[]
 }
 
@@ -436,7 +453,7 @@ export async function getFinancialStatements(
     recordYFSuccess()
   } catch (err) {
     recordYFFailure()
-    throw err
+    throw classifyYahooFetchError(symbol, err)
   }
 
   if (!Array.isArray(result) || result.length === 0) {
@@ -492,7 +509,7 @@ export async function getRawQuoteSummary(
     recordYFSuccess()
   } catch (err) {
     recordYFFailure()
-    throw err
+    throw classifyYahooFetchError(symbol, err)
   }
 
   if (!result) {
@@ -531,7 +548,7 @@ export async function getHistoricalDividends(
     recordYFSuccess()
   } catch (err) {
     recordYFFailure()
-    throw err
+    throw classifyYahooFetchError(symbol, err)
   }
 
   // Extract dividends from events
@@ -613,7 +630,7 @@ export async function getOptionsData(
         await new Promise(r => setTimeout(r, 1000))
         continue
       }
-      throw err
+      throw classifyYahooFetchError(symbol, err)
     }
   }
 }
@@ -626,7 +643,13 @@ export async function getYahooNews(
   limit = 20,
 ): Promise<Record<string, unknown>[]> {
   const yf = getYF()
-  const result = await withRetry(() => yf.search(symbol, { quotesCount: 0, newsCount: limit }))
-  return (result.news ?? []) as Record<string, unknown>[]
+  try {
+    const result = await withRetry(() => yf.search(symbol, { quotesCount: 0, newsCount: limit }))
+    recordYFSuccess()
+    return (result.news ?? []) as Record<string, unknown>[]
+  } catch (err) {
+    recordYFFailure()
+    throw classifyYahooFetchError(symbol, err)
+  }
 }
 

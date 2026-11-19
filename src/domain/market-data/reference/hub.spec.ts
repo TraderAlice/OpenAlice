@@ -49,19 +49,25 @@ describe('createHubFetcher', () => {
   })
 
   it('transport failures trip a PER-BOARD breaker — siblings keep fetching', async () => {
-    fetchSpy.mockRejectedValue(new TypeError('network down'))
-    const viaHub = createHubFetcher({ enabled: true, baseUrl: 'https://hub.test' }, { breakerMs: 60_000 })
-    expect(await viaHub<Board>('global-macro')).toBeNull()
-    // Same board: breaker open, no second fetch.
-    expect(await viaHub<Board>('global-macro')).toBeNull()
-    expect(fetchSpy).toHaveBeenCalledTimes(1)
-    // Different board: NOT gated by the sibling's breaker.
-    // (Fresh Response per call — a body is single-read.)
-    fetchSpy.mockImplementation(() => Promise.resolve(new Response(JSON.stringify(board(3)))))
-    expect((await viaHub<Board>('macro'))?.value).toBe(3)
-    // Original board recovers after the window.
-    vi.advanceTimersByTime(61_000)
-    expect((await viaHub<Board>('global-macro'))?.value).toBe(3)
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    try {
+      fetchSpy.mockRejectedValue(Object.assign(new TypeError('Unable to connect'), { code: 'FailedToOpenSocket' }))
+      const viaHub = createHubFetcher({ enabled: true, baseUrl: 'https://hub.test' }, { breakerMs: 60_000 })
+      expect(await viaHub<Board>('global-macro')).toBeNull()
+      expect(warnSpy).toHaveBeenCalledWith(expect.stringMatching(/hub\.test.*global-macro.*FailedToOpenSocket/))
+      // Same board: breaker open, no second fetch.
+      expect(await viaHub<Board>('global-macro')).toBeNull()
+      expect(fetchSpy).toHaveBeenCalledTimes(1)
+      // Different board: NOT gated by the sibling's breaker.
+      // (Fresh Response per call — a body is single-read.)
+      fetchSpy.mockImplementation(() => Promise.resolve(new Response(JSON.stringify(board(3)))))
+      expect((await viaHub<Board>('macro'))?.value).toBe(3)
+      // Original board recovers after the window.
+      vi.advanceTimersByTime(61_000)
+      expect((await viaHub<Board>('global-macro'))?.value).toBe(3)
+    } finally {
+      warnSpy.mockRestore()
+    }
   })
 
   it('rejects non-contract shapes (data boundary: shape-checked, never trusted)', async () => {

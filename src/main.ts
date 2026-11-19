@@ -1,6 +1,7 @@
 import { newsActivityPayload } from './domain/news/activity.js'
 import { publishCliEndpoint } from './server/cli-endpoint.js'
 import { createMarketBarsTools } from './tool/market-bars.js'
+import { createNetworkCheckTools } from './tool/network-check.js'
 import {
   acquireOpenAliceRuntimeLocks,
   takeoverRequested,
@@ -286,6 +287,14 @@ async function main() {
     toolCenter.register(createIndexTools(indexClient), 'indices')
   }
   toolCenter.register(createEconomyTools(economyClient, commodityClient), 'economy')
+  toolCenter.register(
+    createNetworkCheckTools({
+      utaUrl,
+      utaDisabled: () => currentTradingModePolicy().mode === 'lite',
+      hub: config.marketData.hub,
+    }),
+    'network',
+  )
 
   console.log(`tool-center: ${toolCenter.list().length} tools registered`)
 
