@@ -5,11 +5,14 @@ import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import type { IssueListItem, IssueSnapshot } from '../api/issues'
+import type { ScheduleSnapshot } from '../api/schedule'
 import { i18n } from '../i18n'
 import { IssuesBoard } from './IssuesBoard'
 
 const mocks = vi.hoisted(() => ({
   useIssues: vi.fn(),
+  useScheduleSnapshot: vi.fn<() => { snapshot: ScheduleSnapshot | null; refresh: () => Promise<void> }>(),
+  refreshSchedule: vi.fn().mockResolvedValue(undefined),
   openOrFocus: vi.fn(),
   setSidebar: vi.fn(),
   updateIssue: vi.fn(),
@@ -18,6 +21,14 @@ const mocks = vi.hoisted(() => ({
 vi.mock('../hooks/useIssues', () => ({
   useIssues: () => mocks.useIssues(),
 }))
+
+vi.mock('../hooks/useSchedules', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../hooks/useSchedules')>()
+  return {
+    ...actual,
+    useScheduleSnapshot: () => mocks.useScheduleSnapshot(),
+  }
+})
 
 vi.mock('../contexts/workspaces-context', () => ({
   useWorkspaces: () => ({
@@ -63,6 +74,10 @@ beforeEach(async () => {
     error: null,
     loading: false,
     updateIssue: mocks.updateIssue,
+  })
+  mocks.useScheduleSnapshot.mockReturnValue({
+    snapshot: null,
+    refresh: mocks.refreshSchedule,
   })
 })
 
@@ -304,6 +319,130 @@ describe('inline Issue properties', () => {
     await user.click(screen.getByRole('menuitem', { name: 'Done' }))
     expect(mocks.updateIssue).toHaveBeenCalledWith('ws-1', 'editable', { status: 'done' })
     expect(mocks.openOrFocus).not.toHaveBeenCalled()
+  })
+
+  it('surfaces deferred and parked skipState pills from GET /api/schedule and prioritizes parked issues', () => {
+    const now = Date.now()
+    mocks.useIssues.mockReturnValue({
+      data: snapshot([
+        issue({
+          id: 'healthy-urgent',
+          title: 'Healthy urgent scan',
+          priority: 'urgent',
+          when: { kind: 'every', every: '1h' },
+          automationHealth: { state: 'healthy', message: 'Latest scheduled run completed.' },
+        }),
+        issue({
+          id: 'deferred-scan',
+          title: 'Deferred cooldown scan',
+          priority: 'low',
+          when: { kind: 'every', every: '30m' },
+          automationHealth: { state: 'healthy', message: 'Latest scheduled run completed.' },
+        }),
+        issue({
+          id: 'parked-scan',
+          title: 'Parked session scan',
+          priority: 'low',
+          when: { kind: 'every', every: '6h' },
+          automationHealth: { state: 'healthy', message: 'Latest scheduled run completed.' },
+        }),
+        issue({
+          id: 'done-parked',
+          title: 'Completed scan',
+          status: 'done',
+          when: { kind: 'every', every: '6h' },
+        }),
+      ]),
+      error: null,
+      loading: false,
+      updateIssue: mocks.updateIssue,
+    })
+    mocks.useScheduleSnapshot.mockReturnValue({
+      snapshot: {
+        workspaces: [
+          {
+            wsId: 'ws-1',
+            tag: 'market-desk',
+            status: 'ok',
+            tasks: [
+              {
+                id: 'deferred-scan',
+                issue: 'Deferred cooldown scan',
+                when: { kind: 'every', every: '30m' },
+                what: 'Scan',
+                assignee: '@new-each-run',
+                enabled: true,
+                lastFiredAtMs: now - 30 * 60_000,
+                nextDueAtMs: now,
+                skipState: {
+                  kind: 'deferred',
+                  code: 'session_blocked',
+                  reason: 'Session is cooling down after user limit.',
+                  retryAtMs: now + 5 * 60_000,
+                  sinceMs: now - 60_000,
+                },
+              },
+              {
+                id: 'parked-scan',
+                issue: 'Parked session scan',
+                when: { kind: 'every', every: '6h' },
+                what: 'Scan',
+                assignee: '@resume-a1b2c3',
+                enabled: true,
+                lastFiredAtMs: now - 6 * 3_600_000,
+                nextDueAtMs: now,
+                skipState: {
+                  kind: 'parked',
+                  code: 'session_blocked',
+                  reason: 'Execution fault circuit breaker active.',
+                  sinceMs: now - 10 * 60_000,
+                },
+              },
+              {
+                id: 'done-parked',
+                issue: 'Completed scan',
+                when: { kind: 'every', every: '6h' },
+                what: 'Scan',
+                assignee: '@new-each-run',
+                enabled: false,
+                lastFiredAtMs: null,
+                nextDueAtMs: null,
+                skipState: {
+                  kind: 'parked',
+                  code: 'retired',
+                  reason: 'Should not show on completed issue.',
+                  sinceMs: now - 60_000,
+                },
+              },
+            ],
+          },
+        ],
+      },
+      refresh: mocks.refreshSchedule,
+    })
+
+    render(<IssuesBoard />)
+
+    const pills = screen.getAllByTestId('schedule-skip-pill')
+    expect(pills).toHaveLength(2)
+    expect(pills[0].textContent).toBe('Paused')
+    expect(pills[0].getAttribute('aria-label')).toBe(
+      'Paused — Execution fault circuit breaker active.',
+    )
+    expect(pills[1].textContent).toBe('Retrying in 5m')
+    expect(pills[1].getAttribute('aria-label')).toBe(
+      'Retrying in 5m — Session is cooling down after user limit.',
+    )
+
+    // Parked -> Deferred -> Healthy row ordering inside Todo group.
+    const todoButtons = screen
+      .getByTestId('issue-status-group-todo')
+      .querySelectorAll('button[title^="Open "]')
+    expect(Array.from(todoButtons).map((el) => el.getAttribute('title'))).toEqual([
+      'Open parked-scan',
+      'Open deferred-scan',
+      'Open healthy-urgent',
+    ])
   })
 })
 
