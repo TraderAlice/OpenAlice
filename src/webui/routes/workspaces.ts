@@ -124,6 +124,7 @@ import {
   AUTO_QUANT_WORKSPACE_TEMPLATE,
   CHAT_WORKSPACE_TEMPLATE,
 } from '../../workspaces/chat-workspace-resolver.js';
+import { workspaceTemplateSlot } from '../../workspaces/active-workspace-slots.js';
 import { ALICE_HARNESS_SKILLS } from '../../workspaces/alice-harness-policy.js';
 import { TemplateUpgradeError } from '../../workspaces/template-upgrade.js';
 import { HarnessSourceUpgradeError } from '../../workspaces/harness-source-upgrade.js';
@@ -739,8 +740,26 @@ export function createWorkspaceRoutes(
   };
 
   const rememberRecentChat = async (meta: WorkspaceMeta): Promise<void> => {
-    if (meta.template !== CHAT_WORKSPACE_TEMPLATE) return;
+    if (workspaceTemplateSlot(meta.template) !== CHAT_WORKSPACE_TEMPLATE) return;
     try {
+      const current = await quickChatPreferences.readQuickChatPreferences();
+      if (current.recentChatWorkspaceId && current.recentChatWorkspaceId !== meta.id) {
+        const activeChat = svc.registry.get(current.recentChatWorkspaceId);
+        if (activeChat && workspaceTemplateSlot(activeChat.template) === CHAT_WORKSPACE_TEMPLATE) {
+          // Do not let inspecting/chatting in a standby Chat workspace silently
+          // preempt the active Chat slot without going through activateWorkspace.
+          return;
+        }
+      }
+      if (typeof svc.listActiveWorkspaces === 'function') {
+        const activeWorkspaces = await svc.listActiveWorkspaces();
+        const activeChat = activeWorkspaces.find(
+          (ws) => workspaceTemplateSlot(ws.template) === CHAT_WORKSPACE_TEMPLATE,
+        );
+        if (activeChat && activeChat.id !== meta.id) {
+          return;
+        }
+      }
       await quickChatPreferences.rememberRecentChatWorkspace(meta.id);
     } catch (err) {
       launcherLogger.warn('quick_chat.preference_write_failed', { id: meta.id, err });

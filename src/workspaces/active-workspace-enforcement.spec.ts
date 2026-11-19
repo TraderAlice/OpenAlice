@@ -426,6 +426,40 @@ describe('WorkspaceService & routes active-workspace slot lifecycle', () => {
       expect(offboardRes.ok).toBe(true)
       expect((await readActiveWorkspaceSlots(prefsPath))['auto-prediction']).toBe('pred-a')
       expect((await service.publicMeta(predA) as { activationState: string }).activationState).toBe('active')
+
+      // 8. Sending quick-chat targeting a standby Chat workspace does NOT steal the active Chat slot
+      const rememberSpy = vi.fn(async (id: string | null) => {
+        await slotStore.writeSlot('chat', id)
+        return { lastCredentialByAgent: {}, recentChatWorkspaceId: id }
+      })
+      const quickChatApp = createWorkspaceRoutes(service, {
+        readQuickChatPreferences: async () => ({
+          lastCredentialByAgent: {},
+          recentChatWorkspaceId: (await readActiveWorkspaceSlots(prefsPath)).chat ?? null,
+        }),
+        rememberRecentChatWorkspace: rememberSpy,
+      })
+      vi.spyOn(service.executions, 'terminal').mockResolvedValue({
+        id: 'sess-standby-1',
+        pid: 12345,
+        startedAt: Date.now(),
+        agent: 'claude',
+        resumeId: 'resume-standby-1',
+      } as any)
+      const quickChatRes = await quickChatApp.request('/quick-chat', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          prompt: 'inspect standby chat',
+          agent: 'claude',
+          targetWsId: chatB.id,
+        }),
+      })
+      expect(quickChatRes.status).toBe(201)
+      expect(rememberSpy).not.toHaveBeenCalled()
+      expect((await readActiveWorkspaceSlots(prefsPath)).chat).toBe(chatA.id)
+      expect((await service.publicMeta(chatA) as { activationState: string }).activationState).toBe('active')
+      expect((await service.publicMeta(chatB) as { activationState: string }).activationState).toBe('standby')
     } finally {
       releaseInFlight()
       await service.dispose('test-cleanup')
