@@ -9,7 +9,17 @@ import type { CliAdapter } from '../cli-adapter.js'
 import type { Logger } from '../logger.js'
 import type { WorkspaceMeta, WorkspaceRegistry } from '../workspace-registry.js'
 
-import { ScheduleScanner, type MarkerStore, type ScheduleScannerDeps } from './scanner.js'
+import { SessionAdmissionError } from '../session-admission.js'
+import { HeadlessCapacityError, HeadlessResumeError } from '../service.js'
+import {
+  BACKOFF_STEPS_MS,
+  classifyScheduleSkip,
+  ScheduleDispatchError,
+  ScheduledIssueRunNowError,
+  ScheduleScanner,
+  type MarkerStore,
+  type ScheduleScannerDeps,
+} from './scanner.js'
 
 const NOW = 1_700_000_000_000 // realistic epoch ms — `every` is relative-from-0, so first-sight needs a large clock
 
@@ -133,6 +143,7 @@ function scannerFor(
   workspaces: WorkspaceMeta[],
   opts: {
     dispatch?: ScheduleScannerDeps['dispatch']
+    logger?: Logger
     markers?: MarkerStore
     now?: number
     adapter?: CliAdapter
@@ -141,6 +152,7 @@ function scannerFor(
     claimFreshSession?: ScheduleScannerDeps['claimFreshSession']
     canRetryIssueRun?: ScheduleScannerDeps['canRetryIssueRun']
     isIssueRunning?: ScheduleScannerDeps['isIssueRunning']
+    isSessionBlocked?: ScheduleScannerDeps['isSessionBlocked']
     observeIssues?: ScheduleScannerDeps['observeIssues']
     reconcileSessionRuntimeBindings?: ScheduleScannerDeps['reconcileSessionRuntimeBindings']
   } = {},
@@ -150,6 +162,7 @@ function scannerFor(
   const scanner = new ScheduleScanner({
     canRetryIssueRun: opts.canRetryIssueRun,
     isIssueRunning: opts.isIssueRunning,
+    isSessionBlocked: opts.isSessionBlocked,
     registry: {
       list: () => workspaces,
       get: (id: string) => workspaces.find((workspace) => workspace.id === id),
@@ -161,7 +174,7 @@ function scannerFor(
     observeIssues: opts.observeIssues,
     reconcileSessionRuntimeBindings: opts.reconcileSessionRuntimeBindings,
     markers,
-    logger: noopLogger,
+    logger: opts.logger ?? noopLogger,
     now: () => opts.now ?? NOW,
   })
   return { scanner, dispatch, markers }
@@ -680,13 +693,14 @@ describe('ScheduleScanner', () => {
       what: 'tick',
     }])
     const dispatch = vi.fn(async () => {
-      throw new Error('this conversation already has a running turn')
+      throw new HeadlessResumeError('busy', 'this conversation already has a running turn')
     })
     const { scanner, markers } = scannerFor([ws], { dispatch })
     await scanner.scan()
     expect(dispatch).toHaveBeenCalledTimes(1)
     expect(markers.get('w1', 'c1')).toBeUndefined()
     expect(markers.getHeld('w1', 'c1')).toBeTypeOf('number')
+    expect(scanner.snapshot()?.workspaces[0]?.tasks[0]?.skipState).toBeUndefined()
     await scanner.scan()
     expect(dispatch).toHaveBeenCalledTimes(2)
   })
@@ -699,7 +713,7 @@ describe('ScheduleScanner', () => {
       what: 'tick',
     }])
     const dispatch = vi.fn(async () => {
-      throw new Error('this conversation already has a running turn')
+      throw new HeadlessResumeError('busy', 'this conversation already has a running turn')
     })
     const markers = new FakeMarkers()
     // Simulate a previously successful fire followed by a long sleep. There
@@ -717,12 +731,16 @@ describe('ScheduleScanner', () => {
   it('does not mark when dispatch hits capacity (so it retries next tick)', async () => {
     const ws = await makeWs('w1', [{ id: 't1', title: 'i1', when: { kind: 'every', every: '30m' }, what: 'go' }])
     const dispatch = vi.fn(async () => {
-      throw new Error('headless capacity reached')
+      throw new HeadlessCapacityError(8)
     })
     const { scanner, markers } = scannerFor([ws], { dispatch })
     await scanner.scan()
     expect(dispatch).toHaveBeenCalledTimes(1)
     expect(markers.get('w1', 't1')).toBeUndefined()
+    expect(markers.getHeld('w1', 't1')).toBeUndefined()
+    expect(scanner.snapshot()?.workspaces[0]?.tasks[0]?.skipState).toBeUndefined()
+    await scanner.scan()
+    expect(dispatch).toHaveBeenCalledTimes(2)
   })
 
   it('skips an issue whose resolved adapter has no headless mode', async () => {
@@ -731,6 +749,468 @@ describe('ScheduleScanner', () => {
     await scanner.scan()
     expect(dispatch).not.toHaveBeenCalled()
     expect(markers.get('w1', 't1')).toBeUndefined()
+    expect(markers.getHeld('w1', 't1')).toBeUndefined()
+    expect(scanner.snapshot()?.workspaces[0]?.tasks[0]?.skipState).toEqual({
+      kind: 'parked',
+      code: 'adapter_no_headless',
+      reason: 'agent runtime does not support headless work: shell',
+      sinceMs: NOW,
+    })
+  })
+
+  describe('DispatchGate, skip classification, auto-recovery, and log deduplication', () => {
+    it('classifies structured errors into retry_next_tick, defer, and park', () => {
+      expect(classifyScheduleSkip(new HeadlessCapacityError(8), NOW)).toMatchObject({
+        disposition: 'retry_next_tick',
+        code: 'headless_capacity',
+      })
+      expect(classifyScheduleSkip(new HeadlessResumeError('busy', 'busy'), NOW)).toMatchObject({
+        disposition: 'retry_next_tick',
+        code: 'busy',
+      })
+      expect(classifyScheduleSkip(new HeadlessResumeError('takeover_declined', 'declined'), NOW)).toMatchObject({
+        disposition: 'retry_next_tick',
+        code: 'takeover_declined',
+      })
+      expect(classifyScheduleSkip(new ScheduledIssueRunNowError('already_running', 'running'), NOW)).toMatchObject({
+        disposition: 'retry_next_tick',
+        code: 'already_running',
+      })
+      expect(classifyScheduleSkip(new ScheduleDispatchError('dispatch_in_progress', 'in progress'), NOW)).toMatchObject({
+        disposition: 'retry_next_tick',
+        code: 'dispatch_in_progress',
+      })
+
+      const cooldown = new SessionAdmissionError([{
+        id: 'b1', resumeId: 'resume-1', kind: 'user-cooldown', createdAt: NOW,
+        expiresAt: NOW + 10 * 60_000, executionId: 'e1',
+        actor: { kind: 'user', entry: 'control' },
+        reason: 'User interrupted this Session; new starts are cooling down.',
+      }])
+      expect(classifyScheduleSkip(cooldown, NOW)).toEqual({
+        disposition: 'defer',
+        code: 'session_blocked',
+        reason: 'User interrupted this Session; new starts are cooling down.',
+        retryAtMs: NOW + 10 * 60_000,
+        sessionBlocked: true,
+      })
+
+      // Past retryAt clamps to nowMs.
+      const expiredCooldown = new SessionAdmissionError([{
+        id: 'b1', resumeId: 'resume-1', kind: 'user-cooldown', createdAt: NOW - 10_000,
+        expiresAt: NOW - 1_000, executionId: 'e1',
+        actor: { kind: 'user', entry: 'control' },
+        reason: 'cooling down',
+      }])
+      expect(classifyScheduleSkip(expiredCooldown, NOW)).toMatchObject({
+        disposition: 'defer',
+        code: 'session_blocked',
+        retryAtMs: NOW,
+        sessionBlocked: true,
+      })
+
+      const fault = new SessionAdmissionError([{
+        id: 'b2', resumeId: 'resume-1', kind: 'execution-fault', createdAt: NOW,
+        executionId: 'e2', actor: { kind: 'system', entry: 'session-failure-policy' },
+        reason: 'Three consecutive executions failed.',
+      }])
+      expect(classifyScheduleSkip(fault, NOW)).toEqual({
+        disposition: 'park',
+        code: 'session_blocked',
+        reason: 'Three consecutive executions failed.',
+        sessionBlocked: true,
+      })
+
+      expect(classifyScheduleSkip(new HeadlessResumeError('not_ready', 'not ready'), NOW)).toEqual({
+        disposition: 'defer',
+        code: 'not_ready',
+        reason: 'not ready',
+        backoff: true,
+      })
+      expect(classifyScheduleSkip(new Error('unexpected failure'), NOW)).toEqual({
+        disposition: 'defer',
+        code: 'unknown_error',
+        reason: 'unexpected failure',
+        backoff: true,
+      })
+
+      for (const code of ['not_found', 'wrong_workspace', 'wrong_agent', 'retired', 'deleted'] as const) {
+        expect(classifyScheduleSkip(new HeadlessResumeError(code, `resume ${code}`), NOW)).toEqual({
+          disposition: 'park',
+          code,
+          reason: `resume ${code}`,
+        })
+      }
+
+      for (const code of [
+        'issue_not_found',
+        'no_agent_owner',
+        'assignee_workspace_unavailable',
+        'adapter_no_headless',
+        'workspace_not_active',
+        'invalid_runtime_settings',
+        'claim_persistence_unsupported',
+      ] as const) {
+        expect(classifyScheduleSkip(new ScheduleDispatchError(code, `err ${code}`), NOW)).toEqual({
+          disposition: 'park',
+          code,
+          reason: `err ${code}`,
+        })
+      }
+    })
+
+    it('defers at and every schedules on user-cooldown without advancing markers or consuming at', async () => {
+      const ws = await makeWs('w1', [
+        { id: 'once', title: 'one-shot', when: { kind: 'at', at: new Date(NOW).toISOString() }, what: 'once', assignee: '@resume-1' },
+        { id: 'six-hr', title: 'every 6h', when: { kind: 'every', every: '6h' }, what: 'go', assignee: '@resume-1' },
+      ])
+      const retryAt = NOW + 10 * 60_000
+      let coolingDown = true
+      const dispatch = vi.fn(async () => {
+        if (coolingDown) {
+          throw new SessionAdmissionError([{
+            id: 'b-cool', resumeId: 'resume-1', kind: 'user-cooldown', createdAt: NOW,
+            expiresAt: retryAt, executionId: 'e1',
+            actor: { kind: 'user', entry: 'control' },
+            reason: 'User interrupted this Session; new starts are cooling down.',
+          }])
+        }
+        return { taskId: 'run-ok', resumeId: 'resume-1' }
+      })
+      const info = vi.fn()
+      const logger = { ...noopLogger, info } as unknown as Logger
+      const markers = new FakeMarkers()
+      await markers.set('w1', 'six-hr', NOW - 6 * 60 * 60_000)
+      const opts = {
+        dispatch,
+        markers,
+        logger,
+        now: NOW,
+        isSessionBlocked: (_resumeId: string, nowMs: number) => coolingDown && nowMs < retryAt,
+      }
+      const { scanner } = scannerFor([ws], opts)
+      const skipped = () => info.mock.calls.filter(([event]) => event === 'schedule.fire_skipped')
+
+      await scanner.scan()
+      expect(dispatch).toHaveBeenCalledTimes(2)
+      // Schedule clock untouched: `at` is NOT consumed and `every: 6h` keeps its true lastFired.
+      expect(markers.get('w1', 'once')).toBeUndefined()
+      expect(markers.getHeld('w1', 'once')).toBeUndefined()
+      expect(markers.get('w1', 'six-hr')).toBe(NOW - 6 * 60 * 60_000)
+      expect(markers.getHeld('w1', 'six-hr')).toBeUndefined()
+      expect(skipped()).toHaveLength(2)
+      expect(skipped()[0]?.[1]).toMatchObject({
+        disposition: 'defer',
+        code: 'session_blocked',
+        retryAtMs: retryAt,
+      })
+      expect(scanner.snapshot()!.workspaces[0].tasks.find((t) => t.id === 'once')?.skipState).toEqual({
+        kind: 'deferred',
+        code: 'session_blocked',
+        reason: 'User interrupted this Session; new starts are cooling down.',
+        retryAtMs: retryAt,
+        sinceMs: NOW,
+      })
+
+      // Mid-cooldown: neither dispatches and no duplicate logs.
+      opts.now = NOW + 5 * 60_000
+      await scanner.scan()
+      expect(dispatch).toHaveBeenCalledTimes(2)
+      expect(skipped()).toHaveLength(2)
+
+      // Cooldown expires at +10m: BOTH `at` and `every: 6h` fire immediately (not +6h10m!).
+      coolingDown = false
+      opts.now = retryAt
+      await scanner.scan()
+      expect(dispatch).toHaveBeenCalledTimes(4)
+      expect(markers.get('w1', 'once')).toBe(retryAt)
+      expect(markers.get('w1', 'six-hr')).toBe(retryAt)
+      const snap = scanner.snapshot()!.workspaces[0]
+      expect(snap.tasks.find((t) => t.id === 'once')?.skipState).toBeUndefined()
+      expect(snap.tasks.find((t) => t.id === 'once')?.nextDueAtMs).toBeNull()
+      expect(snap.tasks.find((t) => t.id === 'six-hr')?.skipState).toBeUndefined()
+    })
+
+    it('recovers a deferred cooldown gate early when isSessionBlocked flips to false', async () => {
+      const ws = await makeWs('w1', [
+        { id: 'cool', title: 'cooling', when: { kind: 'every', every: '1h' }, what: 'go', assignee: '@resume-1' },
+      ])
+      let blocked = true
+      const dispatch = vi.fn(async () => {
+        if (blocked) {
+          throw new SessionAdmissionError([{
+            id: 'b-cool', resumeId: 'resume-1', kind: 'user-cooldown', createdAt: NOW,
+            expiresAt: NOW + 10 * 60_000, executionId: 'e1',
+            actor: { kind: 'user', entry: 'control' },
+            reason: 'Cooling down.',
+          }])
+        }
+        return { taskId: 'run-ok', resumeId: 'resume-1' }
+      })
+      const opts = { dispatch, now: NOW, isSessionBlocked: () => blocked }
+      const { scanner, markers } = scannerFor([ws], opts)
+
+      await scanner.scan()
+      expect(dispatch).toHaveBeenCalledTimes(1)
+      expect(scanner.snapshot()!.workspaces[0].tasks[0].skipState?.kind).toBe('deferred')
+
+      // User releases cooldown after only 2m (well before the 10m retryAtMs).
+      blocked = false
+      opts.now = NOW + 2 * 60_000
+      await scanner.scan()
+      expect(dispatch).toHaveBeenCalledTimes(2)
+      expect(markers.get('w1', 'cool')).toBe(NOW + 2 * 60_000)
+      expect(scanner.snapshot()!.workspaces[0].tasks[0].skipState).toBeUndefined()
+    })
+
+    it('parks execution-fault session blocks and auto-recovers when isSessionBlocked flips to false', async () => {
+      const ws = await makeWs('w1', [
+        { id: 'ev', title: 'blocked every', when: { kind: 'every', every: '5m' }, what: 'go', assignee: '@resume-1' },
+      ])
+      let blocked = true
+      const dispatch = vi.fn(async () => {
+        if (blocked) {
+          throw new SessionAdmissionError([{
+            id: 'b1', resumeId: 'resume-1', kind: 'execution-fault', createdAt: NOW - 1000,
+            executionId: 'e1', actor: { kind: 'system', entry: 'session-failure-policy' },
+            reason: 'Three consecutive executions failed.',
+          }])
+        }
+        return { taskId: 'run-recovered', resumeId: 'resume-1' }
+      })
+      const info = vi.fn()
+      const logger = { ...noopLogger, info } as unknown as Logger
+      const opts = { dispatch, logger, now: NOW, isSessionBlocked: () => blocked }
+      const { scanner, markers } = scannerFor([ws], opts)
+      const skipped = () => info.mock.calls.filter(([event]) => event === 'schedule.fire_skipped')
+
+      await scanner.scan()
+      expect(dispatch).toHaveBeenCalledTimes(1)
+      expect(markers.get('w1', 'ev')).toBeUndefined()
+      expect(markers.getHeld('w1', 'ev')).toBeUndefined()
+      expect(skipped()).toHaveLength(1)
+      expect(skipped()[0]?.[1]).toEqual({
+        wsId: 'w1',
+        taskId: 'ev',
+        disposition: 'park',
+        code: 'session_blocked',
+        reason: 'Three consecutive executions failed.',
+      })
+      expect(scanner.snapshot()!.workspaces[0].tasks[0].skipState).toEqual({
+        kind: 'parked',
+        code: 'session_blocked',
+        reason: 'Three consecutive executions failed.',
+        sinceMs: NOW,
+      })
+
+      // Even hours later while blocked, it remains parked with zero extra dispatch attempts or logs.
+      opts.now = NOW + 2 * 60 * 60_000
+      await scanner.scan()
+      expect(dispatch).toHaveBeenCalledTimes(1)
+      expect(skipped()).toHaveLength(1)
+
+      // Block released -> auto-recovers on next tick.
+      blocked = false
+      opts.now = NOW + 2 * 60 * 60_000 + 60_000
+      await scanner.scan()
+      expect(dispatch).toHaveBeenCalledTimes(2)
+      expect(markers.get('w1', 'ev')).toBe(NOW + 2 * 60 * 60_000 + 60_000)
+      expect(scanner.snapshot()!.workspaces[0].tasks[0].skipState).toBeUndefined()
+    })
+
+    it('applies capped exponential backoff (1m -> 5m -> 15m -> 60m cap) for not_ready and unknown errors and dedupes logs', async () => {
+      const ws = await makeWs('w1', [
+        { id: 'flaky', title: 'flaky', when: { kind: 'every', every: '1m' }, what: 'go', assignee: '@resume-1' },
+      ])
+      let failWith: Error | null = new HeadlessResumeError('not_ready', 'Session is not eligible for background takeover')
+      const dispatch = vi.fn(async () => {
+        if (failWith) throw failWith
+        return { taskId: 'run-ok', resumeId: 'resume-1' }
+      })
+      const info = vi.fn()
+      const logger = { ...noopLogger, info } as unknown as Logger
+      const opts = { dispatch, logger, now: NOW }
+      const { scanner, markers } = scannerFor([ws], opts)
+      const skipped = () => info.mock.calls.filter(([event]) => event === 'schedule.fire_skipped')
+
+      // Attempt 1 -> 1m backoff
+      await scanner.scan()
+      expect(dispatch).toHaveBeenCalledTimes(1)
+      expect(markers.getHeld('w1', 'flaky')).toBeUndefined()
+      expect(skipped()).toHaveLength(1)
+      expect(skipped()[0]?.[1]).toMatchObject({
+        disposition: 'defer',
+        code: 'not_ready',
+        retryAtMs: NOW + BACKOFF_STEPS_MS[0],
+      })
+      expect(scanner.snapshot()!.workspaces[0].tasks[0].skipState).toEqual({
+        kind: 'deferred',
+        code: 'not_ready',
+        reason: 'Session is not eligible for background takeover',
+        retryAtMs: NOW + BACKOFF_STEPS_MS[0],
+        sinceMs: NOW,
+      })
+
+      // Before 1m -> gated
+      opts.now = NOW + 30_000
+      await scanner.scan()
+      expect(dispatch).toHaveBeenCalledTimes(1)
+
+      // Walk through 5m -> 15m -> 60m -> 60m cap
+      let cursor = NOW + BACKOFF_STEPS_MS[0]
+      for (const expectedDelay of [BACKOFF_STEPS_MS[1], BACKOFF_STEPS_MS[2], BACKOFF_STEPS_MS[3], BACKOFF_STEPS_MS[3]]) {
+        opts.now = cursor
+        await scanner.scan()
+        expect(scanner.snapshot()!.workspaces[0].tasks[0].skipState).toEqual({
+          kind: 'deferred',
+          code: 'not_ready',
+          reason: 'Session is not eligible for background takeover',
+          retryAtMs: cursor + expectedDelay,
+          sinceMs: NOW,
+        })
+        cursor += expectedDelay
+      }
+      expect(dispatch).toHaveBeenCalledTimes(5)
+      // Same (disposition, code, reason) -> logged only once across the entire backoff ladder!
+      expect(skipped()).toHaveLength(1)
+
+      // Changing to an unknown error logs once and restarts its own backoff streak from 1m.
+      failWith = new Error('transient socket reset')
+      opts.now = cursor
+      await scanner.scan()
+      expect(dispatch).toHaveBeenCalledTimes(6)
+      expect(skipped()).toHaveLength(2)
+      expect(skipped()[1]?.[1]).toMatchObject({
+        disposition: 'defer',
+        code: 'unknown_error',
+        reason: 'transient socket reset',
+        retryAtMs: cursor + BACKOFF_STEPS_MS[0],
+      })
+
+      // Recovery on next retry clears gate and re-arms logging.
+      failWith = null
+      opts.now = cursor + BACKOFF_STEPS_MS[0]
+      await scanner.scan()
+      expect(dispatch).toHaveBeenCalledTimes(7)
+      expect(markers.get('w1', 'flaky')).toBe(cursor + BACKOFF_STEPS_MS[0])
+      expect(scanner.snapshot()!.workspaces[0].tasks[0].skipState).toBeUndefined()
+    })
+
+    it('parks structural errors and auto-recovers when Issue fields change', async () => {
+      const ws = await makeWs('w1', [
+        { id: 'orphan', title: 'orphaned', when: { kind: 'every', every: '30m' }, what: 'go', assignee: '@resume-missing-ws' },
+      ])
+      const info = vi.fn()
+      const logger = { ...noopLogger, info } as unknown as Logger
+      const opts = { logger, resolveResumeWorkspace: () => undefined, now: NOW }
+      const { scanner, dispatch, markers } = scannerFor([ws], opts)
+      const skipped = () => info.mock.calls.filter(([event]) => event === 'schedule.fire_skipped')
+
+      await scanner.scan()
+      expect(dispatch).not.toHaveBeenCalled()
+      expect(markers.get('w1', 'orphan')).toBeUndefined()
+      expect(markers.getHeld('w1', 'orphan')).toBeUndefined()
+      expect(skipped()).toHaveLength(1)
+      expect(skipped()[0]?.[1]).toEqual({
+        wsId: 'w1',
+        taskId: 'orphan',
+        disposition: 'park',
+        code: 'assignee_workspace_unavailable',
+        reason: 'assigned Session Workspace is unavailable: resume-missing-ws',
+      })
+      expect(scanner.snapshot()!.workspaces[0].tasks[0].skipState).toEqual({
+        kind: 'parked',
+        code: 'assignee_workspace_unavailable',
+        reason: 'assigned Session Workspace is unavailable: resume-missing-ws',
+        sinceMs: NOW,
+      })
+
+      // Still parked on later ticks.
+      opts.now = NOW + 60 * 60_000
+      await scanner.scan()
+      expect(dispatch).not.toHaveBeenCalled()
+      expect(skipped()).toHaveLength(1)
+
+      // User fixes the Issue's assignee -> fingerprint changes -> gate clears and fires immediately.
+      await writeFile(
+        join(ws.dir, '.alice', 'issues', 'orphan.md'),
+        issueMd({ id: 'orphan', title: 'orphaned', when: { kind: 'every', every: '30m' }, what: 'go', assignee: '@new-each-run' }),
+        'utf8',
+      )
+      opts.now = NOW + 61 * 60_000
+      await scanner.scan()
+      expect(dispatch).toHaveBeenCalledTimes(1)
+      expect(markers.get('w1', 'orphan')).toBe(NOW + 61 * 60_000)
+      expect(scanner.snapshot()!.workspaces[0].tasks[0].skipState).toBeUndefined()
+    })
+
+    it('clears a parked gate when manual runIssueNow succeeds and updates the cached snapshot', async () => {
+      const ws = await makeWs('w1', [
+        { id: 'paused', title: 'paused', when: { kind: 'every', every: '30m' }, what: 'go' },
+      ])
+      let active = false
+      const dispatch = vi.fn(async () => {
+        if (!active) throw new ScheduleDispatchError('workspace_not_active', 'workspace is not active: w1')
+        return { taskId: 'run-manual', resumeId: 'resume-1' }
+      })
+      const opts = { dispatch, now: NOW }
+      const { scanner } = scannerFor([ws], opts)
+
+      await scanner.scan()
+      expect(dispatch).toHaveBeenCalledTimes(1)
+      expect(scanner.snapshot()!.workspaces[0].tasks[0].skipState?.kind).toBe('parked')
+
+      // Workspace becomes active and operator triggers manual run.
+      active = true
+      await scanner.runIssueNow('w1', 'paused')
+      expect(dispatch).toHaveBeenCalledTimes(2)
+      // Cached snapshot immediately clears skipState without waiting for the next scan.
+      expect(scanner.snapshot()!.workspaces[0].tasks[0].skipState).toBeUndefined()
+
+      // Next scheduled scan fires cleanly.
+      opts.now = NOW + 60_000
+      await scanner.scan()
+      expect(dispatch).toHaveBeenCalledTimes(3)
+    })
+
+    it('prunes dispatch gates and log dedup state when an Issue disappears or becomes terminal', async () => {
+      const ws = await makeWs('w1', [
+        { id: 'vanish', title: 'vanish', when: { kind: 'every', every: '30m' }, what: 'go' },
+      ])
+      const info = vi.fn()
+      const logger = { ...noopLogger, info } as unknown as Logger
+      const dispatch = vi.fn(async () => {
+        throw new ScheduleDispatchError('workspace_not_active', 'workspace is not active: w1')
+      })
+      const opts = { dispatch, logger, now: NOW }
+      const { scanner } = scannerFor([ws], opts)
+      const skipped = () => info.mock.calls.filter(([event]) => event === 'schedule.fire_skipped')
+
+      await scanner.scan()
+      expect(skipped()).toHaveLength(1)
+      expect(scanner.snapshot()!.workspaces[0].tasks[0].skipState?.kind).toBe('parked')
+
+      // Mark terminal -> clears skipState.
+      await writeFile(
+        join(ws.dir, '.alice', 'issues', 'vanish.md'),
+        issueMd({ id: 'vanish', title: 'vanish', when: { kind: 'every', every: '30m' }, what: 'go', status: 'done' }),
+        'utf8',
+      )
+      await scanner.scan()
+      expect(scanner.snapshot()!.workspaces[0].tasks[0].skipState).toBeUndefined()
+
+      // Remove issue file -> pruned; re-adding logs again cleanly.
+      await rm(join(ws.dir, '.alice', 'issues', 'vanish.md'))
+      await scanner.scan()
+
+      await writeFile(
+        join(ws.dir, '.alice', 'issues', 'vanish.md'),
+        issueMd({ id: 'vanish', title: 'vanish', when: { kind: 'every', every: '30m' }, what: 'go' }),
+        'utf8',
+      )
+      await scanner.scan()
+      expect(skipped()).toHaveLength(2)
+    })
   })
 
   it('ignores a workspace with no issues dir', async () => {
