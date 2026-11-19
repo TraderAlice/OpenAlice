@@ -69,6 +69,23 @@ AutoQuant assignments deliberately have no default runtime deadline; add
 `--timeout-ms` only when the caller has chosen a real hard stop for that
 particular study.
 
+To override the runtime or model for a single AutoQuant assignment without
+changing saved desk defaults, pass optional selection flags on
+`alice conversation create`:
+
+- `--agent <id>`: choose a specific agent runtime (for example `codex`, `claude`, `pi`).
+- `--model <id>`: choose a model id, or pass `--model default` to bypass a
+  persisted desk model and use the runtime's own account default.
+- `--credential <slug>` or `--credential-source native`: select an OpenAlice
+  vault credential slug or force the runtime's native login (mutually exclusive).
+
+To inspect or permanently update the AutoQuant desk's saved runtime defaults
+(for example, clearing a stale model back to the runtime default), use
+`alice runtime get --harness autoquant` and
+`alice runtime set --harness autoquant --model default` (also supports
+`--clear-model`, `--agent`, `--credential`, `--credential-source native`,
+`--effort`, and `--mode`).
+
 If AutoQuant is not initialized, report that boundary and direct the user to
 initialize the Quant desk. Do not silently perform the research in Chat or
 guess another Workspace.

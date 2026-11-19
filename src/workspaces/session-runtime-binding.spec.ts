@@ -412,6 +412,41 @@ describe('Session follow-up selection', () => {
   it('keeps model choices when explicitly supplied with a new credential', () => {
     expect(mergeSessionRuntimeSelection(binding, { credentialSource: 'native', model: 'new' })).toEqual({ credentialSource: 'native', model: 'new' })
   })
+  it('clears the persisted model when "default" (case-insensitive) is requested on follow-up/reconfigure', async () => {
+    expect(mergeSessionRuntimeSelection(binding, { model: 'default' })).toEqual({
+      credentialSlug: 'a',
+      reasoningEffort: 'medium',
+    })
+    const nativeBinding = {
+      version: 1 as const,
+      credential: { source: 'native' as const },
+      model: 'gpt-5.6-sol',
+      reasoningEffort: 'high' as const,
+    }
+    expect(mergeSessionRuntimeSelection(nativeBinding, { model: ' DEFAULT ' })).toEqual({
+      credentialSource: 'native',
+      reasoningEffort: 'high',
+    })
+
+    // createSessionRuntimeBinding also refuses to persist literal "default"
+    const nativeResolved = await createSessionRuntimeBinding({
+      adapter: codexAdapter,
+      cwd: '/workspace',
+      selection: { credentialSource: 'native', model: 'default', reasoningEffort: 'high' },
+    })
+    expect(nativeResolved.binding).toEqual({
+      version: 1,
+      credential: { source: 'native' },
+      reasoningEffort: 'high',
+    })
+    const vaultResolved = await createSessionRuntimeBinding({
+      adapter: codexAdapter,
+      cwd: '/workspace',
+      selection: { credentialSlug: 'openai-1', model: 'DEFAULT' },
+      credentials: { 'openai-1': openai },
+    })
+    expect(vaultResolved.binding.model).toBe('gpt-5.6-terra')
+  })
 })
 
 it('projects provider-resolved capabilities into launch and resume without injecting a default effort', async () => {

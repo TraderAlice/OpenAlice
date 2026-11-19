@@ -317,6 +317,27 @@ export interface WorkspaceToolContext {
   scheduleControl?: {
     list(wsId?: string): Promise<unknown>
   }
+  /** Workspace default AI runtime settings control plane (.alice/settings.json). */
+  workspaceRuntimeControl?: {
+    get(input: {
+      readonly wsId?: string
+      readonly harness?: 'chat' | 'autoquant' | 'prediction'
+      readonly mode?: 'interactive' | 'headless'
+      readonly agent?: string
+    }): Promise<Record<string, unknown>>
+    set(input: {
+      readonly wsId?: string
+      readonly harness?: 'chat' | 'autoquant' | 'prediction'
+      readonly mode?: 'interactive' | 'headless' | 'both'
+      readonly agent?: string
+      readonly credential?: string
+      readonly credentialSource?: 'native'
+      readonly model?: string
+      readonly clearModel?: boolean
+      readonly effort?: string
+      readonly clearEffort?: boolean
+    }): Promise<Record<string, unknown>>
+  }
 }
 
 // ==================== Factory shape ====================

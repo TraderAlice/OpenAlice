@@ -76,6 +76,7 @@ import { sessionSignatureFactory } from './tool/session-signature.js'
 import { sessionRenameFactory } from './tool/session-rename.js'
 import { sessionToolFactories } from './tool/session-tools.js'
 import { headlessToolFactories } from './tool/headless-tools.js'
+import { workspaceRuntimeToolFactories } from './tool/workspace-runtime-tools.js'
 import { provenanceShowFactory } from './tool/provenance-show.js'
 import { conversationToolFactories } from './tool/conversation.js'
 import { artifactConversationToolFactories } from './tool/conversation-artifacts.js'
@@ -124,6 +125,7 @@ async function main() {
   workspaceToolCenter.register(provenanceShowFactory)
   for (const f of sessionToolFactories) workspaceToolCenter.register(f)
   for (const f of headlessToolFactories) workspaceToolCenter.register(f)
+  for (const f of workspaceRuntimeToolFactories) workspaceToolCenter.register(f)
   for (const f of conversationToolFactories) workspaceToolCenter.register(f)
   for (const f of artifactConversationToolFactories) workspaceToolCenter.register(f)
 

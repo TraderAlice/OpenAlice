@@ -187,15 +187,25 @@ async function filterVendorSearchTargets<T extends { id: string }>(
  *  flow. The approval wall (push) is untouched. */
 async function stageAndMaybeCommit(
   uta: { stage: () => Promise<unknown> | unknown; commit: (msg: string) => Promise<unknown> | unknown },
-  commitMessage?: string,
+  commitMessage: string | undefined,
+  allowAiTrading: () => boolean,
 ): Promise<Record<string, unknown>> {
   const staged = compactStageResult(await uta.stage())
-  if (!commitMessage) return staged
+  if (!commitMessage) {
+    return {
+      ...staged,
+      executed: false,
+      nextStep: 'Staged only (not sent to broker) — run `alice-uta git commit --message "<thesis>"` then `alice-uta git push` to execute (or pass `--commit-message` when staging).',
+    }
+  }
   const committed = await uta.commit(commitMessage) as Record<string, unknown>
   return {
     ...staged,
     committed: { hash: committed['hash'], message: committed['message'] },
-    nextStep: 'Awaiting user approval — they approve in the Web UI (push executes there).',
+    executed: false,
+    nextStep: allowAiTrading()
+      ? 'Staged and committed (not sent to broker yet) — run `alice-uta git push` to execute.'
+      : 'Staged and committed (not sent to broker yet) — run `alice-uta git push` or ask the user to approve in the Web UI (Trading as Git) to execute.',
   }
 }
 
@@ -712,7 +722,7 @@ Optional: attach takeProfit and/or stopLoss for automatic exit orders.`,
         const uta = await manager.resolveOne(source ?? parseAliceId(params.aliceId)?.utaId ?? '')
         return {
           source: uta.id,
-          ...await stageAndMaybeCommit({ stage: () => uta.stagePlaceOrder(params), commit: (m) => uta.commit(m) }, commitMessage),
+          ...await stageAndMaybeCommit({ stage: () => uta.stagePlaceOrder(params), commit: (m) => uta.commit(m) }, commitMessage, allowAiTrading),
         }
       },
     }),
@@ -736,7 +746,7 @@ Optional: attach takeProfit and/or stopLoss for automatic exit orders.`,
         const uta = await manager.resolveOne(source)
         return {
           source: uta.id,
-          ...await stageAndMaybeCommit({ stage: () => uta.stageModifyOrder(params), commit: (m) => uta.commit(m) }, commitMessage),
+          ...await stageAndMaybeCommit({ stage: () => uta.stageModifyOrder(params), commit: (m) => uta.commit(m) }, commitMessage, allowAiTrading),
         }
       },
     }),
@@ -755,7 +765,7 @@ Optional: attach takeProfit and/or stopLoss for automatic exit orders.`,
         const uta = await manager.resolveOne(source ?? parseAliceId(params.aliceId)?.utaId ?? '')
         return {
           source: uta.id,
-          ...await stageAndMaybeCommit({ stage: () => uta.stageClosePosition(params), commit: (m) => uta.commit(m) }, commitMessage),
+          ...await stageAndMaybeCommit({ stage: () => uta.stageClosePosition(params), commit: (m) => uta.commit(m) }, commitMessage, allowAiTrading),
         }
       },
     }),
@@ -771,7 +781,7 @@ Optional: attach takeProfit and/or stopLoss for automatic exit orders.`,
         const uta = await manager.resolveOne(source)
         return {
           source: uta.id,
-          ...await stageAndMaybeCommit({ stage: () => uta.stageCancelOrder({ orderId }), commit: (m) => uta.commit(m) }, commitMessage),
+          ...await stageAndMaybeCommit({ stage: () => uta.stageCancelOrder({ orderId }), commit: (m) => uta.commit(m) }, commitMessage, allowAiTrading),
         }
       },
     }),
@@ -784,11 +794,14 @@ Optional: attach takeProfit and/or stopLoss for automatic exit orders.`,
       }).meta({ examples: [{ message: 'Entry: long AAPL on momentum' }] }),
       execute: async ({ source, message }) => {
         const targets = await manager.resolve(source)
+        const nextStep = allowAiTrading()
+          ? 'Committed (not sent to broker yet) — run `alice-uta git push` to execute.'
+          : 'Committed (not sent to broker yet) — run `alice-uta git push` or ask the user to approve in the Web UI (Trading as Git) to execute.'
         const results: Array<Record<string, unknown>> = []
         for (const uta of targets) {
           const status = await uta.status()
           if (status.staged.length === 0) continue
-          results.push({ source: uta.id, ...await uta.commit(message) })
+          results.push({ source: uta.id, ...await uta.commit(message), executed: false, nextStep })
         }
         if (results.length === 0) return { message: 'No staged operations to commit.' }
         return results.length === 1 ? results[0] : results

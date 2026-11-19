@@ -23,7 +23,7 @@ export const DEFAULT_AWAIT_BUDGET_MS = 30_000
 const conversationSelectionShape = {
   credential: z.string().min(1).optional().describe('OpenAlice vault credential slug, never an API key. Omit to retain the Session or Workspace selection.'),
   credentialSource: z.literal('native').optional().describe('Use the runtime own authentication; mutually exclusive with credential.'),
-  model: z.string().min(1).optional().describe('Optional model id; custom model ids are accepted.'),
+  model: z.string().min(1).optional().describe('Optional model id; custom model ids are accepted. Pass "default" to bypass a persisted Workspace model and use the runtime default.'),
   effort: z.enum(MODEL_REASONING_EFFORTS).optional().describe('Optional reasoning effort.'),
 }
 
@@ -295,7 +295,14 @@ export const conversationCreateFactory: WorkspaceToolFactory = {
   build(ctx) {
     const ask = conversationAskFactory.build(ctx)
     return tool({
-      description: 'Create a new Session and deliver its first prompt. Choose exactly one Workspace or Harness. Retain resumeId and use conversation ask for follow-ups; taskId identifies only this turn. Dispatches asynchronously by default and wakes this Session on completion (then run `alice conversation check`).',
+      description: [
+        'Create a new Session and deliver its first prompt. Choose exactly one Workspace or Harness. Retain resumeId and use conversation ask for follow-ups; taskId identifies only this turn. Dispatches asynchronously by default and wakes this Session on completion (then run `alice conversation check`).',
+        '',
+        'Optional per-launch runtime overrides (do not modify saved Workspace defaults):',
+        '- --agent: override the target Workspace default runtime for this fresh Session (e.g. codex, claude, pi).',
+        '- --model: override the model id; pass `--model default` to bypass a persisted Workspace model and use the runtime default.',
+        '- --credential / --credential-source native: choose an OpenAlice vault credential slug or force the runtime native login (mutually exclusive).',
+      ].join('\n'),
       inputSchema: z.object({
         ...conversationAskCommonShape,
         ...conversationSelectionShape,

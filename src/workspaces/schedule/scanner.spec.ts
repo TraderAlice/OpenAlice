@@ -358,6 +358,31 @@ describe('ScheduleScanner', () => {
     await expect(scanner.runIssueNow('w1', 'closed')).rejects.toMatchObject({ code: 'not_fireable' })
   })
 
+  it('surfaces real validation errors from runIssueNow for invalid issue files or declarations', async () => {
+    const ws = await makeWs('w1', [])
+    await mkdir(join(ws.dir, '.alice', 'issues'), { recursive: true })
+    await writeFile(
+      join(ws.dir, '.alice', 'issues', 'bad-issue.md'),
+      '---\ntitle: Bad\nstatus: bogus_status\n---\nBody\n',
+      'utf8',
+    )
+    const { scanner } = scannerFor([ws])
+    await expect(scanner.runIssueNow('w1', 'bad-issue')).rejects.toMatchObject({
+      code: 'invalid',
+      message: expect.stringContaining('bad-issue'),
+    })
+
+    const legacyDir = join(root, 'w2-legacy')
+    await mkdir(join(legacyDir, '.alice'), { recursive: true })
+    await writeFile(join(legacyDir, '.alice', 'issue.json'), '{}', 'utf8')
+    const legacyWs: WorkspaceMeta = { id: 'w2', tag: 'w2', dir: legacyDir, createdAt: new Date(NOW).toISOString() }
+    const { scanner: legacyScanner } = scannerFor([legacyWs])
+    await expect(legacyScanner.runIssueNow('w2', 'anything')).rejects.toMatchObject({
+      code: 'invalid',
+      message: expect.stringContaining('Issue declaration is invalid'),
+    })
+  })
+
   it('fires a scheduled (every) issue on first sight and records the marker after dispatch', async () => {
     const ws = await makeWs('w1', [{ id: 't1', title: 'i1', when: { kind: 'every', every: '30m' }, what: 'go' }])
     const { scanner, dispatch, markers } = scannerFor([ws])

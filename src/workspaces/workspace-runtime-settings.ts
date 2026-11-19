@@ -11,6 +11,10 @@ import type { SessionRuntimeSelection } from './session-runtime-binding.js'
 
 export const WORKSPACE_RUNTIME_SETTINGS_REL = '.alice/settings.json'
 
+export function isDefaultRuntimeModel(model: string | undefined): boolean {
+  return typeof model === 'string' && model.trim().toLowerCase() === 'default'
+}
+
 const MAX_BYTES = 64 * 1024
 const runtimeIdSchema = z.string().trim().min(1).max(64)
 const modelSchema = z.string().trim().min(1).max(512)
@@ -176,7 +180,9 @@ export function resolveWorkspaceRuntimeSelection(
       : preference?.accessMode === 'vault'
         ? { credentialSlug: preference.credentialSlug }
         : { credentialSource: 'native' as const }
-  const model = requested.model ?? (mayInheritModel ? preference?.model : undefined)
+  const model = isDefaultRuntimeModel(requested.model)
+    ? undefined
+    : requested.model ?? (mayInheritModel && !isDefaultRuntimeModel(preference?.model) ? preference?.model : undefined)
   const reasoningEffort = requested.reasoningEffort
     ?? (mayInheritModel ? preference?.reasoningEffort : undefined)
   return {

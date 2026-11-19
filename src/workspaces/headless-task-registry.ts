@@ -330,6 +330,7 @@ export class HeadlessTaskRegistry {
   list(
     opts: {
       wsId?: string
+      resumeId?: string
       issue?: { workspaceId: string; issueId: string }
       status?: HeadlessTaskStatus
       inquiry?: HeadlessInquiryScope
@@ -341,6 +342,7 @@ export class HeadlessTaskRegistry {
     let out = this.tasks.filter(
       (t) =>
         (!opts.wsId || t.wsId === opts.wsId) &&
+        (!opts.resumeId || t.resumeId === opts.resumeId) &&
         (!opts.issue || (
           t.trigger?.kind === 'issue' &&
           t.trigger.workspaceId === opts.issue.workspaceId &&
@@ -360,10 +362,11 @@ export class HeadlessTaskRegistry {
   }
 
   /** Count filtered records without materializing them over the HTTP boundary. */
-  count(opts: { wsId?: string; issue?: { workspaceId: string; issueId: string }; status?: HeadlessTaskStatus; inquiry?: HeadlessInquiryScope } = {}): number {
+  count(opts: { wsId?: string; resumeId?: string; issue?: { workspaceId: string; issueId: string }; status?: HeadlessTaskStatus; inquiry?: HeadlessInquiryScope } = {}): number {
     return this.tasks.reduce(
       (count, task) => count + (
         (!opts.wsId || task.wsId === opts.wsId) &&
+        (!opts.resumeId || task.resumeId === opts.resumeId) &&
         (!opts.issue || (
           task.trigger?.kind === 'issue' &&
           task.trigger.workspaceId === opts.issue.workspaceId &&
