@@ -747,6 +747,111 @@ async function readSelfIssue(
   return { ok: true, issue: parsed.issue, comments: comments.comments }
 }
 
+function normalizeIssueLookupId(raw: string): string {
+  const trimmed = raw.trim()
+  const stripped = trimmed.replace(/\.md$/i, '')
+  return stripped || trimmed
+}
+
+function workspaceMatchesFilter(ws: { id: string; tag: string }, filter: string): boolean {
+  return ws.id === filter || ws.tag.toLowerCase() === filter.toLowerCase()
+}
+
+/**
+ * When `issue_run` / `issue_retry` finds no valid board match, probe live
+ * workspace declarations so a broken frontmatter or legacy `.alice/issue.json`
+ * surfaces its real parse/validation error instead of a generic "Issue not found".
+ */
+async function probeInvalidIssue(
+  ctx: WorkspaceToolContext,
+  issueId: string,
+  wsFilter?: string,
+): Promise<{ code: 'invalid'; error: string } | null> {
+  try {
+    const targets = new Map<string, { id: string; tag: string; dir: string }>()
+    const addTarget = (meta: { id: string; tag: string; dir: string } | null | undefined) => {
+      if (!meta) return
+      if (wsFilter && !workspaceMatchesFilter(meta, wsFilter)) return
+      targets.set(meta.id, meta)
+    }
+
+    if (wsFilter) addTarget(ctx.resolveWorkspace?.(wsFilter))
+    addTarget(ctx.resolveWorkspace?.(ctx.workspaceId))
+
+    const fallbackInvalidWorkspaces: Array<{ wsId: string; wsTag: string; error: string }> = []
+    if (!wsFilter || targets.size === 0) {
+      const inventory = ctx.workspaceInventory
+        ? await Promise.resolve().then(() => ctx.workspaceInventory!()).catch(() => undefined)
+        : undefined
+      if (Array.isArray(inventory)) {
+        for (const ws of inventory) {
+          if (wsFilter && !workspaceMatchesFilter(ws, wsFilter)) continue
+          addTarget(ctx.resolveWorkspace?.(ws.id))
+        }
+      }
+      const snapshot = ctx.board
+        ? await Promise.resolve().then(() => ctx.board!.snapshot()).catch(() => undefined)
+        : undefined
+      if (snapshot && Array.isArray(snapshot.workspaces)) {
+        for (const ws of snapshot.workspaces) {
+          if (wsFilter && !workspaceMatchesFilter({ id: ws.wsId, tag: ws.tag }, wsFilter)) continue
+          const resolved = ctx.resolveWorkspace?.(ws.wsId)
+          if (resolved) {
+            addTarget(resolved)
+          } else if (ws.status === 'invalid' && ws.error) {
+            fallbackInvalidWorkspaces.push({ wsId: ws.wsId, wsTag: ws.tag, error: ws.error })
+          }
+        }
+      }
+    }
+
+    const needle = issueId.toLowerCase()
+    const fileHits: Array<{ wsId: string; wsTag: string; id: string; error: string }> = []
+    const dirErrors: Array<{ wsId: string; wsTag: string; error: string }> = []
+
+    for (const ws of targets.values()) {
+      const res = await readWorkspaceIssues(ws.dir)
+      if (!res.ok) {
+        if (res.reason === 'invalid') {
+          dirErrors.push({ wsId: ws.id, wsTag: ws.tag, error: res.error })
+        }
+        continue
+      }
+      const invalid = res.invalid.find((entry) => entry.id.toLowerCase() === needle)
+      if (invalid) {
+        fileHits.push({ wsId: ws.id, wsTag: ws.tag, id: invalid.id, error: invalid.error })
+      }
+    }
+
+    if (fileHits.length === 1) {
+      const hit = fileHits[0]!
+      return {
+        code: 'invalid',
+        error: `Issue "${hit.id}" in workspace ${hit.wsTag} (${hit.wsId}) is invalid: ${hit.error}`,
+      }
+    }
+    if (fileHits.length > 1) {
+      const detail = fileHits.map((hit) => `${hit.wsTag} (${hit.wsId}): ${hit.error}`).join('; ')
+      return {
+        code: 'invalid',
+        error: `Issue "${issueId}" is invalid in multiple workspaces: ${detail}`,
+      }
+    }
+
+    const allDirErrors = [...dirErrors, ...fallbackInvalidWorkspaces]
+    if (allDirErrors.length > 0) {
+      const preferred = allDirErrors.find((entry) => entry.wsId === ctx.workspaceId) ?? allDirErrors[0]!
+      return {
+        code: 'invalid',
+        error: `Issue declaration in workspace ${preferred.wsTag} (${preferred.wsId}) is invalid: ${preferred.error}`,
+      }
+    }
+    return null
+  } catch {
+    return null
+  }
+}
+
 /** Dispatch through the same service as the Issue page, never through ask. */
 function issueRunFactory(retry: boolean): WorkspaceToolFactory {
   return {
@@ -757,8 +862,8 @@ function issueRunFactory(retry: boolean): WorkspaceToolFactory {
           ? 'Retry the latest failed or interrupted Issue run using its current canonical What and owner. Preserves schedule cadence and records retry lineage.'
           : 'Run a live scheduled Issue now using its canonical What and configured owner/runtime. Preserves schedule cadence; rejects overlapping runs.',
         inputSchema: z.object({
-          id: z.string().min(1).describe('Issue id or title on the global board.'),
-          wsId: z.string().min(1).optional().describe('Workspace id to disambiguate matching Issues.'),
+          id: z.string().min(1).describe('Issue id or title on the global board (a trailing .md suffix is stripped automatically).'),
+          wsId: z.string().min(1).optional().describe('Workspace id or tag (case-insensitive) to disambiguate matching Issues.'),
           ...(retry ? { runId: z.string().min(1).describe('Exact latest failed or interrupted taskId to retry.') } : {}),
           await: z.boolean().optional().default(false).describe('Wait for completion; otherwise return taskId immediately.'),
         }),
@@ -766,10 +871,32 @@ function issueRunFactory(retry: boolean): WorkspaceToolFactory {
           if (!ctx.board || !ctx.issueRuns) return { ok: false, error: 'Issue execution is unavailable' }
           if (input.await && !ctx.conversation) return { ok: false, error: 'Conversation wait is unavailable' }
           try {
-            const refs = (await ctx.board.resolveByName(input.id)).filter((ref) => !input.wsId || ref.wsId === input.wsId)
-            if (refs.length !== 1) return {
-              ok: false, error: refs.length ? 'Issue name is ambiguous; specify --ws-id' : 'Issue not found',
-              ...(refs.length ? { candidates: refs.map(({ wsId, id, title }) => ({ wsId, id, title })) } : {}),
+            const normalizedId = normalizeIssueLookupId(input.id)
+            const wsFilter = input.wsId?.trim() || undefined
+            const allRefs = await ctx.board.resolveByName(normalizedId)
+            const refs = wsFilter
+              ? allRefs.filter((ref) => workspaceMatchesFilter({ id: ref.wsId, tag: ref.wsTag }, wsFilter))
+              : allRefs
+            if (refs.length > 1) {
+              return {
+                ok: false,
+                error: 'Issue name is ambiguous; specify --ws-id',
+                candidates: refs.map(({ wsId, wsTag, id, title }) => ({ wsId, wsTag, id, title })),
+              }
+            }
+            if (refs.length === 0) {
+              const invalid = await probeInvalidIssue(ctx, normalizedId, wsFilter)
+              if (invalid) return { ok: false, ...invalid }
+              if (wsFilter && allRefs.length > 0) {
+                const candidates = allRefs.map(({ wsId, wsTag, id, title }) => ({ wsId, wsTag, id, title }))
+                const locations = candidates.map((ref) => `${ref.wsTag} (${ref.wsId})`).join(', ')
+                return {
+                  ok: false,
+                  error: `Issue "${normalizedId}" was not found in workspace "${wsFilter}"; matched in: ${locations}`,
+                  candidates,
+                }
+              }
+              return { ok: false, error: 'Issue not found' }
             }
             const ref = refs[0]!
             const result = await ctx.issueRuns.start(ref.wsId, ref.id, retry && typeof input.runId === 'string' ? input.runId : undefined)

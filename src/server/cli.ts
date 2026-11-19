@@ -54,7 +54,9 @@ import {
 } from './cli-commands.js'
 import { resolveInboxOrigin } from './inbox-origin.js'
 import { extractTradeDecisionRefs } from './trade-provenance.js'
-import { headlessLogPaths } from '../workspaces/headless-task-registry.js'
+import { headlessLogPaths, type HeadlessTaskStatus } from '../workspaces/headless-task-registry.js'
+import type { HeadlessLaunchErrorCode } from '../workspaces/headless-task.js'
+import { headlessFailureSummary, readHeadlessStderr } from '../workspaces/headless-failure.js'
 import { parseHeadlessOutputText, type HeadlessStructuredOutput } from '../workspaces/headless-output.js'
 import { sessionPresence } from '../workspaces/resume-registry.js'
 import {
@@ -130,16 +132,71 @@ export function makeSessionControl(svc: WorkspaceService): NonNullable<Workspace
       const record = svc.sessionRegistry.findByResumeId(identity.wsId, resumeId)
       const pty = record ? svc.pool.get(record.id) : undefined
       const recentExecutions = svc.headlessTasks
-        .list({ wsId: identity.wsId, limit: 50 })
-        .filter((t) => t.resumeId === resumeId)
-        .slice(0, 5)
+        .list({ wsId: identity.wsId, resumeId, limit: 5 })
         .map(({ agentSessionId: _nativeSessionId, ...rest }) => rest)
+      const latest = svc.headlessTasks.latestForResumeId(resumeId)
+      const toolFailures = latest?.output?.toolFailures ?? 0
+      const isFailureStatus = latest?.status === 'failed' || latest?.status === 'interrupted'
+      let lastError: {
+        taskId: string
+        status: HeadlessTaskStatus
+        message: string
+        at: number
+        exitCode?: number | null
+        signal?: string | null
+        killed?: boolean
+        launchErrorCode?: HeadlessLaunchErrorCode
+        interruptionReason?: string
+        toolFailures?: number
+        assistantPreview?: string
+      } | undefined
+      if (latest && (isFailureStatus || toolFailures > 0)) {
+        let message: string | undefined
+        if (isFailureStatus) {
+          let structured: HeadlessStructuredOutput | null = null
+          let stderr: { stderrTail: string; stderrTruncated: boolean } | undefined
+          if (!latest.error && svc.headlessLogsDir) {
+            const paths = headlessLogPaths(svc.headlessLogsDir, latest.taskId)
+            ;[structured, stderr] = await Promise.all([
+              readStructuredLog(paths.structured),
+              readHeadlessStderr(paths.stderr),
+            ])
+          }
+          message = headlessFailureSummary({
+            ...latest,
+            structured,
+            ...(stderr ? { stderrTail: stderr.stderrTail } : {}),
+          })
+        } else {
+          message = latest.status === 'done'
+            ? `Completed with ${toolFailures} tool failure(s).`
+            : `${toolFailures} tool failure(s).`
+        }
+        if (message) {
+          lastError = {
+            taskId: latest.taskId,
+            status: latest.status,
+            message,
+            at: latest.finishedAt ?? latest.startedAt,
+            ...(latest.exitCode !== undefined ? { exitCode: latest.exitCode } : {}),
+            ...(latest.signal !== undefined ? { signal: latest.signal } : {}),
+            ...(latest.killed !== undefined ? { killed: latest.killed } : {}),
+            ...(latest.launchErrorCode !== undefined ? { launchErrorCode: latest.launchErrorCode } : {}),
+            ...(latest.interruptionReason !== undefined ? { interruptionReason: latest.interruptionReason } : {}),
+            ...(toolFailures > 0 ? { toolFailures } : {}),
+            ...(latest.output?.assistantPreview ? { assistantPreview: latest.output.assistantPreview } : {}),
+          }
+        }
+      }
+      const admissionBlocks = svc.executions.admission?.blocks(resumeId) ?? []
       return {
         ...(entry ?? { resumeId, wsId: identity.wsId, agent: identity.agent }),
         wsId: identity.wsId,
         unreadMailboxCount: svc.sessionMailbox.unreadFor(resumeId).length,
         hasActiveWatermark: svc.sessionMailbox.hasActiveWatermark(resumeId),
         currentExecution: svc.executions.current(resumeId),
+        ...(lastError ? { lastError } : {}),
+        ...(admissionBlocks.length > 0 ? { admissionBlocks } : {}),
         recentExecutions,
         ...(pty ? {
           terminal: {

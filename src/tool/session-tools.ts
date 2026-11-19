@@ -78,7 +78,7 @@ export const sessionShowFactory: WorkspaceToolFactory = {
   name: 'session_show',
   build(ctx) {
     return tool({
-      description: 'Show one product Session: dossier, unread mailbox, live interactive state, current execution, and recent headless executions.',
+      description: 'Show one product Session: dossier, unread mailbox, live interactive state, current execution, top-level lastError / admissionBlocks (when present), and recent headless executions.',
       inputSchema: z.object({
         resumeId: z.string().min(1).describe('Product Session resumeId.'),
       }),

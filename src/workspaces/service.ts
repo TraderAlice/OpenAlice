@@ -240,6 +240,7 @@ export class IssueRetryError extends Error {
   constructor(
     public readonly code:
       | 'not_found'
+      | 'invalid'
       | 'not_scheduled'
       | 'not_fireable'
       | 'not_retryable'
@@ -2768,10 +2769,20 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
     const ws = registry.get(wsId);
     if (!ws) throw new IssueRetryError('not_found', 'Workspace not found.');
     const issueResult = await readWorkspaceIssues(ws.dir);
-    const issue = issueResult.ok
-      ? issueResult.issues.find((candidate) => candidate.id === id)
-      : undefined;
-    if (!issue) throw new IssueRetryError('not_found', 'Issue not found.');
+    if (!issueResult.ok) {
+      if (issueResult.reason === 'invalid') {
+        throw new IssueRetryError('invalid', `Issue declaration is invalid: ${issueResult.error}`);
+      }
+      throw new IssueRetryError('not_found', 'Issue not found.');
+    }
+    const issue = issueResult.issues.find((candidate) => candidate.id === id);
+    if (!issue) {
+      const invalid = issueResult.invalid.find((candidate) => candidate.id === id);
+      if (invalid) {
+        throw new IssueRetryError('invalid', `Issue "${id}" is invalid: ${invalid.error}`);
+      }
+      throw new IssueRetryError('not_found', 'Issue not found.');
+    }
     if (!issue.when) {
       throw new IssueRetryError('not_scheduled', 'Only scheduled Issues can be run now.');
     }

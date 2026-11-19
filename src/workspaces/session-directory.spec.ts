@@ -216,6 +216,73 @@ describe('buildWorkspaceSessionDirectory', () => {
       resumable: false,
     })
   })
+
+  it('projects latestExecution error and toolFailures when non-healthy and omits them when clean', () => {
+    const result = buildWorkspaceSessionDirectory({
+      workspace: { id: 'ws-1', tag: 'research' },
+      identities: [
+        { resumeId: 'resume-failed', wsId: 'ws-1', agent: 'codex', createdAt: 1, updatedAt: 2, lifecycle: 'active' },
+        { resumeId: 'resume-tool-err', wsId: 'ws-1', agent: 'codex', createdAt: 1, updatedAt: 2, lifecycle: 'active' },
+        { resumeId: 'resume-ok', wsId: 'ws-1', agent: 'codex', createdAt: 1, updatedAt: 2, lifecycle: 'active' },
+      ],
+      interactiveFor: () => undefined,
+      latestExecutionFor: (resumeId) => {
+        if (resumeId === 'resume-failed') {
+          return {
+            taskId: 'run-fail',
+            resumeId,
+            wsId: 'ws-1',
+            agent: 'codex',
+            prompt: 'go',
+            status: 'failed',
+            startedAt: 1,
+            finishedAt: 2,
+            exitCode: 1,
+            error: 'Invalid API key',
+            output: { hasAssistantReply: false, blockCount: 1, toolCalls: 2, toolFailures: 1 },
+          }
+        }
+        if (resumeId === 'resume-tool-err') {
+          return {
+            taskId: 'run-tool-err',
+            resumeId,
+            wsId: 'ws-1',
+            agent: 'codex',
+            prompt: 'go',
+            status: 'done',
+            startedAt: 1,
+            finishedAt: 2,
+            output: { hasAssistantReply: true, assistantPreview: 'partial', blockCount: 2, toolCalls: 3, toolFailures: 2 },
+          }
+        }
+        return {
+          taskId: 'run-ok',
+          resumeId,
+          wsId: 'ws-1',
+          agent: 'codex',
+          prompt: 'go',
+          status: 'done',
+          startedAt: 1,
+          finishedAt: 2,
+          output: { hasAssistantReply: true, assistantPreview: 'ok', blockCount: 1, toolCalls: 1, toolFailures: 0 },
+        }
+      },
+      isActive: () => false,
+    })
+
+    expect(result.sessions[0]?.latestExecution).toMatchObject({
+      taskId: 'run-fail',
+      error: 'Invalid API key',
+      toolFailures: 1,
+    })
+    expect(result.sessions[1]?.latestExecution).toMatchObject({
+      taskId: 'run-tool-err',
+      toolFailures: 2,
+    })
+    expect(result.sessions[1]?.latestExecution?.error).toBeUndefined()
+    expect(result.sessions[2]?.latestExecution?.error).toBeUndefined()
+    expect(result.sessions[2]?.latestExecution?.toolFailures).toBeUndefined()
+  })
 })
 
 describe('connectorDeskRosterExclusions', () => {
