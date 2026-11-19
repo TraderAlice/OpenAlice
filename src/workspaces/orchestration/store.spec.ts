@@ -99,6 +99,15 @@ describe('OrchestrationStore', () => {
       replyRoute: telegramRoute(),
       createdAt: 1000,
     })
+    const staleWorkerMsg = await store.enqueueMessage({
+      kind: 'send',
+      taskId: zombie.taskId,
+      dispatchId: zombie.dispatchId,
+      fromResumeId: 'res-parent',
+      toResumeId: 'res-worker-dead',
+      body: 'Queued before crash',
+      createdAt: 1010,
+    })
     const alive = await store.createTask({
       parentResumeId: 'res-parent',
       parentWorkspaceId: 'ws-desk',
@@ -149,9 +158,11 @@ describe('OrchestrationStore', () => {
     expect(esc.status).toBe('unread')
     expect(esc.metadata?.stopReason).toBe('lost')
 
-    // Persisted to disk
+    // Persisted to disk; stale pre-crash worker message acked so lost worker is not auto-resurrected
     const reloadedAgain = await OrchestrationStore.load(filePath)
     expect(reloadedAgain.getTaskByDispatchId(zombie.dispatchId)?.stopReason).toBe('lost')
+    expect(reloadedAgain.getMessage(staleWorkerMsg.id)?.status).toBe('acked')
+    expect(reloadedAgain.recipientsWithDeliverableWork(5000)).toEqual(['res-parent'])
     expect(reloadedAgain.pendingMessagesFor('res-parent')).toHaveLength(1)
   })
 

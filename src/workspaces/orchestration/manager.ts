@@ -291,12 +291,17 @@ export class OrchestrationManager {
       at,
     )
 
-    // Clear pending parent-bound questions/escalations for this stopped dispatch.
+    // Clear pending parent-bound questions/escalations AND any queued worker-bound
+    // messages for this stopped dispatch so settlement / watchdog ticks never
+    // resurrect an explicitly stopped worker.
     await this.deps.store.ackMatchingMessages(
       (m) =>
         m.dispatchId === dispatchId &&
-        m.toResumeId === existing.parentResumeId &&
-        (m.kind === 'question' || m.kind === 'escalation'),
+        (
+          (m.toResumeId === existing.parentResumeId &&
+            (m.kind === 'question' || m.kind === 'escalation')) ||
+          m.toResumeId === existing.workerResumeId
+        ),
       at,
     )
 
@@ -548,16 +553,6 @@ export class OrchestrationManager {
       )
     }
 
-    await this.deps.store.updateTask(
-      task.dispatchId,
-      (t) => {
-        t.status = 'running'
-        delete t.settledAt
-        delete t.stopReason
-      },
-      at,
-    )
-
     const replyMessage = await this.deps.store.enqueueMessage({
       kind: 'reply',
       taskId: task.taskId,
@@ -569,7 +564,31 @@ export class OrchestrationManager {
       createdAt: at,
     })
 
+    // Only transition task -> `running` once delivery actually succeeds.
+    // If the worker's `ask` turn is still wrapping up (`parked`) or hits
+    // transient capacity, keeping `waiting_parent` prevents a false
+    // `stopped_without_done` escalation when turn 1 exits; `onWorkerHeadlessSettled`
+    // (or `tick()`) will drain the queued reply and flip to `running` via
+    // `handleHeadlessDelivered`.
+    const previousTurnCount = task.turnCount
     const wakeResult = await this.deps.delivery.tryDeliver(task.workerResumeId)
+    if (wakeResult === 'delivered') {
+      const latest = this.deps.store.getTaskByDispatchId(task.dispatchId) ?? task
+      if (latest.turnCount === previousTurnCount || latest.status !== 'running') {
+        await this.deps.store.updateTask(
+          task.dispatchId,
+          (t) => {
+            t.status = 'running'
+            delete t.settledAt
+            delete t.stopReason
+            if (t.turnCount === previousTurnCount) {
+              t.turnCount += 1
+            }
+          },
+          this.now(),
+        )
+      }
+    }
     const updatedTask = this.deps.store.getTaskByDispatchId(task.dispatchId) ?? task
 
     return {
@@ -734,6 +753,10 @@ export class OrchestrationManager {
       await this.deps.delivery.tryDeliver(task.parentResumeId, task.replyRoute)
     }
 
+    // Never resurrect an explicitly stopped worker via settle drain.
+    const latestAfterGuard = this.deps.store.getTaskByDispatchId(task.dispatchId) ?? task
+    if (latestAfterGuard.status === 'stopped') return
+
     // Drain any queued `send` / `reply` messages waiting for this worker.
     const queuedForWorker = this.deps.store
       .deliverableMessagesFor(input.workerResumeId, at)
@@ -747,7 +770,25 @@ export class OrchestrationManager {
           m.status === 'leased',
         at,
       )
-      await this.deps.delivery.tryDeliver(input.workerResumeId)
+      const previousTurnCount = latestAfterGuard.turnCount
+      const wakeResult = await this.deps.delivery.tryDeliver(input.workerResumeId)
+      if (wakeResult === 'delivered') {
+        const latest = this.deps.store.getTaskByDispatchId(task.dispatchId) ?? latestAfterGuard
+        if (latest.turnCount === previousTurnCount || latest.status !== 'running') {
+          await this.deps.store.updateTask(
+            task.dispatchId,
+            (t) => {
+              t.status = 'running'
+              delete t.settledAt
+              delete t.stopReason
+              if (t.turnCount === previousTurnCount) {
+                t.turnCount += 1
+              }
+            },
+            this.now(),
+          )
+        }
+      }
     }
   }
 

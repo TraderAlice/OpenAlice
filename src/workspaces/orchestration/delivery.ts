@@ -257,6 +257,12 @@ export class OrchestrationDelivery {
         },
         at,
       )
+      // Ack any stale queued worker-bound messages so this tick does not
+      // immediately resurrect the stalled worker.
+      await this.deps.store.ackMatchingMessages(
+        (m) => m.dispatchId === task.dispatchId && m.toResumeId === task.workerResumeId,
+        at,
+      )
       if (this.deps.stopStalledWorker) {
         try {
           await this.deps.stopStalledWorker(task)

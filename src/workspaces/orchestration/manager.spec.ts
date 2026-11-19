@@ -513,4 +513,107 @@ describe('OrchestrationManager', () => {
     expect(incRes.task.status).toBe('done')
     expect(incRes.task.outcome).toBe('inconclusive')
   })
+
+  it('handles fast reply() while worker ask turn is still active without false stopped_without_done escalation', async () => {
+    const started = await manager.workerStart({
+      parentResumeId: 'res-parent',
+      parentWorkspaceId: wsDesk.id,
+      workspaceId: wsAutoQuant.id,
+      spec: 'Check parameters',
+    })
+
+    // Worker calls ask while turn 1 is still running (`runningSessions` still has worker)
+    const asked = await manager.ask({
+      dispatchId: started.task.dispatchId,
+      fromResumeId: started.workerResumeId,
+      body: 'Use weekly or daily rebalance?',
+    })
+    expect(asked.task.status).toBe('waiting_parent')
+    expect(headlessWakes).toHaveLength(1) // parent woken
+
+    // Parent replies IMMEDIATELY before worker turn 1 exits -> worker is still busy -> parked
+    const replied = await manager.reply({
+      messageId: asked.message.id,
+      fromResumeId: 'res-parent',
+      body: 'Use daily rebalance.',
+    })
+    expect(replied.wakeResult).toBe('parked')
+    expect(replied.question.status).toBe('acked')
+    expect(replied.reply.status).toBe('unread')
+    // Must stay `waiting_parent` until turn 2 actually launches
+    expect(replied.task.status).toBe('waiting_parent')
+    expect(replied.task.turnCount).toBe(1)
+
+    // Now worker turn 1 finishes cleanly -> NO escalation, queued reply drains into turn 2!
+    runningSessions.delete(started.workerResumeId)
+    await manager.onWorkerHeadlessSettled({
+      headlessTaskId: started.headlessTaskId,
+      workerResumeId: started.workerResumeId,
+      status: 'done',
+      assistantPreview: 'Asked coordinator and waiting.',
+    })
+
+    const resumed = manager.getTask(started.task.dispatchId)!
+    expect(resumed.status).toBe('running')
+    expect(resumed.turnCount).toBe(2)
+    expect(resumed.headlessTaskId).not.toBe(started.headlessTaskId)
+    expect(resumed.stopReason).toBeUndefined()
+    // No escalation message was enqueued for parent
+    expect(
+      manager.inbox({ recipientResumeId: 'res-parent' }).filter((m) => m.kind === 'escalation'),
+    ).toHaveLength(0)
+    // Worker received the reply inline on turn 2
+    expect(headlessWakes.at(-1)?.resumeId).toBe(started.workerResumeId)
+    expect(headlessWakes.at(-1)?.prompt).toContain('Use daily rebalance.')
+  })
+
+  it('workerStop with a queued send keeps worker stopped across settle and tick, while a fresh later send still resumes', async () => {
+    const started = await manager.workerStart({
+      parentResumeId: 'res-parent',
+      parentWorkspaceId: wsDesk.id,
+      workspaceId: wsAutoQuant.id,
+      spec: 'Long scan',
+    })
+
+    // Queue a send while worker is running
+    const queued = await manager.send({
+      toDispatchId: started.task.dispatchId,
+      fromResumeId: 'res-parent',
+      body: 'Stale instruction before stop',
+    })
+    expect(queued.mode).toBe('queued')
+
+    // Coordinator explicitly stops the worker
+    const stopped = await manager.workerStop(started.task.dispatchId, 'canceled_by_user')
+    expect(stopped.task.status).toBe('stopped')
+    expect(store.getMessage(queued.message.id)?.status).toBe('acked')
+
+    // Worker process finishes interrupting
+    await manager.onWorkerHeadlessSettled({
+      headlessTaskId: started.headlessTaskId,
+      workerResumeId: started.workerResumeId,
+      status: 'interrupted',
+      error: 'canceled_by_user',
+    })
+    expect(manager.getTask(started.task.dispatchId)?.status).toBe('stopped')
+    expect(headlessWakes).toHaveLength(0)
+
+    // Watchdog tick also must NOT resurrect the stopped worker
+    nowMs += 60_000
+    const tickRes = await manager.tick(nowMs)
+    expect(tickRes.deliveredRecipients).toEqual([])
+    expect(manager.getTask(started.task.dispatchId)?.status).toBe('stopped')
+    expect(headlessWakes).toHaveLength(0)
+
+    // A NEW explicit send after stop still resumes normally
+    const revived = await manager.send({
+      toDispatchId: started.task.dispatchId,
+      fromResumeId: 'res-parent',
+      body: 'Resume with narrowed scope',
+    })
+    expect(revived.mode).toBe('resumed')
+    expect(revived.task.status).toBe('running')
+    expect(revived.task.turnCount).toBe(2)
+    expect(headlessWakes.at(-1)?.prompt).toContain('Resume with narrowed scope')
+  })
 })

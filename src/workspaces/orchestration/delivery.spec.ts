@@ -324,14 +324,27 @@ describe('OrchestrationDelivery', () => {
       maxIdleMs: 60_000,
       createdAt: nowMs,
     })
+    // Queue a stale worker-bound message before stall; tick must NOT deliver it
+    const staleSend = await store.enqueueMessage({
+      kind: 'send',
+      taskId: task.taskId,
+      dispatchId: task.dispatchId,
+      fromResumeId: 'res-parent',
+      toResumeId: 'res-worker',
+      body: 'Stale queued message',
+      createdAt: nowMs + 1000,
+    })
 
     const stopStalledWorker = vi.fn(async () => {})
+    const deliveredTo: string[] = []
     const receivedPrompts: string[] = []
     const delivery = new OrchestrationDelivery({
       store,
       deliverToWeb: async () => 'absent',
       deliverToPty: async () => 'absent',
-      deliverToHeadless: async (_resumeId, prompt) => {
+      deliverToHeadless: async (resumeId, prompt) => {
+        if (resumeId === 'res-worker') return 'busy'
+        deliveredTo.push(resumeId)
         receivedPrompts.push(prompt)
         return 'delivered'
       },
@@ -345,11 +358,13 @@ describe('OrchestrationDelivery', () => {
     expect(before.stalledDispatchIds).toEqual([])
     expect(stopStalledWorker).not.toHaveBeenCalled()
 
-    // Past maxIdleMs: marked failed (stalled), worker stopped, escalation delivered
+    // Past maxIdleMs: marked failed (stalled), worker stopped, stale worker msg acked, only parent escalated
     nowMs += 30_000
     const after = await delivery.tick(nowMs)
     expect(after.stalledDispatchIds).toEqual([task.dispatchId])
     expect(after.deliveredRecipients).toEqual(['res-parent'])
+    expect(deliveredTo).toEqual(['res-parent'])
+    expect(store.getMessage(staleSend.id)?.status).toBe('acked')
     expect(stopStalledWorker).toHaveBeenCalledTimes(1)
     expect(store.getTaskByDispatchId(task.dispatchId)?.status).toBe('failed')
     expect(store.getTaskByDispatchId(task.dispatchId)?.stopReason).toBe('stalled')

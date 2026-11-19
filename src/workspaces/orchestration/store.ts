@@ -167,6 +167,21 @@ export class OrchestrationStore {
       task.updatedAt = at
       lostTasks.push(task)
 
+      // Clear stale queued worker-bound messages from before restart so the
+      // first post-restart tick does not auto-resurrect a lost worker.
+      for (const m of this.messages) {
+        if (
+          m.dispatchId === task.dispatchId &&
+          m.toResumeId === task.workerResumeId &&
+          m.status !== 'acked'
+        ) {
+          m.status = 'acked'
+          m.ackedAt = at
+          delete m.leasedAt
+          delete m.leaseExpiresAt
+        }
+      }
+
       const escalation: OrchestrationMessage = {
         id: this.generateMessageId(),
         kind: 'escalation',
