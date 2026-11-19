@@ -660,10 +660,22 @@ export class RequestBridge extends DefaultEWrapper {
   override accountDownloadEnd(_accountName: string): void {
     if (!this.accountCachePending_) return
 
-    // Swap pending buffer into cache (atomic replace)
-    this.accountCache_ = {
-      values: this.accountCachePending_.values,
-      positions: this.accountCachePending_.positions,
+    // Swap pending buffer into cache (atomic replace) — but only when the
+    // batch is a FULL download. TWS/Gateway can emit accountDownloadEnd
+    // after a server reconnect (e.g. the IBC "Connecting to server..." blip)
+    // without re-sending the account values; swapping that near-empty
+    // buffer in wiped NetLiquidation/TotalCashValue and getAccount reported
+    // a confident $0 equity. Deltas are already applied to the live cache in
+    // updateAccountValue/updatePortfolio, so a partial batch has nothing to
+    // add — keep the cache. The first download always swaps so the
+    // initial-load promise resolves.
+    const isFullDownload = this.accountCachePending_.values.has('NetLiquidation')
+      || this.accountCachePending_.values.has('TotalCashValue')
+    if (isFullDownload || !this.accountCache_) {
+      this.accountCache_ = {
+        values: this.accountCachePending_.values,
+        positions: this.accountCachePending_.positions,
+      }
     }
 
     // Reset pending buffer for next batch
